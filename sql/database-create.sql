@@ -1063,10 +1063,11 @@ CREATE TABLE unixgroup_membership (
 
 CREATE TABLE user_pubkeys (
   uid varchar(8) NOT NULL default '',
-  comment varchar(128) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
   pubkey text,
   stamp datetime default NULL,
-  PRIMARY KEY  (uid,comment)
+  comment varchar(128) NOT NULL default '',
+  PRIMARY KEY  (uid,idx)
 ) TYPE=MyISAM;
 
 --

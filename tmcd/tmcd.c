@@ -1333,7 +1333,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Need a list of keys for this user.
 		 */
-		pubkeys_res = mydb_query("select comment,pubkey "
+		pubkeys_res = mydb_query("select idx,pubkey "
 					 " from user_pubkeys "
 					 "where uid='%s'",
 					 2, row[0]);
@@ -1354,7 +1354,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				client_writeback(sock, buf, strlen(buf), tcp);
 				pubkeys_nrows--;
 
-				info("ACCOUNTS: PUBKEY LOGIN=%s COMMENT=%s\n",
+				info("ACCOUNTS: PUBKEY LOGIN=%s IDX=%s\n",
 				     row[0], pubkey_row[0]);
 			}
 		}

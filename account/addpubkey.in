@@ -25,7 +25,7 @@ sub usage()
     print " -i      Initialize mode; generate initial key for user\n";
     exit(-1);
 }
-my $optlist   = "knaiw";
+my $optlist   = "kniw";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -279,7 +279,7 @@ sub ParseKey($) {
     }
 
     #
-    # Make up a comment field for the DB index. Need something. 
+    # Make up a comment field for the DB. 
     #
     if (!defined($comment)) {
 	$comment = "$type-${user_email}";
@@ -287,7 +287,7 @@ sub ParseKey($) {
     $key = "$key $comment";
 
     DBQueryFatal("replace into user_pubkeys ".
-		 "values ('$user', '$comment', '$key', now())");
+		 "values ('$user', 0, '$key', now(), '$comment')");
 
     #
     # Mark user record as modified so nodes are updated.

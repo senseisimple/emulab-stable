@@ -77,6 +77,7 @@ function SPITFORM($formfields, $errors)
 	    $comment = $row[comment];
 	    $pubkey  = $row[pubkey];
 	    $date    = $row[stamp];
+	    $idx     = $row[idx];
 	    $fnote   = "";
 
 	    if (strstr($comment, $BOSSNODE)) {
@@ -87,7 +88,7 @@ function SPITFORM($formfields, $errors)
 	    echo "<tr>
                      <td align=center>
                        <A href='deletepubkey.php3?target_uid=$target_uid" .
-	                  "&key=$comment'><img alt=X src=redball.gif></A>
+	                  "&key=$idx'><img alt=X src=redball.gif></A>
                      </td>
                      <td>$chunky</td>
                   </tr>\n";

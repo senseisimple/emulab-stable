@@ -83,3 +83,24 @@ last_net_act,last_cpu_act,last_ext_act);
 			after uselinkdelay;
 
         Nothing special needs to be done.
+
+1.119: Change user_pubkeys to use an idx for its unique index instead
+       of the comment field in the key (a really dumb idea I had).
+       However, adding an auto_increment field is always a pain. So:
+
+	CREATE TABLE user_pubkeys_new (
+	  uid varchar(8) NOT NULL default '',
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  pubkey text,
+	  stamp datetime default NULL,
+	  comment varchar(128) NOT NULL default '',
+	  PRIMARY KEY  (uid,idx)
+	) TYPE=MyISAM;
+	
+	insert into user_pubkeys_new (uid, idx, pubkey, stamp, comment)
+		select uid, 0, pubkey, stamp, comment from
+		user_pubkeys;
+        rename table user_pubkeys to user_pubkeys_old,
+                     user_pubkeys_new to user_pubkeys;
+	drop table user_pubkeys_old;
+		     

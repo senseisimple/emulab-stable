@@ -54,10 +54,10 @@ if (!$isadmin &&
 #
 $query_result =
     DBQueryFatal("select * from user_pubkeys ".
-		 "where uid='$target_uid' and comment='$key'");
+		 "where uid='$target_uid' and idx='$key'");
 
 if (! mysql_num_rows($query_result)) {
-    USERERROR("Public Key '$key' for user '$target_uid' does not exist!", 1);
+    USERERROR("Public Key for user '$target_uid' does not exist!", 1);
 }
 
 $row    = mysql_fetch_array($query_result);
@@ -130,7 +130,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Errors-To: $TBMAIL_WWW");
 
 DBQueryFatal("delete from user_pubkeys ".
-	     "where uid='$target_uid' and comment='$key'");
+	     "where uid='$target_uid' and idx='$key'");
 
 #
 # update authkeys files and nodes.
