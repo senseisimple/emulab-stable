@@ -10,7 +10,7 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line update_delays
+	 os_rpminstall_line update_delays enable_ipod
        );
 
 # Must come after package declaration!
@@ -393,6 +393,36 @@ sub dodelays ()
 	}
     }
 
+    return 0;
+}
+
+use Socket;
+
+sub enable_ipod()
+{
+    if (system("sysctl net.inet.icmp.ipod_host")) {
+	warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
+	return -1;
+    }
+
+    my ($bname, $bip) = split(/ /, `/etc/testbed/tmcc bossinfo`);
+    if (!defined($bip)) {
+	warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
+	return -1;
+    }
+    my $ipuint = unpack("N", inet_aton($bip));
+
+    # XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
+    my $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod_host=%d", $ipuint);
+
+    if (system($sysctlcmd)) {
+	warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
+	return -1;
+    }
+    if (system("sysctl -w net.inet.icmp.ipod_enabled=1")) {
+	warn "*** WARNING: could not enable IPOD\n";
+	return -1;
+    }
     return 0;
 }
 

@@ -20,4 +20,9 @@ use libsetup;
 #
 bootsetup();
 
+#
+# Enable ICMP ping-of-death
+#
+liblocsetup::enable_ipod();
+
 exit 0;
