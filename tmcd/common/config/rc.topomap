@@ -132,13 +132,24 @@ sub dotopomap()
     # Copy over the topomap so that it is locally resident. We will eventually
     # get this via a tarfile instead of NFS.
     #
-    my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap";
+    my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap.gz";
+    my $tempmap = "/tmp/topomap.gz";
+
+    #
+    # Try a couple of times to get the file cause of NFS sillyness.
+    # Should probably have our own version of cp that retries at the block
+    # level?
+    # 
+    for (my $i = 0; $i < 5; $i++) {
+	last
+	    if (system("cp -fp $topomap $tempmap") == 0);
+	unlink("$tempmap");
+    }
     
-    if (-e "${topomap}.gz") {
-	system("cat ${topomap}.gz | gunzip > " . TMTOPOMAP());
+    if (-e ${tempmap}) {
+	system("cat ${tempmap} | gunzip > " . TMTOPOMAP());
     }
-    elsif (-e $topomap) {
-	system("cp -fp $topomap ". TMTOPOMAP());
+    else {
+	fatal("Could not copy over $topomap");
     }
-   
 }
