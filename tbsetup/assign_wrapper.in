@@ -3837,7 +3837,7 @@ sub CreateTopFile()
 	my $vname = virtnodename($node);
 	my $parent = virtnodeparent($vname);
 
-	if (virtnodeissubnode($vname)) {
+	if (virtnodeissubnode($vname) && virtnodetype($vname) eq "ixp-bveil") {
 	    #
 	    # XXX Set the OSID until I figure out something.
 	    #
