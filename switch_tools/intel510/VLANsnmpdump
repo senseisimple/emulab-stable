@@ -1,0 +1,391 @@
+
+File Contains:
+
+0. Discovery of existing VLANs
+
+1. Deleted VLAN
+
+2. Create VLAN by Mac Addresses
+
+3. Add to VLAN by Mac Addresses
+
+
+=======================================================================
+
+<Discovery of Existing VLANs>
+
+coke.1038 > 170.snmp: GetNext(50)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.1
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.2
+170.snmp > coke.1038: GetResp(65)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanId.24=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanName.24="System"
+coke.1038 > 170.snmp: GetNext(52)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanId.24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanName.24
+170.snmp > coke.1038: GetResp(71)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanId.40=40
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanName.40="TESTMENOW!!!"
+coke.1038 > 170.snmp: GetNext(52)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanId.40
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanName.40
+170.snmp > coke.1038: GetResp(64)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanName.24="System"
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanCreateObj.24=""
+coke.1038 > 170.snmp: GetNext(50)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.1
+170.snmp > coke.1038: GetResp(81)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.95.166=08_00_2b_81_5f_a6
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.95.166=40
+coke.1038 > 170.snmp: GetNext(68)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.95.166
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.95.166
+170.snmp > coke.1038: GetResp(79)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.96.84=08_00_2b_81_60_54
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.96.84=40
+coke.1038 > 170.snmp: GetNext(66)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.96.84
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.96.84
+170.snmp > coke.1038: GetResp(81)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.101.199=08_00_2b_81_65_c7
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.101.199=40
+coke.1038 > 170.snmp: GetNext(68)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.101.199
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.101.199
+170.snmp > coke.1038: GetResp(79)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.102.3=08_00_2b_81_66_03
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.102.3=40
+coke.1038 > 170.snmp: GetNext(66)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.102.3
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleId.40.8.0.43.129.102.3
+170.snmp > coke.1038: GetResp(81)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.40.8.0.43.129.95.166=00
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleName.40.8.0.43.129.95.166=08_00_2b_81_5f_a6
+coke.1038 > 170.snmp: GetNext(50)
+	E:intel.mib2ext.vlan.vlanPolicy.11.1.2
+	E:intel.mib2ext.vlan.vlanPolicy.11.1.1
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+coke.1038 > 170.snmp: GetNext(50)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyIpRuleTable.1.2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyIpRuleTable.1.1
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+coke.1038 > 170.snmp: GetNext(69)
+	E:intel.mib2ext.vlan.vlanPolicy.13.1.2
+	E:intel.mib2ext.vlan.vlanPolicy.13.1.3
+	E:intel.mib2ext.vlan.vlanPolicy.13.1.1
+170.snmp > coke.1038: GetResp(86)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+coke.1038 > 170.snmp: GetNext(50)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.1
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.50=50
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.50
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.50
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.51=51
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.51=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.51
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.51
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.52=52
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.52=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.52
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.52
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.53=53
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.53=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.53
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.53
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.54=54
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.54=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.54
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.54
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.55=55
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.55=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.55
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.55
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.56=56
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.56=24
+coke.1038 > 170.snmp: GetNext(54)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.56
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleId.24.56
+170.snmp > coke.1038: GetResp(62)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleCreateObj.24.50=00
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable.1.policyPortRuleName.24.50=50
+
+<End of Discovery of Existing VLANs>
+
+=======================================================================
+
+<Deleted VLAN>
+
+coke.1038 > 170.snmp: SetReq (36)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+170.snmp > coke.1038: GetResp(40)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0=1
+coke.1038 > 170.snmp: GetReq (298)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0
+	E:intel.mib2ext.vlan.vlanLearned.13.0 ip.ipForwarding.0
+	E:intel.mib2ext.s500.1.12.0
+	E:intel.mib2ext.s500.ports.1.0
+	E:intel.mib2ext.33.1.2.0
+	E:intel.mib2ext.vlan.vlanPolicy.25.0
+170.snmp > coke.1038: GetResp(334)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0="STDALONE"
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0=15
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0=15
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0=41
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0=2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0=45
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0=3
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0=1
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0=2
+	E:intel.mib2ext.vlan.vlanLearned.13.0=00_18 ip.ipForwarding.0=2
+	E:intel.mib2ext.s500.1.12.0=12165
+	E:intel.mib2ext.s500.ports.1.0=50
+	E:intel.mib2ext.vlan.vlanPolicy.25.0=1
+
+<Discovery here>
+
+coke.1038 > 170.snmp: SetReq (33)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanDeleteObj.40=1
+170.snmp > coke.1038: GetResp(37)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanDeleteObj.40=1
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=2
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+
+<End of Deleted VLAN>
+
+============================================================================
+
+<Create VLAN by MAC ADDRESS>
+
+coke.1038 > 170.snmp: SetReq (36)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+170.snmp > coke.1038: GetResp(40)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0=1
+coke.1038 > 170.snmp: GetReq (298)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0
+	E:intel.mib2ext.vlan.vlanLearned.13.0 ip.ipForwarding.0
+	E:intel.mib2ext.s500.1.12.0
+	E:intel.mib2ext.s500.ports.1.0
+	E:intel.mib2ext.vlan.vlanPolicy.25.0
+170.snmp > coke.1038: GetResp(334)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0="STDALONE"
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0=16
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0=16
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0=41
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0=2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0=45
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0=3
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0=1
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0=2
+	E:intel.mib2ext.vlan.vlanLearned.13.0=00_18 ip.ipForwarding.0=2
+	E:intel.mib2ext.s500.1.12.0=12165
+	E:intel.mib2ext.s500.ports.1.0=50
+	E:intel.mib2ext.vlan.vlanPolicy.25.0=1
+
+<Discovery here>
+
+coke.1038 > 170.snmp: SetReq (42)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanCreateObj.41="TEST123456"
+170.snmp > coke.1038: GetResp(46)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable.1.policyVlanCreateObj.41="TEST123456"
+coke.1038 > 170.snmp: SetReq (147)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.95.166=08_00_2b_81_5f_a6
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.96.84=08_00_2b_81_60_54
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.101.199=08_00_2b_81_65_c7
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.102.3=08_00_2b_81_66_03
+170.snmp > coke.1038: GetResp(136)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.95.166=08
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.96.84=08
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.101.199=08
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.102.3=08
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0=42
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=2
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+
+<End of Create VLAN By MAC ADDRESSES>
+
+======================================================================
+
+<Add to VLAN by MAC ADDRESSES>
+
+coke.1038 > 170.snmp: SetReq (36)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+170.snmp > coke.1038: GetResp(40)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenClaimReq.0=00_00_00_00_01_01
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenLastClaimRspRetVal.0=1
+coke.1038 > 170.snmp: GetReq (280)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0
+	E:intel.mib2ext.vlan.vlanLearned.13.0 ip.ipForwarding.0
+	E:intel.mib2ext.s500.1.12.0
+	E:intel.mib2ext.s500.ports.1.0
+	E:intel.mib2ext.vlan.vlanPolicy.25.0
+170.snmp > coke.1038: GetResp(334)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyDomainName.0="STDALONE"
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyServerSeqNo.0=18
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyClientSeqNo.0=18
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId.0=42
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMode.0=2
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAssignManagementVlan.0=24
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfTimerValue.0=45
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicySupportedVlanModes.0=3
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAutoMoveMgtIpLink.0=1
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyAllPortSettingsIpLearning.0=2
+	E:intel.mib2ext.vlan.vlanLearned.13.0=00_18 ip.ipForwarding.0=2
+	E:intel.mib2ext.s500.1.12.0=12165
+	E:intel.mib2ext.s500.ports.1.0=50
+	E:intel.mib2ext.vlan.vlanPolicy.25.0=1
+
+<Discovery of Existing VLANs>
+
+coke.1038 > 170.snmp: SetReq (45)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.96.84=08_00_2b_81_60_54
+170.snmp > coke.1038: GetResp(44)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.96.84=08
+coke.1038 > 170.snmp: SetReq (46)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.101.199=08_00_2b_81_65_c7
+170.snmp > coke.1038: GetResp(45)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable.1.policyMacRuleCreateObj.41.8.0.43.129.101.199=08
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.editTokenReleaseReq.0=3
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanEditToken.9.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=1
+coke.1038 > 170.snmp: GetReq (30)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=2
+coke.1038 > 170.snmp: SetReq (31)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+170.snmp > coke.1038: GetResp(35)
+	E:intel.mib2ext.vlan.vlanPolicy.vlanPolicyConfigConfState.0=5
+
+<End of Add to VLAN by MAC ADDRESSES>
+
+=======================================================================
+
+<END OF LISTING>
+
+=======================================================================
