@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.1 2000-07-06 17:42:38 kwright Exp $
+ * $Id: serv_listen.c,v 1.2 2000-07-06 22:52:36 kwright Exp $
  */
 
 #include "discvr.h"
@@ -138,12 +138,20 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		/* Send string to all interfaces. forward_request() will 
 		 * stuff reply into ifi_info. 
 		 */
-	        reply = forward_request(ifihead, &pktinfo, mesg, n);
+
+
+	        forward_request(ifihead, &pktinfo, mesg, n );
+
+		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
+		        fprintf(stderr, "Ran out of memory for reply mesg.\n");
+			exit(1);
+		}
+		n = compose_reply(ifihead, reply, BUFSIZ);
 		fprintf(stderr, "replying: ");
 		print_tdreply(reply);
 
 		/* send response back to original sender */
-		sendto(sockfd, reply, 40, 0, pcliaddr, sizeof(struct sockaddr));
+		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
 	}
 
 	free_ifi_info(ifihead);
