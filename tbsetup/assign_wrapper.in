@@ -286,9 +286,11 @@ my %ips	      = ();
 my %memberof = ();
 
 # delaylinks stores the actual link delay info, converted from the
-# virt delay params above. It is indexed by link name and contains
-# [delay,bw,loss] for each direction. 
-my %delaylinks = ();
+# virt delay params above. It is indexed by link name and contains a
+# [delay,bw,loss] array for each direction. The final member of the
+# array is an indicator of whether the info is there strictly for a 
+# trivial link (linkdelay inserted only when assign makes link trivial).
+my %delaylinks     = ();
 
 # delaynodes stores the names of delaynodes that we create on the
 # fly using delayid. This is useful for doing isdelay? tests.
@@ -1514,22 +1516,25 @@ foreach $plink (keys(%plinks)) {
 	
 	if ($delaylinks{$plink}) {
 	    my ($member0,$delay,$bandwidth,$loss,
-		$member1,$rdelay,$rbandwidth,$rloss) =
+		$member1,$rdelay,$rbandwidth,$rloss,$trivonly) =
 		    @{$delaylinks{$plink}};
 
-	    #
-	    # Two entries, one for each side of the duplex link.
-	    #
-	    $linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
-				       $delay,$bandwidth,$loss,
-				       undef,undef,undef,0];
+	    if (!$trivonly || $trivonly && $trivial) {
+		#
+		# Two entries, one for each side of the duplex link.
+		#
+		$linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
+					   $delay,$bandwidth,$loss,
+					   undef,undef,undef,0];
 	    
-	    $linkdelays{$delayid++} = [$nodeB,$portB,$lan,$member1,
-				       $rdelay,$rbandwidth,$rloss,
-				       undef,undef,undef,0];
-	    
-	    printdb "  LinkDelay: \[$nodeA,$portA,$nodeB,$portB," .
-		"$lan,$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss\]\n";
+		$linkdelays{$delayid++} = [$nodeB,$portB,$lan,$member1,
+					   $rdelay,$rbandwidth,$rloss,
+					   undef,undef,undef,0];
+
+		printdb "  LinkDelay: \[$nodeA,$portA,$nodeB,$portB," .
+		    "$lan,$delay,$bandwidth,$loss,$rdelay,".
+		    "$rbandwidth,$rloss,$trivonly\]\n";
+	    }
 	}
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linklan/([^/]+)/(.+)$|)) {
@@ -1582,18 +1587,21 @@ foreach $plink (keys(%plinks)) {
 	
 	if ($delaylinks{$plink}) {
 	    my ($member0,$delay,$bandwidth,$loss,
-		$member1,$rdelay,$rbandwidth,$rloss) =
+		$member1,$rdelay,$rbandwidth,$rloss,$trivonly) =
 		    @{$delaylinks{$plink}};
 
-	    #
-	    # One entry, comprising each side of the link to lan.
-	    #
-	    $linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
-				       $delay,$bandwidth,$loss,
-				       $rdelay,$rbandwidth,$rloss,1];
+	    if (!$trivonly || $trivonly && $trivial) {
+		#
+		# One entry, comprising each side of the link to lan.
+		#
+		$linkdelays{$delayid++} = [$nodeA,$portA,$lan,$member0,
+					   $delay,$bandwidth,$loss,
+					   $rdelay,$rbandwidth,$rloss,1];
 	    
-	    printdb "  LinkDelay: \[$nodeA,$portA," .
-		"$lan,$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss\]\n";
+		printdb "  LinkDelay: \[$nodeA,$portA," .
+		    "$lan,$delay,$bandwidth,$loss,$rdelay,".
+		    "$rbandwidth,$rloss,$trivonly\]\n";
+	    }
 	}
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
@@ -2295,6 +2303,7 @@ sub InitPnode($pnode, $vnode)
 	    #
 	    $vname = newvname($pnode, "vhost");
 	    $role  = TBDB_RSRVROLE_VIRTHOST;
+	    # XXX Must have routing on jail hosting nodes. Change me.
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
 	    $cmdline = "/kernel.jail";
 	}
@@ -3797,7 +3806,7 @@ sub CreateTopFile()
 			$bw = $rbw = 0;
 		    }
 		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					   $nodeport1,$rdelay,$rbw,$rloss];
+					   $nodeport1,$rdelay,$rbw,$rloss, 0];
 		    
 		    printdb "Delay link $plink = " . 
 			join(" ",@{$delaylinks{$plink}}) . "\n";
@@ -3807,7 +3816,7 @@ sub CreateTopFile()
 		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
 		    
 		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					   $nodeport1,$rdelay,$rbw,$rloss];
+					   $nodeport1,$rdelay,$rbw,$rloss, 0];
 
 		    print TOPFILE "node $delayname delay\n";
 		    print TOPFILE
@@ -3830,9 +3839,11 @@ sub CreateTopFile()
 		#
 		$portbw{$nodeport0} = getbandwidth($bandwidth);
 		$portbw{$nodeport1} = getbandwidth($rbandwidth);
-	    } else {
-		print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
-		    "$node0 $node1";
+	    }
+	    else {
+		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
+		
+		print TOPFILE "link $plink $node0 $node1";
 		if ($emulated) {
 		    print TOPFILE " " . max($bw,$rbw) . " 0 0 emulated";
 		}
@@ -3841,6 +3852,20 @@ sub CreateTopFile()
 		}
 		if ($trivial_ok) {
 		    print TOPFILE " trivial_ok";
+		    #
+		    # We store this info in case assign actually does turn it
+		    # into a trivial link. If that happens, we have to insert
+		    # a link delay if the link is between two vnodes. Why?
+		    # Cause a trivial link (using loopback) would have much
+		    # more bandwidth (400+ Mb) then your typical 100Mb link.
+		    # Note the final member of the array, which indicates this
+		    # delay should be inserted only if assign makes it a
+		    # trivial link.		    
+		    #
+		    if (! virtlanallsim($lan)) {
+			$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
+					       $nodeport1,$rdelay,$rbw,$rloss,1];
+		    }
 		}
 		print TOPFILE "\n";
 	    }
@@ -3884,7 +3909,7 @@ sub CreateTopFile()
 			
 			$delaylinks{$plink} =
 			    [$member,$delay,$bw,$loss,
-			     $member,$rdelay,$rbw,$rloss];
+			     $member,$rdelay,$rbw,$rloss,0];
 
 			print(TOPFILE "link $plink $node lan/$lan " .
 			      max($bw,$rbw) . " 0 0" .
@@ -3900,7 +3925,7 @@ sub CreateTopFile()
 
 			$delaylinks{$plink} =
 			    [$member,$delay,$bw,$loss,
-			     $member,$rdelay,$rbw,$rloss];
+			     $member,$rdelay,$rbw,$rloss,0];
 			
 			print TOPFILE "node $delayname delay\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
@@ -3920,14 +3945,30 @@ sub CreateTopFile()
 		    # real delay node or just a delaywithswitch.
 		    #
 		    $portbw{$member} = $bandwidth;	    
-		} else {
-		    print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
-			" $bandwidth 0 0";
+		}
+		else {
+		    my $plink = "linklan/$lan/$member";
+		    
+		    print TOPFILE "link $plink $node lan/$lan $bandwidth 0 0";
 		    if ($emulated) {
 			print TOPFILE " emulated";
 		    }
 		    if ($trivial_ok) {
 			print TOPFILE " trivial_ok";
+
+			#
+			# We store this info in case assign actually does
+			# turn it into a trivial link. If that happens, we
+			# have to insert a link delay if the link is
+			# between two vnodes. Why?  Cause a trivial link
+			# (using loopback) would have much more bandwidth
+			# (400+ Mb) then your typical 100Mb link. Note the
+			# final member of the array, which indicates this
+			# delay should be inserted only if assign makes it
+			# a trivial link.
+			#
+			$delaylinks{$plink} = [$member,$delay,$bw,$loss,
+					       $member,$rdelay,$rbw,$rloss,1];
 		    }
 		    print TOPFILE "\n";
 		}
