@@ -996,16 +996,16 @@ sub dorouterconfig ()
 sub dohostnames ()
 {
     my $TM;
+    my $HTEMP = HOSTSFILE . ".new";
 
     #
     # Note, we no longer start with the 'prototype' file here, because we have
     # to make up a localhost line that's properly qualified.
     #
-
     $TM = OPENTMCC(TMCCCMD_HOSTS);
 
-    open(HOSTS, ">" . HOSTSFILE)
-	or die("Could not open $HOSTSFILE: $!");
+    open(HOSTS, ">$HTEMP")
+	or die("Could not open $HTEMP: $!");
 
     my $localaliases = "loghost";
 
@@ -1021,7 +1021,8 @@ sub dohostnames ()
     # First, write a localhost line into the hosts file - we have to know the
     # domain to use here
     #
-    print HOSTS os_etchosts_line("localhost", "127.0.0.1", $localaliases), "\n";
+    print HOSTS os_etchosts_line("localhost", "127.0.0.1",
+				 $localaliases), "\n";
 
     #
     # Now convert each hostname into hosts file representation and write
@@ -1046,7 +1047,8 @@ sub dohostnames ()
 	}
     }
     CLOSETMCC($TM);
-    close(HOSTS);
+    (close(HOSTS) and system("mv -f $HTEMP " . HOSTSFILE)) or
+	warn("*** Could not mv $HTEMP to ". HOSTSFILE . "!\n");
 
     return 0;
 }
@@ -2037,10 +2039,10 @@ sub bootsetup()
 sub jailedsetup()
 {
     #
-    # Currently, we rely on the outer environment to set our hostname
-    # to our vnodeid!
+    # Currently, we rely on the outer environment to set our vnodeid
+    # into the environment so we can get it! See mkjail.pl.
     #
-    my $vid = `hostname`;
+    my $vid = $ENV{'TMCCVNODEID'};
     
     if ($vid =~ /^([-\w]+)$/) {
 	$vid = $1;
@@ -2056,10 +2058,10 @@ sub jailedsetup()
     $injail   = 1;
 
     #
-    # Create a file inside so the rest of the libsetup code knows its
-    # inside a jail.
+    # Create a file inside so that libsetup inside the jail knows its
+    # inside a jail and what its ID is. 
     #
-    system("echo '$vid' > " . TMJAILNAME());
+    system("echo '$vnodeid' > " . TMJAILNAME());
     
     #
     # Do account stuff.
@@ -2088,6 +2090,9 @@ sub jailedsetup()
 	
 	print STDOUT "Checking Testbed ifconfig configuration ...\n";
 	dojailifconfig();
+
+	print STDOUT "Checking Testbed hostnames configuration ... \n";
+	dohostnames();
 
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();

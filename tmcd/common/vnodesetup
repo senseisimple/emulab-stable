@@ -10,6 +10,11 @@ use English;
 use Errno;
 use POSIX qw(setsid);
 
+#
+# Configure Variables
+#
+my $OURDOMAIN   = "@OURDOMAIN@";
+
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
@@ -253,7 +258,7 @@ system("tmcc -n $vnodeid state TBSETUP");
 # Invoke remotevnodesetup routine in the setup library. This will talk
 # to tmcd and create the rc files.
 #
-my ($pid) = vnodesetup($vnodeid);
+my ($pid, $eid, $vname) = vnodesetup($vnodeid);
 if (!defined($pid)) {
     #
     # Hmm, suddenly got free. 
@@ -316,9 +321,10 @@ if ($dojail) {
 	fatal("Jail exited unexpectedly!");
     }
     else {
-	my $option = ($interactive ? "-s" : "");
+	my $option       = ($interactive ? "-s" : "");
+	my $jailhostname = "$vname.$eid.$pid.$OURDOMAIN";
 	
-	exec("mkjail.pl $option -p $pid $vnodeid");
+	exec("mkjail.pl $option -p $pid -h $jailhostname $vnodeid");
 	die("*** $0:\n".
 	    "    Could not start the jail!\n");
     }

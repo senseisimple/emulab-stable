@@ -29,10 +29,11 @@ use libsetup qw(JailedNFSMounts REMOTE);
 #
 sub usage()
 {
-    print("Usage: mkjail.pl [-s] [-i <ipaddr>] [-p <pid>] <hostname>\n");
+    print("Usage: mkjail.pl [-s] [-i <ipaddr>] [-p <pid>] ".
+	  "[-h <hostname>] <vnodeid>\n");
     exit(-1);
 }
-my  $optlist = "i:p:e:s";
+my  $optlist = "i:p:e:sh:";
 
 #
 # Only real root can run this script.
@@ -88,6 +89,7 @@ my $VNFILEMBS   = 64;
 my $MAXVNDEVS	= 10;
 my $IP;
 my $PID;
+my $jailhostname;
 my $debug	= 1;
 my $cleaning	= 0;
 my $vndevice;
@@ -119,16 +121,17 @@ if (! getopts($optlist, \%options)) {
 if (@ARGV != 1) {
     usage();
 }
-my $HOST = $ARGV[0];
+my $vnodeid = $ARGV[0];
 
 #
 # Untaint the arguments.
 #
-if ($HOST =~ /^([-\w\/]+)$/) {
-    $HOST = $1;
+if ($vnodeid =~ /^([-\w\/\.]+)$/) {
+    $vnodeid = $1;
+    $jailhostname = $1;
 }
 else {
-    die("Tainted argument $HOST!\n");
+    die("Tainted argument $vnodeid!\n");
 }
 
 if (defined($options{'s'})) {
@@ -180,23 +183,34 @@ if (defined($options{'p'})) {
     }
 }
 
-print("Setting up jail for HOST:$HOST using IP:$IP\n")
+if (defined($options{'h'})) {
+    $jailhostname = $options{'h'};
+
+    if ($jailhostname =~ /^([-\w\.]+)$/) {
+	$jailhostname = $1;
+    }
+    else {
+	die("Tainted argument $jailhostname.");
+    }
+}
+
+print("Setting up jail for $vnodeid using $IP\n")
     if ($debug);
 
 #
-# In most cases, the $HOST directory will have been created by the caller,
+# In most cases, the $vnodeid directory will have been created by the caller,
 # and a config file possibly dropped in.
 # When debugging, we have to create it here. 
 # 
 chdir($JAILPATH) or
     die("Could not chdir to $JAILPATH: $!\n");
 
-if (! -e $HOST) {
-    mkdir($HOST, 0770) or
-	fatal("Could not mkdir $HOST in $JAILPATH: $!");
+if (! -e $vnodeid) {
+    mkdir($vnodeid, 0770) or
+	fatal("Could not mkdir $vnodeid in $JAILPATH: $!");
 }
 else {
-    getjailconfig("$JAILPATH/$HOST");
+    getjailconfig("$JAILPATH/$vnodeid");
 }
 
 #
@@ -207,24 +221,24 @@ setjailoptions();
 #
 # Create the "disk";
 #
-if (-e "$HOST/root") {
+if (-e "$vnodeid/root") {
     #
     # Try to pick up where we left off.
     # 
-    restorerootfs("$JAILPATH/$HOST");
+    restorerootfs("$JAILPATH/$vnodeid");
 }
 else {
     #
     # Create the root filesystem.
     #
-    mkrootfs("$JAILPATH/$HOST");
+    mkrootfs("$JAILPATH/$vnodeid");
 }
 
 #
 # Start the tmcc proxy. This path will be valid in both the outer
 # environment and in the jail!
 #
-startproxy("$JAILPATH/$HOST");
+startproxy("$JAILPATH/$vnodeid");
 
 #
 # Start the jail. We do it in a child so we can send a signal to the
@@ -239,10 +253,10 @@ if ($jailpid) {
 }
 else {
     $SIG{TERM} = 'DEFAULT';
-    $ENV{'TMCCVNODEID'} = $HOST;
+    $ENV{'TMCCVNODEID'} = $vnodeid;
 
     my $cmd = "jail $jailoptions ".
-	"$JAILPATH/$HOST/root $HOST $IP /etc/jail/injail.pl";
+	"$JAILPATH/$vnodeid/root $jailhostname $IP /etc/jail/injail.pl";
     if ($interactive) {
 	$cmd .= " /bin/csh";
     }
@@ -396,7 +410,6 @@ sub mkrootfs($)
     mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
     mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
-    mysystem("echo '$IP		$HOST' >> $path/root/etc/hosts");
     mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
 	     " $path/root/etc/rc.conf");
 
@@ -436,7 +449,7 @@ sub mkrootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedNFSMounts($HOST, "$path/root") ) {
+	foreach my $dir ( JailedNFSMounts($vnodeid, "$path/root") ) {
 	    push(@mntpoints, "$path/root/$dir");
 	}
     }
@@ -508,7 +521,7 @@ sub restorerootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedNFSMounts($HOST, "$path/root") ) {
+	foreach my $dir ( JailedNFSMounts($vnodeid, "$path/root") ) {
 	    push(@mntpoints, "$path/root/$dir");
 	}
     }
@@ -574,7 +587,7 @@ sub startproxy($)
 
     # The -o option will cause the proxy to detach but not fork!
     # Eventually change this to standard pid file kill.
-    exec("$TMCC -d -x $outsidepath -n $HOST -o $log");
+    exec("$TMCC -d -x $outsidepath -n $vnodeid -o $log");
     die("Exec of $TMCC failed! $!\n");
 }
 
@@ -625,11 +638,12 @@ sub cleanup()
         #
         # Ug, with NFS mounts inside the jail, we need to be really careful.
         #
-	if (-d "$JAILPATH/$HOST/root" && !rmdir("$JAILPATH/$HOST/root")) {
+	if (-d "$JAILPATH/$vnodeid/root" &&
+	    !rmdir("$JAILPATH/$vnodeid/root")) {
 	    die("*** $0:\n".
-		"    $JAILPATH/$HOST/root is not empty! This is very bad!\n");
+		"    $JAILPATH/$vnodeid/root is not empty! This is bad!\n");
 	}
-	system("rm -rf $JAILPATH/$HOST");
+	system("rm -rf $JAILPATH/$vnodeid");
     }
 }
 
