@@ -1,11 +1,9 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 # Save the tiplogs from an experiment
@@ -19,6 +17,8 @@ sub usage {
 # Configure variables
 #
 my $TB          = "@prefix@";
+my $CONTROL	= "@USERNODE@";
+my $sshtb	= "$TB/bin/sshtb";
 
 #
 # Testbed Support libraries
@@ -27,10 +27,30 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Locals
+my $SAVEUID = $UID;
+my $dbuid;
+
 #
 # Turn off line buffering on output
 #
 $| = 1;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+        "    Must be root! Maybe its a development version?\n");
+}
+
+#
+# Please run as yourself
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+        "    Please do not run this script as root!\n");
+}
 
 #
 # Untaint the path
@@ -39,7 +59,7 @@ $ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 if (@ARGV != 2) {
-	&usage;
+    usage();
 }
 
 my ($pid,$eid) = @ARGV;
@@ -60,61 +80,56 @@ else {
     die("*** Bad data in eid: $eid.\n");
 }
 
-
-# XXX: This may need to be changed for use outside Utah
-my $logdir =	"/n/plastic/var/log/tiplogs";
-my $tiplogdir =	"/proj/$pid/tiplogs";
-my $savedir = 	"$tiplogdir/$eid";
-
-# Make sure the user is in the correct project
-if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
-    die "You do not have permission for $pid/$eid to use this script\n";
+# Must exist in the DB.
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database!\n");
 }
 
-# Now, we get a list of all nodes...
-my $sth = DBQueryFatal("SELECT node_id, vname FROM reserved " .
-	"WHERE pid='$pid' AND eid='$eid'");
-if ($sth->numrows == 0) {
-	die "No nodes found for experiment $eid in project $pid!\n";
+#
+# Verify permission to muck with this experiment. This is to head off
+# permission problems early; the nodes are indvidually checked later
+# in the library.
+#
+if (!TBAdmin($UID) &&
+    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to save log files in $pid/$eid!\n");
 }
 
-print "Saving tiplogs for $pid/$eid to $savedir\n";
+#
+# Find the names of all physical nodes with tip lines. 
+#
+my $query_result =
+    DBQueryFatal("select r.node_id,r.vname,t.server from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
+		 "left join tiplines as t on t.node_id=r.node_id ".
+		 "where r.pid='$pid' and r.eid='$eid' and ".
+		 "      nt.isvirtnode=0 and nt.isremotenode=0 and ".
+		 "      t.server is not null");
 
-# We don't want directory creation to be modified by the user's umask, 
-# because the tiplogs directory needs to be kept group-writable.
-my $savemask = umask 000;
-
-# Create the directory (and its parent) if they don't exist
-foreach $dir ($tiplogdir, $savedir) {
-	if (! -d $dir) {
-		print "Making directory $dir ...\n";
-		if (!mkdir($dir,0770)) {
-			die "Unable to make directory $dir: $!\n";
-		}
-	}
+if ($query_result->numrows == 0) {
+    print "No console lines found for experiment $eid in project $pid!\n";
+    exit(0);
 }
 
-# Restore the saved umask
-umask $savemask;
+my $savedir = PROJROOT() . "/$pid/tiplogs/$eid";
+my $cmdargs = "$TB/sbin/savelogs.proxy -u $dbuid -s $savedir ";
 
-# Make sure the user can write to it
-if (! -w $savedir) {
-	die "Unable to write to directory $savedir\n";
+while (my ($nodeid, $vname) = $query_result->fetchrow_array()) {
+    $cmdargs .= " $nodeid $vname";
 }
 
-while (@row = $sth->fetchrow) {
-	my ($node, $vname) = @row;
-	if (!$vname) { # In case they don't have a vname...
-		$vname = $node;
-	}
-	my $runfile = "$logdir/$node.run";
-	my $savefile = "$savedir/$vname.log";
-	print "Copying $runfile to $savefile ...\n";
-	# Test to make sure the .run file exists
-	if (! (-e $runfile && -r $runfile) ) {
-		warn "Warning: $runfile does not exist or is not " .
-			"readable, skipping.\n";
-		next;
-	}
-	system "cp $runfile $savefile";
-}
+#
+# Now we call over to the ops node to deal with the rest of this. 
+#
+$EUID = $UID = 0;
+system("$sshtb -host $CONTROL $cmdargs");
+$EUID = $UID = $SAVEUID;
+
+#
+# Nothing else to do ... output from proxy went to stdout/stderr.
+# 
+exit($? >> 8);
+

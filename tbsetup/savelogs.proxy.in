@@ -1,0 +1,146 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use BSD::Resource;
+use POSIX qw(:signal_h);
+    
+#
+# Save off console log files.
+# 
+# The first argument option is the user to run this script as, since we
+# gets invoked by a root ssh from boss.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: savelogs.proxy -u user -s savedir nodeid vname [...]\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $logdir   = "/var/log/tiplogs";
+my $errors   = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# First option has to be the -u option, the user to run this script as.
+#
+if ($UID != 0 || $EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+if ($ARGV[0] ne "-u" ||
+    $ARGV[2] ne "-s" ||
+    scalar(@ARGV) < 6 ||
+    scalar(@ARGV) & 0x1) {
+    usage();
+}
+
+my $user    = $ARGV[1];
+my $savedir = $ARGV[3];
+shift(@ARGV);
+shift(@ARGV);
+shift(@ARGV);
+shift(@ARGV);
+
+(undef,undef,$unix_uid) = getpwnam($user) or
+    die("*** $0:\n".
+	"    No such user $user\n");
+
+#
+# Need the entire group list for the user, cause of subgroups, and
+# cause thats the correct thing to do. Too bad perl does not have a
+# getgrouplist function like the C library.
+#
+my $glist = `/usr/bin/id -G $user`;
+if ($glist =~ /^([\d ]*)$/) {
+    $glist = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Unexpected results from 'id -G $user': $glist\n");
+}
+
+# Need to split off the first group and create a proper list for $GUID.
+my @gglist   = split(" ", $glist);
+my $unix_gid = $gglist[0];
+$glist       = "$unix_gid $glist";
+
+# Flip to user and never go back!
+$GID            = $unix_gid;
+$EGID           = $glist;
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+#
+# Okay, now we can save logs for each console.
+# 
+print "Saving tiplogs to $savedir\n";
+
+if (! -e $savedir) {
+    # We do not want directory creation to be modified by the user's umask, 
+    # because the tiplogs directory needs to be kept group-writable.
+    my $savemask = umask 000;
+    
+    print "Making directory $savedir ...\n";
+    system("/bin/mkdir -m 0770 -p $savedir") == 0
+	or die("*** $0:\n".
+	       "    Unable to make directory $savedir!\n");
+
+    # Restore the saved umask
+    umask $savemask;
+}
+
+# Make sure the user can write to it
+if (! -w $savedir) {
+    die("*** $0:\n".
+	"    Unable to write to directory $savedir\n");
+}
+
+while (@ARGV) {
+    my $nodeid   = shift(@ARGV);
+    my $vname    = shift(@ARGV);
+    my $runfile  = "$logdir/$nodeid.run";
+    my $savefile = "$savedir/$vname.log";
+    
+    print "Copying $runfile to $savefile ...\n";
+    # Test to make sure the .run file exists
+    if (! (-e $runfile && -r $runfile) ) {
+	print "*** WARNING:\n".
+	      "Console log for $nodeid does not exist or is not readable. ".
+	      "Skipping.\n";
+	$errors++;
+	next;
+    }
+    system("/bin/cp $runfile $savefile") == 0
+	or $errors++;
+}
+exit($errors);

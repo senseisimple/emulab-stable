@@ -476,6 +476,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
 	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
+	tbsetup/savelogs.proxy \
 	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \

@@ -32,7 +32,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
-		  newnode_reboot
+		  newnode_reboot savelogs.proxy
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -157,6 +157,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/eventsys_control
 	chown root $(INSTALL_BINDIR)/tarfiles_setup
 	chmod u+s $(INSTALL_BINDIR)/tarfiles_setup
+	chown root $(INSTALL_BINDIR)/savelogs
+	chmod u+s $(INSTALL_BINDIR)/savelogs
 
 #
 # Control node installation (okay, plastic)
@@ -171,6 +173,7 @@ endif
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, sfskey_update.proxy) \
+			$(addprefix $(INSTALL_SBINDIR)/, savelogs.proxy) \
 			$(addprefix $(INSTALL_BINDIR)/, fetchtar.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
