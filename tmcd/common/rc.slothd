@@ -15,7 +15,10 @@ fi
 
 . /etc/emulab/paths.sh
 
-ARGS=
+BOSSINFO=`$BINDIR/tmcc bossinfo`
+BOSSNAME=`echo $BOSSINFO | awk '{ print $1 }'`
+
+ARGS='-s $BOSSNAME '
 SEDCMD='sed -e s/^.*=\(.*\)/\1/'
 
 start () {
