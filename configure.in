@@ -506,8 +506,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
 	tmcd/freebsd/GNUmakefile \
 	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
-	tmcd/linux/GNUmakefile tmcd/linux/supfile tmcd/linux/pump.conf \
-	tmcd/linux/sethostname tmcd/linux/sethostname.dhclient \
+	tmcd/linux/GNUmakefile tmcd/linux/supfile \
+	tmcd/linux/sethostname.dhclient \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
