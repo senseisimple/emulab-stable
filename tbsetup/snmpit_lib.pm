@@ -285,11 +285,6 @@ sub getTestSwitches () {
 	push @switches, $row[0];
     }
 
-    # Sanity check - make sure we actually found some
-    if (!@switches) {
-	die "Failed to find testswitches\n";
-    }
-
     return @switches;
 }
 
