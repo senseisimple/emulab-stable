@@ -258,6 +258,7 @@ sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 #
 # Same for a Windows (CygWinXP) node.
 #
+# XXX  If you change this, look in libtmcc::tmccgetconfig() as well.
 sub WINDOWS()	{ if (-e "$ETCDIR/iscygwin") { return 1; } else { return 0; } }
 
 #

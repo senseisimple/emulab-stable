@@ -498,8 +498,8 @@ sub doboot()
 		# top-down, chowning the directory away and then trying to read it.
 		#
 		# Okay, this is really wrong.  The authkeys files can't be mode 600
-		# and owned by the user.  They can be 644/root, or 600/SYSTEM.
-		# This is a bug in sshd's use of setreuid().  We prefer 600/SYSTEM.
+		# and owned by the user.  They can be 644/user, or 600/SYSTEM.
+		# Is this a bug in sshd's use of setreuid()?  We prefer 600/SYSTEM.
 		my $cmd = "$CHOWN SYSTEM $sshdir/*";
 		if (system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
@@ -600,7 +600,7 @@ sub doshutdown()
     # old accounts as needed. 
 
     # Make the CygWin /etc/passwd and /etc/group files match Windows.
-    os_account_cleanup()
+    os_accounts_sync()
 	if (WINDOWS());
 }
 
@@ -632,7 +632,7 @@ sub docleanup()
     unlink $gdb
 	if (-e $gdb);
     
-    # Hand this off to libloc to restore default passwd/group files.
+    # Hand this off to liblocsetup to restore default passwd/group files.
     os_account_cleanup();
 }
 

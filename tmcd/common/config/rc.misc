@@ -120,7 +120,7 @@ sub doreconfig()
 #
 sub docleanup()
 {
-    unlink TMNODEID(), TMCREATOR();
+    unlink TMNODEID(), TMCREATOR(), TMSWAPPER();
 }
 
 #

@@ -12,10 +12,10 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $LN $RM $CHOWN $CHMOD $TOUCH $MOUNT $EGREP
-	 $NFSMOUNT $UMOUNT $SFCMOUNT $SFCUMOUNT $NTS $NET $HOSTSFILE
+    qw ( $CP $LN $RM $CHOWN $CHMOD $TOUCH $MOUNT $UMOUNT $EGREP
+	 $NTS $NET $HOSTSFILE
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
-	 os_account_cleanup os_accounts_start os_accounts_end
+	 os_account_cleanup os_accounts_start os_accounts_end os_accounts_sync
 	 os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_groupgid os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth
@@ -57,22 +57,13 @@ $CHOWN		= "/bin/chown";
 $CHMOD		= "/bin/chmod";
 $TOUCH		= "/bin/touch";
 $MOUNT		= "/bin/mount";
+$UMOUNT		= "/bin/umount";
 $EGREP		= "/bin/egrep -q";
 
 # Emulab wrappers for Windows.
-$NFSMOUNT	= "$BINDIR/emount";
-$UMOUNT		= "$BINDIR/eumount";
-
 $MKPASSWD	= "/bin/mkpasswd";
 $MKGROUP	= "/bin/mkgroup";
 $AWK		= "/bin/gawk";
-
-$CYGMOUNT	= "/bin/mount";
-$CYGUOUNT	= "/bin/umount";
-
-$SFC		= "/cygdrive/c/SFU/common";
-$SFCMOUNT	= "$SFC/mount";
-$SFCUMOUNT	= "$SFC/umount";
 
 $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
@@ -95,6 +86,7 @@ my $IFC_FDUPLEX = "FD";
 my $IFC_HDUPLEX = "HD";
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $MKDIR	= "/bin/mkdir";
+my $RMDIR	= "/bin/rmdir";
 my $GATED	= "/usr/sbin/gated";
 my $ROUTE	= "/sbin/route";
 my $SHELLS	= "/etc/shells";
@@ -106,6 +98,87 @@ my $usershellsfile = "$BOOTDIR/usershells";
 # OS dependent part of cleanup node state.
 # 
 sub os_account_cleanup()
+{
+    # Undo what rc.mounts and rc.accounts did.  
+
+    # The users list could be gotten from multiple places; let's use the /users
+    # directory as truth.
+    if (opendir(DIRHANDLE, "/users")) {
+	while ($name = readdir(DIRHANDLE)) {
+	    if ($name =~ m/^\.+/) {
+		next;
+	    }
+	    print "Removing user: $name\n";
+
+	    # There is always an NT account.
+	    my $cmd = "$NET user $name /delete > /dev/null";
+	    if (system($cmd) != 0) {
+		warning("Failed: ($cmd), $!\n");
+	    }
+
+	    # There will only be an NT homedir if the user has logged in sometime.
+	    $cmd = "$RM -rf C:/Documents and Settings/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed: ($cmd), $!\n");
+	    }
+
+	    # Unmount the homedir so we can get to the mount point.
+	    $cmd = "$UMOUNT /users/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed: ($cmd), $!\n");
+	    }
+	    $cmd = "$RMDIR /users/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed: ($cmd), $!\n");
+	    }
+	}
+	closedir(DIRHANDLE);
+
+	# Make the CygWin /etc/passwd and /etc/group files match Windows.
+	os_accounts_sync();
+    }
+
+    # Clean out the user /sshkeys directories.
+    $cmd = "$CHOWN -R root /sshkeys";
+    if (system($cmd) != 0) {
+	warning("Failed ($cmd): $!");
+    }
+    $cmd = "$RM -rf /sshkeys";
+    if (system($cmd) != 0) {
+	warning("Failed ($cmd): $!");
+    }
+
+    # Clean out the /proj directories.
+    if (opendir(DIRHANDLE, "/proj")) {
+	while ($name = readdir(DIRHANDLE)) {
+	    if ($name =~ m/^\.+/) {
+		next;
+	    }
+	    print "Removing project: $name\n";
+
+	    # Unmount the project dir so we can get to the mount point.
+	    $cmd = "$UMOUNT /proj/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed ($cmd): $!");
+	    }
+	    $cmd = "$RMDIR /proj/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed ($cmd): $!");
+	    }
+	}
+    }
+
+    # Just unmount /share.
+    $cmd = "$UMOUNT /share";
+    if (system($cmd) != 0) {
+	warning("Failed ($cmd): $!");
+    }
+}
+
+# 
+# Make the CygWin /etc/passwd and /etc/group files match Windows.
+# 
+sub os_accounts_sync()
 {
     unlink @LOCKFILES;
 
@@ -369,7 +442,7 @@ sub os_accounts_end()
 
     # Make the CygWin /etc/passwd and /etc/group files match Windows.
     # Note that the group membership is not reported into the CygWin files.
-    return os_account_cleanup();
+    return os_accounts_sync();
 }
 
 #
