@@ -107,6 +107,22 @@ if ($#ARGV < 1) {
 }
 my ($pid,$eid) = @ARGV;
 
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\@\w.]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
+
 TBDebugTimeStampsOn();
 
 #
