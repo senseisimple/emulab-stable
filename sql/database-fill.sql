@@ -479,6 +479,9 @@ REPLACE INTO table_regex VALUES ('experiments','wa_plr_solverweight','float','re
 REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','usemodelnet','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','modelnet_cores','int','redirect','default:tinyint',0,5,NULL);
+REPLACE INTO table_regex VALUES ('experiments','modelnet_edges','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','[-\\w]+',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','building','text','regex','[-\\w]+',1,32,NULL);
