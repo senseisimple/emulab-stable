@@ -317,11 +317,11 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
     # we set a global variable to indicate that NSE trafgen
     # is present so that nseinput.tcl can take appropriate
     # action
-    append nseconfig "set nsetrafgen_present 1"
+    append nseconfig "set nsetrafgen_present 1\n\n"
     if { ($tcptype == "") || ($tcptype == "Reno") } {
-          set nseconfig "set $self \[new Agent/TCP/FullTcp]\n"
+          append nseconfig "set $self \[new Agent/TCP/FullTcp]\n"
     } else {
-          set nseconfig "set $self \[new Agent/TCP/FullTcp/$tcptype]\n"
+          append nseconfig "set $self \[new Agent/TCP/FullTcp/$tcptype]\n"
     }
 
     if { $role == "sink" } {
@@ -336,6 +336,7 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
              append nseconfig "\$$self set $var [$self set $var]\n"
            }
     }
+    append nseconfig "\n"
 
     if { $application != {} } {
          append nseconfig [$application get_nseconfig]
@@ -524,8 +525,9 @@ Application/FTP instproc get_nseconfig {} {
     append nseconfig "\$$self set objname $self\n"
 
     if { $agent != {} } {
-         append nseconfig "\$$self attach-agent \$$agent\n\n"
+         append nseconfig "\$$self attach-agent \$$agent\n"
     }
+    append nseconfig "\n"
 
     # XXX temporary untill event system changes get in
     # append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
@@ -560,8 +562,9 @@ Application/Telnet instproc get_nseconfig {} {
                
     append nseconfig "\$$self set interval_ $interval_\n"
     if { $agent != {} } {
-         append nseconfig "\$$self attach-agent \$$agent\n\n"
+         append nseconfig "\$$self attach-agent \$$agent\n"
     }
+    append nseconfig "\n"
         
     # XXX temporary untill event system changes get in
     # append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
