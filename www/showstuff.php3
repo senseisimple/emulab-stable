@@ -315,9 +315,10 @@ function SHOWNODES($pid, $eid) {
                 <td align=center>Default<br>OSID</td>
                 <td align=center>Default<br>Path</td>
                 <td align=center>Default<br>Cmdline</td>
+                <td align=center>Boot<br>Status[1]</td>
                 <td align=center>Startup<br>Command</td>
-                <td align=center>Startup<br>Status[1]</td>
-                <td align=center>Ready<br>Status[2]</td>
+                <td align=center>Startup<br>Status[2]</td>
+                <td align=center>Ready<br>Status[3]</td>
               </tr>\n";
 	
 	$query_result = mysql_db_query($TBDBNAME,
@@ -339,6 +340,7 @@ function SHOWNODES($pid, $eid) {
 	    $startupcmd         = $row[startupcmd];
 	    $startstatus        = $row[startstatus];
 	    $readystatus        = $row[ready];
+	    $bootstatus         = $row[bootstatus];
 
 	    if (!$def_boot_cmd_line)
 		$def_boot_cmd_line = "NULL";
@@ -372,6 +374,7 @@ function SHOWNODES($pid, $eid) {
 	    
 	    echo "  <td>$def_boot_path</td>
                     <td>$def_boot_cmd_line</td>
+                    <td align=center>$bootstatus</td>
                     <td>$startupcmd</td>
                     <td align=center>$startstatus</td>
                     <td align=center>$readylabel</td>
@@ -381,8 +384,12 @@ function SHOWNODES($pid, $eid) {
 	echo "<h4><blockquote><blockquote><blockquote><blockquote>
               <dl COMPACT>
                 <dt>[1]
-                    <dd>Exit value of the node startup command.
+                    <dd>Node has rebooted successfully after experiment
+                        creation.
                 <dt>[2]
+                    <dd>Exit value of the node startup command. A value of
+                        666 indicates a testbed internal error.
+                <dt>[3]
                     <dd>User application ready status, reported via TMCC.
               </dl>
               </blockquote></blockquote></blockquote></blockquote></h4>\n";

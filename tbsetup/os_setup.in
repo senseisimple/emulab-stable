@@ -28,9 +28,16 @@ my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TFTP	= "/tftpboot";
 
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
-my $dbg		= 1;
+my $dbg		= 0;
 my @nodes       = ();
 my %osid        = ();
 my %waitfor     = ();
@@ -52,13 +59,6 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
-
-#
-# Testbed Support libraries
-# 
-push(@INC, "$TB/lib");
-require libdb;
-require libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -255,13 +255,16 @@ foreach my $node ( @nodes ) {
     #
     if ($waitfor{$node} == 0) {
 	print STDOUT "Not waiting for $node to come alive. Foreign OS.\n";
+	SetNodeBootStatus($node, NODEBOOTSTATUS_UNKNOWN);
 	next;
     }	
 
     if (WaitTillAlive($node) == 0) {
 	print STDOUT "$node is alive and well\n";
+	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	next;
     }
+    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 
     print STDOUT "$node may be down. This has been reported to testbed-ops.\n";
     print STDOUT "Please end this experiment, and try again.\n";

@@ -908,6 +908,7 @@ foreach $pair (@nodepairs) {
 	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"$osid\"," .
 		       " def_boot_cmd_line=\"$cmdline\"," .
 		       " startstatus=\"none\"," .
+		       " bootstatus=\"unknown\"," .
 		       " ready=0," .
 		       " rpms=\"$rpms\"," .
 		       " deltas=\"$deltas\"," .
@@ -929,6 +930,7 @@ foreach $pair (@nodepairs) {
 	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"" .
 		       $delayosids{$type} . "\"," .
 		       " startstatus=\"none\"," .
+		       " bootstatus=\"unknown\"," .
 		       " ready=0" .
 		       " where node_id=\"$pnode\"")) {
 	    print STDERR "$0: *** Could not update nodes table." .

@@ -15,7 +15,8 @@ my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 #
-# Set up for querying the database.
+# Set up for querying the database. Note that fork causes a reconnect
+# to the DB in the child. 
 # 
 my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
@@ -23,6 +24,21 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Record last DB error string.
 #
 my $DBErrorString = "";
+
+#
+# Define exported "constants". Basically, these are just perl subroutines
+# that look like constants cause you do not need to call a perl subroutine
+# with parens. That is, FOO and FOO() are the same thing.
+#
+sub NODERELOADING_PID()		{ "testbed"; }
+sub NODERELOADING_EID()		{ "reloading"; }
+sub NODEDEAD_PID()		{ "emulab-ops"; }
+sub NODEDEAD_EID()		{ "hwdown"; }
+
+sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
+sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
+sub NODEBOOTSTATUS_UNKNOWN()	{ "unknown"; }
+sub NODESTARTSTATUS_NOSTATUS()	{ "none"; }
 
 #
 # Test admin status. Optional argument is the UID or Name to test. If not
@@ -184,9 +200,13 @@ sub ExpLeader($$)
 sub MarkNodeDown($)
 {
     my($node) = $_[0];
+    my($pid, $eid);
+
+    $pid = NODERELOADING_PID;
+    $eid = NODERELOADING_EID;
 
     my $query_result =
-	DBQueryFatal("update reserved set pid='emulab-ops', eid='hwdown' ".
+	DBQueryFatal("update reserved set pid='$pid', eid='$eid' ".
 		     "where node_id='$node'");
 
     if ($query_result->num_rows < 1) {
@@ -195,12 +215,25 @@ sub MarkNodeDown($)
 }
 
 #
+# Set the boot status for a node.
+#
+# usage: SetNodeBootStatus(char *status)
+#
+sub SetNodeBootStatus($$)
+{
+    my($node, $bstat) = @_;
+
+    DBQueryFatal("update nodes set bootstatus='$bstat' ".
+		 "where node_id='$node'");
+}
+
+#
 # Check if a particular feature is supported by an OSID. 
 #
 # usage: OSFeatureSupported(char *osid, char *feature)
 #        returns 1 if supported, 0 if not.
 #
-sub OSFeatureSupported {
+sub OSFeatureSupported($$) {
     my($osid, $feature) = @_;
 
     my $query_result =
@@ -259,6 +292,23 @@ sub DBQueryFatal($)
 
     if (! $result) {
 	DBFatal("DB Query failed");
+    }
+    return $result;
+}
+
+#
+# Same as above, but just send email on error. This info is useful
+# to the TB system, but the caller has to retain control.
+# 
+sub DBQueryWarn($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = DBQuery($query);
+
+    if (! $result) {
+	DBWarn("DB Query failed");
     }
     return $result;
 }
