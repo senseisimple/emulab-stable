@@ -15,6 +15,7 @@ my $RUNDIR      = "/var/run";
 my $HISTORY     = "/root/.history";
 my $MAILFILE    = "/var/mail/root";
 my $LEASES      = "/var/db/dhclient.leases";
+my $NTPDRIFT    = "/etc/ntp/drift";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -111,6 +112,12 @@ print "Removing root's mailfile ...\n";
 if (-f $MAILFILE) {
     unlink($MAILFILE) or
         die("Could not unlink $MAILFILE: $!");
+}
+
+print "Removing $NTPDRIFT ...\n";
+if (-f $NTPDRIFT) {
+    unlink($NTPDRIFT) or
+        die("Could not unlink $NTPDRIFT: $!");
 }
 
 print "Cleaing .pid files ...\n";
