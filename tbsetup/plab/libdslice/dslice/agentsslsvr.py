@@ -45,7 +45,7 @@ authentication and encryption over SSL.
 
 AUTHOR: Brent Chun (bnc@intel-research.net)
 
-$Id: agentsslsvr.py,v 1.1 2003-08-19 17:17:19 aclement Exp $
+$Id: agentsslsvr.py,v 1.2 2003-09-13 00:23:03 ricci Exp $
 
 """
 import threading
@@ -109,8 +109,8 @@ class agentsslsvr(SSL.ThreadingSSLServer):
             raise "Static slice %s already exists" % slice
         if not slicename.isvalidlogin(slice):
             raise "Slice name %s is a bad name" % slice
-        if agent.dbthr.hastickets(slice):
-            raise "Outstanding tickets for slice %s" % slice
+#        if agent.dbthr.hastickets(slice):
+#            raise "Outstanding tickets for slice %s" % slice
         if agent.gmetadthr.leaseexists(slice):
             raise "Outstanding leases for slice %s" % slice
         if agent.gmetadthr.sliceexists(slice):

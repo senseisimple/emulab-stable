@@ -47,7 +47,7 @@ publish their existence in Ganglia through their local gmond).
 
 AUTHOR: Brent Chun (bnc@intel-research.net)
 
-$Id: gmetadthr.py,v 1.1 2003-08-19 17:17:20 aclement Exp $
+$Id: gmetadthr.py,v 1.2 2003-09-13 00:23:03 ricci Exp $
 
 """
 import threading
@@ -66,6 +66,13 @@ class gmetadthr(threading.Thread):
         self.leases_tag = agent.conf.leases_tag
         self.slivers_tag = agent.conf.slivers_tag
         
+    def reset(self):
+        self.ips = []
+        self.ipstoleases = {}
+        self.leasestoips = {}
+        self.ipstoslices = {}
+        self.slicestoips = {}
+        
     def run(self):
         self.ips = []
         self.ipstoleases = {}
@@ -80,7 +87,7 @@ class gmetadthr(threading.Thread):
                 self.updateleases()
                 self.updateslices()
             except:
-                pass # Ganglia XML SAX badness
+		self.reset() # Ganglia XML SAX badness
             time.sleep(self.pollint)
 
     def updateips(self):
