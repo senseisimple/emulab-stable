@@ -35,6 +35,7 @@ if ($UID != 0) {
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUTOMAIL  = "@TBAUTOMAILEMAIL@";
 
 # un-taint path
 $ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/sbin:$TB/bin";
@@ -201,7 +202,7 @@ while (1) {
         if (@succeeded) {
             my @spnodes = map {$_->[1]} @succeeded;
 
-            SENDMAIL($TBOPS, @succeeded ." plab nodes revived.",
+            SENDMAIL($TBAUTOMAIL, @succeeded ." plab nodes revived.",
                      "The following nodes have been brought back from the afterworld:\n\n".
                      join("\n", @spnodes) ."\n",
                      $TBOPS);
