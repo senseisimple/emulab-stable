@@ -1,0 +1,85 @@
+#! /bin/sh
+
+## Variables
+
+# The full path of the test case
+test_file=$1
+# The base name of the test case
+test_file_base="test_vmcd.sh"
+# The current test number for shell based tests.
+test_num=0
+
+SRCDIR=@srcdir@
+EMC_PORT=6565
+VMC1_PORT=6566
+VMC2_PORT=6567
+
+## Helper functions
+
+run_test() {
+    echo "run_test: $*"
+    $* > ${test_file_base}_${test_num}.tmp 2>&1
+}
+
+check_output() {
+    diff -u - ${test_file_base}_${test_num}.tmp
+    if test $? -ne 0; then
+	echo $1
+	exit 1
+    fi
+    test_num=`expr ${test_num} \+ 1`
+}
+
+##
+
+# Start the daemons vmcd depends on:
+
+../emc/emcd -l `pwd`/test_emcd.log \
+    -i `pwd`/test_emcd.pid \
+    -p ${EMC_PORT} \
+    -s ops \
+    -c `realpath ${SRCDIR}/test_emcd.config`
+
+vmc-client -l `pwd`/test_vmc-client1.log \
+    -i `pwd`/test_vmc-client1.pid \
+    -p ${VMC1_PORT} \
+    foobar
+
+vmc-client -l `pwd`/test_vmc-client2.log \
+    -i `pwd`/test_vmc-client2.pid \
+    -p ${VMC2_PORT} \
+    foobar
+
+# Start vmcd:
+
+vmcd -l `pwd`/test_vmcd.log \
+    -i `pwd`/test_vmcd.pid \
+    -e localhost \
+    -p ${EMC_PORT} \
+    -c localhost -P ${VMC1_PORT} -- \
+    -c localhost -P ${VMC2_PORT}
+
+cleanup() {
+    kill `cat test_vmcd.pid`
+    kill `cat test_emcd.pid`
+    kill `cat test_vmc-client1.pid`
+    kill `cat test_vmc-client2.pid`
+}
+
+trap 'cleanup' EXIT
+
+sleep 2
+
+newframe() {
+    kill -s USR1 `cat test_vmc-client1.pid`
+    kill -s USR1 `cat test_vmc-client2.pid`
+}
+
+# Trigger a couple frame updates in the vmc-clients.
+newframe
+
+sleep 1
+
+newframe
+
+# XXX No checking of output done in here.

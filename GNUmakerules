@@ -73,7 +73,7 @@ ifeq ($(TESTS),)
 .PHONY: check
 else
 check: $(TESTS)
-	@for tst in $<; do \
+	@for tst in $^; do \
 		if test `basename $$tst .sh` != `basename $$tst`; then \
 			tst="sh $$tst"; \
 		fi; \

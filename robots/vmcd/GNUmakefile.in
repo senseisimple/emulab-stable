@@ -11,8 +11,9 @@ SUBDIR		= robots/vmcd
 
 include $(OBJDIR)/Makeconf
 
-PROGS = vmc-client
+PROGS = vmc-client vmcd
 TESTS = test_vmc-client.sh
+TESTS += test_vmcd.sh
 
 all: $(PROGS)
 
@@ -28,8 +29,13 @@ LIBS	 += -lmtp -ltb
 
 test_vmc-client.sh: vmc-client
 
+test_vmcd.sh: vmcd
+
 vmc-client: vmc-client.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+
+vmcd: vmcd.o ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vmcd.o $(LIBS)
 
 clean:
 	rm -f *.o

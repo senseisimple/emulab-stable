@@ -764,19 +764,68 @@ int unknown_client_callback(elvin_io_handler_t handler,
       if (vmc_data.sock_fd != -1) {
 	error("vmc client is already connected\n");
       }
-      else if (elvin_sync_add_io_handler(NULL,
-					 fd,
-					 ELVIN_READ_MASK,
-					 vmc_callback,
-					 &vmc_data,
-					 eerror) == NULL) {
-	error("unable to add elvin io handler");
-      }
       else {
-	vmc_data.sock_fd = fd;
-	vmc_data.position_list = robot_list_create();
+	// write back an RMC_CONFIG packet
+	struct mtp_config_vmc r;
 	
-	retval = 1;
+	r.num_robots = hostname_list->item_count;
+	r.robots = (struct robot_config *)
+	  malloc(sizeof(struct robot_config)*(r.num_robots));
+	if (r.robots == NULL) {
+	  struct mtp_packet *wb;
+	  struct mtp_control c;
+	  
+	  c.id = -1;
+	  c.code = -1;
+	  c.msg = "internal server error";
+	  wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &c);
+	  mtp_send_packet(fd, wb);
+	  
+	  free(wb);
+	  wb = NULL;
+	}
+	else {
+	  struct robot_config *rc = NULL;
+	  struct robot_list_enum *e;
+	  struct mtp_packet *wb;
+	  int i = 0;
+
+	  e = robot_list_enum(hostname_list);
+	  while ((rc = (struct robot_config *)
+		  robot_list_enum_next_element(e)) != NULL) {
+	    r.robots[i] = *rc;
+	    i += 1;
+	  }
+	  robot_list_enum_destroy(e);
+	  
+	  // write back an rmc_config packet
+	  if ((wb = mtp_make_packet(MTP_CONFIG_VMC,
+				    MTP_ROLE_EMC,
+				    &r)) == NULL) {
+	    error("unable to allocate rmc_config packet");
+	  }
+	  else if ((retval= mtp_send_packet(fd, wb)) != MTP_PP_SUCCESS) {
+	    error("unable to send rmc_config packet");
+	  }
+	  else if (elvin_sync_add_io_handler(NULL,
+					     fd,
+					     ELVIN_READ_MASK,
+					     vmc_callback,
+					     &vmc_data,
+					     eerror) == NULL) {
+	    error("unable to add vmc_callback handler");
+	  }
+	  else {
+	    // add descriptor to list, etc:
+	    vmc_data.sock_fd = fd;
+	    vmc_data.position_list = robot_list_create();
+
+	    retval = 1;
+	  }
+
+	  free(wb);
+	  wb = NULL;
+	}
       }
       break;
     default:
