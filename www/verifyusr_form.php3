@@ -33,7 +33,7 @@ contact <a href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Ops
 
 <?php
 echo "<table align=\"center\" border=\"1\">
-      <form action=\"verifyusr.php3?$uid\" method=\"post\">\n";
+      <form action=\"verifyusr.php3\" method=\"post\">\n";
 
 echo "<tr>
           <td>Username:</td>

@@ -8,16 +8,8 @@
 include("defs.php3");
 
 #
-# Only known and logged in users can be verified.
+# Only known and logged in users can be verified. UID came in as a post var.
 #
-$uid = "";
-if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
-    $uid=$Vals[1];
-    addslashes($uid);
-}
-else {
-    unset($uid);
-}
 LOGGEDINORDIE($uid);
 
 #
