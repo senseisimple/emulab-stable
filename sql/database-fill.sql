@@ -524,6 +524,8 @@ REPLACE INTO table_regex VALUES ('virt_lans','uselinkdelay','int','redirect','de
 REPLACE INTO table_regex VALUES ('virt_lans','nobwshaping','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','usevethiface','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trivial_ok','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','protocol','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','is_accesspoint','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);

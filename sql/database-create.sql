@@ -451,6 +451,17 @@ CREATE TABLE interface_types (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `interface_capabilities`
+--
+
+CREATE TABLE interface_capabilities (
+  type varchar(30) NOT NULL default '',
+  capkey varchar(64) NOT NULL default '',
+  capval varchar(64) NOT NULL default '',
+  PRIMARY KEY  (type, capkey)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `interfaces`
 --
 
@@ -1592,6 +1603,8 @@ CREATE TABLE virt_lans (
   nobwshaping tinyint(4) default '0',
   usevethiface tinyint(4) default '0',
   trivial_ok tinyint(4) default '1',
+  protocol varchar(30) NOT NULL default 'ethernet',
+  is_accesspoint tinyint(4) default '0',
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
