@@ -60,7 +60,7 @@ issuing commands like:
 
 <pre>
 $ns duplex-link $node1 $node2 100Mb 150ms DropTail
-tb-set-ip $node1 192.0.0.2
+tb-set-ip $node1 10.1.0.2
 </pre>
 
 <p>(Note the <code>$</code>'s)
@@ -113,7 +113,7 @@ two nodes.
 <pre>
 set link1 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
 tb-set-link-loss $link1 0.05
-tb-set-ip-link $node0 $link1 192.0.0.128
+tb-set-ip-link $node0 $link1 10.1.0.128
 </pre>
 
 <hr>
@@ -173,7 +173,7 @@ will be automatically generated under the same subnet.
 <p>IP address assignment is deterministic and tries to fill lower IP's
 first, starting at 2.  Except in the partial specification case (see
 above), all automatic IP addresses are in the network
-<code>192.168</code>.
+<code>10</code>.
 
 <h4>tb-set-ip</h4>
 

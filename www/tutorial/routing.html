@@ -101,9 +101,9 @@ For FreeBSD, this is done with:
 #!/bin/sh
 if [ `uname` = "FreeBSD" ]
 then
-    sudo route add -net 192.168.0.0 -netmask 255.255.0.0 myrouter
+    sudo route add -net 10.1.0.0 -netmask 255.255.0.0 myrouter
 else
-    sudo route add -net 192.168.0.0 netmask 255.255.0.0 gw myrouter
+    sudo route add -net 10.1.0.0 netmask 255.255.0.0 gw myrouter
 fi
 exit 0
 </pre></code>
