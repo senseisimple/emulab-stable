@@ -8,10 +8,11 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
-	 TBMakeLogname TB_BOSSNODE TBGenSecretKey);
+	 TBMakeLogname TB_BOSSNODE TBGenSecretKey TBDebugTimeStamp );
 
 my $MAILTAG  = "@OURDOMAIN@";
 my $BOSSNODE = "@BOSSNODE@";
+my $TIMESTAMPS = "@TIMESTAMPS@";
 
 # Hostname of our boss node
 sub TB_BOSSNODE()	{ $BOSSNODE; }
@@ -124,6 +125,21 @@ sub TBDateTimeFSSafe()
 {
     return POSIX::strftime("20%y%m%d-%H.%M.%S", localtime());
 }
+
+#
+# Print out a timestamp if the TIMESTAMPS configure variable was set.
+# 
+# usage: void TBDebugTimeStamp(@)
+#
+sub TBDebugTimeStamp(@)
+{
+    my @strings = @_;
+    if ($TIMESTAMPS) {
+	print "TIMESTAMP: ", TBTimeStamp(), " ", join("",@strings), "\n";
+    }
+}
+
+
 
 #
 # Put ourselves into the background, directing output to the log file.
