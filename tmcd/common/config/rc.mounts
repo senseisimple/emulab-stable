@@ -168,11 +168,11 @@ sub doboot()
 
     # On CygWin, the Samba mount is set up per-user by rc.cygwinxp-user, and what is
     # available through the mount is controlled by the smb.conf file on the file
-    # server.  All that's left is to wrap the //fs names in symlinks.
+    # server.  All that's left is to CygWin mount the //fs directory paths.
     if (WINDOWS()) {
 	while (($remote, $local) = each %mounts) {
 	    my $host = "fs.bsd-fs.testbed.emulab.net"; ###"fs";
-	    print "Link $local to //$host\n";
+	    print "Mount $local from //$host\n";
 	    os_samba_mount($local, $host, 0);
 	}
 	return;

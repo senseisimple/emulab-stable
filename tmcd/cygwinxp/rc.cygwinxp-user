@@ -8,46 +8,43 @@
 #   HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run\EmulabLogin
 # with value: 
 #   C:\cygwin\bin\bash /usr/local/etc/emulab/rc/rc.cygwinxp-user
+#
+# We also arrange for this to be run by login shells under ssh.
 
 PATH=/usr/local/etc/emulab:/bin:$PATH
 export PATH
 
-# Root has a local home directory, and is handled by the SYSTEM sshd on port 22.
-# There is no need to do any of the following for root.
-user=`id -un`
-if [ $user = root ]; then
+# Samba server.
+###host=fs
+host=fs.bsd-fs.testbed.emulab.net
+
+# Explanation: Shares are local to the Win32 login session context.
+# We must process a user name and password for the first one to be opened, and it
+# has to go onto a drive letter.  After that, we can use UNC //host paths freely.
+
+# Nothing to do if the mount has already been done.
+if (net use | grep -q Z:); then
+    ##echo "Remote directories have already been enabled by a Z: mount."
+    ##sleep 5
     exit 0
 fi
 
-# Shares are local to the Win32 login session context.
-# We must process a user name and password for the first one to be opened, and it
-# has to go onto a drive letter.  After that, we can use UNC //host paths freely.
-###host=fs
-host=fs.bsd-fs.testbed.emulab.net
-pswd=`tmcc accounts | awk '/LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
-echo "Connecting to //$host as $user."
-while ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no
-do
-    # Read one char (or none on <Enter>), add a time-out for autologins after boot.
-    read -p "Connection failed, try again? [y]: " -n 1 -t 5 chr
-    echo ""
-    if [[ ! -z "$chr" && "$chr" != [yY] ]]; then break; fi
-    echo ""
-    echo "Re-trying connection to //$host as $user."
-done
-# Show network mount status.
-net use
+# Get the password for the user.
+user=`id -un`
+pswd=`tmcc accounts | awk '/^ADDUSER LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
+if [ -z "$pswd" ]; then
+    echo "No account for user $user, so no remote file access."
+    sleep 5
+    exit 1
+fi
 
-# Set the homedir for ssh in case we don't get through rc.mounts .
-ln -f -s //$host/$user /users/$user
+echo "Connecting Z: to //$host as $user."
+if ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no; then
+    echo "Connection failed."
+else
+    # Show network mount status.
+    net use
+fi
 
-# Run the SSH daemon in the Win32 login session context, so ssh client sessions
-# will see the same set of mounts when they come in AS THIS SAME USER.
-echo ""
-startsshd
-
-echo ""
-echo "Hit <Enter> to stop the sshd when you're ready to log out."
-read
-
-stopsshd
+sleep 5
+exit 0

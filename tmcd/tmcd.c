@@ -1868,9 +1868,10 @@ COMMAND_PROTOTYPE(doaccounts)
 
 		/*
 		 * Locally, everything is NFS mounted so no point in
-		 * sending back pubkey stuff; its never used.
+		 * sending back pubkey stuff; it's never used except on CygWin.
+		 * Add an argument of "pubkeys" to get the PUBKEY data on CygWin.
 		 */
-		if (reqp->islocal)
+		if (reqp->islocal && strncmp(rdata, "pubkeys", 7) != 0)
 			goto skipsshkeys;
 
 		/*

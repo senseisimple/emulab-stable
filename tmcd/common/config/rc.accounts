@@ -189,6 +189,7 @@ sub doboot()
 
     # On CygWin, just make a batch of Windows accounts and generate
     # /etc/passwd and /etc/group from the Windows accounts.
+    # (The process isn't finished until os_accounts_end is called.)
     goto bad
 	if (WINDOWS() && os_accounts_start());
 
@@ -453,8 +454,63 @@ sub doboot()
     if (! MFS() && ! WINDOWS()) {
 	dbmclose(%PWDDB);
     }
-    os_accounts_end()
-	if (WINDOWS());
+
+    if (WINDOWS()) {
+	# Make the /etc/group and passwd files.
+	os_accounts_end();
+
+	# We couldn't do chown'ing before new users were in the /etc/passwd file.
+	print "Filling in ssh authorized_keys files.\n";
+	while (($login, $info) = each %newaccounts) {
+	    if ($info =~ /$pat/) {
+		$pswd  = $2;
+		$uid   = $3;
+		$gid   = $4;
+		$root  = $5;
+		$name  = $6;
+		$hdir  = $7;
+
+		# We have to put the authorized_keys files somewhere that they
+		# won't be covered up by the Samba homedir mounts.
+		# 
+		# The SMB protocol (whether served by Samba or Microsoft)
+		# doesn't provide fine-grained control over file and directory
+		# permissions, just coarse control over the whole share mount.
+		# Hence sshd will ignore the keys files if they're remote.
+		# 
+		# This matches a line like this in /etc/sshd_config:
+		# AuthorizedKeysFile /sshkeys/%u/authorized_keys
+		my $sshdir = "/sshkeys/$login";
+
+		# Open up an existing key dir to the root user.  Even though root
+		# is in the Administrators group, it's locked out by permissions.
+		$cmd = "$CHOWN -R root $sshdir";
+		if (-e $sshdir && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+
+		# Create .ssh dir and populate it with an authkeys file.
+		TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
+		TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
+
+		# Set the ownership of the home directory / mount point / keys.
+		# Use the system chown by name, not UID.  Can't use chown -R, it goes
+		# top-down, chowning the directory away and then trying to read it.
+		#
+		# Okay, this is really wrong.  The authkeys files can't be mode 600
+		# and owned by the user.  They can be 644/root, or 600/SYSTEM.
+		# This is a bug in sshd's use of setreuid().  We prefer 600/SYSTEM.
+		my $cmd = "$CHOWN SYSTEM $sshdir/*";
+		if (system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+		$cmd = "$CHOWN $login $sshdir";
+		if (system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+	    }
+	}
+    }
 
     #
     # Create sfs_users file and populate it with public SFS keys
@@ -590,15 +646,21 @@ sub TBNewsshKeyfile($$$$@)
     my $keyfile = "$sshdir/authorized_keys";
 	
     if (! -e $sshdir) {
-	if (! mkdir($sshdir, 0700)) {
-	    warning("Could not mkdir $sshdir: $!");
+	if (! os_mkdir($sshdir, "0700")) {
+	    warning("TBNewsshKeyfile: Could not os_mkdir $sshdir: $!");
 	    return -1;
 	}
+    }
+
+    if (! WINDOWS()) {
+	# On Windows we'll do the chown'ing at the end.
+	# Right now it would lock out root.
 	if (!chown($uid, $gid, $sshdir)) {
 	    warning("Could not chown $sshdir: $!");
 	    return -1;
 	}
     }
+
     if ($protocol == 2) {
 	$keyfile .= "2";
     }
@@ -620,7 +682,7 @@ sub TBNewsshKeyfile($$$$@)
     }
     close(AUTHKEYS);
 
-    if (!chown($uid, $gid, "${keyfile}.new")) {
+    if (! WINDOWS() && !chown($uid, $gid, "${keyfile}.new")) {
 	warning("Could not chown ${keyfile}.new: $!");
 	return -1;
     }
@@ -633,7 +695,7 @@ sub TBNewsshKeyfile($$$$@)
 	    warning("Could not save off ${keyfile}: $!");
 	    return -1;
 	}
-	if (!chown($uid, $gid, "${keyfile}.old")) {
+	if (! WINDOWS() && !chown($uid, $gid, "${keyfile}.old")) {
 	    warning("Could not chown ${keyfile}.old: $!");
 	}
 	if (!chmod(0600, "${keyfile}.old")) {
@@ -641,7 +703,7 @@ sub TBNewsshKeyfile($$$$@)
 	}
     }
     if (system("mv -f ${keyfile}.new ${keyfile}")) {
-	warning("Could not mv ${keyfile} to ${keyfile}.new");
+	warning("Could not mv ${keyfile}.new to ${keyfile}");
     }
     return 0;
 }

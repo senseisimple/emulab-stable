@@ -6,13 +6,13 @@
 #
 
 #
-# Linux specific routines and constants for the client bootime setup stuff.
+# CygWin specific routines and constants for the client bootime setup stuff.
 #
 package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $LN $RM $CHOWN $EGREP 
+    qw ( $CP $LN $RM $CHOWN $CHMOD $TOUCH $MOUNT $EGREP
 	 $NFSMOUNT $UMOUNT $SFCMOUNT $SFCUMOUNT $NTS $NET $HOSTSFILE
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
 	 os_account_cleanup os_accounts_start os_accounts_end
@@ -45,6 +45,8 @@ BEGIN
     }
 }
 
+use librc;
+
 #
 # Various programs and things specific to CygWin on XP and that we want to export.
 # 
@@ -52,6 +54,9 @@ $CP		= "/bin/cp";
 $LN		= "/bin/ln";
 $RM		= "/bin/rm";
 $CHOWN		= "/bin/chown";
+$CHMOD		= "/bin/chmod";
+$TOUCH		= "/bin/touch";
+$MOUNT		= "/bin/mount";
 $EGREP		= "/bin/egrep -q";
 
 # Emulab wrappers for Windows.
@@ -94,6 +99,8 @@ my $GATED	= "/usr/sbin/gated";
 my $ROUTE	= "/sbin/route";
 my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
+my $winusersfile = "$BOOTDIR/winusers";
+my $usershellsfile = "$BOOTDIR/usershells";
 
 #
 # OS dependent part of cleanup node state.
@@ -103,15 +110,21 @@ sub os_account_cleanup()
     unlink @LOCKFILES;
 
     # Generate the CygWin password and group files from the registry users.
+    # Note that the group membership is not reported into the CygWin files.
     print "Resetting the CygWin passwd and group files.\n";
 
-    my $cmd = "$MKPASSWD -l | $AWK -F: '" . 'BEGIN{ OFS=":" } ';
+    my $cmd = "$MKPASSWD -l | $AWK -F: '";
+    $cmd   .=   'BEGIN{ OFS=":" } ';
     # Make root's UID zero.  Put non-root homedirs under /users, not /home.
-    $cmd   .= '{ if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }';
-    $cmd   .= "' > /etc/passwd";
+    $cmd   .=   '{ if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }'; 
+    $cmd   .= "'";
+    # Apply the users' shell preferences.
+    $cmd   .= " | sed -f $usershellsfile"
+	if (-e $usershellsfile);
+    $cmd   .= " > /etc/passwd";
     ##print "$cmd\n";
     if (system("$cmd") != 0) {
-	print STDERR "Could not generate /etc/password file: $!\n";
+	warning("Could not generate /etc/password file: $!\n");
 	return -1;
     }
 
@@ -121,7 +134,7 @@ sub os_account_cleanup()
     $cmd .= "' > /etc/group";
     ##print "$cmd\n";
     if (system("$cmd") != 0) {
-	print STDERR "Could not generate /etc/group file: $!\n";
+	warning("Could not generate /etc/group file: $!\n");
 	return -1;
     }
     
@@ -179,7 +192,6 @@ sub os_etchosts_line($$$)
 # [Global] or [Local]
 # Group Name,Comment,UserName,...
 # 
-my $winusersfile = "$BOOTDIR/winusers";
 my @groupNames;
 my %groupsByGid;
 my %groupMembers;
@@ -191,12 +203,17 @@ sub os_accounts_start()
     %groupMembers = ();
 
     if (! open(WINUSERS, "> $winusersfile")) {
-	print STDERR "os_accounts_start: Cannot create $winusersfile .\n";
+	warning("os_accounts_start: Cannot create $winusersfile .\n");
+	return -1;
+    }
+
+    if (! open(USERSHELLS, "> $usershellsfile")) {
+	warning("os_accounts_start: Cannot create $usershellsfile .\n");
 	return -1;
     }
 
     # Users come before groups in the addusers.exe account stream.
-    # Notice the <CR>'s.  It's a Windows file.
+    # Notice the <CR><LF>'s!  It's a Windows file.
     print WINUSERS "[Users]\r\n";
 
     return 0;
@@ -280,7 +297,7 @@ sub os_useradd($$$$$$$$$)
 
     # Groups have to be created before we can add members.
     my $gname = $groupsByGid{$gid};
-    warn "*** Missing group name for gid $gid.\n"
+    warning("Missing group name for gid $gid.\n")
 	if (!$gname);
     $groupMembers{$gname} .= "$login ";
     $groupMembers{'Administrators'} .= "$login "
@@ -291,12 +308,15 @@ sub os_useradd($$$$$$$$$)
 	    $groupMembers{$gname} .= "$login ";
 	}
 	else {
-	    warn "*** Missing group name for gid $gid.\n";
+	    warning("Missing group name for gid $gid.\n");
 	}
     }
 		     
     # Map the shell into a full path.
     $shell = MapShell($shell);
+    # Change the ones that are different from the default from mkpasswd, /bin/bash.
+    print USERSHELLS "/^$login:/s|/bin/bash\$|$shell|\n"
+	if ($shell !~ "/bin/bash");
 
     # Use the leading 8 chars of the Unix MD5 passwd hash as a known random
     # password, both here and in Samba.  Skip over a "$1$" prefix.
@@ -320,6 +340,7 @@ sub os_accounts_end()
 	print WINUSERS "$grp,Emulab $grp group,\r\n";
     }
     close WINUSERS;
+    close USERSHELLS;
        
     # Create the whole batch of groups and accounts listed in the file.
     # /p options: Users don't have to change passwords, and they never expire.
@@ -329,7 +350,7 @@ sub os_accounts_end()
     my $cmd = "$ADDUSERS /c '$winfile' /p:le";
     ##print "    $cmd\n";
     if (system($cmd) != 0) {
-	warn "*** WARNING: AddUsers error ($cmd)\n";
+	warning("AddUsers error ($cmd)\n");
 	return -1;
     }
 
@@ -341,12 +362,13 @@ sub os_accounts_end()
 	    my $cmd = "$NET localgroup $grp $mbr /add > /dev/null";
 	    ##print "    $cmd\n";
 	    if (system($cmd) != 0) {
-		warn "*** WARNING: net localgroup error ($cmd)\n";
+		warning("net localgroup error ($cmd)\n");
 	    }
 	}
     }
 
     # Make the CygWin /etc/passwd and /etc/group files match Windows.
+    # Note that the group membership is not reported into the CygWin files.
     return os_account_cleanup();
 }
 
@@ -428,7 +450,7 @@ sub os_routing_add_manual($$$$$;$)
     } elsif ($routetype eq "default") {
 	$cmd = "$ROUTE add default gw $gate";
     } else {
-	warn "*** WARNING: bad routing entry type: $routetype\n";
+	warning("Bad routing entry type: $routetype\n");
 	$cmd = "";
     }
 
@@ -447,7 +469,7 @@ sub os_routing_del_manual($$$$$;$)
     } elsif ($routetype eq "default") {
 	$cmd = "$ROUTE delete default";
     } else {
-	warn "*** WARNING: bad routing entry type: $routetype\n";
+	warning("Bad routing entry type: $routetype\n");
 	$cmd = "";
     }
 
@@ -483,39 +505,29 @@ sub os_samba_mount($$$)
 {
     my ($local, $host, $verbose) = @_;
 
-    # Make the CygWin symlink from the local path to the driveletter automount point.
-    my $localdir = $sambapath = $local;
-    $localdir =~ s|(.*)/.*|$1|;
+    # Make the CygWin mount from the Samba path to the local mount point directory.
+    my $sambapath = $local;
     $sambapath =~ s|.*/(.*)|//$host/$1|;
-    if (length($localdir) && ! -e $localdir) {
-	print "os_samba_mount: Making CygWin '$localdir' directory for symlinks.\n"
+    if (! -e $local) {
+	print "os_samba_mount: Making CygWin '$local' mount point directory.\n"
 	    if ($verbose);
-	if (! os_mkdir($localdir, "0777")) { # Writable so anybody can make symlinks.
-	    print STDERR "os_samba_mount: Failed CygWin mkdir, $cmd.\n";
-	    exit(1);
+	if (! os_mkdir($local, "0755")) {  # Will make whole path if necessary.
+	    warning("os_samba_mount: Could not make mount point $local.\n");
 	}
     }
-    if (-e $local) {
-	print "Removing previous CygWin symlink '$local'.\n"
-	    if ($verbose);
-	$cmd = "$CHOWN `id -un` $local";
-	if (system($cmd) != 0) {
-	    print STDERR 
-		"os_samba_mount: Failed to take ownership of symlink, $cmd.\n";
-	}
-	$cmd = "$RM -f $local";
-	if (system($cmd) != 0) {
-	    print STDERR 
-		"os_samba_mount: Failed to remove previous CygWin symlink, $cmd.\n";
-	    exit(1);
-	}
+    elsif (! -d $local) {
+	warning("os_samba_mount: Mount point $local is not a directory.\n");
     }
-    print "Making CygWin symlink '$local' to '$sambapath'.\n"
+    print "Mounting '$local' from '$sambapath'.\n"
 	if ($verbose);
-    $cmd = "$LN -f -s $sambapath $local";
+
+    # If we don't turn on the -E/--no-executable flag, CygWin mount warns us:
+    #     mount: defaulting to '--no-executable' flag for speed since native path
+    #            references a remote share.  Use '-f' option to override.
+    # Even with -E, exe's and scripts still work properly, so put it in.
+    $cmd = "$MOUNT -E $sambapath $local";
     if (system($cmd) != 0) {
-	print STDERR "os_samba_mount: Failed CygWin symlink, $cmd.\n";
-	exit(1);
+	warning("os_samba_mount: Failed, $cmd.\n");
     }
 }
 
@@ -610,8 +622,7 @@ sub os_fwconfig_line($@)
 {
     my ($fwinfo, @fwrules) = @_;
     my ($upline, $downline);
-    my $errstr = "*** WARNING: Linux firewall not implemented\n";
-
+    my $errstr = "*** WARNING: Windows firewall not implemented\n";
 
     warn $errstr;
     $upline = "echo $errstr; exit 1";
