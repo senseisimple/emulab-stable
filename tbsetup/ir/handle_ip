@@ -1,0 +1,385 @@
+#!/usr/bin/perl -w
+# This rather ugly programs takes a post-assign IR file and the 
+# original ns file and adds the ip and ip-mac sections.  This is 
+# necessary because assign has no awareness of the IP layer.
+
+# LIMITATIONS:
+#  Assumes at most 1 link between any two nodes. [Fixing this limitations
+# would also involved changing the TB cmd syntax]
+
+# This is the prefix used for assigning otherwise unassigned IP addresses:
+$ip_base = "192.168";
+
+push(@INC,"/usr/testbed/lib/tbsetup/ir");
+require libir;
+
+use DBI;
+$driver = "mysql";
+$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost") || do {
+    print STDERR "Could not connect to DB.\n";
+    exit(1);
+};
+
+if ($#ARGV != 1) {
+    print STDERR "Syntax: $0 irfile nsfile\n";
+    exit(1);
+}
+
+($irfile,$nsfile) = @ARGV;
+
+# read IR file
+eval {&ir_read($irfile)};
+if ($@) {
+    print STDERR "Could not read $irfile ($@)\n";
+    exit(1);
+}
+
+# Make sure we have links
+&ir_exists("/topology/links") || do {
+    print STDERR "IR does not contain topology/links section.\n";
+    exit(1);
+};
+
+# open NS file
+open(NSFILE,$nsfile) || do {
+    print STDERR "Could not open $nsfile\n";
+    exit(1);
+};
+
+# Read mac map into vlanmap
+# vlanmap is indexed by vlan name and contains a reference
+# to a list of MACs.
+&ir_exists("/vlan") || do {
+    print STDERR "IR does not contain vlan section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/vlan"))) {
+    @vlan = split;
+    $vlanmap{$vlan[0]} = [@vlan[1..$#vlan]];
+}
+
+# Read in node map into vnodemap and rvnodemap (reverse)
+# vnodemap is indexed by virtual and contains the physical name
+# rvnodemap is indexed by physical name and contains the virtual name.
+&ir_exists("/virtual/nodes") || do {
+    print STDERR "IR does not contain virtual/nodes section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/virtual/nodes"))) {
+    ($virtual,$physical) = split;
+    $vnodemap{$virtual} = $physical;
+    $rvnodemap{$physical} = $virtual;
+}
+
+# Pull the MAC table from the database.
+# MACTABLE is indexed by virtual node name and contains a reference
+# to a list of MACs.
+$sth = $dbh->prepare("SELECT node_id,MAC from interfaces");
+$sth->execute || do {
+    print STDERR "Could not get MAC table from DB.\n";
+    exit(1);
+};
+while (@row = $sth->fetchrow_array) {
+    ($node,$mac) = @row;
+    if (defined($rvnodemap{$node})) {
+	if (! defined($MACTABLE{$rvnodemap{$node}})) {
+	    $MACTABLE{$rvnodemap{$node}} = [];
+	}
+	push(@{$MACTABLE{$rvnodemap{$node}}},$mac);
+    }
+}
+$sth->finish;
+
+# This is a list of error messages
+@ERRORS = ();
+
+# Read NS file
+# IP is indexed either by src or by src:dst and contains the IP address.
+while (<NSFILE>) {
+    if (/^#TB/) {
+	chop;
+	@line = split;
+	$_ = $line[1];
+      SWITCH1: {
+	  /^set-ip$/ && do {
+	      # set-ip <node> <ip>
+	      if ($#line != 3) {
+		  push(@ERRORS,"Syntax: set-ip node ip\n");
+		  last SWITCH1;
+	      } 
+	      ($node,$ip) = @line[2..3];
+	      if (!defined($vnodemap{$node})) {
+		  push(@ERRORS,"$node is not a valid node.\n");
+		  last SWITCH1;
+	      }
+	      # This actually matches a valid IP address
+	      if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
+		  push(@ERRORS,"$ip is not a valid ip address.\n");
+		  last SWITCH1;
+	      }
+	      $IP{$node} = $ip;
+	      last SWITCH1;
+	  };
+	  /^set-ip-interface$/ && do {
+	      # set-ip-interface <node> <dst> <ip>
+	      if ($#line != 4) {
+		  push(@ERRORS,"Syntax: set-ip-interface node dst ip\n");
+		  last SWITCH1;
+	      } 
+	      ($node,$dst,$ip) = @line[2..4];
+	      if (! defined($vnodemap{$node})) {
+		  push(@ERRORS,"$node is not a valid node.\n");
+		  last SWITCH1;
+	      }
+	      if (! defined($vnodemap{$dst})) {
+		  push(@ERRORS,"$dst is not a valid node.\n");
+		  last SWITCH1;
+	      } 
+	      if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
+		  push(@ERRORS,"$ip is not a valid ip address.\n");
+		  last SWITCH1;
+	      }
+	      $IP{"$node:$dst"} = $ip;
+	      last SWITCH1;
+	  }
+      }
+    }
+}
+
+
+# At this point we have most of the data we need.  We now loop through all
+# the virtual links (/topology/links) assigning them IP addresses.  This is 
+# done in two phases.  The first phase uses the TB commands to assign
+# IP addresses.  In the second phase all remaining links are assigned
+# IP addresses.
+
+# There are two IP addresses associated with each link.  Since each link
+# is uniquely defined by it's src and dst we can denote each end of the
+# link by src->dst vs. dst->src.
+
+# We store the ir contents in ip_section.
+$ip_section = '';
+
+# ip_mac_section is actually an array since we need to add this to the
+# DB.  It's values are references to lists of [mac,ip]
+@ip_mac_section = ();
+
+# ips_assigned keeps track of which slots we've filled.  It's indexed by
+# src:dst indicating that the IP at src going to dst is filled.
+
+# ips_node is indexed by node and keeps track of all the IPs currently
+# assigned by a node. This is needed for proper subnetting.  The contents
+# is a reference to a list.
+
+# single_node is used to catch trying to use the set-ip cmd on nodes
+# with multiple links.  It's basically a counter for how much set-ips
+# are done on a node.
+
+# to_assign is filled out with what slots remain to be assigned.  It's
+# indexed by link and contains a reference to a list [src,dst,flag] where 
+# if flag is 0 it indicates the slot src->dst and if flag is one it 
+# indicates that both src->dst and dst->src need to be filled.
+
+# intersect - intersection of two lists.  Takes two list references
+# and returns a single element.
+# We assume that the intersection is of size 1 for optimization.
+sub intersect {
+    local($Aref,$Bref) = @_;
+    local($A,$B);
+    foreach $A (@$Aref) {
+	foreach $B (@$Bref) {
+	    if ($A eq $B) {
+		return $A;
+	    }
+	}
+    }
+    return "";
+};
+
+# get_macs link - Returns all MAC addresses associated with a link.  Because
+# a link can pass through a delay node this may be more than two.  Returns
+# a string.
+sub get_macs {
+    local($i)=0;
+    local($macs)=[];
+
+    while (defined($vlanmap{"$_[0]-$i"})) {
+	push(@$macs,@{$vlanmap{"$_[0]-$i"}});
+	$i++;
+    }
+
+    return $macs;
+};
+
+# Phase 1
+foreach (split("\n",&ir_get("/topology/links"))) {
+    @t = split;
+    ($link,$src,$dst) = @t[0,1,3];
+
+    # We need to do two iterations, (A=src, B=dst) and (A=dst, B=src)
+    $A = $src; $B = $dst;
+    foreach (1..2) {
+	# Look for assigned ip
+	if (defined($IP{"$A:$B"})) {
+	    $ip_section .= "$A $B $IP{$A . ':' . $B}\n";
+	    push(@ip_mac_section, 
+		 [&intersect($MACTABLE{$A},&get_macs($link)),$IP{"$A:$B"}]);
+	    $ips_assigned{$IP{"$A:$B"}} = 1;
+	    if (!defined($ips_node{$A})) {
+		$ips_node{$A} = [];
+	    }
+	    push(@{$ips_node{$A}},$IP{"$A:$B"});
+	} elsif (defined($IP{$A})) {
+	    # node-wide IP address
+	    if (defined($single_node{$A})) {
+		push(@ERRORS,"Can not use set-ip on nodes with multiple links ($A)");
+	    } else {
+		# mark as a single_node
+		$single_node{$A} = 1;
+		$ip_section .= "$A $B $IP{$A}\n";
+		push(@ip_mac_section,
+		     [&intersect($MACTABLE{$A},&get_macs($link)),$IP{$A}]);
+		$ips_assigned{$IP{$A}} = 1;
+		if (!defined($ips_node{$A})) {
+		    $ips_node{$A} = [];
+		}
+		push(@{$ips_node{$A}},$IP{$A});
+	    }
+	} else {
+	    # mark for phase 2
+	    if (defined($to_assign{$link})) {
+		$to_assign{$link} = [$A,$B,1];
+	    } else {
+		$to_assign{$link} = [$A,$B,0];
+	    }
+	}
+	# swap for step 2
+	$A = $dst; $B = $src;
+    }
+}
+
+# Phase 2 - Assigning all unassigned nodes.
+
+# find_free_ip <subnet> - is a try-every-possibility routine that
+# finds the first free ip in a given subnet.
+# Note: unlike in handle_ip.tcl this does not add the return to
+# ips_assigned.
+sub find_free_ip {
+    local($subnet) = $_[0];
+    local($i);
+    for ($i=2;$i<250;$i++) {
+	if (!defined($ips_assigned{"$subnet.$i"})) {
+	    return "$subnet.$i";
+	}
+    }
+    return "";
+};
+  
+# get_subnet <ip> - Just parses out the subnet from an IP address.
+# Note: Does no checking to see if $ip is a correct ip address.
+sub get_subnet {
+    local($ip) = $_[0];
+    local(@t) = split('\.',$ip);
+    return join(".",@t[0..2]);
+};
+
+# find_free_subnet - Another try everything routine for finding
+# an unused subnet.
+sub find_free_subnet {
+    local(%used);
+    local($i);
+
+    foreach (keys(%ips_assigned)) {
+	$used{&get_subnet($_)} = 1;
+    }
+    for ($i=2;$i<250;$i++) {
+	if (!defined($used{"$ip_base.$i"})) {
+	    return "$ip_base.$i";
+	}
+    }
+
+    return "";
+};
+
+foreach $left (keys(%to_assign)) {
+    ($node,$dst,$both) = @{$to_assign{$left}};
+    if ($both == 1) {
+	$subnet = &find_free_subnet();
+	$ipA = &find_free_ip($subnet);
+	$ips_assigned{$ipA} = 1;
+	$ipB = &find_free_ip($subnet);
+	$ips_assigned{$ipB} = 1;
+	$ip_section .= "$node $dst $ipA\n";
+	$macs = &get_macs($left);
+	push(@ip_mac_section,[&intersect($MACTABLE{$node},$macs),$ipA]);
+	$ip_section .= "$dst $node $ipB\n";
+	push(@ip_mac_section,[&intersect($MACTABLE{$dst},$macs),$ipB]);
+	push(@{$ips_node{$node}},$ipA);
+	push(@{$ips_node{$dst}},$ipB);
+    } else {
+	if (defined($IP{"$dst:$node"})) {
+	    $subnet = &get_subnet($IP{"$dst:$node"});
+	} elsif (defined($IP{$dst})) {
+	    $subnet = &get_subnet($IP{$dst});
+	} else {
+	    $subnet = &find_free_subnet();
+	}
+	$ip = &find_free_ip($subnet);
+	$ips_assigned{$ip} = 1;
+	$ip_section .= "$node $dst $ip\n";
+	push(@ip_mac_section,
+	     [&intersect($MACTABLE{$node},&get_macs($left)),$ip]);
+	push(@{$ips_node{$node}},$ip);
+    }
+}
+
+# Output
+if ($#ERRORS != -1) {
+    foreach (@ERRORS) {
+	print STDERR $_ . "\n";
+    }
+    exit(1);
+}
+
+# We need to check whether the section exists arleady or not
+if (! &ir_exists("/ip")) {
+    # Fresh file just append.
+    open(IRFILE,">>$irfile") || do {
+	print STDERR "Can not open $irfile for appending.\n";
+	exit(1);
+    };
+    print IRFILE "START ip\n";
+    print IRFILE "START map\n";
+    print IRFILE $ip_section;
+    print IRFILE "END map\n";
+    print IRFILE "START mac\n";
+    foreach (@ip_mac_section) {
+	($mac,$ip) = @$_;
+	$sth = $dbh->prepare("UPDATE interfaces set IP = \"$ip\" where MAC = \"$mac\"");
+	$sth->execute;
+	print IRFILE "$mac $ip\n";
+    }
+    print IRFILE "END mac\n";
+    print IRFILE "END ip\n";
+    
+    close(IRFILE);
+} else {
+    # Use libir to overwrite.
+    # We need to generate the ip_mac section
+    $ip_mac_raw = "";
+    foreach (@ip_mac_section) {
+	($mac,$ip) = @$_;
+	$sth = $dbh->prepare("UPDATE interfaces set IP = \"$ip\" where MAC = \"$mac\"");
+	$sth->execute;
+	$ip_mac_raw .= "$mac $ip\n";
+    }
+    &ir_set("/ip/map",$ip_section);
+    &ir_set("/ip/mac",$ip_mac_raw);
+    eval {&ir_write($irfile)};
+    if ($@) {
+	print STDERR "Could not write $irfile ($@)\n";
+	exit(1);
+    }
+}
+
+0;
