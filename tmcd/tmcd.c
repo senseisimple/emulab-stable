@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 #include <sys/fcntl.h>
 #include <paths.h>
+#include <setjmp.h>
 #include <mysql/mysql.h>
 #include "decls.h"
 #include "config.h"
@@ -43,12 +44,15 @@
 #define USERDIR		"/users"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
+//#define FSHOSTID	"/usr/testbed/etc/fshostid"
+#define FSHOSTID	"./fshostid"
 
 #define TESTMODE
 #define NETMASK		"255.255.255.0"
 
 /* Defined in configure and passed in via the makefile */
 #define DBNAME_SIZE	64
+#define HOSTID_SIZE	(32+64)
 #define DEFAULT_DBNAME	TBDBNAME
 
 int		debug = 0;
@@ -56,6 +60,7 @@ static int	insecure = 0;
 static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
+static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
 static int	iptonodeid(struct in_addr, char *,char *,char *,char *,int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
@@ -106,6 +111,8 @@ COMMAND_PROTOTYPE(doready);
 COMMAND_PROTOTYPE(doreadycount);
 COMMAND_PROTOTYPE(dolog);
 COMMAND_PROTOTYPE(domounts);
+COMMAND_PROTOTYPE(dosfshostid);
+//COMMAND_PROTOTYPE(dosfsmounts);
 COMMAND_PROTOTYPE(doloadinfo);
 COMMAND_PROTOTYPE(doreset);
 COMMAND_PROTOTYPE(dorouting);
@@ -139,6 +146,8 @@ struct command {
 	{ "ready",	doready },
 	{ "log",	dolog },
 	{ "mounts",	domounts },
+	{ "sfshostid",	dosfshostid },
+//	{ "sfsmounts",	dosfsmounts },
 	{ "loadinfo",	doloadinfo},
 	{ "reset",	doreset},
 	{ "routing",	dorouting},
@@ -241,6 +250,29 @@ main(int argc, char **argv)
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
 	info("%s\n", build_info);
 
+	/*
+	 * Get FS's SFS hostid
+	 * XXX This approach is somewhat kludgy
+	 */
+	strcpy(fshostid, "");
+	if (access(FSHOSTID,R_OK) == 0) {
+		fp = fopen(FSHOSTID, "r");
+		if (!fp) {
+			error("Failed to get FS's hostid");
+		}
+		else {
+			fgets(fshostid, HOSTID_SIZE, fp);
+			if (rindex(fshostid, '\n')) {
+				*rindex(fshostid, '\n') = 0;
+			}
+			else {
+				error("fshostid from %s may be corrupt: %s",
+				      FSHOSTID, fshostid);
+			}
+			fclose(fp);
+		}
+	}
+	
 	/*
 	 * Grab our IP for security check below.
 	 */
@@ -1073,8 +1105,9 @@ COMMAND_PROTOTYPE(doaccounts)
 	row = mysql_fetch_row(res);
 	while (nrows) {
 		MYSQL_ROW	nextrow;
-		MYSQL_RES	*pubkeys_res;	
-		int		pubkeys_nrows, i, root = 0;
+		MYSQL_RES	*pubkeys_res;
+		MYSQL_RES	*sfskeys_res;
+		int		pubkeys_nrows, sfskeys_nrows, i, root = 0;
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
 
@@ -1213,6 +1246,40 @@ COMMAND_PROTOTYPE(doaccounts)
 			}
 		}
 		mysql_free_result(pubkeys_res);
+
+		if (vers < 6)
+			goto skipkeys;
+
+		/*
+		 * Need a list of SFS keys for this user.
+		 */
+		sfskeys_res = mydb_query("select comment,pubkey "
+					 " from user_sfskeys "
+					 "where uid='%s'",
+					 2, row[0]);
+
+		if (!sfskeys_res) {
+			error("ACCOUNTS: %s: DB Error getting SFS keys\n", row[0]);
+			goto skipkeys;
+		}
+		if ((sfskeys_nrows = (int)mysql_num_rows(sfskeys_res))) {
+			while (sfskeys_nrows) {
+				MYSQL_ROW	sfskey_row;
+
+				sfskey_row = mysql_fetch_row(sfskeys_res);
+
+				sprintf(buf, "SFSKEY KEY=\"%s\"\n",
+					sfskey_row[1]);
+
+				client_writeback(sock, buf, strlen(buf), tcp);
+				sfskeys_nrows--;
+
+				info("ACCOUNTS: SFSKEY LOGIN=%s COMMENT=%s\n",
+				     row[0], sfskey_row[0]);
+			}
+		}
+		mysql_free_result(sfskeys_res);
+		
 	skipkeys:
 		row = nextrow;
 	}
@@ -2018,6 +2085,8 @@ COMMAND_PROTOTYPE(domounts)
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows;
+	int		usesfs;
+	char		*bp;
 
 	/*
 	 * Now check reserved table
@@ -2028,22 +2097,74 @@ COMMAND_PROTOTYPE(domounts)
 	}
 
 	/*
-	 * Return project mount first. 
+	 * Should SFS mounts be served?
 	 */
-	sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
-		FSPROJDIR, pid, PROJDIR, pid);
-	client_writeback(sock, buf, strlen(buf), tcp);
+	usesfs = 0;
+	if (vers >= 6 && strlen(fshostid)) {
+		while ((bp = strsep(&rdata, " ")) != NULL) {
+			if (sscanf(bp, "USESFS=%d", &usesfs) == 1) {
+				continue;
+			}
 
-	/*
-	 * If pid!=gid, then this is group experiment, and we return
-	 * a mount for the group directory too.
-	 */
-	if (strcmp(pid, gid)) {
-		sprintf(buf, "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
-			FSGROUPDIR, pid, gid, GROUPDIR, pid, gid);
-		client_writeback(sock, buf, strlen(buf), tcp);
+			error("Unknown parameter to domounts: %s\n",
+			      bp);
+			break;
+		}
+
+		if (debug) {
+			if (usesfs) {
+				info("Using SFS\n");
+			}
+			else {
+				info("Not using SFS\n");
+			}
+		}
 	}
+	
+	/*
+	 * If SFS is in use, the project mount is done via SFS.
+	 */
+	if (!usesfs) {
+		/*
+		 * Return project mount first. 
+		 */
+		sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+			FSPROJDIR, pid, PROJDIR, pid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		info("MOUNTS: %s", buf);
+		
+		/*
+		 * If pid!=gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(pid, gid)) {
+			sprintf(buf, "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
+				FSGROUPDIR, pid, gid, GROUPDIR, pid, gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+		}
+	}
+	else {
+		/*
+		 * Return SFS-based project mount.
+		 */
+		sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+			fshostid, FSDIR_PROJ, pid, PROJDIR, pid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		info("MOUNTS: %s", buf);
 
+		/*
+		 * Return SFS-based group mount.
+		 */
+		if (strcmp(pid, gid)) {
+			sprintf(buf, "SFS REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
+				fshostid, FSDIR_GROUPS, pid, gid,
+				GROUPDIR, pid, gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+		}
+	}
+	
 	/*
 	 * Now check for aux project access. Return a list of mounts for
 	 * those projects.
@@ -2111,6 +2232,126 @@ COMMAND_PROTOTYPE(domounts)
 		info("MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Used by dosfshostid to make sure NFS doesn't give us problems.
+ * (This code really unnerves me)
+ */
+int sfshostiddeadfl;
+jmp_buf sfshostiddeadline;
+static void
+dosfshostiddead()
+{
+	sfshostiddeadfl = 1;
+	longjmp(sfshostiddeadline, 1);
+}
+
+/*
+ * Create dirsearch entry for node.
+ */
+COMMAND_PROTOTYPE(dosfshostid)
+{
+	char	pid[64];
+	char	eid[64];
+	char	gid[64];
+	char	nickname[128];
+	char	nodehostid[HOSTID_SIZE];
+	char	sfspath[MYBUFSIZE], dspath[MYBUFSIZE];
+
+	if (!strlen(fshostid)) {
+		/* SFS not being used */
+		info("dosfshostid: Called while SFS is not in use\n");
+		return 0;
+	}
+	
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("dosfshostid: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	if (nodeidtonickname(nodeid, nickname))
+		strcpy(nickname, nodeid);
+
+	/* XXX Make sure that the dirsearch dir exists (more NFS goop) */
+	
+	/*
+	 * Create symlink names
+	 */
+	if (! sscanf(rdata, "%s", nodehostid)) {
+		error("dosfshostid: No hostid reported!\n");
+		return 1;
+	}
+	sprintf(sfspath, "/sfs/%s", nodehostid);
+	// sprintf(dspath, "/proj/%s/.sfs/%s/%s", pid, eid, nickname);
+	sprintf(dspath, "/proj/.sfs/%s.%s.%s", nickname, eid, pid);
+	
+	/*
+	 * Really, there should be a cleaner way of doing this, but
+	 * this works, at least for now.  Perhaps using the DB and a
+	 * symlinking deamon alone would be better.
+	 */
+	if (setjmp(sfshostiddeadline) == 0) {
+		sfshostiddeadfl = 0;
+		signal(SIGALRM, dosfshostiddead);
+		alarm(1);
+
+		unlink(dspath);
+		if (symlink(sfspath, dspath) < 0)
+			sfshostiddeadfl = 1;
+	}
+	alarm(0);
+	if (sfshostiddeadfl) {
+		errorc("symlinking %s to %s", dspath, sfspath);
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ * Return SFS-based mounts.
+ * XXX This is _completely_ unused, and will be removed.
+ */
+COMMAND_PROTOTYPE(dosfsmounts)
+{
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE];
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("MOUNTS: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	if (strlen(fshostid)) {
+		/*
+		 * Return project mount first.
+		 */
+		sprintf(buf, "REMOTE=%s%s/%s LOCAL=%s/%s\n",
+			fshostid, FSDIR_PROJ, pid, PROJDIR, pid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+
+		/*
+		 * If pid!= gid, then this is group experiment, and we return
+		 * a mount for the group directory too.
+		 */
+		if (strcmp(pid, gid)) {
+			sprintf(buf, "REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
+				fshostid, FSDIR_GROUPS, pid, gid,
+				GROUPDIR, pid, gid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+	}
 
 	return 0;
 }

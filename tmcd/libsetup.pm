@@ -79,6 +79,7 @@ sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
 sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
+sub TMSFSMOUNTDB()	{ "$SETUPDIR/sfsmountdb"; }
 sub TMROUTECONFIG()     { ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.route";}
 sub TMTRAFFICCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.traffic";}
 sub TMTUNNELCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.tunnel";}
@@ -87,12 +88,20 @@ sub TMPASSDB()		{ "$SETUPDIR/passdb"; }
 sub TMGROUPDB()		{ "$SETUPDIR/groupdb"; }
 
 #
+# Whether or not to use SFS (the self-certifying file system).  If this
+# is 0, fall back to NFS.  Note that it doesn't hurt to set this to 1
+# even if TMCD is not serving out SFS mounts, or if this node is not
+# running SFS.  It'll deal and fall back to NFS.
+#
+my $USESFS		= 1;
+
+#
 # This is the VERSION. We send it through to tmcd so it knows what version
 # responses this file is expecting.
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 5; };
+sub TMCD_VERSION()	{ 6; };
 
 #
 # These are the TMCC commands. 
@@ -117,6 +126,8 @@ sub TMCCCMD_TUNNEL()	{ "tunnels"; }
 sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
 sub TMCCCMD_VNODELIST() { "vnodelist"; }
 sub TMCCCMD_ISALIVE()   { "isalive"; }
+sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
+sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 
 #
 # Some things never change.
@@ -129,7 +140,8 @@ my $VTUND       = "/usr/local/sbin/vtund";
 # This is a debugging thing for my home network.
 # 
 #my $NODE	= "-p 7778 REDIRECT=192.168.100.1";
-$NODE		= "";
+my $NODE	= "-p 7779";
+#$NODE		= "";
 
 # Locals
 my $pid		= "";
@@ -324,12 +336,20 @@ sub domounts()
     my %MDB;
     my %mounts;
     my %deletes;
-    
-    $TM = OPENTMCC(TMCCCMD_MOUNTS);
+    my %sfsmounts;
+    my %sfsdeletes;
+
+    $TM = OPENTMCC(TMCCCMD_MOUNTS, "USESFS=$USESFS");
 
     while (<$TM>) {
-	if ($_ =~ /REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	if ($_ =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 	    $mounts{$1} = $2;
+	}
+	elsif ($_ =~ /^SFS REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	    $sfsmounts{$1} = $2;
+	}
+	else {
+	    warn "*** WARNING: Malformed mount information: $_\n";
 	}
     }
     CLOSETMCC($TM);
@@ -410,6 +430,269 @@ sub domounts()
 	# Only delete from set if we can actually unmount it. This way
 	# we can retry it later (or next time).
 	# 
+	$deletes{$remote} = $local;
+    }
+    while (($remote, $local) = each %deletes) {
+	delete($MDB{$remote});
+    }
+
+    # Write the DB back out!
+    dbmclose(%MDB);
+
+    #
+    # Now, do basically the same thing over again, but this time for
+    # SFS mounted stuff
+    #
+
+    if (scalar(%sfsmounts)) {
+	dbmopen(%MDB, TMSFSMOUNTDB, 0660);
+	
+	#
+	# First symlink all the mounts we are told to. For each one
+	# that is not currently symlinked, and can be, add it to the
+	# DB.
+	#
+	while (($remote, $local) = each %sfsmounts) {
+	    if (-l $local) {
+		if (readlink($local) eq ("/sfs/" . $remote)) {
+		    $MDB{$remote} = $local;
+		    next;
+		}
+		if (readlink($local) ne ("/sfs/" . $remote)) {
+		    print STDOUT "  Unlinking incorrect symlink $local\n";
+		    if ( ! unlink($local)) {
+			warn "*** WARNING: Could not unlink $local: $!\n";
+			next;
+		    }
+		}
+	    }
+	    
+	    $dir = $local;
+	    $dir =~ s/(.*)\/[^\/]*$/$1/;
+	    if (! -e $dir) {
+		print STDOUT "  Making directory $dir\n";
+		if (! os_mkdir($dir, 755)) {
+		    warn "*** WARNING: Could not make directory $local: $!\n";
+		    next;
+		}
+	    }
+	    print STDOUT "  Symlinking $remote on $local\n";
+	    if (! symlink("/sfs/" . $remote . "/", $local)) {
+		warn "*** WARNING: Could not make symlink $local: $!\n";
+		next;
+	    }
+	    
+	    $MDB{$remote} = $local;
+	}
+
+	#
+	# Now delete the ones that we symlinked previously, but are
+	# now no longer in the mount set (as told to us by the TMCD).
+	# Note, we cannot delete them directly from MDB since that
+	# would mess up the foreach loop, so just stick them in temp
+	# and postpass it.
+	#
+	while (($remote, $local) = each %MDB) {
+	    if (defined($sfsmounts{$remote})) {
+		next;
+	    }
+	    
+	    if (! -e $local) {
+		$sfsdeletes{$remote} = $local;
+		next;
+	    }
+	    
+	    print STDOUT "  Deleting symlink $local\n";
+	    if (! unlink($local)) {
+		warn "*** WARNING: Could not delete $local: $!\n";
+		next;
+	    }
+	    
+	    #
+	    # Only delete from set if we can actually unlink it.  This way
+	    # we can retry it later (or next time).
+	    #
+	    $sfsdeletes{$remote} = $local;
+	}
+	while (($remote, $local) = each %sfsdeletes) {
+	    delete($MDB{$remote});
+	}
+
+	# Write the DB back out!
+	dbmclose(%MDB);	
+    }
+    else {
+	# There were no SFS mounts reported, so disable SFS
+	$usesfs = 0;
+    }
+
+    return 0;
+}
+
+#
+# Do SFS hostid setup.
+# Creates an SFS host key for this node, if it doesn't already exist,
+# and sends it to TMCD
+#
+sub dosfshostid ()
+{
+    my $TM;
+    my $myhostid;
+
+    # Do I already have a host key?
+#      if (-e "/etc/sfs/sfs_host_key") {
+#  	print STDOUT "  This node already has a host key\n";
+#      }
+#      else {
+#          # Create my host key
+#  	if (! -e "/etc/sfs") {
+#  	    if (! os_mkdir("/etc/sfs", 0755)) {
+#  		warn "*** WARNING: Could not make directory /etc/sfs: $!\n";
+#  	    }
+#  	}
+	
+#  	if (! -e "/etc/sfs/sfs_host_key") {
+#  	    print STDOUT "  Creating SFS host key\n";
+#  	    if (system("sfskey gen -KPn $vname.$eid.$pid ".
+#  		       "/etc/sfs/sfs_host_key")) {
+#  		warn "*** WARNING: Could not generate SFS host key: $!\n";
+#  		$USESFS = 0;
+#  		return 1;
+#  	    }
+#  	}
+#      }
+    if (! -e "/etc/sfs/sfs_host_key") {
+	warn "*** This node does not have a host key, skipping SFS stuff\n";
+	$USESFS = 0;
+	return 1;
+    }
+
+    # Start SFS server and client (this has to be done now, as opposed
+    # to in an rc script, because the hostkey has to exist)
+#      if (system($SFSSD)) {
+#  	warn "*** Failed to start sfssd\n";
+#  	$USESFS = 0;
+#  	return 1;
+#      }
+#      if (system($SFSCD)) {
+#  	warn "*** Failed to start sfscd\n";
+#  	$USESFS = 0;
+#  	return 1;
+#      }
+
+    # Give hostid to TMCD
+    # IAMHERE: sfssd needs to be running for this call to succeed
+    #   Directory needs to exist on fs/proj
+    open(SFSKEY, "sfskey hostid - |")
+	or die "Cannot start sfskey";
+    $myhostid = <SFSKEY>;
+    close(SFSKEY);
+    if (defined($myhostid)) {
+	if ( $myhostid =~ /^([-\.\w_]*:[a-z0-9]*)$/ ) {
+	    $myhostid = $1;
+	    print STDOUT "  Hostid: $myhostid\n";
+	    RUNTMCC(TMCCCMD_SFSHOSTID, "$myhostid");
+	}
+	else {
+	    warn "*** WARNING: Invalid hostid\n";
+	}
+    }
+    else {
+	warn "*** WARNING: Could not retrieve this node's hostid (is sfssd running?)\n";
+	$USESFS = 0;
+    }
+
+    return 0;
+}
+
+#
+# Create SFS "mounts" (which are really just symlinks).  The remote side
+# of the mount is relative to /sfs and includes the server hostname, the
+# server's hostid, and the path on the server.  The local side is simply
+# the path relative to / to symlink to the remote sfs directory.  This
+# closely follows domounts()
+#
+sub dosfsmounts()
+{
+    my $TM;
+    my %MBD;
+    my %mounts;
+    my %deletes;
+
+    die("*** Don't call dosfsmounts!");
+    
+    $TM = OPENTMCC(TMCCCMD_SFSMOUNTS);
+
+    while (<$TM>) {
+	if ($_ =~ /REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	    $mounts{$1} = $2;
+	}
+    }
+    CLOSETMCC($TM);
+
+    dbmopen(%MDB, TMSFSMOUNTDB, 0660);
+    
+    #
+    # First symlink all the mounts we are told to. For each one that is
+    # not currently symlinked, and can be, add it to the DB.
+    #
+    while (($remote, $local) = each %mounts) {
+	if (-l $local && readlink($local) eq ("/sfs/" . $remote)) {
+	    $MDB{$remote} = $local;
+	    next;
+	}
+	if ( ! -l $local ) {
+	    print STDOUT "  Unlinking incorrect symlink $local\n";
+	    if ( ! unlink($local)) {
+		warn "*** WARNING: Could not unlink $local: $!\n";
+		next;
+	    }
+	}
+
+	$dir = $local;
+	$dir =~ s/(.*)\/[^\/]*$/$1/;
+	if (! -e $dir) {
+	    print STDOUT "  Making directory $dir\n";
+	    if (! os_mkdir($dir, 755)) {
+		warn "*** WARNING: Could not make directory $local: $!\n";
+		next;
+	    }
+	}
+	print STDOUT "  Symlinking $remote on $local\n";
+	if (! symlink("/sfs/" . $remote, $local)) {
+	    warn "*** WARNING: Could not make symlink $local: $!\n";
+	    next;
+	}
+
+	$MDB{$remote} = $local;
+    }
+
+    #
+    # Now delete the ones that we symlinked previously, but are now no
+    # longer in the mount set (as told to us by the TMCD). Note, we
+    # cannot delete them directly from MDB since that would mess up the
+    # foreach loop, so just stick them in temp and postpass it.
+    #
+    while (($remote, $local) = each %MDB) {
+	if (defined($mounts{$remote})) {
+	    next;
+	}
+
+	if (! -e $local) {
+	    $deletes{$remote} = $local;
+	    next;
+	}
+
+	print STDOUT "  Deleting symlink $local\n";
+	if (! unlink($local)) {
+	    warn "*** WARNING: Could not delete $local: $!\n";
+	    next;
+	}
+
+	#
+	# Only delete from set if we can actually unlink it.  This way
+	# we can retry it later (or next time).
+	#
 	$deletes{$remote} = $local;
     }
     while (($remote, $local) = each %deletes) {
@@ -696,6 +979,7 @@ sub doaccounts()
     my %newaccounts = ();
     my %newgroups   = ();
     my %pubkeys     = ();
+    my @sfskeys     = ();
     my %deletes     = ();
     my %lastmod     = ();
     my %PWDDB;
@@ -738,6 +1022,13 @@ sub doaccounts()
 		$pubkeys{$1} = [];
 	    }
 	    push(@{$pubkeys{$1}}, $2);
+	    next;
+	}
+	elsif ($_ =~ /^SFSKEY KEY="(.*)"/) {
+	    #
+	    # SFS key goes into the array.
+	    #
+	    push(@sfskeys, $1);
 	    next;
 	}
 	else {
@@ -966,7 +1257,7 @@ sub doaccounts()
 		    next;
 		}
 	    }
-		
+	    
 	    if (!open(AUTHKEYS, "> $sshdir/authorized_keys.new")) {
 		warn("*** WARNING: Could not open $sshdir/keys.new: $!\n");
 		next;
@@ -1016,6 +1307,78 @@ sub doaccounts()
     # Write the DB back out!
     dbmclose(%PWDDB);
 
+    #
+    # Create sfs_users file and populate it with public SFS keys
+    #
+    do {
+	if (!open(SFSKEYS, "> /etc/sfs/sfs_users.new")) {
+	    warn("*** WARNING: Could not open /etc/sfs/sfs_users.new: $!\n");
+	    next;
+	}
+
+	print SFSKEYS "#\n";
+	print SFSKEYS "# DO NOT EDIT! This file auto generated by ".
+	    "Emulab.Net account software.\n";
+	print SFSKEYS "#\n";
+	print SFSKEYS "# Please use the web interface to edit your ".
+	    "SFS public key list.\n";
+	print SFSKEYS "#\n";
+	foreach my $key (@sfskeys) {
+	    print SFSKEYS "$key\n";
+	}
+	close(SFSKEYS);
+
+	# Because sfs_users only contains public keys, sfs_users.pub is
+	# exactly the same
+	if (system("cp -p -f /etc/sfs/sfs_users.new ".
+		   "/etc/sfs/sfs_users.pub.new")) {
+	    warn("*** Could not copy /etc/sfs/sfs_users.new to ".
+		 "sfs_users.pub.new: $!\n");
+	    next;
+	}
+	
+	if (!chown(0, 0, "/etc/sfs/sfs_users.new")) {
+	    warn("*** WARNING: Could not chown /etc/sfs/sfs_users.new: $!\n");
+	    next;
+	}
+	if (!chmod(0600, "/etc/sfs/sfs_users.new")) {
+	    warn("*** WARNING: Could not chmod /etc/sfs/sfs_users.new: $!\n");
+	    next;
+	}
+	
+	if (!chown(0, 0, "/etc/sfs/sfs_users.pub.new")) {
+	    warn("*** WARNING: Could not chown /etc/sfs/sfs_users.pub.new: $!\n");
+	    next;
+	}
+	if (!chmod(0644, "/etc/sfs/sfs_users.pub.new")) {
+	    warn("*** WARNING: Could not chmod /etc/sfs/sfs_users.pub.new: $!\n");
+	    next;
+	}
+
+	# Save off old key files and move in new ones
+	foreach my $keyfile ("/etc/sfs/sfs_users",
+			     "/etc/sfs/sfs_users.pub") {
+	    if (-e $keyfile) {
+		if (system("cp -p -f $keyfile $keyfile.old")) {
+		    warn("*** Could not save off $keyfile: $!\n");
+		    next;
+		}
+		if (!chown(0, 0, "$keyfile")) {
+		    warn("*** Could not chown $keyfile: $!\n");
+		}
+		if (!chmod(0600, "$keyfile")) {
+		    warn("*** Could not chmod $keyfile: $!\n");
+		}
+	    }
+	    if (system("mv -f $keyfile.new $keyfile")) {
+		warn("*** Could not mv $keyfile: ~!\n");
+	    }
+	}
+	
+	# The do-while is an easy way out in case of errors
+    }
+    while 0;
+    
     return 0;
 }
 
@@ -1469,8 +1832,17 @@ sub bootsetup()
     #
     create_nicknames();
 
+    if ($USESFS && ! MFS()) {
+	#
+	# Setup SFS hostid.
+	#
+	print STDOUT "Creating node SFS hostid ... \n";
+	dosfshostid();
+    }
+
     #
-    # Mount the project and user directories
+    # Mount the project and user directories and symlink SFS "mounted"
+    # directories
     #
     print STDOUT "Mounting project and home directories ... \n";
     domounts();
@@ -1563,8 +1935,17 @@ sub nodeupdate()
 	return 0;
     }
 
+    if ($USESFS && ! MFS()) {
+	#
+	# Setup SFS hostid.
+	#
+	print STDOUT "Creating node SFS hostid ... \n";
+	dosfshostid();
+    }
+
     #
-    # Mount the project and user directories
+    # Mount the project and user directories and symlink SFS "mounted"
+    # directories
     #
     print STDOUT "Mounting project and home directories ... \n";
     domounts();
