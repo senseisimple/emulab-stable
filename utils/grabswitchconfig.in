@@ -27,7 +27,7 @@ sub usage() {
     exit 1;
 }
 
-if (!TBAdmin($UID)) {
+if ($UID && !TBAdmin($UID)) {
     die "*** $0:\n" .
         "    Sorry, only admins get to run this script\n";
 }
