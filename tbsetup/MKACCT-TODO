@@ -1,4 +1,4 @@
-$Id: MKACCT-TODO,v 1.3 2000-12-05 01:05:20 kwright Exp $
+$Id: MKACCT-TODO,v 1.4 2000-12-14 13:33:07 kwright Exp $
 
 (We can move this to attic when all the account/user setup stuff is
 finished.)
@@ -7,38 +7,15 @@ finished.)
 STUFF TO SET UP USER ACCOUNTS, DIRECTORIES ON CONTROL AND TESTBED NODES
 -----------------------------------------------------------------------
 
-x add installation stuff to makefiles (similar to mkprojdir)
-  for mkacct stuff. all must be setuid root.
-
-x fix UID EUID problem in mkacct
-
-x fix UID EUID problem in mkacct-ctrl
+- write rmacct-ctrl: remove accounts from control node; called when
+	user removed from database. because there is no 
+	form to kill a project now, this can probably wait. 
 
 - test rmacct (tested as tu1 and i couldn't ssh uname to testbed nodes;
   i do have to be root for testbed ssh's since there will be
   no ssh keys for other than root - think i just have to change this) 
 
-- add hooks for mkacct/rmacct into tbrun/end
-
-x rewrite mkacct because it sucks. it uses chpass and a gazillion
-  piped shell commands, some of which can be eliminated by using pw
-  or built-in shell functions (like chmod(), for example)
-
-x to finish mkacct-ctrl, version 1: 
-	x finish pw call in mkacct-ctrl
-	x move user dir creation from mkacct to mkacct-ctrl
-        x take out su1 calls; its setuid now (tried this but commands
-	  executed not as root but as real uid
-
-x remove user dir tar & removal from rmacct to rmacct-ctrl (see
-  note about rmacct-ctrl below); this entails changing call from
-  rmuser to pw userdel.
-
-x fix privs in mkacct and rmacct to check that:
-	- the $UID (real user ID)  has group_root in the project OR    
-	- $UID = 0
-	- the $UID has admin privs
-  (currently, only check is that user is root (tbroot works))
+-  add hook for rmacct to tbend
 
 - bootstrap current users on plastic so they have accounts. 
 
@@ -53,10 +30,6 @@ x fix privs in mkacct and rmacct to check that:
 - create a script to rebuild the tb-user email list. call when a 
 	user is added. build from scratch using database fields
      	(general principle for db).
-
-- do rmacct-ctrl: remove accounts from control node; called when
-	user removed from database. because there is no 
-	form to kill a project now, this can probably wait. 
 
 - check to see where we need to use "lockfile" in mkacct/rmacct stuff. 
 	From email:
@@ -79,6 +52,35 @@ x fix privs in mkacct and rmacct to check that:
 
 	Lbs
 
-- make regexps in mkacct-ctrl use //i convention and allow dashes 
+x make regexps in mkacct-ctrl use //i convention and allow dashes 
   for projects and experiments. 
+
+x add hooks for mkacct into end
+
+x add installation stuff to makefiles (similar to mkprojdir)
+  for mkacct stuff. all must be setuid root.
+
+x fix UID EUID problem in mkacct
+
+x fix UID EUID problem in mkacct-ctrl
+
+x rewrite mkacct because it sucks. it uses chpass and a gazillion
+  piped shell commands, some of which can be eliminated by using pw
+  or built-in shell functions (like chmod(), for example)
+
+x to finish mkacct-ctrl, version 1: 
+	x finish pw call in mkacct-ctrl
+	x move user dir creation from mkacct to mkacct-ctrl
+        x take out su1 calls; its setuid now (tried this but commands
+	  executed not as root but as real uid
+
+x remove user dir tar & removal from rmacct to rmacct-ctrl (see
+  note about rmacct-ctrl below); this entails changing call from
+  rmuser to pw userdel.
+
+x fix privs in mkacct and rmacct to check that:
+	- the $UID (real user ID)  has group_root in the project OR    
+	- $UID = 0
+	- the $UID has admin privs
+  (currently, only check is that user is root (tbroot works))
 
