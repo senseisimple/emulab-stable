@@ -1597,3 +1597,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	Whats vport about? Rather then rely on IP addresses to form a
 	unique key, we use vport (a small integer) so that we can delay the
 	IP assignment until later (after initial DB insertion).
+
+1.250: Add another index to virt_lans for above change.
+
+	alter table virt_lans add index vnode (pid,eid,vnode);
+

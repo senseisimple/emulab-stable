@@ -1669,7 +1669,8 @@ CREATE TABLE virt_lans (
   trivial_ok tinyint(4) default '1',
   protocol varchar(30) NOT NULL default 'ethernet',
   is_accesspoint tinyint(4) default '0',
-  KEY pid (pid,eid,vname)
+  KEY pid (pid,eid,vname),
+  KEY vnode (pid,eid,vnode)  
 ) TYPE=MyISAM;
 
 --
