@@ -560,10 +560,6 @@ void NetRouter::print(std::ostream & output) const
     }
 }
 
-void NetRouter::printStatistics(std::ostream & output) const
-{
-}
-
 void NetRouter::addBorderConnection(size_t first, size_t second,
                                     size_t firstHop, int weight)
 {

@@ -7,7 +7,6 @@
  */
 
 #include "lib.h"
-#include "Exception.h"
 #include "bitmath.h"
 #include "LanRouter.h"
 #include "coprocess.h"
@@ -15,7 +14,6 @@
 using namespace std;
 
 LanRouter::LanRouter()
-    : routeCount(0)
 {
 }
 
@@ -286,7 +284,6 @@ std::pair<size_t,size_t> LanRouter::chooseLan(size_t nodeNumber,
 
 void LanRouter::print(ostream & output) const
 {
-    routeCount = 0;
     output << "%%" << endl;
     for (size_t i = 0; i < routingTable.size(); ++i)
     {
@@ -322,7 +319,6 @@ void LanRouter::print(ostream & output) const
                                << ipToString(m_levelPrefix[0][firstLan]
                                              + increment)
                                << endl;
-                        ++routeCount;
                     }
 
                 }
@@ -336,30 +332,6 @@ void LanRouter::print(ostream & output) const
             output << "%%" << endl;
         }
     }
-}
-
-void LanRouter::printStatistics(ostream & output) const
-{
-    size_t hostCount = m_nodeToLevel[0].size();
-    output << "Total Number of Routes: " << routeCount << endl;
-
-    // calculate route length from every node to every interface.
-    // This should be equivalent to calculating a route length from every
-    // interface to every node.
-    int totalRouteLength = 0;
-    // for each node
-    for (size_t i = 0; i < hostCount; ++i)
-    {
-        if (isValidNode(i))
-        {
-            // for each LAN in the graph
-            for (size_t j = 0; j < m_levelMakeup.size(); ++j)
-            {
-                totalRouteLength += distanceToLan(i, j);
-            }
-        }
-    }
-    output << "Total Route Length: " << totalRouteLength << endl;
 }
 
 int LanRouter::distanceToLan(size_t sourceNode, size_t destLan) const

@@ -6,6 +6,14 @@
  * All rights reserved.
  */
 
+// This strategy takes advantage of all layers of hierarchy given to us by
+// IP assignment. I use a method that is akin to dynamic programming. I
+// Approximate a solution at the lowest level of the hierarchy, then use that
+// approximation to get an approximate solution at the next higher level and
+// so on until I reach the top.
+
+// TODO: Change this so that disconnected graphs are accepted.
+
 #ifndef NET_ROUTER_H_IP_ASSIGN_2
 #define NET_ROUTER_H_IP_ASSIGN_2
 
@@ -20,21 +28,51 @@ public:
 
     virtual void calculateRoutes(void);
     virtual void print(std::ostream & output) const;
-    virtual void printStatistics(std::ostream & output) const;
 private:
     struct RouteInfo
     {
-        RouteInfo() : firstLan(0), firstNode(0), destination(0), distance(INT_MAX) {}
+        // The source in RouteInfo is always a host.
+        RouteInfo() : firstLan(0), firstNode(0),
+            destination(0), distance(INT_MAX) {}
+        // The first LAN on the path to the destination (If there is only one
+        // hop, this is the destination).
+
         size_t firstLan;
+
+        // The first node on the path to the destination. If the destination
+        // is a LAN connected to this host, the firstNode is this host.
         size_t firstNode;
+
+        // In most cases, this is a border LAN number. But see nodeToPartition
+        // for the exception.
         size_t destination;
+
+        // Weight of the route to destination. node-lan routes include both
+        // the first LAN weight and the destination weight. This meshes with
+        // how lan-lan distances are stored. See below for details.
         int distance;
     };
+    // This is a map associating (source-host,destination-LAN) pairs with
+    // routing info.
     // map<pair<node number,destination>,route>
     typedef std::map<pair<size_t,size_t>,RouteInfo> NodeBorderMap;
 private:
+    // Set up the data structures for the LAN level. This is the lowest
+    // level and represents a sort of base-case which is then used to
+    // calculate the routes on each higher level in turn.
     void setup(void);
+
+    // Is this LAN a border LAN at a particular level? A LAN may be a border
+    // LAN at some level, but be an internal LAN at higher level. At the very
+    // bottom level, each LAN is its own partition and therefore every LAN is
+    // a border LAN.
     bool isBorderLan(size_t level, size_t lan) const;
+
+    // We have a partition on a certain level. That partition is made
+    // up of sub-partitions on the level below. Each sub-partition has
+    // borders to other sub-partitions within the partition. This
+    // method calculates the paths between all-pairs of borders on a
+    // particular sub-partition.
     void calculateBorderToBorderPaths(size_t level, size_t partition);
     void calculateNodeToBorderPaths(size_t level, size_t partition);
     void findNodeToBorder(NodeBorderMap::iterator searchPos,
