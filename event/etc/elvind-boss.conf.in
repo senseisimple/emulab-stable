@@ -3,7 +3,7 @@
 # This file contains the standard elvind settings specified in the form
 # attribute	value
 #
-# "@(#)$RCSfile: elvind-boss.conf.in,v $ $Revision: 1.1 $"
+# "@(#)$RCSfile: elvind-boss.conf.in,v $ $Revision: 1.2 $"
 
 
 ################################################################
@@ -52,8 +52,7 @@ scope           testbed
 # that will handle all non-specific attempts at discovery.  This
 # option sets the server to be the default scope for server discovery.
 #
-#default	off
-default		on
+default	off
 
 ################################################################
 # cluster
