@@ -46,10 +46,10 @@ in the following small example:
 	tb-set-node-lan-setting $lan0 $nodew1 "txpower" "auto"
 
 	# You must use Redhat 9.0 on wireless capable nodes.
-	tb-set-node-os $nodew1 RHL90-LBS
-	tb-set-node-os $nodew2 RHL90-LBS
-	tb-set-node-os $nodew3 RHL90-LBS
-	tb-set-node-os $nodew4 RHL90-LBS
+	tb-set-node-os $nodew1 RHL90-WIRELESS
+	tb-set-node-os $nodew2 RHL90-WIRELESS
+	tb-set-node-os $nodew3 RHL90-WIRELESS
+	tb-set-node-os $nodew4 RHL90-WIRELESS
 	tb-set-node-os $node3  FBSD-STD
 
 	# Turn on static routing.
@@ -94,7 +94,7 @@ A few points should be noted:
 
 <li> You must use Redhat 9.0 to take advantage of wireless interfaces. Be
      sure to set the OSID for all of your wireless nodes to
-     <tt>RHL9-NONSTD</tt>.
+     <tt>RHL90-WIRELESS</tt>.
 </ul>
 
 Numerous interface settings are possible using <tt>tb-set-lan-setting</tt>
@@ -134,3 +134,22 @@ can currently specify:
      support this option. 
 </ul>
 
+After your experiment is swapped in, the above settings (including the
+accesspoint) can be changed on the fly, using either the
+<tt>link_config</tt> script on <tt>users.emulab.net</tt>, or with the
+XMLRPC interface. For example, if you want to change the accesspoint
+of a lan, first determine the MAC address (dotted or undotted notation
+is fine) of the interface you want to be the accesspoint, and then use
+link_config:
+
+<code><pre>
+	link_config myproj myexp lan0 accesspoint=00:09:5B:94:26:AF
+</code></pre>
+
+Or you can use the <a href=../xmlrpcapi.php3>XMLRPC interface</a> from
+your desktop or from <tt>users</tt>.
+
+<code><pre>
+	sshxmlrpc_client.py link_config proj=myproj exp=myexp
+		link=lan0 "params={'accesspoint': '00:09:5B:94:26:AF'}"
+</code></pre>
