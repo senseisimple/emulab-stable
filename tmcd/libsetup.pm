@@ -1886,7 +1886,7 @@ sub dotrafficconfig()
     #     storing the output of a few tmcc commands in
     #     $BOOTDIR files for use by NSE
     #
-    if (! REMOTE()) {
+    if (!REMOTE() && !JAILED()) {
 	open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo") or
 	    die "Cannot open file $BOOTDIR/tmcc.bossinfo: $!";
 	print BOSSINFCFG "$bossinfo";
@@ -1917,7 +1917,7 @@ sub dotrafficconfig()
     # Also nse stuff is mixed up with traffic config right
     # now because of having FullTcp based traffic generation.
     # Needs to move to a different place
-    if (! REMOTE()) {
+    if (!REMOTE() && !JAILED()) {
 	my $record_sep;
 
 	$record_sep = $/;
@@ -1942,7 +1942,7 @@ sub dotrafficconfig()
 
     while (<$TM>) {
 
-	if (! REMOTE()) {
+	if (!REMOTE() && !JAILED()) {
 	    print TRAFCFG "$_";
 	}
 	if ($_ =~ /$pat/) {
@@ -2001,7 +2001,7 @@ sub dotrafficconfig()
 	    warn "*** WARNING: Bad traffic line: $_";
 	}
     }
-    if (! REMOTE()) {
+    if (!REMOTE() && !JAILED()) {
 	close(TRAFCFG);
     }
 
@@ -2015,7 +2015,7 @@ sub dotrafficconfig()
     #     storing the output of a few tmcc commands in
     #     $BOOTDIR files for use by NSE
     #
-    if (! REMOTE()) {
+    if (!REMOTE() && !JAILED()) {
 	open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs") or
 	    die "Cannot open file $BOOTDIR/tmcc.nseconfigs: $!";
 	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
