@@ -29,7 +29,7 @@ if (! isset($showby)) {
     $showby = "users";
 }
 if (! isset($sortby)) {
-    $sortby = "pnodes";
+    $sortby = "pdays";
 }
 if (! isset($range)) {
     $range = "epoch";
