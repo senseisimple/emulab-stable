@@ -78,6 +78,65 @@ FSDIR_SHARE=/share
 FS_WITH_QUOTAS="/q /groups /users"
 
 #
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
+
+#
+# Control network configuration stuff.
+# Used primarily to generate initial named and dhcpd config files.
+# See doc/setup-network.txt for definitions of the private, public and
+# control segments.
+#
+
+#
+# Boss and users node IP addresses on the control network.
+# For boss this is an address on the private segment of the control net.
+# For users this is an address on the public segment of the control net.
+#
+BOSSNODE_IP=155.98.32.70
+USERNODE_IP=155.98.33.74
+
+#
+# The overall control network range
+#
+TESTBED_NETWORK=155.98.32.0
+TESTBED_NETMASK=255.255.240.0
+
+#
+# The node control network segment.
+#
+CONTROL_ROUTER_IP=155.98.36.1
+CONTROL_NETWORK=155.98.36.0
+CONTROL_NETMASK=255.255.252.0
+
+#
+# The private network segment.
+#
+PRIVATE_NETWORK=155.98.32.0
+PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETMASK=255.255.255.0
+
+#
+# The public network segment.
+#
+PUBLIC_NETWORK=155.98.33.0
+PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETMASK=255.255.255.0
+
+#
+# A range of addresses within the node control network segment
+# to use for new nodes being added to the testbed.
+# You need at least one.
+#
+DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+
+#
 # You shouldn't have to change anything below this point
 #
 
@@ -91,3 +150,4 @@ DISABLE_NSE=1
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!
 #WWW=www.example.emulab.net/emulab-www
+
