@@ -68,6 +68,7 @@ my $warn_time   = 30; # in minutes
 my %retried     = ();
 my %warned	= ();
 my %failed	= ();
+my @retry_list  = ();
 
 #
 # Turn off line buffering on output (dots ...).
@@ -109,7 +110,6 @@ my $idle=0;
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
     my($pid, $eid);
-    my @retry_list = ();
 
     # Partial delay between loops in case of an error.
     if ($idle) { sleep(10); } # Wait longer if we're not doing anything
@@ -236,20 +236,18 @@ while (1) {
     }
     $count = $query_result->numrows;
 
-    if (! $count) {
+    if (!$count && !scalar(@retry_list)) {
 	next;
     } else {
 	$idle=0;
     }
 
     # Grab all the nodes that match
-    my @node_list = ();
     my @pending_list = @retry_list;
     while (%hrow  = $query_result->fetchhash()) {
-	$node  = $hrow{'node_id'};
-	push(@node_list,$node);
-	$pid = $hrow{'pid'};
-	$eid = $hrow{'eid'};
+	$node = $hrow{'node_id'};
+	$pid  = $hrow{'pid'};
+	$eid  = $hrow{'eid'};
 	if ($pid eq $RELOADPID && $eid eq $PENDINGEID) {
 	    push(@pending_list,$node);
 	} else {
@@ -257,7 +255,7 @@ while (1) {
 	}
     }
 
-    my $nodes = join(" ",@node_list);
+    my $nodes = join(" ", (@pending_list, @other_list));
     print "Trying to reload $nodes at ".`date`;
 
     #
@@ -315,6 +313,8 @@ while (1) {
 	} else {
 	    print "Pending nodes moved to $RELOADEID at ".`date`;
 	}
+	# It is now safe to clear this.
+	@retry_list = ();
 
 	# Now run an os_load for each image
 	
@@ -366,11 +366,11 @@ while (1) {
 	# default, and sched_reload will pick that up from the database
 	# in the absence of a -i option. 
 	#
-	if (system("$sched_reload -f $nodes")) {
+	if (system("$sched_reload -f @other_list")) {
 	    #
 	    # Could not get it. Wait and go around again.
 	    #
-	    print "$sched_reload failed on $nodes. Waiting a bit.\n";
+	    print "$sched_reload failed on @other_list. Waiting a bit.\n";
 	    next;
 	}
 
