@@ -214,20 +214,35 @@ if (! $batch) {
     }
 }
 
+#
+# Sanity check states in case someone changes something.
+#
 if ($estate eq "active") { 
     print STDOUT "Running tbswapout with arguments: -nologfile $pid $eid\n";
     if (system("$tbdir/tbswapout -nologfile $pid $eid") != 0) {
 	fatal("tbswapout failed!\n");
     }
-}
-elsif ($estate ne "swapped") {
-    fatal("Experiment is in the wrong state: $estate\n");
+    
+    $estate = ExpState($pid,$eid);
+    if ($estate ne "swapped") {
+	fatal("Experiment is in the wrong state: $estate\n");
+    }
 }
 
-print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";
-if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
-    fatal("tbend failed!\n");
-}    
+if ($estate eq "swapped") {
+    print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";
+    if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
+	fatal("tbend failed!\n");
+    }    
+    $estate = ExpState($pid,$eid);
+    if ($estate ne "ended") {
+	fatal("Experiment is in the wrong state: $estate\n");
+    }
+}
+
+if ($estate ne "ended" && $estate ne "new") {
+    fatal("Experiment is in the wrong state: $estate\n");
+}
 
 #
 # Try to remove experiment directory. We allow for it not being there
@@ -291,7 +306,7 @@ close($MAIL);
 unlink("$logname");
 exit 0;
 
-sub fatal()
+sub fatal($)
 {
     my($mesg) = $_[0];
     local $MAIL;
@@ -366,4 +381,27 @@ sub background()
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
     return 0;
+}
+
+#
+# Grab experiment state.
+#
+sub ExpState ($$) {
+    my($pid,$eid) = @_;
+    
+    my $query_result =
+	$DB->query("SELECT state FROM experiments ".
+		   "WHERE eid='$eid' and pid='$pid'");
+
+    if (! $query_result) {
+	fatal("DB Error getting experiment termination date for $pid/$eid\n");
+    }
+    if ($query_result->numrows < 1) {
+	print STDOUT "No such experiment $pid/$eid exists!\n";
+	exit(1);
+    }
+
+    my @row = $query_result->fetchrow_array();
+    
+    return $row[0];
 }
