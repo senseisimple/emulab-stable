@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# CygWin startup.
+
+# Make sure the node name is right.
+nodeid=`/usr/local/etc/emulab/tmcc.bin nodeid`
+hostname=`/bin/hostname`
+if [ $nodeid == $hostname ]; then
+    echo "Host name '$hostname' matches nodeid '$nodeid'." > /tmp/wsname
+else
+    echo "Host name '$hostname' and nodeid '$nodeid' differ." > /tmp/wsname
+
+    # Change hostname and computername, rename My Computer, reboot on success.
+    /usr/local/etc/emulab/WSName /N:$nodeid /REBOOT /MCN
+fi

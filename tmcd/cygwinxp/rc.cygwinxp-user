@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# CygWin user setup for each login.
+
+PATH=/usr/local/etc/emulab:$PATH
+set -x
+
+# Mounts are local to the Win32 login session context.
+if [ -e /cygdrive/s ]; then /cygdrive/c/SFU/common/umount S: > /dev/null; fi
+emount fs.emulab.net:/share /share
+
+if [ -e /cygdrive/p ]; then /cygdrive/c/SFU/common/umount P: > /dev/null ; fi
+proj=`tmcc.bin status | sed 's|ALLOCATED=\([^/]*\)/.*|\1|'`
+emount fs.emulab.net:/q/proj/$proj /proj/$proj
+
+if [ -e /cygdrive/h ]; then /cygdrive/c/SFU/common/umount H: > /dev/null ; fi
+creator=`tmcc.bin creator | sed 's|.*CREATOR=\([^ ]*\).*|\1|'`
+emount fs.emulab.net:/users/$creator /users/$creator
+
+if [ -e /cygdrive/i ]; then /cygdrive/c/SFU/common/umount I: > /dev/null ; fi
+swapper=`tmcc.bin creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
+if [ $swapper != $creator ]; then
+    emount fs.emulab.net:/users/$swapper /users/$swapper
+fi
+
+# Make sure the user's homedir is mounted if neither creator nor swapper.
+if [ -e /cygdrive/j ]; then /cygdrive/c/SFU/common/umount J: > /dev/null ; fi
+user=`id -un`
+if [[ $user != $creator && $user != $swapper && $user != root ]]; then
+    emount -d J: fs.emulab.net:/users/$user /users/$user
+fi
+
+set +x
+echo "Hit <Enter> to dismiss."
+sed 1q
+

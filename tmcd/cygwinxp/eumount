@@ -1,0 +1,95 @@
+#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Emulab NFS unmount command, called by rc.mounts .  See emount for more info.
+#
+# Arg is the local mount points, for example:
+#    eumount /proj/testbed
+# 
+# The Services For Unix (SFU 3.5) NFS client commands are used underneath, and the
+# CygWin symlink pointing to the /cygdrive/driveletter mount are cleaned up.
+
+sub usage()
+{
+    print "Usage: eumount [-v] localpath\n";
+    exit(1);
+}
+my $optlist     = "v";
+my $verbose     = 0;
+my $local       = "";
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the positional arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (@ARGV == 1) {
+    $local = $ARGV[0];
+}
+else {
+    usage();
+}
+
+my(%curmounts, $cmd);
+if (os_getnfsmountpoints(\%curmounts) < 0) {
+    fatal("Could not get current NFS mounts!");
+}
+
+if (!defined($curmounts{$local})) {
+    print STDERR "eumount: $local is not mounted.\n";
+	exit(1);
+    }
+else {
+    my $rpath = $curmounts{$local}[0];
+    my $driveletter = $curmounts{$local}[1];
+
+    # Unmount from a drive letter using the Services For Unix NFS client.
+    print "Unmounting remote '$rpath' from drive letter '$driveletter'.\n"
+	if ($verbose);
+    $cmd = "$SFCUMOUNT $driveletter";
+    if (os_noisycmd($cmd, $verbose) != 0) {
+	print STDERR "eumount: Failed SFU umount, $cmd.\n";
+	exit(1);
+    }
+
+    # Kill the CygWin symlink from the local path to the driveletter automount point.
+    print "Removing CygWin symlink '$local'.\n"
+	if ($verbose);
+    $cmd = "$RM $local";
+    if (system($cmd) != 0) {
+	print STDERR "emount: Failed to remove CygWin symlink, $cmd.\n";
+	exit(1);
+    }
+}
+
+exit(0);
+

@@ -1,0 +1,77 @@
+# Some resources...
+
+# Customizing Your Shell: http://www.dsl.org/cookbook/cookbook_5.html#SEC69
+# Consistent BackSpace and Delete Configuration:
+#   http://www.ibb.net/~anne/keyboard.html
+
+# Setup some default paths.  Note that this order will allow user installed
+#  software to override 'system' software
+
+# If you wish to change the path on a user by user basis, it is recommended you
+#  edit ~/.bashrc
+
+# If you wish to change the path for all users, it is recommended you edit
+#  /etc/bash.bashrc
+
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Set the user id
+export USER="`id -un`"
+
+# Here is how HOME is set, in order of priority, when starting from Windows
+# 1) From existing HOME in the Windows environment, translated to a Posix path
+# 2) from /etc/passwd, if there is an entry with a non empty directory field
+# 3) from HOMEDRIVE/HOMEPATH
+# 4) / (root)
+
+# Use a local dir under sshd for now.
+if [ ! -d "$HOME" ]; then
+   HOME=/home/$USER
+fi
+# If the home directory doesn't exist, create it.
+if [ ]; then
+  mkdir -p "$HOME"
+  # copy skeleton files
+  cd /etc/skel
+  for f in `/bin/find . -type f`; do
+    fDest=`echo $f | sed -e 's/^\.//g'`
+    if [ ! -e "$HOME$fDest" -a ! -L "$HOME$fDest" ]; then
+      cp "$f" "$HOME/$fDest"
+    fi
+  done
+fi
+
+# run all of the profile.d scripts
+for i in /etc/profile.d/*.sh ; do
+  if [ -f $i ]; then
+    . $i
+  fi
+done
+
+# default to unix make mode
+export MAKE_MODE=unix
+
+# it is recommended that cvs uses ssh for it's remote shell environment
+export CVS_RSH=/bin/ssh
+
+# Patches to Cygwin always appreciated ;)
+# export CVSROOT=:pserver:anoncvs@sources.redhat.com:/cvs/src
+
+# Set a HOSTNAME variable
+export HOSTNAME=`hostname`
+
+# set a default prompt of: user@host current_directory
+export PS1='\[\033]0;\w\007
+\033[32m\]\u@\h \[\033[33m\w\033[0m\]
+$ '
+
+# uncomment to use the terminal colours set in DIR_COLOR
+# eval `dircolors -b /etc/DIR_COLOR`
+
+# default to removing the write permission for group and other
+# (files normally created with mode 777 become 755; files created with
+# mode 666 become 644)
+umask 022
+
+# make sure we start in home
+cd "$HOME"
