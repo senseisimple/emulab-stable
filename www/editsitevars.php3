@@ -22,7 +22,7 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
-    USERERROR("You do not have admin privledges to edit site variables!", 1);
+    USERERROR("You do not have admin privileges to edit site variables!", 1);
 }
 
 
@@ -60,7 +60,7 @@ if (isset($edit)) {
 	echo "</td></tr><tr><td>&nbsp;</td><td>";
 	echo "<input type='submit' name='edited' value='Change to New Value'></input>";
 	echo "&nbsp;";
-	echo "<input type='submit' name='cancelled' value='Cancel'></input>";
+	echo "<input type='submit' name='canceled' value='Cancel'></input>";
 	echo "</td></tr></table>";
 	echo "</form>";
 	echo "</center>";
@@ -99,8 +99,8 @@ if (isset($defaulted)) {
     return;
 }
 
-if (isset($cancelled)) {
-    echo "<h3>Operation cancelled.</h3>";
+if (isset($canceled)) {
+    echo "<h3>Operation canceled.</h3>";
     echo "<form action='editsitevars.php3' method='get'>";
     echo "<input type='submit' name='yadda' value='Return to list'></input>";
     echo "</form>";
@@ -131,7 +131,7 @@ while ($row = mysql_fetch_row($result)) {
 
     echo "<tr><td>&nbsp;<b>$name</b>&nbsp;</td>\n";
 
-    echo "<td nowrap='1'>&nbsp;";
+    echo "<td>&nbsp;";
     if (isset($value)) {
 	if (0 != strcmp($value, "")) {
 	    echo "<code>$value</code>&nbsp;</td>";
