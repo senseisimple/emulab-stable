@@ -85,6 +85,8 @@ ipassign:
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
 
+boss-install: install
+
 #
 # Only install the planetlab support if enabled in the defs file
 #
