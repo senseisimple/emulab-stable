@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -5188,6 +5188,8 @@ COMMAND_PROTOTYPE(dofwinfo)
 
 	/*
 	 * See if this node's experiment has an associated firewall
+	 *
+	 * XXX will only work if there is one firewall per experiment.
 	 */
 	res = mydb_query("select r.node_id,f.type,f.style,f.fwname,i.IP,i.mac,f.vlan "
 			 "from firewalls as f "
@@ -5275,6 +5277,38 @@ COMMAND_PROTOTYPE(dofwinfo)
 	strncpy(fwstyle, row[2], sizeof(fwstyle));
 	strncpy(fwname, row[3], sizeof(fwname));
 	mysql_free_result(res);
+
+	/*
+	 * Return firewall variables
+	 * XXX these could come out of the database
+	 */
+	if (vers > 21) {
+		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
+		       "EMULAB_BOSS", "boss");
+		client_writeback(sock, buf, strlen(buf), tcp);
+		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
+		       "EMULAB_FS", "fs");
+		client_writeback(sock, buf, strlen(buf), tcp);
+		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
+		       "EMULAB_USERS", "users");
+		client_writeback(sock, buf, strlen(buf), tcp);
+#ifdef CONTROL_NETWORK
+		{
+			unsigned addr, bits = 32;
+			struct in_addr mask;
+
+			inet_aton(CONTROL_NETMASK, &mask);
+			addr = ~ntohl(mask.s_addr);
+			while (addr && (addr & 1)) {
+				addr >>= 1;
+				bits--;
+			}
+			OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s/%d\"\n",
+			       "EMULAB_CNET", CONTROL_NETWORK, bits);
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+#endif
+	}
 
 	/*
 	 * Get the user firewall rules from the DB and return them.
