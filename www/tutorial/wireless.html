@@ -7,6 +7,11 @@
 <h2>Emulab Tutorial - Using Wireless Nodes</h2>
 </center>
 
+<font size=+1>
+Creating an Experiment with Wireless Capable Nodes:</font>
+<br>
+<br>
+
 Some Emulab nodes may contain wireless interfaces, and those nodes may
 be scattered around at various locations. To find out where those
 nodes are located and what their node IDs are, see the <a
@@ -74,6 +79,14 @@ A few points should be noted:
      create an experiment that uses more links (wired or wireless) on a
      node, the experiment will fail to map.
 
+<li> In the example above, we let Emulab decide what wireless nodes to
+     use for the lan. This is not an ideal approach, as Emulab does
+     not currently track the connectivity of nodes, and so might pick
+     a set of nodes (randomly) that cannot communicate with each
+     other.  See the section below on <a href="#ChoosingNodes">choosing
+     your nodes</a> for more information on how to overcome this
+     problem.
+
 <li> You must specify which node is to act as the <em>access point</em> for
      the lan.  Rather then using dedicated access points, Emulab's
      implementation of wireless lans uses the interface's capability to
@@ -81,6 +94,8 @@ A few points should be noted:
      access point should obviously be within range of all of the nodes in
      the lan. There is currently no automated mechanism to pick the access
      point for you, but one is planned for the future.
+     Also planned for the future is to support <em>ad-hoc</em> mode on
+     the cards.
 
 <li> Wireless lans allow a number of configuration parameters to be
      specified, either for the lan as a whole, or for individual members of
@@ -166,4 +181,58 @@ XMLRPC interface:
 	sshxmlrpc_client.py link_config proj=myproj exp=myexp
 		src=nodew1 link=lan0 "params={'txpower': 50}"
 </code></pre>
+<br>
+<br>
 
+<a NAME="ChoosingNodes"></a>
+<font size=+1>
+Choosing Physical Nodes:</font>
+<br>
+<br>
+
+As mentioned above, Emulab's default mapping of nodes in your virtual
+topology, to physical nodes with wireless interfaces, does not
+currently take into account physical connectivity (walls, floors,
+electrical conduits, etc. all conspire to make it possible that two
+wireless nodes 50 apart from each other will not actually be able to
+communicate with each other). We <b>are</b> planning to add this
+capability in the future, but in the meantime it is mostly up to you
+to choose nodes that make sense for your topology. You might end up
+having to make some trial and error runs, trying to find the right
+set of nodes (including setting the accesspoint to different nodes in
+a lan) before you get a working set.
+
+<br>
+<br>
+To assist in this chore there are two Emulab specific NS extensions
+you can use in your NS file. The first is to use <tt>tb-fix-node</tt>
+for all (or some) of the nodes in your lan. Using the
+<a href=https://www.emulab.net/floormap.php3>wireless floormaps</a>
+choose which nodes you want, and then in your NS file:
+
+	<code><pre>
+	set nodew1 [$ns node]
+	set nodew2 [$ns node]
+	set nodew3 [$ns node]
+	set nodew4 [$ns node]
+
+	tb-fix-node $nodew1 pc222
+	tb-fix-node $nodew2 pc223
+	tb-fix-node $nodew3 pc224
+	tb-fix-node $nodew4 pc225 </code></pre>
+
+Keep in mind that the physical nodes you choose must be free when you
+swap in your experiment! The second approach is to use the
+<tt>tb-use-physnaming</tt> extension.
+
+	<code><pre>
+	tb-use-physnaming 1
+	
+	set pc222 [$ns node]
+	set pc223 [$ns node]
+	set pc224 [$ns node]
+	set pc225 [$ns node] </code></pre>
+
+which says that whenever a node is named by an existing physical node
+in the testbed, do an implicit fix-node. This saves a little bit of
+typing, and in some cases might be easier to manage.
