@@ -1,7 +1,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <syslog.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -10,7 +15,7 @@
 #include "decls.h"
 
 #define TESTMODE
-#define VERSION		1
+#define VERSION		2
 #define NETMASK		"255.255.255.0"
 #ifndef TBDBNAME
 #define TBDBNAME	"tbdb"	/* Defined in configure */
@@ -20,23 +25,24 @@
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid);
 static int	iptonodeid(struct in_addr ipaddr, char *bufp);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
-int		client_writeback(int sock, void *buf, int len);
+int		client_writeback(int sock, void *buf, int len, int tcp);
+void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
 
 /*
  * Commands we support.
  */
-static int	doreboot(int sock, struct in_addr ipaddr, char *request);
-static int	dostatus(int sock, struct in_addr ipaddr, char *request);
-static int	doifconfig(int sock, struct in_addr ipaddr, char *request);
-static int	doaccounts(int sock, struct in_addr ipaddr, char *request);
-static int	dodelay(int sock, struct in_addr ipaddr, char *request);
-static int	dohosts(int sock, struct in_addr ipaddr, char *request);
+static int doreboot(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dostatus(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dodelay(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dohosts(int sock, struct in_addr ipaddr, char *request, int tcp);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int sock, struct in_addr ipaddr, char *request);
+	int    (*func)(int sock, struct in_addr ipaddr, char *request, int tcp);
 } command_array[] = {
 	{ "reboot",    doreboot },
 	{ "status",    dostatus },
@@ -47,26 +53,37 @@ struct command {
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
-main()
+int
+main(int argc, char **argv)
 {
-	int			sock, length, data, i, mlen, err;
-	struct sockaddr_in	name, client;
+	int			tcpsock, udpsock;
+	int			length, i, err = 0;
+	struct sockaddr_in	name;
 
+#ifdef LBS
+	openlog("tmcd-test", LOG_PID, LOG_USER);
+#else
 	openlog("tmcd", LOG_PID, LOG_USER);
+#endif
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
 
 #ifndef LBS
 	(void)daemon(0, 0);
 #endif
+
+	/*
+	 * Setup TCP socket
+	 */
+
 	/* Create socket from which to read. */
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock < 0) {
+	tcpsock = socket(AF_INET, SOCK_STREAM, 0);
+	if (tcpsock < 0) {
 		syslog(LOG_ERR, "opening stream socket: %m");
 		exit(1);
 	}
 
 	i = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+	if (setsockopt(tcpsock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
 		syslog(LOG_ERR, "control setsockopt: %m");;
 	
@@ -74,40 +91,109 @@ main()
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
 	name.sin_port = htons(TBSERVER_PORT);
-	if (bind(sock, (struct sockaddr *) &name, sizeof(name))) {
+	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
 		syslog(LOG_ERR, "binding stream socket: %m");
 		exit(1);
 	}
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
-	if (getsockname(sock, (struct sockaddr *) &name, &length)) {
+	if (getsockname(tcpsock, (struct sockaddr *) &name, &length)) {
 		syslog(LOG_ERR, "getting socket name: %m");
 		exit(1);
 	}
-	if (listen(sock, 20) < 0) {
+	if (listen(tcpsock, 20) < 0) {
 		syslog(LOG_ERR, "listening on socket: %m");
 		exit(1);
 	}
-	syslog(LOG_NOTICE, "listening on port %d", ntohs(name.sin_port));
+	syslog(LOG_NOTICE, "listening on TCP port %d", ntohs(name.sin_port));
+
+	/*
+	 * Setup UDP socket
+	 */
+
+	/* Create socket from which to read. */
+	udpsock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udpsock < 0) {
+		syslog(LOG_ERR, "opening dgram socket: %m");
+		exit(1);
+	}
+
+	i = 1;
+	if (setsockopt(udpsock, SOL_SOCKET, SO_REUSEADDR,
+		       (char *)&i, sizeof(i)) < 0)
+		syslog(LOG_ERR, "control setsockopt: %m");;
+	
+	/* Create name. */
+	name.sin_family = AF_INET;
+	name.sin_addr.s_addr = INADDR_ANY;
+	name.sin_port = htons(TBSERVER_PORT);
+	if (bind(udpsock, (struct sockaddr *) &name, sizeof(name))) {
+		syslog(LOG_ERR, "binding stream socket: %m");
+		exit(1);
+	}
+
+	/* Find assigned port value and print it out. */
+	length = sizeof(name);
+	if (getsockname(udpsock, (struct sockaddr *) &name, &length)) {
+		syslog(LOG_ERR, "getting socket name: %m");
+		exit(1);
+	}
+	syslog(LOG_NOTICE, "listening on UDP port %d", ntohs(name.sin_port));
 
 	while (1) {
 		struct sockaddr_in client;
+#ifdef TESTMODE
+		struct sockaddr_in oclient;
+#endif
 		int		   clientsock, length = sizeof(client);
 		char		   buf[BUFSIZ], *bp, *cp;
-		int		   cc;
+		int		   cc, nfds, istcp;
+		fd_set		   fds;
 
-		clientsock = accept(sock, (struct sockaddr *)&client, &length);
+		nfds = udpsock;
+		if (tcpsock > nfds)
+			nfds = tcpsock;
+		FD_ZERO(&fds);
+		FD_SET(tcpsock, &fds);
+		FD_SET(udpsock, &fds);
 
-		/*
-		 * Read in the command request.
-		 */
-		if ((cc = read(clientsock, buf, BUFSIZ - 1)) <= 0) {
-			if (cc < 0)
-				syslog(LOG_ERR, "Reading request: %m");
-			syslog(LOG_ERR, "Connection aborted");
-			close(clientsock);
-			continue;
+		nfds = select(nfds+1, &fds, 0, 0, 0);
+		if (nfds <= 0) {
+			syslog(LOG_ERR, nfds == 0 ?
+			       "select: returned zero!?" : "select: %m");
+			exit(1);
 		}
+
+		if (FD_ISSET(tcpsock, &fds)) {
+			istcp = 1;
+			clientsock = accept(tcpsock,
+					    (struct sockaddr *)&client,
+					    &length);
+
+			/*
+			 * Read in the command request.
+			 */
+			if ((cc = read(clientsock, buf, BUFSIZ - 1)) <= 0) {
+				if (cc < 0)
+					syslog(LOG_ERR, "Reading request: %m");
+				syslog(LOG_ERR, "Connection aborted");
+				close(clientsock);
+				continue;
+			}
+		} else {
+			istcp = 0;
+			clientsock = udpsock;
+
+			cc = recvfrom(clientsock, buf, BUFSIZ - 1,
+				      0, (struct sockaddr *)&client, &length);
+			if (cc <= 0) {
+				if (cc < 0)
+					syslog(LOG_ERR, "Reading request: %m");
+				syslog(LOG_ERR, "Connection aborted");
+				continue;
+			}
+		}
+
 		buf[cc] = '\0';
 		bp = buf;
 		while (*bp++) {
@@ -119,6 +205,7 @@ main()
 		/*
 		 * Allow remote end to be specified for testing.
 		 */
+		oclient = client;
 		if (strncmp("MYIP=", buf, strlen("MYIP=")) == 0) {
 			char *tp;
 			
@@ -146,7 +233,7 @@ main()
 				    strlen(command_array[i].cmdname)) == 0) {
 				err = command_array[i].func(clientsock,
 							    client.sin_addr,
-							    cp);
+							    cp, istcp);
 				break;
 			}
 		}
@@ -158,10 +245,17 @@ main()
 			       inet_ntoa(client.sin_addr), cp, err);
 		
 		free(cp);
-		close(clientsock);
+#ifdef TESTMODE
+		client = oclient;
+#endif
+		if (istcp)
+			close(clientsock);
+		else
+			client_writeback_done(clientsock, &client);
 	}
 
-	close(sock);
+	close(tcpsock);
+	close(udpsock);
 	syslog(LOG_NOTICE, "daemon terminating");
 	exit(0);
 }
@@ -170,13 +264,12 @@ main()
  * Accept notification of reboot. 
  */
 static int
-doreboot(int sock, struct in_addr ipaddr, char *request)
+doreboot(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*res;	
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	int		n;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "REBOOT: %s: No such node", inet_ntoa(ipaddr));
@@ -246,14 +339,12 @@ doreboot(int sock, struct in_addr ipaddr, char *request)
  * Return status of node. Is it allocated to an experiment, or free.
  */
 static int
-dostatus(int sock, struct in_addr ipaddr, char *request)
+dostatus(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
-	MYSQL_RES	*res;	
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		answer[128];
-	int		n;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STATUS: %s: No such node", inet_ntoa(ipaddr));
@@ -273,7 +364,7 @@ dostatus(int sock, struct in_addr ipaddr, char *request)
 		snprintf(answer, sizeof(answer), "ALLOCATED=%s/%s\n",
 			 pid, eid);
 	}
-	client_writeback(sock, answer, strlen(answer));
+	client_writeback(sock, answer, strlen(answer), tcp);
 
 	return 0;
 }
@@ -282,7 +373,7 @@ dostatus(int sock, struct in_addr ipaddr, char *request)
  * Return ifconfig information to client.
  */
 static int
-doifconfig(int sock, struct in_addr ipaddr, char *request)
+doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -358,7 +449,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *request)
 				goto skipit;
 
 			strcat(buf, "\n");
-			client_writeback(sock, buf, strlen(buf));
+			client_writeback(sock, buf, strlen(buf), tcp);
 			syslog(LOG_INFO, "IFCONFIG: %s", buf);
 		}
 	skipit:
@@ -373,7 +464,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *request)
  * Return account stuff.
  */
 static int
-doaccounts(int sock, struct in_addr ipaddr, char *request)
+doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -427,7 +518,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *request)
 	 */
 	gid = atoi(row[0]);
 	sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", pid, gid);
-	client_writeback(sock, buf, strlen(buf));
+	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
 	syslog(LOG_INFO, "ACCOUNTS: %s", buf);
 
@@ -464,7 +555,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *request)
 			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\"\n",
 			row[0], row[1], row[2], gid, root, row[3]);
 			
-		client_writeback(sock, buf, strlen(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
 		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
 	}
@@ -477,7 +568,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *request)
  * Return account stuff.
  */
 static int
-dodelay(int sock, struct in_addr ipaddr, char *request)
+dodelay(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -485,7 +576,7 @@ dodelay(int sock, struct in_addr ipaddr, char *request)
 	char		pid[64];
 	char		eid[64];
 	char		buf[BUFSIZ];
-	int		nrows, gid;
+	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "DELAY: %s: No such node",
@@ -524,11 +615,12 @@ dodelay(int sock, struct in_addr ipaddr, char *request)
 			"DELAY INT0=%s INT1=%s DELAY=%s BW=%s PLR=%s\n",
 			row[0], row[1], row[2], row[3], row[4]);
 			
-		client_writeback(sock, buf, strlen(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
 		syslog(LOG_INFO, "DELAY: %s", buf);
 	}
 	mysql_free_result(res);
+
 	return 0;
 }
 
@@ -536,7 +628,7 @@ dodelay(int sock, struct in_addr ipaddr, char *request)
  * Return host table information.
  */
 static int
-dohosts(int sock, struct in_addr ipaddr, char *request)
+dohosts(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*reserved_result;
 	MYSQL_RES	*vnames_result;
@@ -663,7 +755,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 		if (first)
 			first = 0;
 			
-		client_writeback(sock, buf, strlen(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
 	}
 	mysql_data_seek(vnames_result, 0);
@@ -687,7 +779,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
 			vname_row[3], vname_row[1], vname_row[2], alias);
 			
-		client_writeback(sock, buf, strlen(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
 		strcpy(lastid, vname_row[0]);
 	}
@@ -730,7 +822,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=  \n",
 			vname_row[3], vname_row[1], vname_row[2]);
 			
-		client_writeback(sock, buf, strlen(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
 			
 		nvnames--;
@@ -796,7 +888,6 @@ int
 mydb_update(char *query, ...)
 {
 	MYSQL		db;
-	MYSQL_RES	*res;
 	char		querybuf[BUFSIZ];
 	va_list		ap;
 	int		n;
@@ -838,7 +929,7 @@ iptonodeid(struct in_addr ipaddr, char *bufp)
 			 inet_ntoa(ipaddr));
 	if (!res) {
 		syslog(LOG_ERR, "iptonodeid: %s: DB Error getting interfaces!",
-		       ipaddr);
+		       inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -917,25 +1008,71 @@ nodeidtocontrolnet(char *nodeid, int *net)
 }
  
 /*
+ * Lets hear it for global state...Yeah!
+ */
+static char udpbuf[8192];
+static int udpfd = -1, udpix;
+
+/*
  * Write back to client
  */
 int
-client_writeback(int sock, void *buf, int len)
+client_writeback(int sock, void *buf, int len, int tcp)
 {
 	int	cc;
 	char	*bufp = (char *) buf;
 	
-	while (len) {
-		if ((cc = write(sock, bufp, len)) <= 0) {
-			if (cc < 0) {
-				syslog(LOG_ERR, "writing to client: %m");
+	if (tcp) {
+		while (len) {
+			if ((cc = write(sock, bufp, len)) <= 0) {
+				if (cc < 0) {
+					syslog(LOG_ERR,
+					       "writing to client: %m");
+					return -1;
+				}
+				syslog(LOG_ERR, "write to client aborted");
 				return -1;
 			}
-			syslog(LOG_ERR, "write to client aborted");
-			return -1;
+			len  -= cc;
+			bufp += cc;
 		}
-		len  -= cc;
-		bufp += cc;
+	} else {
+		if (udpfd != sock) {
+			if (udpfd != -1)
+				syslog(LOG_ERR, "UDP reply in progress!?");
+			udpfd = sock;
+			udpix = 0;
+		}
+		if (udpix + len > sizeof(udpbuf)) {
+			syslog(LOG_ERR, "client data write truncated");
+			len = sizeof(udpbuf) - udpix;
+		}
+		memcpy(&udpbuf[udpix], bufp, len);
+		udpix += len;
 	}
 	return 0;
+}
+
+void
+client_writeback_done(int sock, struct sockaddr_in *client)
+{
+	int err;
+
+	/*
+	 * XXX got an error before we wrote anything,
+	 * still need to send a reply.
+	 */
+	if (udpfd == -1)
+		udpfd = sock;
+
+	if (sock != udpfd)
+		syslog(LOG_ERR, "UDP reply out of sync!");
+	else {
+		err = sendto(udpfd, udpbuf, udpix, 0,
+			     (struct sockaddr *)client, sizeof(*client));
+		if (err < 0)
+			syslog(LOG_ERR, "sendto client: %m");
+	}
+	udpfd = -1;
+	udpix = 0;
 }

@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
@@ -24,15 +26,26 @@
 
 void		sigcatcher(int foo);
 
+int
 main(int argc, char **argv)
 {
-	int			sock, length, data, n, cc, err, i;
-	struct sockaddr_in	name, client;
+	int			sock, data, n, cc;
+	struct sockaddr_in	name;
+#if 0
 	struct timeval		tv;
-	struct itimerval	timo;
+#endif
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[BUFSIZ], *bp, *response = "";
+#ifdef UDPTEST
+	int			useudp = 0;
+	void			doudp(int argc, char **argv);
+
+	if (argc > 1 && strcmp(argv[1], "-u") == 0) {
+		useudp = 1;
+		argc--, argv++;
+	}
+#endif
 
 	if (argc < 2 || argc > 3) {
 		fprintf(stderr, "usage: %s <command>\n", argv[0]);
@@ -51,6 +64,10 @@ main(int argc, char **argv)
 	}
 #endif
 
+#ifdef UDPTEST
+	if (useudp)
+		doudp(argc, argv);
+#endif
 	while (1) {
 		/* Create socket from which to read. */
 		sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -103,7 +120,7 @@ main(int argc, char **argv)
 	else
 		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[1], argv[2]);
 	if (n >= sizeof(buf)) {
-		fprintf(stderr, "Command to large!\n");
+		fprintf(stderr, "Command too large!\n");
 		exit(1);
 	}
 
@@ -150,3 +167,85 @@ sigcatcher(int foo)
 {
 }
 
+#ifdef UDPTEST
+/*
+ * Not very robust, send a single request, read a single reply. 
+ */
+void
+doudp(int argc, char **argv)
+{
+	int			sock, length, n, cc;
+	struct sockaddr_in	name, client;
+	struct hostent		*he;
+	struct in_addr		serverip;
+	char			buf[BUFSIZ], *bp, *response = "";
+
+	if (argc < 2 || argc > 3) {
+		fprintf(stderr, "usage: %s <command>\n", argv[0]);
+		exit(1);
+	}
+
+#ifdef	LBS
+	inet_aton(MASTERNODE, &serverip);
+#else
+	he = gethostbyname(MASTERNODE);
+	if (he)
+		memcpy((char *)&serverip, he->h_addr, he->h_length);
+	else {
+		fprintf(stderr, "gethostbyname(%s) failed\n", MASTERNODE); 
+		exit(1);
+	}
+#endif
+
+	/* Create socket from which to read. */
+	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0) {
+		perror("creating dgram socket:");
+		exit(1);
+	}
+
+	/* Create name. */
+	name.sin_family = AF_INET;
+	name.sin_addr   = serverip;
+	name.sin_port = htons(TBSERVER_PORT);
+
+	if (argc == 2)
+		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[1]);
+	else
+		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[1], argv[2]);
+	if (n >= sizeof(buf)) {
+		fprintf(stderr, "Command too large!\n");
+		exit(1);
+	}
+
+	/*
+	 * Write the command to the socket and wait for the response
+	 */
+	cc = sendto(sock, buf, n, 0, (struct sockaddr *)&name, sizeof(name));
+	if (cc != n) {
+		if (cc < 0) {
+			perror("Writing to socket:");
+			exit(1);
+		}
+		fprintf(stderr, "short write (%d != %d)\n", cc, n);
+		exit(1);
+	}
+
+	cc = recvfrom(sock, buf, sizeof(buf), 0,
+		      (struct sockaddr *)&client, &length);
+	if (cc < 0) {
+		perror("Reading from socket:");
+		exit(1);
+	}
+	buf[cc] = '\0';
+	bp = (char *) malloc(strlen(response) + cc + 1);
+	assert(bp);
+	strcpy(bp, response);
+	strcat(bp, buf);
+	response = bp;
+	printf("%s", response);
+
+	close(sock);
+	exit(0);
+}
+#endif
