@@ -8,9 +8,13 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
-	 TBMakeLogname );
+	 TBMakeLogname TB_BOSSNODE );
 
-my $MAILTAG = "@OURDOMAIN@";
+my $MAILTAG  = "@OURDOMAIN@";
+my $BOSSNODE = "@BOSSNODE@";
+
+# Hostname of our boss node
+sub TB_BOSSNODE()	{ $BOSSNODE; }
 
 # A library of useful stuff.
 
