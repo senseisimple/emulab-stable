@@ -561,3 +561,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table veth_interfaces change vnode vnode_id varchar(32)
 		default NULL;
+
+1.147: Add expt_swap_uid to experiments table to store who was the
+       last to swap in/out/modify an experiment. Needed for proper
+       user accounting.
+
+        alter table experiments add expt_swap_uid varchar(8) NOT NULL
+		 default '' after expt_swapped;

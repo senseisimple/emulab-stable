@@ -253,6 +253,7 @@ CREATE TABLE experiments (
   expt_terminating datetime default NULL,
   expt_locked datetime default NULL,
   expt_swapped datetime default NULL,
+  expt_swap_uid varchar(8) NOT NULL default '',
   swappable tinyint(4) NOT NULL default '0',
   priority tinyint(4) NOT NULL default '0',
   batchmode tinyint(4) NOT NULL default '0',
