@@ -957,22 +957,24 @@
  
  Class SimpleLink -superclass Link
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Fri Nov 28 16:55:25 2003
-@@ -492,6 +492,13 @@
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Sun Jan  4 18:27:34 2004
+@@ -492,6 +492,15 @@
  		# at the port demuxer (if there is one)
  		$self add-route $address_ $dmux_
  	}
 +	# XXX netbed specific
 +	$self instvar nodeiplist_
 +	set ns_ [Simulator instance]
-+	foreach ip $nodeiplist_ {
-+	    set ipaton [$ns_ inet-aton $ip]
-+	    $self add-route $ipaton $dmux_
++	if { [info exists nodeiplist_] } {
++	    foreach ip $nodeiplist_ { 
++	    	set ipaton [$ns_ inet-aton $ip]
++	    	$self add-route $ipaton $dmux_
++	    }
 +	}
  	if { $port == "" } {
  		set port [$dmux_ alloc-port [[Simulator instance] nullagent]]
  	}
-@@ -569,3 +576,49 @@
+@@ -569,3 +578,49 @@
  	$self instvar neighbor_
  	return [expr [lsearch $neighbor_ $node] != -1]
  }
@@ -2358,7 +2360,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Mon Dec 15 19:07:19 2003
+--- /dev/null	Mon Jan  5 13:10:04 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
