@@ -1,181 +1,139 @@
-#!/usr/bin/perl -w
-
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use English;
+use Getopt::Std;
 
 #
-# dbcheck - A script to check database consistency
+# Check DB consistency.
 #
-
-######################################################################
-#
-# INSTRUCTIONS FOR UPDATING THE foreign_keys TABLE
-#
-# After updating the database schema you'll need to visit the
-# foreign_keys table in the database. Remove any entries in this
-# table for columns/tables that you've removed, and add new ones for
-# any tables/columns you've added. Examples are probably the best
-# way to explain the format. For example, if projects.head_uid needs
-# to correspond to a user (uid stored in users.uid), you have a
-# row like:
-# +-------------------+-----------------+-----------------+---------+
-# | table1            | column1         | table2          | column2 |
-# +-------------------+-----------------+-----------------+---------+
-# | projects          | head_uid        | users           | uid     |
-# +-------------------+-----------------+-----------------+---------+
-# You can put a comma-separated list of colums in the column fields, 
-# as in:
-# +-------------------+-----------------+-----------------+---------+
-# | table1            | column1         | table2          | column2 |
-# +-------------------+-----------------+-----------------+---------+
-# | vlans             | pid,eid         | experiments     | pid,eid |
-# +-------------------+-----------------+-----------------+---------+
-#
-######################################################################
+sub usage() {
+    print STDOUT "Usage: dbcheck [-d] [-v]\n".
+	"Use the -d option to see debugging output instead of emailing it.\n";
+    exit(-1);
+}
+my $optlist = "vd";
+my $debug   = 0;
+my $verbose = 0;
 
 #
 # Configure variables
 #
-use lib '@prefix@/lib';
-use libtestbed;
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
 use libdb;
-
-use strict;
-use Getopt::Std;
-
-my $debug = 0;
-my $verbose = 0;
+use libtestbed;
 
 #
-# Process command-line arguments
-#
-my %opt = ();
-getopts('dvh',\%opt);
-
-if ($opt{d}) {
-    $debug = 1;
-} 
-if ($opt{v}) {
-    $verbose = 1;
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
 }
-if ($opt{h} || @ARGV) {
-    exit &usage;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
- 
-my $start_time = time();
-my $constraint_count = 0;
-my $failures = 0;
-my %cached_values;
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"v"})) {
+    $verbose++;
+}
 
 #
-# Grab all of the foreign key information from the database
+# Form a temp name.
 #
-my $result = DBQueryFatal("SELECT table1,column1,table2,column2 " .
-	"FROM foreign_keys");
-while (my ($table1, $column1, $table2, $column2) = $result->fetchrow()) {
-    $constraint_count++;
+my $logname = TBMakeLogname("dbcheck");
+my $errors  = 0;
+my $query_result;
 
-    verbose("Checking $table1\[$column1\] against $table2\[$column2\]\n");
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+#
+if (! $debug) {
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+}
 
-    #
-    # Grab a list of all values listed in column2
-    # First, check to see if we've already cached the values for this table
-    #
-    my %valid_values = ();
-    if ($cached_values{$table2.$column2}) {
-	debug("Using previously cached values for $table2.$column2\n");
-	%valid_values = %{ $cached_values{$table2.$column2} };
-    } else {
-	debug("Getting values from database for $table2.$column2\n");
+#
+# Check all tables to make sure none are corrupted.
+#
+if (! ($query_result = DBQueryWarn("show tables"))) {
+    fatal("Error accessing the database.");
+}
 
-	#
-	# We have to grab them from the database
-	#
-	my $result = DBQueryWarn("SELECT $column2 FROM $table2");
-	while (my @row = $result->fetchrow()) {
-	    my $value = join(",",@row);
-	    debug("Adding $value to valid_values\n");
-	    $valid_values{$value} = 1;
-	}
+while (my ($table) = $query_result->fetchrow()) {
+    print "Checking $table ...\n";
 
-	#
-	# Cache it for later
-	#
-	$cached_values{$table2.$column2} = \%valid_values;
+    # virt_routes is too big for this.
+    my $checktype = ($table eq "virt_routes" ? "medium" : "extended");
+
+    my $check_result = DBQueryWarn("check table $table $checktype");
+    if (! $check_result) {
+	fatal("Error accessing the database.");
     }
-
-    #
-    # Now, grab all of the values in column1, and make sure that they actually
-    # exist
-    #
-    my $result = DBQueryWarn("SELECT $column1 FROM $table1");
-    if (!$result) {
-	next;
-    }
-    while (my @row = $result->fetchrow()) {
-	#
-	# Skip values with undefined results
-	#
-	if (grep {(!defined $_) || ($_ eq '')} @row) {
-	    debug("Skipping a row with an undefined value\n");
+    while (my (undef, undef, $msgtype, $msgtext) = $check_result->fetchrow()) {
+	if ($verbose) {
+	    printf("%8s : $msgtext\n", $msgtype, $msgtext);
 	    next;
 	}
-	my $value = join(",",@row);
-	debug("Checking to see if $value is valid\n");
-	if (!$valid_values{$value}) {
-	    print STDERR "ERROR: Found a value in $table1.$column1 ($value) " .
-	    	"that has no corresponding row in $table2.$column2\n";
-	    $failures++;
+	if ($msgtype eq "error") {
+	    print "*** $msgtext\n";
+	    $errors++;
+	}
+	if ($msgtype eq "status" && $msgtext ne "OK") {
+	    print "*** $msgtext\n";
+	    $errors++;
 	}
     }
 }
 
 #
-# See how long it took
-# 
-my $end_time = time();
-my $time = $end_time - $start_time;
-
-verbose("Finished checking $constraint_count constraints in $time seconds\n");
-
-if ($failures) {
-    print "There were $failures failures\n";
-} else {
-    verbose("No failures\n");
+# Send email if anything abnormal happened.
+#
+if (!$debug && $errors) {
+    SENDMAIL($TBOPS, "Testbed DBcheck Results", "Testbed DBcheck Results",
+	     $TBOPS, undef, ($logname));
 }
 
-exit($failures);
+unlink("$logname")
+    if (-e $logname);
+exit($errors);
 
+sub fatal($) {
+    my ($msg) = @_;
 
-#
-# Print out a usage message
-#
-sub usage {
-    print "$0 [-h] [-v] [-d]\n";
-    print "-h    Displays this mesage\n";
-    print "-v    Turns on verbose output\n";
-    print "-d    Turns on debugging output\n";
-    return 1;
-}
-
-#
-# Print the arguments, only if the debug flag is on
-#
-sub debug(@) {
-    if ($debug) {
-	print STDERR @_;
-    }
-}
-
-#
-# Print the arguments, but only if we're in verbose mode. debug mode
-# implies verbosity
-#
-sub verbose(@) {
-    if ($verbose || $debug) {
-	print STDERR @_;
-    }
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+    
+    SENDMAIL($TBOPS, "Testbed DBcheck Failed", $msg, undef, undef, ($logname));
+    unlink("$logname")
+	if (-e $logname);
+    exit(1);
 }
