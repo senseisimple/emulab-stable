@@ -303,22 +303,13 @@ sub step_init {
 	prints "  Setting up tmcc redirect ";
 	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
 	    die "Could not connect to DB.\n";
-	foreach $type (keys(%have)) {
-	    foreach $node (@{$have{$type}}) {
-		$dbh->do("DELETE from tmcd_redirect" .
-			 " where node_id=\"$node\"") || do {
-			     $fail++;
-			     prints "FAIL - $node\n";
-			     doexit(1);
-			 };
-		$dbh->do("INSERT into tmcd_redirect (node_id,dbname) values" .
-			 " (\"$node\",\"$testdb\")") || do {
-			     $fail++;
-			     prints "FAIL - $node\n";
-			     doexit(1);
-			 };
-	    }
-	}
+	$dbh->do("UPDATE experiments set testdb=\"$testdb\" where" .
+		 " pid=\"$pid\" and eid=\"$eid\"") || do {
+		     prints "FAIL\n";
+		     $fail++;
+		     doexit(1);
+		 };
+	$pass++;
 	prints "PASS\n";
 	$dbh->disconnect;
     }
@@ -601,21 +592,17 @@ sub step_cleanup {
 	    prints "FAIL - Could not connect to db\n";
 	    $fail++;
 	} else {
-	    $sth=$dbh->prepare("SELECT node_id from reserved" .
-			       " where pid=\"$pid\" and eid=\"$eid\"");
-	    $sth->execute;
 	    $ok = 1;
-	    while (($node) = $sth->fetchrow_array) {
-		$dbh->do("DELETE from tmcd_redirect" .
-			 " where node_id=\"$node\"") || do {
-			     prints "FAIL - $node\n";
-			     $fail++;
-			     $ok = 0;
-			     last;
-			 }
-	    }
+	    $dbh->do("UPDATE experiments set testdb=NULL" .
+		     " where pid=\"$pid\" and eid=\"$eid\"") || do {
+			 $ok = 0;
+		     };
 	    if ($ok) {
+		$pass++;
 		prints "PASS\n";
+	    } else {
+		$fail++;
+		prints "FAIL\n";
 	    }
 	    $dbh->disconnect;
 	}
