@@ -20,6 +20,7 @@ use constant HI_BW => 90000000; # pathrate test only accurate 1-90 Mbps
 use constant LO_BW =>  1000000;
 use constant BSD => "FreeBSD";
 use constant LAT_TOL => 0.71; # units of ms
+use constant DEBUG => 1;
 
 ##############################################################################
 # Globals
@@ -70,32 +71,33 @@ my $lt_path = "/users/davidand/testbed/event/linktest";
 
 # if there is an arg, just count steps and return.
 # this was a quick hack to survey number of synch steps on production files.
-
 # figure out which file to use
 # get the nsfile path 
 if (@ARGV) {
     $ns_file = $ARGV[0];
+    die "could not find $ns_file" unless -e $ns_file;
     &get_topo();
+    &debug_top();
     &count_steps();
     exit(0);
-} else {
-    # init global scalars
-    &init;
+}
+    
+# init global scalars
+&init;
 
-    if ( defined($ENV{TEST_NS_SCRIPT}) ) {
-	$ns_file = $ENV{TEST_NS_SCRIPT};
+if ( defined($ENV{TEST_NS_SCRIPT}) ) {
+    $ns_file = $ENV{TEST_NS_SCRIPT};
+    die "could not find $ns_file" unless -e $ns_file;
+} else {
+    # TODO: support groups!
+    # if they modified, use the modify; else use the default.
+    my $modname = "/proj/$pid/exp/$eid/tbdata/" . $eid . "-modify.ns";
+    if (-e $modname ) {
+	$ns_file = $modname;
     } else {
-	# TODO: support groups!
-	# if they modified, use the modify; else use the default.
-	my $modname = "/proj/$pid/exp/$eid/tbdata/" . $eid . "-modify.ns";
-	if (-e $modname ) {
-	    $ns_file = $modname;
-	} else {
-	    $ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
-	}
+	$ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
     }
 }
-
 
 # init topology
 &get_topo;
@@ -103,23 +105,25 @@ if (@ARGV) {
 # is there a synch server? if not that's a problem (unless have a default)
 die "no synch server defined in: $ns_file\n" unless defined($synserv);
 
-    &debug_top;
-    &debug("start stat\n");
-    &stat_rt_test if defined($rtproto) && $rtproto eq "Static";
+&debug_top;
+&debug("stat_rt_test\n");
+&stat_rt_test if defined($rtproto) && $rtproto eq "Static";
+&debug("onehop_test\n");
+&onehop_test;
 
-    &debug("start onehop\n");
-    &onehop_test;
 
-    if($platform eq BSD) {
-	&debug("start ping lat\n");	
-	# had problems with ntpq so use ping instead for latency on BSD.
-	&ping_latency_test;
-    }
-    &debug("start stream\n");
-    &stream_test;
-    &debug("start bw\n");
-    &bw_test;
+# had problems with ntpq so use ping instead for latency on BSD.
+&debug("ping_latency_test\n");
+&ping_latency_test;
 
+my $testcount = @verts;
+&barrier_name($synserv,$testcount);
+
+&debug("stream_test\n");
+&stream_test;
+&debug("bw_test\n");
+&bw_test;
+&debug("all done\n");
 
 ##############################################################################
 # Test procedures
@@ -133,6 +137,7 @@ sub stat_rt_test {
     # fork processes to run the pings in parallel.
     foreach my $dst (@verts) {
 	if(!($dst eq $hostname) ) {
+	    &debug("stat_rt_test: ping $dst\n");
 	    my $pid = fork();
 	    if(!$pid) {
 		if(!&ping_node($dst,0)) {
@@ -168,6 +173,11 @@ sub onehop_test {
 # stream test
 #
 # check loss and possibly latency on non-BSD.
+#
+# note: it's possible to get a more precise read on the network if
+# both end nodes are linux (using owd and ntp) but given that it may 
+# be a mix, for now just use the ping test. stream test still useful
+# for loss.
 sub stream_test {
     # repeatedly:
     #   get test assignments.
@@ -182,16 +192,18 @@ sub stream_test {
     # on their own so that the number of barriers is the same.
     while(@edge_copy) {
 	my $edge = &get_assign(\@edge_copy);
+	my $edgecount = @edge_copy;
+	&debug("remaining in edge_copy after assign: $edgecount\n");
 	if(defined($edge)) {
 	    
 	    # unique barrier for this test.
-	    my $barrier_name = $edge->src . $edge->dst;
+	    my $barrier_name = $edge->src;
 
 	    # determine if this machine is the source or the dest.
 	    if($hostname eq $edge->src
 	       ) {
 		# wait for crude startup
-		&barrier($barrier_name);
+		&barrier_name($barrier_name,2);
 		# generate config file
 		open FCFG,">" . RUDE_CFG || die ("couldn't open " . RUDE_CFG);
 		print FCFG "START NOW\n";
@@ -199,36 +211,36 @@ sub stream_test {
 		print FCFG "1000 1 OFF\n";
 		close FCFG;
 		# run rude
-		system "rude -s" . RUDE_CFG . " 1>" . RUDE_LOG . " 2>/dev/null";
-		&barrier($barrier_name);
+		if(DEBUG) {
+		    &debug( "rude flow to " . $edge->dst . "\n");
+		    system "rude -s" . RUDE_CFG ;
+		} else {
+		    system "rude -s" . RUDE_CFG . " 1>" . RUDE_LOG . " 2>/dev/null";
+		}
+		&barrier_name($barrier_name,2);
 
 	    } elsif ($hostname eq $edge->dst) {
 		# start up crude
 		my $crude_pid = fork();
 		if(!$crude_pid) {
 		    unlink CRUDE_DAT if -e CRUDE_DAT;
-		    open(STDOUT, ">/dev/null"); # redirct output to null
+		    open(STDOUT, ">/dev/null") unless DEBUG; # redirct output to null
 		    exec "crude -l " . CRUDE_DAT;
 		}
-		&barrier($barrier_name);
+		&barrier_name($barrier_name,2);
 		# test occurs
-		&barrier($barrier_name);
-		&debug("killing crud\n");
+		&barrier_name($barrier_name,2);
 		system "kill -9 $crude_pid";
-		# analyze log for latency and loss.
-		if($platform eq BSD) {
-		    &analyze_stream($edge,0);
-		} else {
-		    &analyze_stream($edge,1);
-		}
+		# analyze log for loss.
+		&analyze_stream($edge,0);
 	    }
+	    # all nodes wait for the streams to complete
 	    &barrier();
 	}
     }
 }
 
 sub ping_latency_test {
-    die "not supported!" unless $platform eq BSD;
     my @edge_copy = @edges;
 
     # all nodes will execute the same reductions on the edge list
@@ -239,9 +251,14 @@ sub ping_latency_test {
 	    
 	    # do a RTT test for the link and see if it adds up.
 	    if($hostname eq $edge->src ) {
-		
+		my $cmd;
+
 		# set deadline to prevent long waits
-		my $cmd = "sudo ping -c " . PACK_COUNT . " -q  -i " . (1 / SEND_RATE) . " -m 1 -t 1 " . $edge->dst . " 2> " . ERROR_LOG;
+		if($platform eq BSD) {
+		    $cmd = "sudo ping -c " . PACK_COUNT . " -q  -i " . (1 / SEND_RATE) . " -t 1 -m 1 " . $edge->dst ;
+		} else {
+		    $cmd = "sudo ping -c " . PACK_COUNT . " -q  -i " . (1 / SEND_RATE) . " -w 1 -t 1 " . $edge->dst ;
+		}
 		my @results = `$cmd`;
 		foreach my $result (@results) {
 		    # find the results line we care about
@@ -249,7 +266,6 @@ sub ping_latency_test {
 			my $mean = $1;
 			my $expected = $edge->delay + $other_edge->delay;
 			$expected *= 1000 ; # units of ms
-			&debug("expected: $expected\n");
 			my $bestfit = $expected + (-0.10888 - 0.00236 * $expected)  ;
 			my $diff = abs($bestfit - $mean);
 			&debug("pinglat mean: $mean expected $bestfit $diff\n");
@@ -262,7 +278,6 @@ sub ping_latency_test {
 	    }
 
 	}
-	&barrier();
     }
 }
 
@@ -284,7 +299,7 @@ sub bw_test {
     while(@edge_copy && !$needed) {
 	my $edge = &get_assign(\@edge_copy);
 	if(defined($edge)
-	   && $hostname eq $edge->src
+	   && $hostname eq $edge->dst
 	   && $edge->bw <= HI_BW
 	   && $edge->bw >= LO_BW) {
 	    $needed = 1;
@@ -294,7 +309,7 @@ sub bw_test {
     if($needed) {
 	$snd_pid = fork();
 	if(!$snd_pid) {
-	    open(STDOUT, ">/dev/null"); # redirct output to null
+	    open(STDOUT, ">/dev/null") unless DEBUG; # redirct output to null
 	    exec "pathrate_snd -i";
 	}
 	# wait for sender ready.
@@ -382,6 +397,7 @@ sub get_topo {
 
 # prints out the topology read in from the NS file
 sub debug_top {
+#    &debug("host: $hostname\n");
     &debug("ns script: $ns_file\n");
     &debug("nodes:\n");
     foreach my $vert (@verts) {
@@ -407,14 +423,30 @@ sub error {
 
 # synch all nodes
 sub barrier {
-    &barrier_name("allnodes");
+    die "wrong number of args!" if @_;
+    my $name = "allnodes";
+    my $count = @verts - 1;
+    &debug("wait for barrier $name\n");
+    my $cmd;
+    if($hostname eq $synserv) {
+	$cmd = "emulab-sync -s $synserv -n $name -i $count";
+    } else {
+	$cmd = "emulab-sync -s $synserv -n $name";
+    }
+    system $cmd;
+
 }
 
+# ensure the right node puts in the count.
+# @param: the name of the "master" sync command.
+# @param: the number of nodes to synch.
 sub barrier_name {
-    my ($name) = @_;
+    die "wrong number of args" unless @_ == 2;
+    my ($name, $count) = @_;
+    $count -= 1;
+    &debug("wait for barrier $name\n");
     my $cmd;
-    my $count = @verts - 1;
-    if($synserv eq $hostname) {
+    if($hostname eq $name) {
 	$cmd = "emulab-sync -s $synserv -n $name -i $count";
     } else {
 	$cmd = "emulab-sync -s $synserv -n $name";
@@ -458,12 +490,16 @@ sub ping_node {
     my $cmd;
     if($ttl) {
 	if($platform eq BSD) {
-	    $cmd = "sudo ping -c 10 -q  -i 0.1 -m $ttl $host 2> " . ERROR_LOG;
+	    $cmd = "sudo ping -c 10 -q -i 0.1 -t 1 -m $ttl $host 2> " . ERROR_LOG;
 	} else {
-	    $cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 -t $ttl 2> " . ERROR_LOG;
+	    $cmd = "sudo ping -c 10 -q -i 0.1 -w 1 -t $ttl $host 2> " . ERROR_LOG;
 	}
     } else {
-	$cmd = "sudo ping -c 10 -q -i 0.1 -t 1 $host 2> " . ERROR_LOG;
+	if($platform eq BSD) {
+	    $cmd = "sudo ping -c 10 -q -i 0.1 -t 1 $host 2> " . ERROR_LOG;
+	} else {
+	    $cmd = "sudo ping -c 10 -q -i 0.1 -w 1 $host 2> " . ERROR_LOG;
+	}
     }
 
     my @results = `$cmd`;
@@ -695,9 +731,17 @@ sub count_steps {
     my $count = 0;
 
     while(@edge_copy) {
-	my $edge = &get_assign(\@edge_copy);
+	&get_assign(\@edge_copy);
 	$count++;
     }   
-    &debug("$ns_file\t$count\n");
+    &debug("get_assign calls: $count\n");
+    @edge_copy = @edges;
+    $count = 0;
+
+    while(@edge_copy) {
+	&get_twoway_assign(\@edge_copy);
+	$count++;
+    }   
+    &debug("get_twoway_assign calls: $count\n");
 }
 
