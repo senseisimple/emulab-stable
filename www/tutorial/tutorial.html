@@ -18,6 +18,7 @@
     </ul>
 <li> <a href="#Advanced">Advanced Topics</a>
     <ul>
+    <li> <a href="#ADVEX">A more advanced example</a>
     <li> <a href="#RPMS">Installing RPMS automatically</a>
     <li> <a href="#Startupcmd">
             Starting your application automatically</a>
@@ -90,9 +91,13 @@ used by <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.  Since the
 Testbed offers emulation, rather than simulation, these files are
 interpreted in a somewhat different manner than ns-2.  Therefore, some
 ns-2 functionality may work differently than you expect, or may not be
-implemented.  If you feel there is useful functionality missing,
-please let us know.  Also, some
-<a href="docwrapper.php3?docname=nscommands.html">
+implemented at all. Please look for warnings of the form:
+	<code><pre>
+	*** WARNING: Unsupported NS Statement!
+	    Link type BAZ, using DropTail!</code></pre>
+
+If you feel there is useful functionality missing, please let us know.
+Also, some <a href="docwrapper.php3?docname=nscommands.html">
 testbed-specific syntax</a> has been added, which with the inclusion
 of compatibility module (<a href="tb_compat.tcl">tb_compat.tcl</a>),
 will be ignored by the NS simulator. This
@@ -453,6 +458,7 @@ or not work as you expect. Again, please feel free to contact us.
 </center>
 
 <ul>
+<li> <a href="#ADVEX">A more advanced example</a>
 <li> <a href="#RPMS">Installing RPMS automatically</a>
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
@@ -462,6 +468,15 @@ or not work as you expect. Again, please feel free to contact us.
 <p>
 
 <ul>
+
+<li> <a NAME="ADVEX"></a>
+     <h3>A more advanced example</h3>
+<p>
+
+We have a more <a href="docwrapper.php3?docname=advanced.html">
+advanced example</a> demonstrating the use of RED queues, traffic
+generators, and the event system.
+
 <li> <a NAME="RPMS"></a>
      <h3>Installing RPMS automatically</h3>
 <p>
@@ -561,7 +576,7 @@ ready count, being sure to delay a small amount between each poll.
 system("tmcc ready");
 while (1) {
     my $bits = `tmcc readycount`;
-    if ($bits ~= /READY=(\d*) TOTAL=(\d*)/) {
+    if ($bits =~ /READY=(\d*) TOTAL=(\d*)/) {
         if ($1 == $2) {
             last;
 	}

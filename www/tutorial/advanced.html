@@ -1,0 +1,233 @@
+<center>
+<h1>Emulab Tutorial - A More Advanced Example</h1>
+</center>
+
+<p>
+Here is a slightly more complex example demonstrating the use of RED
+queues, traffic generation, and the event system. Where possible, we
+adhere to the syntax and operational model of
+<a href="http://www.isi.edu/nsnam/ns/">ns-2</a>, as described in the
+<a href="http://www.isi.edu/nsnam/ns/doc/index.html">NS manual</a>.
+
+<ul>
+<li> RED/GRED Queues: In addition to normal DropTail links, Emulab
+     supports the specification of the RED and GRED (Gentle RED) links
+     in your NS file. RED/GRED queuing is handled via the
+     insertion of a traffic shaping delay node, in much the same way
+     that bandwidth, delay, and packet loss is handled. For a better
+     understanding of how we support traffic shaping, see the
+     <tt>ipfw</tt> and <tt>dummynet</tt> man pages on
+     <tt>users.emulab.net</tt>. It is important to note that Emulab
+     supports a smaller set of tunable parameters then NS does; please
+     read the aforementioned manual pages!
+
+<li> Traffic Generation: Emulab supports Constant Bit Rate (CBR)
+     traffic generation, in conjunction with either Agent/UDP or
+     Agent/TCP agents. We currently use the
+     <a href="http://www.postel.org/tg">TG Tool Set</a> to generate
+     traffic (usermode programs running on FreeBSD 4.3 endpoints).
+
+<li> Event System: Emulab supports limited use of the NS "at"
+     syntax, allowing you to define a static set of events in your NS
+     file, to be delivered to agents running on your nodes.
+</ul>
+
+<p>
+What follows is a <a href="advanced.ns">sample NS file</a> that
+demonstrates the above features, with annotations where appropriate.
+First we define the 2 nodes in the topology:
+	<code><pre>
+	set nodeA [$ns node]
+	set nodeB [$ns node]			</code></pre>
+</p>
+
+<p>
+Next define a duplex link between nodes nodeA and nodeB. Instead of a
+standard DropTail link, it is declared to be a Random Early Detection
+(RED) link. While this is obviously contrived, it allows us to ignore
+<a href="tutorial.php3#Routing">routing</a> issues within this
+example.
+	<code><pre>
+	set link0 [$ns duplex-link $nodeA $nodeB 100Mb 0ms RED]</code></pre>
+</p>
+
+<p>
+Each link is has an NS "Queue" object associated with it, which you
+can modify to suit your needs. (<em>currently, there is a single queue
+object per duplex link; you can cannot set the parameters
+asymmetrically). The following paramsters can be changed, and are
+defined in the NS manual (see Section 7.3):
+	<code><pre>
+	set queue0 [[$ns link $nodeA $nodeB] queue]
+	$queue0 set gentle_ 0
+	$queue0 set queue-in-bytes_ 0
+	$queue0 set limit_ 75
+	$queue0 set maxthresh_ 20
+	$queue0 set thresh_ 7
+	$queue0 set linterm_ 11
+	$queue0 set q_weight_ 0.004</code></pre>
+</p>
+
+<p>
+A UDP agent is created and attached to nodeA, then a CBR traffic
+generator application is created, and attached to the UDP agent:
+	<code><pre>
+	set udp0 [new Agent/UDP]
+	$ns attach-agent $nodeA $udp0
+
+	set cbr0 [new Application/Traffic/CBR]
+	$cbr0 set packetSize_ 500
+	$cbr0 set interval_ 0.005
+	$cbr0 attach-agent $udp0</code></pre>
+</p>
+
+<p>
+A TCP agent is created and also attached to nodeA, then a second CBR
+traffic generator application is created, and attached to the TCP
+agent:
+	<code><pre>
+	set tcp0 [new Agent/TCP]
+	$ns attach-agent $nodeA $tcp0
+
+	set cbr1 [new Application/Traffic/CBR]
+	$cbr1 set packetSize_ 500
+	$cbr1 set interval_ 0.005
+	$cbr1 attach-agent $tcp0</code></pre>
+</p>
+
+<p>
+You must define traffic sinks for each of the traffic generators
+created above. The sinks are attached to nodeB:
+	<code><pre>
+	set null0 [new Agent/Null]
+	$ns attach-agent $nodeB $null0
+
+	set null1 [new Agent/TCPSINK]
+	$ns attach-agent $nodeB $null1</code></pre>
+</p>
+
+<p>
+Then you must connect the traffic generators on nodeA to the traffic sinks
+on nodeB:
+	<code><pre>
+	$ns connect $udp0 $null0  
+	$ns connect $tcp0 $null1</code></pre>
+</p>
+
+<p>
+Lastly, a set of events to control your applications and link
+characteristics: 
+	<code><pre>
+	$ns at 60.0  "$cbr0  start"
+	$ns at 70.0  "$link0 bandwidth 10Mb"
+	$ns at 80.0  "$link0 delay 10ms"
+	$ns at 90.0  "$link0 plr 0.05"
+	$ns at 100.0 "$link0 down"
+	$ns at 110.0 "$link0 up"
+	$ns at 115.0 "$cbr0  stop"
+	
+	$ns at 120.0 "$cbr1  start"
+	$ns at 130.0 "$cbr1  set packetSize_ 512"
+	$ns at 130.0 "$cbr1  set interval_ 0.01"
+	$ns at 140.0 "$link0 down"
+	$ns at 150.0 "$cbr1  stop"</code></pre>
+</p>
+
+<p>
+When you receive email containing the experiment setup information (as
+described in <a href="tutorial.php3#Beginning">Beginning an
+Experiment</a>), you will notice an additional section that lists all
+of the events that will be delivered during your experiment:
+	<code><pre>
+Event List:
+Time         Node         Agent      Type       Event      Arguments
+------------ ------------ ---------- ---------- ---------- ------------ 
+60.000       nodeA        cbr0       TRAFGEN    START      PACKETSIZE=500
+                                                           RATE=100000
+                                                           INTERVAL=0.005
+70.000       tbsdelay0    link0      LINK       MODIFY     BANDWIDTH=10000
+80.000       tbsdelay0    link0      LINK       MODIFY     DELAY=10ms
+90.000       tbsdelay0    link0      LINK       MODIFY     PLR=0.05
+100.000      tbsdelay0    link0      LINK       DOWN       
+110.000      tbsdelay0    link0      LINK       UP         
+115.000      nodeA        cbr0       TRAFGEN    STOP       
+120.000      nodeA        cbr1       TRAFGEN    START      PACKETSIZE=500
+                                                           RATE=100000
+                                                           INTERVAL=0.005
+130.000      nodeA        cbr1       TRAFGEN    MODIFY     PACKETSIZE=512
+130.000      nodeA        cbr1       TRAFGEN    MODIFY     INTERVAL=0.01
+140.000      tbsdelay0    link0      LINK       DOWN       
+150.000      tbsdelay0    link0      LINK       UP         
+160.000      nodeA        cbr1       TRAFGEN    STOP		</code></pre>
+
+<p>
+The above list represents the set of events for your experiments, and
+are stored in the Emulab Database. When your experiment is swapped in,
+an <em>event scheduler</em> is started that will process the list, and
+send them at the time offset specified. In order to make sure that all
+of the nodes are actually rebooted and ready, time does not start
+ticking until all of the nodes have reported to the event system that
+they are ready. At present, events are restricted to system level
+agents (Emulab traffic generators and delay nodes), but in the future
+we expect to provide an API that will allow experimentors to write
+their own event agents.
+</p>
+
+<p>
+<h3>
+Dynamic Scheduling of Events
+</h3>
+
+<p>
+NS scripts give you the ability to schedule events dynamically; an NS
+script is just a TCL program and the argument to the "at" command is
+any valid TCL expression. This gives you great flexibility in a
+simulated world, but alas, this cannot be supported in a practical
+manner in the real world. Instead, we provide a way for you to inject
+events into the system dynamically, but leave it up to you to script
+those events in whatever manner you are most comfortable with, be it a
+PERL script, or a shell script, or even another TCL script!  Dynamic
+event injection is accomplished via the <em>Testbed Event Client</em>
+(tevc), which is installed on your experimental nodes and on
+<tt>users.emulab.net</tt>. The command line syntax for <tt>tevc</tt>
+is:
+	<code><pre>
+	tevc -e pid/eid time objname event [args ...]</code></pre>
+
+where the <tt>time</tt> parameter is one of:
+
+<blockquote>
+<ul>
+<li> now
+<li> +seconds (floating point or integer)
+<li> [[[[yy]mm]dd]HH]MMss
+</ul>
+</blockquote>
+
+For example, you could issue this sequence of events. 
+	<code><pre>
+	tevc -e testbed/myexp now cbr0 set interval_=0.2
+	tevc -e testbed/myexp +10 cbr0 start
+	tevc -e testbed/myexp +15 link0 down
+	tevc -e testbed/myexp +17 link0 up
+	tevc -e testbed/myexp +20 cbr0 stop</code></pre>
+
+Some points worth mentioning:
+
+<ul>
+<li> There is no "global" clock; Emulab nodes are kept in sync with
+     NTP, which does a very good job of keeping all of the clocks
+     within 0.3ms of each other.
+
+<li> The set of events you can send is currently limited to control of
+     traffic generators and delay nodes. We expect to add more agents
+     in the future.
+
+<li> <tt>tevc</tt> does not provide any feedback; if you specify an
+     object (say, cbr78 or link45) that is not a valid object in your
+     experiment, the event is silently thrown away. Further, if you
+     specify an operation or parameter that is not approprate (say,
+     "link0 start" instead of "link0 up"), the event is silently
+     dropped. We expect to add error feedback in the future.
+</ul>
+
