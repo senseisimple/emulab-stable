@@ -1,3 +1,29 @@
+stoller     2003/07/15 15:25:03 MDT
+
+  Modified files:
+    db                   libdb.pm.in 
+    tbsetup              assign_wrapper.in os_setup.in tbswap.in 
+                         vnode_setup.in 
+  Log:
+  A set of changes to make swapmod work on jailed nodes (note, swapmod
+  does not yet work with remove virtual nodes; that will take even more
+  work).
+  
+  Added a new allocstate called RES_TEARDOWN. assign_wrapper no longer
+  deallocates unused nodes, but rather moves them into the new state for
+  the wrapper (tbswap) to deal with. Thats cause deleted vnodes need to
+  be torn down, since its possible that the node on which they were
+  living will not be deallocated (say, if there are other vnodes on
+  it). We do not want to be doing that from assign_wrapper, so tbswap
+  looks for those nodes.
+  
+  Made vnode_setup allocstate aware in the same way that os_setup is;
+  do not reboot vnodes or try to set up vnodes when they are already in
+  the RES_READY state, as they will be when doing a swapmod. In
+  addition, if os_setup is going to reboot the underlying physnode, move
+  the vnodes on that node into RES_READY too, since there they will
+  setup automatically. Might need an interim state here, for correctness.
+  
 ricci       2003/07/14 18:27:27 MDT
   Modified files:
     utils                newnode.in
