@@ -132,10 +132,10 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
               <td width=8%>
-               <a href='showexp_list.php3?showactive=$showactive&sortby=pid'>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
                   PID</td>
               <td width=8%>
-               <a href='showexp_list.php3?showactive=$showactive&sortby=eid'>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
                   EID</td>
               <td width=3%>PCs</td>\n";
 
@@ -146,10 +146,10 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 <td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
-               <a href='showexp_list.php3?showactive=$showactive&sortby=name'>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
                   Name</td>
               <td width=4%>
-               <a href='showexp_list.php3?showactive=$showactive&sortby=uid'>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
                   Head UID</td>
             </tr>\n";
 
