@@ -734,6 +734,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh \
 	tools/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
+        tools/webcamapplet/GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	apache/GNUmakefile apache/httpd.conf \

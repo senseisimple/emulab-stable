@@ -60,22 +60,41 @@ if (isset($refreshrate)) {
 }
 else {
     echo "<center>
-          <a href=webcam.php3?refreshrate=1>Auto-refresh</a> images at one
-             second interval.
+          <a href=webcam.php3?refreshrate=2>Auto-refresh</a> images at two
+             second interval, or<br>
+          <a href=webcam.php3?applet=1>Live Image</a> using a java applet.
           </center>\n";
 }
 
-echo "<table cellpadding='0' cellspacing='0' border='0' class='stealth'>\n";
+if (isset($applet)) {
+    $auth    = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+    
+    while ($row = mysql_fetch_array($query_result)) {
+	$id  = $row["id"];
+	$url = "webcamimg.php3?webcamid=${id}&nocookieuid=${uid}".
+	    "&nocookieauth=${auth}&applet=1";
 
-while ($row = mysql_fetch_array($query_result)) {
-    $id      = $row["id"];
-
-    echo "<tr><td align=center>Web Cam $id</td></tr>
-          <tr><td align=center class='stealth'>
-                <img src='webcamimg.php3?webcamid=$id' align=center></td></tr>
-          <tr><tr>\n";
+	echo "<applet archive=WebCamApplet.jar
+	              code=WebCamApplet.class height=480 width=640>
+                      <param name=URL value=$url>
+              </applet><br<br>\n";
+    }
 }
-echo "</table>\n";
+else {
+    echo "<table cellpadding='0' cellspacing='0' border='0'
+                 class='stealth'>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$id      = $row["id"];
+
+	echo "<tr><td align=center>Web Cam $id</td></tr>
+              <tr><td align=center class='stealth'>
+                     <img src='webcamimg.php3?webcamid=$id'
+                          align=center></td></tr>
+              <tr><tr>\n";
+    }
+    echo "</table>\n";
+}
 
 #
 # Standard Testbed Footer

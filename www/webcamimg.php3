@@ -50,7 +50,7 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     MyError("No such webcam ID: '$webcamid'");
 }
 $row = mysql_fetch_array($query_result);
-$URL = $row["stillimage_URL"];
+$URL = (isset($applet) ? $row["URL"] : $row["stillimage_URL"]);
 
 #
 # Check sitevar to make sure mere users are allowed to peek at us.
@@ -81,7 +81,9 @@ if (!$socket) {
 # of the interface we are using (fopen). No biggie, but we have to
 # spit them out ourselves so the client knows what to do.
 #
-#header("Content-type: multipart/x-mixed-replace;boundary=--myboundary");
+if (isset($applet)) {
+    header("Content-type: multipart/x-mixed-replace;boundary=--myboundary");
+}
 
 #TBERROR(print_r($http_response_header, TRUE) . "\n\n", 0);
 
