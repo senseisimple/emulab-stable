@@ -29,7 +29,8 @@ $isadmin = ISADMIN($uid);
 #
 $isadmin = ISADMIN($uid);
 
-echo "<b>Show: <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
+echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
+               <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
                <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
@@ -40,13 +41,19 @@ if ($isadmin) {
 echo ".</b><br><br>\n";
 
 if (!isset($showtype)) {
-    $showtype='pcs';
+    $showtype='summary';
 }
 
 $additionalVariables = "";
 $additionalLeftJoin  = "";
 
-if (! strcmp($showtype, "all")) {
+if (! strcmp($showtype, "summary")) {
+    # Separate query below.
+    $role   = "";
+    $clause = "";
+    $view   = "Free Node Summary";
+}
+elseif (! strcmp($showtype, "all")) {
     $role   = "(role='testnode' or role='virtnode')";
     $clause = "";
     $view   = "All";
@@ -100,6 +107,99 @@ if ($isadmin || !strcmp($showtype, "widearea")) {
 }
 
 #
+# Summary info very different.
+# 
+if (! strcmp($showtype, "summary")) {
+    # Get permissions table so as not to show nodes the user is not allowed
+    # to see.
+    $perms = array();
+    
+    if (!$isadmin) {
+	$query_result =
+	    DBQueryFatal("select type from nodetypeXpid_permissions");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $perms{$row[0]} = 0;
+	}
+    
+	$query_result =
+	    DBQueryFatal("select distinct type from group_membership as g ".
+			 "left join nodetypeXpid_permissions as p ".
+			 "     on g.pid=p.pid ".
+			 "where uid='$uid'");
+	
+	while ($row = mysql_fetch_array($query_result)) {
+	    $perms{$row[0]} = 1;
+	}
+    }
+    
+    # Get totals by type.
+    $query_result =
+	DBQueryFatal("select n.type,count(*) from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where (role='testnode') and ".
+		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
+		     "      and nt.class!='pcplabphys') ".
+		     "group BY n.type");
+
+    $totals    = array();
+    $freecount = array();
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$type  = $row[0];
+	$count = $row[1];
+
+	$totals[$type]    = $count;
+	$freecounts[$type] = 0;
+    }
+
+    # Get free totals by type.
+    $query_result =
+	DBQueryFatal("select n.type,count(*) from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "left join reserved as r on r.node_id=n.node_id ".
+		     "where (role='testnode') and ".
+		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
+		     "      and nt.class!='pcplabphys') ".
+		     "      and r.pid is null ".
+		     "group BY n.type");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$type  = $row[0];
+	$count = $row[1];
+
+	$freecounts[$type] = $count;
+    }
+
+    echo "<center>
+          <b>Free Node Summary</b>
+          <br>
+          <table>
+          <tr>
+             <th>Type</th>
+             <th align=center>Free<br>Nodes</th>
+             <th align=center>Total<br>Nodes</th>
+          </tr>\n";
+
+    foreach($totals as $key => $value) {
+	$freecount = $freecounts[$key];
+
+	# Check perm entry.
+	if (isset($perms[$key]) && !$perms[$key])
+	    continue;
+	
+	echo "<tr>
+              <td><a href=shownodetype.php3?node_type=$key>$key</a></td>
+              <td align=center>$freecount</td>
+              <td align=center>$value</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+    PAGEFOOTER();
+    exit();
+}
+
+#
 # Suck out info for all the nodes.
 # 
 $query_result =
@@ -137,13 +237,13 @@ while ($row = mysql_fetch_array($query_result)) {
     if (! isset($freetypes[$type])) {
 	$freetypes[$type] = 0;
     }
+    if (!$pid) {
+	$num_free++;
+	$freetypes[$type]++;
+    }
     switch ($status) {
     case "up":
 	$num_up++;
-	if (!$pid) {
-	    $num_free++;
-	    $freetypes[$type]++;
-	}
 	break;
     case "possibly down":
     case "unpingable":
@@ -309,7 +409,7 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     elseif (strcmp($showtype, "widearea")) {
 	if ($pid)
-	    echo "<td>No</td>\n";
+	    echo "<td>--</td>\n";
 	else
 	    echo "<td>Yes</td>\n";
     }
