@@ -17,7 +17,7 @@
 
 int localmode = 0;
 
-#define DEFAULT_PROGRAM "xterm -T TIP -e telnet %s %s"
+#define DEFAULT_PROGRAM "xterm -T TIP -e telnet localhost @s"
 
 int debug = 0;
 int allowRemote = 0;
@@ -104,7 +104,7 @@ int main( int argc, char ** argv )
   if (argc > 1) {
     programToLaunch = strdup( argv[1] );    
   } else {
-    programToLaunch = DEFAULT_PROGRAM;
+    programToLaunch = strdup( DEFAULT_PROGRAM );
   }
 
   if (localmode) {
@@ -153,7 +153,11 @@ int main( int argc, char ** argv )
       char runString[1024];
       char * foo;
 
-      sprintf(runString, programToLaunch, "localhost", portString);
+      for (foo = programToLaunch; *foo; foo++) {
+	if (*foo == '@') { *foo = '%'; }
+      }
+
+      sprintf(runString, programToLaunch, portString);
 
       if (debug) printf("Running '%s'\n", runString);
 
@@ -190,6 +194,11 @@ void usage(const char * name)
 
 #else
 
+  printf("No aclfile specified.\n"
+         "If you are using a web browser, perhaps\n"
+         "it is not properly configured to pass\n"
+         "an argument to tiptunnel.\n\n");
+
   printf("Usage:\n"
 	 "%s [-l] [-p <portnum>] [-d] [-r] aclfile [<program>]\n"
 	 "-l               enables local mode.\n"
@@ -202,7 +211,8 @@ void usage(const char * name)
 	 "\n"
 	 "<program>        (non-local-mode only)\n"
 	 "                 path of program to launch; default is\n"
-	 "                 \"%s\"\n",
+	 "                 \"%s\"\n"
+         "                 ('@s' indicates where to put port number.)\n",
 	 name,
          DEFAULT_PROGRAM
 	 //"-k keeps accepting connections until killed"
@@ -357,7 +367,7 @@ void doCreateTunnel()
 
   tunnelPort = ntohs(name.sin_port);
 
-  printf("Listening on port %i.\n", tunnelPort);
+  if (debug) { printf("Listening on port %i.\n", tunnelPort); }
 
   if (listen(tunnelSock, 1) < 0) {
     perror("listen");
