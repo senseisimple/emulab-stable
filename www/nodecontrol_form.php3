@@ -60,6 +60,7 @@ $next_boot_osid     = $row[next_boot_osid];
 $next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
 $rpms               = $row[rpms];
+$tarballs           = $row[tarballs];
 $startupcmd         = $row[startupcmd];
 
 #
@@ -210,6 +211,13 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
+          <td>Tarballs[3]:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"tarballs\" size=\"60\"
+                     maxlength=\"1024\" value=\"$tarballs\"></td>
+      </tr>\n";
+
+echo "<tr>
           <td colspan=2 align=center>
               <b><input type=\"submit\" value=\"Submit\"></b>
           </td>
@@ -224,6 +232,10 @@ echo "<p>
                 optional arguments.
         <dt> [2]
            <dd> RPMs must be a colon separated list of pathnames.
+        <dt> [3]
+           <dd> Tarballs must be a colon separated list of directory path
+                and tarfile path (eg: /usr/site /foo/fee.tar.gz). The
+                directory is where the tarfile should be unpacked.
       </dl>\n";
 
 #

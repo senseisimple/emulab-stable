@@ -56,6 +56,7 @@ $query_string =
 	"def_boot_path=\"$def_boot_path\",             ".
 	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
 	"startupcmd='$startupcmd',                     ".
+	"tarballs='$tarballs',                         ".
 	"rpms='$rpms'                                  ";
 
 if ($isadmin) {
