@@ -539,6 +539,7 @@ function SHOWUSER($uid) {
 #
 function SHOWEXP($pid, $eid, $short = 0) {
     global $TBDBNAME, $TBDOCBASE;
+    global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
     $nodecounts  = array();
 
     # Node counts, by class. 
@@ -628,6 +629,14 @@ function SHOWEXP($pid, $eid, $short = 0) {
 	$expt_locked = "";
 
     #
+    # XXX - Temporary until we clear up the state machine stuff.
+    #
+    if (!strcmp($batchstate, TBDB_BATCHSTATE_PAUSED))
+	$batchstate = $TB_EXPTSTATE_SWAPPED;
+    elseif (!strcmp($batchstate, TBDB_BATCHSTATE_TERMINATING))
+	$batchstate = $TB_EXPTSTATE_SWAPPING;
+
+    #
     # Generate the table.
     #
     echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
@@ -708,10 +717,12 @@ function SHOWEXP($pid, $eid, $short = 0) {
                 <td class=left>$exp_path</td>
               </tr>\n";
 
-    echo "<tr>
-            <td>Status: </td>
-            <td class=\"left\">$exp_status</td>
-          </tr>\n";
+	if (ISADMIN()) {
+	    echo "<tr>
+                    <td>Status: </td>
+                    <td class=\"left\">$exp_status</td>
+                  </tr>\n";
+	}
     }
 
     if (count($nodecounts)) {
@@ -790,7 +801,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
                   </tr>\n";
 
 	    echo "<tr>
-                    <td>Batch Status: </td>
+                    <td>State: </td>
                     <td class=\"left\">$batchstate $expt_locked</td>
                   </tr>\n";
 
@@ -801,7 +812,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
     }
     else {
 	    echo "<tr>
-                    <td>Swap State: </td>
+                    <td>State: </td>
                     <td class=\"left\">$batchstate $expt_locked</td>
                   </tr>\n";
     }
@@ -828,6 +839,8 @@ function SHOWEXP($pid, $eid, $short = 0) {
 # Show a listing of experiments by user/pid/gid
 #
 function SHOWEXPLIST($type,$id,$gid = "") {
+    global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
+    
     if ($type == "USER") {
 	$where = "expt_head_uid='$id'";
 	$title = "Current";
@@ -878,7 +891,7 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	while ($row = mysql_fetch_array($query_result)) {
 	    $pid  = $row[pid];
 	    $eid  = $row[eid];
-	    $state= $row[state];
+	    $bstate= $row[batchstate];
 	    $nodes= $row["nodes"];
 	    $minnodes = $row["min_nodes"];
 	    $idlehours = TBGetExptIdleTime($pid,$eid);
@@ -890,6 +903,14 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	    } elseif ($row[swap_requests] > 0) {
 		$nodes .= $idlemark;
 	    }
+
+            #
+            # XXX - Temporary until we clear up the state machine stuff.
+            #
+	    if (!strcmp($bstate, TBDB_BATCHSTATE_PAUSED))
+		$bstate = $TB_EXPTSTATE_SWAPPED;
+	    elseif (!strcmp($bstate, TBDB_BATCHSTATE_TERMINATING))
+		$bstate = $TB_EXPTSTATE_SWAPPING;
 
 	    if ($nopid) {
 		$pidrow="";
@@ -906,7 +927,7 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	    
 	    echo "<tr>$pidrow
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
-		 <td>$state</td>
+		 <td>$bstate</td>
                  <td align=center>$nodes</td>
                  <td align=center>$idlestr</td>
                  <td>$name</td>
