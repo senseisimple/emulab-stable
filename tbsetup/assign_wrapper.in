@@ -200,11 +200,13 @@ my %ips	      = ();
 # emulated is 1 if the link/lan is emulated (virtual). This is
 # controlled by the a variable in the virt_lans table. It also gets
 # set when one of the nodes in the lan is a virtnode (jail).
-# useveth is 1 if the link/lan should us a veth device (virtual only). 
+# useveth is 1 if the link/lan should us a veth device (virtual only).
+# trivok is 1 if emulated link/lan can by colocated on same node. 
 my %lans     = ();
 my %memberof = ();
 my %emulated = ();
 my %useveth  = ();
+my %trivok   = ();
 
 # delayinfo stores the virt_lans info, and is indexed by virtual
 # lan:node:port and is a list of delay, bandwidth, lossrate, rdelay,
@@ -234,9 +236,13 @@ my %linkdelays = ();
 
 # Set this when forcing linkdelays instead of delay nodes. Set in the NS
 # file with a tb-compat directive. The force directive says to set up a
-# link delay, even when no delay would otherwise be inserted. 
+# link delay, even when no delay would otherwise be inserted.
+# usewatunnels is also set in the NS, and can be used to turn them off. 
+# The multiplex_factor is to override node_types table for virtnode.
 my $uselinkdelays   = 0;
 my $forcelinkdelays = 0;
+my $usewatunnels    = 1;
+my $multiplex_factor;
 
 # And the per-lan controls, based on the above two variables, and
 # per-lan variable in the virt_lans table. Indexed by lan name.
@@ -279,9 +285,12 @@ my %expt_stats = (# pnodes include jailnodes and delaynodes.
 );
 
 my $query_result =
-    DBQueryFatal("SELECT uselinkdelays,forcelinkdelays from experiments ".
+    DBQueryFatal("SELECT uselinkdelays,forcelinkdelays,".
+		 "       multiplex_factor,usewatunnels ".
+		 " from experiments ".
 		 "where pid='$pid' and eid='$eid'");
-($uselinkdelays,$forcelinkdelays) = $query_result->fetchrow_array();
+($uselinkdelays,$forcelinkdelays,$multiplex_factor,$usewatunnels) =
+    $query_result->fetchrow_array();
 
 # Figure out what kind of links we have. Indexed by bandwidth and is
 # just a set.
@@ -304,7 +313,7 @@ $query_result =
 
 while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
     $delayosids{$type}   = $delayosid;
-    $jailosids{$type}    = "emulab-ops-FBSD47-JAIL";
+    $jailosids{$type}    = "emulab-ops-FBSD47-UPDATE";
     $defaultosids{$type} = $defosid;
 }
 
@@ -443,7 +452,7 @@ printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
 		 "rdelay,rbandwidth,rlossrate,widearea, ".
-		 "emulated,uselinkdelay,nobwshaping,usevethiface " .
+		 "emulated,uselinkdelay,nobwshaping,usevethiface,trivial_ok " .
 		 "from virt_lans where pid='$pid' and eid='$eid' ".
                  "order by vname,member");
 
@@ -461,7 +470,7 @@ my %tunnels   = ();
 # 
 while (my ($vname,$member,$delay,$bandwidth,$lossrate,
 	   $rdelay,$rbandwidth,$rlossrate,$widearea,
-	   $isemulated,$uselinkdelay,$nobwshaping,$useveth)
+	   $isemulated,$uselinkdelay,$nobwshaping,$useveth,$trivial_ok)
        = $result->fetchrow_array) {
     my ($node,$port) = split(":",$member);
 
@@ -474,13 +483,20 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
     # it later by creating tunnels.
     # 
     if ($widearea) {
-	if (! defined($tunnels{$vname})) {
-	    $tunnels{$vname} = [];
+	#
+	# If the user requested that no tunnels be created, so not bother
+	# with this. wanassign stills does the right thing, but we do not
+	# set up the tunnels (see below). 
+	#
+	if ($usewatunnels) {
+	    if (! defined($tunnels{$vname})) {
+		$tunnels{$vname} = [];
+	    }
+	    push(@{$tunnels{$vname}},$member);
+	    $rnodelans{$vname} = 1;
+	    printdb "    Added $member to tunnels of $vname\n";
 	}
-	push(@{$tunnels{$vname}},$member);
-	$rnodelans{$vname} = 1;
 	$expt_stats{"walinks"} += 1;
-	printdb "    Added $member to tunnels of $vname\n";
 	next;
     }
     
@@ -524,7 +540,8 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
     $uselinkdelay{$vname} = $uselinkdelay;
     $nobwshaping{$vname} = $nobwshaping;
     $useveth{$vname} = $useveth;
-    
+    $trivok{$vname} = $trivial_ok;
+
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
     #       100Mbs, even if they requested exactly 10Mbs. This is a
@@ -636,6 +653,7 @@ foreach $lan (keys(%lans)) {
     $nonsharks = 0;
     $simnodes = 0;
     $realnodes = 0;
+    $virtnodes = 0;
     my $emulated = $emulated{$lan};
     my $uselinkdelay = $uselinkdelay{$lan};
     my $mustdelay = $mustdelay{$lan};
@@ -650,10 +668,21 @@ foreach $lan (keys(%lans)) {
 	    $simnodes++;
 	    $simnodelans{$lan} = 1;
 	} else {
-	    # We always use an emulated link when its a virtnode.
+	    # We always use an emulated link when its a virtnode. An emulated
+	    # link can use a trivial link too, if the user wanted it. 
 	    if ($isvirtnode{$node}) {
-		$emulated++;
+		$virtnodes++;
+		$emulated = 1;
 		$emulated{$lan} = 1;
+		$trivial_ok = $trivok{$lan};
+		#
+		# An emulated link/lan between containing any
+		# virtnodes always uses veth devices. Note that remote
+		# virtual nodes never go through this path cause they
+		# get tunnels, so its only local virtual nodes. 
+		#
+		$useveth{$lan} = 1
+		    if ($isvirtnode{$node});
 	    }
 	    $nonsharks++;
 	    $realnodes++;
@@ -662,7 +691,7 @@ foreach $lan (keys(%lans)) {
     #
     # Hmm, no emulated lans for now. 
     #
-    if ($emulated && @members > 2) {
+    if ($emulated && (@members > 2) && ($virtnodes != scalar(@members))) {
 	fatal(65,"*** $0:\n".
 	        "    Emulated lans ($lan) not allowed yet! Only links.\n");
     }
@@ -723,7 +752,8 @@ foreach $lan (keys(%lans)) {
 		
 		print(TOPFILE "link $plink $node0 $node1 ".
 		      max($bw,$rbw) . " 0 0" .
-		      ($emulated ? " emulated\n" : "\n"));
+		      ($emulated ? " emulated" : "") .
+		      ($trivial_ok ? " trivial_ok\n" : "\n"));
 
 		#
 		# We allow users to oversubscribe by letting them turn
@@ -832,7 +862,8 @@ foreach $lan (keys(%lans)) {
 
 		    print(TOPFILE "link $plink $node lan/$lan " .
 			  max($bw,$rbw) . " 0 0" .
-			  ($emulated ? " emulated\n" : "\n"));
+			  ($emulated ? " emulated" : "") .
+			  ($trivial_ok ? " trivial_ok\n" : "\n"));
 
 		    printdb "Delay link $plink = " .
 			    join(" ", @{$delaylinks{$plink}}) . "\n";
@@ -984,11 +1015,12 @@ while (1) {
     # if updating (-u), include any resources that may already be
     # allocated to experiment in the PTOP results.
     #
-    if ($updating) {
-	system("ptopgen -e $pid/$eid > $ptopfile");
-    } else {
-	system("ptopgen > $ptopfile");
-    }
+    my $ptopargs = "";
+    $ptopargs   .= "-e $pid/$eid "
+	if ($updating);
+    $ptopargs   .= "-m $multiplex_factor "
+	if (defined($multiplex_factor));
+    system("ptopgen $ptopargs > $ptopfile");
 
     TBDebugTimeStamp("ptopgen finished");
 
@@ -1418,6 +1450,8 @@ TBExptSetPortRange();
 #  [pnode, int0, int1, vname, delay, bandwidth, lossrate]
 # portmap is indexed by <virtual node>:<virtual port> and contains
 #  the physical port.
+# vethmap is indexed by <virtual node>:<virtual port> and contains
+#  the veth physical port if the portmap entry is a veth device.
 #
 # vlan ids
 #  vlan ids are increasing integers in the case of node<->delay connections.
@@ -1434,21 +1468,32 @@ $delayid = 0;
 printdb "Interpreting results.\n";
 TBDebugTimeStamp("interpreting started");
 foreach $plink (keys(%plinks)) {
+    # trivial links do not have physical links, so no delay nodes. But,
+    # we *do* use trivial links for intranode links, and thus there could
+    # be link delays (ie: two jailed nodes on a link/lan assigned to the
+    # same phys node).
+    my $trivial = 0;
 
-    # trivial links do not have physical links
-    if( scalar(@{$plinks{$plink}}) == 0 ) {
-      next;
+    if (scalar(@{$plinks{$plink}})) {
+	($nodeportA,$nodeportB) = @{$plinks{$plink}};
+	($nodeA,$portA) = split(":", $nodeportA);
+	($nodeB,$portB) = split(":", $nodeportB);
+	printdb "plink $plink - $nodeportA $nodeportB\n";
+    }
+    else {
+	$trivial = 1;
+	printdb "plink $plink - trivial\n";
     }
     
-    ($nodeportA,$nodeportB) = @{$plinks{$plink}};
-    ($nodeA,$portA) = split(":",$nodeportA);
-    ($nodeB,$portB) = split(":",$nodeportB);
-    printdb "plink $plink - $nodeportA $nodeportB\n";
     if (($lan,$virtA,$virtC) = ($plink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
+	# trivial links do not have physical links, so no delay nodes.
+	if ($trivial) {
+	    next;
+	}
 	# Node has a single entry in lan.
 	# Node is nodeportA
 	# Delay node is nodeportB
-	# Other end of delay node will be given by plink
+	# Other end of delay node will be given by corresponding plink
 	#   linksdelaydst/lan/virtC,virtA where nodeportA will be the other 
 	#   node in the virtual LAN and nodeportB will be the other end of the
 	#   delay node.
@@ -1484,9 +1529,13 @@ foreach $plink (keys(%plinks)) {
 	printdb "    $virtC = $portC\n";
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
+	# trivial links do not have physical links, so no delay nodes.
+	if ($trivial) {
+	    next;
+	}
 	# Node may have multiple entries in lan.
 	# Delay node is nodeB and portB.
-	# Other end of delay node will be given by plink
+	# Other end of delay node will be given by corresponding plink
 	#  linkdelaydst/lan/node where nodeportA will the LAN node and
 	#  nodeportB will be the other end of the delay node.
 	
@@ -1519,7 +1568,38 @@ foreach $plink (keys(%plinks)) {
 	# If the link is delayed, its with endpoint delays, not a delay node.
 	#
 	printdb "  Link:";
-	AddVlan("link", $lan, $nodeportA, $nodeportB);
+
+	#
+	# trivial links do not have physical links, but could be using
+	# virtual interfaces on the same node. 
+	#
+	if (! $trivial) {
+	    AddVlan("link", $lan, $nodeportA, $nodeportB);
+
+	    if ($useveth{$lan}) {
+		#
+		# Create some new veth devices.
+		# 
+		$portA = NewVethIface($virtA, $nodeA, $portA);
+		$portB = NewVethIface($virtB, $nodeB, $portB);
+	    }
+	}
+	else {
+	    # No phys mapping. We create a veth, but there is no phys mapping
+	    # for the port.
+	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
+	    $nodeB = $v2pmap{(split(":", $virtB))[0]};
+	    $portA = NewVethIface($virtA, $nodeA);
+	    $portB = NewVethIface($virtB, $nodeB);
+	}
+	#
+	# Setup portmap using virt members in plink name.
+	#
+	$portmap{$virtA} = $portA;
+	$portmap{$virtB} = $portB;
+	printdb "  Portmap:\n";
+	printdb "    $virtA = $portA\n";
+	printdb "    $virtB = $portB\n";
 	
 	if ($delaylinks{$plink}) {
 	    my ($member0,$delay,$bandwidth,$loss,
@@ -1540,15 +1620,6 @@ foreach $plink (keys(%plinks)) {
 	    printdb "  LinkDelay: \[$nodeA,$portA,$nodeB,$portB," .
 		"$lan,$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss\]\n";
 	}
-
-	#
-	# Setup portmap using virt members in plink name.
-	#
-	$portmap{$virtA} = $portA;
-	$portmap{$virtB} = $portB;
-	printdb "  Portmap:\n";
-	printdb "    $virtA = $portA\n";
-	printdb "    $virtB = $portB\n";
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linklan/([^/]+)/(.+)$|)) {
 	# node may be the LAN multiple times.
@@ -1556,7 +1627,30 @@ foreach $plink (keys(%plinks)) {
 	# nodeportB is the LAN
 	# No delays
 	printdb "  LAN:";
-	AddVlan("lan", $lan, $nodeportA);
+
+	#
+	# trivial links do not have physical links, but could be using
+	# virtual interfaces on the same node. 
+	#
+	if (! $trivial) {
+	    AddVlan("lan", $lan, $nodeportA);
+
+	    if ($useveth{$lan}) {
+		#
+		# Create some new veth devices, and store the mapping
+		# in vethmap so we know the veth->iface mapping later.
+		# 
+		$portA = NewVethIface($virtA, $nodeA, $portA);
+	    }
+	}
+	else {
+	    # No phys mapping. We create a veth, but there is no phys port.
+	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
+	    $portA = NewVethIface($virtA, $nodeA);
+	}
+	$portmap{$virtA} = $portA;
+	printdb "  Portmap:\n";
+	printdb "    $virtA = $portA\n";
 	
 	if ($delaylinks{$plink}) {
 	    my ($member0,$delay,$bandwidth,$loss,
@@ -1573,10 +1667,6 @@ foreach $plink (keys(%plinks)) {
 	    printdb "  LinkDelay: \[$nodeA,$portA," .
 		"$lan,$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss\]\n";
 	}
-
-	$portmap{$virtA} = $portA;
-	printdb "  Portmap:\n";
-	printdb "    $virtA = $portA\n";
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	   $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
@@ -1868,31 +1958,17 @@ foreach $vnodeport (keys(%portmap)) {
 	}
 	# End Shark Hack
     }
-    if ($emulated{$lan} && ($isvirtnode{$vnode} || $useveth{$lan})) {
+    if ($useveth{$lan}) {
 	#
 	# Emulated links on local virtual nodes use the new veth device.
 	# This is still fuzzy. What about connections to non-bsd nodes?
 	#
+	# See NewVethIface() calls. Everything was set up then.
+	#
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
-	my $vvnode= "NULL";
 
-	# Mark as being a jail interface. 
-	if ($isvirtnode{$vnode} && $jailed{$vnode}) {
-	    $vvnode = "'" . $v2vmap{$vnode} . "'";
-	}
-	
-	#
-	# Not sure about the MAC yet. We need to create something, and
-	# for now it will be helpful for debugging if I use the IP.
-	# 
-	my $mac   = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
-
-	printdb("IP: $pnode:$pport $ip (veth)\n");
-
-	DBQueryFatal("insert into veth_interfaces ".
-		     "(node_id, veth_id, mac, IP, iface, vnode_id) ".
-		     "values ('$pnode', 0, '$mac', '$ip', '$pport', $vvnode)");
+	printdb("IP: $pnode:$pport $ip\n");
     }
     else {
 	#
@@ -2722,4 +2798,46 @@ sub CheckMaxConcurrent()
 sub UploadStats()
 {
     GatherAssignStats($pid, $eid, %expt_stats);
+}
+
+#
+# Create a new veth interface. This sets up the entire veth slot,
+# including IP and mac.
+#
+sub NewVethIface($$;$)
+{
+    my ($vnodeport, $pnode, $pport) = @_;
+    my ($vnode) = split(":", $vnodeport);
+    my $ip      = $ips{$vnodeport};
+    my $vvnode  = "NULL";
+
+    # Null pport means no phys port.
+    if (!defined($pport)) {
+	$pport = "NULL";
+    }
+    else {
+	$pport = "'$pport'";
+    }
+
+    # Mark as being a jail interface be establishing a connection
+    # to the nodes table entry for the virtnode. 
+    if ($isvirtnode{$vnode} && $jailed{$vnode}) {
+	$vvnode = "'$v2vmap{$vnode}'";
+    }
+
+    #
+    # Not sure about the MAC yet. We need to create something, and
+    # for now it will be helpful for debugging if I use the IP.
+    # 
+    my $mac   = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
+
+    #
+    # Insert, and then get the id so we can form the name of the veth device. 
+    # 
+    my $query_result = 
+	DBQueryFatal("insert into veth_interfaces ".
+		     "(node_id, veth_id, mac, IP, iface, vnode_id) ".
+		     "values ('$pnode', 0, '$mac', '$ip', $pport, $vvnode)");
+
+    return "veth" . $query_result->insertid;
 }
