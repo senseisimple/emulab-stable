@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -831,7 +831,6 @@ while (1) {
     TBDebugTimeStamp("reserving started");
     # Reserve resources
     if (!$fail) {
-	print "Reserving resources.\n";
 	@toreserve = ();
 	# We don't reserve LAN nodes.
 	foreach $node (keys(%p2vmap)) {
@@ -840,9 +839,9 @@ while (1) {
 	  }
 	}
 	if (system("nalloc $pid $eid " . join(" ",@toreserve))) {
-	    print "Failed to reserve resources.  Trying again.\n";
+	    print "Failed to reserve nodes. Trying again.\n";
 	} else {
-	    print "Successfully reserved resources.  Finishing setup.\n";
+	    print "Successfully reserved physical nodes\n";
 	    TBDebugTimeStamp("reserving finished");
 	    last;
 	}
@@ -942,7 +941,6 @@ foreach my $vname (keys(%isvirtnode)) {
 
     my $fixed = $fixed_nodes{$vname};
     my $pnode;
-    my $type;
 
     #
     # Run avail to see if there are any virtnodes free on the (phys) node 
