@@ -70,5 +70,5 @@ script-install:	dir-install $(SCRIPTS)
 sfs-install:
 
 # create ifcfg-eth? files
-ifcfgs: $(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
+ifcfgs: # $(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
 #	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template

@@ -24,7 +24,7 @@ dijkstra:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
 
 client: all
 client-install: client
-	$(INSTALL_PROGRAM) dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra
+	$(INSTALL_PROGRAM) -s dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra
 
 clean:
 	rm -f *.o dijkstra
