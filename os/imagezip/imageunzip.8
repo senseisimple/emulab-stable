@@ -15,6 +15,7 @@
 .Op Fl D Ar DOS-ptype
 .Op Fl p Ar pattern
 .Op Fl s Ar slice
+.Op Fl W Ar size
 .Ar image
 .Op outfile
 .Sh DESCRIPTION
@@ -65,7 +66,7 @@ man page for more details on disk images and their creation.
 .Pp
 To further optimize the image restoration process,
 writing of the image to the output file is done is a separate thread
-from reading and uncompressing.  This allows overlap of uncompression and IO.
+from reading and decompressing.  This allows overlap of decompression and IO.
 The
 .Fl n
 option can be used to disable this feature.
@@ -106,13 +107,13 @@ an image to a slice.
 Turn on debugging output.  Can be specified multiple times to increase
 the level of debugging output.
 .It Fl n
-Run uncompression and disk writing in a single thread.
+Run decompression and disk writing in a single thread.
 This option can be used for benchmarking or if a race condition is suspected.
 You will probably never need this option.
 .It Fl o
 Indicate the progress of image restore by printing a dot ('.') to
 .Dv stderr
-after every 1MB of compressed data that is uncompressed and written to
+after every 1MB of compressed data that is decompressed and written to
 the output file.
 At the end of each line of dots, elapsed time in seconds and
 the amount of expanded data written is also printed.
@@ -138,6 +139,14 @@ must be seekable and have a DOS MBR with a partition table in its first sector.
 Print the version number of
 .Nm
 and exit.
+.It Fl W Ar size
+Limits the amount of memory used for write buffering.
+When running multi-threaded (i.e., without
+.Fl n )
+the decompression thread queues decompressed data for the writer thread.
+This option limits the amount of queued write data to
+.Ar size
+Megabytes.
 .It Fl z
 Tells
 .Nm
@@ -148,9 +157,9 @@ to free blocks in the image rather than seeking over them.
 .Sh DIAGNOSTICS
 The
 .Nm
-utility will exit with a status of zero if it successfully uncompresses the
+utility will exit with a status of zero if it successfully decompresses the
 entire image and writes it to the output.  It will exit non-zero if it
-runs out of memory or gets an error while reading or uncompressing the
+runs out of memory or gets an error while reading or decompressing the
 image or writing the output file.
 .Sh IMPLEMENTATION NOTES
 Because
@@ -191,7 +200,7 @@ FreeBSD (165) in the DOS partition table.
 .Pp
 .Dl imageunzip -z image.ndz | wc
 .Pp
-A slow way to find out how big an image would be when uncompressed
+A slow way to find out how big an image would be when decompressed
 (use
 .Xr imagedump
 instead).
