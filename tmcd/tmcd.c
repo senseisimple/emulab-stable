@@ -943,50 +943,30 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *unit   = "Mbps";
 			char *duplex = "full";
 
-			/*
-			 * INTERFACE can go away when all machines running
-			 * updated (MAC based) setup. Right now MAC is at
-			 * the end (see below) cause of the sharks, but they
-			 * should be dead soon too.
-			 */
-			sprintf(buf, "INTERFACE=%d INET=%s MASK=%s",
-				card, row[1], NETMASK);
-
-			/*
-			 * The point of this sillyness is to look for the
-			 * special Shark case. The sharks have only one
-			 * interface, so we use an IPalias on what we call
-			 * the "control" interface. This test prevents us
-			 * from returning an ifconfig line for the control
-			 * interface, unless it has an IP alias. I could
-			 * change the setup scripts to ignore this case on
-			 * the PCs. Might end up doing that at some point. 
-			 */
-			if (row[2] && row[2][0]) {
-				strcat(buf, " IPALIAS=");
-				strcat(buf, row[2]);
-			}
-			else if (card == control_net)
+			/* Never for the control net; sharks are dead */
+			if (card == control_net)
 				goto skipit;
 
 			/*
-			 * Tack on MAC, which should go up above after
-			 * Sharks are sunk.
+			 * Speed and duplex if not the default.
 			 */
-			strcat(buf, " MAC=");
-			strcat(buf, row[3]);
+			if (row[4] && row[4][0])
+				speed = row[4];
+			if (row[5] && row[5][0])
+				duplex = row[5];
 
 			/*
-			 * Tack on speed and duplex. 
+			 * We now use the MAC to determine the interface, but
+			 * older images still want that tag at the front.
 			 */
-			if (row[4] && row[4][0]) {
-				speed = row[4];
-			}
-			if (row[5] && row[5][0]) {
-				duplex = row[5];
-			}
+			if (vers < 10)
+			  sprintf(buf, "INTERFACE=%d ", card);
+			else 
+			  sprintf(buf, "IFACETYPE=eth ");
+			
 			sprintf(&buf[strlen(buf)],
-				" SPEED=%s%s DUPLEX=%s", speed, unit, duplex);
+				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
+				row[1], NETMASK, row[3], speed, unit, duplex);
 
 			/* Tack on IPaliases */
 			if (vers >= 8) {
@@ -1004,6 +984,42 @@ COMMAND_PROTOTYPE(doifconfig)
 			info("IFCONFIG: %s", buf);
 		}
 	skipit:
+		nrows--;
+	}
+	mysql_free_result(res);
+
+	/* Veth interfaces are new. */
+	if (vers < 10)
+	  return 0;
+
+	/*
+	 * Find all the veth interfaces.
+	 */
+	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac "
+			 "  from veth_interfaces as v "
+			 "left join interfaces as i on "
+			 "  i.node_id=v.node_id and i.iface=v.iface "
+			 "where v.node_id='%s'",
+			 4, reqp->nodeid);
+	if (!res) {
+		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf,
+			"IFACETYPE=veth "
+			"INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
+			row[1], NETMASK, row[0], row[2], row[3]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		info("IFCONFIG: %s", buf);
 		nrows--;
 	}
 	mysql_free_result(res);
