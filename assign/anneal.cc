@@ -302,13 +302,13 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
        fixed_it!=fixed_nodes.end();++fixed_it) {
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
-      cerr << "Fixed node: " << (*fixed_it).first <<
+      cout << "Fixed node: " << (*fixed_it).first <<
 	"does not exist." << endl;
       exit(2);
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
-      cerr << "Fixed node: " << (*fixed_it).second <<
+      cout << "Fixed node: " << (*fixed_it).second <<
 	" not available." << endl;
       exit(2);
     }
@@ -316,11 +316,11 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
     tb_vnode *vn = get(vvertex_pmap,vv);
     tb_pnode *pn = get(pvertex_pmap,pv);
     if (vn->vclass != NULL) {
-      cerr << "Can not have fixed nodes be in a vclass!.\n";
+      cout << "Can not have fixed nodes be in a vclass!.\n";
       exit(2);
     }
     if (add_node(vv,pv,false,false) == 1) {
-      cerr << "Fixed node: Could not map " << vn->name <<
+      cout << "Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       exit(2);
     }
@@ -494,7 +494,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
 	if (choice >= 0) {
 	    vv = virtual_nodes[choice];
 	} else {
-	    cerr << "**** Error, unable to find any non-fixed nodes" << endl;
+	    cout << "**** Error, unable to find any non-fixed nodes" << endl;
 	    goto DONE;
 	}
       }
@@ -979,7 +979,7 @@ NOTQUITEDONE:
       // Check to make sure that our 'clean' solution scores the same as
       // the initial score - if not, that indicates a bug
       if (!compare_scores(get_score(),initial_score)) {
-	  cerr << "*** WARNING: 'Clean' score does not match initial score" <<
+	  cout << "*** WARNING: 'Clean' score does not match initial score" <<
 	      endl << "     This indicates a bug - contact the operators" <<
 	      endl << "     (initial score: " << initial_score <<
 	      ", current score: " << get_score() << ")" << endl;
@@ -988,7 +988,7 @@ NOTQUITEDONE:
 	  pclass_list::iterator pit = pclasses.begin();
 	  for (;pit != pclasses.end();pit++) {
 	      if ((*pit)->used_members != 0) {
-		  cerr << (*pit)->name << " is " << (*pit)->used_members
+		  cout << (*pit)->name << " is " << (*pit)->used_members
 		      << "% used" << endl;
 	      }
 	  }

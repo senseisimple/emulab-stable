@@ -31,8 +31,8 @@ using namespace boost;
 extern name_pvertex_map pname2vertex;
 extern name_count_map ptypes;
 
-#define ptop_error(s) errors++;cerr << "PTOP:" << line << ": " << s << endl
-#define ptop_error_noline(s) errors++;cerr << "PTOP: " << s << endl
+#define ptop_error(s) errors++;cout << "PTOP:" << line << ": " << s << endl
+#define ptop_error_noline(s) errors++;cout << "PTOP: " << s << endl
 
 // Used to do late binding of subnode names to pnodes, so that we're no
 // dependant on their ordering in the ptop file, which can be annoying to get

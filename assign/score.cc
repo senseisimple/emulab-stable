@@ -538,7 +538,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
     break;
 #endif
   case tb_link_info::LINK_UNKNOWN:
-    cerr << "Internal error: Should not be here either." << endl;
+    cout << "Internal error: Should not be here either." << endl;
     exit(1);
     break;
   }
@@ -1543,7 +1543,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	      break;
 	    default:
 	      // Global features are required to have some kind of type
-	      cerr << "Bad global feature " << (*feature_it).first << endl;
+	      cout << "Bad global feature " << (*feature_it).first << endl;
 	      exit(2);
 	  }
       } else {

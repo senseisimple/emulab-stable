@@ -34,8 +34,8 @@ extern name_count_map vtypes;
 extern name_list_map vclasses;
 extern vvertex_vector virtual_nodes;
 
-#define top_error(s) errors++;cerr << "TOP:" << line << ": " << s << endl
-#define top_error_noline(s) errors++;cerr << "TOP: " << s << endl
+#define top_error(s) errors++;cout << "TOP:" << line << ": " << s << endl
+#define top_error_noline(s) errors++;cout << "TOP: " << s << endl
 
 // Used to do late binding of subnode names to vnodes, so that we're no
 // dependant on their ordering in the top file, which can be annoying to get

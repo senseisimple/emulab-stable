@@ -131,7 +131,7 @@ void read_physical_topology(char *filename)
   ifstream ptopfile;
   ptopfile.open(filename);
   if (!ptopfile.is_open()) {
-      cerr << "Unable to open ptop file " << filename << endl;
+      cout << "Unable to open ptop file " << filename << endl;
       exit(2);
   }
   cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
@@ -240,7 +240,7 @@ void read_virtual_topology(char *filename)
   ifstream topfile;
   topfile.open(filename);
   if (!topfile.is_open()) {
-      cerr << "Unable to open top file " << filename << endl;
+      cout << "Unable to open top file " << filename << endl;
       exit(2);
   }
   cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
@@ -297,23 +297,23 @@ void prune_unusable_pclasses() {
 
 void print_help()
 {
-  cerr << "assign [options] ptopfile topfile [config params]" << endl;
-  cerr << "Options: " << endl;
+  cout << "assign [options] ptopfile topfile [config params]" << endl;
+  cout << "Options: " << endl;
 #ifdef TIME_TERMINATE
-  cerr << "  -l <time>   - Limit runtime." << endl;
+  cout << "  -l <time>   - Limit runtime." << endl;
 #endif
-  cerr << "  -s <seed>   - Set the seed." << endl;
-  cerr << "  -v <viz>    - Produce graphviz files with given prefix." <<
+  cout << "  -s <seed>   - Set the seed." << endl;
+  cout << "  -v <viz>    - Produce graphviz files with given prefix." <<
     endl;
-  cerr << "  -r          - Don't allow trivial links." << endl;
-  cerr << "  -p          - Disable pclasses." << endl;
-  cerr << "  -d          - Enable dynamic pclasses." << endl;
+  cout << "  -r          - Don't allow trivial links." << endl;
+  cout << "  -p          - Disable pclasses." << endl;
+  cout << "  -d          - Enable dynamic pclasses." << endl;
 #ifdef PER_VNODE_TT
-  cerr << "  -P          - Prune unusable pclasses." << endl;
+  cout << "  -P          - Prune unusable pclasses." << endl;
 #endif
-  cerr << "  -T          - Doing some scoring self-testing." << endl;
-  cerr << "  -H <float>  - Try <float> times harder." << endl;
-  cerr << "  -o          - Allow overloaded pnodes to be considered." << endl;
+  cout << "  -T          - Doing some scoring self-testing." << endl;
+  cout << "  -H <float>  - Try <float> times harder." << endl;
+  cout << "  -o          - Allow overloaded pnodes to be considered." << endl;
   exit(2);
 }
  
@@ -559,7 +559,7 @@ int mapping_precheck() {
 // Signal handler - add a convneint way to kill assign and make it return an
 // unretryable error
 void exit_unretryable(int signal) {
-    cerr << "Killed with signal " << signal << " - exiting!" << endl;
+    cout << "Killed with signal " << signal << " - exiting!" << endl;
     _exit(2);
 }
 
@@ -722,11 +722,11 @@ int main(int argc,char **argv)
 #endif
 
   if ((!compare_scores(get_score(),absbest)) || (violated > absbestviolated)) {
-    cerr << "Internal error: Invalid migration assumptions." << endl;
-    cerr << "score:" << get_score() << " absbest:" << absbest <<
+    cout << "Internal error: Invalid migration assumptions." << endl;
+    cout << "score:" << get_score() << " absbest:" << absbest <<
       " violated:" << violated << " absbestviolated:" <<
       absbestviolated << endl;
-    cerr << "  Contact calfeld" << endl;
+    cout << "  Contact calfeld" << endl;
   }
   
   cout << "   BEST SCORE:  " << get_score() << " in " << iters <<
