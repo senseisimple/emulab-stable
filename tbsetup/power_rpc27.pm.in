@@ -1,17 +1,24 @@
 #!/usr/bin/perl -wT
-use English;
-use strict;
+#use English;
+#use strict;
 use Socket;
 use IO::Handle;
 
-#
+use lib "@prefix@/lib";
+use libdb;
+
+package power_rpc27;
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( rpc27ctrl );
+
+
 # A little perl module to power cycle something attached to an RPC27.
 # Thats a serially controlled, power controller.
 #
 # XXX The little secretkey handshake is coded in here. If this changes
 # in capture, you have to change it here too. Look for the "pack"
-# statement below. 
-#
+# statement below.
 
 # Turn off line buffering on output
 $| = 1;
@@ -20,59 +27,59 @@ $| = 1;
 my $debug = 1;
 
 # RPC27 Prompt string
-my $RPC27_PROMPT	= "RPC27>";
-my $RPC27_REBOOT	= "reboot";
+my $RPC27_PROMPT = "RPC27>";
+my %RPC27_CMD =
+  ("cycle"=>"reboot",
+   "on"    =>"on",
+   "off"   =>"off");
 
-#
 # Main routine.
-#
-# usage: power_rpc27(controller, outlet)
-#
-sub power_rpc27($$)
-{
-    my($controller, $outlet) = @_;
-    my($TIP, $i);
+# usage: rpc27ctrl(cmd, controller, outlet)
+# cmd = { "cycle" | "on" | "off" }
+# controller = <node_id>
+# outlet = int, 1 <= outlet <= 20
+sub rpc27ctrl {
+  my($cmd, $controller, $outlet) = @_;
+  my($TIP, $i);
 
-    #
-    # Form the connection to the controller via a "tip" line to the
-    # capture process. Once we have that, we can just talk to the
-    # controller directly.
-    # 
-    if (! ($TIP = tipconnect($controller))) {
-	print STDERR "*** Could not form TIP connection to $controller\n";
-	return 1;
+  # Form the connection to the controller via a "tip" line to the
+  # capture process. Once we have that, we can just talk to the
+  # controller directly.
+  if (! ($TIP = tipconnect($controller))) {
+    print STDERR "*** Could not form TIP connection to $controller\n";
+    return 1;
+  }
+
+  if ( $outlet < 1 || $outlet > 20 ) {
+    print STDERR "*** Invalid outlet '$outlet': Must be 1-20\n";
+    return 1;
+  }
+
+  # Send a couple of newlines to get the command prompt, and then wait
+  # for it to print out the command prompt. This loop is set for a small
+  # number since if it cannot get the prompt quickly, then something has
+  # gone wrong/
+  print $TIP "\n";
+  for ($i = 0; $i < 5; $i++) {
+    my $line = <$TIP>;
+    if ($line =~ /^$RPC27_PROMPT/) {
+      last;
     }
-
-    #
-    # Send a couple of newlines to get the command prompt, and then wait
-    # for it to print out the command prompt. This loop is set for a small
-    # number since if it cannot get the prompt quickly, then something has
-    # gone wrong/
-    #
     print $TIP "\n";
-    for ($i = 0; $i < 5; $i++) {
-	my $line = <$TIP>;
-	if ($line =~ /^$RPC27_REBOOT/) {
-	    last;
-	}
-	print $TIP "\n";
-    }
-    #
-    # Okay, got a prompt. Send it the string:
-    #
-    print $TIP "$RPC27_REBOOT $outlet\n";
+  }
 
-    if ($debug) {
-	print "power_rpc27: Cycled power to outlet $outlet on $controller.\n";
-    }
-    
-    close($TIP);
+  # Okay, got a prompt. Send it the string:
+  print $TIP "$RPC27_CMD{$cmd} $outlet\n";
+
+  if ($debug) {
+    print "rpc27ctrl: Sent $cmd command to outlet $outlet on $controller.\n";
+  }
+
+  close($TIP);
 }
 
-#
 # Connect up to the capture process. This should probably be in a library
 # someplace.
-# 
 sub tipconnect($)
 {
     my($controller) = $_[0];
@@ -87,7 +94,7 @@ sub tipconnect($)
     if ($query_result->numrows < 1) {
 	print STDERR "*** No such tipline: $controller\n";
 	return 1;
-    }    
+    }
     %powerid_row = $query_result->fetchhash();
 
     $server  = $powerid_row{'server'};
@@ -109,7 +116,7 @@ sub tipconnect($)
     $paddr    = sockaddr_in($portnum, $inetaddr);
     $proto    = getprotobyname('tcp');
 
-    if (! socket(TIP, PF_INET, SOCK_STREAM, $proto)) {
+    if (! socket(TIP, 'PF_INET', 'SOCK_STREAM', $proto)) {
 	print STDERR "*** Cannot create socket.\n";
 	return 0;
     }
@@ -120,11 +127,9 @@ sub tipconnect($)
 	return 0;
     }
     TIP->autoflush(1);
-    
-    #
+
     # Okay, we got a connection. We have to send over the key. This is a
     # little hokey, since we have to make it look like the C struct. 
-    #
     my $secretkey = pack("iZ256", $keylen, $keydata);
 
     if (! syswrite(TIP, $secretkey)) {
@@ -133,7 +138,7 @@ sub tipconnect($)
 	return 0;
     }
 
-    return(*TIP);    
+    return(*TIP);
 }
 
 1;
