@@ -1,3 +1,36 @@
+stoller     2003/10/16 12:06:44 MDT
+
+  Modified files:
+    tmcd                 libsetup.pm tmcd.c 
+    tmcd/common          libtmcc.pm tmcc.pl update 
+    tmcd/freebsd         delaysetup liblocsetup.pm 
+    tmcd/freebsd/jail    mkjail.pl 
+  Log:
+  Brave new world of tmcc client side caching. The goal is to reduce the
+  number of connections to tmcd, and the resulting number of DB queries.
+  Currently thats about 24 per node when it boots. Each vnode adds
+  another 24 or so. The new approach is to use the "fullconfig" command,
+  which dumps the entire config in one shot, saving about 20 of those
+  connections. We still need to do the status/state commands for real of
+  course. When a node boots, it requests the fullconfig; the client side
+  takes this fullconfig, and dumps the individual sections to
+  /var/emulab/boot/tmcc/section_name. Subsequent requests first look for
+  it locally in the above named files, falling back to real tmcc if none
+  exists. The update command also refreshes the cache.
+  
+  Tested for jails and plab node vservers as well.
+  
+  Revision  Changes    Path
+  1.84      +50 -39    testbed/tmcd/libsetup.pm
+  1.190     +0 -1      testbed/tmcd/tmcd.c
+  1.3       +185 -39   testbed/tmcd/common/libtmcc.pm
+  1.3       +3 -1      testbed/tmcd/common/tmcc.pl
+  1.6       +1 -0      testbed/tmcd/common/update
+  1.11      +10 -8     testbed/tmcd/freebsd/delaysetup
+  1.38      +2 -1      testbed/tmcd/freebsd/liblocsetup.pm
+  1.25      +3 -0      testbed/tmcd/freebsd/jail/mkjail.pl
+
+
 stoller     2003/10/13 11:59:28 MDT
 
   Modified files:
