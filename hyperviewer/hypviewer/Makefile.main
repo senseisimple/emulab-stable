@@ -8,8 +8,9 @@
 ########################################
 
 #ROOTDIR = /udir/tmm/build.linux/hypviewer
-ROOTDIR = /home/fish/h3/hypviewer
-
+#ROOTDIR = /home/fish/h3/hypviewer
+ROOTDIR = /home/fish/flux/testbed/hyperviewer/hypviewer
+##ROOTDIR = $(HVROOT)
 
 ########################################
 # uncomment the right line for your platform
@@ -19,7 +20,8 @@ ROOTDIR = /home/fish/h3/hypviewer
 #include $(ROOTDIR)/Makefile.irixglut
 #include $(ROOTDIR)/Makefile.irixvk
 #include $(ROOTDIR)/Makefile.freext
-include $(ROOTDIR)/Makefile.freeglut
+#include $(ROOTDIR)/Makefile.freeglut
+include $(ROOTDIR)/Makefile.freewxpy
 #include $(ROOTDIR)/Makefile.linuxglut
 #include $(ROOTDIR)/Makefile.linuxxt
 

@@ -3,9 +3,9 @@
 # totally untested, just a guide...
 
 CPU = free
-WINSYS = glut
+WINSYS = wxpy
 ARCH = $(CPU)$(WINSYS)
-CFLAGS = -DFONTHACK -DHYPGLUT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=''
+CFLAGS = -DPyHack -DFONTHACK -DHYPGLUT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=''
 LDLIBS  =  -L../../src/$(ARCH) -L/usr/X11R6/lib  -l$(LIBRARY)$(ARCH) -lglut -lGLU -lGL -lXmu -lXext -lX11 -lm
 INCDIRS = -I../include -I../../include -I/usr/X11R6/include 
 
