@@ -10,6 +10,10 @@ if ($#ARGV < 1) {
 }
 
 my $error = 0;
+my $TB="/usr/testbed/bin";
+my $osload="$TB/os_load";
+my $reloadpid="testbed";
+my $reloadeid="reloading";
 my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
@@ -36,29 +40,81 @@ if ($#node_names == -1) {
   }
 }
 
+my %reloads = ();
 foreach my $n (@node_names) { 
-    $sth = $dbh->query("select * from reserved where node_id='$n' ".
-		       "and eid='$eid'");
-    if ($sth->numrows == 0) {
-	print "Node '$n' is not reserved by your experiment.\n";
-	$error++;
-	next;
-    } 
+  $sth = $dbh->query("select * from reserved where node_id='$n' ".
+		     "and eid='$eid'");
+  if ($sth->numrows == 0) {
+    print "Node '$n' is not reserved by your experiment.\n";
+    $error++;
+    next;
+  } 
+
+  # If the node has a reloads entry, change the reservation and start it
+  $cmd = "select node_id,partition,image_id,path from reloads where ".
+    "node_id='$n'";
+  $sth = $dbh->query($cmd)
+    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	&& $error++);
+  if ( ($sth->num_rows()) > 0) {
+    my @reload;
+    print STDERR "Adding reloads for $n to the list.\n";
+    my $i = 0;
+    my $max = $sth->num_rows();
+    while ( $i < $max  ) {
+      $i++;
+      @reload = $sth->fetchrow_array();
+      my ($node, $part, $image, $path) = @reload;
+      
+      if (! defined($reloads{"$image $part $path"})) {
+	my @list = ($node);
+	$reloads{"$image $part $path"} = \@list;
+      } else {
+	my @list = @{$reloads{"$image $part $path"}};
+	push(@list,$node);
+	$reloads{"$image $part $path"} = \@list;
+      }
+
+    }
+
+    # Change reservation (don't delete or we'll get races)
+    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
+      "node_id='$n'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++ && next);
+  } else {
+    # No reloads to be done, so really free the node
     print "Releasing node '$n'...";
     $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
     $sth = $dbh->query($cmd) && print "Succeeded.\n"
-	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	    && $error++);
-    
-    # Find the control net interface for this node type
-    $sth = $dbh->query("select control_net from node_types as t left join ".
-		       "nodes  as n on n.type=t.type where node_id='$n'");
-    my @row= $sth->fetchrow_array();
-    my $control= $row[0];
-    $cmd = "update interfaces set IP='' where node_id='$n' and card!='$control'";
-    $sth = $dbh->query($cmd)
-	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	    && $error++);
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++);
+  }
+  
+  # Find the control net interface for this node type
+  $sth = $dbh->query("select control_net from node_types as t left join ".
+		     "nodes  as n on n.type=t.type where node_id='$n'");
+  my @row= $sth->fetchrow_array();
+  my $control= $row[0];
+  # Clean out all IPs except the control net
+  $cmd = "update interfaces set IP='' where node_id='$n' and card!='$control'";
+  $sth = $dbh->query($cmd)
+    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	&& $error++);
+  
+}
+
+foreach $reload ( keys(%reloads)) {
+  @list = @{$reloads{$reload}};
+  # Call os_load to start the reload
+  print STDERR "Starting reload for @list:\n";
+  $cmd = "$osload $reload @list";
+  print STDERR "Calling '$cmd'\n";
+  if ( system($cmd) != 0 ) {
+    print STDERR "WARNING: OS_LOAD FAILED ON @list!\n";
+  }
+  print STDERR "Reload for @list complete.\n";
 }
 
 exit($error);
