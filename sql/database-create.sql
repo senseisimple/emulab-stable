@@ -65,6 +65,16 @@ CREATE TABLE default_firewall_rules (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `default_firewall_vars`
+--
+
+CREATE TABLE default_firewall_vars (
+  name varchar(255) NOT NULL default '',
+  value text,
+  PRIMARY KEY  (name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `delays`
 --
 

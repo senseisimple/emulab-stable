@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -14,7 +14,7 @@
 # The easy way: do 'gmake all'
 # You can also run the individual targets too.
 
-all: db-create db-fill sitevars fwrules
+all: db-create db-fill sitevars
 
 db-create:
 	@rm -f ./.tmp-db-create.sql ./.tmp-create-diff
@@ -40,7 +40,6 @@ sitevars:
 	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
 
 fwrules:
-	@echo "DELETE FROM default_firewall_rules;" > fwrules-create.sql
-	@mysqldump -t tbdb default_firewall_rules >> fwrules-create.sql
+	@echo "*** Use 'gmake insertrules' in the firewall subdir to do this"
 
 dist:	db-fill-dist

@@ -2289,3 +2289,25 @@ last_net_act,last_cpu_act,last_ext_act);
           description tinytext,
           PRIMARY KEY  (obstacle_id)
          ) TYPE=MyISAM;
+
+1.299: Add default_firewall_vars table.  These are global (not
+       per-experiment!) variables that get expanded on the client-side
+       before using them.  Intended to keep the default rules
+       site-independent.
+
+	CREATE TABLE default_firewall_vars (
+	  name varchar(255) NOT NULL default '',
+	  value text,
+	  PRIMARY KEY  (name)
+	) TYPE=MyISAM;
+
+       Populate the vars table at you site by:
+
+	cd <your_build_tree>/firewall
+	gmake insertvars
+
+       Update the default_firewall_rules with (NOTE: this will clobber
+       any rules you have added to default_firewall_rules!):
+
+	cd <your_build_tree>/firewall
+	gmake insertrules
