@@ -50,7 +50,7 @@ if (! $ready) {
 	      "The user that created the experiment will be notified via ".
 	      "email<br>".
 	      "when it has been fully configured and is ready for use.<br>".
-	      "At that time you may terminate the experiment.<br>");
+	      "At that time you may terminate the experiment.<br>", 1);
 }
 
 #
