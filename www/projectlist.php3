@@ -10,7 +10,7 @@ include("defs.php3");
 # Standard Testbed Header
 #
 # Change when do check for number of experiments.
-PAGEHEADER("Projects that have actively used emulab.net");
+PAGEHEADER("Projects that have actively used ".strtolower($THISHOMEBASE));
 
 #
 # We let anyone access this page.  Its basically a pretty-printed version
