@@ -1,5 +1,10 @@
 // ipassign.cc
-//
+
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 // Please note that if
 // log_2(maxNodesPerLan) + log_2(numLans) + log_2(sqrt(numLans)) > 24
@@ -8,29 +13,7 @@
 // into subnets.
 
 // This program processes from stdin to stdout.
-
-// input line specification:
-// <lan_weight> <node> <node> [node [node [...]]]
-//
-// lan_weight: A number representing how expensive crossing the lan is.
-//             This must be positive and integral.
-//
-// node:       A unique integer representing a particular node.
-
-// output header specification:
-// <global_bits> <lan_bits> <host_bits>
-//
-// global_bits: The number of bits allocated to identify inter-lan nets
-// lan_bits:    The number of bits allocated to identify individual lans
-// host_bits:   The number of bits allocated to identify hosts within lans.
-
-// output line specification:
-// <lan_number> <node> <ip>
-//
-// lan_number: The ordinal number of the lan. The first line is lan 0, the
-//             second is lan 1, etc.
-// node:       the node number entered
-// ip:         an IP addresss in the form 'xxx.xxx.xxx.xxx'
+// Input and output specifications can be found in README
 
 #include "lib.h"
 #include "Exception.h"

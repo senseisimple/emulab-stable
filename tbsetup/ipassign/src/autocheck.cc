@@ -1,7 +1,19 @@
 // autocheck.cpp
-//
-// Copyright (c) 2003 Jonathon Duerig.
-// Usage is according to the BSD license (see license.txt).
+
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+// autocheck is a utility for automated regression tests. For ipassign,
+// it takes input from etc/autocheck.conf and uses this to determine which
+// tests to run. Each test is run on a particular input, then the output is
+// compared with a known good output using boolcmp. If the outputs are the
+// same, the test passes. If they are different, it fails.
+
+// This program needs to be rewritten so that it can be used for any similar
+// program with the proper configuration file.
 
 #include <cstring>
 #include <cstdlib>

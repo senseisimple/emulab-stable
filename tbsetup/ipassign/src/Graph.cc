@@ -1,5 +1,14 @@
 // Graph.cc
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+// This is the implementation for a Graph object. A Graph object is used
+// to encapsulate the manipulations needed to assign IP addresses.
+
 #include "lib.h"
 #include "Exception.h"
 #include "Graph.h"
@@ -58,11 +67,14 @@ int Graph::getLanCount(void) const
 void Graph::convert(std::vector<int> & indexes, std::vector<int> & neighbors,
              std::vector<int> & weights) const
 {
+    // ensure that there is no garbage in the output references.
     indexes.clear();
     neighbors.clear();
     weights.clear();
     indexes.reserve(m_nodes.size() + 1);
 
+    // fill them up with the graph.
+    // See the METIS manual, section [5.1 Graph Data Structure], page 18
     list<Lan>::const_iterator lanPos = m_lanList.begin();
     for ( ; lanPos != m_lanList.end(); ++lanPos)
     {
@@ -114,6 +126,9 @@ void Graph::reset(istream & input)
 
 void Graph::partition(std::vector<int> & partitions)
 {
+    // Each number in the partitions vector is the partition that
+    // the associated Lan in m_lanList belongs too.
+    // Let each Lan know where it belongs.
     list<Lan>::iterator pos = m_lanList.begin();
     vector<int>::iterator partPos = partitions.begin();
     for ( ; pos != m_lanList.end() && partPos != partitions.end();
@@ -130,12 +145,16 @@ void Graph::partition(std::vector<int> & partitions)
 void Graph::assign(int networkSize, int lanSize, int hostSize,
                    int numPartitions) const
 {
+    // If they don't specify which ostream they want, give
+    // them standard output.
     assign(cout, networkSize, lanSize, hostSize, numPartitions);
 }
 
 void Graph::assign(ostream & output, int networkSize, int lanSize,
             int hostSize, int numPartitions) const
 {
+    // Do we output raw numbers for debugging purposes or do we output
+    // complete IP addresses?
 #ifdef IP_ASSIGN_DEBUG
     debugAssign(output, networkSize, lanSize, hostSize, numPartitions);
 #else
@@ -149,6 +168,9 @@ void Graph::assign(ostream & output, int networkSize, int lanSize,
 
 int Graph::parseLine(string const & line, list<int> & nodes)
 {
+    // This is called from reset. We want to take each line of input
+    // (which represents a LAN), verify that it is kosher, then
+    // create a LAN based on it.
     int weight = 1;
     size_t i = 0;
     for (i = 0; i < line.size(); ++i)
@@ -182,6 +204,9 @@ int Graph::parseLine(string const & line, list<int> & nodes)
     return weight;
 }
 
+// The following two functions are auxilliary to the 'convert' function
+// They were seperated out into different functions for conceptual simplicity.
+
 void Graph::convertAddLan(Lan const & lanToAdd, std::vector<int> & neighbors,
                    std::vector<int> & weights) const
 {
@@ -213,6 +238,8 @@ void Graph::convertAddNode(Lan const & info, int currentNode,
 void Graph::debugAssign(std::ostream & output, int networkSize, int lanSize,
                         int hostSize, int numPartitions) const
 {
+    // Print out the raw numbers that we would assign for each part of the
+    // IP address.
     vector<int> counter;
     counter.resize(numPartitions);
     fill(counter.begin(), counter.end(), 0);
@@ -237,6 +264,7 @@ void Graph::debugAssign(std::ostream & output, int networkSize, int lanSize,
 void Graph::releaseAssign(std::ostream & output, int networkSize, int lanSize,
                           int hostSize, int numPartitions) const
 {
+    // set up a counter for each supernet (partition).
     vector<int> counter;
     counter.resize(numPartitions);
     fill(counter.begin(), counter.end(), 0);
@@ -253,6 +281,7 @@ void Graph::releaseAssign(std::ostream & output, int networkSize, int lanSize,
     int lanShift = hostSize;
     cout << networkSize << " " << lanSize << " " << hostSize << endl;
 
+    // For each lan, print out the IP addresses for every node on that lan.
     list<Lan>::const_iterator pos = m_lanList.begin();
     for ( ; pos != m_lanList.end(); ++pos)
     {

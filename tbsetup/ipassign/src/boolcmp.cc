@@ -1,5 +1,18 @@
 // boolcmp.cc
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+// boolcmp.cc is used to create a utility program which checks whether two
+// files are identical or not. The reason that the built in utility 'cmp'
+// cannot be used is because a) 'cmp' is not guaranteed to work on binary
+// files, and b) many implementations of 'cmp' treat two different files as
+// the same if they are the same up to the last character and one ends with
+// a newline and the other is one character short.
+
 #include <iostream>
 #include <fstream>
 

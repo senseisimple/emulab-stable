@@ -1,5 +1,19 @@
 // Graph.h
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+// The Graph class is used to represent the network. Each node in the network
+// is a LAN and each edge is a host connecting two LANs.
+
+// First, the graph is populated from input using the constructor or reset()
+// Second, the graph is converted to the METIS format
+// Third, an array of numbers is used to assign each LAN its partition number
+// Fourth, IP addresses are output.
+
 #ifndef GRAPH_H_IP_ASSIGN_1
 #define GRAPH_H_IP_ASSIGN_1
 

@@ -1,5 +1,17 @@
 // top2graph.cc
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+// top2graph is a utility which converts the .top files used for assign into
+// .graph files used for ipassign. There is a single optional flag '-m'. If
+// this flag is set, the mapping from assign names to ipassign numbers and
+// the mapping from ipassign numbers to assign names is sent to the standard
+// error in addition to the conversion being sent to the standard output.
+
 #include <iostream>
 #include <map>
 #include <list>
