@@ -8,6 +8,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.ImageObserver;
 import java.awt.image.BufferedImage;
+import java.awt.font.*;
 import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.table.AbstractTableModel;
@@ -171,9 +172,15 @@ public class RoboTrack extends JApplet {
     }
 
     /*
-     * A container for coordinate information.
+     * A container for node and coordinate information.
      */
     private class Robot {
+	String pname, vname;
+	String type;			// Node type (garcia, mote, etc).
+	boolean mobile;			// A robot or a fixed node (mote).
+	boolean allocated;		// Node is allocated or free.
+	int radius;			// Radius of circle, in pixels
+	int size;			// Actual size, in pixels
         int x, y;			// Current x,y coords in pixels
 	double z;			// Current z in meters
 	double or = 500.0;		// Current orientation 
@@ -201,7 +208,6 @@ public class RoboTrack extends JApplet {
 	String dragx_meters       = "";
 	String dragy_meters       = "";
 	String dragor_string      = "";
-	String pname, vname;
 	long last_update          = 0;	// Unix time of last update.
 	String update_string      = "";
 	int index;
@@ -237,23 +243,23 @@ public class RoboTrack extends JApplet {
         private Thread thread;
         private BufferedImage bimg;
 	private Graphics2D G2 = null;
+	private Font OurFont = null;
 
-	// The DOT radius. This is radius of the circle of the robot.
-	int DOT_RAD   = 20;
-	// The length of the orientation stick, from the center of the circle.
-	int STICK_LEN = 20;
-	// The distance from center of dot to the label x,y.
-	int LABEL_X   = -20;
-	int LABEL_Y   = 20;
-	
+	// The font width/height adjustment, for drawing labels.
+	int FONT_HEIGHT = 14;
+	int FONT_WIDTH  = 6;
+
         public Map() {
 	    /*
 	     * Request obstacle list when a real applet.
 	     */
 	    if (!shelled) {
+		GetNodeInfo();
 		GetObstacles();
 		GetCameras();
 	    }
+
+	    OurFont = new Font("Arial", Font.PLAIN, 14);
         }
 
 	/*
@@ -283,6 +289,7 @@ public class RoboTrack extends JApplet {
 		bimg = (BufferedImage) createImage(w, h);
 		
 		G2 = bimg.createGraphics();
+		G2.setFont(OurFont);
 		G2.setBackground(getBackground());
 		G2.setRenderingHint(RenderingHints.KEY_RENDERING,
 				    RenderingHints.VALUE_RENDER_QUALITY);
@@ -306,10 +313,19 @@ public class RoboTrack extends JApplet {
 	    tmp = tokens.nextToken().trim();	    
 
 	    if ((robbie = (Robot) robots.get(tmp)) == null) {
-		robbie = new Robot();
-		index  = robotcount++;
-		robbie.index = index;
-		robbie.pname = tmp;
+		// For testing from the shell.
+		if (!shelled)
+		    return;
+		
+		robbie        = new Robot();
+		index         = robotcount++;
+		robbie.index  = index;
+		robbie.pname  = tmp;
+		robbie.radius = 18;
+		robbie.size   = 27;
+		robbie.type   = "garcia";
+		robbie.mobile = true;
+		robbie.allocated = true;
 		robots.put(tmp, robbie);
 		robotmap.insertElementAt(robbie, index);
 	    }
@@ -396,11 +412,14 @@ public class RoboTrack extends JApplet {
 	    while (e.hasMoreElements()) {
 		Robot robbie  = (Robot)e.nextElement();
 
-		if ((Math.abs(robbie.y - y) < DOT_RAD/2 &&
-		     Math.abs(robbie.x - x) < DOT_RAD/2) ||
+		if (! robbie.mobile)
+		    continue;
+
+		if ((Math.abs(robbie.y - y) < robbie.size/2 &&
+		     Math.abs(robbie.x - x) < robbie.size/2) ||
 		    (robbie.dragging &&
-		     Math.abs(robbie.drag_y - y) < DOT_RAD/2 &&
-		     Math.abs(robbie.drag_x - x) < DOT_RAD/2)) {
+		     Math.abs(robbie.drag_y - y) < robbie.size/2 &&
+		     Math.abs(robbie.drag_x - x) < robbie.size/2)) {
 		    return robbie.pname;
 		}
 	    }
@@ -428,10 +447,10 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
-		int rx1 = robbie.drag_x - ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int ry1 = robbie.drag_y - ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int rx2 = robbie.drag_x + ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int ry2 = robbie.drag_y + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int rx1 = robbie.drag_x - (robbie.radius);
+		int ry1 = robbie.drag_y - (robbie.radius);
+		int rx2 = robbie.drag_x + (robbie.radius);
+		int ry2 = robbie.drag_y + (robbie.radius);
 
 		//System.out.println("CheckforObstacles: " + rx1 + "," +
 		//                   ry1 + "," + rx2 + "," + ry2);
@@ -442,10 +461,10 @@ public class RoboTrack extends JApplet {
 		for (int index = 0; index < Obstacles.size(); index++) {
 		    Obstacle obstacle = (Obstacle) Obstacles.elementAt(index);
 		    
-		    int ox1 = obstacle.x1;
-		    int oy1 = obstacle.y1;
-		    int ox2 = obstacle.x2;
-		    int oy2 = obstacle.y2;
+		    int ox1 = obstacle.x1 - OBSTACLE_BUFFER;
+		    int oy1 = obstacle.y1 - OBSTACLE_BUFFER;
+		    int ox2 = obstacle.x2 + OBSTACLE_BUFFER;
+		    int oy2 = obstacle.y2 + OBSTACLE_BUFFER;
 
 		    //System.out.println("  " + ox1 + "," +
 		    //		       oy1 + "," + ox2 + "," + cy2);
@@ -536,10 +555,10 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
-		int rx1 = robbie.drag_x - ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int ry1 = robbie.drag_y - ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int rx2 = robbie.drag_x + ((DOT_RAD/2) + OBSTACLE_BUFFER);
-		int ry2 = robbie.drag_y + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int rx1 = robbie.drag_x - (robbie.radius + OBSTACLE_BUFFER);
+		int ry1 = robbie.drag_y - (robbie.radius + OBSTACLE_BUFFER);
+		int rx2 = robbie.drag_x + (robbie.radius + OBSTACLE_BUFFER);
+		int ry2 = robbie.drag_y + (robbie.radius + OBSTACLE_BUFFER);
 
 		//System.out.println("CheckCollision: " + rx1 + "," +
 		//                   ry1 + "," + rx2 + "," + ry2);
@@ -570,10 +589,10 @@ public class RoboTrack extends JApplet {
 			oy1 = oy2 = mary.y;
 		    }
 
-		    ox1 -= (DOT_RAD/2);
-		    oy1 -= (DOT_RAD/2);
-		    ox2 += (DOT_RAD/2);
-		    oy2 += (DOT_RAD/2);
+		    ox1 -= mary.radius;
+		    oy1 -= mary.radius;
+		    ox2 += mary.radius;
+		    oy2 += mary.radius;
 
 		    //System.out.println("  " + ox1 + "," +
 		    //		       oy1 + "," + ox2 + "," + oy2);
@@ -601,26 +620,26 @@ public class RoboTrack extends JApplet {
 	private int DRAWROBOT_DRAG = 3;
 	
 	public void drawRobot(Graphics2D g2,
-			      int x, int y, double or,
-			      String label, int which) {
+			      int x, int y, double or, String label,
+			      int dot_radius, int which) {
 	    /*
 	     * An allocated robot is a filled circle.
 	     * A destination is an unfilled circle. So is a dragging robot.
 	     */
 	    if (which == DRAWROBOT_LOC) {
 		g2.setColor(Color.green);
-		g2.fillOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
-			    DOT_RAD, DOT_RAD);
+		g2.fillOval(x - dot_radius, y - dot_radius,
+			    dot_radius * 2, dot_radius * 2);
 	    }
 	    else if (which == DRAWROBOT_DST) {
 		g2.setColor(Color.green);
-		g2.drawOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
-			    DOT_RAD, DOT_RAD);
+		g2.drawOval(x - dot_radius, y - dot_radius,
+			    dot_radius * 2, dot_radius * 2);
 	    }
 	    else if (which == DRAWROBOT_DRAG) {
 		g2.setColor(Color.red);
-		g2.drawOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
-			    DOT_RAD, DOT_RAD);
+		g2.drawOval(x - dot_radius, y - dot_radius,
+			    dot_radius * 2, dot_radius * 2);
 	    }
 	    
 	    /*
@@ -628,7 +647,8 @@ public class RoboTrack extends JApplet {
 	     * to it.
 	     */
 	    if (or != 500.0) {
-		int endpoint[] = ComputeOrientationLine(x, y, STICK_LEN, or);
+		int endpoint[] = ComputeOrientationLine(x, y,
+							dot_radius * 2, or);
 
 		//System.out.println(or + " " + x + " " + y + " " +
 		//                   endpoint[0] + " " + endpoint[1]);
@@ -640,15 +660,14 @@ public class RoboTrack extends JApplet {
 	     * Draw a label for the robot, either above or below,
 	     * depending on where the orientation stick was.
 	     */
-	    int lx  = x + LABEL_X;
-	    int ly  = y + LABEL_Y;
-	    int dlx = x + LABEL_X - 15;
-	    int dly = ly + 12;
+	    int lx  = x - ((FONT_WIDTH * label.length()) / 2);
+	    int ly  = y + dot_radius + FONT_HEIGHT;
+	    int dly = ly + FONT_HEIGHT;
 
 	    if ((or > 180.0 && or < 360.0) ||
 		(or < 0.0   && or > -180.0)) {
-		ly  = y - (LABEL_Y/2);
-		dly = ly - (LABEL_Y/2);
+		ly  = y - (dot_radius + 2);
+		dly = ly - FONT_HEIGHT;
 	    }
 
 	    g2.setColor(Color.black);
@@ -662,6 +681,7 @@ public class RoboTrack extends JApplet {
 		    "(" + FORMATTER.format(x / pixels_per_meter) + ","
 		        + FORMATTER.format(y / pixels_per_meter) + ")";
 
+		int dlx = x - ((FONT_WIDTH * text.length()) / 2);
 		g2.drawString(text, dlx, dly);
 	    }
 	}
@@ -688,7 +708,8 @@ public class RoboTrack extends JApplet {
 		int x = robbie.x;
 		int y = robbie.y;
 
-		drawRobot(g2, x, y, robbie.or, robbie.pname, DRAWROBOT_LOC);
+		drawRobot(g2, x, y, robbie.or, robbie.pname,
+			  (int) (robbie.size/2), DRAWROBOT_LOC);
 
 		/*
 		 * Okay, if the robot has a destination, draw that too
@@ -699,7 +720,7 @@ public class RoboTrack extends JApplet {
 		    int dy = robbie.dy;
 		    
 		    drawRobot(g2, dx, dy, robbie.dor, robbie.pname,
-			      DRAWROBOT_DST);
+			      robbie.size/2, DRAWROBOT_DST);
 
 		    /*
 		     * And draw a light grey line from source to dest.
@@ -712,7 +733,7 @@ public class RoboTrack extends JApplet {
 		    int dy = robbie.drag_y;
 		    
 		    drawRobot(g2, dx, dy, robbie.drag_or, robbie.pname,
-			      DRAWROBOT_DRAG);
+			      robbie.size/2, DRAWROBOT_DRAG);
 
 		    /*
 		     * And draw a red line from source to drag.
@@ -1192,8 +1213,8 @@ public class RoboTrack extends JApplet {
 		int new_x = e.getX();
 		int new_y = e.getY();
 
-		if (Math.abs(new_x - old_x) >= 3 ||
-		    Math.abs(new_y - old_y) >= 3) {
+		if (Math.abs(new_x - old_x) >= 2 ||
+		    Math.abs(new_y - old_y) >= 2) {
 		    robbie.drag_x = new_x;
 		    robbie.drag_y = new_y;
 		    
@@ -1273,6 +1294,77 @@ public class RoboTrack extends JApplet {
 	    repaint();
 	    maptable.repaint(10);
 	}
+    }
+
+    /*
+     * Get the node list from the server.
+     */
+    public boolean GetNodeInfo() {
+ 	String urlstring = "nodeinfo.php3?fromapplet=1"
+	    + "&nocookieuid="
+	    + URLEncoder.encode(uid)
+	    + "&nocookieauth="
+	    + URLEncoder.encode(auth);
+
+	try
+	{
+	    URL			url = new URL(getCodeBase(), urlstring);
+	    URLConnection	urlConn;
+	    InputStream		is;
+	    String		str;
+	    int			index = 0;
+	    
+	    urlConn = url.openConnection();
+	    urlConn.setDoInput(true);
+	    urlConn.setUseCaches(false);
+	    is = urlConn.getInputStream();
+		
+	    BufferedReader input
+		= new BufferedReader(new InputStreamReader(is));
+
+	    /*
+	     * This should be in XML format.
+	     */
+	    while ((str = input.readLine()) != null) {
+		System.out.println(str);
+
+		StringTokenizer tokens = new StringTokenizer(str, ",");
+		String		nodeid;
+		Robot		robbie;
+
+		nodeid = tokens.nextToken().trim();
+
+		if ((robbie = (Robot) robots.get(nodeid)) == null) {
+		    robbie       = new Robot();
+		    index        = robotcount++;
+		    robbie.index = index;
+		    robbie.pname = nodeid;
+		    robots.put(nodeid, robbie);
+		    robotmap.insertElementAt(robbie, index);
+		}
+		robbie.vname     = tokens.nextToken().trim();
+		robbie.type      = tokens.nextToken().trim();
+		robbie.allocated =
+		    tokens.nextToken().trim().compareTo("1") == 0;
+		robbie.mobile    =
+		    tokens.nextToken().trim().compareTo("1") == 0;
+		robbie.size      = (int)
+		    (Float.parseFloat(tokens.nextToken().trim()) *
+				      pixels_per_meter);
+		robbie.radius    = (int)
+		    (Float.parseFloat(tokens.nextToken().trim()) *
+				      pixels_per_meter);
+	    }
+	    is.close();
+	}
+	catch(Throwable th)
+	{
+	    MyDialog("GetNodeInfo",
+		     "Failed to get node list from server");
+	    th.printStackTrace();
+	    return false;
+	}
+	return true;
     }
 
     /*
