@@ -21,6 +21,14 @@ $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 $TBCSLOGINS     = "$TBETC_DIR/cslogins";
 
+#
+# Hardcoded check against $WWWHOST, to prevent anyone from accidentally setting
+# $TBMAINSITE when it shouldn't be
+#
+if ($WWWHOST != "www.emulab.net") {
+    $TBMAINSITE = 0;
+}
+
 $TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users";
 $TBNSSUBDIR     = "nsdir";
