@@ -47,13 +47,12 @@ boot-time problems that we've had with 3.23.36 .
 
 ##### Step 2 - LEDA
 
-Currently, the LEDA library is required to compile some testbed software (we
-hope to remove this dependency at some point.) The simplest place to install it
-is /usr/testbed/LEDA. If another location is used, be sure to use the
---with-LEDA=<dir> option to configure in the next step. The home page for LEDA
-is at:
-
-http://www.algorithmic-solutions.com/as_html/products/products.html
+We rely on a software package call LEDA which we are not allowed to
+distribute (source *or* binary), and is currently not being
+distributed by the authors. As a result, we will distribute a binary
+for the one program that requires linking with the LEDA library. In
+the meantime we will be working on removing our dependence on the LEDA
+library. 
 
 ##### Step 3 - Testbed tree configuration/installation
 
