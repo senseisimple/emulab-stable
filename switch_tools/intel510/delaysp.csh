@@ -5,22 +5,21 @@ while ( -e time$xxx.log)
     set xxx=`expr $xxx + 1`
 end
 echo "Using file time$xxx.log"
+set file = time$xxx.log
 unset xxx
 
 echo "Pinging..."
 ping -c 10 -q 155.99.214.170 >! pinged
 grep -i received pinged >! ping2
-cat ping2
-echo "Continue?"
-set i= 5
-while ($i > 0)
-    echo -n "$i  "
-    pause.tcl 1000
-    set i = `expr $i - 1`
-end
+set x = `cat ping2 | awk '{print $4}'`
+echo "Received $x packets of 10..."
+if ( $x < 1 ) then
+    echo "Switch down... try again later."
+    exit 1
+endif
 rm ping2
 rm pinged
-echo "0"
+unset x
 echo "Starting..."
 echo ""
 echo ""
@@ -56,23 +55,27 @@ echo ""
 echo "Round $i of 10" 
 echo ""
 pause.tcl $delay
-/usr/bin/time -a -o time.log setport.exp Alpha:TestBox $port -b
+/usr/bin/time -a -o $file setport.exp Alpha:TestBox $port -b
 pause.tcl $delay
-/usr/bin/time -a -o time.log setport.exp Alpha:TestBox $port -f -a
+/usr/bin/time -a -o $file setport.exp Alpha:TestBox $port -f -a
 pause.tcl $delay
-/usr/bin/time -a -o time.log setport.exp Alpha:TestBox $port -d Full -s 100
+/usr/bin/time -a -o $file setport.exp Alpha:TestBox $port -d Full -s 100
 pause.tcl $delay
-/usr/bin/time -a -o time.log setport.exp Alpha:TestBox $port -d Half -s 10
+/usr/bin/time -a -o $file setport.exp Alpha:TestBox $port -d Half -s 10
 pause.tcl $delay
-/usr/bin/time -a -o time.log setport.exp Alpha:TestBox $port -a
+/usr/bin/time -a -o $file setport.exp Alpha:TestBox $port -a
     end
 end
+unset port
+unset i
+unset delay
 echo ""
 echo ""
 echo "24 ports x 5 tests each x 10 reps = 1200 times logged"
-echo "Results in time.log"
+echo "Results in $file"
 echo ""
 echo "Starting logger..."
 echo ""
-exec logger time.log
+exec logger $file
+unset file
 
