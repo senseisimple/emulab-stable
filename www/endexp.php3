@@ -80,6 +80,7 @@ $nsname  = "$dirname" . "/" . "$exp_eid" . ".ns";
 $irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
 $repname = "$dirname" . "/" . "$exp_eid" . ".report";
 $logname = "$dirname" . "/" . "$exp_eid" . ".log";
+$elogname = "$dirname" . "/" . "$exp_eid" . "_end.log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 #
@@ -153,6 +154,8 @@ if (file_exists($repname))
     unlink("$repname");
 if (file_exists($logname))
     unlink("$logname");
+if (file_exists($elogname))
+    unlink("$elogname");
 if (file_exists($assname))
     unlink("$assname");
 if (file_exists($dirname))
