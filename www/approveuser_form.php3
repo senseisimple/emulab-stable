@@ -119,7 +119,8 @@ $query_result =
 		 "ON g.pid=authed.pid and g.gid=authed.gid and ".
 		 "   g.uid!='$auth_usr' and g.trust='none' ".
 		 "left join users as u on u.uid=g.uid ".
-		 "WHERE u.status='" . TBDB_USERSTATUS_UNAPPROVED . "' and ".
+		 "WHERE u.status!='" . TBDB_USERSTATUS_UNVERIFIED . "' and ".
+		 "u.status!='" . TBDB_USERSTATUS_NEWUSER . "' and ".
 		 "      authed.uid='$auth_usr' and ".
 		 "      (authed.trust='group_root' or ".
 		 "       authed.trust='project_root') ".
