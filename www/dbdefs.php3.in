@@ -1122,6 +1122,20 @@ function TBUserPCs($uid)
     return mysql_num_rows($query_result);
 }
 
+function TBExptLogFile($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select logfile from experiments ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     " logfile is not null");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
 function TBWebdbAllowed($uid) {
     $query_result =
         DBQueryFatal("select dbedit from users ".
