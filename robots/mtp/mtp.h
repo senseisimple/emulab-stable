@@ -192,6 +192,35 @@ void mtp_cartesian(struct robot_position *current,
 		   float theta,
 		   struct robot_position *dest_out);
 
+struct robot_position *mtp_world2local(struct robot_position *local_out,
+				       struct robot_position *world_start,
+				       struct robot_position *world_finish);
+
+typedef enum {
+    MD_TAG_DONE,
+
+    MD_Integer,
+    
+    MD_SkipInteger,
+    MD_OnInteger,
+    MD_OnFlags,
+    MD_OnOpcode,
+    MD_OnStatus,
+    MD_OnWiggleType,
+    MD_OnCommandID,
+
+    MD_Return,
+    MD_Call,
+    MD_AlsoCall,
+
+    MD_OR = (0x80000000)
+} mtp_dispatch_tag_t;
+
+typedef int (*mtp_dispatcher_t)(void *userdata, mtp_packet_t *mp);
+int mtp_dispatch(void *userdata, mtp_packet_t *mp,
+		 mtp_dispatch_tag_t tag,
+		 ...);
+
 enum {
     MCB_NORTH,
     MCB_EAST,
@@ -217,6 +246,15 @@ enum {
     (x) == (MCF_WEST) ? "w" : "u")
 
 int mtp_compass(float theta);
+
+#define REL2ABS(_dst, _theta, _rpoint, _apoint) { \
+    float _ct, _st; \
+    \
+    _ct = cosf(_theta); \
+    _st = sinf(_theta); \
+    (_dst)->x = _ct * (_rpoint)->x - _st * -(_rpoint)->y + (_apoint)->x; \
+    (_dst)->y = _ct * (_rpoint)->y + _st * -(_rpoint)->x + (_apoint)->y; \
+}
 
 /**
  * Print the contents of the given packet to the given FILE object.

@@ -631,10 +631,14 @@ void mtp_polar(struct robot_position *current,
 	       float *r_out,
 	       float *theta_out)
 {
-    assert(current != NULL);
+    static struct robot_position rp_zero;
+    
     assert(dest != NULL);
     assert(r_out != NULL);
     assert(theta_out != NULL);
+    
+    if (current == NULL)
+	current = &rp_zero;
 
     *r_out = hypotf(current->x - dest->x, current->y - dest->y);
     *theta_out = atan2f(current->y - dest->y, dest->x - current->x);
@@ -645,11 +649,39 @@ void mtp_cartesian(struct robot_position *current,
 		   float theta,
 		   struct robot_position *dest_out)
 {
-    assert(current != NULL);
+    static struct robot_position rp_zero;
+    
     assert(dest_out != NULL);
 
+    if (current == NULL)
+	current = &rp_zero;
+    
     dest_out->x = current->x + cos(theta) * r;
     dest_out->y = current->y - sin(theta) * r;
+}
+
+struct robot_position *mtp_world2local(struct robot_position *local_out,
+				       struct robot_position *world_start,
+				       struct robot_position *world_finish)
+{
+    float ct, st;
+    
+    assert(local_out != NULL);
+    assert(world_start != NULL);
+    assert(world_finish != NULL);
+    
+    ct = cosf(world_start->theta);
+    st = sinf(world_start->theta);
+    
+    local_out->x = ct*(world_finish->x - world_start->x) +
+	st*(-world_finish->y - -world_start->y);
+    local_out->y = ct*(-world_finish->y - -world_start->y) +
+	st*(world_start->x - world_finish->x);
+    
+    local_out->theta = world_finish->theta - world_start->theta;
+    local_out->timestamp = world_finish->timestamp;
+
+    return local_out;
 }
 
 int mtp_compass(float theta)
@@ -671,6 +703,137 @@ int mtp_compass(float theta)
     
     if ((theta >= (M_PI_2 + DEGREES_30) || (theta <= (-M_PI + DEGREES_30))))
 	retval |= MCF_WEST;
+    
+    return retval;
+}
+
+int mtp_dispatch(void *userdata, mtp_packet_t *mp, mtp_dispatch_tag_t tag, ...)
+{
+    union {
+	int i;
+    } values[32];
+    
+    int value_count = 0, value_curr = 0, match = 1, match_or = 0, retval = 0;
+    mtp_dispatcher_t md;
+    int done = 0;
+    va_list args;
+    
+    assert(mp != NULL);
+
+    va_start(args, tag);
+    
+    while ((tag != MD_TAG_DONE) && !done) {
+	int ival, flags, command_id, match_curr = -1;
+	mtp_wiggle_t mw;
+	mtp_status_t ms;
+	
+	switch (tag & ~(MD_OR)) {
+	case MD_Integer:
+	    values[value_count].i = va_arg(args, int);
+	    value_count += 1;
+	    break;
+
+	case MD_SkipInteger:
+	    assert(value_curr < value_count);
+	    
+	    value_curr += 1;
+	    break;
+	case MD_OnInteger:
+	    assert(value_curr < value_count);
+
+	    ival = va_arg(args, int);
+	    match_curr = (values[value_curr].i == ival);
+	    if (!(tag & MD_OR))
+		value_curr += 1;
+	    break;
+	case MD_OnFlags:
+	    assert(value_curr < value_count);
+
+	    flags = va_arg(args, int);
+	    match_curr = ((values[value_curr].i & flags) == flags);
+	    if (!(tag & MD_OR))
+		value_curr += 1;
+	    break;
+	case MD_OnOpcode:
+	    match_curr = (mp->data.opcode == va_arg(args, mtp_opcode_t));
+	    break;
+	case MD_OnStatus:
+	    ms = va_arg(args, mtp_status_t);
+	    switch (mp->data.opcode) {
+	    case MTP_UPDATE_POSITION:
+		match_curr = (mp->data.mtp_payload_u.update_position.
+			      status == ms);
+		break;
+	    case MTP_WIGGLE_STATUS:
+		match_curr = (mp->data.mtp_payload_u.wiggle_status.
+			      status == ms);
+		break;
+	    default:
+		match_curr = 0;
+		break;
+	    }
+	    break;
+	case MD_OnWiggleType:
+	    mw = va_arg(args, mtp_wiggle_t);
+	    if (mp->data.opcode == MTP_WIGGLE_REQUEST) {
+		match_curr = (mp->data.mtp_payload_u.wiggle_request.
+			      wiggle_type == mw);
+	    }
+	    break;
+	case MD_OnCommandID:
+	    command_id = va_arg(args, int);
+	    switch (mp->data.opcode) {
+	    case MTP_COMMAND_GOTO:
+		match_curr = (mp->data.mtp_payload_u.command_goto.
+			      command_id == command_id);
+		break;
+	    case MTP_UPDATE_POSITION:
+		match_curr = (mp->data.mtp_payload_u.update_position.
+			      command_id == command_id);
+		break;
+	    default:
+		match_curr = 0;
+		break;
+	    }
+	    break;
+
+	case MD_Return:
+	    if (match)
+		done = 1;
+	    match = 1;
+	    match_or = 0;
+	    value_curr = 0;
+	    break;
+
+	case MD_Call:
+	    if (match)
+		done = 1;
+	    /* FALLTHROUGH */
+	    
+	case MD_AlsoCall:
+	    md = va_arg(args, mtp_dispatcher_t);
+	    if (match)
+		retval = md(userdata, mp);
+	    match = 1;
+	    match_or = 0;
+	    value_curr = 0;
+	    break;
+	}
+
+	if (match_curr >= 0) {
+	    if (tag & MD_OR) {
+		match_or = match_or || match_curr;
+	    }
+	    else {
+		match = match && (match_curr || match_or);
+		match_or = 0;
+	    }
+	}
+	
+	tag = va_arg(args, mtp_dispatch_tag_t);
+    }
+
+    va_end(args);
     
     return retval;
 }
