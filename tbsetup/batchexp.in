@@ -82,10 +82,6 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 # Parse command arguments.
 #
 ParseArgs();
-if (!$immediate) {
-    die("*** $0:\n".
-	"    Batch system is disabled while we do some testing! Sorry.\n");
-}
 
 #
 # Sanity check them.
@@ -248,7 +244,10 @@ else {
     if (system("$startexp -f -b -g $gid $pid $eid $nsfile")) {
 	fatal("Failed to preload batch experiment $pid/$eid!");
     }
-    TBSetBatchState($pid, $eid, BATCHSTATE_POSTED);
+    # And drop the batch into the queue unless the user was preloading
+    # a batch experiment.
+    TBSetBatchState($pid, $eid,
+		    ($frontend ? BATCHSTATE_PAUSED : BATCHSTATE_POSTED));
 }
 
 exit(0);
@@ -310,9 +309,6 @@ sub ParseArgs()
     }
     if (defined($options{"f"})) {
 	$frontend = 1;
-    }
-    if ($frontend && !$immediate) {
-	usage();
     }
     if (defined($options{"p"})) {
 	$pid = $options{"p"};

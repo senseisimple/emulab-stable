@@ -97,10 +97,6 @@ if (defined($options{"s"})) {
 	$inout ne "modify") {
 	usage();
     }
-    if ($batch &&
-	($inout ne "out" && $inout ne "in")) {
-	usage();
-    }
 }
 else {
     usage();
@@ -210,12 +206,60 @@ if (defined($hashrow{'expt_locked'})) {
 }
 
 #
-# Do not allow the user to swap a batch experiment. It has to come via
-# the batch daemon. 
+# Batchmode.
 #
-if ($isbatchexpt && !$batch) {
-    die("*** $0:\n".
-	"    Batch experiments cannot be swapped or modified yet!");
+if ($isbatchexpt) {
+    #
+    # When coming from the daemon, sanity check the batch state.
+    #
+    if ($batch) {
+	if ($inout eq "in") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate, but should be ACTIVATING\n")
+		if ($ebatchstate ne BATCHSTATE_ACTIVATING);
+	}
+	elsif ($inout eq "out") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate, but should be TERMINATING\n")
+		if ($ebatchstate ne BATCHSTATE_TERMINATING);
+	}
+	else {
+	    die("*** $0:\n".
+		"    Improper request from batch daemon for $pid/$eid!\n");
+	}
+    }
+    else {
+	#
+	# User is requesting that a batch either be injected or paused.
+	# Sanity check the state, but otherwise let the batch daemon
+	# handle it.
+	# 
+	if ($inout eq "in") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate. Must be PAUSED to swap in.\n")
+		if ($ebatchstate ne BATCHSTATE_PAUSED);
+	    TBSetBatchState($pid, $eid, BATCHSTATE_POSTED);
+	}
+	elsif ($inout eq "out") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate. Must be RUNNING to swap out.\n")
+		if ($ebatchstate ne BATCHSTATE_RUNNING);
+
+	    my $flag = BATCHMODE_CANCELSWAP;
+	
+	    DBQueryFatal("UPDATE experiments set canceled=$flag ".
+			 "WHERE eid='$eid' and pid='$pid'");
+	}
+	else {
+	    die("*** $0:\n",
+		"    Batch experiments can only be swapped in or out!\n");
+	}
+	exit(0);
+    }
 }
 
 #

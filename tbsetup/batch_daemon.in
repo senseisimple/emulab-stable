@@ -65,6 +65,7 @@ my $BSTATE_POSTED	= BATCHSTATE_POSTED;
 my $BSTATE_ACTIVATING	= BATCHSTATE_ACTIVATING;
 my $BSTATE_RUNNING	= BATCHSTATE_RUNNING;
 my $BSTATE_TERMINATING	= BATCHSTATE_TERMINATING;
+my $BSTATE_PAUSED	= BATCHSTATE_PAUSED;
 
 #
 # These are valid in the children, not the parent. I suppose I could use
@@ -220,11 +221,17 @@ while (1) {
     while (%row = $running_result->fetchhash()) {
 	my $canceled = $row{'canceled'};
 	if ($canceled) {
-	    dosomething("cancel", %row);
+	    # Look at the cancel flag.
+	    if ($canceled == BATCHMODE_CANCELTERM) {
+		dosomething("cancel", %row);
+	    }
+	    elsif ($canceled == BATCHMODE_CANCELSWAP) {
+		dosomething("swap", %row);
+	    }
 	    next;
 	}
 	if (isexpdone(%row)) {
-	    dosomething("end", %row);
+	    dosomething("swap", %row);
 	    next;
 	}
     }
@@ -328,8 +335,8 @@ sub dosomething($$)
     if ($dowhat eq "start") {
 	startexp(%exphash);
     }
-    elsif ($dowhat eq "end") {
-	endexp(%exphash);
+    elsif ($dowhat eq "swap") {
+	swapexp(%exphash);
     }
     elsif ($dowhat eq "cancel") {
 	cancelexp(1, %exphash);
@@ -449,30 +456,37 @@ sub startexp($)
 }
 
 #
-# End an experiment. Never returns.
+# A batch has completed. Swap it out. 
 #
-sub endexp($)
+sub swapexp($)
 {
     my(%exphash)  = @_;
+    my $canceled  = $exphash{'canceled'};
 
     #
-    # Save tiplogs
-    #
-    system("$savelogs $pid $eid");
-
-    #
-    # Have to set the state to terminating or else endexp will not accept it.
+    # Have to set the state to terminating or else swapexp will not accept it.
     # 
     TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
     
-    system("$endexp -b $pid $eid");
+    system("$swapexp -b -s out $pid $eid");
     if ($?) {
 	#
 	# TB admin is going to have to clean up. 
 	# 
-	fatal("Terminating Batch Mode experiment $pid/$eid");
+	fatal("Swapping out Batch Mode experiment $pid/$eid");
     }
-    email_status("Batch Mode experiment $pid/$eid has finished!");
+    #
+    # Set the state to paused to ensure that it is not run again until
+    # the user wants to.
+    # 
+    TBSetBatchState($pid, $eid, $BSTATE_PAUSED);
+
+    if ($canceled) {
+	email_status("Batch Mode experiment $pid/$eid has been stopped!");
+    }
+    else {
+	email_status("Batch Mode experiment $pid/$eid has finished!");
+    }
    
     #
     # Child must exit!

@@ -342,7 +342,7 @@ function SPITFORM($formfields, $errors)
              <li>Check this if you want to load the experiment, but not
                  configure it (assign physical resources). You may swap in the
                  experiment later, or terminate it without ever swapping
-                 it. This option is not compatible with batch mode.\n";
+                 it.\n";
     echo "</ol>
           </blockquote></blockquote></blockquote>\n";
 
@@ -484,16 +484,6 @@ if (isset($formfields[exp_priority]) &&
     strcmp($formfields[exp_priority], "") &&
     ! isset($priorities[$formfields[exp_priority]])) {
     $errors["Priority"] = "Bad Value";
-}
-
-#
-# Preload and Batch are mutually exclusive.
-#
-if (isset($formfields[exp_batched]) &&
-    !strcmp($formfields[exp_batched], "Yep") &&
-    isset($formfields[exp_preload]) &&
-    !strcmp($formfields[exp_preload], "Yep")) {
-    $errors["Preload"] = "Cannot use with Batch Mode";
 }
 
 #
@@ -665,12 +655,11 @@ if (isset($formfields[exp_batched]) &&
 else {
     $exp_batched   = 0;
     $batcharg      = "-i";
-
-    if (isset($formfields[exp_preload]) &&
-	strcmp($formfields[exp_preload], "Yep") == 0) {
-	$exp_preload   = 1;
-	$batcharg     .= " -f";
-    }
+}
+if (isset($formfields[exp_preload]) &&
+    strcmp($formfields[exp_preload], "Yep") == 0) {
+    $exp_preload   = 1;
+    $batcharg     .= " -f";
 }
 
 # 
@@ -810,14 +799,8 @@ echo "<font size=+1>
         in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
         is configuring!<br><br>\n";
 
-if ($exp_batched) {
-    echo "Batch Mode experiments will be run when enough resources become
-          available. This might happen immediately, or it may take hours
-	  or days. You will be notified via email when the experiment has
-          been run. If you do not receive email notification within a
-          reasonable amount of time, please contact $TBMAILADDR.\n";
-}
-elseif ($exp_preload) {
+
+if ($exp_preload) {
     echo "Since you are only pre-loading the experiment, this will typically
           take less than one minute. If you do not receive email notification
           within a reasonable amount of time, please contact $TBMAILADDR.<br>
@@ -825,6 +808,13 @@ elseif ($exp_preload) {
           While you are waiting, you can watch the log 
           in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
           realtime</a>.\n";
+}
+elseif ($exp_batched) {
+    echo "Batch Mode experiments will be run when enough resources become
+          available. This might happen immediately, or it may take hours
+	  or days. You will be notified via email when the experiment has
+          been run. If you do not receive email notification within a
+          reasonable amount of time, please contact $TBMAILADDR.\n";
 }
 else {
     echo "You will be notified via email when the experiment has been fully

@@ -120,9 +120,13 @@ if (!$confirmed) {
     echo "<center><h2><br>
           Are you sure you want to ";
     if ($force) {
-	    echo "<font color=red><br>forcibly</br></font> ";
+	echo "<font color=red><br>forcibly</br></font> ";
     }
-    echo "$action experiment '$exp_eid?'
+    echo "$action ";
+    if ($batch) {
+	echo "batch mode ";
+    }
+    echo "experiment '$exp_eid?'
           </h2>\n";
     
     echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
@@ -210,14 +214,24 @@ if ($retval) {
 #
 # Exit status 0 means the experiment is swapping, or will be.
 #
-echo "<br><br><h3>\n";
+echo "<br><h3>\n";
 if ($retval == 0) {
-    if (strcmp($inout, "in") == 0)
-	$howlong = "two to ten";
-    else
-	$howlong = "less than two";
+    if ($batch &&
+	strcmp($inout, "in") == 0) {
+	echo "Batch Mode experiments will be run when enough resources
+              become available. This might happen immediately, or it
+              may take hours or days. You will be notified via email
+              when the experiment has been run. If you do not receive
+              email notification within a reasonable amount of time,
+              please contact $TBMAILADDR.\n";
+    }
+    else {
+	if (strcmp($inout, "in") == 0)
+	    $howlong = "two to ten";
+	else
+	    $howlong = "less than two";
     
-    echo "Experiment
+	echo "Experiment
 	  <a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>
           in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
           has started its $action.
@@ -231,6 +245,7 @@ if ($retval == 0) {
           While you are waiting, you can watch the log
           in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
           realtime</a>.\n";
+    }
 }
 echo "</h3>\n";
 

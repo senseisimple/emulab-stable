@@ -171,25 +171,44 @@ if (defined($hashrow{'expt_locked'})) {
 # to determine when this was invoked from the batch daemon for a valid
 # teardown. 
 #
-if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
+if ($isbatchexpt) {
     #
-    # Set the canceled state. This will prevent the batch_daemon from trying
-    # to run it (once the table is unlocked). It might already be running,
-    # but we deal with that by looking at the batch state.
+    # Sanity Check. If called from the daemon, must be in the proper state.
     #
-    DBQueryFatal("UPDATE experiments set canceled=1 ".
-		 "WHERE eid='$eid' and pid='$pid'");
+    if ($batch) {
+	die("*** $0:\n".
+	    "    Batch experiment $pid/$eid is not in the correct state!\n".
+	    "    Currently $ebatchstate, but should be TERMINATING\n")
+	    if ($ebatchstate ne BATCHSTATE_TERMINATING);
+    }
+    else {
+	#
+	# Set the canceled flag. This will prevent the batch_daemon
+	# from trying to run it (once the table is unlocked). It might
+	# already be running, but we deal with that by looking at the
+	# batch state.
+	#
+	my $flag = BATCHMODE_CANCELTERM;
+	
+	DBQueryFatal("UPDATE experiments set canceled=$flag ".
+		     "WHERE eid='$eid' and pid='$pid'");
 
-    if ($ebatchstate ne BATCHSTATE_POSTED) {
 	#
-	# Daemon does the rest ... Exit with non zero status so that caller
-	# knows (web server) that the batch experiment cannot be ended
-	# at this time.
-	#
-	print "Batch Experiment $eid in project $pid is currently running.\n".
+	# If the state is POSTED or PAUSED, we can do it right away.
+	# Otherwise, have to let the batch daemon deal with it.
+	# 
+	if ($ebatchstate ne BATCHSTATE_POSTED &&
+	    $ebatchstate ne BATCHSTATE_PAUSED) {
+	    #
+	    # Exit with non zero status so that caller knows (web
+	    # server) that the batch experiment cannot be ended at
+	    # this time.
+	    #
+	    print "Batch experiment $pid/$eid is currently running.\n".
 	      "You will receive email notification when the experiment is\n".
 	      "torn down and you can reuse the experiment name\n";
-	exit(0);
+	    exit(0);
+	}
     }
     #
     # Let termination proceed normally. 
