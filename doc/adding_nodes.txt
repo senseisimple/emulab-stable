@@ -77,6 +77,12 @@ C. What to do on boss:
    insert into nodes (node_id, type, def_boot_osid, priority) values
    ("pcN","pc1u","FBSD40-STD",N)
 
+   If the node is a pxebooting node, then you need to set the
+   pxe_boot_path in the nodes table. Try:
+
+	update nodes set pxe_boot_path='boss.emulab.net:/tftpboot/pxeboot'
+		where node_id='pcN';
+
 5. Until you are ready to put it in service, reserve it to an expt,
    either with nalloc or by adding an entry to the reserved table
    directly. You'll probably also want to put its ports in a vlan to
