@@ -60,10 +60,10 @@ $ENV{'PATH'} = "/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
     "/usr/local/bin:/usr/site/bin:/usr/site/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $etcdir	= "/tmp/etc";
+my $etcdir	= "/etc";
 my $rcconflocal	= "$etcdir/rc.conf.local";
 my $resolveconf = "$etcdir/resolv.conf";
-my $rootuser	= "lbs2";
+my $rootuser	= "root";
 my $dodhcp	= 1;
     
 #
