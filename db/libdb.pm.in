@@ -2847,7 +2847,7 @@ sub TBExptMinMaxNodes($$$$)
     my($pid, $eid, $minp, $maxp) = @_;
 
     my $query_result =
-	DBQueryWarn("select maximum_nodes,minimum_nodes from experiments ".
+	DBQueryWarn("select minimum_nodes,maximum_nodes from experiments ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (!$query_result || !$query_result->numrows) {
