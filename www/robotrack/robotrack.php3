@@ -54,7 +54,7 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
                          the destination position,
                          and the battery level (percentage and voltage).
                          The shaded areas (blue border) are <em>exclusion</em>
-                         zones where robots are not allowed to go. You
+                         zones where robots are not allowed to go. You can
                          <b>click</b> on a robot to bring up its info page.
         </td>
       </tr>
