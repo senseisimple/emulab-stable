@@ -5,20 +5,26 @@
 # All rights reserved.
 #
 
-TMCC=/etc/testbed/tmcc
-DISKDEV=/dev/rad0
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+fi
 
-$TMCC state RELOADSETUP
-LOADINFO=`$TMCC loadinfo`
+$BINDIR/tmcc state RELOADSETUP
 
-# For testing purposes.
-#LOADINFO='ADDR=234.5.6.69:4444 PART=0'
-
+DISKDEV=/dev/ad0
+LOADINFO=`$BINDIR/tmcc loadinfo`
+#LOADINFO='ADDR=234.5.6.69:4444 PART=0'	# for testing
 ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
 PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }'`
-
 if [ x"$PARTITION" != x ] && [ "$PARTITION" != 0 ]; then
 	SLICE="-s $PARTITION";
+fi
+
+# Enable IPoD
+if [ -r $BINDIR/rc.ipod ]; then
+	. $BINDIR/rc.ipod
 fi
 
 if [ x"$ADDRESS" != x ]; then
@@ -26,15 +32,24 @@ if [ x"$ADDRESS" != x ]; then
 	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
 	MCASTADDR="-m $MCAST -p $PORT";
 
-	/bin/echo "Running /etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV ";
-	$TMCC state RELOADING;
-	/etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV;
-	/bin/echo "Frisbee run finished";
-	/bin/echo "Resizing final disk partition";
-	/etc/testbed/growdisk -vW;
-	/bin/echo "Image load complete, rebooting ...";
-	$TMCC state RELOADDONE;
-	/sbin/reboot &
+	echo "Running $BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV ";
+	$BINDIR/tmcc state RELOADING;
+
+	$BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV;
+	case $? in
+	0)
+		echo "Frisbee run finished";
+		echo "Resizing final disk partition";
+		$BINDIR/growdisk -vW;
+		echo "Image load complete, rebooting ...";
+		$BINDIR/tmcc state RELOADDONE;
+		/sbin/reboot;
+		;;
+	*)
+		echo "Frisbee run failed, status $?"
+		;;
+	esac
 else
 	echo "Unable to get address for loading image"
 fi
+echo "Failed to load disk, dropping to login prompt"
