@@ -15,7 +15,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: vistoplogy [-o <outputfile>] [-z <zoomfactor>] [-d <detaillevel>] <pid> <eid>\n";
+	"Usage: dbvistoplogy [-o <outputfile>] [-z <zoomfactor>] [-d <detaillevel>] <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "o:z:d:";

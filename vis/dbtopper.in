@@ -133,6 +133,7 @@ sub combineloss {
 sub gvclean {
     my $n = shift;
     $n =~ s/\W/_/g;
+    $n = "_x1823Y_" . $n; 
     return $n;
 }
 

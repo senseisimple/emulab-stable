@@ -261,8 +261,18 @@ $im->fill( 1, 1, $bgcolor );
 
 foreach $i (keys %nodes) {
   ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
-  $im->filledRectangle( $x - 12, $y - 12, 
- 	                $x + 20, $y + 20, $colors{"gray80"});
+  $cname = $nodes{$i}{"color"};
+  if ($cname eq "green") {
+      for ($i = 1; $i < 18; $i++) {
+	  $im->arc( $x + 4, $y + 4, 
+		    $i * 2, $i * 2, 
+		    0, 360, 
+		    $colors{"gray80"} );
+      }
+  } else {
+      $im->filledRectangle( $x - 12, $y - 12, 
+			    $x + 20, $y + 20, $colors{"gray80"});
+  }
 } 
 
 # render links
@@ -323,13 +333,23 @@ foreach $i (keys %nodes) {
   if ($cname eq "red") {
       $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"darkred"} );
       $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"darkred"} );
+  } elsif ($cname eq "green") { 
+      $im->arc( $x, $y, 36, 36, 0, 360, $colors{"gray50"} );
+      $im->arc( $x, $y, 34, 34, 0, 360, $colors{"gray25"} );
+      $im->arc( $x, $y, 32, 32, 0, 360, $colors{"gray75"} );
   } else {
       $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
       $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
   }
 
-  $im->filledRectangle( $x - 14, $y - 14, 
-			$x + 14, $y + 14, $colors{"white"} );
+  if ($cname eq "green") {
+      for ($i = 1; $i < 16; $i++) {
+	  $im->arc( $x, $y, $i * 2, $i * 2, 0, 360, $colors{"white"} );
+      }
+  } else {
+      $im->filledRectangle( $x - 14, $y - 14, 
+			    $x + 14, $y + 14, $colors{"white"} );
+  }
 
   if ($nodeicon && ($cname eq "skyblue" || 
 		    $cname eq "steelblue" ||
@@ -339,8 +359,8 @@ foreach $i (keys %nodes) {
   } elsif ($lanicon && $cname eq "green") {
     $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
   } else {
-  $im->filledRectangle( $x - 6, $y - 6, 
-			$x + 6, $y + 6, $c );
+    $im->filledRectangle( $x - 6, $y - 6, 
+	     		  $x + 6, $y + 6, $c );
   }
 } 
 
@@ -356,7 +376,9 @@ foreach $i (@links) {
 	($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
 
 	$linklabels{ $i } =~ s/^\!..//;
-	
+	# axe prefix added to avoid reserved-word collide:
+	$linklabels{ $i } =~ s/_x1823Y_//; 
+
 	my @lines = split " ", $linklabels{ $i };
 
 	$y -= (0.5 * (@lines * gdTinyFont->height)); 
@@ -391,7 +413,7 @@ foreach $i (keys %nodes) {
   $nm .= " ";
 
   $nm =~ s/^(\S+)//;
-
+  $nm =~ s/_x1823Y_//; 
   push @lines, $1;
 
   while ( $nm =~ s/^(.{1,12})\s// ) {
