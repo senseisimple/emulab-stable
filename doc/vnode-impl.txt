@@ -77,7 +77,12 @@ that sent it (since there is no virtual MAC).  Preserving the necessary
 information in the ethernet packet would require help from the switching
 fabric, either by supporting VLANs or by supporting arbitrary numbers of
 fake MAC addresses per switch port (where the fake addresses would be
-derived from the virtual IP addresses).
+derived from the virtual IP addresses).  Another problem with the fake
+MAC address scheme is that broadcast traffic cannot be associated with
+the correct set of virtual links since the source virtual MAC address
+is the tag that is used to multiplex and demultiplex traffic.  MAC-level
+broadcast packets are thus seen by all virtual links sharing a physical
+link.
 
 We solve all of these problems in one fell swoop, with a virtual ethernet
 device.  The BSD virtual ethernet (veth) driver, which we wrote, is a goofy
@@ -409,8 +414,59 @@ so wide-spread also indicates to me that we are virtualizing in the wrong
 place.  In retrospect, the multiple network stack work done by Zec, which
 virtualizes the entire network stack, would have been a better approach.
  
+C4. The problem with ARP.
 
-C4. More about the startup pieces.
+The ARP protocol has proven to be a major pain in the ass, due to a
+confluence of factors.  One is just the way BSD implements ARP, another
+the way the virtual routing tables work and finally, how we setup the
+virtual control net.
+
+In BSD, there is no distinct "ARP table", instead ARP entries are just
+route table entries where the next hop is a link address rather than an
+IP address.  There is some auxiliary info hanging off of the routing
+entry however.  In particular, when say an IP packet is sent, and we
+must first ARP for the next hop IP, the original "triggering" IP packet
+is held and associated with the route table entry while the ARP exchange
+is done.  When the ARP reply comes in, that original packet is then
+sent out on the wire.  The point is that a "pending" ARP entry is setup
+at request time and then, when a reply comes in, a lookup is done to
+locate that entry so that requests and replies are matched up.
+
+Enter factor two, the multiple routing tables.  Since outgoing packets
+use the rtabid of the socket that sent them (the jail rtabid for us) the
+pending ARP entry will be in that route table.  However, incoming packets,
+which may need to be further routed if we are an IP forwarder, are
+assigned the rtabid of the interface in which they come in on.  This
+rtabid could be different than that for packets that go out the same
+interface and thus an ARP reply could be "tagged" differently than the
+request that caused it.  Note that typically this is not a problem,
+since interfaces are usually private to a jail and would have the same
+rtabid as sockets which produce packets.  The problem is with shared
+interfaces.
+
+Thus we reach the final piece of the puzzle, the virtual control net.
+This is implemented by assigning each virtual node an IP alias on the
+control interface of the physical node.  That is, we do not use virtual
+interfaces (veths) for the control net, to do so would require using
+veths on boss and ops and anything else the vnodes talked to.  Anyway,
+the control net interface is associated with rtabid 0, the main routing
+table, and is visible in all vnodes.  Now we have a case where outgoing
+packets will be tagged with (and use) their own private routing table,
+but incoming packets will be tagged with rtabid 0.  (As an aside, this
+means that a vnode cannot forward packets between the control net and
+its other interfaces).  For ARP, specifically, it means that the pending
+ARP entry will wind up in the vnode's routing table, but when the reply
+comes in, we will look to match it up with an entry in the main routing
+table.  So a more sophisticated matching is needed.  Currently, we do
+this by looking up the source of the incoming ARP packet in each
+routing table.  The first such table we find that has an outstanding
+request for that address is matched up with the reply.  Note that if
+multiple vnodes have outstanding ARPs to a machine, we may not match
+up with the correct one. But that shouldn't matter as each vnode should
+get a reply eventually and each reply should have the same info.
+
+
+C5. More about the startup pieces.
 
 vnodesetup hangs around so that you can signal it and easily
  reboot the vnode.  I guess the idea is that it is also jail/vserver
