@@ -1239,6 +1239,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/top2png vis/render \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/cvsupd.sh rc.d/2.elvind.sh \
+	tools/pcapper/GNUmakefile \
 	$eventfiles \
 	apache/GNUmakefile apache/apache.conf "
 

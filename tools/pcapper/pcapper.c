@@ -13,6 +13,9 @@
 #ifdef __linux__
 #define __PREFER_BSD
 #define __USE_BSD
+#define __FAVOR_BSD
+#define uh_ulen len
+#define th_off doff
 #endif
 
 #include <sys/types.h>
@@ -26,9 +29,13 @@
 #include <sys/sockio.h>
 #endif
 
+#include <netinet/in_systm.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <arpa/inet.h>
 
 #include <err.h>
@@ -43,9 +50,16 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef EVENTSYS
+#include "event.h"
+#include "tbdefs.h"
+#include "log.h"
+#endif
+
 #define PORT 4242
 #define MAX_INTERFACES 10
 #define MAX_CLIENTS 10
+#define MAX_FILES 10
 
 /*
  * Program run to determine the control interface.
@@ -53,7 +67,7 @@
 #define CONTROL_IFACE "/etc/testbed/control_interface"
 
 /*
- * Some struct definitions shamelessly stolen from tcpdump.org
+ * A struct definitions shamelessly stolen from tcpdump.org
  */
 
 /* Ethernet header */
@@ -61,26 +75,6 @@ struct sniff_ethernet {
 	u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
 	u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
 	u_short ether_type; /* IP? ARP? RARP? etc */
-};
-
-/* IP header */
-struct sniff_ip {
-#if BYTE_ORDER == LITTLE_ENDIAN
-	u_int ip_hl:4, /* header length */
-	ip_v:4; /* version */
-#endif
-#if BYTE_ORDER == BIG_ENDIAN
-	u_int ip_v:4, /* version */
-	ip_hl:4; /* header length */
-#endif
-	u_char ip_tos; /* type of service */
-	u_short ip_len; /* total length */
-	u_short ip_id; /* identification */
-	u_short ip_off; /* fragment offset field */
-	u_char ip_ttl; /* time to live */
-	u_char ip_p; /* protocol */
-	u_short ip_sum; /* checksum */
-	struct in_addr ip_src,ip_dst; /* source and dest address */
 };
 
 /*
@@ -146,9 +140,15 @@ struct interface_counter {
  */
 void *readpackets(void *args);
 void *feedclient(void *args);
+void *runeventsys(void *args);
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *packet);
 int getaddr(char *dev, struct in_addr *addr);
+#ifdef EVENTSYS
+static void
+callback(event_handle_t handle,
+	event_notification_t notification, void *data);
+#endif
 
 /*
  * Number of interfaces we've detected, and their names.
@@ -162,6 +162,40 @@ char interface_names[MAX_INTERFACES][1024];
  * feeding thread has woken up.) For statistical purposes.
  */
 int ontime_packets = 0, early_packets = 0;
+
+/*
+ * Nonzero if we're supposed to count payload only
+ */
+int payload_only = 0;
+
+/*
+ * Nonzero if we're supposed to add ethernet headers to the packet size
+ */
+int add_ethernet = 0;
+
+/*
+ * Nonzero if we're supposed to _not_ count zero-sized packets in the
+ * packet counts (obviously, they're already ignored in the byte counts.
+ */
+int no_zero = 0;
+
+#ifdef EVENTSYS
+/*
+ * Time to subtract out of each timestamp reported to clients - this allows
+ * us to report times relative to event system time start events.
+ */
+struct timeval start_time;
+
+/*
+ * 1 if we're adjusting timestamps by start_time, 0 otherwise
+ */
+int adjust_time = 0;
+
+/*
+ * A barrier, so that the main thread can wait for time to start
+ */
+pthread_cond_t time_started;
+#endif
 
 /*
  * For getopt()
@@ -196,8 +230,32 @@ int client_connected[MAX_CLIENTS];
 
 int MAX(int a, int b) { if ((a) > (b)) return (a); else return (b); }
 
+void usage(char *progname) {
+    char *short_usage = "Usage: %s [-f filename] [-i interval] [-p] "
+#ifdef EVENTSYS
+			"[-e eid/pid] "
+#endif
+			"[interfaces...]\n";
+    char *long_usage = "-f filename   Log output to a file\n"
+    		       "-i interval   When logging to a file, the interval "
+			   "(in ms) to report\n"
+		       "-p            Count only payload (not header) size\n"
+		       "-n            Add in ethernet header size\n"
+		       "-z            Don't count zero-length packets\n"
+		       "-o            Print output to stdout\n"
+#ifdef EVENTSYS
+		       "-e pid/eid    Wait for a time start for experiment\n"
+		       "-s server     Use <server> for event server\n"
+#endif
+		       "interfaces... A list of interfaces to monitor\n";
+
+    fprintf(stderr,short_usage,progname);
+    fprintf(stderr,long_usage);
+    exit(-1);
+}
+
 /*
- * XXX: Shorten
+ * XXX: Break up into smaller chunks
  */
 int main (int argc, char **argv) {
 	pthread_t thread;
@@ -206,40 +264,87 @@ int main (int argc, char **argv) {
 	struct sockaddr_in address;
 	struct in_addr ifaddr;
 	struct hostent *host;
-	FILE *control_interface;
 	int i;
 	struct sigaction action;
 	int limit_interfaces;
 	struct ifconf ifc;
 	void  *ptr;
 	char lastname[IFNAMSIZ];
-	char *filename;
+	char *filenames[MAX_FILES];
 	int filetime;
 	char ch;
-
+	char *event_server;
+#ifdef EVENTSYS
+	char *exp;
+	address_tuple_t tuple;
+#endif
 #ifdef EMULAB
+	FILE *control_interface;
 	char control[1024];
+#endif
+#ifdef DROPROOT
+	uid_t uid;
 #endif
 	/*
 	 * Defaults for command-line arugments
 	 */
-
-	filename = NULL;
+	bzero(filenames,sizeof(filenames));
 	filetime = 1000;
+#ifdef EMULAB
+	event_server = BOSSNODE;
+#else
+	event_server = NULL;
+#endif
+
+#ifdef EVENTSYS
+	exp = 0;
+#endif
 
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnzs:o")) != -1)
 		switch(ch) {
 		case 'f':
-			filename = optarg;
+			/* Find the first empty slot */
+			for (i = 0; filenames[i] != NULL; i++) {}
+			filenames[i] = optarg;
 			break;
 		case 'i':
 			filetime = atoi(optarg);
 			break;
+		case 'p':
+			payload_only = 1;
+			break;
+		case 'n':
+			add_ethernet = 1;
+			break;
+		case 'z':
+			no_zero = 1;
+			break;
+		case 'o':
+			/* Find the first empty slot */
+			for (i = 0; filenames[i] != NULL; i++) {}
+			filenames[i] = "-";
+			break;
+
+#ifdef EVENTSYS
+		case 'e':
+			adjust_time = 1;
+			exp = optarg;
+			break;
+		case 's':
+			event_server = optarg;
+			break;
+
+#endif
+		case 'h':
+			usage(argv[0]);
+			break;
 		default:
 			fprintf(stderr,"Bad argument\n");
+			usage(argv[0]);
+			break;
 		}
 	argc -= optind;
 	argv += optind;
@@ -248,7 +353,7 @@ int main (int argc, char **argv) {
 	 * If they give any more arguments, we take those as interface/hostname
 	 * names to match against, and skip all others.
 	 */
-	if (argc > 1) {
+	if (argc > 0) {
 	    	limit_interfaces = 1;
 	} else {
 	    	limit_interfaces = 0;
@@ -405,7 +510,7 @@ int main (int argc, char **argv) {
 			 */
 			if (limit_interfaces) {
 				int j;
-				for (j = 1; j < argc; j++) {
+				for (j = 0; j < argc; j++) {
 					if ((strstr(name,argv[j])) ||
 					    (strstr(hostname,argv[j]))) {
 					    break;
@@ -446,20 +551,90 @@ int main (int argc, char **argv) {
 			printf("down\n");
 		}
 	}
-
 	close(sock);
 
+	if (interfaces <= 0) {
+		fprintf(stderr,"No interfaces to monitor!\n");
+		exit(-1);
+	}
+
+#ifdef DROPROOT
+	if (geteuid() == 0) {
+	    uid = getuid();
+	    seteuid(uid);
+	}
+#endif
+
 	/*
-	 * If they gave us a filename to log to, open it up.
+	 * Wait for time to start
 	 */
-	if (filename) {
+#ifdef EVENTSYS
+	if (adjust_time) {
+	    event_handle_t ehandle;
+	    char server_string[1024];
+
+	    printf("Waiting for time start in experiment %s\n",exp);
+	    tuple = address_tuple_alloc();
+	    if (tuple == NULL) {
+		fatal("could not allocate an address tuple");
+	    }      
+	    tuple->host      = ADDRESSTUPLE_ANY;
+	    tuple->site      = ADDRESSTUPLE_ANY;
+	    tuple->group     = ADDRESSTUPLE_ANY;
+	    tuple->expt      = exp ? exp : ADDRESSTUPLE_ANY;
+	    tuple->objtype   = TBDB_OBJECTTYPE_TIME;
+	    tuple->objname   = ADDRESSTUPLE_ANY;
+	    tuple->eventtype = TBDB_EVENTTYPE_START;
+
+	    pthread_cond_init(&time_started,NULL);
+
+	    if (event_server) {
+		snprintf(server_string,sizeof(server_string),"elvin://%s",
+			event_server);
+	    } else {
+		server_string[0] = '\0';
+	    }
+
+	    ehandle = event_register(server_string,0);
+	    if (ehandle == NULL) {
+		fatal("could not register with event system");
+	    }
+	    if (!event_subscribe(ehandle, callback, tuple, NULL)) {
+		fatal("could not subscribe to TIME events");
+	    }
+	    address_tuple_free(tuple);
+
+	    /*
+	     * We put the event system main loop into a new thread, since
+	     * we can't use the threaded API with linuxthreads
+	     */
+	    if (pthread_create(&thread,NULL,runeventsys,&ehandle)) {
+		fprintf(stderr,"Unable to start thread!\n");
+		exit(1);
+	    }
+	    pthread_cond_wait(&time_started,&lock);
+	    pthread_mutex_unlock(&lock);
+	}
+#endif
+
+	/*
+	 * If they gave us filenames to log to, open them up.
+	 */
+	for (i = 0; filenames[i] != NULL; i++) {
 		int fd;
 		struct feedclient_args *args;
 
-		fd = open(filename,O_WRONLY | O_CREAT | O_TRUNC);
-		if (fd < 0) {
+		/*
+		 * Allow use the of '-' for stdout
+		 */
+		if (!strcmp(filenames[i],"-")) {
+		    fd = 1;
+		} else {
+		    fd = open(filenames[i],O_WRONLY | O_CREAT | O_TRUNC);
+		    if (fd < 0) {
 			perror("Opening savefile");
 			exit(1);
+		    }
 		}
 
 		/*
@@ -624,6 +799,7 @@ void *feedclient(void *args) {
 		int used = 0;
 		int writerv;
 		struct timeval sleepintr;
+		struct timeval timestamp;
 		struct timespec sleepintr_ts;
 		struct pcap_stat ps;
 
@@ -668,11 +844,20 @@ void *feedclient(void *args) {
 		 */
 		timeradd(&next_time,&interval_tv,&next_time);
 
+		timestamp.tv_sec = now.tv_sec;
+		timestamp.tv_usec = now.tv_usec;
+
+#ifdef EVENTSYS
+		if (adjust_time) {
+		    timersub(&now,&start_time,&timestamp);
+		}
+#endif
+
 		/*
 		 * Put a timestamp on the beginning of each line
 		 */
-		used += sprintf((outbuf +used),"%li.%06li ",now.tv_sec,
-				now.tv_usec);
+		used += sprintf((outbuf +used),"%li.%06li ", timestamp.tv_sec,
+				timestamp.tv_usec);
 
 		/*
 		 * Gather up the counts for each interface into
@@ -748,7 +933,8 @@ void *readpackets(void *args) {
 	/*
 	 * How much of the packet we want to grab. For some reason 
 	 */
-	size = sizeof(struct sniff_ethernet) + sizeof(struct sniff_ip);
+	size = sizeof(struct sniff_ethernet) + sizeof(struct ip) +
+	    sizeof(struct tcphdr);
 	sargs = (struct readpackets_args*)args;
 
 	/*
@@ -756,7 +942,7 @@ void *readpackets(void *args) {
 	 * don't get to see packets until a certain number have been buffered
 	 * up, for some reason.
 	 */
-	dev = pcap_open_live(sargs->devname,size,1,1000,ebuf);
+	dev = pcap_open_live(sargs->devname,size,1,1,ebuf);
 
 	if (!dev) {
 		fprintf(stderr,"Failed to open %s: %s\n",sargs->devname,ebuf);
@@ -795,7 +981,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *packet) {
 
 	struct sniff_ethernet *ether_pkt;
-	struct sniff_ip *ip_pkt; 
+	struct ip *ip_pkt; 
 	int length;
 	int type;
 	int index;
@@ -809,12 +995,16 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 		return;
 	}
 
-	ip_pkt = (struct sniff_ip*)(packet + sizeof(struct sniff_ethernet));
+	ip_pkt = (struct ip*)(packet + sizeof(struct sniff_ethernet));
 
 	/*
 	 * Add this packet length to the appropriate total
 	 */
-	length = ntohs(ip_pkt->ip_len);
+	if (!add_ethernet) {
+		length = ntohs(ip_pkt->ip_len);
+	} else {
+		length = ntohs(ip_pkt->ip_len) + sizeof (struct sniff_ethernet);
+	}
 	type = ip_pkt->ip_p;
 
 	/* printf("got type %d, len=%d(0x%x)\n", type, length, length); */
@@ -855,21 +1045,65 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 				ontime_packets*1.0/
 					(ontime_packets + early_packets),
 				ontime_packets,early_packets);
-			*/
+				*/
 
 			/*
 			 * Now, just  add it into the approprate counts
 			 */
 			switch (type) {
-				case 1:  count->icmp_bytes  += length;
-					 count->icmp_packets++;
-					 break;
-				case 6:  count->tcp_bytes   += length;
-					 count->tcp_packets++;
-					 break;
-				case 17: count->udp_bytes   += length;
-					 count->udp_packets++;
-					 break;
+				case 1: 
+				    count->icmp_bytes  += length;
+				    count->icmp_packets++;
+				    break;
+				case 6:
+				    if (payload_only) {
+					/*
+					 * Find the TCP header in the packet
+					 */
+					struct tcphdr *tcp_hdr =
+					    (struct tcphdr*)((char*)ip_pkt +
+							     ip_pkt->ip_hl*4);
+					int hdr_len = ip_pkt->ip_hl *4 +
+					    tcp_hdr->th_off *4;
+					count->tcp_bytes  += length - hdr_len;
+					length = length - hdr_len;
+				    } else {
+					count->tcp_bytes  += length;
+				    }
+				    if (no_zero) {
+					if (length > 0) {
+					    count->tcp_packets++;
+					}
+				    } else {
+					count->tcp_packets++;
+				    }
+
+				    break;
+
+				case 17:
+				    if (payload_only) {
+					/*
+					 * Find the UDP header in the packet
+					 */
+					struct udphdr *udp_hdr =
+					    (struct udphdr*)((char*)ip_pkt +
+							     ip_pkt->ip_hl*4);
+					int pay_len = htons(udp_hdr->uh_ulen) -
+					    sizeof(struct udphdr);
+					count->udp_bytes  += pay_len;
+					length = pay_len;
+				    } else {
+					count->udp_bytes  += length;
+				    }
+
+				    if (no_zero) {
+					if (length > 0) {
+					    count->udp_packets++;
+					}
+				    } else {
+					count->udp_packets++;
+				    }
+				    break;
 				default: count->other_bytes += length;
 					 count->other_packets++;
 					 break;
@@ -918,3 +1152,41 @@ int getaddr(char *dev, struct in_addr *addr) {
 		return 0;
 	}
 }
+
+#ifdef EVENTSYS
+/*
+ * Callback used for the event system. Resets the experiment start time,
+ * and signals the main thread, which may be waiting on the condition
+ * variable before it starts
+ */
+static void
+callback(event_handle_t handle,
+	         event_notification_t notification, void *data) {
+
+	char objtype[256], eventtype[256];
+	int len = 256;
+
+	printf("Received an event\n");
+	event_notification_get_objtype(handle, notification, objtype, len);
+	event_notification_get_eventtype(handle, notification, eventtype, len);
+
+	if (!strcmp(objtype,TBDB_OBJECTTYPE_TIME) &&
+		!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
+	    /* OK, time has started */
+	    gettimeofday(&start_time,NULL);
+	    pthread_cond_signal(&time_started);
+	    printf("Event time started at UNIX time %lu.%lu\n",
+		    start_time.tv_sec, start_time.tv_usec);
+	}
+	return;
+}
+
+/*
+ * Simple function that starts up the event main loop - suitable for use as
+ * an argument to pthread_create .
+ */
+void *runeventsys(void *args) {
+    event_main(*((event_handle_t*)args));
+    return NULL;
+}
+#endif

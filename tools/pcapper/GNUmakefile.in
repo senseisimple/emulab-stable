@@ -1,0 +1,47 @@
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = tools/pcapper
+
+include $(OBJDIR)/Makeconf
+
+all: pcapper
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+PTHREADCFLAGS = -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
+PTHREADLIBS   = -L/usr/local/lib -llthread -llgcc_r
+
+ELVINFLAGS    = `elvin-config --cflags vin4c`
+ELVINLIBS     = -L/usr/local/lib -lvin4c -lvin4 -lssl -lcrypto -lm
+
+TBCFLAGS      = -I$(TESTBED_SRCDIR)/event/lib -I$(TESTBED_SRCDIR)/lib/libtb
+TBLIBS        = $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o \
+		$(OBJDIR)/lib/libtb/libtb.a
+
+PCAPLIBS=-lpcap
+
+CFLAGS  = -Wall -static $(PTHREADCFLAGS) $(TBCFLAGS) $(ELVINFLAGS) \
+	-DEVENTSYS -DEMULAB -g -DDROPROOT -DBOSSNODE=\"@BOSSNODE@\"
+LDFLAGS = -static
+
+CFLAGS_FREEBSD = $(CFLAGS) 
+CLAGS_LINUX    = $(CLAGS) -I/usr/include/pcap 
+LIBS           = $(PTHREADLIBS) $(TBLIBS) $(ELVINLIBS) $(PCAPLIBS)
+
+
+clean:
+	-rm pcapper pcapper.linux
+
+pcapper: GNUmakefile pcapper.o
+	$(CC) $(LDFLAGS) $(CFLAGS_FREEBSD) pcapper.o $(LIBS) \
+		-o pcapper
+		cp pcapper pcapper.debug
+		strip pcapper
+
+#
+# Note: Building on Linux with the event system is mighty tricky
+#
+pcapper.linux: pcapper.c GNUmakefile
+	$(CC) $(CFLAGS) $(CPPFLAGS_LINUX) -L/usr/lib -lpthread -lpcap \
+	pcapper.c -o pcapper.linux -lpcap
