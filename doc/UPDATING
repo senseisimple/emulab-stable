@@ -6,6 +6,10 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20041025:
+
+	Run sql/fixstats_swapmod.pl to fix up stats records.
+
 20040901:
 	New SSL version of the XMLRPC server.
 

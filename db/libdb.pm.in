@@ -3777,14 +3777,15 @@ sub GatherSwapStats($$$$$;$)
     local $DBQUERY_MAXTRIES = 5;
 
     my $query_result =
-	DBQueryWarn("select e.gid,e.idx,s.rsrcidx,s.lastrsrc,e.expt_swap_uid ".
+	DBQueryWarn("select e.state,e.gid,e.idx,s.rsrcidx,s.lastrsrc, ".
+		    "       e.expt_swap_uid ".
 		    "  from experiments as e ".
 		    "left join experiment_stats as s on e.idx=s.exptidx ".
 		    "where e.pid='$pid' and e.eid='$eid'");
     if (!$query_result || !$query_result->numrows) {
 	return;
     }
-    my ($gid, $exptidx, $rsrcidx, $lastrsrc, $lastswapuid) =
+    my ($curstate, $gid, $exptidx, $rsrcidx, $lastrsrc, $lastswapuid) =
 	$query_result->fetchrow_array;
     $lastswapuid = $uid
 	if (!defined($lastswapuid) || $lastswapuid eq "");
@@ -3873,7 +3874,7 @@ sub GatherSwapStats($$$$$;$)
     $duration = 0;
 
     if ($mode eq TBDB_STATS_SWAPOUT ||
-	($mode eq TBDB_STATS_SWAPMODIFY &&
+	($mode eq TBDB_STATS_SWAPMODIFY && $curstate eq EXPTSTATE_ACTIVE && 
 	 ($flags & TBDB_STATS_FLAGS_PREMODIFY) == 0)) {
 	$query_result =
 	    DBQueryWarn("select r.pnodes,r.vnodes, ".
