@@ -1469,11 +1469,11 @@ sub enablePortTrunking($$$) {
     #
     # Allow the native VLAN to cross the trunk
     #
+    $rv = $self->setVlansOnTrunk($port,1,$native_vlan);
     if (!$rv) {
 	warn "ERROR: Unable to enable native VLAN on trunk\n";
 	return 0;
     }
-
 
     return 1;
     
