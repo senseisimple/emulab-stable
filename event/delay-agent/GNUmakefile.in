@@ -34,7 +34,8 @@ delay-agent:	$(OBJS)
 
 $(OBJS):	main.h ../lib/libevent.a
 
-#install:	$(addprefix $(INSTALL_SBINDIR)/, event-sched)
+client-install: 
+	$(INSTALL_PROGRAM) delay-agent /etc/testbed/tevc
 
 clean:
 	/bin/rm -f *.o delay-agent
