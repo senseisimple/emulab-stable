@@ -15,10 +15,10 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: dbvistoplogy [-o <outputfile>] [-z <zoomfactor>] [-d <detaillevel>] <pid> <eid>\n";
+	"Usage: dbvistoplogy [-o <outputfile>] [-t <thumbsize> ] [-z <zoomfactor>] [-d <detaillevel>] <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "o:z:d:";
+my  $optlist = "o:z:d:t:";
 
 #
 # Configure variables
@@ -37,6 +37,7 @@ my $render   = "$TB/libexec/vis/render";
 my $output;
 my $zoom;
 my $detail;
+my $thumb;
 
 #
 # Turn off line buffering on output
@@ -62,6 +63,17 @@ if (@ARGV != 2) {
 }
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
+
+if (defined($options{"t"})) {
+    $thumb = $options{"t"};
+    
+    if ($thumb =~ /^([0-9]+)$/) {
+	$thumb = $1;
+    }
+    else {
+	die("Bad data in thumbnail size: $thumb");
+    } 
+}
 
 if (defined($options{"o"})) {
     $output = $options{"o"};
@@ -136,6 +148,10 @@ if (defined($zoom)) {
 
 if (defined($detail)) {
     $args .= "-d $detail ";
+}
+
+if (defined($thumb)) {
+    $args .= "-t $thumb ";
 }
 
 $args .= "$pid $eid ";

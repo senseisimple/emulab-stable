@@ -30,10 +30,10 @@ my $ICONDIR     = "$TB/www";
 sub dprint($);
 
 sub usage {
-    die "Usage:\nrender [-v] [-z zoomfactor] [-d detaillevel] <pid> <eid>\n";
+    die "Usage:\nrender [-v] [-t <thumbsize>] [-z <zoomfactor>] [-d <detaillevel>] <pid> <eid>\n";
 }
 
-my  $optlist = "z:d:v";
+my  $optlist = "z:d:vt:";
 if (! getopts($optlist, \%options)) { usage; }
 
 if (@ARGV != 2) { usage; }
@@ -58,6 +58,16 @@ if (defined($options{"d"})) {
 	$detail = $1;
     } else {
 	die("Bad argument to -d; must be non-negative integer.");
+    }
+}
+
+my $thumbnail = 0;
+if (defined($options{"t"})) {
+    my $tf = $options{"t"};
+    if ($tf =~ /^([0-9]+)/) {
+	$thumbnail = $1;
+    } else {
+	die("Bad argument to -t; must be non-negative integer.");
     }
 }
 
@@ -116,21 +126,26 @@ while (my ($name, $vis_type, $vis_x, $vis_y, $ips, $virt_type) = $result->fetchr
 
 if (!(defined $min_x)) {
     # no nodes.
-    die "No visible nodes in '$pid/$eid', or experiment does not exist.\n";
+    if ($thumbnail != 0) {
+	$max_x = 64;
+	$max_y = 64;
+    }
+    $noNodes = 1;
+    # die "No visible nodes in '$pid/$eid', or experiment does not exist.\n";
+} else {
+    dprint "min x,y = $min_x, $min_y\n" .
+	   "max x,y = $max_x, $max_y\n";
+    
+    # adjust each node's position so topleftmost node is at (60,60) * $zoom.
+    foreach $i (keys %nodes) {
+	$nodes{$i}{"x"} = ($nodes{$i}{"x"} - $min_x + 60) * $zoom;
+	$nodes{$i}{"y"} = ($nodes{$i}{"y"} - $min_y + 60) * $zoom;
+    }
+    
+    # adjust max x,y appropriately.
+    $max_x = ($max_x - $min_x + 120) * $zoom;
+    $max_y = ($max_y - $min_y + 120) * $zoom;
 }
-
-dprint "min x,y = $min_x, $min_y\n" .
-       "max x,y = $max_x, $max_y\n";
-
-# adjust each node's position so topleftmost node is at (60,60) * $zoom.
-foreach $i (keys %nodes) {
-    $nodes{$i}{"x"} = ($nodes{$i}{"x"} - $min_x + 60) * $zoom;
-    $nodes{$i}{"y"} = ($nodes{$i}{"y"} - $min_y + 60) * $zoom;
-}
-
-# adjust max x,y appropriately.
-$max_x = ($max_x - $min_x + 120) * $zoom;
-$max_y = ($max_y - $min_y + 120) * $zoom;
 
 # get vlan list.
 
@@ -204,7 +219,12 @@ if ($zoom >= 1.75) { $embiggen = 2; }
 # start constructing the image
 
 dprint "Image size = $max_x x $max_y\n";
-$im = new GD::Image($max_x, $max_y);
+
+if ($thumbnail == 0) {
+    $im = new GD::Image($max_x, $max_y);
+} else {
+    $im = new GD::Image($thumbnail, $thumbnail);
+}
 
 $nodeicon = GD::Image->newFromPng("$ICONDIR/nodeicon.png") || warn "nodeicon.png not found";
 $lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png not found";
@@ -218,7 +238,10 @@ $colors{"red"}       =  $im->colorAllocate(192,0,0);
 $colors{"blue"}      =  $im->colorAllocate(0,0,192);
 $colors{"paleyellow"}      =  $im->colorAllocate(192,192,127);
 $colors{"paleblue"}  =  $im->colorAllocate(127,127,192);
-$colors{"green"}     =  $im->colorAllocate(0,96,0);
+$colors{"palered"}  =  $im->colorAllocate(210,200,180);
+#$colors{"green"}     =  $im->colorAllocate(0,96,0);
+$colors{"green"}     =  $im->colorAllocate(0,192,0);
+$colors{"palegreen"}     =  $im->colorAllocate(96,192,96);
 $colors{"lightgreen"} =  $im->colorAllocate(0, 160, 0);
 $colors{"orange"}    =  $im->colorAllocate(255, 128, 0);
 $colors{"yellow"}    =  $im->colorAllocate(255, 255, 0);
@@ -232,255 +255,334 @@ $colors{"gray25"}    =  $im->colorAllocate(63,63,63);
 # set clear background
 $bgcolor = $im->colorAllocate(254, 254, 254);
 
-# $im->transparent($bgcolor);
+$im->transparent($bgcolor);
 $im->fill( 1, 1, $bgcolor );
 
 #$im->interlaced('true');
 #$im->rectangle( 0,0,99,99, $gray50 );
 
-# render shadows
+if ($thumbnail != 0) {    
+    # Thumbnails are drawn similarly to full views,
+    # but there are enough differences to warrant separate code.
 
-foreach $i (keys %nodes) {
-  # get node location
-  ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
-  if ($nodes{$i}{"type"} eq "lan") {
-      # render filled circle for LAN shadow.
-      # there doesn't seem to be a filledArc (!),
-      # so we render 18 concentric circles.
-      for ($i = 1; $i < 18; $i++) {
-	  $im->arc( $x + 4, $y + 4, 
-		    $i * 2, $i * 2, 
-		    0, 360, 
-		    $colors{"gray80"} );
-      }
-  } else {
-      # not a LAN, so render solid square for shadow.
-      $im->filledRectangle( $x - 12, $y - 12, 
-			    $x + 20, $y + 20, $colors{"gray80"});
-  }
-} 
+    foreach $i (keys %links) {
+	# get endpoint names from link name
+	($a, $b) = ($i =~ /(\S+)\s(\S+)/);
+	
+	# get endpoint node location
+	($x1, $y1) = ($nodes{ $a }{"x"}, $nodes{ $a }{"y"});
+	($x2, $y2) = ($nodes{ $b }{"x"}, $nodes{ $b }{"y"});
+
+	# scale down to thumbnail size; 'ceil' prevents subpixel errors,
+	# though it is probably not needed for lines.
+	$x1 = ceil(($x1 * $thumbnail) / $max_x);
+	$y1 = ceil(($y1 * $thumbnail) / $max_y);
+	$x2 = ceil(($x2 * $thumbnail) / $max_x);
+	$y2 = ceil(($y2 * $thumbnail) / $max_y);
+
+	$im->line( $x1, $y1, $x2, $y2, $colors{"paleblue"} );
+    }
+
+    foreach $i (keys %nodes) {
+	# get node position and type.
+	my ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+	my $type = $nodes{$i}{"type"};    
+
+	# scale down to thumbnail size; 'ceil' prevents subpixel errors.
+	# 'ceil' is important, since if $x has a fractional part as well as $size,
+	# when they're added together, they may produce an additional pixel of
+	# width or height on some of the nodes; such an error is surprisingly noticable.
+
+	$x = ceil(($x * $thumbnail) / $max_x);
+	$y = ceil(($y * $thumbnail) / $max_y);
+
+	$size = ceil(min( 16 * $thumbnail / $max_x, 16 * $thumbnail / $max_y ));
+
+	if ($type eq "special") {
+	    $im->filledRectangle( $x - $size, $y - $size, $x + $size, $y + $size, $colors{"darkred"} );	
+	    $im->rectangle( $x - $size, $y - $size, $x + $size, $y + $size, $colors{"black"} );	
+	} elsif ($type eq "lan") {
+	    for ($i = 1; $i < $size; $i++) {
+		$im->arc( $x, $y, $i * 2, $i * 2, 0, 360, $colors{"blue"} );
+	    }	    
+	    $im->arc( $x, $y, $size * 2, $size * 2, 0, 360, $colors{"black"} );
+	} elsif ($type eq "node") {
+	    $im->filledRectangle( $x - $size, $y - $size, $x + $size, $y + $size, $colors{"palegreen"} );	
+	    $im->rectangle( $x - $size, $y - $size, $x + $size, $y + $size, $colors{"black"} );	
+	}
+    }
+} else { 
+# not a thumbnail, so we do the full rendering path.
+
+
+# render shadows
+    foreach $i (keys %nodes) {
+	# get node location
+	($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+	if ($nodes{$i}{"type"} eq "lan") {
+	    # render filled circle for LAN shadow.
+	    # there doesn't seem to be a filledArc (!),
+	    # so we render 18 concentric circles.
+	    for ($i = 1; $i < 18; $i++) {
+		$im->arc( $x + 4, $y + 4, 
+			  $i * 2, $i * 2, 
+			  0, 360, 
+			  $colors{"gray80"} );
+	    }
+	} else {
+	    # not a LAN, so render solid square for shadow.
+	    $im->filledRectangle( $x - 12, $y - 12, 
+				  $x + 20, $y + 20, $colors{"gray80"});
+	}
+    } 
 
 # render links
-
-foreach $i (keys %links) {
-  # get endpoint names from link name
-  ($a, $b) = ($i =~ /(\S+)\s(\S+)/);
-
-  # get endpoint node location
-  ($x1, $y1) = ($nodes{ $a }{"x"}, $nodes{ $a }{"y"});
-  ($x2, $y2) = ($nodes{ $b }{"x"}, $nodes{ $b }{"y"});  
-
-  # get near-endpoints
-  ($xv, $yv) = ($x2 - $x1, $y2 - $y1);
-  $vmag = sqrt( $xv * $xv + $yv * $yv );
-
-  if ($vmag > (26 * 2)) {
-      $xv = ($xv / $vmag) * 26;
-      $yv = ($yv / $vmag) * 26;
-      
-      ($x1n, $y1n) = ($x1 + $xv, $y1 + $yv);
-      ($x2n, $y2n) = ($x2 - $xv, $y2 - $yv);
-      
-      # set link color
-      # $im->setStyle($colors{"paleblue"}); 
-      # $im->setStyle($red, $red, gdTransparent);   
-      
-      # actual rendering
-      # $im->line( $x1, $y1, $x2, $y2, gdStyled );
-      
-      $im->setStyle( $colors{"yellow"} );
-      $im->line( $x1 + 1, $y1, $x1n + 1, $y1n, gdStyled );
-      $im->line( $x2n + 1, $y2n, $x2 + 1, $y2, gdStyled );
-
-      $im->line( $x1, $y1 + 1, $x1n, $y1n + 1, gdStyled );
-      $im->line( $x2n, $y2n + 1, $x2, $y2 + 1, gdStyled );
-
-      $im->line( $x1 - 1, $y1, $x1n - 1, $y1n, gdStyled );
-      $im->line( $x2n - 1, $y2n, $x2 - 1, $y2, gdStyled );
-
-      $im->line( $x1, $y1 - 1, $x1n, $y1n - 1, gdStyled );
-      $im->line( $x2n, $y2n - 1, $x2, $y2 - 1, gdStyled );
-
-      $im->setStyle( $colors{"paleyellow"} );
-
-      $im->line( $x1, $y1, $x1n, $y1n, gdStyled );
-      $im->line( $x2n, $y2n, $x2, $y2, gdStyled );
-
-      $im->setStyle( $colors{"paleblue"} );
-      $im->line( $x1n, $y1n, $x2n, $y2n, gdStyled );
-
-  } else {
-      $im->setStyle( $colors{"black"}, gdTransparent );
-      $im->line( $x1, $y1, $x2, $y2, gdStyled );
-  }
-}
+    foreach $i (keys %links) {
+	# get endpoint names from link name
+	($a, $b) = ($i =~ /(\S+)\s(\S+)/);
+	
+	# get endpoint node location
+	($x1, $y1) = ($nodes{ $a }{"x"}, $nodes{ $a }{"y"});
+	($x2, $y2) = ($nodes{ $b }{"x"}, $nodes{ $b }{"y"});  
+	
+	# get near-endpoints
+	($xv, $yv) = ($x2 - $x1, $y2 - $y1);
+	$vmag = sqrt( $xv * $xv + $yv * $yv );
+	
+	if ($vmag > (26 * 2)) {
+	    $xv = ($xv / $vmag) * 26;
+	    $yv = ($yv / $vmag) * 26;
+	    
+	    ($x1n, $y1n) = ($x1 + $xv, $y1 + $yv);
+	    ($x2n, $y2n) = ($x2 - $xv, $y2 - $yv);
+	    
+	    # set link color
+	    # $im->setStyle($colors{"paleblue"}); 
+	    # $im->setStyle($red, $red, gdTransparent);   
+	    
+	    # actual rendering
+	    # $im->line( $x1, $y1, $x2, $y2, gdStyled );
+	    
+	    $im->setStyle( $colors{"yellow"} );
+	    $im->line( $x1 + 1, $y1, $x1n + 1, $y1n, gdStyled );
+	    $im->line( $x2n + 1, $y2n, $x2 + 1, $y2, gdStyled );
+	    
+	    $im->line( $x1, $y1 + 1, $x1n, $y1n + 1, gdStyled );
+	    $im->line( $x2n, $y2n + 1, $x2, $y2 + 1, gdStyled );
+	    
+	    $im->line( $x1 - 1, $y1, $x1n - 1, $y1n, gdStyled );
+	    $im->line( $x2n - 1, $y2n, $x2 - 1, $y2, gdStyled );
+	    
+	    $im->line( $x1, $y1 - 1, $x1n, $y1n - 1, gdStyled );
+	    $im->line( $x2n, $y2n - 1, $x2, $y2 - 1, gdStyled );
+	    
+	    $im->setStyle( $colors{"paleyellow"} );
+	    
+	    $im->line( $x1, $y1, $x1n, $y1n, gdStyled );
+	    $im->line( $x2n, $y2n, $x2, $y2, gdStyled );
+	    
+	    $im->setStyle( $colors{"paleblue"} );
+	    $im->line( $x1n, $y1n, $x2n, $y2n, gdStyled );
+	    
+	} else {
+	    $im->setStyle( $colors{"black"}, gdTransparent );
+	    $im->line( $x1, $y1, $x2, $y2, gdStyled );
+	}
+    }
 
 # render nodes.
 
-foreach $i (keys %nodes) {
-  # get node position and type.
-  my ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
-  my $type = $nodes{$i}{"type"};
-
-  if ($type eq "special") {
-      # 'special' is not used for anything right now.
-      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"darkred"} );
-      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"darkred"} );
-      $im->filledRectangle( $x - 14, $y - 14, 
-			    $x + 14, $y + 14, $colors{"white"} );
-      # render icon
-      $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
-  } elsif ($type eq "lan") {
-      # render multiple concentric circles (again, no filledArc) for LAN.
-      # render outermost circle at 50% grey to provide
-      # fake antialiasing.
-      $im->arc( $x, $y, 36, 36, 0, 360, $colors{"gray50"} );
-      $im->arc( $x, $y, 34, 34, 0, 360, $colors{"gray25"} );
-      $im->arc( $x, $y, 32, 32, 0, 360, $colors{"gray75"} );
-      for ($i = 1; $i < 16; $i++) {
-	  $im->arc( $x, $y, $i * 2, $i * 2, 0, 360, $colors{"white"} );
-      }
-      # render icon
-      $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
-  } else {
-      # anything that isn't a LAN (in other words, a node.)
-      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
-      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
-      $im->filledRectangle( $x - 14, $y - 14, 
-			    $x + 14, $y + 14, $colors{"white"} );
-      # render icon
-      $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
-  }
-} 
-
+    foreach $i (keys %nodes) {
+	# get node position and type.
+	my ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+	my $type = $nodes{$i}{"type"};
+	
+	if ($type eq "special") {
+	    # 'special' is not used for anything right now.
+	    $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"darkred"} );
+	    $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"darkred"} );
+	    $im->filledRectangle( $x - 14, $y - 14, 
+				  $x + 14, $y + 14, $colors{"white"} );
+	    # render icon
+	    $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
+	} elsif ($type eq "lan") {
+	    # render multiple concentric circles (again, no filledArc) for LAN.
+	    # render outermost circle at 50% grey to provide
+	    # fake antialiasing.
+	    $im->arc( $x, $y, 36, 36, 0, 360, $colors{"gray50"} );
+	    $im->arc( $x, $y, 34, 34, 0, 360, $colors{"gray25"} );
+	    $im->arc( $x, $y, 32, 32, 0, 360, $colors{"gray75"} );
+	    for ($i = 1; $i < 16; $i++) {
+		$im->arc( $x, $y, $i * 2, $i * 2, 0, 360, $colors{"white"} );
+	    }
+	    # render icon
+	    
+	    $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
+	} else {
+	    # anything that isn't a LAN (in other words, a node.)
+	    $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
+	    $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
+	    $im->filledRectangle( $x - 14, $y - 14, $x + 14, $y + 14, $colors{"white"} );
+	    # render icon
+	    
+	    $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
+	}
+    } # foreach $i (keys %nodes)
+    
+    
 # render link text.
 # (this is done in a second pass so no text is obscured by boxes)
-
-foreach $i (keys %links) {
-    # only render label if there _is_ a label.
-    if (!exists $links{$i}{"label"}) { next; }
-
-    # get endpoint names and positions
-    ($a, $b) = ($i =~ /(\S+)\s(\S+)/);
-    ($x1, $y1) = ($nodes{$a}{"x"}, $nodes{$a}{"y"});
-    ($x2, $y2) = ($nodes{$b}{"x"}, $nodes{$b}{"y"});  
-    # calculate midpoint of link line
-    ($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
     
-    # $links{$i}{"label"} =~ s/^\!..//;
-    
-    # split lines by space
-    my @lines = split " ", $links{$i}{"label"};
-    
-    # center vertically
-    $y -= (0.5 * (@lines * gdTinyFont->height)); 
-    
-    my $linenum = 0;
-    foreach $j (@lines) {
-	$xpos = $x - ((length($j) - 0.5) * (($embiggen == 2) ? gdSmallFont->width : gdTinyFont->width) / 2); 
+    foreach $i (keys %links) {
+	# only render label if there _is_ a label.
+	if (!exists $links{$i}{"label"}) { next; }
 	
-	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos + 1, $y, 
-		    $j, $bgcolor);
-	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos - 1, $y, 
-		    $j, $bgcolor);
-	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y - 1, 
-		    $j, $bgcolor);
-	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y + 1, 
-		    $j, $bgcolor);
-	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y, 
-		    $j, $colors{"darkblue"}); 
-	$y += ($embiggen == 2) ? gdSmallFont->height : gdTinyFont->height; 
-    }
-}
-
+	# get endpoint names and positions
+	($a, $b) = ($i =~ /(\S+)\s(\S+)/);
+	($x1, $y1) = ($nodes{$a}{"x"}, $nodes{$a}{"y"});
+	($x2, $y2) = ($nodes{$b}{"x"}, $nodes{$b}{"y"});  
+	# calculate midpoint of link line
+	($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
+	
+	# $links{$i}{"label"} =~ s/^\!..//;
+	
+	# split lines by space
+	my @lines = split " ", $links{$i}{"label"};
+	
+	# center vertically
+	$y -= (0.5 * (@lines * gdTinyFont->height)); 
+	
+	my $linenum = 0;
+	foreach $j (@lines) {
+	    $xpos = $x - ((length($j) - 0.5) * (($embiggen == 2) ? gdSmallFont->width : gdTinyFont->width) / 2); 
+	    
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos + 1, $y, 
+			$j, $bgcolor);
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos - 1, $y, 
+			$j, $bgcolor);
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y - 1, 
+			$j, $bgcolor);
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y + 1, 
+			$j, $bgcolor);
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y, 
+			$j, $colors{"darkblue"}); 
+	    $y += ($embiggen == 2) ? gdSmallFont->height : gdTinyFont->height; 
+	}
+    } # foreach $i (keys %links)
+    
 # render node text.
 # (this is done in a second pass so no text is obscured by boxes)
     
-foreach $i (keys %nodes) {
-  # only render label if there _is_ a label.  
-  if (!exists $nodes{$i}{"label"}) { next; }
-
-  # get node position
-  ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
-
-  # my $nm = $i;
-  my $nm = $nodes{$i}{"label"};
-
-  @lines = ();
-
-  # append space, so same patterns work on the last word.
-  $nm .= " ";
-
-  # first word (i.e., node name) 
-  # always gets its own line.
-  $nm =~ s/^(\S+)\s+//;
-  push @lines, $1;
-
-  # greedy line breaking (split works for links, but isn't quite sexy enough for nodes.):
-  while ($nm ne "") {
-      if ($nm =~ s/^(.{1,12})\s+//) {
-	  # if the next n words (plus the space between them) 
-	  # total less than 13 characters, use that as a line. 
-	  push @lines, $1;
-      } elsif ($nm =~ s/^(\S+)\s+//) {
-	  # if the next word is longer than 12, we fall through to this,
-	  # which uses that word as a line.
-	  push @lines, $1;
-      } else {
-	  # if neither of the above applies,
-	  # we abort the loop, and add a complaint to the string list.
-	  push @lines, "ERROR";
-	  last;
-      }
-  }
-
-  # now that @lines contains each line of the node caption,
-  # render it.
-
-  my $linenum = 0;
-  foreach $j (@lines) {
+    foreach $i (keys %nodes) {
+	# only render label if there _is_ a label.  
+	if (!exists $nodes{$i}{"label"}) { next; }
+	
+	# get node position
+	($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+	
+	# my $nm = $i;
+	my $nm = $nodes{$i}{"label"};
+	
+	@lines = ();
+	
+	# append space, so same patterns work on the last word.
+	$nm .= " ";
+	
+	# first word (i.e., node name) 
+	# always gets its own line.
+	$nm =~ s/^(\S+)\s+//;
+	push @lines, $1;
+	
+	# greedy line breaking (split works for links, but isn't quite sexy enough for nodes.):
+	while ($nm ne "") {
+	    if ($nm =~ s/^(.{1,12})\s+//) {
+		# if the next n words (plus the space between them) 
+		# total less than 13 characters, use that as a line. 
+		push @lines, $1;
+	    } elsif ($nm =~ s/^(\S+)\s+//) {
+		# if the next word is longer than 12, we fall through to this,
+		# which uses that word as a line.
+		push @lines, $1;
+	    } else {
+		# if neither of the above applies,
+		# we abort the loop, and add a complaint to the string list.
+		push @lines, "ERROR";
+		last;
+	    }
+	}
+	
+	# now that @lines contains each line of the node caption,
+	# render it.
+	
+	my $linenum = 0;
+	foreach $j (@lines) {
 #     warn "$j $x $y!";
-      if ($linenum++ == 0) {
-	  # The first line, so we render it bigger.
-	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdMediumBoldFont->width : gdSmallFont->width) / 2);
+	    if ($linenum++ == 0) {
+		# The first line, so we render it bigger.
+		$xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdMediumBoldFont->width : gdSmallFont->width) / 2);
+		
+		$im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+			    $xpos + 1, $y + 20, $j, $bgcolor);
+		$im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+			    $xpos - 1, $y + 20, $j, $bgcolor);
+		$im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+			    $xpos, $y + 19, 
+			    $j, $bgcolor);
+		$im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+			    $xpos, $y + 21, 
+			    $j, $bgcolor);
+		$im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+			    $xpos, $y + 20, 
+			    $j, $colors{"black"}); 
+		$y += $embiggen ? gdMediumBoldFont->height : gdSmallFont->height; 
+	    } else {
+		# Not the first line, so we render it smaller.
+		$xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdSmallFont->width : gdTinyFont->width) / 2); 
+		
+		$im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+			    $xpos + 1, $y + 20, 
+			    $j, $bgcolor);
+		$im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+			    $xpos - 1, $y + 20, 
+			    $j, $bgcolor);
+		$im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+			    $xpos, $y + 19, 
+			    $j, $bgcolor);
+		$im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+			    $xpos, $y + 21, 
+			    $j, $bgcolor);
+		$im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+			    $xpos, $y + 20, 
+			    $j, $colors{"black"}); 
+		$y += ($embiggen) ? gdSmallFont->height : gdTinyFont->height; 
+	    }
+       } # foreach $j (@lines) 
+    } # foreach $i (keys %nodes)
+} # if ($thumbnail == 0)
 
-	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
-		      $xpos + 1, $y + 20, $j, $bgcolor);
-	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
-		      $xpos - 1, $y + 20, $j, $bgcolor);
-	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
-		      $xpos, $y + 19, 
-		      $j, $bgcolor);
-	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
-		      $xpos, $y + 21, 
-		      $j, $bgcolor);
-	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
-		      $xpos, $y + 20, 
-		      $j, $colors{"black"}); 
-	  $y += $embiggen ? gdMediumBoldFont->height : gdSmallFont->height; 
-      } else {
-	  # Not the first line, so we render it smaller.
-	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdSmallFont->width : gdTinyFont->width) / 2); 
 
-	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
-		      $xpos + 1, $y + 20, 
-		      $j, $bgcolor);
-	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
-		      $xpos - 1, $y + 20, 
-		      $j, $bgcolor);
-	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
-		      $xpos, $y + 19, 
-		      $j, $bgcolor);
-	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
-		      $xpos, $y + 21, 
-		      $j, $bgcolor);
-	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
-		      $xpos, $y + 20, 
-		      $j, $colors{"black"}); 
-	  $y += ($embiggen) ? gdSmallFont->height : gdTinyFont->height; 
-      }
-  }
-} 
+# if there were no nodes, provide visual clue as to what's up.
+if ($noNodes) {
+    if ($thumbnail) {
+	$center_x = ceil( $thumbnail / 2 );
+	$center_y = $center_x;
+	$radius = $center_x;
+	($brx,$bry) = ($thumbnail, $thumbnail);
+    } else {
+	$center_x = ceil( $max_x / 2 );
+	$center_y = ceil( $max_y / 2 );
+	$radius = min( $center_x, $center_y );
+	($brx,$bry) = ($max_x, $max_y);
+    }
+
+    for ($i = 0; $i < 4; $i++) {
+	$im->arc( $center_x, $center_y, $radius - $i, $radius - $i, 0, 360, $colors{"palered"} );    
+    }
+
+    for ($i = -3; $i < 4; $i++) {
+	$im->line( 0, 0 + $i,$brx,$bry + $i, $bgcolor );
+    }
+}
 
 #write it to stdout
 
@@ -573,6 +675,13 @@ sub min {
     my ($a, $b) = @_;
     if ($a < $b) { return $a; }
     return $b;
+}
+
+sub ceil {
+    my ($a) = @_;
+    my $b = sprintf("%i",$a);
+    if ($a == $b) { return $b; }
+    return $b + 1;
 }
 
 sub dprint($) {
