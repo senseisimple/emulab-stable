@@ -9,6 +9,7 @@ if [ -r /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
 else
 	BINDIR=/etc/testbed
+	BOOTDIR=/var/emulab/boot
 fi
 
 disk="ad0"
@@ -57,8 +58,64 @@ dofreebsd() {
 }
 
 dolinux() {
-	# need to update fstab, lilo.conf
-	echo "do not do linux yet"
+	# figure out the linux device name
+	dunit=`echo $disk | sed -e 's/..\([0-7]\)/\1/'`
+	case $disk in
+	# IDE
+	ad[0-3])
+		dtype="hd"
+		d=`echo $dunit | sed -e 'y/0123/048c/'`
+		lrootdev="3${d}${part}"
+		;;
+	# SATA
+	ad[4-7])
+		dtype="sd"
+		dunit=`expr $dunit - 4`
+		lrootdev="8${dunit}${part}"
+		;;
+	# SCSI
+	da[0-7])
+		dtype="sd"
+		lrootdev="8${dunit}${part}"
+		;;
+	*)
+		echo "slicefix: linux: unknown disk $disk"
+		return 1
+		;;
+	esac
+	dunit=`echo $dunit | sed -e 'y/01234567/abcdefgh/'`;
+	ldisk=$dtype$dunit
+
+	# attempt to mount filesystem   
+	rootdev=/dev/${disk}s${part}
+	mount -t ext2fs $rootdev /mnt || {
+		echo "EXT2FS mount of $rootdev failed"
+		return 1
+	}
+
+	# change the swap devices in fstab
+	sed -i .orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${ldisk}\1;" /mnt/etc/fstab || {
+		echo "Failed to update /etc/fstab"
+		umount $rootdev
+		return 1
+	}
+
+	# update lilo.conf and set indicator to tell Emulab to rerun lilo
+	sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" /mnt/etc/lilo.conf || {
+		echo "Failed to update /etc/lilo.conf"
+		umount $rootdev
+		return 1
+	}
+	cp /dev/null /mnt/$BOOTDIR/runlilo
+
+	umount $rootdev
+
+	# setup one time lilo command line, must be done after unmount
+	$BINDIR/groklilo -c "linux root=$lrootdev" $part /dev/$disk || {
+		echo "Failed to set LILO command line"
+		return 1
+	}
+
 	return 0
 }
 
@@ -92,6 +149,11 @@ case $part in
     part=2; fixone
     part=3; fixone
     part=4; fixone
+
+    # when fixing all partitions, do not fail on an error
+    if [ $? -ne 0 ]; then
+    	echo "WARNING: failed to fix one or more partitions, BEWARE!"
+    fi
 
     # for the CD boot, we need to intialize the magic boot block
     if [ -e /cdrom.inf -a -x $BINDIR/tbbootconfig ]; then

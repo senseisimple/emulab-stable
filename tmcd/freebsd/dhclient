@@ -7,5 +7,5 @@
 ifconfig lo0 down
 ifconfig lo0 inet 127.0.0.1
 
-/sbin/dhclient $flags
+/sbin/dhclient
 exit $?

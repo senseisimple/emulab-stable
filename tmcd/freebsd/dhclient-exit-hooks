@@ -39,6 +39,7 @@ fi
 #
 # I'd love to use the dhclient.pid file, but it helpfully has not been
 # created at this point
+#
 killall dhclient >>$LOGDIR/dhclient.log 2>&1
 
 #

@@ -124,9 +124,9 @@ if [ x"$ADDRESS" != x ]; then
 		$BINDIR/growdisk -vW /dev/$DISK
 		#
 		# XXX limit the use of slicefix for now to just
-		# those machines with "ad4" as their root disk
+		# those machines with SATA/SCSI as their root disk
 		#
-		if [ -x $BINDIR/slicefix -a "$DISK" = "ad4" ]; then
+		if [ -x $BINDIR/slicefix -a "$DISK" != "ad0" ]; then
 			echo "Adjusting slice-related files";
 			$BINDIR/slicefix $PARTITION $DISK
 		fi
