@@ -72,16 +72,17 @@ PAGEHEADER("Documentation");
 
 <h3>Miscellaneous</h3>
 <ul>
-<li><b><a href = "docwrapper.php3?docname=news.html">
-          Current and Past Emulab News Items</a></b>
 <li><b><a href = "docwrapper.php3?docname=policies.html">
           Administrative Policies and Disclaimer</a></b>
-<li><b><a href = "docwrapper.php3?docname=pubs.html">
-          Publications</a></b>
 <li><b><a href = "docwrapper.php3?docname=sponsors.html">
           Emulab Sponsors</a></b>
-<li><b><a href = "doc/docwrapper.php3?docname=changelog.html">
-          (Changelog/Technical Details)</a></b>
+<p>
+<li><b><a href = "news.php3">
+          Current and Past Emulab News Items</a></b>
+<li><b><a href = "doc/docwrapper.php3?docname=ChangeLog.txt">
+          Changelog/Technical Details</a></b>
+<li><b><a href = "pubs.php3">
+          Papers and Talks</a></b>
 </ul>
 
 <h3>SIGCOMM Tutorial</h3>
