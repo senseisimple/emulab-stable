@@ -1106,7 +1106,11 @@ sub dorouterconfig (;$)
     # though more work may be needed on the gated config files to make
     # this work (i.e., to import existing kernel routes).
     #
-    if ($usegated) {
+    # XXX if rtabid is set, we are setting up routing from outside a
+    # jail on behalf of a jail.  We don't want to enable gated in this
+    # case, it will be run inside the jail.
+    #
+    if ($usegated && !defined($rtabid)) {
 	$rcline = gatedsetup();
 	print RC "    $rcline\n";
     }

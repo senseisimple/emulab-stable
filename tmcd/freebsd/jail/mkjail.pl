@@ -31,11 +31,11 @@ use libsetup qw(JailedMounts REMOTE LOCALROOTFS TMPASSDB TMGROUPDB);
 #
 sub usage()
 {
-    print("Usage: mkjail.pl [-s] [-i <ipaddr>] [-p <pid>] ".
+    print("Usage: mkjail.pl [-V] [-s] [-i <ipaddr>] [-p <pid>] ".
 	  "[-h <hostname>] <vnodeid>\n");
     exit(-1);
 }
-my  $optlist = "i:p:e:sh:";
+my  $optlist = "Vi:p:e:sh:";
 
 #
 # Only real root can run this script.
@@ -73,6 +73,10 @@ $SIG{TERM} = 'IGNORE';
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
 
+# XXX
+my $JAILCNET	   = "172.16.0.0";
+my $JAILCNETMASK   = "255.240.0.0";
+
 #
 # Locals
 #
@@ -102,6 +106,7 @@ my $nfsmounts = 0;
 my $jailpid;
 my $tmccpid;
 my $interactive = 0;
+my $USEVCNETROUTES = 0;
 
 # This stuff is passed from tmcd, which we parse into a config string
 # and an option set.
@@ -140,6 +145,10 @@ else {
 
 if (defined($options{'s'})) {
     $interactive = 1;
+}
+
+if (defined($options{'V'})) {
+    $USEVCNETROUTES = 1;
 }
 
 #
@@ -209,6 +218,9 @@ else {
     getjailconfig("$JAILPATH/$vnodeid");
 }
 
+my $phys_cnet_if = `control_interface`;
+chomp($phys_cnet_if);
+
 #
 # See if special options supported, and if so setup args as directed.
 #
@@ -246,8 +258,7 @@ else {
 # virtual nodes from the same subnet on this node. 
 #
 if (defined($IPALIAS)) {
-    mysystem("ifconfig `control_interface` alias $IPALIAS ".
-	     "netmask 255.255.255.255");
+    setcnethostalias($IPALIAS);
 }
 
 #
@@ -713,7 +724,7 @@ sub cleanup()
 
     # If the jail has its own IP, clean the alias.
     if (defined($IPALIAS)) {
-	system("ifconfig `control_interface` -alias $IPALIAS");
+	clearcnethostalias($IPALIAS);
     }
 
     while (@mntpoints) {
@@ -943,8 +954,7 @@ sub addroutestorc($rc)
     open(RC, ">$rc") or
 	fatal("Could not open $rc to append static routes");
 
-    my $routerip  = `cat $BOOTDIR/routerip`;
-    chomp($routerip);
+    my $routerip  = getcnetrouter();
     my $hostip    = `cat $BOOTDIR/myip`;
     chomp($hostip);
 
@@ -960,25 +970,31 @@ sub addroutestorc($rc)
 	print RC "static_routes=\"\$static_routes jailnet\"\n";
 	print RC "route_jailnet=\"-net $IP -interface lo0 255.255.255.0\"\n";
 
-	# Need a route for the private network.
-	my $ctrliface = `control_interface`;
-	chomp($ctrliface);
-	
 	print RC "static_routes=\"\$static_routes privnet\"\n";
-	print RC "route_privnet=\"-net $IP -interface $ctrliface $IPMASK\"\n";
+	print RC "route_privnet=\"-net $IP -interface $phys_cnet_if $IPMASK\"\n";
     }
 
     #
-    # Now a list of routes for each of the IPs the jail has access
-    # to. The idea here is to override the interface route such that
-    # traffic to the local interface goes through lo0 instead. This
-    # avoids going through traffic shaping when, say, pinging your own
-    # interface!
-    # 
-    foreach my $ip (@jailips) {
-	print RC "static_routes=\"ip${count} \$static_routes\"\n";
-	print RC "route_ip${count}=\"$ip -interface lo0\"\n";
-	$count++;
+    # XXX I don't think this is really a virtual control net issue, but
+    # rather a gated issue.  However, this is the only hook I have right now.
+    #
+    # This just in!  It looks like whatever the gated problem was, it went
+    # away after fixing numerous other bugs.  But I'll leave the conditional
+    # here for a little while just in case...
+    #
+    if (1 || !$USEVCNETROUTES) {
+	#
+	# Now a list of routes for each of the IPs the jail has access
+	# to. The idea here is to override the interface route such that
+	# traffic to the local interface goes through lo0 instead. This
+	# avoids going through traffic shaping when, say, pinging your own
+	# interface!
+	# 
+	foreach my $ip (@jailips) {
+	    print RC "static_routes=\"ip${count} \$static_routes\"\n";
+	    print RC "route_ip${count}=\"$ip -interface lo0\"\n";
+	    $count++;
+	}
     }
     close(RC);
     return 0;
@@ -1038,4 +1054,87 @@ sub getnextrtabid()
     system("route flush -rtabid $nextrtabid");
     
     return $nextrtabid;
+}
+
+#
+# Return the number of alias on the jailhost control interface
+#
+sub jailcnetaliases()
+{
+    my $count = 0;
+
+    if (open(IFC, "ifconfig $phys_cnet_if |")) {
+	while (<IFC>) {
+	    if ($_ =~ /inet ([0-9\.]*) netmask 0xffffffff/) {
+		my $host = $1;
+		if (inet_ntoa(inet_aton($host) & inet_aton($JAILCNETMASK)) eq
+		    $JAILCNET) {
+		    $count++;
+		}
+	    }
+	}
+	close(IFC);
+    }
+    return $count;
+}
+
+sub setcnethostalias($)
+{
+    my ($vnodeip) = @_;
+
+    mysystem("ifconfig $phys_cnet_if alias $vnodeip netmask 255.255.255.255");
+
+    if (!$USEVCNETROUTES) {
+	return;
+    }
+
+    #
+    # If the jail's IP is part of the local virtual control net,
+    # make sure the physical host has an alias on it as well.
+    #
+    # The convention is that .0 is the physical host alias.
+    #
+    my $cnalias = inet_aton($vnodeip);
+    if ((inet_ntoa($cnalias & inet_aton($JAILCNETMASK)) eq $JAILCNET) &&
+	jailcnetaliases() == 1) {
+	my $palias = inet_ntoa($cnalias & inet_aton("255.255.255.0"));
+	mysystem("ifconfig $phys_cnet_if alias $palias netmask $JAILCNETMASK");
+    }
+}
+
+sub clearcnethostalias($)
+{
+    my ($vnodeip) = @_;
+
+    system("ifconfig $phys_cnet_if -alias $vnodeip");
+
+    if (!$USEVCNETROUTES) {
+	return;
+    }
+
+    #
+    # If the jail's IP is part of the local virtual control net,
+    # and we were the last jail, remove the physical host's alias.
+    #
+    my $cnalias = inet_aton($vnodeip);
+    if ((inet_ntoa($cnalias & inet_aton($JAILCNETMASK)) eq $JAILCNET) &&
+	jailcnetaliases() == 0) {
+	my $palias = inet_ntoa($cnalias & inet_aton("255.255.255.0"));
+	mysystem("ifconfig $phys_cnet_if -alias $palias");
+    }
+}
+
+sub getcnetrouter()
+{
+    my $routerip;
+
+    if (!$USEVCNETROUTES) {
+	$routerip = `cat $BOOTDIR/routerip`;
+	chomp($routerip);
+    } else {
+	$routerip = inet_ntoa(inet_aton($JAILCNET) |
+			      inet_aton("0.0.0.1"));
+    }
+
+    return $routerip;
 }

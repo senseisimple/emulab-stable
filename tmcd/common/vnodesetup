@@ -18,11 +18,17 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 #
 sub usage()
 {
-    print "Usage: vnodesetup [-j [-s] | -p] [-b | -k | -r | -h] [-d] <vnodeid>\n".
-	"Use the -k option to kill the virtual node.\n";
+    print "Usage: vnodesetup -j [-sV] [-b | -k | -r | -h] [-d] <vnodeid>\n".
+	"         vnodesetup -p [-b | -k | -r | -h] [-d] <vnodeid>\n".
+	" -j creates a BSD jail-based virtual node.\n".
+	" -p creates a Planetlab virtual node.\n".
+	"\n".
+	"Use -b when starting the virtual node at boot time.\n".
+	"Use -h when halting the virtual node.\n".
+	"Use -k when killing the virtual node (removes filesystems).\n";
     exit(1);
 }
-my $optlist	= "kbdjsrhp";
+my $optlist	= "kbdjsVrhp";
 
 # Locals
 my $killit	= 0;
@@ -31,8 +37,9 @@ my $haltit	= 0;
 my $debug	= 0;
 my $fromboot	= 0;
 my $dojail	= 0;
-my $doplab	= 0;
 my $interactive = 0;
+my $usevcnetroutes = 0;
+my $doplab	= 0;
 my $cleaning	= 0;
 my $rebooting   = 0;
 my $leavejail   = 0;
@@ -109,6 +116,9 @@ if (defined($options{"j"})) {
     $dojail = 1;
     if (defined($options{"s"})) {
 	$interactive = 1;
+    }
+    if (defined($options{"V"})) {
+	$usevcnetroutes = 1;
     }
 }
 if (defined($options{"p"})) {
@@ -386,10 +396,16 @@ if ($dojail) {
 	fatal("Jail exited unexpectedly!");
     }
     else {
-	my $option       = ($interactive ? "-s" : "");
+	my $options      = "";
 	my $jailhostname = "$vname.$eid.$pid.$DOMAINNAME";
 	
-	exec("mkjail.pl $option -p $pid -h $jailhostname $vnodeid");
+	if ($interactive) {
+	    $options .= "-s ";
+	}
+	if ($usevcnetroutes) {
+	    $options .= "-V ";
+	}
+	exec("mkjail.pl $options -p $pid -h $jailhostname $vnodeid");
 	die("*** $0:\n".
 	    "    Could not start the jail!\n");
     }
