@@ -416,8 +416,8 @@ VLAN  Project/Experiment   VName      Members
 --------------------------------------------------------------------------------
 END
     format vlanlist =
-@<<<< @<<<<<<<<<<<<<<<<<<< @<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-$vlan_id,$pideid,          $vname,    $members
+@<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$vlan_id,$pideid,           $vname,   $members
 ~~                                    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                       $members
 .
@@ -484,10 +484,10 @@ sub doListPorts() {
     my ($port,$enabled,$up,$speed,$duplex);
     print << "END";
 Port      Enabled Up   Speed      Duplex
-----------------------------------------
+--------------------------------------------
 END
     format portlist =
-@<<<<<<<< @<<<<<< @<<< @<<<<<<<<< @<<<
+@<<<<<<<< @<<<<<< @<<< @<<<<<<<<< @<<<<<<<<<
 $port,    $enabled,$up,$speed,$duplex
 .
     $FORMAT_NAME = 'portlist';
