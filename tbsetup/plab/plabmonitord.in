@@ -197,7 +197,7 @@ while (1) {
 			      "plab node $vnode setup okay by monitor.'");
 
 	    SENDMAIL($TBOPS, "$pnode is alive",
-		     "$pnode has been brought back from the afterworld!".
+		     "$pnode has been brought back from the afterworld!",
 		     $TBOPS);	    
 	} else {
             print "Leaving $pnode in hwdown!\n";
