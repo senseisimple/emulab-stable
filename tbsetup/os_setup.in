@@ -266,8 +266,8 @@ foreach my $node ( @nodes ) {
     }
     SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 
-    print STDOUT "$node may be down. This has been reported to testbed-ops.\n";
-    print STDOUT "Please end this experiment, and try again.\n";
+    print STDOUT "*** Oops, $node may be down. ".
+	         "This has been reported to testbed-ops.\n";
 
     if ($canfail{$node}) {
 	# Send mail to testbed-ops and to the user about it.
@@ -287,7 +287,7 @@ foreach my $node ( @nodes ) {
 		 0,
 		 "Cc: $TBOPS");
 
-	print STDERR "*** Oops, $node did not come back alive!\n";
+	print STDERR "*** Continuing with experiment setup anyway ...\n";
     }
     else {
 	# Reserve it to down experiment.
@@ -301,7 +301,7 @@ foreach my $node ( @nodes ) {
 		 "Thanks\n".
 		 "Testbed Operations\n");
 
-	die("*** Oops, $node did not come back alive!\n");
+	die("*** Experiment will be now be terminated automatically.");
     }
 }
 
