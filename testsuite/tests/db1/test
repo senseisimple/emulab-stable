@@ -17,7 +17,7 @@ tb_prerun("tbprerun",0);
 );
 
 tb_compare("SELECT vname,delay,bandwidth,lossrate,member from virt_lans" .
-    " where pid=\"testbed\" and eid=\"test\" .
+    " where pid=\"testbed\" and eid=\"test\" " .
     "order by vname,member",
     \@result);
 @result = (
