@@ -147,8 +147,8 @@ public class RoboTrack extends JApplet {
 	int dx, dy;			// Destination x,y coords
 	double dor = 500.0;		// Destination orientation
 	boolean gotdest = false;	// We have a valid destination
-	double battery_voltage    = -1.0;
-	double battery_percentage = -1.0;
+	double battery_voltage    = 500.0;
+	double battery_percentage = 500.0;
 	String pname, vname;		
 	int index;
     }
@@ -245,6 +245,11 @@ public class RoboTrack extends JApplet {
 		robbie.dy  = Integer.parseInt(tokens.nextToken().trim());
 		robbie.dor = Float.parseFloat(tokens.nextToken().trim());
 		robbie.gotdest = true;
+	    }
+	    else {
+		// Consume next two tokens.
+		str = tokens.nextToken();
+		str = tokens.nextToken();
 	    }
 
 	    str = tokens.nextToken().trim();
@@ -463,9 +468,9 @@ public class RoboTrack extends JApplet {
 	    case 5: return (robbie.gotdest ? "" + robbie.dx  : "");
 	    case 6: return (robbie.gotdest ? "" + robbie.dy  : "");
 	    case 7: return (robbie.dor != 500.0 ? "" + robbie.dor : "");
-	    case 8: return (robbie.battery_percentage != -1.0 ?
+	    case 8: return (robbie.battery_percentage != 500.0 ?
 			    "" + robbie.battery_percentage : "");
-	    case 9: return (robbie.battery_voltage != -1.0 ?
+	    case 9: return (robbie.battery_voltage != 500.0 ?
 			    "" + robbie.battery_voltage : "");
 	    }
 	    return "Foo";
@@ -492,11 +497,18 @@ public class RoboTrack extends JApplet {
 
     public static void main(String argv[]) {
         final RoboTrack robomap = new RoboTrack();
-	URL url = RoboTrack.class.getResource("robots-4.jpg");
+	try
+	{
+	    URL url = new URL("file://robots-4.jpg");
+	    robomap.init();
+	    robomap.is = System.in;
+	    robomap.floorimage = robomap.getImage(url);
+	}
+	catch(Throwable th)
+	{
+	    th.printStackTrace();
+	}
 	
-        robomap.init();
-	robomap.is = System.in;
-	robomap.floorimage = robomap.getImage(url);
         Frame f = new Frame("Robot Map");
 	
         f.addWindowListener(new WindowAdapter() {

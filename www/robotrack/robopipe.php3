@@ -100,7 +100,7 @@ while (1) {
 	if (!isset($bper))
 	    $bper = "";
 	    
-	echo "$pname, $vname, $x, $y, $or, $dx, $dy, $dor, $bvolts, $bper\n";
+	echo "$pname, $vname, $x, $y, $or, $dx, $dy, $dor, $bper, $bvolts\n";
     }
     flush();
     sleep(1);

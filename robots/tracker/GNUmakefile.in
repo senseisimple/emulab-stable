@@ -26,7 +26,11 @@ RoboTrack.class: $(SRCDIR)/RoboTrack.java
 	$(JAVAC) -deprecation -d . $^
 
 $(TESTBED_SRCDIR)/www/robotrack/tracker.jar: RoboTrack.class
-	$(JAR) cvf $@ *.class
+	echo '$(filter-out RoboTrack.class, $(shell echo *.class))'
+	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out RoboTrack.class, $(shell echo *.class)))
+
+foo:
+	echo '$(filter-out RoboTrack.class, $(wildcard *.class))'
 
 install:
 
