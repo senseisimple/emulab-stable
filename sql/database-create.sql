@@ -586,6 +586,7 @@ CREATE TABLE new_nodes (
   node_id varchar(10) NOT NULL default '',
   type varchar(30) default NULL,
   IP varchar(15) default NULL,
+  temporary_IP varchar(15) default NULL,
   dmesg text,
   created timestamp(14) NOT NULL,
   PRIMARY KEY  (new_node_id)

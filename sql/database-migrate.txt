@@ -779,3 +779,8 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table new_interfaces add column card int not null after
 	   new_node_id;
        alter table new_interfaces add primary key (new_node_id,card);
+
+1.164: Added a new column to new_nodes, so we can tell the IP address that
+       the node was temporarily given while it's configuring:
+
+       alter table new_nodes add column temporary_IP varchar(15) after IP;
