@@ -36,12 +36,12 @@ echo "<center><h3>
       Here is a list of research groups using Emulab.Net
       </h3></center>\n";
 
-echo "<table width=\"100%\" border=0 cellpadding=0 cellspacing=2
+echo "<table width=\"100%\" border=0 cellpadding=2 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td><h4>Institution</td>
           <td><h4>Name</td>
+          <td><h4>Institution</td>
       </tr>\n";
 echo "<tr></tr>\n";
 echo "<tr></tr>\n";
@@ -51,8 +51,7 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $url    = $projectrow[URL];
     $affil  = $projectrow[usr_affil];
 
-    echo "<tr>
-              <td>$affil</td>\n";
+    echo "<tr>\n";
 
     if (!$url || strcmp($url, "") == 0) {
 	echo "<td>$pname</td>\n";
@@ -60,6 +59,8 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     else {
 	echo "<td><A href=\"$url\">$pname</A></td>\n";
     }
+
+    echo "<td>$affil</td>\n";
 
     echo "</tr>\n";
 
