@@ -60,6 +60,8 @@ use libreboot;
 use libosload;
 use libtestbed;
 
+TBDebugTimeStampsOn();
+
 my $vnode_setup = "$TB/sbin/vnode_setup";
 my $osselect    = "$TB/bin/os_select";
 my $nodereboot  = "$TB/bin/node_reboot";
@@ -756,6 +758,7 @@ elsif (@vnodelist) {
     my $vnode_setup_args = ""; # add any generic args here.
     my @retry_list = ();
 
+    TBDebugTimeStamp("Setting up virtual nodes");
     print "Setting up virtual testbed nodes ...\n";
 
     # If there are any plab vnodes, we have to adjust batching and timeouts
@@ -767,6 +770,7 @@ elsif (@vnodelist) {
     }
 
   retry:
+    TBDebugTimeStamp("Setting up virtual nodes");
     system("$vnode_setup $vnode_setup_args $pid $eid");
     if ($?) {
 	die_noretry("*** $0:\n".
@@ -778,6 +782,7 @@ elsif (@vnodelist) {
     foreach my $node (@vnodelist) {
 	$waitstart{$node} = time;
     }
+    @vnodelist = sort(@vnodelist);
 
     while ( @vnodelist ) {
 	my $node   = shift(@vnodelist);
@@ -798,12 +803,15 @@ elsif (@vnodelist) {
 	    if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP,
 				 $wstart, $maxwait)) {
 		print "$node is alive and well\n";
+		TBDebugTimeStamp("Virtual node $node setup ISUP");
+		
 		# Might have already been set above.
 		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
 		SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 		next;
 	    }
 
+	    TBDebugTimeStamp("Virtual node $node setup FAILED");
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
 
