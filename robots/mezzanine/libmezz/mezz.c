@@ -21,7 +21,7 @@
  * Desc: Mezzanine IPC wrapper
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezz.c,v 1.2 2004-12-15 05:05:40 johnsond Exp $ 
+ * CVS: $Id: mezz.c,v 1.3 2005-02-17 08:24:18 johnsond Exp $ 
  **************************************************************************/
 
 #include <errno.h>
@@ -137,6 +137,19 @@ int mezz_init(int create,char *ipcfilepath)
   signal(SIGUSR1, mezz_sigusr1);
   for (i = 0; i < sizeof(ipc->mmap->pids) / sizeof(ipc->mmap->pids[0]); i++)
   {
+      /* weed out stale pids */
+      if (ipc->mmap->pids[i] != 0) {
+	  if (kill(ipc->mmap->pids[i],0) == -1 && errno == ESRCH) {
+	      /* stale process */
+	      printf("stale %d\n",ipc->mmap->pids[i]);
+	      ipc->mmap->pids[i] = 0;
+	      break;
+	  }
+	  else {
+	      /* printf("not stale: %d\n",ipc->mmap->pids[i]); */
+	  }
+      }
+      
     if (ipc->mmap->pids[i] == 0)
       break;
   }
