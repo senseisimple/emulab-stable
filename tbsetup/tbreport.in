@@ -159,13 +159,6 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     }
     print "\n";
 
-    $result = DBQueryFatal("SELECT vnode,vport,pport from portmap" .
-		       " where pid=\"$pid\" and eid=\"$eid\"");
-    while (($vnode,$vport,$pport) = $result->fetchrow_array) {
-	$portmap{"$vnode:$vport"} = $pport;
-    }
-    $result->finish;
-
     $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     print "Lan/Link Info:\n";
@@ -175,12 +168,16 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 	. "--------- ---------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $result->fetchrow_array()) {
-	($vnode,$vport) = split(":",$member);
-	if (defined($portmap{$member})) {
-	    $pport = $portmap{$member};
-	} else {
-	    # shark hack
+	$vnode = (split(":",$member))[0];
+	$pnode = $v2pmap{$vnode};
+	if ($pnode =~ /sh*/) {
 	    $pport = "eth0";
+	} else {
+	    $subresult = DBQueryFatal("select card from interfaces where node_id = \"$pnode\" and IP=\"$ipmap{$member}\"");
+	    ($card) = $subresult->fetchrow_array();
+	    $pport = "eth$card";
+	    $subresult->finish();
+	    $pport = "eth$card";
 	}
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
 	    "$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
