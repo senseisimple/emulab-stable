@@ -96,7 +96,7 @@ if (defined($options{"r"})) {
     }
     DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
     DBQueryFatal("DELETE FROM vis_experiments WHERE pid='$pid' AND eid='$eid'");
-    exit; 
+    exit 0; 
 }
 
 ### Now, read experiment virtual info from the DB.
@@ -439,7 +439,7 @@ if ($thumb) {
 
 ### Success!!
 
-exit;
+exit 0;
 
 
 # function to munge node/lan names as they are fed to neato so
