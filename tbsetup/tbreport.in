@@ -235,22 +235,33 @@ if ($showmap &&
     print "\n";
 
     if ($hasremote || $hasplab) {
+	# Have to do this query twice, once to get the number of distinct
+	# sites
+	my $wai_query = "from reserved as r ".
+			 "left join nodes as n on r.node_id=n.node_id ".
+			 "left join widearea_nodeinfo as w on ".
+			 "    w.node_id=n.phys_nodeid " .
+			 "where pid='$pid' and eid='$eid' order by vname";
+	my $distinct_sites_results =
+	    DBQueryFatal("select count(distinct site) $wai_query");
+        my ($sites) = $distinct_sites_results->fetchrow_array();
 	my $widearea_info_result =
-	    DBQueryFatal("select vname, hostname from reserved as r left join ".
-			 "nodes as n on r.node_id=n.node_id left join " .
-			 "widearea_nodeinfo as w on w.node_id=n.phys_nodeid " .
-			 "where pid='$pid' and eid='$eid'");
-	print  "Wide-Area Node Hostnames:\n";
-	printf "%-15s %-15s %-45s \n", "ID", "Physical", "Hostname";
-	print  "--------------- --------------- --------------------\n";
-	while (($vname,$hostname) = $widearea_info_result->fetchrow_array()) {
+	    DBQueryFatal("select vname, site, hostname $wai_query");
+	print  "Wide-Area Node Hostnames and Sites: $sites distinct sites\n";
+	printf "%-15s %-20s %-40s \n", "ID", "Site", "Hostname";
+	print  "--------------- -------------------- --------------------\n";
+	while (($vname,$site,$hostname)
+		= $widearea_info_result->fetchrow_array()) {
 	    next unless
 		($v2pmap{$vname}->{ISREMOTE} || $v2pmap{$vname}->{PLAB});
 	    my $pnode = $v2pmap{$vname}->{VVP};
 	    if (!defined($hostname)) {
 		$hostname = "--";
 	    }
-	    printf "%-15s %-15s %-45s\n", $vname, $pnode, $hostname;
+	    if (!defined($site)) {
+		$site = "--";
+	    }
+	    printf "%-15s %-20s %-40s\n", $vname, $site, $hostname;
 	}
 	print "\n";
     }
@@ -271,7 +282,7 @@ if ($showmap &&
 	print  "SSHD Port allocation ('ssh -p portnum'):\n";
 	printf "%-15s %-10s %-20s\n", "ID", "Port", "SSH command";
 	print  "--------------- ---------- ----------------------\n";
-	foreach $v (keys(%v2pmap)) {
+	foreach $v (sort keys(%v2pmap)) {
 	    my $p = $v2pmap{$v}->{PNODE};
 	    my $s = $v2pmap{$v}->{SSHDPORT};
 	    my $m = $v2pmap{$v}->{VVP};
