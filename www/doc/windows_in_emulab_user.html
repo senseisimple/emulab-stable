@@ -1,0 +1,387 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta content="text/html; charset=ISO-8859-1"
+ http-equiv="content-type">
+  <title>Windows XP in Emulab</title>
+</head>
+<body>
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<h2>Windows XP in Emulab</h2>
+<h3>Table of Contents:</h3>
+<ol>
+  <li> <a href="#Overview"> Overview </a></li>
+  <li> <a href="#Differences">Differences from FreeBSD and Linux in Emulab </a></li>
+  <ul>
+    <li> <a href="#Windows_Passwords"> Windows Passwords </a></li>
+    <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes. </a></li>
+    <li> <a href="#Login_connections"> Login connections to Windows. </a></li>
+    <li> <a href="#RDP_details"> RDP details </a></li>
+  </ul>
+  <li> <a href="#Cygwin"> Cygwin </a> </li>
+  <ul>
+    <li> <a href="#Cygwin_packages"> Cygwin packages </a></li>
+    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a></li>
+    <li> <a href="#Cygwin_arcana"> Cygwin arcana </a></li>
+  </ul>
+  <li> <a href="#NtEmacs"> NtEmacs </a></li>
+  <li> <a href="#Future"> Future work </a></li>
+</ol>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="Overview"> </a> Overview </h3>
+
+Microsoft Windows XP is now supported as one of the operating system types for
+experiment nodes in Emulab, in addition to FreeBSD and Linux.
+
+Before booting the node at swap-in time, Emulab loads a fresh image of Windows
+XP onto the experiment nodes in parallel, using our Frisbee service.  Emulab
+software automatically configures each Windows XP node, providing the expected
+experiment user environment including: user accounts and Emulab SSH keys; remote
+home, project, and shared directories; and network connections.  <p>
+
+The Cygwin GNU environment is provided, including Bash and TCSH shells, the
+C/C++, Perl and Python programming languages, and several editors including
+Emacs, vim, nano and ed.  <p>
+
+The Emulab web interface manages a separate Windows password in the user
+profile, as well as making SSH and RDP login connections to the experiment nodes.
+Remote Desktop Protocol service supports Windows Desktop logins from the
+user's workstation screen to the experiment node.  <p>
+
+Windows XP installations are more hardware dependent than Linux or FreeBSD.
+At first, this Windows XP image only runs on the pc850 and pc600 Emulab node
+types.  <p>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="Differences"></a> Differences from FreeBSD and Linux in Emulab </h3>
+
+The biggest difference of course, is that this is <b>Windows</b> (!), with
+Cygwin layered on top, in an Emulab context.  In particular, this is Windows
+XP (NT 5.1), with various levels of service packs and updates (see <a
+href="#Experiment_setup">below</a>.) <p>
+
+The second-biggest difference is that shared directories are provided not by
+the NFS (Network File System) protocol, but instead by the <b>SMB</b> (Server
+Message Block) protocol, otherwise known as Windows File Sharing.  The Client
+for Microsoft Networks software contacts the SMB server, in this case
+<b>Samba</b> running on the file server known as <b>Fs</b>.  The SMB protocol
+authenticates using a plain-text user name and password, encrypted as they go
+across the network.  (These Windows Shares are then accessed by UNC paths
+under Cygwin mounts, described below.) <p>
+
+<h4><a name="Windows_Passwords"> </a> Windows Passwords </h4>
+
+A separate <b>Windows password</b> is kept for use only with experiment nodes
+running Windows.  It will eventually be presented behind-the-scenes to
+rdesktop and Samba by our Web interface.  Meanwhile, you will need to type it
+on each connection. <p>
+
+The default Windows password is randomly generated.  It's easy to change it to
+something easier to remember. <p>
+
+To see or edit your Windows password, log in to Emulab, and click <b>Manage
+User Profile</b> and then <b>Edit Profile under User Options</b>.  You
+will see <b>Windows Password</b> fields in addition to the regular Emulab
+<b>Password</b> fields. <p>
+
+When you change your Windows password, you will also have to re-type it as a
+check.  The new Windows password should propagate to the Samba server on Fs
+instantly, so you can swap in an experiment and log in to its Windows nodes
+with the new password. <p>
+
+If you have already swapped-in experiment nodes and change your Windows
+password, the account information including passwords will be updated at the
+next Emulab watchdog daemon isalive interval.  This should be in 3 to 6
+minutes. <p>
+
+<h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes. </h4>
+
+All you have to do is put a line specifying a WINXP OS image in your
+experiment .ns file, like this: <br>
+<pre>    tb-set-node-os $node WINXP-02-16</pre>
+
+Currently available images are:
+
+<ul>
+
+  <li><b>WINXP-02-11</b> - Windows XP-SP1, pc600 and pc850, release
+  candidate.</li>
+
+  <li><b>WINXP-02-16</b> - Windows XP-SP2+, pc600 and pc850, release
+  candidate.  This incorporates SP2, as well as all "critical" and "security"
+  updates as of the date of the image. </li>
+
+</ul>
+
+Notice that Windows reboots an extra time after first swap-in on a node, after
+changing the node name, to set up the network stack properly.   <p>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen Windows
+XP fail to do the second reboot.  We're working on it.  If you try to login
+after swap-in and your Windows password isn't honored, use this command on Ops
+to remotely reboot the node:<pre>    node_reboot pcxxx</pre>
+
+If you are able to log in but your remote home directory isn't mounted, you
+have the additional option of executing this command on
+the node itself: <pre>    /sbin/reboot</pre> </div>
+
+<h4><a name="Login_connections"> </a> Login connections to Windows. </h4>
+
+You can manually start up SSH or RDP client programs to connect and log in to
+nodes in your experiment, using your Windows password. <p>
+
+Or you can set up your browser to automatically connect in one click from the
+Emulab web interface.  Once an experiment is swapped in, the Emulab Experiment
+Information page contains a table of the physical node ID and logical node
+name, status, and connection buttons.  The captions of the button columns link
+to pages explaining how to set up up mime-types in your browser to make the
+buttons work, from FreeBSD, Linux, and Windows workstations:
+
+<ul>
+       
+  <li> <a href="https://www.emulab.net/docwrapper.php3?docname=ssh-mime.html">
+       <b>SSH</b> </a> - The <b>SSH</b> connection button gives a Bash or TCSH
+       shell, as usual.  Although your Emulab ssh keys are installed on the
+       node in a /sshkeys subdirectory, you have to type your password to SSH
+       logins to enable remote directory mounts through SMB.  </li>
+
+  <li> <a href="https://www.emulab.net/faq.php3#UTT-TUNNEL"> <b>Console</b>
+       </a> - The <b>Console</b> button won't do much good now, because
+       Windows doesn't normally provide logins on the com serial device.
+       (This will be remedied with <i>agetty</i> eventually.)  An exception is
+       that you can monitor the Frisbee loading of the Windows image on the
+       console.  </li>
+
+  <li> <a href="https://www.emulab.net/docwrapper.php3?docname=rdp-mime.html">
+       <b>RDP</b> </a> - The <b>RDP</b> button starts up a Remote Desktop
+       Protocol connection, giving a Windows Desktop login from the user's
+       workstation screen to the experiment node.  The "rdesktop" client
+       software is used from Linux and Unix client workstations.  A Microsoft
+       RDC (Remote Desktop Connector) client program is included in Windows
+       XP, and may be installed onto other versions of Windows as well.  </li> 
+
+</ul>
+
+<h4><a name="RDP_details"> </a> RDP details </h4>
+
+Here are some fine points and hints for RDP logins to remote Windows desktops:
+
+<ul>
+
+  <li> Microsoft allows only <b>one desktop login at a time</b> to Windows XP,
+       although this is the same Citrix Hydra technology that supports many
+       concurrent logins to Terminal Server or Server 2003. <p>
+
+       The <b>Fast User Switching</b> option to XP is turned on, so a second
+       RDP connection disconnects a previous one rather than killing it.
+       Similarly, just closing your RDP client window disconnects your Windows
+       Login session rather than killing it. You can reconnect later on
+       without losing anything. <p>
+
+       SSH doesn't count as a desktop, so you can ssh in and use this command:
+       <pre> qwinsta</pre> (Query WINdows STAtion) command to show existing
+       winstation sessions and their session ID's, and this one to reset
+       (kill) a session by ID: <pre> rwinsta</pre> </li>
+
+  <li> We rename <b>My Computer</b> to show the PCxxx physical node name, but
+       it doesn't appear on the Windows XP desktop by default.  The XP user
+       interface incorporates My Computer into the upper-right quadrant of the
+       Start menu by default, and removes it from the desktop. <p>
+
+       You can go back to the "classic" user interface of Windows 2000,
+       including showing My Computer.  Right-click on the background of the
+       Taskbar which contains the Start button at the left, and choose
+       "Properties".  Select the "Start Menu" tab, click the "Classic Start
+       menu" radio-button, and click "OK". <p>
+
+       Alternatively, you can force My Computer to appear on your XP desktop
+       by right-clicking on the desktop background and choosing "Properties".
+       Select the "Desktop" tab and click "Customize Desktop..." to get the
+       "Desktop Items" dialog.  Turn on the My Computer checkbox, then click
+       "OK" twice.  </li>
+
+  <li> There are several <b>Desktop icons</b> (i.e. "shortcuts") installed by
+       default in the XP images: Computer Management, Bash and TCSH shells,
+       and NtEmacs.  </li> <br>
+       
+  <li> The Bash and TCSH icons run their respective shells in a </b>Windows
+       Terminal</b>, just like the Windows cmd.exe .  <p>
+
+       <b>Quick-edit mode</b> is on by default, so you can cut-and-paste
+       freely between your local workstation desktop and your remote RDP
+       desktops. <p>
+
+       Remember that the cut-and-paste mouse clicks are different from in
+       <b>X</b>, where left-click starts a selection, right-click extends it,
+       and middle-click pastes.  (These are the clicks to use when you are
+       SSH'ed in to a Windows node from an xterm window.)  Yes, it can be
+       confusing. <p>
+
+       In a Windows Terminal window on your RDP remote desktop, the
+       cut-and-paste mouse clicks are:
+
+       <ul>
+
+         <li> <b>Left-drag</b> the mouse to <i>mark</i> a rectangle 
+	      of text, highlighting it.  </li>
+       
+         <li> <b>Type <i>Enter</i> or <i>right-click</i> the mouse when text
+	      is highlighted</b>, to <i>copy</i> the selected text to the
+	      clipboard. (<b><i>Escape</i></b> <i>cancels</i> the selection
+	      without copying it.)  </li>
+       
+	 <li> <b>Right-click the mouse with nothing selected</b> to 
+	      <i>paste</i> the contents of the clipboard.  </li>
+
+       </ul> <br>
+
+  <li> On the <b>first login by a user</b>, Windows creates the user's <i>Windows
+       profile directory</i> under "C:\Documents and Settings", and creates
+       the <i>registry key</i> (folder) for persistent settings for that user. <p>
+
+       We arrange that early in the user's login process, a user <b>HOME</b>
+       environment variable value is set in the user's registry.  Otherwise
+       Emacs wouldn't know how to find your <i>.emacs</i> setup file in your
+       remotely mounted home directory. <p>
+
+       User "root" is special, and has a local home directory under /home.
+       /home is a Cygwin symbolic link to "C:\Documents and Settings".  </li>
+
+  <li> The Windows XP Start menu has no <b>Shutdown</b> button under RDP.
+       Instead, it is labeled <b>Disconnect</b> and only closes the RDP client
+       window, leaving the login session and the node running. <p>
+
+       To restart the computer, run <b>/sbin/reboot</b>, or use the "Shut
+       Down" menu of <b>Task Manager</b>.  One way to start Task Manager is to
+       right-click on the background of the Taskbar at the bottom of the
+       screen and select it. </li>
+
+</ul>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="Cygwin"> </a> Cygwin </h3>
+
+Cygwin is <a href="http://www.cygwin.com/"> GNU + Cygnus + Windows </a>,
+providing Linux-like functionality at the API, command-line, and package
+installation levels. <p>
+
+<h4><a name="Cygwin_packages"> </a> Cygwin packages </h4>
+
+A number of optional Cygwin packages are installed in the image due to our
+building and running the Emulab client software, plus some editors for
+convenience.  These packages are currently agetty, bison, cvs, cygrunsrv, ed,
+file, flex, gcc, gdb, make, nano, openssh, openssl-devel, patch, perl,
+perl-libwin32, python, rpm, rsync, shutdown, tcsh, vim, wget, and zip. <p>
+
+The <a href="http://www.cygwin.com/packages/"> Cygwin package site </a> lists
+the available pre-compiled packages and provides a search engine. <p>
+
+If you want to install more Cygwin pre-compiled packages, run the graphical
+installer: <pre>    C:/Software/Cygwin/cygwin-setup.exe</pre>  <p>
+
+The Cygwin command <pre>    cygcheck -l <i>package-name</i></pre> lists the
+contents of an installed package, which may help you to make a tarfile from a
+package you have installed, which will then installed automatically by Emulab
+into all of the nodes of your experiment.  See the <a
+href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#TARBALLS">
+Tutorial  </a> for more information. <p>
+
+Watch out for post-install scripts in:
+<pre>    /etc/postinstall/<i>package-name</i>.sh{,.done}</pre><p>
+
+Many packages not in the Cygwin package site have also been ported to Cygwin
+already.  Download the sources to an experiment node and try
+<pre>
+    configure
+    make
+    make install
+</pre> as usual. <p>
+
+<h4><a name="SMB_mounts"> </a> SMB mounts and Samba </h4>
+
+Some details remain to be documented: <br>
+
+<pre>
+       - Home dirs are on //fs via SMB(Windows Client, Samba server)
+         . cygwin/UNC mounts of Windows Shares under /users, /proj, /share.
+         . Can put \\fs\<share_name> into the Windows Explorer "Address"
+
+       - Shared directories: /share, /project/pid, /group/<pid>/<gid>
+
+       - Bug: One protection mask for everything in a whole mount/share under SMB.
+</pre>
+
+<h4><a name="Cygwin_arcana"> </a> Cygwin arcana </h4>
+
+<pre>
+       - Paths 
+         . \ == / modulo quoting
+         . cygpath -w, cygpath -u
+         . UNC paths: //machine
+
+       - Cygwin mounts
+         . Shown in the "mount" and "df" commands.
+         . / == C:/cygwin
+         . /cygdrive/c == C:
+         . //fs/... all Emulab directories.
+
+       - /etc/{passwd,group} contain Windows SID's as UID's and GID's.
+
+       -  No suid, but everybody is in group wheel==Administrators.
+
+       - File protections can lock out root, Administrator, or SYSTEM.
+</pre>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="NtEmacs"> </a> NtEmacs </h3>
+
+We don't include the Cygwin X server in our XP images to keep the bulk and
+complexity down.  So <a
+href="http://www.gnu.org/software/emacs/windows/ntemacs.html"> NtEmacs 21.3
+</a> is provided instead of the Cygwin X Emacs.  NtEmacs "frames" are windows
+on the Windows Desktop. <p>
+
+The /usr/local/bin/emacs executable is a symlink to
+/cygdrive/c/emacs-21.3/bin/runemacs.exe, which starts up an Emacs on the desktop.
+This only works under RDP, since SSH logins have a null desktop. <p>
+
+There is also a /usr/local/bin/emacs-exe executable, a symlink to
+/cygdrive/c/emacs-21.3/bin/emacs.exe, which is only useful as an Emacs
+compiler.  It could be used to run Emacs in an SSH window with the -nw (no
+windows) flag, except that it exits with "emacs: standard input is not a tty".
+Another thing not to try is running "emacs-exe -nw" in a Bash or TCSH shell on
+the RDP desktop.  It crashes Windows XP. <p>
+
+<pre>
+       - Can drag-and-drop files from Windows Explorer to NtEmacs windows.
+
+       - cygmount.el makes Cygwin mounts visible within Emacs.
+
+       - Options - See ~root/.emacs
+         . mouse-wheel-mode
+         . CUA mode option (^C copy / ^X cut on selection, ^V paste, ^Z undo).
+</pre>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="Future"> </a> Future work </h3>
+
+There are still some things left to do: <br>
+
+<pre>
+       - The Elvin event system, and hence progagent, is not yet running.
+
+       - syncerver, slothd and healthd.
+
+       - Password and ssh keys both working (hopefully.)
+
+       - Console support (agetty serial line speed 115.2kb doesn't work)
+
+       - No such thing as load averages, see the Task Manager/Performance tab.
+
+       - Automate production of Windows XP images for Emulab.
+</pre>
