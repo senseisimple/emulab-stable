@@ -723,9 +723,13 @@ my @vnodelist = keys(%vnodes);
 foreach my $vnode (@vnodelist) {
     my $pnode  = $vnode2pnode{$vnode};
 
+    # Default retry count.
+    $retries{$vnode} = 1;
+
     # Remote node, always does setup.
     next
 	if (!exists($nodes{$pnode}));
+    
     # Pnode was neither rebooted or reconfiged, so leave allocstate alone
     # for vnode_setup (has to be done).
     next
@@ -750,6 +754,7 @@ elsif ($failed && @vnodelist) {
 }
 elsif (@vnodelist) {
     my $vnode_setup_args = ""; # add any generic args here.
+    my @retry_list = ();
 
     print "Setting up virtual testbed nodes ...\n";
 
@@ -761,21 +766,23 @@ elsif (@vnodelist) {
         $vnode_setup_args .= " -n $plabnumbatch -w $plabwait ";
     }
 
+  retry:
     system("$vnode_setup $vnode_setup_args $pid $eid");
     if ($?) {
 	die_noretry("*** $0:\n".
 	    "    Vnode setup failed!");
     }
+    print "Waiting for virtual testbed nodes to finish setting up ...\n";
+    TBDebugTimeStamp("Virtual node waiting started");
 
     foreach my $node (@vnodelist) {
 	$waitstart{$node} = time;
     }
-    print "Waiting for virtual testbed nodes to finish setting up ...\n";
 
-    TBDebugTimeStamp("Virtual node waiting started");
     while ( @vnodelist ) {
 	my $node   = shift(@vnodelist);
 	my $pnode  = $vnode2pnode{$node};
+	my $islocal= exists($nodes{$pnode});
 	my $wstart = $waitstart{$node};
 	my $maxwait = 90 + (100 * $pnodevcount{$pnode});
 	my $curallocstate;
@@ -799,6 +806,20 @@ elsif (@vnodelist) {
 
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
+
+	    #
+	    # If a local node, lets retry since jail setup appears to be
+	    # rather flaky.
+	    # 
+	    if ($islocal && $retries{$node}) {
+		$retries{$node} -= 1;
+
+		print "*** WARNING: $node did not boot; will retry setup ...\n";
+		push(@retry_list, $node);
+		next;
+	    }
+
+	    # Otherwise, fall through ...
 	}
 
 	print "*** WARNING: $node did not boot!\n";
@@ -845,6 +866,29 @@ elsif (@vnodelist) {
 	}
     }
     TBDebugTimeStamp("Virtual node waiting finished");
+
+    #
+    # Check for retry, but only if not canceled. If so, we go around again.
+    #
+    if (@retry_list) {
+	# Check cancel first.
+	if (!$canceled) {
+	    TBGetCancelFlag($pid, $eid, \$canceled);
+	
+	    if ($canceled) {
+		print "*** Swap canceled; not retrying failed virtual nodes!\n";
+	    }
+	    else {
+		# Mark each node so that vnode_setup will retry.
+		foreach my $node (@retry_list) {
+		    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+		}
+		@vnodelist  = @retry_list;
+		@retry_list  = ();
+		goto retry;
+	    }
+	}
+    }
 }
 
 print "OS Setup Done.\n";
