@@ -35,14 +35,15 @@ CFLAGS	+= -Wall \
 	-DDEFAULT_PATH='"/tftpboot/pxeboot.newnode"' \
 	-DLOG_TESTBED=$(LOG_TESTBED)
 
+LFLAGS	=  ${OBJDIR}/lib/libtb/libtb.a
+
 ifeq ($(EVENTSYS),1)
 BI_DBSRC += event-support.c
 BI_DBOBJ += event-support.o
 
 CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
 		`elvin-config --cflags vin4c`
-LFLAGS  += $(OBJDIR)/event/lib/libevent.a ${OBJDIR}/lib/libtb/libtb.a \
-		`elvin-config --libs vin4c` -lcrypto
+LFLAGS  += $(OBJDIR)/event/lib/libevent.a `elvin-config --libs vin4c` -lcrypto
 endif
 
 bootinfo: bootinfo.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ)
