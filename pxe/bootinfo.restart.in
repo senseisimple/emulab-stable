@@ -3,5 +3,5 @@
 DIR=@prefix@/sbin
 
 killall bootinfo
-${DIR}/bootinfo > /dev/null 2>&1 &
+${DIR}/bootinfo
 
