@@ -49,10 +49,11 @@ if (! $isadmin) {
 $insert_result = mysql_db_query($TBDBNAME, 
 	"UPDATE nodes SET ".
 	"def_boot_image_id=\"$def_boot_image_id\",     ".
-	"def_boot_path=\"$def_boot_path\",           ".
+	"def_boot_path=\"$def_boot_path\",             ".
 	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
 	"next_boot_path=\"$next_boot_path\",           ".
-	"next_boot_cmd_line=\"$next_boot_cmd_line\"    ".
+	"next_boot_cmd_line=\"$next_boot_cmd_line\",   ".
+	"startupcmd='$startupcmd'                      ".
 	"WHERE node_id=\"$node_id\"");
 
 if (! $insert_result) {

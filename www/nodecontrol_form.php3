@@ -62,6 +62,7 @@ $def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
 $next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
+$startupcmd         = $row[startupcmd];
 
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
@@ -126,6 +127,14 @@ echo "<tr>
           <td class=\"left\">
               <input type=\"text\" name=\"next_boot_cmd_line\" size=\"40\"
                      value=\"$next_boot_cmd_line\"></td>
+      </tr>\n";
+
+
+echo "<tr>
+          <td>Startup Command:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"startupcmd\" size=\"60\"
+                     value=\"$startupcmd\"></td>
       </tr>\n";
 
 
