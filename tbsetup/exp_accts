@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -wT
+#!/usr/local/bin/perl -w
 
 ### 
 ### $ID$
@@ -18,20 +18,41 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 ##
-## Should expand to all allowable characters. -lkw
+## arg: @row = {user, passwd, unix_uid, comment};
 ##
-sub check_user_data {
+sub untaint_user_data {
     my @row = @_;
-    if ( @row > 0 &&
-	 $row[0] =~ /^([a-z]|\d)+$/ && # user
-	 $row[1] =~ /^\w+$/ &&         # encrypted passwd
-	 $row[2] =~ /^\d+$/ &&         # unix UID   
-	 $row[2] <  32000 &&         # unix UID must be < 32000   
-	 $row[3] =~ /^([^:]+$|^$)/ ) { # comment (fullname)
-	return 1;
+
+    if ( @row < 4 ) {                           # need 4 fields 
+	return 0;    
+    }
+
+    if ( $row[0] =~ /^(([a-z]|\d)+)$/ ) {       # user
+	$row[0] = $1;
+    } else { 
+	return 0;
+    }
+
+    if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
+	$row[1] = $1;
     } else {
 	return 0;
     }
+
+    if ( $row[2] =~ /^(\d+)$/ &&                # unix UID
+	 $row[2] < 32000 ) {                    # unix UID must be < 32000   
+	$row[2] = $1;
+    } else {
+	return 0;
+    }
+	 
+    if ( $row[3] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
+	$row[3] = $1;
+    } else {
+	return 0;
+    } 
+	 
+    return 1;
 }
 
 my $d = 1;			#debug flag
@@ -92,7 +113,7 @@ my %passwd = ();
 my %unix_uid = ();
 my %fullname = ();
 while (@row = $sth->fetchrow_array) {
-    if ( check_user_data(@row) == 1 ) {
+    if ( untaint_user_data(@row) == 1 ) {
 	$passwd{$row[0]}   = $row[1];
 	$unix_uid{$row[0]} = $row[2];
 	$fullname{$row[0]} = $row[3];
@@ -215,7 +236,6 @@ foreach $IP (@nodes) {
 	    ## 1) Append new account info to master.passwd
 	    ## 2) Create secure (spwd.db) and insecure (pwd.db) password 
 	    ##    databases and
-	    ## 3) Create passwd entries
 	    ## 4) Create home directories
 
  	    ## Fetch remote login information
@@ -273,12 +293,12 @@ foreach $IP (@nodes) {
 		close(SCP);
  
 		## Create secure and insecure databases (/etc/s?pwd.db)
-		open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
+		open (MKDB, "/usr/local/bin/ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
 		while ( <MKDB> ) { print $_; }
 		close(MKDB);
 
 		## Update /etc/passwd (this closes above MKDB)
-		open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
+		open (MKDB, "/usr/local/bin/ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
 		while ( <MKDB> ) { print $_; }
 		close(MKDB);
 	    }
