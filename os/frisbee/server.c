@@ -14,6 +14,10 @@
 
 #define PACKETS_PER_CHUNK 16
 
+int verbose = 0;
+int timeout = 0;
+int msecleft = 0;
+
 int  inFile;
 uint packetTotal;
 uint pollSequence;
@@ -58,7 +62,7 @@ void goodClient( uint id )
       return;
     }
   }
-  syslog( LOG_WARNING, 
+  if (verbose) syslog( LOG_WARNING, 
           "goodClient() called on non-existent id 0x%08x\n", id);
 }
 
@@ -72,7 +76,7 @@ int naughtyClient( uint id )
       return (++clientNaughtiness[i]) > NAUGHTY_THRESHOLD ? 1 : 0;
     }
   }
-  syslog( LOG_WARNING, "naughtyClient() called on unknown id 0x%08x\n", id);
+  if (verbose) syslog( LOG_WARNING, "naughtyClient() called on unknown id 0x%08x\n", id);
   return 0;
 }
 
@@ -82,7 +86,7 @@ void removeClient( uint id )
   int i;
   for (i = 0; i < MAX_CLIENTS; i++) {
     if (clientList[i] == id ) {
-      syslog( LOG_INFO, "Removing client (id=0x%08x)\n", id );
+      if (verbose) syslog( LOG_INFO, "Removing client (id=0x%08x)\n", id );
       clientList[i] = 0;
       clientCount++;
       return;
@@ -107,9 +111,9 @@ void addClient( uint id )
   }
 
   if (place == -1) {
-    syslog(LOG_WARNING, "TOO MANY DAMN CLIENTS. (%i max)\n", MAX_CLIENTS );
+    syslog(LOG_WARNING, "Too many clients-- (up the constant in server.c)\n", MAX_CLIENTS );
   } else { 
-    syslog(LOG_INFO, "Adding client (id=0x%08x)\n", id );
+    if (verbose) syslog(LOG_INFO, "Adding client (id=0x%08x)\n", id );
     clientList[ place ] = id;
     clientNaughtiness[ place ] = 0;
   }
@@ -124,24 +128,53 @@ void usage(char * appname)
 {
   fprintf(stderr, 
 	  "%s: Usage:\n"
-	  "%s: %s <filename> [<serveraddress> [<port>]]\n"
+	  "%s: %s [-v] [-t seconds] <filename> [<serveraddress> [<port>]]\n"
+	  "%s: -v is verbose mode\n"
+	  "%s: -t specifies idle seconds before server exits\n"
 	  "%s: (default is 234.5.6.7, port 3564.)\n",
-	  appname, appname, appname, appname );
+	  appname, appname, appname, appname, appname, appname );
 }
 
 void handleArgs( int argc, char ** argv )
 {
   int i;
+  char ch;
+
+  verbose = 0;
+  timeout = 0;
+
+  while ((ch = getopt(argc, argv, "vht:")) != -1) {
+    switch(ch) {
+    case 'v':
+      verbose++;
+      syslog(LOG_INFO, "Verbose (-v) mode.\n");
+      break;
+      
+    case 't':
+      timeout = atoi(optarg);
+      break;
+      
+    case 'h':
+    case '?':
+    default:
+      syslog(LOG_ERR, "Fatal - Bad arguments." );
+      usage("frisbeed" /* argv[0] */);
+      exit(1);
+    }
+  }
+
+  argc -= optind;
+  argv += optind;
   
   port = 3564;
   strcpy( sendAddress, "234.5.6.7" );
 
-  if (argc > 1) {
-    strcpy( filename, argv[1] );
-    if (argc > 2) {
-      strcpy( sendAddress, argv[2] );
-      if (argc > 3) {
-	port = atoi( argv[3] );
+  if (argc > 0) {
+    strcpy( filename, argv[0] );
+    if (argc > 1) {
+      strcpy( sendAddress, argv[1] );
+      if (argc > 2) {
+	port = atoi( argv[2] );
       }
     }
   } else {
@@ -187,6 +220,7 @@ int main( int argc, char ** argv )
 
   n_initLookup( port, port, sendAddress );
 
+  msecleft = 1000 * timeout;
   t_setTimer( POLL_WAIT );
   gotNonRequestYet = 0;
 
@@ -199,6 +233,7 @@ int main( int argc, char ** argv )
 		       gotNonRequestYet ? t_getRemainingTime() : POLL_WAIT,
 		       NPT_REQUEST | NPT_ALIVE | NPT_GONE ))) {
       /* got a packet.. */
+      msecleft = 1000 * timeout;
       if (p.type == NPT_REQUEST) {
 	/* it was a request for data, so service this request */
 	PacketRequest * pr = (PacketRequest *)&p;
@@ -246,7 +281,7 @@ int main( int argc, char ** argv )
 	  }
 	  /* "fall through" to polling code */
 	} else {
-	  syslog( LOG_WARNING, 
+	  if (verbose) syslog( LOG_WARNING, 
                   "Bad or duplicate request:"
                   "psv = %i; p.ps = %i; ps = %i; p.pi = %i; pt = %i;\n ", 
 		  pollSequenceValid, 
@@ -260,13 +295,13 @@ int main( int argc, char ** argv )
 	}
       } else if (p.type == NPT_ALIVE) {
 	PacketAlive * pa = (PacketAlive *)&p;
-	syslog( LOG_DEBUG, "Alive hint received\n");
+	if (verbose) syslog( LOG_DEBUG, "Alive hint received\n");
 	addClient( pa->clientId );
 	gotNonRequestYet = 1;
 	continue; /* continue with while as long as poll timer is > 0*/
       } else if (p.type == NPT_GONE) {
 	PacketGone * pg = (PacketGone *)&p;
-	syslog( LOG_DEBUG, "Gone hint received\n");
+	if (verbose) syslog( LOG_DEBUG, "Gone hint received\n");
 	removeClient( pg->clientId );
 	if (pg->clientId == lastAddress) {
 	  /* we are in the process of polling them, so poll someone else */
@@ -284,11 +319,11 @@ int main( int argc, char ** argv )
 
       if (lastAddress != 0) {
         /* client didn't seem to do its job */
-	syslog( LOG_WARNING, "Poll failed to produce results.\n");
+	if (verbose) syslog( LOG_WARNING, "Poll failed to produce results.\n");
 	if (naughtyClient( lastAddress )) {
           /* too many dropped polls in a row. */
-	  syslog( LOG_WARNING,
-                  "Removing client 0x%08x for being naughty.\n", lastAddress);
+	  if (verbose) syslog( LOG_WARNING,
+                  "Removing client 0x%08x for being unresponsive.\n", lastAddress);
 	  removeClient( lastAddress ); 
 	}
 	/* we timed out.. no request received. */
@@ -315,7 +350,17 @@ int main( int argc, char ** argv )
 	n_packetSend( (Packet *)&pp );
       } else {
 	/* printf("No clients to poll *twiddle* *twiddle* *twiddle*.\n"); */
-       
+        if (msecleft > 0) { 
+	  msecleft -= POLL_WAIT; 
+	  if (msecleft <= 0) {
+	    /* printf("TIMEOUT ELAPSED.\n"); */
+	  syslog( LOG_INFO,
+		  "Timeout of %i seconds elapsed with no clients - exiting.\n",
+		  timeout );
+	    exit( 0 );
+	  }
+	}
+
 	lastAddress = 0;
       }
     }
