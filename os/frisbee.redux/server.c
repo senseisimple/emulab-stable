@@ -73,6 +73,7 @@ struct {
 	unsigned long	badpackets;
 	unsigned long   blockslost;
 	unsigned long	goesidle;
+	unsigned long	wakeups;
 } Stats;
 #define DOSTAT(x)	(Stats.x)
 #else
@@ -100,6 +101,7 @@ typedef struct {
 } WQelem_t;
 static queue_head_t     WorkQ;
 static pthread_mutex_t	WorkQLock;
+static pthread_cond_t	WorkQCond;
 static int		WorkQDelay = -1;
 static int		WorkQSize = 0;
 #ifdef STATS
@@ -126,6 +128,7 @@ static void
 WorkQueueInit(void)
 {
 	pthread_mutex_init(&WorkQLock, NULL);
+	pthread_cond_init(&WorkQCond, NULL);
 	queue_init(&WorkQ);
 
 	if (WorkQDelay < 0)
@@ -184,6 +187,8 @@ WorkQueueEnqueue(int chunk, int block, int blockcount)
 		WorkQMax = WorkQSize;
 #endif
 
+	if (WorkQSize == 1)
+		pthread_cond_signal(&WorkQCond);
 	pthread_mutex_unlock(&WorkQLock);
 
 	EVENT(1, EV_WORKENQ, mcastaddr, chunk, block, blockcount, WorkQSize);
@@ -195,16 +200,31 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 {
 	WQelem_t	*wqel;
 
-	pthread_mutex_lock(&WorkQLock);
-
 	/*
-	 * Condvars broken in linux threads impl, so use this rather bogus
-	 * sleep to keep from churning cycles. 
+	 * Wait for up to WorkQDelay usec for work
 	 */
-	if (queue_empty(&WorkQ)) {
-		pthread_mutex_unlock(&WorkQLock);
-		fsleep(WorkQDelay);
-		return 0;
+	pthread_mutex_lock(&WorkQLock);
+	if (WorkQSize == 0) {
+		struct timeval tv;
+		struct timespec ts;
+
+		gettimeofday(&tv, 0);
+		ts.tv_nsec = tv.tv_usec * 1000 + WorkQDelay;
+		if (ts.tv_nsec >= 1000000000) {
+			ts.tv_sec = tv.tv_sec + 1;
+			ts.tv_nsec -= 1000000000;
+		} else
+			ts.tv_sec = tv.tv_sec;
+
+		do {
+			if (pthread_cond_timedwait(&WorkQCond,
+						   &WorkQLock, &ts) != 0) {
+				pthread_mutex_unlock(&WorkQLock);
+				return 0;
+			}
+			if (WorkQSize == 0)
+				DOSTAT(wakeups++);
+		} while (WorkQSize == 0);
 	}
 	
 	queue_remove_first(&WorkQ, wqel, WQelem_t *, chain);
@@ -490,22 +510,21 @@ PlayFrisbee(void)
 				DOSTAT(blockssent++);
 				EVENT(3, EV_BLOCKMSG, mcastaddr,
 				      chunk, block+j, 0, 0);
+
+				/*
+				 * Completed a burst.  Adjust the busrtsize
+				 * if necessary and delay as required.
+				 */
+				if (++throttle >= burstsize) {
+					if (dynburst)
+						calcburst();
+					if (gapsize > 0)
+						fsleep(gapsize);
+					throttle = 0;
+				}
 			}
 			offset   += readbytes;
 			block    += readcount;
-			throttle += readcount;
-
-			/*
-			 * Dynamically adjust the burst size if necessary
-			 */
-			if (dynburst)
-				calcburst();
-
-			if (throttle >= burstsize) {
-				if (gapsize > 0)
-					fsleep(gapsize);
-				throttle = 0;
-			}
 		}
 	}
 	free(databuf);
@@ -605,11 +624,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (readsize > burstsize ||
-	    ((burstsize / readsize) * readsize != burstsize))
-		fatal("readsize (%d) not at even divisor of burstsize (%d)",
-		      readsize, burstsize);
-
 	if (!portnum || ! mcastaddr.s_addr)
 		usage();
 
@@ -691,6 +705,7 @@ main(int argc, char **argv)
 		    Stats.filereads, Stats.filebytes,
 		    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
 		log("  net idle/blocked: %d/%d", Stats.goesidle, nonetbufs);
+		log("  spurious wakeups: %d", Stats.wakeups);
 		log("  max workq size:   %d", WorkQMax);
 	}
 #endif

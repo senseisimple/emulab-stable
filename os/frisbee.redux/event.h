@@ -23,6 +23,7 @@ typedef struct {
 			int zerofill;	/* non-0 to zero fill free space */
 			int randomize;	/* non-0 to randomize request list */
 			int nothreads;	/* non-0 to single thread unzip */
+			int dostype;	/* DOS partition type to set */
 			int debug;	/* debug level */
 			int trace;	/* tracing level */
 		} start;

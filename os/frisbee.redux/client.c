@@ -47,10 +47,7 @@ int		startdelay = 0;
 int		debug = 0;
 int		tracing = 0;
 char		traceprefix[64];
-int		zero = 0;
 int		randomize = 1;
-int		slice = 0;
-int		nothreads = 0;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
@@ -61,11 +58,11 @@ static int	dotcol;
 static void	PlayFrisbee(void);
 static void	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
-static int	ImageUnzip(int chunk);
 static void	RequestStamp(int chunk, int block, int count);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
 extern int	ImageUnzipInit(char *filename, int slice,
-			       int debug, int zero, int nothreads);
+			       int debug, int zero, int nothreads, int dostype);
+extern int	ImageUnzipChunk(char *chunkdata);
 extern void	ImageUnzipFlush(void);
 extern int	ImageUnzipQuit(void);
 
@@ -138,8 +135,12 @@ main(int argc, char **argv)
 {
 	int	ch;
 	char   *filename;
+	int	zero = 0;
+	int	nothreads = 0;
+	int	dostype = -1;
+	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -189,6 +190,10 @@ main(int argc, char **argv)
 
 		case 'z':
 			zero++;
+			break;
+
+		case 'D':
+			dostype = atoi(optarg);
 			break;
 
 		case 'h':
@@ -273,6 +278,10 @@ main(int argc, char **argv)
 			nothreads = event.data.start.nothreads;
 		else
 			nothreads = 0;
+		if (event.data.start.dostype >= 0)
+			dostype = event.data.start.dostype;
+		else
+			dostype = -1;
 		if (event.data.start.debug >= 0)
 			debug = event.data.start.debug;
 		else
@@ -285,10 +294,10 @@ main(int argc, char **argv)
 
 		log("Starting: slice=%d, startdelay=%d, zero=%d, "
 		    "randomize=%d, nothreads=%d, debug=%d, tracing=%d, "
-		    "pkttimeout=%d, idletimer=%d, redodelay=%d, "
+		    "pkttimeout=%d, idletimer=%d, ideldelay=%d, redodelay=%d, "
 		    "chunkbufs=%d maxreadahead=%d, maxinprogress=%d",
 		    slice, startdelay, zero, randomize, nothreads,
-		    debug, tracing, pkttimeout, idletimer, redodelay,
+		    debug, tracing, pkttimeout, idletimer, idledelay, redodelay,
 		    maxchunkbufs, maxreadahead, maxinprogress);
 	}
 #endif
@@ -296,7 +305,7 @@ main(int argc, char **argv)
 	redodelay = sleeptime(redodelay, "request retry delay");
 	idledelay = sleeptime(idledelay, "writer idle delay");
 
-	ImageUnzipInit(filename, slice, debug, zero, nothreads);
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype);
 
 	if (tracing) {
 		ClientTraceInit(traceprefix);
@@ -560,7 +569,8 @@ ChunkerStartup(void)
 			}
 		}
 
-		ImageUnzip(i);
+		if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data))
+			pfatal("ImageUnzipChunk failed");
 
 		/*
 		 * Okay, free the slot up for another chunk.
@@ -1061,26 +1071,4 @@ PlayFrisbee(void)
 	PacketSend(p, 0);
 #endif
 	log("\nLeft the team after %ld seconds on the field!", estamp.tv_sec);
-}
-
-/*
- * Supply a read function to the imageunzip library. Kinda hokey right
- * now. The original imageunzip code depends on read to keep track of
- * the seek offset within the input file. Well, in our case we know what
- * chunk the inflator is working on, and we keep track of the block offset
- * as well.
- *
- * XXX We copy out the data. Need to change this interface to avoid that.
- */
-extern int	inflate_subblock(char *);
-
-static int
-ImageUnzip(int slot)
-{
-	char	*data = (char *) &ChunkBuffer[slot].blocks;
-
-	if (inflate_subblock(data))
-		pfatal("ImageUnzip: inflate_subblock failed");
-
-	return 0;
 }

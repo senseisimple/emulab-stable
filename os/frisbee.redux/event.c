@@ -106,6 +106,10 @@ parse_event(Event_t *event, char *etype, char *buf)
 				event->data.start.nothreads = val;
 				continue; 
 			}
+			if (sscanf(cp, "DOSTYPE=%d", &val) == 1) {
+				event->data.start.dostype = val;
+				continue; 
+			}
 			if (sscanf(cp, "DEBUG=%d", &val) == 1) {
 				event->data.start.debug = val;
 				continue; 

@@ -60,8 +60,7 @@
 
 /*
  * The number of disk read blocks in a single read on the server.
- * Must be an even divisor of CHUNKSIZE.  Should also be an even
- * divisor of SERVER_BURST_SIZE below.
+ * Must be an even divisor of CHUNKSIZE.
  */
 #define SERVER_READ_SIZE	32
 

@@ -38,8 +38,7 @@ LDFLAGS		= -static
 #CFLAGS		+= -DDOEVENTS
 #CLIENTOBJS	+= event.o $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o
 #CLIENTLIBS	+= `elvin-config --libs vin4c`
-#EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` \
-		-I$(TESTBED_SRCDIR)
+#EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
 frisbee: $(CLIENTOBJS) ../imagezip/frisbee.o
 	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
