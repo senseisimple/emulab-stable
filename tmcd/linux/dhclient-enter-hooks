@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Sweet! dhclient on linux wants to DHCP on the loopback interface
+# thus screwing up its default setting.  Put a stop to that early on!
+#
+if [ xxx$interface = xxxlo ]; then
+    exit_status=1
+fi

@@ -87,8 +87,8 @@ etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	dir-install pump.conf
 	$(INSTALL) -m 644 ./pump.conf $(SYSETCDIR)/pump.conf
-	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-				$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks $(SYSETCDIR)/dhclient-enter-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks $(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth0 \
 			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth0
