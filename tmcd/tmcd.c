@@ -3199,12 +3199,12 @@ COMMAND_PROTOTYPE(doloadinfo)
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS "
+	res = mydb_query("select load_address,loadpart,OS,frisbee_pid "
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
-			 3, reqp->nodeid);
+			 4, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3224,6 +3224,15 @@ COMMAND_PROTOTYPE(doloadinfo)
 	if (! row[0] || !row[0][0]) {
 		mysql_free_result(res);
 		return 0;
+	}
+
+	/*
+	 * Sanity check
+	 */
+	if (!row[3] || !row[3][0]) {
+		error("doloadinfo: %s: No pid associated with address %s\n",
+		      reqp->nodeid, row[0]);
+		return 1;
 	}
 
 	bufp += OUTPUT(bufp, ebufp - bufp,

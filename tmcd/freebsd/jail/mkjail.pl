@@ -1053,6 +1053,15 @@ sub setjailoptions() {
 		}
 		last SWITCH;
 	    };
+	    /^IPFW$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o ipfw";
+		}
+		else {
+		    $jailoptions .= " -o noipfw";
+		}
+		last SWITCH;
+	    };
 	    /^DEVMEM$/ && do {
 		$jailflags |= $JAIL_DEVMEM;
 		last SWITCH;
@@ -1089,6 +1098,7 @@ sub setjailoptions() {
     system("sysctl jail.bpf_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.inaddrany_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.multiip_allowed=1 >/dev/null 2>&1");
+    system("sysctl jail.ipfw_allowed=1 >/dev/null 2>&1");
     system("sysctl net.link.ether.inet.useloopback=0 >/dev/null 2>&1");
 
     if ($?) {
