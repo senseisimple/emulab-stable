@@ -93,11 +93,15 @@ void n_initLookup( ushort receivePort, ushort sendPort, const char * sendName )
   n_init( receivePort, sendPort, htonl( *((unsigned int *)he->h_addr_list[0])) ); /* XXX bad?? */
 }
 
+static uint gSendAddress;
+
 /* same initialize, only no lookup */
 void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
 {
   struct sockaddr_in name;
   /*  int result; */
+
+  gSendAddress = sendAddress;
 
   nboSendPort    = htons( sendPort ); 
   nboSendAddress = htonl( sendAddress );
@@ -179,10 +183,59 @@ void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
 
 void n_finish()
 {
-  /* XXX - do explicit MCAST leave */
+#ifdef MCAST
+  if ((gSendAddress >> 28) == 14) {
+    unsigned char ttl = MCAST_TTL;
+    struct ip_mreq mreq;
+    mreq.imr_multiaddr.s_addr = nboSendAddress;
+    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    
+#ifdef SYSLOG
+    syslog( LOG_INFO, "Dropping multicast.\n");
+#else
+    printf("Dropping multicast...\n");
+#endif
+    if (setsockopt(sock,IPPROTO_IP,IP_DROP_MEMBERSHIP,&mreq,sizeof(mreq)) < 0) {
+      perror("setsockopt [error ignored]");
+      /*      exit(1); */
+    }
+  }
+#endif /* MCAST */
   close( sock );
 } 
 
+static unsigned int doChk( unsigned char * data, int len )
+{
+  unsigned int accum = 0;
+  unsigned int i;
+  for (i = 0; i < len; i++) {
+    accum += data[i];
+  }
+}
+
+static int verifyChk( PacketData * pd )
+{ 
+  uint chk2 = 0;
+  uint chk = pd->checksum;
+
+  pd->checksum = 0;  
+  chk2 = doChk( (unsigned char *)pd, sizeof( PacketData ) );
+  pd->checksum = chk;
+
+  {
+    uint rv = (chk == chk2);
+    if (!rv) {
+      printf("Warning! Checksum failed, tossing packet.\n" );
+    }
+    return rv;
+ }
+}
+
+static void genChk( PacketData * pd )
+{
+  pd->checksum = 0;
+  pd->checksum = doChk( (unsigned char *)pd, sizeof( PacketData ));
+}
 
 void n_packetSend(Packet * p)
 {
@@ -192,6 +245,10 @@ void n_packetSend(Packet * p)
     /* valid packet type */
     struct sockaddr_in toName;
     struct pollfd fds;
+
+    if (p->type == NPT_DATA) {
+      genChk( (PacketData *)p );
+    }
 
     toName.sin_family      = AF_INET;
     toName.sin_port        = nboSendPort;
@@ -275,7 +332,8 @@ int n_packetRecv( Packet * p, uint timeout, uchar mask )
 
     if ((got != 0) &&
 	(mask & p->type) && 
-        (got == n_sizeOfType( p->type ))) {
+        (got == n_sizeOfType( p->type )) &&
+        (p->type != NPT_DATA || verifyChk( (PacketData *) p))) {
       return 1;
     }
   }

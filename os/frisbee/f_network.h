@@ -24,6 +24,7 @@
 typedef struct {
   unsigned char type;
   uint packetId;
+  uint checksum;
   uchar data[PACKET_PAYLOAD_SIZE];
 } PacketData;
 
@@ -69,3 +70,10 @@ void n_finish();
 
 int  n_packetRecv( Packet * p, uint timeout, uchar mask );
 void n_packetSend( Packet * p );
+
+
+
+
+
+
+
