@@ -863,13 +863,14 @@ $query_result =
     DBQueryFatal("INSERT INTO images ".
 		 "(imagename, imageid, description, loadpart, loadlength, ".
 		 " part1_osid, part2_osid, part3_osid, part4_osid, ".
-		 " default_osid, path, pid, shared,global, creator, created) ".
+		 " default_osid, path, pid, gid, shared, global, creator, ".
+		 " created) ".
 		 "VALUES ".
 		 "  ('$imagename', '$imageid', '$description', $loadpart, ".
 		 "   $loadlength, ".
 		 "   $part1_osid, $part2_osid, $part3_osid, $part4_osid, ".
-		 "   '$default_osid', '$path', '$pid', $shared, $global, ".
-	         "   '$uid', now())");
+		 "   '$default_osid', '$path', '$pid', '$gid', $shared, ".
+	         "   $global, '$uid', now())");
 
 if (!$isadmin || $makedefault) {
     for ($i = 0; $i < count($mtypes_array); $i++) {
