@@ -12,6 +12,7 @@ use libdb;
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
 my $BASEADDR	= "234.5.6";
+my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
 # Process command line options
@@ -70,7 +71,11 @@ while (1) {
 		}
 	} else {
 		# Child branch
-		if (!exec($FRISBEED,$filename,$address)) {
+		# The database format for address is host:port - however, we need
+		# to give them as seperate arguments to frisbeed
+		$address =~ s/:/ /g;
+
+		if (!exec("$FRISBEED $filename $address")) {
 			# Hmmm. We'll exit(0), so that the parent doesn't try to
 			# restart us
 			print STDERR "$$: Unable to exec $FRISBEED\n";
@@ -161,16 +166,18 @@ sub pick_address {
 
 	my %used_addrs = (); # Loading addresses already taken
 	while (@row = $sth->fetchrow) {
-		$row[0] =~ /^$BASEADDR\.(\d+)$/;
-		if ($1) {
-			$used_addrs{$1} = 1;
+		$row[0] =~ /^$BASEADDR\.(\d+):(\d+)$/;
+		# $1 is the address, $2 the port number
+		if ($1 && $2) {
+			$used_addrs{$1} = $2;
 		}
 	}
 
 	my $address;
 	for (my $i = 1; $i < 255; $i++) {
 		if (!$used_addrs{$i}) {
-			$address = $BASEADDR . "." . $i;
+			my $port = $BASEPORT + ($i - 1);
+			$address = "${BASEADDR}.${i}:${port}";
 			last;
 		}
 	}
