@@ -1,0 +1,147 @@
+<a name="top">
+<center>
+<h1>Node Use Policies</h1>
+</center>
+
+<ul>
+<li><a href="#summary">
+What are your policies?</a>
+<li><a href="#active">
+What is "active use"?</a>
+<li><a href="#idle">
+How long is too long for a node to be idle?</a>
+<li><a href="#state">
+What is "node state"?</a>
+<li><a href="#email">
+I just received an email asking me to swap or terminate my
+experiment</a>
+<li><a href="#swapped">
+Someone swapped my experiment!</a>
+</ul>
+
+
+<ul>
+<p><li>
+<a name="summary">
+<h3>What are your policies?</h3>
+
+As a courtesy to other experimenters, we ask that experiments be
+swapped out or terminated when they are no longer in active use. There
+are a limited number of nodes available, and node reservations are
+exclusive, so it is important to free nodes that will be idle so that
+others may use them. By way of summary, our policy is that experiments
+should be swapped out when they are not in use. In general, if they
+are idle for 24 hours or more, we will send you mail about it and/or
+swap out the experiment for you. The actual grace period will differ
+depending on the size of the experiment and other factors. If you mark
+your experiment "unswappable" at creation time, we will contact you
+before swapping it, since local node state will be lost on
+swapout. Please see full details below.
+
+<p><li>
+<a name="active">
+<h3>What is "active use"?</h3>
+
+A node or experiment that is being actively used will be doing
+something related to your experiment. In almost all cases, someone
+will either be logged into it using it interactively, or some program
+will be running, sending and receiving packets, and performing the
+operations necessary to carry out the experiment.
+
+<p><li>
+<a name="idle">
+<h3>How long is too long for a node to be idle?</h3>
+
+Ideally, an experiment should be used nearly continuously from start
+to finish of the experiment, then swapped out or terminated. However,
+this isn't always possible. In general, the 24-hour rule is
+appropriate. If your experiment will most likely be idle for 24 hours
+or more, it should be swapped out. This is especially true on
+weekends. If you finish at the end of the day Friday, and are planning
+to come back Monday morning to use the nodes again, swap out before
+you leave for the day. Experimenters who need many nodes take
+advantage of lower usage on weekends to run their large-scale (50-100
+node) tests. If your experiment is larger than 10 nodes, it is even
+more important to release your nodes as soon as possible. Swapin and
+swapout only take a few minutes (typically 3-5 for swapin, and less
+than 1 for swapout), so you won't lose much time by doing it.
+
+<p><li>
+<a name="state">
+<h3>What is "node state"?</h3>
+
+Some experiments have state that is stored exclusively on the nodes
+themselves, saved to the local hard drive. This is state that is not
+in your NS file and files it references, and which is not preserved in
+our database across swapin/swapout. This is state you add to your
+machines "by hand" after Emulab sets up your experiment, like files
+you add or modify on filesystems local to test nodes. Local node state
+does not include any data you store in /users or /proj, since they are
+saved on a fileserver, and not on the local nodes. 
+
+<p>
+Most experiments don't have any local node state, and can be swapped
+out and in without losing any information. This is highly recommended,
+since it is more courteous to other experimenters. It allows you to
+easily free up your nodes on request without losing any of the work
+you have done on your experiment. Please make your experiments adhere
+to this guideline whenever possible.
+
+<p>
+Wherever possible it is discouraged to have local node state, since
+swapping out causes this data to be lost. An experiment that needs
+local state should be marked "unswappable" when you create it. If you
+must have node state, you can save it before you swap out by creating
+a disk image of the node in question, and later reloading it to a new
+node after you swap in again. Disk images in effect create a "custom
+OS" that can be loaded automatically based on your NS file. More
+information about disk images can be found on our <a
+href="https://www.emulab.net/newimageid_explain.php3"> Disk Image
+page</a> (you must be logged in to use it). We are currently working
+on a system that will allow you to save disk images from all the nodes
+in your experiment at swapout time, and reload them automatically when
+you swap back in.
+
+<p><li>
+<a name="email">
+<h3>I just received an email asking me to swap or terminate my
+experiment</h3>
+
+Emulab has a system for detecting node use, to help achieve more
+efficient and fair use of Emulab's limited resources. This system
+sends email messages to experiment leaders whose experiments have been
+idle for over 24 hours. If you get a message like this, your
+experiment has been inactive for too long and should free up the nodes
+it has allocated. If the experiment continues to be idle, more
+reminders will be sent. On the third reminder and subsequent messages,
+your project leader will be one of the recipients. If you feel you
+receive the message in error, please respond to <a
+href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Operations
+(testbed-ops@flux.cs.utah.edu)</a> as soon as possible, describing how
+you have used your node in the last 24 hours. There are some types of
+activity that are difficult to accurately detect, so we'd like to know
+how we can improve our activity detection system. Above all, <b>do not
+ignore these messages</b>. If you get several reminders and don't
+respond, your experiment may be swapped out, potentially causing loss
+of some of your work (see "node state" above). If there is a reason
+you need to keep your experiment running <b>tell us</b> so we don't
+inadvertently cause problems for you.
+
+<p><li>
+<a name="swapped">
+<h3>Someone swapped my experiment!</h3>
+
+As described above, we will typically try to contact you about your
+idle experiment before we swap it out. However, if the experiment has
+been idle for many hours, we may swap it out for you unless you marked
+it as "unswappable" when you created your experiment. Because of this,
+it is critical that you keep in close contact with us about an
+experiment that we may perceive as idle if you want to avoid any loss
+of your work.
+
+</ul>
+<p>
+
+<a href="#top"> Back to top of page</a>
+
+
