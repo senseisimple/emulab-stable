@@ -1,11 +1,7 @@
 # This NS file shows how to use loops to set a topology.  This topology is a 
 # degree 3/depth 3 tree.
 
-# Unfortunately TB commands are out of band so ignore control structure.
-# For now...  I've marked with ! comments the tcl code that will replace
-# all the tb commands in the near future.
-
-#! source tb_compat.tcl
+source tb_compat.tcl
 
 set ns [new Simulator]
 
@@ -14,43 +10,17 @@ set center_node [$ns node]
 for {set group 0} {$group < 3} {incr group} {
     set nodes(node-$group) [$ns node]
     $ns duplex-link $nodes(node-$group) $center_node 100Mb 1ms DropTail
-    #! set-ip-interface $center_node $nodes(node-$group) 192.0.$group.1
-    #! set-ip-interface $nodes(node-$group) center_node 192.0.$group.2
+    tb-set-ip-interface $center_node $nodes(node-$group) 192.0.$group.1
+    tb-set-ip-interface $nodes(node-$group) $center_node 192.0.$group.2
     for {set member 0} {$member < 3} {incr member} {
 	set nodes(node-$group-$member) [$ns node]
 	$ns duplex-link $nodes(node-$group-$member) $nodes(node-$group) \
-	    100Mb 1ms DropTail
-	#! set-ip-interface $nodes(node-$group) $nodes(node-$group-$member) \
-	#!    192.0.[expr 10*($group+1)+$member].1
-	#! set-ip-interface $nodes(node-$group-$member) $nodes(node-$group) \
-	#!    192.0.[expr 10*($group+1)+$member].2
+		100Mb 1ms DropTail
+	tb-set-ip-interface $nodes(node-$group) $nodes(node-$group-$member) \
+		192.0.[expr 10*($group+1)+$member].1
+	tb-set-ip-interface $nodes(node-$group-$member) $nodes(node-$group) \
+		192.0.[expr 10*($group+1)+$member].2
     }
 }
-
-# The above ! comment commands will replace the following
-#TB set-ip-interface center_node nodes_node-0_ 192.0.0.1
-#TB set-ip-interface center_node nodes_node-1_ 192.0.1.1
-#TB set-ip-interface center_node nodes_node-2_ 192.0.2.1
-#TB set-ip-interface nodes_node-0_ center_node 192.0.0.2
-#TB set-ip-interface nodes_node-0_ nodes_node-0-0_ 192.0.10.1
-#TB set-ip-interface nodes_node-0_ nodes_node-0-1_ 192.0.11.1
-#TB set-ip-interface nodes_node-0_ nodes_node-0-2_ 192.0.12.1
-#TB set-ip-inteface nodes_node-0-0_ nodes_node-0_ 192.0.10.2
-#TB set-ip-inteface nodes_node-0-0_ nodes_node-1_ 192.0.11.2
-#TB set-ip-inteface nodes_node-0-0_ nodes_node-2_ 192.0.12.2
-#TB set-ip-interface nodes_node-1_ center_node 192.0.1.2
-#TB set-ip-interface nodes_node-1_ nodes_node-1-0_ 192.0.20.1
-#TB set-ip-interface nodes_node-1_ nodes_node-1-1_ 192.0.21.1
-#TB set-ip-interface nodes_node-1_ nodes_node-1-2_ 192.0.22.1
-#TB set-ip-inteface nodes_node-1-0_ nodes_node-1_ 192.0.20.2
-#TB set-ip-inteface nodes_node-1-0_ nodes_node-1_ 192.0.21.2
-#TB set-ip-inteface nodes_node-1-0_ nodes_node-2_ 192.0.22.2
-#TB set-ip-interface nodes_node-2_ center_node 192.0.2.2
-#TB set-ip-interface nodes_node-2_ nodes_node-2-0_ 192.0.30.1
-#TB set-ip-interface nodes_node-2_ nodes_node-2-1_ 192.0.31.1
-#TB set-ip-interface nodes_node-2_ nodes_node-2-2_ 192.0.32.1
-#TB set-ip-inteface nodes_node-2-0_ nodes_node-2_ 192.0.30.2
-#TB set-ip-inteface nodes_node-2-0_ nodes_node-2_ 192.0.31.2
-#TB set-ip-inteface nodes_node-2-0_ nodes_node-2_ 192.0.32.2
 
 $ns run
