@@ -69,7 +69,7 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     }
 
     echo "Emulab's Planetlab support is recovering from their transition
-	  to Plab 2.0.  Currently it's much slower then before but is
+	  to Plab 2.0.  Currently it's much slower than before but is
 	  largely working. Please report problems.
           <br>\n";
 
