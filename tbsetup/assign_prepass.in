@@ -24,7 +24,9 @@ my $AVG_NODES_PER_PARTITION = 10;
 #
 # Figure out assign args
 #
-
+if (@ARGV < 2) {
+    die "Usage: $0 [assign args] ptopfile topfile\n";
+}
 my $topfile = pop @ARGV;
 
 #
@@ -46,13 +48,12 @@ while (my $arg = shift @ARGV) {
 # Make up a logfile name, which we'll put assign's output into. Try to extract
 # a filename from the top file.
 my $logfile;
-my $base;
 if ($topfile =~ /(.*).top$/) {
     $logfile = "assign_prepass-$1.log";
-    $base = $1;
+    $::base = $1;
 } else {
     $logfile = "assign_prepass-$$.log";
-    $base = $$;
+    $::base = $$;
 }
 
 #
@@ -60,7 +61,8 @@ if ($topfile =~ /(.*).top$/) {
 #
 my ($realnodes, $reallinks) = parse_top($topfile);
 #my $newgraph = combine_lans($realnodes);
-my $newgraph = do_metis($realnodes,$base);
+#my $newgraph = do_metis($realnodes);
+my $newgraph = factor_out_fixednodes($realnodes,\&do_metis);
 print "Reduced " . scalar(keys %$realnodes) . " nodes down to " .
 	scalar(keys %$newgraph) . "\n";
 
@@ -443,14 +445,51 @@ sub combine_lans($) {
 }
 
 #
+# Conglomerate sets of nodes that are fixed to the same physical node. Returns
+# two hash refs - first the conglomerated fixed nodes, then the left over nodes
+# that weren't fixed in place.
+#
+sub combine_fixed($) {
+    my ($nodes) = @_;
+
+    #
+    # Buid up lists of nodes that are fixed to the same physical node - put all
+    # nodes that aren't fixed anywhere in the 'unfixed' group
+    #
+    my %fixednodes;
+    my %unfixed;
+    while (my ($name,$node) = each %$nodes) {
+	if ($node->{fixed}) {
+	    push @{$fixednodes{$node->{fixed}}}, $node;
+	} else {
+	    $unfixed{$name} = $node;
+	}
+    }
+
+    #
+    # Create the new graph by coarsening into the lists we made above
+    #
+    my %newgraph;
+    foreach my $nodelist (values %fixednodes) {
+	my @newnodes = make_conglomerates(@$nodelist);
+	foreach my $newnode (@newnodes) {
+	    $newgraph{$newnode->{name}} = $newnode;
+	}
+    }
+
+    return (\%newgraph,\%unfixed);
+}
+
+#
 # More complex coarsener that uses METIS to partition up the graph
 #
-sub do_metis($$) {
-    my ($nodes,$base) = @_;
+sub do_metis($) {
+    my ($nodes) = @_;
+
     my @metisfile = generate_metis_graphfile($nodes);
 
-    my $metisfilename = "$base.metis";
-    my $metislog = "metis-$base.log";
+    my $metisfilename = "$::base.metis";
+    my $metislog = "metis-$::base.log";
 
     my @nodelists = run_metis(\@metisfile,$nodes,$metisfilename,$metislog);
 
@@ -467,6 +506,18 @@ sub do_metis($$) {
 
     return \%newgraph;
 
+}
+
+#
+# Front-end to other coarsening functions - 'factor out' fixed nodes and
+# conglomerate them seperately, running the passed function pointer on only the
+# non-fixed nodes. Takes a node graph and a reference to the function to run.
+#
+sub factor_out_fixednodes($$) {
+    my ($nodes, $func_ref) = @_;
+    my ($fixednodes, $unfixed) = combine_fixed($nodes);
+    my $newgraph = &$func_ref($unfixed);
+    return {%$newgraph, %$fixednodes};
 }
 
 #####
@@ -488,7 +539,12 @@ sub generate_metis_graphfile($) {
     while (my ($name, $node) = each %$nodes) {
 	$node->{'metis_id'} = ++$node_count;
 	foreach my $link (@{$node->{'slinks'}}) {
-	    $link->{'metis_id'} = ++$link_count;
+	    #
+	    # Ignore links whose other end is not in our set of links
+	    #
+	    if ($nodes->{$link->{'dst'}}) {
+		$link->{'metis_id'} = ++$link_count;
+	    }
 	}
     }
 
@@ -508,13 +564,15 @@ sub generate_metis_graphfile($) {
 	my @neighbors = ();
 	foreach my $link (@{$node->{'slinks'}}) {
 	    if (!$link->{'metis_id'}) {
-		die "Uh oh, link without a metis_id!\n";
+		# Other end of this link is not in our set of nodes, ignore it
+		next;
 	    }
 	    push @neighbors, $nodes->{$link->{'dst'}}{'metis_id'};
 	}
 	foreach my $link (@{$node->{'dlinks'}}) {
 	    if (!$link->{'metis_id'}) {
-		die "Uh oh, link without a metis_id!\n";
+		# Other end of this link is not in our set of nodes, ignore it
+		next;
 	    }
 	    push @neighbors, $nodes->{$link->{'src'}}{'metis_id'};
 	}
@@ -772,14 +830,14 @@ sub node_fits_in_conglomerate($$) {
     #
     my $self_link_bandwidth = 0;
     foreach my $link (@{$conglomerate->{'slinks'}}) {
-	print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
+	#print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
 	if (($link->{'dst'} eq $conglomerate->{'name'}) ||
 	    ($link->{'dst'} eq $node->{'name'})) {
 	    $self_link_bandwidth += $link->{'bw'};
 	}
     }
     foreach my $link (@{$node->{'slinks'}}) {
-	print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
+	#print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
 	if (($link->{'dst'} eq $conglomerate->{'name'}) ||
 	    ($link->{'dst'} eq $node->{'name'})) {
 	    $self_link_bandwidth += $link->{'bw'};
@@ -855,7 +913,7 @@ sub combine_links($) {
 	    my $dst = $nodes->{$link->{'dst'}};
 
 	    # We do this to get a canonical src, dst ordering
-	    my ($csrc, $cdst) = sort { $a cmp $b } ($src,$dst);
+	    my ($csrc, $cdst) = sort { $a cmp $b } ($src, $dst);
 	    push @{$links{$csrc}{$cdst}}, $link;
 	    $totallinks++;
 	}
