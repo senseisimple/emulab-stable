@@ -27,7 +27,7 @@ foreach ($HTTP_GET_VARS as $key => $value) {
     	if ($vartype == "name") {
 	    if (preg_match("/^([a-z]+)(\d+)$/i",$value,$matches)) {
 		$interfaces[$ifacenum]["type"] = $matches[1];
-	        $interfaces[$ifacenum]["iface"] = "eth$ifacenum";
+	        $interfaces[$ifacenum]["card"] = $ifacenum;
 	    } else {
 		echo "Bad interface name $value!";
 		continue;
@@ -71,19 +71,19 @@ $row = mysql_fetch_array($query_result);
 $new_node_id = $row[0];
 
 foreach ($interfaces as $interface) {
-	$iface = $interface["iface"];
+	$card = $interface["card"];
 	$mac = $interface["mac"];
 	$type = $interface["type"];
 	if ($mac_list[$mac]["switch"]) {
 	    DBQueryFatal("insert into new_interfaces set " .
-		"new_node_id=$new_node_id, iface='$iface', mac='$mac', " .
+		"new_node_id=$new_node_id, card=$card, mac='$mac', " .
 		"interface_type='$type', ".
 		"switch_id='$mac_list[$mac][switch]', " .
 		"switch_card='$mac_list[$mac][card]', " .
 		"switch_port='$mac_list[$mac][port]'");
 	} else {
 	    DBQueryFatal("insert into new_interfaces set " .
-		"new_node_id=$new_node_id, iface='$iface', mac='$mac', " .
+		"new_node_id=$new_node_id, card=$card, mac='$mac', " .
 		"interface_type='$type'");
 	}
 }
