@@ -2,6 +2,12 @@
 use English;
 
 #
+# TODO: Database checks for valid OS image in IR file.
+#       Delta stuff.
+#       Reload disk images.
+#
+
+#
 # Parse an IR file and determine what OS has been requested on each node.
 # Do the database magic to make it so. Only root, admin types, or the
 # owners of the nodes in an experiments may do this. The machines are then
@@ -117,6 +123,20 @@ while (<IN>) {
     if ($row[0] ne "$pid" ||
 	$row[1] ne "$eid") {
 	die("Node '$node' pid/eid mismatch: $pid/$eid ... $row[0]/$row[1]\n");
+    }
+
+    #
+    # Check to make sure that the OS spec is valid by checking the database.
+    # Cross check type from nodes table against image_ids for that type in
+    # the disk_images table. 
+    #
+    $db_result = $DB->query("select disk_images.image_id from disk_images ".
+			    "left join nodes ".
+			    "on nodes.type=disk_images.type ".
+			    "and disk_images.image_id='$os' ".
+                            "where nodes.node_id='tbpc09'");
+    if ($db_result->numrows < 1) {	
+	die("Improper image specification $node:$os in IR file.\n");
     }
 }
 
