@@ -10,8 +10,10 @@ import os
 import popen2
 import tempfile
 import time
+import re
+import string
 sys.path.append("@prefix@/lib")
-import libdb
+from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
 from emulabclient import *
 
@@ -26,6 +28,29 @@ VERSION = 0.1
 # "struct" which in Perl/PHP/Ruby would be a hash. So, a client written in
 # pretty much any language should be able to talk to this class.
 #
+
+#
+# A helper function for checking required arguments.
+#
+def CheckRequiredArgs(argdict, arglist):
+    # proj,group,exp are aliases for pid,gid,eid
+    if (argdict.has_key("pid") and not argdict.has_key("proj")):
+        argdict["proj"] = argdict["pid"]
+        pass
+    if (argdict.has_key("gid") and not argdict.has_key("group")):
+        argdict["group"] = argdict["gid"]
+        pass
+    if (argdict.has_key("eid") and not argdict.has_key("exp")):
+        argdict["exp"] = argdict["eid"]
+        pass
+
+    # Okay, now check.
+    for arg in arglist:
+        if not argdict.has_key(arg):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Must supply '" + arg + "'")
+        pass
+    return None
 
 #
 # This class implements the server side of the XMLRPC interface to experiments.
@@ -63,10 +88,9 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid and eid!");
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
 
         nsfilename = None
         argstr     = ""
@@ -81,15 +105,15 @@ class experiment:
                 argstr += " -E "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt == "gid":
+            elif opt == "group":
                 argstr += " -g "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt == "eid":
+            elif opt == "exp":
                 argstr += " -e "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt == "pid":
+            elif opt == "proj":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
@@ -170,8 +194,11 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
-        argstr     = ""
-        
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp", "direction"))
+        if (argerror):
+            return argerror
+
+        argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
@@ -180,15 +207,9 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid") and
-                argdict.has_key("direction")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid, eid and direction!");
-
         argstr += " -s " + escapeshellarg(argdict["direction"])
-        argstr += " " + escapeshellarg(argdict["pid"])
-        argstr += " " + escapeshellarg(argdict["eid"])
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
         if exitval:
@@ -205,6 +226,10 @@ class experiment:
             return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
 
         nsfilename = None
         argstr     = ""
@@ -243,14 +268,9 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid and eid!");
-
         argstr += " -s modify"
-        argstr += " " + escapeshellarg(argdict["pid"])
-        argstr += " " + escapeshellarg(argdict["eid"])
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
 
         if nsfilename:
             argstr += " " + nsfilename
@@ -271,8 +291,11 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
-        argstr     = ""
-        
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
@@ -281,19 +304,133 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid and eid!");
-
-        argstr += " " + escapeshellarg(argdict["pid"])
-        argstr += " " + escapeshellarg(argdict["eid"])
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Return the state of an experiment.
+    #
+    def state(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+        
+        res = DBQueryFatal("select state from experiments "
+                           "where pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        
+        state = res[0][0]
+        return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
+
+    #
+    # Return the state of an experiment.
+    #
+    def info(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp", "aspect"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Illegal characters in arguments!")
+
+        res = DBQueryFatal("select state from experiments "
+                           "where pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        state   = res[0][0]
+        result  = {}
+        mapping = None
+
+        if state == "active":
+            dbres = DBQuery("select r.vname,r.node_id,n.type "
+                            "  from reserved as r "
+                            "left join nodes as n on r.node_id=n.node_id "
+                            "where r.pid=%s and r.eid=%s "
+                            "order by vname",
+                            (argdict["proj"], argdict["exp"]))
+            mapping = {}
+            for res in dbres:
+                tmp = {}
+                tmp["name"] = res[0]
+                tmp["node"] = res[1]
+                tmp["type"] = res[2]
+                mapping[res[0]] = tmp
+                pass
+            pass
+
+        if argdict["aspect"] == "mapping":
+            if state != "active":
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="Experiment is not active!")
+            # Just return the mapping above
+            result = mapping
+            pass
+        elif argdict["aspect"] == "links":
+            dbres = DBQueryFatal("SELECT vname,ips from virt_nodes "
+                                 "where pid=%s and eid=%s",
+                                 (argdict["proj"], argdict["exp"]))
+            ipmap = {}
+            for res in dbres:
+                for ipinfo in string.split(res[1], " "):
+                    port, ip = string.split(ipinfo, ":")
+                    ipmap[res[0] + ":" + port] = ip
+                    pass
+                pass
+            
+            dbres = DBQuery("select vname,member,mask,delay,bandwidth, "
+                            "       lossrate,rdelay,rbandwidth,rlossrate "
+                            "from virt_lans where pid=%s and eid=%s "
+                            "order by vname,member",
+                            (argdict["proj"], argdict["exp"]))
+
+            for res in dbres:
+                tmp = {}
+                tmp["name"]        = res[0]
+                tmp["member"]      = res[1]
+                tmp["ipaddr"]      = ipmap[res[1]]
+                tmp["mask"]        = res[2]
+                tmp["delay"]       = res[3]
+                tmp["bandwidth"]   = int(res[4])
+                tmp["plr"]         = res[5]
+                tmp["r_delay"]     = res[6]
+                tmp["r_bandwidth"] = int(res[7])
+                tmp["r_plr"]       = res[8]
+                result[res[1]]     = tmp
+                pass
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result, output=str(result))
 
     #
     # nscheck an NS file.
@@ -315,7 +452,8 @@ class experiment:
         
             (nsfp, nsfilename) = writensfile(nsfilestr)
             if not nsfilename:
-                return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+                return EmulabResponse(RESPONSE_SERVERERROR,
+                                      output="Server Error")
 
             argstr += nsfilename
             pass
@@ -342,8 +480,12 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict,
+                                     ("proj", "exp", "link", "params"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "persist":
                 if val == "true":
@@ -356,15 +498,8 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid") and
-                argdict.has_key("link") and
-                argdict.has_key("params")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid, eid, link, params!");
-
-        argstr += " " + escapeshellarg(argdict["pid"])
-        argstr += " " + escapeshellarg(argdict["eid"])
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
         argstr += " " + escapeshellarg(argdict["link"])
 
         for opt, val in argdict["params"].items():
@@ -386,8 +521,11 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
@@ -396,12 +534,8 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid and eid!");
-
-        argstr += " -e " + escapeshellarg(argdict["pid"] + "," + argdict["eid"])
+        argstr += " -e "
+        argstr += escapeshellarg(argdict["proj"] + "," + argdict["exp"])
         
         (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
         if exitval:
@@ -418,15 +552,18 @@ class experiment:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "false":
                     argstr += " -s "
                     pass
                 pass
-            elif opt == "imagepid":
+            elif opt == "imageproj":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
@@ -436,12 +573,8 @@ class experiment:
                 pass
             pass
 
-        if not (argdict.has_key("pid") and
-                argdict.has_key("eid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply pid and eid!");
-
-        argstr += " -e " + escapeshellarg(argdict["pid"] + "," + argdict["eid"])
+        argstr += " -e "
+        argstr += escapeshellarg(argdict["proj"] + "," + argdict["exp"])
         
         (exitval, output) = runcommand(TBDIR + "/bin/os_load " + argstr)
 
@@ -472,8 +605,11 @@ class node:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict, ("nodes"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
@@ -481,10 +617,6 @@ class node:
                     pass
                 pass
             pass
-
-        if not (argdict.has_key("nodes")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply a list of nodes!");
 
         tokens = argdict["nodes"].split(",")
         for token in tokens:
@@ -506,24 +638,22 @@ class node:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict, ("imageid", "node"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
                 pass
-            elif opt == "pid":
+            elif opt == "proj":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
             pass
-
-        if not (argdict.has_key("imageid") and
-                argdict.has_key("node")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply imageid and node!");
 
         argstr += " " + escapeshellarg(argdict["imageid"])
         argstr += " " + escapeshellarg(argdict["node"])
@@ -543,15 +673,18 @@ class node:
                                  output="Client version mismatch!");
             pass
 
+        argerror = CheckRequiredArgs(argdict, ("nodes"))
+        if (argerror):
+            return argerror
+
         argstr = ""
-        
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "false":
                     argstr += " -s "
                     pass
                 pass
-            elif opt == "imagepid":
+            elif opt == "imageproj":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
@@ -560,10 +693,6 @@ class node:
                 argstr += escapeshellarg(val)
                 pass
             pass
-
-        if not (argdict.has_key("nodes")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply a list of nodes!");
 
         tokens = argdict["nodes"].split(",")
         for token in tokens:

@@ -57,9 +57,9 @@ Python is also available that you can use on your desktop to invoke
 commands from the shell. For example:
 
     <code><pre>
-    $ sshxmlrpc_client.py startexp batch=false wait=true pid="mypid" eid="myeid" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
+    $ sshxmlrpc_client.py startexp batch=false wait=true proj="myproj" exp="myexp" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
 
-which says to create an experiment called "myeid" in the "mypid" project,
+which says to create an experiment called "myexp" in the "myproj" project,
 swap it in immediately, wait for the exit status (instead of running
 asynchronously), passing inline the contents of <tt>nsfile.ns</tt> in your
 home dir on your desktop.  By default, the client will contact the RPC
@@ -116,13 +116,13 @@ might:
 
     <code><pre>
     args = {};
-    args["pid"] = "mypid"
-    args["eid"] = "myeid"
+    args["proj"] = "myproj"
+    args["exp"] = "myexp"
     args["swapop"]  = "out"
     response = server->swapexp(CURRENTVERSION, args)</code></pre>
 </ul>
 
-The client specifies the <tt>pid</tt> and <tt>eid</tt> of the experiment
+The client specifies the <tt>proj</tt> and <tt>exp</tt> of the experiment
 he/she wants to swap, as well as the actual swap operation, in this case
 <tt>out</tt>. The response from the server is another hashed array (Python
 Dictionary) of the form:
@@ -165,12 +165,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID in which to create the experiment</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The unique ID to call the experiment</td>
   </tr>
@@ -185,7 +185,7 @@ experiments.
     <td>string</td>
     <td>The pathname of a NS file on the Emulab file
          server, within the project directory<br>
-	 (example: /proj/mypid/foo.ns)</td>
+	 (example: /proj/myproj/foo.ns)</td>
   </tr>
   </table>
   <br>
@@ -196,9 +196,9 @@ experiments.
    </tr>
    <tr></tr>
    <tr>
-    <td><tt>gid</tt></td>
+    <td><tt>group</tt></td>
     <td>string</td>
-    <td>pid</td>
+    <td>proj</td>
     <td>The Emulab subgroup ID in which to create the experiment<br>
         (defaults to project id)</td>
    </tr>
@@ -282,12 +282,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID of the experiment</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab experiment ID</td>
   </tr>
@@ -328,12 +328,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID of the experiment</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab experiment ID</td>
   </tr>
@@ -348,7 +348,7 @@ experiments.
     <td>string</td>
     <td>The pathname of a NS file on the Emulab file
          server, within the project directory<br>
-	 (example: /proj/mypid/foo.ns)</td>
+	 (example: /proj/myproj/foo.ns)</td>
   </tr>
   </table>
   <br>
@@ -392,12 +392,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID in which the experiment was created</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab ID of the experiment to terminate</td>
   </tr>
@@ -421,6 +421,74 @@ experiments.
   </table>
   
   <br>
+  <li><tt><b>state</b></tt>: Get the current state of the experiment.
+  The return value is a string; one of active, swapped, activating, etc.
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  </table>
+  
+  <br>
+  <li><tt><b>info</b></tt>: Get information about an experiment. The
+  return value is a hash table (Dictionary) of hash tables. For example,
+  the <tt>mapping</tt> request will return a hash indexed by node name, where
+  each entry is another hash table of name=value pairs, such as type=pc850
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>aspect</tt></td>
+    <td>string</td>
+    <td>Request information about specifc aspect of the experiment.</td>
+  </tr>
+  </table>
+  
+  <br>
+  The <tt>aspect</tt> is one of:
+  <table cellpadding=2>
+   <tr>
+    <td>name</td><td>description</td>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>mapping</tt></td>
+    <td>Request the mapping of nodes in your NS file, to physical testbed
+    nodes. This request is ignored if the experiment is not swapped in</td>
+   </tr>
+   <tr>
+    <td><tt>links</tt></td>
+    <td>Request information about all of the links in your experiment,
+    including delay characteristics, ip address and mask</td>
+   </tr>
+  </table>
+  
+  <br>
   <li><tt><b>nscheck</b></tt>: Check an NS file for obvious parser errors.
   The return code is <tt>RESPONSE_SUCCESS</tt> or <tt>RESPONSE_ERROR</tt>.
   The required arguments are:<br><br>
@@ -440,7 +508,7 @@ experiments.
     <td>string</td>
     <td>The pathname of a NS file on the Emulab file
          server, within the project directory<br>
-	 (example: /proj/mypid/foo.ns)</td>
+	 (example: /proj/myproj/foo.ns)</td>
   </tr>
   </table>
 
@@ -457,12 +525,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID in which the experiment was created</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab ID of the experiment</td>
   </tr>
@@ -583,12 +651,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID in which the experiment was created</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab ID of the experiment</td>
   </tr>
@@ -620,12 +688,12 @@ experiments.
   </tr>
   <tr></tr>
   <tr>
-    <td><tt>pid</tt></td>
+    <td><tt>proj</tt></td>
     <td>string</td>
     <td>The Emulab project ID in which the experiment was created</td>
   </tr>
   <tr>
-    <td><tt>eid</tt></td>
+    <td><tt>exp</tt></td>
     <td>string</td>
     <td>The Emulab ID of the experiment</td>
   </tr>
@@ -653,7 +721,7 @@ experiments.
     <td>Specify the imageid to load on all of the nodes</td>
    </tr>
    <tr>
-    <td><tt>imagepid</tt></td>
+    <td><tt>imageproj</tt></td>
     <td>string</td>
     <td>&nbsp</td>
     <td>Specify the Emulab project ID of the imageid. By default the
@@ -731,10 +799,11 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td><tt>wait</tt></td>
       <td>boolean</td>
       <td>false</td>
-      <td>If true, wait synchronously for all nodes to complete their reboot</td>
+      <td>If true, wait synchronously for all nodes to complete their
+       reboot</td>
      </tr>
      <tr>
-      <td><tt>pid</tt></td>
+      <td><tt>proj</tt></td>
       <td>string</td>
       <td>emulab-ops</td>
       <td>The project ID in which the imageid was created; defaults to
@@ -781,7 +850,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td>Specify the imageid to load on all of the nodes</td>
      </tr>
      <tr>
-      <td><tt>imagepid</tt></td>
+      <td><tt>imageproj</tt></td>
       <td>string</td>
       <td>&nbsp</td>
       <td>Specify the Emulab project ID of the imageid. By default the
