@@ -582,7 +582,6 @@ function SHOWEXP($pid, $eid, $edit=0) {
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
-    $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
     if ($edit) {
 	# make this a form too
 	echo "<form action=\"showexp.php3?pid=$pid&eid=$eid\" method=POST>\n";
@@ -590,12 +589,19 @@ function SHOWEXP($pid, $eid, $edit=0) {
 	    "name=noswap value=\"$noswap_reason\" size=30>";
 	$noidleswap = "Why: <input type=text ".
 	    "name=noidleswap value=\"$noidleswap_reason\" size=30>";
-	$autoswap_str= "<input type=text size=2 name=autoswap ".
+	$autoswap_str= "<input type=text size=3 name=autoswap ".
 	    "value=\"$autoswap_hrs\"> hour".($autoswap_hrs==1 ? "" : "s");
     } else {
 	$noswap = "(\"$noswap_reason\")";
 	$noidleswap = "(\"$noidleswap_reason\")";
 	$autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
+    }
+    if ($edit && ISADMIN() ) {
+	# Admins can edit the idleswap time.
+	$idleswap_str= "<input type=text size=3 name=idleswap ".
+	    "value=\"$idleswap_hrs\"> hour".($idleswap_hrs==1 ? "" : "s");
+    } else {
+	$idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
     }
     
     if ($swappable)
@@ -706,9 +712,7 @@ function SHOWEXP($pid, $eid, $edit=0) {
             <td class=\"left\">$autoswap</td>
           </tr>\n";
 
-    # XXX: isadmin doesn't use the uid you give it, and we don't have a real
-    # uid to send here. so just make something up to match the prototype.
-    if (isadmin(123)) {
+    if (ISADMIN()) {
 	echo "<tr>
             <td>Idle Ignore:</td>
             <td class=\"left\">$idle_ignore</td>

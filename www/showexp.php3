@@ -165,6 +165,10 @@ if ($submit) {
 	$str .= ",noidleswap_reason=\"$noidleswap\"";
 	$mail=1;
     }
+    if (isset($idleswap) && $idleswap !="" && $idleswap>0 && ISADMIN()) {
+	$str .= ",idleswap_timeout=\"".(60*$idleswap)."\"";
+	$mail=1;
+    }
     if (isset($autoswap) && $autoswap !="" && $autoswap>0) {
 	$str .= ",autoswap_timeout=\"".(60*$autoswap)."\"";
 	$mail=1;
