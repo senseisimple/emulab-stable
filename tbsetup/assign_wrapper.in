@@ -439,25 +439,27 @@ while (1) {
 	  SWITCH1: {
 	      /^intraswitch$/ && do {
 		  ($vlink,$rawA,$rawB) = @info[0,3,5];
-		  $nodeportA = &getnodeport($rawA);
-		  $nodeportB = &getnodeport($rawB);
-		  $nodeportA =~ s/\//:/;
-		  $nodeportB =~ s/\//:/;
-		  if (&isdelay($nodeportB)) {
-		      $plinks{$vlink} = [$nodeportA,$nodeportB];
-		  } else {
-		      $plinks{$vlink} = [$nodeportB,$nodeportA];
-		  }
 		  last SWITCH1;
 	      };
 	      /^interswitch$/ && do {
-		  print STDERR "$0: *** Unsupported link type: interswitch.\n";
+		  ($vlink,$rawA,$rawB) = @info[0,3,$#info];
+		  last SWITCH1;
 	      };
 	      /^direct$/ && do {
 		  print STDERR "$0: *** Unsupported link type: direct.\n";
+		  exit(1);
 	      };
 	      print "Found garbage: $line\n";
 	  }
+	    $nodeportA = &getnodeport($rawA);
+	    $nodeportB = &getnodeport($rawB);
+	    $nodeportA =~ s/\//:/;
+	    $nodeportB =~ s/\//:/;
+	    if (&isdelay($nodeportB)) {
+		$plinks{$vlink} = [$nodeportA,$nodeportB];
+	    } else {
+		$plinks{$vlink} = [$nodeportB,$nodeportA];
+	    }
 	    printdb "  $vlink " . join(" ",@{$plinks{$vlink}}) . "\n";
 	}
     } else {
