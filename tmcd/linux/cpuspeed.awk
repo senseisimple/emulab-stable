@@ -5,6 +5,10 @@
 # All rights reserved.
 #
 
+/^cpu MHz.*(24|25)[0-9][0-9]\.[0-9]+$/ {
+    print "2500";
+    next
+}
 /^cpu MHz.*(19|20)[0-9][0-9]\.[0-9]+$/ {
     print "2000";
     next

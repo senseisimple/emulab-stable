@@ -23,6 +23,10 @@ elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
 		echo pc$cpuspeed;
 	fi
 
+# For Wiconsin nodes - they have a different node typing scheme
+elif [ $cpuspeed = "2500" ]; then
+	echo i2;
+
 else
 	echo pc$cpuspeed;
 fi

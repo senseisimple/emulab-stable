@@ -11,6 +11,9 @@ case $NODETYPE in
 pc300|pc1500|pc2000)
     echo 'eth0'
     ;;
+i2)
+    echo 'eth1'
+    ;;
 pc850)
     echo 'eth2'
     ;;
