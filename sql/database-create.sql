@@ -534,6 +534,7 @@ CREATE TABLE node_activity (
   last_net_act datetime NOT NULL default '0000-00-00 00:00:00',
   last_cpu_act datetime NOT NULL default '0000-00-00 00:00:00',
   last_ext_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_report datetime NOT NULL default '0000-00-00 00:00:00',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
