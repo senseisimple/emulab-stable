@@ -981,14 +981,48 @@ regular experiment and a batch mode experiment:
      their exit values, the batch system will then tear down the
      experiment. 
 </ul>
-<p>
 
+<p>
 The batch system may also be used for "queuing" interactive experiments.
-By leaving out <tt>tb-set-node-startcmd</tt> commands, an experiment
-will be started when enough nodes are available, but then remain active
-until you (or the system) swap or terminate it.
-<p>
+By leaving out <tt>tb-set-node-startcmd</tt> commands in the NS file,
+an experiment will be started when enough nodes are available,
+but then remain active until you (or the system) swap or terminate it.
 
+<p>
+Existing Batch Mode experiments
+(both true batch experiments and queued interactive ones)
+may be "stopped" and "queued."
+Stopping a Batch Mode experiment has identical semantics to swapping
+out a regular experiment, including loss of local node disk state,
+and thus is not really a "clean stop."
+Queueing a Batch Mode experiment is almost the same as a regular experiment
+swapin, the difference being that the swapin may be delayed if insufficient
+resources are available at the time of the swapin..
+
+<p>
+Unfortunately, while Batch Mode makes running experiments much easier,
+it also makes wasting resources far easier, e.g., a user queues up an
+interactive experiment and then is not around when it finally gets swapped in.
+To counter this, the idle swap threshold for a Batch Mode experiment is
+typically set lower than that for a regular experiment, usually 15 minutes.
+If necessary, this can be changed using the "Edit Experiment Metadata" link
+on an experiment's page.  The modified value will remain in effect til the
+next swapout.
+
+<p>
+While multiple Batch Mode experiments may be running in Emulab simultaneously,
+the current policy is that there can only be one such experiment per-user,
+per-project.  That is, two users in the same project may run experiments
+simultaneously and one user may run simultaneous experiments in different
+projects.
+
+<p>
+Finally, note that the rights and responsibilities of a Batch Mode experiment
+are conferred at creation time.  It is not possible to, for example, swap out
+a regular experiment and then swap it back in as a Batch Mode experiment
+(i.e., to get delayed swapin semantics).  This is unfortunate.
+
+<p>
 <li> <a NAME="BatchExample"></a>
      <h3>A Batch Mode Example</h3>
 
