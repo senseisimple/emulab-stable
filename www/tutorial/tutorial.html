@@ -98,14 +98,6 @@ from node A to B.
 	$ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail</code></pre>
 
 <p>
-Lastly, all NS files end with an epilog that instructs the simulator
-to start. This command is ignored by the Testbed, but should be
-included in all NS files for compability with the simulator.
-
-	<code><pre>
-	$ns run					</code></pre>
-
-<p>
 In addition to the standard NS syntax above, a number of <a
 href="nscommands.html">extensions</a> have been added that allow you
 to better control your experiment. For example, you may specify what
@@ -130,10 +122,12 @@ going to node C:
 	tb-set-ip-interface $NodeB $NodeC 192.168.42.42	</code></pre>
 
 <p>
-Then make sure to add the NS run command at the end:
+Lastly, all NS files end with an epilog that instructs the simulator
+to start.
+
 	<code><pre>
 	# Go!
-        $ns run                               </code></pre>
+	$ns run					</code></pre>
 
 <p>
 If you would like to try the above example, the completed <a
