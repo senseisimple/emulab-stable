@@ -8,9 +8,10 @@ SUBDIRS		= checkpass
 SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  delay_setup ifc_setup ifc_filegen \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
-		  tbprerun tbreport vpower vsnmpit killtip 
+		  tbprerun tbreport vpower vsnmpit killtip \
+		  mkacct-ctrl_wrapper
 DATAFILES	= default.ifc
-SUSCRIPTS	= mkprojdir os_setup mkacct-ctrl mkacct rmacct \
+SUSCRIPTS	= mkprojdir os_setup mkacct rmacct \
 	          mkacct-ctrl ifc_setup
 
 all:	$(BINS) $(SUBDIRS)
