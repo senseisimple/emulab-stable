@@ -21,7 +21,7 @@
  * Desc: Mezzanine IPC wrapper
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezz.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $ 
+ * CVS: $Id: mezz.c,v 1.2 2004-12-15 05:05:40 johnsond Exp $ 
  **************************************************************************/
 
 #include <errno.h>
@@ -89,7 +89,11 @@ int mezz_init(int create,char *ipcfilepath)
   else {
 	ipc->filename = strdup(ipcfilepath);
   }
+
+  printf("ipcfile = '%s'\n",ipc->filename);
   
+  strncpy(filename,ipc->filename,128);
+
   // Create a file to map
   if (create)
   {
