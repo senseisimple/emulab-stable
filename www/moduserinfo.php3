@@ -574,7 +574,8 @@ if (isset($formfields[password1]) &&
     }
 }
 if (isset($formfields[w_password1]) &&
-    strcmp($formfields[w_password1], "")) {
+    strcmp($formfields[w_password1], "") &&
+    $formfields[w_password1] != $defaults[w_password1]) {
     if (!isset($formfields[w_password2]) ||
 	strcmp($formfields[w_password2], "") == 0) {
 	$errors["Retype Windows Password"] = "Missing Field";
