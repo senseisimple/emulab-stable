@@ -156,6 +156,9 @@ while (1) {
 	my $eid = $pending_row{'eid'};
 	my $pid = $pending_row{'pid'};
 	my $now = `date '+20%y-%m-%d %H:%M:%S'`;
+	if ($now =~ /^([-\@\w: ]+)$/) {
+	    $now = $1;
+	}
 
 	$query_result = 
 	    DBQuery("update batch_experiments set status='configuring', ".
@@ -315,17 +318,22 @@ sub startexp($)
     my $creator   = $exphash{'creator_uid'};
     my $longname  = $exphash{'name'};
     my $attempts  = $exphash{'attempts'};
+    my $expires   = $exphash{'expires'};
 
     #
     # Insert an experiment record for startexp.
     #
     my $rightnow = `date '+20%y-%m-%d %H:%M:%S'`;
+    if ($rightnow =~ /^([-\@\w: ]+)$/) {
+	$rightnow = $1;
+    }
+    
     $query_result =
 	DBQueryFatal("insert into experiments ".
 		     "(eid, pid, expt_created, expt_name, ".
-		     "expt_head_uid, state, batchmode) ".
+		     "expt_head_uid, expt_expires, state, batchmode) ".
 		     "VALUES ('$eid', '$pid', '$rightnow', '$longname', ".
-		     "'$creator', 'new', 1)");
+		     "'$creator', '$expires', 'new', 1)");
 
     #
     # Try to start the experiment. If it fails, the experiment is gone.

@@ -120,9 +120,10 @@ echo "<p><center>
       </center>\n";    
 
 #
-# Dump experiment record if its currently running.
+# Dump experiment record if its currently running or configuring.
 #
-if (strcmp($status, "running") == 0) {
+if (strcmp($status, "running") == 0 ||
+    strcmp($status, "configuring") == 0) {
     echo "<center>
           <h1>Experiment Information</h1>
           </center>\n";
