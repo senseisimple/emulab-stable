@@ -345,6 +345,9 @@ elsif ($inout eq "in") {
 elsif ($inout eq "modify") {
     my $modifyError = "";
 
+    GatherSwapStats($pid, $eid, $dbuid,
+		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
+
     print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
     if (TBExptBackupVirtualState($pid, $eid, $$)) {
 	fatal("*** $0:\n".

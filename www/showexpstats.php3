@@ -8,6 +8,11 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
+# This page needs more work to make user friendly and flexible.
+# Its a hack job at the moment.
+# 
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("Show Experiment Information");
@@ -20,29 +25,36 @@ LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
 #
-# Only admins
-#
-if (! $isadmin) {
-    USERERROR("You do not have permission to view this page!", 1);
-}
-
-#
 # Right now we show just the last N records entered, unless the user
 # requested a specific record. 
 #
 if (isset($record) && strcmp($record, "")) {
+    $wclause = "";
+    if (! $isadmin) {
+	$wclause = "and s.creator='$uid'";
+    }
     $query_result =
-	DBQueryFatal("select * from experiment_stats ".
-		     "where idx=$record");
+	DBQueryFatal("select s.*,r.* from experiment_stats as s ".
+		     "left join experiment_resources as r on ".
+		     " r.exptidx=s.exptidx ".
+		     "where s.exptidx=$record $wclause ".
+		     "order by r.idx desc");
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("No such experiment record $record in the system!", 1);
     }
 }
 else {
+    $wclause = "";
+    if (! $isadmin) {
+	$wclause = "where s.creator='$uid'";
+    }
     $query_result =
-	DBQueryFatal("select * from experiment_stats ".
-		     "order by idx desc limit 100");
+	DBQueryFatal("select s.*,r.* from experiment_stats as s ".
+		     "left join experiment_resources as r on ".
+		     " r.exptidx=s.exptidx ".
+		     "$wclause ".
+		     "order by s.exptidx desc,r.idx asc limit 200");
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("No experiment records in the system!", 1);

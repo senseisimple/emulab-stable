@@ -66,46 +66,43 @@ SHOWEXPLIST("PROJ",$pid);
 SHOWGROUPMEMBERS($pid, $pid, 0);
 
 #
-# A list of project Groups (if more than just the default).
+# A list of project Groups
 #
+echo "<center>
+      <h3>Project Groups</h3>\n";
+
+SUBPAGESTART();
+SUBMENUSTART("Project Options");
+WRITESUBMENUBUTTON("Create Subgroup",
+		   "newgroup_form.php3?pid=$pid");
+WRITESUBMENUBUTTON("Show Project History",
+		   "showstats.php3?showby=project&which=$pid");
+SUBMENUEND();
+
 $query_result =
     DBQueryFatal("SELECT * FROM groups WHERE pid='$pid'");
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Project Groups</h3>
-          </center>
-          <table align=center border=1>\n";
+echo "<table align=center border=1>\n";
+echo "<tr>
+          <th>GID</th>
+          <th>Desription</th>
+          <th>Leader</th>
+      </tr>\n";
+
+while ($row = mysql_fetch_array($query_result)) {
+    $gid      = $row[gid];
+    $desc     = stripslashes($row[description]);
+    $leader   = $row[leader];
 
     echo "<tr>
-              <th>GID</th>
-              <th>Desription</th>
-              <th>Leader</th>
+              <td><A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+              <td>$desc</td>
+              <td><A href='showuser.php3?target_uid=$leader'>$leader</A></td>
           </tr>\n";
-
-    while ($row = mysql_fetch_array($query_result)) {
-        $gid      = $row[gid];
-        $desc     = stripslashes($row[description]);
-	$leader   = $row[leader];
-
-        echo "<tr>
-                  <td>
-                      <A href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a>
-                      </td>
-
-                  <td>$desc</td>
-
-	          <td><A href='showuser.php3?target_uid=$leader'>$leader</A>
-                      </td>
-              </tr>\n";
-    }
-
-    echo "</table>\n";
 }
+echo "</table>\n";
+echo "</center>\n";
 
-echo "<p><center>
-       <A href='newgroup_form.php3?pid=$pid'>Create</a> a new Group?
-      </center>\n";
-
+SUBPAGEEND();
 SHOWPROJECT($pid, $uid);
 
 if ($isadmin) {

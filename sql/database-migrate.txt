@@ -423,3 +423,96 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table os_info add column max_concurrent int(11) default NULL;
        alter table images drop column max_concurrent;
+
+1.143: Split the experiment stats table into two parts. The first is
+       the per-experiment instantiation with aggregate data like the
+       number of swapins, the dates and the like. The other part is
+       the per swapin/modify stats. These are number of pnodes, links,
+       lans, etc. Long term, I think we want more precise swapin
+       stats, and with experiment modify in the mix, we need to have
+       multiple stat records per experiment, but do not need to
+       duplicate all the stuff in the other table just mentioned.
+
+       To reduce the amount the table size, we cross reference the
+       tables by index only instead of with pid,eid and the like. We use
+       exptidx to link experiments, experiment_stats, and the new
+       experiment_resources table. experiment_resources and stats are
+       linked by another index in the resources table, which indicates
+       which is the current resource row. On a modify, a new resource
+       record is created, and the stats record updated to point to the
+       new (latest) resource record. 
+
+	DROP TABLE IF EXISTS experiment_resources;
+	CREATE TABLE experiment_resources (
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  exptidx int(10) unsigned NOT NULL default '0',
+	  tstamp datetime default NULL,
+	  vnodes smallint(5) unsigned default '0',
+	  pnodes smallint(5) unsigned default '0',
+	  wanodes smallint(5) unsigned default '0',
+	  simnodes smallint(5) unsigned default '0',
+          jailnodes smallint(5) unsigned default '0',
+          delaynodes smallint(5) unsigned default '0',
+          linkdelays smallint(5) unsigned default '0',
+          walinks smallint(5) unsigned default '0',
+          links smallint(5) unsigned default '0',
+          lans smallint(5) unsigned default '0',
+          shapedlinks smallint(5) unsigned default '0',
+          shapedlans smallint(5) unsigned default '0',
+          minlinks tinyint(3) unsigned default '0',
+          maxlinks tinyint(3) unsigned default '0',
+          PRIMARY KEY  (idx),
+	  KEY exptidx (exptidx)
+        ) TYPE=MyISAM;
+
+      Be clear about what index is what:
+
+        alter table experiment_stats change idx exptidx 
+			int(10) unsigned NOT NULL default '0';
+        alter table experiment_stats drop index idx;
+	alter table experiment_stats add index(exptidx);
+        alter table experiment_stats add rsrcidx 
+			int(10) unsigned NOT NULL default '0' after exptidx;
+	alter table experiment_stats add index(rsrcidx);
+        alter table experiment_stats add lastrsrc
+			int(10) unsigned default NULL after rsrcidx;
+
+      Change a few names cause I picked bad ones initially:
+        alter table experiment_stats change swapmodify_count swapmod_count
+			smallint(5) unsigned default '0';
+        alter table experiment_stats change swapmodify_last swapmod_last
+			datetime default NULL;
+        alter table group_stats change exptswapmodify_count exptswapmod_count
+			int(11) unsigned default '0';
+        alter table group_stats change exptswapmodify_last exptswapmod_last
+			datetime default NULL;
+        alter table project_stats change exptswapmodify_count exptswapmod_count
+			int(11) unsigned default '0';
+        alter table project_stats change exptswapmodify_last exptswapmod_last
+			datetime default NULL;
+        alter table user_stats change exptswapmodify_count exptswapmod_count
+			int(11) unsigned default '0';
+        alter table user_stats change exptswapmodify_last exptswapmod_last
+			datetime default NULL;
+
+      To populate the new table from the old table:
+
+	insert into experiment_resources (idx, exptidx, tstamp, vnodes, 
+		pnodes, wanodes, simnodes, jailnodes, delaynodes, 
+		linkdelays, walinks, links, lans, shapedlinks, 
+		shapedlans, minlinks, maxlinks) 
+               select 0, exptidx, created, vnodes, pnodes, wanodes, 
+	        simnodes, jailnodes, delaynodes, linkdelays, walinks, 
+		links, lans, shapedlinks, shapedlans, minlinks, 
+		maxlinks from experiment_stats order by exptidx;
+
+      Now we have to insert the newly created resource idx into the
+      stats table to link them up.
+
+	my $query_result =
+	    DBQueryFatal("select idx,exptidx from experiment_resources");
+
+	while (($idx,$exptidx) = $query_result->fetchrow_array()) {
+	    DBQueryFatal("update experiment_stats set rsrcidx=$idx ".
+			 "where exptidx=$exptidx");
+	}

@@ -116,7 +116,7 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
 #
-DBQueryFatal("lock tables experiments write, experiment_stats write");
+DBQueryFatal("lock tables experiments write");
 
 $query_result =
     DBQueryFatal("SELECT pid,eid FROM experiments ".
@@ -142,23 +142,33 @@ if (! DBQueryWarn("INSERT INTO experiments ".
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
 }
-# Need the idx.
-if (! ($query_result =
-       DBQueryWarn("select idx from experiments ".
-		   "where pid='$pid' and eid='$eid'"))) {
-    DBQueryWarn("unlock tables");
-    fatal("Database error inserting experiment stats record for $pid/$eid!\n");
-}
-my ($idx) = $query_result->fetchrow_array;
-
-# Insert stats record.
-DBQueryWarn("INSERT INTO experiment_stats ".
-	    "(eid, pid, creator, idx, gid, created, batch) ".
-	    "VALUES ('$eid', '$pid', '$dbuid', $idx, '$gid', now(), ".
-	    ($immediate ? 0 : 1) . ")");
 
 if (! DBQueryWarn("unlock tables")) {
     fatal("Unexpected DB Error!");
+}
+
+#
+# Create an experiment_resources record for the above record. 
+#
+if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
+		  "select 0, now(), idx from experiments ".
+		  "where pid='$pid' and eid='$eid'")) {
+    DBQueryWarn("unlock tables");
+    fatal("DB error inserting experiment resources record for $pid/$eid!\n");
+}
+
+#
+# Now create an experiment_stats record to match.
+# 
+if (! DBQueryWarn("insert into experiment_stats ".
+		  "(eid, pid, creator, gid, created, batch, exptidx,rsrcidx) ".
+		  "select '$eid', '$pid', '$dbuid', '$gid', now(), ".
+		  ($immediate ? 0 : 1) .
+		  ", e.idx,r.idx from experiments as e ".
+		  "left join experiment_resources as r on e.idx=r.exptidx ".
+		  "where pid='$pid' and eid='$eid'")) {
+    DBQueryWarn("unlock tables");
+    fatal("DB error inserting experiment stats record for $pid/$eid!\n");
 }
 
 #
@@ -247,19 +257,29 @@ sub fatal($)
     print STDOUT "    $mesg\n";
 
     #
+    # Generally, we do not delete the stats/resource record, but if we
+    # failed at this point, no point in keeping the record. Just a
+    # waste of space since the testbed_stats log indicates there was a
+    # failure and why (sorta, via the exit code).
+    #
+    if (($query_result = 
+	 DBQueryWarn("select idx from experiments ".
+		     "where pid='$pid' and eid='$eid'"))) {
+
+	my ($idx) = $query_result->fetchrow_array;
+
+	if (defined($idx) && $idx) {
+	    DBQueryWarn("DELETE from experiment_stats ".
+			"WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
+	    DBQueryWarn("DELETE from experiment_resources ".
+			"WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
+	}
+    }
+    
+    #
     # Clear the record and cleanup.
     # 
     TBExptDestroy($pid, $eid);
-
-    #
-    # Generally, we do not delete the stats record, but if we failed
-    # at this point, no point in keeping the record. Just a waste of
-    # space.
-    #
-    if (defined($idx) && $idx) {
-	DBQueryWarn("DELETE from experiment_stats ".
-		    "WHERE eid='$eid' and pid='$pid' and idx=$idx");
-    }
     
     exit(-1);
 }

@@ -402,7 +402,6 @@ REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 
 REPLACE INTO testsuite_preentables VALUES ('comments','drop');
 REPLACE INTO testsuite_preentables VALUES ('iface_counters','drop');
-REPLACE INTO testsuite_preentables VALUES ('lastlogin','drop');
 REPLACE INTO testsuite_preentables VALUES ('login','drop');
 REPLACE INTO testsuite_preentables VALUES ('loginmessage','drop');
 REPLACE INTO testsuite_preentables VALUES ('node_idlestats','drop');
@@ -432,6 +431,7 @@ REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('experiment_resources','clean');
 REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --

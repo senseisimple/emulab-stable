@@ -165,6 +165,33 @@ CREATE TABLE eventlist (
   KEY vnode (vnode)
 ) TYPE=MyISAM;
 
+
+--
+-- Table structure for table 'experiment_stats'
+--
+
+CREATE TABLE experiment_resources (
+  idx int(10) unsigned NOT NULL auto_increment,
+  exptidx int(10) unsigned NOT NULL default '0',
+  tstamp datetime default NULL,
+  vnodes smallint(5) unsigned default '0',
+  pnodes smallint(5) unsigned default '0',
+  wanodes smallint(5) unsigned default '0',
+  simnodes smallint(5) unsigned default '0',
+  jailnodes smallint(5) unsigned default '0',
+  delaynodes smallint(5) unsigned default '0',
+  linkdelays smallint(5) unsigned default '0',
+  walinks smallint(5) unsigned default '0',
+  links smallint(5) unsigned default '0',
+  lans smallint(5) unsigned default '0',
+  shapedlinks smallint(5) unsigned default '0',
+  shapedlans smallint(5) unsigned default '0',
+  minlinks tinyint(3) unsigned default '0',
+  maxlinks tinyint(3) unsigned default '0',
+  PRIMARY KEY  (idx),
+  KEY exptidx (exptidx)
+) TYPE=MyISAM;
+
 --
 -- Table structure for table 'experiment_stats'
 --
@@ -173,7 +200,9 @@ CREATE TABLE experiment_stats (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   creator varchar(8) NOT NULL default '',
-  idx int(10) unsigned NOT NULL default '0',
+  exptidx int(10) unsigned NOT NULL default '0',
+  rsrcidx int(10) unsigned NOT NULL default '0',
+  lastrsrc int(10) unsigned default NULL,
   gid varchar(16) NOT NULL default '',
   created datetime default NULL,
   destroyed datetime default NULL,
@@ -181,8 +210,8 @@ CREATE TABLE experiment_stats (
   swapin_last datetime default NULL,
   swapout_count smallint(5) unsigned default '0',
   swapout_last datetime default NULL,
-  swapmodify_count smallint(5) unsigned default '0',
-  swapmodify_last datetime default NULL,
+  swapmod_count smallint(5) unsigned default '0',
+  swapmod_last datetime default NULL,
   swap_errors smallint(5) unsigned default '0',
   swap_exitcode tinyint(3) unsigned default '0',
   idle_swaps smallint(5) unsigned default '0',
@@ -202,8 +231,9 @@ CREATE TABLE experiment_stats (
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   batch tinyint(3) unsigned default '0',
-  PRIMARY KEY  (eid,pid,idx),
-  KEY idx (idx)
+  PRIMARY KEY  (eid,pid,exptidx),
+  KEY exptidx (exptidx),
+  KEY rsrcidx (rsrcidx)
 ) TYPE=MyISAM;
 
 --
@@ -317,8 +347,8 @@ CREATE TABLE group_stats (
   exptswapin_last datetime default NULL,
   exptswapout_count int(11) unsigned default '0',
   exptswapout_last datetime default NULL,
-  exptswapmodify_count int(11) unsigned default '0',
-  exptswapmodify_last datetime default NULL,
+  exptswapmod_count int(11) unsigned default '0',
+  exptswapmod_last datetime default NULL,
   allexpt_duration int(11) unsigned default '0',
   allexpt_vnodes int(11) unsigned default '0',
   allexpt_vnode_duration int(11) unsigned default '0',
@@ -941,8 +971,8 @@ CREATE TABLE project_stats (
   exptswapin_last datetime default NULL,
   exptswapout_count int(11) unsigned default '0',
   exptswapout_last datetime default NULL,
-  exptswapmodify_count int(11) unsigned default '0',
-  exptswapmodify_last datetime default NULL,
+  exptswapmod_count int(11) unsigned default '0',
+  exptswapmod_last datetime default NULL,
   allexpt_duration int(11) unsigned default '0',
   allexpt_vnodes int(11) unsigned default '0',
   allexpt_vnode_duration int(11) unsigned default '0',
@@ -1233,8 +1263,8 @@ CREATE TABLE user_stats (
   exptswapin_last datetime default NULL,
   exptswapout_count int(11) unsigned default '0',
   exptswapout_last datetime default NULL,
-  exptswapmodify_count int(11) unsigned default '0',
-  exptswapmodify_last datetime default NULL,
+  exptswapmod_count int(11) unsigned default '0',
+  exptswapmod_last datetime default NULL,
   allexpt_duration int(11) unsigned default '0',
   allexpt_vnodes int(11) unsigned default '0',
   allexpt_vnode_duration int(11) unsigned default '0',

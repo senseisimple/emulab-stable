@@ -277,12 +277,12 @@ function WRITESIDEBAR() {
 				   $TBBASE, "nodecontrol_list.php3");
 		WRITESIDEBARBUTTON("Node Up/Down Status",
 				   $TBDOCBASE, "updown.php3");
-
+		WRITESIDEBARBUTTON("View Testbed Stats",
+				   $TBBASE, "showstats.php3");
+		
 		if (ISADMIN($login_uid)) {
 		    WRITESIDEBARBUTTON("Edit Site Variables",
 				       $TBBASE, "editsitevars.php3");
-		    WRITESIDEBARBUTTON("View Testbed Stats",
-				       $TBBASE, "showstats.php3");
 		}
 		
 		if ($login_status & CHECKLOGIN_CVSWEB) {
@@ -567,12 +567,12 @@ function PAGEFOOTER() {
               <td colspan=2 class=contentbody>
 	        <center>
                 <font size=-1>
-		[&nbsp;<a href=http://www.cs.utah.edu/flux/>
-                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
-		[&nbsp;<a href=http://www.cs.utah.edu/>
-                    School&nbsp;of&nbsp;Computing</a>&nbsp;]
-		[&nbsp;<a href=http://www.utah.edu/>
-                    The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]
+		[<a href=http://www.cs.utah.edu/flux/>
+                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a>]
+		[<a href=http://www.cs.utah.edu/>
+                    School&nbsp;of&nbsp;Computing</a>]
+		[<a href=http://www.utah.edu/>
+                    The&nbsp;University&nbsp;of&nbsp;Utah</a>]
 		</font>
 		<br>
                 <!-- begin copyright -->
@@ -585,7 +585,7 @@ function PAGEFOOTER() {
                 <p align=right>
 		  <font size=-2>
                     Problems?
-	            Contact $TBMAILADDR; 
+	            Contact $TBMAILADDR.
                   </font>
                 </p>
                 <!-- end copyright -->\n";
@@ -594,15 +594,7 @@ function PAGEFOOTER() {
 
     if ($TBMAINSITE) {
 	echo "<p>
-              <a href=\"$TBDOCBASE/netemu.php3\"></a>\n";#
-
-	if (! isset($SSL_PROTOCOL)) {
-	    echo "<a href=http://www.addme.com>
-	             <img width=8 height=2
-	                 src='http://www.addme.com/link8.gif'
-   	                 alt='Add Me!' border=0>
-	          </a>\n";
-	}
+              <a href=\"$TBDOCBASE/netemu.php3\"></a>\n";
     }
     echo "</body></html>\n";
 }
