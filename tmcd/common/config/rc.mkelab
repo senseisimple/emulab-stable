@@ -377,7 +377,7 @@ sub SetupOpsNode()
 
     print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
     print RC "ifconfig_${outer_controlif}=".
-	"\"inet $outer_ip netmask $outer_netmask\n";
+	"\"inet $outer_ip netmask $outer_netmask\"\n";
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
@@ -489,9 +489,6 @@ sub SetupBossNode()
 
     # Copy over creators ssl certificate for XMLRPC. See below.
     mysystem("cp -fp ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff", 3);
-
-    # Still waiting for Rob to fix packages. This is some extra goo.
-#    mysystem("cp -p /proj/$pid/exp/$eid/extras.tar.gz ${TBDIR}/testbed/stuff");
 
     #
     # Stash the IP of the outer emulab for tmcc (and script above).
@@ -611,7 +608,7 @@ sub SetupBossNode()
 
     print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
     print RC "ifconfig_${outer_controlif}=".
-	"\"inet $outer_ip netmask $outer_netmask\n";
+	"\"inet $outer_ip netmask $outer_netmask\"\n";
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
