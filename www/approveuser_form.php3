@@ -135,9 +135,9 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td rowspan=2>$pid</td>
               <td rowspan=2>
                   <select name=\"$newuid\$\$approval-$pid\">
+                          <option value='postpone'>Postpone</option>
                           <option value='approve'>Approve</option>
                           <option value='deny'>Deny</option>
-                          <option value='postpone'>Postpone</option>
                   </select>
               </td>
               <td rowspan=2>
