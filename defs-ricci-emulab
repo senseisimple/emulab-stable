@@ -9,3 +9,4 @@ BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 OURDOMAIN=emulab.net
 DELAYCAPACITY=2
+IPBASE=192.168
