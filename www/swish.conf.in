@@ -14,9 +14,10 @@ FileRules dirname contains /dev/
 FileRules dirname contains /downloads
 FileRules dirname contains /distributions
 FileRules dirname contains /bugtrack
+FileRules dirname contains /netlab
 
 # Sigh, special case. Sorry.
-FileMatch filename contains xmlrpcapi.php3
+FileMatch filename contains xmlrpcapi.php3 client.php3 mobilewireless.php3
 
 # But only index the .html files
 IndexOnly .html
