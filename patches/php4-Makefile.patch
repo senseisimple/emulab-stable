@@ -1,0 +1,12 @@
+--- /usr/ports/lang/php4/Makefile.orig	Fri Oct  1 15:18:55 2004
++++ /usr/ports/lang/php4/Makefile	Fri Oct  1 14:59:22 2004
+@@ -31,7 +31,8 @@
+ 		--enable-memory-limit \
+ 		--with-layout=GNU \
+ 		--with-config-file-scan-dir=${PREFIX}/etc/php \
+-		--disable-all
++		--disable-all \
++		--with-openssl=/usr
+ 
+ .if !defined(WITH_REGEX_TYPE) || ${WITH_REGEX_TYPE} == "php"
+ CONFIGURE_ARGS+=--with-regex=php

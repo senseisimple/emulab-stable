@@ -85,6 +85,7 @@ my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
 my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $PHP4_PATCH      = "$TOP_SRCDIR/patches/php4-Makefile.patch";
 my $INIT_PRIVKEY    = "$TOP_SRCDIR/install/identity";
 
 my $SSH_CONFIG      = "/etc/ssh/ssh_config";
@@ -277,6 +278,14 @@ Phase "tftp", "Setting up directories for tftp", sub {
 };
 
 Phase "ports", "Installing ports", sub {
+    # Ick. The php4 port is broken with SSL, so we have to patch it - hopefully
+    # it'll get fixed someday, and we remove this
+    Phase "php4patch", "Patching php4 port", sub {
+	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $PHP4_PATCH")) {
+	    PhaseSkip("$PHP4_PATCH already applied");
+	}
+	ExecQuietFatal("$PATCH -f -l -p0 -i $PHP4_PATCH");
+    };
     Phase "packages", "Installing packages", sub {
 	if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT")) {
 	    PhaseSkip("Ports already installed");
