@@ -13,26 +13,26 @@ use Getopt::Std;
 # Reboot a node (or nodes). Will power cycle the node as a last resort.
 # Use -e option to reboot all nodes in an experiment.
 #
-# usage: node_reboot [-d] [-f] node [node ...]
-#        node_reboot [-d] [-f] -e pid,eid
-#        Exit value is 0 if all nodes reboot okay, or the number of nodes
-#        could not be rebooted.
+# Exit value is 0 if all nodes reboot okay, or the number of nodes
+# could not be rebooted.
 #
 sub usage()
 {
-    print STDOUT "Usage: node_reboot [-d] [-f] node [node ...]\n" .
-	         "       node_reboot [-d] [-f] -e pid,eid\n".
+    print STDOUT "Usage: node_reboot [-d] [-f] [-w] node [node ...]\n" .
+	         "       node_reboot [-d] [-f] [-w] -e pid,eid\n".
 	"Use the -d option to turn on debugging\n" .
 	"Use the -e option to reboot all the nodes in an experiment\n" .
-	"Use the -f option to shoot the node in the head\n";
+	"Use the -w option to to wait for nodes is come back up\n" .
+	"Use the -f option to power cycle (and not wait for nodes to die)\n";
     exit(-1);
 }
-my  $optlist = "dfe:";
+my  $optlist = "dfe:w";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
+my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 
 #
 # Testbed Support libraries
@@ -45,6 +45,7 @@ use POSIX qw(strftime);
 my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/apod";
+my $vnodesetup	= "$TB/sbin/vnode_setup";
 my $logfile	= "$TB/log/power.log";
 my $ping	= "/sbin/ping";
 my %pids	= ();
@@ -52,6 +53,7 @@ my @row;
 my @nodes       = ();
 my $debug       = 0;
 my $force       = 0;
+my $waitmode    = 0;
 my $failed      = 0;
 my $eidmode     = 0;
 my $pid;
@@ -84,6 +86,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"w"})) {
+    $waitmode = 1;
 }
 if (defined($options{"e"})) {
     if (@ARGV) {
@@ -156,18 +161,43 @@ else {
 }
 
 #
-# VIRTNODE HACK: Virtual nodes are special. Do not reboot!
+# VIRTNODE HACK: Virtual nodes are special. We can reboot jailed vnodes.
+# but not old style (non-jail). Also, if we are going to reboot the physical
+# node that a vnode is on, do not bother with rebooting the vnode since
+# it will certainly get rebooted anyway!
 #
-my @temp = ();
+my %realnodes = ();
+my %virtnodes = ();
+
 foreach my $node ( @nodes ) {
-    if (TBIsNodeVirtual($node)) {
-	print "*** Skipping virtual node $node ...\n";
-	next;
+    my $jailed;
+    
+    if (TBIsNodeVirtual($node, \$jailed)) {
+	if (! $jailed) {
+	    print "*** Skipping old style (non-jail) virtual node $node ...\n";
+	    next;
+	}
+	my $pnode;
+	
+	if (! TBPhysNodeID($node, \$pnode)) {
+	    die("*** $0:\n".
+		"    No physical node for $node!\n");
+	}
+	$virtnodes{$node} = $pnode;
     }
-    push(@temp, $node);
+    else {
+	$realnodes{$node} = $node;
+    }
 }
-@nodes = @temp;
-if (! @nodes) {
+for my $node ( keys(%virtnodes) ) {
+    my $pnode = $virtnodes{$node};
+
+    if (defined($realnodes{$pnode})) {
+	print "*** Dropping $node since its host ($pnode) will reboot ...\n";
+	delete($virtnodes{$node});
+    }
+}
+if (! keys(%realnodes) && ! keys(%virtnodes)) {
     print "No nodes to reboot. Exiting ...\n";
     exit(0);
 }
@@ -178,7 +208,7 @@ if (! @nodes) {
 # so that the shelves are grouped together at least, and issue the reboots
 # in batches. 
 #
-my @sortednodes = sort(@nodes);
+my @sortednodes = sort(keys(%realnodes));
 
 while (@sortednodes) {
     my @batch = ();
@@ -243,30 +273,66 @@ while (@sortednodes) {
 }
 
 #
-# In force mode, we are done.
-#
-if ($force) {
-    exit 0;
-}
-
-#
 # Wait for all the reboot children to exit before continuing.
 #
-foreach my $node ( sort(@nodes) ) {
-    my $mypid     = $pids{$node};
+if (! $force) {
+    foreach my $node ( sort(keys(%realnodes)) ) {
+	my $mypid     = $pids{$node};
 
-    waitpid($mypid, 0);
-    if ($?) {
-	$failed++;
-	print STDERR "Reboot of node $node failed!\n";
-    }
-    else {
-	print STDOUT "$node rebooting ...\n";
+	waitpid($mypid, 0);
+	if ($?) {
+	    $failed++;
+	    print STDERR "Reboot of node $node failed!\n";
+	}
+	else {
+	    print STDOUT "$node rebooting ...\n";
+	}
     }
 }
 
-if ($debug && $failed) {
-    print STDERR "$failed nodes could not be rebooted\n";
+#
+# Now do vnodes. Do these serially for now (simple).
+# 
+for my $node ( keys(%virtnodes) ) {
+    my $pnode = $virtnodes{$node};
+
+    if (RebootVNode($node, $pnode)) {
+	$failed++;
+	print STDERR "Reboot of node $node on $pnode failed!\n";
+    }
+    else {
+	print STDOUT "$node on $pnode rebooting ...\n";
+    }
+}
+
+if ($failed) {
+    if ($debug) {
+	print STDERR "$failed real nodes could not be rebooted\n";
+    }
+    exit($failed);
+}
+
+#
+# Wait for nodes to reboot. We wait only once, no reboots. 
+# 
+if ($waitmode) {
+    my $waitstart = time;
+
+    print STDOUT "Waiting for nodes to come up ...\n";
+
+    # Wait for events to filter through stated! If we do not wait, then we
+    # could see nodes still in ISUP.
+    sleep(2);
+    
+    foreach my $node ( sort(@nodes) ) {
+	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
+	    print STDOUT "$node is alive and well\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    next;
+	}
+	SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	$failed++;
+    }
 }
 exit $failed;
 
@@ -392,6 +458,57 @@ sub RebootNode {
 }
 
 #
+# Reboot a vnode in a child process, and wait for it. 
+# 
+sub RebootVNode($$) {
+    my ($vnode, $pnode) = @_;
+    my $syspid;
+
+    print STDOUT "Rebooting $vnode on $pnode ...\n";
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    # 
+    $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 20;
+	waitpid($syspid, 0);
+	alarm 0;
+	my $exitstatus = $?;
+
+	#
+	# The ssh can return non-zero exit status, but still have worked.
+	# FreeBSD for example.
+	#
+	print STDERR "reboot of $vnode returned $exitstatus.\n" if $debug;
+    
+	#
+	# Look for setup failure, reported back through ssh.
+	# 
+	if ($exitstatus) {
+	    if ($exitstatus == 256) {
+		print STDERR "$pnode is not running sshd.\n" if $debug;
+	    }
+	    elsif ($exitstatus == 15) {
+		print STDERR "$pnode is wedged.\n" if $debug;
+	    }
+	}
+	return($exitstatus);
+    }
+    #
+    # Must change our real UID to root so that ssh will work.
+    #
+    $UID = 0;
+    
+    exec("$ssh -host $pnode $CLIENT_BIN/vnodesetup -r -j $vnode");
+    exit(0);
+}
+
+#
 # Power cycle a PC using the testbed power program.
 #
 sub PowerCycle {
@@ -406,7 +523,6 @@ sub PowerCycle {
 # 
 sub WaitTillDead {
     local($pc) = @_;
-    local($status);
 
     print STDERR "Waiting for $pc to die off\n" if $debug;
     
@@ -451,6 +567,7 @@ sub DoesPing {
     return 1;
 }
 
+
 sub info($) {
     my $message = shift;
     # Print out log entries like this:
@@ -459,3 +576,4 @@ sub info($) {
     print LOG strftime("%b %e %H:%M:%S",localtime)." $message\n";
     close(LOG);
 }
+
