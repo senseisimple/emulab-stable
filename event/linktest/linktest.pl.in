@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -T
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -194,6 +194,14 @@ my @results = &read_file($fname);
 chomp $hostname;
 chomp $exp_id;
 chomp $proj_id;
+
+# taint check pid/eid
+if ($proj_id =~ /([-\w]*)/) {
+    $proj_id = $1;
+}
+if ($exp_id =~ /([-\w]*)/) {
+    $exp_id = $1;
+}
 $gid = $proj_id;
 
 #
@@ -216,9 +224,9 @@ if(-e "$expt_path/$exp_id-modify.ns") {
 #
 ($platform) = POSIX::uname();
 if($platform eq BSD) {
-    $ns_cmd = LINKTEST_NSPATH ."/fbsd/ns";
+    $ns_cmd = LINKTEST_NSPATH . "/fbsd/ns";
 } elsif ($platform eq LINUX) {
-    $ns_cmd = LINKTEST_NSPATH ."/linux/ns";
+    $ns_cmd = LINKTEST_NSPATH . "/" . linux_version() . "/ns";
 } else {
     die ("Platform $platform is not currently supported.\n");
 }
@@ -1091,7 +1099,7 @@ sub wait_all {
 # that all exited properly.
 #
 sub post_event {
-    my ($event,$args) = @_;
+    my ($event,$args) = map { $1 if (/(.*)/) } @_;
     if($hostname eq $synserv) {
 	system(PATH_LTEVENT,
 		   "-s",
@@ -1261,4 +1269,15 @@ sub is_special_node {
     } else {
 	return FALSE;
     }
+}
+
+sub linux_version {
+    my $vers = "linux";
+    if (-e "/etc/redhat-release") {
+	my $foo = `cat /etc/redhat-release`;
+	if ($foo =~ /Red Hat Linux release 9/) {
+	    $vers = "linux9";
+	}
+    }
+    return $vers;
 }
