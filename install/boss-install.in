@@ -27,6 +27,8 @@ my $DBNAME     = "@TBDBNAME@";
 
 my $OURDOMAIN  = '@OURDOMAIN@';
 
+my $LOGFACIL   = '@TBLOGFACIL@';
+
 my $USERNODE   = '@USERNODE@';
 my $FSNODE     = '@FSNODE@';
 my $BOSSNODE   = '@BOSSNODE@';
@@ -383,6 +385,18 @@ Phase "database", "Setting up database", sub {
 	    PhaseSkip("Already done");
 	}
 	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-fill.sql");
+    };
+    Phase "sdbdata", "Filling tables with supplemental data", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "os_info' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < " .
+	    "$TOP_SRCDIR/sql/database-fill-supplemental.sql");
     };
     Phase "sitevars", "Setting sitevars to default values", sub {
 	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
