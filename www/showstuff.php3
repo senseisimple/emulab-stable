@@ -1064,8 +1064,11 @@ function SHOWIMAGEID($imageid, $edit) {
 #
 function SHOWNODE($node_id) {
     $query_result =
-	DBQueryFatal("select n.*,r.vname,r.pid,r.eid from nodes as n ".
+	DBQueryFatal("select n.*,r.vname,r.pid,r.eid,i.IP from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
+		     "left join node_types as t on t.type=n.type ".
+		     "left join interfaces as i on i.card=t.control_net ".
+		     " and i.node_id=n.node_id ".
 		     "where n.node_id='$node_id'");
     
     if (mysql_num_rows($query_result) == 0) {
@@ -1095,6 +1098,7 @@ function SHOWNODE($node_id) {
     $state_timestamp    = $row[state_timestamp];
     $op_mode            = $row[op_mode];
     $op_mode_timestamp  = $row[op_mode_timestamp];
+    $IP                 = $row[IP];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -1153,6 +1157,11 @@ function SHOWNODE($node_id) {
     echo "<tr>
               <td>Node Type:</td>
               <td class=left>$type</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Control Net IP:</td>
+              <td class=left>$IP</td>
           </tr>\n";
 
     echo "<tr>
