@@ -4,7 +4,7 @@ use Mysql;
 #
 # Configure variables
 #
-my $TB     = "@prefix@/bin";
+my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
@@ -16,8 +16,8 @@ if ($#ARGV < 1) {
 }
 
 my $error = 0;
-my $consetup="$TB/console_setup";
-my $osload="$TB/os_load";
+my $consetup="$TB/libexec/console_setup";
+my $osload="$TB/bin/os_load";
 my $reloadpid="testbed";
 my $reloadeid="reloading";
 my $pid = shift;
@@ -36,6 +36,12 @@ if ($sth->numrows < 1) {
   die("There is no experiment '$eid' in project '$pid'.\n");
 }
  
+print "Locking tables.\n";
+$cmd = "lock tables nodes read, node_types read, reloads read, ".
+  "interfaces write, reserved write";
+$sth = $dbh->query($cmd) 
+  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+
 # If list is empty, put in all the nodes
 if ($#node_names == -1) {
   print "Releasing all nodes from experiment '$eid' in project '$pid'...\n";
@@ -100,8 +106,9 @@ foreach my $n (@node_names) {
 
   if (! ($n =~ /^tbsh/)) { #If its not a shark
     # Find the control net interface for this node type
-    $sth = $dbh->query("select control_net from node_types as t left join ".
-		       "nodes  as n on n.type=t.type where node_id='$n'");
+    $sth = 
+      $dbh->query("select control_net from node_types left join ".
+		  "nodes on nodes.type=node_types.type where node_id='$n'");
     my @row= $sth->fetchrow_array();
     my $control= $row[0];
     # Clean out all IPs except the control net
@@ -113,8 +120,13 @@ foreach my $n (@node_names) {
   }
 
   system("$consetup $n") == 0 or
-      print STDERR "WARNING: $consetup $n failed!";
+      print STDERR "WARNING: $consetup $n failed!\n";
 }
+
+print "Unlocking tables.\n";
+$cmd = "unlock tables";
+$sth = $dbh->query($cmd) 
+  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
 foreach $reload ( keys(%reloads)) {
   @list = @{$reloads{$reload}};

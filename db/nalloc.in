@@ -5,7 +5,7 @@ use English;
 #
 # Configure variables
 #
-my $TB     = "@prefix@/bin";
+my $TB     = "@prefix@/libexec";
 my $DBNAME = "@TBDBNAME@";
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
@@ -17,9 +17,8 @@ my $error = 0;
 my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
-my @machines = @node_names;
-foreach my $m (@machines) { $m = "node_id='".$m."'"; }
-my $list= join(" or ",@machines);
+my @vals = ();
+my @nodes= ();
 
 my $cmd = "";
 my $sth = "";
@@ -34,6 +33,11 @@ if ( ($sth->numrows < 1) && ($UID != 0) && ($EUID != 0)) {
   die("You are not a member of experiment '$eid' in project '$pid'.\n");
 }
  
+print "Locking tables.\n";
+$cmd = "lock tables nodes read, reserved write";
+$sth = $dbh->query($cmd) 
+  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+
 foreach my $n (@node_names) { 
   $sth = $dbh->query("select * from reserved where node_id='$n'");
   if ($sth->numrows > 0) {
@@ -53,15 +57,32 @@ foreach my $n (@node_names) {
       print "Node '$n' does not exist.\n";
       $error++;
       next;
+    } else {
+      # No one has reserved it, and it exists, so add it to my list
+      push(@vals,"('$n','$pid','$eid')");
+      push(@nodes,"$n");
     }
   }
-  print "Reserving node '$n'...";
-  $cmd = "insert into reserved (node_id,pid,eid) values ('$n','$pid','$eid')";
-  $sth = $dbh->query($cmd) && print "Succeeded.\n"
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-      && $error++);
-  system("$consetup $n") == 0 or
-      print STDERR "WARNING: $consetup $n failed!";
 }
+
+if (!$error && @vals) {
+  print "Reserving nodes...";
+  $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
+  if ($sth = $dbh->query($cmd)) {
+    print "Succeeded.\n";    
+    foreach $n ( @nodes ) { 
+      system("$consetup $n") == 0 or
+	print STDERR "WARNING: $consetup $n failed!\n";
+    }
+  } else { 
+    print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+    $error++;
+  }
+}
+
+print "Unlocking tables.\n";
+$cmd = "unlock tables";
+$sth = $dbh->query($cmd) 
+  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
 exit($error);
