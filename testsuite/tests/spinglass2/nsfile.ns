@@ -1,0 +1,50 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set supernets {p q r}
+set nets {a e i}
+
+set nsupernets [llength $supernets]
+set nnets [llength $nets]
+
+# All the set X [set Y [$ns node]] is so that the node gets the name Y
+# but we can refer to it as X for loops.
+set j 0
+set k 2
+set routers {}
+foreach supernet $supernets {
+        set router [set router$supernet [$ns node]]
+        lappend routers $router
+        tb-set-node-os $router FBSD40-STD
+        tb-set-node-startup $router "/proj/Spinglass/router.script $nsupernets
+$j $nnets"
+        foreach net $nets {
+                set nodes {}
+                for {set i 0} {$i <= 7} {incr i} {
+                        set tmp [set $supernet$net$i [$ns node]]
+                        tb-set-hardware $tmp shark
+                        tb-set-node-startup $tmp  "/proj/Spinglass/host.script
+emulab $tmp /$supernet$net/$tmp 192.168.$k.2"
+                        lappend nodes $tmp
+                }
+                set lan [set lan$router$net [$ns make-lan "$router $nodes" 10Mb 0ms]] 
+                tb-set-ip-lan $router $lan 192.168.$k.2
+                set i 3
+                foreach node $nodes {
+                        tb-set-ip-lan $node $lan 192.168.$k.$i
+                        incr i
+                }
+                incr k
+        }
+        incr j
+}
+
+set backbone [$ns make-lan "$routers" 100Mb 0ms]
+
+set j 2
+foreach router $routers {
+        tb-set-ip-lan $router $backbone 192.168.1.$j
+        incr j
+}
+
+$ns run
