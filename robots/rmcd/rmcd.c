@@ -3,16 +3,46 @@
  * Dan Flickinger
  *
  *
+ * RMCD will immediately try to connect to EMCD, get configuration data,
+ * and then open connections to all robots as sent by EMCD.
+ *
+ * Once connections are open, RMCD will wait for commands from EMCD.
+ *
+ * After a command is received, RMCD will wait for EMCD to send the
+ * current position for the robot commanded to move by EMCD.  Once the
+ * current position is received, the move command is relayed to the
+ * appropriate robot after converting the coordinates into the local
+ * robot's reference frame.
+ *
+ * Upon completion of a command, RMCD will send notice to EMCD, along
+ * with a position update sent from the robot and converted into the
+ * global coordinate frame.
+ *
+ *
  * 2004/12/01
- * 2004/12/02
+ * 2004/12/06
  */
  
 #include<stdio.h>
 #include<sys/types.h>
+
+#include<unistd.h>
+#include<stdlib.h>
+#include<signal.h>
+#include<netiten/in.h>
+#include<errno.h>
+
+#include<string.h>
 #include<sys/socket.h>
+
+#include "rmcd.h"
+
 
  
 int main(int argc, char **argv) {
+  /* You are watching RMCD
+   * Everything you beleave is wrong.
+   */
 
 
   int FD_emc; // file descripter: EMC
