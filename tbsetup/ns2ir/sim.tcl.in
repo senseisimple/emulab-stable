@@ -281,6 +281,9 @@ Simulator instproc run {} {
     if {$elab_in_elab && [llength [array names node_list]] == 0} {
 	uplevel 1 source "@prefix@/lib/ns2ir/elabinelab.ns"
     }
+    if {$security_level} {
+	uplevel 1 source "@prefix@/lib/ns2ir/fw.ns"
+    }
 
     # Fill out IPs
     if {! $use_ipassign } {

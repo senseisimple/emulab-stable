@@ -1,0 +1,21 @@
+#
+# This file is intended to be included into another NS file. It is not
+# a stand alone file.
+# 
+if {${::GLOBALS::security_level} >= 1} {
+    # Set up a firewall
+    set fw [new Firewall $ns]
+    $fw set-type ipfw2-vlan
+        
+    if {${::GLOBALS::security_level} == 1} {
+	$fw set-style open
+    } elseif {${::GLOBALS::security_level} == 2} {
+	if {${::GLOBALS::elab_in_elab}} {
+	    $fw set-style emulab
+	} else {
+	    $fw set-style basic
+	}
+    } else {
+	$fw set-style closed
+    }
+}
