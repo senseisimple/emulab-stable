@@ -114,10 +114,17 @@ if (-f $MAILFILE) {
         die("Could not unlink $MAILFILE: $!");
 }
 
-print "Removing $NTPDRIFT ...\n";
+#
+# Just removing the drift file results in no drift being tracked,
+# so set it to zero instead.  Not ideal, but at least the clock will
+# stabilize eventually this way.
+#
+print "Resetting drift in $NTPDRIFT ...\n";
 if (-f $NTPDRIFT) {
-    unlink($NTPDRIFT) or
-        die("Could not unlink $NTPDRIFT: $!");
+    open(DRIFT, ">$NTPDRIFT") or
+	die("Could not open $NTPDRIFT: $!");
+    print DRIFT "0\n";
+    close(DRIFT);
 }
 
 print "Cleaing .pid files ...\n";
