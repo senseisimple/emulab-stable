@@ -854,9 +854,28 @@ sub doifconfig (;$)
     }
 
     my $TM = OPENTMCC(TMCCCMD_IFC);
+
+    #
+    # XXX hack: workaround for tmcc cmd failure inside TCL
+    #     storing the output of a few tmcc commands in
+    #     $BOOTDIR files for use by NSE
+    if (!REMOTE() && !JAILED()) {
+	open(IFCFG, ">$BOOTDIR/tmcc.ifconfig") or
+		die "Cannot open file $BOOTDIR/tmcc.ifconfig: $!";
+    }
+
     while (<$TM>) {
 	push(@ifaces, $_);
+
+	#
+	# XXX hack: workaround for tmcc cmd failure inside TCL
+	#     storing the output of a few tmcc commands in
+	#     $BOOTDIR files for use by NSE
+	if (!REMOTE() && !JAILED()) {
+	    print IFCFG "$_";
+	}
     }
+    close(IFCFG);
     CLOSETMCC($TM);
 
     #
@@ -1926,18 +1945,6 @@ sub dotrafficconfig()
     # now because of having FullTcp based traffic generation.
     # Needs to move to a different place
     if (!REMOTE() && !JAILED()) {
-	my $record_sep;
-
-	$record_sep = $/;
-	undef($/);
-	$TM = OPENTMCC(TMCCCMD_IFC);
-	open(IFCFG, ">$BOOTDIR/tmcc.ifconfig") or
-	    die "Cannot open file $BOOTDIR/tmcc.ifconfig: $!";
-	print IFCFG <$TM>;
-	close(IFCFG);
-	CLOSETMCC($TM);
-	$/ = $record_sep;
-	
 	open(TRAFCFG, ">$BOOTDIR/tmcc.trafgens") or
 	    die "Cannot open file $BOOTDIR/tmcc.trafgens: $!";    
     }
