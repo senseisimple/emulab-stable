@@ -23,9 +23,9 @@ sub usage()
 	  "       Use -l (with -n) to print routes in Linux format.\n".
 	  "       Use -d to turn on debugging output.\n".
 	  "       Use -f to force route calculation; ignore 'static' flag.\n".
-          "       Use -H to specift host-host routing in ipassign\n".
-          "       Use -L to specift host-lan routing in ipassign\n".
-          "       Use -N to specift host-net routing in ipassign\n".
+          "       Use -H to specify host-host routing in ipassign\n".
+          "       Use -L to specify host-lan routing in ipassign\n".
+          "       Use -N to specify host-net routing in ipassign\n".
           "       Use -p to specify the # of partitions\n");
 
     exit(-1);
@@ -269,7 +269,7 @@ while(<CHILD>) {
         my $vn = $index2vnode{$vindex};
 
         push (@{$vnodetab{$vn}->{'IPS'}}, 
-              [$ip, $masks{$lan}, $lan2iface{$lan}->{$vn}]);
+              [$ip, $masks{$lan}, $lan2iface{$lan}->{$vn}, $lan]);
     }
 
     elsif ($mode eq "route") {
@@ -326,7 +326,24 @@ while (my ($vnode, $valhash) = each %vnodetab) {
 
     if ($debug) {
         print "Info for $vnode:\n".
-            "IPS: @ipifaces\n";
+            "  IPS: @ipifaces\n";
+    }
+
+    # New ip representation will replace iplist above at some point.
+    foreach my $ipref (@ipinfo) {
+	my $ip   = $ipref->[0];
+	my $port = $ipref->[2];
+	my $lan  = $ipref->[3];
+
+	if (!$impotent) {
+	    DBQueryFatal("update virt_lans set ".
+			 "      ip='$ip',vport='$port' ".
+			 "where vname='$lan' and vnode='$vnode' and ".
+			 "      pid='$pid' and eid='$eid'");
+	}
+	if ($debug) {
+	    print "  IP: $lan $port $ip\n";
+	}
     }
 
     # If we're not calculating routes, then just go on to next entry.
