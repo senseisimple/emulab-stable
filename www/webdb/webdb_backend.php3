@@ -165,7 +165,7 @@ function listTables() {
 
 	if( $pTable == 0 ) {
 		$msg  = mysql_error();
-		setError( "$msg" ); 
+		setError( "MySQL Error: " . $msg ); 
 		return;
 	}
 
@@ -255,7 +255,7 @@ function viewData() {
 	$pResult = mysql_query( $query );
 	
 	if ($pResult == "") {
-	  setError( mysql_error() );
+	  setError( "Mysql Error: " . mysql_error() );
 	  return;
  	}
 
@@ -385,12 +385,11 @@ function manageData( $cmd ) {
 			} else {
 				$cell = "<select name=c_$fieldname size=4 multiple>\n";
 			}
-			$cell .= strtok( "'" );
 			while ($str = strtok( "'" ) ) {
 				if ($fieldvalueraw == $str) {
-					$cell .= "<option selected>$str\n";
+					$cell .= "<option selected>$str";
 				} else {	
-					$cell .= "<option>$str\n";
+					$cell .= "<option>$str";
 				}
 				strtok( "'" );
 			}
@@ -445,7 +444,7 @@ function deleteData() {
 	
 	$errMsg = mysql_error();
 	if ($errMsg != "") {
-	  seterror( $errmsg );
+	  seterror( "MySQL Error: " . $errMsg );
 	  return 0;
 	}
 
@@ -479,7 +478,7 @@ function manageData_submit( $cmd ) {
 	
 	$errMsg = mysql_error();
 	if ($errMsg != "") {
-	  seterror( $errmsg );
+	  seterror( "MySQL Error: " . $errMsg );
 	  return 0;
 	}
 
