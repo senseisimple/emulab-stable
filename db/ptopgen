@@ -63,3 +63,17 @@ foreach $node (sort keys %nodes) {
     print "link $node $node:$links{$node} cisco 100 1\n";
   }
 }
+
+# Add lans to ptopfile
+# lan nodes do not really exist, they represent the ability of the cisco
+# to set up lans via vlans.  We set the maxmimum number of links on a lan
+# node to some very high number.  This should actually be the maximum number
+# of ports in a vlan.  Which, since by default everything is in a VLAN, this
+# maxmimum number will be >= the number of ports on the CISCO(s) so really
+# need only be a number higher then we'll ever need.
+$maxlans = 20;
+for ($i=0;$i<$maxlans;$i++) {
+    print "node lan$i lan:1\n";
+    print "link lan$i-link lan$i cisco 100 1000\n";
+}
+
