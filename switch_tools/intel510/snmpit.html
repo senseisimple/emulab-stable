@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>SnmpIt Users Manual</title>
+</head>
+
+<body>
+<h1>SnmpIt Users Manual</h1>
+
+SnmpIt is a tool that uses SNMP to manage the Intel 510T switches that
+are used in the Utah Testbed. Its abilities include VLAN configuration
+(create, delete, [list, configure from a file]) and configuration of
+port settings (enable/disable, auto-detect speed/duplex, speed,
+duplex). SnmpIt is also used by <a href="power.html">power</a> to
+manage the power controllers attached to the nodes.
+<p>
+In the context of the testbed, this allows creating of the virtual
+"links" in the topology using VLANs, and allows configuration of
+different types of connections (100Mbps/10Mbps, Full/Half duplex), and
+forcing a link to go down by disabling it on the switch. Using <a
+href="power.html">power</a>, you can also force an entire node to go
+down by turning it off or rebooting it.
+<p>
+SnmpIt is currently located in /usr/testbed/bin/ on plastic and the
+testbed nodes.
+<ul>
+<li><a href="#syntax">SnmpIt Syntax</a>
+<li><a href="#general">General Commands</a>
+<li><a href="#VLAN">VLAN Configuration Commands</a>
+<li><a href="#port">Port Control Commands</a>
+<li><a href="#power">Power Control Commands</a>
+<!-- <li><a href="#"></a> -->
+</ul>
+
+<a name="syntax"></a>
+<h3>Syntax</h3>
+Syntax is as follows: (this message can be viewed by with 
+"<tt>snmpit -h</tt>") 
+<pre>SnmpIt! - A general purpose SNMP Tool
+Syntax:
+snmpit [-h] [-v] [+b|-b] [+c|-c] -i&lt;ip\>
+        [-p&lt;port> &lt;port> &lt;x>..&lt;y> ... ]
+        [-d[isable]|-e[nable]] [+a|-a] [-s&lt;speed>] [-dup&lt;duplex>]
+        [-m&lt;vlan name>] [[-vlan&lt;MAC Addr.>] | [-f&lt;filename>]]
+        [-r&lt;vlan #>] [-l]
+        [ [-on|-off|-cyc] [-all] | [-&lt;n>] ]
+
+  -h    Display this help message
+  -v    Verbose mode (now off)
+  -i    IP address or switch name
+  +b/-b Blocking mode (now off)
+  +c/-c Confirm Changes (now on)
+  -p    List of port numbers and ranges
+  -d    Disable port(s)
+  -e    Enable port(s)
+  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex
+  -s    Port Speed (10 or 100 Mbits)
+  -dup  Port Duplex (half or full)
+  -f    File mode - Automatically set up set of VLANs
+  -l    List all VLANs on switch (ell, not #1)
+  -m    Make a VLAN
+  -vlan Add MAC Address to VLAN
+  -r    Remove VLAN  
+  -on   Turn on outlets
+  -off  Turn off outlets
+  -cyc  Power Cycle outlets
+  -all  All outlets
+  -(n)  Outlet #(n) (n=1-8)</pre>
+
+<a name="general"></a>
+<h3>General SnmpIt Commands</h3>
+
+<pre>snmpit [-h] [-v] [+b|-b] [+c|-c]</pre>
+<dl>
+<dt><pre>  -h    Display this help message</pre>
+<dd>When in doubt, use this for a full explanation of syntax.
+<dt><pre>  -v    Verbose mode (now off)</pre>
+<dd>Turns on extra output. Generally, SnmpIt won't say anything if it
+did what you asked, but with this option, you can ask it for more
+information. It will always give the appropriate error message when
+something goes wrong, without regard to the verbose option.
+<dt><pre>  +b/-b Blocking mode (now off)</pre>
+<dd>SnmpIt can operate in a blocking or a non-blocking mode. If you
+have a lot of similar changes to make, non blocking mode will make it
+go faster. SnmpIt defaults to non-blocking mode.
+<dt><pre>  +c/-c Confirm Changes (now on)</pre>
+<dd>When in non-blocking mode, this can ask SnmpIt to make sure that
+the changes requested were successfully carried out. This will take a
+little longer, but if there were more than 10 or 15 identical changes,
+the change has usually happened by the time it is checked.
+</dl>
+
+<a name="VLAN"></a>
+<h3>VLAN Control Commands</h3>
+<pre>snmpit -i&lt;ip>
+        [-m&lt;vlan name>] [[-vlan&lt;MAC Addr.>] | [-f&lt;filename>]]
+        [-r&lt;vlan #>] [-l]</pre>
+<dl>
+<dt><pre>  -i    IP address or switch name</pre>
+<dd>IP address of switch on which to operate. Also accepts names. The
+Intel 510T switches now in use in the Testbed are the following:
+<pre>Alpha/155.99.214.170
+ Beta/155.99.214.171</pre>
+
+<dt><pre>  -m    Make a VLAN</pre>
+<dd>This optional command takes a VLAN name as a parameter. If no name
+is given when creating a vlan, one will be chosen.
+<dt><pre>  -vlan Add MAC Address to VLAN</pre>
+<dd>This is the command to make a VLAN. May be used in conjunction
+with "<tt>-m</tt>". This command takes as its parameters a list of MAC
+addresses. The list can include MAC addresses from another switch, but
+an identical VLAN will have to be created on the other switch for full
+VLAN functionality. MAC addresses are specified as 12 character
+hexadecimal strings containing digits and the letters "a" through
+"f". A possible command line for configuring a VLAN might be:
+<pre>snmpit -i alpha -vlan 1C2B536AF27C 008b1ca721d0</pre>
+This would put the network cards with MAC addresses "1C2B536AF27C" and
+"008b1ca721d0" in a VLAN together, making a "link" in the topology, as
+if it were hardwired with a cable. These two MAC addresses can now
+only communicate with each other, whether by broadcast, unicast, or multicast.
+<dt><pre>  -f    File mode - Automatically set up set of VLANs</pre>
+<dd>This command takes as a parameter a file name. This file will
+generally be output of the assignment algorithms used to map a virtual
+topology to the physical topology of the testbed. They can also be
+created by hand. The important section has the following format:
+<pre>START vlan
+switch &lt;SwitchName/IP>
+1C2B536AF27C 008b1ca721d0
+1073c38b28fd 283bc8a82f8c
+...
+end
+switch &lt;SwitchName/IP>
+&lt;MAC 1> &lt;MAC 2>
+&lt;MAC 3> &lt;MAC 4>
+...
+end
+END vlan</pre>
+After starting the VLAN sectiom of the file, the keyword
+"<tt>switch</tt>" is followed by a switch name or IP address. Each
+line after that should contain a list of MAC addresses to be put in a
+VLAN together. There should be at least two, but the actual number is
+unlimited. Then the keyword "<tt>end</tt>" is used before starting
+another switch, and and when finished, the VLAN section is closed.
+<dt><pre>  -r    Remove VLAN  </pre>
+<dd>This command takes as its parameter a VLAN number. This number is
+given as output from SnmpIt every time a VLAN is created. VLAN numbers
+can also be found when listing VLANs. This command simply removes the
+named VLAN from the switch, effectively "disconnecting" the virtual
+link that had been established.
+<dt><pre>  -l    List all VLANs on switch (ell, not #1)</pre>
+<dd>As its name suggests, this command shows a table of all VLANs on
+the switch, along with their names, numbers, and the MAC addresses
+that they contain.
+</dl>
+
+<a name="port"></a>
+<h3>Port Control Commands</h3>
+
+<pre>snmpit [-p&lt;port> &lt;port> &lt;x>..&lt;y> ... ]
+        [-d[isable]|-e[nable]] [+a|-a] [-s&lt;speed>] [-dup&lt;duplex>]</pre>
+
+<dl>
+<dt><pre>  -p    List of port numbers and ranges</pre>
+<dd>This sets which ports will be reconfigured. It will accept
+individual port numbers (from 1 to 24) or ranges in the form "x..y"
+where 1 <= x,y <= 24.
+<dt><pre>  -d    Disable port(s)</pre>
+<dd>As suggested, this will disable the given port, effectively
+forcing a link to go down.
+<dt><pre>  -e    Enable port(s)</pre>
+<dd>This will enable a port that has been disabled with the
+"<tt>-d</tt>" command. Note that this will not fix link that has gone
+down for some other reason.
+<dt><pre>  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex</pre>
+<dd>This tells the switch to auto detect and self configure the given
+ports, or with the "<tt>-a</tt" command, turn off this
+feature. Default is to use 100Mbps, Full duplex, unless it is not
+supported by the link, in which case it lowers one or both to 10Mbps,
+Half duplex.
+<dt><pre>  -s    Port Speed (10 or 100 Mbits)</pre>
+<dd>This command takes as its parameter a number, either 10 or 100,
+then configures the port to use that speed. Use of this command
+automatically turns off the auto-negotiate feature.
+<dt><pre>  -dup  Port Duplex (half or full)</pre>
+<dd>This command takes as its parameter a word, either half or full,
+then configures the port to use that duplex setting. Use of this command
+automatically turns off the auto-negotiate feature.
+</dl>
+
+<a name="power"></a>
+<h3>Power Control Commands</h3>
+
+<pre>snmpit [ [-on|-off|-cyc] [-all] | [-&lt;n>] ]</pre>
+
+It is strongly recommended that <a href="power.html">power</a> be used
+for controlling the power settings. It has additional features,
+including lookup of IP and outlet for the given machine. Please see
+the power man page <a href="power.html">here</a>.
+
+<dl>
+<dt><pre>  -on   Turn on outlets</pre>
+<dd>This turns on outlets on the power controller at the specified IP
+address.
+<dt><pre>  -off  Turn off outlets</pre>
+<dd>This turns off outlets on the power controller at the specified IP
+address. 
+<dt><pre>  -cyc  Power Cycle outlets</pre>
+<dd>This power cycles (reboots) outlets on the power controller at the
+specified IP address. 
+<dt><pre>  -all  All outlets</pre>
+<dd>This causes SnmpIt to operate on all outlets on the power
+controller at the specified IP address. 
+<dt><pre>  -(n)  Outlet #(n) (n=1-8)</pre>
+<dd>This causes SnmpIt to operate on the specified outlet on the power
+controller at the specified IP address. Examples of use are
+"<tt>-1</tt>", "<tt>-4</tt>", or "<tt>-8</tt>".
+</dl>
+
+<address><font size=-1>
+SnmpIt was written by Mac Newbold, of the Flux Research Group,
+University of Utah Computer Science Dept., in March-April 2000.<br>
+Please contact <a href="mailto:newbold@cs.utah.edu">
+newbold@cs.utah.edu</a> for further information, including licensing
+for use outside of the Utah Testbed, and concerning source code customization
+issues.
+<p>
+SnmpIt &copy; 2000, Mac Newbold, Flux Research Group, Computer Science
+Department, University of Utah
+</font>
+</address>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Power Users Manual</title>
+</head>
+
+<body>
+<h1>Power Users Manual</h1>
+
+Power is a tool that uses SNMP to manage the APC Power Controllers
+that are used in the Utah Testbed. It was designed to facilitate easy
+control of power to the nodes in the testbed. It can turn on, turn
+off, or power cycle (reboot) any machine that is plugged into an APC
+power controller.
+<p>
+Along with power itself, there is a configuration file power.conf,
+that should be found in /usr/testbed/etc/, which lists the machine
+names and the IP addresses for thier power controllers and their
+outlet numbers. (power itself is currently located in
+/usr/testbed/bin/, and requires <a href="snmpit.html">snmpit</a> in
+/usr/testbed/bin/ also)
+<p>
+<h3>Syntax</h3>
+Syntax is as follows: (this message can be viewed by using 
+"<tt>power</tt>" without any parameters)
+<pre>
+Syntax:
+power on &lt;machine> &lt;machine> ...
+power off &lt;machine> &lt;machine> ...
+power cycle &lt;machine> &lt;machine> ...
+</pre>
+
+<dl>
+<dt><pre>power on &lt;machine> &lt;machine> ...</pre>
+<dd>This command turns on the specified machines.
+<dt><pre>power off &lt;machine> &lt;machine> ...</pre>
+<dd>This command turns off the specified machines.
+<dt><pre>power cycle &lt;machine> &lt;machine> ...</pre>
+<dd>This command power cycles (reboots) the specified machines.
+</dl>
+
+Machines are specified using thier names: "<tt>test1</tt>" through
+"<tt>test10</tt>", and "<tt>alpha</tt>" and "<tt>beta</tt>" for the
+switches. Like most Unix commands, the keywords and machine names are
+case-sensitive.
+
+<h3>Power.conf Configuration File</h3>
+
+A configuration file called "<tt>power.conf</tt>" should be found in
+/usr/testbed/etc/, which should have the following format:
+<pre>
+#
+#power.conf
+#
+# format:
+# machine&lt;tab>PowerControlIP&lt;tab>Outlet#&lt;\n>
+#Machine PowerControlIP Outlet#
+test1   155.99.214.100  1
+test2   155.99.214.100  2
+test3   155.99.214.100  3
+test4   155.99.214.100  4
+test5   155.99.214.100  5
+test6   155.99.214.100  6
+test7   155.99.214.100  7
+test8   155.99.214.100  8
+test9   155.99.214.99   6
+test10  155.99.214.99   5
+alpha   155.99.214.99   7
+beta    155.99.214.99   8
+#
+#end of power.conf
+#
+</pre>
+
+As might be guessed, lines starting with "#" are comments, and the
+format is simply a machine name, an IP address for its power
+controller, and the outlet that it is using, all separated by tabs
+(any spaces could cause incorrect results).
+
+<p>
+<address><font size=-1>
+Power was written by Mac Newbold, of the Flux Research Group,
+University of Utah Computer Science Dept., in April 2000.<br>
+Please contact <a href="mailto:newbold@cs.utah.edu">
+newbold@cs.utah.edu</a> for further information, including licensing
+for use outside of the Utah Testbed, and concerning source code customization
+issues.
+<p>
+Power &copy; 2000, Mac Newbold, Flux Research Group, Computer Science
+Department, University of Utah
+</font>
+</address>
+</body>
+</html>
