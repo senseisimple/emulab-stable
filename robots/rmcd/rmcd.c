@@ -158,7 +158,7 @@ static int mygethostbyname(struct sockaddr_in *host_addr,
 static void usage(void)
 {
     fprintf(stderr,
-	    "Usage: rmcd ...\n");
+	    "Usage: rmcd [-hd] [-l logfile] [-i pidfile] [-e emchost] [-p emcport]\n");
 }
 
 /**
@@ -205,18 +205,20 @@ static void conv_a2r(struct position *rel,
     
     ct = cos(abs_start->theta);
     st = sin(abs_start->theta);
-
-    //rel->x = ct*(abs_finish->x - abs_start->x) +
-    //         st*(abs_finish->y - abs_start->y);
-    //rel->y = ct*(abs_finish->y - abs_start->y) +
-    //         st*(abs_start->x - abs_finish->x);
     
+#if 1
+    rel->x = ct*(abs_finish->x - abs_start->x) +
+             st*(-abs_finish->y - -abs_start->y);
+    rel->y = ct*(-abs_finish->y - -abs_start->y) +
+             st*(abs_start->x - abs_finish->x);
+#else
     // Transpose x, y
     rel->x = ct*(abs_finish->y - abs_start->y) +
              st*(abs_finish->x - abs_start->x);
     rel->y = ct*(abs_finish->x - abs_start->x) +
              st*(abs_start->y - abs_finish->y);
-
+#endif
+    
     rel->theta = abs_finish->theta - abs_start->theta;
     rel->timestamp = abs_finish->timestamp;
     
@@ -253,7 +255,7 @@ static void conv_r2a(struct position *abs_finish,
  //   abs_finish->y = ct*rel->y + st*rel->x + abs_start->y;
   
     // transpose x,y
-    abs_finish->x = ct*rel->y - st*rel->x + abs_start->y;
+    abs_finish->x = ct*rel->y - st*rel->x + -abs_start->y;
     abs_finish->y = ct*rel->x + st*rel->y + abs_start->x;
   
     abs_finish->theta = abs_start->theta + rel->theta;
@@ -779,7 +781,7 @@ int main(int argc, char *argv[])
 		else if (connect(gc->gc_fd,
 				 (struct sockaddr *)&saddr,
 				 sizeof(saddr)) == -1) {
-		    fatal("connect");
+		    fatal("robot connect");
 		}
 		else {
 		    FD_SET(gc->gc_fd, &readfds);
