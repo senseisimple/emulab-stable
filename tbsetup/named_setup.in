@@ -180,9 +180,13 @@ if ($db_result->numrows > 0) {
 	# Put it into a map so we can generate the reverse zone file later
 	#
 	$IP =~ /(\d+\.\d+\.\d+)\.(\d+)/;
-	my $subnet = $1;
-	my $host = $2;
-	push @{$reverse{$subnet}}, [$host, $node_id];
+	if ($1 && $2) {
+	    my $subnet = $1;
+	    my $host = $2;
+	    push @{$reverse{$subnet}}, [$host, $node_id];
+	} else {
+	    warn "Poorly formed IP address $IP\n";
+	}
     }
 }
 print MAP "\n";
@@ -314,9 +318,11 @@ while (my $dirent = readdir(DIR)) {
 
     my $filename = "$reversedir/$basename.tail";
     open MAP, ">$filename" || fatal("Couldn't open $filename: $!\n");
-    foreach my $aref (sort {$$a[0] <=> $$b[0]} @{$reverse{$subnet}}) {
-	my ($host, $name) = @$aref;
-	printf MAP "$host\tIN\tPTR\t$name.$OURDOMAIN.\n";
+    if ($reverse{$subnet}) {
+	foreach my $aref (sort {$$a[0] <=> $$b[0]} @{$reverse{$subnet}}) {
+	    my ($host, $name) = @$aref;
+	    printf MAP "$host\tIN\tPTR\t$name.$OURDOMAIN.\n";
+	}
     }
     close MAP;
 
