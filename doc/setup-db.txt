@@ -96,25 +96,19 @@ warning above. We'll soon provide contents for this table
 1) Create node types for switches
 
 Add entries to the node_types table for each type of switch you'll be using.
-The class column should be 'switch', and choose a type that reasonably
-describes the switch. Most of the other columns aren't important for switches
-(so you can leave them blank), but putting in max_cards (if the switch is
-expandable) and max_ports is a good idea.
+The class column should be 'switch'. The type for Cisco switches should be
+something like 'cisco6509', or 'catalyst2950'.  Most of the other columns
+aren't important for switches (so you can leave them blank), but putting in
+max_cards (if the switch is expandable) and max_ports is a good idea.
 
-2) Create interface type for the switch IP interfaces
-
-Now, go into the interface_types table and add interface types for your
-switches' IP interfaces. Since these are logical interfaces, not real ones,
-most of the information here is unimportant.
-
-3) Create interface types for switch interconnects (if any)
+2) Create interface types for switch interconnects (if any)
 
 If you'll be connecting switches together, also add interface types for the
 ports you'll be using to link them together. Unlike the logical IP interfaces,
 make sure that you get physical information like speed (in Kbps) and duplex are
 correct.
 	
-4) Create switches in nodes table
+3) Create switches in nodes table
 
 Next, add the switches to the nodes table. The only necessary fields here are
 node_id (choose one appropriate to the switch), type (use one of the ones you
@@ -122,14 +116,7 @@ created earlier,) and role. Role, for switches, should be either 'testswitch'
 or 'controlswitch', depending on whether you're using it for the
 experimental or control network.
 
-5) Create interfaces for switch IP interfaces
-
-In the interfaces table, add an interface for the IP address of each switch.
-The important columns are node_id, IP, and interface_type. card and port should
-be set to values that will not be used by actual ports on the switch (they
-could both, for example, be 0)
-
-6) Add state for switch interconnects
+4) Add state for switch interconnects
 
 If you'll be connecting switches together, add interfaces to each of them.
 Unlike the previous interfaces, make sure that you get the correct card and
@@ -140,7 +127,8 @@ duplex correct.
 Now, go into the wires table and add wires connecting the switch interfaces you
 just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
 matter which switch you use as node 1 (the node_id1, card1, port1 columns), and
-which you use as node 2.
+which you use as node 2. If you have a non-modular switch, all ports are
+considered to be on card 0.
 
 7) Create switch stacks
 
@@ -152,7 +140,18 @@ be named (the stack_id column) after the master switch in the stack.  In our
 case, for example, our experimental network stack is called 'cisco1'. The
 stack_type column is used by snmpit to determine which module to use to talk to
 the stack. The currently supported values are 'cisco' and 'intel'. Making a
-control network stack is optional.
+stack for the control network is optional. There are a few columns in this
+table that you may want to set:
+supports_private: (Cisco only) This switch can make private VLANs - probably
+    best to leave it as 0
+single_domain: (Cisco only) Means that all switches in the stack use VTP to
+    maintain a common set of VLANs. This means that we will only create VLANs
+    on the stack leader - if set to 0, we create VLANs on each switch
+    individually
+snmp_community: The SNMP community string we use for read-write access to the
+    switch. Most switches use 'private' by default.
+min_vlan: The smallest VLAN number that the testbed software will use
+max_vlan: Ditto, but the biggest number
 
 Finally, add switches to these stacks by putting entries in the switch_stacks
 table, listing the node_id of each switch and the stack_id of the stack it
@@ -196,157 +195,4 @@ node's capabilities are.
 
 ##### Step 7 - Setup nodes
 
-1) Create node type for the nodes
-
-Add an entry to the node_types table for each type of experimental node you
-have. Most of the columns should be self-explanatory, but here are some notes:
-
-class: Should be 'pc'
-type: Should be 'pcXXX', where XXX is a short (a few characters) string
-	describing the nodes (such as processor speed, chipset, etc.)
-proc: Class of processor (ie. 'PIII')
-speed: CPU speed in MHz
-RAM: Amount of RAM in MB
-HD: Hard disk size in GB
-max_cards: Number of PCI (or ISA) slots
-max_ports: Maximum number of NIC ports (eg. dual port cards count as 2)
-osid: Default operating system to use. Should be one of the ones created in
-	Step 6
-control_net: Interface number (described below) of the control network
-	interface
-power_time: Number of second between power cycles (to help save wear and tear
-	on the hardware). We recommend 60.
-imageid: Default image to load (created in Step 6)
-imageable: Set to 1 if a disk image can be created/restored on this node type.
-delay_capacity: How many delay nodes this node can be. For example, nodes with
-	2 experimental interfaces can be 1 delay node, nodes with 4 experimental
-	interfaces can be 2 delay nodes, etc.
-virtnode_capacity: Number of virtual nodes that can be hosted on a single
-	physical node of this type.
-control_iface: Linux-style interface name for the control network (ie. 'eth0')
-disktype: FreeBSD-style disk name for the primary hard drive.
-	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
-delay_osid: Which OS should be run when this node is being a delay node. 
-	Should usually be 'FBSD-STD'
-pxe_boot_path: Path (including hostname) to the mini-kernel that should be
-	loaded by PXE. Ask Utah for this kernel. For example,
-	'boss.emulab.net:/tftboot/pxeboot'
-isvirtnode: Should be 0.
-isremotenode: Should be 0.
-
-2) Create interface types for the nodes
-
-Add entries to the interface_types table for each type of network card you are
-using. Notes on the columns:
-
-type: So far, we have been using FreeBSD driver names for types, but this
-	string is arbitrary
-max_speed: The maximum speed of the interface, in Kbps
-full_duplex: 1 if the card can operate in full duplex, 0 otherwise
-
-3) Create the nodes
-
-Will be somewhat automated (no script yet) - documentation coming soon!
-
-4) Setup outlets - Local Only
-
-Will be somewhat automated (no script yet)  - documentation coming soon!
-
-5a) Create their interfaces - Local Only
-
-The macgrabber script is used when you have serial consoles on all nodes. Thus,
-you should get the capture processes running on your ops node before beginnig
-this step.
-
-When a node is booting, and no data on the node is available in the database
-(ie. there is no entry in the interfaces table that matches it's IP address),
-then the node will boot a kernel from the boss node called /tftpboot/whoami .
-Ask Utah for this kernel - it simply prints out the MAC addresses of all of its
-interfaces.
-
-In order to get the node to boot far enough to load the whoami kernel, one more
-trick is needed: you need to start up your dhcp server with a range of dynamic
-addresses. Take a look at the template file in the dhcpd/ directory for our
-example dhcpd.conf file. Make a copy of this file, fixed up for your local IP
-addresses, etc. - but with the template part ('%%nodetype=foo' - you'll know
-what I mean when you see it) removed. There's an example in this file that
-shows how to set up a dynamic range. I suggest using a range of addresses that
-won't be used once the nodes are up, but is big enough for all of them, if
-possible. Once this is done, and the dhcpd.conf file is installed in the
-proper place, start up the dhcp server.
-
-Now, power cycle all nodes. When they come up, they should print out their
-MAC addresses, and you should have captured these all in /var/log/tiplogs
-on your ops node.
-
-Take a look at the utils/macgrabber.pl script. At the top of this script,
-there is '#defines' section, which contains information about the specific
-nodes you're harvesting information about. Edit this, according to the comments,
-to suit your needs. Someday, we may have a better way to record this
-information, but for now, this will do.
-
-Finally, run the macgrabber script, like so:
-macgrabber.pl pcX pcY /var/log/tiplogs/pcX.log
-... where pcX and pcY are the the first and last nodes in your set.  This will
-spit out, on stdout, sql commands to create the interfaces to the database. If
-its output seems to make sense, pipe it into 'mysql tbdb'.
-
-You can now hop back over to the boss setup documentation, and set up the
-dcpd.conf file for real.
-
-5b) Create their Interfaces - Wide-area only
-
-In the wide-area case, MAC addresses for interfaces are not necessary. Instead,
-the only necessary columns in the interfaces table are:
-
-node_id: Node's ID
-card: Number of the card (0 if the node only has one card)
-port: Set to 0
-IP: The node's IP
-interface_type: Useful, but not necessary
-iface: eth0, as long as the node has only one interface
-
-6) Create their wires - Local Only
-
-Now, we need to enter information into the wires table, so that we know what
-NIC on which machine connects to which port on the switch. This can be done 
-quickly and easily with the fillwires.pl script (in the util directory.) As
-with macgrabber, edit the defines at the top of the file, which are similar
-to those in the macgrabber script.
-
-Now, you'll need to devide the wires up into 'blocks'. Take a look at the
-arguments below. A block is basically a set of wires that are all the same
-type, and plug into consecutive nodes and switch ports. For example, in one set
-of racks at Utah, we have three different lengths of experimental network
-cables - a long set for the bottom third of the rack, a medium set of the
-middle third, etc. Each of these three sets of wires would be a block.
-
-The cable numbers and length are primarily for your benefit in tracking down
-problems and re-connecting wires correctly. The other information, however, is
-critical for the correct operation of the testbed software.
-
-Once you've done this, run fillwires.pl for each block. There are 10 arguments
-to it:
-
-start_cable: The number of the cable you'll be starting with
-end_cable: The number on the cable you'll be ending with
-type: The type of the cable: 'Node' for experimental interfaces, 'Control'
-	for control network interfaces
-length: The length, in (integer) feet, of the cables
-start_node: The node id (eg. pc1) that the _lowest numbered_ cable is connected
-	to
-switch_name: node id of the switch that this node is connected to
-start_module: The module number on the switch that the lowest-numbered cable
-	is plugged into. If your switch does not have multiple modules, then
-	it is assumed to use module 1 for all ports.
-start_port: The port number that the lowest-numbered cable is plugged into.
-min_port: At Utah, we've done our wiring by filling up the left half of the
-	switch before the right half. This means that we filled ports
-	1-24 on all of our 48-port modules before moving on to ports 25-48.
-	When you exceed the max_port (the next argument), this is the number
-	you wrap back to.
-max_port: The maximum port number in your fill pattern. When you go past this
-	number, you move onto the next module and the back to the min_port.
-		
-Like macgrabber.pl, fillwires.pl spits out SQL statements on stdout that can
-be fed to mysql.
+To add nodes to the testbed, see setup-nodes.txt .
