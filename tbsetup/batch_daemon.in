@@ -336,7 +336,7 @@ sub startexp($)
     #
     # Try to start the experiment. If it fails, the experiment is gone.
     #
-    system("$startexp -b $pid $eid $nsfile");
+    system("$startexp -b $logname $pid $eid $nsfile");
     $exit_status = $? >> 8;
     $running     = 1;
     if ($exit_status) {

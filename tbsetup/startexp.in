@@ -11,14 +11,18 @@ use Getopt::Std;
 # it into the background and send email, but just want an exit status 
 # returned to the batch system.
 #
-# usage: startexp [-b] <pid> <eid> <nsfile>
+# XXX - The -b option takes a logfile name. This is so this script can
+#       save off the file in the expinfo directory. The caller (batch daemon) 
+#       opens the file and just passes the name in. I do not like this!
+#
+# usage: startexp [-b logfile] <pid> <eid> <nsfile>
 #
 sub usage()
 {
-    print STDOUT "Usage: startexp [-b] <pid> <eid> <nsfile>\n";
+    print STDOUT "Usage: startexp [-b logfile] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
-my  $optlist = "b";
+my  $optlist = "b:";
 
 #
 # Configure variables
@@ -33,6 +37,7 @@ my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my $cleanme  = 0;
 my $batch    = 0;
+my $logname  = 0;
 my $errorstat= -1;
 
 #
@@ -67,7 +72,15 @@ my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 my $tempfile = $ARGV[2];
 if (defined($options{"b"})) {
-    $batch = $options{"b"};
+    $batch   = 1;
+    $logname = $options{"b"};
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die "Bad data in logfile name: $logname";
+    }
 }
 
 #
@@ -268,7 +281,7 @@ $expt_expires  = $row[2];
 print STDOUT "Setup Success\n";
 
 #
-# Try to copy off the files for testbed information gathering
+# Try to copy off the files for testbed information gathering.
 #
 my $infodir = "$pid-$eid-" . `date +20%y%m%d-%H.%M.%S`;
 
@@ -278,6 +291,8 @@ if ($infodir =~ /^([-\@\w.]+)$/) {
     if (mkdir("$TBINFO/$infodir", 0770)) {
 	system("cp $nsfile $irfile $TBINFO/$infodir");
 	system("cp *.ptop *.top $TBINFO/$infodir");
+	system("cp assign.log $TBINFO/$infodir");
+	system("cp $logname $TBINFO/$infodir/$eid.log");
     }
 }
 
@@ -482,7 +497,7 @@ sub background()
     if ($logname =~ /^([-\@\w.\/]+)$/) {
 	$logname = $1;
     } else {
-	die "Bad data in $logname";
+	die "Bad data in logfile name: $logname";
     }
 
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
