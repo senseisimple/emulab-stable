@@ -98,7 +98,10 @@ sub new {
     $SNMP::debugging = ($self->{DEBUG} - 2) if $self->{DEBUG} > 2;
     my $mibpath = '/usr/local/share/snmp/mibs';
     &SNMP::addMibDirs($mibpath);
-    &SNMP::addMibFiles("$mibpath/INT_GEN.MIB", 
+    &SNMP::addMibFiles("$mibpath/SNMPv2-SMI.txt", "$mibpath/SNMPv2-TC.txt", 
+	               "$mibpath/SNMPv2-MIB.txt", "$mibpath/IANAifType-MIB.txt",
+		       "$mibpath/IF-MIB.txt",
+		       "$mibpath/INT_GEN.MIB", 
 		       "$mibpath/INT_S500.MIB",
 		       "$mibpath/INT_VLAN.MIB");
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
