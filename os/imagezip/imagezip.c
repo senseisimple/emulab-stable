@@ -25,6 +25,12 @@
 #endif
 #include "ext2_fs.h"
 #include "imagehdr.h"
+#ifdef WITH_NTFS
+#include <linux/fs.h>
+#include "volume.h"
+#include "inode.h"
+#include "attrib.h"
+#endif
 
 #define min(a,b) ((a) <= (b) ? (a) : (b))
 
@@ -36,7 +42,11 @@
 #define	DOSPTYP_LINUX	0x83	/* Linux partition */
 #define	DOSPTYP_EXT	5	/* DOS extended partition */
 #endif
+#ifndef DOSPTYPE_NTFS
+#define DOSPTYP_NTFS    7       /* Windows NTFS partition */
+#endif
 
+char	*infilename;
 int	infd, outfd, outcanseek;
 int	secsize	  = 512;	/* XXX bytes. */
 int	debug	  = 0;
@@ -77,6 +87,10 @@ int	read_image(void);
 int	read_bsdslice(int slice, u_int32_t start, u_int32_t size);
 int	read_bsdpartition(struct disklabel *dlabel, int part);
 int	read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dboff);
+#ifdef WITH_NTFS
+int     read_ntfsslice(int slice, u_int32_t start, u_int32_t size,
+		       char *openname);
+#endif
 #endif
 int	read_linuxslice(int slice, u_int32_t start, u_int32_t size);
 int	read_linuxswap(int slice, u_int32_t start, u_int32_t size);
@@ -243,8 +257,9 @@ main(argc, argv)
 	if (info && !debug)
 		debug++;
 
-	if ((infd = open(argv[0], O_RDONLY, 0)) < 0) {
-		perror("opening input file");
+	infilename = argv[0];
+	if ((infd = open(infilename, O_RDONLY, 0)) < 0) {
+		perror(infilename);
 		exit(1);
 	}
 
@@ -337,6 +352,11 @@ read_image()
 			case DOSPTYP_EXT:
 				fprintf(stderr, "  DOS   ");
 				break;
+#ifdef WITH_NTFS
+			case DOSPTYP_NTFS:
+				fprintf(stderr, "  NTFS  ");
+				break;
+#endif
 			default:
 				fprintf(stderr, "  UNKNO ");
 			}
@@ -383,6 +403,11 @@ read_image()
 		case DOSPTYP_LINUX:
 			rval = read_linuxslice(i, start, size);
 			break;
+#ifdef WITH_NTFS
+		case DOSPTYP_NTFS:
+			rval = read_ntfsslice(i, start, size, infilename);
+			break;
+#endif
 		default:
 			fprintf(stderr,
 				"  Slice %d is an unknown type. Skipping.\n",
@@ -853,6 +878,242 @@ read_linuxswap(int slice, u_int32_t start, u_int32_t size)
 	addskip(start, size);
 	return 0;
 }
+
+#ifdef WITH_NTFS
+/********Code to deal with NTFS file system*************/
+/* Written by: Russ Christensen <rchriste@cs.utah.edu> */
+
+/**@bug If the Windows partition is only created in a part of a
+ * primary partition created with FreeBSD's fdisk then the sectors
+ * after the end of the NTFS partition and before the end of the raw
+ * primary partition will not be marked as free space. */
+
+/**@bug The name of an NTFS volume *must* be blank, because the volume
+   name is stored as Unicode and the C99 functions needed by the
+   NTFS-library code to read the volume name have not been implemented
+   yet (Aug 2002, FreeBSD 4.6).  Trying to imagezip an NTFS volume
+   with a name will result in an error and program termination.*/
+
+
+struct ntfs_cluster;
+struct ntfs_cluster {
+	unsigned long start;
+	unsigned long length;
+	struct ntfs_cluster *next;
+};
+
+static __inline__ int
+ntfs_isAllocated(char *map, __s64 pos)
+{
+	int result;
+	char unmasked;
+	char byte;
+	short shift;
+	byte = *(map+(pos/8));
+	shift = pos % 8;
+	unmasked = byte >> shift;
+	result = unmasked & 1;
+	assert((result == 0 || result == 1) && "Programming error in statement above");
+	return result;
+}
+
+static void
+ntfs_addskips(ntfs_volume *vol,struct ntfs_cluster *free,u_int32_t offset)
+{
+	__u8 sectors_per_cluster;
+	struct ntfs_cluster *cur;
+	int count = 0;
+	sectors_per_cluster = vol->cluster_size/vol->sector_size;
+	if(debug) {
+		fprintf(stderr,"sectors per cluster: %d\n", sectors_per_cluster);
+		fprintf(stderr,"offset: %d\n", offset);
+	}
+	for(count = 0, cur = free;cur != NULL; cur = cur->next, count++) {
+		if(debug > 1) {
+			fprintf(stderr,"\tGroup:%-10dCluster%8li, size%8li\n",count,
+			       cur->start,cur->length);
+		}
+		addskip(cur->start*sectors_per_cluster + offset,
+			cur->length*sectors_per_cluster);
+	}
+}
+
+static int
+ntfs_freeclusters(struct ntfs_cluster *free)
+{
+	int total;
+	struct ntfs_cluster *cur;
+	for(total = 0, cur = free; cur != NULL; cur = cur->next)
+		total += cur->length;
+	return total;
+}
+
+/* The calling function owns the pointer returned.*/
+static void *
+ntfs_read_data_attr(ntfs_attr *na)
+{
+	void  *result;
+	__s64 pos;
+	__s64 tmp;
+	__s64 amount_needed;
+	int   count;
+	int   fd;
+	/**ntfs_attr_pread might actually read in more data than we
+	 * ask for.  It will round up to the nearest DEV_BSIZE boundry
+	 * so make sure we allocate enough memory.*/
+	amount_needed = na->data_size - (na->data_size % DEV_BSIZE) + DEV_BSIZE;
+	assert(amount_needed > na->data_size && amount_needed % DEV_BSIZE == 0
+	       && "amount_needed is rounded up to DEV_BSIZE multiple");
+	if(!(result = malloc(amount_needed))) {
+		perror("Out of memory!\n");
+		exit(1);
+	}
+	pos = 0;
+	count = 0;
+	while(pos < na->data_size) {
+		tmp = ntfs_attr_pread(na,pos,na->data_size - pos,result+pos);
+		if(tmp < 0) {
+			perror("ntfs_attr_pread failed");
+			exit(1);
+		}
+		assert(tmp != 0 && "Not supposed to happen error!  "
+		       "Either na->data_size is wrong or there is another "
+		       "problem");
+		assert(tmp % DEV_BSIZE == 0 && "Not supposed to happen");
+		pos += tmp;
+	}
+#if 0 /*Turn on if you want to look at the free list directly*/
+	if((fd = open("ntfs_free_bitmap.bin",O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
+		perror("open ntfs_free_bitmap.bin failed\n");
+		exit(1);
+	}
+	if(write(fd, result, na->data_size) != na->data_size) {
+		perror("writing free space bitmap.bin failed\n");
+		exit(1);
+	}
+#endif
+	return result;
+}
+
+static struct ntfs_cluster *
+ntfs_compute_free(ntfs_attr *na, void *cluster_map, __s64 num_clusters)
+{
+	struct ntfs_cluster *result;
+	struct ntfs_cluster *curr;
+	struct ntfs_cluster *tmp;
+	__s64 pos = 1;
+	int total_free = 0;
+	result = curr = NULL;
+	assert(num_clusters <= na->data_size * 8 && "If there are more clusters than bits in "
+	       "the free space file then we have a problem.  Fewer clusters than bits is okay.");
+	if(debug)
+		fprintf(stderr,"num_clusters==%ld\n",num_clusters);
+	while(pos < num_clusters) {
+		if(!ntfs_isAllocated(cluster_map,pos++)) {
+			curr->length++;
+			total_free++;
+		}
+		else {
+			while(ntfs_isAllocated(cluster_map,pos) && pos < num_clusters) {
+				++pos;
+			}
+			if(pos >= num_clusters) break;
+			if(!(tmp = malloc(sizeof(struct ntfs_cluster)))) {
+				perror("clusters_free: Out of memory");
+				exit(1);
+			}
+			if(curr) {
+				curr->next = tmp;
+				curr = curr->next;
+			} else
+				result = curr = tmp;
+			curr->start = pos;
+			curr->length = 0;
+			curr->next = NULL;
+		}
+	}
+	if(debug)
+		fprintf(stderr, "total_free==%d\n",total_free);
+	return result;
+}
+
+/*
+ * Primary function to call to operate on an NTFS slice.
+ */
+int
+read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
+{
+	ntfs_inode     *ni;
+	ntfs_attr      *na;
+	void           *buf;
+	struct ntfs_cluster *cfree;
+	struct ntfs_cluster *tmp;
+	char           *name;
+	ntfs_volume    *vol;
+	int            count;
+	int            length;
+	__s64          pos;
+	length = strlen(openname);
+	name = malloc(length+3);
+	/*Our NTFS Library code needs the /dev name of the partion to
+	 * examine.  The following line is FreeBSD specific code.*/
+	sprintf(name,"%ss%d",openname,slice + 1);
+	/*The volume must be mounted to find out what clusters are free*/
+	if(!(vol = ntfs_mount(name, MS_RDONLY))) {
+		fprintf(stderr,"When mounting %s\n",name);
+		perror("Failed to read superblock information.  Not a valid "
+		       "NTFS partition\n");
+		return -1;
+	}
+	/*A bitmap of free clusters is in the $DATA attribute of the
+	 *  $BITMAP file*/
+	if(!(ni = ntfs_open_inode(vol, FILE_Bitmap))) {
+		perror("Opening file $BITMAP failed\n");
+		ntfs_umount(vol,TRUE);
+		exit(1);
+	}
+	if(!(na = ntfs_attr_open(ni, AT_DATA, NULL, 0))) {
+		perror("Opening attribute $DATA failed\n");
+		exit(1);
+	}
+	buf = ntfs_read_data_attr(na);
+	cfree = ntfs_compute_free(na,buf,vol->nr_clusters);
+	ntfs_addskips(vol,cfree,start);
+	if(debug > 1) {
+		fprintf(stderr, "  P%d (NTFS v%u.%u)\n", slice + 1 /* DOS Numbering */,
+			vol->major_ver,vol->minor_ver);
+		fprintf(stderr, "        %s",name);
+		fprintf(stderr, "      start %10d, size %10d\n", start, size);
+		fprintf(stderr, "        Sector size: %u, Cluster size: %u\n",
+			vol->sector_size, vol->cluster_size);
+		fprintf(stderr, "        Volume size in clusters: %u\n", vol->nr_clusters);
+		fprintf(stderr, "        Free clusters:\t\t %u\n",ntfs_freeclusters(cfree));
+	}
+
+	/*We have the information we need so unmount everything*/
+	ntfs_attr_close(na);
+	if(ntfs_close_inode(ni)) {
+		perror("ntfs_close_inode failed");
+		exit(1);
+	}
+	if(ntfs_umount(vol,FALSE)) {
+		perror("ntfs_umount failed");
+		exit(1);
+	}
+	/*Free NTFS malloc'd memory*/
+	assert(name && "Programming Error, name should be freed here");
+	free(name);
+	assert(buf && "Programming Error, buf should be freed here");
+	free(buf);
+	assert(cfree && "Programming Error, 'struct cfree' should be freed here");
+	while(cfree) {
+		tmp = cfree->next;
+		free(cfree);
+		cfree = tmp;
+	}
+	return 0; /*Success*/
+}
+#endif
 
 /*
  * For a raw image (something we know nothing about), we report the size
@@ -1634,4 +1895,3 @@ compress_finish(unsigned long *subblksize)
 	subblockleft = SUBBLOCKMAX;
 	return 1;
 }
-

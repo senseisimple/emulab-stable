@@ -9,16 +9,29 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= os/imagezip
 
+WITH_NTFS	= @WINSUPPORT@
+
 include $(OBJDIR)/Makeconf
+
+CFLAGS		= -O2 -g -static
+LIBS 		= -lz
+
+# with NTFS
+ifeq ($(WITH_NTFS),1)
+CC		= gcc30
+INCS		= -I$(SRCDIR)/ntfs/extra_bsd_includes \
+		  -I$(SRCDIR)/ntfs/linux-ntfs/include \
+		  -Intfs/linux-ntfs -I$(SRCDIR)
+CFLAGS		+= -DWITH_NTFS $(INCS)
+LIBS		+= -Lntfs -lntfs
+NTFSDIR		= ntfs
+endif
 
 all:	imagezip imageunzip frisbee.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS = -O2 -g -static
-LIBS   = -lz
-
-imagezip: imagezip.o
+imagezip: $(NTFSDIR) imagezip.o
 	$(CC) $(CFLAGS) imagezip.o $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o 
@@ -27,6 +40,9 @@ imageunzip: imageunzip.o
 frisbee.o:	imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -o frisbee.o $<
 
+ntfs:
+	@$(MAKE) -C ntfs all
+
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 
 client-install: 
@@ -34,4 +50,9 @@ client-install:
 	$(INSTALL_PROGRAM) imageunzip /usr/local/bin/imageunzip
 
 clean:
+	@if [ -d ntfs ]; then \
+		$(MAKE) -C ntfs clean; \
+	fi;
 	/bin/rm -f *.o imagezip imageunzip
+
+.PHONY:	$(NTFSDIR)
