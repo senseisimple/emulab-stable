@@ -90,6 +90,7 @@ REPLACE INTO event_objecttypes VALUES (3,'TIME');
 REPLACE INTO event_objecttypes VALUES (4,'PROGRAM');
 REPLACE INTO event_objecttypes VALUES (5,'FRISBEE');
 REPLACE INTO event_objecttypes VALUES (6,'SIMULATOR');
+REPLACE INTO event_objecttypes VALUES (7,'LINKTEST');
 
 --
 -- Dumping data for table 'exported_tables'

@@ -328,6 +328,9 @@ Simulator instproc run {} {
 
     # This could probably be elsewhere.
     $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" $self $objtypes(SIMULATOR) ]
+
+    # This will eventually be under user control.
+    $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" "linktest" $objtypes(LINKTEST) ]
     
     foreach event $event_list {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] ]
