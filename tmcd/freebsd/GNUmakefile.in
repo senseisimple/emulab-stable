@@ -57,4 +57,5 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk /etc/testbed/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 /etc/start_if.fxp0
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 /etc/start_if.fxp4
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0 /etc/start_if.xl0
 
