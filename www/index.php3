@@ -60,7 +60,8 @@ elseif ($uid = GETUID()) {
 
 <?php
 #
-# So I can test on my home machine easily.
+# So I can test on my home machine easily. This *is* required to make the
+# the frames work correctly.
 # 
 echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
 ?>
