@@ -243,11 +243,9 @@ sub readXML($$$) {
 			undef($row);
 		    }
 		}
-		elsif ($_ =~ /^\s*\<([-\w]+)\>(.*)\<\/([-\w]+)\>/) {
+		elsif ($_ =~ /^\s*\<([-\w]+)\>(.*)\<\/\1\>$/) {
 		    fatal("Parser out of sync at entity: $_")
 			if (!defined($row));
-		    fatal("Malformed (mismatch) entity: $1/$2/$3")
-			if ($1 ne $3);
 		    #
 		    # Always toss out pid/eid, since we insert our own!
 		    #
