@@ -535,16 +535,6 @@ if (!isset($formfields[exp_autoswap]) ||
     }
 }
 
-#
-# Preload and Batch are mutually exclusive.
-#
-if (isset($formfields[exp_batched]) &&
-    !strcmp($formfields[exp_batched], "Yep") &&
-    isset($formfields[exp_preload]) &&
-    !strcmp($formfields[exp_preload], "Yep")) {
-    $errors["Do Not Swap In"] = "Cannot use with Batch Mode";
-}
-
 # None of the above errors count during a syntax check
 if (isset($syntax)) { $errors = array(); }
 
@@ -783,16 +773,14 @@ if ($formfields[exp_idleswap] == "1") {
 # All experiments are low priority for now.
 #
 $exp_priority  = "-n low";
+$exp_batched   = 0;
+$exp_preload   = 0;
+$batcharg      = "-i";
 
 if (isset($formfields[exp_batched]) &&
     strcmp($formfields[exp_batched], "Yep") == 0) {
     $exp_batched   = 1;
     $batcharg      = "";
-    $exp_preload   = 0;
-}
-else {
-    $exp_batched   = 0;
-    $batcharg      = "-i";
 }
 if (isset($formfields[exp_preload]) &&
     strcmp($formfields[exp_preload], "Yep") == 0) {
