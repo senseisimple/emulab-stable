@@ -787,7 +787,7 @@ sub EventSendWarn(@) {
 	my $result = EventSend(@tuple);
 
 	if (!$result) {
-		EventFatal("Event Send failed");
+		EventWarn("Event Send failed");
 	}
 
 	return $result;
