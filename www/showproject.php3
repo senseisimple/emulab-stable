@@ -58,47 +58,7 @@ echo "<br /><br />\n";
 #
 # A list of project experiments.
 #
-$query_result =
-    DBQueryFatal("select e.*,count(r.node_id) as nodes from experiments as e ".
-		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		 "where e.pid='$pid' ".
-		 "group by e.eid order by e.state,e.eid");
-
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Project Experiments</h3>
-          </center>
-          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
-
-    echo "<tr>
-              <th>EID</th>
-              <th>State</th>
-              <th align=center>Nodes</th>
-              <th align=center>Hours Idle</th>
-              <th>Description</th>
-          </tr>\n";
-
-    while ($projrow = mysql_fetch_array($query_result)) {
-	$eid  = $projrow[eid];
-	$state= $projrow[state];
-	$nodes= $projrow[nodes];
-	$idlehours = TBGetExptIdleTime($pid,$eid);
-	if ($idlehours == -1) { $idlehours = "&nbsp;"; }
-	$name = stripslashes($projrow[expt_name]);
-	if ($projrow[swap_requests] > 0) {
-	  $state .= "&nbsp;(idle)";
-	}
-
-        echo "<tr>
-                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
-		 <td>$state</td>
-                 <td align=center>$nodes</td>
-                 <td align=center>$idlehours</td>
-                 <td>$name</td>
-             </tr>\n";
-    }
-    echo "</table>\n";
-}
+SHOWEXPLIST("PROJ",$pid);
 
 #
 # A list of project members (from the default group).

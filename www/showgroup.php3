@@ -106,48 +106,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
 #
 # A list of Group experiments.
 #
-$query_result =
-    DBQueryFatal("select e.*,count(r.node_id) as nodes from experiments as e ".
-		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		 "where e.gid='$gid' ".
-		 "group by e.eid order by e.state,e.eid");
-
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Group Experiments</h3>
-          </center>
-          <table align=center border=1>\n";
-
-    echo "<tr>
-              <th>EID</th>
-              <th>State</th>
-              <th align=center>Nodes</th>
-              <th align=center>Hours Idle</th>
-              <th>Description</th>
-          </tr>\n";
-
-    while ($row = mysql_fetch_array($query_result)) {
-        $eid  = $row[eid];
-        $name = stripslashes($row[expt_name]);
-	$state= $row[state];
-	$nodes= $row[nodes];
-	$idlehours = TBGetExptIdleTime($pid,$eid);
-	if ($idlehours == -1) { $idlehours = "&nbsp;"; }
-	if (!$name)
-	    $name = "--";
-	if ($row[swap_requests] > 0) {
-	  $state .= "&nbsp;(idle)";
-	}
-        echo "<tr>
-                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></td>
-		 <td>$state</td>
-                 <td align=center>$nodes</td>
-                 <td align=center>$idlehours</td>
-                 <td>$name</td>
-              </tr>\n";
-    }
-    echo "</table>\n";
-}
+SHOWEXPLIST("GROUP",$gid);
 
 if ($isadmin) {
     echo "<center>

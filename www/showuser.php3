@@ -73,50 +73,7 @@ if ($yourpcs) {
 #
 # Lets show Experiments.
 #
-$query_result =
-    DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
-		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		 "where expt_head_uid='$target_uid' ".
-		 "group by e.pid,e.eid order by e.state,e.eid");
-
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Current Experiments</h3>
-          </center>
-          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
-
-    echo "<tr>
-              <th>PID</th>
-              <th>EID</th>
-              <th>State</th>
-              <th align=center>Nodes</th>
-              <th align=center>Hours Idle</th>
-              <th>Description</th>
-          </tr>\n";
-
-    while ($projrow = mysql_fetch_array($query_result)) {
-	$pid  = $projrow[pid];
-	$eid  = $projrow[eid];
-	$state= $projrow[state];
-	$nodes= $projrow["count(r.node_id)"];
-	$idlehours = TBGetExptIdleTime($pid,$eid);
-	if ($idlehours == -1) { $idlehours = "&nbsp;"; }
-	$name = stripslashes($projrow[expt_name]);
-	if ($projrow[swap_requests] > 0) {
-	  $state .= "&nbsp;(idle)";
-	}
-	
-        echo "<tr>
-                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
-		 <td>$state</td>
-                 <td align=center>$nodes</td>
-                 <td align=center>$idlehours</td>
-                 <td>$name</td>
-             </tr>\n";
-    }
-    echo "</table>\n";
-}
+SHOWEXPLIST("USER",$target_uid);
 
 #
 # Lets show project and group membership.

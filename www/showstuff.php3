@@ -518,7 +518,9 @@ function SHOWEXP($pid, $eid) {
     global $TBDBNAME, $TBDOCBASE;
 		
     $query_result =
-	DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
+	DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
+		     "round(minimum_nodes+.1,0) as min_nodes ".
+		     "from experiments as e ".
 		     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
 		     "where e.pid='$pid' and e.eid='$eid' ".
 		     "group by e.eid order by eid");
@@ -547,7 +549,8 @@ function SHOWEXP($pid, $eid) {
     $idle_ignore = $exprow[idle_ignore];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
-    $nodes       = $exprow["count(r.node_id)"];
+    $nodes       = $exprow["nodes"];
+    $minnodes    = $exprow["min_nodes"];
 
     if ($swappable)
 	$swappable = "Yes
@@ -661,10 +664,18 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$exp_status</td>
           </tr>\n";
 
-    echo "<tr>
+    if ($nodes > 0) {
+	echo "<tr>
             <td>Reserved Nodes: </td>
             <td class=\"left\">$nodes</td>
           </tr>\n";
+    } else {
+	echo "<tr>
+            <td>Minumum Nodes: </td>
+            <td class=\"left\"><font color=blue>
+               $minnodes (estimate)</font></td>
+          </tr>\n";
+    }
 
     $lastact = TBGetExptLastAct($pid,$eid);
     $idletime = TBGetExptIdleTime($pid,$eid);
@@ -711,6 +722,92 @@ function SHOWEXP($pid, $eid) {
     }
 
     echo "</table>\n";
+}
+
+#
+# Show a listing of experiments by user/pid/gid
+#
+function SHOWEXPLIST($type,$id) {
+    if ($type == "USER") {
+	$where = "expt_head_uid='$id'";
+	$title = "Current";
+    } elseif ($type == "PROJ") {
+	$where = "e.pid='$id'";
+	$title = "Project";
+	$nopid = 1;
+    } elseif ($type == "GROUP") {
+	$where = "e.gid='$id'";
+	$title = "Group";
+	$nopid = 1;
+    } else {
+	$where = "e.eid='$id'";
+	$title = "Bad id '$id'!";
+    }
+    
+    $query_result =
+	DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
+		     "round(minimum_nodes+.1,0) as min_nodes ".
+		     "from experiments as e ".
+		     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		     "where $where ".
+		     "group by e.pid,e.eid order by e.state,e.eid");
+    
+    if (mysql_num_rows($query_result)) {
+	echo "<center>
+          <h3>$title Experiments</h3>
+          </center>
+          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
+
+	if ($nopid) {
+	    $pidrow="";
+	} else {
+	    $pidrow="\n<th>PID</th>";
+	}
+	
+	echo "<tr>$pidrow
+              <th>EID</th>
+              <th>State</th>
+              <th align=center>Nodes</th>
+              <th align=center>Hours Idle</th>
+              <th>Description</th>
+          </tr>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $pid  = $row[pid];
+	    $eid  = $row[eid];
+	    $state= $row[state];
+	    $nodes= $row["nodes"];
+	    $minnodes = $row["min_nodes"];
+	    $idlehours = TBGetExptIdleTime($pid,$eid);
+	    if ($idlehours == -1) { $idlehours = "&nbsp;"; }
+	    $name = stripslashes($row[expt_name]);
+	    if ($row[swap_requests] > 0) {
+		$state .= "&nbsp;(idle)";
+	    }
+	    if ($nodes==0) {
+		$nodes = "<font color=blue>$minnodes</font>";
+	    }
+
+	    if ($nopid) {
+		$pidrow="";
+	    } else {
+		$pidrow="\n<td>".
+		    "<A href='showproject.php3?pid=$pid'>$pid</A></td>";
+	    }
+	    
+	    echo "<tr>$pidrow
+                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+		 <td>$state</td>
+                 <td align=center>$nodes</td>
+                 <td align=center>$idlehours</td>
+                 <td>$name</td>
+             </tr>\n";
+	}
+	echo "</table>\n";
+	echo "<font size=-1 color=blue>Node counts in blue show a rough \n".
+	    "estimate of the minimum number of nodes required to swap in.\n".
+	    "It does not account for node types, etc.</font>\n";
+    }   
 }
 
 #
