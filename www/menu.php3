@@ -130,6 +130,14 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Change Your Password",
 				   $TBBASE, "moduserinfo.php3");
 	    }
+	    elseif ($login_status & CHECKLOGIN_WEBONLY) {
+		WRITESIDEBARBUTTON("My Emulab",
+				   $TBBASE,
+				   "showuser.php3?target_uid=$login_uid");
+	    
+		WRITESIDEBARBUTTON("Update User Information",
+				   $TBBASE, "moduserinfo.php3");
+	    }
 	    else {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
@@ -138,6 +146,9 @@ function WRITESIDEBAR() {
 		if (ISADMIN($login_uid)) {
 		    WRITESIDEBARBUTTON("New Project Approval",
 				       $TBBASE, "approveproject_list.php3");
+
+		    WRITESIDEBARBUTTON("Widearea User Approval",
+				       $TBBASE, "approvewauser_form.php3");
 		}
 		if ($login_status & CHECKLOGIN_TRUSTED) {
                   # Only project/group leaders can do these options
@@ -160,15 +171,16 @@ function WRITESIDEBAR() {
 		    WRITESIDEBARBUTTON_NEW("New User Approval",
 					   $TBBASE, "approveuser_form.php3");
 		  } else {
-		    WRITESIDEBARBUTTON("New User Approval",
+
+		      WRITESIDEBARBUTTON("New User Approval",
 				       $TBBASE, "approveuser_form.php3");
 		  }
 		}
-		
+
                 #
                 # Since a user can be a member of more than one project,
-                # display this option, and let the form decide if the user is
-                # allowed to do this.
+                # display this option, and let the form decide if the 
+                # user is allowed to do this.
                 #
 		WRITESIDEBARBUTTON("Project List",
 				   $TBBASE, "showproject_list.php3");
