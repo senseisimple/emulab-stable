@@ -48,51 +48,51 @@ foreach ($HTTP_GET_VARS as $key => $value) {
 # Use one of the interfaces to see if this node seems to have already checked
 # in once
 #
-#if (count($interfaces)) {
-#    $testmac = $interfaces[0]["mac"];
-#
-#    #
-#    # First, make sure it isn't a 'real boy' - we should let the operators know
-#    # about this, because there may be some problem.
-#    #
-#    $query_result = DBQueryFatal("select n.node_id from " .
-#	"nodes as n left join interfaces as i " .
-#	"on n.node_id=i.node_id " .
-#	"where i.mac='$testmac'");
-#    if  (mysql_num_rows($query_result)) {
-#        $row = mysql_fetch_array($query_result);
-#	$node_id = $row["node_id"];
-#        echo "Node is already a real node, named $node_id\n";
-#	TBMAIL($TBMAIL_OPS,"Node Checkin Error","A node attempted to check " .
-#	    "in as a new node, but it is already\n in the database as " .
-#	    "$node_id!");
-#	exit;
-#    }
-#
-#
-#    #
-#    # Next, try the new nodes
-#    #
-#    $query_result = DBQueryFatal("select n.new_node_id, n.node_id from " .
-#	"new_nodes as n left join new_interfaces as i " .
-#	"on n.new_node_id=i.new_node_id " .
-#	"where i.mac='$testmac'");
-#
-#    if  (mysql_num_rows($query_result)) {
-#        $row = mysql_fetch_array($query_result);
-#	$id = $row["new_node_id"];
-#	$node_id = $row["node_id"];
-#        echo "Node has already checked in as ID $id, name $node_id\n";
-#
-#	#
-#	# Keep the temp. IP address around in case it's gotten a new one
-#	#
-#	DBQueryFatal("update new_nodes set temporary_IP='$tmpIP' " .
-#	    "where new_node_id=$id");
-#
-#	exit;
-#    }
-#}
+if (count($interfaces)) {
+    $testmac = $interfaces[0]["mac"];
+
+    #
+    # First, make sure it isn't a 'real boy' - we should let the operators know
+    # about this, because there may be some problem.
+    #
+    $query_result = DBQueryFatal("select n.node_id from " .
+	"nodes as n left join interfaces as i " .
+	"on n.node_id=i.node_id " .
+	"where i.mac='$testmac'");
+    if  (mysql_num_rows($query_result)) {
+        $row = mysql_fetch_array($query_result);
+	$node_id = $row["node_id"];
+        echo "Node is already a real node, named $node_id\n";
+	TBMAIL($TBMAIL_OPS,"Node Checkin Error","A node attempted to check " .
+	    "in as a new node, but it is already\n in the database as " .
+	    "$node_id!");
+	exit;
+    }
+
+
+    #
+    # Next, try the new nodes
+    #
+    $query_result = DBQueryFatal("select n.new_node_id, n.node_id from " .
+	"new_nodes as n left join new_interfaces as i " .
+	"on n.new_node_id=i.new_node_id " .
+	"where i.mac='$testmac'");
+
+    if  (mysql_num_rows($query_result)) {
+        $row = mysql_fetch_array($query_result);
+	$id = $row["new_node_id"];
+	$node_id = $row["node_id"];
+        echo "Node has already checked in as ID $id, name $node_id\n";
+
+	#
+	# Keep the temp. IP address around in case it's gotten a new one
+	#
+	DBQueryFatal("update new_nodes set temporary_IP='$tmpIP' " .
+	    "where new_node_id=$id");
+
+	exit;
+    }
+}
 
 
 #
