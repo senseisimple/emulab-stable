@@ -118,21 +118,6 @@ if (@ARGV != (($inout eq "modify") ? 3 : 2)) {
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 
-my $nsfile;
-
-if ($inout eq "modify") {
-    $nsfile = $ARGV[2];
-
-    #
-    # Untaint nsfile argument; Allow slash.
-    #
-    if ($nsfile =~ /^([-\w.\/]+)$/) {
-	$nsfile = $1;
-    } else {
-	die("Tainted nsfile name: $nsfile");
-    }
-}
-
 #
 # Untaint the arguments.
 #
@@ -151,6 +136,22 @@ else {
 my $repfile = "$eid.report";
 my $workdir = TBExptWorkDir($pid, $eid);
 my $userdir = TBExptUserDir($pid, $eid);
+my $tempnsfile;
+my $modnsfile;
+
+if ($inout eq "modify") {
+    $tempnsfile = $ARGV[2];
+
+    #
+    # Untaint nsfile argument; Allow slash.
+    #
+    if ($tempnsfile =~ /^([-\w.\/]+)$/) {
+	$tempnsfile = $1;
+    } else {
+	die("Tainted nsfile name: $tempnsfile");
+    }
+    $modnsfile = "$eid-modify.ns";
+}
 
 #
 # Verify user and get his DB uid.
@@ -389,6 +390,18 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 }
 
 #
+# Before going to background, we have to copy out the NS file!
+#
+if ($inout eq "modify") {
+    unlink($modnsfile);
+    if (system("/bin/cp", "$tempnsfile", "$modnsfile")) {
+	die("*** $0:\n".
+	    "    Could not copy $tempnsfile to $modnsfile");
+    }
+    chmod(0664, "$modnsfile");
+}
+
+#
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
@@ -466,7 +479,7 @@ elsif ($inout eq "modify") {
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
 
     print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
-    if (TBExptBackupVirtualState($pid, $eid, $$)) {
+    if (TBExptBackupVirtualState($pid, $eid)) {
 	fatal("*** $0:\n".
 	      "    Could not backup experiment state; cannot safely continue!\n");
     }
@@ -478,7 +491,7 @@ elsif ($inout eq "modify") {
     #
     # Rerun tbprerun if modifying.
     #
-    if (system("$tbdir/tbprerun -m $pid $eid $nsfile") != 0) {
+    if (system("$tbdir/tbprerun -m $pid $eid $modnsfile") != 0) {
 	$modifyError = "tbprerun failed!";
     }
 
@@ -519,7 +532,8 @@ elsif ($inout eq "modify") {
 	system("prerender -r $pid $eid");
 	TBExptRemoveVirtualState($pid, $eid );
 	
-	if (0 == TBExptRestoreVirtualState($pid, $eid, $$)) {
+	if (TBExptRestoreVirtualState($pid, $eid) == 0) {
+	    TBExptClearBackupState($pid, $eid);
 	    # Must deal with the prerender explicitly since it runs background.
 	    system("prerender -t $pid $eid");
 	    fatal("*** Update aborted; old state restored.\n");
@@ -529,6 +543,7 @@ elsif ($inout eq "modify") {
 	    fatal("*** Experiment state could not be restored!\n");
 	}
     }
+    TBExptClearBackupState($pid, $eid);
 }
 else { # $inout eq "restart" assumed.
     print STDOUT "Running tbrestart with arguments: $pid $eid\n";
@@ -587,15 +602,16 @@ if ($batch) {
 #
 
 if ($inout eq "modify") {
-    $nsdata_string = `cat $nsfile`;
+    $nsdata_string = `cat $modnsfile`;
     if (defined($nsdata_string)) {
 	$nsdata_string = DBQuoteSpecial($nsdata_string);
 
 	DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
 	DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
 		    "VALUES('$pid', '$eid', $nsdata_string)");
-    } else {
-	print "Warning!! Couldn't read nsfile '$nsfile'!\n";
+    }
+    else {
+	print "Warning!! Could not read nsfile '$modnsfile'!\n";
     }
 }
 
@@ -733,7 +749,7 @@ sub fatal($)
 	     ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
 	     "Cc:  $TBOPS",
-	     ($logname));
+	     (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
     if ($hosed) {
 	#
@@ -750,6 +766,3 @@ sub fatal($)
 
     exit($errorstat);
 }
-
-
-

@@ -240,7 +240,7 @@ if (! $errors) {
 if (! $errors) {
     if ($swapop eq "update") {
 	print STDERR "Backing up physical state...\n";
-	TBExptBackupPhysicalState($pid,$eid,$$);
+	TBExptBackupPhysicalState($pid,$eid);
 
 	$errors = doSwapout(UPDATE);
 	if (! $errors) {
@@ -298,7 +298,7 @@ if (! $errors) {
 
 	    if ($canStillRecover) {
 		print STDERR "Recovering physical state...\n";
-		my $recoverErrors = TBExptRestorePhysicalState($pid,$eid,$$);
+		my $recoverErrors = TBExptRestorePhysicalState($pid,$eid);
 		if ($recoverErrors) {
 		    print STDERR "Could not restore backed-up physical state; ";
 		    $canStillRecover = 0;

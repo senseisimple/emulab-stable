@@ -190,6 +190,9 @@ if (! isset($go)) {
 	$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 		       "webswapexp $rebootswitch -s modify $pid $eid $nsfile",
 		       $output, $retval);
+
+        # It has been copied out by the program!
+	unlink($nsfile);
 	
 	if ($retval) {
 	    echo "<br /><br />\n".

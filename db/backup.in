@@ -140,6 +140,12 @@ if (system("gzip -9 $backname")) {
     fatal("gzip $backname failed!");
 }
 
+# Should do this too, but right now I do it by hand ...
+if (0) {
+    system("find . \( -name 'tbdb.*.gz' \) ".
+	   "-mtime +45 -print -delete");
+}
+
 if (! chdir($LOGDIR)) {
     fatal("Could not chdir to $LOGDIR: $!");
 }
@@ -163,7 +169,8 @@ if (0) {
 	   "-mtime +35 -print -delete");
 }
 
-#SENDMAIL("stoller", "DB Backup Finished", "", undef, undef, ($logname));
+#SENDMAIL("stoller@flux.utah.edu",
+#	 "DB Backup Finished", "", undef, undef, ($logname));
 unlink("$logname");
 exit 0;
 
