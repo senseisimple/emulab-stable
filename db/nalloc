@@ -1,5 +1,6 @@
 #!/usr/local/bin/perl -w
 use Mysql;
+use English;
 
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
@@ -18,10 +19,14 @@ my $list= join(" or ",@machines);
 my $cmd = "";
 my $sth = "";
 
-$cmd = "select * from experiments where eid='$eid' and pid='$pid'";
+my $self = (getpwuid($UID))[0]
+  || die "Cannot figure out who you are!\n";
+
+$cmd = "select uid from proj_memb as pm left join experiments as e on ".
+  "e.pid=pm.pid where e.eid='$eid' and uid='$self' and e.pid='$pid'";
 $sth = $dbh->query($cmd);
-if ($sth->numrows < 1) {	
-  die("There is no experiment '$eid' in project '$pid'.\n");
+if ( ($sth->numrows < 1) && ($UID != 0) && ($EUID != 0)) {	
+  die("You are not a member of experiment '$eid' in project '$pid'.\n");
 }
  
 foreach my $n (@node_names) { 
