@@ -563,24 +563,37 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 	}
 	else if (!islocal) {
+		if (!istcp) {
+			/*
+			 * Simple "isalive" support for remote nodes.
+			 * Update timestamp, but let someone else worry
+			 * about what it means. 
+			 */
+			mydb_update("update nodes "
+				    "set status='up',status_timestamp=now() "
+				    "where node_id='%s'", nodeid);
+			client_writeback(sock, "\n", strlen("\n"), istcp);
+			goto skipit;
+		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
-		/*
-		 * Allow for now, until ron nodes updated.
-		 * if (! redirect)
-		 *	goto skipit;
-		 */
+		goto skipit;
 	}
 #else
 	/*
 	 * When not compiled for ssl, do not allow remote connections.
 	 */
 	if (!islocal) {
-		error("%s: Remote node without SSL!\n", nodeid);
-		/*
-		 * Allow for now, until ron nodes updated.
-		 * if (! redirect)
-		 *	goto skipit;
-		 */
+		if (!istcp) {
+			/*
+			 * Simple "isup" daemon support!
+			 */
+			mydb_update("update nodes set status='up' "
+				    "where node_id='%s'", nodeid);
+			client_writeback(sock, "\n", strlen("\n"), istcp);
+			goto skipit;
+		}
+		error("%s: Remote node connected without SSL!\n", nodeid);
+		goto skipit;
 	}
 #endif
 	/*
