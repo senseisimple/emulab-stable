@@ -111,8 +111,9 @@ if ($vcg) {
 
 if ($dot) {
     open(TMPN,">$filename2");
-    #print TMPN "digraph G {\n  node [shape=ellipse]\n  rotate=90\n";
-    print TMPN "digraph G {\n  node [shape=ellipse]\n";
+    print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  edge [fontsize=8]\n";
+    #print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  graph [clusterrank=global]\n";
+    #print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n";
 }
 
 my %states=();
@@ -132,21 +133,35 @@ while(@r=$result->fetchrow()) {
     if ($m ne $lastmode) {
 	if ($lastmode ne "") { print TMPN "  }\n"if $dot; }
 	print TMPN "  subgraph cluster_$m {\n    label = \"$m\";\n" if $dot;
+	#print TMPN "  subgraph cluster_$m {\n    rank=max\n    label = \"$m\";\n" if $dot;
 	#print "Starting subgraph $m\n";
     }
     $lastmode = $m;
     $s1=$r[1];
     $s2=$r[2];
+    $l =$r[3];
     mkstates([$m,$s1],[$m,$s2]);
     $n1 = $m.$delim.$s1;
     $n2 = $m.$delim.$s2;
-    print TMPN "    $n1 -> $n2;\n" if $dot;
+    #if ($n1 ne $n2) {
+	#print TMPN "    $n1 -> $n2;\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [sametail=\"tail$n2\",samehead=\"head$n1\"];\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [sametail=\"tail$n1\",samehead=\"head$n2\"];\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [sametail=\"$n2\"];\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [sametail=\"$n1\"];\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [samehead=\"$n1\"];\n" if $dot;
+	#print TMPN "    $n1 -> $n2 [samehead=\"$n2\"];\n" if $dot;
+    #} else {
+	#print TMPN "    $n1 -> $n2;\n" if $dot;
+	print TMPN "    $n1 -> $n2 [label=\"$l\"];\n" if $dot;
+    #}
     print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n" if $vcg;
 }
 
 print TMPN "  }\n" if $dot; # end the last subgraph
 my $modetrans=1;
 
+%modelist=();
 $result = DBQueryFatal($cmd2);
 while(@r=$result->fetchrow()) {
     $m1=$r[0];
@@ -167,7 +182,24 @@ while(@r=$result->fetchrow()) {
     mkstates([$m1,$s1],[$m2,$s2]);
     $n1=$m1.$delim.$s1;
     $n2=$m2.$delim.$s2;
-    print TMPN "  $n1 -> $n2;\n" if $dot;
+    if (0) {
+	if (!defined($modelist{"in$n1"})) {
+	    print TMPN "  $n1 -> MODE_CHANGE;\n" if $dot;
+	    $modelist{"in$n1"}=1;
+	}
+	if (!defined($modelist{"out$n2"})) {
+	    print TMPN "  MODE_CHANGE -> $n2;\n" if $dot;
+	    $modelist{"out$n2"}=1;
+	}
+    } else {
+	print TMPN "  $n1 -> $n2;\n" if $dot;
+    }
+    #print TMPN "  $n1 -> $n2 [samehead=\"$n2\",sametail=\"$n1\"];\n" if $dot;
+    #print TMPN "  $n1 -> $n2 [samehead=\"$n1\",sametail=\"$n2\"];\n" if $dot;
+    #print TMPN "  $n1 -> $n2 [samehead=\"$n2\"];\n" if $dot;
+    #print TMPN "  $n1 -> $n2 [samehead=\"$n1\"];\n" if $dot;
+    #print TMPN "  $n1 -> $n2 [sametail=\"$n1\"];\n" if $dot;
+    #print TMPN "  $n1 -> $n2 [sametail=\"$n2\"];\n" if $dot;
     print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n" if $vcg;
 }
 
@@ -237,6 +269,8 @@ sub doformats() {
 }
 
 sub mkstates {
+    my $n;
+    my $l;
     foreach $pair (@_) {
 	my ($m, $s) = @$pair;
 	$n = $m.$delim.$s;
@@ -250,6 +284,8 @@ sub mkstates {
 	    print "Adding node '$n'\n" if ($v);
 	    print TMP "  node: { title: \"$n\" label: \"$l\"}\n" if $vcg;
 	    print TMPN "    $n [label=\"$s\"];\n" if $dot;
+	    #print TMPN "    $n [label=\"$m\\n$s\"];\n" if $dot;
+	    #print TMPN "    $n;\n" if $dot;
 	    $states{$n}=1;
 	}
     }
