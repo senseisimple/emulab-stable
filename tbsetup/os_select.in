@@ -125,16 +125,15 @@ if (@nodes < 1) { fatal("No valid nodes supplied.\n"); }
 
 # Figure out who called us. Only root, people with admin status
 # in the DB, or members of the right project can do this.
+my ($me) = getpwuid($UID)
+  or fatal("$UID not in passwd file\n");
 if ($UID && !TBAdmin($UID)) {
-    my ($me) = getpwuid($UID)
-        or fatal("$UID not in passwd file\n");
-    #debug("Not an admin.\n");
     if (! TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYINFO,@nodes)) {
         fatal("os_select: You do not have permission to modify ".
-	    "one or more of the nodes.\n");
+	    "one or more of the nodes. ($me/$UID)\n");
     }
-    debug("$UID: Access granted to all nodes requested.\n");
-} else { debug("$UID: Running as an admin.\n"); }
+    debug("$me/$UID: Access granted to all nodes requested.\n");
+} else { debug("$me/$UID: Running as an admin.\n"); }
 
 my $pernodeopmode=0;
 my $opmode = os_opmode($osid);
