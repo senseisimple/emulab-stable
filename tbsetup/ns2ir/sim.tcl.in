@@ -279,11 +279,12 @@ Simulator instproc at {time event} {
 	return
     }
 
-    set atstring "$time $event"
+    set atstring "$event"
 
     # Check otype/command
     set obj [lindex $event 0]
     set cmd [lindex $event 1]
+    set args {}
     set okargs 0
     switch -- [$obj info class] {
 	"Application/Traffic/CBR" {
@@ -296,14 +297,23 @@ Simulator instproc at {time event} {
 		    return
 		}
 	    }
-	    set vnode $obj
-	    set vname {}
+	    set vnode [$obj get_node]
+	    set vname $obj
 	}
 	"Link" {
 	    set otype LINK
 	    switch -- $cmd {
-		"up" {set etype UP}
-		"down" {set etype DOWN}
+		"up"	    {set etype UP}
+		"down"	    {set etype DOWN}
+		"bandwidth" {
+		    if {[llength $event] < 4} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    set bw    [lindex $event 2]
+                    set args  "BANDWIDTH=$bw"
+		    set etype MODIFY
+		}
 		unknown {
 		    punsup "at $time $event"
 		    return
@@ -313,9 +323,9 @@ Simulator instproc at {time event} {
 	    set vname $obj
 	}
 	"Simulator" {
-	    set otype TBCONTROL
 	    switch -- $cmd {
 		"bandwidth" {
+		    set otype LINK
 		    set etype MODIFY
 		}
 		unknown {
@@ -332,11 +342,6 @@ Simulator instproc at {time event} {
 	    return
 	}
     }
-    if {($okargs == 0) && ([llength $event] > 2)} {
-	punsup "Too many arguments: at $time $event"
-	return
-    }
-    set args [lrange $event 2 end]
 
     $self instvar event_list
     lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]

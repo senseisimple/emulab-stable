@@ -29,6 +29,10 @@ Agent instproc init {} {
 Agent instproc set_node {node} {
     $self set node $node
 }
+Agent instproc get_node {} {
+    $self instvar node
+    return $node
+}
 Agent instproc set_application {application} { 
     $self set application $application
 }
@@ -140,6 +144,10 @@ Application instproc init {} {
 Application instproc attach-agent {agent} {
     $self set agent $agent
     $agent set_application $self
+}
+Application instproc get_node {} {
+    $self instvar agent
+    return [$agent get_node]
 }
 
 # Application/Traffic/CBR
