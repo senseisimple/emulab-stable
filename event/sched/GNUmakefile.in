@@ -11,7 +11,7 @@ SUBDIR		= event/sched
 
 include $(OBJDIR)/Makeconf
 
-all:	event-sched event-sched_rpc
+all:	event-sched event-sched_rrpc
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -50,7 +50,7 @@ event-sched_rpc:	event-sched_rpc.o rpc.o queue.o event-sched.h \
 
 event-sched_rrpc:	event-sched_rpc.o rrpc.o queue.o event-sched.h \
 				../lib/libevent.a
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ event-sched_rpc.o \
+	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ event-sched_rpc.o \
 			rrpc.o queue.o $(ULXRLIBS) $(LIBS)
 
 queue.o:		event-sched.h
@@ -62,12 +62,12 @@ rpc.o:			rpc.cc rpc.h
 rrpc.o:			rpc.cc rpc.h
 	$(CXX) $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
-install: event-sched_rpc
+install: event-sched_rrpc
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
-	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_DIR)/opsdir/sbin/event-sched
+	$(INSTALL_PROGRAM) event-sched_rrpc $(INSTALL_DIR)/opsdir/sbin/event-sched
 
-control-install: event-sched_rpc
-	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_SBINDIR)/event-sched
+control-install: event-sched_rrpc
+	$(INSTALL_PROGRAM) event-sched_rrpc $(INSTALL_SBINDIR)/event-sched
 
 # not a client thing
 client:

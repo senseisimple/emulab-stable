@@ -154,7 +154,7 @@ main(int argc, char **argv)
 	if (!server)
 		server = "localhost";
 #ifdef  RPC
-	if (RPC_init(NULL, BOSSNODE, 0)) {
+	if (RPC_init(NULL, BOSSNODE, 3069)) {
 		fatal("could not connect to rpc server");
 	}
 #endif

@@ -22,15 +22,22 @@ import xmlrpclib
 import signal
 import types
 import datetime
-sys.path.append("@prefix@/lib")
-from libdb        import *
-from libtestbed   import SENDMAIL, TBOPS
-from emulabclient import *
 
 # Configure variables
 TBDIR = "@prefix@"
 BOSSNODE = "@BOSSNODE@"
 BOSSEVENTPORT = "@BOSSEVENTPORT@"
+OURDOMAIN = "@OURDOMAIN@"
+USERNODE = "@USERNODE@"
+
+TBPATH = os.path.join(TBDIR, "lib")
+if TBPATH not in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
+from libdb        import *
+from libtestbed   import SENDMAIL, TBOPS
+from emulabclient import *
 
 # Version
 VERSION = 0.1

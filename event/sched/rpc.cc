@@ -50,15 +50,15 @@ main(int argc, char **argv)
 
 int RPC_init(char *certpath, char *host, int port)
 {
+  struct passwd *pwd;
   int retval = -1;
   
+  pwd = getpwuid(getuid());
 #ifdef SSHRPC
   {
     char identity_path[PATH_MAX];
-    struct passwd *pwd;
 
     /* Construct the path to the identity and */
-    pwd = getpwuid(getuid());
     snprintf(identity_path,
 	     sizeof(identity_path),
 	     "%s/.ssh/identity",
@@ -115,13 +115,19 @@ int RPC_init(char *certpath, char *host, int port)
     }
   }
 #else
-  /* XXX THIS IS OUT OF DATE */
   {
-    ulxr::SSLConnection conn(false, host, port);
-    ulxr::HttpProtocol proto(&conn, conn.getHostName());
-    if (certpath == NULL)
-      certpath = "/usr/testbed/etc/client.pem";
-    conn.setCryptographyData("", certpath, certpath);
+    ulxr::SSLConnection *sslconn;
+    char buf[BUFSIZ];
+    
+    rpc_data.conn = sslconn = new ulxr::SSLConnection(false, host, port);
+    rpc_data.proto = new ulxr::HttpProtocol(rpc_data.conn,
+					    sslconn->getHostName());
+    rpc_data.proto->setPersistent(true);
+    if (certpath == NULL) {
+      snprintf(buf, sizeof(buf), "%s/.ssl/emulab.pem", pwd->pw_dir);
+      certpath = buf;
+    }
+    sslconn->setCryptographyData("", certpath, certpath);
   }
 #endif
   return 0;
@@ -150,12 +156,7 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 {
   try
     {
-#ifdef SSHRPC
-      emulab::ServerProxy proxy(rpc_data.proto);
-#else
-      /* XXX THIS IS OUT OF DATE */
-      emulab::ServerProxy proxy(rpc_data.proto, false, "/RPC2");
-#endif
+      emulab::ServerProxy proxy(rpc_data.proto, false, TBROOT);
 
       *er = proxy.invoke(method,
 			 emulab::SPA_String, "proj", pid,
