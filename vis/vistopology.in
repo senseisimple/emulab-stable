@@ -1,0 +1,137 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Generate a GIF image of the topology for an experiment.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: vistoplogy [-o <outputfile>] <pid> <eid>\n";
+    exit(-1);
+}
+my  $optlist = "o:";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+my $top2gif  = "$TB/libexec/vis/top2gif";
+my $tbdata   = "tbdata";
+my $output;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# be left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+
+if (defined($options{"o"})) {
+    $output = $options{"o"};
+
+    if ($output =~ /^([-\@\w.\/]+)$/) {
+	$output = $1;
+    }
+    else {
+	die("Bad data in output name: $output");
+    }
+}
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
+
+#
+# Verify existing experiment.
+#
+if (! ExpState($pid, $eid)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid\n");
+}
+
+#
+# Verify that this person is allowed to look at experiment.
+#
+if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+    die("*** $0:\n".
+	"    You do not have permission to view experiment $pid/$eid\n");
+}
+
+#
+# Find out where the experiment directory is.
+#
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+        "    No experiment record for $pid/$eid exists!\n");
+}
+
+my %row		= $query_result->fetchhash();
+my $estate	= $row{'state'};
+my $expt_path   = $row{'path'};
+
+if ($estate ne EXPTSTATE_ACTIVE) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is not active!\n");
+}
+
+if (! chdir("$expt_path/$tbdata")) {
+    die("*** $0:\n".
+	"    Could not chdir to $expt_path/$tbdata: $!\n");
+}
+
+#
+# Run the vis script and be done with it.
+#
+my $args = "$eid.top";
+if (defined($output)) {
+    $args = "-o $output $args";
+}
+
+if (system("$top2gif $args") != 0) {
+    exit(1);
+}
+exit(0);
+

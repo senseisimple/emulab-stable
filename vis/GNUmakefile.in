@@ -1,0 +1,33 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= vis
+
+include $(OBJDIR)/Makeconf
+
+BIN_SCRIPTS	= vistopology
+LIBEXEC_SCRIPTS = webvistopology
+LIBEXEC_VIS	= topper top2gif
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(LIBEXEC_SCRIPTS) $(LIBEXEC_VIS) $(BIN_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: \
+	$(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/vis/, $(LIBEXEC_VIS))
+
+$(INSTALL_LIBEXECDIR)/vis/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/vis
+	$(INSTALL) $< $@
+
+clean:
