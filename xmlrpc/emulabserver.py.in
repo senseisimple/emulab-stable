@@ -21,6 +21,7 @@ import exceptions
 import xmlrpclib
 import signal
 import syslog
+import types
 sys.path.append("@prefix@/lib")
 from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
@@ -606,7 +607,8 @@ class osid:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         # Get the listing that is accessible to this user and
-        res = DBQueryFatal("SELECT distinct o.osname,o.description FROM "
+        res = DBQueryFatal("SELECT distinct "
+                           "o.osname,o.pid,o.description,o.OS FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
                            "where g.uid=%s or o.shared=1",
@@ -621,7 +623,9 @@ class osid:
         for osid in res:
             tmp = {
                 "osid" : osid[0],
-                "description" : osid[1],
+                "pid" : osid[1],
+                "description" : osid[2],
+                "OS" : osid[3],
                 }
             result[osid[0]] = tmp
             pass
@@ -696,26 +700,60 @@ class experiment:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
+        # Figure out the format for the returned data.
+        if argdict.has_key("format"):
+            format = argdict["format"]
+            pass
+        else:
+            format = "brief"
+            pass
+
         # XXX Let the user specify the pid/gid
-        dbres = DBQueryFatal("SELECT e.pid,e.gid,e.eid FROM experiments AS e "
-                             "WHERE expt_head_uid=%s",
+        dbres = DBQueryFatal("SELECT e.pid,e.gid,e.eid,e.expt_name,e.state,"
+                             "e.expt_head_uid "
+                             "  FROM experiments AS e "
+                             "WHERE e.expt_head_uid=%s",
                              (UID,))
 
         # Build a dictionary of projects that refer to a dictionary of groups
         # that refer to a list of experiments in that group.
         result = {}
         for res in dbres:
-            if not result.has_key(res[0]):
-                result[res[0]] = {
-                    res[1] : [ res[2], ]
+            # Get everything from the DB result,
+            pid = res[0]
+            gid = res[1]
+            eid = res[2]
+            desc = res[3]
+            state = res[4]
+            expt_head = res[5]
+            # ... make sure 'result' has the proper slots,
+            if not result.has_key(pid):
+                result[pid] = {
+                    gid : list()
                     }
                 pass
-            elif not result[res[0]].has_key(res[1]):
-                result[res[0]][res[1]] = [ res[2], ]
+            elif not result[pid].has_key(gid):
+                result[pid][gid] = list()
                 pass
-            else:
-                result[res[0]][res[1]].append(res[2])
+
+            # ... drop the data into place, and
+            expdata = None
+            if format == "brief":
+                expdata = eid;
                 pass
+            elif format == "full":
+                expdata = {
+                    "pid" : pid,
+                    "gid" : gid,
+                    "name" : eid,
+                    "description" : desc,
+                    "state" : state,
+                    "expt_head" : expt_head,
+                    }
+                pass
+
+            # ... append it to the group list.
+            result[pid][gid].append(expdata)
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
@@ -1031,15 +1069,23 @@ class experiment:
         if (argerror):
             return argerror
 
+        # Check for well formed proj/exp and
         if not (re.match("^[-\w]*$", argdict["proj"]) and
                 re.match("^[-\w]*$", argdict["exp"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed proj/exp!")
 
+        # ... timeout arguments.
         if (argdict.has_key("timeout") and
+            isinstance(argdict["timeout"], types.StringType) and
             not re.match("^[\d]*$", argdict["timeout"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed timeout!")
+
+        # Make sure the state argument is a list.
+        if (not isinstance(argdict["state"], types.ListType)):
+            argdict["state"] = [argdict["state"],]
+            pass
         
         res = DBQueryFatal("select state,gid from experiments "
                            "where pid=%s and eid=%s",
@@ -1066,11 +1112,12 @@ class experiment:
                         + argdict["proj"] + "/" + argdict["exp"]))
 
         #
-        # See if experiment already in the desired state.
+        # First, see if the experiment is already in the desired state,
         #
-        if (state == argdict["state"]):
+        if (state in argdict["state"]):
             return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
 
+        # ... subscribe to the event, and then
         try:
             import tbevent
             pass
@@ -1086,47 +1133,65 @@ class experiment:
         try:
             mc = tbevent.EventClient(server="localhost")
             mc.subscribe(at)
+            pass
         except:
             return EmulabResponse(RESPONSE_ERROR,
                                   output="Could not connect to Event System")
+
+        # ... check the state again in case it changed between the first
+        # check and the subscription.
+        res = DBQueryFatal("select state from experiments "
+                           "where pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment: " +
+                                  argdict["proj"] + "/" + argdict["exp"])
+
+        state = res[0][0]
+        if (state in argdict["state"]):
+            return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
 
         if (argdict.has_key("timeout")):
             signal.signal(signal.SIGALRM, TimeoutHandler)
             signal.alarm(int(argdict["timeout"]))
             pass
 
+        # Need to wait for an event.
         try:
             while True:
                 ev = mc.poll()
 
                 if ev == None:
-                    time.sleep(1)
+                    time.sleep(1) # Slow down the polling.
                     continue
 
+                # Got an event, log it, and
                 syslog.syslog(syslog.LOG_INFO,
                               "statewait: " + ev.getObjType() + ", " +
                               ev.getEventType());
 
-                if ev.getEventType() == argdict["state"]:
+                # ... check if it is one the user cares about.
+                if ((argdict["state"] == []) or
+                    (ev.getEventType() in argdict["state"])):
+                    retval = ev.getEventType()
                     break
+
                 pass
-            
+            pass
         except TimedOutError, e:
             return EmulabResponse(RESPONSE_TIMEDOUT,
-                                  output="Operation Timed Out")
-        except:
-            if (argdict.has_key("timeout")):
-                signal.alarm(0)
-                pass
-            return EmulabResponse(RESPONSE_ERROR, output="System Failure")
+                                  output=("Timed out waiting for states: "
+                                          + `argdict["state"]`))
 
         if (argdict.has_key("timeout")):
             signal.alarm(0)
             pass
-        del(mc);
+
+        del(mc)
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=argdict["state"],
-                              output=argdict["state"])
+        return EmulabResponse(RESPONSE_SUCCESS, value=retval, output=retval)
         
     #
     # Return the node/link mappings for an experiment.
@@ -1705,6 +1770,53 @@ class experiment:
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
+
+    #
+    # Return the thumbnail image of experiment's topology.
+    #
+    def thumbnail(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # Check for valid arguments.
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        dbres = DBQueryFatal(
+            "select s.rsrcidx from experiments as e "
+            "left join experiment_stats as s on s.exptidx=e.idx "
+            "where e.pid=%s and e.eid=%s",
+            (argdict["proj"], argdict["exp"]))
+
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        
+        dbres = DBQueryFatal(
+            "select thumbnail from experiment_resources "
+            "where idx=%s",
+            (dbres[0][0],))
+
+        # The return is a PNG, which needs to be encoded as base64 before
+        # sending over XML-RPC.
+        result = xmlrpclib.Binary(dbres[0][0])
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output="ok")
 
     pass
 

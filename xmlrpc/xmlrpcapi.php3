@@ -407,7 +407,30 @@ experiments.
   </tr>
   </table>
   
+  <br>
+  <li><tt><b>getlist</b></tt>: Get the list of experiments created by a
+  user.  There are no required arguments and the optional arguments
+  are:<br><br>
+  
+  <table cellpadding=2>
+   <tr>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>format</tt></td>
+    <td>string</td>
+    <td>"brief"</td>
+    <td>The format of the data to return.  The "brief" format contains a nested
+    mapping of project names to group names and group names to a list of
+    experiment names.  The "full" format expands the experiment listing to
+    include structures containing extra information about each experiment,
+    instead of just the name.
+    </td>
+   </tr>
+  </table>
 
+  
   <br>
   <li><tt><b>startexp</b></tt>: Create an experiment. By default, the experiment
   is started as a <a href="tutorial/tutorial.php3#BatchMode"><em>batch</em></a>
@@ -724,7 +747,11 @@ experiments.
   <tr>
     <td><tt>state</tt></td>
     <td>string</td>
-    <td>The experiment state to wait for</td>
+    <td>The experiment state(s) to wait for.  If a single string is specified
+    the call will block until the experiment has reached that state.  If a list
+    of states is given, the call will block until the experiment has reached
+    any of the states in the list.  Finally, if an empty list is given, the
+    call will block until the experiment undergoes a state change.</td>
   </tr>
   </table>
     
@@ -738,13 +765,16 @@ experiments.
    <tr>
     <td><tt>timeout</tt></td>
     <td>integer</td>
-    <td>1-999999</td>
+    <td><i>forever</i></td>
     <td>Timeout after this many <b>seconds</b>. The return code is
         is <tt>RESPONSE_SUCCESS</tt> if the state is reached or
 	<tt>RESPONSE_TIMEDOUT</tt> if the timer expires.
     </td>
    </tr>
   </table>
+
+  <br>The return value is the current state of the experiment.
+  <br>
 
   <br>
   <li><tt><b>info</b></tt>: Get information about an experiment. The
@@ -1099,6 +1129,31 @@ experiments.
     system project for globally shared images.</td>
    </tr>
   </table>
+
+  
+  <br>
+  <li><tt><b>thumbnail</b></tt>: Get the thumbnail image of the experiment
+  topology.  The required arguments are:<br><br>
+  
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  </table>
+
+  <br>The return value is a byte array containing a PNG image.
+  <br>
   </ul>
 
 <br>
