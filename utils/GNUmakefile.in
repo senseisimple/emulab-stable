@@ -16,7 +16,7 @@ SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
-                  eventping grantnodetype
+                  eventping grantnodetype import_commitlog
 LIBEXEC_SCRIPTS	= webcreateimage newnode
 
 #

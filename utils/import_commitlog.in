@@ -1,0 +1,144 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX;
+
+#
+# Yuck. Take the cvs log for the testbed which is rsync'ed over from
+# the flux cvs server each night, and pull out the last N months of
+# entries, reversing them in the process. Then write the file into the
+# www directory!
+#
+# This script should be run from crontab on the main emulab site only.
+#
+# 12  2  *  *  *     root    /usr/testbed/sbin/import_commitlog
+#
+sub usage()
+{
+    print STDERR "Usage: import_commitlog\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+
+#
+# Only root can run this script.
+#
+if ($UID) {
+    die("*** $0:\n".
+	"    Only root can run this script\n");
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $INPUTLOG    = "/usr/testbed/scratch/CVS/CVSROOT/commitlogs/testbed";
+my $OUTPUTLOG   = "$TB/www/doc/ChangeLog.txt";
+my $STARTDATE   = "2004/01";
+my $tempname    = "/tmp/import.$$";
+my @entries     = ();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{d})) {
+    $debug = 1;
+}
+
+if (!open(INPUT, $INPUTLOG)) {
+    fatal("Could not open $INPUTLOG for reading!");
+}
+if (!open(OUTPUT, "> $tempname")) {
+    fatal("Could not open $tempname for writing!");
+}
+
+#
+# Skip to approximate start date.
+# 
+while (<INPUT>) {
+    if ($_ =~ /^\w*\s*(\d\d\d\d\/\d\d)\/\d\d\s*\d\d:\d\d:\d\d\s*\w\w\w$/) {
+        if ($1 eq $STARTDATE) {
+	    last;
+	}
+    }
+}
+my $entry = $_;
+
+#
+# Reverse the rest of the entries, saving them up.
+#
+while (<INPUT>) {
+    if ($_ =~ /^\w*\s*(\d\d\d\d\/\d\d)\/\d\d\s*\d\d:\d\d:\d\d\s*\w\w\w$/) {
+	unshift(@entries, $entry);
+	$entry = $_;
+	next;
+    }
+    $entry .= $_;
+}
+
+#
+# Write out the list!
+# 
+foreach my $entry (@entries) {
+    print OUTPUT $entry;
+}
+close(INPUT);
+close(OUTPUT);
+
+#
+# Move the new file into the www directory.
+#
+if (system("mv -f $tempname $OUTPUTLOG")) {
+    fatal("Could not mv $tempname to $OUTPUTLOG");
+}
+
+unlink($tempname);
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print "$mesg\n";
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Failure importing testbed commitlog",
+	     $mesg);
+    
+    if (defined($tempname)) {
+	unlink("$tempname");
+    }
+    exit(-1);
+}
