@@ -35,3 +35,10 @@ This commands is used to set the IP address for nodes with multiple
 links.  It sets the IP for the interface the leads to <dst>.
 Currently there is no support when nodes have multiple connections
 between them.
+
+
+#TB set-hardware <node> <type> [<args>]
+
+This commands is used to set hardware specs.  Currently only one
+format is supported: <type> = dnard-shelf.  This indicates that <node>
+should be a shelf (unswitches LAN) of 8 dnards.
