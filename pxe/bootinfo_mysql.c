@@ -104,8 +104,11 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	if (row[0] != 0 && row[0][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
 		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[0],
-			MAX_BOOT_DATA-sizeof(boot_what_t)-1);
+		strncpy(info->what.mb.filename, row[0], MAX_BOOT_PATH-1);
+		if (row[1] != 0 && row[1][0] != '\0')
+			strncpy(info->cmdline, row[1], MAX_BOOT_CMDLINE-1);
+		else
+			info->cmdline[0] = 0;	/* Must zero first byte! */
 		mysql_free_result(res);
 		return 0;
 	}
@@ -128,6 +131,11 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	info->type = BIBOOTWHAT_TYPE_PART;
 	info->what.partition = part;
+	if (row[5] != 0 && row[5][0] != '\0')
+		strncpy(info->cmdline, row[5], MAX_BOOT_CMDLINE-1);
+	else
+		info->cmdline[0] = 0;	/* Must zero first byte! */
+	
 	return 0;
 }
 
@@ -169,6 +177,9 @@ print_bootwhat(boot_what_t *bootinfo)
 		       bootinfo->what.mb.filename);
 		break;
 	}
+	if (bootinfo->cmdline[0])
+		printf("Command line %s\n", bootinfo->cmdline);
+		
 }
 
 main(int argc, char **argv)
