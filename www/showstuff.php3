@@ -147,7 +147,10 @@ function SHOWGROUP($pid, $gid) {
 	DBQueryFatal("SELECT * FROM groups WHERE pid='$pid' and gid='$gid'");
     $row = mysql_fetch_array($query_result);
 
-    echo "<table align=center border=1>\n";
+    echo "<center>
+          <h3>Group Profile</h3>
+          </center>
+          <table align=center border=1>\n";
 
     $leader	= $row[leader];
     $created	= $row[created];
@@ -229,7 +232,7 @@ function SHOWGROUPMEMBERS($pid, $gid) {
     echo "<center>
           <h3>Group Members</h3>
           </center>
-          <table align=center border=1>\n";
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
               <td align=center>Name</td>
@@ -261,6 +264,44 @@ function SHOWGROUPMEMBERS($pid, $gid) {
 	    echo "<td align=center>
                       <img alt=\"N\" src=\"redball.gif\"></td>\n";
 	}
+	echo "</tr>\n";
+    }
+    echo "</table>\n";
+}
+
+#
+# A list of groups for a user.
+#
+function SHOWGROUPMEMBERSHIP($uid) {
+    $query_result =
+	DBQueryFatal("SELECT * FROM group_membership ".
+		     "WHERE uid='$uid'");
+    
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+
+    echo "<center>
+          <h3>Group Membership</h3>
+          </center>
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+    echo "<tr>
+              <td align=center>PID</td>
+              <td align=center>GID</td>
+              <td align=center>Privs</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$pid   = $row[pid];
+	$gid   = $row[gid];
+	$trust = $row[trust];
+
+        echo "<tr>
+                  <td>$pid</td>
+                  <td>$gid</td>
+                  <td>$trust</td>\n";
+	    
 	echo "</tr>\n";
     }
     echo "</table>\n";
