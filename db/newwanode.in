@@ -12,10 +12,11 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: newwanode [-w] -t <nodetype> -i <ip address>\n";
+    print "Usage: ".
+	"newwanode [-w] [-n nickname] -t <nodetype> -i <ip address>\n";
     exit(1);
 }
-my  $optlist = "wt:i:";
+my  $optlist = "wt:i:v:n:";
 
 #
 # Configure variables
@@ -51,6 +52,7 @@ if ($UID != getpwnam("nobody") && !TBAdmin($UID)) {
 my $nodetype;
 my $nodeip;
 my $fromweb = 0;
+my $nickname;
 my $nodename;
 my $nodevtype;
 my $nodevname;
@@ -72,6 +74,12 @@ if (defined($options{"i"})) {
 if (defined($options{"t"})) {
     $nodetype = $options{"t"};
 }
+if (defined($options{"v"})) {
+    $nodevtype = $options{"v"};
+}
+if (defined($options{"n"})) {
+    $nickname = $options{"n"};
+}
 if (!defined($nodeip) || !defined($nodetype)) {
     usage();
 }
@@ -90,6 +98,22 @@ if ($nodeip =~ /^([\d\.]+)$/) {
 }
 else {
     die("*** Bad data in $nodeip\n");
+}
+if (defined($nodevtype)) {
+    if ($nodevtype =~ /^([\w]+)$/) {
+	$nodevtype = $1;
+    }
+    else {
+	die("*** Bad data in $nodevtype\n");
+    }
+}
+if (defined($nickname)) {
+    if ($nickname =~ /^([-\w]+)$/) {
+	$nickname = $1;
+    }
+    else {
+	die("*** Bad data in $nickname\n");
+    }
 }
 
 #
@@ -110,6 +134,19 @@ my ($defosid,$control_net) = $query_result->fetchrow_array();
 #
 if ($nodetype ne "pcwa" && $nodetype ne "pcron") {
     fatal("Can only handle pcwa/pcron nodetype right now!");
+}
+
+#
+# Make sure its a valid vtype too!
+#
+if (defined($nodevtype)) {
+    $query_result =
+	DBQueryFatal("select * from node_types where type='$nodevtype'");
+    
+    if (! $query_result->numrows) {
+	fatal("*** $0:\n".
+	      "    No such nodevtype $nodevtype is defined in the DB!\n");
+    }
 }
 
 #
@@ -143,6 +180,21 @@ if ($nodetype =~ /^pc(\w+)$/) {
 else {
     fatal("Could not determine a name from type for $nodetype!");
 }
+if (!defined($nickname)) {
+    $nickname = $nodename;
+}
+
+#
+# Create the virtual type name. Again, this is bogus.
+#
+if (!defined($nodevtype)) {
+    if ($nodetype eq "pcwa") {
+	$nodevtype = "pcvwainet";
+    }    
+    else {
+	$nodevtype = "pcvroninet";
+    }
+}
 
 #
 # Enter the records
@@ -153,19 +205,9 @@ DBQueryFatal("insert into nodes ".
 	     "values ('$nodename', '$nodetype', '$nodename', ".
 	     "        'testnode', $nextpri, 'down', 'NORMAL', '$defosid') ");
 
-#
-# Create the virtual nodes. Again, this is bogus.
-#
-if ($nodetype eq "pcwa") {
-    $nodevtype = "pcvwainet";
-}    
-else {
-    $nodevtype = "pcvroninet";
-}
-
-for ($i = 0; $i < 5; $i++) {
+for ($i = 1; $i < 9; $i++) {
     my $priority  = ($nextpri * 100) + $i;
-    $nodevname = "v${nodename}${i}";
+    $nodevname = "v${nodename}-${i}";
 	
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".
@@ -176,8 +218,26 @@ for ($i = 0; $i < 5; $i++) {
 }
 
 DBQueryFatal("insert into interfaces ".
-	     "(node_id, card, port, IP, iface) ".
-	     "values ('$nodename', $control_net, 1, '$nodeip', 'eth0')");
+	     "(node_id, card, port, IP, interface_type, iface) ".
+	     "values ('$nodename', $control_net, 1, '$nodeip', ".
+	     "        'fxp0', 'eth0')");
+
+#
+# Again, this is bogus.
+#
+my $pid;
+my $eid;
+if ($nodetype eq "pcwa") {
+    $pid = "emulab-ops";
+    $eid = "widearea-nodes";
+}    
+else {
+    $pid = "ron";
+    $eid = "all";
+}
+DBQueryFatal("insert into reserved ".
+	     "(node_id, pid, eid, rsrv_time, vname) ".
+	     "values ('$nodename', '$pid', '$eid', now(), '$nickname')");
 
 #
 # Lets log it.
@@ -190,7 +250,8 @@ if ($fromweb) {
 	     "Name:      $nodename\n".
 	     "IP:        $nodeip\n".
 	     "Vtype:     $nodevtype\n".
-	     "Vname:     $nodevname (actually the last vnode)\n",
+	     "Vname:     $nodevname (actually the last vnode)\n".
+	     "Nickname:  $nickname\n",
 	     $TBOPS);
 }
 
