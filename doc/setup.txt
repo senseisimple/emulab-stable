@@ -91,6 +91,11 @@ tftp - Should have the following line in /etc/inetd.conf
 tftp    dgram   udp wait    nobody  /usr/libexec/tftpd  tftpd /tftpboot /proj
 (make sure to HUP inetd)
 
+inetd - In FreeBSD, you need to prevent inetd from rate-limiting connections
+(an attempt to defend against DOS attacks, but very annoying in a testbed
+environment). Put the following in /etc/rc.conf:
+inetd_flags="-wW -R 0"
+
 SSH - If possible, grab the old machine's SSH host keys (from
 /etc/ssh/ssh_host*) and HUP sshd. Also, get the root identity and known_hosts
 files from the old machine (/root/.ssh/{identity,identity.pub,known_hosts}) - Make
