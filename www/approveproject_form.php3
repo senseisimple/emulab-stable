@@ -89,6 +89,17 @@ echo "<center>
 SHOWUSER($projleader);
 
 #
+# Check to make sure that the head user is 'unapproved' or 'active'
+#
+$headstatus = TBUserStatus($projleader);
+if (!strcmp($headstatus,TBDB_USERSTATUS_UNAPPROVED) ||
+	!strcmp($headstatus,TBDB_USERSTATUS_ACTIVE)) {
+    $approvable = 1;
+} else {
+    $approvable = 0;
+}
+
+#
 # Now put up the menu choice along with a text box for an email message.
 #
 echo "<center>
@@ -100,12 +111,20 @@ echo "<center>
 echo "<tr>
           <td align=center>
               <select name=approval>
-                      <option value='postpone'>Postpone</option>
-                      <option value='approve'>Approve</option>
+                      <option value='postpone'>Postpone</option>";
+if ($approvable) {
+    echo "                  <option value='approve'>Approve</option>";
+}
+echo "
                       <option value='moreinfo'>More Info</option>
                       <option value='deny'>Deny</option>
                       <option value='destroy'>Destroy</option>
-              </select>
+              </select>";
+if (!$approvable) {
+	echo "              <br><b>WARNING:</b> Project cannot be approved,";
+	echo"               since head user has not been verified";
+}
+echo "
           </td>
        </tr>\n";
 
