@@ -7,7 +7,10 @@ with local nodes - they can be skipped in a widearea-only testbed.
 ##### Step 0 - Create the database
 
 Before beginning this process, you should have mysql installed and running on
-your boss node.
+your boss node. If it isn't already running, you can simply reboot the node,
+or run '/usr/local/etc/rc.d/2.mysql-server.sh start'. It's also a good idea
+to run the mysql-client.sh script, so that you'll be able to use the mysql
+client scripts.
 
 Create the database. You can do this with the database-create.sql file in the
 sql subdirectory of the testbed tree, like so:
