@@ -160,15 +160,15 @@ if (! $returning) {
     mail("$email", "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
-         "\tThank you for applying to use the Utah Network Testbed.\n".
-         "As promised, here is your key to verify your account:\n\n".
+         "\tHere is your key to verify your account on the".
+         "Utah Network Testbed:\n\n".
          "\t\t$key\n\n".
          "Please return to $TBWWW and log in using\n".
 	 "the user name and password you gave us when you applied. You will\n".
 	 "then find an option on the menu called 'New User Verification'.\n".
 	 "Select it, and on that page enter your password and your key.\n".
 	 "You will then be verified as a user. When you have been both\n".
-         "verified and approved by the Testbed Approval Committee, you will\n".
+         "verified and approved by Testbed Operations, you will\n".
 	 "be marked as an active user, and will be granted full access to\n".
   	 "your user account.\n\n".
          "Thanks,\n".
@@ -257,8 +257,8 @@ if (! $returning) {
 #
 # Now give the user some warm fuzzies
 #
-echo "<h1>Project '$gid' successfully added.</h1>
-      <h2>The Testbed Approval Committee has been notified of your application.
+echo "<center><h1>Project '$gid' successfully added.</h1></center>
+      Testbed Operations has been notified of your application.
       Most applications are reviewed within one week. We will notify
       you by e-mail at '$usr_name&nbsp;&lt;$email>' of their decision
       regarding your proposed project '$gid'.\n";
@@ -273,8 +273,7 @@ if (! $returning) {
           marked as a verified user.
           <p>Once you have been both verified
           and approved, you will be classified as an active user, and will 
-          be granted full access to your user account.
-          </h2>";
+          be granted full access to your user account.";
 }
 ?>
 </body>

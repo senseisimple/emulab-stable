@@ -155,8 +155,8 @@ if (! $returning) {
     mail("$usr_email", "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
-         "\tThank you for applying to use the Utah Network Testbed.\n".
-         "As promised, here is your key to verify your account:\n\n".
+         "\tHere is your key to verify your account on the".
+         "Utah Network Testbed:\n\n".
          "\t\t$key\n\n".
          "Please return to $TBWWW and log in using\n".
 	 "the user name and password you gave us when you applied. You will\n".
@@ -176,16 +176,18 @@ if (! $returning) {
     #
     # Generate some warm fuzzies.
     #
-    echo "<h3>As a new user of the Testbed, for
+    echo "<center><h1>Adding new Testbed User!</h1></center>";
+
+    echo "<p>As a new user of the Testbed, for
           security purposes, you will receive by e-mail a key. When you
           receive it, come back to the site, and log in. When you do, you
           will see a new menu option called 'New User Verification'. On
           that page, enter in your username, password, and the key,
           exactly as you received it in your e-mail. You will then be
-          marked as a verified user.<br>
-          <h3>Once you have been both verified
+          marked as a verified user.
+          <p>Once you have been both verified
           and approved, you will be classified as an active user, and will 
-          be granted full access to your user account.</h3>";
+          be granted full access to your user account.";
 }
 
 #
@@ -250,13 +252,10 @@ mail("$group_leader_email",
 #
 # Generate some warm fuzzies.
 #
-echo "<br><br><h3>
-      The leader of project '$grp' has been notified of your application.
+echo "<br>
+      <p>The leader of project '$grp' has been notified of your application.
       He/She will make a decision and either approve or deny your application,
-      and you will be notified as soon as a decision has been made.<br><br>
-      Thanks for using the Testbed!
-      </h3>";
-
+      and you will be notified as soon as a decision has been made.";
 ?>
 </body>
 </html>
