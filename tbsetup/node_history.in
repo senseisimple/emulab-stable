@@ -146,11 +146,6 @@ if (!$list && !$summary) {
     $list = 1;
 }
 
-if ($showall && $summary) {
-    print STDERR "Cannot summarize for all nodes (yet)\n";
-    exit(1) if (!$list);
-}
-
 #
 # Common case: a single node.
 # Just fetch data for it, otherwise fetch data for all.
@@ -302,36 +297,39 @@ for my $rec (@records) {
     }
 }
 
+print scalar(@records) . " records\n"
+    if ($list && $verbose);
+
 #
 # Print out summary information
-# We can do this for all nodes, but how do we present it?
 #
-my $node = $nodes[0]; # XXX
-if ($summary && defined($nodestats{$node})) {
-    my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
-    my $ttime = $ftime + $atime + $rtime + $dtime;
+for $node (sort keys(%nodestats)) {
+    if ($summary && defined($nodestats{$node})) {
+	my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
+	my $ttime = $ftime + $atime + $rtime + $dtime;
 
-    if ($verbose) {
-	my $pct;
-	print "$node SUMMARY\n";
-	if ($atime > 0) {
-	    $pct = ($atime * 100) / $ttime;
-	    printf("  Allocted:  %9d sec (%5.1f%%)\n", $atime, $pct);
+	if ($verbose) {
+	    my $pct;
+	    print "$node SUMMARY\n";
+	    if ($atime > 0) {
+		$pct = ($atime * 100) / $ttime;
+		printf("  Allocted:  %9d sec (%5.1f%%)\n", $atime, $pct);
+	    }
+	    if ($ftime > 0) {
+		$pct = ($ftime * 100) / $ttime;
+		printf("  Free:      %9d sec (%5.1f%%)\n", $ftime, $pct);
+	    }
+	    if ($rtime > 0) {
+		$pct = ($rtime * 100) / $ttime;
+		printf("  Reloading: %9d sec (%5.1f%%)\n", $rtime, $pct);
+	    }
+	    if ($dtime > 0) {
+		$pct = ($dtime * 100) / $ttime;
+		printf("  Down:      %9d sec (%5.1f%%)\n", $dtime, $pct);
+	    }
+	} else {
+	    print "$node SUM $atime $ftime $rtime $dtime\n";
 	}
-	if ($ftime > 0) {
-	    $pct = ($ftime * 100) / $ttime;
-	    printf("  Free:      %9d sec (%5.1f%%)\n", $ftime, $pct);
-	}
-	if ($rtime > 0) {
-	    $pct = ($rtime * 100) / $ttime;
-	    printf("  Reloading: %9d sec (%5.1f%%)\n", $rtime, $pct);
-	}
-	if ($dtime > 0) {
-	    $pct = ($dtime * 100) / $ttime;
-	    printf("  Down:      %9d sec (%5.1f%%)\n", $dtime, $pct);
-	}
-    } else {
-	print "$node SUM $atime $ftime $rtime $dtime\n";
     }
 }
 
