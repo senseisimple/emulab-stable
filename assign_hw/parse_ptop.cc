@@ -34,13 +34,14 @@ void parse_ptop(tb_pgraph &G, istream& i)
   char inbuf[255];
   char n1[32], n2[32];
   int size, num;
-  int n=0;
+  int n=1;
   int j;
   char *snext;
   char *snode;
   char *scur;
   int isswitch;
-  
+
+  pnodes[0] = NULL;
   while (!i.eof()) {
     char *ret;
     i.getline(inbuf, 254);

@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <string.h>
+#include <assert.h>
 
 #include "common.h"
 #include "physical.h"
@@ -143,11 +144,11 @@ int assign()
       newpos = oldpos;
       /* XXX:  Room for improvement. :-) */
       while (newpos == oldpos)
-	newpos = random() % nparts;
+	newpos = (random() % nparts)+1;
       if (oldpos != 0) {
 	remove_node(n);
       }
-      add_node(n,newpos);
+      if (add_node(n,newpos) == 1) continue; // didn't go through
       newscore = get_score();
       if (newscore < 0.11f) {
 	timeend = used_time(timestart);
@@ -173,7 +174,10 @@ int assign()
 	}
       } else { /* Reject this change */
 	remove_node(n);
-	add_node(n,oldpos);
+	if (oldpos != 0) {
+	  int r = add_node(n,oldpos);
+	  assert(r == 0);
+	}
       }
     }
       
@@ -382,8 +386,11 @@ void print_solution()
     } else {
       node pnode = pnodes[G[n].posistion];
       tb_pnode &pnoder = PG[pnode];
-      cout << G[n].name << " " << PG[pnoder.the_switch].name << " "
-	   << pnoder.name << endl;
+      cout << G[n].name << " " << (pnoder.the_switch ?
+				   PG[pnoder.the_switch].name :
+				   "NO_SWITCH") <<
+	" " << pnoder.name << endl;
+
     }
   }
   cout << "End solution" << endl;
@@ -413,8 +420,9 @@ int main(int argc, char **argv)
 
   argc -= optind;
   argv += optind;
-    
-  srandom(time(NULL) + getpid());
+
+  //  srandom(time(NULL) + getpid());
+  srandom(42);
 
   /*
    * Set up the LEDA graph window environment.  Whenever

@@ -36,7 +36,7 @@ extern tb_vgraph G;		// virtual graph
 extern tb_pgraph PG;		// physical grpaph
 
 int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s);
-edge *direct_link(node a,node b);
+edge direct_link(node a,node b);
 
 /*
  * score()
@@ -51,6 +51,9 @@ float get_score() {return score;}
  */
 void init_score()
 {
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"SCORE: Initializing\n");
+#endif
   score=0;
   violated=0;
 
@@ -80,6 +83,7 @@ void init_score()
   }
 
   ASSERT(pnodes[0] == NULL);
+  fprintf(stderr,"  score = %.2f violated = %d\n",score,violated);
 }
 
 /*
@@ -95,6 +99,12 @@ void remove_node(node n)
   tb_vnode &vnoder = G[n];
   pnode = pnodes[vnoder.posistion];
   tb_pnode &pnoder = PG[pnode];
+
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"SCORE: remove_node(%s)\n",vnoder.name);
+  fprintf(stderr,"       no_connections = %d\n",vnoder.no_connections);
+#endif
+
   
   ASSERT(pnode != NULL);
 
@@ -112,14 +122,27 @@ void remove_node(node n)
     if (vdst == n)
       vdst = G.source(e);
     vdstr=&G[vdst];
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  edge to %s\n",vdstr->name);
+#endif
+    if (vdstr->posistion == 0) continue;
     if (vlink->type == tb_vlink::LINK_DIRECT) {
       // DIRECT LINK
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"   direct link\n");
+#endif
       PG[vlink->plink].users--;
       if (PG[vlink->plink].users == 0) {
 	// link no longer used
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   freeing link\n");
+#endif
 	score -= SCORE_DIRECT_LINK;
       } else {
 	// getting close to no violations
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   reducing users\n");
+#endif
 	score -= SCORE_DIRECT_LINK_PENALTY;
 	violated--;
       }
@@ -130,6 +153,16 @@ void remove_node(node n)
       edge first,second;
       first = vlink->plink;
       second = vlink->plink_two;
+#ifdef SCORE_DEBUG
+      node through;
+      if (PG.source(first) == pnode)
+	through = PG.target(first);
+      else
+	through = PG.source(first);
+      fprintf(stderr,"   interswitch link (through %s)\n",
+	      PG[through].name);
+#endif
+      
 
       // remove bandwidth from edges      
       PG[first].bw_used -= vlink->bandwidth;
@@ -142,10 +175,15 @@ void remove_node(node n)
       score -= SCORE_INTERSWITCH_LINK;
       if (second) 
 	score -= SCORE_INTERSWITCH_LINK;
-    } else {
+    } else if (vlink->type == tb_vlink::LINK_INTRASWITCH) {
       // INTRASWITCH LINK
-      ASSERT(vlink->type == tb_vlink::LINK_INTRASWITCH);
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"   intraswitch link\n");
+#endif
       score -= SCORE_INTRASWITCH_LINK;
+    } else {
+      // No link
+      assert(0);
     }
   }
 
@@ -155,23 +193,38 @@ void remove_node(node n)
 
   // adjust pnode scores
   pnoder.current_load--;
+  vnoder.posistion = 0;
   if (pnoder.current_load == 0) {
     // release pnode
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  releasing pnode\n");
+#endif
     score -= SCORE_PNODE;
-    node the_switch =pnoder.the_switch;
-    if ((PG[the_switch].pnodes_used--) == 0) {
-      // release switch
-      score -= SCORE_SWITCH;
+    node the_switch=pnoder.the_switch;
+    if (the_switch) {
+      if ((PG[the_switch].pnodes_used--) == 0) {
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"  releasing switch %s\n",PG[the_switch].name);
+#endif
+	// release switch
+	score -= SCORE_SWITCH;
+      }
     }
     // revert pnode type
     pnoder.current_type=TYPE_UNKNOWN;
   } else if (pnoder.current_load >= pnoder.max_load) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  reducing penalty, new load = %d (>= %d)\n",pnoder.current_load,pnoder.max_load);
+#endif
     score -= SCORE_PNODE_PENALTY;
     violated--;
   }
   // add score for unassigned node
   score += SCORE_UNASSIGNED;
   violated++;
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
+#endif
 }
 
 /*
@@ -187,32 +240,38 @@ int add_node(node n,int ploc)
   node pnode = pnodes[ploc];
   tb_pnode &pnoder=PG[pnode];
 
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"SCORE: add_node(%s,%s[%d])\n",
+	  vnoder.name,pnoder.name,ploc);
+  fprintf(stderr,"  vnode type = %d\n",vnoder.type);
+#endif
+  
   // set up pnode
   // figure out type
   if (pnoder.current_type != TYPE_UNKNOWN) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  already assigned\n");
+#endif
     return 1;
   }
   
-  // !!!: This code could be improved
-  // Hard code types to ints for efficiency?
   // Remove check assuming at higher level?
   // Remove higher level checks?
-  // XXX fix this.
-#if 0
   pnoder.max_load=0;
-  for (int i=0;i<MAX_TYPES;++i) {
-    if (pnoder.types[i] &&
-	strcmp(pnoder.types[i].name,n->type.name) == 0) {
-      pnoder.current_type=i;
-      pnoder.max_load=pnoder.types[i].max;
-      break;
-    }
-  }
-#endif
+  pnoder.current_type=vnoder.type;
+  pnoder.max_load = pnoder.types[vnoder.type].max;
+
   if (pnoder.max_load == 0) {
     // didn't find a type
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  no matching type\n");
+#endif
     return 1;
   }
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"  matching type found (%d, max = %d)\n",
+	  pnoder.current_type,pnoder.max_load);
+#endif
 
   // set up links
   vnoder.no_connections=0;
@@ -220,7 +279,7 @@ int add_node(node n,int ploc)
   node dst;
   tb_vlink *er;
   tb_plink *pl;
-  edge *pedge;
+  edge pedge;
   forall_inout_edges(e,n) {
     dst=G.source(e);
     er=&G[e];
@@ -228,44 +287,69 @@ int add_node(node n,int ploc)
       dst=G.target(e);
     }
     tb_vnode &dstr=G[dst];
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  edge to %s\n",dstr.name);
+#endif
 
     if (dstr.posistion != 0) {
       // dstr is assigned
       node dpnode=pnodes[dstr.posistion];
       tb_pnode &dpnoder=PG[pnode];
 
-      // XXX - choose method of getting there and set up links
-      // XXX - this is all wrong, need to distirnguish between
-      // plinks and vlinks.  AAAA!!!
-      // XXX - 5/00 - Really need to write thise code.
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"   goes to %s\n",dpnoder.name);
+#endif
+
       if ((pedge=direct_link(dpnode,pnode)) != NULL) {
-	pl = &PG[*pedge];
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   found direct link = %p\n",pedge);
+#endif
+	pl = &PG[pedge];
 	// direct
 	er->type = tb_vlink::LINK_DIRECT;
-	er->plink = *pedge;
+	er->plink = pedge;
 	pl->users++;
 	if (pl->users == 1) {
+#ifdef SCORE_DEBUG
+	  fprintf(stderr,"    first user\n");
+#endif
 	  score += SCORE_DIRECT_LINK;
 	} else {
+#ifdef SCORE_DEBUG
+	  fprintf(stderr,"    not first user - penalty\n");
+#endif
 	  score += SCORE_DIRECT_LINK_PENALTY;
 	  violated++;
 	}
-      } else if (pnoder.the_switch == dpnoder.the_switch) {
+      } else if (pnoder.the_switch &&
+		 pnoder.the_switch == dpnoder.the_switch) {
 	// intraswitch
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   found intraswitch link\n");
+#endif
 	er->type = tb_vlink::LINK_INTRASWITCH;
 	score += SCORE_INTRASWITCH_LINK;
       } else {
 	// try to find interswitch
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   looking for interswitch link\n");
+#endif
 	edge first,second;
 	first=second=NULL;
 	if (find_interswitch_path(pnoder.the_switch,dpnoder.the_switch,
 				  er->bandwidth,
 				  &first,&second) == 0) {
+#ifdef SCORE_DEBUG
+	  fprintf(stderr,"   could not find path - no connection\n");
+#endif
 	  // couldn't fidn path.
 	  vnoder.no_connections++;
 	  score += SCORE_NO_CONNECTION;
 	  violated++;
  	} else {
+#ifdef SCORE_DEBUG
+	  fprintf(stderr,"   found interswitch link (%p, %p)\n",first,second);
+#endif
 	  er->type=tb_vlink::LINK_INTERSWITCH;
 	  score += SCORE_INTERSWITCH_LINK;
 	  if (second)
@@ -287,12 +371,20 @@ int add_node(node n,int ploc)
     
   // finish setting up pnode
   pnoder.current_load++;
+  vnoder.posistion = ploc;
   if (pnoder.current_load > pnoder.max_load) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  load to high - penalty (%d)\n",pnoder.current_load);
+#endif
     score += SCORE_PNODE_PENALTY;
     violated++;
   } else {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  load is fine\n");
+#endif
     score += SCORE_PNODE;
-    if ((PG[pnoder.the_switch].pnodes_used++) == 1) {
+    if (pnoder.the_switch &&
+	(PG[pnoder.the_switch].pnodes_used++) == 1) {
       score += SCORE_SWITCH;
     }
   }
@@ -301,17 +393,21 @@ int add_node(node n,int ploc)
   score -= SCORE_UNASSIGNED;
   violated--;
 
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"  posistion = %d\n",vnoder.posistion);
+  fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
+#endif
   return 0;
 }
 
 // returns "best" direct link between a and b.
 // best = less users
 //        break ties with minimum bw_used
-edge *direct_link(node a,node b)
+edge direct_link(node a,node b)
 {
   node dst;
   edge e;
-  edge *best = NULL;
+  edge best = NULL;
   tb_plink *pl;
   tb_plink *bestpl = NULL;
   forall_inout_edges(e,a) {
@@ -320,10 +416,11 @@ edge *direct_link(node a,node b)
       dst=PG.source(e);
     if (dst == b) {
       pl = &PG[e];
-      if (pl->users < bestpl->users ||
-	  (pl->users == bestpl->users &&
-	   pl->bw_used < bestpl->bw_used)) {
-	best = &e;
+      if (! bestpl ||
+	  (pl->users < bestpl->users ||
+	   (pl->users == bestpl->users &&
+	    pl->bw_used < bestpl->bw_used))) {
+	best = e;
 	bestpl = pl;
       }
     }
@@ -344,6 +441,8 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
   
   best_bw=100.0;
   best_first = best_second = NULL;
+
+  if (!src || ! dst) return 0;
   
   // try to find a path to the destination
   node ldst,ldstb;
