@@ -696,7 +696,7 @@ sub fatal($)
 	# Now we can clean up the stats records. 
 	#
 	DBQueryWarn("DELETE from experiment_resources ".
-		    "WHERE exptidx=$rsrcidx");
+		    "WHERE idx=$rsrcidx");
 	
 	DBQueryWarn("DELETE from testbed_stats ".
 		    "WHERE exptidx=$exptidx");
