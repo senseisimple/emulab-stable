@@ -699,3 +699,9 @@ proc tb-set-cpu-usage {usage} {
     set cpu_usage $usage
 }
 
+#
+# This is nicer syntax for subnodes.
+#
+proc tb-bind-parent {sub phys} {
+    tb-fix-node $sub $phys
+}
