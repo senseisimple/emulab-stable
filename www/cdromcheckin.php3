@@ -15,6 +15,7 @@ define("CDROMSTATUS_BADPRIVKEY",	103);
 define("CDROMSTATUS_BADIPADDR",		104);
 define("CDROMSTATUS_BADREMOTEIP",	105);
 define("CDROMSTATUS_IPADDRINUSE",	106);
+define("CDROMSTATUS_UPGRADEERROR",	107);
 define("CDROMSTATUS_OTHER",		199);
 
 #
@@ -192,15 +193,19 @@ if (isset($updated) && $updated == 1) {
 	   "From: $TBMAIL_OPS\n".
 	   "Errors-To: $TBMAIL_WWW");
     }
-    $newroot = "";
-    if (isset($roottag)) {
-	    $newroot = ",rootkey='$roottag'";
-    }
 
     DBQueryFatal("update widearea_privkeys ".
 		 "set privkey=nextprivkey,updated=now(),nextprivkey=NULL ".
-		 "    $newroot ".
+		 (isset($roottag) ? ",rootkey='$roottag'" : "") .
 		 "where privkey='$privkey'");
+
+    #
+    # Check for image upgrade completed. Delete record. 
+    #
+    $query_result =
+	DBQueryFatal("delete from widearea_updates ".
+		     "where IP='$IP' and roottag='$roottag' and " .
+		     "      update_started is not null");
 
     #
     # Update with new nickname. Nice if node changes its real hostname.
@@ -226,37 +231,56 @@ if (strcmp($privIP, "1.1.1.1")) {
 	SPITSTATUS(CDROMSTATUS_BADIPADDR);
 	return;
     }
-    if (strcmp($REMOTE_ADDR, $IP)) {
-	SPITSTATUS(CDROMSTATUS_BADREMOTEIP);
-	return;
-    }
-    $newroot = "";
-    if (isset($roottag)) {
-	    $newroot = ",rootkey='$roottag'";
+#    if (strcmp($REMOTE_ADDR, $IP)) {
+#	SPITSTATUS(CDROMSTATUS_BADREMOTEIP);
+#	return;
+#    }
+
+    $upgrade_instructions = "";
+    #
+    # Check for image upgrade. Rather simplistic right now.
+    #
+    $query_result =
+	DBQueryFatal("select * from widearea_updates where IP='$IP'");
+    if (mysql_num_rows($query_result)) {
+	$row     = mysql_fetch_array($query_result);
+	$newroot = $row["roottag"];
+
+	# Do not upgrade if the root tag already matches. ???
+	if (!isset($roottag) || strcmp($roottag, $newroot)) {
+	    $update  = 1;
+
+	    DBQueryFatal("update widearea_updates set update_started=now() ".
+			 "where IP='$IP'");
+
+	    switch ($newroot) {
+	    case "d326a1f604489c43b488fa80a88221f4":
+		$upgrade_instructions =
+		    "slice1_image=slice1.ndz\n" .
+		    "slice1_sig=slice1.ndz.sig\n" .
+		    "slice1_md5=d326a1f604489c43b488fa80a88221f4";
+		break;
+	    default:
+		SPITSTATUS(CDROMSTATUS_UPGRADEERROR);
+		break;
+	    }
+	}
     }
 
     #
-    # For now we just give them a new privkey. There is no real image upgrade
-    # path in place yet.
+    # Generate a new privkey and stash in the DB. Always stash the root
+    # tag the node is running. If upgrading, it will be overwritten above
+    # when it completes. This helps to figure out where things went wrong.
     #
     $newkey = GENHASH();
     DBQueryFatal("update widearea_privkeys ".
 		 "set nextprivkey='$newkey',updated=now(),cdkey='$cdkey' ".
-		 "    $newroot ".
+		 (isset($roottag) ? ",rootkey='$roottag'" : "") .
 		 "where IP='$IP' and privkey='$privkey'");
 
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
-
-    if (0 && $cdvers == 69) {
-	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
-	echo "slice1_md5=d10baf117e269e3faa9cf4ee5d089a7f\n";
-	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
-#	echo "slicex_slice=3\n";
-#	echo "slicex_mount=/users\n";
-#	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v4.tar.gz\n";
-#	echo "slicex_sig=https://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
-    }
+    echo "$upgrade_instructions\n";
     echo "emulab_status=0\n";
     
     return;

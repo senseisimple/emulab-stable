@@ -644,3 +644,21 @@ last_net_act,last_cpu_act,last_ext_act);
 	
 	alter table state_timeouts modify timeout int(11) not null;
 	alter table state_timeouts modify action mediumtext not null;
+
+1.154: Add simple support for updating widearea images (slice 1 only).
+
+	CREATE TABLE widearea_updates (
+	  IP varchar(15) NOT NULL default '1.1.1.1',
+	  roottag tinytext NOT NULL default '',
+	  update_requested datetime NOT NULL default '0000-00-00 00:00:00',
+	  update_started datetime default NULL,
+	  PRIMARY KEY  (IP)
+	) TYPE=MyISAM;
+
+	The IP is of course the IP of the node you want to update.
+	The roottag is the MD5 of the new slice to be layed down,
+	which should also have a DB entry someplace, but I won't
+	bother with that now; I'll just hard code that into the web
+	page. The records are dynamic; someone like Dave will insert
+	them, and the web page will remove them after a node
+	sucessfully updates.
