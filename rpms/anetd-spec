@@ -1,0 +1,36 @@
+Summary: ABone network management software.
+Name: anetd
+Version: 1.5
+Release: 1
+Copyright: Anetd Community Software License: http://www.csl.sri.com/activate/anetd/LICENSE.txt
+Group: Net-Extra
+Source: http://www.csl.sri.com/pub/anetd/anetd-linux.tar.gz
+Requires: jdk-abocc-1.1.8-1
+
+%description
+The anetd daemon from SRI supports the configuration
+and operation of the Active Networks Backbone (ABone) 
+being developed by the ACTIVATE project at ISI and
+SRI. See http://www.csl.sri.com/activate/anetd/ for
+more information.
+
+%prep
+/bin/rm -rf /usr/local/jdk118_v1
+
+%build
+# no build steps required.
+
+%install
+# add abone group (from database)
+# add 7 abone accounts (from database)
+cp $RPM_SOURCE_DIR/anetd-linux.tar.gz ~abocc 
+cd ~abocc
+/usr/bin/gunzip anetd-linux.tar.gz
+/bin/tar xvf anetd-linux.tar
+# create symlink to jdk in ~abocc
+# create symlink to ~abocc/anetd (use script in tbpc:/~kwright)
+
+%clean
+rm ~abocc/anetd-linux.tar
+
+
