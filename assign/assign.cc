@@ -216,7 +216,7 @@ int assign()
 	bestscore = newscore;
 	bestviolated = violated;
 	accepts++;
-	if (violated < absbestv ||
+	if ((violated < absbestv) ||
 	    ((violated == absbestv) &&
 	     (newscore < absbest))) {
 	  node n2;
