@@ -53,7 +53,7 @@ print "node cisco switch\n";
 # Give the nodes:
 foreach $node (sort keys %nodes) {
   if ($node =~ /tbpc/) {
-    print "node $node pc:1 delay:1\n";
+    print "node $node pc:1 delay:2\n";
     print "link $node-0 $node:$links{$node.'-0'} cisco 100 1\n";
     print "link $node-1 $node:$links{$node.'-1'} cisco 100 1\n";
     print "link $node-2 $node:$links{$node.'-2'} cisco 100 1\n";
