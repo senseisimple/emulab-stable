@@ -262,7 +262,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/frisbee.redux/GNUmakefile \
+	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
 	security/plasticwrap \
