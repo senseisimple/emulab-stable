@@ -44,7 +44,7 @@ AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
 
 FLOORMAPFILES  = $(wildcard $(SRCDIR)/floormap/*.jpg)
-FLOORMAPFILES  = $(wildcard $(SRCDIR)/floormap/*.gif)
+FLOORMAPFILES += $(wildcard $(SRCDIR)/floormap/*.gif)
 
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
