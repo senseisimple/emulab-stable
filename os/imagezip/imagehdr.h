@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -70,7 +70,8 @@ struct blockreloc {
 	uint32_t	size;		/* size of data affected */
 };
 #define RELOC_NONE		0
-#define RELOC_BSDDISKLABEL	1	/* BSD disklabel */
+#define RELOC_FBSDDISKLABEL	1	/* FreeBSD disklabel */
+#define RELOC_OBSDDISKLABEL	2	/* OpenBSD disklabel */
 
 /* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
 #define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */

@@ -1083,7 +1083,7 @@ fixmbr(int slice, int dtype)
 
 static struct blockreloc *reloctable;
 static int numrelocs;
-static void reloc_bsdlabel(struct disklabel *label);
+static void reloc_bsdlabel(struct disklabel *label, int reloctype);
 
 static void
 getrelocinfo(blockhdr_t *hdr)
@@ -1138,9 +1138,11 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			switch (reloc->type) {
 			case RELOC_NONE:
 				break;
-			case RELOC_BSDDISKLABEL:
+			case RELOC_FBSDDISKLABEL:
+			case RELOC_OBSDDISKLABEL:
 				assert(reloc->size >= sizeof(struct disklabel));
-				reloc_bsdlabel((struct disklabel *)(buf+coff));
+				reloc_bsdlabel((struct disklabel *)(buf+coff),
+					       reloc->type);
 				break;
 			default:
 				fprintf(stderr,
@@ -1153,9 +1155,9 @@ applyrelocs(off_t offset, size_t size, void *buf)
 }
 
 static void
-reloc_bsdlabel(struct disklabel *label)
+reloc_bsdlabel(struct disklabel *label, int reloctype)
 {
-	int i;
+	int i, npart;
 	uint32_t slicesize;
 
 	/*
@@ -1176,10 +1178,21 @@ reloc_bsdlabel(struct disklabel *label)
 	/*
 	 * Fixup the partition table.
 	 */
-	for (i = 0; i < MAXPARTITIONS; i++) {
+	npart = label->d_npartitions;
+	for (i = 0; i < npart; i++) {
 		uint32_t poffset, psize;
 
 		if (label->d_partitions[i].p_size == 0)
+			continue;
+
+		/*
+		 * Don't mess with OpenBSD partitions 8-15 which map
+		 * extended DOS partitions.  Also leave raw partition
+		 * alone as it maps the entire disk (not just slice)
+		 * and we don't know how big that is.
+		 */
+		if (reloctype == RELOC_OBSDDISKLABEL &&
+		    (i == 2 || (i >= 8 && i < 16)))
 			continue;
 
 		/*

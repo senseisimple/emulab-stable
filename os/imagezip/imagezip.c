@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -54,6 +54,9 @@
 #endif
 #ifndef DOSPTYPE_NTFS
 #define DOSPTYP_NTFS    7       /* Windows NTFS partition */
+#endif
+#ifndef DOSPTYP_OPENBSD
+#define DOSPTYP_OPENBSD 0xa6
 #endif
 
 char	*infilename;
@@ -109,7 +112,7 @@ void	addreloc(off_t offset, off_t size, int reloctype);
 /* Forward decls */
 #ifndef linux
 int	read_image(void);
-int	read_bsdslice(int slice, u_int32_t start, u_int32_t size);
+int	read_bsdslice(int slice, u_int32_t start, u_int32_t size, int type);
 int	read_bsdpartition(struct disklabel *dlabel, int part);
 int	read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dboff);
 #ifdef WITH_NTFS
@@ -320,7 +323,7 @@ main(argc, argv)
 		rval = read_linuxslice(0, 0, 0);
 #ifndef linux
 	else if (bsdfs)
-		rval = read_bsdslice(0, 0, 0);
+		rval = read_bsdslice(0, 0, 0, DOSPTYP_386BSD);
 	else if (rawmode)
 		rval = read_raw();
 	else
@@ -398,7 +401,10 @@ read_image()
 				fprintf(stderr, "  UNUSED");
 				break;
 			case DOSPTYP_386BSD:
-				fprintf(stderr, "  BSD   ");
+				fprintf(stderr, "  FBSD  ");
+				break;
+			case DOSPTYP_OPENBSD:
+				fprintf(stderr, "  OBSD  ");
 				break;
 			case DOSPTYP_LINSWP:
 				fprintf(stderr, "  LSWAP ");
@@ -456,7 +462,10 @@ read_image()
 
 		switch (type) {
 		case DOSPTYP_386BSD:
-			rval = read_bsdslice(i, start, size);
+			rval = read_bsdslice(i, start, size, type);
+			break;
+		case DOSPTYP_OPENBSD:
+			rval = read_bsdslice(i, start, size, type);
 			break;
 		case DOSPTYP_LINSWP:
 			rval = read_linuxswap(i, start, size);
@@ -502,17 +511,17 @@ read_image()
  * Operate on a BSD slice
  */
 int
-read_bsdslice(int slice, u_int32_t start, u_int32_t size)
+read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
 {
-	int		cc, i, rval = 0;
+	int		cc, i, rval = 0, npart;
 	union {
 		struct disklabel	label;
 		char			pad[BBSIZE];
 	} dlabel;
 
 	if (debug)
-		fprintf(stderr,
-			"  P%d (BSD Slice)\n", slice + 1 /* DOS Numbering */);
+		fprintf(stderr, "  P%d (%sBSD Slice)\n", slice + 1,
+			bsdtype == DOSPTYP_386BSD ? "Free" : "Open");
 	
 	if (devlseek(infd, sectobytes(start), SEEK_SET) < 0) {
 		warn("Could not seek to beginning of BSD slice");
@@ -567,12 +576,28 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	 * XXX space not covered by a partition winds up being compressed,
 	 * we could detect this.
 	 */
-	for (i = 0; i < MAXPARTITIONS; i++) {
+	npart = dlabel.label.d_npartitions;
+	assert(npart >= 0 && npart <= 16);
+	if (debug)
+		fprintf(stderr, "  P1: %d partitions\n", npart);
+	for (i = 0; i < npart; i++) {
 		if (! dlabel.label.d_partitions[i].p_size)
 			continue;
 
 		if (dlabel.label.d_partitions[i].p_fstype == FS_UNUSED)
 			continue;
+
+		/*
+		 * OpenBSD maps the extended DOS partitions as slices 8-15,
+		 * skip them.
+		 */
+		if (bsdtype == DOSPTYP_OPENBSD && i >= 8 && i < 16) {
+			if (debug)
+				fprintf(stderr, "    %c   skipping, "
+					"OpenBSD mapping of DOS partition %d\n",
+					BSDPARTNAME(i), i - 6);
+			continue;
+		}
 
 		if (debug) {
 			fprintf(stderr, "    %c ", BSDPARTNAME(i));
@@ -594,8 +619,17 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	 */
 	if (slicemode &&
 	    start != 0 && dlabel.label.d_partitions[0].p_offset == start) {
-		for (i = 0; i < MAXPARTITIONS; i++) {
+		for (i = 0; i < npart; i++) {
 			if (dlabel.label.d_partitions[i].p_size == 0)
+				continue;
+
+			/*
+			 * Don't mess with OpenBSD partitions 8-15 which map
+			 * extended DOS partitions.  Also leave raw partition
+			 * alone as it maps the entire disk (not just slice)
+			 */
+			if (bsdtype == DOSPTYP_OPENBSD &&
+			    (i == 2 || (i >= 8 && i < 16)))
 				continue;
 
 			assert(dlabel.label.d_partitions[i].p_offset >= start);
@@ -605,7 +639,8 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 		dlabel.label.d_checksum = dkcksum(&dlabel.label);
 		addfixup(sectobytes(start+LABELSECTOR), sectobytes(start),
 			 (off_t)sizeof(dlabel.label), &dlabel,
-			 RELOC_BSDDISKLABEL);
+			 bsdtype == DOSPTYP_OPENBSD ?
+			 RELOC_OBSDDISKLABEL : RELOC_FBSDDISKLABEL);
 	}
 
 	return 0;
@@ -674,7 +709,7 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 		unsigned long	cgoff, dboff;
 
 		cgoff = fsbtodb(&fs.fs, cgtod(&fs.fs, i)) + offset;
-		dboff = fsbtodb(&fs.fs, cgstart(&fs.fs, i)) + offset;
+		dboff = fsbtodb(&fs.fs, cgbase(&fs.fs, i)) + offset;
 
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
 			warn("BSD Partition %c: Could not seek to cg %d",
@@ -718,10 +753,12 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 	/*
 	 * XXX The bitmap is fragments, not FS blocks.
 	 *
-	 * The block bitmap lists blocks relative to the start of the
-	 * cylinder group. cgdmin() is the first actual datablock, but
+	 * The block bitmap lists blocks relative to the base (cgbase()) of
+	 * the cylinder group. cgdmin() is the first actual datablock, but
 	 * the bitmap includes all the blocks used for all the blocks
-	 * comprising the cg. These include superblock/cg/inodes/datablocks.
+	 * comprising the cg. These include the superblock, cg, inodes,
+	 * datablocks and the variable-sized padding before all of these
+	 * (used to skew the offset of consecutive cgs).
 	 * The "dbstart" parameter is thus the beginning of the cg, to which
 	 * we add the bitmap offset. All blocks before cgdmin() will always
 	 * be allocated, but we scan them anyway. 
@@ -1302,7 +1339,7 @@ void
 dumpskips(void)
 {
 	struct range	*pskip;
-	uint32_t	total = 0;
+	uint32_t	offset = 0, total = 0;
 
 	if (!skips)
 		return;
@@ -1312,9 +1349,11 @@ dumpskips(void)
 	
 	pskip = skips;
 	while (pskip) {
+		assert(pskip->start >= offset);
 		if (debug > 2)
 			fprintf(stderr,
 				"  %12d    %9d\n", pskip->start, pskip->size);
+		offset = pskip->start + pskip->size;
 		total += pskip->size;
 		pskip  = pskip->next;
 	}
@@ -1448,15 +1487,18 @@ makeranges(void)
 		numranges++;
 	}
 
-	if (debug > 2) {
-		range = ranges;
-		while (range) {
-			fprintf(stderr,
-				"  %12d    %9d\n", range->start, range->size);
-			range  = range->next;
+	if (debug) {
+		if (debug > 2) {
+			range = ranges;
+			while (range) {
+				fprintf(stderr, "  %12d    %9d\n",
+					range->start, range->size);
+				range  = range->next;
+			}
+			fprintf(stderr, "\n");
 		}
 		fprintf(stderr,
-			"\nTotal Number of Valid Sectors: %d (bytes %qd)\n",
+			"Total Number of Valid Sectors: %d (bytes %qd)\n",
 			total, sectobytes(total));
 	}
 }
