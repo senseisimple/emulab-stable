@@ -39,6 +39,7 @@ my $dirname;
 my $eid;
 my $pid;
 my $logname;
+my $nsfile;
 my $user_name  = "Batch Daemon";
 my $user_email = "$TBOPS";
 
@@ -159,7 +160,7 @@ sub runexp($)
 
     # global var
     $dirname = "$batchdir/$pid-$eid";
-    my $nsfile  = "$dirname/$eid.ns";
+    $nsfile  = "$dirname/$eid.ns";
 
     #
     # Get some user information. 
@@ -398,6 +399,15 @@ sub fatal()
 	close(IN);
 	unlink("$logname");
     }
+
+    if (defined($nsfile) && open(IN, "$nsfile")) {
+	print MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
     close(MAIL);
    
     exit(-1);
@@ -460,6 +470,16 @@ sub email_status($)
 	}
 	close(IN);
     }
+
+    if (defined($nsfile) && open(IN, "$nsfile")) {
+	print MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
+    
     close(MAIL);
 }
 
