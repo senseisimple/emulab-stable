@@ -384,7 +384,7 @@ sub step_init {
     tbexec("mysqldump $TBDB","$path/dbdump.txt");
     # Now add a line to the dumped database that sets flest as an admin
     tbexec("echo \"update users set admin=1 where uid='flest';\"".
-	   " >> $path/dbdump.txt");
+	   " >> $path/dbdump.txt", "dbdump.log");
     
     prints "  Creating DB ";
     system("echo \"drop database if exists $testdb\" | mysql");
@@ -404,7 +404,8 @@ sub step_init {
 	# Clear out experiments and set up test experiment.     
 	prints "  Clearing out existing experiments ";
 	open(CLEARLOG,"> clear.log");
-	$sth = $dbh->prepare("SELECT pid,eid from experiments");
+	$sth = $dbh->prepare("SELECT pid,eid from experiments ".
+			     "where !(pid='emulab-ops' and eid='hwdown')");
 	$sth->execute;
 	while (($pid,$eid) = $sth->fetchrow_array) {
 	    print CLEARLOG "$pid $eid\n";
@@ -432,7 +433,8 @@ sub step_init {
 	    }   
 	}
 	# now we clear 
-	$dbh->do("delete from reserved where pid=\"emulab-ops\"") || do {
+	$dbh->do("delete from reserved ".
+		 "where pid='emulab-ops' and eid!='hwdown'") || do {
 	    prints "FAIL\n";
 	    $fail++;
 	    doexit(1);
