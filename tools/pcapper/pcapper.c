@@ -747,7 +747,7 @@ int main (int argc, char **argv) {
 				}
 				if (++active == 1)
 					pthread_cond_broadcast(&cond);
-				printf("Now have %d clients\n", active);
+				/* printf("Now have %d clients\n", active); */
 				break;
 			}
 		}
@@ -960,7 +960,7 @@ void *feedclient(void *args) {
 			}
 			client_connected[cli] = 0;
 			active--;
-			printf("Now have %d clients\n", active);
+			/* printf("Now have %d clients\n", active); */
 			pthread_mutex_unlock(&lock);
 			/*
 			 * Client disconnected - exit the loop
