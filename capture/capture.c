@@ -96,10 +96,10 @@ char	*Ttyname;
 char	*Ptyname;
 char	*Devname;
 char	*Machine;
-char	*Bossnode = BOSSNODE;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
 #ifdef  USESOCKETS
+char	          *Bossnode = BOSSNODE;
 int		   sockfd, tipactive, portnum;
 struct sockaddr_in tipclient;
 secretkey_t	   secretkey;
@@ -125,10 +125,11 @@ main(argc, argv)
 	while ((op = getopt(argc, argv, "rds:Hb:it")) != EOF)
 		switch (op) {
 
+#ifdef	USESOCKETS
 		case 'b':
 			Bossnode = optarg;
 			break;
-
+#endif
 		case 'H':
 			++hwflow;
 			break;

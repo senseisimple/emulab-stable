@@ -9,7 +9,6 @@
  * (c) Copyright 1992, 2000, University of Utah, all rights reserved.
  */
 
-#define BOSSNODE	"boss.emulab.net"
 #define SERVERPORT	855
 #define DEVPATH		"/dev"
 #define TIPPATH		"/dev/tip"
