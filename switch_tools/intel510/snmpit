@@ -742,7 +742,11 @@ sub OneVLAN {
     my $Vlan = $sess->get([[$NextVLANId,0]]);
     my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
     my $RetVal = "Undef.";
-    if ( !$m ) { $m = $Vlan; }
+    if ( !$m 
+	 #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
+	 || ($m =~ /l(\d)+-(\d)+/)
+	 #End of Temp fix
+       ) { $m = $Vlan; }
     print "  Creating VLAN $m as VLAN #$Vlan: @vlan ... ";
     $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
     print "",($RetVal? "Succeeded":"Failed"),".\n";
