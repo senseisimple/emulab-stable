@@ -167,8 +167,8 @@ the robots.
 
 <?php NLCBODYBEGIN() ?>
 
-Due to the "brand-new" nature of this part of the mobile testbed, there are
-some limitations you should be aware of:
+Due to the "brand-new" nature of this part of Emulab, there are some
+limitations you should be aware of:
 
 <ul>
 <li>Availability is reduced to weekdays between 9am and 5pm mountain time,
@@ -265,15 +265,15 @@ The values specified above are measured in meters and based on the map located
 <a href="/robotmap.php3">here</a>, where the origin is in the upper left hand
 corner, with positive X going right and positive Y going down.  You can also
 click on the map to get a specific set of coordinates.  Note that any
-coordinates you specify must be in the camera-viewable area and not in an
-obstacle, or they will be rejected by the system.
+coordinates you specify must not be in an obstacle, or they will be rejected by
+the system.
 
 <p>
 With this NS file you can now create your first mobile experiment.  Actually
 creating the experiment is the same as any other, except you might want to
 check the "Do Not Swapin" checkbox so that the creation does not fail if
 someone else is using the mobile testbed at the time.  Once the area is free
-for use, you can swap-in your experiment and begin to use it.
+for use, you can swap-in your experiment and begin to work.
 
 <?php NLCBODYEND() ?>
 
@@ -289,8 +289,8 @@ for use, you can swap-in your experiment and begin to use it.
 
 Now that you have a node allocated, lets make it mobile.  Emulab will have
 already moved the node to its initial position on swap-in, so moving the robot
-again is done by sending it a SETDEST event with the coordinates, much like you
-send START and STOP events to <a
+again is done by sending it a SETDEST event with the coordinates, much like
+sending START and STOP events to <a
 href="docwrapper.php3?docname=advanced.html">traffic generators</a> and <a
 href="docwrapper.php3?docname=advanced.html">program objects</a>.  However,
 before moving it for the first time, you might want to check its current
@@ -342,14 +342,14 @@ Y coordinates.  The robot's speed is currently fixed at 0.1 meters per second.
 
 Generating destination points for nodes can become quite a tedious task, so we
 provide a modified version of the NS-2 "setdest" tool that will produce a valid
-set of destination points for our area.  The tool is installed ops and takes
-the following arguments:
+set of destination points for a given area.  The tool is installed ops and
+takes the following arguments:
 
 <blockquote>
 <ul>
 <li><b>-n</b> <i>nodes</i> - The total number of nodes to generate motion for.
-The format for the node variables in the generated code is:
-"<code>$node(N)</code>".
+The format for the node variables in the generated code is,
+"<code>$node(N)</code>", so write your NS file accordingly.
 <li><b>-t</b> <i>secs</i> - The simulation time, in seconds.
 <li><b>-a</b> <i>area</i> - The name of the area where the robots will be
 roaming around.  Currently, MEB-ROBOTS is the only area available.
@@ -415,6 +415,10 @@ to the timeline, in contrast to the "<code>$ns at</code>" events which are only
 queued when the event system starts up.  This feature can be useful for testing
 your experiment by just (re)queueing subsets of events.
 
+<p>
+Once the modify completes, you can start the robots on their way by running the
+following on ops:
+
 <blockquote>
 <pre>3 ops:~> tevc -e <b>proj</b>/<b>exp</b> now rtl START</pre>
 </blockquote>
@@ -438,10 +442,10 @@ your experiment by just (re)queueing subsets of events.
 Now that you are getting the hang of the mobility part of this testbed, we can
 move on to working with wireless network traffic.  As stated earlier, each of
 the robots carries a Mica2 mote (pictured on the right), which is a popular
-device used in wireless sensor networks.  We'll be loading the motes on the two
-nodes you already have allocated with a couple of <a
-href="http://www.tinyos.net">TinyOS</a> demo kernels, one sender and one
-receiver.
+device used in wireless sensor networks.  We'll be using the motes on the
+mobile nodes you already have allocated and loading them with <a
+href="http://www.tinyos.net">TinyOS</a> demo kernels, one that will be sending
+traffic and the other recieving.
 
 <?php NLCBODYEND() ?>
 
@@ -484,17 +488,20 @@ then send packets every second containing the value of a counter that goes from
 one to eight.  So, if the mote's radios are well within range of each other,
 the receiver should pick up the packets and display the number on the LEDs.  Of
 course, since you're not physically around to see that, you can click on the
-"Show Blinky Lights" menu item on the experiment web page to get a near
-real-time view of the lights.
+"Show Blinky Lights" menu item on the experiment web page to bring up a webpage
+with an applet that provides a near real-time view of the lights.
 
 <p>
+After the modify completes, try moving the nodes close to one another and far
+away, to see the lights updating, or not.  You should also try running the
+nodes through the random motion created earlier and watching for the same
+effect on the lights.
 
 <?php NLCBODYEND() ?>
 
 <?php NLCEMPTY() ?>
 
 </tr>
-
 
 <tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
