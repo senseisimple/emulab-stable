@@ -155,8 +155,7 @@ print MAP "\n";
 # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
 #
 $nodes_result =
-    DBQueryFatal("select r.node_id,r.pid,r.eid,e.gid,i.IP,e.expt_head_uid ".
-		 "  from reserved as r ".
+    DBQueryFatal("select r.node_id,r.pid,r.eid,e.gid,i.IP from reserved as r ".
 		 "left join experiments as e on r.pid=e.pid and r.eid=e.eid ".
 		 "left join nodes on r.node_id=nodes.node_id ".
 		 "left join node_types on node_types.type=nodes.type ".
@@ -168,7 +167,6 @@ $nodes_result =
 		 "order by r.pid,e.gid,r.eid,nodes.priority");
 
 my %ipgroups	= ();
-my %maproot     = ();
 my %lastfslist  = ();
 my $lastpid     = "";
 my $lastgid     = "";
@@ -187,7 +185,6 @@ while (@row = $nodes_result->fetchrow_array) {
     my $eid     = $row[2];
     my $gid     = $row[3];
     my $ip      = $row[4];
-    my $creator = $row[5];
     my %fslist = ();
     my @dirlist = ();
 
@@ -257,7 +254,6 @@ while (@row = $nodes_result->fetchrow_array) {
 
 	if (! defined($ipgroups{$str})) {
 	    $ipgroups{$str} = [ $ip ];
-	    $maproot{$str}  = $creator;
 	}
 	else {
 	    push(@{ $ipgroups{$str} }, $ip);
@@ -269,10 +265,9 @@ while (@row = $nodes_result->fetchrow_array) {
 # Now spit out each group!
 #
 foreach my $str ( keys(%ipgroups) ) {
-    my @iplist = @{ $ipgroups{$str} };
-    my $root   = $maproot{$str};
+    my @iplist = @{ $ipgroups{$str} };    
 
-    print MAP "$str -maproot=$root @iplist\n";
+    print MAP "$str -maproot=root @iplist\n";
 }
 
 print MAP "\n";
