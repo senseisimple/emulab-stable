@@ -11,9 +11,6 @@ PAGEHEADER("Home");
 
 ?>
 
-<img src="pix/front-left-med.jpg" align="right" >
-
-<p>
 Welcome to Emulab.  Emulab (sometimes called the Utah Network Testbed)
 is a new and unique type of experimental environment: a
 universally-available "Internet Emulator" which provides a
@@ -46,6 +43,10 @@ root access, DNS service, compilers and linkers. But fundamentally,
 the software you run on it, including all bits on the disks, is
 replaceable and up to you.  The same applies to the network's
 characteristics, including its topology: configurable by users.
+
+<br><br>
+<a href='pix/side-crop-big.jpg'>
+   <img src='pix/side-crop-small.jpg' align=right></a>
 
 <h3>Links to help you get started:</h3>
 <ul>
