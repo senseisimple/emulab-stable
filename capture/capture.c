@@ -93,7 +93,7 @@ void usage();
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
 
-#define DEFAULT_CERTFILE PREFIX"/etc/capture.pem"
+#define DEFAULT_CERTFILE PREFIX"etc/capture.pem"
 
 char 	*Progname;
 char 	*Pidname;
