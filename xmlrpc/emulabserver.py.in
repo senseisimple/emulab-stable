@@ -2916,6 +2916,33 @@ class node:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    def tbuisp(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("op", "filestr", "nodes"))
+        if (argerror):
+            return argerror
+
+        (fp, filename) = writensfile(argdict["filestr"].data)
+
+        argstr = escapeshellarg(argdict["op"])
+        argstr += " " + filename
+        argstr += " " + escapeshellarg(" ".join(argdict["nodes"]))
+
+        (exitval, output) = runcommand(TBDIR + "/bin/tbuisp " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
     pass
 
 

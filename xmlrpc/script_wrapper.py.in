@@ -111,6 +111,8 @@ API = {
                             "help" : "Terminate an experiment" },
     "expinfo"           : { "func" : "expinfo",
                             "help" : "Get information about an experiment" },
+    "tbuisp"            : { "func" : "tbuisp",
+                            "help" : "Upload code to a mote" },
 };
 
 #
@@ -1583,6 +1585,72 @@ class expinfo:
         print "     -a   - Show all of the above";
         wrapperoptions();
         return
+    pass
+
+class tbuisp:
+    def __init__(self, argv=None):
+        self.argv = argv
+        return
+
+    def apply(self):
+        params = {}
+  
+        try:
+            opts, req_args = getopt.getopt(self.argv, "h", [
+                "help", ])
+
+            for opt, val in opts:
+                if opt in ("-h", "--help"):
+                    self.usage();
+                    return 0
+                pass
+
+            if len(req_args) < 3:
+                raise getopt.error(
+                    "error: a file and one or more nodes must be specified")
+            pass
+        except  getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+	params["op"] = req_args[0]
+        file = req_args[1]
+        params["nodes"] = req_args[2:]
+  
+        try:
+            filestr = open(file).read()
+            pass
+        except:
+            print "Could not open file: " + file
+            return -1
+
+        # I don't know what is in the file, so we'll base64 encode before
+        # sending it over XML-RPC.  On the receiving side you'll get a Binary
+        # object with the bits stored in the data field.  In code:
+        #
+        #   filestr = params["filestr"].data
+        #
+        # I think...
+        params["filestr"] = xmlrpclib.Binary(filestr)
+
+        rval,response = do_method("node", "tbuisp", params)
+                
+        return rval
+                    
+    def usage(self):
+        print "tbuisp <operation> <file> <node1> [<node2> ...]"
+        print "where:"
+	print "     operation - Operation to perform. Currently, only 'upload'"
+	print "                 is supported"
+        print "     file      - Name of the to upload to the mote"
+        print "     nodeN     - The physical node name ..."
+        print
+        print "example:"   
+        print "  $ tbuisp upload foo.srec mote1"
+        wrapperoptions()
+        return
+        
     pass
 
 #
