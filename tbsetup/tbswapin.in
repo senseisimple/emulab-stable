@@ -25,19 +25,29 @@ $| = 1;
 
 require libtbsetup;
 
-if ($#ARGV < 1 || $#ARGV > 2 ||
-    ($#ARGV == 2 && $ARGV[0] ne "-nologfile")) {
-    print STDERR "Syntax: $0 [-nologfile] pid eid\n";
+$dolog = 1;
+$test = 0;
+
+sub show_help {
+    print STDERR "Syntax: $0 [-nologfile] [-test] pid eid\n";
     exit(1);
+};
+
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-nologfile") {
+	$dolog = 0;
+    } elsif ($arg eq "-test") {
+	$test = 1;
+    } else {
+	&show_help;
+    }
 }
 
-if ($#ARGV == 2) {
-    shift;
-    $dolog = 0;
+if ($#ARGV != 1) {
+    &show_help;
 }
-else {
-    $dolog = 1;
-}
+
 ($pid,$eid) = @ARGV;
 
 $dbh = &tbs_initdbi($TBDB);
@@ -121,6 +131,18 @@ if ($exitcode = &tbs_exec("assign_wrapper $pid $eid")) {
     cleanup;
     # Pass exit code through
     exit($exitcode >> 8);
+}
+
+# Exit here if we are testing.
+if ($test == 1) {
+    &tbs_out("Testing run - Stopping here.\n");
+    if (! $dbh->do("UPDATE experiments set state=\"testing\"" .
+		   " where pid=\"$pid\" and eid=\"$eid\"")) {
+	&tbs_out("Could not set state to tested.\n");
+	cleanup;
+	exit(1);
+    }
+    exit(0);
 }
 
 # Everything from now on sets up switch and node state.
