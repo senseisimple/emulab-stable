@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Utah Testbed Modify User Information</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify User Information");
 
 #
 # First off, sanity check the form to make sure all the required fields
@@ -15,39 +14,33 @@ include("defs.php3");
 # only the last bad field being displayed, but thats okay. The user will
 # eventually figure out that fields marked with * mean something!
 #
-$formerror="No Error";
 if (!isset($uid) ||
     strcmp($uid, "") == 0) {
-  $formerror = "Username";
+  FORMERROR("Username");
 }
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
-  $formerror = "Full Name";
+  FORMERROR("Full Name");
 }
 if (!isset($usr_email) ||
     strcmp($usr_email, "") == 0) {
-  $formerror = "Email Address";
+  FORMERROR("Email Address");
 }
 if (!isset($usr_addr) ||
     strcmp($usr_addr, "") == 0) {
-  $formerror = "Mailing Address";
+  FORMERROR("Mailing Address");
 }
 if (!isset($usr_phone) ||
     strcmp($usr_phone, "") == 0) {
-  $formerror = "Phone #";
+  FORMERROR("Phone #");
 }
 if (!isset($usr_title) ||
     strcmp($usr_title, "") == 0) {
-  $formerror = "Title/Position";
+  FORMERROR("Title/Position");
 }
 if (!isset($usr_affil) ||
     strcmp($usr_affil, "") == 0) {
-  $formerror = "Institutional Affiliation";
-}
-
-if ($formerror != "No Error") {
-  USERERROR("Missing field; Please go back and fill out ".
-            "the \"$formerror\" field!", 1);
+  FORMERROR("Institutional Affiliation");
 }
 
 #
@@ -121,7 +114,12 @@ if (! $insert_result) {
 <center>
 <br>
 <br>
-<h3>User information successfully modified!<h3><p>
+<h3>User information successfully modified!</h3><p>
 </center>
-</body>
-</html>
+
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New User Verification</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New User Verification");
 
 #
 # Only known and logged in users can be verified.
@@ -52,9 +51,12 @@ echo "<tr>
 
 echo "</form>\n";
 echo "</table>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
 
 
 

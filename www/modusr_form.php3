@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Modify User Information</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify User Information Form");
 
 #
 # Only known and logged in users can modify info.
@@ -136,5 +135,10 @@ echo "<tr>
 </form>
 </table>
 </center>
-</body>
-</html>
+
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

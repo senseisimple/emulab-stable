@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New Project Approval</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approval");
 
 #
 # Only known and logged in users can do this.
@@ -107,6 +106,9 @@ echo "<tr>
       </tr>
       </form>
       </table>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Node Control</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Control List");
 
 #
 # Only known and logged in users can do this.
@@ -75,8 +74,11 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 echo "</table>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
 
 

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New User Approval</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Users Approval Form");
 
 #
 # Only known and logged in users can be verified.
@@ -166,7 +165,10 @@ echo "<tr>
               <b><input type='submit' value='Submit' name='OK'></td>
       </tr>
       </form>
-      </table>
-      </body>
-      </html>\n";
+      </table>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Terminate Experiment</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Terminate Experiment Form");
 
 #
 # Only known and logged in users can end experiments.
@@ -105,5 +104,10 @@ echo "    </td>
 </form>
 </table>
 </center>
-</body>
-</html>
+
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

@@ -1,94 +1,82 @@
-<html>
-<head>
-<title>Utah Testbed Project Request</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Start a New Project");
 
 #
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
-# the project form. Note that this sequence of  statements results in
-# only the last bad field being displayed, but thats okay. The user will
-# eventually figure out that fields marked with * mean something!
+# the project form. 
 #
-$formerror="No Error";
 if (!isset($pid) ||
     strcmp($pid, "ucb-omcast") == 0) {
-  $formerror = "Name";
+  FORMERROR("Name");
 }
 if (!isset($proj_head_uid) ||
     strcmp($proj_head_uid, "") == 0) {
-  $formerror = "Username";
+  FORMERROR("Username");
 }
 if (!isset($proj_name) ||
     strcmp($proj_name, "UCB Overlay Multicast") == 0) {
-  $formerror = "Long Name";
+  FORMERROR("Long Name");
 }
 if (!isset($proj_members) ||
     strcmp($proj_members, "") == 0) {
-  $formerror = "Estimated #of Project Members";
+  FORMERROR("Estimated #of Project Members");
 }
 if (!isset($proj_pcs) ||
     strcmp($proj_pcs, "") == 0) {
-  $formerror = "Estimated #of PCs";
+  FORMERROR("Estimated #of PCs");
 }
 if (!isset($proj_sharks) ||
     strcmp($proj_sharks, "") == 0) {
-  $formerror = "Estimated #of Sharks";
+  FORMERROR("Estimated #of Sharks");
 }
 if (!isset($proj_why) ||
     strcmp($proj_why, "") == 0) {
-  $formerror = "Please describe your project";
+  FORMERROR("Please describe your project");
 }
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
-  $formerror = "Full Name";
+  FORMERROR("Full Name");
 }
 if (!isset($proj_URL) ||
     strcmp($proj_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
-  $formerror = "Project URL";
+  FORMERROR("Project URL");
 }
 if (!isset($usr_email) ||
     strcmp($usr_email, "") == 0) {
-  $formerror = "Email Address";
+  FORMERROR("Email Address");
 }
 if (!isset($usr_addr) ||
     strcmp($usr_addr, "") == 0) {
-  $formerror = "Postal Address";
+  FORMERROR("Postal Address");
 }
 if (!isset($usr_affil) ||
     strcmp($usr_affil, "UCB Networks Group") == 0) {
-  $formerror = "Institutional Afilliation";
+  FORMERROR("Institutional Afilliation");
 }
 if (!isset($usr_title) ||
     strcmp($usr_title, "Professor Emeritus") == 0) {
-  $formerror = "Title/Position";
+  FORMERROR("Title/Position");
 }
 if (!isset($usr_phones) ||
     strcmp($usr_phones, "") == 0) {
-  $formerror = "Phone #";
-}
-
-if ($formerror != "No Error") {
-  USERERROR("Missing field; ".
-            "Please go back and fill out the \"$formerror\" field!", 1);
+  FORMERROR("Phone #");
 }
 
 #
-# Database limit; PID must be 12 chars or less.
-#                 UID must be 8 chars or less.
+# Check database length limits.
 #
-# XXX Note CONSTANT in expression!
-#
-if (strlen($pid) > 12) {
+if (strlen($pid) > $TBDB_PIDLEN) {
     USERERROR("The project name \"$pid\" is too long! ".
               "Please select another.", 1);
 }
-if (strlen($proj_head_uid) > 8) {
+if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
     USERERROR("The name \"$proj_head_uid\" is too long! ".
               "Please select another.", 1);
 }
@@ -322,6 +310,9 @@ if (! $returning) {
           and approved, you will be classified as an active user, and will 
           be granted full access to your user account.";
 }
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>

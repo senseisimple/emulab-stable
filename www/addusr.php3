@@ -1,11 +1,7 @@
-<html>
-<head>
-<title>New User</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+PAGEHEADER("New User");
 
 $uid = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
@@ -130,7 +126,8 @@ else {
     echo "<tr>
               <td>*Username:</td>
               <td class=\"left\">
-                  <input type=\"text\" name=\"uid\" size=8 maxlength=8></td>
+                  <input type=\"text\" name=\"uid\"
+                         size=$TBDB_UIDLEN maxlength=$TBDB_UIDLEN></td>
           </tr>\n";
 
     echo "<tr>
@@ -197,12 +194,13 @@ else {
 #
 # The only common field!
 #
-# XXX Note CONSTANT size in expression: PID is 12 chars max.
+# Note PID max length.
 # 
 echo "<tr>
           <td>*Project:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"pid\" size=12></td>
+              <input type=\"text\" name=\"pid\"
+                     size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN></td>
       </tr>\n";
 
 ?>
@@ -210,9 +208,10 @@ echo "<tr>
 <b><input type="submit" value="Submit"></b></td></tr>
 </form>
 </table>
-</body>
-</html>
 
-
-
-
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

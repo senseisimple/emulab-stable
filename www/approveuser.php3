@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New Users Approved</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Users Approved");
 
 #
 # Only known and logged in users can be verified.
@@ -228,7 +227,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     TBERROR("Invalid approval value $approval in approveuser.php3.", 1);
 }
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
-

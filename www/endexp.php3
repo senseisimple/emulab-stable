@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Terminate Experiment</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Terminate Experiment");
 
 #
 # Only known and logged in users can end experiments.
@@ -172,9 +171,11 @@ if (! $query_result) {
 
 echo "<center><br>";
 echo "<h2>Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>";
-echo "</h2></center><br>";
+echo "</h2>";
+echo "</center>\n";
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</center>
-</body>
-</html>

@@ -1,6 +1,6 @@
 <?php
 #
-# This is an included file.
+# This is an included file. No headers or footers or includes!
 # 
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM projects WHERE pid=\"$pid\"");

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Show Experiment Information</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Show Experiment Information");
 
 #
 # Only known and logged in users can end experiments.
@@ -221,9 +220,11 @@ echo "<tr>
           <td class=\"left\">$proj_expires</td>
       </tr>\n";
 
-echo "</table>\n";
+echo "</table>
+      </center>\n";
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</center>
-</body>
-</html>

@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Utah Testbed Begin Experiment</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Begin an Experiment");
 
 $mydebug = 0;
 
@@ -13,34 +12,27 @@ $mydebug = 0;
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
-# the project form. Note that this sequence of  statements results in
-# only the last bad field being displayed, but thats okay. The user will
-# eventually figure out that fields marked with * mean something!
+# the project form. 
 #
-$formerror="No Error";
 if (!isset($uid) ||
     strcmp($uid, "") == 0) {
-  $formerror = "Username";
+  FORMERROR("Username");
 }
 if (!isset($exp_pid) ||
     strcmp($exp_pid, "") == 0) {
-  $formerror = "Select Project";
+  FORMERROR("Select Project");
 }
 if (!isset($exp_id) ||
     strcmp($exp_id, "") == 0) {
-  $formerror = "Experiment Name (short)";
+  FORMERROR("Experiment Name (short)");
 }
 if (!isset($exp_name) ||
     strcmp($exp_name, "") == 0) {
-  $formerror = "Experiment Name (long)";
+  FORMERROR("Experiment Name (long)");
 }
 if (!isset($exp_created) ||
     strcmp($exp_created, "") == 0) {
-  $formerror = "Experiment Created";
-}
-if ($formerror != "No Error") {
-  USERERROR("Missing field; Please go back and fill out ".
-            "the \"$formerror\" field!", 1);
+  FORMERROR("Experiment Created");
 }
 
 #
@@ -49,14 +41,9 @@ if ($formerror != "No Error") {
 LOGGEDINORDIE($uid);
 
 #
-# Current policy is to prefix the EID with the PID. Make sure it is not
-# too long for the database. PID is 12, and the max is 32, so the user
-# cannot have provided one more than 19, since other parts of the system
-# may concatenate them together with a hyphen.
+# Database limits
 #
-# XXX Note CONSTANT in expression!
-#
-if (strlen($exp_id) > 19) {
+if (strlen($exp_id) > $TBDB_EIDLEN) {
     USERERROR("The experiment name \"$exp_id\" is too long! ".
               "Please select another.", 1);
 }
@@ -304,6 +291,8 @@ mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
      "Errors-To: $TBMAIL_WWW");
 }
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>

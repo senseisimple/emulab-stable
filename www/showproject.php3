@@ -1,11 +1,11 @@
-<html>
-<head>
-<title>Show Project Information</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Show Project Information");
+
 
 #
 # Note the difference with which this page gets it arguments!
@@ -52,7 +52,10 @@ if (!$isadmin) {
 
 include("showproject_dump.php3");
 
+echo "</center>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</center>
-</body>
-</html>

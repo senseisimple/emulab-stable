@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New Project Approval List</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approval List");
 
 #
 # Only known and logged in users can do this. uid came in with the URI.
@@ -104,7 +103,10 @@ while ($projectrow = mysql_fetch_array($query_result)) {
           </tr>\n";
 }
 echo "</table>\n";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
 

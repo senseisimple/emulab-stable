@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Begin an Experiment</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Begin an Experiment Form");
 
 #
 # Only known and logged in users can begin experiments.
@@ -76,12 +75,12 @@ echo "    </td>
 #
 # Experiment ID and Long Name:
 #
-# XXX Note CONSTANT in expression!
+# Note DB max length.
 #
 echo "<tr>
           <td>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"exp_id\"
-                     size=\"19\" maxlength=\"19\">
+                     size=$TBDB_EIDLEN maxlength=$TBDB_EIDLEN>
               </td>
       </tr>\n";
 
@@ -144,5 +143,10 @@ echo "<tr>
 </tr>
 </form>
 </table>
-</body>
-</html>
+
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

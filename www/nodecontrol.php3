@@ -14,6 +14,7 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
+    PAGEHEADER("Node Control");
     USERERROR("You do not have admin privledges!", 1);
 }
 
@@ -23,7 +24,8 @@ if (! $isadmin) {
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT node_id FROM nodes WHERE node_id=\"$node_id\"");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id is not a valid nodeid", 1);
+    PAGEHEADER("Node Control");
+    USERERROR("The node $node_id is not a valid nodeid", 1);
 }
 
 #
@@ -39,6 +41,7 @@ $insert_result = mysql_db_query($TBDBNAME,
 
 if (! $insert_result) {
     $err = mysql_error();
+    PAGEHEADER("Node Control");
     TBERROR("Database Error changing node setup for $node_id: $err", 1);
 }
 
@@ -47,4 +50,7 @@ if (! $insert_result) {
 # 
 header("Location: nodecontrol_list.php3?uid=$uid");
 
+#
+# No need to do a footer!
+#
 ?>

@@ -1,11 +1,7 @@
-<html>
-<head>
-<title>Start a New Project</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+PAGEHEADER("Start a New Project");
 
 $uid = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
@@ -81,7 +77,7 @@ if ($row) {
     echo     "type=\"readonly\" value=\"$row[uid]\">";
 }
 else {
-    echo     "type=\"text\" size=\"8\" maxlength=\"8\">";
+    echo     "type=\"text\" size=$TBDB_UIDLEN maxlength=$TBDB_UIDLEN>";
 }
 echo "     </td>
       </tr>\n";
@@ -230,7 +226,7 @@ echo "<tr>
 echo "<tr>
           <td>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"pid\" value=\"ucb-omcast\"
-                     size=\"12\" MAXLENGTH=\"12\"></td>
+                     size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN></td>
       </tr>\n";
 
 #
@@ -299,6 +295,10 @@ echo "<tr>
 </tr>
 </form>
 </table>
-</body>
-</html>
 
+<?php
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>

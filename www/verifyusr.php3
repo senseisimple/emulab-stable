@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>Confirming Verification</title>
-<link rel="stylesheet" href="tbstyle.css" type="text/css">
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Confirming Verification");
 
 #
 # Only known and logged in users can be verified. UID came in as a post var.
@@ -74,7 +73,10 @@ else {
     USERERROR("You have already been verified, $uid. If you did not perform ".
 	      "this verification, please notify Testbed Operations.", 1);
 }
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
 
-</body>
-</html>

@@ -63,25 +63,15 @@ I could just figure out how to add a php mode to emacs ...
 
 * Backup links in all the pages.
 
-* Page Footers in all the pages. Last modified, link to main testbed page,
-  email address of the testbed, etc. 
-
 * Change to ?uid=stoller&pid=testbed style arguments in all the pages I
   have not yet fixed (that is, get rid of that regex thing at the top of
   the page to find the arguments).
-
-* Add a Show Project Information selection page (akin to the Show
-  Experiments selection page), which invokes the existing showproject
-  page. Useful for admin types who want to see the information for a
-  particular project.
 
 * Admin page to remove a project.
 
 * Admin page to remove a user.
 
 * Admin page to remove an experiment.
-
-* Admin page to control node settings (OS, etc.)
 
 * Add confirm buttons in various places. I did one in the end experiments
   page, as a simple button (so you gotta press two things). I think this
@@ -91,8 +81,6 @@ I could just figure out how to add a php mode to emacs ...
   That is, anyplace a user *types* in a username, project name, or an
   experiment name, downcase it. Mac was going to do this, but I don't know
   if he got to it. 
-
-* Cleanse the database of random entries that have crept in.
 
 * Get people to go use the pages (including modify user information!).
 

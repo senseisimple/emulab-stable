@@ -1,11 +1,10 @@
-<html>
-<head>
-<title>New Users Approved</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>
 <?php
 include("defs.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Project Approved");
 
 #
 # Only known and logged in users can do this.
@@ -236,7 +235,8 @@ else {
     TBERROR("Invalid approval value $approval in approveproject.php3.", 1);
 }
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
-

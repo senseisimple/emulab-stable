@@ -13,7 +13,6 @@ $TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
 #$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
 #$TBMAIL_APPROVE = "Testbed Approval <stoller@fast.cs.utah.edu>";
 
-$TBDBNAME       = "tbdb";
 $TBDIR          = "/usr/testbed/";
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
@@ -29,6 +28,11 @@ $TBAUTHCOOKIE   = "HashCookie";
 $TBAUTHTIMEOUT  = 10800;
 $TBAUTHDOMAIN   = ".emulab.net";
 #$TBAUTHDOMAIN   = "golden-gw.ballmoss.com";
+
+#
+# Database constants and the like.
+#
+include("dbdefs.php3");
 
 #
 # Generate the KEY from a name
@@ -91,6 +95,14 @@ function USERERROR($message, $death) {
 }
 
 #
+# A form error.
+#
+function FORMERROR($field) {
+    USERERROR("Missing field; ".
+              "Please go back and fill out the \"$field\" field!", 1);
+}
+
+#
 # Is this user an admin type?
 #
 function ISADMIN($uid) {
@@ -108,6 +120,40 @@ function ISADMIN($uid) {
     $admin  = $row[0];
 
     return $admin;
+}
+
+#
+# Spit out a vanilla page header.
+#
+function PAGEHEADER($title) {
+    echo "<html>
+          <head>
+           <title>$title</title>
+           <link rel=\"stylesheet\" href=\"tbstyle.css\" type=\"text/css\">
+          </head>
+          <body>\n";
+}
+
+#
+# Spit out a vanilla page footer.
+#
+function PAGEFOOTER() {
+    global $TBBASE;
+
+    echo "<br><hr>
+          <center>[<a href=\"$TBBASE\">Network Testbed Home</a>]</center>
+          <center>
+           [<a href=\"http://www.cs.utah.edu/flux/\">Flux Research Group</a>]
+           [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]
+           [<a href=\"http://www.utah.edu/\">University of Utah</a>]
+          </center>
+         <p align=right>
+         <font size=-2>
+          Problems? Contact
+                    <a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+                       Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+          </body>
+          </html>\n";
 }
 
 #

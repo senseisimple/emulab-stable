@@ -1,61 +1,46 @@
 <?php
 include("defs.php3");
 
-echo "<html>
-      <head>
-      <title>Joining a project</title>
-      <link rel='stylesheet' href='tbstyle.css' type='text/css'>
-      </head>
-      <body>";
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Join a Project");
+
 #
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
-# the project form. Note that this sequence of statements results in
-# only the last bad field being displayed, but thats okay. The user will
-# eventually figure out that fields marked with * mean something!
+# the project form. 
 #
-$formerror="No Error";
 if (!isset($uid) ||
     strcmp($uid, "") == 0) {
-  $formerror = "UserName";
+  FORMERROR("UserName");
 }
 if (!isset($usr_email) ||
     strcmp($usr_email, "") == 0) {
-  $formerror = "Email Address";
+  FORMERROR("Email Address");
 }
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
-  $formerror = "Full Name";
+  FORMERROR("Full Name");
 }
 if (!isset($pid) ||
     strcmp($pid, "") == 0) {
-  $formerror = "Project";
+  FORMERROR("Project");
 }
 if (!isset($usr_affil) ||
     strcmp($usr_affil, "") == 0) {
-  $formerror = "Institutional Afilliation";
+  FORMERROR("Institutional Afilliation");
 }
 if (!isset($usr_title) ||
     strcmp($usr_title, "") == 0) {
-  $formerror = "Title/Position";
-}
-
-if ($formerror != "No Error") {
-  echo "<h3><br><br>
-        Missing field; Please go back and fill out the \"$formerror\" field!\n
-        </h3>
-        </body>
-        </html>";
-  die("");
+  FORMERROR("Title/Position");
 }
 
 #
-# Database limit; UID must be 8 chars or less.
+# Database limits
 #
-# XXX Note CONSTANT in expression!
-#
-if (strlen($uid) > 8) {
+if (strlen($uid) > $TBDB_UIDLEN) {
     USERERROR("The name \"$uid\" is too long! ".
               "Please select another.", 1);
 }
@@ -268,6 +253,9 @@ echo "<br>
       <p>The leader of project '$pid' has been notified of your application.
       He/She will make a decision and either approve or deny your application,
       and you will be notified as soon as a decision has been made.";
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
-</body>
-</html>
