@@ -249,9 +249,10 @@ if (strcmp($privIP, "1.1.1.1")) {
     if (mysql_num_rows($query_result)) {
 	$row     = mysql_fetch_array($query_result);
 	$newroot = $row["roottag"];
+	$force   = $row["force"];
 
 	# Do not upgrade if the root tag already matches. ???
-	if (!isset($roottag) || strcmp($roottag, $newroot)) {
+	if ($force eq "yes"|| !isset($roottag) || strcmp($roottag, $newroot)) {
 	    $update  = 1;
 
 	    DBQueryFatal("update widearea_updates set update_started=now() ".
@@ -270,6 +271,7 @@ if (strcmp($privIP, "1.1.1.1")) {
 	    case "c9f8578517f5ebb0eca70b69dce144db":
 		$upgrade_instructions =
 		    "slice1_image=slice1.ndz\n" .
+		    "slice1_alt_image=http://${WWWHOST}/images/slice1-v4.ndz\n" .
 		    "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n".
 		    "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n" .
 		    "slicex_slice=3\n" .
