@@ -16,7 +16,7 @@
 #
 
 package libdb;
-#use strict;
+use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
@@ -3842,7 +3842,7 @@ sub TBFieldErrorString() { return $DBFieldErrstr; }
 #
 sub TBGrabFieldData()
 {
-    $DBFieldData = ();
+    %DBFieldData = ();
 
     my $query_result =
 	DBQueryFatal("select * from table_regex");
@@ -3878,7 +3878,7 @@ sub TBFieldData($$;$)
     my $toplevel;
     my $fielddata;
 
-    if (! defined($DBFieldData)) {
+    if (! defined(%DBFieldData)) {
 	TBGrabFieldData();
     }
     my $key = $table . ":" . $column;
@@ -3895,7 +3895,7 @@ sub TBFieldData($$;$)
 	    }
 
 	    $key = $fielddata->{"check"};
-	    #print STDERR "Redirecting to $key for $table/$column!\n";
+	    print STDERR "Redirecting to $key for $table/$column!\n";
 	    next;
 	}
 	last;
@@ -3915,10 +3915,9 @@ sub TBFieldData($$;$)
     # Overwrite final entry with toplevel data.
     if (defined($toplevel) &&
 	($toplevel->{"min"} || $toplevel->{"max"})) {
-	$fielddata->{"min"} = $toplevel->{"min"};
-	$fielddata->{"max"} = $toplevel->{"max"};
+	return ($fielddata, $toplevel);
     }
-    return $fielddata;
+    return ($fielddata);
 }
 
 #
@@ -3928,7 +3927,7 @@ sub TBcheck_dbslot($$$;$)
 {
     my ($token, $table, $column, $flag) = @_;
 
-    my $fielddata   = TBFieldData($table, $column, $flag);
+    my ($fielddata,$toplevel) = TBFieldData($table, $column, $flag);
 
     return 0
 	if (!defined($fielddata));
@@ -3936,10 +3935,13 @@ sub TBcheck_dbslot($$$;$)
     my $check       = $fielddata->{"check"};
     my $check_type  = $fielddata->{"check_type"};
     my $column_type = $fielddata->{"column_type"};
-    my $min         = $fielddata->{"min"};
-    my $max         = $fielddata->{"max"};
+    my $min         = (defined($toplevel) ?
+		       $toplevel->{"min"} : $fielddata->{"min"});
+    my $max         = (defined($toplevel) ?
+		       $toplevel->{"max"} : $fielddata->{"max"});
 
-#    print STDERR "Using $check/$check_type/$column_type for $table/$column\n";
+    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
+	"$table/$column\n";
 
     #
     # Functional checks not implemented yet.
