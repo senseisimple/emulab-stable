@@ -17,7 +17,7 @@ SUBDIRS		= checkpass ns2ir
 BIN_STUFF	= power snmpit tbend tbswapin tbswapout tbprerun tbreport \
 		  os_load startexp endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
-		  portstats checkports
+		  portstats checkports eventsys_control
 
 # Stuff that mere users get on plastic.
 USERBINS        = os_load node_reboot nscheck node_update savelogs \
@@ -26,7 +26,7 @@ USERBINS        = os_load node_reboot nscheck node_update savelogs \
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
-		  rmgroup mkgroup mkacct setgroups mkproj eventsys_control \
+		  rmgroup mkgroup mkacct setgroups mkproj \
 		  exports_setup.proxy vnode_setup
 
 LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
@@ -115,8 +115,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/node_update
 	chown root $(INSTALL_SBINDIR)/vnode_setup
 	chmod u+s $(INSTALL_SBINDIR)/vnode_setup
-	chown root $(INSTALL_SBINDIR)/eventsys_control
-	chmod u+s $(INSTALL_SBINDIR)/eventsys_control
+	chown root $(INSTALL_BINDIR)/eventsys_control
+	chmod u+s $(INSTALL_BINDIR)/eventsys_control
 
 #
 # Control node installation (okay, plastic)
