@@ -354,18 +354,31 @@ foreach my $n (@freed_nodes) {
     # project a node was reserved into. At present, there might already
     # be an entry. Eventually, os_setup will look for this and force
     # a reload.
+    # Make sure we don't schedule a reload if the node is coming out of
+    # the reloading or reloadpending experimenets.
     #
-    if ($mustclean) {
+    if ($mustclean && (($pid ne $reloadpid) ||
+	      (($eid ne $reloadeid) && ($eid ne $pendingeid)))) {
 	#
-	# Make sure we don't schedule a reload if the node is coming out of
-	# the reloading or reloadpending experimenets.
+	# Schedule a reload
 	#
-	if (!(($pid eq $reloadpid) &&
-	      (($eid eq $reloadeid) || ($eid eq $pendingeid)))) {
-	    DBQueryWarn("update reserved set ".
-		"pid='$reloadpid',eid='$pendingeid' ".
-		"where node_id='$n'") || $error++;
+	if (my $imageid = DefaultImageID($n)) {
+	    if (!TBSetSchedReload($n,$imageid)) {
+		print STDERR "WARNING: Unable to schedule reload for $n\n";
+		$errors++;
+	    }
+	} else {
+	    print STDERR "WARNING: Unable to get default imageid for $n\n";
+	    $errors++;
 	}
+	#
+	# Let's still stick the node into the reloadpending experiment, even
+	# if there were errors, to get it out of the way.
+	#
+	print "Moving $n to $reloadpid/$pendingeid.\n";
+	DBQueryWarn("update reserved set ".
+	    "pid='$reloadpid',eid='$pendingeid' ".
+	    "where node_id='$n'") || $error++;
 	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
 	next;
     }
