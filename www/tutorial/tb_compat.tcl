@@ -10,7 +10,6 @@ proc tb-set-node-os {node os} {}
 proc tb-create-os {label path partition} {}
 proc tb-set-link-loss {src args} {}
 proc tb-set-lan-loss {lan rate} {}
-
-# The following commands are not clearly defined and probably will be
-# changed or removed
-proc tb-set-node-deltas {node deltas} {}
+proc tb-set-node-rpms {node args} {}
+proc tb-set-node-startup {node cmd} {}
+proc tb-set-node-cmdline {node cmd} {}

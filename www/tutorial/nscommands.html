@@ -19,7 +19,6 @@
   <li><a href=#IP>IP Commands</a>
   <li><a href=#OS>OS Commands</a>
   <li><a href=#LOSS>Link Loss Commands</a>
-  <li><a href=#UNSUP>Unsupported/Not yet implemented Commands</a>
 </ul>
 
 <hr>
@@ -320,6 +319,42 @@ tb-create-os MYKERNEL image.ndz 4
       kernels.
 </ul>
 
+<h4>tb-set-node-rpms</h4>
+
+<pre>
+tb-set-node-rpms <i>node</i> <i>rpms...</i>
+
+tb-set-node-rpms $node0 rpm1 rpm2 rpm3
+</pre>
+
+<ul>
+  <li>This command sets which rpms are to be installed on the node.
+</ul>
+
+<h4>tb-set-node-startup</h4>
+
+<pre>
+tb-set-node-startup <i>node</i> <i>startupcmd</i>
+
+tb-set-node-startup $node0 {mystart.sh -a}
+</pre>
+
+<ul>
+  <li>This sets a script to run on node boot.
+</ul>
+
+<h4>tb-set-node-cmdline</h4>
+
+<pre>
+tb-set-node-cmdline <i>node</i> <i>cmdline</i>
+
+tb-set-node-cmdline $node0 {???}
+</pre>
+
+<ul>
+  <li>Ask Mike
+</ul>
+      
 <hr>
 
 <a name=LOSS></a><h3>Link Loss Commands</h3>
@@ -352,7 +387,7 @@ tb-set-link-loss $link1 0.02
 
 <p>Notes:
 <ul>
-  <li>There are two syntaxs available.  The first specifies a link by
+  <li>There are two syntax's available.  The first specifies a link by
       a source/destination pair.  The second explicitly specifies the
       link.
   <li>The source/destination pair is incapable of describing an
@@ -381,22 +416,6 @@ tb-set-lan-loss $lan1 0.3
       <code>make-lan</code> command) and set the loss rate of the link
       appropriately (contact testbed-ops).
 </ul>
-
-<hr>
-
-<a name=UNSUP></a><h3>Unsupported/Not yet implemented Commands</h3>
-
-<p>The following commands will parse but do not do anything as yet.
-
-<h4>tb-set-node-deltas</h4>
-
-<pre>
-tb-set-node-deltas <i>node</i> <i>deltas</i>
-</pre>
-
-<p>This command will likely go through some change and accompany a
-few other commands once we get delta support going.
-
 
 <hr size=2 noshade>
 <center>
