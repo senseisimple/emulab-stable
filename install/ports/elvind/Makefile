@@ -17,9 +17,8 @@ COMMENT=	"Message router for the elvin messaging system"
 
 .if !exists(${DISTDIR}/${DISTNAME}${EXTRACT_SUFX})
 IGNORE=         may not be automatically fetched due to licensing\
-		restrictions.  Please grab ${DISTFILES} from \
-		http://elvin.dstc.com/projects/elvind, and place it in \
-		${DISTDIR}.
+		restrictions.  Please ask testbed-ops@emulab.net for a \
+		copy of ${DISTFILES}, and place it in ${DISTDIR}
 .endif
 
 HAS_CONFIGURE=	yes
