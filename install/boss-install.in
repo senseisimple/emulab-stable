@@ -676,6 +676,7 @@ Phase "cron", "Adding cron jobs", sub {
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
 	    "0  \t6\t*\t*\t*\troot\t$PREFIX/sbin/audit",
+	    "0  \t1\t*\t*\t*\troot\t$PREFIX/sbin/dbcheck",
 	    "45 \t1\t*\t*\t*\troot\t$PREFIX/sbin/backup",
 	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/node_status",
 	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/idlemail");
