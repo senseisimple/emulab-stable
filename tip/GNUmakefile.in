@@ -9,7 +9,17 @@ all:	tip tiptunnel console
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-#CC = gcc -g -O2 -DUSESOCKETS -DWITHSSL -I$(TESTBED_SRCDIR)/capture
+SSLFLAGS = -DWITHSSL
+SSLLIBS	 = -lssl -lcrypto
+SYSTEM := $(shell uname -s)
+ifeq ($(SYSTEM),Linux)
+NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+ifeq ($(NEEDKERB),0)
+ SSLFLAGS += `/usr/kerberos/bin/krb5-config --cflags`
+ SSLLIBS  += `/usr/kerberos/bin/krb5-config --libs krb5`
+endif
+endif
+
 CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
@@ -22,8 +32,6 @@ TUNNELOBJS = tiptunnel.o
 #
 LIBS=
 
-SSLLIBS		= -lssl -lcrypto
-
 #tip:	$(OBJS)
 #	$(CC) -static -o tip $(OBJS) $(LIBS)
 
@@ -31,15 +39,15 @@ tip:	$(TESTBED_SRCDIR)/tip/tip.deprecation
 	cp $(TESTBED_SRCDIR)/tip/tip.deprecation tip
 
 tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
-	$(CC) -DWITHSSL -o tiptunnel.o -c $<
+	$(CC) $(SSLFLAGS) -o tiptunnel.o -c $<
+
+tiptunnel: tiptunnel.o
+	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS)
 
 # 'console' is tiptunnel, without SSL, and with localmode on by default.
 
 console.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 	$(CC) -DLOCALBYDEFAULT -o console.o -c $<
-
-tiptunnel: tiptunnel.o
-	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS) 
 
 console: console.o
 	$(CC) -o console console.o
