@@ -90,7 +90,12 @@ def do_method(server, method_and_args):
     #
     # Make the call. 
     #
-    response = apply(meth, meth_args)
+    try:
+        response = apply(meth, meth_args)
+        pass
+    except xmlrpclib.Fault, e:
+        print e.faultString
+        return -1
 
     #
     # Parse the Response, which is a Dictionary. See EmulabResponse in the
@@ -169,12 +174,7 @@ else:
             line = raw_input("$ ")
             tokens = line.split(" ")
             if len(tokens) >= 1 and len(tokens[0]) > 0:
-                try:
-                    print str(do_method(server, tokens))
-                    pass
-                except xmlrpclib.Fault, e:
-                    print e.faultString
-                    pass
+                print str(do_method(server, tokens))
                 pass
             pass
         pass
