@@ -37,7 +37,6 @@ use Node;
 
 my $consetup	= "$TB/libexec/console_setup";
 my $osselect    = "$TB/bin/os_select";
-my $tbrsync     = "$TB/bin/tbrsync";
 my $nodereboot  = "$TB/bin/node_reboot";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
@@ -351,7 +350,8 @@ foreach my $n (@freed_nodes) {
 		     "where node_id='$n'");
 
     # XXX force reload hack!
-    if ( !$TESTMODE && ((!$isvirt && $imageable) || $result->numrows()) ) {
+    if ( !$TESTMODE && ((!$isvirt && $imageable) || $result->numrows() ||
+                        TBNodeType($n) eq "garcia")) { # XXX Garcia hack
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".

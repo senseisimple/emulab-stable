@@ -61,6 +61,7 @@ my $NODEDEAD_EID= NODEDEAD_EID;
 my $os_load	= "$TB/bin/os_load -s";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
+my $tbrsync     = "$TB/bin/tbrsync";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
 my $retry_time  = 15; # in minutes
@@ -69,6 +70,10 @@ my %retried     = ();
 my %warned	= ();
 my %failed	= ();
 my @retry_list  = ();
+
+# XXX: Garcia hack vars
+my $gimageid = "GARCIA-STARGATE";
+my $gimagepath = "/usr/testbed/images/garcia";
 
 #
 # Turn off line buffering on output (dots ...).
@@ -285,6 +290,13 @@ while (1) {
 		@row     = $query_result->fetchrow_array();
 		$imageid = $row[0];
 	    }
+
+            # XXX Garcia Hack
+            if (TBNodeType($node) eq "garcia") {
+                $imageid = $gimageid;
+            }
+            # XXX End Garcia Hack
+
 	    $images{$node} = $imageid;
 	    if (defined(@{$imagenodes{$imageid}})) {
 		push(@{$imagenodes{$imageid}},$node);
@@ -327,6 +339,36 @@ while (1) {
 
 	    my $nodelist = join(" ",@{$imagenodes{$imageid}});
 	    my $os_load_flags = "";
+
+            # XXX Garcia Hack - gross..
+            # We special-case garcia loading for now until the subnode->node
+            # dependancies are worked out inside os_load.
+            if ($imageid eq $gimageid) {
+                print "Synching garcia nodes: '$nodelist' at ".`date`;
+                # path to directory tree "image" hardcoded for now since
+                # users have no choice over OS selection when reloading
+                # isn't performed during swapin.
+                if (system("$tbrsync upload $gimagepath $nodelist") == 0) {
+                    if (system("$reboot $nodelist") == 0) {
+                        print "tbrsync done at ".`date`;
+                        next;
+                    }
+                    else {
+                        notify("Failed to reboot garcias after rsync: ". 
+                               "$nodelist.\n");
+                    }
+                }
+                else {
+                    notify("Failed to rsync garcia nodes: $nodelist.\n");
+                }
+
+                # Either rsync or reboot failed on the robots if we get here.
+		foreach my $node (@{$imagenodes{$imageid}}) {
+		    $failed{$node} = $time;
+		}
+                next;
+            }
+            # XXX End Garcia Hack
 
 	    #
 	    # We only add the -m flag to os_load if we found a specific image
