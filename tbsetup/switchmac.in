@@ -135,7 +135,7 @@ SWITCH:
     my @vlanList;
     my $device;
     if ($useindexing) {
-	$device = new snmpit_cisco($switch,0,$community,0);
+	$device = new snmpit_cisco($switch,$debug,$community);
 	@vlanList = $device->listVlans();
     } else {
 	#

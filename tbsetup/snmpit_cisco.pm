@@ -55,17 +55,12 @@ my $PORT_FORMAT_MODPORT  = 2;
 my $PORT_FORMAT_NODEPORT = 3;
 
 #
-# Highest-numbered VLAN we will try
-#
-my $MAX_VLAN_NUMBER = 999;
-
-#
 # Creates a new object.
 #
-# usage: new($classname,$devicename,$debuglevel)
+# usage: new($classname,$devicename,$debuglevel,$community)
 #        returns a new object, blessed into the snmpit_cisco class.
 #
-sub new($$$$$$) {
+sub new($$$;$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -73,9 +68,7 @@ sub new($$$$$$) {
 
     my $name = shift;
     my $debugLevel = shift;
-    my $switchtype = shift;
     my $community = shift;
-    my $supportsPrivate = shift;
 
     #
     # Create the actual object
@@ -93,12 +86,32 @@ sub new($$$$$$) {
     $self->{BLOCK} = 1;
     $self->{BULK} = 1;
     $self->{NAME} = $name;
-    $self->{COMMUNITY} = $community;
-    $self->{SUPPORTS_PRIVATE} = $supportsPrivate;
 
-    # Figure out some stuff about this switch
-    $switchtype =~ /^(\w+)(-ios)?$/;
+    #
+    # Get config options from the database
+    #
+    my $options = getDeviceOptions($self->{NAME});
+    if (!$options) {
+	warn "ERROR: Getting switch options for $self->{NAME}\n";
+	return undef;
+    }
+
+    $self->{SUPPORTS_PRIVATE} = $options->{'supports_private'};
+    $self->{MIN_VLAN}         = $options->{'min_vlan'};
+    $self->{MAX_VLAN}         = $options->{'max_vlan'};
+
+    if ($community) { # Allow this to over-ride the default
+	$self->{COMMUNITY}    = $community;
+    } else {
+	$self->{COMMUNITY}    = $options->{'snmp_community'};
+    }
+
+    #
+    # We have to change our behavior depending on what OS the switch runs
+    #
+    $options->{'type'} =~ /^(\w+)(-ios)?$/;
     $self->{SWITHCTYPE} = $1;
+
     if ($2) {
 	$self->{OSTYPE} = "IOS";
     } else {
@@ -623,10 +636,9 @@ sub createVlan($$;$$$) {
 
 	if (!$vlan_number) {
 	    #
-	    # Find a free VLAN number to use. Since 1 is the default VLAN on
-	    # Ciscos, we start with number 2.
+	    # Find a free VLAN number to use.
 	    #
-	    $vlan_number = 2; # We need to start at 2
+	    $vlan_number = $self->{MIN_VLAN};
 	    my $RetVal = snmpitGetWarn($self->{SESS},
 		[$VlanRowStatus,"1.$vlan_number"]);
 	    if (!defined($RetVal)) {
@@ -638,7 +650,7 @@ sub createVlan($$;$$$) {
 	    }
 	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
 	    while (($RetVal ne 'NOSUCHINSTANCE') &&
-		    ($vlan_number <= $MAX_VLAN_NUMBER)) {
+		    ($vlan_number <= $self->{MAX_VLAN})) {
 		$vlan_number += 1;
 		$RetVal = snmpitGetWarn($self->{SESS},
 		    [$VlanRowStatus,"1.$vlan_number"]);
@@ -653,7 +665,7 @@ sub createVlan($$;$$$) {
 		    $self->debug("Row $vlan_number got '$RetVal'\n",2);
 		}
 	    }
-	    if ($vlan_number > $MAX_VLAN_NUMBER) {
+	    if ($vlan_number > $self->{MAX_VLAN}) {
 		#
 		# We must have failed to find one
 		#

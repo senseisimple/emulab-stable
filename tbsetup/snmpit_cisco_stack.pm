@@ -35,7 +35,7 @@ use libdb;
 # usage: new(string name, string stack_id, int debuglevel, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
-sub new($$$#@) {
+sub new($$$$@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -43,8 +43,6 @@ sub new($$$#@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
-    my $community = shift;
-    my $supports_private = shift;
     my $uses_vtp = shift;
     my @devicenames = @_;
 
@@ -102,8 +100,7 @@ sub new($$$#@) {
 	    (/65\d\d/ || /40\d\d/ || /29\d\d/ || /55\d\d/)
 		    && do {
 		use snmpit_cisco;
-		$device = new snmpit_cisco($devicename,$self->{DEBUG},$type,
-			$community,$supports_private);
+		$device = new snmpit_cisco($devicename,$self->{DEBUG});
 		if (!$device) {
 		    die "Failed to create a device object for $devicename\n";
 		} else {
@@ -126,8 +123,7 @@ sub new($$$#@) {
 	# XXX: For simplicity, we assume for now that the leader is a Cisco
 	use snmpit_cisco;
 	my $type = getDeviceType($self->{STACKID});
-	$self->{LEADER} = new snmpit_cisco($self->{STACKID}, $self->{DEBUG},
-	    $type, $community, $supports_private)
+	$self->{LEADER} = new snmpit_cisco($self->{STACKID}, $self->{DEBUG});
     }
 
     bless($self,$class);

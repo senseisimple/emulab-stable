@@ -77,7 +77,24 @@ sub new {
     $self->{BLOCK} = 1;
     $self->{CONFIRM} = 1;
     $self->{NAME} = $name;
-    $self->{COMMUNITY} = $community;
+    
+    #
+    # Get config options from the database
+    #
+    my $options = getDeviceOptions($self->{NAME});
+    if (!$options) {
+	warn "ERROR: Getting switch options for $self->{NAME}\n";
+	return undef;
+    }
+
+    $self->{MIN_VLAN}         = $options->{'min_vlan'};
+    $self->{MAX_VLAN}         = $options->{'max_vlan'};
+
+    if ($community) { # Allow this to over-ride the default
+	$self->{COMMUNITY}    = $community;
+    } else {
+	$self->{COMMUNITY}    = $options->{'snmp_community'};
+    }
 
     if ($self->{DEBUG}) {
 	print "snmpit_intel module initializing... debug level $self->{DEBUG}\n"
@@ -462,8 +479,14 @@ sub createVlan($$;@) {
 
     #
     # Intel provides us with a handy way to pick a VLAN number
+    # NOTE: This will respect the MAX_VLAN variable, but not the MIN_VLAN
+    # one
     #
     my $vlan_number = $self->{SESS}->get([[$NextVLANId,0]]);
+    if ($vlan_number > $self->{MAX_VLAN}) {
+	print STDERR "ERROR: Returned VLAN was too high ($vlan_number)\n";
+	return 0;
+    }
 
     #
     # Pick a name if one was not given

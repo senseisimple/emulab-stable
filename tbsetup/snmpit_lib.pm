@@ -18,7 +18,7 @@ use Exporter;
 		getTestSwitches getControlSwitches getVlanPorts
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchStack
-		getStackType getTrunks getTrunksFromSwitches
+		getStackType getDeviceOptions getTrunks getTrunksFromSwitches
 		getExperimentPorts snmpitGetWarn snmpitGetFatal
 		snmpitWarn snmpitFatal printVars tbsort );
 
@@ -52,7 +52,7 @@ my %vlanids=();
 my $snmpitErrorString;
 
 #
-# Initialize the 
+# Initialize the library
 #
 sub init($) {
     $debug = shift || $debug;
@@ -368,6 +368,52 @@ sub getStackType($) {
 	    return $stack_type;
 	}
     }
+}
+
+#
+# Get a hash that describes the configuration options for a switch. The idea is
+# that the device's object will call this method to get some options.  Right
+# now, all this stuff actually comes from the stack, but there could be
+# switch-specific configuration in the future. Provides defaults for NULL
+# columns
+#
+# We could probably make this look more like an object, for type checking, but
+# that just doesn't seem necessary yet.
+#
+sub getDeviceOptions($) {
+    my $switch = shift;
+    my %options;
+
+    my $result = DBQueryFatal("SELECT supports_private, " .
+	"single_domain, snmp_community, min_vlan, max_vlan " .
+	"FROM switch_stacks AS s left join switch_stack_types AS t " .
+	"    ON s.stack_id = t.stack_id ".
+	"WHERE s.node_id='$switch'");
+
+    if (!$result->numrows()) {
+	print STDERR "No switch $switch found, or it is not in a stack\n";
+	return undef;
+    }
+
+    my ($supports_private, $single_domain, $snmp_community, $min_vlan,
+	$max_vlan) = $result->fetchrow();
+
+    $options{'supports_private'} = $supports_private;
+    $options{'single_domain'} = $single_domain;
+    $options{'snmp_community'} = $snmp_community || "public";
+    $options{'min_vlan'} = $min_vlan || 2;
+    $options{'max_vlan'} = $max_vlan || 1000;
+
+    $options{'type'} = getDeviceType($switch);
+
+    if ($debug) {
+	print "Options for $switch:\n";
+	while (my ($key,$value) = each %options) {
+	    print "$key = $value\n"
+	}
+    }
+
+    return \%options;
 }
 
 #

@@ -1020,3 +1020,9 @@ last_net_act,last_cpu_act,last_ext_act);
        have to read that file!
 
        alter table nodes add sfshostid varchar(128) default NULL;
+
+1.194: Add a range of VLANs to be used, per switch stack. NULL values will
+       default to the old VLAN range.
+
+       alter table switch_stack_types add column min_vlan int default NULL;
+       alter table switch_stack_types add column max_vlan int default NULL;
