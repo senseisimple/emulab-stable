@@ -52,6 +52,11 @@ if (count($selected_nodes)) {
     }
     $whereclause = implode(" OR ",$equal_clauses);
     $whereclause_qualified = implode(" OR ",$equal_clauses_qualified);
+} else {
+    if ($delete || $calc || $create || $research || $swap || $newtype ||
+	    $newprefix || $addnumber || $renumber) {
+	USERERROR("At least one node must be selected!",1);
+    }
 }
 
 #
@@ -240,7 +245,7 @@ if ($renumber) {
 #
 $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
-	"i.switch_id, i.switch_card, i.switch_port " .
+	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP " .
 	"FROM new_nodes AS n " .
 	"LEFT JOIN node_types AS t on n.type=t.type " .
 	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
@@ -248,6 +253,8 @@ $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"ORDER BY n.new_node_id");
 
 ?>
+
+<h3><a href="newnodes_list.php3">Refresh this page</a></h3>
 
 <form action="newnodes_list.php3" method="get" name="nodeform">
 
@@ -275,6 +282,7 @@ function deselectAll(form) {
 	    <th>Control MAC</th>
 	    <th>Control Port</th>
 	    <th>Interfaces</th>
+	    <th>Temporary IP</th>
 	    <th>Created</th>
 	</tr>
 
@@ -287,6 +295,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	$IP         = $row["IP"];
 	$created    = $row["created"];
 	$mac        = $row["MAC"];
+	$tempIP     = $row["temporary_IP"];
 	if ($row["switch_id"]) {
 	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
 	} else {
@@ -309,6 +318,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "          <td>$mac</td>\n";
 	echo "          <td>$port</td>\n";
 	echo "		<td>$interfaces</td>\n";
+	echo "		<td>$tempIP</td>\n";
 	echo "		<td>$created</td>\n";
 	echo "	</tr>\n";
 }
@@ -316,7 +326,7 @@ while ($row = mysql_fetch_array($query_result)) {
 ?>
 
 <tr>
-    <td align="center" colspan=9>
+    <td align="center" colspan=10>
     <input type="button" name="SelectAll" value="Select All"
 	onClick="selectAll(document.nodeform.elements['selected[]'])">
     &nbsp;
@@ -327,7 +337,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
 </table>
 
-<br>
+<h3>Actions</h3>
 
 <table>
 <tr>
@@ -336,12 +346,12 @@ while ($row = mysql_fetch_array($query_result)) {
 </tr>
 
 <tr>
-    <th>Set Node ID Prefix</th>
+    <th>Set Node ID Prefix (eg. 'pc')</th>
     <td><input type="text" width="10" name="newprefix"></td>
 </tr>
 
 <tr>
-    <th>Add to Node ID</th>
+    <th>Add to Node ID Suffix (integer, can be negative)</th>
     <td><input type="text" width="10" name="addnumber"></td>
 </tr>
 
@@ -356,32 +366,28 @@ while ($row = mysql_fetch_array($query_result)) {
 
 <table>
 <tr>
-    <th>0</th>
+    <th>0 -&gt;</th>
     <td><input type="text" size=2 name="remap[0]"></td>
 </tr>
 <tr>
-    <th>1</th>
+    <th>1 -&gt;</th>
     <td><input type="text" size=2 name="remap[1]"></td>
 </tr>
 <tr>
-    <th>2</th>
+    <th>2 -&gt;</th>
     <td><input type="text" size=2 name="remap[2]"></td>
 </tr>
 <tr>
-    <th>3</th>
+    <th>3 -&gt;</th>
     <td><input type="text" size=2 name="remap[3]"></td>
 </tr>
 <tr>
-    <th>4</th>
+    <th>4 -&gt;</th>
     <td><input type="text" size=2 name="remap[4]"></td>
 </tr>
-<tr>
-    <td colspan=2>
+</table>
     <input type="submit" value="Re-number interfaces of selected nodes"
 	name="renumber">
-    </td>
-</tr>
-</table>
 
 <br><br>
 
@@ -389,7 +395,7 @@ while ($row = mysql_fetch_array($query_result)) {
 <br><br>
 <input type="submit" value="Swap Node IDs and IPs for selected nodes" name="swap">
 <br><br>
-<input type="submit" value="Re-search switches for selected nodes" name="research">
+<input type="submit" value="Search switch ports for selected nodes" name="research">
 <br><br>
 <input type="submit" value="Create selected nodes" name="create">
 <br><br>
