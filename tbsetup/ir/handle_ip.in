@@ -317,11 +317,15 @@ sub get_macs {
 	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
     }
     # XXX - Not sure if this is correct
+	# XXX - ricci: still not sure if it is! The old code checked to make sure
+	# that one of the nodes was a delay node - I'm not sure why this was desirable,
+	# but it broke things
+
     if (defined($links{$_[0]})) {
   	my($src,$dst) = @{$links{$_[0]}};
-  	if (&islan($src) && defined($delays{$dst})) {
+  	if (&islan($src)) {
   	    push(@$macs,@{$vlanmap{$src}});
-  	} elsif (&islan($dst) && defined($delays{$src})) {
+  	} elsif (&islan($dst)) {
   	    push(@$macs,@{$vlanmap{$dst}});
   	}
     }
