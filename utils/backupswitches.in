@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+my $BACKUPDIR = '@prefix@/backup/switch-config';
+my $TMPFILE = "/tftpboot/switch-backup";
+my $GRAB = "@prefix@/sbin/grabswitchconfig";
+
+use lib '@prefix@/lib';
+use libdb;
+
+use strict;
+use English;
+
+sub usage() {
+    print "Usage: backupswitches <switches...>\n";
+    exit 1;
+}
+
+if ($UID && !TBAdmin($UID)) {
+    die "*** $0:\n" .
+        "    Sorry, only admins get to run this script\n";
+}
+
+if (!@ARGV) {
+    usage();
+}
+
+#
+# Get today's date, nicely formatted
+#
+my ($junk,$junk,$junk,$mday,$mon,$year,$junk,$junk,$junk) = localtime(time);
+$year += 1900;
+$mon = sprintf("%02d",$mon + 1);
+$mday = sprintf("%02d",$mday);
+my $datestr = "$year-$mon-$mday";
+
+#
+# Back up each switch in turn
+#
+foreach my $switch (@ARGV) {
+    system "$GRAB $switch $TMPFILE"
+        and die "Unable to grab config for $switch\n";
+    system "mv $TMPFILE $BACKUPDIR/$switch-$datestr\n"
+        and die "Unable to move config file to $BACKUPDIR/$switch-$datestr\n";
+}
+
+exit 0;
