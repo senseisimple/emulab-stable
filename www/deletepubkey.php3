@@ -128,6 +128,9 @@ TBMAIL("$targuid_name <$targuid_email>",
 DBQueryFatal("delete from user_pubkeys ".
 	     "where uid='$target_uid' and comment='$key'");
 
+DBQueryFatal("update users set usr_modified=now() ".
+	     "where uid='$target_uid'");
+
 #
 # mkacct updates the user pubkeys.
 # 

@@ -297,6 +297,9 @@ if (isset($usr_key)) {
 	$chunky .= "\n";
     }
 
+    DBQueryFatal("update users set usr_modified=now() ".
+		 "where uid='$target_uid'");
+
     #
     # Audit
     #
