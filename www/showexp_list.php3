@@ -488,8 +488,6 @@ if ($thumb && !$idle) {
 	$isidle = $row["swap_requests"];
 	$daysidle=0;
 	$idletime = round(TBGetExptIdleTime($pid,$eid),1);
-	$stale = TBGetExptIdleStale($pid,$eid);
-	$ignore = TBGetExptIdleIgnore($pid,$eid);
 
 	if ($isadmin) {
 	    $swappable= $row["swappable"];
@@ -510,8 +508,10 @@ if ($thumb && !$idle) {
 	    if ($lastlogin=="<td></td>\n") { $lastlogin="<td>&nbsp;</td>\n"; }
 	}
 
-	$inactive = $idletime >= $idlehours;
 	if ($idle) {
+	    $inactive = $idletime >= $idlehours;
+	    $stale = TBGetExptIdleStale($pid,$eid);
+	    $ignore = TBGetExptIdleIgnore($pid,$eid);
 	    # If it is ignored, skip it now.
 	    if ($ignore) { continue; }
 	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
@@ -520,7 +520,7 @@ if ($thumb && !$idle) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
 	    } else { $pcs=0; }
 	    $foo = "<td align=center valign=center>\n";
- 	    if ($inactive && !$stale && !$ignore && $pcs) {
+ 	    if ($inactive && !$stale && !$ignore && $pcs && $swappable) {
 		$fooswap = "<td><a ".
 		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
 		    "<img border=0 src=\"redball.gif\"></a></td>\n" ;
@@ -528,6 +528,7 @@ if ($thumb && !$idle) {
 		$label = "";
 		if ($stale) { $label .= "stale "; }
 		if ($ignore) { $label .= "ignore "; }
+		if (!$swappable) { $label .= "unswap. "; }
 		if ($label == "") { $label = "&nbsp;"; }
 		$fooswap = "<td>$label</td>";
 		if (!$pcs) { $foo .= "(no PCs)\n"; }
