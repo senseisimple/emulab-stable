@@ -21,10 +21,14 @@ my $v = 0; # Verbose
 my $help=0;
 my $allmodes=1;
 my %modes=();
+my $dot=0;
+my $vcg=0;
 
 while ($_ = shift) {
     print "arg: '$_'\n" if ($v);
     /^-h/ && do { $help=1; next; };
+    /^-dot/ && do { $dot=1; next; };
+    /^-vcg/ && do { $vcg=1; next; };
     /^-[dv]/ && do { $v++; next; };
     /^-o/ && do { $prefix=shift || $defprefix; next; };
     # if it is all lowercase, caps it, otherwise leave it alone
@@ -37,17 +41,21 @@ while ($_ = shift) {
 if ($help) {
     #Help mode
     print <<EOF;
-Usage: stategraph [-h] [-v] [-d] [-o <out>] [op_mode1] ...
+Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg] [-o <out>] [op_mode1] ...
   -h       This help message
   -v       Verbose mode. Multiple -v options cause more verbosity.
   -d       Debug mode. Alias for -v.
+  -dot     Generate output using 'dot' graph layout tool.
+  -vcg     Generate output using 'vcg' graph layout tool.
   -o <out> Prefix for output filenames.
 
 This program generates a graph of the state machines as defined in the
 state_transitions and mode_transitions tables in the database. This
 graph is generated from the current in the actual database, and is
-always current. Output is saved into images named "out-vcg.ps" and
-"out-dot.ps", where out defaults to "$defprefix".  
+always current. By default, output will be generated with the 'dot'
+tool, and will be saved into the "out.ps". If both -dot and -vcg are
+specified, Output is saved into images named "out-vcg.ps" and
+"out-dot.ps", where out defaults to "$defprefix".
 stategraph will show state machine diagrams for all operational modes
 by default, or for a subset by specifying the desired modes on the
 command line.
@@ -56,27 +64,35 @@ EOF
     die("\n");
 }
 
+my $vcgtag="-vcg";
+my $dottag="-dot";
+if (!$dot && !$vcg) { $dot=1; }
+if (!($dot && $vcg)) { $vcgtag=""; $dottag=""; }
 my $filename="/tmp/stategraph-vcg-$$";
 my $filename2="/tmp/stategraph-dot-$$";
-open(TMP,">$filename");
-open(TMPN,">$filename2");
 
-print TMP "graph: {\n  orientation: top_to_bottom\n".
-    "  title: \"Testbed State Machines Graph - ".$date."\"\n";
-print TMP "  height: 500\n  width: 1000\n";
-print TMP "  priority_phase: yes\n  straight_phase: yes\n";
-print TMP "  arrowmode: fixed\n  node. shape:ellipse\n";
-print TMP "  layoutalgorithm: maxdegree\n  port_sharing: no\n";
+if ($vcg) {
+    open(TMP,">$filename");
+    print TMP "graph: {\n  orientation: top_to_bottom\n".
+      "  title: \"Testbed State Machines Graph - ".$date."\"\n";
+    print TMP "  height: 500\n  width: 1000\n";
+    print TMP "  priority_phase: yes\n  straight_phase: yes\n";
+    print TMP "  arrowmode: fixed\n  node. shape:ellipse\n";
+    print TMP "  layoutalgorithm: maxdegree\n  port_sharing: no\n";
+    
+    # Adjust the scale here...
+    print TMP "  display_edge_labels: yes\n  scaling: 1.0\n";
+    
+    # Use one of the following to control layout... whichever works better...
+    print TMP "  crossingweight: medianbary\n  splines: yes\n";
+    #print TMP "  crossingweight: barymedian\n  splines: yes\n";
+}
 
-# Adjust the scale here...
-print TMP "  display_edge_labels: yes\n  scaling: 1.0\n";
-
-# Use one of the following to control layout... whichever works better...
-print TMP "  crossingweight: medianbary\n  splines: yes\n";
-#print TMP "  crossingweight: barymedian\n  splines: yes\n";
-
-#print TMPN "digraph G {\n  node [shape=ellipse]\n  rotate=90\n";
-print TMPN "digraph G {\n  node [shape=ellipse]\n";
+if ($dot) {
+    open(TMPN,">$filename2");
+    #print TMPN "digraph G {\n  node [shape=ellipse]\n  rotate=90\n";
+    print TMPN "digraph G {\n  node [shape=ellipse]\n";
+}
 
 my %states=();
 
@@ -93,8 +109,8 @@ while(@r=$result->fetchrow()) {
     if (!($allmodes || (defined($modes{$m}) && $modes{$m}))) { next; }
     print "mode $m is on the list\n" if ($v && !$allmodes);
     if ($m ne $lastmode) {
-	if ($lastmode ne "") { print TMPN "  }\n";}#print "Ending subgraph\n";}
-	print TMPN "  subgraph cluster_$m {\n    label = \"$m\";\n";
+	if ($lastmode ne "") { print TMPN "  }\n"if $dot; }
+	print TMPN "  subgraph cluster_$m {\n    label = \"$m\";\n" if $dot;
 	#print "Starting subgraph $m\n";
     }
     $lastmode = $m;
@@ -103,11 +119,11 @@ while(@r=$result->fetchrow()) {
     mkstates([$m,$s1],[$m,$s2]);
     $n1 = $m.$delim.$s1;
     $n2 = $m.$delim.$s2;
-    print TMPN "    $n1 -> $n2;\n";
-    print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n";
+    print TMPN "    $n1 -> $n2;\n" if $dot;
+    print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n" if $vcg;
 }
 
-print TMPN "  }\n"; # end the last subgraph
+print TMPN "  }\n" if $dot; # end the last subgraph
 my $modetrans=1;
 
 $result = DBQueryFatal($cmd2);
@@ -123,19 +139,22 @@ while(@r=$result->fetchrow()) {
     mkstates([$m1,$s1],[$m2,$s2]);
     $n1=$m1.$delim.$s1;
     $n2=$m2.$delim.$s2;
-    print TMPN "  $n1 -> $n2;\n";
-    print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n";
+    print TMPN "  $n1 -> $n2;\n" if $dot;
+    print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n" if $vcg;
 }
 
-print TMP "}\n";
-close TMP;
-print TMPN "}\n";
-close TMPN;
-
-print "Generating vcg graph...\n";
-system("/usr/X11R6/bin/xvcg -silent -color -psoutput $prefix-vcg.ps $filename");
-print "Generating dot graph...\n";
-system("/usr/local/bin/dot -Tps -o $prefix-dot.ps $filename2");
+if ($vcg) {
+    print TMP "}\n";
+    close TMP;
+    print "Generating vcg graph...\n";
+    system("/usr/X11R6/bin/xvcg -silent -color -psoutput $prefix$vcgtag.ps $filename");
+}
+if ($dot) {
+    print TMPN "}\n";
+    close TMPN;
+    print "Generating dot graph...\n";
+    system("/usr/local/bin/dot -Tps -o $prefix$dottag.ps $filename2");
+}
 print "Done.\n";
 
 #exec "/bin/rm $filename";
@@ -152,8 +171,8 @@ sub mkstates {
 		$s=$m."\\n".$s;
 	    }
 	    print "Adding node '$n'\n" if ($v);
-	    print TMP "  node: { title: \"$n\" label: \"$l\"}\n";
-	    print TMPN "    $n [label=\"$s\"];\n";
+	    print TMP "  node: { title: \"$n\" label: \"$l\"}\n" if $vcg;
+	    print TMPN "    $n [label=\"$s\"];\n" if $dot;
 	    $states{$n}=1;
 	}
     }
