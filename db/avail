@@ -85,3 +85,5 @@ my $sth = $dbh->
 
 print $sth->as_string();
 
+# Hacky. Batch daemon depends on this exit code.
+exit($sth->numrows);
