@@ -8,6 +8,7 @@
 $login_status     = CHECKLOGIN_NOTLOGGEDIN;
 $login_uid        = 0;
 $drewheader       = 0;
+$autorefresh      = 0;
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -64,7 +65,7 @@ function WRITESIDEBARDIVIDER() {
     global $BASEPATH;
     echo "<tr>";
     echo "<td class=\"menuoptdiv\">";
-    # We have to put something in this cell, or IE ignores it. But, we don't
+    # We have to put something in this cell, or IE ignores it. But, we do not
     # want to make the table row full line-height, so a space will not do.
     echo "<img src=\"$BASEPATH/1px.gif\" border=0 height=1 width=1 />";
     echo "</td>";
@@ -568,6 +569,7 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
+    global $autorefresh;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/"); 
   
@@ -580,8 +582,8 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
             <link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
 	    <link REL='stylesheet' HREF='$BASEPATH/common-style.css' TYPE='text/css' />
-    	    <!-- don't import full style sheet into NS47, since it does a bad job
-            of handling it. NS47 doesn't understand '@import'. -->
+    	    <!-- do not import full style sheet into NS47, since it does bad job
+            of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
             <!-- @import '$BASEPATH/style.css'; -->";
 
@@ -599,10 +601,13 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
 	echo "<meta NAME=\"description\" ".
                    "CONTENT=\"emulab - network emulation testbed home\">\n";
     }
-
     echo "</head>
             <body bgcolor='#FFFFFF' 
              topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
+    
+    if ($autorefresh) {
+	echo "<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"$autorefresh\">\n";
+    }
     if (! $nobanner ) {
 	echo "<map name=overlaymap>
                  <area shape=rect coords=\"100,60,369,100\"
@@ -649,10 +654,13 @@ function FINISHSIDEBAR()
 #
 function PAGEHEADER($title, $view = NULL) {
     global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
-    global $BASEPATH, $SSL_PROTOCOL, $drewheader;
+    global $BASEPATH, $SSL_PROTOCOL, $drewheader, $autorefresh;
     global $TBMAINSITE;
 
     $drewheader = 1;
+    if (isset($_GET['refreshrate']) && is_numeric($_GET['refreshrate'])) {
+	$autorefresh = $_GET['refreshrate'];
+    }
 
     #
     # Determine the proper basepath, which depends on whether the page

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -68,7 +68,21 @@ else {
     else
 	echo "Project</a>.";
 }
-echo "</b><br><br>\n";
+echo "</b><br>\n";
+
+# Refresh option
+if ($isadmin) {
+    echo "<b>Refresh every: ";
+    echo "<a class='static' ".
+	     "href='showstats.php3?showby=$showby&refreshrate=30'>30</a>, ";
+    echo "<a class='static' ".
+	     "href='showstats.php3?showby=$showby&refreshrate=60'>60</a>, ";
+    echo "<a class='static' ".
+	     "href='showstats.php3?showby=$showby&refreshrate=120'>120</a> ";
+    echo "seconds.\n";
+    echo "</b><br>\n";
+}
+echo "<br>\n";
 
 # Determine what to do.
 if ($showby == "user") {
