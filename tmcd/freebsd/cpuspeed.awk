@@ -5,6 +5,10 @@
 # All rights reserved.
 #
 
+/^CPU:.*\((25)[0-9][0-9]\.[0-9]+\-MHz/ {
+    print "2500";
+    next
+}
 /^CPU:.*\((19|20)[0-9][0-9]\.[0-9]+\-MHz/ {
     print "2000";
     next
