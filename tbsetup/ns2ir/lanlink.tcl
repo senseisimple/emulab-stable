@@ -553,10 +553,20 @@ Link instproc updatedb {DB} {
 	set wait_ [$linkqueue set wait_]
 	set setbit_ [$linkqueue set setbit_]
 	set droptail_ [$linkqueue set drop-tail_]
-	
+
+	#
+	# Note; we are going to deprecate virt_lans:member and virt_nodes:ips
+	# Instead, store vnode,vport,ip in the virt_lans table. To get list
+	# of IPs for a node, join virt_nodes with virt_lans. port number is
+	# no longer required, but we maintain it to provide a unique key that
+	# does not depend on IP address.
+	#
+	set port [lindex $nodeport 1]
+	set ip [$node ip $port]
+
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "vnode" "vport" "ip"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -569,7 +579,7 @@ Link instproc updatedb {DB} {
 	    lappend fields "rest_bandwidth"
 	}
 	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)
@@ -658,6 +668,16 @@ Lan instproc updatedb {DB} {
 	set setbit_ [$linkqueue set setbit_]
 	set droptail_ [$linkqueue set drop-tail_]
 	
+	#
+	# Note; we are going to deprecate virt_lans:member and virt_nodes:ips
+	# Instead, store vnode,vport,ip in the virt_lans table. To get list
+	# of IPs for a node, join virt_nodes with virt_lans. port number is
+	# no longer required, but we maintain it to provide a unique key that
+	# does not depend on IP address.
+	#
+	set port [lindex $nodeport 1]
+	set ip [$node ip $port]
+
 	set nodeportraw [join $nodeport ":"]
 
 	set is_accesspoint 0
@@ -665,7 +685,7 @@ Lan instproc updatedb {DB} {
 	    set is_accesspoint 1
 	}
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -678,7 +698,7 @@ Lan instproc updatedb {DB} {
 	    lappend fields "rest_bandwidth"
 	}
 	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)

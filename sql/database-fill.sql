@@ -507,6 +507,9 @@ REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','de
 REPLACE INTO table_regex VALUES ('virt_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','vport','int','redirect','default:tinyint',0,99,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','ip','text','regex','^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','delay','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','bandwidth','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','lossrate','float','redirect','default:float',0,1,NULL);

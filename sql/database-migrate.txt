@@ -1557,3 +1557,43 @@ last_net_act,last_cpu_act,last_ext_act);
         way to figure out which new node is which.
 
          alter table new_nodes add column identifier varchar(255);
+
+1.249:  Add slots to virt_lans to rationalize the relationship between
+        virt_lans and virt_nodes. The intent is to migrate away from
+        the convention we use in virt_nodes:ips and virt_lans:member
+        to a more acceptable representation (one that does not rely
+        on textual conventions like space separated lists of colon
+        seperate entities. Instead:
+
+	virt_nodes
+		vname:	nodeA
+        virt_lans
+		vname:  link0
+		vport:  0
+		ip:     1.1.1.2
+
+		vname:  link1
+		vport:  1
+		ip:     1.1.2.2
+
+	alter table virt_lans add vnode varchar(32) NOT NULL default '' \
+		after vname;
+	alter table virt_lans add vport tinyint(3) NOT NULL default '0' \
+		after vnode;
+        alter table virt_lans add ip varchar(15) NOT NULL default '' \
+		after vport;
+
+	Then run this script to update these new fields from the
+	existing ips,member slots. This must be run after installing
+	the parser changes, or you can just run it again. 
+
+		./ipmember.pl
+
+        This is a transitional phase; the old slots will be left in place
+        until they are no longer used, at which time we will also add a
+        unique key to the table (pid,eid,vname,vnode,vport). assign_wrapper
+        will be the hardest to change, but other scripts should be easy. 
+
+	Whats vport about? Rather then rely on IP addresses to form a
+	unique key, we use vport (a small integer) so that we can delay the
+	IP assignment until later (after initial DB insertion).
