@@ -507,6 +507,13 @@ public class WorkArea {
 		    0 != s.compareTo("")) {
 		    r += "tb-set-hardware $" + n + " " + s + "\n";
 		}
+		// Hack! This should be done in the ns parser.
+		// Should match on "ixp*".
+		if (0 == s.compareTo("ixp-bv")) {
+		    r += "# Create a host for the ixp and associate them.\n";
+		    r += "set " + n + "host" + " [$ns node]\n";
+		    r += "tb-bind-parent $" + n + " $" + n + "host\n";
+		}
 	    }
 	}	
 
