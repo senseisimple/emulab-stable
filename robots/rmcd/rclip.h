@@ -19,6 +19,8 @@ enum {
     RCF_BOTTOM = (1L << RCB_BOTTOM),
     RCF_RIGHT = (1L << RCB_RIGHT),
     RCF_LEFT = (1L << RCB_LEFT),
+
+    RCF_ALL = (RCF_TOP|RCF_BOTTOM|RCF_LEFT|RCF_RIGHT)
 };
 
 typedef unsigned long rc_code_t;

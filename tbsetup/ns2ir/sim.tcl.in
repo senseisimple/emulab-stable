@@ -1177,7 +1177,8 @@ Simulator instproc make_event {outer event} {
 		    ::GLOBALS::named-args [lrange $evargs 3 end] {
 			-orientation 0
 		    }
-		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$(-orientation)"
+		    set o [expr $(-orientation) * 3.14159 / 180.0]
+		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$o"
 		}
 		unknown {
 		    punsup "$obj $cmd $evargs"

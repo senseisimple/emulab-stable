@@ -243,6 +243,13 @@ typedef enum {
     EA_When,
 } ea_tag_t;
 
+event_notification_t event_notification_create_v(event_handle_t handle,
+						 struct timeval **when_out,
+						 ea_tag_t tag,
+						 va_list args);
+event_notification_t event_notification_create(event_handle_t handle,
+					       ea_tag_t tag,
+					       ...);
 int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args);
 int event_do(event_handle_t handle, ea_tag_t tag, ...);
 

@@ -12,12 +12,12 @@ use File::Basename;
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
 # 
 sub usage {
-    print STDERR "Usage: floormap [-t] [-T] [-g] [-o <prefix>] ";
+    print STDERR "Usage: floormap [-tvnx] [-T] [-g] [-o <prefix>] ";
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-f <floor>] [<building>]";
     print STDERR "\nor\n";
-    print STDERR "Usage: floormap [-t] [-T] [-g] [-o <prefix>] ";
+    print STDERR "Usage: floormap [-tvnx] [-T] [-g] [-o <prefix>] ";
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
@@ -35,13 +35,18 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTakgz";
+my $optlist  = "df:o:s:c:S:C:O:e:tTakgzvnx";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
 my $cleanup  = 0;
 my $nozoom   = 0;
 my $ghost    = 0;	#  Overlay ghost nodes from all floors onto each map.
+
+# Display options
+my $show_vnames    = 0;
+my $show_cameras   = 0;
+my $show_exclusion = 0;
 
 my $building;
 my $floor;
@@ -119,6 +124,8 @@ use libdb;
 use Image::Magick;
 my $images = new Image::Magick;
 my $img_n  = -1;
+
+my $excl = Image::Magick->new;
 
 # Admin people get extra info
 $mereuser = 0
@@ -274,6 +281,18 @@ if (defined($options{"o"})) {
 	exit(0);
     }
 }
+if (defined($options{"v"})) {
+    $show_cameras = 1;
+}
+if (defined($options{"n"})) {
+    $show_vnames = 1;
+}
+if (defined($options{"x"})) {
+    $show_exclusion = 1;
+
+    my $err = $excl->Read("$TB/www/floormap/exclusion.png");
+    warn "$err" if "$err";
+}
 
 if (defined($options{"e"})) {
     if ($options{"e"} =~ /([-\w]*),([-\w]*)/) {
@@ -314,7 +333,8 @@ elsif (@ARGV == 1) {
 my $path_col = ($scale_arg == 0 ? "thumb_path" : "image_path");
 my $db_scale = max($scale_arg, 1);
 my $query_result =
-    DBQueryFatal("select b.building,b.title,f.floor,f.$path_col ".
+    DBQueryFatal("select b.building,b.title,f.floor,f.$path_col,".
+		 "f.pixels_per_meter ".
 		 "   from buildings as b ".
 		 "left join floorimages as f on f.building=b.building ".
 		 "where f.scale=$db_scale");
@@ -324,11 +344,13 @@ if (!$query_result->numrows) {
 	"    There is no building/floor data in the DB!\n");
 }
 
-while (my ($building,$title,$floor,$image) = $query_result->fetchrow_array()) {
+while (my ($building,$title,$floor,$image,$ppm) = 
+       $query_result->fetchrow_array()) {
     ##dprint "building $building, floor $floor, image $image\n";
     if (!exists($baseimages{$building})) {
 	$baseimages{$building} = {};
 	$baseimages{$building}->{"title"}  = $title;
+	$baseimages{$building}->{"ppm"}  = $ppm;
 	$baseimages{$building}->{"floors"} = {};
     }
 
@@ -558,6 +580,68 @@ sub dofloor($$)
 			    x=>$x_offset, y=>$y_offset);
     warn "$err" if "$err";
 
+    if ($show_cameras) {
+	my $camera_query = "select * from cameras where building='$building'";
+	my $camera_result = DBQueryFatal($camera_query . 
+					 " and floor='$floor'");
+	
+	while (my %crow = $camera_result->fetchhash()) {
+	    my $xmin    = $crow{"loc_x"} * $baseimages{$building}->{"ppm"};
+	    my $ymin    = $crow{"loc_y"} * $baseimages{$building}->{"ppm"};
+	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * 
+		$baseimages{$building}->{"ppm"};
+	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) *
+		$baseimages{$building}->{"ppm"};
+	    
+	    $err = $baseimage->Draw(stroke=>'orange',
+				    strokewidth=>'1.5',
+				    primitive=>'rectangle',
+				    points=>"$xmin,$ymin $xmax,$ymax");
+	    warn "$err" if "$err";
+	}
+
+    }
+    
+    #
+    # Stick in obstacles, if any.
+    #
+    my $obstacles_result =
+	DBQueryFatal("select * from obstacles ".
+		     "where floor='$floor' and building='$building'");
+
+    while (my %obrow = $obstacles_result->fetchhash()) {
+	my $id       = $obrow{"obstacle_id"};
+	my $x1       = $obrow{"x1"};
+	my $x2       = $obrow{"x2"};
+	my $y1       = $obrow{"y1"};
+	my $y2       = $obrow{"y2"};
+	my $descr    = $obrow{"description"};
+	my $props  = {};
+
+	$props->{"X1"}    = $x1;
+	$props->{"Y1"}    = $y1;
+	$props->{"X2"}    = $x2;
+	$props->{"Y2"}    = $y2;
+	$props->{"DESCR"} = $descr;
+	$props->{"ISOBS"} = 1;
+	$areamap->{"$id"} = $props;
+
+	if ($show_exclusion) {
+	    my $obstacle_buffer = 25; # XXX
+	    my $xmin = $x1 - $obstacle_buffer;
+	    my $ymin = $y1 - $obstacle_buffer;
+	    my $xmax = $x2 + $obstacle_buffer;
+	    my $ymax = $y2 + $obstacle_buffer;
+
+	    $err = $baseimage->Draw(primitive=>'rectangle',
+				    points=>"$xmin,$ymin $xmax,$ymax",
+				    stroke=>'steelblue',
+				    strokewidth=>'1.5',
+				    fill=>"#000000dd");
+	    warn "$err" if "$err";
+	}
+    }
+
     # Draw the selected node locations and labels. 
     # Green dot means node is free or owned by pid/eid.
     # Red dot mean node is down.
@@ -604,7 +688,9 @@ sub dofloor($$)
 		# With -e option, green means node belongs to experiment. 
 		$color = 'limegreen';
 		if (defined($vname)) {
-		    $props->{'VNAME'} = $vname;
+		    $props->{'PNAME'} = $nodeid;
+		    $label = $vname 
+			if ($show_vnames);
 		}
 		if (defined($rowref->{"battery_voltage"})) {
 		    $props->{'BATVOLTS'} = $rowref->{"battery_voltage"};
@@ -680,12 +766,15 @@ sub dofloor($$)
 		    # Shift the label above of the orientation line would go
 		    # through it.
 		    $dly = $dy - ($DOT_RAD + 2)
-			if ($do > 90.0 && $do < 270.0);
+			if (($do < 0.0 && $do > -180.0) || 
+			    ($do > 180.0 && $do < 360.0));
 		}
-		$err = $baseimage->Annotate(fill=>'black',
-					    x=>$dlx, y=>$dly,
-					    text=>"$label");
-		warn "$err" if "$err";
+		if (abs($x - $dx) > 20 || abs($y - $dy) > 20) {
+		    $err = $baseimage->Annotate(fill=>'black',
+						x=>$dlx, y=>$dly,
+						text=>"$label");
+		    warn "$err" if "$err";
+		}
 
 		#
 		# And, draw a light grey line from source to destination
@@ -704,7 +793,8 @@ sub dofloor($$)
 	    # Shift the label above of the orientation line would go
 	    # through it.
 	    $ly = $y - ($DOT_RAD + 2)
-		if (defined($o) && $o > 90.0 && $o < 270.0);
+		if (defined($o) && (($o < 0.0 && $o > -180.0) || 
+				    ($o > 180.0 && $o < 360.0)));
 	    
             $err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
 					text=>"$label");
@@ -767,31 +857,6 @@ sub dofloor($$)
 	adjustmap($areamap, 0, $head_height);
     }
 
-    #
-    # Stick in obstacles, if any.
-    #
-    my $obstacles_result =
-	DBQueryFatal("select * from obstacles ".
-		     "where floor='$floor' and building='$building'");
-
-    while (my %obrow = $obstacles_result->fetchhash()) {
-	my $id       = $obrow{"obstacle_id"};
-	my $x1       = $obrow{"x1"};
-	my $x2       = $obrow{"x2"};
-	my $y1       = $obrow{"y1"};
-	my $y2       = $obrow{"y2"};
-	my $descr    = $obrow{"description"};
-	my $props  = {};
-
-	$props->{"X1"}    = $x1;
-	$props->{"Y1"}    = $y1;
-	$props->{"X2"}    = $x2;
-	$props->{"Y2"}    = $y2;
-	$props->{"DESCR"} = $descr;
-	$props->{"ISOBS"} = 1;
-	$areamap->{"$id"} = $props;
-    }
-    
     return ($baseimage, $areamap);
 }
 
@@ -979,8 +1044,8 @@ sub ComputeOrientationLine($$$$$$)
 {
     my ($x1, $y1, $distance, $angle, $px2, $py2) = @_;
 
-    my $x2 = $x1 + $distance * cos(($angle - 90) * 3.1415926536 / 180.0);
-    my $y2 = $y1 + $distance * sin(($angle - 90) * 3.1415926536 / 180.0);
+    my $x2 = $x1 + $distance * cos(-$angle * 3.1415926536 / 180.0);
+    my $y2 = $y1 + $distance * sin(-$angle * 3.1415926536 / 180.0);
 
     $$px2 = $x2;
     $$py2 = $y2;

@@ -9,6 +9,8 @@
 
 #include "visionTrack.h"
 
+extern int debug;
+
 /**
  * Find the track in a list that is the minimum distance from a given track.
  *
@@ -218,13 +220,13 @@ void vtCoalesce(struct lnMinList *extra,
 					  vtNextCamera(vt),
 					  &distance)) != NULL) &&
 		   (distance < 0.35)) {
-#if 0
-		printf("coalesce %.2f %.2f %.2f %d --  %.2f %.2f %.2f %d\n",
-		       vt->vt_position.x, vt->vt_position.y,
-		       vt->vt_position.theta, vt->vt_client->vc_port,
-		       vt_extra->vt_position.x, vt_extra->vt_position.y,
-		       vt->vt_position.theta, vt_extra->vt_client->vc_port);
-#endif
+		if (debug > 1) {
+		    info("coalesce %.2f %.2f %.2f %d -- %.2f %.2f %.2f %d\n",
+			 vt->vt_position.x, vt->vt_position.y,
+			 vt->vt_position.theta, vt->vt_client->vc_port,
+			 vt_extra->vt_position.x, vt_extra->vt_position.y,
+			 vt->vt_position.theta, vt_extra->vt_client->vc_port);
+		}
 
 		//midpoint = (vt->vt_client->vc_right + 
 		//    vt_extra->vt_client->vc_left) / 2.0f;
@@ -355,35 +357,39 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 	struct vision_track *vt_start;
 	float distance;
 
-	printf("check %f %f %f\n",
-	       vt->vt_position.x,
-	       vt->vt_position.y,
-	       vt->vt_position.theta);
+	info("check %f %f %f\n",
+	     vt->vt_position.x,
+	     vt->vt_position.y,
+	     vt->vt_position.theta);
 	if ((vt_start = vtFindMin(vt,
 				  (struct vision_track *)start->lh_Head,
 				  &distance)) == NULL) {
 	}
-	else if (((vt->vt_client == vt_start->vt_client) && (distance < 0.05)) ||
-		 ((vt->vt_client != vt_start->vt_client) && (distance < 0.22))) {
+	else if (((vt->vt_client == vt_start->vt_client) &&
+		  (distance < 0.05)) ||
+		 ((vt->vt_client != vt_start->vt_client) &&
+		  (distance < 0.22))) {
 	    float diff;
 
 	    diff = mtp_theta(mtp_theta(vt_start->vt_position.theta) -
 			     mtp_theta(vt->vt_position.theta));
-	    printf("diff = %f  %f - %f\n",
-		   diff,
-		   mtp_theta(vt_start->vt_position.theta),
-		   mtp_theta(vt->vt_position.theta));
-	    printf("diff2 = %f  %f - %f\n",
-		   mtp_theta(vt_start->vt_position.theta) -
-		   mtp_theta(vt->vt_position.theta),
-		   vt_start->vt_position.theta,
-		   vt->vt_position.theta);
+	    info("hit for %.2f %.2f %.2f -- %.2f %.2f %.2f = %.2f\n"
+		 "  %f -- %f\n",
+		 vt->vt_position.x,
+		 vt->vt_position.y,
+		 vt->vt_position.theta,
+		 vt_start->vt_position.x,
+		 vt_start->vt_position.y,
+		 vt_start->vt_position.theta,
+		 diff,
+		 vt->vt_position.timestamp,
+		 vt_start->vt_position.timestamp);
 	    if (diff > (M_PI - M_PI_4) || (diff < (-M_PI + M_PI_4))) {
 		retval = vt;
-		printf(" found it %p\n", retval);
+		info(" found it %p\n", retval);
 	    }
 	}
-	printf("dist %p %f\n", vt_start, distance);
+	info("dist %p %f\n", vt_start, distance);
 	
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
     }

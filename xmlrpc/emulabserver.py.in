@@ -360,43 +360,17 @@ class emulab:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed 'area'!")
 
-        table = {
-            "MEB-ROBOTS" : [ { "name" : "camera0",
-                               "host" : "junk.flux.utah.edu",
-                               "port" : 6100,
-                               "x" : 0.25,
-                               "y" : 1.80,
-                               "width" : 1.45,
-                               "height" : 2.20 },
-                             { "name" : "camera1",
-                               "host" : "junk.flux.utah.edu",
-                               "port" : 6101,
-                               "x" : 1.7,
-                               "y" : 1.5,
-                               "width" : 1.45,
-                               "height" : 1.6 },
-                             { "name" : "camera2",
-                               "host" : "junk.flux.utah.edu",
-                               "port" : 6102,
-                               "x" : 3.1,
-                               "y" : 1.5,
-                               "width" : 1.45,
-                               "height" : 1.6 },
-                             { "name" : "camera3",
-                               "host" : "junk.flux.utah.edu",
-                               "port" : 6103,
-                               "x" : 4.50,
-                               "y" : 1.5,
-                               "width" : 1.4,
-                               "height" : 1.6 } ]
-            }
+        result = DBQuery("select * from cameras where building=%s",
+                        (argdict["area"],),
+                        asDict=True)
         
-        if not table.has_key(argdict["area"]):
+        if len(result) == 0:
             return EmulabResponse(RESPONSE_ERROR,
                                   output="Unknown area " + argdict["area"])
 
-        result = table[argdict["area"]]
-        
+        result = [scrubdict(x, defaultvals={ "loc_x" : 0.0, "loc_y" : 0.0 })
+                  for x in result]
+
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
@@ -3817,10 +3791,15 @@ def nfspath(value):
 # @param prunelist A list of keys to prune from the dictionary.
 # @return retval
 #
-def scrubdict(retval, prunelist=[]):
+def scrubdict(retval, prunelist=[], defaultvals={}):
     for key in retval.keys():
         if not retval[key] or key in prunelist:
-            del retval[key]
+            if key in defaultvals:
+                retval[key] = defaultvals[key]
+                pass
+            else:
+                del retval[key]
+                pass
             pass
         elif isinstance(retval[key], datetime.datetime):
             retval[key] = xmlrpclib.DateTime(

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -48,7 +48,7 @@ flush();
 # Silly, I can't get php to get the buffering behavior I want with a socket, so
 # we'll open a pipe to a perl process
 #
-$socket = popen("$TBSUEXEC_PATH $uid nobody spewleds $node","r");
+$socket = fsockopen("$node", 1812);
 if (!$socket) {
     USERERROR("Error opening $node - $errstr",1);
 }
@@ -63,22 +63,21 @@ function SPEWCLEANUP()
     if (!$socket || !connection_aborted()) {
 	exit();
     }
-    pclose($socket);
+    fclose($socket);
     exit();
 }
-ignore_user_abort(1);
+# ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
 
 #
 # Just loop forver reading from the socket
 #
-while(!feof($socket)) {
-
+do {
     # Bad rob! No biscuit!
     $onoff = fread($socket,6);
     echo "$onoff";
     flush();
-}
+} while ($onoff != "");
 fclose($socket);
 
 ?>

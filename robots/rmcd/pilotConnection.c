@@ -200,8 +200,8 @@ void pc_dump_info(void)
 	     pc->pc_flags,
 	     state_strings[pc->pc_state],
 	     pc->pc_tries_remaining,
-	     pc->pc_last_pos.x, pc->pc_last_pos.y, pc->pc_last_pos.theta,
 	     pc->pc_actual_pos.x, pc->pc_actual_pos.y, pc->pc_actual_pos.theta,
+	     pc->pc_last_pos.x, pc->pc_last_pos.y, pc->pc_last_pos.theta,
 	     pc->pc_waypoint.x, pc->pc_waypoint.y, pc->pc_waypoint.theta,
 	     (pc->pc_flags & PCF_WAYPOINT) ? "(active)" : "(inactive)",
 	     pc->pc_goal_pos.x, pc->pc_goal_pos.y, pc->pc_goal_pos.theta);
@@ -240,7 +240,22 @@ struct pilot_connection *pc_find_pilot(int robot_id)
 
 void pc_plot_waypoint(struct pilot_connection *pc)
 {
+    struct obstacle_config *oc;
+    struct rc_line rl;
+    
     assert(pc != NULL);
+
+    rl.x0 = pc->pc_actual_pos.x;
+    rl.y0 = pc->pc_actual_pos.y;
+    rl.x1 = pc->pc_goal_pos.x;
+    rl.y1 = pc->pc_goal_pos.y;
+    if ((pc->pc_obstacle_count == 0) &&
+	(oc = ob_find_obstacle(pc_data.pcd_config, &rl)) != NULL) {
+	info("debug: preloaded obstacle\n");
+	
+	pc->pc_obstacles[pc->pc_obstacle_count] = *oc;
+	pc->pc_obstacle_count += 1;
+    }
 
 #if 0
     if ((pc->pc_flags & PCF_WAYPOINT) &&
@@ -274,7 +289,6 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	pc->pc_flags &= ~PCF_WAYPOINT;
 	for (lpc = 0; lpc < pc->pc_obstacle_count; lpc++) {
 	    struct obstacle_config *oc = &pc->pc_obstacles[lpc];
-	    struct rc_line rl;
 	    
 	    rl.x0 = pc->pc_actual_pos.x;
 	    rl.y0 = pc->pc_actual_pos.y;
@@ -338,7 +352,6 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		float bearing;
 		rc_code_t rc;
 		int in_vision = 0;
-		int flipped_bearing = 0;
 		int compass;
 
 		printf("clip %f %f %f %f\n",
@@ -387,6 +400,10 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		    pc->pc_waypoint_tries = 0;
 		    continue;
 		}
+
+		info("debug: clip %.2f %.2f -- %.2f %.2f == %.2f\n",
+		     rl.x0, rl.y0, rl.x1, rl.y1,
+		     hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1));
 		
 		pc->pc_flags |= PCF_WAYPOINT;
 		pc->pc_waypoint_tries += 1;
@@ -419,82 +436,132 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		 * control if we've tried stalling.
 		 */
 		while (!in_vision) {
-		    int new_rc = 0;
+		    int new_rc = 0, alt_rc = 0;
 		    
 		    switch (rc) {
 		    case RCF_TOP|RCF_LEFT:
-			if (compass & MCF_EAST)
+			if (compass & MCF_EAST) {
 			    new_rc = RCF_TOP|RCF_RIGHT;
-			else if (compass & MCF_SOUTH)
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else if (compass & MCF_SOUTH) {
 			    new_rc = RCF_BOTTOM|RCF_LEFT;
-			else
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_BOTTOM|RCF_LEFT:
-			if (compass & MCF_EAST)
+			if (compass & MCF_EAST) {
 			    new_rc = RCF_BOTTOM|RCF_RIGHT;
-			else if (compass & MCF_NORTH)
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else if (compass & MCF_NORTH) {
 			    new_rc = RCF_TOP|RCF_LEFT;
-			else
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_BOTTOM|RCF_RIGHT:
-			if (compass == (MCF_NORTH|MCF_WEST))
+			if (compass == (MCF_NORTH|MCF_WEST)) {
 			    new_rc = RCF_BOTTOM|RCF_LEFT;
-			else if (compass & MCF_NORTH)
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else if (compass & MCF_NORTH) {
 			    new_rc = RCF_TOP|RCF_RIGHT;
-			else if (compass & MCF_WEST)
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else if (compass & MCF_WEST) {
 			    new_rc = RCF_BOTTOM|RCF_LEFT;
-			else
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_TOP|RCF_RIGHT:
-			if (compass & MCF_SOUTH)
+			if (compass & MCF_SOUTH) {
 			    new_rc = RCF_BOTTOM|RCF_RIGHT;
-			else if (compass & MCF_WEST)
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else if (compass & MCF_WEST) {
 			    new_rc = RCF_TOP|RCF_LEFT;
-			else
+			    alt_rc = ~new_rc & RCF_ALL;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_LEFT:
-			if (compass & MCF_EAST)
+			if (compass & MCF_EAST) {
 			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
-			else if (compass & MCF_NORTH)
+			    alt_rc = new_rc ^ (RCF_TOP|RCF_BOTTOM);
+			}
+			else if (compass & MCF_NORTH) {
 			    new_rc = RCF_TOP|RCF_LEFT;
-			else if (compass & MCF_SOUTH)
+			    alt_rc = RCF_BOTTOM|RCF_LEFT;
+			}
+			else if (compass & MCF_SOUTH) {
 			    new_rc = RCF_BOTTOM|RCF_LEFT;
-			else
+			    alt_rc = RCF_TOP|RCF_LEFT;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_TOP:
-			if (compass & MCF_SOUTH)
+			if (compass & MCF_SOUTH) {
 			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
-			else if (compass & MCF_EAST)
+			    alt_rc = new_rc ^ (RCF_LEFT|RCF_RIGHT);
+			}
+			else if (compass & MCF_EAST) {
 			    new_rc = RCF_TOP|RCF_RIGHT;
-			else if (compass & MCF_WEST)
+			    alt_rc = RCF_TOP|RCF_LEFT;
+			}
+			else if (compass & MCF_WEST) {
 			    new_rc = RCF_TOP|RCF_LEFT;
-			else
+			    alt_rc = RCF_TOP|RCF_RIGHT;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_RIGHT:
-			if (compass & MCF_WEST)
+			if (compass & MCF_WEST) {
 			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
-			else if (compass & MCF_NORTH)
+			    alt_rc = new_rc ^ (RCF_TOP|RCF_BOTTOM);
+			}
+			else if (compass & MCF_NORTH) {
 			    new_rc = RCF_TOP|RCF_RIGHT;
-			else if (compass & MCF_SOUTH)
+			    alt_rc = RCF_BOTTOM|RCF_LEFT;
+			}
+			else if (compass & MCF_SOUTH) {
 			    new_rc = RCF_BOTTOM|RCF_RIGHT;
-			else
+			    alt_rc = RCF_TOP|RCF_LEFT;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 		    case RCF_BOTTOM:
-			if (compass & MCF_NORTH)
+			if (compass & MCF_NORTH) {
 			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
-			else if (compass & MCF_EAST)
+			    alt_rc = new_rc ^ (RCF_LEFT|RCF_RIGHT);
+			}
+			else if (compass & MCF_EAST) {
 			    new_rc = RCF_BOTTOM|RCF_RIGHT;
-			else if (compass & MCF_WEST)
+			    alt_rc = RCF_BOTTOM|RCF_LEFT;
+			}
+			else if (compass & MCF_WEST) {
 			    new_rc = RCF_BOTTOM|RCF_LEFT;
-			else
+			    alt_rc = RCF_BOTTOM|RCF_RIGHT;
+			}
+			else {
 			    assert(0);
+			}
 			break;
 
 		    default:
@@ -518,15 +585,19 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 			info("waypoint in vision\n");
 		    }
 		    else {
+			new_rc = alt_rc;
+			info("debug: alt=%s\n",
+			     RC_CODE_STRING(new_rc));
+			rc_corner(new_rc, &pc->pc_waypoint, oc);
 			
-			if (!flipped_bearing) {
-			    flipped_bearing = 1;
-			    /* flip it */
-			    /* bearing = -bearing; */
-			    bearing = mtp_theta(-bearing - M_PI);
-			    compass = mtp_compass(bearing);
-			    info("flipped bearing in waypoint gen %f\n",
-				 bearing);
+			info(" flipped waypoint %f %f\n",
+			     pc->pc_waypoint.x,
+			     pc->pc_waypoint.y);
+			
+			if (pc_point_in_bounds(pc->pc_waypoint.x,
+					       pc->pc_waypoint.y)) {
+			    in_vision = 1;
+			    info("flipped waypoint in vision\n");
 			}
 			else {
 			    /* try moving backwards, and away from vision */
@@ -563,10 +634,14 @@ void pc_plot_waypoint(struct pilot_connection *pc)
     }
 
     /* XXX: not sure about the added condition... */
-    if (!(pc->pc_flags & PCF_WAYPOINT) && pc->pc_waypoint_tries <= 20) {
+    if (pc->pc_waypoint_tries <= 20) {
 	float distance, theta;
 
-	mtp_polar(&pc->pc_actual_pos, &pc->pc_goal_pos, &distance, &theta);
+	mtp_polar(&pc->pc_actual_pos,
+		  (pc->pc_flags & PCF_WAYPOINT) ?
+		  &pc->pc_waypoint : &pc->pc_goal_pos,
+		  &distance,
+		  &theta);
 	if (distance > 1.5) {
 	    pc->pc_flags |= PCF_WAYPOINT;
 	    mtp_cartesian(&pc->pc_actual_pos, 1.5, theta, &pc->pc_waypoint);
@@ -602,9 +677,16 @@ void pc_set_goal(struct pilot_connection *pc, struct robot_position *rp)
 	mtp_free_packet(&rmp);
     }
     else {
+	info("new goal for %s in %s\n", pc->pc_robot->hostname,
+	     state_strings[pc->pc_state]);
+	
+	pc->pc_flags &= ~PCF_WAYPOINT;
+	pc->pc_waypoint_tries = 0;
 	pc->pc_goal_pos = *rp;
-	if (pc->pc_state != PS_START_WIGGLING && pc->pc_state != PS_WIGGLING)
+	if (pc->pc_state != PS_START_WIGGLING &&
+	    pc->pc_state != PS_WIGGLING) {
 	    pc_change_state(pc, PS_PENDING_POSITION);
+	}
     }
 }
 
@@ -663,6 +745,8 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 
     switch (ps) {
     case PS_REFINING_POSITION:
+	pc->pc_flags &= ~PCF_IN_PROGRESS;
+	
 	if (pc->pc_state != ps) {
 	    pc->pc_tries_remaining = MAX_REFINE_RETRIES;
 	}
@@ -767,6 +851,10 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 
     case PS_PENDING_POSITION:
     case PS_START_WIGGLING:
+	if ((ps == PS_PENDING_POSITION) &&
+	    (pc->pc_state != PS_ARRIVED) && (pc->pc_state != PS_WIGGLING)) {
+	    pc->pc_flags |= PCF_IN_PROGRESS;
+	}
 	mtp_init_packet(&pmp,
 			MA_Opcode, MTP_COMMAND_STOP,
 			MA_Role, MTP_ROLE_RMC,
@@ -777,7 +865,7 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	break;
 	
     case PS_WIGGLING:
-	if (pc->pc_flags & PCF_WIGGLE_REVERSE) {
+	if (pc->pc_flags & PCF_CONTACT) {
 	    mtp_init_packet(&mp,
 			    MA_Opcode, MTP_WIGGLE_STATUS,
 			    MA_Role, MTP_ROLE_RMC,
@@ -786,7 +874,8 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 			    MA_TAG_DONE);
 	    send_mp = 1;
 
-	    pc->pc_flags &= ~(PCF_CONTACT|PCF_WIGGLE_REVERSE);
+	    pc->pc_flags &= ~PCF_CONTACT;
+	    pc->pc_flags |= PCF_WIGGLE_REVERSE;
 	    ps = PS_ARRIVED;
 	}
 	else {
@@ -795,15 +884,12 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 			    MA_Role, MTP_ROLE_RMC,
 			    MA_RobotID, pc->pc_robot->id,
 			    MA_CommandID, 2,
-			    MA_Theta, (pc->pc_flags & PCF_CONTACT ?
+			    MA_Theta, (pc->pc_flags & PCF_WIGGLE_REVERSE ?
 				       -M_PI : M_PI),
 			    MA_TAG_DONE);
 	    send_pmp = 1;
 
-	    if (pc->pc_flags & PCF_CONTACT) {
-		pc->pc_flags &= ~PCF_CONTACT;
-		pc->pc_flags |= PCF_WIGGLE_REVERSE;
-	    }
+	    pc->pc_flags &= ~PCF_WIGGLE_REVERSE;
 	}
 	break;
 
@@ -896,16 +982,22 @@ static void pc_handle_update(struct pilot_connection *pc,
     switch (mup->status) {
     case MTP_POSITION_STATUS_IDLE:
 	/* Response to a COMMAND_STOP. */
-	if (mup->command_id == 1 && pc->pc_state == PS_PENDING_POSITION)
+	pc->pc_flags &= ~PCF_VISION_POSITION;
+	if (mup->command_id == 1 &&
+	    !(pc->pc_flags & PCF_IN_PROGRESS) &&
+	    pc->pc_state == PS_PENDING_POSITION) {
 	    pc_change_state(pc, PS_REFINING_POSITION);
+	}
 	break;
     case MTP_POSITION_STATUS_ERROR:
 	/* XXX */
 	{
 	    struct mtp_packet ump;
-		
+	    
+	    pc->pc_flags &= ~PCF_VISION_POSITION;
+	    
 	    info("error for %d\n", pc->pc_robot->id);
-		
+	    
 	    mtp_init_packet(&ump,
 			    MA_Opcode, MTP_UPDATE_POSITION,
 			    MA_Role, MTP_ROLE_RMC,
@@ -939,6 +1031,12 @@ static void pc_handle_update(struct pilot_connection *pc,
 
     case MTP_POSITION_STATUS_ABORTED:
 	pc->pc_flags &= ~PCF_VISION_POSITION;
+	if (pc->pc_state == PS_REFINING_ORIENTATION)
+	    pc_change_state(pc, PS_REFINING_POSITION);
+	else if (pc->pc_state == PS_PENDING_POSITION)
+	    pc_change_state(pc, PS_REFINING_POSITION);
+	else
+	    pc_change_state(pc, pc->pc_state);
 	break;
 
     case MTP_POSITION_STATUS_CONTACT:
@@ -970,6 +1068,7 @@ static void pc_handle_update(struct pilot_connection *pc,
 	    break;
 	    
 	case PS_ARRIVED:
+	case PS_START_WIGGLING:
 	    break;
 	    
 	default:

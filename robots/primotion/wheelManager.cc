@@ -174,7 +174,7 @@ wheelManager::~wheelManager()
 acpObject *wheelManager::createPivot(float angle, wmCallback *callback)
 {
     acpObject *retval = NULL;
-
+    
     assert(this->invariant());
 
     /* First, reduce to a single rotation, */
@@ -239,8 +239,9 @@ acpObject *wheelManager::createMove(float distance, wmCallback *callback)
 
 void wheelManager::setDestination(float x, float y, wmCallback *callback)
 {
+    struct mtp_garcia_telemetry *mgt;
+    float diff, angle, distance;
     acpObject *move, *pivot;
-    float angle, distance;
     
     angle = atan2f(y, x);
     distance = hypot(x, y);
@@ -257,6 +258,24 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	distance = -distance;
     }
     
+    mgt = this->wm_dashboard->getTelemetry();
+    diff = fabsf(mgt->rear_ranger_left - mgt->rear_ranger_right);
+    if (diff > 0.08f) {
+	if ((mgt->rear_ranger_right == 0.0f) ||
+	    (mgt->rear_ranger_left < mgt->rear_ranger_right)) {
+	    if (angle < 0.0f) {
+		angle += M_PI;
+		distance = -distance;
+	    }
+	}
+	else {
+	    if (angle > 0.0f) {
+		angle -= M_PI;
+		distance = -distance;
+	    }
+	}
+    }
+
     if ((move = this->createMove(distance, callback)) == NULL) {
 	/* Skipping everything. */
 	if (callback != NULL) {

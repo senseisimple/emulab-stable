@@ -205,7 +205,14 @@ robots.
 
 <?php NLCBODYEND() ?>
 
-<?php NLCEMPTY() ?>
+<?php NLCFIGBEGIN() ?>
+
+<font size="-2">Sample Movie</font>
+<img src="robot_anim.gif" border="1" alt="Robot Movie">
+<a href="robot_divx.avi"><font size="-2">[DiVX (1.2M)]</font></a><br>
+<a href="robot.mpg"><font size="-2">[MPG (5.3M)]</font></a>
+
+<?php NLCFIGEND() ?>
 
 </tr>
 
@@ -304,11 +311,11 @@ href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
 <?php NLCLINKFIG("robotmap-ss.gif", 
 		 "<img src=\"robotmap-ss-thumb.gif\" border=1
 		 alt=\"Robot Map Screenshot\">",
-		 "Robot Map Screenshot") ?>
+		 "Sample Robot Map Screenshot") ?>
 <?php NLCLINKFIG("webcam-ss.gif", 
 		 "<img src=\"webcam-ss-thumb.gif\" border=1
 		 alt=\"Webcam Screenshot\">",
-		 "Webcam Screenshot") ?>
+		 "Sample Webcam Screenshot") ?>
 </tr>
 </table>
 

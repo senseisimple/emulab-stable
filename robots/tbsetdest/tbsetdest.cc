@@ -103,6 +103,7 @@ void		show_diffs(void);
 void		show_routes(void);
 void		show_counters(void);
 
+const double OBSTACLE_BUFFER = 0.25;
 
 /* ======================================================================
    Global Variables
@@ -142,7 +143,9 @@ u_int32_t	*D2 = 0;
 
 ulxr::SSLConnection *xmlrpc_conn;
 ulxr::Protocol *xmlrpc_proto;
+emulab::EmulabResponse cameras_er, obstacles_er;
 ulxr::Array cameras;
+ulxr::Array obstacles;
 
 /* ======================================================================
    Random Number Generation
@@ -346,20 +349,27 @@ main(int argc, char **argv)
 		init();
 
 		emulab::ServerProxy proxy(xmlrpc_proto, false, TBROOT);
-		emulab::EmulabResponse er;
 		
-		er = proxy.invoke("emulab.vision_config",
-				  emulab::SPA_String, "area", AREA_NAME,
-				  emulab::SPA_TAG_DONE);
-
-		cameras = (ulxr::Array)er.getValue();
+		cameras_er = proxy.
+			invoke("emulab.vision_config",
+			       emulab::SPA_String, "area", AREA_NAME,
+			       emulab::SPA_TAG_DONE);
+		obstacles_er = proxy.
+			invoke("emulab.obstacle_config",
+			       emulab::SPA_String, "area", AREA_NAME,
+			       emulab::SPA_String, "units", "meters",
+			       emulab::SPA_TAG_DONE);
+		
+		cameras = (ulxr::Array)cameras_er.getValue();
 		for (lpc = 0; lpc < cameras.size(); lpc++) {
 			double x, y, width, height;
 			ulxr::Struct attr;
 
 			attr = cameras.getItem(lpc);
-			x = ((ulxr::Double)attr.getMember("x")).getDouble();
-			y = ((ulxr::Double)attr.getMember("y")).getDouble();
+			x = ((ulxr::Double)attr.getMember("loc_x")).
+				getDouble();
+			y = ((ulxr::Double)attr.getMember("loc_y")).
+				getDouble();
 			width = ((ulxr::Double)attr.getMember("width")).
 				getDouble();
 			height = ((ulxr::Double)attr.getMember("height")).
@@ -374,6 +384,8 @@ main(int argc, char **argv)
 			if ((y + height) > MAXY)
 				MAXY = (y + height);
 		}
+
+		obstacles = (ulxr::Array)obstacles_er.getValue();
 
 		init2();
 	}
@@ -618,22 +630,72 @@ Node::Node()
 }
 
 
+static bool check_position(double rx, double ry)
+{
+	unsigned int lpc, camera_hit = 0;
+	bool retval = 1;
+
+	for (lpc = 0; lpc < cameras.size(); lpc++) {
+		double x, y, width, height;
+		ulxr::Struct attr;
+		
+		attr = cameras.getItem(lpc);
+		x = ((ulxr::Double)attr.getMember("loc_x")).getDouble();
+		y = ((ulxr::Double)attr.getMember("loc_y")).getDouble();
+		width = ((ulxr::Double)attr.getMember("width")).getDouble();
+		height = ((ulxr::Double)attr.getMember("height")).getDouble();
+		
+		if ((rx >= x) && (ry >= y) &&
+		    (rx < (x + width) && (ry < (y + height)))) {
+			camera_hit = 1;
+		}
+	}
+
+	if (!camera_hit) {
+		return 0;
+	}
+
+	for (lpc = 0; lpc < obstacles.size(); lpc++) {
+		double xmin, ymin, xmax, ymax;
+		ulxr::Struct attr;
+		
+		attr = obstacles.getItem(lpc);
+		xmin = ((ulxr::Double)attr.getMember("x1")).getDouble() -
+			OBSTACLE_BUFFER;
+		ymin = ((ulxr::Double)attr.getMember("y1")).getDouble() -
+			OBSTACLE_BUFFER;
+		xmax = ((ulxr::Double)attr.getMember("x2")).getDouble() +
+			OBSTACLE_BUFFER;
+		ymax = ((ulxr::Double)attr.getMember("y2")).getDouble() +
+			OBSTACLE_BUFFER;
+
+		if ((rx > xmin) && (ry > ymin) && (rx < xmax) && (ry < ymax)) {
+			return 0;
+		}
+	}
+	
+	return retval;
+}
 
 void
 Node::RandomPosition()
 {
-	position.X = uniform() * (MAXX - MINX) + MINX;
-	position.Y = uniform() * (MAXY - MINY) + MINY;
-	position.Z = 0.0;
+	do {
+		position.X = uniform() * (MAXX - MINX) + MINX;
+		position.Y = uniform() * (MAXY - MINY) + MINY;
+		position.Z = 0.0;
+	} while (!check_position(position.X, position.Y));
 }
 
 
 void
 Node::RandomDestination()
 {
-   	destination.X = uniform() * (MAXX - MINX) + MINX;
-   	destination.Y = uniform() * (MAXY - MINY) + MINY;
-	destination.Z = 0.0;
+	do {
+		destination.X = uniform() * (MAXX - MINX) + MINX;
+		destination.Y = uniform() * (MAXY - MINY) + MINY;
+		destination.Z = 0.0;
+	} while (!check_position(destination.X, destination.Y));
 	assert(destination != position);
 }
 

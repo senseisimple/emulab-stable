@@ -1750,10 +1750,14 @@ int event_arg_dup(char *args, char *key, char **value_out)
 	return retval;
 }
 
-int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args)
+event_notification_t event_notification_create_v(event_handle_t handle,
+						 struct timeval **when_out,
+						 ea_tag_t tag,
+						 va_list args)
 {
+	event_notification_t retval = NULL;
+	struct timeval *when = NULL;
 	address_tuple_t tuple;
-	int retval = 0;
 
 	if ((tuple = address_tuple_alloc()) == NULL) {
 		ERROR("could not allocate address tuple");
@@ -1762,8 +1766,6 @@ int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args)
 	else {
 		char *arg_name, *event_args, *event_args_cursor;
 		char event_args_buffer[1024] = "";
-		struct timeval *when = NULL;
-		event_notification_t en;
 
 		event_args = event_args_buffer;
 		event_args_cursor = event_args_buffer;
@@ -1829,28 +1831,63 @@ int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args)
 			tag = va_arg(args, ea_tag_t);
 		}
 		
-		if ((en = event_notification_alloc(handle, tuple)) == NULL) {
+		if ((retval = event_notification_alloc(handle,
+						       tuple)) == NULL) {
 			ERROR("could not allocate notification");
 			errno = ENOMEM;
 		}
 		else {
-			struct timeval tv;
-
-			if (when == NULL) {
-				when = &tv;
-				gettimeofday(when, NULL);
-			}
 			if (strlen(event_args) > 0) {
 				event_notification_set_arguments(handle,
-								 en,
+								 retval,
 								 event_args);
 			}
-			retval = event_schedule(handle, en, when);
-			event_notification_free(handle, en);
-			en = NULL;
 		}
 		address_tuple_free(tuple);
 		tuple = NULL;
+	}
+
+	if (when_out != NULL)
+		*when_out = when;
+
+	return retval;
+}
+
+event_notification_t event_notification_create(event_handle_t handle,
+					       ea_tag_t tag,
+					       ...)
+{
+	event_notification_t retval;
+	va_list args;
+
+	va_start(args, tag);
+	retval = event_notification_create_v(handle, NULL, tag, args);
+	va_end(args);
+	
+	return retval;
+}
+
+int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args)
+{
+	event_notification_t en;
+	struct timeval *when;
+	int retval = -1;
+	
+	if ((en = event_notification_create_v(handle, &when,
+					      tag, args)) == NULL) {
+		ERROR("could not allocate notification");
+		errno = ENOMEM;
+	}
+	else {
+		struct timeval tv;
+		
+		if (when == NULL) {
+			when = &tv;
+			gettimeofday(when, NULL);
+		}
+		retval = event_schedule(handle, en, when);
+		event_notification_free(handle, en);
+		en = NULL;
 	}
 	
 	return retval;

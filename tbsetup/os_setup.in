@@ -203,7 +203,7 @@ while (my %row = $db_result->fetchhash()) {
     my $class     = $row{'class'};
     my $subnode   = $row{'issubnode'};
     my $virtnode  = $row{'isvirtnode'};
-    my $imageable = $row{'iimageable'};
+    my $imageable = $row{'imageable'};
     my $jailnode  = $row{'jailflag'};
     my $plabnode  = $row{'isplabdslice'};
     my $failmode  = $row{'failureaction'};
@@ -219,13 +219,6 @@ while (my %row = $db_result->fetchhash()) {
 	if (! $jailnode && ! $plabnode) {
 	    next;
 	}
-    }
-    elsif ($class eq "robot") {
-	print "Skipping os_setup for $node cause its a robot.\n";
-	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
-	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY;
-	$reboots{$node} = 1;
-	next;
     }
     elsif ($subnode) {
 	print "Will skip subnode $node ISUP wait.\n";
@@ -326,7 +319,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it.
     #
-    if (!$bootpath && !$jailnode && !$plabnode && !$imageable) {
+    if (!$bootpath && !$jailnode && !$plabnode && $imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -509,6 +502,18 @@ if (!$TESTMODE) {
 	    delete $reboots{$node};
 	    delete $reconfigs{$node};
 	    $rebooted{$node} = 1;
+
+
+	    # XXX BEGIN Robot hack
+	    my $host;
+
+	    TBPhysNodeID($node, \$host);
+	    if ($host ne $node) {
+		delete $reboots{$host};
+		delete $reconfigs{$host};
+		$rebooted{$host} = 1;
+	    }
+	    # XXX END Robot hack
 	}
 
 	my %reload_args     = ();

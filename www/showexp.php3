@@ -191,7 +191,9 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON(($linktest_running ?
 			    "Stop LinkTest" : "Run LinkTest"), 
 			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
-	
+    }
+
+    if (STUDLY() && $types['pcvm']) {
 	WRITESUBMENUBUTTON("Record Feedback Data",
 			   "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=record");
     }
@@ -199,7 +201,8 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 
 if (($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_SWAPPED) &&
-    STUDLY()) {
+    STUDLY() &&
+    $types['pcvm']) {
     WRITESUBMENUBUTTON("Clear Feedback Data",
 		       "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=clear");
     
@@ -218,6 +221,13 @@ if ($wireless) {
 # History
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
+
+if ($types['garcia']) {
+    WRITESUBMENUBUTTON("Robot Map",
+		       "robotmap.php3".
+		       ($expstate == $TB_EXPTSTATE_ACTIVE ?
+			"?pid=$exp_pid&eid=$exp_eid" : ""));
+}
 
 # Blinky lights - but only if they have nodes of the correct type in their
 # experiment

@@ -74,6 +74,11 @@ static pid_t emcd_pid;
 static pid_t vmcd_pid;
 static pid_t rmcd_pid;
 
+static struct agent ns_sequence_agent;
+static timeline_agent_t ns_sequence;
+static struct agent ns_timeline_agent;
+static timeline_agent_t ns_timeline;
+
 static void sigpass(int sig)
 {
 	kill(emcd_pid, sig);
@@ -234,6 +239,34 @@ main(int argc, char *argv[])
 		fatal("could not register with event system");
 	}
 
+	ns_sequence = create_timeline_agent(TA_SEQUENCE);
+	ns_sequence->ta_local_agent.la_link.ln_Name = ns_sequence_agent.name;
+	ns_sequence->ta_local_agent.la_handle = handle;
+	ns_sequence->ta_local_agent.la_agent = &ns_sequence_agent;
+	ns_sequence_agent.link.ln_Name = ns_sequence_agent.name;
+	strcpy(ns_sequence_agent.name, "__ns_sequence");
+	strcpy(ns_sequence_agent.nodeid, "*");
+	strcpy(ns_sequence_agent.vnode, "*");
+	strcpy(ns_sequence_agent.objtype, TBDB_OBJECTTYPE_SEQUENCE);
+	strcpy(ns_sequence_agent.ipaddr, "*");
+	ns_sequence_agent.handler = &ns_sequence->ta_local_agent;
+	lnAddTail(&sequences, &ns_sequence->ta_local_agent.la_link);
+	lnAddTail(&agents, &ns_sequence_agent.link);
+	
+	ns_timeline = create_timeline_agent(TA_TIMELINE);
+	ns_timeline->ta_local_agent.la_link.ln_Name = ns_timeline_agent.name;
+	ns_timeline->ta_local_agent.la_handle = handle;
+	ns_timeline->ta_local_agent.la_agent = &ns_timeline_agent;
+	ns_timeline_agent.link.ln_Name = ns_timeline_agent.name;
+	strcpy(ns_timeline_agent.name, "__ns_timeline");
+	strcpy(ns_timeline_agent.nodeid, "*");
+	strcpy(ns_timeline_agent.vnode, "*");
+	strcpy(ns_timeline_agent.objtype, TBDB_OBJECTTYPE_TIMELINE);
+	strcpy(ns_timeline_agent.ipaddr, "*");
+	ns_timeline_agent.handler = &ns_timeline->ta_local_agent;
+	lnAddTail(&timelines, &ns_timeline->ta_local_agent.la_link);
+	lnAddTail(&agents, &ns_timeline_agent.link);
+
 	/*
 	 * Construct an address tuple for event subscription. We set the 
 	 * scheduler flag to indicate we want to capture those notifications.
@@ -255,7 +288,7 @@ main(int argc, char *argv[])
 	if (RPC_agentlist(handle, pid, eid))
 		fatal("Could not get agentlist from RPC server\n");
 
-	if (RPC_waitforrobots(pid, eid))
+	if (RPC_waitforrobots(handle, pid, eid))
 		fatal("waitforrobots: RPC failed!");
 
 	if (access("tbdata/emcd.config", R_OK) == 0) {
@@ -302,7 +335,7 @@ main(int argc, char *argv[])
 		case 0:
 			execlp("rmcd",
 			       "rmcd",
-			       "-d",
+			       "-dd",
 			       "-l",
 			       "logs/rmcd.log",
 			       "-U",
@@ -884,6 +917,9 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 			return -1;
 		}
 	}
+	else {
+		ta = ns_timeline;
+	}
 	
 	tuple->host      = agentp->ipaddr;
 	tuple->objname   = objname;
@@ -938,6 +974,45 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	return 0;
 }
 
+int
+AddRobot(event_handle_t handle,
+	 struct agent *agent,
+	 double init_x,
+	 double init_y,
+	 double init_o)
+{
+	sched_event_t se;
+	int retval = 0;
+
+	assert(agent != NULL);
+
+	se.agent.s = agent;
+	se.notification = event_notification_create(
+		handle,
+		EA_Experiment, pideid,
+		EA_Type, TBDB_OBJECTTYPE_NODE,
+		EA_Event, TBDB_EVENTTYPE_SETDEST,
+		EA_Name, agent->name,
+		EA_ArgFloat, "X", init_x,
+		EA_ArgFloat, "Y", init_y,
+		EA_ArgFloat, "ORIENTATION", init_o,
+		EA_TAG_DONE);
+	event_notification_put_int32(handle,
+				     se.notification,
+				     "TOKEN",
+				     next_token);
+	next_token += 1;
+	
+	memset(&se.time, 0, sizeof(se.time));
+	se.length = 1;
+	se.flags = SEF_SENDS_COMPLETE | SEF_SINGLE_HANDLER;
+	
+	sched_event_prepare(handle, &se);
+	timeline_agent_append(ns_sequence, &se);
+	
+	return retval;
+}
+
 /*
  * Get the static event list from the DB and schedule according to
  * the relative time stamps.
@@ -951,6 +1026,72 @@ get_static_events(event_handle_t handle)
 	char		pideid[BUFSIZ];
 	event_notification_t notification;
 	sched_event_t	event;
+
+	/*
+	 * Construct an address tuple for the notifications. We can reuse
+	 * the same one over and over since the data is copied out.
+	 */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		error("could not allocate an address tuple\n");
+		return -1;
+	}
+	tuple->expt = pideid;
+
+	/*
+	 * Generate a TIME starts message.
+	 */
+	tuple->host      = ADDRESSTUPLE_ALL;
+	tuple->objname   = ADDRESSTUPLE_ANY;
+	tuple->objtype   = TBDB_OBJECTTYPE_TIME;
+	tuple->eventtype = TBDB_EVENTTYPE_START;
+	
+	notification = event_notification_alloc(handle, tuple);
+	if (! notification) {
+		error("could not allocate notification\n");
+		return -1;
+	}
+	event_notification_insert_hmac(handle, notification);
+	event.notification = notification;
+	event.time.tv_sec  = 0;
+	event.time.tv_usec = 0;
+	event.agent.s = NULL;
+	event.length = 1;
+	event.flags = 0;
+	timeline_agent_append(ns_sequence, &event);
+
+	
+	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
+	event.notification = event_notification_create(
+		handle,
+		EA_Experiment, pideid,
+		EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+		EA_Event, TBDB_EVENTTYPE_LOG,
+		EA_Name, event.agent.s->name,
+		EA_Arguments, "Time started",
+		EA_TAG_DONE);
+	memset(&event.time, 0, sizeof(event.time));
+	event.length = 1;
+	event.flags = SEF_SINGLE_HANDLER;
+	
+	sched_event_prepare(handle, &event);
+	timeline_agent_append(ns_sequence, &event);
+
+	
+	event.agent.s = &ns_timeline_agent;
+	event.notification = event_notification_create(
+		handle,
+		EA_Experiment, pideid,
+		EA_Type, TBDB_OBJECTTYPE_TIMELINE,
+		EA_Event, TBDB_EVENTTYPE_START,
+		EA_Name, ns_timeline_agent.name,
+		EA_TAG_DONE);
+	memset(&event.time, 0, sizeof(event.time));
+	event.length = 1;
+	event.flags = SEF_SENDS_COMPLETE | SEF_SINGLE_HANDLER;
+	
+	sched_event_prepare(handle, &event);
+	timeline_agent_append(ns_sequence, &event);
 
 	if (RPC_grouplist(handle, pid, eid)) {
 		error("Could not get grouplist from RPC server\n");
@@ -970,17 +1111,6 @@ get_static_events(event_handle_t handle)
 		}
 	}
 
-	/*
-	 * Construct an address tuple for the notifications. We can reuse
-	 * the same one over and over since the data is copied out.
-	 */
-	tuple = address_tuple_alloc();
-	if (tuple == NULL) {
-		error("could not allocate an address tuple\n");
-		return -1;
-	}
-	tuple->expt = pideid;
-
 	sprintf(pideid, "%s/%s", pid, eid);
 	gettimeofday(&now, NULL);
 	info(" Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
@@ -994,34 +1124,14 @@ get_static_events(event_handle_t handle)
 		error("Could not get eventlist from RPC server\n");
 		return -1;
 	}
+
+	event_do(handle,
+		 EA_Experiment, pideid,
+		 EA_Type, TBDB_OBJECTTYPE_SEQUENCE,
+		 EA_Event, TBDB_EVENTTYPE_START,
+		 EA_Name, ns_sequence_agent.name,
+		 EA_TAG_DONE);
 	
-	/*
-	 * Generate a TIME starts message.
-	 */
-	tuple->host      = ADDRESSTUPLE_ALL;
-	tuple->objname   = ADDRESSTUPLE_ANY;
-	tuple->objtype   = TBDB_OBJECTTYPE_TIME;
-	tuple->eventtype = TBDB_EVENTTYPE_START;
-	
-	notification = event_notification_alloc(handle, tuple);
-	if (! notification) {
-		error("could not allocate notification\n");
-		return -1;
-	}
-	event_notification_insert_hmac(handle, notification);
-	event.notification = notification;
-	event.time.tv_sec  = basetime;
-	event.time.tv_usec = 0;
-	event.agent.s = NULL;
-	event.length = 1;
-	event.flags = 0;
-	sched_event_enqueue(event);
-
-	info("TIME STARTS will be sent at: %lu:%d\n", now.tv_sec, now.tv_usec);
-
-	gettimeofday(&now, NULL);
-	info("The time is now: %lu:%d\n", now.tv_sec, now.tv_usec);
-
 	return 0;
 }
 

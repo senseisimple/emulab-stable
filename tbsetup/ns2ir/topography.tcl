@@ -82,10 +82,10 @@ Topography instproc checkdest {obj x y} {
 	foreach {key value} $oblist {
 	    set id [lindex [split $key ,] 0]
 	    
-	    if {($x >= $obstacles($id,$area_name,x1)) &&
-	        ($x <= $obstacles($id,$area_name,x2)) &&
-	        ($y >= $obstacles($id,$area_name,y1)) &&
-	        ($y <= $obstacles($id,$area_name,y2))} {
+	    if {($x >= [expr $obstacles($id,$area_name,x1) - 0.25]) &&
+	        ($x <= [expr $obstacles($id,$area_name,x2) + 0.25]) &&
+	        ($y >= [expr $obstacles($id,$area_name,y1) - 0.25]) &&
+	        ($y <= [expr $obstacles($id,$area_name,y2) + 0.25])} {
 		    perror "Destination $x,$y puts $obj in obstacle $value."
 		    return 0
 	    }

@@ -57,7 +57,7 @@ int RPC_grab(void);
 void RPC_drop(void);
 
 int RPC_exppath(char *pid, char *eid, char *path_out, size_t path_size);
-int RPC_waitforrobots(char *pid, char *eid);
+int RPC_waitforrobots(event_handle_t handle, char *pid, char *eid);
 int RPC_waitforactive(char *pid, char *eid);
 int RPC_agentlist(event_handle_t handle, char *pid, char *eid);
 int RPC_grouplist(event_handle_t handle, char *pid, char *eid);
@@ -75,6 +75,12 @@ extern int AddEvent(event_handle_t handle, address_tuple_t tuple,
 		    long basetime,
 		    char *exidx, char *ftime, char *objname, char *exargs,
 		    char *objtype, char *evttype, char *parent);
+
+extern int AddRobot(event_handle_t handle,
+		    struct agent *agent,
+		    double init_x,
+		    double init_y,
+		    double init_orientation);
 
 #ifdef __cplusplus
 }

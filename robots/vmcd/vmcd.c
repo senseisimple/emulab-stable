@@ -59,6 +59,8 @@ static struct mtp_config_vmc vmc_config;
 static struct vision_track vt_pool_nodes[TRACK_POOL_SIZE];
 static struct lnMinList vt_pool;
 
+static unsigned long long frame_count = 0;
+
 static struct robot_object ro_pool_nodes[16];
 
 static struct lnMinList known_bots, unknown_bots, wiggling_bots, lost_bots;
@@ -141,12 +143,16 @@ static void siginfo(int sig)
 
 static void dump_robot(struct robot_object *ro)
 {
+    assert(ro != NULL);
+    
     info("  %d: %s; flags=%x\n", ro->ro_id, ro->ro_name, ro->ro_flags);
 }
 
 static void dump_robot_list(struct lnMinList *list)
 {
     struct robot_object *ro;
+
+    assert(list != NULL);
     
     ro = (struct robot_object *)list->lh_Head;
     while (ro->ro_link.ln_Succ != NULL) {
@@ -157,12 +163,15 @@ static void dump_robot_list(struct lnMinList *list)
 
 static void dump_vision_track(struct vision_track *vt)
 {
-    info("  %d: %.2f %.2f %.2f; age=%d; %s\n",
+    assert(vt != NULL);
+    
+    info("  %d: %.2f %.2f %.2f; age=%d; ts=%f; %s\n",
 	 vt->vt_client->vc_port,
 	 vt->vt_position.x,
 	 vt->vt_position.y,
 	 vt->vt_position.theta,
 	 vt->vt_age,
+	 vt->vt_position.timestamp,
 	 (vt->vt_userdata == NULL) ?
 	 "(unknown)" :
 	 ((struct robot_object *)vt->vt_userdata)->ro_name);
@@ -171,6 +180,8 @@ static void dump_vision_track(struct vision_track *vt)
 static void dump_vision_list(struct lnMinList *list)
 {
     struct vision_track *vt;
+
+    assert(list != NULL);
     
     vt = (struct vision_track *)list->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
@@ -181,18 +192,41 @@ static void dump_vision_list(struct lnMinList *list)
 
 static void dump_info(void)
 {
-    info("Unknown robots:\n");
+    static unsigned long long last_frame_count = 0;
+
+    int lpc;
+    
+    info("Frame: %qd (%qd - %qd)\n",
+	 frame_count - last_frame_count,
+	 frame_count,
+	 last_frame_count);
+    last_frame_count = frame_count;
+
+    for (lpc = 0; lpc < vmc_client_count; lpc++) {
+	struct vmc_client *vc = &vmc_clients[lpc];
+	
+	info(" Client: %s/%d; frames=%qd; l=%.2f r=%.2f t=%.2f b=%.2f\n",
+	     vc->vc_hostname,
+	     vc->vc_port,
+	     vc->vc_frame_count,
+	     vc->vc_left,
+	     vc->vc_right,
+	     vc->vc_top,
+	     vc->vc_bottom);
+    }
+    
+    info(" Unknown robots:\n");
     dump_robot_list(&unknown_bots);
-    info("Wiggling robots:\n");
+    info(" Wiggling robots:\n");
     dump_robot_list(&wiggling_bots);
-    info("Lost robots:\n");
+    info(" Lost robots:\n");
     dump_robot_list(&lost_bots);
 
-    info("Wiggle frame:\n");
+    info(" Wiggle frame:\n");
     dump_vision_list(&wiggle_frame);
-    info("Last frame:\n");
+    info(" Last frame:\n");
     dump_vision_list(&last_frame);
-    info("Current frame:\n");
+    info(" Current frame:\n");
     dump_vision_list(&current_frame);
 }
 #endif
@@ -481,6 +515,7 @@ int main(int argc, char *argv[])
 	    struct robot_object *ro;
 
 	    /* We've got all of the camera tracks, start processing. */
+	    frame_count += 1;
 	    
 	    vtCoalesce(&vt_pool,
 		       &current_frame,
@@ -537,14 +572,6 @@ int main(int argc, char *argv[])
 		vt = (struct vision_track *)vt->vt_link.ln_Succ;
 	    }
 
-#if 0
-	    if ((lnCountNodes(&unknown_bots) == 1) && (vt_unknown != NULL)) {
-		ro = (struct robot_object *)lnRemHead(&unknown_bots);
-		lnAddTail(&known_bots, &ro->ro_link);
-		vt_unknown->vt_userdata = ro;
-	    }
-#endif
-
 	    /*
 	     * Send MTP_WIGGLE_STARTs for any unknown robots, this should stop
 	     * them and cause an IDLE wiggle_status to come back.
@@ -556,6 +583,7 @@ int main(int argc, char *argv[])
 		    struct mtp_packet wmp;
 
 		    info("sending wiggle request for %d\n", ro->ro_id);
+		    dump_info();
 		    
 		    mtp_init_packet(&wmp,
 				    MA_Opcode, MTP_WIGGLE_REQUEST,
@@ -633,8 +661,12 @@ int main(int argc, char *argv[])
 
 	    if (!lnEmptyList(&wiggle_frame)) {
 		struct mtp_packet wmp;
-		
+
 		wiggle_bot = (struct robot_object *)lnRemHead(&wiggling_bots);
+		
+		info("starting wiggle for %s\n", wiggle_bot->ro_name);
+		dump_info();
+		
 		mtp_init_packet(&wmp,
 				MA_Opcode, MTP_WIGGLE_REQUEST,
 				MA_Role, MTP_ROLE_VMC,
@@ -712,6 +744,7 @@ int main(int argc, char *argv[])
 					 " %d\n",
 					 wiggle_bot->ro_id
 					 );
+				    dump_info();
 
 				    wiggle_bot = NULL;
 				}
@@ -736,6 +769,7 @@ int main(int argc, char *argv[])
 				    (wiggle_bot->ro_id == mws->robot_id)) {
 				    ro = wiggle_bot;
 				    wiggle_bot = NULL;
+				    lnAppendList(&vt_pool, &wiggle_frame);
 				}
 				else if (ro != NULL) {
 				    lnRemove(&ro->ro_link);
@@ -776,16 +810,19 @@ int main(int argc, char *argv[])
 			}
 			
 			if (vtUpdate(&vc->vc_frame, vc, &mp, &vt_pool)) {
+			    vc->vc_frame_count += 1;
+			    
 			    if (vc->vc_handle->mh_remaining > 0) {
 				lnAppendList(&vt_pool, &vc->vc_frame);
 			    }
 			    else {
 				if (debug > 2) {
-				    printf("got frame from client %s:%d\n",
-					   vc->vc_hostname,
-					   vc->vc_port);
+				    info("debug: "
+					 "got frame from client %s:%d\n",
+					 vc->vc_hostname,
+					 vc->vc_port);
 				}
-				
+
 				lnAppendList(&current_frame, &vc->vc_frame);
 				
 				/*

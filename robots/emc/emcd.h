@@ -28,6 +28,6 @@ struct vmc_client {
 
 #define EMC_SERVER_PORT 2525
 
-#define EMC_UPDATE_HZ (2 * 1000)
+#define EMC_UPDATE_HZ (1500)
 
 #endif

@@ -381,7 +381,7 @@ RPC_obstaclelist(FILE *emcd_config, char *area)
 }
 
 int
-RPC_waitforrobots(char *pid, char *eid)
+RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 {
 	emulab::EmulabResponse er;
 	int lpc, rc, retval = 0;
@@ -408,6 +408,8 @@ RPC_waitforrobots(char *pid, char *eid)
 	
 	if (locs.size() == 0)
 		return 0;
+
+	info("info: waiting for robots\n");
 	
 	if ((emcd_config = fopen("tbdata/emcd.config", "w")) == NULL) {
 		fprintf(stderr, "Cannot create emcd.config!\n");
@@ -433,7 +435,6 @@ RPC_waitforrobots(char *pid, char *eid)
 			
 			return -1;
 		}
-#if 0
 		else if ((rc = RPC_invoke(
 			"node.statewait",
 			&ner,
@@ -445,7 +446,6 @@ RPC_waitforrobots(char *pid, char *eid)
 			
 			return -1;
 		}
-#endif
 		else {
 			fprintf(emcd_config,
 				"robot %s %d %s %f %f %f %s\n",
@@ -457,6 +457,8 @@ RPC_waitforrobots(char *pid, char *eid)
 				orientation,
 				agent->name);
 			buildings.insert(bldg.getString());
+
+			AddRobot(handle, agent, x, y, orientation);
 		}
 	}
 	

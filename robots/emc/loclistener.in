@@ -88,6 +88,15 @@ class LocationInfoUpdater(EventClient):
                 else:
                     node_id = res[0][0]
                     pass
+
+                if event.getEventType() == "COMPLETE":
+                    DBQueryFatal("UPDATE nodes SET "
+                                 "destination_x=NULL,"
+                                 "destination_y=NULL,"
+                                 "destination_orientation=NULL "
+                                 "WHERE node_id=%s",
+                                 (node_id,))
+                    return
                 
                 update = {}
                 for arg in event.getArguments().split():
@@ -160,7 +169,14 @@ liu = LocationInfoUpdater(server=server, port=port)
 
 at = address_tuple()
 at.objtype = "NODE"
-at.eventtype = "MODIFY,SETDEST"
+at.eventtype = "SETDEST,MODIFY"
+
+liu.subscribe(at)
+
+at = address_tuple()
+at.objtype = "NODE"
+at.eventtype = "COMPLETE"
+at.scheduler = 1
 
 liu.subscribe(at)
 

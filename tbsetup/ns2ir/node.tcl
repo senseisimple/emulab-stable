@@ -250,9 +250,10 @@ Node instproc updatedb {DB} {
 	    return
 	}
 
+	set o [expr $orientation_ * 3.14159 / 180.0]
 	$sim spitxml_data "virt_node_startloc" \
 		[list "vname" "building" "floor" "loc_x" "loc_y" "orientation"] \
-		[list $self [$topo set area_name] "" $X_ $Y_ $orientation_]
+		[list $self [$topo set area_name] "" $X_ $Y_ $o]
     }
     
     # Put in the desires, too

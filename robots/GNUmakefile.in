@@ -23,7 +23,13 @@ else
 EMCDIR=
 endif
 
-SUBDIRS	= tbsetdest $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
+ifeq ($(HAVE_ULXMLRPCPP),yes)
+TBSETDESTDIR=tbsetdest
+else
+TBSETDESTDIR=
+endif
+
+SUBDIRS	= $(TBSETDESTDIR) $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
 
 all:		robomonitord all-subdirs 
 client:		client-subdirs

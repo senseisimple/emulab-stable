@@ -114,9 +114,11 @@ if (mysql_num_rows($query_result)) {
 # Build a table of location info to print in table below image.
 #
 $locations = array();
+$vnames = array();
 
 $query_result =
-    DBQueryFatal("select loc.* from location_info as loc ".
+    DBQueryFatal("select loc.*,r.vname from location_info as loc ".
+		 "left join reserved as r on r.node_id=loc.node_id ".
 		 "where loc.floor='$floor' and loc.building='$building'");
 
 while ($row = mysql_fetch_array($query_result)) {
@@ -124,6 +126,9 @@ while ($row = mysql_fetch_array($query_result)) {
     $loc_x     = $row["loc_x"];
     $loc_y     = $row["loc_y"];
     $orient    = $row["orientation"];
+
+    if (isset($pid) && isset($row["vname"]))
+	$vnames[$node_id] = $row["vname"];
 
     if (isset($pixels_per_meter) && $pixels_per_meter) {
 	$meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
@@ -135,7 +140,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	$locations[$node_id] = "x=$loc_x, y=$loc_y pixels";
     }
     if (isset($orient)) {
-	$locations[$node_id] .= ", o=" . sprintf("%.2f", $orient);
+	$locations[$node_id] .= ", o=" . sprintf("%.1f", $orient) . "&#176;";
     }
 }
 
@@ -174,11 +179,16 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$perl_args = "-o $prefix -t -z " .
-	     # From clicking on a map image.
-	     (isset($map_x) ? "-c $map_x,$map_y " : "") .
-	     (isset($floor) ? "-f $floor " : "") .
-	     (isset($building) ? "$building" : "");  # Building arg must be last!
+$perl_args = ("-o $prefix -t -z -n " .
+	      # From clicking on a map image.
+	      ((isset($formfields[show_cameras]) &&
+		strcmp($formfields[show_cameras], "Yep") == 0) ? "-v " : "") .
+	      ((isset($formfields[show_exclusion]) &&
+		strcmp($formfields[show_exclusion], "Yep") == 0) ? "-x " : "") .
+	      (isset($map_x) ? "-c $map_x,$map_y " : "") .
+	      (isset($floor) ? "-f $floor " : "") .
+	      (isset($pid) ? "-e $pid,$eid " : "") .
+	      (isset($building) ? "$building" : ""));  # Building arg must be last!
 
 if (0) {    ### Put the Perl script args into the page when debugging.
     echo "\$btfv/floormap -d $perl_args\n";
@@ -197,6 +207,13 @@ if ($retval) {
 #
 if (! readfile("${prefix}.map")) {
     TBERROR("Could not read ${prefix}.map", 1);
+}
+
+if (isset($pid)) {
+    echo "<font size=+2>Robots in experiment <b>".
+         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b> </font>\n";
+    echo "<br /><br />\n";
 }
 
 echo "<center>\n";
@@ -240,22 +257,92 @@ echo "  <br>\n";
 # is clicked.
 echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
 
+if (isset($pid)) {
+    echo "  <input type=\"hidden\" name=\"pid\" value=\"$pid\">\n";
+    echo "  <input type=\"hidden\" name=\"eid\" value=\"$eid\">\n";
+}
+
 # The last_* items come from a .state file with the map, from the Perl script.
 if (! readfile("${prefix}.state")) {
     TBERROR("Could not read ${prefix}.state", 1);
 }
 
-echo "</form>\n";
+echo "<br>
+      <table cellspacing=5 cellpadding=5 border=0 class=\"stealth\"
+             bgcolor=\"#ffffff\">
+      <tr>";
+
+echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
+      <table>
+      <tr><th colspan=2>Legend</th></tr>
+      <tr>
+          <td><img src=\"floormap/map_legend_node.gif\"></td>
+          <td>Robot Actual Position</td>
+      </tr>
+      <tr>
+          <td><img src=\"floormap/map_legend_node_dst.gif\"></td>
+          <td>Robot Destination Position</td>
+      </tr>
+      </table>
+      </td>";
 
 if (count($locations)) {
+    echo "<td align=\"left\" valign=\"top\" class=\"stealth\">";
     echo "<table align=center border=2 cellpadding=0 cellspacing=2>
  	  <tr><th>Node</th><th>Location</th></tr>\n";
     
     while (list($node_id, $location) = each($locations)) {
-	echo "<tr><td>$node_id</td> <td>$location</td> </tr>\n";
+	if ((!isset($pid) && !isset($eid)) || isset($vnames[$node_id])) {
+	    if (isset($vnames[$node_id]))
+		$name = $vnames[$node_id];
+	    else
+		$name = $node_id;
+	    echo "<tr>
+              <td><a href=\"shownode.php3?node_id=$node_id\">$name</a></td>
+              <td>$location</td> </tr>\n";
+	}
     }
-    echo "</table>\n";
+    echo "</table></td>\n";
 }
+
+if (isset($formfields[show_cameras]) &&
+    strcmp($formfields[show_cameras], "Yep") == 0) {
+	$cam_checked = "checked";
+}
+else {
+	$cam_checked = "";
+}
+
+if (isset($formfields[show_exclusion]) &&
+    strcmp($formfields[show_exclusion], "Yep") == 0) {
+	$excl_checked = "checked";
+}
+else {
+	$excl_checked = "";
+}
+
+echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
+      <table>
+      <tr><th>Display Options</th></tr>
+      <tr>
+          <td><input type=checkbox
+                     name=\"formfields[show_cameras]\"
+                     value=Yep
+                     $cam_checked>Show Camera Bounds</input></td>
+      </tr>
+      <tr>
+          <td><input type=checkbox
+                     name=\"formfields[show_exclusion]\"
+                     value=Yep
+                     $excl_checked>Show Exclusion Zones</input></td>
+      </tr>
+      <tr><td colspan=2 align=center><input type=submit value=Update></td></tr>
+      </table>
+      </td>";
+
+echo "</tr></table>\n";
+
+echo "</form>\n";
 
 echo "</center>\n";
 

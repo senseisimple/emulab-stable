@@ -60,6 +60,7 @@ etc-install:	dir-install sysetc-remove sysetc-install
 	-cp -f /dev/null $(ETCDIR)/isstargate
 
 sysetc-install:	dir-install
+	-mkdir -p $(SYSETCDIR)/dhcpc
 	$(INSTALL) -m 755 $(SRCDIR)/dhcpcd.exe $(SYSETCDIR)/dhcpc/dhcpcd.exe
 	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
@@ -67,6 +68,7 @@ sysetc-install:	dir-install
 		$(RCDIR)/init.d/mountallwrapper.sh
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
+	-mkdir -p $(SYSETCDIR)/pcmcia
 	$(INSTALL) -m 755 $(SRCDIR)/wireless.opts \
 		$(SYSETCDIR)/pcmcia/wireless.opts
 	-ln -sf ../init.d/mountallwrapper.sh \

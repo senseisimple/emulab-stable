@@ -106,12 +106,14 @@ static void sigpanic(int signum)
     snprintf(msg, sizeof(msg), "panic: %d; reexec'ing\n", signum);
     write(1, msg, strlen(msg));
 
+#if 0
     execve(reexec_argv[0], reexec_argv, environ);
 
     snprintf(msg, sizeof(msg), "reexec failed %s\n", strerror(errno));
     write(1, msg, strlen(msg));
+#endif
 
-    exit(1);
+    abort();
 }
 
 /**
@@ -190,21 +192,19 @@ int main(int argc, char *argv[])
     if (!debug) {
 	/* Become a daemon */
 	daemon(1, 0);
-
-	if (logfile) {
-	    int logfd;
-
-	    if ((logfd = open(logfile,
-			      O_CREAT|O_WRONLY|O_APPEND,
-			      0644)) != -1) {
-		dup2(logfd, 1);
-		dup2(logfd, 2);
-		if (logfd > 2)
-		    close(logfd);
-	    }
-	}
     }
 
+    if (logfile) {
+	int logfd;
+	
+	if ((logfd = open(logfile, O_CREAT|O_WRONLY|O_APPEND, 0644)) != -1) {
+	    dup2(logfd, 1);
+	    dup2(logfd, 2);
+	    if (logfd > 2)
+		close(logfd);
+	}
+    }
+    
     if (pidfile) {
 	FILE *fp;
 	
@@ -350,12 +350,6 @@ int main(int argc, char *argv[])
 		struct timeval tv_zero = { 0, 0 };
 		int rc;
 
-		if (debug == 3) {
-		    int *i = 0;
-		    
-		    *i = 1;
-		}
-		
 		/* Poll the file descriptors, don't block */
 		rc = select(FD_SETSIZE,
 			    &rreadyfds,
@@ -450,7 +444,7 @@ int main(int argc, char *argv[])
 		garcia.handleCallbacks(50);
 		aIO_GetMSTicks(ioRef, &now, NULL);
 	    } while (looping && db.update(now));
-	    
+
 	    garcia.flushQueuedBehaviors();
 	    
 	    garcia.handleCallbacks(1000);
@@ -459,7 +453,7 @@ int main(int argc, char *argv[])
 
     aIO_ReleaseLibRef(ioRef, &err);
 
-    if (batterylog) {
+    if (batterylog != NULL) {
 	fclose(batterylog);
 	batterylog = NULL;
     }

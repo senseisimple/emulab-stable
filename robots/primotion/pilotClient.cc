@@ -87,6 +87,11 @@ void pilotMoveCallback::call(int status)
 		    MA_CommandID, this->command_id,
 		    MA_TAG_DONE);
 
+    if (debug > 1) {
+	fprintf(stderr, "debug: sending update\n");
+	mtp_print_packet(stderr, &mp);
+    }
+
     for (i = this->notify_list.begin(); i != this->notify_list.end(); i++) {
 	pilotClient *pc = *i;
 	
