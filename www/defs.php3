@@ -16,11 +16,13 @@ $TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
 $TBDIR          = "/usr/testbed/";
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
+$TBSUEXEC_PATH  = "$TBBIN_DIR/suexec";
 
 $TBLIST_DIR     = "/usr/testbed/www/maillist";
 $TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.txt";
 $TBLIST_USERS   = "$TBLIST_DIR"."/users.txt";
 
+$TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users/";
 $TBNSSUBDIR     = "nsdir";
 
@@ -160,11 +162,11 @@ function PAGEFOOTER() {
 # Run a program as a user.
 #
 function SUEXEC($uid, $gid, $cmdandargs, $die) {
-    global $TBBIN_DIR;
+    global $TBSUEXEC_PATH;
 
     $output = array();
     $retval = 0;
-    $result = exec("$TBBIN_DIR/suexec $uid $gid $cmdandargs",
+    $result = exec("$TBSUEXEC_PATH $uid $gid $cmdandargs",
 		   $output, $retval);
 
     if ($retval) {
