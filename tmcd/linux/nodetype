@@ -16,7 +16,7 @@ if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
 	echo "unknown";
 
 # XXX hack for minibed and buff pc600s
-elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
+elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk -a -e /proc/pci ]; then
     case `$BINDIR/chipset.awk /proc/pci` in
     BX)
 	echo pc850	# normal pc850
