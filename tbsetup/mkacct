@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: mkacct,v 1.20 2000-11-21 08:13:33 kwright Exp $
+### $Id: mkacct,v 1.21 2000-11-21 10:37:53 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -49,6 +49,7 @@ print "Checking that $eid is a valid EID...";
 my $cmd = "select eid from experiments where eid='$eid'";
 my $sth = $dbh->query($cmd);
 my $rows =0;
+
 ## Must put in check that $sth defined. May be undefined if
 ## query command above is syntactically incorrect which could
 ## conceivably be caused by a weird eid argument. -kw
@@ -66,7 +67,7 @@ if ( $rows != 1 ) {
 ##
 print "Selecting users...\n";
 $cmd = 
-  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name, p.control_node ".
+  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name, p.control_node, p.pid ".
   "from experiments as e ".
   "left join projects as p on e.pid = p.pid ".
   "left join proj_memb as pm on p.pid = pm.pid ".
@@ -77,11 +78,11 @@ my %passwd = ();
 my %unix_uid = ();
 my %fullname = ();
 while (@row = $sth->fetchrow_array) {
-    if ( @row == 5 ) {
+    if ( @row == 6 ) {
 	if ( $row[0] =~ /^([a-z0-9]+)$/ ) {
 	    $user = $1;
 	} else {
-	    die "username from password no good\n";
+	    die "Username from database invalid\n";
 	}
 
 	if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
@@ -108,10 +109,18 @@ while (@row = $sth->fetchrow_array) {
 	} else {
 	    die "Control node from database not valid.\n";
 	} 
+
+	if ( $row[5] =~ /^([a-z0-9]+)$/ ) {          # project/group name
+	    $group = $1;
+	} else {
+	    die "Group name from database not valid.\n";
+	} 
+
 	
     } else {
 	die "User data query did not return correct number of elements.\n";
     }
+
     print "\t$user\n";    
 }
 
@@ -130,7 +139,7 @@ if (@row = $sth->fetchrow_array) {
     if ( $row[0] =~ /^(\d+)$/ &&             # unix GID
 	 $row[0] < 65536 ) {                 # unix GID must be < 65535 
 	$unix_gid = $1;
-	print "$unix_gid\n";
+	print "$group ($unix_gid)\n";
     } else {
 	die("Invalid group ID.\n"); 
     }
@@ -254,10 +263,35 @@ foreach $IP (@nodes) {
 
 	} elsif ($OS =~ /FreeBSD/) { 
 
-	    ## 1) Append new account info to master.passwd
-	    ## 2) Create secure (spwd.db) and insecure (pwd.db) password 
-	    ##    databases and
-	    ## 4) Create home directories
+	    ## 1) Create groups
+	    ## 2) Create user accts 
+	    ## 3) Create home directories
+
+	    ## Fetch remote group information
+	    open(SCP, "/usr/local/bin/scp -pq $IP:/etc/group /tmp/group.$IP |");
+	    while ( <SCP> ) { print $_; }
+	    close SCP;
+
+	    ## Does the group already exist?
+	    open(GROUP, "+</tmp/group.$IP") or die "Couldn't open /tmp/group.$IP\n";
+	    my $prev = 0;
+	    while ( <GROUP> ) {
+		if ( $_ =~ /^$group:/ ) { 
+		    $prev = 1;
+		}
+	    }
+
+	    if ( !$prev ) {
+		print "Adding group $group to $IP\n"; 
+		print GROUP "$group:*:$unix_gid:\n";
+		close GROUP;
+		open(SCP, "/usr/local/bin/scp -pq /tmp/group.$IP $IP:/etc/group |");
+		while ( <SCP> ) { print $_; }
+		close SCP;
+	    } else {
+		print "Group $group already exists on $IP\n";
+		close GROUP;
+	    }
 
  	    ## Fetch remote login information
 	    open(SCP, "/usr/local/bin/scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
@@ -318,9 +352,9 @@ foreach $IP (@nodes) {
 		}
 	    }
 	    close TMPCHPASS;
-	    open(SCP, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
-	    while ( <SCP> ) { print $_; }
-	    close SCP;
+	    open(SCP2, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
+	    while ( <SCP2> ) { print $_; }
+	    close SCP2;
 
 	    print "Commiting password changes to $IP.\n";
 	    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
