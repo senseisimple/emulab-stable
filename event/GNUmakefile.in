@@ -15,7 +15,7 @@ SYSTEM	       := $(shell uname -s)
 
 SUBDIRS		= lib tbgen trafgen program-agent
 ifeq ($(SYSTEM),FreeBSD)
-SUBDIRS	       += sched example delay-agent nsetrafgen stated
+SUBDIRS	       += sched example delay-agent nsetrafgen stated proxy
 endif
 
 all:	$(SUBDIRS)
@@ -50,6 +50,9 @@ program-agent:
 stated:
 	@$(MAKE) -C stated all
 
+proxy:
+	@$(MAKE) -C proxy all
+
 install: 
 	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
@@ -62,6 +65,7 @@ client-install:
 	@$(MAKE) -C program-agent client-install
 	@$(MAKE) -C tbgen client-install
 	@$(MAKE) -C trafgen client-install
+	@$(MAKE) -C proxy client-install
 
 control-install: 
 	@$(MAKE) -C tbgen control-install

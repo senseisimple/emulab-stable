@@ -40,6 +40,9 @@ CFLAGS   += `elvin-config --cflags vin4c`
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent
 LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
 
 tevc:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 	# Link against some of the object files from libtb, instead of the

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/program-agent
 
+SYSTEM	       := $(shell uname -s)
 PROGRAMS	= program-agent
 
 include $(OBJDIR)/Makeconf
@@ -25,6 +26,9 @@ CFLAGS   += `elvin-config --cflags vin4c`
 LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
 LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
 
 program-agent:		program-agent.o
 	$(CC) $(LDFLAGS) -o $@ program-agent.o $(LIBS)

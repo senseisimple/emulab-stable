@@ -60,7 +60,7 @@ ifeq ($(SYSTEM),Linux)
 # Linux
 CFLAGS	 += -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
-LIBS	 += -ll
+LIBS	 += -ll -ldl
 endif
 
 LEX	 = flex -l
