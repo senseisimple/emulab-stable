@@ -13,16 +13,6 @@ if [ -f /etc/rc.d/testbed/supfile ]; then
 	/usr/local/bin/cvsup -h $1 -e -1 -g -L 1 /etc/rc.d/testbed/supfile
 fi
 
-if [ -x /etc/rc.d/testbed/rc.healthd ]; then
-    echo "Starting node health monitoring ..."
-    /etc/rc.d/testbed/rc.healthd start
-fi
-
-if [ -x /etc/rc.d/testbed/slothd ]; then
-        echo "Starting idle detector ..."
-        /etc/testbed/slothd
-fi
-
 if [ -x /etc/rc.d/testbed/rc.setup  ]; then
         echo "Starting Testbed Setup ..."
 	/etc/rc.d/testbed/rc.setup

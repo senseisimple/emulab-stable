@@ -38,6 +38,16 @@ if [ -x /etc/rc.d/testbed/rc.tarballs  ]; then
 	/etc/rc.d/testbed/rc.tarballs
 fi
 
+if [ -x /etc/rc.d/testbed/rc.healthd ]; then
+        echo "Starting node health monitoring ..."
+        /etc/rc.d/testbed/rc.healthd start
+fi
+
+if [ -x /etc/rc.d/testbed/slothd ]; then
+            echo "Starting idle detector ..."
+            /etc/rc.d/testbed/slothd
+fi
+
 /bin/rm -f /var/spool/at/S*
 if [ -s /etc/rc.d/testbed/startupcmd  ]; then
         echo "Scheduling startup command to run in a little bit ..."
