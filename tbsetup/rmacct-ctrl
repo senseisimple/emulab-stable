@@ -1,0 +1,250 @@
+#!/usr/local/bin/perl -wT
+
+### $Id: rmacct-ctrl,v 1.1 2000-12-14 16:35:44 kwright Exp $
+
+use English;
+use Mysql;
+
+my $me;                # alphanumeric username of $UID 
+
+my $USERROOT = "/users";
+my $YES      = "YES";
+my $NO       = "NO";
+
+my $user;              # kwright
+my $project;           # lkwbox
+my $pid;               # 6009
+
+my $dbh;               # database handle 
+my $sth;               # statement handle
+my @db_row;
+my $db_query;
+
+sanitize();
+dbsetup();
+check_credentials();
+dowork();
+exit(0);
+
+sub dbsetup() {
+    $dbh = Mysql->connect("localhost", "tbdb", "script", "none");
+}
+
+#
+# Figure out who called us. There are 3 possible scenarios:
+#
+# 1) Called from web UI as some TB admin user from the database 
+#    to remove a project head's 
+#    account for a deleted project (called from deleteproject.php3). 
+#
+# 2) Called as user with group_root for project to remove a user
+#    account (from, say, deleteuser.php3).
+#
+# 3) Called from command line as user with group_root for project 
+#    to delete a user account. 
+# 
+# 4) Called from command line as root.
+#
+sub check_credentials() {
+
+    print "Credential check: ";
+
+    #
+    # Make sure the UID is a valid UID in this machine's passwd file
+    #
+    my ($me) = getpwuid($UID) or die "$0: $UID not in passwd file";
+
+    #
+    # Check if we're root
+    #
+    if ($UID == 0) {
+	print "Root user allowed.\n";
+	return;
+    } 
+    
+    #
+    # User could be an admin user.
+    #
+    $sth    = $dbh->query("select admin from users where uid='$me'");
+    @db_row = $sth->fetchrow_array();
+    if ($db_row[0] == 1) {
+	print "Testbed admin user allowed.\n";
+	return;
+    } 
+    #
+    # Last resort: check if group_root for $project
+    #
+    $db_query = "select trust from proj_memb where uid='$me' and pid='$project'";
+    $sth      = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting trust for $me in $project.\n";
+    @db_row   = $sth->fetchrow_array();
+    if ($db_row[0] eq "group_root") {
+	print "Group_root privileges allowed.\n";
+	return;
+    }
+
+    #
+    # If  we're here, we do not have the correct credentials
+    #
+    print "Not root, a TB admin user, or group_root for $pid. Failed.\n";   
+    exit(1);
+}
+
+# 
+# Find the right control node. Create an account for given
+# user with correct user info.
+# 
+sub dowork() {
+
+    my $control_node;
+    my $group_number;   # 601
+
+    #
+    # Find control node.
+    # Note: In the end, I simply assign to 'plastic' as control nodes
+    #       not yet set in the database. 12/14/00 -lkw 
+    #
+    $db_query     = "select control_node from projects where pid='$project'";
+    $sth          = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting control_node.\n";
+    @db_row       = $sth->fetchrow_array();
+    $control_node = $db_row[0];
+    $control_node = "plastic";           # see note above  
+
+    #
+    # Get group number just to make sure there's a group around.
+    #
+    $db_query       = "select unix_gid from projects where pid='$project'";
+    $sth            = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting group number.\n";
+    @db_row         = $sth->fetchrow_array();
+    $group_number   = $db_row[0];
+
+    # XXX: I assume FreeBSD. Its 
+    # firmly entrenched as our control node OS. -lkw
+
+    # The following user/group creation commands must be done as root. 
+
+    my $UID_save = $UID;
+    $UID         = $EUID;
+
+    #
+    # Remove user on paper. 
+    #
+    print "Removing user $user from paper.\n";
+    open(PWDELP, "/usr/sbin/pw userdel $user 2>&1 |") or die "$0: Could not open pw userdel on paper.";
+    while (<PWDELP>) { print "$_"; }
+    close(PWDELP);
+
+    #
+    # Delete user on control node. 
+    #
+    print "Deleting user $user from $control_node.\n";
+    $cmd = "/usr/local/bin/sshtb $control_node " .
+	      "/usr/sbin/pw userdel $user ";
+    open(PWDEL, "$cmd 2>&1 |") or die "$0: Could not open pw userdel.";
+    while (<PWDEL>) { print "$_"; }
+    close(PWDEL);
+
+    #
+    # Remove group name if the project is being deleted
+    # 
+
+    if ( $rmgroup eq $YES ) {
+
+	print "Removing group $project from paper.\n";
+	open(DELGROUPP, "/usr/sbin/pw groupdel $project 2>&1 |");
+	while (<DELGROUPP>) { print "$_"; }
+	close(DELGROUPP);    
+	
+	print "Removing group $project from $control_node.\n";
+	open(DELGROUP, "/usr/local/bin/sshtb $control_node /usr/sbin/pw groupdel $project 2>&1 |");
+	while (<DELGROUP>) { print "$_"; }
+	close(DELGROUP);    
+    }
+
+    # Problem: root will own this dir, but we have to be root to
+    # rename in $USERROOT.
+    #
+    # Run commands below as the user
+    # $EUID = $UID_save;
+    # $UID  = $EUID;
+
+    #
+    # Rename the user directory. These lines stolen from rmprojdir.
+    # 
+
+    my $newname = "$USERROOT/$user-" . `date +20%y%m%d-%H.%M.%S`;
+
+    #
+    # Untaint the new name since it was constructed with date. Dopey.
+    #
+    if ($newname =~ /^($USERROOT\/[-\@\w.]+)$/) {
+	$newname = $1;
+    }
+
+    if ( !(-e "$USERROOT/$user") ) {
+	print STDOUT "User directory '$user' does not exist!\n";
+	exit(-1);
+    }
+
+    if (! rename("$USERROOT/$user", $newname)) {
+	print STDOUT "Could not rename user directory $user to $newname: $!\n";
+	exit(-1);
+    }
+
+}
+
+sub sanitize() {
+
+    ## un-taint path
+    $ENV{'PATH'} = '/bin:/usr/bin';
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+    ## check usage
+    if ($#ARGV < 2) { 
+	die("Usage: rmacct-ctrl <project> <username> <yes/no>\n" .
+	    "\tDeletes given user account on appropriate control node.\n");
+    }
+
+    ## sanitize project
+    if ( $ARGV[0] =~ /^([A-Za-z0-9-]+)$/ ) {
+	$project = $1;
+    } else {
+	die "$0: Project argument $ARGV[0] has invalid characters.\n";
+    }
+
+    ## sanitize user 
+    if ( $ARGV[1] =~ /^([a-z0-9]+)$/i ) {
+	$user = $1;
+    } else {
+	die "$0: User argument $ARGV[1] has invalid characters.\n";
+    }
+
+    ## sanitize the yes/no
+     if ( $ARGV[2] =~ /^(yes)$/i ) {
+	 $rmgroup = $YES;
+    } elsif ( $ARGV[2] =~ /^(no)$/i ) {
+	$rmgroup = $NO;
+    } else {
+	die "$0: User argument $ARGV[2] should be 'yes' or 'no'.\n";
+    }
+
+    ## effective uid must be root
+    if ($> != 0) {
+	die("$0: Must have an EUID of 0 to create an account.\n");
+    }
+
+}
+
+
+###
+### Return non-zero if we got tuples; 0 if not.
+###
+sub got_tuples() {
+
+    my $sth = $_[0];
+    my $db_numrows = $sth->numrows;
+    return $db_numrows;
+}
+
