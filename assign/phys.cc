@@ -28,6 +28,13 @@ tbswitch::~tbswitch() {
 	nodecount = 0;
 }
 
+inline int tbswitch::numnodes() {
+	int nc = 0;
+	for (int i = 0; i < nodecount; i++)
+		nc += nodes[i].count;
+	return nc;
+}
+
 topology::topology(int nswitches) {
 	switchcount = nswitches;
 	switches = new tbswitch *[switchcount];

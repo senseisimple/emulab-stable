@@ -12,6 +12,9 @@ public:
 	virtual ~tbswitch();
 	tbswitch(int ncount, char *newname);	// Specify number of toponodes
 	void setsize(int ncount);
+
+	inline int numnodes();
+	
 	int nodecount;
 	toponode *nodes;
 	char *name;
