@@ -3,10 +3,16 @@
 # tbreport
 # This just provides the necessary information from the IR file.
 
-$TBROOT = "@prefix@";
+my $TBROOT = "@prefix@";
+my $DBNAME = "tbdb";
 
 push(@INC,"$TBROOT/lib/ir");
 require libir;
+
+use DBI;
+$dbh = DBI->connect("DBI:mysql:database=$DBNAME;host=localhost") 
+    || die "Could not connect to DB.\n";
+
 
 if ($#ARGV == 3) {
     ($v,$pid,$eid,$irfile) = @ARGV;
@@ -20,6 +26,8 @@ if ($#ARGV == 3) {
     print STDERR "Syntax: $0 [-v] pid eid irfile\n";
     exit(1);
 }
+
+
 
 eval {&ir_read($irfile)};
 if ($@) {
@@ -52,6 +60,16 @@ foreach (split("\n",$raw)) {
 #      $lan = @info[0];
 #      $lans{$lan} = 1;
 #  }
+$raw = eval {&ir_get("/ip/mac")};
+if ($@) {
+    print STDERR "Could not read /ip/mac from IR file!\n";
+    exit(1);
+}
+foreach (split("\n",$raw)) {
+    ($mac,$ip) = split;
+    $ipmac{$ip} = $mac;
+}
+
 $raw = eval {&ir_get("/ip/map")};
 if ($@) {
     print STDERR "Could not read /ip/map from IR file!\n";
@@ -59,11 +77,21 @@ if ($@) {
 }
 print "\n";
 print "IP Addresses:\n";
-printf "%-20s %-20s %-20s\n", "Node", "Destination", "IP";
+printf "%-20s %-5s %-20s %-20s\n", "Node", "IFC", "Destination", "IP";
 print "-------------------- -------------------- --------------------\n";
 foreach (split("\n",$raw)) {
     ($src,$dst,$ip) = split;
-    printf "%-20s %-20s %-20s\n", $src, $dst, $ip;
+    if (defined($ipmac{$ip})) {
+	$mac = $ipmac{$ip};
+	$sth = $dbh->prepare("SELECT card FROM interfaces WHERE mac = \"$mac\"");
+	if ($sth->execute != 0) {
+	    ($ifc) = $sth->fetchrow_array;
+	}
+	$sth->finish;
+    } else {
+	$ifc = "?";
+    }
+    printf "%-20s eth%-2s %-20s %-20s\n", $src, $ifc, $dst, $ip;
 }
 
 0;
