@@ -108,13 +108,18 @@ int assign()
   int accepts = 0;
   int oldpos;
 
+  int bestviolated;
+  int absbestv;
+  
   float temp = initial_temperature;
   
   /* Set up the initial counts */
   init_score();
 
   bestscore = get_score();
+  bestviolated = violated;
   absbest = bestscore;
+  absbestv = bestviolated;
   node n3;
   forall_nodes(n3, G) {
     absnodes[n3] = G[n3].posistion;
@@ -160,16 +165,23 @@ int assign()
       /* So it's negative if bad */
       scorediff = bestscore - newscore;
 
-      if (newscore < bestscore || accept(scorediff, temp)) {
+      // tinkering aournd witht his.
+      if ((violated < bestviolated) ||
+	  ((violated == bestviolated) && (newscore < bestscore)) ||
+	  accept(scorediff*((bestviolated - violated)/2), temp)) {
 	bestnodes[n] = G[n].posistion;
 	bestscore = newscore;
+	bestviolated = violated;
 	accepts++;
-	if (newscore < absbest) {
+	if (violated < absbestv ||
+	    ((violated == absbestv) &&
+	     (newscore < absbest))) {
 	  node n2;
 	  forall_nodes(n2, G) {
 	    absnodes[n2] = G[n2].posistion;
 	  }
 	  absbest = newscore;
+	  absbestv = violated;
 	  cycles_to_best = iters;
 	}
       } else { /* Reject this change */
@@ -193,12 +205,16 @@ int assign()
   forall_nodes(n, G) {
     if (G[n].posistion != 0)
       remove_node(n);
-    add_node(n,absnodes[n]);
+    if (absnodes[n] != 0)
+      add_node(n,absnodes[n]);
+    else
+      cout << "Unassigned node: " << G[n].name << endl;
   }
   
   timeend = used_time(timestart);
   cout << "   BEST SCORE:  " << get_score() << " in "
        << iters << " iters and " << timeend << " seconds" << endl;
+  cout << "With " << violated << " violations" << endl;
   cout << "With " << accepts << " accepts of increases\n";
   cout << "Iters to find best score:  " << cycles_to_best << endl;
 

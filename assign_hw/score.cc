@@ -91,7 +91,9 @@ void init_score()
   }
 
   ASSERT(pnodes[0] == NULL);
+#ifdef SCORE_DEBUG
   fprintf(stderr,"  score = %.2f violated = %d\n",score,violated);
+#endif
 }
 
 /*
@@ -293,7 +295,12 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
       fprintf(stderr,"  comaptible types\n");
 #endif
-      ; 
+      if (pnoder.current_load == pnoder.max_load) {
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"  node is full\n");
+#endif
+	return 1;
+      }
       
     }
   }
@@ -312,6 +319,8 @@ int add_node(node n,int ploc)
       dst=G.target(e);
     }
     tb_vnode &dstr=G[dst];
+    assert(dst != n);
+    assert(&dstr != &vnoder);
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  edge to %s\n",dstr.name);
 #endif
@@ -319,7 +328,7 @@ int add_node(node n,int ploc)
     if (dstr.posistion != 0) {
       // dstr is assigned
       node dpnode=pnodes[dstr.posistion];
-      tb_pnode &dpnoder=PG[pnode];
+      tb_pnode &dpnoder=PG[dpnode];
 
 #ifdef SCORE_DEBUG
       fprintf(stderr,"   goes to %s\n",dpnoder.name);
@@ -347,8 +356,9 @@ int add_node(node n,int ploc)
 	  violated++;
 	}
       } else if (pnoder.the_switch &&
-		 pnoder.the_switch == dpnoder.the_switch) {
+		 (pnoder.the_switch == dpnoder.the_switch)) {
 	// intraswitch
+	assert(pnoder.the_switch == dpnoder.the_switch);
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   found intraswitch link\n");
 #endif
@@ -468,7 +478,7 @@ edge direct_link(node a,node b)
 //   lowest % of bw used after link added is better.
 int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
 {
-  edge *best_first,*best_second;
+  edge best_first,best_second;
   float best_bw;
   float bw;
   
@@ -489,7 +499,7 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
       if (first)
 	bw = (PG[first].bw_used+bandwidth)/PG[first].bandwidth;
       if (! best_first || bw < best_bw) {
-	best_first = &first;
+	best_first = first;
 	best_bw = bw;
 	best_second = NULL;
       }
@@ -505,8 +515,8 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
 	  // NOTE: One thing to try differently.
 	  bw *= (PG[second].bw_used+bandwidth)/PG[second].bandwidth;
 	if (bw < best_bw) {
-	  best_first = &first;
-	  best_second = &second;
+	  best_first = first;
+	  best_second = second;
 	  best_bw = bw;
 	}
       }
@@ -514,9 +524,9 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
   }
   // if we get here we didn't find a path
   if (best_first) {
-    *f = *best_first;
+    *f = best_first;
     if (best_second)
-      *s = *best_second;
+      *s = best_second;
     return 1;
   } else {
     return 0;
