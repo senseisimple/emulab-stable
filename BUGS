@@ -194,7 +194,7 @@ Informational stuff should go to us.
     be the one using the machines.
 
 
-*** Node control changes lost on swapin/out - Oct 30 2001 - Needs to be fixed
+*** Node control changes lost on swapin/out - Oct 30 2001 - Fixed by LBS
 
     > From: Mac Newbold <newbold@cs.utah.edu>
     > Subject: Re: swapin/out anomoly
@@ -215,3 +215,10 @@ Informational stuff should go to us.
     interface, especially virt_nodes and virt_lans (since it would be nice to
     present a web interface to change the delay params at some point).
     
+*** Frisbee sucks up CPU - Nov 10 2001 - Needs to be fixed
+
+Frisbee is sucking up 15% of the CPU. Needs to be profiled.
+
+*** Add virtual name to node control for. - Nov 12 2001 - Needs to be fixed.
+
+Requested by Dave.
