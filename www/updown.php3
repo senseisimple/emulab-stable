@@ -6,6 +6,45 @@
 #
 require("defs.php3");
 
+if ($output == "xml") {
+    header("Content-type: text/xml");
+
+    $query_result =
+	DBQueryFatal("SELECT n.node_id, n.type, ns.status FROM nodes as n ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "left join node_status as ns on ns.node_id=n.node_id ".
+		     "WHERE nt.class!='shark' and role='testnode'".
+		     "ORDER BY n.type,n.priority");
+
+    print "<?xml version=\"1.0\" encoding=\"ISO-8859_1\" standalone=\"yes\"?>\n";
+
+    print "<!DOCTYPE testbed \n[\n".
+          "  <!ELEMENT testbed (node*)>\n".
+	  "  <!ATTLIST testbed name CDATA #REQUIRED>\n".
+          "  <!ELEMENT node EMPTY>\n".
+	  "  <!ATTLIST node id     ID    #REQUIRED\n".
+	  "                 type   CDATA #IMPLIED\n".
+          "                 status CDATA \"unknown\"\n".
+          "  >\n". 
+	  "]>\n";
+
+    print "<testbed name=\"$OURDOMAIN\">\n";
+    while ($r = mysql_fetch_array($query_result)) {
+	$node_id = $r["node_id"];
+	$type = $r["type"];
+	$status = $r["status"];
+	
+	print "  <node id=\"$node_id\" type=\"$type\" ";
+	if ($status != "") {
+	    print " status=\"$status\" ";
+	}
+	print "/>\n";
+    }
+    print "</testbed>\n";
+
+    return;
+}
+
 #
 # Standard Testbed Header
 #

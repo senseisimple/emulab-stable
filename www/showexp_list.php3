@@ -349,13 +349,24 @@ if ($thumb && !$idle) {
 	$thumb_hash = $row["thumb_hash"];
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
+
+	if ($TBMAINSITE) {
+	    # if image is not in thumbs dir, render it!
+	    if ($thumb_hash && !file_exists ($TBDIR . "www/thumbs/tn$thumb_hash.png")) {
+		# we'll be paranoid, and escape pid and eid.
+		$prerender_cmd = $TBDIR . "libexec/vis/prerender -t " . 
+		                 escapeshellcmd($pid) . " " . escapeshellcmd($eid) .
+				 " > /dev/null";
+		#echo "<!-- rerendered $pid $eid -->";
+		system( $prerender_cmd );
+	    }
+	}
+
 #	echo "<table style=\"float: none;\" width=256 height=192><tr><td>".
 #	echo "And<table align=left width=256 height=192><tr width=256><td height=192>".
 #	echo "<table width=256 height=192><tr><td>".
 #	echo "<td width=50%>".
 #	echo "<tr
-
-#	Should create on demand.
 
 	if ($thumb == 2) {
 	    if ($pid != "emulab-ops") {
