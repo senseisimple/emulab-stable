@@ -95,8 +95,8 @@ ID  Name                            Members of VLAN
 
 2. Checking on the firewall rules
 
-   You have to login to the "control" Cisco, enable and then
-   "session 15" to connect to the Router module.
+   You have to login to the "control" Cisco and then "session 15" to
+   connect to the Router module.
 
    While at the Router> prompt, you will get any "access denied" type
    messages that the router produces, ala:
@@ -110,17 +110,36 @@ ID  Name                            Members of VLAN
 
    To see the whole lists in all their ugliness, type:
 	show ip access-lists
-   The rules are pretty straightforward. First match wins. Netmasks are bass-ackwards
-   (intead of 255.255.255.0, you would use 0.0.0.255). Each list is applied both
-   on entrance and exit to the like-named control network VLAN.
+   The rules are pretty straightforward. First match wins. Netmasks are
+   bass-ackwards (intead of 255.255.255.0, you would use 0.0.0.255).
+   Each list is applied both on entrance and exit to the like-named control
+   network VLAN.
 
 3. Changing the firewall rules
 
    ROB: Working on this part
 
 4. Finding MAC address information
-	To find which port a given MAC address is on type (on the switch console):
-		show cam <MAC> (where MAC is colon-separated, like 08:00:2b:81:62:d3
-	To show all MAC addresses in a given VLAN, type:
-		show cam dynamic <VLAN> (where VLAN is the number, not the name)
+
+   To find which port a given MAC address is on type (on the switch console):
+	show cam <MAC>
+   where MAC is colon-seperated, like 08:00:2b:81:62:d3.
+
+   To show all MAC addresses in a given VLAN, type:
+	show cam dynamic <VLAN>
+   where VLAN is the number, not the name.
 	
+5. Deleting a "sticky" ARP entry
+
+   If you should ever be so unfortunate as to have to replace a faulty
+   shark, in addition to recording the new MAC address in the DB and DHCP
+   config file, you may also need to clear it from the router module.
+   If you fire up a new shark, and it says that it cannot get its DHCP info,
+   this is likely the problem.  To find out, login to the control Cisco and
+   "session 15" to get to the router module.  You should start seeing periodic
+   
+   24w2d: %IP-3-STCKYARPOVR: Attempt to overwrite Sticky ARP entry: \
+   	155.101.130.73, hw: 0800.2b81.62d3 by hw: 0800.2b81.611b
+
+   messages.  To clear the arp entry (actually the whole cache), enable at
+   the Router> prompt and then do "clear arp".
