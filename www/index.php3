@@ -17,8 +17,9 @@ $query_result =
     DBQueryFatal("select count(*) from experiments as e " .
 	"left join experiment_stats as s on s.exptidx=e.idx " .
 	"left join experiment_resources as rs on rs.idx=s.rsrcidx ".
-	"where state='active' and rs.pnodes > 0 and " .
-        "      e.pid!='emulab-ops' and (e.pid!='ron' and e.eid!='all')");
+	"where state='active' and rs.pnodes>0 and " .
+        "      e.pid!='emulab-ops' and ".
+	"      not (e.pid='ron' and e.eid='all')");
 
 if (mysql_num_rows($query_result) != 1) {
     $active_expts = "ERR";
