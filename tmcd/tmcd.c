@@ -98,6 +98,7 @@ typedef struct {
 	int		jailflag;
 	int		isvnode;
 	int		islocal;
+	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
 	char		pid[TBDB_FLEN_PID];
@@ -3203,7 +3204,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	if (reqp->isvnode) {
 		res = mydb_query("select t.class,t.type,np.node_id,"
 				 " np.jailflag,r.pid,r.eid,r.vname, "
-				 " e.gid,e.testdb "
+				 " e.gid,e.testdb,nv.update_accounts "
 				 " from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3216,11 +3217,12 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=np.type and i.card=t.control_net "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 9, reqp->vnodeid, inet_ntoa(ipaddr));
+				 10, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
-				 " r.pid,r.eid,r.vname,e.gid,e.testdb "
+				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
+				 " n.update_accounts " 
 				 " from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3230,7 +3232,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.card=t.control_net "
 				 "where i.IP='%s'",
-				 9, inet_ntoa(ipaddr));
+				 10, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3280,6 +3282,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 			      reqp->nodeid, reqp->pid, reqp->eid);
 		}
 	}
+	if (row[9])
+		reqp->update_accounts = atoi(row[9]);
+	else
+		reqp->update_accounts = 0;
 
 	/* If a vnode, copy into the nodeid. Eventually split this */
 	if (reqp->isvnode)
@@ -3579,7 +3585,6 @@ client_writeback_done(int sock, struct sockaddr_in *client)
  */
 COMMAND_PROTOTYPE(doisalive)
 {
-	MYSQL_RES	*res;
 	int		doaccounts = 0;
 	char		buf[MYBUFSIZE];
 
@@ -3597,20 +3602,9 @@ COMMAND_PROTOTYPE(doisalive)
 	/*
 	 * Return info about what needs to be updated. 
 	 */
-	res = mydb_query("select update_accounts from nodes "
-			 "where node_id='%s' and update_accounts!=0",
-			 1, reqp->nodeid);
-			 
-	if (!res) {
-		error("ISALIVE: %s: DB Error getting account info!\n",
-		      reqp->nodeid);
-		return 1;
-	}
-	if (mysql_num_rows(res)) {
+	if (reqp->update_accounts)
 		doaccounts = 1;
-	}
-	mysql_free_result(res);
-
+	
 	/*
 	 * At some point, maybe what we will do is have the client
 	 * make a request asking what needs to be updated. Right now,
