@@ -10,6 +10,13 @@
 <h3>Table of Contents:</h3>
 <ol>
   <li><a href="#intro">Introduction</a></li>
+  <li><a
+ href="file:///.a/nfast/users/fish/flux/testbed/www/hyperviewer/index.html#platforms">Supported
+platforms, release notes<br>
+    </a></li>
+  <li><a
+ href="file:///.a/nfast/users/fish/flux/testbed/www/hyperviewer/index.html#dependencies">Package
+dependencies</a></li>
   <li><a href="#install">Installing hypview</a></li>
   <ol style="list-style-type: lower-alpha;">
     <li><a href="#getting_unix">Getting and unpacking the Emulab
@@ -24,8 +31,6 @@ program from sources (Unix/Linux)</a></li>
     <li><a href="#building_windows">Building the Emulab HyperViewer
 client
 program from sources (Windows)</a></li>
-    <li><a href="#platforms">Supported platforms</a></li>
-    <li><a href="#dependencies">Package dependencies</a></li>
   </ol>
   <li><a href="#run">Running hypview as a script</a></li>
   <li><a href="#gui">The hypview Graphical User Interface</a></li>
@@ -40,6 +45,25 @@ topologies for Emulab experiments.&nbsp; In detail, we have wrapped the
 HyperViewer in a wxGlade Python graphical user
 interface, and connected it to the Emulab database via XML-RPC over SSH.<br>
 <br>
+<span style="font-style: italic; font-weight: bold;">hypview</span>
+supports interactive three-dimensional exploration of experiment
+network topologies, and scales to very large topologies.&nbsp; Here is
+a before-and-after view of a moderate-sized network with 541
+nodes.&nbsp; First is the static 2D Graphviz view, using an algorithm
+which is perfectly adequate for smaller topologies.&nbsp; Then a
+snapshot
+from hypview of the same topology, where more detail is apparent.&nbsp;
+Interactively, it is easy to reach out from the high-detail area in the
+center of the sphere to look more closely into the compressed areas
+near the center of the sphere.<br>
+<br>
+<div style="margin-left: 40px;"><a href="graphviz_biglan.jpg"><img
+ style="border: 2px solid ; width: 320px; height: 348px;" alt=""
+ title="Click for full-size image." src="graphviz_biglan_small.jpg"></a><a
+ href="graphviz_biglan.jpg">&nbsp; </a><a href="gui_top2.jpg"><img
+ align="top" style="border: 2px solid ; width: 380px; height: 326px;"
+ alt="" src="gui_top_small2.jpg" title="Click for full-size image."></a></div>
+<br>
 The <a href="http://graphics.stanford.edu/papers/h3cga/">HyperViewer</a>
 software was developed by <a
  href="http://graphics.stanford.edu/%7Emunzner">Tamara Munzner at
@@ -53,7 +77,9 @@ library</a> which calls OpenGL for drawing.&nbsp; See her short <a
 further description, particularly <a
  href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig">Figure
 3</a> which shows Hyperbolic motion over a 30,000 element
-Unix file system.<br>
+Unix file system.&nbsp; The drawing and picking algorithms are designed
+to produce a constant frame-rate by doing the most visible features
+first, and hence scales to 100,000-node graphs.<br>
 &nbsp;<a
  href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig"><img
  style="border: 2px solid ; width: 149px; height: 150px;"
@@ -72,6 +98,126 @@ tilings</a>.<br>
  title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
 <br>
 <hr style="width: 100%; height: 2px;"><br>
+<h3><a name="platforms"></a>Supported platforms, release notes:</h3>
+<ul>
+  <li><b>FreeBSD</b> - The first target system.</li>
+</ul>
+<ul>
+  <ul>
+    <li>There is a bug in the <span style="font-weight: bold;">ATI
+Radeon</span> DRI graphics card driver which "tatters" bitmap
+text so labels on nodes in the HyperViewer are unreadable.</li>
+    <ul>
+      <li>A temporary work-around which doesn't require restarting X is
+to rename <span style="font-weight: bold;">/dev/dri/card0</span> or
+change its mode to prevent access.&nbsp; This will still throw an X
+"BadMatch" error_code 8 request_code 156 minor_code 5 when used
+remotely, though.</li>
+      <li>A better work-around is to comment out the <span
+ style="font-weight: bold;">Load "dri"</span> line in the <span
+ style="font-weight: bold;">/etc/XF86Config</span> file and restart
+X.&nbsp; You will get a normal warning message when starting up any
+OpenGL program such as HyperViewer: <br>
+      </li>
+    </ul>
+  </ul>
+</ul>
+<pre style="margin-left: 160px;">Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
+<ul>
+  <ul>
+    <li>The <span style="font-weight: bold;">nVidia</span> OpenGL
+drivers on the FreeBSD 4.10 machines have another problem.&nbsp; Mike
+encountered an X 'GLXBadDrawable' error_code 160 request_code 144
+minor_code 11.&nbsp; As a result, our current 4.10 build uses the Mesa
+OpenGL with no DRI, since DRI isn't supported on the nVidia
+cards.&nbsp; You will get a normal warning message:<br>
+      <pre>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
+    </li>
+  </ul>
+  <li><b>Windows</b> - Initial version.</li>
+</ul>
+<ul>
+  <ul>
+    <li>Picking of graph nodes is not working yet due to a PyOpenGL
+bug.&nbsp; However, you can pick graph edges. which is equivalent to
+picking the node the edge leads to.</li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>It busy-loops too much on Windows.&nbsp; I'll try to tame that.<br>
+    </li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>You connect to XMLRPC on boss.emulab.net via SSH to retrieve
+experiments from the database.&nbsp; On Windows, you can use either the
+      <a href="http://www.chiark.greenend.org.uk/%7Esgtatham/putty/">PuTTY</a>
+"plink" command line program or the <a href="http://www.cygwin.com/">Cygwin</a>
+OpenSSH "ssh" program. <br>
+    </li>
+  </ul>
+</ul>
+<div style="margin-left: 80px;">In either case, the proper directory
+has to be on your PATH environment variable, and you have to have an
+SSH key generated and loaded:</div>
+<ul>
+  <ul>
+    <ul>
+      <li>For PuTTY: generate a dsa key for SSH 2 in putty-keygen; load
+it into pageant; and paste the ssh-dss string into Insert Key under
+Edit SSH Keys on your "My Emulab" page after logging in at <a
+ href="https://www.emulab.net">https://www.emulab.net</a>.&nbsp; (PuTTY
+includes a good online manual.)</li>
+    </ul>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <ul>
+      <li>For OpenSSH: use ssh-keygen if necessary; start an ssh-agent
+and load the key with:</li>
+    </ul>
+  </ul>
+</ul>
+<pre style="margin-left: 160px;">eval `ssh-agent -s`<br>ssh-add .ssh/id_dsa<br></pre>
+<div style="margin-left: 120px;">Paste the id_dsa.pub into the Emulab
+page as above, and do the following once to get boss.emulab.net put
+into your .ssh/known_hosts file:<br>
+</div>
+<pre style="margin-left: 160px;">ssh boss.emulab.net</pre>
+<ul>
+</ul>
+<ul>
+  <li><b>Linux</b> - Pretty much untested.<br>
+  </li>
+  <ul>
+    <li>Edit the GNUMakefile to select CPU=linux before building,</li>
+    <li>and also select the include of Makefile.linuxwxpy in
+hypviewer/Makefile.main .<br>
+    </li>
+  </ul>
+</ul>
+<ul>
+  <li>Please send problem reports to <a href="mailto:fish@cs.utah.edu">Russ
+Fish</a>.<br>
+  </li>
+</ul>
+<h4><a name="dependencies"></a>Package dependencies: </h4>
+<div style="margin-left: 40px;">It needs wxPython, which on Unix
+requires Python 2.3, wx_GTK2, GTK-x11, Pango, and glib, as well as glX
+and
+OpenGL.&nbsp; On Windows, the distributions of Python, wxPython, and
+PyOpenGL are
+self-contained.<br>
+<br>
+Plus wxGlade on top of wxPython if you want to modify the GUI design.<br>
+</div>
+<br>
+<hr style="width: 100%; height: 2px;">
+<div style="margin-left: 40px;"></div>
+<br>
 <h3><a name="install"></a>Installing hypview</h3>
 <h4><a name="getting_unix"></a>Getting and unpacking the Emulab
 HyperViewer
@@ -142,41 +288,60 @@ HyperViewer
 client program (Windows):<br>
 </h4>
 <ul>
-  <li>You first need to download and install the Windows versions of
+  <li>You first need Python, wxWindows, and PyOpenGL.&nbsp; The easy
+way is to get it all packaged together in <a
+ href="http://www.emulab.net/downloads/Python22-wxWindows-PyOpenGL.exe">one
+exe file</a>, and unpack to the location of your choice.&nbsp; The
+download size is 25 meg and installed it becomes 56 meg.&nbsp; The
+default unpack location is C:\, in which case you can also unpack <a
+ href="http://www.emulab.net/downloads/Python22-wxWindows-shortcuts.exe">these
+shortcuts</a> into your Start Menu/Programs folder for the effect of a
+normal installation.<br>
+  </li>
+</ul>
+<ul>
+  <li>Another approach is to download and install the official Windows
+versions of
 the following :</li>
   <ul>
     <li><a
  href="http://www.python.org/ftp/python/2.2.3/Python-2.2.3.exe">Python
-2.2</a>, <a href="http://www.python.org/">(Python home page)</a><br>
+2.2</a>, <a href="http://www.python.org/">(Python home page)</a>, 8
+-&gt; 30 meg, User or Admin install.<br>
     </li>
     <li><a
  href="http://prdownloads.sourceforge.net/wxpython/wxPythonWIN32-2.4.2.4u-Py22.exe">wxWindows
-2.4.2</a>, <a href="http://www.wxpython.org/">(wxWindows home page)</a><br>
+2.4.2</a>, <a href="http://www.wxpython.org/">(wxWindows home page)</a>,
+8 -&gt; 21 meg, User or Admin install, requires reboot.<br>
     </li>
     <li><a
  href="http://prdownloads.sourceforge.net/pyopengl/PyOpenGL-2.0.0.44.win32-py2.2.exe?download">PyOpenGL
 2.0.0.44</a>, <a href="http://pyopengl.sourceforge.net/">(PyOpenGL
-home page)</a></li>
+home page)</a>, 1.5 -&gt; 5 meg, Admin install only.<br>
+    </li>
   </ul>
 </ul>
-<div style="margin-left: 40px;">Verify that it's all working by running
+<ul>
+  <li>Verify that it's all working by running
 Start/Programs/wxPython 2.4/wxPython DEMO.&nbsp; Click the [+] to open
 the "Objects using an external library" branch, click wxGLCanvas, then
 the Cube and/or Cone buttons on the Demo tab.&nbsp; An OpenGL canvas
-window should pop up.&nbsp; Moving <br>
-</div>
+window should pop up.&nbsp; Clicking and moving the mouse in the canvas
+rotates the object.<br>
+  </li>
+</ul>
 <ul>
-  <li>There is a self-extracting WinZip exe for <a
+  <li>For hyperviewer, there is a self-extracting WinZip exe for <a
  href="http://www.emulab.net/downloads/hyperviewer-Win32.exe">Windows
-2000 and XP</a>
-now.&nbsp; There is a top-level hyperviewer directory in the exe, so
+2000 and XP</a>.&nbsp; There is a top-level hyperviewer directory in
+the exe, so
 just unpack into the directory of your choice.<br>
   </li>
 </ul>
 <ul>
   <li>Test by running hypview.bat in the hyperviewer directory and
 feeding it BigLan.hyp or ts600.hyp.&nbsp; You can double-click it and
-use the File/Open menu command, or in a command shell, do this:<br>
+use the File/Open menu command, or do this in a command shell:<br>
     <pre style="margin-left: 40px;"><big>cd hyperviewer</big></pre>
   </li>
 </ul>
@@ -227,9 +392,17 @@ install Developer Studio 6 with Visual C++ and the Platform SDK (which
 includes OpenGL.)&nbsp; VC++ and OpenGL documentation is on the MSDN
 library disks.
 <ul>
+  <li>Move the source files that are in the <span
+ style="font-weight: bold;">win32</span> subdirectory up into the main
+directory, if that has not already been done.&nbsp; These are the
+-DWIN32 versions of the files generated by SWIG, and Python library
+files that are missing from the Windows version of Python.<br>
+  </li>
+</ul>
+<ul>
   <li>To rebuild the hypviewer C++ library and the _hv.dll that gets
 loaded
-into Python, open the hv.dsw workspace in Developer Studio and hit F7.<br>
+into Python, open the hv.dsw workspace in Developer Studio, and hit F7.<br>
   </li>
 </ul>
 <ul>
@@ -247,125 +420,9 @@ things.&nbsp; You can get it from <a
 the ROADMAP file if you want to know more about internals.</li>
 </ul>
 There are a couple of example files included:
-<pre><big>cd hyperviewer<br>hypview.bat BigLan.hyp</big><big><br>hypview.bat ts600.hyp</big></pre>
+<pre style="margin-left: 80px;"><big>cd hyperviewer<br>hypview.bat BigLan.hyp</big><big><br>hypview.bat ts600.hyp</big></pre>
 <div style="margin-left: 80px;">
 </div>
-<h4><a name="platforms"></a>Supported platforms:</h4>
-<ul>
-  <li>FreeBSD - The first target system.</li>
-</ul>
-<ul>
-  <ul>
-    <li>There is a bug in the <span style="font-weight: bold;">ATI
-Radeon</span> DRI graphics card driver which "tatters" bitmap
-text so labels on nodes in the HyperViewer are unreadable.</li>
-    <ul>
-      <li>A temporary work-around which doesn't require restarting X is
-to rename <span style="font-weight: bold;">/dev/dri/card0</span> or
-change its mode to prevent access.&nbsp; This will still throw an X
-"BadMatch" error_code 8 request_code 156 minor_code 5 when used
-remotely, though.</li>
-      <li>A better work-around is to comment out the <span
- style="font-weight: bold;">Load "dri"</span> line in the <span
- style="font-weight: bold;">/etc/XF86Config</span> file and restart
-X.&nbsp; You will get a normal warning message when starting up any
-OpenGL program such as HyperViewer: <br>
-      </li>
-    </ul>
-  </ul>
-</ul>
-<pre style="margin-left: 160px;">Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
-<ul>
-  <ul>
-    <li>The <span style="font-weight: bold;">nVidia</span> OpenGL
-drivers on the FreeBSD 4.10 machines have another problem.&nbsp; Mike
-encountered an X 'GLXBadDrawable' error_code 160 request_code 144
-minor_code 11.&nbsp; As a result, our current 4.10 build uses the Mesa
-OpenGL with no DRI, since DRI isn't supported on the nVidia
-cards.&nbsp; You will get a normal warning message:<br>
-      <pre>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
-    </li>
-  </ul>
-  <li>Windows - The initial version is out.</li>
-</ul>
-<ul>
-  <ul>
-    <li>Picking of graph nodes is not working yet due to a PyOpenGL
-bug.&nbsp; However, you can pick graph edges. which is equivalent to
-picking the node the edge leads to.</li>
-  </ul>
-</ul>
-<ul>
-  <ul>
-    <li>It busy-loops too much on Windows.&nbsp; I'll try to tame that.<br>
-    </li>
-  </ul>
-</ul>
-<ul>
-  <ul>
-    <li>You connect to XMLRPC on boss.emulab.net via SSH to retrieve
-experiments from the database.&nbsp; On Windows, you can use either the
-      <a href="http://www.chiark.greenend.org.uk/%7Esgtatham/putty/">PuTTY</a>
-"plink" command line program or the <a href="http://www.cygwin.com/">Cygwin</a>
-OpenSSH "ssh" program. <br>
-    </li>
-  </ul>
-</ul>
-<div style="margin-left: 80px;">In either case, the proper directory
-has to be on your PATH environment variable, and you have to have an
-SSH key generated and loaded:</div>
-<ul>
-  <ul>
-    <ul>
-      <li>For PuTTY: generate a dsa key for SSH 2 in putty-keygen; load
-it into pageant; and paste the ssh-dss string into Insert Key under
-Edit SSH Keys on your "My Emulab" page after logging in at <a
- href="https://www.emulab.net">https://www.emulab.net</a>.&nbsp; (PuTTY
-includes a good online manual.)</li>
-    </ul>
-  </ul>
-</ul>
-<ul>
-  <ul>
-    <ul>
-      <li>For OpenSSH: use ssh-keygen if necessary; start an ssh-agent
-and load the key with:</li>
-    </ul>
-  </ul>
-</ul>
-<pre style="margin-left: 160px;">eval `ssh-agent -s`<br>ssh-add .ssh/id_dsa<br></pre>
-<div style="margin-left: 120px;">Paste the id_dsa.pub into the Emulab
-page as above, and do the following once to get boss.emulab.net put
-into your .ssh/known_hosts file:<br>
-</div>
-<pre style="margin-left: 160px;">ssh boss.emulab.net</pre>
-<ul>
-</ul>
-<ul>
-  <li>Linux - Pretty much untested.<br>
-  </li>
-  <ul>
-    <li>Edit the GNUMakefile to select CPU=linux before building,</li>
-    <li>and also select the include of Makefile.linuxwxpy in
-hypviewer/Makefile.main .<br>
-    </li>
-  </ul>
-</ul>
-<ul>
-  <li>Please send problem reports to <a href="mailto:fish@cs.utah.edu">Russ
-Fish</a>.<br>
-  </li>
-</ul>
-<h4><a name="dependencies"></a>Package dependencies: </h4>
-<div style="margin-left: 40px;">It needs wxPython, which on Unix
-requires Python 2.3, wx_GTK2, GTK-x11, Pango, and glib, as well as glX
-and
-OpenGL.&nbsp; On Windows, Python, wxPython, and PyOpenGL are
-self-contained.<br>
-<br>
-Plus wxGlade on top if you want to modify the GUI.<br>
-</div>
-<br>
 <hr style="width: 100%; height: 2px;">
 <div style="margin-left: 40px;"></div>
 <h3><a name="run"></a>Running hypview as a script<br>
@@ -373,8 +430,9 @@ Plus wxGlade on top if you want to modify the GUI.<br>
 Running hypview with any dash argument such as -h produces the
 following usage
 summary: <br>
-(Use the hypview script on Unix/Linux or Cygwin/BASH;&nbsp; hypview.bat
-on Windows.)<br>
+(Use the <span style="font-weight: bold;">hypview</span> script on
+Unix/Linux or Cygwin/BASH;&nbsp; <span style="font-weight: bold;">hypview.bat</span>
+in Windows cmd shells.)<br>
 <pre style="margin-left: 40px;"><big>Hyperviewer usage:</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; No args - Starts up the GUI.&nbsp; Use the File/Open menu item to read a topology.</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; One arg - A .hyp file name.&nbsp; Read it in and start the GUI, e.g.:</big></pre>
