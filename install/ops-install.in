@@ -77,6 +77,7 @@ my $TOP_OBJDIR = "$OBJDIR/..";
 my $CHGRP      = "/usr/bin/chgrp";
 my $CHMOD      = "/bin/chmod";
 my $PW         = "/usr/sbin/pw";
+my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
@@ -101,6 +102,8 @@ my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 my $CRONTAB         = "/etc/crontab";
+
+my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
 
 #
 # Some directories we care about
@@ -216,6 +219,15 @@ Phase "ports", "Installing ports", sub {
 	chdir $pwd;
     };
 };
+
+Phase "patches", "Applying patches", sub {
+    Phase "m2cryptopatch", "Patching m2crypto", sub {
+        if (!ExecQuiet("$PATCH -C -f -R -p0 -i $M2CRYPTO_PATCH")) {
+            PhaseSkip("$M2CRYPTO_PATCH already applied");
+        }
+        ExecQuietFatal("$PATCH -f -p0 -i $M2CRYPTO_PATCH");
+    };
+}; 
 
 Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     DoneIfEdited($RCCONF);
