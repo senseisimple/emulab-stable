@@ -6,7 +6,6 @@
 #
 use English;
 use Getopt::Std;
-use POSIX qw(setsid);
 
 #
 # This is a helper program for your web browser. It allows you to ssh
