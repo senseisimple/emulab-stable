@@ -6,8 +6,8 @@ LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3 -fomit-frame-pointer -m486
 CXXFLAGS = -I${LEDA}/incl
 # Pick one of the two below.
-#CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
-CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
+CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
+#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
 DEPLIBS=$(OBJS)
 
 all: assign 
