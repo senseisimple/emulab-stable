@@ -109,7 +109,8 @@ LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/lib/, $(LIB_STUFF))
 
-control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+control-install:	libevent_r.a \
+			$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 #
 # Right now we don't bother with the dynamic libs since all of the existing
