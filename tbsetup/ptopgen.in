@@ -575,6 +575,14 @@ if ($widearea) {
 	    push @features, @{$features{$physnode}};
 	}
 
+	#
+	# Add in features for all of the OSes that this node (as evidenced by
+	# its type) can support
+	#
+	if ($node_type_osids{$ptype}) {
+	    push @features, map "OS-$_:0", @{$node_type_osids{$ptype}};
+	}
+
 	my $text = "node $physnode " .
 	           join(" ",@types) . " - " . join(" ",@features) .
 		   " - " . join(" ",@flags);
