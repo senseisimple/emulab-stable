@@ -148,7 +148,7 @@ def wrapperoptions():
 # @param ssh_identity The ssh identity file to use when connecting.
 # @return A pair containing the ssh transport and the path used, in that order.
 #
-def make_transport(user_agent=None, ssh_identity=None):
+def make_transport(login_id, user_agent=None, ssh_identity=None):
     if path:
         retval = (SSHTransport(user_agent=user_agent, ssh_opts=SSH_OPTS), path)
         pass
@@ -159,7 +159,7 @@ def make_transport(user_agent=None, ssh_identity=None):
                                        ssh_identity=ssh_identity,
                                        ssh_opts=SSH_OPTS),
                           xrpath)
-                hdrs = retval[0].probe(xmlrpc_server,
+                hdrs = retval[0].probe(login_id + "@" + xmlrpc_server,
                                        "/" + xrpath,
                                        verbose=debug)
                 if hdrs["probe-response"] == "EmulabServer":
@@ -196,7 +196,8 @@ def do_method(module, method, params):
     if impotent:
         return 0;
 
-    transport, fullpath = make_transport(user_agent="sshxmlrpc_wrapper-v0.2")
+    transport, fullpath = make_transport(login_id,
+                                         user_agent="sshxmlrpc_wrapper-v0.2")
 
     # Get a handle on the server,
     server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
