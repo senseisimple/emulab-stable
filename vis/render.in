@@ -21,6 +21,11 @@ if (! getopts($optlist, \%options)) {
     
 }
 
+# if $embiggen == 1, node fonts will be rendered bigger.
+# if $embiggen == 2, node and link fonts will be rendered bigger.
+
+my $embiggen = 0; 
+
 my $zoom = 1;
 if ( defined($options{"z"} ) ) {
     my $zf = $options{"z"};
@@ -30,6 +35,9 @@ if ( defined($options{"z"} ) ) {
 	die("Bad argument to -z.. must be float.");
     }
 }
+
+if ($zoom >= 1.5) { $embiggen = 1; }
+if ($zoom >= 1.75) { $embiggen = 2; }
 
 %props = ();
 %nodes = ();
@@ -302,19 +310,19 @@ foreach $i (@links) {
 
 	my $linenum = 0;
 	foreach $j (@lines) {
-	    $xpos = $x - (((length($j) - 0.5) * $fontw) / 2); 
+	    $xpos = $x - ((length($j) - 0.5) * (($embiggen == 2) ? gdSmallFont->width : gdTinyFont->width) / 2); 
 	    
-	    $im->string(gdTinyFont, $xpos + 1, $y, 
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos + 1, $y, 
 			$j, $bgcolor);
-	    $im->string(gdTinyFont, $xpos - 1, $y, 
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos - 1, $y, 
 			$j, $bgcolor);
-	    $im->string(gdTinyFont, $xpos, $y - 1, 
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y - 1, 
 			$j, $bgcolor);
-	    $im->string(gdTinyFont, $xpos, $y + 1, 
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y + 1, 
 			$j, $bgcolor);
-	    $im->string(gdTinyFont, $xpos, $y, 
+	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y, 
 			$j, $colors{"darkblue"}); 
-	    $y += gdTinyFont->height; 
+	    $y += ($embiggen == 2) ? gdSmallFont->height : gdTinyFont->height; 
 	}
     }
 }
@@ -325,39 +333,61 @@ foreach $i (keys %nodes) {
 # my $nm = $i;
   my $nm = $nodes{$i}{"label"};
 
-  my @lines = split " ", $nm;
+  @lines = ();
+
+  $nm .= " ";
+
+  $nm =~ s/^(\S+)//;
+
+  push @lines, $1;
+
+  while ( $nm =~ s/^(.{1,12})\s// ) {
+    push @lines, $1;
+  }
+
+  push @lines, $nm;
+
+  # my @lines = split " ", $nm;
 
   my $linenum = 0;
   foreach $j (@lines) {
 #     warn "$j $x $y!";
       if ($linenum++ == 0) {
-	  $xpos = $x - (((length($j) - 0.5) * gdSmallFont->width) / 2); 
+	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdMediumBoldFont->width : gdSmallFont->width) / 2);
 
-	  $im->string(gdSmallFont, $xpos + 1, $y + 20, 
+	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+		      $xpos + 1, $y + 20, $j, $bgcolor);
+	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+		      $xpos - 1, $y + 20, $j, $bgcolor);
+	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+		      $xpos, $y + 19, 
 		      $j, $bgcolor);
-	  $im->string(gdSmallFont, $xpos - 1, $y + 20, 
+	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+		      $xpos, $y + 21, 
 		      $j, $bgcolor);
-	  $im->string(gdSmallFont, $xpos, $y + 19, 
-		      $j, $bgcolor);
-	  $im->string(gdSmallFont, $xpos, $y + 21, 
-		      $j, $bgcolor);
-	  $im->string(gdSmallFont, $xpos, $y + 20, 
+	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
+		      $xpos, $y + 20, 
 		      $j, $colors{"black"}); 
-	  $y += gdSmallFont->height; 
+	  $y += $embiggen ? gdMediumBoldFont->height : gdSmallFont->height; 
       } else {
-	  $xpos = $x - (((length($j) - 0.5) * gdTinyFont->width) / 2); 
+	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdSmallFont->width : gdTinyFont->width) / 2); 
 
-	  $im->string(gdTinyFont, $xpos + 1, $y + 20, 
+	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+		      $xpos + 1, $y + 20, 
 		      $j, $bgcolor);
-	  $im->string(gdTinyFont, $xpos - 1, $y + 20, 
+	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+		      $xpos - 1, $y + 20, 
 		      $j, $bgcolor);
-	  $im->string(gdTinyFont, $xpos, $y + 19, 
+	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+		      $xpos, $y + 19, 
 		      $j, $bgcolor);
-	  $im->string(gdTinyFont, $xpos, $y + 21, 
+	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+		      $xpos, $y + 21, 
 		      $j, $bgcolor);
-	  $im->string(gdTinyFont, $xpos, $y + 20, 
+	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
+		      $xpos, $y + 20, 
 		      $j, $colors{"black"}); 
-	  $y += gdTinyFont->height; 
+	  $y += ($embiggen) ? gdSmallFont->height : gdTinyFont->height; 
       }
   }
 } 
