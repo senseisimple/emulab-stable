@@ -138,6 +138,7 @@ typedef struct {
 	int		islocal;
 	int		iscontrol;
 	int		isplabdslice;
+	int		isplabsvc;
 	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
@@ -299,6 +300,7 @@ char *usagestr =
  " -d              Turn on debugging. Multiple -d options increase output\n"
  " -p portnum	   Specify a port number to listen on\n"
  " -c num	   Specify number of servers (must be %d <= x <= %d)\n"
+ " -v              More verbose logging\n"
  "\n";
 
 void
@@ -508,10 +510,12 @@ main(int argc, char **argv)
 			int which = 0;
 			if (!foo[1])
 				which = 1;
-			else if (!debug && !foo[2])
-				which = 2;
-			else if (!debug && !foo[3])
-				which = 3;
+			else if (!debug && portnum == TBSERVER_PORT) {
+				if (!foo[2])
+					which = 2;
+				else if (!foo[3])
+					which = 3;
+			}
 
 			if ((pid = fork()) < 0) {
 				errorc("forking server");
@@ -532,9 +536,9 @@ main(int argc, char **argv)
 			signal(SIGHUP, SIG_DFL);
 			
 			switch (which) {
-			case 0: tcpserver(tcpsock, TBSERVER_PORT);
+			case 0: tcpserver(tcpsock, portnum);
 				break;
-			case 1: udpserver(udpsock, TBSERVER_PORT);
+			case 1: udpserver(udpsock, portnum);
 				break;
 			case 2: udpserver(altudpsock, TBSERVER_PORT2);
 				break;
@@ -3714,6 +3718,15 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
 	reqp->isplabdslice = (! strcasecmp(row[21], "0") ? 0 : 1);
+	reqp->isplabsvc    = 0;
+
+	/* XXX cough, cough... */
+	if (reqp->isplabdslice) {
+		char *pcp = strstr(reqp->vnodeid, "-20");
+		if (pcp && pcp[3] == 0)
+			reqp->isplabsvc = 1;
+	}
+
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
 	if (row[4] && row[5]) {
@@ -4827,8 +4840,8 @@ COMMAND_PROTOTYPE(dofullconfig)
 }
 
 /*
- * Report node resource usage. This also serves as Isalive(), so we send back
- * update info. The format for upload is:
+ * Report node resource usage. This also serves as an isalive(),
+ * so we send back update info. The format for upload is:
  *
  *  LA1=x.y LA5=x.y LA15=x.y DUSED=x ...
  */
@@ -4954,6 +4967,25 @@ COMMAND_PROTOTYPE(dodoginfo)
 		nrows--;
 	}
 	mysql_free_result(res);
+
+	/*
+	 * XXX adjust for local policy
+	 * - vnodes and plab nodes do not send NTP drift or cvsup
+	 * - widearea nodes do not record drift
+	 * - local nodes do not cvsup
+	 * - only a plab node service slice reports rusage
+	 *   (which it uses in place of isalive)
+	 */
+	if ((reqp->islocal && reqp->isvnode) || reqp->isplabdslice)
+		iv_ntpdrift = iv_cvsup = 0;
+	if (!reqp->islocal)
+		iv_ntpdrift = 0;
+	else
+		iv_cvsup = 0;
+	if (!reqp->isplabsvc)
+		iv_rusage = 0;
+	else
+		iv_isalive = 0;
 
 	OUTPUT(buf, sizeof(buf),
 	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d RUSAGE=%d\n",
