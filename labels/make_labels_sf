@@ -1,0 +1,5 @@
+#!/bin/csh -f
+
+foreach a (labelsf[0-9].cse labelsf1[0-9].cse) 
+	./csetool.tk -print $a.ps labels.cse $a
+end

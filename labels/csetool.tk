@@ -1,0 +1,147 @@
+#!/usr/local/bin/wish
+
+######################################################################
+# csetool.tk
+# Chris Alfeld - calfeld@math.utah.edu
+# 5/18/99
+######################################################################
+
+wm title . "CseTool"
+
+######################################################################
+# Options
+#   Scale - scale sheet by factor
+#   NoText - don't print text
+#   NoColor - don't print color
+#   Print - print posscript and exit
+######################################################################
+set Scale 1.0
+set NoText 0
+set NoColor 0
+set Print {}
+set NoScroll 0
+
+proc lpop {lv} {
+    upvar $lv l
+    
+    set ret [lindex $l 0]
+    set l [lrange $l 1 1000]
+    
+    return $ret
+}
+
+if {[llength $argv] == 0} {
+    puts stderr "Syntax: csetool [<options>] <file(s)>"
+    exit 1
+}
+
+set Files {}
+while {$argv != {}} {
+    set arg [lpop argv]
+    switch -- $arg {
+	"-scale" {
+	    set Scale [lpop argv]
+	}
+	"-notext" {
+	    set NoText 1
+	}
+	"-nocolor" {
+	    set NoColor 1
+	}
+	"-print" {
+	    set Print [lpop argv]
+	}
+	"-noscroll" {
+	    set NoScroll 1
+	}
+	default {
+	    lappend Files $arg
+	}
+    }
+}
+
+if {$Print == 0} {
+    tkwait visibility .
+}
+
+set t "Courier 9"
+set fontmap($t) {Courier 10}
+set t "Courier 8"
+set fontmap($t) {Courier 9}
+
+canvas .c -width [expr 800 * $Scale] -height [expr 1035 * $Scale] \
+    -bg white
+
+if {$NoScroll == 0} {
+    .c configure -scrollregion "0 0 [expr 800 * $Scale] [expr 1035 * $Scale]" 
+    .c configure -confine true
+    .c configure -xscrollcommand ".x set" -yscrollcommand ".y set"
+    scrollbar .y -orient vertical -command ".c yview"
+    scrollbar .x -orient horizontal -command ".c xview"
+
+    pack .y -side right -fill y
+    pack .x -side bottom -fill x
+}
+pack .c -fill both -expand true
+
+foreach file $Files {
+    if {[catch "open $file r" fp]} {
+	puts stderr "ERROR: $fp"
+	exit 1
+    }
+    
+    while {[gets $fp line] >= 0} {
+	set type [lindex $line 0]
+	if {$type == "exec"} {
+	    eval [lrange $line 1 end]
+	    continue
+	}
+	if {[string index [lindex $line 3] 0] == "-"} {
+	    set coords [lrange $line 1 2]
+	    set options [lrange $line 3 end]
+	} else {
+	    set coords [lrange $line 1 4]
+	    set options [lrange $line 5 end]
+	}
+	if {$NoText && $type == "text"} {
+	    continue
+	}
+	set skip 0
+	if {$NoColor || $Scale != 1} {
+	    for {set i 0} "\$i < [llength $options]" {incr i} {
+		set op [lindex $options $i]
+		if {$NoColor && ($op == "-fill" || $op == "-outline")} {
+		    incr i
+		    set color [lindex $options $i]
+		    if {$color != "black" && $color != "white"} {
+			set options [lreplace $options $i $i "white"]
+		    }
+		}
+		if {$Scale != 1 && $op == "-font"} {
+		    incr i
+		    set font [lindex $options $i]
+		    set size [lindex $font 1]
+		    set font [lreplace $font 1 1 [lindex [split [expr $size * $Scale] .] 0]]
+		    set options [lreplace $options $i $i $font]
+		}
+	    }
+	}
+	
+	set rcoords {}
+	foreach coord $coords {
+	    lappend rcoords [expr $coord * $Scale]
+	}
+	
+	eval .c create $type $rcoords $options
+    }
+
+    close $fp
+}
+
+if {$Print != {}} {
+    .c postscript -pagewidth 8i -height 1035 -width 800 -x 0 -y 0 \
+	-file $Print -fontmap fontmap
+    exit 
+}
+
+
