@@ -681,6 +681,7 @@ CREATE TABLE interfaces (
   duplex enum('full','half') NOT NULL default 'full',
   rtabid smallint(5) unsigned NOT NULL default '0',
   vnode_id varchar(32) default NULL,
+  whol tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (node_id,card,port),
   KEY mac (mac),
   KEY IP (IP)

@@ -2527,3 +2527,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table current_reloads add mustwipe \
 	    tinyint(4) NOT NULL default '0';
       
+1.322: Whack-on-LAN power control support.  Add whol field to interfaces
+       table to indicate if an interface supports WhOL.
+
+	alter table interfaces add whol tinyint(4) NOT NULL default '0';
