@@ -17,10 +17,10 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 my $mapdir      = "/etc/namedb";
-my $mapfile	= "$mapdir/emulab.db";
-my $mapfileback	= "$mapdir/emulab.db.backup";
-my $mapfilehead = "$mapdir/emulab.db.head";
-my $mapfiletail = "$mapdir/emulab.db.tail";
+my $mapfile	= "$mapdir/@OURDOMAIN@.db";
+my $mapfileback	= "$mapfile.backup";
+my $mapfilehead = "$mapfile.head";
+my $mapfiletail = "$mapfile.tail";
 my $lockfile    = "/var/tmp/testbed_named_lockfile";
 my $dbg		= 0;
 my @row;
