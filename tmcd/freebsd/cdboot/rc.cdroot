@@ -61,11 +61,8 @@ chkerr $? "hier cp /etc to /tmp/etc"
 /sbin/mount_mfs -s 8192 -b 8192 -f 1024 -c 16 -T minimum dummy /etc
 chkerr $? "MFS mount on /etc"
 
-/usr/site/bin/hier cp /tmp/etc /etc
-chkerr $? "hier cp /tmp/etc to /etc"
-
-/bin/rm -rf /tmp/etc
-chkerr $? "rm -rf /tmp/etc"
+/usr/site/bin/hier mv /tmp/etc /etc
+chkerr $? "hier mv /tmp/etc to /etc"
 
 #
 # Duplicate /var using /tmp as a temporary location.
@@ -76,11 +73,8 @@ chkerr $? "hier cp /var to /tmp/var"
 /sbin/mount_mfs -s 8192 -b 8192 -f 1024 -c 16 -T minimum dummy /var
 chkerr $? "MFS mount on /var"
 
-/usr/site/bin/hier cp /tmp/var /var
-chkerr $? "hier cp /tmp/var to /var"
-
-/bin/rm -rf /tmp/var
-chkerr $? "rm -rf /tmp/var"
+/usr/site/bin/hier mv /tmp/var /var
+chkerr $? "hier mv /tmp/var to /var"
 
 #
 # Duplicate /dev using /tmp as a temporary location.
@@ -88,24 +82,21 @@ chkerr $? "rm -rf /tmp/var"
 /usr/site/bin/hier cp /dev /tmp/dev
 chkerr $? "hier cp /dev to /tmp/dev"
 
-/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -i 1024 -c 16 -T minimum dummy /dev
+/sbin/mount_mfs -s 2048 -b 8192 -f 1024 -i 512 -c 16 -T minimum dummy /dev
 chkerr $? "MFS mount on /dev"
 
-/usr/site/bin/hier cp /tmp/dev /dev
-chkerr $? "hier cp /tmp/dev to /dev"
-
-/bin/rm -rf /tmp/dev
-chkerr $? "rm -rf /tmp/dev"
+/usr/site/bin/hier mv /tmp/dev /dev
+chkerr $? "hier mv /tmp/dev to /dev"
 
 chmod 666 /dev/pty[pqrsPQRS]*
 chown root:wheel /dev/pty[pqrsPQRS]*
 
 # Need writable /proj, /users, etc.
 
-/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -c 16 -T minimum dummy /proj
+/sbin/mount_mfs -s 2048 -b 8192 -f 1024 -i 1024 -c 16 -T minimum dummy /proj
 chkerr $? "MFS mount on /proj"
 
-/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -c 16 -T minimum dummy /users
+/sbin/mount_mfs -s 2048 -b 8192 -f 1024 -i 1024 -c 16 -T minimum dummy /users
 chkerr $? "MFS mount on /users"
 
 exit 0
