@@ -3,11 +3,16 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-boss
-PORTVERSION=	1.1
+PORTVERSION=	1.2
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
+
+#
+# We set this so that the mysql server port doesn't do name resolution
+#
+.MAKEFLAGS+= -DSKIP_DNS_CHECK
 
 MAINTAINER=	ricci@cs.utah.edu
 
@@ -19,6 +24,7 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd2 \
 	vin4.2:${PORTSDIR}/misc/libelvin
 
 RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
+	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
 	cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	fping:${PORTSDIR}/net/fping \
 	neato:${PORTSDIR}/graphics/graphviz \
@@ -37,7 +43,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	tftp-hpa:${PORTSDIR}/misc/tftp-hpa \
 	elvind:${PORTSDIR}/misc/elvind \
-	dhcpd:${PORTSDIR}/net/isc-dhcp3
+	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
+	sudo:${PORTSDIR}/security/sudo
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
