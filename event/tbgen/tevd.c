@@ -63,9 +63,10 @@ main(int argc, char **argv)
 
 	if (debug)
 		loginit(0, 0);
-	else
-		loginit(1, "tbmevd");
-
+	else {
+		loginit(1, "tevd");
+		/* See below for daemonization */
+	}
 
 	/*
 	 * Set up DB state.
@@ -105,6 +106,13 @@ main(int argc, char **argv)
 	if (! event_subscribe(handle, callback, tuple, "event received")) {
 		fatal("could not subscribe to event");
 	}
+
+	/*
+	 * Do this now, once we have had a chance to fail on the above
+	 * event system calls.
+	 */
+	if (!debug)
+		daemon(0, 0);
 	
 	/* Begin the event loop, waiting to receive event notifications: */
 	event_main(handle);

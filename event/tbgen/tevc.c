@@ -87,7 +87,7 @@ main(int argc, char **argv)
 	    }
 
 	    if (! (he = gethostbyname(buf))) {
-		fatal("could not get IP address from hostname");
+		fatal("could not get IP address from hostname: %s", buf);
 	    }
 	    memcpy((char *)&myip, he->h_addr, he->h_length);
 	    strcpy(ipbuf, inet_ntoa(myip));
