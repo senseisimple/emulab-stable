@@ -770,7 +770,7 @@ sub doSwapin($) {
     # wait for the os_setup to finish, down below
     #
     print "Resetting OS and rebooting.\n";
-    TBDebugTimeStamp("os_setup started");
+    TBDebugTimeStamp("launching os_setup");
     if (!($os_setup_pid = fork())) { 
 	exec("os_setup $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
