@@ -21,8 +21,9 @@
 }
 
 #define SECSIZE 512
-#define BSIZE	0x10000
-char		inbuf[BSIZE], outbuf[2*BSIZE], zeros[BSIZE];
+#define BSIZE	(32 * 1024)
+#define OUTSIZE (2 * BSIZE)
+char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
 int		infd, outfd;
 int		doseek = 0;
@@ -34,6 +35,8 @@ void		writezeros(off_t zcount);
 int
 main(int argc, char **argv)
 {
+	struct timeval  stamp, estamp;
+
 	if (argc < 2 || argc > 3) {
 		fprintf(stderr, "usage: "
 		       "%s <input filename> [output filename]\n", argv[0]);
@@ -54,6 +57,8 @@ main(int argc, char **argv)
 	}
 	else
 		outfd = fileno(stdout);
+	
+	gettimeofday(&stamp, 0);
 	
 	while (1) {
 		off_t		offset, correction;
@@ -81,13 +86,18 @@ main(int argc, char **argv)
 		}
 	}
 	close(infd);
+
+	gettimeofday(&estamp, 0);
+	estamp.tv_sec -= stamp.tv_sec;
+	printf("Done in %ld seconds!\n", estamp.tv_sec);
+	
 	return 0;
 }
 
 int
 inflate_subblock(void)
 {
-	int		cc, err, count;
+	int		cc, err, count, ibsize = 0, ibleft = 0;
 	z_stream	d_stream; /* inflation stream */
 	char		*bp;
 	struct blockhdr *blockhdr;
@@ -158,16 +168,24 @@ inflate_subblock(void)
 		d_stream.next_in   = inbuf;
 		d_stream.avail_in  = cc;
 	inflate_again:
-		d_stream.next_out  = outbuf;
-		d_stream.avail_out = sizeof(outbuf);
+		/*
+		 * Must operate on multiples of the sector size!
+		 */
+		if (ibleft) {
+			memcpy(outbuf, &outbuf[ibsize - ibleft], ibleft);
+		}
+		d_stream.next_out  = &outbuf[ibleft];
+		d_stream.avail_out = OUTSIZE;
 
 		err = inflate(&d_stream, Z_SYNC_FLUSH);
 		if (err != Z_OK && err != Z_STREAM_END) {
 			fprintf(stderr, "inflate failed, err=%ld\n", err);
 			exit(1);
 		}
-		count = sizeof(outbuf) - d_stream.avail_out;
-		bp = outbuf;
+		ibsize = (OUTSIZE - d_stream.avail_out) + ibleft;
+		count  = ibsize & ~(SECSIZE - 1);
+		ibleft = ibsize - count;
+		bp     = outbuf;
 
 		while (count) {
 			/*
