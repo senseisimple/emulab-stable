@@ -24,6 +24,7 @@ my $PREFIX     = '@prefix@';
 my $SRCDIR     = '@srcdir@';
 my $TOP_SRCDIR = '@top_srcdir@';
 my $DBNAME     = "@TBDBNAME@";
+my $ELABINELAB = @ELABINELAB@;
 
 my $OURDOMAIN  = '@OURDOMAIN@';
 
@@ -654,16 +655,21 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
 };
 
-Phase "mibs", "Fetching Cisco MIBs", sub {
-    foreach my $mib (@CISCO_MIBS) {
-	my $localfile = "$MIBPATH/$mib.txt";
-	my $mibURL = "$CISCO_MIB_FTP/$mib.my";
-	Phase "$mib", "Fetching $mib", sub {
-	    DoneIfExists($localfile);
-	    FetchFileFatal($mibURL,$localfile);
-	};
-    }
-};
+#
+# Not needed in an inner elab, and it takes a long time.
+#
+if (! $ELABINELAB) {
+    Phase "mibs", "Fetching Cisco MIBs", sub {
+	foreach my $mib (@CISCO_MIBS) {
+	    my $localfile = "$MIBPATH/$mib.txt";
+	    my $mibURL = "$CISCO_MIB_FTP/$mib.my";
+	    Phase "$mib", "Fetching $mib", sub {
+		DoneIfExists($localfile);
+		FetchFileFatal($mibURL,$localfile);
+	    };
+	}
+    };
+}
 
 Phase "cron", "Adding cron jobs", sub {
     Phase "crontab", "Editing $CRONTAB", sub {

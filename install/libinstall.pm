@@ -9,6 +9,7 @@
 # A simple library for use in the installation scripts, to make them seem a
 # little more legitimate, instead of the quick hacks they are.
 #
+use POSIX qw(strftime);
 
 #
 # Make sure that output gets printed right away
@@ -128,12 +129,14 @@ sub Phase($$$) {
 	    #
 	    # If we're a parent, and all sub-phases got skipped, we did too
 	    #
+	    my $stamp = POSIX::strftime("%H:%M:%S", localtime());
+	    
 	    if ($hasSubPhase && $skipped && ($nonSkipped == 0)) {
-		print "[ Skipped   ]\n";
+		print "[ Skipped   ] ($stamp)\n";
 		$libinstall::phaseResults{$name} = "skip";
 		$$parentSkipped++;
 	    } else {
-		print "[ Succeeded ]\n";
+		print "[ Succeeded ] ($stamp)\n";
 		$$parentNonSkipped++;
 		$libinstall::phaseResults{$name} = "succeed";
 	    }
