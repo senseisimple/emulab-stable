@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -162,6 +162,28 @@ if (isset($updated) && $updated == 1) {
 	}
 	$newargs .= " -t $type ";
 	SUEXEC("nobody", $TBADMINGROUP, "webnewwanode $newargs", 0);
+
+	#
+	# Send email to user reminding to register node.
+	#
+	$user_name = $warow[user_name];
+	$user_email= $warow[user_email];
+	$lockkey   = $warow[lockkey];
+
+	TBMAIL("$user_name <$user_email>",
+	   "Thanks for installing a NetBed CDROM!",
+	   "It would be very helpful if you could please go to:\n".
+	   "\n".
+	   "    ${TBBASE}/widearea_register.php?cdkey=$lockkey&IP=$IP\n".
+	   "\n".
+	   "and tell us a few things about the node (processor, connection\n".
+	   "type, geographical info, etc.). You can also register for a\n".
+	   "local account on your node by providing this info to us.\n".
+	   "\n".
+	   "Thanks,\n".
+	   "Testbed Operations\n",
+	   "From: $TBMAIL_OPS\n".
+	   "Errors-To: $TBMAIL_WWW");
     }
     $newroot = "";
     if (isset($roottag)) {

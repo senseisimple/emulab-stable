@@ -492,6 +492,16 @@ if (! isset($submit)) {
     $defaults = array();
     $defaults[usr_URL] = "$HTTPTAG";
     $defaults[node_country] = "USA";
+
+    #
+    # These two allow presetting the IP and cdkey
+    # 
+    if (isset($IP) && strcmp($IP, "")) {
+	$defaults[IP] = $IP;
+    }
+    if (isset($cdkey) && strcmp($cdkey, "")) {
+	$defaults[cdkey] = $cdkey;
+    }
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
