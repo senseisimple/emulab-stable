@@ -26,8 +26,8 @@ int parse_top(tb_vgraph &G, istream& i)
   node no1;
   string s1, s2;
   char inbuf[255];
-  char n1[32], n2[32];
-  char lname[32];
+  char n1[1024], n2[1024];
+  char lname[1024];
   int num_nodes = 0;
   int bw;
   int r;
