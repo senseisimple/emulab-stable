@@ -8,11 +8,14 @@ my $TMCC	= "/etc/testbed/tmcc";
 my $TMIFC       = "/etc/testbed/rc.ifc";
 my $TMGROUP     = "/etc/testbed/group";
 my $TMPASSWD    = "/etc/testbed/master.passwd";
+my $TMHOSTS     = "/etc/testbed/hosts";
+my $HOSTSFILE   = "/etc/hosts";
 my @CONFIGS	= ($TMIFC);
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
+my $HOSTSCMD    = "hostnames";
 my $IFCONFIG    = "/sbin/ifconfig cs%d alias %s netmask %s ".
 		  "media 10baseT mediaopt full-duplex\n";
 my $CP		= "/bin/cp -f";
@@ -26,6 +29,7 @@ my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $project     = "";
 my $PROJDIR     = "/proj";
 my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
+my $HOSTNAME    = "%s\t%s-%s %s\n";
 
 #
 # This is a debugging thing for my home network.
@@ -114,6 +118,28 @@ print STDOUT "Checking Testbed interface configuration ... \n";
 #chmod(0755, "$TMIFC");
 
 #
+# Host names configuration (/etc/hosts). 
+#
+print STDOUT "Checking Testbed /etc/hosts configuration ... \n";
+
+open(TM,  "$TMCC $NODE $HOSTSCMD |")
+    or die "Cannot start $TMCC: $!";
+open(HOSTS, ">>$HOSTSFILE")
+    or die("Could not open $HOSTSFILE");
+
+#
+# Now convert each hostname into hosts file representation and write
+# it to the hosts file.
+# 
+while (<TM>) {
+    $_ =~ /NAME=([-\@\w.]+) LINK=([0-9]*) IP=([0-9.]*) ALIAS=([-\@\w.]*)/;
+    printf STDOUT "  $1, $2, $3, $4\n";
+    printf HOSTS  $HOSTNAME, $3, $1, $2, $4;
+}
+close(TM);
+close(HOSTS);
+
+#
 # Account stuff. Again, open a connection to the TMCD, and receive
 # ADDGROUP and ADDUSER commands. We turn those into "pw" commands.
 #
@@ -183,6 +209,12 @@ close(TM);
 sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink @CONFIGS;
+
+    printf STDOUT "Resetting /etc/hosts file\n";
+    if (system("$CP -f $TMHOSTS $HOSTSFILE") != 0) {
+	print STDERR "Could not copy default /etc/hosts file into place: $!\n";
+	exit(1);
+    }    
 
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {

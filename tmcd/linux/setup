@@ -10,6 +10,8 @@ my $TMGROUP     = "/etc/rc.d/testbed/group";
 my $TMPASSWD    = "/etc/rc.d/testbed/passwd";
 my $TMSHADOW    = "/etc/rc.d/testbed/shadow";
 my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
+my $TMHOSTS     = "/etc/rc.d/testbed/hosts";
+my $HOSTSFILE   = "/etc/hosts";
 my @CONFIGS	= ($TMIFC);
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $REBOOTCMD   = "reboot";
@@ -17,16 +19,19 @@ my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
+my $HOSTSCMD    = "hostnames";
 my $IFCONFIG    = "/sbin/ifconfig eth%d inet %s netmask %s\n";
 my $CP		= "/bin/cp -f";
 my $USERADD	= "/usr/sbin/useradd";
 my $USERMOD	= "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
 my $IFACE	= "eth";
-my $CTLIFACE    = "eth4";
+my $CTLIFACENUM = "4";
+my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $project     = "";
 my $PROJDIR     = "/proj";
 my $MOUNTCMD	= "/bin/mount fs.emulab.net:/q/proj/";
+my $HOSTNAME    = "%s\t%s-%s %s\n";
 
 #
 # This is a debugging thing for my home network.
@@ -115,6 +120,28 @@ close(IFC);
 chmod(0755, "$TMIFC");
 
 #
+# Host names configuration (/etc/hosts). 
+#
+print STDOUT "Checking Testbed /etc/hosts configuration ... \n";
+
+open(TM,  "$TMCC $NODE $HOSTSCMD |")
+    or die "Cannot start $TMCC: $!";
+open(HOSTS, ">>$HOSTSFILE")
+    or die("Could not open $HOSTSFILE");
+
+#
+# Now convert each hostname into hosts file representation and write
+# it to the hosts file.
+# 
+while (<TM>) {
+    $_ =~ /NAME=([-\@\w.]+) LINK=([0-9]*) IP=([0-9.]*) ALIAS=([-\@\w.]*)/;
+    printf STDOUT "  $1, $2, $3, $4\n";
+    printf HOSTS  $HOSTNAME, $3, $1, $2, $4;
+}
+close(TM);
+close(HOSTS);
+
+#
 # Account stuff. Again, open a connection to the TMCD, and receive
 # ADDGROUP and ADDUSER commands. We turn those into "pw" commands.
 #
@@ -188,6 +215,12 @@ sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink @CONFIGS;
     unlink @LOCKFILES;
+
+    printf STDOUT "Resetting /etc/hosts file\n";
+    if (system("$CP -f $TMHOSTS $HOSTSFILE") != 0) {
+	print STDERR "Could not copy default /etc/hosts file into place: $!\n";
+	exit(1);
+    }    
 
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {

@@ -9,12 +9,15 @@ my $TMIFC       = "/etc/testbed/rc.ifc";
 my $TMDELAY	= "/etc/testbed/rc.delay";
 my $TMGROUP     = "/etc/testbed/group";
 my $TMPASSWD    = "/etc/testbed/master.passwd";
+my $TMHOSTS     = "/etc/testbed/hosts";
+my $HOSTSFILE   = "/etc/hosts";
 my @CONFIGS	= ($TMIFC, $TMDELAY);
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
+my $HOSTSCMD    = "hostnames";
 my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s ".
 		  "media 100baseTX mediaopt full-duplex\n";
 my $CP		= "/bin/cp -f";
@@ -22,15 +25,18 @@ my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $PW		= "/usr/sbin/pw";
 my $CHPASS	= "/usr/bin/chpass";
 my $IFACE	= "fxp";
-my $CTLIFACE    = "fxp4";
+my $CTLIFACENUM = "4";
+my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $project     = "";
 my $PROJDIR     = "/proj";
 my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
+my $HOSTNAME    = "%s\t%s-%s %s\n";
+my $kernel      = "/kernel.100HZ";
 
 #
 # This is a debugging thing for my home network.
 # 
-my $NODE	= "MYIP=155.99.214.136";
+my $NODE	= "MYIP=155.101.132.101";
 $NODE		= "";
 
 #
@@ -114,6 +120,28 @@ close(IFC);
 chmod(0755, "$TMIFC");
 
 #
+# Host names configuration (/etc/hosts). 
+#
+print STDOUT "Checking Testbed /etc/hosts configuration ... \n";
+
+open(TM,  "$TMCC $NODE $HOSTSCMD |")
+    or die "Cannot start $TMCC: $!";
+open(HOSTS, ">>$HOSTSFILE")
+    or die("Could not open $HOSTSFILE");
+
+#
+# Now convert each hostname into hosts file representation and write
+# it to the hosts file.
+# 
+while (<TM>) {
+    $_ =~ /NAME=([-\@\w.]+) LINK=([0-9]*) IP=([0-9.]*) ALIAS=([-\@\w.]*)/;
+    printf STDOUT "  $1, $2, $3, $4\n";
+    printf HOSTS  $HOSTNAME, $3, $1, $2, $4;
+}
+close(TM);
+close(HOSTS);
+
+#
 # Delay node configuration
 #
 print STDOUT "Checking Testbed delay configuration ... \n";
@@ -127,7 +155,8 @@ while (<TM>) {
 close(TM);
 
 if (@delays) {
-    $count = 69;
+    $count    = 69;
+    $mindelay = 10000;
     
 #    foreach $delay (@delays) {
 #	print $delay;
@@ -163,6 +192,14 @@ if (@delays) {
 	$bandw  = $4;
 	$plr    = $5;
 
+	#
+	# We want to know what the minimum delay is so we can boot the
+	# the correct kernel.
+	# 
+	if ($delay < $mindelay) {
+	    $mindelay = $delay;
+	}
+
 	print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex\n";
 	print DEL "ifconfig $iface2 media 100baseTX mediaopt full-duplex\n";
 	print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
@@ -181,6 +218,46 @@ if (@delays) {
 
     close(DEL);
     chmod(0755, "$TMDELAY");
+    
+    #
+    # Now do kernel configuration. All of the above work is wasted, but
+    # we needed to know the minimum delay. Eventually we will boot the
+    # correct kernel to start with via PXE. 
+    #
+    if ($mindelay >= 20) {
+	$kernel = "/kernel.100HZ";
+    }
+    elsif ($mindelay >= 3) {
+	$kernel = "/kernel.1000HZ";
+    }
+    else {
+	$kernel = "/kernel.10000HZ";
+    }
+}
+
+#
+# Make sure we are running the correct kernel
+#
+print STDOUT "Checking kernel configuration ... \n";
+if (-e $kernel) {
+    if (system("cmp -s /kernel $kernel") != 0) {
+	if (system("cp -f /kernel /kernel.save")) {
+	    print STDOUT "Could not backup /kernel! Aborting kernel change\n";
+	}
+	else {
+	    if (system("cp -f $kernel /kernel")) {
+		print STDOUT "Could not cp $kernel to /kernel! ".
+		    "Aborting kernel change\n";
+	    }
+	    else {
+		system("sync");
+		system("reboot");
+	    }
+	}
+    }
+}
+else {
+    print STDOUT "Kernel $kernel does not exist!\n";
 }
 
 #
@@ -259,6 +336,12 @@ close(TM);
 sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink @CONFIGS;
+
+    printf STDOUT "Resetting /etc/hosts file\n";
+    if (system("$CP -f $TMHOSTS $HOSTSFILE") != 0) {
+	print STDERR "Could not copy default /etc/hosts file into place: $!\n";
+	exit(1);
+    }    
 
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
