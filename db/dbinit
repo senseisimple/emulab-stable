@@ -93,7 +93,7 @@ $cmd = "create table reserved (".
   "rsrv_time timestamp);";
 $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr);
 
-$cmd = "create table SW_Table (".
+$cmd = "create table SW_table (".
   "node_id char($id_len) NOT NULL PRIMARY KEY,".
   "image_id char($id_len) NOT NULL,".
   "quick_clean tinyint,".
@@ -217,7 +217,7 @@ foreach $n (1..40) {
   $cmd = "insert into nodes ".
     "(node_id,type) values ('tbpc$n','pc');";
   $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
-  $cmd = "insert into SW_Table (node_id,image_id) values ".
+  $cmd = "insert into SW_table (node_id,image_id) values ".
     "('tbpc$n','".($n % 4 + 1)."');";
   $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
 }
@@ -229,7 +229,7 @@ foreach $n (1..20) {
     $cmd = "insert into nodes ".
       "(node_id,type) values ('tbsh$n-$m','shark');";
     $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
-    $cmd = "insert into SW_Table (node_id,image_id) values ".
+    $cmd = "insert into SW_table (node_id,image_id) values ".
       "('tbsh$n-$m','".(($n-1)/10 + 5)."');";
     $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
   }

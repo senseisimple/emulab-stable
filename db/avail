@@ -69,7 +69,7 @@ if (defined($args{"extras"})) {
 #}
 
 if ($img) {
-  $join .= " left join SW_Table as c on a.node_id=c.node_id";
+  $join .= " left join SW_table as c on a.node_id=c.node_id";
   $join .= " left join disk_images as d on c.image_id=d.image_id";
 }
 
