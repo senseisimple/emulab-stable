@@ -29,6 +29,8 @@ using namespace boost;
 
 extern switch_pred_map_map switch_preds;
 
+extern bool use_pclasses;
+
 double score;			// The score of the current mapping
 int violated;			// How many times the restrictions
 				// have been violated.
@@ -247,7 +249,7 @@ void remove_node(vvertex vv)
 #endif
 
   // pclass
-  if (pnode->my_class && (pnode->my_class->used == 0)) {
+  if (use_pclasses && pnode->my_class && (pnode->my_class->used == 0)) {
     SDEBUG(cerr << "  freeing pclass" << endl);
     SSUB(SCORE_PCLASS);
   }
@@ -525,13 +527,14 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
       if (dest_pv == pv) {
 	SDEBUG(cerr << "  trivial link" << endl);
-	if (!allow_trivial_links) {
+	if (allow_trivial_links) {
+	    vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
+	} else {
 	    SADD(SCORE_NO_CONNECTION);
 	    vlink->no_connection=true;
 	    vinfo.no_connection++;
 	    violated++;
 	}
-	vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
       } else {
 	SDEBUG(cerr << "   finding link resolutions" << endl);
 	// We need to calculate all possible link resolutions, stick them
@@ -770,7 +773,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   vinfo.desires += fd_violated;
 
   // pclass
-  if (pnode->my_class && (pnode->my_class->used == 0)) {
+  if (use_pclasses && pnode->my_class && (pnode->my_class->used == 0)) {
     SDEBUG(cerr << "  new pclass" << endl);
     SADD(SCORE_PCLASS);
   }
