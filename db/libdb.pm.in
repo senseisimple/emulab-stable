@@ -125,6 +125,8 @@ use Exporter;
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID TBTipServers
+
+	 TBActivityReport
 	 );
 
 # Must come after package declaration!
@@ -2659,6 +2661,25 @@ sub TBTipServers()
     }
     return @tipservers;
 }
+
+#
+# Report some activity for a node
+#
+# usage: TBActivityReport(char *node)
+#        Returns 1 if okay.
+#        Returns 0 if failed.
+#
+sub TBActivityReport($)
+{
+    my ($node) = @_;
+
+    # Set last_ext_act to now(), but don't update the last_report
+    return DBQueryFatal("update node_activity set last_ext_act= now() " .
+			"where node_id='$node'");
+}
+
+
+# _Always_ make sure that this 1 is at the end of the file...
 
 1;
 

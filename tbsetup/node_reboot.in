@@ -346,6 +346,9 @@ sub RebootNode {
 
     print STDOUT "Rebooting $pc ...\n";
 
+    # Report some activity into last_ext_act
+    TBActivityReport($pc);
+
     $mypid = fork();
     if ($mypid) {
 	return $mypid;
