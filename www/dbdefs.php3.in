@@ -314,6 +314,22 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
     return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
 }
 
+# Usage: TBExptGroup($pid, $eid, &$gid)
+#	 returns 0 if expt doesn't exist.
+#        returns 1 if expt exists.
+function TBExptGroup($pid, $eid, &$gid)
+{
+  $query_result =
+    DBQueryFatal("SELECT gid FROM experiments WHERE ".
+		 "eid='$eid' and pid='$pid'");
+  if (mysql_num_rows($query_result) == 0) {
+    return 0;
+  }
+  $row  = mysql_fetch_array($query_result);
+  $gid  = $row[gid];
+  return 1;
+}
+
 #
 # Experiment permission checks.
 #
@@ -866,6 +882,36 @@ function TBValidNodeName($node)
 	return 0;
     }
     return 1;
+}
+
+#
+# Return mail addresses for project_root and group_root people.
+#
+# usage TBLeaderMailList($pid, $gid)
+#       Uses default group (pid=gid) if gid not given.
+#       returns string like "Leader Name (uid) <email>[, ...]"
+#       returns 0 if not valid
+function TBLeaderMailList($pid, $gid)
+{
+  # No group, then use the default group.
+  if (! $gid) { $gid = $pid; }
+  
+  $query_result =
+    DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
+		 "left join group_membership as gm on gm.uid=u.uid ".
+		 "where (trust='". TBDB_TRUSTSTRING_PROJROOT .
+		 "' and pid='$pid') or (trust='". TBDB_TRUSTSTRING_GROUPROOT .
+		 "' and gid='$gid') order by trust DESC, usr_name");
+  
+  if (mysql_num_rows($query_result) == 0) {
+    return 0;
+  }
+  $mailstr="";
+  while ($row = mysql_fetch_array($query_result)) {
+    if ($mailstr != "") { $mailstr .=", "; }
+    $mailstr .= $row[usr_name]." (".$row[uid].") <".$row[usr_email].">";
+  }
+  return $mailstr;
 }
 
 #

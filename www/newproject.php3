@@ -45,9 +45,11 @@ function SPITFORM($formfields, $returning, $errors)
     PAGEHEADER("Start a New Testbed Project");
     
     echo "<center><font size=+1>
-             If you are a student
-             <font color=red>(undergrad or graduate)</font>, please
-             <a href=auth.html>read this first</a>!
+             If you are a <font color=red>student
+             (undergrad or graduate)</font>, please
+             do not try to start a project! <br>Your advisor must do it.
+             <a href=docwrapper.php3?docname=auth.html>
+             Read this for more info.</a>
           </font></center><br>\n";
 
     if ($errors) {

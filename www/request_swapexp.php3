@@ -81,7 +81,7 @@ $r=mysql_fetch_array($q);
 $c=$r["c"];
 
 if (!$confirmed) {
-    echo "<center><h2><br>
+    echo "<center><h3><br>
 Experiment '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
       " reserved, \nand has been sent $swap_requests swap request".
       ($swap_requests!=1?"s":"")." since it went idle.\n";
@@ -94,7 +94,7 @@ Experiment '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
     echo "<p>
           Are you sure you want to send an email message requesting that<br>
           experiment '$eid' be swapped or terminated?
-          </h2>\n";
+          </h3>\n";
 
     #
     # Dump experiment record.
@@ -125,7 +125,13 @@ TBUserInfo($expleader, $expleader_name, $expleader_email);
 if (! TBProjLeader($pid, $projleader)) {
     TBERROR("Could not determine project leader!", 1);
 }
-TBUserInfo($projleader, $projleader_name, $projleader_email);
+if (! TBExptGroup($pid,$eid,$gid)) {
+    TBERROR("Could not determine experiment group!", 1);
+}
+$leaders = TBLeaderMailList($pid,$gid);
+if (! $leaders) {
+    TBERROR("Could not get leader emails!", 1);
+}
 
 TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid ($c PC".($c!=1?"s":"")."): Please Swap or Terminate Experiment",
@@ -165,7 +171,7 @@ TBMAIL("$expleader_name <$expleader_email>",
      "Testbed Operations\n",
      "From: $TBMAIL_OPS\n".
      ( $swap_requests >= $tell_proj_head
-       ? "Cc: $projleader_name <$projleader_email>\n"
+       ? "Cc: $leaders\n"
        : "") .
      "Bcc: $TBMAIL_OPS\n".
      "X-NetBed: request_swapexp.php3\n".
