@@ -1,0 +1,334 @@
+#!/usr/bin/perl -w
+
+# tbtest
+
+# This is the toplevel of the testbed testing setup.  This command
+# should be invokved by a user and script.  It well then create a
+# separate object tree, configure it appropriately, setup a testing
+# database, and then proceed to run tests.
+
+# IMPORTANT: This command should be come from a tree configured 
+# for the real DB.
+
+# tbtest [options] <db> <testdir> 
+# Options:
+#   -path <path> - Path to test tree, otherwise uses cwd.
+
+use DBI;
+use POSIX;
+
+$| = 1;
+
+$pwd = `/bin/pwd`;
+chop $pwd;
+
+# Figure out where the script is
+if ($0 =~ m|/|) {
+    # Not pwd
+    @a = split("/",$0);
+    $dir = join("/",@a[0..$#a-1]);
+    if ($0 =~ m|^/|) {
+	# absolute path
+	$basedir = $dir;
+    } else {
+	# relative path
+	chdir $dir;
+	$basedir = `/bin/pwd`;
+	chop $basedir;
+	chdir $pwd;
+    }
+} else {
+    $basedir = `/bin/pwd`;
+    chop $basedir;
+}
+
+$path = $pwd;
+
+$ENV{'PATH'} = "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:$basedir";
+
+# Parse argv
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-path") {
+	$path = shift;
+    } else {
+	print STDERR "Unknown argument: $arg\n";
+	exit(1);
+    }
+}
+
+chdir $path;
+
+if ($#ARGV != 1) {
+    print STDERR "Syntax: $0 [-path <path>] <db> <testdir>\n";
+    exit(1);
+}
+
+($TBDB,$testdir) = @ARGV;
+
+if (! ($testdir =~ m|^/|)) {
+    $testdir = "$basedir/tests/$testdir";
+}
+
+# Initialize DB
+$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+    die "Could not connect to DB.\n";
+# Having made sure we can, we now disconnect so as not to harm DB.
+$dbh->disconnect;
+
+$user=`whoami`;
+chop $user;
+$testdb = "tbdb_$user";
+$logfile = "test.log";
+open(LOG,"> $logfile");
+
+# prints sends the string to stdout and the logfile.
+sub prints {
+    print $_[0];
+    print LOG $_[0];
+};
+
+# tbexec <cmd> <file>
+# Executes <cmd> storing results to <file> and displaying appropriate
+# message and exiting on failure.
+sub tbexec {
+    my ($cmd,$file) = @_;
+    open(EXEC,"$cmd 2>&1 |");
+    open(FILE,"> $file");
+    while (<EXEC>) {
+	print FILE $_;
+    }
+    close(FILE);
+    close(EXEC);
+    if (($? >> 8) == 0) {
+	prints " PASS\n";
+	$pass++;
+    } else {
+	prints " FAIL - See $file\n";
+	$fail++;
+	doexit(1);
+    }
+};
+
+# tbexect <cmd> <logfp>
+# This is similar to tbexec except is used for running commands specific
+# to tests.  It runs the command appending the output to the file handle
+# <logfp> and returns the exit code.
+sub tbexect {
+    my ($cmd,$logfp) = @_;
+    print $logfp "$cmd\n";
+    open(EXEC,"$cmd 2>&1 |");
+    while (<EXEC>) {
+	print $logfp $_;
+    }
+    close(EXEC);
+    return ($? >> 8);
+};
+
+# doexit
+# This displays exit counts and then exits with the specified exit code.
+sub doexit {
+    printf LOG "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
+    printf "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
+    # Try to do the necessary cleanup
+    system("echo \"drop database if exists $testdb\" | mysql");
+    exit($_[0]);
+};
+
+# Test counts
+$pass = 0;
+$fail = 0;
+$unknown = 0;
+
+prints "User:    $user\n";
+prints "Testdir: $testdir\n";
+prints "Logfile: $logfile\n";
+prints "\n";
+prints "Beginning test run. " . ctime(time) . "\n";
+
+# Set up object tree
+prints "Setting up object tree.\n";
+if (! -d $path) {
+    mkdir $path,0755;
+}
+mkdir "tbobj",0755;
+mkdir "install",0755;
+chdir "tbobj";
+system("cp -f $basedir/test-defs $path/defs");
+open(DEFS,">>$path/defs");
+print DEFS "TBDBNAME=$testdb\n";
+print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
+print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
+close(DEFS);
+
+prints "  Configuring ";
+tbexec("$basedir/../configure --prefix=$path/install ".
+       "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
+       "$path/configure.log");
+
+prints "  Building ";
+tbexec("gmake","$path/build.log");
+
+prints "  Installing ";
+tbexec("gmake boss-install","$path/install.log");
+
+prints "  Post-Installing ";
+tbexec("su1 gmake post-install","$path/postinstall.log");
+
+# Let's add some stuff to our path
+$ENV{'PATH'} .= ":$path/install/bin:$path/install/sbin";
+
+chdir $path;
+
+# Setup test database
+prints "Setting up test database.\n";
+prints "  Dumping Current ";
+tbexec("mysqldump $TBDB","$path/dbdump.txt");
+
+prints "  Creating DB ";
+tbexec("echo \"create database $testdb\" | mysql","createdb.log");
+
+prints "  Filling DB ";
+tbexec("cat $path/dbdump.txt | mysql $testdb","fill.log");
+
+# Clear out experiments and set up test experiment.
+$dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
+    prints "ERROR: Could not connect to new DB.\n";
+    doexit(1);
+};
+
+prints "  Clearing out existing experiments.\n";
+open(CLEARLOG,"> clear.log");
+$sth = $dbh->prepare("SELECT pid,eid from experiments");
+$sth->execute;
+while (($pid,$eid) = $sth->fetchrow_array) {
+    prints "    $pid/$eid ";
+    print CLEARLOG "$pid $eid\n";
+    print CLEARLOG "tbswapout -force -test $pid $eid\n";
+    open(EXEC,"tbswapout -force -test $pid $eid 2>&1 |");
+    while (<EXEC>) {
+	print CLEARLOG $_;
+    }
+    close(EXEC);
+    if (($? >> 8) != 0) {
+	prints "FAIL - On tbswapout - See clear.log\n";
+	$fail++;
+	doexit(1);
+    } 
+    print CLEARLOG "tbend $pid $eid\n";
+    open(EXEC,"tbend $pid $eid 2>&1 |");
+    while (<EXEC>) {
+	print CLEARLOG $_;
+    }
+    close(EXEC);
+    if (($? >> 8) != 0) {
+	prints " FAIL - On tbend - See clear.log\n";
+	$fail++;
+	doexit(1);
+    }
+    
+    prints "PASS\n";
+    $pass++;
+}
+close(CLEARLOG);
+
+prints "  Setting up test experiment ";
+$dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
+$dbh->do("INSERT into experiments (pid,eid) "
+	 . "values (\"testbed\",\"test\")") || do {
+	     prints "FAIL\n";
+	     $fail++;
+	     doexit(1);
+	 };
+print "PASS\n";
+$pass++;
+
+
+prints "  Snapshotting clean state ";
+tbexec("mysqldump $testdb","clean.txt");
+
+# Time to run tests!
+prints "Running Tests\n";
+
+opendir(TESTDIR,$testdir);
+@tests = readdir(TESTDIR);
+closedir(TESTDIR);
+
+mkdir "tests",0755;
+foreach $test (@tests) {
+    if (($test eq ".") || ($test eq "..") || ($test eq "CVS")) {
+	next;
+    }
+    prints "  $test ";
+
+    mkdir "tests/$test",0755;
+    chdir "tests/$test";
+    open(TESTLOG,"> test.log");
+
+    # Set up DB state
+    if (tbexect("echo \"drop database $testdb\" | mysql",TESTLOG)) {
+	prints "FAIL - Could not drop test DB.\n";
+	prints "Failure was FATAL - Exiting.\n";
+	$fail++;
+	doexit(1);
+    }
+    if (tbexect("echo \"create database $testdb\" | mysql",TESTLOG)) {
+	prints "FAIL - Could not recreate test DB.\n";
+	prints "Failure was FATAL - Exiting.\n";
+	$fail++;
+	doexit(1);
+    }
+    if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
+	prints "FAIL - Could not populate test DB.\n";
+	prints "Failure was FATAL - Exiting.\n";
+	$fail++;
+	doexit(1);
+    }
+    
+    if (-f "$testdir/$test/dbstate") {
+	if (tbexect("cat $testdir/$test/dbstate | mysql $testdb",TESTLOG)) {
+	    prints "FAIL - Could not evaluate dbstate.\n";
+	    $fail++;
+	    next;
+	}
+    }
+
+    # We're now ready to run the test.
+
+    # The last line of this command will be either PASS
+    # or FAIL <msg>, all output before that should be sent 
+    # to the log file.
+    open(TESTFP,"tbstub $testdb testbed test $test $testdir/$test |");
+    while (<TESTFP>) {
+	print TESTLOG $_;
+	$status = $_;
+    }
+    chop $status;
+    close(TESTFP);
+    if (($? >> 8) != 0) {
+	prints "UNKNOWN - Test exited with non-0 code.\n";
+	$unknown++;
+    } else {
+	if ($status =~ /^PASS/) {
+	    $pass++;
+	} elsif ($status =~ /^FAIL/) {
+	    $fail++;
+	} else {
+	    $unknown++;
+	    $status = "UKNONW";
+	}
+	prints "$status\n";
+    }
+
+    close(TESTLOG);
+
+    chdir $path;
+}
+
+prints "Cleaning up\n";
+prints "  Dropping test DB ";
+tbexec("echo \"drop database $testdb\" | mysql","cleanup.log");
+
+prints "End test run. " . ctime(time) . "\n";
+
+doexit(0);

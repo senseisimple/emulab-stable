@@ -1,0 +1,94 @@
+
+mktest
+------
+
+Make test is a tool to create basic tests from a NS file.  Tests created
+with mktest only check the exit codes, they do not check database or
+node status.
+
+Syntax:
+
+mktest <mode> <name> <nsfile> [<description>]
+mktest
+
+<mode> is one of "frontend" or "full".  If a description is not
+specified on the command line then an editor will be opened for the
+user to enter one.
+
+When run with no arguments then mktest prompts the user for all
+information.
+
+mktest MUST be run in testbed/testsuite.
+
+
+Test Format
+-----------
+
+A test is a directory in testsuite/tests which contains the following files:
+	nsfile.ns - NS file.
+	dbstate - Any commands to set up the DB.
+	test - Test file.
+	info - Info file.
+
+dbstate 
+
+This is just a list of SQL commands that are applied to the DB state
+before the test in run.
+
+info
+
+Just a description of the test.
+
+test 
+
+This is a perl script that actually runs the test.  Generally it looks
+something like:
+
+tb_prerun("tbprerun",0);
+tb_compare("<SQL query>",<results>);
+tb_run("tbswapin -test",0);
+tb_compare("<SQL query>",<results>);
+
+See TEST FILES below
+
+
+TEST FILES
+----------
+
+Routines:
+
+tb_prerun(<cmd>,<exitcode>)
+
+This runs "<cmd> pid eid nsfile", and compares the exitcode.  The test
+fails and exit if the exit codes do not equal.
+
+tb_run(<cmd>,<exitcode>)
+
+This runs "<cmd> pid eid", and compares the exitcode.  The test fails
+and exit if the exit codes do not equal.
+
+tb_compare(<query>,<results>)
+
+This executes the SQL <query> and then fetches the results.  <results>
+is a list of list references.  If the results match exactly then test
+test continues otherwise results are displayed and the test fails.
+
+tb_fail(<msg>)
+
+Explicitely fail the test with <msg>.
+
+
+Variables (do not change values!):
+
+$pid, $eid - PID and EID of test experiment.
+$test - Test name.
+$dir - Directory containing test files.
+
+Other notes:
+
+The current directory should not be changed.  It will be the directory
+containing .top, .ptop, and .log files.
+
+
+
+

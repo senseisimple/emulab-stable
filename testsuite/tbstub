@@ -1,0 +1,83 @@
+#!/usr/bin/perl
+
+# The lack of -w is intentional!  Several variables here are only used
+# by the test file and maybe not even there.  Thus -w will cause a lot
+# of warnings of variables being used only once.
+
+# tbstub
+
+# This should not be directly called by the user.  This is called from
+# tbtest to provide a basic environment for the test scripts to run.  The
+# reason to have the tests run in a seperate process it for memory management.
+# There is no way to completely clear out the memory used by a package
+# other than terminating the interpreter.  Thus to allow each test to
+# run in it's own namespace without having a memory leak we put each
+# in it's own process.
+
+# The last last of output must be:
+#   PASS
+#   FAIL <msg>
+
+# Syntax:
+#   tbstub <db> <pid> <eid> <testname> <testdir>
+
+($db,$pid,$eid,$test,$dir) = @ARGV;
+
+# The status of the test.
+$status = "";
+
+sub doexit {
+    if ($status eq "") {
+	$status = "PASS";
+    }
+    
+    print "$status\n";
+    
+    exit(0);
+};
+
+do {
+package TEST;
+$eid = $::eid;
+$pid = $::pid;
+$test = $::test;
+$dir = $::dir;
+
+sub tb_prerun {
+    my ($cmd,$exitcode) = @_;
+    print "$cmd $pid $eid $dir/nsfile.ns\n";
+    open(TBEXEC,"$cmd $pid $eid $dir/nsfile.ns 2>&1 |");
+    while (<TBEXEC>) {
+	print $_;
+    }
+    close(TBEXEC);
+    if (($? >> 8) != $exitcode) {
+	tb_fail($cmd);
+    }
+};
+sub tb_compare {
+    print "tb_compare not yet implemented.\n";
+};
+sub tb_run {
+    my ($cmd,$exitcode) = @_;
+    print "$cmd $pid $eid\n"; 
+    open(TBEXEC,"$cmd $pid $eid 2>&1 |");
+    while (<TBEXEC>) {
+	print $_;
+    }
+    close(TBEXEC);
+    if (($? >> 8) != $exitcode) {
+	tb_fail($cmd);
+    }
+};
+sub tb_fail {
+    $::status = "FAIL - " . $_[0];
+    ::doexit;
+};
+
+print "Executing $dir/test\n";
+do "$dir/test";
+
+};
+
+doexit;
