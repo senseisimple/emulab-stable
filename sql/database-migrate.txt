@@ -1526,3 +1526,7 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table node_types add column bootdisk_unit tinyint(3) unsigned \
 	   not null default 0 after disktype;
 
+1.244: Add trivlink_maxspeed for Mike.
+
+      alter table node_types add trivlink_maxspeed int(11) unsigned \
+	   NOT NULL default '0' after simnode_capacity;

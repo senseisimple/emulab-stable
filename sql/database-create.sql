@@ -845,6 +845,7 @@ CREATE TABLE node_types (
   isplabphysnode tinyint(4) NOT NULL default '0',
   issimnode tinyint(4) NOT NULL default '0',
   simnode_capacity smallint(5) unsigned NOT NULL default '0',
+  trivlink_maxspeed int(11) unsigned NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
