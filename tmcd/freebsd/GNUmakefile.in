@@ -40,11 +40,13 @@ mfs-install:	common-install etc-install \
 			script-install bin-install
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 
-lbs-install:	common-install \
-			script-install bin-install jail-install
+lbs-install:	simple-install
 	cp /dev/null $(BINDIR)/isrem
 	cp /dev/null $(ETCDIR)/isrem
 	@echo "Remember to install the PEM files if necessary"
+
+simple-install:	common-install \
+			script-install bin-install jail-install
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)

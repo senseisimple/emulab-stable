@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,6 +35,8 @@ install:	common-install etc-install \
 			sup-install script-install bin-install
 	@echo "Remember to install the PEM files if necessary"
 
+simple-install:	common-install script-install bin-install
+
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
@@ -62,7 +64,7 @@ bin-install:	dir-install
 	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc
 	$(INSTALL) -m 755 ../findif $(BINDIR)/findif
 
-etc-install:	dir-install sysetc-install
+etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
 	$(INSTALL) -m 644 $(SRCDIR)/passwd $(ETCDIR)/passwd
 	$(INSTALL) -m 600 $(SRCDIR)/shadow $(ETCDIR)/shadow
