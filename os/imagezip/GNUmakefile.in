@@ -9,9 +9,10 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= os/imagezip
 
-DISTFILES	= TODO ext2_fs.h imagehdr.h linux_types.h queue.h \
+DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
 		  imagedump.c imagedump.8 imagezip.c imagedump.8 \
 		  imageunzip.c imageunzip.8
+EXPANDCOPYRIGHT	= /n/fast/usr/lsrc/flux/doc/copyright/expand-copyr
 
 WITH_NTFS	= @WINSUPPORT@
 
@@ -73,8 +74,16 @@ clean:
 	fi;
 	/bin/rm -f *.o imagezip imageunzip imagedump version.c
 
+imagezip.tar.gz: imagezip.tar
+	gzip -c imagezip.tar > imagezip.tar.gz
+
 imagezip.tar: Makefile.sa $(DISTFILES)
-	(cd $(SRCDIR); cp -p Makefile.sa Makefile; \
-		tar cf - Makefile $(DISTFILES); rm -f Makefile) > imagezip.tar
+	rm -rf imagezip-dist; mkdir imagezip-dist
+	(cd $(SRCDIR); tar cf - Makefile.sa $(DISTFILES)) | \
+		(cd imagezip-dist; tar xf -)
+	mv imagezip-dist/Makefile.sa imagezip-dist/Makefile
+	(cd imagezip-dist; $(EXPANDCOPYRIGHT) Makefile $(DISTFILES))
+	tar cf imagezip.tar imagezip-dist
+	rm -rf imagezip-dist
 
 .PHONY:	$(NTFSDIR)
