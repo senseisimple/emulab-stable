@@ -20,14 +20,15 @@ echo "<ul>\n";
 FLUXPERSON("calfeld", "Chris Alfeld");
 FLUXPERSON("danderse", "Dave Andersen");
 FLUXPERSON("barb", "Chad Barb");
+FLUXPERSON("rchriste", "Russ Christensen");
+FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("mike", "Mike Hibler");
 FLUXPERSON("abhijeet", "Abhijeet Joglekar");
-FLUXPERSON("imurdock", "Ian Murdock");
 FLUXPERSON("newbold", "Mac Newbold");
 FLUXPERSON("ricci", "Robert Ricci");
-FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("stoller", "Leigh Stoller");
 FLUXPERSON("kwebb", "Kirk Webb");
+FLUXPERSON("bwhite", "Brian White");
 echo "</ul>\n";
 
 echo "<h3>Alumni:</h3>\n";
@@ -35,6 +36,7 @@ echo "<ul>\n";
 FLUXPERSON("sclawson", "Steve Clawson");
 FLUXPERSON("ikumar", "Indrajeet Kumar");
 FLUXPERSON("vanmaren", "Kevin Van Maren");
+FLUXPERSON("imurdock", "Ian Murdock");
 FLUXPERSON("kwright", "Kristin Wright");
 echo "</ul>\n";
 
