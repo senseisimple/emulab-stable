@@ -11,12 +11,14 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: ptopgen [-s switch] [-e pid/eid] \n" .
+    print STDOUT "Usage: ptopgen [-s switch] [-e pid/eid] [-m factor]\n" .
                  "       -e include given experiment's resources\n" .
-                 "          in the ptopfile (as if they were free)\n";
+                 "          in the ptopfile (as if they were free)\n" .
+		 "       -m Override multiplex_factor\n";
     exit(-1);
 }
-my  $optlist = "s:e:";
+my $optlist = "s:e:m:";
+my $mfactor;
 
 
 # Settings - Change these to your particular network.
@@ -62,6 +64,9 @@ if (@ARGV) {
 }
 if (defined($options{"s"})) {
     $switchtouse = $options{"s"};
+}
+if (defined($options{"m"})) {
+    $mfactor = $options{"m"};
 }
 
 if (defined($options{"e"})) {
@@ -172,16 +177,17 @@ foreach $node (keys(%nodes)) {
             ### and therefore we can support sim nodes
             #################################################################
             $text .= " sim:100000";
-	    #
-	    # Ditto for jailed nodes
-	    #
-            $text .= " pcvm:10";
 	}
 	if ($virtnode_capacity > 0) {
 	    #
 	    # Ditto for jailed nodes
 	    #
-            $text .= " pcvm:$virtnode_capacity";
+	    if (defined($mfactor)) {
+		$text .= " pcvm:$mfactor";
+	    }
+	    else {
+		$text .= " pcvm:$virtnode_capacity";
+	    }
 	}
 	print "$text\n";
     }
