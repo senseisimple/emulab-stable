@@ -49,7 +49,7 @@ sub usage ()
     exit($WRAPPER_FAILED);
 }
 my $optlist  = "vutnfp";
-my $verbose  = 1;
+my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
