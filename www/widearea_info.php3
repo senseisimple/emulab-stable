@@ -58,40 +58,41 @@ function SPITDATA($table, $title, $showtype)
 	$bw       = $row[bandwidth];
 	$plr      = $row[lossrate];
     
-	$msectime = $time * 1000;
 	$glom1    = $node_id1;
 	$glom2    = $node_id2;
 
-        #echo "Got $glom1 to $glom2 in $msectime ms<br>\n";
-
+        # echo "Got $glom1 to $glom2 in $msectime ms<br>\n";
+	
 	$nodenamesrow[$glom1] = 1;
 	$nodenamesrow[$glom2] = 1;
 	$nodenamescol[$glom1] = 1;
 	$nodenamescol[$glom2] = 1;
 
-	$speeds[ $glom1 . "+" . $glom2 ] = $msectime;
+	$speeds[ $glom1 . "+" . $glom2 ] = $time * 1000;
 	$bws[ $glom1 . "+" . $glom2 ] = $bw;
-	$plrs[ $glom1 . "+" . $glom2 ] = $plr;
+	$plrs[ $glom1 . "+" . $glom2 ] = $plr * 100.0;
     }
     ksort($nodenamesrow);
     ksort($nodenamescol);
 
     echo "<center>
-           <h2>$title</h2>
-          </center>\n";
+           <b>$title</b><br>\n";
     
+    if ($showtype == 1)
+	echo "(Delay,BW,PLR)\n";
+    elseif ($showtype == 2)
+	echo "(Delay)\n";
+    elseif ($showtype == 3)
+	echo "(BW)\n";
+    elseif ($showtype == 4)
+	echo "(PLR)\n";
+
+    echo "</center><br>\n";
+
     echo "<table border=2 
                  cellpadding=1 cellspacing=2 align=center>
              <tr>";
-
-    if ($showtype == 1)
-	echo "<td>(D,BW,PLR)</td>\n";
-    elseif ($showtype == 2)
-	echo "<td>(Delay)</td>\n";
-    elseif ($showtype == 3)
-	echo "<td>(BW)</td>\n";
-    elseif ($showtype == 4)
-	echo "<td>(PLR)</td>\n";
+    echo "<td>&nbsp</td>\n";
 
     while (list($n1, $ignore1) = each($nodenamescol)) {
 	echo "<td>$n1</td>\n";
@@ -130,8 +131,12 @@ function SPITDATA($table, $title, $showtype)
 	reset($nodenamescol);
 	echo "</tr>\n";
     }
-    echo  "</table>\n";
-    echo  "<br>\n";
+    echo "</table>\n";
+    echo "<center>
+           Delay in milliseconds, Bandwidth in KB/s, PLR rounded to two
+	   decimal places (0-100%).
+          </center>\n";
+    echo "<br>\n";
 }
 
 SPITDATA("widearea_recent", "Most Recent Data", $showtype);
