@@ -1381,7 +1381,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/checkports tbsetup/webidlecheck tbsetup/webnodereboot \
+	tbsetup/checkports tbsetup/webnodereboot \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
