@@ -48,7 +48,7 @@ if ($confirmed) {
 			     "state_timestamp=unix_timestamp(NOW()) " .
 			     "where node_id='$ni'");
 	}
-	$body_str .= "<b>$ni</b> $poweron<br>";
+	$body_str .= "<b>$ni</b><br>";
     }
 }
 else {
