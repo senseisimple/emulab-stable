@@ -1255,8 +1255,6 @@ while (my ($vname,$vnode) = $virt_agents->fetchrow_array()) {
 		 " vname='$vname' and vnode='$vnode'");
 }
 
-my $pipeid = 100;
-
 foreach $delayid (keys(%nodedelays)) {
     # So r* indicates int1->int0 and others are int0->int1
     my ($pnode,$int0,$int1,$vname,
@@ -1264,9 +1262,8 @@ foreach $delayid (keys(%nodedelays)) {
 	$member1,$rdelay,$rbandwidth,$rlossrate) = @{$nodedelays{$delayid}};
 
     # ipfw pipe number so we can control it remotely.
-    my $pipe0 = $pipeid;
-    my $pipe1 = $pipeid + 10;
-    $pipeid += 100;
+    my $pipe0 = physnodenextpipe($pnode);
+    my $pipe1 = physnodenextpipe($pnode);
 
     my ($vnode0) = split(":", $member0);
     my ($vnode1) = split(":", $member1);
@@ -1409,9 +1406,8 @@ foreach $delayid (keys(%linkdelays)) {
 	$rdelay,$rbandwidth,$rlossrate,$islan) = @{$linkdelays{$delayid}};
 
     # ipfw pipe numbers so we can control it remotely.
-    my $pipe  = $pipeid;
-    my $rpipe = $pipeid + 10;
-    $pipeid += 100;
+    my $pipe  = physnodenextpipe($pnode);
+    my $rpipe = physnodenextpipe($pnode);
 
     my $ip      = $ips{$member};
     my ($vnode) = split(":", $member);
@@ -3252,6 +3248,7 @@ sub LoadPhysNode($)
 	# Pnodes start in "reboot" state.
 	#
 	$rowref->{"__reuse"} = "reboot";
+	$rowref->{"__pipeno"} = "100";
     }
     return $phys_nodes{$pnode};
 }
@@ -3311,6 +3308,7 @@ sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
 sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
 sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
 sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
+sub physnodenextpipe($)  { return $phys_nodes{$_[0]}->{"__pipeno"} += 10; }
 
 #
 # Load current resources. We pull in the phys node entries now.
