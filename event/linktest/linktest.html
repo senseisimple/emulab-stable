@@ -1,0 +1,247 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>Linktest Tutorial</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#QuickStart">Quick Start</a>
+<li> <a href="#Understand">Understanding Linktest</a>
+    <ul>
+    <li> <a href="#Level0">Level 0 - Do not run Linktest</a>
+    <li> <a href="#Level1">Level 1 - Connectivity and Latency</a>
+    <li> <a href="#Level2">Level 2 - Static Routing</a>
+    <li> <a href="#Level3">Level 3 - Loss</a>
+    <li> <a href="#Level4">Level 4 - Bandwidth</a>
+    </ul>
+<li> <a href="#Advanced">Advanced Topics</a>
+    <ul>
+    <li> <a href="#Ops">Running Linktest on Ops</a>
+    <li> <a href="#Tevc">Running Linktest with Tevc</a>
+    <li> <a href="#Log">Linktest Log Directory</a>
+    </ul>
+</ul>
+
+<hr>
+<a name="QuickStart"></a>
+<center>
+<h2>Quick Start</h2>
+</center>
+
+<p>
+To run linktest, select a Linktest test level from the dropdown on the
+<a href="beginexp_html.php3">Begin an Experiment</a> page.
+<ul>
+<li>For fastest response, select <a href="#Level1">Level 1 - Connectivity and Latency</a>. This
+will check that all nodes respond to ping and that latency is correct.
+<li>For a more thorough but relatively fast test, select <a
+href="#Level3">Level 3 - Loss</a>. Test levels are cumulative, so this option includes
+Connectivity, Latency, Static Routing (if applicable) and Loss.
+<li>If bandwidth is important in your experiment, select <a
+href="#Level4">Level 4 - Bandwidth</a>. Be warned that the bandwidth test takes up to 40 seconds per
+link.
+</ul>
+<p>If you select a test lest level other than 0, Linktest
+will run after the experiment completes its swapin. If a problem is
+found, testbed-ops is automatically notified and a message will appear
+in the activation log. Otherwise, no notification will appear.
+</p>
+
+<hr>
+<a name="Understand"></a>
+<center>
+<h2>Understanding Linktest</h2>
+</center>
+
+<p>
+Linktest is an end-to-end validation test for Emulab experiments. It
+verifies that experiment nodes are up, that they are reachable by
+static routes (when applicable), and that traffic shaping on delay
+nodes matches the experiment NS script.
+</p>
+<p>
+Linktest works by parsing the experiment NS script, then invoking
+external measurement tools -- namely
+ping, <a href="http://rude.sourceforge.net">Rude and Crude</a> and <a
+href="http://www.cc.gatech.edu/fac/Constantinos.Dovrolis/pathrate.html">Pathrate</a>.
+Linktest compares the results against margins of error calculated in
+advance to identify major errors in configuration.
+</p>
+<p>
+Linktest runs on each experiment node. The Linktest daemon waits for a
+custom event instructing it to begin testing. When it receives the
+event, it invokes the Linktest script to conduct the actual tests. The
+script invokes external processes to parse the NS script, validate
+links and log any errors found.
+</p>
+<p>
+If a node detects an error, it writes
+an explanatory message to the experiment tbdata/linktest
+directory. Otherwise, no messages appear in the directory after
+Linktest completes its run.
+</p>
+<p>
+Linktest uses test levels to select which tests to perform. Test
+levels are cumulative, so that selecting a higher test level ensures
+lower-level tests are also run. Test levels are ordered in length of
+time to complete, so that <a href="#Level4">Level 4 - Bandwidth</a> takes the most time and
+<a href="#Level1">Level 1 - Connectivity and Latency</a> takes the least.
+</p>
+<p>
+Read more about each test level in the following sections:
+</p>
+<p>
+    <ul>
+    <li> <a href="#Level0">Level 0 - Do not run Linktest</a>
+    <li> <a href="#Level1">Level 1 - Connectivity and Latency</a>
+    <li> <a href="#Level2">Level 2 - Static Routing</a>
+    <li> <a href="#Level3">Level 3 - Loss</a>
+    <li> <a href="#Level4">Level 4 - Bandwidth</a>
+    </ul>
+</p>
+
+<ul>
+<a NAME="Level0"></a>
+<li> <h3>Level 0 - Do not run Linktest</h3>
+
+<p>
+The default test level is Level 0 - Do not run Linktest. Use this
+level to leave Linktest turned off, performing no validation of
+experiment links after swapin.
+</p>
+
+<a NAME="Level1"></a>
+<li> <h3>Level 1 - Connectivity and Latency</h3>
+
+<p>
+Each Linktest node on a lan or direct link pings the node on the other
+side of the link. From the responses, the node detects whether the
+link is up and the latency of the link. Linktest compares the measured
+latency with the expected latency of the link, adjusting for known
+delay crossing the testbed backplane. If the measured latency
+is outside the 99% confidence interval for latencies at that setting, Linktest reports an error.
+</p>
+
+<a NAME="Level2"></a>
+<li> <h3>Level 2 - Static Routing</h3>
+
+<p>
+If the routing mode of the experiment is static, each Linktest node
+pings the remainder of nodes in the experiment. If any node cannot be
+reached, the Linktest node reports an error.
+</p>
+
+
+<a NAME="Level3"></a>
+<li> <h3>Level 3 - Loss</h3>
+
+<p>
+Each Linktest node on a lan or direct link with loss > 0 sends a burst
+of packets to the node on the other side of the link using Rude and
+Crude, a real-time packet emitter and collector. If the percentage of
+packets lost is outside the 99% confidence interval for
+normally-distributed loss at that setting, Linktest reports an
+error.
+</p>
+
+
+<a NAME="Level4"></a>
+<li> <h3>Level 4 - Bandwidth</h3>
+
+<p>
+Each Linktest node on a lan or direct link uses Pathrate to measure
+the bandwidth of the link, provided that the link is >= 1 Mbps and <=
+45 Mbps. If the measured bandwidth is outside the margin of error
+of 1Mb, Linktest reports an error.
+</p>
+
+<p>
+The Bandwidth test adds up to 40 seconds per distinct link in the
+experiment, or 15-20 seconds in each direction. Linktest attempts to run tests in parallel whenever
+possible, but topologies such as a star will lead to longer runtimes
+because Linktest allows only one sender or receiver to run on a node at a
+time.
+</p>
+
+</ul>
+<hr>
+<a name="Advanced"></a>
+<center>
+<h2>Advanced Topics</h2>
+</center>
+
+<p>
+To run Linktest after experiment swapin, manually
+invoke the script run_linktest.pl on ops or use tevc to send a custom
+Linktest event. You may also examine Linktest output in its log
+directory. Read about these options in the following sections:
+</p>
+<p>
+    <ul>
+    <li> <a href="#Ops">Running Linktest on Ops</a>
+    <li> <a href="#Tevc">Running Linktest with Tevc</a>
+    <li> <a href="#Log">Linktest Log Directory</a>
+    </ul>
+</p>
+<ul>
+<a NAME="Ops"></a>
+<li> <h3>Running Linktest on Ops</h3>
+<p>
+Use run_linktest.pl to run Linktest on ops. The option "-e" is
+mandatory for specifying the
+project and experiment id. Running with "-q" will run all tests except
+the bandwidth test. Running without "-q" runs all tests. Running with "-o" allows you to specify an output directory
+for log messages. Invoke run_linktest.pl with no options for a help
+message.
+Example:
+</p>
+<p>
+<code><pre>run_linktest.pl -e utahstud/simple -q -o /tmp/linktest.log</code></pre>
+</p>
+<p>You may also specify the test level using the "-l" option. Example:
+</p>
+<p>
+<code><pre>run_linktest.pl -e utahstud/simple -l 1</code></pre>
+</p>
+
+<p>
+After Linktest completes, run_linktest.pl prints out errors found
+during the run, if any. For scripting, run_linktest.pl returns 0 if no
+errors were found, or !0 if at least one error was found.
+</p>
+
+
+<a NAME="Tevc"></a>
+<li> <h3>Running Linktest with Tevc</h3>
+<p>
+
+For the most fine-grained control of Linktest, use tevc to send
+Linktest events. Use STARTAT and STOPAT optional arguments to specify
+start and stop levels, or tevc to specify one test only. For example,
+to run only the bandwidth test:
+</p>
+<p>
+<code><pre>
+tevc -e pid/eid now linktest start STARTAT=4 STOPAT=4
+</code></pre>
+</p>
+<p>
+When running Linktest manually using tevc events, no messages appear
+indicating whether the tests passed. Instead, watch the contents of
+the tbdata/linktest directory for error reports.
+</p>
+
+
+<a NAME="Log"></a>
+<li> <h3>Linktest Log Directory</h3>
+<p>
+
+Linktest logs the results of parsing the NS script and any error reports
+in the tbdata/linktest directory for each experiment. By default this
+is in ops:/proj/$pid/exp/$eid.
+</p>
+</ul>
