@@ -41,7 +41,7 @@ if ($printable) {
 }
 else {
 	echo "<b><a href=$REQUEST_URI&printable=1>
-                 Printable version of this document</a></b><br>";
+                 Printable version of this document</a></b><br>\n";
 }
 
 readfile("$docname");
