@@ -71,7 +71,7 @@ if (! (($state) = $sth->fetchrow_array())) {
 if ($force == 0) {
     if ($TESTMODE) {
 	if ($state ne "testing") {
-	    &tbs_out("Experiment should be in testing if -test is used.\n");
+	    &tbs_out("Experiment should be in testing.\n");
 	    exit(1);
 	}
     } else {
