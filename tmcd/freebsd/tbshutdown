@@ -39,14 +39,14 @@ sleep;
 
 exit(0);
 
-sub cleanup() {
+sub cleanup {
     # This is our signal handler.
     tmcc(TMCCCMD_STATE, "SHUTDOWN");
     exit(0);
 }
 
 # Put ourselves into the background so that caller sees immediate response.
-sub background() {
+sub background {
 
     $mypid = fork();
     if ($mypid) { return $mypid; }

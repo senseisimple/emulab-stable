@@ -12,7 +12,7 @@ use Getopt::Std;
 # means to run the scripts so that the delays are installed. Use -u for
 # uninstall mode, which really only makes sense when used in conjunction
 # with -j. BTW, none of the options make sense on a delaynode; they are
-# intended for use with linkdelays on end nodes. 
+# intended for use with linkdelays on end nodes.
 #
 sub usage()
 {
@@ -34,14 +34,14 @@ $| = 1;
 
 #
 # Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
+# library and initialize itself.
+#
 use libsetup;
 use libtmcc;
 
 #
 # Must be root.
-# 
+#
 if ($EUID) {
     die("*** $0:\n".
 	"    Must be run as root!\n");
@@ -70,6 +70,7 @@ if (defined($options{"j"})) {
 if (@ARGV) {
     usage();
 }
+sub checkkernel($);
 
 #
 # Delay node configuration goop.
@@ -79,7 +80,7 @@ my $KERNEL1000  = "/kernel.1000HZ";
 my $KERNEL10000 = "/kernel.10000HZ";
 my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
 my $KERNELJAIL  = "/kernel.jail";	# Specific to jails (with linkdelays).
-my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel. 
+my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel.
 
 # This should never happen!
 if (REMOTE() || MFS()) {
@@ -91,11 +92,11 @@ if (REMOTE() || MFS()) {
 if ($uninstall) {
     system(TMDELAY . " disable")
 	if (-e TMDELAY);
-	
+
     system(TMLINKDELAY . " disable")
 	if (-e TMLINKDELAY);
 
-    # Kill delay agent. 
+    # Kill delay agent.
     if (defined($vnodeid)) {
 	system("$BINDIR/rc.delayagent -j $vnodeid stop");
     }
@@ -119,7 +120,7 @@ if (-e TMLINKDELAY) {
     if ($install) {
 	system(TMLINKDELAY . " enable");
 
-	# Fire up a delay agent. 
+	# Fire up a delay agent.
 	if (defined($vnodeid)) {
 	    system("$BINDIR/rc.delayagent -j $vnodeid start");
 	}
@@ -129,9 +130,9 @@ if (-e TMLINKDELAY) {
 exit(0);
 
 #
-# This sets up delays on a delay node. 
-# 
-sub DelaySetup()
+# This sets up delays on a delay node.
+#
+sub DelaySetup
 {
     my @delays;
     my $checkreplace = 0;
@@ -151,10 +152,10 @@ sub DelaySetup()
 
 	open(MAP, ">" . TMDELMAP)
 	    or die("Could not open " . TMDELMAP . ": $!");
-    
+
 	open(DEL, ">" . TMDELAY)
 	    or die("Could not open " . TMDELAY . ": $!");
-	
+
 	print DEL "#!/bin/sh\n";
 	# Turn these off before setting bridge_cfg.
 	print DEL "sysctl -w net.link.ether.bridge=0\n";
@@ -201,12 +202,12 @@ sub DelaySetup()
 	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
 	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+) );
 	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+));
-	    
+
 	    $delay =~ /$pat/;
 
 	    #
 	    # tmcd returns the interfaces as MAC addrs.
-	    # 
+	    #
 	    my $iface1 = findiface($1);
 	    my $iface2 = findiface($2);
 	    my $p1        = $3;
@@ -220,7 +221,7 @@ sub DelaySetup()
 	    my $linkname  = $11;
 	    my $red1      = $12;
 	    my $red2      = $13;
-		
+
 	    #
 	    # Only a few of these NS RED params make sense for dummynet,
 	    # but they all come through; someday they might be used.
@@ -251,7 +252,7 @@ sub DelaySetup()
 	    my $gentle2    = $37;
 	    my $vnode0     = $38;
 	    my $vnode1     = $39;
-	    
+
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
 	    # support floats, so apply a cheesy rounding function to convert
@@ -360,7 +361,7 @@ sub DelaySetup()
 	close(DEL);
 	chmod(0755, TMDELAY);
 	close(MAP);
-    
+
 	#
 	# Now do kernel configuration. All of the above work is wasted,
 	# but such is life.
@@ -380,14 +381,14 @@ sub DelaySetup()
 
 #
 # This sets up linkdelays on an experimental node.
-# 
-sub LinkDelaySetup()
+#
+sub LinkDelaySetup
 {
     my @delays;
     my @jails;
     my $kernel;
     my $checkreplace = 0;
-    my $gotjails = (defined($vnodeid) ? 1 : 0); 
+    my $gotjails = (defined($vnodeid) ? 1 : 0);
     my $upcmds   = "";
     my $downcmds = "";
 
@@ -425,10 +426,10 @@ sub LinkDelaySetup()
     if (@delays) {
 	open(MAP, ">" . TMDELMAP)
 	    or die("Could not open " . TMDELMAP . ": $!");
-    
+
 	open(DEL, ">" . TMLINKDELAY)
 	    or die("Could not open " . TMLINKDELAY . ": $!");
-	
+
 	foreach $delay (@delays) {
 	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
 	    $pat .= q(LINKNAME=([-\d\w]+) VNODE=([-\d\w]+) );
@@ -440,12 +441,12 @@ sub LinkDelaySetup()
 	    $pat .= q(LINTERM=(\d+) QINBYTES=(\d+) BYTES=(\d+) );
 	    $pat .= q(MEANPSIZE=(\d+) WAIT=(\d+) SETBIT=(\d+) );
 	    $pat .= q(DROPTAIL=(\d+) GENTLE=(\d+));
-	    
+
 	    $delay =~ /$pat/;
 
 	    #
 	    # tmcd returns the interfaces as MAC addrs.
-	    # 
+	    #
 	    my $iface     = findiface($1);
 	    my $type      = $2;
 	    my $linkname  = $3;
@@ -461,7 +462,7 @@ sub LinkDelaySetup()
 	    my $rbandw    = $13;
 	    my $rplr      = $14;
 	    my $red       = $15;
-	    
+
 	    #
 	    # Only a few of these NS RED params make sense for dummynet,
 	    # but they all come through; someday they might be used.
@@ -536,12 +537,12 @@ sub LinkDelaySetup()
 
 	    $downcmds .= "ipfw pipe delete $pipeno\n";
 	    $downcmds .= "ipfw delete $pipeno\n";
-		
+
 	    if ($type eq "duplex") {
 		#
 		# Want to force the reverse side to 1 queue slot to enforce
 		# the proper bandwidth. Not ideal, especially since at 1000HZ
-		# 1 queue slot is not enough. Make it 4 instead. 
+		# 1 queue slot is not enough. Make it 4 instead.
 		#
 		$upcmds .= "ipfw add $rpipeno pipe $rpipeno ip from any ".
 		           "to any in recv $iface\n";
@@ -565,7 +566,7 @@ sub LinkDelaySetup()
 
 	print DEL "#!/bin/sh\n";
 	print DEL "# auto-generated by libsetup.pm, DO NOT EDIT\n";
-	# Main boot only. 
+	# Main boot only.
 	if (!defined($vnodeid)) {
 	    print DEL "ipfw -f flush\n";
 	}
@@ -573,7 +574,7 @@ sub LinkDelaySetup()
 	print DEL "case \"\$action\" in\n";
 	print DEL "  enable)\n";
 	print DEL "     $upcmds\n";
-	# Turn off Flow-based IP (fast) forwarding since it causes packets 
+	# Turn off Flow-based IP (fast) forwarding since it causes packets
 	# to bypass traffic shaping and ipfw. Stupid!
 	print DEL "     sysctl -w net.inet.ip.fastforwarding=0\n";
 	print DEL "     ;;\n";
@@ -583,7 +584,7 @@ sub LinkDelaySetup()
 	print DEL "esac\n";
 	close(DEL);
 	chmod(0755, TMLINKDELAY);
-    
+
 	#
 	# Now do kernel configuration. All of the above work is wasted,
 	# but such is life.
@@ -605,7 +606,7 @@ sub LinkDelaySetup()
 sub checkkernel($)
 {
     my($kernel) = @_;
-    
+
     print STDOUT "Making sure node is running $kernel ... \n";
 
     if (-e $kernel) {
