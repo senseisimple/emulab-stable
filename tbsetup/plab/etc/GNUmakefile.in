@@ -12,7 +12,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-ETC_STUFF       = plabroot.tgz 
+ETC_STUFF       = fixsudo.sh # plabroot.tgz 
 
 CERTS		= cacert.pem cert.pem key.pem pubkey.pem req.pem
 
