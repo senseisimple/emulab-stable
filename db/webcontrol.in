@@ -15,12 +15,8 @@ my  $optlist = "m:l:";
 #
 # Configure variables
 #
-my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
-
-# un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+use lib "@prefix@/lib";
+use libdb;
 
 #
 # Turn off line buffering on output
@@ -60,35 +56,22 @@ if (defined($options{"l"})) {
 }
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
 # Only root or admin types!
 # 
-if ($UID != 0) {
-    ($name) = getpwuid($UID)
-	or die "$UID not in passwd file\n";
-
-    $db_result = $DB->query("select admin from users where uid='$name'");
-    @row = $db_result->fetchrow_array();
-    if ($row[0] != 1) {
+if (($UID != 0) && (!TBAdmin($UID))) {
 	die("Only root or TB administrators can control the web interface.\n");
-    }
 }
 
 if ($setmesg) {
     if ($message eq "") {
 	print "Clearing Web Message of the Day\n";
 
-    	$db_result = $DB->query("delete from loginmessage");
+    	DBQueryFatal("delete from loginmessage");
     }
     else {
 	print "Setting Web Message of the Day to $message\n";
 
-	$db_result = $DB->query("replace into loginmessage (valid, message) ".
+	DBQueryFatal("replace into loginmessage (valid, message) ".
 				"values(1, '$message')");
     }
 }
@@ -97,12 +80,12 @@ if ($setlogin) {
     if ($logins) {
 	print "Enabling Web Interface logins\n";
 
-    	$db_result = $DB->query("delete from nologins");
+    	DBQueryFatal("delete from nologins");
     }
     else {
 	print "Disabling Web Interface logins\n";
 
-	$db_result = $DB->query("replace into nologins (nologins) values(1)");
+	DBQueryFatal("replace into nologins (nologins) values(1)");
     }
 }
 
