@@ -1,0 +1,141 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# tbsgmotepower - An emulab frontend to turning on and off the power to a mote
+# hosted on a stargate
+#
+
+use lib '@prefix@/lib';
+my $TB = '@prefix@';
+ 
+use libdb;
+use English;
+
+#
+# We have to be setuid root so that we can ssh into stargates as root
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+ 
+use strict;
+
+#
+# Constants
+#
+my $MOTEPOWER = "/usr/local/bin/motepower";
+my $SSHTB     = "$TB/bin/sshtb";
+
+#
+# Handle command-line arguments
+#
+sub usage() {
+    warn "Usage: $0 <on | off | cycle> <motes ...>\n";
+    return 1;
+}
+
+my $operation = shift @ARGV;
+if (!$operation) {
+    exit usage();
+}
+
+# Check the operation type
+if ($operation !~ /^(on|off|cycle)$/) {
+    exit &usage;
+} else {
+    # Untaint operation
+    $operation = $1;
+}    
+
+# They have to give us at least one mote
+my @motes = @ARGV;
+if (!@motes) {
+    exit usage();
+}
+
+#
+# Tait check the node names
+#
+@motes = map {
+    if (/^([-\w]+)$/) {
+	$1;
+    } else {
+	die("*** Tainted node name: $_\n");
+    }
+} @motes;
+
+#
+# Permission check
+#
+if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
+    die "You do not have permission to modify one or more nodes\n";
+}
+
+#
+# Log into each stargate to reboot the mote
+#
+my $errors = 0;
+MOTE: foreach my $mote (@motes) {
+    #
+    # Make sure they gave us an actual mote
+    #
+    my ($motetype, $moteclass) = TBNodeType($mote);
+    if ($moteclass ne "mote") {
+	warn "$mote is not a mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+
+    #
+    # Find out the type of the mote's host
+    #
+    my $host;
+    if (!TBPhysNodeID($mote,\$host)) {
+	warn "Error getting host for $mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+    if ($host eq $mote) {
+	warn "Error - no host found for $mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+    my ($hosttype, $hostclass) = TBNodeType($host);
+
+    # Make sure the host is a stargate
+    # XXX - garcia is temporary - hopefully, at some point, we will
+    # distinguish the garcia from the stargate that rides on it
+    if ($hosttype !~ /^(sg|garcia)/) {
+	die "Mote host $host for $mote has unsupported type $hosttype";
+    }
+
+    #
+    # Actually do the power control
+    #
+    my $commandstr = "$SSHTB -host $host $MOTEPOWER $operation";
+
+    #
+    # SSH gets ticked if UID != EUID, so set that now
+    #
+    $UID = $EUID;
+    if (system($commandstr)) {
+	$errors++;
+	warn "Failed to control power for $mote";
+    }
+}
+
+if ($errors) {
+    exit 1;
+} else {
+    exit 0;
+}

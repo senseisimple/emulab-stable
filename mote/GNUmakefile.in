@@ -11,7 +11,7 @@ SUBDIR		= mote
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= tbuisp
+BIN_SCRIPTS	= tbuisp tbsgmotepower
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -27,5 +27,7 @@ install: \
 post-install:
 	chown root $(INSTALL_BINDIR)/tbuisp
 	chmod u+s $(INSTALL_BINDIR)/tbuisp
+	chown root $(INSTALL_BINDIR)/tbsgmotepower
+	chmod u+s $(INSTALL_BINDIR)/tbsgmotepower
 
 clean:

@@ -1582,7 +1582,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
-	mote/GNUmakefile mote/tbuisp \
+	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower \
 	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
 	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
