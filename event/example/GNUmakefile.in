@@ -3,7 +3,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/example
 
-PROGRAMS	= tbrecv tbsend
+PROGRAMS	= tbrecv tbsend eventdebug.pl
 
 include $(OBJDIR)/Makeconf
 
@@ -28,7 +28,7 @@ tbsend:		tbsend.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:
+install:	$(addprefix $(INSTALL_SBINDIR)/, eventdebug.pl)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

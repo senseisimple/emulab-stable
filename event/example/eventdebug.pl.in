@@ -20,7 +20,7 @@ sub usage {
 }
 
 my %opt = ();
-getopt(\%opt,"s:p:h");
+getopt("s:p:h", \%opt);
 
 if ($opt{h}) { exit &usage; }
 if (@ARGV) { exit &usage; }
