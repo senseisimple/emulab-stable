@@ -5348,7 +5348,8 @@ COMMAND_PROTOTYPE(doemulabconfig)
 			 "  vn.eid=r.eid "
 			 "left join virt_lans as vl on vl.vnode=r.vname and "
 			 "  vl.pid=r.pid and vl.eid=r.eid "
-			 "where r.pid='%s' and r.eid='%s'",
+			 "where r.pid='%s' and r.eid='%s' and "
+			 "      vn.inner_elab_role is not null",
 			 4, reqp->pid, reqp->eid);
 
 	if (!res) {
