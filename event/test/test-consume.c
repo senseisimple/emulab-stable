@@ -1,8 +1,6 @@
 /* test-consume.c: Test delivery of events (consumer). */
 
-static char rcsid[] = "$Id: test-consume.c,v 1.4 2002-02-19 15:51:01 imurdock Exp $";
-
-#include <event.h>
+#include "event.h"
 
 static void callback(event_handle_t handle, event_notification_t notification,
                      char *host, event_type_t type, void *data);

@@ -9,6 +9,7 @@ export CXX	= @CXX@
 export LD	= @CC@ ${CFLAGS}
 export STRIP    = @STRIP@
 export RANLIB	= @RANLIB@
+export AR	= @AR@
 
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@

@@ -11,15 +11,12 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event-sched.c,v 1.3 2002-02-19 15:47:46 imurdock Exp $";
-
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-
-#include <event-sched.h>
+#include "event-sched.h"
 
 static void enqueue(event_handle_t handle, event_notification_t notification,
                     char *host, event_type_t type, void *data);

@@ -1,8 +1,6 @@
 /* test-attr-produce.c: Test delivery of events, with attributes (producer). */
 
-static char rcsid[] = "$Id: test-attr-produce.c,v 1.5 2002-02-19 15:51:01 imurdock Exp $";
-
-#include <event.h>
+#include "event.h"
 
 int
 main(int argc, char **argv)

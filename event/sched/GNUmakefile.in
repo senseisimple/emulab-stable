@@ -1,0 +1,27 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/sched
+
+include $(OBJDIR)/Makeconf
+
+all:	event-sched
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	 += -O -g -static -I. -I$(SRCDIR)/../lib -Wall -pthread -DDEBUG
+CFLAGS   += `elvin-config --cflags vin4mt`
+
+LDFLAGS  += -pthread -L../lib
+LIBS     += -levent -lcipher 
+LIBS     += `elvin-config --libs vin4mt`
+
+OBJS	  = event-sched.o queue.o
+
+event-sched:	$(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+$(OBJS):	event-sched.h
+
+clean:
+	/bin/rm -f *.o event-sched

@@ -7,14 +7,14 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.10 2002-02-19 16:18:21 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.11 2002-02-19 17:12:52 stoller Exp $";
 
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <event.h>
+#include "event.h"
 
 static char hostname[MAXHOSTNAMELEN];
 

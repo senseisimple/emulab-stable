@@ -1,0 +1,46 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= event
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS	= lib sched test
+
+all:	$(SUBDIRS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+lib:
+	@$(MAKE) -C lib all
+
+sched:
+	@$(MAKE) -C sched all
+
+test:
+	@$(MAKE) -C test all
+
+install: 
+	@$(MAKE) -C lib install
+	@$(MAKE) -C sched install
+	@$(MAKE) -C test install
+
+clean:		subdir-clean
+
+subdir-clean:
+	@$(MAKE) -C lib clean
+	@$(MAKE) -C sched clean
+	@$(MAKE) -C test clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C lib clean
+	@$(MAKE) -C sched clean
+	@$(MAKE) -C test clean
+
+.PHONY:	$(SUBDIRS)
+

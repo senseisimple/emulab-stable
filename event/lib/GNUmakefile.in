@@ -1,0 +1,24 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/lib
+
+include $(OBJDIR)/Makeconf
+
+all:	libevent.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS += -O -g -static -I. -Wall -DDEBUG
+CFLAGS += `elvin-config --cflags vin4mt`
+
+OBJS	= event.o util.o
+
+libevent.a:	$(OBJS)
+	$(AR) crv $@ $(OBJS)
+	$(RANLIB) $@
+
+$(OBJS):	event.h
+
+clean:
+	/bin/rm -f *.o libevent.a

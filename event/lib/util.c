@@ -6,11 +6,9 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: util.c,v 1.1 2001-11-02 04:43:04 imurdock Exp $";
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <event.h>
+#include "event.h"
 
 /* Attempt to allocate SIZE bytes of memory and exit if memory
    allocation fails.  Returns pointer to allocated memory. */

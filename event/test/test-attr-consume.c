@@ -1,8 +1,6 @@
 /* test-attr-consume.c: Test delivery of events, with attributes (consumer). */
 
-static char rcsid[] = "$Id: test-attr-consume.c,v 1.5 2002-02-19 15:51:01 imurdock Exp $";
-
-#include <event.h>
+#include "event.h"
 
 static void callback(event_handle_t handle, event_notification_t notification,
                      char *host, event_type_t type, void *data);

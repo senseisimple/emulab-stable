@@ -1,9 +1,7 @@
 /* test-sched-produce.c: Test event scheduler, with attributes (producer).
    This test may be used with test-consume or test-attr-consume. */
 
-static char rcsid[] = "$Id: test-sched-produce.c,v 1.2 2002-02-19 15:51:01 imurdock Exp $";
-
-#include <event.h>
+#include "event.h"
 
 int
 main(int argc, char **argv)

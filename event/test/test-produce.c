@@ -1,8 +1,6 @@
 /* test-produce.c: Test delivery of events (producer). */
 
-static char rcsid[] = "$Id: test-produce.c,v 1.3 2002-02-19 15:51:01 imurdock Exp $";
-
-#include <event.h>
+#include "event.h"
 
 int
 main(int argc, char **argv)

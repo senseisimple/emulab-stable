@@ -6,7 +6,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event-sched.h,v 1.2 2002-01-29 17:08:14 imurdock Exp $
+ * $Id: event-sched.h,v 1.3 2002-02-19 17:12:52 stoller Exp $
  */
 
 #ifndef __SCHED_H__
@@ -14,7 +14,7 @@
 
 #include <stdio.h>
 #include <sys/time.h>
-#include <event.h>
+#include "event.h"
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
