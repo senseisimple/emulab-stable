@@ -56,8 +56,8 @@ $dbh = $::dbh;
 
 sub tb_prerun {
     my ($cmd,$exitcode) = @_;
-    print "$cmd $pid $eid $dir/nsfile.ns\n";
-    open(TBEXEC,"$cmd $pid $eid $dir/nsfile.ns 2>&1 |");
+    print "$cmd $pid $eid nsfile.ns\n";
+    open(TBEXEC,"$cmd $pid $eid nsfile.ns 2>&1 |");
     while (<TBEXEC>) {
 	print $_;
     }
@@ -108,6 +108,12 @@ sub tb_fail {
     $::status = "FAIL - " . $_[0];
     ::doexit;
 };
+
+print "Debug: $dir/nsfile.ns\n";
+system("cp -f $dir/nsfile.ns .");
+if (($? >> 8) != 0) {
+    tb_fail("Could not copy nsfile.");
+}
 
 print "Executing $dir/test\n";
 do "$dir/test";
