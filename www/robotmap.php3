@@ -22,10 +22,22 @@ $isadmin = ISADMIN($uid);
 unset($prefix);
 
 #
-# One robot map right now ...
-# 
-$building = "MEB-ROBOTS";
-$floor    = 4;
+# Verify page arguments. First allow user to optionally specify building/floor.
+#
+if (isset($building) && $building != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $building)) {
+	PAGEARGERROR("Invalid building argument.");
+    }
+    # Optional floor argument. Sanitize for the shell.
+    if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
+	PAGEARGERROR("Invalid floor argument.");
+    }
+}
+else {
+    $building = "MEB-ROBOTS";
+    $floor    = 4;
+}
 
 #
 # Optional pid,eid. Without a building/floor, show all the nodes for the
@@ -201,10 +213,10 @@ $uniqueid = $matches[1];
 
 $perl_args = ("-o $prefix -t -z -n " .
 	      # From clicking on a map image.
-	      ((isset($formfields[show_cameras]) &&
-		strcmp($formfields[show_cameras], "Yep") == 0) ? "-v " : "") .
-	      ((isset($formfields[show_exclusion]) &&
-		strcmp($formfields[show_exclusion], "Yep") == 0) ? "-x " : "") .
+	      ((isset($show_cameras) &&
+		strcmp($show_cameras, "Yep") == 0) ? "-v " : "") .
+	      ((isset($show_exclusion) &&
+		strcmp($show_exclusion, "Yep") == 0) ? "-x " : "") .
 	      (isset($map_x) ? "-c $map_x,$map_y " : "") .
 	      (isset($floor) ? "-f $floor " : "") .
 	      (isset($pid) ? "-e $pid,$eid " : "") .
@@ -239,7 +251,9 @@ if (isset($pid)) {
 echo "<center>\n";
 
 # Wrap the image and zoom controls together in an input form.
-echo "<form method=\"post\" action=\"robotmap.php3\">\n";
+echo "<form method=post action='robotmap.php3" .
+       ((isset($building) && isset($floor)) ?
+	"?building=${building}&floor=${floor}" : "") . "'>";
 
 echo "Click on the image to get its X,Y coordinates<br>\n";
 # The image may be clicked to get node info or set a new center-point.
@@ -344,16 +358,16 @@ if (count($locations)) {
     echo "</table></td>\n";
 }
 
-if (isset($formfields[show_cameras]) &&
-    strcmp($formfields[show_cameras], "Yep") == 0) {
+if (isset($show_cameras) &&
+    strcmp($show_cameras, "Yep") == 0) {
 	$cam_checked = "checked";
 }
 else {
 	$cam_checked = "";
 }
 
-if (isset($formfields[show_exclusion]) &&
-    strcmp($formfields[show_exclusion], "Yep") == 0) {
+if (isset($show_exclusion) &&
+    strcmp($show_exclusion, "Yep") == 0) {
 	$excl_checked = "checked";
 }
 else {
@@ -365,7 +379,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
       <tr><th>Display Options</th></tr>
       <tr>
           <td><input type=checkbox
-                     name=\"formfields[show_cameras]\"
+                     name=show_cameras
                      value=Yep
                      $cam_checked>Show <a
  href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Tracking
@@ -373,7 +387,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
       </tr>
       <tr>
           <td><input type=checkbox
-                     name=\"formfields[show_exclusion]\"
+                     name=show_exclusion
                      value=Yep
                      $excl_checked>Show <a
  href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Exclusion

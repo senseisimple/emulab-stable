@@ -13,10 +13,22 @@ LOGGEDINORDIE($uid);
 PAGEHEADER("Real Time Robot Tracking Applet");
 
 #
-# One robot map right now ...
-# 
-$building = "MEB-ROBOTS";
-$floor    = 4;
+# Verify page arguments. First allow user to optionally specify building/floor.
+#
+if (isset($building) && $building != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $building)) {
+	PAGEARGERROR("Invalid building argument.");
+    }
+    # Optional floor argument. Sanitize for the shell.
+    if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
+	PAGEARGERROR("Invalid floor argument.");
+    }
+}
+else {
+    $building = "MEB-ROBOTS";
+    $floor    = 4;
+}
 $ppm      = 1;
 
 #
@@ -28,6 +40,9 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     $row = mysql_fetch_array($query_result);
     $ppm = $row["pixels_per_meter"];
+}
+else {
+    USERERROR("No such building/floor $building/$floor", 1);
 }
 
 #
@@ -98,7 +113,7 @@ if (isset($fake))
      
 echo "<applet name='tracker' code='RoboTrack.class'
               archive='tracker.jar'
-              width='900' height='600'
+              width='1025' height='1150'
               alt='You need java to run this applet'>
             <param name='pipeurl' value='$pipeurl'>
             <param name='floorurl' value='$baseurl'>
