@@ -39,6 +39,8 @@ echo "<tr>
           <td>Change</td>
           <td>ID</td>
           <td>Type</td>
+          <td>PID</td>
+          <td>EID</td>
           <td>Def Image</td>
           <td>Def Cmdline</td>
           <td>Next Path</td>
@@ -60,12 +62,33 @@ while ($row = mysql_fetch_array($query_result)) {
     if (!$next_boot_cmd_line)
         $next_boot_cmd_line = "NULL";
 
+    #
+    # If the node is reserved, lets get the PID/EID from that table
+    #
+    $reserved_result = mysql_db_query($TBDBNAME,
+	"SELECT eid,pid from reserved where node_id='$node_id'");
+    if (! $reserved_result) {
+        $err = mysql_error();
+        TBERROR("Database Error reading reserved table for $node_id: $err\n",
+                1);
+    }
+    if ($resrow = mysql_fetch_row($reserved_result)) {
+	$eid = $resrow[0];
+	$pid = $resrow[1];
+    }
+    else {
+	$eid = "--";
+	$pid = "--";
+    }
+
     echo "<tr>
               <td align=center>
                   <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td>$node_id</td>
               <td>$type</td>
+              <td>$pid</td>
+              <td>$eid</td>
               <td>$def_boot_image_id</td>
               <td>$def_boot_cmd_line</td>
               <td>$next_boot_path</td>
