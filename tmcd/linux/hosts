@@ -1,5 +1,5 @@
 #
 # Hosts Database.
 #
-127.0.0.1               localhost localhost.emulab.net loghost
+127.0.0.1               localhost loghost
 

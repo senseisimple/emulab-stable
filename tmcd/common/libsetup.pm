@@ -991,18 +991,30 @@ sub dohostnames ()
     my $TM;
 
     #
-    # Start with fresh copy, since the hosts files is potentially updated
-    # after the node boots via the update command.
-    # 
-    if (system($CP, "-f", TMHOSTS, HOSTSFILE) != 0) {
-	printf STDERR "Could not copy default %s into place: $!\n", HOSTSFILE;
-	return 1;
-    }
-    
+    # Note, we no longer start with the 'prototype' file here, because we have
+    # to make up a localhost line that's properly qualified.
+    #
+
     $TM = OPENTMCC(TMCCCMD_HOSTS);
 
-    open(HOSTS, ">>" . HOSTSFILE)
+    open(HOSTS, ">" . HOSTSFILE)
 	or die("Could not open $HOSTSFILE: $!");
+
+    my $localaliases = "loghost";
+
+    #
+    # Find out our domain name, so that we can qualify the localhost entry
+    #
+    my $hostname = `hostname`;
+    if ($hostname =~ /[^.]+\.(.+)/) {
+	$localaliases .= " localhost.$1";
+    }
+    
+    #
+    # First, write a localhost line into the hosts file - we have to know the
+    # domain to use here
+    #
+    print HOSTS os_etchosts_line("localhost", "127.0.0.1", $localaliases), "\n";
 
     #
     # Now convert each hostname into hosts file representation and write

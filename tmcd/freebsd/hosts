@@ -7,5 +7,5 @@
 # not be consulted at all; see /etc/host.conf for the resolution order.
 #
 #
-127.0.0.1               localhost localhost.emulab.net loghost
+127.0.0.1               localhost loghost
 
