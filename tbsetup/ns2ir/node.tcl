@@ -140,12 +140,12 @@ Node instproc updatedb {DB} {
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
-	if {$isvirt} {
+	if {0 && $isvirt} {
 	    perror "You may not specify an OS for virtual nodes ($self)!"
 	    return
 	}
 	# Do not allow user to set os for host running virt nodes.
-	if {$virthost} {
+	if {0 && $virthost} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
 	    return
 	}
@@ -284,10 +284,11 @@ Node instproc set_hwtype {hwtype isrem isv} {
 #
 Node instproc set_fixed {pnode} {
     $self instvar fixed
-    
-    if {[$pnode info class] == "Node"} {
+
+    if { [Node info instances $pnode] != {} } {
+        # $pnode is an object instance of class Node
 	$pnode set virthost 1
-    }
+    }    
     set fixed $pnode
 }
 
