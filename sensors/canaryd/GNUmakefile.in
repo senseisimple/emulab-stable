@@ -49,7 +49,7 @@ client: canaryd
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) alertlistener)
 
 client-install: client
-	$(INSTALL_PROGRAM) -s canaryd $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL_PROGRAM) -s canaryd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)$(EXE)
 
 clean:
 	rm -f *.o $(CDPROGS) *~ core *.core version.c

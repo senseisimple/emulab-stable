@@ -48,7 +48,7 @@ install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedbac
 	$(INSTALL_PROGRAM) webfeedback $(INSTALL_LIBEXECDIR)
 
 client-install: client
-	$(INSTALL_PROGRAM) -s slothd $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL_PROGRAM) -s slothd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)$(EXE)
 
 clean:
 	rm -f *.o $(SDPROGS) *~ core *.core version.c
