@@ -1048,11 +1048,13 @@ bool direct_link(pvertex a,pvertex b,tb_vlink *vlink,pedge &edge)
   double best_distance;
   tie(pedge_it,end_pedge_it) = out_edges(a,PG);
   for (;pedge_it!=end_pedge_it;++pedge_it) {
-    dest_pv = target(*pedge_it,PG);
+
+    pedge actual_pedge = *pedge_it;
+    dest_pv = target(actual_pedge,PG);
     if (dest_pv == a)
-      dest_pv = source(*pedge_it,PG);
+      dest_pv = source(actual_pedge,PG);
     if (dest_pv == b) {
-      plink = get(pedge_pmap,*pedge_it);
+      plink = get(pedge_pmap,actual_pedge);
       int users = plink->nonemulated;
       if (! vlink->emulated) {
 	users += plink->emulated;
@@ -1069,7 +1071,7 @@ bool direct_link(pvertex a,pvertex b,tb_vlink *vlink,pedge &edge)
 	  ((users == best_users) && (distance < best_distance))) {
 	best_users = users;
 	best_distance = distance;
-	best_pedge = *pedge_it;
+	best_pedge = actual_pedge;
 	best_plink = plink;
       }
     }
