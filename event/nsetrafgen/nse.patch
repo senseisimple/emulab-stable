@@ -1122,16 +1122,12 @@
  
  class ReservePortClassifier : public PortClassifier {
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Wed Feb 26 15:07:33 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Sat Mar 20 16:58:28 2004
-@@ -26,15 +26,144 @@
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Wed Apr 14 03:58:33 2004
+@@ -26,6 +26,31 @@
  #endif
  
  #include "classifier-port.h"
 +#include "packet.h"
-+
-+#ifdef PACKET_DECAPSULATE
-+extern bool PacketDecapsulateIfNeeded(Packet *p);
-+#endif
 +
 +#ifdef STORE_PKTS
 +
@@ -1159,16 +1155,7 @@
  
  int PortClassifier::classify(Packet *p) 
  {
-+#ifdef STORE_PKTS
-+	// We need to store the packet timestamp before decapsulation
-+	// since after that the packet will have meaningless values
-+	// from a different instance of nse
-+	double packet_ts = p->time_;
-+#endif
-+#ifdef PACKET_DECAPSULATE
-+	::PacketDecapsulateIfNeeded(p);
-+#endif
- 	// Port classifier returns the destination port.  No shifting
+@@ -33,8 +58,99 @@
  	// or masking is required since in the 32-bit addressing,
  	// ports are stored in a seperate variable.
  	hdr_ip* iph = hdr_ip::access(p);
@@ -1186,7 +1173,7 @@
 +		}
 +		hdr_cmn *hc = HDR_CMN(p);
 +		dump->pkts[dump->num_pkts].size = hc->size();
-+		dump->pkts[dump->num_pkts].ts = packet_ts; 
++		dump->pkts[dump->num_pkts].ts = p->time_; 
 +		dump->pkts[dump->num_pkts].clock = Scheduler::instance().clock(); 
 +		dump->num_pkts += 1;
 +	    }
@@ -2084,7 +2071,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Sun Mar 28 01:09:09 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Apr 16 06:07:15 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2174,7 +2161,13 @@
  
  /*
   * Checking for duplicate packets.  Need to do this, if running
-@@ -131,17 +183,63 @@
+@@ -127,21 +179,77 @@
+   inst->processpkt(p, ts);
+ }
+ 
++bool PacketDecapsulateIfNeeded(Packet *p);
++
+ void
  IPTapAgent::processpkt(Packet *p, const struct timeval &ts)
  {
    struct ip *ipheader;
@@ -2225,7 +2218,7 @@
 +
 +  Packet::free(p);
 +  return;
-+  
+   
 +#endif
 +
 +#if 0 //MEASURE_EVENT_RATE
@@ -2235,7 +2228,15 @@
 +    firstpacket++;
 +  }
 +#endif
-   
++  
++  // Pcap would have filled in a timestamp based on the bpf timestamp
++  double ptime = p->time_;
++  // We always need to decapsulate right here coz further simulation
++  // of the packet
++  if( PacketDecapsulateIfNeeded(p) ) {
++      p->time_ = ptime;
++      goto sendit;
++  }
 +  /* PcapNetwork created this packet and does not know how
 +     to initialize it. So, we need to do that here by calling
 +     the base Agent class's initpkt method */
@@ -2243,7 +2244,7 @@
    /* 
       At this point, all I have to do is to grab the ttl value 
       from the received packet and put it in p's ttl field after
-@@ -150,8 +248,6 @@
+@@ -150,8 +258,6 @@
    */
  
    ipheader = (struct ip *) p->accessdata();
@@ -2252,8 +2253,18 @@
    ttl = ipheader->ip_ttl;
    if (!(--ttl)) {
      fprintf(stderr,
-@@ -180,15 +276,34 @@
-   hdr_ip *ih = HDR_IP(p);
+@@ -174,21 +280,43 @@
+   datagramlen = ntohs(ipheader->ip_len);
+ 
+   /* Put all the info in the ns headers. */
+-  hdr_cmn *ch = HDR_CMN(p);
++  hdr_cmn *ch;
++  ch = HDR_CMN(p);
+   ch->size() = datagramlen;
+ 
+-  hdr_ip *ih = HDR_IP(p);
++  hdr_ip *ih;
++  ih = HDR_IP(p);
    ih->ttl() = ttl;
  
 +  /* Route lookups need not be performed here in the new code.
@@ -2266,6 +2277,7 @@
 +  ih->daddr() = ntohl(ipheader->ip_dst.s_addr);
 +  /* Dunno how to take care of ports yet */  
 +
++sendit:
 +  // syncing the clock to real-time for every packet
 +  // so that further packet scheduling uses a reliable
 +  // value of clock instead of some old value.
@@ -2288,7 +2300,7 @@
   * as there are from the packet capture facility.
   * For every packet received through the callback, it populates the ns packet
   * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +312,17 @@
+@@ -197,14 +325,17 @@
  void
  IPTapAgent::recvpkt()
  {
@@ -2308,7 +2320,7 @@
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -219,13 +337,71 @@
+@@ -219,13 +350,71 @@
  }
  
  
@@ -2381,7 +2393,7 @@
   */
  int
  IPTapAgent::sendpkt(Packet* p)
-@@ -233,10 +409,11 @@
+@@ -233,10 +422,11 @@
    int byteswritten;
    unsigned char *packet;
    unsigned char received_ttl;
@@ -2395,7 +2407,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -245,7 +422,7 @@
+@@ -245,7 +435,7 @@
    
    // send packet into the live network
    hdr_cmn* hc = HDR_CMN(p);
@@ -2404,7 +2416,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +450,111 @@
+@@ -273,27 +463,107 @@
      return(-1);
    }
  
@@ -2515,10 +2527,6 @@
  }
  
 +bool PacketDecapsulateIfNeeded(Packet *p) {
-+    hdr_cmn *hc = HDR_CMN(p);
-+    if ( hc->ptype_ != PT_LIVE )
-+	return false;
-+
 +    struct ip *ipheader = (struct ip *)p->accessdata();
 +    if (!ipheader || ipheader->ip_p != IPPROTO_ENCAP )
 +	return false;
@@ -2699,7 +2707,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Tue Apr 13 16:18:02 2004
+--- /dev/null	Fri Apr 16 06:10:10 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
@@ -2776,7 +2784,7 @@
  	return (Network::command(argc, argv));
  }
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Thu Apr  1 17:02:04 2004
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Fri Apr 16 06:07:48 2004
 @@ -1,5 +1,5 @@
  /*-
 - * Copyright (c) 1998 The Regents of the University of California.
@@ -3407,7 +3415,7 @@
      int	       	lo_, hi_;	// range of lost packets
      double     	ts_;		// timestamp for RTT estimation
 --- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Tue Apr 13 16:16:18 2004
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Wed Apr 14 03:59:40 2004
 @@ -79,6 +79,25 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
@@ -3418,11 +3426,11 @@
 +# The following commented CFLAGS represent all flags that can be used when building even
 +# though many of them are not turned on by default. Some of the options need to be used
 +# together. e.g. STORE_PKTS and NUM_PKTS, USEEVENTS and RESWAP
-+#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS
++#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DSTORE_PKTS
 +#CFLAGS += -DNUM_PKTS=20000 -DBPF_BASED_PACKET_TIME -DRESWAP -DPRINT_SLOP -DDISPATCH_IN_RT
 +#CFLAGS += -DSELECT_TIMEOUT -SCHED_DEBUG -DMEASURE_EVENT_RATE -DMEASURE_DELAYS
 +#CFLAGS += -DHAVE_POLLER -DHAVE_KQUEUE
-+CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS 
++CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DSTORE_PKTS 
 +CFLAGS += -DRESWAP -DBPF_BASED_PACKET_TIME -DRESWAP -DPRINT_SLOP
 +CFLAGS += -DHAVE_POLLER -DHAVE_KQUEUE
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
