@@ -107,7 +107,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
-	discvr/GNUmakefile \
+	db/webcontrol discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
