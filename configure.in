@@ -168,6 +168,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/frisbee.redux/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
+	security/plasticwrap \
 	tbsetup/GNUmakefile tbsetup/console_setup \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/power \

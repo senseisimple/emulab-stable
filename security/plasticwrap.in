@@ -1,4 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
+
+#
+# Configure variables
+#
+my $BOSSNODE = "@BOSSNODE@";
+my $TBOPSEMAIL = "@TBOPSEMAIL@";
 
 # Location of ssh program
 if (-x "/usr/local/bin/ssh" ) {
@@ -6,11 +12,11 @@ if (-x "/usr/local/bin/ssh" ) {
 } elsif (-x "/usr/bin/ssh" ) {
 	$ssh = "/usr/bin/ssh";
 } else {
-	die "Unable to find ssh - please send mail to testbed-ops\@fast.cs.utah.edu\n";
+	die "Unable to find ssh - please send mail to $TBOPSEMAIL\n";
 }
 
 # Remote host to connect to
-$host = "boss.emulab.net";
+$host = $BOSSNODE;
 
 # String to turn off password authentications
 $nopass = "-o 'BatchMode yes'";
