@@ -132,7 +132,7 @@ sub tb_fail {
 
 # Clean out any old ns files in the dir (esp. temps made by tbprerun), 
 # then copy in the new ns file.
-system("rm *.ns");
+system("rm -f *.ns");
 print "Debug: $dir/nsfile.ns\n";
 system("cp -f $dir/nsfile.ns .");
 if (($? >> 8) != 0) {
