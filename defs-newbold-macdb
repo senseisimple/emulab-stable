@@ -1,0 +1,12 @@
+#
+# This is the definitions file for Mac when he uses his own db.
+#
+TBDBNAME=macdb
+WWWDEFS=newbold-emulab
+TBOPSEMAIL=newbold@cs.utah.edu
+TBLOGSEMAIL=newbold@cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=2
+BOSSNODE=boss.emulab.net
+USERNODE=users.emulab.net
+OURDOMAIN=emulab.net
