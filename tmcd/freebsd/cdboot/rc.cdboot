@@ -99,12 +99,13 @@ if ($action eq "boot" || $action eq "reconfig") {
 	    print LOG $_;
 	    print "$_";
 	}
-	close(FOO);
 	close(LOG);
+	close(FOO);
 	# The CDROM *always* reports back what it can.
 	BootNotify($? >> 8, "CD Boot");
 	exit(0);
     }
+    open(STDERR, ">&STDOUT");
 }
 
 # Execute the action.
@@ -154,7 +155,7 @@ sub BootNotify($$)
 	print "Error sending TBFAILED to Emulab Control!\n";
     }
 
-    exit(0)
+    return
 	if (!$code);
     
     if (tmcc(TMCCCMD_STATE, "PXEFAILED") < 0) {
