@@ -624,12 +624,16 @@ sub WaitTillReloadDone($$$@)
 	while ($count) {
 	    foreach my $node (@nodes) {
 		print STDERR "osload ($node): waiting for node to finish ".
-		    "booting";
+		    "booting\n";
 		if ($done{$node} < $waitmode) {
+		    my $actual_state;
+
 		    if (!TBNodeStateWait($node,
-					 TBDB_NODESTATE_ISUP,
 					 $startwait,
-					 (60*7))) {
+					 (60*6),
+					 \$actual_state,
+					 (TBDB_NODESTATE_TBFAILED,
+					  TBDB_NODESTATE_ISUP))) {
 			$count--;
 			$done{$node} = $waitmode;
 		    }
