@@ -1,0 +1,132 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# Startup vnodes, if there are any!
+#
+# NB: This script should not be run in foreground mode on a remote node
+# when booting; if boss is down the boot will hang. On local nodes, its
+# okay to hang.
+#
+sub usage()
+{
+    print "Usage: bootvnodes [-d] [-f]\n";
+    exit(1);
+}
+my $optlist = "df";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+# Locals
+my $logname = "$LOGDIR/bootvnodes.debug";
+my $vndir   = "/var/emulab/jails";
+my $debug   = 0;
+my $daemon  = 1;
+
+#
+# Forward declarations for prototype checking
+#
+sub bootvnodes();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug  = 1;
+}
+if (defined($options{"f"})) {
+    $daemon = 0;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# XXX
+# Do not run the vnode startup on Linux nodes yet.
+#
+my $sysname = `uname -s`;
+chomp($sysname);
+if ($sysname eq "Linux") {
+    exit(0);
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if ($daemon && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+my %curvnodelist;
+my @vnodes;
+
+#
+# Get the current set of vnodes that are supposed to be running on
+# this node.
+#
+my $TM = OPENTMCC(TMCCCMD_VNODELIST);
+while (<$TM>) {
+    if ($_ =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+	$curvnodelist{$1} = $2;
+    }
+    else {
+	print "Skipping bad vnodeid: '$_'\n";
+    }
+}
+CLOSETMCC($TM);
+
+@vnodes = keys(%curvnodelist);
+if (! @vnodes) {
+    print "No vnodes. Exiting gracefully ...\n";
+    exit(0);
+}
+print "Vnodelist is @vnodes.\n";
+
+foreach my $vnode (keys(%curvnodelist)) {
+    my $jailflag = "";
+    if ($curvnodelist{$vnode}) {
+	$jailflag = "-j";
+    }
+    print "Setting up vnode $vnode ...\n";
+    system("vnodesetup -b $jailflag $vnode");
+    sleep(5);
+}
+exit(0);
