@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(REMOTE LOCALROOTFS TBDebugTimeStamp);
+use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TBDebugTimeStamp);
 use libtmcc;
 
 #
@@ -325,9 +325,26 @@ TBDebugTimeStamp("mkjail tmcc proxy is running");
 #
 $jailpid = fork();
 if ($jailpid) {
-    # We do not really care about the exit status of the jail.
-    waitpid($jailpid, 0);
-    undef($jailpid);
+    #
+    # We do not really care about the exit status of the jail. We want to catch
+    # any children, which includes the tmcc proxy. If it dies, something has
+    # gone wrong, and that appears to happen a lot. Lets restart it until we
+    # figure out what is going wrong.
+    #
+    while (1) {
+	my $kidpid = waitpid(-1, 0);
+
+	if ($kidpid == $jailpid) {
+	    undef($jailpid);
+	    last;
+	}
+	if ($kidpid == $tmccpid) {
+	    print("TMCC proxy exited with status $?. Restarting ...\n");
+	    startproxy("$JAILPATH/$vnodeid");
+	    next;
+	}
+	print("Unknown child $kidpid exited with status $?!\n");
+    }
 }
 else {
     $SIG{TERM} = 'DEFAULT';
@@ -519,6 +536,9 @@ sub mkrootfs($)
     TBDebugTimeStamp("mkjail copying the tmcc cache");
     
     tmcccopycache($vnodeid, "$path/root");
+    if (-e TMTOPOMAP()) {
+	mysystem("cp -fp " . TMTOPOMAP() . " $path/root/var/emulab/boot");
+    }
 
     #
     # Stash the control net IP if not the same as the host IP
@@ -685,6 +705,9 @@ sub restorerootfs($)
     }
 
     tmcccopycache($vnodeid, "$path/root");
+    if (-e TMTOPOMAP()) {
+	mysystem("cp -fp " . TMTOPOMAP() . " $path/root/var/emulab/boot");
+    }
 
     #
     # The proc FS in the jail is per-jail of course.
@@ -780,6 +803,7 @@ sub startproxy($)
 {
     my ($dir) = @_;
     my $log   = "$dir/tmcc.log";
+    my $klog  = "$dir/tmcc.ktrace";
 
     #
     # The point of these paths is so that there is a comman path to
@@ -810,7 +834,7 @@ sub startproxy($)
 
     # The -o option will cause the proxy to detach but not fork!
     # Eventually change this to standard pid file kill.
-    exec("$TMCC -d -x $outsidepath -n $vnodeid -o $log");
+    exec("ktrace -i -a -f $klog $TMCC -d -x $outsidepath -n $vnodeid -o $log");
     die("Exec of $TMCC failed! $!\n");
 }
 

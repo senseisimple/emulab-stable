@@ -85,6 +85,7 @@ exit(0);
 
 # More protos
 sub donodeid();
+sub dotopomap();
 
 #
 # Boot Action.
@@ -93,7 +94,10 @@ sub doboot()
 {
     # Handled elsewhere for other node types.
     donodeid()
-	if (!PLAB() && !JAILED() && !IXP())
+	if (!PLAB() && !JAILED() && !IXP());
+
+    dotopomap()
+	if (!PLAB() && !JAILED() && !IXP());
 }
 
 #
@@ -119,6 +123,7 @@ sub doreconfig()
 sub docleanup()
 {
     unlink TMNODEID();
+    unlink TMTOPOMAP();
 }
 
 #
@@ -147,4 +152,26 @@ sub donodeid()
     
     system("echo '$nodeid' > ". TMNODEID);
     return 0;
+}
+
+#
+# Get topomap
+#
+sub dotopomap()
+{
+    my ($pid, $eid, $vname) = check_nickname();
+    
+    #
+    # Copy over the topomap so that it is locally resident. We will eventually
+    # get this via a tarfile instead of NFS.
+    #
+    my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap";
+    
+    if (-e "${topomap}.gz") {
+	system("cat ${topomap}.gz | gunzip > " . TMTOPOMAP());
+    }
+    elsif (-e $topomap) {
+	system("cp -fp $topomap ". TMTOPOMAP());
+    }
+   
 }
