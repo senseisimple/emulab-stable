@@ -25,7 +25,7 @@ debug = 0
 #
 # PLC constants
 #
-DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
+DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
 DEF_PLC_USER = "lepreau@cs.utah.edu"
 DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
 
@@ -358,8 +358,8 @@ class mod_PLC:
             print "Slice %s unknown to PLC" % slicename
             return None
 
-        exptime = self.__sliceexpdict[slicename]['expires']
-        leaseend = calendar.timegm(time.strptime(exptime, "%Y-%m-%d %H:%M:%S"))
+        leaseend = self.__sliceexpdict[slicename]['expires']
+        # leaseend = calendar.timegm(time.strptime(exptime, "%Y-%m-%d %H:%M:%S"))
 
         return leaseend
 

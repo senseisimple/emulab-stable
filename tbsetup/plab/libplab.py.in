@@ -760,7 +760,7 @@ class Slice:
         assert (len(res) == 1), \
                "Multiple slices found for %s-%s" % (self.pid, self.eid)
         ((self.slicename, self.slicemeta, self.leaseend), ) = res
-        self.leaseend = calendar.timegm(time.strptime(self.leaseend,
+        self.leaseend = calendar.timegm(time.strptime(str(self.leaseend),
                                                       "%Y-%m-%d %H:%M:%S"))
         return
 
