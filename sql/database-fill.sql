@@ -105,10 +105,10 @@ REPLACE INTO exported_tables VALUES ('event_objecttypes');
 REPLACE INTO exported_tables VALUES ('exported_tables');
 REPLACE INTO exported_tables VALUES ('foreign_keys');
 REPLACE INTO exported_tables VALUES ('mode_transitions');
-REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('state_timeouts');
 REPLACE INTO exported_tables VALUES ('state_transitions');
 REPLACE INTO exported_tables VALUES ('state_triggers');
+REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 
@@ -402,7 +402,7 @@ REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
 REPLACE INTO table_regex VALUES ('eventlist','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','time','float','redirect','default:float',0,0,NULL);
-REPLACE INTO table_regex VALUES ('eventlist','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','vnode','text','redirect','virt_agents:vnode',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w]+$',1,20,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
@@ -586,5 +586,4 @@ REPLACE INTO webdb_table_permissions VALUES ('os_info',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('projects',1,1,0);
 REPLACE INTO webdb_table_permissions VALUES ('osidtoimageid',1,0,1);
 REPLACE INTO webdb_table_permissions VALUES ('table_regex',1,1,1);
-
 
