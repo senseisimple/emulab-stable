@@ -41,10 +41,14 @@ if (! count($projlist)) {
 }
 
 #
-# Need a list of node types.
+# Need a list of node types. We join this over the nodes table so that
+# we get a list of just the nodes that currently in the testbed, not
+# just in the node_types table.
 #
 $types_result =
-    DBQueryFatal("select distinct type from nodes where role='testnode'");
+    DBQueryFatal("select distinct n.type from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "where nt.imageable=1");
 
 #
 # Spit the form out using the array of data. 
@@ -331,6 +335,11 @@ function SPITFORM($formfields, $errors)
                  </ul>
              <li> Specify the node types that this image will be able
                   to work on (can be loaded on and expected to work).
+                  Typically, images will work on all of the \"pc\" types when
+                  you are customizing one of the standard images. However,
+                  if you are installing your own OS from scratch, or you are
+                  using DOS partition four, then this might not be true.
+                  Feel free to ask us!
              <li> If you already have a node customized, enter that node
                   name (pcXXX) and the image will be auto created for you.
                   Notification of completion will be sent to you via email. 
