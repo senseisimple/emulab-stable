@@ -31,6 +31,8 @@ WWWHOST=changeme
 TBMAINSITE=0
 THISHOMEBASE=changeme
 PLABSUPPORT=0
+SFSSUPPORT=0
+DISABLE_NSE=1
 #
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
