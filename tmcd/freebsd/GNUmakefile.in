@@ -118,9 +118,6 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(BINDIR)/gated_fxp0.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(BINDIR)/gated_fxp1.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(BINDIR)/gated_fxp4.conf
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs

@@ -114,9 +114,6 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
-	$(INSTALL) -m 644 $(SRCDIR)/gated_eth0.conf $(BINDIR)/gated_eth0.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_eth2.conf $(BINDIR)/gated_eth2.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_eth4.conf $(BINDIR)/gated_eth4.conf
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs

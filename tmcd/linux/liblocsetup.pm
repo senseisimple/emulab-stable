@@ -295,14 +295,29 @@ sub os_routing_enable_forward()
     return $cmd;
 }
 
-sub os_routing_enable_gated()
+sub os_routing_enable_gated($)
 {
+    my ($conffile) = @_;
     my $cmd;
 
-    # XXX hack to avoid gated dying mysteriously with TCP/611 already in use
-    $cmd = "sleep 3\n    ";
-    $cmd .= "(ps alxww ; netstat -na) > /tmp/gated.state\n    ";
-    $cmd .= "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
+    #
+    # XXX hack to avoid gated dying with TCP/616 already in use.
+    #
+    # Apparently the port is used by something contacting ops's
+    # portmapper (i.e., NFS mounts) and probably only happens when
+    # there are a bazillion NFS mounts (i.e., an experiment in the
+    # testbed project).
+    #
+    $cmd  = "for try in 1 2 3 4 5 6; do\n";
+    $cmd .= "\tif `cat /proc/net/tcp | ".
+	"grep -E -e '[0-9A-Z]{8}:0268 ' >/dev/null`; then\n";
+    $cmd .= "\t\techo 'gated GII port in use, sleeping...';\n";
+    $cmd .= "\t\tsleep 10;\n";
+    $cmd .= "\telse\n";
+    $cmd .= "\t\tbreak;\n";
+    $cmd .= "\tfi\n";
+    $cmd .= "    done\n";
+    $cmd .= "    $GATED -f $conffile";
     return $cmd;
 }
 

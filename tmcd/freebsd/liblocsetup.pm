@@ -390,15 +390,16 @@ sub os_routing_enable_forward()
     return $cmd;
 }
 
-sub os_routing_enable_gated()
+sub os_routing_enable_gated($)
 {
+    my ($conffile) = @_;
     my $cmd;
 
     if (REMOTE()) {
 	$cmd = "echo 'GATED IS NOT ALLOWED!'";
     }
     else {
-	$cmd = "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
+	$cmd = "$GATED -f $conffile";
     }
     return $cmd;
 }
