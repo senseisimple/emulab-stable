@@ -19,7 +19,7 @@ use Exporter;
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodesetup dorouterconfig
-	 jailsetup dojailconfig JailedNFSMounts findiface
+	 jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
@@ -503,8 +503,9 @@ sub domounts()
 	    }
 	
 	    print STDOUT "  Mounting $remote on $local\n";
-	    if (system("$MOUNT $remote $local")) {
-		warn "*** WARNING: Could not $MOUNT $remote on $local: $!\n";
+	    if (system("$NFSMOUNT $remote $local")) {
+		warn "*** WARNING: Could not $NFSMOUNT ".
+		    "$remote on $local: $!\n";
 		next;
 	    }
 	}
@@ -535,8 +536,8 @@ sub domounts()
 	}
 	
 	print STDOUT "  Mounting $remote on $local\n";
-	if (system("$MOUNT $remote $local")) {
-	    warn "*** WARNING: Could not $MOUNT $remote on $local: $!\n";
+	if (system("$NFSMOUNT $remote $local")) {
+	    warn "*** WARNING: Could not $NFSMOUNT $remote on $local: $!\n";
 	    next;
 	}
 
@@ -670,21 +671,27 @@ sub domounts()
 }
 
 #
-# Aux function called from the mkjail code to do the NFS mounts outside
-# of a jail, and return the list of mounts that were created. This
-# will hopefully go away some point with better SFS support inside of
-# jails. Local only, of course.
+# Aux function called from the mkjail code to do mounts outside
+# of a jail, and return the list of mounts that were created. Can use
+# either NFS or local loopback. Maybe SFS someday. Local only, of course.
 # 
-sub JailedNFSMounts($$)
+sub JailedMounts($$$)
 {
-    my ($vid, $rootpath) = @_;
+    my ($vid, $rootpath, $usenfs) = @_;
     my @mountlist = ();
+    my $mountstr;
 
     #
     # No NFS mounts on remote nodes.
     # 
     if (REMOTE()) {
 	return ();
+    }
+
+    if ($usenfs) {
+	$mountstr = $NFSMOUNT;
+    } else {
+	$mountstr = $LOOPBACKMOUNT;
     }
 
     #
@@ -694,7 +701,7 @@ sub JailedNFSMounts($$)
     dbmopen(%MDB, TMMOUNTDB, 0444);
     
     while (my ($remote, $path) = each %MDB) {
-	$local = "$rootpath/$path";
+	$local = "$rootpath$path";
 	    
 	if (! -e $local) {
 	    if (! os_mkdir($local, "0770")) {
@@ -703,9 +710,13 @@ sub JailedNFSMounts($$)
 	    }
 	}
 	
+	if (! $usenfs) {
+	    $remote = $path;
+	}
+
 	print STDOUT "  Mounting $remote on $local\n";
-	if (system("$MOUNT $remote $local")) {
-	    warn "*** WARNING: Could not $MOUNT $remote on $local: $!\n";
+	if (system("$mountstr $remote $local")) {
+	    warn "*** WARNING: Could not $mountstr $remote on $local: $!\n";
 	    next;
 	}
 	push(@mountlist, $path);
@@ -1088,7 +1099,6 @@ sub dohostnames ()
 	    
 	    my $hostline = os_etchosts_line($name, $ip, $aliases);
 	    
-	    print STDOUT "  $hostline\n";
 	    print HOSTS  "$hostline\n";
 	}
 	else {

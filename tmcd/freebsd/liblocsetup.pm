@@ -13,7 +13,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
+    qw ( $CP $EGREP $NFSMOUNT $LOOPBACKMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line os_ifconfig_veth
@@ -50,7 +50,8 @@ sub JAILED()	{ return libsetup::JAILED(); }
 # 
 $CP		= "/bin/cp";
 $EGREP		= "/usr/bin/egrep -s -q";
-$MOUNT		= "/sbin/mount -o -b ";
+$NFSMOUNT	= "/sbin/mount -o -b ";
+$LOOPBACKMOUNT	= "/sbin/mount -t null ";
 $UMOUNT		= "/sbin/umount";
 $TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
@@ -202,7 +203,7 @@ sub os_ifconfig_veth($$$$$;$)
     }
     $uplines = "";
     if (defined($iface)) {
-	$uplines .= "$IFCONFIGBIN $iface up\n";
+	$uplines .= "$IFCONFIGBIN $iface up $IFC_100MBS $IFC_FDUPLEX\n";
     }
     $uplines .= "$IFCONFIGBIN veth${id} create\n" .
 	        "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
