@@ -4,16 +4,18 @@
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# usage: tbstopit <path to working directory> <irfile>
+# usage: tbstopit <path to working directory> <project> <eid> <irfile>
 #
 my $tbdir = "/usr/testbed/bin/";
 
-if (@ARGV != 2) {
-    print STDOUT "Usage: tbstopit <working dir> <irfile>\n";
+if (@ARGV != 4) {
+    print STDOUT "Usage: tbstopit <working dir> <project> <eid> <irfile>\n";
     exit(-1);
 }
 my $workdir = $ARGV[0];
-my $irfile  = $ARGV[1];
+my $project = $ARGV[1];
+my $eid     = $ARGV[2];
+my $irfile  = $ARGV[3];
 
 #
 # We run the TB stuff in the given directory.
