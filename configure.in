@@ -99,6 +99,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/sched_reload tbsetup/tbdoit tbsetup/tbstopit \
 	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
+	tbsetup/ir/handle_virt \
 	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl.in \
 	tbsetup/savevlans tbsetup/ir/extract_tb.in \
