@@ -533,9 +533,9 @@ Application/Traffic/CBR instproc get_params {} {
     }
 
     if {$iptos_ != {} && $iptos_ != 0} {
-	set param "$param QOS=$iptos_"
+	set param "$param IPTOS=$iptos_"
     } else {
-	set param "$param QOS=-1"
+	set param "$param IPTOS=-1"
     }
 
     return $param

@@ -303,7 +303,7 @@ parse_args(char *buf, tg_action *tg)
 			if (sscanf(cp, "RATE=%i", &rate) == 1)
 				continue; 
 
-			if (sscanf(cp, "QOS=%i", &qos) == 1)
+			if (sscanf(cp, "IPTOS=%i", &qos) == 1)
 				continue; 
 		}
 	}
