@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl -wT
 #
 # Testbed Power Control script
 #
@@ -38,6 +38,9 @@ die("Syntax:\npower on <machine> <machine> ...\n",
 
 #Read in ARGV
 $op = shift (@ARGV);
+if ($op =~ /^(on|off|cycle)$/) {
+  $op = $1;
+} else { die("Invalid command '$op'\n"); }
 if ($op eq "cycle") { $op = "cyc"; }
 $op = '-'.$op;
 @machines = @ARGV;
@@ -115,10 +118,10 @@ foreach $node ( sort @machines) {
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
       open(OUT,$cmd." |");
       while (<OUT>) {
-	if (/was outlet(.*)/) {
+	if (/was outlet(O[nf]*)/) {
 	  print "$node was $1";
 	}
-	if (/to outlet(.*)/) {
+	if (/to outlet(O[nf]*)/) {
 	  print " ... $node now $1";
 	}
       }
