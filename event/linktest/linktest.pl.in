@@ -63,20 +63,35 @@ my $lt_path = "/users/davidand/testbed/event/linktest";
 # Main control
 ##############################################################################
 
-# init global scalars
-&init;
+# if there is an arg, just count steps and return.
+
+# figure out which file to use
+# get the nsfile path 
+if (@ARGV) {
+    $ns_file = $ARGV[0];
+    &get_topo();
+    &count_steps();
+    exit(0);
+} else {
+    # init global scalars
+    &init;
+
+    if ( defined($ENV{TEST_NS_SCRIPT}) ) {
+	$ns_file = $ENV{TEST_NS_SCRIPT};
+    } else {
+	# TODO: adjust for groups
+	$ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
+    }
+}
+
 
 # init topology
 &get_topo;
+
+# is there a synch server? if not that's a problem (unless have a default)
+die "no synch server defined in: $ns_file\n" unless defined($synserv);
+
 &debug_top;
-
-
-## NB: call by reference by value
-#my @edge_copy = @edges;
-#while(@edge_copy) {
-#    my $assignment = &get_assign(\@edge_copy);
-#    print "assignment: " . $assignment->src . "\n";
-#}
 
 &stat_rt_test if defined($rtproto) && $rtproto eq "Static";
 
@@ -243,13 +258,6 @@ sub get_topo {
     # in the experiment directory, execute the ns script with my hacked tb_compat.tcl
     chdir($lt_path);
     
-    # get the nsfile path # TODO: adjust for groups
-    if(defined($ENV{TEST_NS_SCRIPT})) {
-	$ns_file = $ENV{TEST_NS_SCRIPT};
-    } else {
-	$ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
-    }
-
     die "could not find NS script: $ns_file\n" unless -e $ns_file;
 
     my @ns_output = `$ns_cmd $ns_file`;
@@ -283,8 +291,6 @@ sub get_topo {
     @verts = sort { $a cmp $b } @verts;
     @edges = sort { $a->src . $a->dst cmp $b->src . $b->dst } @edges;
 
-    # is there a synch server? if not that's a problem (unless have a default)
-    die "no synch server defined in: $ns_file\n" unless defined($synserv);
 }
 
 
@@ -525,3 +531,16 @@ sub round {
     my($number) = shift;
     return int($number + .5);
 }
+
+sub count_steps {
+ 
+    my @edge_copy = @edges;
+    my $count = 0;
+
+    while(@edge_copy) {
+	my $edge = &get_assign(\@edge_copy);
+	$count++;
+    }   
+    &debug("$ns_file\t$count\n");
+}
+
