@@ -7,10 +7,12 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: nodeadmin <on | off> <node>\n";
+    print STDOUT "Usage: nodeadmin [-h] [-n] <on | off> <node>\n";
+    print STDOUT "-h   This message\n";
+    print STDOUT "-n   Don't reboot nodes\n";
     exit(-1);
 }
-my  $optlist = "";
+my  $optlist = "hn";
 
 #
 # Configure variables
@@ -52,6 +54,9 @@ my $dbuid;
 #
 %options = ();
 if (! getopts($optlist, \%options)) {
+    usage();
+}
+if ($options{h}) {
     usage();
 }
 if (@ARGV != 2) {
@@ -114,10 +119,11 @@ DBQueryFatal("update nodes set pxe_boot_path='$pxebootpath', ".
 #
 # Reboot node
 #
-if (system("$nodereboot", "$node")) {
-    die("*** $0:\n".
+if (!$options{n}) {
+    if (system("$nodereboot", "$node")) {
+	die("*** $0:\n".
 	"    WARNING: Could not reboot $node.\n");
+    }
 }
 exit(0);
-
 
