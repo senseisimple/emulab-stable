@@ -26,7 +26,6 @@ Plans for the control switch VLANs, and description of which traffic should
    high ports      for user proxies
    nsr             networker filesave to/from envy
    smtp            outbound, mail
-   ftp             give users easy access to /users space (anonymous only?)
    nfs             only to .212 subnet
    snmp            get machine information
    
@@ -57,5 +56,7 @@ Plans for the control switch VLANs, and description of which traffic should
 6. Public <-> Control
    ssh             as always
    nfs             /users, all FSes for dnards
+                   plastic:/proj on node:/proj
+		   plastic:/q/tftpboot/proj from netdisk
    high ports      talk to user proxies on plastic
    snmp            get machine information
