@@ -1,6 +1,14 @@
 #!/bin/sh
 
 #
+# Remember our server IP as the boss IP
+#
+rm -f /etc/testbed/bossip
+if [ x"$reason" = xREBOOT ]; then
+	echo $new_dhcp_server_identifier > /etc/testbed/bossip
+fi
+
+#
 # See if the Testbed configuration software wants to change the hostname.
 # Installed into /etc.
 # 
