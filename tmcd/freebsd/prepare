@@ -27,7 +27,6 @@ my $NTPDRIFT    = "/etc/ntp.drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $MOUNTINFO	= "/var/db/mounttab";
-my $LOCATEDB	= "/var/db/locate.database";
 
 #
 # Turn off line buffering on output
@@ -145,10 +144,6 @@ if (-f $NTPDRIFT) {
     print DRIFT "0\n";
     close(DRIFT);
 }
-
-print "Clearing $LOCATEDB ...\n";
-truncate($LOCATEDB,0) or
-    die("Could not truncate $LOCATEDB: $!");
 
 print "Cleaning .pid files ...\n";
 system("rm -rf $RUNDIR/*.pid");
