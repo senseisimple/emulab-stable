@@ -63,6 +63,7 @@ static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
 static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int doloadaddr(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -84,6 +85,7 @@ struct command {
 	{ "ready",	doready },
 	{ "log",	dolog },
 	{ "mounts",	domounts },
+	{ "loadaddr",	doloadaddr},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1632,6 +1634,70 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 	return 0;
 }
+
+/*
+ * Return address from which to load an image
+ */
+static int
+doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "doloadaddr: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Get the address the node should contact to load its image
+	 */
+	res = mydb_query("select load_address from images as i "
+			"left join reloads as r on i.imageid = r.image_id "
+			"where node_id='%s'",
+			 1, nodeid);
+
+	if (!res) {
+		syslog(LOG_ERR, "doloadaddr: %s: DB Error getting "
+		       "loading address!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Simple text string.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	sprintf(buf, "ADDR=%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	syslog(LOG_INFO, "doloadaddr: %s", buf);
+	
+	return 0;
+}
+
+
 
 /*
  * DB stuff
