@@ -56,7 +56,7 @@ if (!$isadmin &&
 $yourpcs = TBUserPCs($target_uid);
 
 if ($yourpcs) {
-    echo "<center><font color=Red size=+1>\n";
+    echo "<center><font color=Red size=+2>\n";
     
     if (strcmp($uid, $target_uid))
 	echo "$target_uid is using $yourpcs PCs!\n";
