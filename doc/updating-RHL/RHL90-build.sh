@@ -574,6 +574,8 @@ install -o root -g root -m 644 {"${image_root}",}/etc/ld.so.conf
 cd "${local_build_root}"
 wget "http://www.emulab.net/downloads/libelvin-4.0.3.tar.gz"
 tar zxf libelvin-4.0.3.tar.gz
+wget "http://www.emulab.net/downloads/libelvin-4.0.3.patch"
+patch -p0 < libelvin-4.0.3.patch
 cd libelvin-4.0.3
 #
 # Ancient software.  Without `-fno-strict-aliasing', the `configure' script
@@ -594,6 +596,8 @@ unset CFLAGS CPPFLAGS LIBS
 cd "${local_build_root}"
 wget "http://www.emulab.net/downloads/elvind-4.0.3.tar.gz"
 tar zxf elvind-4.0.3.tar.gz
+wget "http://www.emulab.net/downloads/elvind-4.0.3.patch"
+patch -p0 < elvind-4.0.3.patch
 cd elvind-4.0.3
 ./configure
 gmake
