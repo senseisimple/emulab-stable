@@ -52,6 +52,8 @@ void grobot::dgoto(float Dx, float Dy, float Rf)
 
 void grobot::resetPosition()
 {
+    this->dx_est = 0;
+    this->dy_est = 0;
 }
 
 void grobot::updatePosition()
