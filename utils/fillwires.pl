@@ -1,5 +1,40 @@
 #!/usr/bin/perl -w
 
+#
+# fillwires.pl - script to fill out the wires table for testbed nodes
+#
+
+#
+# '#defines' - Edit these, depending on your nodes
+#
+
+# At Utah, we have lower numbered wires on the bottom of the rack: so, as
+# wire numbers increment, node numbers decrement. If you have the opposite,
+# change this variable to +1;
+$node_increment = -1;
+
+# The number of experimental interfaces on each node
+$experimental_interfaces = 4;
+
+# Since the wires on the back of the node may not correspond directly to the
+# actual interface numbering (ie. the lowest numbered wire may not be eth0),
+# we have the map below. In the example below, the lowest numbered wire on each
+# node corresponds to eth3, the next to eth4, etc. There should be as many
+# enries in this table as the number in experimental_interfaces variable above.
+# Note that on the right side, there is no 2. This is because, with these nodes,
+# eth2 is the control net.
+%cardmap = ( 0 => 3,
+	     1 => 4,
+	     2 => 0,
+	     3 => 1);
+
+# The interface number of the control net
+$control_net = 2;
+
+#
+# end of defines
+#
+
 if (@ARGV != 10) {
 	die "Usage: $0 <start_cable> <end_cable> <type> <length> <start_node> <switch_name> <start_module> <start_port> <min_port> <max_port>\n";
 }
@@ -14,16 +49,18 @@ my ($start_cable,$end_cable, $type, $length, $start_node, $switch_name,
 # eth4) 
 my ($wires_per_node, $card_start);
 if ($type eq "Node") {
-	$wires_per_node = 4;
-	$card_start = 0;
-	# Since the card numbers (as probed at boot time) may not correspond
-	# to the left-to-right order we're using for cable numbers, we
-	# use this map to match to reality
-	# FIXME: Placeholder until we get the real thing figured out
-	%cardmap = ( 0 => 3, 1 => 4, 2 => 0, 3 => 1);
+	$wires_per_node = $experimental_interfaces;
+	if ($control_net == 0) {
+	    $card_start = 1;
+	} else {
+	    $card_start = 0;
+	}
 } elsif ($type eq "Control") {
 	$wires_per_node = 1;
-	$card_start = 2;
+	$card_start = $control_net;
+
+	# We don't use the cardmap for the control net
+	undef %cardmap;
 } else {
 	die "Sorry, $type is not a supported wire type\n";
 }
@@ -31,7 +68,8 @@ if ($type eq "Node") {
 # Parse the start_node they gave us
 $start_node =~ /^(\D+)(\d+)$/;
 my $node_type = $1;
-my $node_num = $2 +1; # Will be decremented the first the through the for loop
+my $node_num = $2 - $node_increment; # Will be decremented the
+				     # first the through the for loop
 
 if ((!$node_type) || (!$node_num)) {
 	die "Invalid start node: $start_node\n";
@@ -47,7 +85,7 @@ for (my $i = 0; $i <= ($end_cable - $start_cable); $i++ ) {
 	# We assume that you start wiring from the bottom of the rack -
 	# change the next line to $node_num++ if wiring from the top
 	if (!($i % $wires_per_node)) {
-		$node_num--;
+		$node_num += $node_increment;
 	}
 	my $node1 = $node_type . $node_num;
 
