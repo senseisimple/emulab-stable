@@ -1,17 +1,28 @@
 #!/usr/bin/perl -w
 
-my $rsh  = "echo ssh";
-my $rcp  = "echo scp";
-my $me   = "stoller";
-my $dbg  = 1; #debug
-my $net  = "fxp";
-my $pipe = 1;
+my $rsh		= "su1 ssh";
+my $ssh		= "su1 ssh";
+my $rcp		= "su1 scp";
+my $ping	= "/sbin/ping";
+my $TB		= "/usr/testbed/bin";
+my $power	= "$TB/power";
+my $me		= "stoller";
+my $dbg		= 1;
+my $net		= "fxp";
+my $pipe	= 1;
+my $DBOSID	= "FBSD40-STD";
 
 my %delaynodes  = ();
 my %delaylinks  = ();
 my %delayparams = ();
 
 $| = 1; #Turn off line buffering on output
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
 
 if ( $#ARGV < 0) {
     die("Usage: delay_setup <ifc_file>\n". 	
@@ -141,6 +152,95 @@ while (<IN>) {
 close(IN);
 
 #
+# First, check to make sure that each delay node is up and running the
+# correct OS (FreeBSD). We get all the nodes rebooted at once, and then
+# wait to start running the delay configuration setup stuff.
+#
+foreach my $link ( keys %delayparams ) {
+    my $node  = $delayparams{$link}[0];
+    my $pc    = $delaynodes{$node};
+
+    #
+    # database goo. We check to make sure the default image is set to
+    # FreeBSD, and reset it if not. 
+    #
+    my $cmd = "select def_boot_image_id from nodes where node_id='$pc'";
+    my $sth = $DB->query($cmd);
+    my @row = $sth->fetchrow_array();
+    print STDERR "$pc is currently set to OS = $row[0]\n" if $dbg;
+    if ($row[0] ne $DBOSID) {
+	print STDERR "Changing default OS for $pc to $DBOSID\n";
+	$cmd = "update nodes set def_boot_image_id='$DBOSID' ";
+	$cmd = "$cmd where node_id='$pc'";
+	$sth = $DB->query($cmd);
+	if ($sth == 0) {
+	    die("Database update failed. Aborted...\n");
+	}
+    }
+
+    #
+    # See if the machine is pingable. If its not pingable, then
+    # we just power cycle the machine rather than wait for a bunch
+    # of ssh/rsh commands to time out.
+    #
+    print STDERR "Pinging $pc ... \n" if $dbg;
+    if (-e $ping) {
+	open(PING, "$ping -c 4 $pc 2>&1 |");
+    }
+    else {
+	die("PING command $ping not found!\n");
+    }
+    do {
+    }
+    until ( <PING> =~ /transmitted, (\d*) packets received/ );
+    close(PING);
+    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
+
+    #
+    # Power cycle if the machine is dead. It will come back up with the
+    # proper OS, cause we modified the database above.
+    #
+    if ( $1 == 0 ) {
+	print STDERR "$pc appears to be dead. Power cycling ... ";
+	PowerCycle($pc);
+	print STDERR "Done!\n";
+    }
+
+    #
+    # Machine is up. See if its already running the proper OS so that we can
+    # avoid a reboot.
+    #
+    open(UNAME, "$rsh $pc uname -a 2>&1 |");
+    $_ = <UNAME>;
+    close(UNAME);
+    print STDERR "$_\n";
+    my $OS = "Unknown";    
+    if ( $_ ) {
+	@temp = split(" ",$_);
+	$OS = $temp[0];
+    }
+    if ( $OS eq "FreeBSD" ) {
+	print STDERR "$pc appears to be running the correct OS\n";
+	next;
+    }
+
+    #
+    # Time to reboot or power cycle. 
+    # 
+    print STDERR "Rebooting $pc cause its not running the correct OS\n";
+
+    if (system("$rsh -l root $pc /sbin/reboot") == 0 ||
+	system("$ssh -l root $pc /sbin/reboot") == 0) {
+	printf STDERR "$pc appears to be rebooting\n" if $dbg;
+    }
+    else {
+	print STDERR "$pc appears to be unrepsonsive Power cycling ... ";
+	PowerCycle($pc);
+	print STDERR "Done!\n";
+    }
+}
+
+#
 # Okay, got everything we need. Generate some script files 
 #
 foreach my $link ( keys %delayparams ) {
@@ -160,14 +260,17 @@ foreach my $link ( keys %delayparams ) {
 	    push @cards, $pclink;
 	}
     }
-    my $e1 = $cards[0];
-    my $e2 = $cards[1];
+    my $iface1 = $cards[0];		# Okay, fxp0
+    my $iface2 = $cards[1];		# Okay, fxp1
+    my $fname  = "/tmp/delayconfig_${pc}_$$";
     
-    open(TEMP, ">/tmp/delayconfig");
-    print TEMP "sysctl -w net.link.ether.bridge_cfg=fxp4:6,";
-    print TEMP "$e1:69,$e2:69,\n";
-    print TEMP "sysctl -w net.link.ether.bridge=1\n";
-    print TEMP "sysctl -w net.link.ether.bridge_ipfw=1\n";
+    open(TEMP, "> $fname");
+#    print TEMP "sysctl -w net.link.ether.bridge=0\n";
+#    print TEMP "sysctl -w net.link.ether.bridge_ipfw=0\n";
+#    print TEMP "sysctl -w net.link.ether.bridge_cfg=fxp4:6,";
+#    print TEMP "$iface1:69,$iface2:69,\n";
+#    print TEMP "sysctl -w net.link.ether.bridge=1\n";
+#    print TEMP "sysctl -w net.link.ether.bridge_ipfw=1\n";
 
     #
     # Try to form unqiue pipe numbers, since at some point I'll have
@@ -175,15 +278,83 @@ foreach my $link ( keys %delayparams ) {
     # 
     my $p1 = $pipe++;
     my $p2 = $pipe++;
-    
-    print TEMP "ipfw add pipe $p1 ip from any to any in recv $e1\n";
-    print TEMP "ipfw add pipe $p2 ip from any to any in recv $e2\n";
-    print TEMP "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s\n";
-    print TEMP "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+
+#    print TEMP "ipfw -f flush\n";
+#    print TEMP "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
+#    print TEMP "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+#    print TEMP "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+#    print TEMP "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+    print TEMP "echo \"Delay Configuration Complete\"\n";
     
     close(TEMP);
+
+    if ($dbg) {
+	system("cat $fname");
+    }
+
+    #
+    # Copy the file over to the target machine. Since the machine might
+    # have been rebooted above, run a short ping waiting for it come alive.
+    # The most you want to wait is 60 seconds, I think, before throwing
+    # in the towl.
+    #
+    print STDERR "Checking $pc to make sure it is alive ... " if $dbg;
+    open(PING, "$ping -c 60 $pc 2>&1 |");
+    do {
+	$_ = <PING>;
+	if ( $_ =~ /bytes from/ ) {
+	    close(PING);
+	    print STDERR "Yep, alive and well\n" if $dbg;
+	    goto ALIVE;
+	}
+    }
+    until ( $_ =~ /transmitted, (\d*) packets received/ );
+    close(PING);
+    die("$pc is not responding. Better check into it\n");
+ ALIVE:
+
+    #
+    # Copy the file over to the target machine.
+    #
+    if (system("$rcp $fname $pc:/etc/rc.delayconfig")) {
+	die("Error copying delay config file to $pc\n");
+    }
+    unlink($fname);
+
+    #
+    # Now run the config script on the target. We look for the echo
+    # at the end of the script that says it completed okay (See above).
+    # The script generated above needs to be changed so that it terminates
+    # early if one of the commands fails, but I have not done that yet.
+    # 
+    open(CONFIG, "$rsh $pc sh /etc/rc.delayconfig 2>&1 |");
+    while ( $_ = <CONFIG> ) {
+	if ( $_ =~ /Complete/ ) {
+	    close(CONFIG);
+	    goto FIGGED;
+	}
+    }
+    die("Problem running configuration script on delay node $pc.\n");
+FIGGED:
+    print STDERR "Wow! Delay node $pc configured okay!\n" if $dbg;
 }
 
-print "End of input file.\nDone.\n";
+print STDERR "Done!\n";
 
+#
+# Power cycle a PC using the testbed power program.
+#
+sub PowerCycle {
+    local($pc) = @_;
+
+    open(POWER, "$power cycle $pc 2>&1 |");
+    $_ = <POWER>;
+    close(POWER);
+    if ( $_ =~ /Reboot/ ) {
+	return;
+    }
+    else {
+	die("Could not power cycle $pc! Quitting\n");
+    }
+}
 
