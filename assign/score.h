@@ -29,16 +29,17 @@ class violated_info {
 
     /* Spit out the current violations (details only, not the total) */
     friend ostream &operator<<(ostream &o, const violated_info &vinfo) {
-	o << "  unassigned: " << vinfo.unassigned << endl;
-	o << "  pnode_load: " << vinfo.pnode_load << endl;
-	o << "  no_connect: " << vinfo.no_connection << endl;
-	o << "  link_users: " << vinfo.link_users << endl;
-	o << "  bandwidth:  " << vinfo.bandwidth << endl;
-	o << "  desires:    " << vinfo.desires << endl;
-	o << "  vclass:     " << vinfo.vclass << endl;
-	o << "  delay:      " << vinfo.delay << endl;
+	o << "  unassigned:  " << vinfo.unassigned << endl;
+	o << "  pnode_load:  " << vinfo.pnode_load << endl;
+	o << "  no_connect:  " << vinfo.no_connection << endl;
+	o << "  link_users:  " << vinfo.link_users << endl;
+	o << "  bandwidth:   " << vinfo.bandwidth << endl;
+	o << "  desires:     " << vinfo.desires << endl;
+	o << "  vclass:      " << vinfo.vclass << endl;
+	o << "  delay:       " << vinfo.delay << endl;
+	o << "  trivial mix: " << vinfo.delay << endl;
 #ifdef FIX_PLINK_ENDPOINTS
-	o << "  endpoints:  " << vinfo.incorrect_endpoints << endl;
+	o << "  endpoints:   " << vinfo.incorrect_endpoints << endl;
 #endif
 	return o;
     }
@@ -58,6 +59,7 @@ class violated_info {
 	int vclass;
 	int delay;
 	int incorrect_endpoints;
+	int trivial_mix;
 };
 
 extern double score;

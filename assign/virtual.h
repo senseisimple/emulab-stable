@@ -99,6 +99,12 @@ public:
   int total_bandwidth;
 #endif
 
+  // For the case where we want to make sure that a vnode has all trivial
+  // links, or no trivial links, but not a mix of both.
+  bool disallow_trivial_mix;
+  int nontrivial_links;
+  int trivial_links;
+
 };
 
 class tb_vlink {

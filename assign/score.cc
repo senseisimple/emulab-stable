@@ -57,8 +57,10 @@ int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
 double fd_score(tb_vnode *vnode,tb_pnode *pnoder,int &out_fd_violated);
-void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode);
-void unscore_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode);
+void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
+	tb_vnode *src_vnode, tb_vnode *dst_vnode);
+void unscore_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
+	tb_vnode *src_vnode, tb_vnode *dst_vnode);
 
 #ifdef FIX_PLINK_ENDPOINTS
 void score_link_endpoints(pedge pe);
@@ -142,9 +144,51 @@ void init_score()
  * This routine is the highest level link scorer.  It handles all
  * scoring that depends on the link_info of vlink.
  */
-void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode)
+void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnode *src_vnode,
+	tb_vnode *dst_vnode)
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
+  cerr << "Unscore " << vlink->name << endl;
+
+  // Handle vnodes that are not allowed to have a mix of trivial and
+  // non-trivial links
+  if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+      src_vnode->trivial_links--;
+      dst_vnode->trivial_links--;
+      if (src_vnode->disallow_trivial_mix &&
+	      (src_vnode->trivial_links == 0) &&
+	      (src_vnode->nontrivial_links != 0)) {
+	  // We just removed the last trivial link
+	  violated--;
+	  vinfo.trivial_mix--;
+      }
+      if (dst_vnode->disallow_trivial_mix &&
+	      (dst_vnode->trivial_links == 0) &&
+	      (dst_vnode->nontrivial_links != 0)) {
+	  // We just removed the last trivial link
+	  violated--;
+	  vinfo.trivial_mix--;
+      }
+  } else if (vlink->link_info.type != tb_link_info::LINK_UNKNOWN) {
+      src_vnode->nontrivial_links--;
+      dst_vnode->nontrivial_links--;
+      if (src_vnode->disallow_trivial_mix &&
+	      (src_vnode->nontrivial_links == 0) &&
+	      (src_vnode->trivial_links != 0)) {
+	  // We just removed the last nontrivial link
+	  violated--;
+	  vinfo.trivial_mix--;
+      }
+      if (dst_vnode->disallow_trivial_mix &&
+	      (dst_vnode->nontrivial_links == 0) &&
+	      (dst_vnode->trivial_links != 0)) {
+	  // We just removed the last nontrivial link
+	  violated--;
+	  vinfo.trivial_mix--;
+      }
+  }
+
+  // Unscore the link itself
   if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
     // DIRECT LINK
     SDEBUG(cerr << "   direct link" << endl);
@@ -214,6 +258,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode)
       unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
   }
 #endif
+
 }
 
 /*
@@ -323,7 +368,7 @@ void remove_node(vvertex vv)
     // Find the pnode on the ther end of the link, and unscore it!
     pvertex dest_pv = dest_vnode->assignment;
     tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
-    unscore_link_info(*vedge_it,pnode,dest_pnode);
+    unscore_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
   }
  
 #ifdef PENALIZE_UNUSED_INTERFACES
@@ -384,9 +429,11 @@ void remove_node(vvertex vv)
  * This routine is the highest level link scorer.  It handles all
  * scoring that depends on the link_info of vlink.
  */
-void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
+void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnode *src_vnode,
+	tb_vnode *dst_vnode)
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
+  cerr << "Score " << vlink->name << endl;
   tb_pnode *the_switch;
   switch (vlink->link_info.type) {
   case tb_link_info::LINK_DIRECT:
@@ -449,6 +496,45 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
     exit(1);
     break;
   }
+
+  // Handle vnodes that are not allowed to have a mix of trivial and
+  // non-trivial links
+  if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+      src_vnode->trivial_links++;
+      dst_vnode->trivial_links++;
+      if (src_vnode->disallow_trivial_mix &&
+	      (src_vnode->trivial_links == 1) &&
+	      (src_vnode->nontrivial_links != 0)) {
+	  // We just added the first trivial link
+	  violated++;
+	  vinfo.trivial_mix++;
+      }
+      if (dst_vnode->disallow_trivial_mix &&
+	      (dst_vnode->trivial_links == 1) &&
+	      (dst_vnode->nontrivial_links != 0)) {
+	  // We just added the first trivial link
+	  violated++;
+	  vinfo.trivial_mix++;
+      }
+  } else {
+      src_vnode->nontrivial_links++;
+      dst_vnode->nontrivial_links++;
+      if (src_vnode->disallow_trivial_mix &&
+	      (src_vnode->nontrivial_links == 1) &&
+	      (src_vnode->trivial_links != 0)) {
+	  // We just added the first trivial link
+	  violated++;
+	  vinfo.trivial_mix++;
+      }
+      if (dst_vnode->disallow_trivial_mix &&
+	      (dst_vnode->nontrivial_links == 1) &&
+	      (dst_vnode->trivial_links != 0)) {
+	  // We just added the first trivial link
+	  violated++;
+	  vinfo.trivial_mix++;
+      }
+  }
+
 }
 
 /*
@@ -575,7 +661,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	    // XXX - okay, this is really bad, but score_link_info doesn't
 	    // usually get called for trivial links, and letting them fall
 	    // through into the 'normal' link code below is disatrous!
-	    score_link_info(*vedge_it,pnode,dest_pnode);
+	    score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
 	} else {
 	    SADD(SCORE_NO_CONNECTION);
 	    vlink->no_connection=true;
@@ -780,14 +866,14 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	    int i;
 	    for (i=0;i<resolution_index;++i) {
 	      vlink->link_info = resolutions[i];
-	      score_link_info(*vedge_it,pnode,dest_pnode);
+	      score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
 	      if ((score <= bestscore) &&
 		  (violated <= bestviolated)) {
 		bestscore = score;
 		bestviolated = violated;
 		bestindex = i;
 	      }
-	      unscore_link_info(*vedge_it,pnode,dest_pnode);
+	      unscore_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
 	    }
 	    index = bestindex;
 	  }
@@ -796,7 +882,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 #endif
 	  vlink->link_info = resolutions[index];
 	  SDEBUG(cerr << "  choice:" << vlink->link_info);
-	  score_link_info(*vedge_it,pnode,dest_pnode);
+	  score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
 	}
       }
     }

@@ -83,18 +83,26 @@ int parse_top(tb_vgraph &VG, istream& i)
 	v->num_links = 0;
 	v->total_bandwidth = 0;
 #endif
+	v->disallow_trivial_mix = false;
+	v->nontrivial_links = v->trivial_links = 0;
 	
 	for (unsigned int i = 3;i < parsed_line.size();++i) {
 	  crope desirename,desireweight;
 	  if (split_two(parsed_line[i],':',desirename,desireweight,"0") == 1) {
-	    top_error("Bad desire, missing weight.");
+	      // It must be a flag?
+	      if (parsed_line[i].compare("disallow_trivial_mix") == 0) {
+		  v->disallow_trivial_mix = true;
+	      } else {
+		  top_error("Unknown flag or bad desire (missing weight)");
+	      }
+	  } else {
+	      double gweight;
+	      if (sscanf(desireweight.c_str(),"%lg",&gweight) != 1) {
+		  top_error("Bad desire, bad weight.");
+		  gweight = 0;
+	      }
+	      v->desires[desirename] = gweight;
 	  }
-	  double gweight;
-	  if (sscanf(desireweight.c_str(),"%lg",&gweight) != 1) {
-	    top_error("Bad desire, bad weight.");
-	    gweight = 0;
-	  }
-	  v->desires[desirename] = gweight;
 	}
       }
     } else if (command.compare("link") == 0) {
