@@ -44,6 +44,11 @@ my $USERNODE    = "@USERNODE@";
 		"tbreport"	=> "$TB/bin/tbreport",
 		"xmlrpc/experiment" => "$TB/sbin/sshxmlrpc_server.py",
 		"xmlrpc/node"   => "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/imageid" => "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/osid"	=> "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/fs"	=> "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/user"	=> "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/emulab"	=> "$TB/sbin/sshxmlrpc_server.py",
 	   );
 
 #
