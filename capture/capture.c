@@ -1404,6 +1404,17 @@ handshake(void)
 		die("socket(): %s", geterr(errno));
 	}
 
+	/*
+	 * Bind to a reserved port so that capserver can verify integrity
+	 * of the sender by looking at the port number. The actual port
+	 * number does not matter.
+	 */
+	if (bindresvport(sock, NULL) < 0) {
+		warnc("Could not bind reserved port");
+		close(sock);
+		return -1;
+	}
+
 	/* For alarm. */
 	deadbossflag = 0;
 	signal(SIGALRM, deadboss);
@@ -1416,7 +1427,7 @@ handshake(void)
 	}
 	alarm(5);
 
-	if (connect(sock, (struct sockaddr *)&Bossaddr, sizeof(Bossaddr)) < 0) {
+	if (connect(sock, (struct sockaddr *)&Bossaddr, sizeof(Bossaddr)) < 0){
 		warn("connect(%s): %s", Bossnode, geterr(errno));
 		err = -1;
 		close(sock);

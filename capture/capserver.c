@@ -132,7 +132,7 @@ main(int argc, char **argv)
 	while (1) {
 		struct sockaddr_in client;
 		int		   clientsock, length = sizeof(client);
-		int		   cc;
+		int		   cc, port;
 		whoami_t	   whoami;
 		unsigned char	   buf[BUFSIZ], node_id[64];
 		secretkey_t        secretkey;
@@ -144,7 +144,17 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "accept failed: %m");
 			exit(1);
 		}
-		syslog(LOG_INFO, "%s connected", inet_ntoa(client.sin_addr));
+		port = ntohs(client.sin_port);
+		syslog(LOG_INFO, "%s connected from port %d",
+		       inet_ntoa(client.sin_addr), port);
+
+		/*
+		 * Check port number of sender. Must be a reserved port.
+		 */
+		if (port >= IPPORT_RESERVED || port < IPPORT_RESERVED / 2) {
+			syslog(LOG_ERR, "Illegal port! Ignoring.");
+			goto done;
+		}
 
 		/*
 		 * Set timeouts
