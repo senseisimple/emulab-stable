@@ -47,8 +47,11 @@ if (@ARGV != 2) {
 if (defined($options{"s"})) {
     my $num = $options{"s"};
 
-    if (! ($num =~ /\d/)) {
-	usage();
+    if ($num =~ /(\d)/) {
+	$num = $1;
+    }
+    else {
+	die("Tainted slice number: $num");
     }
     
     $slice = "-s $num";
@@ -64,13 +67,13 @@ if ($device =~ /^([-\w.\/]+)$/) {
     $device = $1;
 }
 else {
-    fatal("Tainted device name: $device");
+    die("Tainted device name: $device");
 }
 if ($filename =~ /^([-\w.\/]+)$/) {
     $filename = $1;
 }
 else {
-    fatal("Tainted output filename: $filename");
+    die("Tainted output filename: $filename");
 }
 
 #
