@@ -579,3 +579,24 @@ last_net_act,last_cpu_act,last_ext_act);
        
        ALTER TABLE users ADD COLUMN usr_shell TINYTEXT AFTER usr_phone;
        UPDATE users SET usr_shell='tcsh';
+
+1.149: Add more fields to expts table for new swapping features. All
+       the "bits" default to 0, so no further updating is needed.
+
+	ALTER TABLE experiments ADD COLUMN noswap_reason tinytext 
+	     AFTER priority;
+
+	ALTER TABLE experiments ADD COLUMN idleswap tinyint(4) 
+	      NOT NULL default '0' AFTER noswap_reason;
+
+	ALTER TABLE experiments ADD COLUMN idleswap_timeout int(4) 
+	      NOT NULL default '0' AFTER idleswap;
+
+	ALTER TABLE experiments ADD COLUMN noidleswap_reason tinytext 
+	      AFTER idleswap_timeout;
+
+	ALTER TABLE experiments ADD COLUMN autoswap tinyint(4) 
+	      NOT NULL default '0' AFTER noidleswap_reason;
+
+	ALTER TABLE experiments ADD COLUMN autoswap_timeout int(4) 
+	      NOT NULL default '0' AFTER autoswap;
