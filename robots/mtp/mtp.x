@@ -249,6 +249,7 @@ enum mtp_robot_type_t {
 };
 
 struct mtp_garcia_telemetry {
+    int robot_id;
     float battery_level;
     float battery_voltage;
     int battery_misses;

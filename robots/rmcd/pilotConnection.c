@@ -1248,6 +1248,11 @@ void pc_handle_packet(struct pilot_connection *pc, struct mtp_packet *mp)
     case MTP_CONTACT_REPORT:
 	pc_handle_report(pc, &mp->data.mtp_payload_u.contact_report);
 	break;
+    case MTP_TELEMETRY:
+	mp->data.mtp_payload_u.telemetry.mtp_telemetry_u.garcia.robot_id =
+	    pc->pc_robot->id;
+	mtp_send_packet(pc_data.pcd_emc_handle, mp);
+	break;
 	
     default:
 	fprintf(stderr, "error: unhandled pilot packet %d\n", mp->data.opcode);

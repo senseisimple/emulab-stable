@@ -13,9 +13,13 @@ import java.net.URLEncoder;
 
 import java.applet.Applet;
 
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 
 import thinlet.Thinlet;
+import thinlet.NumberFormatter;
+
+import net.emulab.mtp_garcia_telemetry;
 
 public class GarciaTelemetry
     extends Thinlet
@@ -23,32 +27,22 @@ public class GarciaTelemetry
     public static final SimpleDateFormat TIME_FORMAT =
 	new SimpleDateFormat("hh:mm:ss a - ");
     
+    public static final NumberFormatter FLOAT_FORMAT =
+	new NumberFormatter(new DecimalFormat("0.00"));
+
     private final Applet applet;
     private URL servicePipe;
     
-    public Object batteryBar;
-    public Object batteryText;
+    public Object status;
+    public Object lastUpdate;
     
-    public Object leftOdometer;
-    public Object rightOdometer;
-    
-    public Object leftVelocity;
-    public Object rightVelocity;
-    
-    public Object flSensor;
-    public Object frSensor;
-    public Object slSensor;
-    public Object srSensor;
-    public Object rlSensor;
-    public Object rrSensor;
-
     public Object log;
     public String logString = "";
-    
-    public Object connected;
-    public Object lastUpdate;
-    public Object reconnectButton;
 
+    public mtp_garcia_telemetry mgt = new mtp_garcia_telemetry();
+
+    public UpdateThread ut;
+    
     public GarciaTelemetry(Applet applet)
 	throws Exception
     {
@@ -58,30 +52,6 @@ public class GarciaTelemetry
 	{
 	    this.add(this.parse("main.xml"));
 
-	    this.batteryBar = this.find("battery-bar");
-	    this.batteryText = this.find("battery-text");
-	    
-	    this.leftOdometer = this.find("left-odom");
-	    this.rightOdometer = this.find("right-odom");
-	    
-	    this.leftVelocity = this.find("left-vel");
-	    this.rightVelocity = this.find("right-vel");
-	    
-	    this.flSensor = this.find("fl-sensor");
-	    this.frSensor = this.find("fr-sensor");
-
-	    this.slSensor = this.find("sl-sensor");
-	    this.srSensor = this.find("sr-sensor");
-
-	    this.rlSensor = this.find("rl-sensor");
-	    this.rrSensor = this.find("rr-sensor");
-
-	    this.log = this.find("log");
-
-	    this.connected = this.find("connected");
-	    this.lastUpdate = this.find("last-update");
-	    this.reconnectButton = this.find("reconnect-button");
-	    
 	    URL urlServer = applet.getCodeBase();
 	    String uid, auth, pipeurl;
 
@@ -110,14 +80,16 @@ public class GarciaTelemetry
     private void connect()
 	throws IOException
     {
-	new UpdateThread(this, this.servicePipe).start();
+	this.tkv.setKeyValue(this,
+			     "ut",
+			     new UpdateThread(this, this.servicePipe));
+	this.ut.start();
     }
 
     public void reconnect()
 	throws IOException
     {
-	this.setBoolean(this.reconnectButton, "enabled", false);
-	this.setString(this.connected, "text", "Connecting...");
+	this.setString(this.status, "text", "Connecting...");
 	this.connect();
     }
 

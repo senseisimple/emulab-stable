@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -36,6 +36,7 @@ use strict;
 #
 my $RSYNC  = "/usr/local/bin/rsync";
 my $SSHTB  = "$TB/bin/sshtb";
+my $POWER  = "$TB/bin/power";
 my $DEBUG  = 1;
 
 #
@@ -225,6 +226,30 @@ NODE: foreach my $node (@nodes) {
 	# No default, we've checked for a valid operation above
     }
 
+    my $nodestate;
+    if (! TBGetNodeEventState($node, \$nodestate) ||
+	$nodestate eq TBDB_NODESTATE_POWEROFF) {
+	warn "$node: power cycling";
+	
+	system("$POWER cycle $node");
+	if ($?) {
+	    $errors++;
+	    warn "$node failed to power up.";
+	    next NODE;
+	}
+    }
+    
+    my $actual_state;
+    if (TBNodeStateWait($node,
+			time,
+			(60*6),
+			\$actual_state,
+			(TBDB_NODESTATE_ISUP,))) {
+	$errors++;
+	warn "$node is not up.";
+	next NODE;
+    }
+    
     #
     # Actually run rsync
     # TODO - Squelch output

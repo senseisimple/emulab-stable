@@ -99,6 +99,7 @@ class LocationInfoUpdater(EventClient):
                     return
                 
                 update = {}
+                battery_update = {}
                 for arg in event.getArguments().split():
                     try:
                         key, value = arg.split('=')
@@ -119,6 +120,15 @@ class LocationInfoUpdater(EventClient):
                         elif key == "ORIENTATION" or key == "orientation":
                             update["orientation"] = str(float(value))
                             pass
+                        elif key == "BATTERY_LEVEL" or key == "battery_level":
+                            battery_update["battery_percentage"] = (
+                                str(float(value)))
+                            pass
+                        elif (key == "BATTERY_VOLTAGE" or
+                              key == "battery_voltage"):
+                            battery_update["battery_voltage"] = (
+                                str(float(value)))
+                            pass
                         else:
                             sys.stderr.write("warning: unknown key: %s\n" %
                                              key)
@@ -128,6 +138,20 @@ class LocationInfoUpdater(EventClient):
                         sys.stderr.write("error: bad argument: %s\n" % arg)
                         pass
                     pass
+
+                if len(battery_update) > 0:
+                    clause = ",".join(["=".join(i) for i in
+                                       battery_update.items()])
+                    
+                    DBQueryFatal("UPDATE nodes SET "
+                                 "battery_timestamp=UNIX_TIMESTAMP(now()), "
+                                 + clause
+                                 + " WHERE node_id=%s",
+                                 (node_id,))
+                    pass
+                
+                if not (update.has_key("loc_x") and update.has_key("loc_y")):
+                    return
 
                 if event.getEventType() == "SETDEST":
                     table_name = "nodes"

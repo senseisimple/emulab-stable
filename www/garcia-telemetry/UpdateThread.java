@@ -18,6 +18,8 @@ import java.text.DecimalFormat;
 import org.acplt.oncrpc.XdrTcpDecodingStream;
 import org.acplt.oncrpc.XdrTcpEncodingStream;
 
+import thinlet.ThinletKeyValue;
+
 import net.emulab.mtp;
 import net.emulab.mtp_packet;
 import net.emulab.mtp_role_t;
@@ -25,15 +27,15 @@ import net.emulab.mtp_control;
 import net.emulab.mtp_payload;
 import net.emulab.mtp_opcode_t;
 import net.emulab.mtp_status_t;
+import net.emulab.mtp_command_goto;
 import net.emulab.mtp_robot_type_t;
+import net.emulab.mtp_contact_report;
+import net.emulab.mtp_update_position;
 import net.emulab.mtp_garcia_telemetry;
 
 public class UpdateThread
     extends Thread
 {
-    private static final DecimalFormat FLOAT_FORMAT =
-	new DecimalFormat("0.00");
-
     private static final String STATUS_STRINGS[] = {
 	"unknown",
 	"",
@@ -41,11 +43,15 @@ public class UpdateThread
 	"moving",
 	"error",
 	"complete",
-	"obstructed",
+	"contact",
 	"aborted"
     };
     
+    private static final DecimalFormat LOG_FLOAT_FORMAT =
+	new DecimalFormat("0.00");
+    
     private final GarciaTelemetry gt;
+    private final ThinletKeyValue tkv;
     private final URL servicePipe;
     private final mtp_packet mp = new mtp_packet();
     
@@ -53,56 +59,8 @@ public class UpdateThread
 	throws IOException
     {
 	this.gt = gt;
+	this.tkv = gt.getNamespace();
 	this.servicePipe = servicePipe;
-    }
-
-    private void updateGUI(mtp_garcia_telemetry mgt)
-    {
-	this.gt.setInteger(this.gt.batteryBar,
-			   "value",
-			   (int)mgt.battery_level);
-	this.gt.setString(this.gt.batteryText,
-			  "text",
-			  Integer.toString((int)mgt.battery_level) + "%");
-		    
-	this.gt.setString(this.gt.leftOdometer,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.left_odometer) + " meters");
-	this.gt.setString(this.gt.rightOdometer,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.right_odometer) + " meters");
-		    
-	this.gt.setString(this.gt.leftVelocity,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.left_velocity) + " m/s");
-	this.gt.setString(this.gt.rightVelocity,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.right_velocity) + " m/s");
-		    
-	this.gt.setString(this.gt.flSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.front_ranger_left)
-			  + " meters");
-	this.gt.setString(this.gt.frSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.front_ranger_right)
-			  + " meters");
-	this.gt.setString(this.gt.slSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.side_ranger_left)
-			  + " meters");
-	this.gt.setString(this.gt.srSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.side_ranger_right)
-			  + " meters");
-	this.gt.setString(this.gt.rlSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.rear_ranger_left)
-			  + " meters");
-	this.gt.setString(this.gt.rrSensor,
-			  "text",
-			  FLOAT_FORMAT.format(mgt.rear_ranger_right)
-			  + " meters");
     }
     
     public void run()
@@ -158,7 +116,7 @@ public class UpdateThread
 		xdr.endDecoding();
 		if (!connected) {
 		    this.gt.appendLog("Connected\n");
-		    this.gt.setString(this.gt.connected, "text", "Connected");
+		    this.gt.setString(this.gt.status, "text", "Connected");
 		    connected = true;
 		}
 		
@@ -171,17 +129,23 @@ public class UpdateThread
 		if ((this.mp.data.opcode == mtp_opcode_t.MTP_TELEMETRY) &&
 		    (this.mp.data.telemetry.type ==
 		     mtp_robot_type_t.MTP_ROBOT_GARCIA)) {
-		    this.updateGUI(this.mp.data.telemetry.garcia);
+		    this.tkv.setKeyValue(this.gt,
+					 "mgt",
+					 this.mp.data.telemetry.garcia);
 		}
 		else if (this.mp.data.opcode ==
 			 mtp_opcode_t.MTP_COMMAND_GOTO) {
+		    mtp_command_goto mcg = this.mp.data.command_goto;
+		    
 		    this.gt.appendLog(
 			"GOTO x="
-			+ this.mp.data.command_goto.position.x
+			+ LOG_FLOAT_FORMAT.format(mcg.position.x)
 			+ " y="
-			+ this.mp.data.command_goto.position.y
+			+ LOG_FLOAT_FORMAT.format(mcg.position.y)
 			+ " theta="
-			+ this.mp.data.command_goto.position.theta
+			+ LOG_FLOAT_FORMAT.format(mcg.position.theta)
+			+ " id="
+			+ this.mp.data.command_goto.command_id
 			+ "\n");
 		}
 		else if (this.mp.data.opcode ==
@@ -190,14 +154,40 @@ public class UpdateThread
 		}
 		else if (this.mp.data.opcode ==
 			 mtp_opcode_t.MTP_UPDATE_POSITION) {
-		    int ms = this.mp.data.update_position.status + 1;
+		    mtp_update_position mup = this.mp.data.update_position;
+		    int ms = mup.status + 1;
 
-		    this.gt.appendLog("UPDATE-POS "
-				      + STATUS_STRINGS[ms]
-				      + "\n");
+		    this.gt.appendLog(
+			"UPDATE-POS "
+			+ STATUS_STRINGS[ms]
+			+ " x="
+			+ LOG_FLOAT_FORMAT.format(mup.position.x)
+			+ " y="
+			+ LOG_FLOAT_FORMAT.format(mup.position.y)
+			+ " theta="
+			+ LOG_FLOAT_FORMAT.format(mup.position.theta)
+			+ " id="
+			+ this.mp.data.update_position.command_id
+			+ "\n");
+		}
+		else if (this.mp.data.opcode ==
+			 mtp_opcode_t.MTP_CONTACT_REPORT) {
+		    mtp_contact_report mcr = this.mp.data.contact_report;
+		    String msg;
+		    int lpc;
+		    
+		    msg = "CONTACT-REPORT count=" + mcr.count + "\n";
+		    for (lpc = 0; lpc < mcr.count; lpc++) {
+			msg += "    x="
+			    + LOG_FLOAT_FORMAT.format(mcr.points[lpc].x)
+			    + " y="
+			    + LOG_FLOAT_FORMAT.format(mcr.points[lpc].y)
+			    + "\n";
+		    }
+		    this.gt.appendLog(msg);
 		}
 		else {
-		    System.err.println("Unknown packet type: "
+		    System.out.println("Unknown packet type: "
 				       + this.mp.data.opcode);
 		}
 	    }
@@ -214,9 +204,9 @@ public class UpdateThread
 	catch(Throwable th) {
 	    th.printStackTrace();
 	}
-	
-	this.gt.setBoolean(this.gt.reconnectButton, "enabled", true);
-	this.gt.setString(this.gt.connected, "text", "Disconnected");
+
+	this.tkv.setKeyValue(this.gt, "ut", null);
+	this.gt.setString(this.gt.status, "text", "Disconnected");
 	this.gt.appendLog("Disconnected\n");
     }
 

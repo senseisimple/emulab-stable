@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 ifeq ($(JAVAC),)
 JARS =
 else
-JARS = $(SRCDIR)/../garcia-telemetry.jar
+JARS = ../garcia-telemetry.jar
 endif
 
 all: $(JARS)
@@ -34,9 +34,10 @@ MYCLASSPATH = \
 $(CLASSES): $(CLASSES_SRC)
 	env CLASSPATH=$(MYCLASSPATH) $(JAVAC) -d . $^
 
-$(SRCDIR)/../garcia-telemetry.jar: $(CLASSES) main.xml
+../garcia-telemetry.jar: $(CLASSES) main.xml
 	cp -f $(filter $(SRCDIR)/%,$^) .
-	$(JAR) cvf $@ $(patsubst $(SRCDIR)/%,%,$^) 'Base64$$OutputStream.class' 'Base64$$InputStream.class'
+	$(JAR) cvf $@ $(patsubst $(SRCDIR)/%,%,$^) \
+		'Base64$$OutputStream.class' 'Base64$$InputStream.class'
 	rm -f $(patsubst $(SRCDIR)/%,%,$(filter $(SRCDIR)/%,$^))
 
 clean:
