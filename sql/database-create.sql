@@ -960,7 +960,7 @@ CREATE TABLE os_info (
   path tinytext,
   magic tinytext,
   machinetype varchar(30) NOT NULL default '',
-  osfeatures set('ping','ssh','ipod','isup') default NULL,
+  osfeatures set('ping','ssh','ipod','isup','veths','mlinks') default NULL,
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
   mustclean tinyint(4) NOT NULL default '1',
