@@ -67,10 +67,10 @@ set machines {}
 foreach pair $nodemap {
     lappend machines [lindex $pair 1]
 }
-if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error running $resetvlans. ($err)"
-    exit 1
-}
+#if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
+#    outs stderr "Error running $resetvlans. ($err)"
+#    exit 1
+#}
 
 outs "Setting up VLANs"
 if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
@@ -84,11 +84,11 @@ outs "PLACEHOLDER - Booting for the first time."
 outs "PLACEHOLDER - Verifying OS functionality."
 
 # XXX - This should only be done for linux/freebsd OSs
-outs "Setting up interfaces."
-if {[catch "exec cat $irFile | $ir2ifc | $ifcboot >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error setting interfaces ($err)"
-    exit 1
-}
+#outs "Setting up interfaces."
+#if {[catch "exec cat $irFile | $ir2ifc | $ifcboot >@ $logFp 2>@ $logFp" err]} {
+#    outs stderr "Error setting interfaces ($err)"
+#    exit 1
+#}
 
 outs "PLACEHOLDER - Installing secondary pacakages."
 outs "PLACEHOLDER - Rebooting."
