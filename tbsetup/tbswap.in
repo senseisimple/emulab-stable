@@ -24,7 +24,7 @@ use English;
 
 sub usage()
 {
-    print STDERR "Usage: $0 -force { in | out | update [-reboot] } pid eid\n";
+    print STDERR "Usage: $0 -force { in | out | update [-reboot] [-eventsys_restart] } pid eid\n";
     exit(-1);
 }
 
@@ -66,6 +66,7 @@ sub UPDATE_RECOVER()  { return 0; }
 $| = 1;
 
 my $updateReboot = 0;
+my $updateEventsys_restart = 0;
 my $force  = 0;
 my $errors = 0;
 my $assignWrapperErrorCode = 0;
@@ -100,6 +101,8 @@ while ($#ARGV > 1) {
 	$force = 1;
     } elsif ($arg eq "-reboot") {
 	$updateReboot = 1;
+    } elsif ($arg eq "-eventsys_restart" && $swapop eq "update") {
+	$update_Eventsys_restart = 1;
     } else {
 	usage();
     }
@@ -309,7 +312,7 @@ sub doSwapout($) {
 
     if (! $TESTMODE) { 
 	if (! $DISABLE_EVENTS) {
-	    if ($type >= RETRY) {
+	    if ($type >= RETRY || ($update_Eventsys_restart && $type == UPDATE) ) {
 		print "Stopping the event system\n";
 		if (system("eventsys_control stop $pid $eid")) {
 		    print STDERR "*** Failed to stop the event system.\n";
@@ -844,7 +847,8 @@ sub doSwapin($) {
     # event system previously, so starting it again will fail!
     # 
     if (! $DISABLE_EVENTS) {
-	if ($type != UPDATE && $type != UPDATE_RECOVER) {
+	if ( $update_Eventsys_restart || 
+	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
 	    if (system("eventsys_control start $pid $eid")) {

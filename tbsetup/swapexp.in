@@ -16,11 +16,11 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-b] [-i | -a | -f] [-r] ".
+    print STDOUT "Usage: swapexp [-b] [-i | -a | -f] [-r] [-e] ".
 	"<-s in | out | restart | modify | pause> <pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "biafrs:";
+my  $optlist = "biafres:";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -69,6 +69,7 @@ my $idleswap = 0;
 my $autoswap = 0;
 my $force    = 0;
 my $reboot   = 0;
+my $eventsys_restart   = 0;
 my $errorstat= -1;
 my $modifyHosed = 0;
 
@@ -124,6 +125,9 @@ if (defined($options{"b"})) {
 if (defined($options{"r"})) {
     $reboot = 1;
 }
+if (defined($options{"e"})) {
+    $eventsys_restart = 1;
+}
 if (defined($options{"s"})) {
     $inout = $options{"s"};
 
@@ -140,6 +144,11 @@ else {
 }
 
 if ($inout ne "modify" && @ARGV != 2) {
+    usage();
+}
+if ($eventsys_restart && $inout ne "modify") {
+    print STDOUT "Usage: swapexp: -e (eventsys_restart) can be used ".
+                 "only with -s modify\n";
     usage();
 }
 my $pid   = $ARGV[0];
@@ -630,6 +639,7 @@ elsif ($inout eq "modify") {
 	    SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
 	    
 	    my $optarg = ($reboot ? "-reboot" : "");
+	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
 
 	    print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
 	    if (system("$tbdir/tbswap update $optarg $pid $eid") != 0) {
