@@ -31,26 +31,18 @@ all:	tg2.0 $(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -pthread #-Wall
+CFLAGS	 += -O -g -static #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
 CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4mt`
+CFLAGS   += `elvin-config --cflags vin4c`
 CFLAGS	 += -DFREEBSD -DUSEEVENTS
 
 YCFLAGS	 += -I. -DFREEBSD -DUSEEVENTS
 
-LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
-LIBS     += -lcipher -lc_r
 LIBS	 += -ll -lcompat
-
-#
-# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
-#     build on freebsd. I made a vain attempt to filter it out, but
-#     gave up quickly. Deal with it later. 
-#
-#LIBS     += `elvin-config --libs vin4mt`
-LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+LIBS     += `elvin-config --libs vin4c`
 
 lex.yy.c: scan.l
 	@echo 'Expect non-portable character class warning (ASCII assumed).'

@@ -24,7 +24,6 @@
 
 static char hostname[MAXHOSTNAMELEN];
 
-
 /*
  * Register with the testbed event system.  NAME specifies the name of
  * the event server.  Returns a pointer to a handle that may be passed
@@ -70,6 +69,7 @@ event_register(char *name, int threaded)
 
     /* Set up the Elvin interface pointers: */
     if (threaded) {
+#ifdef THREADED
         handle->init = elvin_threaded_init_default;
         handle->connect = elvin_threaded_connect;
         handle->disconnect = elvin_threaded_disconnect;
@@ -77,6 +77,11 @@ event_register(char *name, int threaded)
         handle->mainloop = NULL; /* no mainloop for mt programs */
         handle->notify = elvin_threaded_notify;
         handle->subscribe = elvin_threaded_add_subscription;
+#else
+	ERROR("Threaded API not linked in with the program!\n");
+	free(handle);
+	return 0;
+#endif
     } else {
         handle->init = elvin_sync_init_default;
         handle->connect = elvin_sync_connect;

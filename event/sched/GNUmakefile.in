@@ -17,7 +17,7 @@ CFLAGS   += `elvin-config --cflags vin4mt`
 
 LDFLAGS  += -pthread -static
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient -lz
+LIBS     += -levent_r -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient -lz
 
 #
 # XXX elvin-config adds -lc which is rather bogus, and messes up -pthread

@@ -16,23 +16,13 @@ all:	$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -Wall -pthread
+CFLAGS	 += -O -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4mt`
+CFLAGS   += `elvin-config --cflags vin4c`
 
-LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
-ifneq ($(SYSTEM),Linux)
-LIBS     += -lcipher -lc_r
-endif
-
-#
-# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
-#     build on freebsd. I made a vain attempt to filter it out, but
-#     gave up quickly. Deal with it later. 
-#
-#LIBS     += `elvin-config --libs vin4mt`
-LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+LIBS     += `elvin-config --libs vin4c`
 
 tevc:	tevc.o
 	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBS)

@@ -5,7 +5,7 @@ SUBDIR		= event/lib
 
 include $(OBJDIR)/Makeconf
 
-all:	libevent.a
+all:	libevent.a libevent_r.a
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -14,12 +14,21 @@ CFLAGS += -O -g -static -I. -Wall -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS += `elvin-config --cflags vin4mt`
 
 OBJS	= event.o util.o
+POBJS	= event_r.o util.o
 
 libevent.a:	$(OBJS)
 	$(AR) crv $@ $(OBJS)
 	$(RANLIB) $@
 
+libevent_r.a:	$(POBJS)
+	$(AR) crv $@ $(POBJS)
+	$(RANLIB) $@
+
 $(OBJS):	event.h
+$(POBJS):	event.h
+
+event_r.o:	event.c
+	$(CC) $(CFLAGS) -DTHREADED -c -o event_r.o $<
 
 install:
 
