@@ -115,7 +115,7 @@ if ($killit | $haltit) {
     closedir(DIR);
 
     foreach my $file (@files) {
-	if ($file ne "." && $file ne ".." &&
+	if ($file ne "." && $file ne ".." && $file ne "local" &&
 	    $file =~ /^([-\w]*)$/) {
 
 	    print "$act vnode $1 ...\n";
