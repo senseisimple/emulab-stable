@@ -1,5 +1,5 @@
 59c
-EXTRA_LD_FLAGS += -lg++ -lstdc++ -lm -lgcc_pic
+EXTRA_LD_FLAGS += -lstdc++ -lm -lgcc_pic
 .
 32c
 INCLUDE  = -I/usr/local/include -I/usr/local/include/tcl8.2 -I/usr/local/include/mysql -I/usr/local/mysql/include
