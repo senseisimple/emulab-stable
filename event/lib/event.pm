@@ -793,6 +793,39 @@ sub EventSendWarn(@) {
 	return $result;
 }
 
+#
+# Register with the event system. You would use this if you are not
+# running on boss. The inline registration below is a convenience for
+# testbed software, but is technically bad practice. See the END block
+# below where we disconnect at exit.
+#
+sub EventRegister(;$$) {
+        my ($host, $port) = @_;
+
+	if ($event::EventSendHandle) {
+	        if (event_unregister($event::EventSendHandle) == 0) {
+			warn "Could not unregister with event system";
+		}
+		$event::EventSendHandle = undef;
+	}
+
+	$host = TB_EVENTSERVER()
+	    if (!defined($host));
+
+	my $URL = "elvin://$host";
+	$URL   .= ":$port"
+	    if (defined($port));
+	
+	$event::EventSendHandle = event_register($URL,0);
+	
+	if (!$event::EventSendHandle) {
+		$EventErrorString = "Unable to register with the event system";
+		return undef;
+	}
+
+	return 1;
+}
+
 sub EventSend(@) {
 	my %tuple_values = @_;
 
@@ -801,9 +834,8 @@ sub EventSend(@) {
 	# handle. The handle gets disconnected in the END block below
 	#
 	if (!$event::EventSendHandle) {
-		my $URL = "elvin://" . TB_BOSSNODE;
+		EventRegister("localhost", TB_BOSSEVENTPORT());
 
-		$event::EventSendHandle = event_register($URL,0);
 		if (!$event::EventSendHandle) {
 			$EventErrorString =
 				"Unable to register with the event system";
@@ -861,6 +893,6 @@ END {
 }
 
 push @EXPORT, qw(event_subscribe event_poll event_poll_blocking EventSend
-	EventSendFatal EventSendWarn EventFork);
+	EventSendFatal EventSendWarn EventFork EventRegister);
 1;
 
