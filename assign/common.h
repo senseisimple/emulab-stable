@@ -44,6 +44,9 @@ static float delta = 2;
 //static float min_temp_end = 0.01;
 //static float min_temp_end = 10000000.0;
 
+// The weight at which a feature or desire triggers a violations if
+// unstatisfied or unused
+static float FD_VIOLATION_WEIGHT = 1.0;
 
 // Number of runs to spend melting
 static int melt_trans = 500;

@@ -184,6 +184,10 @@ bool allow_trivial_links = true;
 // Whether or not assign should use pclasses
 bool use_pclasses = true;
 
+// Whether or not assign should prune out pclasses that it knows can
+// never be used
+bool prune_pclasses = false;
+
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
 inline int accept(double change, double temperature)
@@ -204,6 +208,7 @@ inline int accept(double change, double temperature)
   return 0;
 }
 
+// Return the CPU time (in seconds) used by this process
 float used_time()
 {
   struct rusage ru;
@@ -212,10 +217,15 @@ float used_time()
     ru.ru_stime.tv_sec+ru.ru_stime.tv_usec/1000000.0;
 }
 
+// Read in the .ptop file
 void read_physical_topology(char *filename)
 {
   ifstream ptopfile;
   ptopfile.open(filename);
+  if (!ptopfile.is_open()) {
+      cerr << "Unable to open ptop file " << filename << endl;
+      exit(2);
+  }
   cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
 
 #ifdef DUMP_GRAPH
@@ -239,7 +249,7 @@ void read_physical_topology(char *filename)
 	target(*eit,PG) << ")\t" << *p;
     }
   }
-#endif
+#endif // DUMP_GRAPH
 
 #ifdef GRAPH_DEBUG
   {
@@ -263,9 +273,10 @@ void read_physical_topology(char *filename)
 	target(*eit,SG) << ")\t" << *p;
     }
   }
-#endif
+#endif // GRAPH_DEBUG
 
-  // Set up pnode2vertex
+  // Set up pnode2vertex - a mapping between vertices in the physical graph and
+  // the pnodes that we just read in from the ptop file
   pvertex_iterator pvit,pvendit;
   tie(pvit,pvendit) = vertices(PG);
   for (;pvit != pvendit;pvit++) {
@@ -274,10 +285,13 @@ void read_physical_topology(char *filename)
 
 }
 
+// Calculate the minimum spanning tree for the switches - we only consider one
+// potential path between each pair of switches.
 void calculate_switch_MST()
 {
-  // Calculute MST
   cout << "Calculating shortest paths on switch fabric." << endl;
+
+  // Set up the weight map for Dijkstra's
   tb_sgraph_weight_pmap sweight_pmap = get(edge_weight, SG);
   sedge_iterator seit,seendit;
   tie(seit,seendit) = edges(SG);
@@ -289,7 +303,7 @@ void calculate_switch_MST()
 	100000000-get(pedge_pmap,slink->mate)->delay_info.bandwidth);
   }
 
-  // ricci - add distance map
+  // Let boost do the Disjktra's for us, from each switch
   svertex_iterator svit,svendit;
   tie(svit,svendit) = vertices(SG);
   for (;svit != svendit;svit++) {
@@ -309,13 +323,18 @@ void calculate_switch_MST()
       cout << i << " " << (*switch_dist[*svit])[i] << endl;
     }
   }
-#endif
+#endif // GRAPH_DEBUG
 }
 
+// Read in the .top file
 void read_virtual_topology(char *filename)
 {
   ifstream topfile;
   topfile.open(filename);
+  if (!topfile.is_open()) {
+      cerr << "Unable to open top file " << filename << endl;
+      exit(2);
+  }
   cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
 
 #ifdef DUMP_GRAPH
@@ -458,6 +477,32 @@ REDO_SEARCH:
   }
 }
 
+/*
+ * Make a pass through the pclasses, looking for ones that no node can use, and
+ * nuking them.
+ */
+void prune_unusable_pclasses() {
+    cout << "Pruning pclasses." << endl;
+    int pruned = 0;
+    pclass_list::iterator pclass_iterator = pclasses.begin();
+    while (pclass_iterator != pclasses.end()) {
+	if ((*pclass_iterator)->refcount == 0) {
+	    pclass_list::iterator nukeme = pclass_iterator;
+	    pclass_iterator++;
+#ifdef PCLASS_DEBUG
+	    cout << "Pruning " << (*nukeme)->name << endl;
+#endif
+	    pruned++;
+	    delete *nukeme;
+	    pclasses.erase(nukeme);
+	} else {
+	    pclass_iterator++;
+	}
+    }
+    cout << "pclass pruning complete: removed " << pruned << " pclasses, " <<
+	pclasses.size() << " remain." << endl;
+}
+
 /* When this is finished the state will reflect the best solution found. */
 void anneal()
 {
@@ -508,25 +553,25 @@ void anneal()
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
       cerr << "Fixed node: " << (*fixed_it).first <<
 	"does not exist." << endl;
-      exit(1);
+      exit(2);
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
       cerr << "Fixed node: " << (*fixed_it).second <<
 	" not available." << endl;
-      exit(1);
+      exit(2);
     }
     pvertex pv = pname2vertex[(*fixed_it).second];
     tb_vnode *vn = get(vvertex_pmap,vv);
     tb_pnode *pn = get(pvertex_pmap,pv);
     if (vn->vclass != NULL) {
       cerr << "Can not have fixed nodes be in a vclass!.\n";
-      exit(1);
+      exit(2);
     }
     if (add_node(vv,pv,false) == 1) {
       cerr << "Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
-      exit(1);
+      exit(2);
     }
     vn->fixed = true;
     num_fixed++;
@@ -709,8 +754,9 @@ void anneal()
       if (vn->vclass != NULL) {
 	vn->type = vn->vclass->choose_type();
 #ifdef SCORE_DEBUG
-	cerr << "vclass " << vn->vclass->name  << ": choose type = "
-	     << vn->type << " dominant = " << vn->vclass->dominant << endl;
+	cerr << "vclass " << vn->vclass->name  << ": choose type for " <<
+	    vn->name << " = " << vn->type << " dominant = " <<
+	    vn->vclass->dominant << endl;
 #endif
       }
       if (vn->type.compare("lan") == 0) {
@@ -1545,7 +1591,10 @@ void print_help()
     endl;
   cerr << "  -r          - Don't allow trivial links." << endl;
   cerr << "  -p          - Disable pclasses." << endl;
-  exit(0);
+#ifdef PER_VNODE_TT
+  cerr << "  -P          - Prune unusable pclasses." << endl;
+#endif
+  exit(2);
 }
 
 int main(int argc,char **argv)
@@ -1557,7 +1606,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rp")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpP")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -1585,6 +1634,10 @@ int main(int argc,char **argv)
       allow_trivial_links = false; break;
     case 'p':
       use_pclasses = false; break;
+#ifdef PER_VNODE_TT
+    case 'P':
+      prune_pclasses = true; break;
+#endif
     default:
       print_help();
     }
@@ -1652,13 +1705,13 @@ int main(int argc,char **argv)
     // Check to see if there were any pnodes of the type at all
     name_count_map::iterator ptype_it = ptypes.find(vtype_it->first);
     if (ptype_it == ptypes.end()) {
-      cout << "  *** No physical nodes of type " << vtype_it->first << " found"
+      cerr << "  *** No physical nodes of type " << vtype_it->first << " found"
         << endl;
       ok = false;
     } else {
       // Okay, there are some - are there enough?
       if (ptype_it->second < vtype_it->second) {
-	cout << "  *** " << vtype_it->second << " nodes of type " <<
+	cerr << "  *** " << vtype_it->second << " nodes of type " <<
 	  vtype_it->first << " requested, but only " << ptype_it->second <<
 	  " found" << endl;
 	ok = false;
@@ -1667,7 +1720,7 @@ int main(int argc,char **argv)
   }
   if (! ok) {
       cout << "Type preecheck failed!" << endl;
-      exit(-1);
+      exit(2);
   }
 
   cout << "Type preecheck passed." << endl;
@@ -1680,7 +1733,7 @@ int main(int argc,char **argv)
    * sure that it:
    * (1) Has enough interfaces
    * (2) Has enough total bandwidth (for emulated links)
-   * (3) TODO: Meets any 1.0-weight features and/or desires
+   * (3) Meets any 1.0-weight features and/or desires
    */
   vvertex_iterator vit,vendit;
   tie(vit,vendit) = vertices(VG);
@@ -1704,7 +1757,10 @@ int main(int argc,char **argv)
       // This constitutes a list of the number of ptypes that matched the
       // criteria. We use to guess what's wrong with the vnode.
       int matched_links = 0;
-      int matched_bw    = 0;
+      int matched_bw = 0;
+      // Keep track of desires had how many 'hits', so that we can tell
+      // if any simply were not matched
+      tb_vnode::desires_count_map matched_desires;
 
       tb_vclass *vclass = v->vclass;
       tb_vclass::members_map::iterator mit;
@@ -1742,9 +1798,54 @@ int main(int argc,char **argv)
 		  potential_match = false;
 	      }
 
+	      //
+	      // Check features and desires
+	      //
+
+	      // Desires first
+	      for (tb_vnode::desires_map::iterator desire_it = v->desires.begin();
+		      desire_it != v->desires.end();
+		      desire_it++) {
+		  crope name = (*desire_it).first;
+		  float value = (*desire_it).second;
+		  // Only check for desires that would result in a violation if
+		  // unsatisfied
+		  if (value >= FD_VIOLATION_WEIGHT) {
+		      if (matched_desires.find(name) == matched_desires.end()) {
+			  matched_desires[name] = 0;
+		      }
+		      tb_pnode::features_map::iterator feature_it =
+			  pnode->features.find(name);
+		      if (feature_it != pnode->features.end()) {
+			  matched_desires[name]++;
+		      } else {
+			  potential_match = false;
+		      }
+		  }
+	      }
+
+	      // Next, features
+	      for (tb_pnode::features_map::iterator feature_it = pnode->features.begin();
+		      feature_it != pnode->features.end();
+		      feature_it++) {
+		  crope name = (*feature_it).first;
+		  float value = (*feature_it).second;
+		  // Only check for feature that would result in a violation if
+		  // undesired
+		  if (value >= FD_VIOLATION_WEIGHT) {
+		      tb_vnode::desires_map::iterator desire_it =
+			  v->desires.find(name);
+		      if (desire_it == v->desires.end()) {
+			  potential_match = false;
+		      }
+		  }
+	      }
+
+
 	      if (potential_match) {
 		  vec->push_back(*it);
 		  vnode_type_table[v->name].first++;
+		  (*it)->refcount++;
 #ifdef PCLASS_DEBUG
 		  cerr << v->name << " can map to " << (*it)->name << endl;
 #endif
@@ -1768,8 +1869,18 @@ int main(int argc,char **argv)
 	  if (!matched_links) {
 	      cerr << "      Too many links!" << endl;
 	  }
+
 	  if (!matched_bw) {
 	      cerr << "      Too much bandwidth on emulated links!" << endl;
+	  }
+
+	  for (tb_vnode::desires_count_map::iterator dit = matched_desires.begin();
+		  dit != matched_desires.end();
+		  dit++) {
+	      if (dit->second == 0) {
+		  cerr << "      No physical nodes have feature " << dit->first
+		      << "!" << endl;
+	      }
 	  }
 	  ok = false;
       }
@@ -1782,9 +1893,14 @@ int main(int argc,char **argv)
 
   if (!ok) {
       cout << "Node mapping precheck failed!" << endl;
-      exit(-1);
+      exit(2);
   }
   cout << "Node mapping precheck succeeded" << endl;
+
+  if (prune_pclasses) {
+      prune_unusable_pclasses();
+  }
+
 #endif
 
   // Output graphviz if necessary
@@ -1850,7 +1966,7 @@ int main(int argc,char **argv)
   }
   
   if (violated > 0) {
-      return 2;
+      return 1;
   } else {
       return 0;
   }

@@ -62,7 +62,7 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : size(0), used(0) {;}
+  tb_pclass() : size(0), used(0), refcount(0) {;}
 
   typedef hash_map<crope,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
@@ -77,6 +77,10 @@ public:
 #ifdef SMART_UNMAP
   pclass_members_set used_members;
 #endif
+
+  // A count of how many nodes can use this pclass
+  // For use with PRUNE_PCLASSES
+  int refcount;
 
   friend ostream &operator<<(ostream &o, const tb_pclass& p)
   {

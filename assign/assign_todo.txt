@@ -58,18 +58,6 @@ This is the current TODO list for assign (not in order by priority):
 
    Merge back in Chris's delay node support.
 
-8.   prune pclasses when using PER_VNODE_TT
-   
-   Right now, we use all pclasses, even those which we cannot possibly use, in
-   our estimation of how hard the problem is (vnodes*pclasses). With
-   PER_VNODE_TT, we can do mark-and-sweep 'garbage collection' of pnodes that
-   it's not possible to map to. Should improve performace.
-
-9.   add features/desires to PER_VNODE_TT restrictions
-
-   PER_VNODE_TT currently only looks at the node type and number of links - it
-   could also easily look at features/desires with a weight of 1.0, too
-
 10.  add some sort of global allocation strategy
 
    The idea here is to include other, already mapped, experiments in the top and

@@ -1229,7 +1229,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
       SDEBUG(cerr << "    unmatched" << endl);
       value = (*desire_it).second;
       fd_score += SCORE_DESIRE*value;
-      if (value >= 1) {
+      if (value >= FD_VIOLATION_WEIGHT) {
 	fd_violated++;
       }
     }
@@ -1245,6 +1245,9 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
       SDEBUG(cerr << "    unused" << endl);
       value = (*feature_it).second;
       fd_score+=SCORE_FEATURE*value;
+      if (value >= FD_VIOLATION_WEIGHT) {
+	fd_violated++;
+      }
     }
   }
 

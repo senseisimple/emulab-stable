@@ -4,7 +4,6 @@
  * All rights reserved.
  */
 
-
 #include "port.h"
 
 #include <hash_map>

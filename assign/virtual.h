@@ -82,6 +82,7 @@ public:
   }
 
   typedef hash_map<crope,double> desires_map;
+  typedef hash_map<crope,int> desires_count_map;
 
   // contains weight of each desire
   desires_map desires;
