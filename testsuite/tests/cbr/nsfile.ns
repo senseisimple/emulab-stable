@@ -7,6 +7,9 @@ set n1 [$ns node]
 set n2 [$ns node]
 set n3 [$ns node]
 
+# Turn on routing.
+$ns rtproto Session
+
 #Create links between the nodes
 set link0 [$ns duplex-link $n0 $n2 100Mb 1ms DropTail]
 set link1 [$ns duplex-link $n1 $n2 100Mb 1ms DropTail]
