@@ -67,4 +67,4 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 #
 %: %.in
 	@echo "Regenerating $@"
-	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ config.status
+	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ ./config.status
