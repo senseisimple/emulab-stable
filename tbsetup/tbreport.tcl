@@ -12,7 +12,7 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 ###
 if {[file exists $scriptdir/ns2ir]} {
     # development tree
-    set updir [file dirname $scriptdir]
+    set updir [file dirname $scriptdir]/lib
 } else {
     # install tree
     set updir [file dirname $scriptdir]/lib

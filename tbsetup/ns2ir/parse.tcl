@@ -1,10 +1,10 @@
 #!/usr/local/bin/otclsh
 
 if {$argc != 3} {
-   puts "usage: $argv0 project ns_input_file ir_file"
+   puts "usage: $argv0 id ns_input_file ir_file"
    exit 1
 }
-set project [lindex $argv 0]
+set id [lindex $argv 0]
 set nsfile [lindex $argv 1]
 set irfile [lindex $argv 2]
 
@@ -73,6 +73,6 @@ source $libdir/sim.tcl
 
 source $libdir/stubs.tcl
  
-set prefix $project[lindex [split [lindex [split $nsfile /] end] .] 0]
+set prefix $id
 source $nsfile
 

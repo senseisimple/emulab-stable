@@ -49,6 +49,7 @@ set ns2ir "$scriptdir/ns2ir/parse.tcl"
 set postparse "$scriptdir/ns2ir/postparse.tcl"
 set assign "$scriptdir/ir/assign.tcl"
 set handle_ip "$scriptdir/ir/handle_ip.tcl"
+set handle_os "$scriptdir/ir/handle_os.tcl"
 set avail "$updir/db/avail"
 set ptopgen "$updir/db/ptopgen"
 set ptopfile "/tmp/testbed[pid].ptop"
@@ -59,14 +60,14 @@ source $libir
 namespace import TB_LIBIR::ir
 
 if {$argc != 2} {
-    puts stderr "Syntax: $argv0 <project> <ns-file>"
+    puts stderr "Syntax: $argv0 <id> <ns-file>"
     exit 1
 }
 
 set nsFile [lindex $argv 1]
 set t [split $nsFile .]
-set project [lindex $argv 0]
-set prefix "$project[join [lrange $t 0 [expr [llength $t] - 2]] .]"
+set id [lindex $argv 0]
+set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set irFile "$prefix.ir"
 set logFile "$prefix.log"
 
@@ -87,7 +88,7 @@ if {! [file exists $nsFile]} {
 }
 
 outs "Parsing ns input."
-if {[catch "exec $ns2ir $project $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $ns2ir $id $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error parsing ns input. ($err)"
     exit 1
 }
@@ -139,7 +140,7 @@ foreach pair $nodemap {
 }
 
 outs "Reserving resources."
-if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $reserve $id $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reserving resources. ($err)"
     unlock
     exit 1
@@ -150,6 +151,12 @@ unlock
 outs "Allocating IP addresses."
 if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error allocating IP addresses. ($err)"
+    exit 1
+}
+
+outs "Parsing OS information."
+if {[catch "exec $handle_os $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error parsing OS information. ($err)"
     exit 1
 }
 

@@ -39,13 +39,14 @@ set resetvlans "$scriptdir/resetvlans.tcl"
 source $libir
 namespace import TB_LIBIR::ir
 
-if {$argc != 1} {
-    puts stderr "Syntax: $argv0 <ir-file>"
+if {$argc != 2} {
+    puts stderr "Syntax: $argv0 <id> <ir-file>"
     exit 1
 }
 
-set nsFile [lindex $argv 0]
-set t [split $nsFile .]
+set irFile [lindex $argv 1]
+set id [lindex $argv 0]
+set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set irFile "$prefix.ir"
 set logFile "$prefix.log"
@@ -76,7 +77,7 @@ foreach pair $nodemap {
     lappend machines [lindex $pair 1]
 }
 
-if {[catch "exec $nfree $prefix $machines >@ $logFp 2>@ $logFp err"]} {
+if {[catch "exec $nfree $id $machines >@ $logFp 2>@ $logFp err"]} {
     outs stderr "Error freeing resources. ($err)"
     exit 1
 }
