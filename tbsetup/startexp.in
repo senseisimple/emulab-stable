@@ -33,6 +33,7 @@ my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
 my $TBINFO   = "$TB/expinfo";
+my $PROJROOT = "/proj";
 
 #
 # Testbed Support libraries
@@ -42,12 +43,10 @@ use libdb;
 use libtestbed;
 
 my $tbdir    = "$TB/bin/";
-my $projroot = "/proj";
 my $tbdata   = "tbdata";
-my $estate   = 0;
 my $batch    = 0;
-my $logname  = 0;
 my $errorstat= -1;
+my $logname;
 
 #
 # For debugging all this goo. Leaves the experiment directory intact,
@@ -79,18 +78,12 @@ if (@ARGV != 3) {
 }
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
-my $tempfile = $ARGV[2];
+my $nsfile= $ARGV[2];
 if (defined($options{"b"})) {
     $batch   = 1;
     $logname = $options{"b"};
-
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in logfile name: $logname";
-    }
 }
+
 if (defined($options{"g"})) {
     $gid = $options{"g"};
 }
@@ -104,88 +97,97 @@ else {
 if ($pid =~ /^([-\@\w]+)$/) {
     $pid = $1;
 }
+else {
+    die("Tainted argument $pid!\n");
+}
 if ($eid =~ /^([-\@\w]+)$/) {
     $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
 }
 if ($gid =~ /^([-\@\w]+)$/) {
     $gid = $1;
 }
+else {
+    die("Tainted argument $gid!\n");
+}
 # Note different taint check (allow /).
-if ($tempfile =~ /^([-\w.\/]+)$/) {
-    $tempfile = $1;
+if ($nsfile =~ /^([-\w.\/]+)$/) {
+    $nsfile = $1;
 }
 else {
-    die("Tainted tempfile name: $tempfile");
+    die("Tainted nsfile name: $nsfile");
 }
 
-my $piddir  = "$projroot/$pid";
-my $expdir  = "$piddir/exp";
-my $eiddir  = "$expdir/$eid";
-my $nsfile  = "$eid.ns";
-my $irfile  = "$eid.ir";
+if (!defined($logname)) {
+    $logname = `mktemp /tmp/start-$pid-$eid.XXXXXX`;
+}
+if ($logname =~ /^([-\@\w.\/]+)$/) {
+    $logname = $1;
+}
+else {
+    die("Bad data in logfile name: $logname");
+}
+
 my $repfile = "$eid.report";
-my $tempns  = "$tempfile.$$";
-my $user_name  = "Startexp Script";
-my $user_email = "$TBOPS";
+my $user_name;
+my $user_email;
 my $dbuid;
 
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($EUID, \$dbuid)) {
-    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
-    exit(1);
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    Go Away! You do not exist in the Emulab Database.\n");
 }
 
 #
 # Verify that this person is allowed to start the experiment. 
 #
 if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    print STDOUT
-	"You do not have permission to start experiments in project $pid\n";
-    exit(1);
-}
-
-#
-# Check to make sure the experiment record exists. The experiment must
-# be in the "new" state when using this interface. This prevents the same
-# pid/eid from being used twice, as could happen by mistake if the user
-# invoked this directly without being clueful. The goal is to eventually
-# script experiment creation and termination completely.
-#
-# Note that tbprerun is going verify and change this state.
-#
-$query_result =
-    DBQueryFatal("SELECT state FROM experiments ".
-		 "WHERE eid='$eid' and pid='$pid'");
-if ($query_result->numrows < 1) {
-    print STDOUT "No experiment record for $pid/$eid exists!\n";
-    exit(1);
-}
-@row = $query_result->fetchrow_array();
-if ($row[0] ne EXPTSTATE_NEW) {
-    die("Experiment $pid/$eid is already configured (or still configuring)!\n".
-	"You are not allowed to reconfigure experiments unless you\n".
-	"first terminate the existing experiment via the web interface.\n");
+    die("*** $0:\n".
+	"    You do not have permission to start experiments in $pid/$gid\n");
 }
 
 #
 # Get email info for user.
 #
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    print STDOUT "Cannot determine your name and email address.\n";
-    exit(1);
+    die("*** $0:\n".
+        "    Cannot determine your name and email address.\n");
 }
 
 #
-# Copy the nsfile from wherever the web server stuffed it into a temporary
-# file. The web server is going to delete it once this script returns.
+# Check to make sure the experiment record exists. The experiment must
+# be in the "new" state when using this interface. 
 #
-if (system("/bin/cp", "$tempfile", "$tempns") != 0) {
-    print STDOUT "Could not copy $tempfile to $tempns.\n";
-    exit(1);
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+        "    No experiment record for $pid/$eid exists!\n");
 }
-chmod(0770, "$tempns");
+
+my %row		= $query_result->fetchhash();
+my $estate	= $row{'state'};
+my $expt_path   = $row{'path'};
+my $expt_name   = $row{'expt_name'};
+my $expt_created= $row{'expt_created'};
+my $expt_expires= $row{'expt_expires'};
+my $expt_started;
+
+if ($estate ne EXPTSTATE_NEW) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is already configured (or configuring)!\n");
+}
+
+if (! chdir("$expt_path/$tbdata")) {
+    die("*** $0:\n".
+	"    Could not chdir to $expt_path/$tbdata: $!\n");
+}
 
 #
 # The rest of this goes into the background so that the user sees
@@ -193,7 +195,7 @@ chmod(0770, "$tempns");
 # is actually torn down.
 #
 if (! $batch) {
-    if (background()) {
+    if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
 	#
@@ -203,25 +205,6 @@ if (! $batch) {
 	    "ready to use\n";
 	exit(0);
     }
-}
-
-#
-# Create a directory structure for the experiment in the project directory.
-#
-if (system("$TB/libexec/mkexpdir $pid $gid $eid") != 0) {
-    fatal("$tbdir/mkexpdir failed\n");
-}
-
-#
-# Copy the nsfile from wherever the web server stuffed it, into the
-# experiment directory. We leave the tempns file around till later.
-#
-if (! chdir("$eiddir/$tbdata")) {
-    fatal("Could not chdir to $tbdata in $eiddir: $!\n");
-}
-
-if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
-    fatal("Could not copy $tempns to $eiddir/$tbdata/$nsfile: $!\n");
 }
 
 #
@@ -250,30 +233,8 @@ if (system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile") != 0) {
 # Increment the project experiment count/lastdate. This is informational. 
 #
 DBQueryWarn("update projects ".
-	    "set expt_count=expt_count+1, expt_last=NOW() ".
+	    "set expt_count=expt_count+1, expt_last=now() ".
 	    "where pid='$pid'");
-
-#
-# In batchmode, send the report to stdout for the batch daemon.
-#
-if ($batch) {
-    system("$tbdir/tbreport -v $pid $eid");
-    print STDOUT "\n\n";
-}
-
-#
-# Grab the experiment info for the mail message below.
-#
-$query_result =
-    DBQueryWarn("SELECT expt_name,expt_created,expt_expires from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-if (! $query_result) {
-    fatal("DB Error getting experiment record for $pid/$eid\n");
-}
-@row = $query_result->fetchrow_array();
-$expt_name     = $row[0];
-$expt_created  = $row[1];
-$expt_expires  = $row[2];
 
 #
 # Gen up a date for the started field of the record, and insert it.
@@ -282,7 +243,13 @@ $expt_started  = DBDateTime();
 DBQueryWarn("update experiments set expt_start='$expt_started' ".
 	    "WHERE eid='$eid' and pid='$pid'");
 
-print STDOUT "Setup Success\n";
+#
+# In batchmode, send the report to stdout for the batch daemon.
+#
+if ($batch) {
+    system("$tbdir/tbreport -v $pid $eid");
+    print STDOUT "\n\n";
+}
 
 #
 # Try to copy off the files for testbed information gathering.
@@ -296,98 +263,53 @@ if (mkdir("$TBINFO/$infodir", 0770)) {
     system("cp $logname $TBINFO/$infodir/$eid.log");
 }
 
-#
-# Shove a copy of the NS file into the DB to make Mike happy.
-#
-$nsfile_string = `cat $nsfile`;
-
-if ($nsfile_string) {
-    $nsfile_string = DBQuoteSpecial($nsfile_string);
-
-    DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
-
-    #
-    # I could strlen check the string, but the webserver has a limit,
-    # plus the DB is going to truncate it if its longer. Doing it here
-    # would be a third (call it redundant) check. 
-    # 
-    DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
-		"VALUES('$pid', '$eid', $nsfile_string)");
-}
+print STDOUT "Setup Success\n";
 
 #
-# In batch mode, just exit without sending email. Remove tempns file!
+# In batch mode, just exit without sending email. 
 #
 if ($batch) {
-    unlink("$tempns");
     exit(0);
 }
 
 #
 # Dump the report file and the log file to the user via email. 
 #
-if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
-			"TESTBED: New Experiment Created: $pid/$eid",
-			undef, "Bcc: $TBLOGS"))) {
-    tbendit();
-    die("Cannot start mail program!");
-}
-    
-print $MAIL "Your experiment `$eid' in project `$pid' is now configured.\n";
-print $MAIL "Here is the experiment summary detailing the nodes that were\n";
-print $MAIL "allocated to you. You may use the `Qualified Name' to log on\n";
-print $MAIL "to your nodes. See /etc/hosts on your nodes (when running\n";
-print $MAIL "FreeBSD, Linux, or NetBSD) for the IP mapping on each node\n";
+my $message = 
+    "Your experiment `$eid' in project `$pid' is now configured.\n" .
+    "Here is the experiment summary detailing the nodes that were\n" .
+    "allocated to you. You may use the `Qualified Name' to log on\n" .
+    "to your nodes. See /etc/hosts on your nodes (when running\n" .
+    "FreeBSD, Linux, or NetBSD) for the IP mapping on each node\n" .
+    "\n" .
+    "User:        $user_name\n" .
+    "EID:         $eid\n" .
+    "PID:         $pid\n" .
+    "GID:         $gid\n" .
+    "Name:        $expt_name\n" .
+    "Created:     $expt_created\n" .
+    "Expires:     $expt_expires\n" .
+    "Started:     $expt_started\n" .
+    "Directory:   $expt_path\n".
+    "\n".
+    "Appended at the end is the output of the experiment setup. If you\n" .
+    "have any questions or comments, please include the output below\n" .
+    "in your message to $TBOPS\n";
+   
 
-print $MAIL "\n";
-print $MAIL "User:        $user_name\n";
-print $MAIL "EID:         $eid\n";
-print $MAIL "PID:         $pid\n";
-print $MAIL "Name:        $expt_name\n";
-print $MAIL "Created:     $expt_created\n";
-print $MAIL "Expires:     $expt_expires\n";
-print $MAIL "Started:     $expt_started\n";
-print $MAIL "Directory:   $eiddir\n\n";
+SENDMAIL("$user_name <$user_email>",
+	 "TESTBED: New Experiment Created: $pid/$eid",
+	 $message,
+	 "$user_name <$user_email>",
+	 "Bcc: $TBLOGS",
+	 ($repfile, $logname, $nsfile));
 
-if (open(IN, "$repfile")) {
-    while (<IN>) {
-	print $MAIL "$_";
-    }
-    close(IN);
-}
-
-print $MAIL "\n\n---------\n\n";
-
-print $MAIL "Here is the log of the configuration process.\n";
-print $MAIL "If you have any questions or problems, please include the\n";
-print $MAIL "output below in your message to $TBOPS\n\n";
-
-if (open(IN, "$logname")) {
-    while (<IN>) {
-	print $MAIL "$_";
-    }
-    close(IN);
-}
-
-if (open(IN, "$nsfile")) {
-    print $MAIL "\n\n---------\n\n";
-    print $MAIL "Here is the NS file\n\n";
-
-    while (<IN>) {
-	print $MAIL "$_";
-    }
-    close(IN);
-}
-close($MAIL);
-
-unlink("$tempns");
-unlink("$logname");
+unlink($logname);
 exit 0;
 
 sub fatal()
 {
     my($mesg)     = $_[0];
-    local $MAIL;
 
     print STDOUT "$mesg\n";
     print STDOUT "Cleaning up and exiting with status $errorstat ...\n";
@@ -395,87 +317,29 @@ sub fatal()
     #
     # If we got far enough to allocate nodes, must run tbend.
     #
-    if ($estate) {
+    if ($estate ne EXPTSTATE_NEW) {
 	tbendit();
     }
 
     #
-    # Now we can remove all trace from the DB since it failed.
-    # 
-    DBQueryWarn("DELETE from experiments WHERE eid='$eid' and pid='$pid'");
-    DBQueryWarn("DELETE from nsfiles WHERE eid='$eid' and pid='$pid'");
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-    
-    #
-    # In batch mode, exit. Make sure to delete tempns file. 
+    # In batch mode, exit.
     #
     if ($batch) {
-	if (open(IN, "$eiddir/assign.log")) {
-	    print STDOUT "\n\n--------- assign.log --------\n\n";
-	    
-	    while (<IN>) {
-		print STDOUT "$_";
-	    }
-	    close(IN);
-	}
-	
-	if (chdir($expdir)) {
-	    system("/bin/rm", "-rf", "${eid}-TBfailed");
-	    system("/bin/mv", "-f", "$eid", "${eid}-TBfailed");
-	}
-	unlink("$tempns");
 	exit($errorstat);
     }
 
     #
-    # Send a message to the testbed list. Append the logfile if it got
-    # that far.
+    # Send a message to the testbed list. 
     #
-    if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
-			    "TESTBED: Experiment Configure Failure: $pid/$eid",
-			    undef, "Cc: $TBOPS"))) {
-	die("Cannot start mail program!");
-    }
+    SENDMAIL("$user_name <$user_email>",
+	     "TESTBED: Experiment Configure Failure: $pid/$eid",
+	     $mesg,
+	     "$user_name <$user_email>",
+	     "Cc: $TBOPS",
+	     ($logname, "assign.log", $nsfile));
     
-    print $MAIL $mesg;
-
-    if (open(IN, "$logname")) {
-	print $MAIL "\n\n--------- $logname ---------\n\n";
-	
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-    }
-
-    if (open(IN, "$eiddir/assign.log")) {
-	print $MAIL "\n\n--------- assign.log --------\n\n";
-	
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-    }
-
-    if (open(IN, "$tempns")) {
-	print $MAIL "\n\n--------- $tempns ---------\n\n";
-
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-	unlink("$tempns");
-    }
-
-    close($MAIL);
-
-    unlink("$tempns");
-    unlink("$logname");
-    if (chdir($expdir)) {
-	system("/bin/rm", "-rf", "${eid}-TBfailed");
-	system("/bin/mv", "-f", "$eid", "${eid}-TBfailed");
-    }
+    unlink($logname);
+    
     exit($errorstat);
 }
 
@@ -495,41 +359,4 @@ sub tbendit()
     if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	print "tbend failed!\n";
     }
-}
-
-#
-# Put ourselves into the background so that caller sees immediate response.
-# Mail notification will happen later.
-# 
-sub background()
-{
-    $mypid = fork();
-    if ($mypid) {
-	return $mypid;
-    }
-
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller (the web server) will
-    # continue to wait even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Create a temporary name for a log file and untaint it.
-    #
-    $logname = `mktemp /tmp/start-$pid-$eid.XXXXXX`;
-
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in logfile name: $logname";
-    }
-
-    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-
-    return 0;
 }

@@ -21,7 +21,7 @@ use Exporter;
 #
 sub SENDMAIL($$$;$$@)
 {
-    my($To, $Subject, $Message, $From, $Headers, $Files) = @_;
+    my($To, $Subject, $Message, $From, $Headers, @Files) = @_;
 
     if (! open(MAIL, "|/usr/sbin/sendmail -t")) {
 	print STDERR "SENDMAIL: Could not start sendmail: $!\n";
@@ -46,7 +46,7 @@ sub SENDMAIL($$$;$$@)
     if (defined(@Files)) {
 	foreach my $file ( @Files ) {
 	    if (open(IN, "$file")) {
-		print MAIL "\n\n--------- $file --------\n\n";
+		print MAIL "\n--------- $file --------\n";
 
 		while (<IN>) {
 		    print MAIL "$_";

@@ -20,11 +20,11 @@ if (!isset($exp_pid) ||
 }
 if (!isset($exp_id) ||
     strcmp($exp_id, "") == 0) {
-  FORMERROR("Experiment Name (short)");
+  FORMERROR("Experiment Name");
 }
 if (!isset($exp_name) ||
     strcmp($exp_name, "") == 0) {
-  FORMERROR("Experiment Name (long)");
+  FORMERROR("Experiment Description");
 }
 
 #
@@ -107,8 +107,6 @@ elseif ($specupload) {
 
 #
 # Make sure the PID/EID tuple does not already exist in the database.
-# It may not exist in either the current experiments list, or the
-# batch experiments list.
 #
 $query_result =
     DBQueryFatal("SELECT eid FROM experiments ".
@@ -116,14 +114,6 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     USERERROR("The experiment name '$exp_id' you have chosen is already ".
               "in use in project $exp_pid. Please select another.", 1);
-}
-
-$query_result =
-    DBQueryFatal("SELECT eid FROM batch_experiments ".
-		 "WHERE eid='$exp_id' and pid='$exp_pid'");
-if (mysql_num_rows($query_result)) {
-    USERERROR("The batch experiment name '$exp_id' you have chosen is ".
-              "already in use in project $exp_pid. Please select another.", 1);
 }
 
 #
@@ -141,7 +131,7 @@ if (!TBValidGroup($exp_pid, $exp_gid)) {
 # Verify permissions.
 #
 if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
-    USERERROR("You do not have permission to begin a batch experiment in "
+    USERERROR("You do not have permission to begin a batch experiment in ".
 	      "in Project/Group $exp_pid/$exp_gid!", 1);
 }
 
@@ -149,37 +139,6 @@ if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
 # We need the unix gid for the group for running the scripts below.
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
-
-#
-# Create a temporary file with the goo in it.
-#
-$tmpfname = tempnam( "/tmp", "batch-$pid-$eid" );
-$fp = fopen($tmpfname, "w");
-if (! $fp) {
-    TBERROR("Opening temporary file $tmpfname.", 1);
-}
-
-#
-# XXX The batchexp script parses this file, so if you change something
-#     here, go change it there too!
-# 
-fputs($fp, "EID:	$exp_id\n");
-fputs($fp, "PID:	$exp_pid\n");
-fputs($fp, "GID:	$exp_gid\n");
-fputs($fp, "name:       $exp_name\n");
-fputs($fp, "expires:    $exp_expires\n");
-fputs($fp, "nsfile:	$nsfile\n");
-fclose($fp);
-
-#
-# XXX
-# Set the permissions on the batch file so that the scripts can get to it.
-# It is owned by nobody, and most likely protected. This leaves the 
-# file open for a short time. A potential security hazard we should
-# deal with at some point, but since the files are on paper:/tmp, its
-# a minor problem. 
-#
-chmod($tmpfname, 0666);
 
 echo "<center><br>";
 echo "<h2>Starting batch experiment setup. Please wait a moment ...
@@ -196,13 +155,10 @@ $output = array();
 $retval = 0;
 $last   = time();
 
-$result = exec("$TBSUEXEC_PATH $uid $unix_gid webbatchexp $tmpfname",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
+	       "webbatchexp -x \"$exp_expires\" -E \"$exp_name\" ".
+	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
-
-#
-# Kill the tempfile since the script will have copied it by now.
-#
-unlink($tmpfname);
 
 if ($retval) {
     echo "<br><br><h2>

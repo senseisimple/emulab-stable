@@ -20,11 +20,11 @@ if (!isset($exp_pid) ||
 }
 if (!isset($exp_id) ||
     strcmp($exp_id, "") == 0) {
-  FORMERROR("Experiment Name (short)");
+  FORMERROR("Experiment Name");
 }
 if (!isset($exp_name) ||
     strcmp($exp_name, "") == 0) {
-  FORMERROR("Experiment Name (long)");
+  FORMERROR("Experiment Description");
 }
 
 #
@@ -128,15 +128,6 @@ if (mysql_num_rows($query_result)) {
               "in use in project $exp_pid. Please select another.", 1);
 }
 
-$query_result =
-    DBQueryFatal("SELECT eid FROM batch_experiments ".
-		 "WHERE eid='$exp_id' and pid='$exp_pid'");
-if (mysql_num_rows($query_result)) {
-    USERERROR("The experiment name '$exp_id' you have chosen is a current ".
-              "batch mode experiment in project $exp_pid. ".
-              "Please select another name.", 1);
-}
-
 #
 # Check group. If none specified, then use default group.
 #
@@ -175,23 +166,6 @@ else {
 }
 
 #
-# At this point enter the exp_id into the database so that it shows up as
-# valid when the tb scripts run. We need to remove the entry if any of
-# this fails!
-#
-DBQueryFatal("INSERT INTO experiments ".
-	     "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
-	     "expt_head_uid, state, shared) ".
-	     "VALUES ('$exp_id', '$exp_pid', '$exp_gid', now(), ".
-	     "        '$exp_expires', ".
-	     "        '$exp_name', '$uid', '$expt_state', $exp_shared)");
-
-#
-# This is where the experiment hierarchy is going to be created.
-#
-$dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
-
-#
 # Grab the unix GID for running scripts.
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
@@ -203,7 +177,22 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 # to clear it out of the database.
 #
 if ($nonsfile) {
-    $retval = SUEXEC($uid, $unix_gid, "mkexpdir $exp_pid $exp_id", 0);
+    #
+    # Stub Experiment record. Should do this elsewhere?
+    #
+    DBQueryFatal("INSERT INTO experiments ".
+		 "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
+		 "expt_head_uid, state, shared) ".
+		 "VALUES ('$exp_id', '$exp_pid', '$exp_gid', now(), ".
+		 "        '$exp_expires', ".
+		 "        '$exp_name', '$uid', '$expt_state', $exp_shared)");
+
+    #
+    # This is where the experiment hierarchy is going to be created.
+    #
+    $dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
+    
+    $retval = SUEXEC($uid, $unix_gid, "mkexpdir $exp_pid $exp_gid $exp_id", 0);
 
     echo "<center><br>
           <h2>Experiment Configured!</h2>
@@ -262,7 +251,8 @@ $last   = time();
 set_time_limit(0);
 
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       "webstartexp -g $exp_gid $exp_pid $exp_id $nsfile",
+	       "webbatchexp -i -x \"$exp_expires\" -E \"$exp_name\" ".
+	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
 
 if ($retval) {
@@ -276,9 +266,6 @@ if ($retval) {
           }
     echo "</XMP>\n";
     
-    $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
-
     PAGEFOOTER();
     die("");
 }

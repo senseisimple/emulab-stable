@@ -384,6 +384,10 @@ function SHOWEXP($pid, $eid) {
     $exp_head    = $exprow[expt_head_uid];
     $exp_status  = $exprow[state];
     $exp_shared  = $exprow[shared];
+    $exp_path    = $exprow[path];
+    $batchmode   = $exprow[batchmode];
+    $attempts    = $exprow[attempts];
+    $batchstate  = $exprow[batchstate];
 
     #
     # Generate the table.
@@ -451,6 +455,23 @@ function SHOWEXP($pid, $eid) {
             <td>Status: </td>
             <td class=\"left\">$exp_status</td>
           </tr>\n";
+
+    if ($batchmode) {
+	    echo "<tr>
+                    <td>Batch Mode: </td>
+                    <td class=\"left\">Yes</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                    <td>Batch Status: </td>
+                    <td class=\"left\">$batchstate</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                    <td>Start Attempts: </td>
+                    <td class=\"left\">$attempts</td>
+                  </tr>\n";
+    }
 
     echo "</table>\n";
 }

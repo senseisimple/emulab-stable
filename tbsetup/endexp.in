@@ -14,6 +14,10 @@ use Getopt::Std;
 # it into the background and send email, but just want an exit status 
 # returned to the batch system.
 #
+# Note about exit value. -1 means error. 0 means backgrounded. 1 means
+# termination happened immediately. The web page uses this to decide
+# what kind of message to give the user. 
+#
 sub usage()
 {
     print STDOUT "Usage: endexp [-b] <pid> <eid>\n";
@@ -39,10 +43,11 @@ use libtestbed;
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
-my $logname  = 0;
 my $batch    = 0;
-my $estate   = 0;
-my $user_login;
+my $logname;
+my $dbuid;
+my $user_name;
+my $user_email;
 my @row;
     
 #
@@ -79,69 +84,123 @@ if (defined($options{"b"})) {
 if ($pid =~ /^([-\@\w.]+)$/) {
     $pid = $1;
 }
+else {
+    die("Tainted argument $pid!\n");
+}
 if ($eid =~ /^([-\@\w.]+)$/) {
     $eid = $1;
 }
+else {
+    die("Tainted argument $eid!\n");
+}
 
-my $piddir  = "$projroot/$pid";
-my $expdir  = "$piddir/exp";
-my $eiddir  = "$expdir/$eid";
+$logname = `mktemp /tmp/start-$pid-$eid.XXXXXX`;
+
+if ($logname =~ /^([-\@\w.\/]+)$/) {
+    $logname = $1;
+}
+else {
+    die("Bad data in logfile name: $logname");
+}
 
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($EUID, \$user_login)) {
-    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
-    exit(1);
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
 }
 
 #
 # Get email info for user.
 #
-my $user_name;
-my $user_email;
-if (! UserDBInfo($user_login, \$user_name, \$user_email)) {
-    print STDOUT "Cannot determine your name and email address.\n";
-    exit(1);
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
 }
 
 #
 # Verify that this person is allowed to end the experiment.
 # Note that any script down the line has to do an admin check also. 
 #
-if ($EUID && !TBAdmin($EUID) &&
-    !TBExptAccessCheck($user_login, $pid, $eid, TB_EXPT_DESTROY)) {
-    print STDOUT "You do not have permission to end this experiment!\n";
-    exit(1);
+if ($UID && !TBAdmin($UID) &&
+    !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
+    die("*** $0:\n".
+	"    You do not have permission to end this experiment!\n");
 }
 
 #
 # We have to protect against trying to end an experiment that is currently
 # in the process of being terminated. We use a "wrapper" state (actually
 # a timestamp so we can say when termination was requested) since
-# terminating conists of a couple of different experiment states down inside
+# terminating consists of a couple of different experiment states down inside
 # the tb scripts. 
 #
 DBQueryFatal("lock tables experiments write");
 
 $query_result =
-    DBQueryFatal("SELECT expt_terminating,state,expt_head_uid ".
-		 "FROM experiments WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
 
-if ($query_result->numrows < 1) {
-    print STDOUT "No such experiment $pid/$eid exists!\n";
-    exit(1);
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
 }
+my %hashrow = $query_result->fetchhash();
+my $expt_head_login = $hashrow{'expt_head_uid'};
+my $estate          = $hashrow{'state'};
+my $expt_path       = $hashrow{'path'};
+my $isbatchexpt     = $hashrow{'batchmode'};
+my $ebatchstate     = $hashrow{'batchstate'};
 
-@row = $query_result->fetchrow_array();
-if (defined($row[0])) {
+if (defined($hashrow{'expt_terminating'})) {
+    $val = $hashrow{'expt_terminating'};
+    
     print STDOUT
-	"It appears that $pid/$eid started terminating at $row[0]\n".
+	"It appears that $pid/$eid started terminating at $val\n".
 	"You will be notified via email when the experiment has been ".
 	"torn down\n";
+    exit(-1);
+}
+
+#
+# Batch experiments get a different protocol to avoid races with the
+# batch daemon. We can kill the experiment directly, but only if the
+# batch daemon is not currently working on it. In this case, its the
+# same as killing an experiment that is not running.
+#
+# XXX: This script is run from the batch daemon. Use the batch state
+# to determine when this was invoked from the batch daemon for a valid
+# teardown. 
+#
+if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
+    #
+    # Set the canceled state. This will prevent the batch_daemon from trying
+    # to run it (once the table is unlocked). It might already be running,
+    # but we deal with that by looking at the batch state.
+    #
+    DBQueryFatal("UPDATE experiments set canceled=1 ".
+		 "WHERE eid='$eid' and pid='$pid'");
+
+    if ($ebatchstate ne BATCHSTATE_POSTED) {
+	#
+	# Daemon does the rest ... Exit with non zero status so that caller
+	# knows (web server) that the batch experiement cannot be ended
+	# at this time.
+	#
+	print "Batch Experiment $eid in project $pid is currently running.\n".
+	      "You will receive email notification when the experiment is\n".
+	      "torn down and you can reuse the experiment name\n";
+	exit(0);
+    }
+    DBQueryFatal("unlock tables");
+
+    #
+    # Cleanup Experiment state.
+    # 
+    ExptCleanup();
+    
     exit(1);
 }
-my $expt_head_login = $row[2];
 
 #
 # Okay, check state. We do not allow termination to start when the
@@ -150,31 +209,27 @@ my $expt_head_login = $row[2];
 #
 # Seems like too many states!
 #
-$estate = $row[1];
 if ($estate eq EXPTSTATE_PRERUN ||
     $estate eq EXPTSTATE_ACTIVATING ||
     $estate eq EXPTSTATE_SWAPPING ||
     $estate eq EXPTSTATE_TERMINATING) {
-    print STDOUT
-	"It appears that experiment $pid/$eid is in transition.\n".
-	"The user that created the experiment will be notified via email\n".
-        "when the experiment is no longer in transition, and can be killed\n";
-    exit(1);
+    die("*** $0:\n".
+	"    It appears that experiment $pid/$eid is in transition.\n".
+	"    The user that created the experiment will be notified via\n".
+        "    email when the experiment is no longer in transition.\n");
 }
 
 #
 # Set the timestamp now, and unlock the experiments table.
 #
-$stamp = DBDateTime();
-
-DBQueryFatal("UPDATE experiments SET expt_terminating='$stamp' ".
+DBQueryFatal("UPDATE experiments SET expt_terminating=now() ".
 	     "WHERE eid='$eid' and pid='$pid'");
 
 DBQueryFatal("unlock tables");
 
 #
-# At this point a failure is going to leave things in an inconsistent
-# state. Not much to do about that right now. 
+# XXX - At this point a failure is going to leave things in an
+# inconsistent state.
 #
 
 #
@@ -196,7 +251,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
-    if (background()) {
+    if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
 	#
@@ -239,34 +294,11 @@ if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
 }
 
 #
-# Try to remove experiment directory. We allow for it not being there
-# cause we often run the tb programs directly. We also allow for not
-# having permission, in the case that an admin type is running this,
-# in which case it won't be allowed cause of directory permissions. Thats
-# okay since admin types should rarely end experiments in other projects.
-#
-if (chdir($expdir)) {
-    print STDOUT "Removing experiment directory: $eiddir\n";
-    system("rm -rf $eid");
-}
-else {
-    print STDOUT "Not able to remove experiment directory: $eiddir\n";
-    print STDOUT "Someone will need to do this by hand.\n";
-}
-
-#
-# Done! Remove all trace from the DB.
+# Cleanup DB state and remove directory.
 # 
-DBQueryWarn("DELETE from experiments ".
-	    "WHERE eid='$eid' and pid='$pid'");
+ExptCleanup();
 
-DBQueryWarn("DELETE from nsfiles ".
-	    "WHERE eid='$eid' and pid='$pid'");
-
-DBQueryWarn("DELETE from exppid_access ".
-	    "WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-print STDOUT "Termination Success\n";
+print "Termination Success\n";
 
 #
 # In batch mode, just exit without sending email.
@@ -276,30 +308,22 @@ if ($batch) {
 }
 
 #
-# Send email notification if not in batch mode.
+# Send email notification to user.
 #
-if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
-			"TESTBED: Experiment $pid/$eid Terminated",
-			undef,
-			"Cc:  $expt_head_name <$expt_head_email>\n".
-			"Bcc: $TBLOGS"))) {
-    die("Cannot start mail program!");
-}
+my $message =
+    "Experiment `$eid' in project `$pid' has been terminated.\n" .
+    "You may now reuse `$eid' as an experiment name.\n\n" .
+    "Appended below is the output of the experiment teardown. If you\n" .
+    "have any questions or comments, please include the output below\n" .
+    "in your message to $TBOPS\n";
 
-print $MAIL "Experiment `$eid' in project `$pid' has been terminated.\n";
-print $MAIL "You may now reuse `$eid' as an experiment name.\n\n";
-print $MAIL "Appended below is the output of the experiment teardown.\n";
-print $MAIL "If you have any questions or comments, please include the\n";
-print $MAIL "output below in your message to $TBOPS\n";
-print $MAIL "\n\n---------\n\n";
-
-if (open(IN, "$logname")) {
-    while (<IN>) {
-	print $MAIL "$_";
-    }
-    close(IN);
-}
-close($MAIL);
+SENDMAIL("$user_name <$user_email>",
+	 "TESTBED: Experiment $pid/$eid Terminated",
+	 $message,
+	 "$user_name <$user_email>",
+	 "Cc:  $expt_head_name <$expt_head_email>\n".
+	 "Bcc: $TBLOGS",
+	 ($logname));
 
 unlink("$logname");
 exit 0;
@@ -307,7 +331,6 @@ exit 0;
 sub fatal($)
 {
     my($mesg) = $_[0];
-    local $MAIL;
     
     print STDOUT $mesg;
 
@@ -325,66 +348,46 @@ sub fatal($)
     }
 
     #
-    # Send a message to the testbed list. Append the logfile if it got
-    # that far.
+    # Send a message to the testbed list. Append the logfile.
     #
-    if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
-			    "TESTBED: Termination Failure: $pid/$eid",
-			    undef,
-			    "Cc: $expt_head_name <$expt_head_email>\n".
-			    "Cc: $TBOPS"))) {
-	die("Cannot start mail program!");
-    }
+    SENDMAIL("$user_name <$user_email>",
+	     "TESTBED: Termination Failure: $pid/$eid",
+	     $mesg,
+	     "$user_name <$user_email>",
+	     "Cc:  $expt_head_name <$expt_head_email>\n".
+	     "Bcc: $TBOPS",
+	     ($logname));
 
-    print $MAIL $mesg;
-
-    if (open(IN, "$logname")) {
-	print $MAIL "\n\n---------\n\n";
-	
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-    }
-    close($MAIL);
-    
     unlink("$logname");
     exit(-1);
 }
 
-#
-# Put ourselves into the background so that caller sees immediate response.
-# Mail notification will happen later.
-# 
-sub background()
+sub ExptCleanup()
 {
-    $mypid = fork();
-    if ($mypid) {
-	return $mypid;
+    #
+    # Try to remove experiment directory. We allow for it not being there
+    # cause we often run the tb programs directly. We also allow for not
+    # having permission, in the case that an admin type is running this,
+    # in which case it won't be allowed cause of directory permissions. Thats
+    # okay since admin types should rarely end experiments in other projects.
+    #
+    print STDOUT "Removing experiment directory: $expt_path ... \n";
+    if (system("rm -rf $expt_path")) {
+	print "*** WARNING: Not able to remove experiment directory.\n";
+	print "             Someone will need to do this by hand.\n";
     }
 
     #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller (the web server) will
-    # continue to wait even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
+    # Remove all trace from the DB.
+    # 
+    DBQueryWarn("DELETE from nsfiles ".
+		"WHERE eid='$eid' and pid='$pid'");
 
-    #
-    # Create a temporary name for a log file and untaint it.
-    #
-    $logname = `mktemp /tmp/end-$pid-$eid.XXXXXX`;
+    DBQueryWarn("DELETE from exppid_access ".
+		"WHERE exp_eid='$eid' and exp_pid='$pid'");
 
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in $logname";
-    }
-
-    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-
-    return 0;
+    DBQueryWarn("DELETE from experiments ".
+		"WHERE eid='$eid' and pid='$pid'");
 }
+
+

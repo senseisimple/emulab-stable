@@ -11,7 +11,7 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= checkpass ns2ir
 
 BIN_STUFF	= power snmpit tbend tbswapin tbswapout tbprerun tbreport \
-		  os_load savevlans startexp endexp batchexp killbatchexp \
+		  os_load savevlans startexp endexp batchexp \
 		  node_reboot nscheck node_update savelogs
 
 # Stuff that mere users get on plastic.
@@ -24,7 +24,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck webreport \
-		  webstartexp webendexp webbatchexp webkillbatchexp \
+		  webstartexp webendexp webbatchexp \
 		  assign_wrapper ptopgen webnodeupdate webgroupupdate \
 		  webrmgroup
 

@@ -22,10 +22,6 @@ if ($isadmin) {
     $experiments_result =
 	DBQueryFatal("select pid,eid,expt_head_uid,expt_name from ".
 		     "experiments order by pid,eid,expt_name");
-
-    $batch_result =
-	DBQueryFatal("select pid,eid,creator_uid,name from batch_experiments ".
-		     "order by pid,eid,name");
 }
 else {
     $experiments_result =
@@ -34,16 +30,8 @@ else {
 		     "left join group_membership as g on g.pid=e.pid ".
 		     "where g.uid='$uid' ".
 		     "order by e.pid,eid,expt_name");
-
-    $batch_result =
-	DBQueryFatal("select distinct e.pid,eid,creator_uid,name from ".
-		     "batch_experiments as e ".
-		     "left join group_membership as g on g.pid=e.pid ".
-		     "where g.uid='$uid' ".
-		     "order by e.pid,eid,name");
 }
-if (mysql_num_rows($experiments_result) == 0 &&
-    mysql_num_rows($batch_result) == 0) {
+if (! mysql_num_rows($experiments_result)) {
     USERERROR("There are no experiments running in any of the projects ".
               "you are a member of.", 1);
 }
@@ -109,42 +97,6 @@ if (mysql_num_rows($experiments_result)) {
     echo "<center>\n<h2>Total PCs in use: $total_pcs<br>\n";#</h2>\n";
     echo "Total Sharks in use: $total_sharks<br>\n";
     echo "Total Nodes in use: ",$total_sharks+$total_pcs,"</h2>\n</center>\n";
-}
-
-if (mysql_num_rows($batch_result)) {
-    echo "<center>
-           <h2>Batch Mode Experiments</h2>
-          </center>\n";
-    
-    echo "<table border=2
-                 cellpadding=0 cellspacing=2 align=center>
-            <tr>
-              <td width=10%>PID</td>
-              <td width=10%>EID</td>
-              <td width=5%>Head UID</td>
-              <td width=5% align=center>Terminate</td>
-              <td width=70%>Name</td>
-            </tr>\n";
-
-    while ($row = mysql_fetch_array($batch_result)) {
-	$pid  = $row[pid];
-	$eid  = $row[eid];
-	$huid = $row[creator_uid];
-	$name = $row[name];
-
-	echo "<tr>
-                <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                <td><A href='showbatch.php3?pid=$pid&eid=$eid'>
-                       $eid</A></td>
-                <td><A href='showuser.php3?target_uid=$huid'>
-                       $huid</A></td>
-	        <td align=center>
-                    <A href='endbatch.php3?exp_pideid=$pid\$\$$eid'>
-                       <img alt=\"o\" src=\"redball.gif\"></A></td>
-                <td>$name</td>
-               </tr>\n";
-    }
-    echo "</table>\n";
 }
 
 #

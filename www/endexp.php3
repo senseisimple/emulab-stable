@@ -58,19 +58,6 @@ if ($expt_terminating) {
 }
 
 #
-# If this is a running batch mode experiment, then force user through the
-# terminate batchmode path, to ensure that this is really what the person
-# wanted to do. Its also easier for me.
-#
-$batchmode = $row[batchmode];
-if ($batchmode) {
-    USERERROR("The experiment $exp_eid is a batch mode experiment that ".
-	      "is currently running on the testbed. If you really want to ".
-	      "terminate this experiment, please go back and terminate it ".
-	      "using the entry in the batch mode experiments listing.", 1);
-}
-
-#
 # Verify permissions.
 #
 if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
@@ -137,7 +124,7 @@ $retval = 0;
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid webendexp $exp_pid $exp_eid",
  	       $output, $retval);
 
-if ($retval) {
+if ($retval < 0) {
     echo "<br><br><h2>
           Termination Failure($retval): Output as follows:
           </h2>
@@ -152,15 +139,25 @@ if ($retval) {
     die("");
 }
 
-echo "<br><br>";
-echo "<h3>
-        Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
-        You will be notified via email when the experiment has been torn
-	down, and you can reuse the experiment name.
-        This typically takes less than 5 minutes.
-        If you do not receive email notification within a reasonable amount
-        of time, please contact $TBMAILADDR.
-      </h3>\n";
+#
+# Exit status 1 means termination/cancelation was immediate.
+# Exit status 0 means the experiment is terminating, or will be.
+#
+echo "<br><br><h3>\n";
+if ($retval) {
+    echo "Experiment `$exp_eid' in project `$exp_pid' has been terminated!
+          <br><br>
+          You may now reuse the experiment name.\n";         
+}
+else {
+    echo "Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
+          You will be notified via email when the experiment has been torn
+	  down, and you can reuse the experiment name.
+          This typically takes less than 5 minutes.
+          If you do not receive email notification within a reasonable amount
+          of time, please contact $TBMAILADDR.\n";
+}
+echo "</h3>\n";
 
 #
 # Standard Testbed Footer

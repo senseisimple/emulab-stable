@@ -7,16 +7,17 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: batchexp <batchfile>\n";
-    exit(-1);
+    die("Usage: batchexp [-i] [-x expires] [-E description] [-g gid] ".
+	"-p <pid> -e <eid> <nsfile>\n");
 }
-my  $optlist = "";
+my  $optlist = "iE:d:g:x:e:p:";
 
 #
 # Configure variables
 #
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
+my $PROJROOT = "/proj";
 
 #
 # Testbed Support libraries
@@ -25,11 +26,14 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $tbbindir = "$TB/bin/";
-my $batchdir = "$TB/batch";
 my $parser   = "$TB/libexec/ns2ir/parse.tcl";
-my $projroot = "/proj";
+my $mkexpdir = "$TB/libexec/mkexpdir";
+my $startexp = "$TB/bin/startexp";
+my $tbdata   = "tbdata";
+my $immediate= 0;
 my $dirname;
+my $dbuid;
+my @row;
 
 #
 # Turn off line buffering on output
@@ -43,187 +47,266 @@ $| = 1;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-#
-# Parse command arguments. Once we return from getopts, all that should
-# left are the required arguments.
-#
-%options = ();
-if (! getopts($optlist, \%options)) {
-    usage();
-}
-if (@ARGV != 1) {
-    usage();
-}
-my $tempfile = $ARGV[0];
-
-#
-# Untaint the arguments.
-#
-# Note different taint check (allow /).
-if ($tempfile =~ /^([-\@\w.\/]+)$/) {
-    $tempfile = $1;
-}
-else {
-    fatal("Tainted argument $tempfile");
-}
-
-#
-# Parse the batchfile.
-#
 my $eid;
 my $pid;
 my $gid;
-my $dbuid;
-my $longname;
+my $description;
 my $expires;
-my $webnsfile;
-
-parse_batchfile($tempfile) or
-    fatal("*** Could not parse batchfile $tempfile");
-
-#
-# Sanity check a few things.
-#
-if (!defined($eid) || !defined($pid) || !defined($longname) ||
-    !defined($expires) || !defined($webnsfile)) {
-    fatal("*** Batchfile is incomplete!");
-}
-$nsfile = "$eid.ns";
-
-#
-# Create a subdir in the batch directory to work in.
-#
-$dirname = "$batchdir/$pid-$eid";
-
-mkdir($dirname, 0775) or
-    fatal("*** Could not mkdir $dirname: $!");
-
-chdir($dirname) or
-    fatal("*** Could not chdir to $dirname: $!");
-
-#
-# Copy in the batch file. Web script is responsible for removing the
-# original.
-#
-if (system("/bin/cp", "$tempfile", "batchfile")) {
-    fatal("*** Could not copy $tempfile to $dirname");
-}
+my $tempnsfile;
 
 #
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    fatal("*** You do not exist in the Emulab Database!");
+    die("*** $0:\n".
+        "    You do not exist in the Emulab Database!\n");
 }
+
+#
+# Parse command arguments.
+#
+ParseArgs();
+
+#
+# Sanity check them.
+# 
+if (!defined($pid) || !defined($eid)) {
+    usage();
+}
+if (!defined($gid)) {
+    $gid = $pid;
+}
+if (defined($description)) {
+    $description = DBQuoteSpecial($description);
+}
+else {
+    $description = "'Created by $dbuid'";
+}
+if (! defined($expires)) {
+    $expires = DBDateTime(60 * 60 * 24 * 30);
+}
+
+$nsfile = "$eid.ns";
 
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-if (!TBAdmin($UID) &&
-    !TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    fatal("*** You do not have permission to create experiments ".
-	  "in project $pid";
+if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    die("*** $0:\n".
+	"    You do not have permission to create experiments in $pid/$gid\n");
 }
 
 #
-# The pid/eid pair has to be unique. LOCKING!
-# 
+# Create an experiment record. The pid/eid has to be unique, so lock the
+# table for the check/insert.
+#
+DBQueryFatal("lock tables experiments write");
+
 $query_result =
-    DBQueryFatal("SELECT * FROM experiments ".
+    DBQueryFatal("SELECT pid,eid FROM experiments ".
 		 "WHERE eid='$eid' and pid='$pid'");
 
 if ($query_result->numrows) {
-    fatal("*** Experiment $eid in project $pid already exists!");
+    DBQueryWarn("unlock tables");
+    die("*** $0:\n".
+        "    Experiment $eid in project $pid already exists!\n");
 }
 
+#
+# Insert the record. This reserves the pid/eid for us. If its a batchmode
+# experiment, we will update the record later so that the batch daemon
+# will recognize it. 
+#
+if (! DBQueryWarn("INSERT INTO experiments ".
+		  "(eid, pid, gid, expt_created, expt_expires, ".
+		  " expt_name, expt_head_uid, state) ".
+		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
+		  "$description, '$dbuid', 'new')")) {
+    DBQueryWarn("unlock tables");
+    die("*** $0:\n".
+	"    Database error inserting record for $pid/$eid!\n");
+}
+
+if (! DBQueryWarn("unlock tables")) {
+    fatal("Unexpected DB Error!");
+}
+
+#
+# Create a directory structure for the experiment.
+#
+if (system("$mkexpdir $pid $gid $eid") != 0) {
+    fatal("$mkexpdir failed");
+}
+
+#
+# Grab that path from the DB (set by mkexpdir).
+#
 $query_result =
-    DBQueryFatal("SELECT * FROM batch_experiments ".
-		 "WHERE eid='$eid' and pid='$pid'");
-
-if ($query_result->numrows) {
-    fatal("*** Batch experiment $eid in project $pid already exists!");
+    DBQueryWarn("select path from experiments ".
+		"where pid='$pid' and eid='$eid'");
+if (! $query_result ||
+    ! $query_result->numrows) {
+    fatal("Unexpected DB Error! Experiment $pid/$eid does not exist!");
 }
+@row      = $query_result->fetchrow_array();
+$dirname  = $row[0];
+
+chdir("$dirname/$tbdata") or
+    fatal("Could not chdir to $dirname/$tbdata: $!");
 
 #
 # Now we can get the NS file! 
 #
-if (system("/bin/cp", "$webnsfile", "$nsfile")) {
-    fatal("*** Could not copy $webnsfile to $dirname/$nsfile");
+if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
+    fatal("Could not copy $tempnsfile to $dirname/$nsfile");
 }
+chmod(0770, "$nsfile");
 
+#
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
-
+#
 if (system("$parser -n -a $nsfile") != 0) {
-    fatal("*** NS Parse failed!");
+    fatal("NS Parse failed!");
 }
 
 #
-# Gen up the creation time for the batch record.
+# Shove a copy of the NS file into the DB to make Mike happy.
 #
-$created = DBDateTime();
+$nsfile_string = `cat $nsfile`;
+
+if ($nsfile_string) {
+    $nsfile_string = DBQuoteSpecial($nsfile_string);
+
+    DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
+
+    #
+    # I could strlen check the string, but the webserver has a limit,
+    # plus the DB is going to truncate it if its longer. Doing it here
+    # would be a third (call it redundant) check. 
+    # 
+    DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
+		"VALUES('$pid', '$eid', $nsfile_string)");
+}
 
 #
-# Insert the record. We leave this to very last cause the batch daemon
-# is looking for batch experiments to run. Easy race avoidance.
-#
-DBQueryFatal("INSERT INTO batch_experiments ".
-	     "(eid, pid, gid, created, expires, ".
-	     " name, creator_uid, status) ".
-	     "VALUES ('$eid', '$pid', '$gid', '$created', '$expires', ".
-	     "'$longname', '$dbuid', 'new')");
+# Check for immediate or batch experiment. If immediate, fire off the
+# the startexp script to do the rest. It exits and so do we; user gets
+# email later. If its a batch experiment, update the experiment record
+# so that the batch daemon will see it and act.
+# 
+if ($immediate) {
+    system("$startexp -g $gid $pid $eid $nsfile");
 
-exit 0;
+    if ($?) {
+	#
+	# Save a copy of the failed experiment directory for debugging. 
+	#
+	system("/bin/rm", "-rf", "${dirname}-TBfailed");
+	system("/bin/mv", "-f", "${dirname}", "${dirname}-TBfailed");
+	
+	fatal("Failed to start experiment $pid/$eid!");
+    }
+    exit(0);
+}
+
+if (! TBSetBatchState($pid, $eid, BATCHSTATE_POSTED)) {
+    fatal("DB Error in batch system insertion!");
+}
+
+exit(0);
 
 sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT "$mesg\n";
-    print STDOUT "Cleaning up ...\n";
+    print STDOUT "*** $0:\n";
+    print STDOUT "    $mesg\n";
 
-    system("/bin/rm", "-rf", "$dirname");
+    #
+    # It is safe to do this because fatal is called *after* the experiment
+    # record has been sucessfully inserted. We own it! Before that, use
+    # the die function. 
+    #
+    DBQueryWarn("DELETE from nsfiles ".
+		"WHERE eid='$eid' and pid='$pid'");
+
+    DBQueryWarn("DELETE from exppid_access ".
+		"WHERE exp_eid='$eid' and exp_pid='$pid'");
+
+    DBQueryWarn("DELETE from experiments ".
+		"WHERE eid='$eid' and pid='$pid'");
+
+    if (defined($dirname)) {
+	system("/bin/rm", "-rf", "$dirname");
+    }
     exit(-1);
 }
 
 #
-# Open up the batch file and parse it.
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
 #
-sub parse_batchfile()
+sub ParseArgs()
 {
-    my($batchfile) = $_[0];
-
-    if (! open(BATCH, "$batchfile")) {
-	print STDERR "Could not open $batchfile\n";
-	return 0;
+    print "@ARGV\n";
+    
+    my %options = ();
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+    
+    if (@ARGV != 1) {
+	usage();
     }
 
-    while (<BATCH>) {
-	if ($_ =~ /^EID:\s+([-\@\w.]*)/) {
-	    $eid = $1;
-	    next;
-	}
-	if ($_ =~ /^PID:\s+([-\@\w.]*)/) {
+    $tempnsfile = $ARGV[0];
+    
+    if (defined($options{"i"})) {
+	$immediate = 1;
+    }
+    if (defined($options{"p"})) {
+	$pid = $options{"p"};
+
+	if ($pid =~ /^([-\@\w]+)$/) {
 	    $pid = $1;
-	    next;
 	}
-	if ($_ =~ /^GID:\s+([-\@\w.]*)/) {
-	    $gid = $1;
-	    next;
-	}
-	if ($_ =~ /^name:\s+([-\@\w. ]*)/) {
-	    $longname = $1;
-	    next;
-	}
-	if ($_ =~ /^expires:\s+([-\@\w.: ]*)$/) {
-	    $expires = $1;
-	    next;
-	}
-	if ($_ =~ /^nsfile:\s+([-\@\w.\/]*)/) {
-	    $webnsfile = $1;
-	    next;
+	else {
+	    die("Bad data in argument: $pid.");
 	}
     }
-    close(BATCH);
-    return 1;
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\@\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    die("Bad data in argument: $eid.");
+	}
+    }
+    if (defined($options{"g"})) {
+	$gid = $options{"g"};
+
+	if ($gid =~ /^([-\@\w]+)$/) {
+	    $gid = $1;
+	}
+	else {
+	    die("Bad data in argument: $gid.");
+	}
+    }
+    if (defined($options{"x"})) {
+	$expires = $options{"x"};
+    }
+    if (defined($options{"E"})) {
+	$description = $options{"E"};
+    }
+
+    # Note different taint check (allow /).
+    if ($tempnsfile =~ /^([-\@\w.\/]+)$/) {
+	$tempnsfile = $1;
+    }
+    else {
+	fatal("Bad data in argument: $tempnsfile");
+    }
 }
