@@ -1233,13 +1233,16 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 	}
 	File = ntfs_inode_lookup_by_name(ni_root, ufilename, ulen);
 	if(IS_ERR_MREF(File)) {
-		perror("ntfs_inode_lookup_by_name failed");
-		exit(1);
+		if (debug > 1) {
+			fprintf(stderr, "%s does not exist so there is no need "
+				"to skip the file.\n", filename);
+		}
+		return;
 	}
   	free(ufilename);
 	ufilename = NULL;
-	if(debug) fprintf(stderr,"vol->nr_mft_records==%lld\n",
-			  vol->nr_mft_records);
+	if(debug > 1 ) fprintf(stderr,"vol->nr_mft_records==%lld\n",
+			       vol->nr_mft_records);
 	/*Goal: Skip the file*/
 	if(!(ni = ntfs_inode_open(vol, File))) {
 	  perror("calling ntfs_inode_open (0)");
