@@ -1,0 +1,218 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Add a new node to the DB. Strictly for widearea nodes right now.
+# 
+sub usage()
+{
+    print "Usage: newwanode [-w] -t <nodetype> -i <ip address>\n";
+    exit(1);
+}
+my  $optlist = "wt:i:";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $named_setup = "$TB/sbin/named_setup";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# This is run from the web page, but tbadmins can run it from the command
+# line. 
+#
+if ($UID != getpwnam("nobody") && !TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You do not have permission to run this script!\n");
+}
+
+my $nodetype;
+my $nodeip;
+my $fromweb = 0;
+my $nodename;
+my $nodevtype;
+my $nodevname;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"w"})) {
+    $fromweb = 1;
+}
+if (defined($options{"i"})) {
+    $nodeip = $options{"i"};
+}
+if (defined($options{"t"})) {
+    $nodetype = $options{"t"};
+}
+if (!defined($nodeip) || !defined($nodetype)) {
+    usage();
+}
+
+#
+# Taint check.
+#
+if ($nodetype =~ /^([\w]+)$/) {
+    $nodetype = $1;
+}
+else {
+    die("*** Bad data in $nodetype\n");
+}
+if ($nodeip =~ /^([\d\.]+)$/) {
+    $nodeip = $1;
+}
+else {
+    die("*** Bad data in $nodeip\n");
+}
+
+#
+# Must be a valid type.
+#
+my $query_result =
+    DBQueryFatal("select osid,control_net from node_types ".
+		 "where type='$nodetype'");
+if (! $query_result->numrows) {
+    fatal("*** $0:\n".
+	  "    No such nodetype $nodetype is defined in the DB!\n");
+}
+my ($defosid,$control_net) = $query_result->fetchrow_array();
+
+#
+# For now, just pcwa/pcron is allowed until we have more DB state that says
+# how to build the virtual nodes, although that is temporary as well.
+#
+if ($nodetype ne "pcwa" && $nodetype ne "pcron") {
+    fatal("Can only handle pcwa/pcron nodetype right now!");
+}
+
+#
+# We need the next id and priority.
+# 
+DBQueryFatal("lock tables nextfreenode write");
+
+$query_result =
+    DBQueryFatal("select nextid,nextpri from nextfreenode ".
+		 "where nodetype='$nodetype'");
+
+if (!$query_result->numrows) {
+    fatal("nodetype $nodetype is not in the nextfreenode table!");
+}
+my %row     = $query_result->fetchhash();
+my $nextid  = $row{'nextid'};
+my $nextpri = $row{'nextpri'};
+
+DBQueryFatal("update nextfreenode ".
+	     "set nextid=nextid+1,nextpri=nextpri+1 ".
+	     "where nodetype='$nodetype'");
+
+DBQueryFatal("unlock tables");
+
+#
+# Form a new node name! Bogus. need more DB state.
+#
+if ($nodetype =~ /^pc(\w+)$/) {
+    $nodename = "${1}${nextid}";
+}
+else {
+    fatal("Could not determine a name from type for $nodetype!");
+}
+
+#
+# Enter the records
+#
+DBQueryFatal("insert into nodes ".
+	     "(node_id, type, phys_nodeid, role, priority, ".
+	     " status, op_mode, def_boot_osid) ".
+	     "values ('$nodename', '$nodetype', '$nodename', ".
+	     "        'testnode', $nextpri, 'down', 'NORMAL', '$defosid') ");
+
+#
+# Create the virtual nodes. Again, this is bogus.
+#
+if ($nodetype eq "pcwa") {
+    $nodevtype = "pcvwainet";
+}    
+else {
+    $nodevtype = "pcvroninet";
+}
+
+for ($i = 0; $i < 5; $i++) {
+    my $priority  = ($nextpri * 100) + $i;
+    $nodevname = "v${nodename}${i}";
+	
+    DBQueryFatal("insert into nodes ".
+		 "(node_id, type, phys_nodeid, role, priority, ".
+		 " status, op_mode, def_boot_osid) ".
+		 "values ('$nodevname', '$nodevtype', '$nodename', ".
+		 "        'virtnode', $priority, 'down', 'NORMAL', ".
+		 "        '$defosid') ");
+}
+
+DBQueryFatal("insert into interfaces ".
+	     "(node_id, card, port, IP, iface) ".
+	     "values ('$nodename', $control_net, 1, '$nodeip', 'eth0')");
+
+#
+# Lets log it.
+#
+if ($fromweb) {
+    SENDMAIL($TBLOGS, "New WA node created",
+	     "New Wide Area node has been created.\n".
+	     "\n".
+	     "Type:      $nodetype\n".
+	     "Name:      $nodename\n".
+	     "IP:        $nodeip\n".
+	     "Vtype:     $nodevtype\n".
+	     "Vname:     $nodevname (actually the last vnode)\n",
+	     $TBOPS);
+}
+
+#
+# update the named maps. Do it in the background since we do not
+# want to hold up the caller.
+#
+my $logname = TBMakeLogname("newwanode");
+if (TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+system("$named_setup");
+unlink($logname);
+exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    SENDMAIL($TBOPS, "Failure creating new WA node", $msg, $TBOPS);
+    exit(1);
+}
