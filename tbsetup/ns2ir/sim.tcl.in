@@ -341,6 +341,70 @@ Simulator instproc at {time event} {
                     set args  "DELAY=$arg"
 		    set etype MODIFY
 		}
+		"plr" {
+		    if {[llength $event] < 3} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    if {[scan [lindex $event 2] "%f" plr] != 1 ||
+                        $plr < 0 || $plr > 1} {
+			punsup "Improper argument: at $time $event"
+			return
+                    }
+                    set args  "PLR=$plr"
+		    set etype MODIFY
+		}
+		"qsize" {
+		    if {[llength $event] < 4} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    set units [lindex $event 3]
+                    if {[scan [lindex $event 2] "%d" size] != 1 ||
+                        ($units != "bytes" && $units != "packets")} { 
+			punsup "Improper argument: at $time $event"
+			return
+                    }
+                    if {$units == "bytes"} {
+	                set args  "QSIZE=${size}b"
+                    } else {
+	                set args  "QSIZE=${size}p"
+		    }
+		    set etype MODIFY
+		}
+		"qtype" {
+		    if {[llength $event] < 3} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    if {$time != 0} {
+			punsup "Qtype change after time zero: at $time $event"
+			return
+		    }
+                    set qtype [lindex $event 2]
+                    if {$qtype != "RED" && $qtype != "DropTail"} { 
+			punsup "Improper argument: at $time $event"
+			return
+                    }
+                    set args  "QTYPE=$qtype"
+		    set etype MODIFY
+		}
+		"qparams" {
+		    if {[llength $event] < 6} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    if {[scan $event "%s qparams %f %d %d %f" ignore arg1 arg2 arg3 arg4] != 5} {
+			punsup "Improper argument: at $time $event"
+			return
+                    }
+                    if {$arg1 <= 0 || $arg1 > 1 || $arg4 <= 0 || $arg4 > 1} {
+			punsup "Improper argument: at $time $event"
+			return
+		    }
+	            set args  "QPARAMS=$arg1:$arg2:$arg3:$arg4"
+		    set etype MODIFY
+		}
 		unknown {
 		    punsup "at $time $event"
 		    return
