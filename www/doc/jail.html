@@ -48,6 +48,21 @@ these changes around October of 2002.
      with any other experiments. This assignment is done when the
      experiment is swapped in so that swapped experiments are not
      holding ranges (16 bits of port space does not go very far).
+
+<li> Allow a jailed process to optionally bind to IPs other than the
+     jail IP (the ip that is specified to the jail command). The
+     default implementation of jail allows processes inside of a jail
+     to bind to just the one IP. If a process specifies INADDR_ANY,
+     the kernel silently changes it to the jail IP. If however there
+     are other interfaces on the node, or if tunnels are being used to
+     construct an overlay for the experiment, it is necessary to allow
+     processes inside the jail to bind to those interfaces. When the
+     jail is created, a list of aux IPs can be specified on the
+     command line, which tells the kernel to allow processes inside
+     the jail to bind to any of those IPs (including the jail IP).
+     When the bind happens, the kernel checks the jails list of IPs;
+     this applies to sockets bound for outgoing traffic, as well as
+     incoming traffic. 
      
 <li> Disallow FS unmounts inside a jail unless the mount was created
      in the jail. This was more of a bug fix that a feature addition.
@@ -168,21 +183,63 @@ act like "init" in that it starts the initial shell and then waits
 until it receives a signal to terminate. The easiest way to ensure
 that all processes inside the jail are terminated is for injail.pl to
 send a TERM to the entire process group, and then a KILL to pick up
-any stragglers. The initial shell mentioned above is /etc/rc, which
-proceeds to do all of the same boot time configuration that normally
-happens when a node boots. The difference of course is that the jail
-has a heavily constrained /etc/rc.conf that starts up just a few
-essential services such as syslogd and sshd (on the specific port
-assigned sshd for the jail; see above). The last part of configuration
-it run the standard testbed setup, although again in a somewhat
-restricted manner.
+any stragglers. This is because kill all of the processes from outside
+the jail is difficult (hard to see inside the jail), and because the
+jail will not actually terminate until all the processes inside are
+really dead. 
 
 <br>
 <br>
-
-The next set of changes was made by Leigh and Mike in March of 2003.
+The initial shell mentioned above is /etc/rc, which proceeds to do all
+of the same boot time configuration that normally happens when a node
+boots. The difference of course is that the jail has a heavily
+constrained /etc/rc.conf that starts up just a few essential services
+such as syslogd, cron, and sshd (on the specific port assigned sshd
+for the jail; see above). The last part of configuration run is the
+standard testbed setup, although again in a somewhat restricted
+manner.  Currently the following testbed mechanisms are supported
+<em>within</em> the jailed environment:
 
 <ul>
-<li>
+<li> 
+</ul>
+
+<br>
+<br>
+
+In March of 2003 Mike and Leigh added another option to jails:
+
+<ul>
+<li> Optionally allow jails to bind to INADDRY_ANY. The default
+     implementation of jail is to map INADDRY_ANY to the jail's main
+     IP address (that which is specified to the jail command).
+     However, if the jail is allowed to access other IPs (see above),
+     then INADDRY_ANY actually means a subset of all the interfaces on
+     the node that the jail is allowed to us (which might also be
+     tunnels). There are two situations in which this matters:
+
+     <ul>
+     <li> A process is connecting to another address, and has
+     specified its local address as INADDR_ANY (which is typical).
+     Instead of binding the local address of packets to the jail IP,
+     the local address is set to the actual address of the interface
+     that the packet is routed out of. If there are IP aliases on the
+     interface, the list of aliases is searched for a match against
+     one of the allowed prison IPs. If there is a match, the local
+     address is set to that IP. Otherwise the address is set to the
+     main address of the interface (this is not correct; it should be
+     an error). This is to support multiplexing links using IP
+     aliases. If we were to use IP tunnels or some other form of
+     virtual interface, there would be no need to search the list of
+     aliases. 
+
+     <li> A process is binding a local socket for an incoming
+     connection. In this case, any of the prison IPs can be the local
+     target of the connection, but it is not until the connection is
+     actually made that the address can be checked. This is done in
+     the pcb lookup routine. For each pcb, if the port matches and the
+     local address is INADDR_ANY, and the pcb was created within a
+     jail, then the list of the prison IPs is searched, looking for a
+     match. If no match is found, the pcb is skipped.
 </ul>
 
