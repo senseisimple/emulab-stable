@@ -1166,4 +1166,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.209: Go back to revision 202 and change a bit.
 
+1.210: Add vnode_id column in the interfaces table to indicate which
+       vnode in an allocated experiment that the interface belongs
+       to. This is useful when multiple jail vnodes are hosted on a
+       physical node. 
+
+       alter table interfaces add vnode_id varchar(32) default NULL;
 

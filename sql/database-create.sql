@@ -461,6 +461,7 @@ CREATE TABLE interfaces (
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
   rtabid smallint(5) unsigned NOT NULL default '0',
+  vnode_id varchar(32) default NULL,
   PRIMARY KEY  (node_id,card,port),
   KEY mac (mac),
   KEY IP (IP)
