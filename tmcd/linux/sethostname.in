@@ -42,7 +42,7 @@ use libtmcc;
 my ($action,$iface,$ip) = @ARGV;
 
 if (defined($action)) {
-    if ($token ne "up" && $token ne "renewal") {
+    if ($action ne "up" && $action ne "renewal") {
 	exit 0;
     }
 }
