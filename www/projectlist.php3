@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Clients of Emulab.Net");
+PAGEHEADER("Clients who have actively used Emulab.net");
 
 #
 # We let anyone access this page. Its bascailly a pretty printed version of the
@@ -18,7 +18,9 @@ PAGEHEADER("Clients of Emulab.Net");
 # Get the project list.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects where public=1 and approved=1 order by pid");
+	"SELECT pid,name,URL,usr_affil FROM projects ".
+	"left join users on projects.head_uid=users.uid ".
+	"where public=1 and approved=1 order by pid");
 
 if (! $query_result) {
     $err = mysql_error();
@@ -34,26 +36,29 @@ echo "<center><h3>
       Here is a list of research groups using Emulab.Net
       </h3></center>\n";
 
-echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
+echo "<table width=\"100%\" border=0 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td>Name</td>
-          <td>URL</td>
+          <td><h4>Institution</td>
+          <td><h4>Name</td>
       </tr>\n";
+echo "<tr></tr>\n";
+echo "<tr></tr>\n";
 
 while ($projectrow = mysql_fetch_array($query_result)) {
     $pname  = $projectrow[name];
     $url    = $projectrow[URL];
+    $affil  = $projectrow[usr_affil];
 
     echo "<tr>
-              <td>$pname</td>\n";
+              <td>$affil</td>\n";
 
     if (!$url || strcmp($url, "") == 0) {
-	echo "<td>&nbsp</td>\n";
+	echo "<td>$pname</td>\n";
     }
     else {
-	echo "<td><A href=\"$url\">$url</A></td>\n";
+	echo "<td><A href=\"$url\">$pname</A></td>\n";
     }
 
     echo "</tr>\n";
