@@ -132,11 +132,10 @@ if (ISADMIN($uid)) {
 }
 SUBMENUEND_2A();
 
-echo "<br />\n";
-echo "<a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>";
-echo "<img width=160 height=160 border=1 src='top2image.php3?pid=$pid&eid=$eid&thumb=160' />\n";
-echo "</a>";
-
+echo "<br>
+      <a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>
+         <img width=160 height=160 border=1 alt='experiment vis'
+              src='top2image.php3?pid=$pid&eid=$eid&thumb=160'></a>\n";
 
 SUBMENUEND_2B();
 
