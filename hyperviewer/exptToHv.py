@@ -102,6 +102,7 @@ def getExperiment(project, experiment, root=""):
     linksByName = {}	# Regroup by link name into sets of members, to find lans.
     for member, link in links.items():	# The links dict is keyed by interface (member) name.
         linkName = link['name']
+        #print linkName
         if not linksByName.has_key(linkName):
             linksByName[linkName] = sets.Set()
         linksByName[linkName].add(member)	# Each link/lan connects a set of interfaces.
