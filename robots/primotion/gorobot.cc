@@ -63,7 +63,10 @@ static void handle_client_packet(grobot &bot,
     case MTP_COMMAND_GOTO:
 	/* Record our robot id. */
 	robot_id = mp->data.command_goto->robot_id;
+ 
+        // theta should be calculated by grobot; override instead
 	theta = mp->data.command_goto->position.theta;
+ 
 	bot.dgoto(mp->data.command_goto->position.x,
 		  mp->data.command_goto->position.y,
 		  mp->data.command_goto->position.theta);
@@ -79,6 +82,7 @@ static void handle_client_packet(grobot &bot,
 	    bot.getDisplacement(mup.position.x,
                                 mup.position.y,
                                 mup.position.theta);
+            bot.resetPosition(); // not really needed
 	    mup.status = MTP_POSITION_STATUS_IDLE;
 	    if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
 				       MTP_ROLE_RMC,
@@ -268,7 +272,14 @@ int main(int argc, char *argv[])
 		bot.getDisplacement(mup.position.x,
                                     mup.position.y,
                                     mup.position.theta);
-		bot.resetPosition();
+  		
+  		// override, for now:
+  		mup.position.theta = theta;
+  
+		// bot.resetPosition();
+                // No need to reset position, because it's done
+                // automatically at the start of each primitive
+  
 		if (rc < 0) {
 		    mup.status = MTP_POSITION_STATUS_ERROR;
 		}
