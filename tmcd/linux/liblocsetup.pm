@@ -177,9 +177,9 @@ sub os_userdel($)
 #
 # Modify user group membership.
 # 
-sub os_usermod($$$$)
+sub os_usermod($$$$$)
 {
-    my($login, $gid, $glist, $root) = @_;
+    my($login, $gid, $glist, $pswd, $root) = @_;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "root");
@@ -188,7 +188,7 @@ sub os_usermod($$$$)
 	$glist = "-G $glist";
     }
 
-    return system("$USERMOD -g $gid $glist $login");
+    return system("$USERMOD -g $gid $glist -p $pswd $login");
 }
 
 #

@@ -185,9 +185,9 @@ sub os_userdel($)
 #
 # Modify user group membership.
 # 
-sub os_usermod($$$$)
+sub os_usermod($$$$$)
 {
-    my($login, $gid, $glist, $root) = @_;
+    my($login, $gid, $glist, $pswd, $root) = @_;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "wheel");
@@ -196,6 +196,10 @@ sub os_usermod($$$$)
 	$glist = "-G $glist";
     }
 
+    if (system("$CHPASS $pswd $login") != 0) {
+	warn "*** WARNING: $CHPASS $login error.\n";
+	return -1;
+    }
     return system("$USERMOD $login -g $gid $glist");
 }
 
