@@ -195,18 +195,63 @@ function edaycmp ($a, $b) {
 }
 
 function showrange ($showby, $sortby, $range) {
+    global $TBOPSPID;
+    
     switch ($range) {
         case "day":
-	    $wclause = "(3600 * 24 * 1)";
+	    $span = 3600 * 24 * 1;
 	    break;
         case "week":
-	    $wclause = "(3600 * 24 * 7)";
+	    $span = 3600 * 24 * 7;
 	    break;
         case "month":
-	    $wclause = "(3600 * 24 * 31)";
+	    $span = 3600 * 24 * 31;
 	    break;
         default:
 	    USERERROR("Invalid range argument: $range!", 1);
+    }
+    $wclause = "($span)";
+
+    # Summary info, indexed by pid and uid. Each entry is an array of the
+    # summary info.
+    $pid_summary = array();
+    $uid_summary = array();
+
+    #
+    # First get current swapped in experiments.
+    #
+    $query_result =
+	DBQueryFatal("select r.pid,r.eid,e.expt_head_uid as creator, ".
+		     "  UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped) ".
+		     "   as swapseconds, ".
+		     "  count(*) as pnodes ".
+		     " from reserved as r ".
+		     "left join experiments as e on ".
+		     "     e.pid=r.pid and e.eid=r.eid ".
+		     "where r.pid!='$TBOPSPID' and ".
+		     "      (r.pid!='ron' and r.eid!='all') ".
+		     "group by r.pid,r.eid");
+
+    while ($row = mysql_fetch_assoc($query_result)) {
+	$pid         = $row["pid"];
+	$eid         = $row["eid"];
+	$uid         = $row["creator"];
+	$swapseconds = $row["swapseconds"];
+	$pnodes      = $row["pnodes"];
+
+	#echo "$pid $eid $uid $swapseconds $pnodes<br>\n";
+
+	if ($swapseconds > $span)
+	    $swapseconds = $span;
+
+	$pid_summary[$pid] = array('pnodes'   => $pnodes,
+				   'pseconds' => $pnodes * $swapseconds,
+				   'eseconds' => $swapseconds,
+				   'current'  => 1);
+	$uid_summary[$uid] = array('pnodes'   => $pnodes,
+				   'pseconds' => $pnodes * $swapseconds,
+				   'eseconds' => $swapseconds,
+				   'current'  => 1);
     }
 
     $query_result =
@@ -222,11 +267,6 @@ function showrange ($showby, $sortby, $range) {
     # Experiment start time, indexed by pid:eid.
     $expt_start = array();
 
-    # Summary info, indexed by pid and uid. Each entry is an array of the
-    # summary info.
-    $pid_summary = array();
-    $uid_summary = array();
-
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pid     = $row["pid"];
 	$eid     = $row["eid"];
@@ -241,10 +281,12 @@ function showrange ($showby, $sortby, $range) {
 	if (!isset($pid_summary[$pid])) {
 	    $pid_summary[$pid] = array('pnodes'   => 0,
 				       'pseconds' => 0,
-				       'eseconds' => 0);
+				       'eseconds' => 0,
+				       'current'  => 0);
 	    $uid_summary[$uid] = array('pnodes'   => 0,
 				       'pseconds' => 0,
-				       'eseconds' => 0);
+				       'eseconds' => 0,
+				       'current'  => 0);
 	}
 
 	#echo "$pid $eid $uid $tstamp $action $pnodes<br>\n";
@@ -291,25 +333,11 @@ function showrange ($showby, $sortby, $range) {
 	    TBERROR("Invalid action: $action!", 1);
 	}
     }
-    #
-    # Anything still in the expt_start arrary is obviously still running, so
-    # count those up to the current time. 
-    #
-    $now = time();
-    foreach ($expt_start as $pideid => $value) {
-	$pid     = $value["pid"];
-	$uid     = $value["uid"];
-	$pnodes  = $value["pnodes"];
-	$stamp   = $value["stamp"];
-	$diff    = $now - $stamp;
 
-	$pid_summary[$pid]["pnodes"]   += $pnodes;
-	$pid_summary[$pid]["pseconds"] += $pnodes * $diff;
-	$pid_summary[$pid]["eseconds"] += $diff;
-	$uid_summary[$uid]["pnodes"]   += $pnodes;
-	$uid_summary[$uid]["pseconds"] += $pnodes * $diff;
-	$uid_summary[$uid]["eseconds"] += $diff;
-    }
+    #
+    # Anything still in the expt_start array is obviously still running,
+    # but we caught those in the first query above.
+    #
     
     switch ($showby) {
         case "projects":
@@ -345,7 +373,10 @@ function showrange ($showby, $sortby, $range) {
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
 
-    echo "<center><b>$title</b></center><br>\n";
+    echo "<center>
+               <b>$title</b><br>
+               (includes current experiments (*))
+          </center><br>\n";
     echo "<table align=center border=1>
           <tr>
              <th><a class='static'
@@ -365,6 +396,7 @@ function showrange ($showby, $sortby, $range) {
     foreach ($table as $key => $value) {
 	$heading = $key;
 	$pnodes  = $value["pnodes"];
+	$current = $value["current"];
 	$phours  = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$ehours  = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
@@ -373,8 +405,13 @@ function showrange ($showby, $sortby, $range) {
 	if (!$pnodes)
 	    continue;
 
+	if ($current)
+	    $current = "*";
+	else
+	    $current = "";
+
 	echo "<tr>
-                <td><A href='$link${heading}'>$heading</A></td>
+                <td><A href='$link${heading}'>$heading $current</A></td>
                 <td>$pnodes</td>
                 <td>$phours</td>
                 <td>$ehours</td>
