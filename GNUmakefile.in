@@ -21,7 +21,8 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 SUBDIRS = lib db assign @optional_subdirs@ discvr ipod os security sensors \
-		pxe tbsetup tmcd utils www tip capture ipod vis sensors 
+		pxe tbsetup account tmcd utils www tip capture ipod vis \
+		sensors 
 
 all:		all-subdirs
 
@@ -45,6 +46,7 @@ post-install:
 	@$(MAKE) -C db post-install
 	@$(MAKE) -C ipod post-install
 	@$(MAKE) -C tbsetup post-install
+	@$(MAKE) -C account post-install
 	@$(MAKE) -C security post-install
 
 #

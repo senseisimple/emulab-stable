@@ -352,6 +352,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/plasticwrap \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
 	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
+	account/GNUmakefile account/tbacct account/webtbacct \
+	account/addpubkey account/webaddpubkey \
+	account/addsfskey account/webaddsfskey \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
@@ -376,7 +379,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
+	tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
@@ -389,7 +392,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables \
-	utils/addpubkey utils/webaddpubkey utils/cvsupd.pl \
+	utils/cvsupd.pl \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	vis/dbvistopology vis/dbtopper \
