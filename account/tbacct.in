@@ -286,7 +286,7 @@ sub AddUser()
 	print "Adding user $user ($user_number) to $CONTROL.\n";
 
 	if (system("$SSH -host $CONTROL ".
-		   "'$USERADD $user -u $user_number -c \\\"$fullname\\\" ".
+		   "'$USERADD $user -u $user_number -c \"$fullname\" ".
 		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
 		   "-g $default_groupname -s /bin/tcsh'")) {
 	    if (($? >> 8) != $USEREXISTS) {
@@ -468,7 +468,7 @@ sub UpdateUser(;$)
 	print "Updating user $user ($user_number) on $CONTROL\n";
 
 	if (system("$SSH -host $CONTROL ".
-		   "'$USERMOD $user $remshellarg -c \\\"$fullname\\\"'")) {
+		   "'$USERMOD $user $remshellarg -c \"$fullname\"'")) {
 	    fatal("Could not modify user $user record on $CONTROL.");
 	}
     }
