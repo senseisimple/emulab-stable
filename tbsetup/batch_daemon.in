@@ -552,7 +552,7 @@ sub email_status($)
 sub notify_user($$$)
 {
     my($mesg, $subtext, $iserr) = @_;
-    my $subject, $from, $to, $cc;
+    my($subject, $from, $to, $cc);
     my $MAIL;
 
     print STDOUT "$mesg\n";
