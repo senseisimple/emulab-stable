@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -468,8 +468,8 @@ sub step_init {
 	$sth->execute;
 	while (($pid,$eid) = $sth->fetchrow_array) {
 	    print CLEARLOG "$pid $eid\n";
-	    print CLEARLOG "tbswapout -force $pid $eid\n";
-	    open(EXEC,"tbswapout -force $pid $eid 2>&1 |");
+	    print CLEARLOG "tbswap out -force $pid $eid\n";
+	    open(EXEC,"tbswap out -force $pid $eid 2>&1 |");
 	    while (<EXEC>) {
 		print CLEARLOG $_;
 	    }
@@ -489,15 +489,25 @@ sub step_init {
 		prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
 		$fail++;
 		doexit(1);
-	    }   
+	    }
+	    #
+	    # tbend does not clear the experiments or nsfiles table.
+	    # 
+	    $dbh->do("delete from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+	    $dbh->do("delete from nsfiles ".
+		     "where pid='$pid' and eid='$eid'");
 	}
-	# now we clear 
+	# Clear reserved just to make sure. 
 	$dbh->do("delete from reserved ".
 		 "where pid='emulab-ops' and eid!='hwdown'") || do {
 	    prints "FAIL\n";
 	    $fail++;
 	    doexit(1);
 	};
+
+	# Clear all the users except the person running the test.
+	$dbh->do("delete from users where uid!='$user'");
 
 	prints "PASS\n";
 	$pass++;
