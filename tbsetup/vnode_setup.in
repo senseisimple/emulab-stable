@@ -263,7 +263,7 @@ while (1) {
     #
     # There are more free slots
     #
-    if (($children < $MAX_CHILDREN) && @vnodes) {
+    if (($children <= $MAX_CHILDREN) && @vnodes) {
 	#
 	# Look for a vnode that is not on a pnode we're already working on
 	# 
@@ -377,12 +377,9 @@ while (1) {
 	    elsif ($exitstatus == 15) {
 		print STDERR "$vnode is wedged.\n" if $debug;
 	    }
-	    
-	    # Send mail to testbed-ops about it
-	    SENDMAIL($TBOPS, "Virtual Node $vnode $mode failure",
-	     "Virtual node $vnode $mode (on physical node $pnode) in pid/eid\n".
-	     "$pid/$eid has failed! Exit status was $exitstatus.\n");
 
+	    push @failed_nodes, [$vnode, $pnode, $mode, $exitstatus];
+	    
 	    if (!$killmode) {
 		warn("*** $0:\n".
 		    "    Virtual node $vnode setup failure!\n");
@@ -400,6 +397,17 @@ while (1) {
 	    }
 	}
     }
+}
+
+#
+# Send mail to testbed-ops about failed nodes
+#
+if (@failed_nodes) { 
+    my $failed_lines = join("\n",map { join("\t",@{$_}) } @failed_nodes);
+    SENDMAIL($TBOPS, "Virtual Node failure for $pid/$eid",
+	"The following virtual nodes failed: \n" .
+	"vnode\t\tpnode\t\tmode\texit status\n" .
+	$failed_lines);
 }
 
 if ($killmode) {
