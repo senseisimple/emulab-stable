@@ -194,7 +194,7 @@ if (! -e "$GRPROOT/$pid") {
     if (! mkdir("$GRPROOT/$pid", 0770)) {
 	fatal("Could not make directory $GRPROOT/$pid: $!");
     }
-    if (! chmod(0777, "$GRPROOT/$pid")) {
+    if (! chmod(0770, "$GRPROOT/$pid")) {
 	fatal("Could not chmod directory $GRPROOT/$pid: $!");
     }
     if (! chown($uid, $gid, "$GRPROOT/$pid")) {
