@@ -149,7 +149,9 @@ aErr endCallback::call()
     status = this->ec_behavior->
 	getNamedValue("completion-status")->getIntVal();
 
-    this->ec_wheel_manager.motionFinished(status, this->ec_callback);
+    this->ec_wheel_manager.motionFinished(this->ec_behavior,
+					  status,
+					  this->ec_callback);
 
     this->ec_callback = NULL;
     
@@ -321,10 +323,22 @@ void wheelManager::motionStarted(void)
     this->wm_dashboard->startMove(this->wm_garcia);
 }
 
-void wheelManager::motionFinished(int status, wmCallback *callback)
+void wheelManager::motionFinished(acpObject *behavior,
+				  int status,
+				  wmCallback *callback)
 {
     if (debug) {
 	fprintf(stderr, "debug: motion finished -- %d\n", status);
+    }
+
+    if (status == aGARCIA_ERRFLAG_STALL) {
+	float distance = behavior->getNamedValue("distance")->getFloatVal();
+
+	this->wm_dashboard->getTelemetry()->stall_contact =
+	    (distance < 0) ? -1 : 1;
+    }
+    else {
+	this->wm_dashboard->getTelemetry()->stall_contact = 0;
     }
     
     if (status != aGARCIA_ERRFLAG_WONTEXECUTE) {

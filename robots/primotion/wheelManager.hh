@@ -161,7 +161,7 @@ public:
      * values.)
      * @param callback The callback to trigger.
      */
-    void motionFinished(int status, wmCallback *callback);
+    void motionFinished(acpObject *behavior, int status, wmCallback *callback);
 
     /**
      * Check the object to make sure it is internally consistent.

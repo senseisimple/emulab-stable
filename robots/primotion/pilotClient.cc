@@ -55,6 +55,8 @@ void pilotMoveCallback::call(int status)
     mtp_packet_t mp;
     mtp_status_t ms;
 
+    fprintf(stderr, "callback: %d\n", status);
+
     switch (status) {
     case aGARCIA_ERRFLAG_NORMAL:
 	ms = MTP_POSITION_STATUS_COMPLETE;
@@ -314,6 +316,11 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    else if (mgt->rear_ranger_right != 0.0) {
 		points[count].x = cos(-M_PI + 0.40) * mgt->rear_ranger_right;
 		points[count].y = sin(-M_PI + 0.40) * mgt->rear_ranger_right;
+		count += 1;
+	    }
+	    else if (mgt->stall_contact && count == 0) {
+		points[count].x = (mgt->stall_contact < 0) ? -0.20 : 0.15;
+		points[count].y = 0;
 		count += 1;
 	    }
 
