@@ -143,10 +143,8 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 static void
 ClientJoin(Packet_t *p)
 {
-	struct in_addr	ipaddr = { p->hdr.srcip };
-
-	log("%s (id %u) joins at %s!",
-	    inet_ntoa(ipaddr), p->msg.join.clientid, CurrentTimeString());
+	struct in_addr	ipaddr   = { p->hdr.srcip };
+	unsigned int    clientid = p->msg.join.clientid;
 
 	/*
 	 * Return fileinfo. Duplicates are harmless.
@@ -155,6 +153,13 @@ ClientJoin(Packet_t *p)
 	p->hdr.datalen         = sizeof(p->msg.join);
 	p->msg.join.blockcount = FileInfo.blocks;
 	PacketReply(p);
+
+	/*
+	 * Log after we send reply so that we get the packet off as
+	 * quickly as possible!
+	 */
+	log("%s (id %u) joins at %s!",
+	    inet_ntoa(ipaddr), clientid, CurrentTimeString());
 }
 
 /*
@@ -389,7 +394,6 @@ main(int argc, char **argv)
 
 	ServerLogInit();
 	WorkQueueInit();
-	ServerNetInit();
 	
 	filename = argv[0];
 	if (access(filename, R_OK) < 0)
@@ -409,6 +413,11 @@ main(int argc, char **argv)
 	FileInfo.blocks = (int) roundup(fsize, BLOCKSIZE) / BLOCKSIZE;
 	FileInfo.chunks = FileInfo.blocks / CHUNKSIZE;
 	log("Opened %s: %d blocks", filename, FileInfo.blocks);
+
+	/*
+	 * Everything else done, now init the network.
+	 */
+	ServerNetInit();
 
 	/*
 	 * Create the subthread to listen for packets.
