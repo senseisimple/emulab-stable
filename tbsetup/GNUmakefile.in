@@ -82,7 +82,7 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
 		done;
 
 clean:	subdir-clean
-	rm -f *.o core tbreport
+	rm -f *.o core
 
 subdir-clean:
 	@$(MAKE) -C checkpass clean
