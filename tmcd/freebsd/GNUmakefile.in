@@ -52,6 +52,10 @@ mfs-install:	common-install etc-install \
 
 cdboot-install:	common-install etc-install \
 			script-install bin-install
+ifndef  DESTDIR
+	@@echo "You must define DESTDIR for this target!"
+	@@false
+endif
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdroot $(SYSETCDIR)/rc.cdroot
