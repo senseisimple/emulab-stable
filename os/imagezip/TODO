@@ -17,3 +17,5 @@ Things to do for image*:
 4. Write an imageconvert so that we can convert old version images into
    new ones and maybe change the compression level used in an image.
 
+5. Imageunzip could be triple-threaded like frisbee, i.e., split the
+   file reading and decompression that are currently one in imageunzip.

@@ -73,6 +73,7 @@ clean:
 		$(MAKE) -C ntfs clean; \
 	fi;
 	/bin/rm -f *.o imagezip imageunzip imagedump version.c
+	/bin/rm -f imagezip.tar imagezip.tar.gz
 
 imagezip.tar.gz: imagezip.tar
 	gzip -c imagezip.tar > imagezip.tar.gz
