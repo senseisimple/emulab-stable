@@ -621,6 +621,16 @@ if ($speclocal) {
     # Do not allow anything outside of special dirs. I do not think there
     # is a security worry, but good to enforce it anyway.
     #
+    if (!preg_match("/^([-\@\w\.\/]+)$/", $exp_localnsfile)) {
+	if (isset($syntax)) {
+	    echo "<h3 style='color: #f00'>Error: \n".
+		"Pathname includes illegal characters!</h3>\n";
+	    die("");
+	}
+	else {
+	    RESPIT("NS File", "Pathname includes illegal characters");
+	}
+    }
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
         ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
         ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
