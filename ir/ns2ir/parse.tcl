@@ -17,7 +17,7 @@ source $libdir/event.tcl
 # stored the node ids in.
 ###
 rename set real_set
-set skipset 0
+real_set skipset 0
 proc set {args} {
     global skipset
     global nodeid_map
@@ -36,7 +36,11 @@ proc set {args} {
 	}
 	real_set skipset 0
     }
-    return [eval "uplevel real_set $args"]
+    if {[llength $args] == 1} {
+	return [uplevel real_set [lindex $args 0]]
+    } else {
+	return [uplevel real_set [lindex $args 0] \{[lindex $args 1]\}]
+    }
 }
 ###
 
@@ -50,11 +54,11 @@ set nodeID 0
 set linkID 0
 set eventID 0
 
-set nodelist [list]
+set nodelist {}
 
-set linkslist [list]
+set linkslist {}
 
-set eventlist [list]
+set eventlist {}
 
 # sim.tcl handles the ns Simulator methods
 source $libdir/sim.tcl
