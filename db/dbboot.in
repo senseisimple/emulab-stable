@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -56,7 +56,7 @@ open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 # Clear the load_address field of the images table since any frisbee's
 # that were running are obviously not running anymore! 
 #
-DBQueryFatal("update images set load_address=''");
+DBQueryFatal("update images set load_address='',frisbee_pid=0,load_busy=0");
 
 #
 # Clear the event scheduler pids. Its okay to set them to zero since
