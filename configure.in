@@ -90,7 +90,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	discvr/GNUmakefile \
 	lib/GNUmakefile \
-	os/GNUmakefile os/imagezip/GNUmakefile \
+	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
@@ -101,8 +101,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ir/handle_virt \
 	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
-	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl.in \
-	tbsetup/savevlans tbsetup/ir/extract_tb.in \
+	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
+	tbsetup/savevlans tbsetup/ir/extract_tb \
 	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
 	tbsetup/named_setup \
 	tbsetup/checkpass/GNUmakefile \

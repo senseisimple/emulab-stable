@@ -1,0 +1,41 @@
+#!/bin/sh
+
+#
+# Split up an image and imagezip it. Beware, some sector offsets and sizes
+# are hardcoded in here.
+#
+
+#
+# Configure variables
+#
+TB="@prefix@"
+
+#
+# My zipper.
+# 
+zipper="$TB/bin/imagezip"
+
+#
+# The input image
+# 
+image=wd0
+
+#
+# Boot block: start 0, size 63
+# 
+$zipper -d -r -c 62 $image ${image}-mbr.ndz
+
+#
+# FreeBSD:
+#
+$zipper -d -s 1 $image ${image}-fbsd.ndz
+
+#
+# Linux:
+#
+$zipper -d -s 2 $image ${image}-rhat.ndz
+
+#
+# All of it.
+#
+$zipper -d $image ${image}-all.ndz

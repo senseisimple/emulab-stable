@@ -9,7 +9,7 @@ all:	imagezip imageunzip
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS = -O2 -g
+CFLAGS = -O -g -static
 LIBS = -lz
 
 imagezip: imagezip.o

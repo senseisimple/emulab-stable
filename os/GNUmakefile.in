@@ -10,14 +10,14 @@ include $(OBJDIR)/Makeconf
 
 SUBDIRS	= imagezip
 
-all:	$(SUBDIRS)
+all:	$(SUBDIRS) split-image.sh
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 imagezip:
 	@$(MAKE) -C imagezip all
 
-install: 
+install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
 
 control-install: 
