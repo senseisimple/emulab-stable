@@ -1,8 +1,13 @@
 #!/bin/sh
 #	cd from <builddir>/event/trafgen to testbed/event/trafgen
-cd $1
-fetch http://www.emulab.net/tg2.0.tar.gz
-#fetch http://www.postel.org/tg/tg2.0.tar.gz
-tar xzf tg2.0.tar.gz
-patch -p0 < tg.patch
+if [ ! -d $1/tg2.0/src ]; then
+    echo "Downloading tg2.0 source to $1 ..."
+    cd $1
+    fetch http://www.emulab.net/tg2.0.tar.gz
+    #fetch http://www.postel.org/tg/tg2.0.tar.gz
+    echo "Unpacking/patching tg2.0 source ..."
+    tar xzf tg2.0.tar.gz
+    patch -p0 < tg.patch
+    rm -f tg2.0.tar.gz tg2.0/*/*/*.orig
+fi
 
