@@ -2148,6 +2148,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table firewalls add vlanid int(11) default NULL;
 
 1.286: ElabinElab and Firewall stuff
+1.287: 
 
 	alter table experiments add elabinelab_eid varchar(32) \
             default NULL after elab_in_elab;
@@ -2165,14 +2166,14 @@ last_net_act,last_cpu_act,last_ext_act);
               inner_elab_role enum('boss','ops','node') default NULL \
               after cnet_vlan;
 
-1.287: Add a 'rebootable' bit to the node_types table to indicate that a 
+1.288: Add a 'rebootable' bit to the node_types table to indicate that a 
        given type should not be attempted to be rebooted. This should be
        temporary, and will go away when we have node_capabilities:
 
          alter table node_types add (isrebootable tinyint(1) default '1');
 	
 
-1.288: Add "emulab" style of firewall for elabinelab
+1.289: Add "emulab" style of firewall for elabinelab
 
        ALTER table firewalls MODIFY style \
 	 enum('open','closed','basic','emulab') not NULL default 'basic';
@@ -2185,31 +2186,31 @@ last_net_act,last_cpu_act,last_ext_act);
 
        mysql tbdb < fwrules-create.sql
 
-1.289: Add conversion factor floorimages that converts from pixels to
+1.290: Add conversion factor floorimages that converts from pixels to
       meters.
 
       alter table floorimages add pixels_per_meter float(10,3) \
              NOT NULL default '0.000' after scale;
 
-1.290: Add Windows to the OS list in the os_info table.
+1.291: Add Windows to the OS list in the os_info table.
 
 	 alter table os_info modify column \
 	   OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Windows','Other') \
 	   NOT NULL default 'Unknown';
 
-1.291: Add a settable Windows password.  We derive a default password
+1.292: Add a settable Windows password.  We derive a default password
        from the Unix usr_pswd MD5 hash string.
 
        alter table users add column usr_w_pswd tinytext after usr_pswd;
 
-1.292: Add "paniced" bit to experiments table.
+1.293: Add "paniced" bit to experiments table.
 
 	alter table experiments add paniced tinyint(1) NOT NULL \
             default '0' after security_level;
 	alter table experiments add panic_date datetime default NULL \
             after paniced;
 
-1.293: Add a "leader" column to the switch_stack_types table so that we no
+1.294: Add a "leader" column to the switch_stack_types table so that we no
        longer need to assume that the leader of a stack is the switch after
        which it was named - we can now name stacks things like 'Control' or
        'Experiment'.
@@ -2243,13 +2244,13 @@ last_net_act,last_cpu_act,last_ext_act);
        update switch_stack_types set stack_id='Control' where \
          stack_id='<stackid>';
 
-1.294: Add some battery stuff for robots to the nodes table.
+1.295: Add some battery stuff for robots to the nodes table.
 
         alter table nodes add battery_voltage float default NULL;
         alter table nodes add battery_percentage float default NULL;
         alter table nodes add battery_timestamp int(10) unsigned default NULL;
 
-1.295: Add stuff for capturing boot errors.
+1.296: Add stuff for capturing boot errors.
 
         alter table nodes add boot_errno int(11) NOT NULL default '0';
 
@@ -2260,12 +2261,12 @@ last_net_act,last_cpu_act,last_ext_act);
           PRIMARY KEY  (node_id)
         ) TYPE=MyISAM;
 
-1.296: Fix virt_vtypes table.
+1.297: Fix virt_vtypes table.
 
          alter table virt_vtypes change eid eid varchar(32) NOT NULL \
                 default '';
 
-1.297: Add webcams support.
+1.298: Add webcams support.
 
          CREATE TABLE webcams (
           id int(11) unsigned NOT NULL default '0',
@@ -2274,7 +2275,7 @@ last_net_act,last_cpu_act,last_ext_act);
           PRIMARY KEY  (id)
          ) TYPE=MyISAM;
 
-1.298: Add obstacles table for the robots.
+1.299: Add obstacles table for the robots.
 
          CREATE TABLE obstacles (
           obstacle_id int(11) unsigned NOT NULL auto_increment,
@@ -2290,7 +2291,7 @@ last_net_act,last_cpu_act,last_ext_act);
           PRIMARY KEY  (obstacle_id)
          ) TYPE=MyISAM;
 
-1.299: Add default_firewall_vars table.  These are global (not
+1.300: Add default_firewall_vars table.  These are global (not
        per-experiment!) variables that get expanded on the client-side
        before using them.  Intended to keep the default rules
        site-independent.
@@ -2312,14 +2313,14 @@ last_net_act,last_cpu_act,last_ext_act);
 	cd <your_build_tree>/firewall
 	gmake insertrules
 
-1.300: Allow a switch to be in multiple stacks, and add a column that records
+1.301: Allow a switch to be in multiple stacks, and add a column that records
        of the memberships is the primary one.
 
         alter table switch_stacks drop primary key;
 	alter table switch_stacks add index (node_id);
 	alter table switch_stacks add column (is_primary tinyint(1) not null default '1');
 
-1.301: Add node history table at Mike's request to track what
+1.302: Add node history table at Mike's request to track what
        experiments are assigned to over time.
 
 	CREATE TABLE node_history (
@@ -2333,7 +2334,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  KEY node_id (node_id)
 	) TYPE=MyISAM;
 
-1.301: Add a "lockdown" bit to the experiments table to prevent
+1.303: Add a "lockdown" bit to the experiments table to prevent
        accidental swaps, even by admin people.
 
          alter table experiments add lockdown tinyint(1) NOT NULL \
