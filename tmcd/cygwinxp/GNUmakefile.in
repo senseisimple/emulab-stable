@@ -62,7 +62,7 @@ bin-install:	dir-install
 	# These are found in the /share/windows directory.
 	$(INSTALL) -m 755 $(SRCDIR)/WSName.exe $(BINDIR)/WSName.exe
 	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/addusers.exe
-	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/usrtogrp.exe
+	$(INSTALL) -m 755 $(SRCDIR)/usrtogrp.exe $(BINDIR)/usrtogrp.exe
 	# These are used by tmcd/findif.
 	$(INSTALL) -m 755 $(SYSTEM32)/getmac.exe $(BINDIR)/getmac.exe
 	$(INSTALL) -m 755 $(WBEM)/framedyn.dll $(BINDIR)/framedyn.dll

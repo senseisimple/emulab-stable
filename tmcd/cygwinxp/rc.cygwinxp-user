@@ -9,9 +9,11 @@
 # with value: 
 #   C:\cygwin\bin\bash /usr/local/etc/emulab/rc/rc.cygwinxp-user
 
-PATH=/usr/local/etc/emulab:$PATH
+PATH=/usr/local/etc/emulab:/bin:$PATH
+export PATH
 
 # Root has a local home directory, and is handled by the SYSTEM sshd on port 22.
+# There is no need to do any of the following for root.
 user=`id -un`
 if [ $user = root ]; then
     exit 0

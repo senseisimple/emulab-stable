@@ -46,7 +46,7 @@ chmod o-r /etc/ssh*key.user
 
 # Start sshd in the background, orphaned so it doesn't get SIGINT from here.
 # The pidfile is updated by sshd itself.
-# Don't use privilege separation, because it requires taking ownership of
+# Don't use privilege separation here, because it requires taking ownership of
 # /var/empty, which kills key exchange for the SYSTEM root sshd.
 echo "Starting new sshd daemon as $user."
 (CYGWIN="ntsec tty" /usr/sbin/sshd -p 2222 -o "UsePrivilegeSeparation no" \
@@ -54,6 +54,6 @@ echo "Starting new sshd daemon as $user."
 sleep 2
 
 # Remember this one separately from the SYSTEM sshd.
-chmod -f g+w $upidfile
+chmod -f g+w $upidfile >& /dev/null
 cp $pidfile $upidfile
 chmod -f g+w $upidfile
