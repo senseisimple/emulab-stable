@@ -62,14 +62,21 @@ $cdvers = $row[version];
 
 #
 # Node is requesting latest instructions. Give it the script. This could
-# be on a per CDROM basis, but for now all versions get the same thing.
+# be on a per CDROM basis, but for now its hardwired.
 # I know, the hardwired paths are bad; move into the cdroms DB table, even
 # if duplicated. 
 # 
 if (isset($needscript)) {
     header("Content-Type: text/plain");
-    echo "MD5=5ed48bdf6def666d5a5d643cbc2ce4d0\n";
-    echo "URL=https://${WWWHOST}/images/netbed-setup.pl\n";
+
+    if ($cdvers <= 3) {
+	echo "MD5=5ed48bdf6def666d5a5d643cbc2ce4d0\n";
+	echo "URL=https://${WWWHOST}/images/netbed-setup-v3.pl\n";
+    }
+    else {
+	echo "URL=https://${WWWHOST}/images/netbed-setup-v4.pl\n";
+	echo "SIG=https://${WWWHOST}/images/netbed-setup-v4.pl.sig\n";
+    }
     echo "emulab_status=0\n";
     return;
 }
@@ -241,14 +248,14 @@ if (strcmp($privIP, "1.1.1.1")) {
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
 
-    if (0) {
-    if ($cdvers == 3) {
-#	    echo "slice1_image=slice1.ndz\n";
-	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	    echo "slice1_md5=a9af4a08310a314c5b38e5e33a2b9c3e\n";
-	    echo "slicex_slice=3\n";
-	    echo "slicex_mount=/users\n";
-    }
+    if (0 && $cdvers == 69) {
+	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
+	echo "slice1_md5=d10baf117e269e3faa9cf4ee5d089a7f\n";
+	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
+#	echo "slicex_slice=3\n";
+#	echo "slicex_mount=/users\n";
+#	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v4.tar.gz\n";
+#	echo "slicex_sig=https://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
     }
     echo "emulab_status=0\n";
     
@@ -316,7 +323,7 @@ elseif ($cdvers == 2) {
 	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
     }
 }
-else {
+elseif ($cdvers == 3) {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
@@ -334,6 +341,32 @@ else {
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
+    }
+}
+else {
+    if (0) {
+	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
+	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
+	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
+	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
+	# Still return this for the root tag. Might change later.
+	echo "slice1_md5=d326a1f604489c43b488fa80a88221f4\n";
+	echo "slicex_slice=3\n";
+	echo "slicex_mount=/users\n";
+	echo "slicex_tarball=https://${WWWHOST}/images/slicex-v4.tar.gz\n";
+	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
+    }
+    else {
+	echo "fdisk=image.fdisk\n";
+	echo "fdisk_sig=image.fdisk.sig\n";
+	echo "slice1_image=slice1.ndz\n";
+	echo "slice1_sig=slice1.ndz.sig\n";
+	# Still return this for the root tag. Might change later.
+	echo "slice1_md5=d326a1f604489c43b488fa80a88221f4\n";
+	echo "slicex_slice=3\n";
+	echo "slicex_mount=/users\n";
+	echo "slicex_tarball=slicex.tar.gz\n";
+	echo "slicex_sig=slicex.tar.gz.sig\n";
     }
 }
 echo "emulab_status=0\n";
