@@ -130,7 +130,7 @@ if {[catch "exec $ifcboot $pid $eid $ifcfile >@ $logFp 2>@ $logFp" err]} {
 outs "PLACEHOLDER - Installing secondary packages."
 
 outs "Creating user accounts."
-if {[catch "exec $mkacct $eid >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $mkacct $eid $pid >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error running $mkacct. ($err)"
     exit 1
 }

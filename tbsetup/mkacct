@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.30 2000-12-15 18:10:52 stoller Exp $
+# $Id: mkacct,v 1.31 2000-12-18 21:42:48 kwright Exp $
 
 use English;
 use Mysql;
@@ -10,7 +10,7 @@ my $control_subnet = "155\.99\.214\.";
 my $me;                # alphanumeric username of $UID 
 
 my $eid;               # experiment ID from command line
-my $group_name;        # project/group that the above EID belongs to
+my $group_name;        # project/group from the command line
 my $group_number;      # the number associated with group_name
 
 my $dbh;               # database handle 
@@ -35,11 +35,10 @@ sub doqueries() {
     print "Selecting users...\n";
     $db_query = 
 	"select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
-        "from experiments as e " .
-	"left join projects as p on e.pid = p.pid " .
+        "from projects as p " .
 	"left join proj_memb as pm on p.pid = pm.pid " .
 	"left join users as u on u.uid = pm.uid ".
-	"where e.eid = '$eid'";
+	"where p.pid = '$group_name'";
     
     $sth = $dbh->query($db_query);
     while (@row = $sth->fetchrow_array) {
@@ -83,9 +82,8 @@ sub doqueries() {
     # Note: In the end, I simply assign to 'plastic' as control 
     # nodes are not yet set in the database. 12/3/00 -lkw
     #
-    $db_query       = "select p.unix_gid, p.pid, p.control_node " .
-	              "from projects as p, experiments as e " .
-		      "where p.pid=e.pid and e.eid='$eid'";	       
+    $db_query       = "select unix_gid, pid, control_node " .
+	              "from projects where pid='$group_name'";
     $sth            = $dbh->query($db_query);
     got_tuples($sth) or die "$0: Error selecting group fields.\n";
     @db_row         = $sth->fetchrow_array();
@@ -127,7 +125,7 @@ sub is_node_ok() {
 	return 0;
     }
       
-    # the node must be on the control new
+    # the node must be on the control net
     if ( ! ($node =~ /$control_subnet/) ) {
 	return 0;
     }
@@ -228,9 +226,9 @@ sub sanitize() {
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
     ## check usage
-    if ($#ARGV < 0) { 
-	die("Usage: mkacct <eid>\n" .
-	    "\tCreates user accounts by experiment.\n");
+    if ($#ARGV < 1) { 
+	die("Usage: mkacct <eid> <pid>\n" .
+	    "\tCreates user accounts by experiment/pid pair\n");
     }
 
     ## sanitize eid
@@ -238,6 +236,13 @@ sub sanitize() {
 	$eid = $1;
     } else {
 	die "$0: EID $ARGV[0] has invalid characters.\n";
+    }
+
+    ## sanitize project
+    if ( $ARGV[1] =~ /^([A-Za-z0-9-]+)$/ ) {
+	$group_name = $1;
+    } else {
+	die "$0: Project argument $ARGV[1] has invalid characters.\n";
     }
 
     ## effective uid must be root
