@@ -507,7 +507,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid)) {
-		syslog(LOG_ERR, "IFCONFIG: %s: Node is free", nodeid);
+		syslog(LOG_INFO, "IFCONFIG: %s: Node is free", nodeid);
 		return 1;
 	}
 
@@ -903,9 +903,9 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		row = mysql_fetch_row(vlan_result);
 
 		/*
-		 * Add this member to the linked list of directly connected interfaces
+		 * Add this member to the linked list of directly connected
+		 * interfaces
 		 */
-		syslog(LOG_NOTICE, "dohosts: Adding interface %s", row[0]);
 		interface = (struct node_interface *)malloc(sizeof(struct node_interface *));
 		interface->iface = (char*)malloc(strlen(row[0]) +1);
 		strcpy(interface->iface,row[0]);
@@ -1511,7 +1511,7 @@ dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 1;
 	}
 	if (nodeidtoexp(nodeid, pid, eid)) {
-		syslog(LOG_ERR, "LOG: %s: Node is free", nodeid);
+		syslog(LOG_INFO, "LOG: %s: Node is free", nodeid);
 		return 1;
 	}
 
@@ -1766,7 +1766,7 @@ checkdbredirect(struct in_addr ipaddr)
 		return 1;
 	}
 	if (nodeidtoexp(nodeid, pid, eid)) {
-		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: Node is free", nodeid);
+		syslog(LOG_INFO, "CHECKDBREDIRECT: %s: Node is free", nodeid);
 		return 0;
 	}
 
@@ -1784,7 +1784,7 @@ checkdbredirect(struct in_addr ipaddr)
 	}
 
 	if (mysql_num_rows(res) == 0) {
-		syslog(LOG_ERR, "CHECKDBREDIRECT: "
+		syslog(LOG_INFO, "CHECKDBREDIRECT: "
 		       "%s: Hmm, experiment not there anymore!", nodeid);
 		mysql_free_result(res);
 		return 0;
