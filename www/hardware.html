@@ -14,7 +14,8 @@
 
 <h3>Test Nodes</h3>
 <ul>
-<li>40 PC nodes (<b>pc1-40</b>), consisting of:
+<a name="tbpc600"></a>
+<li>40 "pc600" PC nodes (<b>pc1-40</b>), consisting of:
 
 <ul>
 <li> 600MHz Intel Pentium III "Coppermine" processors.
@@ -23,7 +24,10 @@
 href="http://www.asus.com/Products/Motherboard/Pentiumpro/P3b-f/index.html">
 Asus P3B-F (6 PCI/1 ISA slot)</a> motherboard (old reliable BX chipset).
 <li> 256MB PC100 ECC SDRAM.
-<li> 5 Intel EtherExpress Pro/100B 10/100Mbps Ethernet cards.
+<li> 5
+<a
+href="http://support.intel.com/support/network/adapter/pro100/index.htm">
+Intel EtherExpress Pro/100B</a> 10/100Mbps Ethernet cards.
 <li> <a href="http://www.storage.ibm.com/hardsoft/diskdrdl/desk/ds34gxp.htm">
 13GB IBM 34GXP DPTA-371360 7200RPM IDE</a> hard drive.
 <li> Floppy drive
@@ -34,7 +38,8 @@ Antec IPC3480B</a>, with 300W PS and extra fan.
 </ul>
 <p>
 
-<li>128 PC nodes (<b>pc41-pc168</b>), consisting of:
+<a name="tbpc850"></a>
+<li>128 "pc850" PC nodes (<b>pc41-pc168</b>), consisting of:
 
 <ul>
 <li> 850MHz Intel Pentium III processors.
@@ -43,7 +48,10 @@ Antec IPC3480B</a>, with 300W PS and extra fan.
 href="http://www.intel.com/network/products/isp1100.htm">
 Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
 <li> 512MB PC133 ECC SDRAM.
-<li> 5 Intel EtherExpress Pro 10/100Mbps Ethernet ports:
+<li> 5
+<a
+href="http://support.intel.com/support/network/adapter/pro100/index.htm">
+Intel EtherExpress Pro</a> 10/100Mbps Ethernet ports:
 <ul>
 	<li>2 builtin on the motherboard
 		(<code>eth2/eth3</code> in Linux, <code>fxp0/fxp1</code> in FreeBSD)</i>
@@ -61,6 +69,7 @@ Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
 <p>
 
 
+<a name="tbshark"></a>
 <li>160 diskless <a href = "http://www.research.digital.com/SRC/iag/">
 	Compaq DNARD "Sharks"</a> edge nodes (<b>sh[1-20]-[1-8]</b>),
 	consisting of:
@@ -79,7 +88,7 @@ Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
 <li> a users, file, and serial line server (<b>users.emulab.net</b>), consisting of:
 
 <ul>
-<li> Dual 500MHz Intel Pentium III cpus
+<li> Dual 500MHz Intel Pentium III processors
 <li> <a href="http://developer.intel.com/design/servers/l440gx/index.htm">
 Intel L440GX+</a> motherboard (the GX+ chipset)
 <li> 512MB PC100 ECC SDRAM
@@ -92,11 +101,13 @@ Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 </ul>
 <p>
 
-<li> a DB, web, and operations server, consisting of:
+<li> a DB, web, DNS and operations server, consisting of:
 
 <ul>
-<li> Dell PowerEdge 2550 Rack Mount Server
-<li> Single 1000MHz Intel Pentium III cpu
+<li> <a
+href="http://www.dell.com/us/en/hied/products/model_pedge_pedge_2550.htm">
+Dell PowerEdge 2550</a> Rack Mount Server
+<li> Single 1000MHz Intel Pentium III processor
 <li> 512MB PC133 ECC SDRAM
 <li> Dual-Channel On-board RAID (5) Controller 128MB Cache (2-Int Channels)
 <li> Five 18GB Ultra3 (Ultra160) SCSI 10K RPM Hot Plug Hard Drives
@@ -125,18 +136,24 @@ Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 <h3>Switches and Routers</h3>
 <ul>
 
-<li> 3 <a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/c6000_ds.htm">
+<li> 4 <a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/c6000_ds.htm">
 Cisco 6509 high-end switches</a>.
-	Two function as the "testbed backplane" ("programmable patch panel"),
+	Two (soon to be three) function as the
+	<a name="tbbackplane"></a>
+	<em>testbed backplane</em> ("programmable patch panel"),
 	each filled with a
 	<a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/6nam_ds.htm">
 	Network Analysis Module</a>
 	and seven 48-port 10/100 ethernet modules,
 	giving 336 100Mbps ethernet ports on each.  They are linked with 2 Gbit interfaces.
-	The third 6509 contains an MSFC router card and functions as the core router for the testbed.
-	It is configured with full router software,
+	The final 6509 contains an MSFC router card and functions as the
+	<a name="tbcorerouter"></a>
+	<em>core router</em> for the testbed,
+	providing "control" interfaces for the test nodes as well as
+	regulating access to the testbed servers and the outside world.
+	This switch is configured with full router software,
 	Gigabit ethernet, OC-12 ATM (~600Mbps), and more 
-	10/100 Ethernet ports.  A fourth 6509 provides expansion room.
+	10/100 Ethernet ports.
         <!-- Another, but no pix: http://www.cisco.com/univercd/cc/td/doc/pcat/ca6000.htm -->
 <p>
 
@@ -167,24 +184,30 @@ Cisco 6509 high-end switches</a>.
 
 <p><h2>Layout</h2><p>
 
-The first 4 ethernet ports of each PC node are connected to one of the
-      big Cisco switches.  
-All 160 ports can be connected in arbitrary ways by setting up VLANs
-on the switches via remote configuration tools. 
-Cisco 6500 Switch backplane bandwidth is supposed to be near 50Gb/s.
-<!-- but we've heard rumors that it's worse. -->
+Four ethernet ports on each PC node are connected to the
+      <a href="#tbbackplane">testbed backplane</a>.
+      All 672 ports can be connected in arbitrary ways by setting up VLANs
+      on the switches via remote configuration tools. 
+      Cisco 6500 Switch backplane bandwidth is supposed to be near 50Gb/s,
+      <!-- but we've heard rumors that it's worse. -->
+      though between the testbed backplane switches,
+      bandwidth is currently limited to 2Gb/s.
 <p>
 
-The fifth ethernet port is connected to another Cisco 6509. They
-      each have full duplex 100Mbps connections. These are for dumping 
+The fifth ethernet port on each PC is connected to the
+      <a href="#tbcorerouter">core router</a>.
+      Thus each PC has a full duplex 100Mbps connection to the servers.
+      These connections are for dumping 
       data off of the nodes and such, without interfering with
       the experimental interfaces. The only impact on the node is
       processor and disk use, and bandwidth on the PCI bus.
-
 <p>
 
-The DNARD Sharks are also attached to the big Cisco switch by way of a 
-      8+2 10/100 ethernet switch from Asante. Each shelf of 8 sharks
-      is capable of generating up to 80Mbps, and shares one
-      100Mbps link to the Cisco.
+The DNARD Sharks are arranged by "shelves."  A shelf holds 8 sharks
+      each of which is connected by a 10Mbps link to an
+      8+2 10/100 ethernet switch from Asante.  The Asante switches
+      are connected via a 100Mbps link to the testbed backplane.
+      Thus each shelf of 8 sharks
+      is capable of generating up to 80Mbps to the backplane.
+
 

@@ -19,23 +19,26 @@ PAGEHEADER("Home");
       Late Breaking News</a></b>
 
 <p>
-Welcome to Emulab. Emulab (sometimes called the Utah Network Testbed)
+Welcome to Emulab.  Emulab (sometimes called the Utah Network Testbed)
 is a new and unique type of experimental environment: a
-universally-available "Internet in a room" which will provide a new,
-much anticipated balance between control and realism. Several hundred
-PCs, combined with secure, user-friendly web-based tools, allow you
+universally-available "Internet Emulator" which provides a
+new balance between control and realism.  Several hundred
+machines, combined with secure, user-friendly web-based tools, and driven
+by <it>ns</it>-compatible scripts, allow you
 to remotely reserve, configure and control machines and links down to
-the hardware level: error models, latency, bandwidth, packet ordering,
+the hardware level:
+packet loss, latency, bandwidth, packet ordering,
 buffer space all can be user-defined. Even the operating system disk
 contents can be securely and fully replaced with custom images.
 
 <p>
 The Testbed currently features high-speed Cisco switches connecting,
-with over 2 miles of cabling, 160 end nodes
+with over 5 miles of cabling, 160 edge nodes
 <a href = "http://www.research.digital.com/SRC/iag/">
-(Compaq DNARD Sharks)</a> and 40 core nodes (PCs). The core nodes can be
-used as end nodes, simulated routers or traffic-shaping nodes, or
-traffic generators. During an experiment's time slots, the experiment
+(Compaq DNARD Sharks)</a> and 128 core nodes (PCs) (40 more will
+be available shortly).  The core nodes can be
+used as edge nodes, simulated routers, traffic-shaping nodes, or
+traffic generators.  During an experiment's time slots, the experiment
 (and associated researchers) get exclusive use of the assigned
 machines, including root access if desired.  Until we finish designing
 and building smarter scheduling and state-saving software, and obtain
@@ -43,8 +46,8 @@ the disk space, scheduling is manual and done at coarse granularity
 (days).
 
 <p>
-We provide some default software (e.g. Linux and FreeBSD on the PCs,
-NetBSD on the Sharks) that many users may want. The basic software
+We provide some default software (e.g. Redhat Linux and FreeBSD on the PCs,
+NetBSD on the Sharks) that many users want. The basic software
 configuration on your nodes includes accounts for project members,
 root access, DNS service, compilers and linkers. But fundamentally,
 the software you run on it, including all bits on the disks, is
