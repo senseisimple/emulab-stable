@@ -129,6 +129,9 @@ void grobot::pbMove(float mdisplacement) {
   // execute a move primitive
   
   if (mdisplacement != 0.0f) {
+    // send the move to the robot
+    std::cout << "Move length: " << mdisplacement << std::endl;
+    
     acpValue moveLength((float)(mdisplacement));
     pBehavior = garcia.createNamedBehavior("move", "move1");
     pBehavior->setNamedValue("distance", &moveLength);
@@ -181,6 +184,9 @@ void grobot::pbPivot(float pangle) {
   }
   
   if (pangle != 0.0f) {
+    // send the pivot to the robot
+    std::cout << "Pivot angle: " << pangle << std::endl;
+    
     acpValue pivotAngle((float)(pangle));
     pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
     pBehavior->setNamedValue("angle", &pivotAngle);
