@@ -235,6 +235,28 @@ sub domounts()
 	}
     }
 
+    #
+    # The MFS version does not support (or need) this DB stuff. Just mount
+    # them up.
+    #
+    if (-e "$SETUPDIR/ismfs") {
+	while (($remote, $local) = each %mounts) {
+	    if (! -e $local) {
+		if (! os_mkdir($local, 0770)) {
+		    warn "*** WARNING: Could not make directory $local: $!\n";
+		    next;
+		}
+	    }
+	
+	    print STDOUT "  Mounting $remote on $local\n";
+	    if (system("$MOUNT $remote $local")) {
+		warn "*** WARNING: Could not $MOUNT $remote on $local: $!\n";
+		next;
+	    }
+	}
+	return 0;
+    }
+
     dbmopen(%MDB, TMMOUNTDB, 0660);
     
     #
@@ -734,9 +756,9 @@ sub dotrafficconfig()
 
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
 
-    $pat = q(MYNAME=([-\w.]+) MYPORT=(\d+) );
+    $pat  = q(MYNAME=([-\w.]+) MYPORT=(\d+) );
     $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
-    $pat .= q(PROTO=(\w+) ROLE=(\w+));
+    $pat .= q(PROTO=(\w+) ROLE=(\w+) GENERATOR=(\w+));
 
     while (<$TM>) {
 	if ($_ =~ /$pat/) {
@@ -752,7 +774,14 @@ sub dotrafficconfig()
 	    my $peerport = $4;
 	    my $proto = $5;
 	    my $role = $6;
+	    my $generator = $7;
 	    my $target;
+
+	    # Skip if not specified as a TG generator. At some point
+	    # work in Shashi's NSE work.
+	    if ($generator ne "TG") {
+		next;
+	    }
 
 	    if ($role eq "sink") {
 		$target = "$ownaddr.$ownport";

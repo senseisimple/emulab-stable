@@ -2130,12 +2130,12 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 
 	res = mydb_query("select vi.vname,role,proto,"
-			 "vnode,port,target_vnode,target_port "
+			 "vnode,port,target_vnode,target_port,generator "
 			 "from virt_trafgens as vi "
 			 "left join reserved as r on r.vname=vi.vnode "
 			 "where r.node_id='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
-			 7, nodeid, pid, eid);
+			 8, nodeid, pid, eid);
 
 	if (!res) {
 		syslog(LOG_ERR, "TRAFGENS: %s: DB Error getting virt_trafgens",
@@ -2152,9 +2152,9 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 		sprintf(buf, "TRAFGEN=%s MYNAME=%s-0 MYPORT=%s "
 			"PEERNAME=%s-0 PEERPORT=%s "
-			"PROTO=%s ROLE=%s\n",
+			"PROTO=%s ROLE=%s GENERATOR=%s\n",
 			row[0], row[3], row[4], row[5], row[6],
-			row[2], row[1]);
+			row[2], row[1], row[7]);
 		       
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
