@@ -7,6 +7,11 @@ use lib '@prefix@/lib';
 use libdb;
 use English;
 
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be a TB administrator to use this program\n");
+}
+
 my ($virtual,$id,$pideid,$members);
 print << "END";
 ID     Project/Experiment Link/LAN   Switches (number of members in parens)
