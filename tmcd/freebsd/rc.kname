@@ -1,0 +1,43 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Check to see what the kernel says was booted, and copy to /kernel.
+#
+my $kernel = `sysctl -n kern.bootfile`;
+
+#
+# Taint check just cause.
+#
+if ($kernel =~ /^([-\w\.\/]+)$/) {
+    $kernel = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Tainted filename: $kernel\n");
+}
+
+if (-e $kernel) {
+    if (system("cmp -s /kernel $kernel") != 0) {
+	if (system("cp -f /kernel /kernel.save")) {
+	    print "Could not backup /kernel! Aborting kernel change\n";
+	}
+	elsif (system("cp -f $kernel /kernel")) {
+	    print "Could not cp $kernel to /kernel!\n";
+	}
+	else {
+	    print "Copied $kernel to /kernel.\n";
+	}
+    }
+}
+else {
+    die("*** $0:\n".
+	"    Kernel $kernel does not exist!\n");
+}
+

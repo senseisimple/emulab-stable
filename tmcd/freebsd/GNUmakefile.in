@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -110,6 +110,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc.mfs
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
