@@ -158,6 +158,13 @@ START mac
 # <mac> <ip>
 END mac
 END ip
+
+START delay
+# Records of the form
+# <node> <bw> <delay>
+# <node> is a virtual node name, <bw> is ###Mb, and <delay> is ###ms
+END delay
+
 ----------------------------------------------------------------------
 
 Other possible sections:
