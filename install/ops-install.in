@@ -156,7 +156,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Installing ports (may take a while)", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.3")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.4")) {
 	    PhaseSkip("Ports already installed");
 	}
 
