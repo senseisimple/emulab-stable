@@ -10,6 +10,11 @@ if [ -x /etc/testbed/rc.ifc ]; then
         /etc/testbed/rc.ifc
 fi
 
+if [ -x /etc/testbed/rc.route -a -r /etc/testbed/router.conf ]; then
+        echo "Setting up Testbed interface routing ..."
+	/etc/testbed/rc.route `cat /etc/testbed/router.conf`
+fi
+
 if [ -x /etc/testbed/rc.delay ]; then
         echo "Setting up Testbed delay configuration ..."
         /etc/testbed/rc.delay

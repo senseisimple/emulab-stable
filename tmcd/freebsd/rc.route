@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# We only handle gated right now
+if [ "$1"x != "ROUTERTYPE=gated"x ]
+then
+	echo "WARNING bad TMCD routing info, gated not started"
+	exit 0
+fi
+
+# Must know the control net
+if [ -x /etc/testbed/control_interface ]
+then
+	CIF=`/etc/testbed/control_interface`
+else
+	echo "WARNING cannot determine control interface, gated not started"
+	exit 0
+fi
+
+if [ ! -x /usr/local/sbin/gated ]
+then
+	echo "WARNING gated not installed, gated not started"
+	exit 0
+fi
+
+if [ ! -r /etc/testbed/gated_$CIF.conf ]
+then
+	echo "WARNING no gated config for interface $CIF, gated not started"
+	exit 0
+fi
+
+sysctl -w net.inet.ip.forwarding=1
+sysctl -w net.inet.ip.fastforwarding=1
+/usr/local/sbin/gated -f /etc/testbed/gated_$CIF.conf
+
+exit 0

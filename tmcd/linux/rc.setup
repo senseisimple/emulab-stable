@@ -10,6 +10,11 @@ if [ -x /etc/rc.d/testbed/rc.ifc  ]; then
 	/etc/rc.d/testbed/rc.ifc
 fi
 
+if [ -x /etc/testbed/rc.route -a -r /etc/testbed/router.conf ]; then
+        echo "Setting up Testbed interface routing ..."
+	/etc/testbed/rc.route `cat /etc/testbed/router.conf`
+fi
+
 if [ -x /etc/rc.d/testbed/rc.rpm  ]; then
         echo "Installing RPMs ..."
 	/etc/rc.d/testbed/rc.rpm
