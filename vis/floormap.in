@@ -72,8 +72,13 @@ $building = $ARGV[0];
 #
 # Hardwire the imagemaps for now.
 #
-my %baseimages = ("MEB:4-East" => "$TB/www/meb-4east.png",
-		  "MEB:4-West" => "$TB/www/meb-4east.png");
+my %baseimages = ();
+$baseimages{"MEB"}{"4-East"} = "$TB/www/meb-4east.png";
+$baseimages{"MEB"}{"4-West"} = "$TB/www/meb-4east.png";
+
+if (!exists($baseimages{$building})) {
+    die("No such building: $building\n");
+}
 
 #
 # Red dot mean node is down.
@@ -103,6 +108,10 @@ my ($bluedot_width, $bluedot_height) = $bluedot->getBounds();
 # If a floor specified, then do just that floor and spit it out.
 #
 if (defined($floor)) {
+    if (!exists($baseimages{$building}{$floor})) {
+	die("No such floor '$floor' in building: $building\n");
+    }
+    
     my ($floorimage, $areamap) = dofloor($building, $floor);
     $image    = $floorimage;
     @areamaps = ($areamap);
@@ -113,10 +122,7 @@ else {
     #
     my @floors = ();
 
-    my $query_result =
-	DBQueryFatal("select distinct floor from location_info ".
-		     "where building='$building'");
-    while (my ($floor) = $query_result->fetchrow_array()) {
+    foreach my $floor (sort(keys(%{ $baseimages{$building} }))) {
 	my ($floorimage, $areamap) = dofloor($building, $floor);
 
 	push(@floors, [ $floorimage, $areamap ]);
@@ -186,12 +192,12 @@ sub dofloor($$)
     #
     # Grab the base image for the floor.
     #
-    if (! exists($baseimages{"$building:$floor"})) {
+    if (! exists($baseimages{$building}{$floor})) {
 	die("*** $0:\n".
 	    "    No base image for $building:$floor!\n");
     }
     my $baseimage =
-	GD::Image->newFromPng($baseimages{"$building:$floor"}, 1) ||
+	GD::Image->newFromPng($baseimages{$building}{$floor}, 1) ||
 	die("*** $0:\n".
 	    "    Could not get base ". $baseimages{"$building:$floor"} ."!\n");
 
