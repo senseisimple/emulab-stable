@@ -590,8 +590,7 @@ sub mkrootfs($)
     if ($IP ne $hostip) {
 	mysystem("echo 'ListenAddress $IP' >> ".
 		 "$path/root/etc/ssh/sshd_config");
-	my @ips = split(",", $jailconfig{IPADDRS});
-	foreach my $ip (@ips) {
+	foreach my $ip (@jailips) {
 	    mysystem("echo 'ListenAddress $ip' >> ".
 		     "$path/root/etc/ssh/sshd_config");
 	}
@@ -744,8 +743,7 @@ sub restorerootfs($)
     if ($IP ne $hostip) {
 	mysystem("echo 'ListenAddress $IP' >> ".
 		 "$path/root/etc/ssh/sshd_config");
-	my @ips = split(",", $jailconfig{IPADDRS});
-	foreach my $ip (@ips) {
+	foreach my $ip (@jailips) {
 	    mysystem("echo 'ListenAddress $ip' >> ".
 		     "$path/root/etc/ssh/sshd_config");
 	}
@@ -967,9 +965,10 @@ sub getjailconfig($)
 	return -1;
     }
     while (<CONFIG>) {
-	if ($_ =~ /^(.*)="(.+)"$/ ||
+	if ($_ =~ /^(.*)="(.*)"$/ ||
 	    $_ =~ /^(.*)=(.+)$/) {
-	    $jailconfig{$1} = $2;
+		$jailconfig{$1} = $2
+		    if ($2 ne "");
 	}
     }
     close(CONFIG);
