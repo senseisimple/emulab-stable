@@ -42,4 +42,21 @@ function TBERROR ($message, $death) {
     }
     return 0;
 }
+
+#
+# General user errors should print something warm and fuzzy
+#
+function USERERROR($message, $death) {
+    echo "<h3><br><br>
+          $message
+          <br>
+          </h3>";
+
+    if ($death) {
+        echo "</body>
+              </html>";
+        die("");
+    }
+}
+
 ?>
