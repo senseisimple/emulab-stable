@@ -41,7 +41,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $INPUTLOG    = "/usr/testbed/scratch/CVS/CVSROOT/commitlogs/testbed";
 my $OUTPUTLOG   = "$TB/www/doc/ChangeLog.txt";
-my $STARTDATE   = "2004/01";
+my $STARTDATE   = "2003/10";
 my $tempname    = "/tmp/import.$$";
 my @entries     = ();
 
