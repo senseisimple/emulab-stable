@@ -112,7 +112,16 @@ if (defined($options{"v"})) {
       warn("Invalid list for -v: Must have $num vnames\n");
       usage();
     }
+    my @usednames = ();
+    my $q = DBQueryFatal("select vname from reserved ".
+			 "where pid='$pid' and eid='$eid'");
+    while (my @r=$q->fetchrow_array()) {
+      push(@usednames, $r[0]);
+    }
     foreach $vname (@vlist) {
+      if ( grep(/^$vname$/,@vnames,@usednames) > 0 ) {
+	die("Vname $vname cannot be used twice.\n");
+      }
       push(@vnames,untaint($vname));
     }
 }
@@ -139,7 +148,6 @@ if ($op==ADD) {
 } else {
     die("*** You must select an operation (add or remove).\n");
 }
-
 
 # Figure out who called us. Root and admin types can do whatever they
 # want. Normal users can only change expts they can MODIFY (local_root)
