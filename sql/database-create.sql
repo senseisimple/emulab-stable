@@ -492,6 +492,7 @@ CREATE TABLE nodes (
   priority int(11) NOT NULL default '-1',
   bootstatus enum('okay','failed','unknown') default 'unknown',
   status enum('up','possibly down','down','unpingable') default NULL,
+  status_timestamp datetime default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static','manual') NOT NULL default 'none',
   next_pxe_boot_path text,
