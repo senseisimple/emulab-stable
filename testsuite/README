@@ -1,8 +1,75 @@
+WARNING: Only frontend tests are currently supported.
+
+Testbed Testing Suite
+---------------------
+
+This directory contains the testing framework for the Testbed.
+
+Running
+-------
+
+To run the tests, follow these steps:
+
+1. Create a directory to store your test files and logs.
+	mkdir ~/tbtest
+
+2. Make that directory your current working directory.
+	cd ~/tbtest
+
+3. Run tbtest with the appropriate arguments.  For frontend tests this
+would be:
+	~/testbed/testsuite/tbtest tbdb frontend
+
+4. Sit back and wait.
+
+The test directory holds the following files:
+	XXX
+
+
+Adding Tests
+------------
+
+There are two ways to add a test.  
+
+The simple way:
+
+The script 'mktest' can be used to automatically generate tests the
+use the following testing approach:
+	Run tbprerun and check for exit code 0.
+	Run tbswapin and check for exit code 0.
+	Run tbswapout and check for exit code0.
+	Run tbswapin and check for exit code 0.
+	Run tbswapout and check for exit code 0.
+	Run tbend and check for exit code 0.
+
+I.e. tests that should pass and only care about checking as far as
+exit codes.
+
+To make such a test run:
+	mktest <mode> <testname> <nsfile>
+
+Where <mode> is frontend or full.  You will be prompted to enter a description of the test.
+
+Alternately you can run mktest without arguments and it will prompt
+for all information.
+
+
+The advanced way:
+
+The testing framework supports a far wider range of tests than those
+described above.  A test can have arbitrary DB state, run any sequence
+of commands, check for fail cases, and inspect data base state for
+correctness.  To create such tests read the "Test Format" section
+below.
+
+
+Program Reference 
+-----------------
 
 mktest
 ------
 
-Make test is a tool to create basic tests from a NS file.  Tests created
+mktest is a tool to create basic tests from a NS file.  Tests created
 with mktest only check the exit codes, they do not check database or
 node status.
 
@@ -21,10 +88,30 @@ information.
 mktest MUST be run in testbed/testsuite.
 
 
+tbtest
+------
+
+tbtest runs all the tests.  It is designed to do an entire testing run
+from start to finish leaving a large collection of log files in its
+wake.
+
+Syntax:
+
+tbtest [-path <path>] <db> <testdir>
+
+-path <path> - Specify a path to store test files in, otherwise uses
+	       the current directory.
+<db>         - What DB to base on.  Usually you want 'tbdb'.
+<testdir>    - What set of tests to run.  Usually "frontend" or "full".
+               Refers to a subdirectory of testdir/test.  Could also
+               be used with an absolute path to run custom test sets.
+
+
 Test Format
 -----------
 
-A test is a directory in testsuite/tests which contains the following files:
+A test is a directory in testsuite/tests/<testdir> which contains the
+following files:
 	nsfile.ns - NS file.
 	dbstate - Any commands to set up the DB.
 	test - Test file.
@@ -49,11 +136,12 @@ tb_compare("<SQL query>",<results>);
 tb_run("tbswapin -test",0);
 tb_compare("<SQL query>",<results>);
 
-See TEST FILES below
+See "Test API" below for a list of available subroutines and
+variables.
 
 
-TEST FILES
-----------
+Test API
+--------
 
 Routines:
 
@@ -75,19 +163,22 @@ test continues otherwise results are displayed and the test fails.
 
 tb_fail(<msg>)
 
-Explicitely fail the test with <msg>.
+Explicitly fail the test with <msg>.
 
 
-Variables (do not change values!):
+Variables (changing this values will have no effect besides
+potentially messing your own test up).
 
 $pid, $eid - PID and EID of test experiment.
 $test - Test name.
 $dir - Directory containing test files.
 
+
 Other notes:
 
 The current directory should not be changed.  It will be the directory
 containing .top, .ptop, and .log files.
+
 
 
 
