@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: mkacct,v 1.16 2000-11-02 17:26:21 newbold Exp $
+### $Id: mkacct,v 1.17 2000-11-13 22:32:45 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -128,13 +128,10 @@ while (@row = $sth->fetchrow_array) {
 ##
 print "Selecting group ID for experiment...";
 $cmd = 
-  "select unix_gid from groups as g ".
-  "left join proj_grps as pg on g.gid = pg.gid ".
-  "left join projects as p on pg.pid = p.pid ".
+  "select unix_gid from projects as p ".
   "left join experiments as e on e.pid = p.pid ".
   "where e.eid = '$eid'";
 $sth = $dbh->query($cmd);
-my $unix_gid = 65533;		# "nogroup"...
 if (@row = $sth->fetchrow_array) {
     $unix_gid = $row[0];
     print "$unix_gid\n";
