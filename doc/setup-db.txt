@@ -1,5 +1,5 @@
 ##### Setting up tbdb for a new boss node
-##### Last updated January 23, 2002
+##### Last updated January 24, 2002
 
 ##### Step 0 - Create the database
 
@@ -289,4 +289,45 @@ dcpd.conf file for real.
 
 6) Create their wires
 
-Use the fillwires.pl script - documentation coming soon!
+Now, we need to enter information into the wires table, so that we know what
+NIC on which machine connects to which port on the switch. This can be done 
+quickly and easily with the fillwires.pl script (in the util directory.) As
+with macgrabber, edit the defines at the top of the file, which are similar
+to those in the macgrabber script.
+
+Now, you'll need to devide the wires up into 'blocks'. Take a look at the
+arguments below. A block is basically a set of wires that are all the same
+type, and plug into consecutive nodes and switch ports. For example, in one set
+of racks at Utah, we have three different lengths of experimental network
+cables - a long set for the bottom third of the rack, a medium set of the
+middle third, etc. Each of these three sets of wires would be a block.
+
+The cable numbers and length are primarily for your benefit in tracking down
+problems and re-connecting wires correctly. The other information, however, is
+crititcal for the correct operation of the testbed software.
+
+Once you've done this, run fillwires.pl for each block. There are 10 arguments
+to it:
+
+start_cable: The number of the cable you'll be starting with
+end_cable: The number on the cable you'll be ending with
+type: The type of the cable: 'Node' for experimental interfaces, 'Control'
+	for control network interfaces
+length: The length, in (integer) feet, of the cables
+start_node: The node id (eg. pc1) that the _lowest numbered_ cable is connected
+	to
+switch_name: node id of the switch that this node is connected to
+start_module: The module number on the switch that the lowest-numbered cable
+	is plugged into. If your switch does not have multiple modules, then
+	it is assumed to use module 1 for all ports.
+start_port: The port number that the lowest-numbered cable is plugged into.
+min_port: At Utah, we've done our wiring by filling up the left half of the
+	switch before the right half. This means that we filled ports
+	1-24 on all of our 48-port modules before moving on to ports 25-48.
+	When you exceed the max_port (the next argument), this is the number
+	you wrap back to.
+max_port: The maximum port number in your fill pattern. When you go past this
+	number, you move onto the next module and the back to the min_port.
+		
+Like macgrabber.pl, fillwires.pl spits out SQL statements on stdout that can
+be fed to mysql.
