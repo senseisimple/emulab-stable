@@ -2173,7 +2173,7 @@ if ($query_result->numrows) {
 #
 # Deal with interface settings.
 #
-foreach my $lan (keys(%virt_lans)) {
+foreach $lan (keys(%virt_lans)) {
     my $protocol = virtlanprotocol($lan);
     
     next
@@ -2685,7 +2685,7 @@ sub AddVlan($$$;$)
 	}
 	printdb "  $lan, \[" . join(" ",@{$vlantable{$lan}}) . "\]\n";
     }
-    elsif (virtlanemulated($lan)) {
+    elsif (virtlanexists($lan) && virtlanemulated($lan)) {
 	#
 	# Like above, except that in this case, its a bunch of vlinks
 	# sharing a smaller set of physical links. Just mark it differently
@@ -3609,6 +3609,7 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"MUSTDELAY"} = 1;
     }
 }
+sub virtlanexists($)	{ return exists($virt_lans{$_[0]}); }
 sub virtlanname($)	{ return $virt_lans{$_[0]}->{"VNAME"}; }
 sub virtlanmembers($)	{ return @{$virt_lans{$_[0]}->{"MEMBERLIST"}}; }
 sub virtlanmustdelay($)	{ return $virt_lans{$_[0]}->{"MUSTDELAY"}; }
