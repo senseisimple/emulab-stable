@@ -9,7 +9,7 @@ SUBDIR		= db
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= mac2if nalloc nfree nodeip
-SBIN_SCRIPTS	= avail inuse showgraph if2port
+SBIN_SCRIPTS	= avail inuse showgraph if2port backup
 LIBEXEC_SCRIPTS = ptopgen
 
 #

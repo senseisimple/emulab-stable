@@ -41,6 +41,7 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/locks
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/lists
+	-mkdir -p $(INSTALL_TOPDIR)/backup
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

@@ -1,0 +1,56 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
+my $BACKUPDIR	= "$TB/backup";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+if (! chdir($BACKUPDIR)) {
+    print STDERR "Could not chdir to $BACKUPDIR!\n";
+    exit(-1);
+}
+
+#
+# Format the name of the backup with date.
+# Untaint it since it was constructed with date. Dopey.
+# 
+my $name = "tbdb-" . `date +20%y%m%d-%H.%M.%S`;
+
+if ($name =~ /^([-\@\w.]+)$/) {
+    $name = $1;
+}
+
+#
+# Do a mysqldump. This will reset the log files.
+#
+if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $name")) {
+    print STDERR "mysqldump failed!\n";
+    exit(1);
+}
+
+#
+# Compress it.
+#
+if (system("gzip $name")) {
+    print STDERR "gzip failed!\n";
+    exit(1);
+}
+
+print STDOUT "DB backup ($DBNAME) complete!\n";
+exit 0;
