@@ -661,7 +661,7 @@ sub setjailoptions() {
 		}
 		last SWITCH;
 	    };
- 	    /^IPADDR$/ && do {
+ 	    /^IPADDRS$/ && do {
 		# Comma separated list of IPs
 		my @iplist = split(",", $val);
 
