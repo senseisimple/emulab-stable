@@ -10,5 +10,7 @@ DELAYCAPACITY=2
 BOSSNODE=golden-gw.ballmoss.com
 USERNODE=golden-gw.ballmoss.com
 FSNODE=golden-gw.ballmoss.com
-MYDOMAIN=ballmoss.com
-
+OURDOMAIN=ballmoss.com
+FSDIR_GROUPS=/groups
+FSDIR_PROJ=/proj
+FSDIR_USERS=/users

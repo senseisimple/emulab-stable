@@ -4,6 +4,7 @@ AC_PREREQ(2.13)
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
 AC_PREFIX_DEFAULT(/usr/testbed)
+AC_CONFIG_HEADER(config.h)
 
 AC_CHECK_TOOL(CC,gcc)
 AC_CHECK_TOOL(CXX,g++)
@@ -14,6 +15,8 @@ AC_CHECK_TOOL(SSH,ssh)
 
 #
 # These get defined in the definitions file (--with-TBDEFS).
+# NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
+# to appear in config.h.
 # 
 AC_SUBST(TBDBNAME)
 AC_SUBST(WWWDEFS)
@@ -25,6 +28,9 @@ AC_SUBST(BOSSNODE)
 AC_SUBST(USERNODE)
 AC_SUBST(FSNODE)
 AC_SUBST(OURDOMAIN)
+AC_SUBST(FSDIR_PROJ)
+AC_SUBST(FSDIR_GROUPS)
+AC_SUBST(FSDIR_USERS)
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -48,6 +54,22 @@ if test -f $TBDEFS; then
 else
 	AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
 fi
+
+#
+# These must come after the "eval" above, since the variables are not
+# defined until the defs file is taken in.
+#
+# Be sure to add to config.h.in!
+#
+AC_DEFINE_UNQUOTED(TBDBNAME, "$TBDBNAME")
+AC_DEFINE_UNQUOTED(IPBASE, "$IPBASE")
+AC_DEFINE_UNQUOTED(BOSSNODE, "$BOSSNODE")
+AC_DEFINE_UNQUOTED(USERNODE, "$USERNODE")
+AC_DEFINE_UNQUOTED(FSNODE, "$FSNODE")
+AC_DEFINE_UNQUOTED(OURDOMAIN, "$OURDOMAIN")
+AC_DEFINE_UNQUOTED(FSDIR_PROJ, "$FSDIR_PROJ")
+AC_DEFINE_UNQUOTED(FSDIR_GROUPS, "$FSDIR_GROUPS")
+AC_DEFINE_UNQUOTED(FSDIR_USERS, "$FSDIR_USERS")
 
 #
 # The email addresses need to be be munged for perl scripts.

@@ -1,0 +1,16 @@
+/* config.h.in */
+
+/* For current automake/autoconf incompatibility. */
+#undef PACKAGE
+#undef VERSION
+
+#undef TBDBNAME
+#undef IPBASE
+#undef BOSSNODE
+#undef USERNODE
+#undef FSNODE
+#undef OURDOMAIN
+#undef FSDIR_PROJ
+#undef FSDIR_GROUPS
+#undef FSDIR_USERS
+

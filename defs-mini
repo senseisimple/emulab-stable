@@ -14,3 +14,6 @@ BOSSNODE=boss.mini.emulab.net
 USERNODE=users.mini.emulab.net
 FSNODE=fs.mini.emulab.net
 OURDOMAIN=mini.emulab.net
+FSDIR_GROUPS=/z/groups
+FSDIR_PROJ=/z/proj
+FSDIR_USERS=/z/users
