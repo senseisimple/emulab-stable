@@ -199,7 +199,7 @@ while (my %row = $db_result->fetchhash()) {
 	}
     }
     elsif ($subnode) {
-	print "Skipping subnode $node\n";
+	print "Will skip subnode $node ISUP wait.\n";
     }
     else {
 	my $nodeAllocState;
@@ -304,7 +304,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it. 
     #
-    if (!$bootpath && !$jailnode && !$plabnode) {
+    if (!$bootpath && !$jailnode && !$plabnode && !$subnode) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
