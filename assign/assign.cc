@@ -20,13 +20,14 @@ tbgraph PG(1,1);
 #define PARTITION_BY_ANNEALING 0
 
 int nparts = 3;     /* DEFAULTS */
-int intercap = 2;
+int *intercap = NULL;
 int *nodecap = NULL;
 int better_heuristic = 0;
 int accepts = 0;
 int nnodes = 0;
 int partition_mechanism;
 int on_line = 0;
+int cycles_to_best = 0;
 
 float sensitivity = .1;
 
@@ -119,10 +120,6 @@ float score()
 	float sc = 0;
 
 	for (int i = 0; i < nparts; i++) {
-		/* Have we violated bandwidth between switches? */
-		if (interlinks[i] > intercap) {
-			sc += (interlinks[i]-intercap);
-		}
 		/* XXX:  THIS MUST BE OPTIMIZED */
 		
 		/* Experimental:  Collapse delay nodes together
@@ -186,7 +183,12 @@ float score()
 		/* Try to minimize the bandwidth used... also probably
 		   not effective */
 		if (interlinks[i] > 0) {
-			sc += .1 * interlinks[i];
+			sc += .001 * interlinks[i];
+		}
+		/* Have we violated bandwidth between switches? */
+		
+		if (interlinks[i] > intercap[i]) {
+			sc += (interlinks[i]-intercap[i])/100;
 		}
 	}
 	return sc;
@@ -210,7 +212,7 @@ void violated()
 {
 	for (int i = 0; i < nparts; i++) {
 		/* Have we violated bandwidth between switches? */
-		if (interlinks[i] > intercap) {
+		if (interlinks[i] > intercap[i]) {
 			cout << "violated:  switch " << i << " bandwidth"
 			     << endl;
 		}
@@ -293,8 +295,8 @@ void screset() {
 		node w = G.target(e);
 	
 		if (G[v].partition() != G[w].partition()) {
-			interlinks[G[v].partition()]++;
-			interlinks[G[w].partition()]++;
+			interlinks[G[v].partition()] += G[e].capacity();
+			interlinks[G[w].partition()] += G[e].capacity();
 		}
 	}
 }
@@ -331,20 +333,20 @@ void scupdate(node n, int newpos)
 		/* They were not in the same bucket to start with */
 		/* So both contributed to their interlinks */
 		if (G[n2].partition() != prevpos) {
-			interlinks[prevpos]--;
+			interlinks[prevpos] -= G[e].capacity();
 
 			/* If they're together now, there's no interlink */
 			if (G[n2].partition() == newpos) {
-				interlinks[G[n2].partition()]--;
+				interlinks[G[n2].partition()] -= G[e].capacity();
 			} else { /* Otherwise, move the interlink */
-				interlinks[newpos]++;
+				interlinks[newpos] += G[e].capacity();
 			}
 		}
 		else /* They were in the same bucket.  They aren't anymore,
 		      * or we would have exited earlier */
 		{
-			interlinks[G[n2].partition()]++;
-			interlinks[newpos]++;
+			interlinks[G[n2].partition()] += G[e].capacity();
+			interlinks[newpos] += G[e].capacity();
 		}
 		++it;
 	}
@@ -441,6 +443,7 @@ int assign()
 						absnodes[n2] = G[n2].partition();
 					}
 					absbest = newscore;
+					cycles_to_best = iters;
 				}
 			} else { /* Reject this change */
 				scupdate(n, oldpos);
@@ -461,6 +464,7 @@ int assign()
 	cout << "   BEST SCORE:  " << score() << " in "
 	     << iters << " iters and " << timeend << " seconds" << endl;
 	cout << "With " << accepts << " accepts of increases\n";
+	cout << "Iters to find best score:  " << cycles_to_best << endl;
 #if 0
 	for (int i = 0; i < nparts; i++) {
 		if (numnodes[i] > nodecap[i]) {
@@ -493,8 +497,6 @@ void loopassign()
 {
 	node_array<int> nodestorage;
 	int optimal = 0;
-	int orig_nparts;
-	int orig_cap;
 	float timestart = used_time();
 	float totaltime;
 
@@ -508,7 +510,6 @@ void loopassign()
 	violated();
 	cout << "Total time to find solution "
 	     << totaltime << " seconds" << endl;
-	node n;
 }
 
 /*
@@ -638,8 +639,6 @@ void usage() {
 		"           -h ...... brief help listing\n"
 		"           -s #  ... number of switches in cluster\n"
 		"           -n #  ... number of nodes per switch\n"
-		"           -c #  ... inter-switch capacity (bw)\n"
-		"                 (# of links which can go between switches\n"
 		"           -a ...... Use simulated annealing (default)\n"
 		"           -o ...... Update on-line (vs batch, default)\n"
 		"           -t <file> Input topology desc. from <file>\n"
@@ -657,11 +656,10 @@ int main(int argc, char **argv)
 
 	partition_mechanism = PARTITION_BY_ANNEALING;
     
-	while ((ch = getopt(argc, argv, "oas:n:c:t:h")) != -1)
+	while ((ch = getopt(argc, argv, "oas:n:t:h")) != -1)
 		switch(ch) {
 		case 'h': usage(); exit(0);
 		case 's': nparts = atoi(optarg); break;
-		case 'c': intercap = atoi(optarg); break;
 		case 'a': partition_mechanism = PARTITION_BY_ANNEALING; break;
 		case 'o': on_line = 1; break;
 		case 't': topofile = optarg; break;
@@ -745,12 +743,16 @@ int main(int argc, char **argv)
 		nparts = topo->switchcount;
 		cout << "Nparts: " << nparts << endl;
 		nodecap = new int[nparts];
+		intercap = new int[nparts];
 		for (int i = 0; i < nparts; i++) {
 			nodecap[i] = topo->switches[i]->numnodes();
 		}
+		for (int i = 0; i < nparts; i++) {
+			intercap[i] = topo->switches[i]->bw;
+		}
 		topo->print_topo();
 	}
-    
+
 	gw.display();
     
 	gw.set_directed(false);
