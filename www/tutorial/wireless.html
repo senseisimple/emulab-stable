@@ -1,0 +1,112 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2004 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h2>Emulab Tutorial - Using Wireless Nodes</h2>
+</center>
+
+Some Emulab nodes may contain wireless interfaces, and those nodes may
+be scattered around at various locations. To find out where those
+nodes are located and what their node IDs are, see the <a
+href=../floormap.php3>wireless floormaps</a> page. When you click on
+one of the colored dots, you will be taken to a page describing the
+node and what type of interfaces the node has installed in it. To use
+wireless nodes in an experiment, you must provide a few Emulab specific
+NS directives in your NS file, which are illustrated in the following
+small example:
+
+	<code><pre>
+	source tb_compat.tcl
+	set ns [new Simulator]
+
+	# Four wireless capable nodes for a lan.	
+	set nodew1 [$ns node]
+	set nodew2 [$ns node]
+	set nodew3 [$ns node]
+	set nodew4 [$ns node]
+	# A regular node.
+	set node5  [$ns node]
+
+	# A wireless lan.
+	set lan0 [$ns make-lan "nodew1 nodew2 nodew3 nodew4" 54Mb 0ms]
+
+	# A regular duplex link from a wireless capable node to a plain node.
+	set link0 [$ns duplex-link $nodew1 $node5 100Mb 0ms DropTail]
+
+	# Choose the lan protocol.
+	tb-set-protocol $lan0 "80211g"
+
+	# You must choose which node to act as the access point.
+	tb-set-lan-accesspoint $lan0 $nodew1
+
+	# Choose some other settings.
+	tb-set-lan-setting $lan0 "channel" 5
+	tb-set-node-lan-setting $lan0 $nodew1 "txpower" "auto"
+
+	# You must use Redhat 9.0 on wireless capable nodes.
+	tb-set-node-os $nodew1 RHL90-LBS
+	tb-set-node-os $nodew2 RHL90-LBS
+	tb-set-node-os $nodew3 RHL90-LBS
+	tb-set-node-os $nodew4 RHL90-LBS
+	tb-set-node-os $node3  FBSD-STD
+
+	# Turn on static routing.
+	$ns rtproto Static
+	$ns run			</code></pre>
+
+A few points should be noted:
+<ul>
+<li> <tt>lan0</tt> is created with standard <tt>make-lan</tt>
+     directive, but with a bandwidth that reflects the typical speed of a
+     wireless link (54Mb for 80211a and 80211g, 11Mb for 80211b). Note that
+     you may not use duplex links of wireless interfaces; just lans.
+
+<li> After you create the lan, choose the <em>protocol</em> for the lan
+     with the <tt>tb-set-lan-protocol</tt> directive. Currently, you can
+     set the protocol to one of <tt>80211a, 80211b, or 80211g.</tt>. If you
+     fail to set the protocol, the lan will consist of wired links, most
+     likely with delay nodes inserted!
+
+<li> <tt>link0</tt> is a plain duplex link. You may create plain links
+     as long as the nodes have enough wired interfaces. If you try to
+     create an experiment that uses more links (wired or wireless) on a
+     node, the experiment will fail to map.
+
+<li> You must specify which node is to act as the <em>access point</em> for
+     the lan.  Rather then using dedicated access points, Emulab's
+     implementation of wireless lans uses the interface's capability to
+     become an access point for a lan. The node that is choosen to be the
+     access point should obviously be within range of all of the nodes in
+     the lan. There is currently no automated mechanism to pick the access
+     point for you, but one is planned for the future.
+
+<li> Wireless lans allow a number of configuration parameters to be
+     specified, either for the lan as a whole, or for individual members of
+     a lan. There are two Emulab specific directives that you can use;
+     <tt>tb-set-lan-setting</tt> sets a configuration parameter for the
+     entire lan. In the example above, we set the channel to be used for
+     the lan to channel five. Per-node settings can be specified with the
+     <tt>tb-set-node-lan-setting</tt> directive. In the example, we set the
+     transmit power for <tt>nodew1</tt> to auto; all other nodes will
+     default to an interface specific setting.
+
+<li> You must use Redhat 9.0 to take advantage of wireless interfaces. Be
+     sure to set the OSID for all of your wireless nodes to
+     <tt>RHL9-STD</tt>.
+</ul>
+
+Numerous interface settings are possible using <tt>tb-set-lan-setting</tt>
+and <tt>tb-set-node-lan-setting</tt>. These mostly correspond to options
+that are available using the <tt>iwconfig</tt> command on Redhat 9.0. Not
+all options are accepted by all cards, and the format of the value you
+provide for the option must be acceptable to iwconfig. At some point in the
+future we hope to make this more explicit so that know exactly what options
+are available each type of card, and what their legal values are. For now
+you have to be something of an expert. Here is a rough guide to what you
+can currently specify:
+
+<ul>
+<li> 
+</ul>
