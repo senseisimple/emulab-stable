@@ -115,7 +115,7 @@ union mapsect {
 };
 #define MSECT_S_SIZE	512
 
-static inline u_int32_t
+static __inline u_int32_t
 getsector(sectaddr_t *sect)
 {
 	int flags = (sect->device & DEVFLAGS) & ~HARD_DISK;
@@ -146,7 +146,7 @@ getsector(sectaddr_t *sect)
 	return sector;
 }
 
-static inline void
+static __inline void
 putsector(sectaddr_t *sect, u_int32_t sector, int device, int nsect)
 {
 	int flags = (device & DEVFLAGS) & ~HARD_DISK;
@@ -168,7 +168,7 @@ putsector(sectaddr_t *sect, u_int32_t sector, int device, int nsect)
 
 #define LILO_CKSUM	0xabcd
 
-static inline uint16_t
+static __inline uint16_t
 lilocksum(union idescriptors *idp, uint16_t sum)
 {
 	uint16_t *up = (uint16_t *)idp;

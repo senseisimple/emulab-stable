@@ -245,26 +245,26 @@ dumpfile(char *name, int fd)
 	if (detail > 0)
 		printf("\n");
 
-	printf("  %qu bytes of overhead/wasted space (%5.2f%% of image file)\n",
+	printf("  %llu bytes of overhead/wasted space (%5.2f%% of image file)\n",
 	       wasted, (double)wasted / filesize * 100);
 	if (relocs)
-		printf("  %d relocations covering %qu bytes\n",
+		printf("  %d relocations covering %llu bytes\n",
 		       relocs, relocbytes);
-	printf("  %qu bytes of compressed data\n",
+	printf("  %llu bytes of compressed data\n",
 	       cbytes);
-	printf("  %5.2fx compression of allocated data (%qu bytes)\n",
+	printf("  %5.2fx compression of allocated data (%llu bytes)\n",
 	       (double)dbytes / cbytes, dbytes);
-	printf("  %5.2fx compression of total known disk size (%qu bytes)\n",
+	printf("  %5.2fx compression of total known disk size (%llu bytes)\n",
 	       (double)tbytes / cbytes, tbytes);
 
 	if (franges)
-		printf("  %d free ranges: %qu/%qu/%qu ave/min/max size\n",
+		printf("  %d free ranges: %llu/%llu/%llu ave/min/max size\n",
 		       franges, SECTOBYTES(sectfree)/franges,
 		       SECTOBYTES(fmin), SECTOBYTES(fmax));
 	if (aranges) {
 		int maxsz, i;
 
-		printf("  %d allocated ranges: %qu/%qu/%qu ave/min/max size\n",
+		printf("  %d allocated ranges: %llu/%llu/%llu ave/min/max size\n",
 		       aranges, SECTOBYTES(sectinuse)/aranges,
 		       SECTOBYTES(amin), SECTOBYTES(amax));
 		printf("  size distribution:\n");

@@ -126,7 +126,7 @@ struct slicemap fsmap[] = {
 	{ -1,			"",		0 },
 };
 
-static inline struct slicemap *
+static __inline struct slicemap *
 getslicemap(int stype)
 {
 	struct slicemap *smap;
@@ -182,7 +182,7 @@ devread(int fd, void *buf, size_t nbytes)
 
 			if (cc > 0) {
 				nbytes -= cc;
-				buf    += cc;
+				buf     = (void *)((char *)buf + cc);
 				count  += cc;
 				continue;
 			}
@@ -193,7 +193,7 @@ devread(int fd, void *buf, size_t nbytes)
 					strerror(errno), IORETRIES-1);
 	
 			nbytes += count;
-			buf    -= count;
+			buf     = (void *)((char *)buf - count);
 			count   = 0;
 			goto again;
 		}
@@ -235,7 +235,7 @@ devwrite(int fd, const void *buf, size_t nbytes)
 
 			if (cc > 0) {
 				nbytes -= cc;
-				buf    += cc;
+				buf     = (void *)((char *)buf + cc);
 				count  += cc;
 				continue;
 			}
@@ -248,7 +248,7 @@ devwrite(int fd, const void *buf, size_t nbytes)
 	
 			sleep(1);
 			nbytes += count;
-			buf    -= count;
+			buf     = (void *)((char *)buf - count);
 			count   = 0;
 			goto again;
 		}
@@ -256,7 +256,7 @@ devwrite(int fd, const void *buf, size_t nbytes)
 			perror("fsync error: will retry");
 			sleep(1);
 			nbytes += count;
-			buf    -= count;
+			buf     = (void *)((char *)buf - count);
 			count   = 0;
 			goto again;
 		}
@@ -304,9 +304,7 @@ setpartition(partmap_t map, char *str)
 }
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	int	ch, rval;
 	char	*outfilename = 0;
@@ -593,7 +591,7 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			 */
 			rval = read_image(extstart + doslabel.parts[i].dp_start,
 					  pstart + NDOSPART,
-					  extstart ?: start);
+					  extstart ? extstart : start);
 			/* XXX for inputmaxsec calculation below */
 			start = extstart + doslabel.parts[i].dp_start;
 			break;
@@ -665,7 +663,7 @@ read_raw(void)
 
 	if (debug) {
 		fprintf(stderr, "  Raw Image\n");
-		fprintf(stderr, "        start %12d, size %12qd\n", 0, size);
+		fprintf(stderr, "        start %12d, size %12lld\n", 0, size);
 	}
 	return 0;
 }
@@ -708,7 +706,7 @@ addskip(uint32_t start, uint32_t size)
 {
 	struct range	   *skip;
 
-	if (size == 0 || size < frangesize)
+	if (size == 0 || size < (uint32_t)frangesize)
 		return;
 
 	if ((skip = (struct range *) malloc(sizeof(*skip))) == NULL) {
@@ -752,7 +750,7 @@ dumpskips(int verbose)
 		pskip  = pskip->next;
 	}
 	
-	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %qd)\n",
+	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %lld)\n",
 		total, sectobytes(total));
 }
 
@@ -899,7 +897,7 @@ dumpranges(int verbose)
 		range = range->next;
 	}
 	fprintf(stderr,
-		"Total Number of Valid Sectors: %d (bytes %qd)\n",
+		"Total Number of Valid Sectors: %d (bytes %lld)\n",
 		total, sectobytes(total));
 }
 
@@ -987,11 +985,11 @@ applyfixups(off_t offset, off_t size, void *data)
 			clen = (u_int32_t)fp->size;
 			if (debug > 1)
 				fprintf(stderr,
-					"Applying fixup [%qu-%qu] "
-					"to [%qu-%qu]\n",
+					"Applying fixup [%llu-%llu] "
+					"to [%llu-%llu]\n",
 					fp->offset, fp->offset+fp->size,
 					offset, offset+size);
-			memcpy(data+coff, fp->data, clen);
+			memcpy((char *)data+coff, fp->data, clen);
 
 			/* create a reloc if necessary */
 			if (fp->reloctype != RELOC_NONE)
@@ -1044,7 +1042,7 @@ freerelocs(void)
 /*
  * Compress the image.
  */
-static u_char   output_buffer[SUBBLOCKSIZE];
+static uint8_t  output_buffer[SUBBLOCKSIZE];
 static int	buffer_offset;
 static off_t	inputoffset;
 static struct timeval cstamp;
@@ -1067,7 +1065,7 @@ compress_image(void)
 	blockhdr_t	*blkhdr;
 	struct region	*curregion, *regions;
 	struct timeval  estamp;
-	char		*buf;
+	uint8_t		*buf;
 	uint32_t	cursect = 0;
 	struct region	*lreg;
 
@@ -1116,7 +1114,7 @@ compress_image(void)
 		 */
 		if (debug > 0 && debug < 3) {
 			fprintf(stderr,
-				"Compressing range: %14qd --> ", inputoffset);
+				"Compressing range: %14lld --> ", inputoffset);
 			fflush(stderr);
 		}
 
@@ -1124,7 +1122,7 @@ compress_image(void)
 				      &full, &blkhdr->size);
 	
 		if (debug >= 3) {
-			fprintf(stderr, "%14qd -> %12qd %10ld %10u %10d %d\n",
+			fprintf(stderr, "%14lld -> %12lld %10ld %10u %10d %d\n",
 				inputoffset, inputoffset + size,
 				prange->start - inputminsec,
 				bytestosec(size),
@@ -1133,7 +1131,7 @@ compress_image(void)
 		else if (debug) {
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= cstamp.tv_sec;
-			fprintf(stderr, "%12qd in %ld seconds.\n",
+			fprintf(stderr, "%12lld in %ld seconds.\n",
 				inputoffset + size, estamp.tv_sec);
 		}
 		else if (dots && full) {
@@ -1143,7 +1141,7 @@ compress_image(void)
 			if (pos++ >= 60) {
 				gettimeofday(&estamp, 0);
 				estamp.tv_sec -= cstamp.tv_sec;
-				fprintf(stderr, " %12qd %4ld\n",
+				fprintf(stderr, " %12lld %4ld\n",
 					inputoffset+size, estamp.tv_sec);
 				pos = 0;
 			}
@@ -1157,7 +1155,7 @@ compress_image(void)
 		 * This should never happen!
 		 */
 		if (size & (secsize - 1)) {
-			fprintf(stderr, "  Not on a sector boundry at %qd\n",
+			fprintf(stderr, "  Not on a sector boundry at %lld\n",
 				inputoffset);
 			return 1;
 		}
@@ -1432,10 +1430,10 @@ compress_status(int sig)
 	ms = (stamp.tv_sec - cstamp.tv_sec) * 1000 +
 		(stamp.tv_usec - cstamp.tv_usec) / 1000;
 	fprintf(stderr,
-		"%qu input (%qu compressed) bytes in %u.%03u seconds\n",
+		"%llu input (%llu compressed) bytes in %u.%03u seconds\n",
 		inputoffset, bytescompressed, ms / 1000, ms % 1000);
 	if (sig == 0) {
-		fprintf(stderr, "Image size: %qu bytes\n", datawritten);
+		fprintf(stderr, "Image size: %llu bytes\n", datawritten);
 		bps = (bytescompressed * 1000) / ms;
 		fprintf(stderr, "%.3fMB/second compressed\n",
 			(double)bps / (1024*1024));
@@ -1530,7 +1528,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		}
 
 		if (cc != count && !tileof) {
-			fprintf(stderr, "Bad count in read, %d != %d at %qu\n",
+			fprintf(stderr, "Bad count in read, %d != %d at %llu\n",
 				cc, count,
 				off+total);
 			exit(1);
@@ -1552,7 +1550,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		if (oldstyle && outsize > 0x20000)
 			outsize = 0x20000;
 
-		d_stream.next_in   = inbuf;
+		d_stream.next_in   = (Bytef *)inbuf;
 		d_stream.avail_in  = cc;
 		d_stream.next_out  = &output_buffer[buffer_offset];
 		d_stream.avail_out = outsize;

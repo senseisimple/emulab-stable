@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -60,7 +60,8 @@ read_fatslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		return 1;
 	}
 
-	if (readfat(infd, &boot, boot.ValidFat >= 0 ?: 0, &fat) != FSOK)
+	if (readfat(infd, &boot,
+		    boot.ValidFat >= 0 ? boot.ValidFat : 0, &fat) != FSOK)
 		return 1;
 	free(fat);
 

@@ -65,7 +65,7 @@ struct hashinfo {
 typedef struct readbuf {
 	queue_chain_t chain;
 	struct region region;
-	char data[0];
+	unsigned char data[0];
 } readbuf_t;
 static unsigned long maxreadbufmem = MAXREADBUFMEM;
 
@@ -88,10 +88,10 @@ static void dumphash(char *name, struct hashinfo *hinfo);
 static int createhash(char *name, struct hashinfo **hinfop);
 static int hashimage(char *name, struct hashinfo **hinfop);
 static int hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop);
-static char *spewhash(char *h);
+static char *spewhash(unsigned char *h);
 
 static int imagecmp(char *ifile, char *dev);
-static int datacmp(uint32_t off, uint32_t size, char *idata);
+static int datacmp(uint32_t off, uint32_t size, unsigned char *idata);
 
 static int startreader(char *name, struct hashinfo *hinfo);
 static void stopreader(void);
@@ -278,7 +278,8 @@ readhashinfo(char *name, struct hashinfo **hinfop)
 		free(hname);
 		return -1;
 	}
-	if (strcmp(hi.magic, HASH_MAGIC) != 0 || hi.version != HASH_VERSION) {
+	if (strcmp((char *)hi.magic, HASH_MAGIC) != 0 ||
+	    hi.version != HASH_VERSION) {
 		fprintf(stderr, "%s: not a valid signature file\n", hname);
 		goto bad;
 	}
@@ -303,7 +304,7 @@ readhashinfo(char *name, struct hashinfo **hinfop)
 
 static void
 addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
-	char hash[HASH_MAXSIZE])
+	unsigned char hash[HASH_MAXSIZE])
 {
 	struct hashinfo *hinfo = *hinfop;
 	int nreg;
@@ -347,7 +348,7 @@ dumphash(char *name, struct hashinfo *hinfo)
 }
 
 static char *
-spewhash(char *h)
+spewhash(unsigned char *h)
 {
 	static char hbuf[33];
 	uint32_t *foo = (uint32_t *)h;
@@ -390,7 +391,7 @@ createhash(char *name, struct hashinfo **hinfop)
 	 * Write the image file
 	 */
 	hinfo = *hinfop;
-	strcpy(hinfo->magic, HASH_MAGIC);
+	strcpy((char *)hinfo->magic, HASH_MAGIC);
 	hinfo->version = HASH_VERSION;
 	hinfo->hashtype = hashtype;
 	count = sizeof(*hinfo) + hinfo->nregions*sizeof(struct hashregion);
@@ -408,10 +409,10 @@ createhash(char *name, struct hashinfo **hinfop)
 
 	free(hfile);
 	nhregions = hinfo->nregions;
-	printf("%s: %lu chunks, %lu regions, %lu hashregions, %qu data bytes\n",
+	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
 	       name, nchunks, nregions, nhregions, ndatabytes);
 #ifdef TIMEIT
-	printf("%qu bytes: inflate cycles: %qu\n", ndatabytes, dcycles);
+	printf("%qu bytes: inflate cycles: %llu\n", ndatabytes, dcycles);
 #endif
 	return 0;
 }
@@ -536,15 +537,15 @@ checkhash(char *name, struct hashinfo *hinfo)
 	stopreader();
 
 	nhregions = hinfo->nregions;
-	printf("%s: %lu chunks, %lu hashregions, %qu data bytes\n",
+	printf("%s: %lu chunks, %lu hashregions, %llu data bytes\n",
 	       name, nchunks, nhregions, ndatabytes);
 	if (badhashes)
 		printf("%s: %u regions (%d chunks) had bad hashes, "
-		       "%qu bytes affected\n",
+		       "%llu bytes affected\n",
 		       name, badhashes, badchunks, badhashdata);
 	dump_readbufs();
 #ifdef TIMEIT
-	printf("%qu bytes: read cycles: %qu, hash cycles: %qu, cmp cycles: %qu\n",
+	printf("%llu bytes: read cycles: %llu, hash cycles: %llu, cmp cycles: %llu\n",
 	       ndatabytes, rcycles, hcycles, ccycles);
 #endif
 	return 0;
@@ -635,11 +636,11 @@ fullcmp(void *p1, void *p2, off_t sz, uint32_t soff)
 		if (ip[off] == dp[off]) {
 			if (boff != -1 &&
 			    off+1 < sz && ip[off+1] == dp[off+1]) {
-				fprintf(stderr, " [%qu-%qu]: bad",
+				fprintf(stderr, " [%llu-%llu]: bad",
 					byoff+boff, byoff+off-1);
 				reloc = hasrelocs(byoff+boff, off-boff);
 				if (reloc)
-					fprintf(stderr, " (overlaps reloc [%qu-%qu])",
+					fprintf(stderr, " (overlaps reloc [%llu-%llu])",
 						sectobytes(reloc->sector)+reloc->sectoff,
 						sectobytes(reloc->sector)+reloc->sectoff+reloc->size-1);
 				fprintf(stderr, "\n");
@@ -659,10 +660,10 @@ fullcmp(void *p1, void *p2, off_t sz, uint32_t soff)
 		off++;
 	}
 	if (boff != -1) {
-		fprintf(stderr, " [%qu-%qu] bad", byoff+boff, byoff+off-1);
+		fprintf(stderr, " [%llu-%llu] bad", byoff+boff, byoff+off-1);
 		reloc = hasrelocs(byoff+boff, off-boff);
 		if (reloc)
-			fprintf(stderr, " (overlaps reloc [%qu-%qu])",
+			fprintf(stderr, " (overlaps reloc [%llu-%llu])",
 				sectobytes(reloc->sector)+reloc->sectoff,
 				sectobytes(reloc->sector)+reloc->sectoff+reloc->size-1);
 		fprintf(stderr, "\n");
@@ -677,7 +678,7 @@ fullcmp(void *p1, void *p2, off_t sz, uint32_t soff)
 }
 
 static int
-datacmp(uint32_t off, uint32_t size, char *idata)
+datacmp(uint32_t off, uint32_t size, unsigned char *idata)
 {
 	readbuf_t *rbuf;
 
@@ -760,7 +761,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	struct region *regp;
 	z_stream z;
 	int err, nreg;
-	char hash[HASH_MAXSIZE];
+	unsigned char hash[HASH_MAXSIZE];
 	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
 				   unsigned char *);
 	readbuf_t *rbuf;
@@ -787,8 +788,8 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	 */
 	blockhdr = (blockhdr_t *)chunkbufp;
 	chunkbufp += DEFAULTREGIONSIZE;
-	nregions += blockhdr->regioncount;
-	z.next_in = chunkbufp;
+	nregions += (uint32_t)blockhdr->regioncount;
+	z.next_in = (Bytef *)chunkbufp;
 	z.avail_in = blockhdr->size;
 	
 	setrelocs(0, 0);
@@ -848,7 +849,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 			else
 				hsize = rsize;
 
-			z.next_out = rbuf->data;
+			z.next_out = (Bytef *)rbuf->data;
 			z.avail_out = sectobytes(hsize);
 #ifdef TIMEIT
 			sstamp = rdtsc();

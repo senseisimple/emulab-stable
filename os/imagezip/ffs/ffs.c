@@ -214,7 +214,7 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 		fs.fs_cstotal.cs_nffree;
 
 	if (debug) {
-		fprintf(stderr, "        bfree %9qd, bsize %9d, cgsize %9d\n",
+		fprintf(stderr, "        bfree %9lld, bsize %9d, cgsize %9d\n",
 			fs.fs_cstotal.cs_nbfree, fs.fs_bsize, fs.fs_cgsize);
 	}
 	assert(fs.fs_cgsize <= MAXBSIZE);
@@ -229,7 +229,7 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
 			warn("BSD Partition '%c': "
-			     "Could not seek to cg %d at %qd",
+			     "Could not seek to cg %d at %lld",
 			     BSDPARTNAME(part), i, sectobytes(cgoff));
 			return 1;
 		}
@@ -372,14 +372,14 @@ static int
 read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 {
 	int  i, max;
-	char *p;
+	u_int8_t *p;
 	int count, j;
 
 	max = fsp->fs_fpg;
 	p   = cg_blksfree(cgp);
 
 	/* paranoia: make sure we stay in the buffer */
-	assert(&p[max/NBBY] <= (char *)cgp + fsp->fs_cgsize);
+	assert(&p[max/NBBY] <= (u_int8_t *)cgp + fsp->fs_cgsize);
 
 	/*
 	 * XXX The bitmap is fragments, not FS blocks.

@@ -87,7 +87,9 @@ static struct timeval stamp;
 #endif
 int		 readmbr(int slice);
 int		 fixmbr(int slice, int dtype);
+#ifdef FRISBEE
 static int	 write_subblock(int, char *);
+#endif
 static int	 inflate_subblock(char *);
 void		 writezeros(off_t offset, off_t zcount);
 void		 writedata(off_t offset, size_t count, void *buf);
@@ -191,7 +193,7 @@ dump_stats(int sig)
 		while (dotcol++ <= 60)
 			fprintf(stderr, " ");
 		
-		fprintf(stderr, "%4ld %13qd\n", estamp.tv_sec, totaledata);
+		fprintf(stderr, "%4ld %13lld\n", estamp.tv_sec, totaledata);
 	}
 	else {
 		if (sig) {
@@ -204,7 +206,7 @@ dump_stats(int sig)
 				fprintf(stderr, "%d chunks decompressed\n",
 					donechunks);
 		}
-		fprintf(stderr, "Wrote %qd bytes (%qd actual) in %ld seconds\n",
+		fprintf(stderr, "Wrote %lld bytes (%lld actual) in %ld seconds\n",
 			totaledata, totalrdata, estamp.tv_sec);
 	}
 	if (debug)
@@ -420,7 +422,7 @@ dowrite_request(writebuf_t *wbuf)
 #endif
 }
 
-static inline int devread(int fd, void *buf, size_t size)
+static __inline int devread(int fd, void *buf, size_t size)
 {
 	assert((size & (SECSIZE-1)) == 0);
 	return read(fd, buf, size);
@@ -447,7 +449,7 @@ usage(void)
 }	
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
 	int		i, ch;
 	extern char	build_info[];
@@ -926,6 +928,7 @@ DiskWriter(void *arg)
 }
 #endif
 
+#ifdef FRISBEE
 /*
  * Just write the raw, compressed chunk data to disk
  */
@@ -948,6 +951,7 @@ write_subblock(int chunkno, char *chunkbufp)
 	}
 	return 0;
 }
+#endif
 
 static int
 inflate_subblock(char *chunkbufp)
@@ -1034,7 +1038,7 @@ inflate_subblock(char *chunkbufp)
 	blockhdr->regioncount--;
 
 	if (debug == 1)
-		fprintf(stderr, "Decompressing: %14qd --> ", offset);
+		fprintf(stderr, "Decompressing: %14lld --> ", offset);
 
 	wbuf = NULL;
 	while (1) {
@@ -1043,7 +1047,7 @@ inflate_subblock(char *chunkbufp)
 		 */
 		count              = blockhdr->size;
 		blockhdr->size     = 0;
-		d_stream.next_in   = chunkbufp;
+		d_stream.next_in   = (Bytef *)chunkbufp;
 		d_stream.avail_in  = count;
 		chunkbufp	  += count;
 		chunkbytes	  -= count;
@@ -1062,11 +1066,19 @@ inflate_subblock(char *chunkbufp)
 		/*
 		 * Adjust the decompression params to account for the resid
 		 */
-		d_stream.next_out  = &wbuf->data[ibleft];
+		d_stream.next_out  = (Bytef *)&wbuf->data[ibleft];
 		d_stream.avail_out = OUTSIZE - ibleft;
 
-#ifdef FRISBEE
-		sched_yield();
+#if !defined(NOTHREADS) && defined(FRISBEE)
+		/*
+		 * XXX this may be a FreeBSD/linuxthreads specific thing
+		 * but it seems that the decompression thread can run way
+		 * longer than a timeslice causing incoming packets to
+		 * get dropped before the network thread can be rescheduled.
+		 * So force the decompressor to take a break once in awhile.
+		 */
+		if (!nothreads)
+			sched_yield();
 #endif
 		/*
 		 * Inflate a chunk
@@ -1121,7 +1133,7 @@ inflate_subblock(char *chunkbufp)
 
 			if (debug == 2) {
 				fprintf(stderr,
-					"%12qd %8d %8d %12qd %10qd %8d %5d %8d"
+					"%12lld %8d %8d %12lld %10lld %8d %5d %8d"
 					"\n",
 					offset, cc, count, totaledata, size,
 					ibsize, ibleft, d_stream.avail_in);
@@ -1213,7 +1225,7 @@ inflate_subblock(char *chunkbufp)
 	}
  
 	if (debug == 1) {
-		fprintf(stderr, "%14qd\n", offset);
+		fprintf(stderr, "%14lld\n", offset);
 	}
 #ifndef FRISBEE
 	else if (dots) {
@@ -1223,7 +1235,7 @@ inflate_subblock(char *chunkbufp)
 
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= stamp.tv_sec;
-			fprintf(stderr, "%4ld %13qd\n",
+			fprintf(stderr, "%4ld %13lld\n",
 				estamp.tv_sec, totaledata);
 
 			dotcol = 0;
@@ -1257,7 +1269,7 @@ writezeros(off_t offset, off_t zcount)
 		}
 		nextwriteoffset = offset;
 	} else if (offset != nextwriteoffset) {
-		fprintf(stderr, "Non-contiguous write @ %qu (should be %qu)\n",
+		fprintf(stderr, "Non-contiguous write @ %llu (should be %llu)\n",
 			offset, nextwriteoffset);
 		exit(1);
 	}
@@ -1270,7 +1282,7 @@ writezeros(off_t offset, off_t zcount)
 		
 #ifndef FRISBEE
 		if (docrconly)
-			compute_crc(zeros, zcc, &crc);
+			compute_crc((u_char *)zeros, zcc, &crc);
 		else
 #endif
 		if ((zcc = write(outfd, zeros, zcc)) != zcc) {
@@ -1294,7 +1306,7 @@ writedata(off_t offset, size_t size, void *buf)
 
 #ifndef FRISBEE
 	if (docrconly) {
-		compute_crc(buf, size, &crc);
+		compute_crc((u_char *)buf, size, &crc);
 		cc = size;
 	} else
 #endif
@@ -1303,7 +1315,7 @@ writedata(off_t offset, size_t size, void *buf)
 	} else if (offset == nextwriteoffset) {
 		cc = write(outfd, buf, size);
 	} else {
-		fprintf(stderr, "Non-contiguous write @ %qu (should be %qu)\n",
+		fprintf(stderr, "Non-contiguous write @ %llu (should be %llu)\n",
 			offset, nextwriteoffset);
 		exit(1);
 	}
@@ -1357,7 +1369,7 @@ readmbr(int slice)
 	outputmaxsize = (long long)sectobytes(outputmaxsec - outputminsec);
 
 	if (debug) {
-		fprintf(stderr, "Slice Mode: S:%d min:%ld max:%ld size:%qd\n",
+		fprintf(stderr, "Slice Mode: S:%d min:%ld max:%ld size:%lld\n",
 			slice, outputminsec, outputmaxsec, outputmaxsize);
 	}
 	return 0;
@@ -1431,7 +1443,7 @@ getrelocinfo(blockhdr_t *hdr)
 	}
 
 	relocs = (struct blockreloc *)
-		((void *)&hdr[1] + hdr->regioncount * sizeof(struct region));
+		((char *)&hdr[1] + hdr->regioncount * sizeof(struct region));
 	memcpy(reloctable, relocs, numrelocs * sizeof(struct blockreloc));
 }
 
@@ -1457,8 +1469,8 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			coff = (u_int32_t)(roffset - offset);
 			if (debug > 1)
 				fprintf(stderr,
-					"Applying reloc type %d [%qu-%qu] "
-					"to [%qu-%qu]\n", reloc->type,
+					"Applying reloc type %d [%llu-%llu] "
+					"to [%llu-%llu]\n", reloc->type,
 					roffset, roffset+reloc->size,
 					offset, offset+size);
 			switch (reloc->type) {
@@ -1468,13 +1480,14 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			case RELOC_FBSDDISKLABEL:
 			case RELOC_OBSDDISKLABEL:
 				assert(reloc->size >= sizeof(struct disklabel));
-				reloc_bsdlabel((struct disklabel *)(buf+coff),
+				reloc_bsdlabel((struct disklabel *)((char *)buf+coff),
 					       reloc->type);
 				break;
 #endif
 			case RELOC_LILOSADDR:
 			case RELOC_LILOMAPSECT:
-				reloc_lilo(buf+coff, reloc->type, reloc->size);
+				reloc_lilo((char *)buf+coff, reloc->type,
+					   reloc->size);
 				break;
 			case RELOC_LILOCKSUM:
 				reloc_lilocksum(buf, coff, reloc->size);
@@ -1607,7 +1620,7 @@ reloc_lilocksum(void *addr, uint32_t off, uint32_t size)
 
 	assert(size == 2);
 	assert(off >= sizeof(struct idtab));
-	addr += off;
+	addr = (void *)((char *)addr + off);
 
 	/*
 	 * XXX total hack: reloc entry points to the end of the
