@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -62,6 +62,10 @@ if (defined($options{"s"})) {
     }
     
     $slice = "-s $num";
+
+    # XXX for now we do not generate relocation info on slices
+    # XXX there are still some issues with LILO/GRUB
+    $slice = "-N $slice";
 }
 $device   = $ARGV[0];
 $filename = $ARGV[1];
