@@ -237,6 +237,20 @@ CREATE TABLE groups (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'iface_counters'
+#
+
+CREATE TABLE iface_counters (
+  node_id varchar(10) NOT NULL default '',
+  tstamp datetime NOT NULL default '0000-00-00 00:00:00',
+  mac varchar(12) NOT NULL default '000000000000',
+  ipkts int NOT NULL default '0',
+  opkts int NOT NULL default '0',
+  PRIMARY KEY  (node_id, tstamp, mac)
+) TYPE = MyISAM;
+
+
+#
 # Table structure for table 'images'
 #
 
@@ -371,6 +385,21 @@ CREATE TABLE next_reserve (
   eid varchar(32) NOT NULL default '',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
+
+#
+# Table structure for table 'node_idlestats'
+#
+
+CREATE TABLE node_idlestats (
+  node_id varchar(10) NOT NULL default '',
+  tstamp datetime NOT NULL default '0000-00-00 00:00:00',
+  last_tty datetime NOT NULL default '0000-00-00 00:00:00',
+  load_1min float NOT NULL default '0',
+  load_5min float NOT NULL default '0',
+  load_15min float NOT NULL default '0',
+  PRIMARY KEY  (node_id, tstamp)
+) TYPE = MyISAM;
+
 
 #
 # Table structure for table 'node_types'
