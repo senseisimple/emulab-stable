@@ -231,7 +231,7 @@ proc tb-set-node-tarfiles {node args} {
 	lappend tarfiles [join [lrange $args 0 1]]
 	set args [lrange $args 2 end]
     }
-    $node set tarfiles [join $tarfiles ;]
+    $node set tarfiles [join $tarfiles ";"]
 }
 proc tb-set-node-deltas {node args} {
     if {$args == {}} {
