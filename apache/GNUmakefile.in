@@ -1,0 +1,29 @@
+#
+# For installation only.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= apache
+
+include $(OBJDIR)/Makeconf
+
+CONFIG_FILES	= apache.conf
+#
+# Force dependencies to make sure configure regenerates if the .in file
+# is changed.
+# 
+all: $(CONFIG_FILES)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# Like the INSTALL_ETCDIR target
+$(INSTALL_APACHE_CONFIG)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_ETCDIR)
+	$(INSTALL_DATA) $< $@
+
+
+install: $(addprefix $(INSTALL_APACHE_CONFIG)/, $(CONFIG_FILES))
+
+clean:

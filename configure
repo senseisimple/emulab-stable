@@ -21,6 +21,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)"
 ac_help="$ac_help
+  --with-apache-config	Specify path to install apache config files (/usr/local/etc/apache default)"
+ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
 ac_help="$ac_help
@@ -564,7 +566,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:568: checking host system type" >&5
+echo "configure:570: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -585,7 +587,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:589: checking build system type" >&5
+echo "configure:591: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -611,7 +613,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:615: checking for $ac_word" >&5
+echo "configure:617: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -643,7 +645,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:647: checking for $ac_word" >&5
+echo "configure:649: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -675,7 +677,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:679: checking for $ac_word" >&5
+echo "configure:681: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -707,7 +709,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:711: checking for $ac_word" >&5
+echo "configure:713: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -739,7 +741,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:743: checking for $ac_word" >&5
+echo "configure:745: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -771,7 +773,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:775: checking for $ac_word" >&5
+echo "configure:777: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -904,6 +906,24 @@ fi
 
 
 #
+# Path to install apache config files in
+#
+# Check whether --with-apache-config-dir or --without-apache-config-dir was given.
+if test "${with_apache_config_dir+set}" = set; then
+  withval="$with_apache_config_dir"
+  
+    INSTALL_APACHE_CONFIG="$withval"
+
+else
+  
+    INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+
+fi
+
+
+
+
+#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -959,7 +979,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:963: checking for a BSD compatible install" >&5
+echo "configure:983: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1063,7 +1083,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/cvsupd.sh"
+	rc.d/cvsupd.sh \
+	apache/GNUmakefile apache/apache.conf "
 
 #
 # Do this for easy distclean.
@@ -1244,6 +1265,7 @@ s%@OURDOMAIN@%$OURDOMAIN%g
 s%@LEDA@%$LEDA%g
 s%@SSH_ARGS@%$SSH_ARGS%g
 s%@INSTALL_RCDIR@%$INSTALL_RCDIR%g
+s%@INSTALL_APACHE_CONFIG@%$INSTALL_APACHE_CONFIG%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g

@@ -95,6 +95,19 @@ AC_ARG_WITH(rcdir,
 AC_SUBST(INSTALL_RCDIR)
 
 #
+# Path to install apache config files in
+#
+AC_ARG_WITH(apache-config-dir,
+[  --with-apache-config	Specify path to install apache config files (/usr/local/etc/apache default)],
+[
+    INSTALL_APACHE_CONFIG="$withval"
+],[
+    INSTALL_APACHE_CONFIG="/usr/local/etc/apache"
+])
+AC_SUBST(INSTALL_APACHE_CONFIG)
+
+
+#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -185,7 +198,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/cvsupd.sh"
+	rc.d/cvsupd.sh \
+	apache/GNUmakefile apache/apache.conf "
 
 #
 # Do this for easy distclean.
