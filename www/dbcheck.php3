@@ -259,3 +259,7 @@ function TBvalid_osid($token) {
     return TBcheck_dbslot($token, "os_info", "osid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_node_id($token) {
+    return TBcheck_dbslot($token, "nodes", "node_id",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
