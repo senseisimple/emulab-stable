@@ -115,10 +115,10 @@ if (defined($options{"e"})) {
 my $result =
     DBQueryFatal("select class,type,delay_capacity,".
 		 "   virtnode_capacity,isvirtnode,simnode_capacity, " .
-		 "   speed, RAM ".
+		 "   speed, RAM, trivlink_maxspeed ".
 		 "from node_types");
 while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt,$simcapacity, $speed, $ram)
+	$virtcapacity,$isvirt,$simcapacity, $speed, $ram, $trivspeed)
 	    = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
@@ -128,6 +128,7 @@ while (($class,$type,$delaycapacity,
     $map->{'ISVIRT'}   = $isvirt;
     $map->{'SPEED'}    = $speed;
     $map->{'RAM'}      = $ram;
+    $map->{'TRIVSPEED'}= $trivspeed;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
     $typemap{$type} = $map;
@@ -279,6 +280,7 @@ foreach $node (keys(%nodes)) {
     my $simnode_capacity = $typemap{$type}->{'SIMCAP'};
     my $cpu_speed = $typemap{$type}->{'SPEED'};
     my $ram = $typemap{$type}->{'RAM'};
+    my $trivspeed = $typemap{$type}->{'TRIVSPEED'};
     
     my @types = ("$type:1");
     my @features;
@@ -340,8 +342,10 @@ foreach $node (keys(%nodes)) {
     # 
     if ($needvirtgoo) {
 	push @types, "*lan:*";
-	# Add trivial bw spec.
-	push @flags, "trivial_bw:400000";
+	# Add trivial bw spec., but only if the node type has it
+	if ($trivspeed) {
+	    push @flags, "trivial_bw:$trivspeed";
+	}
 	# Add CPU and RAM information
 	$cpu_ram_features_present++;
 	# This number can be use for fine-tuning packing
