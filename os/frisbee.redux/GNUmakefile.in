@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,14 +15,16 @@ all:	frisbee frisbeed
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+FRISBEEDIR	= $(OBJDIR)/os/imagezip
+
 SHAREDOBJS	= log.o network.o trace.o utils.o
 PTHREADCFLAGS	= -D_THREAD_SAFE \
 		  -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 
 CLIENTFLAGS	= $(CFLAGS)
-CLIENTLIBS	= ../imagezip/frisbee.o -lz $(PTHREADLIBS)
-CLIENTOBJS	= client.o $(SHAREDOBJS)
+CLIENTLIBS	= -lz $(PTHREADLIBS)
+CLIENTOBJS	= client.o frisbee.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
@@ -40,7 +42,7 @@ LDFLAGS		= -static
 #CLIENTLIBS	+= `elvin-config --libs vin4c`
 #EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
-frisbee: $(CLIENTOBJS) ../imagezip/frisbee.o
+frisbee: $(CLIENTOBJS)
 	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
 	cp frisbee frisbee.debug
 	strip frisbee
@@ -53,6 +55,11 @@ frisbeed: $(SERVEROBJS)
 
 event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
+
+$(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h
+
+frisbee.o:	$(FRISBEEDIR)/imageunzip.c
+	$(CC) -c $(CFLAGS) -DFRISBEE -I$(FRISBEEDIR) -o frisbee.o $<
 
 client.o:	decls.h log.h trace.h
 server.o:	decls.h log.h trace.h

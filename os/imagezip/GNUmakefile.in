@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,7 +33,7 @@ LIBS		+= -Lntfs -lntfs
 NTFSDIR		= ntfs
 endif
 
-all:	imagezip imageunzip imagedump frisbee.o
+all:	imagezip imageunzip imagedump
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -48,9 +48,6 @@ imageunzip.o:	imageunzip.c
 
 imagedump: imagedump.o version.o
 	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
-
-frisbee.o:	imageunzip.c
-	$(CC) -c $(UNZIPCFLAGS) -DFRISBEE -o frisbee.o $<
 
 ntfs:
 	@$(MAKE) -C ntfs all
