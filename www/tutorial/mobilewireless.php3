@@ -117,8 +117,8 @@ function NLCEMPTY()
 We have deployed and opened to public external use a small version of
 what will grow into a large mobile robotic wireless testbed.  The
 small version (4 Motes and 4 Stargates on 4 robots, all remotely
-controllable) is in an open area within our offices; the big one will
-be elsewhere.
+controllable, plus 2 static Motes) is in an open area within our offices;
+the big one will be elsewhere.
 
 <?php NLCBODYEND() ?>
 
