@@ -249,12 +249,13 @@ experiments.
     <td>A sentence describing why your experiment cannot be idle swapped</td> 
    </tr>
    <tr>
-    <td><tt>autoswap</tt></td>
+    <td><tt>max_duration</tt></td>
     <td>integer</td>
     <td>0</td>
     <td>How long (in minutes) before your experiment
-     should be <a href="docwrapper.php3?docname=swapping.html#autoswap">auto
-     swapped</a>. A value of zero means never auto swap.
+     should be <a href="docwrapper.php3?docname=swapping.html#autoswap">
+     unconditionally swapped</a>. A value of zero means never
+     unconditionally swap this experiment.
    </tr>
    <tr>
     <td><tt>noswapin</tt></td>
