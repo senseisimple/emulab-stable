@@ -36,6 +36,7 @@ my $MAXRETRIES  = 1;
 
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $osselect	    = "$TB/bin/os_select";
+my $TBUISP	    = "$TB/bin/tbuisp";
 my $FRISBEEOSID     = TB_OSID_FRISBEE_MFS();
 
 # Locals
@@ -55,7 +56,6 @@ sub osload ($$) {
     my $asyncmode   = 0;
 
     # Locals
-    my %imageids    = ();
     my %retries	    = ();
     my $failures    = 0;
     my $usedefault  = 1;
@@ -144,6 +144,10 @@ sub osload ($$) {
 	TBdbfork();
     }
 
+    # This will store information about each node, so that if we have to try
+    # again later, we'll have it all.
+    my %reload_info;
+
     # Loop for each node.
     foreach my $node (@nodes) {
 	# All nodes start out as being successful; altered later as needed.
@@ -163,7 +167,6 @@ sub osload ($$) {
 
 	print STDERR "osload: Using $imageid for $node\n"
 	    if $debug;
-	$imageids{$node} = $imageid;
 
 	#
 	# Try to avoid repeated queries to DB for info that does not change!
@@ -308,11 +311,43 @@ sub osload ($$) {
 	    }
 	}
 
-	print "Setting up reload for $node\n";
+	#
+	# Determine which mode to use for reloading this node (note: this may
+	# become an entry in node_capabilities or something like that in the
+	# future - that would be cleaner)
+	#
+	my ($type, $class) = TBNodeType($node);
+	my $reload_mode;
+	my $reload_func;
+	my $reboot_required;
+	if ($class eq "mote") {
+	    $reload_mode = "UISP";
+	    $reload_func = \&SetupReloadUISP;
+	    $reboot_required = 0; # We don't reboot motes to reload them
+	} else {
+	    $reload_mode = "Frisbee";
+	    $reload_func = \&SetupReloadFrisbee;
+	    $reboot_required = !$noreboot; # Reboot unless $noreboot flag set
+	}
+
+	#
+	# Remember this stuff so that if we have to retry this node again
+	# later, we'll know how to handle it
+	#
+	$reload_info{$node} = {
+	    'mode'    => $reload_mode,
+	    'func'    => $reload_func,
+	    'imageid' => $imageid,
+	    'osid'    => $defosid,
+	    'reboot'  => $reboot_required
+	};
+
+	print "Setting up reload for $node (mode: $reload_mode)\n";
+
 	if (!$TESTMODE) {
-	    if (SetupReload($node, $imageid) < 0) {
+	    if (&$reload_func($node, $imageid,$defosid) < 0) {
 		print STDERR
-		    "*** osload ($node): Could not set up reload. Skipping.\n";
+		"*** osload ($node): Could not set up reload. Skipping.\n";
 		goto failednode;
 	    }
 	}
@@ -346,7 +381,9 @@ sub osload ($$) {
 
     # Fire off a mass reboot and quit if not in waitmode.
     if (! $waitmode) {
-	if (! $noreboot) {
+	my ($reboot_nodes, $noreboot_nodes)
+	    = GetNodesRequiringReboot(\%reload_info);
+	if (@$reboot_nodes) {
 	    print "osload: Rebooting nodes.\n";
 
 	    my %reboot_args     = ();
@@ -354,10 +391,10 @@ sub osload ($$) {
 
 	    $reboot_args{'debug'}    = $debug;
 	    $reboot_args{'waitmode'} = 0;
-	    $reboot_args{'nodelist'} = [ @nodes ];
+	    $reboot_args{'nodelist'} = [ @$reboot_nodes ];
 
 	    if (nodereboot(\%reboot_args, \%reboot_failures)) {
-		foreach my $node (@nodes) {
+		foreach my $node (@$reboot_nodes) {
 		    if ($reboot_failures{$node}) {
 			$result->{$node} = $reboot_failures{$node};
 			$failures++;
@@ -377,7 +414,9 @@ sub osload ($$) {
     }
     
     while (@nodes) {
-	if (! $noreboot) {
+	my ($reboot_nodes, $noreboot_nodes)
+	    = GetNodesRequiringReboot(\%reload_info, @nodes);
+	if (@$reboot_nodes) {
 	    # Reboot them all.
 	    print "osload: Issuing reboot for @nodes and then waiting ...\n";
 	    
@@ -386,7 +425,7 @@ sub osload ($$) {
 
 	    $reboot_args{'debug'}    = $debug;
 	    $reboot_args{'waitmode'} = 0;
-	    $reboot_args{'nodelist'} = [ @nodes ];
+	    $reboot_args{'nodelist'} = [ @$reboot_nodes ];
 
 	    if (nodereboot(\%reboot_args, \%reboot_failures)) {
 		#
@@ -395,7 +434,7 @@ sub osload ($$) {
 		# 
 		my @temp = ();
 		
-		foreach my $node (@nodes) {
+		foreach my $node (@$reboot_nodes) {
 		    if ($reboot_failures{$node}) {
 			$result->{$node} = $reboot_failures{$node};
 			$failures++;
@@ -404,13 +443,13 @@ sub osload ($$) {
 			push(@temp, $node);
 		    }
 		}
-		@nodes = @temp;
+		@nodes = (@temp,@$noreboot_nodes);
 	    }
 	}
 
 	# Now wait for them.
 	my $startwait   = time;
-	my @failednodes = WaitTillReloadDone($startwait, \%imageids, @nodes);
+	my @failednodes = WaitTillReloadDone($startwait, \%reload_info, @nodes);
 	@nodes=();
     
 	while (@failednodes) {
@@ -419,8 +458,11 @@ sub osload ($$) {
 	    if ($retries{$node}) {
 		print "*** osload ($node): Trying again ...\n";
 
+		my $reload_info = $reload_info{$node};
+
 		# Possible race with reboot?
-		if (SetupReload($node, $imageids{$node}) < 0) {
+		if (&{$reload_info->{'func'}}($node, $reload_info->{'imageid'},
+		    $reload_info->{'osid'}) < 0) {
 		    print(STDERR
 			  "*** osload ($node): ".
 			  "Could not set up reload. Skipping.\n");
@@ -464,7 +506,7 @@ sub osload ($$) {
 # Wait for a reload to finish by watching its state
 sub WaitTillReloadDone($$@)
 {
-    my ($startwait, $imageids, @nodes) = @_;
+    my ($startwait, $reload_info, @nodes) = @_;
     my %done	= ();
     my $count   = @nodes;
     my @failed  = ();
@@ -484,7 +526,7 @@ sub WaitTillReloadDone($$@)
 	sleep(5);
 	foreach my $node (@nodes) {
 	    if (! $done{$node}) {
-		my $maxwait = $maxwaits{$imageids->{$node}};
+		my $maxwait = $maxwaits{$reload_info->{$node}{'imageid'}};
 		
 		my $query_result =
 		    DBQueryWarn("select * from current_reloads ".
@@ -538,9 +580,9 @@ sub WaitTillReloadDone($$@)
 }
 
 # Setup a reload. 
-sub SetupReload($$)
+sub SetupReloadFrisbee($$$)
 {
-    my ($node, $imageid) = @_;
+    my ($node, $imageid, $osid_notused) = @_;
     my $osid = $FRISBEEOSID;
 
     #
@@ -577,6 +619,83 @@ sub SetupReload($$)
 	return -1;
     }
     return 0;
+}
+
+#
+# Setup a reload, using USIP (for motes), rather than Frisbee. Note that
+# this differs from a Frisbee reload in one key way - it does the reload
+# right here in this code, rather than setting up a reload for later.
+#
+sub SetupReloadUISP($$$)
+{
+    my ($node, $imageid, $osid) = @_;
+
+    #
+    # Get the path to the image
+    #
+    my $query_result = DBQueryFatal("select path from images " .
+	"where imageid='$imageid'");
+    if ($query_result->num_rows() != 1) {
+	print STDERR "*** osload ($node): Failed to get path for $imageid!\n";
+	return -1;
+    }
+    my ($path) = $query_result->fetchrow();
+
+    #
+    # Tell stated that we're about to start reloading
+    #
+    TBSetNodeNextOpMode($node,TBDB_NODEOPMODE_RELOADMOTE);
+
+    #
+    # The mote goes 'down', then starts to reload
+    #
+    TBSetNodeEventState($node,TBDB_NODESTATE_SHUTDOWN);
+    TBSetNodeEventState($node,TBDB_NODESTATE_RELOADING);
+
+    #
+    # Okay, just run tbuisp with that path
+    #
+    my $rv = system("$TBUISP upload $path $node");
+    if ($rv) {
+	print STDERR "*** osload ($node): tbuisp failed\n";
+	return -1;
+    }
+
+    #
+    # Tell stated that we've finished reloading the node
+    #
+    TBSetNodeEventState($node,TBDB_NODESTATE_RELOADDONE);
+
+    system("$osselect $osid $node");
+    if ($?) {
+	print STDERR "*** osload ($node): os_select $osid failed!\n";
+	goto failednode;
+    }
+
+    #
+    # 'Reboot' the node (from stated's perspective, anyway)
+    # has been shutdown, so that the os_select will take effect
+    #
+    TBSetNodeEventState($node,TBDB_NODESTATE_SHUTDOWN);
+
+    return 0;
+}
+
+#
+# Return two array references (possbily empty) of:
+# [all nodes requiring reboot, all nodes not requiring reboot]
+#
+sub GetNodesRequiringReboot($) {
+    my ($reload_info) = @_;
+    my (@reboot, @noreboot);
+    foreach my $node (%$reload_info) {
+	if ($reload_info->{$node}{'reboot'}) {
+	    push @reboot, $node;
+	} else {
+	    push @noreboot, $node;
+	}
+    }
+    return (\@reboot, \@noreboot);
 }
 
 #
