@@ -1,0 +1,217 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage {
+    print STDERR "Usage: plaything [-o <prefix>] [-f <floor>] <building>\n";
+    exit(-1);
+}
+my $optlist = "df:o:";
+my $building;
+my $floor;
+my $debug;
+my $image;
+my $prefix = "/tmp/floormap";
+sub dofloor($$);
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $ICONDIR     = "$TB/www";
+
+# Load libraries.
+use lib '@prefix@/lib';
+use libdb;
+use GD;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Debugging.
+sub dprint($) {
+    my ($msg) = @_;
+    
+    print STDERR $msg
+	if ($debug);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $floor = $options{"f"};
+}
+if (defined($options{"o"})) {
+    $prefix = $options{"o"};
+}
+$building = $ARGV[0];
+
+#
+# Hardwire the imagemaps for now.
+#
+my %baseimages = ("MEB:4-East" => "$TB/www/meb-4east.png",
+		  "MEB:4-West" => "$TB/www/meb-4east.png");
+
+#
+# We are also going to build an imagemap array, indexed by node_id.
+#
+my %imagemap = ();
+
+#
+# Red dot mean node is down.
+#
+my $reddot = GD::Image->newFromPng("$ICONDIR/redball.png", 1) ||
+    die("*** $0:\n".
+	"    Could not get reddot image!\n");
+my ($reddot_width, $reddot_height) = $reddot->getBounds();
+
+#
+# Green dot means node is free.
+#
+my $greendot = GD::Image->newFromPng("$ICONDIR/greenball.png", 1) ||
+    die("*** $0:\n".
+	"    Could not get greendot image!\n");
+my ($greendot_width, $greendot_height) = $greendot->getBounds();
+
+#
+# Blue dot means node is allocated
+#
+my $bluedot = GD::Image->newFromPng("$ICONDIR/blueball.png", 1) ||
+    die("*** $0:\n".
+	"    Could not get bluedot image!\n");
+my ($bluedot_width, $bluedot_height) = $bluedot->getBounds();
+
+#
+# If a floor specified, then do just that floor and spit it out.
+#
+if (defined($floor)) {
+    $image = dofloor($building, $floor);
+}
+else {
+    #
+    # Need to find all the floors in this building and generate them all.
+    #
+    my @floors = ();
+
+    my $query_result =
+	DBQueryFatal("select distinct floor from location_info ".
+		     "where building='$building'");
+    while (my ($floor) = $query_result->fetchrow_array()) {
+	push(@floors, dofloor($building, $floor));
+    }
+
+    #
+    # Now generate a superimage from all the base images. We just line
+    # them up; nothing fancy at all.
+    #
+    my $total_y = 0;
+    my $max_x   = 0;
+    foreach my $floorimage (@floors) {
+	($x, $y) = $floorimage->getBounds();
+
+	$total_y = $total_y + $y + 10;
+	$max_x = $x
+	    if ($x > $max_x);
+    }
+    #
+    # Create a new image using the aggregate size.
+    #
+    $image = new GD::Image($max_x, $total_y);
+
+    #
+    # Now copy the floor images into the superimage.
+    #
+    my $running_y = 0;
+    foreach my $floorimage (@floors) {
+	($x, $y) = $floorimage->getBounds();
+	$image->copy($floorimage,
+		     0, $running_y,
+		     0, 0, $x, $y);
+	$running_y += $y + 10;
+    }
+}
+open(PNG, "> ${prefix}.png") ||
+    die("*** $0:\n".
+	"    Could not open ${prefix}.png for writing!\n");
+print PNG $image->png();
+close(PNG);
+
+exit(0);
+
+#
+# Do a floor. Returns the image object.
+#
+sub dofloor($$)
+{
+    my ($building, $floor) = @_;
+
+    #
+    # Grab the base image for the floor.
+    #
+    if (! exists($baseimages{"$building:$floor"})) {
+	die("*** $0:\n".
+	    "    No base image for $building:$floor!\n");
+    }
+    my $baseimage = GD::Image->newFromPng($baseimages{"$building:$floor"}, 1) ||
+	die("*** $0:\n".
+	    "    Could not get base " . $baseimages{"$building:$floor"} ."!\n");
+
+
+    #
+    # Grab the nodes on this floor in this building. We want to know
+    # their allocation status so we know what colors to use.
+    # 
+    my $query_result =
+	DBQueryFatal("select loc.*,r.pid,r.eid from location_info as loc ".
+		     "left join reserved as r on r.node_id=loc.node_id ".
+		     "where loc.floor='$floor' and loc.building='$building'");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $x   = $rowref->{"loc_x"};
+	my $y   = $rowref->{"loc_y"};
+	my $pid = $rowref->{"pid"};
+	my $eid = $rowref->{"eid"};
+
+	if (!defined($pid)) {
+	    $baseimage->copy($greendot,
+			     $x - int($greendot_width / 2.0),
+			     $y - int($greendot_height / 2.0),
+			     0, 0,
+			     $greendot_width, $greendot_height);
+	}
+	elsif ($pid eq NODEDEAD_PID() and $eid eq NODEDEAD_EID()) {
+	    $baseimage->copy($reddot,
+			     $x - int($reddot_width / 2.0),
+			     $y - int($reddot_height / 2.0),
+			     0, 0,
+			     $reddot_width, $reddot_height);
+	}
+	else {
+	    $baseimage->copy($bluedot,
+			     $x - int($bluedot_width / 2.0),
+			     $y - int($bluedot_height / 2.0),
+			     0, 0,
+			     $bluedot_width, $bluedot_height);
+	}
+    }
+    return $baseimage;
+}
