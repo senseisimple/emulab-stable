@@ -27,11 +27,13 @@ my @row;
 
 # We don't want to run this script unless its the real version.
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
 if ($TB ne "/usr/testbed") {
-    die("Wrong version. Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Wrong version. Maybe its a development version?\n");
 }
 
 # un-taint path
@@ -76,7 +78,7 @@ print MAP "\$TTL\t1\n";
 # that have a vname in the reserved table. 
 #
 $db_result =
-    DBQueryFatal("select node_id,pid,eid,vname from reserved where vname!=''");
+    DBQueryFatal("select node_id,pid,eid,vname from reserved");
 
 if ($db_result->numrows > 0) {
     #
@@ -86,8 +88,12 @@ if ($db_result->numrows > 0) {
 	my $node_id = $row[0];
 	my $pid     = $row[1];
 	my $eid     = $row[2];
-	my $vname   = $row[3];
+	my $vname   = $node_id;
 
+	if (defined($row[3])) {
+	    $vname = $row[3];
+	}
+	    
 	my $cname   = sprintf("%-40s", "$vname.$eid.$pid");
 	printf MAP "$cname IN\tCNAME\t$node_id\n";
     }
