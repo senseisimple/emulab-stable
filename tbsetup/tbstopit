@@ -24,7 +24,7 @@ if (! chdir($workdir)) {
 }
 
 print STDOUT "Running tbend with arguments: $irfile\n";
-if (system("$tbdir/tbend $irfile") == 0) {
+if (system("$tbdir/tbend $irfile") != 0) {
     print STDOUT "tbend failed!\n";
     exit(-1);
 }

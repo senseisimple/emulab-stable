@@ -4,11 +4,11 @@
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# usage: tbdoit <path to working directory> <nsfile>
+# usage: tbdoit <path to working directory> <project> <nsfile>
 #
 my $tbdir = "/usr/testbed/bin/";
 
-if (@ARGV != 2) {
+if (@ARGV != 3) {
     print STDOUT "Usage: tbdoit <working dir> <project> <file>\n";
     exit(-1);
 }
@@ -19,7 +19,7 @@ my $base    = "$nsfile";
 $_ = $nsfile;
 s/\.ns//g;
 $base = $_;
-my $irfile  = "$base.ir";
+my $irfile  = "$project$base.ir";
 my $repfile = "$base.report";
 
 #
@@ -30,20 +30,20 @@ if (! chdir($workdir)) {
     exit(-1);
 }
 
-print STDOUT "Running tbprerun with arguments: $project $nsfile\n";
-if (system("$tbdir/tbprerun $project $nsfile") == 0) {
+print STDOUT "Running $tbdir/tbprerun with arguments: $project $nsfile\n";
+if (system("$tbdir/tbprerun $project $nsfile") != 0) {
     print STDOUT "tbprerun failed!\n";
     exit(-1);
 }
 
 print STDOUT "Running tbrun with arguments: $irfile\n";
-if (system("$tbdir/tbrun $irfile") == 0) {
+if (system("$tbdir/tbrun $irfile") != 0) {
     print STDOUT "tbrun failed!\n";
     exit(-1);
 }
 
-print STDOUT "Running tbreport with arguments: $irfile -v >& $repfile\n";
-if (system("$tbdir/tbreport -v $irfile >& $repfile") == 0) {
+print STDOUT "Running tbreport with arguments: -v $irfile 2>&1 > $repfile\n";
+if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
     print STDOUT "tbreport failed!\n";
     exit(-1);
 }
