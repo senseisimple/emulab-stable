@@ -127,10 +127,10 @@ echo "<tr>
 
 echo "<tr>
           <td>OS Features:</td>
-          <td><input type=checkbox name=\"os_feature_ping\">ping &nbsp
-              <input type=checkbox name=\"os_feature_ssh\">ssh  &nbsp
-              <input type=checkbox name=\"os_feature_ipod\">ipod  &nbsp
-              <input type=checkbox name=\"os_feature_isup\">isup  &nbsp
+          <td><input checked type=checkbox name=\"os_feature_ping\">ping &nbsp
+              <input checked type=checkbox name=\"os_feature_ssh\">ssh  &nbsp
+              <input checked type=checkbox name=\"os_feature_ipod\">ipod  &nbsp
+              <input checked type=checkbox name=\"os_feature_isup\">isup  &nbsp
               <p>
               Guidelines for setting os_features for your OS:
               <ol>
@@ -150,15 +150,19 @@ echo "<tr>
 echo "<tr>
           <td>*Operational Mode (op_mode):</td>
           <td><select name=op_mode>
+               <option selected value=NORMALv1>NORMALv1 </option>
                <option value=MINIMAL>MINIMAL &nbsp;</option>
                <option value=NORMAL>NORMAL </option>
-               <option value=NORMALv1>NORMALv1 </option>
               </select>
               <p>
               Guidelines for setting op_mode for your OS:
               <ol>
-                <li> If it is based on a testbed image, use the same
-                     op_mode as that image (should be NORMAL or NORMALv1).
+                <li> If it is based on a testbed image (one of our
+                     RedHat Linux or FreeBSD images)  use the same
+                     op_mode as that image (should be NORMALv1,
+                     or NORMAL for old images. Select it from the
+                     <a href=\"$TBBASE/showosid_list.php3\"
+                     >OS Descriptor List</a> to find out).
                 <li> If not, use MINIMAL.
               </ol>
           </td>

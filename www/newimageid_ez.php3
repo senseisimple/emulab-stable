@@ -38,12 +38,12 @@ $oslist["NetBSD"]  = "NetBSD";
 $oslist["Other"]   = "Other";
 
 #
-# Default OS strings. Needs to move someplace else!
+# Default op modes. Needs to move someplace else!
 #
 $opmodes             = array();
-$opmodes["NORMAL"]   = "NORMAL";
 $opmodes["NORMALv1"] = "NORMALv1";
 $opmodes["MINIMAL"]  = "MINIMAL";
+$opmodes["NORMAL"]   = "NORMAL";
 
 #
 # See what projects the uid can do this in.
@@ -405,18 +405,22 @@ function SPITFORM($formfields, $errors)
                     <li> otherwise, feel free to ask us!
                  </ul>
              <li> Guidelines for setting OS features for your OS:
+                  (Most images should mark all four of these.)
                 <ol type=a>
                   <li> Mark ping and/or ssh if they are supported.
-                  <li> If you use one of our standard kernels, or
-                       are based on a testbed kernel config, mark ipod.
-                  <li> If it is based on one of our standard images or
-                       sends its own ISUP notification, mark isup.
+                  <li> If you use one of our standard Linux or FreeBSD
+                       kernels, or started from our kernel configs, mark ipod.
+                  <li> If it is based on one of our standard Linux or
+                       FreeBSD images (or otherwise
+                       sends its own ISUP notification), mark isup.
                 </ol>
              <li> Guidelines for setting Operational Mode for your OS:
+                  (Most images should use NORMALv1.)
                 <ol type=a>
-                  <li> If it is based on one of our standard images,
-                       use the same Op. Mode as that image (should be
-                       NORMAL or NORMALv1; select it from the
+                  <li> If it is based on a testbed image (one of our
+                       RedHat Linux or FreeBSD images)  use the same
+                       op_mode as that image (should be NORMALv1,
+                       or NORMAL for old images. Select it from the
                        <a href=\"$TBBASE/showosid_list.php3\"
                        >OS Descriptor List</a> to find out).
                   <li> If not, use MINIMAL.
@@ -448,6 +452,11 @@ if (! $submit) {
     $defaults = array();
     $defaults[loadpart] = "X";
     $defaults[path]     = "/proj/";
+    $defaults[op_mode]  = "NORMALv1";
+    $defaults[os_feature_ping] = "checked";
+    $defaults[os_feature_ssh]  = "checked";
+    $defaults[os_feature_ipod] = "checked";
+    $defaults[os_feature_isup] = "checked";
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
