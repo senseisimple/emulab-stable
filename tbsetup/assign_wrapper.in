@@ -3599,7 +3599,14 @@ sub virtlantopbw($$) {
     if (defined($rebw)) {
 	$return_rbw = $rebw;
     } else {
-	$return_rbw = &getbandwidth($node, $virtlan, $rbw);
+	# If this is an emulated link, we put in only the reported bandwidth -
+	# otherwise, we put in the bandwidth of the type of physical interface
+	# it is likely to get mapped to
+	if (virtlanemulated($virtlan)) {
+	    $return_rbw = $rbw;
+	} else {
+	    $return_rbw = &getbandwidth($node, $virtlan, $rbw);
+	}
     }
 
     return ($return_bw, $return_rbw);
