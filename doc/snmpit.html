@@ -1,0 +1,298 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>snmpit/vsnmpit Users Manual</title>
+</head>
+
+<body>
+<h1>snmpit/vsnmpit Users Manual</h1>
+
+<code>snmpit</code> is a tool that uses SNMP to manage the Intel 510T
+switches that are used in the Utah Testbed. Its abilities include VLAN
+configuration (create, delete, [list, configure from a file]) and
+configuration of port settings (enable/disable, auto-detect
+speed/duplex, speed, duplex).
+<p>
+<code>vsnmpit</code> is a graphical interface to
+<code>snmpit</code>. It does everything that snmpit does, but in a
+prettier and more convenient way.
+<p>
+In the context of the testbed, this allows creating of the virtual
+"links" in the topology using VLANs, and allows configuration of
+different types of connections (100Mbps/10Mbps, Full/Half duplex), and
+forcing a link to go down by disabling it on the switch. 
+<p>
+snmpit is currently located in /usr/testbed/bin/ on plastic.
+<ul>
+<li><a href="#vsnmpit">vsnmpit</a>
+<li><a href="#vVLAN">VLAN Setup Menu</a>
+<li><a href="#vPort">Port Setup</a>
+<li><a href="#voptions">Options Menu</a>
+<li><a href="#snmpit">Command-line snmpit</a>
+</ul>
+
+<a name="vsnmpit"></a>
+<h1>vsnmpit</h1>
+<code>vsnmpit</code>, or Visual SnmpIt!, has no command line options,
+and is simply run by typing <code>vsnmpit</code> or <code>vsnmpit
+&</code> on the command line. When it starts, you will see this:
+<p align=center>
+<img src="images/vsnmpitopening.jpg"/>
+<p>
+The buttons at the top bring up their associated menus. As expected,
+the Exit button in the top right corner closes vsnmpit.
+(As you can see, all screen shots show vsnmpit as seen using the fvwm2
+window manager, configured with red active borders.)
+
+<a name="vVLAN"></a>
+<h3>VLAN Setup</h3>
+The VLAN Setup menu shows a table of all existing VLANs. In the Remove
+column are buttons to select a set of VLANs to be removed. Each VLAN
+also has a number and a name. Note that the Control cannot be
+removed. Then each VLAN's members are listed. This shows that the
+switch had 10 VLANs, that happened to make a fully connected graph of
+5 nodes.
+<p align=center>
+<img src="images/vsnmpitvlan.jpg"/>
+<p>
+The process of removing VLANs is quite simple. First, select some
+VLANs to remove. Like this:
+<p align=center>
+<img src="images/vsnmpitvlanr1.jpg"/>
+<p>
+Then press the Remove button, and you'll see this:
+<p align=center>
+<img src="images/vsnmpitvlanr2.jpg"/>
+<p>
+When it finishes, you'll get something like this:
+<p align=center>
+<img src="images/vsnmpitvlanr3.jpg"/>
+<p>
+The File button is used to add a set of VLANs specified in a setup
+file. See <a href="#file">here</a> for details on making this file. It
+is really quite simple. First, type in the file name. Here we use
+<code>t1-10.i0</code>, a file that takes machines tbpc01 through
+tbpc10, and adds their first interface, i0, to a VLAN. In this way,
+all the machines can talk to each other on thier first interface.
+<p align=center>
+<img src="images/vsnmpitvlanf1.jpg"/>
+<p>
+Then it will show you this:
+<p align=center>
+<img src="images/vsnmpitvlanf2.jpg"/>
+<p>
+And when it finishes, the switch will be configured like this:
+<p align=center>
+<img src="images/vsnmpitvlanf3.jpg"/>
+<p>
+
+<a name="vPort"></a>
+<h3>Port Setup</h3>
+<p>
+Choose a switch, and it will show you its ports, and the way they are
+currently configured. Then make any changes you like, and hit the
+update button.
+</p>
+<a name="voptions"></a>
+<h3>Options</h3>
+There are four global options for vsnmpit. They correspond with
+options from snmpit. The first deals with VLANs only, and the last two
+only pertain to port setup. This is what you'll see when you choose
+this menu. Its pretty self explanatory. The default values are shown here.
+<p align=center>
+<img src="images/vsnmpitoptions.jpg"/>
+<p>
+
+
+
+<a name="snmpit"></a>
+<h1>snmpit</h1>
+<ul>
+<li><a href="#syntax">snmpit Syntax</a>
+<li><a href="#general">General Commands</a>
+<li><a href="#VLAN">VLAN Configuration Commands</a>
+<li><a href="#port">Port Control Commands</a>
+<!-- <li><a href="#"></a> -->
+</ul>
+
+<a name="syntax"></a>
+<h3>Syntax</h3>
+Syntax is as follows: (this message can be viewed by with 
+"<tt>snmpit -h</tt>") 
+<pre>snmpit - A general purpose SNMP Tool - Version 1.1
+Syntax:
+ snmpit [-h] [-v] -i&lt;ip>
+        [-u] [-l] [-m&lt;vlan name>] [-vlan&lt;MAC Addr.>]
+        [-f&lt;filename>] [-r&lt;vlan #> &lt;vlan #> ... ]
+        [+b|-b] [+c|-c] [-s] [-p&lt;port> &lt;port> &lt;x>..&lt;y> ... ]
+        [-d|-e] [+a|-a] [-s&lt;speed>] [-dup&lt;duplex>]
+
+General:
+  -h    Display this help message
+  -v    Verbose mode (now off)
+  -i    IP address or switch name
+
+VLAN Control:
+  -u    Wait for Update of VLAN tables (takes ~10 seconds)
+  -l    List all VLANs on switch (ell, not #1)
+  -m    Make a VLAN
+  -vlan Add MAC Address to VLAN
+  -f    File mode - Automatically set up set of VLANs
+  -r    Remove VLAN(s)
+
+Port Control:
+  +b/-b Blocking mode (now off)
+  +c/-c Confirm Changes (now on)
+  -s    Show Port Configurations
+  -p    List of port numbers and ranges
+  -d    Disable port(s)
+  -e    Enable port(s)
+  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex
+  -spd    Port Speed (10 or 100 Mbits)
+  -dup  Port Duplex (half or full)                                             
+</pre>
+<a name="general"></a>
+<h3>General SnmpIt Commands</h3>
+
+<pre>snmpit [-h] [-v] -i&lt;ip></pre>
+<dl>
+<dt><pre>  -h    Display this help message</pre>
+<dd>When in doubt, use this for a full explanation of syntax.
+<dt><pre>  -v    Verbose mode (now off)</pre>
+<dd>Turns on extra output. Generally, SnmpIt won't say anything if it
+did what you asked, but with this option, you can ask it for more
+information. It will always give the appropriate error message when
+something goes wrong, without regard to the verbose option.
+<dt><pre>  -i    IP address or switch name</pre>
+<dd>IP address of switch on which to operate. Also accepts names. The
+Intel 510T switches now in use in the Testbed are the following:
+<pre>Alpha/155.99.214.170
+Beta/155.99.214.171
+Gamma/155.99.214.172
+Delta/155.99.214.173 </pre>
+</dl>
+
+<a name="VLAN"></a>
+<h3>VLAN Control Commands</h3>
+<pre>snmpit [-u] [-l] [-m&lt;vlan name>] [-vlan&lt;MAC Addr.>]
+       [-f&lt;filename>] [-r&lt;vlan #> &lt;vlan #> ... ]</pre>
+
+<code>snmpit</code> also understands machine names and interfaces in
+the format &lt;name>:&lt;interface>, such as tbpc01:0 or tbpc03:3, in
+place of MAC addresses. Output of known MAC addresses will also be
+converted to this format. Therefore, anywhere that a MAC address is
+used, you may also supply a name/interface pair.
+
+<dl>
+<dt><pre>  -u    Wait for Update of VLAN tables (takes ~10 seconds)</pre>
+<dd>Waits for switch to update its VLAN tables before returning. With
+this option set, you may list the VLANs right after you change them,
+and the new changes will be reflected. Otherwise, changes will not be
+shown for several seconds after changes are made.
+<dt><pre>  -l    List all VLANs on switch (ell, not #1)</pre>
+<dd>As its name suggests, this command shows a table of all VLANs on
+the switch, along with their names, numbers, and the MAC addresses
+that they contain.
+<dt><pre>  -m    Make a VLAN</pre>
+<dd>This optional command takes a VLAN name as a parameter. If no name
+is given when creating a VLAN, the VLAN number will be used as the name.
+<dt><pre>  -vlan Add MAC Address to VLAN</pre>
+<dd>This is the command to make a VLAN. May be used in conjunction
+with "<tt>-m</tt>". This command takes as its parameters a list of MAC
+addresses. The list can include MAC addresses from any of the testbed
+switches. MAC addresses are specified as 12 character
+hexadecimal strings containing digits and the letters "a" through
+"f". A possible command line for configuring a VLAN might be:
+<pre>snmpit -i alpha -vlan 1C2B536AF27C 008b1ca721d0</pre>
+This would put the network cards with MAC addresses "1C2B536AF27C" and
+"008b1ca721d0" in a VLAN together, making a "link" in the topology, as
+if it were hardwired with a cable. These two MAC addresses can now
+only communicate with each other, whether by broadcast, unicast, or multicast.
+<a name="file"/a>
+<dt><pre>  -f    File mode - Automatically set up set of VLANs</pre>
+<dd>This command takes as a parameter a file name. This file will
+generally be output of the assignment algorithms used to map a virtual
+topology to the physical topology of the testbed. They can also be
+created by hand. The important section has the following format:
+<pre>START vlan
+link1 1C2B536AF27C 008b1ca721d0
+link2 1073c38b28fd 283bc8a82f8c
+...
+&lt;name1> &lt;MAC 1> &lt;MAC 2>
+&lt;name2> &lt;MAC 3> &lt;MAC 4>
+...
+a_b tbpc01:0 tbpc02:0
+a_c tbpc01:1 tbpc03:0
+a_d tbpc01:2 tbpc04:0
+a_e tbpc01:3 tbpc05:0
+b_c tbpc02:1 tbpc03:1
+b_d tbpc02:2 tbpc04:1
+b_e tbpc02:3 tbpc05:1
+c_d tbpc03:2 tbpc04:2
+c_e tbpc03:3 tbpc05:2
+d_e tbpc04:3 tbpc05:3
+END vlan</pre>
+After starting the VLAN sectiom of the file each
+line should contain a VLAN name and a list of MAC addresses to be put in a
+VLAN together. There should be at least two, but the actual number is
+unlimited. When finished, the VLAN section is closed. As
+mentioned above, the syntax "tbpcM:I" can be used where M is the
+machine number, and I is the interface, from 0 to 3. The demonstration above
+shows a fully connected graph with 5 nodes.
+
+<dt><pre>  -r    Remove VLAN(s)  </pre>
+<dd>This command takes as its parameter a list of VLAN numbers. These
+VLAN numbers are given as output from snmpit every time a VLAN is
+created. VLAN numbers can also be found when listing VLANs. This
+command simply removes the specified VLAN(s) from the switch, effectively
+"disconnecting" the virtual link(s) that had been established.
+</dl>
+
+<a name="port"></a>
+<h3>Port Control Commands</h3>
+
+<pre>snmpit [+b|-b] [+c|-c] [-p&lt;port> &lt;port> &lt;x>..&lt;y> ... ]
+       [-d[isable]|-e[nable]] [+a|-a] [-s&lt;speed>] [-dup&lt;duplex>]</pre>
+
+<dl>
+<dt><pre>  +b/-b Blocking mode (now off)</pre>
+<dd>SnmpIt can operate in a blocking or a non-blocking mode. If you
+have a lot of similar changes to make, non blocking mode will make it
+go faster. SnmpIt defaults to non-blocking mode.
+<dt><pre>  +c/-c Confirm Changes (now on)</pre>
+<dd>When in non-blocking mode, this can ask SnmpIt to make sure that
+the changes requested were successfully carried out. For one or a few
+changes, this will take a little longer, because it will poll until
+the changes are made on the switch. However if there were more than 10
+or 15 identical changes, the first port changes have usually happened
+by the time they are checked, and in the usual case, everything will
+be polled only once.
+<dt><pre>  -p    List of port numbers and ranges</pre>
+<dd>This sets which ports will be reconfigured. It will accept
+individual port numbers (from 1 to 24) or ranges in the form "x..y"
+where 1 <= x,y <= 24.
+<dt><pre>  -d    Disable port(s)</pre>
+<dd>As suggested, this will disable the given port, effectively
+forcing a link to go down.
+<dt><pre>  -e    Enable port(s)</pre>
+<dd>This will enable a port that has been disabled with the
+"<tt>-d</tt>" command. Note that this will not fix link that has gone
+down for some other reason.
+<dt><pre>  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex</pre>
+<dd>This tells the switch to auto detect and self configure the given
+ports, or with the "<tt>-a</tt" command, turn off this
+feature. Default is to use 100Mbps, Full duplex, unless it is not
+supported by the link, in which case it lowers one or both to 10Mbps,
+Half duplex.
+<dt><pre>  -spd    Port Speed (10 or 100 Mbits)</pre>
+<dd>This command takes as its parameter a number, either 10 or 100,
+then configures the port to use that speed. Use of this command
+automatically turns off the auto-negotiate feature.
+<dt><pre>  -dup  Port Duplex (half or full)</pre>
+<dd>This command takes as its parameter a word, either half or full,
+then configures the port to use that duplex setting. Use of this command
+automatically turns off the auto-negotiate feature.
+</dl>
+
+</body>
+</html>
