@@ -276,6 +276,18 @@ foreach my $node (@nodes) {
     my $shared    = $imageid_row{'shared'};
 
     #
+    # Check for a few errors early!
+    #
+    if (!defined($imagepath)) {
+	die("*** $0:\n".
+	    "    There is no filename associated with $imageid!\n");
+    }
+    if (! -R $imagepath) {
+	die("*** $0:\n".
+	    "    $imagepath does not exists or cannot be read!\n");
+    }
+
+    #
     # 0 means load the entire disk.
     #
     my $diskpart = "";
