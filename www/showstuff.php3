@@ -726,6 +726,7 @@ function SHOWOSINFO($osid) {
     $os_path        = $osrow[path];
     $os_magic       = $osrow[magic];
     $os_osfeatures  = $osrow[osfeatures];
+    $os_op_mode     = $osrow[op_mode];
     $os_pid         = $osrow[pid];
     $os_shared      = $osrow[shared];
     $os_osname      = $osrow[osname];
@@ -743,6 +744,8 @@ function SHOWOSINFO($osid) {
 	$os_magic = "&nbsp";
     if (!$os_osfeatures)
 	$os_osfeatures = "&nbsp";
+    if (!$os_op_mode)
+	$os_op_mode = "&nbsp";
     if (!$created)
 	$created = "N/A";
 
@@ -799,6 +802,11 @@ function SHOWOSINFO($osid) {
     echo "<tr>
             <td>Features: </td>
             <td class=\"left\">$os_osfeatures</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Operational Mode: </td>
+            <td class=\"left\">$os_op_mode</td>
           </tr>\n";
 
     echo "<tr>

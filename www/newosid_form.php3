@@ -87,7 +87,7 @@ echo "<tr>
 echo "<tr>
           <td>*Select OS:</td>
           <td><select name=OS>
-               <option value=none>Please Select &nbsp</option>
+               <option value=none>Please Select &nbsp;</option>
                <option value=Linux>Linux </option>
                <option value=FreeBSD>FreeBSD </option>
                <option value=NetBSD>NetBSD </option>
@@ -129,6 +129,38 @@ echo "<tr>
           <td>OS Features:</td>
           <td><input type=checkbox name=\"os_feature_ping\">ping &nbsp
               <input type=checkbox name=\"os_feature_ssh\">ssh  &nbsp
+              <input type=checkbox name=\"os_feature_ipod\">ipod  &nbsp
+              <input type=checkbox name=\"os_feature_isup\">isup  &nbsp
+              <p>
+              Guidelines for setting os_features for your OS:
+              <ol>
+                <li> Mark ping and/or ssh if they are supported.
+                <li> If you use a testbed kernel, or are based on a
+                     testbed kernel config, mark the ipod box.
+                <li> If it is based on a testbed image or sends its own
+                     isup, mark isup.
+              </ol>
+          </td>
+      </tr>\n";
+
+#
+# Choose an op_mode state machine
+#
+
+echo "<tr>
+          <td>*Operational Mode (op_mode):</td>
+          <td><select name=op_mode>
+               <option value=MINIMAL>MINIMAL &nbsp;</option>
+               <option value=NORMAL>NORMAL </option>
+               <option value=NORMALv1>NORMALv1 </option>
+              </select>
+              <p>
+              Guidelines for setting op_mode for your OS:
+              <ol>
+                <li> If it is based on a testbed image, use the same
+                     op_mode as that image (should be NORMAL or NORMALv1).
+                <li> If not, use MINIMAL.
+              </ol>
           </td>
       </tr>\n";
 

@@ -153,7 +153,20 @@ if (isset($os_feature_ssh)) {
 if (isset($os_feature_ipod)) {
     $os_features_array[] = "ipod";
 }
+if (isset($os_feature_ipod)) {
+    $os_features_array[] = "isup";
+}
 $os_features = join(",", $os_features_array);
+
+# Check op_mode
+if (!isset($op_mode) ||
+    strcmp($op_mode, "") == 0 ||
+    (strcmp($op_mode, "MINIMAL") &&
+     strcmp($op_mode, "NORMAL") &&
+     strcmp($op_mode, "NORMALv1") &&
+     strcmp($op_mode, "Unknown"))) {
+    FORMERROR("Operational Mode (op_mode)");
+}
 
 #
 # And insert the record!
@@ -187,10 +200,10 @@ if (TBValidOSID($osid)) {
 
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
-		 "(osname, osid, description, OS, version, path, magic, ".
+		 "(osname, osid, description,OS,version,path,magic,op_mode, ".
 		 " osfeatures, pid, shared, creator, mustclean, created) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
-		 "        '$os_version', $os_path, '$os_magic', ".
+		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
 	         "        '$uid', $os_mustclean, now())");
 
