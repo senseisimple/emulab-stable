@@ -1005,7 +1005,7 @@ function SHOWIMAGEID($imageid, $edit) {
 #
 function SHOWNODE($node_id) {
     $query_result =
-	DBQueryFatal("select n.*,r.vname from nodes as n ".
+	DBQueryFatal("select n.*,r.vname,r.pid,r.eid from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "where n.node_id='$node_id'");
     
@@ -1018,6 +1018,8 @@ function SHOWNODE($node_id) {
     $node_id            = $row[node_id]; 
     $type               = $row[type];
     $vname		= $row[vname];
+    $pid 		= $row[pid];
+    $eid		= $row[eid];
     $bios               = $row[bios_version];
     $def_boot_osid      = $row[def_boot_osid];
     $def_boot_path      = $row[def_boot_path];
@@ -1060,6 +1062,19 @@ function SHOWNODE($node_id) {
                   <td>Virtual Name:</td>
                   <td class=left>$vname</td>
               </tr>\n";
+    }
+
+    if ($pid) {
+	echo "<tr>
+                <td>Project: </td>
+                <td class=\"left\">
+                    <A href='showproject.php3?pid=$pid'>$pid</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>Experiment:</td>
+                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+               </tr>\n";
     }
 
     echo "<tr>

@@ -20,6 +20,17 @@ if (! $isadmin) {
     USERERROR("You do not have admin privledges!", 1);
 }
 
+if ($verbose) {
+    echo "<b><a href=nodecontrol_list.php3>
+                Less Clutter</a>
+          </b><br><br>\n";
+}
+else {
+    echo "<b><a href='nodecontrol_list.php3?verbose=1'>
+                Add Clutter</a>
+          </b><br><br>\n";
+}
+
 #
 # Suck out info for all the nodes.
 # 
@@ -28,7 +39,7 @@ $query_result =
 		 "left join reserved on nodes.node_id=reserved.node_id ".
 		 "WHERE role='testnode' ORDER BY priority");
 
-echo "<table border=2 cellpadding=0 cellspacing=2
+echo "<table border=2 cellpadding=2 cellspacing=1
        align='center'>\n";
 
 echo "<tr>
@@ -37,60 +48,37 @@ echo "<tr>
           <td align=center>PID</td>
           <td align=center>EID</td>
           <td align=center>Default<br>OSID</td>
-          <td align=center>Default<br>Path</td>
-          <td align=center>Default<br>Cmdline</td>
-          <td align=center>Next<br>OSID</td>
-          <td align=center>Next<br>Path</td>
-          <td align=center>Next<br>Cmdline</td>
       </tr>\n";
     
 while ($row = mysql_fetch_array($query_result)) {
     $node_id            = $row[node_id]; 
     $type               = $row[type];
     $def_boot_osid      = $row[def_boot_osid];
-    $def_boot_path      = $row[def_boot_path];
-    $def_boot_cmd_line  = $row[def_boot_cmd_line];
-    $next_boot_osid     = $row[next_boot_osid];
-    $next_boot_path     = $row[next_boot_path];
-    $next_boot_cmd_line = $row[next_boot_cmd_line];
     $pid                = $row[pid];
     $eid                = $row[eid];
 
-    if (!$def_boot_cmd_line)
-        $def_boot_cmd_line = "&nbsp";
-    if (!$def_boot_path)
-        $def_boot_path = "&nbsp";
-    if (!$next_boot_path)
-        $next_boot_path = "&nbsp";
-    if (!$next_boot_cmd_line)
-        $next_boot_cmd_line = "&nbsp";
-    if (!$pid)
-	$pid = "--";
-    if (!$eid)
-	$eid = "--";
+    if ($type == "dnard" && !$verbose)
+	continue;
 
     echo "<tr>
-              <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>
-              <td>$type</td>
-              <td>$pid</td>
+             <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>\n
+             <td>$type</td>\n";
+
+    if ($pid) {
+	echo "<td>$pid</td>
               <td>$eid</td>\n";
+    }
+    else {
+	echo "<td>--</td>
+	      <td>--</td>\n";
+    }
+    
     if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid))
 	echo "<td>$osname</td>\n";
     else
 	echo "<td>&nbsp</td>\n";
     
-    echo "    <td>$def_boot_path</td>
-              <td>$def_boot_cmd_line</td>\n";
-
-    if ($next_boot_osid && TBOSInfo($next_boot_osid, $osname, $ospid)) {
-	echo "<td>$osname</td>\n";
-    }
-    else
-	echo "<td>&nbsp</td>\n";
-    
-    echo "    <td>$next_boot_path</td>
-              <td>$next_boot_cmd_line</td>
-          </tr>\n";
+    echo "</tr>\n";
 }
 
 echo "</table>\n";
