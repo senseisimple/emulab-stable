@@ -116,9 +116,18 @@ earliest time one of the steps needs to occur.
 20040901: Before build
 	New SSL version of the XMLRPC server.
 
+	* Make sure python is installed on both boss and ops. If not,
+          the port is located in:
+
+		/usr/ports/lang/python		
+
 	* Install this port on both boss and ops:
 
-		/usr/ports/security/py-m2crypto	
+		/usr/ports/security/py-m2crypto
+
+          then patch a silly bug on both boss and ops:
+
+		patch -f -p0 -l -i patches/m2crypto.patch
 
 	* Reconfig, rebuild, and reinstall the testbed software on your
 	  boss node. Be sure to pick up changes in sql/database-migrate.
