@@ -9,6 +9,9 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= robots/vmcd
 
+SYSTEM         := $(shell uname -s)
+MEZZ_INSTALL   = /opt/mezzanine-0.00
+
 include $(OBJDIR)/Makeconf
 
 PROGS = vmc-client vmcd
@@ -47,6 +50,8 @@ vmc-client: vmc-client.o
 
 vmcd: vmcd.o ../mtp/libmtp.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vmcd.o $(LIBS)
+
+install:
 
 clean:
 	rm -f *.o

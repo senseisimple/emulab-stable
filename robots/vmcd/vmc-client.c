@@ -50,7 +50,7 @@ static int looping = 1;
 
 static FILE *posfile = NULL;
 
-static unsigned int mezz_event_count = 0;
+static volatile unsigned int mezz_event_count = 0;
 
 static void usage(void)
 {
@@ -196,11 +196,6 @@ int main(int argc, char *argv[])
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
     
-    sa.sa_handler = sigusr1;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGUSR1, &sa, NULL);
-    
     mezzfile = argv[0];
     
     if (debug) {
@@ -242,6 +237,11 @@ int main(int argc, char *argv[])
         mezzmap->objectlist.objects[1].pa = 0.54;
     }
 #endif
+    
+    sa.sa_handler = sigusr1;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGUSR1, &sa, NULL);
     
     if (pidfile) {
         FILE *fp;
@@ -332,8 +332,8 @@ int main(int argc, char *argv[])
                      */
                     if (mezz_event_count > last_mezz_event) {
                         char buffer[8192];
-                        
-			info("sending updates\n");
+
+			// info("sending updates\n");
                         
                         if ((rc = encode_packets(buffer, mezzmap)) == -1) {
                             errorc("unable to encode packets");
