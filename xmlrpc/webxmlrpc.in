@@ -17,6 +17,9 @@ use English;
 #
 my $TB       = "@prefix@";
 
+# We have to do this to fake out the server. Harmless.
+$ENV{'SSH_CONNECTION'} = "localhost 0 localhost 0";
+
 #
 # Run the real thing, and never return.
 # 
