@@ -847,14 +847,20 @@ function PAGEERROR($msg) {
 #
 # Sub Page/Menu Stuff
 #
-function WRITESUBMENUBUTTON($text, $link) {
+function WRITESUBMENUBUTTON($text, $link, $target = "") {
 
+    #
+    # Optional 'target' agument, so that we can pop up new windows
+    #
+    if ($target) {
+	$targettext = "target='$target'";
+    }
 
     echo "<!-- Table row for button $text -->
           <tr>
             <td valign=center align=left nowrap>
                 <b>
-         	 <a class=sidebarbutton href='$link'>$text</a>\n";
+         	 <a class=sidebarbutton href='$link' $targettext>$text</a>\n";
 
     echo "      </b>
             </td>
