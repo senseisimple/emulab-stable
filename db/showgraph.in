@@ -30,7 +30,7 @@ my $display = shift;
 
 my $v = 0; # Verbose
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 my @tbls = $dbh->listtables;
 

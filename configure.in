@@ -142,7 +142,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists discvr/GNUmakefile \
-	db/libdb.pm \
+	db/libdb.pm db/inuse db/avail db/mac2if db/nodeip db/showgraph \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \

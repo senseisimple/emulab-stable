@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 use Mysql;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 my $sth = $dbh->
     query("select r.* from reserved as r left join nodes as n on r.node_id=n.node_id order by n.type,n.node_id");

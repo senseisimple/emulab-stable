@@ -18,7 +18,7 @@ if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) {
      );
 }
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 print "Got ARGS = ",join(" ",@ARGV),"\n" if $d;
 

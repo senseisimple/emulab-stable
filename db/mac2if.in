@@ -4,7 +4,7 @@ if ($#ARGV < 0) {die("Usage: mac2if <mac|if> <mac|if> <...>\n");}
 
 use Mysql;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 my @list = "";
 my $n=0;

@@ -4,7 +4,7 @@ if ($#ARGV < 0) {die("Usage: nodeip <node_id|if|IP> <node_id|if|IP> <...>\n");}
 
 use Mysql;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 my @list = "";
 my $n=0;
