@@ -53,8 +53,9 @@ if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
 }
 
-$filename = $node_id . ".tbc"; 
+$filename = $node_id . ".tbssh"; 
 header("Content-Type: text/x-testbed-ssh");
+header("Content-Disposition: inline; filename=$filename;");
 header("Content-Description: SSH description file for a testbed node");
 
 echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";
