@@ -92,12 +92,12 @@ echo "<tr>
                     value=\"$usr_URL\"></td>
       </tr>\n";
 
-echo "<tr>
-          <td>Expiration date:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"usr_expires\"
-                     value=\"$usr_expires\"></td>
-      </tr>\n";
+#echo "<tr>
+#          <td>Expiration date:</td>
+#          <td class=\"left\">
+#              <input type=\"text\" name=\"usr_expires\"
+#                     value=\"$usr_expires\"></td>
+#      </tr>\n";
 
 echo "<tr>
           <td>*Mailing Address:</td>

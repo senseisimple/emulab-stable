@@ -126,7 +126,15 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     }
 }
 
-array_walk($HTTP_POST_VARS, 'addslashes');
+#
+# Add slashes. These should really by ereg checks, kicking back special
+# chars since they are more trouble then they are worth.
+# 
+$usr_name  = addslashes($usr_name);
+$usr_addr  = addslashes($usr_addr);
+$usr_title = addslashes($usr_title);
+$usr_affil = addslashes($usr_affil);
+$usr_phone = addslashes($usr_phone);
 
 #
 # Now change the rest of the information.
@@ -138,7 +146,6 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"usr_URL=\"$usr_url\",         ".
 	"usr_addr=\"$usr_addr\",       ".
 	"usr_phone=\"$usr_phone\",     ".
-	"usr_expires=\"$usr_expires\", ".
 	"usr_title=\"$usr_title\",     ".
 	"usr_affil=\"$usr_affil\"      ".
 	"WHERE uid=\"$target_uid\"");
@@ -147,6 +154,12 @@ if (! $insert_result) {
     $err = mysql_error();
     TBERROR("Database Error changing user info for $target_uid: $err", 1);
 }
+
+#
+# Create the user accounts. Must be done *before* we create the
+# project directory!
+# 
+SUEXEC($target_uid, "flux", "mkacct-ctrl $target_uid", 0);	 	
 
 ?>
 <center>
