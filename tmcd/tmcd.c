@@ -2497,9 +2497,9 @@ COMMAND_PROTOTYPE(dotunnels)
 	}
 
 	res = mydb_query("select vname,isserver,peer_ip,port,password, "
-			 " encrypt,compress,assigned_ip "
+			 " encrypt,compress,assigned_ip,proto "
 			 "from tunnels where node_id='%s'",
-			 8, nodeid);
+			 9, nodeid);
 
 	if (!res) {
 		error("TUNNELS: %s: DB Error getting tunnels\n", nodeid);
@@ -2514,9 +2514,10 @@ COMMAND_PROTOTYPE(dotunnels)
 		row = mysql_fetch_row(res);
 
 		sprintf(buf, "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
-			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s INET=%s MASK=%s\n",
+			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s "
+			"INET=%s MASK=%s PROTO=%s\n",
 			row[0], row[1], row[2], row[3], row[4],
-			row[5], row[6], row[7], NETMASK);
+			row[5], row[6], row[7], NETMASK, row[8]);
 		       
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
