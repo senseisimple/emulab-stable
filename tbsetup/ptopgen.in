@@ -1,5 +1,22 @@
 #!/usr/bin/perl -w
 
+# Settings - Change these to your particular network.
+
+# Switch interface speed - In Mbps
+$switch_speed = 100;
+
+# Switch types - include all node types that are switches
+%switch_types = (
+		 'cisco', 1,
+		 );
+
+# Omit types - Include all types of node that will never be used.
+%omit_types = (
+	       'APC', 1,
+	       );
+
+######################################################################
+
 use DBI;
 my $TBDB = "@TBDBNAME@";
 my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
@@ -8,16 +25,20 @@ my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
 $sth = $dbh->prepare("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
-		     " where b.node_id is null" .
-		     " and a.type != \"cisco\" and a.type != \"APC\"");
-$sth->execute;
+		     " where b.node_id is null");
+$sth->execute;		
 while (($node,$type) = $sth->fetchrow_array) {
+    if (defined($omit_types{$type})) {next;}
+
     # Shark hack
     if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
 	if ($number == 1) {
 	    $nodes{"sh$shelf"} = "shark-shelf";
 	}
     } else {
+	if (defined($switch_types{$type})) {
+	    $type = "switch";
+	}
 	$nodes{$node} = $type;
 	$nodetypes{$type} = 1;
     }
@@ -25,45 +46,90 @@ while (($node,$type) = $sth->fetchrow_array) {
 $sth->finish;
 
 foreach $type (keys(%nodetypes)) {
-    $sth = $dbh->prepare("SELECT control_iface,delay_capacity" .
+    $sth = $dbh->prepare("SELECT delay_capacity" .
 			 " from node_types where type = \"$type\"");
     $sth->execute;
-    @row = $sth->fetchrow_array;
-    $nodetypes{$type} = [@row];
+    ($delaycapacity) = $sth->fetchrow_array;
+    $nodetypes{$type} = $delaycapacity;
     $sth->finish;
 }
+$nodetypes{"switch"} = 0;
 
-$sth = $dbh->prepare("SELECT type,max_speed from interface_types");
-$sth->execute;
-while (($type,$bw) = $sth->fetchrow_array) {
-    $itypes{$type} = $bw;
-}
-$sth->finish;
-
-print "node cisco switch:1\n";
-
+$sharklinks = "";
 foreach $node (keys(%nodes)) {
     if ($node =~ /^sh/) {
 	print "node $node shark-shelf:1\n";
-	print "link link-$node $node:$node/eth0 cisco 100 1\n";
+	$sharklinks .= "link link-$node $node:$node/eth0 cisco 100 1\n";
     } else {
-	$sth = $dbh->prepare("SELECT iface,interface_type from interfaces" .
-			     " where node_id = \"$node\"");
-	$sth->execute;
 	$text = "node $node $nodes{$node}:1";
-	($control_net,$delay_capacity) = @{$nodetypes{$nodes{$node}}};
+	$delay_capacity = $nodetypes{$nodes{$node}};
 	if ($delay_capacity > 0) {
 	    $text .= " delay:$delay_capacity";
 	}
 	print "$text\n";
-	while (($interface,$itype) = $sth->fetchrow_array) {
-	    if ($interface ne $control_net) {
-		print "link link-$node $node:$node/$interface cisco $itypes{$itype} 1\n";
-	    }
-	}
-	$sth->finish;
     }
 }
+
+# Read interfaces
+$sth = $dbh->prepare("SELECT node_id,card,port,iface,interface_type" .
+		     " from interfaces");
+$sth->execute;
+while (($node,$card,$port,$iface,$type) = $sth->fetchrow_array) {
+    $interfacemap{"$node:$card:$port"} = $iface;
+    if ($type ne "") {
+	$interfacetypes{"$node:$card:$port"} = $type;
+    }
+}
+$sth->finish;
+
+# Read interface types
+$sth = $dbh->prepare("SELECT type,max_speed from interface_types");
+$sth->execute;
+while (($type,$speed) = $sth->fetchrow_array) {
+    $interfacespeeds{$type} = $speed;
+}
+$sth->finish;
+
+# Print out links
+sub get_iface {
+    ($node,$card,$port) = @_;
+    if (defined($interfacemap{"$node:$card:$port"})) {
+	return $interfacemap{"$node:$card:$port"};
+    } else {
+	return "(null)";
+    }
+};
+sub get_ifacebw {
+    ($node,$card,$port) = @_;
+    if (defined($interfacetypes{"$node:$card:$port"})) {
+	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}};
+    } else {
+	return $switch_speed;
+    }
+};
+
+$sth = $dbh->prepare("SELECT type,node_id1,card1,port1,node_id2,card2,port2" .
+ 		    " from wires where type=\"Node\"");
+$sth->execute;
+while (($type,$node1,$card1,$port1,$node2,$card2,$port2) = 
+       $sth->fetchrow_array) {
+    $iface1 = get_iface($node1,$card1,$port1);
+    $iface2 = get_iface($node2,$card2,$port2);
+    $iface1bw = get_ifacebw($node1,$card1,$port1);
+    $iface2bw = get_ifacebw($node2,$card2,$port2);
+    if ($iface1bw < $iface2bw) {
+	$bw = $iface1bw;
+    } else {
+	$bw = $iface2bw;
+    }
+    # !!! - Here we use our knowledge that in the wires table links
+    # to the switch always come as node2.
+    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
+	" $node2:$iface2 $bw 1\n"
+}
+$sth->finish;
+
+print $sharklinks;
 
 # Add a bunch of LANs
 for ($i = 0;$i <= 100;$i++) {
