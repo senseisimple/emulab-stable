@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/nsetrafgen
+INSTALL_SUPDIR	= /usr/testbed/sup/sup/FBSD45-STD/root
+INSTALL_FILES	= $(SRCDIR)/nseinput.tcl $(SRCDIR)/startnse
+INSTALL_NSE     = $(SRCDIR)/nse
+
+include $(OBJDIR)/Makeconf
+
+all: msg
+
+msg:
+	@echo ""
+	@echo -n "WARNING! You must first do a \"make buildnse\" in $(SRCDIR) "
+	@echo "if $(SRCDIR)/nse is not built"
+	@echo ""
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+buildnse:
+	cd $(SRCDIR); $(SRCDIR)/nse-install
+
+install:
+	cp $(INSTALL_FILES) $(INSTALL_SUPDIR)/etc/testbed
+	cp $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
+
+clean:
+	/bin/rm -f $(INSTALL_NSE)

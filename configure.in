@@ -227,6 +227,7 @@ else
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
 		    event/trafgen/GNUmakefile \
+		    event/nsetrafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
 		    event/stated/GNUmakefile event/stated/stated";

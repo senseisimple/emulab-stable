@@ -35,10 +35,7 @@ trafgen:
 	@$(MAKE) -C trafgen all
 
 nsetrafgen:
-	@echo ""
-	@echo "WARNING! You must first install NSE if you want NSE traffic generation"
-	@echo "WARNING! See $(SRCDIR)/nsetrafgen/README"
-	@echo ""
+	@$(MAKE) -C nsetrafgen all
 
 delay-agent:
 	@$(MAKE) -C delay-agent all
@@ -54,6 +51,7 @@ install:
 	@$(MAKE) -C sched install
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
+	@$(MAKE) -C nsetrafgen install
 
 control-install: 
 	@$(MAKE) -C tbgen control-install
