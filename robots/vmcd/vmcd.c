@@ -346,7 +346,6 @@ int main(int argc, char *argv[])
             FD_SET(vc->vc_fd, &readfds);
 
             // we now init the robot_track list for this struct:
-            vc->updating = 0;
             for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
                 vc->tracks[i].updated = 0;
                 vc->tracks[i].valid = 0;
@@ -539,7 +538,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             printf("OUT OF TRACKING ROOM IN VMCD!\n");
         }
         else {
-	    int retval;
+          int retval;
 	    
             vc->tracks[first_invalid_track].valid = 1;
             vc->tracks[first_invalid_track].position = p->data.update_position->position;
@@ -549,17 +548,17 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             // now, if we can find a match for this track close enough to
             // a track in the real_robots list, we can steal the robot_id from
             // there!
-	    retval = find_real_robot_id(&(vc->tracks[i].position));
+            retval = find_real_robot_id(&(vc->tracks[i].position));
             if (retval == -1) {
                 // we have to send our request_id packet, now:
                 struct mtp_request_id rid;
-		struct mtp_packet *mp;
+                struct mtp_packet *mp;
                 rid.position = vc->tracks[i].position;
                 rid.request_id = get_next_request_id();
                 mp = mtp_make_packet(MTP_REQUEST_ID, MTP_ROLE_VMC, &rid);
                 retval = mtp_send_packet(emc_fd,mp);
                 if (retval == MTP_PP_SUCCESS) {
-                    vc->request_id = rid.request_id;
+                    vc->tracks[first_invalid_track].request_id = rid.request_id;
                 }
                 else {
                     vc->tracks[first_invalid_track].valid = 0;
@@ -610,11 +609,10 @@ int find_real_robot_id(struct position *p) {
             float my_dist_delta;
             float my_pose_delta;
 
-            dx = p->data.update_position->position.x - real_robots[i].position.x;
-            dy = p->data.update_position->position.y - real_robots[i].position.y;
+            dx = p->.x - real_robots[i].position.x;
+            dy = p->y - real_robots[i].position.y;
             my_dist_delta = sqrt(dx*dx + dy*dy);
-            my_pose_delta = p->data.update_position->position.theta - 
-                real_robots[i].position.theta;
+            my_pose_delta = p->theta - real_robots[i].position.theta;
 
             if (fabsf(my_dist_delta) > DIST_THRESHOLD || 
                 fabsf(my_dist_delta) > best_dist_delta) {
