@@ -103,6 +103,16 @@ foreach (split("\n",&ir_get("/topology/links"))) {
     $links{$link} = [$src,$dst];
 }
 
+# Get a list of delays
+&ir_exists("/delay") || do {
+    print STDERR "IR does not contain delay section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/delay"))) {
+    @t = split;
+    $delays{$t[0]} = 1;
+}
+
 # Pull the MAC table from the database.
 # MACTABLE is indexed by virtual node name and contains a reference
 # to a list of MACs.
@@ -304,13 +314,14 @@ sub get_macs {
     if (defined($vlanmap{"ddst_$_[0]"})) {
 	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
     }
+    # XXX - Not sure if this is correct
     if (defined($links{$_[0]})) {
-	my($src,$dst) = @{$links{$_[0]}};
-	if (&islan($src)) {
-	    push(@$macs,@{$vlanmap{$src}});
-	} elsif (&islan($dst)) {
-	    push(@$macs,@{$vlanmap{$dst}});
-	}
+  	my($src,$dst) = @{$links{$_[0]}};
+  	if (&islan($src) && defined($delays{$dst})) {
+  	    push(@$macs,@{$vlanmap{$src}});
+  	} elsif (&islan($dst) && defined($delays{$src})) {
+  	    push(@$macs,@{$vlanmap{$dst}});
+  	}
     }
 
     return $macs;
@@ -496,10 +507,13 @@ foreach $left (keys(%to_assign)) {
 	$ipB = &find_free_ip($subnet);
 	$ips_assigned{$ipB} = 1;
 	$ip_section .= "$node $dst $ipA\n";
+	printdb "ip_section .= $node $dst $ipA\n";
 	$macs = &get_macs($left);
 	push(@ip_mac_section,[&intersect($MACTABLE{$node},$macs),$ipA]);
+	printdb "ip_mac_section .= ".&intersect($MACTABLE{$node},$macs).",$ipA\n";
 	$ip_section .= "$dst $node $ipB\n";
 	push(@ip_mac_section,[&intersect($MACTABLE{$dst},$macs),$ipB]);
+	printdb "ip_mac_section .= ".&intersect($MACTABLE{$dst},$macs).",$ipB\n";
 	push(@{$ips_node{$node}},$ipA);
 	push(@{$ips_node{$dst}},$ipB);
     } else {

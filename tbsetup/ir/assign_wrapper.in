@@ -221,16 +221,16 @@ foreach $lan (keys(%lans)) {
 	printdb "  Setting up link\n";
 	$extlink = $lanlinks[0];
 	($src,$dst,$bw,$delay,$loss) = @{$links{$extlink}};
+	delete $links{$extlink};
 	if ($src eq "$lan") {
 	    $rdst = $dst;
 	} else {
 	    $rdst = $src;
 	}
-	$nodes{$ssnode} = ["ext-$ssnode"];
-	printdb "  nodes{$ssnode} = ext-$ssnode\n";
-	$links{"ext-$ssnode"} = [$ssnode,$rdst,$bw,$delay,$loss];
-	printdb "  links{ext-$ssnode} = [$ssnode,$rdst,$bw,$delay,$loss]\n";
-	delete $links{$extlink};
+	$nodes{$ssnode} = ["$extlink"];
+	printdb "  nodes{$ssnode} = $extlink\n";
+	$links{"$extlink"} = [$ssnode,$rdst,$bw,$delay,$loss];
+	printdb "  links{$extlink} = [$ssnode,$rdst,$bw,$delay,$loss]\n";
     } else {
 	$nodes{$ssnode} = [];
 	printdb "  nodes{$ssnode} = []\n";
