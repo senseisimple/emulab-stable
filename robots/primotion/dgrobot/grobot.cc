@@ -141,6 +141,32 @@ void grobot::pbMove(float mdisplacement) {
 void grobot::pbPivot(float pangle) {
   // execute a pivot primitive
   
+  int numturns;
+  
+  // make the pivot smarter
+  if (fabs(pangle) == 2*M_PI) {
+    // this is zero! Who sends this shit??
+    //pangle = 0.0f;
+    // PROBLEM: if the garcia is told to pivot 0.0,
+    // !!!! BAD THINGS WILL HAPPEN !!!!
+  }
+  
+  if (fabs(pangle) > 2*M_PI) {
+    // no dancing! Reduce this.
+    numturns = (int)(pangle / (2*M_PI));
+    pangle = pangle - (2*M_PI * numturns);
+  }
+  
+  if (fabs(pangle) > M_PI) {
+    // turn the short way
+    if (pangle >= 0) {
+      pangle = -(2*M_PI - pangle);
+    } else {
+      pangle = pangle + 2*M_PI;
+    }
+  }
+  
+  
   acpValue pivotAngle((float)(pangle));
   pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
   pBehavior->setNamedValue("angle", &pivotAngle);
