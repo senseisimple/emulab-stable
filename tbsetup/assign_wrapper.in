@@ -1318,8 +1318,16 @@ foreach $plink (keys(%plinks)) {
 	($nodeD,$portD) = split(":",$nodeportD);
 	printdb "LAN delay src: other end = $nodeportC $nodeportD\n";
 
+	#
+	# Construct a name for the delay link. This has to be unique
+	# since now (with virtual nodes) we can have multiple vnodes
+	# from the same lan, on the same pnode, without using veths.
+	# Multiple routing tables made this possible.
+	#
+	my $dlink = $lan . "/dlink/" . (split(":", $virtA))[0];
+
 	printdb "  VLANS:\n";
-	AddVlan("link", $lan . "-delay" . $nodeA, $nodeportA, $nodeportB);
+	AddVlan("link", $dlink, $nodeportA, $nodeportB);
 	AddVlan("lan",  $lan, $nodeportD);
 	
 	my ($member0,$delay,$bandwidth,$loss,
