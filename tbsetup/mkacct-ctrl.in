@@ -108,13 +108,6 @@ if ($UID && !TBAdmin($UID) && ($me ne $user)) {
 }
 
 #
-# Run genelists to update the email lists. This is a convenient
-# spot to do this. Errors are non-fatal; the testbed list will
-# will find out about problems via email from genelists.
-#
-system("$GENELISTS");
-
-#
 # Get the user info (the user being created).
 #
 $query_result =
@@ -184,6 +177,15 @@ my $control_node = $CONTROL;
 # All this stuff must be done as root (ssh).
 #
 $UID = $EUID;
+
+#
+# Run genelists to update the email lists. This is a convenient
+# spot to do this. Errors are non-fatal; the testbed list will
+# will find out about problems via email from genelists. Note that
+# this command must be run when EUID==UID==0 because its a setuid
+# PERL script.
+#
+system("$GENELISTS");
 
 foreach my $group ( @groupnames ) {
     my $group_number = $groupnumbers{$group};
