@@ -76,6 +76,9 @@ $showlastlogin = $isadmin;
 # show properly... it just shows the header in the table, over the
 # wrong column. 
 
+# how many hours is considered idle...
+$idlehours = 2;
+
 #
 # Handle showtype
 # 
@@ -104,7 +107,6 @@ elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
-    $idlehours = 2;
     $showlastlogin = 0; # don't show a lastlogin column
 }
 else {
@@ -489,6 +491,14 @@ if ($thumb && !$idle) {
 	$daysidle=0;
 	$idletime = round(TBGetExptIdleTime($pid,$eid),1);
 
+	$inactive = $idletime >= $idlehours;
+	if ($isidle && !$inactive) {
+	    $isidle = "";
+	    mysql_query("update experiments set swap_requests='' ".
+			"where pid='$pid' and eid='$eid'");
+	}
+
+	
 	if ($isadmin) {
 	    $swappable= $row["swappable"];
 	    $swapreq=$row["swap_requests"];
@@ -509,7 +519,6 @@ if ($thumb && !$idle) {
 	}
 
 	if ($idle) {
-	    $inactive = $idletime >= $idlehours;
 	    $stale = TBGetExptIdleStale($pid,$eid);
 	    $ignore = TBGetExptIdleIgnore($pid,$eid);
 	    # If it is ignored, skip it now.
