@@ -14,23 +14,33 @@ $ENV{'PATH'} = "$TBROOT/libexec:$TBROOT/libexec/ir"
     . ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin:/usr/bin";
 push(@INC,$TBSETUPLIB);
 
+# Turn off line buffering.
+$| = 1; 
+
 require libtbsetup;
 require 'ctime.pl';
 
-if ($#ARGV != 2) {
-    print STDERR "Syntax: $0 pid eid ir_file\n";
+if ($#ARGV < 2 || $#ARGV > 3 ||
+    ($#ARGV == 3 && $ARGV[0] ne "-nologfile")) {
+    print STDERR "Syntax: $0 [-nologfile] pid eid ir_file\n";
     exit(1);
+}
+
+if ($#ARGV == 3) {
+    shift;
+    $dolog = 0;
+}
+else {
+    $dolog = 1;
 }
 ($pid,$eid,$irfile) = @ARGV;
 
 $prefix = &tbs_prefix($irfile);
 $logfile = "$prefix.log";
 
-&tbs_initlog($logfile);
-
-#&tbs_out("Input: $irfile\n");
-#&tbs_out("Log:   $logfile\n");
-#&tbs_out("\n");
+if ($dolog) {
+    &tbs_initlog($logfile);
+}
 
 if (! -r $irfile) {
     &tbs_out("$irfile does not exist or is not readable.\n");

@@ -21,13 +21,25 @@ $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ir"
 push(@INC,$TBSETUPLIB);
 push(@INC,$TBIRLIB);
 
+# Turn off line buffering.
+$| = 1; 
+
 require libtbsetup;
 require libir;
 require 'ctime.pl';
 
-if ($#ARGV != 2) {
-    print STDERR "Syntax: $0 pid eid ns_file\n";
+if ($#ARGV < 2 || $#ARGV > 3 ||
+    ($#ARGV == 3 && $ARGV[0] ne "-nologfile")) {
+    print STDERR "Syntax: $0 [-nologfile] pid eid ns_file\n";
     exit(1);
+}
+
+if ($#ARGV == 3) {
+    shift;
+    $dolog = 0;
+}
+else {
+    $dolog = 1;
 }
 ($pid,$eid,$nsfile) = @ARGV;
 
@@ -47,11 +59,13 @@ sub cleanup {
     &tbs_exec("nfree $eid $pid");
 };
 
-&tbs_initlog($logfile);
+if ($dolog) {
+    &tbs_initlog($logfile);
+    &tbs_out("Log:    $logfile\n");
+}
 
 &tbs_out("Input:  $nsfile\n");
 &tbs_out("Output: $irfile\n");
-&tbs_out("Log:    $logfile\n");
 &tbs_out("\n");
 &tbs_out("Beginning pre run for $pid-$eid ($nsfile). " 
 	 . &ctime(time) . "\n");
