@@ -55,7 +55,8 @@ my $query_result =
 		 " (UNIX_TIMESTAMP(now()) - ".
 		 "   UNIX_TIMESTAMP(ns.status_timestamp)) > 90");
 
-while (my ($node,$status,$pid,$remote,$timediff) = $result->fetchrow_array) {
+while (my ($node,$status,$pid,$remote,$timediff) =
+       $query_result->fetchrow_array) {
     my $newstatus = "down";
 
     if (! $remote) {
