@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,6 +31,13 @@ version.c: emulab-syncd.c
 client-install: 
 	$(INSTALL_PROGRAM) emulab-syncd $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd
 	$(INSTALL_PROGRAM) emulab-sync $(DESTDIR)$(CLIENT_BINDIR)/emulab-sync
+	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-syncd.1 \
+		$(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
+	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-sync.1 \
+		$(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
+
+check:
+	sh $(SRCDIR)/syncd_test.sh
 
 clean:
 	/bin/rm -f *.o emulab-syncd version.c
