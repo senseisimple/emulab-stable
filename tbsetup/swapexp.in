@@ -203,6 +203,25 @@ my $estate          = $hashrow{'state'};
 my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $ebatchstate     = $hashrow{'batchstate'};
+my $swappablebit= $row{'swappable'};
+my $idleswapbit = $row{'idleswap'};
+my $autoswapbit = $row{'autoswap'};
+my $swappablestr= ( $row{'swappable'} ? "Yes" : "No" );
+my $idleswapstr = ( $row{'idleswap'} ? "Yes" : "No" );
+my $autoswapstr = ( $row{'autoswap'} ? "Yes" : "No" );
+my $noswap      = $row{'noswap_reason'};
+my $noidleswap  = $row{'noidleswap_reason'};
+my $idleswaptime= $row{'idleswap_timeout'} / 60.0;
+my $autoswaptime= $row{'autoswap_timeout'} / 60.0;
+
+my $swapsettings = 
+ #"Name:        $expt_name\n" .
+  "Swappable:   $swappablestr".
+  ($swappablebit ? "\n" : " (Reason: '$noswap')\n").
+  "Idle-Swap:   $idleswapstr".
+  ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: '$noidleswap')\n").
+  "Auto-Swap:   $autoswapstr".
+  ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
 if (! chdir($workdir)) {
     die("*** $0:\n".
@@ -563,6 +582,11 @@ if ($inout eq "out" && ($idleswap || $autoswap || $force) ) {
 }
 else {
     $message .= "$action.\n";
+}
+
+if ($inout eq "in") {
+    # Add the swap settings...
+    $message .="\nCurrent swap settings:\n$swapsettings";
 }
 
 $message .=

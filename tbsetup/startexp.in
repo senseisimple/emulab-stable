@@ -181,6 +181,24 @@ my $estate	= $row{'state'};
 my $expt_path   = $row{'path'};
 my $expt_name   = $row{'expt_name'};
 my $expt_created= $row{'expt_created'};
+my $swappablebit= $row{'swappable'};
+my $idleswapbit = $row{'idleswap'};
+my $autoswapbit = $row{'autoswap'};
+my $swappable   = ( $row{'swappable'} ? "Yes" : "No" );
+my $idleswap    = ( $row{'idleswap'} ? "Yes" : "No" );
+my $autoswap    = ( $row{'autoswap'} ? "Yes" : "No" );
+my $noswap      = $row{'noswap_reason'};
+my $noidleswap  = $row{'noidleswap_reason'};
+my $idleswaptime= $row{'idleswap_timeout'} / 60.0;
+my $autoswaptime= $row{'autoswap_timeout'} / 60.0;
+
+my $swapsettings = 
+ #"Name:        $expt_name\n" .
+  "Swappable:   $swappable".($swappablebit ? "\n" : " (Reason: '$noswap')\n").
+  "Idle-Swap:   $idleswap".
+  ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: '$noidleswap')\n").
+  "Auto-Swap:   $autoswap".
+  ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
 if ($estate ne EXPTSTATE_NEW) {
     die("*** $0:\n".
@@ -334,13 +352,13 @@ $message .=
     "PID:         $pid\n" .
     "GID:         $gid\n" .
     "Name:        $expt_name\n" .
+    $swapsettings .
     "Created:     $expt_created\n" .
     "Directory:   $expt_path\n".
     "\n".
     "Appended at the end is the output of the experiment setup. If you\n" .
     "have any questions or comments, please include the output below\n" .
     "in your message to $TBOPS";
-   
 
 SENDMAIL("$user_name <$user_email>",
 	 "New Experiment " . (($frontend == 0) ? "Created" : "Preloaded") .
