@@ -1,3 +1,762 @@
+stoller     2003/09/24 17:23:40 MDT
+
+  Modified files:
+    .                    configure configure.in 
+    db                   libdb.pm.in 
+    tbsetup              os_setup.in 
+    tbsetup/plab         GNUmakefile.in 
+  Added files:
+    tbsetup/plab         plabmonitord.in 
+  Log:
+  Commit my daemon to monitor the status of plab physnodes in hwdown,
+  trying to bring them back from the dead periodically by trying to
+  instantiate a vserver/vnode on them, and then tearing it down. If we
+  can do that, then the node is usable, and it gets moved back into the
+  normal holding experiment so that ptopgen will add it to ptop files.
+  
+  This deamon is not turned on yet; waiting for other little bits and
+  pieces to be done.
+  
+  There is an equiv change in os_setup that moves physnodes into hwdown
+  when a setup on a vnode fails.
+  
+  Lbs
+  
+  Revision  Changes    Path
+  1.174     +2 -1      testbed/configure
+  1.181     +2 -1      testbed/configure.in
+  1.126     +32 -3     testbed/db/libdb.pm.in
+  1.78      +6 -0      testbed/tbsetup/os_setup.in
+  1.5       +2 -1      testbed/tbsetup/plab/GNUmakefile.in
+
+
+stoller     2003/09/24 16:43:43 MDT
+
+  Modified files:
+    .                    configure configure.in 
+    os                   install-rpm install-tarfile 
+    tmcd                 libsetup.pm 
+    www                  dbdefs.php3.in 
+  Added files:
+    www                  spewrpmtar.php3 
+    tbsetup              spewrpmtar.in 
+  Log:
+  Convert install-rpm/install-tarfile to use the web server instead of
+  tmcd (which is bad, since tying up the tmcd threads blocks all nodes
+  in the testbed). The old functionality is left in tmcd for now.
+  
+  On the server side, a new web page (www/spewrpmtar.php3) receives a
+  request for a file, along with the nodeid (pcXXX) making the request,
+  and the secret key that is generated for each new experiment and
+  transfered to the node via tmcd. If the key matches, the operation is
+  handed off to tbsetup/spewrpmtar.in which verifies that the file is in
+  the list of rpm/tar files for that node, and then spits it out to
+  stdout. The web page uses fpassthru() to send the file out to the
+  client. The client is using wget, and is required to use https (the
+  web page checks).
+  
+  At present, the external script is run as the creator of the
+  experiment, and gid of the experiment. Perhaps this is not a good
+  idea. In any event, the file must be in the list of rpm/tarfiles,
+  either owned by the experiment creator or with a group of the
+  experiment, and the file must reside in either /proj or /groups.
+  I use the realpath() function to make sure there are no symlink tricks
+  pointing to outside those filesystems. I use the standard NFS read goo to
+  prevent transient mount problems that we all know and love.
+  
+  Revision  Changes    Path
+  1.173     +1 -0      testbed/configure
+  1.180     +1 -0      testbed/configure.in
+  1.2       +122 -81   testbed/os/install-rpm
+  1.8       +126 -83   testbed/os/install-tarfile
+  1.80      +100 -14   testbed/tmcd/libsetup.pm
+  1.58      +19 -0     testbed/www/dbdefs.php3.in
+
+
+mike        2003/09/23 16:50:23 MDT
+
+  Modified files:
+    tmcd/freebsd         control_interface cpuspeed.awk nodetype 
+    tmcd/linux           chipset.awk control_interface 
+                         cpuspeed.awk nodetype 
+  Log:
+  Prototype changes for Aero 2.4Ghz boxes.
+  Also change awk scripts to exit after printing something.
+  
+  Revision  Changes    Path
+  1.12      +3 -0      testbed/tmcd/freebsd/control_interface
+  1.8       +17 -12    testbed/tmcd/freebsd/cpuspeed.awk
+  1.8       +3 -0      testbed/tmcd/freebsd/nodetype
+  1.4       +4 -4      testbed/tmcd/linux/chipset.awk
+  1.12      +1 -1      testbed/tmcd/linux/control_interface
+  1.7       +14 -10    testbed/tmcd/linux/cpuspeed.awk
+  1.9       +3 -0      testbed/tmcd/linux/nodetype
+
+
+stoller     2003/09/22 09:35:54 MDT
+
+  Modified files:
+    www                  plabmetrics.php3 
+  Log:
+  Pump up linecount with sorting by each metric.
+  
+  Revision  Changes    Path
+  1.2       +122 -29   testbed/www/plabmetrics.php3
+
+
+stoller     2003/09/22 07:56:18 MDT
+
+  Modified files:
+    tbsetup              os_setup.in vnode_setup.in 
+  Log:
+  Minor allocstate changes to try and cope with plab nodes that either
+  fail in "plabnode alloc" or in the remote vnodesetup call. In the
+  former case, we do not want to "plabnode free" it later. In the later,
+  we want to plabnode free it right away, and make sure we do not try to
+  remote vnode teardown or plabfree it later. In either case, os_setup
+  needs to check so that it does not bother waiting for the node since
+  it is wasted time. I use an alternate dead state for this, but the
+  real solution is to move much of the vnode specific code from os_setup
+  to vnode_setup.
+  
+  Note that this stuff is mostly untested since I need nodes to fail!
+  The normal path works fine though.
+  
+  Revision  Changes    Path
+  1.77      +21 -12    testbed/tbsetup/os_setup.in
+  1.28      +70 -31    testbed/tbsetup/vnode_setup.in
+
+
+stoller     2003/09/19 14:37:12 MDT
+
+  Modified files:
+    www                  nodecontrol_list.php3 
+  Added files:
+    www                  plabmetrics.php3 
+  Log:
+  Add very primitive plabmetrics page. Needs a bunch of work (mostly
+  sorting options).
+  
+  Revision  Changes    Path
+  1.37      +2 -1      testbed/www/nodecontrol_list.php3
+
+
+ricci       2003/09/19 12:40:21 MDT
+
+  Modified files:
+    assign               anneal.cc score.cc score.h 
+  Log:
+  Some new behavior - features and desires do not generate violations
+  when mapping fixed nodes.
+  
+  Revision  Changes    Path
+  1.17      +5 -5      testbed/assign/anneal.cc
+  1.38      +12 -10    testbed/assign/score.cc
+  1.18      +1 -1      testbed/assign/score.h
+
+
+stoller     2003/09/19 09:15:51 MDT
+
+  Modified files:
+    www                  dbdefs.php3.in showexp.php3 
+                         showstuff.php3 toggle.php 
+  Added files:
+    www                  editexp.php3 
+  Log:
+  Redo the Edit Experiment Metadata page; turned it into a standard form
+  based page that looks like the original Begin Experiment page. Be sure
+  to look at the page in both admin mode and non-admin mode since I had
+  some trouble determining how swappable is treated these days.
+  
+  Oh, added the ability to convert non-batch experiments into batch, and
+  back. The experiment must be unlocked and in the swapped state to go
+  in either direction.
+  
+  Also added the cpu_usage and mem_usage slots for editing. I added a
+  comment about planetlab only, since otherwise we would just confuse
+  normal users who have no idea what they mean. I could conditionalize
+  them on having plab nodes, but thats difficult to figure out in the
+  web page when the experiment is swapped out, so lets not worry about
+  it.
+  
+  Revision  Changes    Path
+  1.56      +12 -0     testbed/www/dbdefs.php3.in
+  1.70      +2 -131    testbed/www/showexp.php3
+  1.115     +28 -103   testbed/www/showstuff.php3
+  1.11      +2 -73     testbed/www/toggle.php
+
+
+mike        2003/09/18 23:23:04 MDT
+
+  Modified files:
+    tbsetup/plab         GNUmakefile.in 
+  Added files:
+    tbsetup/plab         plabstats.in 
+  Log:
+  First whack at a per-node stats program that will make a stats web page go.
+  
+  Usage: plabstats [-dfh] [-CDHILMS]
+    -d    print debug diagnostics
+    -f    fetch new data, else use what is in /tmp/plabxml
+    -h    this help message
+    -i    print IP address along with metrics
+    -n    do not print hostname with metrics
+  
+    -C    print Ganglia CPU metrics, sorted by %CPU usage
+    -D    print Ganglia disk metrics, sorted by %disk usage
+    -L    print Ganglia load metrics, sorted by one minute load
+    -M    print Ganglia memory metrics, sorted by %mem usage
+    -S    print Emulab state info, summarizing per-node availability
+  
+  Default is to print a terse summary of per-node resource usage.
+  Use "plabstats -f" to get fresh data or try something whacky like:
+  	plabstats -S | grep accept_3
+  to get the list of nodes which are currently available for mapping
+  by a "level 3" (aka, average) resource consuming experiment, or:
+  	plabstats -S | grep reject
+  to get info about the nodes that cannot be used along with the reason(s) why.
+  
+  Needs some refinement:
+    plabmetrics should store raw info into the DB where plabstats can get it
+    presentation of Emulab state info should be improved
+  
+  Revision  Changes    Path
+  1.3       +1 -1      testbed/tbsetup/plab/GNUmakefile.in
+
+
+kwebb       2003/09/18 18:36:13 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in 
+  Log:
+  A couple of enhancements to libplab:
+  
+  - new SENDMAIL function that mirrors the perl lib's
+  - retry logic for communicating with the dslice agent when a slice/sliver is
+    being deleted (plabnode free)
+  
+  One thing I'd like to do is write a wrapper class around agent and node
+  manager communication since it can be flaky - would clean up a and simplify
+  things.  Maybe just wait since we're going to have to port over to dynamic
+  slices soon enough.
+  
+  Revision  Changes    Path
+  1.16      +75 -1     testbed/tbsetup/plab/libplab.py.in
+
+
+stoller     2003/09/18 15:13:59 MDT
+
+  Modified files:
+    tbsetup              tbswap.in vnode_setup.in 
+  Log:
+  Changes to the allocstate machine to support swapmod on widearea nodes
+  in general, and plab nodes in particular.
+  
+  Revision  Changes    Path
+  1.26      +14 -9     testbed/tbsetup/tbswap.in
+  1.27      +21 -11    testbed/tbsetup/vnode_setup.in
+
+
+stoller     2003/09/18 14:04:35 MDT
+
+  Modified files:
+    tbsetup/ns2ir        sim.tcl.in 
+  Log:
+  Add a LINKTEST agent, that fires to all nodes. This is to support the
+  link testing stuff, and will eventually be under user control, but for
+  now we stick this agent into every experiment, although most of the
+  time no one will be listening for it.
+  
+  Revision  Changes    Path
+  1.52      +3 -0      testbed/tbsetup/ns2ir/sim.tcl.in
+
+
+ricci       2003/09/18 11:18:28 MDT
+
+  Modified files:
+    assign               score.cc score.h 
+  Log:
+  Add some new ways to treat features.
+  
+  Features that begin with a '*' have some kind of global scope. Since
+  that, by itself, doesn't mean much, the second character of the
+  feature name must tell us what type of global feature it is. The two
+  currently supported are:
+  
+  '&' - 'one is okay' - don't penalize the first pnode that has this
+      feature, but penalize subsequent ones. Will be used to prefer
+      not to give people multiple nodes at the sime widearea site.
+  '!' - 'more than one is okay' - penalize the first pnode that has
+      this feature, but not subsequent ones. This could be used to let
+      assign pick experiments to swap out in order to let the current
+      experiment map. The idea being that once you've decided that one
+      of the experiment's nodes is getting stolen, you might as well
+      swap the whole thing.
+  
+  For now, these global features should not have corresponding desires,
+  because it's not clear what the right thing to do would be. But, we may
+  decide to add these semantics someday.
+  
+  Revision  Changes    Path
+  1.37      +86 -10    testbed/assign/score.cc
+  1.17      +0 -1      testbed/assign/score.h
+
+
+kwebb       2003/09/17 02:56:24 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in plabnode.in 
+  Log:
+  Several updates to libplab.py and plabnode.in
+  
+  - getfree daemon doesn't die anymore when communcation with the plab dslice
+    agent fails.
+  
+  - the link classifier logic has been changed slightly to allow nodes
+    to be classified as inet2 even if they don't reverse resolve.  The problem
+    here is that intl nodes that don't resolve, but which go through abilene
+    will look like inet2 nodes, which is wrong.  Manual verification of the
+    node_auxtypes table is still recommended.
+  
+  - The fping verifier has been disabled for now (since some plab nodes
+    block ICMP traffic).
+  
+  - made some error messages more descriptive
+  
+  - plabnodes script now handles more agent communication errors gracefully
+   (retries when if encounters them).
+  
+  - rearranged plabnode's retry loops to be a little easier to read, and
+    more general.
+  
+  Revision  Changes    Path
+  1.12      +30 -19    testbed/tbsetup/plab/libplab.py.in
+  1.4       +29 -19    testbed/tbsetup/plab/plabnode.in
+
+
+stoller     2003/09/16 16:03:17 MDT
+
+  Modified files:
+    tmcd/linux           ixpboot rc.ixp 
+  Log:
+  More IXP changes:
+  
+  * Put a hosts file in /opt/config, which gets copied to /etc/hosts on
+    the IXP.
+  * Put a resolv.conf in /opt/config, which gets copied to /etc on
+    the IXP.
+  * Add support for startcmd, which will override the default boot.
+  * Do not squash root in the /opt export.
+  
+  Revision  Changes    Path
+  1.2       +88 -31    testbed/tmcd/linux/ixpboot
+  1.2       +8 -6      testbed/tmcd/linux/rc.ixp
+
+
+ricci       2003/09/16 15:54:01 MDT
+
+  Modified files:
+    tbsetup              vnode_setup.in 
+  Log:
+  Add some paralelism - do up to $MAX_CHILDREN (currently 8) vnodes at
+  a time.
+  
+  Revision  Changes    Path
+  1.24      +130 -41   testbed/tbsetup/vnode_setup.in
+
+
+kwebb       2003/09/16 15:15:10 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in 
+  Log:
+  Small change to libplab to have it try to pull the plab rootball from
+  a little local loopback httpd server which now runs on all slivers of
+  the static utah1 slice.
+  
+  It falls back to pushing the tarball from Emulab central if the local
+  fetch fails.  Also introduced the notion of versioning for the plab rootball.
+  For now, just chang the ROOTBALL_NAME def at the beginning of this file; I'd
+  like to move this into autoconf or the makefile eventually.
+  
+  Revision  Changes    Path
+  1.11      +33 -15    testbed/tbsetup/plab/libplab.py.in
+
+
+stoller     2003/09/16 14:00:33 MDT
+
+  Modified files:
+    tbsetup              named_setup.in 
+  Log:
+  Changes to allow for exporting subnodes/vnodes that have their own
+  properly routable IPs addresses in the interfaces table.
+  
+  Revision  Changes    Path
+  1.30      +69 -15    testbed/tbsetup/named_setup.in
+
+
+mike        2003/09/16 12:31:10 MDT
+
+  Modified files:
+    tbsetup/plab         plabmetrics.in 
+  Log:
+  Don't use nodes with less than 10% free disk
+  
+  Revision  Changes    Path
+  1.3       +68 -14    testbed/tbsetup/plab/plabmetrics.in
+
+
+kwebb       2003/09/15 20:01:06 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in plabnode.in 
+  Added files:
+    tbsetup/plab/etc     fixsudo.sh 
+  Log:
+  Some PLAB dslice manager updates:
+  
+  - in addition to asking the dslice agent (on plab) for a list of available
+    nodes, we now also fping them all to weed out unresponsive ones.  One
+    problem here is that several plab nodes block ICMP; could be
+    solved by pinging with nmap (tries both a ICMP, and TCP ping).  This
+    affects the plabdaemon getfree command, and subsequently which plab nodes
+    appear as "up" in the DB
+  
+  - Changed slice naming scheme:  we now append the experiment index onto the
+    slice name to try to ensure uniqueness (emulab_<pid>_<eid>_<idx>)
+  
+  - Modified plabnode to try to cope with flaky nodes - there is some retry
+    code in there now
+  
+  - Added the "fixsudo" shell script which is run very first as root (via the
+    cumbersome "su" command) to fix sudoers for later sudo use on plab nodes.
+  
+  Revision  Changes    Path
+  1.9       +39 -1     testbed/tbsetup/plab/libplab.py.in
+  1.3       +52 -11    testbed/tbsetup/plab/plabnode.in
+
+
+ricci       2003/09/15 19:19:45 MDT
+
+  Modified files:
+    assign               parse_ptop.cc physical.h score.cc 
+  Log:
+  Some fixes aimed at vnodes:
+  
+  Don't allow intraswitch links to vnodes on switches - they'll get
+  scored as direct links. Since LANs are now directly on switches, there
+  were situations where we could have scored the same link as either
+  direct or intraswitch, which results in two different scores. This can
+  cause those 'contact calfeld' warnings, and might have caused some
+  strange scoring fluxuations as assign ran.
+  
+  When picking a link to a switch, for emulated links, pick the least
+  loaded link, not the one with the fewest users. This helps in situations
+  where the link bandwidths are heterogenous.
+  
+  Revision  Changes    Path
+  1.30      +1 -0      testbed/assign/parse_ptop.cc
+  1.21      +4 -1      testbed/assign/physical.h
+  1.36      +46 -13    testbed/assign/score.cc
+
+
+mike        2003/09/15 16:20:06 MDT
+
+  Modified files:
+    tbsetup/plab         plabmetrics.in 
+  Log:
+  Default to using 15-minute loadave and a cap of 5.0.
+  Change to make nodes with stale data unusable (give em a loadave of 999)
+  
+  Revision  Changes    Path
+  1.2       +36 -8     testbed/tbsetup/plab/plabmetrics.in
+
+
+kwebb       2003/09/12 16:51:14 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in 
+  Log:
+  Several changes to support plab nodes on the mainbed:
+  
+  1) put linktype in the node_auxtypes table instead of having separate classes
+  of vnodes (now they're all one type).
+  
+  2) Code added to emulabify() to fix the sudoers file pre-overlay.
+     - turns out that only "su" is available to supply initial root access
+  
+  3) uncapped eligibility to allow all plab nodes to filter in.
+  
+  Other minor things too.
+  
+  Revision  Changes    Path
+  1.8       +29 -23    testbed/tbsetup/plab/libplab.py.in
+
+
+ricci       2003/09/12 13:08:31 MDT
+
+  Modified files:
+    assign               assign.cc anneal.cc solution.h 
+                         solution.cc 
+  Log:
+  Add a new function to test for equality of two scores - just make
+  sure they're within some tolerance of each other. Use this so that
+  cumulative float point errors don't cause us to spit out scary
+  looking false positive warnings.
+  
+  Revision  Changes    Path
+  1.59      +1 -1      testbed/assign/assign.cc
+  1.14      +1 -1      testbed/assign/anneal.cc
+  1.2       +8 -0      testbed/assign/solution.h
+  1.3       +8 -0      testbed/assign/solution.cc
+
+
+ricci       2003/09/12 11:21:55 MDT
+
+  Modified files:
+    assign               anneal.cc 
+  Log:
+  Fix an infinite loop bug - could only show up in some unlikely
+  circumstances with vnodes, but I managed to run into it.
+  
+  Revision  Changes    Path
+  1.13      +13 -7     testbed/assign/anneal.cc
+
+
+stoller     2003/09/12 10:14:58 MDT
+
+  Modified files:
+    tbsetup/plab         GNUmakefile.in 
+  Added files:
+    tbsetup/plab         plabmetrics.in 
+  Log:
+  New script to query the plab web site, download the gmetad XML file,
+  and push load data into the node_features table. Once every 5 minutes
+  from cron on boss.
+  
+  Revision  Changes    Path
+  1.2       +1 -1      testbed/tbsetup/plab/GNUmakefile.in
+
+
+ricci       2003/09/11 17:48:09 MDT
+
+  Modified files:
+    sql                  database-create.sql database-migrate.txt 
+    tbsetup              ptopgen.in 
+  Log:
+  Add a node_features table - just like the node_type_features table,
+  but it's per node, not per type. Will initially be used to store
+  inforomation about planetlab nodes.
+  
+  Revision  Changes    Path
+  1.181     +12 -2     testbed/sql/database-create.sql
+  1.71      +8 -0      testbed/sql/database-migrate.txt
+  1.44      +21 -6     testbed/tbsetup/ptopgen.in
+
+
+ricci       2003/09/11 17:30:52 MDT
+
+  Modified files:
+    assign               parse_ptop.cc pclass.cc physical.h 
+  Log:
+  Add a new 'unique' flag to the ptop file - tells assign that there is
+  some reason, which is invisible to assign, that a node should never
+  be considered the same as another. This is for scoring, so that assign
+  doesn't prefer to give you 2 DSL nodes if you ask for 1 DSL and one
+  generic wide-area.
+  
+  Revision  Changes    Path
+  1.29      +4 -0      testbed/assign/parse_ptop.cc
+  1.20      +9 -0      testbed/assign/pclass.cc
+  1.20      +6 -1      testbed/assign/physical.h
+
+
+stoller     2003/09/11 14:23:18 MDT
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Widearea changes, mostly started for plab but affects all widearea
+  nodes. The intent is to better support last mile types, which right
+  now are a total mess cause the types are associated with the virtual
+  nodes, and a node can have just a single type. This info has now been
+  moved in the node_types_auxtypes table and the node_types table.
+  
+  Anyway, we no longer use wanassign on unconnected widearea nodes, but
+  use assign directly, much like we use assign to allocate virtual nodes
+  on local physical nodes. ptopgen inserts the physical widearea nodes
+  (even though they are allocated), and the proper counts for the types
+  that are available on them. assign will pick the nodes, and
+  assign_wrapper will allocate the necessary vnodes on the pnodes (but
+  in the case of wideare nodes, the underlying physical node does not
+  need to be allocated).
+  
+  Also added some fixes for dealing with vtypes when used in conjunction
+  with widearea nodes. Rather then generating an error like it used to,
+  you can create a vtype in your NS file:
+  
+  	tb-make-soft-vtype mytype {pcvroninet pcvwainet}
+  	tb-set-hardware $v0 mytype
+  
+  and assign_wrapper now looks at the underlying types to figure out
+  what it needs. Note: No consistency checking yet; mixing a remote/virt
+  and a local/real type will break.
+  
+  Revision  Changes    Path
+  1.120     +94 -34    testbed/tbsetup/assign_wrapper.in
+
+
+kwebb       2003/09/11 13:35:55 MDT
+
+  Modified files:
+    tbsetup/plab         libplab.py.in 
+  Log:
+  Small change to insertion of PLAB nodes into the DB.  We no longer classify
+  the plab vnodes according to link type (they are all of generic "pcplab"
+  type and class now), but add the linktype to the node_auxtypes field.  This
+  data in this table is then used to tell assign what kinds of types/roles the
+  node can take on.
+  
+  Revision  Changes    Path
+  1.7       +6 -1      testbed/tbsetup/plab/libplab.py.in
+
+
+stoller     2003/09/11 13:06:14 MDT
+
+  Modified files:
+    tbsetup              ptopgen.in 
+  Log:
+  Split out the widearea code, and rework. Added new option, -r, which
+  says to include widearea physnodes, with the types set to those listed
+  in the node_auxtypes table. Those types will include the last mile
+  types that a vnode on a pnode can take on. The :count value for the
+  types is set to the min of the number of *free* vnodes on the pnode,
+  and the virtnode_capacity in the node_types table. Obviously, if all
+  the vnodes are allocated, the physnode will not appear in the ptop
+  file. For plab, virtnode_capacity will get set to one in the
+  node_types table, thereby preventing "revisitation" of a plab physnode
+  in an experiment.
+  
+  Revision  Changes    Path
+  1.43      +91 -34    testbed/tbsetup/ptopgen.in
+
+
+mike        2003/09/11 12:43:32 MDT
+
+  Modified files:
+    tbsetup              batchexp.in 
+  Log:
+  Use new sitevar that controls how long we let a batch job be idle before
+  swapping.
+  
+  This is primarily for the "queue an interactive job" form of batching,
+  but applies to all batch jobs at the moment.
+  
+  Revision  Changes    Path
+  1.36      +12 -1     testbed/tbsetup/batchexp.in
+
+
+ricci       2003/09/10 18:32:11 MDT
+
+  Modified files:
+    www                  newnode-defs.php3 newnodecheckin.php 
+                         newnodes_list.php3 
+  Log:
+  Add support for Wisconsin's naming scheme, or more generally, any
+  naming scheme that ends in -A, where A is a letter, not a number.
+  
+  Revision  Changes    Path
+  1.5       +18 -2     testbed/www/newnode-defs.php3
+  1.5       +105 -64   testbed/www/newnodecheckin.php
+  1.4       +17 -4     testbed/www/newnodes_list.php3
+
+
+ricci       2003/09/10 13:55:32 MDT
+
+  Modified files:
+    assign               pclass.cc 
+  Log:
+  Fix a bug/memory leak - assign should now stay at a constant memory
+  footprint as it runs. All the credit for this one goes to Tim!
+  
+  Revision  Changes    Path
+  1.19      +0 -2      testbed/assign/pclass.cc
+
+
+stoller     2003/09/10 11:09:05 MDT
+
+  Modified files:
+    sql                  database-create.sql database-migrate.txt 
+  Log:
+  Add new table for mapping auxtypes back to their parent in the
+  node_types table. This should make it easier to assign last mile
+  types to widearea nodes since a given type can now have as many
+  subtypes as you like.
+  
+  Also add cpu_usage and mem_usage to the experiments table. The
+  user will be able to specify these in the NS file. Currently a
+  tinyint, where the default is zero, which means ignore.
+  
+  Revision  Changes    Path
+  1.180     +13 -0     testbed/sql/database-create.sql
+  1.70      +16 -0     testbed/sql/database-migrate.txt
+
+
+mike        2003/09/09 15:41:55 MDT
+
+  Modified files:
+    os                   install-tarfile 
+  Log:
+  "Fix" to deal with NFS hup-to-mountd-screws-us-all race:
+  add -c option to force copying file over locally before untaring,
+  the copy code knows how to retry read operations that fail
+  
+  Revision  Changes    Path
+  1.6       +90 -33    testbed/os/install-tarfile
+
+
+ricci       2003/09/09 14:44:48 MDT
+
+  Modified files:
+    sql                  database-create.sql database-migrate.txt 
+    tbsetup              ptopgen.in 
+  Log:
+  Add a new table, node_auxtypes - this table contains additional types
+  that should be associated with a node when it is put into the ptop
+  file.
+  
+  Revision  Changes    Path
+  1.179     +12 -1     testbed/sql/database-create.sql
+  1.69      +5 -0      testbed/sql/database-migrate.txt
+  1.42      +18 -0     testbed/tbsetup/ptopgen.in
+
+
+ricci       2003/09/04 17:16:50 MDT
+
+  Modified files:
+    assign               anneal.cc common.h parse_ptop.cc 
+                         parse_top.cc pclass.cc physical.h 
+                         score.cc score.h virtual.h 
+  Log:
+  Teach assign about subnode relationships - on node lines in both the
+  top and ptop files, you can put
+  subnode_of:nodename
+  Any vnode that is a subnode must be mapped to a pnode that is a a
+  subnode of the pnode the vnode's parent is mapped to. Read that a few
+  times slowly, I swear it makes sense.
+  
+  Revision  Changes    Path
+  1.12      +1 -1      testbed/assign/anneal.cc
+  1.19      +5 -0      testbed/assign/common.h
+  1.27      +18 -0     testbed/assign/parse_ptop.cc
+  1.27      +20 -6     testbed/assign/parse_top.cc
+  1.17      +8 -0      testbed/assign/pclass.cc
+  1.17      +7 -1      testbed/assign/physical.h
+  1.33      +77 -2     testbed/assign/score.cc
+  1.16      +4 -2      testbed/assign/score.h
+  1.18      +8 -1      testbed/assign/virtual.h
+
+
 stoller     2003/09/04 08:30:38 MDT
 
   Modified files:
