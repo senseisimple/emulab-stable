@@ -970,3 +970,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table widearea_nodeinfo add column hostname varchar(255);
        alter table widearea_nodeinfo add column site varchar(255);
+
+1.186: Add hashkey slot to experiments table to use as a secret key to
+       pass from the nodes to the webserver, to download tar/rpm
+       files.
+
+       alter table experiments add keyhash varchar(64) default NULL \
+		after mem_usage;
