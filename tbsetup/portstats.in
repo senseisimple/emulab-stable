@@ -18,6 +18,8 @@
 #
 # Configure variables
 #
+my $ELABINELAB = @ELABINELAB@;
+
 use lib '@prefix@/lib';
 
 use libdb;
@@ -155,6 +157,14 @@ if ($opt{p}) {
     if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
 	die "You do not have permission to view experiment $pid/$eid\n";
     }
+}
+
+#
+# Eventually, we can pass this out via XMLRPC. For now just exit.
+# 
+if ($ELABINELAB) {
+    print "Not bothering with portstats inside an elabinelab.\n";
+    exit(0);
 }
 
 snmpit_lib::init(0);
