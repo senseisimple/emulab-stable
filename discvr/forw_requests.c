@@ -18,8 +18,10 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.3 2000-07-13 18:52:51 kwright Exp $
+ * $Id: forw_requests.c,v 1.4 2000-07-13 23:05:11 kwright Exp $
  */
+
+#include <math.h>
 
 #include "discvr.h"
 #include "packet.h"
@@ -30,11 +32,27 @@
  */
 char recvbuf[BUFSIZ];
 
+static double start = 0.0;
+
+double
+tod(void)
+{
+        double s;
+	struct timeval tv;
+
+	gettimeofday(&tv, 0);
+	s = tv.tv_sec;
+	s += (1e-6 * tv.tv_usec);
+	return (s - start);
+}
+
+
 void
 forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo, 
 		 const char *mesg, int mesglen) 
 {
 	int                     s, n;
+	int                     more_time = 1;
 	fd_set                  rset;
         const int               on = 1;
 	char                    ifname[IFNAMSIZ];
@@ -52,7 +70,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		 * a loopback interface, or it's the receiving
 		 * interface.
 		 * 
-		 * Add check for control net. -lkw
+		 * Add check for control net? -lkw
 		 */
 	        if (ifi->ifi_flags & !IFF_UP || 
 		    ifi->ifi_flags & IFF_LOOPBACK ||
@@ -118,28 +136,47 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 
 		tdi = (struct topd_inqid *)mesg;
 		tv.tv_sec  = ntohs(tdi->tdi_ttl) * ntohs(tdi->tdi_factor);
-		fprintf(stderr, "tv.tv_sec: %d", tv.tv_sec);
 		tv.tv_usec = 0;
 		FD_ZERO(&rset);
 		FD_SET(s, &rset);
 
-		select(s + 1, &rset, NULL, NULL, &tv);
-		
-		if (!FD_ISSET(s, &rset)) {
-		        /* socket is not readable */
-		        fprintf(stderr, "Socket not readable before timeout.\n");
-                        continue; 
-		}
-
-		while (	(n = recvfrom(s, recvbuf, BUFSIZ, 0, NULL, NULL)) > 0 ) {	
+		n     = 0;
+                start = tod();
+		while (	more_time  ) {
+		        double begin, end, elapsed;
+			double deadline = tv.tv_sec + (tv.tv_usec * 1e-6);
 
 		        /* 
 			 * It's possible that one neighbor responded very quickly
 			 * and other neighbors (perhaps because they have many more
 			 * neighbors whose messages they had to parse) could respond
 			 * slowly. To cover this case, we should continue to try to 
-			 * read from the socket until our delay is up. 
+			 * read from the socket until our delay is up. -lkw
 			 */
+
+		        begin = tod();
+		        select(s + 1, &rset, NULL, NULL, &tv);
+			end = tod();
+		
+			if (!FD_ISSET(s, &rset)) {
+			        /* socket is not readable */
+			        fprintf(stderr, "Socket not readable before timeout.\n");
+				more_time = 0;
+				/*continue;*/
+			}
+			
+			/* get ready for next select */
+			elapsed = end - begin;
+			fprintf(stderr, "elapsed:%f ", elapsed);
+			if (elapsed > deadline) {
+			        break;
+			}	
+			deadline -= elapsed;
+			tv.tv_sec = floor(deadline);
+			tv.tv_usec = (deadline - tv.tv_sec) * 1e+6;
+			fprintf(stderr, "sec:%d usec:%d\n", tv.tv_sec, tv.tv_usec);
+			n = recvfrom(s, recvbuf, BUFSIZ, 0, NULL, NULL);
+
 		        /* 
 			 * Be sure to malloc enough space for all of the mesg. 
 			 * See note above about possible datagram truncation. -lkw
