@@ -102,7 +102,7 @@ DOWNLOADFILES += $(wildcard $(SRCDIR)/downloads/*.exe)
 #
 ifeq ($(OURDOMAIN),$(MAINSITE)) 
 	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php3)
-	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php)
+	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.php)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.conf)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.gif)
 	CVSWEBCGI    = $(wildcard $(SRCDIR)/cvsweb/*.cgi)
