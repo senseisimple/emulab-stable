@@ -54,6 +54,14 @@
 #include <sys/conf.h>
 #include <sys/syslog.h>
 
+#include <ufs/ufs/quota.h>
+#include <ufs/ufs/inode.h>
+#include <ufs/ufs/ufs_extern.h>
+#include <ufs/ufs/ufsmount.h>
+
+#include <ufs/ffs/fs.h>
+#include <ufs/ffs/ffs_extern.h>
+
 static int vn_closefile __P((struct file *fp, struct proc *p));
 static int vn_ioctl __P((struct file *fp, u_long com, caddr_t data, 
 		struct proc *p));
@@ -395,9 +403,47 @@ vn_read(fp, uio, cred, flags, p)
 }
 
 extern int checkpt_flag;
+extern int checkpt_process_sleep_variable;
+
+void shd_write_entry (struct vnode *vp, char *name)
+{
+    if (0 == vp)
+    { 
+        printf ("shd_write_entry called from %s, vp = %x\n", name, vp);
+        return;
+    }
+    if (0 == vp->v_mount)
+    {
+        printf ("shd_write_entry called from %s, vp->v_mount = %x\n", name, vp->v_mount);
+        return;
+    }
+    while (checkpt_flag != 0)
+            tsleep((caddr_t)&checkpt_flag, PINOD, "checkpointlock", 0);
+    ++(vp->v_mount->mnt_ops_in_progress);
+
+}
+
+void shd_write_exit (struct vnode *vp, char *name)
+{
+    if (0 == vp)
+    {
+        printf ("shd_write_exit called from %s, vp = %x\n", name, vp);
+        return;
+    }
+    if (0 == vp->v_mount)
+    {
+        printf ("shd_write_exit called from %s, vp->v_mount = %x\n", name, vp->v_mount);
+        return;
+    }
+    --(vp->v_mount->mnt_ops_in_progress);
+    if (checkpt_flag)
+        wakeup(&checkpt_process_sleep_variable);
+}
+
 /*
  * File table vnode write routine.
  */
+
 static int
 vn_write(fp, uio, cred, flags, p)
 	struct file *fp;
@@ -408,9 +454,6 @@ vn_write(fp, uio, cred, flags, p)
 {
 	struct vnode *vp;
 	int error, ioflag;
-
-        while (checkpt_flag != 0)
-            tsleep((caddr_t)&checkpt_flag, PINOD, "checkpointlock", 0);
 
 	KASSERT(uio->uio_procp == p, ("uio_procp %p is not p %p",
 	    uio->uio_procp, p));
@@ -433,7 +476,9 @@ vn_write(fp, uio, cred, flags, p)
 	if ((flags & FOF_OFFSET) == 0)
 		uio->uio_offset = fp->f_offset;
 	ioflag |= sequential_heuristic(uio, fp);
+        shd_write_entry (vp, "vn_write");
 	error = VOP_WRITE(vp, uio, ioflag, cred);
+        shd_write_exit (vp, "vn_write");
 	if ((flags & FOF_OFFSET) == 0)
 		fp->f_offset = uio->uio_offset;
 	fp->f_nextoff = uio->uio_offset;

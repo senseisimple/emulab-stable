@@ -284,7 +284,6 @@ shd_attach()
 	if (num == 1)
 		num = 16;
 
-        printf ("\n\nInside shd_attach\n\n");
 	/*printf("shd[0-%d]: Shadow disk devices\n", num-1);*/
 
 	shd_softc = (struct shd_softc *)malloc(num * sizeof(struct shd_softc),
@@ -381,22 +380,7 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 		reqsize = shd->shd_copysize;
 	}
 	ci->ci_vp = vp;
-        /* reqsize = 1024 * 1024; hardcoded value */ 
 
-	/*bzero(tmppath, sizeof(tmppath));
-	error = copyinstr(pp, tmppath, MAXPATHLEN, &ci->ci_pathlen);
-	if (error) {
-#ifdef SHDDEBUG
-		if (shddebug & (SHDB_INIT|SHDB_ERROR))
-			printf("shd%d: can't copy path, error = %d\n",
-			       shd->shd_unit, error);
-#endif
-		return (error);
-	}
-	ci->ci_path = malloc(ci->ci_pathlen, M_DEVBUF, M_WAITOK);
-	bcopy(tmppath, ci->ci_path, ci->ci_pathlen);*/
-
-	/*ci->ci_dev = vn_todev(vp); */
 	ci->ci_path = malloc(11, M_DEVBUF, M_WAITOK);
         ci->ci_pathlen = 11;
         if (issrc)
@@ -417,21 +401,11 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 	 */
 	size = 0;
 	secsize = DEV_BSIZE;
-	/*if (vn_isdisk(vp, &error)) {*/
 		if (devsw(ci->ci_dev)->d_psize != NULL)
 			size = (*devsw(ci->ci_dev)->d_psize)(ci->ci_dev);
 		if (reqsize > 0 && reqsize < size)
 			size = reqsize;
 		secsize = ci->ci_dev->si_bsize_phys; 
-	/*} else if (vp->v_type == VREG) {
-		struct vattr vattr;
-
-		error = VOP_GETATTR(vp, &vattr, p->p_ucred, p);
-		if (error == 0)
-			size = vattr.va_size / secsize;
-		if (reqsize > 0)
-			size = reqsize;
-	}*/
 
 	if (size == 0) {
 		free(ci->ci_path, M_DEVBUF);
@@ -491,62 +465,18 @@ void root_init (void)
             return;
         }
 
-        /*error = shd_lookup("/dev/ad0s1", curproc, FREAD,
-                                 &shd.shd_srcvp);
-        if (error) {
-            printf ("shd_lookup for /dev/ad0s1 failed\n");
-            shdunlock(ss);
-            return;
-        }*/
         shd.shd_srcpath = srcpath;
 
-        /*error = shd_lookup("/dev/ad0s4", curproc, FREAD,
-                                 &shd.shd_copyvp);
-        if (error) {
-            printf ("shd_lookup for /dev/ad0s4 failed\n");
-            (void)vn_close(shd.shd_srcvp, FREAD, curproc->p_ucred, curproc);
-            shdunlock(ss);
-            return;
-        }*/
         shd.shd_copypath = copypath;
 
         error = shd_init(&shd, curproc);
         if (error) {
-                printf ("shd_init failed\n");
+                printf ("shd_init failed. error = %d\n", error);
                 bzero(&shd_softc[unit], sizeof(struct shd_softc));
                 shdunlock(ss);
                 return (error);
         }
         bcopy(&shd, &shddevs[unit], sizeof(shd));
-
-         /* Put the vp pointers here 
-        if (0 == bInit) {
-            bcopy(&shddevs[unit], &shd, sizeof(shd));
-            bInit = 1;
-            printf ("Before lookup on source\n");
-            error = shd_lookup("/dev/ad0s1", curproc, FREAD,
-                             &shd.shd_srcvp);
-            printf ("After lookup on source\n");
-            if (error) {
-                        shdunlock(ss);
-                        return;
-                }
-
-            printf ("Before lookup on copy\n");
-            error = shd_lookup("/dev/ad0s4", curproc, FREAD|FWRITE,
-                           &shd.shd_copyvp);
-            printf ("After lookup on copy\n");
-            if (error) {
-                (void)vn_close(shd.shd_srcvp, FREAD, curproc->p_ucred, curproc);
-                shdunlock(ss);
-                return; 
-            }
-            bcopy(&shd, &shddevs[unit], sizeof(shd));
-            ss->sc_srcdisk.ci_vp = shd.shd_srcvp;
-            ss->sc_copydisk.ci_vp = shd.shd_copyvp;
-            printf ("Src vp = %x, Copy vp = %x\n", ss->sc_srcdisk.ci_vp, ss->sc_copydisk.ci_vp);
-        }
-        */
 
         shdunlock(ss);
 }
@@ -600,15 +530,6 @@ shd_init(shd, p)
 	ss->sc_cred = crdup(p->p_ucred);
 	ss->sc_secsize = ss->sc_srcdisk.ci_secsize;
 
-	/*
-	 * Initialize the copy block map
-	 
-	error = (*ss->sc_mapops->init)(ss, p);
-	if (error)
-        {
-                printf ("ss->sc_mapops->init failed \n");
-		goto bad; 
-        } */ 
 
 	/*
 	 * Add an devstat entry for this device.
@@ -790,7 +711,7 @@ shdstrategy(bp)
 		if (bounds_check_with_label(bp, lp, wlabel) <= 0) {
 			biodone(bp);
                         printf ("Error! Bounds checking and transfer adjust failed\n");
-			/*return;*/
+			return;
 		}
 	} else {
 		int pbn;        /* in sc_secsize chunks */
@@ -1367,13 +1288,13 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	biodone(bp);
 }
 
+int reboot_machine = 0;
 void reboot_to_checkpoint (void)
 {
      struct shd_softc *ss;
      struct vnode *vp;
      int unit = 0;
      ss = &shd_softc[unit];
-     bCheckpoint = 0;
      if (reboot_version > latest_version)
      { 
         printf ("Error! Cannot rollback to version %d because you have only %d previous checkpoints so far\n", reboot_version, latest_version);
@@ -1382,6 +1303,8 @@ void reboot_to_checkpoint (void)
      if (reboot_version != 0 && latest_version != 0) 
      {
          printf ("Rolling back disk state from checkpoint version %d to version %d\n\n", latest_version, reboot_version); 
+         bCheckpoint = 0;
+         /*reboot_machine = 1;*/
          rollback_to_checkpoint (reboot_version, ss, curproc);
          sync(curproc, 0);
          /*save_checkpoint_map (ss, curproc);*/
@@ -1391,29 +1314,85 @@ void reboot_to_checkpoint (void)
 
 extern void sync_before_checkpoint (void);
 
-struct vnode * lock_filesystem()
+Trie *mod_trie = 0;
+TrieIterator mod_pos = 0;
+int mod_ok = 0;
+ 
+int get_mod_blocks (int command, long *buf, long bufsiz)
 {
-    struct nameidata nd;
-    struct vnode *vp = 0;
-    int error;
-    printf ("Inside lock_filesystem\n");
-    NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
-    printf ("After NDINIT\n");
-    if ((error = vn_open(&nd, FREAD, 0)) != 0) {
-        printf ("Error opening filesystem \n");
-        return 0;
-    }
-    vp = nd.ni_vp;
-    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, curproc);
-    printf ("After vn_lock\n");
-    NDFREE(&nd, NDF_ONLY_PNBUF);
-    printf ("After NDFREE\n");  
-    return vp;
-}
+    int ix;
+    int retsiz = 0;
 
-unlock_filesystem(struct vnode * vp)
-{
-    VOP_UNLOCK(vp, 0, curproc);
+    switch (command)
+    {
+        case 1:
+            if (0 == mod_trie || 0 == mod_pos) 
+            {
+                TrieInit (&mod_trie, BlockAlloc, BlockFree, block_copy);
+                for (ix = latest_version; ix >= 1; ix--)
+                {
+                    merge (mod_trie, get_trie_for_version (ix), DEFAULT_OVERLAP);
+                }
+                mod_ok = TrieIteratorInit(mod_trie, &mod_pos);
+            }
+            if (mod_ok)
+            {
+                retsiz = 0;
+                for ( ; TrieIteratorIsValid(mod_pos); TrieIteratorAdvance(&mod_pos))
+                {
+                    buf[retsiz] = mod_pos->key;
+                    buf[retsiz+1] = mod_pos->key + depthToSize(mod_pos->maxDepth);
+                    retsiz+=2;
+                    if (retsiz >= bufsiz)
+                        return retsiz/2;
+                }
+                TrieIteratorCleanup(&mod_pos);
+                TrieCleanup(mod_trie);
+                mod_pos = 0;
+                mod_trie = 0;
+                return retsiz/2;
+            }
+            else
+            {
+                printf ("Error getting modified blocks. Data structures not initialized\n");
+                return -1;
+            }
+            break;
+        case 2:
+            if (mod_ok)
+            {
+                retsiz = 0;
+                for ( ; TrieIteratorIsValid(mod_pos); TrieIteratorAdvance(&mod_pos))
+                {
+                    buf[retsiz] = mod_pos->key;
+                    buf[retsiz+1] = mod_pos->key + depthToSize(mod_pos->maxDepth);
+                    retsiz+=2;
+                    if (retsiz >= bufsiz)
+                        return retsiz/2;
+                }
+                TrieIteratorCleanup(&mod_pos);
+                TrieCleanup(mod_trie);
+                mod_pos = 0;
+                mod_trie = 0;
+                return retsiz/2;
+            }
+            else
+            {
+                printf ("Error getting modified blocks. Data structures not initialized\n");
+                return -1;
+            }
+            break; 
+        case 3:
+            if (mod_pos)
+            { 
+                TrieIteratorCleanup(&mod_pos);
+            }
+            if (mod_trie)
+            {
+                TrieCleanup(mod_trie);
+            }
+            break;
+    } 
 }
 
 static int
@@ -1432,6 +1411,7 @@ shdioctl(dev, cmd, data, flag, p)
 	struct shd_ioctl *shio = (struct shd_ioctl *)data;
         struct shd_readbuf *shread; 
 	struct shddevice shd;
+        struct shd_mod *shmod;
 
         struct vnode * vp;        
 /*#ifdef SHDDEBUG
@@ -1447,6 +1427,10 @@ shdioctl(dev, cmd, data, flag, p)
 	shd.shd_unit = unit;
 
 	switch (cmd) {
+        case SHDGETMODBLOCKS:
+                shmod = (struct shd_mod *) data;
+                shmod->retsiz = get_mod_blocks (shmod->command, shmod->buf, shmod->bufsiz);
+                break;
         case SHDREADBLOCK:
                 shread = (struct shd_readbuf *) data;
                 read_block (ss, p, shread->buf, shread->block_num);
@@ -1455,7 +1439,6 @@ shdioctl(dev, cmd, data, flag, p)
                 reboot_version = shio->version;
                 break;
         case SHDROLLBACK:
-                /*printf ("Attempting to rollback from version %d to version %d\n", latest_version, (int )shio->version);*/
                 if (shio->version > latest_version)
                 {
                     printf ("Error! Cannot rollback to version %d because you have only %d previous checkpoints so far\n", (int) shio->version, latest_version);
@@ -1477,7 +1460,6 @@ shdioctl(dev, cmd, data, flag, p)
                 break;
         case SHDCHECKPOINT:
                 printf ("[SHDCHECKPOINT] Received checkpoint command!\n");
-                /*vp = lock_filesystem();*/
                 sync_before_checkpoint (); /*Uncomment this*/
                 if (MAX_CHECKPOINTS <= latest_version)
                 {
@@ -1488,12 +1470,8 @@ shdioctl(dev, cmd, data, flag, p)
                     latest_version++;
                 else
                 {
-                    /*if (vp != 0)
-                        unlock_filesystem(vp);*/
                     return (EINVAL);
                 } 
-                /*if (vp != 0)
-                    unlock_filesystem(vp); */
                 break;
         case SHDGETCHECKPOINTS:
                 if (latest_version < 1)
@@ -1518,13 +1496,9 @@ shdioctl(dev, cmd, data, flag, p)
                 latest_version = 1;
                 bCheckpoint = 0;
                 init_trie_list ();
-                printf ("unit = %d, curproc = %x\n", unit, curproc);
                 if (0 == create_new_trie (1))
                     return (EINVAL);
  
-		/*if (ss->sc_flags & SHDF_INITED)
-			return (EBUSY);*/
-
 		if ((flag & FWRITE) == 0)
 			return (EBADF);
 
@@ -1561,40 +1535,12 @@ shdioctl(dev, cmd, data, flag, p)
 			return (EINVAL);
 		}
 
-                /*printf ("Before lookup on source\n");
-		error = shd_lookup(shio->shio_srcdisk, p, FREAD,
-				 &shd.shd_srcvp);
-                printf ("After lookup on source\n");
-		if (error) {
-			shdunlock(ss);
-			return (error);
-		}*/
 		shd.shd_srcpath = shio->shio_srcdisk;
 		shd.shd_srcsize = shio->shio_srcsize;
 
-                /*printf ("Before lookup on copy\n");
-		error = shd_lookup(shio->shio_copydisk, p, FREAD|FWRITE,
-				   &shd.shd_copyvp);
-                printf ("After lookup on copy\n");
-		if (error) {
-			(void)vn_close(shd.shd_srcvp, FREAD, p->p_ucred, p);
-			shdunlock(ss);
-			return (error);
-		}*/
 		shd.shd_copypath = shio->shio_copydisk;
 		shd.shd_copysize = shio->shio_copysize;
 
-		/*
-		 * Initialize the shd.  Fills in the softc for us.
-		 */
-		/*error = shd_init(&shd, p);
-		if (error) {
-                        printf ("shd_init failed\n");*/
-			/* vnodes closed by shd_init */
-/*			bzero(&shd_softc[unit], sizeof(struct shd_softc));
-			shdunlock(ss);
-			return (error);
-		}*/
                 InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);
 		/*
 		 * The shd has been successfully initialized, so
@@ -1604,7 +1550,8 @@ shdioctl(dev, cmd, data, flag, p)
 		shio->shio_unit = unit;
 		shio->shio_size = ss->sc_size;
 		shdgetdisklabel(dev);
-                shd_refresh_devices (&shd, p);
+                /*shd_refresh_devices (&shd, p);
+                InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);*/
 		shdunlock(ss);
 
 		break;

@@ -10,7 +10,7 @@ void InitBlockAllocator (int method, long range_start, long range_size)
 {
     reclaim_method = method;
     block_range.start = range_start;
-    range_size = 200;
+    /*range_size = 200;*/
     block_range.end = range_start + range_size;
     block_range.ptr = range_start;
     printf ("Initialized block allocator to start = %ld, end = %ld\n", block_range.ptr, block_range.end);
@@ -58,9 +58,9 @@ int BlockFree (long start, long size)
 
     struct FreeSpaceQueue* temp = head;
     long end = (start + size) % shadow_size;
-    printf ("Free space queue before deleting block = \n");
+    /*printf ("Free space queue before deleting block = \n");
     PrintFreeSpaceQueue ();  
-    printf ("Freeing blocks %ld to %ld\n", start, end);
+    printf ("Freeing blocks %ld to %ld\n", start, end);*/
     while (temp != 0)
     {
         if ((temp->start == (end + 1) % shadow_size)
@@ -79,8 +79,8 @@ int BlockFree (long start, long size)
         temp = temp->next;
     }
     AddFreeSpaceToQueue (start, end);
-    printf ("Free space queue after deleting block = \n");
-    PrintFreeSpaceQueue ();
+    /*printf ("Free space queue after deleting block = \n");
+    PrintFreeSpaceQueue ();*/
     return 0;
 }
 
@@ -88,8 +88,8 @@ long BlockAlloc (int size)
 {
     struct FreeSpaceQueue* temp = 0;
     long retVal;
-    printf ("Free space queue before allocating block = \n");
-    PrintFreeSpaceQueue ();
+    /*printf ("Free space queue before allocating block = \n");
+    PrintFreeSpaceQueue ();*/
     switch (reclaim_method)
     {
      case LAST_CKPT_AUTO_DELETE:
@@ -115,9 +115,9 @@ long BlockAlloc (int size)
     }
     retVal = block_range.ptr;
     block_range.ptr += size;
-    printf ("Allocating %d blocks starting %d\n", size, retVal);
+    /*printf ("Allocating %d blocks starting %d\n", size, retVal);
     printf ("Free space queue after allocating block = \n");
-    PrintFreeSpaceQueue ();
+    PrintFreeSpaceQueue ();*/
     return retVal;
 }
 

@@ -29,6 +29,13 @@ struct shd_ioctl {
         long    delete_end;
 };
 
+struct shd_mod {
+        int command;
+        long *buf;
+        long bufsiz;
+        long retsiz;
+};
+ 
 struct shd_readbuf {
         long block_num;
         char *buf;
@@ -134,3 +141,5 @@ struct shd_softc {
 #define SHDDELETECHECKPOINTS _IOWR('S', 26, struct shd_ioctl)
 #define SHDREADBLOCK _IOWR('S', 27, struct shd_readbuf)
 #define SHDSETREBOOTVERSION _IOWR('S', 28, struct shd_ioctl)
+#define SHDGETMODBLOCKS _IOWR('S', 29, struct shd_mod)
+

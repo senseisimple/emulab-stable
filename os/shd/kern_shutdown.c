@@ -69,6 +69,9 @@
 
 #include <sys/signalvar.h>
 
+#include <sys/namei.h>
+#include <sys/ucred.h>
+
 #ifndef PANIC_REBOOT_WAIT_TIME
 #define PANIC_REBOOT_WAIT_TIME 15 /* default to 15 seconds */
 #endif
@@ -202,16 +205,90 @@ print_uptime()
 void (*shdrebootp)(void); 
 
 int checkpt_flag = 0;
+int checkpt_process_sleep_variable = 0; 
 
 void sync_before_checkpoint (void)
 {
     register struct buf *bp;
     int iter, nbusy, pbusy;
+    struct nameidata nd[5];
+    /*struct nameidata nd;
+    int mnt_cnt;
+    struct statfs *mntbuf;
+    int i;*/
 
+    int error;
+ 
     waittime = 0;
     printf("\nsyncing disks... ");
 
     checkpt_flag = 1;
+
+    /*mnt_cnt = getmntinfo(&mntbuf, MNT_NOWAIT);
+    if (mnt_cnt > 0)
+    {
+        for (i = 0; i < mnt_cnt; i++)
+        if (strcmp (mntbuf[i].f_fstypename, "ufs") == 0)
+        {
+             NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, mntbuf[i].f_mntonname, curproc);
+             if ((error = namei(&nd)) != 0)
+                 printf ("Error = %d\n", error);
+             while (nd.ni_vp->v_mount->mnt_ops_in_progress)
+                 tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+             NDFREE(&nd, NDF_ONLY_PNBUF);
+        }
+    }*/
+    NDINIT(&nd[0], LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
+    if ((error = namei(&nd[0])) != 0)
+        printf ("Error = %d\n", error);
+    NDINIT(&nd[1], LOOKUP, FOLLOW, UIO_SYSSPACE, "/usr", curproc);
+    if ((error = namei(&nd[1])) != 0)
+        printf ("Error = %d\n", error);
+    NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
+    if ((error = namei(&nd[2])) != 0)
+        printf ("Error = %d\n", error);
+    NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
+    if ((error = namei(&nd[3])) != 0)
+        printf ("Error = %d\n", error);
+
+/*
+    printf ("vp0 = %x\n", nd[0]);                                 
+    printf ("vp1 = %x\n", nd[1]);
+    printf ("vp2 = %x\n", nd[2]);
+    printf ("vp3 = %x\n", nd[3]);
+
+  
+    printf ("vp0 vp = %x\n", nd[0].ni_vp);
+    printf ("vp1 vp = %x\n", nd[1].ni_vp);
+    printf ("vp2 vp = %x\n", nd[2].ni_vp);
+    printf ("vp3 vp = %x\n", nd[3].ni_vp);
+
+
+   
+    printf ("vp0 vp mount= %x\n", nd[0].ni_vp->v_mount);
+    printf ("vp1 vp mount= %x\n", nd[1].ni_vp->v_mount);
+    printf ("vp2 vp mount= %x\n", nd[2].ni_vp->v_mount);
+    printf ("vp3 vp mount= %x\n", nd[3].ni_vp->v_mount);
+                                                        
+    printf ("vp0 vp mount mnt_ops_in_progress= %x\n", nd[0].ni_vp->v_mount->mnt_ops_in_progress); 
+    printf ("vp1 vp mount mnt_ops_in_progress= %x\n", nd[1].ni_vp->v_mount->mnt_ops_in_progress);
+    printf ("vp2 vp mount mnt_ops_in_progress= %x\n", nd[2].ni_vp->v_mount->mnt_ops_in_progress); 
+    printf ("vp3 vp mount mnt_ops_in_progress= %x\n", nd[3].ni_vp->v_mount->mnt_ops_in_progress);*/
+ 
+    while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
+           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+    while (nd[1].ni_vp->v_mount->mnt_ops_in_progress)
+           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+    while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
+           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+    while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
+           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+
+    NDFREE(&nd[0], NDF_ONLY_PNBUF);
+    NDFREE(&nd[1], NDF_ONLY_PNBUF);
+    NDFREE(&nd[2], NDF_ONLY_PNBUF);
+    NDFREE(&nd[3], NDF_ONLY_PNBUF);
+
     sync(&proc0, NULL);
 
                 /*
@@ -273,8 +350,6 @@ void sync_before_checkpoint (void)
 
     checkpt_flag = 0;
     wakeup ((caddr_t)&checkpt_flag);
-    /*printf ("Returning from sync_before_checkpoint\n");
-    DELAY(1000000);*/
 } 
 /*
  *  Go through the rigmarole of shutting down..
@@ -303,8 +378,7 @@ boot(howto)
 	 * Now sync filesystems
 	 */
 
-        /*printf ("cold = %d, howto = %d, waittime = %d\n", cold, howto, waittime);
-	if (!cold && (howto & RB_NOSYNC) == 0 && waittime < 0) {*/
+	/*if (!cold && (howto & RB_NOSYNC) == 0 && waittime < 0) {*/
           if (1) {
 		register struct buf *bp;
 		int iter, nbusy, pbusy;
@@ -379,16 +453,70 @@ boot(howto)
 			/*
 			 * Unmount filesystems
 			 */
+
 			if (panicstr == 0)
                         {
+                                 /*struct nameidata nd;
+                                 int mnt_cnt;
+                                 struct statfs *mntbuf;
+                                 int i;
+                                 int error;
+
+                                 mnt_cnt = getmntinfo(&mntbuf, MNT_NOWAIT);
+                                 if (mnt_cnt > 0) 
+                                 {            
+                                     for (i = 0; i < mnt_cnt; i++)
+                                         if (strcmp (mntbuf[i].f_fstypename, "ufs") == 0)
+                                         {
+                                             NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, mntbuf[i].f_mntonname, curproc);
+                                             if ((error = namei(&nd)) != 0)
+                                                 printf ("Error = %d\n", error);
+                                             while (nd.ni_vp->v_mount->mnt_ops_in_progress)
+                                                 tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+                                             NDFREE(&nd, NDF_ONLY_PNBUF);
+                                         }       
+                                }  */              
+                                struct nameidata nd[5];
+                                int error;
+
+                                NDINIT(&nd[0], LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
+                                if ((error = namei(&nd[0])) != 0) 
+                                    printf ("Error = %d\n", error);
+
+                                NDINIT(&nd[1], LOOKUP, FOLLOW, UIO_SYSSPACE, "/usr", curproc);
+                                if ((error = namei(&nd[1])) != 0)
+                                    printf ("Error = %d\n", error); 
+
+                                NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
+                                if ((error = namei(&nd[2])) != 0)
+                                    printf ("Error = %d\n", error);
+
+                                NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
+                                if ((error = namei(&nd[3])) != 0)
+                                    printf ("Error = %d\n", error);
+
+                                while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
+                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+                                while (nd[1].ni_vp->v_mount->mnt_ops_in_progress)
+                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+                                while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
+                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+                                while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
+                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+           
+                                NDFREE(&nd[0], NDF_ONLY_PNBUF);
+                                NDFREE(&nd[1], NDF_ONLY_PNBUF);
+                                NDFREE(&nd[2], NDF_ONLY_PNBUF);
+                                NDFREE(&nd[3], NDF_ONLY_PNBUF);
+
+                                printf ("Unmounting filesystems...");
+                                vfs_unmountall();
+                                printf ("Done!\n");
+
                                 DELAY(10000000);
                                 printf ("Copying blocks\n");
                                 (*shdrebootp)();
                                 printf ("Done!\n"); 
-                                DELAY(10000000);
-                                printf ("Unmounting filesystems...");  
-				vfs_unmountall();
-                                printf ("Done!\n");  
                         }
 		}
 		DELAY(100000);		/* wait for console output to finish */
@@ -396,9 +524,7 @@ boot(howto)
 
 	print_uptime();
 
-        /*DELAY(10000000);
-        (*shdrebootp)();*/
-        DELAY(10000000);
+        /*DELAY(10000000);*/
 	/*
 	 * Ok, now do things that assume all filesystem activity has
 	 * been completed.

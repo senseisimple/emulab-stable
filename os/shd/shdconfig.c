@@ -248,6 +248,45 @@ do_single(argc, argv, action, flags)
             if (do_io(shd, SHDLOADCHECKPOINTMAP, &shio))
                 return (1);
         }   
+        else
+        if (strcmp (cp, "-gm") == 0)
+        {
+            long buf[512];
+            struct shd_mod mod;
+            mod.command = 1; /* To initialize iterator */
+            mod.buf = buf;
+            mod.bufsiz = 512;
+
+            for (i = 0; i < 512; i++)
+                    buf[i] = 0;
+            mod.retsiz = 0;
+            if (do_io(shd, SHDGETMODBLOCKS, &mod))
+                return (1);
+            printf ("retsize = %d\n", mod.retsiz);
+            for (i = 0; i < mod.retsiz; i++)
+            {
+                printf ("%ld <-> %ld\n", buf[i*2], buf[i*2+1]);
+            }
+            while (mod.retsiz > 0)
+            {
+                for (i = 0; i < 512; i++)
+                    buf[i] = 0;
+                mod.retsiz = 0;
+                mod.command = 2;
+                if (do_io(shd, SHDGETMODBLOCKS, &mod))
+                    return (1);
+                printf ("retsize = %d\n", mod.retsiz);
+                for (i = 0; i < mod.retsiz; i++)
+                {
+                    printf ("%ld <-> %ld\n", buf[i*2], buf[i*2+1]);
+                }
+            } 
+
+            mod.command = 3; /* Close iterator */
+            if (do_io(shd, SHDGETMODBLOCKS, &mod))
+                return (1);
+        }
+
 	/*printf("shd%d: ", shio.shio_unit);
 	printf("%lu blocks ", (u_long)shio.shio_size);*/
 
