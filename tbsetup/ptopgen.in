@@ -128,10 +128,11 @@ if (defined($options{"e"})) {
 my $result =
     DBQueryFatal("select class,type,delay_capacity,".
 		 "   virtnode_capacity,isvirtnode,simnode_capacity, " .
-		 "   speed, RAM, trivlink_maxspeed ".
+		 "   speed, RAM, trivlink_maxspeed, imageable, osid ".
 		 "from node_types");
 while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt,$simcapacity, $speed, $ram, $trivspeed)
+	$virtcapacity,$isvirt,$simcapacity, $speed, $ram, $trivspeed,
+	$imageable, $osid)
 	    = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
@@ -141,6 +142,8 @@ while (($class,$type,$delaycapacity,
     $map->{'ISVIRT'}   = $isvirt;
     $map->{'SPEED'}    = $speed;
     $map->{'RAM'}      = $ram;
+    $map->{'OSID'}     = $osid;
+    $map->{'IMAGEABLE'}= $imageable;
     $map->{'TRIVSPEED'}= $trivspeed;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
@@ -459,6 +462,17 @@ foreach $node (keys(%nodes)) {
     #
     if ($node_type_osids{$type}) {
 	push @features, map "OS-$_:0", @{$node_type_osids{$type}};
+    }
+    elsif (! $typemap{$type}->{'IMAGEABLE'} &&
+	   defined($typemap{$type}->{'OSID'})) {
+	#
+	# If node is not imageable (and thus no entries in osidtoimageid,
+	# then assume it always has its default OSID loaded and ready to
+	# go, so that assign will agree to the allocation (assign_wrapper
+	# adds a desire that says it has to be running the OSID the user
+	# has selected, or the default OSID from the node_types table).
+	#
+	push @features, map "OS-$_:0", $typemap{$type}->{'OSID'};
     }
 
     # This is for the case that we are modifying an existing experiment - tell
