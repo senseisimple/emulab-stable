@@ -67,6 +67,9 @@ else {
 # THIS is ugly...  Value= is not passed by IE on <input type=image>, so we wrap the
 # scale value into the button name.  Hence we will see coordinates of scale_1_x
 # scale_2_x, etc. when the buttons are pressed.  Decode to just a $scale value here.
+if (isset($scale_0_x) && $scale_0_x != "") {
+    $scale = 0;
+}
 if (isset($scale_1_x) && $scale_1_x != "") {
     $scale = 1;
 }
@@ -86,7 +89,7 @@ elseif (isset($scale_5_x) && $scale_5_x != "") {
 #
 # Verify numeric scale and centering arguments.
 #
-if (isset($scale) && $scale != "") {
+if (isset($scale) && $scale !== "") {  # "0" is a valid value for $scale.
     # Sanitize for the shell.
     if (!preg_match("/^[0-9]+$/", $scale)) {
 	PAGEARGERROR("Invalid scale argument.");
@@ -119,7 +122,7 @@ else {
 #
 # We need the previous scale and click coords, and offsets to interpret new click coords!
 #
-if (isset($last_scale) && $last_scale != "") {
+if (isset($last_scale) && $last_scale !== "") {  # "0" is a valid value.
     # Sanitize for the shell.
     if (!preg_match("/^[0-9]+$/", $last_scale)) {
 	PAGEARGERROR("Invalid last_scale argument.");
@@ -232,9 +235,8 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 #
-# Run the script. It will produce three output files; image, areamap, and state.
-# We want to embed all of these images into the page we send back. This
-# is painful!
+# Run the Perl script. It will produce three output files; image, areamap, and state.
+# We want to embed all of these images into the page we send back. This is painful!
 #
 # Need cleanup "handler" to make sure temp files get deleted! 
 #
@@ -266,25 +268,34 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$retval = SUEXEC($uid, "nobody", "webfloormap -o $prefix " .
-		 (isset($pid) ? "-e $pid,$eid " : "") .
-		 (isset($floor) ? "-f $floor " : "") .
-		 (isset($building) ? "$building" : "") .
+# Default the ghosting checkbox state to checked the first time through.
+if (!isset($last_ghost)) {
+    $ghost = 1;	
+}
 
-		 # From clicking on a zoom button.
-		 (isset($scale) ? "-s $scale " : "") .
+$perl_args = "-o $prefix " .
+	     # From clicking on a zoom button.
+	     (isset($scale) ? "-s $scale " : "") .
 
-		 # From clicking on a map image.
-		 (isset($map_x) ? "-c $map_x,$map_y " : "") .
+	     # From clicking on a map image.
+	     (isset($map_x) ? "-c $map_x,$map_y " : "") .
 
-		 # Previous image state info came from an included .state
-		 # file, previously output by the Perl script along with the map.
-		 (isset($last_scale) ? "-S $last_scale " : "") .
-		 (isset($last_x) ? "-C $last_x,$last_y " : "") .
-		 (isset($last_x_off) ? "-O $last_x_off,$last_y_off " : "") .
-		 (isset($last_notitles) && $last_notitles ? "-T " : ""),
+	     # Previous image state info came from an included .state
+	     # file, previously output by the Perl script along with the map.
+	     (isset($last_scale) ? "-S $last_scale " : "") .
+	     (isset($last_x) ? "-C $last_x,$last_y " : "") .
+	     (isset($last_x_off) ? "-O $last_x_off,$last_y_off " : "") .
+	     (isset($last_notitles) && $last_notitles ? "-T " : "") .
+	     (isset($ghost) ? "-g " : "") .
 
-		 SUEXEC_ACTION_IGNORE);
+	     (isset($pid) ? "-e $pid,$eid " : "") .
+	     (isset($floor) ? "-f $floor " : "") .
+	     (isset($building) ? "$building" : "");  # Building arg must be last!
+
+if (0) {    ### Put the Perl script args into the page when debugging.
+    echo "\$btfv/floormap -d $perl_args\n";
+}
+$retval = SUEXEC($uid, "nobody", "webfloormap $perl_args", SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
@@ -365,7 +376,7 @@ echo "</td> <td style=\" background-color: transparent\"> &nbsp; &nbsp; </td> <t
 # Wrap the image and zoom controls together in an input form.
 echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
 
-# Zoom controls may be clicked to set a new scale.
+# Zoom controls may be clicked to set a new scale.  Otherwise, it persists.
 $curr_scale = (isset($scale) ? $scale : (isset($last_scale) ? $last_scale : 1));
 echo "  <a name=zoom></a>\n";
 function zoom_btns($curr_scale) {
@@ -373,15 +384,15 @@ echo "  <table align=\"center\" border=\"2\" cellpadding=\"0\" cellspacing=\"2\"
 echo "    <tbody>\n";
 echo "      <tr>\n";
 # Wrap the scale into the button name.  Value= is not passed by IE.
-echo "        <td><input type=\"image\" src=\"btn_zoom_out.jpg\"\n";
-echo "             name=\"scale_" . max($curr_scale-1,1) . "\"><br></td>\n";
-for ($i = 1; $i <= 5; $i++) {
+echo "        <td><input type=\"image\" src=\"floormap/btn_zoom_out.jpg\"\n";
+echo "             name=\"scale_" . max($curr_scale-1,0) . "\"><br></td>\n";
+for ($i = 0; $i <= 5; $i++) {
     $img = "btn_scale_" . $i . "_" . ($curr_scale==$i?"brt":"dim") . ".jpg";
-    echo "        <td><input type=\"image\" src=\"$img\"\n";
+    echo "        <td><input type=\"image\" src=\"floormap/$img\"\n";
     echo "             name=\"scale_$i\"><br></td>\n";
 }
-echo "        <td><input type=\"image\" src=\"btn_zoom_in.jpg\"\n";
-echo "             name=\"scale_" . min($curr_scale+1,6) . "\"><br></td>\n";
+echo "        <td><input type=\"image\" src=\"floormap/btn_zoom_in.jpg\"\n";
+echo "             name=\"scale_" . min($curr_scale+1,5) . "\"><br></td>\n";
 echo "      </tr>\n";
 echo "    </tbody>\n";
 echo "  </table>\n";
@@ -408,12 +419,17 @@ if (count($channels)) {
 
 echo "</td> </tr> </table>\n";
 
-# The image may be clicked to set a new center-point.
+# The image may be clicked to get node info or set a new center-point.
 echo "  Click on the dots below to see information about the node.\n";
 echo "  <br>\n";
 echo "  Clicks elsewhere on the map set the center point for a zoomed-in view.\n";
 echo "  <br>\n";
-echo "  <input name=\"map\" type=\"image\" style=\"border: 2px solid\" ";
+# The checkbox value is sent when the box is checked; nothing is sent otherwise.
+echo "  <input name=ghost type=checkbox value=\"1\"" .
+	  (isset($ghost) ? " checked" : "") . ">\n"; # Current checkbox state.
+echo "  Show nodes on other floors as hollow dots.\n";
+echo "  <br>\n";
+echo "  <input name=map type=image style=\"border: 2px solid\" ";
 echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">\n";
 echo "  <br>\n";
 zoom_btns($curr_scale);

@@ -43,6 +43,8 @@ FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml $(SRCDIR)/ssh-mime.pl \
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
 
+FLOORMAPFILES  = $(wildcard $(SRCDIR)/floormap/*.jpg)
+
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
 
@@ -111,6 +113,7 @@ endif
 # Kill the directory part of the names. The vpath rule will do the rest.
 #
 ALLFILES  = $(notdir $(FILES))
+ALLFLOORMAPS  = $(notdir $(FLOORMAPFILES))
 ALLPIXES  = $(notdir $(PIXFILES))
 ALLDOCS   = $(notdir $(DOCFILES))
 ALLTUTS   = $(notdir $(TUTFILES))
@@ -124,6 +127,7 @@ ALLHY     = $(notdir $(HYFILES))
 ALLUSRP   = $(notdir $(USRPFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
+	$(addprefix $(INSTALL_WWWDIR)/floormap/, $(ALLFLOORMAPS)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \

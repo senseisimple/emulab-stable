@@ -12,15 +12,17 @@ use File::Basename;
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
 # 
 sub usage {
-    print STDERR "Usage: floormap [-t] [-T] [-o <prefix>] ";
+    print STDERR "Usage: floormap [-t] [-T] [-g] [-o <prefix>] ";
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-f <floor>] [<building>]";
     print STDERR "\nor\n";
-    print STDERR "Usage: floormap [-t] [-T] [-o <prefix>] ";
+    print STDERR "Usage: floormap [-t] [-T] [-g] [-o <prefix>] ";
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
+    print STDERR "\nor\n";
+    print STDERR "Usage: floormap [-k] [-o <prefix>] ";
     exit(-1);
 }
 
@@ -33,11 +35,12 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTak";
+my $optlist  = "df:o:s:c:S:C:O:e:tTakg";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
 my $cleanup  = 0;
+my $ghost    = 0;	#  Overlay ghost nodes from all floors onto each map.
 
 my $building;
 my $floor;
@@ -64,7 +67,7 @@ my $last_x  = 0;  # The UNZOOMED, and hence un-offset, previous click point.
 my $last_y  = 0;
 my $last_notitles = 0;  # This says there were no titles around the previous images.
 
-# The image produced for each floor will be this size.
+# The image produced for each floor will be this size, except when using thumbnails.
 my $out_width  = 792;
 my $out_height = 492;
 
@@ -146,19 +149,35 @@ if (defined($options{"t"})) {
 if (defined($options{"T"})) {
     $last_notitles = 1;
 }
+if (defined($options{"g"})) {
+    $ghost = 1;
+}
 if (defined($options{"f"})) {
     $floor   = $options{"f"};
     $showany = 1;
 }
 if (defined($options{"s"})) {
-    # Scale by half-integer factors: 1=>1, 2=>1.5, 3=>2, etc.
     $scale_arg = $options{"s"};
-    $scale = ( $scale_arg + 1 ) / 2;
+    if ($scale_arg > 0) {
+	# Scale by half-integer factors: 1=>1, 2=>1.5, 3=>2, etc.
+	$scale = ( $scale_arg + 1 ) / 2;
+    }
+    else {
+	# Scale_arg 0 means to use the 40% size thumbnail images.
+	$scale = 0.4;
+    }
     dprint "scale arg $scale_arg, scaling factor $scale\n";
 }
 if (defined($options{"S"})) {
     $last_scale_arg = $options{"S"};
-    $last_scale = ( $last_scale_arg + 1 ) / 2;
+    if ($last_scale_arg > 0) {
+	# Scale by half-integer factors: 1=>1, 2=>1.5, 3=>2, etc.
+	$last_scale = ( $last_scale_arg + 1 ) / 2;
+    }
+    else {
+	# Scale_arg 0 means to use the 40% size thumbnail images.
+	$last_scale = 0.4;
+    }
     dprint "last_scale arg $last_scale_arg, last scaling factor $last_scale\n";
 
     # Do this now so $scale is defined when reading in images.
@@ -245,11 +264,14 @@ elsif (@ARGV == 1) {
 #
 # Gather image data from DB.
 #
+# Scale_arg 0 means to use the 40% size thumbnail images.
+my $path_col = ($scale_arg == 0 ? "thumb_path" : "image_path");
+my $db_scale = max($scale_arg, 1);
 my $query_result =
-    DBQueryFatal("select b.building,b.title,f.floor,f.image_path ".
+    DBQueryFatal("select b.building,b.title,f.floor,f.$path_col ".
 		 "   from buildings as b ".
 		 "left join floorimages as f on f.building=b.building ".
-		 "where f.scale=$scale_arg");
+		 "where f.scale=$db_scale");
 
 if (!$query_result->numrows) {
     die("*** $0:\n".
@@ -264,7 +286,7 @@ while (my ($building,$title,$floor,$image) = $query_result->fetchrow_array()) {
 	$baseimages{$building}->{"floors"} = {};
     }
 
-    $image = "$TB/www/$image"
+    $image = "$TB/www/floormap/$image"
 	if (dirname($image) eq ".");
     dprint "image $image\n";
 
@@ -354,7 +376,7 @@ else {
 writefiles($images->[0], @areamaps);
 
 ## Append the component images in the shell, until the Perl function is fixed.
-dprint "Last image is $img_n.";
+dprint "Last image is $img_n.\n";
 if ($img_n > 0) {
     my @args = ("convert", "${prefix}.jpg.*", "-append", "${prefix}.jpg");
     dprint "@args\n";
@@ -381,15 +403,22 @@ sub dofloor($$)
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
     #
-    my $query_result =
-	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname ".
-		     "  from location_info as loc ".
-		     "left join reserved as r on r.node_id=loc.node_id ".
-		     "where loc.floor='$floor' and loc.building='$building'");
+    my $query = "select loc.*,r.pid,r.eid,r.vname ".
+		"  from location_info as loc ".
+		"left join reserved as r on r.node_id=loc.node_id ".
+		"where loc.building='$building'";
+    my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
 
-    my $newnodes_result =	
-	DBQueryFatal("select * from new_nodes ".
-		     "where floor='$floor' and building='$building'");
+    my $newnodes_query = "select * from new_nodes ".
+		         "where building='$building'";
+    my $newnodes_result = DBQueryFatal($newnodes_query . " and floor='$floor'");
+
+    # When ghosting is turned on, get nodes from all floors to be overlaid.
+    my ($ghost_result, $ghost_newnodes_result);
+    if ($ghost) {
+	$ghost_result = DBQueryFatal($query);
+	$ghost_newnodes_result = DBQueryFatal($newnodes_query);
+    }
 
     if ($mereuser) {
 	if (!$query_result->numrows && !$showany) {
@@ -479,10 +508,10 @@ sub dofloor($$)
 	    next
 		if ($mereuser);
 	    
-	    $table = $newnodes_result;
+	    $table = ($ghost ? $ghost_newnodes_result : $newnodes_result);
 	}
 	else {
-	    $table = $query_result;
+	    $table = ($ghost ? $ghost_result : $query_result);
 	}
 	
 	while (my $rowref = $table->fetchrow_hashref()) {
@@ -511,8 +540,14 @@ sub dofloor($$)
 		$color = 'blue';
 	    }
             my $x2 = $x + $DOT_RAD;
-            $err = $baseimage->Draw(fill=>$color, primitive=>'circle', 
-                                    points=>"$x,$y $x2,$y");
+	    if ($ghost && $rowref->{"floor"} != $floor) { 
+		$err = $baseimage->Draw(stroke=>$color, strokewidth=>'1.5',
+					primitive=>'circle', points=>"$x,$y $x2,$y");
+	    }
+	    else {
+		$err = $baseimage->Draw(fill=>$color, 
+					primitive=>'circle', points=>"$x,$y $x2,$y");
+	    }
             warn "$err" if "$err";
             $err = $baseimage->Annotate(fill=>'black', x=>$x+$LX, y=>$y+$LY, 
 					text=>"$label");
@@ -557,7 +592,8 @@ sub dofloor($$)
         $err = $baseimage->Border(fill=>'white', width=>0, height=>$head_height);
         warn "$err" if "$err";
         $err = $baseimage->Annotate(fill=>'black', x=>10, y=>40, 
-                                    font=>"/usr/testbed/lib/arial.ttf", pointsize=>32,
+                                    font=>"/usr/testbed/lib/arial.ttf", 
+				    pointsize=>($scale_arg == 0 ? 16 : 32),
                                     text=>"$floor_label");
 	warn "$err" if "$err";            
 
@@ -720,6 +756,8 @@ sub writefiles($@)
 	"value=\"$curr_x\">\n";
     print STATE "  <input type=\"hidden\" name=\"last_y\" " .
 	"value=\"$curr_y\">\n";
+    print STATE "  <input type=\"hidden\" name=\"last_ghost\" " .
+	"value=\"$ghost\">\n";
     if ($notitles) {
 	print STATE "  <input type=\"hidden\" name=\"last_notitles\" " .
 	    "value=\"$notitles\">\n";
