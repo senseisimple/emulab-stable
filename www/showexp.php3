@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -79,6 +79,10 @@ if ($expstate) {
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Swap this Experiment out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	if (ISADMIN($uid)) {
+	    WRITESUBMENUBUTTON("Restart this Experiment",
+		"swapexp.php3?inout=restart&pid=$exp_pid&eid=$exp_eid");
+	}
     }
 }
 
