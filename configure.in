@@ -59,6 +59,7 @@ AC_SUBST(SFSSUPPORT)
 AC_SUBST(PLABSUPPORT)
 AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
+AC_SUBST(PLAB_SLICEPREFIX)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -100,6 +101,7 @@ IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
 PLAB_ROOTBALL="plabroot-8.tgz"
+PLAB_SLICEPREFIX="emulab"
 TBLOGFACIL="local5"
 
 #

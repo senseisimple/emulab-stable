@@ -30,3 +30,4 @@ SFSSUPPORT=0
 WWWHOST=www.mini.emulab.net
 TBCOOKIESUFFIX=-mini
 THISHOMEBASE=Mini.Emulab.Net
+PLAB_SLICEPREFIX=emulab_mini

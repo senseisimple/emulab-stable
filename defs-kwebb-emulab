@@ -2,10 +2,10 @@
 # This is the definitions file for Kirk on Emulab.Net.
 #
 TBDBNAME=tbdb
-TBOPSEMAIL=kwebb@cs.utah.edu
-TBLOGSEMAIL=kwebb@cs.utah.edu
-TBWWWEMAIL=kwebb@cs.utah.edu
-TBAUDITEMAIL=kwebb@cs.utah.edu
+TBOPSEMAIL=kwebb@flux.utah.edu
+TBLOGSEMAIL=kwebb@flux.utah.edu
+TBWWWEMAIL=kwebb@flux.utah.edu
+TBAUDITEMAIL=kwebb@flux.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 FSNODE=fs.emulab.net
@@ -14,9 +14,9 @@ DELAYCAPACITY=2
 FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
-TBSTATEDEMAIL=kwebb@cs.utah.edu
-TBTESTSUITEEMAIL=kwebb@cs.utah.edu
+TBSTATEDEMAIL=kwebb@flux.utah.edu
+TBTESTSUITEEMAIL=kwebb@flux.utah.edu
 WWWHOST=www.emulab.net
-WWW=www.emulab.net/~kwebb/www
+WWW=www.emulab.net/dev/kwebb
 FS_WITH_QUOTAS="/q /users"
 PLABSUPPORT=1

@@ -68,6 +68,7 @@ HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
 DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
+SLICEPREFIX = "@PLAB_SLICEPREFIX@"
 
 #
 # How many seconds to sleep between failures and how many times to try
@@ -635,7 +636,7 @@ class Plab:
         # Add new nodes
         toadd = []  # List of IP's
         for ip in avail:
-            if not known.has_key(ip):
+            if not known.has_key(ip) and ip not in toadd:
                 if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
                     if verbose:
                         print "Skipping %s because it's not in the allowed" \
@@ -1024,7 +1025,7 @@ class Slice:
         if not len(res):
             raise RuntimeError, "Didn't get any results while looking for idx"
         eindex = res[0][0]
-        self.slicename = "emulab_%s" % eindex
+        self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
         print "Creating Plab slice %s." % self.slicename
         self.privkey, self.pubkey = self.__genKeypair()
         try:
