@@ -178,6 +178,7 @@ CREATE TABLE experiments (
   canceled tinyint(4) NOT NULL default '0',
   batchstate varchar(12) default NULL,
   event_sched_pid int(11) default '0',
+  uselatestwadata tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
