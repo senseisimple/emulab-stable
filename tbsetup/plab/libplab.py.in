@@ -57,7 +57,7 @@ HTTPD_PORT = "1492"
 HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
-DEF_ROOTBALL_NAME = "plabroot-5.tgz"
+DEF_ROOTBALL_NAME = "plabroot-7.tgz"
 
 FREETRIES = 3
 
@@ -642,7 +642,7 @@ class Slice:
         if len(res) == 0:
             raise RuntimeError, "Didn't get any results while looking for idx"
         ((eindex, ), ) = res
-        self.slicename = "emulab_%s_%s_%s" % (self.pid, self.eid, eindex)
+        self.slicename = "emulab_%s" % eindex
         print "Creating Plab slice %s." % self.slicename
         self.privkey, self.pubkey = self.__genKeypair()
         try:
