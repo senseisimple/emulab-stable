@@ -33,7 +33,7 @@ usage(char *progname)
 {
 	fprintf(stderr,
 		"Usage: %s [-d] "
-		"[-s server] [-p port] [-l logfile] -e pid/eid\n",
+		"[-s server] [-p port] [-k keyfile] [-l logfile] -e pid/eid\n",
 		progname);
 	exit(-1);
 }
@@ -44,6 +44,7 @@ main(int argc, char **argv) {
 	address_tuple_t	tuple;
 	char *server = NULL;
 	char *port = NULL;
+	char *keyfile = NULL;
 	char *pideid = NULL;
 	char *logfile = NULL;
 	char *progname;
@@ -52,7 +53,7 @@ main(int argc, char **argv) {
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:l:d")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:dk:")) != -1) {
 	  switch (c) {
 	  case 'd':
 	    debug++;
@@ -69,7 +70,9 @@ main(int argc, char **argv) {
 	  case 'l':
 	    logfile = optarg;
 	    break;
-	  
+	  case 'k':
+	    keyfile = optarg;
+	    break;
 	  default:
 	    usage(progname);
 	  }
@@ -119,9 +122,9 @@ main(int argc, char **argv) {
 	/*
 	 * Register with the event system. 
 	 */
-	handle = event_register(server, 0);
+	handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
-		fatal("could not register with event system");
+	  fatal("could not register with event system");
 	}
 	
 	/*
