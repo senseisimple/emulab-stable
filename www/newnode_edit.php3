@@ -55,7 +55,7 @@ foreach ($HTTP_GET_VARS as $key => $value) {
     	DBQueryFatal("UPDATE new_interfaces SET mac='$mac', " .
 	    "interface_type='$type', switch_id='$switch_id', " .
 	    "switch_card='$switch_card', switch_port='$switch_port', " .
-	    "cable='$cable', len=$len " .
+	    "cable='$cable', len='$len' " .
 	    "WHERE new_node_id=$id AND card='$card'");
     }
 }
