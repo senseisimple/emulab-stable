@@ -631,14 +631,27 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 1;
 	}
 
+#ifdef  NOSHAREDEXPTS
 	/*
 	 * We have the pid name, but we need the GID number from the
 	 * projects table to send over. 
 	 */
-	res = mydb_query("select unix_gid from projects where pid='%s'",
-			 1, pid);
+	res = mydb_query("select pid,unix_gid from projects where pid='%s'",
+			 2, pid);
+#else
+	/*
+	 * Get a list of pid/unix_gid for each group that is allowed
+	 * access to the experiments nodes. This is the owner of the
+	 * node, plus the additional pids granted access. 
+	 */
+	res = mydb_query("select p.pid,unix_gid from projects as p "
+			 "left join exppid_access as a on p.pid=a.pid "
+			 "where p.pid='%s' or "
+			 "      (a.exp_pid='%s' and a.exp_eid='%s')",
+			 2, pid, pid, eid);
+#endif
 	if (!res) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting gid!", pid);
+		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting gids!", pid);
 		return 1;
 	}
 
@@ -647,32 +660,53 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		mysql_free_result(res);
 		return 1;
 	}
-	row = mysql_fetch_row(res);
-	if (!row[0] || !row[0][0]) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: No Project GID!", pid);
-		mysql_free_result(res);
-		return 1;
-	}
 
-	/*
-	 * Format as a command so that we can send back multiple group
-	 * names if that ever becomes necessary. The client side should
-	 * be prepared to get multiple group commands.
-	 */
-	gid = atoi(row[0]);
-	sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", pid, gid);
-	client_writeback(sock, buf, strlen(buf), tcp);
+	while (nrows) {
+		row = mysql_fetch_row(res);
+		if (!row[1] || !row[1][1]) {
+			syslog(LOG_ERR, "ACCOUNTS: %s: No Project GID!", pid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		gid = atoi(row[1]);
+		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
+
+		nrows--;
+	}
 	mysql_free_result(res);
-	syslog(LOG_INFO, "ACCOUNTS: %s", buf);
 
 	/*
 	 * Now onto the users in the project.
 	 */
+#ifdef  NOSHAREDEXPTS
 	res = mydb_query("select u.uid,u.usr_pswd,u.unix_uid,u.usr_name,"
 			 "p.trust from users as u "
 			 "left join proj_memb as p on p.uid=u.uid "
 			 "where p.pid='%s' and u.status='active'",
 			 5, pid);
+#else
+	/*
+	 * This crazy join is going to give us multiple lines for each
+	 * user that is allowed on the node, where each line (for each user)
+	 * differs by the project PID and it unix GID. The intent is to
+	 * build up a list of GIDs for each user to return. Well, a primary
+	 * group and a list of aux groups for that user. It might be cleaner
+	 * to do this as multiple querys, but this makes it atomic.
+	 */
+	res = mydb_query("select distinct "
+			 "u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			 "p.trust,p.pid,pr.unix_gid from users as u "
+			 "left join proj_memb as p on p.uid=u.uid "
+			 "left join exppid_access as a "
+			 " on a.exp_pid='%s' and a.exp_eid='%s' "
+			 "left join projects as pr on p.pid=pr.pid "
+			 "where (p.pid='%s' or p.pid=a.pid) "
+			 "      and u.status='active' order by u.uid",
+			 7, pid, eid, pid);
+#endif
 	if (!res) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting users!", pid);
 		return 1;
@@ -684,25 +718,78 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 0;
 	}
 
+	row = mysql_fetch_row(res);
 	while (nrows) {
-		int root = 0;
+		MYSQL_ROW	nextrow;
+		int		i, root = 0;
+		int		auxgids[128], gcount = 0;
+		char		glist[BUFSIZ];
 
-		row = mysql_fetch_row(res);
+		gid = -1;
+		
+		while (1) {
+			
+			/*
+			 * This is whole point of this mess. Figure out the
+			 * main GID and the aux GIDs. Perhaps trying to make
+			 * distinction between main and aux is unecessary, as
+			 * long as the entire set is represented.
+			 */
+			if (strcmp(row[5], pid) == 0) {
+				gid = atoi(row[6]);
 
-		if ((strcmp(row[4], "local_root") == 0) ||
-		    (strcmp(row[4], "group_root") == 0))
-			root = 1;
+				/*
+				 * Only people in the main pid can get root
+				 * at this time, so do this test here.
+				 */
+				if ((strcmp(row[4], "local_root") == 0) ||
+				    (strcmp(row[4], "group_root") == 0))
+					root = 1;
+			}
+			else {
+				auxgids[gcount++] = atoi(row[6]);
+			}
+			nrows--;
+
+			if (!nrows)
+				break;
+
+			/*
+			 * See if the next row is the same UID. If so,
+			 * we go around the inner loop again.
+			 */
+			nextrow = mysql_fetch_row(res);
+			if (strcmp(row[0], nextrow[0]))
+				break;
+			row = nextrow;
+		}
+		/*
+		 * Okay, process the UID. If there is no primary gid,
+		 * then use one from the list. Then convert the rest of
+		 * the list for the GLIST argument below.
+		 */
+		if (gid == -1) {
+			gid = auxgids[--gcount];
+		}
+		glist[0] = '\0';
+		for (i = 0; i < gcount; i++) {
+			sprintf(&glist[strlen(glist)], "%d", auxgids[i]);
+
+			if (i < gcount-1)
+				strcat(glist, ",");
+		}
 
 		sprintf(buf,
 			"ADDUSER LOGIN=%s "
 			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
-			"HOMEDIR=%s/%s\n",
+			"HOMEDIR=%s/%s GLIST=%s\n",
 			row[0], row[1], row[2], gid, root, row[3],
-			USERDIR, row[0]);
+			USERDIR, row[0], glist);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
-		nrows--;
 		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
+
+		row = nextrow;
 	}
 	mysql_free_result(res);
 
@@ -1598,19 +1685,55 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 
 	/*
-	 * Return project mount first. Will eventually be a list of mounts
+	 * Return project mount first. 
 	 */
 	sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
 		FSPROJDIR, pid, PROJDIR, pid);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	/*
-	 * Now a list of user directories.
+	 * Now check for aux project access. Return a list of mounts for
+	 * those projects.
 	 */
+	res = mydb_query("select pid from exppid_access "
+			 "where exp_pid='%s' and exp_eid='%s'",
+			 1, pid, eid);
+	if (!res) {
+		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res))) {
+		while (nrows) {
+			row = mysql_fetch_row(res);
+
+			sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+				FSPROJDIR, row[0], PROJDIR, row[0]);
+			client_writeback(sock, buf, strlen(buf), tcp);
+
+			nrows--;
+		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Now a list of user directories. These include the members of the
+	 * experiments projects, plus all the members of all of the projects
+	 * that have been granted access to share the nodes in that expt.
+	 */
+#ifdef  NOSHAREDEXPTS
 	res = mydb_query("select u.uid from users as u "
 			 "left join proj_memb as p on p.uid=u.uid "
 			 "where p.pid='%s' and u.status='active'",
 			 1, pid);
+#else
+	res = mydb_query("select distinct u.uid from users as u "
+			 "left join exppid_access as a "
+			 " on a.exp_pid='%s' and a.exp_eid='%s' "
+			 "left join proj_memb as p on p.uid=u.uid "
+			 "where p.pid='%s' or p.pid=a.pid",
+			 1, pid, eid, pid);
+#endif
 	if (!res) {
 		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
 		return 1;
