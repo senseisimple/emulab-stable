@@ -54,12 +54,19 @@ sub new($$$@) {
 	$self->{DEBUG} = 0;
     }
 
-    #
-    # The stackid just happens to also be leader of the stack
-    # 
     $self->{STACKID} = $stack_id;
     $self->{MAX_VLAN} = 4095;
     $self->{MIN_VLAN} = 2;
+
+    #
+    # The name of the leader of this stack. We fall back on the old behavior of
+    # using the stack name as the leader if the leader is not set
+    #
+    my $leader_name = getStackLeader($stack_id);
+    if (!$leader_name) {
+	$leader_name = $stack_id;
+    }
+    $self->{LEADERNAME} = $leader_name;
 
     #
     # Store the list of devices we're supposed to operate on
@@ -104,7 +111,7 @@ sub new($$$@) {
 		next;
 	}
 	$self->{DEVICES}{$devicename} = $device;
-	if ($devicename eq $self->{STACKID}) {
+	if ($devicename eq $self->{LEADERNAME}) {
 	    $self->{LEADER} = $device;
 	}
 	if (defined($device->{MIN_VLAN}) &&

@@ -2208,3 +2208,30 @@ last_net_act,last_cpu_act,last_ext_act);
             default '0' after security_level;
 	alter table experiments add panic_date datetime default NULL \
             after paniced;
+
+1.293: Add a "leader" column to the switch_stack_types table so that we no
+       longer need to assume that the leader of a stack is the switch after
+       which it was named - we can now name stacks things like 'Control' or
+       'Experiment'.
+
+       alter table switch_stack_types add column leader varchar(32) \
+         default NULL;
+
+       Set the leader names like this:
+
+       update switch_stack_types set leader=stack_id;
+
+       Then, determine the name of the experimental net stack like so:
+
+       select distinct stack_id from nodes as n left join switch_stacks as \
+         s on n.node_id=s.node_id where n.role='ctrlswitch';
+
+       You can then set the name of the experimental stack like this
+       (substituting in the name of the stack you just found):
+
+       update switch_stacks set stack_id='Control' where \
+         stack_id='<stackid>';
+       update switch_stack_types set stack_id='Control' where \
+         stack_id='<stackid>';
+
+       Then, do the same with the control net:

@@ -18,7 +18,8 @@ use Exporter;
 		getVlanPorts
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchStack
-		getStackType getDeviceOptions getTrunks getTrunksFromSwitches
+		getStackType getStackLeader
+		getDeviceOptions getTrunks getTrunksFromSwitches
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
 		snmpitSet snmpitSetWarn snmpitSetFatal snmpitWarn snmpitFatal
 		printVars tbsort );
@@ -390,6 +391,23 @@ sub getStackType($) {
 	} else {
 	    return $stack_type;
 	}
+    }
+}
+
+#
+# Returns the leader for the given stack - the meaning of this is vendor-
+# specific. May be undefined.
+#
+sub getStackLeader($) {
+    my $stack = shift;
+    my $result = DBQueryFatal("SELECT leader FROM switch_stack_types " .
+	"WHERE stack_id='$stack'");
+    if (!$result->numrows()) {
+	print STDERR "No stack found called $stack\n";
+	return undef;
+    } else {
+	my ($leader) = ($result->fetchrow());
+	return $leader;
     }
 }
 

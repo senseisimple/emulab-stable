@@ -1463,6 +1463,7 @@ CREATE TABLE switch_stack_types (
   snmp_community varchar(32) default NULL,
   min_vlan int(11) default NULL,
   max_vlan int(11) default NULL,
+  leader varchar(32) default NULL,
   PRIMARY KEY  (stack_id)
 ) TYPE=MyISAM;
 

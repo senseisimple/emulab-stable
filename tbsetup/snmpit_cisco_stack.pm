@@ -29,9 +29,6 @@ use libdb;
 # so that the object knows which to connect to. A future version may not 
 # require the device list, and dynamically connect to devices as appropriate
 #
-# For a Cisco stack, the stack_id happens to also be the name of the stack
-# leader.
-#
 # usage: new(string name, string stack_id, int debuglevel, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
@@ -61,9 +58,19 @@ sub new($$$$@) {
     }
 
     #
-    # The stackid just happens to also be leader of the stack
+    # The ID of this stack
     # 
     $self->{STACKID} = $stack_id;
+
+    #
+    # The name of the leader of this stack. We fall back on the old behavior of
+    # using the stack name as the leader if the leader is not set
+    #
+    my $leader_name = getStackLeader($stack_id);
+    if (!$leader_name) {
+	$leader_name = $stack_id;
+    }
+    $self->{LEADERNAME} = $leader_name;
 
     #
     # Store the list of devices we're supposed to operate on
@@ -105,7 +112,7 @@ sub new($$$$@) {
 		    die "Failed to create a device object for $devicename\n";
 		} else {
 		    $self->{DEVICES}{$devicename} = $device;
-		    if ($devicename eq $self->{STACKID}) {
+		    if ($devicename eq $self->{LEADERNAME}) {
 			$self->{LEADER} = $device;
 		    }
 		    last;
@@ -122,8 +129,8 @@ sub new($$$$@) {
     if (!$self->{LEADER}) {
 	# XXX: For simplicity, we assume for now that the leader is a Cisco
 	use snmpit_cisco;
-	my $type = getDeviceType($self->{STACKID});
-	$self->{LEADER} = new snmpit_cisco($self->{STACKID}, $self->{DEBUG});
+	my $type = getDeviceType($self->{LEADERNAME});
+	$self->{LEADER} = new snmpit_cisco($self->{LEADERNAME}, $self->{DEBUG});
     }
 
     bless($self,$class);
