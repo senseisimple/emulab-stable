@@ -4,6 +4,8 @@
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# TODO: Startup command in rc.ixp. Use old version.
+
 use English;
 use Getopt::Std;
 use Socket;
@@ -72,6 +74,7 @@ my $confdir	= "/opt/config";
 my $ixtemplate  = "ixsys.l3fwdr.template";
 my $ixconfig    = "ixsys.l3fwdr";
 my $ixroute     = "route.l3fwdr";
+my $bootscript  = "$confdir/bootscript";
 
 #
 # Okay, lets background so we can redirect all the output. We wait for the
@@ -117,10 +120,43 @@ if (! ixpsetup($ixpid)) {
 }
 
 #
+# Gen up a hostnames in the config dir.
+#
+dohostnames("$confdir/hosts");
+
+#
+# Copy resolv.conf
+#
+system("cp -f /etc/resolv.conf $confdir") == 0
+    or die("*** $0:\n".
+	   "    Could not cp resolv.conf!\n");
+
+my $TM = OPENTMCC(TMCCCMD_STARTUP);
+my $startcmd = <$TM>;
+CLOSETMCC($TM);
+
+if (defined($startcmd)) {
+    open(RUN, "> $bootscript")
+	or die("Could not open $bootscript: $!");
+    
+    if ($startcmd =~ /CMD=\'(.+)\' UID=([0-9A-Za-z]+)/) {
+	print RUN "#!/bin/sh\n";
+	print RUN "\n";
+	print RUN "$1\n";
+    }
+    else {
+	warn "*** WARNING: Bad startupcmd line: $startcmd";
+    }
+
+    close(RUN);
+    chmod(0755, $bootscript);
+}
+
+#
 # Ask tmcd for the configuration data. Create the file and store into
 # the directory.
 #
-my $TM = OPENTMCC(TMCCCMD_SUBCONFIG);
+$TM = OPENTMCC(TMCCCMD_SUBCONFIG);
 while (<$TM>) {
     chomp();
     SWITCH1: {
@@ -151,6 +187,7 @@ while (<$TM>) {
 	};
 	/^NETMASK="(.*)"$/ && do {
 	    $config{"IXP1200_MASK"} = $1;
+	    $config{"HOST_MASK"}    = $1;
 	    last SWITCH1;
 	};
 	print STDERR "Invalid Directive: $_\n";
@@ -176,6 +213,14 @@ foreach my $conf (keys(%config)) {
 
     print RC "export $conf=$val\n";
 }
+# Need this one too.
+print RC "export HOST_CNTL_I=" . `$BINDIR/control_interface`;
+# And this. Could be done elsewhere ...
+my (undef,undef,undef,undef,@ipaddrs) = gethostbyname("fs.emulab.net");
+$FSIP = inet_ntoa($ipaddrs[0]);
+print RC "export FS_IP=$FSIP\n";
+print RC "export PROJECT=$pid\n";
+    
 print RC "\n";
 print RC "./.create_environment\n";
 close(RC);
@@ -201,43 +246,53 @@ system("mv -f create_environment.rc.new create_environment.rc") == 0
 #
 my @ifacelist = doifconfig();
 
-if (@ifacelist) {
-    #
-    # Copy the template to the config file, replace the TAG with the
-    # interfaces we got above. When the card boots its little linux,
-    # it will run a script that reads this new file (the directory
-    # we write it to is NFS mounted by the card). 
-    #
-    open(TEMPL, "$confdir/$ixtemplate") or
-	die("Could not open $confdir/$ixtemplate: $!\n");
-    open(CONF, ">$confdir/$ixconfig") or
-	die("Could not open $confdir/$ixconfig: $!\n");
+#
+# Copy the template to the config file, replace the TAG with the
+# interfaces we got above. When the card boots its little linux,
+# it will run a script that reads this new file (the directory
+# we write it to is NFS mounted by the card). 
+#
+open(TEMPL, "$confdir/$ixtemplate") or
+    die("Could not open $confdir/$ixtemplate: $!\n");
+open(CONF, ">$confdir/$ixconfig") or
+    die("Could not open $confdir/$ixconfig: $!\n");
 
-    while (<TEMPL>) {
-	print CONF $_;
+while (<TEMPL>) {
+    print CONF $_;
 	
-	if ($_ =~ /^\# IXPINTERFACES:$/) {
-	    foreach my $iface (@ifacelist) {
+    if ($_ =~ /^\# IXPINTERFACES:$/) {
+	foreach my $iface (@ifacelist) {
 		
-		my $inet  = $iface->{"IPADDR"};
-		my $mask  = $iface->{"IPMASK"};
-		my $mac   = $iface->{"MAC"};
-		my ($ifaceno) = ($iface->{"IFACE"} =~ /^[a-zA-Z]*(\d*)/);
-		my $bcast = inet_ntoa((inet_aton($inet) & inet_aton($mask)) |
-				      ~(inet_aton($mask)));
+	    my $inet  = $iface->{"IPADDR"};
+	    my $mask  = $iface->{"IPMASK"};
+	    my $mac   = $iface->{"MAC"};
+	    my ($ifaceno) = ($iface->{"IFACE"} =~ /^[a-zA-Z]*(\d*)/);
+	    my $bcast = inet_ntoa((inet_aton($inet) & inet_aton($mask)) |
+				  ~(inet_aton($mask)));
 		
-		if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-		    $mac = "$1:$2:$3:$4:$5:$6";
-		}
-		$ifaceno--;
-		
-		print CONF "interface $ifaceno $inet $bcast $mask $mac 1\n";
+	    if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+		$mac = "$1:$2:$3:$4:$5:$6";
 	    }
+	    $ifaceno--;
+	    
+	    print CONF "interface $ifaceno $inet $bcast $mask $mac 1\n";
+	}
+
+	# Give the rest of the interfaces a stub setup. Otherwise the
+	# card wedges. Amazing. Something to do with arp. 
+	for ($i = scalar(@ifacelist) + 1; $i <=4; $i++) {
+	    my $ifaceno = $i - 1;
+	    my $mac     = "00:23:45:67:89:0${i}";
+	    my $mask    = "255.255.255.0";
+	    my $inet    = "10.254.$i.0";
+	    my $bcast   = "10.254.$i.255";
+	    
+	    print CONF "interface $ifaceno $inet $bcast $mask $mac 1\n";
 	}
     }
-    close(TEMPL);
-    close(CONF);
 }
+close(TEMPL);
+close(CONF);
 
 #
 # Now set up the routes file. 
@@ -294,9 +349,11 @@ close(CONF);
 #
 # Export the root filesystem to the IXP.
 #
-system("exportfs -o rw,root_squash " . $config{"IXP1200_IP"} . ":/") == 0
+system("exportfs -o rw,no_root_squash " . $config{"IXP1200_IP"} . ":/opt") == 0
     or die("*** $0:\n".
 	   "    Could not exportfs / to IXP!\n");
+
+exit(0);
 
 #
 # Fire off the boot.

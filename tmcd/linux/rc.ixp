@@ -5,15 +5,17 @@
 # All rights reserved.
 #
 
-# A totally bogus hack. This is run on the card.
+# A totally bogus hack. This is run on the card. Must copy to /opt/config.
 
-BOOTDIR="/nfs/config"
-armdir="/nfs/ixasdk/bin/arm-be"
+BOOTDIR="/opt/config"
+armdir="/opt/ixasdk/bin/arm-be"
 ixconfig="ixsys.l3fwdr"
 
-cd $armdir
-
-if [ -x ixstart -a -e $BOOTDIR/$ixconfig ]; then
+if [-x $BOOTDIR/bootscript ]; then
+    echo "Running local bootscript ..."
+    $BOOTDIR/bootscript
+elif [ -x $armdir/ixstart -a -e $BOOTDIR/$ixconfig ]; then
     echo "Setting up interfaces ..."
+    cd $armdir
     ./ixstart $BOOTDIR/$ixconfig
 fi
