@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: rmacct,v 1.1 2000-09-20 21:21:14 kwright Exp $
+### $Id: rmacct,v 1.2 2000-09-22 22:06:40 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -31,11 +31,22 @@ sub untaint_user {
     return 1;
 }
 
-if ($#ARGV < 0) { 
-    die("Usage: rmacct <eid>\n".
-	"\tRemoves accounts by experiment.\n");
+my $eid;
+my $savedir = 1;
+my $usage = "Usage: rmacct [-t] <eid>\n" .
+            "-nt\t(notar) DON'T save user directory in a tar file in /tmp\n";
+if ( $#ARGV < 0 or $#ARGV > 1 ) { 
+    die($usage);
+} elsif ($#ARGV == 0) {
+    $eid = $ARGV[0];
+} else {
+    $eid = $ARGV[1];
+    if ( $ARGV[0] =~ /-nt/ ) {
+	$savedir = 0;
+    } else {
+	die($usage);
+    }
 }
-my $eid = $ARGV[0];
 if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
     die("Invalid eid '$eid' contains illegal characters.\n"); 
 }
@@ -62,6 +73,9 @@ my $sth = $dbh->query($cmd);
 my $rows =0;
 ## Must put in check that $sth defined. May be undefined if
 ## query command above is syntactically incorrect. -lkw
+if (not defined($sth)) {
+    die "Malformed query $cmd.";
+}
 while ($sth->fetchrow_array) {
     $rows += 1;
 }
@@ -93,24 +107,6 @@ while (@row = $sth->fetchrow_array) {
 	print "\t$row[0]\n";
     }
 }
-##
-## Select group ID for experiment.
-##
-print "Selecting group ID for experiment...";
-$cmd = 
-  "select unix_gid from groups as g ".
-  "left join proj_grps as pg on g.gid = pg.gid ".
-  "left join projects as p on pg.pid = p.pid ".
-  "left join experiments as e on e.pid = p.pid ".
-  "where e.eid = '$eid'";
-$sth = $dbh->query($cmd);
-my $unix_gid = 65533;		# "nogroup"...
-if (@row = $sth->fetchrow_array) {
-    $unix_gid = $row[0];
-    print "$unix_gid\n";
-} else {
-    die("Invalid group ID.\n"); 
-}
 
 ##
 ## Select machines.
@@ -128,6 +124,20 @@ while (@row = $sth->fetchrow_array) {
     print " $row[0] ";
 }
 print "\n";
+
+##
+## Save user dirs in tar file unless -nt specified 
+##
+if ( $savedir ) {
+    foreach my $user (@users) {
+	if ( -e "/users/$user" ) {
+	    print "Creating $user.tar in /tmp\n";
+	    open(TAR, "/usr/bin/tar cvf /tmp/$user.tar /users/$user 2>&1 |");
+	    while (<TAR>) { print "$_"; }
+	    close(TAR);	    
+	}
+    }
+}
 
 ##
 ## For each machine, ping to see if its alive.
@@ -175,7 +185,6 @@ foreach $IP (@nodes) {
 	    } else { 
 		$OS = $_;
 	    }
-
         } 
 
         if ( $OS =~ /Linux/ ) {  
@@ -192,9 +201,7 @@ foreach $IP (@nodes) {
 		close(USERDEL);
 	    }
 
-## lkw: might not need $unix_gid if below works. 
-
-	    print "Removing group $unix_gid on $IP.\n";
+	    print "Removing group $eid on $IP.\n";
 	    open(GROUPDEL, "/usr/local/bin/ssh $IP /usr/sbin/groupdel $eid 2>&1 |");
 	    while (<GROUPDEL>) { print "$_"; }
 	    close(GROUPDEL); 
