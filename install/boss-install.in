@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -786,8 +786,8 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
  	ExecQuietFatal("$SCP $TOP_OBJDIR/ssl/$CTRLNODE_PEM".
 		       "     ${USERNODE}:${ETC_EMULAB_DIR}/${CLIENT_PEM}");
  	ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
-		       "     chmod 640 ${ETC_EMULAB_DIR}/${CLIENT_PEM}; ".
-		       "     chmod 640 ${ETC_EMULAB_DIR}/${EMULAB_PEM}  ");
+		       "     'chmod 640 ${ETC_EMULAB_DIR}/${CLIENT_PEM}; ".
+		       "      chmod 640 ${ETC_EMULAB_DIR}/${EMULAB_PEM}'  ");
     };
     Phase "apache", "Setting up Apache", sub {
 	Phase "cert", "Installing Apache SSL certificate", sub {
