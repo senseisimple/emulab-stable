@@ -773,15 +773,21 @@ class Plab:
                 if verbose:
                     print "%d new Plab nodes, but ignored for now" % len(toadd)
             else:
+                addstr = ""
                 print "There are %d new Plab nodes." % len(toadd)
                 for ip in toadd:
                     linktype, hostname = self.__findLinkType(ip)
                     if debug:
                         print "Found linktype %s for node %s" % (linktype, ip)
                     self.__addNode(ip, linktype, hostname)
+                    addstr += "%s\t\t%s\t\t%s\n" % (ip, hostname, linktype)
 
                 print "Forcing a named map update ..."
                 os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
+                SENDMAIL(TBOPS, "New plab nodes have been added to the DB.",
+                         "The following plab nodes have been added to the DB:\n"
+                         "Hostname\t\tIP\t\tLinktype\n\n"
+                         "%s" % addstr, TBOPS)
                 print "Done adding new Plab nodes."
 
     def __getKnownPnodes(self):
@@ -974,7 +980,7 @@ class Plab:
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
-                         (nodeid, 'up'))
+                         (nodeid, 'down'))
 
             vnodetype = "pcplab"
             vnodeid = ""
@@ -1353,15 +1359,15 @@ class Node:
         self.__nodemgrProxy = None
 
         if method == "PLC":
-            res = DBQueryFatal("select w.hostname from"
-                               " nodes as n left join widearea_nodeinfo as w"
-                               " on n.phys_nodeid = w.node_id"
+            res = DBQueryFatal("select i.IP from"
+                               " nodes as n left join interfaces as i"
+                               " on n.phys_nodeid = i.node_id"
                                " where n.node_id = %s limit 1",
                                (nodeid,))
             
             assert (len(res) > 0), "%s not found in widearea_info table!" % \
                    nodeid
-            self.hostname = res[0][0]
+            self.IP = res[0][0]
 
     # XXX: may want to rethink signal handling here.
     def _create(self):
@@ -1455,17 +1461,38 @@ class Node:
 
         elif method == "PLC":
             TIMESTAMP("createnode %s started." % self.nodeid)
-            try:
-                res = tryXmlrpcCmd(self.agent.AssignNodes, self.hostname)
-                if debug:
-                    print res
-            except:
-                print "Failed to assign %s to PLC slice %s" % \
-                      (self.nodeid, self.slice.slicename)
-                raise
+
+            # add the node to the PLC slice.
+            tries = 3
+            while 1:
+                TIMESTAMP("createnode %s try %d started." % (self.nodeid,
+                                                             DEF_TRIES-tries+1))
+                try:
+                    res = tryXmlrpcCmd(self.agent.AssignNodes, self.IP,
+                                       inittries=tries, raisefault=True)
+                    if debug:
+                        print res
+
+                    # We may have actually gotten the lease/vm even though
+                    # the xmlrpc call appeared to fail.  We check for this
+                    # condition here, which will show up on subsequent
+                    # allocation attempts.
+                except xmlrpclib.Fault, e:
+                    if e.faultString.find("already assigned") != -1:
+                        print "Lease for %s already exists." % self.nodeid
+                        break
+                    elif e.triesleft > 0:
+                        tries = e.triesleft
+                    else:
+                        raise
+                # success
+                else:
+                    break
+
+            # push changes out immediately.
             try:
                 res = tryXmlrpcCmd(self.agent.InstantiateSliver,
-                                   self.hostname)
+                                   self.IP)
                 if debug:
                     print res
             except:

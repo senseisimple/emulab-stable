@@ -49,8 +49,7 @@ my $killmode    = 0;
 my $dbuid;
 
 my $MAX_CHILDREN = 8;
-# Try to let auxiliary setup programs timeout naturally first.
-my $CHILD_TIMEOUT = 600;  # ten minutes
+my $CHILD_TIMEOUT = 120;  # Two minutes
 
 #
 # Load the Testbed support stuff. 
