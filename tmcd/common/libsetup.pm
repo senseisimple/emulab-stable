@@ -5,7 +5,7 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# TODO: .forward files for users. Back to emulab.
+# TODO: Signal handlers for protecting db files.
 
 #
 # Common routines and constants for the client bootime setup stuff.
@@ -1215,15 +1215,32 @@ sub doaccounts()
 	    }
 
 	    #
-	    # Create .ssh dir and populate it with an authkeys file.
 	    # Must ask for the current home dir since we rely on pw.conf.
 	    #
 	    my (undef,undef,undef,undef,
 		undef,undef,undef,$homedir) = getpwuid($uid);
-	    my $sshdir = "$homedir/.ssh";
-	    
+	    my $sshdir  = "$homedir/.ssh";
+	    my $forward = "$homedir/.forward";
+
+	    #
+	    # Create .ssh dir and populate it with an authkeys file.
+	    #
 	    TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
 	    TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
+
+	    #
+	    # Give user a .forward back to emulab.
+	    #
+	    if (! -e $forward) {
+
+		system("echo '${login}\@emulab.net' > $forward");
+		
+		chown($uid, $gid, $forward) 
+		    or warn("*** Could not chown $forward: $!\n");
+		
+		chmod(0644, $forward) 
+		    or warn("*** Could not chmod $forward: $!\n");
+	    }
 	}
 	else {
 	    warn("*** Bad accounts line: $info\n");
