@@ -60,5 +60,36 @@ What it does:
 Who it should run as:
 	N/A
 
+Name:
+	run_linktest.pl.in
+Description:
+	A script to run Linktest and report results.
+Where it runs:
+	Nodes, ops or boss.
+What it does:
+	Sends a START event to Linktest, then waits for the 
+	STOP event. If errors were found, exit code is 1, else 0.
+	Prints out contents of error files saved by Linktest.
+	This script could be used by boss to run linktest when
+	starting up the experiment.
+	Important usage note: -q to skip the (time-consuming)
+	bandwidth test.
+Who it should run as:
+	Experimenter.
+
+Name:
+	ltevent.c
+Description:
+	A program to either send an event or wait for an event.
+Where it runs:
+	Anywhere run_linktest.pl.in is called, or linktest.pl.in.
+What it does:
+	Accepts command line arguments to either send or wait for
+	an event.
+Who it should run as:
+	Experiment swapper when invoked by linktest.pl;
+	experimenter when invoked by run_linktest.pl
+
+
 
 
