@@ -90,12 +90,17 @@ if ($row = mysql_fetch_row($pswd_result)) {
 }
 
 #
+# Current policy is to prefix the EID with the PID. 
+#
+$exp_eid = $exp_pid . "-" . $exp_id;
+
+#
 # Make sure the experiment ID does not already exist.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM experiments WHERE eid=\"$exp_id\"");
+	"SELECT eid FROM experiments WHERE eid=\"$exp_eid\"");
 if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
+    USERERROR("The experiment name \"$exp_eid\" you have chosen is already ".
             "in use. Please select another.", 1);
 }
 
@@ -124,6 +129,12 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 # processing by tbrun. We generate a name from the experiment ID,
 # which we know to be unique cause we tested that above. Later, when
 # the experiment is ended, the directory will be deleted.
+#
+# Note that the filenames are all wierd. The tbsetup scripts do very odd
+# things with the name, prepending the "project" to the filename.
+#
+# There is similar path stuff in endexp.php3.  Be sure to sync that up
+# if you change things here.
 #
 # No need to tell me how bogus this is.
 #
@@ -219,15 +230,16 @@ $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
         "expt_head_uid, expt_start, expt_end) ".
-        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
+        "VALUES ('$exp_eid', '$exp_pid', '$exp_created', '$exp_expires', ".
         "'$exp_name', '$uid', '$exp_start', '$exp_end')");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
+    TBERROR("Database Error adding new experiment $exp_eid: $err\n", 1);
 }
 
 echo "<center><br>";
 echo "<h2>Experiment Configured!<br>";
+echo "The ID for your experiment is $exp_eid<br>";
 echo "Here is a summary of the nodes that were allocated<br>";
 echo "</h2></center><br>";
 
@@ -252,7 +264,7 @@ echo "</XMP>\n";
 if (1) {
 mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
      "User:        $uid\n".
-     "EID:         $exp_id\n".
+     "EID:         $exp_eid\n".
      "PID:         $exp_pid\n".
      "Name:        $exp_name\n".
      "Created:     $exp_created\n".

@@ -103,14 +103,14 @@ echo "    </td>
 # Experiment ID and Long Name:
 #
 echo "<tr>
-          <td>*Experiment Name:</td>
+          <td>*Name<br>(will be prefixed by project name):</td>
           <td><input type=\"text\" name=\"exp_id\">
               </td>
       </tr>\n";
 
 echo "<tr>
-          <td>*Experiment Long Name:</td>
-          <td><input type=\"text\" name=\"exp_name\">
+          <td>*Long Name:</td>
+          <td><input type=\"text\" name=\"exp_name\" size=\"40\">
               </td>
       </tr>\n";
 
@@ -121,7 +121,7 @@ echo "<tr>
 echo "<tr>
           <td>*Your NS file (20K max):</td>
           <td><input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
-              <input type=\"file\" name=\"exp_nsfile\">
+              <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               </td>
       </tr>\n";
 
