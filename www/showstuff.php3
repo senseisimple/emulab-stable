@@ -244,7 +244,9 @@ function SHOWEXP($pid, $eid) {
 
     echo "<tr>
             <td>Name: </td>
-            <td class=\"left\">$eid</td>
+            <td class=\"left\">
+                <A href='shownsfile.php3?exp_pideid=$pid\$\$$eid'>
+                   $eid</a></td>
           </tr>\n";
 
     echo "<tr>

@@ -55,22 +55,16 @@ if (!$isadmin) {
     }
 }
 
-# Terminate option.
-echo "<p><center>
-       Do you want to terminate this experiment?
-       <A href='endexp.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
-      </center><br>\n";    
-
 #
 # Dump experiment record.
 # 
 SHOWEXP($exp_pid, $exp_eid);
 
-# NS File option
+# Terminate option.
 echo "<p><center>
-       Do you want to see the
-       <A href='shownsfile.php3?exp_pideid=$exp_pid\$\$$exp_eid'>NS file?</a>
-      </center>\n";
+       Do you want to terminate this experiment?
+       <A href='endexp.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
+      </center>\n";    
 
 #
 # Dump the node information.
