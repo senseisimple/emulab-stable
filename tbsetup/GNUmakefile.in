@@ -13,7 +13,7 @@ PLABSUPPORT     = @PLABSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir ipassign nseparse
+SUBDIRS		= checkpass ns2ir nseparse
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load startexp endexp batchexp swapexp \
@@ -65,7 +65,7 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir plab ipassign
+.PHONY:	checkpass ns2ir plab
 checkpass:
 	@$(MAKE) -C checkpass all
 
@@ -77,9 +77,6 @@ nseparse:
 
 plab:
 	@$(MAKE) -C plab all
-
-ipassign:
-	@$(MAKE) -C ipassign all
 
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
@@ -103,7 +100,6 @@ subdir-install:
 	@$(MAKE) -C ns2ir install
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
-	@$(MAKE) -C ipassign install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -115,7 +111,6 @@ post-install:
 	@$(MAKE) -C ns2ir post-install
 	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
-	@$(MAKE) -C ipassign post-install
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
@@ -189,7 +184,6 @@ subdir-clean:
 	@$(MAKE) -C ns2ir clean
 	@$(MAKE) -C nseparse clean
 #	@$(MAKE) -C plab clean
-	@$(MAKE) -C ipassign clean
 
 distclean:	subdir-distclean
 
@@ -198,7 +192,6 @@ subdir-distclean:
 	@$(MAKE) -C ns2ir distclean
 	@$(MAKE) -C nseparse distclean
 	@$(MAKE) -C plab distclean
-	@$(MAKE) -C ipassign distclean
 #
 # XXX Create non .tcl files.
 #
