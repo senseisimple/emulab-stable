@@ -121,7 +121,7 @@ if (! -f $imagepath) {
 #
 my $diskpart = "";
 if ($imagepart) {
-    $diskpart = "wd0 s${imagepart}";
+    $diskpart = "wd0:s${imagepart}";
 }
 else {
     $diskpart = "wd0";
