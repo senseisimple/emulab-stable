@@ -230,10 +230,6 @@ void anneal(bool scoring_selftest)
   /* Set up the initial counts */
   init_score();
 
-  /* We'll check against this later to make sure that whe we've unmapped
-   * everything, the score is the same */
-  double initial_score = get_score();
-
   /* Set up fixed nodes */
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
        fixed_it!=fixed_nodes.end();++fixed_it) {
@@ -263,6 +259,10 @@ void anneal(bool scoring_selftest)
     vn->fixed = true;
     num_fixed++;
   }
+
+  /* We'll check against this later to make sure that whe we've unmapped
+   * everything, the score is the same */
+  double initial_score = get_score();
 
   bestscore = get_score();
   bestviolated = violated;
