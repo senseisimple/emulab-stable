@@ -435,8 +435,9 @@ Phase "cron", "Adding cron jobs", sub {
     Phase "crontab", "Editing $CRONTAB", sub {
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
-	    "45 \t1\t*\t*\t*\troot\t/usr/testbed/sbin/backup",
-	    "*/5\t*\t*\t*\t*\troot\t/usr/testbed/sbin/node_status");
+	    "45 \t1\t*\t*\t*\troot\t$PREFIX/sbin/backup",
+	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/node_status",
+	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/idlemail");
     };
     Phase "cronhup", "HUPing cron", sub {
 	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }

@@ -6,7 +6,16 @@
 # All rights reserved.
 #
 
+#
 # idlemail - send mail to idle expts
+#
+# see usage message below for details
+#
+# This should get run out of cron, about every 5 minutes or so.
+# Add an entry like this to /etc/crontab:
+#
+# */5     *       *       *       *       root    /usr/testbed/sbin/idlemail
+#
 
 # Configure variables
 use lib '@prefix@/lib';
@@ -14,30 +23,6 @@ use libdb;
 use libtestbed;
 use English;
 use Getopt::Std;
-
-my $THISHOMEBASE     = "@THISHOMEBASE@";
-my $TBBASE           = "@TBBASE@";
-my $TBDOCBASE        = "@TBDOCBASE@";
-my $TBMAILADDR_OPS   = "@TBOPSEMAIL@";
-my $TBMAILADDR_WWW   = "@TBWWWEMAIL@";
-my $TBMAILADDR_AUDIT = "@TBAUDITEMAIL@";
-my $TBMAIL_OPS       = "Testbed Ops <$TBMAILADDR_OPS>";
-my $TBMAIL_WWW       = "Testbed WWW <$TBMAILADDR_WWW>";
-my $TBMAIL_AUDIT     = "Testbed Audit <$TBMAILADDR_AUDIT>";
-my $TBMAIL_AUTOMAIL  = "@TBAUTOMAILEMAIL@";
-
-# Turn off line buffering on output
-$| = 1;
-
-# Defaults
-
-# Don't put 'my' on these, or they won't be settable with ${$var}
-$h = 0; # help mode
-$d = 0; # debug mode
-$n = 0; # no-mail mode
-$f = 0; # force mode
-
-print "Got ARGV = ",join(" ",@ARGV),"\n" if $d;
 
 # Grab our site variables...
 my $mailinterval = TBGetSiteVar("idle/mailinterval");
@@ -65,6 +50,30 @@ idle threshold = $threshold hours
 mail interval  = $mailinterval hours
 Start CC'ing group leaders on message $cc_grp_ldrs\n");
 }
+
+my $THISHOMEBASE     = "@THISHOMEBASE@";
+my $TBBASE           = "@TBBASE@";
+my $TBDOCBASE        = "@TBDOCBASE@";
+my $TBMAILADDR_OPS   = "@TBOPSEMAIL@";
+my $TBMAILADDR_WWW   = "@TBWWWEMAIL@";
+my $TBMAILADDR_AUDIT = "@TBAUDITEMAIL@";
+my $TBMAIL_OPS       = "Testbed Ops <$TBMAILADDR_OPS>";
+my $TBMAIL_WWW       = "Testbed WWW <$TBMAILADDR_WWW>";
+my $TBMAIL_AUDIT     = "Testbed Audit <$TBMAILADDR_AUDIT>";
+my $TBMAIL_AUTOMAIL  = "@TBAUTOMAILEMAIL@";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Defaults
+
+# Don't put 'my' on these, or they won't be settable with ${$var}
+$h = 0; # help mode
+$d = 0; # debug mode
+$n = 0; # no-mail mode
+$f = 0; # force mode
+
+print "Got ARGV = ",join(" ",@ARGV),"\n" if $d;
 
 my $optlist = "hdnf";
 my %opt = ();
