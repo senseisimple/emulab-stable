@@ -17,14 +17,16 @@ Rough steps for upgrading your existing Emulab.
 	mysqldump tbdb > db.backup
 
 4. Update the DB.  Look at sql/database-migrate.txt which is a list of
-   SQL commands to perform.  Diff the version of this file from the last
-   release, with the version from this release to find which ones to apply.
+   SQL commands to perform. In some cases, it also includes instructions
+   regarding operations you need to perform on your data to make it work
+   in the new schema.  Diff the version of this file from the last release,
+   with the version from this release to find which ones to apply.
 
    If anything goes wrong with this step, contact us.  You can put back
    the old db:
        mysql
-       drop tbdb
-       create tbdb
+       drop database tbdb;
+       create database tbdb;
        quit
        mysql < db.backup
    and bring the testbed back up if necessary.
