@@ -275,12 +275,13 @@ void fill_tuple(address_tuple_t at)
   return;
 }
 
-/***************************dump_link_map******************************/
-/*A debugging aid.*/
+/***************************dump_link_map******************************
+ A debugging aid.*/
 /***************************dump_link_map******************************/
 void dump_link_map(){
   int i;
   for (i = 0; i < link_index; i++){
+    info ("================================================================\n");
     info("linkname = %s\n", link_map[i].linkname);
     info("interface[0] = %s \t interface[1] = %s\n", link_map[i].interfaces[0], link_map[i].interfaces[1]);
     info("linktype = %s\n", link_map[i].linktype);
@@ -294,12 +295,45 @@ void dump_link_map(){
 
     info("delay = %d, bw = %d plr = %f q_size = %d buckets = %d n_qs = %d flags_p = %d \n",  link_map[i].params[0].delay, link_map[i].params[0].bw, link_map[i].params[0].plr, link_map[i].params[0].q_size, link_map[i].params[0].buckets, link_map[i].params[0].n_qs, link_map[i].params[0].flags_p);
 
+    if(link_map[i].params[0].flags_p & PIPE_Q_IS_RED){
+      info(" queue is RED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	   link_map[i].params[0].red_gred_params.min_th,
+	   link_map[i].params[0].red_gred_params.max_th,
+	   link_map[i].params[0].red_gred_params.w_q,
+	   link_map[i].params[0].red_gred_params.max_p);
+    }
+
+    else if(link_map[i].params[0].flags_p & PIPE_Q_IS_GRED){
+      info(" queue is GRED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	   link_map[i].params[0].red_gred_params.min_th,
+	   link_map[i].params[0].red_gred_params.max_th,
+	   link_map[i].params[0].red_gred_params.w_q,
+	   link_map[i].params[0].red_gred_params.max_p);
+    }else info(" queue is droptail\n");
+
+    info ("--------------------------------------------------\n");
+    
     info("Pipe 1 .....\n");
 
     info("delay = %d, bw = %d plr = %f q_size = %d buckets = %d n_qs = %d flags_p = %d \n",  link_map[i].params[1].delay, link_map[i].params[1].bw, link_map[i].params[1].plr, link_map[i].params[1].q_size, link_map[i].params[1].buckets, link_map[i].params[1].n_qs, link_map[i].params[1].flags_p);
 
+    if(link_map[i].params[1].flags_p & PIPE_Q_IS_RED){
+      info(" queue is RED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	   link_map[i].params[1].red_gred_params.min_th,
+	   link_map[i].params[1].red_gred_params.max_th,
+	   link_map[i].params[1].red_gred_params.w_q,
+	   link_map[i].params[1].red_gred_params.max_p);
+    }
+
+    else if(link_map[i].params[1].flags_p & PIPE_Q_IS_GRED){
+      info(" queue is GRED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	   link_map[i].params[1].red_gred_params.min_th,
+	   link_map[i].params[1].red_gred_params.max_th,
+	   link_map[i].params[1].red_gred_params.w_q,
+	   link_map[i].params[1].red_gred_params.max_p);
+    }else info(" queue is droptail\n");
+
     info ("--------------------------------------------------\n");
   }
 }
-
 /************************** FUNCTION DEFS *******************************/

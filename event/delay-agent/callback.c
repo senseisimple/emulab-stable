@@ -359,21 +359,25 @@ void get_flowset_params(struct dn_flow_set *fs, int l_index,
 #endif
     
     /* q type and corresponding parameters*/
-    if (fs->flags_fs & DN_IS_RED){
-      p_params->flags_p |= PIPE_Q_IS_RED;
 
-      /* get RED params */
+    /* internally dummynet sets DN_IS_RED (only) if the queue is RED and
+       sets DN_IS_RED and DN_IS_GENTLE_RED(both) if queue is GRED*/
 
-      p_params->red_gred_params.w_q = fs->w_q;
-      p_params->red_gred_params.max_p = fs->max_p;
+    if (fs->flags_fs & DN_IS_GENTLE_RED) {
+      p_params->flags_p |= PIPE_Q_IS_GRED;
+
+      /* get GRED params */
+
+      p_params->red_gred_params.w_q =  1.0*fs->w_q/(double)(1 << SCALE_RED);
+      p_params->red_gred_params.max_p = 1.0*fs->max_p/(double)(1 << SCALE_RED);
       p_params->red_gred_params.min_th = SCALE_VAL(fs->min_th);
       p_params->red_gred_params.max_th = SCALE_VAL(fs->max_th);
 
-    }else if (fs->flags_fs & DN_IS_GENTLE_RED) {
-	p_params->flags_p |= PIPE_Q_IS_GRED;
-	/* get GRED params */
-	p_params->red_gred_params.w_q = fs->w_q;
-	p_params->red_gred_params.max_p =  fs->max_p;
+    }else if (fs->flags_fs & DN_IS_RED){
+	p_params->flags_p |= PIPE_Q_IS_RED;
+	/* get RED params */
+	p_params->red_gred_params.w_q =  1.0*fs->w_q/(double)(1 << SCALE_RED);
+	p_params->red_gred_params.max_p = 1.0*fs->max_p/(double)(1 << SCALE_RED);
 	p_params->red_gred_params.min_th =  SCALE_VAL(fs->min_th);
 	p_params->red_gred_params.max_th = SCALE_VAL(fs->max_th);
       }
@@ -397,14 +401,15 @@ void get_queue_params(struct dn_flow_set *fs,
   structpipe_params *p_params
     = &(link_map[l_index].params[p_index]);
   
-  p_params->id.proto     = fs->flow_mask.proto;
-  p_params->id.src_ip    = fs->flow_mask.src_ip;
-  p_params->id.src_port  = fs->flow_mask.src_port;
-  p_params->id.dst_ip    = fs->flow_mask.dst_ip;
-  p_params->id.dst_port  = fs->flow_mask.dst_port;
-
-  if(fs->flags_fs & DN_HAVE_FLOW_MASK)
+  
+  if(fs->flags_fs & DN_HAVE_FLOW_MASK){
     p_params->flags_p    |= PIPE_HAS_FLOW_MASK;
+    p_params->id.proto     = fs->flow_mask.proto;
+    p_params->id.src_ip    = fs->flow_mask.src_ip;
+    p_params->id.src_port  = fs->flow_mask.src_port;
+    p_params->id.dst_ip    = fs->flow_mask.dst_ip;
+    p_params->id.dst_port  = fs->flow_mask.dst_port;
+  }
 
   return;
 }
@@ -485,34 +490,33 @@ void set_link_params(int l_index, int blackhole)
 #endif
 
       /* set if the pipe has a flow mask*/
-       if(p_params->flags_p & PIPE_HAS_FLOW_MASK)
+       if(p_params->flags_p & PIPE_HAS_FLOW_MASK){
 	 pipe.fs.flags_fs |= DN_HAVE_FLOW_MASK;
 
-      /* set the flow mask anyway, if there was NO
-	 flowmask, it would anyway be zero
-       */
-       pipe.fs.flow_mask.proto = p_params->id.proto;
-       pipe.fs.flow_mask.src_ip = p_params->id.src_ip;
-       pipe.fs.flow_mask.dst_ip = p_params->id.dst_ip;
-       pipe.fs.flow_mask.src_port = p_params->id.src_port;
-       pipe.fs.flow_mask.dst_port = p_params->id.dst_port;
-
+	 pipe.fs.flow_mask.proto = p_params->id.proto;
+	 pipe.fs.flow_mask.src_ip = p_params->id.src_ip;
+	 pipe.fs.flow_mask.dst_ip = p_params->id.dst_ip;
+	 pipe.fs.flow_mask.src_port = p_params->id.src_port;
+	 pipe.fs.flow_mask.dst_port = p_params->id.dst_port;
+       }
       /* set the queing discipline and other relevant params*/
 
-       if(p_params->flags_p & PIPE_Q_IS_RED){
-	 /* set RED params */
+       if(p_params->flags_p & PIPE_Q_IS_GRED){
+	 /* set GRED params */
 	 pipe.fs.flags_fs |= DN_IS_RED;
+	 pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
 	 pipe.fs.max_th = p_params->red_gred_params.max_th;
 	 pipe.fs.min_th = p_params->red_gred_params.min_th;
-	 pipe.fs.w_q = p_params->red_gred_params.w_q;
-	 pipe.fs.max_p = p_params->red_gred_params.max_p;
-	}else if (p_params->flags_p & PIPE_Q_IS_GRED){
-	  /* set GRED params*/
-	  pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
+	 pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
+	 pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
+	}else if (p_params->flags_p & PIPE_Q_IS_RED){
+	  /* set RED params*/
+	  pipe.fs.flags_fs |= DN_IS_RED;
 	  pipe.fs.max_th = p_params->red_gred_params.max_th;
 	  pipe.fs.min_th = p_params->red_gred_params.min_th;
-	  pipe.fs.w_q = p_params->red_gred_params.w_q;
-	  pipe.fs.max_p = p_params->red_gred_params.max_p;
+	   pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
+	 pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
+
 	}
        else ; /* DROPTAIL*/
 
@@ -568,19 +572,63 @@ int  get_new_link_params(int l_index, event_handle_t handle,
 	     atof(argvalue);
 	 info("Plr = %f\n", link_map[l_index].params[0].plr);
        }
-       else if (strcmp(argtype,"QSIZE")== 0){
+       else if (strcmp(argtype,"LIMIT")== 0){
 	 link_map[l_index].params[0].q_size =
 	   link_map[l_index].params[1].q_size =
 	     atoi(argvalue);
-	 /* set the PIPE_QSIZE_IN_BYTES flag to 0*/
+	 /* set the PIPE_QSIZE_IN_BYTES flag to 0,
+	  since we assume that limit is in slots/packets by
+	  default
+	  */
 	 link_map[l_index].params[0].flags_p &=
 	  ~PIPE_QSIZE_IN_BYTES;
 	 link_map[l_index].params[1].flags_p &=
 	  ~PIPE_QSIZE_IN_BYTES;
-	 
-	 info("QSize = %d\n", link_map[l_index].params[0].q_size);
+
+	 info("QSize/Limit = %d\n", link_map[l_index].params[0].q_size);
        }
-       else error("unrecognized argument\n");
+
+       else if (strcmp(argtype,"QUEUE-IN-BYTES")== 0){
+	 int qsztype = atoi(argvalue);
+	 if(qsztype == 0){
+	   /* queue size is in slots/packets*/
+	   link_map[l_index].params[0].flags_p &=
+	     ~PIPE_QSIZE_IN_BYTES;
+	   link_map[l_index].params[1].flags_p &=
+	     ~PIPE_QSIZE_IN_BYTES;
+	 }
+	 else if(qsztype == 1)
+	   {
+	     /* queue size is in bytes*/
+	     link_map[l_index].params[0].flags_p |= PIPE_QSIZE_IN_BYTES;
+	     link_map[l_index].params[1].flags_p |= PIPE_QSIZE_IN_BYTES;
+
+	   }
+       }
+       else if(strcmp(argtype,"MAXTHRESH")== 0){
+	 link_map[l_index].params[0].red_gred_params.max_th
+	   = link_map[l_index].params[1].red_gred_params.max_th
+	     = atoi(argvalue);
+       }
+       else if(strcmp(argtype,"THRESH")== 0){
+	 link_map[l_index].params[0].red_gred_params.min_th
+	   = link_map[l_index].params[1].red_gred_params.min_th
+	     = atoi(argvalue);
+       }
+       else if(strcmp(argtype,"LINTERM")== 0){
+	 link_map[l_index].params[0].red_gred_params.max_p
+	   = link_map[l_index].params[1].red_gred_params.max_p
+	     = 1.0 / atof(argvalue);
+       }
+       else if(strcmp(argtype,"Q_WEIGHT")== 0){
+	 link_map[l_index].params[0].red_gred_params.w_q
+	   = link_map[l_index].params[1].red_gred_params.w_q
+	     = atof(argvalue);
+       }
+       else {
+	 error("unrecognized argument\n");
+	 error("%s -> %s \n", argtype, argvalue);
+       }
        argtype = strtok(argstring,"=");
      }
   }
