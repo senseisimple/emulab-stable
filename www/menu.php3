@@ -154,19 +154,19 @@ function WRITESIDEBAR() {
                   # Only project/group leaders can do these options
                   # Show a "new" icon if there are people waiting for approval
 		  $query_result =
-		    DBQueryFatal("SELECT g.* FROM group_membership as g ".
-				 "LEFT JOIN group_membership as authed ".
-				 "ON g.pid=authed.pid and g.gid=authed.gid ".
-				 "and g.uid!='$auth_usr' and g.trust='none' ".
+		    DBQueryFatal("select g.* from group_membership as authed ".
+				 "left join group_membership as g on ".
+				 " g.pid=authed.pid and g.gid=authed.gid ".
 				 "left join users as u on u.uid=g.uid ".
-				 "WHERE u.status!='".
+				 "where u.status!='".
 				 TBDB_USERSTATUS_UNVERIFIED . "' and ".
-				 "u.status!='" . TBDB_USERSTATUS_NEWUSER .
-				 "' and authed.uid='$login_uid' and ".
-				 "(authed.trust='group_root' or ".
-				 " authed.trust='project_root') ".
+				 " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
+				 "' and g.uid!='$login_uid' and ".
+				 "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
+				 "  and authed.uid='$login_uid' and ".
+				 "  (authed.trust='group_root' or ".
+				 "   authed.trust='project_root') ".
 				 "ORDER BY g.uid,g.pid,g.gid");
-
 		  if (mysql_num_rows($query_result) > 0) {
 		    WRITESIDEBARBUTTON_NEW("New User Approval",
 					   $TBBASE, "approveuser_form.php3");
