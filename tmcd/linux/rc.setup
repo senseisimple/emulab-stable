@@ -1,5 +1,13 @@
 #!/bin/sh
 
+#
+# Inform TMCD that we've rebooted, and are starting testbed setup
+#
+if [ -x /etc/rc.d/testbed/tmcc ]; then
+        echo "Informing the testbed that we've rebooted ..."
+	/etc/rc.d/testbed/tmcc state REBOOTED
+fi
+
 if [ -x /etc/rc.d/testbed/setup  ]; then
         echo "Setting up Testbed Configuration ..."
 	/etc/rc.d/testbed/setup
@@ -36,9 +44,9 @@ if [ -x /etc/rc.d/testbed/rc.agents  ]; then
 fi
 
 #
-# Generate an event that says we are up and running
+# Inform TMCD that we're up and running
 #
-if [ -x /etc/rc.d/testbed/sendevent ]; then
-        echo "Sending an ISUP event ..."
-	/etc/rc.d/testbed/sendevent ISUP
+if [ -x /etc/rc.d/testbed/tmcc ]; then
+        echo "Informing the testbed that we're up and running ..."
+	/etc/rc.d/testbed/tmcc state ISUP
 fi

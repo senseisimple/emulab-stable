@@ -23,6 +23,8 @@ use lib "@prefix@/lib";
 use libdb;
 use power_rpc27;
 use snmpit_apc;
+use event;
+use libtestbed;
 use strict;
 use English;
 
@@ -202,7 +204,10 @@ foreach my $power_id (keys %outlets) {
     if (!$errors) {
 	foreach my $node (@nodes) {
 	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
-	    TBSetNodeEventState($node, TBDB_NODESTATE_REBOOT);
+	    EventSendFatal(objtype   => "TBNODESTATE",
+	    	           objname   => $node,
+			   eventtype => "REBOOTING",
+			   host      => TB_BOSSNODE);
 	}
     } else {
 	$exitval += $errors;

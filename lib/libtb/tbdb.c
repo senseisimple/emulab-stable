@@ -154,7 +154,7 @@ mydb_nodeidtoip(char *nodeid, char *bufp)
 int
 mydb_setnodeeventstate(char *nodeid, char *eventtype)
 {
-	if (! mydb_update("update nodes set eventstatus='%s' "
+	if (! mydb_update("update nodes set eventstate='%s' "
 			  "where node_id='%s'",
 			  eventtype, nodeid)) {
 		error("setnodestatus: DB Error: %s/%s!", nodeid, eventtype);
@@ -175,7 +175,7 @@ mydb_checkexptnodeeventstate(char *pid, char *eid,
 	MYSQL_ROW	row;
 	int		nrows;
 
-	res = mydb_query("select eventstatus from nodes "
+	res = mydb_query("select eventstate from nodes "
 			 "left join reserved on "
 			 " nodes.node_id=reserved.node_id "
 			 "where reserved.pid='%s' and reserved.eid='%s' ",
