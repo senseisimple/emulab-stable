@@ -135,14 +135,15 @@ if (($state eq EXPTSTATE_ACTIVE) ||
     ($state eq EXPTSTATE_TESTING)) {
     my $query_result =
 	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname,".
-		     "       n.sshdport,n.jailflag,nt.isremotenode ".
+		     "       n.sshdport,n.jailflag,nt.isremotenode,".
+		     "       nt.isplabdslice ".
 		     "  from reserved as r ".
 		     "left join nodes as n on r.node_id=n.node_id ".
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "where r.pid='$pid' and r.eid='$eid' order by vname");
 
-    while (($v,$p,$t,$m,$o,$s,$j,$r) = $query_result->fetchrow_array()) {
+    while (($v,$p,$t,$m,$o,$s,$j,$r,$d) = $query_result->fetchrow_array()) {
 	if (!$v) {
 	    $v = $p;
 	}
@@ -154,6 +155,7 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 	    SSHDPORT	=> $s,
 	    JAILED	=> $j,
 	    ISREMOTE    => $r,
+	    PLAB	=> $d,
 	};
     }
 }
@@ -244,7 +246,8 @@ if ($showmap &&
 	    my $s = $v2pmap{$v}->{SSHDPORT};
 	    my $m = $v2pmap{$v}->{VVP};
 	    my $q = "$v.$eid.$pid.$DOMAIN";
-	    if ($v2pmap{$v}->{JAILED} && $v2pmap{$v}->{ISREMOTE}) {
+	    if (($v2pmap{$v}->{JAILED} || $v2pmap{$v}->{PLAB}) &&
+		$v2pmap{$v}->{ISREMOTE}) {
 		printf "%-15s %-10s %-20s", $v, $s, "ssh -p $s $q";
 		print  "\n";
 	    }

@@ -1510,13 +1510,16 @@ function SHOWNODE($node_id) {
 	DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
 		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
 		     "last_ext_act) as last_act, ".
-		     " t.isvirtnode,t.isremotenode,r.erole as rsrvrole ".
+		     " t.isvirtnode,t.isremotenode,t.isplabdslice, ".
+		     " r.erole as rsrvrole, pi.IP as phys_IP ".
 		     " from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_activity as na on n.node_id=na.node_id ".
 		     "left join node_types as t on t.type=n.type ".
 		     "left join interfaces as i on i.card=t.control_net ".
 		     " and i.node_id=n.node_id ".
+		     "left join interfaces as pi on pi.card=t.control_net ".
+		     " and pi.node_id=n.phys_nodeid ".
 		     "where n.node_id='$node_id'");
     
     if (mysql_num_rows($query_result) == 0) {
@@ -1550,9 +1553,11 @@ function SHOWNODE($node_id) {
     $IP                 = $row[IP];
     $isvirtnode         = $row[isvirtnode];
     $isremotenode       = $row[isremotenode];
+    $isplabdslice       = $row[isplabdslice];
     $ipport_low		= $row[ipport_low];
     $ipport_next	= $row[ipport_next];
     $ipport_high	= $row[ipport_high];
+    $sshdport		= $row[sshdport];
     $last_act           = $row[last_act];
     $last_tty_act       = $row[last_tty_act];
     $last_net_act       = $row[last_net_act];
@@ -1560,6 +1565,7 @@ function SHOWNODE($node_id) {
     $last_ext_act       = $row[last_ext_act];
     $last_report        = $row[last_report];
     $rsrvrole           = $row[rsrvrole];
+    $phys_IP		= $row[phys_IP];
     
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -1575,8 +1581,6 @@ function SHOWNODE($node_id) {
 	$tarballs = "&nbsp";
     if (!$startupcmd)
 	$startupcmd = "&nbsp";
-    if (!$bios)
-	$bios = "&nbsp";
 
     echo "<table border=2 cellpadding=0 cellspacing=2
                  align=center>\n";
@@ -1742,19 +1746,26 @@ function SHOWNODE($node_id) {
               </tr>\n";
     }
     elseif ($isvirtnode) {
-	echo "<tr>
-                  <td>IP Port Low:</td>
-                  <td class=left>$ipport_low (sshd port)</td>
-              </tr>\n";
+	if (!$isplabdslice) {
+		echo "<tr>
+                          <td>IP Port Low:</td>
+                          <td class=left>$ipport_low</td>
+                      </tr>\n";
+
+		echo "<tr>
+                          <td>IP Port Next:</td>
+                          <td class=left>$ipport_next</td>
+                      </tr>\n";
+
+		echo "<tr>
+                          <td>IP Port High:</td>
+                          <td class=left>$ipport_high</td>
+                      </tr>\n";
+	}
 
 	echo "<tr>
-                  <td>IP Port Next:</td>
-                  <td class=left>$ipport_next</td>
-              </tr>\n";
-
-	echo "<tr>
-                  <td>IP Port High:</td>
-                  <td class=left>$ipport_high</td>
+                  <td>SSHD Port:</td>
+                  <td class=left>$sshdport</td>
               </tr>\n";
     }
 
@@ -1768,7 +1779,7 @@ function SHOWNODE($node_id) {
               <td class=left>$tarballs</td>
           </tr>\n";
 
-    if (!$isvirtnode && !$isremotenode) {
+    if (!$isremotenode) {
 	echo "<tr>
                   <td>RPMs:</td>
                   <td class=left>$rpms</td>
@@ -1782,10 +1793,18 @@ function SHOWNODE($node_id) {
           </tr>\n";
     }
 
-    echo "<tr>
-              <td>Control Net IP:</td>
-              <td class=left>$IP</td>
-          </tr>\n";
+    if ($IP) {
+	echo "<tr>
+                  <td>Control Net IP:</td>
+                  <td class=left>$IP</td>
+              </tr>\n";
+    }
+    elseif ($phys_IP) {
+	echo "<tr>
+                  <td>Physical IP:</td>
+                  <td class=left>$phys_IP</td>
+              </tr>\n";
+    }
 
     if ($rsrvrole) {
 	echo "<tr>
@@ -1794,10 +1813,12 @@ function SHOWNODE($node_id) {
               </tr>\n";
     }
 
-    echo "<tr>
-              <td>Bios Version:</td>
-              <td class=left>$bios</td>
-          </tr>\n";
+    if ($bios) {
+	echo "<tr>
+                  <td>Bios Version:</td>
+                  <td class=left>$bios</td>
+              </tr>\n";
+    }
 
     if ($isremotenode) {
 	if ($isvirtnode) {

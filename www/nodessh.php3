@@ -28,7 +28,7 @@ if (!isset($node_id) ||
 $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
-		 "       t.isvirtnode,t.isremotenode ".
+		 "       t.isvirtnode,t.isremotenode,t.isplabdslice ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
@@ -47,6 +47,7 @@ $pid      = $row[pid];
 $eid      = $row[eid];
 $isvirt   = $row[isvirtnode];
 $isremote = $row[isremotenode];
+$isplab   = $row[isplabdslice];
 
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
@@ -66,7 +67,7 @@ if ($isvirt) {
 	# Remote nodes run sshd on another port since they so not
 	# have per-jail IPs. Of course, might not even be jailed!
 	#
-	if ($jailflag) {
+	if ($jailflag || $isplab) {
 	    echo "port: $sshdport\n";
 	}
     }
