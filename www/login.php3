@@ -131,7 +131,7 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
           </table>\n";
 
     echo "<center><h2>
-          <a href='password.php3'>Forgot your password?</a>
+          <a href='password.php3'>Forgot your username or password?</a>
           </h2></center>\n";
 }
 
@@ -159,6 +159,8 @@ if (!isset($uid) || $uid == "" || !isset($password) || $password == "") {
 }
 else {
     if (DOLOGIN($uid, $password, $adminmode)) {
+	# Short delay.
+	sleep(1);
 	$login_status = $STATUS_LOGINFAIL;
     }
     else {
