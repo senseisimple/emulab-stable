@@ -9,19 +9,19 @@ all:	event-sched
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	 += -O -g -static -I. -I$(SRCDIR)/../lib -Wall -pthread -DDEBUG
+CFLAGS	 += -O -g -I. -I${OBJDIR} -I$(SRCDIR)/../lib -Wall -pthread -DDEBUG
 CFLAGS   += `elvin-config --cflags vin4mt`
 
-LDFLAGS  += -pthread -L../lib
-LIBS     += -levent -lcipher 
+LDFLAGS  += -pthread -L../lib 
+LIBS     += -levent -lcipher -L/usr/local/lib/mysql -lmysqlclient
 LIBS     += `elvin-config --libs vin4mt`
 
-OBJS	  = event-sched.o queue.o
+OBJS	  = event-sched.o queue.o libdb.o
 
 event-sched:	$(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS):	event-sched.h
+$(OBJS):	event-sched.h ../lib/libevent.a
 
 clean:
 	/bin/rm -f *.o event-sched

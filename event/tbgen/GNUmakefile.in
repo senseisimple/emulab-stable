@@ -1,0 +1,46 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/tbgen
+
+PROGRAMS = tbmevc tbmevd sample-client tbmevd.restart
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	 += -O -g -static -I. -I$(SRCDIR)/../lib -Wall -pthread -DDEBUG
+CFLAGS   += `elvin-config --cflags vin4mt`
+
+LDFLAGS  += -static -pthread -L../lib
+LIBS     += -levent -lcipher -lc_r
+
+#
+# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
+#     build on freebsd. I made a vain attempt to filter it out, but
+#     gave up quickly. Deal with it later. 
+#
+#LIBS     += `elvin-config --libs vin4mt`
+LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+
+tbmevc:	tbmevc.o
+	$(CC) $(LDFLAGS) -o $@ tbmevc.o $(LIBS)
+
+tbmevd:	tbmevd.o
+	$(CC) $(LDFLAGS) -o $@ tbmevd.o $(LIBS)
+
+sample-client:	sample-client.o
+	$(CC) $(LDFLAGS) -o $@ sample-client.o $(LIBS)
+
+$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+install:	$(INSTALL_SBINDIR)/tbmevd \
+		$(INSTALL_SBINDIR)/tbmevd.restart
+
+client-install: 
+	$(INSTALL_PROGRAM) tbmevc /etc/testbed/tbmevc
+
+clean:
+	/bin/rm -f *.o $(PROGRAMS)

@@ -1032,10 +1032,11 @@ fi
 
 
 if test "$enable_events" = "yes"; then
-	elvinfiles="event/GNUmakefile event/lib/GNUmakefile \
-		     event/sched/GNUmakefile event/test/GNUmakefile";
+	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
+		    event/sched/GNUmakefile event/test/GNUmakefile \
+                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart";
 else
-	elvinfiles="";
+	eventfiles="";
 fi
 
 #
@@ -1072,7 +1073,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1076: checking for a BSD compatible install" >&5
+echo "configure:1077: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1181,7 +1182,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/cvsupd.sh \
-	$elvinfiles \
+	$eventfiles \
 	apache/GNUmakefile apache/apache.conf "
 
 #

@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.6 2002-02-19 15:45:24 imurdock Exp $
+ * $Id: event.h,v 1.7 2002-02-21 17:49:38 stoller Exp $
  */
 
 #ifndef __EVENT_H__
@@ -44,6 +44,43 @@ typedef elvin_notification_t event_notification_t;
 /* Event subscription: */
 typedef elvin_subscription_t event_subscription_t;
 
+/*
+ * A tuple defines the target of the event, or if you are a subscriber,
+ * what events you want to subscribe to.
+ */
+typedef struct {
+	char		*site;		/* Which Emulab site. God only */
+	char		*expt;		/* Project and experiment IDs */
+	char		*group;		/* User defined group of nodes */
+	char		*host;		/* A specific host */		
+	char		*objtype;	/* LINK, TRAFGEN, etc ... */
+        char		*objname;	/* link0, cbr0, cbr1, etc ... */
+        char		*eventtype;	/* START, STOP, UP, DOWN, etc ... */
+	int		scheduler;	/* A dynamic event to schedule */
+} address_tuple, *address_tuple_t;
+#define ADDRESSTUPLE_ANY	NULL
+#define ADDRESSTUPLE_ALL	"*"
+#define OBJECTTYPE_TESTBED	"TBCONTROL"
+
+address_tuple_t	address_tuple_alloc(void);
+int		address_tuple_free(address_tuple_t);
+
+#define event_notification_get_site(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "SITE", buf, len)
+#define event_notification_get_expt(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "EXPT", buf, len)
+#define event_notification_get_group(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "GROUP", buf, len)
+#define event_notification_get_host(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "HOST", buf, len)
+#define event_notification_get_objtype(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "OBJTYPE", buf, len)
+#define event_notification_get_objname(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "OBJNAME", buf, len)
+#define event_notification_get_eventtype(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "EVENTTYPE", buf, len)
+
+
 /* The "any host" string: */
 #define EVENT_HOST_ANY "*"
 
@@ -60,11 +97,10 @@ typedef enum {
    and called whenever the specified event is triggered.
    HANDLE is the handle to the event server, NOTIFICATION is the event
    notification itself, and DATA is an arbitrary value passed to
-   event_subscribe (argument 4). HOST and TYPE are attributes from the
-   event notification. */
+   event_subscribe (argument 4).
+ */
 typedef void (*event_notify_callback_t)(event_handle_t handle,
                                         event_notification_t notification,
-                                        char *host, event_type_t type,
                                         void *data);
 
 /*
@@ -74,8 +110,10 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
 #define ERROR(fmt,...) fprintf(stderr, __FUNCTION__ ": " fmt, ## __VA_ARGS__)
 #ifdef DEBUG
 #define TRACE(fmt,...) printf(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define DBG(fmt,...) printf(fmt, ## __VA_ARGS__)
 #else
 #define TRACE(fmt,...)
+#define DBG(fmt,...)
 #endif /* DEBUG */
 
 /*
@@ -90,7 +128,7 @@ int event_notify(event_handle_t handle, event_notification_t notification);
 int event_schedule(event_handle_t handle, event_notification_t notification,
                    struct timeval *time);
 event_notification_t event_notification_alloc(event_handle_t handle,
-                                              char *host, event_type_t type);
+                                              address_tuple_t tuple);
 int event_notification_free(event_handle_t handle,
                             event_notification_t notification);
 int event_notification_get_double(event_handle_t handle,
@@ -127,7 +165,7 @@ int event_notification_remove(event_handle_t handle,
                               event_notification_t notification, char *name);
 event_subscription_t event_subscribe(event_handle_t handle,
                                      event_notify_callback_t callback,
-                                     event_type_t type, void *data);
+                                     address_tuple_t tuple, void *data);
 
 /* util.c */
 void *xmalloc(int size);

@@ -7,14 +7,14 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.11 2002-02-19 17:12:52 stoller Exp $";
-
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include "event.h"
+#undef  TRACE
+#define TRACE(fmt,...)
 
 static char hostname[MAXHOSTNAMELEN];
 
@@ -259,8 +259,6 @@ int
 event_schedule(event_handle_t handle, event_notification_t notification,
                struct timeval *time)
 {
-    event_type_t type;
-
     if (!handle || !notification || !time) {
         ERROR("invalid parameter\n");
         return 0;
@@ -269,38 +267,12 @@ event_schedule(event_handle_t handle, event_notification_t notification,
     TRACE("scheduling event notification %p to be sent at time (%ld, %ld)\n",
           notification, time->tv_sec, time->tv_usec);
 
-    /* Change the event type to EVENT_SCHEDULE, saving the old event
-       type in the notification structure so the event scheduler can
-       change it back when the event is scheduled: */
-
-    if (event_notification_get_int32(handle, notification, "type",
-                                     (int *) &type)
-        == 0)
-    {
-        ERROR("could not get old type attribute from notification %p\n",
-              notification);
-        return 0;
-    }
-
-    if (event_notification_remove(handle, notification, "type") == 0) {
-        ERROR("could not remove old type attribute from notification %p\n",
-              notification);
-        return 0;
-    }
-
-    if (event_notification_put_int32(handle, notification, "type",
-                                     EVENT_SCHEDULE)
-        == 0)
-    {
-        ERROR("could not add new type attribute to notification %p\n",
-              notification);
-        return 0;
-    }
-    if (event_notification_put_int32(handle, notification, "old_type",
-                                     type)
-        == 0)
-    {
-        ERROR("could not add old type attribute to notification %p\n",
+    /*
+     * Add an attribute that signifies its a scheduler operation.
+     */
+    if (! event_notification_remove(handle, notification, "SCHEDULER") ||
+	! event_notification_put_int32(handle, notification, "SCHEDULER", 1)) {
+	ERROR("could not add scheduler attribute to notification %p\n",
               notification);
         return 0;
     }
@@ -332,25 +304,22 @@ event_schedule(event_handle_t handle, event_notification_t notification,
 
 
 /*
- * Allocate an event notification.  The HOST parameter specifies
- * the hostname of the node that should receive the notification,
- * or EVENT_HOST_ANY if the notification should go to all hosts.
- * The TYPE parameter specifies the event type.  Returns
- * a pointer to an event notification structure if the operation
- * is successful, 0 otherwise.
+ * Allocate an event notification.  The address TUPLE defines who
+ * should receive the notification. Returns a pointer to an event
+ * notification structure if the operation is successful, 0 otherwise.
  */
 
 event_notification_t
-event_notification_alloc(event_handle_t handle, char *host, event_type_t type)
+event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 {
     elvin_notification_t notification;
 
-    if (!handle || !host || !type) {
+    if (!handle || !tuple) {
         ERROR("invalid paramater\n");
         return NULL;
     }
 
-    TRACE("allocating notification (host=\"%s\", type=%d)\n", host, type);
+    TRACE("allocating notification (tuple=%p)\n", tuple);
 
     notification = elvin_notification_alloc(handle->status);
     if (notification == NULL) {
@@ -360,22 +329,23 @@ event_notification_alloc(event_handle_t handle, char *host, event_type_t type)
     }
 
     TRACE("allocated notification %p\n", notification);
-
-    /* Add hostname to notification: */
-    if (event_notification_put_string(handle, notification, "host", host)
-        == 0)
-    {
-        ERROR("could not add host attribute to notification %p\n",
-              notification);
-        return NULL;
-    }
-
-    /* Add type to notification: */
-    if (event_notification_put_int32(handle, notification, "type", type)
-        == 0)
-    {
-        ERROR("could not add type attribute to notification %p\n",
-              notification);
+#define EVPUT(name, field) \
+({ \
+	char *foo = (tuple->field ? tuple->field : ADDRESSTUPLE_ALL); \
+	\
+	event_notification_put_string(handle, notification, name, foo); \
+})
+    
+    /* Add the target address stuff to the notification */
+    if (!EVPUT("SITE", site) ||
+	!EVPUT("EXPT", expt) ||
+	!EVPUT("GROUP", group) ||
+	!EVPUT("HOST", host) ||
+	!EVPUT("OBJTYPE", objtype) ||
+	!EVPUT("OBJNAME", objname) ||
+	!EVPUT("EVENTTYPE", eventtype) ||
+	! event_notification_put_int32(handle, notification, "SCHEDULER", 0)) {
+	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
     }
 
@@ -818,38 +788,77 @@ static void notify_callback(elvin_handle_t server,
  *
  *     void callback(event_handle_t handle,
  *                   event_notification_t notification,
- *                   char *host,
- *                   event_type_t type,
  *                   void *data);
  *
  * where HANDLE is the handle to the event server, NOTIFICATION is the
- * event notification, HOST and TYPE are the respective attributes of
- * the event notification, and DATA is the arbitrary pointer passed to
+ * event notification, and DATA is the arbitrary pointer passed to
  * event_subscribe.  Returns a pointer to an event
  * subscription structure if the operation is successful, 0 otherwise.
  */
 
 event_subscription_t
 event_subscribe(event_handle_t handle, event_notify_callback_t callback,
-                event_type_t type, void *data)
+		address_tuple_t tuple, void *data)
 {
     elvin_subscription_t subscription;
     struct notify_callback_arg *arg;
     char expression[EXPRESSION_LENGTH];
+    int index = 0;
 
     /* XXX: The declaration of expression has to go last, or the
        local variables on the stack after it get smashed.  Check
        Elvin for buffer overruns. */
 
-    if (!handle || !callback || !type) {
+    if (!handle || !callback || !tuple) {
         ERROR("invalid parameter\n");
         return NULL;
     }
 
-    snprintf(expression, EXPRESSION_LENGTH,
-             "(host == \"*\" || host == \"%s\") && type == %d",
-             hostname,
-             type);
+    if (tuple->site) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "SITE == \"%s\" ",
+			     tuple->site);
+    }
+    if (tuple->expt) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s EXPT == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->expt);
+    }
+    if (tuple->group) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s GROUP == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->group);
+    }
+    if (tuple->host) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s HOST == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->host);
+    }
+    if (tuple->objtype) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s OBJTYPE == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->objtype);
+    }
+    if (tuple->objname) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s OBJNAME == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->objname);
+    }
+    if (tuple->eventtype) {
+	    index += snprintf(&expression[index], sizeof(expression) - index,
+			     "%s EVENTTYPE == \"%s\" ",
+			     (index ? "&&" : ""),
+			     tuple->eventtype);
+    }
+    index += snprintf(&expression[index], sizeof(expression) - index,
+		     "%s SCHEDULER == %d ",
+		     (index ? "&&" : ""),
+		     tuple->scheduler);
 
     TRACE("subscribing to event %s\n", expression);
 
@@ -910,8 +919,6 @@ notify_callback(elvin_handle_t server,
     struct notify_callback_arg *arg = (struct notify_callback_arg *) rock;
     event_notify_callback_t callback;
     void *data;
-    char host[MAXHOSTNAMELEN];
-    event_type_t type;
 
     TRACE("received event notification\n");
 
@@ -921,23 +928,25 @@ notify_callback(elvin_handle_t server,
     handle.server = server;
     handle.status = status;
 
-    if (event_notification_get_string(&handle, notification, "host",
-                                      host, MAXHOSTNAMELEN)
-        == 0)
-    {
-        ERROR("could not get host attribute from notification %p\n",
-              notification);
-        return;
-    }
+    callback(&handle, notification, data);
+}
 
-    if (event_notification_get_int32(&handle, notification, "type",
-                                     (int *) &type)
-        == 0)
-    {
-        ERROR("could not get type attribute from notification %p\n",
-              notification);
-        return;
-    }
+/*
+ * address tuple alloc and free.
+ */
+address_tuple_t
+address_tuple_alloc(void)
+{
+	address_tuple_t	tuple = xmalloc(sizeof(address_tuple));
 
-    callback(&handle, notification, host, type, data);
+	bzero(tuple, sizeof(address_tuple));
+
+	return tuple;
+}
+
+int
+address_tuple_free(address_tuple_t tuple)
+{
+	free(tuple);
+	return 1;
 }

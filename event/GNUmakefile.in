@@ -8,7 +8,7 @@ SUBDIR		= event
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= lib sched test
+SUBDIRS	= lib sched tbgen
 
 all:	$(SUBDIRS)
 
@@ -20,19 +20,23 @@ lib:
 sched:
 	@$(MAKE) -C sched all
 
+tbgen:
+	@$(MAKE) -C tbgen all
+
 test:
 	@$(MAKE) -C test all
 
 install: 
 	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
-	@$(MAKE) -C test install
+	@$(MAKE) -C tbgen install
 
 clean:		subdir-clean
 
 subdir-clean:
 	@$(MAKE) -C lib clean
 	@$(MAKE) -C sched clean
+	@$(MAKE) -C tbgen clean
 	@$(MAKE) -C test clean
 
 distclean:	subdir-distclean
