@@ -21,7 +21,7 @@
  * Desc: Mezzanine entry point
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezzanine.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: mezzanine.c,v 1.2 2004-12-15 05:06:17 johnsond Exp $
  ***************************************************************************/
 
 #include <signal.h>
@@ -30,6 +30,7 @@
 #include "err.h"
 #include "opt.h"
 #include "mezzanine.h"
+#include <string.h>
 
 // Set flag to 1 to force program to quit
 static int quit = 0;
@@ -49,7 +50,7 @@ double gettime()
 }
 
 // convert slashes to '_' chars
-void strip_slashes(char *s) {
+char *strip_slashes(char *s) {
   char *p;
   if (s != NULL) {
 	for (p = s; *p != '\0'; ++p) {
@@ -88,6 +89,8 @@ int main(int argc, char *argv[])
   tmpdir = getenv("TMP");
   if (tmpdir == NULL)
     tmpdir = "/tmp";
+
+  //  char *sd = strdup(opt_get_string("fgrab","device","unknown_device"));
 
   snprintf(ipcfilename,sizeof(ipcfilename),"%s/mezz_instance%s.ipc",
 		   tmpdir,opt_get_string("fgrab","device","unknown_device"));
@@ -144,9 +147,9 @@ int main(int argc, char *argv[])
     time[3] += gettime();
 
     // Display stats
-    printf("%3.0f %3.0f %3.0f %3.0f    \r", 1000 * time[0], 1000 * time[1],
-           1000 * time[2], 1000 * time[3]);
-    fflush(stdout);
+    //    printf("%3.0f %3.0f %3.0f %3.0f    \r", 1000 * time[0], 1000 * time[1],
+    //           1000 * time[2], 1000 * time[3]);
+    //    fflush(stdout);
 
     mmap->time = gettime();
     mezz_raise_event();
