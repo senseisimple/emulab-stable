@@ -12,7 +12,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= tbacct addsfskey addpubkey
+SBIN_STUFF	= tbacct addsfskey addpubkey quotamail
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey
 
 #
