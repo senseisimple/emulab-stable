@@ -55,6 +55,10 @@ $expiretime = date("m/d/Y", time() + (86400 * 90));
 </tr>
 
 <?php
+
+#
+#  Name: and Username:
+#
 echo "<tr>
           <td>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"></td>
@@ -71,6 +75,9 @@ else {
 echo "     </td>
       </tr>\n";
 
+#
+#  Long Name: and Full Name:
+#
 echo "<tr>
           <td>*Long name:</td>
           <td><input type=\"text\" name=\"grp_name\"
@@ -87,6 +94,9 @@ if ($row) {
 echo "     </td>
       </tr>\n";
 
+#
+#  URL: and Title/Position:
+#
 echo "<tr>
          <td>+URL:</td>
          <td><input type=\"text\" name=\"grp_URL\"
@@ -104,6 +114,9 @@ if ($row) {
 echo "     </td>
       </tr>\n";
 
+#
+#  Expires: and Affiliation:
+#
 echo "<tr>
           <td>When do&nbsp;you<br>
               expect&nbsp;to&nbsp;be&nbsp;done<br>
@@ -123,6 +136,9 @@ if ($row) {
 echo "     </td>
       </tr>\n";
 
+#
+#  Blank and Email:
+#
 echo "<tr>
          <td></td>
          <td></td>
@@ -139,8 +155,7 @@ echo "    </td>
       </tr>\n";
 
 #
-# If a new usr, then provide a second password confirmation field.
-# Otherwise, a blank spot.
+# PawwordL and Postal Address:
 #
 echo "<tr>
          <td>*Password:</td>
@@ -157,7 +172,10 @@ if ($row) {
 echo "    </td>
       </tr>\n";
 
-
+#
+# If a new usr, then provide a second password confirmation field.
+# Otherwise, a blank spot.
+#
 echo "<tr>";
 if (! $row) {
     echo "<td>*Retype<br>New Password:</td>

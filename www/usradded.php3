@@ -32,12 +32,20 @@ if (!isset($grp) ||
     strcmp($grp, "") == 0) {
   $formerror = "Project";
 }
+if (!isset($usr_affil) ||
+    strcmp($usr_affil, "") == 0) {
+  $formerror = "Institutional Afilliation";
+}
+if (!isset($usr_title) ||
+    strcmp($usr_title, "") == 0) {
+  $formerror = "Title/Position";
+}
 #
-# Not sure about the passwd. If the user is already known, then is he
-# supposed to plug his passwd in?
+# The first password field must always be filled in. The second only
+# if a new user, and we will catch that later.
 #
-if ((!isset($password1) || strcmp($password1, "") == 0) ||
-    (!isset($password2) || strcmp($password2, "") == 0)) {
+if (!isset($password1) ||
+    strcmp($password1, "") == 0) {
   $formerror = "Password";
 }
 
@@ -118,9 +126,10 @@ if (! $returning) {
 
     $newuser_command = "INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	"usr_phone,usr_pswd,unix_uid,status) ".
+	"usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
 	"VALUES ('$uid',now(),'$usr_expires','$usr_name','$usr_email',".
-	"'$usr_addr','$usr_phone','$encoding','$unix_uid','newuser')";
+	"'$usr_addr','$usr_phone','$usr_title','$usr_affil',".
+        "'$encoding','$unix_uid','newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
         $err = mysql_error();
