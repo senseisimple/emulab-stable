@@ -1,0 +1,155 @@
+#!/usr/bin/perl -w
+
+# tbprerun
+
+# This is the first program in the tbprerun/tbrun/tbend sequence.
+# It's main purpose is to parse the NS input and translate this into
+# IR and database.
+
+# Settings
+# maxruns is the maximum number of times to run the assignment loop
+$maxruns = 5;
+
+# Setting up the paths
+$TBROOT = "@prefix@";
+
+$TBSETUPLIB = "$TBROOT/lib";
+$TBIRLIB = "$TBROOT/lib/ir";
+
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ir" 
+    . ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin";
+push(@INC,$TBSETUPLIB);
+push(@INC,$TBIRLIB);
+
+require libtbsetup;
+require libir;
+require 'ctime.pl';
+
+if ($#ARGV != 2) {
+    print STDERR "Syntax: $0 pid eid ns_file\n";
+    exit(1);
+}
+($pid,$eid,$nsfile) = @ARGV;
+
+$prefix = &tbs_prefix($nsfile);
+$irfile = "$prefix.ir";
+$logfile = "$prefix.log";
+$ptopfile = "/tmp/testbed$$.ptop";
+$id = "$pid-$eid";
+
+# This will hold the list of nodes currently assigned.
+@nodes = ();
+
+# This routine is called after reservation and frees the reservation.
+sub cleanup {
+    &tbs_exec("nfree $eid $pid");
+};
+
+&tbs_initlog($logfile);
+
+&tbs_out("Input:  $nsfile\n");
+&tbs_out("Output: $irfile\n");
+&tbs_out("Log:    $logfile\n");
+&tbs_out("\n");
+&tbs_out("Beginning pre run for $pid-$eid ($nsfile). " 
+	 . &ctime(time) . "\n");
+
+if (! -r $nsfile) {
+    &tbs_out("$nsfile does not exist or is not readable.\n");
+    exit(1);
+}
+
+&tbs_out("Parsing ns input.\n");
+if (&tbs_exec("parse.tcl $id $nsfile $irfile")) {
+    &tbs_out("Parsing failed.\n");
+    exit(1);
+}
+if (! -r $irfile) {
+    &tbs_out("Parse failed to produce output.\n");
+    &tbs_out("  Make sure you have a 'run' command in your ns file.\n");
+    exit(1);
+}
+
+&tbs_out("Post parsing NS input.");
+if (&tbs_exec("postparse $nsfile $irfile")) {
+    &tbs_out("Postparsing failed.\n");
+    exit(1);
+}
+
+# Now we do a loop with assign/nalloc until we work or give up
+$run = 0;
+$done = 0;
+&tbs_out("Starting assignment.\n");
+while ($done == 0) {
+    $run++;
+    if ($run > $maxruns) {
+	&tbs_out("Too many runs - Giving up.\n");
+	exit(1);
+    }
+    &tbs_out("Run: $run\n");
+
+    &tbs_out("Determining available resources.\n");
+    if (&tbs_exec("avail | ptopgen > $ptopfile")) {
+	&tbs_out("Failed to determine available resources.\n");
+	exit(1);
+    }
+    
+    &tbs_out("Allocating resources - This may take a while.\n");
+    if (&tbs_exec("assign_wrapper $irfile $ptopfile")) {
+	&tbs_out("Failed to allocate resources.\n");
+	&tbs_out("  See $logfile and assign.log for more info.\n");
+    } else {
+	# now we need to read what resources are needed from the IR file
+	eval {&ir_read($irfile)};
+	if ($@) {
+	    &tbs_out("Could not read $irfile - ($@)\n");
+	    exit(1);
+	}
+	$raw = eval {&ir_get("/virtual/nodes")};
+	if ($@) {
+	    &tbs_out("Could not load /virtual/nodes - ???\n");
+	    exit(1);
+	}
+	@nodes = ();
+	foreach (split("\n",$raw)) {
+	    @info = split;
+	    push(@nodes,$info[1]);
+	}
+	
+	&tbs_out("Attempting to reserve resources.\n");
+	if (&tbs_exec("nalloc $pid $eid " . join(" ",@nodes))) {
+	    &tbs_out("Could not reserve resources.\n");
+	} else {
+	    &tbs_out("Resources successfully reserved.\n");
+	    $done = 1;
+	}
+    }
+}
+
+&tbs_out("Syncing database with assignment.\n");
+if (&tbs_exec("postassign $irfile")) {
+    &tbs_out("Error syncing.\n");
+    &cleanup();
+    exit(1);
+}
+
+&tbs_out("!!! Any further errors will result in partial DB state.\n");
+
+&tbs_out("Allocating IP addresses.\n");
+if (&tbs_exec("handle_ip $irfile $nsfile")) {
+    &tbs_out("Failed to allocate IP addresses.\n");
+    &cleanup();
+    exit(1);
+}
+
+&tbs_out("Setting up OS state.\n");
+if (&tbs_exec("handle_os $irfile $nsfile")) {
+    &tbs_out("Failed to set up OS state.\n");
+    &cleanup();
+    exit(1);
+}
+
+&tbs_out("Pre run finished - " . &ctime(time) . "\n");
+
+0;
+
