@@ -90,9 +90,16 @@ if ($row = mysql_fetch_row($pswd_result)) {
 }
 
 #
-# Current policy is to prefix the EID with the PID. 
+# Current policy is to prefix the EID with the PID. Make sure it is not
+# too long for the database.
 #
-$exp_eid = $exp_pid . "-" . $exp_id;
+# XXX Note CONSTANT in expression!
+#
+$exp_eid = $exp_pid . $exp_id;
+if (strlen($exp_id) > 22) {
+    USERERROR("The experiment name \"$exp_id\" is too long! ".
+              "Please select another.", 1);
+}
 
 #
 # Make sure the experiment ID does not already exist.

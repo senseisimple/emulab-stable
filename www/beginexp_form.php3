@@ -104,7 +104,8 @@ echo "    </td>
 #
 echo "<tr>
           <td>*Name<br>(will be prefixed by project name):</td>
-          <td><input type=\"text\" name=\"exp_id\">
+          <td><input type=\"text\" name=\"exp_id\"
+                     size=\"22\" MAXLENGTH=\"22\">
               </td>
       </tr>\n";
 

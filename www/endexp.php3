@@ -71,12 +71,11 @@ if (mysql_num_rows($query_result) == 0) {
 #
 # No need to tell me how bogus this is.
 #
-$exp_pid = $pid;
 $dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
 $nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
-$irname  = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".ir";
+$irname  = "$dirname" . "/" . "$exp_id"  . ".ir";
 $repname = "$dirname" . "/" . "$exp_id"  . ".report";
-$logname = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".log";
+$logname = "$dirname" . "/" . "$exp_id"  . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 #
@@ -97,7 +96,7 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_pid$exp_id.ir",
+$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_id.ir",
                $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
