@@ -224,7 +224,7 @@ EOT
 
     # Now send warning messages to those who will get autoswapped soon
     my $warnmin = 60; # minutes before autoswap that we warn them
-    my $window = 8; # idlemail frequency <= window < 2*frequency
+    my $window = 5; # same as idlemail frequency in cron
     $sql  = <<EOT;
 select pid,eid,autoswap_timeout,
 (unix_timestamp(now()) - unix_timestamp(expt_swapped))/60 as activemin
