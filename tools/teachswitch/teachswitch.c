@@ -93,6 +93,9 @@ int main(int argc, char **argv) {
 	    exit(1);
 	}
 
+	/*
+	 *
+	 */
 	if (flag_ifr.ifr_flags & IFF_LOOPBACK) {
 	    continue;
 	}
@@ -126,7 +129,7 @@ int main(int argc, char **argv) {
 
 	if (bpffd[num_interfaces] < 0) {
 	    printf("Failed to find an open-able BPF device\n");
-	    exit(1);
+	    continue;
 	}
 
 	/*
@@ -136,7 +139,7 @@ int main(int argc, char **argv) {
 
 	if (ioctl(bpffd[num_interfaces],BIOCSETIF,&req) < 0) {
 	    perror("BIOSETIF failed");
-	    exit(-1);
+	    continue;
 	}
 
 	num_interfaces++;
