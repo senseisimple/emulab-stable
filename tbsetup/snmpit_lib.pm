@@ -39,6 +39,7 @@ my %vlanids=();
 sub init($) {
     $debug = shift || $debug;
     &ReadTranslationTable;
+    print getTrunkPath(\%trunk,[ keys %trunk ],'cisco1','cisco4'),"\n";
     return 0;
 }
 
@@ -321,6 +322,91 @@ sub getStackType($) {
     } else {
 	my ($stack_type) = ($result->fetchrow());
 	return $stack_type;
+    }
+}
+
+#
+# Returns a structure representing all trunk links. It's a hash, keyed by
+# switch, that contains hash references. Each of the second level hashes
+# is keyed by destination, with the value being an array reference that
+# contains the card.port pairs to which the trunk is conencted.
+#
+sub getTrunks() {
+
+    my %trunks = ();
+
+    my $result = DBQueryFatal("SELECT node_id1, card1, port1, " .
+	"node_id2, card2, port2 FROM wires WHERE type='Trunk'");
+
+    while (my @row = $result->fetchrow()) {
+	my ($node_id1, $card1, $port1, $node_id2, $card2, $port2)  = @row;
+	push @{ $trunks{$node_id1}{$node_id2} }, "$card1.$port1";
+	push @{ $trunks{$node_id2}{$node_id1} }, "$card2.$port2";
+    }
+
+    return %trunks;
+	
+}
+
+#
+# Find the best path from one switch to another. Returns an empty list if no
+# path exists, otherwise returns a list of switch names. Arguments are:
+# A reference to a hash, as returned by the getTrunks() function
+# A reference to an array of unvisited switches: Use [keys %trunks]
+# Two siwtch names, the source and the destination 
+sub getTrunkPath($$$$) {
+    my ($trunks, $unvisited, $src,$dst) = @_;
+    if ($src eq $dst) {
+	#
+	# The source and destination are the same
+	#
+	return ($src);
+    } elsif ($trunks->{$src}{$dst}) {
+	#
+	# The source and destination are directly connected
+	#
+	return ($src,$dst);
+    } else {
+	# The source and destination aren't directly connected. We'll need to 
+	# recurse across other trunks to find solution
+	my @minPath = ();
+
+	#
+	# We use the @$unvisited list to pick switches to traverse to, so
+	# that we don't re-visit switches we've already been to, which would 
+	# cause infinite recursion
+	#
+	foreach my $i (0 .. $#{$unvisited}) {
+	    if ($trunks->{$src}{$$unvisited[$i]}) {
+
+		#
+		# We need to pull theswitch out of the unvisted list that we
+		# pass to it.
+		#
+		my @list = @$unvisited;
+		splice(@list,$i,1);
+
+		#
+		# Check to see if the path we get with this switch is the 
+		# best one found so far
+		#
+		my @path = getTrunkPath($trunks,\@list,$$unvisited[$i],$dst);
+		if (@path && ((!@minPath) || (@path < @minPath))) {
+		    @minPath = @path;
+		}
+	    }
+
+	}
+
+	#
+	# If we found a path, tack ourselves on the front and return. If not,
+	# return the empty list of failure.
+	#
+	if (@minPath) {
+	    return ($src,@minPath);
+	} else {
+	    return ();
+	}
     }
 }
 
