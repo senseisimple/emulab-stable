@@ -821,7 +821,7 @@ if ($showfwinfo) {
     if ($result_fw->numrows) {
 	print "Firewall information:\n";
 	printf("%-15s %-8s %-8s %-5s %s\n",
-	       "Firewall", "Type", "Style", "Rule#", "Rule");
+	       "ID", "Type", "Style", "Rule#", "Rule");
 	print("--------------- -------- -------- ----- ".
 	      "-----------------------------------\n");
 	while (my ($fwname,$fwtype,$fwstyle) = $result_fw->fetchrow_array()) {
