@@ -67,7 +67,7 @@ if ($expstate) {
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
     else {
-	WRITESUBMENUBUTTON("View NS File",
+	WRITESUBMENUBUTTON("Visualization and NS File",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
 
