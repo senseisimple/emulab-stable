@@ -789,7 +789,7 @@ elsif (@vnodelist) {
 	my $pnode  = $vnode2pnode{$node};
 	my $islocal= exists($nodes{$pnode});
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (100 * $pnodevcount{$pnode});
+	my $maxwait = 90 + (40 * $pnodevcount{$pnode});
 	my $curallocstate;
 
 	TBGetNodeAllocState($node, \$curallocstate);
