@@ -32,7 +32,7 @@ else {
     $row = 0;
 }
 
-$expiretime = date("m/d/Y", time() + (86400 * 90));
+$expiretime = date("Y:m:d", time() + (86400 * 120));
 
 ?>
 <table align="center" border="1"> 
@@ -264,8 +264,9 @@ echo "<tr>
 #  Expires
 #
 echo "<tr>
-          <td>When do you expect to be<br>done using the testbed</td>
-          <td><input type=\"text\" name=\"proj_expires\"
+          <td>When do you expect to be done<br>
+              using the testbed (YYYY:MM:DD):</td>
+          <td><input type=\"text\" name=\"proj_expires\" size=\"10\"
                      value=\"$expiretime\"></td>
       </tr>\n";
 
