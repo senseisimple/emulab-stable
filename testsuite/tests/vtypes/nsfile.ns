@@ -1,0 +1,30 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set node4 [$ns node]
+set node5 [$ns node]
+set node6 [$ns node]
+
+set lan1 [$ns make-lan "$node1 $node2 $node3" 100Mb 0ms]
+set link1 [$ns duplex-link $node4 $node1 100Mb 50ms DropTail]
+set link2 [$ns duplex-link $node4 $node3 10Mb 100ms DropTail]
+set link3 [$ns duplex-link $node5 $node2 100Mb 0ms DropTail]
+set link4 [$ns duplex-link $node6 $node5 100Mb 0ms DropTail]
+
+tb-make-soft-vtype A {pc600 pc850}
+tb-make-hard-vtype B {pc600 pc850}
+tb-make-weighted-vtype C 0.1 {pc600 pc850}
+
+tb-set-hardware $node1 B
+tb-set-hardware $node2 B
+tb-set-hardware $node3 A
+tb-set-hardware $node4 A
+tb-set-hardware $node5 C
+tb-set-hardware $node6 C
+
+$ns run
+
