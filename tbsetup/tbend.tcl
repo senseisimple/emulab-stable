@@ -28,8 +28,8 @@ set updir [file dirname $scriptdir]
 
 
 set nfree "$updir/db/nfree"
-set libir "$updir/ir/libir.tcl"
-set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
+set libir "$scriptdir/ir/libir.tcl"
+set resetvlans "$scriptdir/resetvlans.tcl"
 
 source $libir
 namespace import TB_LIBIR::ir
