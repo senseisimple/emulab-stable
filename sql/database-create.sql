@@ -1,12 +1,12 @@
-# MySQL dump 8.13
-#
-# Host: localhost    Database: tbdb
-#--------------------------------------------------------
-# Server version	3.23.47-log
+-- MySQL dump 8.22
+--
+-- Host: localhost    Database: tbdb
+---------------------------------------------------------
+-- Server version	3.23.54-log
 
-#
-# Table structure for table 'cdroms'
-#
+--
+-- Table structure for table 'cdroms'
+--
 
 CREATE TABLE cdroms (
   cdkey varchar(64) NOT NULL default '',
@@ -19,9 +19,9 @@ CREATE TABLE cdroms (
   PRIMARY KEY  (cdkey)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'comments'
-#
+--
+-- Table structure for table 'comments'
+--
 
 CREATE TABLE comments (
   table_name varchar(64) NOT NULL default '',
@@ -30,9 +30,9 @@ CREATE TABLE comments (
   UNIQUE KEY table_name (table_name,column_name)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'current_reloads'
-#
+--
+-- Table structure for table 'current_reloads'
+--
 
 CREATE TABLE current_reloads (
   node_id varchar(10) NOT NULL default '',
@@ -40,9 +40,9 @@ CREATE TABLE current_reloads (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'delays'
-#
+--
+-- Table structure for table 'delays'
+--
 
 CREATE TABLE delays (
   node_id varchar(10) NOT NULL default '',
@@ -90,9 +90,9 @@ CREATE TABLE delays (
   PRIMARY KEY  (node_id,iface0,iface1)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'delta_inst'
-#
+--
+-- Table structure for table 'delta_inst'
+--
 
 CREATE TABLE delta_inst (
   node_id varchar(10) NOT NULL default '',
@@ -101,9 +101,9 @@ CREATE TABLE delta_inst (
   PRIMARY KEY  (node_id,partition,delta_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'delta_proj'
-#
+--
+-- Table structure for table 'delta_proj'
+--
 
 CREATE TABLE delta_proj (
   delta_id varchar(10) NOT NULL default '',
@@ -111,9 +111,9 @@ CREATE TABLE delta_proj (
   PRIMARY KEY  (delta_id,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'deltas'
-#
+--
+-- Table structure for table 'deltas'
+--
 
 CREATE TABLE deltas (
   delta_id varchar(10) NOT NULL default '',
@@ -123,9 +123,9 @@ CREATE TABLE deltas (
   PRIMARY KEY  (delta_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'event_eventtypes'
-#
+--
+-- Table structure for table 'event_eventtypes'
+--
 
 CREATE TABLE event_eventtypes (
   idx smallint(5) unsigned NOT NULL default '0',
@@ -133,9 +133,9 @@ CREATE TABLE event_eventtypes (
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'event_objecttypes'
-#
+--
+-- Table structure for table 'event_objecttypes'
+--
 
 CREATE TABLE event_objecttypes (
   idx smallint(5) unsigned NOT NULL default '0',
@@ -143,9 +143,9 @@ CREATE TABLE event_objecttypes (
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'eventlist'
-#
+--
+-- Table structure for table 'eventlist'
+--
 
 CREATE TABLE eventlist (
   pid varchar(12) NOT NULL default '',
@@ -162,9 +162,9 @@ CREATE TABLE eventlist (
   KEY vnode (vnode)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'experiments'
-#
+--
+-- Table structure for table 'experiments'
+--
 
 CREATE TABLE experiments (
   eid varchar(32) NOT NULL default '',
@@ -207,18 +207,18 @@ CREATE TABLE experiments (
   KEY idx (idx)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'exported_tables'
-#
+--
+-- Table structure for table 'exported_tables'
+--
 
 CREATE TABLE exported_tables (
   table_name varchar(64) NOT NULL default '',
   PRIMARY KEY  (table_name)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'exppid_access'
-#
+--
+-- Table structure for table 'exppid_access'
+--
 
 CREATE TABLE exppid_access (
   exp_eid varchar(32) NOT NULL default '',
@@ -227,9 +227,9 @@ CREATE TABLE exppid_access (
   PRIMARY KEY  (exp_eid,exp_pid,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'foreign_keys'
-#
+--
+-- Table structure for table 'foreign_keys'
+--
 
 CREATE TABLE foreign_keys (
   table1 varchar(30) NOT NULL default '',
@@ -239,9 +239,9 @@ CREATE TABLE foreign_keys (
   PRIMARY KEY  (table1,column1)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'group_membership'
-#
+--
+-- Table structure for table 'group_membership'
+--
 
 CREATE TABLE group_membership (
   uid varchar(8) NOT NULL default '',
@@ -250,12 +250,14 @@ CREATE TABLE group_membership (
   trust enum('none','user','local_root','group_root','project_root') default NULL,
   date_applied date default NULL,
   date_approved datetime default NULL,
-  PRIMARY KEY  (uid,gid,pid)
+  PRIMARY KEY  (uid,gid,pid),
+  KEY pid (pid),
+  KEY gid (gid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'groups'
-#
+--
+-- Table structure for table 'groups'
+--
 
 CREATE TABLE groups (
   pid varchar(12) NOT NULL default '',
@@ -268,12 +270,14 @@ CREATE TABLE groups (
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
   PRIMARY KEY  (pid,gid),
-  KEY unix_gid (unix_gid)
+  KEY unix_gid (unix_gid),
+  KEY gid (gid),
+  KEY pid (pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'iface_counters'
-#
+--
+-- Table structure for table 'iface_counters'
+--
 
 CREATE TABLE iface_counters (
   node_id varchar(10) NOT NULL default '',
@@ -286,9 +290,9 @@ CREATE TABLE iface_counters (
   KEY node_idindex (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'images'
-#
+--
+-- Table structure for table 'images'
+--
 
 CREATE TABLE images (
   imagename varchar(30) NOT NULL default '',
@@ -314,9 +318,9 @@ CREATE TABLE images (
   PRIMARY KEY  (imagename,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'interface_types'
-#
+--
+-- Table structure for table 'interface_types'
+--
 
 CREATE TABLE interface_types (
   type varchar(30) NOT NULL default '',
@@ -329,9 +333,9 @@ CREATE TABLE interface_types (
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'interfaces'
-#
+--
+-- Table structure for table 'interfaces'
+--
 
 CREATE TABLE interfaces (
   node_id varchar(10) NOT NULL default '',
@@ -345,12 +349,13 @@ CREATE TABLE interfaces (
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
   PRIMARY KEY  (node_id,card,port),
-  KEY mac (mac)
+  KEY mac (mac),
+  KEY IP (IP)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'ipport_ranges'
-#
+--
+-- Table structure for table 'ipport_ranges'
+--
 
 CREATE TABLE ipport_ranges (
   eid varchar(32) NOT NULL default '',
@@ -360,9 +365,9 @@ CREATE TABLE ipport_ranges (
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'ipsubnets'
-#
+--
+-- Table structure for table 'ipsubnets'
+--
 
 CREATE TABLE ipsubnets (
   pid varchar(12) NOT NULL default '',
@@ -371,9 +376,9 @@ CREATE TABLE ipsubnets (
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'last_reservation'
-#
+--
+-- Table structure for table 'last_reservation'
+--
 
 CREATE TABLE last_reservation (
   node_id varchar(10) NOT NULL default '',
@@ -381,9 +386,9 @@ CREATE TABLE last_reservation (
   PRIMARY KEY  (node_id,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'lastlogin'
-#
+--
+-- Table structure for table 'lastlogin'
+--
 
 CREATE TABLE lastlogin (
   uid varchar(10) NOT NULL default '',
@@ -391,9 +396,9 @@ CREATE TABLE lastlogin (
   PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'login'
-#
+--
+-- Table structure for table 'login'
+--
 
 CREATE TABLE login (
   uid varchar(10) NOT NULL default '',
@@ -402,9 +407,9 @@ CREATE TABLE login (
   PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'loginmessage'
-#
+--
+-- Table structure for table 'loginmessage'
+--
 
 CREATE TABLE loginmessage (
   valid tinyint(4) NOT NULL default '1',
@@ -412,9 +417,9 @@ CREATE TABLE loginmessage (
   PRIMARY KEY  (valid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'mode_transitions'
-#
+--
+-- Table structure for table 'mode_transitions'
+--
 
 CREATE TABLE mode_transitions (
   op_mode1 varchar(20) NOT NULL default '',
@@ -426,9 +431,9 @@ CREATE TABLE mode_transitions (
   KEY op_mode2 (op_mode2,state2)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'newdelays'
-#
+--
+-- Table structure for table 'newdelays'
+--
 
 CREATE TABLE newdelays (
   node_id varchar(10) NOT NULL default '',
@@ -450,9 +455,9 @@ CREATE TABLE newdelays (
   PRIMARY KEY  (node_id,iface0,iface1)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'next_reserve'
-#
+--
+-- Table structure for table 'next_reserve'
+--
 
 CREATE TABLE next_reserve (
   node_id varchar(10) NOT NULL default '',
@@ -461,9 +466,9 @@ CREATE TABLE next_reserve (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nextfreenode'
-#
+--
+-- Table structure for table 'nextfreenode'
+--
 
 CREATE TABLE nextfreenode (
   nodetype varchar(30) NOT NULL default '',
@@ -472,9 +477,9 @@ CREATE TABLE nextfreenode (
   PRIMARY KEY  (nodetype)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'node_idlestats'
-#
+--
+-- Table structure for table 'node_idlestats'
+--
 
 CREATE TABLE node_idlestats (
   node_id varchar(10) NOT NULL default '',
@@ -486,9 +491,9 @@ CREATE TABLE node_idlestats (
   PRIMARY KEY  (node_id,tstamp)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'node_types'
-#
+--
+-- Table structure for table 'node_types'
+--
 
 CREATE TABLE node_types (
   class varchar(10) default NULL,
@@ -513,9 +518,9 @@ CREATE TABLE node_types (
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nodeipportnum'
-#
+--
+-- Table structure for table 'nodeipportnum'
+--
 
 CREATE TABLE nodeipportnum (
   node_id varchar(10) NOT NULL default '',
@@ -523,9 +528,9 @@ CREATE TABLE nodeipportnum (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nodelog'
-#
+--
+-- Table structure for table 'nodelog'
+--
 
 CREATE TABLE nodelog (
   node_id varchar(10) NOT NULL default '',
@@ -537,9 +542,9 @@ CREATE TABLE nodelog (
   PRIMARY KEY  (node_id,log_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nodes'
-#
+--
+-- Table structure for table 'nodes'
+--
 
 CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
@@ -584,9 +589,9 @@ CREATE TABLE nodes (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nodetypeXpid_permissions'
-#
+--
+-- Table structure for table 'nodetypeXpid_permissions'
+--
 
 CREATE TABLE nodetypeXpid_permissions (
   type varchar(30) NOT NULL default '',
@@ -594,9 +599,9 @@ CREATE TABLE nodetypeXpid_permissions (
   PRIMARY KEY  (type,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nodeuidlastlogin'
-#
+--
+-- Table structure for table 'nodeuidlastlogin'
+--
 
 CREATE TABLE nodeuidlastlogin (
   node_id varchar(10) NOT NULL default '',
@@ -606,18 +611,18 @@ CREATE TABLE nodeuidlastlogin (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nologins'
-#
+--
+-- Table structure for table 'nologins'
+--
 
 CREATE TABLE nologins (
   nologins tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (nologins)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nseconfigs'
-#
+--
+-- Table structure for table 'nseconfigs'
+--
 
 CREATE TABLE nseconfigs (
   pid varchar(12) NOT NULL default '',
@@ -627,9 +632,9 @@ CREATE TABLE nseconfigs (
   PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'nsfiles'
-#
+--
+-- Table structure for table 'nsfiles'
+--
 
 CREATE TABLE nsfiles (
   pid varchar(12) NOT NULL default '',
@@ -638,9 +643,9 @@ CREATE TABLE nsfiles (
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'ntpinfo'
-#
+--
+-- Table structure for table 'ntpinfo'
+--
 
 CREATE TABLE ntpinfo (
   node_id varchar(10) NOT NULL default '',
@@ -649,9 +654,9 @@ CREATE TABLE ntpinfo (
   PRIMARY KEY  (node_id,IP,type)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'os_info'
-#
+--
+-- Table structure for table 'os_info'
+--
 
 CREATE TABLE os_info (
   osname varchar(20) NOT NULL default '',
@@ -673,9 +678,9 @@ CREATE TABLE os_info (
   PRIMARY KEY  (osname,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'osidtoimageid'
-#
+--
+-- Table structure for table 'osidtoimageid'
+--
 
 CREATE TABLE osidtoimageid (
   osid varchar(35) NOT NULL default '',
@@ -684,9 +689,9 @@ CREATE TABLE osidtoimageid (
   PRIMARY KEY  (osid,type)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'outlets'
-#
+--
+-- Table structure for table 'outlets'
+--
 
 CREATE TABLE outlets (
   node_id varchar(10) NOT NULL default '',
@@ -696,9 +701,9 @@ CREATE TABLE outlets (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'partitions'
-#
+--
+-- Table structure for table 'partitions'
+--
 
 CREATE TABLE partitions (
   node_id varchar(10) NOT NULL default '',
@@ -707,9 +712,9 @@ CREATE TABLE partitions (
   PRIMARY KEY  (node_id,partition)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'port_counters'
-#
+--
+-- Table structure for table 'port_counters'
+--
 
 CREATE TABLE port_counters (
   node_id char(10) NOT NULL default '',
@@ -730,9 +735,9 @@ CREATE TABLE port_counters (
   PRIMARY KEY  (node_id,card,port)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'portmap'
-#
+--
+-- Table structure for table 'portmap'
+--
 
 CREATE TABLE portmap (
   pid varchar(12) NOT NULL default '',
@@ -742,9 +747,9 @@ CREATE TABLE portmap (
   pport varchar(32) NOT NULL default ''
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'proj_memb'
-#
+--
+-- Table structure for table 'proj_memb'
+--
 
 CREATE TABLE proj_memb (
   uid varchar(8) NOT NULL default '',
@@ -755,9 +760,9 @@ CREATE TABLE proj_memb (
   PRIMARY KEY  (uid,pid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'projects'
-#
+--
+-- Table structure for table 'projects'
+--
 
 CREATE TABLE projects (
   pid varchar(12) NOT NULL default '',
@@ -786,9 +791,9 @@ CREATE TABLE projects (
   KEY unix_gid (unix_gid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'reserved'
-#
+--
+-- Table structure for table 'reserved'
+--
 
 CREATE TABLE reserved (
   node_id varchar(10) NOT NULL default '',
@@ -799,9 +804,9 @@ CREATE TABLE reserved (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'scheduled_reloads'
-#
+--
+-- Table structure for table 'scheduled_reloads'
+--
 
 CREATE TABLE scheduled_reloads (
   node_id varchar(10) NOT NULL default '',
@@ -810,9 +815,9 @@ CREATE TABLE scheduled_reloads (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'state_timeouts'
-#
+--
+-- Table structure for table 'state_timeouts'
+--
 
 CREATE TABLE state_timeouts (
   op_mode varchar(20) NOT NULL default '',
@@ -822,9 +827,9 @@ CREATE TABLE state_timeouts (
   PRIMARY KEY  (op_mode,state)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'state_transitions'
-#
+--
+-- Table structure for table 'state_transitions'
+--
 
 CREATE TABLE state_transitions (
   op_mode varchar(20) NOT NULL default '',
@@ -833,9 +838,9 @@ CREATE TABLE state_transitions (
   PRIMARY KEY  (op_mode,state1,state2)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'state_triggers'
-#
+--
+-- Table structure for table 'state_triggers'
+--
 
 CREATE TABLE state_triggers (
   op_mode varchar(20) NOT NULL default '',
@@ -844,9 +849,9 @@ CREATE TABLE state_triggers (
   PRIMARY KEY  (op_mode,state)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'switch_paths'
-#
+--
+-- Table structure for table 'switch_paths'
+--
 
 CREATE TABLE switch_paths (
   pid varchar(12) default NULL,
@@ -856,9 +861,9 @@ CREATE TABLE switch_paths (
   node_id2 varchar(10) default NULL
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'switch_stack_types'
-#
+--
+-- Table structure for table 'switch_stack_types'
+--
 
 CREATE TABLE switch_stack_types (
   stack_id varchar(10) NOT NULL default '',
@@ -867,9 +872,9 @@ CREATE TABLE switch_stack_types (
   PRIMARY KEY  (stack_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'switch_stacks'
-#
+--
+-- Table structure for table 'switch_stacks'
+--
 
 CREATE TABLE switch_stacks (
   node_id varchar(10) NOT NULL default '',
@@ -877,9 +882,9 @@ CREATE TABLE switch_stacks (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'testsuite_preentables'
-#
+--
+-- Table structure for table 'testsuite_preentables'
+--
 
 CREATE TABLE testsuite_preentables (
   table_name varchar(128) NOT NULL default '',
@@ -887,9 +892,9 @@ CREATE TABLE testsuite_preentables (
   PRIMARY KEY  (table_name)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'tiplines'
-#
+--
+-- Table structure for table 'tiplines'
+--
 
 CREATE TABLE tiplines (
   tipname varchar(32) NOT NULL default '',
@@ -901,18 +906,18 @@ CREATE TABLE tiplines (
   PRIMARY KEY  (tipname)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'tipservers'
-#
+--
+-- Table structure for table 'tipservers'
+--
 
 CREATE TABLE tipservers (
   server varchar(64) NOT NULL default '',
   PRIMARY KEY  (server)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'tmcd_redirect'
-#
+--
+-- Table structure for table 'tmcd_redirect'
+--
 
 CREATE TABLE tmcd_redirect (
   node_id varchar(10) NOT NULL default '',
@@ -920,9 +925,9 @@ CREATE TABLE tmcd_redirect (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'tunnels'
-#
+--
+-- Table structure for table 'tunnels'
+--
 
 CREATE TABLE tunnels (
   pid varchar(12) NOT NULL default '',
@@ -940,9 +945,9 @@ CREATE TABLE tunnels (
   PRIMARY KEY  (pid,eid,node_id,vname)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'uidnodelastlogin'
-#
+--
+-- Table structure for table 'uidnodelastlogin'
+--
 
 CREATE TABLE uidnodelastlogin (
   uid varchar(10) NOT NULL default '',
@@ -952,9 +957,9 @@ CREATE TABLE uidnodelastlogin (
   PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'unixgroup_membership'
-#
+--
+-- Table structure for table 'unixgroup_membership'
+--
 
 CREATE TABLE unixgroup_membership (
   uid varchar(8) NOT NULL default '',
@@ -962,9 +967,9 @@ CREATE TABLE unixgroup_membership (
   PRIMARY KEY  (uid,gid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'user_pubkeys'
-#
+--
+-- Table structure for table 'user_pubkeys'
+--
 
 CREATE TABLE user_pubkeys (
   uid varchar(8) NOT NULL default '',
@@ -974,9 +979,9 @@ CREATE TABLE user_pubkeys (
   PRIMARY KEY  (uid,comment)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'user_sfskeys'
-#
+--
+-- Table structure for table 'user_sfskeys'
+--
 
 CREATE TABLE user_sfskeys (
   uid varchar(8) NOT NULL default '',
@@ -986,9 +991,9 @@ CREATE TABLE user_sfskeys (
   PRIMARY KEY  (uid,comment)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'users'
-#
+--
+-- Table structure for table 'users'
+--
 
 CREATE TABLE users (
   uid varchar(8) NOT NULL default '',
@@ -1023,9 +1028,9 @@ CREATE TABLE users (
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'userslastlogin'
-#
+--
+-- Table structure for table 'userslastlogin'
+--
 
 CREATE TABLE userslastlogin (
   uid varchar(10) NOT NULL default '',
@@ -1034,9 +1039,9 @@ CREATE TABLE userslastlogin (
   PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'v2pmap'
-#
+--
+-- Table structure for table 'v2pmap'
+--
 
 CREATE TABLE v2pmap (
   pid varchar(12) NOT NULL default '',
@@ -1046,9 +1051,9 @@ CREATE TABLE v2pmap (
   PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_agents'
-#
+--
+-- Table structure for table 'virt_agents'
+--
 
 CREATE TABLE virt_agents (
   pid varchar(12) NOT NULL default '',
@@ -1059,9 +1064,9 @@ CREATE TABLE virt_agents (
   PRIMARY KEY  (pid,eid,vname,vnode)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_lans'
-#
+--
+-- Table structure for table 'virt_lans'
+--
 
 CREATE TABLE virt_lans (
   pid varchar(12) NOT NULL default '',
@@ -1091,9 +1096,9 @@ CREATE TABLE virt_lans (
   widearea tinyint(4) default '0'
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_nodes'
-#
+--
+-- Table structure for table 'virt_nodes'
+--
 
 CREATE TABLE virt_nodes (
   pid varchar(12) NOT NULL default '',
@@ -1112,9 +1117,9 @@ CREATE TABLE virt_nodes (
   fixed text NOT NULL
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_routes'
-#
+--
+-- Table structure for table 'virt_routes'
+--
 
 CREATE TABLE virt_routes (
   pid varchar(12) NOT NULL default '',
@@ -1129,9 +1134,9 @@ CREATE TABLE virt_routes (
   PRIMARY KEY  (pid,eid,vname,src,dst)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_trafgens'
-#
+--
+-- Table structure for table 'virt_trafgens'
+--
 
 CREATE TABLE virt_trafgens (
   pid varchar(12) NOT NULL default '',
@@ -1151,9 +1156,9 @@ CREATE TABLE virt_trafgens (
   KEY vnode (vnode)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'virt_vtypes'
-#
+--
+-- Table structure for table 'virt_vtypes'
+--
 
 CREATE TABLE virt_vtypes (
   pid varchar(12) NOT NULL default '',
@@ -1163,9 +1168,9 @@ CREATE TABLE virt_vtypes (
   members text
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'vlans'
-#
+--
+-- Table structure for table 'vlans'
+--
 
 CREATE TABLE vlans (
   eid varchar(32) NOT NULL default '',
@@ -1176,9 +1181,9 @@ CREATE TABLE vlans (
   PRIMARY KEY  (id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'webdb_table_permissions'
-#
+--
+-- Table structure for table 'webdb_table_permissions'
+--
 
 CREATE TABLE webdb_table_permissions (
   table_name varchar(64) NOT NULL default '',
@@ -1188,9 +1193,9 @@ CREATE TABLE webdb_table_permissions (
   PRIMARY KEY  (table_name)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'widearea_accounts'
-#
+--
+-- Table structure for table 'widearea_accounts'
+--
 
 CREATE TABLE widearea_accounts (
   uid varchar(8) NOT NULL default '',
@@ -1201,9 +1206,9 @@ CREATE TABLE widearea_accounts (
   PRIMARY KEY  (uid,node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'widearea_delays'
-#
+--
+-- Table structure for table 'widearea_delays'
+--
 
 CREATE TABLE widearea_delays (
   time double default NULL,
@@ -1219,9 +1224,9 @@ CREATE TABLE widearea_delays (
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'widearea_nodeinfo'
-#
+--
+-- Table structure for table 'widearea_nodeinfo'
+--
 
 CREATE TABLE widearea_nodeinfo (
   node_id varchar(10) NOT NULL default '',
@@ -1235,9 +1240,9 @@ CREATE TABLE widearea_nodeinfo (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'widearea_privkeys'
-#
+--
+-- Table structure for table 'widearea_privkeys'
+--
 
 CREATE TABLE widearea_privkeys (
   privkey varchar(64) NOT NULL default '',
@@ -1253,9 +1258,9 @@ CREATE TABLE widearea_privkeys (
   PRIMARY KEY  (privkey,IP)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'widearea_recent'
-#
+--
+-- Table structure for table 'widearea_recent'
+--
 
 CREATE TABLE widearea_recent (
   time double default NULL,
@@ -1271,9 +1276,9 @@ CREATE TABLE widearea_recent (
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
-#
-# Table structure for table 'wires'
-#
+--
+-- Table structure for table 'wires'
+--
 
 CREATE TABLE wires (
   cable smallint(3) unsigned default NULL,
