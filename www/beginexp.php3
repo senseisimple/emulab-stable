@@ -87,21 +87,21 @@ function SPITFORM($formfields, $errors)
         }
     }
 
-    echo "<table align=center border=1>
-          <tr>
-              <td align=center colspan=2>
-                 <em>(Fields marked with * are required)</em>
-              </td>
-          </tr>\n";
+    echo "<table align=center border=1>\n";
+    #      <tr>
+    #          <td align=center colspan=2>
+    #             <em>(Fields marked with * are required)</em>
+    #          </td>
+    #      </tr>\n";
 
-    echo "<form enctype=multipart/form-data
+    echo "<form name='form1' enctype=multipart/form-data
                 action=beginexp.php3 method=post>\n";
 
     #
     # Select Project
     #
     echo "<tr>
-              <td class='pad4'>*Select Project:</td>
+              <td class='pad4'>Select Project:</td>
               <td class='pad4'><select name=\"formfields[exp_pid]\">\n";
 
     # If just one project, make sure just the one option.
@@ -158,7 +158,7 @@ function SPITFORM($formfields, $errors)
     # Name:
     #
     echo "<tr>
-              <td class='pad4'>*Name:
+              <td class='pad4'>Name:
               <br><font size='-1'>(No blanks)</font></td>
               <td class='pad4' class=left>
                   <input type=text
@@ -173,7 +173,7 @@ function SPITFORM($formfields, $errors)
     # Description
     #
     echo "<tr>
-              <td class='pad4'>*Description:<br>
+              <td class='pad4'>Description:<br>
                   <font size='-1'>(A concise sentence)</font></td>
               <td class='pad4' class=left>
                   <input type=text
@@ -188,7 +188,7 @@ function SPITFORM($formfields, $errors)
     #
     if (isset($nsdata)) {
         echo "<tr>
-                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsdata value=$nsdata>
                   <td class='pad4'><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
                       View NS File</a></td>
@@ -196,7 +196,7 @@ function SPITFORM($formfields, $errors)
     } elseif (isset($nsref)) {
 	if (isset($guid)) {
         echo "<tr>
-                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                       <input type=hidden name=guid value=$guid>
                   <td class='pad4'><a target=_blank href=\"spitnsdata.php3?nsref=$nsref&guid=$guid\">
@@ -204,7 +204,7 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
         } else {
         echo "<tr>
-                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                   <td class='pad4'><a target=_blank href=spitnsdata.php3?nsref=$nsref>
                       View NS File</a></td>
@@ -214,7 +214,23 @@ function SPITFORM($formfields, $errors)
     else {
 
 	echo "<tr>
-                  <td class='pad4'>*Your NS file: &nbsp</td>
+                  <td class='pad4'>Your NS file:<br>
+<script language='JavaScript'>
+<!--
+function SyntaxCheck() {
+  window.open('','nscheck','width=600,height=400,toolbar=no,resizeable=yes,scrollbars=yes,status=yes,menubar=yes');
+  document.form1.target='nscheck';
+  document.form1.submit();
+}
+function NormalSubmit() {
+  document.form1.target='_self';
+  document.form1.submit();
+}
+//-->
+</script>
+		  <input type=submit disabled id=syntax name='syntax' value='Syntax Check'
+		   onclick='SyntaxCheck()'>
+		  </td>
 
                   <td><table cellspacing=0 cellpadding=0 border=0>
                     <tr>
@@ -225,7 +241,8 @@ function SPITFORM($formfields, $errors)
 	                <input type=file
                                name=exp_nsfile
                                value=\"" . $exp_nsfile . "\"
-	                       size=30>
+	                       size=30
+			       onchange=\"this.form.syntax.disabled=(this.value=='')\">
                       </td>
                     </tr><tr>
                     <td>&nbsp;&nbsp;<b>or</b></td><td></td>
@@ -236,7 +253,8 @@ function SPITFORM($formfields, $errors)
 	                <input type=text
                                name=\"formfields[exp_localnsfile]\"
                                value=\"" . $formfields[exp_localnsfile] . "\"
-	                       size=40>
+	                       size=40
+			       onchange=\"this.form.syntax.disabled=(this.value=='')\">
                       </td>
                     </tr></table></td></tr>\n";
     }
@@ -248,11 +266,9 @@ function SPITFORM($formfields, $errors)
     # Add in hidden fields to send swappable and noswap_reason, since
     # they don't show on the form
     echo "<tr>
-	      <td class='pad4'>*Swapping:<br>
-              <font size='-1'>
-	      (See <a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
-              Swapping</a>)
-              </font></td>
+	      <td class='pad4'>
+		<a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
+		Swapping:</td>
 	      <td>
 	      <input type=hidden name='formfields[exp_swappable]' value='$formfields[exp_swappable]'>
 	      <input type=hidden name='formfields[exp_noswap_reason]' value='";
@@ -336,7 +352,8 @@ function SPITFORM($formfields, $errors)
 
     echo "<tr>
               <td class='pad4' align=center colspan=2>
-                 <b><input type=submit value=Submit name=submit></b></td>
+                 <b><input type=submit value=Submit name=submit
+			onclick='NormalSubmit()'></b></td>
          </tr>
         </form>
         </table>\n";
@@ -388,7 +405,7 @@ if (! count($projlist)) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($submit)) {
+if (! isset($submit) && ! isset($syntax)) {
     $defaults = array();
 
     #
@@ -525,8 +542,11 @@ if (isset($formfields[exp_batched]) &&
     !strcmp($formfields[exp_batched], "Yep") &&
     isset($formfields[exp_preload]) &&
     !strcmp($formfields[exp_preload], "Yep")) {
-    $errors["Preload"] = "Cannot use with Batch Mode";
+    $errors["Do Not Swap In"] = "Cannot use with Batch Mode";
 }
+
+# None of the above errors count during a syntax check
+if (isset($syntax)) { $errors = array(); }
 
 #
 # If any errors, respit the form with the current values and the
@@ -551,7 +571,7 @@ if (isset($formfields[exp_localnsfile])) {
 #
 # Continue with error checks.
 #
-if (TBValidExperiment($exp_pid, $exp_id)) {
+if (TBValidExperiment($exp_pid, $exp_id) && !isset($syntax)) {
     RESPIT("Experiment Name", "Already in use");
 }
 
@@ -562,14 +582,15 @@ if (!isset($exp_gid) ||
     strcmp($exp_gid, "") == 0) {
     $exp_gid = $exp_pid;
 }
-if (!TBValidGroup($exp_pid, $exp_gid)) {
+if (!TBValidGroup($exp_pid, $exp_gid) && !isset($syntax)) {
     RESPIT("Group", "Group '$exp_gid' is not in project '$exp_pid'!");
 }
 
 #
 # Verify permissions.
 #
-if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
+if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)
+    && !isset($syntax)) {
     RESPIT("Project/Group", "Not enough permission to create experiment");
 }
 
@@ -589,13 +610,25 @@ if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
 }
 
 if ($speclocal && $specupload) {
-    RESPIT("NS File", "Specified both a local and remote file");
+    if (isset($syntax)) {
+	echo "<h3 style='color: #f00'>Error: \n".
+	    "Specified both a local and remote file!</h3>\n";
+	die("");
+    } else {
+	RESPIT("NS File", "Specified both a local and remote file");
+    }
 }
 if (!$specupload && strcmp($exp_nsfile_name, "")) {
     #
     # Catch an invalid filename.
     #
-    RESPIT("NS File", "Local filename does not appear to be valid");
+    if (isset($syntax)) {
+	echo "<h3 style='color: #f00'>Error: \n".
+	    "Local filename does not appear to be valid!</h3>\n";
+	die("");
+    } else {
+	RESPIT("NS File", "Local filename does not appear to be valid");
+    }
 }
 
 if ($speclocal) {
@@ -611,9 +644,16 @@ if ($speclocal) {
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
         ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
         ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
-	RESPIT("NS File",
-	       "Server resident file must be in either ".
-	       "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/");
+	if (isset($syntax)) {
+	    echo "<h3 style='color: #f00'>Error: \n".
+		"Server resident file must be in either ".
+		"$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/!</h3>\n";
+	    die("");
+	} else {
+	    RESPIT("NS File",
+		   "Server resident file must be in either ".
+		   "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/");
+	}
     }
 
     $nsfile = $exp_localnsfile;
@@ -663,10 +703,63 @@ else {
     # I am going to allow shell experiments to be created (No NS file),
     # but only by admin types.
     #
-    if (! ISADMIN($uid)) {
-	RESPIT("NS File", "You must provide an NS file");
+    if (isset($syntax)) {
+	echo "<h3 style='color: #f00'>Error: \n".
+	    "You must provide an NS file!</h3>\n";
+	die("");
+    } else {	
+	if (! ISADMIN($uid)) {
+	    RESPIT("NS File", "You must provide an NS file");
+	}
     }
     $nonsfile = 1;
+}
+
+#
+# Syntax Check:
+# If this is a syntax check, do the magic now.
+# Magic below courtesy of nscheck.php3
+#
+
+if (isset($syntax)) {
+    #
+    # Run the script. We use a script wrapper to deal with changing
+    # to the proper directory and to keep most of these details out
+    # of this.
+    #
+    $output = array();
+    $retval = 0;
+
+    $result =
+	exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webnscheck $nsfile", $output,
+	     $retval);
+
+    echo "<div align=right>\n";
+    echo "<a href='' onclick='window.close()'>Close Window</a>\n</div>\n";
+    echo "<center>\n";
+    echo "<h2>Syntax Check Results</h2>\n";
+    echo "</center>\n";
+
+    if ($retval) {
+	echo "<br><br><h2>
+          Parse Failure($retval): Output as follows:
+          </h2>
+          <br>
+          <XMP>\n";
+	for ($i = 0; $i < count($output); $i++) {
+	    echo "$output[$i]\n";
+	}
+	echo "</XMP>\n";
+    
+	die("");
+    }
+
+    echo "<center><br>";
+    echo "<br>";
+    echo "<h3>Your NS file looks good!</h3>";
+    echo "</center>\n";
+    
+    exit();
 }
 
 #
