@@ -1,0 +1,7 @@
+# This ir file adds a system vlan - connects every interface to every
+# other one
+start vlan
+switch gamma
+test1:0 test1:1 test1:2 test1:3 test2:0 test2:1 test2:2 test2:3 test3:0 test3:1 test3:2 test3:3 test4:0 test4:1 test4:2 test4:3 test5:0 test5:1 test5:2 test5:3 test6:0 test6:1 test6:2 test6:3 test7:0 test7:1 test7:2 test7:3 test8:0 test8:1 test8:2 test8:3 test9:0 test9:1 test9:2 test9:3 test10:0 test10:1 test10:2 test10:3
+end
+end vlan
