@@ -21,3 +21,9 @@ if [ -x /usr/site/etc/capture.rc -a -d /var/log/tiplogs ]; then
 	echo -n " capture"
 	/usr/site/etc/capture.rc
 fi
+
+if [ -x /usr/testbed/sbin/reload_daemon  ]; then
+        echo -n " reloadd"
+        /usr/testbed/sbin/reload_daemon
+fi
+
