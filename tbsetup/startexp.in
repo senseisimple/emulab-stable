@@ -60,6 +60,13 @@ my $debug    = 1;
 $| = 1;
 
 #
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
 # Untaint the path
 # 
 $ENV{'PATH'} = '/bin:/usr/bin';
