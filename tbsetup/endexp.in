@@ -196,7 +196,7 @@ if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
     #
     # Cleanup Experiment state.
     # 
-    ExptCleanup();
+    TBExptDestroy($pid, $eid);
     
     exit(1);
 }
@@ -307,16 +307,16 @@ TBExptClearLogFile($pid, $eid);
 #
 # Cleanup DB state and remove directory.
 # 
-ExptCleanup();
-
-print "Termination Success\n";
+TBExptDestroy($pid, $eid);
 
 #
-# In batch mode, just exit without sending email.
+# In batch mode, exit now.
 #
 if ($batch) {
     exit(0);
 }
+
+print "Termination Success\n";
 
 #
 # Send email notification to user.
@@ -330,7 +330,7 @@ SENDMAIL("$user_name <$user_email>",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Bcc: $TBLOGS");
+	 "Bcc: $TBLOGS", ($logname));
 
 exit 0;
 
@@ -376,37 +376,3 @@ sub fatal($)
 
     exit(-1);
 }
-
-sub ExptCleanup()
-{
-    #
-    # Try to remove experiment directory. We allow for it not being there
-    # cause we often run the tb programs directly. We also allow for not
-    # having permission, in the case that an admin type is running this,
-    # in which case it won't be allowed cause of directory permissions. Thats
-    # okay since admin types should rarely end experiments in other projects.
-    #
-    print STDOUT "Removing experiment directories ... \n";
-    if (system("/bin/rm -rf $userdir")) {
-	print "*** WARNING: Not able to remove $userdir\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-    if (system("/bin/rm -rf $workdir")) {
-	print "*** WARNING: Not able to remove $workdir\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-
-    #
-    # Remove all trace from the DB.
-    # 
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-}
-
-

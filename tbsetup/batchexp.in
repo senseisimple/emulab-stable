@@ -208,12 +208,6 @@ if ($immediate) {
     my $farg = ($frontend ? "-f" : "");
     
     if (system("$startexp $farg -g $gid $pid $eid $nsfile")) {
-	#
-	# Save a copy of the failed experiment directory for debugging. 
-	#
-	system("/bin/rm", "-rf", "${workdir}-TBfailed");
-	system("/bin/mv", "-f", "${workdir}", "${workdir}-TBfailed");
-	
 	fatal("Failed to start experiment $pid/$eid!");
     }
     exit(0);
@@ -233,22 +227,10 @@ sub fatal($)
     print STDOUT "    $mesg\n";
 
     #
-    # It is safe to do this because fatal is called *after* the experiment
-    # record has been sucessfully inserted. We own it! Before that, use
-    # the die function. 
-    #
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    if (defined($workdir)) {
-	system("/bin/rm", "-rf", "$workdir");
-    }
+    # Clear the record and cleanup.
+    # 
+    TBExptDestroy($pid, $eid);    
+    
     exit(-1);
 }
 

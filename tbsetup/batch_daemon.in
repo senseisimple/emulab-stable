@@ -50,7 +50,6 @@ my $avail    = "$TB/sbin/avail";
 my $batchlog = "$TB/log/batchlog";
 my $projroot = "/proj";
 my $debug    = 0;
-my $dirname;
 
 my $BSTATE_POSTED	= BATCHSTATE_POSTED;
 my $BSTATE_ACTIVATING	= BATCHSTATE_ACTIVATING;
@@ -66,6 +65,8 @@ my $pid;
 my $gid;
 my $logname;
 my $nsfile;
+my $userdir;
+my $workdir;
 my $user_name  = "Testbed Operations";
 my $user_email = "$TBOPS";
 
@@ -236,7 +237,8 @@ sub dosomething($$)
     $eid     = $exphash{'eid'};
     $pid     = $exphash{'pid'};
     $gid     = $exphash{'gid'};
-    $dirname = $exphash{'path'};
+    $userdir = $exphash{'path'};
+    $workdir = TBExptWorkDir($pid, $eid);
     $nsfile  = "$eid.ns";
     
     # Locals
@@ -266,20 +268,12 @@ sub dosomething($$)
 	print "Child PID $childpid exited with exit status $status\n";
 
         #
-        # Move the temporary log file into the experiment directory and
-	# change the name in the DB. This makes it available to the web
-	# interface later on if desired.
-	#
+        # Close the log file.
 	# The exp dir might be gone if the batch was killed/canceled.
         #
-	if (-e $dirname) {
-	    my $fname = "$dirname/tbdata/${dowhat}-batch.log";
-	    
-	    system("cp -pf $logname $fname");
+	if (-e $userdir) {
 	    TBExptCloseLogFile($pid, $eid);
-	    TBExptSetLogFile($pid, $eid, $fname);
 	}
-	unlink($logname);
 	return $status;
     }
     openlog($logname);
@@ -293,8 +287,8 @@ sub dosomething($$)
 	fatal("DB Error getting user information for uid $creator");
     }
     
-    chdir("$dirname/tbdata") or
-	fatal("Could not cd into $dirname/tbdata!");
+    chdir("$workdir") or
+	fatal("Could not cd into $workdir!");
 
     #
     # Figure out the unix uid/gid that the experiment configuration is
@@ -341,7 +335,7 @@ sub startexp($)
     #
     # Try to start the experiment. 
     #
-    system("$startexp -b $logname -g $gid $pid $eid $nsfile");
+    system("$startexp -b -g $gid $pid $eid $nsfile");
     $exit_status = $? >> 8;
     $running     = 1;
     if ($exit_status) {
@@ -393,7 +387,7 @@ sub startexp($)
 	if ($exit_status == 1 || $exit_status == -1) {
 	    email_status("Experiment startup has failed with a fatal error!\n".
 			 "Batch has been removed from the system.");
-	    ExptCleanup();
+	    TBExptDestroy($pid, $eid);
 	    exit($exit_status);
 	}
 	
@@ -457,16 +451,12 @@ sub endexp($)
     TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
     
     system("$endexp -b $pid $eid");
-    my $exit_status = $? >> 8;
-
-    if ($exit_status) {
+    if ($?) {
 	#
 	# TB admin is going to have to clean up. 
 	# 
 	fatal("Terminating Batch Mode experiment $pid/$eid");
     }
-
-    ExptCleanup();
     email_status("Batch Mode experiment $pid/$eid has finished!");
    
     #
@@ -487,9 +477,16 @@ sub cancelexp($$)
     
     if ($running) {
 	system("$endexp -b $pid $eid");
+	if ($?) {
+	    #
+	    # TB admin is going to have to clean up. 
+	    # 
+	    fatal("Terminating Batch Mode experiment $pid/$eid");
+	}
     }
-
-    ExptCleanup();
+    else {
+	TBExptDestroy($pid, $eid);
+    }
     donotify("Your Batch Mode experiment has been canceled!", "Canceled", 0);
    
     #
@@ -541,29 +538,6 @@ sub isexpdone($)
 	}
     }
     return 1;
-}
-
-#
-# Remove all trace.
-# 
-sub ExptCleanup()
-{
-    if (system("rm -rf $dirname")) {
-	print "*** WARNING: Not able to remove experiment directory.\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-
-    #
-    # Remove all trace from the DB.
-    # 
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
 }
 
 #

@@ -18,17 +18,13 @@ use Getopt::Std;
 # it into the background and send email, but just want an exit status 
 # returned to the batch system.
 #
-# XXX - The -b option takes a logfile name. This is so this script can
-#       save off the file in the expinfo directory. The caller (batch daemon) 
-#       opens the file and just passes the name in. I do not like this!
-#
 sub usage()
 {
     print STDOUT
-	"Usage: startexp [-b logfile | -f] [-g gid] <pid> <eid> <nsfile>\n";
+	"Usage: startexp [-b | -f] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
-my  $optlist = "b:g:f";
+my  $optlist = "bg:f";
 
 #
 # Configure variables
@@ -94,14 +90,6 @@ my $eid   = $ARGV[1];
 my $nsfile= $ARGV[2];
 if (defined($options{"b"})) {
     $batch   = 1;
-    $logname = $options{"b"};
-    
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    }
-    else {
-	die("Bad data in logfile name: $logname");
-    }
 }
 if (defined($options{"f"})) {
     $frontend = 1;
@@ -144,10 +132,6 @@ if ($nsfile =~ /^([-\w.\/]+)$/) {
 }
 else {
     die("Tainted nsfile name: $nsfile");
-}
-
-if (!defined($logname)) {
-    $logname = TBExptCreateLogFile($pid, $eid, "startexp");
 }
 
 my $workdir = TBExptWorkDir($pid, $eid);
@@ -224,6 +208,7 @@ TBLockExp($pid, $eid);
 # is actually torn down.
 #
 if (! $batch) {
+    $logname = TBExptCreateLogFile($pid, $eid, "startexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
     
@@ -385,6 +370,7 @@ sub fatal()
     #
     # In batch mode, exit. Must unlock the experiment since the record
     # is kept by the batch system until it is finished or canceled.
+    # The batch daemon might terminate the experiment based on the error.
     #
     if ($batch) {
 	TBUnLockExp($pid, $eid);
@@ -405,19 +391,6 @@ sub fatal()
 	     ($logname, "assign.log", "wanassign.log", $nsfile));
 
     #
-    # We have to cleanup the DB since we are disconnected from the
-    # wrapper script.
-    #
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    #
     # Copy off the workdir to the user directory, Then back up both of
     # them for post-mortem debugging.
     #
@@ -426,6 +399,11 @@ sub fatal()
     system("/bin/mv -f   $workdir ${workdir}-failed");
     system("/bin/rm -rf  ${userdir}-failed");
     system("/bin/mv -f   $userdir ${userdir}-failed");
+
+    #
+    # Clear the record and cleanup.
+    # 
+    TBExptDestroy($pid, $eid);    
     
     exit($errorstat);
 }
