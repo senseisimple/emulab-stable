@@ -290,7 +290,7 @@ function SHOWNODES($pid, $eid) {
 	        "FROM nodes LEFT JOIN reserved ".
 	        "ON nodes.node_id=reserved.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
-	        "ORDER BY type");
+	        "ORDER BY type,priority");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];

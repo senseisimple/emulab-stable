@@ -25,7 +25,7 @@ if (! $isadmin) {
 # 
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM nodes WHERE type='pc' OR type='shark' ".
-	"ORDER BY type");
+	"ORDER BY type,priority");
 
 if (! $query_result) {
     TBERROR("Database Error retrieving node information", 1);
