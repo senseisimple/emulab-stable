@@ -99,13 +99,18 @@ class LocationInfoUpdater(EventClient):
                     try:
                         key, value = arg.split('=')
                         if key == "X" or key == "x":
-                            update["loc_x"] = str(
-                                float(value) * pixels_per_meter)
+                            update["loc_x"] = float(value) * pixels_per_meter
+			    if update["loc_x"] < 0.0:
+				update["loc_x"] = 0.0
+				pass
+			    update["loc_x"] = str(update["loc_x"])
                             pass
                         elif key == "Y" or key == "y":
-                            # XXX 520 is hardcoded
-                            update["loc_y"] = str(
-                                520 - float(value) * pixels_per_meter)
+                            update["loc_y"] = float(value) * pixels_per_meter
+			    if update["loc_y"] < 0.0:
+				update["loc_y"] = 0.0
+				pass
+			    update["loc_y"] = str(update["loc_y"])
                             pass
                         else:
                             sys.stderr.write("warning: unknown key: %s\n" %
