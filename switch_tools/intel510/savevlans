@@ -1,0 +1,22 @@
+#!/usr/local/bin/perl -w
+#
+# savevlans - Saves vlans from the switches into a .ir file, suitable for 
+# restoring with 'snmpit -f <file>'.
+#
+
+open(LIST,"snmpit -l |");
+
+print "START vlan\n";
+while(<LIST>) {
+  chop;
+  if (/(^ID)|(^--)/) { next; }
+  s/[\t ]+/ /g;
+  /(\d+)\s+(\S+)\s+(.*)/;
+  if ($2 ne "System") { 
+    (my $name, my @IDs) = ($2,split(" ",$3));
+    print "$name @IDs\n";
+  }
+
+}
+print "END vlan\n";
+
