@@ -239,7 +239,7 @@ foreach my $n (@freed_nodes) {
     # Clean up interfaces by clearing IPs and/or aliases.
     if (! ($n =~ /sh\d+/)) {
         # Its not a shark, so clean out all IPs except the control net.
-	DBQueryWarn("update interfaces set IP='',IPaliases=NULL " .
+	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL " .
 		    "where node_id='$n' and ".
 		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	    || $error++;
