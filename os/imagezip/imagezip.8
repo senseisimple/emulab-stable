@@ -201,7 +201,9 @@ that
 is a BSD slice.  Should be used only when the device does not contain
 a DOS partition table and really does contains a BSD filesystem.
 Incompatible with
-.Fl l .
+.Fl l
+and
+.Fl n .
 .It Fl c Ar count
 Explicitly tell
 .Nm
@@ -239,7 +241,20 @@ that
 is a Linux filesystem slice.  Should be used only when the device does
 not contain a DOS partition table and really does contains a Linux filesystem.
 Incompatible with
-.Fl b .
+.Fl b 
+and
+.Fl n .
+.It Fl n
+Tells
+.Nm
+that
+.Ar device
+is an NTFS slice.  Should be used only when the device does not contain
+a DOS partition table and really does contains an NT filesystem.
+Incompatible with
+.Fl b
+and
+.Fl l .
 .It Fl X
 Try e(X)tremely hard to read data from the input device,
 returning success even if a read fails.

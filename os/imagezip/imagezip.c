@@ -322,10 +322,11 @@ main(argc, argv)
 	char	*outfilename = 0;
 	int	linuxfs	  = 0;
 	int	bsdfs     = 0;
+	int	ntfs	  = 0;
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:DR:X")) != -1)
+	while ((ch = getopt(argc, argv, "vlbndihrs:c:z:oI:1F:DR:X")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -344,6 +345,9 @@ main(argc, argv)
 			break;
 		case 'b':
 			bsdfs++;
+			break;
+		case 'n':
+			ntfs++;
 			break;
 		case 'o':
 			dots++;
@@ -409,8 +413,8 @@ main(argc, argv)
 			"the slice (-s) option\n\n");
 		usage();
 	}
-	if (linuxfs && bsdfs) {
-		fprintf(stderr, "Cannot specify linux and bsd together!\n\n");
+	if (linuxfs + bsdfs + ntfs > 1) {
+		fprintf(stderr, "-b, -l, and -n are mutually exclusive!\n\n");
 		usage();
 	}
 	if (!info && argc != 2) {
@@ -434,6 +438,10 @@ main(argc, argv)
 #ifndef linux
 	else if (bsdfs)
 		rval = read_bsdslice(0, 0, 0, DOSPTYP_386BSD);
+#ifdef WITH_NTFS
+	else if (ntfs)
+		rval = read_ntfsslice(0, 0, 0, infilename);
+#endif
 	else if (rawmode)
 		rval = read_raw();
 	else
@@ -1482,16 +1490,21 @@ read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
 	assert(sizeof(s32) == 4);
 	assert(sizeof(u64) == 8);
 	assert(sizeof(u32) == 4);
-	length = strlen(openname);
-	name = malloc(length+3);
-	/*Our NTFS Library code needs the /dev name of the partion to
+	/*Our NTFS Library code needs the /dev name of the partition to
 	 * examine.  The following line is FreeBSD specific code.*/
-	sprintf(name,"%ss%d",openname,slice + 1);
+	if (slice != 0) {
+		length = strlen(openname);
+		name = malloc(length+3);
+		sprintf(name,"%ss%d",openname,slice + 1);
+	} else
+		name = openname;
 	/*The volume must be mounted to find out what clusters are free*/
 	if(!(vol = ntfs_mount(name, MS_RDONLY))) {
-		fprintf(stderr,"When mounting %s\n",name);
-		perror("Failed to read superblock information.  Not a valid "
-		       "NTFS partition\n");
+		perror(name);
+		fprintf(stderr, "Failed to read superblock information.  "
+			"Not a valid NTFS partition\n");
+		if (name != openname)
+			free(name);
 		return -1;
 	}
 	/*A bitmap of free clusters is in the $DATA attribute of the
@@ -1536,8 +1549,10 @@ read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
 		exit(1);
 	}
 	/*Free NTFS malloc'd memory*/
-	assert(name && "Programming Error, name should be freed here");
-	free(name);
+	if (name != openname) {
+		assert(name && "Programming Error, name should be freed here");
+		free(name);
+	}
 	assert(buf && "Programming Error, buf should be freed here");
 	free(buf);
 	assert(cfree && "Programming Error, "
@@ -1593,8 +1608,10 @@ char *usagestr =
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
  " -d             Turn on debugging.  Multiple -d options increase output\n"
- " -l             Linux slice only.  Input must be a Linux slice image\n"
- " -b             FreeBSD slice only.  Input must be a FreeBSD slice image\n";
+ " -b             FreeBSD slice only.  Input must be a FreeBSD FFS slice\n"
+ " -l             Linux slice only.  Input must be a Linux EXT2FS slice\n"
+ " -n             NTFS slice only.  Input must be an NTFS slice\n";
+
 
 void
 usage()
