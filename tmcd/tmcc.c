@@ -66,7 +66,7 @@ main(int argc, char **argv)
 		}
 
 	argc -= optind;
-	if (argc < 2 || argc > 4) {
+	if (argc < 1 || argc > 3) {
 		usage();
 	}
 	argv += optind;
