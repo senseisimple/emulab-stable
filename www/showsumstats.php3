@@ -117,9 +117,11 @@ function showsummary ($showby, $sortby) {
         default:
 	    USERERROR("Invalid showby argument: $showby!", 1);
     }
+    $wclause = "";
     switch ($sortby) {
         case "pid":
-	    $order = "pid";
+	    $order   = "pid";
+	    $wclause = "where pid!='$TBOPSPID'";
 	    break;
         case "uid":
 	    $order = "uid";
@@ -142,8 +144,42 @@ function showsummary ($showby, $sortby) {
 		     "allexpt_pnode_duration / (24 * 3600) as pnode_days, ".
 		     "allexpt_duration / (24 * 3600) as expt_days ".
 		     "from $table where allexpt_pnodes!=0 ".
+		     "$wclause ".
 		     "order by $order");
 
+    #
+    # Gather some totals first.
+    #
+    $pnode_total  = 0;
+    $phours_total = 0;
+    $ehours_total = 0;
+    while ($row = mysql_fetch_assoc($query_result)) {
+	$pnodes  = $row["allexpt_pnodes"];
+	$phours  = $row["pnode_days"];
+	$ehours  = $row["expt_days"];
+	
+	$pnode_total  += $pnodes;
+	$phours_total += $phours;
+	$ehours_total += $ehours;
+    }
+
+    SUBPAGESTART();
+    echo "<table>
+           <tr><td colspan=2 nowrap align=center>
+               <b>Totals</b></td>
+           </tr>
+           <tr><td nowrap align=right><b>Pnodes</b></td>
+               <td align=left>$pnode_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Pnode Hours</b></td>
+               <td align=left>$phours_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Expt Hours</b></td>
+               <td align=left>$ehours_total</td>
+           </tr>
+          </table>\n";
+    SUBMENUEND_2B();
+    
     echo "<center><b>$title</b></center><br>\n";
     echo "<table align=center border=1>
           <tr>
@@ -161,6 +197,7 @@ function showsummary ($showby, $sortby) {
                     Expt Days</th>
           </tr>\n";
 
+    mysql_data_seek($query_result, 0);    
     while ($row = mysql_fetch_assoc($query_result)) {
 	$heading = $row[$which];
 	$pnodes  = $row["allexpt_pnodes"];
@@ -175,6 +212,7 @@ function showsummary ($showby, $sortby) {
               </tr>\n";
     }
     echo "</table>\n";
+    SUBPAGEEND();
 }
 
 #
@@ -395,6 +433,40 @@ function showrange ($showby, $sortby, $range) {
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
 
+    #
+    # Gather some totals first.
+    #
+    $pnode_total  = 0;
+    $phours_total = 0;
+    $ehours_total = 0;
+
+    foreach ($table as $key => $value) {
+	$pnodes  = $value["pnodes"];
+	$phours  = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
+	$ehours  = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
+
+	$pnode_total  += $pnodes;
+	$phours_total += $phours;
+	$ehours_total += $ehours;
+    }
+
+    SUBPAGESTART();
+    echo "<table>
+           <tr><td colspan=2 nowrap align=center>
+               <b>Totals</b></td>
+           </tr>
+           <tr><td nowrap align=right><b>Pnodes</b></td>
+               <td align=left>$pnode_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Pnode Hours</b></td>
+               <td align=left>$phours_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Expt Hours</b></td>
+               <td align=left>$ehours_total</td>
+           </tr>
+          </table>\n";
+    SUBMENUEND_2B();
+    
     echo "<center>
                <b>$title</b><br>
                (includes current experiments (*))
@@ -440,6 +512,7 @@ function showrange ($showby, $sortby, $range) {
               </tr>\n";
     }
     echo "</table>\n";
+    SUBPAGEEND();
 }
 
 if ($range == "epoch") {
