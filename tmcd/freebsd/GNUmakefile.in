@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,6 +39,12 @@ install:	common-install etc-install \
 mfs-install:	common-install etc-install \
 			script-install bin-install
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
+
+lbs-install:	common-install \
+			script-install bin-install jail-install
+	cp /dev/null $(BINDIR)/isrem
+	cp /dev/null $(ETCDIR)/isrem
+	@echo "Remember to install the PEM files if necessary"
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
@@ -81,6 +87,8 @@ sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(SYSETCDIR)/start_if.fxp1
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(SYSETCDIR)/start_if.fxp4
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(SYSETCDIR)/start_if.xl0
+	$(INSTALL) -m 755 $(SRCDIR)/periodic.conf $(SYSETCDIR)/periodic.conf
+	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
 
 script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
@@ -99,7 +107,6 @@ script-install:	dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(BINDIR)/gated_fxp0.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(BINDIR)/gated_fxp1.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(BINDIR)/gated_fxp4.conf
-	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RCDIR)/testbed.sh
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
@@ -129,3 +136,13 @@ jail-install:	dir-install
 remote-install:	jail-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
+
+# Invoked from ../ron
+locrem-install:
+	-rm -f $(BINDIR)/sethostname
+	-rm -f $(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
+	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
+			$(BINDIR)/control_interface
