@@ -341,7 +341,9 @@ public class Netbuild extends java.applet.Applet
     public String postIt( String s ) {
 	int hash = s.hashCode();
         Random rand = new Random();
-        String randVal = String.valueOf(rand.nextInt() % 102010201);
+        int randInt = rand.nextInt() % 102010201;
+        if (randInt < 0) { randInt = -randInt; }
+        String randVal = String.valueOf( randInt );
 
 	if (hash < 0) { hash = -hash; }
 	if (hash == 0) { hash = 1; }
