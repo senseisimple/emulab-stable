@@ -13,6 +13,14 @@
 What are your policies?</a>
 <li><a href="#active">
 What is "active use"?</a>
+<li><a href="#idleness">
+When is an experiment considered idle?</a>
+<li><a href="#swapping">
+What is "swapping"?</a>
+<li><a href="#idleswap">
+What is an "Idle-Swap"?</a>
+<li><a href="#autoswap">
+What is an "Auto-Swap"?</a>
 <li><a href="#idle">
 How long is too long for a node to be idle?</a>
 <li><a href="#state">
@@ -52,6 +60,69 @@ something related to your experiment. In almost all cases, someone
 will either be logged into it using it interactively, or some program
 will be running, sending and receiving packets, and performing the
 operations necessary to carry out the experiment.
+</p>
+
+<a name="idleness"></a>
+<h3>When is an experiment considered idle?</h3>
+
+<p>
+Your experiment will be considered idle if it has no mesurable 
+activity for a significant period of time (a few hours). 
+We detect the following types of activity:
+<ul>
+<li>Any Network activity on the experimental network
+<li>Substantial activity on the control network
+<li>TTY/console activity on nodes
+<li>High CPU activity on nodes
+<li>Certain external events, like rebooting a node with <tt>node_reboot</tt>
+</ul>
+If your experiment's activity falls outside these measurable types 
+of activity, please be sure to let us know when you create your 
+experiment, or you may be swapped out unexpectedly.
+</p>
+
+<a name="swapping"></a>
+<h3>What is "swapping"?</h3>
+
+<p>
+Swapping is the process of instantiating your experiment,
+i.e. allocating nodes, configuring links, etc. It also refers 
+to the reverse process, where nodes are released. These are
+called "swapping in" and "swapping out" respectively. See also
+the <A href="docwrapper.php3?docname=faq.html#UTT-Swapping">
+What is Swapping?</a> question on our FAQ.
+</p>
+
+<a name="idleswap"></a>
+<h3>What is an "Idle-Swap"?</h3>
+
+<p>
+An "Idle-Swap" is when Emulab or its administrators swap your 
+experiment out for you because it was idle for too long. 
+Experiments typically don't get idle-swapped until they've been 
+idle for several hours. We try to contact the experiment creator
+before swapping, unless they've already given us permission to 
+swap the experiment when idle.
+</p>
+
+<a name="autoswap"></a>
+<h3>What is an "Auto-Swap"?</h3>
+
+<p>
+An "Auto-Swap" is when Emulab or its administrators swap your
+experiment out because it was swapped in for longer than its specified
+time limit. Emulab allows users to schedule experiment swapouts, to
+aid experimenters in releasing nodes in a timely manner.  For
+instance, if you plan to use your experiment throughout an 8 hour work
+day, you can schedule a swapout for 8 hours after it is swapped
+in. That way, if you forget to swap out before leaving for the day, it
+will automatically be taken care of for you, without leaving the nodes
+reserved and idle for several hours before being idle-swapped. For
+automated experiments, it can also help by letting you schedule an
+auto-swap for just after the maximum amount of time your experiment
+should last.  You will typically receive a warning message about any
+upcoming auto-swaps about an hour before they occur, to give you a
+chance to readjust the timing for your auto-swap.
 </p>
 
 <a name="idle"></a>
@@ -130,15 +201,20 @@ experiment.</h3>
 Emulab has a system for detecting node use, to help achieve more
 efficient and fair use of Emulab's limited resources. This system
 sends email messages to experiment leaders whose experiments have been
-idle for over 24 hours. If you get a message like this, your
+idle for several hours. If you get a message like this, your
 experiment has been inactive for too long and should free up the nodes
 it has allocated. If the experiment continues to be idle, more
-reminders will be sent. On the third reminder and subsequent messages,
-your project leader will be one of the recipients. If you feel you
-receive the message in error, please respond to <a
+reminders may be sent, and soon 
+your project leader will be one of the recipients. 
+After you have been notified, your experiment may be swapped at any 
+time, depending on current demand for nodes, and other factors.
+</p>
+
+<p>
+If you feel you received the message in error, please respond to <a
 href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Operations
 (testbed-ops@flux.cs.utah.edu)</a> as soon as possible, describing how
-you have used your node in the last 24 hours. There are some types of
+you have used your node in the last few hours. There are some types of
 activity that are difficult to accurately detect, so we'd like to know
 how we can improve our activity detection system. Above all, <b>do not
 ignore these messages</b>. If you get several reminders and don't
@@ -153,7 +229,7 @@ inadvertently cause problems for you.
 <p>
 As described above, we will typically try to contact you about your
 idle experiment before we swap it out. However, if the experiment has
-been idle for many hours, we may swap it out for you unless you marked
+been idle for several hours, we may swap it out for you unless you marked
 it as "unswappable" when you created your experiment. Because of this,
 it is critical that you keep in close contact with us about an
 experiment that we may perceive as idle if you want to avoid any loss
