@@ -53,13 +53,13 @@ all: commotion pathmotion circle gorobot gorobotc
 
 
 commotion: $(OBJECTSREQ)
-	$(CC) -o commotion $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) commotion.cc $(LIBRARIES)
+	$(CC) -o commotion $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) commotion.cc $(LIBRARIES)
 
 pathmotion: $(OBJECTSREQ)
-	$(CC) -o pathmotion $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) pathmotion.cc $(LIBRARIES)
+	$(CC) -o pathmotion $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) pathmotion.cc $(LIBRARIES)
 
 circle: $(OBJECTSREQ)
-	$(CC) -o circle $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) circle.cc $(LIBRARIES)
+	$(CC) -o circle $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) circle.cc $(LIBRARIES)
 
 gorobot: $(OBJECTS)
 	$(CXX) -o gorobot $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) gorobot.cc $(LIBRARIES)
@@ -68,7 +68,7 @@ mtp_send: mtp.o
 	$(CC) -o mtp_send $(CXXFLAGS) $(LDFLAGS) ../mtp/mtp_send.c $<
 
 gorobotc: $(OBJECTSREQ)
-	$(CC) -o gorobotc $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
+	$(CC) -o gorobotc $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
 
 # %.o : %.c
 # 	$(CC) $(CFLAGS) -c -o $@ $< $(INCLUDES)
@@ -77,16 +77,16 @@ gorobotc: $(OBJECTSREQ)
 # 	$(CC) $(CFLAGS) -c -o $@ $< $(INCLUDES)
 
 grobot:
-	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/grobot.cc
+	$(CC) -c $(CXXFLAGS) dgrobot/grobot.cc
 
 gcallbacks:
-	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/gcallbacks.cc
+	$(CC) -c $(CXXFLAGS) dgrobot/gcallbacks.cc
 
 gbehaviors:
-	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/gbehaviors.cc
+	$(CC) -c $(CXXFLAGS) dgrobot/gbehaviors.cc
 
 simplepath:
-	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/simplepath.cc
+	$(CC) -c $(CXXFLAGS) dgrobot/simplepath.cc
 
 ROBOTS = \
 	garcia1.emulab.net \
