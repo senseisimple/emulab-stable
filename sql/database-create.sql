@@ -538,6 +538,7 @@ CREATE TABLE os_info (
   osfeatures set('ping','ssh','ipod') default NULL,
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
+  mustclean tinyint(4) NOT NULL default '1',
   PRIMARY KEY  (osname,pid)
 ) TYPE=MyISAM;
 
