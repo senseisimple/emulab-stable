@@ -55,6 +55,10 @@ Node instproc init {s} {
     # If hosting a virtual node (or nodes).
     $self set virthost 0
 
+    # Sorta ditto for subnode stuff.
+    $self set issubnode   0
+    $self set subnodehost 0
+
     # If osid remains blank when updatedb is called it is changed
     # to the default OS based on it's type (taken from node_types
     # table).
@@ -124,6 +128,7 @@ Node instproc updatedb {DB} {
     $self instvar realtime
     $self instvar isvirt
     $self instvar virthost
+    $self instvar issubnode
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
@@ -149,6 +154,14 @@ Node instproc updatedb {DB} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
 	    return
 	}
+    }
+
+    #
+    # If a subnode, then it must be fixed to a pnode, or we have to
+    # create one on the fly and set the type properly. 
+    # 
+    if {$issubnode && $fixed == ""} {
+	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" $self ]
     }
 
     # We need to generate the IP column from our iplist.
@@ -268,26 +281,33 @@ Node instproc add-route {dst nexthop} {
 #
 # Set the type/isremote/isvirt for a node. Called from tb_compat.
 #
-Node instproc set_hwtype {hwtype isrem isv} {
+Node instproc set_hwtype {hwtype isrem isv issub} {
     $self instvar type
     $self instvar isremote
     $self instvar isvirt
+    $self instvar issubnode
 
     set type $hwtype
     set isremote $isrem
     set isvirt $isv
+    set issubnode $issub
 }
 
 #
-# Fix a node. Watch for fixing a node to another node, in which case
-# we are putting virtual (jailed) nodes on a real node. 
+# Fix a node. Watch for fixing a node to another node.
 #
 Node instproc set_fixed {pnode} {
     $self instvar fixed
+    $self instvar issubnode
 
     if { [Node info instances $pnode] != {} } {
         # $pnode is an object instance of class Node
-	$pnode set virthost 1
+	if {$issubnode} {
+	    $pnode set subnodehost 1
+	} else {
+	    perror "\[set-fixed] Improper fix-node $self to $pnode!"
+	    return
+	}
     }    
     set fixed $pnode
 }

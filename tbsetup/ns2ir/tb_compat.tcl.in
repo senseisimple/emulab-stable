@@ -52,11 +52,13 @@ namespace eval TBCOMPAT {
     variable hwtypes
     variable isremote
     variable isvirt
+    variable issubnode
 
     # NSE hack: sim type is not in DB. Just adding it now
     set hwtypes(sim) 1
     set isremote(sim) 0
     set isvirt(sim) 0
+    set issubnode(sim) 0
 
     # The permissions table. Entries in this table indicate who is allowed
     # to use nodes of a particular type. No entries means anyone can use it.
@@ -127,6 +129,7 @@ proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
     var_import ::TBCOMPAT::isremote
     var_import ::TBCOMPAT::isvirt
+    var_import ::TBCOMPAT::issubnode
     var_import ::GLOBALS::vtypes
     if {(! [info exists hwtypes($type)]) &&
 	(! [info exists vtypes($type)])} {
@@ -159,7 +162,11 @@ proc tb-set-hardware {node type args} {
     if {[info exists isvirt($type)]} {
 	set isv $isvirt($type)
     }
-    $node set_hwtype $type $remote $isv
+    set issub 0
+    if {[info exists isvirt($type)]} {
+	set issub $issubnode($type)
+    }
+    $node set_hwtype $type $remote $isv $issub
 }
 
 proc tb-set-node-os {node os} {

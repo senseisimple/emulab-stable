@@ -349,13 +349,15 @@ sub GenDefsFile($)
     
     print TCL "# Node Types\n";
     $query_result =
-	DBQueryFatal("select type,isremotenode,isvirtnode,osname ".
+	DBQueryFatal("select type,isremotenode,isvirtnode,osname,issubnode ".
 		     " from node_types as nt ".
 		     "left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$isrem,$isvirt,$osid) = $query_result->fetchrow_array()) {
+    while (my ($type,$isrem,$isvirt,$osid,$issubnode) =
+	   $query_result->fetchrow_array()) {
 	print TCL "set hwtypes($type) 1\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
+	print TCL "set issubnode($type) $issubnode\n";
 	print TCL "set default_osids($type) \"$osid\"\n"
 	    if (defined($osid) && $osid ne "");
     }
