@@ -15,7 +15,7 @@ SUBDIR		= tbsetup/nseparse
 include $(OBJDIR)/Makeconf
 
 LIB_STUFF    =  nse.node.tcl nse.sim.tcl nse.null.tcl \
-		  nse.agent.tcl nse.parse.tcl
+		  nse.agent.tcl nse.parse.tcl tb_compat.tcl
 BOSSLIBEXEC  = parse-nse
 USERLIBEXEC  = nse.parse.proxy
 

@@ -274,6 +274,7 @@ proc punsup {msg} {
 source ${GLOBALS::libnsedir}/nse.sim.tcl
 source ${GLOBALS::libnsedir}/nse.node.tcl
 source ${GLOBALS::libnsedir}/nse.agent.tcl
+source ${GLOBALS::libnsedir}/tb_compat.tcl
 
 ##################################################
 # Redifing Assignment
@@ -404,6 +405,9 @@ namespace eval GLOBALS {
     real_set sim [lindex [Simulator info instances] 0]
     foreach pnode [array names p2vmapsim] {
 	real_set nseconfig($pnode) {}
+	if { [$sim info vars rtslop] != {} } {
+		append nseconfig($pnode) "Scheduler/RealTime set maxslop_ [$sim set rtslop]\n\n"
+	}
 	append nseconfig($pnode) "set [$sim set objname] [$sim set createcmd]\n"
 	# Since we will be adding IP address based routes, any ns default
 	# routing causes problems
@@ -411,6 +415,9 @@ namespace eval GLOBALS {
 	append nseconfig($pnode) \
 		    "\$[$sim set objname] set tbname \{$v2vmap([$sim set objname])\}\n"
 	append nseconfig($pnode) "[$sim set nseconfig]\n\n"
+	
+	# XXX temporary hack
+	append nseconfig($pnode) "Agent/TCP set QOption_ 1\n\n"
     }
     
     real_set ignore_class_vars(id_counter) {}
@@ -614,6 +621,12 @@ namespace eval GLOBALS {
 		    # We don't want duplicate entries in the virt_agents
 		    # table
 		    real_set virt_agents_list($vname) {}
+
+		    real_set agt [$vname set agent]
+		    if { ! [info exists virt_agents_list($agt)] } {
+		    	$sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $pnode [$agt set objname] $otype]
+			real_set virt_agents_list($agt) {}
+		    }
 		}
 		$sim spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list $time $pnode [$vname set objname] $otype $etype $args $atstring]
 	    }
@@ -622,6 +635,11 @@ namespace eval GLOBALS {
 	}
 	array donesearch event_list $searchid
     }
+    real_set otype $objtypes(NSE)
+    foreach pnode [array names p2vmapsim] {
+	$sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $pnode $pnode $otype]
+    }
+
     $sim spitxml_finish
 }
     
