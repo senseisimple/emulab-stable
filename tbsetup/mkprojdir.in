@@ -14,17 +14,28 @@ use English;
 #
 # Configure variables
 #
-my $TB     = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
-
-# un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+my $TB       = "@prefix@";
 
 my $PROJROOT = "/proj";
 my $TFTPROOT = "/tftpboot";
-my $dbh      = Mysql->connect("localhost",$DBNAME,"script","none");
-my $db_result= "";
+my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms");
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+push(@INC, "$TB/lib");
+require libdb;
 
 #
 # Check args.
@@ -45,18 +56,11 @@ else {
 }
 
 #
-# Figure out who called us. Only root, tbroot, or people with admin status
+# Figure out who called us. Only root or people with admin status
 # in the DB can run this script.
 #
-if ($UID != 0) {
-    my ($me) = getpwuid($UID)
-	or die "$UID not in passwd file";
-    
-    $db_result = $dbh->query("select admin from users where uid='$me'");
-    my @row = $db_result->fetchrow_array();
-    if ($row[0] != 1) {
-	die("mkprojdir: You must be root or a TB administrator\n");
-    }
+if ($UID && !TBAdmin($UID)) {
+    die("mkprojdir: You must be root or a TB administrator\n");
 }
 
 #
@@ -65,8 +69,9 @@ if ($UID != 0) {
 # * The project gid.
 # * The project leader uid.
 #
-$db_result = $dbh->query("select unix_gid,head_uid ".
-			 "from projects where pid='$pid'");
+$db_result =
+    DBQueryFatal("select unix_gid,head_uid from projects where pid='$pid'");
+
 if ($db_result->numrows < 1) {	
     die("There is no project '$pid'.\n");
 }
@@ -96,36 +101,19 @@ if (! chown($uid, $gid, "$PROJROOT/$pid")) {
 }
 
 #
-# Make a few subdirs. If this gets long, make it a loop.
-# 
-if (! mkdir("$PROJROOT/$pid/exp", 0770)) {
-    die("Could not make directory $PROJROOT/$pid/exp: $!\n");
-}
-if (! chmod(0770, "$PROJROOT/$pid/exp")) {
-    die("Could not chmod directory $PROJROOT/$pid/exp: $!\n");
-}
-if (! chown($uid, $gid, "$PROJROOT/$pid/exp")) {
-    die("Could not chown $PROJROOT/$pid/exp to $uid/$gid: $!\n");
-}
+# Make project subdirs.
+#
+foreach my $dir (@DIRLIST) {
 
-if (! mkdir("$PROJROOT/$pid/images", 0770)) {
-    die("Could not make directory $PROJROOT/$pid/images: $!\n");
-}
-if (! chmod(0770, "$PROJROOT/$pid/images")) {
-    die("Could not chmod directory $PROJROOT/$pid/images: $!\n");
-}
-if (! chown($uid, $gid, "$PROJROOT/$pid/images")) {
-    die("Could not chown $PROJROOT/$pid/images to $uid/$gid: $!\n");
-}
-
-if (! mkdir("$PROJROOT/$pid/logs", 0770)) {
-    die("Could not make directory $PROJROOT/$pid/logs: $!\n");
-}
-if (! chmod(0770, "$PROJROOT/$pid/logs")) {
-    die("Could not chmod directory $PROJROOT/$pid/logs: $!\n");
-}
-if (! chown($uid, $gid, "$PROJROOT/$pid/logs")) {
-    die("Could not chown $PROJROOT/$pid/logs to $uid/$gid: $!\n");
+    if (! mkdir("$PROJROOT/$pid/$dir", 0770)) {
+	die("Could not make directory $PROJROOT/$pid/$dir: $!\n");
+    }
+    if (! chmod(0770, "$PROJROOT/$pid/$dir")) {
+	die("Could not chmod directory $PROJROOT/$pid/$dir: $!\n");
+    }
+    if (! chown($uid, $gid, "$PROJROOT/$pid/$dir")) {
+	die("Could not chown $PROJROOT/$pid/$dir to $uid/$gid: $!\n");
+    }
 }
 
 #

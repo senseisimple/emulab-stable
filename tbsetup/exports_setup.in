@@ -7,6 +7,8 @@ use Fcntl ':flock';
 # members. Fire that tail over to the fileserver where it is concatenated with
 # the head file to become the new /etc/exports
 #
+# This script always does the right thing, so it does not matter who calls it. 
+#
 # usage: exports_setup
 #
 
@@ -14,7 +16,6 @@ use Fcntl ':flock';
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
@@ -34,32 +35,25 @@ if ($EUID != 0) {
     die("Must be root! Maybe its a development version?");
 }
 # XXX Hacky!
-if ($TB ne "/usr/testbed") {
-    die("Wrong version. Maybe its a development version?");
-}
+#if ($TB ne "/usr/testbed") {
+#    die("Wrong version. Maybe its a development version?");
+#}
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-$| = 1; #Turn off line buffering on output
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 #
-# Testbed Support library
+# Testbed Support libraries
 # 
 push(@INC, "$TB/lib");
 require libtestbed;
-
-#
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
-# This script always does the right thing, so it does not matter who
-# calls it. 
-#
+require libdb;
 
 #
 # We need to serialize this script to avoid a trashed map file. Use
@@ -93,13 +87,14 @@ print MAP "\n";
 # card.
 #
 $db_result =
-    DBquery("select reserved.node_id,reserved.pid,interfaces.IP ".
-	    "from reserved ".
-	    "left join nodes on reserved.node_id=nodes.node_id ".
-	    "left join node_types on node_types.type=nodes.type ".
-	    "left join interfaces on reserved.node_id=interfaces.node_id and ".
-	    "interfaces.card=node_types.control_net ".
-	    "where interfaces.IP!='NULL' order by reserved.pid,interfaces.IP");
+    DBQueryFatal("select reserved.node_id,reserved.pid,interfaces.IP ".
+		 "from reserved ".
+		 "left join nodes on reserved.node_id=nodes.node_id ".
+		 "left join node_types on node_types.type=nodes.type ".
+		 "left join interfaces on reserved.node_id=interfaces.node_id".
+		 " and interfaces.card=node_types.control_net ".
+		 "where interfaces.IP!='NULL' ".
+		 "order by reserved.pid,interfaces.IP");
 
 #
 # Generate a per project directory line, listing all of the nodes for
@@ -148,15 +143,15 @@ if ($db_result->numrows > 0) {
 #       /users/mike                101.101.101.103
 #
 $db_result =
-   DBquery("select reserved.node_id,reserved.pid,proj_memb.uid,interfaces.IP ".
-	   "from reserved ".
-	   "left join proj_memb on proj_memb.pid=reserved.pid ".
-	   "left join nodes on reserved.node_id=nodes.node_id ".
-	   "left join node_types on node_types.type=nodes.type ".
-	   "left join interfaces on reserved.node_id=interfaces.node_id ".
-	   "and interfaces.card=node_types.control_net ".
-	   "where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
-	   "order by reserved.pid,reserved.node_id");
+   DBQueryFatal("select reserved.node_id,reserved.pid,".
+		"proj_memb.uid,interfaces.IP from reserved ".
+		"left join proj_memb on proj_memb.pid=reserved.pid ".
+		"left join nodes on reserved.node_id=nodes.node_id ".
+		"left join node_types on node_types.type=nodes.type ".
+		"left join interfaces on reserved.node_id=interfaces.node_id ".
+		"and interfaces.card=node_types.control_net ".
+		"where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
+		"order by reserved.pid,reserved.node_id");
 
 #
 # Generate a per user directory line, listing all of the nodes for
@@ -241,18 +236,3 @@ sub fatal {
     SENDMAIL($TBOPS, "TESTBED: Exports Setup Failed", $msg);
     die($msg);
 }
-
-sub DBquery($)
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB->query($query);
-
-    if (! $result) {
-	print "DB Query failed: $query\n";
-    }
-
-    return $result;
-}
-

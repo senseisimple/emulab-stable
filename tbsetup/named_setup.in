@@ -5,6 +5,8 @@ use Fcntl ':flock';
 #
 # Suck out virtual names and create CNAME map entries.
 #
+# This script always does the right thing, so it does not matter who calls it. 
+#
 # usage: named_setup
 #
 
@@ -12,7 +14,6 @@ use Fcntl ':flock';
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 my $mapdir      = "/etc/namedb";
@@ -39,24 +40,17 @@ if ($TB ne "/usr/testbed") {
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-$| = 1; #Turn off line buffering on output
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 #
-# Testbed Support library
+# Testbed Support libraries
 # 
 push(@INC, "$TB/lib");
 require libtestbed;
-
-#
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
-# This script always does the right thing, so it does not matter who
-# calls it. 
-#
+require libdb;
 
 #
 # We need to serialize this script to avoid a trashed map file. Use
@@ -87,8 +81,8 @@ print MAP "\$TTL\t1\n";
 # Figure out the set of nodes we are working on. These are the nodes
 # that have a vname in the reserved table. 
 #
-$db_result = $DB->query("select node_id,pid,eid,vname from reserved ".
-			"where vname!=''");
+$db_result =
+    DBQueryFatal("select node_id,pid,eid,vname from reserved where vname!=''");
 
 if ($db_result->numrows > 0) {
     #

@@ -95,23 +95,16 @@ if ($UID && !TBAdmin($UID)) {
 my @load_list=();
 foreach my $node (@nodes) {
     my $pc = $node;
+    my $allocated = 0;
 
-    $sth = DBQuery("select * from nodes where node_id='$pc'");
-    if ($sth == 0) {
-	die("Database lookup failed (exists). Aborted...\n");
-    }
+    $sth = DBQueryFatal("select * from nodes where node_id='$pc'");
     if ($sth->num_rows() != 1) {
       print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
       next;
     }
     
     print STDERR "Checking if $pc is reserved...";
-    $sth = DBQuery("select * from reserved where node_id='$pc'");
-    if ($sth == 0) {
-	die("Database lookup failed (reserved). Aborted...\n");
-    }
-
-    my $allocated = 0;
+    $sth = DBQueryFatal("select * from reserved where node_id='$pc'");
    
     if ( ($sth->num_rows()) < 1) {
         print STDERR "Available.\nReserving and adding to list.\n";
@@ -127,7 +120,7 @@ foreach my $node (@nodes) {
 	    # Kill the last_reservation so that whoever gets the node next
 	    # won't be fooled into thinking a reload is required.
 	    #
-	    $sth = DBQuery("delete from last_reservation where node_id='$pc'");
+	    DBQueryFatal("delete from last_reservation where node_id='$pc'");
 	    push (@load_list,$pc);
 	    $allocated = 1;
 	}
@@ -145,11 +138,8 @@ foreach my $node (@nodes) {
 
     # Put it in the reloads table so TMCD knows to free it.
     print STDERR "Scheduling reload of $imageid for $pc:\n";
-    $sth = DBQuery("replace into reloads ".
-		   "(node_id, image_id) values ('$pc', '$imageid')");
-    if ($sth == 0) {
-      die("Database update failed (reloads). Aborted...\n");
-    }
+    DBQueryFatal("replace into reloads ".
+		 "(node_id, image_id) values ('$pc', '$imageid')");
 }
 
 if (@load_list > 0) {

@@ -22,7 +22,12 @@ my  $optlist = "df";
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
+
+#
+# Load the Testbed support stuff. 
+#
+push(@INC, "$TB/lib");
+require libdb;
 
 my $ssh		= "ssh -n -q";
 my $power	= "$TB/bin/power";
@@ -41,12 +46,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
 $| = 1; 
-
-#
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 #
 # We don't want to run this script unless its the real version.
@@ -89,30 +88,10 @@ foreach my $node ( @ARGV ) {
 # Figure out who called us. Root and admin types can do whatever they
 # want. Normal users can reboot nodes in their experiment.
 #
-if ($UID != 0) {
-    my $query_result;
-    
-    my ($name) = getpwuid($UID) or
-	die("$UID not in passwd file");
-
-    $query_result = DBquery("select admin from users where uid='$name'");
-    if (! $query_result) {
-	die("DB Error getting user status");
-    }
-    @row = $query_result->fetchrow_array();
-    if ($row[0] != 1) {
-	#
-	# Check to make sure that mere user is allowed to muck with nodes
-	#
-	foreach my $node (@nodes) {
-	    $query_result = DBquery("select reserved.node_id from reserved ".
-				    "left join proj_memb on ".
-				    "reserved.pid=proj_memb.pid and ".
-				    "reserved.node_id='$node' ".
-				    "where proj_memb.uid='$name'");
-	    if ($query_result->numrows < 1) {
-		die("You do not have permission to reboot $node\n");
-	    }
+if ($UID && !TBAdmin($UID)) {
+    foreach my $node (@nodes) {
+	if (! NodeAccessCheck(\$node)) {
+	    die("You do not have permission to reboot $node\n");
 	}
     }
 }
@@ -305,18 +284,4 @@ sub DoesPing {
 	return 0;
     }
     return 1;
-}
-
-sub DBquery($)
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB->query($query);
-
-    if (! $result) {
-	print "DB Query failed: $query\n";
-    }
-
-    return $result;
 }

@@ -18,12 +18,16 @@ my  $optlist = "";
 # Configure variables
 #
 my $TB       = "@prefix@";
-my $DBNAME   = "@TBDBNAME@";
-my $TBOPS    = "@TBOPSEMAIL@";
 
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $projroot = "/proj";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Turn off line buffering on output
@@ -31,16 +35,11 @@ my $projroot = "/proj";
 $| = 1;
 
 #
-# Testbed Support library
+# Testbed Support libraries
 # 
 push(@INC, "$TB/lib");
 require libtestbed;
-
-#
-# Untaint the path
-# 
-$ENV{'PATH'} = "/bin:/usr/bin";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+require libdb;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -67,15 +66,9 @@ if ($eid =~ /^([-\@\w.]+)$/) {
 }
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
 # This is where we currently hold the batch goo.
 #
-$dirname = "$batchdir/$pid-$eid";
+my $dirname = "$batchdir/$pid-$eid";
 
 #
 # Need to lock the table for this. We could avoid the locking if we just
@@ -83,14 +76,14 @@ $dirname = "$batchdir/$pid-$eid";
 # introduces needless (and annoying) delay when killing a batch experiment
 # that is not even running. See corresponding lock in the batch_daemon.
 #
-DBquery("lock tables batch_experiments write");
+DBQueryFatal("lock tables batch_experiments write");
 
 #
 # Set the canceled state right away. This will prevent the batch_daemon
 # from trying to run it. It might already be running, but thats okay.
 #
-DBquery("UPDATE batch_experiments set canceled=1 ".
-	"WHERE eid='$eid' and pid='$pid'");
+DBQueryFatal("UPDATE batch_experiments set canceled=1 ".
+	     "WHERE eid='$eid' and pid='$pid'");
 
 #
 # Now its safe to look at the state. If its in the "new" state, then
@@ -98,10 +91,10 @@ DBquery("UPDATE batch_experiments set canceled=1 ".
 # batch daemon will not bother with it once the canceled bit is set.
 #
 $query_result = 
-    DBquery("SELECT status from batch_experiments ".
-	    "WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("SELECT status from batch_experiments ".
+		 "WHERE eid='$eid' and pid='$pid'");
 
-DBquery("unlock tables");
+DBQueryFatal("unlock tables");
 
 @row = $query_result->fetchrow_array();
 $state = $row[0];
@@ -125,7 +118,7 @@ if ($state ne "new") {
 #
 # Delete the DB record. LOCKING!
 #
-DBquery("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
+DBQueryFatal("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
 
 #
 # And kill the directory.
@@ -140,31 +133,3 @@ print STDOUT
     "Batch Experiment $eid in project $pid has been canceled!\n";
 
 exit(0);
-
-sub fatal($)
-{
-    my($mesg) = $_[0];
-
-    print STDOUT "$mesg\n";
-
-    #
-    # Send a message to the testbed list
-    #
-    SENDMAIL($TBOPS,
-	     "TESTBED: Batch Mode Cancelation Failure $pid/$eid", $mesg);
-    exit(-1);
-}
-
-sub DBquery()
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB->query($query);
-
-    if (! $result) {
-	fatal("DB Error: $query");
-    }
-
-    return $result;
-}

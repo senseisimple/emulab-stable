@@ -104,7 +104,7 @@ if ($UID && !TBAdmin($UID)) {
 # or any image that has a null pid field, since those are defined to be
 # open to anyone. 
 #
-$db_result = DBQuery("select * from images where imageid='$imageid'");
+$db_result = DBQueryFatal("select * from images where imageid='$imageid'");
     
 if ($db_result->numrows < 1) {
     die("No such imageid $imageid!");
@@ -169,12 +169,9 @@ foreach my $node (@nodes) {
     my $pc = $node;
 	
     print STDOUT "Changing default OS for $pc to $defosid\n";
-    $sth = DBQuery("update nodes set ".
-		   "def_boot_osid='$defosid',def_boot_path='' ".
-		   "where node_id='$pc'");
-    if ($sth == 0) {
-	die("Database update failed (nodes def_boot_osid).");
-    }
+    DBQueryFatal("update nodes set ".
+		 "def_boot_osid='$defosid',def_boot_path='' ".
+		 "where node_id='$pc'");
 
     #
     # Assign partition table entries for each partition in the image.
@@ -193,29 +190,21 @@ foreach my $node (@nodes) {
 	if (defined($imageid_row{$partname})) {
 	    my $osid = $imageid_row{$partname};
 
-	    $sth = DBQuery("replace into partitions ".
-			   "(partition, osid, node_id) ".
-			   "values('$i', '$osid', '$pc')");
+	    DBQueryFatal("replace into partitions ".
+			 "(partition, osid, node_id) ".
+			 "values('$i', '$osid', '$pc')");
 	}
 	else {
-	    $sth = DBQuery("delete from partitions ".
-			   "where node_id='$pc' and partition='$i'");
+	    DBQueryFatal("delete from partitions ".
+			 "where node_id='$pc' and partition='$i'");
 	}
-
-	if ($sth == 0) {
-	    die("Database update failed (partitions table). Aborted ...");
-	}
-	
     }
     
     print STDOUT "Setting up reload for $pc\n";
-    $sth = DBQuery("update nodes set ".
-		   "next_boot_path='$NETDISK',".
-		   "next_boot_cmd_line='$cmdline' ".
-		   "where node_id='$pc'");
-    if ($sth == 0) {
-	die("Database update failed (nodes next_boot). Aborted ...");
-    }
+    DBQueryFatal("update nodes set ".
+		 "next_boot_path='$NETDISK',".
+		 "next_boot_cmd_line='$cmdline' ".
+		 "where node_id='$pc'");
 }
 
 #
