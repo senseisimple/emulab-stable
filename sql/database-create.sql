@@ -980,12 +980,29 @@ CREATE TABLE webdb_table_permissions (
 CREATE TABLE widearea_delays (
   IP1 varchar(15) default NULL,
   IP2 varchar(15) default NULL,
-  time double unsigned default NULL,
-  node_id1 text,
-  iface1 text,
-  node_id2 varchar(10) default NULL,
-  iface2 text,
-  bandwidth double unsigned default NULL
+  time double default NULL,
+  node_id1 varchar(10) NOT NULL default '',
+  iface1 varchar(10) NOT NULL default '',
+  node_id2 varchar(10) NOT NULL default '',
+  iface2 varchar(10) NOT NULL default '',
+  bandwidth double default NULL,
+  PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'widearea_recent'
+#
+
+CREATE TABLE widearea_recent (
+  IP1 varchar(15) default NULL,
+  IP2 varchar(15) default NULL,
+  time double default NULL,
+  node_id1 varchar(10) NOT NULL default '',
+  iface1 varchar(10) NOT NULL default '',
+  node_id2 varchar(10) NOT NULL default '',
+  iface2 varchar(10) NOT NULL default '',
+  bandwidth double default NULL,
+  PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
 #
