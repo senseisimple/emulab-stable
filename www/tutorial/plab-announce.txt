@@ -1,0 +1,136 @@
+<pre>
+From: Jay Lepreau &lt;lepreau@cs.utah.edu&gt;
+To: planetlab-announce@lists.sourceforge.net, emulab-users@emulab.net
+Subject: [Planetlab-announce] Emulab interface to Planetlab, now in production
+Date: Mon, 22 Sep 2003 12:02:30 MDT
+
+Hello frantic NSDIers and PlanetLab users,
+
+Thanks to those listed at the end of the message, PlanetLab vserver
+VMs are now available as another device type in Emulab/Netbed.  We've
+also added load-driven allocation with admission control.  Optionally
+combined with Emulab's queuing facilities, that is useful for sharing
+PlanetLab resources when they are scarce.  You might use the Emulab
+interface to get the N least-loaded nodes that satisfy your optional
+node type criteria, perhaps queuing your request until enough become
+available, or simply to provide a richer and more friendly interface
+to the nodes and your experiment.
+
+[LATER NOTE: In contrast to our cluster support, our PlanetLab
+support is not about topology: instead we provide you a bunch of
+(v)nodes fully interconnected through the normal Internet.  We
+don't provide tunnels or link emulation or topology emulation.]
+
+Most of the normal Emulab facilities are now available to Planetlab
+users.  Many of these features derive from creating more or less
+first-class virtual nodes in each vserver, from having a first-class
+notion of a dynamic slice (an Emulab "experiment"), the database, and
+the Web interface.  The new backend includes a combination dslice
+service manager and resource broker that are integrated with the
+Emulab experiment lifecycle control flow, by extending Emulab's
+existing support for wide-area and virtual nodes.
+
+
+FEATURES of note include:
+  -Request nodes by last-mile type, by specific physical node, or mixed.
+  -For each vnode you get:
+      Real Unix user accounts & pubkeys for everyone in your project
+      Transparent ssh setup (on a per-vnode port)
+      Optional loading of initial tarballs or RPMs
+      Optional automatic startup of a command at vnode boot
+      Liveness monitoring
+      Your symbolic node name inserted into the global DNS
+      Per-vnode port range allocation (by convention; not enforced)
+      Automatic account update when project members join or leave
+  -Reboot by vnode, or by entire experiment
+  -Modification of existing experiments, including more or fewer nodes
+  -Find new nodes to replace failed ones: 3 clicks
+  -Optional max-duration after which resources are released (swapout)
+  -Combine Emulab cluster nodes with PlanetLab nodes in same expt
+  -Handy frills include 1 click ssh-in-xterm popup window to vnode.
+
+It takes about 8 minutes to set up an 80 node experiment in a dynamic
+slice if all nodes work; about 13 minutes if a few fail.  Despite a
+fair amount of monitoring-- which we will improve-- many PlanetLab
+nodes fail in unpredictable ways; we do a few retries, but you control
+whether experiment creation proceeds despite some failures.
+
+We classify Planetlab nodes into types according to their effective
+"last-mile" link; you can request any Plab node or specific subtypes.
+The subtypes currently are: Internet2 end hosts, North American
+commodity Internet nodes, nodes outside North America, and DSL nodes.
+Current counts:
+ 127  Any Planetlab node
+   3 	Plab nodes on DSL lines
+  12 	Plab nodes on the commodity Internet, in North America
+  24 	Plab nodes outside North America
+  88    Plab end-hosts on Internet2
+
+Emulab currently finds the approximately least-loaded nodes with free
+disk space that satisfy your type and usage specifications.  You
+optionally specify your CPU and memory usage from 1 (very low) to 5
+(very high), and Emulab uses that in selecting nodes, from load data
+Ganglia provides every 5 minutes.  Overloaded nodes are not eligible,
+thus providing admission control, but if you queue your experiment
+allocation request Emulab will keep trying until nodes become
+available, and then notify you by email.
+
+
+HOW TO USE
+1. Use the following heavily commented 'ns' file as a template; it's easy.
+</pre>
+&nbsp;&nbsp;&nbsp;&nbsp;  <a href = "http://www.emulab.net/tutorial/planetlab.ns">
+     http://www.emulab.net/tutorial/planetlab.ns</a>
+<pre>
+2. You need an Emulab account and be a legal PlanetLab user.  We
+currently verify the latter manually via PlanetLab's list of PIs; you
+don't need a Planetlab account.  Therefore, your Emulab project head
+must be a PlanetLab PI or associated with them at the PI's
+institution, and we must turn on that project's Plab-ok bit.  So
+either have your PI or advisor start a new Emulab project or request
+testbed-ops@emulab.net to set the bit for an existing project.  Like
+any PlanetLab user, you of course must abide by the PlanetLab AUP.
+
+
+CAVEATS
+As nodes show up in planet-lab.org's dslice system, they are
+automatically added to our DB, with their type heuristically intuited.
+Many nodes do not successfully run (the deprecated) dslice or its
+supporting programs, which is why we have only 127 right now.  Some of
+of those are very flaky or down; at any time you will likely find a
+useful set of 110-120.  When Tammo's new dynamic slice mechanism
+becomes stable and replaces the partially deployed dslice, all useful
+Planetlab nodes should become available through Emulab.
+ 
+What we haven't (yet?) provided for these nodes that we do for our
+other wide area nodes are SFS, tunneled overlays, and node selection
+by best-matching paths.
+
+Formal documentation is lacking.  Improvements in all areas will be
+forthcoming; the load and type support, including the interface, is
+crude and preliminary, but the system is working reasonably.  We
+welcome any kind of comments, either to me or to testbed-ops@emulab.net.
+
+
+THANKS
+Many thanks to Brent Chun, especially, who is extremely prompt about
+corresponding and fixing things-- he's a one man rapid-response team.
+Thanks to Mic Bowman for his experienced advice about which PlanetLab
+resources get scarce.  Thanks to Larry Peterson for getting the dslice
+mechanism turned back on for awhile so we can provide this, to Tammo
+for doing that, and to Larry and Dave Culler for encouraging us to
+provide a place for PlanetLab users to queue their requests--
+unfortunately I doubt we're in time for even the most desperate
+NSDIers, but things will get tight again.
+
+In the Emulab crew, the bulk of the thanks go to Austin Clements who
+implemented most of the code last summer, and to Kirk Webb, Leigh
+Stoller, Rob Ricci, and Mike Hibler, who did a whole lot more to
+make this real and put it into production.
+
+
+-------------------------------------------------------
+Planetlab-announce mailing list
+Planetlab-announce@lists.sourceforge.net
+https://lists.sourceforge.net/lists/listinfo/planetlab-announce
+</pre>
