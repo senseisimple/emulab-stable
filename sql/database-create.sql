@@ -766,8 +766,8 @@ CREATE TABLE linkdelays (
 
 CREATE TABLE location_info (
   node_id varchar(32) NOT NULL default '',
-  floor varchar(32) default NULL,
-  building varchar(32) default NULL,
+  floor varchar(32) NOT NULL default '',
+  building varchar(32) NOT NULL default '',
   loc_x int(10) unsigned NOT NULL default '0',
   loc_y int(10) unsigned NOT NULL default '0',
   loc_z float default NULL,
@@ -776,7 +776,7 @@ CREATE TABLE location_info (
   phone tinytext,
   room varchar(32) default NULL,
   stamp int(10) unsigned default NULL,
-  PRIMARY KEY  (node_id)
+  PRIMARY KEY  (node_id,building,floor)
 ) TYPE=MyISAM;
 
 --

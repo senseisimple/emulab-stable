@@ -2598,3 +2598,13 @@ last_net_act,last_cpu_act,last_ext_act);
        used to set an ID for the programmed mote.
 
         alter table virt_nodes add column numeric_id int default NULL;
+
+1.331: Change location_info to include building and floor in the
+       primary key.
+
+	alter table location_info change floor floor varchar(32) \
+	      NOT NULL default '';
+	alter table location_info change building building varchar(32) \
+	      NOT NULL default '';
+	alter table location_info drop primary key;
+	alter table location_info add primary key(node_id,building,floor);
