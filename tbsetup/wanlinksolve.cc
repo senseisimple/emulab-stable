@@ -585,6 +585,7 @@ unsigned int msecscpu()
 
 int main( int argc, char ** argv )
 {
+  unsigned int seed = 1;
   int available = 0;
   int fixedNodeCount = 0;
   unsigned int bestSpeed = 0;
@@ -600,10 +601,17 @@ int main( int argc, char ** argv )
 
   int ch;
 
+  { 
+    struct timeval tp;
+    if ( 0 == gettimeofday( &tp, NULL )) {
+      seed = ((unsigned int)tp.tv_sec << 6) + (unsigned int)tp.tv_usec;
+    }
+  }
+
   while ((ch = getopt(argc, argv, "v1:2:3:r:R:s:m:")) != -1) {
     switch (ch) {
     case 's':
-      srand( atoi( optarg ) );
+      seed = atoi( optarg );
       break;
     case 'v': 
       verbose++; 
@@ -650,6 +658,9 @@ int main( int argc, char ** argv )
 	    "Negative weights are silly.\n" );
     exit(1);
   }
+
+  srand( seed );
+  if (verbose) { printf("Using random seed %u\n", seed ); }
 
   char line[4096];
 
@@ -871,7 +882,7 @@ int main( int argc, char ** argv )
     // dump a detailed report of the returned solution's errors.
     if (verbose > 1) { 
       calcError<true>( &(currentPool[0]) ); 
-      printf("Found in %i msecs\n", bestSpeed );
+      printf("Found in %i msecs (cpu time)\n", bestSpeed );
     }
   }
 
