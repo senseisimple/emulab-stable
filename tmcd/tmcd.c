@@ -61,6 +61,13 @@
 #define DISKTYPE	"ad"
 #define DISKNUM		0
 
+/* Compiled in slothd parameters
+ *
+ * 1 - reg_interval  2 - agg_interval  3 - load_thresh  
+ * 4 - expt_thresh   5 - ctl_thresh
+ */
+#define SDPARAMS        "reg=300 agg=5 load=1 expt=5 ctl=1000"
+
 /* Defined in configure and passed in via the makefile */
 #define DBNAME_SIZE	64
 #define HOSTID_SIZE	(32+64)
@@ -160,6 +167,7 @@ COMMAND_PROTOTYPE(doatarball);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
+COMMAND_PROTOTYPE(doslothdparams);
 
 struct command {
 	char	*cmdname;
@@ -200,6 +208,7 @@ struct command {
 	{ "ntpdrift",	dontpdrift},
 	{ "tarball",	doatarball},
 	{ "jailconfig",	dojailconfig},
+        { "sdparams",   doslothdparams},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4312,4 +4321,15 @@ COMMAND_PROTOTYPE(dojailconfig)
 	strcat(buf, "\"\n");
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
+}
+
+
+/* return slothd params - just compiled in for now. */
+COMMAND_PROTOTYPE(doslothdparams) 
+{
+  char buf[MYBUFSIZE];
+  
+  sprintf(buf, "%s", SDPARAMS);
+  client_writeback(sock, buf, strlen(buf), tcp);
+  return 0;
 }
