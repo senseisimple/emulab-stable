@@ -331,7 +331,8 @@ function PAGEBEGINNING( $title ) {
                                                  . ".gif" ?>" 
             alt="<?php echo "$THISHOMEBASE" ?> - the network testbed" /></td>
       </tr>
-    </table><table cellpadding="8" cellspacing="0" height="100%">
+    </table>
+    <table cellpadding="8" cellspacing="0" height="100%" width="100%">
       <tr height=100%>
         <td valign="top" class="leftcell" bgcolor=#ccddee>
 <!-- sidebar begins -->
