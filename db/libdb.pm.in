@@ -89,6 +89,9 @@ use Exporter;
 	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
+
+	 TBDB_WIDEAREA_LOCALNODE
+	 TBWideareaNodeID
 	 );
 
 # Must come after package declaration!
@@ -285,6 +288,12 @@ sub TBDB_NODEOPMODE_DELAYING	{ TBDB_TBEVENT_DELAYING; }
 sub TBDB_NODEOPMODE_UNKNOWNOS	{ TBDB_TBEVENT_UNKNOWNOS; }
 sub TBDB_NODEOPMODE_RELOADING	{ TBDB_TBEVENT_RELOADING; }
 sub TBDB_NODEOPMODE_UNKNOWN	{ "UNKNOWN"; }
+
+#
+# Node name we use in the widearea_* tables to represent a generic local node.
+# All local nodes are considered to have the same network characteristcs.
+#
+sub TBDB_WIDEAREA_LOCALNODE     { "boss"; }
 
 #
 # We should list all of the DB limits.
@@ -1679,6 +1688,28 @@ sub TBPhysNodeID($$)
     }
     return 0;
 }
+
+#
+# From the physical node name, get the name that the should be used in the
+# widearea_* tables
+#
+# usage TBWideareaNodeID(char *nodeid, char \*widearea_nodeid)
+#	Return 1 if success.
+#	Return 0 if error. (Currently, not possible)
+#
+sub TBWideareaNodeID($$)
+{
+    my ($nodeid, $pwide) = @_;
+
+    if (TBIsNodeRemote($nodeid)) {
+	$$pwide = $nodeid;
+    } else {
+	$$pwide = TBDB_WIDEAREA_LOCALNODE;
+    }
+
+    return 1;
+}
+
 
 #
 # Issue a DB query. Argument is a string. Returns the actual query object, so
