@@ -225,15 +225,18 @@ function WRITESIDEBAR() {
     # cause warnings.
     # 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+
 ?>
     <tr>
-      <td class="menufooter">
-        <center>
-          <b>[ <a class="whitelink" href="<?php echo "$TBBASE/logout.php3?uid=$login_uid" ?> ">Log Out</a> ]</b>
-        </center>
+      <td class="menufooter" align=center valign=center> <?php
+echo "                <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
+	           <img alt=\"logoff\" border=0
+                        src=\"$BASEPATH/logoff.gif\"></a>\n"
+?>
       </td>
     </tr>
 <?php
+
 #	echo "<tr>
 #               <td align=center height=50 valign=center>
 #                <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
@@ -245,19 +248,18 @@ function WRITESIDEBAR() {
     elseif (!NOLOGINS()) {
 ?>
     <tr>
-      <td class="menufooter">
-        <center>
-          <b>[ <a class="whitelink" href="<?php echo "$TBBASE/login.php3"; ?> ">Log In</a> ]</b>
-        </center>
+      <td class="menufooter" align=center valign=center> <?php
+echo "                <a href=\"$TBBASE/login.php3\">
+	           <img alt=\"logon\" border=0
+                        src=\"$BASEPATH/logon.gif\"></a>\n"
+?>
       </td>
     </tr>
 <?php
 
 #	echo "<tr>
 #               <td align=center height=50 valign=center>
-#                <a href=\"$TBBASE/login.php3\">
-#	           <img alt=\"logon\" border=0
-#                        src=\"$BASEPATH/logon.gif\"></a>
+
 #               </td>
 #              </tr>\n";
     }
