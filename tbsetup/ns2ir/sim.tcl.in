@@ -271,6 +271,11 @@ Simulator instproc run {} {
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
     
+    if {$ran == 1} {
+	perror "The Simulator 'run' statement can only be run once."
+	return
+    }
+
     # Fill out IPs
     if {! $use_ipassign } {
 	foreach obj [concat [array names lanlink_list]] {
