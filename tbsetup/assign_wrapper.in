@@ -3469,11 +3469,12 @@ sub LoadVirtLans()
 	my $useveth        = $rowref->{"usevethiface"};
 	my $trivial_ok     = $rowref->{"trivial_ok"};
 	my $protocol       = $rowref->{"protocol"};
+	my $mustdelay      = $rowref->{"mustdelay"};
 
 	# Extend the DB info with this stuff:
 	#
 	# If RED, must insert traffic shapping.
-	$virt_lans{$vname}->{"MUSTDELAY"}    = $rowref->{"q_red"};
+	$virt_lans{$vname}->{"MUSTDELAY"}    = $mustdelay;
 	# User has requested the link/lan be emulated. Not typical.
 	$virt_lans{$vname}->{"EMULATED"}     = $isemulated;
 	# User has requested "endnodeshaping" (dummynet on end nodes).
@@ -3591,21 +3592,6 @@ sub LoadVirtLans()
 	printdb "  $vname $member - $delay $bandwidth $lossrate ".
 	    "$rdelay $rbandwidth $rlossrate\n";
 	printdb "   $port:$vname is a lan of $node\n";
-    }
-
-    #
-    # Check event list. Anytime we find an event to control a link, we need
-    # to drop a delay node in. start/stop especially, since thats the easiest
-    # way to do that, even if the link has no other traffic shaping in it. 
-    # 
-    printdb "Checking events for LINK commands.\n";
-    $result =
-	DBQueryFatal("select distinct vname from eventlist as ex ".
-		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
-		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
-		 "where ot.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
-    while (($vname) = $result->fetchrow_array) {
-	$virt_lans{$vname}->{"MUSTDELAY"} = 1;
     }
 }
 sub virtlanexists($)	{ return exists($virt_lans{$_[0]}); }

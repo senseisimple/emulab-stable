@@ -190,7 +190,7 @@ if ($state eq EXPTSTATE_ACTIVE) {
 # this.
 #
 my $virtnodes_result =
-    DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms," .
+    DBQueryFatal("SELECT vname,osname,cmd_line,rpms," .
 		 "startupcmd,tarfiles,type,fixed from virt_nodes ".
 		 "where pid='$pid' and eid='$eid' order by vname");
 
@@ -200,7 +200,7 @@ if ($shownodes) {
     print "--------------- ------------ --------------- ".
 	  "--------------------\n";
 
-    while (($vname,$ips,$osname,$cmd_line,$rpms,$startupcmd,
+    while (($vname,$osname,$cmd_line,$rpms,$startupcmd,
 	    $tarfiles,$type,$fixed) = $virtnodes_result->fetchrow_array()) {
 	my $qualname = "$vname.$eid.$pid.$DOMAIN";
 
@@ -313,36 +313,33 @@ if ($showmap && $state eq EXPTSTATE_ACTIVE) {
 # Links and Lans
 #
 if ($showlinks) {
-    $virtnodes_result->dataseek(0);
+    $result =
+	DBQueryFatal("select vname,vnode,vport,ip,member,mask,delay, ".
+		     "       bandwidth,lossrate, ".
+		     "       rdelay,rbandwidth,rlossrate,protocol ".
+		     "  from virt_lans as v ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vname,member");
 
-    while (($vname,$ips) = $virtnodes_result->fetchrow_array()) {
-	foreach $ipinfo (split(" ",$ips)) {
-	    ($port,$ip) = split(":",$ipinfo);
-	    $ipmap{"$vname:$port"} = $ip;
-	    $macmap{$ip}->{"MEMBER"} = "$vname:$port";
-	}
+    while (my ($vname,$vnode,$vport,$ip) = $result->fetchrow_array()) {
+	$ipmap{"$vnode:$vport"} = $ip;
+	$macmap{$ip}->{"MEMBER"} = "$vnode:$vport";
     }
+    $result->dataseek(0);
 
-    my $result =
+    my $iface_result =
 	DBQueryFatal("select i.ip,i.mac,i.iface from reserved as r ".
 		     "left join interfaces as i on r.node_id=i.node_id ".
 		     "where r.pid='$pid' and r.eid='$eid' and ".
 		     "      i.ip is not NULL and i.ip!=''");
 
-    while (($ip,$mac,$iface) = $result->fetchrow_array()) {
+    while (($ip,$mac,$iface) = $iface_result->fetchrow_array()) {
 	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
 	    $mac = "$1:$2:$3:$4:$5:$6";
 	}
 	$macmap{$ip}->{"MAC"}   = $mac;
 	$macmap{$ip}->{"IFACE"} = $iface;
     }
-
-    $result =
-	DBQueryFatal("select vname,member,mask,delay,bandwidth,lossrate, ".
-		     "       rdelay,rbandwidth,rlossrate,protocol ".
-		     "  from virt_lans as v ".
-		     "where pid='$pid' and eid='$eid' ".
-		     "order by vname,member");
 
     if ($result->numrows) {
 	print  "Virtual Lan/Link Info:\n";
@@ -351,8 +348,8 @@ if ($showlinks) {
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
 
-	while (($vname,$member,$mask,$delay,$bandwidth,$lossrate,
-		$rdelay,$rbandwidth,$rlossrate,$protocol)
+	while (($vname,$vnode,$vport,$ip,$member,$mask,$delay,$bandwidth,
+		$lossrate,$rdelay,$rbandwidth,$rlossrate,$protocol)
 	       = $result->fetchrow_array()) {
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
 	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
@@ -371,7 +368,8 @@ if ($showlinks) {
 	print  "--------------- --------------- --------------- ".
 	       "-------------------- ---------\n";
 
-	while (($vname,$member) = $result->fetchrow_array()) {
+	while (($vname,$vnode,$vport,$ip,$member) =
+	       $result->fetchrow_array()) {
 	    my ($vname,$port) = split(":", $member);
 	    
 	    printf "%-15s %-15s %-15s %-20s %-9s\n", $vname,
@@ -721,6 +719,35 @@ if ($showroutes) {
 #
 if ($showevents) {
     my $result =
+	DBQueryFatal("select group_name,agent_name from event_groups ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by group_name");
+
+    if ($result->numrows) {
+	my %egroups = ();
+
+	while (($group_name,$agent_name) = $result->fetchrow_array()) {
+	    if (!exists($egroups{$group_name})) {
+		$egroups{$group_name} = [];
+	    }
+	    push(@{ $egroups{$group_name} }, $agent_name);
+	}
+	print  "Event Groups:\n";
+
+	printf("%-15s %s\n",
+	       "Group Name", "Members");
+	print("--------------- --------------------------------".
+	      "-------------------------------\n");
+
+	foreach my $group (keys(%egroups)) {
+	    my @agents = @{ $egroups{$group} };
+	    
+	    printf("%-15s %s\n", $group, join(",", @agents));
+	}
+	print "\n";
+    }
+    
+    $result =
 	DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments ".
 		" from eventlist as ex ".
 		"left join event_eventtypes as et on ex.eventtype=et.idx ".

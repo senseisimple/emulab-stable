@@ -32,7 +32,9 @@ SimplexLink instproc init {link dir} {
 SimplexLink instproc queue {} {
     $self instvar mylink
     $self instvar mydir
-    return [$mylink set ${mydir}queue]
+
+    set myqueue [$mylink set ${mydir}queue]
+    return $myqueue
 }
 LLink instproc init {lan node} {
     $self set mylan  $lan
@@ -49,14 +51,10 @@ LLink instproc queue {} {
 # Don't need any rename procs since these never use their own name and
 # can not be generated during Link creation.
 
-Queue instproc init {link type dir} {
+Queue instproc init {link type node} {
     $self set mylink $link
+    $self set mynode $node
     
-
-    # direction is either "to" indicating src to dst or "from" indicating
-    # the dst to src.  I.e. to dst or from dst.
-    $self set direction $dir
-
     # These control whether the link was created RED or GRED. It
     # filters through the DB.
     $self set gentle_ 0
@@ -83,13 +81,21 @@ Queue instproc init {link type dir} {
 	
 	if {$type == "RED"} {
 	    set red_ 1
+	    $link mustdelay
 	} elseif {$type == "GRED"} {
 	    set red_ 1
 	    set gentle_ 1
+	    $link mustdelay
 	} elseif {$type != "DropTail"} {
 	    punsup "Link type $type, using DropTail!"
 	}
     }
+}
+
+Queue instproc rename {old new} {
+    $self instvar mylink
+
+    $mylink rename_queue $old $new
 }
 
 Queue instproc rename_lanlink {old new} {
@@ -104,19 +110,20 @@ Queue instproc get_link {} {
     return $mylink
 }
 
-# Hacky. Need to create an association bewteen the queue direction
-# and a dummynet pipe. This should happen later on, but I do not
-# have time right now to make all the changes. Instead, convert
-# "to" to "pipe0" and "from" to "pipe1".
-Queue instproc get_pipe {} {
-    $self instvar direction
+Queue instproc agent_name {} {
+    $self instvar mylink
+    $self instvar mynode
 
-    if {$direction == "to"} {
-	set pipe "pipe0"
-    } else {
-	set pipe "pipe1"
-    }
-    return $pipe
+    return "$mylink-$mynode"
+}
+
+#
+# A queue is associated with a node on a link. Return that node.
+# 
+Queue instproc get_node {} {
+    $self instvar mynode
+
+    return $mynode
 }
 
 Link instproc init {s nodes bw d type} {
@@ -134,8 +141,8 @@ Link instproc init {s nodes bw d type} {
     var_import GLOBALS::new_counter
     set q1 q[incr new_counter]
     
-    Queue to$q1 $self $type to
-    Queue from$q1 $self $type from
+    Queue to$q1 $self $type $src
+    Queue from$q1 $self $type $dst
 
     $self set toqueue to$q1
     $self set fromqueue from$q1
@@ -171,6 +178,13 @@ LanLink instproc init {s nodes bw d type} {
 
     # Allow user to turn off actual bw shaping on emulated links.
     $self set nobwshaping 0
+
+    # mustdelay; force a delay (or linkdelay) to be inserted. assign_wrapper
+    # is free to override this, but not sure why it want to! When used in
+    # conjunction with nobwshaping, you get a delay node, but with no ipfw
+    # limits on the bw part, and assign_wrapper ignores the bw when doing
+    # assignment.
+    $self set mustdelay 0
 
     # Allow user to turn on veth devices on emulated links.
     $self set useveth 0
@@ -242,9 +256,17 @@ LanLink instproc init {s nodes bw d type} {
 	lappend nodelist $nodepair
 
 	set lq q[incr new_counter]
-	Queue lq$lq $self $type to
+	Queue lq$lq $self $type $node
 	set linkq($nodepair) lq$lq
     }
+}
+
+#
+# Set the mustdelay flag.
+#
+LanLink instproc mustdelay {} {
+    $self instvar mustdelay
+    set mustdelay 1
 }
 
 # get_port <node>
@@ -421,7 +443,6 @@ LanLink instproc cost {c} {
     }
 }
 
-
 Link instproc rename {old new} {
     $self next $old $new
 
@@ -429,6 +450,19 @@ Link instproc rename {old new} {
     $self instvar fromqueue
     $toqueue rename_lanlink $old $new
     $fromqueue rename_lanlink $old $new
+}
+
+Link instproc rename_queue {old new} {
+    $self next $old $new
+
+    $self instvar toqueue
+    $self instvar fromqueue
+
+    if {$old == $toqueue} {
+	set toqueue $new
+    } elseif {$old == $fromqueue} {
+	set fromqueue $new
+    }
 }
 
 # The following methods are for renaming objects (see README).
@@ -449,6 +483,7 @@ LanLink instproc rename_node {old new} {
     $self instvar rbandwidth
     $self instvar rdelay
     $self instvar rloss
+    $self instvar linkq
     $self instvar accesspoint
 
     # XXX Temporary
@@ -472,14 +507,30 @@ LanLink instproc rename_node {old new} {
 	set rbandwidth($newnodeport) $rbandwidth($nodeport)
 	set rdelay($newnodeport) $rdelay($nodeport)
 	set rloss($newnodeport) $rloss($nodeport)
+	set linkq($newnodepair) linkq($nodeport)
+	
 	unset bandwidth($nodeport)
 	unset delay($nodeport)
 	unset loss($nodeport)
 	unset rbandwidth($nodeport)
 	unset rdelay($nodeport)
 	unset rloss($nodeport)
+	unset linkq($nodeport)
     }
     set nodelist $newnodelist
+}
+
+LanLink instproc rename_queue {old new} {
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set foo linkq($nodeport)
+	
+	if {$foo == $old} {
+	    set linkq($nodeport) $new
+	}
+    }
 }
 
 Link instproc updatedb {DB} {
@@ -507,6 +558,7 @@ Link instproc updatedb {DB} {
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
+    $self instvar mustdelay
 
     if {$protocol != "ethernet"} {
 	perror "Link must be an ethernet only, not a $protocol"
@@ -566,7 +618,7 @@ Link instproc updatedb {DB} {
 
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "vnode" "vport" "ip"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -579,7 +631,7 @@ Link instproc updatedb {DB} {
 	    lappend fields "rest_bandwidth"
 	}
 	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)
@@ -621,6 +673,7 @@ Lan instproc updatedb {DB} {
     $self instvar accesspoint
     $self instvar settings
     $self instvar member_settings
+    $self instvar mustdelay
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
@@ -692,7 +745,7 @@ Lan instproc updatedb {DB} {
 	    set is_accesspoint 1
 	}
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -705,7 +758,7 @@ Lan instproc updatedb {DB} {
 	    lappend fields "rest_bandwidth"
 	}
 	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)

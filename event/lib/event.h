@@ -108,6 +108,10 @@ int		address_tuple_free(address_tuple_t);
 	event_notification_remove(handle, note, "OBJTYPE")
 #define event_notification_set_objtype(handle, note, buf) \
         event_notification_put_string(handle, note, "OBJTYPE", buf)
+#define event_notification_clear_objname(handle, note) \
+	event_notification_remove(handle, note, "OBJNAME")
+#define event_notification_set_objname(handle, note, buf) \
+        event_notification_put_string(handle, note, "OBJNAME", buf)
 
 /*
  * Event library sets this field. Holds the sender of the event, as 

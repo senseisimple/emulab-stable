@@ -2733,6 +2733,7 @@ sub TBGetSiteVar($)
 		   "virt_simnode_attributes",
 		   "nseconfigs",
 		   "eventlist",
+		   "event_groups",
 		   "ipsubnets",
 		   "nsfiles");
 

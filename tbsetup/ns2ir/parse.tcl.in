@@ -264,6 +264,7 @@ source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
 source ${GLOBALS::libdir}/vtype.tcl
 source ${GLOBALS::libdir}/program.tcl
+source ${GLOBALS::libdir}/event.tcl
 
 ##################################################
 # Redifing Assignment

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -219,7 +219,8 @@ if ($showevents) {
     $flags = "-v";
 }
 else {
-    $flags = "-b";
+    # Show event summary. 
+    $flags = "-b -e";
 }
 
 $result = exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webreport $flags $pid $eid",

@@ -106,8 +106,11 @@ my %virtual_tables =
      "eventlist"		=> { rows  => undef, 
 				     tag   => "events",
 				     row   => "event",
-				     attrs => [ "vname" ]});
-    
+				     attrs => [ "vname" ]},
+     "event_groups"		=> { rows  => undef, 
+				     tag   => "event_groups",
+				     row   => "event_group",
+				     attrs => [ "group_name", "agent-name" ]});
 
 # XXX
 # The experiment table is special. Only certain fields are allowed to

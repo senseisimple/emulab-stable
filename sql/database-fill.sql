@@ -539,6 +539,7 @@ REPLACE INTO table_regex VALUES ('virt_lans','widearea','int','redirect','defaul
 REPLACE INTO table_regex VALUES ('virt_lans','emulated','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','uselinkdelay','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','nobwshaping','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','mustdelay','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','usevethiface','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trivial_ok','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
@@ -634,6 +635,10 @@ REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capkey','text','red
 REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capval','text','redirect','virt_lan_settings:capval',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','est_bandwidth','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rest_bandwidth','int','redirect','default:int',0,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('event_groups','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('event_groups','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('event_groups','group_name','text','redirect','eventlist:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('event_groups','agent_name','text','redirect','eventlist:vname',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`

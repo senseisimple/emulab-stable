@@ -418,8 +418,77 @@ example:
 
 <li> FullTcp, FTP and Telnet: Refer to the NS documentation <a
      href="http://www.isi.edu/nsnam/ns/doc/ns_doc.pdf">here</a>.
-
 </ul>
+
+<p>
+<h3>
+<a NAME="EventGroups"></a>
+Event Groups
+</h3>
+
+Event Groups allow you to conveniently send events to groups of like
+objects. For example, if you want to bring down a set of links at the
+same time, you could do it one event at a time:
+
+	<code><pre>
+	$ns at 100.0 "$link0 down"
+	$ns at 100.0 "$link1 down"
+	$ns at 100.0 "$link2 down"
+	$ns at 100.0 "$link3 down" </code></pre>
+
+which works, but is somewhat verbose. Its also presents a problem when
+sending dynamic events with <tt>tevc</tt> from the shell:
+
+	<code><pre>
+	tevc -e proj/expt now link0 down
+	tevc -e proj/expt now link1 down
+	tevc -e proj/expt now link2 down
+	tevc -e proj/expt now link3 down</pre></code>
+
+These four events will be separated by many milliseconds as each call
+to tevc requires forking a command from the shell, contacting boss,
+sending the event to the event scheduler, etc.
+
+<br><br>
+A better alternative is to create an <em>event group</em>, which will
+schedule events for all of the members of the group, sending them at
+the same time from the event scheduler. The example above can be more
+simply implemented as:
+
+	<code><pre>
+	set mylinks [new EventGroup $ns]
+	$mylinks add $link0 $link1 $link2 $link3
+
+	$ns at 60.0 "$mylinks down"</pre></code>
+
+From the command line:
+
+	<code><pre>
+	tevc -e proj/expt now mylinks down</pre></code>
+
+Note:
+<ul>
+<li> All of the members of an event group must be of the same type;
+     you cannot, say, put a link and a program object into the same
+     event group since they respond to entirely different commands.
+     The parser will reject such groups.
+
+<li> An object (such as a link or lan) can be in multiple event
+     groups. 
+
+<li> Event groups are not hierarchical; you cannot put one event group
+     into another event group. If you need this functionality, then
+     you need to put the objects themselves (such as a link or lan)
+     into each event group directly:
+
+	<code><pre>
+	set mylinks1 [new EventGroup $ns]
+	set mylinks2 [new EventGroup $ns]
+	
+	$mylinks1 add $link0 $link1 $link2 $link3
+	$mylinks2 add $link0 $link1 $link2 $link3</pre></code>
+</ul>
+
 
 <p>
 <h3>
@@ -479,7 +548,5 @@ Some points worth mentioning:
 <li> The "stop" command is implemented by sending a SIGTERM to the
      process group leader (the csh process). If the SIGTERM fails, a
      SIGKILL is sent.
-
-<li> If you override 
 </ul>
 

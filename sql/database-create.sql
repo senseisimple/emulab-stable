@@ -158,6 +158,21 @@ CREATE TABLE event_objecttypes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `event_groups`
+--
+
+CREATE TABLE event_groups (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
+  group_name varchar(64) NOT NULL default '',
+  agent_name varchar(64) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,idx),
+  KEY group_name (group_name),
+  KEY agent_name (agent_name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `eventlist`
 --
 
@@ -170,6 +185,7 @@ CREATE TABLE eventlist (
   vname varchar(64) NOT NULL default '',
   objecttype smallint(5) unsigned NOT NULL default '0',
   eventtype smallint(5) unsigned NOT NULL default '0',
+  isgroup tinyint(1) unsigned default '0',
   arguments text,
   atstring text,
   PRIMARY KEY  (pid,eid,idx),
@@ -1710,6 +1726,7 @@ CREATE TABLE virt_lans (
   emulated tinyint(4) default '0',
   uselinkdelay tinyint(4) default '0',
   nobwshaping tinyint(4) default '0',
+  mustdelay tinyint(1) default '0',
   usevethiface tinyint(4) default '0',
   trivial_ok tinyint(4) default '1',
   protocol varchar(30) NOT NULL default 'ethernet',

@@ -1778,3 +1778,42 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.267: Remove table definition that snuck in while developing; skip to
        next entry;
+
+1.268: Add event_groups table to allow users to define groups of
+       targets for events. The agent_name refers to an entry in the
+       virt_agents table. All members of an eventgroup must of course
+       be of the same type.  I am not currently enforcing this.  (note
+       that the vnode slot of the eventlist table was effectively
+       deprecated quite some time ago; the event scheduler uses the
+       vnode slot of the virt_agents entry instead).
+
+	CREATE TABLE event_groups (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  group_name varchar(64) NOT NULL default '',
+	  agent_name varchar(64) NOT NULL default '',
+	  PRIMARY KEY  (pid,eid,idx),
+	  KEY group_name (group_name),
+	  KEY agent_name (agent_name)
+	) TYPE=MyISAM;
+
+
+      Also add a boolean to the eventlist table to mark an event as a
+      group event. 
+
+        alter table eventlist add isgroup tinyint(1) unsigned \
+             NOT NULL default '0' after eventtype;
+
+      Add mustdelay boolean to virt_lans to relieve assign_wrapper
+      from the chore of guessing when a delay node needs to be
+      inserted; assign_wrapper can still override of course, but this
+      should make it less error prone.
+
+        alter table virt_lans add mustdelay tinyint(1) unsigned \
+             default '0' after nobwshaping;
+	update virt_lans set mustdelay=q_red;
+
+      Then run:
+	
+		./mustdelay.pl

@@ -23,6 +23,7 @@
 
 Class Simulator
 Class Program -superclass NSObject
+Class EventGroup -superclass NSObject
 
 Simulator instproc init {args} {
     # A counter for internal ids
@@ -61,6 +62,10 @@ Simulator instproc init {args} {
     # Program list.
     $self instvar prog_list;
     array set prog_list {}
+
+    # EventGroup list.
+    $self instvar eventgroup_list;
+    array set eventgroup_list {}
 
     var_import ::GLOBALS::last_class
     set last_class $self
@@ -226,6 +231,7 @@ Simulator instproc run {} {
     $self instvar node_list
     $self instvar event_list
     $self instvar prog_list
+    $self instvar eventgroup_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -361,6 +367,9 @@ Simulator instproc run {} {
     }
     foreach prog [array names prog_list] {
 	$prog updatedb "sql"
+    }
+    foreach egroup [array names eventgroup_list] {
+	$egroup updatedb "sql"
     }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
@@ -501,6 +510,23 @@ Simulator instproc at {time eventstring} {
     set atstring "$event"
     set args {}
     set okargs 0
+
+    #
+    # Groups are special. It would be nice to optimize the event groups
+    # so that a single event could be stored in the DB, but some events
+    # take arguments based on the actual object being controlled. For now
+    # I will not try to optimize for when they can be lumped, but rather
+    # will just turn all group events into a list of individual events.
+    #
+    if {[$obj info class] == "EventGroup"} {
+	set cmd [lrange $event 1 end]
+	
+	foreach member [$obj members] {
+	    $self at $time "$member $cmd"
+	}
+	return
+    }
+    
     switch -- [$obj info class] {
 	"Application/Traffic/CBR" {
 	    set otype TRAFGEN
@@ -571,7 +597,8 @@ Simulator instproc at {time eventstring} {
 	    set vnode [$obj get_node]
 	    set vname $obj
 	}
-	"Link" {
+	"Link" -
+	"Lan" {
 	    set otype LINK
 	    switch -- $cmd {
 		"up"	    {set etype UP}
@@ -615,11 +642,13 @@ Simulator instproc at {time eventstring} {
 	    }
 	    set vnode {}
 	    set vname $obj
+	    $obj mustdelay
 	}
 	"Queue" {
 	    set otype LINK
-	    set pipe [$obj get_pipe]
-	    set obj [$obj get_link]
+	    set node [$obj get_node]
+	    set lanlink [$obj get_link]
+	    $lanlink mustdelay
 	    switch -- $cmd {
                 "set" {
 		    if {[llength $event] < 4} {
@@ -662,9 +691,8 @@ Simulator instproc at {time eventstring} {
 		    return
 		}
 	    }
-	    set args "PIPE=$pipe $args"
 	    set vnode {}
-	    set vname $obj
+	    set vname "$lanlink-$node"
 	}
 	"Program" {
 	    set otype PROGRAM
@@ -815,6 +843,12 @@ Simulator instproc rename_program {old new} {
     $self instvar prog_list
     unset prog_list($old)
     set prog_list($new) {}
+}
+
+Simulator instproc rename_eventgroup {old new} {
+    $self instvar eventgroup_list
+    unset eventgroup_list($old)
+    set eventgroup_list($new) {}
 }
 
 # find_link <node1> <node2>
@@ -970,6 +1004,13 @@ Simulator instproc use_subnet {subnet netmask} {
 Simulator instproc add_program {prog} {
     $self instvar prog_list
     set prog_list($prog) {}
+}
+
+# add_eventgroup
+# Link to a EventGroup object.
+Simulator instproc add_eventgroup {group} {
+    $self instvar eventgroup_list
+    set eventgroup_list($group) {}
 }
 
 # cost

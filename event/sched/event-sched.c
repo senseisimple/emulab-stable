@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -42,6 +42,7 @@ static void	cleanup(void);
 static void	quit(int);
 
 struct agent {
+	char    name[TBDB_FLEN_EVOBJNAME];  /* Agent *or* group name */
 	char    nodeid[TBDB_FLEN_NODEID];
 	char    vnode[TBDB_FLEN_VNAME];
 	char	objname[TBDB_FLEN_EVOBJNAME];
@@ -173,6 +174,8 @@ main(int argc, char **argv)
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
 
+	goto doit;
+
 	/*
 	 * Hacky. Need to wait until all nodes in the experiment are
 	 * in the ISUP state before we can start the event list rolling.
@@ -194,6 +197,8 @@ main(int argc, char **argv)
 		 */
 		sleep(3);
 	}
+
+ doit:
 
 	/*
 	 * Read the static events list and schedule.
@@ -220,82 +225,105 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 {
     sched_event_t	event;
     char		objname[TBDB_FLEN_EVOBJNAME];
-    int			x;
-
-    /* Clone the event notification, since we want the notification to
-       live beyond the callback function: */
-    event.notification = event_notification_clone(handle, notification);
-    if (!event.notification) {
-	    error("event_notification_clone failed!\n");
-	    return;
-    }
-
-    /* Clear the scheduler flag */
-    if (! event_notification_remove(handle, event.notification, "SCHEDULER") ||
-	! event_notification_put_int32(handle,
-				       event.notification, "SCHEDULER", 0)) {
-	    error("could not clear scheduler attribute of notification %p\n",
-		  event.notification);
-	    goto bad;
-    }
+    int			x, sent = 0;
 
     /* Get the event's firing time: */
-    if (! event_notification_get_int32(handle, event.notification, "time_usec",
+    if (! event_notification_get_int32(handle, notification, "time_usec",
 				       (int *) &event.time.tv_usec) ||
-	! event_notification_get_int32(handle, event.notification, "time_sec",
+	! event_notification_get_int32(handle, notification, "time_sec",
 				       (int *) &event.time.tv_sec)) {
 	    error("could not get time from notification %p\n",
-		  event.notification);
-	    goto bad;
+		  notification);
+	    return;
     }
 
     /*
      * Must map the event to the proper agent running on a particular
-     * node. 
+     * node. Might be multiple agents if its a group event; send a cloned
+     * event for each one. 
      */
-    if (! event_notification_get_objname(handle, event.notification,
+    if (! event_notification_get_objname(handle, notification,
 					 objname, sizeof(objname))) {
 	    error("could not get object name from notification %p\n",
-		  event.notification);
-	    goto bad;
-    }
-    for (x = 0; x < numagents; x++) {
-	    if (!strcmp(agents[x].objname, objname))
-		    break;
-    }
-    if (x == numagents) {
-	    error("Could not map object to an agent: %s\n", objname);
-	    goto bad;
+		  notification);
+	    return;
     }
     
-    event_notification_clear_host(handle, event.notification);
-    event_notification_set_host(handle,
-				event.notification, agents[x].ipaddr);
-    event_notification_clear_objtype(handle, event.notification);
-    event_notification_set_objtype(handle,
-				   event.notification, agents[x].objtype);
-    event_notification_insert_hmac(handle, event.notification);
+    for (x = 0; x < numagents; x++) {
+	    if (!strcmp(agents[x].name, objname)) {
+		    /*
+		     * Clone the event notification, since we want the
+		     * notification to live beyond the callback function:
+		     */
+		    event.notification =
+			    event_notification_clone(handle, notification);
+		    
+		    if (!event.notification) {
+			    error("event_notification_clone failed!\n");
+			    return;
+		    }
 
-    event.simevent = !strcmp(agents[x].objtype, TBDB_OBJECTTYPE_SIMULATOR);
+		    /*
+		     * Clear the scheduler flag. Not allowed to do this above
+		     * the loop cause the notification thats comes in is
+		     * "read-only".
+		     */
+		    if (! event_notification_remove(handle,
+					event.notification, "SCHEDULER") ||
+			! event_notification_put_int32(handle,
+					event.notification, "SCHEDULER", 0)) {
+			    error("could not clear scheduler attribute of "
+				  "notification %p\n", event.notification);
+			    return;
+		    }
 
-    if (debug > 1) {
-	    struct timeval now;
+		    event_notification_clear_host(handle, event.notification);
+		    event_notification_set_host(handle,
+						event.notification,
+						agents[x].ipaddr);
+		    event_notification_clear_objtype(handle,
+						     event.notification);
+		    event_notification_set_objtype(handle,
+						   event.notification,
+						   agents[x].objtype);
+		    /*
+		     * Indicates a group event; must change the name of the
+		     * event to the underlying agent.
+		     */
+		    if (strcmp(agents[x].objname, agents[x].name)) {
+			    event_notification_clear_objname(handle,
+					event.notification);
+			    event_notification_set_objname(handle,
+					event.notification, agents[x].objname);
+		    }
+
+		    event_notification_insert_hmac(handle, event.notification);
+		    event.simevent = !strcmp(agents[x].objtype,
+					     TBDB_OBJECTTYPE_SIMULATOR);
+
+		    if (debug > 1) {
+			    struct timeval now;
 	    
-	    gettimeofday(&now, NULL);
+			    gettimeofday(&now, NULL);
 	    
-	    info("Sched: note:%p at:%ld:%d now:%ld:%d agent:%d\n",
-                 event.notification,
-		 event.time.tv_sec, event.time.tv_usec,
-		 now.tv_sec, now.tv_usec,
-		 x);
+			    info("Sched: "
+				 "note:%p at:%ld:%d now:%ld:%d agent:%d\n",
+				 event.notification,
+				 event.time.tv_sec, event.time.tv_usec,
+				 now.tv_sec, now.tv_usec, x);
+		    }
+
+		    /*
+		     * Enqueue the event notification for resending at the
+		     * indicated time:
+		     */
+		    sched_event_enqueue(event);
+		    sent++;
+	    }
     }
-
-    /* Enqueue the event notification for resending at the indicated
-       time: */
-    sched_event_enqueue(event);
-    return;
- bad:
-    event_notification_free(handle, event.notification);
+    if (!sent) {
+	    error("Could not map object to an agent: %s\n", objname);
+    }
 }
 
 /* Dequeue events from the event queue and fire them at the
@@ -347,7 +375,7 @@ dequeue(event_handle_t handle)
 static int
 get_static_events(event_handle_t handle)
 {
-	MYSQL_RES	*res;
+	MYSQL_RES	*res, *agent_res, *group_res;
 	MYSQL_ROW	row;
 	int		nrows;
 	struct timeval	now, time;
@@ -366,32 +394,50 @@ get_static_events(event_handle_t handle)
 	 * That is, we want to be able to quickly map from "cbr0" to
 	 * the node on which it lives (for dynamic events).
 	 */
-	res = mydb_query("select vi.vname,vi.vnode,r.node_id,o.type "
-			 " from virt_agents as vi "
-			 "left join reserved as r on "
-			 " r.vname=vi.vnode and r.pid=vi.pid and r.eid=vi.eid "
-			 "left join event_objecttypes as o on "
-			 " o.idx=vi.objecttype "
-			 "where vi.pid='%s' and vi.eid='%s'",
-			 4, pid, eid);
+	agent_res =
+		mydb_query("select vi.vname,vi.vnode,r.node_id,o.type "
+			   " from virt_agents as vi "
+			   "left join reserved as r on "
+			   " r.vname=vi.vnode and r.pid=vi.pid and "
+			   " r.eid=vi.eid "
+			   "left join event_objecttypes as o on "
+			   " o.idx=vi.objecttype "
+			   "where vi.pid='%s' and vi.eid='%s'",
+			   4, pid, eid);
 
-	if (!res) {
+	if (!agent_res) {
 		error("getting virt_agents list for %s/%s", pid, eid);
 		return 0;
 	}
-	nrows = mysql_num_rows(res);
-	agents = calloc(nrows, sizeof(struct agent));
+
+	/*
+	 * We also need the event_groups table so we know how many entries.
+	 */
+	group_res =
+		mydb_query("select group_name,agent_name from event_groups "
+			   "where pid='%s' and eid='%s'",
+			   2, pid, eid);
+
+	if (!group_res) {
+		error("getting virt_groups list for %s/%s", pid, eid);
+		return 0;
+	}
+	
+	agents = calloc(mysql_num_rows(agent_res) + mysql_num_rows(group_res),
+			sizeof(struct agent));
 	if (agents == NULL) {
-		error("cannot allocate memory, too many agents (%d)\n", nrows);
+		error("cannot allocate memory, too many agents/groups\n");
 		return 0;
 	}
 
+	nrows = mysql_num_rows(agent_res);
 	while (nrows--) {
-		row = mysql_fetch_row(res);
+		row = mysql_fetch_row(agent_res);
 
 		if (!row[0] || !row[1] || !row[3])
 			continue;
 
+		strcpy(agents[numagents].name,    row[0]);
 		strcpy(agents[numagents].objname, row[0]);
 		strcpy(agents[numagents].vnode,   row[1]);
 		strcpy(agents[numagents].objtype, row[3]);
@@ -425,7 +471,7 @@ get_static_events(event_handle_t handle)
 		}
 		numagents++;
 	}
-	mysql_free_result(res);
+	mysql_free_result(agent_res);
 	
 	if (debug) {
 		for (adx = 0; adx < numagents; adx++) {
@@ -435,6 +481,50 @@ get_static_events(event_handle_t handle)
 			     agents[adx].vnode,
 			     agents[adx].nodeid,
 			     agents[adx].ipaddr);
+		}
+	}
+
+	/*
+	 * Now get the group list. To make life simple, I just create
+	 * new entries in the agents table, named by the group name, but
+	 * with the info from the underlying agent duplicated, for each
+	 * member of the group. 
+	 */
+	nrows = mysql_num_rows(group_res);
+	while (nrows--) {
+		row = mysql_fetch_row(group_res);
+
+		/*
+		 * Find the agent entry.
+		 */
+		for (adx = 0; adx < numagents; adx++) {
+			if (!strcmp(agents[adx].name, row[1]))
+				break;
+		}
+		if (adx == numagents) {
+			error("Could not find group event %s/%s",
+			      row[0], row[1]);
+			return 0;
+		}
+
+		/*
+		 * Copy the entry, but rename it to the group name.
+		 */
+		memcpy((void *)&agents[numagents], (void *)&agents[adx],
+		       sizeof(struct agent));
+		strcpy(agents[numagents].name, row[0]);
+		numagents++;
+	}
+	mysql_free_result(group_res);
+
+	if (debug) {
+		for (adx = 0; adx < numagents; adx++) {
+			if (!strcmp(agents[adx].objname, agents[adx].name))
+				continue;
+			
+			info("Group %d: %10s %10s\n", adx,
+			     agents[adx].name,
+			     agents[adx].objname);
 		}
 	}
 
@@ -491,7 +581,7 @@ get_static_events(event_handle_t handle)
 		firetime = atof(EXTIME);
 
 		for (adx = 0; adx < numagents; adx++) {
-			if (!strcmp(agents[adx].objname, OBJNAME))
+			if (!strcmp(agents[adx].name, OBJNAME))
 				break;
 		}
 		if (adx == numagents) {

@@ -16,7 +16,7 @@ include $(OBJDIR)/Makeconf
 
 LIB_STUFF    = lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
 		  nsobject.tcl traffic.tcl vtype.tcl parse.tcl program.tcl \
-		  nsenode.tcl nstb_compat.tcl
+		  nsenode.tcl nstb_compat.tcl event.tcl
 BOSSLIBEXEC  = parse-ns
 USERLIBEXEC  = parse.proxy
 
