@@ -5,12 +5,16 @@ the eepro100.
 A client PC equipped with such a card and configured to boot from the network
 first does the following:
 
-1. the LAN card uses DHCP to get its IP info from a standard DHCP server
-2. as PXE requires DHCP extensions, and thus cannot use may standard DHCP
-   servers, so it gets redirected to a Proxy DHCP server (proxydhcp* in
-   this directory)
-3. This server tells the client which boot program to download via TFTP
-   and the client does so.
+1. The LAN card uses DHCP to get its IP info from a standard DHCP server.
+
+2. PXE requires DHCP extensions, so a PXE-saavy DHCP server is required.
+   ISC's DHCP V3 server can handle the extensions so we just use it.
+   If you are using V2 of their server, you will need a "proxy" DHCP
+   server to handle the PXE interaction.  See, for example, proxydhcp
+   from www.bpbatch.org.
+
+3. The (proxy) DHCP server tells the client which boot program to download
+   via TFTP and the client does so.
 
 The above steps are not specific to the testbed.  Starting with the execution
 of the downloaded boot program, a testbed specific protocol takes over:
@@ -22,15 +26,19 @@ of the downloaded boot program, a testbed specific protocol takes over:
 5. This server (bootinfo* in this directory) is responsible for determining,
    in a testbed-specific way, what action should be performed by the client.
    This action is either boot from a specific partition on the hard disk
-   or download (via TFTP) a particular multiboot OSKit kernel (e.g., netboot)
+   or download (via TFTP) a FreeBSD kernel and memory-based filesystem to
+   run from.  The former is the typical case where the disk is already
+   loaded and we are just booting an OS.  The latter (kernel+MFS) case is
+   used in situations where we want to load (or save) the disk.
    Bootinfo has a variety of backends, tracing the evolutionary path of
    where it got its info from.  Currently we use the mysql backend which
    talks to our DB.
 
 6. Finally, pxeboot transfers control either to the first-level boot code
-   in the indicated hard disk partition or to the OSKit kernel it has just
-   downloaded.
+   in the indicated hard disk partition or to the TFTP loaded kernel+MFS.
 
 If you are interested in more general remote booting mechanisms see:
 www.bpbatch.org.
- 
+
+
+Last updated: Thu Jul 15 10:34:47 MDT 2004
