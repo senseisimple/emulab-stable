@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -62,6 +62,14 @@ if (!$isadmin) {
     }
 }
 
+#
+# See if user is privledged for deletion.
+#
+$prived = 0;
+if ($isadmin || TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELUSER)) {
+    $prived = 1;
+}
+
 SUBPAGESTART();
 SUBMENUSTART("Group Options");
 WRITESUBMENUBUTTON("Edit this Group",
@@ -77,7 +85,7 @@ if (strcmp($gid, $pid)) {
 SUBMENUEND();
 
 SHOWGROUP($pid, $gid);
-SHOWGROUPMEMBERS($pid, $gid);
+SHOWGROUPMEMBERS($pid, $gid, $prived);
 SUBPAGEEND();
 
 #
