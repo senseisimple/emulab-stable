@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,31 +11,97 @@ SUBDIR		= robots/primotion
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = dgrobot
-PROGS = gorobot
-TESTS = test_gorobot.sh
+ifeq ($(BRAINSTEM_DIR),)
+PROGS = 
+else
+PROGS = garcia-pilot
+endif
 
-all: all-subdirs $(PROGS)
+all client: $(PROGS)
+client-install: client
+	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_ETCDIR)
+	$(INSTALL_PROGRAM) garcia-pilot \
+		$(DESTDIR)$(CLIENT_BINDIR)/garcia-pilot
+	$(INSTALL_DATA) $(SRCDIR)/garcia.config \
+		$(DESTDIR)$(CLIENT_ETCDIR)/garcia.config
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CXXFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CXXFLAGS	       += -I${SRCDIR}/../mtp
-CXXFLAGS	       += -DGROBOT_SIM
+CXXFLAGS	+= -O -g -Wall -I${OBJDIR} -I/usr/local/include
+CXXFLAGS	+= -I${SRCDIR}/../mtp -I../mtp
 
 LDFLAGS		= -L../mtp -Ldgrobot
 
-LIBS	 += -lmtp -ldgrobot
+ifeq ($(host_cpu),arm)
+BRAINSTEM_ARCH=ARM
+else
+BRAINSTEM_ARCH=$(host_cpu)
+endif
+
+ifeq ($(BRAINSTEM_DIR),)
+CXXFLAGS	+= -DGROBOT_SIM
+else
+CXXFLAGS += \
+	-DaUNIX \
+	-I$(BRAINSTEM_DIR)/aCommon \
+	-I$(BRAINSTEM_DIR)/aUnix \
+	-I$(BRAINSTEM_DIR)/aIO/aCommon \
+	-I$(BRAINSTEM_DIR)/aIO/aUnix \
+	-I$(BRAINSTEM_DIR)/aUI/aCommon \
+	-I$(BRAINSTEM_DIR)/aUI/aUnix \
+	-I$(BRAINSTEM_DIR)/aRelease/aSystem \
+	-I$(BRAINSTEM_DIR)/aStem/aCommon \
+	-I$(BRAINSTEM_DIR)/aStem/aUnix \
+	-I$(BRAINSTEM_DIR)/aGarcia/aGarcia \
+	-I$(BRAINSTEM_DIR)/aGarcia/aUnix \
+	-I$(BRAINSTEM_DIR)/aGarcia/aCommon
+
+ifeq ($(host_cpu),arm)
+LDFLAGS += -static
+endif
+
+LDFLAGS += \
+	-L$(BRAINSTEM_DIR)/aDebug/aUnix/$(BRAINSTEM_ARCH)/ \
+	-laGarcia \
+	-laStem \
+	-laIO \
+	-laUI \
+	-lpthread \
+	-lm
+endif
+
+LIBS	 += -lmtp # -ldgrobot
 
 test_gorobot.sh: gorobot
 
+PILOT_OBJS = \
+	buttonManager.o \
+	dashboard.o \
+	garcia-pilot.o \
+	garciaUtil.o \
+	ledManager.o \
+	pilotButtonCallback.o \
+	pilotClient.o \
+	wheelManager.o
+
+garcia-pilot-debug: $(PILOT_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+
+garcia-pilot: garcia-pilot-debug
+	$(STRIP) -o $@ $<
+
+flash-user-led: flash-user-led.o ledManager.o garciaUtil.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+watch-user-button: watch-user-button.o buttonManager.o garciaUtil.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
 gorobot: gorobot.o ../mtp/libmtp.a dgrobot/libdgrobot.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ gorobot.o $(LIBS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ gorobot.o $(LIBS)
 
 clean: clean-subdirs
 	rm -f *.o
-
-install:
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
