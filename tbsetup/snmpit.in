@@ -281,7 +281,7 @@ sub ParseArgs {
     elsif (/^-h(.*)/) {$help = 2;}
     elsif (/^-off(.*)/) {$powerop = "off";}
     elsif (/^-on(.*)/) {$powerop = "on";}
-    elsif (/^-cyc(.*)/) {$powerop = "cyc";}
+    elsif (/^-cyc(.*)/) {$powerop = "cycle";}
     elsif (/^-a(.*)/) {$a="enable";}
     elsif (/^-dup(.*)/) {$dup = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-spd(.*)/) {$spd = ($1 ? $1 : shift(@CMDS));}
@@ -340,7 +340,7 @@ sub ParseArgs {
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
       "\t[-d|-e] [-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
     # Hidden Power control functionality
-    # "\t[ [-on|-off|-cyc] | [-<n>] ]\n";
+    # "\t[ [-on|-off|-cycle] | [-<n>] ]\n";
   }
   if ($help > 1) {
     print
@@ -372,7 +372,7 @@ sub ParseArgs {
     # Hidden Power control functionality
     # "  -on   Turn on outlets\n",
     # "  -off  Turn off outlets\n",
-    # "  -cyc  Power Cycle outlets\n",
+    # "  -cycle  Power Cycle outlets\n",
     # "  -(n)  Outlet #(n) (n=1-8)\n";
   }
   #Unused letters of the alphabet:
