@@ -1,3 +1,94 @@
+stoller     2003/09/30 09:30:09 MDT
+
+  Modified files:
+    db                   libdb.pm.in 
+    tbsetup              assign_wrapper.in batch_daemon.in 
+                         batchexp.in endexp.in nscheck.in 
+                         startexp.in swapexp.in tbswap.in 
+    www                  beginexp.php3 boot.php3 dbdefs.php3.in 
+                         defs.php3.in delaycontrol.php3 
+                         editexp.php3 endexp.php3 modifyexp.php3 
+                         nscheck.php3 showexp.php3 showstuff.php3 
+                         swapexp.php3 
+  Log:
+  Up to now we have had two state variables associated with an experiment,
+  plus a lock field. The lock field was a simple "experiment locked, go away"
+  slot that is easy to use when you do not care about the actual state that
+  an experiment is in, just that it is in "transition" and should not be
+  messed with.
+  
+  The other two state variables are "state" and "batchstate". The former
+  (state) is the original variable that Chris added, and was used by the tb*
+  scripts to make sure that the experiment was in the state each particular
+  script wanted them to be in. But over time (and with the addition of so
+  much wrapper goo around them), "state" has leaked out all over the place to
+  determine what operations on an experiment are allowed, and if/when it
+  should be displayed in various web pages. There are a set of transition
+  states in addition to the usual "active", "swapped", etc like "swapping"
+  that make testing state a pain in the butt.
+  
+  I added the other state variable ("batchstate") when I did the batch
+  system, obviously! It was intended as a wrapper state to control access to
+  the batch queue, and to prevent batch experiments from being messed with
+  except when it was really okay (for example, its okay to terminate a
+  swapped out batch experiment, but not a swapped in batch experiment since
+  that would confuse the batch daemon). There are fewer of these states, plus
+  one additional state for "modifying" experiments.
+  
+  So what I have done is change the system to use "batchstate" for all
+  experiments to control entry into the swap system, from the web interface,
+  from the command line, and from the batch daemon. The other state variable
+  still exists, and will be brutally pushed back under the surface until its
+  just a vague memory, used only by the original tb* scripts. This will
+  happen over time, and the "batchstate" variable will be renamed once I am
+  convinced that this was the right thing to do and that my changes actually
+  work as intended.
+  
+  Only people who have bothered to read this far will know that I also added
+  the ability to cancel experiment swapin in progress. For that I am using
+  the "canceled" flag (ah, this one was named properly from the start!), and
+  I test that at various times in assign_wrapper and tbswap. A minor downside
+  right now is that a canceled swapin looks too much like a failed swapin,
+  and so tbops gets email about it. I'll fix that at some point (sometime
+  after the boss complains).
+  
+  I also cleaned up various bits of code, replacing direct calls to exec
+  with calls to the recently improved SUEXEC interface. This removes
+  some cruft from each script that calls an external script.
+  
+  Cleaned up modifyexp.ph3 quite a bit, reformatting and indenting.
+  Also fixed to not run the parser directly! This was very wrong; should
+  call nscheck instead. Changed to use "nobody" group instead of group
+  flux (made the same change in nscheck).
+  
+  There is a script in the sql directory called newstates.pl. It needs
+  to be run to initialize the batchstate slot of the experiments table
+  for all existing experiments.
+  
+  Revision  Changes    Path
+  1.131     +49 -18    testbed/db/libdb.pm.in
+  1.128     +30 -1     testbed/tbsetup/assign_wrapper.in
+  1.39      +108 -39   testbed/tbsetup/batch_daemon.in
+  1.38      +19 -8     testbed/tbsetup/batchexp.in
+  1.27      +74 -59    testbed/tbsetup/endexp.in
+  1.8       +16 -5     testbed/tbsetup/nscheck.in
+  1.57      +50 -46    testbed/tbsetup/startexp.in
+  1.42      +200 -82   testbed/tbsetup/swapexp.in
+  1.27      +17 -6     testbed/tbsetup/tbswap.in
+  1.37      +29 -58    testbed/www/beginexp.php3
+  1.7       +2 -2      testbed/www/boot.php3
+  1.59      +10 -10    testbed/www/dbdefs.php3.in
+  1.44      +32 -23    testbed/www/defs.php3.in
+  1.6       +2 -2      testbed/www/delaycontrol.php3
+  1.3       +7 -7      testbed/www/editexp.php3
+  1.34      +44 -67    testbed/www/endexp.php3
+  1.10      +174 -151  testbed/www/modifyexp.php3
+  1.9       +22 -19    testbed/www/nscheck.php3
+  1.71      +20 -12    testbed/www/showexp.php3
+  1.116     +137 -123  testbed/www/showstuff.php3
+  1.19      +36 -53    testbed/www/swapexp.php3
+
+
 stoller     2003/09/24 17:23:40 MDT
 
   Modified files:
