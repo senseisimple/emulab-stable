@@ -1,6 +1,6 @@
 #####
 ##### Setting up the Utah Network Testbed software
-##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6, and FreeBSD 4.7
+##### Most recently tested on FreeBSD 4.10.
 #####
 
 ##### Step 0 - OS installation and setup
@@ -32,13 +32,19 @@ space to hold them:
 			which aids per-project accountability.
 /groups/      - Needs enough space for files shared by the sub-groups of
 			projects. These are primarily used by classes, if any.
-/share/       - Exported read-only to all nodes, we use it for providing the
-			source for the FreeBSD and Linux versions we run to
-			experimenters.
+/share/       - Exported read-only to all nodes, we use it for providing to
+			experimenters the source for the FreeBSD and Linux
+			versions we run as well as common packages and RPMs.
+			This could require anything from 1GB to 20GB+ depending
+			on what you want to make available.
 			
 You may want to enforce quotas on the user-writable filesystems. This is the
 main reason you'd want to keep them in separate filesystems (ie. so people can
 have different /users/ and /proj/ quotas.)
+
+Note also since /share is exported read-only, FreeBSD requires that it be on
+a separate filesystem from anything that is exported read-write.  So while
+/users, /proj and /groups can be on the same filesystem, /share cannot.
 
 Make sure that, no matter how you decide to partition things up, you make
 symlinks to the appropriate places. ie., if you make one big filesystem called
