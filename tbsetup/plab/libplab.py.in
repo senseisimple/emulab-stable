@@ -596,8 +596,10 @@ class Plab:
         """
         print "Getting free Plab nodes ..."
         try:
-            agent = self._createAgentProxy(insecure = True)
-            avail = tryXmlrpcCmd(agent.getads)
+#            agent = self._createAgentProxy(insecure = True)
+#            avail = tryXmlrpcCmd(agent.getads)
+# right now these are the only 2.0 machines running the new slice interface:
+	     avail = [ '198.78.49.59', '18.31.0.213', '169.229.50.85', '169.229.50.89', '128.112.152.124', '12.46.129.23' ]
         except:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to dslice agent: %s: %s" % (extype, exval)
