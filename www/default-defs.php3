@@ -2,7 +2,7 @@
 #
 # Default definitions. Selected via configure.
 # 
-$TBWWW          = "<https://www.emulab.net/tbdb.html>";
+$TBWWW          = "<https://www.emulab.net/>";
 $TBBASE         = "https://www.emulab.net/";
 $TBMAIL_CONTROL = "Testbed Ops <testbed-ops@flux.cs.utah.edu>";
 $TBMAIL_WWW     = "Testbed WWW <testbed-www@flux.cs.utah.edu>";
