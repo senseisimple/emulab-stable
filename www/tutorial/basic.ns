@@ -1,5 +1,6 @@
 # This is a simple ns script. Comments start with #.
 set ns [new Simulator]                  
+source tb_compat.tcl
 
 # define the 4 nodes in the topology. 
 set NodeA [$ns node]
