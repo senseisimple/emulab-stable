@@ -118,6 +118,7 @@ sub handler () {
     $SIG{TERM} = 'IGNORE';
     $SIG{INT} = 'IGNORE';
     unlink($pidfile);
+    system("tmcc state SHUTDOWN");
     kill('TERM', -$pgrp);
     sleep(1);
     exit(0);
@@ -175,7 +176,11 @@ print "Informing Emulab Operations that we're up and running ...\n";
 system("tmcc state ISUP");
 
 # Done!
-print "Done! Exiting ...\n";
-unlink($pidfile);
+while (1) {
+    #
+    # Loop until killed. 
+    #
+    sleep(1000);
+}
 exit(0);
 
