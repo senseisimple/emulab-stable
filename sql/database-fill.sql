@@ -480,6 +480,13 @@ REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','def
 REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','[-\\w]+',1,32,NULL);
+REPLACE INTO table_regex VALUES ('location_info','building','text','regex','[-\\w]+',1,32,NULL);
+REPLACE INTO table_regex VALUES ('location_info','loc_x','int','redirect','default:int',0,2048,NULL);
+REPLACE INTO table_regex VALUES ('location_info','loc_y','int','redirect','default:int',0,2048,NULL);
+REPLACE INTO table_regex VALUES ('location_info','contact','text','redirect','users:usr_name',0,64,NULL);
+REPLACE INTO table_regex VALUES ('location_info','phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
+REPLACE INTO table_regex VALUES ('location_info','room','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nodes','node_id','text','regex','^[-\\w]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','eid','text','redirect','experiments:eid',0,0,NULL);
