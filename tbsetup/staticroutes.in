@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -306,8 +306,10 @@ foreach my $result (@results) {
 #
 # Clean the routes.
 #
-DBQueryFatal("delete from virt_routes where ".
-	     "pid='$pid' and eid='$eid'");
+if (! $impotent) {
+    DBQueryFatal("delete from virt_routes where ".
+		 "pid='$pid' and eid='$eid'");
+}
 
 #
 # Now it gets fun. We have to go through each src:dst pair in the route
