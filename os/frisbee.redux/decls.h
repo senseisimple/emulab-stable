@@ -17,17 +17,17 @@
 /*
  * The number of chunk buffers in the client.
  */
-#define MAXCHUNKBUFS	16
+#define MAXCHUNKBUFS	64
 
 /*
  * The number of read-ahead chunks that the client will request
- * at a time. No point in requesting to far ahead either, since they
+ * at a time. No point in requesting too far ahead either, since they
  * are uncompressed/written at a fraction of the network transfer speed.
  * Also, with multiple clients at different stages, each requesting blocks
  * it is likely that there will be plenty more chunks ready or in progress.
  */
 #define MAXREADAHEAD	2
-#define MAXINPROGRESS	4
+#define MAXINPROGRESS	8
 
 /*
  * Timeout (in usecs) for packet receive. The idletimer number is how
@@ -36,12 +36,13 @@
  * more.
  */
 #define PKTRCV_TIMEOUT		30000
-#define CLIENT_IDLETIMER_COUNT	1
+#define CLIENT_IDLETIMER_COUNT	3
 
 /*
  * Timeout (in seconds!) server will hang around with no active clients.
+ * Make it zero to never exit. 
  */
-#define SERVER_INACTIVE_SECONDS	30
+#define SERVER_INACTIVE_SECONDS	0
 
 /*
  * The number of disk read blocks in a single read on the server.
