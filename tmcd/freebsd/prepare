@@ -20,15 +20,17 @@ my $RUNDIR      = "/var/run";
 my $HISTORY     = "/root/.history";
 my $MAILFILE    = "/var/mail/root";
 my $LEASES      = "/var/db/dhclient.leases";
-my $NTPDRIFT    = "/etc/ntp/drift";
+my $NTPDRIFT    = "/etc/ntp.drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
+my $MOUNTINFO	= "/var/db/mounttab";
+my $LOCATEDB	= "/var/db/locate.database";
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/rc.d/testbed";
+use lib "/etc/testbed";
 use libsetup;
 
 #
@@ -90,7 +92,8 @@ opendir(LOG,$LOGDIR) or
 while ($dirent = readdir(LOG)) {
     my $file = $LOGDIR . "/" . $dirent;
     if (-f $file) {
-        if (($file =~ /\.\d$/) || ($file =~ /\.\d\.gz$/)) {
+        if (($file =~ /\.\d+$/) || ($file =~ /\.\d\.gz$/) ||
+	    ($file =~ /\.(today|yesterday)$/)) {
             # Remove archived logfiles
             unlink($file) or
                 die("Could not unlink $file: $!");
@@ -102,6 +105,20 @@ while ($dirent = readdir(LOG)) {
     }
 }
 closedir(LOG);
+
+#
+# Must remove /var/db/mounttab or else at boot time the node will attempt
+# to contact all the servers listed in the file to tell them that the
+# indicated filesystems are no longer mounted by this node.  Normally this
+# is harmless however, if the listed server is not reachable in the image's
+# new environment (e.g., you are making an image for another testbed), each
+# and every one of the listed server/fs pairs will hang for 5 minutes or so.
+#
+print "Removing $MOUNTINFO ...\n";
+if (-f $MOUNTINFO) {
+    unlink($MOUNTINFO) or
+        die("Could not unlink $MOUNTINFO: $!");
+}    
 
 print "Removing root's history ...\n";
 if (-f $HISTORY) {
@@ -115,20 +132,38 @@ if (-f $MAILFILE) {
         die("Could not unlink $MAILFILE: $!");
 }
 
-print "Removing $NTPDRIFT ...\n";
+#
+# Just removing the drift file results in no drift being tracked,
+# so set it to zero instead.  Not ideal, but at least the clock will
+# stabilize eventually this way.
+#
+print "Resetting drift in $NTPDRIFT ...\n";
 if (-f $NTPDRIFT) {
-    unlink($NTPDRIFT) or
-        die("Could not unlink $NTPDRIFT: $!");
+    open(DRIFT, ">$NTPDRIFT") or
+	die("Could not open $NTPDRIFT: $!");
+    print DRIFT "0\n";
+    close(DRIFT);
 }
 
-print "Cleaing .pid files ...\n";
+print "Clearing $LOCATEDB ...\n";
+truncate($LOCATEDB,0) or
+    die("Could not truncate $LOCATEDB: $!");
+
+print "Cleaning .pid files ...\n";
 system("rm -rf $RUNDIR/*.pid");
 
-print "Cleaing out /tmp ...\n";
+print "Cleaning out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
 
 print "Removing dhclient leases ...\n";
 system("rm -f $LEASES");
+
+#
+# Urk.  Old copies of passwd files are stored here...
+#
+print "Cleaning out /var/backups ...\n";
+system("rm -rf /var/backups/*");
+
 
 print "Removing SFS files ...\n";
 if (-f $SFSUSERS) {
