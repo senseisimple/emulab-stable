@@ -10,6 +10,11 @@ in YYYYMMDD format.
 
 	Run sql/fixstats_swapmod.pl to fix up stats records.
 
+	Run "/usr/testbed/etc/rc.d/and start" as root on ops to start
+	up the auto nice daemon.  This daemon is not required,
+	however, it can save you from greedy users that consume too
+	much CPU and cause experiment swapin to fail.
+
 20040901:
 	New SSL version of the XMLRPC server.
 
