@@ -143,9 +143,10 @@ TBDebugTimeStamp("os_setup started");
 # Get the set of nodes, as well as the nodes table information for them.
 #
 $db_result =
-    DBQueryFatal("select n.*,l.pid from reserved as r ".
+    DBQueryFatal("select n.*,l.pid,nt.* from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
 		 "where r.pid='$pid' and r.eid='$eid'");
 
 if ($db_result->numrows < 1) {	
@@ -157,19 +158,24 @@ while (my %row = $db_result->fetchhash()) {
     my $node     = $row{'node_id'};
     my $osid     = $row{'def_boot_osid'};
     my $type     = $row{'type'};
+    my $subnode  = $row{'issubnode'};
+    my $virtnode = $row{'isvirtnode'};
+    my $jailnode = $row{'jailflag'};
+    my $plabnode = $row{'isplabdslice'};
     my $bootpath = 0;
-    my $jailnode = 0;
-    my $plabnode = 0;
 
     #
     # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
     # a bit, and so run them through the checks below.
     #
-    if (TBIsNodeVirtual($node, \$jailnode, \$plabnode)) {
+    if ($virtnode) {
 	$vnodes{$node} = ($jailnode || $plabnode);
 	if (! $jailnode && ! $plabnode) {
 	    next;
 	}
+    }
+    elsif ($subnode) {
+	print "Skipping subnode $node\n";
     }
     else {
 	my $nodeAllocState;
