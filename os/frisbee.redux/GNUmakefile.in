@@ -34,7 +34,7 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
-CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
+CFLAGS		= -O2 -g -Wall -fno-builtin-log -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
 #
