@@ -1194,6 +1194,8 @@ CREATE TABLE switch_stack_types (
   supports_private tinyint(1) NOT NULL default '0',
   single_domain tinyint(1) NOT NULL default '1',
   snmp_community varchar(32) default NULL,
+  min_vlan int(11) default NULL,
+  max_vlan int(11) default NULL,
   PRIMARY KEY  (stack_id)
 ) TYPE=MyISAM;
 
