@@ -12,7 +12,7 @@ package snmpit_lib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( macport portnum Dev NodeCheck vlanmemb vlanid);
+@EXPORT = qw( macport portnum Dev DevType NodeCheck vlanmemb vlanid);
 
 use English;
 use Mysql;
@@ -24,6 +24,9 @@ my $sth;
 
 my %Devices=();
 # Devices maps device names to device IPs
+
+my %DevTypes=();
+# DevTypes maps device names to device types
 
 my %Interfaces=();
 # Interfaces maps pcX:Y<==>MAC
@@ -67,6 +70,11 @@ sub Dev {
   return $Devices{$val};
 }
 
+sub DevType {
+  my $val = shift || "";
+  return $DevTypes{$val};
+}
+
 sub vlanmemb {
   my $val = shift || "";
   return $vlanmembers{$val};
@@ -97,20 +105,22 @@ sub ReadTranslationTable {
   }
 
   print "FILLING %Devices\n" if $debug;
-  $sth = $dbh->query("select i.node_id,i.IP from interfaces as i ".
+  $sth = $dbh->query("select i.node_id,i.IP,n.type from interfaces as i ".
 		     "left join nodes as n on n.node_id=i.node_id ".
 		     "where n.role!='testnode'");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]";
-    $ip = "$_[1]";
+    $ip   = "$_[1]";
+    $type = "$_[2]";
     $Devices{$name} = $ip;
+    $DevTypes{$name} = $type;
     $Devices{$ip} = $name;
-    print "Devices: $name <==> $ip\n" if $debug > 1;
+    print "Devices: $name ($type) <==> $ip\n" if $debug > 1;
   }
 
   print "FILLING %Ports\n" if $debug;
   $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
-		     "from wires where node_id2 like 'cisco%';");
+		     "from wires;");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
     print "Name='$name'\t" if $debug > 2;
