@@ -1,0 +1,545 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use XML::Parser;
+
+#
+# XXX user-specified desires assumed to be between 1 and DESIREMAX
+#
+my $DESIREMAX = 5;
+
+#
+# Drift to allow between our clock and the gmond nodes
+#
+my $STALESLOP = 1 * 60;
+
+#
+# Age (in seconds) at which we consider metric data stale
+#
+my $STALEAGE  = 30 * 60;
+
+my $fetch   = 0;
+my $debug   = 0;
+my $xmlfile = "/tmp/plabxml";
+my $showload = 0;
+my $showcpu = 0;
+my $showmem = 0;
+my $showdisk = 0;
+my $showhost = 1;
+my $showip = 0;
+my $showstate = 0;
+my $now = time();
+
+my $optlist = "CDLMSdfhin";
+
+sub usage()
+{
+    print STDOUT
+	"Usage: plabstats [-dfh] [-CDHILMS]\n".
+	"  -d	print debug diagnostics\n".
+	"  -f	fetch new data, else use what is in $xmlfile\n".
+	"  -h	this help message\n".
+	"  -i	print IP address along with metrics\n".
+	"  -n	do not print hostname with metrics\n".
+	"\n".
+	"  -C	print Ganglia CPU metrics, sorted by %CPU usage\n".
+	"  -D	print Ganglia disk metrics, sorted by %disk usage\n".
+	"  -L	print Ganglia load metrics, sorted by one minute load\n".
+	"  -M	print Ganglia memory metrics, sorted by %mem usage\n".
+	"  -S	print Emulab state info, summarizing per-node availability\n".
+	"\n".
+	"Default is to print a terse summary of per-node resource usage.\n";
+
+    exit(-1);
+}
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my %nodemap     = ();
+my $LOADMETRIC;
+my $MAXLOAD;
+my $MINDISK;
+
+# Current cluster and host.
+my $cluster;
+my $host;
+my $IP;
+my $metricsage;
+my %metrics;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug   = 1;
+}
+if (defined($options{"f"})) {
+    $fetch = 1;
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (defined($options{"i"})) {
+    $showip = 1;
+}
+if (defined($options{"n"})) {
+    $showhost = 0;
+}
+if (defined($options{"C"})) {
+    $showcpu = 1;
+}
+if (defined($options{"D"})) {
+    $showdisk = 1;
+}
+if (defined($options{"L"})) {
+    $showload = 1;
+}
+if (defined($options{"M"})) {
+    $showmem = 1;
+}
+if (defined($options{"S"})) {
+    $showstate = 1;
+}
+
+#
+# Set default values
+#
+if (TBSiteVarExists("plab/load_metric")) {
+    $LOADMETRIC = TBGetSiteVar("plab/load_metric");
+    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
+	undef $LOADMETRIC;
+    }
+}
+if (!defined($LOADMETRIC)) {
+    $LOADMETRIC = "load_fifteen";
+}
+
+$MAXLOAD = 5.0;
+if (TBSiteVarExists("plab/max_load")) {
+    $MAXLOAD = TBGetSiteVar("plab/max_load");
+}
+$MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
+$MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
+
+$MINDISK = 10;
+if (TBSiteVarExists("plab/min_disk")) {
+    $MINDISK = TBGetSiteVar("plab/min_disk");
+}
+$MINDISK = 0 if $MINDISK < 0;
+$MINDISK = 100 if $MINDISK > 100;
+
+#
+# Download the metrics from the plab site.
+# Do this before hitting the DB in case it fails.
+#
+if ($fetch) {
+    #
+    # Must prevent hangs ...
+    #
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 60;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	fatal("Timed out downloading XML data from web site!")
+	    if ($? == 15);
+	    
+	fatal("Could not download XML data from web site!")
+	    if ($?);
+    }
+    else {
+	exec("/usr/local/bin/wget -q -O $xmlfile ".
+	     "http://www.planet-lab.org/xml/gmetad.xml");
+	exit(0);
+    }
+}
+
+#
+# Grab the node list from the DB in one query, which we use later to
+# map from the IP we get from the XML output, to our node_id. 
+#
+my $query_result =
+    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
+    		 "and nt.type like 'pcplab%'");
+
+while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
+    $nodemap{$IP} = $nodeid;
+}
+
+#
+# Compute max load for each user-specified level
+#
+my @level;
+if ($showstate) {
+    for (my $i = 0; $i < $DESIREMAX; $i++) {
+	$level[$i+1] = $MAXLOAD * (1.0 - ($i / $DESIREMAX));
+    }
+}
+
+#
+# Finally, run the parser.
+#
+$p1 = new XML::Parser(Style => 'Tree');
+$p1->setHandlers('Start'   => \&StartElement,
+		 'End'     => \&EndElement);
+
+fatal($@)
+    if (eval { $p1->parsefile($xmlfile); return 1; } != 1);
+
+#
+# Loop thru the IP map looking for any nodes that we have listed in the DB
+# but for which we got no metrics.
+#
+$debug = 0;
+foreach my $arg (keys(%nodemap)) {
+    $IP = $arg;
+    if (defined($nodemap{$IP})) {
+	$host = "(" . $nodemap{$IP} . ")";
+	ShowMetrics();
+	undef($host);
+	undef($metricsage);
+	%metrics = ();
+    }
+}
+
+sub SortMe
+{
+    my $pat;
+    my $akey;
+    my $bkey;
+
+    if ($showload) {
+	$pat = q(LOAD1 ([\d\.]+));
+    } elsif ($showcpu) {
+	$pat = q(%USED ([\d\.]+));
+    } elsif ($showmem) {
+	$pat = q(%USED ([\d\.]+));
+    } elsif ($showdisk) {
+	$pat = q(%USED ([\d\.]+));
+    } else {
+	$pat = q(^\s*([\d\.]+));
+    }
+    ($akey) = $a =~ /$pat/;
+    ($bkey) = $b =~ /$pat/;
+
+    return $akey <=> $bkey;
+}
+
+for $line (sort SortMe @nodelist) {
+    print "$line\n";
+}
+
+exit(0);
+
+sub CheckMetrics()
+{
+    if (!defined($metrics{load_one})) {
+	print "* * * WARNING $host: no load_one metric\n"
+	    if $debug;
+	$metrics{load_one} = 100;
+    }
+    if (!defined($metrics{load_five})) {
+	print "* * * WARNING $host: no load_five metric\n"
+	    if $debug;
+	$metrics{load_five} = 100;
+    }
+    if (!defined($metrics{load_fifteen})) {
+	print "* * * WARNING $host: no load_fifteen metric\n"
+	    if $debug;
+	$metrics{load_fifteen} = 100;
+    }
+
+    if (!defined($metrics{cpu_idle})) {
+	print "* * * WARNING $host: no cpu_idle metric\n"
+	    if $debug;
+	$metrics{cpu_idle} = 0;
+    }
+    if (!defined($metrics{cpu_user})) {
+	print "* * * WARNING $host: no cpu_user metric\n"
+	    if $debug;
+	$metrics{cpu_user} = 100.0;
+    }
+    if (!defined($metrics{cpu_nice})) {
+	print "* * * WARNING $host: no cpu_nice metric\n"
+	    if $debug;
+	$metrics{cpu_nice} = 0;
+    }
+    if (!defined($metrics{cpu_system})) {
+	print "* * * WARNING $host: no cpu_system metric\n"
+	    if $debug;
+	$metrics{cpu_system} = 0;
+    }
+
+    if (!defined($metrics{mem_free})) {
+	print "* * * WARNING $host: no mem_free metric\n"
+	    if $debug;
+	$metrics{mem_free} = 0;
+    }
+    if (!defined($metrics{mem_cached})) {
+	print "* * * WARNING $host: no mem_cached metric\n"
+	    if $debug;
+	$metrics{mem_cached} = 0;
+    }
+    if (!defined($metrics{mem_buffers})) {
+	print "* * * WARNING $host: no mem_buffers metric\n"
+	    if $debug;
+	$metrics{mem_buffers} = 0;
+    }
+    if (!defined($metrics{mem_shared})) {
+	print "* * * WARNING $host: no mem_shared metric\n"
+	    if $debug;
+	$metrics{mem_shared} = 0;
+    }
+    if (!defined($metrics{mem_total})) {
+	print "* * * WARNING $host: no mem_total metric\n"
+	    if $debug;
+	$metrics{mem_total} = $metrics{mem_free} + $metrics{mem_cached} +
+	    $metrics{mem_buffers} + $metrics{mem_shared};
+    }
+    $metrics{mem_total} = 1
+	if $metrics{mem_total} == 0;
+
+    if (!defined($metrics{bytes_in})) {
+	print "* * * WARNING $host: no bytes_in metric\n"
+	    if $debug;
+	$metrics{bytes_in} = 0;
+    }
+    if (!defined($metrics{bytes_out})) {
+	print "* * * WARNING $host: no bytes_out metric\n"
+	    if $debug;
+	$metrics{bytes_out} = 0;
+    }
+
+    if (!defined($metrics{disk_free})) {
+	print "* * * WARNING $host: no disk_free metric\n"
+	    if $debug;
+	$metrics{disk_free} = 0;
+    }
+    if (!defined($metrics{disk_total})) {
+	print "* * * WARNING $host: no disk_total metric\n"
+	    if $debug;
+	$metrics{disk_total} = $metrics{disk_free};
+    }
+    $metrics{disk_total} = 1
+	if $metrics{disk_total} == 0;
+}
+
+#
+# Show whatever metric we care about
+#
+sub ShowMetrics()
+{
+    my $line;
+
+    CheckMetrics();
+
+    if ($showload) {
+	$line = "LOAD1 $metrics{load_one} ".
+	        "LOAD5 $metrics{load_five} ".
+		"LOAD15 $metrics{load_fifteen} ";
+    } elsif ($showcpu) {
+	my $cpu = 100.0 - $metrics{cpu_idle};
+	$line = sprintf("%%USED %.1f ", $cpu);
+	$line .= "USER $metrics{cpu_user} ".
+		 "NICE $metrics{cpu_nice} ".
+		 "SYS $metrics{cpu_system} ".
+		 "IDLE $metrics{cpu_idle} ";
+    } elsif ($showmem) {
+	my $mem = 100.0 -
+	    (($metrics{mem_free} + $metrics{mem_cached} +
+	      $metrics{mem_buffers}) * 100.0 / $metrics{mem_total});
+	$line = sprintf("%%USED %.1f ", $mem);
+	$line .= "TOTAL $metrics{mem_total} ".
+	         "FREE $metrics{mem_free} ".
+	         "CACHED $metrics{mem_cached} ".
+	         "BUFFERS $metrics{mem_buffers} ".
+	         "SHARED $metrics{mem_shared} ";
+    } elsif ($showdisk) {
+	my $disk = 100.0 - ($metrics{disk_free} * 100.0 / $metrics{disk_total});
+	$line = sprintf("%%USED %.1f ", $disk);
+	$line .= "TOTAL $metrics{disk_total} ".
+		 "FREE $metrics{disk_free} ";
+    } else {
+	my $cpu = 100.0 - $metrics{cpu_idle};
+	my $memfree = $metrics{mem_free} + $metrics{mem_cached} +
+	    $metrics{mem_buffers};
+	my $mem = 100.0 - ($memfree * 100.0 / $metrics{mem_total});
+	my $disk = 100.0 - ($metrics{disk_free} * 100.0 / $metrics{disk_total});
+	my $netbw = ($metrics{bytes_in} + $metrics{bytes_out}) / 1000.0;
+
+	$line = sprintf("%6.2f %5.1f %5.1f %5.1f %6.2f ",
+		       $metrics{$LOADMETRIC}, $cpu, $mem, $disk, $netbw);
+    }
+    $line .= "$host "
+	if $showhost;
+    $line .= "$IP "
+	if $showip;
+
+    if ($showstate) {
+	my $gotone = 0;
+
+	$line .= "STATE=";
+	if (!defined($nodemap{$IP})) {
+	    $gotone = 1;
+	    $line .= "reject_unknown_node";
+	}
+	if (!defined($metricsage)) {
+	    $line .= "," if $gotone++;
+	    $line .= "reject_no_data";
+	} elsif ($metricsage > $STALEAGE) {
+	    $line .= "," if $gotone++;
+	    $line .= "reject_stale_data";
+	}
+	if ($metrics{disk_free}/$metrics{disk_total}*100.0 < $MINDISK) {
+	    $line .= "," if $gotone++;
+	    $line .= "reject_diskspace";
+	}
+	if ($metrics{$LOADMETRIC} >= $MAXLOAD) {
+	    $line .= "," if $gotone++;
+	    $line .= "reject_load";
+	}
+	if (!$gotone) {
+	    my $i;
+	    for ($i = 1; $i <= $DESIREMAX; $i++) {
+		last if $level[$i] < $metrics{$LOADMETRIC};
+		$line .= "," if $i > 1;
+		$line .= "accept_$i";
+	    }
+	}
+    }
+
+    # XXX so we can detect nodes we got status for but not in the DB
+    undef($nodemap{$IP});
+
+    push @nodelist, $line;
+}
+
+#
+# Start an element.
+# 
+sub StartElement ($$$)
+{
+    my ($expat, $element, %attrs) = @_;
+
+    SWITCH: for ($element) {
+	/^CLUSTER/i && do {
+	    fatal("Out of Sync: CLUSTER!")
+		if (defined($cluster) || defined($host));
+	    
+	    fatal("Malformed CLUSTER Element!")
+		if (!defined($attrs{"NAME"}));
+	    
+	    $cluster = $attrs{"NAME"};
+	    last SWITCH;
+	};
+	/^HOST/i && do {
+	    fatal("Out of Sync: HOST!")
+		if (defined($host) || !defined($cluster));
+	    
+	    fatal("Malformed HOST Element!")
+		if (!defined($attrs{"NAME"}));
+	    
+	    $host = $attrs{"NAME"};
+	    $IP   = $attrs{"IP"};
+
+	    $metricsage = $now - $attrs{"REPORTED"};
+	    if ($metricsage < 0) {
+		print "* * * WARNING $host: bogus report time (" .
+		    $attrs{"REPORTED"} . " > $now)\n";
+		$metricsage = 0x3fffffff;
+	    }
+	    last SWITCH;
+	};
+	/^METRIC/i && do {
+	    fatal("Out of Sync: METRIC!")
+		if (!defined($host) || !defined($cluster));
+
+	    fatal("Malformed METRIC Element!")
+		if (!defined($attrs{"NAME"}) ||
+		    !defined($attrs{"VAL"}));
+		
+	    $metrics{$attrs{"NAME"}} = $attrs{"VAL"};
+	    last SWITCH;
+	};
+    }
+}
+
+#
+# End an element.
+# 
+sub EndElement ($$)
+{
+    my ($expat, $element) = @_;
+
+    SWITCH: for ($element) {
+	/^CLUSTER/i && do {
+	    fatal("Out of Sync (End): CLUSTER!")
+		if (!defined($cluster) || defined($host));
+	    
+	    undef($cluster);
+	    last SWITCH;
+	};
+	/^HOST/i && do {
+	    fatal("Out of Sync (End): HOST!")
+		if (!defined($host) || !defined($cluster));
+
+	    ShowMetrics();
+
+	    undef($host);
+	    undef($IP);
+	    undef($metricsage);
+	    %metrics = ();
+	    last SWITCH;
+	};
+	/^METRIC/i && do {
+	    fatal("Out of Sync (End): METRIC!")
+		if (!defined($host) || !defined($cluster));
+
+	    last SWITCH;
+	};
+    }
+}
+
+
+
+sub fatal {
+    my $msg = $_[0];
+
+    die($msg);
+}
