@@ -96,7 +96,6 @@ typedef struct {
     int in_addr;
     int  lastmsg;
 } ec_elt;
-int ec_elt_size = sizeof(ec_elt);
 
 ec_elt evcache[EVENTCACHESIZE];
 ec_elt ec_tmp;
@@ -125,7 +124,7 @@ int rv;
 /* Some support functions for the event cache */
 ec_elt* ec_next(ec_elt* ptr) {
     if (ptr < ec_front || ptr > ec_back) { return 0; }
-    ptr += ec_elt_size;
+    ptr += 1;
     if (ptr==ec_back) { ptr = ec_front; }
     return ptr;
 }
@@ -133,7 +132,7 @@ ec_elt* ec_next(ec_elt* ptr) {
 ec_elt* ec_prev(ec_elt* ptr) {
     if (ptr < ec_front || ptr > ec_back) { return 0; }
     if (ptr==ec_front) { ptr = ec_back; }
-    ptr -= ec_elt_size;
+    ptr -= 1;
     return ptr;
 }
 
@@ -370,10 +369,13 @@ main(int argc, char *argv[])
 	}
 #endif
 #ifdef EVENTSYS
-		ec_front=&evcache[0];
-		ec_back=&evcache[EVENTCACHESIZE];
-		ec_head=ec_front;
-		ec_tail=ec_front;
+	ec_front=&(evcache[0]);
+	ec_back=&(evcache[EVENTCACHESIZE]);
+	ec_head=ec_front;
+	ec_tail=ec_front;
+	printf("event_cache_front: %u\nevent_cache_back: %u\nhead:      %u\nhead-next: %u\nhead-prev: %u\n",
+	       ec_front, ec_back, ec_head, ec_next(ec_head),
+	       ec_prev(ec_head));
 #endif
 		
 	printf("Server started on port %d\n\n", ntohs(server.sin_port));
