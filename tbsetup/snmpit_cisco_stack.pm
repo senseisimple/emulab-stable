@@ -147,7 +147,7 @@ sub listVlans($) {
     # the header comment for this function
     #
     my @vlanList;
-    foreach my $vlan (sort {tbsort($a,$b)] keys %vlans) {
+    foreach my $vlan (sort {tbsort($a,$b)} keys %vlans) {
 	push @vlanList, [$vlan, @{$vlans{$vlan}}];
     } 
     return @vlanList;
