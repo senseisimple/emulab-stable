@@ -1450,13 +1450,13 @@ function TBGetNodeLastAct($pc) {
 }
 
 #
-# Gets the time of idleness for a node, in hours
+# Gets the time of idleness for a node, in hours by default (ie '2.75')
 #
-function TBGetNodeIdleTime($pc) {
+function TBGetNodeIdleTime($pc, $format = 0) {
     global $lastact_query;
     $query_result =
 	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
-		    "$lastact_query))/3600 as idle_time from node_activity ".
+		    "$lastact_query)) as idle_time from node_activity ".
 		    "where node_id='$pc'");
 
     if (mysql_num_rows($query_result) == 0) {
@@ -1465,7 +1465,13 @@ function TBGetNodeIdleTime($pc) {
     $row   = mysql_fetch_array($query_result);
     $t = $row[idle_time];
     # if it is less than 5 minutes, it is not idle at all...
-    return ($t < 0.0834 ? 0 : $t);
+    $t = ($t < 300 ? 0 : $t);
+    if (!$format) {
+	$t = round($t/3600,2);
+    } else {
+	$t = date($format,mktime(0,0,$t));
+    }
+    return $t;
 }
 
 #
@@ -1493,7 +1499,7 @@ function TBGetNodeIdleStale($pc) {
 #
 # Gets the time of last activity for an expt
 #
-function TBGetExptLastAct($pid,$eid) {
+function TBGetExptLastAct($pid, $eid) {
     global $lastact_query;
     $query_result =
 	DBQueryWarn("select max($lastact_query) as last_act ".
@@ -1512,11 +1518,11 @@ function TBGetExptLastAct($pid,$eid) {
 #
 # Gets the time of idleness for an expt, in hours
 #
-function TBGetExptIdleTime($pid,$eid) {
+function TBGetExptIdleTime($pid, $eid, $format = 0) {
     global $lastact_query;
     $query_result =
 	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
-		    "max($lastact_query) ))/3600 as idle_time ".
+		    "max($lastact_query))) as idle_time ".
 		    "from node_activity as na ".
 		    "left join reserved as r on na.node_id=r.node_id ".
 		    "where pid='$pid' and eid='$eid' ".
@@ -1528,13 +1534,19 @@ function TBGetExptIdleTime($pid,$eid) {
     $row   = mysql_fetch_array($query_result);
     $t = $row[idle_time];
     # if it is less than 5 minutes, it is not idle at all...
-    return ($t < 0.0834 ? 0 : $t);
+    $t = ($t < 300 ? 0 : $t);
+    if (!$format) {
+	$t = round($t/3600,2);
+    } else {
+	$t = date($format,mktime(0,0,$t));
+    }
+    return $t;
 }
 
 #
 # Find out if an expt's idle report is stale
 #
-function TBGetExptIdleStale($pid,$eid) {
+function TBGetExptIdleStale($pid, $eid) {
     global $lastact_query;
 
     # We currently have a 5 minute interval for slothd between reports

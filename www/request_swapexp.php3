@@ -83,13 +83,13 @@ $c=$r["c"];
 if (!$confirmed) {
     echo "<center><h3><br>
 Experiment '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
-      " reserved, \nand has been sent $swap_requests swap request".
-      ($swap_requests!=1?"s":"")." since it went idle.\n";
+      " reserved,<br>and has been sent $swap_requests swap request".
+      ($swap_requests!=1?"s":"")." since it went idle.<br>";
     if ($swap_requests > 0) {
-      echo "The most recent one was sent at $last_swap_req.\n";
+      echo "The most recent one was sent at $last_swap_req.<br>";
     }
     if ($swap_requests >= $tell_proj_head) {
-      echo "This notification will also be sent to the project leader.\n";
+      echo "This notification will also be sent to the project leader.<br>";
     }
     echo "<p>
           Are you sure you want to send an email message requesting that<br>
@@ -133,48 +133,51 @@ if (! $leaders) {
     TBERROR("Could not get leader emails!", 1);
 }
 
+$lastact = TBGetExptLastAct($pid,$eid);
+$idletime= TBGetExptIdleTime($pid,$eid,"G \h\o\u\\r\s\, i \m\i\\n\u\\t\e\s");
+
+$msg =
+"Hi, this is an important automated message from $THISHOMEBASE.\n\n".
+"It appears that the $c node".($c!=1?"s":"")." in your experiment ".
+"'$eid' ".($c!=1?"have":"has")." been inactive for $idletime, ".
+"since $lastact. ".
+( $swap_requests > 0 
+  ? ("You have been sent ".$swap_requests." other message".
+     ($swap_requests!=1?"s":"")." since this ".
+     "experiment became idle. ")
+  : "").
+($swappable ?
+ ("This experiment is marked as swappable, so it may be ".
+  "automatically swapped out by $THISHOMEBASE or its ".
+  "operational staff.\n") :
+ ("This experiment has not been marked swappable, so it will not be ".
+  "automatically swapped out.\n")).
+"\nWe would appreciate it if you could either terminate or swap this ".
+"experiment out so that the nodes will be available for use by ".
+"other experimenters. You can do this by logging into the ".
+"$THISHOMEBASE Web Interface, and using the swap or terminate ".
+"links on this page:\n\n$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
+"More information on experiment swapping is available in the $THISHOMEBASE ".
+"FAQ at $TBDOCBASE/faq.php3#UTT-Swapping\n\n".
+"More information on our node usage policy is available at ".
+"$TBDOCBASE/docwrapper.php3?docname=swapping.html\n\n".
+"If you feel this message is in error then please contact ".
+"Testbed Operations <$TBMAILADDR_OPS>.\n\n".
+"Thanks!\nTestbed Operations\n";
+
+#print "<pre>\n$msg\n</pre>\n";
+
+# For debugging:
+#TBMAIL("Expt Leader <$TBMAILADDR_OPS>",
 TBMAIL("$expleader_name <$expleader_email>",
-     "$pid/$eid ($c PC".($c!=1?"s":"")."): Please Swap or Terminate Experiment",
-     "Hi, this is an automated message from $THISHOMEBASE.\n".
-       ( $swap_requests > 0 
-         ? ("You have been sent ".$swap_requests." other message".
-	    ($swap_requests!=1?"s":"")." since this ".
-	    "experiment became idle.\n")
-         : "").
-       ($swappable ?
-	("This experiment is marked as swappable, so it may be ".
-	 "automatically \nswapped out by $THISHOMEBASE or its ".
-	 "operational staff.\n") :
-	("This experiment has not been marked swappable, so it will not be\n".
-	 "automatically swapped out.\n")).
-     "\n".
-     "It appears that the $c node".($c!=1?"s":"").
-       " in your experiment '$eid' \n".
-     "in project '$pid' ".($c!=1?"are":"is")." inactive.\n".
-     "We would appreciate it if you could either terminate or swap this\n".
-     "experiment out so that the nodes will be available for use by\n".
-     "other experimenters. You can do this by logging into the $THISHOMEBASE".
-     " Web\nInterface, and using the swap or terminate links on this page:".
-     "\n\n".
-     "        $TBBASE/showexp.php3?pid=$pid&eid=$eid\n".
-     "\n".
-     "More information on experiment swapping is available in the Emulab\n".
-     "FAQ at $TBDOCBASE/faq.php3#UTT-Swapping\n".
-     "\n".
-     "More information on our node usage policy is available at\n".
-     "$TBDOCBASE/docwrapper.php3?docname=swapping.html\n".
-     "\n".
-     "If you feel this message is in error then please contact\n".
-     "$TBMAILADDR_OPS.\n".
-     "\n".
-     "Thanks!\n".
-     "Testbed Operations\n",
-     "From: $TBMAIL_OPS\n".
-     ( $swap_requests >= $tell_proj_head
-       ? "Cc: $leaders\n"
-       : "") .
-     "Bcc: $TBMAIL_OPS\n".
-     "Errors-To: $TBMAIL_WWW");
+       "$pid/$eid ($c PC".($c!=1?"s":"")."): Swap or Terminate Experiment",
+       wordwrap($msg,75),
+       "From: $TBMAIL_OPS\n".
+       ( $swap_requests >= $tell_proj_head
+	 ? "Cc: $leaders\n"
+	 : "") .
+       "Bcc: $TBMAIL_OPS\n".
+       "Errors-To: $TBMAIL_WWW");
 
 #
 # And log a copy so we know who sent it. 
