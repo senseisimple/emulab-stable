@@ -137,7 +137,7 @@ class experiment:
                 pass
             elif opt == "noidleswap_reason":
                 pass
-            elif opt == "autoswap":
+            elif opt == "autoswap" or opt == "max_duration":
                 argstr += " -a "
                 argstr += escapeshellarg(val)
                 pass
