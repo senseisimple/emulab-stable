@@ -37,6 +37,8 @@
  */
 #define PKTRCV_TIMEOUT		30000
 #define CLIENT_IDLETIMER_COUNT	3
+#define TIMEOUT_HZ		(1000000 / PKTRCV_TIMEOUT)
+#define TIMEOUT_HALFHZ		(TIMEOUT_HZ / 2)
 
 /*
  * Timeout (in seconds!) server will hang around with no active clients.

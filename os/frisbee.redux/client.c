@@ -147,11 +147,30 @@ void *
 ClientRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
+	int		BackOff;
 
 	if (debug)
 		log("Receive pthread starting up ...");
 
+	/*
+	 * Use this to control the rate at which we request blocks.
+	 * The IdleCounter is how many ticks we let pass without a
+	 * useful block, before we make another request. We want that to
+	 * be short, but not too short; we do not want to pummel the
+	 * server. 
+	 */
 	IdleCounter = CLIENT_IDLETIMER_COUNT;
+
+	/*
+	 * This is another throttling mechanism; avoid making repeated
+	 * requests to a server that is not running. That is, if the server
+	 * is not responding, slowly back off our request rate (to about
+	 * one a second) until the server starts responding.  This will
+	 * prevent a large group of clients from pummeling the server
+	 * machine, when there is no server running to respond (say, if the
+	 * server process died).
+	 */
+	BackOff = 0;
 
 	while (1) {
 		/*
@@ -164,6 +183,12 @@ ClientRecvThread(void *arg)
 			 if (! IdleCounter) {
 				 RequestChunk(1);
 				 IdleCounter = CLIENT_IDLETIMER_COUNT;
+				 
+				 if (BackOff++) {
+					 IdleCounter += BackOff;
+					 if (BackOff > TIMEOUT_HZ)
+						 BackOff = TIMEOUT_HZ;
+				 }
 			 }
 			 continue;
 		 }
@@ -171,6 +196,7 @@ ClientRecvThread(void *arg)
 
 		 switch (p->hdr.subtype) {
 		 case PKTSUBTYPE_BLOCK:
+			 BackOff = 0;
 			 GotBlock(p);
 			 break;
 
@@ -535,7 +561,7 @@ PlayFrisbee(void)
 			p->hdr.datalen    = sizeof(p->msg.join);
 			p->msg.join.clientid = myid;
 			PacketSend(p);
-			countdown = 10;
+			countdown = TIMEOUT_HALFHZ;
 		}
 
 		/*
