@@ -943,34 +943,6 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
-#
-# SSL Certificate stuff. Used to customize config files in ssl directory.
-# Note that OrganizationalUnit is set in the cnf file.
-# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
-#
-SSLCERT_COUNTRY="US"
-SSLCERT_STATE="Utah"
-SSLCERT_LOCALITY="Salt Lake City"
-SSLCERT_ORGNAME="Utah Network Testbed"
-#
-# Network config stuff. Obviously, this needs to be localized, but there are
-# too many defs files too worry about right now.
-#
-TESTBED_NETWORK=155.98.32.0
-TESTBED_NETMASK=255.255.240.0
-BOSSNODE_IP=155.98.32.70
-USERNODE_IP=155.98.33.74
-CONTROL_ROUTER_IP=155.98.36.1
-CONTROL_NETWORK=155.98.36.0
-CONTROL_NETMASK=255.255.252.0
-PRIVATE_NETWORK=155.98.32.0
-PRIVATE_ROUTER=155.98.32.1
-PRIVATE_NETMASK=255.255.255.0
-PUBLIC_NETWORK=155.98.33.0
-PUBLIC_ROUTER=155.98.33.1
-PUBLIC_NETMASK=255.255.255.0
-DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
-DHCPD_CONTROLNET_DECL=""
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -983,10 +955,12 @@ if test "${with_TBDEFS+set}" = set; then
 	{ echo "configure: error: Invalid TBDEFS - Must specify the value" 1>&2; exit 1; }
     fi
     TBDEFS="$withval"
+    TBPATH=`dirname $withval`
 
 else
   
     TBDEFS="$srcdir/defs-default"
+    TBPATH="$srcdir"
 
 fi
 
@@ -995,7 +969,10 @@ if test -f $TBDEFS; then
     #
     # Remove the comments and newlines.  Really, that's what it does.
     #
+    OLDPATH=$PATH
+    PATH="$TBPATH:$PATH"
     eval `cat $TBDEFS | sed -n -e '{s/#.*$//;H;}; ${g;s/\n/ /g;s/  */ /g;p;}'`
+    PATH=$OLDPATH
 else
 	{ echo "configure: error: Definitions file $TBDEFS was not found." 1>&2; exit 1; }
 fi
@@ -1408,7 +1385,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1412: checking for a BSD compatible install" >&5
+echo "configure:1389: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1579,7 +1556,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	apache/GNUmakefile apache/httpd.conf \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
-	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py xmlrpc/libxmlrpc.pm \
+	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
