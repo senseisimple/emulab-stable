@@ -11,18 +11,27 @@
 CREATE TABLE batch_experiments (
   eid varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
   created datetime default NULL,
   started datetime default NULL,
   expires datetime default NULL,
   name tinytext,
   creator_uid varchar(8) NOT NULL default '',
   start datetime default NULL,
-  numpcs tinyint(4) unsigned default NULL,
-  numsharks tinyint(4) unsigned default NULL,
   status enum('new','configuring','running','stopping') NOT NULL default 'new',
   attempts smallint(5) unsigned NOT NULL default '0',
   canceled tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'current_reloads'
+#
+
+CREATE TABLE current_reloads (
+  node_id varchar(10) NOT NULL default '',
+  image_id varchar(30) NOT NULL default '',
+  PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
 #
@@ -31,17 +40,22 @@ CREATE TABLE batch_experiments (
 
 CREATE TABLE delays (
   node_id varchar(10) NOT NULL default '',
-  card0 tinyint(3) unsigned NOT NULL default '0',
-  card1 tinyint(3) unsigned NOT NULL default '0',
-  delay int(10) unsigned NOT NULL default '0',
-  bandwidth int(10) unsigned NOT NULL default '100',
-  lossrate float(10,3) NOT NULL default '0.000',
-  iface0 text,
-  iface1 text,
+  pipe0 smallint(5) unsigned NOT NULL default '0',
+  delay0 float(10,2) NOT NULL default '0.00',
+  bandwidth0 int(10) unsigned NOT NULL default '100',
+  lossrate0 float(10,3) NOT NULL default '0.000',
+  pipe1 smallint(5) unsigned NOT NULL default '0',
+  delay1 float(10,2) NOT NULL default '0.00',
+  bandwidth1 int(10) unsigned NOT NULL default '100',
+  lossrate1 float(10,3) NOT NULL default '0.000',
+  iface0 varchar(8) NOT NULL default '',
+  iface1 varchar(8) NOT NULL default '',
   eid varchar(32) default NULL,
   pid varchar(32) default NULL,
   vname varchar(32) default NULL,
-  PRIMARY KEY  (node_id,card0,card1)
+  card0 tinyint(3) unsigned default NULL,
+  card1 tinyint(3) unsigned default NULL,
+  PRIMARY KEY  (node_id,iface0,iface1)
 ) TYPE=MyISAM;
 
 #
@@ -94,6 +108,7 @@ CREATE TABLE deltas (
 CREATE TABLE experiments (
   eid varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
   expt_created datetime default NULL,
   expt_expires datetime default NULL,
   expt_name tinytext,
@@ -101,12 +116,64 @@ CREATE TABLE experiments (
   expt_start datetime default NULL,
   expt_end datetime default NULL,
   expt_terminating datetime default NULL,
-  expt_ready tinyint(4) NOT NULL default '0',
+  expt_locked datetime default NULL,
+  expt_swapped datetime default NULL,
+  swappable tinyint(4) NOT NULL default '0',
+  priority tinyint(4) NOT NULL default '0',
   batchmode tinyint(4) NOT NULL default '0',
+  shared tinyint(4) NOT NULL default '0',
   state varchar(12) NOT NULL default 'new',
-  maximum_nodes tinyint(4) default '0',
-  minimum_nodes tinyint(4) default '0',
+  maximum_nodes tinyint(4) default NULL,
+  minimum_nodes tinyint(4) default NULL,
+  testdb tinytext,
+  path tinytext,
+  attempts smallint(5) unsigned NOT NULL default '0',
+  canceled tinyint(4) NOT NULL default '0',
+  batchstate varchar(12) default NULL,
   PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'exppid_access'
+#
+
+CREATE TABLE exppid_access (
+  exp_eid varchar(32) NOT NULL default '',
+  exp_pid varchar(12) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  PRIMARY KEY  (exp_eid,exp_pid,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'group_membership'
+#
+
+CREATE TABLE group_membership (
+  uid varchar(8) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  trust enum('none','user','local_root','group_root','project_root') default NULL,
+  date_applied date default NULL,
+  date_approved datetime default NULL,
+  PRIMARY KEY  (uid,gid,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'groups'
+#
+
+CREATE TABLE groups (
+  pid varchar(12) NOT NULL default '',
+  gid varchar(12) NOT NULL default '',
+  leader varchar(8) NOT NULL default '',
+  created datetime default NULL,
+  description tinytext,
+  unix_gid smallint(5) unsigned NOT NULL auto_increment,
+  unix_name varchar(16) NOT NULL default '',
+  expt_count mediumint(8) unsigned default '0',
+  expt_last date default NULL,
+  PRIMARY KEY  (pid,gid),
+  KEY unix_gid (unix_gid)
 ) TYPE=MyISAM;
 
 #
@@ -126,6 +193,7 @@ CREATE TABLE images (
   path tinytext,
   magic tinytext,
   pid varchar(12) default NULL,
+  load_address text,
   PRIMARY KEY  (imageid)
 ) TYPE=MyISAM;
 
@@ -134,13 +202,13 @@ CREATE TABLE images (
 #
 
 CREATE TABLE interface_types (
-  type enum('fxp','cs') NOT NULL default 'fxp',
+  type enum('fxp','cs','cisco_supervisor','dc','xl','cisco_ip') NOT NULL default 'fxp',
   max_speed int(11) default NULL,
   full_duplex tinyint(1) default NULL,
   manufacturuer varchar(30) default NULL,
   model varchar(30) default NULL,
   ports tinyint(4) default NULL,
-  connector enum('RJ45') default NULL,
+  connector enum('RJ45','SC') default NULL,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -152,11 +220,13 @@ CREATE TABLE interfaces (
   node_id varchar(10) NOT NULL default '',
   card tinyint(3) unsigned NOT NULL default '0',
   port tinyint(3) unsigned NOT NULL default '0',
-  MAC varchar(12) default NULL,
+  mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
   IPalias varchar(15) default NULL,
-  interface_type enum('fxp','cs') default NULL,
+  interface_type enum('fxp','cs','cisco_supervisor','dc','xl','cisco_ip') default NULL,
   iface text,
+  current_speed enum('100','10','1000') NOT NULL default '100',
+  duplex enum('full','half') NOT NULL default 'full',
   PRIMARY KEY  (node_id,card,port)
 ) TYPE=MyISAM;
 
@@ -168,6 +238,16 @@ CREATE TABLE last_reservation (
   node_id varchar(10) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   PRIMARY KEY  (node_id,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'lastlogin'
+#
+
+CREATE TABLE lastlogin (
+  uid varchar(10) NOT NULL default '',
+  time datetime default NULL,
+  PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
 #
@@ -192,12 +272,48 @@ CREATE TABLE loginmessage (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'newdelays'
+#
+
+CREATE TABLE newdelays (
+  node_id varchar(10) NOT NULL default '',
+  pipe0 smallint(5) unsigned NOT NULL default '0',
+  delay0 int(10) unsigned NOT NULL default '0',
+  bandwidth0 int(10) unsigned NOT NULL default '100',
+  lossrate0 float(10,3) NOT NULL default '0.000',
+  pipe1 smallint(5) unsigned NOT NULL default '0',
+  delay1 int(10) unsigned NOT NULL default '0',
+  bandwidth1 int(10) unsigned NOT NULL default '100',
+  lossrate1 float(10,3) NOT NULL default '0.000',
+  iface0 varchar(8) NOT NULL default '',
+  iface1 varchar(8) NOT NULL default '',
+  eid varchar(32) default NULL,
+  pid varchar(32) default NULL,
+  vname varchar(32) default NULL,
+  card0 tinyint(3) unsigned default NULL,
+  card1 tinyint(3) unsigned default NULL,
+  PRIMARY KEY  (node_id,iface0,iface1)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'next_reserve'
+#
+
+CREATE TABLE next_reserve (
+  node_id varchar(10) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'node_types'
 #
 
 CREATE TABLE node_types (
-  type enum('pc','shark','intel','cisco','APC') NOT NULL default 'pc',
-  proc enum('PIII','StrongARM','Intel510','Cisco6509') default NULL,
+  class enum('pc','shark','switch','power') NOT NULL default 'pc',
+  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','PC27','pc1500') NOT NULL default 'pc600',
+  proc enum('PIII','StrongARM','Intel510','Cisco6509','P4') default NULL,
   speed smallint(5) unsigned default NULL,
   RAM smallint(5) unsigned default NULL,
   HD float(10,2) default NULL,
@@ -209,7 +325,23 @@ CREATE TABLE node_types (
   imageid varchar(30) NOT NULL default '',
   delay_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
+  delay_osid varchar(30) default NULL,
+  pxe_boot_path text,
   PRIMARY KEY  (type)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'nodelog'
+#
+
+CREATE TABLE nodelog (
+  node_id varchar(10) NOT NULL default '',
+  log_id smallint(5) unsigned NOT NULL auto_increment,
+  type enum('misc') NOT NULL default 'misc',
+  reporting_uid varchar(8) NOT NULL default '',
+  entry tinytext NOT NULL,
+  reported datetime default NULL,
+  PRIMARY KEY  (node_id,log_id)
 ) TYPE=MyISAM;
 
 #
@@ -218,12 +350,15 @@ CREATE TABLE node_types (
 
 CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
-  type enum('pc','shark','intel','cisco','APC') default NULL,
+  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500') default NULL,
+  role enum('testnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
   def_boot_osid varchar(30) NOT NULL default '',
   def_boot_path text,
   def_boot_cmd_line text,
+  next_boot_osid varchar(30) NOT NULL default '',
   next_boot_path text,
   next_boot_cmd_line text,
+  pxe_boot_path text,
   rpms text,
   deltas text,
   tarballs text,
@@ -231,7 +366,24 @@ CREATE TABLE nodes (
   startstatus tinytext,
   ready tinyint(4) unsigned NOT NULL default '0',
   priority smallint(6) NOT NULL default '-1',
+  bootstatus enum('okay','failed','unknown') default 'unknown',
   status enum('up','possibly down','down','unpingable') default NULL,
+  failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
+  routertype enum('none','ospf','static') NOT NULL default 'none',
+  next_pxe_boot_path text,
+  bios_version varchar(64) default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'nodeuidlastlogin'
+#
+
+CREATE TABLE nodeuidlastlogin (
+  node_id varchar(10) NOT NULL default '',
+  uid varchar(10) NOT NULL default '',
+  date date default NULL,
+  time time default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -245,6 +397,17 @@ CREATE TABLE nologins (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'nsfiles'
+#
+
+CREATE TABLE nsfiles (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  nsfile text,
+  PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'os_info'
 #
 
@@ -255,7 +418,7 @@ CREATE TABLE os_info (
   version varchar(12) default '',
   path tinytext,
   magic tinytext,
-  machinetype enum('pc','shark') NOT NULL default 'pc',
+  machinetype enum('pc600','pc850','dnard','pc1500') default NULL,
   osfeatures set('ping','ssh','ipod') default NULL,
   pid varchar(12) default '',
   PRIMARY KEY  (osid)
@@ -304,6 +467,8 @@ CREATE TABLE proj_memb (
   uid varchar(8) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   trust enum('none','user','local_root','group_root') default NULL,
+  date_applied date default NULL,
+  date_approved date default NULL,
   PRIMARY KEY  (uid,pid)
 ) TYPE=MyISAM;
 
@@ -318,7 +483,6 @@ CREATE TABLE projects (
   name tinytext,
   URL tinytext,
   funders tinytext,
-  affil tinytext,
   addr tinytext,
   head_uid varchar(8) NOT NULL default '',
   num_members int(11) default '0',
@@ -329,18 +493,11 @@ CREATE TABLE projects (
   unix_gid smallint(5) unsigned NOT NULL auto_increment,
   approved tinyint(4) default '0',
   public tinyint(4) NOT NULL default '0',
+  public_whynot tinytext,
+  expt_count mediumint(8) unsigned default '0',
+  expt_last date default NULL,
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid)
-) TYPE=MyISAM;
-
-#
-# Table structure for table 'reloads'
-#
-
-CREATE TABLE reloads (
-  node_id varchar(10) NOT NULL default '',
-  image_id varchar(30) NOT NULL default '',
-  PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
 #
@@ -354,6 +511,89 @@ CREATE TABLE reserved (
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
   PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'scheduled_reloads'
+#
+
+CREATE TABLE scheduled_reloads (
+  node_id varchar(10) NOT NULL default '',
+  image_id varchar(30) NOT NULL default '',
+  reload_type enum('netdisk','frisbee') default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'switch_stack_types'
+#
+
+CREATE TABLE switch_stack_types (
+  stack_id varchar(10) default NULL,
+  stack_type varchar(10) default NULL
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'switch_stacks'
+#
+
+CREATE TABLE switch_stacks (
+  node_id varchar(10) default NULL,
+  stack_id varchar(10) default NULL
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'tiplines'
+#
+
+CREATE TABLE tiplines (
+  node_id varchar(10) NOT NULL default '',
+  server tinytext NOT NULL,
+  portnum int(11) NOT NULL default '0',
+  keylen smallint(6) NOT NULL default '0',
+  keydata text,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'tipservers'
+#
+
+CREATE TABLE tipservers (
+  server varchar(64) NOT NULL default '',
+  PRIMARY KEY  (server)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'tmcd_redirect'
+#
+
+CREATE TABLE tmcd_redirect (
+  node_id varchar(10) NOT NULL default '',
+  dbname tinytext NOT NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'uidnodelastlogin'
+#
+
+CREATE TABLE uidnodelastlogin (
+  uid varchar(10) NOT NULL default '',
+  node_id varchar(10) NOT NULL default '',
+  date date default NULL,
+  time time default NULL,
+  PRIMARY KEY  (uid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'unixgroup_membership'
+#
+
+CREATE TABLE unixgroup_membership (
+  uid varchar(8) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
+  PRIMARY KEY  (uid,gid)
 ) TYPE=MyISAM;
 
 #
@@ -380,6 +620,7 @@ CREATE TABLE users (
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
   admin tinyint(4) default '0',
   stud tinyint(4) default '0',
+  pswd_expires date default NULL,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
@@ -392,10 +633,10 @@ CREATE TABLE virt_lans (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
-  members text NOT NULL,
-  delay int(10) unsigned default NULL,
+  delay float(10,2) default '0.00',
   bandwidth int(10) unsigned default NULL,
-  lossrate float(10,3) default NULL
+  lossrate float(10,3) default NULL,
+  member text
 ) TYPE=MyISAM;
 
 #
@@ -413,7 +654,9 @@ CREATE TABLE virt_nodes (
   startupcmd tinytext,
   tarfiles text,
   vname varchar(32) NOT NULL default '',
-  type enum('pc','shark') default NULL
+  type enum('pc','shark','pc600','pc850','dnard','pc1500') default NULL,
+  failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
+  routertype enum('none','ospf','static') NOT NULL default 'none'
 ) TYPE=MyISAM;
 
 #
@@ -436,7 +679,7 @@ CREATE TABLE vlans (
 CREATE TABLE wires (
   cable smallint(3) unsigned default NULL,
   len tinyint(3) unsigned NOT NULL default '0',
-  type enum('Node','Serial','Power','Dnard','Control') NOT NULL default 'Node',
+  type enum('Node','Serial','Power','Dnard','Control','Trunk') NOT NULL default 'Node',
   node_id1 char(10) NOT NULL default '',
   card1 tinyint(3) unsigned NOT NULL default '0',
   port1 tinyint(3) unsigned NOT NULL default '0',
