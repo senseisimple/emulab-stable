@@ -243,7 +243,7 @@ if (isset($formfields[usr_key]) &&
         #
 	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
 	$usr_key = $formfields[usr_key];
-	$addpubkeyargs = "-k $uid '$usr_key' ";
+	$addpubkeyargs = "-k $target_uid '$usr_key' ";
     }
 }
 
@@ -258,7 +258,7 @@ if (isset($usr_keyfile) &&
 	$errors["PubKey File"] = "No such file";
     }
     else {
-	$addpubkeyargs = "$uid $usr_keyfile";
+	$addpubkeyargs = "$target_uid $usr_keyfile";
 	chmod($usr_keyfile, 0640);	
     }
 }
