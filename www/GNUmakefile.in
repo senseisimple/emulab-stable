@@ -61,12 +61,17 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS))
 	cd $(INSTALL_WWWDIR) && \
-		rm -f webglimpse \
-		ln -s ../webglimpse webglimpse \
+		if test -d ../webglimpse; \
+		then \
+			rm -f webglimpse; \
+			ln -s ../webglimpse webglimpse; \
+			(cd webglimpse && wgreindex -q); \
+		fi; \
 		rm -f tbdb.html; \
 		ln -s index.html tbdb.html; \
 		rm -f icons; \
 		ln -s /usr/local/www/icons icons;
+
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"

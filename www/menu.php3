@@ -63,6 +63,7 @@ function WRITESIDEBAR() {
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
+    WRITESIDEBARBUTTON("Search Documentation", $TBDOCBASE, "search.php3");
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
