@@ -433,9 +433,6 @@ function PAGEBEGINNING( $title ) {
 	echo "<meta NAME=\"description\" ".
                    "CONTENT=\"emulab - network emulation testbed home\">\n";
     }
-    else {
-	echo "<meta NAME=\"robots\" CONTENT=\"NOINDEX\">\n";
-    }
 
     echo "</head>
             <body bgcolor='#FFFFFF' 
