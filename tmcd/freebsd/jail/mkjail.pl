@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(JailedNFSMounts REMOTE);
+use libsetup qw(JailedMounts REMOTE LOCALROOTFS TMPASSDB TMGROUPDB);
 
 #
 # Questions:
@@ -78,7 +78,7 @@ STDERR->autoflush(1);
 #
 my $JAILPATH	= "/var/emulab/jails";
 my $ETCJAIL     = "/etc/jail";
-my $LOCALFS	= "/users/local";
+my $LOCALFS	= LOCALROOTFS();
 my $LOCALMNTPNT = "/local";
 my $TMCC	= "$BINDIR/tmcc";
 my $JAILCONFIG  = "jailconfig";
@@ -88,7 +88,7 @@ my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
 my @ROOTMNTDIRS = ("bin", "sbin", "usr");
 my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $VNFILESECT  = 64 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
-my $MAXVNDEVS	= 10;
+my $MAXVNDEVS	= 100;
 my $IP;
 my $IPALIAS;
 my $IPMASK;
@@ -98,6 +98,7 @@ my $debug	= 1;
 my $cleaning	= 0;
 my $vndevice;
 my @mntpoints   = ();
+my $nfsmounts = 0;
 my $jailpid;
 my $tmccpid;
 my $interactive = 0;
@@ -357,7 +358,11 @@ sub mkrootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	mysystem("mount -r localhost:/$dir $path/root/$dir");
+	if ($nfsmounts) {
+	    mysystem("mount -r localhost:/$dir $path/root/$dir");
+	} else {
+	    mysystem("mount -r -t null /$dir $path/root/$dir");
+	}
 	push(@mntpoints, "$path/root/$dir");
     }
 
@@ -384,6 +389,10 @@ sub mkrootfs($)
 	$makedevs .= " jail";
     }
     mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV $makedevs");
+
+    # Remove some extraneous devices.
+    mysystem("cd $path/root/dev; rm -f pci io klog console; ".
+	     "ln -sf null console");
     
     #
     # Create stub /var and create the necessary log files.
@@ -428,10 +437,7 @@ sub mkrootfs($)
     mysystem("rm -f $path/root/etc/rc.conf.local");
     mysystem("cp -p $ETCJAIL/rc.local $path/root/etc");
     mysystem("cp -p $ETCJAIL/crontab $path/root/etc");
-    mysystem("cp -p $ETCJAIL/group $path/root/etc");
-    mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
-    mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
 
     # No X11 forwarding. 
     mysystem("cat $path/root/etc/ssh/sshd_config | ".
@@ -456,11 +462,30 @@ sub mkrootfs($)
 	     "$path/root/etc/resolv.conf");
 
     #
+    # Password/group file stuff. If remote the jail picks them up. Locally
+    # we start with current set of accounts on the physnode, since this is
+    # more efficient (less tmcd work), and besides, the physnode starts with
+    # exactly the same accounts.
+    #
+    if (REMOTE()) {
+	mysystem("cp -p $ETCJAIL/group $path/root/etc");
+	mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
+	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
+    }
+    else {
+	mysystem("cp -p /etc/group $path/root/etc");
+	mysystem("cp -p /etc/master.passwd $path/root/etc");
+	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
+	mysystem("cp -p " . TMPASSDB() . ".db $path/root/$DBDIR");
+	mysystem("cp -p " . TMGROUPDB() . ".db $path/root/$DBDIR");
+    }
+    
+    #
     # If the jail gets its own routing table, must arrange for it to
     # be populated with some extras when it boots up.
     # 
     if ($jailflags & $JAIL_ROUTING) {
-	addroutestorc("$path/root/etc/rc.conf");
+	addroutestorc("$path/root/etc/rc.conf.routes");
     }
 
     #
@@ -469,7 +494,13 @@ sub mkrootfs($)
     #
     if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
 	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
-	mysystem("mount localhost:$LOCALFS/$PID $path/root/$LOCALMNTPNT/$PID");
+	if ($nfsmounts) {
+	    mysystem("mount localhost:$LOCALFS/$PID ".
+		     "      $path/root/$LOCALMNTPNT/$PID");
+	} else {
+	    mysystem("mount -t null $LOCALFS/$PID ".
+		     "      $path/root/$LOCALMNTPNT/$PID");
+	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
 
@@ -479,7 +510,7 @@ sub mkrootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedNFSMounts($vnodeid, "$path/root") ) {
+	foreach my $dir ( JailedMounts($vnodeid, "$path/root", $nfsmounts) ) {
 	    push(@mntpoints, "$path/root/$dir");
 	}
     }
@@ -525,7 +556,11 @@ sub restorerootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	mysystem("mount -r localhost:/$dir $path/root/$dir");
+	if ($nfsmounts) {
+	    mysystem("mount -r localhost:/$dir $path/root/$dir");
+	} else {
+	    mysystem("mount -r -t null /$dir $path/root/$dir");
+	}
 	push(@mntpoints, "$path/root/$dir");
     }
 
@@ -536,12 +571,25 @@ sub restorerootfs($)
     push(@mntpoints, "$path/root/proc");
 
     #
+    # Must rebuild the routes list cause of swapmodify.
+    #
+    if ($jailflags & $JAIL_ROUTING) {
+	addroutestorc("$path/root/etc/rc.conf.routes");
+    }
+
+    #
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
     #
     if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
 	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
-	mysystem("mount localhost:$LOCALFS/$PID $path/root/$LOCALMNTPNT/$PID");
+	if ($nfsmounts) {
+	    mysystem("mount localhost:$LOCALFS/$PID ".
+		     "      $path/root/$LOCALMNTPNT/$PID");
+	} else {
+	    mysystem("mount -t null $LOCALFS/$PID ".
+		     "      $path/root/$LOCALMNTPNT/$PID");
+	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
 
@@ -551,7 +599,7 @@ sub restorerootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedNFSMounts($vnodeid, "$path/root") ) {
+	foreach my $dir ( JailedMounts($vnodeid, "$path/root", $nfsmounts) ) {
 	    push(@mntpoints, "$path/root/$dir");
 	}
     }
@@ -572,6 +620,7 @@ sub cleanmess($) {
     mysystem("rm -f $path/root/etc/emulab.cdkey");
     mysystem("rm -f $path/root/etc/emulab.pkey");
 
+    # This is /etc/emulab inside the jail.
     mysystem("rm -f  $path/root/$ETCDIR/*.pem");
     mysystem("rm -f  $path/root/$ETCDIR/cvsup.auth");
     mysystem("rm -rf $path/root/$ETCDIR/.cvsup");
@@ -878,7 +927,7 @@ sub addroutestorc($rc)
     my ($rc)   = @_;
     my $count  = 0;
 
-    open(RC, ">>$rc") or
+    open(RC, ">$rc") or
 	fatal("Could not open $rc to append static routes");
 
     my $routerip  = `cat $BOOTDIR/routerip`;

@@ -22,12 +22,12 @@ use Exporter;
 	 jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
+	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED LOCALROOTFS
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
 	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
-	 TMPROGAGENTS
+	 TMPROGAGENTS TMPASSDB TMGROUPDB
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
@@ -122,12 +122,16 @@ use liblocsetup;
 sub TMCC()		{ "$BINDIR/tmcc"; }
 sub TMHOSTS()		{ "$ETCDIR/hosts"; }
 sub FINDIF()		{ "$BINDIR/findif"; }
-sub LOCALROOTFS()	{ "/users/local"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 #
 # This path is valid only *outside* the jail when its setup.
 # 
 sub JAILDIR()		{ "$VARDIR/jails/$vnodeid"; }
+
+#
+# Also valid outside the jail, this is where we put local project storage.
+#
+sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
 
 #
 # Okay, here is the path mess. There are three environments.
@@ -2165,8 +2169,12 @@ sub jailsetup()
 	print STDOUT "Checking Testbed hostnames configuration ... \n";
 	dohostnames();
 
-	print STDOUT "Checking Testbed group/user configuration ... \n";
-	doaccounts();
+	if (REMOTE()) {
+	    # Locally, the password/group files initially comes from
+	    # outside the jail. 
+	    print STDOUT "Checking Testbed group/user configuration ... \n";
+	    doaccounts();
+	}
 
 	print STDOUT "Checking Testbed RPM configuration ... \n";
 	dorpms();
@@ -2236,6 +2244,8 @@ sub vnodesetup($)
 		die("*** $0:\n".
 		    "    mkdir filed - $eiddir: $!\n");
 	}
+	chmod(0777, $piddir);
+	chmod(0777, $eiddir);
     }
 
     #

@@ -179,8 +179,26 @@ if (-e $pidfile) {
 #
 if (!$debug && !$interactive && TBBackGround($logname)) {
     #
-    # Parent exits normally
+    # Parent exits normally, but we wait until we think the jail is
+    # setup first. This whole approach is wildly hacky.
     #
+    if ($dojail) {
+	my $now   = time();
+	my $goofy = "$vnodedir/root/var/run/emulab-watchdog.pid";
+	my $count = 30;
+	
+	while ($count--) {
+	    sleep(1);
+	    if (-e $goofy) {
+		my (undef,undef,undef,undef,undef,undef,undef,undef,
+                      undef,$mtime,$ctime,undef,undef)
+                          = stat($goofy);
+		exit(0)
+		    if ($mtime >= $now || $ctime >= $now);
+	    }
+	}
+	exit(1);
+    }
     exit(0);
 }
 
@@ -447,8 +465,8 @@ sub cleanup()
 
     $SIG{TERM} = 'IGNORE';
     kill('TERM', -$pgrp);
-    print "Waiting 10 seconds for process group to die off ...\n";
-    sleep(10);
+    print "Waiting 5 seconds for process group to die off ...\n";
+    sleep(5);
     if (! $leavejail) {
 	removevnodedir($vnodedir);
     }
@@ -476,8 +494,8 @@ sub reboot()
 
     $SIG{TERM} = 'IGNORE';
     kill('TERM', -$pgrp);
-    print "Waiting 10 seconds for process group to die off ...\n";
-    sleep(10);
+    print "Waiting 5 seconds for process group to die off ...\n";
+    sleep(5);
     $SIG{TERM} = \&handler;
 }
 

@@ -174,7 +174,8 @@ foreach my $vnode (keys(%curvnodelist)) {
 	$jailflag = "-j";
     }
     print "Setting up vnode $vnode ...\n";
+    # This will not return until the vnode is fully running.
     system("vnodesetup -b $jailflag $vnode");
-    sleep(10);
+    sleep(1);
 }
 exit(0);
