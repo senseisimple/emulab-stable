@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -52,6 +52,13 @@ if (@ARGV) {
     system("kill -KILL -1");
 }
 else {
+    #
+    # Otherwise, wait for the command to exit (prevent zombie), but
+    # then just wait forever. The only way to die is to be killed
+    # from outside the jail via the signal handler above. I suppose
+    # we could look at the exit status of the child ...
+    # 
+    waitpid($childpid, 0);
     while (1) {
 	system("/bin/sleep 10000");
     }
