@@ -12,12 +12,18 @@ $error_message    = 0;
 $login_uid        = 0;
 
 #
+# This has to be set so we can spit out http or https paths properly!
+# Thats because browsers do not like a mix of secure and nonsecure.
+# 
+$BASEPATH	  = "";
+
+#
 # WRITESIDEBARBUTTON(text, link): Write a button on the sidebar menu.
 # We do not currently try to match the current selection so that its
 # link looks different. Not sure its really necessary.
 #
 function WRITESIDEBARBUTTON($text, $base, $link) {
-    $link = "$base" . "$link";
+    $link = "$base/$link";
     
     echo "<!-- Table row for button $text -->
           <tr>
@@ -43,11 +49,15 @@ function WRITESIDEBAR() {
     global $login_status, $login_message, $error_message, $login_uid;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
-    global $TBBASE, $TBDOCBASE, $TBDBNAME;
+    global $TBBASE, $TBDOCBASE, $TBDBNAME, $BASEPATH;
+
+    #
+    # The document base cannot be a mix of secure and nonsecure.
+    # 
 
     echo "<table cellspacing=2 cellpadding=2 border=0 width=150>\n";
 
-    WRITESIDEBARBUTTON("Home", $TBBASE, "index.php3");
+    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
     WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
@@ -169,47 +179,30 @@ function WRITESIDEBAR() {
 
     #
     # Now the login/logout box. Remember, already inside a table.
+    # We want the links to the login/logout pages to always be https,
+    # but the images path depends on whether the page was loaded as
+    # http or https, since we don't want to mix them, since they
+    # cause warnings.
     # 
-    echo "<form action=\"${TBBASE}index.php3\" method=post>\n";
     if ($login_status == $STATUS_LOGGEDIN) {
 	echo "<tr>
-                <td><input type=hidden name=uid value=\"$login_uid\"></td>
-              </tr>
-              <tr>
-                <td align=center>
-                    <b><input type=submit value=Logout name=logout></b>
-                </td>
+               <td align=center height=50 valign=center>
+                <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
+	           <img alt=\"logout\" border=0
+                        src=\"$BASEPATH/logoff.gif\"></a>
+               </td>
               </tr>\n";
     }
     else {
-	#
-	# Get the UID that came back in the cookie so that we can present a
-	# default login name to the user.
-	#
-	if (($known_uid = GETUID()) == FALSE) {
-	    $known_uid = "";
-	}
-
 	echo "<tr>
-                <td>
-                   Username:<br>
-                            <input type=text value=\"$known_uid\"
-                                   name=uid size=8>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                   Password:<br>
-                            <input type=password name=password size=12>
-                </td>
-              </tr>
-              <tr>
-                <td align=center>
-                    <b><input type=submit value=Login name=login></b>
-                </td>
+               <td align=center height=50 valign=center>
+                <a href=\"$TBBASE/login_form.php3\">
+	           <img alt=\"logon\" border=0
+                        src=\"$BASEPATH/logon.gif\"></a>
+               </td>
               </tr>\n";
     }
-    echo "</form>\n";
+
     if ($login_message) {
 	echo "<tr>
                 <td align=center>
@@ -319,32 +312,48 @@ function PAGEHEADER($title) {
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
     global $TBBASE, $TBDOCBASE, $TBDBNAME;
+    global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
+    global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
+    global $BASEPATH, $SSL_PROTOCOL;
 
     #
-    # $login_uid will be set only when the index page is loaded, which
-    # is where the login/logout box is handled. Otherwise, there will
-    # be no $login_status, and $login_uid will be zero. We need to figure
-    # that out so we can generate the proper menu options for the user.
+    # Determine the proper basepath, which depends on whether the page
+    # was loaded as http or https. This lets us be consistent in the URLs
+    # we spit back, so that users do not get those pesky warnings. These
+    # warnings are generated when a page *loads* (say, images, style files),
+    # a mix of http and https. Links can be mixed, and in fact when there
+    # is no login active, we want to spit back http for the documentation,
+    # but https for the start/join pages.
+    #
+    if (isset($SSL_PROTOCOL)) {
+	$BASEPATH = $TBBASE;
+    }
+    else {
+	$BASEPATH = $TBDOCBASE;
+    }
+
+    #
+    # Figure out who is logged in, if anyone.
     # 
-    if ($login_status == $STATUS_NOSTATUS) {
-	if (($known_uid = GETUID()) != FALSE) {
-            #
-            # Check to make sure the UID is logged in (not timed out).
-            #
-            $status = CHECKLOGIN($known_uid);
-            switch ($status) {
-	    case 0:
-		$login_uid    = 0;
-		break;
-	    case 1:
-		$login_status = $STATUS_LOGGEDIN;
-		$login_uid    = $known_uid;
-		break;
-	    case -1:
-		$login_status = $STATUS_TIMEDOUT;
-		$login_uid    = 0;
-		break;
-	    }
+    if (($known_uid = GETUID()) != FALSE) {
+        #
+        # Check to make sure the UID is logged in (not timed out).
+        #
+        $status = CHECKLOGIN($known_uid);
+	switch ($status) {
+	case $CHECKLOGIN_NOTLOGGEDIN:
+	    $login_status = $STATUS_NOSTATUS;
+	    $login_uid    = 0;
+	    break;
+	case $CHECKLOGIN_LOGGEDIN:
+	case $CHECKLOGIN_MAYBEVALID:
+	    $login_status = $STATUS_LOGGEDIN;
+	    $login_uid    = $known_uid;
+	    break;
+	case $CHECKLOGIN_TIMEDOUT:
+	    $login_status = $STATUS_TIMEDOUT;
+	    $login_uid    = 0;
+	    break;
 	}
     }
 
@@ -395,7 +404,8 @@ function PAGEHEADER($title) {
               </script>\n";
     }
     
-    echo " <link rel=\"stylesheet\" href=\"$TBBASE/tbstyle.css\"
+    echo " <meta HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">
+           <link rel=\"stylesheet\" href=\"$BASEPATH/tbstyle.css\"
                  type=\"text/css\">
           </head>\n";
 
@@ -410,7 +420,7 @@ function PAGEHEADER($title) {
     }
 
     echo "<basefont size=4>\n";
-    
+
     WRITEBANNER($title);
     WRITETITLE($title);
 
@@ -449,13 +459,13 @@ function ENDPAGE() {
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER() {
-    global $TBBASE, $TBMAILADDR;
+    global $TBDOCBASE, $TBMAILADDR;
 
     ENDPAGE();
 
     echo "<!-- Force full window! -->
 	  <base target=_top>
-          <center>[<a href=\"$TBBASE\">Emulab.Net Home</a>]</center>
+          <center>[<a href=\"$TBDOCBASE\">Emulab.Net Home</a>]</center>
           <center>
            [<a href=\"http://www.cs.utah.edu/flux/\">Flux Research Group</a>]
            [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]

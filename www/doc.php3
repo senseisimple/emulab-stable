@@ -8,8 +8,8 @@ PAGEHEADER("Documentation");
 ?>
 
 <ul>
-<li><b><a href="docwrapper.php3?docname=tutorial/tutorial.html">
-        Emulab "Getting Started" Tutorial</a></b>
+<li><b><a href="tutorial/tutorial.php3">
+              Emulab "Getting Started" Tutorial</a></b>
      <p>
 
 <li><b><a href="docwrapper.php3?docname=faq.html">

@@ -1,7 +1,12 @@
 <?php
 #
 # Login support: Beware empty spaces (cookies)!
-# 
+#
+
+$CHECKLOGIN_NOTLOGGEDIN = 0;
+$CHECKLOGIN_LOGGEDIN    = 1;
+$CHECKLOGIN_TIMEDOUT    = -1;
+$CHECKLOGIN_MAYBEVALID  = 2;
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -26,10 +31,12 @@ function GENHASH() {
 # logged in.
 # 
 function GETLOGIN() {
+    global $CHECKLOGIN_LOGGEDIN;
+
     if (($uid = GETUID()) == FALSE)
 	    return FALSE;
 
-    if (CHECKLOGIN($uid) == 1)
+    if (CHECKLOGIN($uid) == $CHECKLOGIN_LOGGEDIN)
 	    return $uid;
 
     return FALSE;
@@ -51,18 +58,21 @@ function GETUID() {
 }
 
 #
-# Verify a login by sucking a UID's current hash value out of the database.
+# Verify a login by sucking a UIDs current hash value out of the database.
 # If the login has expired, or of the hashkey in the database does not
 # match what came back in the cookie, then the UID is no longer logged in.
 #
-# Should we advance the timeout since the user is still being active?
-#
-# Returns: 0 if not logged in ever.
-#          1 if logged in okay
-#         -1 if login timed out
+# Returns: if not logged in ever.
+#          if logged in okay
+#          if login timed out
+#          if login record exists, is not timed out, but no hash cookie.
+#             this case will be caught later when the user tries to do
+#             something for which a valid login is required.
 #
 function CHECKLOGIN($uid) {
     global $TBDBNAME, $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
+    global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
+    global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
 
     $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
@@ -75,30 +85,39 @@ function CHECKLOGIN($uid) {
 
     # Not logged in.
     if (($row = mysql_fetch_array($query_result)) == 0) {
-	return 0;
+	return $CHECKLOGIN_NOTLOGGEDIN;
     }
 
     $hashkey = $row[hashkey];
     $timeout = $row[timeout];
 
     # A match?
-    if ($timeout > time() &&
-        strcmp($curhash, $hashkey) == 0) {
-	#
-	# We update the time in the database. Basically, each time the
-	# user does something, we bump the logout further into the future.
-	# This avoids timing them out just when they are doing useful work.
-	#
-	$timeout = time() + $TBAUTHTIMEOUT;
+    if ($timeout > time()) {
+        if (strcmp($curhash, $hashkey) == 0) {
+	    #
+   	    # We update the time in the database. Basically, each time the
+	    # user does something, we bump the logout further into the future.
+	    # This avoids timing them out just when they are doing useful work.
+	    #
+	    $timeout = time() + $TBAUTHTIMEOUT;
 
-	$query_result = mysql_db_query($TBDBNAME,
-		"UPDATE login set timeout='$timeout' ".
-		"WHERE uid=\"$uid\"");
-	if (! $query_result) {
-            $err = mysql_error();
-            TBERROR("Database Error updating login timeout for $uid: $err", 1);
-        }
-	return 1;
+	    $query_result = mysql_db_query($TBDBNAME,
+			"UPDATE login set timeout='$timeout' ".
+			"WHERE uid=\"$uid\"");
+	    if (! $query_result) {
+		$err = mysql_error();
+		TBERROR("Database Error updating login timeout for ".
+			"$uid: $err", 1);
+	    }
+	    return $CHECKLOGIN_LOGGEDIN;
+	}
+	elseif (!isset($curhash) || !$curhash || $curhash == NULL) {
+	    #
+	    # A login is valid, but we have no proof yet. Proof will be
+	    # demanded later by whatever page wants it.
+	    # 
+	    return $CHECKLOGIN_MAYBEVALID;
+	}
     }
 
     #
@@ -111,7 +130,7 @@ function CHECKLOGIN($uid) {
         TBERROR("Database Error deleting login info for $uid: $err\n", 1);
     }
 
-    return -1;
+    return $CHECKLOGIN_TIMEDOUT;
 }
 
 #
@@ -119,17 +138,22 @@ function CHECKLOGIN($uid) {
 # message.
 #
 function LOGGEDINORDIE($uid) {
+    global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
+    global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
 
     $status = CHECKLOGIN($uid);
     switch ($status) {
-    case 0:
-        USERERROR("You $uid do not appear to be logged in!", 1);
+    case $CHECKLOGIN_NOTLOGGEDIN:
+        USERERROR("You do not appear to be logged in!", 1);
         break;
-    case 1:
+    case $CHECKLOGIN_LOGGEDIN:
         return $uid;
         break;
-    case -1:
+    case $CHECKLOGIN_TIMEDOUT:
         USERERROR("Your login has timed out! Please log in again.", 1);
+        break;
+    case $CHECKLOGIN_MAYBEVALID:
+        USERERROR("Your login cannot be verified. Are cookies turned on?", 1);
         break;
     }
     TBERROR("LOGGEDINORDIE failed mysteriously", 1);
@@ -140,7 +164,7 @@ function LOGGEDINORDIE($uid) {
 # 
 function DOLOGIN($uid, $password) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
-    global $TBNAMECOOKIE;
+    global $TBNAMECOOKIE, $TBSECURECOOKIES;
 
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
@@ -197,7 +221,8 @@ function DOLOGIN($uid, $password) {
 	# expire and the user will be forced to log in again anyway. 
 	#
 	$timeout = time() + (60 * 60 * 24);
-	setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/", $TBAUTHDOMAIN, 0);
+	setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/",
+                  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 	#
 	# We give this a really long timeout. We want to remember who the
@@ -224,7 +249,7 @@ function DOLOGIN($uid, $password) {
 # Should we kill the cookie? 
 # 
 function DOLOGOUT($uid) {
-    global $TBDBNAME;
+    global $TBDBNAME, $TBSECURECOOKIES;
 
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT hashkey timeout FROM login WHERE uid=\"$uid\"");
@@ -239,7 +264,7 @@ function DOLOGOUT($uid) {
     }
 
     $hashkey = $row[hashkey];
-    $timeout = time() - 3600;
+    $timeout = time() - 1000000;
 
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM login WHERE uid=\"$uid\"");
@@ -247,7 +272,7 @@ function DOLOGOUT($uid) {
     #
     # Issue a cookie request to delete the cookie. 
     #
-    setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
 
     return 0;
 }

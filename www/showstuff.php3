@@ -206,6 +206,15 @@ function SHOWEXP($pid, $eid) {
     $exp_end     = $exprow[expt_end];
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
+    $exp_ready   = $exprow[expt_ready];
+    $exp_term    = $exprow[expt_terminating];
+
+    if ($exp_ready)
+	$exp_status = "Ready";
+    elseif ($exp_term)
+	$exp_status = "Terminating";
+    else
+	$exp_status = "Configuring";
 
     #
     # Generate the table.
@@ -252,6 +261,11 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Expires: </td>
             <td class=\"left\">$exp_expires</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Status: </td>
+            <td class=\"left\">$exp_status</td>
           </tr>\n";
 
     echo "</table>\n";

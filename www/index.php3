@@ -5,55 +5,6 @@
 require("defs.php3");
 
 #
-# This page gets loaded either as the result of a login/logout click,
-# or as a regular page cause its the base. We deal with login and
-# logout right here. Once that is done, we can move onto writing the
-# actual page contents. The current login status is checked when the
-# menu bar is written, and by the pages themselves when they care.
-#
-# $uid will be set by the login/logout form. We need to set $login_uid
-# (global variable if a valid login. This is for the menu generation. 
-# 
-if (isset($login)) {
-    #
-    # Login button pressed. 
-    #
-    if (!isset($uid) ||
-        strcmp($uid, "") == 0) {
-            $login_status = $STATUS_LOGINFAIL;
-    }
-    else {
-	#
-	# Look to see if already logged in. If the user hits reload,
-	# we are going to get another login post, and this could
-	# update the current login. Try to avoid that if possible.
-        #
-	if (CHECKLOGIN($uid) == 1) {
-            $login_status = $STATUS_LOGGEDIN;
-	    $login_uid    = $uid;
-	}
-	elseif (DOLOGIN($uid, $password)) {
-            $login_status = $STATUS_LOGINFAIL;
-        }
-        else {
-            $login_status = $STATUS_LOGGEDIN;
-	    $login_uid    = $uid;
-        }
-    }
-}
-elseif (isset($logout)) {
-    #
-    # Logout button pressed.
-    #
-    DOLOGOUT($uid);
-    $login_status = $STATUS_LOGGEDOUT;
-}
-#
-# Don't need this anymore. Avoid confusion.
-# 
-unset($uid);
-
-#
 # Standard Testbed Header
 #
 PAGEHEADER("Home");
