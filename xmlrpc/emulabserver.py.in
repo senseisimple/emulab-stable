@@ -154,6 +154,25 @@ def CheckRequiredArgs(argdict, arglist):
     return None
 
 #
+# Check user permission to access a project.
+#
+def CheckProjPermission(uid, pid):
+    if not re.match("^[-\w]*$", pid):
+        return EmulabResponse(RESPONSE_BADARGS,
+                              output="Illegal characters in project ID!")
+
+    res = DBQueryFatal("SELECT trust FROM group_membership "
+                       "WHERE uid=%s and pid=%s and gid=%s",
+                       (uid, pid, pid))
+
+    if len(res) == 0:
+        return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output=("You do not have permission to " +
+                                      "access project: " + pid))
+    
+    return None
+
+#
 # Check user permission to access an experiment.
 # 
 def CheckExptPermission(uid, pid, eid):
@@ -2515,16 +2534,43 @@ class node:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
+        if not argdict.has_key("class"):
+            argdict["class"] = "pc"
+            pass
+
+        if not re.match("^[-\w]*$", str(argdict["class"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node class")
+        
+        type_test = ""
+        if argdict.has_key("type"):
+            if not re.match("^[-\w]*$", str(argdict["type"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed node type")
+            
+            type_test = " and nt.type='%s'" % (str(argdict["type"]),)
+            pass
+
+        pid_clause = ""
+        if argdict.has_key("proj"):
+            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            if permerror:
+                return permerror
+
+            pid_clause = " or p.pid='%s'" % (str(argdict["proj"]),)
+            pass
+        
         res = DBQueryFatal("SELECT count(a.node_id) FROM nodes AS a "
                            "left join reserved as b on a.node_id=b.node_id "
                            "left join node_types as nt on a.type=nt.type "
                            "left join nodetypeXpid_permissions as p "
                            "  on a.type=p.type "
                            "WHERE b.node_id is null and a.role='testnode' "
-                           "  and nt.class = 'pc' and p.pid is null and "
+                           "  and nt.class=%s and "
+                           "      (p.pid is null" + pid_clause + ") and "
                            "      (a.eventstate='ISUP' or "
-                           "       a.eventstate='PXEWAIT') and"
-                           "      (p.pid is null)")
+                           "       a.eventstate='PXEWAIT')" + type_test,
+                           (argdict["class"],))
 
         if len(res) == 0:
             result = 0
@@ -2536,7 +2582,6 @@ class node:
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
-
 
     #
     # Get the console parameters.
