@@ -46,6 +46,8 @@ Activity does not currently include:
        );
 }
 
+my $defidlehours = 2;
+
 print "Got ARGV = ",join(" ",@ARGV),"\n" if $d > 1;
 
 my %args = ();
@@ -72,7 +74,7 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 }
 
 # Configurable parameters
-my $idlehours = $t || 2;
+my $idlehours = $t || $defidlehours;
 my $minpph = $p || 1; # Min packets per hour a non-idle interface sends/rcvs
 my $stalemin = $f || 65; # Max minutes of staleness for latest report
 
@@ -217,7 +219,8 @@ while(@r=$result->fetchrow()) {
 }
 print $result->as_string() if ($d>1);
 
-if (@list > 0) {
+if (($idlehours==$defidlehours) && (@list > 0)) {
+    # Don't clear flags when we're using a time other than the normal one
     $cmd = "update experiments set swap_requests=0 where not (".
       join(" or ",@list).")";
     print "Sending cmd:\n$cmd\n" if $d>1;
