@@ -245,6 +245,11 @@ sub fail {
 	print FLESTLOG "FAIL $_[0]\n";
     }
 };
+sub fail2 {
+    if ($flestlog) {
+	print FLESTLOG "FAIL: $_[0]\n";
+    }
+}
 
 sub step_init {
     open(LOG,"> $logfile");
@@ -423,6 +428,13 @@ sub step_init {
 		doexit(1);
 	    }   
 	}
+	# now we clear 
+	$dbh->do("delete from reserved where pid=\"emulab-ops\"") || do {
+	    prints "FAIL\n";
+	    $fail++;
+	    doexit(1);
+	};
+
 	prints "PASS\n";
 	$pass++;
 
@@ -523,21 +535,21 @@ sub step_test {
 	if (tbexect("echo \"drop database if exists $testdb\" | mysql",TESTLOG)) {
 	    prints "FAIL - Could not drop test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
-	    fail("$test - Drop test DB");
+	    fail2("$test - Drop test DB");
 	    $fail++;
 	    doexit(1);
 	}
 	if (tbexect("echo \"create database $testdb\" | mysql",TESTLOG)) {
 	    prints "FAIL - Could not recreate test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
-	    fail("$test - Recreate test DB");
+	    fail2("$test - Recreate test DB");
 	    $fail++;
 	    doexit(1);
 	}
 	if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
 	    prints "FAIL - Could not populate test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
-	    fail("$test - Populate test DB");
+	    fail2("$test - Populate test DB");
 	    $fail++;
 	    doexit(1);
 	}
@@ -545,7 +557,7 @@ sub step_test {
 	if (-f "$basedir/tests/$test/dbstate") {
 	    if (tbexect("cat $basedir/tests/$test/dbstate | mysql $testdb",TESTLOG)) {
 		prints "FAIL - Could not evaluate dbstate.\n";
-		fail("$test - Evaluate dbstate");
+		fail2("$test - Evaluate dbstate");
 		$fail++;
 		if ($exitonfail) {doexit(1);}
 		next;
@@ -581,7 +593,7 @@ sub step_test {
 		if ($exitonfail) {prints "FAIL\n"; doexit(1);}
 	    } else {
 		$unknown++;
-		$status = "UKNONW";
+		$status = "UKNOWN";
 	    }
 	    prints "$status\n";
 	    if ($flestlog) {
