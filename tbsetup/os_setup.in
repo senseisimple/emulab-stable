@@ -1,55 +1,49 @@
 #!/usr/bin/perl -wT
 use English;
+use Getopt::Std;
 require 'ctime.pl';
 
 #
-# TODO: Delta stuff.
-#       Reload disk images.
-#       Finish up local OS spec stuff. Kinda hacky right now. Does not deal
-#       with command lines or disk images. Only does neboot type stuff and
-#	hardwires the path to /tftpboot/proj/$pid/$imagepaths{$os}
+# Reboot the nodes in an experiment. The nodes table will already contain
+# all the information. This script deals with possible disk reloading,
+# rebooting, and waiting for nodes to come back alive before allowing
+# experiment creation to continue.
 #
-
-#
-# Parse an IR file and determine what OS has been requested on each node.
-# Do the database magic to make it so. Only root, admin types, or the
-# owners of the nodes in an experiments may do this. The machines are then
-# rebooted (or power cycled).
+# TODO: Reload disk images.
 # 
-# usage: os_setup <pid> <eid> <ir_file>
+# usage: os_setup <pid> <eid>
 #
+sub usage()
+{
+    print STDOUT "Usage: os_setup <pid> <eid>\n";
+    exit(-1);
+}
+my  $optlist = "";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
 
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $mail        = "/usr/bin/mail";
-my $tbops       = "testbed-ops\@flux.cs.utah.edu";
 my $dbg		= 0;
 my @nodes       = ();
-my %imagepaths  = ();
-my %imageparts  = ();
-my %nodeos      = ();
-my %nodepath    = ();
-my %nodepart    = ();
+my %osid        = ();
 my %waitfor     = ();
-my $SAVEUID	= $UID;
 my @row;
 
 #
 # This stuff is BOGUS! Quick hack for paper deadline to make Jay happy.
+# If Frisbee works, this might be appropriate.
 #
 my $doreloading = 0;
 my $forcereload = 0;
-my $NETDISK     = "/tftpboot/netdisk";
-my $PAPERADDR	= "boss.emulab.net";
-my $IMAGE       = "/usr/testbed/images/wd0-all.ndz";
-my $RELOADCMD   = "${PAPERADDR}:${IMAGE} wd0";
 my %reload      = ();
+my $osload	= "$TB/bin/os_load";
     
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -58,24 +52,45 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+#
 # Set up for querying the database.
 # 
 use Mysql;
 my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
-if ( $#ARGV != 2) {
-    die("Usage: os_setup <pid> <eid> <ir_file>\n". 	
-	"Sets node OS configuration from a .ir file.\n");
-}
-my $pid = $ARGV[0];
-my $eid = $ARGV[1];
-my $ir  = $ARGV[2];
-
 #
-# Figure out who called us. Only root, tbroot, people with admin status
+# Figure out who called us. Only root, people with admin status
 # in the DB, or the owner of the experiment can run this script.
 #
-
 $db_result = $DB->query("select expt_head_uid from experiments ".
 			"where eid='$eid' and pid='$pid'");
 if ($db_result->numrows < 1) {	
@@ -98,200 +113,32 @@ if ($UID != 0) {
 }
 
 #
-# Open up the ir file.
+# Get the set of nodes, as well as the nodes table information for them.
 #
-if (-e "$ir") {
-    open(IN, $ir) || die("Couldn't open $ir\n");
-}
-else {
-    die("Couldn't open $ir\n");
-}
-
-#
-# Look for the start of the OS section. Exit if not found
-#
-my $ossection=0;
-
-while (<IN>) {
-    if ( /^start os/i ) { 
-	$ossection=1; 
-	print STDERR "Start OS section...\n" if $dbg;
-	last;
-    }
-}
-if ($ossection == 0) {
-    die("No OS section in $ir\n");
+$db_result = $DB->query("select * from nodes left join reserved on ".
+			"nodes.node_id=reserved.node_id ".
+			"where reserved.pid='$pid' and reserved.eid='$eid'");
+if ($db_result->numrows < 1) {	
+    die("There are no nodes assigned to experiment '$eid' in project '$pid'.");
 }
 
-#
-# Parse the images table to see what the local images are.
-# 
-while (<IN>) {
-    if ( /^start images/i ) { 
-	print STDERR "Start IMAGES section...\n" if $dbg;
-	next;
-    }
-    elsif ( /^end images/i ) {
-	print STDERR "End IMAGES section...\n" if $dbg;
-	last;
-    }
-    my ($id,$path,$part) = split();
-    print STDERR "$id $path $part\n" if $dbg;
-    $imagepaths{$id} = $path;
-    $imageparts{$id} = $part;
-}
+for ($i = 0; $i < $db_result->numrows; $i++) {
+    my %row  = $db_result->fetchhash();
+    my $node = $row{'node_id'};
 
-#
-# Okay, parse the OS section.
-# 
-# Search the NODES section for OS labels. Consult the database to make
-# sure the node specified in the IR file is really in the pid/eid that
-# was given on the command line. 
-# 
-while (<IN>) {
-    if ( /^start nodes/i ) { 
-	print STDERR "Start NODES section...\n" if $dbg;
-	next;
-    }
-    elsif ( /^end nodes/i ) {
-	print STDERR "End NODES section...\n" if $dbg;
-	last;
-    }
-    my ($node,$os) = split();
-
-    # untaint since $node is passed off to another program.
-    if ($node =~ /^([-\@\w]+)$/) {
-	$node = $1;
-    }
-    else {
-	die("Bad node name: $node.");
-    }
-    print STDERR "$node $os\n" if $dbg;
-    $nodeos{$node} = $os;
     push(@nodes, $node);
-
-    $db_result = $DB->query("select pid,eid from reserved ".
-			    "where node_id='$node'");
-    if ($db_result->numrows < 1) {	
-	die("There is no node '$node' reserved in the DB.\n");
-    }
-    @row = $db_result->fetchrow_array();
-    if ($row[0] ne "$pid" ||
-	$row[1] ne "$eid") {
-	die("Node '$node' pid/eid mismatch: $pid/$eid ... $row[0]/$row[1]\n");
-    }
+    $osid{$node} = $row{'def_boot_osid'};
 
     #
-    # BOGUS
-    # 
-    $db_result = $DB->query("select pid from last_reservation ".
-			    "where node_id='$node'");
-    $reload{$node} = $forcereload;
-    if ($doreloading) {
-	if ($db_result->numrows) {
-	    @row = $db_result->fetchrow_array();
-	    if ($row[0] ne $pid) {
-		$reload{$node} = 1;
-	    }
-	}
-    }
-
+    # If pingable, then the node is "waitable".
     #
-    # First see if the OS spec is a local one from the images table. We
-    # leave it up to the user to make sure the OS is capable of running
-    # on the node! This local image stuff is pretty hacky right now. I'm
-    # only going to allow netboot type stuff and stuff on partition 4.
-    #
-    if ($imagepaths{$os}) {
-	if ($imageparts{$os} eq "4") {
-	    $nodepart{$node} = 4;
-	    $waitfor{$node}  = 0;
-	    next;
-	}
-	if ($imageparts{$os} eq "mb") {
-	    #
-	    # Okay, now it gets really bad. I'm going to form the tftpboot
-	    # path right here, since local OS specs are not in the database
-	    # disk_images table.
-	    # 
-	    $nodepath{$node} = "/tftpboot/proj/$pid/$imagepaths{$os}";
-	    $waitfor{$node}  = 0;
-	    next;
-	}
-	die("Improper local OS spec: $os. ".
-	    "Partition can currently only be 4 or 'mb' (multiboot)");
-    }
-
-    #
-    # Check to make sure that the OS spec is valid by checking the database.
-    # Cross check type from nodes table against image_ids for that type in
-    # the disk_images table. 
-    #
-    $db_result = $DB->query("select ".
-			    "disk_images.image_id,disk_images.img_path ".
-			    "from disk_images left join nodes ".
-			    "on nodes.type=disk_images.type ".
-			    "and disk_images.image_id='$os' ".
-                            "where nodes.node_id='$node'");
-    if ($db_result->numrows < 1) {	
-	die("Improper image specification $node:$os in IR file.\n");
-    }
-    @row = $db_result->fetchrow_array();
-    $nodepath{$node} = $row[1];
-
-    #
-    # See if the OS that is going to be booted supports a ping feature.
-    # This is the only way we can tell if the machine has come back alive.
-    # If not, then we effectively do not support the os for anything at all.
-    #
-    if (OSFeatureSupported($os, "ping")) {
+    if (OSFeatureSupported($osid{$node}, "ping")) {
 	$waitfor{$node} = 1;
     }
     else {
 	$waitfor{$node} = 0;
     }
-}
-
-#
-# Make the DB changes.
-# 
-foreach my $node ( keys %nodeos ) {
-    my $pc	= $node;
-    my $os	= $nodeos{$node};
-    my $path    = $nodepath{$node};
-
-    print STDOUT "Changing default OS for $pc to $os:$path ".
-	         "and rebooting ...\n";
-
-    #
-    # database goo. Reset the OS stuff.
-    #
-    $sth = $DB->query("update nodes set ".
-		      "def_boot_image_id='$os',def_boot_path='$path' ".
-		      "where node_id='$pc'");
-    if ($sth == 0) {
-	die("Database update failed. Aborted...\n");
-    }
-
-    if ($nodepart{$node}) {
-	#
-	# At this point we would perhaps want to do an os_load, but I'm
-	# not ready to do that. Just skip the node and let the user deal
-	# with it.
-	#
-	printf STDOUT "Skipping $node. You will need to load the OS.\n";
-	next;
-    }
-
-    #
-    # BOGUS!
-    #
-    if ($reload{$pc}) {
-	$sth = $DB->query("update nodes set ".
-			  "next_boot_path='$NETDISK',".
-			  "next_boot_cmd_line='$RELOADCMD' ".
-			  "where node_id='$pc'");
-    }
+    print STDOUT "$node - $osid{$node} - $waitfor{$node}\n" if $dbg;
 }
 
 #
@@ -310,31 +157,28 @@ my $waitstart = time;
 #
 # Now lets wait for them to come back alive.
 #
-foreach my $node ( keys %nodeos ) {
-    $node =~ /^([a-zA-Z0-9_\-]*)$/;
-    my $pc = $1;
-
+foreach my $node ( @nodes ) {
     #
     # Don't bother to wait for nodes that are running foreign OSs since
     # we are not going to deal with them anyway later in the process.
     #
-    if ($waitfor{$pc} == 0) {
-	print STDOUT "Not waiting for $pc to come alive. Foreign OS.\n";
+    if ($waitfor{$node} == 0) {
+	print STDOUT "Not waiting for $node to come alive. Foreign OS.\n";
 	next;
     }	
 
-    if (WaitTillAlive($pc) == 0) {
-	print STDOUT "$pc is alive and well\n";
+    if (WaitTillAlive($node) == 0) {
+	print STDOUT "$node is alive and well\n";
 	next;
     }
 
-    print STDOUT "$pc may be down. This has been reported to testbed-ops.\n";
+    print STDOUT "$node may be down. This has been reported to testbed-ops.\n";
     print STDOUT "Please end this experiment, and try again.\n";
     
     # Reserve it to testbed down
 
     $cmd = "update reserved set pid='testbed',eid='down' ".
-      "where eid='$eid' and pid='$pid' and node_id='$pc'";
+      "where eid='$eid' and pid='$pid' and node_id='$node'";
     print "Using '$cmd'\n" if $dbg;
     $db_result = $DB->query($cmd) 
       || print STDERR "WARNING: Couldn't change reservation:".
@@ -344,16 +188,16 @@ foreach my $node ( keys %nodeos ) {
     }
 
     # Send mail to testbed-ops about it
-    open(MAIL,"| $mail -s \"TESTBED: $pc down?\" $tbops");
-    print MAIL "User ".getpwuid($SAVEUID)." was running expt. $eid\n";
-    print MAIL "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata/$ir\n";
-    print MAIL "but $pc appears to be unresponsive.\n";
-    print MAIL "\nPlease look into this matter. $pc has been reserved to\n";
+    open(MAIL,"| $mail -s \"TESTBED: $node down?\" $TBOPS");
+    print MAIL "User ".getpwuid($UID)." was running expt. $eid\n";
+    print MAIL "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata\n";
+    print MAIL "but $node appears to be unresponsive.\n";
+    print MAIL "\nPlease look into this matter. $node has been reserved to\n";
     print MAIL "the testbed/down experiment until this has been resolved.\n\n";
     print MAIL "Thanks,\nTestbed Operations\ntestbed-ops\@flux.cs.utah.edu\n";
     close(MAIL);
     
-    die("Oops, $pc did not come back alive!\n");
+    die("Oops, $node did not come back alive!\n");
 }
 
 print STDOUT "OS Setup Done!\n";
@@ -401,9 +245,9 @@ sub WaitTillAlive {
 sub OSFeatureSupported {
     local($os)      = $_[0];
     local($feature) = $_[1];
+    local($db_result);
 
-    $db_result = $DB->query("select osfeatures from disk_images ".
-			    "where image_id='$os'");
+    $db_result = $DB->query("select osfeatures from os_info where osid='$os'");
 
     if ($db_result->numrows < 1) {
 	return 0;

@@ -277,7 +277,7 @@ function SHOWNODES($pid, $eid) {
                 <td align=center>Node ID</td>
                 <td align=center>Node Name</td>
                 <td align=center>Type</td>
-                <td align=center>Default<br>Image</td>
+                <td align=center>Default<br>OSID</td>
                 <td align=center>Default<br>Path</td>
                 <td align=center>Default<br>Cmdline</td>
                 <td align=center>Startup<br>Command</td>
@@ -290,13 +290,13 @@ function SHOWNODES($pid, $eid) {
 	        "FROM nodes LEFT JOIN reserved ".
 	        "ON nodes.node_id=reserved.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
-	        "ORDER BY type,node_id");
+	        "ORDER BY type");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
 	    $vname   = $row[vname];
 	    $type    = $row[type];
-	    $def_boot_image_id  = $row[def_boot_image_id];
+	    $def_boot_osid      = $row[def_boot_osid];
 	    $def_boot_path      = $row[def_boot_path];
 	    $def_boot_cmd_line  = $row[def_boot_cmd_line];
 	    $next_boot_path     = $row[next_boot_path];
@@ -329,7 +329,7 @@ function SHOWNODES($pid, $eid) {
                     <td>$node_id</td>
                     <td>$vname</td>
                     <td>$type</td>
-                    <td>$def_boot_image_id</td>
+                    <td>$def_boot_osid</td>
                     <td>$def_boot_path</td>
                     <td>$def_boot_cmd_line</td>
                     <td>$startupcmd</td>
@@ -347,6 +347,92 @@ function SHOWNODES($pid, $eid) {
               </dl>
               </blockquote></blockquote></blockquote></blockquote></h4>\n";
     }
+}
+
+#
+# Show OS INFO record.
+#
+function SHOWOSINFO($osid) {
+    global $TBDBNAME;
+		
+    $query_result = mysql_db_query($TBDBNAME,
+		"SELECT * FROM os_info WHERE osid='$osid'");
+
+    $osrow = mysql_fetch_array($query_result);
+
+    $os_description = $osrow[description];
+    $os_OS          = $osrow[OS];
+    $os_version     = $osrow[version];
+    $os_path        = $osrow[path];
+    $os_magic       = $osrow[magic];
+    $os_machinetype = $osrow[machinetype];
+    $os_osfeatures  = $osrow[osfeatures];
+    $os_pid         = $osrow[pid];
+
+    if (!$os_description)
+	$os_description = "&nbsp";
+    if (!$os_version)
+	$os_version = "&nbsp";
+    if (!$os_path)
+	$os_path = "&nbsp";
+    if (!$os_magic)
+	$os_magic = "&nbsp";
+    if (!$os_osfeatures)
+	$os_osfeatures = "&nbsp";
+    if (!$os_pid)
+	$os_pid = "&nbsp";
+
+    #
+    # Generate the table.
+    #
+    echo "<table align=center border=1>\n";
+
+    echo "<tr>
+            <td>OSID: </td>
+            <td class=\"left\">$osid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Description: </td>
+            <td class=\"left\">$os_description</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Operating System: </td>
+            <td class=\"left\">$os_OS</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Project: </td>
+            <td class=\"left\">$os_pid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Version: </td>
+            <td class=\"left\">$os_version</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Path: </td>
+            <td class=\"left\">$os_path</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Magic (uname -r -s): </td>
+            <td class=\"left\">$os_magic</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Node Type: </td>
+            <td class=\"left\">$os_machinetype</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Features: </td>
+            <td class=\"left\">$os_osfeatures</td>
+          </tr>\n";
+
+    echo "</table>\n";
 }
 
 #

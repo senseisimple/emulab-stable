@@ -29,8 +29,6 @@ my $TBOPS    = "@TBOPSEMAIL@";
 
 my $TYPE     = "pc";
 my $reloader = "$TB/sbin/sched_reload";
-my $IMAGE    = "/usr/testbed/images/wd0-all.ndz";
-my $PART     = 0;
 my $logfile  = "$TB/log/reloadlog";
 my $debug    = 0;
 
@@ -75,7 +73,7 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Loop, looking for nodes to reload.
 # 
 while (1) {
-    my($count, $which, @row, $osid, $node);
+    my($count, $which, @row, $imageid, $node);
     
     #
     # Find all of the free node that have not been reloaded (no pid entry
@@ -110,19 +108,19 @@ while (1) {
     $node = $row[0];
 
     #
-    # Query for the default OSID. I do this each time through the loop
+    # Query for the default imageid. I do this each time through the loop
     # in case it gets changed in the DB.
     #
     $query_result =
-	DBquery("select image_id from node_types where type='$TYPE'");
+	DBquery("select imageid from node_types where type='$TYPE'");
     
     if (! $query_result) {
 	print "DB Error getting node type. Waiting a bit.\n";
 	sleep(10);
 	next;
     }
-    @row  = $query_result->fetchrow_array();
-    $osid = $row[0];
+    @row     = $query_result->fetchrow_array();
+    $imageid = $row[0];
     
     print "Trying to reload $node ...\n";
     
@@ -132,7 +130,7 @@ while (1) {
     # then don't schedule a reload for later. Just fail outright.
     # We will try again in a bit.
     #
-    if (system("$reloader -f $osid $PART $IMAGE $node")) {
+    if (system("$reloader -f $imageid $node")) {
 	#
 	# Could not get it. Wait and go around again.
 	#

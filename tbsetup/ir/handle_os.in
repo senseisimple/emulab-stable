@@ -1,8 +1,6 @@
 #!/usr/bin/perl -w
 
 # This handles all the OS TB commands:
-# create-os
-# set-dnard-os
 # set-node-os
 
 # Yet to do:
@@ -17,11 +15,11 @@ my $DBNAME = "@TBDBNAME@";
 push(@INC, $IRLIB);
 require libir;
 
-if ($#ARGV != 1) {
-    print STDERR "Syntax: $0 ir_file tbcmdfile\n";
+if ($#ARGV != 0) {
+    print STDERR "Syntax: $0 ir_file\n";
     exit 1;
 }
-($irfile,$tbcmdfile) = @ARGV;
+$irfile = $ARGV[0];
 
 use DBI;
 
@@ -39,18 +37,14 @@ if ($@) {
     exit(1);
 }
 
-# open the tbcmd file
-open(TBCMD,$tbcmdfile) || do {
-    print STDERR "Could not open $tbcmdfile.\n";
-    exit(1);
-};
-
 # Load the node types and grab the default OS from the database
 # %nodetype is indexed by virtual node id and contains the type
-# %defaultos is indexed by type and contains the default OS
+# %ostype is indexed by type and contains the default OS
 # $delayos is the delay os, currently assumed to be os of PC's
 # XXX - Should grab this from the DB eventually
-$delayos = "FBSD40-STD";
+$delayos   = "FBSD40-STD";
+$delaytype = "pc";
+
 $raw = eval {&ir_get("/topology/nodes")};
 if ($@) {
     print STDERR "Could not load /topology/nodes.\n";
@@ -62,7 +56,8 @@ foreach (split("\n",$raw)) {
     $type = $info[1];
     $nodetype{$node} = $type;
     if (! defined($ostype{$type})) {
-	$sth = $dbh->prepare("SELECT image_id from node_types where type = \"$type\"");
+	$sth = $dbh->prepare("SELECT osid from os_info ".
+			     "where machinetype=\"$type\"");
 	$rr = $sth->execute;
 	if ($rr == 0) {
 	    push(@ERRORS,"Invalid type $type");
@@ -77,7 +72,7 @@ foreach (split("\n",$raw)) {
 
 # Load the nodemap and set up an initial os table
 # nodemap is indexed by virtual node id and contains the physical node id
-# os is indexed by physical node id and contains the image id
+# os is indexed by physical node id and contains the osid
 $raw = eval {&ir_get("/virtual/nodes")};
 if ($@) {
     print STDERR "Could not load /virtual/nodes.  Run assign first.\n";
@@ -87,78 +82,64 @@ foreach (split("\n",$raw)) {
     ($virtual,$physical) = split;
     $nodemap{$virtual} = $physical;
     if (!defined($nodetype{$virtual})) {
-	# assume to be a delay node
+	# assume to be a delay node. 
 	$os{$physical} = $delayos;
+	$nodetype{$virtual} = $delaytype;
     } else {
 	$os{$physical} = $ostype{$nodetype{$virtual}};
     }
 }
-# Now we parse the tbcmd file
-# %images is indexed by label and contains "$path $partition"
-while (<TBCMD>) {
-    chop;
-    @line = split;
-    $_ = $line[0];
-  SWITCH: {
-      /^tb-create-os$/ && do {
-	  # Should add some checking for partition
-	  if ($#line != 3) {
-	      push(@ERRORS,"Syntax: tb-create-os label path partition");
-	  } else {
-	      ($label,$path,$partition) = @line[1..3];
-	      $images{$label} = "$path $partition";
-	  }
-	  last SWITCH;
-      };
-      /^tb-set-node-os$/ && do {
-	  if ($#line != 2) {
-	      push(@ERRORS,"Syntax: tb-set-node-os nodespec os");
-	  } else {
-	      ($nodespec,$label) = @line[1..2];
-	      # Do initial checking on label
-	      # We also get the valid type for this image and store it
-	      # in valid_type;
-	      if (! defined($images{$label})) {
-		  # Check DB
-		  $sth = $dbh->prepare("SELECT type from disk_images where image_id = \"$label\"");
-		  $rr = $sth->execute;
-		  if ($rr == 0) {
-		      # Bad OS
-		      $sth->finish;
-		      push(@ERRORS,"Unknown OS label $label");
-		      last SWITCH;
-		  } else {
-		      @result = $sth->fetchrow_array;
-		      $sth->finish;
-		      $valid_type = $result[0];
-		  }
-	      } else {
-		  # Custom image - don't know type info
-		  $valid_type = "";
-	      }
-	      foreach (keys(%nodemap)) {
-		  if (eval("/^$nodespec" . '$' . "/")) {
-		      if (($valid_type ne "") &&
-			  ($nodetype{$_} ne $valid_type)) {
-			  push(@ERRORS,"$_ is of type $nodetype($_), OS $label is of type $valid_type");
-			  $os{$nodemap{$_}} = "INVALID";
-		      } else {
-			  $os{$nodemap{$_}} = $label;
-		      }
-		  }
-	      }
-	  }
-	      
-	  last SWITCH;
-      };
-      /^tb-set-node-deltas$/ && do {
-	  # PLACE HOLDER
-	  last SWITCH;
-      };
-  }
+
+#
+# Read in the osid section. We overwrite the default for any node listed
+# in the osid section. 
+# 
+if (! &ir_exists("/osid")) {
+    print STDERR "IR incomplete: No /osid.\n";
+    exit(1);
 }
- 
-close(TBCMD);
+foreach (split("\n",&ir_get("/osid"))) {
+    my ($node,$osid) = /^([^ ]+)(.*)$/;
+    $osid =~ s/^ //;
+    $os{$nodemap{$node}} = $osid;
+}
+
+#
+# Now verify that the OSID is valid and appropriate for the node type.
+#
+# os_path is indexed by physical node id and contains the path.
+#
+foreach my $virt (keys(%nodemap)) {
+    my $phys = $nodemap{$virt};
+    my $osid = $os{$phys};
+
+    $sth = $dbh->prepare("SELECT machinetype,path FROM os_info ".
+			 "where osid = \"$osid\"");
+    $rr = $sth->execute;
+    if ($rr == 0) {
+	# Bad OSID
+	$sth->finish;
+	push(@ERRORS,"Unknown OSID: $osid");
+	next;
+    }
+    @result = $sth->fetchrow_array;
+    $sth->finish;
+    $valid_type = $result[0];
+    
+    if ($nodetype{$virt} ne $valid_type) {
+	push(@ERRORS, "Node $virt is type $nodetype{$virt}, ".
+	     "but $osid is for $valid_type.\n");
+	next;
+    }
+    $os{$phys} = $osid;
+
+    if (defined($result[1])) {
+	$os_path{$phys} = $result[1];
+    }
+    else {
+	$os_path{$phys} = "";
+    }
+}
 
 # Check if we're good so far
 if ($#ERRORS != -1) {
@@ -166,6 +147,21 @@ if ($#ERRORS != -1) {
 	print STDERR $_ . "\n";
     }
     exit(1);
+}
+
+#
+# Now update the nodes table in DB.
+#
+foreach my $virt (keys(%nodemap)) {
+    my $phys = $nodemap{$virt};
+    my $osid = $os{$phys};
+    my $path = $os_path{$phys};
+
+    $sth = $dbh->prepare("UPDATE nodes set def_boot_osid = \"$osid\", ".
+			 "def_boot_path = \"$path\" ".
+			 "where node_id = \"$phys\"");
+    $sth->execute;
+    $sth->finish;
 }
 
 ## Handle cmdline/startup/etc.
@@ -227,47 +223,4 @@ foreach (values(%nodemap)) {
     $sth->execute;
     $sth->finish;
 }
-
-# Let's do some output
-# We allow running this on an IR file that has already been handle_os'ed
-# it simply overwrites in that case.
-if (! &ir_exists("/os")) {
-    # Fresh file, just append
-    open(IRFILE,">> $irfile") || do {
-	print STDERR "Could not open $irfile for appending.\n";
-	exit(1);
-    };
-    print IRFILE "START os\n";
-    print IRFILE "START images\n";
-    foreach (sort(keys(%images))) {
-	print IRFILE "$_ $images{$_}\n";
-    }
-    print IRFILE "END images\n";
-    print IRFILE "START nodes\n";
-    foreach (sort(keys(%os))) {
-	print IRFILE "$_ $os{$_}\n";
-    }
-    print IRFILE "END nodes\n";
-    print IRFILE "END os\n";
-    close(IRFILE);
-} else {
-    # Here we use libir to overwrite the sections.
-    $images_raw = "";
-    foreach (sort(keys(%images))) {
-	$images_raw .= "$_ $images{$_}\n";
-    }
-    &ir_set("/os/images",$images_raw);
-    $nodes_raw = "";
-    foreach (sort(keys(%os))) {
-	$nodes_raw .= "$_ $os{$_}\n";
-    }
-    &ir_set("/os/nodes",$nodes_raw);
-    eval {&ir_write($irfile)};
-    if ($@) {
-	print STDERR "Could not write $irfile ($@)\n";
-	exit(1);
-    }
-}
-
-
 

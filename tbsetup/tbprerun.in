@@ -195,7 +195,7 @@ if (&tbs_exec("handle_virt $irfile")) {
 }
 
 &tbs_out("Setting up OS state.\n");
-if (&tbs_exec("handle_os $irfile $tbcmdfile")) {
+if (&tbs_exec("handle_os $irfile")) {
     &tbs_out("Failed to set up OS state.\n");
     &cleanup();
     exit(1);

@@ -8,12 +8,11 @@ use Getopt::Std;
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload [-f] <imageid> <imagepart> <imagepath> <node> [node ...]
+# usage: sched_reload [-f] <imageid> <node> [node ...]
 #
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f] <imageid> <imagepart> <imagepath> ".
-	"<node> [node ...]\n".
+    print STDOUT "Usage: sched_reload [-f] <imageid> <node> [node ...]\n".
 	"Use the -f to force reload. Fail if node cannot be reserved.\n";
     exit(-1);
 }
@@ -31,6 +30,7 @@ my $mereuser    = 0;
 my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
+my @nodes       = ();
 my @row;
 
 # un-taint path
@@ -47,17 +47,34 @@ $| = 1; #Turn off line buffering on output
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 4) {
+if (@ARGV != 2) {
     usage();
 }
 if (defined($options{"f"})) {
     $force = $options{"f"};
 }
-
 my $imageid   = shift;
-my $imagepart = shift;
-my $imagepath = shift;
-my @nodes     = @ARGV;
+
+#
+# Untaint args.
+#
+if ($imageid =~ /^([-\@\w.\+]+)$/) {
+    $imageid = $1;
+}
+else {
+    die("Bad data in $imageid.");
+}
+
+foreach my $node ( @ARGV ) {
+    if ($node =~ /^([-\@\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	die("Bad node name: $node.");
+    }
+    
+    push(@nodes, $node);
+}
 
 #
 # Set up for querying the database.
@@ -89,52 +106,11 @@ if ($mereuser) {
 }
 
 #
-# We only support 0 or 4 right now.
-#
-if ($imagepart != 0 && $imagepart != 4) {
-    die("Only the entire disk or partition 4 can be loaded.\n");
-}
-
-#
-# The image has to be accessible, and it must reside in the right places.
-#
-if (! -e $imagepath) {
-    die("Cannot access $imagepath.\n");
-}
-if (! -f $imagepath) {
-    die("$imagepath is not a plain file.\n");
-}
-
-#
-# Do the best we can
+# A loop.
 # 
 my @load_list=();
 foreach my $node (@nodes) {
     my $pc = $node;
-
-    # Untaint the arguments. Sheer idiocy.
-    #
-    if ($pc =~ /^([-\@\w.]+)$/) {
-	$pc = $1;
-    }
-    if ($imageid =~ /^([-\@\w.]+)$/) {
-	$imageid = $1;
-    } else {
-        print STDERR "Imageid contains invalid characters. Skipping $pc.\n";
-	next;
-    }
-    if ($imagepart =~ /^([-\@\w.]+)$/) {
-	$imagepart = $1;
-    } else {
-        print STDERR "Imagepart contains invalid characters. Skipping $pc.\n";
-	next;
-    }
-    if ($imagepath =~ /^([-\@\w.\/]+)$/) {
-	$imagepath = $1;
-    } else {
-        print STDERR "Imagepath contains invalid characters. Skipping $pc.\n";
-	next;
-    }
 
     $sth = $DB->query("select * from nodes where node_id='$pc'");
     if ($sth == 0) {
@@ -185,12 +161,9 @@ foreach my $node (@nodes) {
     }
 
     # Put it in the reloads table so TMCD knows to free it.
-    print STDERR "Scheduling reload for $pc:\n".
-      "Load OS $imageid to partition $imagepart from $imagepath\n";
+    print STDERR "Scheduling reload of $imageid for $pc:\n";
     $sth = $DB->query("replace into reloads ".
-		      "(node_id, partition, image_id, path)".
-		      "values ('$pc', '$imagepart',".
-		      "'$imageid', '$imagepath')");
+		      "(node_id, image_id) values ('$pc', '$imageid')");
     if ($sth == 0) {
       die("Database update failed (reloads). Aborted...\n");
     }
@@ -198,7 +171,7 @@ foreach my $node (@nodes) {
 
 if (@load_list > 0) {
   print STDERR "Running os_load on ",join(", ",@load_list),":\n";
-  $cmd = "$osload $imageid $imagepart $imagepath @load_list";
+  $cmd = "$osload $imageid @load_list";
   print STDERR "Calling '$cmd'\n";
   if ( system($cmd) != 0 ) {
     print STDERR "WARNING: OS_LOAD FAILED ON @load_list!\n";

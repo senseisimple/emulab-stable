@@ -68,7 +68,7 @@ if (&tbs_exec("exports_setup")) {
 }
 
 &tbs_out("Resetting OS and rebooting.\n");
-if (&tbs_exec("os_setup $pid $eid $irfile")) {
+if (&tbs_exec("os_setup $pid $eid")) {
     &tbs_out("Failed to reset OS and reboot nodes.\n");
     exit(1);
 }

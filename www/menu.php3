@@ -5,6 +5,7 @@ $STATUS_LOGGEDIN  = 1;
 $STATUS_LOGGEDOUT = 2;
 $STATUS_LOGINFAIL = 3;
 $STATUS_TIMEDOUT  = 4;
+$STATUS_NOLOGINS  = 5;
 $login_status     = $STATUS_NOSTATUS;
 $login_message    = "";
 $error_message    = 0;
@@ -40,7 +41,7 @@ function WRITESIDEBARBUTTON($text, $base, $link) {
 function WRITESIDEBAR() {
     global $login_status, $login_message, $error_message, $uid, $TBDBNAME;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
-    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT;
+    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
     global $TBBASE, $TBDOCBASE;
 
     echo "<table cellspacing=2 cellpadding=2 border=0 width=150>\n";
@@ -61,23 +62,26 @@ function WRITESIDEBAR() {
             </td>
           </tr>\n";
 
-    if (NOLOGINS()) {
+    if ($login_status == $STATUS_NOLOGINS) {
         WRITESIDEBARBUTTON("Web Interface Temporarily Unavailable",
 			   $TBDOCBASE, "nologins.php3");
-	
-	echo "</table>
-              <br>\n";
 
-	return;
+	echo "<tr>
+               <td height=30 valign=center align=center nowrap>
+                  <b><span class=sidebarbutton>
+                       Please Try Again Later
+                     </span>
+                  </b>
+               </td>
+              </tr>\n";
     }
-
-    if ($login_status == $STATUS_LOGGEDIN) {
+    elseif ($login_status == $STATUS_LOGGEDIN) {
 	$query_result = mysql_db_query($TBDBNAME,
 		"SELECT status,admin,stud FROM users WHERE uid='$uid'");
 	$row = mysql_fetch_row($query_result);
 	$status = $row[0];
 	$admin  = $row[1];
-	$stud   = $row[1];
+	$stud   = $row[2];
 
         #
         # See if group_root in any projects, not just the last one in the DB!
@@ -139,8 +143,10 @@ function WRITESIDEBAR() {
     #
     # Standard options for anyone.
     #
-    WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject_form.php3");
-    WRITESIDEBARBUTTON("Join Project",  $TBBASE, "addusr.php3");
+    if ($login_status != $STATUS_NOLOGINS) {
+	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject_form.php3");
+	WRITESIDEBARBUTTON("Join Project",  $TBBASE, "addusr.php3");
+    }
 
     switch ($login_status) {
     case $STATUS_LOGGEDIN:
@@ -154,6 +160,9 @@ function WRITESIDEBAR() {
 	break;
     case $STATUS_TIMEDOUT:
 	$login_message = "Login Timed Out";
+	break;
+    case $STATUS_NOLOGINS:
+	$login_message = "Please Try Again Later";
 	break;
     }
 
@@ -207,6 +216,24 @@ function WRITESIDEBAR() {
                       $login_message
                    </span>
                  <b>
+                </td>
+              </tr>\n";
+    }
+    #
+    # Okay, reminder for admin types who won't be turned away when
+    # nologins is set in the DB. The blinking is for Mike, who says
+    # he really likes it. 
+    #
+    if ($login_status != $STATUS_NOLOGINS && NOLOGINS()) {
+	echo "<tr>
+                <td align=center>
+                 <b><blink>
+                   <span class=sidebarbutton>
+                    <font size=\"+1\" color=RED>
+                      Maintenance Mode.<br>Please GO AWAY!
+                    </font>
+                   </span>
+                 </blink><b>
                 </td>
               </tr>\n";
     }
@@ -282,8 +309,8 @@ function WRITETITLE($title) {
 function PAGEHEADER($title) {
     global $login_status, $TBAUTHTIMEOUT, $uid;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
-    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT;
-    global $TBBASE, $TBDOCBASE;
+    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
+    global $TBBASE, $TBDOCBASE, $TBDBNAME;
 
     if ($login_status == $STATUS_NOSTATUS) {
 	if ($uid = GETUID()) {
@@ -304,6 +331,26 @@ function PAGEHEADER($title) {
 		break;
 	    }
 	}
+    }
+
+    #
+    # Check for NOLOGINS. This is complicated by the fact that we
+    # want to allow admin types to continue using the web interface,
+    # and logout anyone else that is currently logged in!
+    #
+    if ($login_status == $STATUS_LOGGEDIN && NOLOGINS()) {
+	$query_result = mysql_db_query($TBDBNAME,
+		"SELECT admin FROM users WHERE uid='$uid'");
+	$row = mysql_fetch_row($query_result);
+	$admin  = $row[0];
+
+	if (!$admin) {
+	    DOLOGOUT($uid);
+	    $login_status = $STATUS_NOLOGINS;
+	}
+    }
+    elseif (NOLOGINS()) {
+	$login_status = $STATUS_NOLOGINS;
     }
 
     echo "<html>

@@ -138,10 +138,14 @@ echo "<tr>
 </table>
 
 <p>
-<center>
-<img alt="*" src="redball.gif"> 
-Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
-</center>
+<ul>
+<li> Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
+<li> If your NS file is using a custom OSID, you must
+     <a href="newosid_form.php3">create the OSID first!</a>
+<li>
+     You can also view a <a href="showosid_list.php3"> list of OSIDs</a>
+     that are available for you to use in your NS file.
+</ul>    
 
 <?php
 #

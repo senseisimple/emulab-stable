@@ -8,6 +8,7 @@
 # set-node-cmdline
 # set-node-rpms
 # set-node-startup
+# set-node-os
 
 #
 # Configure variables
@@ -94,6 +95,7 @@ open(TBCMD,$tbcmdfile) || do {
 
 # hwtype is indexed by node and contains the type
 # linkloss is indexed by src:dst and contains the loss rate
+$osids = ();
 $cmdlines = ();
 $startups = ();
 $rpms = ();
@@ -151,6 +153,16 @@ while (<TBCMD>) {
 	    # lanloss(lan) = loss
 	    $lanloss{$line[1]} = $line[2];
 	}
+    } elsif ($line[0] eq "tb-set-node-os") {
+	if ($#line < 2) {
+	    push(@ERRORS,"Syntax: tb-set-node-os node osid");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$osids{$line[1]} = $line[2];
     } elsif ($line[0] eq "tb-set-node-cmdline") {
 	if ($#line < 2) {
 	    push(@ERRORS,"Syntax: tb-set-node-cmdline node cmdline");
@@ -264,6 +276,14 @@ open(IRFILE,">> $irfile") || do {
     print STDERR "Could not open $irfile\n";
     exit(1);
 };
+
+print IRFILE "START osid\n";
+foreach $node (keys(%nodes)) {
+    if (defined($osids{$node})) {
+	print IRFILE "$node $osids{$node}\n";
+    }
+}
+print IRFILE "END osid\n";
 
 print IRFILE "START rpms\n";
 foreach $node (keys(%nodes)) {

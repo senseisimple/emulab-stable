@@ -22,7 +22,7 @@ function GENHASH() {
 #
 # Return the value of the currently logged in uid, or null if not
 # logged in. Basically, check the browser to see if its sending a UID
-# and HASH back, and then check the DB to see if the useris really
+# and HASH back, and then check the DB to see if the user is really
 # logged in.
 # 
 function GETLOGIN() {

@@ -15,5 +15,7 @@ $TBDB_PIDLEN    = 12;
 #
 $TBDB_EIDLEN    = 19;
 
+$TBDB_OSID_OSIDLEN   = 30;
+$TBDB_OSID_VERSLEN   = 12;
 
 ?>

@@ -1,30 +1,27 @@
 #!/usr/bin/perl -wT
 use English;
+use Getopt::Std;
    
 #
-# So, I now realize that disk_images is rather badly named, or maybe just
-# has the wrong information in it. It does not describe disk images, but
-# instead describes OSs. What we really need is a disk_images table that
-# describes an "image". What partitions have what OSs in them, which we
-# can use to load up the partitions table for each node from something that
-# describes the image that just got dropped onto the disk. Well, such is
-# life. 
-#
-
-#
 # XXX Paper and plastic IP addresses wired into the kernel choice.
-#     Paths to the images are wired in.
-#     Path to netdisk is wired in.
-#     Need to reset the partitions when reloading the entire disk.
+#     Path to netdisk is wired in (should come from os_info table).
+#     wd0 wired in. Should come from node_types table in DB
 # 
 
 #
-# Load an image onto a disk. We support the loading of an image
-# into a particular partition, or onto the entire disk. Partitions
-# are numbered from 1-4, with 0 being the special "entire disk" load.
+# Load an image onto a disk. The image must be in the DB images table,
+# which defines how/where to load, and what partitions are affected.
+# The nodes and partitions tables are updated appropriately. 
 # 
-# usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]
+# usage: os_load [-s] <imageid> <node> [node ...]
 #
+sub usage()
+{
+    print STDOUT "Usage: os_load [-s] <imageid> <node> [node ...]\n".
+	"Use the -s to setup reload only, but do not issue a reboot\n";
+    exit(-1);
+}
+my  $optlist = "s";
 
 #
 # Configure variables
@@ -36,13 +33,13 @@ my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "boss.emulab.net";
 my $PLASTICADDR	= "users.emulab.net";
 my $nodereboot	= "$TB/bin/node_reboot";
-my $dbg		= 1;
-my %waitfor     = ();
-my $SAVEUID	= $UID;
+my $dbg		= 0;
 my @row;
+my %imageid_row = ();
 my @nodes       = ();
 my $name        = "";
 my $mereuser    = 0;
+my $setuponly   = 0;
 my $failures    = 0;
 
 # un-taint path
@@ -52,20 +49,31 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-if ( $#ARGV < 3) {
-    die("Usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]\n".
-	"Writes OS image to a node partition.\n");
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
-my $imageid   = shift;
-my $imagepart = shift;
-my $imagepath = shift;
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"s"})) {
+    $setuponly = 1;
+}
+my $imageid = shift;
 
-# Untaint the nodes.
+#
+# Untaint args.
+#
+if ($imageid =~ /^([-\@\w.\+]+)$/) {
+    $imageid = $1;
+}
+else {
+    die("Bad data in $imageid.");
+}
+
 foreach my $node ( @ARGV ) {
     if ($node =~ /^([-\@\w]+)$/) {
 	$node = $1;
@@ -76,6 +84,12 @@ foreach my $node ( @ARGV ) {
     
     push(@nodes, $node);
 }
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 #
 # Figure out who called us. Root and admin types can do whatever they
@@ -90,6 +104,33 @@ if ($UID != 0) {
     @row = $db_result->fetchrow_array();
     if ($row[0] != 1) {
 	$mereuser = 1;
+    }
+}
+
+#
+# Grab the imageid description from the DB. The permission check for this
+# is that mere user can load an image from any project he/she is a member of,
+# or any image that has a null pid field, since those are defined to be
+# open to anyone. 
+#
+$db_result = $DB->query("select * from images where imageid='$imageid'");
+    
+if ($db_result->numrows < 1) {
+    die("No such imageid $imageid!");
+}
+%imageid_row = $db_result->fetchhash();
+
+my $imagepid = 0;
+if (defined($imageid_row{'pid'})) {
+    $imagepid = $imageid_row{'pid'};
+}
+    
+if ($mereuser && $imagepid) {
+    $db_result = $DB->query("select * from proj_memb ".
+			    "where uid='$name' and pid='$imagepid'");
+    
+    if ($db_result->numrows < 1) {
+	die("You do not have permission to load imageid $imageid!");
     }
 }
 
@@ -109,39 +150,28 @@ if ($mereuser) {
     }
 }
 
-#
-# We only support 0 or 4 right now.
-#
-if ($imagepart != 0 && $imagepart != 4) {
-    die("Only the entire disk or partition 4 can be loaded.\n");
-}
+my $loadpart  = $imageid_row{'loadpart'};
+my $loadlen   = $imageid_row{'loadlength'};
+my $imagepath = $imageid_row{'path'};
+my $defosid   = $imageid_row{'default_osid'};
 
 #
-# The image has to be accessible, and it must reside in the right places.
-#
-if (! -e $imagepath) {
-    die("Cannot access $imagepath.\n");
-}
-if (! -f $imagepath) {
-    die("$imagepath is not a plain file.\n");
-}
-
-#
-# 0 means load the entire disk. 
+# 0 means load the entire disk.
 #
 my $diskpart = "";
-if ($imagepart) {
-    $diskpart = "wd0:s${imagepart}";
+if ($loadpart) {
+    $diskpart = "wd0:s${loadpart}";
 }
 else {
     $diskpart = "wd0";
 }
 
 #
-# Admin types do whatever they like
+# For now, all testbed default images from from paper and all pid specific
+# images come from plastic:/proj.
 # 
 my $cmdline = "";
-if ($mereuser) {
+if ($imagepid) {
     if (! ($imagepath =~ /^\/proj\//)) {
 	die("Your image must reside in /proj\n");
     }
@@ -152,49 +182,68 @@ else {
 }
 
 #
-# Do the best we can
+# Loop for each node.
 # 
 foreach my $node (@nodes) {
     my $pc = $node;
 	
-    print STDOUT "Changing default OS for $pc to $imageid\n";
+    print STDOUT "Changing default OS for $pc to $defosid\n";
     $sth = $DB->query("update nodes set ".
-		      "def_boot_image_id='$imageid',def_boot_path='' ".
+		      "def_boot_osid='$defosid',def_boot_path='' ".
 		      "where node_id='$pc'");
     if ($sth == 0) {
-	die("Database update failed (nodes def_boot). Aborted...\n");
+	die("Database update failed (nodes def_boot_osid).");
     }
 
     #
-    # Assign partition table entry.
-    # 
-    if ($imagepart) {
-	$sth = $DB->query("delete from partitions where ".
-			  "partition='$imagepart' and node_id='$pc'");
+    # Assign partition table entries for each partition in the image.
+    # This is complicated by the fact that an image that covers only
+    # part of the slices, should only change the partition table entries
+    # for the subset of slices that are written to disk. In reality, this
+    # is silly since there is no telling what the disk is going to end
+    # up looking like after a partial image is written, especially if its
+    # a user generated image. Not sure how to handle this yet. For now
+    # lets just say that a user defined images essentially wipe the disk
+    # except for the stuff they write. 
+    #
+    for ($i = 1; $i <= 4; $i++) {
+	my $partname = "part${i}_osid";
+	
+	if (defined($imageid_row{$partname})) {
+	    my $osid = $imageid_row{$partname};
 
-	$sth = $DB->query("insert into partitions ".
-			  "(node_id,partition,image_id) ".
-			  "values ('$pc','$imagepart',$imageid)");
-	if ($sth == 0) {
-	    die("Database delete failed (partitions). Aborted...\n");
+	    $sth = $DB->query("replace into partitions ".
+			      "(partition, osid, node_id) ".
+			      "values('$i', '$osid', '$pc')");
 	}
-    }
+	else {
+	    $sth = $DB->query("delete from partitions ".
+			      "where node_id='$pc' and partition='$i'");
+	}
 
+	if ($sth == 0) {
+	    die("Database update failed (partitions table). Aborted ...");
+	}
+	
+    }
+    
     print STDOUT "Setting up reload for $pc\n";
     $sth = $DB->query("update nodes set ".
 		      "next_boot_path='$NETDISK',".
 		      "next_boot_cmd_line='$cmdline' ".
 		      "where node_id='$pc'");
     if ($sth == 0) {
-	die("Database update failed (nodes next_boot). Aborted...\n");
+	die("Database update failed (nodes next_boot). Aborted ...");
     }
 
     #
     # Fire off a reboot.
     #
-    if (system("$nodereboot $pc")) {
-	print STDERR "Node $pc could not be rebooted!\n";
-	$failures++;
+    if (! $setuponly) {
+	if (system("$nodereboot $pc")) {
+	    print STDERR "Node $pc could not be rebooted!\n";
+	    $failures++;
+	}
     }
 }
 

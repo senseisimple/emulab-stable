@@ -53,7 +53,7 @@ if (! $isadmin) {
 
 $node_id            = $row[node_id]; 
 $type               = $row[type];
-$def_boot_image_id  = $row[def_boot_image_id];
+$def_boot_osid      = $row[def_boot_osid];
 $def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
 $next_boot_path     = $row[next_boot_path];
@@ -89,10 +89,10 @@ echo "<tr>
 # This should be a menu.
 # 
 echo "<tr>
-          <td>Def Boot Image:</td>
+          <td>Def Boot OSID:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"def_boot_image_id\" size=\"30\"
-                     value=\"$def_boot_image_id\"></td>
+              <input type=\"text\" name=\"def_boot_osid\" size=\"30\"
+                     value=\"$def_boot_osid\"></td>
       </tr>\n";
 
 echo "<tr>

@@ -9,7 +9,7 @@ PAGEHEADER("Utah Testbed Machine Status");
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT n.node_id, n.type, j.eid FROM nodes ".
 	"AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
-	"WHERE type='pc' OR type='shark' ORDER BY type,node_id");
+	"WHERE type='pc' OR type='shark' ORDER BY type");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting node reservation status: $err\n", 1);
