@@ -1,0 +1,9 @@
+#
+# This is the definitions file for Leigh on Emulab.Net.
+#
+TBDBNAME=tbdb
+WWWDEFS=stoller-emulab
+TBOPSEMAIL=stoller@fast.cs.utah.edu
+TBLOGSEMAIL=stoller@fast.cs.utah.edu
+
+

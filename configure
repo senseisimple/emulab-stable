@@ -2,7 +2,7 @@
 
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 2.13 
-# Copyright (C) 1992, 93, 94, 95, 96, 01 Free Software Foundation, Inc.
+# Copyright (C) 1992, 93, 94, 95, 96 Free Software Foundation, Inc.
 #
 # This configure script is free software; the Free Software Foundation
 # gives unlimited permission to copy, distribute and modify it.
@@ -13,13 +13,9 @@ ac_default_prefix=/usr/local
 # Any additions from configure.in:
 ac_default_prefix=/usr/testbed
 ac_help="$ac_help
-  --with-TBDBNAME=name		Specify TBDB name (tbdb default)"
+  --with-TBDEFS=name	Specify definitions file (defs-default default)"
 ac_help="$ac_help
-  --with-WWWDEFS=name		Specify WWW defintions ("default" default)"
-ac_help="$ac_help
-  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@flux default)"
-ac_help="$ac_help
-  --with-LEDA			Specify LEDA path (/usr/testbed default)"
+  --with-LEDA		Specify LEDA path (/usr/testbed default)"
 ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
@@ -561,7 +557,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:565: checking host system type" >&5
+echo "configure:561: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -582,7 +578,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:586: checking build system type" >&5
+echo "configure:582: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -608,7 +604,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:612: checking for $ac_word" >&5
+echo "configure:608: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -640,7 +636,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:644: checking for $ac_word" >&5
+echo "configure:640: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -672,7 +668,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:676: checking for $ac_word" >&5
+echo "configure:672: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -704,7 +700,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:708: checking for $ac_word" >&5
+echo "configure:704: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -736,7 +732,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:740: checking for $ac_word" >&5
+echo "configure:736: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -767,65 +763,46 @@ fi
 
 
 #
-# Okay, I know this is improper usage of --with. Too bad.
-#
-# Check whether --with-TBDBNAME or --without-TBDBNAME was given.
-if test "${with_TBDBNAME+set}" = set; then
-  withval="$with_TBDBNAME"
-  
-    if test "$withval" = "yes"; then
-	{ echo "configure: error: Invalid TBDBNAME - Must specify the value" 1>&2; exit 1; }
-    fi
-    TBDBNAME="$withval"
+# These get defined in the definitions file (--with-TBDEFS).
+# 
 
-else
-  
-    TBDBNAME="tbdb"
 
-fi
 
 
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
 #
-# Check whether --with-WWWDEFS or --without-WWWDEFS was given.
-if test "${with_WWWDEFS+set}" = set; then
-  withval="$with_WWWDEFS"
+# Check whether --with-TBDEFS or --without-TBDEFS was given.
+if test "${with_TBDEFS+set}" = set; then
+  withval="$with_TBDEFS"
   
     if test "$withval" = "yes"; then
-	{ echo "configure: error: Invalid WWWDEFS - Must specify the value" 1>&2; exit 1; }
+	{ echo "configure: error: Invalid TBDEFS - Must specify the value" 1>&2; exit 1; }
     fi
-    WWWDEFS="$withval"
+    TBDEFS="$withval"
 
 else
   
-    WWWDEFS="default"
+    TBDEFS="$srcdir/defs-default"
 
 fi
 
 
-
-#
-# Okay, I know this is improper usage of --with. Too bad.
-#
-# Check whether --with-TBOPSEMAIL or --without-TBOPSEMAIL was given.
-if test "${with_TBOPSEMAIL+set}" = set; then
-  withval="$with_TBOPSEMAIL"
-  
-    if test "$withval" = "yes"; then
-	{ echo "configure: error: Invalid TBOPSEMAIL - Must specify the value" 1>&2; exit 1; }
-    fi
-    TBOPSEMAIL="$withval"
-
+if test -f $TBDEFS; then
+    #
+    # Remove the comments and newlines.  Really, that's what it does.
+    #
+    eval `cat $TBDEFS | sed -n -e '{s/#.*$//;H;}; ${g;s/\n/ /g;s/  */ /g;p;}'`
 else
-  
-    TBOPSEMAIL="testbed-ops@flux.cs.utah.edu"
-
+	{ echo "configure: error: Definitions file $TBDEFS was not found." 1>&2; exit 1; }
 fi
 
+#
+# The email addresses need to be be munged for perl scripts.
+#
 TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
-
+TBLOGSEMAIL="`echo $TBLOGSEMAIL | sed -e 's/@/\\\@/'`"
 
 #
 # LEDA library path
@@ -885,7 +862,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:889: checking for a BSD compatible install" >&5
+echo "configure:866: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1146,6 +1123,7 @@ s%@STRIP@%$STRIP%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
+s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
 s%@LEDA@%$LEDA%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g

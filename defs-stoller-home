@@ -1,0 +1,8 @@
+#
+# This is the definitions file for Leigh at home.
+#
+TBDBNAME=tbdb
+WWWDEFS=stoller-home
+TBOPSEMAIL=stoller@stoller.casco.net
+TBLOGSEMAIL=stoller@stoller.casco.net
+

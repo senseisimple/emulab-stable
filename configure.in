@@ -12,56 +12,47 @@ AC_CHECK_TOOL(RANLIB,ranlib)
 AC_CHECK_TOOL(STRIP,strip)
 
 #
-# Okay, I know this is improper usage of --with. Too bad.
-#
-AC_ARG_WITH(TBDBNAME,
-[  --with-TBDBNAME=name		Specify TBDB name (tbdb default)],
-[
-    if test "$withval" = "yes"; then
-	AC_MSG_ERROR(Invalid TBDBNAME - Must specify the value)
-    fi
-    TBDBNAME="$withval"
-],[
-    TBDBNAME="tbdb"
-])
+# These get defined in the definitions file (--with-TBDEFS).
+# 
 AC_SUBST(TBDBNAME)
-
-#
-# Okay, I know this is improper usage of --with. Too bad.
-#
-AC_ARG_WITH(WWWDEFS,
-[  --with-WWWDEFS=name		Specify WWW defintions ("default" default)],
-[
-    if test "$withval" = "yes"; then
-	AC_MSG_ERROR(Invalid WWWDEFS - Must specify the value)
-    fi
-    WWWDEFS="$withval"
-],[
-    WWWDEFS="default"
-])
 AC_SUBST(WWWDEFS)
+AC_SUBST(TBOPSEMAIL)
+AC_SUBST(TBLOGSEMAIL)
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
 #
-AC_ARG_WITH(TBOPSEMAIL,
-[  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@flux default)],
+AC_ARG_WITH(TBDEFS,
+[  --with-TBDEFS=name	Specify definitions file (defs-default default)],
 [
     if test "$withval" = "yes"; then
-	AC_MSG_ERROR(Invalid TBOPSEMAIL - Must specify the value)
+	AC_MSG_ERROR(Invalid TBDEFS - Must specify the value)
     fi
-    TBOPSEMAIL="$withval"
+    TBDEFS="$withval"
 ],[
-    TBOPSEMAIL="testbed-ops@flux.cs.utah.edu"
+    TBDEFS="$srcdir/defs-default"
 ])
+
+if test -f $TBDEFS; then
+    #
+    # Remove the comments and newlines.  Really, that's what it does.
+    #
+    eval `cat $TBDEFS | sed -n -e '{s/#.*$//;H;}; ${g;s/\n/ /g;s/  */ /g;p;}'`
+else
+	AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
+fi
+
+#
+# The email addresses need to be be munged for perl scripts.
+#
 TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
-AC_SUBST(TBOPSEMAIL)
+TBLOGSEMAIL="`echo $TBLOGSEMAIL | sed -e 's/@/\\\@/'`"
 
 #
 # LEDA library path
 #
 AC_ARG_WITH(LEDA,
-[  --with-LEDA			Specify LEDA path (/usr/testbed default)],
+[  --with-LEDA		Specify LEDA path (/usr/testbed default)],
 [
     if test "$withval" = "yes"; then
         LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
