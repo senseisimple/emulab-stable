@@ -71,6 +71,16 @@ DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
 SLICEPREFIX = "@PLAB_SLICEPREFIX@"
 
 #
+# PLC constants
+#
+DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
+DEF_PLC_USER = "lepreau@cs.utah.edu"
+DEF_PLC_PASS = "phurds"
+DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
+DEF_PLC_SHARES = 30
+EMULABMAN_EMAIL = "emulabman@emulab.net"
+
+#
 # How many seconds to sleep between failures and how many times to try
 # commands to both the dslice agent, and individual node managers.
 #
@@ -82,6 +92,11 @@ DEF_TRIES = 3
 #
 verbose = 0
 debug = 0
+
+#
+# Method of operation
+#
+method = "PLC"
 
 #
 # var to track failed renewals
@@ -538,6 +553,76 @@ def tryXmlrpcCmd(cmd, args = (),
             print "Giving up after %s tries" % inittries
             raise
 
+
+class PLCagent:
+    def __init__(self, slicename,
+                 uri = DEF_PLC_URI,
+                 username = DEF_PLC_USER,
+                 password = DEF_PLC_PASS):
+        if not slicename:
+            raise RuntimeError, "Must provide a slicename!"
+        self.__slice = {}
+        self.__slice['sliceName'] = slicename
+        self.__auth = {}
+        self.__auth['AuthMethod'] = "password"
+        self.__auth['username'] = username
+        self.__auth['AuthString'] = password
+        try:
+            self.__server = xmlrpclib.ServerProxy(uri)
+        except:
+            print "Failed to create XML-RPC proxy"
+            raise
+
+    def createSlice(self):
+        return self.__server.createSlice(self.__slice, self.__auth)
+
+    def deleteSlice(self):
+        return self.__server.deleteSlice(self.__slice, self.__auth)
+
+    def AssignNodes(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.AssignNodes(self.__slice, self.__auth, nodes)
+    
+    def UnAssignNodes(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.UnAssignNodes(self.__slice, self.__auth, nodes)
+
+    def AssignUsers(self, userlist):
+        if type(userlist) != tuple:
+            userlist = (userlist,)
+        users = {}
+        users['userList'] = userlist
+        return self.__server.AssignUsers(self.__slice, self.__auth, users)
+    
+    def UnAssignUsers(self, userlist):
+        if type(userlist) != tuple:
+            userlist = (userlist,)
+        users = {}
+        users['userList'] = userlist
+        return self.__server.UnAssignUsers(self.__slice, self.__auth, users)
+
+    def AssignShares(self, renewtime, numshares):
+        shareinfo = {}
+        shareinfo['renewTime'] = renewtime
+        shareinfo['share'] = numshares
+        return self.__server.AssignShares(self.__slice, self.__auth, shareinfo)
+
+    def InstantiateSliver(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.InstantiateSliver(self.__slice, self.__auth, nodes)
+
+    def listSlice(self):
+        return self.__server.listSlice(self.__auth)
+    
 
 #
 # Plab abstraction
@@ -1009,7 +1094,7 @@ class Plab:
             else:
                 args = (AGENTIP, agent.PORT, agent.SSLPORT,
                         self.keyfile, self.certfile, self.cacertfile)
-            self.__agentProxy = agentproxy.agentproxy(*args)
+                self.__agentProxy = agentproxy.agentproxy(*args)
         return self.__agentProxy
 
 
@@ -1027,6 +1112,7 @@ class Slice:
         Creates a new slice that initially contains no nodes.  Don't call
         this directly, use Plab.createSlice instead.
         """
+        cleanup = 0
         res = DBQueryFatal("select idx from experiments "
                               "where pid=%s "
                               "and eid=%s",
@@ -1035,19 +1121,66 @@ class Slice:
             raise RuntimeError, "Didn't get any results while looking for idx"
         eindex = res[0][0]
         self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+        
         print "Creating Plab slice %s." % self.slicename
-        self.privkey, self.pubkey = self.__genKeypair()
-        try:
-            DBQueryFatal("insert into plab_slices"
-                         " (pid, eid, slicename, privkey, pubkey) "
-                         " values (%s, %s, %s, %s, %s)",
-                         (self.pid, self.eid, self.slicename,
-                          self.privkey, self.pubkey))
-        except:
-            # No cleanup necessary
+
+        # Method dependant slice creation steps
+        if method == "dslice":
+            self.privkey, self.pubkey = self.__genKeypair()
+            
+        elif method == "PLC":
+            self.agent = PLCagent(self.slicename)
+            self.privkey = self.pubkey = None
+            try:
+                try:
+                    res = tryXmlrpcCmd(self.agent.createSlice)
+                    if debug:
+                        print res
+                except:
+                    print "Failed to create slice %s" % self.slicename
+                    raise
+                try:
+                    res = tryXmlrpcCmd(self.agent.AssignUsers,
+                                       EMULABMAN_EMAIL)
+                    if debug:
+                        print res
+                except:
+                    print "Failed to assign emulabman to slice %s" % \
+                          self.slicename
+                    raise
+                try:
+                    res = tryXmlrpcCmd(self.agent.AssignShares,
+                                       (DEF_PLC_LEASELEN,
+                                       DEF_PLC_SHARES))
+                    if debug:
+                        print res
+                except:
+                    print "Failed to assign shares to slice %s" % \
+                          self.slicename
+                    raise
+            except:
+                cleanup = 1
+                
+        # Method independent slice creation steps
+        if not cleanup:
+            try:
+                DBQueryFatal("insert into plab_slices"
+                             " (pid, eid, slicename, privkey, pubkey) "
+                             " values (%s, %s, %s, %s, %s)",
+                             (self.pid, self.eid, self.slicename,
+                              self.privkey, self.pubkey))
+            except:
+                cleanup = 1
+
+        if cleanup:
+            # Method dependant failure cleanup
+            if method == "PLC":
+                tryXmlrpcCmd(self.agent.deleteSlice)
+
+            # Method independant failure cleanup
+            DBQueryFatal("delete from plab_slices where slicename=%s",
+                         (self.slicename,))
             raise
-        # It turns out that there's no concrete "slice" in dslice, so
-        # nothing real needs to be done
 
     def _load(self):
         """
@@ -1067,6 +1200,8 @@ class Slice:
         assert (len(res) == 1), \
                "Multiple slices found for %s-%s" % (self.pid, self.eid)
         ((self.slicename, self.privkey, self.pubkey), ) = res
+        if method == "PLC":
+            self.agent = PLCagent(self.slicename)
 
     def destroy(self):
         """
@@ -1076,18 +1211,26 @@ class Slice:
         slice is destroyed.
         """
         print "Destroying Plab slice %s." % self.slicename
-        res = DBQueryFatal("select node_id from plab_slice_nodes"
-                           " where slicename = %s",
-                           (self.slicename))
-        print "\tRemoving any remaining nodes in slice.."
-        for (nodeid,) in res:
-            node = self.loadNode(nodeid)
-            node.free()
-            del node  # Encourage the GC'er
+        if method == "dslice":
+            res = DBQueryFatal("select node_id from plab_slice_nodes"
+                               " where slicename = %s",
+                               (self.slicename))
+            print "\tRemoving any remaining nodes in slice.."
+            for (nodeid,) in res:
+                node = self.loadNode(nodeid)
+                node.free()
+                del node  # Encourage the GC'er
 
-        print "\tRemoving slice DB entry."
         osigs = disable_sigs(TERMSIGS)
+        
+        if method == "PLC":
+            try:
+                tryXmlrpcCmd(self.agent.deleteSlice)
+            except:
+                print "Failed to delete PLC slice!"
+
         try:
+            print "\tRemoving slice DB entry."
             DBQueryFatal("delete from plab_slices where slicename = %s",
                          (self.slicename,))
         except:
@@ -1166,10 +1309,21 @@ class Slice:
 
 class Node:
     def __init__(self, slice, nodeid):
-        self.slice, self.plab = slice, slice.plab
+        self.slice, self.agent = slice, slice.agent
         self.nodeid = nodeid
         self.ip = self.__findIP()
         self.__nodemgrProxy = None
+
+        if method == "PLC":
+            res = DBQueryFatal("select w.hostname from"
+                               " nodes as n left join widearea_nodeinfo as w"
+                               " on n.phys_nodeid = w.node_id"
+                               " where n.node_id = %s limit 1",
+                               (nodeid,))
+            
+            assert (len(res) > 0), "%s not found in widearea_info table!" % \
+                   nodeid
+            self.hostname = res[0][0]
 
     # XXX: may want to rethink signal handling here.
     def _create(self):
@@ -1189,39 +1343,41 @@ class Node:
             raise RuntimeError, "Entry for plab node %s already exists " \
                   "in the DB" % self.nodeid
 
-        # Now get a ticket, and redeem it for a vm lease
-        print "Creating Plab node %s on %s." % (self.nodeid, self.ip)
-        agent = self.plab._createAgentProxy()
-        tickets = tryXmlrpcCmd(agent.newtickets,
-                               (self.slice.slicename, 1, LEASELEN, (self.ip,)))
-        assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
-        self.ticketdata = tickets[0]
-        if debug:
-            print "Obtained ticket:"
-            print self.ticketdata
+        if method == "dslice":
+            # Now get a ticket, and redeem it for a vm lease
+            print "Creating Plab node %s on %s." % (self.nodeid, self.ip)
+            agent = self.plab._createAgentProxy()
+            tickets = tryXmlrpcCmd(agent.newtickets,
+                                   (self.slice.slicename, 1, LEASELEN,
+                                    (self.ip,)))
+            assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
+            self.ticketdata = tickets[0]
+            if debug:
+                print "Obtained ticket:"
+                print self.ticketdata
 
-        nodemgr = self._createNodemgrProxy()
-        self.leasedata = None
+            nodemgr = self._createNodemgrProxy()
+            self.leasedata = None
         
-        tries = DEF_TRIES
-        while 1:
-            TIMESTAMP("createnode %s try %d started." % (self.nodeid,
-                                                        DEF_TRIES-tries+1))
-            try:
-                self.leasedata = tryXmlrpcCmd(nodemgr.newleasevm,
-                                              (self.ticketdata,
-                                               self.slice.privkey,
-                                               self.slice.pubkey),
-                                              inittries = tries,
-                                              raisefault = True)
+            tries = DEF_TRIES
+            while 1:
+                TIMESTAMP("createnode %s try %d started." % (self.nodeid,
+                                                             DEF_TRIES-tries+1))
+                try:
+                    self.leasedata = tryXmlrpcCmd(nodemgr.newleasevm,
+                                                  (self.ticketdata,
+                                                   self.slice.privkey,
+                                                   self.slice.pubkey),
+                                                  inittries = tries,
+                                                  raisefault = True)
 
-            # We may have actually gotten the lease/vm even though
-            # the xmlrpc call appeared to fail.  We check for this
-            # condition here, which will show up on subsequent allocation
-            # attempts.
-            except xmlrpclib.Fault, e:
-                if e.faultString.find("already exists") != -1:
-                    print "Lease for %s already exists; deleting." % self.nodeid
+                    # We may have actually gotten the lease/vm even though
+                    # the xmlrpc call appeared to fail.  We check for this
+                    # condition here, which will show up on subsequent allocation
+                    # attempts.
+                except xmlrpclib.Fault, e:
+                    if e.faultString.find("already exists") != -1:
+                        print "Lease for %s already exists; deleting." % self.nodeid
                     nodeleases = tryXmlrpcCmd(nodemgr.getleases)
                     for mylease in nodeleases:
                         if mylease.find(self.slice.slicename) != -1:
@@ -1235,29 +1391,59 @@ class Node:
                               "lease for slice %s on %s" % \
                               (self.slice.slicename, self.nodeid)
                     
-                if e.triesleft > 0:
-                    tries = e.triesleft
+                    if e.triesleft > 0:
+                        tries = e.triesleft
+                    else:
+                        raise
+                # success
                 else:
-                    raise
-            # success
-            else:
-                break
+                    break
 
-        # Good, we have a lease; now put an entry into the DB
-        if debug:
-            print "Obtained lease/vm:"
-            print self.leasedata
-        self.lease = lease.lease(self.leasedata)
-        # Note that the lease's end_time happens to be formatted the
-        # same as a SQL DATETIME (how conspicuously convenient...)
-        DBQueryFatal("insert into plab_slice_nodes"
-                     " (pid, eid, slicename, node_id,"
-                     " ticketdata, leasedata, leaseend)"
-                     " values (%s, %s, %s, %s, %s, %s, %s)",
-                     (self.slice.pid, self.slice.eid,
-                      self.slice.slicename, self.nodeid,
-                      self.ticketdata, self.leasedata,
-                      self.lease.end_time))
+            # Good, we have a lease; now put an entry into the DB
+            if debug:
+                print "Obtained lease/vm:"
+                print self.leasedata
+            self.lease = lease.lease(self.leasedata)
+            # Note that the lease's end_time happens to be formatted the
+            # same as a SQL DATETIME (how conspicuously convenient...)
+            DBQueryFatal("insert into plab_slice_nodes"
+                         " (pid, eid, slicename, node_id,"
+                         " ticketdata, leasedata, leaseend)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (self.slice.pid, self.slice.eid,
+                          self.slice.slicename, self.nodeid,
+                          self.ticketdata, self.leasedata,
+                          self.lease.end_time))
+
+        elif method == "PLC":
+            TIMESTAMP("createnode %s started." % self.nodeid)
+            try:
+                res = tryXmlrpcCmd(self.agent.AssignNodes, self.hostname)
+                if debug:
+                    print res
+            except:
+                print "Failed to assign %s to PLC slice %s" % \
+                      (self.nodeid, self.slice.slicename)
+                raise
+            try:
+                res = tryXmlrpcCmd(self.agent.InstantiateSliver,
+                                   self.hostname)
+                if debug:
+                    print res
+            except:
+                print "Failed to instantiate sliver %s on slice %s" % \
+                      (self.nodeid, self.slice.slicename)
+                raise
+
+            leaselen = time.time() + DEF_PLC_LEASELEN
+            DBQueryFatal("insert into plab_slice_nodes"
+                         " (pid, eid, slicename, node_id,"
+                         " ticketdata, leasedata, leaseend)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (self.slice.pid, self.slice.eid,
+                          self.slice.slicename, self.nodeid,
+                          None, None, leaselen))
+
         TIMESTAMP("createnode %s finished." % self.nodeid)
 
 
@@ -1280,7 +1466,8 @@ class Node:
         assert (slicename == self.slice.slicename), \
                "Node %s loaded by slice %s, but claims to be in slice %s" % \
                (self.nodeid, self.slice.slicename, slicename)
-        self.lease = lease.lease(self.leasedata)
+        if method == "dslice":
+            self.lease = lease.lease(self.leasedata)
 
     def free(self):
         """
@@ -1304,7 +1491,8 @@ class Node:
         print "Freeing Plab node %s." % self.nodeid
         
         # Get node manager handle
-        nodemgr = self._createNodemgrProxy()
+        if method == "dslice":
+            nodemgr = self._createNodemgrProxy()
 
         # Remove the DB entry first.
         try:
@@ -1317,33 +1505,45 @@ class Node:
                      "Unable to delete entry for sliver %s from the DB:"
                      "\n\n%s" % (self.nodeid, tbstr), TBOPS)
 
-        tries = DEF_TRIES
-        while 1:
-            TIMESTAMP("freenode %s try %d started." % (self.nodeid,
-                                                       DEF_TRIES-tries+1))
-            try:
-                tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
-                             inittries = tries, raisefault = 1)
-            except xmlrpclib.Fault, e:
-                if e.faultString.find("does not exist") != -1:
-                    print "Lease for %s did not exist on node" % self.nodeid
+        if method == "dslice":
+            tries = DEF_TRIES
+            while 1:
+                TIMESTAMP("freenode %s try %d started." % (self.nodeid,
+                                                           DEF_TRIES-tries+1))
+                try:
+                    tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
+                                 inittries = tries, raisefault = 1)
+                except xmlrpclib.Fault, e:
+                    if e.faultString.find("does not exist") != -1:
+                        print "Lease for %s did not exist on node" % self.nodeid
+                        deleted = 1
+                        break
+                    elif e.triesleft > 0:
+                        tries = e.triesleft
+                    else:
+                        break
+                except:
+                    print "Warning: couldn't delete the lease for %s on %s" % \
+                          (self.slice.slicename, self.nodeid)
+                    tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+                    SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
+                             "dslice %s" % (self.nodeid, self.slice.slicename),
+                             "Sliver lease deletion failed:\n\n%s" % tbstr, TBOPS)
+                    break
+                else:
                     deleted = 1
                     break
-                elif e.triesleft > 0:
-                    tries = e.triesleft
-                else:
-                    break
+
+        elif method == "PLC":
+            TIMESTAMP("freenode %s started." % self.nodeid)
+            try:
+                res = tryXmlrpcCmd(self.agent.UnAssignNodes, self.hostname)
+                if debug:
+                    print res
             except:
-                print "Warning: couldn't delete the lease for %s on %s" % \
-                      (self.slice.slicename, self.nodeid)
-                tbstr = "".join(traceback.format_exception(*sys.exc_info()))
-                SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
-                         "dslice %s" % (self.nodeid, self.slice.slicename),
-                         "Sliver lease deletion failed:\n\n%s" % tbstr, TBOPS)
-                break
-            else:
-                deleted = 1
-                break
+                print "Failed to release node %s from slice %s" % \
+                      (self.nodeid, self.slice.slicename)
+                raise
 
         TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
@@ -1379,6 +1579,7 @@ class Node:
                       disable_sigs_parent = TERMSIGS)
         return res[0] | res[1]
 
+    # XXX: fix for PLC
     def _renew(self):
         """
         Renew the lease for node belonging to this instance.  Don't
@@ -1458,7 +1659,7 @@ class Node:
                   "Falling back to remote transfer." % self.nodeid
             self.__copy(tgzpath + tgzname, "/tmp/" + tgzname)
             
-        self.__perform("sudo tar -xzf /tmp/" + tgzname + " -C %s" % destpath)
+        self.__perform("sudo tar -jxf /tmp/" + tgzname + " -C %s" % destpath)
 
     def __perform(self, command):
         """
