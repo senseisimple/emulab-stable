@@ -794,7 +794,7 @@ elseif (! preg_match("/^[-\w]+$/", $formfields[op_mode])) {
 elseif (! array_key_exists($formfields[op_mode], $osid_opmodes)) {
     $errors["Op. Mode"] = "Invalid Operation Mode";
 }
-elseif (! $osid_opmodes[$formfields[os_mode]] && !$isadmin) {
+elseif (! $osid_opmodes[$formfields[op_mode]] && !$isadmin) {
     $errors["Op. Mode"] = "No enough permission";
 }
 
