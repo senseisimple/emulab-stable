@@ -141,7 +141,7 @@ my %commandset =
       "keyhash"		=> {TAG => "keyhash"},
       "nodeid"		=> {TAG => "nodeid"},
       "ntpinfo"		=> {TAG => "ntpinfo"},
-      "ntprift"		=> {TAG => "ntpdrift"},
+      "ntpdrift"	=> {TAG => "ntpdrift"},
       "sdparams"	=> {TAG => "sdparams"},
       "eventkey"	=> {TAG => "eventkey"},
       "routelist"	=> {TAG => "routelist"},
