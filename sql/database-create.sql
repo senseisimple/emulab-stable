@@ -83,6 +83,26 @@ CREATE TABLE deltas (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'event_eventtypes'
+#
+
+CREATE TABLE event_eventtypes (
+  idx smallint(5) unsigned NOT NULL default '0',
+  type tinytext NOT NULL,
+  PRIMARY KEY  (idx)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'event_objecttypes'
+#
+
+CREATE TABLE event_objecttypes (
+  idx smallint(5) unsigned NOT NULL default '0',
+  type tinytext NOT NULL,
+  PRIMARY KEY  (idx)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'experiments'
 #
 
@@ -111,6 +131,7 @@ CREATE TABLE experiments (
   attempts smallint(5) unsigned NOT NULL default '0',
   canceled tinyint(4) NOT NULL default '0',
   batchstate varchar(12) default NULL,
+  event_sched_pid int(11) default '0',
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
@@ -371,6 +392,7 @@ CREATE TABLE nodes (
   routertype enum('none','ospf','static') NOT NULL default 'none',
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
+  eventstatus tinytext,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -640,6 +662,7 @@ CREATE TABLE users (
   dbedit tinyint(4) default '0',
   stud tinyint(4) default '0',
   pswd_expires date default NULL,
+  cvsweb tinyint(4) default NULL,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
@@ -680,6 +703,23 @@ CREATE TABLE virt_nodes (
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static') NOT NULL default 'none',
   fixed text NOT NULL
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'virt_trafgens'
+#
+
+CREATE TABLE virt_trafgens (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  role tinytext NOT NULL,
+  proto tinytext NOT NULL,
+  port int(11) NOT NULL default '0',
+  target_vnode varchar(32) NOT NULL default '',
+  target_port int(11) NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,vnode,vname)
 ) TYPE=MyISAM;
 
 #
