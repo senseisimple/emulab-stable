@@ -433,7 +433,7 @@ public class RoboTrack extends JApplet {
 		int rx2 = robbie.drag_x + ((DOT_RAD/2) + OBSTACLE_BUFFER);
 		int ry2 = robbie.drag_y + ((DOT_RAD/2) + OBSTACLE_BUFFER);
 
-		//System.out.println("CheckCollision: " + rx1 + "," +
+		//System.out.println("CheckforObstacles: " + rx1 + "," +
 		//                   ry1 + "," + rx2 + "," + ry2);
 
 		/*
@@ -515,6 +515,78 @@ public class RoboTrack extends JApplet {
 		    MyDialog("Out of Bounds",
 			     robbie.pname + " is out of camera range");
 		    return true;
+		}
+	    }
+	    return false;
+	}
+
+	/*
+	 * Check for collisions with other robots. We check all the
+	 * robots that are dragging, and popup a dialog box if we find
+	 * one. The user then has to fix it.
+	 *
+	 * XXX I am treating the robot as a square! Easier to calculate.
+	 */
+	public boolean CheckforCollisions() {
+	    Enumeration robot_enum = robots.elements();
+
+	    while (robot_enum.hasMoreElements()) {
+		Robot robbie  = (Robot)robot_enum.nextElement();
+
+		if (!robbie.dragging)
+		    continue;
+
+		int rx1 = robbie.drag_x - ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int ry1 = robbie.drag_y - ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int rx2 = robbie.drag_x + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int ry2 = robbie.drag_y + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+
+		//System.out.println("CheckCollision: " + rx1 + "," +
+		//                   ry1 + "," + rx2 + "," + ry2);
+
+		/*
+		 * Check for overlap of this robot with each other robot.
+		 * If the other robot is also moving or being dragged, then
+		 * check its current/target destination, not its current
+		 * location. 
+		 */
+		for (int index = 0; index < robotmap.size(); index++) {
+		    Robot mary = (Robot) robotmap.elementAt(index);
+		    int   ox1, oy1, ox2, oy2;
+
+		    if (robbie == mary)
+			continue;
+
+		    if (mary.gotdest) {
+			ox1 = ox2 = mary.dx;
+			oy1 = oy2 = mary.dy;
+		    }
+		    else if (mary.dragging) {
+			ox1 = ox2 = mary.drag_x;
+			oy1 = oy2 = mary.drag_y;
+		    }
+		    else {
+			ox1 = ox2 = mary.x;
+			oy1 = oy2 = mary.y;
+		    }
+
+		    ox1 -= (DOT_RAD/2);
+		    oy1 -= (DOT_RAD/2);
+		    ox2 += (DOT_RAD/2);
+		    oy2 += (DOT_RAD/2);
+
+		    //System.out.println("  " + ox1 + "," +
+		    //		       oy1 + "," + ox2 + "," + oy2);
+
+		    if (! (oy2 < ry1 ||
+			   ry2 < oy1 ||
+			   ox2 < rx1 ||
+			   rx2 < ox1)) {
+			MyDialog("Collision",
+				 robbie.pname + " is going to run into " +
+				 mary.pname);
+			return true;
+		    }
 		}
 	    }
 	    return false;
@@ -1194,7 +1266,8 @@ public class RoboTrack extends JApplet {
 		 * Check for collisions before submitting.
 		 */
 		if (! map.CheckforObstacles() &&
-		    ! map.CheckOutOfBounds()) 
+		    ! map.CheckforCollisions() &&
+		    ! map.CheckOutOfBounds())
 		    SendInDestinations();
 	    }
 	    repaint();

@@ -125,7 +125,10 @@ echo "<br>
           orientation column in the table.
      <li> A robot destination must not overlap an obstacle (shaded area,
           blue border), and it must be fully within the field of view of at
-          least one camera (orange boxes). 
+          least one camera (orange boxes).
+     <li> A robot destination must not overlap with another robot (its final
+          destination). Because of the sensors on the robots, the closest a
+          robot can come to anything else is 23cm.
      </ul>
      <blockquote><blockquote>\n";
 
