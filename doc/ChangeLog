@@ -44,7 +44,60 @@ kwebb       2003/10/23 15:37:17 MDT
   1.3       +85 -17    testbed/tbsetup/plab/plabmonitord.in
   1.8       +13 -28    testbed/tbsetup/plab/plabnode.in
 
-	
+ricci       2003/10/23 14:57:45 MDT
+
+  Modified files:
+    doc                  setup-nodes.txt
+  Log:
+  Turn this file from a simple desription of what we do to the BIOS into
+  a full-out explanation of the new way we add nodes to the testbed,
+  the new (well, not that new anymore) newnode MFS, web page, etc.
+
+  Revision  Changes    Path
+  1.2       +213 -6    testbed/doc/setup-nodes.txt
+
+ricci       2003/10/22 18:17:36 MDT
+
+  Modified files:
+    www                  nodessh.php3 nodetipacl.php3
+  Log:
+  Remove the Content-Disposition header - this forces the browser to
+  pop up a save dialog box, no matter what the user's settings for the
+  mime type are.
+
+  Revision  Changes    Path
+  1.3       +0 -1      testbed/www/nodessh.php3
+  1.7       +0 -1      testbed/www/nodetipacl.php3
+
+ricci       2003/10/22 16:11:30 MDT
+
+  Modified files:
+    sql                  database-migrate.txt
+    tbsetup              checkports.in snmpit.in snmpit_cisco.pm
+                         snmpit_cisco_stack.pm snmpit_intel.pm
+                         snmpit_intel_stack.pm snmpit_lib.pm
+                         switchmac.in                                                              
+  Log:
+  Change the way the switch modules for snmpit get their configuration
+  information. Rather than pass it all in, which was getting very
+  cumbersome, and inconsistent between Cisco and Intel switches, the
+  modules query the database themselves (via a new function in
+  snmpit_lib.pm).
+
+  Also in this commit are two new options for switch stacks - the
+  ability to specify minimum and maximum VLAN number to use.
+
+  Revision  Changes    Path
+  1.83      +6 -0      testbed/sql/database-migrate.txt
+  1.4       +2 -2      testbed/tbsetup/checkports.in
+  2.48      +3 -16     testbed/tbsetup/snmpit.in
+  1.45      +30 -18    testbed/tbsetup/snmpit_cisco.pm
+  2.33      +3 -7      testbed/tbsetup/snmpit_cisco_stack.pm
+  1.21      +24 -1     testbed/tbsetup/snmpit_intel.pm
+  1.12      +2 -3      testbed/tbsetup/snmpit_intel_stack.pm
+  1.32      +48 -2     testbed/tbsetup/snmpit_lib.pm
+  1.5       +1 -1      testbed/tbsetup/switchmac.in
+
 stoller     2003/10/16 12:06:44 MDT
 
   Modified files:
