@@ -1,0 +1,10 @@
+lib/nls/msg/elvind/en
+lib/nls/msg/elvind/xrot
+libexec/elvind
+libexec/epf
+etc/elvind.conf.sample
+@exec [ -f %B/elvind.conf ] || cp %B/%f %B/elvind.conf
+@unexec if cmp -s %D/etc/elvind.conf %D/etc/elvind.conf.sample; then rm -f %D/etc/elvind.conf; fi
+etc/elvind_ssl.pem.sample
+@exec [ -f %B/elvind_ssl.pem ] || cp %B/%f %B/elvind_ssl.pem
+@unexec if cmp -s %D/etc/elvind_ssl.pem %D/etc/elvind_ssl.pem.sample; then rm -f %D/etc/elvind_ssl.pem; fi

@@ -1,0 +1,112 @@
+bin/ec
+bin/elvin-config
+bin/ep
+bin/sha1digest
+etc/ssl_client.pem
+include/elvin/ast.h
+include/elvin/ast_internal.h
+include/elvin/async_api.h
+include/elvin/attrlist.h
+include/elvin/base64.h
+include/elvin/basetypes.h
+include/elvin/client.h
+include/elvin/config.h
+include/elvin/constants.h
+include/elvin/convert.h
+include/elvin/disconnect.h
+include/elvin/discovery.h
+include/elvin/elvin.h
+include/elvin/endpoint.h
+include/elvin/error.h
+include/elvin/errors/elvin.h
+include/elvin/errors/http.h
+include/elvin/errors/krb5.h
+include/elvin/errors/protocol.h
+include/elvin/errors/ssl.h
+include/elvin/errors/unix.h
+include/elvin/errors/win32.h
+include/elvin/gtk_mainloop.h
+include/elvin/handle.h
+include/elvin/hash.h
+include/elvin/i18n.h
+include/elvin/id32list.h
+include/elvin/id64list.h
+include/elvin/io_handler.h
+include/elvin/ip_discovery.h
+include/elvin/keys.h
+include/elvin/list.h
+include/elvin/logging.h
+include/elvin/mainloop.h
+include/elvin/marshal.h
+include/elvin/marshal_buf.h
+include/elvin/memory.h
+include/elvin/notification.h
+include/elvin/offer.h
+include/elvin/packet_queue.h
+include/elvin/packet_segments.h
+include/elvin/packets.h
+include/elvin/qos.h
+include/elvin/quench.h
+include/elvin/segments.h
+include/elvin/sha1.h
+include/elvin/socket.h
+include/elvin/subdb.h
+include/elvin/subscription.h
+include/elvin/sync_api.h
+include/elvin/thread_memory.h
+include/elvin/threaded_api.h
+include/elvin/threads.h
+include/elvin/threads_none.h
+include/elvin/threads_pthreads_1003.1c.h
+include/elvin/timeout.h
+include/elvin/transport.h
+include/elvin/types.h
+include/elvin/unicode.h
+include/elvin/url.h
+include/elvin/urllist.h
+include/elvin/utils.h
+include/elvin/version.h
+include/elvin/xt_mainloop.h
+info/elvin.info
+lib/libvin4.a
+lib/libvin4.la
+lib/libvin4.so
+lib/libvin4.so.2
+lib/libvin4Xt.a
+lib/libvin4Xt.la
+lib/libvin4Xt.so
+lib/libvin4Xt.so.2
+lib/libvin4c.a
+lib/libvin4c.la
+lib/libvin4c.so
+lib/libvin4c.so.2
+lib/libvin4mt.a
+lib/libvin4mt.la
+lib/libvin4mt.so
+lib/libvin4mt.so.2
+lib/nls/msg/elvin/en
+lib/nls/msg/elvin/xrot
+lib/nls/msg/http/en
+lib/nls/msg/http/xrot
+lib/nls/msg/krb5/en
+lib/nls/msg/krb5/xrot
+lib/nls/msg/protocol/en
+lib/nls/msg/protocol/xrot
+lib/nls/msg/ssl/en
+lib/nls/msg/ssl/xrot
+lib/nls/msg/unix/en
+lib/nls/msg/unix/xrot
+lib/nls/msg/win32/en
+lib/nls/msg/win32/xrot
+@dirrm lib/nls/msg/win32
+@dirrm lib/nls/msg/unix
+@dirrm lib/nls/msg/ssl
+@dirrm lib/nls/msg/protocol
+@dirrm lib/nls/msg/krb5
+@dirrm lib/nls/msg/http
+@dirrm lib/nls/msg/elvin
+@dirrm lib/nls/msg
+@dirrm lib/nls
+@dirrm include/elvin/replace
+@dirrm include/elvin/errors
+@dirrm include/elvin

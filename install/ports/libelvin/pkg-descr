@@ -1,0 +1,6 @@
+Elvin is a notification/messaging service with a difference; rather than
+messages being directed by applications from one component to another, Elvin
+messages are routed to one or more locations, based entirely on the content of
+each message. 
+
+WWW: http://elvin.dstc.com/index.html
