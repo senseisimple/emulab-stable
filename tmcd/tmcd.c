@@ -17,6 +17,8 @@
 #define TESTMODE
 #define VERSION		2
 #define NETMASK		"255.255.255.0"
+#define RELOADPID	"emulab-ops"
+#define RELOADEID	"reloading"
 
 /* Defined in configure and passed in via the makefile */
 #define DBNAME_SIZE	64
@@ -404,8 +406,8 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * XXX This must match the reservation made in sched_reload
 	 *     in the tbsetup directory.
 	 */
-	if (strcmp(pid, "testbed") ||
-	    strcmp(eid, "reloading")) {
+	if (strcmp(pid, RELOADPID) ||
+	    strcmp(eid, RELOADEID)) {
 		return 0;
 	}
 

@@ -29,6 +29,12 @@ my $TB     = "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 
+#
+# This stuff should not be hardwired in.
+# 
+my $RELOADPID	= "emulab-ops";
+my $RELOADEID	= "reloading";
+
 my $osload      = "$TB/bin/os_load";
 my $nalloc      = "$TB/bin/nalloc";
 my $name        = "";
@@ -112,7 +118,7 @@ foreach my $node (@nodes) {
 	# XXX If you change testbed/reloading, be sure to update the
 	#     test in doreboot() in tmcd/tmcd.c.
 	# 
-	my $cmd = "$nalloc testbed reloading $pc";
+	my $cmd = "$nalloc $RELOADPID $RELOADEID $pc";
         if ( system($cmd) != 0 ) {
 	    print STDERR "WARNING: Could not reserve $pc!\n";
 	} else {
