@@ -16,7 +16,4 @@ cd $armdir
 if [ -x $BOOTDIR/bootscript ]; then
     echo "Running local bootscript ..."
     $BOOTDIR/bootscript
-elif [ -x $armdir/ixstart -a -e $BOOTDIR/$ixconfig ]; then
-    echo "Setting up interfaces ..."
-    ./ixstart $BOOTDIR/$ixconfig
 fi

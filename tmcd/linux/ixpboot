@@ -143,7 +143,7 @@ if (defined($startcmd)) {
     if ($startcmd =~ /CMD=\'(.+)\' UID=([0-9A-Za-z]+)/) {
 	print RUN "#!/bin/sh\n";
 	print RUN "\n";
-	print RUN "$1 $userconfig\n";
+	print RUN "$1\n";
     }
     else {
 	warn "*** WARNING: Bad startupcmd line: $startcmd";
@@ -232,6 +232,7 @@ print RC "export FS_IP=$FSIP\n";
 print UC "FS_IP=$FSIP\n";
 print RC "export PROJECT=$pid\n";
 print UC "PROJECT=$pid\n";
+print RC "export USERCONFIG=$userconfig\n";
     
 print RC "\n";
 print RC "./.create_environment\n";
@@ -288,7 +289,7 @@ while (<TEMPL>) {
 	    $ifaceno--;
 	    
 	    print CONF "interface $ifaceno $inet $bcast $mask $mac 0\n";
-	    print UC   "interface $ifaceno $inet $bcast $mask $mac 0\n";
+	    print UC   "interface $ifaceno $inet $bcast $mask $mac\n";
 	}
 
 	# Give the rest of the interfaces a stub setup. Otherwise the
@@ -301,7 +302,7 @@ while (<TEMPL>) {
 	    my $bcast   = "10.254.$i.255";
 	    
 	    print CONF "interface $ifaceno $inet $bcast $mask $mac 0\n";
-	    print UC   "interface $ifaceno $inet $bcast $mask $mac 0\n";
+	    print UC   "interface $ifaceno $inet $bcast $mask $mac\n";
 	}
     }
 }
@@ -324,7 +325,7 @@ foreach my $iface (@ifacelist) {
     $ifaceno--;
 
     print CONF "routeadd $inet $mask 0.0.0.0 $ifaceno\n";
-    print UC   "routeadd $inet $mask 0.0.0.0 $ifaceno\n";
+    print UC   "route    $inet $mask 0.0.0.0 $ifaceno\n";
 }
 
 #
@@ -345,10 +346,11 @@ if (my @routelist = dorouterconfig()) {
 	    my $ifaceip   = $iface->{"IPADDR"};
 	    my $ifacemask = $iface->{"IPMASK"};
 	    
-	    if ((inet_aton($ifacemask) & inet_aton($ifaceip)) ==
-		(inet_aton($ifacemask) & inet_aton($inet))) {
+	    if (inet_ntoa((inet_aton($ifacemask) & inet_aton($ifaceip))) eq
+		inet_ntoa((inet_aton($ifacemask) & inet_aton($gate)))) {
 		($ifaceno) = ($iface->{"IFACE"} =~ /^[a-zA-Z]*(\d*)/);
 		$ifaceno--;
+		last;
 	    }
 	}
 
@@ -357,7 +359,7 @@ if (my @routelist = dorouterconfig()) {
 	}
     
 	print CONF "routeadd $inet $mask $gate $ifaceno\n";
-	print UC   "routeadd $inet $mask $gate $ifaceno\n";
+	print UC   "route    $inet $mask $gate $ifaceno\n";
     }
 }
 close(CONF);
@@ -369,8 +371,6 @@ close(UC);
 system("exportfs -o rw,no_root_squash " . $config{"IXP1200_IP"} . ":/opt") == 0
     or die("*** $0:\n".
 	   "    Could not exportfs / to IXP!\n");
-
-exit(0);
 
 #
 # Fire off the boot.
