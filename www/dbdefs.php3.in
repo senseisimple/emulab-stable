@@ -153,9 +153,9 @@ $TBDB_USER_INTERFACE_LIST = array(TBDB_USER_INTERFACE_EMULAB,
 $linktest_levels	= array();
 $linktest_levels[0]	= "Skip Linktest";
 $linktest_levels[1]	= "Connectivity and Latency";
-$linktest_levels[2]	= "Static Routing";
-$linktest_levels[3]	= "Loss";
-$linktest_levels[4]	= "Bandwidth";
+$linktest_levels[2]	= "Plus Static Routing";
+$linktest_levels[3]	= "Plus Loss";
+$linktest_levels[4]	= "Plus Bandwidth";
 define("TBDB_LINKTEST_MAX", 4);
 
 #
