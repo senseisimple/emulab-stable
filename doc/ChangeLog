@@ -1,3 +1,25 @@
+stoller     2003/05/1 09:09:12 MDT
+	
+  Modified files:
+    event/sched          event-sched.c event-sched.h 
+    lib/libtb            tbdefs.c tbdefs.h 
+    sql                  database-fill.sql 
+    tbsetup              eventsys_control.in 
+    tbsetup/ns2ir        sim.tcl.in 
+  Log:
+  Add the long desired halt/swap event directives. You can now put this
+  in your NS file:
+  
+  	$ns at 2000.0 "$ns halt" (or terminate)
+  or
+  	$ns at 2000.0 "$ns swapout"
+  
+  The first causes the experiment to terminate, the later causes it to
+  swap out. The units are seconds, as are all "at" statements.
+
+  NOTE: You can use halt (terminate) to cancel a batch experiment, but you
+	cannot schedule a swapout.
+
 stoller     2003/04/16 11:41:12 MDT
 
   Modified files:
