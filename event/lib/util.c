@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "event.h"
-#include "log.h"
 
 /* Attempt to allocate SIZE bytes of memory and exit if memory
    allocation fails.  Returns pointer to allocated memory. */
@@ -24,7 +23,8 @@ xmalloc(int size)
     void *p;
     p = malloc(size);
     if (!p) {
-	fatal("virtual memory exhausted!");
+	fprintf(stderr,"virtual memory exhausted!");
+	exit(1);
     }        
     return p;
 }
@@ -38,7 +38,8 @@ xrealloc(void *p, int size)
     void *q;
     q = realloc(p, size);
     if (!q) {
-	fatal("virtual memory exhausted!");
+	fprintf(stderr,"virtual memory exhausted!");
+	exit(1);
     }        
     return q;
 }

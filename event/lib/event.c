@@ -22,11 +22,11 @@
 #include <sys/param.h>
 #include <time.h>
 #include "event.h"
-#include "log.h"
 
-#define ERROR(fmt,...) error(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define ERROR(fmt,...) fprintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define INFO(fmt,...) fprintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
 #ifdef  DEBUG
-#define TRACE(fmt,...) info(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define TRACE(fmt,...) frintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
 #else
 #define TRACE(fmt,...)
 #endif
@@ -1217,7 +1217,7 @@ notify_callback(elvin_handle_t server,
 	    
 	    gettimeofday(&now, NULL);
 
-	    info("note arrived at %ld:%d\n", now.tv_sec, now.tv_usec);
+	    INFO("note arrived at %ld:%ld\n", now.tv_sec, now.tv_usec);
     }
 	
     callback = arg->callback;
@@ -1305,7 +1305,7 @@ event_notification_insert_hmac(event_handle_t handle,
 	int		i, len = EVP_MAX_MD_SIZE;
 
 	if (0)
-	    info("event_notification_insert_hmac: %d %s\n",
+	    INFO("event_notification_insert_hmac: %d %s\n",
 		 handle->keylen, handle->keydata);
 
 	if (notification->has_hmac) {
@@ -1329,11 +1329,11 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_cleanup(&ctx);
 
 	if (0) {
-		info("event_notification_insert_hmac: %d\n", len);
+		INFO("event_notification_insert_hmac: %d\n", len);
 		for (i = 0; i < len; i += 4) {
-			info("%x", *((unsigned int *)(&mac[i])));
+			INFO("%x", *((unsigned int *)(&mac[i])));
 		}
-		info("\n");
+		INFO("\n");
 	}
 
 	/*
@@ -1363,7 +1363,7 @@ event_notification_check_hmac(event_handle_t handle,
 	elvin_basetypes_t type;
 
 	if (0)
-	    info("event_notification_check_hmac: %d %s\n",
+	    INFO("event_notification_check_hmac: %d %s\n",
 		 handle->keylen, handle->keydata);
 		
 	/*
@@ -1380,11 +1380,11 @@ event_notification_check_hmac(event_handle_t handle,
 	memcpy(srcmac, (unsigned char *)value.o.data, value.o.length);
 
 	if (0) {
-		info("event_notification_check_hmac1: %d\n", srclen);
+		INFO("event_notification_check_hmac1: %d\n", srclen);
 		for (i = 0; i < srclen; i += 4) {
-			info("%x", *((unsigned int *)(&srcmac[i])));
+			INFO("%x", *((unsigned int *)(&srcmac[i])));
 		}
-		info("\n");
+		INFO("\n");
 	}
 	
 	memset(&ctx, 0, sizeof(ctx));
@@ -1405,11 +1405,11 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_cleanup(&ctx);
 
 	if (0) {
-		info("event_notification_check_hmac2: %d\n", len);
+		INFO("event_notification_check_hmac2: %d\n", len);
 		for (i = 0; i < len; i += 4) {
-			info("%x", *((unsigned int *)(&mac[i])));
+			INFO("%x", *((unsigned int *)(&mac[i])));
 		}
-		info("\n");
+		INFO("\n");
 	}
 
 	if (srclen != len || memcmp(srcmac, mac, len)) {
@@ -1562,7 +1562,7 @@ event_notification_unpack(event_handle_t handle,
 	while (offset < len) {
 		struct pack_bin	*bin = (struct pack_bin *) (data + offset);
 
-		info("type: %d %s %s\n", bin->type, bin->name, bin->data);
+		INFO("type: %d %s %s\n", bin->type, bin->name, bin->data);
 
 		switch (bin->type) {
 		case ELVIN_INT32:
