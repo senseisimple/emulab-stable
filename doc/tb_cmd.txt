@@ -58,3 +58,7 @@ Node, it all cases <node> can include * and ? as wild cards and
 #TB set-link-loss <src> <dst> <rate>
 
 Set the loss rate of a link.
+
+#TB set-lan-loss <lan> <rate>
+
+Set the loss rate of a lan.
