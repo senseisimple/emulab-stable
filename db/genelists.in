@@ -473,10 +473,11 @@ sub genelist($$$)
     if (-e "$ELISTS/$listname" &&
 	system("cmp -s $tempfile $ELISTS/$listname") == 0) {
 	print "$listname has not changed. Skipping.\n";
+	unlink("$tempfile");
 	return;
     }
 
-    system("/bin/mv -f $tempfile $ELISTS/$listname") == 0 ||
+    system("/bin/cp -pf $tempfile $ELISTS/$listname") == 0 ||
 	fatal("Could not move $tempfile to $ELISTS/$listname: $!");
     
     #
