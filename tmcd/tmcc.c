@@ -100,6 +100,7 @@ char *usagestr =
  " -l path	   Use named unix domain socket instead of TCP\n"
  " -t timeout	   Timeout waiting for the controller.\n"
  " -x path	   Be a tmcc proxy, using the named unix domain socket\n"
+ " -o logfile      Specify log file name for -x option\n"
  "\n";
 
 void

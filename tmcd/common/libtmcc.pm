@@ -44,6 +44,7 @@ BEGIN
 my $TMCCBIN	= "$BINDIR/tmcc.bin";
 my $PROXYDEF    = "$BOOTDIR/proxypath";
 my $debug       = 0;
+my $beproxy     = 0;
 
 #
 # Configuration. The importer of this library should set these values
@@ -60,6 +61,7 @@ my $debug       = 0;
       "subnode"		=> undef,
       "keyfile"		=> undef,
       "timeout"		=> undef,
+      "logfile"		=> undef,
     );
 
 #
@@ -176,12 +178,16 @@ sub optionstring($%)
     }
     if ($opthash{"beproxy"}) {
 	$options .= " -x " . $opthash{"beproxy"};
+	$beproxy  = 1;
     }
     if ($opthash{"dounix"}) {
 	$options .= " -l " . $opthash{"dounix"};
     }
     if (defined($opthash{"server"})) {
 	$options .= " -s " . $opthash{"server"};
+    }
+    if (defined($opthash{"subnode"})) {
+	$options .= " -n " . $opthash{"subnode"};
     }
     if (defined($opthash{"portnum"})) {
 	$options .= " -p " . $opthash{"portnum"};
@@ -194,6 +200,9 @@ sub optionstring($%)
     }
     if (defined($opthash{"timeout"})) {
 	$options .= " -t " . $opthash{"timeout"};
+    }
+    if (defined($opthash{"logfile"})) {
+	$options .= " -o " . $opthash{"logfile"};
     }
     return $options;
 }
@@ -227,6 +236,13 @@ sub runtmcc ($;$$%)
 	print STDERR "$string\n";
     }
 
+    #
+    # Special case. If the proxy option is given, exec and forget.
+    #
+    if ($beproxy) {
+	exec($string);
+	die("exec failure: $string\n");
+    }
     if (!open(TM, "$string |")) {
 	print STDERR "Cannot start TMCC: $!\n";
 	return -1;
@@ -268,7 +284,7 @@ sub tmcc ($;$$%)
 	close(PP);
 
 	if ($ppath =~ /^([-\w\.\/]+)$/) {
-	    $config{"dounix"} = $ppath;
+	    $config{"dounix"} = $1;
 	}
 	else {
 	    die("Bad data in tmccproxy path: $ppath");

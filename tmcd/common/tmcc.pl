@@ -24,9 +24,10 @@ sub usage()
     print STDERR " -l path	Use named unix domain socket instead of TCP\n";
     print STDERR " -t timeout	Timeout waiting for the controller.\n";
     print STDERR " -x path	Be a proxy using the unix domain socket\n";
+    print STDERR " -o path	Specify log file name for -x option\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -107,11 +108,15 @@ sub ParseOptions()
     if (defined($options{"x"})) {
         libtmcc::configtmcc("beproxy" , $options{"x"});
     }
-    usage()
-	if (! @ARGV);
-
-    $CMD  = shift(@ARGV);
+    if (defined($options{"o"})) {
+        libtmcc::configtmcc("logfile" , $options{"o"});
+    }
+    
+    $CMD  = "";
     $ARGS = "";
+    if (@ARGV) {
+	$CMD = shift(@ARGV);
+    }
     if (@ARGV) {
 	$ARGS = "@ARGV";
     }
