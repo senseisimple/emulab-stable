@@ -1,0 +1,37 @@
+What needs to be done to get us off the ground...
+
+Automatic VLAN configuration		Rob
+Mapping algorithm			Dave and Chris
+Building				Steve and all
+Setting up disks/systems		Steve
+Wiring					???
+Monitor/Control node			Steve, ???
+Firewall				???
+OS distribution (FTP, rsync, custom)	???
+Data recovery				???
+PR					Jay
+Reset					???
+Delays					Dave?, Chris?
+
+Easy and nice:
+Roatan					Chris
+
+Extra:
+ns to mapping to vlan			Rob
+Documentation				Chris and Jay?
+Initial experiments			Kristin
+
+Later:
+Automatic testing
+Automatic routing
+Automatic traffic
+Automatic running
+Events
+Full ns integration (includes most of above)
+Dnards
+Mapping extended to arbitrary topology
+Publications
+GUIs
+Scheduler
+Web Integration
+Data visualization
