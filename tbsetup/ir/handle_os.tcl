@@ -13,8 +13,15 @@ set scriptdir [file dirname [info script]]
 set updir [file dirname $scriptdir]
 
 source "$scriptdir/libir.tcl"
+if {[file exists $updir/../lib/sql.so]} {
+    load $updir/../lib/sql.so
+} else {
+    load $updir/../sql.so
+}
 namespace import TB_LIBIR::ir
 
+set DB [sql connect]
+sql selectdb $DB tbdb
 
 set nsfile [lindex $argv 1]
 set irfile [lindex $argv 0]
@@ -33,6 +40,28 @@ foreach pair $nmap {
 }
 
 set fp [open $nsfile r]
+
+#
+# Verify that the OS is valid for the node. Return zero if not supported.
+#
+# XXX Checks just for PCs in the disk_images table. Need to add support
+#     for the sharks and for create OS.
+#
+proc checkimage {node label} {
+    global DB
+
+    sql query $DB "select image_id from disk_images \
+	           where type='pc' and image_id='$label'"
+
+    if {[sql fetchrow $DB] != {}} {
+	set ret 1
+    } else {
+	set ret 0
+    }
+    sql endquery $DB
+
+    return $ret;
+}
 
 while {[gets $fp line] >= 0} {
     if {[lindex $line 0] != "#TB"} {continue}
@@ -61,10 +90,14 @@ while {[gets $fp line] >= 0} {
 	    set node [lindex $line 2]
 	    set label [lindex $line 3]
 	    
-	    # XXX Check valid - See above
 	    foreach n [array names node_map] {
 		if {[string match $node $n] == 1} {
-		    set os($node_map($n)) $label
+		    if {[checkimage $node $label] == 1} {
+		        set os($node_map($n)) $label
+		    } else {
+			puts stderr "Invalid OS spec for $node:$label."
+			exit 1
+		    }
 		}
 	    }
 	}
