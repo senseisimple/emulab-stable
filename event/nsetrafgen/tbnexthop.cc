@@ -13,6 +13,15 @@
 #include <netinet/in.h>
 #include <net/if_dl.h>
 #include <unistd.h>
+#include <errno.h>
+/*#include <netinet/ip_fw.h> */
+/* ipfw data structures have changed between FBSD 4.3 and FBSD 4.5 .
+   boss has the former but the experimental nodes run the latter. 
+   Therefore use a local version of ip_fw.h which is also in cvs */
+#include "ip_fw.h"
+#include <string.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include "tbnexthop.h"
 
 static int sockfd;
@@ -108,6 +117,67 @@ get_nexthop_if(struct in_addr addr)
 	return 0;
 }
 
+/* Does a
+   ipfw add fwd <nexthop> ip from <src> to <dst>:<dstmask> [out]
+   and returns the number of the added rule
+*/
+
+static int ipfw_sock = -1;
+
+int
+ipfw_addfwd(struct in_addr nexthop, struct in_addr src, struct in_addr dst,
+	      struct in_addr dstmask, bool out) {
+
+  struct ip_fw rule;
+
+  if( ipfw_sock == -1 ) {
+    ipfw_sock = socket( AF_INET, SOCK_RAW, IPPROTO_RAW );
+    if( ipfw_sock < 0 ) {
+      fprintf(stderr, "can't create raw socket: %s\n", strerror(errno));
+      return(-1);
+    }
+  }
+
+  memset(&rule, 0, sizeof rule);
+
+  /* rule.fw_flg |= IP_FW_F_FWD | IP_FW_F_DMSK;*/
+  rule.fw_flg |= IP_FW_F_FWD;
+  rule.fw_prot |= IPPROTO_IP;
+ 
+  /* filling next hop information */
+  rule.fw_fwd_ip.sin_len = sizeof(struct sockaddr_in);
+  rule.fw_fwd_ip.sin_family = AF_INET;
+  rule.fw_fwd_ip.sin_port = 0;
+  rule.fw_fwd_ip.sin_addr = nexthop;
+  // printf( "nexthop = %s\n", inet_ntoa(nexthop));
+
+  rule.fw_src = src;
+  //printf( "src = %s\n", inet_ntoa(src));
+  rule.fw_smsk.s_addr = ~0;
+  //printf( "smsk = %s\n", inet_ntoa(rule.fw_smsk));
+  
+  rule.fw_dst = dst;
+  //printf( "dst = %s\n", inet_ntoa(dst));
+  rule.fw_dmsk = dstmask;
+  //printf( "dmsk = %s\n", inet_ntoa(rule.fw_dmsk));
+
+  if( out ) {
+    rule.fw_flg |= IP_FW_F_OUT;    
+  }
+
+  /* getsockopt and setsockopt do the same thing for ipfw rules
+     except that in the former, the rule is copied back. Since
+     we need the rule number that ipfirewall chose, we use
+     getsockopt() */
+  socklen_t i = sizeof(rule);
+  if (getsockopt(ipfw_sock, IPPROTO_IP, IP_FW_ADD, &rule, &i) == -1) {
+    fprintf(stderr, "getsockopt(IP_FW_ADD): %s\n", strerror(errno));
+    return(-1);
+  }
+
+  return(rule.fw_number);
+}
+
 #ifdef TBNEXTHOP_TESTME
 int
 main(int argc, char **argv)
@@ -132,6 +202,44 @@ main(int argc, char **argv)
 		else
 			printf("%s: through if%d\n", *argv, ifn);
 	}
+
+	exit(0);
+}
+#endif
+
+#ifdef IPFW_ADDFWD_TESTME
+
+int
+main(int argc, char *argv[])
+{
+	struct in_addr src, dst, mask, nexthop;
+	int rulenum;
+
+	if (argc < 5) {
+		fprintf(stderr, "usage: %s src dst mask nexthop\n", argv[0]);
+		exit(2);
+	}
+        printf("argc = %d\n", argc );
+
+	if (inet_aton(argv[1], &src) == 0) {
+	  fprintf(stderr, "bad src IP address: %s\n", argv[1]);
+	  exit(2);
+	}
+	if (inet_aton(argv[2], &dst) == 0) {
+	  fprintf(stderr, "bad dst IP address: %s\n", argv[2]);
+	  exit(3);
+	}
+	if (inet_aton(argv[3], &mask) == 0) {
+	  fprintf(stderr, "bad IP mask: %s\n", argv[3]);
+	  exit(4);
+	}
+	if (inet_aton(argv[4], &nexthop) == 0) {
+	  fprintf(stderr, "bad nexthop IP address: %s\n", argv[4]);
+	  exit(5);
+	}
+	
+	rulenum = ipfw_addfwd(nexthop, src, dst, mask, true);
+	printf("rulenum = %d\n", rulenum);
 
 	exit(0);
 }

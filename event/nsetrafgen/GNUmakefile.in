@@ -20,6 +20,7 @@ msg:
 	@echo ""
 	@echo -n "WARNING! You must first do a \"make buildnse\" in $(SRCDIR) "
 	@echo "if $(SRCDIR)/nse is not built"
+	@echo "WARNING! It takes about 15 minutes for buildnse"
 	@echo ""
 
 include $(TESTBED_SRCDIR)/GNUmakerules

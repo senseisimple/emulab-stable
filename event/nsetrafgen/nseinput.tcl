@@ -74,6 +74,53 @@ proc getmac {ipaddr} {
     return ""
 }
 
+# This is temporary. Needs to be done from libsetup.pm
+proc installipfwfwd {} {
+    set tmccroutelist [open /etc/testbed/tmcc.routelist r]
+    set routeliststr [read $tmccroutelist]
+    close $tmccroutelist
+
+    set ipfw /sbin/ipfw
+
+    set routelist [split $routeliststr "\n"]
+    foreach route $routelist {
+	set ret [scan $route "ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s DESTMASK=%s NEXTHOP=%s COST=%s" \
+		              node src dst dsttype dstmask nexthop cost]
+	# we ensure that by expecting all 7 conversions in scan to happen for correct lines
+	# probably a ROUTERTYPE line if the conversion fails
+	if { $ret == 7 } {
+	    exec $ipfw add fwd $nexthop ip from $src to $dst:$dstmask out
+	}
+    }
+}
+
+proc findcpuspeed {} {
+    set dmesgfd [open /var/run/dmesg.boot r]
+    set dmesg [read $dmesgfd]
+    close $dmesgfd
+
+    set regret [regexp {CPU:\D*(\d+\.?\d*)-([MmGg][Hh][zZ])} $dmesg matchstr speed mghz]
+
+    if { $regret == 1 } {
+	
+	if { [regexp -nocase {mhz} $mghz] == 1 } {
+	    return [expr $speed * 1000000]
+	} elseif { [regexp -nocase {ghz} $mghz] == 1 } {
+	    return [expr $speed * 1000000000]
+	} else {
+	    return -1
+	}
+
+    } else {
+	return -1
+    }
+}
+
+# call it after evaluating nseconfigs
+# This will parse tmcc routelist and
+# store a list of routes for all source nodes that are
+# in this simulation
+
 set tmccnseconfigs [open /etc/testbed/tmcc.nseconfigs r]
 set nseconfig [read $tmccnseconfigs]
 close $tmccnseconfigs
@@ -92,6 +139,11 @@ set simcode_present 0
 if { [catch {eval $nseconfig} errMsg] == 1 } {
     puts stderr "NSE: syntax error evaluating script: $errMsg"
 }
+
+# XXX: don't uncomment. causes incorrect behaviour
+#if { $nsetrafgen_present == 1 || $simcode_present == 1 } {
+#    installipfwfwd
+#}
 
 # the name of the simulator instance variable might not
 # always be 'ns', coming from the TB parser
@@ -236,6 +288,7 @@ if { $simcode_present == 1 } {
 	if { [$nodeinst info vars nsenode_ipaddrlist] == {} } {
 	    continue
 	}
+
 	set nodeinst_ipaddrlist [$nodeinst set nsenode_ipaddrlist]
 	foreach nodeinst_ipaddr $nodeinst_ipaddrlist {
 	    set iface [getif $nodeinst_ipaddr]
@@ -257,6 +310,22 @@ if { $simcode_present == 1 } {
 	    # associate the 2 network objects in the IPTap object
 	    $iptap($i) network-outgoing $ipnet
 	    $iptap($i) network-incoming $bpf_ip($i)
+
+	    if { [$nodeinst info vars routes] != {} } {
+		set routelist [split [$nodeinst set routes] "\n"]
+		foreach route $routelist {
+		    scan $route "DST=%s DST_MASK=%s NEXTHOP=%s" dstip dstmask nexthop
+		    $iptap($i) addroute $dstip $nexthop
+		    # We dont really consider the case where different routes
+		    # have different masks. A complete longest prefix match
+		    # implementation that is also efficient for nse may
+		    # have to be done in the future
+		}
+	    }
+
+	    # The emulab default netmask
+	    $iptap($i) ipmask "255.255.255.0"
+
 	    
 	    $ns attach-agent $nodeinst $iptap($i)
 	    
@@ -287,6 +356,11 @@ if { $objnamelist != {} } {
     $evsink objnamelist [join $objnamelist ","]
     $evsink logfile $logpath
     [$ns set scheduler_] tbevent-sink $evsink
+}
+
+set cpuspeed [findcpuspeed]
+if { $cpuspeed != -1 } {
+    [$ns set scheduler_] cpuspeed $cpuspeed
 }
 
 $ns run

@@ -1,6 +1,5 @@
-diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
 --- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
-+++ ns-allinone-2.1b9/install	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/install	Fri Nov  8 17:04:05 2002
 @@ -39,224 +39,82 @@
  
  # Get current path
@@ -413,9 +412,8 @@ diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
  
  echo ""
  echo "----------------------------------------------------------------------------------"
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/Makefile.in
 --- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Sun Oct  6 23:17:08 2002
++++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Fri Nov  8 17:04:05 2002
 @@ -78,6 +78,14 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
@@ -451,9 +449,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/
  
  OBJ_EMULATE_C = \
  	emulate/inet.o
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Nov  8 17:04:05 2002
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -463,34 +460,19 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1
  		/* reschedule the timer */
  		double t = next();
  		timer_.resched(t);
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Sun Oct  6 22:22:18 2002
-@@ -31,24 +31,58 @@
-  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-  * SUCH DAMAGE.
-  *
-- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.65 2002/04/10 20:37:46 haldar Exp $
-+ * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.69 2002/07/23 21:35:21 yuri Exp $
-  */
- 
- #ifndef lint
- static const char rcsid[] =
--    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.65 2002/04/10 20:37:46 haldar Exp $ (LBL)";
-+    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.69 2002/07/23 21:35:21 yuri Exp $ (LBL)";
- #endif
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Fri Nov  8 18:28:33 2002
+@@ -41,14 +41,46 @@
  
  #include <stdlib.h>
  #include <limits.h>
 +#include <math.h>
-+
  #include "config.h"
  #include "scheduler.h"
  #include "packet.h"
 +#ifdef USEEVENTS
 +#include "tbevent.h"
 +#endif
-+
  
  #ifdef MEMDEBUG_SIMULATIONS
  #include "mem-trace.h"
@@ -527,7 +509,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  Scheduler* Scheduler::instance_;
  scheduler_uid_t Scheduler::uid_ = 1;
  
-@@ -59,6 +93,9 @@
+@@ -59,6 +91,9 @@
  
  Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
  {
@@ -537,7 +519,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  }
  
  Scheduler::~Scheduler(){
-@@ -76,11 +113,14 @@
+@@ -76,11 +111,14 @@
   * is much harder (because we've lost all context about who did
   * the scheduling).
   */
@@ -554,7 +536,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  		abort();
  	};
  	if (e->uid_ > 0) {
-@@ -91,7 +131,9 @@
+@@ -91,7 +129,9 @@
  	if (delay < 0) {
  		// You probably don't want to do this
  		// (it probably represents a bug in your simulation).
@@ -565,7 +547,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	}
  
  	if (uid_ < 0) {
-@@ -104,6 +146,17 @@
+@@ -104,6 +144,17 @@
  
  	e->time_ = t;
  	insert(e);
@@ -583,7 +565,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  }
  
  void
-@@ -117,7 +170,7 @@
+@@ -117,7 +168,7 @@
  	 * Patch by Thomas Kaemer <Thomas.Kaemer@eas.iis.fhg.de>.
  	 */
  	while (!halted_ && (p = deque())) {
@@ -592,7 +574,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	}
  }
  
-@@ -133,11 +186,23 @@
+@@ -133,11 +184,23 @@
  {
  	if (t < clock_) {
  		fprintf(stderr, "ns: scheduler going backwards in time from %f to %f.\n", clock_, t);
@@ -616,7 +598,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  }
  
  void
-@@ -161,7 +226,8 @@
+@@ -161,7 +224,8 @@
  	void handle(Event* event);
  } at_handler;
  
@@ -626,7 +608,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	AtEvent* at = (AtEvent*)e;
  	Tcl::instance().eval(at->proc_);
-@@ -174,7 +240,8 @@
+@@ -174,7 +238,8 @@
  	clock_ = SCHED_START;
  }
  
@@ -636,7 +618,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	Tcl& tcl = Tcl::instance();
  	if (instance_ == 0)
-@@ -220,7 +287,7 @@
+@@ -220,7 +285,7 @@
  		if (strcmp(argv[1], "at") == 0 ||
  		    strcmp(argv[1], "cancel") == 0) {
  			Event* p = lookup(STRTOUID(argv[2]));
@@ -645,7 +627,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  				/*XXX make sure it really is an atevent*/
  				cancel(p);
  				AtEvent* ae = (AtEvent*)p;
-@@ -286,7 +353,8 @@
+@@ -286,7 +351,8 @@
  	}
  } class_list_sched;
  
@@ -655,7 +637,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	double t = e->time_;
  	Event** p;
-@@ -303,7 +371,8 @@
+@@ -303,7 +369,8 @@
   * must free the event if necessary; this routine only removes
   * it from the scheduler queue.
   */
@@ -665,7 +647,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	Event** p;
  	if (e->uid_ <= 0)	// event not in queue
-@@ -316,7 +385,8 @@
+@@ -316,7 +383,8 @@
  	e->uid_ = - e->uid_;
  }
  
@@ -675,7 +657,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	Event* e;
  	for (e = queue_; e != 0; e = e->next_)
-@@ -397,9 +467,9 @@
+@@ -397,9 +465,9 @@
  Heap::heap_delete(void* elem)
  {
  	int	i;
@@ -687,7 +669,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  		swap(i, parent(i));
  	}
  	(void) heap_extract_min();
-@@ -485,9 +555,10 @@
+@@ -485,9 +553,10 @@
  	void*	min;				  /* return value */
  	unsigned int	i;
  	unsigned int	l, r, x;
@@ -700,7 +682,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	h_elems[0] = h_elems[--h_size];
  // Heapify:
  	i = 0;
-@@ -523,7 +594,8 @@
+@@ -523,7 +592,8 @@
  	}
  } class_heap_sched;
  
@@ -710,7 +692,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
  	Event* e;
  	
-@@ -553,6 +625,8 @@
+@@ -553,6 +623,8 @@
   *  Comm. of ACM, 31(10):1220-1227, Oct 1988
   */
  
@@ -719,7 +701,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  static class CalendarSchedulerClass : public TclClass {
  public:
  	CalendarSchedulerClass() : TclClass("Scheduler/Calendar") {}
-@@ -561,212 +635,305 @@
+@@ -561,212 +633,305 @@
  	}
  } class_calendar_sched;
  
@@ -820,9 +802,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +	// Same as insert, but for inserts e *before* any same-time-events, if
 +	//   there should be any.  Since it is used only by CalendarScheduler::newwidth(),
 +	//   some important checks present in insert() need not be performed.
- 
--	if (++qsize_ > top_threshold_)
--		resize(nbuckets_<<1);
++
 +	int i = CALENDAR_HASH(e->time_);
 +	Event *head = buckets_[i].list_;
 +	Event *before=0;
@@ -843,7 +823,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +				;
 +			newhead = (before == head);
 +		}
-+
+ 
+-	if (++qsize_ > top_threshold_)
+-		resize(nbuckets_<<1);
 +		e->next_ = before;
 +		e->prev_ = before->prev_;
 +		before->prev_ = e;
@@ -1061,12 +1043,12 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  {
 -	if (!resizeenabled_) return;
 +	double bwidth = newwidth(newsize);
-+
-+	if (newsize < 4)
-+		newsize = 4;
  
 -	double bwidth = newwidth();
 -	Event** oldb = buckets_;
++	if (newsize < 4)
++		newsize = 4;
++
 +	Bucket *oldb = buckets_;
  	int oldn = nbuckets_;
  
@@ -1187,7 +1169,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	return nw;
  }
  
-@@ -776,77 +943,90 @@
+@@ -776,77 +941,91 @@
   * must free the event if necessary; this routine only removes
   * it from the scheduler queue.
   *
@@ -1320,11 +1302,12 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +#ifdef GETTIME_TSC
 +        unsigned long long basetsc_ ;
 +        double  oneontscfreq_;
++        double  tscfreq_;
 +#endif
  };
  
  static class RealTimeSchedulerClass : public TclClass {
-@@ -860,16 +1040,51 @@
+@@ -860,16 +1039,58 @@
  RealTimeScheduler::RealTimeScheduler() : start_(0.0)
  {
  	bind("maxslop_", &slop_);
@@ -1334,6 +1317,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +#ifdef GETTIME_TSC
 +        basetsc_ = 0 ;
 +	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
++	tscfreq_ = TSC_COUNT_PERSEC;
 +#endif
  }
  
@@ -1350,6 +1334,13 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +    if(strcmp(argv[1], "tbevent-sink") == 0) {
 +      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
 +      return(TCL_OK);
++    } else if (strcmp(argv[1], "cpuspeed") == 0) {
++      double ret;
++      if( (ret = atof(argv[2])) != 0 ) {
++	tscfreq_ = ret;
++	oneontscfreq_ = 1.0 / tscfreq_;
++      }
++      return(TCL_OK);
 +    }
 +  }
 +
@@ -1365,7 +1356,6 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +                 
 +        unsigned long long curtsc = read_tsc();
 +        return (((double)(curtsc - basetsc_)) * oneontscfreq_);
-+
 +#else
  	timeval tv;
  	gettimeofday(&tv, 0);
@@ -1376,7 +1366,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  }
  
  void
-@@ -877,81 +1092,81 @@
+@@ -877,81 +1098,81 @@
  {
  	clock_ = SCHED_START;
  	start_ = tod();
@@ -1395,7 +1385,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  { 
 -	Event *p;
 -	double now;
-+        static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
++        static const double RTSCHEDULER_MINWAIT = 1.0e3; // don't wait for less
 +	const Event *p;
 +
 +#ifdef USEEVENTS
@@ -1520,18 +1510,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 -	return -1;
 +	// we reach here only if halted
  }
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Sun Oct  6 23:48:29 2002
-@@ -31,7 +31,7 @@
-  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-  * SUCH DAMAGE.
-  *
-- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.h,v 1.22 2002/04/10 20:37:46 haldar Exp $ (LBL)
-+ * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.h,v 1.25 2002/07/23 21:35:21 yuri Exp $ (LBL)
-  */
- 
- #ifndef ns_scheduler_h
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Fri Nov  8 17:04:05 2002
 @@ -56,6 +56,7 @@
  class Event {
  public:
@@ -1658,9 +1638,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h ns-allinone-2.1b9/ns
  
  };
  
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Nov  8 17:04:05 2002
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -1677,9 +1656,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/
  #endif
  
  }
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Nov  8 17:04:05 2002
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -1721,9 +1699,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1
 +}
 +
 +#endif
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Fri Nov  8 17:04:05 2002
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -1740,21 +1717,28 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b
 +#endif
 +
  #endif /* timer_handler_h */
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Sun Oct  6 23:08:01 2002
-@@ -37,21 +37,64 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Fri Nov  8 17:04:05 2002
+@@ -37,21 +37,82 @@
  #endif
  
  #include "iptap.h"
 +#include "net.h"
 +#include <sys/time.h>
- 
++#include <netinet/in.h>
++
 +#ifdef USEROUTES
 +#include "tbnexthop.h"
 +
 +static IPTapAgent *iface_to_iptap[IFNAMSIZ+1];
 +static Tcl_HashTable ip_to_iptap;
++
++// used for storing pairs for which we have created
++// ipfw rules
++struct SrcDestAddr {
++  struct in_addr src;
++  struct in_addr dst;
++};
 +
 +#endif
 +
@@ -1771,7 +1755,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +#endif
 +#include        "tbdefs.h"
 +#include        "log.h"
-+
+ 
 +#ifdef __cplusplus
 +}
 +#endif
@@ -1786,6 +1770,13 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +#endif
 +	}
  	TclObject* create(int, const char*const*) {
++#ifdef MEASURE_EVENT_RATE
++	  // schedule the event rate 
++	  if ( firstpacket == 0 ) {
++	    ert.sched(1.0);
++	    firstpacket++;
++	  }
++#endif
  		return (new IPTapAgent());
  	}
  } class_iptap_agent;
@@ -1806,11 +1797,14 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +#endif
 +#ifdef USEROUTES
 +  iface_index = 0;
++  inet_aton( "255.255.255.0", &ipmask ); // default mask
++  Tcl_InitHashTable( &rttable, TCL_ONE_WORD_KEYS );
++  Tcl_InitHashTable( &ipfwruleexists, sizeof(SrcDestAddr) );
 +#endif
    for (; i < MAX_PACKETS ; i++) {
      ident[i] = -1;
      offset[i] = -1;
-@@ -120,20 +163,21 @@
+@@ -120,20 +181,21 @@
    
  }
  
@@ -1842,7 +1836,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    unsigned char *buf;
    
    /* Ip header information from the grabbed packet. */
-@@ -143,45 +187,39 @@
+@@ -143,45 +205,53 @@
    
    /* TCP header info from the grabbed packet. */
    unsigned char tcphlen;
@@ -1876,13 +1870,32 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 -    }
 -    Packet::free(p);
 -    return;
--  }
--  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
++  double delay ;
 +  // This code keeps some delay data and drops the packet 
 +  if( firstpkt_in_burst ) {
 +    ts_firstpkt_in_burst = ts.tv_sec + ts.tv_usec * 1e-6 ;
 +    firstpkt_in_burst = false;
-+  }
++    delay = 0.0;
++  } else {
++    delay = double(ts.tv_sec + ts.tv_usec * 1e-6) - ts_firstpkt_in_burst;
++    timeval tv;
++    gettimeofday(&tv, 0);
++    double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
++    max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
+   }
+-  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
+ 
+-  /* 
+-     At this point, all I have to do is to grab the ttl value 
+-     from the received packet and put it in p's ttl field after
+-     decrementing it. It's ok, if we don't recalculate the checksum
+-     of the actual packet, because we'll do it at the end anyways.
+-  */
+ 
++#endif
++
++  
++#if 0
 +  timeval tv;
 +  gettimeofday(&tv, 0);
 +  double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
@@ -1894,19 +1907,13 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +			      bpf_ts_to_iptap_min_delay);
 +  data_idx = (data_idx+1) %
 +    (sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]));
- 
--  /* 
--     At this point, all I have to do is to grab the ttl value 
--     from the received packet and put it in p's ttl field after
--     decrementing it. It's ok, if we don't recalculate the checksum
--     of the actual packet, because we'll do it at the end anyways.
--  */
++
 +  Packet::free(p);
 +  return;
 +  
 +#endif
- 
-+#ifdef MEASURE_EVENT_RATE
++
++#if 0 //MEASURE_EVENT_RATE
 +  // schedule the event rate 
 +  if ( firstpacket == 0 ) {
 +    ert.sched(1.0);
@@ -1917,7 +1924,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    ipheader = (struct ip *) p->accessdata();
    buf = p->accessdata();
    iphlen = ipheader->ip_hl * 4;
-@@ -193,12 +231,6 @@
+@@ -193,12 +263,6 @@
      return;
    }
  
@@ -1930,7 +1937,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    datagramlen = ntohs(ipheader->ip_len);
  
    /* Put all the info in the ns headers. */
-@@ -208,13 +240,146 @@
+@@ -208,13 +272,210 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -1945,28 +1952,38 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +     the simulated network and is spit out
 +     into the real world from the right place
 +  */
-+  uint16_t dst_iface_index = 0;
 +  //dst.s_addr = (u_int32_t)ntohl(ipheader->ip_dst.s_addr);
-+
-+  int newentry = 0;
-+  // finds an entry if it exists, else creates a new one
-+  Tcl_HashEntry *he = Tcl_CreateHashEntry( &ip_to_iptap,
-+					   (char *)(ipheader->ip_dst.s_addr),
-+					   &newentry );  
 +  IPTapAgent *dst_agent = 0;
-+  
-+  // entry exists
-+  if( newentry == 0 ) {
 +
-+    dst_agent = (IPTapAgent *)Tcl_GetHashValue(he);
++  // Try looking up a route for the host
++  Tcl_HashEntry *localhe = Tcl_FindHashEntry( &rttable,
++					      (char *)(ipheader->ip_dst.s_addr) );
 +
-+  } else { // entry was newly created and we need to lookup routing table
++  // If that doesn't work, try a net route anding with the mask
++  if( localhe == 0 ) {
++    localhe = Tcl_FindHashEntry( &rttable,
++				 (char *)(ipheader->ip_dst.s_addr & ipmask.s_addr) );
++  }
++
++  RouteEntry *entry = 0;
++  if( localhe != 0 && (entry = (RouteEntry *)Tcl_GetHashValue(localhe)) != 0 ) {
 +    
-+    if( (dst_iface_index = get_nexthop_if(ipheader->ip_dst)) != 0 ) {
-+      dst_agent = iface_to_iptap[dst_iface_index];
-+    }
-+    Tcl_SetHashValue( he, (char *)dst_agent);
++    dst_agent = iface_to_iptap[entry->nexthop_iface];
 +
++    /* Now we consult our hashtable based on source addresses and if an entry
++       exists, it means that we had previously inserted the rule */
++    int newentry = 0;
++    SrcDestAddr pair = {ipheader->ip_src,entry->dst};
++    Tcl_HashEntry *ruleexists = Tcl_CreateHashEntry( &ipfwruleexists,
++						     (char *)(&pair),
++						     &newentry );
++
++    if( newentry ) {      
++      int rulenum = ipfw_addfwd( entry->nexthop, ipheader->ip_src,
++				     entry->dst, ipmask, true );
++      Tcl_SetHashValue( ruleexists, (char *)rulenum );
++    } // else we don't need to do anything
++						     
 +  }
 +
 +  if( dst_agent ) {
@@ -1976,16 +1993,20 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +  } 
 +  
 + /* if we fail to map a dest iptap object, we drop the packet */
-+  fprintf( stderr, "dropping packet with ipaddr:%s at %f with iface_idx:%d\n",
-+	   inet_ntoa(ipheader->ip_dst), Scheduler::instance().clock(), dst_iface_index );
++  fprintf( stderr, "dropping packet with ipaddr:%s at %f\n",
++	   inet_ntoa(ipheader->ip_dst), Scheduler::instance().clock() );
 +  drop(p);
 +  return;
 +  
 + injectsim:  
 +#endif
 +
++#ifdef MEASURE_DELAYS
++  Scheduler::instance().schedule( target_, p, max_delay );
++#else 
    // inject into simulator
    target_->recv(p);
++#endif
    return;
  }
  
@@ -2012,7 +2033,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +  
 +  /* TCP header info from the grabbed packet. */
 +  unsigned char tcphlen;
- 
++
 +  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
 +    fprintf(stderr,
 +	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
@@ -2037,7 +2058,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +  // nothing to do coz pkt_handler would have called processpkt()
 +  // that would have injected packets into the simulator
 +}
-+
+ 
 +#ifdef USEROUTES
 +  
 +int
@@ -2068,7 +2089,57 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +			    iface_to_iptap[iface_index] = this;
 +			  }
 +			}
++		} else if( strcmp(argv[1], "ipmask") == 0) {
++		  struct in_addr tmpmask;
++		  if( inet_aton( argv[2], &tmpmask ) == 1 ) {
++		    ipmask = tmpmask;
++		    return(TCL_OK);
++		  } else {
++		    return(TCL_ERROR);
++		  }
 +		}
++	} else if (argc == 4) {
++	  if (strcmp(argv[1], "addroute") == 0 ) {
++	    struct in_addr dst;
++	    struct in_addr nexthop;
++
++	    if( inet_aton( argv[2], &dst ) == 0 ) {
++	      fprintf( stderr, "IPTapAgent(%s): Invalid ipaddress %s\n",
++		       name(), argv[2] );
++	      return(TCL_ERROR);
++	    }
++	    if( inet_aton(argv[3], &nexthop) == 0 ) {
++	      fprintf( stderr, "IPTapAgent(%s): Invalid ipaddress %s\n",
++		       name(), argv[3] );
++	      return(TCL_ERROR);
++	    }
++	    // entry exists
++	    int nexthop_iface;
++	    if( (nexthop_iface = get_nexthop_if(nexthop)) == 0 ) {
++	      fprintf( stderr, "IPTapAgent(%s): Route nonexistent for nexthop %s\n",
++		       argv[3] );
++	      return(TCL_ERROR);
++	    }
++
++	    // finds an entry if it exists, else creates a new one
++	    int newentry = 0;
++	    Tcl_HashEntry *he = Tcl_CreateHashEntry( &rttable,
++						     (char *)(dst.s_addr),
++						     &newentry );
++	    
++	    RouteEntry *entry = 0;
++	    if( newentry ) {
++	      entry = new RouteEntry;
++	      Tcl_SetHashValue( he, (char *)entry);
++	    } else {
++	      entry = (RouteEntry *)Tcl_GetHashValue(he);
++	    }
++	    entry->dst = dst;
++	    entry->nexthop = nexthop;
++	    entry->nexthop_iface = nexthop_iface;
++	    
++	    return(TCL_OK);
++	  }
 +	}
 +	return (TapAgent::command(argc, argv));
 +}
@@ -2077,7 +2148,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
  
  /*
   * simulator schedules TapAgent::recv which calls sendpkt
-@@ -231,23 +396,24 @@
+@@ -231,23 +492,24 @@
    unsigned short dglen;
    struct ip *ipheader;
  
@@ -2110,7 +2181,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    /*
      At this point, we should grab the ttl field from the ns
      packet, put it in the IP header of the actual packet,
-@@ -277,13 +443,29 @@
+@@ -277,13 +539,29 @@
    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
  						sizeof(struct ip));
  
@@ -2141,10 +2212,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
  	  name(), hc->size());
    return 0;
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Sun Oct  6 23:07:23 2002
-@@ -38,29 +38,54 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Nov  8 17:04:05 2002
+@@ -38,29 +38,67 @@
  
  #include "tap.h"
  #include <netinet/in.h>
@@ -2155,13 +2225,22 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.
  #include "tcp.h"
  #include "ip.h"
  
--#define MAX_PACKETS 640
 +#ifdef USEROUTES
 +#include <net/if.h>
 +#include "tb_routelookup.h"
 +#endif
++
+ #define MAX_PACKETS 640
  
-+#define MAX_PACKETS 640
++#ifdef USEROUTES
++
++struct RouteEntry {
++  struct in_addr dst;
++  struct in_addr nexthop;
++  int nexthop_iface;
++};
++
++#endif
  
  class IPTapAgent : public TapAgent {
  
@@ -2177,6 +2256,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.
    int index;
 +#ifdef USEROUTES
 +  uint16_t iface_index;
++  struct in_addr ipmask;
++  Tcl_HashTable rttable;
++  Tcl_HashTable ipfwruleexists;
 +#endif
 +#ifdef MEASURE_DELAYS
 +  bool firstpkt_in_burst;
@@ -2200,9 +2282,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.
  };
  
  #endif /* iptap_h */
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Sun Oct  6 23:04:43 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Nov  8 17:04:05 2002
 @@ -57,92 +57,25 @@
  
  #ifdef __cplusplus
@@ -2338,8 +2419,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
 +{
 +	pcap_singleton_callback *ps = (pcap_singleton_callback*) userdata;	
 +
-+	Packet *p = Packet::alloc(ph->caplen);
 +	PcapNetwork *inst = ps->net;
++	int s = inst->skiphdr();	// go to IP header
++	Packet *p = Packet::alloc(ph->caplen - s);
 +	
 +	if (++(inst->pcnt_) == 1) {
 +		// mark time stamp of first pkt
@@ -2347,7 +2429,6 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
 +	}
 +
 +	// link layer header will be placed at the beginning from pcap
-+	int s = inst->skiphdr();	// go to IP header
 +	memcpy(p->accessdata(), pkt + s, ph->caplen - s);
 +
 +	ps->callback(ps->clientdata, p, ph->ts);
@@ -2408,9 +2489,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
  		}
  	}
  #endif
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b9/emulate/net.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Sun Oct  6 23:06:56 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri Nov  8 17:04:05 2002
 @@ -49,12 +49,16 @@
  #undef interface
  #endif
@@ -2534,9 +2614,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b
 +	unsigned int local_netmask_;	// seems shouldn't be necessary :(
  };
  #endif
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Fri Nov  8 17:04:05 2002
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -2670,9 +2749,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1
  		fprintf(stderr,
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Fri Nov  8 17:04:05 2002
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -2685,18 +2763,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b
  	double now() { return Scheduler::instance().clock(); }
  };
  
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Sun Oct  6 23:02:17 2002
-@@ -33,7 +33,7 @@
- 
- #ifndef lint
- static const char rcsid[] =
--    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/emulate/tcptap.cc,v 1.2 2001/09/20 19:05:21 alefiyah Exp $ (ISI)";
-+    "@(#) $Header: /home/anoncvs/PUBLIC_CVSROOT/ns-2/emulate/tcptap.cc,v 1.4 2002/09/23 23:25:05 alefiyah Exp $ (ISI)";
- #endif
- 
- #include "tcptap.h"
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Nov  8 17:04:05 2002
 @@ -97,6 +97,11 @@
        return (TCL_OK);
      }
@@ -2882,18 +2950,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-
    return 0;
  }
  
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Sun Oct  6 22:59:30 2002
-@@ -30,7 +30,7 @@
-  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-  * SUCH DAMAGE.
-  *
-- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/emulate/tcptap.h,v 1.2 2001/12/20 18:18:44 haldar Exp $ (ISI)
-+ * @(#) $Header: /home/anoncvs/PUBLIC_CVSROOT/ns-2/emulate/tcptap.h,v 1.4 2002/09/23 23:27:10 alefiyah Exp $ (ISI)
-  */
- 
- #ifndef tcptap_h
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Nov  8 17:04:05 2002
 @@ -38,6 +38,7 @@
  
  #include "tap.h"
@@ -2924,9 +2982,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2
    
   public:
    TCPTapAgent();
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h ns-allinone-2.1b9/ns-2.1b9/link/delay.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Nov  1 18:03:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Fri Nov  8 17:04:05 2002
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -2950,9 +3007,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h ns-allinone-2.1b9/ns-2.1b9
  	}
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Fri Nov  8 17:04:05 2002
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -3427,9 +3483,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.
  		}
  	}
  //if (int(t_seqno_) > 1)
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Fri Nov  8 17:04:05 2002
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -3463,9 +3518,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1
  			rtxbytes_ += amt;
  	}
  	virtual void oldack() {			// what to do on old ack
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Nov  8 17:04:05 2002
 @@ -54,6 +54,8 @@
  	int ackno_;             /* ACK number for FullTcp */
  	int hlen_;              /* header len (bytes) for FullTcp */
@@ -3483,9 +3537,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tc
  };
  
  /* these are used to mark packets as to why we xmitted them */
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.1b9/tools/random.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Fri Nov  8 17:04:05 2002
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -3500,9 +3553,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.
 +#endif
  
  #endif /* !WIN32 */
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Apr  1 16:07:28 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Sun Oct  6 21:54:17 2002
++++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Fri Nov  8 17:04:05 2002
 @@ -826,6 +826,8 @@
  			break;
  		case PT_GAF:
