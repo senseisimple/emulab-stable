@@ -10,7 +10,7 @@ OBJDIR		= ../..
 SUBDIR		= os/imagezip
 
 DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
-		  imagedump.c imagedump.8 imagezip.c imagedump.8 \
+		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
 		  imageunzip.c imageunzip.8
 EXPANDCOPYRIGHT	= /n/fast/usr/lsrc/flux/doc/copyright/expand-copyr
 
