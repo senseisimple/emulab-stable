@@ -60,6 +60,11 @@ admin           = 0
 devel           = 0
 needhelp        = 0
 
+# The set of paths to try when connecting to the server.
+XMLRPC_PATH     = [ "xmlrpc", SERVER_PATH + "/sbin/sshxmlrpc_server.py", ]
+# The ssh options that should be added to the default.
+SSH_OPTS        = { "-1" : "-1" }
+
 API = {
     "node_admin"        : { "func" : "adminmode",
                             "help" : "Boot selected nodes into FreeBSD MFS" },
@@ -133,6 +138,52 @@ def wrapperoptions():
     print "    --debug     Turn on semi-useful debugging"
     return
 
+##
+# Construct an SSHTransport object that is connected to an EmulabServer object
+# on the peer.  Multiple paths are attempted until one succeeds.
+#
+# @param user_agent The user-agent identifier.
+# @param ssh_identity The ssh identity file to use when connecting.
+# @return A pair containing the ssh transport and the path used, in that order.
+#
+def make_transport(user_agent=None, ssh_identity=None):
+    if path:
+        retval = (SSHTransport(user_agent=user_agent, ssh_opts=SSH_OPTS), path)
+        pass
+    else:
+        for xrpath in XMLRPC_PATH:
+            try:
+                retval = (SSHTransport(user_agent=user_agent,
+                                       ssh_identity=ssh_identity,
+                                       ssh_opts=SSH_OPTS),
+                          xrpath)
+                hdrs = retval[0].probe(xmlrpc_server,
+                                       "/" + xrpath,
+                                       verbose=debug)
+                if hdrs["probe-response"] == "EmulabServer":
+                    if debug:
+                        print "make_transport: found path " + xrpath
+                        pass
+                    break
+                else:
+                    retval = None
+                    pass
+                pass
+            except BadResponse, e:
+                if debug:
+                    print ("make_transport: bad response for "
+                           + xrpath + "; " + str(e))
+                    pass
+                pass
+            pass
+        pass
+
+    if not retval:
+        print "error - Unable to connect to RPC server"
+        pass
+
+    return retval
+
 #
 # Process a single command line
 #
@@ -143,15 +194,16 @@ def do_method(module, method, params):
     if impotent:
         return 0;
 
+    transport, fullpath = make_transport(user_agent="sshxmlrpc_wrapper-v0.2")
+
     # Get a handle on the server,
     server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
-                            "/xmlrpc/" + module,
-                            path=path,
-                            user_agent="sshxmlrpc_wrapper-v0.1")
-
+                            "/" + fullpath,
+                            transport=transport,
+                            user_agent="sshxmlrpc_wrapper-v0.2")
     
     # Get a pointer to the function we want to invoke.
-    meth      = getattr(server, method)
+    meth      = getattr(server, module + "." + method)
     meth_args = [ PACKAGE_VERSION, params ]
 
     #
@@ -1557,6 +1609,15 @@ if admin:
 #
 handler      = None;
 command_argv = None;
+
+if not conf_passphraseless_login():
+    sys.stderr.write(sys.argv[0]
+                     + ": error - No agent or passphrase-less key found\n")
+    sys.stderr.write(sys.argv[0]
+                     + ": You will need to regenerate your passphrase-less "
+                     + "key manually\n")
+    sys.exit(-1)
+    pass
 
 if API.has_key(os.path.basename(sys.argv[0])):
     handler      = API[os.path.basename(sys.argv[0])]["func"];

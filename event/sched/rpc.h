@@ -23,6 +23,7 @@ typedef struct address_tuple * address_tuple_t;
 #endif
 
 extern CD int RPC_init(char *certpath, char *host, int port);
+extern CD void RPC_kill(void);
 extern CD int RPC_waitforactive(char *pid, char *eid);
 extern CD int RPC_agentlist(char *pid, char *eid);
 extern CD int RPC_grouplist(char *pid, char *eid);

@@ -154,7 +154,9 @@ main(int argc, char **argv)
 	if (!server)
 		server = "localhost";
 #ifdef  RPC
-	RPC_init(NULL, BOSSNODE, 0);
+	if (RPC_init(NULL, BOSSNODE, 0)) {
+		fatal("could not connect to rpc server");
+	}
 #endif
 	
 	snprintf(buf, sizeof(buf), "elvin://%s%s%s",
@@ -192,6 +194,10 @@ main(int argc, char **argv)
 	if (get_static_events(handle) < 0) {
 		fatal("could not get static event list");
 	}
+
+#ifdef  RPC
+	RPC_kill();
+#endif
 
 	/* Dequeue events and process them at the appropriate times: */
 	dequeue(handle);

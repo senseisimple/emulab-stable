@@ -27,7 +27,7 @@ DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
 LIBS     += -levent_r -ltb -lcipher -lz
 
 ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
-CXXFLAGS += -pthread -O $(ULXRINC)
+CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR)
 ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
 
 #
@@ -62,7 +62,7 @@ rpc.o:			rpc.cc rpc.h
 rrpc.o:			rpc.cc rpc.h
 	$(CXX) $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
-install:
+install: event-sched_rpc
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_DIR)/opsdir/sbin/event-sched
 

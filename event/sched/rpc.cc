@@ -3,9 +3,14 @@
  * Copyright (c) 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+#include "config.h"
+
 #include "rpc.h"
 
-#define ULXR_INCLUDE_SSL_STUFF
+#include <limits.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include <ulxmlrpcpp.h>  // always first header
 #include <iostream>
@@ -27,36 +32,109 @@
 // This is just a stub that calls the realmain in event-sched.c
 //
 extern "C" int	realmain(int argc, char **argv);
-	
+
+/**
+ * We cache the connection to the server until all of the RPCs have completed
+ * so we do not have to reconnect.
+ */
+static struct {
+  ulxr::Connection *conn;	// The cached connection.
+  ulxr::Protocol *proto;	// The cached protocol layer.
+} rpc_data;
+
 int
 main(int argc, char **argv)
 {
-	return realmain(argc, argv);
+  return realmain(argc, argv);
 }
-
-/*
- * Simply save the stuff we need for making the connections later.
- */
-static char *CERTPATH;
-static char *PATH;
-static char *HOST = "localhost";
-static int   PORT = 3069;
 
 int RPC_init(char *certpath, char *host, int port)
 {
-  printf("%s %s %d\n", certpath, host, port);
+  int retval = -1;
   
 #ifdef SSHRPC
-  PATH     = "xmlrpc";
+  {
+    char identity_path[PATH_MAX];
+    struct passwd *pwd;
+
+    /* Construct the path to the identity and */
+    pwd = getpwuid(getuid());
+    snprintf(identity_path,
+	     sizeof(identity_path),
+	     "%s/.ssh/identity",
+	     pwd->pw_dir);
+    /* ... check to make sure it is passphrase-less. */
+    if (!ulxr::SSHConnection::has_passphraseless_login(identity_path)) {
+      /* XXX We should just automatically restore from backup here. */
+      fprintf(stderr, " *** ~/.ssh/identity is not a passphrase-less key\n");
+      fprintf(stderr, "     You will need to regenerate the key manually\n");
+      return 1;
+    }
+    else {
+      static char *XMLRPC_PATHS[] = {
+	"xmlrpc",
+	TBROOT "/sbin/sshxmlrpc_server.py",
+	NULL
+      };
+      
+      int lpc;
+
+      /*
+       * Probe each path looking for one that has the server on the other side.
+       */
+      for (lpc = 0; XMLRPC_PATHS[lpc]; lpc++) {
+	try {
+	  ulxr::RFC822Protocol *proto;
+	  ulxr::CppString server_name;
+	  
+	  rpc_data.conn = new ulxr::SSHConnection(
+		pwd->pw_name, host, XMLRPC_PATHS[lpc],
+		port ? port : ulxr::SSHConnection::DEFAULT_PORT,
+		ulxr::SSHConnection::DEFAULT_SSH_OPTS +
+		ULXR_PCHAR(" -1 -i ") +
+		ULXR_PCHAR(identity_path));
+	  rpc_data.proto = proto = new ulxr::RFC822Protocol(rpc_data.conn);
+	  
+	  server_name = proto->probe();
+	  
+	  if (strcmp(server_name.c_str(), "EmulabServer") == 0) {
+	    break;
+	  }
+	  else {
+	    RPC_kill();
+	  }
+	}
+	catch (ulxr::ConnectionException &ce) {
+	  RPC_kill();
+	}
+      }
+      if (rpc_data.proto == NULL) {
+	/* Bah, could not connect to the server. */
+	return 1;
+      }
+    }
+  }
 #else
-  if (certpath)
-    CERTPATH = strdup(certpath);
-  else
-    CERTPATH = "/usr/testbed/etc/client.pem";
+  /* XXX THIS IS OUT OF DATE */
+  {
+    ulxr::SSLConnection conn(false, host, port);
+    ulxr::HttpProtocol proto(&conn, conn.getHostName());
+    if (certpath == NULL)
+      certpath = "/usr/testbed/etc/client.pem";
+    conn.setCryptographyData("", certpath, certpath);
+  }
 #endif
-  HOST     = strdup(host);
-  PORT     = port;
   return 0;
+}
+
+void RPC_kill(void)
+{
+  if (rpc_data.proto != NULL) {
+    delete rpc_data.proto;
+    rpc_data.proto = NULL;
+    delete rpc_data.conn;
+    rpc_data.conn = NULL;
+  }
 }
 
 /*
@@ -73,25 +151,21 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
   try
     {
 #ifdef SSHRPC
-      const char *user = getenv("USER");
-      
-      ulxr::SSHConnection conn(user, HOST, PATH);
-      ulxr::RFC822Protocol proto(&conn);
-      emulab::ServerProxy proxy(&proto);
+      emulab::ServerProxy proxy(rpc_data.proto);
 #else
-      ulxr::SSLConnection conn(false, HOST, PORT); 
-      ulxr::HttpProtocol proto(&conn, conn.getHostName());
-      conn.setCryptographyData("", CERTPATH, CERTPATH);
-      emulab::ServerProxy proxy(&proto, false, "/RPC2");
+      /* XXX THIS IS OUT OF DATE */
+      emulab::ServerProxy proxy(rpc_data.proto, false, "/RPC2");
 #endif
 
       *er = proxy.invoke(method,
-			emulab::SPA_String, "proj", pid,
-			emulab::SPA_String, "exp", eid,
-			emulab::SPA_TAG_DONE);
-
+			 emulab::SPA_String, "proj", pid,
+			 emulab::SPA_String, "exp", eid,
+			 emulab::SPA_TAG_DONE);
+      
       if (! er->isSuccess()){
-	  ULXR_CERR << "SSL_waitforactive failed: "
+	  ULXR_CERR << "RPC_invoke failed: "
+		    << method
+		    << " "
 		    << er->getOutput()
 		    << std::endl;
 	  return -1;

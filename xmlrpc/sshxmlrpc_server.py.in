@@ -43,7 +43,7 @@ if len(sys.argv) > 1:
 # 
 # Construct and wrap our object.
 server  = eval(module + "(readonly=" + str(ReadOnly) + ")")
-wrapper = sshxmlrpc.SSHServerWrapper(server)
+wrapper = sshxmlrpc.SSHServerWrapper(server, module)
 # Handle the request on stdin and send the response to stdout.
-wrapper.serve_forever((sys.stdin, sys.stdout))
+wrapper.serve_stdio_forever()
 sys.exit(0)
