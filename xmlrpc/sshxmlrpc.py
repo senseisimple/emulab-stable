@@ -18,7 +18,7 @@ class SSHTransport:
     # Send a request to the destination.
     #
     # @param host The host name on which to execute the request
-    # @param handler The python file that will handle the request.
+    # @param handler The python module that will handle the request.
     # @param request_body The XML-RPC encoded request.
     # @param verbose unused.
     # @return The value returned 
@@ -28,13 +28,13 @@ class SSHTransport:
         if handler.startswith('/'):
             handler = handler[1:]
             pass
+
+	self.user, self.realhost = urllib.splituser(host)
         
         # SSH to the host and call python on the handler.
-        self.myChild = popen2.Popen3("ssh -x "
-                                     + host
-                                     + " 'python "
-                                     + handler
-                                     + "'")
+        self.myChild = popen2.Popen3("ssh -x -l " + self.user + " "
+                                     + self.realhost + " "
+                                     + handler)
 
         # Send the request over SSH's stdin,
         self.myChild.tochild.write(request_body)
@@ -205,3 +205,4 @@ class SSHServerProxy:
     def __getattr__(self, name):
         # magic method dispatcher
         return xmlrpclib._Method(self.__request, name)
+

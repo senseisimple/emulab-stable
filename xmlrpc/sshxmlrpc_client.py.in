@@ -5,44 +5,59 @@
 # All rights reserved.
 #
 import sys
+sys.path.append("@prefix@/lib")
 import getopt
+import os
 
 from sshxmlrpc import *
+from emulabclient import emulabclient
 
 ##
 # The package version number
 #
 PACKAGE_VERSION = "0.1"
 
+# Default server
+XMLRPC_SERVER   = "@BOSSNODE@"
+
+# User supplied server name.
+xmlrpc_server   = XMLRPC_SERVER
+
+# User supplied login ID to use (overrides env variable USER if exists).
+login_id        = os.environ["USER"]
+
+# Debugging output.
+debug           = 0
+
 ##
 # Print the usage statement to stdout.
 #
 def usage():
-    print "Send an XML-RPC request to a SSH-based server."
-    print "Usage: " + sys.argv[0] + " [-hV] <URI> <method> [<args>]"
+    print "Make a request to the Emulab XML-RPC (SSH-based) server."
+    print ("Usage: " + sys.argv[0] 
+                     + " [-hV] [-l login] [-s server] <method> [<args>]")
     print
     print "Options:"
     print "  -h, --help\t\t  Display this help message"
-    print "  -V, --version\t\t  Show the vesion number"
+    print "  -V, --version\t\t  Show the version number"
+    print "  -s, --server\t\t  Set the server hostname"
+    print "  -l, --login\t\t  Set the login id (defaults to $USER)"
     print
     print "Required arguments:"
-    print "  URI\t\t\t  The URI of the server (e.g. ssh://localhost/echo.py)"
     print "  method\t\t  The method to execute on the server"
-    print "  args\t\t\t  The method arguments, given as a python list"
-    print "      \t\t\t  (Note: This value gets eval'd)"
+    print "  args\t\t\t  The method arguments"
     print
     print "Example:"
     print ("  "
            + sys.argv[0]
-           + " ssh://ops.emulab.net/~stack/sshxmlrpc/echo.py"
-           + " echo '\"Hello, World!\"'")
+           + " -s boss.emulab.net echo \"Hello World!\"")
     return
 
 try:
     # Parse the options,
     opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "hV",
-                                   [ "help", "version", ])
+                                   "dhVs:l:",
+                                   [ "help", "version", "server=", "login=", ])
     # ... act on them appropriately, and
     for opt, val in opts:
         if opt in ("-h", "--help"):
@@ -53,9 +68,18 @@ try:
             print PACKAGE_VERSION
             sys.exit()
             pass
+        elif opt in ("-s", "--server"):
+	    xmlrpc_server = val
+            pass
+        elif opt in ("-l", "--login"):
+	    login_id = val
+            pass
+        elif opt in ("-d"):
+	    debug = 1
+            pass
         pass
     # ... make sure the required arguments are there.
-    if len(req_args) < 2:
+    if len(req_args) < 1:
         raise getopt.error("Required arguments not given", "")
     pass
 except getopt.error, e:
@@ -65,18 +89,19 @@ except getopt.error, e:
     pass
 
 # Get a handle on the server,
-server = SSHServerProxy(req_args[0])
+server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server + "/sshxmlrpc")
 
-# ... get the requested method,
-meth = getattr(server, req_args[1])
+# Get a handle on the emulab client object, giving it the transport to use.
+client = emulabclient(server, debug);
 
-# ... cons up the arguments, and
-if len(req_args) > 2:
-    meth_args = eval("[" + req_args[2] + "]")
-    pass
-else:
-    meth_args = []
-    pass
+# Get a pointer to the client side of the function we want to invoke.
+meth = getattr(client, req_args[0])
 
-# ... make the call.
-print str(apply(meth, meth_args))
+# The rest of the list is passed as is.
+req_args.pop(0)
+
+#
+# Make the call. The clientside class will do whatever it needs before
+# invoking the equiv method on the server side.
+#
+sys.exit(apply(meth, req_args))

@@ -1,0 +1,324 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+import socket
+import os
+import popen2
+import tempfile
+import time
+sys.path.append("@prefix@/lib")
+import libdb
+from libtestbed   import SENDMAIL, TBOPS
+from emulabclient import ResponseBlock
+
+# Configure variables
+TBDIR = "@prefix@"
+
+#
+# This class implements the server side of the XMLRPC interface to Emulab. 
+#
+# Arguments passed as a Dictionary. This converts to a XML "struct"
+# which in Perl/PHP/Ruby would be a hash. So, a client written in
+# pretty much any language should be able to talk to this class.
+#
+class emulabserver:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self):
+        self.VERSION = 0.1
+        return
+
+    ##
+    # Echo a message, basically, prepend the host name to the parameter list.
+    #
+    # @param args The argument list to echo back.
+    # @return The 'msg' value with this machine's name prepended.
+    #
+    def echo(self, version, argdict):
+        return ResponseBlock(0, socket.gethostname() + ": " + str(version)
+                             + " " + str(argdict["list"]))
+
+    #
+    # Start an experiment using batchexp. We get the NS file inline, which
+    # we have to write to a temp file first. 
+    #
+    def batchexp(self, version, argdict):
+        if version != self.VERSION:
+            return ResponseBlock(-1, "Client version mismatch!");
+            pass
+
+        nsfilename = None
+        argstr     = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("batchmode"):
+                if val == 0:
+                    argstr += " -i"
+                    pass
+                pass
+            elif opt in ("description"):
+                argstr += " -E "
+                argstr += val
+                pass
+            elif opt in ("gid"):
+                argstr += " -g "
+                argstr += val
+                pass
+            elif opt in ("eid"):
+                argstr += " -e "
+                argstr += val
+                pass
+            elif opt in ("pid"):
+                argstr += " -p "
+                argstr += val
+                pass
+            elif opt in ("idleswap"):
+                if opt == 0:
+                    argstr += " -S "
+                    argstr += argdict["noswap_reason"]
+                    pass
+                pass
+            elif opt in ("noswap_reason"):
+                pass
+            elif opt in ("idleswap"):
+                if opt == 0:
+                    argstr += " -L "
+                    argstr += argdict["noidleswap_reason"]
+                    pass
+                else:
+                    argstr += " -l "
+                    argstr += val
+                    pass
+                pass
+            elif opt in ("noidleswap_reason"):
+                pass
+            elif opt in ("autoswap"):
+                argstr += " -a "
+                argstr += val
+                pass
+            elif opt in ("frontend"):
+                argstr += " -f "
+                pass
+            elif opt in ("waitmode"):
+                argstr += " -w "
+                pass
+            elif opt in ("nsfilepath"):
+                # Backend script will verify this local path. 
+                nsfilename = val
+                pass
+            elif opt in ("nsfilestr"):
+                nsfilestr = val
+            
+                if len(nsfilestr) > (1024 * 512):
+                    return ResponseBlock(-1, "NS File way too big!");
+        
+                (nsfp, nsfilename) = writensfile(nsfilestr)
+                if not nsfilename:
+                    return ResponseBlock(-1, "Server Error")
+                pass
+            pass
+
+        if nsfilename:
+            argstr += " "
+            argstr += nsfilename
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/batchexp " + argstr)
+        return ResponseBlock(exitval >> 8, output)
+
+    #
+    # swap an experiment using swapexp. We get the NS file inline, which
+    # we have to write to a temp file first. 
+    #
+    def swapexp(self, version, argdict):
+        if version != self.VERSION:
+            return ResponseBlock(-1, "Client version mismatch!");
+            pass
+
+        nsfilename = None
+        argstr     = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("waitmode"):
+                argstr += " -w "
+                pass
+            elif opt in ("reboot_nodes"):
+                argstr += " -r "
+                pass
+            elif opt in ("restart_eventsys"):
+                argstr += " -e "
+                pass
+            elif opt in ("swapop"):
+                argstr += " -s "
+                argstr += val
+                pass
+            elif opt in ("nsfilepath"):
+                # Backend script will verify this local path. 
+                nsfilename = val
+                pass
+            elif opt in ("nsfilestr"):
+                nsfilestr = val
+            
+                if len(nsfilestr) > (1024 * 512):
+                    return ResponseBlock(-1, "NS File way too big!");
+        
+                (nsfp, nsfilename) = writensfile(nsfilestr)
+                if not nsfilename:
+                    return ResponseBlock(-1, "Server Error")
+                pass
+            pass
+
+        if argdict.has_key("pid"):
+            argstr += " "
+            argstr += argdict["pid"]
+            pass
+        if argdict.has_key("eid"):
+            argstr += " "
+            argstr += argdict["eid"]
+            pass
+        if nsfilename:
+            argstr += " "
+            argstr += nsfilename
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        return ResponseBlock(exitval >> 8, output)
+
+    #
+    # end an experiment using endexp.
+    #
+    def endexp(self, version, argdict):
+        if version != self.VERSION:
+            return ResponseBlock(-1, "Client version mismatch!");
+            pass
+
+        argstr     = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("waitmode"):
+                argstr += " -w "
+                pass
+            pass
+
+        if argdict.has_key("pid"):
+            argstr += " "
+            argstr += argdict["pid"]
+            pass
+        if argdict.has_key("eid"):
+            argstr += " "
+            argstr += argdict["eid"]
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
+        return ResponseBlock(exitval >> 8, output)
+
+    #
+    # nscheck an NS file.
+    #
+    def nscheck(self, version, argdict):
+        if version != self.VERSION:
+            return ResponseBlock(-1, "Client version mismatch!");
+            pass
+
+        argstr = ""
+
+        if argdict.has_key("nsfilestr"):
+            nsfilestr = argdict["nsfilestr"]
+            
+            if len(nsfilestr) > (1024 * 512):
+                return ResponseBlock(-1, "NS File way too big!");
+        
+            (nsfp, nsfilename) = writensfile(nsfilestr)
+            if not nsfilename:
+                return ResponseBlock(-1, "Server Error")
+
+            argstr += nsfilename
+            pass
+        elif argdict.has_key("nsfilepath"):
+                # Backend script will verify this local path. 
+                argstr += escapeshellarg(argdict["nsfilepath"])
+                pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/nscheck " + argstr)
+        return ResponseBlock(exitval >> 8, output)
+
+    #
+    # create_image.
+    #
+    def create_image(self, version, argdict):
+        if version != self.VERSION:
+            return ResponseBlock(-1, "Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("pid"):
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        if argdict.has_key("imageid"):
+            argstr += " "
+            argstr += argdict["imageid"]
+            pass
+        if argdict.has_key("nodeid"):
+            argstr += " "
+            argstr += argdict["nodeid"]
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/create_image " + argstr)
+        return ResponseBlock(exitval >> 8, output)
+
+    pass
+
+#
+# Utility functions
+#
+
+#
+# escapeshellarg() adds single quotes around a string and quotes/escapes any
+# existing single quotes allowing string to be passed directly to a shell
+# function and having it be treated as a single safe argument.
+#
+def escapeshellarg(s):
+    s2 = ""
+
+    for c in s:
+        if c == '\'':
+            s2 = s2 + '\'\\\''
+        s2 = s2 + c
+
+    return '\'' + s2 + '\''
+
+#
+# Run a command. args is a list of strings to pass as arguments to cmd.
+# Return the exitcode and the output as a tuple.
+# 
+def runcommand(cmd):
+    child  = popen2.Popen4(cmd)
+    output = child.fromchild.read(8192)
+    return (child.wait(), output)
+
+def writensfile(str):
+    tempfile.tempdir = "/var/tmp"
+    try:
+        fp = tempfile.NamedTemporaryFile(prefix="php")
+        fp.write(str)
+        fp.flush()
+
+    except:
+        SENDMAIL(TBOPS, "writensfile failed",
+                 "Could not write temporary NS file:\n" +
+                 "%s:%s" % (sys.exc_type, sys.exc_value))
+        return None
+        pass
+
+    # Yuck. Need to maintain a ref so that the file is not deleted!
+    return (fp, fp.name)
