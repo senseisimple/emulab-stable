@@ -15,9 +15,11 @@
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.*;
 import java.util.*;
 import java.lang.*;
 import java.net.*;
+//import netscape.javascript.*;
 //import java.io.*;
 
 public class Netbuild extends java.applet.Applet 
@@ -336,13 +338,79 @@ public class Netbuild extends java.applet.Applet
 	g.setPaintMode();
     }
 
+    public int postIt( String s ) {
+	int hash = s.hashCode();
+	if (hash < 0) { hash = -hash; }
+	if (hash == 0) { hash = 1; }
+	try {	    
+	    URL url;
+	    URLConnection urlConn;
+	    DataOutputStream    printout;
+	    DataInputStream     input;
+	    // URL of CGI-Bin script.
+	    //url = new URL (getCodeBase().toString() + "env.tcgi");
+	    url = new URL ( getParameter("exporturl") );
+	    // URL connection channel.
+	    urlConn = url.openConnection();
+	    // Let the run-time system (RTS) know that we want input.
+	    urlConn.setDoInput (true);
+	    // Let the RTS know that we want to do output.
+	    urlConn.setDoOutput (true);
+	    // No caching, we want the real thing.
+	    urlConn.setUseCaches (false);
+	    // Specify the content type.
+	    urlConn.setRequestProperty("Content-Type", 
+				       "application/x-www-form-urlencoded");
+	    // Send POST output.
+	    printout = new DataOutputStream (urlConn.getOutputStream ());
+	    String content =	    
+		"nsdata=" + URLEncoder.encode ( s ) +
+                "&nsref=" + String.valueOf(hash);
+	    printout.writeBytes (content);
+	    printout.flush ();
+	    printout.close ();
+	    // Get response data.
+	    input = new DataInputStream (urlConn.getInputStream ());
+	    String str;
+	    while (null != ((str = input.readLine()))) {
+		System.out.println (str);
+	    }
+	    input.close();
+	    
+	} catch (Exception ex) {
+	    System.out.println("exception: " + ex.getMessage());
+	    ex.printStackTrace();	       
+	    return -1;
+	}
+	return hash;
+    }
+
+
+    // public void toCookie( String s ) {
+    //   java.util.Calendar c = java.util.Calendar.getInstance();
+    //   c.add(java.util.Calendar.MONTH, 1);
+    //   String expires = "; expires=" + c.getTime().toString();
+
+    //   String s1 = s + expires; 
+    //   System.out.println(s1);
+        
+    //   JSObject myBrowser = JSObject.getWindow(this);
+    //   JSObject myDocument =  (JSObject) myBrowser.getMember("document");
+    
+    //   myDocument.setMember("cookie", s1);
+    //}
+
     public void actionPerformed( ActionEvent e ) {
 	if (e.getSource() == exportButton) {
 	    startAppropriatePropertiesArea(); // make sure strings are up'd
 	    String ns = workArea.toNS();
-	    System.out.println( ns );		
-	    String url = getParameter("exporturl") + "?nsdata=" + 
-		URLEncoder.encode( ns );
+	    System.out.println( ns );	
+	    int refid = postIt( ns );	
+	    //String url = getParameter("exporturl") + "?nsdata=" + 
+	    //URLEncoder.encode( ns );
+	    //toCookie( ns );
+	    //String url = getParameter("exporturl") + "?nsdataincookie=1";
+	    String url = getParameter("expcreateurl") + "?nsref=" + String.valueOf(refid);
 	    System.out.println( url );
 	    try {
 		getAppletContext().showDocument( new URL( url ), "_blank" );

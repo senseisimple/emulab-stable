@@ -19,8 +19,10 @@ chdir("buildui");
 
 ?>
 
-<applet code="Netbuild.class" width=800 height=600>
+<applet code="Netbuild.class" width=800 height=600 MAYSCRIPT>
   <param name=exporturl
+         value="<?php echo $TBBASE?>/buildui/nssave.php3">
+  <param name=expcreateurl
          value="<?php echo $TBBASE?>/beginexp.php3">
 <pre>
 We're sorry, NetBuild in unable to run,

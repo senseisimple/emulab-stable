@@ -37,7 +37,7 @@ function RESPIT($tag, $value)
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN;
-    global $nsdata, $projlist, $priorities, $exp_nsfile;
+    global $nsdata, $nsref, $projlist, $priorities, $exp_nsfile;
     global $uid;
     
     PAGEHEADER("Begin a Testbed Experiment");
@@ -135,6 +135,13 @@ function SPITFORM($formfields, $errors)
                   <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsdata value=$nsdata>
                   <td><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
+                      View NS File</a></td>
+              </tr>\n";
+    } elseif (isset($nsref)) {
+        echo "<tr>
+                  <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+                      <input type=hidden name=nsref value=$nsref>
+                  <td><a target=_blank href=spitnsdata.php3?nsref=$nsref>
                       View NS File</a></td>
               </tr>\n";
     }
@@ -324,12 +331,18 @@ function SPITFORM($formfields, $errors)
           </blockquote>\n";
 }
 
+if (isset($nsref)) {
+    if (strcmp($nsref, "") == 0 || !ereg("^[0-9]+$", $nsref))
+	unset($nsref);
+}
+
 #
 # See if nsdata was provided. Clear it if an empty string, otherwise
 # reencode it *only* if not from the form. It appears that php decodes
 # it for you when it comes in as GET argument, but leaves it encoded
 # when its a POST argument.
 #
+
 if (isset($nsdata)) {
     if (strcmp($nsdata, "") == 0) 
 	unset($nsdata);
@@ -531,6 +544,11 @@ elseif ($specupload) {
     chmod($exp_nsfile, 0666);
     $nsfile = $exp_nsfile;
     $nonsfile = 0;
+}
+elseif (isset($nsref) && strcmp($nsref, "")) {
+    $nsfile = "/tmp/$uid-$nsref.nsfile";
+    $delnsfile = 1;
+    $nonsfile  = 0;
 }
 elseif (isset($nsdata) && strcmp($nsdata, "")) {
     #
