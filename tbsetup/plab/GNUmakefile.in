@@ -57,8 +57,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/plabslice
 	chown root $(INSTALL_SBINDIR)/plabnode
 	chmod u+s $(INSTALL_SBINDIR)/plabnode
-	chown root $(INSTALL_SBINDIR)/plabdaemon
-	chmod u+s $(INSTALL_SBINDIR)/plabdaemon
+	chown root $(INSTALL_SBINDIR)/plabrenewd
+	chmod u+s $(INSTALL_SBINDIR)/plabrenewd
 
 clean:	subdir-clean
 
