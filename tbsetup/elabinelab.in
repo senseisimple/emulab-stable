@@ -258,17 +258,15 @@ $UID = 0;
 #
 # This is temporary. I think I will switch this over to grabbing the latest
 # version from the web server.
-# 
-system("scp /proj/$pid/src/testbed/tmcd/common/config/rc.mkelab ".
-       "    ${bossnode}:/tmp");
-system("scp /proj/$pid/src/testbed/tmcd/common/config/rc.mkelab ".
-       "    ${opsnode}:/tmp");
+#
+my $mkelab = "$TB/etc/rc.mkelab";
 
-# Still waiting for new images.
-system("scp /proj/$pid/src/testbed/tmcd/common/rc.inelab ".
-       "    ${bossnode}:/usr/local/etc/emulab/rc");
-system("scp /proj/$pid/src/testbed/tmcd/common/rc.inelab ".
-       "    ${opsnode}:/usr/local/etc/emulab/rc");
+if (-e "/proj/$pid/exp/$eid/rc.mkelab") {
+    $mkelab = "/proj/$pid/exp/$eid/rc.mkelab";
+}
+print "Copying $mkelab to ${bossnode}/${opsnode}\n";
+system("scp $mkelab ${bossnode}:/tmp");
+system("scp $mkelab ${opsnode}:/tmp");
 
 TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
