@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.10 2002-03-05 16:33:41 stoller Exp $
+ * $Id: event.h,v 1.11 2002-03-18 18:55:21 stoller Exp $
  */
 
 #ifndef __EVENT_H__
@@ -84,6 +84,27 @@ int		address_tuple_free(address_tuple_t);
         event_notification_get_string(handle, note, "ARGS", buf, len)
 #define event_notification_set_arguments(handle, note, buf) \
         event_notification_put_string(handle, note, "ARGS", buf)
+
+/*
+ * For dynamic events.
+ */
+#define event_notification_clear_host(handle, note) \
+	event_notification_remove(handle, note, "HOST")
+#define event_notification_set_host(handle, note, buf) \
+        event_notification_put_string(handle, note, "HOST", buf)
+#define event_notification_clear_objtype(handle, note) \
+	event_notification_remove(handle, note, "OBJTYPE")
+#define event_notification_set_objtype(handle, note, buf) \
+        event_notification_put_string(handle, note, "OBJTYPE", buf)
+
+/*
+ * Event library sets this field. Holds the sender of the event, as 
+ * determined by the library when it is initialized. 
+ */
+#define event_notification_get_sender(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "___SENDER___", buf, len)
+#define event_notification_set_sender(handle, note, buf) \
+        event_notification_put_string(handle, note, "___SENDER___", buf)
 
 
 /* The "any host" string: */

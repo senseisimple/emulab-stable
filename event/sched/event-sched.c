@@ -35,6 +35,16 @@ static int	debug;
 static void	cleanup(void);
 static void	quit(int);
 
+#define MAXAGENTS	100
+static struct {
+	char    nodeid[TBDB_FLEN_NODEID];
+	char    vnode[TBDB_FLEN_VNAME];
+	char	objname[TBDB_FLEN_EVOBJNAME];
+	char	objtype[TBDB_FLEN_EVOBJTYPE];
+	char	ipaddr[32];
+} agents[MAXAGENTS];
+static int	numagents;
+
 void
 usage()
 {
@@ -51,7 +61,7 @@ main(int argc, char **argv)
 	char *server = NULL;
 	char *port = NULL;
 	char *log = NULL;
-	char buf[BUFSIZ];
+	char pideid[BUFSIZ], buf[BUFSIZ];
 	int c, count;
 
 	progname = argv[0];
@@ -85,6 +95,7 @@ main(int argc, char **argv)
 		usage();
 	pid = argv[0];
 	eid = argv[1];
+	sprintf(pideid, "%s/%s", pid, eid);
 
 	signal(SIGINT, quit);
 	signal(SIGTERM, quit);
@@ -138,6 +149,7 @@ main(int argc, char **argv)
 		fatal("could not allocate an address tuple");
 	}
 	tuple->scheduler = 1;
+	tuple->expt      = pideid;
 
 	if (event_subscribe(handle, enqueue, tuple, NULL) == NULL) {
 		fatal("could not subscribe to EVENT_SCHEDULE event");
@@ -183,50 +195,81 @@ main(int argc, char **argv)
 static void
 enqueue(event_handle_t handle, event_notification_t notification, void *data)
 {
-    sched_event_t event;
+    sched_event_t	event;
+    char		objname[TBDB_FLEN_EVOBJNAME];
+    int			x;
 
     /* Clone the event notification, since we want the notification to
        live beyond the callback function: */
     event.notification = elvin_notification_clone(notification,
                                                   handle->status);
     if (!event.notification) {
-        ERROR("elvin_notification_clone failed: ");
-        elvin_error_fprintf(stderr, handle->status);
-        return;
+	    error("elvin_notification_clone failed!\n");
+	    return;
     }
 
     /* Clear the scheduler flag */
     if (! event_notification_remove(handle, event.notification, "SCHEDULER") ||
 	! event_notification_put_int32(handle,
 				       event.notification, "SCHEDULER", 0)) {
-        ERROR("could not clear scheduler attribute of notification %p\n",
-              event.notification);
-        return;
+	    error("could not clear scheduler attribute of notification %p\n",
+		  event.notification);
+	    goto bad;
     }
 
     /* Get the event's firing time: */
-
-    if (event_notification_get_int32(handle, event.notification, "time_sec",
-                                     (int *) &event.time.tv_sec)
-        == 0)
-    {
-        ERROR("could not get time.tv_sec attribute from notification %p\n",
-              event.notification);
-        return;
+    if (! event_notification_get_int32(handle, event.notification, "time_usec",
+				       (int *) &event.time.tv_usec) ||
+	! event_notification_get_int32(handle, event.notification, "time_sec",
+				       (int *) &event.time.tv_sec)) {
+	    error("could not get time from notification %p\n",
+		  event.notification);
+	    goto bad;
     }
 
-    if (event_notification_get_int32(handle, event.notification, "time_usec",
-                                     (int *) &event.time.tv_usec)
-        == 0)
-    {
-        ERROR("could not get time.tv_usec attribute from notification %p\n",
-              event.notification);
-        return;
+    /*
+     * Must map the event to the proper agent running on a particular
+     * node. 
+     */
+    if (! event_notification_get_objname(handle, event.notification,
+					 objname, sizeof(objname))) {
+	    error("could not get object name from notification %p\n",
+		  event.notification);
+	    goto bad;
+    }
+    for (x = 0; x < numagents; x++) {
+	    if (!strcmp(agents[x].objname, objname))
+		    break;
+    }
+    if (x == numagents) {
+	    error("Could not map object to an agent: %s\n", objname);
+	    goto bad;
+    }
+    event_notification_clear_host(handle, event.notification);
+    event_notification_set_host(handle,
+				event.notification, agents[x].ipaddr);
+    event_notification_clear_objtype(handle, event.notification);
+    event_notification_set_objtype(handle,
+				   event.notification, agents[x].objtype);
+
+    if (debug > 1) {
+	    struct timeval now;
+	    
+	    gettimeofday(&now, NULL);
+	    
+	    info("Sched: note:%p at:%ld:%d now:%ld:%d agent:%d\n",
+                 event.notification,
+		 event.time.tv_sec, event.time.tv_usec,
+		 now.tv_sec, now.tv_usec,
+		 x);
     }
 
     /* Enqueue the event notification for resending at the indicated
        time: */
     sched_event_enqueue(event);
+    return;
+ bad:
+    event_notification_free(handle, event.notification);
 }
 
 /* Returns the amount of time until EVENT fires. */
@@ -284,12 +327,9 @@ dequeue(event_handle_t handle)
         }
 
 	if (debug > 1) {
-	    info("firing event (event=(notification=%p, "
-		 "time=(tv_sec=%ld, tv_usec=%ld)) "
-		 "at time (time=(tv_sec=%ld, tv_usec=%ld))\n",
-		 next_event.notification,
-		 next_event.time.tv_sec,
-		 next_event.time.tv_usec,
+	    info("Fire:  note:%p at:%ld:%d now:%ld:%d\n",
+                 next_event.notification,
+		 next_event.time.tv_sec, next_event.time.tv_usec,
 		 now.tv_sec,
 		 now.tv_usec);
 	}
@@ -311,28 +351,101 @@ get_static_events(event_handle_t handle)
 	address_tuple_t tuple;
 	char		pideid[BUFSIZ];
 	event_notification_t notification;
+	int		adx = 0;
 
-	res = mydb_query("select ex.time,ex.vnode,ex.vname,ex.arguments,"
-			 " ot.type,et.type,i.IP from eventlist as ex "
+	/*
+	 * Build up a table of agents that can receive dynamic events.
+	 * Currently, these are trafgens and delay nodes. We want to
+	 * be able to quickly map from "cbr0" to the node on which it
+	 * lives (for dynamic events). 
+	 */
+	res = mydb_query("select vi.vname,vi.vnode,r.node_id "
+			 " from virt_trafgens as vi "
+			 "left join reserved as r on "
+			 " r.vname=vi.vnode and r.pid=vi.pid and r.eid=vi.eid "
+			 "where vi.role='source' and "
+			 " vi.pid='%s' and vi.eid='%s'",
+			 3, pid, eid);
+
+	if (!res) {
+		error("getting virt_trafgens list for %s/%s", pid, eid);
+		return 0;
+	}
+	nrows = mysql_num_rows(res);
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+
+		if (!row[0] || !row[1] || !row[2])
+			continue;
+
+		strcpy(agents[numagents].objname, row[0]);
+		strcpy(agents[numagents].vnode,   row[1]);
+		strcpy(agents[numagents].nodeid,  row[2]);
+		strcpy(agents[numagents].objtype, TBDB_OBJECTTYPE_TRAFGEN);
+
+		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
+			continue;
+		numagents++;
+	}
+	mysql_free_result(res);
+	
+	res = mydb_query("select d.vname,r.vname,d.node_id from delays as d "
+			 "left join reserved as r on r.node_id=d.node_id "
+			 "where d.pid='%s' and d.eid='%s'",
+			 3, pid, eid);
+
+	if (!res) {
+		error("getting delays list for %s/%s", pid, eid);
+		return 0;
+	}
+	nrows = mysql_num_rows(res);
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+
+		if (!row[0] || !row[1] || !row[2])
+			continue;
+
+		strcpy(agents[numagents].objname, row[0]);
+		strcpy(agents[numagents].vnode,   row[1]);
+		strcpy(agents[numagents].nodeid,  row[2]);
+		strcpy(agents[numagents].objtype, TBDB_OBJECTTYPE_LINK);
+
+		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
+			continue;
+		numagents++;
+	}
+	mysql_free_result(res);
+
+	if (debug) {
+		for (adx = 0; adx < numagents; adx++) {
+			info("Agent %d: %10s %10s %10s %8s %16s\n", adx,
+			     agents[adx].objname,
+			     agents[adx].objtype,
+			     agents[adx].vnode,
+			     agents[adx].nodeid,
+			     agents[adx].ipaddr);
+		}
+	}
+
+	/*
+	 * Now get the eventlist. There should be entries in the
+	 * agents table for anything we find in the list.
+	 */
+	res = mydb_query("select ex.idx,ex.time,ex.vnode,ex.vname,"
+			 " ex.arguments,ot.type,et.type from eventlist as ex "
 			 "left join event_eventtypes as et on "
 			 " ex.eventtype=et.idx "
 			 "left join event_objecttypes as ot on "
 			 " ex.objecttype=ot.idx "
-			 "left join reserved as r on "
-			 " ex.vnode=r.vname and ex.pid=r.pid and ex.eid=r.eid "
-			 "left join nodes as n on r.node_id=n.node_id "
-			 "left join node_types as nt on nt.type=n.type "
-			 "left join interfaces as i on "
-			 " i.node_id=r.node_id and i.iface=nt.control_iface "
 			 "where ex.pid='%s' and ex.eid='%s'",
 			 7, pid, eid);
-#define EXTIME	row[0]
-#define EXVNODE	row[1]
-#define EXVNAME	row[2]
-#define EXARGS	row[3]
-#define OBJTYPE	row[4]
-#define EVTTYPE	row[5]
-#define IPADDR	row[6]
+#define EXIDX	 row[0]
+#define EXTIME	 row[1]
+#define EXVNODE	 row[2]
+#define OBJNAME  row[3]
+#define EXARGS	 row[4]
+#define OBJTYPE	 row[5]
+#define EVTTYPE	 row[6]
 
 	if (!res) {
 		error("getting static event list for %s/%s", pid, eid);
@@ -364,18 +477,26 @@ get_static_events(event_handle_t handle)
 		row = mysql_fetch_row(res);
 		firetime = atof(EXTIME);
 
-		if (debug) 
-			info("EV: %8s %10s %10s %10s %10s %10s %10s\n",
-			     row[0], row[1], row[2],
-			     row[3] ? row[3] : "",
-			     row[4], row[5],
-			     row[6] ? row[6] : "");
+		for (adx = 0; adx < numagents; adx++) {
+			if (!strcmp(agents[adx].objname, OBJNAME))
+				break;
+		}
+		if (adx == numagents) {
+			error("Could not map event index %s", EXIDX);
+			return 0;
+		}
 
 		tuple->expt      = pideid;
-		tuple->host      = IPADDR;
-		tuple->objname   = EXVNAME;
+		tuple->host      = agents[adx].ipaddr;
+		tuple->objname   = OBJNAME;
 		tuple->objtype   = OBJTYPE;
 		tuple->eventtype = EVTTYPE;
+
+		if (debug) 
+			info("%8s %10s %10s %10s %10s %10s %10s\n",
+			     EXTIME, EXVNODE, OBJNAME, OBJTYPE,
+			     EVTTYPE, agents[adx].ipaddr, 
+			     EXARGS ? EXARGS : "");
 
 		event.notification = event_notification_alloc(handle, tuple);
 		if (! event.notification) {
