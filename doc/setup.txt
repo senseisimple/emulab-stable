@@ -53,19 +53,10 @@ Again, this works the same as it did on ops, except that you run
 install/boss-install in the object tree, instead of ops-install.
 
 Part way through, this script will bail out and prompt you to install some
-ports. Some of the ports we need on boss have interactive installations, and
-this generally takes a long time, and you want to see what's going on, right?
+ports. This can take a long time (hours), and you want to be able to see what's
+going on, right?
 
 So, just cd to /usr/ports/misc/emulab-boss/ and run (as root) a 'make install'.
-There are a few things you'll need to know about the ports:
-* Installation of the mysql323-server port will fail if the name returned by
-  'hostname' doesn't resolve.
-* The php4 port will bring up a funky menu system to let you choose some
-  features to enable and disable. Enable 'mhash' and 'xmlrpc', and
-  leave the rest alone.
-* The snmp port asks all kinds of silly questions that don't matter, since
-  we're not going to be running snmpd on boss. Just take the defaults.
-
 When you're done, re-run the boss-install script.
 
 Like the ops-install script, boss-install sets up paswordless sudo for anyone

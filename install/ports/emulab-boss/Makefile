@@ -10,12 +10,23 @@ DISTFILES=	#none
 EXTRACT_ONLY=	#none
 COMMENT=	"Meta-port for an emulab boss node"
 
+MAINTAINER=	ricci@cs.utah.edu
+
 #
 # We set this so that the mysql server port doesn't do name resolution
 #
-.MAKEFLAGS+= -DSKIP_DNS_CHECK
+.MAKEFLAGS+=	-DSKIP_DNS_CHECK
 
-MAINTAINER=	ricci@cs.utah.edu
+#
+# These are for the mod_php4 port
+#
+.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC
+
+#
+# This prevents any ports from trying to run interactively - some, like the
+# net-snmp port, ask silly questions without this option.
+#
+.MAKEFLAGS+=	-DBATCH
 
 LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd2 \
 	lthread.2:${PORTSDIR}/devel/linuxthreads \
