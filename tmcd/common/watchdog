@@ -709,6 +709,7 @@ sub sendhkeys($)
     }
 
     if ($arg ne "") {
+	$arg = "\"" . $arg . "\"";
 	print "hostkeys: $arg\n"
 	    if ($debug);
 
