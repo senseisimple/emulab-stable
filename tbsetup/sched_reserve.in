@@ -71,6 +71,10 @@ if ($UID && !TBAdmin($UID)) {
   die("Only root or TB administrators can schedule reservations.\n");
 }
 
+if (! ExpLeader($pid,$eid)) {
+    die("You experiment $pid/$eid does not exist.\n");
+}
+
 foreach my $node (@nodes) {
   my $pc = $node;
   my $allocated = 0;
@@ -86,7 +90,7 @@ foreach my $node (@nodes) {
 
   if ( ($sth->num_rows()) < 1) {
     print "Available - Reserving...\n";
-    print STDERR "Using proj $pid, expt $eid, I am ",`whoami`;
+    #print STDERR "Using proj $pid, expt $eid, I am ",`whoami`;
     my $cmd = "$nalloc $pid $eid $pc";
     if ( system($cmd) != 0 ) {
       print STDERR "WARNING: Could not reserve $pc!\n";
