@@ -681,7 +681,7 @@
     Each project has its own directory, rooted at <tt>/proj</tt>,
     which is available via NFS to all of the nodes in experiments
     running in that project. For example, when the "RON" project was
-    created, a directory called /proj/RON was also created. This
+    created, a directory called <tt>/proj/RON</tt> was also created. This
     directory is owned by the project creator, and is in the unix
     group "RON." Its permission (mode) is 770; read/write/execute
     permitted by the project creator and by all of the members of the
@@ -689,16 +689,22 @@
     the RON project.
     </p>
     <p>
+    Sub-groups within a project likewise have a directory in the
+    <tt>/groups</tt> tree. A group named "group1" in the RON project
+    would thus have a group directory in <tt>/groups/RON/group1</tt>.
+    </p>
+    <p>
     Project members are encouraged to store any files needed by their
-    experiments in the corresponding /proj project directory. 
+    experiments in the corresponding /proj or /groups directory.
     </p>
 
 <li><a NAME="UTT-6"></a>
     <font size='+1'><b>Are my files on 
     <b>users.emulab.net</b> backed up (filesaved)?</b></font>
     <p>
-    Yes. All of the files in your home directory on /users, and all of
-    the files in your project directory in /proj are filesaved. While
+    Yes. All of the files in your home directory on /users, all of
+    the files in your project directory in /proj, and all of the files
+    in your groups directory in /groups are filesaved. While
     we can restore lost files in an emergency, we encourage you to
     back up critical data on your own to avoid (possibly long) delays
     in conducting your experiments.
