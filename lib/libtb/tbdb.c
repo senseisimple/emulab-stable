@@ -176,9 +176,8 @@ mydb_checkexptnodeeventstate(char *pid, char *eid,
 	MYSQL_ROW	row;
 	int		nrows;
 
-	res = mydb_query("select eventstate from nodes "
-			 "left join reserved on "
-			 " nodes.node_id=reserved.node_id "
+	res = mydb_query("select eventstate from reserved "
+			 "left join nodes on nodes.node_id=reserved.node_id "
 			 "where reserved.pid='%s' and reserved.eid='%s' ",
 			 1, pid, eid);
 	
