@@ -178,6 +178,8 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...);
  */
 void mtp_free_packet(struct mtp_packet *mp);
 
+float mtp_theta(float theta);
+
 /**
  * Print the contents of the given packet to the given FILE object.
  *

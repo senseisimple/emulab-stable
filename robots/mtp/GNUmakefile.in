@@ -25,7 +25,7 @@ all client: $(MTPLIBS) $(MTPPROGS) $(JARS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= mtp.o mtp_xdr.o
+OBJS		= mtp.o mtp_xdr.o listNode.o
 CFLAGS	       += -O -g -Wall -I. -I${SRCDIR} -I${OBJDIR} -I/usr/local/include
 
 libmtp.a: $(OBJS)

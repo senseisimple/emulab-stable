@@ -51,13 +51,14 @@ test_vmcd.sh: vmcd
 vmc-client: vmc-client.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
-vmcd: vmcd.o ../mtp/libmtp.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+vmcd: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vmcd.o visionTrack.o robotObject.o $(LIBS)
 
 install: all
 ifeq ($(HAVE_MEZZANINE),yes)
 	-mkdir -p $(INSTALL_SBINDIR)
 	$(INSTALL_PROGRAM) vmc-client $(INSTALL_SBINDIR)/vmc-client
+	$(INSTALL_PROGRAM) vmcd $(INSTALL_SBINDIR)/vmcd
 else
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) vmcd $(INSTALL_DIR)/opsdir/sbin/vmcd

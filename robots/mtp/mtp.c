@@ -8,6 +8,7 @@
  * @file mtp.c
  */
 
+#include <math.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -390,14 +391,14 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		mp->data.mtp_payload_u.command_stop.robot_id =
 		    va_arg(args, int);
 		break;
-        case MTP_WIGGLE_REQUEST:
-        mp->data.mtp_payload_u.wiggle_request.robot_id = 
-            va_arg(args, int);
-        break;
-        case MTP_WIGGLE_STATUS:
-        mp->data.mtp_payload_u.wiggle_status.robot_id = 
-            va_arg(args, int);
-        break;
+	    case MTP_WIGGLE_REQUEST:
+		mp->data.mtp_payload_u.wiggle_request.robot_id = 
+		    va_arg(args, int);
+		break;
+	    case MTP_WIGGLE_STATUS:
+		mp->data.mtp_payload_u.wiggle_status.robot_id = 
+		    va_arg(args, int);
+		break;
 	    default:
 		assert(0);
 		break;
@@ -499,15 +500,15 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    }
 	    break;
 	case MA_Status:
-        switch (mp->data.opcode) {
+	    switch (mp->data.opcode) {
 	    case MTP_UPDATE_POSITION:
 		mp->data.mtp_payload_u.update_position.status =
-          va_arg(args, mtp_status_t);
+		    va_arg(args, mtp_status_t);
 		break;
-        case MTP_WIGGLE_STATUS:
-        mp->data.mtp_payload_u.wiggle_status.status = 
-            va_arg(args, mtp_status_t);
-        break;
+	    case MTP_WIGGLE_STATUS:
+		mp->data.mtp_payload_u.wiggle_status.status = 
+		    va_arg(args, mtp_status_t);
+		break;
 	    default:
 		assert(0);
 		break;
@@ -526,15 +527,15 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    mp->data.mtp_payload_u.telemetry.mtp_telemetry_u.garcia =
 		*(va_arg(args, struct mtp_garcia_telemetry *));
 	    break;
-    case MA_WiggleType:
-        mp->data.mtp_payload_u.wiggle_request.wiggle_type =
-          va_arg(args, mtp_wiggle_t);
-		break;
+	case MA_WiggleType:
+	    mp->data.mtp_payload_u.wiggle_request.wiggle_type =
+		va_arg(args, mtp_wiggle_t);
+	    break;
 	}
-
+	
 	tag = va_arg(args, mtp_tag_t);
     }
-
+    
     va_end(args);
     
     return retval;
@@ -546,6 +547,23 @@ void mtp_free_packet(struct mtp_packet *mp)
 	if (mp->data.opcode != 0)
 	    xdr_free(xdr_mtp_packet, (char *)mp);
     }
+}
+
+float mtp_theta(float theta)
+{
+    float retval;
+
+    if (theta < -M_PI) {
+	retval = theta + (2.0 * M_PI);
+    }
+    else if (theta > M_PI) {
+	retval = theta - (2.0 * M_PI);
+    }
+    else {
+	retval = theta;
+    }
+
+    return retval;
 }
 
 void mtp_print_packet(FILE *file, struct mtp_packet *mp)
@@ -802,6 +820,11 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
               mp->data.mtp_payload_u.wiggle_request.robot_id
               );
       switch (mp->data.mtp_payload_u.wiggle_request.wiggle_type) {
+      case MTP_WIGGLE_START:
+        fprintf(file,
+                "  wiggle_type:\tstart\n"
+                );
+        break;
       case MTP_WIGGLE_180_R:
         fprintf(file,
                 "  wiggle_type:\t180deg right\n"

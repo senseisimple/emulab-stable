@@ -287,6 +287,22 @@ static int encode_packets(mezz_mmap_t *mm)
 
     retval = cursor - packet_buffer;
 
+    if (retval == 0) {
+	mtp_init_packet(&mp,
+			MA_Opcode, MTP_CONTROL_ERROR,
+			MA_Role, MTP_ROLE_VMC,
+			MA_Code, MTP_POSITION_STATUS_CYCLE_COMPLETE,
+			MA_Message, "",
+			MA_TAG_DONE);
+	
+	if (!xdr_mtp_packet(&xdr, &mp))
+	    assert(0);
+
+	xdrrec_endofrecord(&xdr, 1);
+
+	retval = cursor - packet_buffer;
+    }
+
     if (debug > 1) {
 	info("vmc-client: packet length %d\n", retval);
     }

@@ -439,7 +439,8 @@ void parse_config_file(char *config_file) {
   FILE *fp;
 
   if (config_file == NULL) {
-    return;
+      fprintf(stderr, "error: no config file given\n");
+      exit(1);
   }
 
   fp = fopen(config_file,"r");
@@ -486,7 +487,6 @@ void parse_config_file(char *config_file) {
       }
       else {
 	struct emc_robot_config *rc;
-	struct robot_position *p;
 	struct hostent *he;
 	
 	// now we save this data to the lists:
@@ -503,13 +503,11 @@ void parse_config_file(char *config_file) {
 	memcpy(&rc->ia, he->h_addr, he->h_length);
 	rc->vname = strdup(vname);
 	rc->token = ~0;
-	
-	robot_list_append(hostname_list,id,(void*)rc);
-	p = (struct robot_position *)malloc(sizeof(struct robot_position *));
-	p->x = init_x;
-	p->y = init_y;
-	p->theta = init_theta;
-	robot_list_append(initial_position_list,id,(void*)p);
+	rc->init_x = init_x;
+	rc->init_y = init_y;
+	rc->init_theta = init_theta;
+
+	robot_list_append(hostname_list, id, (void *)rc);
       }
     }
     else if (strcmp(directive, "camera") == 0) {
@@ -855,17 +853,35 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	error("unable to add rmc_callback handler");
       }
       else {
+	robot_list_item_t *rli;
+	
 	if (debug) {
 	  info("established rmc connection\n");
 	}
 
-	rmc_data.handle = mh;
-	mh = NULL;
-	
 	// add descriptor to list, etc:
 	if (rmc_data.position_list == NULL)
 	  rmc_data.position_list = robot_list_create();
 
+	for (rli = hostname_list->head; rli != NULL; rli = rli->next) {
+	  struct emc_robot_config *erc = rli->data;
+	  struct mtp_packet gmp;
+
+	  mtp_init_packet(&gmp,
+			  MA_Opcode, MTP_COMMAND_GOTO,
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_CommandID, 1,
+			  MA_RobotID, erc->id,
+			  MA_X, (double)erc->init_x,
+			  MA_Y, (double)erc->init_y,
+			  MA_Theta, (double)erc->init_theta,
+			  MA_TAG_DONE);
+	  mtp_send_packet(mh, &gmp);
+	}
+	
+	rmc_data.handle = mh;
+	mh = NULL;
+	
 	if (rmc_data.handle->mh_remaining > 0) {
 	    // XXX run the callbacks here to catch any queued data.
 	}
@@ -976,20 +992,14 @@ int rmc_callback(elvin_io_handler_t handler,
 	//   otherwise, take the position with the most recent timestamp
 	//     from rmc_data or vmc_data
 	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
-	struct mtp_update_position *vmc_up, *rmc_up, *up;
-	struct mtp_packet mp_reply;
+	struct mtp_update_position *up;
 	
-	vmc_up = (struct mtp_update_position *)
+	up = (struct mtp_update_position *)
 	  robot_list_search(vmc_data.position_list, my_id);
-	rmc_up = (struct mtp_update_position *)
-	  robot_list_search(rmc_data.position_list, my_id);
 
-	if (vmc_up != NULL)
-	  up = vmc_up; // XXX prefer vmc?
-	else
-	  up = rmc_up;
-	
-	if (up != NULL) {
+	if (up != NULL && up->status != MTP_POSITION_STATUS_ERROR) {
+	  struct mtp_packet mp_reply;
+	  
 	  // since VMC isn't hooked in, we simply write back the rmc posit
 	  mtp_init_packet(&mp_reply,
 			  MA_Opcode, MTP_UPDATE_POSITION,
@@ -1004,18 +1014,12 @@ int rmc_callback(elvin_io_handler_t handler,
 			  MA_TAG_DONE);
 	  mtp_send_packet(rmc->handle, &mp_reply);
 	}
-	else {
-	  info("no updates for %d %p\n", my_id, rmc->handle);
-
-	  mtp_init_packet(&mp_reply,
-			  MA_Opcode, MTP_CONTROL_ERROR,
-			  MA_Role, MTP_ROLE_EMC,
-			  MA_Message, "position not updated yet",
-			  MA_TAG_DONE);
-
-	  info("rmc reply packet %d\n", rmc->handle->mh_fd);
-	  
-	  mtp_send_packet(rmc->handle, &mp_reply);
+	else if (up == NULL) {
+	  up = (struct mtp_update_position *)
+	    calloc(1, sizeof(struct mtp_update_position));
+	  up->robot_id = my_id;
+	  up->status = MTP_POSITION_STATUS_ERROR;
+	  robot_list_append(vmc_data.position_list, my_id, up);
 	}
 	
 	retval = 1;
@@ -1088,11 +1092,6 @@ int rmc_callback(elvin_io_handler_t handler,
 	  
 	  if (mtp_send_packet(vmc_data.handle,mp) != MTP_PP_SUCCESS) {
 	      error("vmc unavailable; cannot forward wiggle-status\n");
-	  }
-	  if (mtp_send_packet(rmc_data.handle,mp) != MTP_PP_SUCCESS) {
-	      error("could not ack the wiggle-status packet from rmc;"
-		    " this is a serious problem!\n"
-		    );
 	  }
 	  
 	  retval = 1;
@@ -1207,6 +1206,7 @@ int emulab_callback(elvin_io_handler_t handler,
 	  info("no updates for %d\n", my_id);
 
 	  mtp_init_packet(&mp_reply,
+			  MA_Role, MTP_ROLE_EMC,
 			  MA_Opcode, MTP_CONTROL_ERROR,
 			  MA_Message, "position not updated yet",
 			  MA_TAG_DONE);
@@ -1287,8 +1287,27 @@ int vmc_callback(elvin_io_handler_t handler,
         int my_id = mp->data.mtp_payload_u.update_position.robot_id;
         struct mtp_update_position *up = (struct mtp_update_position *)
           robot_list_remove_by_id(vmc->position_list, my_id);
-        struct mtp_update_position *up_copy;
-        
+        struct mtp_update_position *up_copy, *up_in;
+
+	up_in = &mp->data.mtp_payload_u.update_position;
+	if ((up->status == MTP_POSITION_STATUS_ERROR) &&
+	    (up_in->status != MTP_POSITION_STATUS_ERROR)) {
+	  struct mtp_packet mp_reply;
+	  
+	  mtp_init_packet(&mp_reply,
+			  MA_Opcode, MTP_UPDATE_POSITION,
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_RobotID, up->robot_id,
+			  MA_Position, &up_in->position,
+			  /*
+			   * The status field has no meaning when this packet
+			   * is being sent.
+			   */
+			  MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+			  MA_TAG_DONE);
+	  mtp_send_packet(rmc_data.handle, &mp_reply);
+	}
+	
         free(up);
         up = NULL;
         
@@ -1441,6 +1460,14 @@ int vmc_callback(elvin_io_handler_t handler,
 
     case MTP_WIGGLE_REQUEST:
       {
+	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
+	struct mtp_update_position *up;
+	
+	up = (struct mtp_update_position *)
+	  robot_list_search(vmc_data.position_list, my_id);
+	if (up != NULL)
+	    up->status = MTP_POSITION_STATUS_ERROR;
+	
         /* simply forward this to rmc */
         if (rmc_data.handle != NULL) {
           mp->role = MTP_ROLE_EMC;

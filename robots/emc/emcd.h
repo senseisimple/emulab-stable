@@ -10,6 +10,9 @@ struct emc_robot_config {
   char *vname;
   struct in_addr ia;
   int token;
+  float init_x;
+  float init_y;
+  float init_theta;
 };
 
 struct rmc_client {
