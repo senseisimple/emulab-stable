@@ -22,7 +22,7 @@ use Exporter;
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
-	 TMCCCMD_BOSSINFO
+	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST
 
        );
 
@@ -57,6 +57,7 @@ use liblocsetup;
 # jail we have to share the same namespace.
 #
 my $vnodeid	= "";
+my $vnodedir;
 
 #
 # These are the paths of various files and scripts that are part of the
@@ -72,13 +73,12 @@ sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
 sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
-sub TMROUTECONFIG()     { "$SETUPDIR/$vnodeid/rc.route"; }
-sub TMTRAFFICCONFIG()	{ "$SETUPDIR/$vnodeid/rc.traffic"; }
-sub TMTUNNELCONFIG()	{ "$SETUPDIR/$vnodeid/rc.tunnel"; }
-sub TMVTUNDCONFIG()	{ "$SETUPDIR/$vnodeid/vtund.conf"; }
+sub TMROUTECONFIG()     { ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.route";}
+sub TMTRAFFICCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.traffic";}
+sub TMTUNNELCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.tunnel";}
+sub TMVTUNDCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/vtund.conf";}
 sub TMPASSDB()		{ "$SETUPDIR/passdb"; }
 sub TMGROUPDB()		{ "$SETUPDIR/groupdb"; }
-sub TMVNODEDIR()	{ "$SETUPDIR/$vnodeid"; }
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -109,6 +109,7 @@ sub TMCCCMD_TRAFFIC()	{ "trafgens"; }
 sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
 sub TMCCCMD_TUNNEL()	{ "tunnels"; }
 sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
+sub TMCCCMD_VNODELIST() { "vnodelist"; }
 
 #
 # Some things never change.
@@ -1484,24 +1485,30 @@ sub remotenodeupdate()
 #
 # Remote Node virtual node setup.
 #
-sub remotenodevnodesetup($)
+sub remotenodevnodesetup($$)
 {
-    my ($vid) = @_;
+    my ($vid, $vdir) = @_;
 
     #
     # Set global vnodeid for tmcc commands.
     #
-    $vnodeid = $vid;
+    $vnodeid  = $vid;
 
     #
-    # Make the directory where all this stuff is going to go.
+    # This is the directory where the rc files go.
     #
-    if (! -e TMVNODEDIR) {
-	mkdir(TMVNODEDIR, 0755) or
-	    die("*** $0:\n".
-		"    Could not mkdir " . TMVNODEDIR . ": $!\n");
+    if (! -e $vdir) {
+	die("*** $0:\n".
+	    "    No such directory: $vdir\n");
     }
-    
+    $vnodedir = $vdir;
+
+    # Do not bother if somehow got released.
+    if (! check_status()) {
+	print "Node is free!\n";
+	return undef;
+    }
+
     #
     # Do tunnels
     # 
