@@ -23,7 +23,7 @@ use lib ( '../lib' );
 use TWiki;
 use TWiki::Plugins::SessionPlugin;
 
-my $oopsurl = "oopsnoweb";
+my $oopsurl = "oopsloginfail";
 
 $query= new CGI;
 
@@ -33,12 +33,15 @@ sub main
 {
     my $username = $query->param('username');
     my $password = $query->param('password');
+    my $redurl   = $query->param('redurl');
 
     chomp($username);
     chomp($password);
 
     if (! ($username && $password)) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl);
+        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
+			     "Missing arguments (username or password)");
+
         TWiki::redirect( $query, $url );
 	return;
     }
@@ -48,8 +51,8 @@ sub main
     #
     my $pwentry;
     
-    open(HTP, $htpasswdFilename) or
-	die("Could not open $htpasswdFilename\n");
+    open(HTP, $TWiki::htpasswdFilename) or
+	die("Could not open $TWiki::htpasswdFilename\n");
 
     while (<HTP>) {
 	if ($_ =~ /^${username}:.*$/) {
@@ -60,7 +63,8 @@ sub main
     close(HTP);
 
     if (!defined($pwentry)) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl);
+        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
+				     "No such user: '$username'");
         TWiki::redirect( $query, $url );
 	return;
     }
@@ -71,15 +75,38 @@ sub main
     my ($wikiname, $encryptedpasswd) = split(":", $pwentry);
     chomp($encryptedpasswd);
 
-    my $salt = substr($encryptedpasswd, 0, 2);
-    my $str  = crypt($password, $salt);
+    my $str = crypt($password, $encryptedpasswd);
 
     if ($str ne $encryptedpasswd) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl);
+        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
+				     "Incorrect Password");
         TWiki::redirect( $query, $url );
 	return;
     }
 
-    
-    
+    # This causes the query object to suddenly have a remote_user() value.
+    # SessionPlugin uses that ...
+    $ENV{REMOTE_USER} = $username;
+
+    #
+    # Stuff we need to pass down. Note that I am not bothering with the
+    # topic cause of how this script will typically be invoked. 
+    #
+    my $thePathInfo = $query->path_info(); 
+    my $theRemoteUser = $query->remote_user();
+    my $theUrl = $query->url;
+    my $theTopic = (defined($redurl) ? $redurl : "");
+
+    # This appears to be necessary.
+    $query->delete_all();
+
+    my ($topic, $webName) = 
+        &TWiki::initialize($thePathInfo, $theRemoteUser,
+			   $theTopic, $theUrl, $query);
+
+    my $url = &TWiki::getViewUrl($webName, $topic);
+
+    $url .= ( '?' . $query->query_string() ) if $query->query_string();
+
+    &TWiki::redirect( $query, $url );
 }
