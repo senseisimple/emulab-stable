@@ -373,8 +373,21 @@ else {
 
 echo "</td> <td style=\" background-color: transparent\"> &nbsp; &nbsp; </td> <td>\n";
 
+# Script action to activate controls that do not normally submit, like checkboxes.
+echo "<SCRIPT LANGUAGE=JavaScript>
+    <!--
+	function NormalSubmit(theform) {
+	    theform.target='_self';
+	    theform.submit();
+	}
+    //-->
+  </SCRIPT>\n";
+
 # Wrap the image and zoom controls together in an input form.
-echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
+echo "<form enctype=multipart/form-data
+      name=myform 
+      method=\"get\" 
+      action=\"floormap.php3#zoom\">\n";
 
 # Zoom controls may be clicked to set a new scale.  Otherwise, it persists.
 $curr_scale = (isset($scale) ? $scale : (isset($last_scale) ? $last_scale : 1));
@@ -385,14 +398,14 @@ echo "    <tbody>\n";
 echo "      <tr>\n";
 # Wrap the scale into the button name.  Value= is not passed by IE.
 echo "        <td><input type=\"image\" src=\"floormap/btn_zoom_out.jpg\"\n";
-echo "             name=\"scale_" . max($curr_scale-1,0) . "\"><br></td>\n";
+echo "                   name=\"scale_" . max($curr_scale-1,0) . "\"><br></td>\n";
 for ($i = 0; $i <= 5; $i++) {
     $img = "btn_scale_" . $i . "_" . ($curr_scale==$i?"brt":"dim") . ".jpg";
     echo "        <td><input type=\"image\" src=\"floormap/$img\"\n";
     echo "             name=\"scale_$i\"><br></td>\n";
 }
 echo "        <td><input type=\"image\" src=\"floormap/btn_zoom_in.jpg\"\n";
-echo "             name=\"scale_" . min($curr_scale+1,5) . "\"><br></td>\n";
+echo "                   name=\"scale_" . min($curr_scale+1,5) . "\"><br></td>\n";
 echo "      </tr>\n";
 echo "    </tbody>\n";
 echo "  </table>\n";
@@ -425,7 +438,8 @@ echo "  <br>\n";
 echo "  Clicks elsewhere on the map set the center point for a zoomed-in view.\n";
 echo "  <br>\n";
 # The checkbox value is sent when the box is checked; nothing is sent otherwise.
-echo "  <input name=ghost type=checkbox value=\"1\"" .
+echo "  <input name=ghost type=checkbox value=\"1\"
+          onchange=\"NormalSubmit(myform);\"" .
 	  (isset($ghost) ? " checked" : "") . ">\n"; # Current checkbox state.
 echo "  Show nodes on other floors as hollow dots.\n";
 echo "  <br>\n";
