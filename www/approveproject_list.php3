@@ -91,7 +91,9 @@ while ($projectrow = mysql_fetch_array($query_result)) {
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td rowspan=2>
                   <A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
-              <td rowspan=2>$headuid</td>
+              <td rowspan=2>
+                  <A href='showuser.php3?uid=$uid&target_uid=$headuid'>
+                     $headuid</A></td>
               <td>$name</td>
               <td>$title</td>
               <td>$email</td>

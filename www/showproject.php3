@@ -1,5 +1,6 @@
 <?php
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -50,7 +51,10 @@ if (!$isadmin) {
     }
 }
 
-include("showproject_dump.php3");
+echo "<center>
+      <h3>Project Information</h3>
+      </center>\n";
+SHOWPROJECT($pid, $uid);
 
 echo "</center>\n";
 

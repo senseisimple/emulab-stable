@@ -203,6 +203,24 @@ if ($retval) {
           }
     echo "</XMP>\n";
 
+    #
+    # Lets dump the log file also.
+    #
+    $fp = fopen($logname, "r");
+    if ($fp) {
+        echo "<br><h2>
+              Logfile as follows:
+              </h2>
+              <br>\n";
+
+        echo "<XMP>\n";
+        while ($line = fgets($fp, 1024)) {
+            echo "$line";
+        }
+        echo "</XMP>\n";
+        fclose($fp);
+    }
+
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 

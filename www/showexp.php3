@@ -1,5 +1,6 @@
 <?php
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -96,7 +97,9 @@ echo "<tr>
 
 echo "<tr>
           <td>Experiment Head: </td>
-          <td class=\"left\">$exp_head</td>
+          <td class=\"left\">
+              <A href='showuser.php3?uid=$uid&target_uid=$exp_head'>
+                 $exp_head</td>
       </tr>\n";
 
 echo "<tr>
@@ -163,65 +166,11 @@ if (mysql_num_rows($reserved_result)) {
 
 #
 # Lets dump the project information too.
-# 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects WHERE pid=\"$exp_pid\"");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting info for project $exp_pid: $err\n", 1);
-}
-$row = mysql_fetch_array($query_result);
-
+#
 echo "<center>
       <h3>Project Information</h3>
-      </center>
-      <table align=center border=1>\n";
-
-$proj_created	= $row[created];
-$proj_expires	= $row[expires];
-$proj_name	= $row[name];
-$proj_URL	= $row[URL];
-$proj_affil	= $row[affil];
-$proj_addr	= $row[addr];
-$proj_head_uid	= $row[head_uid];
-$control_node	= $row[control_node];
-
-#
-# Generate the table.
-# 
-echo "<tr>
-          <td>Name: </td>
-          <td class=\"left\">$exp_pid</td>
-      </tr>\n";
-
-echo "<tr>
-          <td>Long Name: </td>
-          <td class=\"left\">$proj_name</td>
-      </tr>\n";
-
-echo "<tr>
-          <td>Project Head: </td>
-          <td class=\"left\">$proj_head_uid</td>
-      </tr>\n";
-
-echo "<tr>
-          <td>URL: </td>
-          <td class=\"left\">
-              <A href='$proj_URL'>$proj_URL</A></td>
-      </tr>\n";
-
-echo "<tr>
-          <td>Created: </td>
-          <td class=\"left\">$proj_created</td>
-      </tr>\n";
-
-echo "<tr>
-          <td>Expires: </td>
-          <td class=\"left\">$proj_expires</td>
-      </tr>\n";
-
-echo "</table>
       </center>\n";
+SHOWPROJECT($exp_pid, $uid);
 
 #
 # Standard Testbed Footer

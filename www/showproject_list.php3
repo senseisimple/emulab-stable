@@ -58,7 +58,8 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     echo "<tr>
               <td><A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
               <td>$Pname</td>
-              <td>$headuid</td>
+              <td><A href='showuser.php3?uid=$uid&target_uid=$headuid'>
+                     $headuid</A></td>
 	      <td>$Paffil</td>
           </tr>\n";
 }
