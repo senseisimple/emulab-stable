@@ -2344,7 +2344,18 @@ COMMAND_PROTOTYPE(dostate)
 	while (isspace(*rdata)) {
 		rdata++;
 	}
+
+	/*
+	 * Pull blanks off the end of rdata
+	 */
+	newstate = rdata + (strlen(rdata) -1);
+	while ((newstate >= rdata) && (*newstate == ' ')) {
+		*newstate = '\0';
+		newstate--;
+	}
+
 	newstate = rdata;
+
 
 #ifdef EVENTSYS
 	/*
@@ -2361,6 +2372,7 @@ COMMAND_PROTOTYPE(dostate)
 	tuple->objtype   = "TBNODESTATE";
 	tuple->objname	 = nodeid;
 	tuple->eventtype = newstate;
+	printf("Newstate is (%s)\n",newstate);
 
 	if (myevent_send(tuple)) {
 		syslog(LOG_ERR,"dostate: Error sending event\n");
