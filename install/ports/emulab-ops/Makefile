@@ -19,6 +19,7 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \
 	otcl:${PORTSDIR}/lang/otcl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget
 
 NO_BUILD=	yes
