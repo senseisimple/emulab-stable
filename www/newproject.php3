@@ -50,7 +50,7 @@ if (!isset($usr_name) ||
 }
 if (!isset($proj_URL) ||
     strcmp($proj_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
-  $formerror = Project URL";
+  $formerror = "Project URL";
 }
 if (!isset($usr_email) ||
     strcmp($usr_email, "") == 0) {
