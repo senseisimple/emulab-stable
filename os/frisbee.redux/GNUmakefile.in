@@ -34,9 +34,6 @@ LDFLAGS		= -static
 # Define this to a non-zero value to enable recording of trace data
 #CFLAGS		+= -DNEVENTS=20000
 
-# Turn on server packet loss rate ability
-#CFLAGS		+= -DDOLOSSRATE
-
 # Turn on client event handling
 #CFLAGS		+= -DDOEVENTS
 #CLIENTOBJS	+= event.o $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o

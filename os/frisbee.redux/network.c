@@ -21,15 +21,7 @@
 #include <errno.h>
 #include "decls.h"
 
-#ifdef DOLOSSRATE
-extern int lossrate;
-#endif
-
 #ifdef STATS
-#ifdef DOLOSSRATE
-unsigned long spackets, spacketslost;
-unsigned long rpackets, rpacketslost;
-#endif
 unsigned long nonetbufs;
 #define DOSTAT(x)	(x)
 #else
@@ -202,29 +194,6 @@ PacketReceive(Packet_t *p)
 	struct sockaddr_in from;
 	int		   mlen, alen;
 
-#ifdef DOLOSSRATE
-	struct timeval	   now, then;
-
-	if (lossrate) {
-		/*
-		 * XXX cannot rely on socket timeout value since we need to
-		 * treat received and dropped packets as though they never
-		 * arrived.  This is still not correct as a receive timeout
-		 * could still be up to twice as long as it should be, but
-		 * I don't want to mess with the socket timeout on every
-		 * recv call.
-		 */
-		gettimeofday(&then, 0);
-		if ((then.tv_usec += PKTRCV_TIMEOUT) >= 1000000) {
-			then.tv_sec++;
-			then.tv_usec -= 1000000;
-		}
-	again:
-		gettimeofday(&now, 0);
-		if (timercmp(&now, &then, >=))
-			return -1;
-	}
-#endif
 	alen = sizeof(from);
 	bzero(&from, alen);
 	if ((mlen = recvfrom(sock, p, sizeof(*p), 0,
@@ -233,13 +202,6 @@ PacketReceive(Packet_t *p)
 			return -1;
 		pfatal("PacketReceive(recvfrom)");
 	}
-#ifdef DOLOSSRATE
-	DOSTAT(rpackets++);
-	if (lossrate && random() < lossrate) {
-		DOSTAT(rpacketslost++);
-		goto again;
-	}
-#endif
 
 	if (mlen != sizeof(p->hdr) + p->hdr.datalen)
 		fatal("PacketReceive: Bad message length %d!=%d",
@@ -260,14 +222,6 @@ PacketSend(Packet_t *p, int *resends)
 {
 	struct sockaddr_in to;
 	int		   len, delays;
-
-#ifdef DOLOSSRATE
-	DOSTAT(spackets++);
-	if (lossrate && random() < lossrate) {
-		DOSTAT(spacketslost++);
-		return;
-	}
-#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 	p->hdr.srcip = myipaddr.s_addr;
@@ -306,14 +260,6 @@ PacketReply(Packet_t *p)
 {
 	struct sockaddr_in to;
 	int		   len;
-
-#ifdef DOLOSSRATE
-	DOSTAT(spackets++);
-	if (lossrate && random() < lossrate) {
-		DOSTAT(spacketslost++);
-		return;
-	}
-#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 

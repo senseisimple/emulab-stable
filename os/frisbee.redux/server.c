@@ -43,10 +43,6 @@ struct in_addr	mcastif;
 char	       *filename;
 struct timeval  IdleTimeStamp;
 
-#ifdef DOLOSSRATE
-int		lossrate;
-#endif
-
 /* Forward decls */
 void		quit(int);
 void		reinit(int);
@@ -539,7 +535,7 @@ main(int argc, char **argv)
 	off_t		fsize;
 	void		*ignored;
 
-	while ((ch = getopt(argc, argv, "dhp:m:i:tbDT:R:B:G:L:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:i:tbDT:R:B:G:")) != -1)
 		switch(ch) {
 		case 'b':
 			broadcast++;
@@ -578,17 +574,6 @@ main(int argc, char **argv)
 		case 'G':
 			gapsize = atoi(optarg);
 			break;
-#ifdef DOLOSSRATE
-		/* XXX this is not the emulab way! */
-		case 'L':
-		{
-			double plr = atof(optarg);
-			if (plr < 0 || plr > 1)
-				fatal("bad loss rate: %f", plr);
-			lossrate = (int)(plr * 0x7fffffff);
-			break;
-		}
-#endif
 		case 'h':
 		case '?':
 		default:
@@ -707,17 +692,6 @@ main(int argc, char **argv)
 		    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
 		log("  net idle/blocked: %d/%d", Stats.goesidle, nonetbufs);
 		log("  max workq size:   %d", WorkQMax);
-#ifdef DOLOSSRATE
-		{
-			extern unsigned long spackets, spacketslost;
-			extern unsigned long rpackets, rpacketslost;
-
-			log("  send total/lost:  %d/%d",
-			    spackets, spacketslost);
-			log("  recv total/lost:  %d/%d",
-			    rpackets, rpacketslost);
-		}
-#endif
 	}
 #endif
 

@@ -34,10 +34,6 @@ static Event_t event;
 static int exitstatus;
 #endif
 
-#ifdef DOLOSSRATE
-int		lossrate;
-#endif
-
 /* Tunable constants */
 int		maxchunkbufs = MAXCHUNKBUFS;
 int		pkttimeout = PKTRCV_TIMEOUT;
