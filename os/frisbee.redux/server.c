@@ -65,7 +65,10 @@ static void	compute_sendrate(void);
 char		*chunkmap;
 
 #define MAXCLIENTS 256	/* not a realy limit, just for stats */
-unsigned int	clients[MAXCLIENTS];
+struct {
+	unsigned int id;
+	unsigned int ip;
+} clients[MAXCLIENTS];
 
 /*
  * Stats gathering.
@@ -348,15 +351,29 @@ ClientJoin(Packet_t *p)
 		int i, j = -1;
 
 		for (i = 0; i < MAXCLIENTS; i++) {
-			if (clients[i] == clientid)
+			if (clients[i].id == clientid) {
+				if (clients[i].ip != p->hdr.srcip) {
+					log("%s reuses active client id",
+					    inet_ntoa(ipaddr));
+					clients[i].ip = p->hdr.srcip;
+				}
 				break;
-			if (j == -1 && clients[i] == 0)
+			}
+			if (clients[i].ip == p->hdr.srcip) {
+				log("%s rejoins with different cid, ocid=%u",
+				    inet_ntoa(ipaddr), clients[i].id);
+				clients[i].id = clientid;
+				break;
+			}
+			if (j == -1 && clients[i].id == 0)
 				j = i;
 		}
 		if (i == MAXCLIENTS) {
 			activeclients++;
-			if (j != -1)
-				clients[j] = clientid;
+			if (j != -1) {
+				clients[j].id = clientid;
+				clients[j].ip = p->hdr.srcip;
+			}
 		}
 	}
 	DOSTAT(joinrep++);
@@ -391,9 +408,9 @@ ClientLeave(Packet_t *p)
 		int i;
 
 		for (i = 0; i < MAXCLIENTS; i++)
-			if (clients[i] == clientid) {
+			if (clients[i].id == clientid) {
 				activeclients--;
-				clients[i] = 0;
+				clients[i].id = 0;
 				break;
 			}
 	}
@@ -423,8 +440,8 @@ ClientLeave2(Packet_t *p)
 		int i;
 
 		for (i = 0; i < MAXCLIENTS; i++)
-			if (clients[i] == clientid) {
-				clients[i] = 0;
+			if (clients[i].id == clientid) {
+				clients[i].id = 0;
 				activeclients--;
 				log("%s (id %u): leaves at %s, "
 				    "ran for %d seconds.  %d active clients",
