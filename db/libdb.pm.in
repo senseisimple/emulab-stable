@@ -121,7 +121,7 @@ use Exporter;
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
-	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID
+	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
 	 TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
@@ -989,6 +989,29 @@ sub ExpLeader($$)
 
     my $query_result =
 	DBQueryFatal("select expt_head_uid from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Return Experiment swapper. First argument pid. Second argument is eid.
+#
+# usage: ExpSwapper(char *pid, char *eid)
+#        returns char *swapper if a valid pid/eid.
+#        returns 0 if an invalid pid/eid.
+#
+sub ExpSwapper($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select expt_swap_uid from experiments ".
 		     "where eid='$eid' and pid='$pid'");
 
     if ($query_result->numrows == 0) {
