@@ -210,6 +210,7 @@ sub doplabconfig()
         print RC "touch /var/log/messages\n";
         print RC "touch /var/log/maillog\n";
         print RC "touch /var/log/secure\n";
+        print RC "chmod 600 /var/log/secure\n";
         print RC "touch /var/log/cron\n";
         print RC "/sbin/syslogd\n";
 

@@ -25,7 +25,8 @@ THISDIR         = $(PWD)
 #
 # Linux binaries the tarball needs
 #
-BINARIES	= $(SRCDIR)/tmcc $(SRCDIR)/suidperl $(SRCDIR)/tcsh
+BINARIES	= $(SRCDIR)/tmcc $(SRCDIR)/suidperl $(SRCDIR)/tcsh \
+		  $(SRCDIR)/gzip
 ALLBINARIES	= $(BINARIES)
 
 #
@@ -73,6 +74,8 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 			plabroot/usr/local/etc/emulab/tmcc.bin
 	$(INSTALL_PROGRAM) -s -m 4511 $(SRCDIR)/suidperl plabroot/usr/bin
 	$(INSTALL_PROGRAM) -s $(SRCDIR)/tcsh plabroot/bin
+	$(INSTALL_PROGRAM) -s $(SRCDIR)/gzip plabroot/bin
+	ln -fs gzip plabroot/bin/gunzip
 	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
 	                plabroot/usr/local/etc/emulab/client.pem
 	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
