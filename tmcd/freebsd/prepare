@@ -27,13 +27,6 @@ my $MOUNTINFO	= "/var/db/mounttab";
 my $LOCATEDB	= "/var/db/locate.database";
 
 #
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/testbed";
-use libsetup;
-
-#
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
@@ -43,6 +36,13 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
 
 #
 # First clean up the node as it would be if free.

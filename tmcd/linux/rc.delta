@@ -13,13 +13,6 @@ use English;
 my $reboot      = 0;
 
 #
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/rc.d/testbed";
-use libsetup;
-
-#
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
@@ -29,6 +22,13 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 print STDOUT "Checking Testbed Delta configuration ... \n";
 

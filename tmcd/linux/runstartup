@@ -8,13 +8,6 @@
 use English;
 
 #
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/rc.d/testbed";
-use libsetup;
-
-#
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
@@ -29,8 +22,14 @@ sub background();
 #
 # Turn off line buffering on output
 #
-
 $| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 #
 # Get the config parameters so we can open up a log file in the proper

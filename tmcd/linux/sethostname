@@ -23,13 +23,6 @@ use English;
 #
 
 #
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/rc.d/testbed";
-use libsetup;
-
-#
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
@@ -37,6 +30,13 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
 $| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 if (@ARGV) {
     my $token = shift;

@@ -33,6 +33,10 @@ install:	misc-install script-install bin-install
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/db
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/jails
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/logs
 	-rm -f /etc/testbed
 	-ln -s $(INSTALL_DIR) /etc/testbed
 
