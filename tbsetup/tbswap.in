@@ -62,7 +62,7 @@ sub FWTEARDOWN()  { return 2; }
 sub doFW($$$);
 
 # XXX fixme: should not be hardwired!
-my $cnetstack = "-S cisco2";
+my $cnetstack = "-S Control";
 my $cnetvlanname = "Control";
 
 
