@@ -1,8 +1,9 @@
 #
 # This is the defaults definitions file for configure.
+# See doc/setup.txt for an explanation of these variables.
 #
-# Use the --with-TBDEFS=filename to specify your own. If you add a variable,
-# be sure to go and update configure.in.
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
 WWWDEFS=default
