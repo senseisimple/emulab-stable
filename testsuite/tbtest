@@ -101,10 +101,10 @@ sub tbexec {
     close(FILE);
     close(EXEC);
     if (($? >> 8) == 0) {
-	prints " PASS\n";
+	prints "PASS\n";
 	$pass++;
     } else {
-	prints " FAIL - See $file\n";
+	prints "FAIL - See $file\n";
 	$fail++;
 	doexit(1);
     }
@@ -197,39 +197,38 @@ $dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
     doexit(1);
 };
 
-prints "  Clearing out existing experiments.\n";
+prints "  Clearing out existing experiments ";
 open(CLEARLOG,"> clear.log");
 $sth = $dbh->prepare("SELECT pid,eid from experiments");
 $sth->execute;
 while (($pid,$eid) = $sth->fetchrow_array) {
-    prints "    $pid/$eid ";
     print CLEARLOG "$pid $eid\n";
-    print CLEARLOG "tbswapout -force -test $pid $eid\n";
-    open(EXEC,"tbswapout -force -test $pid $eid 2>&1 |");
+    print CLEARLOG "tbswapout -nologfile -force -test $pid $eid\n";
+    open(EXEC,"tbswapout -nologfile -force -test $pid $eid 2>&1 |");
     while (<EXEC>) {
 	print CLEARLOG $_;
     }
     close(EXEC);
     if (($? >> 8) != 0) {
-	prints "FAIL - On tbswapout - See clear.log\n";
+	prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
 	$fail++;
 	doexit(1);
     } 
-    print CLEARLOG "tbend $pid $eid\n";
+    print CLEARLOG "tbend -nologfile $pid $eid\n";
     open(EXEC,"tbend $pid $eid 2>&1 |");
     while (<EXEC>) {
 	print CLEARLOG $_;
     }
     close(EXEC);
     if (($? >> 8) != 0) {
-	prints " FAIL - On tbend - See clear.log\n";
+	prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
 	$fail++;
 	doexit(1);
-    }
-    
-    prints "PASS\n";
-    $pass++;
+    }   
 }
+prints "PASS\n";
+$pass++;
+
 close(CLEARLOG);
 
 prints "  Setting up test experiment ";
@@ -313,6 +312,12 @@ foreach $test (@tests) {
 	    $pass++;
 	} elsif ($status =~ /^FAIL/) {
 	    $fail++;
+	    # grab copy of testbed
+	    system("mysqldump $testdb > db.txt");
+	    if (($? >> 8) != 0) {
+		prints "ERROR: Could not grab copy of database.\n";
+		doexit(1);
+	    }
 	} else {
 	    $unknown++;
 	    $status = "UKNONW";
