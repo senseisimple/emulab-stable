@@ -19,7 +19,11 @@ if {[file dirname [info script]] == "."} {
 } else {
     set updir [file dirname [file dirname [info script]]]
 }
-set assign "$updir/../assign/assign"
+if {[file exists $updir/../assign]} {
+    set assign "$updir/../assign/assign"
+} else {
+    set assign "$updir/lib/assign"
+}
 
 set maxrun 5
 set delaythresh .25
