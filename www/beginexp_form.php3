@@ -68,7 +68,7 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-          <td colspan=2>*Long Name:</td>
+          <td colspan=2>*Long Name (description):</td>
           <td><input type=\"text\" name=\"exp_name\" size=\"40\">
               </td>
       </tr>\n";
@@ -129,6 +129,13 @@ echo "<tr>
           <td><input type=\"text\" value=\"$year:$month:$rest\"
                      name=\"exp_end\"></td>
      </tr>\n";
+
+echo "<tr>
+	  <td colspan=2>Pool Experiment?:<br>
+                        (Leave unchecked unless you know what this means!)</td>
+          <td><input type=checkbox name=exp_shared value=Yep>&nbsp</td>
+     </tr>\n";
+         
 ?>
 
 <tr>

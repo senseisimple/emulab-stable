@@ -236,6 +236,7 @@ function SHOWEXP($pid, $eid) {
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
     $exp_status  = $exprow[state];
+    $exp_shared  = $exprow[shared];
 
     #
     # Generate the table.
@@ -284,6 +285,18 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Expires: </td>
             <td class=\"left\">$exp_expires</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Shared: </td>
+            <td class=\"left\">";
+    if ($exp_shared) {
+	echo "<A href='expaccess_form.php3?pid=$pid&eid=$eid'>Yes</a>";
+    }
+    else {
+	echo "No";
+    }
+    echo "   </td>
           </tr>\n";
 
     echo "<tr>

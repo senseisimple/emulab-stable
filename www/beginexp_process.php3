@@ -183,6 +183,14 @@ $user_email = $row[1];
 #
 $expt_state = "new";
 
+# Shared experiments.
+if (isset($exp_shared) && strcmp($exp_shared, "Yep") == 0) {
+    $exp_shared = 1;
+}
+else {
+    $exp_shared = 0;
+}
+
 #
 # At this point enter the exp_id into the database so that it shows up as
 # valid when the tb scripts run. We need to remove the entry if any of
@@ -191,9 +199,10 @@ $expt_state = "new";
 $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end, state) ".
+        "expt_head_uid, expt_start, expt_end, state, shared) ".
         "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end', '$expt_state')");
+        "'$exp_name', '$uid', '$exp_start', '$exp_end', ".
+        "'$expt_state', $exp_shared)");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
