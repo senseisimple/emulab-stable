@@ -1,40 +1,81 @@
 #!/usr/local/bin/perl -w
 use Mysql;
+use Getopt::Std;
 use strict;
 
-my $debug = 0;
+# IMPORTANT: This file contains some information specific to the Utah
+# Network Testbed! If you want to use it in another enviroment, change
+# the information below
+
+# Describes the location of each of the switches that nodes may be connected
+# to
+my %switches = ( cisco1 => 'top right', cisco2 => 'bottom right',
+		 cisco3 => 'top left', cisco4 => 'bottom left');
+
+# Description of the location of each chard on the back of a machine.
+# A hash, indexed by node type. Each value is an array reference, ordered
+# by the card order in the database 
+my %cards = ( 'pc600' => [ 'second from left','third from left',
+                          'second from right','rightmost','leftmost' ],
+	      'pc850' => [ 'left port of dual card', 'right port of dual card',
+	      		   'bottom builtin port', 'top builtin port',
+			   'single port card' ] );
+
+# Colors of wires, indexed by wire type
+my %wires = ( Node => 'yellow', Control => 'red', Power => 'green',
+	Serial => 'white' );
+
 my ($node, $card);
 my $tbdb = "@TBDBNAME@";
 
-if (@ARGV == 2) {
-	($node,$card) = @ARGV;
-} elsif (@ARGV == 1) {
-	($node,$card) = split /:/,$ARGV[0];
-} else {
-	exit &usage;
-}
+# Options: v = verbose, d = debug
+my %opt = ( v => 0, d => 0);
 
-&debug("Node is $node");
-&debug("Card is $card") if (defined $card);
+getopts('vd',\%opt);
 
 my $dbh = Mysql->connect("localhost",$tbdb,"script","none");
 die "Unable to connect to database" unless $dbh;
 
-my $query = qq|SELECT node_id1,card1,node_id2,card2,port2 FROM | .
-            qq|wires WHERE node_id1="$node"|;
-if (defined $card) {
-	$query .= qq|AND card1="$card"|;
+if (@ARGV < 1) {
+	exit &usage;
 }
 
-&debug("Sending query $query\n");
+while (my $arg = shift @ARGV) {
+	my ($node,$card) = split /:/,$arg;
+	&debug("Node is $node");
+	&debug("Card is $card") if (defined $card);
 
-my $qh = $dbh->query($query);
+	my $query = qq|SELECT node_id1,card1,node_id2,card2,port2,cable,len| . 
+		qq|,wires.type,nodes.type FROM wires LEFT JOIN nodes | .
+		qq|ON node_id1 = node_id WHERE node_id1="$node"|;
+	if (defined $card) {
+		$query .= qq|AND card1="$card"|;
+	}
 
-print $qh->as_string();
+	&debug("Sending query $query\n");
+	my $sth = $dbh->query($query);
 
-sub debug { warn @_,"\n" if $debug; }
+	if ($opt{v}) {
+		while (my @row = $sth->fetchrow) {
+			my $cardinfo = ${$cards{$row[8]}}[$row[1]];
+			my $switchinfo = $switches{$row[2]};
+			my $wireinfo = $wires{$row[7]};
+			print "$row[0] port $row[1] ($cardinfo) connects to $row[2] " .
+				"($switchinfo), module $row[3], port $row[4] via wire #" .
+				"$row[5] (length $row[6], color $wireinfo)\n";
+		}
+	} else {
+		print $sth->as_string;
+	}
+}
+
+#print $sth->as_string();
+
+sub debug { warn @_,"\n" if $opt{d}; }
 
 sub usage {
-	print "Usage: $0 <node | node:if | node if>\n";
+	print "Usage: $0 [-v] [-d] <node | node:if> ... \n";
+	print "-v: Verbose, prose, output\n";
+	print "-d: Enable debugging output\n";
 	return -1;
 }
