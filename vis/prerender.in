@@ -486,9 +486,6 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
     if ($overlaps == 0) { last; }
 } # for $attempt
 
-### Delete tempfile
-unlink $tempfile;
-
 ### Success!!
 cleanup();
 
@@ -520,6 +517,10 @@ sub dprint($) {
 
 sub cleanup()
 {
+    ### Delete tempfile
+    unlink $tempfile
+	if (defined($tempfile));
+
     # Clear our pid from the DB since we are about to exit.
     if ($renderpid) {
 	DBQueryFatal("update experiments set prerender_pid=0 ".
