@@ -529,6 +529,15 @@ sub CheckDotFiles()
 	}
 	chmod(0644, "$HOMEDIR/$user/.forward") or
 		fatal("Could not chmod $forward: $!");
+	$fileowner= (stat($forward))[4];
+	$dochown=0;
+	if ($fileowner==0) {
+	    chown($user_number,$default_groupgid,"$HOMEDIR/$user/.forward") or
+	      do {
+		  warn("Could not chown $forward: $!");
+		  $dochown=1;
+	      };
+	}
     }
 
     #
@@ -544,6 +553,11 @@ sub CheckDotFiles()
 	system("echo '$spathstr' >> $profile");
     }
     $UID = $SAVEUID;
+
+    if (defined($dochown) && $dochown!=0) {
+	chown($user_number,$default_groupgid,"$HOMEDIR/$user/.forward") or
+	  warn("Could not chown $forward: $!");
+    }
 
     return 0;
 }
