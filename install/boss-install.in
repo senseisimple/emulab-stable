@@ -48,6 +48,7 @@ my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $TOUCH      = "/usr/bin/touch";
 my $SSH        = "/usr/bin/ssh";
+my $SCP        = "/usr/bin/scp";
 my $CP         = "/bin/cp";
 my $ENV        = "/usr/bin/env";
 
@@ -83,6 +84,7 @@ my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
 my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $INIT_PRIVKEY    = "$TOP_SRCDIR/install/identity";
 
 my $SSH_CONFIG      = "/etc/ssh/ssh_config";
 
@@ -203,7 +205,7 @@ if ($UID != 0) {
     die "This script must be run as root.\n";
 }
 
-Phase "groups", "Creating groups", sub {
+Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
 	if (getgrnam("tbadmin")) {
 	    PhaseSkip("tbadmin group already exists");
@@ -215,6 +217,21 @@ Phase "groups", "Creating groups", sub {
 	    PhaseSkip("root group already exists");
 	}
 	ExecQuietFatal("$PW groupadd root -g 103");
+    };
+    # Added next two cause the mysql package does not do this (port does).
+    Phase "mysqlgroup", "Creating mysql group", sub {
+	if (getgrnam("mysql")) {
+	    PhaseSkip("mysql group already exists");
+	}
+	ExecQuietFatal("$PW groupadd mysql -g 88");
+    };
+    Phase "mysqluser", "Creating mysql user", sub {
+	if (getpwnam("mysql")) {
+	    PhaseSkip("mysql user already exists");
+	}
+	ExecQuietFatal("$PW useradd mysql -g 88 -g 88 -h - ".
+		       "-d /var/db/mysql -s /sbin/nologin -c 'MySQL Daemon'");
+	ExecQuietFatal("$CHOWN mysql:mysql /var/db/mysql");	
     };
 };
 
@@ -623,16 +640,23 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	    "   Protocol 1,2");
     };
     Phase "keycopy", "Copy root ssh keys to ops", sub {
-	if (ExecQuiet("$SSH root@$USERNODE pwd")) {
+	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
 	    PhaseSkip("Key already copied");
 	} else {
-	    PhaseFail("You'll need to manually copy boss's public SSH key\n".
-		      "over to ops print so boss can get into ops without a\n" .
-		      "password. Run the following print as root:\n" .
-		      "scp $ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
-	}
+	    ExecQuietFatal("$SCP -i $INIT_PRIVKEY ".
+			   "$ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
+
+	    if (ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
+		PhaseFail("You'll need to manually copy boss's public SSH key\n".
+			  "over to ops print so boss can get into ops without\n".
+			  "a password. Run the following print as root:\n" .
+			  "scp $ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
+	    }
+	};
     };
 };
+
+PrintLastOutput();
 
 Phase "rndc", "Setting up rndc for control of nameserver", sub {
     DoneIfExists($RNDC_KEY);

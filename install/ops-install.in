@@ -107,6 +107,8 @@ my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 my $CRONTAB         = "/etc/crontab";
+my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
+
 
 #
 # Some directories we care about
@@ -136,6 +138,7 @@ my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
 my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
 my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
 
 #
 # The meta-port (name and version) that drags in all the dependancies for
@@ -154,7 +157,6 @@ if (! $batchmode) {
     my $response = <>;
     die "Installation aborted!\n" unless ($response =~ /^y/i);
 }
-exit(0);
 
 if ($UID != 0) {
     die "This script must be run as root.\n";
@@ -435,7 +437,15 @@ Phase "ssh", "Allowing root ssh", sub {
 	mkdir("/root/.ssh",0700) or
 	    PhaseFail("Unable to create /root/.ssh: $!");
     };
-
+   Phase "authkeys", "Adding stub identity to /root/.ssh/authorized_keys", sub {
+       DoneIfEdited($AUTHKEYS);
+       my $ident = `cat $IDENTPUB`;
+       PhaseFail("Could not read $IDENTPUB")
+	   if ($?);
+       chomp($ident);
+       AppendToFileFatal($AUTHKEYS,
+			 "from=\"${BOSSNODE}\" $ident");
+   };
 };
 
 Phase "capture", "Setting up capture", sub {
