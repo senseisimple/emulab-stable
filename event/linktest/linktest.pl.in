@@ -860,15 +860,15 @@ sub ping_node {
 	# standard programs ping and sudo.
 	# for some reason including them in the env didn't work.
 	if($platform eq BSD) {
-	    $cmd = "/usr/local/bin/sudo /sbin/ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
+	    $cmd = "/sbin/ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
 	} elsif($platform eq LINUX) {
-	    $cmd = "/usr/bin/sudo /bin/ping -c $send_count -q -i $send_rate -w $timeout -t $ttl $host";
+	    $cmd = "/bin/ping -c $send_count -q -i $send_rate -w $timeout -t $ttl $host";
 	}
     } else {
 	if($platform eq BSD) {
-	    $cmd = "/usr/local/bin/sudo /sbin/ping -c $send_count -q -i $send_rate -t $timeout $host";
+	    $cmd = "/sbin/ping -c $send_count -q -i $send_rate -t $timeout $host";
 	} elsif($platform eq LINUX) {
-	    $cmd = "/usr/bin/sudo /bin/ping -c $send_count -q -i $send_rate -w $timeout $host";
+	    $cmd = "/bin/ping -c $send_count -q -i $send_rate -w $timeout $host";
 	}
     }
 
