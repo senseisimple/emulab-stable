@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Active and Recently Swapped Out Experiments");
-
-#
 # We let anyone access this page. No details are leaked out, hopefully.
 #
 $thumbCount = 0;
@@ -56,6 +51,34 @@ function GENPLIST ($which, $query_result)
 	}
     }
     echo "</tr></table>";
+}
+
+#
+# Standard Testbed Header
+#
+if (isset($keymaster) &&
+    strcmp($keymaster, "Clortho") == 0) {
+    PAGEHEADER("All Experiments");
+
+    $query_result =
+	DBQueryFatal("select s.pid,s.eid,'terminated',s.rsrcidx,rs.pnodes, ".
+		     "       s.swapin_last as swapdate ".
+		     " from experiment_stats as s ".
+		     "left join experiment_resources as rs on ".
+		     "     rs.idx=s.rsrcidx ".
+		     "where rs.pnodes>0 and rs.thumbnail is not null and ".
+		     "      s.pid!='emulab-ops' ".
+		     "order by s.swapin_last desc ");
+
+    if (mysql_num_rows($query_result)) {
+	GENPLIST("Experiments Run on Emulab", $query_result);
+    }
+
+    PAGEFOOTER();
+    return;
+}
+else {
+    PAGEHEADER("Active and Recently Swapped Out Experiments");
 }
 
 #
