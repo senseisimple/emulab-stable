@@ -141,13 +141,14 @@ foreach my $n (@node_names) {
     }
   }
 
+  # Find the control net interface for this node type
+  $sth = 
+    $dbh->query("select control_net,osid from node_types left join ".
+		"nodes on nodes.type=node_types.type where node_id='$n'");
+  my @row= $sth->fetchrow_array();
+  my $control= $row[0];
+  my $osid= $row[1];
   if (! ($n =~ /sh\d+/)) { #If its not a shark
-    # Find the control net interface for this node type
-    $sth = 
-      $dbh->query("select control_net from node_types left join ".
-		  "nodes on nodes.type=node_types.type where node_id='$n'");
-    my @row= $sth->fetchrow_array();
-    my $control= $row[0];
     # Clean out all IPs except the control net
     $cmd = 
       "update interfaces set IP='' where node_id='$n' and card!='$control'";
@@ -170,7 +171,7 @@ foreach my $n (@node_names) {
 	&& $error++);
 
   # And clean out various tidbits from the nodes table.
-  $cmd = "update nodes set def_boot_osid='', def_boot_cmd_line='',".
+  $cmd = "update nodes set def_boot_osid='$osid', def_boot_cmd_line='',".
       "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs=''".
       " where node_id='$n'";
   $sth = $dbh->query($cmd)
