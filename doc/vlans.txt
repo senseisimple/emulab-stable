@@ -43,6 +43,7 @@ NOTE: ICMP gets to go from anywhere to anywhere
                    paper:/usr/testbed/tftpboot/proj on plastic
    ntp             time
    dns             name server
+   capserver	   capture server (tcp port 855) on paper.
    
 5) Private <-> Control
    ssh             as always
