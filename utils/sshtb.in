@@ -21,6 +21,10 @@ sub usage()
 my $TB		= "@prefix@";
 my $SSH	        = "@SSH@";
 my $SSH_ARGS	= '@SSH_ARGS@';
+my $UNIFIED     = "@UNIFIED_BOSS_AND_OPS@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $USERNODE    = "@USERNODE@";
+my $FSNODE      = "@FSNODE@";
 
 # Locals
 my $debug	= 0;
@@ -70,7 +74,12 @@ if (!defined($hostname)) {
 my $cmd;
 
 if (! TBValidNodeName($hostname) || !TBIsNodeRemote($hostname)) {
-    $cmd = "$SSH $SSH_ARGS @args $hostname @ARGV";
+    if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
+		     $hostname eq $FSNODE)) {
+	$cmd = "@ARGV";
+    } else {
+	$cmd = "$SSH $SSH_ARGS @args $hostname @ARGV";
+    }
 }
 else {
     $cmd = "$SSH $SSH_ARGS @args -l emulabman $hostname @ARGV";

@@ -5,6 +5,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= utils
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
@@ -32,11 +33,16 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 #
 # Control node installation (okay, plastic)
 #
-control-install:
-	cd $(INSTALL_BINDIR) && \
+ifneq ($(UNIFIED),1)
+LINKS=	cd $(INSTALL_BINDIR) && \
 		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;
+
+
+endif
+control-install:
+	$(LINKS)
 
 clean:

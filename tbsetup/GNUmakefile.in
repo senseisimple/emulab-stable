@@ -5,6 +5,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= tbsetup
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
@@ -115,14 +116,17 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
-			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
-			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
-	cd $(INSTALL_BINDIR) && \
+ifneq ($(UNIFIED),1)
+LINKS=	cd $(INSTALL_BINDIR) && \
 		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;
+endif
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
+			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
+			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
+	$(LINKS)
 
 #
 # Tip servers get very little
