@@ -38,7 +38,8 @@ sub usage()
 	  " THRESH=NNN       - Maximum threshold for the average queue size\n".
 	  " LINTERM=NNN      - Packet dropping probability\n".
 	  " Q_WEIGHT=NNN     - For calculating the average queue size\n");
-    exit(-1);
+    # Web interface cares about this return value!
+    exit(2);
 }
 my  $optlist = "dms:";
 
@@ -100,6 +101,35 @@ if (defined($options{"s"})) {
 }
 
 #
+# Permission check.
+#
+if ($UID && !TBAdmin($UID) &&
+    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to modify the delay parameters!\n");
+}
+
+#
+# No transitional experiments.
+#
+my $query_result =
+    DBQueryFatal("select state,expt_locked from experiments ".
+		 "where eid='$eid' and pid='$pid'");
+
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
+}
+my ($estate,$expt_locked) = $query_result->fetchrow_array();
+
+if (defined($expt_locked)) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid went into transition at $expt_locked.\n".
+	"    You will be notified via email when experiment transition ".
+	"    is complete and you can alter its delay configuration.\n");
+}
+
+#
 # Parse options, which will modify the existing configuration below.
 #
 while (@ARGV) {
@@ -129,7 +159,7 @@ while (@ARGV) {
 	    last SWITCH;
 	};
 	/^PLR=([0-9\.]*)$/i && do {
-	    if ($1 < 0) {
+	    if ($1 < 0 || $1 > 1) {
 		usage();
 	    }
 	    $config{"lossrate"} = $1;
@@ -196,29 +226,30 @@ my %agentmap =
     );
 
 #
-# Verify user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
-
-#
-# Permission check.
-#
-if ($UID && !TBAdmin($UID) &&
-    ! TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_MODIFY)) {
-    die("*** $0:\n".
-	"    You do not have permission to modify the delay parameters!\n");
-}
-
-#
 # Link or Lan!
 # 
-my $query_result =
+$query_result =
     DBQueryFatal("select member from virt_lans ".
 		 "where pid='$pid' and eid='$eid' and vname='$link'");
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    $link is not a link in $pid/$eid!\n");
+}
 my $islink = ($query_result->numrows == 2 ? 1 : 0);
+
+#
+# If experiment is not active, all we can do is change virt_lans.
+#
+if ($estate ne EXPTSTATE_ACTIVE) {
+    if ($modify) {
+	ChangeVirtLans();
+    }
+    else {
+	print "Experiment $pid/$eid is not active. If you want to change\n".
+	    "the base experiment configuration, please use the -m option!\n";
+    }
+    exit(0);
+}
 
 #
 # Check to see if linkdelays or normal delay nodes. This is a gross
@@ -227,12 +258,39 @@ my $islink = ($query_result->numrows == 2 ? 1 : 0);
 if (ChangeDelayConfig() < 0 &&
     ChangeLinkDelayConfig() < 0) {
     die("*** $0:\n".
-	"    No such link or node in $pid/$eid!\n");
+	"    $link is not a traffic shaped link in $pid/$eid!\n");
 }
-
 if ($modify) {
     ChangeVirtLans();
 }
+
+#
+# Inject an event. 
+#
+my $inject_string = "$TEVC -e $pid/$eid now $link";
+
+# Direct the event to the whoever is handling this particular delay.
+$inject_string .= "-${srcvnode} "
+    if (defined($srcvnode));
+
+$inject_string .= " modify ";
+
+# Append the parameters.
+foreach my $key (keys(%config)) {
+    my $val = $config{$key};
+    my $str = $agentmap{$key};
+    
+    $inject_string .= "${str}=$val ";
+}
+if ($debug) {
+    print "$inject_string\n";
+}
+
+system($inject_string) &&
+    die("*** $0:\n".
+	"    Failed to inject delay update event!\n");
+    
+exit(0);
 
 #
 # Get current delay configuration. 
@@ -502,32 +560,3 @@ sub ChangeVirtLans() {
 	DBQueryFatal($query_string);
     }
 }
-
-#
-# Inject an event. 
-#
-my $inject_string = "$TEVC -e $pid/$eid now $link";
-
-# Direct the event to the whoever is handling this particular delay.
-$inject_string .= "-${srcvnode} "
-    if (defined($srcvnode));
-
-$inject_string .= " modify ";
-
-# Append the parameters.
-foreach my $key (keys(%config)) {
-    my $val = $config{$key};
-    my $str = $agentmap{$key};
-    
-    $inject_string .= "${str}=$val ";
-}
-if ($debug) {
-    print "$inject_string\n";
-}
-
-system($inject_string) &&
-    die("*** $0:\n".
-	"    Failed to inject delay update event!\n");
-    
-exit(0);
-
