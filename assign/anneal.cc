@@ -317,7 +317,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   double scores[neighborsize];
 #endif
 
-  if (num_fixed == nnodes) {
+  if (nnodes <= 0) {
     cout << "All nodes are fixed.  No annealing." << endl;
     goto DONE;
   }
