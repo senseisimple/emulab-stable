@@ -24,7 +24,7 @@ use Exporter;
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE CONTROL JAILED PLAB LOCALROOTFS IXP USESFS 
-	 SIMTRAFGEN SIMHOST ISDELAYNODE
+	 SIMTRAFGEN SIMHOST ISDELAYNODE JAILHOST
 
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
@@ -275,6 +275,9 @@ sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
 #
 sub SIMHOST()   { if ($role eq "simhost") { return 1; } else { return 0; } }
 sub SIMTRAFGEN(){ if (-e ISSIMTRAFGEN())  { return 1; } else { return 0; } }
+
+# A jail host?
+sub JAILHOST()  { if ($role eq "virthost") { return 1; } else { return 0; } }
 
 #
 # Is this node using SFS. Several scripts need to know this.

@@ -29,6 +29,12 @@ use libsetup;
 use libtmcc;
 
 #
+# Exit if not a valid node to run linktest on.
+# 
+exit(0)
+    if (MFS() || REMOTE() || SIMHOST() || JAILHOST());
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -69,6 +75,8 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 # Start the daemon.
 #
+print("Starting linktest daemon\n");
+
 system("linktest -e $pid/$eid ".
        "-s localhost -l $logfile -i $pidfile -k $keyfile");
 exit($? >> 0);

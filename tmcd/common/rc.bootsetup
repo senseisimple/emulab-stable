@@ -223,15 +223,10 @@ sub doboot()
     }
 
     #
-    # Start the linktest daemon. At this time, it talks directly to
-    # elvind on boss instead of to the proxy, since the proxy is just
-    # one-way!
+    # Start the linktest daemon. This script will exit without running
+    # linktest is the node is hosting SIM or JAILS.
     #
-    # XXX We do not want to run this on delay nodes so must do this after
-    # we have run the config scripts. 
-    #
-    if (-x "$RCDIR/rc.linktest" && ! -e ISDELAYNODE()) {
-	print("Starting linktest daemon\n");
+    if (-x "$RCDIR/rc.linktest") {
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.linktest");
