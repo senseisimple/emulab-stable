@@ -245,6 +245,8 @@ if (! -e $vnodedir) {
 #
 # Inform the TMCD we are setting up. 
 #
+REBOOT:
+system("tmcc -n $vnodeid state REBOOTING");
 system("tmcc -n $vnodeid state TBSETUP");
 
 #
@@ -266,7 +268,6 @@ if (!defined($pid)) {
 #
 $UID = 0;
 
-REBOOT:
 #
 # Okay, now startup the scripts.
 #
@@ -300,7 +301,6 @@ if ($dojail) {
 	    # 
 	    if (!defined($jailpid) && $rebooting) {
 		$rebooting = 0;
-		system("tmcc -n $vnodeid state TBSETUP");
 		goto REBOOT;
 	    }
 	}
