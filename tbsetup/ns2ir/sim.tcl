@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.1 2000-08-25 20:41:55 newbold Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.2 2000-10-18 22:21:48 calfeld Exp $
 
 #
 
@@ -178,9 +178,9 @@ Simulator instproc run {} {
     global nodelist
     global linkslist
     global eventlist
-    global argv
+    global irfile
 
-    set IRfile [open [lindex $argv 1] w]
+    set IRfile [open $irfile w]
 
     puts $IRfile "START topology\nSTART nodes"
     foreach node $nodelist {
