@@ -198,15 +198,9 @@ foreach $node (keys(%rvnodemap)) {
 	# subnet the lindex will correspond to the first, second, etc.
 	# subnet.
 	$lindex = 0;
-	$lastdest = "";
 	foreach $dest (@sortdests) {
 	    ($dest,$ip) = @$dest;
-	    if ($dest ne $lastdest) {
-		$lindex = 0;
-		$lastdest = $dest;
-	    } else {
-		$lindex++;
-	    }
+	    $lindex++;
 	    $sth = $dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$node\",\"$dest\",$lindex,\"$ip\")");
 	    $sth->execute;
 	    $sth->finish;
