@@ -21,6 +21,7 @@
 #include "event.h"
 #include "linktest.h"
 
+static int	debug;
 static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
 
@@ -31,7 +32,8 @@ void
 usage(char *progname)
 {
 	fprintf(stderr,
-		"Usage: %s [-s server] [-p port] [-l logfile] -e pid/eid\n",
+		"Usage: %s [-d] "
+		"[-s server] [-p port] [-l logfile] -e pid/eid\n",
 		progname);
 	exit(-1);
 }
@@ -50,8 +52,11 @@ main(int argc, char **argv) {
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:l:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:d")) != -1) {
 	  switch (c) {
+	  case 'd':
+	    debug++;
+	    break;
 	  case 's':
 	    server = optarg;
 	    break;
@@ -73,9 +78,16 @@ main(int argc, char **argv) {
 	if (!pideid)
 	  usage(progname);
 
-	loginit(0, logfile);
+	if (debug)
+		loginit(0, 0);
+	else {
+		if (logfile)
+			loginit(0, logfile);
+		else
+			loginit(1, "linktest");
+		/* See below for daemonization */
+	}
 
-	
 	/*
 	 * Convert server/port to elvin thing.
 	 *
@@ -89,8 +101,6 @@ main(int argc, char **argv) {
 		server = buf;
 	}
 
-
-	
 	/*
 	 * Construct an address tuple for subscribing to events for
 	 * this node.
@@ -120,7 +130,13 @@ main(int argc, char **argv) {
 	if (! event_subscribe(handle, callback, tuple, NULL)) {
 		fatal("could not subscribe to event");
 	}
-	
+
+	/*
+	 * Do this now, once we have had a chance to fail on the above
+	 * event system calls.
+	 */
+	if (!debug)
+		daemon(0, 0);
 	
 	/*
 	 * Begin the event loop, waiting to receive event notifications:
