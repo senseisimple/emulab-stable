@@ -2070,7 +2070,7 @@ sub requires_delay {
     # XXX temporary hack: && $bestbandwidth < $S100Kbs
     # A delay node is not being added for the 10Mb 0ms link
     # Permanent fix required
-    if ($bestbandwidth == $targetbandwidth && $bestbandwidth < $S100Kbs) {
+    if ($bestbandwidth == $targetbandwidth && $bestbandwidth >= $S100Kbs) {
 	return 0;
     }
 
