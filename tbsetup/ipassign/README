@@ -31,13 +31,7 @@ used, the last one used takes precedence.
 !!! Always use this for now. Dynamic bitspace allocation is not yet
     implemented !!!
 '-c'    Use conservative bitspace allocation. Each level of the hierarchy
-        is allocated a fixed number of bits. Only takes effect alongside
-	of -p or -s
-#'-b'    Instead of using a single level of hierachy in which a set number
-#        of partitions are used, cut the graph in half assigning each
-#        half a zero or one, cut each of the resulting subgraphs in half,
-#        etc. until the graph has been fully partitioned.
-#        -- NOT IMPLEMENTED --
+        is allocated a fixed number of bits.
 #'-g'    Partition the graph using a greedy marriage algorithm instead of
 #        METIS.
 #        -- NOT IMPLEMENTED --
@@ -58,7 +52,8 @@ last one used takes precedence.
 '-n'    Host-to-net routing. Calculate routes using a hierarchical network
         number if possible. Otherwise use a LAN. Theoretically, this should
         produce the smallest number of routes in each routing table. (default)
-        -- NOT IMPLEMENTED --
+
+'-!'    Do not calculate routes or output them. Only do ipassignment.
 
 Input
 -----
