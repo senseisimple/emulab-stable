@@ -950,8 +950,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
-	if (verbose || ! (command_array[i].func != doisalive ||
-			  command_array[i].func != doisalive))
+	if (verbose || ! (command_array[i].func == doisalive ||
+			  command_array[i].func == dorusage))
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
 
