@@ -96,7 +96,7 @@ EOF
 
 my $vcgtag="-vcg";
 my $dottag="-dot";
-my $cleanup=1;
+my $cleanup=!$v;
 my $nocluster=$g;
 if (!$dot && !$vcg) { $dot=1; }
 if (!$ps && !$gif && !$png) { $ps=1; }
