@@ -13,6 +13,7 @@ emulab-sync \- Simple distributed synchronization client.
 [\fB-a\fR]
 [\fB-u\fR]
 [\fB-e \fIerror-number\fR]
+[\fB-m\fR]
 .SH DESCRIPTION
 The
 .B emulab-sync
@@ -96,6 +97,14 @@ Specify the error code for this client.  The value must be greater than zero
 (indicating no error) and less than 240 because we reserve the range [240, 256)
 for internal use.  The error codes for all of the clients are collected by the
 server and the maximum is returned by the clients when they exit.  (Default: 0)
+.TP
+\fB-m
+Check if this node is where the default sync server is running and then
+immediately exit.  If this node
+.I is
+running the server, the return value is zero, otherwise it is one.  This mode
+is useful for detecting the "master" node when the experimental nodes all run
+the same startup script.
 .SH RETURN VALUES
 .TP
 A \fB-e \fRerror value
@@ -115,8 +124,15 @@ If the server name lookup failed.
 64
 If there was an invalid command line argument.
 .TP
+1
+If the
+.B -m
+option was used and this node is not the master.
+.TP
 0
-If the barrier was successfully crossed without error.
+If the barrier was successfully crossed without error or the
+.B -m
+option was used and this node is the master.
 .SH EXAMPLES
 .PP
 To synchronize one machine with another:
@@ -155,6 +171,42 @@ To synchronize and report an error code of "100":
 100
 .PD
 .RE
+.PP
+To use a single script to synchronize N nodes:
+.PP
+.RS
+.PD 0
+#! /bin/sh
+
+# Get number of nodes to synchronize against.
+.P
+node_count=${1}
+
+# Synchronize first.
+.P
+\fBif\fR emulab-sync -m; \fBthen\fR
+.P
+    # This is the master node, initialize the
+.P
+    # barrier to N - 1 since the master node
+.P
+    # is not counted.
+.P
+    emulab-sync -i `expr ${node_count} - 1`
+.P
+\fBelse\fR
+.P
+    # This is a regular node, just do a regular
+.P
+    # sync.
+.P
+    emulab-sync
+.P
+\fBfi\fR
+
+# ... then do something interesting.
+.RE
+.PD
 .SH FILES
 .TP
 /var/emulab/boot/syncserver

@@ -55,6 +55,7 @@ char *usagestr =
  " -a              Master returns immediately when initializing barrier\n"
  " -u              Use UDP instead of TCP\n"
  " -e errornum     Signal an error (must be zero or >= 32)\n"
+ " -m              Test whether or not this is the 'master' node\n"
  "\n";
 
 void
@@ -79,8 +80,9 @@ main(int argc, char **argv)
 	char			*barrier= DEFAULT_BARRIER;
 	barrier_req_t		barrier_req;
 	extern char		build_info[];
+	int			mastercheck = 0;
 	
-	while ((ch = getopt(argc, argv, "hVds:p:ui:n:ae:")) != -1)
+	while ((ch = getopt(argc, argv, "hVds:p:ui:n:ae:m")) != -1)
 		switch(ch) {
 		case 'a':
 			nowait++;
@@ -172,6 +174,9 @@ main(int argc, char **argv)
 			fprintf(stderr, "%s", usagestr);
 			exit(0);
 			break;
+		case 'm':
+			mastercheck = 1;
+			break;
 		default:
 			usage();
 		}
@@ -222,6 +227,15 @@ main(int argc, char **argv)
 			"use the -s option, or, you can recreate your\n"
 			"experiment.\n\n");
 		usage();
+	}
+	if (mastercheck) {
+		char nodename[BUFSIZ];
+
+		gethostname(nodename, sizeof(nodename));
+		if (strcmp(server, nodename) == 0)
+			exit(0);
+		else
+			exit(1);
 	}
 	
 	/*
