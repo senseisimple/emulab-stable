@@ -18,14 +18,15 @@ ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS	       += sched delay-agent nsetrafgen stated
 endif
 
-all:	all-subdirs
+all:	trafgen-fetch all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+# XXX Yeah, this doesn't belong here but I can't make the trafgen
+# makefile work if it unpacks the tarball itself
+#
 trafgen-fetch:
 	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
-
-trafgen:	trafgen-fetch
 
 install: 
 	@$(MAKE) -C lib install
@@ -57,4 +58,4 @@ distclean:	distclean-subdirs
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
-.PHONY:	$(SUBDIRS)
+.PHONY:	$(SUBDIRS) trafgen-fetch
