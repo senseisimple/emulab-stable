@@ -219,11 +219,6 @@ if ($submit) {
 	    $errors['Max Duration'] = "Time must be non-zero";
 	}
     }
-    if (count($strs)>0) {
-	$str = implode(",",$strs);
-	DBQueryWarn("update experiments set $str ".
-		    "where pid='$pid' and eid='$eid'");
-    }
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
@@ -246,6 +241,23 @@ if ($submit) {
 	echo "</table><br>\n";
 	# Jump back into edit mode
 	$edit=1;
+	$mail=0;
+    } else {
+	$q = DBQueryFatal("select * from experiments ".
+			  "where pid='$pid' and eid='$eid'");
+	$r = mysql_fetch_array($q);
+	$olds = ($r[swappable] ? "Yes" : "No");
+	$oldsr= $r[noswap_reason];
+	$oldi = ($r[idleswap] ? "Yes" : "No");
+	$oldit= $r[idleswap_timeout] / 60.0;
+	$oldir= $r[noidleswap_reason];
+	$olda = ($r[autoswap] ? "Yes" : "No");
+	$oldat= $r[autoswap_timeout] / 60.0;
+	if (count($strs)>0) {
+	    $str = implode(",",$strs);
+	    DBQueryWarn("update experiments set $str ".
+			"where pid='$pid' and eid='$eid'");
+	}
     }
     if ($mail) {
 	$q = DBQueryFatal("select * from experiments ".
@@ -271,10 +283,14 @@ if ($submit) {
 	    TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
 		   "\nThe swap settings for $pid/$eid have changed.\n".
 		   "\nThe reasons and/or timeouts have changed.\n".
+		   "\nThe old settings were:\n".
+		  #"Swappable:\t$olds\t($oldsr)\n".
+		   "Idleswap:\t$oldi\t(after $oldit hrs)\t($oldir)\n".
+		   "MaxDuration:\t$olda\t(after $oldat hrs)\n".
 		   "\nThe new settings are:\n".
 		  #"Swappable:\t$s\t($sr)\n".
 		   "Idleswap:\t$i\t(after $it hrs)\t($ir)\n".
-		   "Autoswap:\t$a\t(after $at hrs)\n".
+		   "MaxDuration:\t$a\t(after $at hrs)\n".
 		   "\nCreator:\t$cuid ($cname <$cemail>)\n".
 		   "Swapper:\t$suid ($sname <$semail>)\n".
 		   "\nIf it is necessary to change these settings, ".

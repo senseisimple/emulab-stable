@@ -98,16 +98,24 @@ elseif ($type=="swappable" || $type=="idleswap" || $type=="autoswap") {
 	    $ir= $r[noidleswap_reason];
 	    $a = ($r[autoswap] ? "Yes" : "No");
 	    $at= $r[autoswap_timeout] / 60.0;
+	    $olds = ($type=="swappable"? "Yes" : $s);
+	    $oldi = ($type=="idleswap" ? "Yes" : $i);
+	    $olda = ($type=="autoswap" ? "Yes" : $a);
+	    
 	    TBUserInfo($uid, $user_name, $user_email);
 	    TBUserInfo($cuid, $cname, $cemail);
 	    TBUserInfo($suid, $sname, $semail);
 	    TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
 		   "\nThe swap settings for $pid/$eid have changed.\n".
 		   "\nThe $type bit has been cleared.\n".
+		   "\nThe old settings were:\n".
+		  #"Swappable:\t$olds\t('$sr')\n".
+		   "Idleswap:\t$oldi\t(after $it hrs)\t('$ir')\n".
+		   "MaxDuration:\t$olda\t(after $at hrs)\n".
 		   "\nThe new settings are:\n".
 		  #"Swappable:\t$s\t('$sr')\n".
 		   "Idleswap:\t$i\t(after $it hrs)\t('$ir')\n".
-		   "Autoswap:\t$a\t(after $at hrs)\n".
+		   "MaxDuration:\t$a\t(after $at hrs)\n".
 		   "\nCreator:\t$cuid ($cname <$cemail>)\n".
 		   "Swapper:\t$suid ($sname <$semail>)\n".
 		   "\nIf it is necessary to change these settings, ".
