@@ -309,11 +309,10 @@ capture()
 	 * I keep thinking (use threads) that there is a better way to do
 	 * this (use threads).  Hmm...
 	 */
-	n = FNDELAY;
-	if (fcntl(ptyfd, F_SETFL, &n) < 0)
-		die("fcntl(FNDELAY): %s", Ptyname, geterr(errno));
-	if (fcntl(devfd, F_SETFL, &n) < 0)
-		die("fcntl(FNDELAY): %s", Devname, geterr(errno));
+	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
+	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
 
 	n = devfd;
 	if (devfd < ptyfd)
