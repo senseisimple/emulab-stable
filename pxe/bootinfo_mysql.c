@@ -30,11 +30,13 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	char dbquery[] =
 		"select n.next_boot_path, n.next_boot_cmd_line, "
 		"n.def_boot_osid, p.partition, n.def_boot_cmd_line, "
-	        "n.def_boot_path, o.path from nodes "
+	        "n.def_boot_path, o1.path, "
+	        "n.next_boot_osid, o2.path from nodes "
 		"as n left join partitions as p on n.node_id=p.node_id and "
 		"n.def_boot_osid=p.osid left join interfaces as i on "
 		"i.node_id=n.node_id "
-    	        "left join os_info as o on o.osid=n.def_boot_osid "
+    	        "left join os_info as o1 on o1.osid=n.def_boot_osid "
+    	        "left join os_info as o2 on o2.osid=n.next_boot_osid "
 	        "where i.IP = '%s'";
 
 #define NEXT_BOOT_PATH		0
@@ -43,7 +45,9 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 #define PARTITION		3
 #define DEF_BOOT_CMD_LINE	4
 #define DEF_BOOT_PATH		5
-#define OSID_PATH		6
+#define DEF_BOOT_OSID_PATH	6
+#define NEXT_BOOT_OSID		7
+#define NEXT_BOOT_OSID_PATH	8
 
 	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
 	if (n > sizeof querybuf) {
@@ -96,7 +100,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	ncols = (int)mysql_num_fields(res);
 	switch (ncols) {
-	case 7: /* Should have 7 fields */
+	case 9: /* Should have 9 fields */
 		break;
 	default:
 		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
@@ -110,9 +114,17 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	/*
 	 * Check next_boot_path.  If set, assume it is a multiboot kernel.
 	 */
-	if (row[NEXT_BOOT_PATH] != 0 && row[NEXT_BOOT_PATH][0] != '\0') {
+	if ((row[NEXT_BOOT_PATH] != 0 &&
+	     row[NEXT_BOOT_PATH][0] != '\0') ||
+	    (row[NEXT_BOOT_OSID_PATH] != 0 &&
+	     row[NEXT_BOOT_OSID_PATH][0] != '\0')) {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		parse_multiboot_path(row[NEXT_BOOT_PATH], info);
+		
+		if (row[NEXT_BOOT_PATH] != 0 &&
+		    row[NEXT_BOOT_PATH][0] != '\0')
+		    parse_multiboot_path(row[NEXT_BOOT_PATH], info);
+		else
+		    parse_multiboot_path(row[NEXT_BOOT_OSID_PATH], info);
 
 		if (row[NEXT_BOOT_CMD_LINE] != 0 &&
 		    row[NEXT_BOOT_CMD_LINE][0] != '\0')
@@ -132,9 +144,10 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		info->type = BIBOOTWHAT_TYPE_MB;
 		parse_multiboot_path(row[DEF_BOOT_PATH], info);
 	}
-	else if (row[OSID_PATH] != 0 && row[OSID_PATH][0] != '\0') {
+	else if (row[DEF_BOOT_OSID_PATH] != 0 &&
+		 row[DEF_BOOT_OSID_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		parse_multiboot_path(row[OSID_PATH], info);
+		parse_multiboot_path(row[DEF_BOOT_OSID_PATH], info);
 	}
 	else if (row[PARTITION] != 0 && row[PARTITION][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_PART;
@@ -164,7 +177,9 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 #undef PARTITION
 #undef DEF_BOOT_CMD_LINE
 #undef DEF_BOOT_PATH
-#undef OSID_PATH
+#undef DEF_BOOT_OSID_PATH
+#undef NEXT_BOOT_OSID
+#undef NEXT_BOOT_OSID_PATH
 }
 
 int
@@ -177,7 +192,8 @@ ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	MYSQL_ROW row;
 
 	n = snprintf(querybuf, sizeof querybuf,
-		     "select i.node_id,n.next_boot_path,n.next_boot_cmd_line "
+		     "select i.node_id,"
+		     "n.next_boot_osid,n.next_boot_path,n.next_boot_cmd_line "
 		     "from nodes as n left join interfaces as i on "
 		     "i.node_id=n.node_id where i.IP = '%s'",
 		     inet_ntoa(ipaddr));
@@ -226,7 +242,8 @@ ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	row = mysql_fetch_row(res);
 
-	if (row[1] == 0 || row[1][0] == '\0') {
+	if ((row[1] == 0 || row[1][0] == '\0') &&
+	    (row[2] == 0 || row[2][0] == '\0')) {
 		/* Nothing to do */
 		mysql_free_result(res);
 		mysql_close(&db);
@@ -237,7 +254,7 @@ ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 * Update the database to reflect that the boot has been done.
 	 */
 	n = snprintf(querybuf, sizeof querybuf,
-		     "update nodes set next_boot_path='',"
+		     "update nodes set next_boot_osid='',next_boot_path='',"
 		     "next_boot_cmd_line='' where node_id='%s'",
 		     row[0]);
 	mysql_free_result(res);

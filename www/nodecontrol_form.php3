@@ -56,6 +56,7 @@ $type               = $row[type];
 $def_boot_osid      = $row[def_boot_osid];
 $def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
+$next_boot_osid     = $row[next_boot_osid];
 $next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
 $rpms               = $row[rpms];
@@ -143,6 +144,28 @@ echo "<tr>
                      value=\"$def_boot_cmd_line\"></td>
       </tr>\n";
 
+
+mysql_data_seek($osid_result, 0);
+
+echo "<tr>
+          <td>Next Boot OSID:</td>";
+echo "    <td><select name=\"next_boot_osid\">\n";
+echo "                <option value=\"None\">No OSID</option>\n";
+               while ($row = mysql_fetch_array($osid_result)) {
+                  $osid = $row[osid];
+		  $pid  = $row[pid];
+		  if (!$pid)
+		      $pid = "testbed";
+
+                  echo "<option ";
+		  if ($next_boot_osid == $osid) {
+			  echo "selected ";
+		  }
+                  echo "value=\"$osid\">$pid - $osid</option>\n";
+               }
+echo "       </select>";
+echo "    </td>
+      </tr>\n";
 
 echo "<tr>
           <td>Next Boot Path:</td>

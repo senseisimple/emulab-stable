@@ -43,6 +43,7 @@ echo "<tr>
           <td align=center>Default<br>OSID</td>
           <td align=center>Default<br>Path</td>
           <td align=center>Default<br>Cmdline</td>
+          <td align=center>Next<br>OSID</td>
           <td align=center>Next<br>Path</td>
           <td align=center>Next<br>Cmdline</td>
       </tr>\n";
@@ -53,17 +54,18 @@ while ($row = mysql_fetch_array($query_result)) {
     $def_boot_osid      = $row[def_boot_osid];
     $def_boot_path      = $row[def_boot_path];
     $def_boot_cmd_line  = $row[def_boot_cmd_line];
+    $next_boot_osid     = $row[next_boot_osid];
     $next_boot_path     = $row[next_boot_path];
     $next_boot_cmd_line = $row[next_boot_cmd_line];
 
     if (!$def_boot_cmd_line)
-        $def_boot_cmd_line = "NULL";
+        $def_boot_cmd_line = "&nbsp";
     if (!$def_boot_path)
-        $def_boot_path = "NULL";
+        $def_boot_path = "&nbsp";
     if (!$next_boot_path)
-        $next_boot_path = "NULL";
+        $next_boot_path = "&nbsp";
     if (!$next_boot_cmd_line)
-        $next_boot_cmd_line = "NULL";
+        $next_boot_cmd_line = "&nbsp";
 
     #
     # If the node is reserved, lets get the PID/EID from that table
@@ -97,9 +99,17 @@ while ($row = mysql_fetch_array($query_result)) {
                      $def_boot_osid</A></td>\n";
     else
 	echo "<td>&nbsp</td>\n";
+    
     echo "    <td>$def_boot_path</td>
-              <td>$def_boot_cmd_line</td>
-              <td>$next_boot_path</td>
+              <td>$def_boot_cmd_line</td>\n";
+
+    if ($next_boot_osid)
+	echo "<td><A href='showosinfo.php3?osid=$next_boot_osid'>
+                     $next_boot_osid</A></td>\n";
+    else
+	echo "<td>&nbsp</td>\n";
+    
+    echo "    <td>$next_boot_path</td>
               <td>$next_boot_cmd_line</td>
           </tr>\n";
 }

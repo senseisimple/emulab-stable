@@ -54,6 +54,7 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"def_boot_osid=\"$def_boot_osid\",             ".
 	"def_boot_path=\"$def_boot_path\",             ".
 	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
+	"next_boot_osid=\"$next_boot_osid\",           ".
 	"next_boot_path=\"$next_boot_path\",           ".
 	"next_boot_cmd_line=\"$next_boot_cmd_line\",   ".
 	"startupcmd='$startupcmd',                     ".
