@@ -197,7 +197,8 @@ main(int argc, char **argv)
 		fatal("could not unregister with event system");
 	}
 
-    return 0;
+	info("Scheduler for %s/%s exiting\n", pid, eid);
+	return 0;
 }
 
 /* Enqueue event notifications as they arrive. */
@@ -525,6 +526,8 @@ cleanup(void)
 static void
 quit(int sig)
 {
+	info("Got sig %d, exiting\n", sig);
+
 	/* cleanup() will be called from atexit() */
 	exit(0);
 }
