@@ -901,7 +901,8 @@ dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
 }
 
 /*
- * Return node run command. 
+ * Return node run command. We return the command to run, plus the UID
+ * of the experiment creator to run it as!
  */
 static int
 doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
@@ -926,12 +927,12 @@ doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 		return 0;
 
 	/*
-	 * Get RPM list for the experiment. Might be per-machine at
+	 * Get run command for the experiment. Might be per-machine at
 	 * some point.
 	 */
-	res = mydb_query("select runcmd from experiments "
+	res = mydb_query("select runcmd,expt_head_uid from experiments "
 			 "where pid='%s' and eid='%s'",
-			 1, pid, eid);
+			 2, pid, eid);
 
 	if (!res) {
 		syslog(LOG_ERR, "RPMS: %s: DB Error getting run command!",
@@ -953,7 +954,7 @@ doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 		return 0;
 	}
 	
-	sprintf(buf, "RUNCMD=%s\n", row[0]);
+	sprintf(buf, "RUNCMD=%s UID=%s\n", row[0], row[1]);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	syslog(LOG_INFO, "RUNCMD: %s", buf);
 	
