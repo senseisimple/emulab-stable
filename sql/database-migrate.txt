@@ -1,0 +1,7 @@
+#
+# Anytime you change database-create.sql, but sure to put any special
+# (sql) instructions that need to be executed to bring an existing DB
+# into compliance.
+#
+# Please indicate the CVS revision number your instructions refer to.
+# 
