@@ -728,6 +728,8 @@ Simulator instproc rtproto {type args} {
 	set default_ip_routing_type "manual"
     } elseif {($type == "Static")} {
 	set default_ip_routing_type "static"
+    } elseif {($type == "Static-ddijk")} {
+	set default_ip_routing_type "static-ddijk"
     } else {
 	punsup "rtproto: unsupported routing protocol ignored: $type"
 	return
