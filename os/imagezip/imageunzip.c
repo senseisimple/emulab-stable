@@ -226,6 +226,7 @@ inflate_subblock(void)
 	struct blockhdr *blockhdr;
 	struct region	*curregion;
 	off_t		offset, size;
+	char		blockbuf[DEFAULTREGIONSIZE], *bbuf = blockbuf;
 	char		*buf = inbuf;
 	
 	d_stream.zalloc   = (alloc_func)0;
@@ -243,9 +244,9 @@ inflate_subblock(void)
 	 * image size and the magic number.
 	 */
 #ifdef  FRISBEE
-	if ((cc = FrisbeeRead(&buf, DEFAULTREGIONSIZE)) <= 0) {
+	if ((cc = FrisbeeRead(&bbuf, DEFAULTREGIONSIZE)) <= 0) {
 #else
-	if ((cc = read(infd, buf, DEFAULTREGIONSIZE)) <= 0) {
+	if ((cc = read(infd, bbuf, DEFAULTREGIONSIZE)) <= 0) {
 #endif
 		if (cc == 0)
 			return 1;
@@ -253,7 +254,7 @@ inflate_subblock(void)
 		exit(1);
 	}
 	assert(cc == DEFAULTREGIONSIZE);
-	blockhdr = (struct blockhdr *) buf;
+	blockhdr = (struct blockhdr *) bbuf;
 
 	if (blockhdr->magic != COMPRESSED_MAGIC) {
 		fprintf(stderr, "Bad Magic Number!\n");
@@ -274,11 +275,13 @@ inflate_subblock(void)
 	 * Set the output pointer to the beginning of the region.
 	 */
 	if (doseek) {
-		if (devlseek(outfd, offset, SEEK_SET) < 0) {
+		if (devlseek(outfd,
+			     offset + (((off_t) outputminsec) * SECSIZE),
+			     SEEK_SET) < 0) {
 			perror("Skipping to start of output region");
 			exit(1);
 		}
-		total += offset - total;
+		total  += offset - total;
 	}
 	else {
 		assert(offset > total);
