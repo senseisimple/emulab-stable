@@ -1,6 +1,12 @@
 #!/usr/bin/perl -w
 use POSIX;
 
+package libtbsetup;
+use Exporter;
+@ISA = "Exporter";
+@EXPORT =
+    qw ( tbs_initdbi tbs_initlog tbs_prefix tbs_out tbs_exec );
+
 # This has the common functionality for tbprerun/tbrun/tbend.
 
 # tbs_initdbi(dbname) - Initializes a DBI connection to the testbed database

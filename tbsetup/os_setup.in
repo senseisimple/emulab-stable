@@ -26,6 +26,7 @@ my  $optlist = "";
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TESTMODE    = "@TESTMODE@";
 my $TFTP	= "/tftpboot";
 
 #
@@ -235,8 +236,10 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 # no need to create any new children here. We just wait until it exits,
 # which means all the nodes are actually rebooting.
 #
-if (system("$nodereboot @nodes")) {
+if (!$TESTMODE) {
+  if (system("$nodereboot @nodes")) {
     die("Failed to reboot some nodes!");
+  }
 }
 
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";

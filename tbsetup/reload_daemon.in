@@ -44,11 +44,9 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-#
 # Testbed Support library
-# 
-push(@INC, "$TB/lib");
-require libtestbed;
+use lib "@prefix@/lib";
+use libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

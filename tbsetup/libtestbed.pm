@@ -1,11 +1,15 @@
 #!/usr/bin/perl -w
 use English;
 
-#
-# A library of useful stuff.
-#
+package libtestbed;
+use Exporter;
 
-#
+@ISA = "Exporter";
+@EXPORT =
+    qw ( SENDMAIL OPENMAIL );
+
+# A library of useful stuff.
+
 # Send an email message via sendmail -t.
 #
 # I am mimicking the PHP mail interface, only because I'm old and its

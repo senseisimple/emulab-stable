@@ -3,8 +3,8 @@
 my $TB = "@prefix@";
 my $debug=0;
 
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
 
 if ( @ARGV < 4 ) {
   print STDERR

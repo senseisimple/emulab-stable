@@ -26,8 +26,8 @@ my $TB     = "@prefix@";
 #
 # Load the Testbed support stuff. 
 #
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
 
 my $osload      = "$TB/bin/os_load";
 my $nalloc      = "$TB/bin/nalloc";

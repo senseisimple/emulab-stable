@@ -17,8 +17,8 @@ sub usage() {
 my $TB     = "@prefix@";
 
 # Load the Testbed support stuff.
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
 
 my $nalloc      = "$TB/bin/nalloc";
 my $debug       = 0;

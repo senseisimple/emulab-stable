@@ -17,6 +17,7 @@ use Fcntl ':flock';
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TESTMODE    = "@TESTMODE@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root fs.emulab.net";
@@ -59,20 +60,26 @@ use libtestbed;
 # We need to serialize this script to avoid a trashed map file. Use
 # a dummy file in /var/tmp, opened for writing and flock'ed. 
 #
-open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-$count = 0;
-while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+if (!$TESTMODE) {
+  open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+  $count = 0;
+  while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
     print "Another /etc/exports update in progress. Waiting a moment ...\n";
     if ($count++ > 20) {
-	fatal("Could not get the lock after a long time!\n");
+      fatal("Could not get the lock after a long time!\n");
     }
     sleep(1);
+  }
 }
 
 #
 # We stick the new map entries into the tail file. First zero it out.
 #
-open(MAP, ">$exportstail") || fatal("Couldn't open $exportstail\n");
+if (!$TESTMODE) {
+  open(MAP, ">$exportstail") || fatal("Couldn't open $exportstail\n");
+} else {
+  open(MAP, ">/dev/null") || fatal("Couldn't open /dev/null\n");
+}
 print MAP "\n";
 print MAP "#\n";
 print MAP "# DO NOT EDIT below this point. Auto generated entries!\n";
@@ -220,16 +227,18 @@ close(MAP);
 # Fire the new tail file over to the fileserver to finish. We cat the file
 # right into it.
 #
-$UID = 0;
-system("$SSH $PROG < $exportstail") == 0 or
+if (!$TESTMODE) {
+  $UID = 0;
+  system("$SSH $PROG < $exportstail") == 0 or
     fatal("Failed: $SSH $PROG < $exportstail: $?");
+  unlink("$exportstail");
 
-unlink("$exportstail");
+  #
+  # Close the lock file. Exiting releases it, but might as well.
+  #
+  close(LOCK);
+}
 
-#
-# Close the lock file. Exiting releases it, but might as well.
-#
-close(LOCK);
 exit(0);
 
 sub fatal {

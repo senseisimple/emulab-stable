@@ -16,16 +16,16 @@ use DBI;
 $TESTMODE = @TESTMODE@;
 $TBDB = "@TBDBNAME@";
 $TBROOT = "@prefix@";
-$TBSETUPLIB = "$TBROOT/lib";
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/sbin:$TBROOT/bin";
-push(@INC,$TBSETUPLIB);
 
 # Turn off line buffering.
 $| = 1; 
 
-require exitonwarn;
-require libtbsetup;
+use lib "@prefix@/lib";
+use libtbsetup;
+
+require exitonwarn; # exitonwarn isn't really a module, so just require it
 
 $dolog = 1;
 

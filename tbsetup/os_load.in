@@ -41,9 +41,9 @@ my $MAXLOADS	= 2;
 #
 # Load the Testbed support stuff. 
 #
-push(@INC, "$TB/lib");
-require libdb;
-require libtestbed;
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 my $BOSSADDR	= "boss.emulab.net";
 my $USERADDR	= "users.emulab.net";

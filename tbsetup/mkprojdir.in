@@ -34,8 +34,8 @@ $| = 1;
 #
 # Load the Testbed support stuff. 
 #
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
 
 #
 # Check args.

@@ -31,9 +31,9 @@ my $d = 0;
 $| = 1; 
 
 # Load the Testbed support stuff.
-push(@INC, "$TB/lib");
-require libdb;
-require libtestbed;
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 #
 # We don't want to run this script unless its the real version.
