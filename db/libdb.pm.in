@@ -89,13 +89,14 @@ sub TBAdmin(;$)
 }
 
 #
-# Check access permission to a list of nodes. First argument is a *reference* to
-# a single node, or a list of nodes. Second argument is optional uid, defaults
-# to the current uid.
+# Check access permission to a list of nodes. First argument is a *reference*
+# to a single node, or a list of nodes. Second argument is optional uid,
+# defaults to the current uid.
 #
 # usage: NodeAccessCheck(array or scalar \@nodelist, [int uid])
 #        returns 1 if the uid is allowed to muck with all the nodes.
-#        returns 0 if the uid is not allowed to muck with at least one of the nodes.
+#        returns 0 if the uid is not allowed to muck with at least one of the
+#                  nodes.
 #
 sub NodeAccessCheck($;$)
 {
@@ -272,6 +273,31 @@ sub OSFeatureSupported($$) {
 	if ($feature eq $osfeature) {
 	    return 1;
 	}
+    }
+    return 0;
+}
+
+#
+# Ah, what a hack! I'm tired of seeing regexs for sharks scattered around
+# the code. Anyway, this checks to see if a node is a shelf, and fills
+# in the shelf/node, return 1 if it is. The shelf/node arguments are
+# optional, if all you want to do is see if its a shelf type thing.
+#
+# usage: IsShelved(char *nodeid, [\@shelf], [\@node])
+#        returns 1 if the node is a shelf type thing. Optionally fills in info.
+#        returns 0 if the node is just a normal kind of node.
+#
+sub IsShelved ($;$$) {
+    my($nodeid, $shelf, $node) = @_;
+
+    if ($nodeid =~ /sh(\d+)-(\d+)/) {
+	if (defined($shelf)) {
+	    $$shelf = $1;
+	}
+	if (defined($node)) {
+	    $$node = $2;
+	}
+	return 1;
     }
     return 0;
 }
