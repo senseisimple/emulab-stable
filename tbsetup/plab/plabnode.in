@@ -7,6 +7,7 @@ import getopt
 import libplab
 import xmlrpclib
 import time
+import socket
 
 TRIES = 3
 SLEEPINT = 5
@@ -35,17 +36,24 @@ def main(args):
             try:
                 node = slice.createNode(nodeid)
             except xmlrpclib.Fault, e:
-                print "XML-RPC Fault happened while attempting node alloc:"
-                print "Code: %s, Error: %s" % (e.faultCode, e.faultString)
-                alloctries = alloctries - 1
-                if alloctries > 0:
-                    print "Sleeping %s and trying again" % SLEEPINT
-                    time.sleep(SLEEPINT)
-                else:
-                    print "Giving up after %s tries" % TRIES
-                    sys.exit(1)
+                print "XML-RPC Fault happened while attempting " \
+                      "node alloc for %s" % nodeid
+                print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
+            except (socket.error, xmlrpclib.ProtocolError):
+                print "Encountered problem communicating with an agent " \
+                      "while setting up plab vnode %s" % nodeid
             else:
                 break
+            
+            alloctries = alloctries - 1
+            if alloctries > 0:
+                print "Sleeping for %s seconds, then retrying alloc on %s" % \
+                      (SLEEPINT, nodeid)
+                time.sleep(SLEEPINT)
+            else:
+                print "Giving up after %s tries" % TRIES
+                raise
+
 
         while 1:
             try:
@@ -55,18 +63,20 @@ def main(args):
                 # node.putConfig("/etc/vnodeid", nodeid)
                 # Note that vnode_setup boots the node
             except:
-                print "Node setup failed."
-                setuptries = setuptries - 1
-                if setuptries > 0:
-                    print "Sleeping for %s seconds and retrying" % \
-                          SLEEPINT
-                    time.sleep(SLEEPINT)
-                else:
-                    print "Giving up after %s tries" % TRIES
-                    node.free()
-                    raise
+                print "Node setup failed on %s" % nodeid
             else:
                 break
+
+            setuptries = setuptries - 1
+            if setuptries > 0:
+                print "Sleeping for %s seconds and then retrying " \
+                      "setup on %s" % (SLEEPINT, nodeid)
+                time.sleep(SLEEPINT)
+            else:
+                print "Giving up after %s setup attempts on %s" % \
+                      (TRIES, nodeid)
+                node.free()
+                raise
 
     elif command == "free":
         try:

@@ -216,17 +216,26 @@ class Plab:
         """
         print "Getting free Plab nodes ..."
         agent = self._createAgentProxy(insecure = True)
-        avail = agent.getads()
+        try:
+            avail = agent.getads()
+        except:
+            extype, exval, extrace = sys.exc_info()
+            print "Error talking to dslice agent: %s: %s" % (extype, exval)
+            if debug:
+                print extrace
+            print "Going back to sleep until next scheduled poll"
+            return
+        
         if debug:
             print "Got advertisement list:"
             print avail
 
-        if debug:
-            print "Pinging nodes in advertisement list"
-        avail = self.__getPingStatus(avail)
-        if debug:
-            print "Refined node list after ping verification:"
-            print avail
+#        if debug:
+#            print "Pinging nodes in advertisement list"
+#        avail = self.__getPingStatus(avail)
+#        if debug:
+#            print "Refined node list after ping verification:"
+#            print avail
 
         known = self.__getKnownPnodes()
         if debug:
@@ -365,22 +374,23 @@ class Plab:
         This can't detect DSL links, but those are probably rare for
         Plab nodes.
         """
-        # Is host international?
+        # Is host international (or flux/emulab local)?
         from socket import gethostbyaddr, getfqdn, herror
+        hostname = ip
         try:
             hostname, aliaslist, ipaddrlist = gethostbyaddr(ip)
             hostname = getfqdn(hostname)
+            tld = hostname.split(".")[-1].lower()
+            if not tld in ("edu", "org", "net", "com", "gov", "us", "ca"):
+                return "pcplabintl", hostname
+            
+            # Is it us?
+            if hostname.endswith(LOCAL_PLAB_DOMAIN):
+                return LOCAL_PLAB_LINKTYPE, hostname
+            
         except herror:
+            hostname = ip
             print "WARNING: Failed to get hostname for %s" % ip
-            return "pcplabinet", ip
-
-        tld = hostname.split(".")[-1]
-        if not tld in ("edu", "org", "net", "com", "gov", "us"):
-            return "pcplabintl", hostname
-
-        # Is it us?
-        if hostname.endswith(LOCAL_PLAB_DOMAIN):
-            return LOCAL_PLAB_LINKTYPE, hostname
 
         # Is host on I2?
         traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
@@ -390,6 +400,7 @@ class Plab:
         for gw in MAGIC_INET2_GATEWAYS:
             if trace.find(gw) != -1:
                 return "pcplabinet2", hostname
+
         for gw in MAGIC_INET_GATEWAYS:
             if trace.find(gw) != -1:
                 break
@@ -841,8 +852,8 @@ class Node:
             self.__perform("sudo wget -q -nH -P /tmp " +
                            ROOTBALL_HTTP_URLPATH + tgzname)
         except RuntimeError:
-            print "Warning: couldn't get tarball via local service:"
-            print "\tFalling back to remote transfer."
+            print "Warning: couldn't get tarball via local service on %s: " \
+                  "Falling back to remote transfer." % self.nodeid
             self.__copy(tgzpath + tgzname, "/tmp/" + tgzname)
             
         self.__perform("sudo tar -xzf /tmp/" + tgzname + " -C %s" % destpath)
