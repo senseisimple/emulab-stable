@@ -36,6 +36,12 @@ MAINTAINER=	ricci@cs.utah.edu
 .MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
 
 #
+# For the PHP ports, so they will depend on the actual version of apache we're
+# installing
+#
+.MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
+
+#
 # This prevents any ports from trying to run interactively - some, like the
 # net-snmp port, ask silly questions without this option.
 #
