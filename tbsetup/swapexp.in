@@ -411,8 +411,9 @@ if ($inout ne "restart" && -e $repfile) {
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
+    if ($force || $idleswap) { $arg = "-force"; } else { $arg = ""; }
     print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
-    if (system("$tbdir/tbswap out $pid $eid") != 0) {
+    if (system("$tbdir/tbswap out $arg $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!\n");
     }
