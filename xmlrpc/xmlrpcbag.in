@@ -27,7 +27,7 @@ my $TB		= "@prefix@";
 		"node_admin"	=> "$TB/bin/node_admin",
 		"delay_config"	=> "$TB/bin/delay_config",
 		"savelogs"	=> "$TB/bin/savelogs",
-		"portstats"	=> "$TB/bin/portstats"
+		"portstats"	=> "$TB/bin/portstats",
 		"eventsys_control" => "$TB/sbin/eventsys_control"
 	   );
 
