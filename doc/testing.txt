@@ -1,47 +1,86 @@
-Notes on testing.
+Notes on testing development versions of the Emulab software
+
+General rule: Don't commit or install software live until you've done
+plenty of testing on it. Several methods exist for doing non-live
+testing of Emulab software.
+
+Methods, from most isolated to least:
+[Disclaimer: some of these may not be approved by Leigh]
+
+ - Do your testing on an alternate Emulab setup. [At Utah, there's a
+   separate "mini-bed" with a boss, an ops, and 8 nodes.] Not always
+   an option for everyone, and not necessary for all but the most
+   disruptive changes.
+
+ - Run the changes from your development tree with your own copy of
+   the database. This is what the testsuite does. This would be the
+   recommended method, except that it is hard to keep your copy of the
+   database up to date in some cases. Sometimes it also is too much
+   separation, if you want to be able to see how your code interacts
+   with the live code.
+
+ - Run the changes from your devel tree (carefully!) with the live
+   database. Typically the right mix of isolation and ease of
+   use. Don't do anything that might screw up the database, though.
+
+ - Build (but don't install) a real version of your changes. Works
+   well as long as your changes are not in multiple files that need to
+   know paths to each other.
+
+ - Build (but don't install) real versions, and then run your
+   development software instead of the live installed software. If
+   you've changed one of the key daemons, and need to do some live
+   testing, this can be a good option, but beware! If your version is
+   really broken, you may have to do some tedious fixing up by
+   hand. The advantage here is that it is really quick to go back to
+   the live installed version of the code.
+
+How-to: A guide to setting up development trees, etc.  
 
 * To configure you testbed tree for installation and testing outside
   the real install tree, you want to do something like this:
 
 	./configure --prefix=/usr/testbed/devel/stoller \
-		--with-LEDA=/usr/testbed/LEDA/LEDA-4.0 \
-		--with-WWWDEFS=stoller-emulab
+		--with-TBDEFS=defs-stoller-emulab
 
-  This will build against the installed LEDA goo, install it in the
-  directory of your choosing, and select the WWWDEFS file you gave it. This
-  last option is for testing your own version of web pages using the server
-  on paper.  Take a look at www/stoller-emulab-defs.php3, and compare that
-  against www/default-defs.php3. It should be obvious whats going on. You
-  should create a version for yourself since it is a good idea to test the
-  web pages too. Go ahead and commit the file if you like.
+  This will build with your defs file and install it in the directory
+  of your choosing. If done right, you'll even be able to test your
+  own version of web pages using the server on boss.  Take a look at
+  defs-stoller-emulab, and compare that against defs-default. It
+  should be obvious whats going on. You should create a complete
+  version for yourself since it is a good idea to test the web pages
+  too. Go ahead and commit the file if you like. [If you commit it,
+  others will update it for you as the options and required settings
+  change.]
 
 * The --prefix argument above is choosen simply so that the same name
-  directory will exist in the same place on both paper and plastic.  This
+  directory will exist in the same place on both boss and ops.  This
   allows you to do an install of both ops and the control software and
   completely test everything.
 
-* To build and install, do this on paper:
+* To build and install, do this on boss:
 
 	gmake
 	gmake ops-install
 	su1 gmake post-install
 
-  On plastic:
+  On ops:
 
 	gmake control-install
 
-  And now you have install trees on both paper and plastic, each with the
+  And now you have install trees on both boss and ops, each with the
   stuff appropriate to that machine. 
 
 * To test the web pages, you can use this URL:
 
 	https://www.emulab.net/~stoller/www/tbdb.html
 
-  Well, replace "stoller" with your login name. Note that this is a home
-  dir URL, so you will need to create a public_html directory in your home
-  directory, and stick a symlink in there that points to you www pages you
-  just installed. This is a little inconvenient, but I only had to do it
-  once.
+  Well, replace "stoller" with your login name. Note that this is a
+  home dir URL, so you will need to create a public_html directory in
+  your home directory, and stick a symlink in there that points to you
+  www pages you just installed. (You may also need to update an apache
+  conf file to allow your dir through. See note about web pages
+  below.) This is a little inconvenient, but I only had to do it once.
 
 	cd ~/public_html
 	ln -s ../../../usr/testbed/devel/stoller/www .
@@ -50,22 +89,22 @@ Notes on testing.
   pages to be used by just anyone. I think we will need to drop in a
   .htaccess file that permits just Utah people to use those pages.
 
-* In order to test on plastic as a real user, you need to create a new
-  user (via the web interface). Why? Well, you need a user on paper
+* In order to test on ops as a real user, you need to create a new
+  user (via the web interface). Why? Well, you need a user on boss
   with a shell that points to the right version (your version) of the
   paperbag. You could edit the passwd file and change some other test
   user, but I think its a good idea to go through the whole user
   create process to make sure everything is working. You can easily
   delete the test projects and users via the web interface.
 
-* So, now you have a new user on plastic and paper. You can log in as
-  that user and run some simple tests using the plasticbag scripts in
+* So, now you have a new user on ops and boss. You can log in as
+  that user and run some simple tests using the plasticwrap scripts in
   your /usr/testbed/devel/<login>/bin directory, which will access the
-  new paperbag on paper and run your programs.
+  new paperbag on boss and run your programs.
 
-* You can also test directly on paper by setting your path to place
+* You can also test directly on boss by setting your path to place
   your new bin directory at the front. Better to do as much testing on
-  plastic as you can though.
+  ops as you can though.
 
 * In order to test your version of the web pages, but ensure that no
   one else can use them, you will need to enable your home directory
@@ -78,22 +117,29 @@ Notes on testing.
 	order deny,allow
 	deny from all
 	allow from 155.99.212.
+	allow from 155.98.60.
 	allow from 206.163.75.136
 	allow from 206.163.153.25
 	</limit>
 
 * NOTE: You cannot test the testbed daemons since they listen on well
-  known ports on paper. I don't expect this to be a big problem since
-  those do not change a lot.
+  known ports on boss. I don't expect this to be a big problem since
+  those do not change a lot. (See also "Methods" section above.)
 
-* The DB name is still hardwired to "tbdb" in many places. However,
-  when those changes are finished, you will be able to change the name
-  of your DB with the configure option --with-TBDBNAME=name. Not an
-  accepted use of the --with option, but so what; configure should
-  allow arbitrary use specifed options to be passed through.
+* The DB name may still be hardwired to "tbdb" in a few
+  places. However, when those changes are finished, you will be able
+  to change the name of your DB with the configure option
+  --with-TBDBNAME=name. Not an accepted use of the --with option, but
+  so what; configure should allow arbitrary use specifed options to be
+  passed through. 
 
-  There are still issues to resolve with changing the DB, with respect
-  to reserving nodes.
+* There are still issues to resolve with changing the DB, with respect
+  to reserving nodes. The right way to do it is the way that the
+  testsuite currently does it.
 
-  Generating your own copy of the DB needs to be addressed.
+* The usual way to generate your own copy of the db is to either use
+  mysqldump to copy the entire live database, and load it into a
+  different database, or to create yours from scratch using (possibly
+  modified versions of) sql/database-{create,fill}.sql and the other
+  scripts in testbed/sql/.
 
