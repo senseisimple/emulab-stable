@@ -415,6 +415,12 @@ if ($toponly) {
 
 TBDebugTimeStamp("assign_loop started");
 $currentrun = 1;
+
+# XXX plab hack - only run assign once on plab topologies, since they're easy
+# to map and the physical topology does not change frequently
+if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
+    $maxrun = 1;
+}
 while (1) {
     print "Assign Run $currentrun\n";
 
