@@ -53,6 +53,8 @@ my $XMLHEADER = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>";
 my %virtual_tables = ("experiments"		=> undef,
 		      "virt_nodes"		=> undef,
 		      "virt_lans"		=> undef,
+		      "virt_lan_settings"	=> undef,
+		      "virt_lan_member_settings"=> undef,
 		      "virt_trafgens"		=> undef,
 		      "virt_agents"		=> undef,
 		      "virt_node_desires"	=> undef,
