@@ -399,7 +399,7 @@ sub info($) {
     my $message = shift;
     # Print out log entries like this:
     # Sep 20 09:36:00 stated[238]: Reloading state from database
-    print strftime("%b %e %H:%M:%S",gmtime)." stated[$$]: $message";
+    print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
 }
 
 #
