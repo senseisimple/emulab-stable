@@ -83,11 +83,11 @@ common-script-install:	dir-install
 
 symlinks:	dir-install
 	rm -f $(TBBINDIR)/tevc
-	ln -s $(BINDIR)/tevc $(TBBINDIR)/tevc
+	ln -s $(CLIENT_BINDIR)/tevc $(TBBINDIR)/tevc
 	rm -f $(TBBINDIR)/emulab-sync
-	ln -s $(BINDIR)/emulab-sync $(TBBINDIR)/emulab-sync
+	ln -s $(CLIENT_BINDIR)/emulab-sync $(TBBINDIR)/emulab-sync
 	rm -f $(TBLIBDIR)
-	ln -s $(BINDIR) $(TBLIBDIR)
+	ln -s $(CLIENT_BINDIR) $(TBLIBDIR)
 
 local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
@@ -98,7 +98,7 @@ local-script-install:	common-script-install
 	# Symlink this cause we invoke it from boss, and its too much
 	# of a hassle to worry about right now.
 	rm -f $(ETCDIR)/update
-	-ln -s $(BINDIR)/update $(ETCDIR)/update
+	-ln -s $(CLIENT_BINDIR)/update $(ETCDIR)/update
 
 remote-script-install:	common-script-install
 	-chown root $(BINDIR)/vnodesetup
