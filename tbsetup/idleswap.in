@@ -27,12 +27,14 @@ my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $swapexp	= "$TB/bin/swapexp";
 
 #
 # Testbed Support libraries
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -112,6 +114,16 @@ if (! TBAdmin($UID)) {
 }
 
 #
+# This script is always audited.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
 # Need to know the creator of the experiment.
 #
 my $query_result =
@@ -141,6 +153,9 @@ if (! $request) {
 	die("*** $0:\n".
 	    "    No such group $pid/$gid\n");
 
+    # Send the email now, which terminates the audit.
+    AuditEnd();
+    
     $EGID = $GID    = $unix_gid;
     $EUID = $UID    = $unix_uid;
     $ENV{'USER'}    = $creator;
