@@ -8,6 +8,14 @@ use English;
 # is to interpret the NS file and create the appropriate entries in
 # virt_nodes and virt_lans.  After this script ends successfully the
 # NS file is no longer necessary.
+#
+sub usage()
+{
+    print STDERR "Usage: $0 [-force] pid eid nsfile\n";
+    exit(-1);
+}
+my $force = 0;
+my $state;
 
 #
 # Configure variables
@@ -30,32 +38,36 @@ use libtestbed;
 #
 $| = 1;
 
-if ($#ARGV != 2) {
-    print STDERR "Syntax: $0 pid eid ns_file\n";
-    exit(1);
+#
+# Check for -force, and ignore experiment state.
+#
+if ($ARGV[0] eq "-force") {
+    $force = 1;
+    shift;
+}
+if (@ARGV != 3) {
+    usage();
 }
 my ($pid,$eid,$nsfile) = @ARGV;
 
 if (! -r $nsfile) {
-    print STDERR "*** NS File '$nsfile' does not exist!\n";
-    exit(1);
+    die("*** $0:\n".
+	"    NS File '$nsfile' does not exist!\n");
 }
-
-my $state;
 
 print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
 
 if (! ($state = ExpState($pid, $eid))) {
-    print STDERR "*** No such experiment $pid/$eid\n";
-    exit(1);
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid\n");
 }
-if ($state ne EXPTSTATE_NEW) {
-    print STDERR "*** Experiment is not in the proper state: $state\n";
-    exit(1);
+if (!$force && $state ne EXPTSTATE_NEW) {
+    die("*** $0:\n".
+	"    Experiment is not in the proper state: $state\n");
 }
 if (! SetExpState($pid, $eid, EXPTSTATE_PRERUN)) {
-    print STDERR "*** Failed to set intermediate experiment state.\n";
-    exit(1);
+    die("*** $0:\n".
+	"    Failed to set intermediate experiment state.\n");
 }
 
 #
@@ -67,6 +79,7 @@ sub cleanup {
     DBQueryWarn("DELETE from virt_lans     where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from virt_trafgens where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from virt_agents   where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from virt_routes   where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from nseconfigs    where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from eventlist     where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_NEW);
@@ -76,16 +89,16 @@ sub cleanup {
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
 if (system("parse-ns $pid $eid $nsfile")) {
-    print STDERR "*** Parsing failed.\n";
     cleanup();
-    exit(1);
+    die("*** $0:\n".
+	"    Parsing failed!\n");
 }
-print "Parser done! Marking as prerunned. " . TBTimeStamp() . "\n";
+print "Parser done! " . TBTimeStamp() . "\n";
 
 if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
-    print STDERR "*** Failed to set experiment state!\n";
     cleanup();
-    exit(1);
+    die("*** $0:\n".
+	"    Failed to set experiment state!\n");
 }
 
 print "Pre run finished. " . TBTimeStamp() . "\n";

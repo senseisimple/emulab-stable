@@ -511,6 +511,8 @@ Simulator instproc rtproto {type args} {
 
     if {($type == "Session") ||	($type == "ospf")} {
 	set default_ip_routing_type "ospf"
+    } elseif {($type == "Manual")} {
+	set default_ip_routing_type "manual"
     } else {
 	punsup "rtproto: unsupported routing protocol ignored: $type"
 	return
@@ -584,8 +586,6 @@ Simulator instproc link {src dst} {
     set name sl[incr new_counter]
     
     return [SimplexLink $name $reallink $dir]
-    
-    return $reallink
 }
 
 # get_subnet
@@ -619,4 +619,3 @@ Simulator instproc add_program {prog} {
     $self instvar prog_list
     set prog_list($prog) {}
 }
-

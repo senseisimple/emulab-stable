@@ -32,6 +32,10 @@ Node instproc init {s} {
     # {} indicates an unassigned IP address for that port.
     $self set iplist {}
 
+    # A route list. 
+    $self instvar routelist
+    array set routelist {}
+
     # The type of the node.
     $self set type "pc" 
 
@@ -88,6 +92,8 @@ Node instproc updatedb {DB} {
     $self instvar routertype
     $self instvar fixed
     $self instvar agentlist
+    $self instvar routelist
+    $self instvar sim
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
@@ -118,6 +124,8 @@ Node instproc updatedb {DB} {
         # update the per-node nseconfigs table in the DB
         sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid','$eid','$self','$nseconfig')";
     }
+
+    $self add_routes_to_DB $DB
 
     # Update the DB
     sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osname,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype,fixed) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\",\"$fixed\")";
@@ -174,4 +182,63 @@ Node instproc next_portnumber {} {
     
     set next_port [incr next_portnumber_]
     return $next_port
+}
+
+#
+# Add a route.
+# The nexthop to <dst> from this node is <target>.
+#
+Node instproc add-route {dst nexthop} {
+    $self instvar routelist
+
+    if {[info exists routelist($dst)]} {
+	perror "\[add-route] route from $self to $dst already exists!"
+    }
+    set routelist($dst) $nexthop
+}
+
+#
+# Update DB with routes
+#
+Node instproc add_routes_to_DB {DB} {
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+    $self instvar routelist
+    $self instvar sim
+
+    foreach dst [lsort [array names routelist]] {
+	set hop $routelist($dst)
+
+	#
+	# Convert hop IP address.
+	#
+	set hopip [$hop ip [$hop find_port [$sim find_link $self $hop]]]
+
+	switch -- [$dst info class] {
+	    "Node" {
+		if {[llength [$dst set portlist]] != 1} {
+		    perror "\[add-route] $dst must have only one link."
+		}
+		set dstip [$dst ip 0]
+		set type  "host"
+	    }
+	    "SimplexLink" {
+		set link [$dst set mylink]
+		set src [$link set src_node]
+		set dstip [$src ip [$src find_port $link]]
+		set type  "net"
+	    }
+	    "Link" {
+		set dstip [$dst get_subnet]
+		set type  "net"
+	    }
+	    unknown {
+		perror "\[add-route] Bad argument. Must be a node or a link."
+		return
+	    }
+	}
+	puts stderr "'$pid','$eid','$self','$dstip','$hopip','$type'"
+	
+	sql exec $DB "insert into virt_routes (pid,eid,vname,dst,nexthop,dst_type) values ('$pid','$eid','$self','$dstip','$hopip','$type')";
+    }
 }

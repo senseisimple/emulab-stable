@@ -1978,6 +1978,7 @@ COMMAND_PROTOTYPE(dorouting)
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
+	int		nrows;
 
 	/*
 	 * Now check reserved table
@@ -2018,6 +2019,39 @@ COMMAND_PROTOTYPE(dorouting)
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	info("ROUTES: %s", buf);
+
+	/*
+	 * Get the routing type from the nodes table.
+	 */
+	res = mydb_query("select dst,dst_type,dst_mask,nexthop,cost "
+			 "from virt_routes as vi "
+			 "left join reserved as r on r.vname=vi.vname "
+			 "where r.node_id='%s' and "
+			 " vi.pid='%s' and vi.eid='%s'",
+			 5, nodeid, pid, eid);
+	
+	if (!res) {
+		error("ROUTES: %s: DB Error getting manual routes!\n", nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+				
+		sprintf(buf, "ROUTE DEST=%s DESTTYPE=%s DESTMASK=%s "
+			"NEXTHOP=%s COST=%s\n",
+			row[0], row[1], row[2], row[3], row[4]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		info("ROUTES: %s", buf);
+	}
+	mysql_free_result(res);
 
 	return 0;
 }

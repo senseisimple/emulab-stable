@@ -7,13 +7,14 @@
 #
 
 sub usage {
-    print "Usage: $0 [-h] [-n] [-l] [-m] [-e] [-d] [-v] pid eid\n";
+    print "Usage: $0 [-h] [-n] [-l] [-m] [-e] [-d] [-r] [-v] pid eid\n";
     print "-h		Shows this message\n";
     print "-n		Show node info\n";
     print "-m		Show node mapping\n";
     print "-l		Show link info\n";
     print "-d		Show traffic shapping info\n";
     print "-e		Show event listing\n";
+    print "-r		Show routes\n";
     print "-b		Show most things\n";
     print "-v		Show everything!\n";
     return 1;
@@ -23,6 +24,7 @@ my $TBROOT = "@prefix@";
 my $DOMAIN = "@OURDOMAIN@";
 
 use lib '@prefix@/lib';
+use libtestbed;
 use libdb;
 require exitonwarn;
 use Getopt::Std;
@@ -42,6 +44,7 @@ my $showmap    = 0;
 my $showlinks  = 0;
 my $showdelays = 0;
 my $showevents = 0;
+my $showroutes = 0;
 my %v2pmap;
 my %p2type;
 my %p2osid;
@@ -58,6 +61,7 @@ if ($opt{v}) {
     $showdelays = 1;
     $showlinks = 1;
     $showevents = 1;
+    $showroutes = 1;
 }
 if ($opt{b}) {
     $shownodes = 1;
@@ -65,6 +69,7 @@ if ($opt{b}) {
     $showdelays = 1;
     $showlinks = 1;
     $showevents = 1;
+    $showroutes = 1;
 }
 if ($opt{n}) {
     $shownodes = 1;
@@ -80,6 +85,9 @@ if ($opt{l}) {
 }
 if ($opt{e}) {
     $showevents = 1;
+}
+if ($opt{r}) {
+    $showroutes = 1;
 }
 if (@ARGV != 2) {
     exit &usage;
@@ -250,6 +258,35 @@ if ($showdelays &&
 	while (($phys,$vname,$pipe0,$pipe1,$virt) = $result->fetchrow_array()){
 	    printf "%-15s %-15s %-15s %-15s\n",
 	           $vname, $virt, $phys, "$pipe0,$pipe1";
+	}
+	print "\n";
+    }
+}
+
+#
+# Print route list.
+#
+if ($showroutes) {
+    my $result =
+	DBQueryFatal("select vname,dst,dst_type,dst_mask,nexthop,cost ".
+		     " from virt_routes where ".
+		     "pid='$pid' and eid='$eid' order by vname");
+
+    if ($result->numrows) {
+	print  "Route List:\n";
+	printf "%-15s %-15s %-15s %-15s %-8s \n",
+	       "Node", "Dest", "Type/Mask", "Nexthop", "Cost";
+	print  "--------------- --------------- --------------- ".
+	       "--------------- --------\n";
+	
+	while (($vname,$dst,$dst_type,$dst_mask,$nexthop,$cost) =
+	       $result->fetchrow_array()) {
+
+	    if ($dst_type eq "host") {
+		$dst_mask = "host";
+	    }
+	    printf "%-15s %-15s %-15s %-15s %-10s \n",
+	           $vname, $dst, $dst_mask, $nexthop, $cost;
 	}
 	print "\n";
     }

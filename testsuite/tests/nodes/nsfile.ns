@@ -7,11 +7,34 @@ set node3 [$ns node]
 set node4 [$ns node]
 set node5 [$ns node]
 
-$ns duplex-link $node0 $node1 100Mb .1ms DropTail 
-$ns duplex-link $node0 $node2 100Mb .1ms DropTail 
-$ns duplex-link $node0 $node3 10Mb 100ms DropTail
-$ns duplex-link $node3 $node4 100Mb .1ms DropTail
-$ns duplex-link $node3 $node5 100Mb .1ms DropTail
+set link0 [$ns duplex-link $node0 $node1 100Mb .1ms DropTail]
+set link1 [$ns duplex-link $node0 $node2 100Mb .1ms DropTail]
+set link2 [$ns duplex-link $node0 $node3 10Mb 100ms DropTail]
+set link3 [$ns duplex-link $node3 $node4 100Mb .1ms DropTail]
+set link4 [$ns duplex-link $node3 $node5 100Mb .1ms DropTail]
+
+# Turn on manual routing.
+$ns rtproto Manual
+
+# Set manual routes
+$node0 add-route $node4 $node3
+$node0 add-route $node5 $node3
+$node1 add-route $node2 $node0
+$node1 add-route $link2 $node0
+$node1 add-route $node4 $node0
+$node1 add-route $node5 $node0
+$node2 add-route $node1 $node0
+$node2 add-route [$ns link $node3 $node0] $node0
+$node2 add-route $node4 $node0
+$node3 add-route $node1 $node0
+$node3 add-route $node2 $node0
+$node4 add-route $link2 $node3
+$node4 add-route $node1 $node3
+$node4 add-route $node2 $node3
+$node4 add-route $node5 $node3
+$node5 add-route [$ns link $node0 $node3] $node3
+$node5 add-route $node1 $node3
+$node5 add-route $node2 $node3
+$node5 add-route $node4 $node3
 
 $ns run
-

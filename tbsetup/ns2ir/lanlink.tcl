@@ -212,6 +212,19 @@ LanLink instproc fill_ips {} {
     }
 }
 
+#
+# Return the subnet of a lan. Actually, just return one of the IPs.
+#
+LanLink instproc get_subnet {} {
+    $self instvar nodelist
+
+    set nodeport [lindex $nodelist 0]
+    set node [lindex $nodeport 0]
+    set port [lindex $nodeport 1]
+
+    return [$node ip $port]
+}
+
 Link instproc rename {old new} {
     $self next $old $new
 
