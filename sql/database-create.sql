@@ -307,6 +307,8 @@ CREATE TABLE experiments (
   usemodelnet tinyint(1) NOT NULL default '0',
   modelnet_cores tinyint(4) unsigned NOT NULL default '0',
   modelnet_edges tinyint(4) unsigned NOT NULL default '0',
+  modelnetcore_osname varchar(20) default NULL,
+  modelnetedge_osname varchar(20) default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)

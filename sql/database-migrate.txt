@@ -1726,3 +1726,11 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table virt_nodes change type type varchar(30) default NULL;
 
+1.261: Add modelnetcore_osname and modelnetedge_osname to experiments
+       table so that user can select them (like jail/delay osname)
+
+        alter table experiments add modelnetcore_osname varchar(20) \
+		default NULL after modelnet_edges;
+        alter table experiments add modelnetedge_osname varchar(20) \
+		default NULL after modelnetcore_osname;
+
