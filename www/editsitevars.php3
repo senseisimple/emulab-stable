@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -37,7 +37,7 @@ if (isset($edit)) {
 	$value        = $row[1];
 	$defaultvalue = $row[2];
 	$description  = $row[3];
-    
+
 	echo "<center>";
 	echo "<form action='editsitevars.php3' method='post'>";
 	echo "<input type='hidden' name='name' value='$name'></input>";
@@ -128,15 +128,15 @@ while ($row = mysql_fetch_row($result)) {
     $value        = $row[1];
     $defaultvalue = $row[2];
     $description  = $row[3];
-
-    $cginame = urlencode($name);
+    $cginame      = urlencode($name);
 
     echo "<tr><td>&nbsp;<b>$name</b>&nbsp;</td>\n";
 
     echo "<td>&nbsp;";
     if (isset($value)) {
 	if (0 != strcmp($value, "")) {
-	    echo "<code>$value</code>&nbsp;</td>";
+	    $wrapped_value = wordwrap($value, 30, "<br />", 1);
+	    echo "<code>$wrapped_value</code>&nbsp;</td>";
 	} else {
 	    echo "<font color='#00B040'><i>empty string</i></font>&nbsp;</td>";	
 	}
