@@ -5,15 +5,17 @@ include("showstuff.php3");
 $changed_password = "No";
 
 #
-# Standard Testbed Header
+# Hold off drawing header until later!
 #
-PAGEHEADER("Modify User Information");
 
 #
 # Only known and logged in users can modify info.
 #
+# Note different test though, since we want to allow logged in
+# users with expired passwords to change them.
+#
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+LOGGEDINORDIE_SPECIAL($uid);
 
 #
 # The target_uid comes in as a POST var. It must be set. We allow
@@ -111,7 +113,8 @@ VERIFYURL($usr_url);
 # checks to make sure the two fields agree and that it passes our tests for
 # safe passwords.
 #
-if (isset($new_password1) && strcmp($new_password2, "")) {
+if ((isset($new_password1) && strcmp($new_password1, "")) ||
+    (isset($new_password2) && strcmp($new_password2, ""))) {
     if (strcmp($new_password1, $new_password2)) {
 	USERERROR("You typed different passwords in each of the two password ".
 		  "entry fields. <br> Please go back and correct them.", 1);
@@ -137,16 +140,25 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     # Password is good. Insert into database.
     #
     $encoding = crypt("$new_password1");
-    $insert_result  = mysql_db_query($TBDBNAME, 
-		"UPDATE users SET usr_pswd=\"$encoding\" ".
-		"WHERE uid=\"$target_uid\"");
+    if ($uid != $target_uid)
+	$expires = "now()";
+    else
+	$expires = "date_add(now(), interval 1 year)";
+    
+    $insert_result =
+	DBQueryFatal("UPDATE users SET usr_pswd='$encoding', ".
+		     "pswd_expires=$expires ".
+		     "WHERE uid='$target_uid'");
 
-    if (! $insert_result) {
-        $err = mysql_error();
-        TBERROR("Database Error changing password for $target_uid: $err", 1);
-    }
     $changed_password = "Yes";
 }
+
+#
+# Okay, draw the header now that the password has been changed.
+# This is a convenience to avoid asking the user to refresh after
+# an expired password.
+#
+PAGEHEADER("Modify User Information");
 
 #
 # Add slashes. These should really be ereg checks, kicking back special
@@ -161,20 +173,15 @@ $usr_phone = addslashes($usr_phone);
 #
 # Now change the rest of the information.
 #
-$insert_result = mysql_db_query($TBDBNAME, 
-	"UPDATE users SET ".
-	"usr_name=\"$usr_name\",       ".
-	"usr_URL=\"$usr_url\",         ".
-	"usr_addr=\"$usr_addr\",       ".
-	"usr_phone=\"$usr_phone\",     ".
-	"usr_title=\"$usr_title\",     ".
-	"usr_affil=\"$usr_affil\"      ".
-	"WHERE uid=\"$target_uid\"");
-
-if (! $insert_result) {
-    $err = mysql_error();
-    TBERROR("Database Error changing user info for $target_uid: $err", 1);
-}
+$insert_result =
+    DBQueryFatal("UPDATE users SET ".
+		 "usr_name=\"$usr_name\",       ".
+		 "usr_URL=\"$usr_url\",         ".
+		 "usr_addr=\"$usr_addr\",       ".
+		 "usr_phone=\"$usr_phone\",     ".
+		 "usr_title=\"$usr_title\",     ".
+		 "usr_affil=\"$usr_affil\"      ".
+		 "WHERE uid=\"$target_uid\"");
 
 #
 # Audit

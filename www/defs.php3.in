@@ -77,16 +77,14 @@ function TBERROR ($message, $death) {
     sleep(1); 
 
     if ($death) {
-	    echo "<h3><br><br>
-        	  $message
-	          <br>	
-        	  </h3>";
+            $msg = "<h3><br><br>
+                    $message
+	            <br>	
+        	    </h3>
+                    <p><p>
+		    Could not continue. Please contact $TBMAILADDR\n";
 
-	    echo "<p><p>
-		  Could not continue. Please contact $TBMAILADDR\n";
-
-	    PAGEFOOTER();
-	    die("");
+	    PAGEERROR($msg);
     }
     return 0;
 }
@@ -97,18 +95,18 @@ function TBERROR ($message, $death) {
 function USERERROR($message, $death) {
     global $TBMAILADDR;
 
-    echo "<h3><br><br>
-          $message
-          <br>
-          </h3>";
-
-    echo "<p><p>
-          Please contact $TBMAILADDR if you feel this message is an error.";
+    $msg = "<h3><br><br>
+            $message
+            <br>	
+      	    </h3>
+            <p><p>
+            Please contact $TBMAILADDR if you feel this message is an error.";
 
     if ($death) {
-	PAGEFOOTER();
-        die("");
+	PAGEERROR($msg);
     }
+    else
+        echo "$msg\n";
 }
 
 #

@@ -205,11 +205,13 @@ if (! $returning) {
 
     $newuser_command = "INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	"usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
+	" usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,".
+	" status,pswd_expires) ".
 	"VALUES ('$joining_uid', now(), '$usr_expires', '$usr_name', ".
         "'$usr_email', ".
-	"'$usr_addr', '$usr_url', '$usr_phone', '$usr_title', '$usr_affil',".
-        "'$encoding', NULL, 'newuser')";
+	"'$usr_addr', '$usr_url', '$usr_phone', '$usr_title', '$usr_affil', ".
+        "'$encoding', NULL, 'newuser', ".
+	"date_add(now(), interval 1 year))";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
         $err = mysql_error();

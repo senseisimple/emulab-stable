@@ -14,9 +14,8 @@ $uid = GETLOGIN();
 # personal information for some random ?uid argument.
 #
 if ($uid) {
-    if (CHECKLOGIN($uid) != 1) {
-        USERERROR("You are not logged in. Please log in and try again.", 1);
-    }
+    LOGGEDINORDIE($uid);
+
     $query_result = mysql_db_query($TBDBNAME,
 	    "SELECT * FROM users WHERE uid='$uid'");
     if (! $query_result) {

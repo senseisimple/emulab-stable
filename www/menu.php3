@@ -7,9 +7,11 @@ $STATUS_LOGINFAIL = 3;
 $STATUS_TIMEDOUT  = 4;
 $STATUS_NOLOGINS  = 5;
 $login_status     = $STATUS_NOSTATUS;
+$pswd_expired     = 0;
 $login_message    = "";
 $error_message    = 0;
 $login_uid        = 0;
+$drewheader       = 0;
 $javacode         = file("java.html");
 
 #
@@ -50,7 +52,7 @@ function WRITESIDEBAR() {
     global $login_status, $login_message, $error_message, $login_uid;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
-    global $TBBASE, $TBDOCBASE, $TBDBNAME, $BASEPATH;
+    global $TBBASE, $TBDOCBASE, $TBDBNAME, $BASEPATH, $pswd_expired;
 
     #
     # The document base cannot be a mix of secure and nonsecure.
@@ -94,12 +96,12 @@ function WRITESIDEBAR() {
               </tr>\n";
     }
     elseif ($login_status == $STATUS_LOGGEDIN) {
-	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT status,admin,stud FROM users WHERE uid='$login_uid'");
+	$query_result =
+	    DBQueryFatal("SELECT status,admin ".
+			 "FROM users WHERE uid='$login_uid'");
 	$row = mysql_fetch_row($query_result);
 	$status = $row[0];
 	$admin  = $row[1];
-	$stud   = $row[2];
 
         #
         # See if group_root in any projects, not just the last one in the DB!
@@ -115,7 +117,11 @@ function WRITESIDEBAR() {
 	    $trusted = 0;
 	}
 
-	if ($status == "active") {
+	if ($status == "active" && $pswd_expired) {
+	    WRITESIDEBARBUTTON("Change your Password",
+			       $TBBASE, "modusr_form.php3");
+	}
+	elseif ($status == "active") {
 	    if ($admin) {
 		WRITESIDEBARBUTTON("New Project Approval",
 				   $TBBASE, "approveproject_list.php3");
@@ -174,6 +180,8 @@ function WRITESIDEBAR() {
     switch ($login_status) {
     case $STATUS_LOGGEDIN:
 	$login_message = "$login_uid Logged In";
+	if ($pswd_expired)
+	    $login_message = "$login_message<br>(Password Expired!)";
 	break;
     case $STATUS_LOGGEDOUT:
 	$login_message = "Logged Out";
@@ -326,7 +334,10 @@ function PAGEHEADER($title) {
     global $TBBASE, $TBDOCBASE, $TBDBNAME;
     global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
-    global $BASEPATH, $SSL_PROTOCOL, $javacode;
+    global $CHECKLOGIN_PSWDEXPIRED;
+    global $BASEPATH, $SSL_PROTOCOL, $javacode, $drewheader, $pswd_expired;
+
+    $drewheader = 1;
 
     #
     # Determine the proper basepath, which depends on whether the page
@@ -357,6 +368,8 @@ function PAGEHEADER($title) {
 	    $login_status = $STATUS_NOSTATUS;
 	    $login_uid    = 0;
 	    break;
+	case $CHECKLOGIN_PSWDEXPIRED:
+	    $pswd_expired = 1;
 	case $CHECKLOGIN_LOGGEDIN:
 	case $CHECKLOGIN_MAYBEVALID:
 	    $login_status = $STATUS_LOGGEDIN;
@@ -492,5 +505,17 @@ function PAGEFOOTER() {
           </font>
           </body>
           </html>\n";
+}
+
+function PAGEERROR($msg) {
+    global $drewheader;
+
+    if (! $drewheader)
+	PAGEHEADER("");
+
+    echo "$msg\n";
+
+    PAGEFOOTER();
+    die("");
 }
 ?>

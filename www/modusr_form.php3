@@ -9,8 +9,11 @@ PAGEHEADER("Modify User Information Form");
 #
 # Only known and logged in users can modify info.
 #
+# Note different test though, since we want to allow logged in
+# users with expired passwords to change them.
+#
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+LOGGEDINORDIE_SPECIAL($uid);
 $isadmin = ISADMIN($uid);
 
 #

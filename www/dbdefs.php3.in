@@ -980,11 +980,8 @@ function DBFatal($message)
 
     DBWarn($message);
 
-    echo "<p><p>
-	  Unexpected Error. Could not continue. Please contact $TBMAILADDR\n";
-
-    PAGEFOOTER();
-    die("");
+    PAGEERROR("<p><p>".
+	      "Unexpected Error. Could not continue. ".
+              "Please contact $TBMAILADDR\n");
 }
-
 ?>

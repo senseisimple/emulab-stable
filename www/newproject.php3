@@ -253,10 +253,12 @@ if (! $returning) {
     
     $newuser_command = "INSERT INTO users ".
         "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-        "usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
+        " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
+	" status,pswd_expires) ".
         "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
         "'$usr_email', '$usr_addr', '$usr_url', '$usr_title', '$usr_affil', ".
-        "'$usr_phones', '$encoding', NULL, 'newuser')";
+        "'$usr_phones', '$encoding', NULL, 'newuser', ".
+	"date_add(now(), interval 1 year))";
 
     DBQueryFatal($newuser_command);
 

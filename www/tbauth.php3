@@ -7,6 +7,7 @@ $CHECKLOGIN_NOTLOGGEDIN = 0;
 $CHECKLOGIN_LOGGEDIN    = 1;
 $CHECKLOGIN_TIMEDOUT    = -1;
 $CHECKLOGIN_MAYBEVALID  = 2;
+$CHECKLOGIN_PSWDEXPIRED = 3;
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -31,12 +32,15 @@ function GENHASH() {
 # logged in.
 # 
 function GETLOGIN() {
-    global $CHECKLOGIN_LOGGEDIN;
+    global $CHECKLOGIN_LOGGEDIN, $CHECKLOGIN_PSWDEXPIRED;
 
     if (($uid = GETUID()) == FALSE)
 	    return FALSE;
 
-    if (CHECKLOGIN($uid) == $CHECKLOGIN_LOGGEDIN)
+    $check = CHECKLOGIN($uid);
+
+    if ($check == $CHECKLOGIN_LOGGEDIN ||
+	$check == $CHECKLOGIN_PSWDEXPIRED)
 	    return $uid;
 
     return FALSE;
@@ -68,28 +72,36 @@ function GETUID() {
 #          if login record exists, is not timed out, but no hash cookie.
 #             this case will be caught later when the user tries to do
 #             something for which a valid login is required.
+#	   if logged in okay but password is expired.
 #
 function CHECKLOGIN($uid) {
     global $TBDBNAME, $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
+    global $CHECKLOGIN_PSWDEXPIRED;
 
     $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT hashkey, timeout FROM login WHERE uid=\"$uid\"");
-    if (! $query_result) {
-        $err = mysql_error();
-        TBERROR("Database Error retrieving login info for $uid: $err\n", 1);
-    }
+    $query_result =
+	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout ".
+		     " from users as u ".
+		     "left join login as l on l.uid=u.uid ".
+		     "where u.uid='$uid'");
 
-    # Not logged in.
-    if (($row = mysql_fetch_array($query_result)) == 0) {
+    # No such user.
+    if (($row = mysql_fetch_row($query_result)) == 0) {
 	return $CHECKLOGIN_NOTLOGGEDIN;
     }
 
-    $hashkey = $row[hashkey];
-    $timeout = $row[timeout];
+    $expired = $row[0];
+    $hashkey = $row[1];
+    $timeout = $row[2];
+
+    #
+    # If user exists, but login has no entry, quit now.
+    #
+    if (!$hashkey)
+	return $CHECKLOGIN_NOTLOGGEDIN;
 
     # A match?
     if ($timeout > time()) {
@@ -101,34 +113,32 @@ function CHECKLOGIN($uid) {
 	    #
 	    $timeout = time() + $TBAUTHTIMEOUT;
 
-	    $query_result = mysql_db_query($TBDBNAME,
-			"UPDATE login set timeout='$timeout' ".
-			"WHERE uid=\"$uid\"");
-	    if (! $query_result) {
-		$err = mysql_error();
-		TBERROR("Database Error updating login timeout for ".
-			"$uid: $err", 1);
-	    }
-	    return $CHECKLOGIN_LOGGEDIN;
+	    $query_result =
+		DBQueryFatal("UPDATE login set timeout='$timeout' ".
+			     "WHERE uid='$uid'");
+
+	    if ($expired)
+		return $CHECKLOGIN_PSWDEXPIRED;
+	    else
+		return $CHECKLOGIN_LOGGEDIN;
 	}
 	elseif (!isset($curhash) || !$curhash || $curhash == NULL) {
 	    #
 	    # A login is valid, but we have no proof yet. Proof will be
 	    # demanded later by whatever page wants it.
 	    # 
-	    return $CHECKLOGIN_MAYBEVALID;
+	    if ($expired)
+		return $CHECKLOGIN_PSWDEXPIRED;
+	    else
+		return $CHECKLOGIN_MAYBEVALID;
 	}
     }
 
     #
     # Clear out the database entry for completeness.
     #
-    $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM login WHERE uid=\"$uid\"");
-    if (! $query_result) {
-        $err = mysql_error();
-        TBERROR("Database Error deleting login info for $uid: $err\n", 1);
-    }
+    $query_result =
+	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
 
     return $CHECKLOGIN_TIMEDOUT;
 }
@@ -140,6 +150,7 @@ function CHECKLOGIN($uid) {
 function LOGGEDINORDIE($uid) {
     global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
+    global $CHECKLOGIN_PSWDEXPIRED;
 
     $status = CHECKLOGIN($uid);
     switch ($status) {
@@ -147,6 +158,36 @@ function LOGGEDINORDIE($uid) {
         USERERROR("You do not appear to be logged in!", 1);
         break;
     case $CHECKLOGIN_LOGGEDIN:
+        return $uid;
+        break;
+    case $CHECKLOGIN_TIMEDOUT:
+        USERERROR("Your login has timed out! Please log in again.", 1);
+        break;
+    case $CHECKLOGIN_MAYBEVALID:
+        USERERROR("Your login cannot be verified. Are cookies turned on?", 1);
+        break;
+    case $CHECKLOGIN_PSWDEXPIRED:
+        USERERROR("Your password has expired. Please change it now!", 1);
+        break;
+    }
+    TBERROR("LOGGEDINORDIE failed mysteriously", 1);
+}
+
+#
+# Special function for changing passwords.
+#
+function LOGGEDINORDIE_SPECIAL($uid) {
+    global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
+    global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
+    global $CHECKLOGIN_PSWDEXPIRED;
+
+    $status = CHECKLOGIN($uid);
+    switch ($status) {
+    case $CHECKLOGIN_NOTLOGGEDIN:
+        USERERROR("You do not appear to be logged in!", 1);
+        break;
+    case $CHECKLOGIN_LOGGEDIN:
+    case $CHECKLOGIN_PSWDEXPIRED:
         return $uid;
         break;
     case $CHECKLOGIN_TIMEDOUT:
