@@ -99,6 +99,33 @@ router, and run the following:
 
 Of course, replace 'Vlan3' with the name of your router's node
 control-net interface, and replace the IP address with that of your boss node.                                                          
+##### IGMP snooping on the control net
+
+In order for multicast to work correctly, you need to make sure that IGMP
+snooping is enabled on the control switch. This is needed for frisbee, our
+disk-loading system. It's up to you wheter you want to enable this on the
+experimental switches. On CatOS, the command is:
+  set igmp enable
+
+#### VTP domains
+
+If you have only one Cisco experimental-net switch, you don't need to have it
+using VTP, which is a mechanism for keeping VLANs in sync across multiple
+switches. You do this (in CatOS) with:
+  set vtp mode transparent
+
+If you have multiple experimental switches connected by trunk lines, you should
+use FTP. Pick a domain name (we call ours simply 'Testbed',) and run the
+following on all of your switches:
+  set vtp domain <domainname>
+
+Pick one switch to be the master - it doesn't really matter which one. (See the
+switch setup insturctions in setup-db.txt, and make sure you name the stack
+after the master switch.) On this one, run
+  set vtp mode server
+On all the others, run
+  set vtp mode client
+
 ##### Some variations on the above configuration
 
 There are some variations on the above configuration that we haven't tried, but
