@@ -99,7 +99,13 @@ if (isset($HTTP_REFERER) && strcmp($HTTP_REFERER, "")) {
     header("Location: $HTTP_REFERER");
 }
 else {
-    header("Location: $TBBASE/showuser.php3?target_uid=$target_uid");
+    if (isset($target_uid)) {
+	header("Location: $TBBASE/showuser.php3?target_uid=$target_uid");
+    } elseif (isset($pid) && isset($eid)) {
+	header("Location: $TBBASE/showexp.php3?pid=$pid&eid=$eid");
+    } else {
+	header("Location: $TBBASE/showuser.php3");
+    }
 }
 
 ?>
