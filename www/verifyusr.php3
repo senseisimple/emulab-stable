@@ -82,7 +82,7 @@ function INFORMLEADERS($uid) {
 	 $pid = $row[pid];
 	 $gid = $row[gid];
 
-	 TBGroupLeader($pid, $leader_uid);
+	 TBGroupLeader($pid, $gid, $leader_uid);
 	 TBUserInfo($leader_uid, $leader_name, $leader_email);
 	 
 	 TBMAIL("$leader_name '$leader_uid' <$leader_email>",
