@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -255,7 +255,7 @@ if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
     if ($foo) {
 	print STDERR "Failed to start event system for $pid/$eid: $foo $?!\n";
 	SENDMAIL($TBOPS,
-		 "Event System Failure: $pid/$eid!\n",
+		 "Event System Failure: $pid/$eid!",
 		 "Failed to start event system for $pid/$eid",
 		 undef, undef, "$path/logs/event-sched.log");
 	exit(-1);
