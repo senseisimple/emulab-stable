@@ -420,7 +420,7 @@ sub doListVlans () {
     #
     my ($vlan_id,$pideid,$vname,$members);
     print << "END";
-VLAN  Project/Experiment   VName      Members
+VLAN     Project/Experiment VName     Members
 --------------------------------------------------------------------------------
 END
     format vlanlist =
