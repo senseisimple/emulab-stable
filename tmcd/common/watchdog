@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -199,10 +199,7 @@ sub startisalive()
 
 	while ($retries) {
 #	    my $options = "-p 7778 REDIRECT=192.168.100.1";
-	    my $options = "";
-	    if (REMOTE()) {
-		$options .= " -u -t 3";
-	    }
+	    my $options = "-u -t 3";
 	    my $result = `tmcc $options isalive`;
 	    if (! $?) {
 		my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
