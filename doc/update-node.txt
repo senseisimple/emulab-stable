@@ -39,9 +39,54 @@ A. Things to understand up front:
      exist, you will need to download:
 
        http://www.emulab.net/downloads/libelvin-4.0.3.tar.gz
+       http://www.emulab.net/downloads/libelvin-4.0.3.patch
 
-     build, and install it.  Note that this is an older version of elvin,
-     so you cannot just install a package or RPM.
+     unpack the tarball and patch it:
+
+       tar xzf libelvin-4.0.3.tar.gz
+       patch -p0 < libelvin-4.0.3.patch
+
+     then build, and install it.  For FreeBSD:
+       cd libelvin-4.0.3
+       ./configure
+       make
+       sudo make install
+     for Linux, at least RedHat 9:
+       export CFLAGS="-g -O2 -fno-strict-aliasing"
+       export CPPFLAGS="`/usr/kerberos/bin/krb5-config --cflags`"
+       export LIBS="`/usr/kerberos/bin/krb5-config --libs`"
+       ./configure
+       gmake
+       gmake install
+       unset CFLAGS CPPFLAGS LIBS
+
+     Note that this is an older version of elvin, so you cannot just install
+     a package or RPM.
+
+   - Elvin daemon.  Due to changes in the event system, we now use a node
+     local elvind.  If you didn't have libelvin above installed, you won't
+     have elvind, so download:
+
+       http://www.emulab.net/downloads/elvind-4.0.3.tar.gz
+       http://www.emulab.net/downloads/elvind-4.0.3.patch
+
+     unpack the tarball and patch it:
+
+       tar xzf elvind-4.0.3.tar.gz
+       patch -p0 < elvind-4.0.3.patch
+
+     then build, and install it.  For FreeBSD:
+       cd elvind-4.0.3
+       ./configure
+       make
+       sudo make install
+     for Linux:
+       ./configure
+       gmake
+       gmake install
+
+     Note that no special environment variables are needed for Linux and
+     elvind as were needed for libelvin.
 
    - Boost headers.  Check for the boost directory in the include directory
      path (probably in /usr/local/include or even /usr/include).
