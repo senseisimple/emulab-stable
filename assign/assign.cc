@@ -19,6 +19,8 @@ tbgraph PG(1,1);
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
 
+#define MAX_DELAYS 64
+
 int nparts = 3;     /* DEFAULTS */
 int *intercap = NULL;
 int *nodecap = NULL;
@@ -38,6 +40,7 @@ int refreshed = 0;
 
 tbgraph G(1, 1);
 node_array<int> bestnodes, absnodes;
+node_array<toponode*> physnodes,absphys;
 float                       bestscore, absbest;
 
 float *interlinks;
@@ -133,10 +136,11 @@ float score()
 		int numdelays = 0;
 		int assigned = 0;
 		node n;
+		node delays[MAX_DELAYS];
 		forall_nodes(n, G) {
 		    if (G[n].partition() == i) {
 		        if (G[n].type() == testnode::TYPE_DELAY) {
-				numdelays++;
+				delays[numdelays++]=n;
 			} else {
 			    assigned = 0;
 			    /* Assign to an available node */
@@ -145,6 +149,7 @@ float score()
 				 j++) {
 				    if (topo->switches[i]->nodes[j].used == 0 && (topo->switches[i]->nodes[j].ints >= G.degree(n))) {
 					    topo->switches[i]->nodes[j].used = 1;
+					    physnodes[n]=&(topo->switches[i]->nodes[j]);
 					    assigned = 1;
 					    break;
 				    }
@@ -165,7 +170,9 @@ float score()
 		int j = 0;
 		while (numdelays > 0 && j < maxnodes) {
 			if (topo->switches[i]->nodes[j].used) { j++; continue; }
-			numdelays -= topo->switches[i]->nodes[j].ints/2;
+			for (int z=0;numdelays>0 && z<topo->switches[i]->nodes[j].ints/2;++z) {
+				physnodes[delays[--numdelays]] = &(topo->switches[i]->nodes[j]);
+			}
 			topo->switches[i]->nodes[j].used = 1;
 			j++;
 		}
@@ -224,10 +231,11 @@ void violated()
 		int assigned = 0;
 		int unassigned = 0;
 		node n;
+		node delays[MAX_DELAYS];
 		forall_nodes(n, G) {
 		    if (G[n].partition() == i) {
 		        if (G[n].type() == testnode::TYPE_DELAY) {
-				numdelays++;
+				delays[numdelays++]=n;
 			} else {
 			    /* Assign to an available node */
 			    assigned = 0;
@@ -237,6 +245,7 @@ void violated()
 				    if ((topo->switches[i]->nodes[j].used == 0) && (topo->switches[i]->nodes[j].ints >= G.degree(n))) {
 					    topo->switches[i]->nodes[j].used = 1;
 					    assigned = 1;
+	  				    physnodes[n]=&(topo->switches[i]->nodes[j]);
 					    break;
 				    }
 			    }
@@ -260,7 +269,10 @@ void violated()
 		int j = 0;
 		while (numdelays > 0 && j < maxnodes) {
 			if (topo->switches[i]->nodes[j].used) { j++; continue; }
-			numdelays -= topo->switches[i]->nodes[j].ints/2;
+			for (int z=0;numdelays>0 && z<topo->switches[i]->nodes[j].ints/2;++z) {
+				// XXX: ugh
+				physnodes[delays[--numdelays]] = &(topo->switches[i]->nodes[j]);
+			}
 			topo->switches[i]->nodes[j].used = 1;
 			j++;
 		}
@@ -441,6 +453,7 @@ int assign()
 					node n2;
 					forall_nodes(n2, G) {
 						absnodes[n2] = G[n2].partition();
+						absphys[n2] = physnodes[n2];
 					}
 					absbest = newscore;
 					cycles_to_best = iters;
@@ -503,6 +516,8 @@ void loopassign()
 	nodestorage.init(G, 0);
 	bestnodes.init(G, 0);
 	absnodes.init(G, 0);
+	physnodes.init(G, 0);
+	absphys.init(G, 0);
     
 	nnodes = G.number_of_nodes();
 	optimal = assign();
@@ -622,6 +637,8 @@ void reassign(GraphWin& gw)
 	}
 	bestnodes.init(G, 0);
 	absnodes.init(G, 0);
+	physnodes.init(G, 0);
+	absphys.init(G, 0);
 	chopgraph(gw);
 	refreshed = 1;
 	display_scc(gw);
@@ -643,6 +660,20 @@ void usage() {
 		"           -o ...... Update on-line (vs batch, default)\n"
 		"           -t <file> Input topology desc. from <file>\n"
 		);
+}
+
+void print_solution()
+{
+	node n;
+	cout << "Best solution: " << absbest << endl;
+	forall_nodes(n,G) {
+		if (!absphys[n]) {
+			cout << "unassigned: " << G[n].name() << endl;
+		} else {
+			cout << G[n].name() << " " << absnodes[n] << " " << PG[absphys[n]->n].name() << endl;
+		}
+	}
+	cout << "End solution" << endl;
 }
 
 int main(int argc, char **argv)
@@ -767,6 +798,8 @@ int main(int argc, char **argv)
 	 * from LEDA's event loop from here on.                           */
 	
 	gw.edit();
+
+	print_solution();
     
 	return 0;
 }
