@@ -1004,6 +1004,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
+	int		num_interfaces=0;
 
 	/*
 	 * Now check reserved table
@@ -1014,32 +1015,34 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 1;
 	}
 
-	/*
-	 * Virtual nodes, do not return interface table info. No point.
-	 * Subnode are slightly different. This test might need to be
-	 * smarter?
+	/* 
+	 * For Virtual Nodes, we return interfaces that belong to it.
 	 */
-	if (reqp->isvnode && !reqp->issubnode)
-		goto doveths;
+	if (reqp->isvnode)
+		sprintf(buf, "vnode_id='%s'", reqp->vnodeid);
+	else
+		strcpy(buf, "vnode_id is NULL");
 
 	/*
 	 * Find all the interfaces.
 	 */
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
 			 " IPaliases,iface,role,mask,rtabid "
-			 "from interfaces where node_id='%s'",
-			 11, reqp->nodeid);
+			 "from interfaces where node_id='%s' and %s",
+			 11, reqp->pnodeid, buf);
+
+	/*
+	 * We need pnodeid in the query. But error reporting is done
+	 * by nodeid. For vnodes, nodeid is pcvmXX-XX and for the rest
+	 * it is the same as pnodeid
+	 */
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting interfaces!\n",
 		      reqp->nodeid);
 		return 1;
 	}
 
-	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		error("IFCONFIG: %s: No interfaces!\n", reqp->nodeid);
-		mysql_free_result(res);
-		return 1;
-	}
+	nrows = (int)mysql_num_rows(res);
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		if (row[1] && row[1][0]) {
@@ -1111,6 +1114,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			OUTPUT(bufp, ebufp - bufp, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
+			num_interfaces++;
 			if (verbose)
 				info("IFCONFIG: %s", buf);
 		}
@@ -1150,8 +1154,14 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+	  if (num_interfaces == 0) {
+		error("IFCONFIG: %s: No interfaces!\n", reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	  } else {
 		mysql_free_result(res);
 		return 0;
+	  }
 	}
 	while (nrows) {
 		char *bufp   = buf;

@@ -1190,7 +1190,7 @@ if ($updating && !$impotent) {
 	    if (physnodeisvirtnode($pnode) ||
 		physnodereuse($pnode) eq "unused");
 
-	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL " .
+	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL,rtabid='0',vnode_id=NULL " .
 		     "where node_id='$pnode' and ".
 		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
 
@@ -1765,12 +1765,19 @@ foreach $vnodeport (keys(%portmap)) {
 	#
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
+	my $vvnode  = "NULL";
+
+	# Mark as being a jail interface by establishing a connection
+	# to the nodes table entry for the virtnode.
+	if (virtnodeisjailed($vnode)) {
+	    $vvnode = "'$v2vmap{$vnode}'";
+	}
 
 	if (! defined($IPaliases{"$pnode:$pport"})) {
 	    printdb("IP: $pnode:$pport $ip\n");
 
 	    DBQueryFatal("update interfaces set ".
-			 " IP='$ip',IPaliases=NULL,mask='$mask' " .
+			 " IP='$ip',IPaliases=NULL,mask='$mask',vnode_id=$vvnode " .
 			 "where node_id='$pnode' and iface='$pport'");
 
 	    #
@@ -3421,6 +3428,7 @@ sub CreateTopFile()
 	my $simnodes = 0;
 	my $realnodes = 0;
 	my $virtnodes = 0;
+	my $nonvirtnodes = 0;
 	my $trivial_ok = 0;
 	my $emulated = virtlanemulated($lan);
 	my $uselinkdelay = virtlanlinkdelay($lan);
@@ -3432,25 +3440,28 @@ sub CreateTopFile()
 		$simnodes++;
 		$simnodelans{$lan} = 1;
 	    } else {
-		# We always use an emulated link when its a
-		# virtnode. An emulated link can use a trivial link
-		# too, if the user wanted it.
 		if (virtnodeisvirt($node)) {
 		    $virtnodes++;
-		    $emulated = 1;
-		    $virt_lans{$lan}->{"EMULATED"} = 1;
-		    $trivial_ok = virtlantrivok($lan);
-		    #
-		    # An emulated link/lan between containing any
-		    # virtnodes always uses veth devices. Note that remote
-		    # virtual nodes never go through this path cause they
-		    # get tunnels, so its only local virtual nodes. 
-		    #
-		    $virt_lans{$lan}->{"USEVETH"} = 1
-			if (virtnodeisvirt($node));
+		} else {
+		    $nonvirtnodes++;
 		}
 		$realnodes++;
 	    }
+	}
+	if ($virtnodes > 0 && $nonvirtnodes == 0) {
+	    # We use an emulated link if all members of the lan are
+	    # virtnodes. An emulated link can use a trivial link
+	    # too, if the user wanted it.
+	    $emulated = 1;
+	    $virt_lans{$lan}->{"EMULATED"} = 1;
+	    $trivial_ok = virtlantrivok($lan);
+	    #
+	    # An emulated link/lan between containing any
+	    # virtnodes always uses veth devices. Note that remote
+	    # virtual nodes never go through this path cause they
+	    # get tunnels, so its only local virtual nodes.
+	    #
+	    $virt_lans{$lan}->{"USEVETH"} = 1;
 	}
 	if ($simnodes > 0 && $realnodes == 0) {
 	    $trivial_ok = 1;
