@@ -270,6 +270,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
+    var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::security_level
     
     if {$ran == 1} {
@@ -452,6 +453,11 @@ Simulator instproc run {} {
     if {$elab_in_elab} {
 	lappend fields "elab_in_elab"
 	lappend values 1
+
+	if { $elabinelab_eid != {} } {
+	    lappend fields "elabinelab_eid"
+	    lappend values $elabinelab_eid
+	}
     }
     
     if {$security_level} {
