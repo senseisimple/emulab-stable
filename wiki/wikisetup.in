@@ -93,8 +93,9 @@ my %wikinames  = ();	# Indexed by wikiname.
 #
 $query_result =
     DBQueryFatal("select pid from groups where pid=gid ".
-		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
-		 "     pid='utahstud')");
+#		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
+#		 "     pid='utahstud')" .
+		 "");
 
 while (my ($pid) = $query_result->fetchrow_array()) {
     #
@@ -160,37 +161,40 @@ foreach my $pid (keys(%wikipids)) {
 # Now the users.
 # 
 $query_result =
-    DBQueryFatal("select distinct g.uid,u.usr_name,u.usr_email ".
+    DBQueryFatal("select distinct g.uid,u.usr_name,u.usr_email,u.wikiname ".
 		 "  from group_membership as g ".
 		 "left join users as u on u.uid=g.uid ".
-		 "where u.status='active' and ".
-		 "     (g.pid='testbed' or g.pid='emulab-ops' or ".
-		 "      g.pid='tbres' or g.pid='utahstud')");
+		 "where u.status='active' ".
+#		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
+#		 "       g.pid='tbres' or g.pid='utahstud')" .
+		 "order by u.admin");
 
 my %wikiuids   = ();	# Indexed by user uid, gives wikiname.
 my %emailaddrs = ();	# Indexed by user uid, gives user email address.
 # Clear this for next loop.
 %wikinames = ();
 
-while (my ($uid,$name,$email) = $query_result->fetchrow_array()) {
+while (my ($uid,$name,$email,$wikiname) = $query_result->fetchrow_array()) {
     $emailaddrs{$uid} = $email;
 
-    #
-    # Split the user name up into tokens. 
-    #
-    my @tokens = split(/\s+|-/, $name);
+    if (!defined($wikiname) || $wikiname eq "") {
+	#
+	# Split the user name up into tokens. 
+	#
+	my @tokens = split(/\s+|-/, $name);
 
-    #
-    # Build a wikiname from the tokens. Lowercase each token, then
-    # captialize it, then run them all together. Oh, get rid of any
-    # non alphanum characters.
-    #
-    my $wikiname = "";
+	#
+	# Build a wikiname from the tokens. Lowercase each token, then
+	# captialize it, then run them all together. Oh, get rid of any
+	# non alphanum characters.
+	#
+	$wikiname = "";
 
-    foreach my $token (@tokens) {
-	$token = ucfirst(lc($token));
-	$token =~ s/\.//g;
-	$wikiname .= $token;
+	foreach my $token (@tokens) {
+	    $token = ucfirst(lc($token));
+	    $token =~ s/\.//g;
+	    $wikiname .= $token;
+	}
     }
     #print "$wikiname\n";
 
