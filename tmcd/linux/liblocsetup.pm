@@ -39,6 +39,8 @@ $EGREP		= "/bin/egrep -q";
 $MOUNT		= "/bin/mount";
 $UMOUNT		= "/bin/umount";
 $TMPASSWD	= "$SETUPDIR/passwd";
+$SFSSD		= "/usr/local/sbin/sfssd";
+$SFSCD		= "/usr/local/sbin/sfscd";
 
 #
 # These are not exported
