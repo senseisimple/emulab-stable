@@ -224,6 +224,7 @@ COMMAND_PROTOTYPE(dorole);
 COMMAND_PROTOTYPE(dorusage);
 COMMAND_PROTOTYPE(dodoginfo);
 COMMAND_PROTOTYPE(dohostkeys);
+COMMAND_PROTOTYPE(dotmcctest);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -295,6 +296,7 @@ struct command {
         { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
         { "watchdoginfo", FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dodoginfo},
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
+        { "tmcctest",     FULLCONFIG_NONE, F_MINLOG, dotmcctest},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5280,5 +5282,83 @@ COMMAND_PROTOTYPE(dohostkeys)
 		     (rsav2[0] ? rsav2 : "NULL"),
 		     (dsav2[0] ? dsav2 : "NULL"));
 	}
+	return 0;
+}
+
+/*
+ * Hack to test timeouts and other anomolous situations for tmcc
+ */
+COMMAND_PROTOTYPE(dotmcctest)
+{
+	char		buf[MYBUFSIZE];
+	int		logit;
+
+	logit = verbose;
+
+	if (logit)
+		info("TMCCTEST: %s\n", rdata);
+
+	/*
+	 * Always allow the test that doesn't tie up a server thread
+	 */
+	if (strncmp(rdata, "noreply", strlen("noreply")) == 0)
+		return 0;
+
+	/*
+	 * The rest can tie up a server thread for non-trivial amounts of
+	 * time, only allow if debugging.
+	 */
+	if (!debug) {
+		strcpy(buf, "tmcctest disabled\n");
+		goto doit;
+	}
+
+	/*
+	 * Delay reply by the indicated amount of time
+	 */
+	if (strncmp(rdata, "delayreply", strlen("delayreply")) == 0) {
+		int delay = 0;
+		if (sscanf(rdata, "delayreply %d", &delay) == 1 &&
+		    delay < 20) {
+			sleep(delay);
+			sprintf(buf, "replied after %d seconds\n", delay);
+		} else {
+			strcpy(buf, "bogus delay value\n");
+		}
+		goto doit;
+	}
+
+	if (tcp) {
+		/*
+		 * Reply in pieces
+		 */
+		if (strncmp(rdata, "splitreply", strlen("splitreply")) == 0) {
+			memset(buf, '1', MYBUFSIZE/4);
+			buf[MYBUFSIZE/4] = 0;
+			client_writeback(sock, buf, strlen(buf), tcp);
+			sleep(1);
+			memset(buf, '2', MYBUFSIZE/4);
+			buf[MYBUFSIZE/4] = 0;
+			client_writeback(sock, buf, strlen(buf), tcp);
+			sleep(2);
+			memset(buf, '4', MYBUFSIZE/4);
+			buf[MYBUFSIZE/4] = 0;
+			client_writeback(sock, buf, strlen(buf), tcp);
+			sleep(4);
+			memset(buf, '0', MYBUFSIZE/4);
+			buf[MYBUFSIZE/4-1] = '\n';
+			buf[MYBUFSIZE/4] = 0;
+			logit = 0;
+		} else {
+			strcpy(buf, "no such TCP test\n");
+		}
+	} else {
+		strcpy(buf, "no such UDP test\n");
+	}
+
+ doit:
+	client_writeback(sock, buf, strlen(buf), tcp);
+	if (logit)
+		info("%s", buf);
 	return 0;
 }
