@@ -4,10 +4,11 @@ DEVICE="eth1"
 
 if [ "`control_interface`" = "$DEVICE" ]; then
 	BOOTPROTO="dhcp"
-	NEEDHOSTNAME=""
-	hostname emulab-localhost
+	ONBOOT="yes"
+else
+	ONBOOT="no"
 fi
-ONBOOT="yes"
+
 IPADDR=""
 NETMASK=""
 IPXNETNUM_802_2=""

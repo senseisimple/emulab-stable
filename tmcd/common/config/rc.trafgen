@@ -7,6 +7,7 @@
 use English;
 use Getopt::Std;
 use POSIX ":sys_wait_h";
+use POSIX qw(setsid);
 
 sub usage()
 {
@@ -134,6 +135,32 @@ sub doboot()
 
     my ($pid, $eid, $vname) = check_nickname();
 
+    #
+    # Now daemonize and let the boot continue. We have to disconnect and
+    # change our session id so that we do not killed off (nor the trafgen
+    # children) when boot script terminates. This cause the trafgen does not
+    # properly disconnect and it gets killed once /etc/rc exits. Not sure
+    # exactly why this is, but this is how I deal with it! The downside is
+    # that we cannot report errors to the caller. We have to catch them
+    # later, somehow.
+    #
+    if (TBBackGround($LOGFILE)) {
+	sleep(2);
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    setsid();
+
+    #
+    # Write our pid to a file so we can be killed later.
+    # 
+    system("echo '$PID' > $PIDFILE") == 0
+	or fatal("Could not create $PIDFILE!");
+    
+    $SIG{TERM} = \&Pcleanup;
+    $SIG{INT}  = \&Pcleanup;
+    $SIG{HUP}  = \&Pcleanup;
+    
     # We connect to the local elvind and talk to the master via the proxy.
     my $cmdline = "$BINDIR/trafgen -s localhost ";
     if ($pid) {
@@ -198,44 +225,26 @@ sub doboot()
     }
 
     #
-    # Quick check to see if any trafgens exited. 
+    # Loop, waiting for children to exit. They are not supposed to, so if
+    # they do its an error. Log that to the console in the hope that someone
+    # is looking!
     #
-    while ((my $childpid = waitpid(-1, &WNOHANG)) != 0) {
+    while ((my $childpid = waitpid(-1, 0)) != 0) {
 	foreach my $name (keys(%trafgenpids)) {
 	    if ($trafgenpids{$name} == $childpid) {
-		warning("Trafgen $name failed to run properly!");
+		logit("trafgen", "Trafgen $name has exited with status $?");
 		delete($trafgenpids{$name});
 		last;
 	    }
 	}
 	$errors++;
+	# No more running, might as well stop now. 
+	last
+	    if (! scalar(keys(%trafgenpids)));
 	sleep(1);
     }
-
-    #
-    # Now daemonize and let the boot continue. 
-    #
-    if (TBBackGround($LOGFILE)) {
-	exit($errors);
-    }
-
-    #
-    # Write our pid to a file so we can be killed later.
-    # 
-    system("echo '$PID' > $PIDFILE") == 0
-	or fatal("Could not create $PIDFILE!");
-    
-    $SIG{TERM} = \&Pcleanup;
-    $SIG{INT}  = \&Pcleanup;
-    $SIG{HUP}  = \&Pcleanup;
-    
-    #
-    # Just wait. We will die via the signal handler above.
-    #
-    while (1) {
-	sleep(10000);
-    }
-    return;
+    logit("trafgen", "All trafgens have exited!");
+    exit($errors);
 }
 
 #

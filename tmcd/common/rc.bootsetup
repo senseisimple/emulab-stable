@@ -115,6 +115,18 @@ sub doboot()
     }
 
     #
+    # Check for an os dependent initialization script.
+    #
+    my $os_script = "rc." . lc($OSNAME);
+    
+    if (-x "$RCDIR/$os_script") {
+	system("$RCDIR/$os_script");
+	if ($?) {
+	    fatal("Error running $RCDIR/$os_script");
+	}
+    }
+
+    #
     # Check for kernel rename first. Probably not required so early.
     #
     if (-x "$RCDIR/rc.kname") {
@@ -135,9 +147,7 @@ sub doboot()
     if (-x "$RCDIR/rc.ipod") {
 	print("Setting up Ping of Death\n");
 	system("$RCDIR/rc.ipod");
-	if ($?) {
-	    fatal("Error running $RCDIR/rc.ipod");
-	}
+	# This is allowed to fail; ipod might not be supported.
     }
 
     print("Informing Emulab Control that we have rebooted\n");

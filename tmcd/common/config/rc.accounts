@@ -547,6 +547,12 @@ sub docleanup()
 {
     my $pdb = $PASSDB . ".db";
     my $gdb = $GROUPDB . ".db";
+
+    # RHL9 sillyness; they do not append the .db suffix!
+    unlink $PASSDB
+	if (-e $PASSDB);
+    unlink $GROUPDB
+	if (-e $GROUPDB);
     
     unlink $pdb
 	if (-e $pdb);

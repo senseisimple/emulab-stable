@@ -1,30 +1,27 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 
 #
 # Set the hostname for the node according to the current experiment.
+# Run from /etc/dhclient-exit-hooks.
 #
-# In Linux, this gets invoked directly from the "pump" configuration
-# program. See /etc/pump.conf. Who came up that name? Anyway, the
-# first argument to the script is a token, one of up, renewal, or
-# release. We set the hostname on either of the first two.
+#	usage: sethostname
 #
-# If no args supplied at all (which means being run by hand, then do it).
-#
-# We don't need to worry about the domainname on Linux. Its set via a
-# different mechanism, so changing the hostname will not effect the
-# domain suffix. 
-#
+# A note about Linux. Redhat 9.0 appears to use dhclient instead of pump.
+# We maintain/install both variants though to make life easier. 
+# 
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
+#
 # Turn off line buffering on output
+#
 $| = 1;
 
 #
@@ -33,14 +30,6 @@ $| = 1;
 # 
 use libsetup;
 use libtmcc;
-
-if (@ARGV) {
-    my $token = shift;
-
-    if ($token ne "up" && $token ne "renewal") {
-	exit 0;
-    }
-}
 
 #
 # We assume that we are in the same domain as our boss node
@@ -74,9 +63,13 @@ else {
     die("Bad data in nickname: '$domain'\n");
 }
 
+#
+# Set hostname. This output is redirected to log file by caller. 
+#
 print STDOUT "Resetting hostname to ${nickname}${domain} ... ";
 
-if (system("hostname", "${nickname}${domain}")) {
+system("/bin/hostname ${nickname}${domain}");
+if ($?) {
     print STDOUT "*** FAILED!\n";
     exit 1;
 }

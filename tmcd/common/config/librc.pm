@@ -11,7 +11,7 @@
 package librc;
 use Exporter;
 @ISA    = "Exporter";
-@EXPORT = qw(fatal warning scriptname);
+@EXPORT = qw(fatal warning scriptname logit);
 
 # Must come after package declaration!
 use English;
@@ -29,6 +29,17 @@ BEGIN
     }
     require "/etc/emulab/paths.pm";
     import emulabpaths;
+}
+
+#
+# Log something to the console. The image will setup syslogd.conf so that
+# local5.err goes to the console!
+#
+sub logit($$)
+{
+    my ($tag, $msg) = @_;
+    
+    system("logger -p local5.err -i -t $tag '$msg'");
 }
 
 #

@@ -73,6 +73,8 @@ etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	dir-install
 	$(INSTALL) -m 644 ./pump.conf $(SYSETCDIR)/pump.conf
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+				$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth0 \
 			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth0
@@ -108,18 +110,21 @@ sysetc-remove:
 
 script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc/rc.linux
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
+	$(INSTALL) -m 755 $(SRCDIR)/sethostname.dhclient \
+				$(BINDIR)/sethostname.dhclient
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
-			$(BINDIR)/control_interface
+				$(BINDIR)/control_interface
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs

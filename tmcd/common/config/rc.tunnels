@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use POSIX qw(setsid);
 
 sub usage()
 {
@@ -262,6 +263,9 @@ sub doboot()
 	    $SIG{TERM} = 'DEFAULT';
 	    $SIG{INT}  = 'IGNORE';
 	    $SIG{HUP}  = 'DEFAULT';
+
+	    open(STDIN, "</dev/null") or
+		fatal("opening /dev/null for STDIN: $!");
 
 	    # Redirect stdout/stderr to log file.
 	    open(STDOUT, ">>$log")
