@@ -52,15 +52,16 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 # Need some DB info.
 #
 $query_result =
-    DBQueryFatal("select e.idx,e.state,e.batchmode,s.rsrcidx ".
+    DBQueryFatal("select e.idx,e.state,e.batchmode,e.batchstate,s.rsrcidx ".
 		 "  from experiments as e ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "where e.eid='$eid' and e.pid='$pid'");
-$row      = mysql_fetch_array($query_result);
-$expindex = $row["idx"];
-$expstate = $row["state"];
-$rsrcidx  = $row["rsrcidx"];
-$isbatch  = $row["batchmode"];
+$row        = mysql_fetch_array($query_result);
+$expindex   = $row["idx"];
+$expstate   = $row["state"];
+$rsrcidx    = $row["rsrcidx"];
+$isbatch    = $row["batchmode"];
+$batchstate = $row["batchstate"];
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
