@@ -155,7 +155,7 @@ while (my ($vname,$member,$mask,$cost) = $query_result->fetchrow_array) {
 #
 print $OUT "# nodes: vname,links\n";
 
-foreach my $node (keys(%nodes)) {
+foreach my $node (sort keys(%nodes)) {
     print $OUT "$node,";
     print $OUT join(" ", values(%{ $nodes{$node} }));
     print $OUT "\n";
@@ -166,7 +166,7 @@ foreach my $node (keys(%nodes)) {
 #
 print $OUT "# lans: vname,mask,cost\n";
 
-foreach my $lan (keys(%lans)) {
+foreach my $lan (sort keys(%lans)) {
     my $cost = $lans{$lan}->{"cost"};
     my $mask = $lans{$lan}->{"mask"};
     print $OUT "$lan,$mask,$cost\n";
