@@ -1898,10 +1898,11 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * Locally, everything is NFS mounted so no point in
 		 * sending back pubkey stuff; it's never used except on CygWin.
-		 * Add an argument of "pubkeys" to get the PUBKEY data on CygWin.
+		 * Add an argument of "pubkeys" to get the PUBKEY data.
+		 * An "windows" argument also returns a user's Windows Password.
 		 */
-		if (reqp->islocal && (strncmp(rdata, "pubkeys", 7) != 0
-				      || strncmp(rdata, "windows", 7) != 0))
+		if (reqp->islocal && ! (strncmp(rdata, "pubkeys", 7) == 0
+					|| strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
 
 		/*
