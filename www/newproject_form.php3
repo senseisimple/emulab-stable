@@ -235,8 +235,13 @@ echo "<tr>
       </tr>\n";
 
 #
-# Nodes and PCs
+# Nodes and PCs and Users
 # 
+echo "<tr>
+         <td>*Estimated #of Project Members:</td>
+         <td><input type=\"text\" name=\"proj_members\" size=\"4\"></td>
+      </tr>\n";
+
 echo "<tr>
          <td>*Estimated #of PCs:</td>
          <td><input type=\"text\" name=\"proj_pcs\" size=\"4\"></td>

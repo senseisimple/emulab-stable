@@ -28,6 +28,10 @@ if (!isset($proj_name) ||
     strcmp($proj_name, "UCB Overlay Multicast") == 0) {
   $formerror = "Long Name";
 }
+if (!isset($proj_members) ||
+    strcmp($proj_members, "") == 0) {
+  $formerror = "Estimated #of Project Members";
+}
 if (!isset($proj_pcs) ||
     strcmp($proj_pcs, "") == 0) {
   $formerror = "Estimated #of PCs";
@@ -215,10 +219,10 @@ $unix_gid++;
 
 $newproj_command = "INSERT INTO projects ".
      "(pid, created, expires, name, URL, head_uid, ".
-     " num_pcs, num_sharks, why, unix_gid)".
+     " num_members, num_pcs, num_sharks, why, unix_gid)".
      "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
-     "'$proj_head_uid', '$proj_pcs', '$proj_sharks', '$proj_why', ".
-     "'$unix_gid')";
+     "'$proj_head_uid', '$proj_members', '$proj_pcs', '$proj_sharks', ".
+     "'$proj_why', '$unix_gid')";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
@@ -245,6 +249,7 @@ mail($TBMAIL_APPROVAL,
      "Affiliation:   $usr_affil\n".
      "Address:       $usr_addr\n".
      "Phone:         $usr_phones\n".
+     "Members:       $proj_members\n".
      "PCs:           $proj_pcs\n".
      "Sharks:        $proj_sharks\n".
      "Reasons:\n$proj_why\n\n".
