@@ -1,0 +1,100 @@
+source tb_compat.tcl
+set ns [new Simulator]
+
+#Create four nodes
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+
+tb-set-node-os $n0 FBSD43-STD
+tb-set-node-os $n1 FBSD43-STD
+tb-set-node-os $n2 FBSD43-STD
+
+#Create links between the nodes
+set link0 [$ns duplex-link $n0 $n2 100Mb 1ms DropTail]
+set link1 [$ns duplex-link $n1 $n2 100Mb 1ms RED]
+set link2 [$ns duplex-link $n3 $n2 100Mb 1ms DropTail]
+
+# Get the queue object for the n1/n2 link and modify its RED params.
+set queue0 [[$ns link $n1 $n2] queue]
+$queue0 set gentle_ 1
+$queue0 set queue-in-bytes_ 0
+$queue0 set limit_ 40
+$queue0 set maxthresh_ 35
+$queue0 set thresh_ 25
+$queue0 set linterm_ 20
+$queue0 set q_weight_ 0.004
+
+
+#Create a UDP agent and attach it to node n0
+set udp0 [new Agent/UDP]
+#$udp0 set class_ 1
+$ns attach-agent $n0 $udp0
+
+# Create a CBR traffic source and attach it to udp0
+set cbr0 [new Application/Traffic/CBR]
+$cbr0 set packetSize_ 500
+$cbr0 set interval_ 0.005
+$cbr0 attach-agent $udp0
+
+#Create a UDP agent and attach it to node n1
+set udp1 [new Agent/UDP]
+#$udp1 set class_ 2
+$ns attach-agent $n1 $udp1
+
+# Create a CBR traffic source and attach it to udp1
+set cbr1 [new Application/Traffic/CBR]
+$cbr1 set packetSize_ 500
+$cbr1 set interval_ 0.005
+$cbr1 attach-agent $udp1
+
+#Create a Null agent (a traffic sink) and attach it to node n3
+set null0 [new Agent/Null]
+$ns attach-agent $n3 $null0
+
+#Create a Null agent (a traffic sink) and attach it to node n3
+set null1 [new Agent/Null]
+$ns attach-agent $n3 $null1
+
+#Connect the traffic sources with the traffic sink
+$ns connect $udp0 $null0  
+$ns connect $udp1 $null1
+
+tb-set-ip-interface $n0 $n2 192.168.2.2
+tb-set-ip-interface $n2 $n0 192.168.2.3
+tb-set-ip-interface $n1 $n2 192.168.3.2
+tb-set-ip-interface $n2 $n1 192.168.3.3
+tb-set-ip-interface $n3 $n2 192.168.1.2
+tb-set-ip-interface $n2 $n3 192.168.1.3
+
+
+#tb-set-node-startup $n0 /users/abhijeet/ping0 
+#tb-set-node-startup $n1 /users/abhijeet/ping1 
+
+$ns at 0.00001 "$cbr0 start"
+$ns at 0.00300 "$cbr0 set packetSize_ 64"
+$ns at 0.00300 "$cbr0 set interval_ 128"
+$ns at 0.00300 "$cbr0 set rate_ 15Mbps"
+$ns at 0.00500 "$cbr0 stop"
+$ns at 2.0 "$link0 down"
+$ns at 4.0 "$link1 down"
+$ns at 6.0 "$link0 up"
+$ns at 8.0 "$link1 up"
+$ns at 12.0 "$link0 delay 300ms"
+$ns at 12.0 "$link1 delay 300ms"
+$ns at 13.0 "$link0 bandwidth 1Mb duplex"
+$ns at 13.0 "$link1 bandwidth 1Mb duplex"
+$ns at 15.0 "$link0 bandwidth 100Mb duplex"
+$ns at 15.0 "$link1 bandwidth 100Mb duplex"
+$ns at 15.0 "$link0 delay 1ms"
+$ns at 15.0 "$link1 delay 1ms"
+
+$ns at 20    "$queue0 set thresh_ 5 ; $queue0 set linterm_ 10"
+$ns at 25    "$queue0 set maxthresh_ 30 ; $queue0 set q_weight_ 0.5"
+$ns at 30    "$queue0 set queue-in-bytes_ 0"
+$ns at 35    "$queue0 set limit_ 30"
+
+
+#Run the simulation
+$ns run
