@@ -34,7 +34,7 @@ if (!$printable) {
 ?>
 <p>
 This page describes the XMLRPC interface to Emulab. Currently, the
-interface mainly support experiment creation, modification, swapping,
+interface mainly supports experiment creation, modification, swapping,
 and termination. We also provide interfaces to several other common
 operations on nodes end experiments such as reboot, reloading, link
 delay configuration, etc.
@@ -62,7 +62,7 @@ commands from the shell. For example:
 which says to create an experiment called "myexp" in the "myproj" project,
 swap it in immediately, wait for the exit status (instead of running
 asynchronously), passing inline the contents of <tt>nsfile.ns</tt> in your
-home dir on your desktop.  By default, the client will contact the RPC
+homedir on your desktop.  By default, the client will contact the RPC
 server at <tt><?php echo $BOSSNODE ?></tt>, but you can override that by
 using the <tt>-s hostname</tt> option.. If your login ID on the local
 machine is different then your login ID on Emulab, you can use the <tt>-l
@@ -118,7 +118,7 @@ might:
     args = {};
     args["proj"] = "myproj"
     args["exp"] = "myexp"
-    args["swapop"]  = "out"
+    args["direction"]  = "out"
     response = server->swapexp(CURRENTVERSION, args)</code></pre>
 </ul>
 
