@@ -286,7 +286,19 @@ function WRITESIDEBAR() {
 		    WRITESIDEBARBUTTON("Edit Site Variables",
 				       $TBBASE, "editsitevars.php3");
 		}
-		
+
+		if (ISADMIN($login_uid)) {
+		    $query_result
+		      = DBQUeryFatal("select new_node_id from new_nodes");
+                    if (mysql_num_rows($query_result) > 0) {
+		        WRITESIDEBARBUTTON_NEW("Add Testbed Nodes",
+				           $TBBASE, "newnodes_list.php3");
+		    } else {
+		        WRITESIDEBARBUTTON("Add Testbed Nodes",
+				           $TBBASE, "newnodes_list.php3");
+		    }
+		}		
+
 		if ($login_status & CHECKLOGIN_CVSWEB) {
 		    WRITESIDEBARBUTTON("CVS Repository",
 				       $TBBASE, "cvsweb/cvsweb.php3");
