@@ -11,8 +11,8 @@ SUBDIR		= event/linktest
 LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
 NSTOIRDIR	= $(TESTBED_SRCDIR)/tbsetup/ns2ir
-DAEMON	        = linktest$(EXE)
-LTEVENT		= ltevent$(EXE)
+DAEMON	        = linktest
+LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 SCRIPT_PROXY	= linktest.proxy
@@ -20,7 +20,7 @@ SCRIPT_CONTROL  = linktest_control
 SCRIPT_TBCOMPAT = tb_compat.tcl
 SCRIPT_NSTB_COMPAT = nstb_compat.tcl
 
-SYSTEM	       := $(shell uname -s)
+SYSTEM	       := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
 
 include $(OBJDIR)/Makeconf
 
@@ -59,6 +59,9 @@ ifeq ($(SYSTEM),FreeBSD)
 LOCAL_BINDIR	= fbsd
 endif
 
+ifeq ($(SYSTEM),CYGWIN)
+LOCAL_BINDIR	= windows
+endif
 
 LIBTB_OBJS	= $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 DAEMON_OBJS	= linktest.o
