@@ -48,7 +48,8 @@ my $BASEADDR	= "234.5.6";
 my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
-my $BW		= 70000000; 	# 70Mb/sec
+my $STD_BW	= 72000000; 	# 71.6Mb/sec w/1000HZ kernel
+my $USR_BW	= 54000000;	# 53.7Mb/sec w/1000HZ kernel
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -226,6 +227,16 @@ set_pid($imageid, $PID);
 #
 if ($EUID == 0) {
 	$EUID = $UID;
+}
+
+#
+# Select the appropriate bandwidth
+#
+my $BW;
+if ($filename =~ /^$TB\/images/) {
+    $BW = $STD_BW;
+} else {
+    $BW = $USR_BW;
 }
 
 # Now, we actually launch Frisbee
