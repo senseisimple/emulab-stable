@@ -102,6 +102,7 @@ sub dowork() {
     my $control_node;
     my $pswd;
     my $user_number;    # 1025
+    my $user_email;     # foo@bar
     my $fullname;       # Kristin Wright
     my @groupnames;     # lkwbox (same as projects)
     my %groupnumbers;   # 6001
@@ -119,14 +120,15 @@ sub dowork() {
     $control_node  = $CONTROL;           # see note above  
 
     # get user info
-    $db_query       = "select usr_pswd,unix_uid,usr_name from users " .
-      	              "where uid='$user'";
+    $db_query       = "select usr_pswd,unix_uid,usr_name,usr_email ".
+	              "from users where uid='$user'";
     $sth            = $dbh->query($db_query);
     got_tuples($sth) or die "$0: Error selecting user fields.\n";
     @db_row         = $sth->fetchrow_array();
     $pswd        = $db_row[0];
     $user_number = $db_row[1]; 
     $fullname    = $db_row[2];
+    $user_email  = $db_row[3];
 
     # get group names
     $db_query       = "select pid from proj_memb where uid='$user' ".
@@ -255,7 +257,7 @@ sub dowork() {
     if (! -e "/users/$user/.ssh/" ) {
       # Only do this if its not been done before.
       print "Setting up ssh data...\n";
-      mkdir("/users/$user/.ssh", 0755);
+      mkdir("/users/$user/.ssh", 0700);
       chown($user_number, $group_number, "/users/$user/.ssh");      
       # Run commands below as the user
       $EUID = $user_number;
@@ -270,6 +272,19 @@ sub dowork() {
       chmod(0600, "/users/$user/.ssh/authorized_keys");
     } else {
       print "SSH data in /users/$user/.ssh/ appears to exist. Skipping.\n";
+    }
+
+    #
+    # Set up a .forward file so that any email to them gets forwarded off.
+    # 
+    if (! -e "/users/$user/.forward" ) {
+      print "Setting up .forward file ...\n";
+      open(FOR, ">/users/$user/.forward");
+      print FOR "$user_email\n";
+      close(FOR);
+      chmod(0644, "/users/$user/.forward");
+    } else {
+      print "There appears to be a .forward file in /users/$user. Skipping.\n";
     }
 }
 
