@@ -307,12 +307,16 @@ public class RoboTrack extends JApplet {
 		robbie.gotdest = true;
 	    }
 	    else {
-		// Consume next two tokens and clear strings.
+		// Consume next two tokens and clear strings/values.
 		str = tokens.nextToken();
 		str = tokens.nextToken();
+		robbie.dx  = 0;
+		robbie.dy  = 0;
+		robbie.dor = 500.0;
 		robbie.dx_meters  = "";
 		robbie.dy_meters  = "";
 		robbie.dor_string = "";
+		robbie.gotdest = false;
 	    }
 
 	    // Store these as strings for easy display.
