@@ -145,7 +145,7 @@ echo "<tr>
 #
 # If a new usr, then provide a second password confirmation field.
 # 
-if ($row) {
+if (! $row) {
     echo "<tr>
               <td>Retype<br>New Password:</td>
               <td class=\"left\">
