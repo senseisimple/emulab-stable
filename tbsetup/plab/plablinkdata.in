@@ -1,0 +1,633 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX;
+use IO::Handle;
+
+#
+# Age (in seconds) at which we consider metric data stale
+#
+my $STALEAGE  = 30 * 60;
+
+#
+# This is the magic node which is equivalent to the TBDB_WIDEAREA_LOCALNODE.
+# This could be moved to a configure variable, but I'm not going to do so
+# until there's a need to go to that trouble. It's hacky, no matter where
+# you put it.
+#
+my $MAGICNODE = "planetlab2.flux.utah.edu";
+
+sub usage()
+{
+    print STDERR
+	"Usage: plabmetrics [-d] [-n] [[-l | -b] <datafile>]]\n".
+	"       -d       - Turn on debugging\n".
+	"       -f       - Do not run in background\n".
+	"       -n       - Do not change the DB\n".
+	"       -l file  - Process latency info file\n".
+        "       -b file  - Process bandwidth info file\n";
+    exit(-1);
+}
+my $optlist = "l:b:dnf";
+my $debug   = 0;
+my $daemon  = 1;
+my $impotent= 0;
+my $datafile;
+my $selected= 0; # 1 for latency, 2 for bandwidth.
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my $logfile	= "$TB/log/plablinkdata.log";
+my $tempfile	= "/tmp/plablink.$$";
+my $LATURL	= "http://www.pdos.lcs.mit.edu/~strib/pl_app/current.app";
+my $BWURL	= "http://www.planet-lab.org/logs/iperf/files";
+my %linkdata    = (); # Map IP to link data.
+my %hostmap	= (); # Map hostname to IP.
+my $exitval     = 0;
+my $now         = time();
+my $LocalIface;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 10;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $daemon = 0;
+}
+if (defined($options{"l"})) {
+    $selected = 1;
+    $datafile = $options{"l"};
+}
+if (defined($options{"b"})) {
+    $selected = 2;
+    $datafile = $options{"b"};
+}
+if (defined($datafile)) {
+    # Note different taint check (allow /).
+    if ($datafile =~ /^([-\w.\/]+)$/) {
+	$datafile = $1;
+    }
+    else {
+	die("Tainted file name: $datafile");
+    }
+}
+
+# Disconnect from caller and run in background. Exits after one run.
+if ($daemon) {
+    daemonize();
+}
+
+print "\n=== plablinkdata running at " . `date`;
+
+#
+# Find out the interface to use for the TBDB_WIDEAREA_LOCALNODE, since
+# we do not want to hardcode it anywhere.
+#
+my $query_result =
+    DBQueryFatal("select iface from interfaces ".
+		 "where node_id='" . TBDB_WIDEAREA_LOCALNODE . "'");
+if ($query_result->num_rows() != 1) {
+    fatal("Unable to determine iface for " . TBDB_WIDEAREA_LOCALNODE);
+}
+($LocalIface) = ($query_result->fetchrow());
+
+#
+# Grab the node list from the DB in one query, which we use later to
+# map from the IP we get from the link data, to our node_id. 
+#
+$query_result =
+    DBQueryFatal("select i.node_id,i.IP,i.iface,w.hostname from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "left join widearea_nodeinfo as w on w.node_id=n.node_id ".
+		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
+    		 "and nt.class='pcplabphys'");
+
+while (my ($nodeid,$IP,$iface,$hostname) = $query_result->fetchrow_array()) {
+    $linkdata{$IP} = {
+	NODEID	 => $nodeid,
+	IFACE    => $iface,
+	HOSTNAME => $hostname,
+	INDEX    => undef,
+	LATENCY  => {},
+	BW       => {},
+    };
+    $hostmap{$hostname} = $IP;
+}
+
+#
+# If given a datafile, then parse it as the type of file that was specified
+# on the command line.
+# 
+if (defined($datafile)) {
+    # Default to a latency file.
+    if (!$selected || $selected == 1) {
+	$exitval = ParseLatency($datafile);
+    }
+    else {
+	$exitval = ParseBW($datafile);
+    }
+    $exitval = InsertLinkData()
+	if ($exitval == 0 && !$impotent);
+}
+else {
+    if (DownLoadURL($LATURL, $tempfile) == 0) {
+	$exitval = ParseLatency($tempfile);
+    }
+    if (!$exitval) {
+	#
+	# What a pain. Need to figure the current BW data set from the date.
+	# We go back one week.
+	#
+	for (my $i = 6; $i >= 0; $i--) {
+	    my $bwfile = POSIX::strftime("20%y-%m-%d.log.gz",
+					 localtime(time() -
+						   ($i * (24 * 60 * 60))));
+    
+	    unlink($tempfile);
+	    if (DownLoadURL("$BWURL/$bwfile", "$tempfile.gz") == 0) {
+		$exitval = system("gunzip $tempfile.gz");
+		if (!$exitval) {
+		    $exitval = ParseBW($tempfile);
+		}
+		last
+		    if ($exitval);
+	    }
+	}
+    }
+    $exitval = InsertLinkData()
+	if ($exitval == 0 && !$impotent);
+}
+print "=== plablinkdata done at " . `date`;
+
+unlink($tempfile)
+    if (-e $tempfile);
+fatal("Failed to bring in plab link data")
+    if ($exitval);
+exit(0);
+
+#
+# Insert Link Data into the DB.
+# 
+sub InsertLinkData()
+{
+    foreach my $from_ip (keys(%linkdata)) {
+	my $from_nodeid   = $linkdata{$from_ip}->{NODEID};
+	my $from_iface    = $linkdata{$from_ip}->{IFACE};
+	my $from_hostname = $linkdata{$from_ip}->{HOSTNAME};
+
+	foreach my $to_ip (keys(%linkdata)) {
+	    my $to_nodeid   = $linkdata{$to_ip}->{NODEID};
+	    my $to_iface    = $linkdata{$to_ip}->{IFACE};
+	    my $to_hostname = $linkdata{$to_ip}->{HOSTNAME};
+	    my ($latency,$bandwidth);
+
+	    next
+		if ($from_ip eq $to_ip);
+
+	    if (exists($linkdata{$from_ip}->{LATENCY}->{$to_nodeid})) {
+		$latency = $linkdata{$from_ip}->{LATENCY}->{$to_nodeid};
+	    }
+	    
+	    if (exists($linkdata{$from_ip}->{BW}->{$to_nodeid})) {
+		$bandwidth = $linkdata{$from_ip}->{BW}->{$to_nodeid};
+	    }
+
+	    next
+		if (! (defined($latency) || defined($bandwidth)));
+
+	    if ($debug) {
+		print "$from_nodeid $to_nodeid ";
+		print "Latency: $latency "
+		    if (defined($latency));
+		print "BW: $bandwidth "
+		    if (defined($bandwidth));
+		print "\n";
+	    }
+	    my $update = "";
+	    my $query  = "";
+	    
+	    $update .= "lossrate=0, ";
+	    $update .= "start_time=$now,end_time=start_time ";
+	    $update .= ",time=$latency "
+		if (defined($latency));
+	    $update .= ",bandwidth=$bandwidth "
+		if (defined($bandwidth));
+
+	    my $query_result =
+		DBQueryFatal("update widearea_recent set ".
+			     "$update ".
+			     "where node_id1='$from_nodeid' and ".
+			     "      iface1='$from_iface' and ".
+			     "      node_id2='$to_nodeid' and ".
+			     "      iface2='$to_iface'");
+	    
+	    if (!$query_result->affectedrows &&
+		(defined($latency) && defined($bandwidth))) {
+		DBQueryFatal("replace into widearea_recent set ".
+			     "$update, ".
+			     "node_id1='$from_nodeid', ".
+			     "iface1='$from_iface', ".
+			     "node_id2='$to_nodeid', ".
+			     "iface2='$to_iface'");
+	    }
+	    if (($from_hostname eq $MAGICNODE) ||
+		($to_hostname   eq $MAGICNODE)) {
+		if ($from_hostname eq $MAGICNODE) {
+		    $from_nodeid = TBDB_WIDEAREA_LOCALNODE;
+		    $from_iface  = $LocalIface;
+		}
+		if ($to_hostname eq $MAGICNODE) {
+		    $to_nodeid = TBDB_WIDEAREA_LOCALNODE;
+		    $to_iface  = $LocalIface;
+		}
+		$query_result =
+		    DBQueryFatal("update widearea_recent set ".
+				 "$update ".
+				 "where node_id1='$from_nodeid' and ".
+				 "      iface1='$from_iface' and ".
+				 "      node_id2='$to_nodeid' and ".
+				 "      iface2='$to_iface'");
+	    
+		if (!$query_result->affectedrows &&
+		    (defined($latency) && defined($bandwidth))) {
+		    DBQueryFatal("replace into widearea_recent set ".
+				 "$update, ".
+				 "node_id1='$from_nodeid', ".
+				 "iface1='$from_iface', ".
+				 "node_id2='$to_nodeid', ".
+				 "iface2='$to_iface'");
+		}
+	    }
+	}
+    }
+}
+
+#
+# Parse a latency data file.
+#
+sub ParseLatency($)
+{
+    my ($file) = @_;
+    my ($timestamp, $pingcount);
+    my @nodemap = (); # Map index in latency tables 
+
+    if (!open(LAT, $file)) {
+	print STDERR "Could not open $file: $!\n";
+	return -1;
+    }
+
+    #
+    # Line 1: The date/time of the data.
+    #
+    $_ = <LAT>;
+    goto nosync
+	if (!defined($_));
+
+    if ($_ =~ /^(\d*):(\d*):(\d*) (\d*)\/(\d*)\/(\d*)$/) {
+	$timestamp = mktime($3, $2, $1, $5, $4-1, 100 + ($6 - 2000));
+	print STDERR
+	    "Timestamp is $timestamp: " . POSIX::ctime($timestamp)
+		if ($debug);
+    }
+    else {
+	goto nosync;
+    }
+
+    #
+    # Line 2 is the number of pings in the sample. Not sure what to do
+    # with this number?
+    # 
+    $_ = <LAT>;
+    goto nosync
+	if (!defined($_));
+
+    if ($_ =~ /^(\d*)$/) {
+	$pingcount = $1;
+	print STDERR "$pingcount pings in sample size\n"
+	    if ($debug);
+    }
+    else {
+	goto nosync;
+    }
+
+    #
+    # Line 3 is the list of the N PlanetLab nodes for which this file
+    # contains information.
+    #
+    $_ = <LAT>;
+    goto nosync
+	if (!defined($_));
+
+    my @iplist = split(' ', $_);
+    goto nosync
+	if (! scalar(@iplist));
+
+    for (my $i = 0; $i < scalar(@iplist); $i++) {
+	my $ip = $iplist[$i];
+	
+	if ($ip =~ /^(\d*\.\d*\.\d*\.\d*)$/) {
+	    if (exists($linkdata{$1})) {
+		$linkdata{$1}->{INDEX} = $i;
+	    }
+	    # Map index to the ip for later (its position in the lists).
+	    $nodemap[$i] = $1;
+	}
+	else {
+	    goto nosync;
+	}
+    }
+    print STDERR scalar(@iplist) . " nodes in sample\n"
+	if ($debug);
+
+    #
+    # Lines 4 through (N+3): The pairwise ping times themselves, as an
+    # NxN matrix of min ping/av. ping/max ping tuples. For example,
+    # line i includes the pairwise ping times for the node (i-4) as
+    # listed in the array on Line 3. The jth entry on line i contains
+    # the ping tuple for node (i-4) to node j.
+    #
+    my $i = 0;
+
+    while (<LAT>) {
+	my $from_ip      = $nodemap[$i];
+	my $from_nodeid;
+
+	#
+	# If this IP is not known to us, skip
+	#
+	if (!exists($linkdata{$from_ip})) {
+	    print STDERR "Skipping line $i ($from_ip); not in DB!\n"
+		if ($debug);
+	    goto skip;
+	}
+	$from_nodeid = $linkdata{$from_ip}->{NODEID};	
+	
+	#
+	# If the centralized controller receives no data from node x
+	# for a given time period, node x's line will read:
+	#     *** no data received for node.x.ip.address ***
+	# Note that in the most recently collected data sets, this may
+	# appear because node x was just slow or unsynchronized in
+	# sending its data back; this line can be replaced with actual
+	# data at any point in the future, if node x ever sends it in.
+	#
+	if ($_ =~ /^\*\*\* no data received for ([\d\.]*) \*\*\*$/) {
+	    print STDERR "No data for $1 ($from_nodeid)\n"
+		if ($debug);
+	    goto skip;
+	}
+
+	my @pinglist = split(' ', $_);
+	goto nosync
+	    if (! scalar(@pinglist));
+	goto nosync
+	    if (scalar(@pinglist) != scalar(@iplist));
+
+	#
+	# Go through the list.
+	# 
+	for (my $j = 0; $j < scalar(@pinglist); $j++) {
+	    my $to_ip     = $nodemap[$j];
+	    
+	    #
+	    # The ping time to itself is actually included! We do not put
+	    # that into the DB at this time.
+	    #
+	    next
+		if ($i == $j);
+
+	    #
+	    # Skip nodes we do not know about.
+	    #
+	    next
+		if (!exists($linkdata{$to_ip}));
+
+	    my $to_nodeid = $linkdata{$to_ip}->{NODEID};	    
+	    my $data      = $pinglist[$j];
+
+	    #
+	    # If the pings failed, or if the node sent back no data,
+	    # there will be a *** ... *** entry. Skip it for now.
+	    #
+	    next
+		if ($data =~ /^\*\*\*.*\*\*\*/);
+
+	    # Actual ping data.
+	    my ($min,$avg,$max) = split('/', $data);
+
+	    $linkdata{$from_ip}->{LATENCY}->{$to_nodeid} = $avg / 1000.0;
+	    print STDERR "$from_nodeid --> $to_nodeid: $avg\n"
+		if ($debug > 2);
+	}
+     skip:
+	$i++;
+    }
+    close(LAT);
+    return 0;
+    
+  nosync:
+    close(LAT);
+    print STDERR "Out of sync parsing latency file.\n";
+    print STDERR "Current line: $_\n"
+	if (defined($_));
+    return 1;
+}
+
+sub ParseBW($)
+{
+    my ($file) = @_;
+
+    if (!open(BW, $file)) {
+	print STDERR "Could not open $file: $!\n";
+	return -1;
+    }
+
+    #
+    # Very simple format:
+    #
+    # yyyy-mm-dd HH:MM:SS,fromhost,tohost,bitspersecond
+    #
+    # Ignore the timestamps for now since they have no relation to
+    # the latency data. 
+    #
+    while (<BW>) {
+	my ($daydate,$fromhost,$tohost,$bits) = split(',', $_);
+
+	if (! (defined($daydate) && defined($fromhost) &&
+	       defined($tohost) && defined($bits))) {
+	    goto nosync;
+	}
+
+	if ($daydate =~ /^(\d*)\-(\d*)\-(\d*) (\d*):(\d*):(\d*)$/) {
+	    $timestamp = mktime($6, $5, $4, $3, $2-1, 100 + ($1 - 2000));
+	    print STDERR
+		"Timestamp is $timestamp: " . POSIX::ctime($timestamp)
+		    if ($debug > 2);
+	}
+	else {
+	    goto nosync;
+	}
+	if ($bits =~ /^(\d*)$/) {
+	    $bits = $1;
+	}
+	else {
+	    goto nosync;
+	}
+
+	next
+	    if (!exists($hostmap{$fromhost}) ||
+		!exists($hostmap{$tohost}));
+
+	my $from_ip     = $hostmap{$fromhost};
+	my $to_ip       = $hostmap{$tohost};
+	my $from_nodeid = $linkdata{$from_ip}->{NODEID};
+	my $to_nodeid   = $linkdata{$to_ip}->{NODEID};
+
+	print STDERR "BW: $from_nodeid --> $to_nodeid: $bits\n"
+	    if ($debug);
+
+	$linkdata{$from_ip}->{BW}->{$to_nodeid} = $bits / 1000.0;
+    }
+    close(BW);
+    return 0;
+    
+  nosync:
+    close(BW);
+    print STDERR "Out of sync parsing bandwidth file.\n";
+    print STDERR "Current line: $_\n"
+	if (defined($_));
+    return 1;
+}
+
+#
+# Download the datafile from the plab site.
+#
+sub DownLoadURL($$)
+{
+    my ($url, $tempfile) = @_;
+
+    print STDERR "Downloading $url to $tempfile ...\n"
+	if (1);
+    
+    #
+    # Must prevent hangs ...
+    #
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 120;
+	waitpid($syspid, 0);
+	alarm 0;
+	my $exitcode = $?;
+
+	warn("*** Timed out downloading link data from web site!\n")
+	    if ($exitcode == 15);
+	    
+	warn("*** Could not download link data from web site!\n")
+	    if ($exitcode);
+
+	return($exitcode >> 8);
+    }
+    else {
+	exec("/usr/local/bin/wget -q -O $tempfile $url");
+	exit(1);
+    }
+}
+
+sub fatal {
+    my $msg = $_[0];
+
+    if ($daemon) {
+	SENDMAIL($TBOPS, "plablinkdata failed",
+		 "$msg\n\n".
+		 "Please see $logfile for more info.\n");
+    }
+    die($msg);
+}
+
+#
+# Become a daemon.
+# 
+sub daemonize()
+{
+    my $mypid = fork();
+    if ($mypid) {
+	exit(0);
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller will continue to wait
+    # even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    #
+    # Open the batch log and start writing to it. 
+    #
+    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
+    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
+
+    #
+    # Turn off line buffering on output
+    #
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+
+    return 0;
+}

@@ -1409,7 +1409,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord \
+	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
