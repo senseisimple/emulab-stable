@@ -232,10 +232,10 @@ client-install:
 	$(INSTALL_DATA) emulab_pubkey.pem \
 			$(DESTDIR)$(CLIENT_ETCDIR)/emulab_pubkey.pem
 
-control-install:	$(INSTALL_SBINDIR)/capture.pem \
+control-install:	$(INSTALL_ETCDIR)/capture.pem \
 			$(INSTALL_ETCDIR)/emulab.pem
 	$(INSTALL_DATA) ctrlnode.pem $(INSTALL_ETCDIR)/client.pem
-	chmod 640 $(INSTALL_SBINDIR)/capture.pem
+	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 
