@@ -85,7 +85,7 @@ my $JAILCONFIG  = "jailconfig";
 my @ROOTCPDIRS	= ("etc", "root");
 my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
 		   "bin", "sbin", "home", $LOCALMNTPNT);
-my @ROOTMNTDIRS = ("bin", "sbin", "usr");
+my @ROOTMNTDIRS = ("bin", "sbin", "usr", "compat");
 my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $VNFILESECT  = 64 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
 my $MAXVNDEVS	= 100;
