@@ -436,17 +436,6 @@ foreach my $vnode (keys(%vnodes)) {
 	#
 	next;
     }
-    #
-    # Set the allocstate for the local vnode. Used to by vnode_setup to
-    # determine if a reboot is required. If the underlying physnode is
-    # going to be rebooted, move the node into the RES_READY state, since
-    # by definition, when the node reboots the vnode is going to get
-    # set up, and so vnode_setup should not do anything. Might need an
-    # intermediate state here, but not sure yet.
-    #
-    if (exists($reboots{$pnode})) {
-	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
-    }
     
     # Nothing else to do for local jail nodes at this time ...
 }
@@ -625,19 +614,46 @@ TBDebugTimeStamp("Local node waiting finished");
 # We do this in a sub script since nodes are not owned by the user
 # and so must be setuid root so that ssh will work.
 #
+my @vnodelist = keys(%vnodes);
+
+#
+# Set the allocstate for the local vnodes that were sucessfully rebooted
+# and came to ISUP above. These do not need to be setup again! We move
+# them to RES_READY, so vnode_setup will ignore them. If they fail to
+# hit ISUP, we will move them to DOWN so that vnode_setup will ignore
+# them again, in the teardown phase.
+#
+# Note, we do this even if there were failures above, since the teardown
+# phase is going to happen, and we want vnode_setup to know which nodes
+# came up with phynodes okay (need to be torndown) and which ones never
+# had the chance (no need to teardown). Think swapmod, which does teardown
+# in the ACTIVATING state.
+#
+foreach my $vnode (@vnodelist) {
+    my $pnode  = $vnode2pnode{$vnode};
+
+    # Remote node, always does setup. 
+    next
+	if (!exists($nodes{$pnode}));
+
+    if ($nodeAllocStates{$pnode} eq TBDB_ALLOCSTATE_RES_READY()) {
+	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
+	$nodeAllocStates{$vnode} = TBDB_ALLOCSTATE_RES_READY();
+    }
+}
+
+#
 # XXX - Don't bother if something above failed. A waste of time and
 # usually leads to cascading errors.
 #
-my @vnodelist = keys(%vnodes);
-
 if ($failed && @vnodelist) {
     print "*** Skipping virtual node setup since there were previous ".
 	"failures!\n";
 }
 elsif (@vnodelist) {
     print "Setting up virtual testbed nodes ...\n";
+
     system("$vnode_setup $pid $eid");
-    
     if ($?) {
 	die_noretry("*** $0:\n".
 	    "    Vnode setup failed!");
@@ -657,14 +673,16 @@ elsif (@vnodelist) {
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
-	    # Might have been set above.
+	    # Might have already been set above.
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY;
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
 	}
 
 	SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN;
 	
 	print "*** WARNING: $node may be down.\n";
 	
