@@ -1079,8 +1079,8 @@ calcburst(void)
 	bursts = 0;
 }
 
-#define LINK_OVERHEAD	(14 + 20)	/* ethernet (hdr + preamble + gap) */
-#define IP_OVERHEAD	(20 + 8)	/* UDP + IP hdrs */
+#define LINK_OVERHEAD	(14+4+8+12)	/* ethernet (hdr+CRC+preamble+gap) */
+#define IP_OVERHEAD	(20+8)		/* IP + UDP hdrs */
 
 /*
  * Compute the approximate send rate.  Due to typically coarse grained

@@ -12,21 +12,27 @@
 #include "log.h"
 
 /*
- * We operate in terms of this blocksize (in bytes). 
+ * Ethernet MTU (1514) - eth header (14) - min UDP/IP (28) - BLOCK msg
+ * header (24).
  */
+#define MAXBLOCKSIZE	1448
+
+/*
+ * Images are broken into chunks which are the standalone unit of decompression
+ * Chunks are broken into blocks which are the unit of transmission
+ */
+#define CHUNKSIZE	1024
 #define BLOCKSIZE	1024
 
 /*
- * Each chunk is this many blocks.
+ * Make sure we can represent a bitmap of blocks in a single packet.
+ * Make sure we can fit a block in a single ethernet MTU.
  */
-#define CHUNKSIZE	1024
-
-/*
- * See if we can represent a bitmap of blocks in a single packet.
- * If so, then allow partial request messages.
- */
-#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > 1450
+#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > MAXBLOCKSIZE
 #error "Invalid chunk size"
+#endif
+#if BLOCKSIZE > MAXBLOCKSIZE
+#error "Invalid block size"
 #endif
 
 /*
