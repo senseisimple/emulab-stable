@@ -28,6 +28,36 @@ A. Things to understand up front:
    speak of "rebooting into Linux" or "rebooting into the admin MFS", this
    is how I expect you to do it.
 
+3. To do an Emulab client software install, certain other software packages
+   must be installed.  If you are updating a recent Emulab image, these
+   should all be in place.  But if you are updating a really old image,
+   or you are installing the software for the first time, you will need
+   these things:
+
+   - Elvin headers and libraries.  Check for the existance of "libvin4.a"
+     in your library path (probably in /usr/local/lib).  If it doesn't
+     exist, you will need to download:
+
+       http://www.emulab.net/downloads/libelvin-4.0.3.tar.gz
+
+     build, and install it.  Note that this is an older version of elvin,
+     so you cannot just install a package or RPM.
+
+   - Boost headers.  Check for the boost directory in the include directory
+     path (probably in /usr/local/include or even /usr/include).
+     For FreeBSD you can just install the package or port (version >= 1.30).
+     For Linux, you may have a harder time.  The RedHat RPMs I have found
+     only include the libraries, you need just the headers (everything we
+     use is implemented as a template I think).  I think I just copied over
+     the installed headers from a BSD box.
+
+   - Perl.  On FreeBSD 5, perl is not installed by default.  Make sure you
+     have a version of perl5 installed.
+
+   - Ethtool.  On Linux, with certain NICs, you will need ethtool (instead
+     of mii-tool) so that the Emulab software can change link speed/duplex.
+     Just install an RPM.
+
 
 B. Now we can begin the process:
 
@@ -59,23 +89,18 @@ B. Now we can begin the process:
 	sudo cp -pr /etc /Oetc
 	sudo cp -pr /usr/local/etc/emulab /usr/local/etc/Oemulab
 
-   then do the install.  For FreeBSD 4.x and Redhat 7.x systems you can
-   just do:
+   then do the install.  For FreeBSD 4, FreeBSD 5, RedHat 7 and RedHat 9
+   systems you can just do:
 
 	cd <build-tree-for-this-os>
+	gmake client
+
+   and it will build the necessary client-side binaries.  If something
+   doesn't build, most likely it is because of a missing software
+   package, see A3 above.  After successfully building, install the
+   binaries and scripts with:
+
 	sudo gmake client-install
-
-   and it will build and install all client-side binaries and scripts.
-   Due to various compiler and library related issues that we have not
-   yet resolved, the event agents in the event subdirectory, don't build
-   cleanly on newer FreeBSDs or Redhats.  On these systems you can install
-   the most frequently changed stuff (mostly scripts) by doing:
-
-	cd <build-tree-for-this-os>/tmcd
-	cd {linux,freebsd}		# whichever OS you are running
-	sudo gmake install
-
-   If you need to install the other binaries, contact us.
 
    If you did the backup, you can then compare the original to the new:
 
