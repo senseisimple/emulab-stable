@@ -6,6 +6,11 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040805:
+	Add a new CNAME for boss to /etc/namedb/<OURDMAIN>.db.head -
+	event-server . Re-run named_setup on boss to make this change
+	take place. In the future, we may move this CNAME to ops.
+
 20040713:
 	For new distributed routing support, must first run this script as
         root to generate a data file for each existing experiment.

@@ -28,6 +28,7 @@ boss		IN	A		155.101.128.70
 www		IN	CNAME   boss
 db		IN	CNAME	boss
 cvsup		IN	CNAME	boss
+event-server	IN	CNAME	boss
 
 ns2		IN	A		155.99.212.1 ; fast.cs.utah.edu
 
