@@ -30,7 +30,7 @@ using namespace boost;
 
 extern name_vvertex_map vname2vertex;
 extern name_name_map fixed_nodes;
-extern name_slist vtypes;
+extern name_count_map vtypes;
 extern vvertex_vector virtual_nodes;
 
 #define top_error(s) errors++;cerr << "TOP:" << line << ": " << s << endl
@@ -71,7 +71,11 @@ int parse_top(tb_vgraph &VG, istream& i)
 	} else {
 	  v->type=type;
 	  v->vclass=NULL;
-	  vtypes.push_front(v->type);
+	  if (vtypes.find(v->type) == vtypes.end()) {
+	      vtypes[v->type] = 1;
+	  } else {
+	      vtypes[v->type]++;
+	  }
 	}
 	v->fixed = false;	// this may get set to true later
 #ifdef PER_VNODE_TT
@@ -224,7 +228,10 @@ int parse_top(tb_vgraph &VG, istream& i)
 	vclass_map[name] = v;
 	for (unsigned int i = 3;i<parsed_line.size();++i) {
 	  v->add_type(parsed_line[i]);
-	  vtypes.push_front(parsed_line[i]);
+	  // XXX - in order not to break vtypes, we don't put them in the
+	  // vtypes map (otherwise, the type precheck would complain, but the
+	  // top may still be mappable).
+	  //vtypes.push_front(parsed_line[i]);
 	}
       }
     } else if (command.compare("fix-node") == 0) {

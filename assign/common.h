@@ -142,6 +142,11 @@ namespace boost {
 typedef hash_map<crope,crope> name_name_map;
 typedef slist<crope> name_slist;
 
+/*
+ * Used to count the number of nodes in each ptype and vtype
+ */
+typedef hash_map<crope,int> name_count_map;
+
 template <class T> struct hashptr {
   size_t operator()(T const &A) const {
     return (size_t) A;

@@ -7,7 +7,6 @@
 #include "port.h"
 
 #include <hash_map>
-#include <slist>
 #include <rope>
 #include <queue>
 
@@ -38,6 +37,11 @@ using namespace boost;
 #include "pclass.h"
 #include "score.h"
 
+/*
+ * 'optimal' score - computes a lower bound on the optimal score for this
+ * mapping, so that if we find this score, we know we're done and can exit
+ * early.
+ */
 #ifdef USE_OPTIMAL
 #define OPTIMAL_SCORE(edges,nodes) (nodes*SCORE_PNODE + \
                                     nodes/opt_nodes_per_sw*SCORE_SWITCH + \
@@ -89,7 +93,7 @@ tb_vgraph_edge_pmap vedge_pmap = get(edge_data, VG);
 name_pvertex_map pname2vertex;
 
 // A simple list of physical types.
-name_slist ptypes;
+name_count_map ptypes;
 
 // Map of virtual node name to its vertex descriptor.
 name_vvertex_map vname2vertex;
@@ -104,7 +108,7 @@ vvertex_vector virtual_nodes;
 name_name_map fixed_nodes;
 
 // List of virtual types by name.
-name_slist vtypes;
+name_count_map vtypes;
 
 // Priority queue of unassigned virtual nodes.  Basically a fancy way
 // of randomly choosing a unassigned virtual node.  When nodes become
@@ -1366,7 +1370,7 @@ void print_solution()
     } else if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
       cout << " trivial" << endl;
     } else {
-      cout << " Unknown link type" << endl;
+      cout << " Mapping Failed" << endl;
     }
   }
   cout << "End Edges" << endl;
@@ -1624,19 +1628,36 @@ int main(int argc,char **argv)
 
   read_virtual_topology(argv[1]);
  
-  cout << "Type preecheck." << endl;
-  ptypes.push_front("lan");
+  cout << "Type preecheck:" << endl;
   // Type precheck
   bool ok=true;
-  for (name_slist::iterator it=vtypes.begin();
-       it != vtypes.end();++it) {
-    if (find(ptypes.begin(),ptypes.end(),*it) == ptypes.end()) {
-      cout << "  No physical nodes of type " << *it << endl;
-      ok=false;
+  for (name_count_map::iterator vtype_it=vtypes.begin();
+       vtype_it != vtypes.end();++vtype_it) {
+    
+    // Ignore LAN vnodes
+    if (vtype_it->first == crope("lan")) {
+	continue;
+    }
+
+    // Check to see if there were any pnodes of the type at all
+    name_count_map::iterator ptype_it = ptypes.find(vtype_it->first);
+    if (ptype_it == ptypes.end()) {
+      cout << "  *** No physical nodes of type " << vtype_it->first << " found"
+        << endl;
+      ok = false;
+    } else {
+      // Okay, there are some - are there enough?
+      if (ptype_it->second < vtype_it->second) {
+	cout << "  *** " << vtype_it->second << " nodes of type " <<
+	  vtype_it->first << " requested, but only " << ptype_it->second <<
+	  " found" << endl;
+	ok = false;
+      }
     }
   }
   if (! ok) exit(-1);
 
+  cout << "Type preecheck passed." << endl;
 
 #ifdef PER_VNODE_TT
   vvertex_iterator vit,vendit;

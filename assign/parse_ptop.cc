@@ -30,7 +30,7 @@ using namespace boost;
 #include "parser.h"
 
 extern name_pvertex_map pname2vertex;
-extern name_slist ptypes;
+extern name_count_map ptypes;
 
 #define ptop_error(s) errors++;cerr << "PTOP:" << line << ": " << s << endl
 
@@ -81,7 +81,11 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    ptop_error("Bad node line, bad load: " << load << ".");
 	    iload = 1;
 	  }
-	  ptypes.push_front(type);
+	  if (ptypes.find(type) == ptypes.end()) {
+	      ptypes[type] = iload;
+	  } else {
+	      ptypes[type] += iload;
+	  }
 	  if (type.compare("switch") == 0) {
 	    isswitch = true;
 	    p->types["switch"] = 1;
