@@ -700,10 +700,10 @@ if ($nonsfile) {
     #
     DBQueryFatal("INSERT INTO experiments ".
 		 "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
-		 "expt_head_uid, state, shared) ".
+		 "expt_head_uid, expt_swap_uid, state, shared) ".
 		 "VALUES ('$exp_id', '$exp_pid', '$exp_gid', now(), ".
-		 "        '$exp_expires', ".
-		 "        '$exp_name', '$uid', '$exp_state', $exp_shared)");
+		 "        '$exp_expires', '$exp_name', ".
+		 "        '$uid', '$uid', '$exp_state', $exp_shared)");
 
     #
     # This is where the experiment hierarchy is going to be created.
