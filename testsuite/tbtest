@@ -588,7 +588,7 @@ sub step_test {
 		@t = split(" ",$status);
 		$result = $t[0];
 		$msg = join(" ",@t[1..$#t]);
-		print FLESTLOG "$result $test $msg\n";
+		print FLESTLOG "$result: $test $msg\n";
 	    }
 	}
 	
