@@ -9,7 +9,7 @@
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
-# the project form. Note that this sequence of statements results in
+# the project form. Note that this sequence of  statements results in
 # only the last bad field being displayed, but thats okay. The user will
 # eventually figure out that fields marked with * mean something!
 #
@@ -140,7 +140,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
     exit;
   }
   mysql_db_query("tbdb","insert into grp_memb (uid,gid,trust)".
-		 "values ('$uid','$grp','none');");
+		 "values ('$grp_head_uid','$gid','none');");
   $fp = fopen("/usr/testbed/www/maillist/leaders.txt", "a");
   $fp2 = fopen("/usr/testbed/www/maillist/users.txt", "a");
   fwrite($fp, "$email\n");   #Writes the email address to mailing lists
