@@ -60,6 +60,7 @@ int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+static void	IsAlive(int sock, char *nodeid, int istcp);
 
 /* thread support */
 #define MAXCHILDREN	25
@@ -566,13 +567,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (!istcp) {
 			/*
 			 * Simple "isalive" support for remote nodes.
-			 * Update timestamp, but let someone else worry
-			 * about what it means. 
 			 */
-			mydb_update("update nodes "
-				    "set status='up',status_timestamp=now() "
-				    "where node_id='%s'", nodeid);
-			client_writeback(sock, "\n", strlen("\n"), istcp);
+			IsAlive(sock, nodeid, istcp);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -1001,27 +997,29 @@ COMMAND_PROTOTYPE(doaccounts)
 		res = mydb_query("select distinct "
 			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			 "  u.emulab_pubkey,u.home_pubkey "
+			 "  u.emulab_pubkey,u.home_pubkey, "
+			 "  UNIX_TIMESTAMP(u.usr_modified) "
 			 "from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on p.pid=g.pid "
 			 "where ((p.pid='%s' and p.gid='%s')) "
 			 "      and p.trust!='none' "
 			 "      and u.status='active' order by u.uid",
-			 11, pid, gid);
+			 12, pid, gid);
 	}
 	else {
 		res = mydb_query("select distinct "
 			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			 "  u.emulab_pubkey,u.home_pubkey "
+			 "  u.emulab_pubkey,u.home_pubkey, "
+			 "  UNIX_TIMESTAMP(u.usr_modified) "
 			 "from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on "
 			 "     p.pid=g.pid and p.gid=g.gid "
 			 "where ((p.pid='%s')) and p.trust!='none' "
 			 "      and u.status='active' order by u.uid",
-			 11, pid);
+			 12, pid);
 	}
 #endif
 	if (!res) {
@@ -1141,9 +1139,9 @@ COMMAND_PROTOTYPE(doaccounts)
 			sprintf(buf,
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
-				"HOMEDIR=%s/%s GLIST=\"%s\"\n",
+				"HOMEDIR=%s/%s GLIST=\"%s\" SERIAL=%s\n",
 				row[0], row[1], row[2], gidint, root, row[3],
-				USERDIR, row[0], glist);
+				USERDIR, row[0], glist, row[11]);
 		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -3120,3 +3118,16 @@ directly_connected(struct node_interface *interfaces, char *iface) {
 
 }
 
+/*
+ * IsAlive(). Mark nodes as being alive. 
+ */
+static void
+IsAlive(int sock, char *nodeid, int istcp)
+{
+	mydb_update("update nodes "
+		    "set status='up',status_timestamp=now() "
+		    "where node_id='%s'", nodeid);
+
+	client_writeback(sock, "\n", strlen("\n"), istcp);
+}
+  
