@@ -64,13 +64,13 @@ if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{"x"})) {
-    $destx = 1;
+    $destx = $options{"x"};
 }
 if (defined($options{"y"})) {
-    $desty = 1;
+    $desty = $options{"y"};
 }
 if (defined($options{"o"})) {
-    $desto = 1;
+    $desto = $options{"o"};
 }
 if (@ARGV != 1) {
     usage();
@@ -126,7 +126,7 @@ my $inject_string = "$TEVC -e $pid/$eid now $vname SETDEST " .
     "X=" . $destx . " Y=" . $desty . " ORIENTATION=" . $desto;
 
 if ($debug) {
-    print "$inject_string\n";
+    print $inject_string . "\n";
 }
 
 system($inject_string) &&
