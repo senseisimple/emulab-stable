@@ -25,10 +25,8 @@ if (!isset($node_id) ||
 #
 # Check to make sure that this is a valid nodeid
 #
-$query_result =
-    DBQueryFatal("SELECT node_id FROM nodes WHERE node_id='$node_id'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id is not a valid nodeid!", 1);
+if (! TBValidNodeName($node_id)) {
+    USERERROR("$node_id is not a valid node name!", 1);
 }
 
 #
@@ -49,6 +47,11 @@ SUBMENUSTART("Node Options");
 #
 WRITESUBMENUBUTTON("Edit node info",
 		   "nodecontrol_form.php3?node_id=$node_id");
+
+if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
+    WRITESUBMENUBUTTON("Reboot Node",
+		       "boot.php3?node_id=$node_id");
+}
 
 if ($isadmin) {
     WRITESUBMENUBUTTON("Access Node Log",

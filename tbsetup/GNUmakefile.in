@@ -33,7 +33,7 @@ LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup webmkacct websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
-		  webidlecheck
+		  webidlecheck webnodereboot
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \

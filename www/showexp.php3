@@ -48,7 +48,7 @@ SUBPAGESTART();
 SUBMENUSTART("Experiment Options");
 
 if ($expstate) {
-    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVATING)==0) {
+    if (TBExptLogFile($exp_pid, $exp_eid)) {
 	WRITESUBMENUBUTTON("View Activation Logfile",
 			   "spewlogfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
@@ -88,6 +88,12 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATEACCOUNTS)) {
 		       "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
+# Reboot option
+if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
+    WRITESUBMENUBUTTON("Reboot all Nodes",
+		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
+}
+
 #
 # Admin folks get a swap request link to send email.
 #
@@ -108,17 +114,6 @@ SUBPAGEEND();
 # Dump the node information.
 #
 SHOWNODES($exp_pid, $exp_eid);
-
-if ($expstate &&
-    (strcmp($expstate, $TB_EXPTSTATE_SWAPPING) == 0 ||
-     strcmp($expstate, $TB_EXPTSTATE_ACTIVATING) == 0)) {
-
-    echo "<script language=\"JavaScript\">
-              <!--
-	          doLoad(30000);
-              //-->
-          </script>\n";
-}
 
 #
 # Standard Testbed Footer
