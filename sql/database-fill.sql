@@ -467,7 +467,7 @@ REPLACE INTO table_regex VALUES ('experiments','wa_plr_solverweight','float','re
 REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',5,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',5,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',5,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','idleswap_timeout','int','redirect','default:int',1,2147483647,NULL);
