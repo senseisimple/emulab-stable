@@ -3,11 +3,10 @@
 # Linktest test script.
 #
 # @author: davidand
+#
+#
 use strict;
 use Class::Struct;
-use constant STATIC => "Static";
-use lib '@prefix@/lib';
-use event;
 
 # path to linktest special ns
 use constant LINKTEST_NSPATH => "@LINKTEST_NSPATH@";
@@ -26,18 +25,21 @@ use constant SEND_RATE => 400; # rude sends 1 more than specified here.
 use constant SEND_COUNT => 401;
 
 # pathrate test limits -- see &valid_bw comment.
-use constant HI_BW => 85000000;
-use constant LO_BW =>  1000000;
-use constant HI_LOSS => 0;
+use constant PATHRATE_HI_BW => 80000000;
+use constant PATHRATE_LO_BW =>  1000000;
+use constant PATHRATE_HI_LOSS => 0;
 
-# supported OS's as returned by uname.
+# misc text contstants
 use constant BSD => "FreeBSD";
 use constant LINUX => "Linux";
+use constant RTPROTO_STATIC => "Static";
+use constant EVENT_STOP => "STOP";
+use constant EVENT_SERVER => "boss";
 
 # tolerance levelS
-use constant LAT_TOL => 0.71; # units of ms
-use constant BW_TOL => 3; # units of mb
-use constant LOSS_TOL => 3; # number of standard deviations of binomial rv
+use constant LAT_TOL => 0.71; # units of ms. Highest diff in finalpaper.
+use constant BW_TOL => 2.13; # units of mb. The 99% quantile from finalpaper
+use constant LOSS_TOL => 3; # number of sd's. The 99% percentile of normal
 
 # test levels
 use constant PARSE_ONLY => 0;   # parse and exit
@@ -57,6 +59,8 @@ use constant SUFFIX_ERROR => ".error";
 use constant SUFFIX_FATAL => ".fatal";
 use constant SUFFIX_TOPO =>  ".topology";
 
+
+
 ##############################################################################
 # Globals
 ##############################################################################
@@ -70,10 +74,10 @@ my $exp_id;     # experiment id
 my $proj_id;    # project id
 my $gid;        # group id
 my $platform;   # name of platform
-my $testlevel=99; # which tests to run (default, all)
+my $stopat=99; # which tests to run (default, all)
 my $crude_pid;  # pid of a crude process to harvest rude streams
 my $pathrate_snd_pid; # pid of a pathrate_snd process to harvest rcv streams
-my $verbosity = 0; # enable debug statements
+my $debug_mode = 0; # enable debug statements
 my $cumulative = 1; # cumulative tests (default,all)
 my $barr_count;   # used by synserv host, nubmer of hosts -1
 my $server = "boss";       # event server. default to boss.
@@ -106,42 +110,42 @@ my $run_in_path = "/users/davidand/testbed/event/linktest";
 ##############################################################################
 # Main control
 ##############################################################################
-
-
 &proc_cmd;
 
 &init;
 
-if($testlevel == PARSE_ONLY) {
+if($stopat == PARSE_ONLY) {
     &debug_top;
 }
 
-if(($cumulative && $testlevel >= ONEHOP_LEVEL)
-   || (!$cumulative && $testlevel == ONEHOP_LEVEL)) {
+if(($cumulative && $stopat >= ONEHOP_LEVEL)
+   || (!$cumulative && $stopat == ONEHOP_LEVEL)) {
     &debug("\nTesting Single Hop Connectivity and Latency...\n\n");
     &ping_latency_test;
 }
 
-if((($cumulative && $testlevel >= NHOP_LEVEL)
-    || (!$cumulative && $testlevel == NHOP_LEVEL))
-   && defined($rtproto) && $rtproto eq STATIC) {
+if((($cumulative && $stopat >= NHOP_LEVEL)
+    || (!$cumulative && $stopat == NHOP_LEVEL))
+   && defined($rtproto) && $rtproto eq RTPROTO_STATIC) {
     &debug("\nTesting Static Routing...\n\n");
     &static_rt_test; # nodes not covered by 1hop test
 }
 
-if (($cumulative && $testlevel >=LOSS_LEVEL)
-    || (!$cumulative && $testlevel ==LOSS_LEVEL)) {
+if (($cumulative && $stopat >=LOSS_LEVEL)
+    || (!$cumulative && $stopat ==LOSS_LEVEL)) {
     &debug("\nTesting Loss...\n\n");
     &stream_test; 
 }
 
-if(($cumulative && $testlevel >=BW_LEVEL)
-   || (!$cumulative && $testlevel == BW_LEVEL)) {
+if(($cumulative && $stopat >=BW_LEVEL)
+   || (!$cumulative && $stopat == BW_LEVEL)) {
     &debug("\nTesting Bandwidth...\n\n");
     &bw_test;
 }
 
 &send_done;
+
+&debug("Done\n");
 
 ##############################################################################
 # Test procedures
@@ -289,7 +293,7 @@ sub stream_test {
 	if(defined($edge) && defined($other_edge)) {
 	    if($hostname eq $edge->src) {
 		# TODO: parameterize this call
-		open FCFG,">" . RUDE_CFG || &fatal ("Could not open " . RUDE_CFG);
+		open FCFG,">" . RUDE_CFG ||  die &fatal ("Could not open " . RUDE_CFG);
 		print FCFG "START NOW\n";
 		print FCFG "0000 $stream_id ON 3001 " . $edge->dst . ":10001 CONSTANT " . SEND_RATE . " 20\n";
 		print FCFG "1000 $stream_id OFF\n";
@@ -298,7 +302,7 @@ sub stream_test {
 		system "rude -s" . RUDE_CFG . " 1>/dev/null 2>/dev/null";
 		$analyze{$stream_id} = $other_edge;
 	    } elsif ($hostname eq $other_edge->src) {
-		open FCFG,">" . RUDE_CFG || &fatal ("Could not open " . RUDE_CFG);
+		open FCFG,">" . RUDE_CFG ||  die &fatal ("Could not open " . RUDE_CFG);
 		print FCFG "START NOW\n";
 		print FCFG "0000 $stream_id ON 3001 " . $other_edge->dst . ":10001 CONSTANT " . SEND_RATE . " 20\n";
 		print FCFG "1000 $stream_id OFF\n";
@@ -318,7 +322,7 @@ sub stream_test {
     # now, analyze the data that this node RECEIVED, which will be the
     # data that the other node sent.
     system "crude -d " . CRUDE_DAT . " > " . CRUDE_DEC;
-    open CLOG, "" . CRUDE_DEC || &fatal ("Could not open " . CRUDE_DEC);
+    open CLOG, "" . CRUDE_DEC ||  die &fatal ("Could not open " . CRUDE_DEC);
     while(<CLOG>) {
 	if(/ID=(\d+) /) {
 	    $recv_cnt{$1}++;
@@ -374,7 +378,7 @@ sub bw_test {
 
     # blitz old data
     if (-e PATHRATE_DAT) {
-	unlink PATHRATE_DAT || &fatal ("Could not delete " . PATHRATE_DAT);
+	unlink PATHRATE_DAT ||  die &fatal ("Could not delete " . PATHRATE_DAT);
     }
 
 
@@ -401,7 +405,7 @@ sub bw_test {
     
     # read the log file.
     if(@analyze_list) {
-	open PLOG, "".PATHRATE_DAT || &fatal ("Could not open " . PATHRATE_DAT);
+	open PLOG, "".PATHRATE_DAT ||  die &fatal ("Could not open " . PATHRATE_DAT);
 	while(<PLOG>) {
 	    my $edge = shift(@analyze_list);
 	    my $sender = $edge->src;
@@ -428,7 +432,7 @@ sub bw_test {
 		}
 
 	    } else {
-		&fatal("Error while parsing " . PATHRATE_DAT);
+		 die &fatal("Error while parsing " . PATHRATE_DAT);
 	    }
 	}
     }
@@ -450,9 +454,9 @@ sub bw_test {
 # successful measurement, since it's rather lengthy to run (16s average).
 sub valid_bw {
     my $edge = shift @_;
-    if($edge->bw >= LO_BW
-       && $edge->bw <= HI_BW
-       && $edge->loss <= HI_LOSS
+    if($edge->bw >= PATHRATE_LO_BW
+       && $edge->bw <= PATHRATE_HI_BW
+       && $edge->loss <= PATHRATE_HI_LOSS
        ) {
 	return 1;
     } else {
@@ -467,7 +471,7 @@ sub valid_bw {
 sub get_topo {
     my $ns_outfile = shift(@_);
 
-    open NSOUT,$ns_outfile || &fatal("Could not open $ns_outfile");
+    open NSOUT,$ns_outfile ||  die &fatal("Could not open $ns_outfile");
     while(<NSOUT>) {
 	chomp;
 
@@ -488,7 +492,7 @@ sub get_topo {
 
 	# currently recognize only Static routing
 	} elsif (/^r Static/i) {
-	    $rtproto = STATIC;
+	    $rtproto = RTPROTO_STATIC;
 	}
     }
     close NSOUT;
@@ -525,10 +529,10 @@ sub error {
     $output .=     "  Error: $msg\n\n";
 
     my $fname = $linktest_path . "/" . $hostname . SUFFIX_ERROR;
-    open ERRF,">>$fname" || &fatal("Could not open $fname");
+    open ERRF,">>$fname" || die &fatal("Could not open $fname");
     print ERRF $output;
     close ERRF;
-    if($verbosity) {
+    if($debug_mode) {
 	print STDERR $output;
     }
 }
@@ -545,7 +549,7 @@ sub fatal {
 	print ERRF $output;
 	close ERRF;
     }
-    die $output;
+    return $output;
 }
 
 
@@ -555,7 +559,7 @@ sub barrier {
     if($hostname eq $synserv) {
 	# note, the synserver should know what the node count is
 	# since it parsed the NS file.
-	&fatal("barrcount not defined!") unless defined($barr_count);
+	 die &fatal("barrcount not defined!") unless defined($barr_count);
 	$cmd = "emulab-sync -i $barr_count";
     } else {
 	$cmd = "emulab-sync";
@@ -566,7 +570,7 @@ sub barrier {
 }
 
 sub debug {
-    return unless $verbosity;
+    return unless $debug_mode;
     print "@_";
 }
 
@@ -582,11 +586,11 @@ sub init {
     } elsif ($platform eq LINUX) {
 	$ns_cmd = LINKTEST_NSPATH ."/linux/ns";
     } else {
-	&fatal("Platform $platform is not currently supported.");
+	 die &fatal("Platform $platform is not currently supported.");
     }
 
     # if this is a dry run, get out here.
-    if($testlevel <= PARSE_ONLY) {
+    if($stopat <= PARSE_ONLY) {
 	my $outname = "/tmp/linktest" . SUFFIX_TOPO;
 	chdir($run_in_path);
 	system "$ns_cmd $ns_file > $outname";
@@ -596,7 +600,7 @@ sub init {
 
     # get the experiment info
     my $fname = "@CLIENT_VARDIR@/boot/nickname";
-    &fatal("Could not locate $fname") unless -e $fname;
+     die &fatal("Could not locate $fname") unless -e $fname;
     my $tmp = `cat $fname`;
     ($hostname, $exp_id, $proj_id) = split /\./, $tmp;
     chomp $hostname;
@@ -609,10 +613,10 @@ sub init {
     $linktest_path = "$expt_path/linktest";
     $ns_file = "$expt_path/$exp_id-modify.ns" unless defined($ns_file);
     $ns_file = "$expt_path/$exp_id.ns" unless -e $ns_file;    
-    &fatal("Could not locate $ns_file") unless -e $ns_file;
+     die &fatal("Could not locate $ns_file") unless -e $ns_file;
 
     my $ssname = "@CLIENT_VARDIR@/boot/syncserver";
-    &fatal("Could not locate an emulab-sync server") unless -e $ssname;
+     die &fatal("Could not locate an emulab-sync server") unless -e $ssname;
 
     $tmp = `cat $ssname`;
     ($synserv) = split/\./, $tmp;
@@ -622,17 +626,17 @@ sub init {
     my $outname = "$linktest_path/$exp_id" . SUFFIX_TOPO;
     if($hostname eq $synserv) {
 	if( -e $linktest_path ) {
-	    &fatal("Path $linktest_path is not a directory") unless -d $linktest_path;
+	     die &fatal("Path $linktest_path is not a directory") unless -d $linktest_path;
 
 	    # blitz files from the last time.
-	    opendir (DIR,$linktest_path) || &fatal("Could not open $linktest_path");
+	    opendir (DIR,$linktest_path) ||  die &fatal("Could not open $linktest_path");
 	    my @dirfiles = grep (!/^\.\.?$/,readdir(DIR));
 	    foreach (@dirfiles) {
-		unlink "$linktest_path/$_" || &fatal("Could not delete $_");
+		unlink "$linktest_path/$_" ||  die &fatal("Could not delete $_");
 	    }
 
 	} else {
-	    mkdir ($linktest_path,0777) or &fatal("Could not create directory $linktest_path");
+	    mkdir ($linktest_path,0777) or  die &fatal("Could not create directory $linktest_path");
 	}
 
 	chdir($run_in_path);
@@ -640,7 +644,7 @@ sub init {
     }
 
     # start up collector streams if necessary.
-    if($testlevel >=LOSS_LEVEL) {
+    if($stopat >=LOSS_LEVEL) {
 	$crude_pid = fork();
 	if(!$crude_pid) {
 	    unlink CRUDE_DAT if -e CRUDE_DAT;
@@ -648,7 +652,7 @@ sub init {
 	    exec "crude -l " . CRUDE_DAT;
 	}
     }
-    if($testlevel >=BW_LEVEL) {
+    if($stopat >=BW_LEVEL) {
 	$pathrate_snd_pid = fork();
 	if(!$pathrate_snd_pid) {
 	    exec "pathrate_snd -i -q";
@@ -840,58 +844,34 @@ sub wait_all {
 sub proc_cmd {
     my %options=();
 
-    # NOTE: arguments come in the form X=something.
-    # due to event thing. rather than finessing for getopt,
-    # just parse argv.
+    # important arguments come from events.
     
     foreach my $arg (@ARGV) {
-	if($arg =~ /VERBOSE=(\d)/) {
-	    $verbosity=$1;
-	}
-	if($arg =~ /THROUGH=(\d)/) {
-	    $testlevel=$1;
+	if($arg =~ /STOPAT=(\d)/) {
+	    $stopat=$1;
 	}
 	if($arg =~ /TEST=(\d)/) {
 	    $cumulative=0;
-	    $testlevel=$1;
+	    $stopat=$1;
 	}
-	if($arg =~ /FILE=(\S+)/) {
+
+	# development options
+	if($arg =~ /SCRIPT=(\S+)/) {
 	    $ns_file = $1;
 	}
+	if($arg =~ /DEBUG=(\d)/) {
+	    $debug_mode=$1;
+	}
+
     }
-    if($testlevel == PARSE_ONLY
+    if($stopat == PARSE_ONLY
        && !defined($ns_file)) {
-	&fatal("Parse-only mode was requested but no filename was supplied");
+	 die &fatal("Parse-only mode was requested but no filename was supplied");
     }
     &debug( "got arguments: @ARGV\n");
 }
 
 # send the event indicating that the test has completed.
 sub send_done {
-    
-    my $URL = "elvin://$server";
-
-    my $handle = event_register($URL,0);
-    if (!$handle) { &fatal("Unable to register with event system"); }
-
-    my $tuple = address_tuple_alloc();
-    if (!$tuple) { &fatal("Could not allocate an address tuple"); }
-
-    %$tuple = ( objtype => "LINKTEST",
-		eventtype => "STOP",
-		host => "*");
-
-    my $notification = event_notification_alloc($handle,$tuple);
-    if (!$notification) { &fatal("Could not allocate notification"); }
-
-    if (!event_notify($handle, $notification)) {
-	&fatal("could not send test event notification");
-    }
-
-    event_notification_free($handle, $notification);
-
-    if (event_unregister($handle) == 0) {
-	&fatal("could not unregister with event system");
-    }
-
+    system "ltevent -s " . EVENT_SERVER . " -e $proj_id/$exp_id -x " . EVENT_STOP;
 }

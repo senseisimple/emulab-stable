@@ -73,8 +73,6 @@ main(int argc, char **argv) {
 	if (!pideid)
 	  usage(progname);
 
-        info("starting up\n");
-
 	loginit(0, logfile);
 
 	
@@ -106,20 +104,15 @@ main(int argc, char **argv) {
 	 */
 	tuple->expt      = pideid;
 	tuple->objtype   = TBDB_OBJECTTYPE_LINKTEST;
-	tuple->objname   = "linktest";
 	tuple->eventtype = ADDRESSTUPLE_ANY;
 
 	/*
 	 * Register with the event system. 
 	 */
-	info("event_register...\n");
-
 	handle = event_register(server, 0);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
-	info("registered with event system\n");
-
 	
 	/*
 	 * Subscribe to the event we specified above.
@@ -127,15 +120,12 @@ main(int argc, char **argv) {
 	if (! event_subscribe(handle, callback, tuple, NULL)) {
 		fatal("could not subscribe to event");
 	}
-	info("subscribed to event\n");
 	
 	
 	/*
 	 * Begin the event loop, waiting to receive event notifications:
 	 */
-	info("starting main event loop\n");
 	event_main(handle);
-	info("end main event loop\n");	
 
 	/*
 	 * Unregister with the event system:
@@ -158,9 +148,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	struct timeval	now;
 
 	gettimeofday(&now, NULL);
-
-	info("got a callback\n");
-
 	
 	if (! event_notification_get_objname(handle, notification,
 					     objname, sizeof(objname))) {
@@ -177,39 +164,27 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_arguments(handle,
 					 notification, args, sizeof(args));
 
-        info("Event: %lu:%d %s %s %s\n", now.tv_sec, now.tv_usec,
-	     objname, event, args);
+/*        info("Event: %lu:%d %s %s %s\n", now.tv_sec, now.tv_usec,
+	     objname, event, args);*/
 	/*
 	 * Dispatch the event. 
 	 */
-	if (strcmp(event, TBDB_EVENTTYPE_START) == 0)
+	if (strcmp(event, TBDB_EVENTTYPE_START) == 0) {
           start_linktest(args, sizeof(args));
-	else {
-		error("Invalid event: %s\n", event);
-		return;
 	}
 
 }
 
-/* start one linktest at a time.
+/* convert arguments from the event into a form for Linktest.
  */
-/* todo, move this to proper place */
-#define MAX_ARGS 10
 static void
 start_linktest(char *args, int buflen) {
-  static int running = 0; /* is linktest currently running? */
   pid_t lt_pid;
   int status;
   char *word;
   char *argv[MAX_ARGS];
   int i=1;
   
-  
-  if(running) return;
-  running = 1;
-
-  info("raw args: %s\n",args);
-
   word = strtok(args," \t");
   do {
     argv[i++] = word;
@@ -217,16 +192,13 @@ start_linktest(char *args, int buflen) {
            && (i<MAX_ARGS));
   argv[i] = NULL;
   argv[0] = LINKTEST_SCRIPT;
-  info("starting linktest.\n");
+/*  info("starting linktest.\n");*/
   
   lt_pid = fork();
   if(!lt_pid) {
     execv( LINKTEST_SCRIPT,argv);
   }
   waitpid(lt_pid, &status, 0);
-  running = 0;
-  info("linktest completed.\n");
+/*  info("linktest completed.\n");*/
 }
-
-
 

@@ -2,4 +2,8 @@
 #define __LINKTEST_H_
 
 #define LINKTEST_SCRIPT "@CLIENT_BINDIR@" "/linktest.pl"
+
+/* max args to Linktest */
+#define MAX_ARGS 10
+
 #endif

@@ -11,6 +11,7 @@ SUBDIR		= event/linktest
 LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
 DAEMON	        = linktest
+LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 
@@ -18,7 +19,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	$(DAEMON) $(SCRIPT) $(SCRIPT_RUN)
+all:	$(DAEMON) $(LTEVENT) $(SCRIPT) $(SCRIPT_RUN)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -42,6 +43,7 @@ endif
 
 LIBTB_OBJS	= $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 DAEMON_OBJS	= linktest.o
+LTEVENT_OBJS	= ltevent.o
 
 # Rules to make sure that some libraries we need from other directories get
 # built first
@@ -56,13 +58,21 @@ $(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
 	-mkdir $(LOCAL_BINDIR)
 	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $(LOCAL_BINDIR)/$@
 
+$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
+	-mkdir $(LOCAL_BINDIR)
+	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $(LOCAL_BINDIR)/$@
+
 $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
+
+$(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 
 install:
 
 client-install:
 	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(DAEMON) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
+	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(LTEVENT) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
 	$(INSTALL_PROGRAM) $(SCRIPT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
@@ -71,3 +81,6 @@ client-install:
 clean:
 	/bin/rm -f *.o $(TESTS)
 	/bin/rm -f $(LOCAL_BINDIR)/$(DAEMON)
+	/bin/rm -f $(LOCAL_BINDIR)/$(LTEVENT)
+	/bin/rm -f $(SCRIPT)
+	/bin/rm -f $(SCRIPT_RUN)
