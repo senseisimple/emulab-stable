@@ -30,6 +30,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_sharks        = $row[num_sharks];
     $proj_why           = $row[why];
     $control_node	= $row[control_node];
+    $approved           = $row[approved];
 
     #
     # Generate the table.
@@ -83,6 +84,16 @@ function SHOWPROJECT($pid, $thisuid) {
           </tr>\n";
     
     echo "<tr>
+              <td>Approved?: </td>\n";
+    if ($approved) {
+	echo "<td class=left><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+    }
+    else {
+	echo "<td class=left><img alt=\"N\" src=\"redball.gif\"></td>\n";
+    }
+    echo "</tr>\n";
+
+    echo "<tr>
               <td colspan='2'>Why?</td>
           </tr>\n";
     
@@ -112,6 +123,7 @@ function SHOWUSER($uid) {
     $usr_passwd  = $row[usr_pswd];
     $usr_title   = $row[usr_title];
     $usr_affil   = $row[usr_affil];
+    $status      = $row[status];
     
     echo "<table align=center border=1>\n";
     
@@ -158,6 +170,11 @@ function SHOWUSER($uid) {
     echo "<tr>
               <td>Institutional Affiliation:</td>
               <td>$usr_affil</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Status:</td>
+              <td>$status</td>
           </tr>\n";
     
     echo "</table>\n";
