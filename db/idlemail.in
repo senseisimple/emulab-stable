@@ -135,11 +135,12 @@ last_cpu_act, last_ext_act)) as lastact,
 from node_activity as na left join reserved as r on na.node_id=r.node_id
 left join experiments as e on r.pid=e.pid and r.eid=e.eid
 where r.pid is not null and r.eid is not null and idle_ignore=0
-and idleswap=0
+and (idleswap=0 or swappable=0)
 group by pid,eid having idle_time >= $threshold and nodes > 0
 order by pid,eid
 EOT
     # We don't want idleswappable ones, since they get a different warning
+    # unless they're unswappable.
 
     $q = DBQueryFatal($sql);
 
