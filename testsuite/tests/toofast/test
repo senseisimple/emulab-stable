@@ -1,1 +1,1 @@
-tb_prerun("tbprerun",2);
+tb_prerun("tbprerun",255);
