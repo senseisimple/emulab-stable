@@ -79,7 +79,17 @@ sub portControl {
   my @p = map {
     if ( /^([^-]*)-\d:(.*)$/ ) { $_ = "$1:$2"; }
     my $pnum = portnum($_);
-    my $port = (split(":",$pnum))[1];
+    my ($switch, $port) = split(":",$pnum);
+
+    print "Sanity check: $switch, $ip\n" if $debug;
+    # Sanity check: Make sure the port we're supposed to be controlling is on
+    # this switch
+    if (($switch ne $ip) && (Dev($switch) ne $ip)) {
+      # Need to remeber to release the VLAN lock
+      &vlanUnlock();
+      die "Sanity check failed got port on $switch while working on $ip\n";
+    }
+
     my $i = $ifIndex{$port};
     print "$_ -> $port -> $i\n" if $debug;
     if ($cmd =~/able/) { $i; } else { $port }

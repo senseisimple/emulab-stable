@@ -402,7 +402,40 @@ sub ParseArgs {
     if ($reset && ((!defined $pid) || (!defined $eid)));
   # If everything is okay so far, initialize snmpit_lib
   snmpit_lib::init($DBNAME, $debug);
-  if (!defined($i)||!$i||$i eq "") { $i = "cisco1"; }
+
+  if ($t || $reset) {
+    if ( ! vlanid("$pid:$eid")) {
+      print "There were no VLANs in the database table for '$pid' '$eid'\n";
+      exit(0);
+    } else {
+      foreach $id ( split(" ",vlanid("$pid:$eid")) ) {
+	my $members = vlanmemb($id);
+	$vlantable{$id} = $members;
+	print "id: $id\t$members\n" if $debug;
+	foreach $node (split (" ",$members)) {
+	  if (!defined macport($node)) {
+	    die("Invalid node found in VLANs table: '$node'\n");
+	  }
+	}
+      }
+    }
+  }
+
+  if (!defined($i)||!$i||$i eq "") {
+      if ($t || $reset) {
+	  # When creating and deleteing VLANs, we look at a random node to
+	  # figure out which switch to contact. XXX: This does NOT work
+	  # for experiments using multiple switches
+	  my $nodes = $vlantable{(keys %vlantable)[0]};
+	  my $node = (split(" ",$nodes))[0];
+	  my $switch = (split(":",portnum($node)))[0];
+	  print "Using switch $switch\n";
+	  $i = $switch;
+      } else {
+	  # In other modes, we default to cisco1
+	  $i = "cisco1";
+      }
+  }
   if ( defined Dev($i) ) {
     if (! ($i =~ /[a-zA-Z]/) ) { $i = Dev($i); } # i is now name
     print "Found device $i (",Dev($i),")..." if $debug;
@@ -482,23 +515,6 @@ sub ParseArgs {
       }
     }
     $num++;
-  }
-  if ($t || $reset) {
-    if ( ! vlanid("$pid:$eid")) {
-      print "There were no VLANs in the database table for '$pid' '$eid'\n";
-      exit(0);
-    } else {
-      foreach $id ( split(" ",vlanid("$pid:$eid")) ) {
-	my $members = vlanmemb($id);
-	$vlantable{$id} = $members;
-	print "id: $id\t$members\n" if $debug;
-	foreach $node (split (" ",$members)) {
-	  if (!defined macport($node)) {
-	    die("Invalid node found in VLANs table: '$node'\n");
-	  }
-	}
-      }
-    }
   }
   if ($powerop) {
     $num=0;
