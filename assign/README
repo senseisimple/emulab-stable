@@ -11,7 +11,7 @@ Typically assign is run in the following method:
 
 ptop format
 -----------
-Each line is one either:
+Each line is one of:
 
 node <node> <types> [- <features>]
 
@@ -48,7 +48,7 @@ Note: <smac> and <dmac> should not be present on switch<->switch links.
 top format
 ----------
 
-Each line is either:
+Each line is one of:
 
 node <node> <type> [<desires>]
 
@@ -66,6 +66,14 @@ OR
 
 link <src> <dst> <bw>
 
+OR
+
+fix-node <node> <physical node>
+
+OR
+
+make-vclass <name> <weight> <physical types...>
+
 features and desires
 --------------------
 
@@ -74,6 +82,24 @@ virtual node has desire/weight pairs associated with it.  When a
 mapping is made any unused features add their cost to the score and
 any unfulfilled desires add their weight to the score.  Fulfilled
 desires/used features add nothing to the score.
+
+fixed nodes
+-----------
+
+A fix-node directive in the top file will cause the named node to be
+mapped to the specified physical node.  These mappings are made before
+annealing and are never changed.  
+
+vclasses
+--------
+
+Vclasses are the assign lingo for vtypes.  See
+www/tutorial/nscommands.html for a complete discussion of vtypes.
+Weights >= 1 result in violations when the vclass is consistent.
+Weights <= 1 add their weight to the score when inconsistent and add 0
+otherwise.  The weight is added once per vclass not once per violating
+member.
+
 
 environmental variables
 -----------------------
@@ -95,5 +121,5 @@ what is going on.
 -DSCORE_PCLASS spits out the equivalence classes at the beginning.
 
 -DSCORE_PCLASS_MORE spits out lots of output during the assign loop.
-It works best with -DSCORE_DEBUG but does nto require
+It works best with -DSCORE_DEBUG but does not require
 -DSCORE_DEBUG_MORE.
