@@ -186,13 +186,24 @@ if ($grabusers && mysql_num_rows($nonmembers_result)) {
                  </td>\n";
 
 	echo "   <td align=center>
-                   <select name='$user\$\$trust'>
-                      <option value='user'>User</option>
-                      <option value='local_root'>Local Root</option>
-	              <option value='group_root'>Group Root</option>\n";
+                   <select name='$user\$\$trust'>\n";
 
+	if (TBCheckGroupTrustConsistency($user, $pid, $gid, "user", 0)) {
+	    echo "<option value='user' " .
+		((strcmp($trust, "user") == 0) ? "selected" : "") .
+		    ">User</option>\n";
+	}
+	if (TBCheckGroupTrustConsistency($user, $pid, $gid, "local_root", 0)) {
+	    echo "<option value='local_root' " .
+		((strcmp($trust, "local_root") == 0) ? "selected" : "") .
+		    ">Local Root</option>\n";
+	    
+	    echo "<option value='group_root' " .
+		((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+		    ">Group Root</option>\n";
+	}
 	echo "        </select>
-                 </td>\n";
+	    </td>\n";
     }
     echo "</tr>\n";
 }

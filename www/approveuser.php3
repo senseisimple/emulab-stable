@@ -96,6 +96,14 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	USERERROR("You are not allowed to approve users in ".
 		  "$project/$group!", 1);
     }
+
+    TBProjLeader($project, $projleader);
+    if (strcmp($uid, $projleader) &&
+	strcmp($newtrust, "group_root") == 0 &&
+	strcmp($group, $project) == 0) {
+	USERERROR("You do not have permission to add new users with group ".
+		  "root status to the default group!", 1);
+    }
     
     #
     # Check if already approved in the project/group. If already an
