@@ -11,10 +11,9 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event-sched.c,v 1.2 2002-01-29 17:08:14 imurdock Exp $";
+static char rcsid[] = "$Id: event-sched.c,v 1.3 2002-02-19 15:47:46 imurdock Exp $";
 
 #include <stdio.h>
-#include <pthread.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
@@ -30,7 +29,6 @@ int
 main(int argc, char **argv)
 {
     event_handle_t handle;
-    pthread_t thread;
     char *server = NULL;
     int c;
 
@@ -49,7 +47,7 @@ main(int argc, char **argv)
     }
 
     /* Register with the event system: */
-    handle = event_register(server);
+    handle = event_register(server, 1);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;
@@ -62,12 +60,8 @@ main(int argc, char **argv)
         return 1;
     }
 
-    /* Create a thread to dequeue events: */
-    pthread_create(&thread, NULL, (void *(*)(void *)) dequeue, handle);
-    pthread_detach(thread);
-
-    /* Begin the event loop, waiting to receive enqueue requests: */
-    event_main(handle);
+    /* Dequeue events and process them at the appropriate times: */
+    dequeue(handle);
 
     /* Unregister with the event system: */
     if (event_unregister(handle) == 0) {
