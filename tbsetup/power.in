@@ -156,14 +156,19 @@ foreach my $node (@machines) {
 
     #
     # Check for rate-limiting, and update the last power cycle time
-    # if it's been long enough. Root gets to bypass the checks.
+    # if it's been long enough. Root gets to bypass the checks, and
+    # we only update the timestamp if it is being turned on or cycled,
+    # to allow off then on without waiting (unless the on is too close 
+    # to a previos on/cycle command)
     #
-    if (! ($time_ok || ($UID == 0)) ) {
-	warn "$node was power cycled recently. Skipping...\n";
-	next;
-    } else {
-	DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
-	"where node_id = '$node'");
+    if ( $op ne "off" ) {
+	if (! ($time_ok || ($UID == 0)) ) {
+	    warn "$node was power cycled recently. Skipping...\n";
+	    next;
+	} else {
+	    DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
+			 "where node_id = '$node'");
+	}
     }
 
     #
