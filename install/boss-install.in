@@ -54,6 +54,7 @@ my $SCP        = "/usr/bin/scp";
 my $CP         = "/bin/cp";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
+my $SUDO       = "/usr/local/bin/sudo";
 
 my $SUIDPERL   = "/usr/bin/suidperl";
 
@@ -88,6 +89,9 @@ my $DHCPD_LEASES    = "/var/db/dhcpd.leases";
 my $DHCPD_MAKECONF  = "$PREFIX/sbin/dhcpd_makeconf";
 my $APACHE_CERTFILE = "/usr/local/etc/apache/ssl.crt/www.${OURDOMAIN}.crt";
 my $APACHE_KEYFILE  = "/usr/local/etc/apache/ssl.key/www.${OURDOMAIN}.key";
+my $BATCHEXP        = "$PREFIX/bin/batchexp";
+my $WAP             = "$PREFIX/sbin/withadminprivs";
+my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
 
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
@@ -123,6 +127,7 @@ my $PORTSDIR      = "/usr/ports/misc";
 my $MIBPATH       = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR      = "$PREFIX/tftpboot";
 my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
+my $VARRUN        = "/var/run";
 
 #
 # URLs
@@ -147,6 +152,22 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
     "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB");
+
+# Initial experiments to create. Indexed by eid.
+my %EXPERIMENTS =
+    ("hwdown"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Node reported as down"},
+     "reloading"     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes reloading images"},
+     "reloadpending" => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes waiting for reload"},
+     "oldreserved"   => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during swap modify"},
+     "nfree-leases"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during nfree"},
+     "opsnodes"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes designated as Ops Nodes"},
+    );
 
 #
 # List of names that goes into $HOSTS and which must resolve.
@@ -191,9 +212,10 @@ sub usage {
 
 my $packagedir = "";
 my $batchmode  = 0;
+my $password;
 my %opts;
 
-if (! getopts("p:b", \%opts)) {
+if (! getopts("p:bw:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -201,6 +223,9 @@ if (defined($opts{p})) {
 }
 if (defined($opts{b})) {
     $batchmode = 1;
+}
+if (defined($opts{w})) {
+    $password = $opts{w};
 }
 
 if (@ARGV) {
@@ -688,7 +713,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 			  "a password. Run the following print as root:\n" .
 			  "scp $ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
 	    }
-	};
+	}
     };
 };
 
@@ -730,7 +755,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 		       "     chmod 640 ${ETC_EMULAB_DIR}/${CLIENT_PEM}; ".
 		       "     chmod 640 ${ETC_EMULAB_DIR}/${EMULAB_PEM}  ");
     };
-    Phase "apache", "Installing Apache SSL cert and key", sub {
+    Phase "apache", "Setting up Apache", sub {
 	Phase "cert", "Installing Apache SSL certificate", sub {
 	    DoneIfExists("$APACHE_CERTFILE");
 	    ExecQuietFatal("$CP $TOP_OBJDIR/ssl/$APACHE_CERTPEM ".
@@ -741,9 +766,13 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	    ExecQuietFatal("$CP $TOP_OBJDIR/ssl/$APACHE_KEYPEM ".
 			   "    $APACHE_KEYFILE");
 	};
-	Phase "startup", "Installing Apache startup file", sub {
+	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
 	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
+	};
+	Phase "starting", "Starting Apache server", sub {
+	    DoneIfExists("$VARRUN/httpd.pid");
+	    ExecQuietFatal("$RCDIR/apache.sh start");
 	};
     };
 };
@@ -752,6 +781,16 @@ Phase "event", "Setting up event system", sub {
     Phase "elvinconf", "Installing elvind config file", sub {
 	DoneIfIdentical($ELVIND_CONF,$BOSS_ELVIND_CONF);
 	ExecQuietFatal("$CP $BOSS_ELVIND_CONF $ELVIND_CONF");
+    };
+    # For elabinelab, be sure to kill off running event system. Harmless.
+    Phase "stopping", "Stopping event system", sub {
+	if (ExecQuiet("killall -s elvind")) {
+	    PhaseSkip("elvind not running");
+	}
+	ExecQuietFatal("$RCDIR/2.elvind.sh stop");
+    };
+    Phase "starting", "Starting event system", sub {
+	ExecQuietFatal("$RCDIR/2.elvind.sh start");
     };
 };
 
@@ -772,6 +811,10 @@ Phase "Software", "Building and Installing Software", sub {
     };
 };
 
+#
+# The next few items must be after the software install since they use
+# testbed libraries and such.
+#
 Phase "dhcpd", "Setting up initial dhcpd configuration", sub {
     Phase "template", "Installing $DHCPD_TEMPLATE", sub {
 	ExecQuietFatal("$CP $TOP_OBJDIR/dhcpd/dhcpd.conf.template ".
@@ -779,12 +822,60 @@ Phase "dhcpd", "Setting up initial dhcpd configuration", sub {
     };
     Phase "config", "Creating $DHCPD_CONF from template", sub {
 	ExecQuietFatal("$DHCPD_MAKECONF $DHCPD_TEMPLATE > $DHCPD_CONF");
+	# Must be group writable for newnode script.
+	ExecQuietFatal("$CHMOD 664 $DHCPD_CONF");	
     };
     # How silly is this?
     Phase "leases", "Creating stub leases file", sub {
 	DoneIfExists("$DHCPD_LEASES");
 	ExecQuietFatal("touch $DHCPD_LEASES");
     };
+};
+
+Phase "named", "Setting up initial named configuration", sub {
+    Phase "building", "Building named files and templates", sub {
+	ExecQuietFatal("cd $TOP_OBJDIR/named; $GMAKE");
+    };
+    Phase "installing", "Installing named files and templates", sub {
+	ExecQuietFatal("cd $TOP_OBJDIR/named; $GMAKE install-real");
+    };
+    Phase "generating", "Generating named zone files", sub {
+	ExecQuietFatal("$NAMED_SETUP -norestart");
+    };
+    Phase "stopping", "Stopping named", sub {
+	if (ExecQuiet("killall -s named")) {
+	    PhaseSkip("named not running");
+	}
+	ExecQuietFatal("$RCDIR/1.named.sh stop");
+    };
+    Phase "starting", "Starting named", sub {
+	ExecQuietFatal("$RCDIR/1.named.sh start");
+    };
+};
+
+Phase "firstuser", "Setting up initial user (elabman)", sub {
+    PhaseSkip("elabman already created")
+	if (-d "/users/elabman");
+    ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser ".
+		   ($batchmode ? " -b" : "") .
+		   (defined($password) ? " -p $password" : ""));
+};
+
+Phase "experiments", "Setting up system experiments", sub {
+    foreach my $eid (keys(%EXPERIMENTS)) {
+	my $pid  = $EXPERIMENTS{$eid}->{"pid"};
+	my $desc = $EXPERIMENTS{$eid}->{"description"};
+	
+	Phase "$pid/$eid", "$pid/$eid", sub {
+	    PhaseSkip("Experiment Created")
+		if (-d "/proj/$pid/exp/$eid");
+	    ExecQuietFatal("$SUDO -u elabman $WAP $BATCHEXP ".
+			   "  -q -i -w -f -S 'System Experiment' ".
+			   "  -L 'System Experiment' ".
+			   "  -E '$desc - DO NOT DELETE' ".
+			   "  -p $pid -e $eid");
+	};
+    }
 };
 
 print "----------------------------------------------------------------------\n";
