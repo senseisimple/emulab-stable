@@ -1,3 +1,11 @@
+This directory contains our various clients for accessing node console
+serial lines remotely.  We originally used the BSD "tip" program, hacked
+for local use (see the notes for ``ntip'' below).  Eventually we switched
+to a simpler custom client ("tiptunnel") that uses telnet and (optionally)
+SSL.  The "tip" branding is maintained in deference to us Old Dogs who
+have trouble with New Tricks.
+
+==================
 ``Ntip'' aka the Emulab version of tip.
 
 This is a variant of the old UNIX ``tip'' program (specifically, based on the
