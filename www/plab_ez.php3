@@ -68,10 +68,10 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	     "</b></p>\n";
     }
 
-    echo "<font size=+1 color=red>
-          Emulab's Planetlab support is broken due to bugs in Plab 2.0.<br>
-          We're working with them; when fixed, our support will be back.
-          </font><br>\n";
+    echo "Emulab's Planetlab support is recovering from their transition
+	  to Plab 2.0.  Currently it's much slower then before but is
+	  largely working. Please report problems.
+          <br>\n";
 
     #
     # Display any errors
