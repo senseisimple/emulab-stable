@@ -108,6 +108,6 @@ Then unmount/close the boot floopy.
     network, but it works just fine cause of the burnproof thing the
     plextor does.
 
+    Or on a FreeBSD box:
 
-
-
+	burncd -s 24 -f /dev/acd0c data foo.iso fixate
