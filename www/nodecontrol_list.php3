@@ -487,8 +487,8 @@ while ($row = mysql_fetch_array($query_result)) {
     # Admins get pid/eid/vname, but mere users yes/no.
     if ($isadmin) {
 	if ($pid) {
-	    echo "<td>$pid</td>
-                  <td>$eid</td>\n";
+	    echo "<td><a href=showproject.php3?pid=$pid>$pid</a></td>
+                  <td><a href=showexp.php3?pid=$pid&eid=$eid>$eid</a></td>\n";
 	}
 	else {
 	    echo "<td>--</td>
