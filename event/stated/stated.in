@@ -68,7 +68,7 @@ END
 
 # Only root should run this - it won't work when run as a user...
 # (Or, let an admin run it if it isn't the real one in /usr/testbed/ )
-if ($UID && ( $TB == $REALTB || ! TBAdmin($UID) ) ) {
+if ($UID && ( $TB eq $REALTB || ! TBAdmin($UID) ) ) {
     die("Only root can run this script!\n");
 }
 
@@ -117,10 +117,7 @@ my $pidfile;
 if ( $TB eq $REALTB ) {
     $pidfile = "/var/run/stated.pid";
 } else {
-    $ext = $TB;
-    $ext =~ s/\//\./g;
-    $pidfile = "/var/run/stated$ext.pid";
-    debug("Devel. version! $TB -> $pidfile\n");
+    $pidfile = "$TB/locks/stated.pid";
 }
 debug("Using pidfile $pidfile\n");
 if (-e $pidfile) {

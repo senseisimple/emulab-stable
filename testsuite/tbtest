@@ -676,9 +676,7 @@ sub step_test {
 	}
 
 	if ($type eq "full") {
-	    my $ext = $TB;
-	    $ext =~ s/\//\./g;
-	    my $statedpidfile = "/var/run/stated$ext.pid";
+	    my $statedpidfile = "$TB/locks/stated.pid";
 	    my $statedpid = `cat $statedpidfile` ||
 	      prints "WARNING: Unable to find stated pid: $!\n";
 	    if (! kill(15, $statedpid) ) {
