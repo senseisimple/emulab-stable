@@ -25,7 +25,7 @@ ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
 #
 # Linux binaries the tarball needs
 #
-BINARIES	= tmcc $(SRCDIR)/suidperl
+BINARIES	= $(SRCDIR)/tmcc $(SRCDIR)/suidperl
 ALLBINARIES	= $(BINARIES)
 
 #
@@ -55,7 +55,7 @@ rootball:	$(ROOTBALLNAME)
 
 $(ROOTBALLNAME): copyfiles
 	chown -R 0:0 plabroot
-	tar cf - --numeric-owner -C plabroot . | gzip -c -9 > $(ROOTBALLNAME)
+	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
 copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	$(INSTALL_PROGRAM) $(ULEESCRIPTS) plabroot/usr/local/etc/emulab
@@ -67,8 +67,9 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
 	$(INSTALL) -m 440  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
 					  plabroot/etc/sudoers
-	ln -fs suidperl  plabroot/usr/bin/sperl5.6.1
-	$(INSTALL_PROGRAM) -s tmcc       plabroot/usr/local/etc/emulab/tmcc.bin
+	ln -fs suidperl  plabroot/usr/bin/sperl5.8.0
+	$(INSTALL_PROGRAM) -s $(SRCDIR)/tmcc \
+			plabroot/usr/local/etc/emulab/tmcc.bin
 	$(INSTALL_PROGRAM) -s -m 4511 $(SRCDIR)/suidperl plabroot/usr/bin
 	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
 	                plabroot/usr/local/etc/emulab/client.pem
@@ -86,7 +87,7 @@ mkdirtree:
 
 tmcc:
 	@echo "*** Error:"
-	@echo "You must copy the tmcc linux binary this dir"
+	@echo "You must copy the tmcc linux binary into this dir"
 	@echo "prior to building the tarball."
 	@false
 
