@@ -1,10 +1,13 @@
-Frisbee README version 0.4 of Tue Oct 21 16:55:36 MDT 2003
+Frisbee README/FAQ version 0.5 of Mon Nov 17 13:38:30 MST 2003
+(This is a possibly out of date copy of:
+http://www.emulab.net/downloads/frisbee-README.txt
+Check there for the latest.)
 
-This is a "raw" tarball of our development tree which includes the NTFS
-source for imagezip (which was not in the original 0.3 release).  It is raw
-in the sense that it has GNUmakefile.in files that will have to be customized
-(and otherwise hacked) to work.  The source also has a few bug fixes and new
-features that were not in 0.3:
+frisbee-snapshot-20031021 is a "raw" tarball of our development tree which
+includes the NTFS source for imagezip (which was not in the original 20030618
+release).  It is raw in the sense that it has GNUmakefile.in files that will
+have to be customized (and otherwise hacked) to work.  The source also has a
+few bug fixes and new features that were not in original, 20030618 release:
 
 	- fix bug which would cause corrupt ext2fs images if the
 	  filesystem superblock's s_first_data_block field was non-zero.
@@ -21,6 +24,7 @@ on our machines to extend DOS partitions (not filesystems!), and the FreeBSD
 startup script (in the misc subdir) we use to invoke Frisbee.
 
 The rest of this file is the standard release README ...
+-----------
 
 This is a preliminary release of the Frisbee[1] disk imaging tool used in
 the University of Utah's Emulab testbed cluster and described in the
