@@ -71,20 +71,25 @@ C. What to do on boss:
    ("pcN","pc1u","FBSD40-STD",N)
 
 5. Until you are ready to put it in service, reserve it to an expt,
-   either with nalloc or by adding an entry to the reserved table directly.
+   either with nalloc or by adding an entry to the reserved table
+   directly. You'll probably also want to put its ports in a vlan to
+   enable them.
 
 6. Add the node to the system files:
    - DNS: on boss, cd /etc/namedb
 	  co -l emulab.db.head
 	  add these lines with all the others:
 	  pcN    IN      A       155.101.132.N
-                  IN      MX 10   ops
-                  IN      MX 20   fast.cs.utah.edu.
+                 IN      MX 10   ops
+                 IN      MX 20   fast.cs.utah.edu.
+	  ci -u emulab.db.head
           cd reverse/
+	  co -l 155.101.132.db
 	  in 155.101.132.db, make these changes:
 	  update serial number on line 10
 	  add entry for node, like this:
 	  N      IN      PTR     pcN.emulab.net.
+	  ci -u 155.101.132.db
 	  run /usr/testbed/sbin/named_setup to update.
    - DHCP: on boss, cd /usr/local/etc/ (old /usr/site/bin/dhcp/)
 	   edit dhcpd.conf
@@ -100,7 +105,14 @@ C. What to do on boss:
    - ProxyDHCP: on boss, edit /usr/testbed/etc/proxydhcp.conf
                 add a line like this:
 		155.101.132.N  155.101.128.70   /tftpboot/pxeboot
-		run /usr/testbed/sbin/proxydhcp.restart
+		sudo /usr/testbed/sbin/proxydhcp.restart
+   - tip: on ops, edit /etc/remote
+	  add a line like this:
+	  pcN:dv=/dev/tip/pcN:br#115200:nt:pa=none:
+	  pcN-tty:dv=/dev/cua<port #>:br#115200:nt:pa=none:
+	  then do these:
+	  sudo touch /var/log/tiplogs/pcN.log
+	  sudo touch /var/log/tiplogs/pcN.run
 
 D. How to get the first image on it:
 ------------------------------------
