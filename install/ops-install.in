@@ -41,6 +41,27 @@ use lib '@srcdir@';
    
 use English;
 use libinstall;
+use Getopt::Std;
+
+#
+# Handle command-line options
+#
+sub usage {
+    print "Usage: ops-install [-p packagedir]\n";
+    exit(1);
+}
+
+my $packagedir = "";
+my %opts;
+getopt("p:",%opts);
+
+if ($opt{p}) {
+    $packagedir = $opt{p};
+}
+
+if (@ARGV) {
+    usage();
+}
 
 #
 # Figure out which directory we live in, so that some stages can do thing
@@ -59,9 +80,11 @@ my $PW         = "/usr/sbin/pw";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
+my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $GMAKE      = "/usr/local/bin/gmake";
+my $ENV        = "/usr/bin/env";
 
 #
 # Some files we edit/create
@@ -91,10 +114,11 @@ my $RCDIR      = "/usr/local/etc/rc.d";
 #
 # And some lists that we use
 #
-my @LOCAL_HOSTS       = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
-my @LOGFILES          = ("/var/log/logins","/var/log/tiplogs/capture.log",
+my @LOCAL_HOSTS        = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
+my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
     "/var/log/mountd.log");
-my @MAILING_LIST_NAMES = map { /^([\w-]+)\@/ } @MAILING_LISTS;
+my @LOCAL_MAILING_LISTS = grep(/$OURDOMAIN$/,@MAILING_LISTS);
+my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 
 my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
     ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
@@ -104,6 +128,12 @@ my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
 #
 my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
 my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
+
+#
+# The meta-port (name and version) that drags in all the dependancies for
+# an ops node
+#
+my $OPS_PORT = "emulab-ops-1.4";
 
 #
 # Make sure they know what they're getting into...
@@ -151,13 +181,28 @@ Phase "dirs", "Setting directory permissions", sub {
 };
 
 Phase "ports", "Installing ports", sub {
+    Phase "packages", "Installing packages", sub {
+	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
+	    PhaseSkip("Ports already installed");
+	}
+	if (!$packagedir) {
+	    PhaseSkip("No package directory provided");
+	}
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
+    };
     Phase "pcopy", "Copying ports into place", sub {
+	if ($packagedir) {
+	    PhaseSkip("Package directory provided");
+	}
 	DoneIfExists("$PORTSDIR/emulab-ops");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Installing ports (may take a while)", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.4")) {
+	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
 	    PhaseSkip("Ports already installed");
+	}
+	if ($packagedir) {
+	    PhaseSkip("Package directory provided");
 	}
 
 	#
@@ -208,7 +253,7 @@ Phase "sendmail","Configuring sendmail", sub {
 		map("$_:\t:include:$LIST_DIR/$_",@MAILING_LIST_NAMES));
 	};
 	Phase "newaliases", "Running newaliases", sub {
-	    PhaseSkip("No new aliases") unless @MAILING_LISTS;
+	    PhaseSkip("No new aliases") unless @MAILING_LIST_NAMES;
 	    PhaseSkip("No new aliases") if PhaseWasSkipped("aliases");
 	    ExecQuietFatal($NEWALIASES);
 	};
@@ -398,7 +443,7 @@ Phase "capture", "Setting up capture", sub {
 
 Phase "event", "Setting up event system", sub {
     Phase "elvinconf", "Installing elvind config file", sub {
-	DoneIfExists("$ELVIND_CONF");
+	DoneIfIdentical($ELVIND_CONF,$OPS_ELVIND_CONF);
 	ExecQuietFatal("$CP $OPS_ELVIND_CONF $ELVIND_CONF");
     };
 };
@@ -420,5 +465,5 @@ print "Please reboot this machine before proceeding with boss setup\n";
 if (!PhaseWasSkipped("maillists")) {
     print "Local mailing lists have been created, with no members, in\n";
     print "$LIST_DIR . Please add members to the following lists:\n";
-    print map "$_\n", @MAILING_LISTS;
+    print map "$_\n", @LOCAL_MAILING_LISTS;
 }

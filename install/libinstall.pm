@@ -244,6 +244,24 @@ sub DoneIfEdited($) {
     my ($filename) = @_;
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfEdited"); }
     open(FH,$filename) or return;
+    if (!-e $filename1 || !-e $filename2) {
+	return;
+    }
+    if (!ExecQuiet("cmp -s $filename1 $filename2")) {
+	PhaseSkip("Files $filename1 and $filename2 are identical");
+    }
+}
+
+#
+# Check to see if the phase is already done, as evidenced by the fact that two
+# files are identical
+#
+sub DoneIfIdentical($) {
+    my ($filename1,$filename2) = @_;
+    if (!$filename1 || !$filename2) {
+	PhaseFail("Bad filename passed to DoneIfIdentical");
+    }
+    open(FH,$filename1) or return;
     if (grep /$MAGIC_STRING/, <FH>) {
 	PhaseSkip("File $filename has already been edited\n");
     }
