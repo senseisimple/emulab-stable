@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -14,6 +14,16 @@ if (!isset($key) || !strcmp($key, "")) {
 }
 if (!isset($vuid) || !strcmp($vuid, "")) {
     $vuid = 0;
+}
+# Allow referrer to be passed along.
+if (!isset($referrer) || !strcmp($referrer, "")) {
+    $referrer = 0;
+}
+# Referrer page requested that it be passed along so that it can be
+# redisplayed after login. Save the referrer for form below.
+if (isset($refer) && $refer &&
+    isset($HTTP_REFERER) && strcmp($HTTP_REFERER, "")) {
+    $referrer = $HTTP_REFERER;
 }
 
 #
@@ -44,7 +54,7 @@ if (($known_uid = GETUID()) != FALSE) {
 #
 # Spit out the form.
 # 
-function SPITFORM($uid, $key, $failed)
+function SPITFORM($uid, $key, $referrer, $failed)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
@@ -84,8 +94,13 @@ function SPITFORM($uid, $key, $failed)
           <tr>
              <td align=center colspan=2>
                  <b><input type=submit value=Login name=login></b></td>
-          </tr>
-          </form>
+          </tr>\n";
+    
+    if ($referrer) {
+	echo "<input type=hidden name=referrer value=$referrer>\n";
+    }
+
+    echo "</form>
           </table>\n";
 
     echo "<center><h2>
@@ -115,7 +130,7 @@ if (0 && NOLOGINS()) {
 if (! isset($login)) {
     if ($vuid)
 	$known_uid = $vuid;
-    SPITFORM($known_uid, $key, 0);
+    SPITFORM($known_uid, $key, $referrer, 0);
     PAGEFOOTER();
     return;
 }
@@ -144,7 +159,7 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, $key, 1);
+    SPITFORM($uid, $key, $referrer, 1);
     PAGEFOOTER();
     return;
 }
@@ -154,6 +169,12 @@ if ($key) {
     # If doing a verification, zap to that page.
     #
     header("Location: $TBBASE/verifyusr.php3?key=$key");
+}
+elseif ($referrer) {
+    #
+    # Zap back to page that started the login request.
+    #
+    header("Location: $referrer");
 }
 else {
     #

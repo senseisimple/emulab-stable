@@ -8,7 +8,7 @@ include("defs.php3");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
-# 
+#
 
 #
 # Get current user.
@@ -56,8 +56,9 @@ function SPITFORM($formfields, $returning, $errors)
 
     if (! $returning) {
 	echo "<center><font size=+1>
-               If you already have an Emulab account, <a href=login.php3>
-               please log on first!</a>
+               If you already have an Emulab account,
+               <a href=login.php3?refer=1>
+               <font color=red>please log on first!</font></a>
               </font></center><br>\n";
     }
 
@@ -352,6 +353,16 @@ if (isset($finished)) {
 if (! isset($submit)) {
     $defaults = array();
     $defaults[usr_URL] = "$HTTPTAG";
+
+    #
+    # These two allow presetting the pid/gid.
+    # 
+    if (isset($target_pid) && strcmp($target_pid, "")) {
+	$defaults[pid] = $target_pid;
+    }
+    if (isset($target_gid) && strcmp($target_gid, "")) {
+	$defaults[gid] = $target_gid;
+    }
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();

@@ -65,8 +65,9 @@ function SPITFORM($formfields, $returning, $errors)
 
     if (! $returning) {
 	echo "<center><font size=+1>
-               If you already have an Emulab account, <a href=login.php3>
-               please log on first!</a>
+               If you already have an Emulab account,
+               <a href=login.php3?refer=1>
+               <font color=red>please log on first!</font></a>
               </font></center><br>\n";
     }
 

@@ -12,8 +12,9 @@ include("defs.php3");
 PAGEHEADER("Request a New Emulab Account");
 
 echo "<center><font size=+1>
-       If you already have an Emulab account, <a href=login.php3>
-       please log on first!</a>
+       If you already have an Emulab account,
+       <a href=login.php3>
+       <font color=red>please log on first!</font></a>
        <br><br>
        <a href=joinproject.php3>Join an Existing Project</a>.
        <br>

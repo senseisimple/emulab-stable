@@ -143,6 +143,26 @@ SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
 SUEXEC($uid, $unix_gid, "websetgroups $group_leader", 1);
 
 #
+# Send an email message with a join link.
+#
+TBUserInfo($group_leader, $group_leader_name, $group_leader_email);
+TBUserInfo($uid, $user_name, $user_email);
+
+TBMAIL("$group_leader_name '$group_leader' <$group_leader_email>",
+       "New Group '$group_pid/$group_id' Created",
+       "\n".
+       "This message is to notify you that group '$group_id' in project\n".
+       "'$group_pid' has been created. Please save this link so that you\n".
+       "send it to people you wish to have join this group:\n".
+       "\n".
+       "    ${TBBASE}/joinproject.php3".
+                             "?target_pid=$group_pid&target_gid=$group_id\n".
+       "\n",
+       "From: $user_name '$uid' <$user_email>\n".
+       "CC: $user_name '$uid' <$user_email>\n".
+       "Errors-To: $TBMAIL_WWW");
+
+#
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 # 

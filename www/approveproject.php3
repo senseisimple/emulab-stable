@@ -222,9 +222,13 @@ elseif (strcmp($approval, "approve") == 0) {
          "Project '$pid' Approval",
          "\n".
 	 "This message is to notify you that your project $pid\n".
-	 "has been approved.\n".
-         "\n$message".
-         "\n\n".
+	 "has been approved. Please save this link so that you can send it\n".
+	 "to people you wish to have join your project:\n".
+	 "\n".
+	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
+         "\n".
+	 "$message\n".
+         "\n".
          "Thanks,\n".
          "Testbed Operations\n",
          "From: $TBMAIL_APPROVAL\n".
