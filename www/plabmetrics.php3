@@ -106,6 +106,11 @@ while ($row = mysql_fetch_array($query_result)) {
 $nodemetrics = array();
 
 if ($fp = popen("$TBSUEXEC_PATH nobody nobody webplabstats -i", "r")) {
+    # Parse the header line to get the load metric
+    $string = fgets($fp, 1024);
+    $results = preg_split("/[\s]+/", $string, -1, PREG_SPLIT_NO_EMPTY);
+    $loadmetric = $results[0];
+
     while (!feof($fp)) {
 	$string = fgets($fp, 1024);
 	$results = preg_split("/[\s]+/", $string, -1, PREG_SPLIT_NO_EMPTY);
@@ -171,11 +176,11 @@ echo "<table border=2
              cellpadding=1 cellspacing=2 align=center>\n";
 echo "<tr>
           <th><a href='plabmetrics.php3?&sortby=nodeid'>Node ID</a></th>
-          <th><a href='plabmetrics.php3?&sortby=load'>Load Metric</a></th>
-          <th><a href='plabmetrics.php3?&sortby=cpu'>CPU</a></th>
-          <th><a href='plabmetrics.php3?&sortby=mem'>Memory</a></th>
-          <th><a href='plabmetrics.php3?&sortby=disk'>Disk</a></th>
-          <th><a href='plabmetrics.php3?&sortby=netbw'>Net BW</a></th>
+          <th><a href='plabmetrics.php3?&sortby=load'>$loadmetric</a></th>
+          <th><a href='plabmetrics.php3?&sortby=cpu'>%CPU Used</a></th>
+          <th><a href='plabmetrics.php3?&sortby=mem'>%Mem Used</a></th>
+          <th><a href='plabmetrics.php3?&sortby=disk'>%Disk Used</a></th>
+          <th><a href='plabmetrics.php3?&sortby=netbw'>Net BW (KB/sec)</a></th>
           <th><a href='plabmetrics.php3?&sortby=name'>Name</a></th>
       </tr>\n";
 
