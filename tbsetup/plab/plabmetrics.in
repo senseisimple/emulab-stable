@@ -19,6 +19,11 @@ my $LOADMETRIC = "load_fifteen";
 my $MAXLOAD   = 5.0;
 
 #
+# Minimum percentage of free space on disk below which we will not allocate
+#
+my $MINDISK   = 10.0;
+
+#
 # Drift to allow between our clock and the gmond nodes
 #
 my $STALESLOP = 1 * 60;
@@ -115,6 +120,9 @@ if (defined($options{"f"})) {
     }
 }
 
+print "\n=== plabmetrics running at " . `date`
+    if $debug;
+
 #
 # Grab the node list from the DB in one query, which we use later to
 # map from the IP we get from the XML output, to our node_id. 
@@ -175,6 +183,43 @@ unlink($tempfile)
     if (-e $tempfile);
 exit(0);
 
+sub CheckMetrics()
+{
+    #
+    # Check for stale data.
+    # In the case where metric data appears to be in the future,
+    # it may be clock skew, so allow a little slop.
+    #
+    if ($metricsage < 0) {
+	if (-$metricsage > $STALESLOP) {
+	    $metrics{$LOADMETRIC} = 999;
+	}
+    } elsif ($metricsage > $STALEAGE) {
+	print "WARNING: $host: stale metric data, ignoring\n"
+	    if $debug;
+	$metrics{$LOADMETRIC} = 999;
+    }
+
+    #
+    # Make sure all the metrics we might need are defined
+    #
+    if (!defined($metrics{$LOADMETRIC})) {
+	print "WARNING: $host: no $LOADMETRIC metric\n"
+	    if $debug;
+	$metrics{$LOADMETRIC} = 999;
+    }
+    if (!defined($metrics{disk_free})) {
+	print "WARNING: $host: no disk_free metric\n"
+	    if $debug;
+	$metrics{disk_free} = 1;
+    }
+    if (!defined($metrics{disk_total})) {
+	print "WARNING: $host: no disk_total metric\n"
+	    if $debug;
+	$metrics{disk_total} = $metrics{disk_free};
+    }
+}
+
 #
 # Insert the metrics we care about. Called for each node.
 #
@@ -182,32 +227,39 @@ sub InsertMetrics()
 {
     if (defined($nodemap{$IP})) {
 	my $nodeid   = $nodemap{$IP};
-	my $load     = $metrics{$LOADMETRIC};
 	my $scaled;
+	my $load;
+	my $disk;
+
+	CheckMetrics();
 
 	#
-	# Check for stale data.
-	# In the case where metric data appears to be in the future,
-	# it may be clock skew, so allow a little slop.
+	# Load must be under MAXLOAD, favor those with lower load
 	#
-	if ($metricsage < 0) {
-	    if (-$metricsage > $STALESLOP) {
-		$load = 999;
-	    }
-	} elsif ($metricsage > $STALEAGE) {
-	    $load = 999;
-	}
-
+	$load = $metrics{$LOADMETRIC};
 	$scaled = $load / $MAXLOAD;
 		
-	if ($debug) {
-	    print STDERR "$nodeid ($host) $load $scaled\n";
+	#
+	# Plab people request that we not start jobs on nodes
+	# with less than a certain amount of available disk space
+	#
+	if ($metrics{disk_free} / $metrics{disk_total} * 100.0 >= $MINDISK) {
+	    $disk = 0;
+	} else {
+	    $disk = 1;
+	}
+
+	if (0&& $debug) {
+	    print STDERR "$nodeid ($host) $load $scaled $disk\n";
 	}
 
 	if (!$impotent) {
 	    DBQueryWarn("replace delayed into node_features ".
 			" (node_id, feature, weight) ".
 			" values ('$nodeid', '+load', $scaled)");
+	    DBQueryWarn("replace delayed into node_features ".
+			" (node_id, feature, weight) ".
+			" values ('$nodeid', '+disk', $disk)");
 	}
     }
 }
@@ -297,6 +349,8 @@ sub fatal {
     my $msg = $_[0];
 
     SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+    print "$msg\n"
+	if $debug;
 
     unlink($tempfile)
 	if (defined($tempfile) && -e $tempfile);
