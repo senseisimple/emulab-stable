@@ -141,13 +141,6 @@ if (system("named_setup")) {
     # 
 }
 
-print "Starting the event system.\n";
-if (system("eventsys_control start $pid $eid")) {
-    print STDERR "*** Failed to start the event system.\n";
-    cleanup;
-    exit(1);
-}
-
 #
 # Since it'll take a while for the nodes to reboot, we'll start now, and
 # wait for the os_setup to finish, down below
@@ -202,6 +195,18 @@ if ($kid == $os_setup_pid) {
 } else {
     undef $os_setup_pid;
     print STDERR "*** Error waiting for os_setup to finish.\n";
+    cleanup;
+    exit(1);
+}
+
+#
+# Okay, start the event system now that we know all the nodes have
+# rebooted (os_setup is done). This only takes a moment (puts itself
+# in the background), so its not enough of a delay to worry about.
+# 
+print "Starting the event system.\n";
+if (system("eventsys_control start $pid $eid")) {
+    print STDERR "*** Failed to start the event system.\n";
     cleanup;
     exit(1);
 }
