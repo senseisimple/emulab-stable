@@ -30,6 +30,7 @@ int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+int		insubnet(int subnets[], char *address);
 
 /*
  * Commands we support.
@@ -659,14 +660,32 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 static int
 dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
-	MYSQL_RES	*reserved_result;
-	MYSQL_RES	*vnames_result;
+
+	char *tmp, *buf;
+	char pid[64], eid[64];
+
+	char nodeid[32]; /* Testbed ID of the node */
+	int control_net; /* Control network interface on this host */
+	int ninterfaces; /* Number of interfaces on the host */
+	int nnodes; /* Number of other nodes in this experiment */
+
+
+	/* XXX: This is hacky. But, the sharks and their IPaliases make this
+	 * a royal PITA! This array contains a bunch of ints that describe
+	 * each subnet - the first 24 bits correspond to an interface's IP address,
+	 * and the last 8 bits are 0. The list is 0-terminated. This
+	 * really should be dynamically allocated, or fixed some other way!
+	 */
+	int subnets[16];
+	int nsubnets;
+
+	char *last_id; /* Used to determine link# */
+	int link;
+	int seen_direct;
+
+	MYSQL_RES	*interface_result;
+	MYSQL_RES	*nodes_result;
 	MYSQL_ROW	row;
-	char		nodeid[32];
-	char		pid[64];
-	char		eid[64];
-	char		*srcnodes, lastid[MYBUFSIZE], buf[MYBUFSIZE];
-	int		nreserved, first, i, nvnames;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "HOSTNAMES: %s: No such node",
@@ -681,184 +700,165 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 0;
 
 	/*
-	 * Need to find all of the nodes in the experiment.
+	 * Figure out which of our interfaces is on the control network
 	 */
-	reserved_result = mydb_query("select node_id from reserved "
-				     "where pid='%s' and eid='%s'",
-				     1, pid, eid);
-	if (!reserved_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting reserved!",
-		       nodeid);
+	interface_result = mydb_query("SELECT control_net "
+			"FROM nodes LEFT JOIN node_types ON nodes.type = node_types.type "
+			"WHERE nodes.node_id = '%s'",
+			1, nodeid);
+
+	if (!interface_result) {
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting interface!", nodeid);
 		return 1;
-	}
-	
-	if ((nreserved = (int)mysql_num_rows(reserved_result)) == 0) {
-		mysql_free_result(reserved_result);
-		return 0;
 	}
 
 	/*
-	 * Build up an "or" clause of the src nodes to feed to the next query.
+	 * There should be exactly 1 control network interface!
 	 */
-	row = mysql_fetch_row(reserved_result);
-	sprintf(buf, " src_node_id='%s' ", row[0]);
-	
-	srcnodes = (char *) malloc(strlen(buf) + 1);
-	if (!srcnodes) {
-		syslog(LOG_ERR, "dohosts: Out of Memory!");
-		mysql_free_result(reserved_result);
+	if ((int)mysql_num_rows(interface_result) != 1) {
+		mysql_free_result(interface_result);
+		syslog(LOG_ERR, "HOSTNAMES: Unable to get control interface for %s",nodeid);
+		return 0;
+	}
+
+	row = mysql_fetch_row(interface_result);
+	control_net = atoi(row[0]);
+	mysql_free_result(interface_result);
+
+	/*
+	 * Now, we need to loop through all of the interfaces to build the list of 
+	 * of our subnets
+	 */
+	interface_result = mydb_query("SELECT IP, IPalias, card "
+			"FROM interfaces "
+			"WHERE node_id = '%s' AND IP IS NOT NULL",
+			3, nodeid);
+
+	if (!interface_result) {
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting interfaces!", nodeid);
 		return 1;
 	}
-	strcpy(srcnodes, buf);
 
-	while (--nreserved) {
-		char	*tmp;
-		
-		row = mysql_fetch_row(reserved_result);
-		sprintf(buf, " or src_node_id='%s' ", row[0]);
+	if ((ninterfaces = (int)mysql_num_rows(interface_result)) == 0) {
+		mysql_free_result(interface_result);
+		return 0;
+	}
 
-		tmp = (char *) malloc(strlen(buf) + strlen(srcnodes) + 1);
-		if (!tmp) {
-			syslog(LOG_ERR, "dohosts: Out of Memory!");
-			mysql_free_result(reserved_result);
-			free(srcnodes);
-			return 1;
+	nsubnets = 0;
+	bzero(subnets,sizeof(subnets));
+	while (ninterfaces--) {
+		row = mysql_fetch_row(interface_result);
+
+		/* Skip Control network interface */
+		if (atoi(row[2]) != control_net) {
+			int aA, aB, aC, aD; /* Hold the 4 parts of the IP address: A.B.C.D */
+			if (sscanf(row[0],"%i.%i.%i.%i",&aA,&aB,&aC,&aD) == 4){
+				subnets[nsubnets++] = (aA << 24) | (aB << 16) | (aC << 8);
+			}
 		}
-		strcpy(tmp, srcnodes);
-		strcat(tmp, buf);
-		free(srcnodes);
-		srcnodes = tmp;
+
+		/* Get IPalias as well (mostly important for Sharks) */
+		if (row[1] && (strcmp(row[1],""))) {
+			int aA, aB, aC, aD; /* Hold the 4 parts of the IP address: A.B.C.D */
+			if (sscanf(row[1],"%i.%i.%i.%i",&aA,&aB,&aC,&aD) == 4){
+				subnets[nsubnets++] = (aA << 24) | (aB << 16) | (aC << 8);
+			}
+		}
+
 	}
-	mysql_free_result(reserved_result);
+	mysql_free_result(interface_result);
 
 	/*
-	 * First find our direct connect links by looking for all
-	 * connections for which we are either a src or dest. 
+	 * Grab a list of all other hosts in this experiment - we'll sort out the
+	 * directly connected ones while looping through them.
 	 */
-	vnames_result =
-		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
-			   "r.vname from virt_names as v "
-			   "left join reserved as r on "
-			   "v.dest_node_id=r.node_id "
-			   "where dest_node_id='%s' or src_node_id='%s' "
-			   "order by dest_node_id,lindex",
-			   4, nodeid, nodeid);
+	nodes_result = 
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname "
+				"FROM interfaces AS i LEFT JOIN reserved AS r "
+				"ON i.node_id = r.node_id "
+				"WHERE IP IS NOT NULL AND IP != '' AND pid='%s' AND eid='%s'"
+		/*		"i.node_id != '%s'" */
+				"ORDER BY node_id DESC, IP",
+				4,pid,eid,nodeid);
 
-	if (!vnames_result) {
-		syslog(LOG_ERR,
-		       "dohosts: %s: DB Error getting direct vnames!", nodeid);
-		free(srcnodes);
+	if (!nodes_result) {
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
+				"in the experiment!", nodeid);
 		return 1;
 	}
 	
-	if ((nvnames = (int)mysql_num_rows(vnames_result)) == 0) {
-		syslog(LOG_ERR, "dohosts: %s: No virtual names!", nodeid);
-		mysql_free_result(vnames_result);
+	if ((nnodes = (int)mysql_num_rows(nodes_result)) == 0) {
+		syslog(LOG_ERR, "dohosts: %s: No nodes in this experiment!", nodeid);
+		mysql_free_result(nodes_result);
 		return 0;
 	}
 
-	/*
-	 * Go through the list. The rules are:
-	 * 
-	 * 1) The outgoing links from the node making the request are given
-	 *    by dest_node_id equal to node_id. The first numbered of these
-	 *    links gets an alias to itself. 
-	 * 2) The incoming links to the node making the request are given
-	 *    by dest_node_id not equal to node_id. For each one of those
-	 *    there might be multiple incoming, but only the first link
-	 *    gets an alias. 
-	 *
-	 * First look for #1 cases.
-	 */
-	first = 1;
-	for (i = 0; i < nvnames; i++) {
-		MYSQL_ROW	vname_row = mysql_fetch_row(vnames_result);
+	last_id = ""; 
+	link = 0; /* Acts as 'lindex' from the virt_names table */
+	seen_direct = 0; /* Set to 1 if we've already seen at least
+						one direct connection to this node */
+	while (nnodes--) {
+		MYSQL_ROW node_row = mysql_fetch_row(nodes_result);
 
-		if (strcmp(vname_row[0], nodeid))
-			continue;
-		
-		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
-			vname_row[3], vname_row[1], vname_row[2],
-			(first) ? vname_row[3] : " ");
+		/*
+		 * Either the IP or IPalias column (or both!) could have
+		 * matched. Code duplication galore!
+		 */
 
-		if (first)
-			first = 0;
-			
+		/*
+		 * Let's take care of the IP first!
+		 */
+
+		if (!strcmp(node_row[0],last_id)) {
+			link++;
+		} else {
+			link = seen_direct = 0;
+			last_id = node_row[0];
+		}
+
+		if (insubnet(subnets,node_row[1])) {
+			sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+					node_row[3], link, node_row[1],
+					(!seen_direct) ? node_row[3] : " ");
+			seen_direct = 1;
+		} else {
+			sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
+					node_row[3], link, node_row[1]);
+		}
+
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+
+		/*
+		 * Make sure it really has an IPalias!
+		 */
+
+		if (node_row[2] && strcmp(node_row[2],"")) {
+			if (!strcmp(node_row[0],last_id)) {
+				link++;
+			} else {
+				link = seen_direct = 0;
+				last_id = node_row[0];
+			}
+
+			if (insubnet(subnets,node_row[2])) {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+						node_row[3], link, node_row[2],
+						(!seen_direct) ? node_row[3] : " ");
+				seen_direct = 1;
+			} else {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
+						node_row[3], link, node_row[2]);
+			}
+
+			client_writeback(sock, buf, strlen(buf), tcp);
+			syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+
+		}
 	}
-	mysql_data_seek(vnames_result, 0);
-
-	/*
-	 * Now look for #2 cases.
-	 */
-	memset(lastid, 0, sizeof(lastid));
-	for (i = 0; i < nvnames; i++) {
-		MYSQL_ROW	vname_row = mysql_fetch_row(vnames_result);
-		char		*alias;
-
-		if (strcmp(vname_row[0], nodeid) == 0)
-			continue;
-
-		if (strcmp(vname_row[0], lastid))
-			alias = vname_row[3];
-		else
-			alias = " ";
-
-		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
-			vname_row[3], vname_row[1], vname_row[2], alias);
-			
-		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
-		strcpy(lastid, vname_row[0]);
-	}
-
-	mysql_free_result(vnames_result);
-
-	/*
-	 * Now select out all the nodes that are not directly attached
-	 * to node making the request. These get non-aliased names.
-	 */
-	vnames_result =
-		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
-			   "r.vname from virt_names as v "
-			   "left join reserved as r on "
-			   "v.dest_node_id=r.node_id "
-			   "where ( %s ) and "
-			   "(dest_node_id!='%s' and src_node_id!='%s') "
-			   "order by dest_node_id,lindex",
-			   4, srcnodes, nodeid, nodeid);
-
-	if (!vnames_result) {
-		syslog(LOG_ERR,
-		       "dohosts: %s: DB Error getting vnames!", nodeid);
-		free(srcnodes);
-		return 1;
-	}
-	
-	if ((nvnames = (int)mysql_num_rows(vnames_result)) == 0) {
-		syslog(LOG_ERR, "dohosts: %s: No virtual names!", nodeid);
-		mysql_free_result(vnames_result);
-		free(srcnodes);
-		return 0;
-	}
-
-	while (nvnames) {
-		MYSQL_ROW	vname_row;
-
-		vname_row = mysql_fetch_row(vnames_result);
-
-		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=  \n",
-			vname_row[3], vname_row[1], vname_row[2]);
-			
-		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
-			
-		nvnames--;
-	}
-	mysql_free_result(vnames_result);
-	
+	mysql_free_result(nodes_result);
 	return 0;
+
 }
 
 /*
@@ -1564,3 +1564,32 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 	udpfd = -1;
 	udpix = 0;
 }
+
+/*
+ * Return 1 if address is in subnets, 0 otherwize
+ */
+
+int
+insubnet(int subnets[], char *address) {
+	int aA, aB, aC, i, binaryAddress;
+
+	if (address == 0) {
+		/* Don't die if address is null */
+		return 0;
+	}
+	if (sscanf(address,"%i.%i.%i",&aA,&aB,&aC) != 3) {
+		/* Address was in the wrong format */
+		return 0;
+	}
+
+	i = 0;
+	binaryAddress = (aA << 24) | (aB << 16) | (aC << 8);
+	while (subnets[i] != 0) {
+		if (subnets[i++] == binaryAddress) {
+			return 1;
+		}
+	}
+	return 0;
+
+}
+
