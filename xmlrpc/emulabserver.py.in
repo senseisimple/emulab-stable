@@ -62,6 +62,9 @@ virtual_tables = {
     "virt_lans"                 : { "rows"  : None, 
                                     "tag"   : "lans",
                                     "attrs" : [ "vname" ]},
+    "virt_lan_lans"             : { "rows"  : None, 
+                                    "tag"   : "lan_lans",
+                                    "attrs" : [ "vname" ]},
     "virt_lan_settings"         : { "rows"  : None, 
                                     "tag"   : "lan_settings",
                                     "attrs" : [ "vname", "capkey" ]},
@@ -2213,6 +2216,173 @@ class experiment:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, value=exitval, output=output)
+
+    #
+    # Get event agent list for event scheduler.
+    #
+    def event_agentlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        #
+        # We return the result as a string. Yucky.
+        #
+        result = "";
+
+	res = DBQuery("select vi.vname,vi.vnode,r.node_id,o.type "
+                      " from virt_agents as vi "
+                      "left join reserved as r on "
+                      " r.vname=vi.vnode and r.pid=vi.pid and "
+                      " r.eid=vi.eid "
+                      "left join event_objecttypes as o on "
+                      " o.idx=vi.objecttype "
+                      "where vi.pid=%s and vi.eid=%s",
+                      (argdict["proj"], argdict["exp"]))
+
+        for agent in res:
+            if agent[2] == None:
+                nodeid = ""
+                ipaddr = ""
+                pass
+            else:
+                ipres = DBQuery("select IP from nodes as n2 "
+			 "left join nodes as n1 on n1.node_id=n2.phys_nodeid "
+			 "left join node_types as nt on n1.type=nt.type "
+			 "left join interfaces as i on "
+			 "i.node_id=n1.node_id and i.iface=nt.control_iface "
+			 "where n2.node_id=%s",
+                         (agent[2]))
+
+                if not ipres or len(ipres) == 0:
+                    continue
+
+                ipaddr = res[0][0];
+                nodeid = agent[2]
+                pass 
+            
+            if not result == "":
+                result = result + "\n"
+                pass
+            
+            result = result + agent[0] + "," + agent[1] + "," 
+            result = result + nodeid + "," + ipaddr + "," + agent[3]
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result,
+                              output=str(result))
+    
+    #
+    # Get event group list for event scheduler.
+    #
+    def event_grouplist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        #
+        # We return the result as a string. Yucky.
+        #
+        result = "";
+
+	res = DBQuery("select group_name,agent_name from event_groups "
+                      "where pid=%s and eid=%s",
+                      (argdict["proj"], argdict["exp"]))
+
+        for group in res:
+            if not result == "":
+                result = result + "\n"
+                pass
+            
+            result = result + group[0] + "," + group[1]
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result,
+                              output=str(result))
+    
+    #
+    # Get event list for event scheduler.
+    #
+    def event_eventlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        #
+        # We return the result as a string. Yucky.
+        #
+        result = "";
+
+	res = DBQuery("select ex.idx,ex.time,ex.vname,"
+                      " ot.type,et.type,ex.arguments from eventlist as ex "
+                      "left join event_eventtypes as et on "
+                      " ex.eventtype=et.idx "
+                      "left join event_objecttypes as ot on "
+                      " ex.objecttype=ot.idx "
+                      "where ex.pid=%s and ex.eid=%s "
+                      "order by ex.time ASC",
+                      (argdict["proj"], argdict["exp"]))
+
+        for event in res:
+            if not result == "":
+                result = result + "\n"
+                pass
+            
+            result = result + str(event[0]) + "," + str(event[1]) + ","
+            result = result + event[2] + "," + event[3] + ","
+            result = result + event[4] + "," + event[5]
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result,
+                              output=str(result))
     
     pass
 
