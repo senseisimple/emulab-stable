@@ -597,6 +597,8 @@ function SHOWEXP($pid, $eid, $edit=0) {
     $lastswapreq = $exprow[last_swap_req];
     $minnodes    = $exprow["min_nodes"];
     $syncserver  = $exprow["sync_server"];
+    $mem_usage   = $exprow["mem_usage"];
+    $cpu_usage   = $exprow["cpu_usage"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -804,6 +806,17 @@ $noswap_form";
                Unknown</font></td>
           </tr>\n";
 	}
+    }
+    if ($mem_usage || $cpu_usage) {
+	echo "<tr>
+                <td>Mem Usage Est: </td>
+                <td class=\"left\">$mem_usage</td>
+              </tr>\n";
+
+	echo "<tr>
+                <td>CPU Usage Est: </td>
+                <td class=\"left\">$cpu_usage</td>
+              </tr>\n";
     }
 
     $lastact = TBGetExptLastAct($pid,$eid);
