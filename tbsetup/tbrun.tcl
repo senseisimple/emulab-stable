@@ -14,6 +14,12 @@ proc outs {args} {
     puts $logFp $s
 }
 
+proc readfifo {fp} {
+    while {[gets $fp line] >= 0} {
+	outs $line
+    }
+}
+
 ### Bootstrapping code.  The whole purpose of this is to find the
 # directory containing the script.
 set file [info script]
@@ -50,6 +56,16 @@ if {[catch "open $logFile a+" logFp]} {
     exit 1
 }
 
+set tmpio "/tmp/[pid].tmp"
+if {[catch "exec touch $tmpio"]} {
+    outs stderr "Could not create $tmpio for IO redirection."
+    exit 1
+}
+if {[catch "open $tmpio r" tmpioFP]} {
+    outs stderr "Could not open $tmpio for IO redirection. ($tmpio)"
+    exit 1
+}
+
 outs "Input: $irFile"
 outs "Log: $logFile"
 
@@ -73,10 +89,12 @@ foreach pair $nodemap {
 #}
 
 outs "Setting up VLANs"
-if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $tmpio" err]} {
+    readfifo $tmpioFP
     outs stderr "Error running $snmpit. ($err)"
     exit 1
 }
+readfifo $tmpioFP
 
 #outs "PLACEHOLDER - Verifying virtual network."
 outs "PLACEHOLDER - Copying disk images."
@@ -94,3 +112,5 @@ outs "PLACEHOLDER - Installing secondary pacakages."
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
 
+close $fifoFP
+file delete -force $fifo
