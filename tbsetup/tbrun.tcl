@@ -39,7 +39,6 @@ if {[file exists $scriptdir/ns2ir]} {
 }
 
 set snmpit "$scriptdir/snmpit"
-set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
 set libir "$scriptdir/ir/libir.tcl"
 set ir2ifc "$scriptdir/ir2ifc"
 set ifcboot "$scriptdir/ifc_setup"
@@ -88,18 +87,6 @@ if {! [file exists $irFile]} {
 }
 
 outs "Beginning Testbed run for $irFile. [clock format [clock seconds]]"
-
-outs "Resetting VLANs"
-ir read $irFile
-set nodemap [ir get /virtual/nodes]
-set machines {}
-foreach pair $nodemap {
-    lappend machines [lindex $pair 1]
-}
-#if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
-#    outs stderr "Error running $resetvlans. ($err)"
-#    exit 1
-#}
 
 outs "Setting up VLANs"
 if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2> $tmpio" err]} {
