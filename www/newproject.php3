@@ -739,7 +739,7 @@ if (!$returning) {
 	}
 	else {
 	    $addpubkeyargs = "$proj_head_uid $usr_keyfile";
-	    chmod($usr_keyfile, 0640);	
+	    chmod($usr_keyfile, 0644);	
 	}
     }
     #

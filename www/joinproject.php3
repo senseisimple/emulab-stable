@@ -499,7 +499,7 @@ if (!$returning) {
 	}
 	else {
 	    $addpubkeyargs = "$joining_uid $usr_keyfile";
-	    chmod($usr_keyfile, 0640);	
+	    chmod($usr_keyfile, 0644);	
 	}
     }
 }

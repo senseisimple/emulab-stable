@@ -155,7 +155,7 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
 	    $foo .= "$output[$i]\n";
 	}
 	
-	TBERROR("SUEXEC failure: '$cmdandargs'\n".
+	TBERROR("SUEXEC failure: '$uid/$gid $cmdandargs'\n".
 		"Error output:\n\n".
                 "$foo", $die, 1);
     }
