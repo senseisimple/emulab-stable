@@ -709,7 +709,7 @@ int main(int argc, char *argv[])
 			    case MTP_POSITION_STATUS_IDLE:
 				/* Got a response to an MTP_WIGGLE_START. */
 				if (ro == NULL) {
-				    fatal("unknown bot %d\n", mws->robot_id);
+				    error("unknown bot %d\n", mws->robot_id);
 				}
 				else {
 				    /*
