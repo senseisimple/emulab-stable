@@ -68,6 +68,51 @@ inline int accept(float change, float temperature)
 	return 0;
 }
 
+/*
+ * score performs two functions at the moment.  First, it actually
+ * performs an assignment of the virtual nodes in a switch to
+ * physical nodes in that switch.  Then it returns a numeric evaluation
+ * of the current mapping.
+ *
+ * There are several problems it solves:
+ *
+ *  a)  Assigning generic vnodes to nodes.
+ *
+ *      This is performed by searching a list of the nodes and assigning
+ *      the virtual node to a node with the minimum necessary number
+ *      of interfaces.
+ *
+ *  b)  Assigning delay vnodes to delay nodes:
+ *
+ *      Since a delay node may support many delay vnodes, this is a
+ *      unit weight knapsack problem.  I take the easy out here
+ *      by simply assigning the delay vnodes to nodes as they
+ *      come along in the list.  This works for finding a feasible
+ *      solution, but does not optimize the use of physical nodes.
+ *
+ *  c)  Scoring
+ *
+ *      Scoring is handled by:
+ *       i)  add 1 for each unassigned node (excess nodes or too many
+ *           interfaces
+ *      ii)  Add 1 for each link across switches in excess of the
+ *           capacity
+ *     iii)  Add .1 for each switch used to try to minimize the number
+ *           of switches involved
+ *      iv)  Add .1 for each unit of bandwidth between switches to try
+ *           to minimize interswitch bandwidth consumption
+ *
+ *
+ *  The score function is the big bottleneck of the program right
+ *  now.  Unlike the earlier versions in which only changed nodes
+ *  were updated, score recomputes the entire solution each time
+ *  it's called.  This is very inefficient and should be fixed
+ *  by having the scupdate function update only the parts of the
+ *  topology which changed.  This needs to be looked at more,
+ *  but should probably be delayed until the rest of the features
+ *  have been added.
+ */
+
 float score()
 {
 
@@ -133,14 +178,6 @@ float score()
 			sc += numdelays;
 		}
 
-		/* XXX:  This should now be obsolete and handled by the
-		 * assigned part above */
-#if 0
-		/* Do we have too many nodes per switch? */
-		if (numnodes[i] > nodecap[i]) {
-			sc += (numnodes[i] - nodecap[i]);
-		}
-#endif
 		/* Try to minimize the number of switches used */
 		/* This is likely NOT an effective way to do it! */
 		if (numnodes[i] > 0) {
@@ -154,6 +191,20 @@ float score()
 	}
 	return sc;
 }
+
+/*
+ * This is a completely bogus function.  It's a straight copy of the
+ * score() function, but instead of incrementing a score counter,
+ * it prints out a list of the constraints which are violated.
+ *
+ * In the future, this function should return something allowing us
+ * to determine if a critical resource (nodes, interfaces, etc.) is
+ * violated, or if a non-critical resource (interswitch bandwidth)
+ * has been violated, so we can allow the user to proceed with a
+ * potentially bad configuration if they so desire.
+ *
+ * ... and the "coding by copy" junk should be eliminated.  Jeez. :)
+ */
 
 void violated()
 {
@@ -222,6 +273,11 @@ void violated()
 }
 
 
+/*
+ * Reset the interlinks and numnodes arrays to an accurate
+ * value.  Requires an inspection of all nodes and edges.
+ */
+
 void screset() {
 	edge e;
 	node n;
@@ -242,6 +298,17 @@ void screset() {
 		}
 	}
 }
+
+/*
+ * Move a node 'n' from its current switch to a new one, indicated by
+ * newpos.
+ *
+ * Right now, this function performs the update logic to change the
+ * node counts and the interswitch bandwidth, but does not cope
+ * with the rest of the score.  In the future, it should perform
+ * the incremental score update.  See the comments for the score()
+ * function for more details.
+ */
 
 void scupdate(node n, int newpos)
 {
@@ -284,6 +351,20 @@ void scupdate(node n, int newpos)
 
 	G[n].partition(newpos);
 }
+
+/*
+ * The workhorse of our program.
+ *
+ * Assign performs an assignment of the virtual nodes (vnodes) to
+ * nodes in the physical topology.
+ *
+ * The input virtual topology is the graph G (global)
+ * the input physical topology is the topology topo (global).
+ *
+ * The simulated annealing logic is contained herein,
+ * except for the "accept a bad change" computation,
+ * which is performed in accept().
+ */
 
 int assign()
 {
@@ -400,6 +481,14 @@ int assign()
 	return 0;
 }
 
+/*
+ * A legacy function from a less general version of the program.
+ *
+ * Now simply resets the node assignment, performs a new assignment,
+ * and prints out the results.
+ *
+ */
+
 void loopassign()
 {
 	node_array<int> nodestorage;
@@ -422,6 +511,11 @@ void loopassign()
 	node n;
 }
 
+/*
+ * If we have more ways of partitioning the graph other than just
+ * simulated annealing, throw them in here.
+ */
+
 void chopgraph(GraphWin& gw) {
 	node n;
 	forall_nodes(n, G) {
@@ -436,6 +530,14 @@ void chopgraph(GraphWin& gw) {
 		exit(-1);
 	}
 }
+
+/*
+ * Something in the graph has changed!  Better redisplay.
+ *
+ * Performs the color assignment for whichever switch the
+ * node belongs to and shows the inter-switch links as
+ * dashed lines.
+ */
 
 void display_scc(GraphWin& gw)
 {
@@ -506,6 +608,11 @@ void display_scc(GraphWin& gw)
 	gw.redraw();
 }
 
+/*
+ * Someone clicked on the "reassign" button.
+ * Reset and redisplay.
+ */
+
 void reassign(GraphWin& gw)
 {
 	node n;
@@ -572,7 +679,13 @@ int main(int argc, char **argv)
 	}
     
 	srandom(time(NULL) + getpid());
-    
+
+	/*
+	 * Set up the LEDA graph window environment.  Whenever
+	 * the user does anything to the graph, call the
+	 * proper handler.
+	 */
+	
 	GraphWin gw(G, "Flux Testbed:  Simulated Annealing");
     
 	gw.set_init_graph_handler(del_edge_handler);
@@ -584,6 +697,10 @@ int main(int argc, char **argv)
 	gw.set_node_width(24);
 	gw.set_node_height(24);
     
+	/*
+	 * Allow the user to specify a topology in ".top" format.
+	 */
+
 	if (argc == 1) {
 		ifstream infile;
 		infile.open(argv[0]);
@@ -604,6 +721,12 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/*
+	 * Allow the user to specify a physical topology
+	 * in .phys format.  Fills in the "topo" global variable.
+	 * Make no mistake:  This is actually mandatory now.
+	 */
+	
 	if (topofile != NULL) {
 		cout << "Parsing phys\n";
 		topo = parse_phys(topofile);
@@ -630,7 +753,10 @@ int main(int argc, char **argv)
     
 	h_menu = gw.get_menu("Layout");
 	gw_add_simple_call(gw, reassign, "Reassign", h_menu);
-    
+
+	/* Run until the user quits.  Everything is handled by callbacks
+	 * from LEDA's event loop from here on.                           */
+	
 	gw.edit();
     
 	return 0;
