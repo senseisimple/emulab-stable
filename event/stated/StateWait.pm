@@ -85,8 +85,8 @@ sub initStateWait( $@ ) {
     $tuple = address_tuple_alloc();
     if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-    %$tuple = ( objtype   => TBDB_TBEVENT_NODESTATE #,
-		eventtype   => join(",",@$states),
+    %$tuple = ( objtype   => TBDB_TBEVENT_NODESTATE,
+		eventtype => join(",",@$states),
 	        objname   => join(",",@nodes) );
 
     if ($debug > 1) {
@@ -126,7 +126,7 @@ sub doEvent( $$$ ) {
 	  "$eventtype\n";
     }
     my $n = $objname;
-    if (@{$remain{$n}}[0] eq $eventtype) {
+    if (defined($remain{$n}) && @{$remain{$n}}[0] eq $eventtype) {
 	# this is the next state we were waiting for
 	if ($debug) { print "Got $eventtype for $n\n" };
 	shift(@{$remain{$n}});
@@ -137,7 +137,6 @@ sub doEvent( $$$ ) {
 	    delete($remain{$n});
 	}
     }
-    #exit(0);
 }
 
 sub waitForState( $$;$ ) {
