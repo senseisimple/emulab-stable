@@ -2792,7 +2792,8 @@ sub TBExptSetSwapUID($$$)
 
 #
 # Set the thumbnail for an experiment. Comes in as a binary string, which
-# must be quoted before DB insertion.
+# must be quoted before DB insertion. Returns 1 if the thumbnail was
+# succesfully updated, 0 if it was not.
 #
 sub TBExptSetThumbNail($$$)
 {
@@ -2805,12 +2806,18 @@ sub TBExptSetThumbNail($$$)
 	DBQueryFatal("select rsrcidx from experiments as e ".
 		     "left join experiment_stats as s on e.idx=s.exptidx ".
 		     "where e.pid='$pid' and e.eid='$eid'");
+    if ($query_result->num_rows() != 1) {
+	return 0;
+    }
     my ($rsrcidx) = $query_result->fetchrow_array();
 
     # Now do the insert. 
-    return
-	DBQueryFatal("update experiment_resources set thumbnail=$bindata ".
-		     "where idx=$rsrcidx");
+    DBQueryFatal("update experiment_resources set thumbnail=$bindata ".
+		 "where idx=$rsrcidx");
+    #
+    # Since the above is a QueryFatal, if it failed, we won't even get here
+    #
+    return 1;
 }
 
 #
