@@ -161,8 +161,6 @@ foreach my $str ( keys(%ipgroups) ) {
 print MAP "\n";
 close(MAP);
 
-exit(0);
-
 #
 # Fire the new tail file over to the fileserver to finish. We cat the file
 # right into it.
