@@ -158,6 +158,21 @@ CREATE TABLE event_objecttypes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `event_groups`
+--
+
+CREATE TABLE event_groups (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
+  group_name varchar(64) NOT NULL default '',
+  agent_name varchar(64) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,idx),
+  KEY group_name (group_name),
+  KEY agent_name (agent_name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `eventlist`
 --
 
@@ -958,7 +973,7 @@ CREATE TABLE nodes (
   status enum('up','possibly down','down','unpingable') default NULL,
   status_timestamp datetime default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
-  routertype enum('none','ospf','static','manual','static-ddijk') NOT NULL default 'none',
+  routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
   eventstate varchar(20) default NULL,
@@ -1748,7 +1763,7 @@ CREATE TABLE virt_nodes (
   vname varchar(32) NOT NULL default '',
   type varchar(30) default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
-  routertype enum('none','ospf','static','manual','static-ddijk') NOT NULL default 'none',
+  routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   fixed text NOT NULL,
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;

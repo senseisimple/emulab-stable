@@ -1762,3 +1762,16 @@ last_net_act,last_cpu_act,last_ext_act);
         update node_types set isjailed=1 where type='modelnet-edge';
 
 1.265: Removed a field I never actually added; skip to next entry.
+
+1.266: Change routertype slots to include token for old centralized
+       routing calculation (static-old).
+
+	alter table nodes change routertype routertype \
+                 enum('none','ospf','static','manual', \
+                      'static-ddijk','static-old') \
+                  NOT NULL default 'none';
+
+	alter table virt_nodes change routertype routertype \
+                 enum('none','ospf','static','manual',\
+                      'static-ddijk','static-old') \
+                 NOT NULL default 'none';
