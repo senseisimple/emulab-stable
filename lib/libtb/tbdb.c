@@ -117,7 +117,7 @@ mydb_iptonodeid(char *ipaddr, char *bufp)
 }
  
 /*
- * Map node ID to IP (control net interface).
+ * Map node ID to IP (control net interface for underlying physical node!).
  */
 int
 mydb_nodeidtoip(char *nodeid, char *bufp)
@@ -125,11 +125,12 @@ mydb_nodeidtoip(char *nodeid, char *bufp)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select IP from nodes as n "
-			 "left join node_types as nt on n.type=nt.type "
+	res = mydb_query("select IP from nodes as n2 "
+			 "left join nodes as n1 on n1.node_id=n2.phys_nodeid "
+			 "left join node_types as nt on n1.type=nt.type "
 			 "left join interfaces as i on "
-			 " i.node_id=n.node_id and i.iface=nt.control_iface "
-			 "where n.node_id='%s'", 1, nodeid);
+			 "i.node_id=n1.node_id and i.iface=nt.control_iface "
+			 "where n2.node_id='%s'", 1, nodeid);
 
 	if (!res) {
 		error("nodeidtoip: DB Error: %s", nodeid);
