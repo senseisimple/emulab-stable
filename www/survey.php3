@@ -24,75 +24,74 @@ if ($uid) {
 #$isadmin = ISADMIN($uid);
 #$checklogin = CHECKLOGIN($uid);
 
-$intro = "How would adding the following to Emulab/Netbed affect you?";
+$intro = "How would adding the following to Emulab affect you, now or in future?";
+
+# $answers = array(
+#   'Don\'t Care',
+#   'Not necessary / Already good enough',
+#   'I wouldn\'t use it',
+#   'Would be nice, but wouldn\'t affect my Netbed use much',
+#   'Would have a definite positive effect on my Netbed use',
+#   'Would let me do experiments I want to do, but can\'t'
+# );
 
 $answers = array(
-  'Don\'t Care',
-  'Not necessary / Already good enough',
-  'I wouldn\'t use it',
-  'Would be nice, but wouldn\'t affect my Netbed use much',
-  'Would have a definite positive effect on my Netbed use',
+  'Choose one',
+  'Not necessary',
+  'Might help me a little, but not that much',
+  'Would definitely help',
   'Would let me do experiments I want to do, but can\'t'
 );
 
 $questions = array(
-  'More Emulab nodes',
+  'More nodes',
     '"There are not enough free when I need them."',
-  'More Emulab nodes',
-    '"I want to run experiments with more nodes than Emulab has."',
-  'More powerful Emulab nodes',
-    'Faster, more RAM, bigger disks, etc.',
-  'Faster network links',
-    'For instance, Gigabit Ethernet',
-  'Nodes with more network interfaces',
+  'More nodes',
+    '"To run experiments with more nodes than Emulab has (170)."',
+  'More powerful nodes',
+    'Faster, more RAM, bigger disks, etc (add specifics in a text box below).',
+  'Gigabit Ethernet links',
+    'If you want faster than Gbit, say so in a text box below.',
+  'Nodes with more physical network interfaces',
     '',
-  'More diverse network hardware',
-    'For instance, "real" routers',
-  'More wide-area nodes',
+  'Virtual links/nodes <i>instead of<i> more physical resources."
+    'Approx 10 virtual per each physical link/node, w/o performance guarantees.'
+  '"Real" commercial routers instead of just PCs',
     '',
-  'More diversity in wide-area nodes',
-    'Such as more consumer-type links',
   'Better user support',
     '',
-  'Better documentation',
-    '',
-  'Fixed-location wireless nodes',
-    '',
-  'Mobile wireless nodes',
-    '',
-  'Network instrumentation',
-    'Automatic tools to monitor network performance',
-  'Better experiment control',
-    'More tools for changing a running experiment or controlling your software',
-  'Better monitoring',
-     'Such things as built-in support for capturing and replaying packet and network characteristic traces',    
-  'More extensive traffic generation capabilities',
-     '',
-  'More powerful or flexible traffic shaping',
-     '',
-  'More persistent state between swap-out and swap-in',
-     '(especially node disk contents)',
-  'Programmatic API to creating and controlling experiments',
-     '',
-  'Group collaboration tools',
-     'Including source control and bug tracking (e.g., SourceForge)'
+  'Better/more organized documentation',
+    ''
 );
 
 $followups = array(
-'Any comments about your ratings above?<br />Anything we left out?',
+'Any elaborations or comments on your responses above?',
 
-'If we were to expand in the directions you indicated above, would this enable
- you to perform qualitatively new experiments? What types?',
+'If we were to expand as you suggested above, what kinds
+ of qualitatively new experiments could you perform, if any?',
 
-'Are there any characteristics of Netbed you were forced to "work around", or
+'Are there any Emulab characteristics you were forced to "work around", or
  that prevented you from being able to perform an experiment you wanted to?',
 
-'What are we doing right?<br />Has Netbed helped you to perform experiments that you
- wouldn\'t have otherwise been able to do? Are there things we do well that you
- would like us to continue to focus on?',
-
-'Any other comments?'
+'What are we doing right?<br />Are there things we do well that you
+ would like us to continue to focus on?'
 );
+
+# $followups = array(
+# 'Any comments about your ratings above?<br />Anything we left out?',
+# 
+# 'If we were to expand in the directions you indicated above, would this enable
+#  you to perform qualitatively new experiments? What types?',
+# 
+# 'Are there any characteristics of Netbed you were forced to "work around", or
+#  that prevented you from being able to perform an experiment you wanted to?',
+# 
+# 'What are we doing right?<br />Has Netbed helped you to perform experiments that you
+#  wouldn\'t have otherwise been able to do? Are there things we do well that you
+#  would like us to continue to focus on?',
+# 
+# 'Any other comments?'
+# );
 
 PAGEHEADER("Emulab Survey");  
 
@@ -162,15 +161,16 @@ if ($submit) {
 if (0 == strcmp($effuid, "unknown")) {
     echo "<h3>If you have an account, please ";
     echo "<a href=\"$TBBASE/login.php3?refer=1\">log in</a>. ";
-    echo "If you don't have an account, or can't log in, ";
-    echo "please fill out this form anyway!</h3>\n";
+    echo "If you don't have an account or don't remember your password, ";
+    echo "don't worry-- fill out the form anyway!</h3>\n";
 }
 
 echo "<p>";
-echo "We're exploring our options for the future development and growth of Netbed.
-      And, we'd like to make sure we focus on the things that are important
-      to researchers and educators. So, we'd appreciate it if you would take
-      a moment of your time to give us some feedback.";
+echo "We are planning to grow Emulab.
+      Since we need to know what's most important to you,
+      please take a few moments to give us some feedback.
+      Please answer at least the multiple choice section;
+      it's quick!"
   
 echo "</p>";
 
