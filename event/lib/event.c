@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.6 2001-12-19 11:18:07 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.7 2002-01-29 12:15:18 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -174,7 +174,7 @@ event_main(event_handle_t handle)
 /*
  * Send the event notification NOTIFICATION.  NOTIFICATION is
  * allocated by event_notification_alloc, and may optionally
- * have attributes added to it by event_notification_attr_put.
+ * have attributes added to it by event_notification_put_*.
  * Returns non-zero if the operation is successful, 0 otherwise.
  */
 
@@ -199,6 +199,85 @@ event_notify(event_handle_t handle, event_notification_t notification)
     }
 
     return 1;
+}
+
+
+/*
+ * Schedule the event notification NOTIFICATION to be sent at time
+ * TIME.  NOTIFICATION is allocated by event_notification_alloc,
+ * and may optionally have attributes added to it by
+ * event_notification_put_*.  Returns non-zero if the operation
+ * is successful, 0 otherwise.
+ */
+
+int
+event_schedule(event_handle_t handle, event_notification_t notification,
+               struct timeval *time)
+{
+    event_type_t type;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("scheduling event notification (notification=%p, "
+          "time=(tv_sec=%ld, tv_usec=%ld))\n", notification,
+          time->tv_sec, time->tv_usec);
+
+    /* Change the event type to EVENT_SCHEDULE, saving the old event
+       type in the notification structure so the event scheduler can
+       change it back when the event is scheduled: */
+
+    if (event_notification_get_int32(handle, notification, "type",
+                                     (int *) &type)
+        == 0)
+    {
+        ERROR("could not get old type attribute from notification\n");
+        return 0;
+    }
+
+    if (event_notification_remove(handle, notification, "type") == 0) {
+        ERROR("could not remove old type attribute from notification\n");
+        return 0;
+    }
+
+    if (event_notification_put_int32(handle, notification, "type",
+                                     EVENT_SCHEDULE)
+        == 0)
+    {
+        ERROR("could not add new type attribute to notification\n");
+        return 0;
+    }
+    if (event_notification_put_int32(handle, notification, "old_type",
+                                     type)
+        == 0)
+    {
+        ERROR("could not add old type attribute to notification\n");
+        return 0;
+    }
+
+    /* Add the time this event should be fired to the notification
+       structure: */
+
+    if (event_notification_put_int32(handle, notification, "time_sec",
+                                     time->tv_sec)
+        == 0)
+    {
+        ERROR("could not add time.tv_sec attribute to notification\n");
+        return 0;
+    }
+    if (event_notification_put_int32(handle, notification, "time_usec",
+                                     time->tv_usec)
+        == 0)
+
+    {
+        ERROR("could not add time.tv_usec attribute to notification\n");
+        return 0;
+    }
+
+    /* Send the event notification: */
+    return event_notify(handle, notification);
 }
 
 
@@ -233,22 +312,18 @@ event_notification_alloc(event_handle_t handle, char *host, event_type_t type)
     TRACE("allocated notification (notification=%p)\n", notification);
 
     /* Add hostname to notification: */
-    if (elvin_notification_add_string(notification, "host", host,
-                                      handle->status)
+    if (event_notification_put_string(handle, notification, "host", host)
         == 0)
     {
-        ERROR("elvin_notification_add_string failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("could not add host attribute to notification\n");
         return NULL;
     }
 
     /* Add type to notification: */
-    if (elvin_notification_add_int32(notification, "type", type,
-                                     handle->status)
+    if (event_notification_put_int32(handle, notification, "type", type)
         == 0)
     {
-        ERROR("elvin_notification_add_int32 failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("could not add host attribute to notification\n");
         return NULL;
     }
 
@@ -283,9 +358,8 @@ event_notification_free(event_handle_t handle,
 
 
 struct attr_traverse_arg {
-    event_attr_type_t type;
     char *name;
-    event_attr_value_t *value;
+    elvin_value_t *value;
 };
 
 static int attr_traverse(void *rock, char *name, elvin_basetypes_t type,
@@ -298,11 +372,10 @@ static int attr_traverse(void *rock, char *name, elvin_basetypes_t type,
  * non-zero if the named attribute is found, 0 otherwise.
  */
 
-int
-event_notification_attr_get(event_handle_t handle,
-                            event_notification_t notification,
-                            event_attr_type_t type, char *name,
-                            event_attr_value_t *value)
+static int
+event_notification_get(event_handle_t handle,
+                       event_notification_t notification,
+                       char *name, elvin_value_t *value)
 {
     struct attr_traverse_arg arg;
 
@@ -313,11 +386,9 @@ event_notification_attr_get(event_handle_t handle,
 
     if (!value) {
         ERROR("invalid result parameter (value)\n");
-
         return 0;
     }
 
-    arg.type = type;
     arg.name = name;
     arg.value = value;
 
@@ -337,74 +408,368 @@ event_notification_attr_get(event_handle_t handle,
 
 
 /*
- * Add an attribute with name NAME, type TYPE, and value
- * VALUE to the notification NOTIFICATION.  Returns
- * non-zero if the operation is successful, 0 otherwise.
+ * Get the double attribute with name NAME from the event
+ * notification NOTIFICATION.
+ * Writes the value of the attribute to *VALUE and returns
+ * non-zero if the named attribute is found, 0 otherwise.
  */
 
 int
-event_notification_attr_put(event_handle_t handle,
-                            event_notification_t notification,
-                            event_attr_type_t type, char *name,
-                            event_attr_value_t value)
+event_notification_get_double(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, double *value)
+{
+    elvin_value_t v;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    if (!value) {
+        ERROR("invalid result parameter (value)\n");
+        return 0;
+    }
+
+    if (event_notification_get(handle, notification, name, &v) == 0) {
+        ERROR("could not get double attribute `%s' from notification %p\n",
+              name, notification);
+        return 0;
+    }
+
+    *value = v.d;
+
+    return 1;
+}
+
+
+/*
+ * Get the int32 attribute with name NAME from the event
+ * notification NOTIFICATION.
+ * Writes the value of the attribute to *VALUE and returns
+ * non-zero if the named attribute is found, 0 otherwise.
+ */
+
+int
+event_notification_get_int32(event_handle_t handle,
+                             event_notification_t notification,
+                             char *name, int32_t *value)
+{
+    elvin_value_t v;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    if (!value) {
+        ERROR("invalid result parameter (value)\n");
+        return 0;
+    }
+
+    if (event_notification_get(handle, notification, name, &v) == 0) {
+        ERROR("could not get int32 attribute `%s' from notification %p\n",
+              name, notification);
+        return 0;
+    }
+
+    *value = v.i;
+
+    return 1;
+}
+
+
+/*
+ * Get the int64 attribute with name NAME from the event
+ * notification NOTIFICATION.
+ * Writes the value of the attribute to *VALUE and returns
+ * non-zero if the named attribute is found, 0 otherwise.
+ */
+
+int
+event_notification_get_int64(event_handle_t handle,
+                             event_notification_t notification,
+                             char *name, int64_t *value)
+{
+    elvin_value_t v;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    if (!value) {
+        ERROR("invalid result parameter (value)\n");
+        return 0;
+    }
+
+    if (event_notification_get(handle, notification, name, &v) == 0) {
+        ERROR("could not get int64 attribute `%s' from notification %p\n",
+              name, notification);
+        return 0;
+    }
+
+    *value = v.h;
+
+    return 1;
+}
+
+
+/*
+ * Get the opaque attribute with name NAME from the event
+ * notification NOTIFICATION.
+ * Writes the value of the attribute to *VALUE and returns
+ * non-zero if the named attribute is found, 0 otherwise.
+ */
+
+int
+event_notification_get_opaque(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, void *buffer, int length)
+{
+    elvin_value_t v;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    if (!buffer) {
+        ERROR("invalid result parameter (buffer)\n");
+        return 0;
+    }
+
+    if (event_notification_get(handle, notification, name, &v) == 0) {
+        ERROR("could not get opaque attribute `%s' from notification %p\n",
+              name, notification);
+        return 0;
+    }
+
+    memcpy(buffer, v.o.data, length);
+
+    return 1;
+}
+
+
+/*
+ * Get the string attribute with name NAME from the event
+ * notification NOTIFICATION.
+ * Writes the value of the attribute to *VALUE and returns
+ * non-zero if the named attribute is found, 0 otherwise.
+ */
+
+int
+event_notification_get_string(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, char *buffer, int length)
+{
+    elvin_value_t v;
+
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    if (!buffer) {
+        ERROR("invalid result parameter (buffer)\n");
+        return 0;
+    }
+
+    if (event_notification_get(handle, notification, name, &v) == 0) {
+        ERROR("could not get double attribute `%s' from notification %p\n",
+              name, notification);
+        return 0;
+    }
+
+    strncpy(buffer, v.s, length);
+
+    return 1;
+}
+
+
+/*
+ * Add a double attribute with name NAME and value VALUE to the
+ * notification NOTIFICATION.
+ * Returns non-zero if the operation is successful, 0 otherwise.
+ */
+
+int
+event_notification_put_double(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, double value)
 {
     if (!handle) {
         ERROR("invalid handle\n");
         return 0;
     }
 
-    switch (type) {
-      case EVENT_ATTR_DOUBLE:
-          TRACE("adding attribute to notification (notification=%p, "
-                "name=%s, value=%f)\n", notification, name, value.d);
-          if (elvin_notification_add_real64(notification, name, value.d,
-                                            handle->status)
-              == 0)
-          {
-              ERROR("elvin_notification_add_real64 failed: ");
-              elvin_error_fprintf(stderr, handle->status);
-              return 0;
-          }
-          break;
-      case EVENT_ATTR_INT32:
-          TRACE("adding attribute to notification (notification=%p, "
-                "name=%s, value=%d)\n", notification, name, value.i);
-          if (elvin_notification_add_int32(notification, name, value.i,
-                                           handle->status)
-              == 0)
-          {
-              ERROR("elvin_notification_add_int32 failed: ");
-              elvin_error_fprintf(stderr, handle->status);
-              return 0;
-          }
-          break;
-      case EVENT_ATTR_INT64:
-          TRACE("adding attribute to notification (notification=%p, "
-                "name=%s, value=%lld)\n", notification, name, value.h);
-          if (elvin_notification_add_int64(notification, name, value.h,
-                                           handle->status)
-              == 0)
-          {
-              ERROR("elvin_notification_add_int64 failed: ");
-              elvin_error_fprintf(stderr, handle->status);
-              return 0;
-          }
-          break;
-      case EVENT_ATTR_STRING:
-          TRACE("adding attribute to notification (notification=%p, "
-                "name=%s, value=\"%s\")\n", notification, name, value.s);
-          if (elvin_notification_add_string(notification, name, value.s,
-                                            handle->status)
-              == 0)
-          {
-              ERROR("elvin_notification_add_string failed: ");
-              elvin_error_fprintf(stderr, handle->status);
-              return 0;
-          }
-          break;
-      default:
-          ERROR("unknown event notification attribute type (type=%d)\n", type);
-          return 0;
+    TRACE("adding attribute to notification (notification=%p, "
+          "name=%s, value=%f)\n", notification, name, value);
+
+    if (elvin_notification_add_real64(notification, name, value,
+                                      handle->status)
+        == 0)
+    {
+        ERROR("elvin_notification_add_real64 failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Add an int32 attribute with name NAME and value VALUE to the
+ * notification NOTIFICATION.
+ * Returns non-zero if the operation is successful, 0 otherwise.
+ */
+
+int
+event_notification_put_int32(event_handle_t handle,
+                             event_notification_t notification,
+                             char *name, int32_t value)
+{
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("adding attribute to notification (notification=%p, "
+          "name=%s, value=%d)\n", notification, name, value);
+
+    if (elvin_notification_add_int32(notification, name, value,
+                                      handle->status)
+        == 0)
+    {
+        ERROR("elvin_notification_add_int32 failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Add an int64 attribute with name NAME and value VALUE to the
+ * notification NOTIFICATION.
+ * Returns non-zero if the operation is successful, 0 otherwise.
+ */
+
+int
+event_notification_put_int64(event_handle_t handle,
+                             event_notification_t notification,
+                             char *name, int64_t value)
+{
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("adding attribute to notification (notification=%p, "
+          "name=%s, value=%lld)\n", notification, name, value);
+
+    if (elvin_notification_add_int64(notification, name, value,
+                                     handle->status)
+        == 0)
+    {
+        ERROR("elvin_notification_add_int64 failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Add an opaque attribute with name NAME to the notification
+ * NOTIFICATION. The attribute is stored in the buffer BUFFER
+ * with length LENGTH.
+ * Returns non-zero if the operation is successful, 0 otherwise.
+ */
+
+int
+event_notification_put_opaque(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, void *buffer, int length)
+{
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("adding attribute to notification (notification=%p, "
+          "name=%s, value=<opaque>)\n", notification, name);
+
+    if (elvin_notification_add_opaque(notification, name, buffer, length,
+                                      handle->status)
+        == 0)
+    {
+        ERROR("elvin_notification_add_opaque failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Add a string attribute with name NAME and value VALUE to the
+ * notification NOTIFICATION.
+ * Returns non-zero if the operation is successful, 0 otherwise.
+ */
+
+int
+event_notification_put_string(event_handle_t handle,
+                              event_notification_t notification,
+                              char *name, char *value)
+{
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("adding attribute to notification (notification=%p, "
+          "name=%s, value=\"%s\")\n", notification, name, value);
+
+    if (elvin_notification_add_string(notification, name, value,
+                                      handle->status)
+        == 0)
+    {
+        ERROR("elvin_notification_add_string failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return 1;
+}
+
+
+/*
+ * Remove the attribute with name NAME and type TYPE from the event
+ * notification NOTIFICATION.  Returns non-zero if the operation is
+ * successful, 0 otherwise.
+ */
+
+int
+event_notification_remove(event_handle_t handle,
+                          event_notification_t notification, char *name)
+{
+    if (!handle) {
+        ERROR("invalid handle\n");
+        return 0;
+    }
+
+    TRACE("removing attribute from notification (notification=%p, name=%s)\n",
+          notification, name);
+
+    if (elvin_notification_remove(notification, name, handle->status) == 0) {
+        TRACE("elvin_notification_remove failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
     }
 
     return 1;
@@ -523,6 +888,8 @@ notify_callback(elvin_handle_t server,
     struct notify_callback_arg *arg = (struct notify_callback_arg *) rock;
     event_notify_callback_t callback;
     void *data;
+    char host[MAXHOSTNAMELEN];
+    event_type_t type;
 
     TRACE("received event notification\n");
 
@@ -532,5 +899,23 @@ notify_callback(elvin_handle_t server,
     handle.server = server;
     handle.status = status;
 
-    callback(&handle, notification, data);
+    if (event_notification_get_string(&handle, notification, "host",
+                                      host, MAXHOSTNAMELEN)
+        == 0)
+    {
+        ERROR("could not get host attribute from notification %p\n",
+              notification);
+        return;
+    }
+
+    if (event_notification_get_int32(&handle, notification, "type",
+                                     (int *) &type)
+        == 0)
+    {
+        ERROR("could not get type attribute from notification %p\n",
+              notification);
+        return;
+    }
+
+    callback(&handle, notification, host, type, data);
 }
