@@ -1806,7 +1806,7 @@ sub TBOSCountInstances ($;@)
     }
 
     my $query_result = DBQueryFatal("select distinct p.node_id from partitions " .
-	"as p left join reserved as r on p.node_id = r.node_id "
+	"as p left join reserved as r on p.node_id = r.node_id " .
 	"where osid='$osid' and !($nodelist) and r.pid != '$TBOPSPID'");
     my $current_count = $query_result->num_rows();
 
