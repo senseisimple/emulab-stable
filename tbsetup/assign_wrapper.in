@@ -2560,35 +2560,13 @@ sub AddVlan($$$;$)
     elsif ($emulated{$lan}) {
 	#
 	# Like above, except that in this case, its a bunch of vlinks
-	# sharing a smaller set of physical links, and since a node:port
-	# can be in only one vlan, we have to convert to a lan with all of
-	# the ports. The routing table on the node should deal with this
-	# properly, except for broadcast packets but thats okay. 
-	# 
-	# Search all existing vlans to see if either of the nodeports
-	# is already in a vlan. If not, its safe to start a new vlan.
-	# Otherwise, add just the nodeports that are missing to the old
-	# vlan.
+	# sharing a smaller set of physical links. Just mark is differently
+	# here. See UploadVlans() below; these vlans will be merged to
+	# into one big supervlan since a nodeport can be in just one vlan
+	# at a time.
 	#
-	foreach my $lanid (keys(%vlantable)) {
-	    my @members    = @{$vlantable{$lanid}};
-
-	    if (grep {$_ eq $nodeportA || $_ eq $nodeportB} @members) {
-		# Add the ones that are not there. 
-		if (! grep {$_ eq $nodeportA} @members) {
-		    push(@{$vlantable{$lanid}}, $nodeportA);
-		}
-		if (! grep {$_ eq $nodeportB} @members) {
-		    push(@{$vlantable{$lanid}}, $nodeportB);
-		}
-
-		printdb "  $lanid (DUP), ".
-		    "\[" . join(" ",@{$vlantable{$lanid}}) . "\]\n";
-		return;
-	    }
-	}
-
 	# Make up a name for the "super" vlan.
+	#
 	my $newid = "s$lan:" . $vlanid++;
 	
 	$vlantable{$newid} = [$nodeportA, $nodeportB];
@@ -2610,11 +2588,43 @@ sub AddVlan($$$;$)
 #
 sub UploadVlans()
 {
+    #
+    # Emulated vlans will result in node:port pairs being in more than
+    # one vlan since that link is shared for several lans. The hardware
+    # cannot support that of course, so we have to build merge the
+    # vlans into "supervlans". Must be done iteratively of course.
+    # 
+    printdb "Merging vlans.\n";
+  again:
+    foreach my $keyA (keys(%vlantable)) {
+	my @membersA = @{$vlantable{$keyA}};
+
+	foreach my $keyB (keys(%vlantable)) {
+	    my @membersB = @{$vlantable{$keyB}};
+
+	    if ($keyA ne $keyB) {
+		foreach my $memberA (@membersA) {
+		    if (grep {$_ eq $memberA} @membersB) {
+			foreach my $memberB (@membersB) {
+			    if (! grep {$_ eq $memberB} @membersA) {
+				push(@{$vlantable{$keyA}}, $memberB);
+			    }
+			}
+			delete($vlantable{$keyB});
+			goto again;
+		    }
+		}
+	    }
+	}
+    }
+    
     printdb "Uploading vlans table.\n";
     
     foreach my $lanid (keys(%vlantable)) {
 	my $lan        = (split(":", $lanid))[0];
 	my $memberlist = join(" ", @{$vlantable{$lanid}});
+    
+	printdb "  $lanid - $memberlist\n";
     
 	DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) ".
 		     "values (0, '$pid', '$eid', '$lan', '$memberlist')");
