@@ -637,7 +637,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         }
 	mtp_free_packet(mp);
 	mp = NULL;
-    }
+   }
 
     // finis!
                                                         
