@@ -112,7 +112,7 @@ if ($IP eq "DHCP") {
 	$IP = inet_ntoa($ipaddrs[0]);
     }
     else {
-
+	fatal("Invalid hostname: $hostname");
     }
 }
 	

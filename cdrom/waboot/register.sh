@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,6 +13,11 @@
 # 
 
 . /etc/rc.conf.local
+
+if [ "$netbed_IP" = "DHCP" ]; then
+	# See /etc/dhclient-exit-hooks
+	netbed_IP=`cat /var/run/myip`    
+fi
 
 case "$1" in
 start)
