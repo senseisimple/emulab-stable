@@ -14,7 +14,7 @@
 # separate object tree, configure it appropriately, setup a testing
 # database, and then proceed to run tests.
 
-# IMPORTANT: This command should be come from a tree configured 
+# IMPORTANT: This command should be come from a tree configured
 # for the real DB.
 
 # tbtest [options] <mode stuff>
@@ -29,7 +29,7 @@
 #
 # <mode> is one of:
 #    run <db> <testlist> [<pid> <eid> <num>] - Do everything.
-#    init <db> [<pid> <eid> <num>] - Initiatlize.  
+#    init <db> [<pid> <eid> <num>] - Initiatlize.
 #    test <testlist> - Run tests
 #    single <tests> - Run only <tests>
 #    finish - Finish run
@@ -281,7 +281,7 @@ sub step_init {
     prints "Beginning test run. " . ctime(time);
 
     # Initialize DB
-    $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+    $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") ||
 	die "Could not connect to DB.\n";
     # Having made sure we can, we now disconnect so as not to harm DB.
     $dbh->disconnect;
@@ -298,7 +298,7 @@ sub step_init {
     # Reserve nodes
     if ($type eq "full") {
 	prints "Reserving nodes.\n";
-	
+
 	my (@nums) = split(" ",$num);
 	my $num;
 	my $type;
@@ -312,12 +312,13 @@ sub step_init {
 	    $want{$type} = $num;
 	    $have{$type} = [];
 	}
-	
+
 	open(AVAIL,"/usr/testbed/sbin/avail includevirt rand |");
 	while (<AVAIL>) {
 	    if (! /^\|/) {next};
 	    if (/node_id/) {next;}
-	    ($node,$type,$class) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;
+	    ($node,$type,$class) =
+	      /^\|([-a-zA-Z0-9]+)\s*\|([-[:word:]]+)\s*\|(\w+)\s*\|$/;
 	    if (defined($want{$type}) && $want{$type} > 0) {
 		push(@{$have{$type}},$node);
 		$want{$type}--;
@@ -348,7 +349,7 @@ sub step_init {
 	tbexec("/usr/testbed/sbin/exports_setup","$path/exports_setup.log");
 
 	prints "  Setting up tmcc redirect ";
-	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") ||
 	    die "Could not connect to DB.\n";
 	$dbh->do("UPDATE experiments set testdb=\"$testdb\" where" .
 		 " pid=\"$pid\" and eid=\"$eid\"") || do {
@@ -382,7 +383,7 @@ sub step_init {
     print DEFS "OURDOMAIN=test.$user.emulab.net\n";
     print DEFS "BOSSNODE=$bossnode\n";
     close(DEFS);
-    
+
     prints "  Configuring ";
     my $testmode;
     if ($type eq "full") {
@@ -397,18 +398,18 @@ sub step_init {
     tbexec("$basedir/../configure --prefix=$TB $testmode ".
 	   "--with-TBDEFS=$path/defs",
 	   "$path/configure.log");
-    
+
     prints "  Building ";
     tbexec("gmake","$path/build.log");
-    
+
     prints "  Installing ";
     tbexec("gmake boss-install","$path/install.log");
-    
+
     prints "  Post-Installing ";
     tbexec("sudo gmake post-install","$path/postinstall.log");
-        
+
     chdir $path;
-    
+
     # Setup test database
     prints "Setting up test database.\n";
     prints "  Dumping Current ";
@@ -417,11 +418,11 @@ sub step_init {
     prints "  Setting up admin account for $user in test database ";
     tbexec("echo \"update users set admin=1 where uid='$user';\"".
 	   " >> $path/dbdump.txt", "dbdump.log");
-    
+
     prints "  Creating DB ";
     system("echo \"drop database if exists $testdb\" | mysql");
     tbexec("echo \"create database $testdb\" | mysql","createdb.log");
-    
+
     prints "  Filling DB ";
     tbexec("cat $path/dbdump.txt | mysql -q -s $testdb","fill.log");
 
@@ -434,7 +435,7 @@ sub step_init {
 
     #
     # Clear our extraneous stuff.
-    # 
+    #
     $sth = $dbh->prepare("SELECT * from testsuite_preentables");
     $sth->execute;
     while (($table,$action) = $sth->fetchrow_array) {
@@ -460,7 +461,7 @@ sub step_init {
     }
 
     if ($type eq "frontend") {
-	# Clear out experiments and set up test experiment.     
+	# Clear out experiments and set up test experiment.
 	prints "  Clearing out existing experiments ";
 	open(CLEARLOG,"> clear.log");
 	$sth = $dbh->prepare("SELECT pid,eid from experiments ".
@@ -478,7 +479,7 @@ sub step_init {
 		prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
 		$fail++;
 		doexit(1);
-	    } 
+	    }
 	    print CLEARLOG "tbend $pid $eid\n";
 	    open(EXEC,"tbend $pid $eid 2>&1 |");
 	    while (<EXEC>) {
@@ -492,13 +493,13 @@ sub step_init {
 	    }
 	    #
 	    # tbend does not clear the experiments or nsfiles table.
-	    # 
+	    #
 	    $dbh->do("delete from experiments ".
 		     "where pid='$pid' and eid='$eid'");
 	    $dbh->do("delete from nsfiles ".
 		     "where pid='$pid' and eid='$eid'");
 	}
-	# Clear reserved just to make sure. 
+	# Clear reserved just to make sure.
 	$dbh->do("delete from reserved ".
 		 "where pid='emulab-ops' and eid!='hwdown'") || do {
 	    prints "FAIL\n";
@@ -526,7 +527,7 @@ sub step_init {
 	    $raw .= " $node";
 	}
 	close(AVAIL);
-	
+
 	$dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"unavailable\"");
 	$dbh->do("INSERT into experiments (pid,eid) "
 		 . "values (\"testbed\",\"unavailable\")") || do {
@@ -543,7 +544,7 @@ sub step_init {
 	prints "  Freeing test nodes ";
 	tbexec("nfree $pid $eid","free.log");
     }
-    
+
     prints "  Setting up test experiment ";
     $dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
     $dbh->do("INSERT into experiments (pid,gid,eid,testdb) "
@@ -554,7 +555,7 @@ sub step_init {
 	     };
     print "PASS\n";
     $pass++;
-    
+
     prints "  Snapshotting clean state ";
     tbexec("mysqldump -e -a $testdb","clean.txt");
     prints "END INIT\n";
@@ -562,13 +563,13 @@ sub step_init {
 
 sub step_test {
     open(LOG,">> $logfile");
-    
+
     prints "START TEST\n";
-    
+
     if ($flestlog) {
 	open(FLESTLOG,"> flest.log");
     }
-    
+
     pass("Pre-Test Setup");
 
     # Time to run tests!
@@ -577,7 +578,7 @@ sub step_test {
 
     # Let's add some stuff to our path
     $ENV{'PATH'} = "$basepath:$TB/bin:$TB/sbin";
-    
+
     my @tests;
     my $testmode;
     my $dir;
@@ -600,11 +601,11 @@ sub step_test {
 	    next;
 	}
 	prints "  $test ";
-	
+
 	mkdir "tests/$test",0755;
 	chdir "tests/$test";
 	open(TESTLOG,"> test.log");
-	
+
 	# Set up DB state
 	if (tbexect("echo \"drop database if exists $testdb\" | mysql",TESTLOG)) {
 	    prints "FAIL - Could not drop test DB.\n";
@@ -627,7 +628,7 @@ sub step_test {
 	    $fail++;
 	    doexit(1);
 	}
-	
+
 	if (-f "$basedir/tests/$test/dbstate") {
 	    if (tbexect("cat $basedir/tests/$test/dbstate | mysql $testdb",TESTLOG)) {
 		prints "FAIL - Could not evaluate dbstate.\n";
@@ -644,11 +645,11 @@ sub step_test {
 	  system("$TB/sbin/stated") and
 	    die "Error running '$TB/sbin/stated': $!\n";
 	}
-	
+
 	# We're now ready to run the test.
-	
+
 	# The last line of this command will be either PASS
-	# or FAIL <msg>, all output before that should be sent 
+	# or FAIL <msg>, all output before that should be sent
 	# to the log file.
 	open(TESTFP,"tbstub $testdb testbed test $test $basedir/tests/$test |");
 	while (<TESTFP>) {
@@ -693,9 +694,9 @@ sub step_test {
 		prints "WARNING: Unable to kill stated process ($statedpid)\n";
 	    }
 	}
-	
+
 	close(TESTLOG);
-	
+
 	chdir $path;
     }
     if ($flestlog) {
@@ -703,10 +704,10 @@ sub step_test {
     }
     prints "END TEST\n";
 }
-   
+
 sub step_cleanup {
     open(LOG,">> $logfile");
-    
+
     prints "START cleanup\n";
 
     # Try to do the necessary cleanup
@@ -721,7 +722,7 @@ sub step_cleanup {
 	    $pass++;
 	}
     }
-    if (($type eq "full")) { 	
+    if (($type eq "full")) {
 	prints "  Clearing redirects ";
 	$ok = 1;
 	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || do {
@@ -769,7 +770,7 @@ sub step_cleanup {
     prints "END CLEANUP\n";
 }
 
-	     
+
 if ($mode eq "run") {
     step_init;
     step_test;
