@@ -524,49 +524,4 @@ if (! &ir_exists("/ip")) {
     }
 }
 
-# Update virt_names table
-# Clear table
-foreach (split("\n",$ip_section)) {
-    ($vsrc,$vdst,$ip) = split;
-    if (!defined($vnodemap{$vsrc})) {
-	# lan
-	$src = $vsrc;
-    } else {
-	$src = $vnodemap{$vsrc};
-    }
-    if (!defined($vnodemap{$vdst})) {
-	# lan
-	$dst = $vdst;
-    } else {
-	$dst = $vnodemap{$vdst}
-    }
-    $dst = $vnodemap{$vdst};
-    $sth = $dbh->prepare("DELETE from virt_names where src_node_id = \"$src\"");
-    $sth->execute;
-    $sth->finish;
-}
-foreach (split("\n",$ip_section)) {
-    ($vsrc,$vdst,$ip) = split;
-    if (!defined($vnodemap{$vsrc})) {
-	# lan
-	$src = $vsrc;
-    } else {
-	$src = $vnodemap{$vsrc};
-    }
-    if (!defined($vnodemap{$vdst})) {
-	# lan
-	$dst = $vdst;
-    } else {
-	$dst = $vnodemap{$vdst}
-    }
-    $sth = $dbh->prepare("SELECT src_node_id from virt_names where src_node_id = \"$src\" and dest_node_id = \"$dst\"");
-    $sth->execute;
-    $i = $sth->rows();
-    $sth->finish;
-    $sth=$dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$src\",\"$dst\",$i,\"$ip\")");
-    $sth->execute;
-    $sth->finish;
-}
-
-
 0;

@@ -1,0 +1,186 @@
+#!/usr/bin/perl -w
+# This program sets up the virt_names table.  It is as complex it is because
+# of LANs.  The non-lan case could be a couple lines at the end of handle_ip.
+# Basically, for each node, find all nodes that can be reached without going
+# through another node (can go through LANs and delay nodes) and add an entry
+# to the virt_names table.
+
+# read in all vlans, node, and delays, also read in the mac<->ip table.
+
+# foreach non-delay node N
+#    remove all src entries from virt_names
+#    reach = ()
+#    foreach mac X of N
+#       gen_reach(X)
+#    foreach X in reach
+#       calculate lindex based on other src,dst pairs
+#       add to virt_names (N,X.node,lindex,X.ip)
+
+# gen_reach(mac X):
+#       find vlan containing X
+#	foreach other mac Y in vlan
+#          if Y belongs to other node add to reach	
+#          else gen_reach(Y)
+
+my $IRLIB = "@prefix@/lib/ir";
+my $DBNAME = "@TBDBNAME@";
+
+push(@INC, $IRLIB);
+require libir;
+
+use DBI;
+
+$driver = "mysql";
+$dbh = DBI->connect("DBI:$driver:database=$DBNAME;host=localhost") || do {
+    print STDERR "Could not connect to DB.\n";
+    exit(1);
+};
+
+if ($#ARGV != 0) {
+    print STDERR "Syntax: $0 irfile\n";
+    exit(1);
+}
+
+($irfile) = @ARGV;
+
+# read IR file
+eval {&ir_read($irfile)};
+if ($@) {
+    print STDERR "Could not read $irfile ($@)\n";
+    exit(1);
+}
+
+# Read IP mac map
+&ir_exists("/ip/mac") || do {
+    print STDERR "IR does not contain ip/mac section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/ip/mac"))) {
+    ($mac,$ip) = split;
+    $ipmap{$mac} = $ip;
+}
+
+# Read mac map into vlanmap
+# vlanmap is indexed by vlan name and contains a reference
+# to a list of MACs.
+&ir_exists("/vlan") || do {
+    print STDERR "IR does not contain vlan section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/vlan"))) {
+    @vlan = split;
+    $vlanmap{$vlan[0]} = [@vlan[1..$#vlan]];
+}
+
+# Read in node map into rvnodemap (reverse)
+# rvnodemap is indexed by physical name and contains the virtual name.
+&ir_exists("/virtual/nodes") || do {
+    print STDERR "IR does not contain virtual/nodes section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/virtual/nodes"))) {
+    ($virtual,$physical) = split;
+    $rvnodemap{$physical} = $virtual;
+}
+
+# Read in delays into an index by node name containing the two macs.
+&ir_exists("/delay") || do {
+    print STDERR "IR does not contain delay section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/delay"))) {
+    @info = split;
+    ($node,$maca,$macb) = @info[0,4,5];
+    $delays{$node} = [$maca,$macb];
+}
+
+# define some useful DB access routines
+
+# converts a mac to node,card pair.
+sub mac2node {
+    local($mac) = @_;
+    local($sth) = $dbh->prepare("SELECT node_id,card from interfaces where MAC = \"$mac\"");
+    $sth->execute;
+    local($ret) = $sth->fetchrow_array;
+    $sth->finish;
+    return $ret;
+};
+
+# this recursively generates a reachability graph, passing through any
+# delay nodes.  The global variable reach is added to and the global done
+# is used to avoid loops.  Both should be reset before a top-level call.
+sub gen_reach {
+    local($mac) = @_;
+    if (grep(/^$mac$/,@done)) {
+	return;
+    }
+    push(@done,$mac);
+
+    local($vlan) = "";
+    local($omac) = "";
+    local($nextmac) = "";
+    local($node) = "";
+
+    # find the vlan containing $mac
+    foreach (keys(%vlanmap)) {
+	if (grep(/^$mac$/,@{$vlanmap{$_}})) {
+	    $vlan = $_;
+	    last;
+	}
+    }
+    foreach $omac (@{$vlanmap{$vlan}}) {
+	if ($omac ne $mac) {
+	    ($node) = (&mac2node($omac))[0];
+	    if (! defined($delays{$node})) {
+		# found a reach
+		if (!grep(/^$omac$/,@reach)) {
+		    push(@reach,$omac);
+		}
+	    } else {
+		# let's find the other side
+		($maca,$macb) = @{$delays{$node}};
+		if ($maca eq $omac) {
+		    $nextmac = $macb;
+		} else {
+		    $nextmac = $maca;
+		}
+		&gen_reach($nextmac);
+	    }
+	}
+    }
+}
+
+# main loop
+foreach $node (keys(%rvnodemap)) {
+    if (! defined($delays{$node})) {
+	# remove all src entries for node from virt_names
+	$sth=$dbh->prepare("DELETE from virt_names where src_node_id = \"$node\"");
+	$sth->execute;
+	$sth->finish;
+
+	# calculate reach
+	@reach = ();
+	@done = ();
+	$sth=$dbh->prepare("SELECT MAC from interfaces where node_id = \"$node\"");
+	$sth->execute;
+	while (($mac) = $sth->fetchrow_array) {
+	    &gen_reach($mac);
+	}
+
+	# reach now contains all mac addresses we need to add an ip for
+	foreach $mac (@reach) {
+	    ($dstnode) = (&mac2node($mac))[0];
+	    if ($dstnode eq $node) {
+		# we have a loop, but that's not our problem
+		next;
+	    }
+	    $sth = $dbh->prepare("SELECT IP from virt_names where src_node_id = \"$node\" and dest_node_id = \"$dstnode\"");
+	    $sth->execute;
+	    $lindex = $sth->rows;
+	    $sth->finish;
+	    $sth = $dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$node\",\"$dstnode\",$lindex,\"$ipmap{$mac}\")");
+	    $sth->execute;
+	    $sth->finish;
+	}
+    }
+}
