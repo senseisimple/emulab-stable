@@ -55,7 +55,7 @@ LinkChange <src> <dst> <old> <new>
 LinkRtt <src> <dst> <diff>	RTT is <diff> off.  This is only
   displayed if the means are father apart then the variance times
   some multiple (default 4, can be changed with '-v #').  I.e. if 
-  diff < A.var * mult || diff < B.var * mult
+  diff > A.var * mult || diff > B.var * mult
 
 ----------------------------------------------------------------------
 
