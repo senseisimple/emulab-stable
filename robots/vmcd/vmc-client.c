@@ -111,6 +111,7 @@ static void usage(void)
             "  -p port\tSpecify the port number to listen on. (Default: %d)\n"
             "  -x offset\tx offset from real world x = 0 to our local x = 0\n"
             "  -y offset\ty offset from real world y = 0 to our local y = 0\n"
+	    "  -z offset\tz offset from\n"
 #if !defined(HAVE_MEZZANINE)
 	    "  -f file\tFile to read simulated positions from.\n"
 #endif
@@ -340,7 +341,7 @@ int main(int argc, char *argv[])
 
     xdrrec_create(&xdr, 0, 0, NULL, NULL, mem_write);
     
-    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:z:")) != -1) {
         switch (c) {
         case 'h':
             usage();
