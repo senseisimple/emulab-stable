@@ -7,71 +7,110 @@
 <h2>Project Groups</h2>
 </center>
 
+<h3>The Group Mechanism</h3>
 <p>
 As an instructional aid, project leaders may designate TAs to lead
-small groups of project members. This is accomplished by creating a
-<em>group</em> (sometimes referred to as a "subgroup"), and
-designating the TA as the leader of the group.  A project group is a
+smaller groups of project members. This is accomplished by creating a
+<em>group</em>, and
+designating the TA as the leader of that group.  A project group is a
 lot like a unix group, and in fact unix groups is the mechanism used
 to protect members of one group from members of another group on
 Emulab nodes. For each group created, a new unix group is created, and
 the members of the group added. When a group member starts an
 experiment, he/she indicates the group in the Begin Experiment
 form. All of the nodes in the experiment will have user accounts built
-for only those members of the group. In this way, multiple subgroups
+for only those members of the group. In this way, multiple groups
 of a project can work independently, and be protected from each other
 via the generally well understood unix group protection mechanism.
 </p>
 
+<h3>The Default Group and Subgroups</h3>
 <p>
 As a convenience, all new projects are created with one new group,
 termed the <em>default group</em>. All project members are in the
 default group, and as its name implies, whenever the group is left
-unspecified in a form, it defaults to the project group (this allows
-you to create a project without any sub groups at all; new members
-join the default group, new experiments are created in the default
-group, etc.).
+unspecified in a form, it defaults to the default group (this allows
+you to create a project without any additional groups at all;
+new members join the default group, new experiments are created
+in the default group, etc.).
+</p><p>
+<em>Subgroup</em> is used to refer to a
+group in a project which is not the default group.
 </p>
 
+<h3>Project Leader Privileges</h3>
 <p>
-As project leader (or a group_root in the project), you may create and
-destroy subgroups, and add or remove project members from those
-groups. You can make yourself the leader of a subgroup, but more
-typically you would designate someone else to lead a subgroup. While
-you are not automatically a member of new groups you create, you may
-add yourself after the group is created using the group edit page.
-However, you do not have to put yourself into the subgroup; you have
-all the same privledges in the subgroup. The main difference is that
-your home directory will not be available on nodes belonging to
-experiments created in subgroups (see below). This means that you can
-terminate experiments that have been created within the group, and
-edit the personal information for group members. To create a group,
+As project leader (<code>proj_root</code> or <code>group_root</code> in the default group),
+you may create and destroy subgroups, and add or remove project members from any
+subgroup. You can also edit the personal information for group members, and
+begin and terminate experiments in any group. You have root access on every
+experiment node in any group in your project.
+You can make yourself the leader of new subgroups, but more
+typically you would designate someone else to lead a subgroup. 
+A project leader has full control over a subgroup regardless of whether he
+is a leader, or even member of that subgroup (in fact, it may be desirable to
+not be a member of subgroups, since subgroup membership means your home
+directory will be available on nodes on experiments in that subgroup.)
+</p>
+<p>To create a subgroup,
 simply go to the Project Information link at your left, and look for
 the "Create New Group" link, or go to the <a
 href=https://www.emulab.net/newgroup_form.php3>Create New Group</a>
-page directly.  Once you have created a group, you can edit the
-members of the group by clicking on the "Edit" option in the group
+page directly.  Once you have created a subgroup, you can edit its
+membership by clicking on the "Edit" option in the group
 information page.
 </p>
 
+<h3>Group Leader Privileges</h3>
 <p>
-As group leader, you may approve new user applications to join your
-group.  You may also create and destroy experiments created within the
-group. If you are a TA managing a group, you can have new Emulab users
-<em>Join</em> your group by telling them to go to the <a
+As group leader (<code>group_root</code>) in your group,
+you may approve new user applications to join your group, 
+as well as remove users from your group. You may bestow 
+<code>group_root</code>, <code>local_root</code>, or <code>user</code>
+privileges on other users in your group.
+You may begin and terminate experiments in your group, and have
+root access on experiment nodes in your group.
+</p>
+<p>
+If you are a TA managing a subgroup, you can have new Emulab users
+<em>Join</em> your subgroup by telling them to go to the <a
 href=https://www.emulab.net/joinproject.php3>Join Project</a> link at your
-left, and specifying the name of your group where it asks for a group
+left, and specifying the name of your subgroup where it asks for a group
 name. You will receive an email message for each person that applies
-to join your group. To approve (or deny) membership in your group, use
+to join your subgroup. To approve (or deny) membership in your subgroup, use
 the <a href=https://www.emulab.net/approveuser_form.php3>New User
-Approval</a> link. If the user who wishes to join your group is
-already a member of the project, then the project leader must add them
-to your group. In other words, there is no mechanism to join multiple
-groups via a web form; the Project Leader must do it on the Edit Group
-page.
+Approval</a> link. If the user who wishes to join your subgroup is
+not already a member of the project, approving them to join your
+group will automatically add them to the project, with <code>user</code>
+permissions in the default group.
+</p>
+
+<p><b>Note:</b> There is no mechanism to join multiple
+subgroups via a single web form, however, once you have joined 
+one group in a project, you may submit group join requests multiple times to
+join other Project groups.
+</p>
+
+<p><b>Note:</b> Only the project leader may give users <code>group_root</code> in
+   the default group.</p>
+
+<h3>Local Root Privileges</h3>
+<p>
+As Local Root (<code>local_root</code>) in a group, you
+may not alter the membership of the group in any way. However, you may begin
+and terminate group experiments, and have root access on experiment nodes in your
+group.
+</p>
+
+<h3>User Privileges</h3>
+<p>
+As a user (<code>user</code>) in a group, you may not alter group membership
+or begin and terminate group experiments. You may, however, log into nodes
+in group experiments, without root access.
 </p>
 
 <a NAME="SECURITY"></a>
+<h3>Security issues</h3>
 <p>
 <b>
 These are some important security issues to keep in mind:
@@ -89,7 +128,7 @@ project, not in the group, will not get accounts.
 <li>
 Emulab uses NFS mounted filesystems for <tt>/users</tt> and
 <tt>/proj</tt> on the experimental nodes. Because of the nature of
-NFS, giving root privledges to a user will allow them to read/write
+NFS, giving root privileges to a user will allow them to read/write
 any files on any filesystems that are mounted, since root access
 allows them to <em>su</em> as any other user. Thus, any files in the
 project directory and in the home directories of other members of the
@@ -98,46 +137,49 @@ no other directories are NFS mounted; other projects and users on
 Emulab are safe.
 </li>
 <li>
-It is important to remember that granting "root" permissions to a user
-in the project (or default group) and "user" permissions in a
-subgroup, is inconsistent and can result in a breach of privacy.
-Consider this example; user Joe has "root" permissions in the default
-group, and "user" permissions in a subgroup. Another user Bob is in
-the same subgroup as Joe, and since Joe has "user" permissions, it was
+It is forbidden to grant root (<code>project_root</code>, 
+<code>group_root</code>, or <code>local_root</code>) permissions to a user
+in the default group and <code>user</code> permissions in a
+subgroup, as it can result in an unintentional breach of privacy.
+<ul><li><p>Consider this example: User Joe has <code>local_root</code>
+permissions in the default group, and <code>user</code> permissions in
+a subgroup. Another user Bob is in
+the same subgroup as Joe, and since Joe has <code>user</code> permissions, it was
 probably intended that Joe would not be able to read Bob's files.  Joe
 now creates an experiment, specifying the default group in the web
 form. The nodes in Joe's experiment would get NFS mounts for all of
-the members in the project (including Bob), and since Joe has "root"
+the members in the project (including Bob), and since Joe has <code>local_root</code>
 permission in the default group, would be granted root access on his
 nodes. Joe can now access the files of all members of the project,
-including Bob. The correct approach is to specify "user" permissions
-in the default group, and either "user" or "root" in the subgroup
+including Bob. The correct approach is to specify <code>user</code> permissions
+in the default group, and either <code>user</code> or <code>local_root</code> in the subgroup
 (depending on whether subgroup members are mutually trust each other
-and need to create experiments).
+and need to create experiments).</p></li></ul>
 </li>
 <li>
-Equally dangerous is specifying different levels of trust for a user
-that is in multiple subgroups of a project. In this case, any
-<em>other</em> users that are in the same groups (overlapping) are
-potentially at risk. For example, if Joe has "root" permissions in one
-subgroup, and "user" permissions in a second subgroup, and there is
+Also disallowed is specifying different levels of trust (some root, some not) 
+for a user who is in multiple subgroups of a project. In this case, any
+<em>other</em> users that are in the same subgroups (overlapping) are
+potentially at risk. 
+<ul><li><p>For example, if Joe has <code>group_root</code> permissions in one
+subgroup, and <code>user</code> permissions in a second subgroup, and there is
 another user Bob who is in both subgroups, then Joe can access Bob's
 files when creating an experiment in one of the subgroups, but not the
 other. If Joe is really not supposed to access Bob's files, then Joe
-should not have "root" permission in a subgroup that contains Bob.
+should not have <code>group_root</code> permission in a subgroup that contains Bob.</p></li></ul>
 </li>
 </ul>
 
-<center><h4>You have the following choices for <b>Trust</b>:</h4>
+<center><h4><b>Trust</b> option summary:</h4>
 <table>
         <tr>
             <td>User</td>
-            <td>User may log into machines in your experiments</td>
+            <td>User may log into machines in your experiments.</td>
         </tr>
         <tr>
             <td nowrap=1>Local Root</td>
             <td>User may create/destroy experiments in your project and
-                has root privileges on machines in your experiments</td>
+                has root privileges on machines in your experiments.</td>
         </tr>
         <tr>
             <td nowrap=1>Group Root&nbsp;&nbsp;</td>
