@@ -68,7 +68,6 @@ sub cleanup {
     print STDERR "Resetting DB.\n";
     DBQueryWarn("DELETE from delays  where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from vlans   where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from portmap where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 }
 

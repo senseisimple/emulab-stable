@@ -765,84 +765,6 @@ foreach $plink (keys(%plinks)) {
     # Else delaysrc case, will be handled by one of the other cases.
 }
 
-# At this point we know our vlans, delays, and the portmap.  We could
-# just dump everything to the DB and be done.  However, we have an 
-# opportunity to preserve port mappings across swap ins.  We do this
-# by looking at the portmap table in the DB which will contain the
-# portmapping we found the last time we swapped in.  We're going
-# to attempt to swap things around so that our portmap matches that
-# portmap.  We can swap two ports if they have the same bandwidth and
-# physically connect to the same location.  Swapping involves swapping
-# node:portA and node:portB in every VLAN.  We use the vlans array
-# to avoid having to search through every VLAN on every swap.
-# Let's read in the current portmap, if any.
-#
-
-# We can just skip this step if this is the first portmap.  If a
-# portmap exists but does not have the same node:vport's in it that
-# our portmap does then we have a problem.  We could try to do
-# something intelligent, but the main cause of this is an uncleared
-# previous version of the experiment.  So what we actually do is
-# clear the previous portmap out of the DB, display a warning, and
-# skip as if there was no portmap.
-
-printdb "Considering Port Swapping\n";
-
-%prevportmap = ();
-$result = DBQueryFatal("SELECT vnode,vport,pport from portmap" .
-		     " where pid = \"$pid\" and eid = \"$eid\"");
-while (($vnode,$vport,$pport) = $result->fetchrow_array) {
-    $prevportmap{"$vnode:$vport"} = $pport;
-}
-$result->finish;
-
-# Compare portmaps
-if (keys(%prevportmap) == 0) {
-    $portswap = 0;
-} elsif (! &keys_equal(\%portmap,\%prevportmap)){
-    print STDERR "WARNING: Portmap in database is incompatible with current portmap.\n";
-    print STDERR "   Perhaps a previous version of the experiment did not get cleared?\n";
-    $portswap = 0;
-} else {
-    $portswap = 1;
-}
-
-if ($portswap) {
-    foreach $vnodeport (keys(%portmap)) {
-	($vnode,$vport) = split(":",$vnodeport);
-	$pnode = $v2pmap{$vnode};
-	$pport = $portmap{$vnodeport};
-	$prevpport = $prevportmap{$vnodeport};
-	printdb "Looking at $pnode - $pport vs. $prevpport\n";
-	if ($pport ne $prevpport) {
-	    $okswap = 1;
-	    printdb "  Want to swap.\n";
-	    # We want to swap.
-	    if (&swapok($pnode,$pport,$prevpport)) {
-		printdb "  Swap ok.\n";
-		foreach $vlan (@{$nodevlans{$pnode}}) {
-		    $members = @{$vlans{$vlan}}[1];
-		    grep {
-			if (/^$pnode:$pport$/) {
-			    $_ = "$pnode:$prevpport";
-			} elsif (/^$pnode:$prevpport$/) {
-			    $_ = "$pnode:$pport";
-			}
-		    } @$members;
-		    printdb "  $vlan: " . join(" ",@$members) . "\n";
-		}
-	    } else {
-		print "Warning: Could not swap $pport and $prevpport.\n";
-		print "  Port mapping is not consistent with last swap.\n";
-		$okswap = 0;
-	    }
-	    if ($okswap) {
-		$portmap{$vnodeport} = $prevpport;
-	    }
-	}
-    }
-}
-
 ######################################################################
 # Step 4 - Upload to DB
 #
@@ -889,13 +811,9 @@ foreach $delay (keys(%delays)) {
 		 "(iface='$int0' or iface='$int1')");
 }
 
-DBQueryFatal("delete from portmap where pid=\"$pid\" and eid=\"$eid\"");
 foreach $vnodeport (keys(%portmap)) {
     ($vnode,$vport) = split(":",$vnodeport);
     $pport = $portmap{$vnodeport};
-    DBQueryFatal("insert into portmap (pid,eid,vnode,vport,pport)" .
-	     " values (\"$pid\",\"$eid\",\"$vnode\"" .
-	     ",\"$vport\",\"$pport\")");
     # Shark Hack
     if ($nodes{$vnode} eq "shark-shelf") {
 	$shelf = $v2pmap{$vnode};
