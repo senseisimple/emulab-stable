@@ -1,0 +1,248 @@
+.\"-
+.\" Copyright (c) 1999-2000 James E. Housley <jim@thehousleys.net>
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: healthd.8,v 1.1 2001-12-05 18:45:08 kwebb Exp $
+.\"
+.\" manual page [] for healthd 0.6.5
+.Dd June 12, 2000
+.Dt HEALTHD 8
+.Os FreeBSD
+.Sh NAME
+.Nm healthd
+.Nd
+Motherboard 
+.Dq health
+monitor
+.Sh SYNOPSIS
+.Nm
+.Op Fl BdLV
+.Op Fl f Ar configfile
+.Op Fl 1|2
+.Op Fl 4
+.Op Fl 6
+.Op Fl c Ar count
+.Op Fl t Ar count
+.Op Fl P Ar port
+.Op Ar delay
+
+.Sh DESCRIPTION
+This program provides a facility to read values from the hardware
+monitoring circuitry on modern motherboards and report when the
+results are outside of acceptable bounds set in a configuration
+file.
+
+.Pp
+.Nm Healthd
+normally runs in the background and reports error conditions via
+the 
+.Xr syslogd 8
+facility.  If the 
+.Dq Fl d
+flag is specified,
+.Nm
+with not become a daemon, but will stay in the foreground and 
+display the values for all parameters.  This maybe useful to 
+characterize the normal range for a motherboard.
+
+.Pp
+Currently
+.Mn healthd
+will try it to determine the chipset type, if not is detected it 
+will default to W83782D, unless over-ridden by the
+.Dq Fl 1
+flag.  It can detect W83781D, W83782D, W83783S, LM78, LM79 and
+the AS99127F.  The AS99127F is SMB only, it has no ISA connection.
+.Sh OPTIONS
+The following command line options are available.
+.Bl -tag -width Fl
+
+.It Fl I
+Use the ISA bus to access the hardware monitor (Default).
+
+.It Fl S
+Use the SMB to access the hardware monitor.  This my require additional lines
+to be added to the kernel and the kernel to be rebuilt.
+
+.It Fl B
+Use the Vbat input on the W83782D type chips for the CPUT core voltage of the second CPU.
+
+.It Fl d
+Do not detach and become a daemon.  Remain running in the
+foreground and display all readings in debug mode.
+
+.It Fl f Ar config_file
+File name of the configuration file to be used.
+
+.It Fl 1
+Specify the Winbond 83781D, or equivalent, monitor chip (default).
+
+.It Fl 2
+Specify the Winbond 83782D, or equivalent, monitor chip.
+
+.It Fl 4
+Don't accept connections on IPv4 addresses.
+
+.It Fl 6
+Don't accept connections on IPv6 addresses.  This is only available if 
+the systems supports IPv6.  The default is IPv4 and IPv6.
+
+.It Fl P Ar port
+Use a different port then the default 1281.  This is a different port
+than previous versions.  The older versions used 9669, however 1281 is
+the official port number.
+
+.It Fl c Ar count
+Repeat the display
+.Ar count
+times, then exit.  This implies the
+.Ar -d
+flag.
+
+.It Fl t Ar count
+Repeat the display
+.Ar count
+times.  This is very similar to -c, except the output is a single, tab 
+delimited line.  This format is more useful to be read by another 
+program.  This implies the -d flag.
+
+.It Fl L
+Local Only mode.  Don't open any network listening sockets to be used by the 
+.Nm healthdc
+program.
+
+.It Fl V
+Display the current version and exit.
+
+.It <delay>
+The number of seconds between readings of the values.  The default is 5 seconds.
+
+.Sh USAGE
+To us the SMB interface the following lines must be added to the kernel.  And the
+kernel will need to be rebuilt.  The ASUS AS99127F chip does not have an ISA
+interface and therefore must have SMB capability in the kernel.
+.Bl -column controllerxxx smb0xatxsmbusx
+.Li controller	smbus0
+.Li controller	iicbus0
+.Li controller	iicbb0
+.Li controller	intpm0
+.Li device	smb0 at smbus?
+.El
+.Pp
+.Nm Healthd
+also monitors TCP port 1281 for information requests from
+.Nm healthdc.
+If the system has libwrap installed then it will be used to control access to the 
+.Nm healthd
+daemon.
+.Pp
+.Sh NOTES
+The following signal have the specified effect when sent to the daemon 
+process using the
+.Xr kill 1
+command:
+.Pp
+.Bl -tag -width "SIGHUP"
+.It Dv SIGHUP
+Causes deaem to read 
+.Pa named.conf
+or the file specified on the commnd line with the -f option.  The counts of
+values that were out of bounds are also reset.
+.Pp
+.Sh Configuration File
+This file specifies which parameters are active, what they are and their
+acceptable range.  There are 13 different objects that are monitored.
+Three temperatures, three fan speeds and seven voltages.  Each object
+has four configuration items: active, label, min and max.
+
+.Bl -column Temp0_activexxxxx 9999xxxx
+.It Sy Name	Type
+.It Temp0_active	yes/no
+.It Temp0_label	string
+.It Temp0_min	float
+.It Temp0_max	float
+.It Temp1_active	yes/no
+.It Temp1_label	string
+.It Temp1_min	float
+.It Temp1_max	float
+.It Temp2_active	yes/no
+.It Temp2_label	string
+.It Temp2_min	float
+.It Temp2_max	float
+.It Temp_warn	string
+.It Temp_fail	string
+.It Fan0_active	yes/no
+.It Fan0_label	string
+.It Fan0_min	integer
+.It Fan0_max	integer
+.It Fan1_active	yes/no
+.It Fan1_label	string
+.It Fan1_min	integer
+.It Fan1_max	integer
+.It Fan2_active	yes/no
+.It Fan2_label	string
+.It Fan2_min	integer
+.It Fan2_max	integer
+.It Fan_warn	string
+.It Fan_fail	string
+.It Volt0_active	yes/no
+.It Volt0_label	string
+.It Volt0_min	float
+.It Volt0_max	float
+.It Volt1_active	yes/no
+.It Volt1_label	string
+.It Volt1_min	float
+.It Volt1_max	float
+.It Volt2_active	yes/no
+.It Volt2_label	string
+.It Volt2_min	float
+.It Volt2_max	float
+.It Volt3_active	yes/no
+.It Volt3_label	string
+.It Volt3_min	float
+.It Volt3_max	float
+.It Volt4_active	yes/no
+.It Volt4_label	string
+.It Volt4_min	float
+.It Volt4_max	float
+.It Volt5_active	yes/no
+.It Volt5_label	string
+.It Volt5_min	float
+.It Volt5_max	float
+.It Volt6_active	yes/no
+.It Volt6_label	string
+.It Volt6_min	float
+.It Volt6_max	float
+.It Volt_warn	string
+.It Volt_fail	string
+.El
+.Pp
+.Sh FILES
+.Bl -tag -width /usr/local/etc/healthd.conf
+.It Pa /usr/local/etc/healthd.conf
+Configuration file
+.Sh SEE ALSO
+.Xr hosts_access 5 ,
+.Xr hosts_options 5 ,
+.Xr healthdc 8

@@ -1,0 +1,143 @@
+######################################################
+#-
+# Copyright (c) 1999-2000 James E. Housley <jim@thehousleys.net>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+# $Id: healthd.conf.sample,v 1.1 2001-12-05 18:45:09 kwebb Exp $
+#
+######################################################
+# Temperature Section
+Temp0_active	yes
+Temp0_label	Chip Set Temperature
+Temp0_min	0.0
+Temp0_max	30.0
+Temp0_doWarn	no
+Temp0_doFail	no
+
+Temp1_active	yes
+Temp1_label	CPU #0 Temperature
+Temp1_min	10.0
+Temp1_max	30.0
+Temp1_doWarn	no
+Temp1_doFail	no
+
+Temp2_active	yes
+Temp2_label	CPU #1 Temperature
+Temp2_min	10.0
+Temp2_max	30.0
+Temp2_doWarn	no
+Temp2_doFail	no
+
+# Actions
+Temp_warn	/usr/bin/Mail -s "%s" root
+Temp_fail	/sbin/shutdown -p +2 "%s"
+
+######################################################
+# Fan Section
+Fan0_active	yes
+Fan0_label	CPU #0 Cooling Fan
+Fan0_min	3000
+Fan0_max	9999
+Fan0_doWarn	no
+Fan0_doFail	no
+
+Fan1_active	yes
+Fan1_label	CPU #1 Cooling Fan
+Fan1_min	3000
+Fan1_max	9999
+Fan1_doWarn	no
+Fan1_doFail	no
+
+Fan2_active	yes
+Fan2_label	Case Fan Cooling Fan
+Fan2_min	3000
+Fan2_max	9999
+Fan2_doWarn	no
+Fan2_doFail	no
+
+# Actions
+Fan_warn	/usr/bin/Mail -s "%s" root
+Fan_fail	/sbin/shutdown -p +5 "%s"
+
+#
+# Send a message using NotePage software (http://www.notepage.com)
+#Temp_warn	/usr/local/bin/NotePage.pl pagejim "%s"
+
+######################################################
+# Voltage Section
+Volt0_active	yes
+Volt0_label	CPU #0 Core Voltage
+Volt0_min	1.95
+Volt0_max	2.05
+Volt0_doWarn	no
+Volt0_doFail	no
+
+Volt1_active	yes
+Volt1_label	CPU #1 Core Voltage
+Volt1_min	1.95
+Volt1_max	2.05
+Volt1_doWarn	no
+Volt1_doFail	no
+
+#
+# These are based upon the ATX power supply spec
+#
+Volt2_active	yes
+Volt2_label	3.3 Volt
+Volt2_min	3.14
+Volt2_max	3.47
+Volt2_doWarn	no
+Volt2_doFail	no
+
+Volt3_active	yes
+Volt3_label	5 Volt
+Volt3_min	4.75
+Volt3_max	5.25
+Volt3_doWarn	no
+Volt3_doFail	no
+
+Volt4_active	yes
+Volt4_label	12 Volt
+Volt4_min	10.80
+Volt4_max	13.20
+Volt4_doWarn	no
+Volt4_doFail	no
+
+Volt5_active	yes
+Volt5_label	-12 Volt
+Volt5_min	-13.20
+Volt5_max	-10.80
+Volt5_doWarn	no
+Volt5_doFail	no
+
+Volt6_active	yes
+Volt6_label	-5 Volt
+Volt6_min	-5.50
+Volt6_max	-4.50
+Volt6_doWarn	no
+Volt6_doFail	no
+
+# Actions
+Volt_warn	/usr/bin/Mail -s "%s" root
+Volt_fail	/sbin/shutdown -p +1 "%s"

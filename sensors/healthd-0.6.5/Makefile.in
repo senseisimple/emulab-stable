@@ -1,0 +1,94 @@
+######################################################
+#-
+# Copyright (c) 1999-2000 James E. Housley <jim@thehousleys.net>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+# $Id: Makefile.in,v 1.1 2001-12-05 18:45:06 kwebb Exp $
+#
+######################################################
+#
+# Source for healthd Makefile
+#
+
+# Just in case
+prefix?=/usr/local
+
+INSTALL?=@INSTALL@
+INSTALL_PROGRAM?=@INSTALL_PROGRAM@
+INSTALL_DATA?=@INSTALL_DATA@
+
+DEFS=@DEFS@ -DCONFIG_FILE="\"@exec_prefix@/etc/healthd.conf\""
+INCLUDES=
+
+CC?=gcc
+CPPFLAGS+=-I. @CPPFLAGS@
+CFLAGS+= -Wall $(INCLUDES) $(DEFS) $(CPPFLAGS)
+LDFLAGS=-s
+LIBS=@LIBS@
+LIBOBJS=@LIBOBJS@
+
+GMBIOBJS=@GMBIOBJS@
+
+RM=rm -f
+
+.c.o:
+	$(CC) -c $(CFLAGS) $<
+
+PROGRAM = healthd
+
+all: $(PROGRAM) $(PROGRAM)c
+
+healthd: healthd.c $(GMBIOBJS) parameters.h methods.h healthd.h VERSION.h optionTable.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ healthd.c $(GMBIOBJS) $(LIBS)
+
+healthdc: healthdc.c VERSION.h @LIBOBJS@
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ healthdc.c $(LIBS) @LIBOBJS@
+
+buildOT: buildOT.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ buildOT.c
+
+optionTable.h: buildOT
+	./buildOT > optionTable.h
+
+getaddrinfo.o: missing/getaddrinfo.c
+
+getnameinfo.o: missing/getnameinfo.c
+
+clean:
+	$(RM) *.o *.BAK *.CKP a.out *.core errs *~ $(PROGRAM) $(PROGRAM)c buildOT
+
+real-clean: clean
+	$(RM) config.log config.status config.h config.cache \
+	Makefile optionTable.h
+
+install-all: install install-doc
+
+install: $(PROGRAM) $(PROGRAM)c
+	$(INSTALL_PROGRAM) -m 0755 -p healthd @exec_prefix@/sbin
+	$(INSTALL_PROGRAM) -m 0755 -p healthdc @exec_prefix@/bin
+	$(INSTALL_DATA) -m 644 -p healthd.conf.sample @exec_prefix@/etc
+
+install-doc:
+	$(INSTALL) -c -m 444 healthd.8 @exec_prefix@/man/man8
+	$(INSTALL) -c -m 444 healthdc.8 @exec_prefix@/man/man8

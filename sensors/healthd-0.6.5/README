@@ -1,0 +1,22 @@
+$Id: README,v 1.1 2001-12-05 18:45:06 kwebb Exp $
+
+*_doWarn and *_doFail:
+  Be careful using these.  Before setting these to "yes" run
+  the program for a while and make sure the values returned are
+  what is expected.  If either do a "shutdown now" and you have
+  got it wrong, a reboot will shut off very quickly.  This can be
+  solved by booting into single-user mode and editing the files,
+  but that is not fun.
+
+PORT NUMBERS:
+  I started using port number 9669, because it looked nice, for
+  communications between healthdc and healthd.  IANA has assigned
+  port 1281 to healthd.  Starting with version 0.6.1 that will
+  be the port used, the can be changed with the -P <port> option.
+
+Remotely reading healthd.conf:
+  Because remotely reading the scripts that are executed on failure might
+  reveal information that is exploitable, it is not enabled by default. To 
+  enable reading these values remotely add --enable-full-config to the
+  invocation of configure.
+        ./configure --enable-full-config

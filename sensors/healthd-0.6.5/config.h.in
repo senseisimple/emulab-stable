@@ -1,0 +1,19 @@
+/*
+ * Does the OS support SMB
+ */
+#undef HAVE_SMBUS
+
+/*
+ * Is libwrap available
+ */
+#undef HAVE_LIBWRAP
+
+/*
+ * Is getaddrinfo() avaliable
+ */
+#undef HAVE_GETADDRINFO
+
+/*
+ * Is getnameinfo() avaliable
+ */
+#undef HAVE_GETNAMEINFO

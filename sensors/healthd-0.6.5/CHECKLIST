@@ -1,0 +1,6 @@
+1. Make sure VERSION.h has the correct version.
+
+2. Make sure comment in healthd.8 & healthdc.8 have
+   the correct versions.
+
+3. Make sure README & CHANGELOG are upto date.

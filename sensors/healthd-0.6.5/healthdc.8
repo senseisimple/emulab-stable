@@ -1,0 +1,96 @@
+.\"-
+.\" Copyright (c) 1999-2000 James E. Housley <jim@thehousleys.net>
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: healthdc.8,v 1.1 2001-12-05 18:45:09 kwebb Exp $
+.\"
+.\" manual page [] for healthd 0.6.1
+.Dd June 12, 2000
+.Dt HEALTHDC 8
+.Os FreeBSD
+.Sh NAME
+.Nm healthdc
+.Nd
+Motherboard 
+.Dq health
+monitor
+.Sh SYNOPSIS
+.Nm
+.Op Fl H|h
+.Op Fl P Ar port
+.Op Fl V
+.Op Fl d
+.Op Fl t|v
+.Op Ar host ...
+
+.Sh DESCRIPTION
+This program provides a facility to read the current values from
+local and remote 
+.Xr healthd(8)
+programs.  This allows monitoring of all networked computers for
+critical hardware failures.  
+.Nm Healthdc
+can be run from other programs or scripts to automatically log
+the current values and watch for trends.
+
+.Sh OPTIONS
+The following command line options are available.
+.Bl -tag -width Fl
+
+.It Fl H
+HTML Output.  This will produce a full HTML page with a table for each host
+specified on the command line.
+
+.It Fl P Ar port
+Use a different port then the default 1281.  This is a different port
+than previous versions.  The older versions used 9669, however 1281 is
+the official port number.
+
+.It Fl V
+Display the current version and exit.
+
+.It Fl d
+Display extra debugging info.  Not implemented yet.
+
+.It Fl h
+HTML output, without headers.  This functions in a similar fashion to 
+.Ar -H
+except the output is missing the <HTML>, <HEAD>, and <BODY> start and end
+tags.  This is intended to be used within another HTML page.
+
+.It Fl t
+Display the output in a tab delimited line.  The order of the output is
+hostname, temp1, temp2, temp3, fan1, fan2, fan3, Vcore1, Vcore2, 3volt,
++5Volt, +12Volt, -12Volt and -5Volt.
+
+.It Fl v
+This displays a comma delimited list with all stats about each of the
+monitored parameters.  This includes, in addition to the current value, 
+whether it is active, the number of out-of-bounds readings, if a failure
+has been logged and if a warning has been logged.  The order of the output is
+hostname, temp1, temp2, temp3, fan1, fan2, fan3, Vcore1, Vcore2, 3volt,
++5Volt, +12Volt, -12Volt and -5Volt.
+
+.It host ...
+The host, or hosts, to get the current readings from.  If not specified localhost is used.

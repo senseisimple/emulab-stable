@@ -1,0 +1,24 @@
+$Id: THANKS,v 1.1 2001-12-05 18:45:06 kwebb Exp $
+
+Thanks to Archie Cobbs <archie@whistle.com>
+	For submitting a patch for the Winbond W83627HF
+
+Thanks to Claus Assmann <ca+healthd@esmtp.org>
+	For work to allow this to compile on OpenBSD
+
+Thanks to  Andre Albsmeier <andre.albsmeier@mchp.siemens.de>
+	For visually identifing the unknown ASUS "health" chip.
+
+Thanks to Dmitry Kohmanyuk Дмитрий Кохманюк <dk@farm.org>
+	For suggesting the -t option.
+
+Thanks to David McNett <nugget@distributed.net>
+	For supplying patches for the -c option.
+
+Thanks to Adrian Murphy (amurphy@gsoft.com.au)
+	For pointing out the the Winbond 83781D and 83782D chips have
+	very different negative voltage equations.
+
+Thanks to Trev Roydhouse <trev@sentry.org>
+	For tracking down that the Abit BP6 M/B uses Vbat on
+	the W83782D chip for Vcore1
