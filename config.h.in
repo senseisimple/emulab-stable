@@ -7,6 +7,8 @@
 #undef TBDBNAME
 #undef TBADMINGROUP
 #undef IPBASE
+#undef JAILIPBASE
+#undef JAILIPMASK
 #undef BOSSNODE
 #undef USERNODE
 #undef FSNODE

@@ -24,6 +24,8 @@ AC_SUBST(TBDBNAME)
 AC_SUBST(TBADMINGROUP)
 AC_SUBST(DELAYCAPACITY)
 AC_SUBST(IPBASE)
+AC_SUBST(JAILIPBASE)
+AC_SUBST(JAILIPMASK)
 AC_SUBST(BOSSNODE)
 AC_SUBST(USERNODE)
 AC_SUBST(FSNODE)
@@ -88,6 +90,8 @@ CLIENT_BINDIR="/usr/local/etc/emulab"
 CLIENT_VARDIR="/var/emulab"
 TBSECURECOOKIES=1
 TBMAINSITE=0
+JAILIPBASE=172.16.0.0
+JAILIPMASK=255.240.0.0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -121,6 +125,8 @@ fi
 AC_DEFINE_UNQUOTED(TBDBNAME, "$TBDBNAME")
 AC_DEFINE_UNQUOTED(TBADMINGROUP, "$TBADMINGROUP")
 AC_DEFINE_UNQUOTED(IPBASE, "$IPBASE")
+AC_DEFINE_UNQUOTED(JAILIPBASE, "$JAILIPBASE")
+AC_DEFINE_UNQUOTED(JAILIPMASK, "$JAILIPMASK")
 AC_DEFINE_UNQUOTED(BOSSNODE, "$BOSSNODE")
 AC_DEFINE_UNQUOTED(USERNODE, "$USERNODE")
 AC_DEFINE_UNQUOTED(FSNODE, "$FSNODE")
@@ -310,6 +316,7 @@ else
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
 		    event/trafgen/GNUmakefile \
+		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
