@@ -56,7 +56,7 @@ $| = 1; #Turn off line buffering on output
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
+if (@ARGV < 2) {
     usage();
 }
 if (defined($options{"s"})) {
@@ -235,16 +235,14 @@ foreach my $node (@nodes) {
     if ($sth == 0) {
 	die("Database update failed (nodes next_boot). Aborted ...");
     }
+}
 
-    #
-    # Fire off a reboot.
-    #
-    if (! $setuponly) {
-	if (system("$nodereboot $pc")) {
-	    print STDERR "Node $pc could not be rebooted!\n";
-	    $failures++;
-	}
-    }
+#
+# Fire off a reboot.
+#
+if (! $setuponly) {
+    system("$nodereboot @nodes");
+    $failures = $? >> 8;
 }
 
 print STDOUT "OS Reload Done!\n";

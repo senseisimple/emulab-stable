@@ -47,7 +47,7 @@ $| = 1; #Turn off line buffering on output
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
+if (@ARGV < 2) {
     usage();
 }
 if (defined($options{"f"})) {
