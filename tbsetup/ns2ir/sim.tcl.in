@@ -55,6 +55,9 @@ Simulator instproc init {args} {
     $self set event_list {}
     $self set event_count 0
 
+    # global nse config file. to be split later
+    $self set nseconfig ""
+
     # Program list.
     $self instvar prog_list;
     array set prog_list {}
@@ -75,7 +78,6 @@ Simulator instproc rename {old new} {
 Simulator instproc node {args} {
     var_import ::GLOBALS::last_class
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
     $self instvar id_counter
     $self instvar node_list
 
@@ -86,42 +88,14 @@ Simulator instproc node {args} {
     set curnode tbnode-n[incr id_counter]
     Node $curnode $self
 
-    # not adding simulated nodes to the node_list
-    if { $simulated == 0 } {
-	set node_list($curnode) {}
+    # simulated nodes have type 'sim'
+    if { $simulated == 1 } {
+        tb-set-hardware $curnode sim
     } 
+    set node_list($curnode) {}
     set last_class $curnode
 
     return $curnode
-}
-
-# nsenode
-# this method does pretty much what the node proc does
-# with some XXXXX
-Simulator instproc nsenode {args} {
-    var_import ::GLOBALS::last_class
-    var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
-    $self instvar id_counter
-    $self instvar node_list
-
-    if {($args != {})} {
-	punsup "Arguments for node: $args"
-    }
-    
-    set curnode tbnsenode-n[incr id_counter]
-    NSENode $curnode $self
-
-    # not adding simulated nodes to the node_list
-    if { $simulated == 0 } {
-	set node_list($curnode) {}
-    } else {
-	$curnode set simulated 1
-	$curnode set nsenode $curnsenode
-    }
-    set last_class $curnode
-
-    return $curnode  
 }
 
 # duplex-link <node1> <node2> <bandwidth> <delay> <type>
@@ -131,7 +105,6 @@ Simulator instproc nsenode {args} {
 Simulator instproc duplex-link {n1 n2 bw delay type args} {
     var_import ::GLOBALS::last_class
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
     $self instvar id_counter
     $self instvar lanlink_list
     $self instvar link_map
@@ -148,62 +121,27 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
 	perror "\[duplex-link] $n2 is not a node."
 	set error 1
     }
+
+    if { $simulated == 1 && ( [$n1 set simulated] == 0 || [$n2 set simulated] == 0 ) } {
+	set simulated 0
+	perror "\[duplex-link] Please define links between real and simulated nodes outside make-simulated"
+	set simulated 1
+	set error 1
+    }
+
     if {$error} {return}
 
     # Convert bandwidth and delay
     set rbw [parse_bw $bw]
     set rdelay [parse_delay $delay]
 
-    set n1sim [$n1 set simulated]
-    set n2sim [$n2 set simulated]
-    set n1node $n1
-    set n2node $n2
-    set simnode ""
-
-    # If one of the nodes is a real node, we
-    # create a link between the real node and
-    # the physical node corresponding to the
-    # simulated node. If both are simulated
-    # nodes, we don't need to do anything
-    if { $n1sim == 1 && $n2sim == 0 } {
-	set simnode $n1
-	set n1node [$n1 set nsenode]
-    } elseif { $n1sim == 0 && $n2sim == 1 } {
-	set simnode $n2
-	set n2node [$n2 set nsenode]
-    } elseif { $n1sim == 1 && $n2sim == 1 } {
-	return ""
-    }
-
-    # At this point we have one of the nodes of
-    # the link to be real. We need to make sure
-    # that this is not being defined in make-simulated.
-    # In other words links or lans from real nodes and
-    # simulated nodes should happen outside make-simulated
-    if { $simulated == 1 } {
-	set simulated 0
-	perror "Please define links between real and simulated nodes outside make-simulated"
-	set simulated 1
-	return ""
-    }
-
     set curlink tblink-l[incr id_counter]
 
-    Link $curlink $self "$n1node $n2node" $rbw $rdelay $type	
+    Link $curlink $self "$n1 $n2" $rbw $rdelay $type	
     set lanlink_list($curlink) {}
-    set link_map($n1node:$n2node) $curlink
-    set link_map($n2node:$n1node) $curlink
+    set link_map($n1:$n2) $curlink
+    set link_map($n2:$n1) $curlink
 
-    # get the vport number on nsenode on which we make
-    # the link and store it in the simulated node that
-    # goes into NSE
-    if { $simnode != {} } {
-	set vport [[$simnode set nsenode] find_port $curlink]
-	set vportlist [$simnode set nsenode_vportlist]
-	lappend vportlist $vport
-	$simnode set nsenode_vportlist $vportlist
-    }
-	
     set last_class $curlink
     return $curlink
 }
@@ -215,7 +153,6 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
 Simulator instproc make-lan {nodelist bw delay args} {
     var_import ::GLOBALS::last_class
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
     $self instvar id_counter
     $self instvar lanlink_list
 
@@ -223,56 +160,34 @@ Simulator instproc make-lan {nodelist bw delay args} {
 	punsup "Arguments for make-lan: $args"
     }
 
-    set modified_nodelist ""
-    set realnode_present 0
-    set simnode_list ""
-    foreach node $nodelist {
-	if { [$node set simulated] == 1 } {
-	    append modified_nodelist [$node set nsenode]
-	    append simnode_list $node
-	} else {
-	    append modified_nodelist "$node "
-	    set realnode_present 1
+    # At this point we have one of the nodes of
+    # the lan to be real. We need to make sure
+    # that this is not being defined in make-simulated.
+    # In other words links or lans from real nodes and
+    # simulated nodes should happen outside make-simulated
+    if { $simulated == 1 } {
+
+	foreach node $nodelist {
+	    if { [$node set simulated] == 0 } {	
+		set simulated 0
+		perror "Please define lans between real and simulated nodes outside make-simulated"
+		set simulated 1
+		return ""
+	    }
 	}
     }
+
+    set curlan tblan-lan[incr id_counter]
     
-    if { $realnode_present == 1 } {
-
-
-	# At this point we have one of the nodes of
-	# the lan to be real. We need to make sure
-	# that this is not being defined in make-simulated.
-	# In other words links or lans from real nodes and
-	# simulated nodes should happen outside make-simulated
-	if { $simulated == 1 } {
-	    set simulated 0
-	    perror "Please define links between real and simulated nodes outside make-simulated"
-	    set simulated 1
-	    return ""
-	}
-
-	set curlan tblan-lan[incr id_counter]
-	
-	# Convert bandwidth and delay
-	set rbw [parse_bw $bw]
-	set rdelay [parse_delay $delay]
-	
-	Lan $curlan $self $modified_nodelist $rbw $rdelay {}
-	set lanlink_list($curlan) {}
-	set last_class $curlan
-	
-	# get the vport number on nsenode on which we make
-	# the lan and store it in the simulated node that
-	# goes into NSE
- 	foreach simnode $simnode_list {
-	    set vport [[$simnode set nsenode] find_port $curlan]
-	    $simnode set nsenode_vport $vport
-	}
-
-	return $curlan
-    } else {
-	return ""
-    }
+    # Convert bandwidth and delay
+    set rbw [parse_bw $bw]
+    set rdelay [parse_delay $delay]
+    
+    Lan $curlan $self $nodelist $rbw $rdelay {}
+    set lanlink_list($curlan) {}
+    set last_class $curlan
+    
+    return $curlan
 }
 
 # run
@@ -285,6 +200,8 @@ Simulator instproc run {} {
     $self instvar node_list
     $self instvar event_list
     $self instvar prog_list
+    $self instvar simulated
+    $self instvar nseconfig
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::errors
@@ -346,6 +263,22 @@ Simulator instproc run {} {
 
     # If we are running in impotent mode we stop here
     if {$impotent == 1} {return}
+
+    # update the global nseconfigs using a bogus vname
+    # i.e. instead of the node on which nse is gonna run
+    # which was the original vname field, we just put $ns
+    # for now. Once assign runs, the correct value will be
+    # entered into the database
+    if { $nseconfig != {} } {
+ 
+ 	set nsecfg_script ""
+ 	set simu [lindex [Simulator info instances] 0]
+ 	append nsecfg_script "set $simu \[new Simulator]\n"
+ 	append nsecfg_script "\$$simu use-scheduler RealTime\n\n"
+ 	append nsecfg_script $nseconfig
+ 
+        sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid', '$eid', '$self', '$nsecfg_script')"
+    }
     
     # Update the DB
     foreach node [lsort [array names node_list]] {
@@ -421,7 +354,6 @@ Simulator instproc connect {src dst} {
 #   ...
 Simulator instproc at {time eventstring} {
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
 
     # ignore at statement for simulated case
     if { $simulated == 1 } {
@@ -661,6 +593,7 @@ Simulator instproc at {time eventstring} {
 	    return
 	}
     }
+
     set event_count [expr $event_count + 1]
     lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]
   }
@@ -672,7 +605,6 @@ Simulator instproc at {time eventstring} {
 Simulator instproc rtproto {type args} {
     var_import ::GLOBALS::default_ip_routing_type
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
 
     # ignore at statement for simulated case
     if { $simulated == 1 } {
@@ -831,4 +763,33 @@ Simulator instproc add_program {prog} {
 Simulator instproc cost {src dst c} {
     set reallink [$self find_link $src $dst]
     $reallink set cost([list $src [$reallink get_port $src]]) $c
+}
+
+# Now we have an experiment wide 
+# simulation specification. Virtual to physical
+# mapping will be done in later stages
+Simulator instproc make-simulated {args} {
+
+    var_import ::GLOBALS::simulated
+    $self instvar nseconfig
+    $self instvar simcode_present
+
+    set simulated 1
+    global script
+    set script [string trim $args "\{\}"]
+
+    if { $script == {} } {
+        set simulated 0
+        return
+    }
+
+    set simcode_present 1
+
+    # we ignore any type of errors coz they have
+    # been caught when we ran the script through NSE
+    uplevel 1 eval $script
+
+    append nseconfig $script
+
+    set simulated 0
 }

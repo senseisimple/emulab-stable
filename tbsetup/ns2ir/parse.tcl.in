@@ -208,10 +208,6 @@ namespace eval GLOBALS {
     # is being parsed should go into a NSE simulation or not
     variable simulated 0
 
-    # If simulated is 1, then curnsenode gives us the name
-    # of the physical node on which the simulation script 
-    # should go into
-    variable curnsenode ""
 }
 
 # Connect to the DB
@@ -238,7 +234,6 @@ source ${GLOBALS::libdir}/nsobject.tcl
 source ${GLOBALS::libdir}/sim.tcl
 source ${GLOBALS::libdir}/lanlink.tcl
 source ${GLOBALS::libdir}/node.tcl
-source ${GLOBALS::libdir}/nsenode.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
 source ${GLOBALS::libdir}/vtype.tcl

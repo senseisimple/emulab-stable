@@ -186,6 +186,12 @@ while (($type,$bandwidth) = $result->fetchrow_array) {
 $result->finish;
 printdb "\n";
 
+# XXX NSE hack: List of simulated nodes. All these are gonna go
+# into one pc850. Needs to change in distributed nse
+my @simnodelist;
+my %simnode_iplist = ();
+my %iptonodemap = ();
+
 printdb "Loading virt_nodes.\n";
 $result =
     DBQueryFatal("select distinct vname,ips,vn.type,fixed,nt.isremotenode ".
@@ -217,12 +223,20 @@ while (($vname,$ips,$type,$fixed,$isremote) = $result->fetchrow_array) {
     $nodes{$vname} = $type;
     $nodelans{$vname} = [];
 
+    if( $type eq "sim" ) {
+      push( @simnodelist, $vname );
+      $simnode_iplist{$vname} = [];
+    }    
     # REMOTENODE HACK
     # 
     $isremotenode{$vname} = $isremote;
     foreach $ipinfo (split(" ",$ips)) {
 	($port,$ip) = split(":",$ipinfo);
 	$ips{"$vname:$port"} = $ip;
+	if( $type eq "sim" ) {
+	  push(@{$simnode_iplist{$vname}}, $ip);
+	}
+	$iptonodemap{$ip} = $vname;
     }
     if ($fixed ne "") {
 	$fixed_nodes{$vname} = $fixed;
@@ -408,18 +422,33 @@ foreach $node (keys(%nodes)) {
     # End Shark hack
 }
 
+#
+# lans that have simulated nodes
+my %simnodelans = ();
+
+#
+# lans that have real nodes
+my %realnodelans = ();
+
 foreach $lan (keys(%lans)) {
     @members = @{$lans{$lan}};
     printdb "$lan - " . join(" ",@members) . "\n";
     # Shark hack for rvr
     $sharks = 0;
     $nonsharks = 0;
+    $simnodes = 0;
+    $realnodes = 0;
     foreach $member (@members) {
 	($node) = (split(":",$member))[0];
 	if ($nodes{$node} eq "shark-shelf") {
 	    $sharks++;
-	} else {
+	  } elsif ($nodes{$node} eq "sim") {
+	    $simnodes++;
+	    $simnodelans{$lan} = 1;
+	  } else {
 	    $nonsharks++;
+	    $realnodes++;
+	    $realnodelans{$lan} = 1;
 	}
     }
     if ($#members == 1) {
@@ -439,7 +468,7 @@ foreach $lan (keys(%lans)) {
 	$rbw = &min($rbw0,$bw1);
 	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
-	if ((($delay >= $delaythresh) ||
+	if (((($delay >= $delaythresh) ||
 	     (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
 	     (($delaywithswitch == 0) && 
 	      (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
@@ -449,7 +478,12 @@ foreach $lan (keys(%lans)) {
 	     (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
 	     (($delaywithswitch == 0) && 
 	      (($rbw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
-	     ($rloss != 0))) {
+	     ($rloss != 0))) &&
+	    # XXX simulated nodes hack. We don't want to put delay nodes between
+	    # simulated nodes. If there is a link between a simulated and a real
+	    # node, we might need to put in delay nodes
+	    ($realnodes != 0)
+	   ) {
 	    $delayname = "tbsdelay$delayid";
 	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss,
 						 $rdelay,$rbw,$rloss];
@@ -484,7 +518,7 @@ foreach $lan (keys(%lans)) {
 	    ($node) = (split(":",$member))[0];
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
-	    if ((($delay >= $delaythresh) ||
+	    if (((($delay >= $delaythresh) ||
 		 (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
 		 (($delaywithswitch == 0) && 
 		  (($bw != $S100Kbs) && (($sharks == 0) ||
@@ -496,7 +530,10 @@ foreach $lan (keys(%lans)) {
 		 (($delaywithswitch == 0) && 
 		  (($rbw != $S100Kbs) && (($sharks == 0) ||
 					 ($nonsharks > 1)))) ||
-		 ($rloss != 0))) {
+		 ($rloss != 0))) &&
+		# if we have 1 real node in the LAN, we may need to create a lan
+		($realnodes != 0)
+	       ) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} =
 		    [$delay,$bw,$loss,$rdelay,$rbw,$rloss];
@@ -523,6 +560,47 @@ foreach $lan (keys(%lans)) {
 	}
     }
     # If a LAN has only one member we don't do anything.
+}
+
+# XXX NSE hack
+# Will find a free randomly chosen pc850 and fix sim nodes to it
+# Assign's scoring needs to be fixed so that the solution has
+# as many sim nodes on a phy node as possible while maxing out
+# its interfaces. Currently having sim:N where N is a large
+# number in the ptop file does not guarantee that all these
+# get mapped to a single phy node even when that mapping has no
+# violations and a low score. distributed nse will fix this
+#$result =
+#  DBQueryFatal("select a.node_id,a.type from nodes as a ".
+#	   "left join reserved as b on a.node_id=b.node_id ".
+#	   "left join reserved as m on a.phys_nodeid=m.node_id ".
+#	   "where b.node_id is null and (a.role='testnode' and ".
+#	   "      a.type='pc850' and ".
+#	   "       (m.node_id is null or ".
+#	   "        m.pid!='$DEADPID' or m.eid!='$DEADEID'))");
+if( scalar(@simnodelist) > 0 ) {
+  open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
+    or die "*** $0:\n".
+           "    avail failed\n";
+
+  my $num = 0;
+  while (<AVAIL>) {
+    if (! /^\|/) {next};
+    if (/node_id/) {next;}
+    ($fixednode,$type) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;    
+    $num++;
+    last;
+  }
+  close(AVAIL);
+  
+  if( $num == 0 ) {
+    print STDERR "$): *** Insufficient PCs available.\n";
+    exit(2);
+  }
+
+  foreach $simnode (@simnodelist) {
+    print TOPFILE "fix-node $simnode $fixednode\n";
+  }
 }
 
 # Print out fixed nodes
@@ -553,7 +631,7 @@ TBDebugTimeStamp("top finished");
 # we're done with step 2 otherwise we loop again.
 #
 # v2pmap is indexed by virtual and contains the physical node.
-# p2vmap is indexed by physical and contains the virtual node
+# p2vmap is indexed by physical and contains one or more virtual nodes
 # p2pmap is indexed by physical and contains the physical node.
 # plinks is indexed by virtual name and contains 
 #  (pnodeportA,pnodeportB) .  If one is a delay node it is always
@@ -575,7 +653,7 @@ while (1) {
     undef %v2pmap;
     undef %p2vmap;
     undef %plinks;
-
+    
     TBDebugTimeStamp("ptopgen started");
     # Snapshot
     system("ptopgen > $ptopfile");
@@ -636,7 +714,10 @@ while (1) {
 	    @info = split;
 	    ($virtual,$physical) = @info[0,2];
 	    $v2pmap{$virtual} = $physical;
-	    $p2vmap{$physical} = $virtual;
+	    if( ! defined($p2vmap{$physical}) ) {
+	      $p2vmap{$physical} = [];
+	    }
+	    push(@{$p2vmap{$physical}}, $virtual);
 	    printdb "  $virtual $physical\n";
 	}
 
@@ -645,8 +726,8 @@ while (1) {
 	# entry.
 	while (<ASSIGNFP> !~ /^Edges:/) {}
 	printdb "Edges:\n";
-	while (<ASSIGNFP>) {
-	    /^End Edges$/ && last;
+	EDGEWHILE: while (<ASSIGNFP>) {
+	    /^End Edges$/ && last EDGEWHILE;
 	    @info = split;
 	    $line = $_;
 	    $_ = $info[1]; # type
@@ -663,13 +744,19 @@ while (1) {
 		  die("*** $0:\n".
 		      "    Unsupported link type: direct.\n");
 	      };
+	      /^trivial$/ && do {
+		  # we don't have plinks for trivial links
+		  $vlink = $info[0];
+		  $plinks{$vlink} = [];
+		  next EDGEWHILE;
+	      };
 	      print "Found garbage: $line\n";
 	  }
 	    $nodeportA = &getnodeport($rawA);
 	    $nodeportB = &getnodeport($rawB);
 	    $nodeportA =~ s/\//:/;
 	    $nodeportB =~ s/\//:/;
-	    if (&isdelay($nodeportB)) {
+            if (&isdelay($nodeportB)) {
 		$plinks{$vlink} = [$nodeportA,$nodeportB];
 	    } else {
 		$plinks{$vlink} = [$nodeportB,$nodeportA];
@@ -704,10 +791,10 @@ while (1) {
 	print "Reserving resources.\n";
 	@toreserve = ();
 	# We don't reserve LAN nodes.
-	foreach $node (keys(%p2vmap)) { 
-	    if (! defined($lannodes{$p2vmap{$node}})) {
-		push(@toreserve,$node);
-	    }
+	foreach $node (keys(%p2vmap)) {
+	  if ( ! defined($lannodes{$p2vmap{$node}[0]})) {
+	    push(@toreserve,$node);
+	  }
 	}
 	if (system("nalloc $pid $eid " . join(" ",@toreserve))) {
 	    print "Failed to reserve resources.  Trying again.\n";
@@ -773,7 +860,7 @@ if (scalar(keys(%isremotenode))) {
 	    chop;
 	    if ($_ =~ /(\S+) mapsto (\S+)/) {
 		$v2pmap{$1} = $2;
-		$p2vmap{$2} = $1;
+		push(@{$p2vmap{$2}}, $1);
 		printdb "  $1 $2\n";
 	    }
 	    if ($_ =~ /^Success/) {
@@ -805,7 +892,7 @@ foreach my $pnode (keys(%p2vmap)) {
     my $phys_nodeid;
 
     # Skip special LAN nodes.
-    if (defined($lannodes{$p2vmap{$pnode}})) {
+    if ( scalar(@{$p2vmap{$pnode}}) == 1 && defined($lannodes{$p2vmap{$pnode}[0]})) {
 	next;
     }
 
@@ -854,6 +941,12 @@ foreach $pnode (keys(%p2vmap)) {
 printdb "Interpreting results.\n";
 TBDebugTimeStamp("interpreting started");
 foreach $plink (keys(%plinks)) {
+
+    # trival links dont have physical links
+    if( scalar(@{$plinks{$plink}}) == 0 ) {
+      next;
+    }
+    
     ($nodeportA,$nodeportB) = @{$plinks{$plink}};
     ($nodeA,$portA) = split(":",$nodeportA);
     ($nodeB,$portB) = split(":",$nodeportB);
@@ -894,14 +987,25 @@ foreach $plink (keys(%plinks)) {
 	    ",$delay,$bandwidth,$lossrate,$rdelay,$rbandwidth," .
 		"$rlossrate,$nodeportA,$nodeportC\]\n";
 	$delayid++;
-	
-	$virtA = &find_vport($p2vmap{$nodeA},$lan);
-	$virtC = &find_vport($p2vmap{$nodeC},$lan);
-	$portmap{"$p2vmap{$nodeA}:$virtA"} = $portA;
-	$portmap{"$p2vmap{$nodeC}:$virtC"} = $portC;
+
+	# XXX NSE hack: p2vmap is an array now. I'm sure we
+	# could do the same in cleaner, more efficient way
+	# Right now, trying to get something working
 	printdb "  Portmap:\n";
-	printdb "    $p2vmap{$nodeA}:$virtA = $portA\n";
-	printdb "    $p2vmap{$nodeC}:$virtC = $portC\n";
+	foreach $vnode (@{$p2vmap{$nodeA}}) {
+	  $virtA = &find_vport($vnode,$lan);
+	  if( $virtA ne "" ) {
+	    $portmap{"$vnode:$virtA"} = $portA;
+	    printdb "    $vnode:$virtA = $portA\n";
+	  }
+	}
+	foreach $vnode (@{$p2vmap{$nodeC}}) {
+	  $virtC = &find_vport($vnode,$lan);
+	  if( $virtC ne "" ) {
+	    $portmap{"$vnode:$virtC"} = $portC;
+	    printdb "    $vnode:$virtC = $portC\n";
+	  }
+	}
     } elsif (($lan,$member) = ($plink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
 	# Node may have multiple entries in lan.
 	# Delay node is nodeB and portB.
@@ -936,11 +1040,19 @@ foreach $plink (keys(%plinks)) {
 	    "$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss," .
              "$nodeportA,$nodeportC\]\n";
 	$delayid++;
-	
-	$virt = &find_vport($p2vmap{$nodeA},$lan);
-	$portmap{"$p2vmap{$nodeA}:$virt"} = $portA;
-	printdb "  Portmap: $p2vmap{$nodeA}:$virt = $portA\n";
-    } elsif (($lan) = ($plink =~ m|^linksimple/(.+)$|)) {
+
+	# XXX NSE hack: p2vmap is an array now. I'm sure we
+	# could do the same in cleaner, more efficient way
+	# Right now, trying to get something working
+	printdb "  Portmap:\n";
+	foreach $vnode (@{$p2vmap{$nodeA}}) {
+	  $virtA = &find_vport($vnode,$lan);
+	  if( $virtA ne "" ) {
+	    $portmap{"$vnode:$virtA"} = $portA;
+	    printdb "    $vnode:$virtA = $portA\n";
+	  }
+	}
+     } elsif (($lan) = ($plink =~ m|^linksimple/(.+)$|)) {
 	# nodeportA and nodeportB are the only two nodes in the
 	# virtual LAN and there are no delays.
 	printdb "Simple Link\n";
@@ -949,14 +1061,25 @@ foreach $plink (keys(%plinks)) {
 	
 	push(@{$nodevlans{$nodeA}},$lan);
 	push(@{$nodevlans{$nodeB}},$lan);
-	
-	$virtA = &find_vport($p2vmap{$nodeA},$lan);
-	$virtB = &find_vport($p2vmap{$nodeB},$lan);
-	$portmap{"$p2vmap{$nodeA}:$virtA"} = $portA;
-	$portmap{"$p2vmap{$nodeB}:$virtB"} = $portB;
+
+	# XXX NSE hack: p2vmap is an array now. I'm sure we
+	# could do the same in cleaner, more efficient way
+	# Right now, trying to get something working
 	printdb "  Portmap:\n";
-	printdb "    $p2vmap{$nodeA}:$virtA = $portA\n";
-	printdb "    $p2vmap{$nodeB}:$virtB = $portB\n";
+	foreach $vnode (@{$p2vmap{$nodeA}}) {
+	  $virtA = &find_vport($vnode,$lan);
+	  if( $virtA ne "" ) {
+	    $portmap{"$vnode:$virtA"} = $portA;
+	    printdb "    $vnode:$virtA = $portA\n";
+	  }
+	}
+	foreach $vnode (@{$p2vmap{$nodeB}}) {
+	  $virtB = &find_vport($vnode,$lan);
+	  if( $virtB ne "" ) {
+	    $portmap{"$vnode:$virtB"} = $portB;
+	    printdb "    $vnode:$virtB = $portB\n";
+	  }
+	}
     } elsif (($lan) = ($plink =~ m|^linklan/([^/]+)/.+$|)) {
 	# node may be the LAN multiple times.
 	# nodeportA is the node.
@@ -970,9 +1093,17 @@ foreach $plink (keys(%plinks)) {
 	push(@$members,$nodeportA);
 	printdb "  VLANS: $lan = $lan,\[" . join(" ",@$members) . "\]\n";
 
-	$virt = &find_vport($p2vmap{$nodeA},$lan);
-	$portmap{"$p2vmap{$nodeA}:$virt"} = $portA;
-	printdb "  Portmap: $p2vmap{$nodeA}:$virt = $portA\n";
+	# XXX NSE hack: p2vmap is an array now. I'm sure we
+	# could do the same in cleaner, more efficient way
+	# Right now, trying to get something working
+	printdb "  Portmap:\n";
+	foreach $vnode (@{$p2vmap{$nodeA}}) {
+	  $virtA = &find_vport($vnode,$lan);
+	  if( $virtA ne "" ) {
+	    $portmap{"$vnode:$virtA"} = $portA;
+	    printdb "    $vnode:$virtA = $portA\n";
+	  }
+	}
     }
     # Else delaysrc case, will be handled by one of the other cases.
 }
@@ -1011,15 +1142,21 @@ foreach $delay (keys(%delays)) {
 	my ($nodeport0,$nodeport1) = @members;
 
 	$np0node = (split(":",$np0))[0];
-	$np1node = (split(":",$np1))[0];
-	$np0vnode = $p2vmap{$np0node};
-	$np1vnode = $p2vmap{$np1node};
+	#$np1node = (split(":",$np1))[0];
+
+	# XXX NSE hack: p2vmap is an array now
+	# Commented out coz this is used onlu\y in printdb
+	#$np0vnode = $p2vmap{$np0node};
+	#$np1vnode = $p2vmap{$np1node};
 
 	$node0 = (split(":",$np0))[0];
 	$node1 = (split(":",$np1))[0];
 
-	printdb("np0 = $np0, np0vnode = $np0vnode, np1 = $np1, ".
-		"np1vnode = $np1vnode, nodeport0 = $nodeport0, ".
+	#printdb("np0 = $np0, np0vnode = $np0vnode, np1 = $np1, ".
+	#	"np1vnode = $np1vnode, nodeport0 = $nodeport0, ".
+	#	"nodeport1 = $nodeport1\n");
+	printdb("np0 = $np0, np1 = $np1, ".
+		"nodeport0 = $nodeport0, ".
 		"nodeport1 = $nodeport1\n");
 
 	# This is pretty hackish
@@ -1088,6 +1225,11 @@ foreach $delay (keys(%delays)) {
 		 "(iface='$int0' or iface='$int1')");
 }
 
+# NSE hack: list of ip addresses of simulated nodes that
+# have an external link/lan and therefore have the corresponding
+# ip on the interface of the physical node
+my %simnode_extips = ();
+
 foreach $vnodeport (keys(%portmap)) {
     ($vnode,$vport) = split(":",$vnodeport);
     $pport = $portmap{$vnodeport};
@@ -1103,9 +1245,125 @@ foreach $vnodeport (keys(%portmap)) {
     } else {
 	DBQueryFatal("update interfaces set IP=\"$ips{$vnodeport}\" where" .
 		 " node_id = \"$v2pmap{$vnode}\" and iface = \"$pport\"");
+
+	# place to append to nseconfigs
+	if( $nodes{$vnode} eq "sim" ) {
+
+	  if( ! defined( $simnode_extips{$vnode}) ) {
+	    $simnode_extips{$vnode} = [];
+	  }
+
+	  push(@{$simnode_extips{$vnode}}, $ips{$vnodeport});
+	}
     }
     # End Shark Hack
 }
+
+# XXX NSE hack: We'll load the virt_routes table so as to
+# calculate next physical hop info for sim nodes.
+
+# This has a list of routes per node
+my %noderoutes = ();
+# This has routes based on node:dstip
+my %routes = ();
+
+my $res = DBQueryFatal("SELECT vname,dst,dst_type,dst_mask,nexthop " .
+		       "from virt_routes where pid='$pid' and eid='$eid'");
+while (($vname,$dstip,$dst_type,$dst_mask,$nexthop) = $res->fetchrow_array) {
+  if( ! defined($noderoutes{$vname}) ) {
+    $noderoutes{$vname} = [];
+  }
+  push(@{$noderoutes{$vname}}, [$dstip,$dst_type,$dst_mask,$nexthop]);
+  $routes{"$vname:$dstip"} = $nexthop;
+}
+
+# contains routes for sim nodes that have external links
+# This is again used to append to nseconfigs
+my %modified_simroutes = ();
+  
+# These hacks wont work in the distributed nse case. Needs fixing...
+# The algorithm traverses each route on the border sim node (i.e.
+# nodes that capture and inject packets into real links) to its
+# destination untill the hop is not a simulated node. 
+foreach $simnode (keys(%simnode_extips)) {
+  $modified_simroutes{$simnode} = [];
+  foreach $route (@{$noderoutes{$simnode}}) {
+    
+    my ($dstip,$dst_type,$dst_mask,$nexthop) =
+      @{$route}[0,1,2,3];
+
+    printdb "on simnode $simnode $dstip -> $nexthop with $dst_mask\n";
+    my $nhopip = $nexthop;
+    my $nhopnode = $iptonodemap{$nhopip};
+    while( 1 ) {
+
+      if( $nodes{$nhopnode} ne "sim" ) {
+	push( @{$modified_simroutes{$simnode}}, [$dstip, $dst_mask, $nhopip]);
+	last;
+      }
+
+      # store prev values
+      my $phopip = $nhopip;
+      my $phopnode = $nhopnode;
+      $nhopip = $routes{"$nhopnode:$dstip"};
+      if( ! defined($nhopip) || $nhopip eq "" ) {
+	# No route exists. Shouldn't have come till 
+	# here coz staticroutes would have croaked first
+	last;
+      }
+      $nhopnode = $iptonodemap{$nhopip};
+
+      # break if we loop around to the same node
+      if( $nhopnode eq $simnode ) {
+	last;
+      }
+    }
+  }
+}
+
+# NSE hack: need to update the ipaddrlist for sim nodes that
+# have links to the external world
+# Needs fix when we get distributed nse coz nseconfigs is per
+# nse physical node. Currently we only have one
+my $nseconfigs = "";
+
+foreach $simnode (keys(%simnode_iplist)) {
+  $nseconfigs .= "\$$simnode set ipaddrlist_ \[list ";
+  foreach $ipaddr (@{$simnode_iplist{$simnode}}) {
+    $nseconfigs .= "$ipaddr ";
+  }
+  $nseconfigs .= "\]\n";
+}
+
+foreach $simnode (keys(%simnode_extips)) {
+  # update nseconfigs
+  $nseconfigs .= "\$$simnode set nsenode_ipaddrlist \[list ";
+  foreach $ipaddr (@{$simnode_extips{$simnode}}) {
+    $nseconfigs .= "$ipaddr ";
+  }
+  $nseconfigs .= "\]\n";
+
+  if( scalar(@{$modified_simroutes{$simnode}}) ) {
+    $nseconfigs .= "\$$simnode set routes \{";
+  }
+  # appending routes for these sim nodes with external links
+  foreach $route (@{$modified_simroutes{$simnode}}) {
+    ($dstip, $dst_mask, $nhopip) = @{$route}[0,1,2];
+    printdb "installing routes on simnode $simnode - $dstip -> $nhopip\n";
+    $nseconfigs .= "DST=$dstip DST_MASK=$dst_mask NEXTHOP=$nhopip\n";
+  }
+
+  if( scalar(@{$modified_simroutes{$simnode}}) ) {
+    $nseconfigs .= "\}\n\n";
+  }
+      
+  
+}
+
+if( $nseconfigs ne "" ) {
+  $nseconfigs .= "set simcode_present 1\n";
+}
+    
 # Load delay_osids and default osids for types
 $result = DBQueryFatal("SELECT type,delay_osid,osid from node_types");
 while (($type,$delayosid,$defosid) = $result->fetchrow_array) {
@@ -1115,15 +1373,20 @@ while (($type,$delayosid,$defosid) = $result->fetchrow_array) {
 $result->finish;
 @nodepairs = ();
 foreach $pnode (keys(%p2vmap)) {
-    if (defined($sharkshelves{$p2vmap{$pnode}})) {
+    if (defined($sharkshelves{$p2vmap{$pnode}[0]})) {
 	$i = 1;
-	foreach $sharknodeport (@{$sharkshelves{$p2vmap{$pnode}}}) {
+	foreach $sharknodeport (@{$sharkshelves{$p2vmap{$pnode}[0]}}) {
 	    $shark = (split(":",$sharknodeport))[0];
 	    push(@nodepairs,["$pnode-$i",$shark]);
 	    $i++;
 	}
     } else {
-	push(@nodepairs,[$pnode,$p2vmap{$pnode}]);
+       # XXX NSE hack. For pnodes that have sim nodes,
+       # we just take the first. We can decide the
+       # osid etc. based on the fact that the vnode is a sim node
+       # For all other pnodes, there is a one-to-one mapping
+       # between pnode and vnode. [0]th element is therefore the vnode
+	push(@nodepairs,[$pnode,$p2vmap{$pnode}[0]]);
     }
 }
 foreach $pair (@nodepairs) {
@@ -1139,46 +1402,73 @@ foreach $pair (@nodepairs) {
 			  " where node_id=\"$pnode\"");
     my ($type) = $result2->fetchrow_array;
     $result2->finish;
-    if (($osname,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
-	 $failureaction,$routertype) = $result->fetchrow_array) {
-	my $osid;
-	if (!defined($osname) || $osname eq "") {
-	    $osid = $defosids{$type};
-	}
-	#
-	# Map the user name into a specific OSID in the project or in
-	# the OPS project (a default image). 
-	# 
-	elsif (! ($osid = TBOSID($pid, $osname)) &&
-	       ! ($osid = TBOSID(TB_OPSPID, $osname))) {
-	    die("*** $0:\n".
-		"    Invalid OS $osname in project $pid!\n");
-	}
-	system("os_select $osid $pnode");
-	DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
-		       " startstatus='none'," .
-		       " bootstatus='unknown'," .
-		       " ready=0," .
-		       " rpms='$rpms'," .
-		       " deltas='$deltas'," .
-		       " tarballs='$tarfiles'," .
-		       " startupcmd='$startupcmd'," .
-		       " failureaction='$failureaction'," .
-		       " routertype='$routertype'" .
-		       " where node_id='$pnode'");
-    } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
-	# Delay node
-	system("os_select ". $delayosids{$type} ." $pnode");
-	DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
-		       " bootstatus=\"unknown\"," .
-		       " ready=0" .
-		       " where node_id=\"$pnode\"");
+
+    # XXX NSE hack: if the vnode is simulated, we just
+    # choose FBSD-STD and static routing
+    if( defined($nodes{$vnode}) && $nodes{$vnode} eq "sim" ) {
+
+      my $nsenodeosid = TBOSID("testbed", "FBSD45-NSE" );
+      system("os_select $nsenodeosid $pnode");
+      DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
+		   " startstatus='none'," .
+		   " bootstatus='unknown'," .
+		   " ready=0," .
+		   " rpms=''," .
+		   " deltas=''," .
+		   " tarballs=''," .
+		   " startupcmd=''," .
+		   " failureaction=''," .
+		   " routertype='static'" .
+		   " where node_id='$pnode'");
+
+
+    } else { # $vnode is not a simulated node
+      if (($osname,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+	   $failureaction,$routertype) = $result->fetchrow_array) {
+	   my $osid;
+	   if (!defined($osname) || $osname eq "") {
+	     $osid = $defosids{$type};
+	   }
+	   #
+	   # Map the user name into a specific OSID in the project or in
+	   # the OPS project (a default image). 
+	   # 
+	   elsif (! ($osid = TBOSID($pid, $osname)) &&
+		  ! ($osid = TBOSID(TB_OPSPID, $osname))) {
+	     die("*** $0:\n".
+		 "    Invalid OS $osname in project $pid!\n");
+	   }
+	   system("os_select $osid $pnode");
+	   DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
+			" startstatus='none'," .
+			" bootstatus='unknown'," .
+			" ready=0," .
+			" rpms='$rpms'," .
+			" deltas='$deltas'," .
+			" tarballs='$tarfiles'," .
+			" startupcmd='$startupcmd'," .
+			" failureaction='$failureaction'," .
+			" routertype='$routertype'" .
+			" where node_id='$pnode'");
+	   } elsif (! defined($lannodes{$p2vmap{$pnode}[0]})) {
+	     # Delay node
+	     system("os_select ". $delayosids{$type} ." $pnode");
+	     DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
+			  " bootstatus=\"unknown\"," .
+			  " ready=0" .
+			  " where node_id=\"$pnode\"");
+	   }
+      $result->finish;
     }
-    $result->finish;
 }
 
+# nsenode id
+# We create vnames for each nsenode that gets mapped from a set of
+# simulated nodes
+$nsenode_id = 0;
+
 foreach $pnode (keys(%p2vmap)) {
-    $vnode = $p2vmap{$pnode};
+    $vnode = $p2vmap{$pnode}[0];
     $i = 1;
     if (defined($nodes{$vnode}) && 
 	($nodes{$vnode} eq "shark-shelf")) {
@@ -1187,8 +1477,35 @@ foreach $pnode (keys(%p2vmap)) {
 	    DBQueryFatal("update reserved set vname=\"$vname\" where" .
 		     " node_id = \"$pnode-$i\"");
 	    $i++;
+	}	
+      } elsif ( defined($nodes{$vnode}) && $nodes{$vnode} eq "sim" ) {
+
+	# XXX NSE hack
+	# In this if block, we assume that if one vnode in the pnode is
+	# of "sim" type, the rest will also be
+	$vname = "nsenode$nsenode_id";
+	DBQueryFatal("update reserved set vname=\"$vname\" where" .
+		     " node_id = \"$pnode\"");
+	$nsenode_id++;
+
+	# Right now, we have only one row for nseconfigs per experiment.
+	# This will change in the distributed nse case. Also reparsing of
+	# nseconfigs will have to be done for the distributed case
+	DBQueryFatal("update nseconfigs set vname=\"$vname\" where" .
+		     " pid=\"$pid\" and eid=\"$eid\"");
+
+	# also append stuff to nse configs with ipaddr info for border
+	# nodes
+	# nseconfigs will be per nse physical node in the distributed
+	# case. needs fix later
+	if( $nseconfigs ne "" ) {
+	  DBQueryFatal("update nseconfigs set nseconfig=CONCAT( nseconfig, " .
+		       "\"$nseconfigs\") where pid=\"$pid\" and eid=\"$eid\"" .
+		       " and vname=\"$vname\"");
 	}
-    } else {
+
+      }
+    else {
 	DBQueryFatal("update reserved set vname=\"$vnode\"" .
 		 " where node_id = \"$pnode\"");
     }
@@ -1197,7 +1514,10 @@ foreach $pnode (keys(%p2vmap)) {
 foreach $vnodeport (keys(%portbw)) {
     ($vnode,$vport) = split(":",$vnodeport);
     # SHARK HACK
-    if (defined($v2pmap{$vnode})) {
+    # NSE hack: additional checks coz portbw is defined
+    #
+    if (defined($v2pmap{$vnode}) && defined($portmap{$vnodeport}) &&
+	defined($portbw{$vnodeport}) ) {
 	$pnode = $v2pmap{$vnode};
 	$pport = $portmap{$vnodeport};
 	DBQueryFatal("update interfaces set " .
@@ -1325,7 +1645,7 @@ while (my ($idx,$vname,$vnode) = $eventlist_result->fetchrow_array) {
 #
 foreach $delay (keys(%delays)) {
     ($pnode,undef,undef,$vname) = @{$delays{$delay}};
-    $vnode = $p2vmap{$pnode};
+    $vnode = $p2vmap{$pnode}[0];
 
     DBQueryFatal("replace into virt_agents ".
 		 " (pid, eid, vname, vnode, objecttype) ".
@@ -1357,6 +1677,17 @@ if ($query_result->numrows) {
 		     " vnode='$target_vnode' and vname='$target_vname'");
     }
 }
+
+#
+# Adding to the v2pmap table
+#
+foreach my $vnode (keys(%v2pmap)) {
+  my $pnode = $v2pmap{$vnode};
+
+  DBQueryFatal("insert into v2pmap (pid,eid,vname,node_id) values " .
+	       "('$pid','$eid','$vnode','$pnode')");
+}
+
 TBDebugTimeStamp("uploading finished");
 
 TBDebugTimeStamp("assign_wrapper finished");
@@ -1406,8 +1737,8 @@ sub isdelay {
     my $pnodeport = $_[0];
 
     my $node = (split(":",$pnodeport))[0];
-    if (($p2vmap{$node} =~ m|^delay/|) ||
-	($p2vmap{$node} =~ m|^sdelay.|)) {
+    if (($p2vmap{$node}[0] =~ m|^delay/|) ||
+	($p2vmap{$node}[0] =~ m|^sdelay.|)) {
 	return 1;
     } 
     return 0;

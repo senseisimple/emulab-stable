@@ -70,6 +70,10 @@ namespace eval TBCOMPAT {
     }
     sql endquery $DB
 
+    # NSE hack: sim type is not in DB. Just adding it now
+    set hwtypes(sim) 1
+    set isremote(sim) 0
+
     # The permissions table. Entries in this table indicate who is allowed
     # to use nodes of a particular type. No entries means anyone can use it.
     #

@@ -136,6 +136,7 @@ sub TMCCCMD_VNODELIST() { "vnodelist"; }
 sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
+sub TMCCCMD_ROUTELIST()	{ "routelist"; }
 
 #
 # Some things never change.
@@ -745,6 +746,12 @@ sub dorouterconfig ()
 	    my $gate  = $4;
 	    my $cost  = $5;
 	    my $routearg = inet_ntoa(inet_aton($gate) & inet_aton($dmask));
+
+	    # NSE hack: staticroutes added routes for the case when dst == hop
+	    # Filtering it on the client side
+	    if ( $dip eq $routearg ) {
+		next;
+	    }
 
 	    if (! defined($upmap{$routearg})) {
 		$upmap{$routearg} = [];
@@ -1386,6 +1393,9 @@ sub dotrafficconfig()
     #     storing the output of a few tmcc commands in
     #     $SETUPDIR files for use by NSE
     #
+    # Also nse stuff is mixed up with traffic config right
+    # now because of having FullTcp based traffic generation.
+    # Needs to move to a different place
     if (! REMOTE()) {
 	my $record_sep;
 
@@ -1396,6 +1406,13 @@ sub dotrafficconfig()
 	    die "Cannot open file $SETUPDIR/tmcc.ifconfig: $!";
 	print IFCFG <$TM>;
 	close(IFCFG);
+	CLOSETMCC($TM);
+
+	$TM = OPENTMCC(TMCCCMD_ROUTELIST);
+	open(ROUTELIST, ">$SETUPDIR/tmcc.routelist") or
+	    die "Cannot open file $SETUPDIR/tmcc.routelist: $!";
+        print ROUTELIST <$TM>;
+	close(ROUTELIST);
 	CLOSETMCC($TM);
 	$/ = $record_sep;
 	

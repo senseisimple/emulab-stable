@@ -171,6 +171,8 @@ DBQueryWarn("DELETE from vlans  where pid='$pid' and eid='$eid'")
     or $errors++;
 DBQueryWarn("DELETE from tunnels where pid='$pid' and eid='$eid'")
     or $errors++;
+DBQueryWarn("DELETE from v2pmap where pid='$pid' and eid='$eid'")
+    or $errors++;
 
 # Accounting info.
 TBSetExpSwapTime($pid, $eid);

@@ -395,7 +395,9 @@ Agent/TCP/FullTcp instproc connect {dst} {
     $self set proto "tcp"
     $dst set proto "tcp"
     $node set osid "FBSD-STD"
+    $node set realtime 1
     $dest set osid "FBSD-STD"
+    $dest set realtime 1
 }
 
 # Agent/Null

@@ -133,6 +133,10 @@ $result->finish;
 
 
 $sharklinks = "";
+
+# XXX NSE hack
+
+
 foreach $node (keys(%nodes)) {
     if ($node =~ /^sh/) {
 	print "node $node shark-shelf:1\n";
@@ -141,6 +145,14 @@ foreach $node (keys(%nodes)) {
 	$delay_capacity = $nodetypes{$nodes{$node}};
 	if ($delay_capacity > 0) {
 	    $text .= " delay:$delay_capacity";
+##################################################################################
+### NSE Node hack. Instead of adding sim nodes into the database schema,
+### I'm just adding it here for now untill we can figure out how to add sim nodes
+### into the nodes table.
+### One assumption is that if we the node type can support delay nodes,
+### then it is a local node and therefore we can support sim nodes
+#################################################################################
+            $text .= " sim:100000";
 	}
 	print "$text\n";
     }

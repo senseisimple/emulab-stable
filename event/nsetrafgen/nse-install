@@ -1,5 +1,5 @@
 #!/bin/sh
-if [ ! -d ns-2 ]; then
+if [ ! -d /ns-allinone-2.1b9 ]; then
     echo "Downloading ns2.1b9 source ..."
     fetch http://www.emulab.net/ns-allinone-2.1b9.tar.gz
     tar xzf ns-allinone-2.1b9.tar.gz

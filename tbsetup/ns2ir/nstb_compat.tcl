@@ -57,3 +57,7 @@ Simulator instproc run {args} {
 Simulator instproc nsenode {args} {
     return [new NSENode]
 }
+
+Simulator instproc make-simulated {args} {
+    uplevel 1 eval $args
+}

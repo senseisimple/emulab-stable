@@ -1542,10 +1542,16 @@ COMMAND_PROTOTYPE(dohosts)
 	 * for the canonical host table. Join it with the reserved
 	 * table to get the node_id at the same time (saves a step).
 	 */
-	res = mydb_query("select v.vname,v.ips,r.node_id from virt_nodes as v "
-			 "left join reserved as r on "
-			 " v.vname=r.vname and v.pid=r.pid and v.eid=r.eid "
-			 " where v.pid='%s' and v.eid='%s' order by r.node_id",
+	/*
+	  XXX NSE hack: Using the v2pmap table instead of reserved because
+	  of multiple simulated to one physical node mapping. Currently,
+	  reserved table contains a vname which is generated in the case of
+	  nse
+	 */
+	res = mydb_query("select v.vname,v.ips,v2p.node_id from virt_nodes as v "
+			 "left join v2pmap as v2p on "
+			 " v.vname=v2p.vname and v.pid=v2p.pid and v.eid=v2p.eid "
+			 " where v.pid='%s' and v.eid='%s' order by v2p.node_id",
 			 3, pid, eid);
 
 	if (!res) {

@@ -63,15 +63,14 @@ Node instproc init {s} {
     $self set failureaction "fatal"
     $self set fixed ""
     $self set nseconfig ""
+    $self set realtime 0
 
     var_import ::GLOBALS::simulated
-    var_import ::GLOBALS::curnsenode
     if { $simulated == 1 } {
 	$self set simulated 1
-	$self set nsenode $curnsenode
     } else {
 	$self set simulated 0
-	$self set nsenode ""
+	$self set realtime 0
     }
     $self set nsenode_vportlist {}
 }
@@ -116,16 +115,10 @@ Node instproc updatedb {DB} {
     $self instvar agentlist
     $self instvar routelist
     $self instvar sim
-    $self instvar simulated
-    $self instvar nseconfig
+    $self instvar realtime
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
-
-    # currently we don't want to update the DB for simulated nodes
-    if { $simulated == 1 } {
-	return
-    }
 
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
@@ -145,19 +138,6 @@ Node instproc updatedb {DB} {
 
     foreach agent $agentlist {
 	$agent updatedb $DB
-
-        append nseconfig [$agent get_nseconfig]
-    }
-    if {$nseconfig != {}} {
-
-	set nsecfg_script ""
-	set simu [lindex [Simulator info instances] 0]
-	append nsecfg_script "set $simu \[new Simulator]\n"
-	append nsecfg_script "\$$simu use-scheduler RealTime\n\n"
-	append nsecfg_script $nseconfig
-
-        # update the per-node nseconfigs table in the DB
-        sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid','$eid','$self','$nsecfg_script')";
     }
 
     $self add_routes_to_DB $DB
