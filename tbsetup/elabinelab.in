@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -246,15 +246,15 @@ if ($firewalled) {
 # This is temporary. I think I will switch this over to grabbing the latest
 # version from the web server.
 # 
-system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
+system("scp /proj/$pid/src/testbed/tmcd/common/config/rc.mkelab ".
        "    ${bossnode}:/tmp");
-system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
+system("scp /proj/$pid/src/testbed/tmcd/common/config/rc.mkelab ".
        "    ${opsnode}:/tmp");
 
 # Still waiting for new images.
-system("scp ~stoller/testbed/testbed/tmcd/common/rc.inelab ".
+system("scp /proj/$pid/src/testbed/tmcd/common/rc.inelab ".
        "    ${bossnode}:/usr/local/etc/emulab/rc");
-system("scp ~stoller/testbed/testbed/tmcd/common/rc.inelab ".
+system("scp /proj/$pid/src/testbed/tmcd/common/rc.inelab ".
        "    ${opsnode}:/usr/local/etc/emulab/rc");
 
 TBDebugTimeStamp("Setting up opsnode");
