@@ -134,6 +134,16 @@ LanLink instproc init {s nodes bw d type} {
     # By default, a local link
     $self set widearea 0
 
+    # Make sure BW is reasonable. 
+    # XXX: Should come from DB instead of hardwired max.
+    # Measured in kbps
+    set maxbw 100000
+
+    if { $bw > $maxbw } {
+	perror "Bandwidth requested ($bw) exceeds maximum of $maxbw kbps!"
+	return
+    }
+
     # Now we need to fill out the nodelist
     $self instvar nodelist
 
