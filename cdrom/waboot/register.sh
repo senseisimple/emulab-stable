@@ -21,8 +21,10 @@ start)
 		exit $?
 	fi
 	;;
+stop)
+	;;
 *)
-	echo "Usage: `basename $0` {start}" >&2
+	echo "Usage: `basename $0` {start|stop}" >&2
 	exit 1
 	;;
 esac

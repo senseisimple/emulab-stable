@@ -318,9 +318,9 @@ for ($i = 1; $i <= 4; $i++) {
 
 	if ($showprogress) {
 	    print "(Output indicates uncompressed bytes written to disk.)\n";
-	    system("imageunzip -o -s $i -d /$image $rawbootdisk");
+	    system("imageunzip -o -s $i /$image $rawbootdisk");
 	} else {
-	    mysystem("imageunzip -s $i -d /$image $rawbootdisk");
+	    mysystem("imageunzip -s $i /$image $rawbootdisk");
 	}
 	fatal("Failed to lay down image /$image!")
 	    if ($?);
@@ -465,7 +465,7 @@ FinishedInstructions();
 # One last chance to hold things up.
 # 
 if (Prompt("Reboot from ${rawbootdisk}?", "Yes", 10) =~ /yes/i) {
-    mysystem("reboot");
+    mysystem("shutdown -r now");
     fatal("Failed to reboot!")
 	if ($?);
     sleep(100000);
@@ -706,6 +706,7 @@ sub MakeFS($$)
     }
 
     print "Creating filesystem on $mntpoint (${rawdevice}s${slice}e).\n";
+    print "    (ignore kernel generated \"no disk label\" messages.)\n";
     mysystem("newfs -U ${rawdevice}s${slice}e");
     if ($?) {
 	print STDERR "*** Oops, could not newfs ${rawdevice}s${slice}e!\n";
