@@ -49,7 +49,7 @@ if (!isset($usr_affil) ||
   $formerror = "Institutional Afilliation";
 }
 if (!isset($usr_title) ||
-    strcmp($usr_title, "Professor") == 0) {
+    strcmp($usr_title, "Professor Emeritus") == 0) {
   $formerror = "Title/Position";
 }
 if (!isset($usr_phones) ||

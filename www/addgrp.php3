@@ -108,7 +108,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_title]\">";
 } else {
-    echo "          type=\"text\" value=\"Professor\">";
+    echo "          type=\"text\" value=\"Professor Emeritus\">";
 }
 
 echo "     </td>
