@@ -23,3 +23,5 @@ THISHOMEBASE=Mac.Emulab.Net
 TBAUTHTIMEOUT=216000
 FS_WITH_QUOTAS="/q /groups /users"
 PLABSUPPORT=1
+PLAB_ROOTBALL="plabroot-10.tar.bz2"
+
