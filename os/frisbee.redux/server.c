@@ -29,6 +29,7 @@ struct timeval  IdleTimeStamp;
 /* Forward decls */
 void		quit(int);
 void		reinit(int);
+static ssize_t	mypread(int fd, void *buf, size_t nbytes, off_t offset);
 
 /*
  * This structure defines the file we are spitting back.
@@ -302,8 +303,8 @@ PlayFrisbee(void)
 				readcount = lastblock - block;
 			readsize = readcount * BLOCKSIZE;
 
-			if ((cc = pread(FileInfo.fd, databuf,
-					readsize, offset)) <= 0) {
+			if ((cc = mypread(FileInfo.fd, databuf,
+					  readsize, offset)) <= 0) {
 				if (cc < 0)
 					pfatal("Reading File");
 				fatal("EOF on file");
@@ -457,3 +458,39 @@ reinit(int sig)
 	exit(1);
 }
 
+/*
+ * Wrap up pread with a retry mechanism to help protect against
+ * transient NFS errors.
+ */
+static ssize_t
+mypread(int fd, void *buf, size_t nbytes, off_t offset)
+{
+	int		cc, i, count = 0;
+
+	while (nbytes) {
+		int	maxretries = 100;
+
+		for (i = 0; i < maxretries; i++) {
+			cc = pread(fd, buf, nbytes, offset);
+			if (cc == 0)
+				fatal("EOF on file");
+
+			if (cc > 0) {
+				nbytes -= cc;
+				buf    += cc;
+				offset += cc;
+				count  += cc;
+				goto again;
+			}
+
+			if (i == 0)
+				pwarning("read error: will retry");
+
+			fsleep(100000);
+		}
+		pfatal("read error: busted for too long");
+		return -1;
+	again:
+	}
+	return count;
+}
