@@ -12,6 +12,7 @@ require 'ctime.pl';
 
 my $LOGFILE;
 my $logging = 0;
+my $dostamp = 0;
 
 sub tbs_initdbi {
     my($dbname) = $_[0];
@@ -41,11 +42,15 @@ sub tbs_prefix {
 
 sub tbs_out {
     my($s) = $_[0];
-    my $t = ctime(time);
-    print $t;
+    if ($dostamp) {
+	my $t = ctime(time);
+	print $t;
+	if ($logging) {
+	    print LOGFILE $t;
+	}
+    }
     print $s;
     if ($logging) {
-	print LOGFILE $t;
 	print LOGFILE $s;
     }
 };

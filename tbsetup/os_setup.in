@@ -45,6 +45,7 @@ my @row;
 # This stuff is BOGUS! Quick hack for paper deadline to make Jay happy.
 #
 my $doreloading = 0;
+my $forcereload = 0;
 my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "boss.emulab.net";
 my $IMAGE       = "/usr/testbed/images/wd0-all.ndz";
@@ -177,7 +178,7 @@ while (<IN>) {
     # 
     $db_result = $DB->query("select pid from last_reservation ".
 			    "where node_id='$node'");
-    $reload{$node} = 0;
+    $reload{$node} = $forcereload;
     if ($doreloading) {
 	if ($db_result->numrows) {
 	    @row = $db_result->fetchrow_array();
@@ -303,14 +304,9 @@ foreach my $node ( keys %nodeos ) {
     if ($?) {
 	die("Reboot of node $pc failed!");
     }
-    my $t = ctime(time);
-    print STDOUT "$t";
     print STDOUT "$pc rebooting ...\n"
 }
 
-my $t = ctime(time);
-print STDOUT "$t";
-	
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
 my $waitstart = time;
@@ -332,9 +328,6 @@ foreach my $node ( keys %nodeos ) {
     }	
 
     if (WaitTillAlive($pc) == 0) {
-	my $t = ctime(time);
-	print STDOUT "$t";
-	
 	print STDOUT "$pc is alive and well\n";
 	next;
     }
@@ -386,7 +379,7 @@ sub WaitTillAlive {
 
     my $maxwait = 150;
     if ($reload{$pc}) {
-	$maxwait += 150;
+	$maxwait += 350;
     }
 
     print STDERR "Waiting for $pc to come alive\n" if $dbg;
@@ -396,7 +389,7 @@ sub WaitTillAlive {
     # loop doing a bunch of shorter pings.
     #
     my $lasttime = ( (time - $waitstart) > 60 ? 61 : (time - $waitstart));
-    for ($i = 0; $i < 120; $i++) {
+    for ($i = 0; $i < 200; $i++) {
 	open(PING, "$ping -c 3 -t 4 $pc 2>&1 |");
 	do {
 	    $_ = <PING>;
@@ -427,9 +420,6 @@ sub WaitTillAlive {
 sub RebootNode {
     local($pc) = @_;
 
-    my $t = ctime(time);
-    print STDOUT "$t";
-	
     print STDOUT "Rebooting $pc ...\n";
 
     $mypid = fork();
