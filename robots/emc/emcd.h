@@ -4,6 +4,14 @@
 
 #include "mtp.h"
 
+enum {
+  ERB_HAS_GOAL,
+};
+
+enum {
+  ERF_HAS_GOAL = (1L << ERB_HAS_GOAL),
+};
+
 struct emc_robot_config {
   int id;
   char *hostname;
@@ -14,6 +22,8 @@ struct emc_robot_config {
   float init_y;
   float init_theta;
   struct robot_position last_update_pos;
+  struct robot_position last_goal_pos;
+  unsigned long flags;
 };
 
 struct rmc_client {

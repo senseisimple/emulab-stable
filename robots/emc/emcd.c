@@ -936,9 +936,13 @@ void ev_callback(event_handle_t handle,
 			MA_Speed, speed,
 			MA_TAG_DONE);
 
+	match->flags |= ERF_HAS_GOAL;
+	match->last_goal_pos = mp.data.mtp_payload_u.command_goto.position;
+
 	if (rmc_data.handle != NULL) {
 	    mtp_send_packet(rmc_data.handle, &mp);
 	}
+#if 0
 	else {
 	    mtp_print_packet(stdout, &mp);
 	    
@@ -953,6 +957,7 @@ void ev_callback(event_handle_t handle,
 		     EA_TAG_DONE);
 #endif
 	}
+#endif
 	
 	mtp_free_packet(&mp);
     }
@@ -1077,15 +1082,26 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	  struct emc_robot_config *erc = rli->data;
 	  struct mtp_packet gmp;
 
-	  mtp_init_packet(&gmp,
-			  MA_Opcode, MTP_COMMAND_GOTO,
-			  MA_Role, MTP_ROLE_EMC,
-			  MA_CommandID, 1,
-			  MA_RobotID, erc->id,
-			  MA_X, (double)erc->init_x,
-			  MA_Y, (double)erc->init_y,
-			  MA_Theta, (double)erc->init_theta,
-			  MA_TAG_DONE);
+	  if (erc->flags & ERF_HAS_GOAL) {
+	    mtp_init_packet(&gmp,
+			    MA_Opcode, MTP_COMMAND_GOTO,
+			    MA_Role, MTP_ROLE_EMC,
+			    MA_CommandID, 1,
+			    MA_RobotID, erc->id,
+			    MA_Position, &erc->last_goal_pos,
+			    MA_TAG_DONE);
+	  }
+	  else {
+	    mtp_init_packet(&gmp,
+			    MA_Opcode, MTP_COMMAND_GOTO,
+			    MA_Role, MTP_ROLE_EMC,
+			    MA_CommandID, 1,
+			    MA_RobotID, erc->id,
+			    MA_X, (double)erc->init_x,
+			    MA_Y, (double)erc->init_y,
+			    MA_Theta, (double)erc->init_theta,
+			    MA_TAG_DONE);
+	  }
 	  mtp_send_packet(mh, &gmp);
 	}
 	
@@ -1377,7 +1393,7 @@ int emulab_callback(elvin_io_handler_t handler,
 				  mp->data.mtp_payload_u.command_goto.position.x,
 				  mp->data.mtp_payload_u.command_goto.position.y)
 	    ) {
-
+	  
 	    /* forward the packet on to rmc... */
 	    if (rmc_data.handle == NULL) {
 		error("no rmcd yet\n");
