@@ -648,19 +648,40 @@
 <li><a NAME="SWS-7"></a>
     <h3>Can I run my own Operating System?</h3>
     <p>
-    Yes! You can run your own OS on any of the PCs (the Sharks do not
-    support custom operating systems as this time, however you can run
-    <a href = "http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels
-    on the PCs or the Sharks). Each of the PCs is partitioned so that
-    the 4th DOS slice (about 6GB) is unused and available to be loaded
-    with whatever OS you want to run. The only requirement is that
-    your image contain a proper DOS boot record in the first sector
-    (first sector of the 4th DOS slice) which can be invoked by the
-    DOS Master Boot Record in the first sector of the disk. There are
-    other minor requirements which are detailed in the <a
-    href="tutorial/tutorial.php3#CustomOS">Custom OS</a> documentation
-    page. The procedure for creating and installing your custom OS are
-    also described in this document.
+    Yes! You can run your own OS (or a customized version of an Emulab
+    supported OS) on any of the PCs. You can also run <a href =
+    "http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
+    PCs. Each of the PCs is partitioned with two DOS partitions large
+    enough to hold the typical OS installation. The 1st and 2nd
+    partitions are each 3GB. The 3rd partition is 500MB, and is
+    labeled as Linux Swap. The 4th partition is the remainder of the
+    disk, and varies in size depending on the pc type. We recommend
+    that you use the 1st or 2nd partition; using the 4th partition
+    will restrict the number of machines that you can run your OS on
+    since it varies in size. Note that you must leave the MBR (Master
+    Boot Record) in sector 0 alone, and that your custom partition
+    must contain a proper DOS boot record in the first sector.
+    </p>
+
+    <p>
+    Please note that while users are free to customize their disks and
+    install their own operating systems, Emulab staff will not be able
+    to offer more than encouragement and advice! We cannot install the
+    OS for you, and we cannot load CDROMS, floppy disks, or tape drives!
+    We <em>do</em> provide an easy way for you to boot FreeBSD from a
+    memory based filesystem (MFS) so that you can more easily work
+    with the disk (in case it is not possible to install your OS on a
+    live disk). Beyond that, you are pretty much on your own!
+    </p>
+
+    <p>
+    Many users had great success with customizing an Emulab supported
+    OS (FreeBSD or Linux), and then creating a disk image that is
+    autoloaded when the experiment is swapped in. We strongly
+    encourage people to use this approach whenever possible! There is
+    more information available in the <a
+    href="tutorial/tutorial.php3#CustomOS">Custom OS</a> section of
+    the <a href = "tutorial/tutorial.php3">Emulab Tutorial.</a>
     </p>
 </ul>
 
