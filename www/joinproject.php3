@@ -612,31 +612,35 @@ $leader_email = $row[1];
 $leader_uid = $row[2];
 
 #
-# The mail message to the approval list.
+# The mail message to the leader. We send this for returning users
+# who are are also verified, since they could not use this page
+# if they were not verified.
 #
-TBMAIL("$leader_name '$leader_uid' <$leader_email>",
-     "$joining_uid $pid Project Join Request",
-     "$usr_name is trying to join your group $gid in project $pid.\n".
-     "\n".
-     "Contact Info:\n".
-     "Name:            $usr_name\n".
-     "Emulab ID:       $joining_uid\n".
-     "Email:           $usr_email\n".
-     "User URL:        $usr_URL\n".
-     "Title:           $usr_title\n".
-     "Affiliation:     $usr_affil\n".
-     "Address:         $usr_addr\n".
-     "Phone:           $usr_phone\n".
-     "\n".
-     "Please return to $TBWWW,\n".
-     "log in, and select the 'New User Approval' page to enter your\n".
-     "decision regarding $usr_name's membership in your project.\n\n".
-     "Thanks,\n".
-     "Testbed Ops\n".
-     "Utah Network Testbed\n",
-     "From: $TBMAIL_APPROVAL\n".
-     "Bcc: $TBMAIL_AUDIT\n".
-     "Errors-To: $TBMAIL_WWW");
+if ($returning) {
+    TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+	   "$joining_uid $pid Project Join Request",
+	   "$usr_name is trying to join your group $gid in project $pid.\n".
+	   "\n".
+	   "Contact Info:\n".
+	   "Name:            $usr_name\n".
+	   "Emulab ID:       $joining_uid\n".
+	   "Email:           $usr_email\n".
+	   "User URL:        $usr_URL\n".
+	   "Title:           $usr_title\n".
+	   "Affiliation:     $usr_affil\n".
+	   "Address:         $usr_addr\n".
+	   "Phone:           $usr_phone\n".
+	   "\n".
+	   "Please return to $TBWWW,\n".
+	   "log in, and select the 'New User Approval' page to enter your\n".
+	   "decision regarding $usr_name's membership in your project.\n\n".
+	   "Thanks,\n".
+	   "Testbed Ops\n".
+	   "Utah Network Testbed\n",
+	   "From: $TBMAIL_APPROVAL\n".
+	   "Bcc: $TBMAIL_AUDIT\n".
+	   "Errors-To: $TBMAIL_WWW");
+}
 
 #
 # Spit out a redirect so that the history does not include a post

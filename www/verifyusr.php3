@@ -51,13 +51,70 @@ if (strcmp($key, $keymatch)) {
 	      "Please enter the correct key.", 1);
 }
 
+function INFORMLEADERS($uid) {
+    global $TBWWW, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $TBMAIL_WWW;
+
+    #
+    # Get the list of all project/groups this users has tried to join
+    # but whose membership messages where delayed until the user verified
+    # himself.
+    #
+    $group_result =
+	DBQueryFatal("select * from group_membership ".
+		     "where uid='$uid' and trust='none'");
+
+    #
+    # Grab user info.
+    #
+    $userinfo_result =
+	DBQueryFatal("select * from users where uid='$uid'");
+
+    $row	 = mysql_fetch_array($userinfo_result);
+    $usr_email   = $row[usr_email];
+    $usr_URL     = $row[usr_URL];
+    $usr_addr    = $row[usr_addr];
+    $usr_name    = $row[usr_name];
+    $usr_phone   = $row[usr_phone];
+    $usr_title   = $row[usr_title];
+    $usr_affil   = $row[usr_affil];
+
+     while ($row = mysql_fetch_array($group_result)) {
+	 $pid = $row[pid];
+	 $gid = $row[gid];
+
+	 TBGroupLeader($pid, $leader_uid);
+	 TBUserInfo($leader_uid, $leader_name, $leader_email);
+	 
+	 TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+		"$uid $pid Project Join Request",
+		"$usr_name is trying to join your group $gid in project $pid.".
+		"\n".
+		"\n".
+		"Contact Info:\n".
+		"Name:            $usr_name\n".
+		"Emulab ID:       $uid\n".
+		"Email:           $usr_email\n".
+		"User URL:        $usr_URL\n".
+		"Title:           $usr_title\n".
+		"Affiliation:     $usr_affil\n".
+		"Address:         $usr_addr\n".
+		"Phone:           $usr_phone\n".
+		"\n".
+		"Please return to $TBWWW,\n".
+		"log in, select the 'New User Approval' page, and enter\n".
+		"your decision regarding $usr_name's membership in your\n".
+		"project.\n\n".
+		"Thanks,\n".
+		"Testbed Ops\n".
+		"Utah Network Testbed\n",
+		"From: $TBMAIL_APPROVAL\n".
+		"Bcc: $TBMAIL_AUDIT\n".
+		"Errors-To: $TBMAIL_WWW");
+     }
+}
+
 if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"update users set status='active' where uid='$uid'");
-    if (!$query_result) {
-        $err = mysql_error();
-        TBERROR("Database Error setting status for $uid: $err\n", 1);
-    }
+    DBQueryFatal("update users set status='active' where uid='$uid'");
 
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
@@ -70,18 +127,13 @@ if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
 	   "Errors-To: $TBMAIL_WWW");
 
     echo "<p>".
-         "Because your project leader has already approved ".
-	 "your membership in the project, you are now an active user ".
-	 "of emulab.  Click on the 'Home' link at your left, and any options ".
+         "Because your membership has already been approved, ".
+	 "you are now an active user of emulab. ".
+	 "Click on the 'Home' link at your left, and any options ".
 	 "that are now available to you will appear.\n";
 }
 elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"update users set status='unapproved' where uid='$uid'");
-    if (!$query_result) {
-        $err = mysql_error();
-        TBERROR("Database Error setting status for $uid: $err\n", 1);
-    }
+    DBQueryFatal("update users set status='unapproved' where uid='$uid'");
 
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
@@ -93,6 +145,8 @@ elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
 	   "From: $TBMAIL_OPS\n".
 	   "Errors-To: $TBMAIL_WWW");
 
+    INFORMLEADERS($uid);
+
     echo "<p>".
 	 "You have now been verified. However, your application ".
 	 "has not yet been approved by the project leader. You will receive ".
@@ -101,7 +155,6 @@ elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
 else {
     TBERROR("Bad user status '$status' for $uid!", 1);
 }
-    
 
 #
 # Standard Testbed Footer
