@@ -79,8 +79,9 @@ boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/server.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 
-client-install:	
-	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
+client-install:
+	$(INSTALL_DATA) localnode.pem /etc/testbed/client.pem
+	$(INSTALL_DATA) emulab.pem /etc/testbed/emulab.pem
 
 clean:
 	rm -f *.pem serial index.txt *.old dirsmade *.cnf
