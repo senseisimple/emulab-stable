@@ -80,6 +80,11 @@ the default one. However, you want to make sure that no ports on the nodes can
 talk to it, so you'll want to disable them all. (Our software will re-enable
 them, and disable them as needed.)                           
 
+You will also need to give the experimental switch(es) IP addresses. With
+CatOS, you do it like this:
+  set interface sc0 <IP> <netmask>
+  set interface sc0 up
+
 ##### DHCP through the router
 
 If your boss node is on a seperate VLAN from the node control net, you'll need
