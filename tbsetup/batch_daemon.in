@@ -242,7 +242,7 @@ sub dosomething($$)
 {
     my($dowhat)   = shift;
     my(%exphash)  = @_;
-    my($unix_uid, $unix_gid, $row, $query_result);
+    my($unix_uid, $unix_gid, $unix_gname, $row, $query_result);
 
     # Global vars
     $eid     = $exphash{'eid'};
@@ -307,8 +307,8 @@ sub dosomething($$)
     #
     (undef,undef,$unix_uid) = getpwnam($creator) or
 	fatal("No such user $creator");
-    (undef,undef,$unix_gid) = getgrnam($gid) or
-	fatal("No such group $gid");
+    TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
+	fatal("No such group $pid/$gid");
 
     #
     # Change the ownership of the log file before we flip.
