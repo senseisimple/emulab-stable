@@ -1029,6 +1029,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
+	tbsetup/console_reset \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \

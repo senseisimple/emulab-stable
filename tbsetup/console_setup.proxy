@@ -14,6 +14,7 @@ my $TIPDEVDIR   = "/dev/tip";
 my $TBPID	= "flux";
 my $dbg		= 1;
 my %nodepid     = ();
+my $failures    = 0;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -63,14 +64,19 @@ if (! chdir($TIPLOGDIR)) {
 # Well, do it.
 # 
 foreach my $node ( keys %nodepid ) {
-    $pid = $nodepid{$node};
+    my $pid        = $nodepid{$node};
+    my $filename   = "${node}.run";
+    my $tipdevname = "$TIPDEVDIR/$node";
+    my $aclname    = "$TIPDEVDIR/$node.acl";
 
     #
     # Find out the current group setting for the file. 
     #
-    $filename = "${node}.run";
     if (! -e $filename) {
-	die("Console log $filename for $node does not exist!");
+	print STDERR
+	    "*** Console log for $node does not exist! Skipping ...\n";
+	$failures++;
+	next;
     }
     # This is silly! Is there a better way to do this?
     (undef,undef,undef,undef,undef,$gid) = stat($filename);
@@ -81,7 +87,7 @@ foreach my $node ( keys %nodepid ) {
     # rolling.
     #
     if (getgrgid($gid) eq $pid) {
-	next;
+	goto setperms;
     }
 
     unlink($filename) or
@@ -126,7 +132,6 @@ foreach my $node ( keys %nodepid ) {
     # inaccessible to both old and new users while we revoke access from
     # any current tip user.
     #
-    $tipdevname = "$TIPDEVDIR/$node";
     chmod(0600, $tipdevname) or
 	die("Could not chmod(0600) $tipdevname: $!");
 
@@ -134,7 +139,6 @@ foreach my $node ( keys %nodepid ) {
     # Ditto for the "acl" file, which is how socket based tip/capture enforce
     # protection of the console line.
     #
-    $aclname = "$TIPDEVDIR/$node.acl";
     if (-e $aclname) {
 	chmod(0600, $aclname) or
 	    die("Could not chmod(0600) $aclname: $!");
@@ -152,6 +156,7 @@ foreach my $node ( keys %nodepid ) {
     # allows the new group to access the tip line using a non-setuid/gid
     # program.
     #
+  setperms:
     chown(0, $gid, $tipdevname) or
 	die("Could not chown(0, $gid) $tipdevname: $!");
     chmod(0660, $tipdevname) or
@@ -168,4 +173,5 @@ foreach my $node ( keys %nodepid ) {
     }
 }
 
+# Don't worry about failures. Non-fatal.
 exit 0;

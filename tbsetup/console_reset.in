@@ -1,0 +1,91 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# usage: console_reset
+#
+sub usage()
+{
+    print STDOUT "Usage: console_reset\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TESTMODE	= "@TESTMODE@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Turn off line buffering on output
+$| = 1; 
+
+my $consetup = "$TB/libexec/console_setup";
+my @row;
+my @nodes    = ();
+my %shelves  = ();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if (@ARGV) {
+    usage();
+}
+
+#
+# Only root or admins should run this script.
+#
+if ($UID && !TBAdmin($UID)) {
+    die("Only root or TB admins can run this script.");
+
+}
+
+#
+# Get a list of all of the experimental nodes.
+#
+my $query_result =
+    DBQueryFatal("select node_id from nodes where role='testnode'");
+
+while (@row = $query_result->fetchrow_array()) {
+    my $node = $row[0];
+    push(@nodes, $node);
+}
+
+#
+# Issue small batches of setup.
+#
+while (@nodes) {
+    my @batch = ();
+    my $i = 0;
+
+    while ($i < 10 && @nodes > 0) {
+	my $node = shift(@nodes);
+	
+	#
+	# Another classic shark hack. Only add shelves to the list.
+	# 
+	if ($node =~ /(sh\d+)-\d+/) {
+	    if (defined($shelves{$1})) {
+		next;
+	    }
+	    $shelves{$1} = $1;
+	    $node = $1;
+	}
+	    
+	push(@batch, $node);
+	$i++;
+    }
+    
+    print "Issuing console_setup for @batch ...\n";
+
+    system("$consetup @batch");
+}
+
+exit 0;
