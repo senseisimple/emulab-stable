@@ -254,14 +254,18 @@ if (!@commands) {
 # User-supplied switch lists
 #
 my @supplied_switches = ();
+my @supplied_stacks = ();
+my $supplied_switches = 0; # Whether -i or -S was given
 if ($opt{i}) {
+    $supplied_switches = 1;
     push @supplied_switches, @{$opt{i}};
 }
 if ($opt{S}) {
     foreach my $stack (@{$opt{S}}) {
+	$supplied_switches = 1;
 	my @switches = getSwitchesInStack($stack);
 	if (@switches) {
-	    push @supplied_switches, @switches;
+	    push @supplied_stacks, $stack;
 	} else {
 	    die "ERROR: No such switch stack: $stack\n";
 	}
@@ -396,19 +400,19 @@ foreach my $command (@commands) {
     my @vlans;
     SWITCH: for ($operation) {
 	(/listvlans/ || /getstats/ || /make/ || /remove/) && do {
-	    @devicenames = @supplied_switches?
+	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/listports/) && do {
-	    @devicenames = @supplied_switches? @supplied_switches :
+	    @devicenames = $supplied_switches? @supplied_switches :
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
 	};
 	(/tables/) && do {
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    @ports = getVlanPorts(@vlans);
-	    @devicenames = @supplied_switches?
+	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
@@ -417,12 +421,12 @@ foreach my $command (@commands) {
 	    # When we reset, we operate on all test switches, just to be safe
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
-	    @devicenames = @supplied_switches?
+	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/portcontrol/ || /trunkdisable/) && do {
-	    @devicenames = @supplied_switches?
+	    @devicenames = $supplied_switches?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
 	};
@@ -431,14 +435,14 @@ foreach my $command (@commands) {
 	    # Safety check - cannot be used with -i . We have to operate on
 	    # all experimental switches
 	    #
-	    if (@supplied_switches) {
+	    if ($supplied_switches) {
 		die "-c and -i or -S cannot be used together\n";
 	    }
 	    @devicenames = getTestSwitches();
 	    last;
 	};
 	(/trunkenable/) && do {
-	    @devicenames = @supplied_switches?
+	    @devicenames = $supplied_switches?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    @vlans = @optvlanids;
 	    last;
@@ -448,16 +452,24 @@ foreach my $command (@commands) {
     debug("Device names: " . join(",",@devicenames) . "\n");
     debug("Ports: " . join(",",@ports) . "\n");
 
-    #
-    # Find out which stack each device belongs to
-    #
     my %stacks = ();
     if (! $ELABINELAB) {
+	#
+	# First, look at the device names we've got and map them to stacks 
+	#
 	foreach my $devicename (@devicenames) {
-	    my $stack = getSwitchStack($devicename);
+	    my $stack = getSwitchPrimaryStack($devicename);
 	    if (defined($stack)) {
 		push @{$stacks{$stack}}, $devicename;
 	    }
+	}
+	#
+	# Next, add in stacks that were specified as a whole
+	#
+	foreach my $stack (@supplied_stacks) {
+	    # We checked for non-existent stacks above
+	    my @switches = getSwitchesInStack($stack);
+	    push @{$stacks{$stack}}, @switches;
 	}
     }
 
@@ -523,8 +535,14 @@ foreach my $command (@commands) {
 	my %devicemap = mapPortsToDevices(@ports);
 	my @devices = keys %devicemap;
 	foreach my $device (@devices) {
-	    my $stack_id = getSwitchStack($device);
-	    if (!$stack_id || !$stack_ids{$stack_id}) {
+	    my @stack_ids = getSwitchStacks($device);
+	    my $matched = 0;
+	    foreach my $stack_id (@stack_ids) {
+		if ($stack_id && $stack_ids{$stack_id}) {
+		    $matched = 1;
+		}
+	    }
+	    if (!$matched) {
 		die "*** ERROR: One or more ports are on $device, but no " .
 		    "stack containing it was specified!\n";
 	    }

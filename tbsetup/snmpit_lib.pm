@@ -17,7 +17,8 @@ use Exporter;
 		getTestSwitches getControlSwitches getSwitchesInStack
 		getVlanPorts
 		getExperimentVlans getDeviceNames getDeviceType
-		getInterfaceSettings mapPortsToDevices getSwitchStack
+		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
+		getSwitchStacks
 		getStackType getStackLeader
 		getDeviceOptions getTrunks getTrunksFromSwitches
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
@@ -355,9 +356,29 @@ sub getSwitchesInStack ($) {
 }
 
 #
-# Returns the stack_id that a switch belongs to
+# Returns the stack_id of a switch's primary stack
 #
-sub getSwitchStack($) {
+sub getSwitchPrimaryStack($) {
+    my $switch = shift;
+    my $result = DBQueryFatal("SELECT stack_id FROM switch_stacks WHERE " .
+    		"node_id='$switch' and is_primary=1");
+    if (!$result->numrows()) {
+	print STDERR "No primary stack_id found for switch $switch\n";
+	return undef;
+    } elsif ($result->numrows() > 1) {
+	print STDERR "Switch $switch is marked as primary in more than one " .
+	    "stack\n";
+	return undef;
+    } else {
+	my ($stack_id) = ($result->fetchrow());
+	return $stack_id;
+    }
+}
+
+#
+# Returns a list of all stack_ids that a switch belongs to
+#
+sub getSwitchStacks($) {
     my $switch = shift;
     my $result = DBQueryFatal("SELECT stack_id FROM switch_stacks WHERE " .
     		"node_id='$switch'");
@@ -365,8 +386,11 @@ sub getSwitchStack($) {
 	print STDERR "No stack_id found for switch $switch\n";
 	return undef;
     } else {
-	my ($stack_id) = ($result->fetchrow());
-	return $stack_id;
+	my @stack_ids;
+	while (my ($stack_id) = ($result->fetchrow())) {
+	    push @stack_ids, $stack_id;
+	}
+	return @stack_ids;
     }
 }
 
