@@ -14,11 +14,19 @@
 #include <mysql/mysql.h>
 #include "decls.h"
 
+/*
+ * XXX This needs to be localized!
+ */
+#define FSPROJDIR	"fs.emulab.net:/q/proj"
+#define FSUSERDIR	"fs.emulab.net:/users"
+#define PROJDIR		"/proj"
+#define USERDIR		"/users"
+#define RELOADPID	"emulab-ops"
+#define RELOADEID	"reloading"
+
 #define TESTMODE
 #define VERSION		2
 #define NETMASK		"255.255.255.0"
-#define RELOADPID	"emulab-ops"
-#define RELOADEID	"reloading"
 
 /* Defined in configure and passed in via the makefile */
 #define DBNAME_SIZE	64
@@ -54,6 +62,7 @@ static int dostartstat(int sock, struct in_addr ipaddr, char *rdata,int tcp);
 static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
 static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -74,6 +83,7 @@ struct command {
 	{ "readycount", doreadycount },
 	{ "ready",	doready },
 	{ "log",	dolog },
+	{ "mounts",	domounts },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -681,8 +691,10 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 		sprintf(buf,
 			"ADDUSER LOGIN=%s "
-			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\"\n",
-			row[0], row[1], row[2], gid, root, row[3]);
+			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
+			"HOMEDIR=%s/%s\n",
+			row[0], row[1], row[2], gid, root, row[3],
+			USERDIR, row[0]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
@@ -1549,6 +1561,74 @@ dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 	fprintf(fd, "%s: %s\n\n%s\n=======\n", tstr, inet_ntoa(ipaddr), rdata);
 	fclose(fd);
+
+	return 0;
+}
+
+/*
+ * Return mount stuff.
+ */
+static int
+domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[MYBUFSIZE];
+	int		nrows, gid;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "MOUNTS: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_ERR, "MOUNTS: %s: Node is free", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Return project mount first. Will eventually be a list of mounts
+	 */
+	sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+		FSPROJDIR, pid, PROJDIR, pid);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	/*
+	 * Now a list of user directories.
+	 */
+	res = mydb_query("select u.uid from users as u "
+			 "left join proj_memb as p on p.uid=u.uid "
+			 "where p.pid='%s' and u.status='active'",
+			 1, pid);
+	if (!res) {
+		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		syslog(LOG_ERR, "MOUNTS: %s: No Users!", pid);
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+				
+		sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+			FSUSERDIR, row[0], USERDIR, row[0]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		syslog(LOG_INFO, "MOUNTS: %s", buf);
+	}
+	mysql_free_result(res);
 
 	return 0;
 }
