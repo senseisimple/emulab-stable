@@ -23,8 +23,32 @@ would be:
 4. Sit back and wait.
 
 The test directory holds the following files:
-	XXX
+	tbobj/			A configured/built object tree.
+	install/		An installed tree.
+	tests/			Holds individual test files.
+	tests/<test>/
+		test.log	Main log of everything.
+		nsfile.ns	The NS file used.
+		*		Any files created by tbsetup stuff.
+	test.log		Master log file.  Output of tbtest.
+	configure.log		Log of 'configure'
+	build.log		Log of 'gmake'
+	install.log		Log of 'gmake boss-install'
+	postinstall.log		Log of 'gmake post-install'
+	createdb.log		Log of creating test DB.
+	fill.log		Log of filling test DB.
+	clear.log		Log of clearing experiments from test DB.
+	clean.txt		Dump of clean test DB.
+	dbdump.txt		Dump of real database.
+	defs			Defs file used for configure.
+	
 
+Note: createdb.log, fill.log, and cleanup.log are empty when no errors
+occur.
+
+Advanced: To run all tests with a special DB setup you can do 'tbtest
+init' and then replace 'clean.txt' with a dump of the DB of your
+choice.  'clean.txt' is loaded into the test DB before every test run.
 
 Adding Tests
 ------------
