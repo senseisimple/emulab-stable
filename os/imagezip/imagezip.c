@@ -55,6 +55,7 @@ int     version   = 0;
 int     slicemode = 0;
 int     maxmode   = 0;
 int     slice     = 0;
+int	level	  = 4;
 long	dev_bsize = 1;
 
 /*
@@ -200,7 +201,7 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -223,6 +224,11 @@ main(argc, argv)
 		case 's':
 			slicemode = 1;
 			slice = atoi(optarg);
+			break;
+		case 'z':
+			level = atoi(optarg);
+			if (level < 1 || level > 9)
+				usage();
 			break;
 		case 'c':
 			maxmode     = 1;
@@ -1156,6 +1162,7 @@ char *usagestr =
  " -c count	   Compress <count> number of sectors (not with slice mode)\n"
  " -s slice        Compress a particular slice (DOS numbering 1-4)\n"
  " -h              Print this help message\n"
+ " -z level        Set the compression level. Range 1-9. Default is 4\n"
  " image | device  The input image or a device special file (ie: /dev/rad2)\n"
  " outputfilename  The output file. Use - for stdout. \n"
  "\n"
@@ -1741,7 +1748,7 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		d_stream.zfree  = (free_func)0;
 		d_stream.opaque = (voidpf)0;
 
-		err = deflateInit(&d_stream, 4);
+		err = deflateInit(&d_stream, level);
 		CHECK_ZLIB_ERR(err, "deflateInit");
 	}
 	*partial = 0;
