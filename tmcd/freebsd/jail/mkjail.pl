@@ -407,14 +407,6 @@ sub mkrootfs($)
     }
 
     #
-    # Pump up the amount of space that can be used per NFS client socket
-    # (up to 64 pending packets @ 8k per packet with default read/write size)
-    #
-    if ($NFSMOUNT_LOCAL) {
-	mysystem("sysctl vfs.nfs.bufpackets=64 >/dev/null 2>&1");
-    }
-
-    #
     # The proc FS in the jail is per-jail of course.
     # 
     mysystem("mount -t procfs proc $path/root/proc");
@@ -625,14 +617,6 @@ sub restorerootfs($)
 	    mysystem("mount -r -t null /$dir $path/root/$dir");
 	}
 	push(@mntpoints, "$path/root/$dir");
-    }
-
-    #
-    # Pump up the amount of space that can be used per NFS client socket
-    # (up to 64 pending packets @ 8k per packet with default read/write size)
-    #
-    if ($NFSMOUNT_LOCAL) {
-	mysystem("sysctl vfs.nfs.bufpackets=64 >/dev/null 2>&1");
     }
 
     tmcccopycache($vnodeid, "$path/root");
