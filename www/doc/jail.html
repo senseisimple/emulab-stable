@@ -1,0 +1,142 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h2>Jails</h2>
+</center>
+
+A long long long time ago I started working on better Jail support.
+What follows is the story of my incredible journey (of woe).
+
+<br>
+<br>
+
+Initially, we started out with some simple changes to jail. Mike made
+these changes around October of 2002.
+
+<ul>
+<li> Allow access to raw sockets and read-only access to BPF
+     devices. In the context of Emulab, the additional access is
+     deemed reasonable.
+
+<li> Make access of new and existing capabilities per-jail instead of
+     global MIB entries for all jails
+     
+<li> Restrict the port range to which a jail can bind to. This allows
+     multiple jails on the same node to safely share the port space
+     without stepping on each other. Since the ultimate goal to allow
+     different experiments to coexist in jails on the same node, the
+     port space has to be allocated globally, with the same port space
+     assigned to all jails across an experiment, so as not to conflict
+     with any other experiments. This assignment is done when the
+     experiment is swapped in so that swapped experiments are not
+     holding ranges (16 bits of port space does not go very far).
+     
+<li> Disallow FS unmounts inside a jail unless the mount was created
+     in the jail. This was more of a bug fix that a feature addition.
+</ul>
+
+The other part of this first phase was creating a jailed environment
+on the node that looked as much like the standard Emulab environment
+as possible.  The goal was to make a jail look so close that user did
+not mind (he was certainly going to notice!). Also note that the
+intent was to use jails both locally and remotely, where there are
+going to be different security considerations (hence the need for
+per-jail permissions bits as mentioned above). Setting up the jail is
+broken into two parts; the stuff that needs to be done outside the
+jail (creating the jail filesystem, setting up interfaces, tunnels,
+routes, mounting user/proj filesystems) cause the jail does not have
+enough permission, and the stuff that can be done inside the jail
+(creating accounts, installing software, starting programs and traffic
+generators).
+
+<br>
+<br>
+
+<h3>Setting up the jail, phase one:</h3>
+
+To set up the outer environment it is necessary to:
+
+<ul>
+<li> Create the tunnels if the experiment requested tunnels. This applies
+     only to widearea nodes, not to local nodes.
+
+<li> Ask tmcd for the set of jail options that apply.
+
+<li> Create a base filesystem for the jail, and then apply some
+     customizations to it. In addition to customizations based on the
+     permissions that tmcd said to use, there are the usual things
+     like setting the hostname of the jail, giving it a proper rc.conf
+     and resolv.conf, etc. More on this below.
+
+<li> Mounting filesystems. Locally, we mount the /user and /proj
+     filesystems into the jail so that the users get the standard
+     directories.
+
+<li> Start the tmcd proxy. More on this below.
+</ul>
+
+Setting up the filesystem for the jail is a long arduous process:
+<ul>
+<li> Create a zero-filled vnode file (currently set to 64MB) and find
+     a free vn device to configure. The root of the filesystem is
+     mounted under /var/emulab/jails/<jailname>/root.
+
+<li> Copy in /root and /etc into the new jail filesystem so that each
+     jail gets to munge their own copy of it.
+
+<li> NFS mount read-only /bin, /sbin, and /usr into the jailed
+     filesystem. This gives each jail shared access to the bulk of the
+     filesystem so that we do not have to duplicate. If the user
+     wishes to install their own software, they will need to do it
+     into /opt. This is perhaps not ideal.
+  
+<li> Mount a proc filesystem inside the jail. This gives the jail a
+     private view of it process world.
+
+<li> Populate the jails /dev filesystem. The jail is not allowed to
+     run the mknod system call, so device entries must be created for
+     it. 
+
+<li> Create a pristine /var filesystem. Create stub entries for
+     several files in /etc including the passsword and group file.
+     Create a resolv.conf file that points to the outer host.
+
+<li> Create an sshd config file and make sure X11 forwarding is off.
+     Also arrange for sshd to be started up (inside the jail) on its
+     per-jail assigned port (which is within the port range for the
+     jail).
+
+<li> NFS mount (via a call in the tmcd library) all of the proj and
+     user directories for the experiment. Again, since the jail cannot
+     do NFS mounts inside, this is down outside. Clean out various
+     files for security (pem files, cvsup auth file, etc).
+
+</ul>
+
+The other complication in setting up the jailed environment involves
+access to TMCD. Widearea testbed nodes are not allowed to contact tmcd
+without an ssl certificate, but we do not want to hand out per-jail
+certificates that could be easily copied. My approach was to not allow
+a jail to contact tmcd directly, but to instead go through a proxy
+running outside the jail. This has the added benefit of ensuring that
+the jail is not able to spoof another jail in another experiment.
+The implementation of this was to add a <em>proxy</em> mode to the
+tmcc client. Outside the jail, a tmcc proxy is started that creates a
+unix domain socket, whose path is inside the jail filesystem. In other
+words, the socket is named such that a tmcc client running inside the
+jail sees it too. The tmcc client inside the jail connects to the tmcc
+proxy running outside the jail via the unix domain socket, which
+relays the request to tmcd (sanitizing the request string), and then
+relays the answer back to the tmcc inside the jail. The proxy ensures
+that there is no spoofing of the jail id. There are many other
+alternatives for accomplishing this, but this was fairly easy to do.
+
+<br>
+<br>
+
+
+
+
