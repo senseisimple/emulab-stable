@@ -34,8 +34,8 @@ else {
     $returning = 0;
 }
 
-$ACCOUNTWARNING = "Your username should reflect your normal login name.<br>".
-    "Emulab accounts are not to be shared amongst users!<br>";
+$ACCOUNTWARNING = "Your username should reflect your normal login name. ".
+    "Emulab accounts are not to be shared amongst users!";
 
 $EMAILWARNING = "We require all Emulab users to provide current, ".
     "non-pseudonymic email addresses. Redirections and anonymous ".
