@@ -1,3 +1,36 @@
+stoller     2003/10/13 11:59:28 MDT
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Aside from another round of cleanup, there is a significant change.
+  I have implemented the suggestion Jay made a couple of weeks ago
+  about allowing partial allocation in assign_wrapper, and retrying with a
+  modified set of "fixed" nodes.
+  
+  My basic approach was to change nalloc to optionally allow partial
+  allocations, returning the number of nodes that could not be allocated as
+  its return value. In assign_wrapper, I determine which nodes we were able
+  to get (in each loop), set their allocstate to INIT_DIRTY, augment the
+  fixed_node set, and recreate the top file. Then I try again, up to the
+  current number of maxtries. If assign fails with an unretryable error, or
+  if we could not nalloc a user directed fixed node, then I stop right away
+  since the experiment is not going to map (in the near term) if the fixed
+  node list cannot be allocated.
+  
+  I am confident that this works okay, although testing is a little
+  difficult. The main problem is how this interacts with experiment modify.
+  Chad's implementation is that a modify can be reverted (recovered from)
+  only as long as the DB is not modified by assign_wrapper. Well, a partial
+  allocation, followed by failure, obviously modifies the DB, and so is
+  deemed not recoverable. I am still trying to figure out the effects of
+  this, and whether I can relax this requirement, but in the meantime
+  lets install it and see what happens (won't affect many people).
+  
+  Revision  Changes    Path
+  1.131     +468 -347  testbed/tbsetup/assign_wrapper.in
+
+
 newbold     2003/10/10 08:44:15 MDT
 
   Modified files:
