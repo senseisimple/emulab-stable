@@ -718,3 +718,42 @@ tb-fix-node $node0 pc42
       done.
   <li>Do not use this command on nodes that are a virtual type.
 </ul>
+
+
+<h4>tb-set-uselatestwadata</h4>
+
+<pre>
+tb-set-uselatestwadata 0
+tb-set-uselatestwadata 1
+</pre>
+
+<p>Notes:
+<ul>
+  <li>This command indicates which widearea data to use when mapping
+  widearea nodes to links. The default is 0, which says to use the aged data.
+  Setting it to 1 says to use the most recent data. 
+</ul>
+
+
+<h4>tb-set-wasolver-weights</h4>
+
+<pre>
+tb-set-wasolver-weights <i>delay bw plr</i>
+
+tb-set-wasolver-weights 1 10 500
+</pre>
+
+<dl>
+  <dt><i>delay</i> - The weight to give delay when solving.
+  <dt><i>bw</i> - The weight to give bandwidth when solving.
+  <dt><i>plr</i> - The weight to give lossrate when solving.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command sets the relative weights to us when assigning widearea
+  nodes to links. Specifying a zero says to ignore that particular
+  metric when doing the assignment. Setting all three to zero results
+  in an essentially random selection.
+</ul>
+

@@ -179,6 +179,11 @@ namespace eval GLOBALS {
     # For remote nodes. Use latest widearea data.
     variable uselatestwadata 0
 
+    # For remote nodes. The solver weights.
+    variable wa_delay_solverweight 1
+    variable wa_bw_solverweight	   7
+    variable wa_plr_solverweight   500
+
     # This is the file handler for the warnings file
     variable WARN_FILE [open "$eid.warnings" w]
 

@@ -503,3 +503,22 @@ proc tb-set-uselatestwadata {onoff} {
 
     set uselatestwadata $onoff
 }
+
+proc tb-set-wasolver-weights {delay bw plr} {
+    var_import ::GLOBALS::wa_delay_solverweight
+    var_import ::GLOBALS::wa_bw_solverweight
+    var_import ::GLOBALS::wa_plr_solverweight
+
+    if {($delay < 0) || ($bw < 0) || ($plr < 0)} {
+	perror "\[tb-set-wasolver-weights] Weights must be postive integers."
+	return
+    }
+    if {($delay == {}) || ($bw == {}) || ($plr == {})} {
+	perror "\[tb-set-wasolver-weights] Must provide delay, bw, and plr."
+	return
+    }
+
+    set wa_delay_solverweight $delay
+    set wa_bw_solverweight $bw
+    set wa_plr_solverweight $plr
+}
