@@ -35,6 +35,8 @@ SFSSUPPORT=0
 DISABLE_NSE=1
 # This means it is an inner elab!
 ELABINELAB=1
+# The name of the outer boss for inner boss to request services from.
+OUTERBOSSNODE=changeme
 #
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
