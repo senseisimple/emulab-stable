@@ -651,6 +651,9 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 	char			command[MYBUFSIZE], buf[MYBUFSIZE];
 	char			*bp, *cp;
 	
+	/* don't let a client kill us */
+	signal(SIGPIPE, SIG_IGN);
+
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror("creating unix domain socket");
