@@ -829,6 +829,52 @@ static void notify_callback(elvin_handle_t server,
  * subscription structure if the operation is successful, 0 otherwise.
  */
 
+/*
+ * This routine takes a "FOO,BAR" string and breaks it up into
+ * separate (TAG==FOO || TAG==BAR) clauses.
+ */
+static int
+addclause(char *tag, char *clause, char *exp, int size, int *index)
+{
+	int	count = 0;
+	char	*bp;
+	char    clausecopy[BUFSIZ], *strp = clausecopy;
+	char	buf[BUFSIZ];
+
+	/* Must copy clause since we use strsep! */
+	strcpy(clausecopy, clause);
+
+	/*
+	 * Build expression of "or" statements.
+	 */
+	while (strp && count < sizeof(buf)) {
+		bp = strsep(&strp, " ,");
+
+		/* Empty token (two delimiters next to each other) */
+		if (! *bp)
+			continue;
+		
+		count += snprintf(&buf[count], sizeof(buf) - count,
+				  "%s %s == \"%s\" ",
+				  (count ? "||" : ""), tag, bp);
+	}
+	if (strp || count >= sizeof(buf))
+		goto bad;
+	
+	/*
+	 * And wrap in parens (add an "and" if not the first clause).
+	 */
+	count = snprintf(exp, size, "%s (%s) ", (*index ? "&&" : ""), buf);
+	if (count >= size)
+		goto bad;
+	
+	*index += count;
+	return 1;
+ bad:
+	ERROR("Ran out of room for subscription clause: %s %s\n", tag, clause);
+	return 0;	
+}
+
 event_subscription_t
 event_subscribe(event_handle_t handle, event_notify_callback_t callback,
 		address_tuple_t tuple, void *data)
@@ -847,47 +893,41 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
         return NULL;
     }
 
-    if (tuple->site) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "SITE == \"%s\" ",
-			     tuple->site);
-    }
-    if (tuple->expt) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s EXPT == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->expt);
-    }
-    if (tuple->group) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s GROUP == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->group);
-    }
-    if (tuple->host) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s HOST == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->host);
-    }
-    if (tuple->objtype) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s OBJTYPE == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->objtype);
-    }
-    if (tuple->objname) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s OBJNAME == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->objname);
-    }
-    if (tuple->eventtype) {
-	    index += snprintf(&expression[index], sizeof(expression) - index,
-			     "%s EVENTTYPE == \"%s\" ",
-			     (index ? "&&" : ""),
-			     tuple->eventtype);
-    }
+    if (tuple->site &&
+	! addclause("SITE", tuple->site,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+
+    if (tuple->expt &&
+	! addclause("EXPT", tuple->expt,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+
+    if (tuple->group &&
+	! addclause("GROUP", tuple->group,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+
+    if (tuple->host &&
+	! addclause("HOST", tuple->host,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+	
+    if (tuple->objtype &&
+	! addclause("OBJTYPE", tuple->objtype,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+
+    if (tuple->objname &&
+	! addclause("OBJNAME", tuple->objname,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+
+    if (tuple->eventtype &&
+	! addclause("EVENTTYPE", tuple->eventtype,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+	    
     index += snprintf(&expression[index], sizeof(expression) - index,
 		     "%s SCHEDULER == %d ",
 		     (index ? "&&" : ""),
