@@ -9,7 +9,7 @@ all:	tip tiptunnel
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
+CC = gcc -g -O2 -DUSESOCKETS -DWITHSSL -I$(TESTBED_SRCDIR)/capture
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
        remote.o tip.o value.o vars.o getcap.o
@@ -21,11 +21,13 @@ TUNNELOBJS = tiptunnel.o
 #
 LIBS=
 
+SSLLIBS		= -lssl -lcrypto
+
 tip:	$(OBJS)
 	$(CC) -static -o tip $(OBJS) $(LIBS)
 
 tiptunnel: tiptunnel.o
-	$(CC) -static -o tiptunnel tiptunnel.o $(LIBS) 
+	$(CC) -o tiptunnel tiptunnel.o $(SSLLIBS) 
 
 $(OBJS): tipconf.h tip.h
 

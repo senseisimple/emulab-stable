@@ -8,10 +8,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#ifdef WITHSSL
+#include <openssl/ssl.h>
+#endif /* WITHSSL */
 
 #include "capdecls.h"
 
-int ssl   = 0;
 int debug = 0;
 int allowRemote = 0;
 
@@ -26,6 +28,12 @@ char * hostname = NULL;
 
 secretkey_t key;
 
+typedef int WriteFunc( void * data, int size );
+typedef int ReadFunc( void * data, int size );
+
+WriteFunc * writeFunc;
+ReadFunc  * readFunc;
+
 void usage();
 void loadAcl( const char * filename );
 void doConnect();
@@ -33,6 +41,24 @@ void doAuthenticate();
 void doCreateTunnel();
 void doTunnelConnection();
 
+int writeNormal( void * data, int size );
+int readNormal( void * data, int size );
+
+#ifdef WITHSSL
+
+void initSSL();
+void sslConnect();
+
+int writeSSL( void * data, int size );
+int readSSL( void * data, int size );
+
+SSL * ssl;
+SSL_CTX * ctx;
+
+int usingSSL = 0;
+char * certString = NULL;
+
+#endif /* WITHSSL */
 
 int main( int argc, char ** argv )
 {
@@ -40,9 +66,6 @@ int main( int argc, char ** argv )
 
   while ((op = getopt( argc, argv, "sp:rd" )) != -1) {
     switch (op) {
-      case 's': 
-	ssl++; 
-	break;
       case 'p':
         tunnelPort = atoi( optarg );
 	break;
@@ -68,9 +91,25 @@ int main( int argc, char ** argv )
 
   loadAcl( argv[0] );
 
-  doConnect();
+#ifdef WITHSSL
+  if (usingSSL) { 
+    writeFunc = writeSSL;
+    readFunc  = readSSL;
+    initSSL();
+    doConnect();
+    sslConnect();
+  } else
+#endif /* WITHSSL */
+  {
+    /* either there is no SSL, or they're not using it. */
+    writeFunc = writeNormal;
+    readFunc  = readNormal;
+    doConnect();
+  }
+
   doAuthenticate();
   doCreateTunnel();
+
   if (programToLaunch) {
     char portString[12];
     sprintf( portString, "%i", tunnelPort );
@@ -95,9 +134,7 @@ void usage()
 	 "\n"
 	 "[program]        path of program to launch with 'localhost'\n"
 	 "                 and tunnel port as arguments.\n"
-	 //	 "-s\tturns on SSL (not implemented)\n"
-	 //"-e <program>\tlaunches program to connect to tunnel\n"
-	 //"-k\tkeeps accepting connections until killed"
+	 //"-k keeps accepting connections until killed"
 	 );
   exit(-1);
 }
@@ -127,6 +164,12 @@ void loadAcl( const char * filename )
       key.keylen = atoi( b2 );
     } else if ( strcmp(b1, "key:") == 0 ) {
       strcpy( key.key, b2 );
+#ifdef WITHSSL
+    } else if ( strcmp(b1, "ssl-server-cert:") == 0 ) {
+      if (debug) { printf("Using SSL to connect to capture.\n"); }
+      certString = strdup( b2 );
+      usingSSL++;
+#endif /* WITHSSL */
     } else {
       fprintf(stderr, "Ignored unknown ACL: %s %s\n", b1, b2);
     }
@@ -137,6 +180,16 @@ void loadAcl( const char * filename )
     exit(-1);
   }
 
+}
+
+int writeNormal( void * data, int size )
+{
+  return write( sock, data, size );
+}
+
+int readNormal( void * data, int size )
+{
+  return read( sock, data, size );
 }
 
 void doConnect()
@@ -172,14 +225,20 @@ void doAuthenticate()
 {
   capret_t capret;
 
-  if ( write( sock, &key, sizeof(key) ) == sizeof(key) &&
-       read(sock, &capret, sizeof(capret)) > 0 ) {
-    if (capret == CAPOK) {
+  if ( writeFunc( /*sock,*/ &key, sizeof(key) ) == sizeof(key) &&
+       readFunc( /*sock,*/ &capret, sizeof(capret)) > 0 ) {
+    switch( capret ) {
+    case CAPOK: 
       return;
-    } else if (capret == CAPBUSY) {
+    case CAPBUSY:       
       fprintf(stderr, "Tip line busy.\n");
-    } else if (capret == CAPNOPERM) {
-      fprintf(stderr, "You do not have permission! No TIP for you!\n");
+      break;
+    case CAPNOPERM:
+      fprintf(stderr, "You do not have permission. No TIP for you!\n");
+      break;
+    default:
+      fprintf(stderr, "Unknown return code 0x%02x.\n", (unsigned int)capret);
+      return; // XXX Final version should break here. 
     }
   } else {
     // write or read hosed.
@@ -284,14 +343,14 @@ acceptor:
 	return;
       }
 
-      if (write( sock, buf, got ) < 0) {
+      if (writeFunc( /*sock,*/ buf, got ) < 0) {
 	perror("write sock");
 	return;
       }
     }
 
     if ( FD_ISSET( sock, &fds ) ) {
-      int got = read( sock, buf, 4096);
+      int got = readFunc( /*sock,*/ buf, 4096);
       if (got <= 0) {
 	if (got < 0) { perror("read sock"); }
 	if (debug) { printf("sock read %i; exiting.\n", got); }
@@ -305,3 +364,80 @@ acceptor:
     }
   }
 }
+
+
+#ifdef WITHSSL
+
+void initSSL()
+{
+  SSL_library_init();
+  ctx = SSL_CTX_new( SSLv23_method() );
+  
+  //  if (!(SSL_CTX_load_verify_location( ctx, CA_LIST, 0 ))
+}
+
+void sslConnect()
+{
+  unsigned char digest[256];
+  unsigned int len = sizeof( digest );
+  unsigned char digestHex[512];
+  X509 * peer;
+  BIO * sbio;
+  int i;
+
+  ssl = SSL_new( ctx );
+  SSL_set_fd( ssl, sock );
+
+  // sbio = BIO_new_socket( sock, BIO_NOCLOSE );
+  // SSL_set_bio( ssl, sbio, sbio );
+  
+  if (SSL_connect( ssl ) <= 0) {
+    fprintf(stderr, "SSL Connect error.\n");
+    exit(-1);
+  }
+
+  peer = SSL_get_peer_certificate( ssl );
+
+  // X509_print_fp( stdout );
+  // X509_digest( &peer, EVP_sha() , digest, &len );
+
+  //X509_digest( peer, EVP_md5(), digest, &len );
+  
+  X509_digest( peer, EVP_sha(), digest, &len );
+
+  for (i = 0; i < len; i++) {
+    sprintf( digestHex + (i * 2), "%02x", (unsigned int) digest[i] );
+  }
+
+  if (debug) {
+    printf("ACL's  cert digest: %s\n"
+	   "Server cert digest: %s\n",
+	   certString, 
+	   digestHex );
+  }
+
+  if (0 != strcmp( certString, digestHex )) {
+    fprintf(stderr, 
+	    "Server does not have certificate described in ACL:\n"
+	    "ACL's  cert digest: %s\n" 
+	    "Server cert digest: %s\n"
+	    "Possible man-in-the-middle attack. Aborting.\n\n",
+	    certString,
+	    digestHex );
+
+    exit(-1);
+  }
+}
+
+
+int writeSSL( void * data, int size )
+{
+  return SSL_write( ssl, data, size );
+}
+
+int readSSL( void * data, int size )
+{
+  return SSL_read( ssl, data, size );
+}
+
+#endif /* WITHSSL */
