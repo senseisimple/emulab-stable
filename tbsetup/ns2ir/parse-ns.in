@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -264,7 +264,7 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 	my ($port,$ip) = split(":", $ipinfo);
 	my ($a,$b,$c,$d) = ($ip =~ /(\d+).(\d+).(\d+).(\d+)/);
 
-	if ($a eq "1" && $b eq "1") {
+	if ($a eq "69" && $b eq "69") {
 	    my $net = inet_ntoa(inet_aton($WANETMASK) & inet_aton($ip));
 		
 	    if (! defined($subnetmap{$net})) {

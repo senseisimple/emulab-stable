@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -888,7 +888,7 @@ Simulator instproc get_subnet_remote {} {
     }
     set subnet $wa_subnet_counter
     incr wa_subnet_counter
-    return "1.1.$subnet.0"
+    return "69.69.$subnet.0"
 }
 
 # use_subnet
