@@ -841,6 +841,15 @@ sub EventSend(@) {
 }
 
 #
+# After a fork, undef the handle to the event system so that we form a
+# a new connection in the child. Do not disconnect from the child; I have
+# no idea what that will do to the parent connection.
+#
+sub EventFork() {
+    $event::EventSendHandle = undef;
+}
+
+#
 # When we exit, unregister with the event system if we're connected
 #
 END {
@@ -852,6 +861,6 @@ END {
 }
 
 push @EXPORT, qw(event_subscribe event_poll event_poll_blocking EventSend
-	EventSendFatal EventSendWarn);
+	EventSendFatal EventSendWarn EventFork);
 1;
 
