@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+
+# This scripts takes a DB and a select statement and dumps the
+# results of the table in a format that can easily be inserted into
+# atest script for use with tb_compare.
+
+use DBI;
+
+if ($#ARGV != 1) {
+    print STDERR "Syntax: $0 <db> <query>\n";
+    exit(1);
+}
+
+($db,$query) = @ARGV;
+
+$dbh = DBI->connect("DBI:mysql:database=$db;host=localhost") || 
+	die "Could not connect to DB.\n";
+$sth = $dbh->prepare($query);
+$sth->execute;
+
+print "\@result = (\n";
+while (@row = $sth->fetchrow_array) {
+    print "[\"" . $row[0] . "\"";
+    foreach $element (@row[1..$#row]) {
+	print ",\"$element\""
+    }
+    print "\],\n";
+}
+print ");\n";
