@@ -2617,10 +2617,9 @@ COMMAND_PROTOTYPE(dorouting)
 	 */
 	res = mydb_query("select dst,dst_type,dst_mask,nexthop,cost "
 			 "from virt_routes as vi "
-			 "left join reserved as r on r.vname=vi.vname "
-			 "where r.node_id='%s' and "
+			 "where vi.vname='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
-			 5, reqp->nodeid, reqp->pid, reqp->eid);
+			 5, reqp->nickname, reqp->pid, reqp->eid);
 	
 	if (!res) {
 		error("ROUTES: %s: DB Error getting manual routes!\n",
@@ -2773,13 +2772,12 @@ COMMAND_PROTOTYPE(dotrafgens)
 	}
 
 	res = mydb_query("select vi.vname,role,proto,"
-			 "vnode,port,ip,target_vnode,target_port,target_ip, "
-			 "generator "
-			 "from virt_trafgens as vi "
-			 "left join reserved as r on r.vname=vi.vnode "
-			 "where r.node_id='%s' and "
+			 "  vnode,port,ip,target_vnode,target_port,target_ip, "
+			 "  generator "
+			 " from virt_trafgens as vi "
+			 "where vi.vnode='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
-			 10, reqp->nodeid, reqp->pid, reqp->eid);
+			 10, reqp->nickname, reqp->pid, reqp->eid);
 
 	if (!res) {
 		error("TRAFGENS: %s: DB Error getting virt_trafgens\n",
@@ -2847,10 +2845,9 @@ COMMAND_PROTOTYPE(donseconfigs)
 	}
 
 	res = mydb_query("select nseconfig from nseconfigs as nse "
-			 "left join reserved as r on r.vname=nse.vname "
-			 "where r.node_id='%s' and "
+			 "where nse.vname='%s' and "
 			 " nse.pid='%s' and nse.eid='%s'",
-			 1, reqp->nodeid, reqp->pid, reqp->eid);
+			 1, reqp->nickname, reqp->pid, reqp->eid);
 
 	if (!res) {
 		error("NSECONFIGS: %s: DB Error getting nseconfigs\n",
