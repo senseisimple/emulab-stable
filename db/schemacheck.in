@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+use strict;
+
+#
+# schemacheck - Make sure that the scehma in the currently-running database
+# matches the one in the checked-out source. Exits with value 1 if the two
+# differ, 0 if they do not, and -1 if some error (such as the mysql server is
+# not running, or the database does not exist) prevents us from telling if
+# they differ or not
+#
+
+#
+# Configure variables
+#
+my $testbed_srcdir = "@top_srcdir@";
+my $DBNAME         = "@TBDBNAME@";
+
+my $master_schema = "$testbed_srcdir/sql/database-create.sql";
+my $schemadiff = "$testbed_srcdir/utils/schemadiff";
+
+#
+# XXX: Requires that mysqldump be in caller's $PATH - probably an OK
+# assumption, but maybe not always
+#
+my $mysqldump = "mysqldump $DBNAME";
+
+#
+# We use Mysql module instead of the tesbed libraries, so that we can get
+# a more precise feel for what the error is.
+#
+use Mysql;
+
+#
+# Check to see if the mysqld is running by trying to connect to it.
+#
+my $dbh = Mysql->connect(undef,undef,undef,undef);
+if (!$dbh) {
+    fatal("Unable to connect to mysqld - Either it's not running or \n" .
+    	  "permission was denied.\n");
+}
+
+#
+# Check to see if the database exists
+#
+my @dbs = $dbh->listdbs();
+if (! grep (/^$DBNAME$/,@dbs)) {
+    fatal("Database $DBNAME does not exist in the running database\n");
+}
+undef $dbh;
+
+#
+# Make sure we can write the temporary file
+#
+my $db_schema = "/tmp/schemacheck.$$";
+open(SCHEMAFILE,">$db_schema") or
+    fatal("Unable to write to temporary file $db_schema: $!\n");
+close(SCHEMAFILE);
+
+#
+# Stick the output of mysqldump into a file
+#
+system "$mysqldump 2> /dev/null > $db_schema";
+
+#
+# ... and compare it to the schema from the source
+#
+my $diff = (system("$schemadiff -q $db_schema $master_schema") >> 8);
+unlink($db_schema);
+
+if ($diff) {
+
+    print << "EOSTR";
+
+The schema from $master_schema differs from
+the running database. As a safety measure, you will not be able to install
+until this is resolved.
+
+If you are a user of the emulab software outside of Utah, this is probably
+because your database was created for an older version of the emulab software.
+Contact emulab-ops\@emulab.net for help in updating your database.
+
+If you're a developer at Utah, this is probably because you (or someone else)
+forgot to update sql/database-create.sql .
+
+EOSTR
+
+    exit(1);
+} else {
+    exit(0);
+}
+
+sub fatal(@) {
+
+    # Offset the text with a few blank lines, so it doesn't get lost in the
+    # make messages
+    warn "\n\n";
+    warn "*** schemacheck - Unable to check database schema:\n";
+    warn @_;
+    warn "\n\n";
+
+    exit(-1);
+
+}

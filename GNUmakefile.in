@@ -21,7 +21,13 @@ install:
 #
 # For installation on boss node (okay, paper).
 # 
-boss-install:	install-subdirs install-mkdirs 
+boss-install:	install-schemacheck install-subdirs install-mkdirs 
+	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
+
+#
+# Same target, with the install-schemacheck dependency omitted
+# 
+boss-install-force:	install-subdirs install-mkdirs 
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
@@ -57,6 +63,19 @@ tipserv-install:
 	@$(MAKE) -C tip tipserv-install
 	@$(MAKE) -C capture tipserv-install
 	@$(MAKE) -C tbsetup tipserv-install
+
+#
+# A check to see if this is a 'real' install. Kinda hacky, but as far as I can
+# tell, you can't put ifeq()'s inside of targets
+#
+ifeq ($(TBROOT),/usr/testbed)
+SCHEMACHECK= perl $(OBJDIR)/db/schemacheck
+else
+SCHEMACHECK= @echo "Skipping schema check, since prefix isn't /usr/testbed"
+endif
+install-schemacheck:
+	@echo "Checking DB schema..."
+	$(SCHEMACHECK)
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs
