@@ -38,12 +38,12 @@ if ($EUID != 0) {
 }
 # XXX Hacky!
 if ($TB ne "/usr/testbed") {
-#    print STDERR "*** $0:\n".
-#	         "    Wrong version. Maybe its a development version?\n";
+    print STDERR "*** $0:\n".
+	         "    Wrong version. Maybe its a development version?\n";
     #
     # Let experiment continue setting up.
     # 
-#    exit(0);
+    exit(0);
 }
 
 # un-taint path

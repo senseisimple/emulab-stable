@@ -32,8 +32,8 @@ if ($EUID != 0) {
 }
 # XXX Hacky!
 if ($TB ne "/usr/testbed") {
-#    die("*** $0:\n".
-#	"    Wrong version. Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Wrong version. Maybe its a development version?\n");
 }
 
 # un-taint path
