@@ -245,21 +245,6 @@ foreach my $node (@nodes) {
     my $node_eid;
     my $node_vname;
 
-    #
-    # We need the vname for the node so that we can update the virt_nodes
-    # table. This implies that we cannot update the virt_nodes unless the
-    # experiment is swapped in (so we can map from phys node name to virt
-    # node name). At some point, maybe we want to provide a way to change
-    # the params of a swapped out experiment by having the user specify
-    # the vname?
-    #
-    if (! NodeidToExp($node, \$node_pid, \$node_eid, \$node_vname)) {
-	print("*** $0:\n".
-	      "    Node $node is not a member of a swapped in experiment!\n");
-	$errors++;
-	next;
-    }
-    
     if (defined($physnodes_updatestr)) {
 	if ($UID && !$IsAdmin &&
 	    ! TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, $node)) {
@@ -272,6 +257,21 @@ foreach my $node (@nodes) {
 	}
 	DBQueryFatal("update nodes set $physnodes_updatestr ".
 		     "where node_id='$node'");
+    }
+
+    #
+    # We need the vname for the node so that we can update the virt_nodes
+    # table. This implies that we cannot update the virt_nodes unless the
+    # experiment is swapped in (so we can map from phys node name to virt
+    # node name). At some point, maybe we want to provide a way to change
+    # the params of a swapped out experiment by having the user specify
+    # the vname?
+    #
+    if (! NodeidToExp($node, \$node_pid, \$node_eid, \$node_vname)) {
+	print("*** $0:\n".
+	      "    Node $node is not a member of a swapped in experiment!\n".
+	      "    Cannot set its virtual node parameters. Skipping ...\n");
+	next;
     }
 
     if (defined($node_vname) && defined($virtnodes_updatestr)) {
