@@ -50,6 +50,11 @@ if (!$address) {
 # Grab the filename to give to frisbee
 my $filename = &get_filename($imageid);
 
+# Make sure that the user can read the image file or bomb out right now.
+if (! -r $filename) {
+	die "You don't have permission to read the image file for imageid $imageid: $filename\n";
+}
+
 # Run in the background
 if (TBBackGround($LOGFILE)) {
     exit(0);
