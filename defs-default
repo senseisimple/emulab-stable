@@ -8,3 +8,5 @@ TBDBNAME=tbdb
 WWWDEFS=default
 TBOPSEMAIL='Testbed Operations <testbed-ops@flux.cs.utah.edu>'
 TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=2

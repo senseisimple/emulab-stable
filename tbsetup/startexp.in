@@ -36,7 +36,7 @@ my $TBINFO   = "$TB/expinfo";
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
-my $cleanme  = 0;
+my $estate   = 0;
 my $batch    = 0;
 my $logname  = 0;
 my $errorstat= -1;
@@ -93,10 +93,10 @@ if (defined($options{"b"})) {
 #
 # Untaint the arguments.
 #
-if ($pid =~ /^([-\@\w.]+)$/) {
+if ($pid =~ /^([-\@\w]+)$/) {
     $pid = $1;
 }
-if ($eid =~ /^([-\@\w.]+)$/) {
+if ($eid =~ /^([-\@\w]+)$/) {
     $eid = $1;
 }
 # Note different taint check (allow /).
@@ -124,14 +124,16 @@ use Mysql;
 my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 #
-# Check to make sure the experiment record exists. To prevent mishap,
-# also check to make sure the experiment is in the "not ready" state
-# to prevent this record from being used to configure two sets of nodes!
-# This could happen if the user invokes this script directly, and that
-# is eventually what I want anyway (instead of users using the tb scripts). 
+# Check to make sure the experiment record exists. The experiment must
+# be in the "new" state when using this interface. Th prevents the same
+# pid/eid from being used twice, as could happen by mistake if the user
+# invoked this directly without being clueful. The goal is to eventually
+# script experiment creation and termination completely.
+#
+# Note that tbprerun is going verify and change this state.
 #
 $query_result =
-    $DB->query("SELECT expt_ready FROM experiments ".
+    $DB->query("SELECT state FROM experiments ".
 	       "WHERE eid='$eid' and pid='$pid'");
 
 if (! $query_result) {
@@ -142,8 +144,8 @@ if ($query_result->numrows < 1) {
     exit(1);
 }
 @row = $query_result->fetchrow_array();
-if ($row[0]) {
-    die("Experiment $pid/$eid is already configured!\n".
+if ($row[0] ne "new") {
+    die("Experiment $pid/$eid is already configured (or still configuring)!\n".
 	"You are not allowed to reconfigure experiments unless you\n".
 	"first terminate the existing experiment via the web interface.\n");
 }
@@ -235,21 +237,21 @@ if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
 # Run the various scripts. We want to propogate the error from tbprerun
 # and tbrun back out, hence the bogus looking errorstat variable.
 #
-#if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
-if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
+if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!\n");
 }
 # So fatal errors run tbend.
-$cleanme = 1;
+$estate = "prerunned";
 
-#if (system("$tbdir/tbrun -nologfile $pid $eid $irfile") != 0) {
-if (system("$tbdir/tbrun $pid $eid $irfile") != 0) {
+if (system("$tbdir/tbswapin -nologfile $pid $eid") != 0) {
     $errorstat = $? >> 8;
-    fatal("tbrun failed!\n");
+    fatal("tbswapin failed!\n");
 }
+# So fatal errors run tbswapout,
+$estate = "active";
 
-if (system("$tbdir/tbreport -v $pid $eid $irfile 2>&1 > $repfile") != 0) {
+if (system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile") != 0) {
     fatal("tbreport failed!\n");
 }
 
@@ -257,22 +259,12 @@ if (system("$tbdir/tbreport -v $pid $eid $irfile 2>&1 > $repfile") != 0) {
 # In batchmode, send the report to stdout for the batch daemon.
 #
 if ($batch) {
-    system("$tbdir/tbreport -v $pid $eid $irfile");
+    system("$tbdir/tbreport -v $pid $eid");
     print STDOUT "\n\n";
 }
 
 #
-# Done! Set the ready bit in the experiment record.
-# 
-$query_result = $DB->query("UPDATE experiments SET expt_ready=1 ".
-			   "WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result) {
-    fatal("DB Error setting ready bit in experiment record for $pid/$eid\n");
-}
-
-#
-# Grab the entire experiment record for the mail message below.
+# Grab the experiment info for the mail message below.
 #
 $query_result =
     $DB->query("SELECT expt_name,expt_created,expt_expires from experiments ".
@@ -297,7 +289,7 @@ if ($infodir =~ /^([-\@\w.]+)$/) {
     $infodir = $1;
 
     if (mkdir("$TBINFO/$infodir", 0770)) {
-	system("cp $nsfile $irfile $TBINFO/$infodir");
+	system("cp $nsfile $TBINFO/$infodir");
 	system("cp *.ptop *.top $TBINFO/$infodir");
 	system("cp assign.log $TBINFO/$infodir");
 	system("cp $logname $TBINFO/$infodir/$eid.log");
@@ -383,7 +375,7 @@ sub fatal()
     #
     # If we got far enough to allocate nodes, must run tbend.
     #
-    if ($cleanme) {
+    if ($estate) {
 	tbendit();
     }
 
@@ -475,10 +467,16 @@ sub fatal()
 # 
 sub tbendit()
 {
-	print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";
-	if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
-	    print STDOUT "tbend failed!\n";
+    if ($estate eq "active") {
+	print "Running tbswapout with arguments: -nologfile $pid $eid\n";
+	if (system("$tbdir/tbswapout -nologfile $pid $eid") != 0) {
+	    print "tbswapout failed!\n";
 	}
+    }
+    print "Running tbend with arguments: -nologfile -force $pid $eid\n";
+    if (system("$tbdir/tbend -nologfile -force $pid $eid") != 0) {
+	print "tbend failed!\n";
+    }
 }
 
 #

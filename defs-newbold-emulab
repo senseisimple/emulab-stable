@@ -5,5 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=newbold-emulab
 TBOPSEMAIL=newbold@cs.utah.edu
 TBLOGSEMAIL=newbold@cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=2
 
 

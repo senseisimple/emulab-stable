@@ -90,7 +90,7 @@ if ($speclocal) {
     # for the file before going to ground, so the user will get immediate
     # feedback if the filename is bogus.
     #
-    # Do not allow anything outside of /users or /proj. I don't think there
+    # Do not allow anything outside of /users or /proj. I do not think there
     # is a security worry, but good to enforce it anyway.
     #
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
@@ -168,7 +168,7 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 $gid = $row[0];
 
 #
-# We need the user's name and email.
+# We need the users name and email.
 #
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT usr_name,usr_email from users where uid=\"$uid\"");
@@ -179,14 +179,9 @@ $user_name = $row[0];
 $user_email = $row[1];
 
 #
-# Set the experiment ready bit to 1 if its a shell experiment.
+# Set the experiment state bit to "new".
 #
-if ($nonsfile) {
-    $expt_ready = 1;
-}
-else {
-    $expt_ready = 0;
-}
+$expt_state = "new";
 
 #
 # At this point enter the exp_id into the database so that it shows up as
@@ -196,9 +191,9 @@ else {
 $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end, expt_ready) ".
+        "expt_head_uid, expt_start, expt_end, state) ".
         "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end', '$expt_ready')");
+        "'$exp_name', '$uid', '$exp_start', '$exp_end', '$expt_state')");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);

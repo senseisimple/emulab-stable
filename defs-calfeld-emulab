@@ -8,3 +8,6 @@ TBDBNAME=tbdb
 WWWDEFS=default
 TBOPSEMAIL=calfeld@flux.cs.utah.edu
 TBLOGSEMAIL=calfeld@flux.cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=2
+

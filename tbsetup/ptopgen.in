@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+
+use DBI;
+my $TBDB = "@TBDBNAME@";
+my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
+
+# Find available nodes
+$sth = $dbh->prepare("select a.node_id,a.type from" .
+		     " nodes as a left join reserved as b" .
+		     " on a.node_id=b.node_id" .
+		     " where b.node_id is null" .
+		     " and a.type != \"cisco\" and a.type != \"APC\"");
+$sth->execute;
+while (($node,$type) = $sth->fetchrow_array) {
+    # Shark hack
+    if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
+	if ($number == 1) {
+	    $nodes{"sh$shelf"} = "shark-shelf";
+	}
+    } else {
+	$nodes{$node} = $type;
+	$nodetypes{$type} = 1;
+    }
+}
+$sth->finish;
+
+foreach $type (keys(%nodetypes)) {
+    $sth = $dbh->prepare("SELECT control_iface,delay_capacity" .
+			 " from node_types where type = \"$type\"");
+    $sth->execute;
+    @row = $sth->fetchrow_array;
+    $nodetypes{$type} = [@row];
+    $sth->finish;
+}
+
+$sth = $dbh->prepare("SELECT type,max_speed from interface_types");
+$sth->execute;
+while (($type,$bw) = $sth->fetchrow_array) {
+    $itypes{$type} = $bw;
+}
+$sth->finish;
+
+print "node cisco switch:1\n";
+
+foreach $node (keys(%nodes)) {
+    if ($node =~ /^sh/) {
+	print "node $node shark-shelf:1\n";
+	print "link link-$node $node:$node/eth0 cisco 100 1\n";
+    } else {
+	$sth = $dbh->prepare("SELECT iface,interface_type from interfaces" .
+			     " where node_id = \"$node\"");
+	$sth->execute;
+	$text = "node $node $nodes{$node}:1";
+	($control_net,$delay_capacity) = @{$nodetypes{$nodes{$node}}};
+	if ($delay_capacity > 0) {
+	    $text .= " delay:$delay_capacity";
+	}
+	print "$text\n";
+	while (($interface,$itype) = $sth->fetchrow_array) {
+	    if ($interface ne $control_net) {
+		print "link link-$node $node:$node/$interface cisco $itypes{$itype} 1\n";
+	    }
+	}
+	$sth->finish;
+    }
+}
+
+# Add a bunch of LANs
+for ($i = 0;$i <= 100;$i++) {
+    print "node lan$i lan:1\n";
+    print "link link-lan$i lan${i}:lan$i cisco 100000 1000\n";
+}
+
+

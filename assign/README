@@ -62,6 +62,9 @@ node <node> <type> [<desires>]
 		A weight >= 1.0 will also result in a violation if
 		not filled.
 
+OR
+
+link <src> <dst> <bw>
 
 features and desires
 --------------------

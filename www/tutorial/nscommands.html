@@ -5,17 +5,17 @@
 
 <h2>Contents</h2>
 <ul>
-  <li><a href=#INTRO>Introduction</a>
-  <li><a href=#TCL>TCL, NS, and node names</a>
-  <li><a href=#HARD>Hardware Commands</a>
-  <li><a href=#IP>IP Commands</a>
-  <li><a href=#OS>OS Commands</a>
-  <li><a href=#LOSS>Link Loss Commands</a>
+  <li><a href="#INTRO">Introduction</a>
+  <li><a href="#TCL">TCL, NS, and node names</a>
+  <li><a href="#HARD">Hardware Commands</a>
+  <li><a href="#IP">IP Commands</a>
+  <li><a href="#OS">OS Commands</a>
+  <li><a href="#LOSS">Link Loss Commands</a>
 </ul>
 
 <hr>
 
-<a name=INTRO></a><h3>Introduction</h3>
+<a name="INTRO"></a><h3>Introduction</h3>
 
 <p>In order to use the testbed specific commands you must include the
 following line near the top of your NS file (before any testbed
@@ -26,13 +26,14 @@ source tb_compat.tcl
 </pre>
 
 <p>If you wish to use your file under NS you can use download this <a
-href=tb_compat.tcl>tb_compat.tcl</a>.  Place it in the same directory
-as your NS file.  When run in this way under NS the testbed commands
-will have no effect, but NS will be able to parse your file.
+href=http://www.emulab.net/tutorial/tb_compat.tcl>tb_compat.tcl</a>.
+Place it in the same directory as your NS file.  When run in this way
+under NS the testbed commands will have no effect, but NS will be able
+to parse your file.
 
 <hr>
 
-<a name=TCL></a><h3>TCL, NS, and node names</h3>
+<a name="TCL"></a><h3>TCL, NS, and node names</h3>
 
 In your file you will be creating nodes with something like:
 
@@ -78,10 +79,13 @@ for {set i 0} {$i < 4} {incr i} {
 }
 </pre>
 
-<p>In this case the names of the node will be <code>nodes_0_</code>,
-<code>nodes_1_</code>, <code>nodes_2_</code>, <code>nodes_3_</code>.
-This slightly ugly syntax comes is to avoid any problems that
-<code>()</code> may cause in later scripts.
+<p>In this case the names of the node will be <code>nodes-0</code>,
+<code>nodes-1</code>, <code>nodes-2</code>, <code>nodes-3</code>. (In
+other words, the <code>(</code> character is replaced with
+<code>-</code>, and <code>)</code> is removed.)  This slightly
+different syntax comes is to avoid any problems that <code>()</code>
+may cause later in the process. For example, the <code>()</code>
+characters cannot appear in DNS entries.
 
 <p>As a final note, everything said above for nodes applies equally to
 lans.  I.e.:
@@ -89,7 +93,6 @@ lans.  I.e.:
 <pre>
 set lan0 [$ns make-lan "$node0 $node1" 100Mb .1ms]
 tb-set-lan-loss $lan0 .02
-$ns duplex-link $lan0 $node3 100Mb 100ms DropTail
 </pre>
 
 <p>(Again, note the <code>$</code>'s)
@@ -107,7 +110,7 @@ tb-set-ip-link $node0 $link1 192.0.0.128
 
 <hr>
 
-<a name=HARD></a><h3>Hardware Commands</h3>
+<a name="HARD"></a><h3>Hardware Commands</h3>
 
 <h4>tb-set-hardware</h4>
 
@@ -133,19 +136,21 @@ supported types.  <code>pc</code> is the default type.
 
 <hr>
 
-<a name=IP></a><h3>IP Commands</h3>
+<a name="IP"></a><h3>IP Commands</h3>
 
-<p>Each node will be assigned an IP address.  The following commands
-will allow you to explicitly set those IP addresses.  IP addresses
-will be automatically generated for all nodes that you do not
-explicitly set IP addresses.
+<p>Each node will be assigned an IP address for each interface that is
+in use.  The following commands will allow you to explicitly set those
+IP addresses.  IP addresses will be automatically generated for all
+nodes that you do not explicitly set IP addresses.
 
 <p>In the common case the IP addresses on either side of a link must
 be in the same subnet.  Likewise, all IP addresses on a LAN should be
-in the same subnet.  Automatically generated IP addresses will conform
-to this requirement.  If part of a link or lan is explicitly specified
-with the commands below then the remainder will be automatically
-generated under the same subnet.
+in the same subnet. Generally the same subnet should not be used for
+more than one link or LAN in a given experiment, nor should one node
+have multiple interfaces in the same subnet. Automatically generated
+IP addresses will conform to these requirements.  If part of a link or
+lan is explicitly specified with the commands below then the remainder
+will be automatically generated under the same subnet.
 
 <p>IP address assignment is deterministic and tries to fill lower IP's
 first, starting at 2.  Except in the partial specification case (see
@@ -252,7 +257,7 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
 
 <hr>
 
-<a name=OS></a><h3>OS Commands</h3>
+<a name="OS"></a><h3>OS Commands</h3>
 
 <h4>tb-set-node-os</h4>
 
@@ -271,15 +276,17 @@ tb-set-node-os $node1 MY_OS
 <p>Notes:
 
 <ul>
-  <li>The OS ID can either by one of the standard OS's we provide or
-      a custom OS ID, created via the web interface.
+  <li>The OSID can either by one of the standard OS's we provide or
+      a custom OSID, created via the web interface.
   <li>If no OS is specified for a node a default OS is chosen based on
       the nodes type.  This is currently RHL62-STD for PCs.
   <li>The currently available standard OS types are: FBSD40-STD,
       RHL62-STD, NBSD14-STD (should not be used on PC nodes), and
-      NETBOOT.  NETBOOT is the oskit netboot kernel for loading other
-      operating systems over the network.
+      NETBOOT-STD (oskit netboot kernel for loading other
+      operating systems over the network).
 </ul>
+
+<hr>
 
 <h4>tb-set-node-rpms</h4>
 
@@ -293,8 +300,13 @@ tb-set-node-rpms $node0 rpm1 rpm2 rpm3
 
 <ul>
   <li>This command sets which rpms are to be installed on the node.
-  <li>Not fully supported.
+  <li>This command sets which rpms are to be installed on the node
+  when it first boots after being assigned to an experiment. 
+  <li>See the <a href="tutorial/tutorial.php3#RPMS">tutorial</a> for more
+  information.
 </ul>
+
+<hr>
 
 <h4>tb-set-node-startup</h4>
 
@@ -306,9 +318,12 @@ tb-set-node-startup $node0 {mystart.sh -a}
 
 <p>Notes:
 <ul>
-  <li>This sets a script to run on node boot.
-  <li>Not fully supported.
+  <li>Specify a script or program to be run when the node is booted.
+  <li>See the <a href="tutorial/tutorial.php3#Startupcmd">tutorial</a> for more
+  information.
 </ul>
+
+<hr>
 
 <h4>tb-set-node-cmdline</h4>
 
@@ -318,23 +333,44 @@ tb-set-node-cmdline <i>node</i> <i>cmdline</i>
 tb-set-node-cmdline $node0 {???}
 </pre>
 
+<p>Notes:
 <ul>
-  <li>Ask Mike
+  <li>Set the command line, to be passed to the <i>kernel<i> when it
+  is booted.
+  <li>Currently, this is supported on OSKit kernels only. 
 </ul>
-      
+
 <hr>
 
-<a name=LOSS></a><h3>Link Loss Commands</h3>
+<h4>tb-set-node-tarfiles</h4>
 
-<p>The NS syntax for creating a link:
+<pre>
+tb-set-node-tarfiles <i>node</i> <i>dir</i> <i>tarfile</i>
+
+tb-set-node-tarfiles $node0 /bin mybinmods.tar /sbin mysbinmods.tar
+</pre>
+
+<p>Notes:
+<ul>
+  <li>This installs tarfiles in specified directories when the node
+  first boots after being assigned to an experiment. 
+  <li>Each tar file is installed just one. Tarfiles that have been
+  loaded, are not reloaded after subsequent reboots.
+</ul>
+	
+<hr>
+
+<a name="LOSS"></a><h3>Link Loss Commands</h3>
+
+<p>This is the NS syntax for creating a link:
 
 <pre>
 $ns duplex-link $node1 $node2 100Mb 150ms DropTail
 </pre>
 
-<p>Does not allow for specifying link loss rates.  Emulab does,
-however, support link loss.  The following commands can be used to
-specify link loss rates.
+<p>Note that it does not allow for specifying link loss rates.  Emulab
+does, however, support link loss.  The following commands can be used
+to specify link loss rates.
 
 <h4>tb-set-link-loss</h4>
 
@@ -362,6 +398,8 @@ tb-set-link-loss $link1 0.02
       nodes.  Use the second syntax for this case.
 </ul>
 
+<hr>
+
 <h4>tb-set-lan-loss</h4>
 
 <pre>
@@ -377,9 +415,124 @@ tb-set-lan-loss $lan1 0.3
 
 <p>Notes:
 <ul>
-  <li>This command sets the loss rate for the entire LAN.  If you want
-      to have a different loss rate for a node in the LAN you'll need
-      to link the node to the lan (rather than include in the
-      <code>make-lan</code> command) and set the loss rate of the link
-      appropriately (contact testbed-ops).
+  <li>This command sets the loss rate for the entire LAN.
 </ul>
+
+<h4>tb-set-node-lan-delay</h4>
+
+<pre>
+tb-set-node-lan-delay <i>node</i> <i>lan</i> <i>delay</i>
+
+tb-set-node-lan-delay $lan0 $node0 40ms
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node we are modifying the delay for.
+  <dt><i>lan</i> - Which LAN the node is in that we are affecting.
+  <dt><i>delay</i> - The new node to switch delay (see below).
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This commands changes to the delay between the node and the
+      switch of the LAN.  This is only half of the trip a packet must
+      take.  The packet will also traverse the switch to the
+      destination node, possibly incurring additional latency from any
+      delay parameters there.
+  <li>If this command is not used to overwrite the delay, then the
+      delay for a given node to switch link is taken as one half of
+      the delay passed to <code>make-lan</code>.  Thus in a LAN where
+      no <code>tb-set-node-delay</code> calls are made the node to
+      node latency will be the latency passed to
+      <code>make-lan</code>.
+  <li>The behavior of this command is not defined when used with nodes
+      that are in the same LAN multiple times.
+</ul>
+
+<h4>tb-set-node-lan-bandwidth</h4>
+
+<pre>
+tb-set-node-lan-bandwidth <i>node</i> <i>lan</i> <i>bandwidth</i>
+
+tb-set-node-lan-bandwidth $lan0 $node0 20Mb
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node we are modifying the bandwidth for.
+  <dt><i>lan</i> - Which LAN the node is in that we are affecting.
+  <dt><i>bandwidth</i> - The new node to switch bandwidth (see below).
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This commands changes to the bandwidth between the node and the
+      switch of the LAN.  This is only half of the trip a packet must
+      take.  The packet will also traverse the switch to the
+      destination node which may have a lower bandwidth.
+  <li>If this command is not used to overwrite the bandwidth, then the
+      bandwidth for a given node to switch link is taken directly from
+      the bandwidth passed to <code>make-lan</code>.
+  <li>The behavior of this command is not defined when used with nodes
+      that are in the same LAN multiple times.
+</ul>
+
+<h4>tb-set-node-lan-loss</h4>
+
+<pre>
+tb-set-node-lan-loss <i>node</i> <i>lan</i> <i>loss</i>
+
+tb-set-node-lan-loss $lan0 $node0 0.05
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node we are modifying the loss for.
+  <dt><i>lan</i> - Which LAN the node is in that we are affecting.
+  <dt><i>loss</i> - The new node to switch loss (see below).
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This commands changes to the loss between the node and the
+      switch of the LAN.  This is only half of the trip a packet must
+      take.  The packet will also traverse the switch to the
+      destination node which may also have a loss chance.  Thus for
+      packet going to switch with loss chance <var>A</var> and then
+      going on the destination with loss chance <var>B</var> the node
+      to node loss chance is
+      <code>(1-(1-<var>A</var>)(1-<var>B</var>))</code>.
+  <li>If this command is not used to overwrite the loss, then the
+      loss for a given node to switch link is taken from the loss rate
+      passed to the <code>make-lan<code> command.  If a loss rate of
+      <var>L</var> is passed to <code>make-lan<code> then the node to
+      switch loss rate for each node is set to
+      <code>(1-sqrt(1-<var>L</var>))</code>.  Thus as each packet will
+      have two such chances to be lost the node to loss rate comes out
+      as the desired <var>L</var>.
+  <li>The behavior of this command is not defined when used with nodes
+      that are in the same LAN multiple times.
+</ul>
+
+<h4>tb-set-node-lan-params</h4>
+
+<pre>
+tb-set-node-lan-params <i>node</i> <i>lan</i> <i>delay</i> <i>bandwidth</i> <i>loss</i>
+
+tb-set-node-lan-params $lan0 $node0 40ms 20Mb 0.05
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node we are modifying the loss for.
+  <dt><i>lan</i> - Which LAN the node is in that we are affecting.
+  <dt><i>delay</i> - The new node to switch delay.
+  <dt><i>bandwidth</i> - The new node to switch bandwidth.
+  <dt><i>loss</i> - The new node to switch loss.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command is exactly equivalent to calling each of the above
+      three commands appropriately.  See above for more information.
+  </li>
+</ul>
+
+ 

@@ -18,6 +18,8 @@ AC_SUBST(TBDBNAME)
 AC_SUBST(WWWDEFS)
 AC_SUBST(TBOPSEMAIL)
 AC_SUBST(TBLOGSEMAIL)
+AC_SUBST(DELAYCAPACITY)
+AC_SUBST(IPBASE)
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -113,14 +115,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/batchexp tbsetup/killbatchexp tbsetup/batch_daemon \
 	tbsetup/webbatchexp tbsetup/webkillbatchexp \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
-	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
-	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
-	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
+	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
-	tbsetup/savevlans tbsetup/ir/extract_tb \
-	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
-	tbsetup/named_setup tbsetup/exports_setup \
-	tbsetup/checkpass/GNUmakefile \
+	tbsetup/ns2ir/sim.tcl tbsetup/savevlans \
+	tbsetup/tbprerun tbsetup/tbswapin tbsetup/tbswapout tbsetup/tbend \
+	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
+	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \

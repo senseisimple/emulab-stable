@@ -11,7 +11,7 @@ include $(OBJDIR)/Makeconf
 BIN_SCRIPTS	= mac2if nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists
-LIBEXEC_SCRIPTS = ptopgen
+LIBEXEC_SCRIPTS = 
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic for mere users.

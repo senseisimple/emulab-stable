@@ -25,7 +25,7 @@ require libdb;
 $| = 1; 
 
 my $SSH		= "sshtb -n -q -l root plastic.emulab.net";
-my $PROG	= "$TB/sbin/console_setup.proxy";
+my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
 my $TBPID	= "flux";
 my $cmdargs     = "";
 my @row;

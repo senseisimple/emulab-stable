@@ -219,15 +219,7 @@ function SHOWEXP($pid, $eid) {
     $exp_end     = $exprow[expt_end];
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
-    $exp_ready   = $exprow[expt_ready];
-    $exp_term    = $exprow[expt_terminating];
-
-    if ($exp_ready)
-	$exp_status = "Ready";
-    elseif ($exp_term)
-	$exp_status = "Terminating";
-    else
-	$exp_status = "Configuring";
+    $exp_status  = $exprow[state];
 
     #
     # Generate the table.

@@ -1,0 +1,292 @@
+######################################################################
+# sim.tcl
+#
+# Defines the Simulator class.  For our purpose a Simulator is a
+# topology.  This contains a number nodes, lans, and links.  It
+# provides methods for the creation of these objects as well as
+# routines to locate the objects.  It also stores common state (such
+# as IP subnet usage).  Finally it defines the import 'run' method
+# which causes all remaining calculations to be done and updates the
+# DB state.
+#
+# Note: Although NS distinguishs between LANs and Links, we do not.
+# We merge both types of objects into a single one called LanLink.  
+# See lanlink.tcl and README for more information.
+######################################################################
+
+Class Simulator
+
+Simulator instproc init {args} {
+    # A counter for internal ids
+    $self set id_counter 0
+
+    # A counter for subnets.  This is the lowest unused subnet
+    # suffix.
+    $self set subnet_counter 1
+
+    # This is the prefix used to fill any unassigned IP addresses.
+    $self set subnet_base "@IPBASE@"
+
+    # The following are sets.  I.e. they map to no value, all
+    # we care about is membership.
+    $self instvar node_list;		# Indexed by node id
+    array set node_list {}
+    $self instvar lanlink_list;		# Indexed by lanlink id
+    array set lanlink_list {}
+    $self instvar subnets;		# Indexed by IP subnet
+    array set subnets {}
+
+    # link_map is indexed by <node1>:<node2> and contains the
+    # id of the lanlink connecting them.  In the case of
+    # multiple links between two nodes this contains
+    # the last one created.
+    $self instvar link_map
+    array set link_map {}
+}
+
+# node
+# This method adds a new node to the topology and returns the id
+# of the node.
+Simulator instproc node {args} {
+    var_import ::GLOBALS::verbose
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar node_list
+
+    if {$verbose && ($args != {})} {
+	puts stderr "Unsupported: Arguments for node: $args"
+    }
+    
+    set curnode n[incr id_counter]
+    Node $curnode $self
+    set node_list($curnode) {}
+    set last_class $curnode
+
+    return $curnode
+}
+
+# duplex-link <node1> <node2> <bandwidth> <delay> <type>
+# This adds a new link to the topology.  <bandwidth> can be in any
+# form accepted by parse_bw and <delay> in any form accepted by
+# parse_delay.  Currently only the type 'DropTail' is supported.
+Simulator instproc duplex-link {n1 n2 bw delay type args} {
+    var_import ::GLOBALS::verbose
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar lanlink_list
+    $self instvar link_map
+
+    if {$verbose && ($args != {})} {
+	puts stderr "Unsupported: Arguments for duplex-link: $args"
+    }
+    if {$verbose && ($type != "DropTail")} {
+	puts stderr "Unsupported: Link type $type, using DropTail"
+    }
+    set error 0
+    if {! [$n1 info class Node]} {
+	perror "duplex-link $n1 $n2: $n1 is not a node."
+	set error 1
+    }
+    if {! [$n2 info class Node]} {
+	perror "duplex-link $n1 $n2: $n2 is not a node."
+	set error 1
+    }
+    if {$error} {return}
+
+    set curlink l[incr id_counter]
+
+    # Convert bandwidth and delay
+    set rbw [parse_bw $bw]
+    set rdelay [parse_delay $delay]
+    
+    Link $curlink $self "$n1 $n2" $rbw $rdelay
+    set lanlink_list($curlink) {}
+    set link_map($n1:$n2) $curlink
+    set link_map($n2:$n1) $curlink
+
+    set last_class $curlink
+    return $curlink
+}
+
+# make-lan <nodelist> <bw> <delay>
+# This adds a new lan to the topology. <bandwidth> can be in any
+# form accepted by parse_bw and <delay> in any form accepted by
+# parse_delay.
+Simulator instproc make-lan {nodelist bw delay args} {
+    var_import ::GLOBALS::verbose
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar lanlink_list
+
+    if {$verbose && ($args != {})} {
+	puts stderr "Unsupported: Arguments for make-lan: $args"
+    }
+    
+    set curlan lan[incr id_counter]
+    
+    # Convert bandwidth and delay
+    set rbw [parse_bw $bw]
+    set rdelay [parse_delay $delay]
+    
+    Lan $curlan $self $nodelist $rbw $rdelay
+    set lanlink_list($curlan) {}
+    set last_class $curlan
+
+    return $curlan
+}
+
+# run
+# This method causes the fill_ips method to be invoked on all 
+# lanlinks and then, if not running in impotent mode, calls the
+# updatedb method on all nodes and lanlinks.  Invocation of this
+# method casues the 'ran' variable to be set to 1.
+Simulator instproc run {} {
+    $self instvar lanlink_list
+    $self instvar node_list
+    var_import ::GLOBALS::errors
+    var_import ::GLOBALS::irfile
+    var_import ::GLOBALS::ran
+    var_import ::GLOBALS::DB
+    var_import ::GLOBALS::impotent
+
+    # Fill out IPs
+    foreach obj [concat [array names lanlink_list]] {
+	$obj fill_ips
+    }
+
+    # Mark that a run statement exists
+    set ran 1
+
+    # Check node names.
+    foreach node [lsort [array names node_list]] {
+	if {! [regexp {^[-0-9A-Za-z]+$} $node]} {
+	    perror "Invalid node name: $node.  Can only contain \[-0-9A-Za-z\] due to DNS limitations."
+	}
+    }
+    foreach lan [lsort [array names lanlink_list]] {
+	if {! [regexp {^[-0-9A-Za-z]+$} $lan]} {
+	    perror "Invalid lan/link name: $lan.  Can only contain \[-0-9A-Za-z\] for symmetry with node DNS limitations."
+	}
+    }
+
+    # If any errors occur stop here.
+    if {$errors == 1} {return}
+
+    # If we are running in impotent mode we stop here
+    if {$impotent == 1} {return}
+    
+    # Update the DB
+    foreach node [lsort [array names node_list]] {
+	$node updatedb $DB
+    }
+    foreach lan [concat [array names lanlink_list]] {
+	$lan updatedb $DB
+    }
+}
+
+# attach-agent <node> <agent>
+# This creates an attachment between <node> and <agent>.
+Simulator instproc attach-agent {node agent} {
+    if {! [$agent info class Agent]} {
+	perror "$agent is not an Agent."
+	return
+    }
+    if {! [$node info class Node]} {
+	perror "$node is not a Node."
+	return
+    }
+    $agent set_node $node
+}
+
+# connect <src> <dst>
+# Connects two agents together.
+Simulator instproc connect {src dst} {
+    set error 0
+    if {! [$src info class Agent]} {
+	perror "$src is not an Agent."
+	set error 1
+    }
+    if {! [$dst info class Agent]} {
+	perror "$dst is not an Agent."
+	set error 1
+    }
+    if {$error} {return}
+    $src connect $dst
+    $dst connect $src
+}
+
+# unknown 
+# This is invoked whenever any method is called on the simulator
+# object that is not defined.  We interpret such a call to be a
+# request to create an object of that type.  We create display an
+# unsupported message and create a NullClass to fulfill the request.
+Simulator instproc unknown {m args} {
+    global ::GLOBALS::verbose
+    $self instvar id_counter
+    if {${::GLOBALS::verbose}} {
+	puts stderr "Unsupported: Object $m"
+    }
+    NullClass null[incr id_counter] $m
+}
+
+# rename_* <old> <new>
+# The following two procedures handle when an object is being renamed.
+# They update the internal datastructures to reflect the new name.
+Simulator instproc rename_lanlink {old new} {
+    $self instvar lanlink_list
+    $self instvar link_map
+
+    unset lanlink_list($old)
+    set lanlink_list($new) {}
+
+    # In the case of a link we need to update the link_map as well.
+    if {[$new info class] == "Link"} {
+	$new instvar nodelist
+	set src [lindex [lindex $nodelist 0] 0]
+	set dst [lindex [lindex $nodelist 1] 0]
+	set link_map($src:$dst) $new
+	set link_map($dst:$src) $new
+    }
+}
+Simulator instproc rename_node {old new} {
+    $self instvar node_list
+    unset node_list($old)
+    set node_list($new) {}
+}
+
+# find_link <node1> <node2>
+# This is just an accesor to the link_map datastructure.  If no
+# link is known between <node1> and <node2> the empty list is returned.
+Simulator instproc find_link {src dst} {
+    $self instvar link_map
+    if {[info exists link_map($src:$dst)]} {
+	return $link_map($src:$dst)
+    } else {
+	return ""
+    }
+}
+
+# get_subnet
+# This is called by lanlinks.  When called get_subnet will find an available
+# IP subnet, mark it as used, and return it to the caller.
+Simulator instproc get_subnet {} {
+    $self instvar subnet_base
+    $self instvar subnets
+    $self instvar subnet_counter
+
+    for {set i $subnet_counter} {$i < 255} {incr i} {
+	if {! [info exists subnets($subnet_base.$i)]} {
+	    set subnet_counter $i
+	    return $subnet_base.$i
+	}
+    }
+    perror "ERROR: Ran out of subnets."
+}
+
+# use_subnet
+# This is called by the ip method of nodes.  It marks the passed subnet
+# as used and thus should never be returned by get_subnet.
+Simulator instproc use_subnet {subnet} {
+    $self instvar subnets
+    set subnets($subnet) {}
+}

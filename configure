@@ -770,6 +770,8 @@ fi
 
 
 
+
+
 #
 # Okay, I know this is improper usage of --with. Too bad.
 #
@@ -862,7 +864,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:866: checking for a BSD compatible install" >&5
+echo "configure:868: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -940,14 +942,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/batchexp tbsetup/killbatchexp tbsetup/batch_daemon \
 	tbsetup/webbatchexp tbsetup/webkillbatchexp \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
-	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
-	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
-	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
+	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
-	tbsetup/savevlans tbsetup/ir/extract_tb \
-	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
-	tbsetup/named_setup tbsetup/exports_setup \
-	tbsetup/checkpass/GNUmakefile \
+	tbsetup/ns2ir/sim.tcl tbsetup/savevlans \
+	tbsetup/tbprerun tbsetup/tbswapin tbsetup/tbswapout tbsetup/tbend \
+	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
+	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
@@ -1125,6 +1125,8 @@ s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
+s%@DELAYCAPACITY@%$DELAYCAPACITY%g
+s%@IPBASE@%$IPBASE%g
 s%@LEDA@%$LEDA%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g

@@ -34,6 +34,7 @@ my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my $logname  = 0;
 my $batch    = 0;
+my $estate   = 0;
 
 #
 # Untaint the path
@@ -90,44 +91,6 @@ use Mysql;
 my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 #
-# We have to protect against trying to end an experiment that is currently
-# in the process of being terminated. We use a timestamp for this purpose.
-# If the timestamp is ever non-null, then something is wrong and we should
-# not proceed.
-#
-# We also have to guard against trying to terminate an experiment that
-# is still in the process of configuring. Its easiest to force the user
-# to wait!
-#
-$query_result =
-    $DB->query("SELECT expt_terminating,expt_ready FROM experiments ".
-	       "WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result) {
-    fatal("DB Error getting experiment termination date for $pid/$eid\n");
-}
-if ($query_result->numrows < 1) {
-    print STDOUT "No such experiment $pid/$eid exists!\n";
-    exit(1);
-}
-
-@row = $query_result->fetchrow_array();
-if (defined($row[0])) {
-    print STDOUT
-	"It appears that $pid/$eid started terminating at $row[0]\n".
-	"You will be notified via email when the experiment has been ".
-	"torn down\n";
-    exit(1);
-}
-if (! $row[1]) {
-    print STDOUT
-	"It appears that experiment $pid/$eid is still configuring.\n".
-	"The user that created the experiment will be notified via email\n".
-	"when it has been fully configured and is ready for use\n";
-    exit(1);
-}
-
-#
 # Get some user information. 
 #
 $query_result = $DB->query("SELECT uid,usr_name,usr_email,admin from users ".
@@ -168,7 +131,59 @@ if (! $isadmin) {
 }
 
 #
-# Set the timestamp.
+# We have to protect against trying to end an experiment that is currently
+# in the process of being terminated. We use a "wrapper" state (actually
+# a timestamp so we can say when termination was requested) since
+# terminating conists of a couple of different experiment states down inside
+# the tb scripts. 
+#
+$query_result = $DB->query("lock tables experiments write");
+if (! $query_result) {
+    fatal("DB Error locking experiments table");
+}
+
+$query_result =
+    $DB->query("SELECT expt_terminating,state FROM experiments ".
+	       "WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result) {
+    fatal("DB Error getting experiment termination date for $pid/$eid\n");
+}
+if ($query_result->numrows < 1) {
+    print STDOUT "No such experiment $pid/$eid exists!\n";
+    exit(1);
+}
+
+@row = $query_result->fetchrow_array();
+if (defined($row[0])) {
+    print STDOUT
+	"It appears that $pid/$eid started terminating at $row[0]\n".
+	"You will be notified via email when the experiment has been ".
+	"torn down\n";
+    exit(1);
+}
+
+#
+# Okay, check state. We do not allow termination to start when the
+# experiment is in transition. A future task would be to allow this,
+# but for now the experiment must be in one of a few states to proceed
+#
+# Seems like too many states!
+#
+$estate = $row[1];
+if ($estate eq "prerunning" ||
+    $estate eq "activating" ||
+    $estate eq "swapping" ||
+    $estate eq "terminating") {
+    print STDOUT
+	"It appears that experiment $pid/$eid is in transition.\n".
+	"The user that created the experiment will be notified via email\n".
+        "when the experiment is no longer in transition, and can be killed\n";
+    exit(1);
+}
+
+#
+# Set the timestamp now, and unlock the experiments table.
 #
 $stamp = `date '+20%y-%m-%d %H:%M:%S'`;
 
@@ -176,6 +191,11 @@ $query_result = $DB->query("UPDATE experiments SET expt_terminating='$stamp' ".
 			   "WHERE eid='$eid' and pid='$pid'");
 if (! $query_result) {
     fatal("DB Error setting expt_terminating for experiment $pid/$eid\n");
+}
+
+$query_result = $DB->query("unlock tables");
+if (! $query_result) {
+    fatal("DB Error unlocking experiments table");
 }
 
 #
@@ -192,6 +212,16 @@ if (! $batch) {
 	    "torn down, and you can reuse the experiment name.\n";
 	exit(0);
     }
+}
+
+if ($estate eq "active") { 
+    print STDOUT "Running tbswapout with arguments: -nologfile $pid $eid\n";
+    if (system("$tbdir/tbswapout -nologfile $pid $eid") != 0) {
+	fatal("tbswapout failed!\n");
+    }
+}
+elsif ($estate ne "swapped") {
+    fatal("Experiment is in the wrong state: $estate\n");
 }
 
 print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";

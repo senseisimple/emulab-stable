@@ -1,0 +1,140 @@
+#!/usr/bin/perl -w
+
+# tbswapout
+
+# This is the third program in the
+# tbprerun/tbswapin/tbswapout/.../tbend sequences.  It's purpose is
+# to reverse what tbswapin did.  I.e. tear down all switch and node
+# state and remove the entries from the delays and vlans table.  
+# When this script succesfully completes the testbed will be in
+# a state for tbswapin or tbend to be run.
+
+use DBI;
+
+# Set up paths
+$TBDB = "@TBDBNAME@";
+$TBROOT = "@prefix@";
+$TBSETUPLIB = "$TBROOT/lib";
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
+    ":$TBROOT/sbin:$TBROOT/bin";
+push(@INC,$TBSETUPLIB);
+
+# Turn off line buffering.
+$| = 1; 
+
+require libtbsetup;
+
+$dolog = 1;
+$force = 0;
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-nologfile") {
+	$dolog = 0;
+    } elsif ($arg eq "-force") {
+	$force = 1;
+    } else {
+	print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
+	exit(1);
+    }
+}
+if ($#ARGV < 1) {
+    print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
+    exit(1);
+}
+($pid,$eid) = @ARGV;
+
+$dbh = &tbs_initdbi($TBDB);
+
+$logfile = "$pid-$eid.log";
+
+if ($dolog) {
+    &tbs_initlog($logfile);
+    &tbs_out("Log:    $logfile\n");
+}
+
+&tbs_out("Beginning swap out for $pid-$eid. " 	 . &ctime(time) . "\n");
+
+
+&tbs_out("Checking sanity.\n");
+$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
+		     " and eid = \"$eid\"");
+$sth->execute();
+if (! (($state) = $sth->fetchrow_array())) {
+    &tbs_out("No entry in experiments table.  Insane.\n");
+    exit(1);
+}
+if ($force == 0) {
+    if ($state eq "swapped") {
+	&tbs_out("Experiment already swapped. ".
+		 "Try swapping in first or use -force.\n");
+	exit(1);
+    } elsif ($state ne "active") {
+	&tbs_out("Experiment is not running: $state. Try -force option\n");
+	exit(1);
+    }
+} elsif ($state ne "active") {
+    &tbs_out("WARNING: Ignoring experimental state of $state.\n");
+}
+
+if (! $dbh->do("UPDATE experiments set state=\"swapping\" " .
+	       "where pid=\"$pid\" and eid=\"$eid\"")) {
+    &tbs_out("Could not set intermediate experiment state.\n");
+}
+
+$errors = 0;
+
+&tbs_out("Clearing VLANs\n");
+if (&tbs_exec("snmpit -reset $pid $eid")) {
+    &tbs_out("Failed to reset VLANs\n");
+    $errors = 1;
+}
+
+&tbs_out("Backing up VLAN configuration\n");
+if (&tbs_exec("savevlans")) {
+    &tbs_out("WARNING: Failed to back up VLAN configuration\n");
+}
+
+&tbs_out("Freeing resources\n");
+if (&tbs_exec("nfree $pid $eid")) {
+    &tbs_out("Failed to free resources.\n");
+    $errors=1;
+}
+
+&tbs_out("Resetting mountpoints\n");
+if (&tbs_exec("exports_setup")) {
+    &tbs_out("Failed to setup mountpoints.\n");
+    $errors=1;
+}
+
+&tbs_out("Resetting named maps.\n");
+if (&tbs_exec("named_setup")) {
+    &tbs_out("Failed to add node names to named map.\n");
+    #
+    # This is a non-fatal error.
+    # 
+}
+
+&tbs_out("Resetting DB.\n");
+
+if (! $dbh->do("DELETE from delays where pid = \"$pid\" and eid=\"$eid\"")) {
+    &tbs_out("Could not clear delays table.\n");
+    $errors = 1;
+}
+if (! $dbh->do("DELETE from vlans where pid = \"$pid\" and eid = \"$eid\"")) {
+    &tbs_out("Could not clear vlans table.\n");
+    $errors = 1;
+}
+
+if ($errors == 0) {
+    &tbs_out("Marking as dormant.\n");
+    if (! $dbh->do("UPDATE experiments set state=\"swapped\"" .
+		   " where pid=\"$pid\" and eid=\"$eid\"")) {
+	&tbs_out("Could not set experiment state.\n");
+	$errors = 1;
+    }
+}
+
+&tbs_out("Swap out finished - " . &ctime(time) . "\n");
+
+exit $errors;
+

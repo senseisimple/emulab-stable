@@ -8,9 +8,9 @@ SUBDIR		= tbsetup
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ir ns2ir
+SUBDIRS		= checkpass ns2ir
 
-BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
+BIN_STUFF	= power snmpit tbend tbswapin tbswapout tbprerun tbreport \
 		  os_load savevlans startexp endexp batchexp killbatchexp \
 		  node_reboot nscheck
 
@@ -22,7 +22,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck \
-		  webstartexp webendexp webbatchexp webkillbatchexp
+		  webstartexp webendexp webbatchexp webkillbatchexp \
+		  assign_wrapper ptopgen
 
 LIB_STUFF       = libtbsetup.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm
@@ -35,11 +36,10 @@ all:	$(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-.PHONY:	checkpass ir ns2ir
+.PHONY:	checkpass ns2ir
 checkpass:
 	@$(MAKE) -C checkpass all
-ir:
-	@$(MAKE) -C ir all
+
 ns2ir:
 	@$(MAKE) -C ns2ir all
 
@@ -51,7 +51,6 @@ install: all script-install subdir-install
 # 
 subdir-install:
 	@$(MAKE) -C checkpass install	
-	@$(MAKE) -C ir install	
 	@$(MAKE) -C ns2ir install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
@@ -99,14 +98,12 @@ clean:	subdir-clean
 
 subdir-clean:
 	@$(MAKE) -C checkpass clean
-	@$(MAKE) -C ir clean
 	@$(MAKE) -C ns2ir clean
 
 distclean:	subdir-distclean
 
 subdir-distclean:
 	@$(MAKE) -C checkpass distclean
-	@$(MAKE) -C ir distclean
 	@$(MAKE) -C ns2ir distclean
 
 #

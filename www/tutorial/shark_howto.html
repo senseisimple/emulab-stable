@@ -17,20 +17,11 @@ each other via a 10Mb, no delay, no loss LAN, with a single link to
 the rest of the topology.
 
 <p>To use sharks in your experiment just set them up as normal nodes.
+Sharks must be in a LAN and there can be at most 8 sharks in any one
+LAN.
+
 Use <code>tb-set-hardware</code> to set them to type
-<code>shark</code> and make sure their topology adheres to the
-conditions below.
-
-<p>Any deviation from these conditions will result in an error.
-
-<ul>
-  <li>Any LAN containing sharks must be 10 MB, 0 latency, no loss.
-  <li>At most 8 sharks per LAN.
-  <li>No non-sharks directly in any LAN containing sharks.
-  <li>At most one link to any LAN containing sharks.
-  <li>No shark outside of a LAN.
-  <li>No shark with any links.
-</ul>
+<code>shark</code>.
 
 <p>Example:
 
@@ -50,18 +41,13 @@ tb-set-hardware $s2 shark
 tb-set-hardware $s3 shark
 tb-set-hardware $s4 shark
 
-set slan [$ns make-lan "$s1 $s2 $s3 $s4" 10Mb 0ms]
+set slan [$ns make-lan "$s1 $s2 $s3 $s4 $n1" 10Mb 0ms]
 
 tb-set-ip-lan $s1 $slan 1.2.3.100
 tb-set-ip-lan $s2 $slan 1.2.3.101
 
-$ns duplex-link $slan $n1 100Mb .5ms DropTail
-
 $ns run
 </pre>
-
-<p>Note especially that <code>n1</code> is not in the LAN but linked
-to it.
 
 <hr size=2 noshade>
 <center>

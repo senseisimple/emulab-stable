@@ -1,0 +1,938 @@
+#!/usr/bin/perl -w
+
+# This function as the main assign loop.  It converts the virtual
+# topology into a top input including LAN and delay translation.  It
+# then snapshots the current testbed physical state and runs assign,
+# looping a couple times if assign fails.  When assign successfully
+# completes it will interpret the results.  Attempt to match any
+# existing portmap entries and then update the delays and vlans table.
+
+# Syntax: assign_wrapper <pid> <eid>
+
+# Caveats:
+#  The support for direct and interswitch links has not been testbed much.
+#  LANs containing single nodes can result in strange behaviors.
+
+# Settings
+# delaythresh is the maximum delay in ms above which a delay node is needed.
+# maxrun is maximum number of times we run assign.
+$delaythresh = 3;
+$maxrun = 5;
+
+use DBI;
+
+$TBROOT = "@prefix@";
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
+$TBDB = "@TBDBNAME@";
+
+$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+    die "Could not connect to DB.\n";
+
+$verbose = 0;
+if (($#ARGV == 2) && ($ARGV[0] eq "-v")) {
+    $verbose = 1;
+    shift;
+} elsif ($#ARGV != 1) {
+    print STDERR "Syntax: $0 pid eid\n";
+    exit(1);
+}
+($pid,$eid) = @ARGV;
+
+$ptopfile = "$pid-$eid-$$.ptop";
+
+sub printdb {
+    if ($verbose) {
+	print $_[0];
+    }
+};
+
+# Let's read the minimum requirements for this experiment.
+$sth = $dbh->prepare("SELECT minimum_nodes from experiments" .
+		     " where pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute;
+($minimum_nodes) = $sth->fetchrow_array;
+$sth->finish;
+
+######################################################################
+# Step 1 - Setup virtual topology
+#
+# Here we need to read the virtual topology in from the virt_nodes
+# and virt_lans table.  We then need to add delay and lan nodes as
+# necessary.
+#
+# Conversion details:
+#   Let L be a LAN with N members.
+#   If N == 2 
+#      Let N1 be node 1
+#      Let N2 be node 2
+#      If L is delayed
+#         Generate delay node D
+#         Link N1 to D
+#         Link N2 to D
+#      Else
+#         Link N1 to N2
+#   Else
+#      Generate lan node A
+#      If L is delayed
+#        Foreach node N in L
+#           Generate delay node DN
+#           Link A to DN
+#           Link N to DN
+#      Else
+#        Foreach node N in L
+#           Link N to A
+#
+# Datastructures:
+#  nodes is indexed by virtual node and contains the node type.
+#  nodelans is indexed by virtual node and contains a list of
+#    <port>:<lan> that it is connected to.
+#  ips is indexed by nodeport and contains the IP addresses.
+#  lans is indexed by virtual lan and is a list of nodeport members.
+#  delayinfo is indexed by virtual lan:node:port and is a list of delay,
+#    bandwidth, lossrate.
+#  okbandwidths is indexed by bandwidth and is just a set.
+#  lannodes is indexed by physical name is the set of lan nodes.
+#  interfacespeed is indexed by type and contains the bandwidth.
+#  delaynodes is indexed by link name and contains [delay,bw,loss]
+#
+# Delay node names:
+#  delay nodes are named tbdelayXX N > 2
+#   and tbsdelayXX for N == 2.
+# 
+# Lan node nameS:
+#  lan nodes are named lan/<virtual lan>
+######################################################################
+
+# Shark Hack
+# For each LAN we replace all the sharks in the LAN with a single
+# shark shelf node.  After this goes through assign we pull them
+# all back out.
+#
+# sharkshelves is indexed by virtual shelf name and is a list of
+# the virtual nodes in it.
+# sharkshelfid is used to generate ids for shark shelves.
+$sharkshelfid = 0;
+
+# delayid is used to generate ids for delay nodes.
+$delayid = 0;
+
+printdb "Generating TOP file.\n";
+
+# Let's figure out what kind of links we have.
+printdb "Finding interface speeds:";
+$sth=$dbh->prepare("SELECT type,max_speed from interface_types");
+$sth->execute;
+while (($type,$bandwidth) = $sth->fetchrow_array) {
+    $okbandwidths{$bandwidth} = 1;
+    $interfacespeed{$type} = $bandwidth;
+    printdb " $bandwidth";
+}
+$sth->finish;
+printdb "\n";
+
+printdb "Loading virt_nodes.\n";
+$sth = $dbh->prepare("SELECT vname,ips,type from virt_nodes" .
+		     " where pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute;
+while (($vname,$ips,$type) = $sth->fetchrow_array) {
+    printdb "  $vname $type $ips\n";
+    # We need to check the names to make sure they won't clash with
+    # our internal delay node names.
+    if (($vname =~ /^tbdelay\d+/) ||
+	($vname =~ /^tbsdelay\d+/)) {
+	print STDERR "Warning: $vname is a reserved name.  Working around.\n";
+	($num) = ($vname =~ /(\d+)/);
+	$delayid = $num + 1;
+    }
+    $nodes{$vname} = $type;
+    $nodelans{$vname} = [];
+    foreach $ipinfo (split(" ",$ips)) {
+	($port,$ip) = split(":",$ipinfo);
+	$ips{"$vname:$port"} = $ip;
+    }
+}
+$sth->finish;
+
+printdb "Loading virt_lans.\n";
+$sth = $dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+		     " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute;
+while (($vname,$member,$delay,$bandwidth,$lossrate) = $sth->fetchrow_array) {
+    if (! defined($lans{$vname})) {
+	$lans{$vname} = [];
+    }
+    push(@{$lans{$vname}},$member);
+    $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate];
+    ($node,$port) = split(":",$member);
+    push(@{$nodelans{$node}},"$port:$vname");
+    printdb "  $vname $member - $delay $bandwidth $lossrate\n";
+    printdb "    Added $port:$vname to nodelans of $node\n";
+}
+$sth->finish;
+
+# Shark hack
+foreach $lan (keys(%lans)) {
+    $realmembers = [];
+    $sharks = [];
+    $hassharks = 0;
+    foreach $member (@{$lans{$lan}}) {
+	($node) = (split(":",$member))[0];
+	if ($nodes{$node} eq "shark") {
+	    push(@$sharks,$member);
+	    $hassharks = 1;
+	} else {
+	    push(@$realmembers,$member);
+	}
+    }
+    if ($hassharks) {
+	$shelfid = "sharkshelf$sharkshelfid";
+	printdb "  Creating shark shelf: $shelfid (" . 
+	    join(" ",@$sharks) . ")\n";
+	$sharkshelfid++;
+	$sharkshelves{$shelfid} = $sharks;
+	push(@$realmembers,"$shelfid:uplink");
+	$nodes{$shelfid} = "shark-shelf";
+    }
+    $lans{$lan} = $realmembers;
+}
+# End shark hack
+
+# isdelayed(lan)
+# Returns 1 if the lan is a delayed lan and 0 otherwise.
+sub isdelayed {
+    my $lan = $_[0];
+    my $member;
+    foreach $member (@{$lans{$lan}}) {
+	my ($delay,$bandwidth,$lossrate) = @{$delayinfo{"$lan:$member"}};
+	if (($delay > $delaythresh) ||
+	    (! defined($okbandwidths{$bandwidth })) ||
+	    ($lossrate != 0)) {
+	    return 1;
+	}
+    }
+    return 0;
+};
+
+# min(a,b)
+# Returns the minimum of a and b.
+sub min {
+    my ($a,$b) = @_;
+    return ($a < $b ? $a : $b);
+};
+
+# getbandwidth(bw)
+# Returns the lowest ok bandwidth that is greater than or equal to
+# the one passed.
+sub getbandwidth {
+    my $targetbandwidth= $_[0];
+    my $bandwidth;
+    my $best = 10000000000;
+    foreach $bandwidth (keys(%okbandwidths)) {
+	if (($bandwidth >= $targetbandwidth) && ($bandwidth < $best)) {
+	    $best = $bandwidth;
+	}
+    }
+    return $best;
+};
+
+# Open the TOP file
+$topfile = "$pid-$eid-$$.top";
+open(TOPFILE,"> $topfile") || do {
+    print STDERR "Could not open $topfile.\n";
+    exit(1);
+};
+
+foreach $node (keys(%nodes)) {
+    # Shark hack
+    if ($nodes{$node} ne "shark") {
+	print TOPFILE "node $node $nodes{$node}\n";
+    }
+    # End Shark hack
+}
+
+foreach $lan (keys(%lans)) {
+    @members = @{$lans{$lan}};
+    if ($#members == 1) {
+	($nodeport0,$nodeport1) = @members;
+	$node0 = (split(":",$nodeport0))[0];
+	$node1 = (split(":",$nodeport1))[0];
+	($delay0,$bw0,$loss0) = @{$delayinfo{"$lan:$nodeport0"}};
+	($delay1,$bw1,$loss1) = @{$delayinfo{"$lan:$nodeport1"}};
+	$bandwidth = &getbandwidth(&min($bw0,$bw1));
+	if (&isdelayed($lan)) {
+	    $delayname = "tbsdelay$delayid";
+	    $delaynodes{"linksdelaysrc/$lan"} = [$delay0+$delay1,
+						 &min($bw0,$bw1),
+						 1-(1-$loss0)*(1-$loss1)];
+	    printdb "Delay node linksdelaysrc/$lan ($delayname) = " . 
+		join(" ",@{$delaynodes{"linksdelaysrc/$lan"}}) . "\n";
+	    $delayid++;
+	    print TOPFILE "node $delayname delay\n";
+	    print TOPFILE "link linksdelaysrc/$lan $node0 $delayname"
+		. " $bandwidth\n";
+	    print TOPFILE "link linksdelaydst/$lan $node1 $delayname"
+		. " $bandwidth\n";
+	} else {
+	    print TOPFILE "link linksimple/$lan $node0 $node1 $bandwidth\n";
+	}
+    } else {
+	print TOPFILE "node lan/$lan lan\n";
+	$lannodes{"lan/$lan"} = 1;
+	foreach $member (@members) {
+	    ($delay,$bw,$loss) = @{$delayinfo{"$lan:$member"}};
+	    $bandwidth = &getbandwidth($bw);
+	    ($node) = (split(":",$member))[0];
+	    if (($delay > $delaythresh) ||
+		(! defined($okbandwidths{$bw})) ||
+		($loss != 0)) {
+		$delayname = "tbdelay$delayid";
+		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
+		printdb "Delay node linkdelaysrc/$lan/$member ($delayname) " .
+		    " = " . join(" ",@{$delaynodes{"linkdelaysrc/$lan/$member"}}) . "\n";
+		$delayid++;
+		print TOPFILE "node $delayname delay\n";
+		print TOPFILE "link linkdelaysrc/$lan/$member" .
+		    " $node $delayname $bandwidth\n";
+		print TOPFILE "link linkdelaydst/$lan/$member" .
+		    " lan/$lan $delayname $bandwidth\n";
+	    } else {
+		print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
+		    " $bandwidth\n";
+	    }
+	}
+    }
+}
+
+close TOPFILE;
+
+######################################################################
+# Step 2 - Assign Loop
+# 
+# Here we loop up to maxrun times.  In each loop we snapshot the
+# current testbed state into a ptop file.  We then run assign.  If
+# assign succeeds we attempt to reserve the resources.  If that works
+# we're done with step 2 otherwise we loop again.
+#
+# v2pmap is indexed by virtual and contains the physical node.
+# p2vmap is indexed by physical and contains the virtual node
+# plinks is indexed by virtual name and contains 
+#  (pnodeportA,pnodeportB) .  If one is a delay node it is always
+#  the second.
+#######################################################################
+
+# getnodeport(s)
+# Takes a ports result from assign (mac0,mac1) and returns the
+# first non-null one.
+sub getnodeport {
+    $macstring=$_[0];
+    ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
+    if ($A ne "(null)") {
+	return $A;
+    } else {
+	return $B;
+    }
+};
+
+# isdelay(pnodeport)
+# Takes a physical nodeport and retruns 1 if the node is a delay node.
+sub isdelay {
+    my $pnodeport = $_[0];
+
+    my $node = (split(":",$pnodeport))[0];
+    if (($p2vmap{$node} =~ m|^delay/|) ||
+	($p2vmap{$node} =~ m|^sdelay.|)) {
+	return 1;
+    } 
+    return 0;
+};
+
+$currentrun = 1;
+while (1) {
+    print "Assign Run $currentrun\n";
+
+    # Violation counts
+    $linkusers = -1;
+    $bandwidth = -1;
+    $desires = -1;
+
+    # Clear v2pmap, p2vmap, and plinks
+    undef %v2pmap;
+    undef %p2vmap;
+    undef %plinks;
+
+    # Snapshot
+    system("ptopgen > $ptopfile");
+
+    # Get number of nodes
+    $numnodes = $dbh->do("select a.node_id,a.type from" .
+		     " nodes as a left join reserved as b" .
+		     " on a.node_id=b.node_id" .
+		     " where b.node_id is null" .
+		     " and a.type != \"cisco\" and a.type != \"APC\"" .
+		     " and a.type != \"shark\"");
+    
+    if ($numnodes < $minimum_nodes) {
+	print STDERR "Insufficient nodes available.\n";
+	exit(2);
+    }
+
+    # Run assign
+    $fail = 0;
+    print "assign -b -t $ptopfile $topfile\n";
+    open(ASSIGNFP,"assign -b -t $ptopfile $topfile | tee assign.log |");
+    $violations = 0;
+    $score = -1;
+
+    # read output
+    # Header
+    printdb "Reading assign results.\n";
+    while (<ASSIGNFP>) {
+	chop;
+	/^With ([0-9]+) violations$/ && do {
+	    $violations = $1;
+	    last;
+	};
+	/^[ \t]+BEST SCORE: [ \t]+([0-9]+\.[0-9]+)/ && ($score=$1);
+    }
+    printdb "Found score $score, violations $violations.\n";
+
+    # We don't bother reading anything else if violations occured.
+    if (($violations == 0) && ($score != -1)) {
+	# read nodes section
+	while (<ASSIGNFP> !~ /^Nodes:/) {}
+	printdb "Nodes:\n";
+	while (<ASSIGNFP>) {
+	    chop;
+	    /^End Nodes$/ && last;
+	    @info = split;
+	    ($virtual,$physical) = @info[0,2];
+	    $v2pmap{$virtual} = $physical;
+	    $p2vmap{$physical} = $virtual;
+	    printdb "  $virtual $physical\n";
+	}
+
+	# read Edges
+	# By convention, in plinks, the delay node is always the second
+	# entry.
+	while (<ASSIGNFP> !~ /^Edges:/) {}
+	printdb "Edges:\n";
+	while (<ASSIGNFP>) {
+	    /^End Edges$/ && last;
+	    @info = split;
+	    $line = $_;
+	    $_ = $info[1]; # type
+	  SWITCH1: {
+	      /^intraswitch$/ && do {
+		  ($vlink,$rawA,$rawB) = @info[0,3,5];
+		  $nodeportA = &getnodeport($rawA);
+		  $nodeportB = &getnodeport($rawB);
+		  $nodeportA =~ s/\//:/;
+		  $nodeportB =~ s/\//:/;
+		  if (&isdelay($nodeportB)) {
+		      $plinks{$vlink} = [$nodeportA,$nodeportB];
+		  } else {
+		      $plinks{$vlink} = [$nodeportB,$nodeportA];
+		  }
+		  last SWITCH1;
+	      };
+	      /^interswitch$/ && do {
+		  print STDERR "Unsupported link type: interswitch.\n";
+	      };
+	      /^direct$/ && do {
+		  print STDERR "Unsupported link type: direct.\n";
+	      };
+	      print "Found garbage: $line\n";
+	  }
+	    printdb "  $vlink " . join(" ",@{$plinks{$vlink}}) . "\n";
+	}
+    } else {
+	# spit out up to nodes
+	print "ASSIGN FAILED:\n";       
+	while (<ASSIGNFP>) {
+	    if (/link_users: (\d+)$/) {
+		$linkusers = $1;
+	    } elsif (/bandwidth: (\d+)$/) {
+		$bandwidth = $1;
+	    } elsif (/desires: (\d+)$/) {
+		$desires = $1;
+	    }
+	    if (/^Nodes:/) {last;}
+	    print "$_";
+	}
+	$fail = 1;
+    }
+    while (<ASSIGNFP>) { } # Read anything left in the pipe before closing
+    close(ASSIGNFP);
+
+    # Reserve resources
+    if ($fail == 0) {
+	print "Reserving resources.\n";
+	@toreserve = ();
+	# We don't reserve LAN nodes.
+	foreach $node (keys(%p2vmap)) { 
+	    if (! defined($lannodes{$p2vmap{$node}})) {
+		push(@toreserve,$node);
+	    }
+	}
+	if (system("nalloc $pid $eid " . join(" ",@toreserve))) {
+	    print "Failed to reserve resources.  Trying again.\n";
+	} else {
+	    print "Successfully reserved resources.  Finishing setup.\n";
+	    last;
+	}
+    }
+
+    # Check for exit
+    if ($currentrun >= $maxrun) {
+	$exitcode = 1;
+	if ($bandwidth > 0) {
+	    $exitcode += 4;
+	} 
+	if ($linkusers > 0) {
+	    $exitcode += 8;
+	}
+	if ($desires > 0) {
+	    $exitcode += 16;
+	}
+	print "Reached run limit.  Giving up.\n";
+	exit($exitcode);
+    }
+    $currentrun++;
+}
+
+
+######################################################################
+# Step 3 - Convert to vlans, delays, and portmap
+# 
+# Here we convert the plinks into vlans, delays, and portmap.  We
+# convert them first into internal datastructure.  After Step 4
+# when we do some port swapping we'll upload the modified versions
+# of these structures into the database.
+#
+# vlans is indexed by an internal ID contains:
+#  [vname, members]
+# delays is indexed by an internal ID and contains:
+#  [pnode, int0, int1, vname, delay, bandwidth, lossrate]
+# portmap is indexed by <virtual node>:<virtual port> and contains
+#  the physical port.
+# nodevlans is indexed by physical node and contains the VLANs
+#  it's interfaces are in.  It does not contain entries for delay
+#  nodes.
+#
+# vlan ids
+#  vlan ids are increasing integers in the case of node<->delay connections.
+#  In the case of actual LANs either of real node or of delay nodes
+#  they are indexed by virtual lan name.
+# delay ids
+#  delay ids are increasing integers.  We could have used a list of
+# delays just as well.  Having it as an array may prove useful for
+# future changes however.
+######################################################################
+
+# find_vport vnode virtlan
+# This finds and returns the virtual port of vnode that it is
+# virtlan and not in portmap.
+sub find_vport {
+    my ($vnode,$virtlan) = @_;
+    my $portlan;
+    my $vport;
+    my $lan;
+    # Shark Hack
+    if ($nodes{$vnode} eq "shark-shelf") {
+	return "0";
+    }
+    # End Shark Hack
+    foreach $portlan (@{$nodelans{$vnode}}) {
+	($vport,$lan) = split(":",$portlan);
+	if (($virtlan eq $lan) &&
+	    (! defined($portmap{"$vnode:$vport"}))) {
+	    return $vport;
+	}
+    }
+    return "";
+};
+
+$vlanid = 0;
+$delayid = 0;
+foreach $pnode (keys(%p2vmap)) {
+    $nodevlans{$pnode} = [];
+}
+
+printdb "Interpreting results.\n";
+foreach $plink (keys(%plinks)) {
+    ($nodeportA,$nodeportB) = @{$plinks{$plink}};
+    ($nodeA,$portA) = split(":",$nodeportA);
+    ($nodeB,$portB) = split(":",$nodeportB);
+    printdb "plink $plink - $nodeportA $nodeportB\n";
+    if (($lan) = ($plink =~ m|^linksdelaysrc/(.+)$|)) {
+	# Node has a single entry in lan.
+	# Node is nodeportA
+	# Delay node is nodeportB
+	# Other end of delay node will be given by plink
+	#   linksdelaydst/lan where nodeportA will be the other node in
+	#   the virtual LAN and nodeportB will be the other end of the
+	#   delay node.
+
+	($nodeportC,$nodeportD) = @{$plinks{"linksdelaydst/$lan"}};
+	($nodeC,$portC) = split(":",$nodeportC);
+	($nodeD,$portD) = split(":",$nodeportD);
+	printdb "LINK delay: other end = $nodeportC $nodeportD\n";
+
+	# assert nodeB == nodeD
+
+	printdb "  VLANS:\n";
+	$vlans{$vlanid} = [$lan,[$nodeportA, $nodeportB]];
+	push(@{$nodevlans{$nodeA}},$vlanid);
+	printdb "    $vlanid = $lan, \[$nodeportA, $nodeportB\]\n";
+	$vlanid++;
+	$vlans{$vlanid} = [$lan,[$nodeportC, $nodeportD]];
+	push(@{$nodevlans{$nodeC}},$vlanid);
+	printdb "    $vlanid = $lan, \[$nodeportC, $nodeportD\]\n";
+	$vlanid++;
+
+	($delay,$bandwidth,$lossrate) = @{$delaynodes{$plink}};
+	$delays{$delayid} = [$nodeB,$portB,$portD,$lan,
+			     $delay,$bandwidth,$lossrate];
+	printdb "  Delays: $delayid = \[$nodeB,$portB,$portD,$lan" .
+	    ",$delay,$bandwidth,$lossrate\]\n";
+	$delayid++;
+
+	$virtA = &find_vport($p2vmap{$nodeA},$lan);
+	$virtC = &find_vport($p2vmap{$nodeC},$lan);
+	$portmap{"$p2vmap{$nodeA}:$virtA"} = $portA;
+	$portmap{"$p2vmap{$nodeC}:$virtC"} = $portC;
+	printdb "  Portmap:\n";
+	printdb "    $p2vmap{$nodeA}:$virtA = $portA\n";
+	printdb "    $p2vmap{$nodeC}:$virtC = $portC\n";
+    } elsif (($lan,$member) = ($plink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
+	# Node may have multiple entries in lan.
+	# Delay node is nodeB and portB.
+	# Other end of delay node will be given by plink
+	#  linkdelaydst/lan/node where nodeportA will the LAN node and
+	#  nodeportB will be the other end of the delay node.
+	($nodeportC,$nodeportD) = @{$plinks{"linkdelaydst/$lan/$member"}};
+	($nodeC,$portC) = split(":",$nodeportC);
+	($nodeD,$portD) = split(":",$nodeportD);
+	printdb "LAN delay src: other end = $nodeportC $nodeportD\n";
+	
+	$vlans{$vlanid} = [$lan,[$nodeportA, $nodeportB]];
+	push(@{$nodevlans{$nodeA}},$vlanid);
+	printdb "  VLANS:\n";
+	printdb "    $vlanid = $lan, \[$nodeportA $nodeportB\]\n";
+	$vlanid++;
+	
+	if (! defined($vlans{$lan})) {
+	    $vlans{$lan} = [$lan,[]];
+	}
+	$members = (@{$vlans{$lan}})[1];
+	push(@$members,$nodeportD);
+	printdb "    $lan = $lan, \[" . join(" ",@$members) . "\]\n"; 
+
+	($delay,$bandwidth,$loss) = @{$delaynodes{$plink}};
+	$delays{$delayid} = [$nodeB,$portB,$portD,$lan,
+			     $delay,$bandwidth,$loss];
+	printdb "  Delays: $delayid = \[$nodeB,$portB,$portD,$lan," .
+	    "$delay,$loss\]\n";
+	$delayid++;
+	
+	$virt = &find_vport($p2vmap{$nodeA},$lan);
+	$portmap{"$p2vmap{$nodeA}:$virt"} = $portA;
+	printdb "  Portmap: $p2vmap{$nodeA}:$virt = $portA\n";
+    } elsif (($lan) = ($plink =~ m|^linksimple/(.+)$|)) {
+	# nodeportA and nodeportB are the only two nodes in the
+	# virtual LAN and there are no delays.
+	printdb "Simple Link\n";
+	$vlans{$lan} = [$lan,[$nodeportA,$nodeportB]];
+	printdb "  VLANS: $lan = $lan, \[$nodeportA $nodeportB\]\n";
+	
+	push(@{$nodevlans{$nodeA}},$lan);
+	push(@{$nodevlans{$nodeB}},$lan);
+	
+	$virtA = &find_vport($p2vmap{$nodeA},$lan);
+	$virtB = &find_vport($p2vmap{$nodeB},$lan);
+	$portmap{"$p2vmap{$nodeA}:$virtA"} = $portA;
+	$portmap{"$p2vmap{$nodeB}:$virtB"} = $portB;
+	printdb "  Portmap:\n";
+	printdb "    $p2vmap{$nodeA}:$virtA = $portA\n";
+	printdb "    $p2vmap{$nodeB}:$virtB = $portB\n";
+    } elsif (($lan) = ($plink =~ m|^linklan/([^/]+)/.+$|)) {
+	# node may be the LAN multiple times.
+	# nodeportA is the node.
+	# nodeportB is the LAN
+	# No delays
+	printdb "LAN\n";
+	if (! defined($vlans{$lan})) {
+	    $vlans{$lan} = [$lan,[]];
+	}
+	$members = (@{$vlans{$lan}})[1];
+	push(@$members,$nodeportA);
+	printdb "  VLANS: $lan = $lan,\[" . join(" ",@$members) . "\]\n";
+
+	$virt = &find_vport($p2vmap{$nodeA},$lan);
+	$portmap{"$p2vmap{$nodeA}:$virt"} = $portA;
+	printdb "  Portmap: $p2vmap{$nodeA}:$virt = $portA\n";
+    }
+    # Else delaysrc case, will be handled by one of the other cases.
+}
+
+# At this point we know our vlans, delays, and the portmap.  We could
+# just dump everything to the DB and be done.  However, we have an 
+# opportunity to preserve port mappings across swap ins.  We do this
+# by looking at the portmap table in the DB which will contain the
+# portmapping we found the last time we swapped in.  We're going
+# to attempt to swap things around so that our portmap matches that
+# portmap.  We can swap two ports if they have the same bandwidth and
+# physically connect to the same location.  Swapping involves swapping
+# node:portA and node:portB in every VLAN.  We use the vlans array
+# to avoid having to search through every VLAN on every swap.
+# Let's read in the current portmap, if any.
+#
+
+# We can just skip this step if this is the first portmap.  If a
+# portmap exists but does not have the same node:vport's in it that
+# our portmap does then we have a problem.  We could try to do
+# something intelligent, but the main cause of this is an uncleared
+# previous version of the experiment.  So what we actually do is
+# clear the previous portmap out of the DB, display a warning, and
+# skip as if there was no portmap.
+
+# keys_equal A B
+# Returns 1 if hashs A and B have the same keys.
+sub keys_equal {
+    my ($ARef,$BRef) = @_;
+    my @AKeys = sort keys(%$ARef);
+    my @BKeys = sort keys(%$BRef);
+    if ($#AKeys != $#BKeys) {
+	return 0;
+    }
+    my $i;
+    for ($i=0;$i<=$#AKeys;++$i) {
+	if ($AKeys[$i] ne $BKeys[$i]) {
+	    return 0;
+	}
+    }
+    return 1;
+};
+
+printdb "Considering Port Swapping\n";
+
+%prevportmap = ();
+$sth = $dbh->prepare("SELECT vnode,vport,pport from portmap" .
+		     " where pid = \"$pid\" and eid = \"$eid\"");
+$sth->execute;
+while (($vnode,$vport,$pport) = $sth->fetchrow_array) {
+    $prevportmap{"$vnode:$vport"} = $pport;
+}
+$sth->finish;
+
+# Compare portmaps
+if (keys(%prevportmap) == 0) {
+    $portswap = 0;
+} elsif (! &keys_equal(\%portmap,\%prevportmap)){
+    print STDERR "WARNING: Portmap in database is incompatible with current portmap.\n";
+    print STDERR "   Perhaps a previous version of the experiment did not get cleared?\n";
+    $portswap = 0;
+} else {
+    $portswap = 1;
+}
+
+# swapok(pnode,portA,nodeportB)
+# This returns 1 if it is ok to swap portA and portB on node pnode
+# and 0 otherwise.
+sub swapok {
+    my ($pnode,$portA,$portB) = @_;
+    # For the Utah testbed we just check to make sure they have
+    # the same bandwidth.  In other testbeds we'd also want to make
+    # sure they went to the same destination.
+    my $sth = $dbh->prepare("SELECT interface_type FROM interfaces" .
+			     " where node_id = \"$pnode\"" .
+			     " and iface = \"$portA\"");
+    $sth->execute;
+    my ($Atype) = $sth->fetchrow_array;
+    $sth->finish;
+    $sth = $dbh->prepare("SELECT interface_type FROM interfaces" .
+			     " where node_id = \"$pnode\"" .
+			     " and iface = \"$portB\"");
+    $sth->execute;
+    my ($Btype) = $sth->fetchrow_array;
+    $sth->finish;
+
+    return ($interfacespeed{$Atype} == $interfacespeed{$Btype});
+};
+
+if ($portswap) {
+    foreach $vnodeport (keys(%portmap)) {
+	($vnode,$vport) = split(":",$vnodeport);
+	$pnode = $v2pmap{$vnode};
+	$pport = $portmap{$vnodeport};
+	$prevpport = $prevportmap{$vnodeport};
+	printdb "Looking at $pnode - $pport vs. $prevpport\n";
+	if ($pport ne $prevpport) {
+	    $okswap = 1;
+	    printdb "  Want to swap.\n";
+	    # We want to swap.
+	    if (&swapok($pnode,$pport,$prevpport)) {
+		printdb "  Swap ok.\n";
+		foreach $vlan (@{$nodevlans{$pnode}}) {
+		    $members = @{$vlans{$vlan}}[1];
+		    grep {
+			if (/^$pnode:$pport$/) {
+			    $_ = "$pnode:$prevpport";
+			} elsif (/^$pnode:$prevpport$/) {
+			    $_ = "$pnode:$pport";
+			}
+		    } @$members;
+		    printdb "  $vlan: " . join(" ",@$members) . "\n";
+		}
+	    } else {
+		print "Warning: Could not swap $pport and $prevpport.\n";
+		print "  Port mapping is not consistent with last swap.\n";
+		$okswap = 0;
+	    }
+	    if ($okswap) {
+		$portmap{$vnodeport} = $prevpport;
+	    }
+	}
+    }
+}
+
+######################################################################
+# Step 4 - Upload to DB
+#
+# Nothing fancy.
+######################################################################
+printdb "Uploading to DB\n";
+foreach $vlan (keys(%vlans)) {
+    ($lan,$members) = @{$vlans{$vlan}};
+    $dbh->do("insert into vlans (id,pid,eid,virtual,members) values" .
+	     " (0,\"$pid\",\"$eid\",\"$lan\",\"" .
+	     join(" ",@$members) . "\")") || do {
+		 print STDERR "Could not update vlans table.  Giving up.\n";
+		 exit(1);
+	     };
+}
+foreach $delay (keys(%delays)) {
+    ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
+	@{$delays{$delay}};
+    # XXX - card0/card1 will eventually vanish.  This is just a temporary
+    # hack for things to work at the same time as the previous generation
+    # of software.
+    ($card0) = ($int0 =~ /^eth(\d+)$/);
+    ($card1) = ($int1 =~ /^eth(\d+)$/);
+    $dbh->do("insert into delays" .
+	     " (pid,eid,node_id,iface0,iface1,card0,card1" .
+	     ",delay,bandwidth,lossrate,vname)" .
+	     " values (\"$pid\",\"$eid\",\"$pnode\",\"$int0\",\"$int1\"".
+	     ",$card0,$card1,$delay,$bandwidth" .
+	     ",$lossrate,\"$vname\")") || do {
+		 print STDERR "Could not update delays table.  Giving up.\n";
+		 exit(1);
+	     };
+}
+$dbh->do("delete from portmap where pid=\"$pid\" and eid=\"$eid\"") || do {
+    print STDERR "Could not clear portmap table.  Giving up.\n";
+    exit(1);
+};
+foreach $vnodeport (keys(%portmap)) {
+    ($vnode,$vport) = split(":",$vnodeport);
+    $pport = $portmap{$vnodeport};
+    $dbh->do("insert into portmap (pid,eid,vnode,vport,pport)" .
+	     " values (\"$pid\",\"$eid\",\"$vnode\"" .
+	     ",\"$vport\",\"$pport\")") || do {
+		 print STDERR "Could not update portmap table.  Giving up.\n";
+		 exit(1);
+	     };
+    # Shark Hack
+    if ($nodes{$vnode} eq "shark-shelf") {
+	$shelf = $v2pmap{$vnode};
+	$i = 1;
+	foreach $shark (@{$sharkshelves{$vnode}}) {
+	    $dbh->do("update interfaces set IPalias=\"$ips{$shark}\" where" .
+		     " node_id = \"$shelf-$i\"") || do {
+			 print STDERR "Could not update IPalias for $shelf-$i.\n";
+			 exit(1);
+		     };
+	    $i++;
+	}
+    } else {
+	$dbh->do("update interfaces set IP=\"$ips{$vnodeport}\" where" .
+		 " node_id = \"$v2pmap{$vnode}\" and iface = \"$pport\"") || do {
+		     print STDERR "Could not update interfaces table.\n" .
+			 "  Giving up.\n";
+		     exit(1);
+		 };
+    }
+    # End Shark Hack
+}
+# Load delay_osids for types
+$sth = $dbh->prepare("SELECT type,delay_osid from node_types");
+$sth->execute;
+while (($type,$delayosid) = $sth->fetchrow_array) {
+    $delayosids{$type} = $delayosid;
+}
+$sth->finish;
+@nodepairs = ();
+foreach $pnode (keys(%p2vmap)) {
+    if (defined($sharkshelves{$p2vmap{$pnode}})) {
+	$i = 1;
+	foreach $sharknodeport (@{$sharkshelves{$p2vmap{$pnode}}}) {
+	    $shark = (split(":",$sharknodeport))[0];
+	    push(@nodepairs,["$pnode-$i",$shark]);
+	    $i++;
+	}
+    } else {
+	push(@nodepairs,[$pnode,$p2vmap{$pnode}]);
+    }
+}
+foreach $pair (@nodepairs) {
+    ($pnode,$vnode) = @$pair;
+    $sth = $dbh->prepare("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
+			  "tarfiles from virt_nodes where pid=\"$pid\"" .
+			  " and eid=\"$eid\" and vname=\"$vnode\"");
+    $sth->execute;
+    # The if statement will cause us to skip nodes that belong to
+    # the experiment but aren't virtual.  I.e. delay nodes.
+    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles) = 
+	$sth->fetchrow_array) {
+	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"$osid\"," .
+		       " def_boot_cmd_line=\"$cmdline\"," .
+		       " startstatus=\"none\"," .
+		       " ready=0," .
+		       " rpms=\"$rpms\"," .
+		       " deltas=\"$deltas\"," .
+		       " tarballs=\"$tarfiles\"," .
+		       " startupcmd=\"$startupcmd\"" .
+		       " where node_id=\"$pnode\"")) {
+	    print STDERR "Could not update nodes table.\n" .
+		"  Giving up.\n";
+	    exit(1);
+	} 
+    } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
+	# Delay node
+	# Figure out delay osid
+	$sth2 = $dbh->prepare("SELECT type from nodes" .
+			      " where node_id=\"$pnode\"");
+	$sth2->execute;
+	($type) = $sth2->fetchrow_array;
+	$sth2->finish;
+	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"" .
+		       $delayosids{$type} . "\"," .
+		       " startstatus=\"none\"," .
+		       " ready=0" .
+		       " where node_id=\"$pnode\"")) {
+	    print STDERR "Could not update nodes table.\n" .
+		"  Giving up.\n";
+	    exit(1);
+	}
+    }
+    $sth->finish;
+}
+
+foreach $pnode (keys(%p2vmap)) {
+    $dbh->do("update reserved set vname=\"$p2vmap{$pnode}\"" .
+	     " where node_id = \"$pnode\"") || do {
+		 print STDERR "Could not update reserved table. Giving up.\n";
+		 exit(1);
+	     };
+}
+

@@ -2,31 +2,32 @@
 
 # tbprerun
 
-# This is the first program in the tbprerun/tbrun/tbend sequence.
-# It's main purpose is to parse the NS input and translate this into
-# IR and database.
+# This is the first program in the
+# tbprerun/tbswapin/tbswapout/.../tbend sequences.  It's main purpose
+# is to interpret the NS file and create the appropriate entries in
+# virt_nodes and virt_lans.  After this script ends successfully the
+# NS file is no longer necessary.
 
-# Settings
-# maxruns is the maximum number of times to run the assignment loop
-$maxruns = 5;
+use DBI;
 
-# Setting up the paths
+# Set up paths
+$TBDB = "@TBDBNAME@";
 $TBROOT = "@prefix@";
-
 $TBSETUPLIB = "$TBROOT/lib";
-$TBIRLIB = "$TBROOT/lib/ir";
-
-$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ir" 
-    . ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin";
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
+    ":$TBROOT/sbin:$TBROOT/bin";
 push(@INC,$TBSETUPLIB);
-push(@INC,$TBIRLIB);
+
+# This is the average number of delay links that can go through a
+# delay node.  To calculate this number take 1/2 the interfaces
+# rounded down on every node capable node in the testbed and average
+# them.
+$DELAYCAPACITY = @DELAYCAPACITY@;
 
 # Turn off line buffering.
 $| = 1; 
 
 require libtbsetup;
-require libir;
-require 'ctime.pl';
 
 if ($#ARGV < 2 || $#ARGV > 3 ||
     ($#ARGV == 3 && $ARGV[0] ne "-nologfile")) {
@@ -43,21 +44,10 @@ else {
 }
 ($pid,$eid,$nsfile) = @ARGV;
 
+$dbh=&tbs_initdbi($TBDB);
+
 $prefix = &tbs_prefix($nsfile);
-$irfile = "$prefix.ir";
 $logfile = "$prefix.log";
-$ptopfile = "$$.ptop";
-$id = "$pid-$eid";
-
-$tbcmdfile = "tbcmds";
-
-# This will hold the list of nodes currently assigned.
-@nodes = ();
-
-# This routine is called after reservation and frees the reservation.
-sub cleanup {
-    &tbs_exec("nfree $pid $eid");
-};
 
 if ($dolog) {
     &tbs_initlog($logfile);
@@ -65,7 +55,6 @@ if ($dolog) {
 }
 
 &tbs_out("Input:  $nsfile\n");
-&tbs_out("Output: $irfile\n");
 &tbs_out("\n");
 &tbs_out("Beginning pre run for $pid-$eid ($nsfile). " 
 	 . &ctime(time) . "\n");
@@ -75,124 +64,102 @@ if (! -r $nsfile) {
     exit(1);
 }
 
-# remove a tbcmdfile is it exists
-if (-r $tbcmdfile) {
-    unlink $tbcmdfile;
+&tbs_out("Checking sanity.\n");
+$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" . 
+		   " and eid = \"$eid\"");
+$sth->execute();
+if (! (($state) = $sth->fetchrow_array())) {
+    &tbs_out("No entry in experiments table.  Insane.\n");
+    exit(1);
+}
+$sth->finish();
+if ($state ne "new") {
+    &tbs_out("Experiment is not in the proper state: $state\n");
+    exit(1);
 }
 
-&tbs_out("Parsing ns input.\n");
-if (&tbs_exec("parse.tcl $id $nsfile $irfile")) {
+$sth = $dbh->prepare("UPDATE experiments set state = \"prerunning\"" . 
+		     "where pid = \"$pid\" and eid = \"$eid\"");
+if (! $sth->execute()) {
+    &tbs_out("Failed to set intermediate state.\n");
+    exit(1);
+}
+$sth->finish();
+
+sub cleanup {
+    &tbs_out("Cleaning up\n");
+    &tbs_out("Clearing virtual state.\n");
+    if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
+		   " and eid = \"$eid\"")) {
+	
+	&tbs_out("Could not clear virt_nodes table.\n");
+    }
+    if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
+		   " and eid = \"$eid\"")) {
+	&tbs_out("Could not clear virt_lans table.\n");
+    }
+    if (! $dbh->do("UPDATE experiments set state = \"new\"" . 
+		   "where pid = \"$pid\" and eid = \"$eid\"")) {
+	&tbs_out("Could not reset experiment state.\n");
+    }
+};
+
+# This setups virt_nodes, virt_names including all IP address calculation
+# and tb-* handling.
+&tbs_out("Running parser.\n");
+if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
     &tbs_out("Parsing failed.\n");
     exit(1);
 }
-if (! -r $irfile) {
-    &tbs_out("Parse failed to produce output.\n");
-    &tbs_out("  Make sure you have a 'run' command in your ns file.\n");
+
+
+&tbs_out("Estimating resource usage.\n");
+$numnodes = $dbh->do("SELECT * from virt_nodes where pid=\"$pid\"" .
+		     " and eid=\"$eid\"");
+$min = $max = $numnodes;
+$bw_query = "";
+$sth = $dbh->prepare("SELECT max_speed from interface_types");
+$sth->execute();
+($speed) = $sth->fetchrow_array();
+$bw_query .= "bandwidth != $speed";
+while (($speed) = $sth->fetchrow_array()) {
+    $bw_query .= " and bandwidth != $speed";
+}
+$numdelays = $dbh->do("SELECT * from virt_lans where (delay != 0" . 
+		      " or lossrate != 0 or ($bw_query))" .
+		      " and pid=\"$pid\" and eid=\"$eid\"");
+$min += $numdelays/$DELAYCAPACITY;
+$max += $numdelays;
+$min = ceil($min);
+$max = ceil($max);
+
+# Shark hack
+$numsharks = $dbh->do("SELECT * from virt_nodes where type = \"shark\"" .
+		      " and pid=\"$pid\" and eid=\"$eid\"");
+$min -= $numsharks;
+$max -= $numsharks;
+# End Shark Hack
+
+&tbs_out("  Minimum $min  Maximum $max\n");
+$sth = $dbh->prepare("UPDATE experiments set minimum_nodes = $min," . 
+		     "maximum_nodes = $max where pid = \"$pid\"" . 
+		     "and eid = \"$eid\"");
+if (! $sth->execute()) {
+    &tbs_out("Failed to set estimates.\n");
+    cleanup;
     exit(1);
 }
+$sth->finish(); 
 
-&tbs_out("Preparing traffic generators.\n");
-if (&tbs_exec("conftrafgen $nsfile $tbcmdfile")) {
-    &tbs_out("Backward Compatability Failed.\n");
+&tbs_out("Marking as prerunned.\n");
+$sth = $dbh->prepare("UPDATE experiments set state = \"swapped\"" . 
+		     "where pid = \"$pid\" and eid = \"$eid\"");
+if (! $sth->execute()) {
+    &tbs_out("Failed to set state.\n");
+    cleanup;
     exit(1);
 }
-
-#&tbs_out("Backward Compatability.\n");
-if (&tbs_exec("extract_tb $nsfile $tbcmdfile")) {
-    &tbs_out("Backward Compatability Failed.\n");
-    exit(1);
-}
-
-#&tbs_out("Post parsing NS input.");
-if (&tbs_exec("postparse $tbcmdfile $irfile")) {
-    &tbs_out("Postparsing failed.\n");
-    exit(1);
-}
-
-# Now we do a loop with assign/nalloc until we work or give up
-$assign_exitval = 0;
-$run = 0;
-$done = 0;
-&tbs_out("Starting assignment.\n");
-%unodes = ();
-while ($done == 0) {
-    $run++;
-    if ($run > $maxruns) {
-	&tbs_out("Too many runs - Giving up.\n");
-	if ($assign_exitval) {
-	    exit($assign_exitval);
-	}
-	exit(1);
-    }
-    &tbs_out("Run: $run\n");
-
-    &tbs_out("Determining available resources.\n");
-    if (&tbs_exec("avail | ptopgen > $ptopfile")) {
-	&tbs_out("Failed to determine available resources.\n");
-	exit(1);
-    }
-    
-    &tbs_out("Allocating resources - This may take a while.\n");
-    $assign_exitval = &tbs_exec("assign_wrapper $irfile $ptopfile");
-    $assign_exitval = $assign_exitval >> 8;
-    if ($assign_exitval) {
-	&tbs_out("Failed to allocate resources.\n");
-    } else {
-	# now we need to read what resources are needed from the IR file
-	eval {&ir_read($irfile)};
-	if ($@) {
-	    &tbs_out("Could not read $irfile - ($@)\n");
-	    exit(1);
-	}
-	$raw = eval {&ir_get("/virtual/nodes")};
-	if ($@) {
-	    &tbs_out("Could not load /virtual/nodes - ???\n");
-	    exit(1);
-	}
-	@nodes = ();
-	foreach (split("\n",$raw)) {
-	    @info = split;
-	    push(@nodes,$info[1]);
-	}
-	
-	&tbs_out("Attempting to reserve resources.\n");
-
-	# make nodes unique
-	undef %unodes;
-	foreach (@nodes) {
-	    $unodes{$_} = 1;
-	}
-	if (&tbs_exec("nalloc $pid $eid " . join(" ",keys(%unodes)))) {
-	    &tbs_out("Could not reserve resources.\n");
-	} else {
-	    &tbs_out("Resources successfully reserved.\n");
-	    $done = 1;
-	}
-    }
-}
-
-#&tbs_out("Syncing database with assignment.\n");
-if (&tbs_exec("postassign $irfile")) {
-    &tbs_out("Error syncing.\n");
-    &cleanup();
-    exit(1);
-}
-
-#&tbs_out("!!! Any further errors will result in partial DB state.\n");
-
-&tbs_out("Allocating IP addresses.\n");
-if (&tbs_exec("handle_ip $irfile $tbcmdfile")) {
-    &tbs_out("Failed to allocate IP addresses.\n");
-    &cleanup();
-    exit(1);
-}
-
-&tbs_out("Setting up OS state.\n");
-if (&tbs_exec("handle_os $irfile")) {
-    &tbs_out("Failed to set up OS state.\n");
-    &cleanup();
-    exit(1);
-}
+$sth->finish();
 
 &tbs_out("Pre run finished - " . &ctime(time) . "\n");
 

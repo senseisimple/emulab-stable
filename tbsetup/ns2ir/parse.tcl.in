@@ -1,104 +1,312 @@
 #!/usr/local/bin/otclsh
+######################################################################
+# parse.tcl.in
+#
+# This is the testbed parser.  It takes a project id, an experiment
+# id and a NS file.  It will parse the NS file and update the DB.
+# It also displays warnings for unsupported functionality.
+#
+# See README for extensive discussion of the structure and 
+# implementation.
+#
+# -q will supress all the unsupported messages.
+# -n will cause the parser to output error/warning messages and exit
+#    without updating the database.
+######################################################################
 
-if {$argc != 3} {
-   puts "usage: $argv0 id ns_input_file ir_file"
-   exit 1
+package require sql
+
+# Initial Procedures
+
+###
+# lpop <listname>
+# This takes the *name* of a list variable and pops the first element
+# off of it, returning that element.
+###
+proc lpop {lv} {
+    upvar $lv l
+    set ret [lindex $l 0]
+    set l [lrange $l 1 end]
+    return $ret
 }
-set id [lindex $argv 0]
-set nsfile [lindex $argv 1]
-set irfile [lindex $argv 2]
-
-set tbroot @prefix@
-
-set libdir @prefix@/lib/ns2ir
-set tbcompat "$libdir/tb_compat.tcl"
-source $libdir/tcl-object.tcl
-source $libdir/node.tcl
-source $libdir/link.tcl
-source $libdir/event.tcl
-source $libdir/lan.tcl
 
 ###
-# calfeld@cs.utah.edu
-# This some ugly/interesting tcl hacking to figure out what variables the user
-# stored the node ids in.
+# var_import <varspec>
+# This procedure takes a fully qualified variable name (::x::y::z..) and
+# creates a variable z which is the same as the variable specified.  This
+# fills the lack of variable importing support in 'namespace import'.
+#
+# Example:
+#  proc a {} {
+#    var_import ::GLOBALS::verbose
+#    if {$verbose == 1} {puts "verbose is on."}
+#  }
+# is functionally identical to:
+#  proc a {} {
+#    if {${::GLOBALS::verbose} == 1} {puts "verbose is on."}
+#  }
 ###
-rename set real_set
-real_set skipset 0
-proc set {args} {
-    global skipset
-    global nodeid_map
-    global rid_map
-    if {! $skipset} {
-	real_set skipset 1
-	real_set var [lindex $args 0]
-	if {$var != "currnode" && $var != "currlan"} {
-	    if {[llength $args] > 1} {
-		# Munge var in case it's a variable
-		regsub -all {[(]} $var {-} out
-		real_set var $out
-		regsub -all {[)]} $var {} out
-		real_set var $out
-		real_set val [lindex $args 1]
-		if {([regexp {^n[0-9]+$} $val] != 0) ||
-		    ([regexp {^lan[0-9]+$} $val] != 0) ||
-		    ([regexp {^l[0-9]+$} $val] != 0)} {
-		    # Ok, we change it so that the variable will hold
-		    # it's own name.  We still need nodeid_map for
-		    # classes to find their names.  rid_map is the
-		    # reverse mapping of nodeid_map
-		    # XXX - might be cleaner to have a class variable
-		    # that we set here instead of using the nodeid_map.
-		    if {([llength $args] == 2) &&
-			(![info exists nodeid_map($val)])} {
-			real_set nodeid_map($val) $var
-			real_set rid_map($var) $val
-			real_set args [list [lindex $args 0] $var]
-		    }
-		}
-	    }
-	}
-	real_set skipset 0
-    }
-    if {[llength $args] == 1} {
-	return [uplevel real_set [lindex $args 0]]
+proc var_import {varspec} {
+    uplevel "upvar $varspec [namespace tail $varspec]"
+}
+
+###
+# perror <msg>
+# Print an error message and mark as failed run.
+###
+proc perror {msg} {
+    var_import ::GLOBALS::errors
+    puts stderr $msg
+    set errors 1
+}
+
+
+# Parse Arguments
+
+# We setup a few globals that we need for argument parsing.
+namespace eval GLOBALS {
+variable verbose 1
+variable impotent 0
+variable anonymous 0
+}
+
+while {$argv != {}} {
+    set arg [lindex $argv 0]
+    if {$arg == "-n"} {
+	lpop argv
+	set GLOBALS::impotent 1
+    } elseif {$arg == "-q"} {
+	lpop argv
+	set GLOBALS::verbose 0
+    } elseif {$arg == "-a"} {
+	lpop argv
+	set GLOBALS::anonymous 1
     } else {
-	return [uplevel real_set [lindex $args 0] \{[lindex $args 1]\}]
+	break
     }
 }
+
+if {${GLOBALS::anonymous} && ! ${GLOBALS::impotent}} {
+    puts stderr "-a can only be used with -n."
+    exit 1
+}
+
+if {${GLOBALS::anonymous} && ([llength $argv] != 1)} {
+    puts stderr "Syntax: $argv0 \[-q\] -n -a ns_file"
+    exit 1
+} elseif {(! ${GLOBALS::anonymous}) && ([llength $argv] != 3)} {
+    puts stderr "Syntax: $argv0 \[-q\] \[-n \[-a\]\] pid eid ns_file"
+    exit 1
+}
+
+# Now we can set up the rest of our global variables.
+namespace eval GLOBALS {
+    # Remaining arguments
+    if {$anonymous} {
+	variable pid "PID"
+	variable eid "EID"
+	variable nsfile [lindex $argv 0]
+    } else {
+	variable pid [lindex $argv 0]
+	variable eid [lindex $argv 1]
+	variable nsfile [lindex $argv 2]
+    }
+    
+    # This is used to name class instances by the variables they
+    # are stored in.  It contains the initial id of the most
+    # recently created class.  See README
+    variable last_class {}
+
+    # Some settings taken from configure.
+    variable tbroot @prefix@
+    variable libdir @prefix@/lib/ns2ir
+
+    # This is the location of the tb_compat.tcl file.  It is copied
+    # into the same directory is the ns file so that the initial
+    # 'source tb_compat.tcl' statement succeeds.
+    variable tbcompat "$libdir/tb_compat.tcl"
+
+    # Is 1 if any errors have occured so far.
+    variable errors 0
+    
+    # Is 1 after a 'Simulator run' command.
+    variable ran 0
+
+    # This is a counter used by the 'new' procedure to create null
+    # classes.
+    variable new_counter 0
+
+    # This will hold the handle for the database connection
+    variable DB {}
+}
+
+# Connect to the DB
+set GLOBALS::DB [sql conn]
+sql selectdb ${GLOBALS::DB} @TBDBNAME@
+
+# Load all our classes
+source ${GLOBALS::libdir}/nsobject.tcl
+source ${GLOBALS::libdir}/sim.tcl
+source ${GLOBALS::libdir}/lanlink.tcl
+source ${GLOBALS::libdir}/node.tcl
+source ${GLOBALS::libdir}/null.tcl
+source ${GLOBALS::libdir}/traffic.tcl
+
+##################################################
+# Redifing Assignment
+#
+# Here we rewrite the set command.  The global variable 'last_class'
+# holds the name instance created just before set.  If last_class is set
+# and the value of the set call is last_class then the value should be
+# changed to the variable and the class renamed to the variable.  I.e.
+# we are making it so that NS objects are named by the variable they
+# are stored in.
+#
+# We only do this if the level above is the global level.  I.e. if
+# class are created in subroutines they keep their internal names
+# no matter what.
+#
+# We munge array references from ARRAY(INDEX) to ARRAY-INDEX.
+#
+# Whenever we rename a class we call the rename method.  This method
+# should update all references that it may have set up to itself.
+#
+# See README
+##################################################
+rename set real_set
+proc set {args} {
+    var_import GLOBALS::last_class
+
+    # There are a bunch of cases where we just pass through to real set.
+    if {[llength $args] == 1} {
+	return [uplevel real_set \{[lindex $args 0]\}]
+    } elseif {([info level] != 1) || ($last_class == {})} {
+	return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
+    }
+
+    # At this point this is an assignment immediately after class creation.
+    real_set var [lindex $args 0]
+    real_set val [lindex $args 1]
+    if {$val == $last_class} {
+	# Here we change ARRAY(INDEX) to ARRAY-INDEX
+	regsub -all {[\(]} $var {-} out
+	regsub -all {[\)]} $out {} val
+	# Sanity check
+	if {! [catch "uplevel info args $val"]} {
+	    error "Already have an object named $val."
+	}
+	# And now we rename the class.  After the class has been
+	# renamed we call it its rename method.
+	uplevel rename $last_class $val
+	uplevel $val rename $last_class $val
+    }
+    
+    # Reset last_class in all cases.
+    real_set last_class {}
+    
+    # And finally we pass through to the actual assignment operator.
+    return [uplevel real_set \{$var\} \{$val\}]
+}
+
 ###
+# new <class> ...
+# NS defines the new command to create class instances.  If the call is
+# for an object we know about we create and return an instance.  For 
+# any classes we do not know about we create a null class and return it
+# as well as display an unsupported message.
+#
+# new_classes is an array in globals that defines the classes
+# new should support.  The index is the class name and the value
+# is the argument list.
+#
+# TODO: Implement support for classes that take arguments.  None yet
+# in supported NS subset.
+###
+namespace eval GLOBALS {
+    variable new_classes
+    set new_classes(Simulator) {}
+}
+proc new {class args} {
+    var_import GLOBALS::new_counter
+    var_import GLOBALS::verbose
+    var_import GLOBALS::new_classes
+    if {! [info exists new_classes($class)]} {
+	if {$verbose} {
+	    puts stderr "Unsupported object: $class"
+	}
+	set id null[incr new_counter]
+	NullClass $id
+	return $id
+    }
+    if {$args != {}} {
+	if {$verbose} {
+	    puts stderr "Unsupported args for $class."
+	}
+    }
+    set id $class[incr new_counter]
+    eval $class $id 
+    return $id
+}
 
-#nop is used for unimplemented $ns instprocs that are supposed to
-#return things. the instproc returns a nop, which users call in their
-#ns input file. 
-proc nop {args} {}
+# Useful routines.
 
-#begin at 0. 1,2,3... i cheerfully ignore the possibility of wrapping...
-set nodeID 0
-set linkID 0
-set lanID 0
-set eventID 0
+# parse_bw bspec 
+# This takes a bandwidth specifier in the form of <amt><unit> where
+# <unit> is any of b, bps, kb, kbps, Mb, Mbps, Gb, or Gbps.  If no
+# unit is given then bytes (b) is assumed.  It returns the bandwidth
+# in Mbps.
+proc parse_bw {bspec} {
+    # Default to bytes
+    if {[scan $bspec "%f%s" bw unit] == 1} {
+	set unit b
+    }
+    
+    switch -- $unit {
+	b {return [expr int($bw/1000000)]} 
+	bps {return [expr int($bw/1000000)]} 
+	kb {return [expr int($bw/1000)]}
+	kbps {return [expr int($bw/1000)]}
+	Mb {return [expr int($bw)]}
+	Mbps {return [expr int($bw)]}
+	Gb {return [expr int($bw*1000)]}
+	Gbps {return [expr int($bw*1000)]}
+	default {
+	    perror "ERROR: Unknown bandwidth unit $unit."
+	    return 100
+	}
+    }
+}
 
-set nodelist {}
+# parse_delay dspec
+# This takes a delay specifier in the form of <amt><unit> where <unit>
+# is any of s, ms, ns.  If no unit is given then seconds (s) is
+# assumed.  It returns the delay in ms.
+proc parse_delay {dspec} {
+    # Default to seconds
+    if {[scan $dspec "%f%s" delay unit] == 1} {
+	set unit s
+    }
+    switch $unit {
+	s {return [expr int($delay*1000)]}
+	ms {return [expr int($delay)]}
+	ns {return [expr int($delay/1000)]}
+	default {
+	    perror "ERROR: Unknown delay unit $unit."
+	    return 0
+	}
+    }
+}
 
-set linkslist {}
+# We now have all our infrastructure in place.  We are ready to load
+# the NS file.
 
-set eventlist {}
+file copy -force ${GLOBALS::tbcompat} [file dirname ${GLOBALS::nsfile}]
+source ${GLOBALS::nsfile}
 
-set lanlist {}
+# Clean up
+sql disconnect ${GLOBALS::DB}
 
-# sim.tcl handles the ns Simulator methods
-source $libdir/sim.tcl
-
-# stubs.tcl contains a lot of dummy things to allow execution of 
-# ns files without going through the trouble of redoing ns or something.
-# i fear that it will grow without bound (or at least until I give up and
-# make this whole thing into an ns add-on and keep all of the ns behavior)
-
-source $libdir/stubs.tcl
- 
-set prefix $id
-
-# Copy in tb_compat.tcl
-file copy -force $tbcompat [file dirname $nsfile]
-source $nsfile
+if {${GLOBALS::ran} == 0} {
+    perror "ERROR: No 'Simulator run' statement found."
+}
+exit ${GLOBALS::errors}

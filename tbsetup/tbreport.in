@@ -6,92 +6,128 @@
 my $TBROOT = "@prefix@";
 my $DBNAME = "tbdb";
 
-push(@INC,"$TBROOT/lib/ir");
-require libir;
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 use DBI;
 $dbh = DBI->connect("DBI:mysql:database=$DBNAME;host=localhost") 
     || die "Could not connect to DB.\n";
 
 
-if ($#ARGV == 3) {
-    ($v,$pid,$eid,$irfile) = @ARGV;
+$verbose = 0;
+if ($#ARGV == 2) {
+    ($v,$pid,$eid) = @ARGV;
     if ($v ne "-v") {
-	print STDERR "Syntax: $0 [-v] pid eid irfile\n";
+	print STDERR "Syntax: $0 [-v] pid eid\n";
 	exit(1);
     }
-} elsif ($#ARGV == 2) {
-    ($pid,$eid,$irfile) = @ARGV;
+    $verbose = 1;
+} elsif ($#ARGV == 1) {
+    ($pid,$eid) = @ARGV;
 } else {
-    print STDERR "Syntax: $0 [-v] pid eid irfile\n";
+    print STDERR "Syntax: $0 [-v] pid eid\n";
     exit(1);
 }
 
-
-
-eval {&ir_read($irfile)};
-if ($@) {
-    print STDERR "Could not read $irfile: $@\n";
+# Experiment
+$sth=$dbh->prepare("SELECT state from experiments where" . 
+		   " pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute();
+if (! ($state = $sth->fetchrow_array())) {
+    print STDERR "Can not find experiment $eid.\n";
     exit(1);
 }
-
-# Display node map
-$raw = eval {&ir_get("/virtual/nodes")};
-if ($@) {
-    print STDERR "Could not read /virtual/nodes from IR file!\n";
-    exit(1);
-}
-print "Node Mapping:\n";
-printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
-print "--------------- --------------- --------------------\n";
-foreach (split("\n",$raw)) {
-    ($v,$p) = split;
-    printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.emulab.net";
-}
-
-# Display IP addresses
-#  $raw = eval {&ir_get("/topology/lans")};
-#  if ($@) {
-#      print STDERR "Could not read /topology/lans from IR file!\n";
-#      exit(1);
-#  }
-#  foreach (split("\n",$raw)) {
-#      @info = split;
-#      $lan = @info[0];
-#      $lans{$lan} = 1;
-#  }
-$raw = eval {&ir_get("/ip/mac")};
-if ($@) {
-    print STDERR "Could not read /ip/mac from IR file!\n";
-    exit(1);
-}
-foreach (split("\n",$raw)) {
-    ($mac,$ip) = split;
-    $ipmac{$ip} = $mac;
-}
-
-$raw = eval {&ir_get("/ip/map")};
-if ($@) {
-    print STDERR "Could not read /ip/map from IR file!\n";
-    exit(1);
-}
+$sth->finish();
+print "Experiment: $eid\n";
+print "State: $state\n";
 print "\n";
-print "IP Addresses:\n";
-printf "%-15s %-5s %-20s %-20s\n", "Node", "IFC", "Destination", "IP";
-print "--------------- -------------------- --------------------\n";
-foreach (split("\n",$raw)) {
-    ($src,$dst,$ip) = split;
-    if (defined($ipmac{$ip})) {
-	$mac = $ipmac{$ip};
-	$sth = $dbh->prepare("SELECT card FROM interfaces WHERE mac = \"$mac\"");
-	if ($sth->execute != 0) {
-	    ($ifc) = $sth->fetchrow_array;
+
+if (($state ne "swapped") && ($state ne "active")) {
+    # nothing to do
+    print "No more information available.\n";
+    exit(0);
+}
+
+# Virtual
+# Display node info
+$sth=$dbh->prepare("SELECT vname,ips,osid,cmd_line,rpms,deltas,startupcmd," .
+		   "tarfiles,type from virt_nodes where pid=\"$pid\"" .
+		   " and eid=\"$eid\"");
+$sth->execute();
+print "Node Info:\n";
+printf "%-15s %-10s %-15s\n", "ID", "Type", "OSID";
+print "--------------- ---------- ---------------\n";
+while (($vname,$ips,$osid,$cmd_line,$rpms,$deltas,$startupcmd,$tarfiles,$type) 
+       = $sth->fetchrow_array()) {
+    printf "%-15s %-10s %-15s\n", $vname, $type, $osid;
+    if ($verbose) {
+	if ($cmd_line ne "") {
+	    printf "   %-17s %s\n", "Command Line:", $cmd_line;
 	}
-	$sth->finish;
-    } else {
-	$ifc = "?";
+	if ($startupcmd ne "") {
+	    printf "   %-17s %s\n", "Startup Command:", $startupcmd;
+	}
+	if ($rpms ne "") {
+	    printf "   %-17s %s\n", "RPMS:", $rpms;
+	}
+	if ($deltas ne "") {
+	    printf "   %-17s %s\n", "Deltas:", $deltas;
+	}
+	if ($tarfiles ne "") {
+	    printf "   %-17s %s\n", "Tarfiles:", $tarfiles;
+	}
     }
-    printf "%-15s eth%-2s %-20s %-20s\n", $src, $ifc, $dst, $ip;
+    foreach $ipinfo (split(" ",$ips)) {
+	($port,$ip) = split(":",$ipinfo);
+	$ipmap{"$vname:$port"} = $ip;
+    }
+}
+$sth->finish();
+print "\n";
+
+# Display link info
+if ($state eq "swapped") {
+    $sth=$dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+    $sth->execute();
+    print "Lan/Link Info:\n";
+    printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", "ID", "Member", "IP", "Delay", "Bandwidth", "Loss Rate";
+    print "--------------- ---------- --------------- ---------- ---------- ----------\n";
+    while (($vname,$member,$delay,$bandwidth,$lossrate) 
+	   = $sth->fetchrow_array()) {
+	printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", $vname, $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+    }
+    $sth->finish();
+    print "\n";
+}
+
+# Mapping
+if ($state eq "active") {
+    print "Node Mapping:\n";
+    printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
+    print "--------------- --------------- --------------------\n";
+    $sth = $dbh->prepare("SELECT vname,node_id from reserved" .
+			 " where pid=\"$pid\" and eid=\"$eid\"");
+    $sth->execute();
+    while (($v,$p) = $sth->fetchrow_array()) {
+	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.emulab.net";
+    }
+    $sth->finish();
+    print "\n";
+
+    $sth=$dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+    $sth->execute();
+    print "Lan/Link Info:\n";
+    printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", "ID", "Member", "IP", "Delay", "Bandwidth", "Loss Rate";
+    print "--------------- ---------- --------------- ---------- ---------- ----------\n";
+    while (($vname,$member,$delay,$bandwidth,$lossrate) 
+	   = $sth->fetchrow_array()) {
+	printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", $vname, $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+    }
+    $sth->finish();
 }
 
 0;

@@ -25,6 +25,11 @@ my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
 
+#
+# Ug, exit value from startexp when not enough nodes.
+# 
+my $TOOFEWNODES = 2;
+
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $startexp = "$TB/bin/startexp";
@@ -333,9 +338,9 @@ sub startexp($)
     $query_result =
 	DBquery("insert into experiments ".
 		"(eid, pid, expt_created, expt_name, ".
-		"expt_head_uid, expt_start, expt_ready, batchmode) ".
+		"expt_head_uid, expt_start, state, batchmode) ".
 		"VALUES ('$eid', '$pid', '$rightnow', '$longname', ".
-		"'$creator', '$rightnow', 0, 1)");
+		"'$creator', '$rightnow', 'new', 1)");
     if (! $query_result) {
 	fatal("DB error inserting experiment record. Quitting ...\n");
     }
@@ -387,8 +392,9 @@ sub startexp($)
 		    "attempts=attempts+1 where eid='$eid' and pid='$pid'");
 	$attempts++;
 
-	if (($exit_status == 77 && $attempts >= 9 && (($attempts % 9) == 0)) ||
-	    (($exit_status != 77) && ($attempts % 5) == 0) ||
+	if (($exit_status == $TOOFEWNODES && $attempts >= 9 &&
+	     (($attempts % 9) == 0)) ||
+	    (($exit_status != $TOOFEWNODES) && ($attempts % 5) == 0) ||
 	    ($attempts == 0)) {
 	    
 	    fatal("Could not configure Batch Mode experiment $pid/$eid\n".

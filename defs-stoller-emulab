@@ -5,5 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=stoller-emulab
 TBOPSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 TBLOGSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
+IPBASE=192.168
+DELAYCAPACITY=2
 
 

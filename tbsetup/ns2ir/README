@@ -1,0 +1,248 @@
+Parser README
+
+Operation
+---------
+
+parse.tcl [-q] [-n] pid eid ns_file
+
+-q - Quiet Mode - Omit messages about unsupported features.
+-n - Impotent Mode - Do not update DB; just display any messages and exit.
+
+parse.tcl will interpret the NS file including all TB commands and
+update the virt_lans, and virt_nodes tables appropriately.  parse.tcl
+also fills in any unassigned IP addresses.
+
+The following objects exist in the top level namespace:
+
+Namespaces: GLOBALS, TBCOMPAT
+OTcl Classes: Link, Lan, LanLink, Node, Simulator, Null
+Procedures: real_set, lpop, var_import, perror, new
+
+In addition all the tb-* commands exist as top level procedures.
+
+======================================================================
+
+Everything that follows is written to provide a basic background for
+understanding and modifying the code.
+
+Basic Structure
+---------------
+
+The parser works by setting up an API nearly identical to that that NS
+presents.  As the input file uses this API a topology is built up
+internally.  The parser also extends the API with a number of testbed
+specific commands.  These annotate the topology with additional
+information.  Finally, when the 'run' method is invoked on the
+simulator class, the parser fills in any unassigned IP addresses and
+updates the database.
+
+parse.tcl - This file checks arguments, loads the other files, and
+defines common state.
+
+tb_compat.tcl - This file contains the implementation of all the
+testbed specific (tb-*) commands.
+
+node.tcl - This defines the Node class.
+
+lanlink.tcl - This defines the LanLink class and its two child classes
+Lan and Link.
+
+sim.tcl - This defines the Simulator class.
+
+null.tcl - This defines the Null class which is used to allow
+unsupported API calls.
+
+
+Object Naming
+-------------
+
+The trickiest part of the parser is the way it names objects.  Since
+the nodes, lans, and links created in the NS file have existence
+outside of the parser and are visible to the user they must have
+meaningful names.  The most intuitive name for an object is that of
+the variable the holds the object.  I.e. the following command:
+
+set router [$ns node]
+
+should create a node named 'router'.  There is a difficulty however,
+in that, the class instance is created before the assignment and thus
+there is no way to create the class with the proper name.
+
+The solution to this is to rename classes as part of the assignment.
+This is accomplished by redefining the assignment operator, 'set'.  In
+almost all cases 'set' behaves as normal.  However, when the Simulator
+class creates a NS object (in make-lan, node, or duplex-link) it sets
+the last_class globals variable to be the name of the just created
+class.  The next call to 'set' will compare the value of the
+assignment with the last_class variable.  If they match it will rename
+the class to the name of the variable and then set the value of the
+variable to its name.
+
+Example:
+
+set router [$ns node]
+
+does the following:
+
+1. Call 'node' method of the Simulator class.
+  Creates a Node object with an internal name, say 'node1'.
+  Set last_class variable to 'node1'.
+  Return 'node1'
+2. Call 'set' with variable of 'router' and value of 'node1'.
+  As the value equals last_class this is not a normal assignment.
+  Rename node1 to router.
+  Set router variable to have value of 'router'.
+  Clear last_class.
+  Return 'router' (normal set behavior)
+
+So after the statement completes there is a new Node instance named
+'router' and the router variable has the value 'router'.  I.e.:
+
+puts $router
+
+will display "router" to stdout.
+
+Renaming an object involves changing the name of the instance and
+changing any references that were created during its creation.
+Changing the name of the instance is easily done directly by 'set'.
+In order to change references each class has a 'rename' method which
+takes the old and the new name.  In addition each class involved and
+the Simulator class have two other methods: rename_node and
+rename_lanlink.  These two methods take an old and a new name and
+should change any references they contain to the old name to now refer
+to the new name.  Thus, the rename method calls the appropriate
+rename_* method in all class instances that may refer to it.  
+
+Example: The rename method of the Lan class looks something like this:
+
+rename old new:
+	sim rename_lanlink old new
+	foreach node in members
+		node rename_lanlink old new
+
+
+Unsupported Methods/Classes
+---------------------------
+
+NS defines a large and rich API, most of which is not supported by the
+testbed.  The parser allows for most of the API and displays warning
+messages of unsupported features.  
+
+In OTcl any class can define a 'unknown' method.  Any time a call to
+an undefined method is made the 'unknown' method is called with the
+method name and any arguments.  This is how the parser supports most
+of the NS API.
+
+In general the 'unknown' method returns a NULL value.  However,
+methods of the Simulator class usually return class instances which
+are used later in the NS file.  In order to support this an instance
+to the Null class is created and returned.
+
+The Null class defines only the 'unknown' method.  Thus any calls to
+it will result in unsupported messages.
+
+The 'new' procedure also always returns class instances.  Any calls to
+'new' for classes that the parser does not know about will result in a
+Null class being created and returned.
+
+This approach allows nearly all NS API to be parsed without
+duplicating large portions of the NS code.  It does, however, have the
+failing that much more than the NS API is valid.  For example:
+
+set foo [new bar]
+$foo order_pizza now
+
+set ns [new Simulator]
+set myhouse [$ns house]
+$myhouse open door for dog
+
+are valid NS files.  However, both will result in several warning
+messages.
+
+Lans and Links
+--------------
+
+NS distinguishes between Lans and Links.  The Testbed however does
+not.  I.e. the following two commands are equivalent:
+
+set mylink [$ns duplex-link $n1 $n2 100Mb 50ms DropTail]
+set mylink [$ns make-lan "$n1 $n2" 100Mb 50ms]
+
+The parser works by having a single class LanLink which it uses in
+both cases.  However, for type checking, it uses two children classes
+of LanLink, Lan and Link.  Both classes makes no changes to LanLink.
+They exist to provide a way for the various method and tb-* commands
+to type check arguments.
+
+Ports
+-----
+
+The parser has a concept of a virtual port.  These are simple integers
+that start at 0 and go up as LanLinks are created and connected to
+nodes.  The Node class defines 'add_lanlink' which connects a LanLink
+to a node and returns the port number.  Whenever a port is directly
+referred to it is by this number.  Virtual ports always start at 0 and
+are continuous.
+
+
+tb-* Commands
+-------------
+
+The file tb_compat.tcl should be loaded 'source tb_compat.tcl' by any
+NS file that wishes to use them.  This allows NS files to still be run
+in NS without modification merely by providing a different
+tb_compat.tcl file.
+
+The tb_compat.tcl file defines all the tb-* procedures.  Each
+procedure checks its arguments and then modifies the topology
+appropriately.  tb-* commands generally fall into three categories:
+
+IP address: These commands all convert into calls to the internal
+procedure 'set-ip'.  'set-ip' takes a node, a LanLink the node is
+connected to, and an IP address, and sets the IP address for the
+appropriate port on the node.
+
+Node state: These commands after checking their arguments all set a
+variable in the appropriate node instance.
+
+Link state: These commands check their arguments, determine which
+LanLink is being referred to, and set a variable in the LanLink
+instance.  The Simulator class provides a 'find_link' method which
+takes a source/destination pair and returns a link.  This method is
+used by some of these commands to map such pairs.
+
+
+IP Addresses
+------------
+
+As the NS file runs calls to tb-* commands will set the IP addresses
+for some node:port pairs.  When the 'run' method of the Simulator
+class is called any node:port's without IP addresses are assigned IP
+addresses.  The algorithm attempts to insure that all IP addresses on
+a LanLink are in the same subnet and that subnets are globally
+unique.  
+
+The 'run' method invokes a 'fill_ips' method on each LanLink.  If any
+members of the LanLink have a defined IP the subnet is taken from this
+IP.  Otherwise, the 'get_subnet' method of the Simulator is called to
+get a unique subnet.  Then any unassigned IP addresses are assigned IP
+addresses, starting at 2, and skipping any that are already used.
+
+'get_subnet' creates subnets starting at 192.168.1 and going up,
+skipping any that have already been used by tb-* commands.
+
+There is a limitation of 253 nodes per LanLink due to the IP
+algorithm.  LANs larger than this will need all their IP addresses
+set manually via the tb-* commands.
+
+
+Updating the DB
+---------------
+
+Every Node and LanLink defines an updatedb method which dumps its
+state to the DB.  Each class instance corresponds to a single row in
+either virt_nodes or virt_lans.
+
+
+
+

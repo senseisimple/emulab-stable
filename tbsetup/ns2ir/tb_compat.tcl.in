@@ -1,91 +1,249 @@
 # This is the tb_compact.tcl that deals with all the TB specific commands.
 # It should be loaded at the beginning of any ns script using the TB commands.
 
-# Open up the tbcmds file
-if {[catch "open tbcmds w" TBCMD]} {
-    puts stderr "Fatal Error: Could not open tbcmds file for writing."
-    exit 1
+# We set up some helper stuff in a separate namespace to avoid any conflicts.
+namespace eval TBCOMPAT {
+    var_import ::GLOBALS::DB
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+
+    # This is regular expression that matches slightly more than valid
+    # IP addresses.  The only thing it doesn't check is that IP 
+    # addresses are in range (i.e. 0-255).
+    variable IP {^([0-9]{1,3}\.){3,3}[0-9]{1,3}$}
+
+    # This is an RE to match a floating point number.
+    variable FLOAT {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)}
+    
+    # This is a general procedure that takes a node, an object (lan or link)
+    # it is connected to, and an IP address, and sets the IP address
+    # for the node on that object.  It checks both the validity of the
+    # IP addresses and the fact that the node is actually a member of the
+    # lan/link.
+    proc set-ip {node obj ip} {
+	variable IP
+	set caller [lindex [info level -1] 0]
+	if {[regexp $IP $ip] == 0} {
+	    perror "ERROR: $caller - $ip is not a valid IP address."
+	    return
+	}
+	set port [$node find_port $obj]
+	if {$port == -1} {
+	    perror "ERROR: $caller - $node is not connected to $obj."
+	    return
+	}
+	$node ip $port $ip
+    }
+
+    # Let's set up a hwtypes table that contains all valid hardware types.
+    variable hwtypes
+    sql query $DB "select type from node_types"
+    while {[set row [sql fetchrow $DB]] != ""} {
+	set hwtypes($row) 1
+    }
+    sql endquery $DB
+
+    # And a os table with valid OSIDs
+    # We omit this check in anonymous mode.
+    if {!${GLOBALS::anonymous}} {
+	variable osids
+	sql query $DB \
+	    "select osid from os_info where pid is NULL or pid = \"$pid\""
+	while {[set row [sql fetchrow $DB]] != ""} {
+	    set osids($row) 1
+	}
+	sql endquery $DB
+    }
 }
 
+# IP addresses routines.  These all do some checks and convert into set-ip
+# calls.
 proc tb-set-ip {node ip} {
-    global TBCMD 
-    puts $TBCMD "tb-set-ip $node $ip"
+    $node instvar portlist
+    if {[llength $portlist] != 1} {
+	perror "Error: tb-set-ip - $node does not have a single connection."
+	return
+    }
+    ::TBCOMPAT::set-ip $node [lindex $portlist 0] $ip
 }
 proc tb-set-ip-interface {src dst ip} {
-    global TBCMD 
-    global linkmap prefix lanlist
-    if {[info exists linkmap($src:$dst)]} {
-	real_set linkname $linkmap($src:$dst)
-	puts $TBCMD "tb-set-ip-link $src $prefix-$linkname $ip"
-    } elseif {([lsearch $lanlist $dst] != -1)} {
-	tb-set-ip-lan $src $dst $ip
-    } else {
-	print stderr "No link exists between $src and $dst."
-	exit 1
+    set sim [$src set sim]
+    set reallink [$sim find_link $src $dst]
+    if {$reallink == {}} {
+	perror \
+	    "ERROR: tb-set-ip-interface - No connection between $src and $dst."
+	return
     }
+    ::TBCOMPAT::set-ip $src $reallink $ip
 }
 proc tb-set-ip-lan {src lan ip} {
-    global TBCMD 
-    global prefix
-    puts $TBCMD "tb-set-ip-lan $src $prefix-$lan $ip"
+    if {[$lan info class] != "Lan"} {
+	perror "ERROR: tb-set-ip-lan - $lan is not a LAN."
+	return
+    }
+    ::TBCOMPAT::set-ip $src $lan $ip
 }
 proc tb-set-ip-link {src link ip} {
-    global TBCMD prefix
-    puts $TBCMD "tb-set-ip-link $src) $prefix-$link $ip"
-}
-proc tb-set-hardware {node type args} {
-    global TBCMD 
-    puts $TBCMD "tb-set-hardware $node $type $args"
-}
-proc tb-set-node-os {node os} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-os $node $os"
-}
-proc tb-set-link-loss {srclink args} {
-    global TBCMD 
-    global linkmap prefix
-    if {[llength $args] == 2} {
-	set dst [lindex $args 0]
-	set loss [lindex $args 1]
-	if {[info exists linkmap($srclink:$dst)]} {
-	    real_set linkname $linkmap($srclink:$dst)
-	    puts $TBCMD "tb-set-link-loss $prefix-$linkname $loss"
-	} else {
-	    puts stderr "No link between $srclink and $dst."
-	    exit 1
-	}
-    } elseif {[llength $args] == 1} {
-	set loss [lindex $args 0]
-	puts $TBCMD "tb-set-link-loss $prefix-$srclink $loss"
-    } else {
-	puts stderr "tb-set-link-loss takes 2 or 3 parameters."
-	exit 1
+    if {[$link info class] != "Link"} {
+	perror "ERROR: tb-set-ip-link - $link is not a link."
+	return
     }
-}
-proc tb-set-lan-loss {lan rate} {
-    global TBCMD prefix
-    puts $TBCMD "tb-set-lan-loss $prefix-$lan $rate"
-}
-proc tb-set-node-cmdline {node cmdline} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-cmdline $node $cmdline"
-}
-proc tb-set-node-rpms {node args} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-rpms $node $args"
-}
-proc tb-set-node-tarfiles {node args} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-tarfiles $node $args"
-}
-proc tb-set-node-startup {node cmd} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-startup $node $cmd"
-}
-proc tb-set-node-deltas {node args} {
-    global TBCMD 
-    puts $TBCMD "tb-set-node-deltas $node $args"
+    ::TBCOMPAT::set-ip $src $link $ip
 }
 
-# Show that we have loaded
-set TB_COMPACT 1
+# Node state routines.
+proc tb-set-hardware {node type args} {
+    var_import ::TBCOMPAT::hwtypes
+    if {! [info exists hwtypes($type)]} {
+	perror "ERROR: tb-set-hardware - Invalid hardware type $type."
+	return
+    }
+    $node set type $type
+}
+proc tb-set-node-os {node os} {
+    if {! ${GLOBALS::anonymous}} {
+	var_import ::TBCOMPAT::osids
+	if {! [info exists osids($os)]} {
+	    perror "ERROR: tb-set-node-os - Invalid osid $os."
+	    return
+	}
+    }
+    $node set osid $os
+}
+proc tb-set-node-cmdline {node cmdline} {
+    $node set cmdline $cmdline
+}
+proc tb-set-node-rpms {node args} {
+    if {$args == {}} {
+	perr "ERROR: tb-set-node-rpms - No rpms given."
+	return
+    }
+    $node set rpms $args
+}
+proc tb-set-node-startup {node cmd} {
+    $node set startup $cmd
+}
+proc tb-set-node-tarfiles {node args} {
+    if {$args == {}} {
+	perror "ERROR: tb-set-node-tarfiles - tb-set-node-tarfiles <node> (<dir> <tar>)+"
+	return
+    }
+    if {[expr [llength $args] % 2] != 0} {
+	perror "ERROR: tb-set-node-tarfiles - Arguments should be node and series of pairs."
+	return
+    }
+    $node set tarfiles $args
+}
+proc tb-set-node-deltas {node args} {
+    if {$args == {}} {
+	perror "ERROR: tb-set-node-deltas - No deltas given."
+	return
+    }
+    $node set deltas $args
+}
+
+# Lan/Link state routines.
+
+# This takes two possible formats:
+# tb-set-link-loss <link> <loss>
+# tb-set-link-loss <src> <dst> <loss>
+proc tb-set-link-loss {srclink args} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[llength $args] == 2} {
+	set dst [lindex $args 0]
+	set lossrate [lindex $args 1]
+	set sim [$srclink set sim]
+	set reallink [$sim find_link $srclink $dst]
+	if {$reallink == {}} {
+	    perror "ERROR: tb-set-link-loss - No link between $srclink and $dst."
+	    return
+	}
+    } else {
+	set reallink $srclink
+	set loss [lindex $args 0]
+    }
+    if {([regexp $FLOAT $lossrate] == 0) ||
+	($lossrate > 1.0)} {
+	perror "ERROR: tb-set-link-loss - $lossrate is not a valid loss rate."
+    }
+    $lan instvar loss
+    set adjloss [expr 1-sqrt(1-$lossrate)]
+    foreach pair [array names loss] {
+	set loss($pair) $adjloss
+    }
+}
+proc tb-set-lan-loss {lan lossrate} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$lan info class] != "Lan"} {
+	perror "ERROR: tb-set-lan-loss - $lan is not a lan."
+	return
+    }
+    if {([regexp $FLOAT $lossrate] == 0) ||
+	($lossrate > 1.0)} {
+	perror "ERROR: tb-set-lan-loss - $lossrate is not a valid loss rate."
+    }
+    $lan instvar loss
+    set adjloss [expr 1-sqrt(1-$lossrate)]
+    foreach pair [array names loss] {
+	set loss($pair) $adjloss
+    }
+}
+
+proc tb-set-node-lan-delay {node lan delay} {
+    if {[$node info class] != "Node"} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	return
+    }
+    $lan set delay([list $node $port]) [parse_delay $delay]
+}
+proc tb-set-node-lan-bandwidth {node lan bw} {
+    if {[$node info class] != "Node"} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	return
+    }
+    $lan set bandwidth([list $node $port]) [parse_bw $bw]
+}
+proc tb-set-node-lan-loss {node lan loss} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$node info class] != "Node"} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	return
+    }
+    if {([regexp $FLOAT $loss] == 0) ||
+	($loss > 1.0)} {
+	perror "ERROR: tb-set-link-loss - $loss is not a valid loss rate."
+    }
+    $lan set loss([list $node $port]) $loss
+}
+proc tb-set-node-lan-params {node lan delay bw loss} {
+    tb-set-node-lan-delay $node $lan $delay
+    tb-set-node-lan-bandwidth $node $lan $bw
+    tb-set-node-lan-loss $node $lan $loss
+}

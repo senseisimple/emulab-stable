@@ -2,86 +2,113 @@
 
 # tbend
 
-# This cleans up the state after a testbed experiment is finished.
-$TBROOT = "@prefix@";
+# This is the fourth and final program in the
+# tbprerun/tbswapin/tbswapout/.../tbend sequences.  It's purpose is to
+# reverse what tbprerun did.  I.e. clear the virt_nodes and virt_lans
+# tables.  
+
+use DBI;
+
+# Set up paths
 $TBDB = "@TBDBNAME@";
-
+$TBROOT = "@prefix@";
 $TBSETUPLIB = "$TBROOT/lib";
-
-$ENV{'PATH'} = "$TBROOT/libexec:$TBROOT/libexec/ir" .
-    ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin:/usr/bin";
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
+    ":$TBROOT/sbin:$TBROOT/bin";
 push(@INC,$TBSETUPLIB);
 
+# Turn off line buffering.
+$| = 1; 
+
 require libtbsetup;
-require 'ctime.pl';
 
-if ($#ARGV < 1 || $#ARGV > 2 ||
-    ($#ARGV == 2 && $ARGV[0] ne "-nologfile")) {
-    print STDERR "Syntax: $0 [-nologfile] pid eid\n";
+$dolog = 1;
+$force = 0;
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-nologfile") {
+	$dolog = 0;
+    } elsif ($arg eq "-force") {
+	$force = 1;
+    } else {
+	print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
+	exit(1);
+    }
+}
+if ($#ARGV < 1) {
+    print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
     exit(1);
-}
-
-if ($#ARGV == 2) {
-    shift;
-    $dolog = 0;
-}
-else {
-    $dolog = 1;
 }
 ($pid,$eid) = @ARGV;
 
-use DBI;
-$dbh=&tbs_initdbi($TBDB);
+$dbh = &tbs_initdbi($TBDB);
 
-$prefix = "$pid-$eid";
+$logfile = "$pid-$eid.log";
 
 if ($dolog) {
-    $logfile = "$prefix-end.log";
     &tbs_initlog($logfile);
-
-    &tbs_out("Id:  $prefix\n");
-    &tbs_out("Log: $logfile\n");
-    &tbs_out("\n");
+    &tbs_out("Log:    $logfile\n");
 }
 
-&tbs_out("Ending Testbed run for $prefix. " . &ctime(time) . "\n");
+&tbs_out("Beginning cleanup for $pid-$eid. "
+	 . &ctime(time) . "\n");
 
-&tbs_out("Finding resources.\n");
-$sth = $dbh->prepare("SELECT node_id FROM reserved \
-		     WHERE eid=\"$eid\" AND pid=\"$pid\"");
-$sth->execute;
-@nodes = ();
-while (@row = $sth->fetchrow_array) {
-    push(@nodes,$row[0]);
-}
-$sth->finish;
+$errors = 0;
 
-&tbs_out("Resetting VLANs\n");
-if (@nodes && &tbs_exec("resetvlans " . join(" ",@nodes))) {
-    &tbs_out("Failed to reset VLANs\n");
+&tbs_out("Checking sanity.\n");
+$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
+		     " and eid = \"$eid\"");
+$sth->execute();
+if (! (($state) = $sth->fetchrow_array())) {
+    &tbs_out("No entry in experiments table.  Insane.\n");
     exit(1);
 }
-
-&tbs_out("Backing up VLAN configuration\n");
-if (&tbs_exec("savevlans")) {
-    &tbs_out("WARNING: Failed to back up VLAN configuration\n");
+if ($force == 0) {
+    if ($state eq "active") {
+	&tbs_out("Experiment already running.  Try swapping out first.\n");
+	exit(1);
+    } elsif ($state ne "swapped") {
+	&tbs_out("Experiment in strange state: $state.\n");
+	exit(1);
+    }
+} elsif ($state ne "swapped") {
+    &tbs_out("WARNING: Ignoring experimental state of $state.\n");
 }
 
-&tbs_out("Freeing resources\n");
-if (&tbs_exec("nfree $pid $eid")) {
-    &tbs_out("Failed to free resources.\n");
-    exit(1);
+if (! $dbh->do("UPDATE experiments set state = \"terminating\" " . 
+	       "where pid=\"$pid\" and eid=\"$eid\"")) {
+    &tbs_out("Could not set intermediate experiment state.\n");
 }
 
-&tbs_out("Resetting named maps\n");
-if (&tbs_exec("named_setup")) {
-    &tbs_out("Failed to reset named map.\n");
-    #
-    # This is a non-fatal error.
-    # 
+&tbs_out("Clearing virtual state.\n");
+if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
+	       " and eid = \"$eid\"")) {
+
+    &tbs_out("Could not clear virt_nodes table.\n");
+    $errors = 1;
+}
+if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
+	       " and eid = \"$eid\"")) {
+    &tbs_out("Could not clear virt_lans table.\n");
+    $errors = 1;
+}
+if (! $dbh->do("DELETE from portmap where pid = \"$pid\"" . 
+	       " and eid = \"$eid\"")) {
+    &tbs_out("Could not clear portmap table.\n");
+    $errors = 1;
+}
+$sth->finish();
+
+if ($errors == 0) {
+    &tbs_out("Marking as ended.\n");
+    if (! $dbh->do("UPDATE experiments set state = \"ended\"" . 
+		   " where pid=\"$pid\" and eid=\"$eid\"")) {
+	&tbs_out("Could not set experiment state.\n");
+	$errors = 1;
+    }
 }
 
 &tbs_out("Cleanup finished - " . &ctime(time) . "\n");
 
-0;
-
+# We exit with whether we had errors or not.
+exit $errors;

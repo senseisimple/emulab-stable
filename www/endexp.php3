@@ -42,26 +42,14 @@ if (mysql_num_rows($query_result) == 0) {
 $row = mysql_fetch_array($query_result);
 
 #
-# If the experiment is still being configured, then do not allow it to
-# be stopped. The user has to wait!
+# Look for termination in progress and exit with error. Other state
+# errors are caught by the backend scripts. We do not set the termination
+# time here. The backend duplicates the check and handles setting it.
 #
-$ready = $row[expt_ready];
-if (! $ready) {
-    USERERROR("The experiment `$exp_eid' is still configuring!<br>".
-	      "The user that created the experiment will be notified via ".
-	      "email<br>".
-	      "when it has been fully configured and is ready for use.<br>".
-	      "At that time you may terminate the experiment.<br>", 1);
-}
-
-#
-# If the experiment is already in the process of ending, then abort.
-# The wrapper script checks this too, but might as well head it off early.
-#
-$terminating = $row[expt_terminating];
-if ($terminating) {
+$expt_terminating = $row[expt_terminating];
+if ($expt_terminating) {
     USERERROR("A termination request for experiment $exp_eid was issued at ".
-	      "$terminating.<br>".
+	      "$expt_terminating.<br>".
 	      "You may not issue multiple termination requests for an ".
 	      "experiment!<br><br>".
 	      "A notification will be sent via email ".
@@ -85,6 +73,7 @@ if ($batchmode) {
 #
 # Verify that this uid is a member of the project for the experiment
 # being displayed, or is an admin type. Must be group or local root.
+# This test is also duplicated by the backend, but nice to catch here.
 #
 if (! $isadmin) {
     $query_result =

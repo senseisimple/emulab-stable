@@ -259,7 +259,7 @@ exit 0;
 sub WaitTillAlive {
     my ($pc) = @_;
 
-    my $maxwait = 150;
+    my $maxwait = 180;
     if ($reload{$pc}) {
 	$maxwait += 350;
     }

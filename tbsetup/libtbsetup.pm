@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-require 'ctime.pl';
+use POSIX;
 
 # This has the common functionality for tbprerun/tbrun/tbend.
 
