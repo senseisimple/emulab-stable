@@ -270,9 +270,9 @@ if (! $batch) {
 # Sanity check states in case someone changes something.
 #
 if ($estate eq EXPTSTATE_ACTIVE) { 
-    print STDOUT "Running tbswapout with arguments: $pid $eid\n";
-    if (system("$tbdir/tbswapout $pid $eid") != 0) {
-	fatal("tbswapout failed!\n");
+    print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
+    if (system("$tbdir/tbswap out $pid $eid") != 0) {
+	fatal("tbswap out failed!\n");
     }
     
     $estate = ExpState($pid,$eid);

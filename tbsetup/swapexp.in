@@ -272,9 +272,9 @@ if ($inout ne "restart" && -e $repfile) {
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
-    print STDOUT "Running tbswapout with arguments: $pid $eid\n";
-    if (system("$tbdir/tbswapout $pid $eid") != 0) {
-	fatal("tbswapout failed!\n");
+    print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
+    if (system("$tbdir/tbswap out $pid $eid") != 0) {
+	fatal("tbswap out failed!\n");
     }
     
     $estate = ExpState($pid,$eid);
@@ -283,9 +283,9 @@ if ($inout eq "out") {
     }
 }
 elsif ($inout eq "in") {
-    print STDOUT "Running tbswapin with arguments: $pid $eid\n";
-    if (system("$tbdir/tbswapin $pid $eid") != 0) {
-	fatal("tbswapin failed!\n");
+    print STDOUT "Running 'tbswap in' with arguments: $pid $eid\n";
+    if (system("$tbdir/tbswap in $pid $eid") != 0) {
+	fatal("tbswap in failed!\n");
     }
     
     $estate = ExpState($pid,$eid);

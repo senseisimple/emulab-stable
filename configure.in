@@ -376,6 +376,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ns2ir/parse-ns \
 	tbsetup/ns2ir/sim.tcl tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswapin tbsetup/tbswapout tbsetup/tbend \
+	tbsetup/tbswap \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \

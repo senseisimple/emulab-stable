@@ -236,11 +236,11 @@ if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
 $estate = EXPTSTATE_PRERUN;
 
 if (! $frontend) {
-    if (system("$tbdir/tbswapin  $pid $eid") != 0) {
+    if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswapin failed!\n");
+	fatal("tbswap in failed!\n");
     }
-    # So fatal errors run tbswapout,
+    # So fatal errors run tbswap out,
     $estate = EXPTSTATE_ACTIVE;
 
     #
@@ -431,9 +431,9 @@ sub fatal()
 sub tbendit()
 {
     if ($estate eq EXPTSTATE_ACTIVE) {
-	print "Running tbswapout with arguments: $pid $eid\n";
-	if (system("$tbdir/tbswapout $pid $eid") != 0) {
-	    print "tbswapout failed!\n";
+	print "Running 'tbswap out' with arguments: $pid $eid\n";
+	if (system("$tbdir/tbswap out $pid $eid") != 0) {
+	    print "tbswap out failed!\n";
 	}
     }
     print "Running tbend with arguments: -force $pid $eid\n";
