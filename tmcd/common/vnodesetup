@@ -10,11 +10,6 @@ use English;
 use Errno;
 use POSIX qw(setsid);
 
-#
-# Configure Variables
-#
-my $OURDOMAIN   = "@OURDOMAIN@";
-
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
@@ -139,6 +134,21 @@ if ($dojail && $doplab) {
 # 
 my $pidfile  = "/var/run/tbvnode-${vnodeid}.pid";
 my $logname  = "$LOGDIR/tbvnode-${vnodeid}.log";
+
+#
+# Need the domain, but no conistent way to do it. Ask tmcc for the
+# boss node and parse out the domain. 
+#
+my ($DOMAINNAME) = split(" ", `tmcc bossinfo`);
+die("Could not get bossinfo!")
+    if ($?);
+
+if ($DOMAINNAME =~ /^[-\w]+\.(.*)$/) {
+    $DOMAINNAME = $1;
+}
+else {
+    die("Could not parse domain name!");
+}
 
 #
 # If killing/halting the virtual node, then kill the manager process.
@@ -373,7 +383,7 @@ if ($dojail) {
     }
     else {
 	my $option       = ($interactive ? "-s" : "");
-	my $jailhostname = "$vname.$eid.$pid.$OURDOMAIN";
+	my $jailhostname = "$vname.$eid.$pid.$DOMAINNAME";
 	
 	exec("mkjail.pl $option -p $pid -h $jailhostname $vnodeid");
 	die("*** $0:\n".
