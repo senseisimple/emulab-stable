@@ -147,8 +147,14 @@ else {
 # Send the email now, which terminates the audit.
 AuditEnd();
 
+# Remove current group from glist, then add gid twice at the front of the list
+# Order matters here, or we won't pick up all the groups we need.
+
+$glist =~ s/ ?\b$unix_gid\b ?//;
+$glist = $unix_gid . " " . $unix_gid . " " . $glist;
+
 $GID            = $unix_gid;
-$EGID           = $unix_gid . " " . $glist;
+$EGID           = $glist;
 $EUID = $UID    = $unix_uid;
 $ENV{'USER'}    = $creator;
 $ENV{'LOGNAME'} = $creator;
