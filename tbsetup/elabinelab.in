@@ -119,9 +119,11 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     die("*** $0:\n".
 	"    Cannot determine your name and email address.\n");
 }
+TBDebugTimeStampsOn();
 
 CopyMFS()
     if (0);
+TBDebugTimeStamp("Dumping DB state");
 DumpDBGoo();
 exit(0)
     if ($dbgooonly);
@@ -131,8 +133,19 @@ exit(0)
 # output and email it to TBOPS for debugging. 
 #
 $UID = 0;
+
+#
+# This is temporary. I think I will switch this over to grabbing the latest
+# version from the web server.
+# 
+system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
+       "    ${bossnode}:/tmp");
+system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
+       "    ${opsnode}:/tmp");
+
+TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
-system("$SSH -host $opsnode /users/stoller/i.sh > /tmp/opsnode.$$ 2>&1");
+system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > /tmp/opsnode.$$ 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -146,8 +159,9 @@ if ($?) {
 	         "    Error building the opsnode ($opsnode)!\n";
     exit(($debug ? 0 : -1));
 }
+TBDebugTimeStamp("Setting up bossnode");
 print "Setting up bossnode on $bossnode\n";
-system("$SSH -host $bossnode /users/stoller/i.sh > /tmp/bossnode.$$ 2>&1");
+system("$SSH -host $bossnode /tmp/rc.mkelab -s -d > /tmp/bossnode.$$ 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -184,26 +198,31 @@ if ($?) {
 }
 
 # Reboot ops and wait for it to come back.
+TBDebugTimeStamp("Rebooting opsnode");
 system("$nodereboot -w $opsnode");
 if ($?) {
     die("*** $0:\n".
 	"    Error rebooting the opsnode ($opsnode)!\n");
 }
 # Reboot boss and wait for it to come back.
+TBDebugTimeStamp("Rebooting bossnode");
 system("$nodereboot -w $bossnode");
 if ($?) {
     die("*** $0:\n".
 	"    Error rebooting the bossnode ($bossnode)!\n");
 }
+
 # Reboot the experimental nodes. They will come up inside the inner elab.
 # DO NOT WAIT! They are not going to report ISUP from this point on. 
 if (@expnodes) {
+    TBDebugTimeStamp("Rebooting experimental nodes");
     system("$nodereboot @expnodes");
     if ($?) {
 	die("*** $0:\n".
 	    "    Error rebooting the expnodes (@expnodes)!\n");
     }
 }
+TBDebugTimeStamp("ElabInElab setup done");
 exit(0);
 
 #
@@ -277,8 +296,7 @@ sub DumpDBGoo()
     # node_id to "ops" and its type to ops.
     #
     my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
-		      "node_rusage", "node_hostkeys", "node_idlestats",
-		      "partitions");
+		      "node_rusage", "node_hostkeys", "node_idlestats");
 
     #
     # These tables are dumped by project ID.
