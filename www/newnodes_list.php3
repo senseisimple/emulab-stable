@@ -252,7 +252,7 @@ if ($renumber) {
 $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
 	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg, " .
-	"n.identifier " .
+	"n.identifier, n.building " .
 	"FROM new_nodes AS n " .
 	"LEFT JOIN node_types AS t on n.type=t.type " .
 	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
@@ -293,6 +293,7 @@ function deselectAll(form) {
 	    <th>Temporary IP</th>
 	    <th>Created</th>
 	    <th>Warnings</th>
+	    <th>Location</th>
 	</tr>
 
 <?
@@ -307,6 +308,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	$tempIP     = $row["temporary_IP"];
 	$dmesg      = $row["dmesg"];
 	$identifier = $row["identifier"];
+	$building   = $row["building"];
 	if ($row["switch_id"]) {
 	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
 	} else {
@@ -337,13 +339,20 @@ while ($row = mysql_fetch_array($query_result)) {
 	} else {
 	    echo "		<td><img src=\"greenball.gif\"></td>\n";
 	}
+	echo "          <td><a href=setnodeloc.php3?node_id=$id&isnewid=1>";
+	if ($building) {
+	    echo "		<img src=\"greenball.gif\" border=0>";
+	} else {
+	    echo "		<img src=\"redball.gif\" border=0>";
+	}
+	echo "</a></td>\n";
 	echo "	</tr>\n";
 }
 
 ?>
 
 <tr>
-    <td align="center" colspan=12>
+    <td align="center" colspan=13>
     <input type="button" name="SelectAll" value="Select All"
 	onClick="selectAll(document.nodeform.elements['selected[]'])">
     &nbsp;

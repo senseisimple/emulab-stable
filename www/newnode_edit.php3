@@ -65,7 +65,7 @@ foreach ($HTTP_GET_VARS as $key => $value) {
 #
 $query_result = DBQueryFatal("SELECT new_node_id, node_id, type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, dmesg, " .
-	"identifier " .
+	"identifier, building " .
 	"FROM new_nodes WHERE new_node_id='$id'");
 
 if (mysql_num_rows($query_result) != 1) {
@@ -116,6 +116,17 @@ $row = mysql_fetch_array($query_result)
 <tr>
     <th>Created</th>
     <td><?= $row['created'] ?></td>
+</tr>
+<tr>
+    <th>Location</th>
+    <td>
+    <? if ($row['building']) {
+	echo "Set (<a href=setnodeloc.php3?node_id=$id&isnewid=1>Change</a>)\n";
+       } else {
+	echo "Unset (<a href=setnodeloc.php3?node_id=$id&isnewid=1>Set</a>)\n";
+       }
+    ?>
+    </td>
 </tr>
 <tr>
     <th>dmesg Output</th>
@@ -183,7 +194,6 @@ while ($row = mysql_fetch_array($query_result)) {
 </center>
 <?
 
-echo "<a href=setnodeloc.php3?node_id=$id&isnewid=1>Set Node Location</a>\n";
 
 #
 # Standard Testbed Footer
