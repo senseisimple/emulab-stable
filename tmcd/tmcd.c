@@ -2841,8 +2841,8 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		/* Leave this logging on all the time for now. */
-		info("MOUNTS: %s", buf);
+		if (verbose)
+		    info("MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -3046,7 +3046,8 @@ COMMAND_PROTOTYPE(dorouting)
 		n--;
 	}
 	mysql_free_result(res);
-	info("ROUTES: %d routes in list\n", nrows);
+	if (verbose)
+	    info("ROUTES: %d routes in list\n", nrows);
 
 	return 0;
 }
