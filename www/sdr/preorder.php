@@ -208,7 +208,14 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
 
     echo "<tr>
               <td colspan=1 align=right><b>Total Cost</b>:</td>
-              <td class=left><b>\$${total_cost}</b></td>
+              <td class=left><b>\$${total_cost}</b>\n";
+    if (!$justview) {
+	echo "       &nbsp &nbsp &nbsp
+                     <input type=button value='Recalculate Total'
+                            name=recalculate
+                            onclick='ChangeQuantities(myform);'>\n";
+    }
+    echo "    </td>
           </tr>\n";
 
     echo "<tr>
