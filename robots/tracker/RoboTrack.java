@@ -33,6 +33,9 @@ public class RoboTrack extends JApplet {
     double pixels_per_meter = 1.0;
     boolean frozen = false;
     static final DecimalFormat FORMATTER = new DecimalFormat("0.00");
+    static final SimpleDateFormat TIME_FORMAT =
+	new SimpleDateFormat("hh:mm:ss");
+    static final Date now = new Date();
     String uid, auth;
     boolean shelled = false;
     
@@ -53,7 +56,7 @@ public class RoboTrack extends JApplet {
 	    uid     = this.getParameter("uid");
 	    auth    = this.getParameter("auth");
 	    pipeurl = this.getParameter("pipeurl");
-	    baseurl = this.getParameter("baseurl");
+	    baseurl = this.getParameter("floorurl");
 	    pixels_per_meter = Double.parseDouble(this.getParameter("ppm"));
 
 	    // form the URL that we use to get the background image
@@ -200,7 +203,7 @@ public class RoboTrack extends JApplet {
     // Indexed by the robot physical name, points Robot struct above.
     Dictionary robots     = new Hashtable();
     // Map from integer index to a Robot struct.
-    Vector     robotmap   = new Vector(10, 10);;
+    Vector     robotmap   = new Vector(10, 10);
     int	       robotcount = 0;
 
     private class Map extends JPanel implements Runnable {
@@ -260,7 +263,6 @@ public class RoboTrack extends JApplet {
 	 */
 	public void parseRobot(String str) {
 	    StringTokenizer tokens = new StringTokenizer(str, ",");
-	    Calendar Now = new GregorianCalendar();
 	    String tmp;
 	    Robot robbie;
 	    int index;
@@ -343,9 +345,9 @@ public class RoboTrack extends JApplet {
 	    else
 		robbie.battery_voltage = "";
 
-	    robbie.last_update   = Now.getTimeInMillis();
-	    robbie.update_string = Now.get(Calendar.HOUR_OF_DAY) + ":" +
-		Now.get(Calendar.MINUTE) + ":" + Now.get(Calendar.SECOND);
+	    robbie.last_update   = System.currentTimeMillis();
+	    now.setTime(robbie.last_update);
+	    robbie.update_string = TIME_FORMAT.format(now);
 	}
 
 	/*
