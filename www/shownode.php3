@@ -87,8 +87,7 @@ if (TBHasSerialConsole($node_id)) {
 #
 # SSH to option.
 # 
-if (isset($pid) &&
-    ($isadmin || !strcmp($OURDOMAIN, "mini.emulab.net"))) {
+if (isset($pid)) {
     WRITESUBMENUBUTTON("SSH to node</a> ".
 		       "<a href='docwrapper.php3?docname=ssh-mime.html'>".
 		       "(howto)", "nodessh.php3?node_id=$node_id");
