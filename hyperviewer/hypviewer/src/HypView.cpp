@@ -203,6 +203,10 @@ int HypView::setGraph(istream & str)
   if (!str)
     return 0;
 
+#ifndef WIN32
+  hypGraph = NULL;              // Kluge for now.
+#endif
+
   if (hypGraph) {
     hypGraph->newGraph(str);
   }
