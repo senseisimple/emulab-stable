@@ -531,7 +531,7 @@ if (!isset($exp_gid) ||
     $exp_gid = $exp_pid;
 }
 if (!TBValidGroup($exp_pid, $exp_gid)) {
-    RESPIT("Group", "No such Group");
+    RESPIT("Group", "Group '$exp_gid' is not in project '$exp_pid'!");
 }
 
 #

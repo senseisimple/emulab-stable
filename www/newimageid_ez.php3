@@ -622,7 +622,8 @@ elseif (!TBValidProject($formfields[pid])) {
 elseif (isset($formfields[gid]) &&
 	strcmp($formfields[gid], "")) {
     if (!TBValidGroup($formfields[pid], $formfields[gid])) {
-	$errors["Group"] = "No such group";
+	$errors["Group"] = "Group '" . $formfields[gid] . "' " .
+	                   "is not in project '" . $formfields[pid] ."'";
     }
     elseif (!TBProjAccessCheck($uid, $formfields[pid],
 			       $formfields[gid], $TB_PROJECT_MAKEIMAGEID)) {
