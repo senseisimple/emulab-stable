@@ -5,9 +5,8 @@
  */
 
 /*
- * This is a program agent to manage programs from the event system.
+ * Program to start Linktest scripts.
  *
- * You can start, stop, and kill (signal) programs. 
  */
 #include <stdio.h>
 #include <ctype.h>
@@ -25,9 +24,14 @@
 #include "log.h"
 #include "event.h"
 
+/* (temporarily) hardcoded path until I find a better place to put this
+ *  (such as /var/emulab/somewhere?)*/
+#define  PATH_LINKTEST "/users/davidand/testbed/event/linktest/linktest.pl"
+
 static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
 
+static void     start_linktest( char* args);
 
 void
 usage(char *progname)
@@ -180,5 +184,27 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
         info("Event: %lu:%d %s %s %s\n", now.tv_sec, now.tv_usec,
 	     objname, event, args);
+	/*
+	 * Dispatch the event. 
+	 */
+	if (strcmp(event, TBDB_EVENTTYPE_START) == 0)
+		start_linktest(args);
+	else {
+		error("Invalid event: %s\n", event);
+		return;
+	}
 
+}
+
+/*
+ * Start up the linktest script and wait for it to complete
+ */
+static void
+start_linktest( char* args) {
+  if( !fork()) {
+    info ("starting linktest");
+    execl(PATH_LINKTEST, NULL);
+  }
+  wait(NULL);
+  info ("linktest completed\n");
 }

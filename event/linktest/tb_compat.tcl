@@ -15,7 +15,7 @@ proc tb-set-ip-lan {src lan ip} {}
 proc tb-set-hardware {node type args} {}
 proc tb-set-node-os {node os} {}
 #proc tb-set-link-loss {src args} {}
-proc tb-set-lan-loss {lan rate} {}
+#proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
@@ -31,8 +31,8 @@ proc tb-fix-node {v p} {}
 proc tb-make-weighted-vtype {name weight types} {}
 proc tb-make-soft-vtype {name types} {}
 proc tb-make-hard-vtype {name types} {}
-proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {}
-proc tb-set-link-simplex-params {link src delay bw loss} {}
+#proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {}
+#proc tb-set-link-simplex-params {link src delay bw loss} {}
 proc tb-set-uselatestwadata {onoff} {}
 proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
@@ -172,20 +172,24 @@ LTLink instproc set_loss { loss } {
     set loss_ $loss
 }
 
+#LTLink instproc clone {} {
+#    $self instvar lanOrLink_ src_ dst_ bw_ delay_ loss_
 
+#    set newLink [new LTLink]
+#    $newLink set_src $src_
+#    $newLink set_dst $dst_
+#    $newLink set_bw $bw_ 
+#    $newLink set_delay $delay_ 
+#    $newLink set_loss $loss_ 
+#    return $newLink
+#}
+
+
+# for final printing, always resolve lans to actual lists of hosts.
 LTLink instproc toString {} {
     $self instvar lanOrLink_ src_ dst_ bw_ delay_ loss_
-    global hosts lans links
-    if { 0 == [llength [array get hosts $dst_] ] } {
-	return "link $lanOrLink_ $hosts($src_) $lans($dst_) $bw_ $delay_ $loss_"
-    } elseif {
-	0 == [llength [array get hosts $src_] ]
-    } {
-	return "link $lanOrLink_ $lans($src_) $hosts($dst_) $bw_ $delay_ $loss_"
-    } else {
-	return "link $lanOrLink_ $hosts($src_) $hosts($dst_) $bw_ $delay_ $loss_"
-    }
-
+    global hosts
+    return [format "l $hosts($src_) $hosts($dst_) %10.0f  %.4f %.4f" $bw_ $delay_ $loss_ ]
 }
 
 
@@ -210,7 +214,10 @@ Simulator instproc addLTLink { linkref } {
 	
 	# lan reference
 	$newLink set_lanOrLink [$link_($linkref) set lan_ ]
-	
+
+	# netbed-specific implementation for lans: add 1/2 the delay
+	$newLink set_delay [expr [$newLink delay] / 2.0]
+
     } elseif {0 == [string compare [$link_($linkref) info class ] "SimpleLink"]} {
 	$newLink set_bw [$link_($linkref) bw ]
 	$newLink set_delay [$link_($linkref) delay ]
@@ -221,30 +228,76 @@ Simulator instproc addLTLink { linkref } {
     } else {
 	error "unknown link type!"
     }
+
+
     lappend lt_links $newLink
 }
+
+# just print the representation to stdout
+Simulator instproc run {args} {
+    join_lans
+    output
+
+}
+
+# update lt_links such that lans become new links containing destination hosts
+# delay: sum both delays
+# loss:  product both losses
+# bandwidth: min of both bandwidths (the bottleneck)
+# 
+proc join_lans {} {
+    global lt_links lans
+    set new_links {}
+    set all_lans [array names lans]
+
+    foreach srclink $lt_links {
+	# dst a lan link?
+	if { [lsearch $all_lans [$srclink dst]] > -1  } {
+	    set lan [$srclink dst]
+
+	    # find all of the "receivers" for this lan.
+	    foreach dstlink $lt_links {
+		if { $lan == [$dstlink src] 
+		    && 
+		     [$srclink src] != [$dstlink dst]
+		 } {
+		    set newLink [new LTLink]
+		    $newLink set_src [$srclink src]
+		    $newLink set_dst [$dstlink dst]
+		    $newLink set_bw [expr [$srclink bw] < [$dstlink bw] ? [$srclink bw] : [$dstlink bw]]
+		    $newLink set_delay [expr [$srclink delay ] + [$dstlink delay]]
+		    $newLink set_loss [expr 1.0 - (1.0 - [$srclink loss] ) * (1.0 - [$dstlink loss])]
+#		    puts [$newLink toString]
+		    lappend new_links $newLink
+		    
+		}
+	    }
+
+
+	    
+	} elseif {[lsearch $all_lans [$srclink src]] > -1  } {
+#	    puts "ignored"
+	} else {
+	    lappend new_links $srclink
+	}
+    }
+    set lt_links $new_links
+}
+
 
 proc output {} {
     global hosts lans links lt_links
 
-    # node names
     foreach name [array names hosts] {
-	puts "node $hosts($name)"
+	puts "h $hosts($name)"
     }
-    foreach name [array names lans] {
-	puts "lan $name $lans($name)"
-    }
-    foreach name [array names links] {
-	puts "link $name $links($name)"
-    }
-
-    foreach lt $lt_links {
-	puts "[$lt toString]"
+    foreach link $lt_links {
+	puts "[$link toString]"
 
     }
 }
 #
-# from here on out, ns is not changed, just lt_links.
+# from here on out, implement netbed-specific commands against lt_links
 #
 proc tb-set-link-loss {args} {
     global lt_links
@@ -276,9 +329,15 @@ proc tb-set-link-loss {args} {
 
 proc tb-set-lan-loss {lan rate} {
     global lt_links
+
+    # netbed-implenetation detail: set loss to 1-sqrt(1-L)
+    set a [expr 1.0 - $rate]
+    set b [expr sqrt ($a)]
+    set newloss [expr 1.0 - $b]
+
     foreach lt $lt_links {
 	if { $lan == [$lt lanOrLink] } {
-	    $lt set_loss $rate
+	    $lt set_loss $newloss
 	}
     }
 }
@@ -299,4 +358,29 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
     }
 }
 
+proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {
+    global lt_links
+    foreach lt $lt_links {
+	if { 
+	    $lan == [$lt dst] 
+	    &&
+	    $node == [$lt src]
+	} {
+	    $lt set_delay $fromdelay
+	    $lt set_bw $frombw
+	    $lt set_loss $fromloss
+	}
+	if { 
+	    $lan == [$lt src] 
+	    &&
+	    $node == [$lt dst]
+	} {
+	    $lt set_delay $todelay
+	    $lt set_bw $tobw
+	    $lt set_loss $toloss
+	}
 
+    }
+
+
+}
