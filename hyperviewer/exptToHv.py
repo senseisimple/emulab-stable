@@ -31,8 +31,8 @@ path            = None
 server = None
 def initServer():
     global server
-    uri = "ssh://" + login_id + "@" + xmlrpc_server + "/" + module
-    ###uri = "ssh://" + login_id + "@" + xmlrpc_server + "/xmlrpc/" + module
+    uri = "ssh://" + login_id + "@" + xmlrpc_server + "/xmlrpc/" + module
+    ###uri = "ssh://" + login_id + "@" + xmlrpc_server + "/" + module
     ##print uri
     server = SSHServerProxy(uri, path=path)
     pass
