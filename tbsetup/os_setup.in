@@ -122,8 +122,8 @@ TBDebugTimeStamp("os_setup started");
 # Get the set of nodes, as well as the nodes table information for them.
 #
 $db_result =
-    DBQueryFatal("select n.*,l.pid from nodes as n ".
-		 "left join reserved as r on n.node_id=r.node_id ".
+    DBQueryFatal("select n.*,l.pid from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
 		 "where r.pid='$pid' and r.eid='$eid'");
 
