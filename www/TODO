@@ -1,0 +1,83 @@
+From: Leigh Stoller <stoller@fast.cs.utah.edu>
+To: Testbed Operations <testbed-ops@fast.cs.utah.edu>
+Subject: Re: web form stuff
+Date: Tue, 7 Nov 2000 17:20:42 -0800 (PST)
+
+So, here is my list of things to do. No particular order. Relative
+importance should be obvious. Whoever does this work *will* program in the
+dominate style of the existing, newly written, 4500 lines of code! Now, if
+I could just figure out how to add a php mode to emacs ...
+
+* Decouple root privs from begin experiment privs, as per Jay
+  request. Default on for begin experiment, default off for root.
+
+* Fix the "revisit" problem. If you revisit the page after logging in, your
+  login is lost. The original index page I started with passed the uid along
+  with a URI parameter. If you click "reload" no problem cause it sends the
+  same URI to the page, which includes the uid (?stoller). But if you log
+  in, go someplace else, and then visit the page again, its lost and you
+  have to log in again. The simple fix is to add another cookie, or to
+  include the uid in the existing cookie (the one I added to send back the
+  hash key).
+
+* Fix the email list problem. Right now we add people people to the two
+  email list files in /usr/testbed/www/maillist when they apply. We should
+  either delay that until they are approved, or make sure they get taken
+  back out when denied.
+
+* Minor bells and whistles and formatting changes. Or maybe I mean fancy
+  things up a tiny bit. I tend to be a minimalist (my favorite example is
+  the google search page compared to the Lycos or netscape page), but my
+  stuff is probably too minimal.
+
+* Admin pages. Continue to add the admin modes to various pages, or create
+  a new set of admin only pages. I prefer admin modes in existing pages.
+
+* Continue on the authentication stuff as per Dave's original suggestion of
+  certificates. I'm not too crazy about this unless its easy to do all of it
+  on my home machine (apache server).
+
+* Continue to hook up the backend parts of the system, which right now is a
+  major unfinished piece of business.
+
+* More linking of information in the forms. There are some obvious places
+  where stuff should be presented as hypertext links so that navigation is
+  easier.
+
+* Backup links in all the pages.
+
+* Page Footers in all the pages. Last modified, link to main testbed page,
+  email address of the testbed, etc. 
+
+* Change to ?uid=stoller&pid=testbed style arguments in all the pages I
+  have not yet fixed (that is, get rid of that regex thing at the top of
+  the page to find the arguments).
+
+* Add a Show Project Information selection page (akin to the Show
+  Experiments selection page), which invokes the existing showproject
+  page. Useful for admin types who want to see the information for a
+  particular project.
+
+* Admin page to remove a project.
+
+* Admin page to remove a user.
+
+* Admin page to remove an experiment.
+
+* Add confirm buttons in various places. I did one in the end experiments
+  page, as a simple button (so you gotta press two things). I think this
+  appproach is fine.
+
+* Fix case sensitivity problems in project, user, and experiment names.
+  That is, anyplace a user *types* in a username, project name, or an
+  experiment name, downcase it. Mac was going to do this, but I don't know
+  if he got to it. 
+
+* Cleanse the database of random entries that have crept in.
+
+* Get people to go use the pages (including modify user information!).
+
+* Lastly, macrofy the entire thing and get rid the damn frames! I hate
+  frames!
+
+Lbs
