@@ -677,6 +677,23 @@ sub stateTransition($$) {
 	debug("Running triggers: ".join("/",@trigs)."\n");
 	foreach ( @trigs) {
 	    my $trig = $_;
+	    /^SCRIPT:([-\w\/]+)$/ && do {
+		#
+		# Run a script. No arguments at the moment.
+		#
+		my $script = $1;
+
+		#
+		# If the path is absolute, run it. Otherwise it has to
+		# come from the sbin directory.
+		#
+		if (! ($script =~ /^\//)) {
+		    $script = "$TB/sbin/$script";
+		}
+		info("$node: Running $script.\n");
+		system("$script &");
+		next;
+	    };
 	    /^$PXEBOOT$/ && do {
 		#
 		# See if we jumped into the PXEBOOT kernel. Bootinfo

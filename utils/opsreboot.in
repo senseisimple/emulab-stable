@@ -1,0 +1,132 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Fcntl ':flock';
+
+#
+# Change delay params for a link.
+#
+# XXX - Does not handle vnodes yet.
+#
+sub usage()
+{
+    print(STDERR "Usage: opsreboot [-d]\n");
+    exit(1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Locals
+my $lockfile    = "/var/tmp/testbed_opsreboot_lockfile";
+my $logfile;
+
+#
+# Only root can run this script.
+#
+if ($UID || $EUID) {
+    die("*** $0:\n".
+	"    Only root can run this script\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+if (@ARGV) {
+    usage();
+}
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+#
+# We only want to run this once; if another one is running, then let it
+# do whatever needs to be done; just exit. 
+#
+if (!$TESTMODE) {
+    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+
+    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	fatal("Another opsreboot script is running!");
+    }
+}
+
+if (!$debug) {
+    $logfile = TBMakeLogname("opsreboot");
+
+    if (my $childpid = TBBackGround($logfile)) {
+	#
+	# Parent exits normally
+	#
+	exit(0);
+    }
+}
+
+SENDMAIL($TBOPS, "OPS has rebooted",
+	 "OPS has rebooted.\n".
+	 "Starting up services. Stay tuned for more info ...");
+
+
+
+SENDMAIL($TBOPS, "OPS has rebooted",
+	 "OPS has rebooted. Services have been restarted.",
+	 undef, undef, (defined($logfile) ? ($logfile) : ()));
+
+
+if (!$TESTMODE) {
+    #
+    # Close the lock file. Exiting releases it, but might as well.
+    #
+    close(LOCK);
+}
+
+unlink($logfile);
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+
+    SENDMAIL($TBOPS, "OPS reboot script Failed", $msg, undef, undef
+	     (defined($logfile) ? ($logfile) : ()));
+    unlink($logfile)
+	if (defined($logfile) && -e $logfile);
+    die($msg);
+}
+
+
+
