@@ -1228,7 +1228,7 @@ function SHOWNODE($node_id) {
     }
 
     if ($op_mode) {
-	$when = strftime("20%y%m%d-%H:%M:%S", $op_mode_timestamp);
+	$when = strftime("20%y-%m-%d %H:%M:%S", $op_mode_timestamp);
 	echo "<tr>
                  <td>Operating Mode:</td>
                  <td class=left>$op_mode ($when)</td>
