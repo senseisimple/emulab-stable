@@ -656,8 +656,6 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
     };
 };
 
-PrintLastOutput();
-
 Phase "rndc", "Setting up rndc for control of nameserver", sub {
     DoneIfExists($RNDC_KEY);
     ExecQuietFatal("$RNDC_CONFGEN -a -r /dev/urandom");
