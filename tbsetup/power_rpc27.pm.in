@@ -43,13 +43,18 @@ my %RPC27_CMD =
 # Returns 0 on success. Non-zero on failure.
 # 
 sub rpc27ctrl {
-    my($cmd, $controller, $outlet) = @_;
+    my($cmd, $controller, @outlets) = @_;
     my($TIP, $i, $insync);
 
-    if ( $outlet < 1 || $outlet > 20 ) {
+    if (grep {$_ < 1 || $_ > 20} @outlets) {
 	print STDERR "*** Invalid outlet '$outlet': Must be 1-20\n";
 	return 1;
     }
+
+    #
+    # Make a comma-seperated string of all the outlets to reboot
+    #
+    my $outlet = join(",",@outlets);
 
     #
     # Form the connection to the controller via a "tip" line to the

@@ -23,8 +23,11 @@ use lib "@prefix@/lib";
 use libdb;
 use power_rpc27;
 use snmpit_apc;
+use strict;
 
-# un-taint path since this gets called from setuid scripts.
+#
+# Un-taint path since this gets called from setuid scripts.
+#
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
@@ -38,190 +41,176 @@ my %IPList = ();		#holds machine/ip pairs
 my %OutletList = ();		#holds machine/outlet pairs
 my $exitval = 0;
 
-#Must have at least an op and a machine, so at least 2 ARGV
+#
+# Must have at least an op and a machine, so at least 2 ARGV
+#
 die("Usage:\npower [-v[n]] [on|off|cycle] <node> [<node>] ...\n",
-    "n = verbosity level (0-3)\n")
-  if ( @ARGV < 2 );
+    "n = verbosity level (0-3)\n") if ( @ARGV < 2 );
 
-#Read in ARGV
+#
+# Read in ARGV
+#
 $op = shift (@ARGV);
 if ($op =~ /^(on|off|cycle)$/) {
     $op = $1;
 } else {
     die("Invalid command '$op'\n");
 }
+
+#
+# Untaint the arguments.
+#
 @machines = @ARGV;
 foreach my $n (0..$#ARGV) {
-    #
-    # Untaint the arguments.
-    #
     $machines[$n] =~ s/^([-\@\w.]+)$/$1/;
+
+    # Shark hack
     if ($machines[$n] =~ /^(sh\d+)-[1-8]$/) {
 	print "WARNING: Rebooting $machines[$n] will reboot all of shelf $1!\n";
 	$machines[$n] = $1;
     }
+    # End shark hack
 }
+
+#
+# Lowercase nodenames and remove duplicates
+#
 my %all_nodes = ();
 foreach my $n (0..$#machines) {
     $all_nodes{"\L$machines[$n]"} = 1; # Lowercase it and use as hash key
 }
 @machines= sort keys %all_nodes;
-# then dump the args
+
+#
+# Dump the args
+#
 print "do \"$op\" to @machines\n" if $verbose > 1;
 
-print "Looking up node->(power_id,powerIP,outlet,powerType) mappings...\n" 
-  if $verbose;
 
-my $result = DBQueryFatal("select o.node_id,o.power_id,i.IP,o.outlet, n.type ".
-	"from outlets as o left join interfaces as i ".
-	"on o.power_id = i.node_id left join nodes as n ".
-	"on o.power_id = n.node_id");
-
-while ( @_ = $result->fetchrow_array()) {
-  $powerID{$_[0]}= $_[1];
-  $IPList{$_[0]}= $_[2] || 0; # RPC-27's don't have IPs...
-  $OutletList{$_[0]}= $_[3];
-  $powerType{$_[0]}= $_[4];
-}
-
-if ($verbose > 2) {
-    print "Displaying node -> (powerIP, outlet) map...\n";
-    foreach $item (sort keys(%IPList)) {
-	print "$item\t$powerID{$item}\t$IPList{$item}\t".
-	"$OutletList{$item}\t$powerType{$item}\n";
-    }
-}
 
 #
 # Get table of users <--> machines for those nodes, to make sure
 # user is authorized to control the nodes
 #
 
-my @OkNodes = ();
-
 my %timelimited = ();
 
-if ($user ne "root") {
-    print "Checking authorization for '$user'\n" if $verbose;
+print "Checking authorization for '$user'\n" if $verbose;
+
+#
+# Though TBNodeAccessCheck can check all nodes at once, we do it one at
+# a time, so that we can get a list of all nodes we have access to. This
+# is primarily to preserve the pre-libification behavior of power
+#
+my %outlets = ();
+foreach my $node (@machines) {
+    if (!TBNodeAccessCheck($user,TB_NODEACCESS_POWERCYCLE,$node)) {
+	warn "You are not authorized to control $node. Skipping...";
+	next;
+    }
+
+    my $result = DBQueryFatal("select o.power_id, o.outlet, " .
+	"(CURRENT_TIMESTAMP - power_time > last_power) " .
+	"from outlets as o left join nodes as n on " .
+	"(o.node_id = n.node_id) ".
+	# Shark hack
+	"or (n.node_id = concat(o.node_id,'-1')) " .
+	# End shark hack
+	"left join node_types as t on n.type=t.type ".
+	"where o.node_id='$node'");
+    if ($result->num_rows() == 0) {
+	warn "No outlets table entry found for $node. Skipping...\n";
+	next;
+    }
+
+    my ($power_id, $outlet, $time_ok) = $result->fetchrow();
 
     #
-    # Though TBNodeAccessCheck can check all nodes at once, we do it one at
-    # a time, so that we can get a list of all nodes we have access to
+    # Check for rate-limiting, and update the last power cycle time
+    # if it's been long enough.
     #
-    foreach $node (@machines) {
-	if (TBNodeAccessCheck($<,TB_NODEACCESS_POWERCYCLE,$node)) {
-	    push @OkNodes, $node;
-	} else {
-	    warn "You are not authorized to control pc4. Skipping...";
-	}
+    if (!$time_ok && ($user ne "root")) {
+	warn "$node was power cycled recently. Skipping...\n";
+	next;
+    } else {
+	DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
+	"where node_id = '$node'");
     }
 
-    if (@OkNodes > 0) {
-	@conds = ();
-	foreach $node (@OkNodes) {
-	    push(@conds,"\Lo.node_id='$node'");
-	}
-	@OkNodes = ();
-	my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
-	    "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
-	    "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
-	    "on n.type=t.type where ".join(" or ",@conds);
-	print "Checking times: '$cmd'\n" if $verbose;
-	my $result = DBQueryFatal($cmd);
-	while ( @_ = $result->fetchrow_array()) {
-	    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-	    my $node = "\L$_[0]";
-	    $node =~ s/(sh\d+)-\d/$1/;
-	    if ($_[1] <= 0) {
-		$timelimited{$node} = $_[2];
-	    } else {
-		push(@OkNodes, "$node");
-	    }
-	}
+    #
+    # Associate this node with the power controller it is attached to
+    #
+    push @{$outlets{$power_id}}, [$node, $outlet];
     }
-} else {
-    foreach $node (@machines) {
-	push(@conds,"\Lnode_id='$node'");
-    }
-    $cmd = 
-	"select node_id from outlets where ".join(" or ",@conds);
-    print "Root user authorized. Getting node list: '$cmd'\n" if $verbose;
-    my $result = DBQueryFatal($cmd);
-    while ( @_ = $result->fetchrow_array()) {
-	print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-	my $node = "\L$_[0]";
-	$node =~ s/(sh\d+)-\d/$1/;
-	push(@OkNodes, "$node");
-    }
-}
-
-if ($verbose) {
-    foreach $node (sort keys %timelimited) {
-	print "TIME_LIMITED: $node = $timelimited{$node}\n";
-    }
-}
-
-if (@OkNodes > 0) {
-    @conds = map {"\Lnode_id='$_'"} @OkNodes;
-    $cmd = "update outlets set last_power = NULL where ".join(" or ",@conds);
-    print "Updating times: '$cmd'\n" if $verbose;
-    DBQueryFatal($cmd);
 }
 
 print "machines= ",join(" ",@machines),"\n" if $verbose;
-print "oknodes= ",join(" ",@OkNodes),"\n" if $verbose;
+print "devices= ", join(" ",keys %outlets),"\n" if $verbose;
 
-foreach $node ( sort @machines) {
-    my $Approved = 0;
-    foreach $ok (sort @OkNodes) {
-	print "Checking $node == $ok\n" if $verbose > 1;
-	if ($node eq $ok) {
-	    print "Approved $node.\n" if $verbose > 1;
-	    $Approved = 1;
-	}
+foreach my $power_id (keys %outlets) {
+
+    #
+    # Get the list of outlet numbers used on this power controller
+    #
+    my @outlets = ();
+    my @nodes = ();
+    foreach my $node (@{$outlets{$power_id}}) {
+	my ($node_id, $outlet) = @$node;
+	push @outlets, $outlet;
+	push @nodes, $node_id;
+
     }
-    if (!$Approved) {
-	if (defined ($timelimited{$node})) {
-	    print "Node '$node' was power controlled within the last ".
-	    $timelimited{$node}." seconds. Skipping...\n";
-	} elsif ( ! defined ($IPList{$node}) ) {
-	    print "Machine $node not found. Skipping...\n";
-	    $exitval++;
-	} else {
-	    print "You are not authorized to control $node. Skipping...\n";
-	    $exitval++;
-	}
-    } else {
-	if ( ! defined ($IPList{$node}) ) {
-	    print "Power controller for $node not found. Skipping...\n";
-	    $exitval++;
-	} else {
-	    my $type = $powerType{$node};
-	    if ($type eq "APC") {
-		my $device = new snmpit_apc($IPList{$node},$verbose);
-		if (!defined $device) {
-		    warn "Unable to contact controller for $node, Skipping..\n";
-		    next;
-		} else {
-		    print "Calling device->power($op,$OutletList{$node}\n"
-			    if $verbose > 1;
-		    $device->power($op,$OutletList{$node});
-		    print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
-		}
+    my $nodestr = join(",",@nodes);
 
-	    } elsif ($type eq "RPC27") {
-		if (rpc27ctrl($op,$powerID{$node},$OutletList{$node})) {
-		    print "Control of $node failed.\n"; $exitval++;
-		}
-		else {
-		    print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
-		}
-	    } else {
-		print "power: Unknown power type '$type'\n";
-		$exitval++;
+    #
+    # Find out some information about this power controller
+    #
+    my $result = DBQueryFatal("select n.type, i.IP ". 
+	"from nodes as n left join interfaces as i on n.node_id=i.node_id " .
+	"where n.node_id='$power_id'");
+    if ($result->num_rows() == 0) {
+	warn "No entry found for power controller $power_id. Skipping " .
+	    "$nodestr\n";
+	$exitval++;
+	next;
+    }
+    my ($type, $IP) = $result->fetchrow();
+
+    #
+    # Finally, we look at the controller type and construct the proper type
+    # of object
+    #
+    my $errors = 0;
+    if ($type eq "APC") {
+	my $device = new snmpit_apc($IP,$verbose);
+	if (!defined $device) {
+	    warn "Unable to contact controller for $nodestr. Skipping..\n";
+	    next;
+	} else {
+	    print "Calling device->power($op,@outlets)\n"
+		if $verbose > 1;
+	    if ($device->power($op,@outlets)) {
+		print "Control of $nodestr failed.\n";
+		$errors++;
 	    }
 	}
+    } elsif ($type eq "RPC27") {
+	if (rpc27ctrl($op,$power_id,@outlets)) {
+	    print "Control of $nodestr failed.\n"; $exitval++;
+	}
+    } else {
+	print "power: Unknown power type '$type'\n";
+	$errors++;
     }
+
+    if (!$errors) {
+	foreach my $node (@nodes) {
+	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
+	}
+    } else {
+	$exitval += $errors;
+    }
+
 }
 
 # Return 0 on success. Return non-zero number of nodes that failed.

@@ -55,14 +55,24 @@ sub new($$;$) {
 sub power {
     my $self = shift;
     my $op = shift;
-    my $port = shift;
+    my @ports = @_;
+
     my $CtlOID = ".1.3.6.1.4.1.318.1.1.4.4.2.1.3";
     if    ($op eq "on")  { $op = "outletOn";    }
     elsif ($op eq "off") { $op = "outletOff";   }
     elsif ($op =~ /cyc/) { $op = "outletReboot";}
-    if ($self->UpdateField($CtlOID,$port,$op)) {
-	print STDERR "Outlet #$port control failed.\n";
+
+    my $errors = 0;
+
+    foreach my $port (@ports) {
+	print STDERR "**** Controlling port $port\n" if ($self->{DEBUG} > 1);
+	if ($self->UpdateField($CtlOID,$port,$op)) {
+	    print STDERR "Outlet #$port control failed.\n";
+	    $errors++;
+	}
     }
+
+    return $errors;
 }
 
 sub UpdateField {
