@@ -48,6 +48,13 @@ Program instproc updatedb {DB} {
 	return
     }
 
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$self','$objtypes(PROGRAM)')";
+    set progvnode $node
+    # if the attached node is a simulated one, we attach the
+    # program to the physical node on which the simulation runs
+    if { [$node set simulated] == 1 } {
+	set progvnode [$node set nsenode]
+    }
+
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$prognode','$self','$objtypes(PROGRAM)')";
 }
 

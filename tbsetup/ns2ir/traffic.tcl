@@ -16,7 +16,7 @@ Class Agent -superclass NSObject
 Class Agent/UDP -superclass Agent
 Class Agent/TCP -superclass Agent
 Class Agent/Null -superclass Agent
-Class Agent/TCPSINK -superclass Agent
+Class Agent/TCPSink -superclass Agent
 Class Agent/TCP/FullTcp -superclass Agent
 Class Agent/TCP/FullTcp/Reno -superclass Agent/TCP/FullTcp
 Class Agent/TCP/FullTcp/Newreno -superclass Agent/TCP/FullTcp
@@ -33,7 +33,7 @@ namespace eval GLOBALS {
     set new_classes(Agent/UDP) {}
     set new_classes(Agent/Null) {}
     set new_classes(Agent/TCP) {}
-    set new_classes(Agent/TCPSINK) {}
+    set new_classes(Agent/TCPSink) {}
     set new_classes(Agent/TCP/FullTcp) {}
     set new_classes(Agent/TCP/FullTcp/Reno) {}
     set new_classes(Agent/TCP/FullTcp/Newreno) {}
@@ -150,19 +150,28 @@ Agent/UDP instproc connect {dst} {
 	perror "\[connect] $self is not attached to a node."
 	set error 1
     }
-    if {$application == {}} {
-	perror "\[connect] $self does not have an attached application."
-	set error 1
-    }
+
     set dest [$destination set node]
     if {$dest == {}} {
 	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
-    if {[llength [$node set portlist]] != 1} {
-	perror "\[connect] $node must have exactly one link to be a traffic generator."
+
+
+    # for the case when the node is simulated
+    # we just ignore
+    if { [$node set simulated] == 1 } {
+	return
+    }
+
+    if {$application == {}} {
+	perror "\[connect] $self does not have an attached application."
 	set error 1
     }
+#    if {[llength [$node set portlist]] != 1} {
+#	perror "\[connect] $node must have exactly one link to be a traffic generator."
+#	set error 1
+#    }
     if {$error} {return}
 
     $self set proto "udp"
@@ -180,19 +189,26 @@ Agent/TCP instproc connect {dst} {
 	perror "\[connect] $self is not attached to a node."
 	set error 1
     }
-    if {$application == {}} {
-	perror "\[connect] $self does not have an attached application."
-	set error 1
-    }
     set dest [$destination set node]
     if {$dest == {}} {
 	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
-    if {[llength [$node set portlist]] != 1} {
-	perror "\[connect] $node must have exactly one link to be a traffic generator."
+
+    # for the case when the node is simulated
+    # we just ignore
+    if { [$node set simulated] == 1 } {
+	return
+    }
+
+    if {$application == {}} {
+	perror "\[connect] $self does not have an attached application."
 	set error 1
     }
+#    if {[llength [$node set portlist]] != 1} {
+#	perror "\[connect] $node must have exactly one link to be a traffic generator."
+#	set error 1
+#    }
     if {$error} {return}
 
     $self set proto "tcp"
@@ -298,6 +314,10 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
          return $nseconfig
     }
 
+    # we set a global variable to indicate that NSE trafgen
+    # is present so that nseinput.tcl can take appropriate
+    # action
+    append nseconfig "set nsetrafgen_present 1"
     if { ($tcptype == "") || ($tcptype == "Reno") } {
           set nseconfig "set $self \[new Agent/TCP/FullTcp]\n"
     } else {
@@ -338,7 +358,14 @@ Agent/TCP/FullTcp instproc connect {dst} {
         perror "\[connect] $self is not attached to a node."
         set error 1
     }
-    if { ($role == "source") && ($application == {}) } {
+ 
+    # for the case when the node is simulated
+    # we just ignore
+    if { [$node set simulated] == 1 } {
+	return
+    }
+
+   if { ($role == "source") && ($application == {}) } {
         perror "\[connect] $self does not have an attached application."
         set error 1
     }
@@ -351,10 +378,10 @@ Agent/TCP/FullTcp instproc connect {dst} {
 # This was an artifact of SEND-CONSUME CBR model. Now that we run freebsd on the
 # traffic generator nodes, all we need to do is either enable OSPF routing by
 # default or setup static routes
-    if {[llength [$node set portlist]] != 1} {
-        perror "\[connect] $node must have exactly one link to be a traffic generator."
-        set error 1
-    }
+#    if {[llength [$node set portlist]] != 1} {
+#        perror "\[connect] $node must have exactly one link to be a traffic generator."
+#        set error 1
+#    }
     if {$error} {return}
 
     $self set proto "tcp"
@@ -379,17 +406,24 @@ Agent/Null instproc connect {dst} {
 	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
-    if {[llength [$node set portlist]] != 1} {
-	perror "\[connect] $node must have exactly one link to be a traffic consumer."
-	set error 1
+
+    # for the case when the node is simulated
+    # we just ignore
+    if { [$node set simulated] == 1 } {
+	return
     }
+
+#    if {[llength [$node set portlist]] != 1} {
+#	perror "\[connect] $node must have exactly one link to be a traffic consumer."
+#	set error 1
+#    }
     if {$error} {return}
 
     $self set role "sink"
 }
 
 # Agent/Null
-Agent/TCPSINK instproc connect {dst} {
+Agent/TCPSink instproc connect {dst} {
     $self next $dst
     $self instvar node
     $self instvar application
@@ -404,10 +438,17 @@ Agent/TCPSINK instproc connect {dst} {
 	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
-    if {[llength [$node set portlist]] != 1} {
-	perror "\[connect] $node must have exactly one link to be a traffic consumer."
-	set error 1
+
+    # for the case when the node is simulated
+    # we just ignore
+    if { [$node set simulated] == 1 } {
+	return
     }
+
+#    if {[llength [$node set portlist]] != 1} {
+#	perror "\[connect] $node must have exactly one link to be a traffic consumer."
+#	set error 1
+#    }
     if {$error} {return}
 
     $self set role "sink"

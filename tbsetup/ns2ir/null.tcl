@@ -9,10 +9,11 @@
 
 Class NullClass
 
-NullClass instproc init {mytype} {
-    $self set type $mytype
+NullClass instproc init {mtype} {
+    $self set type $mtype
 }
 
 NullClass instproc unknown {m args} {
+    $self instvar type
     punsup "$type $m"
 }

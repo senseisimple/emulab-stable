@@ -56,6 +56,15 @@ proc var_import {varspec} {
 ###
 proc perror {msg} {
     var_import ::GLOBALS::errors 
+    var_import ::GLOBALS::simulated
+
+    # If this was a true error in specifying
+    # the simulation, it would have been
+    # caught when run with NSE
+    if { $simulated == 1 } {
+	return 0
+    }
+
     global argv0
     puts stderr "*** $argv0: "
     puts stderr "    $msg"
@@ -69,7 +78,12 @@ proc perror {msg} {
 proc punsup {msg} {
     var_import ::GLOBALS::verbose
     var_import ::GLOBALS::WARN_FILE
-    if {$verbose == 1} {
+    var_import ::GLOBALS::simulated
+
+    # If this was a true error in specifying
+    # the simulation, it would have been
+    # caught when run with NSE
+    if {$simulated == 0 && $verbose == 1} {
 	puts stderr "*** WARNING: Unsupported NS Statement!"
 	puts stderr "    $msg"
 	puts $WARN_FILE "*** WARNING: Unsupported NS Statement!"
@@ -143,6 +157,9 @@ namespace eval GLOBALS {
     # 'source tb_compat.tcl' statement succeeds.
     variable tbcompat "$libdir/tb_compat.tcl"
 
+    # This is used in running the script through nse for syntax errors
+    variable nstbcompat "$libdir/nstb_compat.tcl"
+
     # Is 1 if any errors have occured so far.
     variable errors 0
     
@@ -161,6 +178,15 @@ namespace eval GLOBALS {
 
     # This is the file handler for the warnings file
     variable WARN_FILE [open "$eid.warnings" w]
+
+    # This distinguishes whether the script that
+    # is being parsed should go into a NSE simulation or not
+    variable simulated 0
+
+    # If simulated is 1, then curnsenode gives us the name
+    # of the physical node on which the simulation script 
+    # should go into
+    variable curnsenode ""
 }
 
 # Connect to the DB
@@ -187,6 +213,7 @@ source ${GLOBALS::libdir}/nsobject.tcl
 source ${GLOBALS::libdir}/sim.tcl
 source ${GLOBALS::libdir}/lanlink.tcl
 source ${GLOBALS::libdir}/node.tcl
+source ${GLOBALS::libdir}/nsenode.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
 source ${GLOBALS::libdir}/vtype.tcl
@@ -289,7 +316,7 @@ proc new {class args} {
     if {! [info exists new_classes($class)]} {
 	punsup "Object: $class"
 	set id null[incr new_counter]
-	NullClass $id
+	NullClass $id $class
 	return $id
     }
 
@@ -364,15 +391,24 @@ proc parse_delay {dspec} {
 # We now have all our infrastructure in place.  We are ready to load
 # the NS file.
 
-file copy -force ${GLOBALS::tbcompat} .
-source ${GLOBALS::nsfile}
+# We first run the script through NSE to check syntax errors
+file copy -force ${GLOBALS::nstbcompat} tb_compat.tcl
+if { [catch {exec nse ${GLOBALS::nsfile}}] == 1 } {
+    perror "Syntax check with NS failed\nerrorcode:$errorCode"
+}
+
+if { ${GLOBALS::errors} != 1 } {
+    file copy -force ${GLOBALS::tbcompat} .
+    source ${GLOBALS::nsfile}
+
+    if {${GLOBALS::ran} == 0} {
+	perror "No 'Simulator run' statement found."
+    }
+
+}
 
 # Clean up
 sql disconnect ${GLOBALS::DB}
-
-if {${GLOBALS::ran} == 0} {
-    perror "No 'Simulator run' statement found."
-}
 
 close ${GLOBALS::WARN_FILE}
 
