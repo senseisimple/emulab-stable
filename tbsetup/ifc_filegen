@@ -1,0 +1,52 @@
+#!/bin/csh
+#
+# ifc_filegen
+#
+# Generates files for setting up interfaces (NICs) of testbed machines
+#
+# Range of machines to work with
+if ($1 > 0) then
+    set first=$1
+else
+    set first=1
+endif
+if ($1 > 0) then
+    set last=$2
+else
+    set last=10
+endif
+if ( -e /home/newbold/bin ) then 
+    set machines=`/home/newbold/bin/range $first $last`
+else if ( -e /users/newbold/bin ) then
+    set machines=`/users/newbold/bin/range $first $last`
+else
+    set machines
+    set i=$first
+    while ( $i <= $last )
+	set machines = "$machines $i"
+	set i=`expr $i + 1`
+    end
+endif
+# Usually use 192.168 (unroutable Internet testing subnet)
+if ($3 > 0) then
+    set subnet=$3
+else
+    set subnet=192.168
+endif
+
+echo "#Use this file as input to ifc_all - # is comment line,"
+echo "# Machine IP |if#| New IP for the interface"
+echo "# -----------------------------------------"
+foreach m ( $machines )        # for each machine
+    #Control net IPs are 101, 102, ...
+    set control=`expr 100 + $m`
+    foreach i ( 0 1 2 3 )      # for each interface
+#	set newip=`expr $last \* $i + $m`
+	set newnet=`expr $i + 1`
+	#output a line with Control IP, interface, and IP for that interface
+	echo 155.99.214.$control $i $subnet.$newnet.$m
+    end
+end
+#clean up...
+unset m i first last control newip last machines subnet newnet
+
