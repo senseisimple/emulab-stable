@@ -5,7 +5,7 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-all:	tip
+all:	tip tiptunnel
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -13,6 +13,8 @@ CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
        remote.o tip.o value.o vars.o getcap.o
+
+TUNNELOBJS = tiptunnel.o
 
 #
 # If HAVE_UUCPLOCK is defined you need -lutil for BSD
@@ -22,9 +24,14 @@ LIBS=
 tip:	$(OBJS)
 	$(CC) -static -o tip $(OBJS) $(LIBS)
 
+tiptunnel: tiptunnel.o
+	$(CC) -static -o tiptunnel tiptunnel.o $(LIBS) 
+
 $(OBJS): tipconf.h tip.h
 
-control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip
+tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
+
+control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel
 
 clean:
-	rm -f $(OBJS) tip
+	rm -f $(OBJS) tiptunnel.o tip tiptunnel
