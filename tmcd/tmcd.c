@@ -129,6 +129,7 @@ COMMAND_PROTOTYPE(doipodinfo);
 COMMAND_PROTOTYPE(doatarball);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
+COMMAND_PROTOTYPE(doroutelist);
 
 struct command {
 	char	*cmdname;
@@ -166,6 +167,7 @@ struct command {
 	{ "ntpinfo",	dontpinfo},
 	{ "ntpdrift",	dontpdrift},
 	{ "tarball",	doatarball},
+	{ "routelist",	doroutelist},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3812,3 +3814,109 @@ COMMAND_PROTOTYPE(doatarball)
 {
 	return 0;
 }
+
+/*
+ * Return routing stuff.
+ */
+COMMAND_PROTOTYPE(doroutelist)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("ROUTES: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the routing type from the nodes table.
+	 */
+	res = mydb_query("select routertype from nodes where node_id='%s'",
+			 1, nodeid);
+
+	if (!res) {
+		error("ROUTES: %s: DB Error getting router type!\n", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Return type. 
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	sprintf(buf, "ROUTERTYPE=%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	info("ROUTES: %s", buf);
+
+	/*
+	 * Get the route list.
+	 */
+	res = mydb_query("select vname,src,dst,dst_type,dst_mask,nexthop,cost "
+			 "from virt_routes "
+			 " where pid='%s' and eid='%s'",
+			 7, pid, eid);
+	
+	if (!res) {
+		error("ROUTES: %s: DB Error getting manual routes!\n", nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		char dstip[32];
+
+		row = mysql_fetch_row(res);
+				
+		/*
+		 * OMG, the Linux route command is too stupid to accept a
+		 * host-on-a-subnet as the subnet address, so we gotta mask
+		 * off the bits manually for network routes.
+		 *
+		 * Eventually we'll perform this operation in the NS parser
+		 * so it appears in the DB correctly.
+		 */
+		if (strcmp(row[3], "net") == 0) {
+			struct in_addr tip, tmask;
+
+			inet_aton(row[2], &tip);
+			inet_aton(row[4], &tmask);
+			tip.s_addr &= tmask.s_addr;
+			strncpy(dstip, inet_ntoa(tip), sizeof(dstip));
+		} else
+			strncpy(dstip, row[2], sizeof(dstip));
+
+		sprintf(buf, "ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s "
+			"DESTMASK=%s NEXTHOP=%s COST=%s\n",
+			row[0], row[1], dstip, row[3], row[4], row[5], row[6]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		info("ROUTES: %s", buf);
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
