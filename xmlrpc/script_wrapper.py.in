@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -113,6 +113,8 @@ API = {
                             "help" : "Get information about an experiment" },
     "tbuisp"            : { "func" : "tbuisp",
                             "help" : "Upload code to a mote" },
+    "expwait"           : { "func" : "expwait",
+                            "help" : "Wait for experiment to reach a state" },
 };
 
 #
@@ -1651,6 +1653,72 @@ class tbuisp:
         wrapperoptions()
         return
         
+    pass
+
+#
+# expwait
+#
+class expwait:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "ht:e:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        show   = [];
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-t":
+                params["timeout"] = val;
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) != 3:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            params["state"] = req_args[2];
+            pass
+        elif len(req_args) != 1:
+            self.usage();
+            return -1;
+        else:
+            params["state"] = req_args[0];
+            pass
+
+        rval,response = do_method("experiment", "statewait", params);
+        return rval;
+
+    def usage(self):
+	print "expwait [-t timeout] -e pid,eid state";
+	print "expwait [-t timeout] pid eid state";
+	print "where:";
+ 	print "     -e   - Project and Experiment ID";
+        print "     -t   - Maximum time to wait (in seconds).";
+        wrapperoptions();
+        return
     pass
 
 #
