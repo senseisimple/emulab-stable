@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -58,6 +58,16 @@ SUBMENUEND();
 # Dump os_info record.
 # 
 SHOWOSINFO($osid);
+
+#
+# Show experiments using this OS
+#
+
+$query_result =
+    DBQueryFatal("select pid, osname from os_info where osid='$osid'");
+$row = mysql_fetch_array($query_result);
+echo "<h3 align='center'>Experiments using this OS</h3>\n";
+SHOWOSIDEXPTS($row["pid"],$row["osname"],$uid);
 
 SUBPAGEEND();
 

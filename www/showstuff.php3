@@ -1511,6 +1511,72 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 }
 
 #
+# Show all experiments using a particular OSID
+#
+function SHOWOSIDEXPTS($pid, $osname, $uid) {
+    global $TBOPSPID;
+    global $TB_EXPT_READINFO;
+
+    #
+    # Due to the funny way we handle 'global' images in the emulab-ops project,
+    # we have to treat its images specially - namely, we have to make sure
+    # there is not an osname in that project, which takes priority over the
+    # global ones
+    #
+    if ($pid == $TBOPSPID) {
+	$query_result = DBQueryFatal("select distinct v.pid, v.eid, e.state " .
+		"from virt_nodes as v left join os_info as o on " .
+		"    v.osname=o.osname and v.pid=o.pid ".
+		"left join experiments as e on v.pid=e.pid and v.eid=e.eid " .
+		"where v.osname='$osname' and o.osname is NULL " .
+		"order by v.pid, v.eid, e.state");
+    } else {
+	$query_result = DBQueryFatal("select distinct v.pid, v.eid, e.state " .
+		"from virt_nodes as v left join experiments as e " .
+		"on v.pid=e.pid and v.eid=e.eid " .
+		"where v.pid='$pid' and v.osname='$osname' " .
+		"order by v.pid, v.eid, e.state");
+    }
+
+    if (mysql_num_rows($query_result) == 0) {
+	echo "<h4 align='center'>No experiments are using this OS</h3>";
+    } else {
+	echo "<table align=center border=1>\n";
+	echo "  <tr> 
+		    <th>PID</th>
+		    <th>EID</th>
+		    <th>State</th>
+		</tr>\n";
+	while($row = mysql_fetch_array($query_result)) {
+	    $pid   = $row[0];
+	    $eid   = $row[1];
+	    $state = $row[2];
+
+	    #
+	    # Gotta make sure that the user actually has the right to see this
+	    # experiment - summarize all the experiments that he/she can't see
+	    # at the bottom
+	    #
+	    if (!TBExptAccessCheck($uid,$pid,$eid,$TB_EXPT_READINFO)) {
+		$other_exps++;
+		continue;
+		echo "Not supposed to read!\n";
+	    }
+
+	    echo "<tr>\n";
+	    echo "  <td><a href='showproject.php3?pid=$pid'>$pid</td>\n";
+	    echo "  <td><a href='showexp.php3?pid=$pid&eid=$eid'>$eid</td>\n";
+	    echo "  <td>$state</td>\n";
+	    echo "</tr>\n";
+	}
+	if ($other_exps) {
+	    echo "<tr><td colspan=3>$other_exps experiments in other projects</td></tr>\n";
+	}
+	echo "</table>\n";
+    }
+}
+
+#
 # Show node record.
 #
 function SHOWNODE($node_id, $short = 0) {

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -63,6 +63,42 @@ SUBMENUEND();
 # Dump record.
 # 
 SHOWIMAGEID($imageid, 0);
+
+echo "<br>\n";
+
+#
+# Show experiments using this image - we have to handle all four partitions.
+# Also we don't put OSIDs directly into the virt_nodes table, so we have to
+# get the pid and osname for the image, and use that to look into the virt_nodes
+# table.
+#
+$query_result = DBQueryFatal("select part1_osid, part2_osid, " .
+	"part3_osid, part4_osid from images where imageid='$imageid'");
+if (mysql_num_rows($query_result) != 1) {
+    USERERROR("Error getting partition information for $imageid.", 1);
+}
+
+$row = mysql_fetch_array($query_result);
+
+$parts  = array($row["part1_osid"], $row["part2_osid"],
+		$row["part3_osid"], $row["part4_osid"]);
+
+foreach ($parts as $osid) {
+    if ($osid) {
+	echo "<h3 align='center'>Experiments using OS ";
+	SPITOSINFOLINK($osid);
+	echo "</h3>\n";
+	$query_result =
+	    DBQueryFatal("select pid, osname from os_info where osid='$osid'");
+	if (mysql_num_rows($query_result) != 1) {
+	    echo "<h4>Error getting os_info for $osid!</h4>\n";
+	    continue;
+	}
+	$row = mysql_fetch_array($query_result);
+	SHOWOSIDEXPTS($row["pid"],$row["osname"],$uid);
+    }
+}
+
 
 SUBPAGEEND();
 
