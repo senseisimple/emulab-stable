@@ -428,8 +428,8 @@ sub RebootNode {
     $syspid = fork();
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 15;
-	waitpid($mypid, 0);
+	alarm 60;
+	waitpid($syspid, 0);
 	alarm 0;
 
 	#
