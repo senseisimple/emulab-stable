@@ -59,7 +59,6 @@ if ($action eq "stop") {
 #
 # Need the keyfile. We talk to the elvind on boss, not locally.
 #
-my $boss    = tmccbossname();
 my $keyfile = TMEVENTKEY();
 
 #
@@ -70,5 +69,6 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 # Start the daemon.
 #
-system("linktest -e $pid/$eid -s $boss -l $logfile -i $pidfile -k $keyfile");
+system("linktest -e $pid/$eid ".
+       "-s localhost -l $logfile -i $pidfile -k $keyfile");
 exit($? >> 0);

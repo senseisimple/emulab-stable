@@ -36,6 +36,7 @@ my $port;
 my $pid;
 my $eid;
 my $logfile;
+my $child_pid;
 my $startAt = 1; # default start level
 my $stopAt = 4 ; # default stop level
 
@@ -231,6 +232,33 @@ print "Quick termination requested.\n"
 print "Debug mode requested.\n"
     if ($debug);
 
+sub handler($)
+{
+    my ($signame) = @_;
+
+    $SIG{INT}  = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+
+    sleep(2);
+    &kill_linktest_run;
+
+    if (defined($child_pid)) {
+	kill('TERM', $child_pid);
+	waitpid($child_pid, 0);
+	undef($child_pid);
+    }
+
+    if ($signame eq 'ALRM') {
+	print "Linktest timer has expired, aborting the run.\n"
+	    if ($verbose);
+    }
+    else {
+	print "Linktest KILL event has been sent, aborting the run.\n"
+	    if ($verbose);
+    }
+    exit(&analyze);
+}
+
 #
 # Now that linktest has started, wait for events to be reported
 # by ltevent. It will print out the event followed by args,
@@ -238,45 +266,42 @@ print "Debug mode requested.\n"
 #
 $args = starter();
 $args .= " -w";
-if(my $pid =fork) {
+if (($child_pid = fork())) {
 
     #
     # Install signal handlers to wait for a kill or a timeout.
     # If the process is killed, kill Linktest!
     #
-    $SIG{INT} = sub {
-	&kill_linktest_run;
-	print "Linktest KILL event has been sent, aborting the run.\n"
-	    if ($verbose);
-	exit(&analyze);
-    };
+    $SIG{INT}  = \&handler;
+    $SIG{TERM} = \&handler;
     
     #
     # Set timeout behavior if requested.
     #
-    if($timeout) {
-	$SIG{ALRM} = sub { 
-	    &kill_linktest_run;
-	    print "Timeout expired.\n"
-		if ($verbose);
-	    exit(&analyze);
-
-	};
+    if ($timeout) {
+	$SIG{ALRM} = \&handler;
 	alarm($timeout);
-
     }
-    waitpid($pid,0);
+    waitpid($child_pid, 0);
     alarm 0;
     exit(&analyze());
+}
+else {
+    my $ltpid;
 
-
-} else {
-    
     #
     # Open child process to read in the output from ltevent,
     # and just print out the return values for feedback.
     #
-    my $ltpid = open(LTC, "$args |");
+    $SIG{TERM} = sub {
+	if (defined($ltpid)) {
+	    kill('TERM', $ltpid);
+	    waitpid($ltpid, 0);
+	    exit(0);
+	}
+    };
+    
+    $ltpid = open(LTC, "$args |");
     if (! $ltpid) {
 	die("*** $0:\n".
 	    "    Error running '$args'\n");

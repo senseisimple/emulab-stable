@@ -15,6 +15,7 @@ DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
+SCRIPT_CONTROL  = linktest_control
 SCRIPT_TBCOMPAT = tb_compat.tcl
 SCRIPT_NSTB_COMPAT = nstb_compat.tcl
 
@@ -22,7 +23,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	binaries $(SCRIPT) $(SCRIPT_RUN) weblinktest
+all:	binaries $(SCRIPT) $(SCRIPT_RUN) weblinktest linktest_control
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -81,6 +82,7 @@ install:
 	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(INSTALL_BINDIR)
+	$(INSTALL_PROGRAM) $(SCRIPT_CONTROL) $(INSTALL_SBINDIR)
 	$(INSTALL_DATA) $(SRCDIR)/linktest.html $(INSTALL_WWWDIR)/doc
 
 control-install:	install

@@ -1,0 +1,220 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX;
+
+#
+# Run the linktest code from experiment swapin; this script serves as
+# a wrapper for run_linktest.pl. We store the pid in the DB, and allow
+# for linktest cancelation from the webpage. This script is only run on
+# boss; otherwise the user is running run_linktest.pl directly on ops or
+# on a node, and can terminate linktest directly (via ^C or SIGTERM).
+#
+sub usage()
+{
+    print("Usage: linktest_control [-d] [-k | -l <level>] [-o <file>] ".
+	  "<pid> <eid>\n".
+	  "-l   - Run linktest at a specific level; defaults to DB value.\n".
+	  "-k   - Kill a currently running linktest.\n".
+	  "-o   - Specify output file for linktest results.\n".
+	  "-d   - Turn on debugging output.\n");
+    exit(-1);
+}
+my $optlist  = "dkl:o:";
+my $debug    = 0;
+my $cancel   = 0;
+my $level;
+my $output;
+my $child_pid;			# Child run_linktest process.
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $cancel = 1;
+}
+if (defined($options{"l"})) {
+    $level = $options{"l"};
+
+    if ($level =~ /^(\d*)$/) {
+	$level = $1;
+    }
+    else {
+	die("Bad data in level: $level.");
+    }
+}
+if (defined($options{"o"})) {
+    $output = $options{"o"};
+
+    # Note different taint check (allow /).
+    if ($output =~ /^([-\w\.\/]+)$/) {
+	$output = $1;
+    }
+    else {
+	die("Bad data in output file: $output\n");
+    }
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+#
+# Lets see if there is a linktest running already.
+#
+my $query_result =
+    DBQueryFatal("select linktest_level,linktest_pid ".
+		 "from experiments where eid='$eid' and pid='$pid'");
+
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
+}
+my ($linktest_level, $linktest_pid) = $query_result->fetchrow_array();
+
+if (defined($linktest_pid) && $linktest_pid) {
+    if (! kill(0, $linktest_pid) && ($ERRNO == ESRCH)) {
+	DBQueryFatal("update experiments set linktest_pid=0 ".
+		     "where pid='$pid' and eid='$eid'");
+	
+	if ($cancel) {
+	    print("Linktest has already exited on experiment $pid/$eid!\n");
+	    exit(0);
+	}
+	else {
+	    print("Clearing stale linktest pid from DB for $pid/$eid!\n");
+	}
+    }
+    elsif (!$cancel) {
+	die("*** $0:\n".
+	    "    Linktest is already running on experiment $pid/$eid!\n");
+    }
+    else {
+	if (! kill('TERM', $linktest_pid)) {
+	    SENDMAIL($TBOPS,
+		     "Failed to stop linktest daemon for $pid/$eid",
+		     "Could not kill(TERM) process $linktest_pid: $? $!");
+
+	    die("*** $0:\n".
+		"    Failed to stop linktest daemon for $pid/$eid!\n");
+	}
+	exit(0);
+    }
+}
+elsif ($cancel) {
+    die("*** $0:\n".
+	"    Linktest is not running on experiment $pid/$eid!\n")
+}
+
+#
+# Okay, lets run linktest. First set up a handler so that we can catch
+# a termination signal and kill ourselves off. 
+#
+sub cleanup()
+{
+    DBQueryFatal("update experiments set linktest_pid=0 ".
+		 "where pid='$pid' and eid='$eid'");
+}
+
+sub handler($)
+{
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+
+    if (defined($child_pid)) {
+	kill('TERM', $child_pid);
+	waitpid($child_pid, 0);
+	undef($child_pid);
+    }
+    cleanup();
+    die("*** $0:\n".
+	"    Linktest has been canceled on experiment $pid/$eid!\n")
+}
+
+#
+# Fork a child to run the actual linktest script. The parent just waits
+# for child to exit, or to be signaled to terminate the child.
+#
+if (($child_pid = fork()) < 0) {
+    die("*** $0:\n".
+	"    Linktest could not fork a new process for $pid/$eid!\n")
+}
+
+if ($child_pid) {
+    #
+    # Parent. 
+    #
+    $SIG{TERM} = \&handler;
+    $SIG{INT}  = \&handler;
+
+    DBQueryFatal("update experiments set linktest_pid=$$ ".
+		 "where pid='$pid' and eid='$eid'");
+    
+    waitpid($child_pid, 0);
+    my $exitval = $? >> 8;
+    cleanup();
+    exit($exitval);
+}
+
+#
+# Child execs run_linktest. 
+#
+exec "$TB/bin/run_linktest.pl",
+    ("-d", $debug, "-v"),
+    (defined($output) ? ("-o", $output) : ()),
+    ("-l", (defined($level) ? $level : $linktest_level), "-e", "$pid/$eid");
+
+die("*** $0:\n".
+    "    Could not exec run_linktest.pl\n");

@@ -20,7 +20,7 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/bin/run_linktest.pl", @ARGV;
+exec "$TB/sbin/linktest_control", @ARGV;
 
 die("*** $0:\n".
     "    Could not exec program: $!");
