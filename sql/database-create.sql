@@ -1386,10 +1386,10 @@ CREATE TABLE widearea_nodeinfo (
   machine_type varchar(40) default NULL,
   contact_uid varchar(8) NOT NULL default '',
   connect_type varchar(20) default NULL,
-  city varchar(40) default NULL,
-  state varchar(40) default NULL,
-  country varchar(10) default NULL,
-  zip varchar(10) default NULL,
+  city tinytext,
+  state tinytext,
+  country tinytext,
+  zip tinytext,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 

@@ -150,5 +150,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	 KEY name (name(32))
        ) TYPE=MyISAM;
 
+1.224: Change address fields in widearea_nodeinfo to tinytext:
 
-
+       ALTER TABLE widearea_nodeinfo CHANGE city city tinytext
+       ALTER TABLE widearea_nodeinfo CHANGE state state tinytext
+       ALTER TABLE widearea_nodeinfo CHANGE country country tinytext
+       ALTER TABLE widearea_nodeinfo CHANGE zip zip tinytext
