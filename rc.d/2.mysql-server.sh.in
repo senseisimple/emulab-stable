@@ -3,7 +3,7 @@
 case "$1" in
 	start)
 		if [ -x /usr/local/bin/safe_mysqld ]; then
-			/usr/local/bin/safe_mysqld --skip-grant-tables --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update -O max_connections=300 > /dev/null & && echo -n ' mysqld'
+			/usr/local/bin/safe_mysqld --skip-grant-tables --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update -O max_connections=300 -O key_buffer=32M -O table_cache=256 -O sort_buffer=4M -O record_buffer=1M > /dev/null & && echo -n ' mysqld'
 		fi
 		;;
 	stop)
