@@ -11,6 +11,7 @@ PAGEHEADER("Modify User Information Form");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # The target uid and the current uid will generally be the same, unless
@@ -27,8 +28,6 @@ if (! isset($target_uid)) {
 # them to behave.
 #
 if ($uid != $target_uid) {
-    $isadmin = ISADMIN($uid);
-
     if (! $isadmin) {
 	if (! TBUserInfoAccessCheck($uid, $target_uid,
 				    $TB_USERINFO_MODIFYINFO)) {
@@ -88,11 +87,19 @@ echo "<tr>
                      value=\"$usr_name\"></td>
       </tr>\n";
 
+#
+# Only admins can change the email address.
+# 
 echo "<tr>
           <td>*Email Address:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"usr_email\" size=\"30\"
-                     value=\"$usr_email\"></td>
+          <td class=left>\n";
+if ($isadmin) {
+    echo "<input type=text ";
+}
+else {
+    echo "<input type=readonly ";
+}
+echo "		 name='usr_email' size=30 value='$usr_email'></td>
       </tr>\n";
 
 echo "<tr>

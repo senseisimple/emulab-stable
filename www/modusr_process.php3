@@ -2,6 +2,8 @@
 include("defs.php3");
 include("showstuff.php3");
 
+$changed_password = "No";
+
 #
 # Standard Testbed Header
 #
@@ -74,19 +76,27 @@ if (!isset($usr_affil) ||
 }
 
 #
-# Check that email address looks reasonable. We need the domain for
-# below anyway.
+# Check that email address looks reasonable. Only admin types can change
+# the email address.
 #
-$email_domain = strstr($usr_email, "@");
-if (! $email_domain ||
-    strcmp($usr_email, $email_domain) == 0 ||
-    strlen($email_domain) <= 1 ||
-    ! strstr($email_domain, ".")) {
-    USERERROR("The email address `$usr_email' looks invalid!. Please ".
-	      "go back and fix it up", 1);
+TBUserInfo($target_uid, $dbusr_name, $dbusr_email);
+
+if (strcmp($usr_email, $dbusr_email)) {
+    if (!$isadmin) {
+	USERERROR("Please contact Testbed Admin to change your email address!",
+		  1);
+    }
+    $email_domain = strstr($usr_email, "@");
+    if (! $email_domain ||
+	strcmp($usr_email, $email_domain) == 0 ||
+	strlen($email_domain) <= 1 ||
+	! strstr($email_domain, ".")) {
+	USERERROR("The email address `$usr_email' looks invalid! Please ".
+		  "go back and fix it up", 1);
+    }
+    DBQueryFatal("update users set usr_email='$usr_email' ".
+		 "where uid='$target_uid'");
 }
-$email_domain = substr($email_domain, 1);
-$email_user   = substr($usr_email, 0, strpos($usr_email, "@", 0));
 
 #
 # Check URLs. 
@@ -135,10 +145,11 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
         $err = mysql_error();
         TBERROR("Database Error changing password for $target_uid: $err", 1);
     }
+    $changed_password = "Yes";
 }
 
 #
-# Add slashes. These should really by ereg checks, kicking back special
+# Add slashes. These should really be ereg checks, kicking back special
 # chars since they are more trouble then they are worth.
 # 
 $usr_name  = addslashes($usr_name);
@@ -153,7 +164,6 @@ $usr_phone = addslashes($usr_phone);
 $insert_result = mysql_db_query($TBDBNAME, 
 	"UPDATE users SET ".
 	"usr_name=\"$usr_name\",       ".
-	"usr_email=\"$usr_email\",     ".
 	"usr_URL=\"$usr_url\",         ".
 	"usr_addr=\"$usr_addr\",       ".
 	"usr_phone=\"$usr_phone\",     ".
@@ -165,6 +175,32 @@ if (! $insert_result) {
     $err = mysql_error();
     TBERROR("Database Error changing user info for $target_uid: $err", 1);
 }
+
+#
+# Audit
+#
+TBUserInfo($uid, $uid_name, $uid_email);
+
+mail("$usr_name <$usr_email>",
+     "TESTBED: User Information for '$target_uid' Modified",
+     "\n".
+     "User information for '$target_uid' changed by '$uid'.\n".
+     "\n".
+     "Name:              $usr_name\n".
+     "Email:             $usr_email\n".
+     "URL:               $usr_url\n".
+     "Affiliation:       $usr_affil\n".
+     "Address:           $usr_addr\n".
+     "Phone:             $usr_phone\n".
+     "Title:             $usr_title\n".
+     "Password Changed?: $changed_password\n".
+     "\n\n".
+     "Thanks,\n".
+     "Testbed Ops\n".
+     "Utah Network Testbed\n",
+     "From: $uid_name <$uid_email>\n".
+     "Cc: $TBMAIL_AUDIT\n".
+     "Errors-To: $TBMAIL_WWW");
 
 #
 # Create the user accounts. Must be done *before* we create the
