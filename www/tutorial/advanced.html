@@ -10,7 +10,7 @@ adhere to the syntax and operational model of
 <a href="http://www.isi.edu/nsnam/ns/doc/index.html">NS manual</a>.
 
 <ul>
-<li> RED/GRED Queues: In addition to normal DropTail links, Emulab
+<li> <b>RED/GRED Queues</b>: In addition to normal DropTail links, Emulab
      supports the specification of the RED and GRED (Gentle RED) links
      in your NS file. RED/GRED queuing is handled via the
      insertion of a traffic shaping delay node, in much the same way
@@ -21,14 +21,15 @@ adhere to the syntax and operational model of
      supports a smaller set of tunable parameters then NS does; please
      read the aforementioned manual pages!
 
-<li> Traffic Generation: Emulab supports Constant Bit Rate (CBR)
+<li> <b>Traffic Generation</b>: Emulab supports Constant Bit Rate (CBR)
      traffic generation, in conjunction with either Agent/UDP or
      Agent/TCP agents. We currently use the
      <a href="http://www.postel.org/tg">TG Tool Set</a> to generate
      traffic (usermode programs running on FreeBSD 4.3 endpoints).
 
-<li> Traffic Generation using <a href="http://www.isi.edu/nsnam/ns/doc/node477.html">
-     NS Emulation (NSE)</a>: Emulab supports TCP traffic generation
+<li> <b>Traffic Generation using
+     <a href="http://www.isi.edu/nsnam/ns/doc/node477.html">
+     NS Emulation (NSE)</b></a>: Emulab supports TCP traffic generation
      using NS's Agent/TCP/FullTcp which is a BSD Reno derivative and
      its subclasses namely Newreno, Tahoe and Sack. Currently two
      application classes are supported: Application/FTP and 
@@ -37,13 +38,21 @@ adhere to the syntax and operational model of
      NS's <a href="http://citeseer.nj.nec.com/danzig91tcplib.html"> 
      tcplib</a> telnet distribution for telnet-like data. For
      configuration parameters and commands allowed on the objects,
-     refer to NS documentation <a href="http://www.isi.edu/nsnam/ns/doc/node351.html">
+     refer to NS documentation
+     <a href="http://www.isi.edu/nsnam/ns/doc/node351.html">
      here.</a>
 
-
-<li> Event System: Emulab supports limited use of the NS "at"
+<li> <b>Event System</b>: Emulab supports limited use of the NS <em>at</em>
      syntax, allowing you to define a static set of events in your NS
-     file, to be delivered to agents running on your nodes.
+     file, to be delivered to agents running on your nodes. There is
+     also "dynamic events" support that can be used to inject events
+     into the system on the fly, say from a script running on
+     <tt>users.emulab.net</tt>.
+
+<li> <b>Program Objects</b>: Emulab has added extensions that allow you to
+     run arbitrary programs on your nodes, starting and stopping them
+     at any point during your experiment run.
+
 </ul>
 
 <p>
@@ -360,5 +369,65 @@ example:
 <li> FullTcp, FTP and Telnet: Refer NS documentation <a
      href="http://www.isi.edu/nsnam/ns/doc/ns_doc.pdf">here</a>.
 
+</ul>
+
+<p>
+<h3>
+Program Objects
+</h3>
+
+<p>
+We have added some extensions that allow you to use NS's <tt>at</tt>
+syntax to invoke arbitrary commands on your experimental nodes. Once
+you define a program object and initialize its command line and the
+node on which the command should be run, you can schedule the command
+to be started and stopped with NS <tt>at</tt> statements. To define a
+program object:
+
+	<code><pre>
+	set prog0 [$ns program]
+	$prog0 set node $nodeA
+	$prog0 set command "/bin/ls -lt >& /users/joe/logs/prog0"
+
+	set prog1 [$ns program]
+	$prog1 set node $nodeB
+	$prog1 set command "/bin/sleep 60 >& /tmp/sleep.debug"</pre></code>
+
+Then in your NS files a set of static events to run these commands:
+
+	<code><pre>
+	$ns at 10 "$prog0 start"
+	$ns at 20 "$prog1 start"
+	$ns at 30 "$prog1 stop"</pre></code>
+
+If you want to schedule starts and stops using dynamic events:
+
+	<code><pre>
+	tevc -e testbed/myexp now prog0 start "command=/bin/ls /tmp"
+	tevc -e testbed/myexp now prog1 start "command=sleep 60"
+	tevc -e testbed/myexp +20 prog1 stop</code></pre>
+	
+Some points worth mentioning:
+
+<ul>
+<li> The term "program" generally refers to the object by which you
+     control the command line you have specifed. 
+
+<li> A program must be "stopped" before it is started; if the program
+     is currently running on the node, the start event will be
+     silently ignored.
+
+<li> The command line is passed to /bin/csh; any valid csh expression
+     is allowed, although no syntax checking is done prior to invoking
+     it. If the syntax is bad, the command will fail. It is a good
+     idea to redirect output to a log file so you can track failures. 
+
+<li> The "stop" command is implemented by sending a SIGTERM to the
+     process group leader (the csh process). If the SIGTERM fails, a
+     SIGKILL is sent.
+
+<li> When issuing dynamic events using <tt>tevc</tt?, you must specify
+     the command line to invoke. This is intended to make program
+     objects more flexible.
 </ul>
 
