@@ -55,6 +55,6 @@ Program instproc updatedb {DB} {
 	set progvnode [$node set nsenode]
     }
 
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$prognode','$self','$objtypes(PROGRAM)')";
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$progvnode','$self','$objtypes(PROGRAM)')";
 }
 
