@@ -30,10 +30,11 @@ my $TFTP	= "/tftpboot";
 
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
-my $dbg		= 0;
+my $dbg		= 1;
 my @nodes       = ();
 my %osid        = ();
 my %waitfor     = ();
+my %canfail     = ();
 my $db_result;
 my @row;
 
@@ -213,7 +214,20 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     else {
 	$waitfor{$node} = 0;
     }
-    print STDOUT "$node - $osid{$node} - $waitfor{$node}\n" if $dbg;
+
+    #
+    # Set the canfail bit. Currently, sharks are always canfail=1.
+    # Will come from DB at some point.
+    #
+    if ($row{'type'} eq "shark") {
+	$canfail{$node} = 1;
+    }
+    else {
+	$canfail{$node} = 0;
+    }
+    
+    print STDOUT "$node - $osid{$node} - $waitfor{$node} - $canfail{$node}\n"
+	if $dbg;
 }
 
 #
@@ -233,6 +247,8 @@ my $waitstart = time;
 # Now lets wait for them to come back alive.
 #
 foreach my $node ( @nodes ) {
+    my $failmesg;
+    
     #
     # Don't bother to wait for nodes that are running foreign OSs since
     # we are not going to deal with them anyway later in the process.
@@ -249,20 +265,41 @@ foreach my $node ( @nodes ) {
 
     print STDOUT "$node may be down. This has been reported to testbed-ops.\n";
     print STDOUT "Please end this experiment, and try again.\n";
-    
-    # Reserve it to down experiment.
-    MarkNodeDown($node);
 
-    # Send mail to testbed-ops about it
-    SENDMAIL($TBOPS, "TESTBED: Node $node is down",
-	     "User ".getpwuid($UID)." was running expt. $eid\n".
-	     "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata\n".
-	     "but $node appears to be unresponsive.\n\n".
-	     "Please look into this matter. $node has been reserved to\n".
-	     "the testbed/down experiment until this has been resolved.\n\n".
-	     "Thanks,\n");
-    
-    die("Oops, $node did not come back alive!\n");
+    if ($canfail{$node}) {
+	# Send mail to testbed-ops and to the user about it.
+	my ($user) = getpwuid($UID);
+	
+	SENDMAIL($user, "TESTBED: Node $node is down",
+		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
+		 "Your experiment will continue to run since this failure\n".
+		 "is nonfatal, although you might encounter other problems\n".
+		 "if your experiment depends explicitly on this node.\n".
+		 "You should terminate this experiment if it cannot ".
+		 "tolerate this failure.\n\n".
+		 "Testbed Operations has also been notified so they can ".
+		 "investigate.\n\n".
+		 "Thanks\n".
+		 "Testbed Operations\n",
+		 0,
+		 "Cc: $TBOPS");
+
+	print STDERR "*** Oops, $node did not come back alive!\n";
+    }
+    else {
+	# Reserve it to down experiment.
+	MarkNodeDown($node);
+
+	# Send mail to testbed-ops about it
+	SENDMAIL($TBOPS, "TESTBED: Node $node is down",
+		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
+		 "Please look into this matter. $node has been reserved\n".
+		 "by the Testbed until this matter has been resolved.\n\n".
+		 "Thanks\n".
+		 "Testbed Operations\n");
+
+	die("*** Oops, $node did not come back alive!\n");
+    }
 }
 
 print STDOUT "OS Setup Done!\n";
