@@ -641,12 +641,17 @@ sub doSwapin($) {
 	if ($CHILD_ERROR) {
 	    print STDERR "*** Failed to reset OS and reboot nodes.\n";
 	    #
-	    # Set global $retry flag to indicate to caller
+	    # Use returncode from os_setup process to
+	    # set global $retry flag, indicating to caller
 	    # that it may be beneficial to attempt
 	    # a doSwapin() again.
 	    #
-
-	    $retry = 1;
+            if (($CHILD_ERROR >> 8) == 1) {
+		$retry = 1;
+	    } else {
+		print STDERR "Not retrying due to error type.\n";
+		# leave $retry == 0.
+	    }
 
 	    return 1;
 	}

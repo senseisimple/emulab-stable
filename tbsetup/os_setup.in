@@ -20,12 +20,28 @@ require 'ctime.pl';
 # 
 # usage: os_setup <pid> <eid>
 #
+# errorcode:  0 - all reboots succeeded.
+#             1 - some/all reboots failed; retry may help.
+#            -1 - failure; retry is inappropriate.
+#
+
 sub usage()
 {
     print STDERR "Usage: os_setup <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "d";
+
+#
+# Used to die with a -1 return code, to indicate to caller (tbswap)
+# that the failure is not likely to be fixed with another attempt.
+#
+sub die_noretry($)
+{
+    my ($mesg) = shift;
+    print STDERR "$mesg\n";
+    exit(-1);
+}
 
 #
 # Configure variables
@@ -97,13 +113,13 @@ if ($pid =~ /^([-\@\w]+)$/) {
     $pid = $1;
 }
 else {
-    die("Bad data in pid: $pid.");
+    die_noretry("Bad data in pid: $pid.");
 }
 if ($eid =~ /^([-\@\w]+)$/) {
     $eid = $1;
 }
 else {
-    die("Bad data in eid: $eid.");
+    die_noretry("Bad data in eid: $eid.");
 }
 
 #
@@ -112,8 +128,8 @@ else {
 #
 if ($UID && !TBAdmin($UID) &&
     !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die("*** $0:\n".
-	"    You do not have permission to swap this experiment!\n");
+    die_noretry("*** $0:\n".
+		"    You do not have permission to swap this experiment!");
 }
 
 TBDebugTimeStamp("os_setup started");
@@ -129,7 +145,7 @@ $db_result =
 
 if ($db_result->numrows < 1) {	
     print "There are no nodes in experiment '$eid' in project '$pid'.\n";
-    exit;
+    exit 0;
 }
 
 while (my %row = $db_result->fetchhash()) {
@@ -184,11 +200,12 @@ while (my %row = $db_result->fetchhash()) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die("*** File $path for node $node must reside in $TFTP\n");
+		die_noretry(
+		    "*** File $path for node $node must reside in $TFTP");
 	    }
 
 	    if (! -f $path) {
-		die("*** File $path for node $node does not exist!");
+		die_noretry("*** File $path for node $node does not exist!");
 	    }
 	    $bootpath = 1;
 	}
@@ -207,11 +224,12 @@ while (my %row = $db_result->fetchhash()) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die("*** File $path for node $node must reside in $TFTP\n");
+		die_noretry(
+		    "*** File $path for node $node must reside in $TFTP");
 	    }
 
 	    if (! -f $path) {
-		die("*** File $path for node $node does not exist!");
+		die_noretry("*** File $path for node $node does not exist!");
 	    }
 	}
     }
@@ -224,7 +242,7 @@ while (my %row = $db_result->fetchhash()) {
     #
     foreach my $delta (split(":", $row{'deltas'})) {
 	if (! -f $delta) {
-	    die("*** Delta file $delta for node $node does not exist!");
+	    die_noretry("*** Delta file $delta for node $node does not exist!");
 	}
     }
     #
@@ -232,7 +250,7 @@ while (my %row = $db_result->fetchhash()) {
     #
     foreach my $rpm (split(":", $row{'rpms'})) {
 	if (! -f $rpm) {
-	    die("*** RPM $rpm for node $node does not exist!");
+	    die_noretry("*** RPM $rpm for node $node does not exist!");
 	}
     }
     
@@ -243,7 +261,7 @@ while (my %row = $db_result->fetchhash()) {
 	my ($dir, $tar) = split(" ", $tarspec);
 	
 	if (! -f $tar) {
-	    die("*** Tarfile $tar for node $node does not exist!");
+	    die_noretry("*** Tarfile $tar for node $node does not exist!");
 	}
     }
 
@@ -259,7 +277,8 @@ while (my %row = $db_result->fetchhash()) {
 	# are doing the right thing, but lets be careful anyway.
 	# 
 	if (! $osid) {
-	    die("*** $node has no bootpath and no def_boot_osid set!\n");
+	    die_noretry(
+	        "*** $node has no bootpath and no def_boot_osid set!");
 	}
 
 	#
@@ -269,7 +288,7 @@ while (my %row = $db_result->fetchhash()) {
 	    DBQueryFatal("select * from os_info where osid='$osid'");
 	
 	if ($osid_result->numrows == 0) {
-	    die("*** No such OSID $osid is defined!\n");
+	    die_noretry("*** No such OSID $osid is defined!");
 	}
 	
 	my %osid_row   = $osid_result->fetchhash();
@@ -302,8 +321,9 @@ while (my %row = $db_result->fetchhash()) {
 		    # map it to another osid. 
 		    #
 		    if (!defined($osid_row{'nextosid'})) {
-			die("*** $0:\n".
-			    "    No mapping can be made for $osid ($node)!\n");
+			die_noretry(
+			    "*** $0:\n".
+			    "    No mapping can be made for $osid ($node)!");
 		    }
 		    my $nextosid = $osid_row{'nextosid'};
 		    
@@ -339,8 +359,8 @@ while (my %row = $db_result->fetchhash()) {
 			}
 			else {
 			    system("$osselect $nextosid $node") and
-				die("*** Could not set boot OS to ".
-				    "$nextosid for $node\n");
+				die_noretry("*** Could not set boot OS to ".
+				    "$nextosid for $node");
 			}
 			$osids{$node} = $nextosid;
 		    }
@@ -397,13 +417,13 @@ foreach my $vnode (keys(%vnodes)) {
     }
 
     if (! TBPhysNodeID($vnode, \$pnode)) {
-	die("*** $0:\n".
-	    "    Cannot determine phys_nodeid for $vnode!\n");
+	die_noretry("*** $0:\n".
+	    "    Cannot determine phys_nodeid for $vnode!");
     }
     my $n_osid = $osids{$pnode};
     
     system("$osselect $n_osid $vnode") and
-	die("*** Could not set boot OS to $n_osid for $vnode\n");
+	die_noretry("*** Could not set boot OS to $n_osid for $vnode");
 
     $osids{$vnode} = $n_osid;
 }
@@ -420,10 +440,10 @@ if (!$TESTMODE) {
     if (keys(%reboots)) {
 	foreach my $node (keys(%reboots)) {
 	    if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
-		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN() );
+		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
 		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_CLEAN();
 	    } else {
-		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY() );
+		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
 		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
 	    }
 	}
@@ -570,7 +590,6 @@ while ( @nodelist ) {
 	     "$node has been taken out of the pool until this matter ".
 	     "is resolved.\n");
 
-    # print "*** Experiment will be terminated automatically.\n";
     $failed++;
 }
 TBDebugTimeStamp("Local node waiting finished");
@@ -595,8 +614,8 @@ elsif (@vnodelist) {
     system("$vnode_setup $pid $eid");
     
     if ($?) {
-	die("*** $0:\n".
-	    "    Vnode setup failed!\n");
+	die_noretry("*** $0:\n".
+	    "    Vnode setup failed!");
     }
 
     foreach my $node (@vnodelist) {
@@ -659,7 +678,12 @@ elsif (@vnodelist) {
 
 print "OS Setup Done!\n";
 TBDebugTimeStamp("os_setup finished");
-exit $failed;
+
+if ($failed > 0) {
+    exit 1;
+} else {
+    exit 0;
+}
 
 #
 # Map an OSID to an imageid for a node type.
@@ -698,8 +722,8 @@ sub SetupReload($$$)
 	delete $reboots{$node};
     }
     else {
-	die("*** $0:\n".
-	    "    No image can be found for $osid on $node!\n");
+	die_noretry("*** $0:\n".
+	    "    No image can be found for $osid on $node!");
     }
 }
 
