@@ -71,7 +71,7 @@ sub usage {
 	return 1;
 }
 
-$verbose = 0;
+my $verbose = 0;
 if ($opt{v}) {
 	$verbose = 1;
 }
@@ -121,6 +121,7 @@ sub printdb {
 #
 # Datastructures:
 #  nodes is indexed by virtual node and contains the node type.
+#  isvirtnode is indexed by virtual node and says whether the node is "virtual"
 #  nodelans is indexed by virtual node and contains a list of
 #    <port>:<lan> that it is connected to.
 #  ips is indexed by nodeport and contains the IP addresses.
@@ -176,11 +177,16 @@ $result->finish;
 printdb "\n";
 
 printdb "Loading virt_nodes.\n";
-$result = DBQueryFatal("SELECT vname,ips,type,fixed from virt_nodes" .
-		     " where pid=\"$pid\" and eid=\"$eid\"");
-while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
+$result =
+    DBQueryFatal("select distinct vname,ips,vn.type,fixed,nt.isvirtnode ".
+		 " from virt_nodes as vn ".
+		 "left join node_types as nt on ".
+		 " nt.type=vn.type or nt.class=vn.type ".
+		 "where pid='$pid' and eid='$eid'");
+
+while (($vname,$ips,$type,$fixed,$isvirt) = $result->fetchrow_array) {
     if (! defined($fixed)) {$fixed = "";}
-    printdb "  $vname $type $ips $fixed\n";
+    printdb "  $vname $type $ips $fixed $isvirt\n";
     # We need to check the names to make sure they won't clash with
     # our internal delay node names.
     if (($vname =~ /^tbdelay\d+/) ||
@@ -191,9 +197,15 @@ while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
     }
     $nodes{$vname} = $type;
     $nodelans{$vname} = [];
-    foreach $ipinfo (split(" ",$ips)) {
-	($port,$ip) = split(":",$ipinfo);
-	$ips{"$vname:$port"} = $ip;
+    #
+    # VIRTNODE HACK: For a virtual node, we want to ignore the link info.
+    # 
+    $isvirtnode{$vname} = $isvirt;
+    if (! $isvirt) {
+	foreach $ipinfo (split(" ",$ips)) {
+	    ($port,$ip) = split(":",$ipinfo);
+	    $ips{"$vname:$port"} = $ip;
+	}
     }
     if ($fixed ne "") {
 	$fixed_nodes{$vname} = $fixed;
@@ -202,11 +214,59 @@ while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
 $result->finish;
 
 printdb "Loading virt_lans.\n";
-$result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate," .
-		       "rdelay,rbandwidth,rlossrate " .
-		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+$result =
+    DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
+		 "rdelay,rbandwidth,rlossrate " .
+		 "from virt_lans where pid='$pid' and eid='$eid'");
+
+#
+# VIRTNODE HACK: Virtual nodes are special.
+#
+# Prepass the table looking for those lans that have a virtual node
+# as a member. We want to ignore those (both sides) if its a duplex
+# link, but if its in a lan then we only want to ignore that particular
+# member of the lan. So, record the number of times we see the lan.
+# See below.
+#
+my %skiplans = ();
+my %lancount = ();
+
+while (($vname,$member) = $result->fetchrow_array) {
+    ($node,$port) = split(":",$member);
+
+    if (defined($lancount{$vname})) {
+	$lancount{$vname} += 1;
+    }
+    else {
+	$lancount{$vname} = 1;
+    }
+    
+    if ($isvirtnode{$node}) {
+	$skiplans{$vname} = 1;
+    }
+}
+$result->dataseek(0);
+
+#
+# Now do the real pass.
+# 
 while (($vname,$member,$delay,$bandwidth,$lossrate,
 	$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array) {
+    ($node,$port) = split(":",$member);
+
+    #
+    # VIRTNODE HACK: Virtual nodes are special.
+    #
+    # If its a duplex link involving a virtnode, skip it. 
+    # If its a lan (not a duplex link) then drop just that member.
+    # We do not want to have assign deal with these. The nodes are
+    # allocated as unconnected, and we deal with it later.
+    # 
+    if ($skiplans{$vname} &&
+	($lancount{$vname} == 2 || $isvirtnode{$node})) {
+	    next;
+    }
+    
     if (! defined($lans{$vname})) {
 	$lans{$vname} = [];
     }
@@ -243,7 +303,6 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
 	$mustdelay{$vname} = 1;
     }
     
-    ($node,$port) = split(":",$member);
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
     #       100Mbs, even if they requested exactly 10Mbs. This is a
@@ -623,7 +682,7 @@ while (1) {
     close(ASSIGNFP);
 
     # Reserve resources
-    if ($fail == 0) {
+    if (!$fail) {
 	print "Reserving resources.\n";
 	@toreserve = ();
 	# We don't reserve LAN nodes.
@@ -857,7 +916,9 @@ foreach $delay (keys(%delays)) {
 	$node0 = (split(":",$np0))[0];
 	$node1 = (split(":",$np1))[0];
 
-	printdb "np0 = $np0, np0vnode = $np0vnode, np1 = $np1, np1vnode = $np1vnode, nodeport0 = $nodeport0, nodeport1 = $nodeport1\n";
+	printdb("np0 = $np0, np0vnode = $np0vnode, np1 = $np1, ".
+		"np1vnode = $np1vnode, nodeport0 = $nodeport0, ".
+		"nodeport1 = $nodeport1\n");
 
 	# This is pretty hackish
 	if ($node0 eq $np0node) {
