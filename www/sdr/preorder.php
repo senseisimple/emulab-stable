@@ -7,11 +7,13 @@
 chdir("..");
 include("defs.php3");
 
+# Only one kind of daughterboard right now.
+
 #
 # Prices hardwired for now
 #
-$mobo_price   = 0.69;
-$dboard_price = 5369896.0;
+$mobo_price   = 425;
+$dboard_price =  50;
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -164,7 +166,7 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
           </tr>\n";
 
     echo "<tr>
-              <td colspan=1>USRP Motherboard:</td>
+              <td colspan=1><a href='http://comsec.com/wiki?UniversalSoftwareRadioPeripheral'>USRP motherboard</a>:</td>
               <td class=left>";
     if ($justview)
 	echo      $formfields[num_mobos];
@@ -174,12 +176,12 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
                          onChange='ChangeQuantities(myform);'
                          value=\"" . $formfields[num_mobos] . "\"
 	                 size=3>";
-    echo "        (\$${mobo_price} each)";
+    echo "        (estimated \$${mobo_price} each)";
     echo "    </td>
           </tr>\n";
 
     echo "<tr>
-              <td colspan=1>420MHZ Daughterboards:</td>
+              <td colspan=1>Generic daughterboards:</td>
               <td class=left>";
     if ($justview)
 	echo      $formfields[num_dboards];
@@ -189,7 +191,7 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
                          onChange='ChangeQuantities(myform);'
                          value=\"" . $formfields[num_dboards] . "\"
 	                 size=3>";
-    echo "        (\$${dboard_price} each)";
+    echo "        (estimated  \$${dboard_price} each)";
     echo "    </td>
           </tr>\n";
 
@@ -240,7 +242,7 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
     else {
 	echo "<tr>
                   <td colspan=2 align=center>
-                      Please describe your intended use
+                      We would appreciate your describing your intended use:
                   </td>
               </tr>
               <tr>
@@ -363,6 +365,36 @@ if (isset($_GET['finished']) || isset($_GET['viewonly'])) {
 #
 if (! isset($_POST['fakesubmit'])) {
     PAGEHEADER("Pre-Order USRP Parts");
+
+# I am not certain that this is the right place to put this text, but
+# I don't want to break anything.  It would probably be better to have it
+# displayed whenever they are editing the form, as it's a little disconcerting
+# that it disappears after recalculation, either implicit or explicit.  -fjl
+
+    echo "Use this page to pre-order the
+          <a href='http://comsec.com/wiki?UniversalSoftwareRadioPeripheral'>
+	  Universal Software Radio Peripheral</a> motherboard and its
+	  daughterboards, designed for <a href = 'http://www.gnu.org/software/gnuradio/'>
+	  GNU Radio</a>-based software radio.  This high-performance but low-cost
+	  hardware was developed by a talented team led by
+	  Matt Ettus of <a href='http://www.ettus.com/'>Ettus Research</a>,
+	  with whom we are collaborating under a grant from the National Science
+	  Foundation.\n";
+    echo  "<br><br>
+	  We are currently accepting pre-orders for the motherboard and
+	  the generic connector daughterboard, which provides dual raw coax
+	  connections (SMA connectors to external tuners or signal generators).
+          Ship date is expected to be mid-to-late November 2004.  When we have a firm
+	  date we will contact you to confirm/place your actual order.
+	  The quoted prices may change by a small amount, but we are able to guarantee
+	  that the cost of one motherboard plus one generic daughterboard will not
+	  exceed $500.\n";
+    echo  "<br><br>
+	  When you submit this form you will receive confirmation email
+	  containing a unique order-id and URL, which you can use to edit your
+	  pre-order at any time.\n";
+    echo  "<br><br>";
+
     SPITFORM($defaults, 0, $order_id, 0);
     PAGEFOOTER();
     return;
