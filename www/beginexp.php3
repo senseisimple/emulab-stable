@@ -40,6 +40,15 @@ function SPITFORM($formfields, $errors)
     global $nsdata, $nsref, $projlist, $exp_nsfile;
     global $uid, $guid;
     global $idleswaptimeout;
+    global $view, $view_style;
+
+    #
+    # Handle pre-defined view styles
+    #
+    if ($view_style == "plab") {
+	$view['hide_proj'] = $view['hide_group'] = $view['hide_swap'] =
+	    $view['hide_preload'] = $view['hide_batch'] = $view['quiet'] = 1;
+    }
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -66,7 +75,8 @@ function SPITFORM($formfields, $errors)
     }
     else {
 	    
-	if (!isset($nsdata) && !isset($nsref)) {
+	if (!isset($nsdata) && !isset($nsref) &&
+	    !isset($view['quiet'])) {
 	echo "<p><ul>
 	    <li><b>If you have an NS file:</b><br> You may want to
                 <b><a href='nscheck_form.php3'>syntax check it first</a></b>
@@ -77,7 +87,7 @@ function SPITFORM($formfields, $errors)
 		information</a>)</font>
 	     </ul></p><br>";
 	} else {
-	echo "<p><b>Your NetBuild-generated NS file has been uploaded.</b> " .
+	echo "<p><b>Your automatically generated NS file has been uploaded.</b> " .
              "To finish creating your experiment, " .
              "please fill out the following information:</p>";
         }
@@ -88,62 +98,89 @@ function SPITFORM($formfields, $errors)
                 action=beginexp.php3 method=post>\n";
 
     #
+    # Include view_style in a hidden field so that it gets preserved if there
+    # are errors
+    #
+    if ($view_style) {
+	echo "<input type='hidden' name='view_style' value='$view_style'>\n";
+    }
+
+    #
     # Select Project
     #
-    echo "<tr>
-              <td class='pad4'>Select Project:</td>
-              <td class='pad4'><select name=\"formfields[exp_pid]\">\n";
+    if (isset($view['hide_proj']) && (count($projlist) == 1)) {
+	# Just include the project as a hidden field
+	if ($formfields['project']) {
+	    $project = $formfields['project'];
+	} else {
+	    list($project) = each($projlist);
+	}
+	echo "<input type='hidden' name='formfields[exp_pid]' value='$project'>\n";
+    } else {
+	echo "<tr>
+		  <td class='pad4'>Select Project:</td>
+		  <td class='pad4'><select name=\"formfields[exp_pid]\">\n";
 
-    # If just one project, make sure just the one option.
-    if (count($projlist) != 1) {
-	echo "<option value=''>Please Select &nbsp</option>\n";
+	# If just one project, make sure just the one option.
+	if (count($projlist) != 1) {
+	    echo "<option value=''>Please Select &nbsp</option>\n";
+	}
+
+	while (list($project) = each($projlist)) {
+	    $selected = "";
+
+	    if (strcmp($formfields[exp_pid], $project) == 0)
+		$selected = "selected";
+
+	    echo "        <option $selected value=\"$project\">
+				 $project </option>\n";
+	}
+	echo "       </select>";
+	echo "    </td>
+	      </tr>\n";
     }
-
-    while (list($project) = each($projlist)) {
-	$selected = "";
-
-	if (strcmp($formfields[exp_pid], $project) == 0)
-	    $selected = "selected";
-
-	echo "        <option $selected value=\"$project\">
-                             $project </option>\n";
-    }
-    echo "       </select>";
-    echo "    </td>
-          </tr>\n";
 
     #
     # Select a group
     #
-    echo "<tr>
-              <td class='pad4'>Group:</td>
-              <td class='pad4'><select name=\"formfields[exp_gid]\">
-                    <option value=''>Default Group </option>\n";
+    if (isset($view['hide_group'])) {
+	if ($formfields['group']) {
+	    $group = $formfields['group'];
+	} else {
+	    $group = "";
+	}
+	echo "<input type='hidden' name='formfields[exp_gid]' value='$group'>\n";
+    } else {
+	echo "<tr>
+		  <td class='pad4'>Group:</td>
+		  <td class='pad4'><select name=\"formfields[exp_gid]\">
+			<option value=''>Default Group </option>\n";
 
-    reset($projlist);
-    while (list($project, $grouplist) = each($projlist)) {
-	for ($i = 0; $i < count($grouplist); $i++) {
-	    $group    = $grouplist[$i];
+	reset($projlist);
+	    while (list($project, $grouplist) = each($projlist)) {
+		for ($i = 0; $i < count($grouplist); $i++) {
+		$group    = $grouplist[$i];
 
-	    if (strcmp($project, $group)) {
-		$selected = "";
+		if (strcmp($project, $group)) {
+		    $selected = "";
 
-		if (isset($formfields[exp_gid]) &&
-		    isset($formfields[exp_pid]) &&
-		    strcmp($formfields[exp_pid], $project) == 0 &&
-		    strcmp($formfields[exp_gid], $group) == 0)
-		    $selected = "selected";
+		    if (isset($formfields[exp_gid]) &&
+			isset($formfields[exp_pid]) &&
+			strcmp($formfields[exp_pid], $project) == 0 &&
+			strcmp($formfields[exp_gid], $group) == 0)
+			$selected = "selected";
 
-		echo "<option $selected value=\"$group\">
-                           $project/$group</option>\n";
+		    echo "<option $selected value=\"$group\">
+			       $project/$group</option>\n";
+		}
 	    }
 	}
+	echo "     </select>
+	      <font size=-1>(Must be default or correspond to selected project)
+	      </font>
+		 </td>
+	      </tr>\n";
     }
-    echo "     </select>
-	  <font size=-1>(Must be default or correspond to selected project)
-          </font>
-             </td>
-          </tr>\n";
 
     #
     # Name:
@@ -179,7 +216,7 @@ function SPITFORM($formfields, $errors)
     #
     if (isset($nsdata)) {
         echo "<tr>
-                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your auto-generated NS file: &nbsp</td>
                       <input type=hidden name=nsdata value=$nsdata>
                   <td class='pad4'><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
                       View NS File</a></td>
@@ -187,7 +224,7 @@ function SPITFORM($formfields, $errors)
     } elseif (isset($nsref)) {
 	if (isset($guid)) {
         echo "<tr>
-                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your auto-generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                       <input type=hidden name=guid value=$guid>
                   <td class='pad4'><a target=_blank href=\"spitnsdata.php3?nsref=$nsref&guid=$guid\">
@@ -195,7 +232,7 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
         } else {
         echo "<tr>
-                  <td class='pad4'>Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>Your auto-generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                   <td class='pad4'><a target=_blank href=spitnsdata.php3?nsref=$nsref>
                       View NS File</a></td>
@@ -255,90 +292,113 @@ function NormalSubmit() {
     #
     # Add in hidden fields to send swappable and noswap_reason, since
     # they do not show on the form
-    echo "<tr>
-	      <td class='pad4'>
-		<a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
-		Swapping:</td>
-	      <td>
-	      <input type=hidden name='formfields[exp_swappable]' value='$formfields[exp_swappable]'>
-	      <input type=hidden name='formfields[exp_noswap_reason]' value='";
+    echo "<input type=hidden name='formfields[exp_swappable]' value='$formfields[exp_swappable]'>\n";
+    echo "<input type=hidden name='formfields[exp_noswap_reason]' value='";
     echo htmlspecialchars($formfields[exp_noswap_reason], ENT_QUOTES);
-    echo "'>
-	      <table cellpadding=0 cellspacing=0 border=0><tr>
-              <td><input type='checkbox'
-	             name='formfields[exp_idleswap]'
-	             value='1'";
-    if ($formfields[exp_idleswap] == "1") {
-	echo " checked='1'";
+    echo "'>\n";
+    if (isset($view['hide_swap'])) {
+	$idlevars = array('exp_idleswap','exp_noidleswap_reason','exp_idleswap_timeout',
+	                  'exp_autoswap','exp_autoswap_timeout');
+	while (list($index,$value) = each($idlevars)) {
+	    if (isset($formfields[$value])) {
+		echo "<input type='hidden' name='formfields[$value]' value='$formfields[$value]'>\n";
+	    }
+	}
+
+    } else {
+	echo "<tr>
+		  <td class='pad4'>
+		    <a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
+		    Swapping:</td>
+		  <td>
+		  <table cellpadding=0 cellspacing=0 border=0><tr>
+		  <td><input type='checkbox'
+			 name='formfields[exp_idleswap]'
+			 value='1'";
+	if ($formfields[exp_idleswap] == "1") {
+	    echo " checked='1'";
+	}
+	echo "></td>
+		  <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
+		  <b>Idle-Swap:</b></a> Swap out this experiment
+		  after 
+		  <input type='text' name='formfields[exp_idleswap_timeout]'
+			 value='";
+	echo htmlspecialchars($formfields[exp_idleswap_timeout], ENT_QUOTES);
+	echo "' size='3'> hours idle.</td>
+		  </tr><tr>
+		  <td> </td>
+		  <td>If not, why not?<br><textarea rows=2 cols=50
+			      name='formfields[exp_noidleswap_reason]'>";
+			      
+	echo htmlspecialchars($formfields[exp_noidleswap_reason], ENT_QUOTES);
+	echo "</textarea></td>
+		  </tr><tr>
+		  <td><input type='checkbox'
+			 name='formfields[exp_autoswap]'
+			 value='1' ";
+	if ($formfields[exp_autoswap] == "1") {
+	    echo " checked='1'";
+	}
+	echo "></td>
+		  <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
+		  <b>Max. Duration:</b></a> Swap out after
+		  <input type='text' name='formfields[exp_autoswap_timeout]'
+			 value='";
+	echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
+	echo "' size='3'> hours, even if not idle.</td>
+		  </tr></table>
+		  </td>
+	       </tr>";
     }
-    echo "></td>
-              <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
-	      <b>Idle-Swap:</b></a> Swap out this experiment
-	      after 
-              <input type='text' name='formfields[exp_idleswap_timeout]'
-		     value='";
-    echo htmlspecialchars($formfields[exp_idleswap_timeout], ENT_QUOTES);
-    echo "' size='3'> hours idle.</td>
-	      </tr><tr>
-              <td> </td>
-	      <td>If not, why not?<br><textarea rows=2 cols=50
-                          name='formfields[exp_noidleswap_reason]'>";
-			  
-    echo htmlspecialchars($formfields[exp_noidleswap_reason], ENT_QUOTES);
-    echo "</textarea></td>
-	      </tr><tr>
-	      <td><input type='checkbox'
-		     name='formfields[exp_autoswap]'
-		     value='1' ";
-    if ($formfields[exp_autoswap] == "1") {
-	echo " checked='1'";
-    }
-    echo "></td>
-	      <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
-	      <b>Max. Duration:</b></a> Swap out after
-              <input type='text' name='formfields[exp_autoswap_timeout]'
-		     value='";
-    echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
-    echo "' size='3'> hours, even if not idle.</td>
-              </tr></table>
-              </td>
-           </tr>";
 
     #
     # Batch Experiment?
     #
-    echo "<tr>
-  	      <td class='pad4' colspan=2>
-              <input type=checkbox name='formfields[exp_batched]' value='Yep'";
-
-    if (isset($formfields[exp_batched]) &&
-	strcmp($formfields[exp_batched], "Yep") == 0) {
-	    echo " checked='1'";
+    if (isset($view['hide_batch'])) {
+	if ($formfields['exp_batched']) {
+	    echo "<input type='hidden' name='formfields[exp_batched]' value='Yep'\n";
 	}
+    } else {
+	echo "<tr>
+		  <td class='pad4' colspan=2>
+		  <input type=checkbox name='formfields[exp_batched]' value='Yep'";
 
-    echo ">\n";
-    echo "Batch Mode Experiment &nbsp;
-          <font size='-1'>(See
-          <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
-          for more information)</font>
-          </td>
-          </tr>\n";
+	if (isset($formfields[exp_batched]) &&
+	    strcmp($formfields[exp_batched], "Yep") == 0) {
+		echo " checked='1'";
+	    }
+
+	echo ">\n";
+	echo "Batch Mode Experiment &nbsp;
+	      <font size='-1'>(See
+	      <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+	      for more information)</font>
+	      </td>
+	      </tr>\n";
+    }
 
     #
     # Preload?
     #
-    echo "<tr>
-  	      <td class='pad4' colspan=2>
-              <input type=checkbox name='formfields[exp_preload]' value='Yep'";
-
-    if (isset($formfields[exp_preload]) &&
-	strcmp($formfields[exp_preload], "Yep") == 0) {
-	    echo " checked='1'";
+    if (isset($view['hide_preload'])) { 
+	if ($formfields['exp_preload']) {
+	    echo "<input type='hidden' name='formfields[exp_preload]' value='Yep'>\n";
 	}
+    } else {
+	echo "<tr>
+		  <td class='pad4' colspan=2>
+		      <input type=checkbox name='formfields[exp_preload]' value='Yep'";
 
-    echo ">\n";
-    echo "Do Not Swap In</td>
-          </tr>\n";
+	if (isset($formfields[exp_preload]) &&
+	    strcmp($formfields[exp_preload], "Yep") == 0) {
+		echo " checked='1'";
+	    }
+
+	echo ">\n";
+	echo "Do Not Swap In</td>
+	      </tr>\n";
+    }
 
     echo "<tr>
               <td class='pad4' align=center colspan=2>
@@ -348,14 +408,16 @@ function NormalSubmit() {
         </form>
         </table>\n";
 
-    echo "<p>
-          <h3>Handy Links:</h3>
-          <ul>
-             <li> View a <a href='showosid_list.php3'>list of OSIDs</a>
-                  that are available for you to use in your NS file.</li>
-             <li> Create your own <a href='newimageid_ez.php3'>
-                  custom disk images</a>.</li>
-          </ul>\n";
+    if (!isset($view['quiet'])) {
+	echo "<p>
+	      <h3>Handy Links:</h3>
+	      <ul>
+		 <li> View a <a href='showosid_list.php3'>list of OSIDs</a>
+		      that are available for you to use in your NS file.</li>
+		 <li> Create your own <a href='newimageid_ez.php3'>
+		      custom disk images</a>.</li>
+	      </ul>\n";
+    }
 }
 
 if (isset($nsref)) {
@@ -423,6 +485,15 @@ if (! isset($submit) && ! isset($syntax)) {
     $defaults[exp_idleswap_timeout] = "$idleswaptimeout";
     $defaults[exp_autoswap]  = "0";
     $defaults[exp_autoswap_timeout] = "10";
+
+    #
+    # Allow formfields that are already set to override defaults
+    #
+    if (isset($formfields)) {
+	while (list ($field, $value) = each ($formfields)) {
+	    $defaults[$field] = $formfields[$field];
+	}
+    }
 
     SPITFORM($defaults, 0);
     PAGEFOOTER();
