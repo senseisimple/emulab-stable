@@ -18,7 +18,7 @@ LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
 DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README
-DEBUG_STUFF     = experiment node imageid osid fs user emulab
+DEBUG_STUFF     = experiment node imageid osid fs user emulab server
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
