@@ -119,10 +119,10 @@ puts "  Log in [file dirname $irfile]/assign.log"
 set run 0
 while {$run < $maxrun} {
     set assignfp [open "|$assign -b -t $testbed $tmpfile | tee -a [file dirname $irfile]/assign.log" r]
-    set problem 0
+    set problems 0
     set score -1
     set seed 0
-    while {$problem == 0 && [gets $assignfp line] >= 0} {
+    while {$problems == 0 && [gets $assignfp line] >= 0} {
 	if {[regexp {BEST SCORE: ([0-9]+)} $line match score] == 1} {
 	    continue;
 	}
@@ -133,10 +133,9 @@ while {$run < $maxrun} {
 	    continue
 	}
     }
-    if {$problem > 0} {
+    if {$problems > 0} {
 	incr run
-	close $assignfp
-	puts "Run $run resulted in $problem violations."
+	puts "Run $run resulted in $problems violations."
 	continue
     }
     # we should now be ready to read the solution
@@ -157,7 +156,7 @@ while {$run < $maxrun} {
     }
     break
 }
-if {$run > $maxrun} {
+if {$run >= $maxrun} {
     puts "Could not find solution (not deleting $tmpfile)!"
     exit 1
 }
