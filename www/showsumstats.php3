@@ -210,7 +210,9 @@ function showrange ($showby, $sortby, $range) {
         default:
 	    USERERROR("Invalid range argument: $range!", 1);
     }
-    $wclause = "($span)";
+    $wclause   = "($span)";
+    $now       = time();
+    $spanstart = $now - $span;
 
     # Summary info, indexed by pid and uid. Each entry is an array of the
     # summary info.
@@ -255,13 +257,19 @@ function showrange ($showby, $sortby, $range) {
     }
 
     $query_result =
-	DBQueryFatal("select s.*,t.*,r.*,UNIX_TIMESTAMP(t.tstamp) as ttstamp ".
-		     "  from testbed_stats as t ".
-		     "left join experiment_stats as s on s.exptidx=t.exptidx ".
-		     "left join experiment_resources as r on r.idx=t.rsrcidx ".
+	DBQueryFatal("select s.pid,s.eid,s.creator,t.action, ".
+		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
+		     "  UNIX_TIMESTAMP(t.tstamp) as ttstamp ".
+		     " from testbed_stats as t ".
+		     "left join experiment_stats as s on ".
+		     "  s.exptidx=t.exptidx ".
+		     "left join experiment_resources as r1 on ".
+		     "  r1.idx=t.rsrcidx ".
+		     "left join experiment_resources as r2 on ".
+		     "  r2.idx=s.lastrsrc and s.lastrsrc is not null ".
 		     "where t.exitcode = 0 && ".
-		     "     ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.tstamp)) ".
-		     "      < $wclause) ".
+		     "    ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.tstamp)) ".
+		     "     < $wclause) ".
 		     "order by t.tstamp");
 
     # Experiment start time, indexed by pid:eid.
@@ -273,7 +281,8 @@ function showrange ($showby, $sortby, $range) {
 	$uid     = $row["creator"];
 	$tstamp  = $row["ttstamp"];
 	$action  = $row["action"];
-	$pnodes  = $row["pnodes"];
+	$pnodes  = $row["pnodes1"];
+	$pnodes2 = $row["pnodes2"];
 
 	if ($pnodes == 0)
 	    continue;
@@ -302,21 +311,34 @@ function showrange ($showby, $sortby, $range) {
         case "swapout":
         case "swapmod":
 	    if (isset($expt_start["$pid:$eid"])) {
-		# Use the original data, expecially pnodes since if this
+		# Use the original data, especially pnodes since if this
 		# was a swapmod, the nodes are for the new config, not
 		# the old config. 
 		$uid    = $expt_start["$pid:$eid"]["uid"];
 		$pnodes = $expt_start["$pid:$eid"]["pnodes"];
 		$diff = $tstamp - $expt_start["$pid:$eid"]["stamp"];
-
-		$pid_summary[$pid]["pnodes"]   += $pnodes;
-		$pid_summary[$pid]["pseconds"] += $pnodes * $diff;
-		$pid_summary[$pid]["eseconds"] += $diff;
-		$uid_summary[$uid]["pnodes"]   += $pnodes;
-		$uid_summary[$uid]["pseconds"] += $pnodes * $diff;
-		$uid_summary[$uid]["eseconds"] += $diff;
-		unset($expt_start["$pid:$eid"]);
 	    }
+	    else {
+		#
+                # The start was before the time span being looked at, so
+                # no start/swapin event was returned. Add a record for it.
+	        #
+		$diff = $tstamp - $spanstart;
+		#echo "$pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
+		if ($action == "swapmod") {
+                    # A pain. We need the number of pnodes for the original
+		    # version of the experiment, not the new version.
+		    $pnodes = $pnodes2;
+		}
+	    }
+	    $pid_summary[$pid]["pnodes"]   += $pnodes;
+	    $pid_summary[$pid]["pseconds"] += $pnodes * $diff;
+	    $pid_summary[$pid]["eseconds"] += $diff;
+	    $uid_summary[$uid]["pnodes"]   += $pnodes;
+	    $uid_summary[$uid]["pseconds"] += $pnodes * $diff;
+	    $uid_summary[$uid]["eseconds"] += $diff;
+	    unset($expt_start["$pid:$eid"]);
+	    
 	    # Basically, start the clock ticking again with the new
 	    # number of pnodes.
 	    if ($action == "swapmod") {
