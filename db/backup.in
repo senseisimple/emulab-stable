@@ -81,7 +81,7 @@ exit 0;
 
 sub fatal {
     system("cat $logname | /usr/bin/mail ".
-	   "-s '\"DB Backup Failed\"' testbed@fast");
+	   "-s '\"DB Backup Failed\"' testbed\@fast");
     unlink("$logname");
     exit(1);
 }
