@@ -1,0 +1,29 @@
+#
+# For installation.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= rc.d
+
+include $(OBJDIR)/Makeconf
+
+RC_SCRIPTS	= 3.testbed.sh cvsupd.sh
+#
+# Force dependencies to make sure configure regenerates if the .in file
+# is changed.
+# 
+all: $(RC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# Like the INSTALL_BINDIR target
+$(INSTALL_RCDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_RCDIR)
+	$(INSTALL_PROGRAM) $< $@
+
+
+install: $(addprefix $(INSTALL_RCDIR)/, $(RC_SCRIPTS))
+
+clean:
