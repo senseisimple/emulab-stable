@@ -195,7 +195,7 @@ sub doboot()
 #
 sub doshutdown()
 {
-    # Nothing to do.
+    system("killall nse");
 }
 
 #
