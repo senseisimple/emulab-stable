@@ -51,7 +51,9 @@ install:
 	@$(MAKE) -C sched install
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
-	@$(MAKE) -C nsetrafgen install
+
+client-install:
+	@$(MAKE) -C nsetrafgen client-install
 
 control-install: 
 	@$(MAKE) -C tbgen control-install
