@@ -55,6 +55,8 @@
 #define RELOADEID	"reloading"
 #define FSHOSTID	"/usr/testbed/etc/fshostid"
 #define DOTSFS		".sfs"
+#define RUNASUSER	"nobody"
+#define RUNASGROUP	"nobody"
 
 #define TESTMODE
 #define DEFAULTNETMASK	"255.255.255.0"
@@ -187,7 +189,6 @@ COMMAND_PROTOTYPE(dostartcmd);
 COMMAND_PROTOTYPE(dostartstat);
 COMMAND_PROTOTYPE(doready);
 COMMAND_PROTOTYPE(doreadycount);
-COMMAND_PROTOTYPE(dolog);
 COMMAND_PROTOTYPE(domounts);
 COMMAND_PROTOTYPE(dosfshostid);
 COMMAND_PROTOTYPE(doloadinfo);
@@ -202,8 +203,6 @@ COMMAND_PROTOTYPE(dovnodelist);
 COMMAND_PROTOTYPE(dosubnodelist);
 COMMAND_PROTOTYPE(doisalive);
 COMMAND_PROTOTYPE(doipodinfo);
-COMMAND_PROTOTYPE(doatarball);
-COMMAND_PROTOTYPE(doanrpm);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
@@ -252,7 +251,6 @@ struct command {
 	{ "startstat",	  FULLCONFIG_NONE, dostartstat },
 	{ "readycount",   FULLCONFIG_NONE, doreadycount },
 	{ "ready",	  FULLCONFIG_NONE, doready },
-	{ "log",	  FULLCONFIG_NONE, dolog },
 	{ "mounts",	  FULLCONFIG_ALL,  domounts },
 	{ "sfshostid",	  FULLCONFIG_NONE, dosfshostid },
 	{ "loadinfo",	  FULLCONFIG_NONE, doloadinfo},
@@ -269,8 +267,6 @@ struct command {
 	{ "ipodinfo",	  FULLCONFIG_NONE, doipodinfo},
 	{ "ntpinfo",	  FULLCONFIG_PHYS, dontpinfo},
 	{ "ntpdrift",	  FULLCONFIG_NONE, dontpdrift},
-	{ "tarball",	  FULLCONFIG_NONE, doatarball},
-	{ "rpm",	  FULLCONFIG_NONE, doanrpm},
 	{ "jailconfig",	  FULLCONFIG_VIRT, dojailconfig},
 	{ "plabconfig",	  FULLCONFIG_VIRT, doplabconfig},
 	{ "subconfig",	  FULLCONFIG_NONE, dosubconfig},
@@ -453,6 +449,39 @@ main(int argc, char **argv)
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", mypid);
 		(void) fclose(fp);
+	}
+
+	/*
+	 * Change to non-root user!
+	 */
+	if (geteuid() == 0) {
+		struct passwd	*pw;
+		uid_t		uid;
+		gid_t		gid;
+
+		/*
+		 * Must be a valid user of course.
+		 */
+		if ((pw = getpwnam(RUNASUSER)) == NULL) {
+			error("invalid user: %s", RUNASUSER);
+			exit(1);
+		}
+		uid = pw->pw_uid;
+		gid = pw->pw_gid;
+
+		if (setgroups(1, &gid)) {
+			errorc("setgroups");
+			exit(1);
+		}
+		if (setgid(gid)) {
+			errorc("setgid");
+			exit(1);
+		}
+		if (setuid(uid)) {
+			errorc("setuid");
+			exit(1);
+		}
+		info("Flipped to user/group %d/%d\n", uid, gid);
 	}
 
 	/*
@@ -917,14 +946,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
-	/*
-	 * XXX hack, don't log "log" contents,
-	 * both for privacy and to keep our syslog smaller.
-	 */
-	if (command_array[i].func == dolog)
-		info("%s: vers:%d %s log %d chars\n",
-		     reqp->nodeid, version, cp, strlen(rdata));
-	else if (command_array[i].func != doisalive || verbose)
+	if (command_array[i].func != doisalive || verbose)
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
 
@@ -1125,7 +1147,6 @@ COMMAND_PROTOTYPE(doifconfig)
 	mysql_free_result(res);
 
 	/* Veth interfaces are new. */
- doveths:
 	if (vers < 10)
 		return 0;
 
@@ -2601,48 +2622,6 @@ COMMAND_PROTOTYPE(doreadycount)
 	return 0;
 }
 
-static char logfmt[] = "/proj/%s/logs/%s.log";
-
-/*
- * Log some text to a file in the /proj/<pid>/exp/<eid> directory.
- */
-COMMAND_PROTOTYPE(dolog)
-{
-	char		logfile[TBDB_FLEN_PID+TBDB_FLEN_EID+sizeof(logfmt)];
-	FILE		*fd;
-	time_t		curtime;
-	char		*tstr;
-
-	/*
-	 * Find the pid/eid of the requesting node
-	 */
-	if (!reqp->allocated) {
-		if (verbose)
-			info("LOG: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
-	snprintf(logfile, sizeof(logfile)-1, logfmt, reqp->pid, reqp->eid);
-	fd = fopen(logfile, "a");
-	if (fd == NULL) {
-		error("LOG: %s: Could not open %s\n", reqp->nodeid, logfile);
-		return 1;
-	}
-
-	curtime = time(0);
-	tstr = ctime(&curtime);
-	tstr[19] = 0;	/* no year */
-	tstr += 4;	/* or day of week */
-
-	while (isspace(*rdata))
-		rdata++;
-
-	fprintf(fd, "%s: %s\n\n%s\n=======\n", tstr, reqp->nodeid, rdata);
-	fclose(fd);
-
-	return 0;
-}
-
 /*
  * Return mount stuff.
  */
@@ -2985,7 +2964,11 @@ COMMAND_PROTOTYPE(dosfshostid)
 	OUTPUT(sfspath, sizeof(sfspath), "/sfs/%s", nodehostid);
 	OUTPUT(dspath, sizeof(dspath), "/proj/%s/%s.%s.%s", DOTSFS,
 	       reqp->nickname, reqp->eid, reqp->pid);
-	
+
+	/*
+	 * Create the symlink. The directory in which this is done has to be
+	 * either owned by the same uid used to run tmcd, or in the same group.
+	 */ 
 	if (safesymlink(sfspath, dspath) < 0) {
 		return 1;
 	}
@@ -4258,377 +4241,6 @@ COMMAND_PROTOTYPE(dontpdrift)
 	if (verbose)
 		info("NTPDRIFT: %f", drift);
 	return 0;
-}
-
-static int sendafile(int sock, tmcdreq_t *reqp, int tcp, char *filename,
-		     char *filetype, char *cmdname);
-
-/*
- * Return a tarball.
- * The tarball being requested has to be in the tarballs list for the
- * node of course. Has to be a tcp connection of course, and all remote
- * tcp connections are required to be ssl'ized.
- */
-COMMAND_PROTOTYPE(doatarball)
-{
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
-	char		tarname[1024+1];
-	int		okay = 0;
-	char		*bp, *sp, *tp;
-
-	/*
-	 * Check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("GETTAR: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
-	 * Pick up the name from the argument. Limit to usual MAXPATHLEN.
-	 */
-	if (sscanf(rdata, "%1024s", tarname) != 1) {
-		error("GETTAR: %s: Bad arguments\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
-	 * Get the tarball list from the DB. The requested path must be
-	 * on the list of tarballs for this node.
-	 */
-	res = mydb_query("select tarballs from nodes where node_id='%s' ",
-			 1, reqp->nodeid);
-
-	if (!res) {
-		error("GETTAR: %s: DB Error getting tarballs!\n",
-		      reqp->nodeid);
-		return 1;
-	}
-
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		error("GETTAR: %s: Invalid Tarball: %s!\n",
-		      reqp->nodeid, tarname);
-		return 1;
-	}
-
-	/*
-	 * Text string is a colon separated list of "dir filename". 
-	 */
-	row = mysql_fetch_row(res);
-	if (! row[0] || !row[0][0]) {
-		mysql_free_result(res);
-		error("GETTAR: %s: Invalid Tarball: %s!\n",
-		      reqp->nodeid, tarname);
-		return 1;
-	}
-	
-	bp  = row[0];
-	sp  = bp;
-	do {
-		bp = strsep(&sp, ":");
-		if ((tp = strchr(bp, ' ')) == NULL)
-			continue;
-		*tp++ = '\0';
-
-		if (strcmp(tp, tarname) == 0) {
-			okay = 1;
-			break;
-		}
-	} while ((bp = sp));
-	mysql_free_result(res);
-
-	if (!okay) {
-		error("GETTAR: %s: Invalid Tarball: %s!\n",
-		      reqp->nodeid, tarname);
-		return 1;
-	}
-
-	return sendafile(sock, reqp, tcp, tarname, "tarfile", "GETTAR");
-}
-
-/*
- * Return an RPM file.
- * The rpm being requested has to be in the rpms list for the
- * node of course. Has to be a tcp connection of course, and all remote
- * tcp connections are required to be ssl'ized.
- */
-COMMAND_PROTOTYPE(doanrpm)
-{
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
-	char		rpmname[1024+1];
-	int		okay = 0;
-	char		*bp, *sp;
-
-	/*
-	 * Check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("GETRPM: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
-	 * Pick up the name from the argument. Limit to usual MAXPATHLEN.
-	 */
-	if (sscanf(rdata, "%1024s", rpmname) != 1) {
-		error("GETRPM: %s: Bad arguments\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
-	 * Get the rpm list from the DB. The requested path must be
-	 * on the list of rpms for this node.
-	 */
-	res = mydb_query("select rpms from nodes where node_id='%s' ",
-			 1, reqp->nodeid);
-
-	if (!res) {
-		error("GETRPM: %s: DB Error getting rpms!\n",
-		      reqp->nodeid);
-		return 1;
-	}
-
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		error("GETRPM: %s: Invalid RPM: %s!\n",
-		      reqp->nodeid, rpmname);
-		return 1;
-	}
-
-	/*
-	 * Text string is a colon separated list of filenames.
-	 */
-	row = mysql_fetch_row(res);
-	if (! row[0] || !row[0][0]) {
-		mysql_free_result(res);
-		error("GETRPM: %s: Invalid RPM: %s!\n",
-		      reqp->nodeid, rpmname);
-		return 1;
-	}
-	
-	bp  = row[0];
-	sp  = bp;
-	do {
-		bp = strsep(&sp, ":");
-		if (strcmp(bp, rpmname) == 0) {
-			okay = 1;
-			break;
-		}
-	} while ((bp = sp));
-	mysql_free_result(res);
-
-	if (!okay) {
-		error("GETRPM: %s: Invalid RPM: %s!\n",
-		      reqp->nodeid, rpmname);
-		return 1;
-	}
-
-	return sendafile(sock, reqp, tcp, rpmname, "rpm", "GETRPM");
-}
-
-static int	safesyscall(int sysnum, ...);
-
-/*
- * Return a tar or RPM file.  Verifies that the user has access to the file
- * in question.  If so, the file is sent back on the connection, prefixed by
- * the file's size.  It is up to the caller to ensure it is a registered tar
- * or RPM file.
- */
-static int
-sendafile(int sock, tmcdreq_t *reqp, int tcp, char *filename,
-	  char *filetype, char *cmdname)
-{
-	char		buf[1024 * 32];
-	int		cc, fd;
-	char		*bp;
-	struct stat	statbuf;
-	struct group	*grp;
-	struct passwd   *pwd;
-
-	/*
-	 * Ensure that we do not get tricked into returning a file outside
-	 * of /proj, /users, or /groups. We could put a check in the frontend
-	 * where tarfiles/rpms is set, but this is much safer given the
-	 * potential for disaster.
-	 *
-	 * XXX I know, realpath is not really a syscall. 
-	 */
-	if (safesyscall(696969, filename, buf) == NULL) {
-		errorc("%s: %s: realpath failure %s!",
-		       cmdname, reqp->nodeid, filename);
-		return 1;
-	}
-	if ((bp = strchr(&buf[1], '/')) == NULL) {
-		errorc("%s: %s: could not parse %s!",
-		       cmdname, reqp->nodeid, buf);
-		return 1;
-	}
-	*bp = NULL;
-	if (strcmp(buf, PROJDIR) &&
-	    strcmp(buf, GROUPDIR) &&
-	    strcmp(buf, USERDIR)) {
-		*bp = '/';
-		error("%s: %s: illegal path: %s --> %s!\n",
-		      cmdname, reqp->nodeid, filename, buf);
-		return 1;
-	}
-	*bp = '/';
-	
-	/*
-	 * Better be readable!
-	 */
-	if ((fd = safesyscall(SYS_open, filename, O_RDONLY)) < 0) {
-		errorc("%s: %s: Could not open %s!",
-		       cmdname, reqp->nodeid, filename);
-		return 1;
-	}
-
-	/*
-	 * Stat the file so we get its size to send over first.
-	 */
-	if (safesyscall(SYS_fstat, fd, &statbuf) < 0) {
-		errorc("%s: %s: Could not fstat %s!",
-		       cmdname, reqp->nodeid, filename);
-		goto bad;
-	}
-
-	/*
-	 * As long as we did the stat, check the uid/gid to make doubly
-	 * sure that we should hand this file out. Either the file has
-	 * to be in the gid of the experiment, or it has to be owned
-	 * by the experiment creator.
-	 */
-	if ((grp = getgrnam(reqp->gid)) == NULL) {
-		error("%s: %s: Could map gid %s!",
-		      cmdname, reqp->nodeid, reqp->gid);
-		goto bad;
-	}
-	if (grp->gr_gid != statbuf.st_gid) {
-		if ((pwd = getpwnam(reqp->creator)) == NULL) {
-			error("%s: %s: Could map uid %s!",
-			      cmdname, reqp->nodeid, reqp->creator);
-			goto bad;
-		}
-		if (pwd->pw_uid != statbuf.st_uid) {
-			error("%s: %s: %s %s has bad uid/gid (%d/%d)\n",
-			      cmdname, reqp->nodeid, filetype, filename,
-			      statbuf.st_uid, statbuf.st_gid);
-			goto bad;
-		}
-	}
-	
-	cc = statbuf.st_size;
-	client_writeback(sock, &cc, sizeof(cc), tcp);
-
-	/* Leave this logging on all the time for now. */
-	info("%s: %s: Sending %s (%d): %s\n",
-	     cmdname, reqp->nodeid, filetype, cc, buf);
-
-	/*
-	 * Now dump the file. 
-	 */
-	while (1) {
-	    if ((cc = safesyscall(SYS_read, fd, buf, sizeof(buf))) < 0) {
-		errorc("Error reading %s: %s", filetype, filename);
-		goto bad;
-	    }
-	    if (cc == 0)
-		break;
-	    
-	    if (client_writeback(sock, buf, cc, tcp) < 0) {
-		errorc("Error writing %s data: %s", filetype, filename);
-		goto bad;
-	    }
-	}
-	safesyscall(SYS_close, fd);
-	return 0;
- bad:
-	safesyscall(SYS_close, fd);
-	return 1;
-}
-
-int nfsdeadfl;
-jmp_buf nfsdeadbuf;
-static void
-nfswentdead()
-{
-	nfsdeadfl = 1;
-	longjmp(nfsdeadbuf, 1);
-}
-
-static int
-safesyscall(int sysnum, ...)
-{
-	volatile int	retval = 0;
-	va_list		ap;
-
-	if (setjmp(nfsdeadbuf) == 0) {
-		va_start(ap, sysnum);
-
-		retval    = 0;
-		nfsdeadfl = 0;
-		signal(SIGALRM, nfswentdead);
-		alarm(2);
-
-		switch (sysnum) {
-		case SYS_open:
-			{
-				char   *path = va_arg(ap, char *);
-				int	flags  = va_arg(ap, int);
-
-				retval = open(path, flags);
-			}
-			break;
-
-		case SYS_read:
-			{
-				int	fd     = va_arg(ap, int);
-				void   *buf    = va_arg(ap, void *);
-				size_t  nbytes = va_arg(ap, size_t);
-
-				retval = read(fd, buf, nbytes);
-			}
-			break;
-
-		case SYS_fstat:
-			{
-				int	     fd = va_arg(ap, int);
-				struct stat *sb = va_arg(ap, struct stat *);
-
-				retval = fstat(fd, sb);
-			}
-			break;
-
-		case SYS_close:
-			{
-				int	fd = va_arg(ap, int);
-
-				retval = close(fd);
-			}
-			break;
-
-		case 696969:
-			{
-				char	*pathname = va_arg(ap, char *);
-				char	*resolved = va_arg(ap, char *);
-
-				retval = (int) realpath(pathname, resolved);
-			}
-			break;
-
-		default:
-			break;
-		}
-	}
-	alarm(0);
-	if (nfsdeadfl) {
-		error("NFS wend dead");
-		return -1;
-	}
-	return retval;
 }
 
 /*
