@@ -1,5 +1,6 @@
+#####
 ##### Configuration suggestions for Cisco switches
-##### Last updated July 25, 2002 
+##### 
 
 The purpose of this document is to aid in designing and setting up the control
 and experimental networks on other emulabs.

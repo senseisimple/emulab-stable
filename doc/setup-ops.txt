@@ -1,7 +1,7 @@
+#####
 ##### Setting up the Utah Network Testbed software
-##### Robert Ricci
-##### Last updated January 16, 2002
-##### Tested on FreeBSD 4.3
+##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6
+#####
 
 ##### Step 0 - OS installation and setup
 

@@ -1,6 +1,7 @@
+#####
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Last updated  February 27, 2002
-##### Tested on FreeBSD 4.3
+##### Tested on FreeBSD 4.3, FreeBSD 4.5, and FreeBSD 4.6
+#####
 
 Note: steps labeled "Local Only" are only required when setting up a testbed
 with local nodes - they can be skipped in a widearea-only testbed.

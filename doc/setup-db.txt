@@ -1,5 +1,6 @@
+#####
 ##### Setting up tbdb for a new boss node
-##### Last updated January 24, 2002
+#####
 
 Note: steps labeled "Local Only" are only required when setting up a testbed
 with local nodes - they can be skipped in a widearea-only testbed.
