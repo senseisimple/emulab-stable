@@ -3046,11 +3046,11 @@ COMMAND_PROTOTYPE(dovnodelist)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	res = mydb_query("select r.node_id,n.jailflag from nodes as n "
-			 "left join reserved as r on r.node_id=n.node_id "
-			 "left join node_types as nt on nt.type=n.type "
-			 "where nt.isvirtnode=1 and n.phys_nodeid='%s'",
-			 2, reqp->nodeid);
+	res = mydb_query("select r.node_id,n.jailflag from reserved as r "
+			 "left join nodes as n on r.node_id=n.node_id "
+                         "left join node_types as nt on nt.type=n.type "
+                         "where nt.isvirtnode=1 and n.phys_nodeid='%s'",
+                         2, reqp->nodeid);
 
 	if (!res) {
 		error("VNODELIST: %s: DB Error getting vnode list\n",
