@@ -1,6 +1,6 @@
 <pre>
-From: Jay Lepreau &lt;lepreau@cs.utah.edu&gt;
-To: planetlab-announce@lists.sourceforge.net, emulab-users@emulab.net
+From: Jay Lepreau &lt;lepreau&gt;
+To: planetlab-announce, emulab-users
 Subject: [Planetlab-announce] Emulab interface to Planetlab, now in production
 Date: Mon, 22 Sep 2003 12:02:30 MDT
 
@@ -131,6 +131,6 @@ make this real and put it into production.
 
 -------------------------------------------------------
 Planetlab-announce mailing list
-Planetlab-announce@lists.sourceforge.net
+Planetlab-announce
 https://lists.sourceforge.net/lists/listinfo/planetlab-announce
 </pre>
