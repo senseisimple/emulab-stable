@@ -159,7 +159,7 @@ else {
 
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 60;
+	alarm 120;
 	waitpid($syspid, 0);
 	alarm 0;
 
