@@ -93,8 +93,6 @@ DBQueryWarn("DELETE from eventlist  where pid='$pid' and eid='$eid'") or
     $errors++;
 DBQueryWarn("DELETE from ipsubnets  where pid='$pid' and eid='$eid'") or
     $errors++;
-DBQueryWarn("DELETE from nsfiles  where pid='$pid' and eid='$eid'") or
-    $errors++;
 
 if ($errors == 0) {
     SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or
