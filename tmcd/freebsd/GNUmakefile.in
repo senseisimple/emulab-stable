@@ -42,3 +42,7 @@ install:
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth /root/.cvsup/auth
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 		/etc/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype /etc/testbed/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk /etc/testbed/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 /etc/start_if.fxp0
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 /etc/start_if.fxp4

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# This interface should only DHCP if this node is a pc850
+if [ `/etc/testbed/nodetype` = 'pc850' ]; then
+	dhcp_interfaces="$dhcp_interfaces fxp0";
+fi

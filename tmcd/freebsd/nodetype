@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ -x '/etc/testbed/cpuspeed.awk' ]; then
+	cpuspeed=`/etc/testbed/cpuspeed.awk /var/run/dmesg.boot`;
+else
+	cpuspeed='';
+fi
+
+if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
+	echo "unknown";
+else
+	echo pc$cpuspeed;
+fi
