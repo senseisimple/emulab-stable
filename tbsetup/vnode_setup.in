@@ -49,7 +49,7 @@ my $killmode    = 0;
 my $dbuid;
 
 my $MAX_CHILDREN = 8;
-my $CHILD_TIMEOUT = 600;  # Ten minutes - plab needs a LOOOOONNNGG TIME....
+my $CHILD_TIMEOUT = 960;  # 15 + 1 mins slop - plab needs a LOOOONNNGG TIME....
 
 #
 # Load the Testbed support stuff. 
