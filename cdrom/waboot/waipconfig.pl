@@ -68,6 +68,7 @@ my $rawbootdisk;
 my $etcdir	= "/etc";
 my $rcconflocal	= "$etcdir/rc.conf.local";
 my $resolveconf = "$etcdir/resolv.conf";
+my $localhostrev= "$etcdir/namedb/localhost.rev";
 my $hardconfig	= "$etcdir/emulab-hard.txt";
 my $softconfig	= "$etcdir/emulab-soft.txt";
 my $tbboot	= "tbbootconfig";
@@ -590,6 +591,7 @@ sub WriteRCFiles()
     print CONFIG "# Netbed info\n";
     print CONFIG "netbed_disk=\"$rawbootdisk\"\n";
     print CONFIG "netbed_IP=\"$config{IP}\"\n";
+    print CONFIG "named_enable=\"YES\"\n";
     print CONFIG "# EOF\n";
     close(CONFIG);
 
@@ -600,8 +602,29 @@ sub WriteRCFiles()
 	return -1;
     }
     print CONFIG "search $config{domain}\n";
+    print CONFIG "nameserver 127.0.0.1\n";
     print CONFIG "nameserver $config{nameserver}\n";
     close(CONFIG);
+
+    $path = $localhostrev;
+    my $myhost = "$config{hostname}.$config{domain}";
+    my $mydom  = "$config{domain}";
+    print "Writing $path\n";
+    if (! open(CONFIG, "> $path")) {
+	print("$path could not be opened for writing: $!\n");
+	return -1;
+    }
+    print CONFIG "$TTL	3600\n\n";
+    print CONFIG "@	IN	SOA	${myhost}. root.${myhost}.  (\n";
+    print CONFIG "				20020927  ; Serial\n";
+    print CONFIG "				3600      ; Refresh\n";
+    print CONFIG "				900       ; Retry\n";
+    print CONFIG "				3600000   ; Expire\n";
+    print CONFIG "				3600 )    ; Minimum\n";
+    print CONFIG "	IN	NS	${myhost}.\n";
+    print CONFIG "1	IN	PTR	localhost.${mydom}.\n\n";
+    close(CONFIG);
+    
     return 0;
 }
 
