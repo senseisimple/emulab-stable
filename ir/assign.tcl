@@ -23,7 +23,7 @@ set testbed "[file dirname [info script]]/testbed.ptop"
 set assign "$updir/assign_hw/assign"
 
 set maxrun 5
-set switchports 32
+set delaythresh .25
 
 if {[llength $argv] != 1} {
     puts stderr "Syntax: assign <ir>"
@@ -84,7 +84,7 @@ foreach link [array names links] {
     set bw [string trimright [lindex $links($link) 4] "Mb"]
     set delay [string trimright [lindex $links($link) 6] "ms"]
     if {($bw != 100 && $bw != 10) ||
-	$delay > 0.25} {
+	$delay > $delaythresh} {
 	# we need a delay node
 	set nodes(delay$delayI) [list delay]
 	set rlinks(dsrc_$link) [list $src -1 delay$delayI -1 100Mb 100Mb 1ms 1ms]
