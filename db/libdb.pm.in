@@ -196,6 +196,10 @@ use vars qw(@ISA @EXPORT);
          max min TBcheck_dbslot
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
 	 TBGetUniqueIndex
+
+	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
+	 TBDB_SECLEVEL_GREEN  TBDB_SECLEVEL_YELLOW
+	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED
 	 );
 
 # Must come after package declaration!
@@ -605,6 +609,12 @@ sub TBDB_WEBKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/webkey"; }
 sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
 sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
 sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
+
+# Security Levels.
+sub TBDB_SECLEVEL_GREEN()	{ 0; }
+sub TBDB_SECLEVEL_YELLOW()	{ 1; }
+sub TBDB_SECLEVEL_ORANGE()	{ 2; }
+sub TBDB_SECLEVEL_RED()		{ 3; }
 
 #
 # A hash of all tables that contain information about physical nodes - the
@@ -2745,6 +2755,29 @@ sub TBExptLogDir($$)
 }
 
 #
+# Return the IDX for a current experiment. 
+#
+# usage: TBExptIDX(char $pid, char *gid, int \$idx)
+#        returns 1 if okay.
+#	 returns 0 if error.
+#
+sub TBExptIDX($$$)
+{
+    my($pid, $eid, $idxp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select idx from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+
+    if (!$query_result || !$query_result->numrows) {
+	return 0;
+    }
+    my ($idx) = $query_result->fetchrow_array;
+    $$idxp = $idx;
+    return 1;
+}
+
+#
 # Return the log directory name for an experiment. This is where
 # we keep copies of the files for later inspection.
 #
@@ -2800,6 +2833,58 @@ sub TBExptCreateLogFile($$$)
 	    "    Could not chmod $logname to 0644: $!\n");
 
     return $logname;
+}
+
+#
+# Return the min/max node counts for an experiment.
+#
+# usage: TBExptMinMaxNodes(char $pid, char *gid, int \$min, int \$max)
+#        returns 1 if okay.
+#	 returns 0 if error.
+#
+sub TBExptMinMaxNodes($$$$)
+{
+    my($pid, $eid, $minp, $maxp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select maximum_nodes,minimum_nodes from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (!$query_result || !$query_result->numrows) {
+	return 0;
+    }
+    my ($min, $max) = $query_result->fetchrow_array();
+
+    $$minp = $min
+	if (defined($minp));
+    $$maxp = $max
+	if (defined($maxp));
+    return 1;
+}
+
+#
+# Return the security level for an experiment.
+#
+# usage: TBExptSecurityLevel(char $pid, char *gid, int \$level)
+#        returns 1 if okay.
+#	 returns 0 if error.
+#
+sub TBExptSecurityLevel($$$)
+{
+    my($pid, $eid, $levelp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select security_level from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (!$query_result || !$query_result->numrows) {
+	return 0;
+    }
+    my ($level) = $query_result->fetchrow_array();
+
+    $$levelp = $level
+	if (defined($levelp));
+    return 1;
 }
 
 #
@@ -3213,25 +3298,30 @@ sub TBExptPortRange($$$$)
 }
 
 #
-# Get elabinelab flag for an experiment.
+# Get elabinelab info for an experiment. An experiment with a zero elabinelab
+# flag, but a non-null elabinelab_eid means its an experiment that is linked
+# to an elabinelab experiment cause of its security level.
 #
-# usage TBExptIsElabInElab(char *pid, char *eid, int \*elabinelab)
+# usage TBExptIsElabInElab(char *pid, char *eid,
+#                          int \*elabinelab, char \*elabinelab_eid)
 #	Return 1 if success.
 #	Return 0 if error.
 #
-sub TBExptIsElabInElab($$$)
+sub TBExptIsElabInElab($$$;$)
 {
-    my ($pid, $eid, $elabinelab) = @_;
+    my ($pid, $eid, $elabinelab, $elabinelab_eid) = @_;
 
     my $query_result =
-	DBQueryFatal("select elab_in_elab from experiments ".
+	DBQueryFatal("select elab_in_elab,elabinelab_eid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
 
     if ($query_result->numrows == 0) {
 	return 0;
     }
     my @row = $query_result->fetchrow_array();
-    $$elabinelab = $row[0];
+    $$elabinelab     = $row[0];
+    $$elabinelab_eid = (defined($row[1]) ? $row[1] : undef)
+	if (defined($elabinelab_eid));
     return 1;
 }
 
