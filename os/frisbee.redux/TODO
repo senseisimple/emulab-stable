@@ -1,0 +1,35 @@
+1. Better throttling of block re-requests at the client.
+
+   Currently we have a variable, redodelay, in the client which is a
+   constant value which is supposed to estimate how long a block request
+   might legitimately be outstanding.  Ideally, this value depends on
+   the currently length of the server's request queue; i.e., we should
+   wait long enough for every current request at the server to be
+   processed before it does ours.
+
+   Since we are tracking requests and replies (blocks), estimate the length
+   of the server request queue.  First approximation: chunk granularity.
+   When we see any (full or partial) request for a chunk, mark the chunk
+   outstanding.  When we see any block for a chunk, mark it no longer
+   outstanding.  The number of outstanding chunks at any time is an
+   estimate of the queue size.  Good news: return blocks lost due to
+   congestion will keep the queue size high, reducing the request rate.
+   Bad news: we mark a chunk no longer outstanding after the first block
+   we receive for that chunk, decrementing the queue size even though much
+   of the chunk has not yet been sent.  In fact, if we loose all but one
+   returned block from a chunk, the chunk is still marked as no longer
+   outstanding.  Better approximation: block granularity.  Keep an accurate
+   map of outstanding blocks.  When we see a request, record the blocks.
+   When we see a block come in, remove it.  This function could be combined
+   with the current request aging mechanism.  Good news: offers a
+   conservative estimate of server queue size, lost reply blocks keep our
+   queue size estimate high, reducing congestion.  Bad news: requires space
+   proportional to the compressed image size to track, for each 1k block of
+   data we might have as much as 8 bytes of tracking info, only 2 orders of
+   magnitude difference, e.g. a 1GB image requiring 10MB of tracking info.
+
+   Alternative: measure the rate of partial chunk requests based on observed
+   requests, similar to what the server does.  We back off (increase redodelay)
+   when the rate is too high.  Good news: it is symmetric with what the server
+   currently does.  Bad news: harder to map this rate to an adjustment than
+   it is with the queue-size-estimate method.
