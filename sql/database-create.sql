@@ -437,6 +437,18 @@ CREATE TABLE nologins (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'nseconfigs'
+#
+
+CREATE TABLE nseconfigs (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  nseconfig text,
+  PRIMARY KEY  (pid,eid,vname)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'nsfiles'
 #
 
