@@ -3323,6 +3323,20 @@ sub GatherSwapStats($$$$$;$)
 		     "'$lastswapuid'" : "'$uid'"));
 
 	#
+	# Project/group aggregate is a little more convenient to work with
+	# in some places.
+	#
+	if ($mode eq TBDB_STATS_SWAPIN ||
+	    $mode eq TBDB_STATS_START) {
+	    DBQueryWarn("update projects set ".
+			" expt_last=now(),expt_count=expt_count+1 ".
+			"where pid='$pid'");
+	    DBQueryWarn("update groups set ".
+			" expt_last=now(),expt_count=expt_count+1 ".
+			"where pid='$pid' and gid='$gid'");
+	}
+
+	#
 	# Update the per-experiment record.
 	# Note that we map start into swapin. 
 	#
