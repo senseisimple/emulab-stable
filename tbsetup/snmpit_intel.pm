@@ -344,14 +344,58 @@ sub vlanUnlock($;$) {
 }
 
 #
-# Given a VLAN identifier from the database, find the intel-specific VLAN
+# Given VLAN indentifiers from the database, finds the Intel-specific VLAN
+# number for them. If not VLAN id is given, returns mappings for the entire
+# switch.
+# 
+# usage: findVlans($self, @vlan_ids)
+#        returns a hash mapping VLAN ids to Intel VLAN numbers
+#        any VLANs not found have NULL VLAN numbers
+#
+sub findVlans($@) { 
+    my $self = shift;
+    my @vlan_ids = @_;
+
+    my $field = ["policyVlanName",0];
+
+    my %mapping = ();
+    @mapping{@vlan_ids} = undef;
+
+    #
+    # Find all VLAN names. Do one to get the first field...
+    #
+    $self->{SESS}->getnext($field);
+    my ($name,$vlan_number,$vlan_name);
+    do {
+	($name,$vlan_number,$vlan_name) = @{$field};
+	$self->debug("findVlan: Got $name $vlan_number $vlan_name\n");
+
+	#
+	# We only want the names - we ignore everything else
+	#
+	if ($name =~ /policyVlanName/) {
+	    if (!@vlan_ids || exists $mapping{$vlan_name}) {
+		$self->debug("Putting in mapping from $vlan_name to " .
+		    "$vlan_number\n",2);
+		$mapping{$vlan_name} = $vlan_number;
+	    }
+	}
+
+	$self->{SESS}->getnext($field);
+    } while ( $name =~ /^policyVlanName/) ;
+
+    return %mapping;
+}
+
+#
+# Given a VLAN identifier from the database, find the Intel-specific VLAN
 # number that is assigned to that VLAN. Retries several times (to account
 # for propagation delays) unless the $no_retry option is given.
-#   
+#
 # usage: findVlan($self, $vlan_id,$no_retry)
 #        returns the VLAN number for the given vlan_id if it exists
 #        returns undef if the VLAN id is not found
-#   
+#
 sub findVlan($$;$) { 
     my $self = shift;
     my $vlan_id = shift;
@@ -364,34 +408,16 @@ sub findVlan($$;$) {
 	$max_tries = 10;
     }
 
-    my $field = ["policyVlanName",0];
-
     #
     # We try this a few time, with 1 second sleeps, since it can take
     # a while for VLAN information to propagate
     #
     foreach my $try (1 .. $max_tries) {
 
-	#
-	# Do one to get the first field...
-	#
-	$self->{SESS}->getnext($field);
-	my ($name,$vlan_number,$vlan_name);
-	do {
-	    ($name,$vlan_number,$vlan_name) = @{$field};
-	    $self->debug("findVlan: Got $name $vlan_number $vlan_name\n");
-
-	    #
-	    # We only want the names - we ignore everything else
-	    #
-	    if ($name =~ /policyVlanName/) {
-		if ($vlan_name eq $vlan_id) {
-		    return $vlan_number;
-		}
-	    }
-
-	    $self->{SESS}->getnext($field);
-	} while ( $name =~ /^policyVlanName/) ;
+	my %mapping = $self->findVlans($vlan_id);
+	if (defined($mapping{$vlan_id})) {
+	    return $mapping{$vlan_id};
+	}
 
 	#
 	# Wait before we try again
@@ -401,13 +427,11 @@ sub findVlan($$;$) {
 	    sleep 1;
 	}
     }
-
     #
     # Didn't find it
     #
     return undef;
 }
-
 
 #   
 # Create a VLAN on this switch, with the given identifier (which comes from
@@ -461,6 +485,7 @@ sub createVlan($$;@) {
     # we can do this without unlocking/relocking.
     #
     if ($okay && @ports) {
+	$self->debug("CreateVlan: port list is ".join(",",@ports)."\n");
 	if ($self->setPortVlan($vlan_id,@ports)) {
 	    $okay = 0;
 	}

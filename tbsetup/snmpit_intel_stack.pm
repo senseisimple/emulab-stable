@@ -116,10 +116,13 @@ sub setPortVlan($$@) {
     return $self->{LEADER}->setPortVlan($vlan_id,@ports);
 }
 
-sub createVlan($$;@) {
+sub createVlan($$$;@) {
     my $self = shift;
     my $vlan_id = shift;
-    my @ports = @_;
+    my @ports = @{shift()};
+    #
+    # We ignore other args for now, since Intels don't support private VLANs
+    #
 
     return $self->{LEADER}->createVlan($vlan_id,@ports);
 
@@ -151,6 +154,33 @@ sub vlanExists($$) {
     }
 }
 
+#
+# Return a list of which VLANs from the input set exist on this stack
+#
+# usage: existantVlans(self, vlan identifiers)
+#
+# returns: a list containing the VLANs from the input set that exist on this
+# 	stack
+#
+sub existantVlans($@) {
+    my $self = shift;
+    my @vlan_ids = @_;
+
+    #
+    # The leader holds the list of which VLANs exist
+    #
+    my %mapping = $self->{LEADER}->findVlans(@vlan_ids);
+
+    my @existant = ();
+    foreach my $vlan_id (@vlan_ids) {
+	if (defined $mapping{$vlan_id}) {
+	    push @existant, $vlan_id;
+	}
+    }
+
+    return @existant;
+
+}
 
 sub removeVlan($@) {
     my $self = shift; 
