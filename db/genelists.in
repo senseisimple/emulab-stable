@@ -472,7 +472,8 @@ sub genelist($$$)
 
     if (-e "$ELISTS/$listname" &&
 	system("cmp -s $tempfile $ELISTS/$listname") == 0) {
-	print "$listname has not changed. Skipping.\n";
+	print "$listname has not changed. Skipping.\n"
+	    if ($debug);
 	unlink("$tempfile");
 	return;
     }
