@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,6 +23,7 @@ my $prefix = $defprefix;
 my $v = 0; # Verbose
 my $help=0;
 my $allmodes=1;
+my $x=0;
 my %modes=();
 my $dot=0;
 my $vcg=0;
@@ -39,6 +40,7 @@ while ($_ = shift) {
     /^-gif/ && do { $gif=1; next; };
     /^-png/ && do { $png=1; next; };
     /^-[dv]/ && do { $v++; next; };
+    /^-x/ && do { $x=1; next; };
     /^-o/ && do { $prefix=shift || $defprefix; next; };
     # if it is all lowercase, caps it, otherwise leave it alone
     if ("\L$_" eq "$_") { $_ = "\U$_"; }
@@ -46,6 +48,8 @@ while ($_ = shift) {
     $allmodes=0;
     print "mode '$_' added.\n" if ($v);
 }
+
+if ($allmodes && $x) { $x=0; }
 
 if ($help) {
     #Help mode
@@ -61,6 +65,7 @@ Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg]
   -gif     Generate GIF format output.
   -png     Generate PNG format output.
   -o <out> Prefix for output filenames.
+  -x       Exclude all op_modes not explicitly included
 
 This program generates a graph of the state machines as defined in the
 state_transitions and mode_transitions tables in the database. This
@@ -149,9 +154,16 @@ while(@r=$result->fetchrow()) {
     $m2=$r[2];
     $s2=$r[3];
     print "Checking mode transition ($m1, $s1) -> ($m2, $s2)\n" if ($v);
-    if (!( $allmodes || (defined($modes{$m1}) && $modes{$m1}) ||
-	   (defined($modes{$m2}) && $modes{$m2}))) { next; }
-    print "mode $m1 or $m2 is on the list\n" if ($v && !$allmodes);
+    if ($x) {
+	# $x and $allmodes are mutually exclusive
+	if (!( (defined($modes{$m1}) && $modes{$m1}) &&
+	       (defined($modes{$m2}) && $modes{$m2}))) { next; }
+	print "mode $m1 and $m2 are both on the list\n" if ($v);
+    } else {
+	if (!( $allmodes || (defined($modes{$m1}) && $modes{$m1}) ||
+	       (defined($modes{$m2}) && $modes{$m2}))) { next; }
+	print "mode $m1 or $m2 is on the list\n" if ($v && !$allmodes);
+    }
     mkstates([$m1,$s1],[$m2,$s2]);
     $n1=$m1.$delim.$s1;
     $n2=$m2.$delim.$s2;
@@ -207,14 +219,17 @@ sub doformats() {
 	my $ysize=$ymax-$ymin;
 	$opt .="-xsize $xsize -ysize $ysize";
     }
-    system("pstopnm $opt $in > $in.ppm 2> /dev/null");
+    system("pstopnm $opt $in > $in.ppm 2> /dev/null") &&
+      warn("\npstopnm failed: $!\n");
     if ($gif) {
 	print "gif ";
-	system("ppmtogif $in.ppm > $out.gif 2> /dev/null");
+	system("ppmtogif $in.ppm > $out.gif 2> /dev/null") &&
+	  warn("\nppmtogif failed: $!\n");
     }
     if ($png) {
 	print "png ";
-	system("pnmtopng $in.ppm > $out.png 2> /dev/null");
+	system("pnmtopng $in.ppm > $out.png 2> /dev/null") &&
+	  warn("\npnmtopng failed: $!\n");
     }
     # The ppm is only a temp file, so clean it up
     # Later we could add a ppm output option if anyone cared...
