@@ -1491,7 +1491,7 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		 * and the output size will be *bigger* than the input size.
 		 */
 		if (count > subblockleft) {
-			count = subblockleft - secsize;
+			count = subblockleft - (2 * secsize);
 
 			/*
 			 * But of course, we always want to be sector aligned.
