@@ -248,15 +248,10 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
-    $logname = `mktemp /tmp/end-$pid-$eid.XXXXXX`;
+    $logname = TBExptCreateLogFile($pid, $eid, "end");
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
 
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    }
-    else {
-	die("Bad data in logfile name: $logname");
-    }
-    
     if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
@@ -366,7 +361,18 @@ sub fatal($)
 	     "Bcc: $TBOPS",
 	     ($logname));
 
+    #
+    # Move the temporary log file into the experiment directory so its kept.
+    #
     if (defined($logname)) {
+	#
+	# Move the temporary log file into the experiment directory and
+	# change the name in the DB. This makes it available to the web
+	# interface later on if desired.
+        #
+	system("cp -pf $logname $expt_path/tbdata/endexp.log");
+	TBExptCloseLogFile($pid, $eid);
+	TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/endexp.log");
 	unlink("$logname");
     }
     exit(-1);

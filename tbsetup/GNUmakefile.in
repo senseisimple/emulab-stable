@@ -107,6 +107,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/setgroups
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
+	chown root $(INSTALL_LIBEXECDIR)/spewlogfile
+	chmod u+s $(INSTALL_LIBEXECDIR)/spewlogfile
 	chown root $(INSTALL_BINDIR)/node_reboot
 	chmod u+s $(INSTALL_BINDIR)/node_reboot
 	chown root $(INSTALL_BINDIR)/node_update

@@ -8,6 +8,8 @@
 
 use English;
 use Getopt::Std;
+use Fcntl;
+use IO::Handle;
 
 #
 # Create a batch experiment.
@@ -247,14 +249,7 @@ sub dosomething($$)
     # we can remove it when the child ends. The child could remove it, but
     # since it is open in the child, it has the tendency to stick around.
     #
-    $logname = `mktemp /tmp/$dowhat-batch-$pid-$eid.XXXXXX`;
-
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in $logname";
-    }
+    $logname = TBExptCreateLogFile($pid, $eid, "${dowhat}-batch");
 
     #
     # Start up a child to run the guts. The parent waits. If the
@@ -270,12 +265,26 @@ sub dosomething($$)
 
 	print "Child PID $childpid exited with exit status $status\n";
 
-	sleep(5);
-
+        #
+        # Move the temporary log file into the experiment directory and
+	# change the name in the DB. This makes it available to the web
+	# interface later on if desired.
+	#
+	# The exp dir might be gone if the batch was killed/canceled.
+        #
+	if (-e $dirname) {
+	    my $fname = "$dirname/tbdata/${dowhat}-batch.log";
+	    
+	    system("cp -pf $logname $fname");
+	    TBExptCloseLogFile($pid, $eid);
+	    TBExptSetLogFile($pid, $eid, $fname);
+	}
 	unlink($logname);
 	return $status;
     }
     openlog($logname);
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
 
     #
     # Get some user information. 
@@ -577,6 +586,9 @@ sub openlog($)
 	fatal("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or
 	fatal("opening $logname for STDOUT: $!");
+
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
 
     return 0;
 }

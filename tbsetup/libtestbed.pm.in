@@ -8,6 +8,8 @@
 
 use English;
 use POSIX qw(strftime);
+use Fcntl;
+use IO::Handle;
 
 package libtestbed;
 use Exporter;
@@ -194,6 +196,12 @@ sub TBBackGround($)
 
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    #
+    # Turn off line buffering on output
+    #
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
 
     return 0;
 }
