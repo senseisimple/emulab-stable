@@ -1,3 +1,45 @@
+stoller     2003/09/04 08:30:38 MDT
+
+  Modified files:
+    tbsetup/ns2ir        lanlink.tcl node.tcl parse-ns.in 
+                         sim.tcl.in tb_compat.tcl.in 
+  Log:
+  Add variable netmask support to the parser so that we can handle lots
+  more subnets; with vnodes and 1000 node experiments, we running out of
+  subnets really quick with just 255 networks (255.255.255.0).
+  You can now do this in your NS file:
+  
+  	tb-set-netmask $lan0  "255.255.240.0"
+  	tb-set-netmask $link0 "255.255.255.248"
+  	tb-set-netmask $link1 "255.255.255.240"
+  
+  Yep, more rope for the user to hang himself with. Notes:
+  
+  * You are restricted to 255.255.XXX.XXX. I did not see a reason to
+    allow the user that much rope.
+  
+  * get_subnet can handle 10 or 192.168 addresses so that other sites
+    can continue to operate without changing to 10 addresses, although
+    they will still be able to change the netmask.
+  
+  * I've changed the handling for widearea networks to use 192.168, but
+    I force the netmask to 255.255.255.248 so that we are not restricted
+    to just 255 networks (not that it really matters). To avoid possible
+    confusion, the user is not allowed to choose their own IPs for
+    widearea networks, and I actually set them to 1.1.x.x, and then
+    patch it up later. This is to avoid conflict with existing
+    experiments where people may have used tb-set-ip in their NS files.
+  
+  * There are tmcd and staticroutes and image changes that are required
+    to make this all work right!
+  
+  Revision  Changes    Path
+  1.29      +61 -12    testbed/tbsetup/ns2ir/lanlink.tcl
+  1.39      +8 -5      testbed/tbsetup/ns2ir/node.tcl
+  1.13      +26 -13    testbed/tbsetup/ns2ir/parse-ns.in
+  1.50      +75 -13    testbed/tbsetup/ns2ir/sim.tcl.in
+  1.51      +25 -0     testbed/tbsetup/ns2ir/tb_compat.tcl.in
+
 stoller     2003/08/05 11:41:09 MDT
 
   Modified files:
