@@ -107,6 +107,7 @@ use Exporter;
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
+	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID
 
@@ -2180,6 +2181,61 @@ sub TBNodeUpdateAccountsByPid($)
 	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
 		     "where node_id='$nodeid' and update_accounts<2");
     }
+    return 1;
+}
+
+#
+# Schedule account updates on all the nodes that this person has
+# an account on.
+#
+# There are two sets of nodes. The first is all of the local nodes in
+# all of projects the user is a member of. The second is all of the
+# widearea nodes that the project has access to. Rather than operate
+# on a per node basis.  grab the project names (for the reserved
+# table) and the remote types to match against the node types. Of
+# course, the pcremote_ok slot is a set, so need to parse that.
+#
+# usage TBNodeUpdateAccountsByPid(char pid)
+#    Returns 1 all the time.
+#
+sub TBNodeUpdateAccountsByUID($)
+{
+    my ($uid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
+		     "left join group_membership as g on ".
+		     "  u.uid=g.uid and g.pid=g.gid ".
+		     "left join projects as p on p.pid=g.pid ".
+		     "where u.uid='$uid'");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $pid      = $row{'pid'};
+	my $pcremote = $row{'pcremote_ok'};
+
+	if (defined($pcremote)) {
+	    my @typelist = split(',', $pcremote);
+	    
+	    foreach my $nodetype (@typelist) {
+		TBNodeUpdateAccountsByType($nodetype);
+	    }
+	}
+	TBNodeUpdateAccountsByPid($pid);
+    }
+    #
+    # Also update on widearea nodes if entries in widearea_accounts
+    #
+    $query_result =
+	DBQueryFatal("select node_id from widearea_accounts ".
+		     "where uid='$uid' and trust!='none'");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $node_id = $row{'node_id'};
+
+	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		     "where node_id='$node_id' and update_accounts<2");
+    }
+    
     return 1;
 }
 
