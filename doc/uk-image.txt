@@ -1,4 +1,4 @@
-Stuff I did to make a node image for University of Kentucky.
+Stuff I did to make a node image for University of Kentucky and Georgia Tech.
 Much of this overlaps with local image creation (see newimage.txt).
 
 Start with one of our freshly loaded images.
@@ -9,11 +9,16 @@ A. FreeBSD (while running single user):
   mount -at ufs
 
 * /root/.cvsup/auth
-  Customize host/domain, leave password alone?
+  Customize host/domain, change the password.  Then run "cvpasswd" giving the
+  password just used.  Put the line spit out by cvpasswd in the boss node's
+  /usr/testbed/sup/cvsupd.passwd file.
 
 * /root/.ssh
   Remove known_hosts if it exists.  Put in local boss root pub key.
   Leave in our pub key if acceptible.
+
+* /etc/hosts
+  Fix the fully qualified name for localhost.
 
 * /etc/localtime
   Copy the correct file over from /usr/share/zoneinfo
@@ -40,25 +45,27 @@ A. FreeBSD (while running single user):
       The images need emulab.pem and client.pem from that directory.
 
 * /etc/testbed/supfile
-  Fix release tag (FBSD*) if necessary and host=
+  Fix release tag (FBSD*) if necessary
   [ DON'T FORGET TO FIX UP cvsup TREE on boss ]
 
-* /etc/testbed/sup/sup/*/checkouts
-  Remove the files?
+* /var/emulab/sup/sup/*/checkouts
+  Remove these files.
 
-* /etc/testbed/tmcc
+* /usr/local/etc/testbed/tmcc
   Install a binary customized for the site.  Created as part of the
-  general testbed software build.  Note: a "generic" tmcc would work,
-  but ours has "boss.emulab.net" hardwired in.
+  general testbed software build.  You may not need to do this, run:
+  "tmcc bossinfo" and see what it says.
 
 * /usr/site
   Remove it.
 
-* Run /etc/testbed/prepare
+* Run /usr/local/etc/testbed/prepare
   This will install clean passwd and group files, clean out log files
   and take care of various other lint.
 
 * Unmount filesystems, and remount root read-only to be safe:
+  cd /
+  umount -h <fs node name>
   umount -at ufs
   mount -u -o ro /
 
@@ -71,6 +78,9 @@ B. While running Linux (single user):
 * /root/.ssh
   Remove known_hosts if it exists.  Put in local boss root pub key.
   Leave in our pub key if acceptible.
+
+* /etc/hosts
+  Fix the fully qualified name for localhost.
 
 * /etc/localtime
   Copy the correct file over from /usr/share/zoneinfo
@@ -91,20 +101,25 @@ B. While running Linux (single user):
       The images need emulab.pem and client.pem from that directory.
 
 * /etc/testbed/supfile
-  Fix release tag (RHL*) if necessary and host=
+  Fix release tag (RHL*) if necessary.
 
-* /etc/testbed/sup/sup/*/checkouts
-  Remove the files?
+* /var/emulab/sup/sup/*/checkouts
+  Remove these files.
 
 * /etc/testbed/tmcc
   Install a binary customized for the site.  Must be built from testbed
-  source under Linux (duh!)  Note: a "generic" tmcc would work,
-  but ours has "boss.emulab.net" hardwired in.
+  source under Linux (duh!)  Again, you may not need this, run:
+  "tmcc bossinfo" to verify.
 
 * /usr/site
   Remove it.
 
+* Run /usr/local/etc/testbed/prepare
+  This will install clean passwd and group files, clean out log files
+  and take care of various other lint.
+
 * Remount root filesystem read-only (IMPORTANT!)
+  cd /
   mount -o remount,ro /
 
 * Fsck it for good luck.  Actually, not only good luck but also resets
