@@ -186,7 +186,7 @@ void local2global_posit_trans(struct robot_position *p_inout)
     
     p_inout->x = p_inout->y + x_offset;
     p_inout->y = old_x + y_offset;
-    p_inout->theta -= M_PI_2;
+    //p_inout->theta -= M_PI_2;
 }
 
 /**
