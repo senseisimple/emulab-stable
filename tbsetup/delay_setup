@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
-my $rsh		= "su1 ssh";
-my $ssh		= "su1 ssh";
-my $rcp		= "su1 scp -q";
+my $rsh		= "su1 sshtb";
+my $ssh		= "su1 sshtb";
+my $rcp		= "su1 scptb -q";
 my $ping	= "/sbin/ping";
 my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
