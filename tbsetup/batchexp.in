@@ -10,12 +10,15 @@ use English;
 use Getopt::Std;
 
 #
-# Create a batch experiment.
+# Create an experiment. The experiment is either run immediately, or
+# placed into the batch system to be run later. If no NS file is
+# supplied, an experiment shell is created (this is currently an admin
+# only option).
 #
 sub usage()
 {
     die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
-	"[-s] [-n low|high] -p <pid> -e <eid> <nsfile>\n");
+	"[-s] [-n low|high] -p <pid> -e <eid> [<nsfile>]\n");
 }
 my  $optlist = "iE:d:g:x:e:p:sn:f";
 
@@ -101,7 +104,10 @@ else {
 if (! defined($expires)) {
     $expires = DBDateTime(60 * 60 * 24 * 30);
 }
-
+if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
+    die("*** $0:\n".
+	"    Only admins can create experiments with no NS file\n");
+}
 $nsfile = "$eid.ns";
 
 #
@@ -112,12 +118,25 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 	"    You do not have permission to create experiments in $pid/$gid\n");
 }
 
+#
+# All this stuff should change when new web form approved.
+# 
+my $idleswap      = 1;
+my $idleignore    = 0;
 # Must do this before lock tables!
 # idleswap is in minutes, threshold is in hours
-$idleswap_time = 60 * TBGetSiteVar("idle/threshold");
-# XXX : Remove this and the idle parts of the insert below when we get
-# the new form committed, and they get filled in according to what the
-# expt creator requested.
+my $idleswap_time = $idleswap_time = 60 * TBGetSiteVar("idle/threshold");
+
+#
+# If no NS file, then override swap/idle stuff. Again, might change
+# when new forms installed
+#
+if (!defined($tempnsfile)) {
+    $swappable     = 0;
+    $idleswap      = 0;
+    $idleswap_time = 0;
+    $idleignore    = 1;
+}
 
 #
 # Create an experiment record. The pid/eid has to be unique, so lock the
@@ -143,10 +162,10 @@ if ($query_result->numrows) {
 if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
-		  " idleswap, idleswap_timeout) ".
+		  " idleswap, idleswap_timeout, idle_ignore) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
-		  "$swappable, 1, '$idleswap_time')")) {
+		  "$swappable, $idleswap, '$idleswap_time', $idleignore)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -186,6 +205,12 @@ if (! DBQueryWarn("insert into experiment_stats ".
 if (system("$mkexpdir $pid $gid $eid") != 0) {
     fatal("$mkexpdir failed");
 }
+
+#
+# If no NS file, we are done. 
+#
+exit(0)
+    if (!defined($tempnsfile));
 
 #
 # Grab the working directory path, and thats where we work.
@@ -307,11 +332,20 @@ sub ParseArgs()
 	usage();
     }
     
-    if (@ARGV != 1) {
+    if (@ARGV > 1) {
 	usage();
     }
+    if (@ARGV == 1) {
+	$tempnsfile = $ARGV[0];
 
-    $tempnsfile = $ARGV[0];
+	# Note different taint check (allow /).
+	if ($tempnsfile =~ /^([-\@\w.\/]+)$/) {
+	    $tempnsfile = $1;
+	}
+	else {
+	    fatal("Bad data in argument: $tempnsfile");
+	}
+    }
     
     if (defined($options{"i"})) {
 	$immediate = 1;
@@ -368,13 +402,5 @@ sub ParseArgs()
 	else {
 	    usage();
 	}
-    }
-
-    # Note different taint check (allow /).
-    if ($tempnsfile =~ /^([-\@\w.\/]+)$/) {
-	$tempnsfile = $1;
-    }
-    else {
-	fatal("Bad data in argument: $tempnsfile");
     }
 }

@@ -663,7 +663,7 @@ if (isset($formfields[exp_preload]) &&
 }
 
 # 
-# I'm not spitting out a redirection yet.
+# I am not spitting out a redirection yet.
 #
 PAGEHEADER("Begin a Testbed Experiment");
 
@@ -671,14 +671,6 @@ PAGEHEADER("Begin a Testbed Experiment");
 # We need the email address for messages below.
 #
 TBUserInfo($uid, $user_name, $user_email);
-
-#
-# Set the experiment state bit to "new".
-#
-$exp_state   = "new";
-
-# Shared experiments. (Deprecated for now!)
-$exp_shared  = 0;
 
 # Expiration is hardwired for now.
 $exp_expires = date("Y:m:d", time() + (86400 * 120));
@@ -689,61 +681,8 @@ $exp_expires = date("Y:m:d", time() + (86400 * 120));
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
-# If an experiment "shell" give some warm fuzzies and be done with it.
-# The user is responsible for running the tb scripts on his/her own!
-# The user will need to come back and terminate the experiment though
-# to clear it out of the database.
-#
-if ($nonsfile) {
-    #
-    # Stub Experiment record. Should do this elsewhere?
-    #
-    DBQueryFatal("INSERT INTO experiments ".
-		 "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
-		 "expt_head_uid, expt_swap_uid, state, shared) ".
-		 "VALUES ('$exp_id', '$exp_pid', '$exp_gid', now(), ".
-		 "        '$exp_expires', '$exp_name', ".
-		 "        '$uid', '$uid', '$exp_state', $exp_shared)");
-
-    #
-    # This is where the experiment hierarchy is going to be created.
-    #
-    $dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
-    
-    SUEXEC($uid, $unix_gid, "mkexpdir $exp_pid $exp_gid $exp_id", 0);
-
-    echo "<center><br>
-          <h2>Experiment Configured!</h2>
-          </center><br><br>
-          <h3>
-          The ID for your experiment in project `$exp_pid' is `$exp_id.'
-          <br><br>
-          Since you did not provide an NS script, no nodes have been
-          allocated. You must log in and run the tbsetup scripts
-          yourself. For your convenience, we have created a directory
-          hierarchy on the control node: $dirname
-          </h3>\n";
-
-    if (1) {
-	TBMAIL("$user_name '$uid' <$user_email>", 
-	     "New Experiment Created: $exp_pid/$exp_id",
-	     "User:        $uid\n".
-             "EID:         $exp_id\n".
-             "PID:         $exp_pid\n".
-             "GID:         $exp_gid\n".
-             "Name:        $exp_name\n".
-             "Expires:     $exp_expires\n",
-             "From: $TBMAIL_WWW\n".
-	     "Bcc: $TBMAIL_LOGS\n".
-             "Errors-To: $TBMAIL_WWW");
-    }
-    #
-    # Standard Testbed Footer
-    # 
-    PAGEFOOTER();
-    die("");
-}
-
+# Okay, time to do it. 
+# 
 echo "<center><br>";
 echo "<h2>Starting experiment configuration. Please wait a moment ...
       </h2></center>";
@@ -770,7 +709,8 @@ set_time_limit(0);
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_name\" ".
 	       "$exp_priority $exp_swappable ".
-	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
+	       "-p $exp_pid -g $exp_gid -e $exp_id ".
+	       ($nonsfile ? "" : "$nsfile"), 
  	       $output, $retval);
 
 if ($delnsfile) {
@@ -799,8 +739,14 @@ echo "<font size=+1>
         in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
         is configuring!<br><br>\n";
 
-
-if ($exp_preload) {
+if ($nonsfile) {
+    echo "Since you did not provide an NS script, no nodes have been
+          allocated. You will not be able to modify or swap this experiment,
+          nor do most other neat things you can do with a real experiment.
+          <br><br>
+          If this bothers you, <b>SUPPLY AN NS FILE!</b>\n";
+}
+elseif ($exp_preload) {
     echo "Since you are only pre-loading the experiment, this will typically
           take less than one minute. If you do not receive email notification
           within a reasonable amount of time, please contact $TBMAILADDR.<br>
