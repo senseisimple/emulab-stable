@@ -40,10 +40,12 @@ my $TB		= "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use POSIX qw(strftime);
 
 my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/ipod";
+my $logfile	= "$TB/log/power.log";
 my $ping	= "/sbin/ping";
 my %pids	= ();
 my @row;
@@ -166,7 +168,7 @@ foreach my $node ( @nodes ) {
 }
 @nodes = @temp;
 if (! @nodes) {
-    print "No nodes to load. Exiting ...\n";
+    print "No nodes to reboot. Exiting ...\n";
     exit(0);
 }
 
@@ -208,6 +210,7 @@ while (@sortednodes) {
         # In force mode, call the power program for the whole batch, and
 	# continue on. We don't wait for them to go down or reboot.
         #
+	info("Force mode: power cycle ".join(" ",@batch));
 	system("$power cycle @batch");
 	if ($?) {
 	    exit ($? >> 8);
@@ -290,6 +293,7 @@ sub RebootNode {
     # ping returns 0 if any packets make it through. 
     #
     if (! DoesPing($pc)) {
+	info("$pc appears dead: power cycle");
 	print STDERR "$pc appears to be dead. Power cycling ...\n" if $debug;
 	if (PowerCycle($pc)) {
 	    exit(-1);
@@ -340,9 +344,12 @@ sub RebootNode {
 	    } else {
 		print STDERR "$pc is wedged.\n" if $debug;
 	    }
+	    info("$pc: ssh reboot failed ... sending ipod");
 	    print STDERR "Trying Ping-of-Death on $pc ...\n" if $debug;
 
 	    system("$ipod $pc");
+	} else {
+	    info("$pc: ssh reboot");
 	}
     }
     else {
@@ -367,8 +374,10 @@ sub RebootNode {
 	exit(0);
     }
 	
+    info("$pc: ipod failed ... power cycle");
     print STDERR "$pc is still running. Power cycling ...\n" if $debug;
     if (PowerCycle($pc)) {
+	info("$pc: power cycle failed!");
 	exit(-1);
     }
     exit(0);
@@ -432,4 +441,13 @@ sub DoesPing {
 	return 0;
     }
     return 1;
+}
+
+sub info($) {
+    my $message = shift;
+    # Print out log entries like this:
+    # Sep 20 09:36:00 $message
+    open(LOG,">> $logfile");
+    print LOG strftime("%b %e %H:%M:%S",localtime)." $message\n";
+    close(LOG);
 }
