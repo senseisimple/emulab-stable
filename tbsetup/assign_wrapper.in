@@ -224,14 +224,15 @@ while (($type,$bandwidth) = $query_result->fetchrow_array()) {
 
 # Load delay osids and default osids for types
 my %delayosids   = ();
+my %jailosids    = ();
 my %defaultosids = ();
 
 $query_result =
     DBQueryFatal("SELECT type,delay_osid,osid from node_types");
 
 while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
-    $delayosids{$type} = $delayosid;
-#  $delayosids{$type} = "testbed-FBSD47-UPDATE";
+    $delayosids{$type}   = $delayosid;
+    $jailosids{$type}    = "emulab-ops-FBSD47-JAIL";
     $defaultosids{$type} = $defosid;
 }
 
@@ -668,7 +669,7 @@ foreach $lan (keys(%lans)) {
 			 $member,$rdelay,$rbw,$rloss];
 
 		    print(TOPFILE "link $plink $node lan/$lan " .
-			  "$bandwidth 0 0 " .
+			  max($bw,$rbw) . " 0 0" .
 			  ($emulated ? " emulated\n" : "\n"));
 
 		    printdb "Delay link $plink = " .
@@ -2083,9 +2084,9 @@ sub InitPnode($pnode, $vnode)
 	return;
     }
     elsif (defined($virtnodes{$pnode})) {
-	# A pnode hosting jails. At the moment, we force these to
-	# the delay osid.
-	$osid = $delayosids{$type};
+	# A pnode hosting jails. At the moment, we force these to a
+	# hardwired osid.
+	$osid = $jailosids{$type};
 	
 	DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
 		     " bootstatus=\"unknown\"," .
