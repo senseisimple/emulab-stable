@@ -138,6 +138,8 @@ if (mysql_num_rows($reserved_result)) {
               <td align=center>Default<br>Image</td>
               <td align=center>Default<br>Path</td>
               <td align=center>Default<br>Cmdline</td>
+              <td align=center>Startup<br>Command</td>
+              <td align=center>Startup<br>Status</td>
           </tr>\n";
 
     #
@@ -159,6 +161,8 @@ if (mysql_num_rows($reserved_result)) {
         $def_boot_cmd_line  = $row[def_boot_cmd_line];
         $next_boot_path     = $row[next_boot_path];
         $next_boot_cmd_line = $row[next_boot_cmd_line];
+        $startupcmd         = $row[startupcmd];
+        $startstatus        = $row[startstatus];
 
         if (!$def_boot_cmd_line)
             $def_boot_cmd_line = "NULL";
@@ -168,6 +172,10 @@ if (mysql_num_rows($reserved_result)) {
             $next_boot_path = "NULL";
         if (!$next_boot_cmd_line)
             $next_boot_cmd_line = "NULL";
+        if (!$startupcmd)
+            $startupcmd = "NULL";
+        if (!$startstatus)
+            $startstatus = "NULL";
         if (!$vname)
             $vname = "--";
 
@@ -181,6 +189,8 @@ if (mysql_num_rows($reserved_result)) {
                   <td>$def_boot_image_id</td>
                   <td>$def_boot_path</td>
                   <td>$def_boot_cmd_line</td>
+                  <td>$startupcmd</td>
+                  <td>$startstatus</td>
               </tr>\n";
     }
     echo "</table>\n";
