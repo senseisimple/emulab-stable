@@ -11,6 +11,7 @@ import popen2
 import getopt
 import string
 
+# Maximum size of an NS file that the server will accept. 
 MAXNSFILESIZE = (1024 * 512)
 
 #
@@ -21,11 +22,9 @@ MAXNSFILESIZE = (1024 * 512)
 # send back some output (a string with embedded newlines) to print out
 # to the user.
 #
-# Why not return a tuple? Well, it appears that the python xmlrpc
-# library requires that a singleton be returned from the server.
-#
 # Note that XMLRPC does not actually return a "class" to the caller; It gets
-# converted to a hashed array (Python Dictionary).
+# converted to a hashed array (Python Dictionary), but using a class gives
+# us a ready made constructor. 
 #
 RESPONSE_SUCCESS        = 0
 RESPONSE_BADARGS        = 1
