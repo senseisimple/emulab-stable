@@ -138,27 +138,10 @@ else {
 }
 
 #
-# Are we doing Static routing?
+# Neuter routing until someone removes the non-functional code below.
 #
-my $query_result =
-    DBQueryFatal("select routertype from virt_nodes ".
-		 "where pid='$pid' and eid='$eid' limit 1");
-
-if (!$query_result->numrows) {
-    warn("*** $0:\n".
-	 "    No nodes in experiment $pid/$eid!\n");
-    exit(0);
-} 
-else {
-    my $routertype = $query_result->fetchrow_array;
-    if (!$force && $routertype ne "static") {
-        warn("Static routing not requested in $pid/$eid. This is okay!\n");
-        warn("     Still calculating IP addresses with ipassign..\n");        
-        $doroutes = 0;
-        $ipassign_args .= " -!";
-    }
-}
-
+$doroutes = 0;
+$ipassign_args .= " -!";
 
 #
 # Grab virtual lan configuration from the DB
