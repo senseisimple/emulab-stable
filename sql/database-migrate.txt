@@ -665,3 +665,24 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.155: Bring the definition for the roottag column into sync with what's in
        the database on boss - no database changes required.
+
+1.156: Add uid to testbed_stats table:
+
+	alter table testbed_stats add uid varchar(8) NOT NULL
+			default	'' after exitcode;
+
+       Need to init the table. For lack of better info, use the
+       experiment creator for each record. Turns out there are just a
+       few cases where this is not true.
+
+	my $query_result =
+	    DBQueryWarn("select t.idx,s.creator,t.action ".
+			" from testbed_stats as t ".
+			"left join experiment_stats as s on ".
+			"  s.exptidx=t.exptidx ".
+			"where t.uid='' ".
+			"order by t.tstamp");
+
+	while (($idx,$creator) = $query_result->fetchrow_array()) {
+	    print "update testbed_stats set uid='$creator' where idx=$idx;\n";
+	}

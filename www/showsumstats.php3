@@ -147,6 +147,10 @@ function showsummary ($showby, $sortby) {
 		     "$wclause ".
 		     "order by $order");
 
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("No summary stats of interest!", 1);
+    }
+
     #
     # Gather some totals first.
     #
@@ -261,7 +265,7 @@ function showrange ($showby, $sortby, $range) {
     # First get current swapped in experiments.
     #
     $query_result =
-	DBQueryFatal("select r.pid,r.eid,e.expt_head_uid as creator, ".
+	DBQueryFatal("select r.pid,r.eid,e.expt_swap_uid as swapper, ".
 		     "  UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped) ".
 		     "   as swapseconds, ".
 		     "  count(*) as pnodes ".
@@ -275,7 +279,7 @@ function showrange ($showby, $sortby, $range) {
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pid         = $row["pid"];
 	$eid         = $row["eid"];
-	$uid         = $row["creator"];
+	$uid         = $row["swapper"];
 	$swapseconds = $row["swapseconds"];
 	$pnodes      = $row["pnodes"];
 
@@ -295,7 +299,7 @@ function showrange ($showby, $sortby, $range) {
     }
 
     $query_result =
-	DBQueryFatal("select s.pid,s.eid,s.creator,t.action, ".
+	DBQueryFatal("select s.pid,s.eid,t.uid,t.action, ".
 		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
 		     "  UNIX_TIMESTAMP(t.tstamp) as ttstamp ".
 		     " from testbed_stats as t ".
@@ -316,7 +320,7 @@ function showrange ($showby, $sortby, $range) {
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pid     = $row["pid"];
 	$eid     = $row["eid"];
-	$uid     = $row["creator"];
+	$uid     = $row["uid"];
 	$tstamp  = $row["ttstamp"];
 	$action  = $row["action"];
 	$pnodes  = $row["pnodes1"];
@@ -362,7 +366,7 @@ function showrange ($showby, $sortby, $range) {
                 # no start/swapin event was returned. Add a record for it.
 	        #
 		$diff = $tstamp - $spanstart;
-		#echo "$pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
+		#echo "F $pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
 		if ($action == "swapmod") {
                     # A pain. We need the number of pnodes for the original
 		    # version of the experiment, not the new version.
@@ -380,6 +384,9 @@ function showrange ($showby, $sortby, $range) {
 	    # Basically, start the clock ticking again with the new
 	    # number of pnodes.
 	    if ($action == "swapmod") {
+		# Yuck, we redefined uid above, but we want to start the
+		# new record for the current swapper.
+		$uid = $row["uid"];
 		$expt_start["$pid:$eid"] = array('pnodes' => $pnodes,
 						 'uid'    => $uid,
 						 'pid'    => $pid,

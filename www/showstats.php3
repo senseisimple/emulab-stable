@@ -82,7 +82,6 @@ if ($showby == "user") {
     else
 	$which = $uid;
     $wclause = "where s.creator='$which'";
-    $records = 100;
 }
 elseif ($showby == "project") {
     if (! $which) {
@@ -93,7 +92,6 @@ elseif ($showby == "project") {
 		      "project $which!", 1);
     }
     $wclause = "where s.pid='$which'";
-    $records = 100;
 }
 elseif ($showby == "expt") {
     if (!$which) {
@@ -122,7 +120,6 @@ elseif ($showby == "expt") {
 	}
     }
     $wclause = "where t.exptidx='$which'";
-    $records = 100;
 }
 elseif ($showby == "all") {
     if ($which) {
@@ -146,7 +143,6 @@ elseif ($showby == "all") {
 	}
 	$wclause = "where $wclause 0";
     }
-    $records = 100;
 }
 else {
     USERERROR("Bad page arguments!", 1);

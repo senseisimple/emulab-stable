@@ -3197,7 +3197,7 @@ sub GatherSwapStats($$$$$;$)
     my ($gid, $exptidx, $rsrcidx, $lastrsrc, $lastswapuid) =
 	$query_result->fetchrow_array;
     $lastswapuid = $uid
-	if (!defined($lastswapuid));
+	if (!defined($lastswapuid) || $lastswapuid eq "");
 
     #
     # A non-zero ecode indicates error. If op is a preload/swapin/start/modify
@@ -3434,8 +3434,10 @@ sub GatherSwapStats($$$$$;$)
     #
   logit:
     DBQueryWarn("insert into testbed_stats ".
-		"(idx, tstamp, exptidx, rsrcidx, action, exitcode) ".
-		"values (0, now(), $exptidx, $rsrcidx, '$mode', $ecode)");
+		"(idx, uid, tstamp, exptidx, rsrcidx, ".
+		" action, exitcode) ".
+		"values (0, '$uid', now(), $exptidx, $rsrcidx, ".
+		"        '$mode', $ecode)");
 }
 
 #

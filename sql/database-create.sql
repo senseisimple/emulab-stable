@@ -1141,6 +1141,7 @@ CREATE TABLE testbed_stats (
   rsrcidx int(10) unsigned NOT NULL default '0',
   action varchar(16) NOT NULL default '',
   exitcode tinyint(3) default '0',
+  uid varchar(8) NOT NULL default '',
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
