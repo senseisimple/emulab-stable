@@ -37,8 +37,8 @@ $id = `id`;
 $logpath = "/proj/$pid/exp/$eid/logs/nse-$vnode.log";
 if( $id =~ /uid=(\d+)/ ) {
     if( $1 ne "0" ) {
-        system("sudo nse nseinput.tcl >>& $logpath");
+        system("sudo nse nseinput.tcl >> $logpath 2>&1");
     } else {
-        system("nse nseinput.tcl >>& $logpath");
+        system("nse nseinput.tcl > $logpath 2>&1");
     }
 }
