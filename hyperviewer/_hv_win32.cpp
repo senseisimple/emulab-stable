@@ -704,10 +704,13 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 #define  SWIGTYPE_p_timeval swig_types[1] 
 #define  SWIGTYPE_p_HypGraph swig_types[2] 
 #define  SWIGTYPE_p_HypView swig_types[3] 
-#define  SWIGTYPE_p_p_char swig_types[4] 
-#define  SWIGTYPE_p_string swig_types[5] 
-#define  SWIGTYPE_p_istream swig_types[6] 
-static swig_type_info *swig_types[8];
+#define  SWIGTYPE_p_HWND swig_types[4] 
+#define  SWIGTYPE_p_HGLRC swig_types[5] 
+#define  SWIGTYPE_p_p_char swig_types[6] 
+#define  SWIGTYPE_p_HDC swig_types[7] 
+#define  SWIGTYPE_p_string swig_types[8] 
+#define  SWIGTYPE_p_istream swig_types[9] 
+static swig_type_info *swig_types[11];
 
 /* -------- TYPES TABLE (END) -------- */
 
@@ -868,10 +871,20 @@ static PyObject *_wrap_getSelected(PyObject *self, PyObject *args) {
 
 static PyObject *_wrap_new_HypView(PyObject *self, PyObject *args) {
     PyObject *resultobj;
+    HDC arg1 ;
+    HWND arg2 ;
     HypView *result;
+    HDC *argp1 ;
+    HWND *argp2 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
     
-    if(!PyArg_ParseTuple(args,(char *)":new_HypView")) goto fail;
-    result = (HypView *)new HypView();
+    if(!PyArg_ParseTuple(args,(char *)"OO:new_HypView",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &argp1, SWIGTYPE_p_HDC,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg1 = *argp1; 
+    if ((SWIG_ConvertPtr(obj1,(void **) &argp2, SWIGTYPE_p_HWND,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg2 = *argp2; 
+    result = (HypView *)new HypView(arg1,arg2);
     
     resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_HypView, 1);
     return resultobj;
@@ -883,13 +896,41 @@ static PyObject *_wrap_new_HypView(PyObject *self, PyObject *args) {
 static PyObject *_wrap_HypView_afterRealize(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     HypView *arg1 = (HypView *) 0 ;
+    HGLRC arg2 ;
+    int arg3 ;
+    int arg4 ;
+    HGLRC *argp2 ;
     PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
     
-    if(!PyArg_ParseTuple(args,(char *)"O:HypView_afterRealize",&obj0)) goto fail;
+    if(!PyArg_ParseTuple(args,(char *)"OOii:HypView_afterRealize",&obj0,&obj1,&arg3,&arg4)) goto fail;
     if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
-    (arg1)->afterRealize();
+    if ((SWIG_ConvertPtr(obj1,(void **) &argp2, SWIGTYPE_p_HGLRC,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg2 = *argp2; 
+    (arg1)->afterRealize(arg2,arg3,arg4);
     
     Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_HypView_getWidget(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    HypView *arg1 = (HypView *) 0 ;
+    HDC result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:HypView_getWidget",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (arg1)->getWidget();
+    
+    {
+        HDC * resultptr;
+        resultptr = new HDC((HDC &) result);
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_HDC, 1);
+    }
     return resultobj;
     fail:
     return NULL;
@@ -2089,6 +2130,23 @@ static PyObject *_wrap_HypView_idle(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_HypView_idleCB(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    HypView *arg1 = (HypView *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:HypView_idleCB",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)(arg1)->idleCB();
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_HypView_motion(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     HypView *arg1 = (HypView *) 0 ;
@@ -2794,11 +2852,12 @@ static PyObject *_wrap_HypView_setLabelFont(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     HypView *arg1 = (HypView *) 0 ;
     std::string *arg2 = 0 ;
+    int arg3 ;
     std::string temp2 ;
     PyObject * obj0 = 0 ;
     PyObject * obj1 = 0 ;
     
-    if(!PyArg_ParseTuple(args,(char *)"OO:HypView_setLabelFont",&obj0,&obj1)) goto fail;
+    if(!PyArg_ParseTuple(args,(char *)"OOi:HypView_setLabelFont",&obj0,&obj1,&arg3)) goto fail;
     if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
     {
         if (PyString_Check(obj1)) {
@@ -2809,7 +2868,7 @@ static PyObject *_wrap_HypView_setLabelFont(PyObject *self, PyObject *args) {
             SWIG_exception(SWIG_TypeError, "string expected");
         }
     }
-    (arg1)->setLabelFont((std::string const &)*arg2);
+    (arg1)->setLabelFont((std::string const &)*arg2,arg3);
     
     Py_INCREF(Py_None); resultobj = Py_None;
     return resultobj;
@@ -3152,6 +3211,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"getSelected", _wrap_getSelected, METH_VARARGS },
 	 { (char *)"new_HypView", _wrap_new_HypView, METH_VARARGS },
 	 { (char *)"HypView_afterRealize", _wrap_HypView_afterRealize, METH_VARARGS },
+	 { (char *)"HypView_getWidget", _wrap_HypView_getWidget, METH_VARARGS },
 	 { (char *)"delete_HypView", _wrap_delete_HypView, METH_VARARGS },
 	 { (char *)"HypView_enumerateSubtree", _wrap_HypView_enumerateSubtree, METH_VARARGS },
 	 { (char *)"HypView_flashLink", _wrap_HypView_flashLink, METH_VARARGS },
@@ -3191,6 +3251,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"HypView_bindCallback", _wrap_HypView_bindCallback, METH_VARARGS },
 	 { (char *)"HypView_drawFrame", _wrap_HypView_drawFrame, METH_VARARGS },
 	 { (char *)"HypView_idle", _wrap_HypView_idle, METH_VARARGS },
+	 { (char *)"HypView_idleCB", _wrap_HypView_idleCB, METH_VARARGS },
 	 { (char *)"HypView_motion", _wrap_HypView_motion, METH_VARARGS },
 	 { (char *)"HypView_mouse", _wrap_HypView_mouse, METH_VARARGS },
 	 { (char *)"HypView_passive", _wrap_HypView_passive, METH_VARARGS },
@@ -3259,7 +3320,10 @@ static swig_type_info _swigt__p_f_r_q_const__string_int_int__void[] = {{"_p_f_r_
 static swig_type_info _swigt__p_timeval[] = {{"_p_timeval", 0, "timeval *", 0},{"_p_timeval"},{0}};
 static swig_type_info _swigt__p_HypGraph[] = {{"_p_HypGraph", 0, "HypGraph *", 0},{"_p_HypGraph"},{0}};
 static swig_type_info _swigt__p_HypView[] = {{"_p_HypView", 0, "HypView *", 0},{"_p_HypView"},{0}};
+static swig_type_info _swigt__p_HWND[] = {{"_p_HWND", 0, "HWND *", 0},{"_p_HWND"},{0}};
+static swig_type_info _swigt__p_HGLRC[] = {{"_p_HGLRC", 0, "HGLRC *", 0},{"_p_HGLRC"},{0}};
 static swig_type_info _swigt__p_p_char[] = {{"_p_p_char", 0, "char **", 0},{"_p_p_char"},{0}};
+static swig_type_info _swigt__p_HDC[] = {{"_p_HDC", 0, "HDC *", 0},{"_p_HDC"},{0}};
 static swig_type_info _swigt__p_string[] = {{"_p_string", 0, "string *", 0},{"_p_string"},{0}};
 static swig_type_info _swigt__p_istream[] = {{"_p_istream", 0, "istream *", 0},{"_p_istream"},{0}};
 
@@ -3268,7 +3332,10 @@ _swigt__p_f_r_q_const__string_int_int__void,
 _swigt__p_timeval, 
 _swigt__p_HypGraph, 
 _swigt__p_HypView, 
+_swigt__p_HWND, 
+_swigt__p_HGLRC, 
 _swigt__p_p_char, 
+_swigt__p_HDC, 
 _swigt__p_string, 
 _swigt__p_istream, 
 0

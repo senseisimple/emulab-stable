@@ -5,6 +5,19 @@
 // Copyright (c) 2004 University of Utah and the Flux Group.
 // All rights reserved.
 //
+// Permission to use, copy, modify and distribute this software is hereby
+// granted provided that (1) source code retains these copyright, permission,
+// and disclaimer notices, and (2) redistributions including binaries
+// reproduce the notices in supporting documentation.
+//
+// THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+// CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+// FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+//
+
+#include <string>
+NAMESPACEHACK
+
 #include "HypView.h"
 %}
 
@@ -38,14 +51,14 @@
 }
 
 // It's easier to return the pointer to the HypView object rather than access the global.
-extern HypView  *hvmain(int argc, char *argv[]);  
+extern HypView  *hvmain(int argc, char *argv[], int window, int width, int height);  
 //extern int hvmain(int argc, char *argv[]);
 //%include "cpointer.i"
 //%pointer_class(HypView,hvp)
 //extern HypView *hv;
 
 // Separate out file reading from the main program.
-extern int hvReadFile(char *fname);
+extern int hvReadFile(char *fname, int width, int height);
 
 // Get the node id string last selected by the selectCB function.
 extern char *getSelected();

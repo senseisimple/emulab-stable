@@ -8,6 +8,7 @@
 import sets
 import string
 import fnmatch
+import os
 
 from sshxmlrpc import *
 from emulabclient import *
@@ -16,7 +17,12 @@ from emulabclient import *
 PACKAGE_VERSION = 0.1                   # The package version number
 XMLRPC_SERVER   = "boss.emulab.net"     # Default server
 xmlrpc_server   = XMLRPC_SERVER         # User supplied server name.
-login_id        = os.environ["USER"]    # User supplied login ID to use.
+if os.environ.has_key("USER"):          # User login ID to use.
+    login_id    = os.environ["USER"]      # Unix shells.
+elif os.environ.has_key("USERNAME"):
+    login_id    = os.environ["USERNAME"]  # Windows.
+else:
+    login_id    = "guest"
 module          = "experiment"          # The default RPC module to invoke.
 path            = None
 
@@ -25,7 +31,8 @@ path            = None
 server = None
 def initServer():
     global server
-    uri = "ssh://" + login_id + "@" + xmlrpc_server + "/xmlrpc/" + module
+    uri = "ssh://" + login_id + "@" + xmlrpc_server + "/" + module
+    ###uri = "ssh://" + login_id + "@" + xmlrpc_server + "/xmlrpc/" + module
     ##print uri
     server = SSHServerProxy(uri, path=path)
     pass
@@ -59,7 +66,7 @@ def addConnection(graph, h1, h2):
 # If no root is given, the first lan or the first host is the default root node.
 #
 # An experiment.hyp file is written in /tmp.
-# Return is the .hyp file name, or None in case of failure.
+# Return is the .hyp file name, or an error list in case of failure.
 #
 def getExperiment(project, experiment, root=""):
     if not server:
@@ -71,12 +78,22 @@ def getExperiment(project, experiment, root=""):
         response = apply(meth, meth_args)
         pass
     except xmlrpclib.Fault, e:
-        print e.faultString
-        return None
-
+        err = "XMLRPC-lib error --"
+        #print err,  e.faultString
+        return [3, err,  e.faultString, ""]
+    except BadResponse, e:
+        err = "SSH-XMLRPC error --"
+        err2 = "Make sure you have a valid SSH key in ssh-agent or PuTTY/pageant." 
+        #print err, e
+        #print err2
+        return [4, err, e, err2]
     if response["code"] != RESPONSE_SUCCESS:
-        print "XMLRPC failure, code", response["code"]
-        return response["code"]
+        err = "XMLRPC failure, code"
+        e = response["code"]
+        err2 = "There is no experiment " + project + "/" + experiment
+        #print err, e
+        #print err2        
+        return [2, err, e, err2]
     links = response["value"]
 
     # Figure out the nodes from the experiment links (interfaces) from the virt_lans table.
@@ -158,8 +175,14 @@ def getExperiment(project, experiment, root=""):
             pass
         pass
     
-    hypfile = "/tmp/"+experiment+'.hyp'
-    outfile = file(hypfile,'w')
+    if os.name == "nt":
+        tmpdir = "C:\\temp\\"
+        pass
+    else:
+        tmpdir = "/tmp/"
+        pass
+    hypfile = tmpdir + experiment + '.hyp'
+    outfile = file(hypfile, 'w')
     graph2 = {}
     walkNodes(graph, graph2, root, 0, outfile)
     outfile.close()

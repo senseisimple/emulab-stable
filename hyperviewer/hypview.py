@@ -1,16 +1,27 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
+#
+# hypview - HyperViewer application.
+# For description of script args, invoke with any dash arg or see the "usage:" message below.
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# hypview - HyperViewer application.
-# For description of script args, invoke with any dash arg or see the "usage:" message below.
+# Permission to use, copy, modify and distribute this software is hereby
+# granted provided that (1) source code retains these copyright, permission,
+# and disclaimer notices, and (2) redistributions including binaries
+# reproduce the notices in supporting documentation.
+#
+# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+#
 
 ##import pdb
 
 import string
 import sys
+import types
 
 import hv
 import exptToHv
@@ -20,12 +31,54 @@ from OpenGL.GL import *
 from wxPython.wx import *
 from wxPython.glcanvas import wxGLCanvas
 
-# A wxPython application.
+# A wxPython application object.
 class hvApp(wxApp):
     
     ##
     # The app initialization.
     def OnInit(self):
+	
+	# Given command-line argument(s), attempt to read in a topology.
+	filename = project = None
+	# Any dash argument prints a usage message and exits.
+	if len(sys.argv) == 2 and sys.argv[1][0] == '-': 
+	    print '''Hyperviewer usage:
+  No args - Starts up the GUI.	Use the File/Open menu item to read a topology.
+  One arg - A .hyp file name.  Read it in and start the GUI, e.g.:
+      ./hypview BigLan.hyp
+  Two args - Project and experiment names in the database.
+      Get the topology from XMLRPC, make a .hyp file, start as above.
+      ./hypview testbed BigLan
+  Three args - Project and experiment names, plus an optional root node name.
+      ./hypview testbed BigLan clan'''
+	    sys.exit()
+	    pass
+	
+	# One command-line argument: read from a .hyp file.
+	# (File/experiment input is also in the OnOpenFile and OnOpenExperiment methods.)
+	elif len(sys.argv) == 2:
+	    filename = sys.argv[1]
+	    print "Reading file:", filename
+	    pass
+	
+	# Two args: read an experiment from the DB via XML-RPC, and make a .hyp file.
+	elif len(sys.argv) == 3:
+	    project = sys.argv[1]
+	    experiment = sys.argv[2]
+	    print "Getting project:", project + ", experiment:", experiment
+	    filename = exptToHv.getExperiment(project, experiment)
+	    pass
+
+	# Three args: experiment from database, with optional graph root node.
+	elif len(sys.argv) == 4:
+	    project = sys.argv[1]
+	    experiment = sys.argv[2]
+	    root = sys.argv[3]
+	    print "Getting project:", project + ", experiment:", experiment \
+		  + ", root node:", root
+	    filename = exptToHv.getExperiment(project, experiment, root)
+	    pass
+
 	self.frame = hvFrame(None, -1, "wxHyperViewer", (100,0), (750,750))
 	self.frame.app = self	# A back-reference here from the frame.
 	self.openDialog = hvOpen(None, -1, "Open HyperViewer Data")
@@ -35,64 +88,26 @@ class hvApp(wxApp):
 	# Make it visible.
 	self.frame.Show()
 	self.SetTopWindow(self.frame)
-	
-	# Given command-line argument(s), attempt to read in a topology.
-        filename = project = None
-        # Any dash argument prints a usage message and exits.
-	if len(sys.argv) == 2 and sys.argv[1][0] == '-': 
-	    print '''Hyperviewer usage:
-  No args - Starts up the GUI.  Use the File/Open menu item to read a topology.
-  One arg - A .hyp file name.  Read it in and start the GUI, e.g.:
-      ./hypview BigLan.hyp
-  Two args - Project and experiment names in the database.
-      Get the topology from XMLRPC, make a .hyp file, start as above.
-      ./hypview testbed BigLan
-  Three args - Project and experiment names, plus an optional root node name.
-      ./hypview testbed BigLan clan'''
-	    sys.exit()
-            pass
-        
-        # One command-line argument: read from a .hyp file.
-	elif len(sys.argv) == 2:
-            filename = sys.argv[1]
-	    print "Reading file:", filename
-	    pass
-        
-        # Two args: read an experiment from the DB via XML-RPC, and make a .hyp file.
-	elif len(sys.argv) == 3:
-            project = sys.argv[1]
-            experiment = sys.argv[2]
-	    print "Getting project:", project + ", experiment:", experiment
-	    filename = exptToHv.getExperiment(project, experiment)
+
+	if filename:
+	    if type(filename) is types.ListType:
+		print "Failed to read experiment from database."
+		exptError = '%s %s\n%s' % tuple(filename[1:4])
+		print exptError
+		self.frame.shutdown()
+		pass
+	    else:
+		if not self.frame.ReadTopFile("wxHyperViewer", filename):
+		    #print "Could not open ", filename # Already printed error in C++.
+		    self.frame.shutdown() 
+		pass
 	    pass
 
-        # Three args: experiment from database, with optional graph root node.
-	elif len(sys.argv) == 4:
-            project = sys.argv[1]
-            experiment = sys.argv[2]
-            root = sys.argv[3]
-	    print "Getting project:", project + ", experiment:", experiment \
-		  + ", root node:", root
-	    filename = exptToHv.getExperiment(project, experiment, root)
-            pass
-
-        if filename:
-            if filename == 2:
-                exptError = "There is no experiment " + project + "/" + experiment
-                print exptError
-                pass
-            else:
-                self.frame.ReadTopFile("wxHyperViewer", filename)
-                pass
-            pass
-        elif project:
-            print "Failed to get experiment from database."
-            pass
-
-	return True
+	return True			# OnInit success.
     pass
 
-# The semantics of the UI of the application.
+# hvFrame - The semantics (methods) of the UI of the application.  Notice that this object
+# inherits from hvFrameUI in hvFrameUI.py, which is generated by wxGlade from hvgui.wxg .
 class hvFrame(hvFrameUI):
     
     ##
@@ -123,20 +138,41 @@ class hvFrame(hvFrameUI):
 	EVT_SPINCTRL(self.CountGenLink, -1, self.OnCountGenLink)
 	
 	# Other events.
+	EVT_CLOSE(self, self.OnExit)
+	# These do nothing until the vwr is instantiated below.
 	EVT_IDLE(self.hypView, self.OnIdle)
 	EVT_PAINT(self.hypView, self.OnPaint)
-	EVT_CLOSE(self, self.OnClose)
 	
 	pass
     
     ##
-    # Read in a topology file and instantiate the C++ object.
+    # Close the top-level windows, so the MainLoop exits.
+    def shutdown(self):
+	EVT_CLOSE(self, None)		# Prevent infinite loop.
+	self.app.openDialog.Close(True)
+	self.app.usageDialog.Close(True)
+	self.Close(True)
+	self.app.ExitMainLoop()
+	pass
+    
+    ##
+    # Read in a topology file and instantiate the C++ Hyperviewer object.
+    # Returns True on success, False on failure.
     def ReadTopFile(self, name, file):
 	self.SetTitle(name + " " + file)
 	
-	# Instantiate the SWIG'ed C++ object HypView object.
-	self.hypView.SetCurrent()   # Select the OpenGL Graphics Context from the wxGLCanvas.
-	self.vwr = hv.hvmain([name, file])	# Load the data into the graph.
+	# Select the OpenGL Graphics Context from the wxGLCanvas in the hvFrameUI.
+	self.hypView.SetCurrent()   
+
+	# Instantiate and initialize the SWIG'ed C++ HypView object, loading graph data.
+	window = self.hypView.GetHandle()
+	width, height = self.hypView.GetSizeTuple()
+	self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
+			     window, width, height)  # Win32 needs the window info.
+	if self.vwr is None:
+	    return False
+
+	# Initial drawing.
 	self.hypView.SwapBuffers()		# Make the sphere visible.
 	self.DrawGL()				# Show the graph.
 	
@@ -147,7 +183,7 @@ class hvFrame(hvFrameUI):
 	EVT_MIDDLE_UP(self.hypView, self.OnClick)
 	EVT_MOTION(self.hypView, self.OnMove)
 	
-	pass	
+	return True
     
     ##
     # Draw the OpenGL content and make it visible.
@@ -166,7 +202,7 @@ class hvFrame(hvFrameUI):
 	    self.NodeName.WriteText(node)
 	    self.ChildCount.SetLabel(str(self.vwr.getChildCount(node)))
 	    self.LabelLinksIn.SetLabel(
-		"    Non-tree Links in:  " + str(self.vwr.getIncomingCount(node)))
+		"    Non-tree Links in:	 " + str(self.vwr.getIncomingCount(node)))
 	    self.LabelLinksOut.SetLabel(
 		"    Non-tree Links out:  " + str(self.vwr.getOutgoingCount(node)))
 	pass
@@ -231,7 +267,7 @@ class hvFrame(hvFrameUI):
     ##
     # Menu items issue commands from the menu bar.
     def OnExit(self, cmdEvent):
-	self.app.ExitMainLoop()
+	self.shutdown()
     def OnOpen(self, cmdEvent):
 	self.app.openDialog.Show()
     def OnUsage(self, cmdEvent):
@@ -242,8 +278,8 @@ class hvFrame(hvFrameUI):
     def OnClick(self, mouseEvent):
 	# Encode mouse button events for HypView.
 	btnNum = -1
-        
-        # Left mouse button for X-Y motion of the hyperbolic center.
+	
+	# Left mouse button for X-Y motion of the hyperbolic center.
 	if mouseEvent.LeftDown():
 	    btnNum = 0
 	    btnState = 0
@@ -252,8 +288,8 @@ class hvFrame(hvFrameUI):
 	    btnNum = 0
 	    btnState = 1
 	    pass
-        
-        # Middle button for rotation of the hyperbolic space.
+	
+	# Middle button for rotation of the hyperbolic space.
 	elif mouseEvent.MiddleDown():
 	    btnNum = 1
 	    btnState = 0
@@ -263,13 +299,14 @@ class hvFrame(hvFrameUI):
 	    btnState = 1
 	    pass
 	
-        # Left button with control or shift held down is also rotation.
-        if btnNum == 0 and ( mouseEvent.ControlDown() or mouseEvent.ShiftDown() ):
-            btnNum = 1
-            pass
-        
+	# Left button with control or shift held down is also rotation.
+	if btnNum == 0 and ( mouseEvent.ControlDown() or mouseEvent.ShiftDown() ):
+	    btnNum = 1
+	    pass
+	
 	# Handle mouse clicks in HypView.
 	if btnNum != -1:
+	    ##print "click", btnNum, btnState, mouseEvent.GetX(), mouseEvent.GetY()
 	    self.vwr.mouse(btnNum, btnState, mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    self.vwr.redraw()
 	    self.hypView.SwapBuffers()
@@ -288,6 +325,7 @@ class hvFrame(hvFrameUI):
 	    pass
 	else:
 	    # "passive" mouse motion is when there is no button clicked.
+	    ##print "passive", mouseEvent.GetX(), mouseEvent.GetY()
 	    self.vwr.passive(mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    pass
 	self.vwr.redraw()
@@ -310,9 +348,6 @@ class hvFrame(hvFrameUI):
 	    pass
 	self.hypView.SwapBuffers()
 	pass
-
-    def OnClose(self, cmdEvent):
-	self.app.ExitMainLoop()
     pass
 
 class hvOpen(OpenDialogUI):
@@ -329,8 +364,19 @@ class hvOpen(OpenDialogUI):
     ##
     # Get topology data from a file.
     def OnOpenFile(self, cmdEvent):
-	self.app.frame.ReadTopFile("wxHyperViewer", self.FileToOpen.GetLineText(0))
-	self.Hide();
+	file = self.FileToOpen.GetLineText(0)
+	msg = 'Reading topology file "%s".' % file
+	print msg
+	self.FileMsg.SetLabel(msg)
+	self.Refresh()
+	self.Update()
+
+	if self.app.frame.ReadTopFile("wxHyperViewer", file):
+	    self.Hide();		# Success.
+	    self.FileMsg.SetLabel(" ")
+	else:
+	    fileError = "Could not open " + file
+	    self.FileMsg.SetLabel(fileError)
 	pass
     
     ##
@@ -339,17 +385,28 @@ class hvOpen(OpenDialogUI):
 	project = self.ProjectName.GetLineText(0)
 	experiment = self.ExperimentName.GetLineText(0)
 	root = self.ExperimentRoot.GetLineText(0)
+
+	msg = 'Getting experiment %s/%s.' % (project, experiment)
+	print msg
+	self.ExperimentMsg.SetLabel(msg)
+	self.Refresh()
+	self.Update()
+
 	hypfile = exptToHv.getExperiment(project, experiment, root)
-	if hypfile:
-            if hypfile == 2:
-                exptError = "There is no experiment " + project + "/" + experiment
-                self.ExperimentMsg.SetLabel(exptError)
-                print exptError
-                return
-            
-	    self.app.frame.ReadTopFile("wxHyperViewer", hypfile)
-            self.ExperimentMsg.SetLabel(" ")
-	    self.Hide();
+	if type(hypfile) is types.ListType:
+	    exptError = '%s %s\n%s' % tuple(hypfile[1:4])
+	    print exptError
+	    self.ExperimentMsg.SetLabel(exptError)
+
+	elif self.app.frame.ReadTopFile("wxHyperViewer", hypfile):
+	    self.Hide();		# Success.
+	    self.ExperimentMsg.SetLabel(" ")
+	    pass
+	else:
+	    fileError = "Could not open " + hypfile
+	    print fileError
+	    self.ExperimentMsg.SetLabel(fileError)
+	    pass
 	pass
     
     pass

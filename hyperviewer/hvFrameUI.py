@@ -5,8 +5,28 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# Permission to use, copy, modify and distribute this software is hereby
+# granted provided that (1) source code retains these copyright, permission,
+# and disclaimer notices, and (2) redistributions including binaries
+# reproduce the notices in supporting documentation.
+#
+# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+#
 from wxPython.wx import *
-from wxPython.glcanvas import wxGLCanvas
+from wxPython.glcanvas import *
+
+class hvGLCanvas(wxGLCanvas):
+    def __init__(self, *args, **kwds):
+        ## The PyOpenGL canvas initialization is broken.
+        ## The following doesn't yet work on Windows, although
+        ## it is needed for picking, and seg-faults on FreeBSD.
+        ##kwds["attribList"] = [WX_GL_DOUBLEBUFFER, WX_GL_RGBA,
+        ##                      WX_GL_DEPTH_SIZE, 32, 0]
+        wxGLCanvas.__init__(self, *args, **kwds)
+        pass
+    pass
 
 class UsageDialogUI(wxDialog):
     def __init__(self, *args, **kwds):
@@ -123,7 +143,7 @@ class hvFrameUI(wxFrame):
         wxglade_tmp_menu.Append(3, "&Usage\tCtrl+H", "", wxITEM_NORMAL)
         self.Menu.Append(wxglade_tmp_menu, "&Help")
         # Menu Bar end
-        self.hypView = wxGLCanvas(self.panel_1, -1)
+        self.hypView = hvGLCanvas(self.panel_1, -1)
         self.GoToTop = wxButton(self.Controls, -1, "go to top")
         self.LabelNodeName = wxStaticText(self.Controls, -1, "    Node name    ")
         self.NodeName = wxTextCtrl(self.Controls, -1, "")

@@ -9,7 +9,7 @@ HVSRC  = ${HVROOT}/src
 # The follosing matches Munzner's Makefile scheme.
 CPU = free
 ##CPU = linux
-WINSYS = glut
+WINSYS = wxpy
 ##WINSYS = xt
 ARCH = ${CPU}${WINSYS}
 
@@ -24,8 +24,8 @@ INCDIRS = -I${HVINC} -I/usr/X11R6/include -I/usr/local/include/python2.3
 LDLIBS  = ${HVLIB} ${STATIC} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
 
 # Distribute the Python scripts, sources, shared library, sample input files, and user doc.
-PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py
-SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp
+PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py hv_win32.py
+SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp _hv_win32.cpp
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp
 SCRIPTFILES = hypview pangorc.local pango.modules.local
@@ -47,6 +47,13 @@ hvmain.o: hvmain.cpp
 	g++ -fpic -c ${CFLAGS} ${INCDIRS} hvmain.cpp
 _hv.cpp hv.py: hv.i
 	swig -c++ -python -DHYPGLUT -DHYPFREE -module hv -o _hv.cpp hv.i
+# Kluge to maintain the WIN32 version in parallel...
+_hv_win32.cpp hv_win32.py: hv.i
+	mv -f hv.py hv.py.save
+	# The .py file is named by the -module argument...
+	swig -c++ -python -DWIN32 -module hv -o _hv_win32.cpp hv.i
+	mv hv.py hv_win32.py
+	mv -f hv.py.save hv.py
 
 # Put the wrappers in a shared library for import by hv.py .
 _hv.o: _hv.cpp
@@ -55,13 +62,17 @@ _hv.so: hvmain.o _hv.o ${HVLIB}
 	gcc -shared hvmain.o _hv.o ${LDLIBS} -o _hv.so
 
 hvlib: ${HVLIB}
-${HVLIB}:
+${HVLIB}: checkhv
+	@echo Making ${HVLIB}
+	cd ${HVROOT}; make HVROOT=../$(HVROOT)
+checkhv:
+	@echo ""
+	@echo Make sure that the absolute path to the hypviewer subdir is in Makefile.main .
+	grep '^ROOTDIR' ${HVROOT}/Makefile.main
 	@echo ""
 	@echo Make sure that Makefile.${ARCH} is included, and not commented-out.
 	grep Makefile.${ARCH} ${HVROOT}/Makefile.main
 	@echo ""
-	@echo Making ${HVLIB}
-	cd ${HVROOT}; make
 
 dist:
 	# Wrap a top-level hyperviewer directory around the dist files in the tarball.
@@ -73,4 +84,4 @@ dist:
 
 clean:
 	rm *.o *.so
-	cd ${HVROOT}; make clean
+	cd ${HVROOT}; make HVROOT=$(HVROOT) clean

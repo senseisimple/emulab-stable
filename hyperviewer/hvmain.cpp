@@ -3,10 +3,20 @@
 // Copyright (c) 2004 University of Utah and the Flux Group.
 // All rights reserved.
 //
+// Permission to use, copy, modify and distribute this software is hereby
+// granted provided that (1) source code retains these copyright, permission,
+// and disclaimer notices, and (2) redistributions including binaries
+// reproduce the notices in supporting documentation.
+//
+// THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+// CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+// FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+//
 
 // hvmain.cpp - hypview for SWIG into _hv.so, based on hypviewer/examples/glut/main.cpp .
 
 #include <string>
+#include <iostream>
 NAMESPACEHACK
 
 extern "C" {
@@ -40,12 +50,13 @@ char *getSelected(){
 }
 
 void selectCB(const string & id, int shift, int control) {
+  //printf("selectCB id=%s, prevsel=%s\n", id.c_str(), prevsel);
   hv->setSelected(id, 1);
   hv->setSelected(prevsel, 0);
   hv->gotoNode(id, HV_ANIMATE);
   hv->drawFrame();
   hv->idle(1);
-  strcpy(prevsel, id.c_str());
+  strncpy(prevsel, id.c_str(), sizeof(prevsel));
 }
 
 void display() { hv->drawFrame(); }
@@ -109,7 +120,7 @@ void PrintAllocations()
 #if 0
 int main(int argc, char *argv[]) {
 #else
-HypView *hvmain(int argc, char *argv[]) {
+HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
 #endif
   char *fname;
   if (argc > 1) 
@@ -117,7 +128,9 @@ HypView *hvmain(int argc, char *argv[]) {
   else 
     fname = strdup("test.lvhist");
 
+#ifndef WIN32
   fpsetmask(0);
+#endif
 
 #if 0
   atexit(PrintAllocations);
@@ -139,7 +152,18 @@ HypView *hvmain(int argc, char *argv[]) {
   }
 #endif
 
+#ifndef WIN32
   hv = new HypView();
+#else
+  HWND hWnd = (HWND)window;
+  HDC hdc = ::GetDC(hWnd);
+  hv = new HypView(hdc, hWnd);
+  HGLRC ctx = wglCreateContext(hdc);
+  if (!ctx) {
+    printf("wglCreateContext Failed\n");
+    exit(1);
+  }
+#endif
 
   // hv->clearSpanPolicy();
   // hv->addSpanPolicy(HV_SPANBFS);
@@ -148,16 +172,22 @@ HypView *hvmain(int argc, char *argv[]) {
   hv->setGraph(inFile);
   inFile.close();
 #endif
+#ifndef WIN32
   hv->afterRealize();
+#else
+  hv->afterRealize(ctx, width, height);
+#endif
   hv->setSphere(1);
-  hv->setColorSphere(.3,.3,.3);
+  hv->setColorSphere(.3f,.3f,.3f);
   hv->setColorBackground(1,1,1);
+#ifndef WIN32
   hv->setLabelFont("-adobe-helvetica-medium-r-normal--12-120-75-75-p-67-iso8859-1");
+#endif
   hv->setColorLabel(0,0,0);
   hv->setLabels(HV_LABELLONG);
   hv->setMotionCull(0);
   hv->setPassiveCull(2);
-  hv->setGotoStepSize(.0833);
+  hv->setGotoStepSize(.0833f);
   hv->setKeepAspect(1);
   hv->setCenterShow(0);
 
@@ -167,20 +197,26 @@ HypView *hvmain(int argc, char *argv[]) {
 
   hv->setColorGroup(0, "image", 1.0, 0.0, 1.0);
   hv->setColorGroup(0, "html", 0, 1, 1);
-  hv->setColorGroup(0, "text", .90, .35, .05);
-  hv->setColorGroup(0, "image", .42, 0, .48);
-  hv->setColorGroup(0, "application", .99, .64, .25);
-  hv->setColorGroup(0, "audio", .91, .36, .57);
-  hv->setColorGroup(0, "host", .375, .75, .375);
-  hv->setColorGroup(0, "lan", .375, .375, .75);
-  hv->setColorGroup(0, "source", .9, .9, .9);
-  hv->setColorGroup(0, "vrml", .09, 0, 1);
+  hv->setColorGroup(0, "text", .90f, .35f, .05f);
+  hv->setColorGroup(0, "image", .42f, 0, .48f);
+  hv->setColorGroup(0, "application", .99f, .64f, .25f);
+  hv->setColorGroup(0, "audio", .91f, .36f, .57f);
+  hv->setColorGroup(0, "host", .375f, .75f, .375f);
+  hv->setColorGroup(0, "lan", .375f, .375f, .75f);
+  hv->setColorGroup(0, "source", .9f, .9f, .9f);
+  hv->setColorGroup(0, "vrml", .09f, 0, 1);
   hv->setColorGroup(0, "invisible", 0, 0, 0);
 
   // tree position
   hv->setColorGroup(1, "host", 1.0, 1.0, 1.0);
   hv->setColorGroup(1, "mainbranch", 0, 1, 1);
   hv->setColorGroup(1, "orphan", 1.0, 0.0, 1.0);
+
+  //  hv->gotoCenterNode(HV_JUMP);
+  struct timeval idletime;
+  idletime.tv_sec = 5;
+  idletime.tv_usec = 0;
+  hv->setIdleFrameTime(idletime);
 
 #if 0
   glutDisplayFunc(display);
@@ -208,7 +244,7 @@ HypView *hvmain(int argc, char *argv[]) {
 #endif
 }
 
-int hvReadFile(char *fname) {
+int hvReadFile(char *fname, int width, int height) {
   ifstream inFile(fname);
   if (!inFile) {
     cerr << "Could not open '" << fname << "': " << strerror(errno) << endl;
@@ -217,6 +253,12 @@ int hvReadFile(char *fname) {
 
   hv->setGraph(inFile);
   inFile.close();
+#ifndef WIN32
   hv->afterRealize();
+#else
+  HDC hdc = hv->getWidget();
+  HGLRC ctx = wglCreateContext(hdc);
+  hv->afterRealize(ctx, width, height);
+#endif
   return 0;
 }
