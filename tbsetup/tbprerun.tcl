@@ -141,11 +141,11 @@ if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
 
 unlock
 
-outs "PLACEHOLDER - Allocating IP addresses."
-#if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
-#    outs stderr "Error allocating IP addresses. ($err)"
-#    exit 1
-#}
+outs "Allocating IP addresses."
+if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error allocating IP addresses. ($err)"
+    exit 1
+}
 
 outs "Setup finished - $irFile generated."
 
