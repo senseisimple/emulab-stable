@@ -41,7 +41,7 @@ between them.
 
 This commands is used to set hardware specs.  Currently only one
 format is supported: <type> = shark-shelf.  This indicates that <node>
-should be a shelf (unswitched LAN) of 8 sharks.
+should be a shelf (switched LAN) of 8 sharks.
 
 
 #TB set-dnard-ip <shelf> <number> <ip>
