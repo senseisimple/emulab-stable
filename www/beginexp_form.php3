@@ -37,12 +37,10 @@ echo "<form enctype=\"multipart/form-data\"
 #
 echo "<tr>
           <td colspan=2>*Select Project:</td>";
-echo "    <td><select name=\"exp_pid\">";
-              for ($i = 0; $i < count($projlist); $i++) {
-                  $project = $projlist[$i];
-
-		  echo "<option value=\"$project\">$project</option>\n";
-               }
+echo "    <td><select name=exp_pid>";
+	  while (list($project) = each($projlist)) {
+	      echo "<option value='$project'>$project </option>\n";
+	  }
 echo "       </select>";
 echo "    </td>
       </tr>\n";
@@ -122,10 +120,22 @@ echo "<tr>
 # Select a group
 # 
 echo "<tr>
-          <td colspan=2>Group[<b>3</b>]:</td>
-          <td><input type=\"text\" name=\"exp_gid\"
-                     size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
-              </td>
+          <td colspan=2>Group[<b>3</b>]:</td>\n";
+echo "    <td><select name=exp_gid>
+              <option selected value=''>Default Group </option>\n";
+	    reset($projlist);
+	    while (list($project, $grouplist) = each($projlist)) {
+		for ($i = 0; $i < count($grouplist); $i++) {
+		    $group = $grouplist[$i];
+
+		    if (strcmp($project, $group)) {
+			echo "<option value='$group'>$project/$group
+                              </option>\n";
+		    }
+		}
+	    }
+echo "       </select>
+          </td>
       </tr>\n";
 
 echo "<tr>
@@ -153,7 +163,8 @@ echo "<h4><blockquote><blockquote><blockquote>
                 Priority, which indicates that we can swap you out before high
 	        priority experiments.
         <dt>[3]
-            <dd>Leave blank to use the default group for the project.
+            <dd>Leave as the default group, or pick a subgroup that
+                corresponds to the project you selected.
         <dt>[4]
             <dd>Check this if you want to create a
                 <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>

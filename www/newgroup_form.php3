@@ -60,11 +60,10 @@ else {
               <td>*Select Project:</td>";
     echo "    <td><select name=pid>";
 
-    for ($i = 0; $i < count($projlist); $i++) {
-	$pid = $projlist[$i];
-
-	echo "    <option value='$pid'>$pid</option>\n";
+    while (list($project) = each($projlist)) {
+	echo "<option value='$project'>$project </option>\n";
     }
+
     echo "       </select>";
     echo "    </td>
           </tr>\n";
@@ -99,6 +98,12 @@ echo "<tr>
       </tr>
       </form>
       </table>\n";
+
+echo "<br><center>
+       Important <a href=docwrapper.php3?docname=groups.html#SECURITY'>
+       security issues</a> are discussed in the
+       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+      </center>\n";
 
 #
 # Standard Testbed Footer

@@ -255,7 +255,6 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	$mintrust = $TBDB_TRUST_USER;
     }
     elseif ($access_type == $TB_PROJECT_MAKEGROUP ||
-	    $access_type == $TB_PROJECT_EDITGROUP ||
 	    $access_type == $TB_PROJECT_DELGROUP) {
 	$mintrust = $TBDB_TRUST_PROJROOT;
     }
@@ -270,8 +269,9 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $access_type == $TB_PROJECT_CREATEEXPT) {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
-    elseif ($access_type == $TB_PROJECT_ADDUSER) {
-	if ($gid == $pid) {
+    elseif ($access_type == $TB_PROJECT_ADDUSER ||
+	    $access_type == $TB_PROJECT_EDITGROUP) {
+	if (strcmp($gid, $pid) == 0) {
 	    $mintrust = $TBDB_TRUST_PROJROOT;
 	}
 	else {
@@ -759,6 +759,28 @@ function TBProjLeader($pid, &$projleader)
 }
 
 #
+# Return Group Leader.
+#
+# usage TBGroupLeader($pid, $gid, &$groupleader)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBGroupLeader($pid, $gid, &$groupleader)
+{
+    $query_result =
+	DBQueryFatal("select leader from groups ".
+		     "where pid='$pid' and gid='$gid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $groupleader  = $row[leader];
+    
+    return 1;
+}
+
+#
 # Return Experiment Leader.
 #
 # usage TBExpLeader($pid, &$expleader)
@@ -786,6 +808,8 @@ function TBExpLeader($pid, $eid, &$expleader)
 # to be totally general would require too many DB operations. Not worth
 # the effort or the expense.
 #
+# Returns an indexed array (by pid) of lists (of gids).
+#
 function TBProjList($uid, $access_type)
 {
     global $TB_PROJECT_CREATEEXPT;
@@ -812,7 +836,7 @@ function TBProjList($uid, $access_type)
     }
     
     $query_result =
-	DBQueryFatal("SELECT distinct pid FROM group_membership ".
+	DBQueryFatal("SELECT distinct pid,gid FROM group_membership ".
 		     "WHERE uid='$uid' and $trust_clause");
 
     if (mysql_num_rows($query_result) == 0) {
@@ -821,9 +845,11 @@ function TBProjList($uid, $access_type)
 
     $i = 0;
     while ($row = mysql_fetch_array($query_result)) {
-	$pid = $row[pid];
+	$pid = $row['pid'];
+	$gid = $row['gid'];
+	
+	$result[$pid][] = $gid;
 
-	$result[$i] = $pid;
 	$i++;
     }
     return $result;
