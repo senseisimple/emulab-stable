@@ -296,7 +296,8 @@ if ($thumbnail != 0) {
 	$x = ceil(($x * $thumbnail) / $max_x);
 	$y = ceil(($y * $thumbnail) / $max_y);
 
-	$size = ceil(min( 16 * $thumbnail / $max_x, 16 * $thumbnail / $max_y ));
+	$size = ceil(min( min( 16 * $thumbnail / $max_x, 16 * $thumbnail / $max_y ), $thumbnail / 16));
+	
 
 	if ($type eq "special") {
 	    $im->filledRectangle( $x - $size, $y - $size, $x + $size, $y + $size, $colors{"darkred"} );	
