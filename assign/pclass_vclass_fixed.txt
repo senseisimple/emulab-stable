@@ -1,0 +1,125 @@
+Terminology:
+	pnode = physical node
+	vnode = virtual node
+	pclass = physical equivalence class
+	vclass = virtual equivalence class (vtype)
+
+Physical Equivalence Classes
+
+Two pnodes, A and B, are equivalent iff the following are true:
+
+	1. A and B have identical type information.  Pnode type
+information consists of a type and the number of vnodes of that type
+that can fit in it.  For example, pc:1 pc850:1 delay:2, would allow a
+pc OR a pc850 OR up to two delay nodes.
+
+	2. A and B have identical features.  Feature information
+consists of a feature and a cost. 
+
+	3. A and B have identical links in terms of destination and
+bandwidth.  I.e. if A has a link to X of bandwidth W then so must B,
+and vice versa.
+
+This defines an equivalence relation which is used to partition the
+physical nodes into equivalence classes.
+
+
+Each equivalence class contains, for every type its nods have, a list
+of all the nodes of that type that are available.  When assign wants a
+pnode to assign to it takes the first node from the appropriate list.
+This pnode is then removed from all the *other* lists.  If the pnode
+is full, i.e. no more vnodes can fit in it, then it is also removed
+from the list of its type; otherwise it is left at the front of that
+list.  In this way assign will fill up nodes before moving on to empty
+nodes.  In a similar way when a pnode is unassigned, if it is now
+empty it is added to the end of all lists in its pclass.  Otherwise it
+is only added to the *beginning* of the list of its current type.
+
+
+Example:
+
+Say pc8 is a pnode of type pc:1 pc850:1 delay:2.
+
+Let [pc1] be its pclass (pclasses are named by a representative member).
+
+[pc1] has three lists, pc, pc850, and delay.  Let's say pc8 is at the
+front of all of those lists.
+
+Assign is going along and is trying to find a match for a vnode node1
+of type pc.  Assign ends up choosing [pc1] as the pclass to match
+node1 to.  It looks at the front of the pc list in [pc1] and finds
+pc8.  It maps node1 to pc8.  As pc8 can only have a single pc vnode in
+it, pc8 is removed from all three lists in [pc1].  If, later on, pc8
+is unassigned, as it is then empty, it will be added to the end of all
+three lists.
+
+Let's say, instead, assign was trying to match a vnode delay1 of type
+delay and chose [pc1].  It would find pc8 at the front of the delay.
+In this case, however, pc8 is not full, it can hold another vnode of
+type delay.  It is removed from the pc and pc850 lists but left at the
+front of the delay list.  If later on another delay node is mapped to
+pc8 then it will be removed from the delay list.  When being
+unassigned pc8 will be added to the front of the delay list if it had
+two delay nodes when it was unassigned.  If it only contained one then
+it will be added to the end of all three lists.
+
+
+Assign charges a cost for every pclass used.  In other words it
+attempts to minimize the number of pclasses used.  This causes
+solutions to tend to have nodes of the same type.
+
+
+As part of the implementation of pclasses, assign switched from
+choosing any pnode at all to try, to choosing a pclass that had nodes
+of the right type.  This was not only a conversion from pnode to
+pclass, but also from any to "of the right type".  The result of this
+is that adding nodes that could not be part of the solution has no
+effect.
+
+
+VClasses or VTypes
+------------------
+
+VClasses and VTypes are the same thing.  VClass is the name used only
+in assign for various reasons, and VTypes is used everywhere else.
+
+Similar to PClasses grouping pnodes, VClasses group vnodes.  VClasses
+are explicitly specified in the virtual topology.  Each VClass
+contains a list of possible types, a bunch of vnodes, and a weight.
+The idea is that assign will try very hard to make all of those vnodes
+the same type.
+
+The way this works is based on the idea of a dominant type.  Each
+vclass has a dominant type, being the type most of its assigned
+members are. 
+
+When assign is mapping a vnode that belongs to a vclass it first
+chooses a type for it from the possible types of its class.  If there
+is a dominant type then it tends to choose that type but may choose
+another (randomness is the essence of simulated annealing).  As long
+as all the assigned nodes of a vclass are the same type nothing is
+done to the score.  Whenever a vclass contains assigned nodes of
+different types its weight is added to the score.  This weight is
+added once per vclass, not once per member.  If the weight is greater
+or equal to one a violation is also generated whenever the members are
+of different types.
+
+As the annealing progresses valid solutions where the vclasses are
+consistent (all assigned members of the same type) will have lower
+scores than valid solutions with inconsistent vclasses.  However, if
+no valid solution with consistent vclasses exists then assign will
+tend to the solution with the minimum number of inconsistent vclasses.
+
+The weights of the vclasses can be used to rank them.  In cases where
+no solution with consistent vclasses exists, solutions where higher
+ranked vclasses are consistent will be favored.
+
+
+Fixed Nodes
+-----------
+
+Fixed nodes allow the user to manually specify part of the mapping
+themselves.  In implementation they are basically a special case.  A
+node that is fixed is mapped before annealing begins and simply never
+unmapped.
+
