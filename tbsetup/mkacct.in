@@ -31,6 +31,7 @@ my $USERPATH= "$TB/bin";
 my $PBAG    = "$TB/sbin/paperbag";
 my $SSH     = "$TB/bin/sshtb";
 my $USERADD = "/usr/sbin/pw useradd";
+my $USERDEL = "/usr/sbin/pw userdel";
 my $USERMOD = "/usr/sbin/pw usermod";
 my $CHPASS  = "/usr/bin/chpass";
 my $KEYGEN  = "/usr/bin/ssh-keygen";
@@ -42,6 +43,11 @@ my $logname;
 my $user;
 my @db_row;
 my $query_result;
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
 
 #
 # We don't want to run this script unless its the real version.
@@ -155,7 +161,7 @@ if ($auditmode) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.home_pubkey,m.pid ".
+		 " u.usr_email,u.status,m.pid ".
 		 " from users as u ".
 		 "left join group_membership as m ".
 		 " on u.uid=m.uid and m.pid=m.gid ".
@@ -169,8 +175,36 @@ my $pswd        = $db_row[0];
 my $user_number = $db_row[1]; 
 my $fullname    = $db_row[2];
 my $user_email  = $db_row[3];
-my $user_pubkey = $db_row[4];
+my $status      = $db_row[4];
 my $defpid      = $db_row[5];
+
+if ($status eq USERSTATUS_FROZEN ||
+    $status eq USERSTATUS_NEWUSER ||
+    $status eq USERSTATUS_UNAPPROVED) {
+    #
+    # All this stuff must be done as root (ssh).
+    #
+    $UID = $EUID;
+
+    if ($control_node ne $BOSSNODE) {
+	print "Removing user $user from $control_node.\n";
+	if (system("$SSH -host $control_node '$USERDEL $user'") &&
+	    (($? >> 8) != 67)) {
+	    fatal("Could not remove user $user from $control_node.\n");
+	}
+    }
+
+    print "Removing user $user from local node.\n";
+    if (system("$USERDEL $user") && (($? >> 8) != 67)) {
+	fatal("Could not remove user $user from local node.");
+    }
+    exit(0);
+}
+
+if (!defined($defpid)) {
+    die("*** $0:\n".
+	"    $user is not in any projects!\n");
+}
 
 #
 # Unix info for users default group.
@@ -182,11 +216,6 @@ if (! TBGroupUnixInfo($defpid, $defpid,
 		      \$default_groupgid, \$default_groupname)) {
     fatal("No info for default project $defpid!");
 }
-
-#
-# Note hardwired control node. 
-# 
-my $control_node = $CONTROL;
 
 #
 # All this stuff must be done as root (ssh).
