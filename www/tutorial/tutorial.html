@@ -142,10 +142,10 @@ and including a file that allow you to use the special
 <p>
 Then define the 4 nodes in the topology.
 	<code><pre>
-	set NodeA [$ns node]
-	set NodeB [$ns node]
-	set NodeC [$ns node]
-	set NodeD [$ns node]			</code></pre>
+	set nodeA [$ns node]
+	set nodeB [$ns node]
+	set nodeC [$ns node]
+	set nodeD [$ns node]			</code></pre>
 </p>
 
 <p>
@@ -171,8 +171,8 @@ Operating System is booted on your nodes. We currently support FreeBSD
 Emulab PCs. By default, our most recent Linux image is selected.
 
 	<code><pre>
-	tb-set-node-os $NodeA FBSD-STD
-	tb-set-node-os $NodeC RHL-STD</code></pre>
+	tb-set-node-os $nodeA FBSD-STD
+	tb-set-node-os $nodeC RHL-STD</code></pre>
 
 <p>
 In a topology like this, you will likely want to communicate between
@@ -312,7 +312,7 @@ similar to this:
 A few points should be noted:
 <ul>
 <li> A single delay node was allocated and inserted into the link
-     between NodeA and NodeB. This link is invisible from your
+     between nodeA and nodeB. This link is invisible from your
      perspective, except for the fact that it adds latency, error,
      or reduced bandwidth. However, the information for the delay links
      are included so that you can
@@ -721,8 +721,8 @@ You may also specify the <em>name</em> of the barrier.
 /usr/testbed/bin/emulab-sync -n mybarrier		</code></pre>
 
 This allows multiple barriers to be in use at the same time. Scripts
-on NodeA and NodeB can be waiting on a barrier named "foo" while
-(other) scripts on NodeA and NodeC can be waiting on a barrier named
+on nodeA and nodeB can be waiting on a barrier named "foo" while
+(other) scripts on nodeA and nodeC can be waiting on a barrier named
 "bar."  You may reuse an existing barrier (including the default
 barrier) once it has been released (all clients arrived and woken up).
 <p>
@@ -1137,8 +1137,8 @@ default images as a base, goes like this:
      For example, one of the following statements:
 
      <code><pre>
-     tb-set-node-os $NodeA FBSD-STD
-     tb-set-node-os $NodeA RHL-STD		</code></pre>
+     tb-set-node-os $nodeA FBSD-STD
+     tb-set-node-os $nodeA RHL-STD		</code></pre>
 
 <li> After your experiment has swapped in (you have received the email
      saying it is running), log into the node and load all of the RPMS
