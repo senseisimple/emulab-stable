@@ -67,8 +67,8 @@ $db = $::db;
 
 sub tb_prerun {
     my ($cmd,$exitcode) = @_;
-    print "$cmd $pid $eid nsfile.ns\n";
-    open(TBEXEC,"$cmd $pid $eid nsfile.ns 2>&1 |");
+    print "$cmd -force $pid $eid nsfile.ns\n";
+    open(TBEXEC,"$cmd -force $pid $eid nsfile.ns 2>&1 |");
     while (<TBEXEC>) {
 	print $_;
     }
@@ -110,8 +110,8 @@ sub tb_compare {
 
 sub tb_run {
     my ($cmd,$exitcode) = @_;
-    print "$cmd $pid $eid\n";
-    open(TBEXEC,"$cmd $pid $eid 2>&1 |");
+    print "$cmd -force $pid $eid\n";
+    open(TBEXEC,"$cmd -force $pid $eid 2>&1 |");
     while (<TBEXEC>) {
 	print $_;
     }
