@@ -29,6 +29,7 @@ doc/* contains documentation for developers.
 www/*.html and www/doc/*.html contain end-user documentation.
 
 Good places to start would include:
+  - The doc/papers directory, which contains papers published about Nebed
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
