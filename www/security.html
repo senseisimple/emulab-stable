@@ -119,6 +119,75 @@ experimental traffic from accidentally making it to the 'real world' (say,
 through routing misconfiguration.) These restrictions are not present on the
 experimental net.
 </p>
+
+<h3>Ports used by Emulab</h3>
+
+<p>
+If you wish to do firewalling of your own on your nodes, you should be aware
+that there are several ports used by Emulab that you'll need to keep open if you
+want your nodes to be able to function as "normal" Emulab nodes.
+</p>
+
+<p>
+In the table below, a direction of 'out' measn that your node needs to be able
+to make outgoing TCP connections to a port, 'in' means that it needs to accept
+incoming connections on a port, and 'both' indcates UDP ports on which you must
+be able to send out packets and receive the replies.
+</p>
+
+<table>
+    <tr><th>Host</th><th>Port</th><th>Protocol</th><th>Direction</th><th>Reason</th></tr>
+    <tr>
+	<td>boss</td>
+	<td>22</td>
+	<td>TCP</td>
+	<td>in</td>
+	<td>ssh in from boss to reboot nodes</td>
+    </tr>
+    <tr>
+	<td>boss</td>
+	<td>53</td>
+	<td>UDP</td>
+	<td>both</td>
+	<td>DNS queries and replies</td>
+    </tr>
+    <tr>
+	<td>boss</td>
+	<td>123</td>
+	<td>UDP</td>
+	<td>both</td>
+	<td>NTP</td>
+    </tr>
+    <tr>
+	<td>boss</td>
+	<td>2917</td>
+	<td>TCP</td>
+	<td>out</td>
+	<td>elvin, the event system used by the testbed</td>
+    </tr>
+    <tr>
+	<td>boss</td>
+	<td>7777</td>
+	<td>TCP/UDP</td>
+	<td>out</td>
+	<td>tmcd, from which nodes get configuration information</td>
+    </tr>
+    <tr>
+	<td>ops</td>
+	<td>&lt;1024</td>
+	<td>UDP</td>
+	<td>both</td>
+	<td>portmapper/mountd for NFS, and syslogd for login records</td>
+    </tr>
+    <tr>
+	<td>ops</td>
+	<td>2049</td>
+	<td>UDP</td>
+	<td>both</td>
+	<td>NFS</td>
+    </tr>
+</table>
+
 <h3>Accounts</h3>
 
 <p>
