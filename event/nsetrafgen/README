@@ -9,7 +9,7 @@ b) NSE executable file. To build it the first time, chdir to
    ./nse-install
 
 c) Then do a
-   cp nse nseinput.tcl startnse <sup_directory>
+   cp nse nseinput.tcl startnse init.tcl <sup_directory>
 
 The current NSE trafgen comes with a major caveat:
 

@@ -11,6 +11,7 @@ use English;
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+$ENV{'TCL_LIBRARY'} = '/etc/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -32,10 +33,12 @@ use libsetup;
 
 chdir "/etc/testbed";
 $id = `id`;
+($vnode,$eid,$pid) = split (/\./, `hostname`);
+$logpath = "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
 if( $id =~ /uid=(\d+)/ ) {
     if( $1 ne "0" ) {
-        system("sudo nse nseinput.tcl");
+        system("sudo nse nseinput.tcl >>& $logpath");
     } else {
-        system("nse nseinput.tcl");
+        system("nse nseinput.tcl >>& $logpath");
     }
 }

@@ -6,4 +6,5 @@ if [ ! -d ns-2 ]; then
     cd ns-2
     ./install
     cp ns-2.1b8a/nse ..
+    cp lib/tcl8.3/init.tcl ..
 fi
