@@ -21,6 +21,7 @@ $| = 1; # Turn off line buffering on output
 use English;
 use SNMP;
 use snmpit_lib;
+use Socket;
 
 #
 # These are the commands that can be passed to the portControl function
@@ -1459,6 +1460,83 @@ sub getFields($$$) {
     }
 
     return @return;
+}
+
+#
+# Tell the switch to dump its configuration file to the specified file
+# on the specified server, via TFTP
+#
+# Usage: writeConfigTFTP($server, $filename). The server can be either a
+#        hostname or an IP address. The destination filename must exist and be
+#        world-writable, or TFTP will refuse to write to it
+# Returns: 1 on success, 0 otherwise
+#
+sub writeConfigTFTP($$$) {
+    my ($self,$server,$filename) = @_;
+    
+    #
+    # TODO - convert from Fatal() to Warn() calls
+    #
+
+    #
+    # The MIB this function currently uses is only supported on CatOS. IOS
+    # actually has a better one (CISCO-CONFIG-COPY-MIB), so we'll be able to
+    # support it in the future
+    #
+    if ($self->{OSTYPE} ne "CatOS") {
+	warn "writeConfigTFTP only supported on CatOS\n";
+	return 0;
+    }
+
+    #
+    # Start off by resolving the server's name into an IP address
+    #
+    my $ip = inet_aton($server);
+    if (!@ip) {
+	warn "Unable to lookup hostname $server\n";
+	return 0;
+    }
+
+    $ipstr = join(".",unpack('C4',$ip));
+
+    #
+    # Set up a few values on the switch to tell it where to stick the config
+    # file
+    #
+    my $setHost = ["tftpHost",0,$ipstr,"STRING"];
+    my $setFilename = ["tftpFile",0,$filename,"STRING"];
+
+    snmpitSetFatal($self->{SESS},$setHost);
+    snmpitSetFatal($self->{SESS},$setFilename);
+
+    #
+    # Okay, go!
+    #
+    my $tftpGo = ["tftpAction","0","uploadConfig","INTEGER"];
+    snmpitSetFatal($self->{SESS},$tftpGo);
+
+    #
+    # Poll to see if it suceeded - wait for a while, but not forever!
+    #
+    my $tftpResult = ["tftpResult",0];
+    my $iters = 0;
+    my $rv;
+    while (($rv = snmpitGetFatal($self->{SESS},$tftpResult))
+	eq "inProgress" && ($iters < 30)) {
+	$iters++;
+	sleep(1);
+    }
+    if ($iters == 30) {
+	warn "TFTP write took longer than 30 seconds!";
+	return 0;
+    } else {
+	if ($rv ne "success") {
+	    warn "TFTP write failed with error $rv\n";
+	    return 0;
+	} else {
+	    return 1;
+	}
+    }
 }
 
 #
