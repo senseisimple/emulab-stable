@@ -22,8 +22,8 @@ define("CHECKLOGIN_NOTLOGGEDIN",	0);
 define("CHECKLOGIN_LOGGEDIN",		1);
 define("CHECKLOGIN_TIMEDOUT",		2);
 define("CHECKLOGIN_MAYBEVALID",		4);
-define("CHECKLOGIN_STATUSMASK",		0x000ff);
-define("CHECKLOGIN_MODMASK",		0xfff00);
+define("CHECKLOGIN_STATUSMASK",		0x0000ff);
+define("CHECKLOGIN_MODMASK",		0xffff00);
 #
 # These are modifiers of the above status fields. They are stored
 # as a bit field in the top part. This is intended to localize as
