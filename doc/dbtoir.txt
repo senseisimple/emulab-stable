@@ -145,6 +145,7 @@ virt_nodes:
 pid
 eid
 virtual name
+type		Indexed into node_types
 ips		This is a list of <port>:<ip>
 osid
 cmd_line
@@ -253,9 +254,9 @@ testbed chris	n3	0	eth2
 
 We now generate the vlans table:
 
-id     pid	eid	virtual	type	members
-0      testbed	chris	lan1	lan	pc33:eth0 pc19:eth1
-1      testbed	chris	link1	link	pc19:eth3 pc2:eth0
+id     pid	eid	virtual	members
+0      testbed	chris	lan1	pc33:eth0 pc19:eth1
+1      testbed	chris	link1	pc19:eth3 pc2:eth0
 
 Finally we fill in the reserved and interfaces table:
 
