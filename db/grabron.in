@@ -49,9 +49,9 @@ if ($result->num_rows() != 1){
 }
 my ($localIface) = ($result->fetchrow());
 
-#if (TBBackGround($logfile)) {
-#   exit(0);
-#
+if (TBBackGround($logfile)) {
+   exit(0);
+}
 
 #
 # Start out with the the last $interval seconds
