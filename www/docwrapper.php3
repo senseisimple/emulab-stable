@@ -24,7 +24,17 @@ if (strstr($docname, "../")) {
     USERERROR("Invalid document name: $docname!", 1);
 }
 
-if (!$printable) {
+if ($printable) {
+    #
+    # Need to spit out some header stuff.
+    #
+    echo "<html>
+          <head>
+  	  <link rel='stylesheet' href='tbstyle-plain.css' type='text/css'>
+          </head>
+          <body>\n";
+}
+else {
 	echo "<b><a href=$REQUEST_URI&printable=1>
                  Printable version of this document</a></b><br>";
 }
@@ -34,7 +44,11 @@ readfile("$docname");
 #
 # Standard Testbed Footer
 # 
-if (!$printable) {
+if ($printable) {
+    echo "</body>
+          </html>\n";
+}
+else {
     PAGEFOOTER();
 }
 ?>
