@@ -226,14 +226,20 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("Update User Information",
 			       $TBBASE, "moduserinfo.php3");
 	}
-    }
-
-    #
-    # Standard options for anyone.
-    #
-    if (! NOLOGINS()) {
+	#
+	# Standard options for logged in users!
+	# 
 	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject.php3");
 	WRITESIDEBARLASTBUTTON("Join Project",  $TBBASE, "joinproject.php3");
+    }
+    else {
+        #
+        # Standard options for anyone else not logged in.
+        #
+        if (! NOLOGINS()) {
+	    WRITESIDEBARLASTBUTTON("Request Account",
+				   $TBBASE, "reqaccount.php3");
+	}
     }
 
     #

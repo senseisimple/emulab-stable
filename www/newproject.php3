@@ -63,6 +63,13 @@ function SPITFORM($formfields, $returning, $errors)
              Read this for more info.</a>
           </font></center><br>\n";
 
+    if (! $returning) {
+	echo "<center><font size=+1>
+               If you already have an Emulab account, <a href=login.php3>
+               please log on first!</a>
+              </font></center><br>\n";
+    }
+
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
