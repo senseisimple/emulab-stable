@@ -1,18 +1,20 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
 
 #
-# Remember our server IP as the boss IP
+# Remember our server IP, real hostname, router IP, etc.
 #
-rm -f $BOOTDIR/bossip
-if [ x"$reason" = xREBOOT ]; then
+if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || [ x$reason = xRENEW ]
+then
 	echo $new_dhcp_server_identifier > $BOOTDIR/bossip
 	echo $new_host_name > $BOOTDIR/realname
+	echo $new_routers > $BOOTDIR/routerip
+	echo $new_ip_address > $BOOTDIR/myip
 fi
 
 #
@@ -25,7 +27,8 @@ $BINDIR/sethostname $new_domain_name
 # Once we have an IP address, we can stop dhclient so that it doesn't get
 # in the way 
 #
-if [ x"$reason" = xREBOOT ]; then
+if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || [ x$reason = xRENEW ]
+then
 	# I'd love to use the dhclient.pid file, but it helpfully has not been
 	# created at this point
 	killall dhclient
