@@ -135,7 +135,7 @@ function SPITFORM($formfields, $errors)
 	echo "<tr>
                   <td rowspan>*Your NS file: &nbsp</td>
 
-                  <td rowspan><center>Upload (20K max)<br>
+                  <td rowspan><center>Upload (20K max)[<b>1</b>]<br>
                                    <br>
                                    Or<br>
                                    <br>
@@ -162,7 +162,7 @@ function SPITFORM($formfields, $errors)
     # Swappable?
     # 
     echo "<tr>
-  	      <td colspan=2>Swappable?[<b>1</b>]:</td>
+  	      <td colspan=2>Swappable?[<b>2</b>]:</td>
               <td class=left>
                   <input type=checkbox
                          name=\"formfields[exp_swappable]\"
@@ -180,7 +180,7 @@ function SPITFORM($formfields, $errors)
     # Priority
     #
     echo "<tr>
-	      <td colspan=2>Priority[<b>2</b>]:</td>
+	      <td colspan=2>Priority[<b>3</b>]:</td>
               <td class=left>\n";
 
     reset($priorities);
@@ -202,7 +202,7 @@ function SPITFORM($formfields, $errors)
     # Select a group
     # 
     echo "<tr>
-              <td colspan=2>Group[<b>3</b>]:</td>
+              <td colspan=2>Group[<b>4</b>]:</td>
               <td><select name=\"formfields[exp_gid]\">
                     <option value=''>Default Group </option>\n";
 
@@ -233,7 +233,7 @@ function SPITFORM($formfields, $errors)
     # Batch Experiment?
     #
     echo "<tr>
-  	      <td colspan=2>Batch Experiment?[<b>4</b>]:</td>
+  	      <td colspan=2>Batch Experiment?[<b>5</b>]:</td>
               <td class=left>
                   <input type=checkbox
                          name=\"formfields[exp_batched]\"
@@ -256,6 +256,10 @@ function SPITFORM($formfields, $errors)
 
     echo "<blockquote><blockquote><blockquote>
           <ol>
+             <li>Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:
+                 The file upload mechanism is broken in Opera, so you cannot
+                 specify a local file for upload. Instead, please specify a
+                 file that is resident on the server. 
              <li>Check if your experiment can be swapped out and swapped back 
 	         in without harm to your experiment. Useful for scheduling when
 	         resources are tight. More information on swapping
