@@ -9,14 +9,17 @@ use IO::Handle;     # thousands of lines just for autoflush :-(
 #
 sub usage()
 {
-    print("Usage: staticroutes [-n] [-d] [-f] [-t] <pid> <eid>\n".
+    print("Usage: staticroutes [-n [-s|-l|-b]] [-d] [-f] [-t] <pid> <eid>\n".
 	  "       Use -n to print routes, but leave the DB alone.\n".
+	  "       Use -s (with -n) to print routes in NS format.\n".
+	  "       Use -b (with -n) to print routes in Freebsd format.\n".
+	  "       Use -l (with -n) to print routes in Linux format.\n".
 	  "       Use -d to turn on debugging output.\n".
 	  "       Use -t to optimize network routes.\n".
 	  "       Use -f to force route calculation; ignore 'static' flag.\n");
     exit(-1);
 }
-my  $optlist = "dnft";
+my  $optlist = "dnftslb";
 
 #
 # Configure variables
@@ -29,6 +32,7 @@ my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
 my $force	= 0;
 my $optimize    = 0;
+my $format      = "";
 
 #
 # Testbed Support libraries
@@ -68,6 +72,18 @@ if (defined($options{"f"})) {
 }
 if (defined($options{"t"})) {
     $optimize = 1;
+}
+if (defined($options{"s"})) {
+    $format = "ns";
+}
+if (defined($options{"b"})) {
+    $format = "bsd";
+}
+if (defined($options{"l"})) {
+    $format = "suxs";
+}
+if ($format && !$impotent) {
+    usage();
 }
 
 my $pid = $ARGV[0];
@@ -382,12 +398,39 @@ foreach my $route (keys(%routes)) {
 	}
     }
 
-    if ($debug || $impotent) {
-	printf("%s: %-23s --> %-23s - %s\n",
-	       ($type eq "net" ? "n" : "h"),
-	       "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+    if ($impotent) {
+	if ($debug) {
+	    printf(STDERR "%s: %-23s --> %-23s - %s\n",
+		   ($type eq "net" ? "n" : "h"),
+		   "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+	}
+	if ($format eq "ns") {
+	    print "\$${src} add-route ";
+	    if ($type eq "host") {
+		print "\$${dst} \$${hop}\n";
+	    }
+	    else {
+		print "\$${dstlan} \$${hop}\n";
+	    }
+	}
+	elsif ($format eq "bsd") {
+	    if ($type eq "host") {
+		print "route add -host $dstip $hopip\n";
+	    }
+	    else {
+		print "route add -net $dstip $hopip $NETMASK\n";
+	    }
+	}
+	elsif ($format eq "suxs") {
+	    if ($type eq "host") {
+		print "route add -host $dstip gw $hopip\n";
+	    }
+	    else {
+		print "route add -net $dstip netmask $NETMASK gw $hopip\n";
+	    }
+	}
     }
-    if (! $impotent) {
+    else {
 	DBQueryFatal("insert into virt_routes ".
 		     " (pid,eid,vname,dst,nexthop,dst_type) ".
 		     " values ('$pid', '$eid', '$src', '$dstip', ".
