@@ -1063,6 +1063,7 @@ COMMAND_PROTOTYPE(doifconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
+	char		clause[BUFSIZ];
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
@@ -1080,18 +1081,18 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * For Virtual Nodes, we return interfaces that belong to it.
 	 */
 	if (reqp->isvnode && !reqp->issubnode)
-		sprintf(buf, "vnode_id='%s'", reqp->vnodeid);
+		sprintf(clause, "vnode_id='%s'", reqp->vnodeid);
 	else
-		strcpy(buf, "vnode_id is NULL");
+		strcpy(clause, "vnode_id is NULL");
 
 	/*
 	 * Find all the interfaces.
 	 */
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
-			 " IPaliases,iface,role,mask,rtabid "
+			 " IPaliases,iface,role,mask,rtabid,interface_type "
 			 "from interfaces where node_id='%s' and %s",
-			 11, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
-			 buf);
+			 12, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+			 clause);
 
 	/*
 	 * We need pnodeid in the query. But error reporting is done
@@ -1111,6 +1112,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			int  card    = atoi(row[0]);
 			char *iface  = row[7];
 			char *role   = row[8];
+			char *type   = row[11];
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
@@ -1139,9 +1141,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			if (vers < 10)
 				bufp += OUTPUT(bufp, ebufp - bufp,
 					       "INTERFACE=%d ", card);
-			else
+			else if (vers <= 15)
 				bufp += OUTPUT(bufp, ebufp - bufp,
 					       "IFACETYPE=eth ");
+			else
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       "INTERFACE IFACETYPE=%s ", type);
 
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
@@ -1185,6 +1190,40 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	mysql_free_result(res);
 
+	/*
+	 * Interface settings.
+	 */
+	if (vers >= 16) {
+		res = mydb_query("select i.MAC,s.capkey,s.capval "
+				 "from interface_settings as s "
+				 "left join interfaces as i on "
+				 "     s.node_id=i.node_id and s.iface=i.iface "
+				 "where s.node_id='%s' and %s ",
+				 3,
+				 reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+				 clause);
+
+		if (!res) {
+			error("IFCONFIG: %s: "
+			      "DB Error getting interface_settings!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		nrows = (int)mysql_num_rows(res);
+		while (nrows) {
+			row = mysql_fetch_row(res);
+
+			sprintf(buf, "INTERFACE_SETTING MAC=%s "
+				"KEY='%s' VAL='%s'\n",
+				row[0], row[1], row[2]);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("IFCONFIG: %s", buf);
+			nrows--;
+		}
+		mysql_free_result(res);
+	}
+
 	/* Veth interfaces are new. */
 	if (vers < 10)
 		return 0;
@@ -1227,6 +1266,10 @@ COMMAND_PROTOTYPE(doifconfig)
 	while (nrows) {
 		char *bufp   = buf;
 		row = mysql_fetch_row(res);
+
+		if (vers >= 16) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "INTERFACE ");
+		}
 
 		/*
 		 * Note that PMAC might be NULL, which happens if there is
