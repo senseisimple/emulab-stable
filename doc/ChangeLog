@@ -139,7 +139,25 @@ stoller     2003/06/23 13:55:30 MDT
   1.11      +17 -0     testbed/cdrom/waboot/register.pl
   1.8       +77 -4     testbed/cdrom/waboot/waipconfig.pl
 
+stoller     2003/05/22 15:35:51 MDT
 
+  Modified files:
+    db                   libdb.pm.in 
+    tbsetup              batch_daemon.in batchexp.in endexp.in 
+                         swapexp.in 
+    www                  beginexp.php3 swapexp.php3 
+  Log:
+  Reorg the batch system slightly as per Eric's request that batch mode
+  experiments look more like regular experiments. Batch mode experiments
+  can now be preloaded and swapped. When preloaded, they go into a
+  "Pause" state. Swapping a batch mode experiment in puts them into the
+  "posted" state so the batch daemon will see them. Swapping out a
+  batchmode experiment does the expected; it puts them back into the
+  Pause state. Terminating a batch mode experiment does the expected;
+  its gone. When a batch mode experiment finishes normally, it goes back
+  into the pause state, which allows batches to be reinjected as many
+  times as Eric likes.
+	
 stoller     2003/05/1 09:09:12 MDT
 	
   Modified files:
