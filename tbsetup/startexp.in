@@ -391,7 +391,9 @@ sub fatal()
     # 
     DBQueryWarn("DELETE from experiments WHERE eid='$eid' and pid='$pid'");
     DBQueryWarn("DELETE from nsfiles WHERE eid='$eid' and pid='$pid'");
-
+    DBQueryWarn("DELETE from exppid_access ".
+		"WHERE exp_eid='$eid' and exp_pid='$pid'");
+    
     #
     # In batch mode, exit. Make sure to delete tempns file. 
     #

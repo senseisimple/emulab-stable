@@ -26,7 +26,7 @@ my $exportstail = "/var/tmp/exports.tail";
 my $lockfile    = "/var/tmp/testbed_exports_lockfile";
 my $projdir     = "/q/proj";
 my $usersdir    = "/users";
-my $dbg		= 0;
+my $dbg		= 1;
 my @row;
 
 #
@@ -94,8 +94,10 @@ print MAP "\n";
 # card.
 #
 $db_result =
-    DBQueryFatal("select reserved.node_id,reserved.pid,interfaces.IP ".
+    DBQueryFatal("select reserved.node_id,reserved.pid,interfaces.IP,a.pid ".
 		 "from reserved ".
+		 "left join exppid_access as a ".
+		 " on a.exp_pid=reserved.pid and a.exp_eid=reserved.eid ".
 		 "left join nodes on reserved.node_id=nodes.node_id ".
 		 "left join node_types on node_types.type=nodes.type ".
 		 "left join interfaces on reserved.node_id=interfaces.node_id".
@@ -104,38 +106,82 @@ $db_result =
 		 "order by reserved.pid,interfaces.IP");
 
 #
-# Generate a per project directory line, listing all of the nodes for
-# that project. We could do it one per line, but too messy.
+# Go through and build up a list of exported mounts for each IP. 
 #
-if ($db_result->numrows > 0) {
-    my $lastpid  = 0;
-    my @hostlist = ();
-    
-    print MAP "#\n";
-    print MAP "# Export Project directories\n";
-    print MAP "#\n";
+my %iphash = ();
+my @iplist = ();
 
-    while (@row = $db_result->fetchrow_array) {
-	my $node_id = $row[0];
-	my $pid     = $row[1];
-	my $ip      = $row[2];
+while (@row = $db_result->fetchrow_array) {
+    my $node_id = $row[0];
+    my $pid     = $row[1];
+    my $ip      = $row[2];
+    my $subpid  = $row[3];
 
-	if (!$lastpid) {
-	    $lastpid = $pid;
-	    push(@hostlist, $ip);
-	    next;
+    if (! defined($iphash{$ip})) {
+	$iphash{$ip} = [ $pid ];
+	push(@iplist, $ip);
+
+	if (defined($subpid)) {
+	    push(@{ $iphash{$ip} }, $subpid);
 	}
-
-	if ($pid ne $lastpid) {
-	    print MAP "$projdir/$lastpid $projdir/$lastpid/images ".
-		      "-maproot=root @hostlist\n";
-	    @hostlist = ();
-	    $lastpid = $pid;
-	}
-	push(@hostlist, $ip);
     }
-    print MAP "$projdir/$lastpid $projdir/$lastpid/images ".
-	      "-maproot=root @hostlist\n";
+    else {
+	if (defined($subpid)) {
+	    push(@{ $iphash{$ip} }, $subpid);
+	}
+    }
+}
+
+#
+# Sort each of the lists of projects (per IP). 
+# 
+foreach my $ip ( @iplist ) {
+    my @pids = @{ $iphash{$ip} };
+
+    $iphash{$ip} = [ sort( @pids ) ];
+}
+
+#
+# Next go through and combine sequential IPs that have exactly the same set
+# of exports. Not perfect, but should result in a big enough reduction for
+# now. At some point we should have our own exportfs program do this stuff
+# instead of going through mountd.
+#
+# Shift off the first IP to initialize the sequence.
+#
+my @ipseq    = ( shift(@iplist) );
+my @lastpids = @{ $iphash{$ipseq[0]} };
+
+print MAP "#\n";
+print MAP "# Export Project directories\n";
+print MAP "#\n";
+
+foreach my $ip ( @iplist ) {
+    my @pids = @{ $iphash{$ip} };
+
+    #
+    # Whenever the set changes, spit out what we have saved up, and then
+    # start over. 
+    # 
+    if (! listequal(\@pids, \@lastpids)) {
+	foreach my $pid ( @lastpids ) {
+	    print MAP "$projdir/$pid $projdir/$pid/images ";
+	}
+	print MAP "-maproot=root @ipseq\n";
+	@ipseq = ();
+    }
+    push(@ipseq, $ip);
+    @lastpids = @pids;
+}
+
+#
+# Last set of IPs.
+#
+if (@ipseq) {
+    foreach my $pid ( @lastpids ) {
+	print MAP "$projdir/$pid $projdir/$pid/images ";
+    }
+    print MAP "-maproot=root @ipseq\n";
 }
 
 #
@@ -152,9 +198,12 @@ if ($db_result->numrows > 0) {
 #       /users/mike                101.101.101.103
 #
 $db_result =
-   DBQueryFatal("select reserved.node_id,reserved.pid,".
+   DBQueryFatal("select distinct reserved.node_id,reserved.pid,".
 		"proj_memb.uid,interfaces.IP from reserved ".
+		"left join exppid_access as a ".
+		" on a.exp_pid=reserved.pid and a.exp_eid=reserved.eid ".
 		"left join proj_memb on proj_memb.pid=reserved.pid ".
+		" or proj_memb.pid=a.pid ".
 		"left join nodes on reserved.node_id=nodes.node_id ".
 		"left join node_types on node_types.type=nodes.type ".
 		"left join interfaces on reserved.node_id=interfaces.node_id ".
@@ -162,62 +211,74 @@ $db_result =
 		"where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
 		"order by reserved.pid,reserved.node_id");
 
-#
-# Generate a per user directory line, listing all of the nodes for
-# that user. We could do it one per line, but too messy.
-#
-if ($db_result->numrows > 0) {
-    my $lastpid = 0;
-    my %hostlist = ();
-    my %userlist = ();
-    
-    print MAP "#\n";
-    print MAP "# Export User directories\n";
-    print MAP "#\n";
+%iphash = ();
+@iplist = ();
 
-    while (@row = $db_result->fetchrow_array) {
-	my $node     = $row[0];
-	my $pid      = $row[1];
-	my $uid      = $row[2];
-	my $ip       = $row[3];
+while (@row = $db_result->fetchrow_array) {
+    my $node_id = $row[0];
+    my $pid     = $row[1];
+    my $uid     = $row[2];
+    my $ip      = $row[3];
 
-	if (!$lastpid) {
-	    $lastpid         = $pid;
-	    $hostlist{$ip}   = $ip;
-	    $userlist{$uid}  = $uid;
-	    next;
-	}
-
-	if ($pid ne $lastpid) {
-	    foreach my $user (keys(%userlist)) {
-		print MAP "$usersdir/$user ";
-	    }
-	    print MAP "-maproot=root ";
-	    
-	    foreach my $host (keys(%hostlist)) {
-		print MAP "$host ";
-	    }
-	    print MAP "\n";
-
-	    %hostlist = ();
-	    %userlist = ();
-	    $lastpid = $pid;
-	}
-	$hostlist{$ip}   = $ip;
-	$userlist{$uid}  = $uid
+    if (! defined($iphash{$ip})) {
+	$iphash{$ip} = [ $uid ];
+	push(@iplist, $ip);
     }
+    else {
+	push(@{ $iphash{$ip} }, $uid);
+    }
+}
+
+#
+# Sort each of the lists of users (per IP). 
+# 
+foreach my $ip ( @iplist ) {
+    my @uids = @{ $iphash{$ip} };
+
+    $iphash{$ip} = [ sort( @uids ) ];
+}
+
+#
+# Next go through and combine sequential IPs that have exactly the same set
+# of exports. Not perfect, but should result in a big enough reduction for
+# now. At some point we should have our own exportfs program do this stuff
+# instead of going through mountd.
+#
+# Shift off the first IP to initialize the sequence.
+#
+@ipseq       = ( shift(@iplist) );
+my @lastuids = @{ $iphash{$ipseq[0]} };
+
+print MAP "#\n";
+print MAP "# Export User directories\n";
+print MAP "#\n";
+
+foreach my $ip ( @iplist ) {
+    my @uids = @{ $iphash{$ip} };
+
     #
-    # Last project set
+    # Whenever the set changes, spit out what we have saved up, and then
+    # start over. 
     # 
-    foreach my $user (keys(%userlist)) {
-	print MAP "$usersdir/$user ";
+    if (! listequal(\@uids, \@lastuids)) {
+	foreach my $uid ( @lastuids ) {
+	    print MAP "$usersdir/$uid ";
+	}
+	print MAP "-maproot=root @ipseq\n";
+	@ipseq = ();
     }
-    print MAP "-maproot=root ";
-	    
-    foreach my $host (keys(%hostlist)) {
-	print MAP "$host ";
+    push(@ipseq, $ip);
+    @lastuids = @uids;
+}
+
+#
+# Last set of IPs.
+#
+if (@ipseq) {
+    foreach my $uid ( @lastuids ) {
+	print MAP "$usersdir/$uid ";
     }
-    print MAP "\n";
+    print MAP "-maproot=root @ipseq\n";
 }
 
 print MAP "\n";
@@ -247,3 +308,22 @@ sub fatal {
     SENDMAIL($TBOPS, "TESTBED: Exports Setup Failed", $msg);
     die($msg);
 }
+
+#
+# Compare two lists of tokens.
+# 
+sub listequal ($$)
+{
+    my($lista, $listb) = @_;
+
+    if (@$lista != @$listb) {
+	return 0;
+    }
+    for ($i = 0; $i < @$lista; $i++) {
+	if ($$lista[$i] ne $$listb[$i]) {
+	    return 0;
+	}
+    }
+    return 1;
+}
+
