@@ -293,8 +293,13 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $access_type == $TB_PROJECT_CREATEEXPT) {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
-    elseif ($access_type == $TB_PROJECT_ADDUSER ||
-	    $access_type == $TB_PROJECT_EDITGROUP) {
+    elseif ($access_type == $TB_PROJECT_ADDUSER) {
+	#
+	# Allow delegation of approving users to group_root in main group.
+	#
+	$mintrust = $TBDB_TRUST_GROUPROOT;
+    }
+    elseif ($access_type == $TB_PROJECT_EDITGROUP) {
 	if (strcmp($gid, $pid) == 0) {
 	    $mintrust = $TBDB_TRUST_PROJROOT;
 	}
