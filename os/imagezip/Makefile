@@ -7,3 +7,6 @@ imagezip: imagezip.c
 
 install: imagezip
 	install -c imagezip /usr/testbed/bin
+
+clean:
+	/bin/rm -f *.o imagezip

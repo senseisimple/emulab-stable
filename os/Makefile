@@ -8,3 +8,6 @@ key7: key7.c
 
 key8: key8.c
 	$(CC) $(CFLAGS) -o key8 key8.c
+
+clean:
+	/bin/rm -f *.o key7 key8
