@@ -525,6 +525,12 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
       if (dest_pv == pv) {
 	SDEBUG(cerr << "  trivial link" << endl);
+	if (!allow_trivial_links) {
+	    SADD(SCORE_NO_CONNECTION);
+	    vlink->no_connection=true;
+	    vinfo.no_connection++;
+	    violated++;
+	}
 	vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
       } else {
 	SDEBUG(cerr << "   finding link resolutions" << endl);

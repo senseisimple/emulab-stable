@@ -168,6 +168,12 @@ int iters_to_best = 0;		// iters
 
 int npnodes;
 
+// Whether or not assign is allowed to generate trivial links
+bool allow_trivial_links = true;
+
+// Whether or not assign should use pclasses
+bool use_pclasses = true;
+
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
 inline int accept(double change, double temperature)
@@ -1517,9 +1523,11 @@ void print_help()
   cerr << "  -s <seed>   - Set the seed." << endl;
   cerr << "  -v <viz>    - Produce graphviz files with given prefix." <<
     endl;
+  cerr << "  -r          - Don't allow trivial links." << endl;
+  cerr << "  -p          - Disable pclasses." << endl;
   exit(0);
 }
-  
+
 int main(int argc,char **argv)
 {
   int seed = 0;
@@ -1529,7 +1537,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rp")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -1553,6 +1561,10 @@ int main(int argc,char **argv)
       }
       break;
 #endif
+    case 'r':
+      allow_trivial_links = false; break;
+    case 'p':
+      use_pclasses = false; break;
     default:
       print_help();
     }

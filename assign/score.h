@@ -19,6 +19,7 @@ typedef struct {
 extern double score;
 extern int violated;
 extern violated_info vinfo;
+extern bool allow_trivial_links;
 
 void init_score();
 void remove_node(vvertex vv);

@@ -54,9 +54,12 @@ struct hashlinkinfo {
 // mapping between links that preserves bw, and destination.
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
-#ifdef NO_PCLASSES
-  return 0;
-#else
+  // We disable pclasses by simply never considering any two nodes to be
+  // equivalent
+  if (!use_pclasses) {
+    return 0;
+  }
+  
   typedef hash_multiset<link_info,hashlinkinfo> link_set;
   
   // check type information
@@ -111,7 +114,6 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   }
   if (b_links.size() != 0) return 0;
   return 1;
-#endif
 }
 
 /* This function takes a physical graph and generates the set of

@@ -1,6 +1,8 @@
 #ifndef __PCLASS_H
 #define __PCLASS_H
 
+// Declared in assign.cc - indicated whether or not we should use pclasses
+extern bool use_pclasses;
 
 // tb pnode list is a data structure that acts like list but has
 // O(1) removal.  It is a list of tb_pnode*.
