@@ -475,9 +475,11 @@ void vmc_handle_update_id(struct mtp_packet *p) {
 
                     // if we get here, we have to add a new track to the 
                     // real_robots list:
-                    real_robots[first_invalid_idx].valid = 1;
-                    real_robots[first_invalid_idx].robot_id = vc->tracks[j].robot_id;
-                    real_robots[first_invalid_idx].position = vc->tracks[j].position;
+                    if (first_invalid_idx != -1) {
+                        real_robots[first_invalid_idx].valid = 1;
+                        real_robots[first_invalid_idx].robot_id = vc->tracks[j].robot_id;
+                        real_robots[first_invalid_idx].position = vc->tracks[j].position;
+                    }
 
                     return;
                 }
@@ -487,7 +489,7 @@ void vmc_handle_update_id(struct mtp_packet *p) {
 
 }
 /* we allow a track to be continued if there is a match within 5 cm */
-#define DIST_THRESHOLD 0.05
+#define DIST_THRESHOLD 0.10
 /* and if pose difference is less than 45 degress */
 #define POSE_THRESHOLD 0.785
 
@@ -518,8 +520,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             //my_pose_delta = p->data.update_position->position.theta - 
             //    vc->tracks[i].position.theta;
             
-            if (fabsf(my_dist_delta) > DIST_THRESHOLD || 
-                fabsf(my_dist_delta) > best_dist_delta) {
+            if (fabsf(my_dist_delta) > best_dist_delta) {
                 continue;
             }
             //if (fabsf(my_pose_delta) > POSE_THRESHOLD ||
@@ -617,28 +618,36 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     if (p->data.update_position->status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
         struct mtp_update_position mup;
         struct mtp_packet *mp;
-
-	mp = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_VMC, &mup);
+        
+        mp = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_VMC, &mup);
         for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
             if (vc->tracks[i].valid && !(vc->tracks[i].updated)) {
                 vc->tracks[i].valid = -1;
             }
-	    else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
-		info("sending update for %d -> %f %f\n",
-		     vc->tracks[i].robot_id,
-		     vc->tracks[i].position.x,
-		     vc->tracks[i].position.y);
-		
-		mup.robot_id = vc->tracks[i].robot_id;
-		mup.position = vc->tracks[i].position;
-		mup.status = MTP_POSITION_STATUS_UNKNOWN;
-		mtp_send_packet(emc_fd, mp);
-	    }
+            else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
+                info("sending update for %d (idx %d)-> %f %f\n",
+                     vc->tracks[i].robot_id,
+                     i,
+                     vc->tracks[i].position.x,
+                     vc->tracks[i].position.y);
+                
+                mup.robot_id = vc->tracks[i].robot_id;
+                mup.position = vc->tracks[i].position;
+                mup.status = MTP_POSITION_STATUS_UNKNOWN;
+                mtp_send_packet(emc_fd, mp);
+            }
         }
-	mtp_free_packet(mp);
-	mp = NULL;
-   }
+        mtp_free_packet(mp);
+        mp = NULL;
 
+        // now we null out all teh updated bits and let the next cycle remove
+        // dups
+        for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
+            vc->tracks[i].updated = 0;
+        }
+
+    }
+    
     // finis!
                                                         
             
