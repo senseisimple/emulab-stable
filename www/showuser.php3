@@ -53,10 +53,12 @@ if (!$isadmin &&
     }
 }
 
-echo "<center><font color=Red size=+1>\n";
-echo "Please see this important <a href=news.php3>news item</a> about
-      <a href=news.php3#47>the current state</a> of Emulab.\n";
-echo "</font></center><br>\n";
+# Modify and uncomment this if there's some especially important news.
+# 
+# echo "<center><font color=Red size=+1>\n";
+# echo "Please see this important <a href=news.php3>news item</a> about
+#       <a href=news.php3#47>the current state</a> of Emulab.\n";
+# echo "</font></center><br>\n";
 
 #
 # Tell the user how many PCs he is using.
