@@ -350,7 +350,11 @@ while (1) {
                 # isn't performed during swapin.
                 if (system("$tbrsync upload $gimagepath $nodelist") == 0) {
                     if (system("$reboot $nodelist") == 0) {
-                        print "tbrsync done at ".`date`;
+                        # rsync and reboot succeeded, so free 'em up.
+                        foreach my $gnode (@{$imagenodes{$imageid}}) {
+                            freefromreloading($gnode);
+                        }
+                        print "garcia reload done at ".`date`;
                         next;
                     }
                     else {
@@ -434,6 +438,26 @@ while (1) {
     next;
 
 
+}
+
+
+#
+# free up the node and clear any assocaited reload DB state.
+# (code stolen from stated).
+#
+sub freefromreloading($) {
+    my $node = shift;
+
+    DBQueryFatal("delete from current_reloads where node_id='$node'");  
+    my ($pid,$eid);
+    NodeidToExp($node,\$pid,\$eid);
+    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
+        DBQueryFatal("delete from scheduled_reloads ".
+                     "where node_id='$node'");
+        DBQueryFatal("delete from reserved where node_id='$node'");
+        TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
+                         $UID, $pid, $eid);
+    }
 }
 
 sub fatal($)
