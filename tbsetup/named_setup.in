@@ -27,7 +27,7 @@ my $USERS	= "@USERNODE@";
 my $DISABLED    = "@DISABLE_NAMED_SETUP@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 
-my $mapdir			= "/tmp/namedb";
+my $mapdir			= "/etc/namedb";
 my $mapfile			= "$mapdir/${OURDOMAIN}.db";
 my $mapfiletail			= "$mapfile.tail";
 my $mapfile_internal		= "$mapdir/${OURDOMAIN}.internal.db";
@@ -411,8 +411,6 @@ while (my $dirent = readdir(DIR)) {
     
 }
 closedir DIR;
-
-exit(0);
 
 #
 # This is better than HUPing the nameserver directly. Notet that we look
