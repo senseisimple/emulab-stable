@@ -188,8 +188,9 @@ def CheckExptPermission(uid, pid, eid):
 # For example experiment.swapexp(...).
 #
 class EmulabServer:
-    def __init__(self, readonly=0):
+    def __init__(self, readonly=0, clientip=None):
         self.readonly  = readonly;
+        self.clientip  = clientip;
         self.instances = {};
         self.uid       = pwd.getpwuid(os.getuid())[0]
 
@@ -203,6 +204,8 @@ class EmulabServer:
         self.instances["imageid"]    = imageid(readonly=self.readonly);
         self.instances["osid"]       = osid(readonly=self.readonly);
         self.instances["node"]       = node(readonly=self.readonly);
+        self.instances["elabinelab"] = elabinelab(clientip=self.clientip,
+                                                  readonly=self.readonly);
         return
 
     def __getattr__(self, name):
@@ -2867,6 +2870,211 @@ class node:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    pass
+
+
+#
+# Hack class to get ElabInElab limping along ... Note that nothing we do
+# in this class can damage anything or mess up anything outside the expt.
+#
+class elabinelab:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self, clientip=None, readonly=0):
+        self.readonly = readonly;
+        self.clientip = clientip;
+        self.VERSION  = VERSION
+        self.uid      = pwd.getpwuid(os.getuid())[0]
+        self.pid      = None;
+        self.eid      = None;
+        return
+
+    #
+    # Anything we do from this class has to include pid/eid, and that
+    # pid/eid has to have it elabinelab bit set, and the uid of the
+    # user invoking the method has to be the creator of the experiment.
+    # This might seem overly pedantic, but its probably how it would
+    # look if this was a standalone RPC server supporting elabinelab.
+    #
+    def verifystuff(self):
+        if self.clientip == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="SSL connections only")
+            
+        res = DBQueryFatal("select i.node_id,r.pid,r.eid,"
+                           "       e.elab_in_elab,e.state,e.expt_head_uid, "
+                           "       v.inner_elab_role "
+                           "  from interfaces as i "
+                           "left join reserved as r on r.node_id=i.node_id "
+                           "left join experiments as e on e.pid=r.pid and "
+                           "     e.eid=r.eid "
+                           "left join virt_nodes as v on v.vname=r.vname and "
+                           "     v.pid=r.pid and v.eid=r.eid "
+                           "where i.IP=%s and i.role='ctrl'",
+                           (self.clientip))
+        
+        # IP must map to a node.
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node for IP: " +
+                                  self.clientip)
+        
+        # Node must be reserved.
+        if res[0][1] == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Node is not reserved: " + res[0][0])
+        
+        # Needed below
+        self.pid = res[0][1]
+        self.eid = res[0][2]
+        
+        # Must be an ElabInElab experiment.
+        if int(res[0][3]) != 1:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Not an elabinelab experiment: " +
+                                  res[0][1] + "/" + res[0][2]);
+        
+        # Experiment must be active (not swapping say).
+        if res[0][4] != "active":
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Experiment is not active: " +
+                                  res[0][1] + "/" + res[0][2]);
+        
+        # SSL certificate of caller must map to uid of experiment creator.
+        if res[0][5] != self.uid:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Must be creator to access " +
+                                  "elabinelab method for " +
+                                  res[0][1] + "/" + res[0][2]);
+        
+        # Must be the boss node that is making the request.
+        if res[0][6] != "boss":
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Must be boss node accessing " +
+                                  "elabinelab method for " +
+                                  res[0][1] + "/" + res[0][2]);
+        
+        return None;
+
+    #
+    # Power cycle a node.
+    # 
+    def power(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("nodes", "op"))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        if (argdict["op"] != "on" and
+            argdict["op"] != "off" and
+            argdict["op"] != "cycle"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="op must be on, off or cycle")
+
+        argstr = argdict["op"];
+        tokens = argdict["nodes"].split(",")
+        for token in tokens:
+            argstr += " " + escapeshellarg(token)
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/power " + argstr)
+#        (exitval, output) = runcommand("/bin/echo " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    
+    #
+    # vlan control
+    # 
+    def vlans(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("op", "arg"))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        if (argdict["op"] != "setup" and
+            argdict["op"] != "destroy"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="op must be setup or destroy")
+
+        argstr = "-p " + self.pid + " -e " + self.eid + " " + argdict["op"];
+     
+        #
+        # Figure out how to convert the stuff we got into something we can
+        # pass on the command line to perl backend.
+        # 
+        if argdict["op"] == "destroy":
+            #
+            # Destroy is easy; just pass a list of id numbers out. The backend
+            # script does all the verification.
+            #
+            if (isinstance(argdict["arg"], types.IntType)):
+                argstr += " " + str(argdict["arg"])
+                pass
+            else:
+                tokens = argdict["arg"].split(",")
+                for token in tokens:
+                    argstr += " " + escapeshellarg(token)
+                    pass
+                pass
+            pass
+        else:
+            #
+            # Setup is harder. Pass a set of strings to the script,
+            # consisting of:
+            #
+            #           id,node:iface,speed,duplex,vtag
+            #
+            for id, idval in argdict["arg"].items():
+                vtag = idval["virtual"]
+                
+                for port, portarray in idval["members"].items():
+                    speed  = portarray["speed"]
+                    duplex = portarray["duplex"]
+                    
+                    thisarg = escapeshellarg(str(id) + "," + port + "," +
+                                             str(speed) + "," +
+                                             duplex + "," + vtag)
+                    
+                    argstr += " " + thisarg;
+                    pass
+                pass
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxy " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    
     pass
 
 #

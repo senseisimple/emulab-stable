@@ -97,7 +97,7 @@ class MyXMLRPCRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """
 
         # Update PYTHONPATH with the user's requested path.
-        self.server.set_path(self.path)
+        self.server.set_path(self.path, self.client_address)
 
         try:
             # get arguments
@@ -177,7 +177,7 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
     # @param path The path from the POST request, should not include "lib" on
     # the end (e.g. "/usr/testbed")
     #
-    def set_path(self, path):
+    def set_path(self, path, client_address):
         if not self.emulabserver:
             if path not in ALLOWED_PATHS:
                 self.logit("Disallowed path: %s" % path)
@@ -192,7 +192,8 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
                 pass
             from emulabserver import EmulabServer
             
-            self.emulabserver = EmulabServer(readonly=0)
+            self.emulabserver = EmulabServer(readonly=0,
+                                             clientip=client_address[0])
             pass
         return
     
