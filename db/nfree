@@ -49,6 +49,17 @@ foreach my $n (@node_names) {
     $sth = $dbh->query($cmd) && print "Succeeded.\n"
 	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	    && $error++);
+    
+    # Find the control net interface for this node type
+    $sth = $dbh->query("select control_net from node_types as t left join ".
+		       "nodes  as n on n.type=t.type where node_id='$n'");
+    my @row= $sth->fetchrow_array();
+    my $control= $row[0];
+    print "Got Control $control\n";
+    $cmd = "update interfaces set IP='' where node_id='$n' and card!='$control'";
+    $sth = $dbh->query($cmd)
+	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	    && $error++);
 }
 
 exit($error);
