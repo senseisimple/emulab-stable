@@ -93,6 +93,8 @@ void usage();
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
 
+#define DEFAULT_CERTFILE PREFIX"/etc/capture.pem"
+
 char 	*Progname;
 char 	*Pidname;
 char	*Logname;
@@ -1076,7 +1078,7 @@ clientconnect()
 #define PREFIX
 #endif
 
-	    if (!certfile) { certfile = PREFIX"/etc/capture/cert.pem"; }
+	    if (!certfile) { certfile = DEFAULT_CERTFILE; }
 
 	    if (SSL_CTX_use_certificate_file( ctx, certfile, SSL_FILETYPE_PEM )
 		<= 0) {
