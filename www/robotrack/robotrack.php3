@@ -31,6 +31,33 @@ if (mysql_num_rows($query_result)) {
 }
 
 #
+# Draw the legend and some explanatory text.
+#
+echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
+      <tr>
+       <td align=\"left\" valign=\"top\" class=\"stealth\">
+         <table>
+           <tr><th colspan=2>Legend</th></tr>
+           <tr>
+             <td><img src=\"../floormap/map_legend_node.gif\"></td>
+             <td nowrap=1>Robot Actual Position</td>
+           </tr>
+           <tr>
+             <td><img src=\"../floormap/map_legend_node_dst.gif\"></td>
+             <td nowrap=1>Robot Destination Position</td>
+           </tr>
+         </table>
+       </td>
+       <td class=stealth>This applet allows you to view the robots
+                         as they move around. The table at the bottom
+                         shows the current position (x, y, orientation),
+                         the destination position (dx, dy, dorientation),
+                         and the battery level (percentage and voltage).
+        </td>
+      </tr>
+      </table><hr>\n";
+
+#
 # Create a tempfile to use as a unique prefix; it is not actually used but
 # serves the same purpose (The script uses ${prefix}.jpg and ${prefix}.map .)
 # 

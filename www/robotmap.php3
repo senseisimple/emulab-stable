@@ -240,9 +240,11 @@ echo "<form method=\"post\" action=\"robotmap.php3\">\n";
 echo "Click on the image to get its X,Y coordinates<br>\n";
 # The image may be clicked to get node info or set a new center-point.
 if ($isadmin || TBWebCamAllowed($uid)) {
-    echo "  <a href=webcam.php3>Webcam View</a> (Updated every five seconds)";
+    echo "  <a href=webcam.php3>Webcam View</a> (Updated in real time)";
     echo "  <br>\n";
 }
+echo "  <a href=robotrack/robotrack.php3>Track robots in real time</a>";
+echo "  <br>\n";
 
 if (isset($map_x) && isset($map_y)) {
 #    $map_y = $max_y - $map_y;
