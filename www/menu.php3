@@ -596,8 +596,8 @@ function WRITESUBMENUBUTTON($text, $link) {
 #
 function SUBPAGESTART() {
     echo "<!-- begin subpage -->";
-    echo "<table class=\"stealth\" cellspacing=0 cellpadding=0 width='85%' 
-          border=0>\n
+    echo "<table class=\"stealth\"
+	  cellspacing='0' cellpadding='0' width='85%' border='0'>\n
             <tr>\n
               <td class=\"stealth\"valign=top>\n";
 }
@@ -616,7 +616,8 @@ function SUBPAGEEND() {
 function SUBMENUSTART($title) {
 ?>
     <!-- begin submenu -->
-    <table class="menu" width=200 cellpadding="0" cellspacing="0">
+    <table class='menu' width='200' cellpadding="0" cellspacing="0"
+	style="margin-right: 6px;" >
       <tr>
         <td class="menuheader"><b><?php echo "$title";?></b></td>
       </tr>
