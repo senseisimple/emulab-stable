@@ -4,7 +4,7 @@ use Mysql;
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
 my $sth = $dbh->
-    query("select * from reserved");
+    query("select * from reserved order by node_id");
 
 print $sth->as_string();
 
