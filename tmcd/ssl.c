@@ -59,6 +59,7 @@ int	isssl;
  */
 static char	*clientcertdirs[] = {
 	"/etc/testbed",
+	"/etc/emulab",
 	"/etc/rc.d/testbed",
 	"/usr/local/etc/testbed",
 	"/usr/local/etc/emulab",
@@ -411,11 +412,20 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 	 * If the node is remote, then the unitname must match the type.
 	 * Simply a convention. 
 	 */
+#if 1
+	if (!islocal &&
+	    strcmp(unitname, "pcwa") && strcmp(unitname, "pcron")) {
+		error("sslverify: unitname mismatch: %s!=pcwa|pcron\n",
+		      unitname, type);
+		return -1;
+	}
+#else
 	if (!islocal && strcmp(unitname, type)) {
 		error("sslverify: unitname mismatch: %s!=%s\n",
 		      unitname, type);
 		return -1;
 	}
+#endif
 	return 0;
 }
 
