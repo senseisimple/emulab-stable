@@ -79,7 +79,8 @@ load $sqldir/sql.so
 set lockfile "/usr/testbed/locks/tblock"
 set ns2ir "$scriptdir/ns2ir/parse.tcl"
 set postparse "$scriptdir/ns2ir/postparse"
-set assign "$scriptdir/ir/assign.tcl"
+set assign "$scriptdir/ir/assign_wrapper"
+set postassign "$scriptdir/ir/postassign"
 set handle_ip "$scriptdir/ir/handle_ip"
 set handle_os "$scriptdir/ir/handle_os"
 set avail "$updir/db/avail"
@@ -158,7 +159,6 @@ while {$done == 0} {
     outs "Allocating resources - This may take a while."
     if {[catch "exec $assign $irFile $ptopfile >@ $logFp 2>@ $logFp" err]} {
 	outs stderr "Error allocating resources.  See $logFile and assign.log for more info."
-	unlock
 	exit 1
     }
     
@@ -192,12 +192,21 @@ while {$done == 0} {
     } else {
 	if {$tries >= $maxtries} {
 	    outs "Resources unavailable.  Giving up!"
+	    unlock
 	    exit 1
 	} else {
 	    outs "Resources unavailable.  Retrying."
 	}
     }
     unlock
+}
+
+outs "!!! If any failures occur from now on run tbend to free up resources."
+
+outs "Syncing database with assignment."
+if {[catch "exec $postassign $irFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error syncing database. ($err)"
+    exit 1
 }
 
 outs "Allocating IP addresses."
