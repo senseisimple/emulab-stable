@@ -4382,9 +4382,10 @@ COMMAND_PROTOTYPE(dojailconfig)
 		"INETRAW=1\n"
 		"BPFRO=1\n"
 		"INADDRANY=1\n"
-		"ROUTING=1\n"
-		"DEVMEM=1\n",
-		low, high, atoi(row[0]));
+		"ROUTING=%d\n"
+		"DEVMEM=%d\n",
+		low, high, atoi(row[0]), reqp->islocal, reqp->islocal);
+		
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
