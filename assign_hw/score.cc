@@ -4,6 +4,10 @@
  *     or via at most one other switch (star formation).
  */
 
+// Note on variable names: LEDA has generic 'edge' and 'node'.  When
+// these are translated to 'tb_*' structures the variables end in
+// r.  I.e. dst -> dstr.  dst is a node, and dstr is a tb_pnode or similar.
+
 // Not sure we need all these LEDA includes.
 #include <LEDA/graph_alg.h>
 #include <LEDA/graphwin.h>
@@ -24,7 +28,6 @@
 #include "physical.h"
 
 #include "assert.h"
-#define ASSERT assert
 
 float score;			// The score of the current mapping
 int violated;			// How many times the restrictions
@@ -37,6 +40,10 @@ extern tb_pgraph PG;		// physical grpaph
 
 int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s);
 edge direct_link(node a,node b);
+void score_link(edge e,edge v,bool interswitch);
+void unscore_link(edge e,edge v,bool interswitch);
+edge find_link_to_switch(node n);
+int find_intraswitch_path(node src,node dst,edge *first,edge *second);
 
 #ifdef SCORE_DEBUG_MORE
 #define SADD(amount) fprintf(stderr,"SADD: %s = %.2f\n",#amount,amount);score+=amount
@@ -90,7 +97,7 @@ void init_score()
     pe.users=0;
   }
 
-  ASSERT(pnodes[0] == NULL);
+  assert(pnodes[0] == NULL);
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  score = %.2f violated = %d\n",score,violated);
 #endif
@@ -116,7 +123,7 @@ void remove_node(node n)
 #endif
 
   
-  ASSERT(pnode != NULL);
+  assert(pnode != NULL);
 
   edge e;
   tb_vlink *vlink;
@@ -141,21 +148,7 @@ void remove_node(node n)
 #ifdef SCORE_DEBUG
       fprintf(stderr,"   direct link\n");
 #endif
-      PG[vlink->plink].users--;
-      if (PG[vlink->plink].users == 0) {
-	// link no longer used
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   freeing link\n");
-#endif
-	SSUB(SCORE_DIRECT_LINK);
-      } else {
-	// getting close to no violations
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   reducing users\n");
-#endif
-	SSUB(SCORE_DIRECT_LINK_PENALTY);
-	violated--;
-      }
+      unscore_link(vlink->plink,e,false);
     } else if (vlink->type == tb_vlink::LINK_INTERSWITCH) {
       // INTERSWITCH LINK
       pdst=pnodes[vdstr->posistion];
@@ -172,14 +165,11 @@ void remove_node(node n)
       fprintf(stderr,"   interswitch link (through %s)\n",
 	      PG[through].name);
 #endif
-      
 
-      // remove bandwidth from edges      
-      PG[first].bw_used -= vlink->bandwidth;
-      if (second)
-	PG[second].bw_used -= vlink->bandwidth;
-
-      // XXX add check for over bandwidth
+      unscore_link(first,e,true);
+      if (second) unscore_link(second,e,true);
+      unscore_link(vlink->plink_local_one,e,false);
+      unscore_link(vlink->plink_local_two,e,false);
 
       // adjust score apropriately.
       SSUB(SCORE_INTERSWITCH_LINK);
@@ -191,9 +181,13 @@ void remove_node(node n)
       fprintf(stderr,"   intraswitch link\n");
 #endif
       SSUB(SCORE_INTRASWITCH_LINK);
+
+      unscore_link(vlink->plink,e,false);
+      unscore_link(vlink->plink_two,e,false); 
     } else {
       // No link
-      assert(0);
+      fprintf(stderr,"Internal error - no link\n");
+      abort();
     }
   }
 
@@ -339,33 +333,40 @@ int add_node(node n,int ploc)
 	fprintf(stderr,"   found direct link = %p\n",pedge);
 #endif
 	pl = &PG[pedge];
+
 	// direct
 	er->type = tb_vlink::LINK_DIRECT;
 	er->plink = pedge;
-	pl->users++;
-	if (pl->users == 1) {
-#ifdef SCORE_DEBUG
-	  fprintf(stderr,"    first user\n");
-#endif
-	  SADD(SCORE_DIRECT_LINK);
-	} else {
-#ifdef SCORE_DEBUG
-	  fprintf(stderr,"    not first user - penalty\n");
-#endif
-	  SADD(SCORE_DIRECT_LINK_PENALTY);
-	  violated++;
-	}
+
+	score_link(pedge,e,false);
       } else if (pnoder.the_switch &&
 		 (pnoder.the_switch == dpnoder.the_switch)) {
 	// intraswitch
 	assert(pnoder.the_switch == dpnoder.the_switch);
+	edge first,second;
+	if (find_intraswitch_path(pnode,dpnode,&first,&second) == 1) {
+	  fprintf(stderr,"Internal error: Could not find intraswitch link!\n");
+	  abort();
+	}
+
+	assert(first != NULL);
+	assert(second != NULL);
+	
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"   found intraswitch link\n");
+	fprintf(stderr,"   found intraswitch link (%p,%p)\n",first,second);
 #endif
 	er->type = tb_vlink::LINK_INTRASWITCH;
+	er->plink = first;
+	er->plink_two = second;
 	SADD(SCORE_INTRASWITCH_LINK);
+
+	// check users and bandwidth
+	score_link(first,e,false);
+	score_link(second,e,false);
       } else {
 	// try to find interswitch
+	// XXX - need to do user and bandwidth checking for links to
+	// and from node as well!
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   looking for interswitch link\n");
 #endif
@@ -377,7 +378,7 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
-	  // couldn't fidn path.
+	  // couldn't find path.
 	  vnoder.no_connections++;
 	  SADD(SCORE_NO_CONNECTION);
 	  violated++;
@@ -390,15 +391,19 @@ int add_node(node n,int ploc)
 	  if (second)
 	    SADD(SCORE_INTERSWITCH_LINK);
 
-	  // add bandwidth usage
-	  PG[first].bw_used += er->bandwidth;
-	  if (second)
-	    PG[second].bw_used += er->bandwidth;
+	  score_link(first,e,true);
+	  if (second) score_link(second,e,true);
 
 	  er->plink = first;
 	  er->plink_two = second;
-	  
-	  // XXX add checking for over bandwidth
+
+	  er->plink_local_one = find_link_to_switch(pnode);
+	  assert(er->plink_local_one != NULL);
+	  er->plink_local_two = find_link_to_switch(dpnode);
+	  assert(er->plink_local_two != NULL);
+
+	  score_link(er->plink_local_one,e,false);
+	  score_link(er->plink_local_two,e,false);
 	}
       }
     }
@@ -471,6 +476,54 @@ edge direct_link(node a,node b)
   return best;
 }
 
+edge find_link_to_switch(node n)
+{
+  tb_pnode &nr = PG[n];
+
+  edge e;
+  node edst;
+  float best_bw=1000.0;
+  int best_users = 1000;
+  float bw;
+  edge best=NULL;
+  forall_inout_edges(e,n) {
+    edst = PG.target(e);
+    if (edst == n)
+      edst = PG.source(e);
+    if (edst == nr.the_switch) {
+      tb_plink &er = PG[e];
+      bw = er.bw_used / er.bandwidth;
+      if ((er.users < best_users) ||
+	  ((er.users == best_users) && (bw < best_bw))) {
+	best = e;
+	best_bw = bw;
+	best_users = er.users;
+      }
+    }
+  }
+  
+  return best;
+}
+
+// this looks for the best links between the src and the switch
+// and the dst and the switch.
+int find_intraswitch_path(node src,node dst,edge *first,edge *second)
+{
+  tb_pnode &srcr=PG[src];
+  tb_pnode &dstr=PG[dst];
+
+  assert(srcr.the_switch == dstr.the_switch);
+  assert(srcr.the_switch != NULL);
+  assert(src != dst);
+
+  *first = find_link_to_switch(src);
+  *second = find_link_to_switch(dst);
+
+  if ((*first != NULL) &&
+      (*second != NULL)) return 0;
+  return 1;
+}
+
 // this needs to find a path between switches src and dst (in PG).
 // needs to return the best of all possible
 // best =
@@ -530,5 +583,86 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
     return 1;
   } else {
     return 0;
+  }
+}
+
+// this does scoring for over users and over bandwidth on edges.
+void score_link(edge e,edge v,bool interswitch)
+{
+  tb_plink &pl = PG[e];
+  tb_vlink &er = G[v];
+
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"  score_link(%p)\n",e);
+#endif
+
+  if (! interswitch) {
+    pl.users++;
+    if (pl.users == 1) {
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"    first user\n");
+#endif
+      SADD(SCORE_DIRECT_LINK);
+    } else {
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"    not first user - penalty\n");
+#endif
+      SADD(SCORE_DIRECT_LINK_PENALTY);
+      violated++;
+    }
+  }
+  
+  // bandwidth
+  int prev_bw = pl.bw_used;
+  pl.bw_used += er.bandwidth;
+  if ((pl.bw_used > pl.bandwidth) &&
+      (prev_bw <= pl.bandwidth)) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"    went over bandwidth (%d > %d)\n",
+	    pl.bw_used,pl.bandwidth);
+#endif
+    violated++;
+    SADD(SCORE_OVER_BANDWIDTH);
+  }
+}
+
+void unscore_link(edge e,edge v,bool interswitch)
+{
+  tb_plink &pl = PG[e];
+  tb_vlink &er = G[v];
+
+#ifdef SCORE_DEBUG
+  fprintf(stderr,"  unscore_link(%p)\n",e);
+#endif
+
+  if (!interswitch) {
+    pl.users--;
+    if (pl.users == 0) {
+      // link no longer used
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"   freeing link\n");
+#endif
+      SSUB(SCORE_DIRECT_LINK);
+    } else {
+      // getting close to no violations
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"   reducing users\n");
+#endif
+      SSUB(SCORE_DIRECT_LINK_PENALTY);
+      violated--;
+    }
+  }
+  
+  // bandwidth check
+  int prev_bw = pl.bw_used;
+  pl.bw_used -= er.bandwidth;
+  if ((pl.bw_used <= pl.bandwidth) &&
+      (prev_bw > pl.bandwidth)) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"   went under bandwidth (%d <= %d)\n",
+	    pl.bw_used,pl.bandwidth);
+#endif
+    violated--;
+    SSUB(SCORE_OVER_BANDWIDTH);
   }
 }

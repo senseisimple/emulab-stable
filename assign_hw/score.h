@@ -8,10 +8,10 @@ const float SCORE_DIRECT_LINK = 0.01;
 const float SCORE_DIRECT_LINK_PENALTY = 0.5;
 
 // Cost of an intraswitch link
-const float SCORE_INTRASWITCH_LINK=0.02;
+const float SCORE_INTRASWITCH_LINK = 0.02;
 
 // Cost of an interswitch link
-const float SCORE_INTERSWITCH_LINK=0.05;
+const float SCORE_INTERSWITCH_LINK = 0.05;
 
 // Cost of being unable to fulfill a virtual link
 const float SCORE_NO_CONNECTION = 0.5;
@@ -26,6 +26,9 @@ const float SCORE_SWITCH = 0.5;
 
 // Cost of an unassigned node
 const float SCORE_UNASSIGNED = 1;
+
+// Cost of going over bandwidth
+const float SCORE_OVER_BANDWIDTH = 0.5;
 
 extern float score;
 extern int violated;
