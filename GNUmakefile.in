@@ -6,6 +6,7 @@ OBJDIR		= .
 SUBDIR		= 
 TESTBED_SRCDIR  = @top_srcdir@
 DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
+EVENTSYS	= @EVENTSYS@
 
 include Makeconf
 
@@ -51,7 +52,9 @@ post-install:
 	@$(MAKE) -C security post-install
 	@$(MAKE) -C vis post-install
 	@$(MAKE) -C www post-install
+ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event post-install
+endif
 	@$(MAKE) -C mote post-install
 
 #
@@ -66,7 +69,9 @@ ops-install:
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
 	@$(MAKE) -C lib control-install
+ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event control-install
+endif
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install
 
@@ -102,13 +107,17 @@ client-mkdirs:
 
 client:
 	@$(MAKE) -C lib/libtb client
+ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client
+endif
 	@$(MAKE) -C os client
 	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
 
 client-install: client client-mkdirs
+ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
+endif
 	@$(MAKE) -C os client-install
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
