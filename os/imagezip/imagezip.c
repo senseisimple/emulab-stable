@@ -451,12 +451,8 @@ read_image()
 		if (slicemode && i != (slice - 1) /* DOS Numbering */)
 			continue;
 		
-		if (ignore[i]) {
-			fprintf(stderr, "Slice %d ignored, NOT SAVING\n", i+1);
-			if (start != size)
-				addskip(start, size);
-			continue;
-		}
+		if (ignore[i])
+			type = DOSPTYP_UNUSED;
 
 		switch (type) {
 		case DOSPTYP_386BSD:
@@ -475,8 +471,8 @@ read_image()
 #endif
 		case DOSPTYP_UNUSED:
 			fprintf(stderr,
-				"  Slice %d is unused, NOT SAVING.\n",
-				i + 1 /* DOS Numbering */);
+				"  Slice %d %s, NOT SAVING.\n", i + 1,
+				ignore[i] ? "ignored" : "is unused");
 			if (start != size)
 				addskip(start, size);
 			break;
@@ -1424,6 +1420,7 @@ makeranges(void)
 	 * Last piece, but only if there is something to compress.
 	 */
 	if (inputmaxsec == 0 || (inputmaxsec - offset) != 0) {
+		assert(inputmaxsec == 0 || inputmaxsec > offset);
 		if ((range = (struct range *)malloc(sizeof(*range))) == NULL) {
 			fprintf(stderr, "Out of memory!\n");
 			exit(1);
@@ -2050,7 +2047,8 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		}
 
 		if (cc != count && !eof) {
-			fprintf(stderr, "Bad count in read!\n");
+			fprintf(stderr, "Bad count in read, %d != %d at %qu\n",
+				cc, count, off+total);
 			exit(1);
 		}
 
