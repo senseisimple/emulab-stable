@@ -117,16 +117,23 @@ $num_up   = 0;
 $num_pd   = 0;
 $num_down = 0;
 $num_unk  = 0;
+$freetypes= array();
 
 while ($row = mysql_fetch_array($query_result)) {
     $pid                = $row[pid];
     $status             = $row[status];
+    $type               = $row[type];
 
     switch ($status) {
     case "up":
 	$num_up++;
 	if (!$pid) {
 	    $num_free++;
+
+	    if (! isset($freetypes[$type])) {
+		$freetypes[$type] = 0;
+	    }
+	    $freetypes[$type]++;
 	}
 	break;
     case "possibly down":
@@ -176,7 +183,16 @@ echo "<table>
        <tr><td align=right><b>Free</b></td>
            <td align=left>$num_free</td>
        </tr>
-      </table>\n";
+       <tr><td colspan=2 nowrap align=center>
+               <b>Free Subtotals</b></td></tr>\n";
+
+foreach($freetypes as $key => $value) {
+    echo "<tr>
+           <td align=right><b><font color=green>$key</font></b></td>
+           <td align=left>$value</td>
+          </tr>\n";
+}
+echo "</table>\n";
 SUBMENUEND_2B();
 
 echo "<table border=2 cellpadding=2 cellspacing=2>\n";
