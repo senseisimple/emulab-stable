@@ -95,7 +95,7 @@ characters cannot appear in DNS entries.
 lans.  I.e.:
 
 <pre>
-set lan0 [$ns make-lan "$node0 $node1" 100Mb .1ms]
+set lan0 [$ns make-lan "$node0 $node1" 100Mb 0ms]
 tb-set-lan-loss $lan0 .02
 </pre>
 
@@ -107,7 +107,7 @@ only way to set such attributes when their are multiple links between
 two nodes.
 
 <pre>
-set link1 [$ns duplex-link $node0 $node1 100Mb .1ms DropTail]
+set link1 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
 tb-set-link-loss $link1 0.05
 tb-set-ip-link $node0 $link1 192.0.0.128
 </pre>
@@ -483,8 +483,11 @@ tb-set-node-lan-delay $lan0 $node0 40ms
       <code>make-lan</code>.
   <li>The behavior of this command is not defined when used with nodes
       that are in the same LAN multiple times.
-  <li>Delays of less than 3ms (per trip) are too small to be
+  <li>Delays of less than 2ms (per trip) are too small to be
       accurately modeled at this time, and will be silently ignored.
+      As a convenience, a delay of 0ms can be used to indicate that
+      you do not want added delay; the two interfaces will be
+      "directly" connected to each other.
 </ul>
 
 <h4>tb-set-node-lan-bandwidth</h4>

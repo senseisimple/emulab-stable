@@ -10,8 +10,8 @@ set NodeD [$ns node]
 
 # Next define the 3 links between the nodes.
 $ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
-$ns duplex-link $NodeB $NodeC 100Mb .1ms DropTail
-$ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail
+$ns duplex-link $NodeB $NodeC 100Mb  0ms DropTail
+$ns duplex-link $NodeB $NodeD 100Mb  0ms DropTail
 
 # Set the OS on a couple.
 tb-set-node-os $NodeA FBSD-STD

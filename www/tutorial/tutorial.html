@@ -138,8 +138,8 @@ will define full speed links between B and C,D and a delayed link
 from node A to B.
 	<code><pre>
 	$ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
-	$ns duplex-link $NodeB $NodeC 100Mb .1ms DropTail
-	$ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail</code></pre>
+	$ns duplex-link $NodeB $NodeC 100Mb  0ms DropTail
+	$ns duplex-link $NodeB $NodeD 100Mb  0ms DropTail</code></pre>
 
 <p>
 In addition to the standard NS syntax above, a number of
@@ -193,8 +193,8 @@ multiple projects, be sure to select the correct project from the
 menu.
 
 <p>
-Next fill in the `Name' and `Long Name' fields. The Name should be a
-single word (no spaces) identifier, while the Long Name is a multi
+Next fill in the `Name' and `Description fields. The Name should be a
+single word (no spaces) identifier, while the Description is a multi
 word description of your experiment. In the "Your NS file" field,
 place the <i>local path</i> of a NS file which you have created to
 describe your network topology. This file will be uploaded through
@@ -259,7 +259,10 @@ A few points should be noted:
 <p>
 <li> Delays of less than 2ms (per trip) are too small to be
      accurately modeled at this time, and will be silently ignored.
-     Please see the
+     A delay of 0ms can be used to indicate that you do not want
+     added delay; the two interfaces will be "directly" connected to
+     each other. 
+     Also, please see the
      <a href="docwrapper.php3?docname=nscommands.html#LOSS">
      <i>Link Loss Commands</i></a> section in the
      <a href="docwrapper.php3?docname=nscommands.html">
