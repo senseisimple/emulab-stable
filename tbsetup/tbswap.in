@@ -545,7 +545,7 @@ sub doSwapin($) {
 	    # save this off so it will get passed back later.
 	    # Note that -1 is an uncontrolled error. No recovery.
 	    #
-	    $assignWrapperErrorCode = $?;
+	    $assignWrapperErrorCode = $? >> 8;
 	    $exitcode = $? >> 8;
 
 	    print STDERR "*** Failed ($exitcode) to map to reality.\n";
