@@ -80,8 +80,9 @@ else {
 	DBQueryFatal("select distinct o.*,p.osid from os_info as o ".
 		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
-		     "where m.uid='$uid' and (p.node_id='$node_id' or ".
-		     " (o.path!='' and o.path is not NULL) and o.shared=1) ".
+		     "where p.node_id='$node_id' or ".
+		     "  ((m.uid='$uid' or o.shared=1) and ".
+		     "   (o.path!='' and o.path is not NULL)) ".
 		     "order by o.pid,o.osid");
 }
 
@@ -234,7 +235,7 @@ echo "<p><blockquote><blockquote>
                 optional arguments.
         <li> RPMs must be a colon separated list of pathnames.
         <li> Tarballs must be a colon separated list of directory path
-                and tarfile path (eg: /usr/site /foo/fee.tar.gz). The
+                and tarfile path (/usr/site:/foo/fee.tar.gz). The
                 directory is where the tarfile should be unpacked.
       </ol>
       </blockquote></blockquote>\n";
