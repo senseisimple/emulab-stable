@@ -859,13 +859,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * both for privacy and to keep our syslog smaller.
 	 */
 	if (command_array[i].func == dolog)
-		info("%s: pid:%d vers:%d %s log %d chars\n",
-		     reqp->nodeid, mypid, version,
-		     cp, strlen(rdata));
+		info("%s: vers:%d %s log %d chars\n",
+		     reqp->nodeid, version, cp, strlen(rdata));
 	else if (command_array[i].func != doisalive || verbose)
-		info("%s: pid:%d vers:%d %s %s\n", reqp->nodeid,
-		     mypid, version,
-		     cp, command_array[i].cmdname);
+		info("%s: vers:%d %s %s\n", reqp->nodeid,
+		     version, cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, reqp, rdata, istcp, version);
 
@@ -878,8 +876,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
 	if (byteswritten)
-		info("%s: pid:%d %s wrote %d bytes\n",
-		     reqp->nodeid, mypid, command_array[i].cmdname,
+		info("%s: %s wrote %d bytes\n",
+		     reqp->nodeid, command_array[i].cmdname,
 		     byteswritten);
 
 	return 0;
