@@ -115,12 +115,10 @@ function SPITFORM($formfields, $errors)
     # Select Project
     #
     if (isset($view['hide_proj']) && (count($projlist) == 1)) {
-	# Just include the project as a hidden field
-	if ($formfields['project']) {
-	    $project = $formfields['project'];
-	} else {
-	    list($project) = each($projlist);
-	}
+	# Just include the project as a hidden field - since the user has
+	# only a single project, grab that project, which is the first thing
+	# in $projlist
+	list($project) = each($projlist);
 	echo "<input type='hidden' name='formfields[exp_pid]' value='$project'>\n";
     } else {
 	echo "<tr>
