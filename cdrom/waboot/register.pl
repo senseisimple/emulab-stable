@@ -832,7 +832,9 @@ sub LocalizeRoot()
 
     chdir("/mnt/dev") or
 	fatal("Could not chdir to /mnt/dev!");
-    mysystem("./MAKEDEV ${blockdevice}${slicexdev}");
+    mysystem("./MAKEDEV ${blockdevice}");
+    mysystem("./MAKEDEV ${blockdevice}s1c ${blockdevice}s2c");
+    mysystem("./MAKEDEV ${blockdevice}s3c ${blockdevice}s4c");
     chdir("/") or
 	fatal("Could not chdir to /!");
     
