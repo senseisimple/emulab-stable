@@ -33,11 +33,10 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $consetup	 = "$TB/libexec/console_setup";
-my $sched_reload = "$TB/sbin/sched_reload";
-my $reloadpid	 = "emulab-ops";
-my $pendingeid   = "reloadpending";
-my $reloadeid    = "reloading";
+my $consetup	= "$TB/libexec/console_setup";
+my $reloadpid	= "emulab-ops";
+my $pendingeid  = "reloadpending";
+my $reloadeid   = "reloading";
 
 my @nodes;
 my @freed_nodes=();
@@ -356,39 +355,13 @@ foreach my $n (@freed_nodes) {
     #
     # No reloads or reservation changes, so really free the node
     #
-    # Make sure we don't schedule a reload if the node is coming out of
-    # the reloading or reloadpending experimenets.
+    # This little sillyness is for disk reloading. Remember the last
+    # project a node was reserved into. At present, there might already
+    # be an entry. Eventually, os_setup will look for this and force
+    # a reload.
     #
-    if ($mustclean && (($pid ne $reloadpid) ||
-	      (($eid ne $reloadeid) && ($eid ne $pendingeid)))) {
-	#
-	# Schedule a reload
-	#
-	if (my $imageid = DefaultImageID($n)) {
-	    if (!TBSetSchedReload($n,$imageid)) {
-		print STDERR "WARNING: Unable to schedule reload for $n\n";
-		$errors++;
-	    }
-	} else {
-	    print STDERR "WARNING: Unable to get default imageid for $n\n";
-	    $errors++;
-	}
-	#
-	# Let's still stick the node into the reloadpending experiment, even
-	# if there were errors, to get it out of the way.
-	#
-	print "Moving $n to $reloadpid/$pendingeid.\n";
-	DBQueryWarn("update reserved set ".
-	    "pid='$reloadpid',eid='$pendingeid' ".
-	    "where node_id='$n'") || $error++;
-
-	#
-	# Make SURE that we don't have a last_reservation, since that would
-	# cause the node to get picked up by the reload daemon twice
-	#
-	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
-	    $error++;
-	next;
+    if ($mustclean) {
+	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
     }
     
     print "Releasing node '$n' ... ";
