@@ -12,7 +12,7 @@ It is best to add the following group before creating the following
 directories. Basically, testbed software should be in the tbadmin
 group. Run this command as root.
 
-	pw groupadd tbadmin -g 99
+	pw groupadd tbadmin -g 101
 	
 
 The following directories will need to exist on partitions that have enough
