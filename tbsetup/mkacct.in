@@ -425,14 +425,14 @@ sub FirstTime()
 	chown($user_number, $default_groupgid, "$SFSDIR") or
 	    fatal("Could not chown $SFSDIR: $!");
 
-	$dosfs = 1;
+	$dosfs = 0;
     }
 
     #
     # Check for missing identity file
     #
     if (! -e "$SFSDIR/identity") {
-	$dosfs = 1;
+	$dosfs = 0;
     }
 
     if ($dosfs) {
