@@ -597,8 +597,7 @@ if (! $returning) {
       "marked as an active user, and will be granted full access to your\n".
       "user account.\n\n".
       "Thanks,\n".
-      "Testbed Ops\n".
-      "Utah Network Testbed\n",
+      "Testbed Operations\n",
       "From: $TBMAIL_APPROVAL\n".
       "Bcc: $TBMAIL_AUDIT\n".
       "Errors-To: $TBMAIL_WWW");
@@ -662,8 +661,7 @@ if ($returning) {
 	   "log in, and select the 'New User Approval' page to enter your\n".
 	   "decision regarding $usr_name's membership in your project.\n\n".
 	   "Thanks,\n".
-	   "Testbed Ops\n".
-	   "Utah Network Testbed\n",
+	   "Testbed Operations\n",
 	   "From: $TBMAIL_APPROVAL\n".
 	   "Bcc: $TBMAIL_AUDIT\n".
 	   "Errors-To: $TBMAIL_WWW");

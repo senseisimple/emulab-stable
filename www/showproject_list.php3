@@ -28,7 +28,7 @@ $isadmin = ISADMIN($uid);
 if (!isset($splitview) || !$isadmin)
     $splitview = 0;
 if (!isset($sortby))
-    $sortby = "name";
+    $sortby = "pid";
 
 if ($isadmin) {
     if (! $splitview) {
@@ -58,7 +58,7 @@ elseif (! strcmp($sortby, "running"))
 elseif (! strcmp($sortby, "nodes"))
     $order = "ncount DESC";
 else 
-    $order = "p.name";
+    $order = "p.pid";
 
 if ($isadmin) {
     $query_result =

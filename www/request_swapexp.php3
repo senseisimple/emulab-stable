@@ -162,7 +162,7 @@ TBMAIL("$expleader_name <$expleader_email>",
      "$TBMAILADDR_OPS.\n".
      "\n".
      "Thanks!\n".
-     "Utah Network Testbed\n",
+     "Testbed Operations\n",
      "From: $TBMAIL_OPS\n".
      ( $swap_requests >= $tell_proj_head
        ? "Cc: $projleader_name <$projleader_email>\n"

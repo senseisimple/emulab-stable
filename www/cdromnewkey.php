@@ -189,8 +189,7 @@ TBMAIL("$user_name <$user_email>",
        "This key is good for one installation, and will lapse after 12 hours.".
        "\n\n".
        "Thanks,\n".
-       "Testbed Ops\n".
-       "Utah Network Testbed\n",
+       "Testbed Operations\n",
        "From: $TBMAIL_OPS\n".
        "Bcc: $TBMAIL_AUDIT\n".
        "Errors-To: $TBMAIL_WWW");

@@ -96,8 +96,7 @@ elseif (strcmp($approval, "moreinfo") == 0) {
          "\n$message".
          "\n\n".
          "Thanks,\n".
-         "Testbed Ops\n".
-         "Utah Network Testbed\n",
+         "Testbed Operations\n",
          "From: $TBMAIL_APPROVAL\n".
          "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
@@ -128,8 +127,7 @@ elseif ((strcmp($approval, "deny") == 0) ||
          "\n$message".
          "\n\n".
          "Thanks,\n".
-         "Testbed Ops\n".
-         "Utah Network Testbed\n",
+         "Testbed Operations\n",
          "From: $TBMAIL_APPROVAL\n".
          "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
@@ -148,8 +146,7 @@ elseif ((strcmp($approval, "deny") == 0) ||
              "terminated because your project $pid was denied.\n".
              "\n\n".
              "Thanks,\n".
-             "Testbed Ops\n".
-             "Utah Network Testbed\n",
+             "Testbed Operations\n",
              "From: $TBMAIL_APPROVAL\n".
              "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
@@ -217,8 +214,7 @@ elseif (strcmp($approval, "approve") == 0) {
          "\n$message".
          "\n\n".
          "Thanks,\n".
-         "Testbed Ops\n".
-         "Utah Network Testbed\n",
+         "Testbed Operations\n",
          "From: $TBMAIL_APPROVAL\n".
          "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");

@@ -372,8 +372,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	     "membership in project/group $project/$group.\n".
              "\n\n".
              "Thanks,\n".
-             "Testbed Ops\n".
-             "Utah Network Testbed\n",
+             "Testbed Operations\n",
              "From: $uid_name <$uid_email>\n".
              "Cc:  $phead_name <$phead_email>\n".
              "Bcc: $TBMAIL_AUDIT\n".
@@ -483,8 +482,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	     "$newtrust permissions.\n".
              "\n\n".
              "Thanks,\n".
-             "Testbed Ops\n".
-             "Utah Network Testbed\n",
+             "Testbed Operations\n",
              "From: $uid_name <$uid_email>\n".
              "Cc:  $phead_name <$phead_email>\n".
              "Bcc: $TBMAIL_AUDIT\n".

@@ -849,8 +849,7 @@ if (! $returning) {
       "as an active user and granted full access to your account.\n".
       "\n".
       "Thanks,\n".
-      "Testbed Ops\n".
-      "Utah Network Testbed\n",
+      "Testbed Operations\n",
       "From: $TBMAIL_APPROVAL\n".
       "Bcc: $TBMAIL_AUDIT\n".
       "Errors-To: $TBMAIL_WWW");

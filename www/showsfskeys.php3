@@ -293,8 +293,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "$chunky\n".
      "\n".
      "Thanks,\n".
-     "Testbed Ops\n".
-     "Utah Network Testbed\n",
+     "Testbed Operations\n",
      "From: $uid_name <$uid_email>\n".
      "Cc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");

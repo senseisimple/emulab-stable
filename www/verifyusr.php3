@@ -115,8 +115,7 @@ function INFORMLEADERS($uid) {
 		"your decision regarding $usr_name's membership in your\n".
 		"project.\n\n".
 		"Thanks,\n".
-		"Testbed Ops\n".
-		"Utah Network Testbed\n",
+		"Testbed Operations\n",
 		"From: $TBMAIL_APPROVAL\n".
 		"Bcc: $TBMAIL_AUDIT\n".
 		"Errors-To: $TBMAIL_WWW");
@@ -133,7 +132,7 @@ if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
 	   "User '$uid' has been verified.\n".
            "Status has been changed from 'unverified' to 'active'\n".
 	   "\n".
-	   "Testbed Ops\n",
+	   "Testbed Operations\n",
 	   "From: $TBMAIL_OPS\n".
 	   "Errors-To: $TBMAIL_WWW");
 
@@ -152,7 +151,7 @@ elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
 	   "User '$uid' has been verified.\n".
            "Status has been changed from 'newuser' to 'unapproved'\n".
 	   "\n".
-	   "Testbed Ops\n",
+	   "Testbed Operations\n",
 	   "From: $TBMAIL_OPS\n".
 	   "Errors-To: $TBMAIL_WWW");
 
