@@ -42,7 +42,9 @@ my $tbdata   = "tbdata";
 my $logname  = 0;
 my $batch    = 0;
 my $estate   = 0;
-
+my $user_login;
+my @row;
+    
 #
 # Untaint the path
 # 
@@ -86,21 +88,22 @@ my $expdir  = "$piddir/exp";
 my $eiddir  = "$expdir/$eid";
 
 #
-# Get some user information. 
+# Verify user and get his DB uid.
 #
-my $query_result =
-    DBQueryFatal("SELECT uid,usr_name,usr_email from users ".
-		 "WHERE unix_uid='$EUID'");
-
-if ($query_result->numrows < 1) {
+if (! UNIX2DBUID($EUID, \$user_login)) {
     print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
     exit(1);
 }
 
-my @row        = $query_result->fetchrow_array();
-my $uid        = $row[0];
-my $user_name  = $row[1];
-my $user_email = $row[2];
+#
+# Get email info for user.
+#
+my $user_name;
+my $user_email;
+if (! UserDBInfo($user_login, \$user_name, \$user_email)) {
+    print STDOUT "Cannot determine your name and email address.\n";
+    exit(1);
+}
 
 #
 # Verify that this person is allowed to end the experiment. Must be
@@ -141,6 +144,7 @@ if (defined($row[0])) {
 	"torn down\n";
     exit(1);
 }
+my $expt_head_login = $row[2];
 
 #
 # Okay, check state. We do not allow termination to start when the
@@ -150,19 +154,16 @@ if (defined($row[0])) {
 # Seems like too many states!
 #
 $estate = $row[1];
-if ($estate eq "prerunning" ||
-    $estate eq "activating" ||
-    $estate eq "swapping" ||
-    $estate eq "terminating") {
+if ($estate eq EXPTSTATE_PRERUN ||
+    $estate eq EXPTSTATE_ACTIVATING ||
+    $estate eq EXPTSTATE_SWAPPING ||
+    $estate eq EXPTSTATE_TERMINATING) {
     print STDOUT
 	"It appears that experiment $pid/$eid is in transition.\n".
 	"The user that created the experiment will be notified via email\n".
         "when the experiment is no longer in transition, and can be killed\n";
     exit(1);
 }
-
-# Save experiment creator uid for later email message.
-my $expt_head = $row[2];
 
 #
 # Set the timestamp now, and unlock the experiments table.
@@ -177,19 +178,22 @@ DBQueryFatal("unlock tables");
 #
 # At this point a failure is going to leave things in an inconsistent
 # state. Not much to do about that right now. 
-# 
+#
 
 #
 # Get email address of the experiment head, which may be different than
 # the person who is actually terminating the experiment, since its polite
 # to let the original creator know whats going on. 
-# 
-my $query_result =
-    DBQueryFatal("SELECT usr_name,usr_email from users ".
-		 "WHERE uid='$expt_head'");
-@row = $query_result->fetchrow_array();
-my $expt_head_name  = $row[0];
-my $expt_head_email = $row[1];
+#
+my $expt_head_name;
+my $expt_head_email;
+
+if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
+    print STDERR "*** WARNING: ".
+	         "Could not determine name/email for $expt_head_login.\n";
+    $expt_head_name  = "TBOPS";
+    $expt_head_email = $TBOPS;
+}
 
 #
 # If not in batch mode, go into the background. Parent exits.
@@ -210,30 +214,30 @@ if (! $batch) {
 #
 # Sanity check states in case someone changes something.
 #
-if ($estate eq "active") { 
-    print STDOUT "Running tbswapout with arguments: -nologfile $pid $eid\n";
-    if (system("$tbdir/tbswapout -nologfile $pid $eid") != 0) {
+if ($estate eq EXPTSTATE_ACTIVE) { 
+    print STDOUT "Running tbswapout with arguments: $pid $eid\n";
+    if (system("$tbdir/tbswapout $pid $eid") != 0) {
 	fatal("tbswapout failed!\n");
     }
     
     $estate = ExpState($pid,$eid);
-    if ($estate ne "swapped") {
+    if ($estate ne EXPTSTATE_SWAPPED) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 }
 
-if ($estate eq "swapped") {
-    print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";
-    if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
+if ($estate eq EXPTSTATE_SWAPPED) {
+    print STDOUT "Running tbend with arguments: $pid $eid\n";
+    if (system("$tbdir/tbend $pid $eid") != 0) {
 	fatal("tbend failed!\n");
     }    
     $estate = ExpState($pid,$eid);
-    if ($estate ne "ended") {
+    if ($estate ne EXPTSTATE_TERMINATED) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 }
 
-if ($estate ne "ended" && $estate ne "new") {
+if ($estate ne EXPTSTATE_TERMINATED && $estate ne $EXPTSTATE_NEW) {
     fatal("Experiment is in the wrong state: $estate\n");
 }
 
@@ -377,24 +381,4 @@ sub background()
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
     return 0;
-}
-
-#
-# Grab experiment state.
-#
-sub ExpState ($$) {
-    my($pid,$eid) = @_;
-    
-    my $query_result =
-	DBQueryFatal("SELECT state FROM experiments ".
-		     "WHERE eid='$eid' and pid='$pid'");
-
-    if ($query_result->numrows < 1) {
-	print STDOUT "No such experiment $pid/$eid exists!\n";
-	exit(1);
-    }
-
-    my @row = $query_result->fetchrow_array();
-    
-    return $row[0];
 }

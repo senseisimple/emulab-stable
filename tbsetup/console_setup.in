@@ -50,7 +50,7 @@ my @nodes = @ARGV;
 # nodes are specified since this script always does the right thing.
 #
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?");
+    die("Must be root! Maybe its a development version?\n");
 }
 
 #
