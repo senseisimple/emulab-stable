@@ -160,7 +160,7 @@ my %nodeportlist = ();
 # IPs later when filling in the virt_routes table.
 # 
 while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
-    if (!$force && $routertype ne "static") {
+    if (!$force && $routertype ne TBDB_ROUTERTYPE_STATIC()) {
 	next;
     }
     $dostatic++;
