@@ -32,7 +32,7 @@ my $listonly  = 0;
 my $debug     = 0;
 my $noreboot  = 0;
 my @nodes     = ();
-my $imagepid  = TB_OPSPID;	# Default to looking for ID in emulab-ops proj.
+my $imagepid;
 my $imagename;
 my $imageid;
 
@@ -47,6 +47,9 @@ use libtestbed;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
+
+# Default to looking for ID in emulab-ops proj.
+$imagepid = TB_OPSPID;	
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
