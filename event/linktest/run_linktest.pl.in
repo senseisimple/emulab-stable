@@ -17,18 +17,20 @@ use English;
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-d] [-s server] [-p port] [-k keyfile] -e pid/eid\n".
-	  "Use -q for quick termination mode\n";
+	  "[-q] [-d] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "Use -q for quick termination mode, same as -l 3\n";
     exit(1);
 }
-my $optlist = "qd:s:p:k:e:";
+my $optlist = "qd:s:p:k:e:l:o:";
 my $debug   = 0;
-my $quick   = 0;
 my $server;
 my $keyfile;
 my $port;
 my $pid;
 my $eid;
+my $logfile;
+my $startAt = 1; # default start level
+my $stopAt = 4 ; # default stop level
 
 # Local goo
 my $TB          = "@prefix@";
@@ -72,8 +74,22 @@ if (defined($options{"d"})) {
 	    "    Bad data in debug: $debug\n");
     }
 }
+if (defined($options{"l"})) {
+    $stopAt = $options{"l"};
+    if ($stopAt =~ /^(\d)$/) {
+	$stopAt = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in level: $stopAt\n");
+    }
+}
+
 if (defined($options{"q"})) {
-    $quick = 1;
+    # ignore if via -l they are already in quick mode.
+    if($stopAt > 3) { 
+	$stopAt = 3; 
+    }
 }
 if (defined($options{"s"})) {
     $server = $options{"s"};
@@ -93,6 +109,16 @@ if (defined($options{"k"})) {
     else {
 	die("*** $0:\n".
 	    "    Bad data in keyfile: $keyfile\n");
+    }
+}
+if (defined($options{"o"})) {
+    $logfile = $options{"o"};
+    if ($logfile =~ /^([-\w\.\/]+)$/) {
+	$logfile = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in logfile: $logfile\n");
     }
 }
 if (defined($options{"p"})) {
@@ -171,8 +197,7 @@ $linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
 my $args = starter();
 # event arguments
 $args .=  " -x START";
-$args .= " STARTAT=1 STOPAT=3"
-    if ($quick);
+$args .= " STARTAT=$startAt STOPAT=$stopAt";
 $args .= " DEBUG=$debug"
     if ($debug);
 
@@ -184,7 +209,7 @@ if ($?) {
 
 print "Linktest in progress...\n";
 print "Quick termination requested.\n"
-    if ($quick);
+    if (defined($options{"q"}));
 print "Debug mode requested.\n"
     if ($debug);
 
@@ -217,7 +242,17 @@ foreach my $file (@dir_contents) {
 	die("*** $0:\n".
 	    "    Bad data in filename: $file\n");
     }
-    system("/bin/cat $linktest_path/$file");
+    if(defined($options{"o"})) {
+	open LOG_FILE, ">>$logfile" || die "Could not open $logfile for append: $!";
+	open NODE_TRACE, "$linktest_path/$file" || die "Could not open $file for read: $!";
+	while(<NODE_TRACE>) {
+	    print LOG_FILE $_;
+	}
+	close NODE_TRACE;
+	close LOG_FILE;
+    } else {
+	system("/bin/cat $linktest_path/$file");
+    }
 }
 exit(scalar(@dir_contents));
 
