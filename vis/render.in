@@ -9,10 +9,11 @@
 
 use GD;
 
-# "ideal" width and height
-
-$idealw = 500;
-$idealh = 500;
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $ICONDIR     = "$TB/www";
 
 %props = ();
 %nodes = ();
@@ -65,6 +66,12 @@ foreach $i (keys %nodes) {
 	$nodepos{ $i } = [$1, $2]; 	
     }
 }
+
+# "ideal" width and height
+
+$idealw = 500;
+$idealh = 500;
+
 
 $maxX = 1000;
 $minX = 0;
@@ -139,6 +146,14 @@ $ybig = $maxY - $minY;
 $xscale = 1.0;
 $yscale = 1.0;
 
+
+# recompute new ideal.. minimum size.
+$nodecount = (keys %nodepos);
+$idealarea = 4200 * $nodecount;
+$idealw = sqrt( $idealarea );
+if ($idealw > 500) { $idealw = 500; }
+$idealh = $idealw;
+
 # if it is too small, scale everything up so it takes the
 # "ideal" amount of space
 
@@ -169,8 +184,8 @@ foreach $i (keys %nodepos) {
 
 $im = new GD::Image($xbig + 40, $ybig + 50);
 
-$nodeicon = GD::Image->newFromPng("nodeicon.png") || warn "nodeicon.png not found";
-$lanicon  = GD::Image->newFromPng("lanicon.png") || warn "lanicon.png not found";
+$nodeicon = GD::Image->newFromPng("$ICONDIR/nodeicon.png") || warn "nodeicon.png not found";
+$lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png not found";
 
 %colors = ();
 
@@ -186,7 +201,7 @@ $colors{"gray50"} = $im->colorAllocate(127,127,127);
 $colors{"gray25"} = $im->colorAllocate(63,63,63);
 
 # set clear background
-$bgcolor = $colors{"white"}; # $im->colorAllocate(254, 254, 254);
+$bgcolor = $im->colorAllocate(254, 254, 254);
 
 $im->transparent($bgcolor);
 #$im->interlaced('true');
@@ -249,13 +264,13 @@ foreach $i (keys %nodes) {
   $xpos = $x - (((length($i) - 0.5) * $fontw) / 2); 
 
   $im->string(gdSmallFont, $xpos + 1, $y + 20, 
-	$i, $colors{"white"});
+	$i, $bgcolor);
   $im->string(gdSmallFont, $xpos - 1, $y + 20, 
-	$i, $colors{"white"});
+	$i, $bgcolor);
   $im->string(gdSmallFont, $xpos, $y + 19, 
-	$i, $colors{"white"});
+	$i, $bgcolor);
   $im->string(gdSmallFont, $xpos, $y + 21, 
-	$i, $colors{"white"});
+	$i, $bgcolor);
   $im->string(gdSmallFont, $xpos, $y + 20, 
 	$i, $colors{"black"});
 } 

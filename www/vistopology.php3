@@ -48,7 +48,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 #
 echo "<br>
       <center>
-       <img src='top2gif.php3?pid=$exp_pid&eid=$exp_eid' align=center>
+       <img src='top2image.php3?pid=$exp_pid&eid=$exp_eid' align=center>
       </center>\n";
 
 #

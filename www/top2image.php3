@@ -56,7 +56,7 @@ if (ISADMIN($uid)) {
 # Spit out the image with a content header.
 #
 if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $pid $eid", "r")) {
-    header("Content-type: image/gif");
+    header("Content-type: image/png");
     fpassthru($fp);
 }
 
