@@ -20,13 +20,14 @@ my $d = 0; #debug mode
 
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
-      "              [includevirt]\n".
+      "              [includevirt] [rand]\n".
       #"      [deltas=<delta[,delta,...]>]".
       #	" [fixes=<fix_name[,fix_name,...]>]".
       "\n".
       "type \t= pc | shark\n"."OS \t= Linux | FreeBSD | NetBSD | ...\n".
       "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
       "includevirt: Include virtual nodes\n".
+      "rand: Randomize result order\n".
       #	"fixes \t\t= cron_off | sendmail_off | ...\n"
       "A field name alone will show that field in the display of available\n".
       "nodes. A field name with '=' followed by a string will match nodes\n".
@@ -61,6 +62,12 @@ if ($args{"includevirt"}) {
     $cond .= " or a.role='virtnode' ) ";
 } else {
     $cond .= " ) ";
+}
+
+if ($args{"rand"}) {
+    $order  = "rand()";
+} else {
+    $order = "priority";
 }
 
 my $os = 0;
@@ -99,7 +106,7 @@ if ($os) {
 # }
 
 
-my $cmd = "select $cols from $join where $cond order by priority";
+my $cmd = "select $cols from $join where $cond order by $order";
 
 print "Sending cmd:\n$cmd\n" if $d;
 
