@@ -3,7 +3,12 @@
 # This program takes a list of machines and removes all the VLANs
 # whose every member is an argument.
 
-$snmpit = "/usr/testbed/bin/snmpit";
+#
+# Configure variables
+#
+my $TB	= "@prefix@";
+
+$snmpit = "$TB/bin/snmpit";
 
 if ($#ARGV < 0) {
   #  die "Syntax: $0 machines\n";

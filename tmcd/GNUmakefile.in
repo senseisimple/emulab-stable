@@ -1,16 +1,19 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= tmcd
+
+include $(OBJDIR)/Makeconf
 
 all:	tmcd tmcc
 
-DISTCLEAN_FILES = tmcd.restart
-
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 tmcd: tmcd.c
-	$(CC) $(CFLAGS) -g -o tmcd tmcd.c \
+	$(CC) $(CFLAGS) -DTBDBNAME='"$(TBDBNAME)"' -g -o tmcd tmcd.c \
 		-I/usr/local/include \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 

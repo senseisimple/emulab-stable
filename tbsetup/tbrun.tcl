@@ -35,12 +35,14 @@ if {[file exists $scriptdir/ns2ir]} {
 } else {
     # install tree
     set updir [file dirname $scriptdir]/lib
-    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+    set scriptdir [file dirname $scriptdir]/lib
+    set bindir [file dirname $scriptdir]/bin
+    set execdir [file dirname $scriptdir]/libexec
 }
 
-set snmpit "$scriptdir/snmpit"
+set snmpit "$bindir/snmpit"
 set libir "$scriptdir/ir/libir.tcl"
-set os_setup "$scriptdir/os_setup"
+set os_setup "$execdir/os_setup"
 
 source $libir
 namespace import TB_LIBIR::ir

@@ -8,6 +8,12 @@
 #########################################################################
 
 #
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+
+#
 # Source Code Map
 # ===============
 #
@@ -32,7 +38,7 @@ my $debug = 0;
 if ( join(" ",@ARGV) =~ /-debug/ ) { $debug = 1; print "DEBUG MODE ON\n"; }
 
 my $device;
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
 my %Interfaces=();
@@ -1465,9 +1471,9 @@ sub ReadIRFile {
   my $skip = 1;
   my $name = "";
   my $section = "";
-  if ( -e "/usr/testbed/etc/$f") {
-    open(IR,"/usr/testbed/etc/$f") 
-      || die("Couldn't open /usr/testbed/etc/$f\n");
+  if ( -e "$TB/etc/$f") {
+    open(IR,"$TB/etc/$f") 
+      || die("Couldn't open $TB/etc/$f\n");
   } elsif ( -e "$f" ) {
     open(IR,"$f") 
       || die("Couldn't open $f\n");

@@ -13,6 +13,7 @@ export RANLIB	= @RANLIB@
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@
 
+TBROOT		= @prefix@
 TBDBNAME	= @TBDBNAME@
 CPPFLAGS	= @CPPFLAGS@
 CFLAGS	       += @CFLAGS@

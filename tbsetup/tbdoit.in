@@ -2,6 +2,11 @@
 use English;
 
 #
+# Configure variables
+#
+my $TB     = "@prefix@";
+
+#
 # For debugging all this goo. Leaves the experiment directory intact,
 # and placed in a subdir of the project directory.
 # 
@@ -28,7 +33,7 @@ sub sighandler {
 #
 # usage: tbdoit <pid> <eid> <temp_nsfile>
 #
-my $tbdir    = "/usr/testbed/bin/";
+my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
 

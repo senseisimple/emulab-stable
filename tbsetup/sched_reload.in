@@ -16,9 +16,15 @@ use English;
 # 
 # usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]
 #
+
+#
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+
 my $rsh		= "sshtb -q";
 my $ssh		= "sshtb -q";
-my $TB		= "/usr/testbed/bin";
 my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "155.99.214.70";
 my $PLASTICADDR	= "155.99.214.74";
@@ -42,7 +48,7 @@ $| = 1; #Turn off line buffering on output
 # Set up for querying the database.
 # 
 use Mysql;
-my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 if ( $#ARGV < 3) {
     die("Usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]\n".

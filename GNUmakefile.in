@@ -1,8 +1,11 @@
 #
 # Testbed Makefile
 #
-SRCDIR = 	 @srcdir@
-TESTBED_SRCDIR = @top_srcdir@
+SRCDIR		= @srcdir@
+OBJDIR		= .
+SUBDIR		= 
+TESTBED_SRCDIR  = @top_srcdir@
+DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
 
 include Makeconf
 
@@ -10,13 +13,14 @@ SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd www tip capture
 
 all:		all-subdirs
 install:	install-subdirs
-	echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
+	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 post-install:
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C security post-install
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 	rm -f Makeconf GNUmakefile config.status config.cache config.log
+	rm -f $(DISTCLEAN_FILES)
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.

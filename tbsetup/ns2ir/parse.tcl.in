@@ -8,7 +8,9 @@ set id [lindex $argv 0]
 set nsfile [lindex $argv 1]
 set irfile [lindex $argv 2]
 
-set libdir [file dirname [info script]]
+set tbroot @prefix@
+
+set libdir @prefix@/lib/ns2ir
 source $libdir/tcl-object.tcl
 source $libdir/node.tcl
 source $libdir/link.tcl

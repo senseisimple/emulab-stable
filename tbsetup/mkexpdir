@@ -3,11 +3,11 @@ use English;
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
-# and do the tb stuff.
+# and do the tb stuff. This script cannot do any damage since it can
+# only create directories where the caller has the permission to do so.
 #
 # usage: mkexpdir <pid> <eid>
 #
-my $tbdir    = "/usr/testbed/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot");

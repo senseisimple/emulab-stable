@@ -1,7 +1,13 @@
 #!/usr/local/bin/perl -w
 use Mysql;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+#
+# Configure variables
+#
+my $TB     = "@prefix@/bin";
+my $DBNAME = "@TBDBNAME@";
+
+my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
 if ($#ARGV < 1) {
   die("Usage: nfree <pid> <eid> [<node> <node> <...>]\n".
@@ -10,7 +16,6 @@ if ($#ARGV < 1) {
 }
 
 my $error = 0;
-my $TB="/usr/testbed/bin";
 my $consetup="$TB/console_setup";
 my $osload="$TB/os_load";
 my $reloadpid="testbed";

@@ -9,7 +9,6 @@ use English;
 # we invoke this from paper in nalloc/nfree, giving it a list of node/pid
 # pairs to set. Only use can run this script.
 #
-my $TB		= "/usr/testbed/bin";
 my $TIPLOGDIR   = "/var/log/tiplogs";
 my $TIPDEVDIR   = "/dev/tip";
 my $TBPID	= "flux";

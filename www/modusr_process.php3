@@ -60,7 +60,7 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     }
 
     $mypipe = popen(escapeshellcmd(
-    "/usr/testbed/bin/checkpass $new_password1 $uid '$usr_name:$usr_email'"),
+    "$TBCHKPASS_PATH $new_password1 $uid '$usr_name:$usr_email'"),
     "w+");
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);

@@ -2,11 +2,16 @@
 use Mysql;
 use English;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+#
+# Configure variables
+#
+my $TB     = "@prefix@/bin";
+my $DBNAME = "@TBDBNAME@";
+
+my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
 if ($#ARGV < 1) {die("Usage: nalloc <pid> <eid> <node> <node> <...>\n");}
 
-my $TB="/usr/testbed/bin";
 my $consetup="$TB/console_setup";
 my $error = 0;
 my $pid = shift;

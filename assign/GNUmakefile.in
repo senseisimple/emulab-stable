@@ -1,11 +1,16 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= assign
+
+include $(OBJDIR)/Makeconf
 
 all: assign 
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 LEDA=@LEDA@
 
@@ -27,7 +32,7 @@ assign_p: assign.po $(DEPLIBS) $(POBJS)
 assign.po: assign.cc
 	${CXX} -c -pg -g -o assign.po assign.cc ${CXXFLAGS}
 
-install: $(INSTALL_BINDIR)/assign $(INSTALL_LIBDIR)/assign 
+install: $(INSTALL_LIBEXECDIR)/assign 
 
 clean:
 	/bin/rm -f *.o assign 

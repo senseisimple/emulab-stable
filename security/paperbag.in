@@ -11,43 +11,31 @@
 # Check to make sure only files/directories under user's $HOME can be
 #  passed as arguments, CD'ed to, etc
 
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
 # List of allowed commands - Mapping is from command entered by the user
 # to the actual binary to run
-$tb = "/usr/testbed/bin";
-%allowed = (	"avail"		=> "$tb/avail",
-		"delay_setup"	=> "$tb/delay_setup",
-		"ifc_filegen"	=> "$tb/ifc_filegen",
-		"ifc_setup"	=> "$tb/ifc_setup",
-		"inuse"		=> "$tb/inuse",
-		"ir2ifc"	=> "$tb/ir2ifc",
-		"mac2if"	=> "$tb/mac2if",
-		"mkacct"	=> "$tb/mkacct",
-		"nalloc"	=> "$tb/nalloc",
-		"nfree"		=> "$tb/nfree",
-		"nodeip"	=> "$tb/nodeip",
-		"ns"		=> "$tb/ns",
-		"oslib.tcl"	=> "$tb/oslib.tcl",
-		"power"		=> "$tb/power",
-		"ptopgen"	=> "$tb/ptopgen",
-		"resetvlans"	=> "$tb/resetvlans",
-		"rmacct"	=> "$tb/rmacct",
-		"savevlans"	=> "$tb/savevlans",
-		"showgraph"	=> "$tb/showgraph",
-		"snmpit"	=> "$tb/snmpit",
-		"tbdoit"	=> "$tb/tbdoit",
-		"tbend"		=> "$tb/tbend",
-		"tblog"		=> "$tb/tblog",
-		"tbprerun"	=> "$tb/tbprerun",
-		"tbreport"	=> "$tb/tbreport",
-		"tbrun"		=> "$tb/tbrun",
-		"tbstopit"	=> "$tb/tbstopit",
-		"trafgen"	=> "$tb/trafgen",
-		"turn"		=> "$tb/turn",
-		"vpower"	=> "$tb/vpower",
-		"vsnmpit"	=> "$tb/vsnmpit");
+%allowed = (	"avail"		=> "$TB/bin/avail",
+		"inuse"		=> "$TB/bin/inuse",
+		"mac2if"	=> "$TB/bin/mac2if",
+		"nalloc"	=> "$TB/bin/nalloc",
+		"nfree"		=> "$TB/bin/nfree",
+		"nodeip"	=> "$TB/bin/nodeip",
+		"ns"		=> "$TB/bin/ns",
+		"power"		=> "$TB/bin/power",
+		"snmpit"	=> "$TB/bin/snmpit",
+		"tbprerun"	=> "$TB/bin/tbprerun",
+		"tbreport"	=> "$TB/bin/tbreport",
+		"tbrun"		=> "$TB/bin/tbrun",
+		"tbend"		=> "$TB/bin/tbend",
+		"vpower"	=> "$TB/bin/vpower",
+		"vsnmpit"	=> "$TB/bin/vsnmpit");
 
 # Need to provide a simple path, because some scripts we call need one
-$ENV{PATH} = "/usr/testbed/bin:/bin:/usr/bin:/usr/local/bin";
+$ENV{PATH} = "$TB/bin:/bin:/usr/bin:/usr/local/bin";
 # Clean the environment of potentially nasty variables
 delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 

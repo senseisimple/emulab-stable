@@ -4,8 +4,15 @@ use English;
 #
 # usage: console_setup node [node node ...]
 #
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
 my $SSH		= "sshtb -q -l root plastic.cs.utah.edu";
-my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
+my $PROG	= "$TB/sbin/console_setup.proxy";
 my $TBPID	= "flux";
 my $dbg		= 1;
 my $cmdargs     = "";
@@ -19,7 +26,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Set up for querying the database.
 # 
 use Mysql;
-my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 if ( $#ARGV < 0 ) {
     die("Usage: console_setup node [nodes ... ]\n". 	

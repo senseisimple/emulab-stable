@@ -16,7 +16,7 @@ if {[file exists $scriptdir/ns2ir]} {
 } else {
     # install tree
     set updir [file dirname $scriptdir]/lib
-    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+    set scriptdir [file dirname $scriptdir]/lib
 }
 
 

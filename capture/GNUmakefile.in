@@ -1,8 +1,13 @@
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= capture
+
+include $(OBJDIR)/Makeconf
 
 all: capture
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR=
 

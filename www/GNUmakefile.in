@@ -1,11 +1,16 @@
 #
 # For installation.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= www
+
+include $(OBJDIR)/Makeconf
 
 all:
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 FILES		= tbstyle.css $(wildcard *.jpg *.gif *.html *.php3)
 

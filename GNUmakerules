@@ -1,6 +1,15 @@
 #
 # Insert Copyright Here.
 #
+
+# Get rid of a bunch of nasty built-in implicit rules,
+# to avoid bogus circular dependencies and make things go faster.
+# Use the `-r' command line option to make to get even better performance.
+.SUFFIXES:
+
+#
+# Various install targets.
+# 
 $(INSTALL_BINDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)
@@ -11,14 +20,14 @@ $(INSTALL_SBINDIR)/%: %
 	-mkdir -p $(INSTALL_SBINDIR)
 	$(INSTALL_PROGRAM) $< $@
 
-$(INSTALL_BINDIR)/%: %.tcl
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_BINDIR)
-	$(INSTALL_PROGRAM) $< $@
-
 $(INSTALL_LIBDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBDIR)
+	$(INSTALL_PROGRAM) $< $@
+
+$(INSTALL_LIBEXECDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) $< $@
 
 $(INSTALL_ETCDIR)/%: %
@@ -33,9 +42,29 @@ $(INSTALL_WWWDIR)/%: %
 
 CFLAGS += $(LOCALCFLAGS)
 
-vpath %.c $(SRCDIR)
-
 clean:
 
 distclean: clean
-	rm -f GNUmakefile $(DISTCLEAN_FILES)
+	rm -f GNUmakefile
+
+#
+# Where to find source files.
+# Using specific patterns instead of the catch-all VPATH variable
+# avoids hitting miscellaneous wrong targets in other directories
+# when configuring in the source directory.
+#
+vpath %.in $(SRCDIR)
+vpath %.c $(SRCDIR)
+
+#
+# Define rules which we blew away with .SUFFIXES
+# 
+%.o: %.c
+	$(CC) -c -o $@ $(CFLAGS) $<
+
+#
+# Rules to regen configure written files.
+#
+%: %.in
+	@echo "Regenerating $@"
+	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ config.status

@@ -1,26 +1,38 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= security
+
+include $(OBJDIR)/Makeconf
 
 BINS		= suexec
 SCRIPTS		= paperbag plasticwrap
 
-all:	$(BINS)
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(BINS) $(SCRIPTS)
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS		= -O -g
+CFLAGS	= -O -g \
+	  -DLOG_EXEC='"$(prefix)/log/suexec.log"' \
+	  -DDOC_ROOT='"$(prefix)/libexec/"' \
+	  -DSAFE_PATH='"$(prefix)/libexec:/usr/local/bin:/usr/bin:/bin"'
 
 suexec:	suexec.c suexec.h
 	$(CC) $(CFLAGS) -o suexec suexec.c
 
-install: $(addprefix $(INSTALL_BINDIR)/, $(BINS))
+install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS))
 	@echo "Don't forget to do a post-install as root"
 
 post-install:
-	chown root $(INSTALL_BINDIR)/suexec
-	chmod u+s $(INSTALL_BINDIR)/suexec
+	chown root $(INSTALL_LIBEXECDIR)/suexec
+	chmod u+s $(INSTALL_LIBEXECDIR)/suexec
 
 clean:
 	rm -f *.o $(BINS) core

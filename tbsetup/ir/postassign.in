@@ -4,7 +4,13 @@
 # resources have been reserved.  This updated the delays table and the
 # vname column in the reserved table.
 
-push(@INC,"/usr/testbed/lib/tbsetup/ir");
+#
+# Configure variables
+#
+my $IRLIB  = "@prefix@/lib/ir";
+my $DBNAME = "@TBDBNAME@";
+
+push(@INC, $IRLIB);
 require libir;
 
 if ($#ARGV != 0) {
@@ -16,7 +22,7 @@ $irfile = $ARGV[0];
 use DBI;
 
 $driver = "mysql";
-$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost") 
+$dbh = DBI->connect("DBI:$driver:database=$DBNAME;host=localhost") 
     || die "Could not connect to DB.\n";
 
 

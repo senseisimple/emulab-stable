@@ -1,13 +1,18 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= os
+
+include $(OBJDIR)/Makeconf
 
 SUBDIRS	= imagezip
 
 all:	$(SUBDIRS)
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 imagezip:
 	@$(MAKE) -C imagezip all

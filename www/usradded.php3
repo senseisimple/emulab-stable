@@ -85,7 +85,7 @@ else {
                   1);
     }
     $mypipe = popen(escapeshellcmd(
-    "/usr/testbed/bin/checkpass $password1 $uid '$usr_name:$usr_email'"),
+    "$TBCHKPASS_PATH $password1 $uid '$usr_name:$usr_email'"),
     "w+");
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);

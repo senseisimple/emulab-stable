@@ -133,7 +133,7 @@ if (! $query_result) {
 #
 # Remove the project directory. 
 #
-SUEXEC($uid, "flux", "rmprojdir_wrapper $pid", 0);
+SUEXEC($uid, "flux", "rmprojdir $pid", 0);
 
 #
 # Warm fuzzies.

@@ -10,9 +10,12 @@
 #include "decls.h"
 
 #define TESTMODE
-#define DBNAME		"tbdb"
 #define VERSION		1
 #define NETMASK		"255.255.255.0"
+#ifndef TBDBNAME
+#define TBDBNAME	"tbdb"	/* Defined in configure */
+#endif
+#define DBNAME		TBDBNAME
 
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid);
 static int	iptonodeid(struct in_addr ipaddr, char *bufp);

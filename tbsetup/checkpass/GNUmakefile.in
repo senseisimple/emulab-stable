@@ -1,8 +1,13 @@
-include ../../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/checkpass
+
+include $(OBJDIR)/Makeconf
 
 all: checkpass cracklib
 
-include ../../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 checkpass: cracklib
 	${CC} -g checkpass.c cracklib,2.7/cracklib/libcrack.a -o checkpass -lm
@@ -10,7 +15,7 @@ checkpass: cracklib
 cracklib:
 	gmake -C cracklib,2.7 all
 
-install:	$(INSTALL_BINDIR)/checkpass
+install:	$(INSTALL_LIBEXECDIR)/checkpass
 
 clean:
 	gmake -C cracklib,2.7 clean

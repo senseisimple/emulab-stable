@@ -1,13 +1,20 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= pxe
 
-all: proxydhcp bootinfo
+include $(OBJDIR)/Makeconf
 
-DISTCLEAN_FILES = proxydhcp.restart bootinfo.restart
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: proxydhcp bootinfo proxydhcp.restart bootinfo.restart
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 DBFLAG	= -DUSE_MYSQL_DB
 #DBFLAG = -DUSE_CFILE_DB

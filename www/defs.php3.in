@@ -2,23 +2,21 @@
 #
 # Standard definitions!
 #
-$TBWWW          = "<https://www.emulab.net/tbdb.html>";
-$TBBASE         = "https://www.emulab.net/";
-$TBMAIL_CONTROL = "Testbed Ops <testbed-ops@flux.cs.utah.edu>";
-$TBMAIL_WWW     = "Testbed WWW <testbed-www@flux.cs.utah.edu>";
-$TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
+$TBDIR          = "@prefix@/";
+$WWWDEFS        = "@WWWDEFS@";
 
-#$TBBASE         = "http://golden-gw.ballmoss.com:8080/src/testbed/www/";
-#$TBMAIL_CONTROL = "Testbed Ops <stoller@fast.cs.utah.edu>";
-#$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
-#$TBMAIL_APPROVE = "Testbed Approval <stoller@fast.cs.utah.edu>";
+#
+# Include configure selected definitions.
+#
+include("$WWWDEFS"."-defs.php3");
 
-$TBDIR          = "/usr/testbed/";
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
-$TBSUEXEC_PATH  = "$TBBIN_DIR/suexec";
+$TBLIBEXEC_DIR	= "$TBDIR"."libexec/";
+$TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
+$TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 
-$TBLIST_DIR     = "/usr/testbed/lists";
+$TBLIST_DIR     = "$TBDIR"."lists";
 $TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.list";
 $TBLIST_USERS   = "$TBLIST_DIR"."/users.list";
 
@@ -29,8 +27,6 @@ $TBNSSUBDIR     = "nsdir";
 $TBAUTHCOOKIE   = "HashCookie";
 $TBNAMECOOKIE   = "MyUidCookie";
 $TBAUTHTIMEOUT  = 10800;
-$TBAUTHDOMAIN   = ".emulab.net";
-#$TBAUTHDOMAIN   = "golden-gw.ballmoss.com";
 
 #
 # Database constants and the like.

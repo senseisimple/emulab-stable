@@ -14,8 +14,14 @@
 #
 ############################################################
 
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
 # un-taint path since this gets called from setuid scripts.
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/testbed/bin';
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:$TB/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $user = (getpwuid($<))[0]
@@ -28,7 +34,7 @@ my $outlet = 0; #stores number of an outlet
 my %IPList = (); #holds machine/ip pairs
 my %OutletList = (); #holds machine/outlet pairs
 my $exitval = 0;
-my $snmpit="/usr/testbed/bin/snmpit";
+my $snmpit="$TB/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
 die("Syntax:\npower on <machine> <machine> ...\n",
@@ -60,7 +66,7 @@ foreach my $n (0..$#ARGV) {
 
 use Mysql;
 
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
 $sth = $dbh->query("select o.node_id,i.IP,o.outlet from ".

@@ -1,11 +1,16 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= lib
+
+include $(OBJDIR)/Makeconf
 
 all: sql.so
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 sql.so:
 	./mk_sqlso.sh

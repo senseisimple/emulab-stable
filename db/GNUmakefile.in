@@ -1,33 +1,27 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= db
 
-all:
+include $(OBJDIR)/Makeconf
 
-include ../GNUmakerules
-
-BINSCRIPTS	= avail inuse mac2if nalloc nfree nodeip ptopgen \
-		  showgraph
-ALLSCRIPTS	= checkowner.tcl \
-		  $(BINSCRIPTS)
-
-#
-# Currently, all the stuff that gets installed in the bin directory
-# gets duplicated in lib/tbsetup.
-#
-INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/db
-
-install: $(addprefix $(INSTALL_BINDIR)/, $(BINSCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(ALLSCRIPTS))
+BIN_SCRIPTS	= mac2if nalloc nfree nodeip
+SBIN_SCRIPTS	= avail inuse showgraph
+LIBEXEC_SCRIPTS = ptopgen
 
 #
-# Leave these rules here. They should be flushed when we no longer
-# dup this stuff.
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
 # 
-$(INSTALL_LIBTBDIR)/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBTBDIR)
-	$(INSTALL) $< $@
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
 
 clean:

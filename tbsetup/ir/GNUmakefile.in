@@ -1,32 +1,35 @@
 #
 # Insert Copyright Here.
 #
-include ../../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/ir
 
-all:
+include $(OBJDIR)/Makeconf
 
-include ../../GNUmakerules
+LIB_STUFF	= libir.tcl libir.pm
+LIBEXEC_STUFF   = assign_wrapper handle_os handle_ip postassign
 
 #
-# These get installed with .tcl extensions.
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
 # 
-SCRIPTS		= assign.tcl handle_os libir.tcl handle_ip libir.pm
+all: $(LIB_STUFF) $(LIBEXEC_STUFF)
 
-#
-# Currently, all the stuff that gets installed in the bin directory
-# gets duplicated in lib/tbsetup.
-#
-INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/tbsetup/ir
+include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS))
+install: $(addprefix $(INSTALL_LIBDIR)/ir/, $(LIB_STUFF)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/ir/, $(LIBEXEC_STUFF))
 
-#
-# Leave these rules here. They should be flushed when we no longer
-# dup this stuff.
-# 
-$(INSTALL_LIBTBDIR)/%: %
+$(INSTALL_LIBDIR)/ir/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBTBDIR)
+	-mkdir -p $(INSTALL_LIBDIR)/ir
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBEXECDIR)/ir/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/ir
 	$(INSTALL) $< $@
 
 clean:

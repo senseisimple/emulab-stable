@@ -1,0 +1,154 @@
+#!/usr/bin/perl -wT
+# paperbag - Limited shell for use on ops.emulab.net
+# Allows execution of commands found in a permitted list
+# Also checks arguments for potentially dangerous characters (semicolons,
+# pipes, redirects, etc)
+# Robert Ricci, <ricci@cs.utah.edu>
+# Novemeber 17, 2000
+
+# TODO:
+# Turn off coredumps in ourself, and our children
+# Check to make sure only files/directories under user's $HOME can be
+#  passed as arguments, CD'ed to, etc
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+# List of allowed commands - Mapping is from command entered by the user
+# to the actual binary to run
+%allowed = (	"avail"		=> "$TB/bin/avail",
+		"inuse"		=> "$TB/bin/inuse",
+		"mac2if"	=> "$TB/bin/mac2if",
+		"nalloc"	=> "$TB/bin/nalloc",
+		"nfree"		=> "$TB/bin/nfree",
+		"nodeip"	=> "$TB/bin/nodeip",
+		"ns"		=> "$TB/bin/ns",
+		"power"		=> "$TB/bin/power",
+		"snmpit"	=> "$TB/bin/snmpit",
+		"tbprerun"	=> "$TB/bin/tbprerun",
+		"tbreport"	=> "$TB/bin/tbreport",
+		"tbrun"		=> "$TB/bin/tbrun",
+		"tbend"		=> "$TB/bin/tbend",
+		"vpower"	=> "$TB/bin/vpower",
+		"vsnmpit"	=> "$TB/bin/vsnmpit");
+
+# Need to provide a simple path, because some scripts we call need one
+$ENV{PATH} = "$TB/bin:/bin:/usr/bin:/usr/local/bin";
+# Clean the environment of potentially nasty variables
+delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+
+$prompt = "paperbag> "; # Prompt for interactive commands
+
+# Following message gets displayed to interactive users
+$message = "This is a restricted shell, and will only allow you to run
+a limited set of commands. For an unrestrictive shell, log into
+ops.emulab.net\n";
+
+$debug = 0;
+$| = 1; # No line buffering, so that we can see the prompt
+$interactive = 1;
+
+if (@ARGV && ($ARGV[0] eq "-c")) { # We were called by sshd - transform args into a useful form
+	my $bigarg = pop @ARGV;
+	push(@ARGV,split(/\s+/,$bigarg));
+	shift @ARGV; # Dispose of -c
+	$interactive = 0;
+	&debug("New args are: " . join(",",@ARGV) . "\n");
+}
+	
+# Check for a leading dir= option, which tells us which directory to start from
+if (@ARGV && ($ARGV[0] =~ /dir=(.*)/)) {
+	shift @ARGV;
+	&cd($1); # Change to given directory
+} elsif($ARGV[0] eq "cd") { # also understand 'cd dir &&' or 'cd dir ;' syntax to be a little more compatible
+	  # with other shells
+	# Discard the cd
+	shift @ARGV;
+	my $dir = shift @ARGV;
+	my $trash = shift @ARGV;
+	if (($trash ne "&&") && ($trash ne ";")) {
+		die "Syntax error: expected && or ; after cd <dir>\n";
+	}
+	# Untaint directory name - changing directories isn't a security risk in our situation
+	if ($dir =~ /^(.*)$/) {
+		&cd($1);
+	}
+}
+
+if (@ARGV) { # We were given command line arguments
+	$interactive = 0;
+	$command = $ARGV[0];
+	&debug("NON-INTERACTIVE: command is $command\n");
+	@args = @ARGV[1 .. $#ARGV];
+	&debug("NON-INTERACTIVE: args are " . join(",",@args) ."\n");
+}
+
+if ($interactive) {
+	print $message;
+}
+
+do {{
+	if ($interactive) {
+		print $prompt;
+		($command, @args) = split /\s+/,<>;
+	}
+	
+	next unless $command; # Don't complain if they leave a blank command
+	# Don't allow any naughty characters - kick the user off if they try
+	foreach $string ($command, @args) {
+		if ($string !~ m|^([A-Za-z0-9._\-/=]*)$|) {
+			print "Sorry, you used a forbidden character\n";
+			&debug("String was $string\n");
+			exit(-1);
+		} else {
+			$string = $1; # Untaint
+			&debug("No forbidden characters\n");
+		}
+	}
+
+	# Strip off all path information from the command
+	$command =~ /([^\/]+)$/; $command = $1;
+	next unless $command; # Don't complain if they leave a blank command
+	&debug("Command = $command, @args = " . join ",",@args . "\n");
+
+	# 'builtin' commands
+	if ($command eq "exit") { $interactive = 0; last; } # Quit loop
+	if ($command eq "cd") {
+		if (@args > 1) {
+			print "cd: Too many arguments\n";
+		} else {
+			&cd($args[0]);
+		}
+		next;
+	}
+
+	if (!$allowed{$command}) {
+		print "$command is not in the allowed list, sorry\n";
+	} else {
+		# Exec ourselves to be SURE that a shell doesn't get called
+		# and do something insecure
+		my $pid = fork();
+		if ($pid == -1) { # fork failed
+			print "Unable to fork process - Error number $?\n";
+		} elsif ($pid) { # parent - wait for child to exit
+			wait;
+		} else { # child process
+			exec ($allowed{$command},@args) or
+				die "Unable to execute $command: $?\n";
+		}
+	}
+}} while ($interactive);
+
+# Change directory to the given directory, (TODO) checking whether
+# it is appropriate to do so or not
+sub cd {
+	my $dirname = shift;
+	chdir $dirname or warn "Unable to change directories to $dirname\n";
+
+}
+
+sub debug {
+	if ($debug) { print @_; }
+}

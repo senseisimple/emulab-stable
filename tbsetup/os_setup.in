@@ -17,10 +17,16 @@ use English;
 # 
 # usage: os_setup <pid> <eid> <ir_file>
 #
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
 my $rsh		= "sshtb -q";
 my $ssh		= "sshtb -q";
-my $TB		= "/usr/testbed/bin";
-my $power	= "$TB/power";
+my $power	= "$TB/bin/power";
 my $ping	= "/sbin/ping";
 my $dbg		= 1;
 my %imagepaths  = ();
@@ -42,7 +48,7 @@ $| = 1; #Turn off line buffering on output
 # Set up for querying the database.
 # 
 use Mysql;
-my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 if ( $#ARGV != 2) {
     die("Usage: os_setup <pid> <eid> <ir_file>\n". 	

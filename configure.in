@@ -3,17 +3,13 @@ AC_PREREQ(2.13)
 
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
+AC_PREFIX_DEFAULT(/usr/testbed)
 
 AC_CHECK_TOOL(CC,gcc)
 AC_CHECK_TOOL(CXX,g++)
 AC_CHECK_TOOL(AR,ar)
 AC_CHECK_TOOL(RANLIB,ranlib)
 AC_CHECK_TOOL(STRIP,strip)
-
-#
-# overide with --prefix.
-# 
-ac_default_prefix=/usr/testbed
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -29,6 +25,21 @@ AC_ARG_WITH(TBDBNAME,
     TBDBNAME="tbdb"
 ])
 AC_SUBST(TBDBNAME)
+
+#
+# Okay, I know this is improper usage of --with. Too bad.
+#
+AC_ARG_WITH(WWWDEFS,
+[  --with-WWWDEFS=name		Specify WWW defintions ("default" default)],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_ERROR(Invalid WWWDEFS - Must specify the value)
+    fi
+    WWWDEFS="$withval"
+],[
+    WWWDEFS="default"
+])
+AC_SUBST(WWWDEFS)
 
 AC_ARG_WITH(LEDA,
 [  --with-LEDA			Specify LEDA path (/usr/testbed default)],
@@ -76,15 +87,29 @@ esac]
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	capture/GNUmakefile \
-	db/GNUmakefile \
+	db/GNUmakefile db/nalloc db/nfree \
 	discvr/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/imagezip/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
-	security/GNUmakefile \
-	tbsetup/GNUmakefile tbsetup/ir/GNUmakefile tbsetup/ns2ir/GNUmakefile \
+	security/GNUmakefile security/paperbag \
+	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
+	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
+	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmprojdir \
+	tbsetup/sched_reload tbsetup/tbdoit tbsetup/tbstopit \
+	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
+	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
+	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
+	tbsetup/ns2ir/parse.tcl \
 	tbsetup/checkpass/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
-	www/GNUmakefile"
-AC_OUTPUT($outfiles)	
+	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
+
+#
+# Do this for easy distclean.
+#
+DISTCLEAN_FILES="$outfiles"
+AC_SUBST(DISTCLEAN_FILES)
+
+AC_OUTPUT($outfiles)

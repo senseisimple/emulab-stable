@@ -1,33 +1,36 @@
 #
 # Insert Copyright Here.
 #
-include ../../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/ns2ir
 
-all:
+include $(OBJDIR)/Makeconf
 
-include ../../GNUmakerules
-
-#
-# These get installed with .tcl extensions.
-# 
-SCRIPTS		= event.tcl parse.tcl stubs.tcl link.tcl postparse \
+LIB_STUFF	= event.tcl stubs.tcl link.tcl \
 		  tcl-object.tcl node.tcl sim.tcl lan.tcl
+LIBEXEC_STUFF	= parse.tcl postparse 
 
 #
-# Currently, all the stuff that gets installed in the bin directory
-# gets duplicated in lib/tbsetup.
-#
-INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/tbsetup/ns2ir
-
-install: $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS))
-
-#
-# Leave these rules here. They should be flushed when we no longer
-# dup this stuff.
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
 # 
-$(INSTALL_LIBTBDIR)/%: %
+all: $(LIB_STUFF) $(LIBEXEC_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_LIBDIR)/ns2ir/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/ns2ir/, $(LIBEXEC_STUFF))
+
+$(INSTALL_LIBDIR)/ns2ir/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBTBDIR)
+	-mkdir -p $(INSTALL_LIBDIR)/ns2ir
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBEXECDIR)/ns2ir/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/ns2ir
 	$(INSTALL) $< $@
 
 clean:

@@ -69,26 +69,24 @@ if {[file exists $scriptdir/ns2ir]} {
     set sqldir $updir/lib
 } else {
     # install tree
-    set updir [file dirname $scriptdir]/lib
-    set scriptdir [file dirname $scriptdir]/lib/tbsetup
-    set sqldir $updir
+    set topdir [file dirname $scriptdir]
 }
 
-load $sqldir/sql.so
+load $topdir/lib/sql.so
 
-set lockfile "/usr/testbed/locks/tblock"
-set ns2ir "$scriptdir/ns2ir/parse.tcl"
-set postparse "$scriptdir/ns2ir/postparse"
-set assign "$scriptdir/ir/assign_wrapper"
-set postassign "$scriptdir/ir/postassign"
-set handle_ip "$scriptdir/ir/handle_ip"
-set handle_os "$scriptdir/ir/handle_os"
-set avail "$updir/db/avail"
-set ptopgen "$updir/db/ptopgen"
+set lockfile "$topdir/locks/tblock"
+set ns2ir "$topdir/libexec/ns2ir/parse.tcl"
+set postparse "$topdir/libexec/ns2ir/postparse"
+set assign "$topdir/libexec/ir/assign_wrapper"
+set postassign "$topdir/libexec/ir/postassign"
+set handle_ip "$topdir/libexec/ir/handle_ip"
+set handle_os "$topdir/libexec/ir/handle_os"
+set avail "$topdir/sbin/avail"
+set ptopgen "$topdir/libexec/ptopgen"
 set ptopfile "/tmp/testbed[pid].ptop"
-set reserve "$updir/db/nalloc"
-set nfree "$updir/db/nfree"
-set libir "$scriptdir/ir/libir.tcl"
+set reserve "$topdir/bin/nalloc"
+set nfree "$topdir/bin/nfree"
+set libir "$topdir/lib/ir/libir.tcl"
 set maxtries 5
 
 source $libir

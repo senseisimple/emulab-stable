@@ -117,7 +117,7 @@ if (! $query_result) {
 #
 # Remove the user account from the control nodes.
 #
-SUEXEC($uid, "flux", "rmacct-ctrl_wrapper $target_uid", 0);
+SUEXEC($uid, "flux", "rmacct-ctrl $target_uid", 0);
 
 #
 # Warm fuzzies.

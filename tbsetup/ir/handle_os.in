@@ -8,7 +8,13 @@
 # Yet to do:
 # Any sort of delta support
 
-push(@INC,"/usr/testbed/lib/tbsetup/ir");
+#
+# Configure variables
+#
+my $IRLIB  = "@prefix@/lib/ir";
+my $DBNAME = "@TBDBNAME@";
+
+push(@INC, $IRLIB);
 require libir;
 
 if ($#ARGV != 1) {
@@ -20,7 +26,7 @@ if ($#ARGV != 1) {
 use DBI;
 
 $driver = "mysql";
-$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost") 
+$dbh = DBI->connect("DBI:$driver:database=$DBNAME;host=localhost") 
     || die "Could not connect to DB.\n";
 
 # List of ERROR messages

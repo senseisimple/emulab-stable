@@ -1,8 +1,13 @@
-include ../../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= os/imagezip
+
+include $(OBJDIR)/Makeconf
 
 all:	imagezip imageunzip
 
-include ../../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS = -O2 -g
 LIBS = -lz

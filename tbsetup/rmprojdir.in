@@ -12,12 +12,18 @@ use English;
 # TODO: Allow for the head of a project delete it.
 #
 
+#
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $PROJROOT = "/proj";
-my $dbh      = Mysql->connect("localhost","tbdb","script","none");
+my $dbh      = Mysql->connect("localhost",$DBNAME,"script","none");
 my $db_result= "";
 
 #

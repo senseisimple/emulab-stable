@@ -540,6 +540,7 @@ int main(int argc, char *argv[])
 	exit(118);
     }
 
+#ifndef TESTBED
     /*
      * Error out if the file is setuid or setgid.
      */
@@ -548,7 +549,6 @@ int main(int argc, char *argv[])
 	exit(119);
     }
 
-#ifndef TESTBED
     /*
      * Error out if the target name/group is different from
      * the name/group of the cwd or the program.

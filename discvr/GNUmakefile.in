@@ -1,11 +1,16 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= discvr
+
+include $(OBJDIR)/Makeconf
 
 all: cli serv
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS=get_ifi_info.o get_rtaddrs.o net_rt_iflist.o sock_ntop.o util.o
 SOBJS=serv_listen.o recvfromflags.o if_indextoname.o reply.o serv.o forw_requests.o

@@ -32,9 +32,14 @@
 # assign is the path to assign
 $delaythresh = .25;
 $maxrun = 5;
-$assign = "/usr/testbed/lib/assign";
 
-push(@INC,"/usr/testbed/lib/tbsetup/ir");
+#
+# Configure variables
+#
+my $IRLIB  = "@prefix@/lib/ir";
+my $assign = "@prefix@/libexec/assign";
+
+push(@INC,$IRLIB);
 require libir;
 
 $verbose = -1;

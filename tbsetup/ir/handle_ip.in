@@ -10,12 +10,18 @@
 # This is the prefix used for assigning otherwise unassigned IP addresses:
 $ip_base = "192.168";
 
-push(@INC,"/usr/testbed/lib/tbsetup/ir");
+#
+# Configure variables
+#
+my $IRLIB  = "@prefix@/lib/ir";
+my $DBNAME = "@TBDBNAME@";
+
+push(@INC, $IRLIB);
 require libir;
 
 use DBI;
 $driver = "mysql";
-$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost") || do {
+$dbh = DBI->connect("DBI:$driver:database=$DBNAME;host=localhost") || do {
     print STDERR "Could not connect to DB.\n";
     exit(1);
 };

@@ -1,8 +1,13 @@
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= tip
+
+include $(OBJDIR)/Makeconf
 
 all: tip.static # tip
 
-include ../GNUmakerules
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 CC = gcc -g -O2
 

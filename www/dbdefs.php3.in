@@ -2,7 +2,7 @@
 #
 # Database Constants
 #
-$TBDBNAME       = "tbdb";
+$TBDBNAME       = "@TBDBNAME@";
 
 $TBDB_UIDLEN    = 8;
 $TBDB_PIDLEN    = 12;

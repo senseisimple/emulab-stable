@@ -29,14 +29,16 @@ if {[file exists $scriptdir/ns2ir]} {
 } else {
     # install tree
     set updir [file dirname $scriptdir]/lib
-    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+    set scriptdir [file dirname $scriptdir]/lib
+    set bindir [file dirname $scriptdir]/bin
+    set sbindir [file dirname $scriptdir]/sbin
 }
 
-set nfree "$updir/db/nfree"
+set nfree "$bindir/nfree"
 set libir "$scriptdir/ir/libir.tcl"
-set resetvlans "$scriptdir/resetvlans"
+set resetvlans "$sbindir/resetvlans"
 
-load /usr/testbed/lib/sql.so
+load $updir/sql.so
 
 if {$argc != 3 && $argc != 2} {
     puts stderr "Syntax: $argv0 <pid> <eid>"

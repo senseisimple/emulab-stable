@@ -1,33 +1,42 @@
 #
 # Insert Copyright Here.
 #
-include ../Makeconf
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= tbsetup
 
-SUBDIRS		= checkpass
-SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
-		  power resetvlans savevlans snmpit tbend \
-		  tbrun tbprerun tbreport vpower vsnmpit killtip \
-		  mkacct-ctrl_wrapper rmacct-ctrl_wrapper rmprojdir_wrapper \
-		  sched_reload os_setup
-SUSCRIPTS	= mkprojdir rmprojdir os_setup  \
-	          mkacct-ctrl rmacct-ctrl os_load console_setup
-SBINSCRIPTS     = console_setup.proxy
+include $(OBJDIR)/Makeconf
 
-all:	$(BINS) $(SUBDIRS)
+SUBDIRS		= checkpass ir ns2ir
 
-include ../GNUmakerules
+BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
+		  vpower vsnmpit os_load
 
-.PHONY:	checkpass
+SBIN_STUFF	= resetvlans savevlans console_setup.proxy sched_reload
+
+LIBEXEC_STUFF	= mkprojdir rmprojdir mkacct-ctrl rmacct-ctrl \
+		  os_setup mkexpdir tbdoit tbstopit console_setup
+
+LIB_STUFF       = libtbsetup.pm
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+.PHONY:	checkpass ir ns2ir
 checkpass:
 	@$(MAKE) -C checkpass all
+ir:
+	@$(MAKE) -C ir all
+ns2ir:
+	@$(MAKE) -C ns2ir all
 
-#
-# Currently, all the stuff that gets installed in the bin directory
-# gets duplicated in lib/tbsetup.
-#
-INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/tbsetup
-
-install: script-install subdir-install
+install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
 
 #
@@ -38,54 +47,29 @@ subdir-install:
 	@$(MAKE) -C ir install	
 	@$(MAKE) -C ns2ir install
 
-script-install:	$(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SUSCRIPTS)) \
-	 $(addprefix $(INSTALL_SBINDIR)/, $(SBINSCRIPTS))
-
-#
-# Leave these rules here. They should be flushed when we no longer
-# dup this stuff.
-# 
-$(INSTALL_LIBTBDIR)/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBTBDIR)
-	$(INSTALL) $< $@
-
-$(INSTALL_LIBTBDIR)/%: %.tcl
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBTBDIR)
-	$(INSTALL) $< $@
+script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
+	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
 
 post-install: 
-	chown root $(INSTALL_BINDIR)/mkprojdir
-	chmod u+s $(INSTALL_BINDIR)/mkprojdir
-	chown root $(INSTALL_BINDIR)/rmprojdir
-	chmod u+s $(INSTALL_BINDIR)/rmprojdir
-	chown root $(INSTALL_BINDIR)/mkacct-ctrl
-	chmod u+s $(INSTALL_BINDIR)/mkacct-ctrl
-	chown root $(INSTALL_LIBTBDIR)/mkacct-ctrl
-	chmod u+s $(INSTALL_LIBTBDIR)/mkacct-ctrl
-	chown root $(INSTALL_BINDIR)/rmacct-ctrl
-	chmod u+s $(INSTALL_BINDIR)/rmacct-ctrl
-	chown root $(INSTALL_LIBTBDIR)/rmacct-ctrl
-	chmod u+s $(INSTALL_LIBTBDIR)/rmacct-ctrl
-	chown root $(INSTALL_BINDIR)/os_setup
-	chmod u+s $(INSTALL_BINDIR)/os_setup
-	chown root $(INSTALL_LIBTBDIR)/os_setup
-	chmod u+s $(INSTALL_LIBTBDIR)/os_setup
+	chown root $(INSTALL_LIBEXECDIR)/mkprojdir
+	chmod u+s $(INSTALL_LIBEXECDIR)/mkprojdir
+	chown root $(INSTALL_LIBEXECDIR)/rmprojdir
+	chmod u+s $(INSTALL_LIBEXECDIR)/rmprojdir
+	chown root $(INSTALL_LIBEXECDIR)/mkacct-ctrl
+	chmod u+s $(INSTALL_LIBEXECDIR)/mkacct-ctrl
+	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
+	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
+	chown root $(INSTALL_LIBEXECDIR)/os_setup
+	chmod u+s $(INSTALL_LIBEXECDIR)/os_setup
 	chown root $(INSTALL_BINDIR)/os_load
 	chmod u+s $(INSTALL_BINDIR)/os_load
-	chown root $(INSTALL_LIBTBDIR)/os_load
-	chmod u+s $(INSTALL_LIBTBDIR)/os_load
-	chown root $(INSTALL_BINDIR)/console_setup
-	chmod u+s $(INSTALL_BINDIR)/console_setup
-	chown root $(INSTALL_LIBTBDIR)/console_setup
-	chmod u+s $(INSTALL_LIBTBDIR)/console_setup
+	chown root $(INSTALL_LIBEXECDIR)/console_setup
+	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
 
 clean:	subdir-clean
-	rm -f *.o $(BINS) core
+	rm -f *.o core tbprerun tbrun tbend tbreport
 
 subdir-clean:
 	@$(MAKE) -C checkpass clean
@@ -98,3 +82,10 @@ subdir-distclean:
 	@$(MAKE) -C checkpass distclean
 	@$(MAKE) -C ir distclean
 	@$(MAKE) -C ns2ir distclean
+
+#
+# XXX Create non .tcl files.
+#
+%: %.tcl
+	cp -p $< $@
+

@@ -25,13 +25,19 @@ use English;
 # 
 # usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]
 #
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
 my $rsh		= "sshtb -q";
 my $ssh		= "sshtb -q";
-my $TB		= "/usr/testbed/bin";
 my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "155.99.214.70";
 my $PLASTICADDR	= "155.99.214.74";
-my $power	= "$TB/power";
+my $power	= "$TB/bin/power";
 my $ping	= "/sbin/ping";
 my $dbg		= 1;
 my %waitfor     = ();
@@ -50,7 +56,7 @@ $| = 1; #Turn off line buffering on output
 # Set up for querying the database.
 # 
 use Mysql;
-my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 if ( $#ARGV < 3) {
     die("Usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]\n".
@@ -132,14 +138,14 @@ else {
 # XXX This test is wrong of course. Need a regex, and the project name.
 # 
 my $cmdline = "";
-if (index($imagepath, "/usr/testbed/images/") >= 0) {
+if (index($imagepath, "$TB/images/") >= 0) {
     $cmdline = "${PAPERADDR}:$imagepath $diskpart";
 }
 elsif (index($imagepath, "/proj/") >= 0) {
     $cmdline = "${PLASTICADDR}:$imagepath $diskpart";
 }
 else {
-    die("Your image must reside in /usr/testbed/images or /proj");
+    die("Your image must reside in $TB/images or /proj");
 }
 
 #

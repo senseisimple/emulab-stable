@@ -1,9 +1,15 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: rmacct-ctrl,v 1.2 2000-12-18 20:44:21 kwright Exp $
+### $Id: rmacct-ctrl.in,v 1.1 2001-01-04 01:17:09 stoller Exp $
 
 use English;
 use Mysql;
+
+#
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
 
 my $me;                # alphanumeric username of $UID 
 
@@ -27,7 +33,7 @@ dowork();
 exit(0);
 
 sub dbsetup() {
-    $dbh = Mysql->connect("localhost", "tbdb", "script", "none");
+    $dbh = Mysql->connect("localhost", $DBNAME, "script", "none");
 }
 
 #
