@@ -363,6 +363,10 @@ REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','READY','Unlock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','LOCKED','Lock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','FROZEN','LOCKED','Lock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','FROZEN','Freeze');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','UNVERIFIED','Un-Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','UNAPPROVED','Un-Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','UNAPPROVED','NEW','Un-Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','UNVERIFIED','NEW','Un-Approve');
 
 --
 -- Dumping data for table `state_triggers`
