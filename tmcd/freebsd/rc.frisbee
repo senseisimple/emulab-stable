@@ -66,7 +66,8 @@ fi
 #	split remaining memory (at least 2MB) between network/disk buffering
 #	in frisbee
 #
-HOSTMEM=`dmesg | grep 'avail memory' | sed -e 's/.* (\([0-9]*\)K bytes.*/\1/'`
+HOSTMEM=`sysctl -n hw.usermem`
+HOSTMEM=`expr $HOSTMEM / 1024`
 if [ $HOSTMEM -ge 26624 ]; then
 	HOSTMEM=`expr $HOSTMEM - 24576`
 	ulimit -v $HOSTMEM
