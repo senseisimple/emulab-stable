@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -20,17 +20,20 @@ include("defs.php3");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$isadmin = ISADMIN($uid);
 
 # List of valid toggles
-$toggles = array("adminoff", "webfreeze");
+$toggles = array("adminoff", "webfreeze", "lockdown");
 
 # list of valid values for each toggle
 $values  = array("adminoff"  => array(0,1),
-		 "webfreeze" => array(0,1));
+		 "webfreeze" => array(0,1),
+		 "lockdown"  => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
 $optargs = array("adminoff"  => array("target_uid" => 0),
-		 "webfreeze" => array("target_uid" => 1));
+		 "webfreeze" => array("target_uid" => 1),
+		 "lockdown"  => array("pid" => 1, "eid" => 1));
 
 # Mandatory page arguments.
 $type  = $_GET['type'];
@@ -91,6 +94,17 @@ elseif ($type == "webfreeze") {
     }
     DBQueryFatal("update users set weblogin_frozen='$value' ".
 		 "where uid='$target_uid'");
+}
+elseif ($type == "lockdown") {
+    # must be admin
+    if (! $isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (!TBValidExperiment($pid, $eid)) {
+	PAGEARGERROR("Experiment $pid/$eid is not a valid experiment!");
+    }
+    DBQueryFatal("update experiments set lockdown='$value' ".
+		 "where pid='$pid' and eid='$eid'");
 }
 else {
     USERERROR("Nobody has permission to toggle $type!", 1);

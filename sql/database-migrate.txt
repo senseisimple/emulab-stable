@@ -2333,3 +2333,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	  KEY node_id (node_id)
 	) TYPE=MyISAM;
 
+1.301: Add a "lockdown" bit to the experiments table to prevent
+       accidental swaps, even by admin people.
+
+         alter table experiments add lockdown tinyint(1) NOT NULL \
+              default '0' after security_level;

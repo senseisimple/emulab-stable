@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -85,6 +85,7 @@ $swappable     = $row[swappable];
 $idleswap_bit  = $row[idleswap];
 $idleswap_time = $row[idleswap_timeout];
 $idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
+$lockdown      = $row["lockdown"];
 
 #
 # Verify permissions.
@@ -124,6 +125,12 @@ elseif (!strcmp($inout, "restart")) {
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+
+# A locked down experiment means just that!
+if ($lockdown) {
+    echo "<br><br>\n";
+    USERERROR("Cannot proceed; the experiment is locked down!", 1);
+}
 
 #
 # We run this twice. The first time we are checking for a confirmation

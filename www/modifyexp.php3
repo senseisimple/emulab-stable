@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -75,6 +75,12 @@ if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
     # Netbuild requires the following line.
     echo "\n\n<!-- NetBuild! No permission to modify -->\n\n";	
     USERERROR("You do not have permission to modify this experiment.", 1);
+}
+
+if (TBExptLockedDown($pid, $eid)) {
+    # Netbuild requires the following line.
+    echo "\n\n<!-- NetBuild! No permission to modify -->\n\n";	
+    USERERROR("Cannot proceed; experiment is locked down!", 1);
 }
 
 $expstate = TBExptState($pid, $eid);

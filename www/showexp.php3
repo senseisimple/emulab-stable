@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -60,7 +60,8 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 #
 $query_result =
     DBQueryFatal("select e.idx,e.state,e.batchmode,e.linktest_pid,".
-		 "       e.paniced,e.panic_date,s.rsrcidx,r.wirelesslans ".
+		 "       e.paniced,e.panic_date,s.rsrcidx,r.wirelesslans, ".
+		 "       e.lockdown ".
 		 "  from experiments as e ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as r on s.rsrcidx=r.idx ".
@@ -74,6 +75,7 @@ $wireless   = $row["wirelesslans"];
 $linktest_running = $row["linktest_pid"];
 $paniced    = $row["paniced"];
 $panic_date = $row["panic_date"];
+$lockdown   = $row["lockdown"];
 
 #
 # Get a list of node types and classes in this experiment
@@ -114,48 +116,51 @@ if ($expstate) {
     WRITESUBMENUBUTTON("Download NS File",
 		       "spitnsdata.php3?pid=$exp_pid&eid=$exp_eid");
 
-    # Swap option.
-    if ($isbatch) {
-	if ($expstate == $TB_EXPTSTATE_SWAPPED) {
-	    WRITESUBMENUBUTTON("Queue Batch Experiment",
-			"swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+    if (!$lockdown) {
+        # Swap option.
+	if ($isbatch) {
+	    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
+		WRITESUBMENUBUTTON("Queue Batch Experiment",
+			 "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+	    }
+	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
+		    $expstate == $TB_EXPTSTATE_ACTIVATING) {
+		WRITESUBMENUBUTTON("Stop Batch Experiment",
+			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	    }
+	    elseif ($expstate == $TB_EXPTSTATE_QUEUED) {
+		WRITESUBMENUBUTTON("Dequeue Batch Experiment",
+			 "swapexp.php3?inout=pause&pid=$exp_pid&eid=$exp_eid");
+	    }
 	}
-	elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
-		$expstate == $TB_EXPTSTATE_ACTIVATING) {
-	    WRITESUBMENUBUTTON("Stop Batch Experiment",
-			"swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	else {
+	    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
+		WRITESUBMENUBUTTON("Swap Experiment In",
+			 "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+	    }
+	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
+		    ($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
+		WRITESUBMENUBUTTON("Swap Experiment Out",
+			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	    }
+	    elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
+		WRITESUBMENUBUTTON("Cancel Experiment Swapin",
+				   "swapexp.php3?inout=out".
+				   "&pid=$exp_pid&eid=$exp_eid");
+	    }
 	}
-	elseif ($expstate == $TB_EXPTSTATE_QUEUED) {
-	    WRITESUBMENUBUTTON("Dequeue Batch Experiment",
-			"swapexp.php3?inout=pause&pid=$exp_pid&eid=$exp_eid");
+    
+	if ($expstate != $TB_EXPTSTATE_PANICED) {
+	    WRITESUBMENUBUTTON("Terminate Experiment",
+			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
-    }
-    else {
-	if ($expstate == $TB_EXPTSTATE_SWAPPED) {
-	    WRITESUBMENUBUTTON("Swap Experiment In",
-			"swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
-	}
-	elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
-		($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
-	    WRITESUBMENUBUTTON("Swap Experiment Out",
-			"swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
-	}
-	elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
-	    WRITESUBMENUBUTTON("Cancel Experiment Swapin",
-			       "swapexp.php3?inout=out".
-			       "&pid=$exp_pid&eid=$exp_eid");
-	}
-    }
-    if ($expstate != $TB_EXPTSTATE_PANICED) {
-	WRITESUBMENUBUTTON("Terminate Experiment",
-			   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
-    }
 
-    # Batch experiments can be modifed only when paused.
-    if ($expstate == $TB_EXPTSTATE_SWAPPED ||
-	(!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE)) {
-	WRITESUBMENUBUTTON("Modify Experiment",
-			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+        # Batch experiments can be modifed only when paused.
+	if ($expstate == $TB_EXPTSTATE_SWAPPED ||
+	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE)) {
+	    WRITESUBMENUBUTTON("Modify Experiment",
+			       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+	}
     }
     
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {

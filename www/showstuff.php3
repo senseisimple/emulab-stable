@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -633,6 +633,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $usemodelnet = $exprow["usemodelnet"];
     $mnet_cores  = $exprow["modelnet_cores"];
     $mnet_edges  = $exprow["modelnet_edges"];
+    $lockdown    = $exprow["lockdown"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -827,8 +828,17 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                       <td class=\"left\">$lastswapreq</td>
                   </tr>\n";
 	}
+
+	$lockflip = ($lockdown ? 0 : 1);
+	$lockval  = ($lockdown ? "Yes" : "No");
+	echo "<tr>
+                   <td>Locked Down:</td>
+                   <td>$lockval (<a href=toggle.php?pid=$pid&eid=$eid".
+	                            "&type=lockdown&value=$lockflip>Toggle</a>)
+                   </td>
+              </tr>\n";
     }
-    
+
     if ($batchmode) {
 	    echo "<tr>
                     <td>Batch Mode: </td>

@@ -1918,6 +1918,22 @@ function TBWebCamAllowed($uid) {
 }
 
 #
+# Return lockeddown bit
+#
+function TBExptLockedDown($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select lockdown from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if (!$query_result || !mysql_num_rows($query_result))
+	return 0;
+
+    $row = mysql_fetch_array($query_result);
+    return $row[0];
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;

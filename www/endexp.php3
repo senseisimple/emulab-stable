@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -49,6 +49,12 @@ if (! TBExptGroup($exp_pid, $exp_eid, $exp_gid)) {
 	      "in project $exp_pid.", 1);
 }
 
+$query_result =
+    DBQueryFatal("select lockdown FROM experiments WHERE ".
+		 "eid='$exp_eid' and pid='$exp_pid'");
+$row       = mysql_fetch_array($query_result);
+$lockdown  = $row["lockdown"];
+
 #
 # Verify permissions.
 #
@@ -60,7 +66,13 @@ echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
      "<a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>".
      "</b></font>\n";
-    
+
+# A locked down experiment means just that!
+if ($lockdown) {
+    echo "<br><br>\n";
+    USERERROR("Cannot proceed; the experiment is locked down!", 1);
+}
+   
 #
 # We run this twice. The first time we are checking for a confirmation
 # by putting up a form. The next time through the confirmation will be

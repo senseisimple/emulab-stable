@@ -378,6 +378,7 @@ CREATE TABLE experiments (
   security_level tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',
   panic_date datetime default NULL,
+  lockdown tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)

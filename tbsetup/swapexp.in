@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -333,6 +333,7 @@ my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
 my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
 my $rendering   = $hashrow{'prerender_pid'};
 my $elabinelab  = $hashrow{'elab_in_elab'};
+my $lockdown    = $hashrow{'lockdown'};
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
@@ -369,6 +370,10 @@ if ($batch) {
 	if (!defined($expt_locked) ||
 	    $batchstate ne BATCHSTATE_LOCKED());
 
+    die("*** $0:\n".
+	"    Batch experiment $pid/$eid is locked down; cannot be swapped!\n")
+	if ($lockdown);
+
     if ($inout eq "in") {
 	die("*** $0:\n".
 	    "    Batch experiment $pid/$eid is not in the proper state!\n".
@@ -399,6 +404,9 @@ else {
 	#
 	ExitWithStatus(1, "Batch experiment $pid/$eid is still canceling!")
 	    if ($canceled);
+
+	ExitWithStatus(1, "Batch experiment $pid/$eid is locked down!")
+	    if ($lockdown);
 
 	if ($inout eq "in") {
 	    ExitWithStatus(1,
@@ -479,9 +487,12 @@ else {
  		       "Experiment $pid/$eid is an active ElabInElab.\n".
  		       "You cannot modify this type of experiment while it\n".
  		       "is swapped in. We hope to support this soon.\n")
- 	    if ($inout eq "modify" &&
- 		($elabinelab || defined($elabinelab_eid)) &&
+ 	    if ($inout eq "modify" && $elabinelab &&
  		$estate ne EXPTSTATE_SWAPPED());
+
+ 	ExitWithStatus(1,
+		       "Experiment $pid/$eid is locked down; cannot swap!\n")
+	    if ($lockdown);
 
 	#
 	# Check the state for the various operations.
