@@ -4260,7 +4260,11 @@ COMMAND_PROTOTYPE(dojailconfig)
 		"SSHDPORT=%d\n"
 		"SYSVIPC=1\n"
 		"INETRAW=1\n"
-		"BPFRO=1\n", low, high, sport);
+		"BPFRO=1\n"
+		"INADDRANY=1\n"
+		"ROUTING=1\n"
+		"DEVMEM=1\n",
+		low, high, sport);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 
