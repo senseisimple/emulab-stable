@@ -43,6 +43,15 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 }
 
 #
+# Spit out an image that refers to a php script. That script will run and
+# send back the GIF image contents.
+#
+echo "<br>
+      <center>
+       <img src='top2gif.php3?pid=$exp_pid&eid=$exp_eid' align=center>
+      </center>\n";
+
+#
 # Dump the NS file so that the user can cross reference the visualization
 # against the NS file that created it.
 # 
@@ -53,18 +62,10 @@ if (mysql_num_rows($query_result)) {
     $row    = mysql_fetch_array($query_result);
     $nsfile = $row[nsfile];
 
+    echo "<br><br>\n";
     echo "<XMP>$nsfile</XMP>\n";
     flush();
 }
-
-#
-# Spit out an image that refers to a php script. That script will run and
-# send back the GIF image contents.
-#
-echo "<br>
-      <center>
-       <img src='top2gif.php3?pid=$exp_pid&eid=$exp_eid' align=center>
-      </center>\n";
 
 #
 # Standard Testbed Footer
