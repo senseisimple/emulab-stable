@@ -573,3 +573,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
         update experiments set expt_swap_uid=expt_head_uid
 		where expt_swapped is not null;
+
+1.148: Add usr_shell to users table to specify user's preferred shell.
+       Retroactively make each user's preferred shell 'tcsh'.
+       
+       ALTER TABLE users ADD COLUMN usr_shell TINYTEXT AFTER usr_phone;
+       UPDATE users SET usr_shell='tcsh';

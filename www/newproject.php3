@@ -912,14 +912,14 @@ if (! $returning) {
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
-	 " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
+	 " usr_URL,usr_title,usr_affil,usr_phone,usr_shell,usr_pswd,unix_uid,".
 	 " status,pswd_expires,usr_modified) ".
 	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
          "'$usr_email', ".
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
 	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
+	 "'$usr_phone', 'tcsh', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now())");
 
     DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");

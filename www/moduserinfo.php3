@@ -22,6 +22,10 @@ LOGGEDINORDIE($uid,
 	      CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
+
+$shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
+$defaultshell = 'tcsh';
+
 #
 # Spit the form out using the array of data and error strings (if any).
 # 
@@ -29,6 +33,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
     global $target_uid;
+    global $shelllist, $defaultshell;
     
     #
     # Standard Testbed Header. Written late cause of password
@@ -194,6 +199,28 @@ function SPITFORM($formfields, $errors)
                </table></center></td></tr>";
 
 	#
+	# Default Group
+	#
+
+	# $q = DBQueryWarn("select gid, pid
+
+	# Default Shell
+        echo "<tr><td colspan=2>Shell:</td>
+                  <td class=left>";
+        echo "<select name=\"formfields[usr_shell]\">";
+	foreach ($shelllist as $s) {
+	    if ((!isset($formfields[usr_shell]) &&
+		0 == strcmp($defaultshell, $s)) ||
+		0 == strcmp($formfields[usr_shell],$s)) {
+		$sel = "selected='1'";
+	    } else {
+		$sel = "";
+	    }
+	    echo "<option value='$s' $sel>$s</option>";
+	}	
+        echo "</select></td></tr>";
+
+	#
 	# Phone
 	#
 	echo "<tr>
@@ -329,6 +356,7 @@ $defaults[usr_name]    = stripslashes($row[usr_name]);
 $defaults[usr_phone]   = $row[usr_phone];
 $defaults[usr_title]   = stripslashes($row[usr_title]);
 $defaults[usr_affil]   = stripslashes($row[usr_affil]);
+$defaults[usr_shell]   = stripslashes($row[usr_shell]);
 
 #
 # On first load, display a form consisting of current user values, and exit.
@@ -358,6 +386,10 @@ if (!isset($formfields[usr_name]) ||
 if (!isset($formfields[usr_affil]) ||
     strcmp($formfields[usr_affil], "") == 0) {
     $errors["Affiliation"] = "Missing Field";
+}
+if (!isset($formfields[usr_shell]) ||
+    !in_array($formfields[usr_shell], $shelllist)) {
+    $errors["Shell"] = "Invalid Shell";
 }
 if (!isset($formfields[usr_email]) ||
     strcmp($formfields[usr_email], "") == 0) {
@@ -441,6 +473,7 @@ $usr_state    = addslashes($formfields[usr_state]);
 $usr_zip      = addslashes($formfields[usr_zip]);
 $usr_country  = addslashes($formfields[usr_country]);
 $usr_phone    = $formfields[usr_phone];
+$usr_shell    = $formfields[usr_shell];
 $password1    = $formfields[password1];
 $password2    = $formfields[password2];
 
@@ -545,6 +578,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     strcmp($defaults[usr_phone], $formfields[usr_phone]) ||
     strcmp($defaults[usr_title], $formfields[usr_title]) ||
     strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
+    strcmp($defaults[usr_shell], $formfields[usr_shell]) ||
     # Check this too, since we want to call out if the email addr changed.
     strcmp($defaults[usr_email], $formfields[usr_email])) {
 
@@ -560,6 +594,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 		 "usr_phone=\"$usr_phone\",     ".
 		 "usr_title=\"$usr_title\",     ".
 		 "usr_affil=\"$usr_affil\",     ".
+		 "usr_shell=\"$usr_shell\",     ".
 		 "usr_modified=now()            ".
 		 "WHERE uid=\"$target_uid\"");
 
@@ -585,7 +620,8 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "ZIP/Postal Code:   $usr_zip\n".
 	   "Country:           $usr_country\n".
 	   "Phone:             $usr_phone\n".
-	   "Title:             $usr_title\n",
+	   "Title:             $usr_title\n".
+	   "Shell:             $usr_shell\n",
 	   "From: $TBMAIL_OPS\n".
 	   $BCC .
 	   "Errors-To: $TBMAIL_WWW");

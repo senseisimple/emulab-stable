@@ -367,6 +367,7 @@ function SHOWUSER($uid) {
     $usr_country = stripslashes($row[usr_country]);
     $usr_name    = stripslashes($row[usr_name]);
     $usr_phone   = $row[usr_phone];
+    $usr_shell   = stripslashes($row[usr_shell]);
     $usr_title   = stripslashes($row[usr_title]);
     $usr_affil   = stripslashes($row[usr_affil]);
     $status      = $row[status];
@@ -464,6 +465,11 @@ function SHOWUSER($uid) {
     echo "<tr>
               <td>Phone #:</td>
               <td>$usr_phone</td>
+          </tr>\n";
+
+    echo "<tr>
+	      <td>Shell:</td>
+	      <td>$usr_shell</td>
           </tr>\n";
     
     echo "<tr>

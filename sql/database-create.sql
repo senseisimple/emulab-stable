@@ -165,9 +165,8 @@ CREATE TABLE eventlist (
   KEY vnode (vnode)
 ) TYPE=MyISAM;
 
-
 --
--- Table structure for table 'experiment_stats'
+-- Table structure for table 'experiment_resources'
 --
 
 CREATE TABLE experiment_resources (
@@ -1296,6 +1295,7 @@ CREATE TABLE users (
   usr_zip tinytext,
   usr_country tinytext,
   usr_phone tinytext,
+  usr_shell tinytext,
   usr_pswd tinytext NOT NULL,
   unix_uid smallint(5) unsigned NOT NULL auto_increment,
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
