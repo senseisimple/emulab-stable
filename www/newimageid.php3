@@ -858,7 +858,7 @@ SUBMENUSTART("More Options");
 if (! isset($node)) {
     $fooid = rawurlencode($imageid);
     WRITESUBMENUBUTTON("Edit this Image Descriptor",
-		       "editimageid_form.php3?imageid=$fooid");
+		       "editimageid.php3?imageid=$fooid");
     WRITESUBMENUBUTTON("Delete this Image Descriptor",
 		       "deleteimageid.php3?imageid=$fooid");
 }
