@@ -442,15 +442,18 @@ int main(int argc, char *argv[])
 	ngroups = NGROUPS;
 	getgrouplist(actual_uname, primary_gid, groups, &ngroups);
 	if (ngroups == NGROUPS) {
-		log_err("emerg: failed to getgroups (%ld: %s)\n", gid, cmd);
-		exit(109);
+		log_err("crit: Too many groups (%ld: %s)\n", gid, cmd);
 	}
 	for (i = 0; i < ngroups; i++) {
 		if (groups[i] == gid)
 			break;
 	}
-	if (i == ngroups)
+	if (i == ngroups) {
+		/* Nasty! */
+		if (i == NGROUPS)
+			ngroups--;
 		groups[ngroups++] = gid;
+	}
 	
 	if (((setgid(primary_gid)) != 0) ||
 	    (setgroups(ngroups, groups) != 0)) {
