@@ -448,7 +448,7 @@ function PAGEFOOTER() {
 <!-- end content -->
               </td>
             </tr><tr>
-              <td class="contentbody">
+              <td colspan=2 class="contentbody">
 	        <center><font size=-1>
 		[&nbsp;<a href="http://www.cs.utah.edu/flux/"
                 >The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
