@@ -235,6 +235,10 @@ my $forcelinkdelays;
 my $usewatunnels;
 my $multiplex_factor;
 
+# For admission control. Not well defined yet.
+my $cpu_usage;
+my $mem_usage;
+
 ######################################################################
 
 # ips is indexed by node:port and contains the IP address for the port.
@@ -280,6 +284,7 @@ my $minimum_nodes;
 my $maximum_nodes;
 my $remotecount  = 0;
 my $virtcount    = 0;
+my $plabcount    = 0;
 my $needwanassign= 0;
 
 #
@@ -294,6 +299,8 @@ my %expt_stats = (# pnodes include jailnodes and delaynodes.
 		  vnodes      => 0,
                   # vnodes include wanodes.
 		  wanodes     => 0,
+		  # wanodes includes plabnodes.
+		  plabnodes   => 0,
 		  simnodes    => 0,
 		  delaynodes  => 0,
 		  linkdelays  => 0,
@@ -2593,6 +2600,7 @@ sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
 sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
 sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
 sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
+sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 
 #
 # Load up the virt_nodes info, which includes the type info for each
@@ -2632,12 +2640,14 @@ sub LoadVirtNodes()
 	my $isremote= 0;
 	my $isvirt  = 0;
 	my $issub   = 0;
+	my $isplab  = 0;
 
 	# If we have a real type or auxtype ...
 	if (nodetypeistype($type)) {
 	    $isremote = nodetypeisremote($type);
 	    $isvirt   = nodetypeisvirt($type);
 	    $issub    = nodetypeissub($type);
+	    $isplab   = nodetypeisplab($type);
 	}
 	elsif (virttypeisvtype($type)) {
 	    #
@@ -2649,6 +2659,7 @@ sub LoadVirtNodes()
 	    $isremote = nodetypeisremote($vtype);
 	    $isvirt   = nodetypeisvirt($vtype);
 	    $issub    = nodetypeissub($vtype);
+	    $isplab   = nodetypeisplab($vtype);
 	}
 	else {
 	    fatal(1, "*** $0:\n".
@@ -2660,6 +2671,7 @@ sub LoadVirtNodes()
 	$rowref->{"__isremotenode"} = $isremote;
 	$rowref->{"__isvirtnode"}   = $isvirt;
 	$rowref->{"__issubnode"}    = $issub;
+	$rowref->{"__isplabnode"}   = $isplab;
 	$rowref->{"__usewanassign"} = 0;
 	# The mapped osname to actual osid. 
 	$rowref->{"__osid"} = undef;
@@ -2723,6 +2735,8 @@ sub LoadVirtNodes()
 	# VIRT HACK
 	$virtcount++
 	    if ($isvirt);
+	$plabcount++
+	    if ($isplab);
 
 	# stats
 	my @iplist  = split(" ", $ips);
@@ -2790,6 +2804,9 @@ sub virtnodeisvirt($)   {
 }
 sub virtnodeissubnode($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issubnode"};
+}
+sub virtnodeisplabnode($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isplabnode"};
 }
 sub virtnodeisjailed($) {
     return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
@@ -3006,11 +3023,12 @@ sub LoadExperiment()
     # Load experiment settings.
     my $query_result =
 	DBQueryFatal("select uselinkdelays,forcelinkdelays,".
-		     "       multiplex_factor,usewatunnels ".
+		     "       multiplex_factor,usewatunnels, ".
+		     "       cpu_usage,mem_usage ".
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4) = $query_result->fetchrow_array();
+    my ($o1,$o2,$o3,$o4,$o5,$o6) = $query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
     $uselinkdelays = $o1
@@ -3021,6 +3039,10 @@ sub LoadExperiment()
 	if (!defined($multiplex_factor));
     $usewatunnels = $o4
 	if (!defined($usewatunnels));
+    $cpu_usage = $o5
+	if (!defined($cpu_usage));
+    $mem_usage = $o6
+	if (!defined($mem_usage));
 
     LoadVirtTypes();
     LoadVirtNodes();
@@ -3029,6 +3051,7 @@ sub LoadExperiment()
     # Stats
     $expt_stats{"vnodes"}   = $virtcount;
     $expt_stats{"wanodes"}  = $remotecount;
+    $expt_stats{"plabnodes"}= $plabcount;
     $expt_stats{"simnodes"} = scalar(@simnodelist);
 }
 
@@ -3065,7 +3088,12 @@ sub CreateTopFile()
 		my $parent = virtnodeparent($vname);
 		$subnodestr = "subnode_of:$parent";
 	    }
-	    print TOPFILE "node $vname $type $subnodestr\n";
+	    my $desirestr = "";
+	    if (virtnodeisplabnode($vname) && $cpu_usage) {
+		# Yuck
+		$desirestr = "+load:" . (($cpu_usage - 1) / 5.0);
+	    }
+	    print TOPFILE "node $vname $type $subnodestr $desirestr\n";
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;
 	    }
