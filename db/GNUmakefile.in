@@ -10,12 +10,13 @@ include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= mac2if nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
-                  genelists
+                  genelists genelists.proxy
 LIBEXEC_SCRIPTS = 
 LIB_SCRIPTS     = libdb.pm
 
-# Stuff installed on plastic for mere users.
-USERBINS	= nalloc nfree 
+# Stuff installed on plastic.
+USERBINS	= nalloc nfree
+USERSBINS	= genelists.proxy
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -37,7 +38,7 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install:
+control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS))
 	cd $(INSTALL_BINDIR) && \
 		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \

@@ -1019,7 +1019,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
-	db/webcontrol db/node_status db/genelists discvr/GNUmakefile \
+	db/webcontrol db/node_status db/genelists db/genelists.proxy \
+	discvr/GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/mac2if db/nodeip db/showgraph \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
