@@ -30,5 +30,4 @@ xfs:x:43:
 sfs:x:77:
 sshd:x:74:
 smmsp:x:51:
-abone:x:500:
 vcsa:x:69:
