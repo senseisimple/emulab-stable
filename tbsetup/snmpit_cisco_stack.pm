@@ -158,10 +158,8 @@ sub listVlans($) {
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->listVlans()) {
 	    my ($vlan_id, $vlan_number, $memberRef) = @$line;
-	    if ($memberRef) {
-		${$vlans{$vlan_id}}[0] = $vlan_number;
-		push @{${$vlans{$vlan_id}}[1]}, @$memberRef;
-	    }
+	    ${$vlans{$vlan_id}}[0] = $vlan_number;
+	    push @{${$vlans{$vlan_id}}[1]}, @$memberRef;
 	}
     }
 
@@ -471,6 +469,9 @@ sub removeVlan($@) {
 	    }
 	}
 
+	print "Removing ports on $devicename from VLANS " . 
+	    join(",",@existant_vlans)."\n" if $self->{DEBUG};
+
 	$errors += $device->removePortsFromVlan(@existant_vlans);
 
 	#
@@ -595,7 +596,7 @@ sub setVlanOnTrunks($$$;@) {
 	    my $device = $self->{DEVICES}{$devicename};
 	    foreach my $line ($device->listVlans()) {
 		my ($vlan_id, $vlan, $memberRef) = @$line;
-		if (($vlan == $vlan_number) && $memberRef && @$memberRef){
+		if (($vlan == $vlan_number)){
 		    push @switches, $devicename;
 		}
 	    }

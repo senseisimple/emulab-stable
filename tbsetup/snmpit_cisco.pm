@@ -930,7 +930,7 @@ sub removePortsFromVlan($@) {
     # Make a hash of the vlan number for easy lookup later
     #
     my %vlan_numbers = ();
-    @vlan_numbers{@vlan_numbers} = 1;
+    @vlan_numbers{@vlan_numbers} = @vlan_numbers;
 
     #
     # Get a list of the ports in the VLAN
@@ -1101,6 +1101,7 @@ sub listVlans($) {
     #
     my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanName);
     my %Names = ();
+    my %Members = ();
     foreach my $rowref (@$rows) {
 	my ($name,$vlan_number,$vlan_name) = @$rowref;
 	#
@@ -1109,9 +1110,10 @@ sub listVlans($) {
 	#
 	$vlan_number =~ s/^1\.//;
 
-	$self->debug("Got $name $vlan_number $vlan_name\n",3);
+	$self->debug("Got $name $vlan_number $vlan_name\n");
 	if (!$Names{$vlan_number}) {
 	    $Names{$vlan_number} = $vlan_name;
+	    @{$Members{$vlan_number}} = ();
 	}
     }
 
@@ -1119,7 +1121,6 @@ sub listVlans($) {
     # Walk the tree for the VLAN members
     #
     ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
-    my %Members = ();
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$vlan_number) = @$rowref;
 	$self->debug("Got $name $modport $vlan_number\n",3);
@@ -1129,6 +1130,10 @@ sub listVlans($) {
 	    $node = $self->{NAME} . ".$modport";
 	}
 	push @{$Members{$vlan_number}}, $node;
+	if (!$Names{$vlan_number}) {
+	    $self->debug("listVlans: WARNING: port $self->{NAME}.$modport in non-existant " .
+		"VLAN $vlan_number\n");
+	}
     }
 
     #
@@ -1144,7 +1149,7 @@ sub listVlans($) {
     	    push @list, [$Names{$vlan_id},$vlan_id,$Members{$vlan_id}];
     	}
     }
-    $self->debug(join("\n",@list)."\n",2);
+    $self->debug(join("\n",(map {join ",", @$_} @list))."\n");
 
     return @list;
 }
