@@ -1,0 +1,34 @@
+
+
+	osstatus <node> - Returns current base and deltas of node.
+	osstatus -v <node> - Returns current base and deltas of node
+			with descriptions of deltas.
+	osstatus -vv <node> - Returns above + actual RPMs in deltas.
+
+	osnodestatus <node> - Like os status except that it asks the
+		node rather than the DB.
+
+	ossane <node> - Checks to see if the DB agrees with the OS.
+
+	osnode2db <node> - Sets the DB status to match the node status.
+	
+	osdb2node <node> - Sets the node up to match the DB.
+
+	osset <node> <base> <deltas> - Sets the state of a node.  <base> can
+		be "" to indicate no change.  <deltas> is zero or more entries
+		that can be prefixed with + or - to indicate addition or
+		deletion.  This only sets the DB.
+
+	oslist <what> - Lists from the DB.  <what> can be "" which indicates
+		to list base images or it can be an image id which will
+		mean it should list the deltas available for that image.
+
+General usage:
+
+To configure a node N:
+	osset N ...
+	osdb2node N
+	ossane N
+
+
+	
