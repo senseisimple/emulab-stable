@@ -216,7 +216,7 @@ sub getbandwidth {
 # Open the TOP file
 $topfile = "$pid-$eid-$$.top";
 open(TOPFILE,"> $topfile") || do {
-    print STDERR "Could not open $topfile.\n";
+    print STDERR "$0: *** Could not open $topfile.\n";
     exit(1);
 };
 
@@ -372,7 +372,7 @@ while (1) {
 		     " and a.type != \"shark\"");
     
     if ($numnodes < $minimum_nodes) {
-	print STDERR "Insufficient nodes available.\n";
+	print STDERR "$0: *** Insufficient nodes available.\n";
 	exit(2);
     }
 
@@ -436,10 +436,10 @@ while (1) {
 		  last SWITCH1;
 	      };
 	      /^interswitch$/ && do {
-		  print STDERR "Unsupported link type: interswitch.\n";
+		  print STDERR "$0: *** Unsupported link type: interswitch.\n";
 	      };
 	      /^direct$/ && do {
-		  print STDERR "Unsupported link type: direct.\n";
+		  print STDERR "$0: *** Unsupported link type: direct.\n";
 	      };
 	      print "Found garbage: $line\n";
 	  }
@@ -494,7 +494,7 @@ while (1) {
 	if ($desires > 0) {
 	    $exitcode += 16;
 	}
-	print "Reached run limit.  Giving up.\n";
+	print "$0: *** Reached run limit.  Giving up.\n";
 	exit($exitcode);
     }
     $currentrun++;
@@ -807,7 +807,8 @@ foreach $vlan (keys(%vlans)) {
     $dbh->do("insert into vlans (id,pid,eid,virtual,members) values" .
 	     " (0,\"$pid\",\"$eid\",\"$lan\",\"" .
 	     join(" ",@$members) . "\")") || do {
-		 print STDERR "Could not update vlans table.  Giving up.\n";
+		 print STDERR "$0: *** Could not update vlans table." .
+		     "  Giving up.\n";
 		 exit(1);
 	     };
 }
@@ -819,7 +820,8 @@ foreach $delay (keys(%delays)) {
 	     ",delay,bandwidth,lossrate,vname)" .
 	     " values (\"$pid\",\"$eid\",\"$pnode\",\"$int0\",\"$int1\"".
 	     ",$delay,$bandwidth,$lossrate,\"$vname\")") || do {
-		 print STDERR "Could not update delays table.  Giving up.\n";
+		 print STDERR "$0: *** Could not update delays table." .
+		     "  Giving up.\n";
 		 exit(1);
 	     };
 }
@@ -833,7 +835,8 @@ foreach $vnodeport (keys(%portmap)) {
     $dbh->do("insert into portmap (pid,eid,vnode,vport,pport)" .
 	     " values (\"$pid\",\"$eid\",\"$vnode\"" .
 	     ",\"$vport\",\"$pport\")") || do {
-		 print STDERR "Could not update portmap table.  Giving up.\n";
+		 print STDERR "$0: *** Could not update portmap table." .
+		     "  Giving up.\n";
 		 exit(1);
 	     };
     # Shark Hack
@@ -843,7 +846,8 @@ foreach $vnodeport (keys(%portmap)) {
 	foreach $shark (@{$sharkshelves{$vnode}}) {
 	    $dbh->do("update interfaces set IPalias=\"$ips{$shark}\" where" .
 		     " node_id = \"$shelf-$i\"") || do {
-			 print STDERR "Could not update IPalias for $shelf-$i.\n";
+			 print STDERR "$0: *** Could not update IPalias" .
+			     " for $shelf-$i.\n";
 			 exit(1);
 		     };
 	    $i++;
@@ -851,8 +855,8 @@ foreach $vnodeport (keys(%portmap)) {
     } else {
 	$dbh->do("update interfaces set IP=\"$ips{$vnodeport}\" where" .
 		 " node_id = \"$v2pmap{$vnode}\" and iface = \"$pport\"") || do {
-		     print STDERR "Could not update interfaces table.\n" .
-			 "  Giving up.\n";
+		     print STDERR "$0: *** Could not update interfaces" .
+			 " table.  Giving up.\n";
 		     exit(1);
 		 };
     }
@@ -897,7 +901,7 @@ foreach $pair (@nodepairs) {
 		       " tarballs=\"$tarfiles\"," .
 		       " startupcmd=\"$startupcmd\"" .
 		       " where node_id=\"$pnode\"")) {
-	    print STDERR "Could not update nodes table.\n" .
+	    print STDERR "$0: *** Could not update nodes table." .
 		"  Giving up.\n";
 	    exit(1);
 	} 
@@ -914,7 +918,7 @@ foreach $pair (@nodepairs) {
 		       " startstatus=\"none\"," .
 		       " ready=0" .
 		       " where node_id=\"$pnode\"")) {
-	    print STDERR "Could not update nodes table.\n" .
+	    print STDERR "$0: *** Could not update nodes table." .
 		"  Giving up.\n";
 	    exit(1);
 	}
@@ -931,7 +935,8 @@ foreach $pnode (keys(%p2vmap)) {
 	    $vname = (split(":",$shark))[0];
 	    $dbh->do("update reserved set vname=\"$vname\" where" .
 		     " node_id = \"$pnode-$i\"") || do {
-			 print STDERR "Could not update reserved table.  Giving up.\n";
+			 print STDERR "$0: *** Could not update reserved" .
+			     " table.  Giving up.\n";
 			 exit(1);
 		     };
 	    $i++;
@@ -939,7 +944,8 @@ foreach $pnode (keys(%p2vmap)) {
     } else {
 	$dbh->do("update reserved set vname=\"$vnode\"" .
 		 " where node_id = \"$pnode\"") || do {
-		     print STDERR "Could not update reserved table. Giving up.\n";
+		     print STDERR "$0: *** Could not update reserved" .
+			 " table. Giving up.\n";
 		     exit(1);
 		 };
     }

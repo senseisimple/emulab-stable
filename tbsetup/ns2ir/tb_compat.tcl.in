@@ -24,12 +24,12 @@ namespace eval TBCOMPAT {
 	variable IP
 	set caller [lindex [info level -1] 0]
 	if {[regexp $IP $ip] == 0} {
-	    perror "ERROR: $caller - $ip is not a valid IP address."
+	    perror "$caller - $ip is not a valid IP address."
 	    return
 	}
 	set port [$node find_port $obj]
 	if {$port == -1} {
-	    perror "ERROR: $caller - $node is not connected to $obj."
+	    perror "$caller - $node is not connected to $obj."
 	    return
 	}
 	$node ip $port $ip
@@ -61,7 +61,7 @@ namespace eval TBCOMPAT {
 proc tb-set-ip {node ip} {
     $node instvar portlist
     if {[llength $portlist] != 1} {
-	perror "Error: tb-set-ip - $node does not have a single connection."
+	perror "\[tb-set-ip] $node does not have a single connection."
 	return
     }
     ::TBCOMPAT::set-ip $node [lindex $portlist 0] $ip
@@ -71,21 +71,21 @@ proc tb-set-ip-interface {src dst ip} {
     set reallink [$sim find_link $src $dst]
     if {$reallink == {}} {
 	perror \
-	    "ERROR: tb-set-ip-interface - No connection between $src and $dst."
+	    "\[tb-set-ip-interface] No connection between $src and $dst."
 	return
     }
     ::TBCOMPAT::set-ip $src $reallink $ip
 }
 proc tb-set-ip-lan {src lan ip} {
     if {[$lan info class] != "Lan"} {
-	perror "ERROR: tb-set-ip-lan - $lan is not a LAN."
+	perror "\[tb-set-ip-lan] $lan is not a LAN."
 	return
     }
     ::TBCOMPAT::set-ip $src $lan $ip
 }
 proc tb-set-ip-link {src link ip} {
     if {[$link info class] != "Link"} {
-	perror "ERROR: tb-set-ip-link - $link is not a link."
+	perror "\[tb-set-ip-link] $link is not a link."
 	return
     }
     ::TBCOMPAT::set-ip $src $link $ip
@@ -95,7 +95,7 @@ proc tb-set-ip-link {src link ip} {
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
     if {! [info exists hwtypes($type)]} {
-	perror "ERROR: tb-set-hardware - Invalid hardware type $type."
+	perror "\[tb-set-hardware] Invalid hardware type $type."
 	return
     }
     $node set type $type
@@ -104,7 +104,7 @@ proc tb-set-node-os {node os} {
     if {! ${GLOBALS::anonymous}} {
 	var_import ::TBCOMPAT::osids
 	if {! [info exists osids($os)]} {
-	    perror "ERROR: tb-set-node-os - Invalid osid $os."
+	    perror "\[tb-set-node-os] Invalid osid $os."
 	    return
 	}
     }
@@ -115,7 +115,7 @@ proc tb-set-node-cmdline {node cmdline} {
 }
 proc tb-set-node-rpms {node args} {
     if {$args == {}} {
-	perr "ERROR: tb-set-node-rpms - No rpms given."
+	perror "\[tb-set-node-rpms] No rpms given."
 	return
     }
     $node set rpms $args
@@ -125,18 +125,18 @@ proc tb-set-node-startup {node cmd} {
 }
 proc tb-set-node-tarfiles {node args} {
     if {$args == {}} {
-	perror "ERROR: tb-set-node-tarfiles - tb-set-node-tarfiles <node> (<dir> <tar>)+"
+	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
 	return
     }
     if {[expr [llength $args] % 2] != 0} {
-	perror "ERROR: tb-set-node-tarfiles - Arguments should be node and series of pairs."
+	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
 	return
     }
     $node set tarfiles $args
 }
 proc tb-set-node-deltas {node args} {
     if {$args == {}} {
-	perror "ERROR: tb-set-node-deltas - No deltas given."
+	perror "\[tb-set-node-deltas] No deltas given."
 	return
     }
     $node set deltas $args
@@ -155,7 +155,7 @@ proc tb-set-link-loss {srclink args} {
 	set sim [$srclink set sim]
 	set reallink [$sim find_link $srclink $dst]
 	if {$reallink == {}} {
-	    perror "ERROR: tb-set-link-loss - No link between $srclink and $dst."
+	    perror "\[tb-set-link-loss] No link between $srclink and $dst."
 	    return
 	}
     } else {
@@ -164,7 +164,7 @@ proc tb-set-link-loss {srclink args} {
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
 	($lossrate > 1.0)} {
-	perror "ERROR: tb-set-link-loss - $lossrate is not a valid loss rate."
+	perror "\[tb-set-link-loss] $lossrate is not a valid loss rate."
     }
     $srclink instvar loss
     set adjloss [expr 1-sqrt(1-$lossrate)]
@@ -175,12 +175,12 @@ proc tb-set-link-loss {srclink args} {
 proc tb-set-lan-loss {lan lossrate} {
     var_import ::TBCOMPAT::FLOAT
     if {[$lan info class] != "Lan"} {
-	perror "ERROR: tb-set-lan-loss - $lan is not a lan."
+	perror "\[tb-set-lan-loss] $lan is not a lan."
 	return
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
 	($lossrate > 1.0)} {
-	perror "ERROR: tb-set-lan-loss - $lossrate is not a valid loss rate."
+	perror "\[tb-set-lan-loss] $lossrate is not a valid loss rate."
     }
     $lan instvar loss
     set adjloss [expr 1-sqrt(1-$lossrate)]
@@ -191,32 +191,32 @@ proc tb-set-lan-loss {lan lossrate} {
 
 proc tb-set-node-lan-delay {node lan delay} {
     if {[$node info class] != "Node"} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	perror "\[tb-set-node-lan-delay] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	perror "\[tb-set-node-lan-delay] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	perror "\[tb-set-node-lan-delay] $node is not in $lan."
 	return
     }
     $lan set delay([list $node $port]) [parse_delay $delay]
 }
 proc tb-set-node-lan-bandwidth {node lan bw} {
     if {[$node info class] != "Node"} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	perror "\[tb-set-node-lan-delay] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	perror "\[tb-set-node-lan-delay] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	perror "\[tb-set-node-lan-delay] $node is not in $lan."
 	return
     }
     $lan set bandwidth([list $node $port]) [parse_bw $bw]
@@ -224,21 +224,21 @@ proc tb-set-node-lan-bandwidth {node lan bw} {
 proc tb-set-node-lan-loss {node lan loss} {
     var_import ::TBCOMPAT::FLOAT
     if {[$node info class] != "Node"} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not a node."
+	perror "\[tb-set-node-lan-delay] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "ERROR: tb-set-node-lan-delay - $lan is not a lan."
+	perror "\[tb-set-node-lan-delay] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "ERROR: tb-set-node-lan-delay - $node is not in $lan."
+	perror "\[tb-set-node-lan-delay] $node is not in $lan."
 	return
     }
     if {([regexp $FLOAT $loss] == 0) ||
 	($loss > 1.0)} {
-	perror "ERROR: tb-set-link-loss - $loss is not a valid loss rate."
+	perror "\[tb-set-link-loss] $loss is not a valid loss rate."
     }
     $lan set loss([list $node $port]) $loss
 }

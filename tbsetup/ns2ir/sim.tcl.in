@@ -84,11 +84,11 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
     }
     set error 0
     if {! [$n1 info class Node]} {
-	perror "duplex-link $n1 $n2: $n1 is not a node."
+	perror "\[duplex-link] $n1 is not a node."
 	set error 1
     }
     if {! [$n2 info class Node]} {
-	perror "duplex-link $n1 $n2: $n2 is not a node."
+	perror "\[duplex-link] $n2 is not a node."
 	set error 1
     }
     if {$error} {return}
@@ -160,12 +160,12 @@ Simulator instproc run {} {
     # Check node names.
     foreach node [lsort [array names node_list]] {
 	if {! [regexp {^[-0-9A-Za-z]+$} $node]} {
-	    perror "Invalid node name: $node.  Can only contain \[-0-9A-Za-z\] due to DNS limitations."
+	    perror "\[run] Invalid node name $node.  Can only contain \[-0-9A-Za-z\] due to DNS limitations."
 	}
     }
     foreach lan [lsort [array names lanlink_list]] {
 	if {! [regexp {^[-0-9A-Za-z]+$} $lan]} {
-	    perror "Invalid lan/link name: $lan.  Can only contain \[-0-9A-Za-z\] for symmetry with node DNS limitations."
+	    perror "\[run] Invalid lan/link name $lan.  Can only contain \[-0-9A-Za-z\] for symmetry with node DNS limitations."
 	}
     }
 
@@ -188,11 +188,11 @@ Simulator instproc run {} {
 # This creates an attachment between <node> and <agent>.
 Simulator instproc attach-agent {node agent} {
     if {! [$agent info class Agent]} {
-	perror "$agent is not an Agent."
+	perror "\[attach-agent] $agent is not an Agent."
 	return
     }
     if {! [$node info class Node]} {
-	perror "$node is not a Node."
+	perror "\[attach-agent] $node is not a Node."
 	return
     }
     $agent set_node $node
@@ -203,11 +203,11 @@ Simulator instproc attach-agent {node agent} {
 Simulator instproc connect {src dst} {
     set error 0
     if {! [$src info class Agent]} {
-	perror "$src is not an Agent."
+	perror "\[connect] $src is not an Agent."
 	set error 1
     }
     if {! [$dst info class Agent]} {
-	perror "$dst is not an Agent."
+	perror "\[connect] $dst is not an Agent."
 	set error 1
     }
     if {$error} {return}
@@ -280,7 +280,7 @@ Simulator instproc get_subnet {} {
 	    return $subnet_base.$i
 	}
     }
-    perror "ERROR: Ran out of subnets."
+    perror "Ran out of subnets."
 }
 
 # use_subnet

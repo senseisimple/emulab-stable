@@ -62,19 +62,19 @@ $sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
 		   " and eid = \"$eid\"");
 $sth->execute();
 if (! (($state) = $sth->fetchrow_array())) {
-    &tbs_out("No entry in experiments table.  Insane.\n");
+    &tbs_out("$0: *** No entry in experiments table.  Insane.\n");
     exit(1);
 }
 $sth->finish();
 if ($state ne "new") {
-    &tbs_out("Experiment is not in the proper state: $state\n");
+    &tbs_out("$0: *** Experiment is not in the proper state: $state\n");
     exit(1);
 }
 
 $sth = $dbh->prepare("UPDATE experiments set state = \"prerunning\"" . 
 		     "where pid = \"$pid\" and eid = \"$eid\"");
 if (! $sth->execute()) {
-    &tbs_out("Failed to set intermediate state.\n");
+    &tbs_out("$0: *** Failed to set intermediate state.\n");
     exit(1);
 }
 $sth->finish();
@@ -85,15 +85,15 @@ sub cleanup {
     if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
 		   " and eid = \"$eid\"")) {
 	
-	&tbs_out("Could not clear virt_nodes table.\n");
+	&tbs_out("$0: *** Could not clear virt_nodes table.\n");
     }
     if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
 		   " and eid = \"$eid\"")) {
-	&tbs_out("Could not clear virt_lans table.\n");
+	&tbs_out("$0: *** Could not clear virt_lans table.\n");
     }
     if (! $dbh->do("UPDATE experiments set state = \"new\"" . 
 		   "where pid = \"$pid\" and eid = \"$eid\"")) {
-	&tbs_out("Could not reset experiment state.\n");
+	&tbs_out("$0: *** Could not reset experiment state.\n");
     }
 };
 
@@ -101,7 +101,7 @@ sub cleanup {
 # and tb-* handling.
 &tbs_out("Running parser.\n");
 if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
-    &tbs_out("Parsing failed.\n");
+    &tbs_out("$0: *** Parsing failed.\n");
     exit(1);
 }
 
@@ -109,7 +109,7 @@ if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
 $sth = $dbh->prepare("UPDATE experiments set state = \"swapped\"" . 
 		     "where pid = \"$pid\" and eid = \"$eid\"");
 if (! $sth->execute()) {
-    &tbs_out("Failed to set state.\n");
+    &tbs_out("$0: *** Failed to set state.\n");
     cleanup;
     exit(1);
 }
@@ -118,4 +118,3 @@ $sth->finish();
 &tbs_out("Pre run finished - " . &ctime(time) . "\n");
 
 0;
-

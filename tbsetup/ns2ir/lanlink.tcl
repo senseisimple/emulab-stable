@@ -90,7 +90,7 @@ LanLink instproc fill_ips {} {
 		}
 	    }
 	    if {$ip == {}} {
-		perror "ERROR: Ran out of IP addresses in subnet $subnet."
+		perror "Ran out of IP addresses in subnet $subnet."
 		set ip "255.255.255.255"
 	    }
 	    $node ip $port $ip

@@ -56,7 +56,7 @@ proc var_import {varspec} {
 ###
 proc perror {msg} {
     var_import ::GLOBALS::errors
-    puts stderr $msg
+    puts stderr "$0: *** $msg"
     set errors 1
 }
 
@@ -271,7 +271,7 @@ proc parse_bw {bspec} {
 	Gb {return [expr int($bw*1000)]}
 	Gbps {return [expr int($bw*1000)]}
 	default {
-	    perror "ERROR: Unknown bandwidth unit $unit."
+	    perror "Unknown bandwidth unit $unit."
 	    return 100
 	}
     }
@@ -291,7 +291,7 @@ proc parse_delay {dspec} {
 	ms {return [expr int($delay)]}
 	ns {return [expr int($delay/1000)]}
 	default {
-	    perror "ERROR: Unknown delay unit $unit."
+	    perror "Unknown delay unit $unit."
 	    return 0
 	}
     }
@@ -307,6 +307,6 @@ source ${GLOBALS::nsfile}
 sql disconnect ${GLOBALS::DB}
 
 if {${GLOBALS::ran} == 0} {
-    perror "ERROR: No 'Simulator run' statement found."
+    perror "No 'Simulator run' statement found."
 }
 exit ${GLOBALS::errors}

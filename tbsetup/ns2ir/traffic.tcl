@@ -35,7 +35,7 @@ Agent instproc set_application {application} {
 Agent instproc connect {dst} {
     $self instvar destination
     if {$destination != {}} {
-	perror "connect: $self already has a destination: $destination."
+	perror "\[connect] $self already has a destination: $destination."
 	return
     }
     set destination $dst
@@ -49,20 +49,20 @@ Agent/UDP instproc connect {dst} {
     $self instvar destination
     set error 0
     if {$node == {}} {
-	perror "connect: $self is not attached to a node."
+	perror "\[connect] $self is not attached to a node."
 	set error 1
     }
     if {$application == {}} {
-	perror "connect: $self does not have an attached application."
+	perror "\[connect] $self does not have an attached application."
 	set error 1
     }
     set dest [$destination set node]
     if {$dest == {}} {
-	perror "connect: $destination is not attached to a node."
+	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
     if {[llength [$node set portlist]] != 1} {
-	perror "connect: $node must have exactly one link to be a traffic generator."
+	perror "\[connect] $node must have exactly one link to be a traffic generator."
 	set error 1
     }
     set gateport [lindex [$node set portlist] 0]
@@ -75,7 +75,7 @@ Agent/UDP instproc connect {dst} {
 	}
     }
     if {$gate == {}} {
-	perror "No gateway found for $node."
+	perror "\[connect] No gateway found for $node."
 	set error 1
     }
     if {$error} {return}
@@ -102,16 +102,16 @@ Agent/Null instproc connect {dst} {
     $self instvar destination
     set error 0
     if {$node == {}} {
-	perror "connect: $self is not attached to a node."
+	perror "\[connect] $self is not attached to a node."
 	set error 1
     }
     set dest [$destination set node]
     if {$dest == {}} {
-	perror "connect: $destination is not attached to a node."
+	perror "\[connect] $destination is not attached to a node."
 	set error 1
     }
     if {[llength [$node set portlist]] != 1} {
-	perror "connect: $node must have exactly one link to be a traffic consumer."
+	perror "\[connect] $node must have exactly one link to be a traffic consumer."
 	set error 1
     }
     set gateport [lindex [$node set portlist] 0]
@@ -124,7 +124,7 @@ Agent/Null instproc connect {dst} {
 	}
     }
     if {$gate == {}} {
-	perror "connect: No gateway found for $node."
+	perror "\[connect] No gateway found for $node."
 	set error 1
     }
     if {$error} {return}

@@ -60,41 +60,42 @@ $sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
 		     " and eid = \"$eid\"");
 $sth->execute();
 if (! (($state) = $sth->fetchrow_array())) {
-    &tbs_out("No entry in experiments table.  Insane.\n");
+    &tbs_out("$0: *** No entry in experiments table.  Insane.\n");
     exit(1);
 }
 if ($force == 0) {
     if ($state eq "active") {
-	&tbs_out("Experiment already running.  Try swapping out first.\n");
+	&tbs_out("$0: *** Experiment already running." .
+		 " Try swapping out first.\n");
 	exit(1);
     } elsif ($state ne "swapped") {
-	&tbs_out("Experiment in strange state: $state.\n");
+	&tbs_out("$0: *** Experiment in strange state: $state.\n");
 	exit(1);
     }
 } elsif ($state ne "swapped") {
-    &tbs_out("WARNING: Ignoring experimental state of $state.\n");
+    &tbs_out("$0: *** WARNING: Ignoring experimental state of $state.\n");
 }
 
 if (! $dbh->do("UPDATE experiments set state = \"terminating\" " . 
 	       "where pid=\"$pid\" and eid=\"$eid\"")) {
-    &tbs_out("Could not set intermediate experiment state.\n");
+    &tbs_out("$0: *** Could not set intermediate experiment state.\n");
 }
 
 &tbs_out("Clearing virtual state.\n");
 if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
 	       " and eid = \"$eid\"")) {
 
-    &tbs_out("Could not clear virt_nodes table.\n");
+    &tbs_out("$0: *** Could not clear virt_nodes table.\n");
     $errors = 1;
 }
 if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
 	       " and eid = \"$eid\"")) {
-    &tbs_out("Could not clear virt_lans table.\n");
+    &tbs_out("$0: *** Could not clear virt_lans table.\n");
     $errors = 1;
 }
 if (! $dbh->do("DELETE from portmap where pid = \"$pid\"" . 
 	       " and eid = \"$eid\"")) {
-    &tbs_out("Could not clear portmap table.\n");
+    &tbs_out("$0: *** Could not clear portmap table.\n");
     $errors = 1;
 }
 $sth->finish();
@@ -103,7 +104,7 @@ if ($errors == 0) {
     &tbs_out("Marking as ended.\n");
     if (! $dbh->do("UPDATE experiments set state = \"ended\"" . 
 		   " where pid=\"$pid\" and eid=\"$eid\"")) {
-	&tbs_out("Could not set experiment state.\n");
+	&tbs_out("$0: *** Could not set experiment state.\n");
 	$errors = 1;
     }
 }
