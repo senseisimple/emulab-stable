@@ -438,7 +438,7 @@ echo "</td> </tr> </table>\n";
 # The image may be clicked to get node info or set a new center-point.
 echo "  Click on the dots below to see information about the node.\n";
 echo "  <br>\n";
-echo "  Click elsewhere on the map set the center point for a zoomed-in view.\n";
+echo "  Click elsewhere on the map to set the center point for a zoomed-in view.\n";
 echo "  <br>\n";
 # Couldn't get JavaScript submit on checkbox to be portable to IE with map in form.
 # Just use image buttons to show and invert the checkbox state.  That works.
