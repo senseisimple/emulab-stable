@@ -326,7 +326,7 @@ foreach my $node (@nodes) {
     # for the subset of slices that are written to disk.
     #
     my $startpart = $loadpart == 0 ? 1 : $loadpart;
-    my $endpart   = $loadpart + $loadlen;
+    my $endpart   = $startpart + $loadlen;
 	
     for ($i = $startpart; $i < $endpart; $i++) {
 	my $partname = "part${i}_osid";
