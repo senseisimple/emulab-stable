@@ -56,6 +56,20 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     }
 
     #
+    # If the user is not allowed to use planetlab nodes, print out a messages
+    # telling them so
+    #
+    if (!NODETYPE_ALLOWED("pcplab")) {
+	global $TBMAILADDR;
+	echo "<p><b><font color=\"red\">NOTE:</font> You do not currently " .
+	     "have permission to use PlanetLab nodes through Emulab. Please " .
+	     "have your project leader contact $TBMAILADDR to request ".
+	     "permission for your project to create PlanetLab slices. " .
+	     "</b></p>\n";
+    }
+
+
+    #
     # Display any errors
     #
     if (count($errors)) {
