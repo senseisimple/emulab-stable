@@ -30,6 +30,7 @@ public class RoboTrack extends JApplet {
     static double pixels_per_meter = 1.0;
     boolean frozen = false;
     static final DecimalFormat FORMATTER = new DecimalFormat("0.00");
+    String uid, auth;
     
     /*
      * The connection to boss that will provide robot location info.
@@ -41,7 +42,7 @@ public class RoboTrack extends JApplet {
 	try
 	{
 	    URL urlServer = this.getCodeBase(), robopipe, floorurl;
-	    String uid, auth, pipeurl, baseurl;
+	    String pipeurl, baseurl;
 	    URLConnection uc;
 
 	    /* Get our parameters then */
@@ -84,16 +85,47 @@ public class RoboTrack extends JApplet {
 	 * Middle mouse button will stop/start the display.
 	 */
 	addMouseListener(new MouseAdapter() {
-		public void mousePressed(MouseEvent e) {
-		    if (frozen) {
-			frozen = false;
-			start();
-		    } else {
-			frozen = true;
-			stop();
+	    public void mousePressed(MouseEvent e) {
+	        int button = e.getButton();
+
+		if (button == e.BUTTON1) {
+		    try
+		    {
+			String node_id = map.pickRobot(e.getX(), e.getY());
+
+			if (node_id == "")
+			    return;
+
+			URL url = new URL(getCodeBase(),
+					  "/shownode.php3?node_id=" + node_id
+					  + "&nocookieuid="
+					  + URLEncoder.encode(uid)
+					  + "&nocookieauth="
+					  + URLEncoder.encode(auth));
+
+			System.out.println(url.toString());
+
+			getAppletContext().showDocument(url, "_robbie");
+		    }
+		    catch(Throwable th)
+		    {
+			th.printStackTrace();
 		    }
 		}
-	    });
+		else if (button == e.BUTTON2) {
+		  if (frozen) {
+		    frozen = false;
+		    System.out.println("Restarting applet ...");
+		    start();
+		  }
+		  else {
+		    frozen = true;
+		    System.out.println("Stopping applet ...");
+		    stop();
+		  }
+		}
+	    }
+	});
 
 	/*
 	 * Make sure the redraw stops when the window is iconified.
@@ -297,6 +329,25 @@ public class RoboTrack extends JApplet {
 		    FORMATTER.format(Float.parseFloat(str));
 	    else
 		robbie.battery_voltage = "";
+	}
+
+	/*
+	 * Given an x,y from a button click, try to map the coords
+	 * to a robot that has been drawn on the screen. There are
+	 * probably race conditions here, but I doubt they will cause
+	 * any real problems (like, maybe we pick the wrong robot).
+	 */
+	public String pickRobot(int x, int y) {
+	    Enumeration e = robots.elements();
+
+	    while (e.hasMoreElements()) {
+		Robot robbie  = (Robot)e.nextElement();
+
+		if (Math.abs(robbie.y - y) < 10 &&
+		    Math.abs(robbie.x - x) < 10)
+		    return robbie.pname;
+	    }
+	    return "";
 	}
 
 	/*
