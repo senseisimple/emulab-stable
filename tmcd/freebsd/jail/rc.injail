@@ -9,6 +9,11 @@
 echo "Doing Testbed jailsetup configuration ..."
 $BINDIR/jailsetup
 
+if [ -x $BOOTDIR/rc.route ]; then
+        echo "Setting up Testbed interface routing ..."
+	$BOOTDIR/rc.route enable
+fi
+
 if [ -x $BOOTDIR/rc.rpm  ]; then
         echo "Installing RPMs ..."
 	$BOOTDIR/rc.rpm
