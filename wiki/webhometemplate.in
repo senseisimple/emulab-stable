@@ -11,10 +11,10 @@ information on how to write and create TWiki pages.
 __TWiki groups that are relevant to your Project/Group__
 
 	* [[%MAINWEB%.%WEB%Group][%WEB%Group]]
-	* [[%MAINWEB%.%WEB%AdminGroup][%WEB%AdminGroup]]
+	* [[%MAINWEB%.%WEB%RootGroup][%WEB%RootGroup]]
 
 
-__Site Tools of the %WEB% Web__
+__Site Tools of the <nop>%WEB% Web__
 
 %INCLUDE{"%TWIKIWEB%.WebSiteTools"}%
 

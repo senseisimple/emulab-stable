@@ -118,11 +118,11 @@ while (my ($pid,$wikiname,$trust) = $query_result->fetchrow_array()) {
     push(@glist, $wikiname);
 
     #
-    # Add to the admin group for the project if proj/group root.
-    # This admin project name is hardwired in the wikiproxy. Sorry.
+    # Add to the root group for the project if proj/group root.
+    # This root project name is hardwired in the wikiproxy. Sorry.
     #
     if ($trust eq "project_root" || $trust eq "group_root") {
-	push(@glist, "${wikiname}Admin");
+	push(@glist, "${wikiname}Root");
     }
 }
 
