@@ -73,6 +73,8 @@ frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+			$(SYSETCDIR)/dhclient-enter-hooks
 	@if [ -r $(SRCDIR)/master.passwd ]; then \
 	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
 	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
