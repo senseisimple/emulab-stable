@@ -95,8 +95,8 @@ while ($projectrow = mysql_fetch_array($query_result)) {
                   <A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>
               <td>$name";
-    if ($status == TBDB_USERSTATUS_UNVERIFIED) {
-	echo " (<font color=red>" . TBDB_USERSTATUS_UNVERIFIED . "</font>)";
+    if ($status == TBDB_USERSTATUS_NEWUSER) {
+	echo " (<font color=red>unverified</font>)";
     }
     echo "         </td>";
     echo "    <td>$title</td>
