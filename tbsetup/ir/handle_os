@@ -90,7 +90,13 @@ foreach (split("\n",$raw)) {
 	# assume to be a delay node
 	$os{$physical} = $delayos;
     } else {
-	$os{$physical} = $ostype{$nodetype{$virtual}};
+	if ($nodetype{$virtual} ne "shark-shelf") {
+	    $os{$physical} = $ostype{$nodetype{$virtual}};
+	} else {
+	    for ($i=1;$i<=8;$i++) {
+		$os{"$physical-$i"} = $ostype{"shark-shelf"};
+	    }
+	}
     }
 }
 
