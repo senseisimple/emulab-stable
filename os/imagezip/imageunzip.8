@@ -83,6 +83,12 @@ is '-', the image is read from
 The output file for the expanded image.  If not specified,
 .Va stdout
 is used.
+.Bf Em
+Note that if the output file is a device special file, it should always be
+the special file for an entire disk even when restoring slice images with the
+.Fl s
+option.
+.Ef
 .El
 .Pp
 Recognized options are:
@@ -116,6 +122,10 @@ Specify a 32-bit
 that is to be written to free blocks when using the
 .Fl z
 option.  The default value is zero.
+The number may be in octal, decimal or hex depending on the prefix.
+See
+.Xr strtoul 3
+for details.
 .It Fl s Ar slice
 Restore
 .Ar image
@@ -149,12 +159,8 @@ does not include the content of free blocks in the image and
 because
 .Nm
 may not initialize these free blocks with any value, you cannot
-perform a simple compare of the source and destination of an image.
-.Pp
-If
-.Ar outfile
-is a device special file, it should always be the special file for
-an entire disk even when restoring slice images.
+perform a simple compare of the source and destination of an image
+to verify the correctness of the copy.
 .Pp
 Since slice images do not contain the DOS MBR, you cannot load a slice image
 on a naked disk and expect it to boot.
@@ -164,7 +170,7 @@ option to ignore all but the slice you care about, thus
 creating a full disk image containing only that single slice.
 .Pp
 If the output file is a disk or slice,
-it should not overlap with the filesystem you are running off of
+it should not overlap with the filesystem you are running on
 or disaster will ensue!
 .Sh EXAMPLES
 .Dl imageunzip /nfs/backup/images/myimage.ndz /dev/ad0
@@ -177,7 +183,7 @@ from a CDROM or the network.
 .Pp
 As above but uses ssh to transfer the image from the remote machine.
 .Pp
-.Dl ssh backup imagezip -s 1 /dev/ad0 | imageunzip -z -D 165 -s 1 - /dev/ad0
+.Dl ssh backup imagezip -s 1 /dev/ad0 - | imageunzip -z -D 165 -s 1 - /dev/ad0
 .Pp
 Image slice 1 on the remote machine and restore it to the same slice
 on the local disk, zeroing all free blocks and marking the slice as
