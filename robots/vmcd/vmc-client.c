@@ -13,6 +13,7 @@
 
 #include "log.h"
 #include "mtp.h"
+#include <math.h>
 
 #if defined(HAVE_MEZZANINE)
 #include "mezz.h"
@@ -52,6 +53,19 @@ static FILE *posfile = NULL;
 
 static volatile unsigned int mezz_event_count = 0;
 
+/* for local->global camera coords */ 
+static double x_offset;
+static double y_offset;
+
+void local2global_posit_trans(struct position *p) {
+
+    if (p != NULL) {
+        p->x = p->y + x_offset;
+        p->y = p->x + y_offset;
+        p->theta -= M_PI;
+    }
+}
+
 static void usage(void)
 {
     fprintf(stderr,
@@ -62,7 +76,9 @@ static void usage(void)
             "  -h\t\tPrint this message\n"
             "  -d\t\tTurn on debugging messages and do not daemonize\n"
             "  -l logfile\tSpecify the log file\n"
-            "  -p port\tSpecify the port number to listen on. (Default: %d)\n",
+            "  -p port\tSpecify the port number to listen on. (Default: %d)\n"
+            "  -x offset\t x offset from real world x = 0 to our local x = 0"
+            "  -y offset\t y offset from real world y = 0 to our local y = 0",
             VMCCLIENT_DEFAULT_PORT);
 }
 
@@ -132,6 +148,8 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
             mup.position.y = mol->objects[lpc].py;
             mup.position.theta = mol->objects[lpc].pa;
 
+            local2global_posit_trans(&(mup.position));
+
             if (lpc == last_idx_set) {
                 /* this value being set tells vmc when it can delete stale
                  * tracks.
@@ -165,7 +183,10 @@ int main(int argc, char *argv[])
     int retval = EXIT_FAILURE;
     struct sockaddr_in sin;
     struct sigaction sa;
+    int got_x_offset,got_y_offset;
     
+    got_x_offset = got_y_offset = 0;
+
     while ((c = getopt(argc, argv, "hdp:l:i:f:")) != -1) {
         switch (c) {
         case 'h':
@@ -188,11 +209,19 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             break;
-	case 'f':
-	    if ((posfile = fopen(optarg, "r")) == NULL) {
-		error("cannot open %s\n", optarg);
-	    }
-	    break;
+        case 'f':
+            if ((posfile = fopen(optarg, "r")) == NULL) {
+                error("cannot open %s\n", optarg);
+            }
+            break;
+        case 'x':
+            x_offset = atof(optarg);
+            got_x_offset = 1;
+            break;
+        case 'y':
+            y_offset = atof(optarg);
+            got_y_offset = 1;
+            break;
         default:
             break;
         }
@@ -203,6 +232,12 @@ int main(int argc, char *argv[])
     
     if (argc == 0) {
         error("missing mezzanine file argument\n");
+        usage();
+        exit(1);
+    }
+
+    if (!got_x_offset || !got_y_offset) {
+        error("need both x and y offsets\n");
         usage();
         exit(1);
     }
