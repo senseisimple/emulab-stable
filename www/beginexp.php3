@@ -685,7 +685,7 @@ if ($formfields[exp_autoswap] == "1") {
 }
 
 if ($formfields[exp_idleswap] == "1") {
-    $exp_swappable .= " -l " . (60 * $idleswaptimeout);
+    $exp_swappable .= " -l " . (60 * $formfields[exp_idleswap_timeout]);
 }
 
 #
