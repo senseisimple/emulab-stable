@@ -36,6 +36,15 @@ tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
 ucd-snmp-4.2        An extendable SNMP implimentation
 
+IMPORTANT: php3 has some security vulernabilities, detailed at:
+http://www.cert.org/advisories/CA-2002-05.html
+When building mod_php3, make sure to apply the patch found at:
+http://www.php.net/do_download.php?download_file=mime.c.diff-3.0.gz
+(To do this with a FreeBSD port, do a 'make configure', change into the
+'work' directory to apply the patch, then return to the normal make procedure)
+The latest version of the ports collection (but not the one that came with
+FreeBSD 4.3) may have this patch applied already.
+
 Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
 scripts, requires tcl82. When you install the tcl-sql package, it will be put
 in the library directory for the latest version of tcl you have installed, so
