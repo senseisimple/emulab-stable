@@ -1,0 +1,610 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Pre-pass filter for assign to coarsen the virtual graph
+#
+
+use strict;
+
+my $TBROOT     = '@prefix@';
+my $assign_bin = "$TBROOT/libexec/assign";
+
+$| = 1;
+
+my $MAX_DESIRE_WEIGHT = 0.99;
+
+#
+# Figure out assign args
+#
+
+my $topfile = pop @ARGV;
+my @assign_args = @ARGV;
+
+#
+# Read in and coarsen the virtual graph
+#
+my ($realnodes, $reallinks) = parse_top($topfile);
+my $newgraph = combine_lans($realnodes);
+write_summary($newgraph);
+
+#
+# Run assign
+#
+
+# Make a filename for our coarsened topfile
+my $tmp_topfile = $topfile;
+$tmp_topfile =~ s/(\.top)?$/-coarsened$1/;
+
+# Make up a logfile name, which we'll put assign's output into. Try to extract
+# a filename from the top file.
+my $logfile;
+if ($topfile =~ /(.*).top$/) {
+    $logfile = "assign_prepass-$1.log";
+} else {
+    $logfile = "assign_prepass-$$.log";
+}
+
+my @topfile = generate_topfile($newgraph);
+my ($nodes, $edges) = run_assign($assign_bin, join(" ",@assign_args),
+    $tmp_topfile, \@topfile, $logfile);
+
+#
+# Write out the solution
+#
+write_solution($nodes, $edges, $newgraph);
+
+exit 0;
+
+#####
+##### Assign input/output functions
+#####
+
+#
+# Parse up a top file - note: this parser is much more crude and permissive
+# than assign's top file parser. Takes a filename, and returns %nodes and
+# %links structures
+#
+sub parse_top($) {
+    my ($filename) = @_;
+
+    my %nodes;
+    my %links;
+
+    open(TOP,"<$filename") or die "Unable to open topfile $filename\n";
+
+    while (my $line = <TOP>) {
+	chomp $line;
+	my @tokens = split /\s+/,$line;
+	next unless (@tokens); # Skip blank lines
+	SWITCH: for (shift @tokens) {
+	    (/node/) && do {
+		my $name = shift @tokens;
+		my $type = shift @tokens;
+		if ($nodes{$name}) {
+		    die "Node $name declared twice\n";
+		}
+		my ($realtype,$count) = split(/:/,$type);
+		if (!defined $count) {
+		    $count = 1;
+		}
+
+		my (@flags,@desires);
+		foreach my $token (@tokens) {
+		    my ($desire,$weight) = split /:/, $token;
+		    if (!defined $weight) {
+			push @flags, $desire;
+		    } else {
+			if ($desire eq "subnode_of") {
+			    die "Subnodes not supported yet\n";
+			}
+			push @desires, [$desire, $weight];
+		    }
+		}
+
+		$nodes{$name} = {
+		    'name'    => $name,
+		    'type'    => $realtype,
+		    'count'   => $count,
+		    'desires' => \@desires,
+		    'flags'   => \@flags,
+		    'fixed'   => undef,
+		    'slinks'  => [],
+		    'dlinks'  => [],
+		    'nodes'   => []
+		};
+
+		last;
+	    };
+	    (/link/) && do {
+		my $name = shift @tokens;
+		my $src  = shift @tokens;
+		my $dst  = shift @tokens;
+		if ($links{$name}) {
+		    die "Link $name declared twice\n";
+		}
+		if (!exists($nodes{$src})) {
+		    die "Link source $src does not exist\n";
+		}
+		if (!exists($nodes{$dst})) {
+		    die "Link destination $dst does not exist\n";
+		}
+		$links{$name} = {
+		    'name' => $name,
+		    'src'  => $src,
+		    'dst'  => $dst,
+		    'rest' => \@tokens
+		};
+		push @{$nodes{$src}{'slinks'}}, $links{$name};
+		push @{$nodes{$dst}{'dlinks'}}, $links{$name};
+		last;
+	    };
+	    (/make-vclass/) && do {
+		die "Sorry, vclasses are not yet supported\n";
+		last;
+	    };
+	    (/fix-node/) && do {
+		my ($vnode, $pnode) = @tokens;;
+		if (!$nodes{$vnode}) {
+		    die "Tried to fix to a non existent node: $line\n";
+		}
+		$nodes{$vnode}{fixed} = $pnode;
+		last;
+	    };
+	    (/node-hint/) && do {
+		die "Sorry, node-hints are not yet supported\n";
+		last;
+	    };
+	    die "Bad line: $line\n";
+	}
+   }
+
+   return (\%nodes, \%links);
+
+}
+
+#
+# Create a top file with the data we've gathered - takes a %nodes structure and
+# returns an array of lines for the top file
+#
+sub generate_topfile($) {
+    my ($nodes) = @_;
+    my @topfile;
+    
+    # Print out the nodes
+    while (my ($name,$node) = each %$nodes) {
+	my $topline = "node $name $node->{type}:$node->{count} ";
+	$topline .= join(" ",
+	    map { "$$_[0]:$$_[1]"} @{$node->{desires}},
+	    @{$node->{flags}});
+	$topline .= "\n";
+	push @topfile, $topline;
+	if ($node->{fixed}) {
+	    push @topfile, "fix-node $name $node->{fixed}\n";
+	}
+    }
+
+    # Print out the links
+    foreach my $node (values %$nodes) {
+	foreach my $link (@{$node->{'slinks'}}) {
+	    push @topfile, "link $link->{name} $link->{src} $link->{dst} " ,
+		join(" ",@{$link->{rest}}) , "\n";
+	}
+    }
+
+    return @topfile;
+}
+
+#
+# Actually run assign - takes the name of the assign binary, the arguments to
+# it, and a reference to the @topfile structure. Returns a solution data
+# structure
+#
+sub run_assign($$$$$) {
+    my ($assignbin,$assignargs,$topfile_name,$topfile_contents, $logfile) = @_;
+
+    open(TOP,">$topfile_name") or die "Unable to open $topfile_name for " .
+	    "writing\n";
+    print TOP @$topfile_contents;
+    close TOP;
+
+    open(ASSIGN,"|$assignbin $assignargs $topfile_name > $logfile");
+    close ASSIGN;  # This will wait for the child process to die
+    if ($?) {
+	# Assign failed, just pass through the exit code and the assign output
+	warn "Assign failed\n";
+	my $exit_status = ($? >> 8);
+	open(FH,"<$logfile") or die "Unable to open $logfile\n";
+	while (<FH>) {
+	    #
+	    # Print out assign's results, since assign_wrapper likes to look at
+	    # some of them
+	    #
+	    print;
+	}
+	exit $exit_status;
+    }
+    
+    return parse_solution($logfile);
+
+}
+
+#
+# Given a filename containing an assign logfile, parse the solution. Return a
+# list of (virtual, physical) pairs for the nodes, and just return an unparsed
+# list of edges
+#
+sub parse_solution($) {
+    my ($assignlog) = @_;
+    open SOL, "<$assignlog" or die "Unable to open $assignlog for reading\n";
+    #
+    # Find the BEST SCORE line
+    #
+    while (<SOL>) {
+	#
+	# We print out these lines, assign_wrapper expects to see them
+	#
+	if (/^[ \t]+BEST SCORE: [ \t]+([0-9]+(\.[0-9]+)?)/) {
+	    print;
+	}
+	if (/^With ([0-9]+) violations$/) {
+	    print;
+	    last;
+	}
+    }
+
+    #
+    # Find the nodes
+    #
+    my @nodes;
+    while (<SOL> !~ /^Nodes:/) {}
+    while (<SOL>) {
+	chop;
+	/^End Nodes$/ && last;
+	my @info = split;
+	my ($virtual,$physical) = @info[0,1];
+	push @nodes, [$virtual, $physical];
+    }
+
+    #
+    # Find the edges - luckily, we don't need to do any work with these, just
+    # spit them back out.
+    #
+    my @edges;
+    while (<SOL> !~ /^Edges:/) { }
+    while (<SOL>) {
+	/^End Edges$/ && last;
+	push @edges, $_;
+    }
+    close(SOL);
+
+    return (\@nodes,\@edges);
+
+}
+
+
+#
+# Given a list of (virtual,physical) pairs from the assign output, a list of
+# @edges, and the %nodes structure the mapping was done with, print out an
+# assign-style solution.
+#
+sub write_solution($$$) {
+    my ($nodes, $edges, $nodegraph) = @_;
+
+    print "\nNodes:\n";
+    foreach my $nref (@$nodes) {
+	my ($virtual, $physical) = @$nref;
+	my @real_virtnodes = list_nodes($nodegraph->{$virtual});
+	foreach my $real_virtnode (@real_virtnodes) {
+	    print "$real_virtnode $physical\n";
+	}
+    }
+    print "End Nodes\n";
+
+    print "Edges:\n";
+    print @$edges;
+    print "End Edges\n";
+}
+
+#####
+##### Functions for coarsening the graph
+#####
+
+#
+# Simple coarsener that conglomerates leaf LANs
+#
+sub combine_lans($) {
+    my ($nodes) = @_;
+
+    #
+    # Make groups to coarsen - if a node has exactly one link, and it is to a
+    # LAN, put the node in a group named after that LAN
+    #
+    my %nodegroups;
+    while (my ($name,$node) = each %$nodes) {
+	my $totallinks = @{$node->{slinks}} + @{$node->{dlinks}};
+	if ($totallinks != 1) {
+	    $nodegroups{"$node->{name}-own"} = [$node];
+	    next;
+	}
+	foreach my $link (@{$node->{slinks}}) {
+	    my $dst = $nodes->{$link->{dst}};
+	    if ($dst->{type} =~ /lan/) {
+		push @{$nodegroups{$dst->{name}}}, $node;
+		next;
+	    }
+	}
+	foreach my $link (@{$node->{dlinks}}) {
+	    my $src = $nodes->{$link->{dst}};
+	    if ($src->{type} =~ /lan/) {
+		push @{$nodegroups{$src->{name}}}, $node;
+		next;
+	    }
+	}
+    }
+
+    #
+    # Create the new graph by coarsening into the lists we made above
+    #
+    my %newgraph;
+    foreach my $nodelist (values %nodegroups) {
+	my @newnodes = make_conglomerates(@$nodelist);
+	foreach my $newnode (@newnodes) {
+	    $newgraph{$newnode->{name}} = $newnode;
+	}
+    }
+
+    return \%newgraph;
+}
+
+#####
+##### Functions for dealing with conglomerates
+#####
+
+#
+# Takes a set of nodes and returns a list of 'conglomerates' of them
+#
+sub make_conglomerates(@) {
+    my @nodes = @_;
+
+    # If there is only one node, just give it back
+    if (@nodes == 1) {
+	return $nodes[0];
+    }
+
+    # Put them in order for our bin-packing approximation algorithm
+    @nodes = binpack_sort(@nodes);
+
+    my @conglomerates;
+
+    # Go through the rest of the nodes and add them in
+    foreach my $node (@nodes) {
+
+	#
+	# Find a conglomerate this node can fit into - we take the first fit
+	#
+	my $conglomerate = undef;
+	foreach my $candidate (@conglomerates) {
+	    if (node_fits_in_conglomerate($node,$candidate)) {
+		$conglomerate = $candidate;
+		last;
+	    }
+	}
+	
+	if (!$conglomerate) {
+	    # Start a new one if we didn't find one
+	    $conglomerate = new_congolmerate($node);
+	    push @conglomerates, $conglomerate;
+	} else {
+	    # Add it to the existing conglomerate
+	    
+	    # Check the node type and handle the typecount
+	    if ($node->{'type'} ne $conglomerate->{'type'}) {
+		die "Cannot add node with type $node->{'type'} to " .
+		    "conglomerate with type $conglomerate->{type}\n";
+	    }
+	    $conglomerate->{'count'} += $node->{'count'};
+
+	    # Handle desires
+	    # XXX - for now, we add desires together, but make sure that the
+	    # total doesn't go over 1.0, since that changes the meaning of the
+	    # desire to assign. This is a defciency in assign that should be
+	    # fixed
+	    DESIRE: foreach my $desire (@{$node->{'desires'}}) {
+		my ($name, $weight) = @$desire;
+		foreach my $existing_desire (@{$conglomerate->{'desires'}}) {
+		    my ($existing_name, $existing_weight) = @$existing_desire;
+		    if ($name eq $existing_name) {
+			my $newweight;
+			if (substr($name,0,2) eq "?+") {
+			    # We treat additive local desire specially - we
+			    # don't cap them as we do for other desires
+			    $newweight = $existing_weight + $weight;
+			} else {
+			    $newweight = min($MAX_DESIRE_WEIGHT,
+				$existing_weight + $weight);
+			}
+			$$existing_desire[1] = $newweight;
+			next DESIRE;
+		    }
+		}
+		# If we made it here, we must not have found an existing desire
+		# that matched
+		push @{$conglomerate->{'desires'}}, $desire;
+	    }
+	
+	    # XXX - Handle flags
+	
+	    # Fix up this node's links
+	    foreach my $link (@{$node->{'slinks'}}) {
+		$link->{'src'} = $conglomerate->{'name'};
+		push @{$conglomerate->{'slinks'}}, $link;
+	    }
+	    foreach my $link (@{$node->{'dlinks'}}) {
+		$link->{'dst'} = $conglomerate->{'name'};
+		push @{$conglomerate->{'dlinks'}}, $link;
+	    }
+
+	    # Add to the nodes list
+	    push @{$conglomerate->{'nodes'}}, $node;
+	}
+
+    }
+
+    return @conglomerates;
+}
+
+#
+# Return 1 if the given node will fit into the remaining capacity of the given
+# conglomerate, and 0 if it will not
+#
+sub node_fits_in_conglomerate($$) {
+    my ($node, $conglomerate) = @_;
+
+    #
+    # XXX - These need to come from parsing the ptop file!
+    #
+    my $colocate = 20;
+
+    my %additive_features = (
+	'?+mem'        => 512,
+	'?+cpu'        => 850,
+	'?virtpercent' => 100
+    );
+
+    # Can't conglomerate fixed nodes unless they are fixed to the same place
+    if (($node->{'fixed'} || $conglomerate->{'fixed'}) &&
+	($node->{'fixed'} ne $conglomerate->{'fixed'})) {
+	return 0;
+    }
+
+    # Can't conglomerate nodes of different types
+    if ($node->{'type'} ne $conglomerate->{'type'}) {
+	return 0;
+    }
+
+    #
+    # Can't go over the colocate factor
+    #
+    if (($node->{'count'} + $conglomerate->{'count'}) > $colocate) {
+	return 0;
+    }
+
+    #
+    # Check to see if we're going over for any additive local features
+    #
+    OLD_DESIRE: foreach my $new_desire (@{$node->{'desires'}}) {
+	my ($new_name, $new_weight) = @$new_desire;
+	NEW_DESIRE: foreach my $old_desire (@{$conglomerate->{'desires'}}) {
+	    my ($old_name, $old_weight) = @$old_desire;
+	    next NEW_DESIRE unless ($new_name eq $old_name);
+	    if (exists $additive_features{$new_name} && 
+		(($old_weight + $new_weight) > $additive_features{$new_name})) {
+		return 0;
+	    } else {
+		next OLD_DESIRE;
+	    }
+	}
+    }
+
+    return 1;
+
+}
+
+#
+# Create a new conglomerate, starting from an existing node
+#
+my $conglomerate_count = 0;
+sub new_congolmerate($) {
+    my ($node) = @_;
+    my %conglomerate = ();
+
+    # Make up a name
+    my $name = "conglomerate_" . $conglomerate_count++;
+    $conglomerate{'name'} = $name;
+
+    # Initialize most values from the node
+    $conglomerate{'type'}    = $node->{'type'};
+    $conglomerate{'count'}   = $node->{'count'};
+    $conglomerate{'desires'} = $node->{'desires'};
+    $conglomerate{'flags'}   = $node->{'flags'};
+
+    $conglomerate{'slinks'}  = [];
+    foreach my $link (@{$node->{'slinks'}}) {
+	$link->{'src'} = $name;
+	push @{$conglomerate{'slinks'}}, $link;
+    }
+
+    $conglomerate{'dlinks'}  = [];
+    foreach my $link (@{$node->{'dlinks'}}) {
+	$link->{'dst'} = $name;
+	push @{$conglomerate{'dlinks'}}, $link;
+    }
+
+    $conglomerate{'nodes'} = [$node];
+
+    $conglomerate{'fixed'} = $node->{'fixed'};
+
+    return \%conglomerate;
+
+}
+
+
+#####
+##### Utitility functions
+#####
+
+#
+# Recurse through a $node structure and return a list of all virtual nodes in
+# the original graph that were combined to form this conglomerate
+#
+sub list_nodes($) {
+    my ($virtual) = @_;
+    my @nodelist = ();
+    if (!@{$virtual->{'nodes'}}) {
+	return ($virtual->{name});
+    } else {
+	foreach my $node (@{$virtual->{'nodes'}}) {
+	    push @nodelist, list_nodes($node);
+	}
+    }
+    return @nodelist;
+}
+
+#
+# Write out a summary of the current virtual topology
+#
+sub write_summary($) {
+    my ($nodes) = @_;
+    while (my ($name,$node) = each %$nodes) {
+	my @subnodes = list_nodes($node);
+	print "$name " . join(", ",@subnodes) . "\n";
+    }
+}
+
+
+#
+# Sort a list of nodes for use with the bin-packing algorithm
+# XXX - will probably need to take into account features such as mem/cpu needs
+# in the future.
+#
+sub binpack_sort(@) {
+    return sort {
+	$b->{'count'} <=> $a->{'count'} 
+    } @_;
+}
+
+
+# Returns the smaller of two numbers
+sub min($$) {
+    my ($a,$b) = @_;
+    if ($a < $b) {
+	return $a;
+    } else {
+	return $b;
+    }
+}
