@@ -1172,13 +1172,13 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "  u.emulab_pubkey,u.home_pubkey, "
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
-				 "  u.usr_email "
+				 "  u.usr_email,u.usr_shell "
 				 "from group_membership as p "
 				 "left join users as u on p.uid=u.uid "
 				 "left join groups as g on p.pid=g.pid "
 				 "where p.trust!='none' "
 				 "      and u.status='active' order by u.uid",
-				 13, reqp->pid, reqp->gid);
+				 14, reqp->pid, reqp->gid);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		/*
@@ -1196,14 +1196,15 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
 			     "  UNIX_TIMESTAMP(u.usr_modified), "
-			     "  u.usr_email,u.widearearoot,u.wideareajailroot "
+			     "  u.usr_email,u.usr_shell, "
+			     "  u.widearearoot,u.wideareajailroot "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on p.pid=g.pid "
 			     "where ((p.pid='%s' and p.gid='%s')) "
 			     "      and p.trust!='none' "
 			     "      and u.status='active' order by u.uid",
-			     15, reqp->pid, reqp->gid);
+			     16, reqp->pid, reqp->gid);
 		}
 		else {
 			res = mydb_query("select distinct "
@@ -1211,14 +1212,15 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
 			     "  UNIX_TIMESTAMP(u.usr_modified), "
-			     "  u.usr_email,u.widearearoot,u.wideareajailroot "
+			     "  u.usr_email,u.usr_shell, "
+			     "  u.widearearoot,u.wideareajailroot "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on "
 			     "     p.pid=g.pid and p.gid=g.gid "
 			     "where ((p.pid='%s')) and p.trust!='none' "
 			     "      and u.status='active' order by u.uid",
-			     15, reqp->pid);
+			     16, reqp->pid);
 		}
 	}
 	else if (reqp->jailflag) {
@@ -1231,7 +1233,8 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
 			     "  UNIX_TIMESTAMP(u.usr_modified), "
-			     "  u.usr_email,u.widearearoot,u.wideareajailroot "
+			     "  u.usr_email,u.usr_shell, "
+			     "  u.widearearoot,u.wideareajailroot "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on "
@@ -1239,7 +1242,7 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "where (p.pid='%s') and p.trust!='none' "
 			     "      and u.status='active' and u.admin=1 "
 			     "      order by u.uid",
-			     15, RELOADPID);
+			     16, RELOADPID);
 	}
 	else {
 		/*
@@ -1257,8 +1260,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
 				 "UNIX_TIMESTAMP(u.usr_modified), "
-				 "u.usr_email,u.widearearoot, "
-				 "u.wideareajailroot "
+				 "u.usr_email,u.usr_shell, "
+				 "u.widearearoot,u.wideareajailroot "
 				 "from projects as p "
 				 "left join group_membership as m "
 				 "  on m.pid=p.pid "
@@ -1270,7 +1273,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "      and m.trust!='none' "
 				 "      and u.status='active' "
 				 "order by u.uid",
-				 15, reqp->type);
+				 16, reqp->type);
 	}
 
 	if (!res) {
@@ -1354,9 +1357,9 @@ COMMAND_PROTOTYPE(doaccounts)
 		 */
 		if (!reqp->islocal) {
 			if (!reqp->isvnode)
-				root = atoi(row[13]);
-			else
 				root = atoi(row[14]);
+			else
+				root = atoi(row[15]);
 
 			if (tbadmin)
 				root = 1;
@@ -1414,6 +1417,10 @@ COMMAND_PROTOTYPE(doaccounts)
 			if (vers >= 9) {
 				sprintf(&buf[strlen(buf)],
 					" EMAIL=\"%s\"", row[12]);
+			}
+			if (vers >= 10) {
+				sprintf(&buf[strlen(buf)],
+					" SHELL=%s", row[13]);
 			}
 			strcat(buf, "\n");
 		}
