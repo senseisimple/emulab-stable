@@ -45,6 +45,7 @@ echo "<table border=2 cellpadding=2 cellspacing=1
 echo "<tr>
           <td align=center>ID</td>
           <td align=center>Type</td>
+          <td align=center>Up?</td>
           <td align=center>PID</td>
           <td align=center>EID</td>
           <td align=center>Default<br>OSID</td>
@@ -56,6 +57,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $def_boot_osid      = $row[def_boot_osid];
     $pid                = $row[pid];
     $eid                = $row[eid];
+    $status             = $row[status];
 
     if ($type == "dnard" && !$verbose)
 	continue;
@@ -63,6 +65,11 @@ while ($row = mysql_fetch_array($query_result)) {
     echo "<tr>
              <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>\n
              <td>$type</td>\n";
+
+    if ($status == "up")
+	echo "<td><img src='/autostatus-icons/greenball.gif' alt=up></td>\n";
+    else
+	echo "<td><img src='/autostatus-icons/redball.gif' alt=down></td>\n";
 
     if ($pid) {
 	echo "<td>$pid</td>
