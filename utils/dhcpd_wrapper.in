@@ -87,6 +87,16 @@ while (1) {
 	    "    Could not exec $DHCPD!\n");
     }
     waitpid($childpid, 0);
+
+    if (($? >> 8) == 1) {
+	SENDMAIL($TBOPS, "DHCPD died",
+		 "$DHCPD died with 1\n".
+		 "Not restarting it; might be a config file error",
+		 $TBOPS);
+	unlink $PIDFILE;
+	die("*** $0:\n".
+	    "    Could not start $DHCPD! Might be a config file error.\n");
+    }
     #
     # Anytime it exits, send email.
     #
