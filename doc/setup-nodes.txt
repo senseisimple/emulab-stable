@@ -94,12 +94,13 @@ addresses. However, at this point, we don't know those MAC and IP addresses, so
 we have to set up DHCP to actually do some dynamic stuff. Copy
 dhcpd.conf.template from the dhcpd/ directory of the source tree into
 /usr/local/etc . Edit it to get your actual boss IP, domain, control network
-subnet and mask, etc. into it.  Now, see that line that says 'range ...'?
-Uncomment that line, and put in a range of IP addresses that is in the control
-network, but is _not_ going to be used by nodes. Ideally, this range should be
-large enough to fit all the nodes into it. If it's smaller, remember this for
-later, when we get to bringing up the rest of the nodes. Make the config file
-from the template with:
+subnet and mask, etc. into it.  For things to function properly, boss will need
+to be listed as the nameserver in this file. Now, see that line that says
+'range ...'?  Uncomment that line, and put in a range of IP addresses that is
+in the control network, but is _not_ going to be used by nodes. Ideally, this
+range should be large enough to fit all the nodes into it. If it's smaller,
+remember this for later, when we get to bringing up the rest of the nodes. Make
+the config file from the template with:
 /usr/testbed/sbin/dhcpd.makeconf dhcpd.conf.template > dhcp.conf
 ... then (re) start dhcpd with:
 /usr/local/etc/rc.d/2.dhcpd.sh restart
