@@ -399,6 +399,20 @@ acceptor:
       */
 
       if ((unsigned char)buf[0] != 255) {
+
+	if (buf[got - 1] == '\0') { got--; }
+
+	/*
+	for(i = 0; i < got; i++ ) {
+	  if ((unsigned char)buf[i] > 127 || 
+	      (unsigned char)buf[i] < 32) {
+	    printf("Special to server %i\n", 
+		   (unsigned int)(unsigned char)buf[i] );
+	    //buf[i] = '#';
+	  }
+	}
+	*/
+
 	if (writeFunc( /*sock,*/ buf, got ) < 0) {
 	  perror("write sock");
 	  return;
@@ -414,18 +428,24 @@ acceptor:
 	return;
       }
 
-      /*
-      for(i = 0; i < got; i++ ) {
-	if ((unsigned char)buf[i] > 127) {
-	  printf("Special %i\n", (unsigned int)(unsigned char)buf[i] );
-	}
-      }
-      printf("%i server->consock\n", got );
-      */
+      //printf("%i server->consock\n", got );
 
-      if (write( conSock, buf, got ) < 0) {
-	perror("write conSock");
-	return;
+      if ((unsigned char)buf[0] != 255) {
+	/*
+	for(i = 0; i < got; i++ ) {
+	  if (buf[i] == '^') { buf[i] = '!'; }
+	  if ((unsigned char)buf[i] > 127 || 
+	      (unsigned char)buf[i] < 32) {
+	    printf("Special from server %i\n", 
+		   (unsigned int)(unsigned char)buf[i] );
+	    //buf[i] = '#';
+	  }
+	}
+	*/
+	if (write( conSock, buf, got ) < 0) {
+	  perror("write conSock");
+	  return;
+	}
       }
     }
   }
