@@ -38,6 +38,9 @@ my $SGUISP = "/usr/local/bin/uisp";
 my $SSHTB  = "$TB/bin/sshtb";
 my $POWER  = "$TB/bin/power";
 my $TIP    = "$TB/bin/tiptunnel";
+my $OBJCOPY= "/usr/local/bin/avr-objcopy";
+my $SETID  = "$TB/bin/set-mote-id";
+my $TMPDIR = "/tmp";
 my $USERS  = "@USERNODE@";
 my $DEBUG  = 1;
 
@@ -133,7 +136,7 @@ if ($filename =~ /^([-\w\/.]+)$/) {
 }
 
 #
-# Tait check the node names
+# Taint check the node names
 #
 @motes = map {
     if (/^([-\w]+)$/) {
@@ -142,6 +145,29 @@ if ($filename =~ /^([-\w\/.]+)$/) {
 	die("*** Tainted node name: $_\n");
     }
 } @motes;
+
+#
+# Give them a chance to put IDs in the command line
+#
+my $previous_mote = "";
+my @tmpmotes;
+my %moteIDs;
+foreach my $mote (@motes) {
+    if ($previous_mote) {
+        # This could be an ID
+        if ($mote =~ /^\d+$/) {
+            # Not a mote, a mote ID
+            $moteIDs{$previous_mote} = $mote;
+        } else {
+            push @tmpmotes, $mote;
+            $previous_mote = $mote;
+        }
+    } else {
+        push @tmpmotes, $mote;
+        $previous_mote = $mote;
+    }
+}
+@motes = @tmpmotes;
 
 #
 # Permission check
@@ -158,6 +184,18 @@ if ($filename) {
     if (!-R $filename) {
 	die "$filename not readable\n";
     }
+}
+
+#
+# If this is an exe rather than an srec, we're going to have to process it
+# a bit, so make up a tempfile name
+#
+my $tmpfile;
+my $isexe = 0;
+if ($filename =~ /\.exe$/) {
+    print "exe file, extra processing will be done\n";
+    $tmpfile = "$TMPDIR/tbuisp.$$.srec";
+    $isexe = 1;
 }
 
 #
@@ -181,6 +219,54 @@ MOTE: foreach my $mote (@motes) {
     }
 
     #
+    # Process the exe file if necessary
+    #
+    my $uploadfile = $filename;
+    if ($isexe) {
+        #
+        # Check to see if we have to set the mote ID
+        #
+        my $processedfile = $filename;
+        my $tmpexe = "$TMPDIR/tbuisp.$$.exe";
+        if (!exists $moteIDs{$mote}) {
+            #
+            # Try to grab an ID from the virt_nodes table
+            #
+            my $id_result = DBQueryFatal("select numeric_id from nodes as n " .
+                "left join reserved as r on n.node_id = r.node_id " .
+                "left join virt_nodes as v on r.vname = v.vname " .
+                "where n.node_id='$mote' and v.numeric_id is not null");
+            if ($id_result->num_rows() == 1) {
+                $moteIDs{$mote} = ($id_result->fetch_row());
+            } else {
+                #
+                # Default it to the numeric part of the node ID
+                #
+                if ($mote =~ /(\d+)$/) {
+                    $moteIDs{$mote} = $1;
+                }
+            }
+        }
+        if (exists $moteIDs{$mote}) {
+            print "Setting id for $mote to $moteIDs{$mote}\n";
+            if (system "$SETID --exe $filename $tmpexe $moteIDs{$mote}") {
+                warn "Error: Unable to set mote ID to $moteIDs{$mote}\n";
+                next MOTE;
+            }
+            $processedfile = $tmpexe;
+        }
+        if (system "$OBJCOPY --output-target=srec $processedfile $tmpfile") {
+            warn "Error: Trouble processing $filename\n";
+            next MOTE;
+        }
+        $uploadfile = $tmpfile;
+
+        if ($processedfile eq $tmpexe) {
+            unlink $tmpexe;
+        }
+    }
+
+    #
     # Find out the type of the mote's host, which we use for actual programming
     #
     my $host;
@@ -191,7 +277,7 @@ MOTE: foreach my $mote (@motes) {
     }
     if ($host eq $mote) {
 	print "Uploading code to $mote\n";
-	my $commandstr = "$SSHTB -host $USERS $TIP -u $UID -l $mote - < $filename";
+	my $commandstr = "$SSHTB -host $USERS $TIP -u $UID -l $mote - < $uploadfile";
 	my $OLDUID = $UID;
 	$UID = $EUID;
 	if (system($commandstr)) {
@@ -297,7 +383,7 @@ MOTE: foreach my $mote (@motes) {
 	    #$opstring = "--wr_fuse_e=ff --erase --upload ";
 	    $opstring = "--erase --upload ";
 	    if ($upload_method eq "direct") {
-		$opstring .= "if=$filename";
+		$opstring .= "if=$uploadfile";
 	    } elsif ($upload_method eq "ssh") {
 		$opstring .= "if=-";
 	    }
@@ -327,7 +413,7 @@ MOTE: foreach my $mote (@motes) {
 	# We have to ssh into the mote host
 	#
 	$commandstr = "$SSHTB -host $host $SGUISP " .
-	    join(" ",@uisp_args,$opstring) . " < $filename";
+	    join(" ",@uisp_args,$opstring) . " < $uploadfile";
 
 	#
 	# SSH gets ticked if UID != EUID, so set that now
@@ -342,6 +428,13 @@ MOTE: foreach my $mote (@motes) {
     if (system($commandstr)) {
 	$errors++;
 	warn "Failed to upload code to $mote";
+    }
+
+    #
+    # Clean up the tempfile
+    #
+    if ($tmpfile) {
+        unlink $tmpfile;
     }
 
     # XXX - We have to reboot stargates after loading the mote. Disgusting,
