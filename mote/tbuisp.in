@@ -169,13 +169,15 @@ MOTE: foreach my $mote (@motes) {
 
 	    last TSWITCH;
 	};
-	/^sg/ && do {
+	# XXX - garcia is temporary - hopefully, at some point, we will
+	# distinguish the garcia from the stargate that rides on it
+	(/^sg/ || /^garcia/) && do {
 	    # Stargate
 
 	    # We have to ssh in to the stargate to do the programming
 
 	    # The type of programming board on a stargate
-	    push @uisp_args, "-dprog=stargate";
+	    push @uisp_args, "-dprog=sggpio";
 
 	    # We do the upload by sshing to the toe stargate and running
 	    # uisp
@@ -195,8 +197,12 @@ MOTE: foreach my $mote (@motes) {
     #
     my ($proc, $speed) = TBNodeTypeProcInfo($motetype);
     PSWITCH: for ($proc) {
-	/^ATmega128/i && do {
-	    push @uisp_args, "-dpart=ATmega128";
+	/^ATmega128/i && do { # mica2
+	    push @uisp_args, "-dpart=ATmega128","--wr_fuse_e=ff";
+	    last PSWITCH;
+	};
+	/^ATmega103/i && do { # mica1
+	    push @uisp_args, "-dpart=ATmega103","--wr_fuse_e=fd";
 	    last PSWITCH;
 	};
 	# Default
@@ -211,7 +217,8 @@ MOTE: foreach my $mote (@motes) {
     my $opstring;
     OSWITCH: for ($operation) {
 	/^upload$/ && do {
-	    $opstring = "--wr_fuse_e=ff --erase --upload ";
+	    #$opstring = "--wr_fuse_e=ff --erase --upload ";
+	    $opstring = "--erase --upload ";
 	    if ($upload_method eq "direct") {
 		$opstring .= "if=$filename";
 	    } elsif ($upload_method eq "ssh") {
@@ -236,7 +243,7 @@ MOTE: foreach my $mote (@motes) {
 	#
 	$commandstr = "$UISP " . join(" ",@uisp_args,$opstring);
 
-	# Drop root permission, no need ro it
+	# Drop root permission, no need for it
 	$EUID = $UID;
     } elsif ($upload_method eq "ssh") {
 	#
@@ -244,6 +251,11 @@ MOTE: foreach my $mote (@motes) {
 	#
 	$commandstr = "$SSHTB -host $host $SGUISP " .
 	    join(" ",@uisp_args,$opstring) . " < $filename";
+
+	#
+	# SSH gets ticked if UID != EUID, so set that now
+	#
+	$UID = $EUID;
     } else {
 	warn "Unsupported upload method for $mote - skipping";
 	$errors++;
