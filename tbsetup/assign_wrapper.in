@@ -1640,6 +1640,24 @@ foreach $vnodeport (keys(%portbw)) {
 }
 
 #
+# Set the sshd ports. Its complicated by the fact that a single experiment
+# could have multiple jailed nodes on the same physical node, and so a
+# per-experiment wide sshd port is not going to work unless there happens
+# to be just one jail per node, but thats not likely in the local area case.
+# What would be the point.
+#
+foreach my $vnode (keys(%v2pmap)) {
+    my $pnode = $v2pmap{$vnode};
+
+    if ($isvirtnode{$vnode} && $jailed{$pnode}) {
+	my $sshdport = nextipportnum($pnode);
+
+	DBQueryFatal("update nodes set sshdport=$sshdport ".
+		     "where node_id='$pnode'");
+    }
+}
+
+#
 # Upload the tunnels table. These are built for remote node links.
 #
 # First need to assign ports to the servers. To do that need to figure
@@ -1676,7 +1694,7 @@ foreach $lan (keys(%rnodelans)) {
 
     # Assign a port, but only the first time chosen.
     if (! $rnodetotunnelport{$server}) {
-	$rnodetotunnelport{$server} = nextipportnum($p2pmap{$v2pmap{$server}});
+	$rnodetotunnelport{$server} = nextipportnum($v2pmap{$server});
     }
 }
 
@@ -1779,10 +1797,6 @@ if ($query_result->numrows) {
 	   $query_result->fetchrow_array()) {
 
 	my $pnode    = $v2pmap{$vnode};
-
-	if (! $jailed{$pnode}) {
-	    $pnode = $p2pmap{$pnode};
-	}
 	my $ipport   = nextipportnum($pnode);
 
 	DBQueryFatal("update virt_trafgens set port=$ipport ".
@@ -1886,38 +1900,16 @@ sub find_vport {
 };
 
 #
-# Bump and return the IP port number for a node. This is
-# required for multiplexing virtual nodes on a physical node. It has
-# to be done after node assignment of course.
-#
-# returns port on success, dies if no more ports.
+# Indexed by phys node. If there are no virtual nodes, then there
+# is no port sharing, and it makes no difference, as long as there are
+# no collisions on a node. If there are virtual nodes, then assign a
+# port range for the experiment, and all port allocations need to be
+# shared within that range on each phys node. That is, if there are 2
+# virtual nodes on physical node, then must allocated from the one range.
+# There is never any overlap between experiements of course.
 # 
-sub nextipportnum($) {
-    my ($node) = @_;
-    my $port;
-
-    DBQueryFatal("lock tables nodes write");
-
-    my $query_result =
-	DBQueryFatal("select ipport_low,ipport_next,ipport_high from nodes ".
-		     "where node_id='$node'");
-
-    my ($portlow,$portnext,$porthigh) =	$query_result->fetchrow_array();
-
-    $port = $portnext++;
-
-    if ($port < $portlow || $port > $porthigh) {
-	DBQueryFatal("unlock tables");
-	die("*** $0:\n".
-	    "    No more dynamic ports available for $node!\n");
-    }
-
-    DBQueryFatal("update nodes set ipport_next=$portnext ".
-		 "where node_id='$node'");
-    DBQueryFatal("unlock tables");
-
-    return $port;
-}
+my %portnext	= ();
+my %porthigh    = ();
 
 sub TBExptSetPortRange {
     my @nodelist = ();
@@ -1927,10 +1919,16 @@ sub TBExptSetPortRange {
     # all port allocations will come from physical node. 
     #
     foreach my $vnode (keys(%v2pmap)) {
-	my $pnode = $v2pmap{$vnode};
+	my $pnode  = $v2pmap{$vnode};
+	my $ppnode = $p2pmap{$pnode};
 
 	if ($isvirtnode{$vnode}) {
-	    push(@nodelist, $pnode);
+	    push(@nodelist, $ppnode);
+	}
+	else {
+	    # Same big port range for all phys nodes. 
+	    $portnext{$ppnode} = TBDB_LOWVPORT;
+	    $porthigh{$ppnode} = TBDB_MAXVPORT;
 	}
     }
     if (! @nodelist) {
@@ -1989,13 +1987,40 @@ sub TBExptSetPortRange {
     printdb "Setting ipport range to $newlow,$newhigh\n";
 
     #
-    # Update virtnodes with new range.
+    # Now set the port range for those nodes hosting virtual nodes.
+    # This prevents overlap with other vnodes from other experiments
+    # on that nodes. Since you cannot share a node unless you are using
+    # virtual nodes, there is no need to worry about phys nodes that
+    # are dedicated. That might change of course. 
     #
-    foreach $node (@nodelist) {
+    foreach my $ppnode (@nodelist) {
+	$portnext{$ppnode} = $newlow;
+	$porthigh{$ppnode} = $newhigh;
+
 	DBQueryFatal("update nodes set ipport_low=$newlow, ".
 		     " ipport_next=ipport_low+1, ipport_high=$newhigh ".
-		     "where node_id='$node'");
+		     "where node_id='$ppnode'");
     }
     return 0;
+}
+
+#
+# Bump and return the IP port number for a node. This is
+# required for multiplexing virtual nodes on a physical node. It has
+# to be done after node assignment of course.
+#
+# returns port on success, dies if no more ports.
+# 
+sub nextipportnum($) {
+    my ($pnode)  = @_;
+    my $ppnode   = $p2pmap{$pnode};
+    my $port     = $portnext{$ppnode};
+
+    if ($port >= $porthigh{$ppnode}) {
+	die("*** $0:\n".
+	    "    No more dynamic ports available for $pnode on $ppnode!\n");
+    }
+    $portnext{$ppnode}++;
+    return $port;
 }
 
