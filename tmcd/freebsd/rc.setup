@@ -27,9 +27,9 @@ fi
 if [ -x /etc/testbed/rc.delay ]; then
         echo "Setting up Testbed delay configuration ..."
         /etc/testbed/rc.delay
-elif [ -x /etc/testbed/rc.route -a -r /etc/testbed/router.conf ]; then
+elif [ -x /etc/testbed/rc.route ]; then
         echo "Setting up Testbed interface routing ..."
-	/etc/testbed/rc.route `cat /etc/testbed/router.conf`
+	/etc/testbed/rc.route
 fi
 
 if [ -x /etc/testbed/rc.rpm  ]; then

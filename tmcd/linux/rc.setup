@@ -18,9 +18,9 @@ if [ -x /etc/rc.d/testbed/rc.ifc  ]; then
 	/etc/rc.d/testbed/rc.ifc
 fi
 
-if [ -x /etc/testbed/rc.route -a -r /etc/testbed/router.conf ]; then
+if [ -x /etc/rc.d/testbed/rc.route ]; then
         echo "Setting up Testbed interface routing ..."
-	/etc/testbed/rc.route `cat /etc/testbed/router.conf`
+	/etc/rc.d/testbed/rc.route
 fi
 
 if [ -x /etc/rc.d/testbed/rc.rpm  ]; then

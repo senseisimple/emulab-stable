@@ -10,7 +10,8 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line update_delays enable_ipod
+	 os_rpminstall_line update_delays
+	 os_routing_enable_forward os_routing_enable_gated os_routing_add_manual
        );
 
 # Must come after package declaration!
@@ -47,6 +48,8 @@ my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
 my $RPMINSTALL  = "/usr/local/bin/rpm -i %s";
 my $MKDIR	= "/bin/mkdir";
+my $GATED	= "/usr/local/sbin/gated";
+my $ROUTE	= "/sbin/route";
 
 #
 # Delay node configuration goop.
@@ -56,9 +59,6 @@ my $KERNEL1000  = "/kernel.1000HZ";
 my $KERNEL10000 = "/kernel.10000HZ";
 my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000); 
 my $kernel      = $KERNEL100;
-my $IFACE	= "fxp";
-my $CTLIFACENUM = "4";
-my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $TMDELAY	= "$SETUPDIR/rc.delay";
 my $TMDELMAP	= "$SETUPDIR/delay_mapping";
 my $TMCCCMD_DELAY = "delay";
@@ -517,6 +517,44 @@ sub dodelays ()
     }
 
     return 0;
+}
+
+#
+# OS dependent, routing-related commands
+#
+
+sub os_routing_enable_forward()
+{
+    my $cmd;
+
+    $cmd = "sysctl -w net.inet.ip.forwarding=1\n";
+    $cmd .= "sysctl -w net.inet.ip.fastforwarding=1";
+    return $cmd;
+}
+
+sub os_routing_enable_gated()
+{
+    my $cmd;
+
+    $cmd = "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
+    return $cmd;
+}
+
+sub os_routing_add_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE add -host $destip $gate";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE add -net $destip $gate $destmask";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
 }
 
 1;

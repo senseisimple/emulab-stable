@@ -11,6 +11,7 @@ use Exporter;
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line enable_ipod
+	 os_routing_enable_forward os_routing_enable_gated os_routing_add_manual
        );
 
 # Must come after package declaration!
@@ -49,6 +50,8 @@ my $IFC_HDUPLEX = "HD";
 my $RPMINSTALL  = "/bin/rpm -i %s";
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $MKDIR	= "/bin/mkdir";
+my $GATED	= "/usr/sbin/gated";
+my $ROUTE	= "/sbin/route";
 
 #
 # OS dependent part of cleanup node state.
@@ -223,6 +226,10 @@ sub os_setup()
     return 0;
 }
     
+#
+# OS dependent "ICMP Ping of Death" support
+#
+
 use Socket;
 
 sub enable_ipod()
@@ -251,6 +258,43 @@ sub enable_ipod()
 	return -1;
     }
     return 0;
+}
+
+#
+# OS dependent, routing-related commands
+#
+
+sub os_routing_enable_forward()
+{
+    my $cmd;
+
+    $cmd = "sysctl -w net.ipv4.conf.all.forwarding=1";
+    return $cmd;
+}
+
+sub os_routing_enable_gated()
+{
+    my $cmd;
+
+    $cmd = "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
+    return $cmd;
+}
+
+sub os_routing_add_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE add -host $destip gw $gate";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE add -net $destip netmask $destmask gw $gate";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
 }
 
 1;
