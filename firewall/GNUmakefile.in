@@ -11,7 +11,7 @@ SUBDIR		= firewall
 TBDB		= @TBDBNAME@
 
 FW_SCRIPTS	= initfwvars.pl
-FW_FILES	= open.sql closed.sql basic.sql emulab.sql
+FW_FILES	= open.sql closed.sql basic.sql elabinelab.sql
 
 include $(OBJDIR)/Makeconf
 
