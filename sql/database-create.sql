@@ -722,7 +722,7 @@ CREATE TABLE node_rusage (
   load_1min float NOT NULL default '0',
   load_5min float NOT NULL default '0',
   load_15min float NOT NULL default '0',
-  disk_used float  NOT NULL default '0',
+  disk_used float NOT NULL default '0',
   status_timestamp datetime default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;

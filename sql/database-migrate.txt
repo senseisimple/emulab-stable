@@ -1207,3 +1207,5 @@ last_net_act,last_cpu_act,last_ext_act);
 	  status_timestamp datetime default NULL,
 	  PRIMARY KEY  (node_id)
 	) TYPE=MyISAM;
+
+1.213: Minor whitespace change to make schemacheck happy.
