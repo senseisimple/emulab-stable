@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -423,7 +423,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 			/* Create socket from which to read. */
 			sock = socket(AF_INET, SOCK_STREAM, 0);
 			if (sock < 0) {
-				perror("creating stream socket:");
+				perror("creating stream socket");
 				return -1;
 			}
 
@@ -465,7 +465,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 	while (n) {
 		if ((cc = WRITE(sock, bp, n)) <= 0) {
 			if (cc < 0) {
-				perror("Writing to socket:");
+				perror("Writing to socket");
 				goto bad;
 			}
 			fprintf(stderr, "write aborted");
@@ -478,7 +478,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 	while (1) {
 		if ((cc = READ(sock, buf, sizeof(buf) - 1)) <= 0) {
 			if (cc < 0) {
-				perror("Reading from socket:");
+				perror("Reading from socket");
 				goto bad;
 			}
 			break;
@@ -507,7 +507,7 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
-		perror("creating dgram socket:");
+		perror("creating dgram socket");
 		return -1;
 	}
 
@@ -523,7 +523,7 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	cc = sendto(sock, data, n, 0, (struct sockaddr *)&name, sizeof(name));
 	if (cc != n) {
 		if (cc < 0) {
-			perror("Writing to socket:");
+			perror("Writing to socket");
 			return -1;
 		}
 		fprintf(stderr, "short write (%d != %d)\n", cc, n);
@@ -531,12 +531,13 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	}
 	connected = 1;
 
+	fromlen = sizeof(client);
 	cc = recvfrom(sock, buf, sizeof(buf) - 1, 0,
 		      (struct sockaddr *)&client, &length);
 	progress += cc;
 
 	if (cc < 0) {
-		perror("Reading from socket:");
+		perror("Reading from socket");
 		return -1;
 	}
 	close(sock);
@@ -566,7 +567,7 @@ dounix(char *data, int outfd, char *unixpath)
 	/* Create socket from which to read. */
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (sock < 0) {
-		perror("creating stream socket:");
+		perror("creating stream socket");
 		return -1;
 	}
 
@@ -585,7 +586,7 @@ dounix(char *data, int outfd, char *unixpath)
 	while (n) {
 		if ((cc = write(sock, bp, n)) <= 0) {
 			if (cc < 0) {
-				perror("Writing to socket:");
+				perror("Writing to socket");
 				goto bad;
 			}
 			fprintf(stderr, "write aborted");
@@ -598,7 +599,7 @@ dounix(char *data, int outfd, char *unixpath)
 	while (1) {
 		if ((cc = read(sock, buf, sizeof(buf) - 1)) <= 0) {
 			if (cc < 0) {
-				perror("Reading from socket:");
+				perror("Reading from socket");
 				goto bad;
 			}
 			break;
@@ -764,7 +765,7 @@ dooutput(int fd, char *buf, int len)
 	while (count) {
 		if ((cc = write(fd, buf, count)) <= 0) {
 			if (cc < 0) {
-				perror("Writing to output stream:");
+				perror("Writing to output stream");
 				return -1;
 			}
 			fprintf(stderr, "write to socket aborted");
