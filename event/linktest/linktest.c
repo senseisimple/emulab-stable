@@ -46,6 +46,7 @@ main(int argc, char **argv) {
 	char *port = NULL;
 	char *keyfile = NULL;
 	char *pideid = NULL;
+	char *pidfile = NULL;
 	char *logfile = NULL;
 	char *progname;
 	char c;
@@ -53,7 +54,7 @@ main(int argc, char **argv) {
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:l:dk:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:dk:i:")) != -1) {
 	  switch (c) {
 	  case 'd':
 	    debug++;
@@ -66,6 +67,9 @@ main(int argc, char **argv) {
 	    break;
 	  case 'e':
 	    pideid = optarg;
+	    break;
+	  case 'i':
+	    pidfile = optarg;
 	    break;
 	  case 'l':
 	    logfile = optarg;
@@ -139,8 +143,25 @@ main(int argc, char **argv) {
 	 * event system calls.
 	 */
 	if (!debug)
-		daemon(0, 0);
-	
+		daemon(0, 1);
+
+	/*
+	 * Write out a pidfile if root (after we daemonize).
+	 */
+	if (!getuid()) {
+		FILE *fp;
+		
+		if (pidfile)
+			strcpy(buf, pidfile);
+		else
+			sprintf(buf, "%s/linktest.pid", _PATH_VARRUN);
+		fp = fopen(buf, "w");
+		if (fp != NULL) {
+			fprintf(fp, "%d\n", getpid());
+			(void) fclose(fp);
+		}
+	}
+
 	/*
 	 * Begin the event loop, waiting to receive event notifications:
 	 */
