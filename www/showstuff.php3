@@ -669,7 +669,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
               </tr>\n";
 
 	echo "<tr>
-                <td>Long Name: </td>
+                <td>Description: </td>
                 <td class=\"left\">$exp_name</td>
               </tr>\n";
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -454,7 +454,7 @@ if ($thumb && !$idle) {
 
     echo "    <th width=60%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name$ni'>
-                  Name</a></th>
+                  Description</a></th>
               <th width=4%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid$ni'>
                   Head UID</a></th>
