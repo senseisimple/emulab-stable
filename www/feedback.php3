@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -38,6 +38,22 @@ if (isset($pid) && strcmp($pid, "") &&
 }
 else {
     PAGEARGERROR("Must specify pid and eid!");
+}
+
+$expstate = TBExptState($pid, $eid);
+
+if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
+    strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
+    USERERROR("You cannot modify an experiment in transition.", 1);
+}
+
+if (!strcmp($expstate, $TB_EXPTSTATE_ACTIVE)) {
+	$reboot = 1;
+	$eventrestart = 1;
+}
+else {
+	$reboot = 0;
+	$eventrestart = 0;
 }
 
 if (isset($mode) && strcmp($mode, "")) {
@@ -207,6 +223,53 @@ else if (strcmp($mode, "clear") == 0) {
 	$retval = SUEXEC($uid, "$pid,$unix_gid",
 			 "webfeedback $options $pid $gid $eid",
 			 SUEXEC_ACTION_USERERROR);
+	
+	#
+	# Avoid	SIGPROF in child.
+	# 
+	set_time_limit(0);
+	
+	$query_result = DBQueryFatal("SELECT nsfile from nsfiles ".
+				     "where pid='$pid' and eid='$eid'");
+	if (mysql_num_rows($query_result)) {
+	    $row    = mysql_fetch_array($query_result);
+	    $nsdata = stripslashes($row[nsfile]);
+	}
+	else {
+	    $nsdata = ""; # XXX what to do...
+	}
+	
+	list($usec, $sec) = explode(' ', microtime());
+	srand((float) $sec + ((float) $usec * 100000));
+	$foo = rand();
+	$nsfile = "/tmp/$uid-$foo.nsfile";
+	
+	if (! ($fp = fopen($nsfile, "w"))) {
+	    TBERROR("Could not create temporary file $nsfile", 1);
+	}
+	fwrite($fp, $nsdata);
+	fclose($fp);
+	chmod($nsfile, 0666);
+	
+	$retval = SUEXEC($uid, "$pid,$unix_gid",
+			 "webswapexp " . ($reboot ? "-r " : "") .
+			 ($eventrestart ? "-e " : "") .
+			 "-s modify $pid $eid $nsfile",
+			 SUEXEC_ACTION_IGNORE);
+	
+	unlink($nsfile);
+	
+	#
+	# Fatal Error. Report to the user, even though there is not much he can
+	# do with the error. Also reports to tbops.
+	# 
+	if ($retval < 0) {
+	    SUEXECERROR(SUEXEC_ACTION_DIE);
+	#
+	# Never returns ...
+	#
+	    die("");
+	}
     }
     
     echo "<center><h3><br>Done!</h3></center>\n";
