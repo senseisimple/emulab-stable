@@ -113,7 +113,7 @@ if ($state eq EXPTSTATE_SWAPPED) {
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     print "Lan/Link Info:\n";
     printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member",
-    "IP", "Delay", "Bandwidth", "Loss Rate";
+    "IP", "Delay", "BW (Kbs)", "Loss Rate";
     print "--------------- --------------- --------------- --------- "
 	. "--------- ---------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
@@ -153,7 +153,7 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     print "Lan/Link Info:\n";
     printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member", 
-    "IP", "Delay", "Bandwidth", "Loss Rate";
+    "IP", "Delay", "BW (Kbs)", "Loss Rate";
     print "--------------- --------------- --------------- --------- "
 	. "--------- ---------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
