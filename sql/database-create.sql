@@ -1132,6 +1132,8 @@ CREATE TABLE users (
   home_pubkey text,
   adminoff tinyint(4) default '0',
   verify_key varchar(32) default NULL,
+  widearearoot tinyint(4) default '0',
+  wideareajailroot tinyint(4) default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)

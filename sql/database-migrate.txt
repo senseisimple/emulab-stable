@@ -196,3 +196,11 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table state_triggers drop primary key;
        alter table state_triggers add primary key (node_id,op_mode,state);
 
+1.130: Add widearearoot and wideareajailroot to the users table, to
+       control who gets root on widearea nodes, inside and outside of
+       jail. Kinda brute force; might need to make this more flexible
+       at some point, perhaps with a node/user mapping table, but this
+       will do for now since its handled entirely inside of tmcd. 
+
+       alter table users add widearearoot tinyint(4) default '0';
+       alter table users add wideareajailroot tinyint(4) default '0';
