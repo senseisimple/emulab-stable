@@ -2311,3 +2311,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	cd <your_build_tree>/firewall
 	gmake insertrules
+
+1.300: Allow a switch to be in multiple stacks, and add a column that records
+       of the memberships is the primary one.
+
+        alter table switch_stacks drop primary key;
+	alter table switch_stacks add index (node_id);
+	alter table switch_stacks add column (is_primary tinyint(1) not null default '1');

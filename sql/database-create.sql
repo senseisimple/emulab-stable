@@ -1517,7 +1517,8 @@ CREATE TABLE switch_stack_types (
 CREATE TABLE switch_stacks (
   node_id varchar(32) NOT NULL default '',
   stack_id varchar(32) NOT NULL default '',
-  PRIMARY KEY  (node_id)
+  is_primary tinyint(1) NOT NULL default '1',
+  KEY node_id (node_id)
 ) TYPE=MyISAM;
 
 --

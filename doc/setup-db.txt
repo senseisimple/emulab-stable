@@ -211,7 +211,8 @@ max_vlan: Ditto, but the biggest number. Defaults to 1000.
 
 Finally, add switches to these stacks by putting entries in the switch_stacks
 table, listing the node_id of each switch and the stack_id of the stack it
-belongs to.
+belongs to. You can leave the 'is_primary' column of these rows with its default
+value (1).
 
 ##### Step 4 - Setup control hardware
 ##### Local Only
