@@ -1,3 +1,10 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+#include "config.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -10,16 +17,20 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
 
 #include "log.h"
 #include "mtp.h"
 #include <math.h>
 
 #if defined(HAVE_MEZZANINE)
-#include "mezz.h"
+#  include "mezz.h"
 #else
 
-#define MEZZ_MAX_OBJECTS 100
+#  warning "Mezzanine not available, simulating instead."
+
+#  define MEZZ_MAX_OBJECTS 100
 
 typedef struct {
     int class[2];       // Color class for the two blobs
@@ -41,35 +52,50 @@ typedef struct {
     mezz_objectlist_t objectlist;
 } mezz_mmap_t;
 
-#endif
-
-#define VMCCLIENT_DEFAULT_PORT 6969
-
-static int debug = 0;
-
-static int looping = 1;
-
+/**
+ * File to read simulated positions from.
+ */
 static FILE *posfile = NULL;
 
-static volatile unsigned int mezz_event_count = 0;
+#endif
 
-/* for local->global camera coords */ 
-static double x_offset;
-static double y_offset;
+/**
+ * Default port to listen for client connections.
+ */
+#define VMCCLIENT_DEFAULT_PORT 6969
 
-void local2global_posit_trans(struct position *p) {
+/**
+ * Debugging flag.
+ */
+static int debug = 0;
 
-    if (p != NULL) {
-        p->x = p->y + x_offset;
-        p->y = p->x + y_offset;
-        p->theta -= M_PI;
-    }
-}
+/**
+ * Flag that indicates whether or not to continue in the main loop.
+ */
+static volatile int looping = 1;
 
+/**
+ * Counter used to track when a new frame was received from mezzanine.
+ */
+static volatile unsigned int mezz_frame_count = 0;
+
+/**
+ * X offset from the real world X == 0 to our local camera X == 0.
+ */
+static double x_offset = 0.0;
+
+/**
+ * Y offset from the real world Y == 0 to our local camera Y == 0.
+ */
+static double y_offset = 0.0;
+
+/**
+ * Print the usage statement to standard error.
+ */
 static void usage(void)
 {
     fprintf(stderr,
-            "Usage: vmcclient [-hd] [-p port] mezzfile\n"
+            "Usage: vmc-client [-hd] [-p port] [-x off] [-y off] mezzfile\n"
             "Required arguments:\n"
             "  mezzfile\tThe name of the mezzanine shared file\n"
             "Options:\n"
@@ -77,21 +103,65 @@ static void usage(void)
             "  -d\t\tTurn on debugging messages and do not daemonize\n"
             "  -l logfile\tSpecify the log file\n"
             "  -p port\tSpecify the port number to listen on. (Default: %d)\n"
-            "  -x offset\t x offset from real world x = 0 to our local x = 0"
-            "  -y offset\t y offset from real world y = 0 to our local y = 0",
+            "  -x offset\tx offset from real world x = 0 to our local x = 0\n"
+            "  -y offset\ty offset from real world y = 0 to our local y = 0\n"
+#if !defined(HAVE_MEZZANINE)
+	    "  -f file\tFile to read simulated positions from.\n"
+#endif
+	    ,
             VMCCLIENT_DEFAULT_PORT);
 }
 
+/**
+ * Signal handler for SIGINT, SIGQUIT, and SIGTERM that just stops the main
+ * loop.
+ *
+ * @param signal The actual signal received.
+ */
 static void sigquit(int signal)
 {
+    assert((signal == SIGINT) || (signal == SIGQUIT) || (signal == SIGTERM));
+    
     looping = 0;
 }
 
+/**
+ * Signal handler for SIGUSR1 that updates the mezzanine frame count so the
+ * main loop knows there is a new frame available.
+ *
+ * @param signal The actual signal received.
+ */
 static void sigusr1(int signal)
 {
-    mezz_event_count += 1;
+    assert(signal == SIGUSR1);
+    
+    mezz_frame_count += 1;
 }
 
+/**
+ * Transform a local camera coordinate to a real world coordinate.
+ *
+ * @param p The position to transform.
+ */
+void local2global_posit_trans(struct position *p_inout)
+{
+    float old_x = p_inout->x;
+    
+    assert(p_inout != NULL);
+    
+    p_inout->x = p_inout->y + x_offset;
+    p_inout->y = old_x + y_offset;
+    p_inout->theta -= M_PI;
+}
+
+/**
+ * Encode any object identified by mezzanine as mtp packets in the given
+ * buffer.
+ *
+ * @param buffer The buffer where any packets should be written.
+ * @param mm The mezzanine memory-mapped file.
+ * @return The length, in bytes, of the packets encoded in the buffer.
+ */
 static int encode_packets(char *buffer, mezz_mmap_t *mm)
 {
     struct mtp_update_position mup;
@@ -100,7 +170,6 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     int lpc, retval;
     char *cursor;
     int last_idx_set;
-    struct mtp_packet *hack_decl = NULL;
     
     assert(buffer != NULL);
     assert(mm != NULL);
@@ -125,7 +194,11 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
 	}
     }
 #endif
-    
+
+    /*
+     * Initialize one packet and then overwrite whatever is different between
+     * any located objects.
+     */
     mp.length = mtp_calc_size(MTP_UPDATE_POSITION, &mup);
     mp.opcode = MTP_UPDATE_POSITION;
     mp.version = MTP_VERSION;
@@ -133,6 +206,11 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     mp.data.update_position = &mup;
     
     cursor = buffer;
+
+    /*
+     * XXX Find the index of the last valid objct so we know when to put
+     * MTP_POSITION_STATUS_CYCLE_COMPLETE in the status field.
+     */
     last_idx_set = 0;
     for (lpc = 0; lpc < mol->count; ++lpc) {
         if (mol->objects[lpc].valid) {
@@ -141,37 +219,54 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     }
 
     for (lpc = 0; lpc < mol->count; ++lpc) {
-        // we don't want to send meaningless data!
-        if (mol->objects[lpc].valid) {
+        if (mol->objects[lpc].valid) { /* Don't send meaningless data. */
+	    if (debug > 1) {
+		info("vmc-client: object[%d] - %f %f %f\n",
+		     lpc,
+		     mol->objects[lpc].px,
+		     mol->objects[lpc].py,
+		     mol->objects[lpc].pa);
+	    }
+	    
             mup.robot_id = -1;
+
+	    /* Copy the camera-coordinates, then */
             mup.position.x = mol->objects[lpc].px;
             mup.position.y = mol->objects[lpc].py;
             mup.position.theta = mol->objects[lpc].pa;
 
+	    /* ... transform them into global coordinates. */
             local2global_posit_trans(&(mup.position));
 
             if (lpc == last_idx_set) {
-                /* this value being set tells vmc when it can delete stale
-                 * tracks.
-                 */
+                /*
+		 * Mark the end of updates for this frame so that vmcd can
+		 * delete stale tracks.
+		 */
                 mup.status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
             }
-
             else {
                 mup.status = MTP_POSITION_STATUS_UNKNOWN;
             }
+
+	    /*
+	     * XXX We could probably just look at the timestamp to figure out
+	     * when an update is for a different frame, instead of setting the
+	     * MTP_POSITION_STATUS_CYCLE_COMPLETE flag.
+	     */
             mup.position.timestamp = mm->time;
-            
+
+	    /* Finally, encode the packet. */
             cursor += mtp_encode_packet(&cursor, &mp);
         }
     }
-
-    //if (cursor != buffer) {
-    //    hack_decl = (struct mtp_packet *)(cursor - mtp_calc_size(MTP_UPDATE_POSITION,NULL));
-    //    hack_decl->data.update_position->status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
-    //}
-    retval = cursor - buffer;
     
+    retval = cursor - buffer;
+
+#if !defined(HAVE_MEZZANINE)
+    mm->time += 1.0;
+#endif
+
     return retval;
 }
 
@@ -183,11 +278,8 @@ int main(int argc, char *argv[])
     int retval = EXIT_FAILURE;
     struct sockaddr_in sin;
     struct sigaction sa;
-    int got_x_offset,got_y_offset;
     
-    got_x_offset = got_y_offset = 0;
-
-    while ((c = getopt(argc, argv, "hdp:l:i:f:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -204,23 +296,33 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             if (sscanf(optarg, "%d", &port) != 1) {
-                error("-p option is not a number: %s\n", optarg);
+                error("error: -p option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
             }
             break;
         case 'f':
+#if !defined(HAVE_MEZZANINE)
             if ((posfile = fopen(optarg, "r")) == NULL) {
-                error("cannot open %s\n", optarg);
+                error("error: cannot open %s\n", optarg);
+                usage();
+                exit(1);
             }
+#endif
             break;
         case 'x':
-            x_offset = atof(optarg);
-            got_x_offset = 1;
+	    if (sscanf(optarg, "%lf", &x_offset) != 1) {
+                error("error: -x option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+	    }
             break;
         case 'y':
-            y_offset = atof(optarg);
-            got_y_offset = 1;
+	    if (sscanf(optarg, "%lf", &y_offset) != 1) {
+                error("error: -y option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+	    }
             break;
         default:
             break;
@@ -231,13 +333,7 @@ int main(int argc, char *argv[])
     argc -= optind;
     
     if (argc == 0) {
-        error("missing mezzanine file argument\n");
-        usage();
-        exit(1);
-    }
-
-    if (!got_x_offset || !got_y_offset) {
-        error("need both x and y offsets\n");
+        error("error: missing mezzanine file argument\n");
         usage();
         exit(1);
     }
@@ -245,6 +341,8 @@ int main(int argc, char *argv[])
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
+
+    signal(SIGPIPE, SIG_IGN);
     
     mezzfile = argv[0];
     
@@ -273,7 +371,7 @@ int main(int argc, char *argv[])
     {
         mezzmap = calloc(1, sizeof(mezz_mmap_t));
         
-        mezzmap->time = 20.0;
+        mezzmap->time = 0.0;
         mezzmap->objectlist.count = 2;
         
         mezzmap->objectlist.objects[0].valid = 1;
@@ -287,7 +385,12 @@ int main(int argc, char *argv[])
         mezzmap->objectlist.objects[1].pa = 0.54;
     }
 #endif
-    
+
+    /*
+     * Install our own SIGUSR1 handler _over_ the one installed by mezz_init,
+     * so we can increment the local frame count and really be able to tell
+     * when a frame was received.
+     */
     sa.sa_handler = sigusr1;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
@@ -314,11 +417,11 @@ int main(int argc, char *argv[])
         error("cannot create socket\n");
     }
     else if (setsockopt(serv_sock,
-                        SOL_SOCKET,
-                        SO_REUSEADDR,
+			SOL_SOCKET,
+			SO_REUSEADDR,
                         &on_off,
                         sizeof(on_off)) == -1) {
-        errorc("setsockopt");
+        errorc("setsockopt(SO_REUSEADDR)");
     }
     else if (bind(serv_sock, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
         errorc("bind");
@@ -328,22 +431,30 @@ int main(int argc, char *argv[])
     }
     else {
         fd_set readfds, clientfds;
-        int last_mezz_event = 0;
+        int last_mezz_frame = 0;
         
         FD_ZERO(&readfds);
-        FD_ZERO(&clientfds);
+        FD_ZERO(&clientfds); /* We'll track clients using this fd_set. */
         
         FD_SET(serv_sock, &readfds);
-        
-        while (looping) {
+
+        while (looping) { /* The main loop. */
             fd_set rreadyfds;
             int rc;
             
             rreadyfds = readfds;
+
+	    /*
+	     * Block waiting for a SIGUSR1 signal or a file-descriptor to
+	     * become read-ready.  Technically, we could miss a signal and a
+	     * frame, but I'm too lazy to fix it at the moment.
+	     */
             rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
+	    
             if (rc > 0) {
                 int lpc;
-                
+
+		/* First, check for a client connection. */
                 if (FD_ISSET(serv_sock, &rreadyfds)) {
                     struct sockaddr_in peer_sin;
                     socklen_t slen;
@@ -356,18 +467,33 @@ int main(int argc, char *argv[])
                         errorc("accept");
                     }
                     else {
-		      info("accept %d\n", fd);
+			if (debug) {
+			    info("vmc-client: connect from %s (fd=%d)\n",
+				 inet_ntoa(peer_sin.sin_addr), fd);
+			}
+			
+			if (setsockopt(fd,
+				       IPPROTO_TCP,
+				       TCP_NODELAY,
+				       &on_off,
+				       sizeof(on_off)) == -1) {
+			    errorc("setsockopt(TCP_NODELAY)");
+			}
                         FD_SET(fd, &readfds);
                         FD_SET(fd, &clientfds);
                     }
                 }
                 
-                /* we assume that if somebody connected to us tries to write
-                 * us some data, they're screwing up; we're just a data source
+                /*
+		 * We assume that if somebody connected to us tries to write
+                 * us some data, they're screwing up; we're just a data source.
                  */
                 for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
                     if ((lpc != serv_sock) && FD_ISSET(lpc, &rreadyfds)) {
-                        info("dead connection %d\n", lpc);
+			if (debug) {
+			    info("vmc-client: disconnecting fd %d\n", lpc);
+			}
+			
                         close(lpc);
                         FD_CLR(lpc, &readfds);
                         FD_CLR(lpc, &clientfds);
@@ -377,18 +503,27 @@ int main(int argc, char *argv[])
             else if (rc == -1) {
                 switch (errno) {
                 case EINTR:
-                    /* this is how we check to make sure it was mezzanine
-                     * who signaled us
+                    /*
+		     * Check the current frame count against the last one so we
+		     * can tell if there really is a new frame ready.
                      */
-                    if (mezz_event_count > last_mezz_event) {
+                    if (mezz_frame_count != last_mezz_frame) {
                         char buffer[8192];
 
-			// info("sending updates\n");
+			if (debug > 1) {
+			    info("vmc-client: new frame\n");
+			}
                         
                         if ((rc = encode_packets(buffer, mezzmap)) == -1) {
-                            errorc("unable to encode packets");
+                            errorc("error: unable to encode packets");
                         }
-                        else {
+                        else if (rc == 0) {
+			    if (debug) {
+				info("vmc-client: nothing to send %d\n",
+				     mezz_frame_count);
+			    }
+			}
+			else {
                             int lpc;
                             
                             for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
@@ -397,7 +532,8 @@ int main(int argc, char *argv[])
                                 }
                             }
                         }
-                        last_mezz_event = mezz_event_count;
+			
+                        last_mezz_frame = mezz_frame_count;
                     }
                     break;
                 default:

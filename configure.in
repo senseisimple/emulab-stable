@@ -464,6 +464,22 @@ fi
 AC_SUBST(WINSUPPORT)
 
 #
+# Check for the robot vision system dependencies.
+#
+AC_CHECK_HEADERS([linux/videodev.h],
+		 [AC_DEFINE(HAVE_LINUX_VIDEODEV_H)
+		  HAVE_LINUX_VIDEODEV_H="yes"])
+AC_CHECK_PROG(GTK_CONFIG, gtk-config, gtk-config)
+
+if test x"$HAVE_LINUX_VIDEODEV_H" != x"" && test x"$GTK_CONFIG" != x""; then
+    HAVE_MEZZANINE="yes"
+    AC_DEFINE([HAVE_MEZZANINE])
+else
+    HAVE_MEZZANINE="no"
+fi
+AC_SUBST(HAVE_MEZZANINE)
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -473,9 +489,9 @@ AC_ARG_ENABLE(testmode,
   --disable-testmode    Disable test mode])
 
 if test "$enable_testmode" = "yes"; then
-	TESTMODE=1;
+	TESTMODE=1
 else
-	TESTMODE=0;
+	TESTMODE=0
 fi
 AC_SUBST(TESTMODE)
 
@@ -619,7 +635,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
 	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
 	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
-	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile "
+	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile \
+	robots/mezzanine/GNUmakefile robots/mezzanine/rtk2/GNUmakefile \
+	robots/mezzanine/libfg/GNUmakefile \
+	robots/mezzanine/libmezz/GNUmakefile \
+	robots/mezzanine/mezzanine/GNUmakefile \
+	robots/mezzanine/mezzcal/GNUmakefile "
 
 #
 # Do this for easy distclean.

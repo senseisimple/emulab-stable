@@ -899,6 +899,7 @@ fi
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1367,6 +1368,174 @@ fi
 
 
 #
+# Check for the robot vision system dependencies.
+#
+echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
+echo "configure:1375: checking how to run the C preprocessor" >&5
+# On Suns, sometimes $CPP names a directory.
+if test -n "$CPP" && test -d "$CPP"; then
+  CPP=
+fi
+if test -z "$CPP"; then
+if eval "test \"`echo '$''{'ac_cv_prog_CPP'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+    # This must be in double quotes, not single quotes, because CPP may get
+  # substituted into the Makefile and "${CC-cc}" will confuse make.
+  CPP="${CC-cc} -E"
+  # On the NeXT, cc -E runs the code through the compiler's parser,
+  # not just through cpp.
+  cat > conftest.$ac_ext <<EOF
+#line 1390 "configure"
+#include "confdefs.h"
+#include <assert.h>
+Syntax Error
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:1396: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  :
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  CPP="${CC-cc} -E -traditional-cpp"
+  cat > conftest.$ac_ext <<EOF
+#line 1407 "configure"
+#include "confdefs.h"
+#include <assert.h>
+Syntax Error
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:1413: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  :
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  CPP="${CC-cc} -nologo -E"
+  cat > conftest.$ac_ext <<EOF
+#line 1424 "configure"
+#include "confdefs.h"
+#include <assert.h>
+Syntax Error
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:1430: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  :
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  CPP=/lib/cpp
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+  ac_cv_prog_CPP="$CPP"
+fi
+  CPP="$ac_cv_prog_CPP"
+else
+  ac_cv_prog_CPP="$CPP"
+fi
+echo "$ac_t""$CPP" 1>&6
+
+for ac_hdr in linux/videodev.h
+do
+ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
+echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
+echo "configure:1458: checking for $ac_hdr" >&5
+if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 1463 "configure"
+#include "confdefs.h"
+#include <$ac_hdr>
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:1468: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  rm -rf conftest*
+  eval "ac_cv_header_$ac_safe=yes"
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  eval "ac_cv_header_$ac_safe=no"
+fi
+rm -f conftest*
+fi
+if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
+  echo "$ac_t""yes" 1>&6
+    ac_tr_hdr=HAVE_`echo $ac_hdr | sed 'y%abcdefghijklmnopqrstuvwxyz./-%ABCDEFGHIJKLMNOPQRSTUVWXYZ___%'`
+  cat >> confdefs.h <<EOF
+#define $ac_tr_hdr 1
+EOF
+ cat >> confdefs.h <<\EOF
+#define HAVE_LINUX_VIDEODEV_H 1
+EOF
+
+		  HAVE_LINUX_VIDEODEV_H="yes"
+else
+  echo "$ac_t""no" 1>&6
+fi
+done
+
+# Extract the first word of "gtk-config", so it can be a program name with args.
+set dummy gtk-config; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:1501: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  if test -n "$GTK_CONFIG"; then
+  ac_cv_prog_GTK_CONFIG="$GTK_CONFIG" # Let the user override the test.
+else
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="$PATH"
+  for ac_dir in $ac_dummy; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_prog_GTK_CONFIG="gtk-config"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+fi
+fi
+GTK_CONFIG="$ac_cv_prog_GTK_CONFIG"
+if test -n "$GTK_CONFIG"; then
+  echo "$ac_t""$GTK_CONFIG" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+
+if test x"$HAVE_LINUX_VIDEODEV_H" != x"" && test x"$GTK_CONFIG" != x""; then
+    HAVE_MEZZANINE="yes"
+    cat >> confdefs.h <<\EOF
+#define HAVE_MEZZANINE 1
+EOF
+
+else
+    HAVE_MEZZANINE="no"
+fi
+
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -1379,9 +1548,9 @@ fi
 
 
 if test "$enable_testmode" = "yes"; then
-	TESTMODE=1;
+	TESTMODE=1
 else
-	TESTMODE=0;
+	TESTMODE=0
 fi
 
 
@@ -1400,7 +1569,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1404: checking for a BSD compatible install" >&5
+echo "configure:1573: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1588,7 +1757,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
 	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
 	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
-	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile "
+	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile \
+	robots/mezzanine/GNUmakefile robots/mezzanine/rtk2/GNUmakefile \
+	robots/mezzanine/libfg/GNUmakefile \
+	robots/mezzanine/libmezz/GNUmakefile \
+	robots/mezzanine/mezzanine/GNUmakefile \
+	robots/mezzanine/mezzcal/GNUmakefile "
 
 #
 # Do this for easy distclean.
@@ -1809,8 +1983,8 @@ s%@PUBLIC_NETWORK@%$PUBLIC_NETWORK%g
 s%@PUBLIC_ROUTER@%$PUBLIC_ROUTER%g
 s%@PUBLIC_NETMASK@%$PUBLIC_NETMASK%g
 s%@DHCPD_DYNRANGE@%$DHCPD_DYNRANGE%g
-s%@NAMED_FORWARDERS@%$NAMED_FORWARDERS%g
 s%@DHCPD_CONTROLNET_DECL@%$DHCPD_CONTROLNET_DECL%g
+s%@NAMED_FORWARDERS@%$NAMED_FORWARDERS%g
 s%@SSLCERT_COUNTRY@%$SSLCERT_COUNTRY%g
 s%@SSLCERT_STATE@%$SSLCERT_STATE%g
 s%@SSLCERT_LOCALITY@%$SSLCERT_LOCALITY%g
@@ -1846,6 +2020,9 @@ s%@INSTALL_APACHE_CONFIG@%$INSTALL_APACHE_CONFIG%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@EVENTSYS@%$EVENTSYS%g
 s%@WINSUPPORT@%$WINSUPPORT%g
+s%@CPP@%$CPP%g
+s%@GTK_CONFIG@%$GTK_CONFIG%g
+s%@HAVE_MEZZANINE@%$HAVE_MEZZANINE%g
 s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g

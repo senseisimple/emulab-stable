@@ -83,11 +83,11 @@ check_output "no update?" <<EOF
 Packet: length 36; version 1; role 0
  opcode:	update-position
   id:		1
-  x:		5.040000
-  y:		6.000000
-  theta:	0.380000
+  x:		6.000000
+  y:		5.040000
+  theta:	-2.761593
   status:	-1
-  timestamp:	20.000000
+  timestamp:	1.000000
 EOF
 
 run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
@@ -100,7 +100,7 @@ Packet: length 36; version 1; role 0
   id:		2
   x:		20.000000
   y:		20.000000
-  theta:	0.000000
+  theta:	-3.141593
   status:	-1
-  timestamp:	20.000000
+  timestamp:	1.000000
 EOF

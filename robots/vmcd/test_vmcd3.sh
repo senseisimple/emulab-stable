@@ -86,9 +86,9 @@ check_output "no update?" <<EOF
 Packet: length 36; version 1; role 0
  opcode:	update-position
   id:		1
-  x:		5.280000
-  y:		6.000000
-  theta:	0.000000
+  x:		6.000000
+  y:		5.280000
+  theta:	-3.141593
   status:	-1
-  timestamp:	20.000000
+  timestamp:	14.000000
 EOF

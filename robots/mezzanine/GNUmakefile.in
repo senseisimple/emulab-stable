@@ -6,31 +6,19 @@
 
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
-OBJDIR		= ..
-SUBDIR		= robots
+OBJDIR		= ../..
+SUBDIR		= robots/mezzanine
 
 include $(OBJDIR)/Makeconf
 
-ifeq ($(HAVE_MEZZANINE),yes)
-MEZZDIR=mezzanine
-else
-MEZZDIR=
-endif
-
-ifeq ($(EVENTSYS),1)
-EMCDIR=emc
-else
-EMCDIR=
-endif
-
-SUBDIRS	= $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
+SUBDIRS	= rtk2 libfg libmezz mezzanine mezzcal
 
 all:		all-subdirs
-check:		check-subdirs
-install:	install-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+check:		check-subdirs
+install:	install-subdirs
 clean:		clean-subdirs
 
 # How to recursively descend into subdirectories to make general
@@ -40,4 +28,3 @@ clean:		clean-subdirs
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
 .PHONY:	$(SUBDIRS)
-

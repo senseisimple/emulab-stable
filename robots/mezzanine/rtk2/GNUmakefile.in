@@ -1,0 +1,62 @@
+###########################################################################
+#
+# File: Makefile
+# Author: Andrew Howard
+# Date: 21 Mar 2001
+# Desc:
+#
+# CVS info:
+#  $Source: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/robots/mezzanine/rtk2/GNUmakefile.in,v $
+#  $Author: stack $
+#  $Revision: 1.1 $
+#
+###########################################################################
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= robots/mezzanine/rtk2
+
+include $(OBJDIR)/Makeconf
+
+.SUFFIXES: .cc .o
+
+RTK_LIB = librtk.a
+RTK_OBJS = rtk.o rtk_canvas.o rtk_fig.o rtk_menu.o rtk_table.o
+
+# Tools
+# To build for the robots, use make -e CC = i386-glibc21-linux-gcc
+MAKEDEP = makedepend
+
+# Compile flags
+CFLAGS = -g3 -Wall `$(GTK_CONFIG) --cflags` -I$(SRCDIR)
+
+###########################################################################
+# Build section
+
+all: $(RTK_LIB)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+$(RTK_LIB) : $(RTK_OBJS)
+	ar r $(RTK_LIB) $(RTK_OBJS)
+
+%.o : %.c
+	${CC} ${CFLAGS} -c $< -o $@
+
+dep:
+	$(MAKEDEP) -Y -s "# Dependancies (make dep)" *.c 2>/dev/null
+
+install:
+
+clean:
+	rm -f $(RTK_LIB) *~ *.o 
+
+
+# Dependancies (make dep)
+
+rtk.o: rtk.h rtkprivate.h
+rtk_canvas.o: rtk.h rtkprivate.h
+rtk_fig.o: rtk.h rtkprivate.h
+rtk_menu.o: rtk.h rtkprivate.h
+rtk_table.o: rtk.h rtkprivate.h
