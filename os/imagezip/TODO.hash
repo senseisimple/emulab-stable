@@ -138,3 +138,57 @@ only specific chunks and possibly writing only select data from the chunks.
    writing?  Or do we not collect unsolicited chunks at all?  Conversely,
    what if we start to receive data for a chunk that we are in the process
    of hashing?
+
+
+3/5/05
+
+Thinking about using hashes and signature files to enable creation of
+"incremental" or "delta" image.  The idea is that a user loads the disk
+with a standard image and then at swapout time, or when the user requests
+a custom disk image be saved, we use the signature of the original image
+compared with the disk contents to create a minimal delta.
+
+So imagezip will have an option where it takes an "incremental" option
+and a signature file as created by imagehash, and creates the delta.
+This is a little more complicated than using hashes to update a disk
+as above.  Imagehash only hashes allocated blocks on the disk, since it
+works from the imagezip image.  But what if the user then allocates addtional
+blocks in a filesystem on the disk?  When it comes time to compute the delta
+image from the signature, those blocks will not be even looked at since they
+were free in the original image.  And, blocks that were freed by the user
+might well wind up in the delta.  So the process becomes:
+
+	1. transfer signature file to node
+	2. compute allocated block list for the disk
+	3. compare the two lists:
+	   - blocks allocated on the disk, but not in the sig are saved
+	   - blocks allocated in the sig, but not on the disk are NOT saved
+	   - for all others, we compare hashes
+
+Another issue is how does imagezip know how much of the file it should look
+at when creating a delta.  If a users only loads FreeBSD in partition 1,
+but then puts data in the other partitions, how do we know that we should
+save that in the delta?  In a sense, the mechanism will just work.  If the
+signature used for comparison only covers partition 1, and imagezip is
+told to look at all partitions on the disk, then any allocated blocks
+discovered on other partitions would not be in the signature and thus would
+be saved.  But how does the user tell imagezip that it should be looking
+at the whole disk rather than just partition 1?
+
+I suppose the user will have to specify in the "create an image" form,
+which partitions should be included in the custom image computation.
+They will also need to be able to specify that imagezip look at certain
+paritions in "raw" mode, in case for example, they use partition 4 on the
+disk to store data without creating a filesystem.  Without being explicitly
+told that that partition is in use, imagezip would ignore it.
+
+On the flip side, even though a user has loaded the default, full disk
+image at experiment creation time, they probably will only use the single
+BSD or RHL partition and customize that.  But the delta creation process
+would look at the entire disk, since a full disk image was originally loaded.
+The resulting delta won't be any bigger since the remaining contents of the
+disk are unchanged, but it will take longer than necessary to perform the
+scan and create the image.  Again, if the user is made to specify what
+partitions should be examined when creating the delta image, this won't
+happen.
+
