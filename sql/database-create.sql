@@ -466,6 +466,18 @@ CREATE TABLE foreign_keys (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `global_policies`
+--
+
+CREATE TABLE global_policies (
+  policy varchar(32) NOT NULL default '',
+  auxdata varchar(64) NOT NULL default '',
+  test varchar(32) NOT NULL default '',
+  count int(10) NOT NULL default '0',
+  PRIMARY KEY  (policy,auxdata)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `group_membership`
 --
 
@@ -479,6 +491,19 @@ CREATE TABLE group_membership (
   PRIMARY KEY  (uid,gid,pid),
   KEY pid (pid),
   KEY gid (gid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `group_policies`
+--
+
+CREATE TABLE group_policies (
+  pid varchar(12) NOT NULL default '',
+  gid varchar(12) NOT NULL default '',
+  policy varchar(32) NOT NULL default '',
+  auxdata varchar(64) NOT NULL default '',
+  count int(10) NOT NULL default '0',
+  PRIMARY KEY  (pid,gid,policy,auxdata)
 ) TYPE=MyISAM;
 
 --
@@ -1292,8 +1317,8 @@ CREATE TABLE plab_slice_nodes (
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
   node_id varchar(32) NOT NULL default '',
-  leaseend datetime default NULL,
   nodemeta text,
+  leaseend datetime default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -1658,6 +1683,18 @@ CREATE TABLE unixgroup_membership (
   uid varchar(8) NOT NULL default '',
   gid varchar(16) NOT NULL default '',
   PRIMARY KEY  (uid,gid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `user_policies`
+--
+
+CREATE TABLE user_policies (
+  uid varchar(8) NOT NULL default '',
+  policy varchar(32) NOT NULL default '',
+  auxdata varchar(64) NOT NULL default '',
+  count int(10) NOT NULL default '0',
+  PRIMARY KEY  (uid,policy,auxdata)
 ) TYPE=MyISAM;
 
 --

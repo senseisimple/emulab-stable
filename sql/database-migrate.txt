@@ -2367,3 +2367,31 @@ last_net_act,last_cpu_act,last_ext_act);
        timeline or sequence.
 
 	alter table eventlist add parent varchar(64) not null default '';
+
+1.307: Policy stuff. See long comment in db/libadminctrl.pm.
+
+	CREATE TABLE global_policies (
+	  policy varchar(32) NOT NULL default '',
+	  auxdata varchar(64) NOT NULL default '',
+	  test varchar(32) NOT NULL default '',
+	  count int(10) NOT NULL default '0',
+	  PRIMARY KEY  (policy,auxdata)
+	) TYPE=MyISAM;
+
+	CREATE TABLE group_policies (
+	  pid varchar(12) NOT NULL default '',
+	  gid varchar(12) NOT NULL default '',
+	  policy varchar(32) NOT NULL default '',
+	  auxdata varchar(64) NOT NULL default '',
+	  count int(10) NOT NULL default '0',
+	  PRIMARY KEY  (pid,gid,policy,auxdata)
+	) TYPE=MyISAM;
+
+	CREATE TABLE user_policies (
+	  uid varchar(8) NOT NULL default '',
+	  policy varchar(32) NOT NULL default '',
+	  auxdata varchar(64) NOT NULL default '',
+	  count int(10) NOT NULL default '0',
+	  PRIMARY KEY  (uid,policy,auxdata)
+	) TYPE=MyISAM;
+

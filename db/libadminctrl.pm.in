@@ -1,0 +1,1038 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
+# Admission control policies. These are the ones I could think of, although
+# not all of these are implemented.
+#
+#  * Number of experiments per type/class (only one expt using robots).
+#
+#  * Number of experiments per project
+#  * Number of experiments per subgroup
+#  * Number of experiments per user
+#
+#  * Number of nodes per project      (nodes really means pc testnodes)
+#  * Number of nodes per subgroup
+#  * Number of nodes per user
+#
+#  * Number of nodes of a class per project
+#  * Number of nodes of a class per group
+#  * Number of nodes of a class per user
+#
+#  * Number of nodes of a type per project
+#  * Number of nodes of a type per group
+#  * Number of nodes of a type per user
+#
+#  * Number of nodes with attribute(s) per project
+#  * Number of nodes with attribute(s) per group
+#  * Number of nodes with attribute(s) per user
+#
+# So we have group (pid/gid) policies and user policies. These are stored
+# into two different tables, group_policies and user_policies, indexed in
+# the obvious manner. Each row of the table defines a count (experiments,
+# nodes, etc) and a type of thing being counted (experiments, nodes, types,
+# classes, etc). When we test for admission, we look for each matching row
+# and test each condition. All conditions must pass. No conditions means a
+# pass. There is also some "auxdata" which holds extra information needed
+# for the policy (say, the type of node being restricted). 
+#
+#      uid:     a uid
+#   policy:     'experiments', 'nodes', 'type', 'class', 'attribute'
+#    count:     a number
+#  auxdata:     a string (optional)
+#
+# Example: A user policy of ('mike', 'nodes', 10) says that poor mike is
+# not allowed to have more 10 nodes at a time, while ('mike', 'type',
+# '10', 'pc850') says that mike cannot allocate more than 10 pc850s.
+#
+# The group_policies table:
+#
+#      pid:     a pid
+#      gid:     a gid
+#   policy:     'experiments', 'nodes', 'type', 'class', 'attribute'
+#    count:     a number
+#  auxdata:     a string (optional)
+#
+# Example: A project policy of ('testbed', 'testbed', 'experiments', 10)
+# says that the testbed project may not have more then 10 experiments
+# swapped in at a time, while ('testbed', 'TG1', 'nodes', 10) says that the
+# TG1 subgroup of the testbed project may not use more than 10 nodes at time.
+#
+# In addition to group and user policies (which are policies that apply to
+# specific users/projects/subgroups), we also need policies that apply to
+# all users/projects/subgroups (ie: do not want to specify a particular
+# restriction for every user!). To indicate such a policy, we use a special
+# tag in the tables (for the user or pid/gid):
+#
+#      '+'  -  The policy applies to all users (or project/groups).
+#
+# Example: ('+','experiments',10) says that no user may have more then 10
+# experiments swapped in at a time. The rule overrides anything more
+# specific (say a particular user is restricted to 20 experiments; the above
+# rule overrides that and the user (all users) is restricted to 10.
+#
+# Sometimes, you want one of these special rules to apply to everyone, but
+# *allow* it to be overridden by a more specific rule. For that we use:
+#
+#      '-'  -  The policy applies to all users (or project/groups),
+#              but can be overridden by a more specific rule.
+#
+# Example: The rules:
+#
+#	('-','type',0, 'garcia')
+#       ('testbed', 'testbed', 'type', 10, 'garcia')
+#
+# says that no one is allowed to allocate garcias, unless there is specific
+# rule that allows it; in this case the testbed project can allocate them.
+#
+# There are other global policies we would like to enforce. For example,
+# "only one experiment can be using the robot testbed." Encoding this kind
+# of policy is harder, and leads down a path that can get arbitrarily
+# complex. Tha path leads to ruination, and so we want to avoid it at
+# all costs.
+#
+# Instead we define a simple global policies table that applies to all
+# experiments currently active on the testbed:
+#
+#   policy:     'nodes', 'type', 'class', 'attribute'
+#     test:     'max', others I cannot think of right now ...
+#    count:     a number
+#  auxdata:     a string
+#
+# Example: A global policy of ('nodes', 'max', 10, '') say that the maximum
+# number of nodes that may be allocated across the testbed is 10. Thats not
+# a very realistic policy of course, but ('type', 'max', 1, 'garcia') says
+# that a max of one garcia can be allocated across the testbed, which
+# effectively means only one experiment will be able to use them at once.
+# This is of course very weak, but I want to step back and give it some
+# more thought before I redo this part. 
+#
+# Is that clear? Hope so, cause it gets more complicated. Some admission
+# control tests can be done early in the swap phase, before we really do
+# anything (before assign_wrapper). Others (type and class) tests cannot
+# be done here; only assign can figure out how an experiment is going to map
+# to physical nodes (remember virtual types too), and in that case we need
+# to tell assign what the "constraints" are and let it figure out what is
+# possible.
+#
+# So, in addition to the simple checks we can do, we also generate an array
+# to return to assign_wrapper with the maximum counts of each node type and
+# class that is limited by the policies. assign_wrapper will dump those
+# values into the ptop file so that assign can enforce those maximum values
+# regardless of what hardware is actually available to use. As per discussion
+# with Rob, that will look like:
+#
+#	set-type-limit <type> <limit>
+#
+# and assign will spit out a new type of violation that assign_wrapper will
+# parse. 
+#
+# NOTES:
+#
+#  1) Admission control is skipped in admin mode; returns okay.
+#  2) Admission control is skipped when the pid is emulab-ops; returns okay.
+#  3) When calculating current usage, nodes reserved to emulab-ops are
+#     ignored.
+#  4) The sitevar "swap/use_admission_control" controls the use of admission
+#     control; defaults to 1 (on).
+#  5) The current policies can be viewed in the web interface. See
+#     https://www.emulab.net/showpolicies.php3
+#  6) The global policy stuff is weak. I plan to step back and think about it
+#     some more before redoing it, but it will tide us over for now. 
+#
+
+package libadminctrl;
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA = "Exporter";
+@EXPORT =
+    qw ( TBAdmissionControlCheck );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use English;
+use libdb;
+use libtestbed;
+
+# Configure variables
+my $TB		= "@prefix@";
+
+# Locals
+my $debug         = 0;
+my $expt_min;
+my $expt_max;
+my %virt_types    = ();  # Indexed by virt type, gives number desired
+my %virt_classes  = ();  # Indexed by virt class, gives number desired
+my %node_types    = ();	 # Indexed by type, gives class
+my %node_classes  = ();	 # Indexed by class, gives class
+my $assignflag    = 0;
+my %assign_classes= ();  # For assign (wrapper).
+
+# Constants.
+sub TBADMINCTRL_TYPE_USER()		{ "user"; }
+sub TBADMINCTRL_TYPE_PROJECT()		{ "project"; }
+sub TBADMINCTRL_TYPE_GROUP()		{ "group"; }
+
+sub TBADMINCTRL_POLICY_EXPT()		{ "experiments"; }
+sub TBADMINCTRL_POLICY_NODES()		{ "nodes"; }
+sub TBADMINCTRL_POLICY_TYPE()		{ "type"; }
+sub TBADMINCTRL_POLICY_CLASS()		{ "class"; }
+sub TBADMINCTRL_POLICY_ATTR()		{ "attribute"; }
+
+#
+# The current usage data structure, filled in below.
+#
+my %curusage =
+    ("experiments"	=> {"user"    =>  0,
+			    "project" =>  0,
+			    "group"   =>  0},
+     "nodes"    	=> {"user"    =>  0,
+			    "project" =>  0,
+			    "group"   =>  0},
+     # Arrays of user/project/group counts, indexed by type and class. 
+     "class"		=> {},
+     "type"		=> {},
+    );
+
+# Output useful info.
+sub Declare($)
+{
+    my ($msg) = @_;
+    
+    print "*** Admission Control: $msg\n";
+}
+
+# Debug stuff
+sub Debug($)
+{
+    my ($msg) = @_;
+    
+    if ($debug) {
+	print "*** - $msg\n";
+    }
+}
+
+# Update assign number.
+sub UpdateForAssign($$)
+{
+    my ($typeclass, $count) = @_;
+
+    $count = 0
+	if ($count < 0);
+
+    $assign_classes{$typeclass} = 999999
+	if (!defined($assign_classes{$typeclass}));
+    
+    # Max for assign is the global minus current number
+    $assign_classes{$typeclass} = $count
+	if ($count < $assign_classes{$typeclass});
+}
+
+#
+# Test a user policy.
+#
+sub TestUserPolicy($$$$$)
+{
+    my ($uid, $policy, $count, $auxdata, $global) = @_;
+    my $query_result;
+    my $current = 0;
+    my $gstring = ($global ? "global" : "user");
+
+    if ($policy eq TBADMINCTRL_POLICY_EXPT()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("$uid is not allowed to swap any experiments in!");
+	    return 0;
+	}
+	$current = $curusage{"experiments"}->{'user'};
+
+	Debug("$uid has $current active experiments; ".
+	      "${gstring} limit is $count");
+	
+	if ($current >= $count) {
+	    Declare("$uid has too many experiments swapped in!");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_NODES()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("$uid is not allowed to allocate any nodes!");
+	    return 0;
+	}
+	$current = $curusage{"nodes"}->{'user'};
+	
+	Debug("$uid has $current nodes allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $expt_min > $count) {
+	    Declare("$uid has too many nodes allocated! ".
+		    "Needs $expt_min more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_CLASS()) {
+	$current = $curusage{"class"}->{$auxdata}->{'user'}
+	    if (exists($curusage{"class"}->{$auxdata}));
+	
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check first to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_classes{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("$uid is not allowed to allocate any nodes of ".
+		    "class $auxdata!");
+	    return 0;
+	}
+	Debug("$uid has $current nodes of class $auxdata allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $virt_classes{$auxdata} > $count) {
+	    Declare("$uid has too many nodes of class $auxdata allocated! ".
+		    "Needs ". $virt_classes{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_TYPE()) {
+	$current = $curusage{"type"}->{$auxdata}->{'user'}
+	    if (exists($curusage{"type"}->{$auxdata}));
+
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check first to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_types{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("$uid is not allowed to allocate any nodes of ".
+		    "type $auxdata!");
+	    return 0;
+	}
+	
+	Debug("$uid has $current nodes of type $auxdata allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $virt_types{$auxdata} > $count) {
+	    Declare("$uid has too many nodes of type $auxdata allocated! ".
+		    "Needs ". $virt_types{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    else {
+	warn("*** WARNING: Unknown user policy '$policy'!\n");
+    }
+
+    return 1;
+}
+
+#
+# Test a group policy.
+#
+sub TestGroupPolicy($$$$$$)
+{
+    my ($pid, $gid, $policy, $count, $auxdata, $global) = @_;
+    my $query_result;
+    my $current = 0;
+    my $gstring = ($global ? "global" : "group");
+
+    if ($policy eq TBADMINCTRL_POLICY_EXPT()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("$pid/$gid is not allowed to swap any experiments in!");
+	    return 0;
+	}
+	$current = ($pid eq $gid ?
+		    $curusage{"experiments"}->{'project'} :
+		    $curusage{"experiments"}->{'group'});
+
+	Debug("$pid/$gid has $current active experiments; ".
+	      "${gstring} limit is $count");
+	
+	if ($current >= $count) {
+	    Declare("$pid/$gid has too many experiments swapped in!");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_NODES()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("$pid/gid is not allowed to allocate any nodes!");
+	    return 0;
+	}
+	$current = ($pid eq $gid ?
+		    $curusage{"nodes"}->{'project'} :
+		    $curusage{"nodes"}->{'group'});
+	
+	Debug("$pid/$gid has $current nodes allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $expt_min > $count) {
+	    Declare("$pid/$gid has too many nodes allocated! ".
+		    "Needs $expt_min more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_CLASS()) {
+	$current = ($pid eq $gid ?
+		    $curusage{"class"}->{$auxdata}->{'project'} :
+		    $curusage{"class"}->{$auxdata}->{'group'})
+	    if (exists($curusage{"class"}->{$auxdata}));
+	
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check first to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_classes{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("$pid/$gid is not allowed to allocate any nodes of ".
+		    "class $auxdata!");
+	    return 0;
+	}
+	
+	Debug("$pid/$gid has $current nodes of class $auxdata allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $virt_classes{$auxdata} > $count) {
+	    Declare("$pid/$gid has too many nodes of class $auxdata ".
+		    "allocated! Needs ". $virt_classes{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_TYPE()) {
+	$current = ($pid eq $gid ?
+		    $curusage{"type"}->{$auxdata}->{'project'} :
+		    $curusage{"type"}->{$auxdata}->{'group'})
+	    if (exists($curusage{"type"}->{$auxdata}));
+	
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check first to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_types{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("$pid/$gid is not allowed to allocate any nodes of ".
+		    "type $auxdata!");
+	    return 0;
+	}
+	Debug("$pid/$gid has $current nodes of type $auxdata allocated; ".
+	      "${gstring} limit is $count");
+	
+	if ($current + $virt_types{$auxdata} > $count) {
+	    Declare("$pid/$gid has too many nodes of type $auxdata ".
+		    "allocated! Needs ". $virt_types{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    else {
+	warn("*** WARNING: Unknown group policy '$policy'!\n");
+    }
+
+    return 1;
+}
+
+#
+# Test a Global policy.
+#
+sub TestGlobalPolicy($$$$)
+{
+    my ($policy, $test, $count, $auxdata) = @_;
+    my $current = 0;
+
+    if ($policy eq TBADMINCTRL_POLICY_EXPT()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("No one is allowed to swap any experiments in!");
+	    return 0;
+	}
+
+	#
+	# Get number of current experiments.
+	#
+	my $query_result =
+	    DBQueryWarn("select count(eid) from experiments ".
+			"where (state='" . EXPTSTATE_ACTIVE() . "' or ".
+			"       state='" . EXPTSTATE_ACTIVATING() . "') and ".
+			"       pid!='" . TBOPSPID() . "'");
+
+	return -1
+	    if (!$query_result);
+	
+	$current = ($query_result->fetchrow_array())[0];
+
+	Debug("There are $current active experiments; ".
+	      "global limit is $count");
+	
+	if ($current >= $count) {
+	    Declare("There are too many experiments swapped in!");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_NODES()) {
+	#
+	# Simple check first.
+	#
+	if (!$count) {
+	    Declare("No one is not allowed to allocate any more nodes!");
+	    return 0;
+	}
+
+	my $query_result =
+	    DBQueryFatal("select count(r.node_id) from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "where r.pid!='" . TBOPSPID() . "' and ".
+		     "      n.role='testnode'");
+	
+	return -1
+	    if (!$query_result);
+	
+	$current = ($query_result->fetchrow_array())[0];
+	
+	Debug("The testbed has $current nodes allocated; ".
+	      "global limit is $count");
+	
+	if ($current + $expt_min > $count) {
+	    Declare("The testbed has too many nodes allocated! ".
+		    "Needs $expt_min more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_CLASS()) {
+	#
+	# Get current count.
+	#
+	my $query_result =
+	    DBQueryFatal("select count(r.node_id) from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where r.pid!='" . TBOPSPID() . "' and ".
+			 "      nt.class='$auxdata' and ".
+			 "      n.role='testnode'");
+	
+	return -1
+	    if (!$query_result);
+	$current = ($query_result->fetchrow_array())[0];
+
+	Debug("The testbed has $current nodes of class $auxdata allocated; ".
+	      "global limit is $count");
+	
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_classes{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("No one is allowed to allocate any nodes of ".
+		    "class $auxdata!");
+	    return 0;
+	}
+
+	if ($current + $virt_classes{$auxdata} > $count) {
+	    Declare("The testbed has too many nodes of class $auxdata ".
+		    "allocated! Needs ". $virt_classes{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    elsif ($policy eq TBADMINCTRL_POLICY_TYPE()) {
+	#
+	# Get current count.
+	#
+	my $query_result =
+	    DBQueryFatal("select count(r.node_id) from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where r.pid!='" . TBOPSPID() . "' and ".
+			 "      nt.type='$auxdata' and ".
+			 "      n.role='testnode'");
+	
+	return -1
+	    if (!$query_result);
+	$current = ($query_result->fetchrow_array())[0];
+
+	Debug("The testbed has $current nodes of type $auxdata allocated; ".
+	      "global limit is $count");
+	
+	if ($assignflag) {
+	    UpdateForAssign($auxdata, $count - $current);
+#	    return 1;
+	}
+	
+	#
+	# Check first to see if the experiment even wants this class.
+	#
+	return 1
+	    if (! $virt_types{$auxdata});
+
+	#
+	# If it does, then simple check first.
+	# 
+	if (!$count) {
+	    Declare("No one is allowed to allocate any nodes of ".
+		    "type $auxdata!");
+	    return 0;
+	}
+
+	if ($current + $virt_types{$auxdata} > $count) {
+	    Declare("The testbed has too many nodes of type $auxdata ".
+		    "allocated! Needs ". $virt_types{$auxdata} ." more.");
+	    return 0;
+	}
+    }
+    else {
+	warn("*** WARNING: Unknown global policy '$policy'!\n");
+    }
+
+    return 1;
+}
+
+#
+# Test policies that apply.
+#
+sub TestPolicies($$$$)
+{
+    my ($uid, $pid, $gid, $eid) = @_;
+    my $failcount       = 0;
+    my %user_policies   = ();
+    my %group_policies  = ();
+    my %global_policies = ();
+
+    #
+    # Get the global policies. 
+    #
+    my $query_result =
+	DBQueryWarn("select * from global_policies");
+
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $policy  = $rowref->{'policy'};
+	my $auxdata = $rowref->{'auxdata'};
+	my $count   = $rowref->{'count'};
+	my $test    = $rowref->{'test'};
+
+	if ($debug) {
+	    print "Global Policy: $policy, $test, $count, $auxdata\n";
+	}
+
+	$global_policies{"$policy:$test:$auxdata"} = $rowref;
+    }
+
+    #
+    # Get user policies that apply. Ordering by uid will put the global
+    # policies last, which makes it easier in the loop below.
+    # 
+    $query_result =
+	DBQueryWarn("select * from user_policies ".
+		    "where uid='$uid' or uid='+' or uid='-' ".
+		    "order by uid desc");
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $puid    = $rowref->{'uid'};
+	my $policy  = $rowref->{'policy'};
+	my $auxdata = $rowref->{'auxdata'};
+	my $count   = $rowref->{'count'};
+
+	if ($debug) {
+	    print "User Policy: $puid, $policy, $count, $auxdata\n";
+	}
+
+	if ($puid eq "+") {
+	    $user_policies{"$policy:$auxdata"} = $rowref;
+	}
+	elsif ($puid eq "-") {
+	    # Allow existing user policy to override this.
+	    $user_policies{"$policy:$auxdata"} = $rowref
+		if (!exists($user_policies{"$policy:$auxdata"}));
+	}
+	else {
+	    $user_policies{"$policy:$auxdata"} = $rowref;
+	}
+    }
+
+    $query_result =
+	DBQueryWarn("select * from group_policies ".
+		    "where (pid='$pid' and gid='$gid') or ".
+		    "      pid='+' or pid='-' ".
+		    "order by pid,gid desc");
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $ppid    = $rowref->{'pid'};
+	my $policy  = $rowref->{'policy'};
+	my $auxdata = $rowref->{'auxdata'};
+	my $count   = $rowref->{'count'};
+
+	if ($debug) {
+	    print "Group Policy: $pid, $gid, $policy, $count, $auxdata\n";
+	}
+	
+	if ($ppid eq "+") {
+	    $group_policies{"$policy:$auxdata"} = $rowref;
+	}
+	elsif ($ppid eq "-") {
+	    # Allow existing policy to override this.
+	    $group_policies{"$policy:$auxdata"} = $rowref
+		if (!exists($group_policies{"$policy:$auxdata"}));
+	}
+	else {
+	    $group_policies{"$policy:$auxdata"} = $rowref;
+	}
+    }
+
+    #
+    # Now test the policies. Test them all so that we get feedback on
+    # all policies that fail.
+    #
+    foreach my $key (keys(%global_policies)) {
+	my $pref    = $global_policies{$key};
+	my $test    = $pref->{'test'};
+	my $policy  = $pref->{'policy'};
+	my $count   = $pref->{'count'};
+	my $auxdata = $pref->{'auxdata'};
+
+	my $result = TestGlobalPolicy($policy, $test, $count, $auxdata);
+
+	$failcount++
+	    if (!$result);
+    }
+    
+    foreach my $key (keys(%group_policies)) {
+	my $pref    = $group_policies{$key};
+	my $ppid    = $pref->{'pid'};
+	my $pgid    = $pref->{'gid'};
+	my $policy  = $pref->{'policy'};
+	my $count   = $pref->{'count'};
+	my $auxdata = $pref->{'auxdata'};
+	my $global  = ($ppid eq $pid ? 0 : 1);
+
+	my $result = TestGroupPolicy($pid, $gid,
+				     $policy, $count, $auxdata, $global);
+
+	$failcount++
+	    if (!$result);
+    }
+    
+    foreach my $key (keys(%user_policies)) {
+	my $pref    = $user_policies{$key};
+	my $puid    = $pref->{'uid'};
+	my $policy  = $pref->{'policy'};
+	my $count   = $pref->{'count'};
+	my $auxdata = $pref->{'auxdata'};
+	my $global  = ($puid eq $uid ? 0 : 1);
+
+	my $result = TestUserPolicy($uid, $policy, $count, $auxdata, $global);
+
+	$failcount++
+	    if (!$result);
+    }
+
+    return 0
+	if ($failcount);
+    return 1;
+}
+
+#
+# This is the primary interface to this library. Given a uid/pid/gid/eid,
+# test all of the policies against the current experiment count, and the
+# current node count plus the minimum number of nodes needed by the
+# experiment.
+# 
+sub TBAdmissionControlCheck($$$$)
+{
+    my ($uid, $pid, $eid, $ptypearray) = @_;
+    my $gid = ExpGroup($pid, $eid);
+
+    $assignflag = 1
+	if (defined($ptypearray));
+
+    $uid = MapNumericUID($uid);
+    
+    #
+    # Admin people do not get checks (when in admin mode of course).
+    #
+    return 1
+	if (TBAdmin($UID));
+
+    #
+    # Nothing in emulab-ops should get admission control either.
+    #
+    return 1
+	if ($pid eq TBOPSPID());
+
+    #
+    # Now we need the number of nodes needed by the experiment.
+    #
+    return -1
+	if (!TBExptMinMaxNodes($pid, $eid, \$expt_min, \$expt_max));
+
+    LoadNodeTypes();
+    LoadVirtNodeTypes($pid, $eid);
+    LoadCurrent($uid, $pid, $gid);
+
+    my $rval = TestPolicies($uid, $pid, $gid, $eid);
+    
+    if ($debug && $assignflag) {
+	print "Assign type/class max counts:\n";
+	foreach my $typeclass (keys(%assign_classes)) {
+	    my $count = $assign_classes{$typeclass};
+
+	    printf("%10s: %d\n", $typeclass, $count);
+	}
+    }
+    %$ptypearray = %assign_classes
+	if ($assignflag);
+
+    return $rval;
+}
+
+#
+# Load the real types.
+# 
+sub LoadNodeTypes()
+{
+    my $query_result =
+	DBQueryWarn("select type,class from node_types");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($type, $class) = $query_result->fetchrow_array()) {
+	$node_types{$type}    = $class;
+	$node_classes{$class} = $class;
+    }
+}
+sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
+sub nodetypeclass($)	{ return $node_types{$_[0]}; }
+sub nodeclassisclass($) { return exists($node_classes{$_[0]}); }
+
+#
+# Load the types this experiment wants, from the virt_nodes table.
+# Might be a virtual type, which screws everything up!
+#
+sub LoadVirtNodeTypes($$)
+{
+    my ($pid, $eid) = @_;
+    
+    my $query_result =
+	DBQueryWarn("select type from virt_nodes as vn ".
+		    "where vn.pid='$pid' and vn.eid='$eid'");
+
+    return -1
+	if (!$query_result);
+
+    # XXX Delay nodes!
+    if ($expt_min > $query_result->numrows) {
+	$virt_classes{"pc"} = $expt_min - $query_result->numrows;
+    }
+
+    while (my ($type) = $query_result->fetchrow_array()) {
+	if (nodeclassisclass($type)) {
+	    $virt_classes{$type} = 0
+		if (!exists($virt_classes{$type}));
+	    $virt_classes{$type} += 1;
+	}
+	else {
+	    # Type counts.
+	    $virt_types{$type} = 0
+		if (!exists($virt_types{$type}));
+	    $virt_types{$type} += 1;
+
+	    # Class counts
+	    if (nodetypeistype($type)) {
+		my $class = nodetypeclass($type);
+
+		$virt_classes{$class} = 0
+		    if (!exists($virt_classes{$class}));
+		$virt_classes{$class} += 1;
+	    }
+	}
+    }
+    if ($debug) {
+	print "Experiment Desires:\n";
+	print "  Classes:\n";
+	foreach my $class (keys(%virt_classes)) {
+	    my $count = $virt_classes{$class};
+	    
+	    print "    $class $count\n";
+	}
+	print "  Types:\n";
+	foreach my $type (keys(%virt_types)) {
+	    my $count = $virt_types{$type};
+	    
+	    print "    $type $count\n";
+	}
+    }
+}
+
+#
+# Load Current physical usage. 
+#
+sub LoadCurrent($$$)
+{
+    my ($uid, $pid, $gid) = @_;
+
+    #
+    # Experiment counts,
+    # 
+    my $query_result =
+	DBQueryWarn("select expt_swap_uid,pid,gid from experiments ".
+		    "where (state='" . EXPTSTATE_ACTIVE() . "' or ".
+		    "       state='" . EXPTSTATE_ACTIVATING() . "') and ".
+		    "      (expt_swap_uid='$uid' or ".
+		    "       pid='$pid' or gid='$gid')");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($c_uid,$c_pid,$c_gid) = $query_result->fetchrow_array()) {
+	if ($c_uid eq $uid) {
+	    $curusage{"experiments"}->{'user'} += 1;
+	}
+	if ($c_pid eq $pid) {
+	    $curusage{"experiments"}->{'project'} += 1;
+	}
+	if ($c_gid eq $gid) {
+	    $curusage{"experiments"}->{'group'} += 1;
+	}
+    }
+
+    if ($debug) {
+	printf("Experiment usage: user:%d, project:%d, group:%d\n",
+	       $curusage{"experiments"}->{'user'},
+	       $curusage{"experiments"}->{'project'},
+	       $curusage{"experiments"}->{'group'});
+    }
+
+    #
+    # Node stuff.
+    #
+    $query_result =
+	DBQueryFatal("select e.expt_swap_uid,e.pid,e.gid,n.type,nt.class ".
+		     "  from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "left join experiments as e on ".
+		     "     e.pid=r.pid and e.eid=r.eid ".
+		     "where (e.expt_swap_uid='$uid' or ".
+		     "       r.pid='$pid' and e.gid='$gid') and ".
+		     "      r.pid!='" . TBOPSPID() . "' and ".
+		     "      n.role='testnode'");
+    return -1
+	if (!$query_result);
+
+    while (my ($c_uid,$c_pid,$c_gid,$c_type,$c_class) =
+	   $query_result->fetchrow_array()) {
+	if (!exists($curusage{"class"}->{$c_class})) {
+	    $curusage{"class"}->{$c_class} = {"user"    =>  0,
+					      "project" =>  0,
+					      "group"   =>  0};
+	}
+	if (!exists($curusage{"type"}->{$c_type})) {
+	    $curusage{"type"}->{$c_type} = {"user"    =>  0,
+					    "project" =>  0,
+					    "group"   =>  0};
+	}
+	if ($c_uid eq $uid) {
+	    $curusage{"nodes"}->{'user'} += 1;
+	    $curusage{"class"}->{$c_class}->{'user'} += 1;
+	    $curusage{"type"}->{$c_type}->{'user'} += 1;
+	}
+	if ($c_pid eq $pid) {
+	    $curusage{"nodes"}->{'project'} += 1;
+	    $curusage{"class"}->{$c_class}->{'project'} += 1;
+	    $curusage{"type"}->{$c_type}->{'project'} += 1;
+	}
+	if ($c_gid eq $gid) {
+	    $curusage{"nodes"}->{'group'} += 1;
+	    $curusage{"class"}->{$c_class}->{'group'} += 1;
+	    $curusage{"type"}->{$c_type}->{'group'} += 1;
+	}
+    }
+    if ($debug) {
+	printf("Node usage: user:%d, project:%d, group:%d\n",
+	       $curusage{"nodes"}->{'user'},
+	       $curusage{"nodes"}->{'project'},
+	       $curusage{"nodes"}->{'group'});
+	foreach my $class (keys(%{$curusage{"class"}})) {
+	    printf("Node class usage: $class user:%d, project:%d, group:%d\n",
+		   $curusage{"class"}->{$class}->{'user'},
+		   $curusage{"class"}->{$class}->{'project'},
+		   $curusage{"class"}->{$class}->{'group'});
+	}
+	foreach my $type (keys(%{$curusage{"type"}})) {
+	    printf("Node type usage: $type user:%d, project:%d, group:%d\n",
+		   $curusage{"type"}->{$type}->{'user'},
+		   $curusage{"type"}->{$type}->{'project'},
+		   $curusage{"type"}->{$type}->{'group'});
+	}
+    }
+    
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;

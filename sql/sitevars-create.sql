@@ -43,3 +43,4 @@ INSERT INTO sitevariables VALUES ('general/autoswap_threshold',NULL,'16','Number
 INSERT INTO sitevariables VALUES ('general/autoswap_mode',NULL,'0','Control whether autoswap defaults to on or off in the Begin Experiment page');
 INSERT INTO sitevariables VALUES ('webcam/anyone_can_view',NULL,'0','Turn webcam viewing on/off for mere users; default is off');
 INSERT INTO sitevariables VALUES ('webcam/admins_can_view',NULL,'1','Turn webcam viewing on/off for admin users; default is on');
+INSERT INTO sitevariables VALUES ('swap/use_admission_control',NULL,'1','Use admission control when swapping in experiments');
