@@ -508,6 +508,15 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 				interval, bps / 1000);
 		}
 #endif
+		/*
+		 * XXX Normally we return and reprocess the current event
+		 * list after a MODIFY event, but if the head of the event
+		 * list is a SETUP event (part of a SETUP/WAIT combo) we
+		 * can't do that.  So in that case, we change the head of
+		 * the list to a WAIT.
+		 */
+		if (tg_first->tg_flags & TG_SETUP)
+			goto dowait;
 	}
 	/*
 	 * If eventtype is RESET, zero out the event list so that TG
