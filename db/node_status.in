@@ -106,7 +106,7 @@ if ($wa_timeout == 0) {
 my $query_result =
     DBQueryFatal("SELECT n.node_id,ns.status,r.pid,nt.isremotenode, ".
 		 "       nt.isvirtnode, nt.isplabdslice, ".
-                 "       now() - ns.status_timestamp ".
+                 "       unix_timestamp()-unix_timestamp(ns.status_timestamp) ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join node_status as ns on ns.node_id=n.node_id ".
@@ -115,24 +115,24 @@ my $query_result =
 		 " ns.status != 'down' && " .
 		 # Local phys nodes:
 		 " ((nt.isremotenode=0 && nt.isvirtnode=0 && ".
-		 "   ((now() - ns.status_timestamp) > $local_timeout)) || ".
+		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $local_timeout)) || ".
 		 # Local virtual node:
 		 # must be allocated to an experiment to be considered.
 		 "  (nt.isremotenode=0 && nt.isvirtnode=1 && ".
 		 "   r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > $vnode_timeout)) || ".
+		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $vnode_timeout)) || ".
 		 # Widearea nodes:
 		 "  (nt.isremotenode=1 && nt.isplabdslice=0 && ".
 		 "   nt.isplabphysnode=0 && ".
-		 "   ((now() - ns.status_timestamp) > $wa_timeout)) || ".
+		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $wa_timeout)) || ".
 		 # Plab physical nodes:
 		 "  (nt.isplabphysnode=1 && ".
-		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
+		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $plab_timeout)) || ".
 		 # Plab virtual nodes:
 		 # must be allocated to an experiment to be considered.
 		 "  (nt.isplabdslice=1 && ".
 		 "   r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > $plab_timeout)))");
+		 "   ((unix_timestamp()-unix_timestamp(ns.status_timestamp)) > $plab_timeout)))");
 		 
 
 while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
@@ -178,7 +178,7 @@ $query_result =
 		 "left join node_status as ns on ns.node_id=n.node_id ".
 		 "left join reserved as r on r.node_id=n.node_id " .
 		 "where n.type='pcplabphys' " .
-		 "    and now() - ns.status_timestamp > $timeout " .
+		 "    and unix_timestamp()-unix_timestamp(ns.status_timestamp) > $timeout " .
 		 "    and !(r.pid='" . NODEDEAD_PID . "' and r.eid='" .
 		      NODEDEAD_EID . "')");
 
