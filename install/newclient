@@ -63,6 +63,9 @@ my %BEEP_CODES = (
 );
 my $UNKNOWN_ERROR_BEEPS = 6;
 
+my $MAXIMUM_BEEP_TIME   = 60 * 60; # In seconds - one hour
+my $BEEP_SLEEP          = 3; # In seconds
+
 #
 # Constants for use in determining if the floppy is in or not
 #
@@ -394,7 +397,7 @@ sub error {
 #
 # Same as above, but a fatal error
 #
-sub fatal_error {
+sub error_fatal {
     my ($errno, $string) = @_;
     print STDERR "*** Fatal Error $errno: $string\n";
 
@@ -482,6 +485,8 @@ sub beep {
     $count = 1 unless $count;
 
     my $floppystate;
+    my $iters = 0;
+    my $maxiters = $MAXIMUM_BEEP_TIME / $BEEP_SLEEP;
     while (1) {
 	foreach my $i (1 .. $count) {
 	    syswrite STDOUT, "\a";
@@ -492,7 +497,10 @@ sub beep {
 	    return;
 	}
 
-	sleep(3);
+	sleep($BEEP_SLEEP);
+	if ($iters++ > $maxiters) {
+	    die("Timed out\n");
+	}
     }
 }
 
