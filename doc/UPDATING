@@ -6,6 +6,11 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040121:
+	Changed the 3.testbed.sh rc.d script to handle 'start' and 'stop'
+	arguments properly. Install a fresh copy of rc.d/3.testbed.sh into
+	/usr/local/etc/rc.d .
+
 20040120:
 	Bumped up the sizes on some buffers to help network performance.
 	Add the following two lines to /etc/sysctl.conf:

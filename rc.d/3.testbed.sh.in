@@ -2,76 +2,97 @@
 #
 # Utah Network Testbed local startup
 #
-if [ -x @prefix@/sbin/cvsupd.pl -a -x /usr/local/sbin/cvsupd ]; then
-        echo -n " cvsupd"
-        @prefix@/sbin/cvsupd.pl
-fi
+case "$1" in
+	start)
+		if [ -x @prefix@/sbin/cvsupd.pl -a -x /usr/local/sbin/cvsupd ]; then
+			echo -n " cvsupd"
+			@prefix@/sbin/cvsupd.pl
+		fi
 
-if [ -x @prefix@/sbin/dbboot ]; then
-        echo -n " dbboot"
-        @prefix@/sbin/dbboot
-fi
+		if [ -x @prefix@/sbin/dbboot ]; then
+			echo -n " dbboot"
+			@prefix@/sbin/dbboot
+		fi
 
-if [ -x @prefix@/sbin/bootinfo.restart  ]; then
-        echo -n " bootinfo"
-        @prefix@/sbin/bootinfo.restart
-fi
+		if [ -x @prefix@/sbin/bootinfo.restart  ]; then
+			echo -n " bootinfo"
+			@prefix@/sbin/bootinfo.restart
+		fi
 
-if [ -x @prefix@/sbin/tmcd.restart  ]; then
-        echo -n " tmcd"
-        @prefix@/sbin/tmcd.restart
-fi
+		if [ -x @prefix@/sbin/tmcd.restart  ]; then
+			echo -n " tmcd"
+			@prefix@/sbin/tmcd.restart
+		fi
 
-if [ -x @prefix@/sbin/tevd.restart  ]; then
-        echo -n " tevd"
-        @prefix@/sbin/tevd.restart
-fi
+		if [ -x @prefix@/sbin/tevd.restart  ]; then
+			echo -n " tevd"
+			@prefix@/sbin/tevd.restart
+		fi
 
-if [ -x @prefix@/sbin/capserver  ]; then
-        echo -n " capd"
-        @prefix@/sbin/capserver
-fi
+		if [ -x @prefix@/sbin/capserver  ]; then
+			echo -n " capd"
+			@prefix@/sbin/capserver
+		fi
 
-if [ -x @prefix@/etc/capture.rc -a -d /var/log/tiplogs ]; then
-        echo -n " capture"
-        @prefix@/etc/capture.rc
-fi
+		if [ -x @prefix@/etc/capture.rc -a -d /var/log/tiplogs ]; then
+			echo -n " capture"
+			@prefix@/etc/capture.rc
+		fi
 
-if [ -x @prefix@/sbin/reload_daemon  ]; then
-        echo -n " reloadd"
-        @prefix@/sbin/reload_daemon
-fi
+		if [ -x @prefix@/sbin/reload_daemon  ]; then
+			echo -n " reloadd"
+			@prefix@/sbin/reload_daemon
+		fi
 
-if [ -x @prefix@/sbin/lastlog_daemon  ]; then
-        echo -n " lastlogd"
-        @prefix@/sbin/lastlog_daemon
-fi
+		if [ -x @prefix@/sbin/lastlog_daemon  ]; then
+			echo -n " lastlogd"
+			@prefix@/sbin/lastlog_daemon
+		fi
 
-if [ -x @prefix@/sbin/hmcd  ]; then
-	echo -n " hmcd"
-	@prefix@/sbin/hmcd
-fi
+		if [ -x @prefix@/sbin/hmcd  ]; then
+			echo -n " hmcd"
+			@prefix@/sbin/hmcd
+		fi
 
-if [ -x @prefix@/sbin/sdcollectd  ]; then
-	echo -n " sdcollectd"
-	@prefix@/sbin/sdcollectd
-fi
+		if [ -x @prefix@/sbin/sdcollectd  ]; then
+			echo -n " sdcollectd"
+			@prefix@/sbin/sdcollectd
+		fi
 
-if [ -x @prefix@/sbin/stated  ]; then
-	echo -n " stated"
-	@prefix@/sbin/stated
-fi
+		if [ -x @prefix@/sbin/stated  ]; then
+			echo -n " stated"
+			@prefix@/sbin/stated
+		fi
 
-if [ -x @prefix@/sbin/eventsys_start  ]; then
-        echo -n " eventboot"
-        @prefix@/sbin/eventsys_start
-fi
+		if [ -x @prefix@/sbin/eventsys_start  ]; then
+			echo -n " eventboot"
+			@prefix@/sbin/eventsys_start
+		fi
 
-#
-# Could trigger experiment creation, so make sure everything else
-# is setup first; i.e., run this last!
-#
-if [ -x @prefix@/sbin/batch_daemon  ]; then
-        echo -n " batchd"
-        @prefix@/sbin/batch_daemon
-fi
+		#
+		# Could trigger experiment creation, so make sure everything
+		# else is setup first; i.e., run this last!
+		#
+		if [ -x @prefix@/sbin/batch_daemon  ]; then
+			echo -n " batchd"
+			@prefix@/sbin/batch_daemon
+		fi
+		;;
+	stop)
+		# Only a few of our daemons keep enough state to require an
+		# explicit kill
+		if [ -r /var/run/stated.pid ]; then
+			kill `cat /var/run/stated.pid`
+		fi
+		if [ -r /var/run/tmcd.pid ]; then
+			kill `cat /var/run/tmcd.pid`
+		fi
+
+		;;
+	*)
+		echo ""
+		echo "Usage: `basename $0` { start | stop }"
+		echo ""
+		exit 64
+		;;
+esac
