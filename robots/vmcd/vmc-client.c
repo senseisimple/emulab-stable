@@ -89,6 +89,8 @@ static double x_offset = 0.0;
  */
 static double y_offset = 0.0;
 
+static double z_offset = 0.0;
+
 static XDR xdr;
 static char packet_buffer[2048];
 static char *cursor;
@@ -153,6 +155,21 @@ static void sigusr1(int signal)
     assert(signal == SIGUSR1);
     
     mezz_frame_count += 1;
+}
+
+#define ROBOT_HEIGHT 0.12f
+
+void radial_trans(struct robot_position *p_inout)
+{
+    float distance_from_center, theta, vtheta, offset;
+    struct robot_position rp;
+    
+    rp = *p_inout;
+
+    mtp_polar(NULL, &rp, &distance_from_center, &theta);
+    vtheta = atan2f(z_offset, distance_from_center);
+    offset = ROBOT_HEIGHT / tanf(vtheta);
+    mtp_cartesian(NULL, distance_from_center - offset, theta, p_inout);
 }
 
 /**
@@ -247,6 +264,8 @@ static int encode_packets(mezz_mmap_t *mm)
             mup->position.x = mol->objects[lpc].px;
             mup->position.y = mol->objects[lpc].py;
             mup->position.theta = mol->objects[lpc].pa;
+
+	    radial_trans(&(mup->position));
 
 	    /* ... transform them into global coordinates. */
             local2global_posit_trans(&(mup->position));
@@ -366,6 +385,13 @@ int main(int argc, char *argv[])
                 exit(1);
 	    }
             break;
+	case 'z':
+	    if (sscanf(optarg, "%lf", &z_offset) != 1) {
+                error("error: -z option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+	    }
+	    break;
         default:
             break;
         }
@@ -510,8 +536,10 @@ int main(int argc, char *argv[])
                     }
                     else {
 			if (debug) {
-			    info("vmc-client: connect from %s (fd=%d)\n",
-				 inet_ntoa(peer_sin.sin_addr), fd);
+			    info("vmc-client: connect from %s:%d (fd=%d)\n",
+				 inet_ntoa(peer_sin.sin_addr),
+				 ntohs(peer_sin.sin_port),
+				 fd);
 			}
 			
 			if (setsockopt(fd,
@@ -533,7 +561,19 @@ int main(int argc, char *argv[])
                 for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
                     if ((lpc != serv_sock) && FD_ISSET(lpc, &rreadyfds)) {
 			if (debug) {
-			    info("vmc-client: disconnecting fd %d\n", lpc);
+			    char buffer[512];
+			    int rc;
+
+			    rc = read(lpc, buffer, sizeof(buffer));
+			    if (rc == 0) {
+				info("vmc-client: fd %d disconnected\n", lpc);
+			    }
+			    else {
+				info("vmc-client: fd %d send %d bytes -- "
+				     "disconnecting\n",
+				     lpc,
+				     rc);
+			    }
 			}
 			
                         close(lpc);
