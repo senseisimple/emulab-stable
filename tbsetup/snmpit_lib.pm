@@ -797,12 +797,15 @@ sub snmpitSetFatal($$;$) {
 #
 sub printVars($) {
     my ($vars) = @_;
-    if (ref($vars) eq "SNMP::VarList") {
+    if (!defined($vars)) {
+	return "[(undefined)]";
+    } elsif (ref($vars) eq "SNMP::VarList") {
 	return "[" . join(", ",map( {"[".join(",",@$_)."\]";}  @$vars)) . "]";
     } elsif (ref($vars) eq "SNMP::Varbind") {
 	return "[" . join(",",@$vars) . "]";
     } elsif (ref($vars) eq "ARRAY") {
-	return "[" . join(",",@$vars) . "]";
+	return "[" . join(",",map( {defined($_)? $_ : "(undefined)"} @$vars))
+		. "]";
     } else {
 	return "[unknown value]";
     }
