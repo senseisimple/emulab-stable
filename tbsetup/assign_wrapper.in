@@ -183,6 +183,7 @@ foreach $lan (keys(%lans)) {
 	    join(" ",@$sharks) . ")\n";
 	$sharkshelfid++;
 	$sharkshelves{$shelfid} = $sharks;
+	$delayinfo{"$lan:$shelfid:uplink"} = [0,100,0.0];
 	push(@$realmembers,"$shelfid:uplink");
 	$nodes{$shelfid} = "shark-shelf";
     }
