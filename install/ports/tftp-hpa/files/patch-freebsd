@@ -134,7 +134,7 @@ diff -rcN tftp-hpa-0.33.orig/configure.in tftp-hpa-0.33/configure.in
   AC_SUBST(TFTP_LIBS)
 diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
 *** tftp-hpa-0.33.orig/tftpd/Makefile	Tue Nov 27 03:18:11 2001
---- tftp-hpa-0.33/tftpd/Makefile	Thu Feb  6 13:08:32 2003
+--- tftp-hpa-0.33/tftpd/Makefile	Wed Feb 12 11:25:15 2003
 ***************
 *** 23,32 ****
   	sed -e 's/@@VERSION@@/$(VERSION)/g' < $< > $@
@@ -159,6 +159,103 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
   
   clean:
   	rm -f *.o *.obj *.exe tftpd tftpsubs.c tftpsubs.h tftpd.8
+diff -rcN tftp-hpa-0.33.orig/tftpd/remap.c tftp-hpa-0.33/tftpd/remap.c
+*** tftp-hpa-0.33.orig/tftpd/remap.c	Thu Nov  7 18:10:09 2002
+--- tftp-hpa-0.33/tftpd/remap.c	Wed Feb 12 11:04:49 2003
+***************
+*** 285,291 ****
+    /* Default error */
+    *errmsg = "Remap table failure";
+  
+!   if ( verbosity >= 3 ) {
+      syslog(LOG_INFO, "remap: input: %s", current);
+    }
+  
+--- 285,291 ----
+    /* Default error */
+    *errmsg = "Remap table failure";
+  
+!   if ( verbosity >= 5 ) {
+      syslog(LOG_INFO, "remap: input: %s", current);
+    }
+  
+***************
+*** 308,314 ****
+  	was_match = 1;
+  	
+  	if ( ruleptr->rule_flags & RULE_ABORT ) {
+! 	  if ( verbosity >= 3 ) {
+  	    syslog(LOG_INFO, "remap: rule %d: abort: %s",
+  		   ruleptr->nrule, current);
+  	  }
+--- 308,314 ----
+  	was_match = 1;
+  	
+  	if ( ruleptr->rule_flags & RULE_ABORT ) {
+! 	  if ( verbosity >= 5 ) {
+  	    syslog(LOG_INFO, "remap: rule %d: abort: %s",
+  		   ruleptr->nrule, current);
+  	  }
+***************
+*** 335,341 ****
+  			 pmatch, macrosub);
+  	  free(current);
+  	  current = newstr;
+! 	  if ( verbosity >= 3 ) {
+  	    syslog(LOG_INFO, "remap: rule %d: rewrite: %s",
+  		   ruleptr->nrule, current);
+  	  }
+--- 335,341 ----
+  			 pmatch, macrosub);
+  	  free(current);
+  	  current = newstr;
+! 	  if ( verbosity >= 5 ) {
+  	    syslog(LOG_INFO, "remap: rule %d: rewrite: %s",
+  		   ruleptr->nrule, current);
+  	  }
+***************
+*** 350,369 ****
+        was_match = 0;
+  
+        if ( ruleptr->rule_flags & RULE_EXIT ) {
+! 	if ( verbosity >= 3 ) {
+  	  syslog(LOG_INFO, "remap: rule %d: exit", ruleptr->nrule);
+  	}
+  	return current;		/* Exit here, we're done */
+        } else if ( ruleptr->rule_flags & RULE_RESTART ) {
+  	ruleptr = rules;	/* Start from the top */
+! 	if ( verbosity >= 3 ) {
+  	  syslog(LOG_INFO, "remap: rule %d: restart", ruleptr->nrule);
+  	}
+        }
+      }
+    }
+  
+!   if ( verbosity >= 3 ) {
+      syslog(LOG_INFO, "remap: done");
+    }
+    return current;
+--- 350,369 ----
+        was_match = 0;
+  
+        if ( ruleptr->rule_flags & RULE_EXIT ) {
+! 	if ( verbosity >= 5 ) {
+  	  syslog(LOG_INFO, "remap: rule %d: exit", ruleptr->nrule);
+  	}
+  	return current;		/* Exit here, we're done */
+        } else if ( ruleptr->rule_flags & RULE_RESTART ) {
+  	ruleptr = rules;	/* Start from the top */
+! 	if ( verbosity >= 5 ) {
+  	  syslog(LOG_INFO, "remap: rule %d: restart", ruleptr->nrule);
+  	}
+        }
+      }
+    }
+  
+!   if ( verbosity >= 5 ) {
+      syslog(LOG_INFO, "remap: done");
+    }
+    return current;
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh tftp-hpa-0.33/tftpd/tftpd-hpa.sh
 *** tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh	Wed Dec 31 17:00:00 1969
 --- tftp-hpa-0.33/tftpd/tftpd-hpa.sh	Wed Feb  5 14:28:33 2003
@@ -210,7 +307,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh tftp-hpa-0.33/tftpd/tftpd-hpa.sh
 + exit 0
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
 *** tftp-hpa-0.33.orig/tftpd/tftpd.c	Thu Jan 30 19:22:33 2003
---- tftp-hpa-0.33/tftpd/tftpd.c	Wed Feb  5 14:03:10 2003
+--- tftp-hpa-0.33/tftpd/tftpd.c	Wed Feb 12 11:04:48 2003
 ***************
 *** 61,66 ****
 --- 61,67 ----
@@ -222,8 +319,18 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   #include "tftpsubs.h"
   #include "recvfrom.h"
 ***************
+*** 90,95 ****
+--- 91,97 ----
+  unsigned long maxtimeout = TIMEOUT_LIMIT*TIMEOUT;
+  int           timeout_quit = 0;
+  sigjmp_buf    timeoutbuf;
++ u_short       block;
+  
+  #define	PKTSIZE	MAX_SEGSIZE+4
+  char	buf[PKTSIZE];
+***************
 *** 107,112 ****
---- 108,115 ----
+--- 109,116 ----
   int	unixperms = 0;
   
   int verbosity = 0;
@@ -242,13 +349,14 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
     siglongjmp(timeoutbuf, 1);
   }
   
---- 155,165 ----
+--- 156,167 ----
   {
     (void)sig;			/* Suppress unused warning */
     timeout <<= 1;
 !   if (timeout >= maxtimeout || timeout_quit) {
 !     if ( verbosity >= 3 && !timeout_quit )
-!       syslog(LOG_WARNING, "no response from %s\n", inet_ntoa(from.sin_addr));
+!       syslog(LOG_WARNING, "%s/%d: timeout on block %d\n",
+! 	     inet_ntoa(from.sin_addr), ntohs(from.sin_port), block);
       exit(0);
 +   }
     siglongjmp(timeoutbuf, 1);
@@ -256,7 +364,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   
 ***************
 *** 247,252 ****
---- 253,277 ----
+--- 255,279 ----
     }
   }
   
@@ -273,7 +381,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
 +     if ( pid <= 0 )
 +       break;
 +     numchildren--;
-+     if ( verbosity >= 3 )
++     if ( verbosity >= 4 )
 +       syslog(LOG_INFO, "pid %d exits, numchildren=%d",
 + 	     pid, numchildren);
 +   }
@@ -284,7 +392,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   {
 ***************
 *** 270,275 ****
---- 295,301 ----
+--- 297,303 ----
   #ifdef WITH_REGEX
     char *rewrite_file = NULL;
   #endif
@@ -301,7 +409,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
       switch (c) {
       case 'c':
         cancreate = 1;
---- 304,310 ----
+--- 306,312 ----
     
     openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
     
@@ -311,7 +419,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
         cancreate = 1;
 ***************
 *** 350,355 ****
---- 376,386 ----
+--- 378,388 ----
         printf("%s\n", TFTPD_CONFIG_STR);
         exit(0);
         break;
@@ -339,7 +447,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   
     /* Take SIGHUP and use it to set a variable.  This
        is polled synchronously to make sure we don't
---- 512,535 ----
+--- 514,537 ----
     } else {
       /* 0 is our socket descriptor */
       close(1); close(2);
@@ -376,7 +484,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
       if ( rv == -1 ) {
         syslog(LOG_ERR, "select loop: %m");
         exit(EX_IOERR);
---- 567,582 ----
+--- 569,584 ----
       set_socket_nonblock(fd, 0);
   #endif    
   
@@ -395,7 +503,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
         exit(EX_IOERR);
 ***************
 *** 537,542 ****
---- 584,601 ----
+--- 586,603 ----
         exit(0);		/* Timeout, return to inetd */
       }
   
@@ -416,7 +524,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   #endif    
 ***************
 *** 576,581 ****
---- 635,642 ----
+--- 637,644 ----
         exit(EX_OSERR);	/* Return to inetd, just in case */
       } else if ( pid == 0 )
         break;			/* Child exit, parent loop */
@@ -434,7 +542,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
     /* Get a socket.  This has to be done before the chroot(), since
        some systems require access to /dev to create a socket. */
     
---- 667,673 ----
+--- 669,675 ----
   
     /* Close file descriptors we don't need */
     close(fd);
@@ -443,21 +551,114 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
        some systems require access to /dev to create a socket. */
     
 ***************
+*** 755,767 ****
+        }
+        if ( verbosity >= 1 ) {
+  	if ( filename == origfilename || !strcmp(filename, origfilename) )
+! 	  syslog(LOG_NOTICE, "%s from %s filename %s\n",
+! 		 tp->th_opcode == WRQ ? "WRQ" : "RRQ",
+! 		 inet_ntoa(from.sin_addr), filename);
+  	else
+! 	  syslog(LOG_NOTICE, "%s from %s filename %s remapped to %s\n",
+! 		 tp->th_opcode == WRQ ? "WRQ" : "RRQ",
+! 		 inet_ntoa(from.sin_addr), origfilename, filename);
+        }		   
+        ecode = (*pf->f_validate)(filename, tp->th_opcode, pf, &errmsgptr);
+        if (ecode) {
+--- 818,830 ----
+        }
+        if ( verbosity >= 1 ) {
+  	if ( filename == origfilename || !strcmp(filename, origfilename) )
+! 	  syslog(LOG_NOTICE, "%s/%d: %s for %s\n",
+! 		 inet_ntoa(from.sin_addr), ntohs(from.sin_port),
+! 		 tp->th_opcode == WRQ ? "WRQ" : "RRQ", filename);
+  	else
+! 	  syslog(LOG_NOTICE, "%s/%d: %s for %s (remapped to %s)\n",
+! 		 inet_ntoa(from.sin_addr), ntohs(from.sin_port),
+! 		 tp->th_opcode == WRQ ? "WRQ" : "RRQ", origfilename, filename);
+        }		   
+        ecode = (*pf->f_validate)(filename, tp->th_opcode, pf, &errmsgptr);
+        if (ecode) {
+***************
 *** 793,798 ****
---- 854,866 ----
+--- 856,868 ----
       else
         (*pf->f_send)(pf, NULL, 0);
     }
 + 
 +   if ( verbosity >= 3 ) {
-+     syslog(LOG_NOTICE, "%s from %s done (segsize==%d)\n",
-+ 	   tp->th_opcode == WRQ ? "WRQ" : "RRQ",
-+ 	   inet_ntoa(from.sin_addr), segsize);
++     syslog(LOG_NOTICE, "%s/%d: %s done\n",
++ 	   inet_ntoa(from.sin_addr), ntohs(from.sin_port),
++ 	   tp->th_opcode == WRQ ? "WRQ" : "RRQ");
 +   }
 + 
     exit(0);			/* Request completed */
   }
   
+***************
+*** 1152,1160 ****
+  {
+    struct tftphdr *dp;
+    struct tftphdr *ap;		/* ack packet */
+-   static u_short block = 1;	/* Static to avoid longjmp funnies */
+    int size, n;
+    
+    if (oap) {
+      timeout = rexmtval;
+      (void)sigsetjmp(timeoutbuf,1);
+--- 1222,1230 ----
+  {
+    struct tftphdr *dp;
+    struct tftphdr *ap;		/* ack packet */
+    int size, n;
+    
++   block = 1;
+    if (oap) {
+      timeout = rexmtval;
+      (void)sigsetjmp(timeoutbuf,1);
+***************
+*** 1256,1265 ****
+    int n, size;
+    /* These are "static" to avoid longjmp funnies */
+    static struct tftphdr *ap;    /* ack buffer */
+-   static u_short block = 0;
+    static int acksize;
+  
+    dp = w_init();
+    do {
+      timeout = rexmtval;
+      
+--- 1326,1335 ----
+    int n, size;
+    /* These are "static" to avoid longjmp funnies */
+    static struct tftphdr *ap;    /* ack buffer */
+    static int acksize;
+  
+    dp = w_init();
++   block = 0;
+    do {
+      timeout = rexmtval;
+      
+***************
+*** 1373,1380 ****
+    length += 4;			/* Add space for header */
+    
+    if ( verbosity >= 2 ) {
+!     syslog(LOG_INFO, "sending NAK (%d, %s) to %s",
+! 	   error, tp->th_msg, inet_ntoa(from.sin_addr));
+    }
+    
+    if (send(peer, buf, length, 0) != length)
+--- 1443,1451 ----
+    length += 4;			/* Add space for header */
+    
+    if ( verbosity >= 2 ) {
+!     syslog(LOG_INFO, "%s/%d: NAK (%d, %s) sent",
+! 	   inet_ntoa(from.sin_addr), ntohs(from.sin_port),
+! 	   error, tp->th_msg);
+    }
+    
+    if (send(peer, buf, length, 0) != length)
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.rules tftp-hpa-0.33/tftpd/tftpd.rules
 *** tftp-hpa-0.33.orig/tftpd/tftpd.rules	Wed Dec 31 17:00:00 1969
 --- tftp-hpa-0.33/tftpd/tftpd.rules	Wed Feb  5 14:03:10 2003
