@@ -33,7 +33,7 @@
 void		sigcatcher(int foo);
 char		*getbossnode(void);
 #ifdef UDP
-void		doudp(int, char **, int, struct in_addr, int);
+void		doudp(int, char **, int, struct in_addr, int, char *);
 #endif
 
 char *usagestr = 
@@ -41,6 +41,7 @@ char *usagestr =
  " -s server	   Specify a tmcd server to connect to\n"
  " -p portnum	   Specify a port number to connect to\n"
  " -v versnum	   Specify a version number for tmcd\n"
+ " -n vnodeid	   Specify the vnodeid\n"
  " -u		   Use UDP instead of TCP\n"
  "\n";
 
@@ -62,19 +63,23 @@ main(int argc, char **argv)
 	char			buf[MYBUFSIZE], *bp, *response = "";
 	char			*bossnode = DEFAULT_BOSSNODE;
 	int			version = CURRENT_VERSION;
+	char			*vnodeid = NULL;
 #ifdef UDP
 	int			useudp = 0;
 #endif
 
 	portnum = TBSERVER_PORT;
 
-	while ((ch = getopt(argc, argv, "v:s:p:u")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
 			break;
 		case 's':
 			bossnode = optarg;
+			break;
+		case 'n':
+			vnodeid = optarg;
 			break;
 		case 'v':
 			version = atoi(optarg);
@@ -134,7 +139,7 @@ main(int argc, char **argv)
 
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv, version, serverip, portnum);
+		doudp(argc, argv, version, serverip, portnum, vnodeid);
 		/*
 		 * Never returns.
 		 */
@@ -186,6 +191,11 @@ main(int argc, char **argv)
 
 	/* Start with version number */
 	sprintf(buf, "VERSION=%d ", version);
+
+	/* Tack on vnodeid */
+	if (vnodeid) {
+		sprintf(&buf[strlen(buf)], "VNODEID=%s ", vnodeid);
+	}
 
 	/*
 	 * Since we've gone through a getopt() pass, argv[0] is now the
@@ -274,7 +284,8 @@ getbossnode(void)
  * Not very robust, send a single request, read a single reply. 
  */
 void
-doudp(int argc, char **argv, int vers, struct in_addr serverip, int portnum)
+doudp(int argc, char **argv,
+      int vers, struct in_addr serverip, int portnum, char *vnodeid)
 {
 	int			sock, length, n, cc;
 	struct sockaddr_in	name, client;
@@ -292,7 +303,13 @@ doudp(int argc, char **argv, int vers, struct in_addr serverip, int portnum)
 	name.sin_addr   = serverip;
 	name.sin_port = htons(portnum);
 
+	/* Start with version number */
 	sprintf(buf, "VERSION=%d ", vers);
+
+	/* Tack on vnodeid */
+	if (vnodeid) {
+		sprintf(&buf[strlen(buf)], "VNODEID=%s ", vnodeid);
+	}
 
 	/*
 	 * Since we've gone through a getopt() pass, argv[0] is now the
