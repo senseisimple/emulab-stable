@@ -710,6 +710,8 @@ CREATE TABLE projects (
   num_members int(11) default '0',
   num_pcs int(11) default '0',
   num_sharks int(11) default '0',
+  num_pcplab int(11) default '0',
+  num_ron int(11) default '0',
   why text,
   control_node varchar(10) default NULL,
   unix_gid smallint(5) unsigned NOT NULL auto_increment,
@@ -718,6 +720,7 @@ CREATE TABLE projects (
   public_whynot tinytext,
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
+  pcremote_ok set('pcplab','pcron') default NULL,
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid)
 ) TYPE=MyISAM;
