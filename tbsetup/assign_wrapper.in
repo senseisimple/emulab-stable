@@ -11,7 +11,6 @@
 
 # Caveats:
 #  The support for direct and interswitch links has not been testbed much.
-#  LANs containing single nodes can result in strange behaviors.
 
 # Settings
 # delaythresh is the maximum delay in ms above which a delay node is needed.
@@ -263,7 +262,7 @@ foreach $lan (keys(%lans)) {
 	} else {
 	    print TOPFILE "link linksimple/$lan $node0 $node1 $bandwidth\n";
 	}
-    } else {
+    } elsif ($#members != 0) {
 	print TOPFILE "node lan/$lan lan\n";
 	$lannodes{"lan/$lan"} = 1;
 	foreach $member (@members) {
@@ -292,6 +291,7 @@ foreach $lan (keys(%lans)) {
 	    }
 	}
     }
+    # If a LAN has only one member we don't do anything.
 }
 
 close TOPFILE;
