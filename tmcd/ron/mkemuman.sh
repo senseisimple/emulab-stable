@@ -6,10 +6,17 @@ cd /usr/local/etc/testbed
 cp rc.testbed /usr/local/etc/rc.d/testbed.sh
 chown emulabman . *
 chgrp bin . *
-chown root update 
-chmod u+s update
+chown root update vnodesetup
+chmod u+s update vnodesetup
 chown root /usr/bin/suidperl
 chmod u+s /usr/bin/suidperl
+chown emulabman client.pem emulab.pem
+chmod 640 client.pem emulab.pem
+mkdir /var/testbed
+
+cp vtund /usr/local/sbin
+/usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/log/vtund
+/usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/lock/vtund
 
 cd ~emulabman
 chmod 755 .
@@ -24,3 +31,4 @@ echo "1024 37 168728947415883137658395816497236019932357443574364998989351516015
 chown emulabman authorized_keys
 chgrp bin authorized_keys
 chmod 644 authorized_keys
+

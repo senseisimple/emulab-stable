@@ -36,15 +36,19 @@ bin-install:	dir-install
 script-install:	dir-install
 	$(INSTALL_PROG) $(SRCDIR)/update $(INSTALL_DIR)/update
 	$(INSTALL_PROG) $(SRCDIR)/vnodesetup $(INSTALL_DIR)/vnodesetup
+	$(INSTALL_PROG) $(SRCDIR)/watchdog $(INSTALL_DIR)/watchdog
 	$(INSTALL_PROG) $(SRCDIR)/../libsetup.pm $(INSTALL_DIR)/libsetup.pm
 	$(INSTALL_PROG) $(SRCDIR)/liblocsetup.pm $(INSTALL_DIR)/liblocsetup.pm
 	$(INSTALL_PROG) $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
+	$(INSTALL_PROG) $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
 	$(INSTALL_PROG) $(SRCDIR)/mkemuman.sh $(INSTALL_DIR)/mkemuman.sh
 	$(INSTALL_PROG) $(SRCDIR)/upemuman.sh $(INSTALL_DIR)/upemuman.sh
 
 post-install:
 	chown root $(INSTALL_DIR)/update
 	chmod u+s $(INSTALL_DIR)/update
+	chown root $(INSTALL_DIR)/vnodesetup
+	chmod u+s $(INSTALL_DIR)/vnodesetup
 
 #
 # We build the bossnode file from config info
