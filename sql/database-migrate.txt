@@ -225,3 +225,16 @@ last_net_act,last_cpu_act,last_ext_act);
 	  dmesg text,
 	  PRIMARY KEY  (node_id)
        ) TYPE=MyISAM;
+
+1.132: Changed the new_nodes and new_interfaces table to use a new unique
+       int as they primary key instead of the node_id, so that the latter can
+       be easily changed. Also added a timestamp the the new_nodes column.
+
+       alter table new_nodes add column created timestamp not null;
+       alter table new_nodes drop primary key;
+       alter table new_nodes add column new_node_id int not null auto_increment
+             first, add primary key (new_node_id);
+       alter table new_interfaces drop primary key;
+       alter table new_interfaces drop column node_id;
+       alter table new_interfaces add column new_node_id int not null first,
+              add primary key(new_node_id,iface);

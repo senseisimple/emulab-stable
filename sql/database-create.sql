@@ -498,11 +498,13 @@ CREATE TABLE new_interfaces (
 --
 
 CREATE TABLE new_nodes (
+  unique_id int(11) NOT NULL auto_increment,
   node_id varchar(10) NOT NULL default '',
   type varchar(30) default NULL,
   IP varchar(15) default NULL,
   dmesg text,
-  PRIMARY KEY  (node_id)
+  created timestamp(14) NOT NULL,
+  PRIMARY KEY  (unique_id)
 ) TYPE=MyISAM;
 
 --
