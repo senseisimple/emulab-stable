@@ -5,8 +5,8 @@
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
-# Last Change: March 1999                                               #
-#     Version: 0.2b                                                     #
+# Last Change: April 1999                                               #
+#     Version: 0.5b                                                     #
 #                                                                       #
 #########################################################################
 
@@ -22,13 +22,14 @@ my $a = "";  #Auto Negotiation (enable/disable) (two-way switch)
 my $d = "";  #Duplex (half/full)
 my $s = 0;   #Speed (10/100)
 my $A = "";  #AutoVLAN filename
+my $l = 0;   #List all VLANs on switch
 my $C = "";  #Create VLAN - name
 my @v = ();  #VLAN Members - list of MAC Addresses
 my $B = 0;   #Block (bool) (two-way switch)
 my $V = 1;   #Verify Only (bool) (two-way switch)
 my $L = 0;   #Loud/Verbose (bool) !Must default quiet; switch only turns on!
 
-&ParseArgs(*ARGV,*S,*p,*D,*E,*a,*d,*s,*A,*C,*v,*B,*V,*L);
+&ParseArgs(*ARGV,*S,*p,*D,*E,*a,*d,*s,*A,*l,*C,*v,*B,*V,*L);
 #print "Returned: S=$S p=@p D=$D E=$E a=$a d=$d s=$s C=$C v=@v B=$B\n";
 
 use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
@@ -41,17 +42,18 @@ use SNMP;
 		   '/usr/local/share/snmp/mibs/RFC1213-MIB.txt',
 		   '/usr/local/share/snmp/mibs/BRIDGE-MIB.txt', 
 		   '/usr/local/share/snmp/mibs/EtherLike-MIB.txt',
-		   '/usr/local/share/snmp/mibs/RMON-MIB.txt',
+#		   '/usr/local/share/snmp/mibs/RMON-MIB.txt',
 		   '/usr/local/share/snmp/mibs/INTEL-GEN-MIB.txt', 
 		   '/usr/local/share/snmp/mibs/INTEL-S500-MIB.txt',
 		   '/usr/local/share/snmp/mibs/INTEL-VLAN-MIB.txt',
-		   '/usr/local/share/snmp/mibs/DVMRP-MIB.txt', 
-		   '/usr/local/share/snmp/mibs/INTEL-L3LINK-MIB.txt',
-		   '/usr/local/share/snmp/mibs/IGMP-MIB.txt',
-		   '/usr/local/share/snmp/mibs/INTEL-IPF-MIB.txt', 
-		   '/usr/local/share/snmp/mibs/INTEL-IPROUTER-MIB.txt',
-		   '/usr/local/share/snmp/mibs/INTEL-IGMP-PRUNING-MIB.txt', 
-		   '/usr/local/share/snmp/mibs/INTEL-IPX-MIB.txt');
+#		   '/usr/local/share/snmp/mibs/DVMRP-MIB.txt', 
+#		   '/usr/local/share/snmp/mibs/INTEL-L3LINK-MIB.txt',
+#		   '/usr/local/share/snmp/mibs/IGMP-MIB.txt',
+#		   '/usr/local/share/snmp/mibs/INTEL-IPF-MIB.txt', 
+#		   '/usr/local/share/snmp/mibs/INTEL-IPROUTER-MIB.txt',
+#		   '/usr/local/share/snmp/mibs/INTEL-IGMP-PRUNING-MIB.txt', 
+#		   '/usr/local/share/snmp/mibs/INTEL-IPX-MIB.txt'
+		   );
 $SNMP::save_descriptions = 1; # must be set prior to mib initialization
  SNMP::initMib(); # parses default list of Mib modules from default dirs
 
@@ -75,14 +77,14 @@ if ($D || $E) {
 if ($s) {
     my $Spd = ".1.3.6.1.4.1.343.6.10.2.4.1.10.1.1";
     if (! &Update(*sess,$Spd,*p,$s,*B,*V,*L)) {
-	print STDERR "Port ",($D?"disable":"enable")," failed.\n";
+	print STDERR "Port Speed change failed.\n";
     }    
 }
 
 if ($d) {
     my $Dup = ".1.3.6.1.4.1.343.6.10.2.4.1.11.1.1";
     if (! &Update(*sess,$Dup,*p,$d,*B,*V,*L)) {
-	print STDERR "Port ",($D?"disable":"enable")," failed.\n";
+	print STDERR "Port Duplex change failed.\n";
     }    
 }
 
@@ -90,13 +92,24 @@ if ($a) {
     my $Auto = ".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1";
     my $aOp = ( $a=~/en/ ? "auto" : "manual");
     if (! &Update(*sess,$Auto,*p,$a,*B,*V,*L)) {
-	print STDERR "Port ",($D?"disable":"enable")," failed.\n";
+	print STDERR "Port Auto-Configuration change failed.\n";
     }    
 }
 
-if ($C) {
+if (@v) {
     #This is to make ONE vlan - for multiple, use -A AutoVLAN
+    &GetToken(*sess,*L);
+    &OneVLAN(*sess,*C,*v,*L);
+    &ReleaseToken(*sess,*l);
+}
 
+if ($A) {
+    &AutoVLANConfig(*sess,*A,*L);
+}
+
+#List VLANs is always last, so that changes made are reflected...
+if ($l) {
+    &ListVLANs(*sess,*L);
 }
 
 #
@@ -113,7 +126,7 @@ if ($C) {
 # SUB PARSEARGS----------------------
 #
 sub ParseArgs {
-    local(*CMDS,*S,*p,*D,*E,*a,*d,*s,*A,*C,*v,*B,*V,*L) = @_;
+    local(*CMDS,*S,*p,*D,*E,*a,*d,*s,*A,*l,*C,*v,*B,*V,*L) = @_;
     my $help=0; 
     if (@CMDS < 3) {$help = 2; }
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
@@ -146,8 +159,7 @@ sub ParseArgs {
 	elsif (/^-s(.*)/) {$s = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-A(.*)/) {$A = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-C(.*)/) {$C = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ? 
-				  ($1 ? $1 : shift(@CMDS)) :
-				  "NoName");}
+				  ($1 ? $1 : shift(@CMDS)) : "");}
 	elsif (/^-v(.*)/) {
 	    push(@v, ($1 ? $1 : shift(@CMDS)));
 	    while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) { 
@@ -169,7 +181,7 @@ sub ParseArgs {
 	    "\t[-p<port> <port> <port>...] [-R <x>..<y>]\n",
 	    "\t[-D|-E] [[+|-]a] [-s<speed>] [-d<duplex>]\n", 
 	    "\t[-C[<vlan name>] -v<vlan memeber MAC>]\n",
-	    "\t[-A<vlan data filename>]";
+	    "\t[-A<vlan data filename>] -l\n";
     }
     if ($help == 1) {
 	print
@@ -187,6 +199,7 @@ sub ParseArgs {
 	    "  -s    Port Speed (10 or 100 Mbits)\n",
 	    "  -d    Port Duplex (half or full)\n",
 	    "  -A    AutoVLAN - Automatically set up set of VLANs\n",
+	    "  -l    List all VLANs on switch (ell, not #1)\n",
 	    "  -C    Create VLAN\n",
 	    "  -v    Add member to VLAN\n";
     }
@@ -194,7 +207,7 @@ sub ParseArgs {
     die("\b\n") if ($help);
     #Now die on any combinations that don't make sense...
     die("What shall I do?\n")
-	if (! ($D || $E || $a || $s || $d || $C) );
+	if (! ($D || $E || $a || $s || $d || @v) );
     if ($S =~ /Alpha/i) { $S = "155.99.214.170"; }
     if ($S =~ /Beta/i)  { $S = "155.99.214.171"; }
     die("Unknown Switch $S: Possible completions are\n",
@@ -209,7 +222,6 @@ sub ParseArgs {
 	$n++;
     }
     die("Which port should I reconfigure?\n") if (!@p &&($D||$E||$d||$s||$a));
-    die("Can't create VLAN without name.\n") if ( @v && !$C );
     die("Invalid duplex $d: Must be full or half\n") 
 	if(!($d=~/^full$|^half$|^$/));
     die("Invalid speed $s: Must be 10 or 100\n") if (!($s=~/^10$|^100$|^0$/));
@@ -220,9 +232,6 @@ sub ParseArgs {
 	die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
 	    if (! ( ($v[$n]=~ /^([a-f]|\d)*$/i) && (length ($v[$n]) == 12)));
 	$n++;
-    }
-    if ($C eq "NoName") {
-	$C = $v[0];
     }
 }
 
@@ -283,30 +292,121 @@ sub Update {
 }
 
 #
-# SUB MAKEVLAN----------------------
+# SUB ReleaseToken----------------------
 #
 
-sub MakeVLAN {
-    local(*sess,*C,*v,*B,*V,*L) = @_;
+sub ReleaseToken {
+    local(*sess,*L) = @_;
+    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
+    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
+    $sess->set([[$TokenRelease,0,"save","INTEGER"]]);
+    $RetVal = $sess->get([[$TokenReleaseResult,0]]);
+    print "VLAN Configuration Save Result is $RetVal\n" if ($L);
+    if ($RetVal ne 'success') {
+	die("VLAN Reconfiguration Failed. No changes saved.\n");
+    }
+}
 
-#mib2ext.vlan.vlanPolicy.vlanPolicyNextVlanId = 6.11.1.6
-#mib2ext.vlan.vlanPolicy.vlanPolicyChangeOperation = 6.11.1.8 (create/rename)
-#mib2ext.vlan.vlanPolicy.vlanPolicyVlanTable = 6.11.1.9
-#mib2ext.vlan.vlanPolicy.vlanPolicyMacRuleTable = 6.11.1.10
-#mib2ext.vlan.vlanPolicy.vlanPolicyIpRuleTable = 6.11.1.12
-#mib2ext.vlan.vlanPolicy.vlanPolicyIpNetRuleTable = 6.11.1.13
-#mib2ext.vlan.vlanPolicy.vlanPolicyPortRuleTable = 6.11.1.14
-#mib2ext.vlan.vlanPolicy.vlanPolicyRevert2Default = 6.11.1.21
-#mib2ext.vlan.vlanLearned.vlanLearnedMacTable = 6.11.2.9
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
-#mib2ext.vlan.vlanEditToken. = 6.11.4.
+#
+# SUB GetToken----------------------
+#
 
+sub GetToken {
+    local(*sess,*L) = @_;
+    my $TokenOwner = '.1.3.6.1.4.1.343.6.11.4.5';
+    my $TokenReq = '.1.3.6.1.4.1.343.6.11.4.6';
+    my $TokenReqResult = '.1.3.6.1.4.1.343.6.11.4.7';
+    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
+    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
+    my $Num = pack("C*",0,0,0,0,1,1);
+    #The zeros and ones are a magic number it needs...
+    my $RetVal = $sess->set([[$TokenReq,0,$Num,"OCTETSTR"]]);
+    print "VLAN Token Claim Result is $RetVal\n" if ($L);
+    $RetVal = $sess->get([[$TokenReqResult,0]]);
+    while ($RetVal eq "notReady") {
+	$RetVal = $sess->get([[$TokenReqResult,0]]);
+	print "VLAN Token Claim Result is $RetVal\n" if ($L);
+    }
+    print "VLAN Token Claim Result is $RetVal\n" if ($L);
+    if ($RetVal ne 'success') {
+	my $Owner = $sess->get([[$TokenOwner,0]]);
+	die("Can't edit VLANs: Token taken by $Owner\n");
+    }
+}
 
+#
+# SUB OneVLAN----------------------
+#
 
+sub OneVLAN {
+    #This is to be called ONLY after the edit token has already been taken!
+    local(*sess,*C,*v,*L) = @_;
+    my $NextVLANId = '.1.3.6.1.4.1.343.6.11.1.6';
+    my $Vlan = $sess->get([[$NextVLANId,0]]);
+    my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
+    my $RetVal = "Undef.";
+    if ( ! $C ) { $C = $v[0]; }
+    print "  Creating VLAN $C as VLAN #$Vlan, containing: @v ... " if ($L) ;
+    $RetVal = $sess->set([[$CreateOID,$Vlan,$C,"OCTETSTR"]]);
+    print "",($RetVal? "Succeeded":"Failed"),".\n" if ($L);
+    if (! defined ($RetVal) ) {
+	&ReleaseToken(*sess,*L);
+	die("VLAN name \"$C\" not unique.\n");
+    }
+    my @x;
+    my $n=0;
+    while(@v != 0 && $n < @v) {
+	my $i=0;
+	while ($i < 6 ) {
+	    $x[$i] = hex ("0x".substr($v[$n],2*$i,2) );
+	    $i++;
+	}
+	my $MacObjOID = ".1.3.6.1.4.1.343.6.11.1.10.1.3.$Vlan." . 
+	    "$x[0].$x[1].$x[2].$x[3].$x[4].$x[5]";
+	print "    Adding MAC Address $v[$n] ".
+	    "($Vlan.$x[0].$x[1].$x[2].$x[3].$x[4].$x[5])... " if ($L);
+	$RetVal = $sess->set([[$MacObjOID,0,$v[$n],"OCTETSTR"]]);
+	print "",($RetVal? "Succeeded":"Failed"), ".\n" if ($L);
+	$n++;
+    }
+}
+
+#
+# SUB AutoVLANConfig ----------------------
+#
+
+sub AutoVLANConfig {
+    local(*sess,*A,*L) = @_;
+    my @VLANS= ();
+    &ReadIRFile(*A,*VLANS);
+    &GetToken(*sess,*L);
+    my $C="";
+    while (@VLANS) {
+	@v = shift(@VLANS);
+	&OneVLAN(*sess,*C,*v,*L);
+    }
+    &ReleaseToken(*sess,*L);
+}
+
+#
+# SUB ReadIRFile ----------------------
+#
+
+sub ReadIRFile {
+   local(*A,*VLANS) = @_;
+   if ( !open(IR,$A) ) { die("Could not open $A for VLAN Setup.\n"); }
+   <IR>
+   
+
+}
+
+#
+# SUB ListVLANs ----------------------
+#
+
+sub ListVLANs {
+    local(*sess,*L) = @_;
+    
 }
 
 #
