@@ -1,0 +1,35 @@
+#!/usr/local/bin/perl -wT
+
+#
+# Wrapper for running mkprojdir from the web page. suexec should not be able
+# to run a setuid script, but in this case, we want to allow it. Actually,
+# I'm not entirely sure that this restriction makes sense in our semi
+# controlled environment, but better safe than sorry. If you think I'm being
+# too paranoid, let me know.
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: mkprojdir_wrapper <pid>\n");
+}
+my $pid = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Invalid pid '$pid' contains illegal characters.\n");
+}
+
+exec "/usr/testbed/bin/mkprojdir $pid";
+
+

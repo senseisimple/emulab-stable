@@ -1,4 +1,4 @@
-SCRIPTS		=
+SCRIPTS		= mkprojdir_wrapper
 SUSCRIPTS	= mkprojdir
 
 INSTALL		= install -c
