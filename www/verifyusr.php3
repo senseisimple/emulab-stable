@@ -162,7 +162,7 @@ elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
 
     echo "<p>".
 	 "You have now been verified. However, your application ".
-	 "has not yet been approved by the project leader. You will receive ".
+	 "has not yet been approved. You will receive ".
 	 "email when that has been done.\n";
 }
 else {
