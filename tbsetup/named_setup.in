@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -45,7 +45,7 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
-if (0 && $TB ne "/usr/testbed") {
+if (1 && $TB ne "/usr/testbed") {
     die("*** $0:\n".
 	"    Wrong version. Maybe its a development version?\n");
 }
@@ -198,19 +198,27 @@ if ($db_result->numrows > 0) {
 	my $pid     = $row[1];
 	my $eid     = $row[2];
 	my $vname   = $node_id;
+	my $physid  = $row[4];
+	my $cname;
 
 	if (defined($row[3])) {
 	    $vname = $row[3];
 	}
 
         #
-        # VIRTNODE HACK: Map cname to underlying physnode.
+        # VIRTNODE HACK: Map cname to underlying physnode, but first
+	# spit out a vname for the virtnode name (no point in polluting
+	# the map with a zillion cnames for nodes that do not actually
+	# exist until they are allocated).
         #
 	if (defined($row[4]) && $row[4] ne $node_id) {
-	    $node_id = $row[4];
+	    $cname   = sprintf("%-40s", "$node_id");
+	    printf MAP "$cname IN\tCNAME\t$physid\n";
+	    
+	    $node_id = $physid;
 	}
 	    
-	my $cname   = sprintf("%-40s", "$vname.$eid.$pid");
+	$cname = sprintf("%-40s", "$vname.$eid.$pid");
 	printf MAP "$cname IN\tCNAME\t$node_id\n";
     }
 }
