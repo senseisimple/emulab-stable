@@ -122,7 +122,8 @@ if ($submit) {
     TBMAIL("testbed-survey@emulab.net",
 	   "Survey Answers",
 	   $mesg,
-	   "From: $TBMAIL_OPS");	      
+	   "From: $TBMAIL_OPS\n".
+	   "Reply-To: $TBMAIL_OPS");
 
     if ($anonymous) {
 	echo "<i>Answers reported anonymously.</i><br />\n";
