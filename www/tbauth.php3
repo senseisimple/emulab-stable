@@ -120,7 +120,7 @@ function GETUID() {
 # Returns a combination of the CHECKLOGIN values above.
 #
 function CHECKLOGIN($uid) {
-    global $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
+    global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID;
     global $nocookieauth;
     #
@@ -196,42 +196,80 @@ function CHECKLOGIN($uid) {
     }
 
     #
-    # Check for expired login or for a hash that mismatches. Treat the same.
+    # Check for expired login. It does not matter if the cookie matches,
+    # kill the entry anyway so the user is officially logged out.
     #
-    if ((time() > $timeout) ||
-	(isset($curhash) && $curhash && strcmp($curhash, $hashkey))) {
+    if (time() > $timeout) {
+	echo "foo $timeout<br>\n";
 	
-        #
-        # Clear out the database entry for completeness.
-        #
 	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_TIMEDOUT;
 	return $CHECKLOGIN_STATUS;
     }
 
     #
-    # We know the login has not expired. We also know from the above
-    # test that the hashkey was either null or matched. 
-    # 
-    if (strcmp($curhash, $hashkey) == 0) {
-        #
-   	# We update the time in the database. Basically, each time the
-	# user does something, we bump the logout further into the future.
-	# This avoids timing them out just when they are doing useful work.
+    # We know the login has not expired. The problem is that we might not
+    # have received a cookie since that is set to transfer only when using
+    # https. However, we do not want the menu to be flipping back and forth
+    # each time the user uses http (say, for documentation), and so the lack
+    # of a cookie does not provide enough info to determine if the user is
+    # logged in or not from the current browser. Also, we want to allow for
+    # a user to switch browsers, and not get confused by getting a uid but
+    # no valid cookie from the new browser. In that case the user should just
+    # be able to login from the new browser; gets a standard not-logged-in
+    # front page. In order to accomplish this, we need another cookie that is
+    # set on login, cleared on logout.
+    #
+    if (isset($curhash)) {
 	#
-	$timeout = time() + $TBAUTHTIMEOUT;
+	# Got a cookie (https).
+	#
+	if ($curhash != $hashkey) {
+	    #
+	    # User is not logged in from this browser. Must be stale.
+	    # 
+	    $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	    return $CHECKLOGIN_STATUS;
+	}
+	else {
+            #
+	    # User is logged in. Update the time in the database.
+	    # Basically, each time the user does something, we bump the
+	    # logout further into the future. This avoids timing them
+	    # out just when they are doing useful work.
+            #
+	    $timeout = time() + $TBAUTHTIMEOUT;
 
-	$query_result =
 	    DBQueryFatal("UPDATE login set timeout='$timeout' ".
 			 "WHERE uid='$uid'");
 
-	$CHECKLOGIN_STATUS = CHECKLOGIN_LOGGEDIN;
+	    $CHECKLOGIN_STATUS = CHECKLOGIN_LOGGEDIN;
+	}
     }
     else {
-        #
-	# A login is valid, but we have no proof yet. Cookies off?
-	# 
-	$CHECKLOGIN_STATUS = CHECKLOGIN_MAYBEVALID;
+	#
+	# No cookie. Might be because its http, so there is no way to tell
+	# if user is not logged in from the current browser without more
+	# information. We use another cookie for this, which is a crc of
+	# of the real hash, and simply tells us what menu to draw, but does
+	# not impart any privs!
+	#
+	$hashhash = $HTTP_COOKIE_VARS[$TBLOGINCOOKIE];
+	
+	if (isset($hashhash) &&
+	    $hashhash == bin2hex(mhash(MHASH_CRC32, $hashkey))) {
+            #
+            # The login is probably valid, but we have no proof yet. 
+            #
+	    $CHECKLOGIN_STATUS = CHECKLOGIN_MAYBEVALID;
+	}
+	else {
+	    #
+	    # No hash of the hash, so assume no real cookie either. 
+	    # 
+	    $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
+	    return $CHECKLOGIN_STATUS;
+	}
     }
 
     #
@@ -261,7 +299,7 @@ function CHECKLOGIN($uid) {
     #
     # Set the magic enviroment variable, if appropriate, for the sake of
     # any processes we might spawn. We prepend an HTTP_ on the front of
-	# the variable name, so that it will get through suexec.
+    # the variable name, so that it will get through suexec.
     #
     if ($admin && !$adminoff) {
     	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
@@ -405,8 +443,8 @@ function ISPLABUSER() {
 # Attempt a login.
 # 
 function DOLOGIN($uid, $password, $adminmode = 0) {
-    global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
-    global $TBNAMECOOKIE, $TBSECURECOOKIES;
+    global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
+    global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     
     # Caller makes these checks too.
@@ -545,6 +583,16 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
                   $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 	#
+	# Another cookie, to help in menu generation. See above in
+	# checklogin. This cookie is a simple hash of the real hash,
+	# intended to indicate if the current browser holds a real hash.
+	# All this does is change the menu options presented, imparting
+	# no actual privs. 
+	#
+	$crc = bin2hex(mhash(MHASH_CRC32, $hashkey));
+	setcookie($TBLOGINCOOKIE, $crc, 0, "/", $TBAUTHDOMAIN, 0);
+
+	#
 	# We give this a really long timeout. We want to remember who the
 	# the user was each time they load a page, and more importantly,
 	# each time they come back to the main page so we can fill in their
@@ -652,7 +700,7 @@ function VERIFYPASSWD($uid, $password) {
 # Log out a UID.
 #
 function DOLOGOUT($uid) {
-    global $TBDBNAME, $TBSECURECOOKIES, $CHECKLOGIN_STATUS;
+    global $CHECKLOGIN_STATUS, $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
 
     # Pedantic check.
     if (!TBvalid_uid($uid)) {
@@ -675,9 +723,10 @@ function DOLOGOUT($uid) {
     DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
 
     #
-    # Issue a cookie request to delete the cookie. 
+    # Issue a cookie request to delete the cookies. 
     #
     setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
 
     return 0;
 }

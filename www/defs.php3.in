@@ -50,6 +50,7 @@ $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
 $TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
+$TBLOGINCOOKIE  = "LoginCookie" . $TBCOOKIESUFFIX;
 
 $HTTPTAG        = "http://";
 
