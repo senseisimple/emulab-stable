@@ -135,7 +135,7 @@ sub vlanLock {
   print "Buffer Request Set gave ",(defined($RetVal)?$RetVal:"undef."),
     "\n" if $verbose;
   $RetVal = 
-    $sess->set([[$BufferOwner,1,substr(`uname -n`,0,-1),"OCTETSTR"]]);
+    $sess->set([[$BufferOwner,1,substr(`/usr/bin/uname -n`,0,-1),"OCTETSTR"]]);
   $RetVal = $sess->get([[$BufferOwner,1]]);
   print "Buffer Owner is $RetVal\n" if $verbose;
 }
