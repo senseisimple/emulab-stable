@@ -7,7 +7,12 @@ set scriptdir [file dirname [info script]]
 set updir [file dirname $scriptdir]
 #set mactable "$updir/switch_tools/intel510/macslist"
 source "$scriptdir/libir.tcl"
-load $updir/../lib/sql.so
+if {[file exists $updir/../lib/sql.so]} {
+    load $updir/../lib/sql.so
+} else {
+    load $updir/../sql.so
+}
+
 set DB [sql connect]
 sql selectdb $DB tbdb
 
