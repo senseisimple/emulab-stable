@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -137,7 +137,8 @@ print "\n=== plablinkdata running at " . `date`;
 #
 my $query_result =
     DBQueryFatal("select iface from interfaces ".
-		 "where node_id='" . TBDB_WIDEAREA_LOCALNODE . "'");
+		 "where node_id='" . TBDB_WIDEAREA_LOCALNODE . "' ".
+		 "and role='ctrl'");
 if ($query_result->num_rows() != 1) {
     fatal("Unable to determine iface for " . TBDB_WIDEAREA_LOCALNODE);
 }
