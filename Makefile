@@ -18,29 +18,33 @@ install: all
 	install -c discvr/cli /usr/testbed/bin
 	install -c discvr/serv /usr/testbed/bin
 
-	install -c os/gethostkey.tcl /usr/testbed/bin/gethostkey
-	install -c os/hostkey.tcl /usr/testbed/bin/hostkey
-	install -c os/instimage.exp /usr/testbed/bin/instimage
-	install -c os/key7 /usr/testbed/bin
-	install -c os/key8 /usr/testbed/bin
-	install -c os/oslist.tcl /usr/testbed/bin/oslist
-	install -c os/osnode2db.tcl /usr/testbed/bin/osnode2db
-	install -c os/osnodestatus.tcl /usr/testbed/bin/osnodestatus
-	install -c os/ossane.tcl /usr/testbed/bin/ossane
-	install -c os/osset.tcl /usr/testbed/bin/osset
-	install -c os/osstatus.tcl /usr/testbed/bin/osstatus
-	install -c os/setupmachine.sh /usr/testbed/bin/setupmachine
-	install -c os/imagezip/imagezip /usr/testbed/bin/imagezip
+	# XXXThese don't work anymore
+	#install -c os/gethostkey.tcl /usr/testbed/bin/gethostkey
+	#install -c os/hostkey.tcl /usr/testbed/bin/hostkey
+	#install -c os/instimage.exp /usr/testbed/bin/instimage
+	#install -c os/key7 /usr/testbed/bin
+	#install -c os/key8 /usr/testbed/bin
+	#install -c os/oslist.tcl /usr/testbed/bin/oslist
+	#install -c os/osnode2db.tcl /usr/testbed/bin/osnode2db
+	#install -c os/osnodestatus.tcl /usr/testbed/bin/osnodestatus
+	#install -c os/ossane.tcl /usr/testbed/bin/ossane
+	#install -c os/osset.tcl /usr/testbed/bin/osset
+	#install -c os/osstatus.tcl /usr/testbed/bin/osstatus
+	#install -c os/setupmachine.sh /usr/testbed/bin/setupmachine
+	#install -c os/imagezip/imagezip /usr/testbed/bin/imagezip
+
 	# XXX
 	install -c os/oslib.tcl /usr/testbed/bin
 
-	install -c tbsetup/exp_accts /usr/testbed/bin
+	install -c tbsetup/mkacct /usr/testbed/bin
+	install -c tbsetup/rmacct /usr/testbed/bin
 	install -c tbsetup/genptop /usr/testbed/bin
+	install -c tbsetup/delay_setup /usr/testbed/bin
 	install -c tbsetup/ifc_setup /usr/testbed/bin
 	install -c tbsetup/ifc_filegen /usr/testbed/bin
 	install -c tbsetup/ir2ifc /usr/testbed/bin
 	install -c tbsetup/power /usr/testbed/bin
-	install -c tbsetup/resetvlans.tcl /usr/testbed/bin
+	install -c tbsetup/resetvlans.tcl /usr/testbed/bin/resetvlans
 	install -c tbsetup/savevlans /usr/testbed/bin
 	install -c tbsetup/snmpit /usr/testbed/bin
 	install -c tbsetup/tbend.tcl /usr/testbed/bin/tbend
