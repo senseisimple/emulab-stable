@@ -1,3 +1,3 @@
 # Two switches, configured identically - 8 nodes with 4 interfaces
-switch1 4 8
-switch2 4 8
+switch1 1 4 8
+switch2 1 4 8

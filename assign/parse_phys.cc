@@ -54,9 +54,11 @@ topology *parse_phys(char *filename)
 	
 	while (!infile.eof()) {
 		infile >> name;
-		if (infile.eof()) { break; }
+		if (infile.eof() || !infile.good()) { break; }
 		if (name[0] == '#') {
 			infile.getline(linebuf, 255);
+		} else if (name[0] == 0) {
+			continue;
 		} else {
 			int nodecount;
 			infile >> nodecount;
