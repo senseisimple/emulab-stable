@@ -9,8 +9,7 @@ SUBDIR		= tbsetup/ir
 include $(OBJDIR)/Makeconf
 
 LIB_STUFF	= libir.tcl libir.pm
-LIBEXEC_STUFF   = assign_wrapper handle_os handle_ip postassign extract_tb \
-	handle_virt
+LIBEXEC_STUFF   = assign_wrapper handle_os handle_ip postassign extract_tb
 
 #
 # Force dependencies on the scripts so that they will be rerun through
