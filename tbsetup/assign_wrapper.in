@@ -742,6 +742,10 @@ my %p2pmap = ();
 foreach my $pnode (keys(%p2vmap)) {
     my $phys_nodeid;
 
+    if (defined($lannodes{$p2vmap{$pnode}})) {
+	next;
+    }
+
     if (! TBPhysNodeID($pnode, \$phys_nodeid)) {
 	die("*** $0:\n".
 	    "    Cannot determine phys_nodeid for $pnode!\n");
