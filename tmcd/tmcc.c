@@ -23,10 +23,16 @@
 
 void		sigcatcher(int foo);
 char		*getbossnode(void);
+#ifdef UDP
+void		doudp(int argc, char **argv, struct in_addr, int port);
+#endif
+
 
 char *usagestr = 
- "usage: tmcc [-p #] <command>\n"
+ "usage: tmcc [-u] [-p #] [-s server] <command>\n"
+ " -s server	   Specify a tmcd server to connect to\n"
  " -p portnum	   Specify a port number to connect to\n"
+ " -u		   Use UDP instead of TCP\n"
  "\n";
 
 void
@@ -48,18 +54,20 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-	char			*bossnode;
+	char			*bossnode = NULL;
 #ifdef UDP
 	int			useudp = 0;
-	void			doudp(int argc, char **argv, struct in_addr);
 #endif
 
 	portnum = TBSERVER_PORT;
 
-	while ((ch = getopt(argc, argv, "p:u")) != -1)
+	while ((ch = getopt(argc, argv, "s:p:u")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
+			break;
+		case 's':
+			bossnode = optarg;
 			break;
 #ifdef UDP
 		case 'u':
@@ -76,7 +84,8 @@ main(int argc, char **argv)
 	}
 	argv += optind;
 
-	bossnode = getbossnode();
+	if (!bossnode)
+		bossnode = getbossnode();
 	he = gethostbyname(bossnode);
 	if (he)
 		memcpy((char *)&serverip, he->h_addr, he->h_length);
@@ -95,7 +104,7 @@ main(int argc, char **argv)
 
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv, serverip);
+		doudp(argc, argv, serverip, portnum);
 		/*
 		 * Never returns.
 		 */
@@ -244,7 +253,7 @@ getbossnode(void)
  * Not very robust, send a single request, read a single reply. 
  */
 void
-doudp(int argc, char **argv, struct in_addr serverip)
+doudp(int argc, char **argv, struct in_addr serverip, int portnum)
 {
 	int			sock, length, n, cc;
 	struct sockaddr_in	name, client;
@@ -260,7 +269,7 @@ doudp(int argc, char **argv, struct in_addr serverip)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr   = serverip;
-	name.sin_port = htons(TBSERVER_PORT);
+	name.sin_port = htons(portnum);
 
 	/*
 	 * Since we've gone through a getopt() pass, argv[0] is now the
