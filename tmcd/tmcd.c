@@ -293,7 +293,7 @@ struct command {
         { "routelist",	  FULLCONFIG_PHYS, 0, doroutelist},
         { "role",	  FULLCONFIG_PHYS, 0, dorole},
         { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
-        { "watchdoginfo", FULLCONFIG_ALL,  F_REMUDP|F_MINLOG, dodoginfo},
+        { "watchdoginfo", FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dodoginfo},
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
