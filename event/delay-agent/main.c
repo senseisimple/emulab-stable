@@ -73,6 +73,8 @@ int main(int argc, char **argv)
   char *server = NULL;
   char * port  = NULL;
   char *map_file = NULL;
+  char *log_file = "/tmp/agentlog";
+  char *pid_file = NULL;
   FILE *mp = NULL;
   //char *log = NULL;
   char buf[BUFSIZ];
@@ -84,7 +86,7 @@ int main(int argc, char **argv)
   opterr = 0;
 
   /* get params from the optstring */
-  while ((c = getopt(argc, argv, "s:p:f:dE:")) != -1) {
+  while ((c = getopt(argc, argv, "s:p:f:dE:l:i:")) != -1) {
         switch (c) {
 	  case 'd':
 	      debug++;
@@ -97,6 +99,12 @@ int main(int argc, char **argv)
 	      break;
 	  case 'f':
 	      map_file = optarg;
+	      break;
+	  case 'l':
+	      log_file = optarg;
+	      break;
+	  case 'i':
+	      pid_file = optarg;
 	      break;
 	  case 'E':
 	      myexp = optarg;
@@ -113,7 +121,7 @@ int main(int argc, char **argv)
       usage(argv[0]);
 
   if (debug)
-     loginit(0, "/tmp/agentlog");
+     loginit(0, log_file);
   else
      loginit(1, "agent-thing");
 
@@ -234,6 +242,18 @@ int main(int argc, char **argv)
        ipaddr = ipbuf;
    }
 #endif
+  /*
+   * Write out a pidfile.
+   */
+  if (pid_file)
+	  strcpy(buf, pid_file);
+  else
+	  sprintf(buf, "%s/delayagent.pid", _PATH_VARRUN);
+  mp = fopen(buf, "w");
+  if (mp != NULL) {
+	  fprintf(mp, "%d\n", getpid());
+	  (void) fclose(mp);
+  }
   
   /* Convert server/port to elvin thing.
    */
@@ -274,8 +294,6 @@ int main(int argc, char **argv)
   /* enter the event loop */
    event_main(handle);
   
-  /*now daemonise*/
-
 #ifdef DEBUG
   info("exiting function main\n");
 #endif

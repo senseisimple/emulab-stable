@@ -25,7 +25,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
-
+#include <paths.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -80,8 +80,7 @@
 /**************************DEFINES******************************************/
 
 #define MAX_LINE_LENGTH 512
-#define MAX_LINKS       4 /* 4 simplex or 2 duplex, since we have 4 interfaces
-			     on delay nodes*/
+#define MAX_LINKS       256 /* Virtual interfaces */
 /**************************DEFINES******************************************/
 
 
