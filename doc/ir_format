@@ -133,6 +133,9 @@ START linkinfo
 END linkinfo
 
 VLAN: Describes the vlan configuration for each switches
+5/00 - Changed format.  No longer divided by switch and now each line is
+prefixed by the VLAN name (usually coresponds to the physical link the
+VLAN implements).
 
 START vlan
 # Records of the form:
