@@ -82,7 +82,16 @@ if (! isset($go)) {
 	echo "</textarea>";
 
 	echo "<br />";
-#	echo "<input type='checkbox' name='restart' value='1'>Restart experiment</input>";
+	if (0 == strcmp($expstate, $TB_EXPTSTATE_ACTIVE)) {
+	    echo "<p><b>Note!</b> If changing your experiment topology 
+              (adding or removing nodes, links, and LANs), you will most likely 
+	      have to reboot all nodes in your experiment (check the box below.)
+	      If adding/removing a delay to/from an existing link, or replacing 
+	      a lost node <i>without modifying the experiment topology</i>,
+	      this won't be necessary.</p>";
+	    echo "<input type='checkbox' name='reboot' value='1' checked='1'>
+	      Reboot nodes in experiment</input>";
+	}
 	echo "<br />";
 	echo "<input type='hidden' name='pid' value='$pid' />";
 	echo "<input type='hidden' name='eid' value='$eid' />";
@@ -131,8 +140,12 @@ if (! isset($go)) {
 	
 	$output = array();
 	$retval = 0;
+
+	$rebootswitch = "";
+	if ($reboot) { $rebootswitch = "-r"; }
+
 	$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-		       "webswapexp -s modify $pid $eid $nsfile",
+		       "webswapexp $rebootswitch -s modify $pid $eid $nsfile",
 		       $output, $retval);
 	
 	if ($retval) {

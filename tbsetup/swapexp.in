@@ -15,11 +15,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-i] <-s in | out | restart | modify> ". 
+    print STDOUT "Usage: swapexp [-i] [-r] <-s in | out | restart | modify> ". 
 	         "<pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "s:i";
+my  $optlist = "s:ir";
 
 #
 # Configure variables
@@ -40,6 +40,8 @@ my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
 my $batch    = 0;
 my $idleswap = 0;
+my $reboot   = 0;    
+
 my $inout;
 my $logname;
 my $dbuid;
@@ -47,7 +49,7 @@ my $user_name;
 my $user_email;
 my @row;
 my $action;
-    
+
 #
 # Untaint the path
 # 
@@ -76,6 +78,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"i"})) {
     $idleswap = 1;
+}
+if (defined($options{"r"})) {
+    $reboot = 1;
 }
 if (defined($options{"s"})) {
     $inout = $options{"s"};
@@ -350,6 +355,12 @@ elsif ($inout eq "modify") {
 	}
 	
 	system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+
+	if ($reboot) {
+	    if (system("$tbdir/node_reboot -e $pid,$eid") != 0) {
+		fatal("node reboot failed!\n");
+	    }
+	}
     }
 }
 else { # $inout eq "restart" assumed.
