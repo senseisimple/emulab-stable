@@ -1,0 +1,27 @@
+[ req ]
+prompt                  = no
+default_bits		= 1024
+default_keyfile 	= privkey.pem
+distinguished_name	= req_distinguished_name
+attributes		= req_attributes
+x509_extensions	        = v3_ca	# The extentions to add to the self signed cert
+encrypt_key		= no
+string_mask             = nombstr
+
+[ req_distinguished_name ]
+C                      = @SSLCERT_COUNTRY@
+ST                     = @SSLCERT_STATE@
+L                      = @SSLCERT_LOCALITY@
+O                      = @SSLCERT_ORGNAME@
+OU                     = WebServer
+# The apache server wants the CommonName (CN) to match what we set "ServerName"
+# to in apache/http.conf.in (in the SSL section).
+CN                     = @USERNODE@
+emailAddress           = @TBOPSEMAIL@
+
+[ req_attributes ]
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints = CA:true
