@@ -62,6 +62,8 @@
                            nodes in my experiment are ready?</a>
      <li> <a href="#SWS-7">Can I run my own Operating System?</a>
      <li> <a href="#SWS-8">What if I need more disk space on my nodes?</a>
+     <li> <a href="#SWS-9">Are there testbed-specific daemons that could
+                           interfere with my experiment?</a>
      </ul>
 
 <li> <a href="#SEC">Security Issues</a>
@@ -671,6 +673,31 @@ tb-set-ip-routing ospf
     smallest drives. If you need more space than this, it would be possible
     to enlarge this partition on some machines (for example, our pc850s
     have 40 GB disks,) but that is outside the scope of this FAQ.
+    </p>
+</ul>
+
+<li><a NAME="SWS-9"></a>
+    <h3>Are there testbed-specific daemons that could interfere with my
+	experiment?</h3>
+    <p>
+    The only daemon that the testbed adds to the OS's standard set is
+    <code>healthd</code>. This daemon periodically polls things such as 
+    motherboard/CPU temperature and fan speed, and reports them back to
+    our <code>boss</code> node. We have picked a large polling interval
+    (five minutes) to minimize the impact on nodes. If you are worried
+    about side effects, however, you can safely kill it off.
+    <code>healthd</code> is stared by <code>/etc/testbed/rc.healthd</code> .
+    </p>
+    <p>
+    If you have requested automatic routing on your nodes with the 
+    <code>tb-set-ip-routing</code> command in your NS file, this will
+    start <code>gated</code> on all of your nodes.
+    </p>
+    <p>
+    We have left all daemons started by the operating systems' default
+    configurations (such as <code>cron</code>) enabled, so you should also
+    look at them if you are concered about running processes affecting
+    your experiment.
     </p>
 </ul>
 
