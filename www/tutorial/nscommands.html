@@ -271,6 +271,28 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
 </ul>
 
 
+<h4>tb-set-netmask</h4>
+
+<pre>
+tb-set-netmask <i>lanlink</i> <i>netmask</i>
+
+tb-set-netmask $link0 "255.255.255.248"
+</pre>
+
+<dl>
+  <dt><i>lanlink</i> - The lan or link to set the netmask for.
+  <dt><i>netmask</i> - The netmask in dotted notation.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command sets the netmask for a lan or link. The mask must
+      be big enough to support all of the nodes on the lan or link!
+  <li>You may play with the bottom three octets (0xFFFFFXXX) of the
+      mask; attempts to change the upper octets will cause an error.
+</ul>
+
+
 <hr>
 
 <a name="OS"></a><h3>OS Commands</h3>
