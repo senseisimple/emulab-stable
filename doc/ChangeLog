@@ -1,0 +1,14 @@
+stoller     2003/03/27 17:01:52 MST
+
+  Modified files:
+    db                   libdb.pm.in 
+    www                  dbdefs.php3.in 
+  Log:
+  Changes to permission checks for nodes, experiments, and images.
+  In addition to the usual checks, project_root and group_root (in the
+  project) get the same permission as if they were in the subgroups with
+  group_root permission. This means they can swap/terminate/reboot etc
+  in subgroups even though they are not members of the subgroups.
+  There is still some copy problems with files, but leaving that till
+  later to deal with.
+  
