@@ -27,6 +27,7 @@ p5-DBI-1.15         The perl5 Database Interface.  Required for DBD::* modules
 p5-Mysql-modules-1.2215 Perl5 modules for accessing MySQL databases
 p5-SNMP-4.2.0       A perl5 module for interfacing with the CMU SNMP library
 p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1 a
+p5-BSD-Resource	    BSD resource goo
 rpm-3.0.6_5         The Red Hat Package Manager
 tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
