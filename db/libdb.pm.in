@@ -2689,17 +2689,15 @@ sub TBSiteVarExists($)
 {
     my($name) = @_;
 
-    $name  = DBQuoteSpecial( $name );
+    $name = DBQuoteSpecial( $name );
 
     my $query_result =
-	DBQueryFatal("select name from sitevariables ".
-		     "where name=$name");
+	DBQueryWarn("select name from sitevariables where name=$name");
 
-    if ($query_result->numrows > 0) {
-	return 1;
-    } else {
-	return 0;
-    }
+    return 0
+	if (!$query_result);
+    
+    return $query_result->numrows;
 }
 
 #
