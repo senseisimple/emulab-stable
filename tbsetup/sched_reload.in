@@ -31,12 +31,11 @@ use lib "@prefix@/lib";
 use libdb;
 
 #
-# XXX This stuff should not be hardwired in. If you change these, be sure
-# to update the test in doreboot() in tmcd/tmcd.c.
+# These come from the library.
 # 
-my $RELOADPID	= "emulab-ops";
-my $RELOADEID	= "reloading";
-my $PENDINGEID	= "reloadpending";
+my $RELOADPID	= NODERELOADING_PID;
+my $RELOADEID	= NODERELOADING_EID;
+my $PENDINGEID	= NODERELOADPENDING_EID;
 
 my $osload      = "$TB/bin/os_load";
 my $nalloc      = "$TB/bin/nalloc";

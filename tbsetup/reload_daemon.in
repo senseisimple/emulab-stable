@@ -27,13 +27,22 @@ my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 
+# Testbed Support library
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 #
-# This stuff should not be hardwired in.
+# This should not be hardwired in.
 # 
 my $CLASS	= "pc";	 # XXX: Needs a better approach.
-my $RELOADPID	= "emulab-ops";
-my $RELOADEID	= "reloading";
-my $PENDINGEID	= "reloadpending";
+
+#
+# These come from the library.
+# 
+my $RELOADPID	= NODERELOADING_PID;
+my $RELOADEID	= NODERELOADING_EID;
+my $PENDINGEID	= NODERELOADPENDING_EID;
 
 my $os_load	= "$TB/bin/os_load";
 my $sched_reload= "$TB/sbin/sched_reload";
@@ -51,11 +60,6 @@ $| = 1;
 # 
 $ENV{'PATH'} = "/bin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-# Testbed Support library
-use lib "@prefix@/lib";
-use libdb;
-use libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
