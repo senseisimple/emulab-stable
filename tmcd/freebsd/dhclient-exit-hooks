@@ -14,4 +14,14 @@ fi
 # 
 /etc/testbed/sethostname $new_domain_name
 
+#
+# Once we have an IP address, we can stop dhclient so that it doesn't get
+# in the way 
+#
+if [ x"$reason" = xREBOOT ]; then
+	# I'd love to use the dhclient.pid file, but it helpfully has not been
+	# created at this point
+	killall dhclient
+fi  
+
 exit 0
