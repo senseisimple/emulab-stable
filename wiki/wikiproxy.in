@@ -507,7 +507,6 @@ sub AddWikiGroup(@)
     print GRP "\t* Set ALLOWTOPICCHANGE = %MAINWEB%.TWikiAdminGroup\n";
     print GRP "\t* Set ALLOWTOPICRENAME = %MAINWEB%.TWikiAdminGroup\n";
     print GRP "\n";
-    print GRP "__Any changes you make to this file will be LOST!__\n";
     close(GRP);
 
     #
