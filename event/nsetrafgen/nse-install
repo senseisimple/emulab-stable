@@ -1,10 +1,10 @@
 #!/bin/sh
 if [ ! -d ns-2 ]; then
-    echo "Checking out ns-2 source to ."
-    cvs co ns-2
+    echo "Downloading ns2.1b9 source ..."
+    fetch http://www.emulab.net/ns-allinone-2.1b9.tar.gz
+    tar xzf ns-allinone-2.1b9.tar.gz
     patch -p0 < nse.patch
-    cd ns-2
+    cd ns-allinone-2.1b9
     ./install
-    cp ns-2.1b8a/nse ..
-    cp lib/tcl8.3/init.tcl ..
+    cp ns-2.1b9/nse ..
 fi

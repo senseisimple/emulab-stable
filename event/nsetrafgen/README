@@ -1,4 +1,4 @@
-For NSE based TCP traffic generation, we need the following files
+For NSE integration and traffic generation, we need the following files
 as part of the FBSD disk image or it should be part of 
 /usr/testbed/sup/sup/FBSD43-STD/root*/etc/testbed on the boss node.
 
@@ -9,7 +9,7 @@ b) NSE executable file. To build it the first time, chdir to
    ./nse-install
 
 c) Then do a
-   cp nse nseinput.tcl startnse init.tcl <sup_directory>
+   cp nse nseinput.tcl startnse <sup_directory>
 
 The current NSE trafgen comes with a major caveat:
 

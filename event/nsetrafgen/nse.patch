@@ -1,641 +1,977 @@
-Index: ns-2/install
-diff -u ns-2/install:1.2 ns-2/install:1.3
---- ns-2/install:1.2	Tue Mar 12 01:05:34 2002
-+++ ns-2/install	Thu Mar 21 11:51:21 2002
-@@ -16,7 +16,7 @@
- # WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
- # MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- #
--# $Header: /foo/x/flux/CVS/ns-2/install,v 1.2 2002/03/12 08:05:34 shash Exp $
-+# $Header: /foo/x/flux/CVS/ns-2/install,v 1.3 2002/03/21 18:51:21 shash Exp $
+diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
+--- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
++++ ns-allinone-2.1b9/install	Thu Jun 13 21:46:32 2002
+@@ -39,224 +39,82 @@
  
- die() {
- 	echo "$@"  1>&2
-@@ -53,7 +53,7 @@
- 
- blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
- to see if they have a fix for your platform.'
--./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
-+./configure --enable-gcc --disable-shared --disable-load --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
- if make 
- then 
- 	echo "tcl$TCLVER make succeeded."
-Index: ns-2/ns-2.1b8a/scheduler.cc
-diff -u ns-2/ns-2.1b8a/scheduler.cc:1.2 ns-2/ns-2.1b8a/scheduler.cc:1.3
---- ns-2/ns-2.1b8a/scheduler.cc:1.2	Tue Mar 12 01:03:06 2002
-+++ ns-2/ns-2.1b8a/scheduler.cc	Thu Mar 14 16:46:45 2002
-@@ -304,11 +304,7 @@
- 		return;
- 	for (p = &queue_; *p != e; p = &(*p)->next_)
- 		if (*p == 0) {
--			fprintf( stderr, 
--                                 "Scheduler Cancel fails. Should have aborted\n"); // XXX: hack -> abort();
--                        e->uid_ = - e->uid_;
--                        return;
--                        //abort();
-+                      abort();
-                 }
- 
- 	*p = (*p)->next_;
-Index: ns-2/ns-2.1b8a/tcp-full.cc
-diff -u ns-2/ns-2.1b8a/tcp-full.cc:1.3 ns-2/ns-2.1b8a/tcp-full.cc:1.4
---- ns-2/ns-2.1b8a/tcp-full.cc:1.3	Wed Mar 20 17:30:12 2002
-+++ ns-2/ns-2.1b8a/tcp-full.cc	Tue Apr  9 14:49:20 2002
-@@ -89,6 +89,7 @@
- #include "flags.h"
- #include "random.h"
- #include "template.h"
-+#include <stdlib.h>
- 
- #define	TRUE 	1
- #define	FALSE 	0
-@@ -96,6 +97,20 @@
- #define	MIN(x,y)	(((x)<(y))?(x):(y))
- #define	MAX(x,y)	(((x)>(y))?(x):(y))
- 
-+#define SEQ_LT(a,b)  (((a)<(b) && (b)-(a) < TCP_MAXSEQ/2) || ((a)>(b) && (a)-(b) >= TCP_MAXSEQ/2))
-+#define SEQ_LE(a,b)  (((a)<=(b) && (b)-(a) < TCP_MAXSEQ/2) || ((a)>(b) && (a)-(b) >= TCP_MAXSEQ/2))
-+#define SEQ_GT(a,b)  (((a)>(b) && (a)-(b) < TCP_MAXSEQ/2) || ((a)<(b) && (b)-(a) >= TCP_MAXSEQ/2))
-+#define SEQ_GE(a,b)  (((a)>=(b) && (a)-(b) < TCP_MAXSEQ/2) || ((a)<(b) && (b)-(a) >= TCP_MAXSEQ/2))
-+#define INCR_SEQ(num, val) (num) = ((num) + (val)) % TCP_MAXSEQ
-+#define SEQ_ADD(num, val) (((num) + (val)) % TCP_MAXSEQ)
-+inline int SEQ_SUB(int num, int val) {
-+  int ret = num - val;
-+  return( abs(ret) < TCP_MAXSEQ/2 ? ret : ((int)(((long long)(num) - (val) + TCP_MAXSEQ) % TCP_MAXSEQ)) );
-+}
-+#define DECR_SEQ(num, val) (num) = SEQ_SUB((num), (val))
-+#define SEQ_MIN(x,y) (SEQ_LT((x),(y))?(x):(y))
-+#define SEQ_MAX(x,y) (SEQ_GT((x),(y))?(x):(y))
+ # Get current path
+ CUR_PATH=`pwd`
++  
++if [ -x /usr/local/tcl8.3.2/bin/tclsh8.3 ] ; then
++  V_TCLSH=/usr/local/tcl8.3.2/bin/tclsh8.3 
++  export V_TCLSH
++  WITHTCL_PATH=/usr/local/tcl8.3.2
++  export WITHTCL_PATH
 +
- static class FullTcpClass : public TclClass { 
- public:
- 	FullTcpClass() : TclClass("Agent/TCP/FullTcp") {}
-@@ -229,8 +244,8 @@
- FullTcpAgent::pack(Packet *pkt)
- {
- 	hdr_tcp *tcph = hdr_tcp::access(pkt);
--	return (tcph->ackno() >= highest_ack_ &&
--		tcph->ackno() < recover_);
-+	return (SEQ_GE(tcph->ackno(), highest_ack_) &&
-+		SEQ_LT(tcph->ackno(), recover_) );
- }
++else
++
++  # Build Tcl8.3.2
++  
++  echo "============================================================"
++  echo "* Build tcl$TCLVER"
++  echo "============================================================"
++  
++  cd ./tcl$TCLVER/unix
++  if [ -f Makefile ] ; then 
++	  make distclean
++  fi
++  
++  blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
++  to see if they have a fix for your platform.'
++  ./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
++  if make 
++  then 
++	  echo "tcl$TCLVER make succeeded."
++	  make install || die "tcl$TCLVER installation failed."
++	  echo "tcl$TCLVER installation succeeded."
++	  cp ../generic/*.h ../../include
++  else
++	  echo "tcl$TCLVER make failed! Exiting ..."
++	  echo "For problems with Tcl/Tk see http://www.scriptics.com"
++	  exit
++  fi
++
++  cd ../../
++
++  WITHTCL_PATH=$CUR_PATH/tcl$TCLVER
++
++fi
++
++if [ -d /usr/local/otcl-1.0a8 ] ; then
++
++  WITHOTCL_PATH=/usr/local/otcl-1.0a8
++  export WITHOTCL_PATH
++
++else
++
++  # Build otcl
++
++  echo "============================================================"
++  echo "* Build OTcl-$OTCLVER"
++  echo "============================================================"
++  
++  cd ./otcl-$OTCLVER
++  
++  blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
++  for common problems and bug fixes.'
++  ./configure --with-tcl=$WITHTCL_PATH || die "otcl-$OTCLVER configuration failed! Exiting ..."
++  
++  if make 
++  then
++	  echo "otcl-$OTCLVER has been installed successfully."
++  else
++	  echo "otcl-$OTCLVER make failed! Exiting ..."
++	  echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
++	  exit
++  fi
++  
++  cd ..
  
- /*
-@@ -335,13 +350,13 @@
-   	    return;
- 	} else if (state_ == TCPS_CLOSED) {
- 		reset();
--		curseq_ = iss_ + nb;
-+		INCR_SEQ( curseq_, SEQ_ADD(iss_, nb));
- 		connect();		// initiate new connection
- 	} else if (state_ == TCPS_ESTABLISHED) {
- 		closed_ = 0;
--		if (curseq_ < iss_)
-+		if ( SEQ_LT(curseq_, iss_) )
- 			curseq_ = iss_;
--		curseq_ += nb;
-+		INCR_SEQ(curseq_, nb);
- 		send_much(0, REASON_NORMAL, maxburst_);
- 	}
- 	return;
-@@ -390,7 +405,7 @@
+-# Compile and install xgraph
++  WITHOTCL_PATH=`pwd`/otcl-$OTCLVER
++  export WITHOTCL_PATH
  
- int FullTcpAgent::rcvseqinit(int seq, int dlen)
- {
--	return (seq + dlen + 1);
-+	return (SEQ_ADD(seq, dlen + 1));
- }
- 
- int
-@@ -468,6 +483,7 @@
- 
- 	last_ack_sent_ = ackno;
- 	send(p, 0);
-+	
- }
- 
- void FullTcpAgent::cancel_timers()
-@@ -498,23 +514,23 @@
- 	   	maxseg_ = size_ - headersize();
- 	else
- 		size_ =  maxseg_ + headersize();
--	int is_retransmit = (seqno < maxseq_);
-+	int is_retransmit = SEQ_LT(seqno, maxseq_) ;
- 	int quiet = (highest_ack_ == maxseq_);
- 	int pflags = outflags();
- 	int syn = (seqno == iss_);
- 	int emptying_buffer = FALSE;
- 	int buffered_bytes = (infinite_send_) ? TCP_MAXSEQ :
--				curseq_ - highest_ack_ + 1;
-+				SEQ_ADD( SEQ_SUB(curseq_, highest_ack_), 1);
- 
- 	int win = window() * maxseg_;	// window (in bytes)
--	int off = seqno - highest_ack_;	// offset of seg in window
-+	int off = SEQ_SUB(seqno, highest_ack_);	// offset of seg in window
- 	int datalen;
- 
- 	// be careful if we have not received any ACK yet
- 	if (highest_ack_ < 0) {
- 		if (!infinite_send_)
--			buffered_bytes = curseq_ - iss_;;
--		off = seqno - iss_;
-+		  	buffered_bytes = SEQ_SUB(curseq_, iss_);
-+		off = SEQ_SUB(seqno, iss_);
- 	}
- 
- 	if (syn && !data_on_syn_)
-@@ -535,7 +551,6 @@
- 		datalen = maxseg_;
- 	}
- 
+-echo "============================================================"
+-echo "* Build XGraph-$XGRAPHVER"
+-echo "============================================================"
 -
- 	//
- 	// this is an option that causes us to slow-start if we've
- 	// been idle for a "long" time, where long means a rto or longer
-@@ -552,8 +567,8 @@
- 	// see if sending this packet will empty the send buffer
- 	// a dataless SYN packet counts also
- 	//
--	if (!infinite_send_ && ((seqno + datalen) > curseq_ || 
--	    (syn && datalen == 0))) {
-+	if (!infinite_send_ && SEQ_GT(SEQ_ADD(seqno, datalen), curseq_) || 
-+	    (syn && datalen == 0)) {
- 		emptying_buffer = TRUE;
- 		//
- 		// if not a retransmission, notify application that 
-@@ -638,7 +653,7 @@
- 	 * around until we actually send a segment
- 	 */
+-cd ./xgraph-$XGRAPHVER
+-./configure
+-if make
+-then
+-	echo "xgraph has been installed successfully. "
+-else 
+-	echo "Can not create xgraph; But xgraph is an optional package, continuing..."
+-fi
+-
+-cd ../
+-
+-# Compile and install cweb and sgblib
+-
+-echo "============================================================"
+-echo "* Build CWeb"
+-echo "============================================================"
+-
+-cd ./cweb
+-
+-if [ ! -f ./Makefile ]
+-then
+-	echo "ns-allinone unable to install cweb for you. Please install it manually. cweb is used by sgb to create sgblibrary needed by scenario-generator. But this will not affect the use of ns as such, so continue.."
+-else
+-	echo "Making cweb"
+-	touch *.c
+-	make all || warn "cweb failed to make, but it's optional"
+-	# xxx: other stuff will fail...
+-	chmod 755 cweave
+-	chmod 755 ctangle
+-	cd ..
+-	#echo "cd .."
+-	if [ ! -d bin ]
+-	then
+-		mkdir bin
+-	fi
+-	cd bin
+-	ln -s $CUR_PATH/cweb/cweave cweave
+-	ln -s $CUR_PATH/cweb/ctangle ctangle
+-fi
+-
+-cd ..
+-PATH=$CUR_PATH/bin:$PATH
+-export PATH
+-
+-echo "============================================================"
+-echo "* Build Stanford GraphBase"
+-echo "============================================================"
+-
+-cd ./sgb
+-if [ ! -f ./Makefile ]
+-	then
+-	echo "Unable to create sgb library. This library is used by gt-itm and so for scenario generators. If you already have sgblib (possible if you are on solaris,sunos or freebsd platforms) you may still be able to run gt-itm. so continuing.."
+-else
+-	echo "Making sgb"
+-	if make tests
+-	then
+-                if [ -f libgb.a ] ; then
+-                        rm -f ../gt-itm/lib/libgb.a
+-                        cp libgb.a ../gt-itm/lib/libgb.a
+-                else 
+-                        echo "* Wierd: sgb said it has been built but we can't find libgb.a!
+-"
+-                        exit -1
+-                fi
+-	else
+-		echo "Unable to create sgb library, but it's optional, so continuing..."
+-	fi
+-fi
+-
+-cd ..
+-
+-# Compile and install gt-itm & sgb2ns
+-
+-echo "============================================================"
+-echo "* Build GT-ITM"
+-echo "============================================================"
+-
+-if [ -f ./gt-itm/lib/libgb.a ]
+-then
+- if [ ! -f ./gt-itm/src/Makefile ] 
+-    then
+-    echo "ns-alline is unable to install gt-itm sgb2ns for you, please install"
+-    echo "them manually. You can't run scenario generator without gt-itm"
+-    echo "and sgb2ns. But it will not affect you use ns, so continue ..."
+- else
+-    cd ./gt-itm/src
+-    if make
+-    then
+-      echo "gt-itm has been installed successfully."
+-    fi
+-    
+-    cd ../sgb2ns
+-    if make
+-    then
+-      echo "sgb2ns has been installed successfully."
+-    fi
+-   cd ../../
+- fi
+-else
+-    echo "sgb lib not found. gt-itm & sgb2ns could not be installed. Continuing.."
+-fi
+-
+-# Build zlib
+-
+-echo "============================================================"
+-echo "* Build zlib"
+-echo "============================================================"
+-
+-cd ./zlib-1.1.3
+-
+-if ./configure --exec-prefix=../ --prefix=../
+-then
+-	if make
+-	then
+-		echo "Zlib has been installed successfully."
+-	else
+-		warn "Zlib make failed, but it's optional Continue ..."
+-	fi
+-else
+-	warn "Zlib-1.1.3 configuration failed, but it's optional, so continuing ..."
+-fi
+-
+-cd ../
+-
+-# Build Tcl8.3.2
+-
+-echo "============================================================"
+-echo "* Build tcl$TCLVER"
+-echo "============================================================"
+-
+-cd ./tcl$TCLVER/unix
+-if [ -f Makefile ] ; then 
+-	make distclean
+-fi
+-
+-blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
+-to see if they have a fix for your platform.'
+-./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
+-if make 
+-then 
+-	echo "tcl$TCLVER make succeeded."
+-	make install || die "tcl$TCLVER installation failed."
+-	echo "tcl$TCLVER installation succeeded."
+-	cp ../generic/*.h ../../include
+-else
+-	echo "tcl$TCLVER make failed! Exiting ..."
+-	echo "For problems with Tcl/Tk see http://www.scriptics.com"
+-	exit
+-fi
+-
+-cd ../../
+-
+-# compile and install tk
+-
+-echo "============================================================"
+-echo "* Build Tk$TKVER"
+-echo "============================================================"
+-
+-cd ./tk$TKVER/unix
+-if [ -f Makefile ] ; then
+-	make distclean
+-fi
+-
+-blame='Tk is not part of the ns project.  Please see www.Scriptics.com
+-to see if they have a fix for your platform.'
+-./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tk8.3.2 configuration failed! Exiting ..."
+-if make 
+-then
+-	echo "tk$TKVER build succeeded."
+-	make install || die "tk$TKVER installation failed."
+-	echo "tk$TKVER installation succeeded."
+-else
+-	echo "tk$TKVER make failed! Exiting ..."
+-	echo "For problems with Tcl/Tk see http://www.scriptics.com"
+-	exit
+ fi
  
--	int reliable = datalen + syn + fin; // seq #'s reliably sent
-+	int reliable = SEQ_ADD(datalen, syn + fin); // seq #'s reliably sent
- 	if (cong_action_ && reliable > 0)
- 		cong_action_ = FALSE;
+-cd ../../
+-
+-#
+-# Since our configures search for tclsh in $PATH, the following 
+-# is needed. This is necessary for otcl/tclcl/ns/nam
+-#
+-PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$PATH
+-export PATH
+-LD_LIBRARY_PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$LD_LIBRARY_PATH
+-export LD_LIBRARY_PATH
+-
+-# Build otcl
+-
+-echo "============================================================"
+-echo "* Build OTcl-$OTCLVER"
+-echo "============================================================"
+-
+-cd ./otcl-$OTCLVER
+-
+-blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
+-for common problems and bug fixes.'
+-./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
+-
+-if make 
+-then
+-	echo "otcl-$OTCLVER has been installed successfully."
+-else
+-	echo "otcl-$OTCLVER make failed! Exiting ..."
+-	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
+-	exit
+-fi
+-
+-cd ..
+-
+ # Build tclcl
  
-@@ -648,15 +663,15 @@
- 	 */
+ echo "============================================================"
+@@ -265,7 +123,7 @@
  
- 	if (!fin && seqno == t_seqno_) {
--		t_seqno_ += reliable;
-+	        INCR_SEQ(t_seqno_, reliable);
- 	}
+ cd ./tclcl-$TCLCLVER
  
+-./configure || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
++./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
  
- 	// highest: greatest sequence number sent + 1
- 	//	and adjusted for SYNs and FINs which use up one number
+ if make
+ then
+@@ -286,40 +144,22 @@
+ echo "============================================================"
  
--	int highest = seqno + reliable;
--	if (highest > maxseq_) {
-+	int highest = SEQ_ADD(seqno, reliable);
-+	if (SEQ_GT(highest, maxseq_)) {
- 		maxseq_ = highest;
- 		//
- 		// if we are using conventional RTT estimation,
-@@ -708,8 +723,9 @@
- 	int win = window() * maxseg_;	// window() in pkts
- 	int npackets = 0;
- 	int topwin = curseq_; // 1 seq number past the last byte we can send
--	if ((topwin > highest_ack_ + win) || infinite_send_)
--		topwin = highest_ack_ + win;
-+	int hiack_plus_win = SEQ_ADD(highest_ack_, win);
-+        if (SEQ_GT(topwin, hiack_plus_win) || infinite_send_)
-+		INCR_SEQ( topwin, hiack_plus_win);
+ cd ./ns-$NSVER
+-./configure || die "Ns configuration failed! Exiting ..."
  
- 	if (!force && (delsnd_timer_.status() == TIMER_PENDING))
- 		return;
-@@ -720,7 +736,7 @@
- 	 */
+-if make
++./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "Ns configuration failed! Exiting ..."
++
++
++if make nse
+ then
+-	echo " Ns has been installed successfully." 
++	echo " Nse has been installed successfully." 
+ else
+-	echo "Ns make failed!"
++	echo "Nse make failed!"
+ 	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
+ 	exit
+ fi
  
- 	while (force ||
--	      (pipectrl_ ? (pipe_ < window()) : (t_seqno_ < topwin))) {
-+	      (pipectrl_ ? (pipe_ < window()) : SEQ_LT(t_seqno_, topwin) )) {
+ cd ../
  
- 		if (!force && overhead_ != 0 &&
- 		    (delsnd_timer_.status() != TIMER_PENDING)) {
-@@ -782,7 +798,7 @@
- 	hdr_tcp *tcph = hdr_tcp::access(pkt);
+-# Build nam
+-
+-echo "============================================================"
+-echo "* Build nam-$NAMVER"
+-echo "============================================================"
+-
+-cd ./nam-$NAMVER
+-
+-./configure || die "Nam configuration failed! Exiting ..."
+-
+-if make
+-then 
+-    echo "Nam has been installed successfully."
+-else
+-    echo "Nam make failed! Continue ..."
+-    echo "See http://www.isi.edu/nsnam/ns-problems.html for problems"
+-fi
+-
+-cd ../
+-
+-# Install nam, ns, xgraph into bin
++# Install nse
  
- 	register int ackno = tcph->ackno();
--	int progress = (ackno > highest_ack_);
-+	int progress = SEQ_GT(ackno, highest_ack_);
+ if [ ! -d bin ] ; then
+     mkdir bin
+@@ -327,55 +167,14 @@
  
- //if (state_ > TCPS_ESTABLISHED)
- //printf("%f %s: newack: %d, state %d, maxseq:%d\n", now(), name(),
-@@ -806,7 +822,7 @@
- 	// update t_seqno_ here, otherwise we would be doing
- 	// go-back-n.
+ cd bin
  
--	if (t_seqno_ < highest_ack_)
-+	if (SEQ_LT(t_seqno_, highest_ack_))
- 		t_seqno_ = highest_ack_; // seq# to send next
+-ln -s $CUR_PATH/ns-$NSVER/ns ns
+-
+-if test -x $CUR_PATH/nam-$NAMVER/nam
+-then
+-    ln -s $CUR_PATH/nam-$NAMVER/nam nam
+-else
+-    echo "Please compile your nam separately."
+-fi
+-
+-if test -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph
+-then
+-    ln -s $CUR_PATH/xgraph-$XGRAPHVER/xgraph xgraph
+-else
+-    echo "Please compile your xgraph separately."
+-fi
+-
+-if test -x $CUR_PATH/gt-itm/bin/sgb2ns
+-then 
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2ns sgb2ns
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2hierns sgb2hierns
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2comns sgb2comns
+-    ln -s $CUR_PATH/gt-itm/bin/itm itm
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2alt sgb2alt
+-    ln -s $CUR_PATH/gt-itm/bin/edriver edriver
+-else
+-    echo "Please compile your gt-itm & sgb2ns separately."
+-fi
++ln -s $CUR_PATH/ns-$NSVER/nse nse
  
-         /*
-@@ -821,7 +837,7 @@
- 			recent_age_ = now();
- 			recent_ = tcph->ts();
-                         rtt_update(now() - tcph->ts_echo());
--		} else if (rtt_active_ && ackno > rtt_seq_) {
-+		} else if (rtt_active_ && SEQ_GT(ackno, rtt_seq_)) {
- 			// got an RTT sample, record it
-                         t_backoff_ = 1;
-                         rtt_active_ = FALSE;
-@@ -905,7 +921,7 @@
+ echo "Ns-allinone package has been installed successfully."
+ echo "Here are the installation places:"
+ echo "tcl$TCLVER:	$CUR_PATH/{bin,include,lib}"
+-echo "tk$TKVER:		$CUR_PATH/{bin,include,lib}"
+ echo "otcl:		$CUR_PATH/otcl-$OTCLVER"
+ echo "tclcl:		$CUR_PATH/tclcl-$TCLCLVER"
+-echo "ns:		$CUR_PATH/ns-$NSVER/ns"
+-
+-if [ -x $CUR_PATH/nam-$NAMVER/nam ]
+-then
+-echo "nam:	$CUR_PATH/nam-$NAMVER/nam"
+-fi
+-
+-if [ -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph ]
+-then
+-echo "xgraph:	$CUR_PATH/xgraph-$XGRAPHVER"
+-fi
+-if [ -x $CUR_PATH/gt-itm/bin/sgb2ns ] 
+-then
+-echo "gt-itm:   $CUR_PATH/itm, edriver, sgb2alt, sgb2ns, sgb2comns, sgb2hierns"
+-fi
++echo "nse:		$CUR_PATH/ns-$NSVER/nse"
+ 
+ echo ""
+ echo "----------------------------------------------------------------------------------"
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/Makefile.in
+--- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
++++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Thu Jun 13 18:46:54 2002
+@@ -78,6 +78,14 @@
+ 
+ CFLAGS	= $(CCOPT) $(DEFINE)
+ 
++#### with event system
++INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
++CFLAGS += -DUSEEVENTS -DUSEROUTES
++LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
++LIB += `elvin-config --libs vin4c`
++STATIC += -static
++####
++
+ # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
+ # Also, gcc does not remove the .o before forking 'as', which can be a
+ # problem if you don't own the file but can write to the directory.
+@@ -285,6 +293,10 @@
+ 	emulate/nat.o  \
+ 	emulate/iptap.o \
+ 	emulate/tcptap.o
++
++##### nse with event system
++OBJ_EMULATE_CC += ../../tbevent.o ../../tbnexthop.o
++####
+ 
+ OBJ_EMULATE_C = \
+ 	emulate/inet.o
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
++++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Thu Jun 13 20:01:59 2002
+@@ -77,7 +77,7 @@
  {
- 	if (flags_ & TF_ACKNOW)
- 		return TRUE;
--	return ((rcv_nxt_ - last_ack_sent_) >= (segs_per_ack_ * maxseg_));
-+	return (SEQ_SUB(rcv_nxt_, last_ack_sent_) >= (segs_per_ack_ * maxseg_));
+         if (running_) {
+ 	        /* call the TCP advance method */
+-		agent_->sendmsg(agent_->size());
++		agent_->sendmsg(1); // send 1 byte packets instead of 1460
+ 		/* reschedule the timer */
+ 		double t = next();
+ 		timer_.resched(t);
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Thu Jun 13 19:39:42 2002
+@@ -44,11 +44,22 @@
+ #include "config.h"
+ #include "scheduler.h"
+ #include "packet.h"
++#ifdef USEEVENTS
++#include "tbevent.h"
++#endif
++#include <unistd.h>
+ 
+ #ifdef MEMDEBUG_SIMULATIONS
+ #include "mem-trace.h"
+ #endif
+ 
++#ifdef MEASURE_EVENT_RATE
++
++unsigned long long event_dispatch_counter;
++unsigned int events_per_sec_arr[70];
++
++#endif
++
+ Scheduler* Scheduler::instance_;
+ scheduler_uid_t Scheduler::uid_ = 1;
+ 
+@@ -138,6 +149,11 @@
+ 	clock_ = t;
+ 	p->uid_ = -p->uid_;	// being dispatched
+ 	p->handler_->handle(p);	// dispatch
++
++#ifdef MEASURE_EVENT_RATE
++	event_dispatch_counter++;
++#endif
++
  }
  
- /*
-@@ -1011,7 +1027,7 @@
- 		 * See RFC1323 (now RFC1323 bis)
-                  */
-                 if (ts_option_ && !fh->no_ts_ &&
--		    tcph->seqno() <= last_ack_sent_) {
-+		    SEQ_LE(tcph->seqno(), last_ack_sent_)) {
- 			/*
- 			 * this is the case where the ts value is newer than
- 			 * the last one we've seen, and the seq # is the one
-@@ -1040,11 +1056,11 @@
- 			// If we are in fast
- 			// recovery, go below so we can remember to deflate
- 			// the window if we need to
--			if (ackno > highest_ack_ && ackno < maxseq_ &&
-+			if (SEQ_GT(ackno, highest_ack_) && SEQ_LT(ackno, maxseq_) &&
- 			    cwnd_ >= wnd_ && !fastrecov_) {
- 				newack(pkt);	// update timers,  highest_ack_
- 				/* no adjustment of cwnd here */
--				if (curseq_ >= highest_ack_ || infinite_send_)
-+				if (SEQ_GE(curseq_, highest_ack_) || infinite_send_)
- 					send_much(0, REASON_NORMAL, maxburst_);
- 				Packet::free(pkt);
- 				return;
-@@ -1060,7 +1076,7 @@
- 			//	this routine scans all tcpcb's looking for
- 			//	DELACK segments and when it finds them
- 			//	changes DELACK to ACKNOW and calls tcp_output()
--			rcv_nxt_ += datalen;
-+			INCR_SEQ(rcv_nxt_, datalen);
- 			flags_ |= TF_DELACK;
- 			recvBytes(datalen); // notify application of "delivery"
- 			//
-@@ -1130,7 +1146,7 @@
- 
- 		/* drop if it's a SYN+ACK and the ack field is bad */
- 		if ((tiflags & TH_ACK) &&
--			((ackno <= iss_) || (ackno > maxseq_))) {
-+			(SEQ_LE(ackno, iss_) || SEQ_GT(ackno, maxseq_) )) {
- 			// not an ACK for our SYN, discard
- 			fprintf(stderr,
- 			    "%f: FullTcpAgent::recv(%s): bad ACK (%d) for our SYN(%d)\n",
-@@ -1224,14 +1240,14 @@
- 			 * SYN+ACK, so t_seqno_ will have been
- 			 * advanced to 2... reduce this
- 			 */
--			t_seqno_--;	// CHECKME
-+			DECR_SEQ(t_seqno_, 1);	// CHECKME
- 		}
- 
- trimthenstep6:
- 		/*
- 		 * advance the seq# to correspond to first data byte
- 		 */
--		tcph->seqno()++;
-+		INCR_SEQ(tcph->seqno(), 1);
- 
- 		if (tiflags & TH_ACK)
- 			goto process_ACK;
-@@ -1295,12 +1311,12 @@
- 	//	to have seq #s below rcv_nxt can trigger an ACK war by
- 	//	forcing us to ACK the pure ACKs
- 	//
--	todrop = rcv_nxt_ - tcph->seqno();  // how much overlap?
-+	todrop = SEQ_SUB(rcv_nxt_, tcph->seqno());  // how much overlap?
- 
- 	if (todrop > 0 && ((tiflags & (TH_SYN|TH_FIN)) || datalen > 0)) {
- 		if (tiflags & TH_SYN) {
- 			tiflags &= ~TH_SYN;
--			tcph->seqno()++;
-+			INCR_SEQ(tcph->seqno(), 1);
- 			th->size()--;	// XXX Must decrease packet size too!!
- 			todrop--;
- 		}
-@@ -1329,7 +1345,7 @@
- 			todrop = datalen;
- 			dupseg = TRUE;
- 		}
--		tcph->seqno() += todrop;
-+		INCR_SEQ(tcph->seqno(), todrop);
- 		th->size() -= todrop;	// XXX Must decrease size too!!
- 		datalen -= todrop;
- 	}
-@@ -1339,7 +1355,7 @@
- 	 * record the timestamp.
- 	 * See RFC1323 (now RFC1323 bis)
- 	 */
--	if (ts_option_ && !fh->no_ts_ && tcph->seqno() <= last_ack_sent_) {
-+	if (ts_option_ && !fh->no_ts_ && SEQ_LE(tcph->seqno(), last_ack_sent_) ) {
- 		/*
- 		 * this is the case where the ts value is newer than
- 		 * the last one we've seen, and the seq # is the one we expect
-@@ -1369,7 +1385,7 @@
- 
- 	switch (state_) {
- 	case TCPS_SYN_RECEIVED:	/* want ACK for our SYN+ACK */
--		if (ackno < highest_ack_ || ackno > maxseq_) {
-+		if (SEQ_LT(ackno, highest_ack_) || SEQ_GT(ackno, maxseq_) ) {
- 			// not in useful range
- 			goto dropwithreset;
- 		}
-@@ -1429,7 +1445,7 @@
- 		// look for dup ACKs (dup ack numbers, no data)
- 		//
- 		// do fast retransmit/recovery if at/past thresh
--		if (ackno <= highest_ack_) {
-+		if (SEQ_LE(ackno, highest_ack_)) {
- 			// an ACK which doesn't advance highest_ack_
- 			if (datalen == 0 && (!dupseg_fix_ || !dupseg)) {
- 				--pipe_; // ACK indicates pkt cached @ receiver
-@@ -1462,7 +1478,7 @@
- 					fastrecov_ = TRUE;
- 
- 					/* re-sync the pipe_ estimate */
--					pipe_ = maxseq_ - highest_ack_;
-+					pipe_ = SEQ_SUB(maxseq_, highest_ack_);
- 					pipe_ /= maxseg_;
- 					pipe_ -= (dupacks_ + 1);
- 
-@@ -1502,7 +1518,7 @@
- 
- process_ACK:
- 
--		if (ackno > maxseq_) {
-+		if (SEQ_GT(ackno, maxseq_)) {
- 			// ack more than we sent(!?)
- 			fprintf(stderr,
- 			    "%f: FullTcpAgent::recv(%s) too-big ACK (ack: %d, maxseq:%d)\n",
-@@ -1553,7 +1569,7 @@
- 		 * If no data (only SYN) was ACK'd,
- 		 *    skip rest of ACK processing.
- 		 */
--		if (ackno == (highest_ack_ + 1))
-+		if (ackno == SEQ_ADD(highest_ack_, 1) )
- 			goto step6;
- 
- 		// if we are delaying initial cwnd growth (probably due to
-@@ -1660,7 +1676,7 @@
- 			// accept the data here as-is (i.e. don't
- 			// require being in ESTABLISHED state)
- 			flags_ |= TF_DELACK;
--			rcv_nxt_ += datalen;
-+			INCR_SEQ(rcv_nxt_, datalen);
- 			if (datalen)
- 				recvBytes(datalen); // notify app. of "delivery"
- 			tiflags = tcph->flags() & TH_FIN;
-@@ -1676,8 +1692,8 @@
- 			// K: some changes here, figure out
- 			int rcv_nxt_old_ = rcv_nxt_; // notify app. if changes
- 			tiflags = rq_.add(pkt);
--			if (rcv_nxt_ > rcv_nxt_old_)
--				recvBytes(rcv_nxt_ - rcv_nxt_old_);
-+			if (SEQ_GT(rcv_nxt_, rcv_nxt_old_))
-+				recvBytes(SEQ_SUB(rcv_nxt_, rcv_nxt_old_));
- 			if (tiflags & TH_PUSH) {
- 				// K: APPLICATION recv
- 				needoutput = need_send();
-@@ -1703,7 +1719,7 @@
- 	if (tiflags & TH_FIN) {
- 		if (TCPS_HAVERCVDFIN(state_) == 0) {
- 			flags_ |= TF_ACKNOW;
--			rcv_nxt_++;
-+			INCR_SEQ(rcv_nxt_,1);
- 		}
- 		switch (state_) {
-                 /*
-@@ -1740,7 +1756,7 @@
- 
- 	if (needoutput || (flags_ & TF_ACKNOW))
- 		send_much(1, REASON_NORMAL, maxburst_);
--	else if (curseq_ >= highest_ack_ || infinite_send_)
-+	else if (SEQ_GE(curseq_, highest_ack_) || infinite_send_)
- 		send_much(0, REASON_NORMAL, maxburst_);
- 	// K: which state to return to when nothing left?
- 
-@@ -1767,9 +1783,9 @@
- 	if (tiflags & TH_ACK) {
- 		sendpacket(ackno, 0, 0x0, 0, REASON_NORMAL);
- 	} else {
--		int ack = tcph->seqno() + datalen;
-+		int ack = SEQ_ADD(tcph->seqno(), datalen);
- 		if (tiflags & TH_SYN)
--			ack--;
-+			DECR_SEQ(ack, 1);
- 		sendpacket(0, ack, TH_ACK, 0, REASON_NORMAL);
- 	}
- drop:
-@@ -1796,7 +1812,7 @@
  void
- FullTcpAgent::dupack_action()
- {   
--        int recovered = (highest_ack_ > recover_);
-+        int recovered = SEQ_GT(highest_ack_, recover_);
- 	//int recovered = !fastrecov_;
-         if (recovered || (!bug_fix_ && !ecn_) ||
- 	    last_cwnd_action_ == CWND_ACTION_DUPACK) {
-@@ -1890,8 +1906,7 @@
- 
- void FullTcpAgent::usrclosed()
- {
--//curseq_ = t_seqno_ - 1;	// truncate buffer
--	curseq_ = maxseq_ - 1;
-+	curseq_ = SEQ_SUB(maxseq_, 1);  // truncate buffer
- 	infinite_send_ = 0;
- 	switch (state_) {
- 	case TCPS_CLOSED:
-@@ -2250,7 +2265,7 @@
- 	hdr_cmn *th = hdr_cmn::access(pkt);
- 
- 	int start = tcph->seqno();
--	int end = start + th->size() - tcph->hlen();
-+	int end = SEQ_ADD(start, th->size() - tcph->hlen());
- 	int tiflags = tcph->flags();
- 
- 	return (add(start, end, tiflags));
-@@ -2276,14 +2291,14 @@
- 		head_->flags_ = tiflags;
- 		head_->time_ = now;
- 	} else {
--		if (tail_->endseq_ <= start) {
-+		if (SEQ_LE(tail_->endseq_, start)) {
- 			// common case of end of reass queue
- 			p = tail_;
- 			goto endfast;
- 		}
- 
- 		// Look for the first segment AFTER this one
--		for (q = head_; q && (end > q->startseq_); q = q->next_)
-+		for (q = head_; q && SEQ_GT(end, q->startseq_); q = q->next_)
- 			;
- 		// set p to the segment before this one
- 		if (q == NULL)
-@@ -2293,7 +2308,7 @@
- 
- 		// Put this one after p, regardless whether any segments 
- 		// should be deleted
--		if (p == NULL || (start > p->endseq_)) {
-+		if (p == NULL || SEQ_GT(start, p->endseq_)) {
- 			// no overlap
- endfast:
- 			n = new seginfo;
-@@ -2324,17 +2339,17 @@
- 		} else {
- 			// start or end overlaps p, so patch
- 			// up p; will catch other overlaps below
--			p->startseq_ = MIN(p->startseq_, start);
--			p->endseq_ = MAX(p->endseq_, end);
-+			p->startseq_ = SEQ_MIN(p->startseq_, start); 
-+			p->endseq_ = SEQ_MAX(p->endseq_, end);
- 			p->flags_ |= tiflags;
- 			n = p;
- 		}
- 
- 		// Look for the first segment BEFORE p
--		for (q = head_; q && (n->startseq_ > q->endseq_); q = q->next_)
-+		for (q = head_; q && SEQ_GT(n->startseq_, q->endseq_); q = q->next_)
- 			;
--		while (q != n) {
--			if (n->startseq_ > q->startseq_)
-+		while (q && q != n) {
-+ 		        if (SEQ_GT(n->startseq_, q->startseq_))
- 				// q is partially included in n, merge it
- 				n->startseq_ = q->startseq_;
- 			// Delete q, which is already covered by n.
-@@ -2359,7 +2374,7 @@
- 	// look for a sequence of in-order segments and
- 	// set rcv_nxt if we can
- 	//
--	if (head_->startseq_ > rcv_nxt_) {
-+	if (SEQ_GT(head_->startseq_, rcv_nxt_)) {
- 		return 0;	// still awaiting a hole-fill
- 	}
- 
-@@ -2383,7 +2398,7 @@
- 
- 		if (q == ptr_)
- 			ptr_ = NULL;
--		if (q->next_ && (q->endseq_ < q->next_->startseq_)) {
-+		if (q->next_ && SEQ_LT(q->endseq_, q->next_->startseq_)) {
- 			delete q;
- 			break;		// only the in-seq stuff
- 		}
-@@ -2507,7 +2522,7 @@
- void
- TahoeFullTcpAgent::dupack_action()
- {  
--        int recovered = (highest_ack_ > recover_);
-+        int recovered = SEQ_GT(highest_ack_, recover_);
-         if (recovered || (!bug_fix_ && !ecn_) ||
-             last_cwnd_action_ == CWND_ACTION_DUPACK) {
-                 goto full_tahoe_action;
-@@ -2619,7 +2634,7 @@
- 	int ackno = tcph->ackno();
- 
- 	if (state_ == TCPS_ESTABLISHED &&
--	    (ackno > iss_ && ackno <= maxseq_)) {
-+	    SEQ_GT(ackno, iss_) && SEQ_LE(ackno, maxseq_)) {
- 
- 		int slen = tcph->sa_length();
- 		int i;  
-@@ -2650,11 +2665,11 @@
- {
- 	FullTcpAgent::ack_action(p);
- 
--	if (!sq_.empty() && sack_max_ <= highest_ack_) {
-+	if (!sq_.empty() && SEQ_LE(sack_max_, highest_ack_)) {
- 		sq_.clear();
- 	}
- 
--	if (sack_nxt_ < highest_ack_)
-+	if (SEQ_LT(sack_nxt_, highest_ack_))
- 		sack_nxt_ = highest_ack_;
- 	pipectrl_ = FALSE;
- }
-@@ -2663,7 +2678,7 @@
- SackFullTcpAgent::dupack_action()
- {
- 
--        int recovered = (highest_ack_ > recover_);
-+        int recovered = SEQ_GT(highest_ack_,recover_);
- 
-         if (recovered || (!bug_fix_ && !ecn_) ||
-             last_cwnd_action_ == CWND_ACTION_DUPACK) {
-@@ -2703,7 +2718,7 @@
- SackFullTcpAgent::pack_action(Packet*)
- {
- 	--pipe_;
--	if (sack_nxt_ < highest_ack_)
-+	if (SEQ_LT(sack_nxt_, highest_ack_))
- 		sack_nxt_ = highest_ack_;
- }
- 
-@@ -2748,18 +2763,18 @@
- 
- 	// skip over old blocks
- 	while (sq_.nextblk(nxtblk)) {
--		if (t_seqno_ <= nxtblk[1])
-+		if (SEQ_LE(t_seqno_, nxtblk[1]))
- 			break;
- 	}
- 
- 	while (force || (pipe_ < window())) {
- 		force = 0;
- 		// don't sent off the top
--		if (t_seqno_ > recover_ || t_seqno_ >= sack_max_)
-+		if (SEQ_GT(t_seqno_,recover_) || SEQ_GE(t_seqno_, sack_max_))
- 			break;
- 
- 		// skip this one if the receiver has it already
--		if (t_seqno_ >= nxtblk[0] && t_seqno_ <= nxtblk[1]) {
-+		if (SEQ_GE(t_seqno_, nxtblk[0]) && SEQ_LE(t_seqno_, nxtblk[1])) {
- 			t_seqno_ = nxtblk[1];
- 			if (sq_.nextblk(nxtblk))
- 				continue;
-Index: ns-2/ns-2.1b8a/tcp.h
-diff -u ns-2/ns-2.1b8a/tcp.h:1.1 ns-2/ns-2.1b8a/tcp.h:1.2
---- ns-2/ns-2.1b8a/tcp.h:1.1	Wed Feb 20 15:48:05 2002
-+++ ns-2/ns-2.1b8a/tcp.h	Tue Mar 12 01:03:06 2002
-@@ -54,6 +54,8 @@
- 	int ackno_;             /* ACK number for FullTcp */
- 	int hlen_;              /* header len (bytes) for FullTcp */
- 	int tcp_flags_;         /* TCP flags for FullTcp */
-+        int maxseg_;            /* MSS for TCPTap to negotiate in the SYN segment
-+				   needed in NSE */
- 
- 	static int offset_;	// offset for this header
- 	inline static int& offset() { return offset_; }
-@@ -72,6 +74,7 @@
- 	int& hlen() { return (hlen_); }
- 	int& ackno() { return (ackno_); }  
- 	int& flags() { return (tcp_flags_); }
-+	int& maxseg() { return (maxseg_); }
+@@ -841,12 +857,20 @@
+ 	virtual void run();
+ 	double start() const { return start_; }
+ 	virtual void reset();
++#ifdef USEEVENTS
++	int command(int argc, const char*const* argv);
++#endif
+ protected:
+ 	void sync() { clock_ = tod(); }
+ 	int rwait(double);	// sleep
+ 	double tod();
+ 	double slop_;	// allowed drift between real-time and virt time
+ 	double start_;	// starting time
++
++#ifdef USEEVENTS
++        TbEventSink *evsink_;
++#endif
++  
  };
  
- /* these are used to mark packets as to why we xmitted them */
-Index: ns-2/ns-2.1b8a/emulate/iptap.cc
-diff -u ns-2/ns-2.1b8a/emulate/iptap.cc:1.1 ns-2/ns-2.1b8a/emulate/iptap.cc:1.2
---- ns-2/ns-2.1b8a/emulate/iptap.cc:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/iptap.cc	Tue Mar 12 01:03:06 2002
-@@ -144,7 +144,7 @@
+ static class RealTimeSchedulerClass : public TclClass {
+@@ -859,9 +883,35 @@
+ 
+ RealTimeScheduler::RealTimeScheduler() : start_(0.0)
+ {
++
++#ifdef USEEVENTS
++        evsink_ = 0 ;
++#endif
++       
+ 	bind("maxslop_", &slop_);
+ }
+ 
++#ifdef USEEVENTS
++  
++int RealTimeScheduler::command(int argc, const char*const* argv)
++{
++  Tcl& tcl = Tcl::instance();
++  if (instance_ == 0)
++    instance_ = this;
++  
++  
++  if( argc == 3 ) {
++    if(strcmp(argv[1], "tbevent-sink") == 0) {
++      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
++      return(TCL_OK);
++    }
++  }
++
++  return(Scheduler::command(argc, argv));
++}  
++
++#endif
++
+ double
+ RealTimeScheduler::tod()
+ {
+@@ -876,7 +926,12 @@
+ RealTimeScheduler::reset()
+ {
+ 	clock_ = SCHED_START;
+-	start_ = tod();
++
++	timeval tv;
++	gettimeofday(&tv, 0);
++	double s = tv.tv_sec;
++	s += (1e-6 * tv.tv_usec);
++	start_ = s;
+ }
+ 
+ void RealTimeScheduler::run()
+@@ -884,6 +939,19 @@
+ 	Event *p;
+ 	double now;
+ 
++#ifdef USEEVENTS
++
++	if( evsink_ ) {
++	  evsink_->init();
++	  evsink_->subscribe();
++
++	  // Our time starts now
++	  reset();
++
++	}
++
++#endif
++	
+ 	/*XXX*/
+ 	instance_ = this;
+ 
+@@ -899,7 +967,7 @@
+ 		// first handle any "old events"
+ 		//
+ 		while ((p = deque()) != NULL && (p->time_ <= now)) {
+-			dispatch(p);
++			dispatch(p, clock_);
+ 		}
+ 
+ 		//
+@@ -932,6 +1000,11 @@
+ 		//
+ 		sync();
+ 		Tcl_DoOneEvent(TCL_DONT_WAIT);
++#ifdef USEEVENTS
++		if( evsink_ ) {
++		  evsink_->poll();
++		}
++#endif
+ 	}
+ 
+ 	return;	// we reach here only if halted
+@@ -948,8 +1021,208 @@
+ {
+ 	while (1) {
+ 		sync();
++#ifndef USEEVENTS
++		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
++  		        return(1);
++#else
++		
++		int ret1 = Tcl_DoOneEvent(TCL_DONT_WAIT);
++		int ret2 = 0;
++		if( evsink_ ) {
++		  ret2 = evsink_->poll();
++		}
++		if( ret1 || ret2 )
++		  return(1);
++#endif
++		if (deadline <= tod())
++			return 0;
++	}
++	return -1;
++}
++
++class RealTimeCalendarScheduler : public CalendarScheduler {
++public:
++	RealTimeCalendarScheduler();
++	virtual void run();
++	double start() const { return start_; }
++	virtual void reset();
++#ifdef USEEVENTS
++	int command(int argc, const char*const* argv);
++#endif
++protected:
++	void sync() { clock_ = tod(); }
++	int rwait(double);	// sleep
++	double tod();
++	double slop_;	// allowed drift between real-time and virt time
++	double start_;	// starting time
++
++#ifdef USEEVENTS
++        TbEventSink *evsink_;
++#endif
++  
++};
++
++static class RealTimeCalendarSchedulerClass : public TclClass {
++public:
++	RealTimeCalendarSchedulerClass() : TclClass("Scheduler/RealTimeCalendar") {}
++	TclObject* create(int /* argc */, const char*const* /* argv */) {
++		return (new RealTimeCalendarScheduler);
++	}
++} class_realtimecalendar_sched;
++
++RealTimeCalendarScheduler::RealTimeCalendarScheduler() : start_(0.0)
++{
++
++#ifdef USEEVENTS
++        evsink_ = 0 ;
++#endif
++       
++	bind("maxslop_", &slop_);
++}
++
++#ifdef USEEVENTS
++  
++int RealTimeCalendarScheduler::command(int argc, const char*const* argv)
++{
++  Tcl& tcl = Tcl::instance();
++  if (instance_ == 0)
++    instance_ = this;
++  
++  
++  if( argc == 3 ) {
++    if(strcmp(argv[1], "tbevent-sink") == 0) {
++      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
++      return(TCL_OK);
++    }
++  }
++
++  return(Scheduler::command(argc, argv));
++}  
++
++#endif
++
++double
++RealTimeCalendarScheduler::tod()
++{
++	timeval tv;
++	gettimeofday(&tv, 0);
++	double s = tv.tv_sec;
++	s += (1e-6 * tv.tv_usec);
++	return (s - start_);
++}
++
++void
++RealTimeCalendarScheduler::reset()
++{
++	clock_ = SCHED_START;
++
++	timeval tv;
++	gettimeofday(&tv, 0);
++	double s = tv.tv_sec;
++	s += (1e-6 * tv.tv_usec);
++	start_ = s;
++}
++
++void RealTimeCalendarScheduler::run()
++{ 
++	Event *p;
++	double now;
++
++#ifdef USEEVENTS
++
++	if( evsink_ ) {
++	  evsink_->init();
++	  evsink_->subscribe();
++
++	  // Our time starts now
++	  reset();
++
++	}
++
++#endif
++	
++	/*XXX*/
++	instance_ = this;
++
++	while (!halted_) {
++		now = tod();
++		if ((now - clock_) > slop_) {
++			fprintf(stderr,
++			"RealTimeCalendarScheduler: warning: slop %f exceeded limit %f [now:%f, clock_:%f]\n",
++				now - clock_, slop_, now, clock_);
++		}
++
++		//
++		// first handle any "old events"
++		//
++		while ((p = deque()) != NULL && (p->time_ <= now)) {
++			dispatch(p);
++		}
++
++		//
++		// now handle a "future event", if there is one
++		//
++		if (p != NULL) {
++			int rval = rwait(p->time_);
++			if (rval < 0) {
++				fprintf(stderr, "RTScheduler: wait problem\n");
++				abort();
++			} else if (rval == 0) {
++				//
++				// proper time to dispatch sim event... do so
++				//
++				dispatch(p);
++			} else {
++				//
++				// there was a simulator event which fired, and
++				// may have added something to the queue, which
++				// could cause our event p to not be the next,
++				// so put p back into the event queue and cont
++				//
++				insert(p);
++			}
++			continue;
++		}
++
++		//
++		// no sim events to handle at all, check with tcl
++		//
++		sync();
++		Tcl_DoOneEvent(TCL_DONT_WAIT);
++#ifdef USEEVENTS
++		if( evsink_ ) {
++		  evsink_->poll();
++		}
++#endif
++	}
++
++	return;	// we reach here only if halted
++}
++
++/*
++ * wait until the specified amount has elapsed, or a tcl event has happened,
++ * whichever comes first.  Return 1 if a tcl event happened, 0 if the
++ * deadline has been reached, or -1 on error (shouldn't happen).
++ */
++
++int
++RealTimeCalendarScheduler::rwait(double deadline)
++{
++	while (1) {
++		sync();
++#ifndef USEEVENTS
+ 		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+-			return (1);
++  		        return(1);
++#else
++		
++		int ret1 = Tcl_DoOneEvent(TCL_DONT_WAIT);
++		int ret2 = 0;
++		if( evsink_ ) {
++		  ret2 = evsink_->poll();
++		}
++		if( ret1 || ret2 )
++		  return(1);
++#endif
+ 		if (deadline <= tod())
+ 			return 0;
+ 	}
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
++++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Thu Jun 13 19:05:33 2002
+@@ -186,6 +186,7 @@
+ 	return TCL_OK;
+ }
+ 
++#if 0
+ #ifndef WIN32
+ void
+ abort()
+@@ -200,6 +201,7 @@
+ #endif /*abort*/
+ 	/*NOTREACHED*/
+ }
++#endif
+ #endif
+ 
+ }
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Thu Jun 13 15:37:27 2002
+@@ -76,3 +76,40 @@
+ 	if (status_ == TIMER_HANDLING)
+ 		status_ = TIMER_IDLE;
+ }
++
++#ifdef MEASURE_EVENT_RATE
++
++extern unsigned long long event_dispatch_counter;
++
++unsigned int idx;
++
++#define MAX_EVENT_ARR 70
++
++// circular buffer for the data
++extern unsigned int events_per_sec_arr[MAX_EVENT_ARR];
++
++
++void EventRateTimer::expire(Event *e) {
++
++  if ( idx % MAX_EVENT_ARR == MAX_EVENT_ARR-1 ) {
++
++    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
++    event_dispatch_counter = 0;
++    idx++;
++    
++    int i = 0 ;
++    for( ; i < MAX_EVENT_ARR-1 ; i++ ) {
++      fprintf(stderr, "%u, ", events_per_sec_arr[i] );
++    }
++    fprintf(stderr, "%u\n", events_per_sec_arr[MAX_EVENT_ARR-1] );    
++  } else {
++  
++    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
++    event_dispatch_counter = 0;
++    idx++;
++  }
++  resched(1.0);    
++    
++}
++
++#endif
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Jun 13 15:37:02 2002
+@@ -88,4 +88,15 @@
+ // mode:c++
+ // End:
+ 
++#ifdef MEASURE_EVENT_RATE
++
++class EventRateTimer : public TimerHandler {
++
++public:
++  virtual void expire(Event *e) ;
++
++};
++
++#endif
++
+ #endif /* timer_handler_h */
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Thu Jun 13 16:16:09 2002
+@@ -37,11 +37,42 @@
+ #endif
+ 
+ #include "iptap.h"
++#include "net.h"
+ 
++#ifdef USEROUTES
++#include "tbnexthop.h"
++
++static IPTapAgent *iface_to_iptap[IFNAMSIZ+1];
++static Tcl_HashTable ip_to_iptap;
++
++#endif
++
++#ifdef MEASURE_EVENT_RATE
++#include "timer-handler.h"
++
++EventRateTimer ert;
++unsigned int firstpacket;
++#endif
++
++#ifdef USEROUTES
++#ifdef __cplusplus
++extern "C" {
++#endif
++#include        "tbdefs.h"
++#include        "log.h"
++
++#ifdef __cplusplus
++}
++#endif
++#endif
+ 
+ static class IPTapAgentClass : public TclClass {
+  public:
+-	IPTapAgentClass() : TclClass("Agent/IPTap") {}
++	IPTapAgentClass() : TclClass("Agent/IPTap") {
++#ifdef USEROUTES
++	  Tcl_InitHashTable( &ip_to_iptap, TCL_ONE_WORD_KEYS );
++#endif
++	}
+ 	TclObject* create(int, const char*const*) {
+ 		return (new IPTapAgent());
+ 	}
+@@ -52,6 +83,9 @@
+ {
+   int i = 0;
+   index = 0;
++#ifdef USEROUTES
++  iface_index = 0;
++#endif
+   for (; i < MAX_PACKETS ; i++) {
+     ident[i] = -1;
+     offset[i] = -1;
+@@ -143,8 +177,16 @@
+   
    /* TCP header info from the grabbed packet. */
    unsigned char tcphlen;
++
++#ifdef MEASURE_EVENT_RATE
++  // schedule the event rate 
++  if ( firstpacket == 0 ) {
++    ert.sched(1.0);
++    firstpacket++;
++  }
++#endif
    
 -  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
 +  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
      fprintf(stderr,
  	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
  	    name());
-@@ -165,7 +165,7 @@
+@@ -165,7 +207,7 @@
    // fill up payload
    sockaddr addr;	// not really used (yet)
    double tstamp;
@@ -644,7 +980,109 @@ diff -u ns-2/ns-2.1b8a/emulate/iptap.cc:1.1 ns-2/ns-2.1b8a/emulate/iptap.cc:1.2
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -231,23 +231,24 @@
+@@ -193,11 +235,13 @@
+     return;
+   }
+ 
++  /**** DONT NEED THE FOLLOWING CODE IF WE USE APPROPRIATE PCAP FILTERS
++	THAT HAVE "not ether src xx:xx:xx:xx:xx:xx" in it           ****/
+   /* Discard if duplicate. */
+-  if (isDuplicate(ntohs(ipheader->ip_id), ntohs(ipheader->ip_off))) {
+-    Packet::free(p);
+-    return;
+-  }
++  //  if (isDuplicate(ntohs(ipheader->ip_id), ntohs(ipheader->ip_off))) {
++  //    Packet::free(p);
++  //    return;
++  //  }  
+   
+   datagramlen = ntohs(ipheader->ip_len);
+ 
+@@ -208,13 +252,83 @@
+   hdr_ip *ih = HDR_IP(p);
+   ih->ttl() = ttl;
+ 
++#ifdef USEROUTES
++  /* code to look up the interface index
++     over which we should spit out the
++     packet. with this interface index, we
++     find the iptap which is attached on
++     the corresponding simulated node from
++     where the packet will be spit out.
++     This ensures that the packet traverses
++     the simulated network and is spit out
++     into the real world from the right place
++  */
++  uint16_t dst_iface_index = 0;
++  //dst.s_addr = (u_int32_t)ntohl(ipheader->ip_dst.s_addr);
++
++  int newentry = 0;
++  // finds an entry if it exists, else creates a new one
++  Tcl_HashEntry *he = Tcl_CreateHashEntry( &ip_to_iptap,
++					   (char *)(ipheader->ip_dst.s_addr),
++					   &newentry );  
++  IPTapAgent *dst_agent = 0;
++  
++  // entry exists
++  if( newentry == 0 ) {
++
++    dst_agent = (IPTapAgent *)Tcl_GetHashValue(he);
++
++  } else { // entry was newly created and we need to lookup routing table
++    
++    if( (dst_iface_index = get_nexthop_if(ipheader->ip_dst)) != 0 ) {
++      dst_agent = iface_to_iptap[dst_iface_index];
++    }
++    Tcl_SetHashValue( he, (char *)dst_agent);
++
++  }
++
++  if( dst_agent ) {
++    ih->daddr() = dst_agent->addr();
++    ih->dport() = dst_agent->port();
++    goto injectsim;
++  } 
++  
++ /* if we fail to map a dest iptap object, we drop the packet */
++  fprintf( stderr, "dropping packet with ipaddr:%s at %f with iface_idx:%d\n",
++	   inet_ntoa(ipheader->ip_dst), Scheduler::instance().clock(), dst_iface_index );
++  drop(p);
++  return;
++  
++ injectsim:  
++#endif
++
+   // inject into simulator
+   target_->recv(p);
+   return;
+ }
+ 
++#ifdef USEROUTES
++  
++int
++IPTapAgent::command(int argc, const char*const* argv)
++{
++	Tcl& tcl = Tcl::instance();
+ 
++	if (argc == 3) {
++		if (strcmp(argv[1], "network-incoming") == 0) {
++			PcapNetwork *net_in_ = (PcapNetwork *)TclObject::lookup(argv[2]);
++			if (net_in_ != 0) {
++			  iface_index = if_nametoindex( net_in_->srcname() ) ;
++			  if( iface_index > 0 && iface_index <= IFNAMSIZ ) {
++			    iface_to_iptap[iface_index] = this;
++			  }
++			}
++		}
++	}
++	return (TapAgent::command(argc, argv));
++}
+ 
++#endif
+ 
+ /*
+  * simulator schedules TapAgent::recv which calls sendpkt
+@@ -231,23 +345,24 @@
    unsigned short dglen;
    struct ip *ipheader;
  
@@ -677,11 +1115,18 @@ diff -u ns-2/ns-2.1b8a/emulate/iptap.cc:1.1 ns-2/ns-2.1b8a/emulate/iptap.cc:1.2
    /*
      At this point, we should grab the ttl field from the ns
      packet, put it in the IP header of the actual packet,
-@@ -277,13 +278,15 @@
+@@ -277,13 +392,22 @@
    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
  						sizeof(struct ip));
  
 -  if (net_->send(p->accessdata(), hc->size()) < 0) {
++  /**** DONT NEED THE FOLLOWING CODE IF WE USE APPROPRIATE PCAP FILTERS
++	THAT HAVE "not ether src xx:xx:xx:xx:xx:xx" in it           ****/
++  // we need to store this packet so that we don't pick it up again
++  //  ident[index % MAX_PACKETS] = ntohs(ipheader->ip_id);
++  //  offset[index % MAX_PACKETS] = ntohs(ipheader->ip_off);
++  //  index++;  
++  
 +  if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
@@ -694,11 +1139,10 @@ diff -u ns-2/ns-2.1b8a/emulate/iptap.cc:1.1 ns-2/ns-2.1b8a/emulate/iptap.cc:1.2
    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
  	  name(), hc->size());
    return 0;
-Index: ns-2/ns-2.1b8a/emulate/iptap.h
-diff -u ns-2/ns-2.1b8a/emulate/iptap.h:1.1 ns-2/ns-2.1b8a/emulate/iptap.h:1.2
---- ns-2/ns-2.1b8a/emulate/iptap.h:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/iptap.h	Tue Mar 12 01:03:06 2002
-@@ -38,6 +38,7 @@
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Thu Jun 13 14:55:46 2002
+@@ -38,24 +38,35 @@
  
  #include "tap.h"
  #include <netinet/in.h>
@@ -706,10 +1150,248 @@ diff -u ns-2/ns-2.1b8a/emulate/iptap.h:1.1 ns-2/ns-2.1b8a/emulate/iptap.h:1.2
  #include <netinet/ip.h>
  #include <netinet/tcp.h>
  #include <sys/socket.h>
-Index: ns-2/ns-2.1b8a/emulate/tap.cc
-diff -u ns-2/ns-2.1b8a/emulate/tap.cc:1.1 ns-2/ns-2.1b8a/emulate/tap.cc:1.2
---- ns-2/ns-2.1b8a/emulate/tap.cc:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/tap.cc	Tue Mar 12 01:03:06 2002
+ #include "tcp.h"
+ #include "ip.h"
+ 
+-#define MAX_PACKETS 640
++#ifdef USEROUTES
++#include <net/if.h>
++#include "tb_routelookup.h"
++#endif
+ 
++#define MAX_PACKETS 640
+ 
+ class IPTapAgent : public TapAgent {
+ 
+  public:
+   IPTapAgent();
++#ifdef USEROUTES
++  int command(int, const char*const*);
++#endif
+ 
+  private:
+   int ident[MAX_PACKETS];      /* All three used for duplicate */
+   int offset[MAX_PACKETS];     /* packet detection. */
+   int index;
++#ifdef USEROUTES
++  uint16_t iface_index;
++#endif
+ 
+   unsigned short in_cksum(unsigned short *,int);
+   void recvpkt();
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Thu Jun 13 15:31:39 2002
+@@ -57,10 +57,18 @@
+ 
+ #ifdef __cplusplus
+ extern "C" {
++#if !defined(__FreeBSD__)
+ #include <pcap/pcap.h>
++#else
++#include <pcap.h>
++#endif
+ }
+ #else
++#if !defined(__FreeBSD__)
+ #include <pcap/pcap.h>
++#else
++#include <pcap.h>
++#endif
+ #endif
+ 
+ #include "config.h"
+@@ -68,81 +76,6 @@
+ #include "net.h"
+ #include "tclcl.h"
+ 
+-/*
+- * observations about pcap library
+- *	device name is in the ifreq struct sense, should be doc'd
+- *	pcap_lookupdev returns a ptr to static data
+- *	q: does lookupdev only return devs in the AF_INET addr family?
+- *	why does pcap_compile require a netmask? seems odd
+- *	would like some way to tell it what buffer to use
+- *	arriving packets have the link layer hdr at the beginning, doc
+- *	not convenient/possible to open bpf read/write
+- *	no real way to know what file (/dev/bpf?) it is using
+- *		would be nice if pcap_lookdev helped out more by
+- *		returning ifnet or ifreq or whatever structure
+- *	pcap_lookupnet makes calls to get our addr, but
+- *		then tosses it anyhow, should get us addr and netmask
+- *	interface type codes could be via rfc1573
+- *		see freebsd net/if_types.h
+- *	want a way to set immed mode
+- *	pcap_next masks errors by returning 0 if pcap_dispatch fails
+- *	a pcap_t carries it's own internal buffer, and
+- *		_dispatch gives pointers into it when invoked [eek]
+- *	when you open pcap using a file, pcap_fileno always
+- *		returns -1; not so convenient
+- *	
+- */
+-
+-#define	PNET_PSTATE_INACTIVE	0
+-#define	PNET_PSTATE_ACTIVE	1
+-
+-//
+-// PcapNetwork: a "network" (source or possibly sink of packets)
+-//	this is a base class only-- the derived classes are:
+-//	PcapLiveNetwork [a live net; currently bpf + ethernet]
+-//	PcapFileNetwork [packets from a tcpdump-style trace file]
+-//
+-
+-class PcapNetwork : public Network {
+-
+-public:
+-	PcapNetwork() : t_firstpkt_(0.0),
+-		pfd_(-1), pcnt_(0), local_netmask_(0) { }
+-	int rchannel() { return(pfd_); }
+-	int schannel() { return(pfd_); }
+-	virtual int command(int argc, const char*const* argv);
+-
+-	virtual int open(int mode, const char *) = 0;
+-	virtual int skiphdr() = 0;
+-	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
+-	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
+-	int send(u_char *buf, int len);			// write to net
+-	void close();
+-	void reset();
+-
+-	int filter(const char*);	// compile + install a filter
+-	int stat_pkts();
+-	int stat_pdrops();
+-
+-	double offset_;			// time offset to 1st pkt in a trace
+-	double t_firstpkt_;		// ts of 1st pkt recvd
+-
+-protected:
+-	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
+-	virtual void bindvars() = 0;
+-
+-	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
+-	char srcname_[PATH_MAX];		// device or file name
+-	int pfd_;				// pcap fd
+-	int pcnt_;				// # pkts counted
+-	int state_;				// PNET_PSTATE_xxx (above)
+-	int optimize_;				// bpf optimizer enable
+-	pcap_t* pcap_;				// reference to pcap state
+-	struct bpf_program bpfpgm_;		// generated program
+-	struct pcap_stat pcs_;			// status
+-
+-	unsigned int local_netmask_;	// seems shouldn't be necessary :(
+-};
+ 
+ //
+ // PcapLiveNetwork: a live network tap
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b9/emulate/net.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Thu Jun 13 19:23:55 2002
+@@ -64,4 +64,102 @@
+ protected:
+ 	int mode_;	// read/write bits (from fcntl.h)
+ };
++
++#ifdef __cplusplus
++extern "C" {
++#if !defined(__FreeBSD__)
++#include <pcap/pcap.h>
++#else
++#include <pcap.h>
++#endif
++}
++#else
++#if !defined(__FreeBSD__)
++#include <pcap/pcap.h>
++#else
++#include <pcap.h>
++#endif
++#endif
++
++#include <sys/param.h>
++
++/*
++ * observations about pcap library
++ *	device name is in the ifreq struct sense, should be doc'd
++ *	pcap_lookupdev returns a ptr to static data
++ *	q: does lookupdev only return devs in the AF_INET addr family?
++ *	why does pcap_compile require a netmask? seems odd
++ *	would like some way to tell it what buffer to use
++ *	arriving packets have the link layer hdr at the beginning, doc
++ *	not convenient/possible to open bpf read/write
++ *	no real way to know what file (/dev/bpf?) it is using
++ *		would be nice if pcap_lookdev helped out more by
++ *		returning ifnet or ifreq or whatever structure
++ *	pcap_lookupnet makes calls to get our addr, but
++ *		then tosses it anyhow, should get us addr and netmask
++ *	interface type codes could be via rfc1573
++ *		see freebsd net/if_types.h
++ *	want a way to set immed mode
++ *	pcap_next masks errors by returning 0 if pcap_dispatch fails
++ *	a pcap_t carries it's own internal buffer, and
++ *		_dispatch gives pointers into it when invoked [eek]
++ *	when you open pcap using a file, pcap_fileno always
++ *		returns -1; not so convenient
++ *	
++ */
++
++#define	PNET_PSTATE_INACTIVE	0
++#define	PNET_PSTATE_ACTIVE	1
++
++//
++// PcapNetwork: a "network" (source or possibly sink of packets)
++//	this is a base class only-- the derived classes are:
++//	PcapLiveNetwork [a live net; currently bpf + ethernet]
++//	PcapFileNetwork [packets from a tcpdump-style trace file]
++//
++
++class PcapNetwork : public Network {
++
++public:
++	PcapNetwork() : t_firstpkt_(0.0),
++		pfd_(-1), pcnt_(0), local_netmask_(0) { }
++	int rchannel() { return(pfd_); }
++	int schannel() { return(pfd_); }
++	virtual int command(int argc, const char*const* argv);
++
++	virtual int open(int mode, const char *) = 0;
++	virtual int skiphdr() = 0;
++	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
++	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
++	int send(u_char *buf, int len);			// write to net
++	void close();
++	void reset();
++
++	int filter(const char*);	// compile + install a filter
++	int stat_pkts();
++	int stat_pdrops();
++
++	double offset_;			// time offset to 1st pkt in a trace
++	double t_firstpkt_;		// ts of 1st pkt recvd
++
++#ifdef USEROUTES
++        inline char *srcname() { return(srcname_); }
++#endif
++
++protected:
++	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
++	virtual void bindvars() = 0;
++
++	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
++	char srcname_[PATH_MAX];		// device or file name
++	int pfd_;				// pcap fd
++	int pcnt_;				// # pkts counted
++	int state_;				// PNET_PSTATE_xxx (above)
++	int optimize_;				// bpf optimizer enable
++	pcap_t* pcap_;				// reference to pcap state
++	struct bpf_program bpfpgm_;		// generated program
++	struct pcap_stat pcs_;			// status
++
++	unsigned int local_netmask_;	// seems shouldn't be necessary :(
++};
+ #endif
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Thu Jun 13 16:13:31 2002
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -843,10 +1525,9 @@ diff -u ns-2/ns-2.1b8a/emulate/tap.cc:1.1 ns-2/ns-2.1b8a/emulate/tap.cc:1.2
  		fprintf(stderr,
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
-Index: ns-2/ns-2.1b8a/emulate/tap.h
-diff -u ns-2/ns-2.1b8a/emulate/tap.h:1.1 ns-2/ns-2.1b8a/emulate/tap.h:1.2
---- ns-2/ns-2.1b8a/emulate/tap.h:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/tap.h	Tue Mar 12 01:03:07 2002
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Thu Jun 13 14:56:34 2002
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -859,20 +1540,10 @@ diff -u ns-2/ns-2.1b8a/emulate/tap.h:1.1 ns-2/ns-2.1b8a/emulate/tap.h:1.2
  	double now() { return Scheduler::instance().clock(); }
  };
  
-Index: ns-2/ns-2.1b8a/emulate/tcptap.cc
-diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.2
---- ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/tcptap.cc	Tue Mar 12 01:03:07 2002
-@@ -62,7 +62,7 @@
-     nsnode.sin_addr.s_addr = inet_addr(DEFAULT_NS_ADDR);
-     nsnode.sin_family = AF_INET;
-     
--    dropp = 0; 
-+    dropp = 0;
- }
- 
- 
-@@ -92,6 +92,12 @@
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Thu Jun 13 15:14:09 2002
+@@ -91,6 +91,12 @@
        }
        return (TCL_OK);
      }
@@ -885,7 +1556,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
      
      if (strcmp(argv[1], "extport") == 0) {
        extnode.sin_port = atoi(argv[2]);
-@@ -199,6 +205,8 @@
+@@ -198,6 +204,8 @@
    ipheader->ip_v = IPVERSION;
  
    ipheader->ip_len = length;
@@ -894,7 +1565,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    ipheader->ip_id = 0;
    ipheader->ip_ttl = ttl;
    ipheader->ip_p = protocol;
-@@ -284,7 +292,7 @@
+@@ -318,7 +326,7 @@
    /* Ip header information from the grabbed packet. */
    unsigned char ttl;
    
@@ -903,7 +1574,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
      fprintf(stderr,
  	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
  	    name());
-@@ -304,7 +312,7 @@
+@@ -338,7 +346,7 @@
    // fill up payload
    sockaddr addr;	// not really used (yet)
    double tstamp;
@@ -912,7 +1583,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -370,8 +378,21 @@
+@@ -406,8 +414,21 @@
    ns_tcphdr->flags() = 0;
    if (tcpheader->th_flags & TH_FIN)
      ns_tcphdr->flags() |= TH_FIN;
@@ -935,7 +1606,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    if (tcpheader->th_flags & TH_RST) 
          ns_tcphdr->flags() |= TH_RST;
    if (tcpheader->th_flags & TH_PUSH) 
-@@ -386,6 +407,9 @@
+@@ -462,6 +483,9 @@
    ns_cmnhdr->size() = ntohs(ipheader->ip_len);
  
  
@@ -945,7 +1616,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    // inject into simulator
    target_->recv(nspacket);
    return;
-@@ -398,7 +422,7 @@
+@@ -474,7 +498,7 @@
   * simulator schedules TapAgent::recv which calls sendpkt
   *
   * Grabs a ns Full TCP packet, converts it into real TCP packet 
@@ -954,7 +1625,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
   *
   */
  int
-@@ -410,7 +434,7 @@
+@@ -486,7 +510,7 @@
    int hlength = IP_HEADER_LEN + TCP_HEADER_LEN;
    struct tcphdr *tcpheader;
  
@@ -963,7 +1634,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
      fprintf(stderr,
  	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -419,7 +443,7 @@
+@@ -495,7 +519,7 @@
    
    // send packet into the live network
    hdr_cmn* ns_cmnhdr = HDR_CMN(p);
@@ -972,7 +1643,7 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
      fprintf(stderr,
  	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -432,6 +456,10 @@
+@@ -508,6 +532,10 @@
    hdr_ip * ns_iphdr = HDR_IP(p);
    received_ttl = ns_iphdr->ttl_;
  
@@ -983,13 +1654,19 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    // Here we check if ns has sent any data in the packet.
    datalen = ns_cmnhdr->size() - ns_tcphdr->hlen();
    packet = (unsigned char *) calloc (1, sizeof(unsigned char) * 
-@@ -452,23 +480,43 @@
+@@ -528,30 +556,49 @@
  
    tcp_gen((char *)tcpheader, nsnode.sin_port, extnode.sin_port, p);
  
+-#ifndef LINUX_TCP_HEADER
 -  tcpheader->th_sum = trans_check(IPPROTO_TCP, (char *) tcpheader,
 -				  sizeof(struct tcphdr) + datalen,
 -				  nsnode.sin_addr, extnode.sin_addr);
+-#else 
+-  tcpheader->check = trans_check(IPPROTO_TCP, (char *) tcpheader,
+-				  sizeof(struct tcphdr) + datalen,
+-				  nsnode.sin_addr, extnode.sin_addr);
++  unsigned short thsum = 0;
 +  // In the case of SYN packet, we negotiate MSS
 +   if (ns_tcphdr->tcp_flags_ & TH_SYN) {
 +       unsigned char *mss_opt = (unsigned char *) (packet + IP_HEADER_LEN + TCP_HEADER_LEN);
@@ -1001,15 +1678,21 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
 +       
 +       tcpheader->th_off += 1;
 +
-+       tcpheader->th_sum = trans_check(IPPROTO_TCP, (char *) tcpheader,
++       thsum = trans_check(IPPROTO_TCP, (char *) tcpheader,
 +				       sizeof(struct tcphdr) + 4 + datalen, 
 +				       nsnode.sin_addr, extnode.sin_addr);
-+
 +   } else {
-+     tcpheader->th_sum = trans_check(IPPROTO_TCP, (char *) tcpheader,
-+				     sizeof(struct tcphdr) + datalen,
-+				     nsnode.sin_addr, extnode.sin_addr);
++       thsum = trans_check(IPPROTO_TCP, (char *) tcpheader,
++	  			       sizeof(struct tcphdr) + datalen,
++				       nsnode.sin_addr, extnode.sin_addr);
 +   }
+ 
+-#endif 
++#ifndef LINUX_TCP_HEADER
++   tcpheader->th_sum = thsum;
++#else
++   tcpheader->check = thsum;
++#endif
  
    /* 
       Limits the packets going out to only IP + TCP header. 
@@ -1031,10 +1714,9 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.cc:1.1 ns-2/ns-2.1b8a/emulate/tcptap.cc:1.
    TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), hc->size());
    return 0;
  }
-Index: ns-2/ns-2.1b8a/emulate/tcptap.h
-diff -u ns-2/ns-2.1b8a/emulate/tcptap.h:1.1 ns-2/ns-2.1b8a/emulate/tcptap.h:1.2
---- ns-2/ns-2.1b8a/emulate/tcptap.h:1.1	Wed Feb 20 15:48:06 2002
-+++ ns-2/ns-2.1b8a/emulate/tcptap.h	Tue Mar 12 01:03:07 2002
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Thu Jun 13 15:20:40 2002
 @@ -38,6 +38,7 @@
  
  #include "tap.h"
@@ -1043,3 +1725,572 @@ diff -u ns-2/ns-2.1b8a/emulate/tcptap.h:1.1 ns-2/ns-2.1b8a/emulate/tcptap.h:1.2
  #include <netinet/ip.h>
  #include <netinet/tcp.h>
  #include <sys/socket.h>
+Only in ns-allinone-2.1b9/ns-2.1b9: gen
+Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/cmu-scen-gen/setdest: Makefile
+Only in ns-allinone-2.1b9/ns-2.1b9/indep-utils/cmu-scen-gen/setdest: calcdest
+Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/dec: Makefile
+Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/epa: Makefile
+Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/nlanr: Makefile
+Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/ucb: Makefile
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl
+--- dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Wed Apr 10 16:44:10 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Thu Jun 13 16:01:30 2002
+@@ -66,6 +66,7 @@
+ CMUTrace set debug_ false
+ 
+ Scheduler/RealTime set maxslop_ 0.010; # max allowed slop b4 error (sec)
++Scheduler/RealTimeCalendar set maxslop_ 0.010; # max allowed slop b4 error (sec)
+ 
+ #
+ # Queues and associated
+Only in ns-allinone-2.1b9/ns-2.1b9/tcl/test: all.nam
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Thu Jun 13 18:10:01 2002
+@@ -76,7 +76,7 @@
+  *
+  * Some warnings and comments:
+  *	this version of TCP will not work correctly if the sequence number
+- *	goes above 2147483648 due to sequence number wrap
++ *	goes above  due to sequence number wrap
+  *
+  *	this version of TCP by default sends data at the beginning of a
+  *	connection in the "typical" way... That is,
+@@ -358,16 +358,16 @@
+ 	case TCPS_CLOSED:
+ 	case TCPS_LISTEN:
+                 reset();
+-                curseq_ = iss_ + nb;
++                INCR_SEQ( curseq_, SEQ_ADD(iss_, nb));
+                 connect();              // initiate new connection
+ 		break;
+ 
+ 	case TCPS_ESTABLISHED:
+ 	case TCPS_SYN_SENT:
+ 	case TCPS_SYN_RECEIVED:
+-                if (curseq_ < iss_) 
++	        if (SEQ_LT(curseq_, iss_) ) 
+                         curseq_ = iss_; 
+-                curseq_ += nb;
++                INCR_SEQ(curseq_, nb);
+ 		break;
+ 
+ 	default:
+@@ -433,7 +433,7 @@
+ void
+ FullTcpAgent::usrclosed()
+ {
+-	curseq_ = maxseq_ - 1;	// now, no more data
++	curseq_ = SEQ_SUB(maxseq_, 1);	// now, no more data
+ 	infinite_send_ = FALSE;	// stop infinite send
+ 
+ 	switch (state_) {
+@@ -715,7 +715,7 @@
+ int
+ FullTcpAgent::rcvseqinit(int seq, int dlen)
+ {
+-	return (seq + dlen + 1);
++	return (SEQ_ADD(seq, dlen + 1));
+ }
+ 
+ /*
+@@ -743,8 +743,8 @@
+ FullTcpAgent::pack(Packet *pkt)
+ {
+ 	hdr_tcp *tcph = hdr_tcp::access(pkt);
+-	return (tcph->ackno() >= highest_ack_ &&
+-		tcph->ackno() < recover_);
++	return (SEQ_GE(tcph->ackno(), highest_ack_) &&
++		SEQ_LT(tcph->ackno(), recover_));
+ }
+ 
+ /*
+@@ -801,6 +801,9 @@
+         tcph->hlen() = tcpip_base_hdr_size_;
+ 	tcph->hlen() += build_options(tcph);
+ 
++	/* Fill in maxseg_ for MSS negotiation in TCPTap (NSE) */
++	tcph->maxseg() = maxseg_;
++	
+ 	/*
+ 	 * Explicit Congestion Notification (ECN) related:
+ 	 * Bits in header:
+@@ -909,24 +912,24 @@
+ 	else
+ 		size_ =  maxseg_ + headersize();
+ 
+-	int is_retransmit = (seqno < maxseq_);
++	int is_retransmit = SEQ_LT(seqno, maxseq_);
+ 	int quiet = (highest_ack_ == maxseq_);
+ 	int pflags = outflags();
+ 	int syn = (seqno == iss_);
+ 	int emptying_buffer = FALSE;
+ 	int buffered_bytes = (infinite_send_) ? TCP_MAXSEQ :
+-				curseq_ - highest_ack_ + 1;
++				SEQ_ADD( SEQ_SUB(curseq_, highest_ack_), 1);
+ 
+ 	int win = window() * maxseg_;	// window (in bytes)
+-	int off = seqno - highest_ack_;	// offset of seg in window
++	int off = SEQ_SUB(seqno, highest_ack_);	// offset of seg in window
+ 	int datalen;
+ 	int amtsent = 0;
+ 
+ 	// be careful if we have not received any ACK yet
+ 	if (highest_ack_ < 0) {
+ 		if (!infinite_send_)
+-			buffered_bytes = curseq_ - iss_;;
+-		off = seqno - iss_;
++			buffered_bytes = SEQ_SUB(curseq_, iss_);
++		off = SEQ_SUB(seqno, iss_);
+ 	}
+ 
+ 	if (syn && !data_on_syn_)
+@@ -965,7 +968,7 @@
+ 	// a dataless SYN packet counts also
+ 	//
+ 
+-	if (!infinite_send_ && ((seqno + datalen) > curseq_ || 
++	if (!infinite_send_ && (SEQ_GT( SEQ_ADD(seqno, datalen), curseq_) || 
+ 	    (syn && datalen == 0))) {
+ 		emptying_buffer = TRUE;
+ 		//
+@@ -1069,15 +1072,15 @@
+ 	 * around until we actually send a segment
+ 	 */
+ 
+-	int reliable = datalen + syn + fin; // seq #'s reliably sent
++	int reliable = SEQ_ADD(datalen, syn + fin); // seq #'s reliably sent
+ 	if (cong_action_ && reliable > 0)
+ 		cong_action_ = FALSE;
+ 
+ 	// highest: greatest sequence number sent + 1
+ 	//	and adjusted for SYNs and FINs which use up one number
+ 
+-	int highest = seqno + reliable;
+-	if (highest > maxseq_) {
++	int highest = SEQ_ADD(seqno, reliable);
++	if (SEQ_GT(highest, maxseq_)) {
+ 		maxseq_ = highest;
+ 		//
+ 		// if we are using conventional RTT estimation,
+@@ -1176,10 +1179,11 @@
+         int win = window() * maxseg_;
+         int topwin = curseq_; // 1 seq number past the last byte we can send
+ 
+-        if ((topwin > highest_ack_ + win) || infinite_send_)
+-                topwin = highest_ack_ + win; 
++	int hiack_plus_win = SEQ_ADD(highest_ack_, win);
++        if (SEQ_GT(topwin, hiack_plus_win) || infinite_send_)
++                INCR_SEQ( topwin, hiack_plus_win); 
+ 
+-	return (seq < topwin);
++	return (SEQ_LT(seq, topwin));
+ }
+ /*
+  * Process an ACK
+@@ -1200,7 +1204,7 @@
+ 	hdr_tcp *tcph = hdr_tcp::access(pkt);
+ 
+ 	register int ackno = tcph->ackno();
+-	int progress = (ackno > highest_ack_);
++	int progress = SEQ_GT(ackno, highest_ack_);
+ 
+ 	if (ackno == maxseq_) {
+ 		cancel_rtx_timer();	// all data ACKd
+@@ -1219,7 +1223,7 @@
+ 	// update t_seqno_ here, otherwise we would be doing
+ 	// go-back-n.
+ 
+-	if (t_seqno_ < highest_ack_)
++	if (SEQ_LT(t_seqno_, highest_ack_))
+ 		t_seqno_ = highest_ack_; // seq# to send next
+ 
+         /*
+@@ -1235,7 +1239,7 @@
+ 			recent_age_ = now();
+ 			recent_ = tcph->ts();
+ 			rtt_update(now() - tcph->ts_echo());
+-		} else if (rtt_active_ && ackno > rtt_seq_) {
++		} else if (rtt_active_ && SEQ_GT(ackno,rtt_seq_)) {
+ 			// got an RTT sample, record it
+ 			// "t_backoff_ = 1;" deleted by T. Kelly.
+ 			rtt_active_ = FALSE;
+@@ -1337,10 +1341,10 @@
+ 	if (flags_ & TF_ACKNOW)
+ 		return TRUE;
+ 
+-	int spa = (spa_thresh_ > 0 && ((rcv_nxt_ - irs_)  < spa_thresh_)) ?
++	int spa = (spa_thresh_ > 0 && (SEQ_SUB(rcv_nxt_,irs_)  < spa_thresh_)) ?
+ 		1 : segs_per_ack_;
+ 		
+-	return ((rcv_nxt_ - last_ack_sent_) >= (spa * maxseg_));
++	return (SEQ_SUB(rcv_nxt_, last_ack_sent_) >= (spa * maxseg_));
+ }
+ 
+ /*
+@@ -1479,7 +1483,7 @@
+ 		 * See RFC1323 (now RFC1323 bis)
+                  */
+                 if (ts_option_ && !fh->no_ts_ &&
+-		    tcph->seqno() <= last_ack_sent_) {
++		    SEQ_LE(tcph->seqno(), last_ack_sent_)) {
+ 			/*
+ 			 * this is the case where the ts value is newer than
+ 			 * the last one we've seen, and the seq # is the one
+@@ -1517,7 +1521,7 @@
+ 			// If we are in fast
+ 			// recovery, go below so we can remember to deflate
+ 			// the window if we need to
+-			if (ackno > highest_ack_ && ackno < maxseq_ &&
++			if (SEQ_GT(ackno, highest_ack_) && SEQ_LT(ackno, maxseq_) &&
+ 			    cwnd_ >= wnd_ && !fastrecov_) {
+ 				newack(pkt);	// update timers,  highest_ack_
+ 				send_much(0, REASON_NORMAL, maxburst_);
+@@ -1535,7 +1539,7 @@
+ 			//	this routine scans all tcpcb's looking for
+ 			//	DELACK segments and when it finds them
+ 			//	changes DELACK to ACKNOW and calls tcp_output()
+-			rcv_nxt_ += datalen;
++			INCR_SEQ(rcv_nxt_, datalen);
+ 			flags_ |= TF_DELACK;
+ 			recvBytes(datalen); // notify application of "delivery"
+ 			//
+@@ -1636,7 +1640,7 @@
+ 
+ 		/* drop if it's a SYN+ACK and the ack field is bad */
+ 		if ((tiflags & TH_ACK) &&
+-			((ackno <= iss_) || (ackno > maxseq_))) {
++			(SEQ_LE(ackno, iss_) || SEQ_GT(ackno, maxseq_))) {
+ 			// not an ACK for our SYN, discard
+ 			fprintf(stderr,
+ 			    "%f: FullTcpAgent::recv(%s): bad ACK for our SYN: ",
+@@ -1730,14 +1734,14 @@
+ 			 * SYN+ACK, so t_seqno_ will have been
+ 			 * advanced to 2... reduce this
+ 			 */
+-			t_seqno_--;	// CHECKME
++			DECR_SEQ(t_seqno_, 1);	// CHECKME
+ 		}
+ 
+ trimthenstep6:
+ 		/*
+ 		 * advance the seq# to correspond to first data byte
+ 		 */
+-		tcph->seqno()++;
++		INCR_SEQ(tcph->seqno(), 1);
+ 
+ 		if (tiflags & TH_ACK)
+ 			goto process_ACK;
+@@ -1807,13 +1811,13 @@
+ 	// do anything with it.  In particular, would like to
+ 	// avoid ACKing an incoming FIN+ACK while in CLOSING
+ 	//
+-	todrop = rcv_nxt_ - tcph->seqno();  // how much overlap?
++	todrop = SEQ_SUB(rcv_nxt_, tcph->seqno());  // how much overlap?
+ 
+ 	if (todrop > 0 && ((tiflags & (TH_SYN)) || datalen > 0)) {
+ //printf("%f(%s): trim 1..todrop:%d, dlen:%d\n",now(), name(), todrop, datalen);
+ 		if (tiflags & TH_SYN) {
+ 			tiflags &= ~TH_SYN;
+-			tcph->seqno()++;
++			INCR_SEQ(tcph->seqno(), 1);
+ 			th->size()--;	// XXX Must decrease packet size too!!
+ 					// Q: Why?.. this is only a SYN
+ 			todrop--;
+@@ -1850,7 +1854,7 @@
+ 		 * Trim duplicate data from the front of the packet
+ 		 */
+ 
+-		tcph->seqno() += todrop;
++		INCR_SEQ(tcph->seqno(), todrop);
+ 		th->size() -= todrop;	// XXX Must decrease size too!!
+ 					// why? [kf]..prob when put in RQ
+ 		datalen -= todrop;
+@@ -1863,7 +1867,7 @@
+ 	 * record the timestamp.
+ 	 * See RFC1323 (now RFC1323 bis)
+ 	 */
+-	if (ts_option_ && !fh->no_ts_ && tcph->seqno() <= last_ack_sent_) {
++	if (ts_option_ && !fh->no_ts_ && SEQ_LE(tcph->seqno(), last_ack_sent_)) {
+ 		/*
+ 		 * this is the case where the ts value is newer than
+ 		 * the last one we've seen, and the seq # is the one we expect
+@@ -1894,7 +1898,7 @@
+ 
+ 	switch (state_) {
+ 	case TCPS_SYN_RECEIVED:	/* want ACK for our SYN+ACK */
+-		if (ackno < highest_ack_ || ackno > maxseq_) {
++		if (SEQ_LT(ackno, highest_ack_) || SEQ_GT(ackno, maxseq_)) {
+ 			// not in useful range
+ 		    	fprintf(stderr,
+ 		    		"%f: FullTcpAgent(%s): ack(%d) not in range while in SYN_RECEIVED: ",
+@@ -1968,13 +1972,13 @@
+ 		//	try not to be fooled by data
+ 		//
+ 
+-		if (fastrecov_ && (datalen == 0 || ackno > highest_ack_))
++		if (fastrecov_ && (datalen == 0 || SEQ_GT(ackno, highest_ack_)))
+ 			pipe_ -= maxseg_;
+ 
+ 		// look for dup ACKs (dup ack numbers, no data)
+ 		//
+ 		// do fast retransmit/recovery if at/past thresh
+-		if (ackno <= highest_ack_) {
++		if (SEQ_LE(ackno, highest_ack_)) {
+ 			// a pure ACK which doesn't advance highest_ack_
+ 			if (datalen == 0 && (!dupseg_fix_ || !dupseg)) {
+ 
+@@ -1998,7 +2002,7 @@
+                                  */
+ 
+ 				if ((rtx_timer_.status() != TIMER_PENDING) ||
+-				    ackno < highest_ack_) {
++				    SEQ_LT(ackno, highest_ack_)) {
+ 					// Q: significance of timer not pending?
+ 					// ACK below highest_ack_
+ 					oldack();
+@@ -2038,7 +2042,7 @@
+ 
+ process_ACK:
+ 
+-		if (ackno > maxseq_) {
++		if (SEQ_GT(ackno, maxseq_)) {
+ 			// ack more than we sent(!?)
+ 			fprintf(stderr,
+ 			    "%f: FullTcpAgent::recv(%s) too-big ACK (maxseq:%d): ",
+@@ -2099,7 +2103,7 @@
+ 		 * If no data (only SYN) was ACK'd,
+ 		 *    skip rest of ACK processing.
+ 		 */
+-		if (ackno == (highest_ack_ + 1))
++		if (ackno == SEQ_ADD(highest_ack_, 1))
+ 			goto step6;
+ 
+ 		// if we are delaying initial cwnd growth (probably due to
+@@ -2213,7 +2217,7 @@
+ 			// accept the data here as-is (i.e. don't
+ 			// require being in ESTABLISHED state)
+ 			flags_ |= TF_DELACK;
+-			rcv_nxt_ += datalen;
++			INCR_SEQ(rcv_nxt_, datalen);
+ 			tiflags = tcph->flags() & TH_FIN;
+ 
+ 			// give to "application" here
+@@ -2231,11 +2235,11 @@
+ 			// Note that we may have just a FIN here (datalen = 0)
+ 			int rcv_nxt_old_ = rcv_nxt_; // notify app. if changes
+ 			tiflags = reass(pkt);
+-			if (rcv_nxt_ > rcv_nxt_old_) {
++			if (SEQ_GT(rcv_nxt_, rcv_nxt_old_)) {
+ 				// if rcv_nxt_ has advanced, must have
+ 				// been a hole fill.  In this case, there
+ 				// is something to give to application
+-				recvBytes(rcv_nxt_ - rcv_nxt_old_);
++				recvBytes(SEQ_SUB(rcv_nxt_, rcv_nxt_old_));
+ 			}
+ 			flags_ |= TF_ACKNOW;
+ 
+@@ -2264,7 +2268,7 @@
+ 	if (tiflags & TH_FIN) {
+ 		if (TCPS_HAVERCVDFIN(state_) == 0) {
+ 			flags_ |= TF_ACKNOW;
+- 			rcv_nxt_++;
++ 			INCR_SEQ(rcv_nxt_, 1);
+ 		}
+ 		switch (state_) {
+                 /*
+@@ -2301,7 +2305,7 @@
+ 
+ 	if (needoutput || (flags_ & TF_ACKNOW))
+ 		send_much(1, REASON_NORMAL, maxburst_);
+-	else if (curseq_ >= highest_ack_ || infinite_send_)
++	else if (SEQ_GE(curseq_, highest_ack_) || infinite_send_)
+ 		send_much(0, REASON_NORMAL, maxburst_);
+ 	// K: which state to return to when nothing left?
+ 
+@@ -2332,9 +2336,9 @@
+ 	if (tiflags & TH_ACK) {
+ 		sendpacket(ackno, 0, 0x0, 0, REASON_NORMAL);
+ 	} else {
+-		int ack = tcph->seqno() + datalen;
++		int ack = SEQ_ADD(tcph->seqno(), datalen);
+ 		if (tiflags & TH_SYN)
+-			ack--;
++			DECR_SEQ(ack, 1);
+ 		sendpacket(0, ack, TH_ACK, 0, REASON_NORMAL);
+ 	}
+ drop:
+@@ -2362,7 +2366,7 @@
+ FullTcpAgent::dupack_action()
+ {   
+ 
+-        int recovered = (highest_ack_ > recover_);
++        int recovered = SEQ_GT(highest_ack_, recover_);
+ 
+ 	fastrecov_ = TRUE;
+ 	rtxbytes_ = 0;
+@@ -2548,7 +2552,7 @@
+ void
+ TahoeFullTcpAgent::dupack_action()
+ {  
+-        int recovered = (highest_ack_ > recover_);
++        int recovered = SEQ_GT(highest_ack_, recover_);
+ 
+ 	fastrecov_ = TRUE;
+ 	rtxbytes_ = 0;
+@@ -2665,11 +2669,11 @@
+ SackFullTcpAgent::dupack_action()
+ {
+ 
+-        int recovered = (highest_ack_ > recover_);
++        int recovered = SEQ_GT(highest_ack_, recover_);
+ 
+ 	fastrecov_ = TRUE;
+ 	rtxbytes_ = 0;
+-	pipe_ = maxseq_ - highest_ack_ - sq_.total();
++	pipe_ = SEQ_SUB( SEQ_SUB(maxseq_, highest_ack_), sq_.total());
+ 
+ //printf("%f: SACK DUPACK-ACTION:pipe_:%d, sq-total:%d, bugfix:%d, cwnd:%d, highest_ack:%d, recover_:%d\n",
+ //now(), pipe_, sq_.total(), bug_fix_, int(cwnd_), int(highest_ack_), recover_);
+@@ -2709,7 +2713,7 @@
+ 	recover_ = maxseq_;	// where I am when recovery starts
+ 
+ 	int amt = fast_retransmit(highest_ack_);
+-	h_seqno_ = highest_ack_ + amt;
++	h_seqno_ = SEQ_ADD(highest_ack_, amt);
+ 
+ //printf("%f: FAST-RTX seq:%d, h_seqno_ is now:%d, pipe:%d, cwnd:%d, recover:%d\n",
+ //now(), int(highest_ack_), h_seqno_, pipe_, int(cwnd_), recover_);
+@@ -2722,12 +2726,12 @@
+ void
+ SackFullTcpAgent::pack_action(Packet* p)
+ {
+-	if (!sq_.empty() && sack_min_ < highest_ack_) {
++	if (!sq_.empty() && SEQ_LT(sack_min_, highest_ack_)) {
+ 		sack_min_ = highest_ack_;
+ 		sq_.cleartonxt();
+ 	}
+ 	pipe_ -= maxseg_;	// see comment in tcp-sack1.cc
+-	if (h_seqno_ < highest_ack_)
++	if (SEQ_LT(h_seqno_, highest_ack_))
+ 		h_seqno_ = highest_ack_;
+ }
+ 
+@@ -2737,7 +2741,7 @@
+ //printf("%f: EXITING fast recovery, recover:%d\n",
+ //now(), recover_);
+ 	fastrecov_ = pipectrl_ = FALSE;
+-        if (!sq_.empty() && sack_min_ < highest_ack_) {
++        if (!sq_.empty() && SEQ_LT(sack_min_, highest_ack_)) {
+                 sack_min_ = highest_ack_;
+                 sq_.cleartonxt();
+         }
+@@ -2823,8 +2827,8 @@
+ 		return (FullTcpAgent::send_allowed(seq));
+ 
+ 	// don't overshoot receiver's advertised window
+-	int topawin = highest_ack_ + int(wnd_) * maxseg_;
+-	if (seq >= topawin) {
++	int topawin = SEQ_ADD(highest_ack_, int(wnd_) * maxseg_);
++	if (SEQ_GE(seq, topawin)) {
+ //printf("%f: SEND(%d) NOT ALLOWED DUE TO AWIN:%d, pipe:%d, cwnd:%d\n",
+ //now(), seq, topawin, pipe_, int(cwnd_));
+ 		return FALSE;
+@@ -2846,7 +2850,7 @@
+ SackFullTcpAgent::nxt_tseq()
+ {
+ 
+-	int in_recovery = (highest_ack_ < recover_);
++	int in_recovery = SEQ_LT(highest_ack_, recover_);
+ 	int seq = h_seqno_;
+ 
+ 	if (!in_recovery) {
+@@ -2885,13 +2889,13 @@
+ 			// adjust h_seqno, as we may have
+ 			// been "jumped ahead" by learning
+ 			// about a filled hole
+-			if (seq > h_seqno_)
++			if (SEQ_GT(seq, h_seqno_))
+ 				h_seqno_ = seq;
+ 			return (seq);
+ 		} else if (fcnt <= 0)
+ 			break;
+ 		else {
+-			seq += maxseg_;
++			INCR_SEQ(seq, maxseg_);
+ 		}
+ 	}
+ //if (int(t_seqno_) > 1)
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Thu Jun 13 18:13:10 2002
+@@ -104,6 +104,20 @@
+ #define PF_TIMEOUT 0x04	    /* protocol defined */
+ #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
+ 
++#define SEQ_LT(a,b)  (((a)<(b) && (b)-(a) < TCP_MAXSEQ/2) || ((a)>(b) && (a)-(b) >= TCP_MAXSEQ/2))
++#define SEQ_LE(a,b)  (((a)<=(b) && (b)-(a) < TCP_MAXSEQ/2) || ((a)>(b) && (a)-(b) >= TCP_MAXSEQ/2))
++#define SEQ_GT(a,b)  (((a)>(b) && (a)-(b) < TCP_MAXSEQ/2) || ((a)<(b) && (b)-(a) >= TCP_MAXSEQ/2))
++#define SEQ_GE(a,b)  (((a)>=(b) && (a)-(b) < TCP_MAXSEQ/2) || ((a)<(b) && (b)-(a) >= TCP_MAXSEQ/2))
++#define INCR_SEQ(num, val) (num) = ((num) + (val)) % TCP_MAXSEQ
++#define SEQ_ADD(num, val) (((num) + (val)) % TCP_MAXSEQ)
++inline int SEQ_SUB(int num, int val) {
++  int ret = num - val;
++    return( abs(ret) < TCP_MAXSEQ/2 ? ret : ((int)(((long long)(num) - (val) + TCP_MAXSEQ) % TCP_MAXSEQ)) );
++}
++#define DECR_SEQ(num, val) (num) = SEQ_SUB((num), (val))
++#define SEQ_MIN(x,y) (SEQ_LT((x),(y))?(x):(y))
++#define SEQ_MAX(x,y) (SEQ_GT((x),(y))?(x):(y))
++
+ class FullTcpAgent;
+ class DelAckTimer : public TimerHandler {
+ public:
+@@ -187,9 +201,9 @@
+ 	}
+ 	virtual void sent(int seq, int amt) {
+ 		if (seq == t_seqno_)
+-			t_seqno_ += amt;
++			INCR_SEQ(t_seqno_, amt);
+ 		pipe_ += amt;
+-		if (seq < int(maxseq_))
++		if (SEQ_LT(seq, int(maxseq_)))
+ 			rtxbytes_ += amt;
+ 	}
+ 	virtual void oldack() {			// what to do on old ack
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Thu Jun 13 17:37:43 2002
+@@ -54,6 +54,8 @@
+ 	int ackno_;             /* ACK number for FullTcp */
+ 	int hlen_;              /* header len (bytes) for FullTcp */
+ 	int tcp_flags_;         /* TCP flags for FullTcp */
++        int maxseg_;            /* MSS for TCPTap to negotiate in the SYN segment
++				   needed in NSE */
+ 
+ 	static int offset_;	// offset for this header
+ 	inline static int& offset() { return offset_; }
+@@ -72,6 +74,7 @@
+ 	int& hlen() { return (hlen_); }
+ 	int& ackno() { return (ackno_); }  
+ 	int& flags() { return (tcp_flags_); }
++	int& maxseg() { return (maxseg_); }
+ };
+ 
+ /* these are used to mark packets as to why we xmitted them */
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.1b9/tools/random.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
++++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Thu Jun 13 19:04:19 2002
+@@ -47,11 +47,13 @@
+ #define GCC_THROW
+ #endif
+ 
++#if 0
+ RANDOM_RETURN_TYPE
+ random() GCC_THROW
+ {
+ 	printf("random() called in ns.\nRandom is not portable, please use Random::uniform() instead.\n");
+ 	abort();
+ }
++#endif
+ 
+ #endif /* !WIN32 */
