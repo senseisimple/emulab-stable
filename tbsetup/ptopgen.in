@@ -446,10 +446,19 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	$iface2 = get_iface($node2,$card2,$port2);
 	$iface1bw = get_ifacebw($node1,$card1,$port1);
 	$iface2bw = get_ifacebw($node2,$card2,$port2);
-	if ($iface1bw < $iface2bw) {
+	# XXX - This is a bad, bad hack - we  use our knowledge that in the
+	# wires table links to the switch always come as node2. We also assume
+	# that node interfaces are plugged into switch ports of the same speed.
+	# Chris has something better on the way (storing the speed on the
+	# switch side), so this is just a temp. hack.
+	if (!defined($switches{$node1}) && defined($switches{$node2})) {
 	    $bw = $iface1bw;
 	} else {
-	    $bw = $iface2bw;
+	    if ($iface1bw < $iface2bw) {
+		$bw = $iface1bw;
+	    } else {
+		$bw = $iface2bw;
+	    }
 	}
 	if (defined($switches{$node2})) {
 	    $used_switches{$node2} = 1;
