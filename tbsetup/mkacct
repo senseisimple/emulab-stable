@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.28 2000-12-06 23:36:45 kwright Exp $
+# $Id: mkacct,v 1.29 2000-12-07 06:51:41 kwright Exp $
 
 use English;
 use Mysql;
@@ -50,7 +50,7 @@ sub doqueries() {
 		die "Username $row[0] from database invalid\n";
 	    }
 
-	    if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
+	    if ( $row[1] =~ /^([^:]+)$/ ) {               # encrypted passwd
 		$epasswd{$name} = $1;
 	    } else {
 		die "Encrypted passwd $row[1] from database not valid.\n";
