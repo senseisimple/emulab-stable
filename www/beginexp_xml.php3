@@ -352,10 +352,6 @@ if ($formfields[exp_idleswap] == "1") {
     $exp_swappable .= " -l " . (60 * $formfields[exp_idleswap_timeout]);
 }
 
-#
-# All experiments are low priority for now.
-#
-$exp_priority  = "-n low";
 $exp_batched   = 0;
 $exp_preload   = 0;
 $batcharg      = "-i";
@@ -376,9 +372,6 @@ if (isset($formfields[exp_preload]) &&
 #
 TBUserInfo($uid, $user_name, $user_email);
 
-# Expiration is hardwired for now.
-$exp_expires = date("Y:m:d", time() + (86400 * 120));
-
 #
 # Grab the unix GID for running scripts.
 #
@@ -392,8 +385,7 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 set_time_limit(0);
 
 $retval = SUEXEC($uid, $unix_gid,
-		 "webbatchexp $batcharg -x \"$exp_expires\" -E $exp_desc ".
-		 "$exp_priority $exp_swappable ".
+		 "webbatchexp $batcharg -E $exp_desc $exp_swappable ".
 		 "-p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),
 		 SUEXEC_ACTION_IGNORE);
