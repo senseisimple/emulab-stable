@@ -7,6 +7,9 @@ use English;
 use Getopt::Long;
 use strict;
 
+# Turn off line buffering
+$|=1;
+
 sub usage() {
     print "Usage: $0 [-s] <pid> <eid>\n".
         "  -s    start slothd if not running.\n";
