@@ -70,6 +70,7 @@ static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doloadinfo(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int dotrafgens(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -95,6 +96,7 @@ struct command {
 	{ "loadinfo",	doloadinfo},
 	{ "reset",	doreset},
 	{ "routing",	dorouting},
+	{ "trafgens",	dotrafgens},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2069,6 +2071,70 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 
 	
+	return 0;
+}
+
+/*
+ * Return trafgens info
+ */
+static int
+dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
+	int		nrows;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "TRAFGENS: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		syslog(LOG_ERR, "TRAFGENS: %s: Node is free", nodeid);
+		return 1;
+	}
+
+	res = mydb_query("select vi.vname,role,proto,"
+			 "vnode,port,target_vnode,target_port "
+			 "from virt_trafgens as vi "
+			 "left join reserved as r on r.vname=vi.vnode "
+			 "where r.node_id='%s' and r.pid='%s' and r.eid='%s'",
+			 7, nodeid, pid, eid);
+
+	if (!res) {
+		syslog(LOG_ERR, "TRAFGENS: %s: DB Error getting virt_trafgens",
+		       nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "TRAFGEN=%s MYNAME=%s-0 MYPORT=%s "
+			"PEERNAME=%s-0 PEERPORT=%s "
+			"PROTO=%s ROLE=%s\n",
+			row[0], row[3], row[4], row[5], row[6],
+			row[2], row[1]);
+		       
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		syslog(LOG_INFO, "TRAFGENS: %s", buf);
+	}
+	mysql_free_result(res);
 	return 0;
 }
 
