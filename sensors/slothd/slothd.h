@@ -68,6 +68,9 @@ typedef struct {
   double loadavg[3];
   int ifcnt;
   int sd;
+#ifdef __linux__
+  int ifd; /* IOCTL file descriptor */
+#endif
   struct sockaddr_in servaddr;
   struct {
     u_long ipkts;
@@ -91,7 +94,6 @@ typedef struct {
 
 int parse_args(int, char**);
 int init_slothd(void);
-void do_update(void);
 
 void get_min_tty_idle(void);
 void utmp_enum_terms(void);

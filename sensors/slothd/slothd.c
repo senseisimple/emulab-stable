@@ -93,8 +93,11 @@ int main(int argc, char **argv) {
       for (;;) {
         if (!opts->first) {
           sleep(mopts.interval);
-        }          
-        do_update();
+        }
+        get_load();
+        get_min_tty_idle();
+        get_packet_counts();
+        send_pkt();
         if (opts->once) {
           break;
         }
@@ -105,13 +108,6 @@ int main(int argc, char **argv) {
     }
   }
   return exitcode;
-}
-
-void do_update (void) {
-  get_load();
-  get_min_tty_idle();
-  get_packet_counts();
-  send_pkt();
 }
 
 int parse_args(int argc, char **argv) {
@@ -227,6 +223,9 @@ int init_slothd(void) {
     */
     opts->ttys[opts->numttys] = strdup("/dev/ptmx");
     opts->numttys++;
+
+    /* Open socket for SIOCGHWADDR ioctl */
+    pkt->ifd = socket(PF_INET, SOCK_DGRAM, 0);
 #endif
     while (opts->numttys < MAXTTYS && (dptr = readdir(devs))) {
       if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
@@ -440,35 +439,11 @@ void get_packet_counts(void) {
   return;
 }
 
-#ifdef comment
-int get_macaddrs(char *buf, void *data) {
-
-  int i=-1, j;
-  char *maddr;
-  SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
- 
-  if ((maddr = strstr(buf, "MAC="))) {
-    maddr += 4;
-    ++i;
-    for (j = 0; j < MACADDRLEN; j+=3, maddr+=2) {
-      pkt->ifaces[i].macaddr[j] = *maddr;
-      pkt->ifaces[i].macaddr[j+1] = *(maddr+1);
-      pkt->ifaces[i].macaddr[j+2] = ':';
-    }
-    pkt->ifaces[i].macaddr[MACADDRLEN-1] = '\0';
-  }
-  pkt->numaddrs = i+1;
-  return 0;
-}
-#endif /* comment */
-
 int get_counters(char *buf, void *data) {
 
   SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
 #ifdef __linux__
-  int sfd = socket(PF_INET, SOCK_DGRAM, 0);
   struct ifreq ifr;
-
   bzero(&ifr, sizeof(struct ifreq));
 #endif
 
@@ -494,7 +469,7 @@ int get_counters(char *buf, void *data) {
     }
 #ifdef __linux__
     strcpy(ifr.ifr_name, pkt->ifaces[pkt->ifcnt].ifname);
-    if (ioctl(sfd, SIOCGIFHWADDR, &ifr) < 0) {
+    if (ioctl(pkt->ifd, SIOCGIFHWADDR, &ifr) < 0) {
       perror("error getting HWADDR");
       return -1;
     }
@@ -505,7 +480,6 @@ int get_counters(char *buf, void *data) {
     if (opts->debug) {
       printf("macaddr: %s\n", pkt->ifaces[pkt->ifcnt].addr);
     }
-    close(sfd);
 #endif
     pkt->ifcnt++;
   }
