@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -79,7 +79,7 @@
 
 /**************************DEFINES******************************************/
 
-#define MAX_LINE_LENGTH 256
+#define MAX_LINE_LENGTH 512
 #define MAX_LINKS       4 /* 4 simplex or 2 duplex, since we have 4 interfaces
 			     on delay nodes*/
 /**************************DEFINES******************************************/
@@ -130,7 +130,11 @@ typedef struct {
 
 typedef struct {
 char              *linkname; /*link0, link1 etc*/
+int		  islan;  /* 1 if a lan, 0 if a duplex link */
+int		  numpipes;  /* 1 if a simplex pipe, 2 if a duplex pipe */
 char              *interfaces[2];/* fxp0, fxp1 etc*/
+char		  *vnodes[2]; /* nodeA, nodeB*/
+char		  linkvnodes[2][256]; /* link0-nodeA, link0-nodeB*/
 char              *linktype; /*simplex, duplex */
 int               pipes[2]; /* array of pipe numbers*/
 structpipe_params params[2]; /* params for the two pipes*/
@@ -150,8 +154,6 @@ void agent_callback(event_handle_t handle,
 void handle_pipes (char *objname, char *eventtype, event_notification_t
 		   ,event_handle_t, int);
 int  checkevent (char *);
-int  search(char* objname);
-int  check_object(char* objname);
 void handle_link_up(char * linkname, int l_index);
 void handle_link_down(char * linkname, int l_index);
 void handle_link_modify(char * linkname, int l_index,
@@ -160,10 +162,10 @@ void handle_link_modify(char * linkname, int l_index,
 int  get_link_params(int l_index);
 void get_flowset_params(struct dn_flow_set*, int, int);
 void get_queue_params(struct dn_flow_set*,int, int);
-void set_link_params(int l_index, int blackhole, int,int);
+void set_link_params(int l_index, int blackhole, int);
 int  get_new_link_params(int l_index, event_handle_t handle,
 			 event_notification_t notification,
-			 int *, int*);
+			 int *);
 void dump_link_map();
 int  get_link_info();
 /******************************Function prototypes******************************/

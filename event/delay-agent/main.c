@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -48,6 +48,12 @@ int s_dummy;
 /* agent IP address */
 char *ipaddr = NULL;
 
+/* my pid/eid for event subscription */
+char *myexp  = NULL;
+
+/* The list of linknames in tuple format, for the event subscription */
+char myobjects[1024];
+
 int debug = 0;
 
 char buf_link [MAX_LINKS][MAX_LINE_LENGTH];
@@ -78,7 +84,7 @@ int main(int argc, char **argv)
   opterr = 0;
 
   /* get params from the optstring */
-  while ((c = getopt(argc, argv, "s:p:f:d")) != -1) {
+  while ((c = getopt(argc, argv, "s:p:f:dE:")) != -1) {
         switch (c) {
 	  case 'd':
 	      debug++;
@@ -91,6 +97,9 @@ int main(int argc, char **argv)
 	      break;
 	  case 'f':
 	      map_file = optarg;
+	      break;
+	  case 'E':
+	      myexp = optarg;
 	      break;
 	  case '?':
           default:
@@ -120,21 +129,60 @@ int main(int argc, char **argv)
     char * temp = NULL;
     char *sep = " \n";
 
-    while(fgets(buf_link[link_index], 256, mp)){
+    while(fgets(buf_link[link_index], MAX_LINE_LENGTH, mp)){
       temp = buf_link[link_index];
       link_map[link_index].linkname = strsep(&temp, sep);
       link_map[link_index].linktype = strsep(&temp, sep);
-      link_map[link_index].interfaces[0] = strsep(&temp, sep);
-	
-      if(!strcmp(link_map[link_index].linktype,"duplex"))
-        {
-          link_map[link_index].interfaces[1] = strsep(&temp,sep);
-          link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
-	  link_map[link_index].pipes[1] = atoi(strsep(&temp,sep));
+
+      if(!strcmp(link_map[link_index].linktype,"duplex")){
+	/*
+	 * By convention, the first pipe is towards the switch if its
+	 * a lan node delay. This is important cause of queue params,
+	 * which we do not want to set on the pipe coming from the switch.
+	 */
+        link_map[link_index].vnodes[0] = strsep(&temp, sep);
+	link_map[link_index].vnodes[1] = strsep(&temp,sep);
+        link_map[link_index].interfaces[0] = strsep(&temp, sep);
+	link_map[link_index].interfaces[1] = strsep(&temp,sep);
+	link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
+	link_map[link_index].pipes[1] = atoi(strsep(&temp,sep));
+	sprintf(link_map[link_index].linkvnodes[0], "%s-%s",
+		link_map[link_index].linkname, link_map[link_index].vnodes[0]);
+	sprintf(link_map[link_index].linkvnodes[1], "%s-%s",
+		link_map[link_index].linkname, link_map[link_index].vnodes[1]);
+
+	if (!strcmp(link_map[link_index].vnodes[0],
+		    link_map[link_index].vnodes[1])) {
+	  link_map[link_index].islan = 1;
 	}
-	else{
-	  link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
-	}
+	link_map[link_index].numpipes = 2;
+      }
+      else{
+        link_map[link_index].vnodes[0] = strsep(&temp, sep);
+        link_map[link_index].interfaces[0] = strsep(&temp, sep);
+	link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
+	sprintf(link_map[link_index].linkvnodes[0], "%s-%s",
+		link_map[link_index].linkname, link_map[link_index].vnodes[0]);
+	link_map[link_index].numpipes = 1;
+      }
+      
+      /*
+       * Form the comma separated list of linkname for the subscription
+       * There are two objects, one for the lan, and one for lan-vnode.
+       */
+      /* Do not have name yet, so add it to the string */
+      if (strlen(myobjects)) {
+        strcat(myobjects, ",");
+      }
+      sprintf(&myobjects[strlen(myobjects)], "%s,%s",
+	      link_map[link_index].linkname,
+	      link_map[link_index].linkvnodes[0]);
+
+      if(!strcmp(link_map[link_index].linktype,"duplex") &&
+	 !link_map[link_index].islan) {
+        sprintf(&myobjects[strlen(myobjects)], ",%s",
+		link_map[link_index].linkvnodes[1]);
+      }
       link_index++;
     }
   }
@@ -258,19 +306,20 @@ void usage(char *progname)
 
 void fill_tuple(address_tuple_t at)
 {
-
 #ifdef DEBUG
   info("entering function fill_tuple\n");
 #endif
   /* fill the objectname, objecttype and the eventtype from the file*/
-  at->objname = ADDRESSTUPLE_ANY;
+  at->objname = myobjects;
   at->objtype = TBDB_OBJECTTYPE_LINK;
   at->eventtype = ADDRESSTUPLE_ANY;
-  at->host = ipaddr;
+  at->expt = myexp;
+  at->host = ADDRESSTUPLE_ANY;
+
+  info("tuple: %s -- %s\n", myobjects, myexp);
   
   /*fill in other values, dont know what to fill in yet*/
   at->site = ADDRESSTUPLE_ANY;
-  at->expt = ADDRESSTUPLE_ANY;
   at->group= ADDRESSTUPLE_ANY;
   at->scheduler = 0;
 #ifdef DEBUG
@@ -283,61 +332,44 @@ void fill_tuple(address_tuple_t at)
  A debugging aid.*/
 /***************************dump_link_map******************************/
 void dump_link_map(){
-  int i;
+  int i,j;
   for (i = 0; i < link_index; i++){
-    info ("================================================================\n");
+    info ("===============================================================\n");
     info("linkname = %s\n", link_map[i].linkname);
-    info("interface[0] = %s \t interface[1] = %s\n", link_map[i].interfaces[0], link_map[i].interfaces[1]);
     info("linktype = %s\n", link_map[i].linktype);
     info("linkstatus = %d \n", link_map[i].stat);
-    info("pipes[0] = %d \t pipes[1] = %d \n", link_map[i].pipes[0], link_map[i].pipes[1]);
+    info("numpipes   = %d \n", link_map[i].numpipes);
+    info("islan      = %d \n", link_map[i].islan);
 
-    info ("--------------------------------------------------\n");
-    info("Pipe params.....\n");
+    for (j = 0; j < link_map[i].numpipes; j++) {
+      info("Pipe params:\n");
+      info("interface = %s\n", link_map[i].interfaces[j]);
+      info("pipe num  = %d\n", link_map[i].pipes[j]);
+      info("vnode     = %s\n", link_map[i].vnodes[j]);
 
-    info("Pipe 0 .....\n");
-
-    info("delay = %d, bw = %d plr = %f q_size = %d buckets = %d n_qs = %d flags_p = %d \n",  link_map[i].params[0].delay, link_map[i].params[0].bw, link_map[i].params[0].plr, link_map[i].params[0].q_size, link_map[i].params[0].buckets, link_map[i].params[0].n_qs, link_map[i].params[0].flags_p);
-
-    if(link_map[i].params[0].flags_p & PIPE_Q_IS_RED){
-      info(" queue is RED min_th = %d max_th = %d w_q = %f max_p = %f\n",
-	   link_map[i].params[0].red_gred_params.min_th,
-	   link_map[i].params[0].red_gred_params.max_th,
-	   link_map[i].params[0].red_gred_params.w_q,
-	   link_map[i].params[0].red_gred_params.max_p);
+      info("delay = %d, bw = %d plr = %f\n",  link_map[i].params[j].delay,
+	   link_map[i].params[j].bw, link_map[i].params[j].plr);
+      info("q_size = %d buckets = %d n_qs = %d flags_p = %d\n",
+	   link_map[i].params[j].q_size, link_map[i].params[j].buckets,
+	   link_map[i].params[j].n_qs, link_map[i].params[j].flags_p);
+      
+      if(link_map[i].params[j].flags_p & PIPE_Q_IS_RED){
+        info(" queue is RED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	     link_map[i].params[j].red_gred_params.min_th,
+	     link_map[i].params[j].red_gred_params.max_th,
+	     link_map[i].params[j].red_gred_params.w_q,
+	     link_map[i].params[j].red_gred_params.max_p);
+      }
+      else if(link_map[i].params[j].flags_p & PIPE_Q_IS_GRED){
+	info(" queue is GRED min_th = %d max_th = %d w_q = %f max_p = %f\n",
+	     link_map[i].params[j].red_gred_params.min_th,
+	     link_map[i].params[j].red_gred_params.max_th,
+	     link_map[i].params[j].red_gred_params.w_q,
+	     link_map[i].params[j].red_gred_params.max_p);
+      }
+      else info("queue is droptail\n");
+      info ("-----------------------------------------------------------\n");
     }
-
-    else if(link_map[i].params[0].flags_p & PIPE_Q_IS_GRED){
-      info(" queue is GRED min_th = %d max_th = %d w_q = %f max_p = %f\n",
-	   link_map[i].params[0].red_gred_params.min_th,
-	   link_map[i].params[0].red_gred_params.max_th,
-	   link_map[i].params[0].red_gred_params.w_q,
-	   link_map[i].params[0].red_gred_params.max_p);
-    }else info(" queue is droptail\n");
-
-    info ("--------------------------------------------------\n");
-    
-    info("Pipe 1 .....\n");
-
-    info("delay = %d, bw = %d plr = %f q_size = %d buckets = %d n_qs = %d flags_p = %d \n",  link_map[i].params[1].delay, link_map[i].params[1].bw, link_map[i].params[1].plr, link_map[i].params[1].q_size, link_map[i].params[1].buckets, link_map[i].params[1].n_qs, link_map[i].params[1].flags_p);
-
-    if(link_map[i].params[1].flags_p & PIPE_Q_IS_RED){
-      info(" queue is RED min_th = %d max_th = %d w_q = %f max_p = %f\n",
-	   link_map[i].params[1].red_gred_params.min_th,
-	   link_map[i].params[1].red_gred_params.max_th,
-	   link_map[i].params[1].red_gred_params.w_q,
-	   link_map[i].params[1].red_gred_params.max_p);
-    }
-
-    else if(link_map[i].params[1].flags_p & PIPE_Q_IS_GRED){
-      info(" queue is GRED min_th = %d max_th = %d w_q = %f max_p = %f\n",
-	   link_map[i].params[1].red_gred_params.min_th,
-	   link_map[i].params[1].red_gred_params.max_th,
-	   link_map[i].params[1].red_gred_params.w_q,
-	   link_map[i].params[1].red_gred_params.max_p);
-    }else info(" queue is droptail\n");
-
-    info ("--------------------------------------------------\n");
   }
 }
 /************************** FUNCTION DEFS *******************************/

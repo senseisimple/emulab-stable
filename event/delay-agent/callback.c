@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -42,19 +42,13 @@ void agent_callback(event_handle_t handle,
 
   char objname[MAX_LEN];
   char eventtype[MAX_LEN];
-  int  l_index;
+  int i;
 
     /* get the name of the object, eg. link0 or link1*/
   if(event_notification_get_string(handle,
                                    notification,
                                    "OBJNAME", objname, MAX_LEN) == 0){
     error("could not get the objname \n");
-    return;
-  }
-
-  /* check we are handling the objectname for which we have recd an event */
-    if ((l_index = check_object(objname)) == -1){
-    error("not handling events for this object\n");
     return;
   }
 
@@ -66,10 +60,17 @@ void agent_callback(event_handle_t handle,
     return;
   }
 
-  /* call function to handle this event for this object */
-  handle_pipes(objname, eventtype,notification, handle,l_index);
-   
-  return;
+  /*
+   * We could be an agent for several nodes on the same lan, so need to
+   * loop over the pipe sets and possibly repeat all the work multiple
+   * times. Sigh.
+   */
+  for(i = 0; i < link_index; i++){
+    if(!strcmp(link_map[i].linkname, objname) ||
+       !strcmp(link_map[i].linkvnodes[0], objname) ||
+       !strcmp(link_map[i].linkvnodes[1], objname))
+      handle_pipes(objname, eventtype, notification, handle, i);
+  }
 }
 
 /******************** handle_pipes ***************************************
@@ -84,65 +85,21 @@ void handle_pipes (char *objname, char *eventtype,
   
   /*link_map[index] contains the relevant info*/
 
-  /* as of now, we only support duplex links in the testbed. Also we
-     require that both pipes of the duplex link are changed during the
-     event callback. Later when we add simplex links, we will also add
-     support to send event which will have effect on only one side of a
-     duplex link.
-   */
-  if(strcmp(link_map[l_index].linktype,"duplex") == 0){
-
-    if(strcmp(eventtype, TBDB_EVENTTYPE_UP) == 0){
-      handle_link_up(objname, l_index);
-    }
-    else if(strcmp(eventtype, TBDB_EVENTTYPE_DOWN) == 0){
-      handle_link_down(objname, l_index);
-    }
-    else if(strcmp(eventtype, TBDB_EVENTTYPE_MODIFY) == 0){
-      handle_link_modify(objname, l_index, handle, notification);
-    }
-    else error("unknown link event type\n");
-
+  if(strcmp(eventtype, TBDB_EVENTTYPE_UP) == 0){
+    handle_link_up(objname, l_index);
   }
-   else {
-     error( "not handling simplex links yet ");
-     return;
-   }
+  else if(strcmp(eventtype, TBDB_EVENTTYPE_DOWN) == 0){
+    handle_link_down(objname, l_index);
+  }
+  else if(strcmp(eventtype, TBDB_EVENTTYPE_MODIFY) == 0){
+    handle_link_modify(objname, l_index, handle, notification);
+  }
+  else error("unknown link event type\n");
 
   if(debug){
     system ("echo ======================================== >> /tmp/ipfw.log"); 
     system("(date;echo PARAMS ; ipfw pipe show all) >> /tmp/ipfw.log");
   }
-}
-
-/***************** checkevent **************************************
- * checks if we are handling the link for which we got the event
- ***************** checkevent **************************************/
-
-int check_object (char *objname)
-{
-  return search(objname);
-}
-
-
-/*********************** search ********************************
-This function does a linear search on the link_map and returns
-the index of the link_map entry which matches with the objectname
-from the event notification
-
-There will hardly be a few entries in this table, so we dont need
-anything fancier than a linear search.
-
-*********************** search ********************************/
-
-int search(char* objname){
-  /* for now we do a linear search, maybe bin search later*/
-  int i;
-  for(i = 0; i < link_index; i++){
-    if(strcmp(link_map[i].linkname, objname) == 0)
-      return i;
-  }
-  return -1;
 }
 
 /******************* handle_link_up **************************
@@ -158,22 +115,14 @@ void handle_link_up(char * linkname, int l_index)
      link_map table. Set the pipe params in dummynet
    */
   info("==========================================\n");
-   info("recd. UP event for link = %s\n", linkname);
+  info("recd. UP event for link = %s\n", linkname);
 
-   /* no need to do anything if link is already up*/
-   if(link_map[l_index].stat == LINK_UP)
-      return;
+  /* no need to do anything if link is already up*/
+  if(link_map[l_index].stat == LINK_UP)
+    return;
    
-#if 1
-  /* 0 => dont blackhole, get the plr from the link map table
-     2 => both pipes
-       -1 => both pipes*/
-  set_link_params(l_index, 0, 2, -1);
-  
-   link_map[l_index].stat = LINK_UP;
-    info("==========================================\n");
-#endif
-  
+  link_map[l_index].stat = LINK_UP;
+  set_link_params(l_index, 0, -1);
 }
 
 /******************* handle_link_down **************************
@@ -191,24 +140,17 @@ void handle_link_down(char * linkname, int l_index)
    * Change the pipe config so that plr = 1.0
    * so that packets are blackholed
    */
-    info("==========================================\n");
-    info("recd. DOWN event for link = %s\n", linkname);
+  info("==========================================\n");
+  info("recd. DOWN event for link = %s\n", linkname);
 
-    /* if link is already down, no need to do anything*/
-    if(link_map[l_index].stat == LINK_DOWN)
-      return;
-#if 1
+  if(link_map[l_index].stat == LINK_DOWN)
+    return;
+
   if(get_link_params(l_index) == 1){
-    /* 1 => set plr = 1.0 to blackhole packets
-       2 => both pipes
-       -1 => both pipes*/
-    set_link_params(l_index, 1, 2, -1); 
     link_map[l_index].stat = LINK_DOWN;
+    set_link_params(l_index, 1, -1);
   }
   else error("could not get params\n");
-#endif
-  info("==========================================\n");
-  
 }
 
 /*********** handle_link_modify *****************************
@@ -226,12 +168,29 @@ void handle_link_modify(char * linkname, int l_index,
      update the new set of params by setting the params in
      dummynet
    */
-  int p_which = -1;
-  int n_pipes = 0;
-//  char argstring[50];
+  int i, p_which = -1;
 
   info("==========================================\n");
   info("recd. MODIFY event for link = %s\n", linkname);
+
+  /*
+   * As a convience to the user, we create virt_agents entries
+   * for each "link-vnode" so that users can talk to a specific
+   * side of a duplex link, or a specific node in a lan (in which
+   * case it refers to both pipes, not just one). Look at the
+   * object name to determine ahead of time which pipe. Note that
+   * for the lan node case, the virt agent entry exists strictly
+   * to direct the event to this agent; there might be an actual
+   * pipe spec inside the event if the user wants to one side
+   * of the link (to the switch or from the switch).
+   */
+  if (!link_map[l_index].islan) {
+    for (i = 0; i < link_map[l_index].numpipes; i++) {
+      if(!strcmp(link_map[l_index].linkvnodes[i], linkname)) {
+	p_which = i;
+      }
+    }
+  }
   
   /* if the link is up, then get the params from dummynet,
      get the params from the notification and then merge
@@ -239,18 +198,11 @@ void handle_link_modify(char * linkname, int l_index,
    */
   if(link_map[l_index].stat == LINK_UP){
     if(get_link_params(l_index) == 1)
-      if(get_new_link_params(l_index, handle, notification,
-			     &n_pipes,&p_which) == 1)
-	/* 0 => dont blackhole, get the plr
-	 * from the link map table*/
-	/*info(" n_pipes = %d p_which = %d\n", n_pipes, p_which);*/
-	set_link_params(l_index, 0, n_pipes, p_which);
-    
-				    
+      if(get_new_link_params(l_index, handle, notification, &p_which) == 1)
+	set_link_params(l_index, 0, p_which);
   } else
     /* link is down, so just change in the link_map*/
-     get_new_link_params(l_index, handle, notification,
-			 &n_pipes, &p_which);
+    get_new_link_params(l_index, handle, notification, &p_which);
 }
 
 /****************** get_link_params ***************************
@@ -267,7 +219,7 @@ int get_link_params(int l_index)
   void * data = NULL;
   int p_index = 0;
   int pipe_num;
-  while( p_index < 2){
+  while( p_index < link_map[l_index].numpipes ){
     
     pipe_num = link_map[l_index].pipes[p_index];
 
@@ -439,19 +391,19 @@ for both the pipes of the duplex link, set the pipe params
 sing setsockopt getting the param values from the link_map table
 **************************************************************/
 
-void set_link_params(int l_index, int blackhole,int t_pipes, int p_which)
+void set_link_params(int l_index, int blackhole, int p_which)
 {
   /* Grab the pipe params from the link_map table and then
      set them into dummynet by calling setsockopt
    */
- /*bw, delay, plr, buckets, qsize, mask, qtype*/
+  int p_index;
 
-  int p_index = 0;
-  
-  while(p_index < 2)
-    {
-      if((t_pipes == 2) || (t_pipes == 0) || (p_which == p_index))
-	{
+  for (p_index = 0; p_index < link_map[l_index].numpipes; p_index++) {
+      /*
+       * Want to do all the pipes, or just the one pipe that was
+       * specified.
+       */
+       if(p_which == -1 || p_which == p_index) {
 	    struct dn_pipe pipe;
 	    /* get the params stored in the link table*/
 	    structpipe_params *p_params
@@ -472,30 +424,22 @@ void set_link_params(int l_index, int blackhole,int t_pipes, int p_which)
 	       then we set all other pipe params same, but change the
 	       plr to 1.0
 	       */
-      
-	    if(blackhole == 1){
-	      double d = 1.0;
+	    {
+	      double d = p_params->plr;
+
+	      if (blackhole)
+		d = 1.0;
+	      
 	      pipe.fs.plr = (int)(d*0x7fffffff);
 	    }
-	    else{ /* we want to change plr*/
-	      /* if the pipe was initially down, and if the user wants it up and he
-		 has not specied any plr, then use the default plr = 0.0*/
-	      if((int)(p_params->plr) == 1)
-		pipe.fs.plr = (int)(0*0x7fffffff);
-	      else
-		pipe.fs.plr = (int)(p_params->plr*0x7fffffff);
-	    }
+
 	    /* set the queue size*/
 	    pipe.fs.qsize = p_params->q_size;
 	    /* set the number of buckets used for dynamic queues*/
 	    pipe.fs.rq_size = p_params->buckets;
-
-
 #if 0
 	    pipe.fs.rq_elements = num_qs;
-     
 #endif
-
 	    /* initialise pipe flags to zero */
 	    pipe.fs.flags_fs = 0;
 
@@ -604,10 +548,7 @@ void set_link_params(int l_index, int blackhole,int t_pipes, int p_which)
 		< 0)
 	      error("IP_DUMMYNET_CONFIGURE setsockopt failed\n");
 	  }
-      /* go on to the next pipe in the duplex link*/
-      p_index++;
     }
-
 }
 
 /********* get_new_link_params ***************************
@@ -616,23 +557,28 @@ void set_link_params(int l_index, int blackhole,int t_pipes, int p_which)
  ********************************************************/
 
 int get_new_link_params(int l_index, event_handle_t handle,
-			 event_notification_t notification, int* p_pipes,
-			 int * pipe_which)
+			event_notification_t notification, int *pipe_which)
 {
   /* get the params of the pipe that were sent in the notification and
      store those values into the link_map table
    */
 
-  char argstring[50];
+  char argstring[256];
   char * argtype = NULL;
   char * argvalue = NULL;
-  int tot_pipes = 0;
-  int p_num = -1;
+  int p_num = 0;
+  int gotpipe = 0;
+  int islan = link_map[l_index].islan;
   char *temp = NULL;
+
+  /* Allow upper level to init the pipe */
+  if (*pipe_which >= 0) {
+      gotpipe = 1;
+      p_num   = *pipe_which;
+  }
   
-  if(event_notification_get_string(handle,
-                                   notification,
-                                   "ARGS", argstring, 50) != 0){
+  if(event_notification_get_string(handle, notification,
+                                   "ARGS", argstring, sizeof(argstring)) != 0){
     info("ARGS = %s\n", argstring);
     temp = argstring;
     
@@ -642,141 +588,123 @@ int get_new_link_params(int l_index, event_handle_t handle,
 
       if(strcmp(argtype,"BANDWIDTH")== 0){
 	info("Bandwidth = %d\n", atoi(argvalue) * 1000);
-	 if(p_num == -1){
-	   /* this is for both pipes*/
-	   link_map[l_index].params[0].bw =
-	   link_map[l_index].params[1].bw =
-	     atoi(argvalue) * 1000;
-	 }
-	 else /* do only for the specific pipe*/
-	     link_map[l_index].params[p_num].bw = atoi(argvalue) * 1000;
+	link_map[l_index].params[p_num].bw = atoi(argvalue) * 1000;
+	if (! gotpipe) {
+	  link_map[l_index].params[1].bw = link_map[l_index].params[0].bw;
+	}
       }
 
       else if (strcmp(argtype,"DELAY")== 0){
 	 info("Delay = %d\n", atoi(argvalue));
-	  if(p_num == -1){
-	   /* this is for both pipes*/
-	   link_map[l_index].params[0].delay =
+	 link_map[l_index].params[p_num].delay = atoi(argvalue);
+	 if (! gotpipe) {
 	   link_map[l_index].params[1].delay =
-	     atoi(argvalue);
+		   link_map[l_index].params[0].delay;
 	 }
-	 else
-	   link_map[l_index].params[p_num].delay = atoi(argvalue);
-       }
-
-       else if (strcmp(argtype,"PLR")== 0){
+      }
+      else if (strcmp(argtype,"PLR")== 0){
 	 info("Plr = %f\n", atof(argvalue));
-	 if(p_num == -1){
-	   /* this is for both pipes*/
-	 link_map[l_index].params[0].plr =
-	   link_map[l_index].params[1].plr =
-	     atof(argvalue);
-
+	 link_map[l_index].params[p_num].plr = atof(argvalue);
+	 if (! gotpipe) {
+	   link_map[l_index].params[1].plr = link_map[l_index].params[0].plr;
 	 }
-	 else /* do only for the specific pipe*/
-	   link_map[l_index].params[p_num].plr = atof(argvalue);
-       }
+      }
 
-       /* Queue parameters */
+       /* Queue parameters. Slightly different since we do not want
+	  to set the queue params for a lan node in the from-switch
+	  direction. Note, by convention the 0 pipe is to the switch
+          and the 1 pipe is from the switch. */
        
        else if (strcmp(argtype,"LIMIT")== 0){
 	 info("QSize/Limit = %d\n", atoi(argvalue));
-	 if(p_num == -1){
-	   /* this is for both pipes*/
-	   link_map[l_index].params[0].q_size =
+	 /* set the PIPE_QSIZE_IN_BYTES flag to 0,
+	    since we assume that limit is in slots/packets by default
+	 */
+	 link_map[l_index].params[p_num].q_size = atoi(argvalue);
+	 link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
+	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].q_size =
-	     atoi(argvalue);
-	   /* set the PIPE_QSIZE_IN_BYTES flag to 0,
-	      since we assume that limit is in slots/packets by
-	      default
-	      */
-	   link_map[l_index].params[0].flags_p &=
-	     ~PIPE_QSIZE_IN_BYTES;
-	   link_map[l_index].params[1].flags_p &=
-	     ~PIPE_QSIZE_IN_BYTES;
-	 } else /* do only for the specific pipe*/
-	   {
-	     link_map[l_index].params[p_num].q_size = atoi(argvalue);
-	     link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
-	   }
+		   link_map[l_index].params[0].q_size;
+	   link_map[l_index].params[0].flags_p =
+		   link_map[l_index].params[1].flags_p;
+	 }
        }
 
        else if (strcmp(argtype,"QUEUE-IN-BYTES")== 0){
 	 int qsztype = atoi(argvalue);
 	 if(qsztype == 0){
 	   info("QSize in slots/packets");
-	   /* queue size is in slots/packets*/
-	   if(p_num == -1){
-	     /* this is for both pipes*/
-	     link_map[l_index].params[0].flags_p &=
-	       ~PIPE_QSIZE_IN_BYTES;
-	     link_map[l_index].params[1].flags_p &=
-	       ~PIPE_QSIZE_IN_BYTES;
-	   }else /* just do for the specific pipe*/
-	     link_map[l_index].params[p_num].flags_p &=
-	       ~PIPE_QSIZE_IN_BYTES;
+	   link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
 	 }
-	 else if(qsztype == 1)
-	   {
-	     info("QSize in bytes\n");
-	      if(p_num == -1){
-		/* this is for both pipes*/
-		/* queue size is in bytes*/
-		link_map[l_index].params[0].flags_p |= PIPE_QSIZE_IN_BYTES;
-		link_map[l_index].params[1].flags_p |= PIPE_QSIZE_IN_BYTES;
-	      } else /*do for the specific pipe*/
-		link_map[l_index].params[p_num].flags_p |= PIPE_QSIZE_IN_BYTES;
-	   }
+	 else {
+	   info("QSize in bytes\n");
+	   link_map[l_index].params[p_num].flags_p |= PIPE_QSIZE_IN_BYTES;
+	 }
+	 if (!gotpipe && !islan) {
+	   link_map[l_index].params[1].flags_p =
+		   link_map[l_index].params[0].flags_p;
+	 }
        }
        else if(strcmp(argtype,"MAXTHRESH")== 0){
 	 info("Maxthresh = %d \n", atoi(argvalue));
-	 if(p_num == -1){
-	   link_map[l_index].params[0].red_gred_params.max_th
-	     = link_map[l_index].params[1].red_gred_params.max_th
-	       = atoi(argvalue);
-	 } else
-	   link_map[l_index].params[p_num].red_gred_params.max_th
-	       = atoi(argvalue);
+	 link_map[l_index].params[p_num].red_gred_params.max_th =
+		 atoi(argvalue);
+	 if (!gotpipe && !islan) {
+	   link_map[l_index].params[1].red_gred_params.max_th =
+		   link_map[l_index].params[0].red_gred_params.max_th;
+	 }
        }
        else if(strcmp(argtype,"THRESH")== 0){
 	 info("Thresh = %d \n", atoi(argvalue));
-	 if(p_num == -1){
-	   link_map[l_index].params[0].red_gred_params.min_th
-	     = link_map[l_index].params[1].red_gred_params.min_th
-	       = atoi(argvalue);
-	 }else
-	   link_map[l_index].params[p_num].red_gred_params.min_th
-	       = atoi(argvalue);
+	 link_map[l_index].params[p_num].red_gred_params.min_th =
+		 atoi(argvalue);
+	 if (!gotpipe && !islan) {
+	    link_map[l_index].params[1].red_gred_params.min_th =
+		    link_map[l_index].params[0].red_gred_params.min_th;
+	 }
        }
        else if(strcmp(argtype,"LINTERM")== 0){
 	 info("Linterm = %f\n", 1.0 / atof(argvalue));
-	 if(p_num == -1){
-	   link_map[l_index].params[0].red_gred_params.max_p
-	     = link_map[l_index].params[1].red_gred_params.max_p
-	       = 1.0 / atof(argvalue);
-	 }else
-	   link_map[l_index].params[p_num].red_gred_params.max_p
-	       = 1.0 / atof(argvalue);
+	 link_map[l_index].params[p_num].red_gred_params.max_p =
+		 1.0 / atof(argvalue);
+	 if (!gotpipe && !islan) {
+	   link_map[l_index].params[1].red_gred_params.max_p =
+		   link_map[l_index].params[0].red_gred_params.max_p;
+	 }
        }
        else if(strcmp(argtype,"Q_WEIGHT")== 0){
 	 info("Qweight = %f\n", atof(argvalue));
-	 if(p_num == -1){
-	   link_map[l_index].params[0].red_gred_params.w_q
-	     = link_map[l_index].params[1].red_gred_params.w_q
-	       = atof(argvalue);
-	 }else
-	   link_map[l_index].params[p_num].red_gred_params.w_q
-	       = atof(argvalue);
+	 link_map[l_index].params[p_num].red_gred_params.w_q =
+		 atof(argvalue);
+	 if (!gotpipe && !islan) {
+	   link_map[l_index].params[1].red_gred_params.w_q =
+		   link_map[l_index].params[0].red_gred_params.w_q;
+	 }
        }
        else if(strcmp(argtype,"PIPE")== 0){
 	 info("PIPE = %s\n", argvalue);
 
-	 tot_pipes++;
+	 gotpipe++;
 	 if(strcmp(argvalue, "pipe0") == 0)
-	     p_num = 0;
+	   p_num = 0;
 	 else if(strcmp(argvalue, "pipe1") == 0)
 	   p_num = 1;
-	 else error("unrecognized pipe number\n");
+	 else if(isdigit(argvalue[0])) {
+	   int pipeno = atoi(argvalue);
+
+	   if(link_map[l_index].pipes[0] == pipeno)
+	     p_num = 0;
+	   else if(link_map[l_index].pipes[1] == pipeno)
+	     p_num = 1;
+	   else {
+	     error("unrecognized pipe number\n");
+	     return -1;
+	   }
+	 }
+	 else {
+	   error("unrecognized pipe argument\n");
+	   return -1;
+	 }
        }
        else {
 	 error("unrecognized argument\n");
@@ -785,12 +713,9 @@ int get_new_link_params(int l_index, event_handle_t handle,
        argtype = strsep(&temp,"=");
      }
   }
+  if (gotpipe)
+    *pipe_which = p_num;
   
-  info("In func. get_new \n");
-  info("tot_pips = %d p_num = %d \n", tot_pipes, p_num);
-  
-  *p_pipes = tot_pipes;
-  *pipe_which = p_num;
   return 1;
 }
  /**************** get_link_info ****************************
