@@ -1010,6 +1010,22 @@ function TBNodeUidLastLogin($node_id)
 }
 
 #
+# Return number of events in an experiment.
+#
+function TBEventCount($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select count(*) from eventlist ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
+#
 # Return the last login for all of the nodes in an experiment, but only
 # after the experiment was created (swapped in).
 # 

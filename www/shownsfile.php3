@@ -27,17 +27,6 @@ if (!isset($eid) ||
     USERERROR("You must provide an Experiment ID.", 1);
 }
 
-if ($verbose) {
-    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid'>
-                Be Less Verbose</a>
-          </b><br><br>\n";
-}
-else {
-    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid&verbose=1'>
-                Be More Verbose</a>
-          </b><br><br>\n";
-}
-
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
@@ -62,6 +51,17 @@ if (!$isadmin) {
     if (mysql_num_rows($query_result) == 0) {
         USERERROR("You are not a member of Project $pid!", 1);
     }
+}
+
+if ($showevents) {
+    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid'>
+                Hide Event List</a>
+          </b><br><br>\n";
+}
+elseif (TBEventCount($pid, $eid)) {
+    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid&showevents=1'>
+                Show Event List</a>
+          </b><br><br>\n";
 }
 
 #
@@ -97,7 +97,7 @@ echo "<br>
 $output = array();
 $retval = 0;
 
-if ($verbose) {
+if ($showevents) {
     $flags = "-v";
 }
 else {
