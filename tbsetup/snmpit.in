@@ -61,6 +61,7 @@ VLAN Control:
   -r <pid> <eid>    Remove all VLANs from database tables for an experiment
   -l                List all VLANs
   -w                Used with -l, includes device-specific VLAN number
+  -M                Used with -l, print MAC addresses instead of port numbers
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
   -y <type>         When used with -m, the new VLAN becomes a private VLAN
@@ -92,9 +93,9 @@ END
 
 
 my %opt = ();
-GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','n','o=s@','p=s',
-    'r','s','t','u=s','v','w','y=s','x=s','z=s');
-# Unused: b,f,j,q,w
+GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','M','n','o=s@',
+    'p=s','r','s','t','u=s','v','w','y=s','x=s','z=s');
+# Unused: b,f,j,q
 
 if ($opt{h}) {
     exit &usage;
@@ -595,7 +596,19 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 
 
 	if (!$vname) { $vname = ""; }
-	$members = join(" ",@$memberref);
+
+	#
+	# Check to see if we were supposed to print out MAC addresses
+	#
+	if ($opt{M}) {
+	    # Rather than node:port, print out node:MAC (if we know the MAC)
+	    $members = join(" ", map
+		{
+		    macport($_)? (split /:/)[0] . ":" . macport($_) : $_
+		} @$memberref);
+	} else {
+	    $members = join(" ",@$memberref);
+	}
 
 	#
 	# Setup $pideid for a more compact display
