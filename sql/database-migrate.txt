@@ -2117,6 +2117,10 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (pid,eid,inner_id)
 	) TYPE=MyISAM;
 
+1.272: Add "archived" flag to webnews table for hiding entries.
 
+	alter table webnews add archived tinyint(1) NOT NULL \
+                default '0' after body;
+	alter table webnews add archived_date datetime default NULL \
+	        after archived;
 
-	  

@@ -7,14 +7,17 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
+# Standard Testbed Header is sent below.
 #
-PAGEHEADER("News");
-
 #
 # If user is an admin, present edit options.
 #
 $uid = GETLOGIN();
+
+if (! isset($show_archived)) {
+    $show_archived = 0;
+}
+$show_archived = ($show_archived ? 1 : 0);
 
 if ($uid) {
     $isadmin = ISADMIN($uid);
@@ -23,6 +26,35 @@ if ($uid) {
 }
 
 if ($isadmin) {
+    if (isset($deletec)) {
+	$safeid = addslashes($deletec);
+
+	DBQueryFatal("DELETE FROM webnews WHERE msgid='$safeid'");
+
+	header("Location: news.php3?show_archived=$show_archived");
+	return;
+    }
+    if (isset($archive)) {
+	$safeid = addslashes($archive);
+
+	DBQueryFatal("update webnews set archived=1,archived_date=now() ".
+		     "where msgid='$safeid'");
+
+	header("Location: news.php3?show_archived=$show_archived");
+	return;
+    }
+    if (isset($restore)) {
+	$safeid = addslashes($restore);
+
+	DBQueryFatal("update webnews set archived=0,archived_date=NULL ".
+		     "where msgid='$safeid'");
+
+	header("Location: news.php3?show_archived=$show_archived");
+	return;
+    }
+
+    PAGEHEADER("News");
+    
     if (isset($delete)) {
 	$delete = addslashes($delete);
 	echo "<center>";
@@ -33,17 +65,6 @@ if ($isadmin) {
 	echo "<button name='nothin'>No</button>\n";
 	echo "</form>";
 	echo "</center>";
-	PAGEFOOTER();
-	die("");
-    }
-
-    if (isset($deletec)) {
-	$deleteConf = addslashes($deletec);
-
-	DBQueryFatal("DELETE FROM webnews WHERE msgid='$deletec'");
-
-	echo "<h2>Deleted message.</h2>";
-	echo "<h3><a href='news.php3'>Back to news</a></h3>";
 	PAGEFOOTER();
 	die("");
     }
@@ -182,7 +203,9 @@ if ($isadmin) {
 	echo "<button name='addnew'>Add a new message</button>\n";
 	echo "</form>";
     }
-
+}
+else {
+    PAGEHEADER("News");
 }
 
 ?>
@@ -195,11 +218,27 @@ if ($isadmin) {
 <br />
 <?php
 
+# Allow admin caller to flip the archive bit. 
+$show_archive_clause = "where archived=0";
+if ($isadmin) {
+    if ($show_archived) {
+	$show_archive_clause = "";
+	echo "<a href='news.php3?show_archived=0'>Hide Archived Messages</a>\n";
+    }
+    else {
+	echo "<a href='news.php3?show_archived=1'>Show Archived Messages</a>\n";
+    }
+}
+
 $query_result=
     DBQueryFatal("SELECT subject, author, body, msgid, ".
 		 "DATE_FORMAT(date,'%W, %M %e, %Y, %l:%i%p') as prettydate, ".
-		 "(TO_DAYS(NOW()) - TO_DAYS(date)) as age ".
+		 "(TO_DAYS(NOW()) - TO_DAYS(date)) as age, ".
+		 "archived, ".
+		 "DATE_FORMAT(archived_date,'%W, %M %e, %Y, %l:%i%p') as ".
+		 "  archived_date ".
 		 "FROM webnews ".
+		 "$show_archive_clause ".
 		 "ORDER BY date DESC" );
 
 if (!mysql_num_rows($query_result)) {
@@ -208,6 +247,7 @@ if (!mysql_num_rows($query_result)) {
 
     if ($isadmin) {
 	echo "<form action='news.php3' method='post'>";
+	echo "<input type='hidden' name=show_archived value='$show_archived'>";
     }
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -217,6 +257,8 @@ if (!mysql_num_rows($query_result)) {
 	$body    = $row[body];
 	$msgid   = $row[msgid];
 	$age     = $row[age];
+	$archived = $row[archived];
+	$archived_date = $row[archived_date];
 
 	echo "<a name=\"$msgid\" />\n";
 	echo "<table class='nogrid' 
@@ -233,6 +275,9 @@ if (!mysql_num_rows($query_result)) {
 	echo "</th></tr>\n".
 	     "<tr><td style='padding: 4px; padding-top: 2px;'><font size=-1>";
 	echo "<b>$date</b>; posted by <b>$author</b>.";
+	if ($archived) {
+	    echo "<font color=red> Archived on <b>$archived_date</b></font>.\n";
+	}
 
 	if ($isadmin) {
 	    echo " (Message <b>#$msgid</b>)";
@@ -245,8 +290,14 @@ if (!mysql_num_rows($query_result)) {
 	    echo "<button name='edit' value='$msgid'>".
 		 "Edit</button>".
 	         "<button name='delete' value='$msgid'>".
-		 "Delete</button>\n";
-	    echo "</td></tr>";
+		 "Delete</button>";
+	    if ($archived)
+		echo "<button name='restore' value='$msgid'>".
+		     "Restore</button>";
+	    else
+		echo "<button name='archive' value='$msgid'>".
+		     "Archive</button>";
+	    echo "</td></tr>\n";
 	}
 
 	echo "<tr><td style='padding: 4px; padding-top: 2px;'>".

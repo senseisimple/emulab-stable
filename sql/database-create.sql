@@ -2027,6 +2027,8 @@ CREATE TABLE webnews (
   date datetime default NULL,
   author varchar(32) default NULL,
   body text,
+  archived tinyint(1) default '0',
+  archived_date datetime default NULL,
   PRIMARY KEY  (msgid),
   KEY date (date)
 ) TYPE=MyISAM;
