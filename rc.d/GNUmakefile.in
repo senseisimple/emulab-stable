@@ -8,7 +8,7 @@ SUBDIR		= rc.d
 
 include $(OBJDIR)/Makeconf
 
-RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh
+RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh 1.named.sh
 #
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
