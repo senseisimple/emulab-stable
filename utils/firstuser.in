@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,7 +15,7 @@ use libdb;
 my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
 my $mkgroup = '@prefix@/sbin/mkgroup';
-my $mkacct  = '@prefix@/sbin/mkacct';
+my $mkacct  = '@prefix@/sbin/tbacct add';
 
 print "IMPORTANT: You should ONLY use this script to create the first\n";
 print "testbed user - others should be created through the web interface\n";
