@@ -111,15 +111,19 @@ AC_ARG_WITH(LEDA,
         LEDA="$withval"
     fi
 ],[
-    LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
+    if test -d "$ac_default_prefix/LEDA/LEDA-4.0"; then
+        LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
+    else
+        LEDA=""
+    fi
 ])
 AC_SUBST(LEDA)
 
 #
 # Override LEDA with assign binary.
 #
-AC_ARG_WITH(assign,
-[  --with-assign	Specify assign binary (overrides LEDA, default off)],
+AC_ARG_WITH(assignbinary,
+[  --with-assignbinary	Specify assign binary (overrides LEDA, default on)],
 [
     if test "$withval" = "yes"; then
         ASSIGN="assign.bin"
@@ -129,7 +133,11 @@ AC_ARG_WITH(assign,
         LEDA=""
     fi
 ],[
-    ASSIGN=""
+    if test "$LEDA" = ""; then
+        ASSIGN="assign.bin"
+    else
+        ASSIGN=""
+    fi
 ])
 AC_SUBST(ASSIGN)
 

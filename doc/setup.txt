@@ -55,9 +55,10 @@ library. In the meantime we will be working on removing our dependence
 on the LEDA library.
 
 The program in question is assign (see the assign subdir). Please
-contact us if you need to replace it. When you configure your
-testbed tree, be sure to add the --with-assign=/path/to/assign/binary.
-See below.
+contact us if you need to replace it. The default operation of
+configure is to assume the existence of assign/assign.bin in the
+source tree. However, you can override that by using the configure 
+option --with-assignbinary=/path/to/assign/binary.
 
 ##### Step 3 - Testbed tree configuration/installation
 
@@ -114,8 +115,7 @@ Now, build and install the software. For example, I have the testbed source in
 defs-ricci-emulab defs file in my home directory, I would do:
 
 cd ~/tbobj
-~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab \
-	--with-assign=/users/ricci/testbed/assign_binary
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab
 gmake
 gmake boss-install
 sudo gmake post-install
