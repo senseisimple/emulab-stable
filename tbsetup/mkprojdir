@@ -68,14 +68,17 @@ my $gid  = $row[0];
 my $head = $row[1];
 
 #
+# This acts as check (and we need the numeric uid) in case mkacct failed!
+# 
+my ($login,$pass,$uid) = getpwnam($head)
+    or die "$head not in passwd file";
+
+#
 # Okay, do it.
 #
 if (! mkdir("$PROJROOT/$pid", 0770)) {
     die("Could not make directory $PROJROOT/$pid: $!\n");
 }
-
-my ($login,$pass,$uid) = getpwnam($head)
-    or die "$head not in passwd file";
 
 if (! chown($uid, $gid, "$PROJROOT/$pid")) {
     die("Could not chown $PROJROOT/$pid to $uid/$gid: $!\n");
