@@ -1,0 +1,51 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+
+#
+# dbfillcheck - Make sure that the initial fill contents on the
+# database match the ones in the checked-out source.  Exits with value
+# 1 if the two differ, 0 if they do not, and -1 if some error (such as
+# the mysql server is not running, or the database does not exist)
+# prevents us from telling if they differ or not.
+#
+
+#
+# Configure variables
+#
+my $testbed_srcdir = "@top_srcdir@";
+
+# Locals
+my $master_fill   = "$testbed_srcdir/sql/database-fill.sql";
+my $export_tables = "../utils/export_tables";
+my $tempfile      = "/tmp/dbdiff.$$";
+my $exitcode      = 0;
+
+#
+# Diff exits with 2 if a problem. We tell diff to ignore whitespace
+# changes and comment lines (line starting with '--'). 
+# 
+if (system("perl $export_tables | ".
+	   "diff -b -B -I '^--.*\$' $master_fill - > $tempfile") == 2) {
+    unlink($tempfile);
+    die("*** $0:\n".
+	"    diff $export_tables failed!\n");
+}
+
+# No differences ...
+if (!$?) {
+    unlink($tempfile);
+    exit(0);
+}
+
+#
+# Oh well. Cat the diff to stdout and exit with non-zero status.
+#
+system("cat $tempfile");
+unlink($tempfile);
+exit(1);

@@ -24,7 +24,7 @@ SUBDIRS = lib db assign @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
 		sensors os install/newnode_sshkeys
 
-all:		all-subdirs
+all:		all-subdirs 
 
 install:	
 	@echo "Choose either boss-install (paper) or ops-install (plastic)"
@@ -33,7 +33,8 @@ install:
 #
 # For installation on boss node (okay, paper).
 # 
-boss-install:	install-schemacheck install-sitevarscheck install-subdirs install-mkdirs 
+boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
+		install-subdirs install-mkdirs 
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 #
@@ -110,6 +111,15 @@ endif
 install-sitevarscheck:
 	@echo "Checking Site variables..."
 	$(SITEVARSCHECK)
+
+ifeq ($(TBROOT),/usr/testbed)
+DBFILLCHECK= cd $(OBJDIR)/db && perl dbfillcheck
+else
+DBFILLCHECK= @echo "Skipping DB fill check, since prefix isn't /usr/testbed"
+endif
+install-dbfillcheck:
+	@echo "Checking Initial DB Fill ..."
+	$(DBFILLCHECK)
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

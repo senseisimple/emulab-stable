@@ -1,8 +1,8 @@
--- MySQL dump 8.22
+-- MySQL dump 8.21
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.54-log
+-- Server version	3.23.49-log
 
 --
 -- Dumping data for table 'comments'
@@ -242,14 +242,14 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,'');
-REPLACE INTO state_timeouts VALUES ('PCVM','BOOTING',180,'NOTIFY');
-REPLACE INTO state_timeouts VALUES ('PCVM','SHUTDOWN',0,'');
-REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
-REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',60,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',15,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('PCVM','BOOTING',600,'NOTIFY');
+REPLACE INTO state_timeouts VALUES ('PCVM','SHUTDOWN',0,'');
+REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 
 --
 -- Dumping data for table 'state_transitions'
@@ -321,6 +321,7 @@ REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING');
+REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','BOOTING');
