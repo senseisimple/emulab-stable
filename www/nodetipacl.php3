@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include("xmlrpc.php3");
 
 #
 # This script generates an "acl" file.
@@ -36,28 +37,57 @@ if (! $isadmin) {
     }
 }
 
-$query_result = DBQueryFatal("SELECT server, portnum, keylen, keydata " . 
-			     "FROM tiplines WHERE node_id='$node_id'" );
-
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id does not exist, or seem to have a tipline!", 1);
-}
-
 #
-# Read in the fingerprint of capture's certificate
+# Ask outer emulab for the stuff we need. It does it own perm checks
 #
-$capfile = "$TBETC_DIR/capture.fingerprint";
-$lines = file($capfile,"r");
-if (!$lines) {
-    TBERROR("Unable to open $capfile!",1);
-}
+if ($ELABINELAB) {
+    $arghash = array();
+    $arghash["node"] = $node_id;
 
-$fingerline = rtrim($lines[0]);
-if (!preg_match("/Fingerprint=([\w:]+)$/",$fingerline,$matches)) {
-    TBERROR("Unable to find fingerprint in string $fingerline!",1);
-}
+    $results = XMLRPC($uid, "nobody", "elabinelab.console", $arghash);
 
-$certhash = str_replace(":","",strtolower($matches[1]));
+    if (!$results ||
+	! (isset($results{'server'})  && isset($results{'portnum'}) &&
+	   isset($results{'keydata'}) && isset($results{'certsha'}))) {
+	TBERROR("Did not get everything we needed from RPC call", 1);
+    }
+
+    $server  = $results['server'];
+    $portnum = $results['portnum'];
+    $keydata = $results['keydata'];
+    $keylen  = strlen($keydata);
+    $certhash= strtolower($results{'certsha'});
+}
+else {
+
+    $query_result = DBQueryFatal("SELECT server, portnum, keylen, keydata " . 
+				 "FROM tiplines WHERE node_id='$node_id'" );
+
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("The node $node_id does not exist, ".
+		  "or does not have a tipline!", 1);
+    }
+    $row = mysql_fetch_array($query_result);
+    $server  = $row[server];
+    $portnum = $row[portnum];
+    $keylen  = $row[keylen];
+    $keydata = $row[keydata];
+
+    #
+    # Read in the fingerprint of the capture certificate
+    #
+    $capfile = "$TBETC_DIR/capture.fingerprint";
+    $lines = file($capfile,"r");
+    if (!$lines) {
+	TBERROR("Unable to open $capfile!",1);
+    }
+
+    $fingerline = rtrim($lines[0]);
+    if (!preg_match("/Fingerprint=([\w:]+)$/",$fingerline,$matches)) {
+	TBERROR("Unable to find fingerprint in string $fingerline!",1);
+    }
+    $certhash = str_replace(":","",strtolower($matches[1]));
+}
 
 $filename = $node_id . ".tbacl"; 
 
@@ -67,12 +97,6 @@ header("Content-Description: ACL key file for a testbed node serial port");
 
 # XXX, should handle multiple tip lines gracefully somehow, 
 # but not important for now.
-
-$row = mysql_fetch_array($query_result);
-$server  = $row[server];
-$portnum = $row[portnum];
-$keylen  = $row[keylen];
-$keydata = $row[keydata];
 
 echo "host:   $server\n";	
 echo "port:   $portnum\n";
