@@ -10,6 +10,11 @@ use English;
 use Errno;
 use POSIX qw(setsid);
 
+#
+# Prototypes
+#
+sub hackwaitandexit();
+
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
