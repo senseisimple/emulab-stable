@@ -906,7 +906,6 @@ void ev_callback(event_handle_t handle,
 
     orientation = orientation * M_PI / 180.0;
 
-
     if ((in_camera = position_in_camera(g_camera_config,g_camera_config_size,
 					x,y)) &&
 	!(in_obstacle = position_in_obstacle(g_obstacle_config,
@@ -1735,6 +1734,17 @@ int vmc_callback(elvin_io_handler_t handler,
   return retval;
 }
 
+/**
+ * Do a fuzzy comparison of two values.
+ *
+ * @param x1 The first value.
+ * @param x2 The second value.
+ * @param tol The amount of tolerance to take into account when doing the
+ * comparison.
+ */
+#define cmp_fuzzy(x1, x2, tol) \
+    ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
+
 int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
 {
   struct mtp_update_position *mup;
@@ -1754,17 +1764,25 @@ int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
     while ((mup = (struct mtp_update_position *)
 	    robot_list_enum_next_element(e)) != NULL) {
       struct emc_robot_config *erc;
+      float orientation;
       
       erc = robot_list_search(hostname_list, mup->robot_id);
-      event_do(handle,
-	       EA_Experiment, pideid,
-	       EA_Type, TBDB_OBJECTTYPE_NODE,
-	       EA_Event, TBDB_EVENTTYPE_MODIFY,
-	       EA_Name, erc->vname,
-	       EA_ArgFloat, "X", mup->position.x,
-	       EA_ArgFloat, "Y", mup->position.y,
-	       EA_ArgFloat, "ORIENTATION", mup->position.theta,
-	       EA_TAG_DONE);
+      orientation = mup->position.theta * 180.0 / M_PI;
+      if (!cmp_fuzzy(erc->last_update_pos.x, mup->position.x, 0.02) ||
+	  !cmp_fuzzy(erc->last_update_pos.y, mup->position.y, 0.02) ||
+	  !cmp_fuzzy(erc->last_update_pos.theta, mup->position.theta, 0.04)) {
+	event_do(handle,
+		 EA_Experiment, pideid,
+		 EA_Type, TBDB_OBJECTTYPE_NODE,
+		 EA_Event, TBDB_EVENTTYPE_MODIFY,
+		 EA_Name, erc->vname,
+		 EA_ArgFloat, "X", mup->position.x,
+		 EA_ArgFloat, "Y", mup->position.y,
+		 EA_ArgFloat, "ORIENTATION", orientation,
+		 EA_TAG_DONE);
+	
+	erc->last_update_pos = mup->position;
+      }
     }
     robot_list_enum_destroy(e);
   }

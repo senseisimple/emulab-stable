@@ -47,16 +47,18 @@ check_output "init -> request-position failed?" <<EOF
 Packet: version 2; role emc
  opcode:	config-rmc
   num:		2
-  horiz:	0.000000
-  vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
-  obstacle[0]:	1 0.350000/0.400000 x 0.000000/0.000000
+  bound[0]:	x=0.00, y=0.00, width=5.00, height=6.00
+  obstacle[0]:	1 0.35/0.40 x 0.45/0.50
 Packet: version 2; role emc
- opcode:	error
-  id:		0
-  code:		0
-  msg:		position not updated yet
+ opcode:	command-goto
+  commid:	1
+  id:		1
+  x:		0.000000
+  y:		0.000000
+  theta:	0.000000
+  timestamp:	0.000000
 EOF
 
 run_test ../mtp/mtp_send -U /tmp/$USER.emcd \
@@ -80,17 +82,16 @@ check_output "init -> update-position -> request-position failed?" <<EOF
 Packet: version 2; role emc
  opcode:	config-rmc
   num:		2
-  horiz:	0.000000
-  vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
-  obstacle[0]:	1 0.350000/0.400000 x 0.000000/0.000000
+  bound[0]:	x=0.00, y=0.00, width=5.00, height=6.00
+  obstacle[0]:	1 0.35/0.40 x 0.45/0.50
 Packet: version 2; role emc
- opcode:	update-position
+ opcode:	command-goto
+  commid:	1
   id:		1
-  x:		6.000000
-  y:		7.000000
-  theta:	0.440000
-  status:	-1
-  timestamp:	1.000000
+  x:		0.000000
+  y:		0.000000
+  theta:	0.000000
+  timestamp:	0.000000
 EOF

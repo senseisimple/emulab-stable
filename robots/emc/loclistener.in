@@ -18,7 +18,6 @@ from tbevent import *
 
 server = "ops"
 port = None
-pideid = None
 
 usage = ""
 
@@ -27,8 +26,7 @@ try:
                                "hs:p:e:",
                                [ "help",
                                  "server=",
-                                 "port=",
-                                 "experiment=" ])
+                                 "port=" ])
     for opt, val in opts:
         if opt in ("-h", "--help"):
             sys.stderr.write(usage)
@@ -40,16 +38,11 @@ try:
         elif opt in ("-p", "--port"):
             port = val
             pass
-        elif opt in ("-e", "--experiment"):
-            pideid = val
-            pass
         else:
             sys.stderr.write("Unhandled option: " + opt + "\n")
             pass
         pass
-
-    if not pideid:
-        raise getopt.error("error: -e option must be given")
+    
     pass
 except getopt.error:
     sys.stderr.write(usage)
@@ -76,6 +69,8 @@ class LocationInfoUpdater(EventClient):
                              event.getObjName())
             pass
         else:
+            pid, eid = event.getExpt().split('/')
+            
             res = DBQueryFatal("SELECT li.node_id,li.loc_x,li.loc_y FROM "
                                "reserved AS r "
                                "LEFT JOIN location_info AS li ON "
@@ -112,6 +107,9 @@ class LocationInfoUpdater(EventClient):
 				pass
 			    update["loc_y"] = str(update["loc_y"])
                             pass
+                        elif key == "ORIENTATION" or key == "orientation":
+                            update["orientation"] = str(float(value))
+                            pass
                         else:
                             sys.stderr.write("warning: unknown key: %s\n" %
                                              key)
@@ -122,10 +120,31 @@ class LocationInfoUpdater(EventClient):
                         pass
                     pass
 
+                if event.getEventType() == "SETDEST":
+                    table_name = "nodes"
+                    
+                    if update.has_key("loc_x"):
+                        update["destination_x"] = update["loc_x"]
+                        del update["loc_x"]
+                        pass
+                    if update.has_key("loc_y"):
+                        update["destination_y"] = update["loc_y"]
+                        del update["loc_y"]
+                        pass
+                    if update.has_key("orientation"):
+                        update["destination_orientation"] = (
+                            update["orientation"])
+                        del update["orientation"]
+                        pass
+                    pass
+                else:
+                    table_name = "location_info"
+                    pass
+
                 if len(update) > 0:
                     clause = ",".join(["=".join(i) for i in update.items()])
                     
-                    DBQueryFatal("UPDATE location_info SET "
+                    DBQueryFatal("UPDATE " + table_name + " SET "
                                  + clause
                                  + " WHERE node_id=%s",
                                  (node_id,))
@@ -137,17 +156,11 @@ class LocationInfoUpdater(EventClient):
 
     pass
 
-pid, eid = pideid.split('/')
-
-liu = LocationInfoUpdater(server=server,
-                          port=port,
-                          keyfile=("/proj/%s/exp/%s/tbdata/eventkey" %
-                                   (pid, eid)))
+liu = LocationInfoUpdater(server=server, port=port)
 
 at = address_tuple()
 at.objtype = "NODE"
-at.expt = pideid
-at.eventtype = "MODIFY"
+at.eventtype = "MODIFY,SETDEST"
 
 liu.subscribe(at)
 

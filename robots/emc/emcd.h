@@ -13,6 +13,7 @@ struct emc_robot_config {
   float init_x;
   float init_y;
   float init_theta;
+  struct robot_position last_update_pos;
 };
 
 struct rmc_client {
