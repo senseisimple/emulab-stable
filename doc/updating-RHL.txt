@@ -1,0 +1,56 @@
+When transitioning the testbed to a new Red Hat Linux release, there are
+a few stumbling blocks, and notes to be aware of:
+
+* Always use the "buddy" system:  start with a combined FreeBSD+Linux
+  testbed image, then wipe out, and install the new distribution to the
+  Linux slice.
+
+* The Linux install often corrupts the FreeBSD bootlabel, and replaces
+  the MBR.  You might end up having to imaging the Linux slice, and
+  laying it back down on a reloaded combined scratch image.
+
+* There are many superflous RPMs installed by default, esp. ones for
+  multimedia, and Xwindows (window managers, gnome, KDE, etc.).  Also,
+  don't forget to install some of the more useful, non-default
+  packages: tcpdump, ttcp, gated, etc.
+
+* The "typical" Red Hat "Workstation" installation selection does not
+  install any sort of means to access the node remotely!  Ensure that
+  you at least add openssh-server to the list of packages, or
+  post-install, before rebooting.  Alternatively, FreeBSD has
+  excellent support for ext2fs, including an fsck.ext2fs that can be
+  installed from the ports tree.  This trick can be used to edit a
+  broken Linux slice.
+
+* Red Hat CAN be installed via the serial port.  The boot floppy
+  image's LILO works with BIOS redirection.  You _must_ choose text
+  installation, and must pass: console="ttyS0,115200" as kernel
+  parameters from the lilo prompt.
+
+* Patching the kernel for IPOD is volatile.  Minor kernel revisions
+  will likely break the patch, but hand updating the file(s) is
+  usually trivial since IPOD is a separate/new ICMP type, with new
+  handling functions.  Beware of the sysctl enums, and virtual
+  function tables - those are were you are likely to run into trouble.
+
+* The tmcd/startup script client side install targets may break the
+  image!  Be especially wary of the modules.conf file.  This may whack
+  the proper ethernet driver autoloading depending on the logic of the
+  new distro's startup scripts.  Don't forget to update the tag, and
+  release specifications in the supfile.
+
+* You should download updated RPMS from a redhat mirror, and update
+  all the installed packages to plug security holes and bugs.  It
+  appears that redhat tries to keep versions/behavior consistent in
+  its distributions, usually providing updates only to fix bugs and
+  security holes.
+
+* LILO is a pain.  It doesn't redirect to the console correctly.  We
+  are currently able to get around this by using an internal
+  hacked/bugfixed version that supports our standard 115200 baud rate.
+  Newer versions of lilo are significantly different, and appear to be
+  broken as well.  Work will need to be done on these versions before
+  they will be useful in our environment.
+
+* Grab a precompiled CVSup binary, either from the old RHL image, or
+  from the CVSup website.  _Much_ less hassle.
