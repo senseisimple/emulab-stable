@@ -191,6 +191,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN TBDB_CHECKDBSLOT_ERROR
          max min TBcheck_dbslot
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
+	 TBGetUniqueIndex
 	 );
 
 # Must come after package declaration!
@@ -4292,6 +4293,37 @@ sub TBcheck_dbslot($$$;$)
 	    "    Unrecognized column_type $column_type\n");
     }
     return 0;
+}
+
+#
+# Return a unique index from emulab_indicies for the indicated name.
+# Updates the index to be, well, unique.
+# Eats flaming death on error.
+#
+# WARNING: this will unlock all locked tables, be careful where you call it!
+#
+sub TBGetUniqueIndex($)
+{
+    my ($name) = @_;
+
+    #
+    # Lock the table to avoid conflicts
+    #
+    DBQueryFatal("lock tables emulab_indicies write");
+
+    my $query_result =
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='$name'");
+    my ($curidx) = $query_result->fetchrow_array();
+    $curidx = 1
+	if (!defined($curidx));
+    my $nextidx = $curidx + 1;
+
+    DBQueryFatal("replace into emulab_indicies (name, idx) ".
+		 "values ('$name', $nextidx)");
+    DBQueryFatal("unlock tables");
+
+    return $curidx;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

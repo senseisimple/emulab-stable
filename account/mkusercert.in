@@ -281,22 +281,7 @@ open(IND, ">index.txt")
     or fatal("Could not clear index.txt");
 close(IND);
 
-#
-# Lock the table to avoid conflict with devel trees.
-#
-DBQueryFatal("lock tables emulab_indicies write");
-
-$query_result =
-    DBQueryFatal("select idx from emulab_indicies ".
-		 "where name='user_sslcerts'");
-my ($curidx) = $query_result->fetchrow_array();
-$curidx = 1
-    if (!defined($curidx));
-my $nextidx = $curidx + 1;
-
-DBQueryFatal("replace into emulab_indicies (name, idx) ".
-	     "values ('user_sslcerts', $nextidx)");
-DBQueryFatal("unlock tables");
+my $curidx = TBGetUniqueIndex("user_sslcerts");
 
 open(SER, ">serial")
     or fatal("Could not create new serial file");
