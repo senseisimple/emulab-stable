@@ -120,7 +120,7 @@ if ($@) {
 }
 foreach (split("\n",$raw)) {
     ($lan,$nodes_raw,$bw,$delay,$loss,$links_raw) = 
-	/([^ ]+) "([^\"]+)" ([^ ]+) ([^ ]+) ([^ ]+)[ \t]+(.*)$/;
+	/([^ ]+) "([^\"]+)" ([^ ]+) ([^ ]+) ([^ ]+)(?:[ \t]+(.*))?$/;
     $nodes_tmp = [];
     foreach (split(" ",$nodes_raw)) {
 	push(@$nodes_tmp,$_);
