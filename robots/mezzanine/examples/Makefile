@@ -2,7 +2,7 @@
 # Desc: Makefile for building and installing the examples
 # Author: Andrew Howard
 # Date: Apr 10 2002
-# CVS: $Id: Makefile,v 1.2 2004-12-15 05:03:46 johnsond Exp $
+# CVS: $Id: Makefile,v 1.3 2004-12-15 07:27:07 johnsond Exp $
 ###########################################################################
 
 include ../Makefile.opt
@@ -22,4 +22,4 @@ install:
 	$(MKDIR) -p $(INSTALL_EG)
 	$(MKDIR) -p $(INSTALL_EG)/simple
 #	$(INSTALL) -m 644 simple/*.c simple/Makefile $(INSTALL_EG)/simple/
-	$(INSTALL) -m 644 simple/simple $(INSTALL_EG)/simple/
+	$(INSTALL) -m 755 simple/simple $(INSTALL_EG)/simple/
