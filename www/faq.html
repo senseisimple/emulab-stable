@@ -87,7 +87,7 @@
 
 <li> <a href="#TR">Troubleshooting</a>
      <ul>
-     <li> <a href="#TR-1">My experiment is setup, but I cannot
+     <li> <a href="#TR-1">My experiment is set up, but I cannot
      			  send packets between some of the nodes. Why?</a>
      <li> <a href="#TR-2">I asked for traffic shaping, but everything
 			  seems to be going at full LAN speeds. 
@@ -1017,8 +1017,8 @@
     </p>
 
     <p>
-    If you have requested automatic routing on your nodes with the 
-    <code>tb-set-ip-routing</code> command in your NS file, this will
+    If you have requested automatic routing on your nodes with  
+    <code>$ns&nbsp;rtproto&nbsp;Session</code> in your NS file, this will
     start <code>gated</code> on all of your nodes.
     </p>
 
@@ -1054,7 +1054,7 @@
 <h3>Troubleshooting</h3>
 <ul>
 <li><a NAME="TR-1"></a>
-    <h3>My experiment is setup, but I cannot
+    <h3>My experiment is set up, but I cannot
 	send packets between some of the nodes. Why?</h3>
     <p>
     The most common reason is that your topology
@@ -1112,6 +1112,29 @@
     <h3>I set a non-zero packet-loss (or delay) but 'ping'
         shows a different packet-loss (or delay). Why?</h3>
     <p>
-    Ping is round trip, PLR and delay are "one way".
+    Short answer: Ping is round trip, PLR and delay are "one way".
     </p>
+
+    <p>
+    Long Answer: If you're not seeing any traffic shaping at all
+    (100Mbps, 0ms, 0plr), see <a href="#TR-2">this FAQ entry</a>. If
+    you are seeing shaping, but something different than you
+    expected, it is probably because link characteristics are one
+    way, and you're measuring them over the round trip.
+    </p>
+
+    <p>
+    For instance, if you asked for a link that was 100Mbps, 30ms,
+    with 5% (0.05) packet loss rate (plr), you may expect ping to
+    show 30ms ping times and 5% loss rate. But what you should see
+    is 60ms latency for the round trip, and a loss rate of
+    9.75%. Latencies can be added, therefore 30ms + 30ms gives
+    60ms. However, loss rates are probabilities, and must be
+    multiplied. The chance of a packet making it across a 5% lossy
+    link is 95%, so with a 95% chance of arriving at the
+    destination, and a 95% chance of returning if it made it there,
+    and the total chance of making a round trip is .95 * .95 = .9025 or
+    90.25%, or a round trip loss rate of 9.75% on a 5% lossy link.
+    </p>
+
 </ul>
