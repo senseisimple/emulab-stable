@@ -3,7 +3,7 @@
  * Dan Flickinger
  *
  * 2004/11/16
- * 2004/12/09
+ * 2004/12/15
  */
 
 #include "grobot.h"
@@ -128,11 +128,25 @@ void grobot::setvPath(float Wv, float Wr) {
 void grobot::pbMove(float mdisplacement) {
   // execute a move primitive
   
-  acpValue moveLength((float)(mdisplacement));
-  pBehavior = garcia.createNamedBehavior("move", "move1");
-  pBehavior->setNamedValue("distance", &moveLength);
+  if (mdisplacement != 0.0f) {
+    acpValue moveLength((float)(mdisplacement));
+    pBehavior = garcia.createNamedBehavior("move", "move1");
+    pBehavior->setNamedValue("distance", &moveLength);
   
-  createPRIMbehavior(CBT_MOVE);
+    createPRIMbehavior(CBT_MOVE);
+  } else {
+    // a zero length move will fuckup the robot!
+    std::cout << "ZERO LENGTH MOVE" << std::endl;
+    // fake a successful move, and increment the callback counts
+    // if this is part of a goto sequence of commands
+    if (1 == gotolock) {
+      ++gotomexec;
+      ++gotomcomplete;
+      
+      dx_est = 0.0f; // move nowhere!
+      dy_est = 0.0f; // move nowhere!
+    }
+  }
   
 }
 
@@ -166,12 +180,24 @@ void grobot::pbPivot(float pangle) {
     }
   }
   
+  if (pangle != 0.0f) {
+    acpValue pivotAngle((float)(pangle));
+    pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
+    pBehavior->setNamedValue("angle", &pivotAngle);
   
-  acpValue pivotAngle((float)(pangle));
-  pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
-  pBehavior->setNamedValue("angle", &pivotAngle);
-  
-  createPRIMbehavior(CBT_PIVOT);
+    createPRIMbehavior(CBT_PIVOT);
+  } else {
+    // a zero angle pivot will fuckup the robot!
+    std::cout << "ZERO ANGLE PIVOT" << std::endl;
+    
+    // fake a successful pivot, and increment the callback counts
+    // if this is part of a goto sequence of commands
+    if (1 == gotolock) {
+      ++gotomexec;
+      ++gotomcomplete;
+    }
+    
+  }
   
 }
 
@@ -200,42 +226,18 @@ void grobot::dgoto(float Dx, float Dy, float Rf) {
     // calculate rotation components
     dt_init = atan2(Dy, Dx); // dt_init is private to grobot
     float Rfr = Rf - dt_init;
-    
     float moveL = sqrt((pow(Dx,2)) + (pow(Dy,2)));
 
-    // execute primitives (a zero length pivot or move will BARF!!!)
-    if (0.0f != dt_init) {
-      pbPivot(dt_init);
+    if (0.0f == dt_init && 0.0f == moveL && 0.0f == Rfr) {
+      set_gotocomplete();
     } else {
-      // fake pivot
-      ++gotomexec;
-      ++gotomcomplete;
-      gotop1 = 0;
+      // execute primitives
+
+      pbPivot(dt_init);
+      pbMove(moveL);
+      pbPivot(Rfr);
     }
     
-    if (0.0f != moveL) {
-      pbMove(moveL);
-    } else {
-      // fake move
-      ++gotomexec;
-      ++gotomcomplete;
-      gotom1 = 0;
-      
-      dx_est = 0.0f; // move nowhere!
-      dy_est = 0.0f; // move nowhere!
-    }
-     
-    if (0.0f != Rfr) {
-      pbPivot(Rfr);
-    } else {
-      // fake pivot
-      ++gotomexec;
-      ++gotomcomplete;
-      gotop2 = 0;
-    }
-
-    if (0.0f == dt_init && 0.0f == moveL && 0.0f == Rfr)
-      set_gotocomplete();
     
   } else {
     // if a goto is already executing, drop the command
