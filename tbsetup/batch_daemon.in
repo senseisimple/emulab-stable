@@ -283,13 +283,13 @@ sub dosomething($$)
     $childpid = fork();
     if ($childpid) {
 
-	print TBTimeStamp() . "\n";
+	print TBDateTimeFSSafe() . "\n";
 	print "Child PID $childpid started to $dowhat $pid/$eid\n";
 
 	waitpid($childpid, 0);
 	my $status = $? >> 8;
 
-	print TBTimeStamp() . "\n";
+	print TBDateTimeFSSafe() . "\n";
 	print "Child PID $childpid exited with exit status $status\n";
 
         #
@@ -535,7 +535,7 @@ sub isexpdone($)
     $eid = $exphash{'eid'};
     $pid = $exphash{'pid'};
 
-    print TBTimeStamp() . "\n";
+    print TBDateTimeFSSafe() . "\n";
     print "Checking to see if $pid/$eid has finished up yet\n";
 
     #
