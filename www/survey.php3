@@ -87,41 +87,47 @@ $followups = array(
 PAGEHEADER("Emulab Survey");  
 
 if ($submit) {
-    # DO SOMETHING WITH IT!
 
+    $mesg = "";
     if ($anonymous) {
-	$mesg = "\nFrom: *Anonymous* (uid hash ='" . md5($uid) . "' )\n";
+	$mesg .= "\nSurvey Responder: *Anonymous* (uid hash ='" . md5($uid) . "' )\n";
     } else {
-        $mesg = "\nFrom: $uid\n";
+        $mesg .= "\nSurvey Responder: $uid\n";
     }
-    $mesg .= "Multiple Choice:\n\n";
+    $mesg .= "> Multiple Choice:\n";
     $foo = 0;
     for( $n = 0; $n < count($questions) - 1; $n += 2) {
 	$foo++;
-	$q =  $questions[$n];
-	$q2 = $questions[$n + 1];
+	$questionWord =  $questions[$n];
 
-        $ansvar = "opt$n";
-	$mesg .= "Q: { $foo: $q }\n" .
-                 "A: { " . $$ansvar . ": " . $answers[$$ansvar] . " }\n\n";
+	$answerVar = "opt$n";
+	$answerNum = $$answerVar;
+	$answerWord = $answers[$answerNum];
+
+	$questionWord = wordwrap( preg_replace( "/[\r\n\t ]+/", " ", $questionWord ), 70, "\n>    ");
+
+	$mesg .= "> ($foo) " . $questionWord . "\n" .
+		 "$answerNum. " . $answerWord   . "\n\n";
     }
 
-    $mesg .= "\n\nFree Response:\n\n";
+    $mesg .= "\n\n> Free Response:\n";
     $foo = 0;
     for( $n = 0; $n < count($followups); $n++) {
 	$foo++;
-	$fuq = $followups[$n];
-	$ansvar = "fu$n";
-	$mesg .= "Q: { $foo: $fuq }\n" .
-                 "A: {\n" .
-		 $$ansvar . "\n" .
-		 "}\n\n";
+	$questionWord = $followups[$n];
+	$answerVar = "fu$n";
+	$answerWord = $$answerVar;
+
+	$questionWord = wordwrap( preg_replace( "/[\r\n\t ]+/", " ", $questionWord ), 70, "\n>    ");
+	$answerWord   = wordwrap( preg_replace( "/[\r\n\t ]+/", " ", $answerWord ),   70, "\n");
+
+	$mesg .= "> (FR$foo) " . $questionWord . "\n\n" .
+		 $answerWord . "\n\n\n";
     }
 
 #   testbed-survey@emulab.net
-#   TBMAIL("barb@flux.utah.edu",
-
-    TBMAIL("testbed-survey@emulab.net",
+    TBMAIL("barb@flux.utah.edu",
+#    TBMAIL("testbed-survey@emulab.net",
 	   "Survey Answers",
 	   $mesg,
 	   "From: $TBMAIL_OPS");	      
