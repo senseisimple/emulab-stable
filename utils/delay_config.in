@@ -34,7 +34,7 @@ sub usage()
 	  " QUEUE-IN-BYTES=N - 0 means in packets, 1 means in bytes\n".
 	  "RED/GRED Options: (only if link was specified as RED/GRED)\n".
 	  " MAXTHRESH=NNN    - Maximum threshold for the average queue size\n".
-	  " THRESH=NNN       - Maximum threshold for the average queue size\n".
+	  " THRESH=NNN       - Minimum threshold for the average queue size\n".
 	  " LINTERM=NNN      - Packet dropping probability\n".
 	  " Q_WEIGHT=NNN     - For calculating the average queue size\n");
     # Web interface cares about this return value!
