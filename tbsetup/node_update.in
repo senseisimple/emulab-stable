@@ -1,0 +1,310 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Update mounts and accounts and anything else after changing the permissions
+# for a node. This is intended to be invoked from the web interface after
+# adding and/or subtracting pids from the experiment pid access list.
+#
+# XXX There is an inherent race condition with using this script. What if
+# nodes are released while it is running?
+# 
+# usage: node_update [-b] <pid> <eid>
+#
+sub usage()
+{
+    print STDOUT "Usage: node_update [-b] <pid> <eid>\n".
+	"Update user accounts and NFS mounts on nodes in your experiment.\n".
+	"Use the -b option to use batch operation (place in background).\n";
+    exit(-1);
+}
+my  $optlist = "b";
+  
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+my $ssh		= "$TB/bin/sshtb -n";
+my $expsetup    = "$TB/sbin/exports_setup";
+my $batchmode   = 0;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+if (defined($options{"b"})) {
+    $batchmode = 1;
+}
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+
+my $user_name;
+my $user_email;
+my $logname;
+my %pids	= ();
+my $failed	= 0;
+my $dbuid;
+
+#
+# We don't want to run this script unless its the real version.
+# That is, it must be setuid root. 
+#
+if ($EUID != 0) {
+    die("Must be root! Maybe its a development version?");
+}
+
+#
+# Verify actual user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
+    exit(1);
+}
+
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    print STDOUT "Cannot determine your name and email address.\n";
+    exit(1);
+}
+
+#
+# Verify that this person is allowed to do this. Must be an admin type,
+# the experiment creator or the project leader.
+#
+if ($UID && ! TBAdmin()) {
+    my $expt_leader = ExpLeader($pid, $eid);
+    my $proj_leader = ProjLeader($pid);
+
+    if (!$expt_leader || !$proj_leader) {
+	print STDERR "No such Experiment $eid or no such Project $pid\n";
+	exit(1);
+    }
+
+    if ($expt_leader ne $dbuid && $proj_leader ne $dbuid) {
+	print STDERR "You must be either the experiment creator or ".
+	    "the project leader\n";
+	exit(1);
+    }
+}
+
+if ($batchmode) {
+    #
+    # Create a temporary name for a log file.
+    #
+    $logname = `mktemp /tmp/node_update-$pid-$eid.XXXXXX`;
+    chop($logname);
+    
+    if (TBBackGround($logname)) {
+	#
+	# Parent exits normally
+	#
+	print STDOUT
+	    "Node Update for $pid/$eid is now in progress.\n".
+	    "You will be notified via email when the is complete.\n";
+	exit(0);
+    }
+}
+
+#
+# Currently, we just need to update the mount points. The UID change because
+# of PERL sillyness.
+#
+$UID = $EUID;
+if (system("$expsetup")) {
+    print STDERR "*** Failed to setup mountpoints.\n";
+    fatal("Exports Setup Failed");
+}
+# Give ops a chance to react.
+sleep(2);
+
+#
+# Get the list of nodes that need to be "updated."
+# 
+my @nodes = ExpNodes($pid, $eid);
+if (! @nodes) {
+    fatal("No Nodes in the experiment");
+}
+
+#
+# Fire off an update process so that we can overlap them all.
+# We need the pid so we can wait for them all before preceeding.
+#
+foreach my $node ( @nodes ) {
+    $mypid = UpdateNode($node);
+    $pids{$node} = $mypid;
+}
+
+#
+# Wait for all the children to exit before continuing.
+#
+foreach my $node ( @nodes ) {
+    my $mypid     = $pids{$node};
+
+    waitpid($mypid, 0);
+    if ($?) {
+	$failed++;
+	print STDERR "Update of node $node failed!\n";
+    }
+    else {
+	print STDOUT "$node Updated ...\n";
+    }
+}
+
+NotifyUser("Node Update Complete", $failed);
+if (defined($logname)) {
+    unlink($logname);
+}
+exit($failed);
+
+#
+# Update a node in a child process. Return the pid to the parent so
+# that it can wait on all the children later.
+# 
+sub UpdateNode {
+    my($node) = @_;
+    my($syspid, $mypid);
+
+    print STDOUT "Updating $node ...\n";
+
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    # 
+    $syspid = fork();
+
+    # Must change our real UID to root so that ssh will work.
+    $UID = 0;
+    
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 15;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	print STDERR "update of $node returned $?.\n" if $debug;
+    
+	#
+	# If either ssh is not running or it timed out,
+	# send it a ping of death.
+	# 
+	if ($? == 256 || $? == 15) {
+	    if ($? == 256) {
+		print STDERR "$node is not running sshd.\n" if $debug;
+	    } else {
+		print STDERR "$node is wedged.\n" if $debug;
+	    }
+	    exit(-1);
+	}
+	exit(0);
+    }
+    else {
+	exec("$ssh $node /etc/testbed/update");
+	exit(0);
+    }
+    exit(0);
+}
+
+sub NotifyUser($$)
+{
+    my($mesg, $iserr) = @_;
+    my($subject, $from, $to, $hdrs);
+    local $MAIL;
+
+    print STDOUT "$mesg\n";
+
+    if (! $batchmode) {
+	return;
+    }
+
+    if ($iserr) {
+	$subject = "TESTBED: Node Update Failed $pid/$eid";
+    }
+    else {
+	$subject = "TESTBED: Node Update Success $pid/$eid";
+    }
+    $from  = $TBOPS;
+    $hdrs  = "Reply-To: $TBOPS";
+    
+    #
+    # Message goes to user. If a failure, TBOPS also gets it, otherwise
+    # it goes into the logs.
+    #
+    $to    = "$user_name <$user_email>";    
+    
+    if ($iserr) {
+	$hdrs = "Cc: $TBOPS\n".
+	        "$hdrs";
+    }
+    else {
+	$hdrs = "Bcc: $TBLOGS\n".
+	        "$hdrs";
+    }
+
+    if (! ($MAIL = OPENMAIL($to, $subject, $from, $hdrs))) {
+	die("Cannot start mail program!");
+    }
+
+    print $MAIL $mesg;
+
+    if (open(IN, "$logname")) {
+	print $MAIL "\n\n--------- $logname ---------\n\n";
+	
+	while (<IN>) {
+	    print $MAIL "$_";
+	}
+	close(IN);
+    }
+    close($MAIL);
+}
+
+sub fatal($) {
+    my($mesg) = @_;
+
+    NotifyUser($mesg, 1);
+    if (defined($logname)) {
+	unlink($logname);
+    }
+    exit(1);
+}
+
