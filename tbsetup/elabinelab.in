@@ -397,7 +397,7 @@ if (defined($elabinelab_eid)) {
     print "Starting experiment $pid/$elabinelab_eid on inner emulab.\n";
     TBDebugTimeStamp("Starting inner experiment");
     system("$SSH -host $bossnode 'sudo -u $dbuid /usr/testbed/bin/batchexp ".
-	   "  -q -i $optarg -f -S \"ElabInElab Experiment\" ".
+	   "  -q -i $optarg -S \"ElabInElab Experiment\" ".
 	   "  -L \"ElabInElab ElabInElab\" -E \"ElabInElab Experiment\" ".
 	   "  -p $pid -e $elabinelab_eid $nsfilename'");
     
@@ -413,8 +413,8 @@ if ($firewalled) {
     $UID = 0;
     system("$SSH -host $firewall ipfw delete 1");
     if ($?) {
-	die("*** $0:\n".
-	    "    Error turning on firewall rules ($firewall)!\n");
+	print STDERR "*** $0:\n".
+	             "    Error turning back on firewall rules ($firewall)!\n";
     }
     $UID = $SAVEUID;
 }
@@ -739,6 +739,15 @@ sub TearDownEmulab()
     my $tbdir      = "/usr/testbed";
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
+    my $paniced;
+
+    #
+    # If firewalled, check to see if paniced. Right now that means the nodes
+    # are going to be powered off, so need to do the clean shutdown dance.
+    # 
+    if ($firewalled) {
+	TBExptGetPanicBit($pid, $eid, \$paniced);
+    }
         
     #
     # We want to rebuild the DHCPD file so that when we reboot the inner nodes
@@ -770,6 +779,14 @@ sub TearDownEmulab()
 	    "    Failed to reconfig/restart DHCPD.\n");
     }
     $EUID = 0;
+
+    #
+    # If panic set, just return; nodes are going to be powered down.
+    #
+    if ($firewalled and $paniced) {
+	print "Skipping clean shutdown cause panic button pressed.\n";
+	return 0;
+    }
 
     #
     # When the nodes reboot, we want them to do something reasonable. We
