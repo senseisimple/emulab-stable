@@ -187,7 +187,6 @@ foreach my $node ( keys %nodeos ) {
     if ( $1 == 0 ) {
 	print STDERR "$pc appears to be dead. Power cycling ...\n";
 	PowerCycle($pc);
-	print STDERR "Done!\n";
 	next;
     }
 
@@ -214,30 +213,28 @@ foreach my $node ( keys %nodeos ) {
     # reboot really worked, and the exit value can be ignored.
     #
     my $exit_value = $? >> 8;
-    print STDERR "reboot returned $exit_value. Lets make sure ...\n" if $dbg;
+    print STDERR "reboot returned $exit_value. Lets make sure it dies\n"
+	if $dbg;
 
-    print STDERR "Sleeping for a few seconds to give reboot a chance ...\n";
-    sleep(10);
-    if (-e $ping) {
-	open(PING, "$ping -c 4 $pc 2>&1 |");
-    }
-    else {
-	die("PING command $ping not found!\n");
-    }
-    do {
-    }
-    until ( <PING> =~ /transmitted, (\d*) packets received/ );
-    close(PING);
-    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
-
-    if ( $1 == 0 ) {
-	print STDERR "Good, $pc must have rebooted. Continuing ...\n" if $dbg;
+    if (WaitTillDead($pc) == 0) {
 	next;
     }
 	
     print STDERR "$pc appears to still be running Power cycling ...\n";
     PowerCycle($pc);
-    print STDERR "Done!\n";
+}
+
+#
+# Now lets wait for them to come back alive.
+#
+foreach my $node ( keys %nodeos ) {
+    my $pc	= $node;
+
+    if (WaitTillAlive($pc) == 0) {
+	print STDERR "Yippie! $pc is alive and well\n";
+	next;
+    }
+    die("Oops, $pc did not come back alive!");
 }
 
 print STDOUT "OS Setup Done!\n";
@@ -254,3 +251,52 @@ sub PowerCycle {
     }
 }
 
+sub WaitTillAlive {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to come alive\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 30; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	    $_ = <PING>;
+	    if ( $_ =~ /bytes from/ ) {
+		print STDERR "Yep, $pc alive and well\n" if $dbg;
+		return 0;
+	    }
+	}
+	until ( $_ =~ /transmitted, (\d*) packets received/ );
+    }
+    close(PING);
+    print STDERR "$pc is not responding. Better check into it\n";
+    return 1;
+}
+
+sub WaitTillDead {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to die off\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 12; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	}
+	until ( <PING> =~ /transmitted, (\d*) packets received/ );
+
+	if ( $1 == 0 ) {
+	    print STDERR "Good, $pc must have rebooted.\n" if $dbg;
+	    return 0;
+	}
+    }
+    close(PING);
+    print STDERR "$pc is still alive.\n" if $dbg;
+    return 1;
+}
