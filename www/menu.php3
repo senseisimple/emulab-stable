@@ -425,6 +425,14 @@ function PAGEFOOTER() {
               </td>
             </tr><tr>
               <td class="contentbody">
+	        <center><font size=-1>
+		[&nbsp;<a href="http://www.cs.utah.edu/flux"
+                >The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
+		[&nbsp;<a href="http://www.cs.utah.edu/"
+                >Department&nbsp;of&nbsp;Computer&nbsp;Science</a>&nbsp;]
+		[&nbsp;<a href="http://www.utah.edu/"
+                >The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]</font>
+                </center>
                 <!-- begin copyright -->
                 <p align=right>
                   <font size=-2>
