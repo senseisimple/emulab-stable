@@ -29,8 +29,10 @@ function SPITSTATUS($status)
     header("Content-Type: text/plain");
     echo "emulab_status=$status\n";
 
-    TBERROR("CDROM Checkin Error ($status) from $REMOTE_ADDR:\n\n".
-	    "$REQUEST_URI\n", 0);
+    if ($status) {
+	    TBERROR("CDROM Checkin Error ($status) from $REMOTE_ADDR:\n\n".
+		    "$REQUEST_URI\n", 0);
+    }
 }
 
 #
@@ -66,7 +68,7 @@ $cdvers = $row[version];
 # 
 if (isset($needscript)) {
     header("Content-Type: text/plain");
-    echo "MD5=d8b6b1cf6ea43abc33b0d700d6e4cda8\n";
+    echo "MD5=21bff97fead2dd5e07135708d9bf7316\n";
     echo "URL=https://${WWWHOST}/images/netbed-setup.pl\n";
     echo "emulab_status=0\n";
     return;
@@ -155,8 +157,14 @@ if (isset($updated) && $updated == 1) {
 	SUEXEC("nobody", $TBADMINGROUP,
 	       "webnewwanode -w $nickname -t $type -i $IP", 0);
     }
+    $newroot = "";
+    if (isset($roottag)) {
+	    $newroot = ",rootkey='$roottag'";
+    }
+
     DBQueryFatal("update widearea_privkeys ".
 		 "set privkey=nextprivkey,updated=now(),nextprivkey=NULL ".
+		 "    $newroot ".
 		 "where privkey='$privkey'");
 
     SPITSTATUS(CDROMSTATUS_OKAY);
@@ -176,6 +184,10 @@ if (strcmp($privIP, "1.1.1.1")) {
 	SPITSTATUS(CDROMSTATUS_BADREMOTEIP);
 	return;
     }
+    $newroot = "";
+    if (isset($roottag)) {
+	    $newroot = ",rootkey='$roottag'";
+    }
 
     #
     # For now we just give them a new privkey. There is no real image upgrade
@@ -184,6 +196,7 @@ if (strcmp($privIP, "1.1.1.1")) {
     $newkey = GENHASH();
     DBQueryFatal("update widearea_privkeys ".
 		 "set nextprivkey='$newkey',updated=now(),cdkey='$cdkey' ".
+		 "    $newroot ".
 		 "where IP='$IP' and privkey='$privkey'");
 
     header("Content-Type: text/plain");
@@ -191,8 +204,9 @@ if (strcmp($privIP, "1.1.1.1")) {
 
     if (0) {
     if ($cdvers == 3) {
+#	    echo "slice1_image=slice1.ndz\n";
 	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	    echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
+	    echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
 	    echo "slicex_slice=3\n";
 	    echo "slicex_mount=/users\n";
     }
@@ -267,7 +281,7 @@ else {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
+	echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
@@ -276,7 +290,7 @@ else {
     else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
+	echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
