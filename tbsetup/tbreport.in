@@ -14,13 +14,14 @@
 #
 
 sub usage {
-    print "Usage: $0 [-h] [-n] [-l] [-m] [-e] [-d] [-r] [-v] pid eid\n";
+    print "Usage: $0 [-h] [-n] [-l] [-m] [-e] [-f] [-d] [-r] [-v] pid eid\n";
     print "-h		Shows this message\n";
     print "-n		Show node info\n";
     print "-m		Show node mapping\n";
     print "-l		Show link info\n";
     print "-d		Show traffic shapping info\n";
     print "-e		Show event listing\n";
+    print "-f		Show firewall rules\n";
     print "-r		Show routes\n";
     print "-b		Show most things\n";
     print "-v		Show everything!\n";
@@ -52,6 +53,7 @@ my $showlinks  = 0;
 my $showdelays = 0;
 my $showevents = 0;
 my $showroutes = 0;
+my $showfwinfo = 0;
 my %v2pmap;
 my %p2type;
 my %p2osid;
@@ -62,7 +64,7 @@ my %ipmap;
 my %macmap;
 my %membermap;
 
-getopts('hnmdlevbr',\%opt);
+getopts('hnmdlevbrf',\%opt);
 
 if ($opt{h}) {
     exit &usage;
@@ -75,6 +77,7 @@ if ($opt{v}) {
     $showlinks = 1;
     $showevents = 1;
     $showroutes = 1;
+    $showfwinfo = 1;
 }
 if ($opt{b}) {
     $shownodes = 1;
@@ -99,6 +102,9 @@ if ($opt{e}) {
 }
 if ($opt{r}) {
     $showroutes = 1;
+}
+if ($opt{f}) {
+    $showfwinfo = 1;
 }
 if (@ARGV != 2) {
     exit &usage;
@@ -725,7 +731,6 @@ if ($showevents) {
 
     if ($result->numrows) {
 	my %egroups = ();
-
 	while (($group_name,$agent_name) = $result->fetchrow_array()) {
 	    if (!exists($egroups{$group_name})) {
 		$egroups{$group_name} = [];
@@ -806,4 +811,47 @@ if ($showevents) {
     }
 }
 
+#
+# Print firewall information
+#
+if ($showfwinfo) {
+    my $result_fw =
+	DBQueryFatal("select fwname,type,style from firewalls ".
+		     "where pid='$pid' and eid='$eid' ");
+    if ($result_fw->numrows) {
+	print "Firewall information:\n";
+	printf("%-15s %-8s %-8s %-5s %s\n",
+	       "Firewall", "Type", "Style", "Rule#", "Rule");
+	print("--------------- -------- -------- ----- ".
+	      "-----------------------------------\n");
+	while (my ($fwname,$fwtype,$fwstyle) = $result_fw->fetchrow_array()) {
+	    printf("%-15s %-8s %-8s", $fwname, $fwtype, $fwstyle);
+	    my $result =
+		DBQueryFatal("select ruleno,rule from firewall_rules ".
+			     "where pid='$pid' and eid='$eid' ".
+			     "and fwname='$fwname'");
+	    my %rules = ();
+	    if ($result->numrows) {
+		while ((my $ruleno,$rule) = $result->fetchrow_array()) {
+		    $rules{$ruleno} = $rule;
+		}
+	    }
+	    $result =
+		DBQueryFatal("select ruleno,rule from default_firewall_rules ".
+			     "where type='$fwtype' and style='$fwstyle' ".
+			     "and enabled!=0");
+	    if ($result->numrows) {
+		while ((my $ruleno,$rule) = $result->fetchrow_array()) {
+		    $rules{$ruleno} = $rule;
+		}
+	    }
+	    my $leader=" ";
+	    foreach my $ruleno (sort keys(%rules)) {
+		printf("%s%5d %s\n", $leader, $ruleno, $rules{$ruleno});
+		$leader="                                  ";
+	    }
+	    print "\n";
+	}
+    }
+}
 exit(0);

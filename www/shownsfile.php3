@@ -219,8 +219,8 @@ if ($showevents) {
     $flags = "-v";
 }
 else {
-    # Show event summary. 
-    $flags = "-b -e";
+    # Show event summary and firewall info.
+    $flags = "-b -e -f";
 }
 
 $result = exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webreport $flags $pid $eid",
