@@ -82,7 +82,7 @@ Simulator instproc node {args} {
 	punsup "Arguments for node: $args"
     }
     
-    set curnode n[incr id_counter]
+    set curnode node_n[incr id_counter]
     Node $curnode $self
 
     # not adding simulated nodes to the node_list
@@ -108,7 +108,7 @@ Simulator instproc nsenode {args} {
 	punsup "Arguments for node: $args"
     }
     
-    set curnode n[incr id_counter]
+    set curnode nsenode_n[incr id_counter]
     NSENode $curnode $self
 
     # not adding simulated nodes to the node_list
@@ -186,7 +186,7 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
 	return ""
     }
 
-    set curlink l[incr id_counter]
+    set curlink link_l[incr id_counter]
 
     Link $curlink $self "$n1node $n2node" $rbw $rdelay $type	
     set lanlink_list($curlink) {}
@@ -250,7 +250,7 @@ Simulator instproc make-lan {nodelist bw delay args} {
 	    return ""
 	}
 
-	set curlan lan[incr id_counter]
+	set curlan lan_l[incr id_counter]
 	
 	# Convert bandwidth and delay
 	set rbw [parse_bw $bw]
@@ -702,7 +702,7 @@ Simulator instproc rtproto {type args} {
 Simulator instproc unknown {m args} {
     $self instvar id_counter
     punsup "Object $m"
-    NullClass null[incr id_counter] $m
+    NullClass null_n[incr id_counter] $m
 }
 
 # rename_* <old> <new>
