@@ -18,7 +18,10 @@
 #include <netdb.h>
 #include "decls.h"
 
+#undef BOSSNODE
+
 void		sigcatcher(int foo);
+char		*getbossnode(void);
 
 char *usagestr = 
  "usage: tmcc [-p #] <command>\n"
@@ -44,9 +47,10 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
+	char			*bossnode;
 #ifdef UDP
 	int			useudp = 0;
-	void			doudp(int argc, char **argv);
+	void			doudp(int argc, char **argv, struct in_addr);
 #endif
 
 	portnum = TBSERVER_PORT;
@@ -71,23 +75,32 @@ main(int argc, char **argv)
 	}
 	argv += optind;
 
+	bossnode = getbossnode();
+	he = gethostbyname(bossnode);
+	if (he)
+		memcpy((char *)&serverip, he->h_addr, he->h_length);
+	else {
+		fprintf(stderr, "gethostbyname(%s) failed\n", bossnode); 
+		exit(1);
+	}
+
+	/*
+	 * Handle built-in "bossinfo" command
+	 */
+	if (strcmp(argv[0], "bossinfo") == 0) {
+		printf("%s %s\n", bossnode, inet_ntoa(serverip));
+		exit(0);
+	}
+
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv);
+		doudp(argc, argv, serverip);
 		/*
 		 * Never returns.
 		 */
 		abort();
 	}
 #endif
-
-	he = gethostbyname(BOSSNODE);
-	if (he)
-		memcpy((char *)&serverip, he->h_addr, he->h_length);
-	else {
-		fprintf(stderr, "gethostbyname(%s) failed\n", BOSSNODE); 
-		exit(1);
-	}
 
 	while (1) {
 		/* Create socket from which to read. */
@@ -204,26 +217,37 @@ sigcatcher(int foo)
 {
 }
 
+#ifndef BOSSNODE
+#include <resolv.h>
+#endif
+
+char *
+getbossnode(void)
+{
+#ifdef BOSSNODE
+	return strdup(BOSSNODE);
+#else
+	struct hostent *he;
+
+	res_init();
+	he = gethostbyaddr((char *)&_res.nsaddr.sin_addr,
+			   sizeof(struct in_addr), AF_INET);
+	if (he && he->h_name)
+		return strdup(he->h_name);
+	return("UNKNOWN");
+#endif
+}
+
 #ifdef UDP
 /*
  * Not very robust, send a single request, read a single reply. 
  */
 void
-doudp(int argc, char **argv)
+doudp(int argc, char **argv, struct in_addr serverip)
 {
 	int			sock, length, n, cc;
 	struct sockaddr_in	name, client;
-	struct hostent		*he;
-	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-
-	he = gethostbyname(BOSSNODE);
-	if (he)
-		memcpy((char *)&serverip, he->h_addr, he->h_length);
-	else {
-		fprintf(stderr, "gethostbyname(%s) failed\n", BOSSNODE); 
-		exit(1);
-	}
 
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
