@@ -168,6 +168,7 @@ if (count($errors)) {
 $user_name = addslashes($formfields[user_name]);
 $user_mail = $formfields[user_email];
 $newkey    = substr(GENHASH(), 0, 16);
+$chunked   = chunk_split($newkey, 4, " ");
 
 $query_result =
     DBQueryFatal("insert into widearea_privkeys ".
@@ -179,7 +180,7 @@ TBMAIL("$user_name <$user_email>",
        "\n".
        "Dear $user_name:\n\n".
        "This is your password to unlock your CD:\n\n".
-       "          $newkey\n\n".
+       "          $chunked\n\n".
        "Please enter this password when installing your CD.\n\n".
        "Thanks,\n".
        "Testbed Ops\n".
