@@ -166,3 +166,13 @@ last_net_act,last_cpu_act,last_ext_act);
        db synchronization later.)
 
        ALTER TABLE widearea_nodeinfo ADD COLUMN external_node_id tinytext
+
+1.126: Change 'name' column in 'sitevariables' from
+       text to varchar(255). Also make it a PRIMARY KEY,
+       and get rid of old INDEX. 
+       This table has not yet been used.
+       
+       ALTER TABLE sitevariables 
+         CHANGE COLUMN name name varchar(255) PRIMARY KEY;
+
+       ALTER TABLE sitevariables DROP INDEX name;

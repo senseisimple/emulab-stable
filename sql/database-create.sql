@@ -909,11 +909,11 @@ CREATE TABLE scheduled_reloads (
 --
 
 CREATE TABLE sitevariables (
-  name text NOT NULL,
+  name varchar(255) NOT NULL default '',
   value text,
   defaultvalue text NOT NULL,
   description text,
-  KEY name (name(32))
+  PRIMARY KEY  (name)
 ) TYPE=MyISAM;
 
 --
