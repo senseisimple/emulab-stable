@@ -80,12 +80,11 @@ sub portControl {
     my $p = portnum($_);
     my $port = (split(":",$p))[1];
     my $i = $ifIndex{$port};
-    print "$ip:$_ => $p -> $port -> $i\n" if $debug;
+    print "$_ -> $port -> $i\n" if $debug;
     if ($cmd =~/able/) { $i; } else { $port }
   } @ports;
-  print "portControl: $cmd -> (@p)\n" if $debug;
-  my @oid = @{$cmdOIDs{$cmd}};
-  if (defined @oid) {
+  if (defined $cmdOIDs{$cmd}) {
+    my @oid = @{$cmdOIDs{$cmd}};
     if (@oid == 2) {
       return &UpdateField($oid[0],$oid[1],@p);
     } else {
@@ -98,8 +97,32 @@ sub portControl {
       return $retval;
     }
   } else {
-    print STDERR "Unsupported port control command '$cmd' ignored.\n";
-    return -1;
+    if ($cmd =~ /VLAN(\d+)/) {
+      my $vlan = $1;
+      my $rv = 0;
+      foreach $port (@ports) {
+	print "Setting VLAN for $port to $vlan..." if $debug;
+	$rv += setPortVlan($vlan,$port);
+	print ($rv ? "Failed.\n":"Succeeded.\n") if $debug;
+	if ($rv) { print STDERR "VLAN change for $port failed.\n"; last; }
+      }
+      if ($rv) { return 1; }
+      if ($vlan == 1) {
+	print "Disabling @ports..." if $debug;
+	if ( $rv = portControl(NULL,"disable",@ports) ) {
+	  print STDERR "Port disable had $rv failures.\n";
+	}
+      } else {
+	print "Enabling @ports..." if $debug;
+	if ( $rv = portControl(NULL,"enable",@ports) ) {
+	  print STDERR "Port enable had $rv failures.\n";
+	}
+      }
+      return $rv;
+    } else {
+      print STDERR "Unsupported port control command '$cmd' ignored.\n";
+      return -1;
+    }
   }
 }
 
@@ -229,32 +252,32 @@ sub setupVlan {
       print "***Out of loop: Okay = $okay\n" if $debug;
       if ($okay == 0) { next; }
       # VLAN exists now - Add the ports:
-      # @vlan is a list of MACs, so I need to find out what they are...
-      my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
-      foreach $node (@vlan) {
-	my $if = $node;
-	if ($if =~ /(sh\d+)-\d(:\d)/) { $if = "$1$2"; }
-	my $port = (split(":",portnum($if)))[1];
-	my $IF = $ifIndex{$port};
-	print "Found $node -> $if -> $port -> $IF\n" if $debug;
-	if (!defined $port) {
-	  print "    Addding $node - port not found ... Failed\n";
-	  next;
-	}
-	print "    Adding $node (port $port) ... ";
-	$RetVal = $sess->set([[$PortVlanMemb,$IF,$N,'INTEGER']]);
-	print "",($RetVal? "Succeeded":"Failed"), ".\n";
-	my $Admin = ".1.3.6.1.2.1.2.2.1.7";
-	my $Status = "up";
-	if ( &UpdateField($Admin,$Status,$IF)) {
-	  print STDERR "Port enable failed.\n";
-	}
-      }
+      portControl(NULL,"VLAN$N",@vlan);
       #If everything went okay, break out of the loop
       $okay = 1;
     }
     print "Currently $attempts attempts.\n" if $debug;
   }
+}
+
+sub setPortVlan {
+  my $vlan = shift;
+  my $node = shift;
+  my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
+  if ($node =~ /(sh\d+)-\d(:\d)/) { $node = "$1$2"; }
+  my $port = (split(":",portnum($node)))[1];
+  my $IF = $ifIndex{$port};
+  print "Found $node -> $port -> $IF\n" if $debug;
+  if (!defined $port) {
+    print STDERR "Node $node - port not found!\n";
+    return 1;
+  }
+  $RetVal = $sess->set([[$PortVlanMemb,$IF,$vlan,'INTEGER']]);
+  if (!$RetVal) {
+    print STDERR "Node $node ($port) VLAN change failed.\n";
+    return 1;
+  }
+  return 0;
 }
 
 sub removeVlan {
@@ -268,13 +291,13 @@ sub removeVlan {
   my $i = $sess->{DestHost};
   do {
     if ($RetVal != 1) {
-      print "Got $RetVal   \t" if $debug;
-      print "$data[0]\t$data[1]\t$data[2]\t" if $debug;
-      print "('$data[1]' " if $debug;
+      print "Got $RetVal   \t" if $debug > 1;
+      print "$data[0]\t$data[1]\t$data[2]\t" if $debug > 1;
+      print "('$data[1]' " if $debug > 1;
       $node = portnum("$i:$data[1]");
-      print "== $node)\n" if $debug;
+      print "== $node)\n" if $debug > 1;
       if ($RetVal == $r) {
-	push(@ports,$data[1]);
+	push(@ports,$node);
 	if (!NodeCheck($node)) {
 	  print STDERR "You are not authorized to control $node.\n";
 	  return 1;
@@ -285,32 +308,19 @@ sub removeVlan {
     }
     $RetVal = $sess->getnext($VlanPortVlan);
     @data = @{$VlanPortVlan};
-  } while ( $data[0] =~ /^vlanPortVlan/ ) ;    
+  } while ( $data[0] =~ /^vlanPortVlan/ ) ;
   my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
   if ($r == 1) {
     print STDERR "VLAN #$r is the Control VLAN, and cannot be removed.\n";
   } else {
     print "  Removing VLAN #$r ... ";
     my $RetVal = $sess->set([[$VlanRowStatus,$r,"destroy","INTEGER"]]);
-    print "",($RetVal? "Succeeded":"Failed"),".\n";
+    print ($RetVal ? "Succeeded.\n" : "Failed.\n");
     if (! defined $RetVal) { 
       print STDERR "VLAN #$r does not exist on this switch.\n";
       return;
     }
-    foreach my $port ( @ports ) {
-      my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index=ifIndex
-      my $portIfIndex = ".1.3.6.1.4.1.9.5.1.4.1.1.11";
-      $index = $sess->get([["$portIfIndex.$port"]]);
-      print "Setting VLAN to 1..." if $debug;
-      $RetVal = $sess->set([[$PortVlanMemb,$index,1,'INTEGER']]);
-      print "",($RetVal? "Succeeded.\n":"Failed=$RetVal.\n") if $debug;
-      my $Admin = ".1.3.6.1.2.1.2.2.1.7";
-      my $Status = "down";
-      print "Disabling port $index..." if $debug;
-      if ( &UpdateField($Admin,$Status,$index)) {
-	print STDERR "Port disable failed.\n";
-      }
-    }
+    portControl(NULL,"VLAN1",@ports);
   }
 }
 

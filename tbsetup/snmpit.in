@@ -39,6 +39,7 @@ my $device;
 my $pid;
 my $eid;
 my $t = 0; #VLANs from db table
+my $n;     #VLAN # to move ports into
 my %vlantable = ();
 
 &myMain;
@@ -74,13 +75,7 @@ sub myMain {
   &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
 	     \@r,\$u,\$b,\$c,\$v,\$g,
 	     \$powerop,\@outlets);
-#  print "\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup spd=$spd s=$s f=$f l=$l",
-#  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
-#  "off=$off cyc=$cyc all=$all device=$device\n" if $debug;
 
-  #
-  # Port Level Control
-  #
   if ($d) {
     my $rv = $device->portControl("disable",@p);
     print "Port disable for @p had $rv failures.\n";
@@ -100,20 +95,19 @@ sub myMain {
     my $rv = $device->portControl("auto",@p);
     print "Port auto-configuration change for @p had $rv failures.\n";
   }
+  if ($n) {
+    my $rv = $device->portControl("VLAN$n",@p);
+    print "Port VLAN change for @p had $rv failures.\n";
+  }
 
   #Show always goes after changes, so that they are reflected.
   if ($s) { $device->showPorts; }
   if ($g) { $device->getStats; }
 
   if (@vlan) {
-    #This is to make ONE vlan - for multiple, use -f AutoVLAN from file
-    if ($device ne "APC") {
-      $device->vlanLock;
-      $device->setupVlan($m,@vlan);
-      $device->vlanUnlock;
-    } else {
-      die("Invalid option 'make VLAN' for device of type $device.\n");
-    }
+    $device->vlanLock;
+    $device->setupVlan($m,@vlan);
+    $device->vlanUnlock;
   }
 
   if ($f) { &AutoVLANConfig(\$f); }
@@ -138,9 +132,6 @@ sub myMain {
   #List VLANs is always last so that changes made are reflected
   if ($l) { $device->listVlans; }
 
-  #
-  # Power Control
-  #
   if ($powerop) {
     foreach $outlet (@outlets) {
       $device->power($powerop,$outlet);
@@ -154,7 +145,6 @@ sub AutoVLANConfig {
   my @VLANS= ();
   my @names= ();
   &ReadIRFile(*f,\@names,\@VLANS);
-  print "AutoVLAN got VLANs named: ",join (" ",@names),"\n" if $debug;
   $device->vlanLock;
   my $m="";
   my @vlan=();
@@ -167,7 +157,6 @@ sub AutoVLANConfig {
   $device->vlanUnlock;
 }
 
-
 sub ParseArgs {
   local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,*g,
 	*powerop,*outlets) = @_;
@@ -176,10 +165,6 @@ sub ParseArgs {
   print "Command line was: snmpit ",join(" ",@ARGV),"\n" if $debug;
   while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
     $_ = shift(@CMDS);
-    #print "Item=$_*\n" if $debug;
-    #print "i=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
-    #"m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
-    #"off=$off cyc=$cyc all=$all\n" if $debug;
     if (/^-i(.*)/) {$i = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-p(.*)/) {
       my $Range ="";
@@ -210,6 +195,7 @@ sub ParseArgs {
     elsif (/^\+a(.*)/) {$a="enable";}
     elsif (/^-dup(.*)/) {$dup = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-spd(.*)/) {$spd = ($1 ? $1 : shift(@CMDS));}
+    elsif (/^-n(.*)/) {$n = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-d(.*)/) {$d = 1;}
     elsif (/^-e(.*)/) {$e = 1;}
     elsif (/^-s(.*)/) {$s = 1;}
@@ -241,21 +227,20 @@ sub ParseArgs {
     elsif (/^-([1-8])$/) { push(@outlets, $1);}
     else {die("Unknown Option: $_\n");}
   }
-  print "Done\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
-  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g ".
-    "powerop=$powerop\n" if $debug;
+  #print "Done\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
+  #  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g ".
+  #  "powerop=$powerop\n" if $debug;
   if ($help) {
     print
-      "snmpit - A general purpose SNMP Tool - Version 1.1\n",
+      "snmpit - A general purpose SNMP tool\n",
       "Syntax:\n",
       " snmpit [-h] [-v] -i<ip>\n",
       "\t[-u] [-l] [-t <pid> <eid>] [-m<vlan name>] [-vlan<port>]\n",
       "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
-      "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>]\n";
+      "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
     # Hidden Power control functionality
-    #,
-    #	    "\t[ [-on|-off|-cyc] | [-<n>] ]\n";
+    # "\t[ [-on|-off|-cyc] | [-<n>] ]\n";
   }
   if ($help > 1) {
     print
@@ -268,7 +253,7 @@ sub ParseArgs {
       "  -l    List all VLANs on switch (ell, not #1)\n",
       "  -t    Use Table in database to set up VLANs\n",
       "  -m    Make a VLAN called <name> (optional)\n",
-      "  -vlan Add port to VLAN (may be <node>:<if> or MAC)\n",
+      "  -vlan Put ports in new VLAN (may be <node>:<if> or MAC)\n",
       "  -f    File mode - Automatically set up group of VLANs\n",
       "  -r    Remove VLAN(s) (specify VLAN number)\n",
       "\nPort Control:\n",
@@ -281,66 +266,66 @@ sub ParseArgs {
       "  -e    Enable port(s)\n",
       "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
       "  -spd  Port Speed (10 or 100 Mbits)\n",
-      "  -dup  Port Duplex (half or full)\n";
+      "  -dup  Port Duplex (half or full)\n",
+      "  -n    Change port VLAN #\n";
     # Hidden Power control functionality
-    #,
-    #	    "  -on   Turn on outlets\n",
-    #	    "  -off  Turn off outlets\n",
-    #	    "  -cyc  Power Cycle outlets\n",
-    #	    "  -(n)  Outlet #(n) (n=1-8)\n";
+    # "  -on   Turn on outlets\n",
+    # "  -off  Turn off outlets\n",
+    # "  -cyc  Power Cycle outlets\n",
+    # "  -(n)  Outlet #(n) (n=1-8)\n";
   }
   #Unused letters of the alphabet:
-  #
-  # j, k, n, q, w, x, y, z
+  # j, k, q, w, x, y, z
   #
   #If help only, end here...
   die("\b\n") if ($help);
   #Now die on any combinations that don't make sense...
   die("What shall I do?\n")
-    if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||$t||@r||$l
+    if (!($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||$t||@r||$l
 	  ||$powerop));
-
   if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
   if ( defined Dev($i) ) {
-    if (Dev($i) =~ /cisco/i) {
-      $device = new snmpit_cisco
-	($i,"debug=$debug","block=$b","confirm=$c","verbose=$v");
-    } elsif ($i =~ /cisco/i) {
+    if (! ($i =~ /[a-zA-Z]/) ) { $i = Dev($i); } # i is now name
+    print "Found device $i (",Dev($i),")..." if $debug;
+    if ($i =~ /cisco/i) {
+      print "Making new snmpit_cisco\n" if $debug;
       $device = new snmpit_cisco
 	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-#    } elsif ($i =~ /intel/ || Dev($i) =~ /intel/) {
-#      $device = new snmpit_intel;
+#    elsif ($i =~ /intel/i) {
+#      print "Making new snmpit_intel\n" if $debug;
+#      $device = new snmpit_intel
+#	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
     } else {
+      print "Making new snmpit_apc\n" if $debug;
       $device = new snmpit_apc
-	($i,"debug=$debug","block=$b","confirm=$c","verbose=$v");
+	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
     }
   } else {
-    die ("\"$i\" is not a known device.\n");
+    die ("'$i' is not a known device.\n");
   }
-
-# A useful snippet of code for finding out what device we've got...
-#  if (ref($device)) {
-#    print "Checking type: ",$device->isa(snmpit_intel)," for intel, ";
-#    print $device->isa(snmpit_cisco)," for cisco\n";
-#  } else { print "Type '$device' is not a ref.\n"; }
-
+  if ($debug) {
+    if (ref($device)) {
+      print "Checking type: ",$device->isa(snmpit_intel)," for intel, ";
+      print $device->isa(snmpit_cisco)," for cisco\n";
+    } else { print "Type '$device' is not a ref.\n"; }
+  }
   if ( $i =~ /[a-zA-Z]/) { $i = Dev($i); }
   die("\"$i\" is not a switch. Illegal operation requested.\n")
     if ( ($device->isa(snmpit_apc) )  &&
-	 ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
+	 ($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||@r||$l));
   die("\"$i\" is not a power controller.\n")
     if (! $device->isa(snmpit_apc) && ($powerop || @outlets) );
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
-  my $n=0;
+  my $num=0;
   if ($device->isa(snmpit_intel)) {
-    while( @p != 0 && $n < @p ) {
-      die("Invalid port ",$p[$n],": Must be 1-24\n")
-	if ($p[$n] =~ /\D/ || $p[$n]>24 || $p[$n]<1);
-      $n++;
+    while( @p != 0 && $num < @p ) {
+      die("Invalid port ",$p[$num],": Must be 1-24\n")
+	if ($p[$num] =~ /\D/ || $p[$num]>24 || $p[$num]<1);
+      $num++;
     }
   }
-  die("Which ports do I reconfigure?\n") if (!@p &&($d||$e||$dup||$spd||$a));
+  die("Which ports do I control?\n") if (!@p&&($d||$e||$dup||$spd||$a||$n));
   $dup = "\L$dup\E";		#lowercase it all...
   die("Invalid duplex $dup: Must be full or half\n")
     if(!($dup=~/^full$|^half$|^$/));
@@ -365,27 +350,27 @@ sub ParseArgs {
     $_;
   } @p;
   print "translated ports: \t@p\n" if ($debug && @p);
-  $n=0;
-  while(@vlan != 0 && $n < @vlan) {
-    $vlan[$n] = lc $vlan[$n];
-    print "Checking node $vlan[$n] for validity...\n" if $debug;
-    if ($vlan[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$n] = "$1-1:0"; }
-    if (defined macport($vlan[$n])) {
-      if ($vlan[$n]=~/^([a-f]|\d)*$/i) {
-	$vlan[$n]=macport($vlan[$n]);
+  $num=0;
+  while(@vlan != 0 && $num < @vlan) {
+    $vlan[$num] = lc $vlan[$num];
+    print "Checking node $vlan[$num] for validity...\n" if $debug;
+    if ($vlan[$num] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$num] = "$1-1:0"; }
+    if (defined macport($vlan[$num])) {
+      if ($vlan[$num]=~/^([a-f]|\d)*$/i) {
+	$vlan[$num]=macport($vlan[$num]);
       }
-      print "Found node $vlan[$n]\n";
+      print "Found node $vlan[$num]\n" if $debug;
     } else {
       # Allow people to specify addresses with colons or dots
-      $vlan[$n] =~ s/[:\.]//g;
-      if (defined macport($vlan[$n])) {
-	$vlan[$n]=macport($vlan[$n]);
-	print "Found node $vlan[$n]\n";
+      $vlan[$num] =~ s/[:\.]//g;
+      if (defined macport($vlan[$num])) {
+	$vlan[$num]=macport($vlan[$num]);
+	print "Found node $vlan[$num]\n" if $debug;
       } else {
-	die("Invalid VLAN member '$vlan[$n]': must be 'pcX:Y' or MAC.\n");
+	die("Invalid VLAN member '$vlan[$num]': must be 'pcX:Y' or MAC.\n");
       }
     }
-    $n++;
+    $num++;
   }
   die("Only one of -f, -t and -vlan may be used.\n")
     if (($f && @vlan) || ($f && $t) || ($t && @vlan));
@@ -408,11 +393,11 @@ sub ParseArgs {
     }
   }
   if ($powerop) {
-    $n=0;
-    while(@outlets != 0 && $n < @outlets) {
-      die("Invalid Outlet \"",$outlets[$n],"\": Must be 1 to 8.\n")
-	if (! ($outlets[$n]=~ /^[1-8]$/ ));
-      $n++;
+    $num=0;
+    while(@outlets != 0 && $num < @outlets) {
+      die("Invalid Outlet \"",$outlets[$num],"\": Must be 1 to 8.\n")
+	if (! ($outlets[$num]=~ /^[1-8]$/ ));
+      $num++;
     }
   }
 }
@@ -441,29 +426,29 @@ sub ReadIRFile {
     # If I'm in the right section, turn the line into a VLAN
     my @v= split;
     $name = shift @v;
-    my $n=0;
-    while (@v != 0 && $n < @v) {
-      $v[$n] = lc $v[$n];
-      print "Checking node $v[$n] for validity...\n" if $debug;
-      if ($v[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) {
-	$v[$n] = "$1-1:0";
+    my $num=0;
+    while (@v != 0 && $num < @v) {
+      $v[$num] = lc $v[$num];
+      print "Checking node $v[$num] for validity...\n" if $debug;
+      if ($v[$num] =~ /(sh\d+)(-\d)?(:\d)?/ ) {
+	$v[$num] = "$1-1:0";
       }
-      if (defined macport($v[$n])) {
-	if ($v[$n]=~/^([a-f]|\d)*$/i) {
-	  $v[$n]=macport($v[$n]);
-	  print "Found node $v[$n]\n";
+      if (defined macport($v[$num])) {
+	if ($v[$num]=~/^([a-f]|\d)*$/i) {
+	  $v[$num]=macport($v[$num]);
+	  print "Found node $v[$num]\n" if $debug;
 	}
       } else {
 	# Allow people to specify addresses with colons or dots
-	$v[$n] =~ s/[:\.]//g;
-	if (defined macport($v[$n])) {
-	  $v[$n]=macport($v[$n]);
-	  print "Found node $v[$n]\n";
+	$v[$num] =~ s/[:\.]//g;
+	if (defined macport($v[$num])) {
+	  $v[$num]=macport($v[$num]);
+	  print "Found node $v[$num]\n" if $debug;
 	} else {
-	  die("Invalid VLAN member '$v[$n]': must be 'pcX:Y' or MAC.\n");
+	  die("Invalid VLAN member '$v[$num]': must be 'pcX:Y' or MAC.\n");
 	}
       }
-      $n++;
+      $num++;
     }
     @v = sort @v;
     if (!defined $exists{ join(' ',@v) }) {
