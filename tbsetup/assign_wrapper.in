@@ -1029,7 +1029,8 @@ foreach $vnodeport (keys(%portbw)) {
 $eventlist_result =
     DBQueryFatal("select ex.idx,ex.vname,r.vname ".
 		 " from eventlist as ex ".
-		 "left join delays as d on ex.vname=d.vname ".
+		 "left join delays as d on ".
+		 " ex.vname=d.vname and ex.pid=d.pid and ex.eid=d.eid ".
 		 "left join reserved as r on r.node_id=d.node_id ".
 		 "left join event_objecttypes as ob on ob.idx=ex.objecttype ".
 		 "where ob.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
