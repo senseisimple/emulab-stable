@@ -171,8 +171,9 @@ static int
 doreboot(int sock, struct in_addr ipaddr, char *request)
 {
 	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
 	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
 	int		n;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -181,6 +182,29 @@ doreboot(int sock, struct in_addr ipaddr, char *request)
 	}
 
 	syslog(LOG_INFO, "REBOOT: %s is reporting a reboot", nodeid);
+
+	/*
+	 * Need to check the pid/eid to distinguish between a user
+	 * initiated reload, and a admin scheduled reload. We don't want
+	 * to deschedule an admin reload, which is supposed to happen when
+	 * the node is released.
+	 */
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_INFO, "REBOOT: %s: Node is free", nodeid);
+		return 0;
+	}
+
+	syslog(LOG_INFO, "REBOOT: %s: Node is in experiment %s/%s",
+	       nodeid, pid, eid);
+
+	/*
+	 * XXX This must match the reservation made in sched_reload
+	 *     in the tbsetup directory.
+	 */
+	if (strcmp(pid, "testbed") ||
+	    strcmp(eid, "reloading")) {
+		return 0;
+	}
 
 	/*
 	 * See if the node was in the reload state. If so we need to clear it

@@ -184,6 +184,10 @@ foreach my $node (@nodes) {
     
     if ( ($sth->num_rows()) < 1) {
         print STDERR "Available.\nReserving and adding to list.\n";
+	#
+	# XXX If you change testbed/reloading, be sure to update the
+	#     test in doreboot() in tmcd/tmcd.c.
+	# 
 	my $cmd = "$TB/nalloc testbed reloading $pc";
         if ( system($cmd) != 0 ) {
 	    print STDERR "WARNING: Could not reserve $pc!\n";
