@@ -72,6 +72,19 @@ if [ -x @prefix@/sbin/eventsys_start  ]; then
         @prefix@/sbin/eventsys_start
 fi
 
+if [ -x @prefix@/sbin/plabdaemon  ]; then
+        echo -n " plabrenew"
+        @prefix@/sbin/plabdaemon -v renew
+        echo -n " plabgetfree"
+        @prefix@/sbin/plabdaemon -v getfree
+fi
+
+if [ -x @prefix@/sbin/plabmonitord  ]; then
+        echo -n " plabmonitord"
+        @prefix@/sbin/plabmonitord
+fi
+
+
 #
 # Could trigger experiment creation, so make sure everything else
 # is setup first; i.e., run this last!
