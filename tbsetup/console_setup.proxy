@@ -67,7 +67,7 @@ foreach my $node ( keys %nodepid ) {
     my $pid        = $nodepid{$node};
     my $filename   = "${node}.run";
     my $tipdevname = "$TIPDEVDIR/$node";
-    my $aclname    = "$TIPDEVDIR/$node.acl";
+    my $aclname    = "${node}.acl";
 
     #
     # Find out the current group setting for the file. 
@@ -132,8 +132,10 @@ foreach my $node ( keys %nodepid ) {
     # inaccessible to both old and new users while we revoke access from
     # any current tip user.
     #
-    chmod(0600, $tipdevname) or
-	die("Could not chmod(0600) $tipdevname: $!");
+    if (-e $tipdevname) {
+	chmod(0600, $tipdevname) or
+	    die("Could not chmod(0600) $tipdevname: $!");
+    }
 
     #
     # Ditto for the "acl" file, which is how socket based tip/capture enforce
@@ -150,6 +152,9 @@ foreach my $node ( keys %nodepid ) {
     #
     kill('USR2', $procid) or
 	die("Could not signal(USR2) process $procid for log $filename");
+    # Give capture the chance to react.
+    # Don't use sleep cause 1 second too long wait when doing 25 nodes!
+    select(undef, undef, undef, 0.2);
 
     #
     # Set the mode and group on the tty that tip is going to use. This
@@ -157,10 +162,12 @@ foreach my $node ( keys %nodepid ) {
     # program.
     #
   setperms:
-    chown(0, $gid, $tipdevname) or
-	die("Could not chown(0, $gid) $tipdevname: $!");
-    chmod(0660, $tipdevname) or
-	die("Could not chmod(0660) $tipdevname: $!");
+    if (-e $tipdevname) {
+	chown(0, $gid, $tipdevname) or
+	    die("Could not chown(0, $gid) $tipdevname: $!");
+	chmod(0660, $tipdevname) or
+	    die("Could not chmod(0660) $tipdevname: $!");
+    }
 
     #
     # Ditto for "acl" file, which new tip needs access to.
@@ -168,7 +175,7 @@ foreach my $node ( keys %nodepid ) {
     if (-e $aclname) {
 	chown(0, $gid, $aclname) or
 	    die("Could not chown(0, $gid) $aclname: $!");
-	chmod(0660, $aclname) or
+	chmod(0600, $aclname) or
 	    die("Could not chmod(0660) $aclname: $!");
     }
 }

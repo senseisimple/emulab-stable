@@ -13,6 +13,13 @@
 #define SERVERPORT	855
 #define DEVPATH		"/dev"
 #define TIPPATH		"/dev/tip"
+#ifdef HPBSD
+#define LOGPATH		"/usr/adm/tiplogs"
+#else
+#define LOGPATH		"/var/log/tiplogs"
+#endif
+/* Socket based tip/capture uses an ACL file to hold key below. */
+#define ACLPATH		LOGPATH
 
 /*
  * The key is transferred in ascii text.

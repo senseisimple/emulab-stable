@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.5 2001-08-09 18:40:43 stoller Exp $";
+	"$Id: hunt.c,v 1.6 2001-08-14 19:05:12 stoller Exp $";
 #endif /* not lint */
 
 #ifdef USESOCKETS
@@ -46,6 +46,7 @@ static const char rcsid[] =
 #include <netdb.h>
 #include "capdecls.h"
 
+int	socket_hunt(char *devname);
 int	socket_open(char *devname);
 #endif
 
@@ -77,6 +78,12 @@ hunt(name)
 	register char *cp;
 	sig_t f;
 	int res;
+
+#ifdef  USESOCKETS
+	if ((res = socket_hunt(name)) >= 0) {
+		return 1;
+	}
+#endif
 	
 	f = signal(SIGALRM, dead);
 	while ((cp = getremote(name))) {
@@ -100,15 +107,6 @@ hunt(name)
 			break;
 		if (setjmp(deadline) == 0) {
 			alarm(10);
-#ifdef USESOCKETS
-			if ((FD = socket_open(name)) >= 0) {
-				HW = 0;
-				alarm(0);
-				signal(SIGALRM, SIG_DFL);
-				return ((int)cp);
-			}
-			else
-#endif
 			if ((FD = open(cp, O_RDWR)) >= 0)
 				ioctl(FD, TIOCEXCL, 0);
 		}
@@ -142,6 +140,45 @@ hunt(name)
 }
 
 #ifdef USESOCKETS
+int
+socket_hunt(name)
+	char *name;
+{
+	register char *cp;
+	sig_t f;
+	int res;
+	
+	/*
+	 * There needs to be a "generic" entry in the remote file
+	 * to keep the rest of tip happy. This could go away if
+	 * we drop/rewrite tip.
+	 */
+	if (! (cp = getremote("generic"))) {
+		fprintf(stderr, "No generic entry in remote file!\n");
+		return -1;
+	}
+
+	/*
+	 * Force HW to zero since that makes no sense in socket based tip.
+	 */
+	HW = 0;
+
+	f = signal(SIGALRM, dead);
+	deadfl = 0;
+	
+	if (setjmp(deadline) == 0) {
+		alarm(10);
+		FD = socket_open(name);
+	}
+	alarm(0);
+	if (FD < 0) {
+		warn("%s", name);
+		deadfl = 1;
+	}
+	signal(SIGALRM, f);
+	return (deadfl ? -1 : 0);
+}
+
 /*
  *
  */
@@ -155,10 +192,10 @@ socket_open(char *tipname)
 	secretkey_t		key;
 	int			port;
 	char			hostname[MAXHOSTNAMELEN];
-	FILE			*fp;
+	FILE		       *fp;
 	struct hostent	       *he;
 
-	(void) sprintf(aclname, "%s/%s.acl", TIPPATH, tipname);
+	(void) sprintf(aclname, "%s/%s.acl", ACLPATH, tipname);
 
 	if ((fp = fopen(aclname, "r")) == NULL) {
 		return -1;

@@ -78,11 +78,6 @@ void usage();
 /*
  *  Configurable things.
  */
-#ifdef HPBSD
-#define LOGPATH		"/usr/adm/tiplogs"
-#else
-#define LOGPATH		"/var/log/tiplogs"
-#endif
 #define PIDNAME		"%s/%s.pid"
 #define LOGNAME		"%s/%s.log"
 #define RUNNAME		"%s/%s.run"
@@ -1054,7 +1049,7 @@ createkey()
 	 * This is still secure in that we rely on unix permission, which
 	 * is how most of our security is based anyway.
 	 */
-	(void) sprintf(aclname, ACLNAME, TIPPATH, Machine);
+	(void) sprintf(aclname, ACLNAME, ACLPATH, Machine);
 
 	/*
 	 * We want to control the mode bits when this file is created.
