@@ -17,9 +17,7 @@ sub usage()
 }
 my  $optlist = "d";
 
-#
 # Configure variables
-#
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 
@@ -27,26 +25,21 @@ my $TBOPS    = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use POSIX; # for sigprocmask and friends
+use Fcntl; # file constants for pidfile
 
 my $genlastlog  = "$TB/sbin/genlastlog";
 my $logfile     = "$TB/log/genlastlog";
 my $debug       = 0;
 
-#
-# Turn off line buffering on output (dots ...).
-#
-$| = 1;
+$| = 1; # Turn off line buffering on output
 
-#
 # Untaint the path
-# 
 $ENV{'PATH'} = "/bin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
-#
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
@@ -58,37 +51,82 @@ if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
 
-#
 # Only root and TB Admins.
-#
 if ($UID && !TBAdmin($UID)) {
     die("*** $0:\n".
 	"    You must be root or a TB administrator\n");
 }
- 
-# Go to ground.
+
+# Go to background.
 if (! $debug) {
     if (TBBackGround($logfile)) {
 	exit(0);
     }
 }
 
-#
+my $str=$TB;
+$str =~ s/\/usr\/testbed//g;
+$str =~ s/\//\./g;
+my $pidfile = ($TB eq "/usr/testbed" ? 
+	       "/var/run/lastlog_daemon.pid" :
+	       "/var/run/lastlog_daemon$str.pid" );
+sysopen(PIDFILE, $pidfile, O_WRONLY | O_EXCL | O_CREAT) || 
+  die ("Couldn't create '$pidfile': $? $!\n");
+print PIDFILE "$$";
+close PIDFILE;
+
+$SIG{HUP} = \&restart;
+
+$SIG{USR1} = \&cleanup;
+$SIG{USR2} = \&cleanup;
+$SIG{INT}  = \&cleanup;
+$SIG{QUIT} = \&cleanup;
+$SIG{ABRT} = \&cleanup;
+$SIG{TERM} = \&cleanup;
+$SIG{KILL} = \&cleanup;
+
+print "lastlog_daemon starting, pid $$\n";
+
 # And just loop.
-#
 while (1) {
-    print "Running at " . TBTimeStamp() . "\n";
+    print "Running at " . `date`;
     
     if (system("$genlastlog")) {
-	print "Exited with status $? at " . TBTimeStamp() . "\n";
+	print "Exited with status $? at " . `date`;
 
 	SENDMAIL($TBOPS, "Genlastlog Failed!",
 		 "Failed with exit value $?\n".
 		 "Please look at the syslog entries for genlastlog!");
     }
-    sleep(60 * 15);
+    sleep(60 * 5);
 }
 
 exit(0);
 
-    
+sub restart() {
+  my $prog = "";
+  # If we're started from an abosolute path, use that.
+  if ($0 =~ /^(\/.*)$/) { $prog = $1; }
+  else { $prog = "$TB/sbin/lastlog_daemon"; }
+  print "SIGHUP received, restarting from '$prog'\n";
+  unlink $pidfile;
+  if (!defined(sigprocmask(SIG_UNBLOCK, POSIX::SigSet->new(SIGHUP)))) {
+    $msg = "lastlog_daemon couldn't restart\n".
+	     "sigprocmask: sig unblock failed! $?, $!\n";
+    SENDMAIL($TBOPS,"lastlog_daemon couldn't restart",$msg);
+    die("$msg\n");
+  }
+  exec("$prog") or 
+    do {
+      my $msg = "Couldn't restart lastlog_daemon! cmd='$prog'\n".
+	"Error: ($?) $!\n";
+      SENDMAIL($TBOPS, "lastlog_daemon couldn't restart",$msg);
+      die($msg);
+    };
+}
+
+sub cleanup() {
+  print "Signal received, exiting.\n";
+  unlink $pidfile;
+  exit(0);
+}
