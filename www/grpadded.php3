@@ -57,7 +57,7 @@ if (!isset($usr_phones) ||
 # if a new user, and we will catch that later.
 #
 if (!isset($password1) ||
-    strcmp($password1, "") == 0)
+    strcmp($password1, "") == 0) {
   $formerror = "Password";
 }
 
