@@ -107,6 +107,7 @@ if (&tbs_exec("postparse $tbcmdfile $irfile")) {
 $run = 0;
 $done = 0;
 &tbs_out("Starting assignment.\n");
+%unodes = ();
 while ($done == 0) {
     $run++;
     if ($run > $maxruns) {
@@ -144,7 +145,13 @@ while ($done == 0) {
 	}
 	
 	&tbs_out("Attempting to reserve resources.\n");
-	if (&tbs_exec("nalloc $pid $eid " . join(" ",@nodes))) {
+
+	# make nodes unique
+	undef %unodes;
+	foreach (@nodes) {
+	    $unodes{$_} = 1;
+	}
+	if (&tbs_exec("nalloc $pid $eid " . join(" ",keys(%unodes)))) {
 	    &tbs_out("Could not reserve resources.\n");
 	} else {
 	    &tbs_out("Resources successfully reserved.\n");
