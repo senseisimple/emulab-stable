@@ -103,6 +103,10 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 # Admin folks get a swap request link to send email.
 #
 if (ISADMIN($uid)) {
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+        WRITESUBMENUBUTTON("Control Delay Nodes (BETA)",
+			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
+    }
     WRITESUBMENUBUTTON("Send a swap/terminate request",
 			  "request_swapexp.php3?&pid=$exp_pid&eid=$exp_eid");
 }
