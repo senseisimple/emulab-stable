@@ -1037,8 +1037,9 @@ function SHOWNODES($pid, $eid) {
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
                 <th>Startup<br>Status[<b>2</b>]</th>
-                <th>SSH</th>
-                <th>Console</th>
+                <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a>
+		    </th>
+                <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>
               </tr>\n";
 
 	$sort = "n.type,n.priority";
