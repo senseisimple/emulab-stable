@@ -591,6 +591,7 @@ function TBNodeAccessCheck($uid, $node_id, $access_type)
     global $TB_NODEACCESS_MIN;
     global $TB_NODEACCESS_MAX;
     global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_GROUPROOT;
     global $TBDB_TRUST_LOCALROOT;
     $mintrust;
 
@@ -751,6 +752,7 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
     global $TB_IMAGEID_MIN;
     global $TB_IMAGEID_MAX;
     global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_GROUPROOT;
     global $TBDB_TRUST_LOCALROOT;
     $mintrust;
 
