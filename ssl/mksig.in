@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Create a digital sig and spit out to stdout. You have to know the
+# password. Hint: its the same as widearea root ssh key. 
+#
+openssl dgst -sha1 -sign @prefix@/etc/emulab_privkey.pem $1

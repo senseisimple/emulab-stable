@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,7 +12,8 @@ SUBDIR		= ssl
 
 include $(OBJDIR)/Makeconf
 
-all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem keys
+all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
+	keys mksig
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -84,6 +85,9 @@ capture.pem:	dirsmade capture.cnf ca.cnf
 localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh localnode
 
+ctrlnode.pem:	dirsmade ctrlnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
+	$(SRCDIR)/mkclient.sh ctrlnode
+
 ronnode.pem:	dirsmade ronnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh ronnode
 
@@ -120,7 +124,7 @@ dirsmade:
 # You do not want to run these targets unless you are sure you
 # know what you are doing!
 #
-install:
+install:	$(INSTALL_SBINDIR)/mksig
 	@echo "BE VERY CAREFUL! INSTALLING NEW CERTS CAN CAUSE DISASTER!"
 
 boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
