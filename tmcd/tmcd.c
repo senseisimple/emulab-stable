@@ -57,7 +57,18 @@
 #define DOTSFS		".sfs"
 
 #define TESTMODE
-#define NETMASK		"255.255.255.0"
+#define DEFAULTNETMASK	"255.255.255.0"
+/* This can be tossed once all the changes are in place */
+static char *
+CHECKMASK(char *arg)
+{
+	if (arg && arg[0])
+		return arg;
+
+	error("No netmask defined!\n");
+	return DEFAULTNETMASK;
+}
+/* #define CHECKMASK(arg)  ((arg) && (arg[0]) ? (arg) : DEFAULTNETMASK) */
 
 #define DISKTYPE	"ad"
 #define DISKNUM		0
@@ -641,6 +652,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	int		   version = DEFAULT_VERSION;
 	tmcdreq_t	   tmcdreq, *reqp = &tmcdreq;
 
+	byteswritten = 0;
+
 	/*
 	 * Init the req structure.
 	 */
@@ -859,7 +872,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Execute it.
 	 */
-	byteswritten = 0;
 #ifdef	WITHSSL
 	cp = (isssl ? "SSL" : (istcp ? "TCP" : "UDP"));
 #else
@@ -975,9 +987,9 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the interfaces.
 	 */
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
-			 " IPaliases,iface,role "
+			 " IPaliases,iface,role,mask "
 			 "from interfaces where node_id='%s'",
-			 9, reqp->nodeid);
+			 10, reqp->nodeid);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting interfaces!\n",
 		      reqp->nodeid);
@@ -998,10 +1010,14 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
+			char *mask;
 
 			/* Never for the control net; sharks are dead */
 			if (strcmp(role, TBDB_IFACEROLE_EXPERIMENT))
 				goto skipit;
+
+			/* Do this after above test to avoid error in log */
+			mask = CHECKMASK(row[9]);
 
 			/*
 			 * Speed and duplex if not the default.
@@ -1022,7 +1038,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			
 			sprintf(&buf[strlen(buf)],
 				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
-				row[1], NETMASK, row[3], speed, unit, duplex);
+				row[1], mask, row[3], speed, unit, duplex);
 
 			/* Tack on IPaliases */
 			if (vers >= 8) {
@@ -1075,12 +1091,12 @@ COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the veth interfaces.
 	 */
-	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac "
+	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask "
 			 "  from veth_interfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "where v.node_id='%s' and %s",
-			 4, reqp->pnodeid, buf);
+			 5, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1101,7 +1117,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		sprintf(buf,
 			"IFACETYPE=veth "
 			"INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
-			row[1], NETMASK, row[0], row[2],
+			row[1], CHECKMASK(row[4]), row[0], row[2],
 			row[3] ? row[3] : "none");
 
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -1771,7 +1787,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 			"MEANPSIZE=%s WAIT=%s SETBIT=%s "
 			"DROPTAIL=%s GENTLE=%s\n",
 			(row[27] ? row[27] : row[0]), row[1],
-			row[2],  row[3],  row[4],  row[5],
+			row[2],  row[3],  row[4],  CHECKMASK(row[5]),
 			row[6],	 row[7],  row[8],  row[9],
 			row[10], row[11], row[12], row[14],
 			row[14], row[15], row[16], row[17], row[18],
@@ -2947,11 +2963,11 @@ COMMAND_PROTOTYPE(dorouting)
 	/*
 	 * Get the routing type from the nodes table.
 	 */
-	res = mydb_query("select dst,dst_type,dst_mask,nexthop,cost "
+	res = mydb_query("select dst,dst_type,dst_mask,nexthop,cost,src "
 			 "from virt_routes as vi "
 			 "where vi.vname='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
-			 5, reqp->nickname, reqp->pid, reqp->eid);
+			 6, reqp->nickname, reqp->pid, reqp->eid);
 	
 	if (!res) {
 		error("ROUTES: %s: DB Error getting manual routes!\n",
@@ -2989,8 +3005,13 @@ COMMAND_PROTOTYPE(dorouting)
 			strncpy(dstip, row[0], sizeof(dstip));
 
 		sprintf(buf, "ROUTE DEST=%s DESTTYPE=%s DESTMASK=%s "
-			"NEXTHOP=%s COST=%s\n",
+			"NEXTHOP=%s COST=%s",
 			dstip, row[1], row[2], row[3], row[4]);
+
+		if (vers >= 12) {
+			sprintf(&buf[strlen(buf)], " SRC=%s", row[5]);
+		}
+		strcat(buf, "\n");		
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		n--;
@@ -3342,9 +3363,9 @@ COMMAND_PROTOTYPE(dotunnels)
 	}
 
 	res = mydb_query("select vname,isserver,peer_ip,port,password, "
-			 " encrypt,compress,assigned_ip,proto "
+			 " encrypt,compress,assigned_ip,proto,mask "
 			 "from tunnels where node_id='%s'",
-			 9, reqp->nodeid);
+			 10, reqp->nodeid);
 
 	if (!res) {
 		error("TUNNELS: %s: DB Error getting tunnels\n", reqp->nodeid);
@@ -3362,7 +3383,7 @@ COMMAND_PROTOTYPE(dotunnels)
 			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s "
 			"INET=%s MASK=%s PROTO=%s\n",
 			row[0], row[1], row[2], row[3], row[4],
-			row[5], row[6], row[7], NETMASK, row[8]);
+			row[5], row[6], row[7], CHECKMASK(row[9]), row[8]);
 		       
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
@@ -4632,14 +4653,15 @@ COMMAND_PROTOTYPE(doixpconfig)
 	 * Get the "control" net address for the IXP from the interfaces
 	 * table. This is really a virtual pci/eth interface.
 	 */
-	res = mydb_query("select i1.IP,i1.iface,i2.iface from nodes as n "
+	res = mydb_query("select i1.IP,i1.iface,i2.iface,i2.mask "
+			 " from nodes as n "
 			 "left join node_types as nt on n.type=nt.type "
 			 "left join interfaces as i1 on i1.node_id=n.node_id "
 			 "     and i1.iface=nt.control_iface "
 			 "left join interfaces as i2 on i2.node_id='%s' "
 			 "     and i2.card=255 "
 			 "where n.node_id='%s'",
-			 3, reqp->pnodeid, reqp->nodeid);
+			 4, reqp->pnodeid, reqp->nodeid);
 	
 	if (!res) {
 		error("IXPCONFIG: %s: DB Error getting config!\n",
@@ -4659,10 +4681,13 @@ COMMAND_PROTOTYPE(doixpconfig)
 		error("IXPCONFIG: %s: No host interface!\n", reqp->nodeid);
 		return 1;
 	}
-
-	inet_aton(NETMASK, &mask_addr);	
-	inet_aton(row[0],  &bcast_addr);	
-	inet_aton(row[0],  &gw_addr);
+	if (!row[3]) {
+		error("IXPCONFIG: %s: No mask!\n", reqp->nodeid);
+		return 1;
+	}
+	inet_aton(CHECKMASK(row[3]), &mask_addr);	
+	inet_aton(row[0], &bcast_addr);	
+	inet_aton(row[0], &gw_addr);
 
 	/*
 	 * Not sure we should do this here?
@@ -4684,7 +4709,7 @@ COMMAND_PROTOTYPE(doixpconfig)
 		"HOST_IFACE=\"%s\"\n"
 		"NETMASK=\"%s\"\n",
 		row[0], row[1], bcast_ip, reqp->nickname,
-		gw_ip, row[2], NETMASK);
+		gw_ip, row[2], row[3]);
 		
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
