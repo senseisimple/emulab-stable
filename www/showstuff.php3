@@ -1489,7 +1489,7 @@ function SHOWNODE($node_id) {
 	DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
 		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
 		     "last_ext_act) as last_act, ".
-		     " t.isvirtnode,t.isremotenode ".
+		     " t.isvirtnode,t.isremotenode,r.erole as rsrvrole ".
 		     " from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_activity as na on n.node_id=na.node_id ".
@@ -1538,6 +1538,7 @@ function SHOWNODE($node_id) {
     $last_cpu_act       = $row[last_cpu_act];
     $last_ext_act       = $row[last_ext_act];
     $last_report        = $row[last_report];
+    $rsrvrole           = $row[rsrvrole];
     
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -1764,6 +1765,13 @@ function SHOWNODE($node_id) {
               <td>Control Net IP:</td>
               <td class=left>$IP</td>
           </tr>\n";
+
+    if ($rsrvrole) {
+	echo "<tr>
+                  <td>Role:</td>
+                  <td class=left>$rsrvrole</td>
+              </tr>\n";
+    }
 
     echo "<tr>
               <td>Bios Version:</td>
