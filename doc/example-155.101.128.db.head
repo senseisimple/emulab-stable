@@ -1,0 +1,22 @@
+;
+; Rather than 24 hours, minimum TTL is set to only 16 hours.
+;  - This way, if a change is made as late as 5pm, we can guarantee that old
+;    data will be flushed from anyones cache by the following morning at 9am.
+;
+
+; Exaple reverse .head file for 155.101.128
+
+$TTL	10800
+
+@	IN	SOA	ns.example.emulab.net. testbed-ops.example.emulab.net. (
+			14		; Serial (simple for now)
+			10800		; Refresh 3 hours
+			3600		; Retry   1 hour
+			3600000		; Expire  1000 hours
+			57600 )		; Minimum 16 hours
+
+        IN      NS      ns.example.emulab.net.
+        IN      NS      ns2.example.emulab.net.
+
+1	IN	PTR	private-router.emulab.net.
+

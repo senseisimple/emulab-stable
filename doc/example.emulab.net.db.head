@@ -1,0 +1,44 @@
+;
+; Authoritative data for emulab.
+;
+
+$TTL	30
+
+@	IN	SOA	boss.example.emulab.net. testbed-ops.example.emulab.net. (
+			30		; Serial Number - DO NOT EDIT THIS LINE
+			1800	; Refresh (30 minutes)
+			900		; Retry   (15 minutes)
+			3600000	; Expire  (1000 hours)
+			1 )		; No caching for negative answers
+	IN	NS	ns.example.emulab.net.
+	IN	NS	ns.emulab.net.
+
+$TTL	10800
+
+; 'emulab.net' is implied in the line below
+		IN	A		155.101.128.70
+		IN	MX 10	ops
+
+; Apparently, CNAME NS records are a bad idea - so, ns.example.emulab.net
+; and boss are both A records
+ns		IN	A		155.101.128.70
+boss		IN	A		155.101.128.70
+		IN	MX 10	ops
+
+www		IN	CNAME   boss
+db		IN	CNAME	boss
+cvsup		IN	CNAME	boss
+
+ns2		IN	A		155.99.212.1 ; fast.cs.utah.edu
+
+ops		IN	A		155.101.129.74
+		IN	MX 10	ops
+users		IN	CNAME	ops
+fs		IN	CNAME	ops
+
+; Routers interfaces in the various subnets
+private-router	IN	A	155.101.128.1
+public-router	IN	A	155.101.129.1
+control-router	IN	A	155.101.132.1
+external-router	IN	A	155.99.238.130
+
