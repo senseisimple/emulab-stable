@@ -40,7 +40,7 @@ if (! TBValidNodeName($node_id)) {
 #
 if (! $isadmin) {
     if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
-        USERERROR("You do not have permission to modify node $node_id!", 1);
+        USERERROR("You do not have permission to access node $node_id!", 1);
     }
 }
 

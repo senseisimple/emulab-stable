@@ -64,7 +64,7 @@ echo "</b><br />\n";
 
 # Default value for showlastlogin is 1 for admins
 $showlastlogin = $isadmin;
-# Note: setting this to 1 for non-admins still doesn't make the column
+# Note: setting this to 1 for non-admins still does not make the column
 # show properly... it just shows the header in the table, over the
 # wrong column. 
 
@@ -100,7 +100,7 @@ elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
-    $showlastlogin = 0; # don't show a lastlogin column
+    $showlastlogin = 0; # do not show a lastlogin column
 }
 else {
     # See active above
@@ -216,7 +216,7 @@ if ($clause) {
 
 # Notes about the queries below:
 # - idle is fudged by 121 seconds so that in the five minutes between 
-#   slothd reports we don't get active expts showing up as idle for 0.1 hrs
+#   slothd reports we do not get active expts showing up as idle for 0.1 hrs
 
 if ($isadmin) {
     $experiments_result =
@@ -521,9 +521,9 @@ if ($thumb && !$idle) {
 	    }
 	    $foo = "<td align=center valign=center>\n";
 	    #$label = "";
-	    # Probably don't need this when we're using stalemark
+	    # Probably do not need this when we are using stalemark
 	    #if ($stale) { $label .= "stale "; }
-	    # Don't really need this if we're marking ignore with ()
+	    # Do not really need this if we are marking ignore with ()
 	    #if ($ignore) { $label .= "ignore "; }
 	    #if (!$swappable) { $label .= "unswap. "; }
  	    #if ($isidle && !$stale && !$ignore && !$toosoon && $pcs) {
@@ -579,12 +579,13 @@ if ($thumb && !$idle) {
                        $eid</A></td>\n";
 	
 	if ($isidle && !$ignore) { $nodes = $nodes.$idlemark; }
-	# If multiple classes, then hightlight the number.
-	if ($special)
-	    if ($idle)
-		echo "<td><font color=red>$nodes</font> ($pcs)</td>\n";
+	# If multiple classes, then hightlight the number and show pcs/nodes.
+	if ($special) {
+	    if ($pcs)
+		echo "<td nowrap><font color=red>$nodes</font> ($pcs)</td>\n";
 	    else
-                echo "<td><font color=red>$nodes</font></td>\n";
+		echo "<td nowrap><font color=red>$nodes</font></td>\n";
+	}
 	else
             echo "<td>$nodes</td>\n";
 
@@ -616,7 +617,8 @@ if ($thumb && !$idle) {
     echo "<font size=-1><ol>
              <li><font color=red>Red</font> indicates nodes other than PCs.
                  A $idlemark mark by the node count indicates that the
-                 experiment is currently considered idle.
+                 experiment is currently considered idle. The number of
+                 local pcs is indicated in the parens. 
              <li>A $stalemark indicates that the data is stale, and
 		 at least one node in the experiment has not reported
 		 on its proper schedule.\n";

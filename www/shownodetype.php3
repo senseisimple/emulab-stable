@@ -149,6 +149,65 @@ echo "<tr>
 echo "</table>\n";
 
 #
+# Suck out info for all the nodes of this type. We are going to show
+# just a list of dots, in two color mode.
+# 
+$query_result =
+    DBQueryFatal("select n.node_id,r.pid ".
+		 "from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join reserved as r on n.node_id=r.node_id ".
+		 "where nt.type='$node_type' and ".
+		 "      (role='testnode' or role='virtnode') ".
+		 "ORDER BY priority");
+
+
+if (mysql_num_rows($query_result)) {
+    echo "<br>
+          <center>
+          <table class=nogrid cellspacing=0 border=0 cellpadding=5>\n";
+
+    $maxcolumns = 4;
+    $column     = 0;
+    
+    while ($row = mysql_fetch_array($query_result)) {
+	$node_id = $row["node_id"];
+	$pid     = $row["pid"];
+
+	if ($column == 0) {
+	    echo "<tr>\n";
+	}
+	$column++;
+
+	echo "<td align=left><nobr>\n";
+
+	if (!$pid) {
+	    echo "<img src=\"/autostatus-icons/greenball.gif\" alt=free>\n";
+	}
+	else {
+	    echo "<img src=\"/autostatus-icons/redball.gif\" alt=reserved>\n";
+	}
+	echo "&nbsp;";
+#	echo "<a href=shownode.php3?node_id=$node_id>";
+	echo "$node_id";
+#	echo "</a>";
+	echo "</nobr>
+              </td>\n";
+	
+	if ($column == $maxcolumns) {
+	    echo "</tr>\n";
+	    $column = 0;
+	}
+    }
+    echo "</table>\n";
+    echo "<br>
+          <img src=\"/autostatus-icons/greenball.gif\" alt=free>&nbsp;Free
+          &nbsp &nbsp &nbsp
+          <img src=\"/autostatus-icons/redball.gif\" alt=free>&nbsp;Reserved
+          </center>\n";
+}
+
+#
 # Standard Testbed Footer
 # 
 PAGEFOOTER();
