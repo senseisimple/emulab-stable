@@ -190,7 +190,7 @@ sub vlanSetup {
 
 #EDIT HERE IF SYSTEM VLAN CHANGES
 
-	if ($ID != 24) {
+	if ($ID != 1) {
 	    $row->Checkbutton
 		(-variable=>\$vlans{$ID},-relief=>'sunken',
 		 -width=>5,-anchor=>'center',
