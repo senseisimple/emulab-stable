@@ -1,0 +1,43 @@
+#!/usr/local/bin/perl -wT
+
+
+# Wrapper for running mkacct-ctrl from the web page. See comment in
+# mkprojdir-wrapper for logic.
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: mkacct-ctrl_wrapper <pid> <username>\n");
+}
+my $pid      = $ARGV[0];
+my $username = $ARGV[1];
+
+#
+# Untaint the pid.
+#
+if ($pid =~ /^([A-Z0-9-]+)$/i) {
+    $pid = $1;
+} else {
+    die("Invalid pid '$pid' contains illegal characters.\n");
+}
+
+
+#
+# Untaint the username
+#
+if ( $ARGV[1] =~ /^([a-z0-9]+)$/ ) {
+    $username = $1;
+} else {
+    die "$0: User argument $ARGV[1] has invalid characters.\n";
+}
+
+
+exec "/usr/testbed/bin/mkacct-ctrl $pid $username";
+
+
+
