@@ -49,6 +49,18 @@ namespace eval GLOBALS {
     set new_classes(Application/Traffic/CBR) {}
     set new_classes(Application/FTP) {}
     set new_classes(Application/Telnet) {}
+
+    # When generating NSE Traffic Generator code, need to ignore
+    # testbed specific variables
+    set ignore_nsetrafgen_classvars(destination) {}
+    set ignore_nsetrafgen_classvars(application) {}
+    set ignore_nsetrafgen_classvars(role) {}
+    set ignore_nsetrafgen_classvars(proto) {}
+    set ignore_nsetrafgen_classvars(port) {}
+    set ignore_nsetrafgen_classvars(node) {}
+    set ignore_nsetrafgen_classvars(simulated) {}
+    set ignore_nsetrafgen_classvars(generator) {}
+    set ignore_nsetrafgen_classvars(osid) {}
 }
 
 # Agent
@@ -65,8 +77,7 @@ Agent instproc init {} {
     $self set generator "TG"
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
-    var_import ::GLOBALS::simulated
-    if { $simulated == 1 } {
+    if { ${::GLOBALS::simulated} == 1 } {
 	$self set simulated 1
     } else {
 	$self set simulated 0
@@ -229,7 +240,7 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     $self instvar generator
     $self instvar port
     $self instvar link
-    $self instvar simulated
+    var_import ::GLOBALS::simulated
 
     if {$node == {}} {
 	perror "\[updatedb] $self is not attached to a node."
@@ -276,7 +287,7 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
     $self instvar role
     $self instvar simulated
     $self instvar application
-    $self set objname $self
+    var_import ::GLOBALS::ignore_nsetrafgen_classvars
     
     set nseconfig ""
 
@@ -289,23 +300,26 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
     # we set a global variable to indicate that NSE trafgen
     # is present so that nseinput.tcl can take appropriate
     # action
-    append nseconfig "set nsetrafgen_present 1\n\n"
     if { ($tcptype == "") || ($tcptype == "Reno") } {
           append nseconfig "set $self \[new Agent/TCP/FullTcp]\n"
     } else {
           append nseconfig "set $self \[new Agent/TCP/FullTcp/$tcptype]\n"
     }
+    append nseconfig "\$\{$self\} set tbname \{$self\}\n"
 
     if { $role == "sink" } {
-         append nseconfig "\$$self listen\n\n"
+         append nseconfig "\$\{$self\} listen\n\n"
     }
 
     # We end up including variables present only in TB parser. However
     # that does not matter coz all NS variables end with _ character
     # Pruning can be done later
     foreach var [$self info vars] {
+	   if { [info exists ignore_nsetrafgen_classvars($var)] } {
+	        continue
+	   }
            if { [$self set $var] != {} } {
-             append nseconfig "\$$self set $var [$self set $var]\n"
+             append nseconfig "\$\{$self\} set $var [$self set $var]\n"
            }
     }
     append nseconfig "\n"
@@ -329,9 +343,7 @@ Agent/TCP/FullTcp instproc connect {dst} {
     $self set proto "tcp"
     $dst set proto "tcp"
     $node set osid "FBSD-STD"
-    $node set realtime 1
     $dst set osid "FBSD-STD"
-    $dst set realtime 1
 }
 
 # Agent/Null
@@ -432,10 +444,10 @@ Application/FTP instproc get_nseconfig {} {
     $self instvar agent
     set nseconfig "set $self \[new Application/FTP]\n"
     
-    append nseconfig "\$$self set objname $self\n"
+    append nseconfig "\$\{$self\} set tbname \{$self\}\n"
 
     if { $agent != {} } {
-         append nseconfig "\$$self attach-agent \$$agent\n"
+         append nseconfig "\$\{$self\} attach-agent \$$agent\n"
     }
     append nseconfig "\n"
 
@@ -468,11 +480,11 @@ Application/Telnet instproc get_nseconfig {} {
 
     set nseconfig "set $self \[new Application/Telnet]\n"
 
-    append nseconfig "\$$self set objname $self\n"
+    append nseconfig "\$\{$self\} set tbname \{$self\}\n"
                
-    append nseconfig "\$$self set interval_ $interval_\n"
+    append nseconfig "\$\{$self\} set interval_ $interval_\n"
     if { $agent != {} } {
-         append nseconfig "\$$self attach-agent \$$agent\n"
+         append nseconfig "\$\{$self\} attach-agent \$$agent\n"
     }
     append nseconfig "\n"
         

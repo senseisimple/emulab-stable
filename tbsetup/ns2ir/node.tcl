@@ -77,14 +77,11 @@ Node instproc init {s} {
     $self set failureaction "fatal"
     $self set fixed ""
     $self set nseconfig ""
-    $self set realtime 0
 
-    var_import ::GLOBALS::simulated
-    if { $simulated == 1 } {
+    if { ${::GLOBALS::simulated} == 1 } {
 	$self set simulated 1
     } else {
 	$self set simulated 0
-	$self set realtime 0
     }
     $self set nsenode_vportlist {}
 }
@@ -128,11 +125,12 @@ Node instproc updatedb {DB} {
     $self instvar agentlist
     $self instvar routelist
     $self instvar sim
-    $self instvar realtime
     $self instvar isvirt
     $self instvar virthost
     $self instvar issubnode
     $self instvar desirelist
+    $self instvar nseconfig
+    $self instvar simulated
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
@@ -184,6 +182,26 @@ Node instproc updatedb {DB} {
 
     foreach agent $agentlist {
 	$agent updatedb $DB
+
+	# The following is for NSE traffic generation
+	# Simulated nodes in make-simulated should not be doing this
+	if { $simulated != 1 } { 
+	    append nseconfig [$agent get_nseconfig]
+	}
+    }
+
+     if {$nseconfig != {}} {
+
+       set nsecfg_script ""
+       set simu [lindex [Simulator info instances] 0]
+       append nsecfg_script "set $simu \[new Simulator]\n"
+       append nsecfg_script "\$$simu set tbname \{$simu\}\n"
+       append nsecfg_script "\$$simu use-scheduler RealTime\n\n"
+       append nseconfig "set nsetrafgen_present 1\n\n"
+       append nsecfg_script $nseconfig
+
+        # update the per-node nseconfigs table in the DB
+	$sim spitxml_data "nseconfigs" [list "vname" "nseconfig"] [list "$self" "$nsecfg_script"]
     }
 
     $self add_routes_to_DB $DB

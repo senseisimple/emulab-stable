@@ -182,6 +182,28 @@ proc readroutes {} {
     }
 }
 
+proc readtrafgens {} {
+    global CLIENTVARDIR
+    global tbtrafgens
+
+    set tmcctrafgens [open $CLIENTVARDIR/boot/tmcc.trafgens r]
+    set tmcctraf [read $tmcctrafgens]
+    close $tmcctrafgens
+    set trafgenlist [split $tmcctraf "\n"]
+    set formatstr {TRAFGEN=%s MYNAME=%s MYPORT=%u PEERNAME=%s PEERPORT=%u PROTO=%s ROLE=%s GENERATOR=%s}
+    foreach trafgen $trafgenlist {
+	if { $trafgen == {} } {
+	    continue
+	}
+	
+	scan $trafgen $formatstr traf myname myport peername peerport proto role gen
+	if { $gen != "NSE" || $proto != "tcp" } {
+	    continue
+	}
+	set tbtrafgens($traf) "$myname:$myport:$peername:$peerport"
+    }
+}
+
 # call it after evaluating nseconfigs
 # This will parse tmcc routelist and
 # store a list of routes for all source nodes that are
@@ -213,6 +235,9 @@ readifconfig
 # Routes
 readroutes
 
+# Traffic Generators used only if NSE based traffic generators are present
+readtrafgens
+
 # the name of the simulator instance variable might not
 # always be 'ns', coming from the TB parser
 set ns [Simulator instance]
@@ -222,16 +247,10 @@ set ipnetcommon [new Network/IP]
 $ipnetcommon open writeonly
 
 # configuring NSE FullTcp traffic generators
-set objnamelist ""
 if { $nsetrafgen_present == 1 } {
 
     # The following nodes are present 
     set n0_FullTcp [$ns node]
-    set n1_FullTcp [$ns node]
-
-    # required hack for now or FullTcp timer cancels cause aborts
-    # otherwise, we just need 1 node
-    $ns duplex-link $n0_FullTcp $n1_FullTcp 100Mb 0ms DropTail
 
     # set sysctl tcp blackhole to 2
     exec sysctl -w net.inet.tcp.blackhole=2
@@ -241,7 +260,12 @@ if { $nsetrafgen_present == 1 } {
 	lappend tcpclasses $tcpsubclass
     }
     
+    # for each entry in `tmcc trafgens` that has NSE as the generator
+    # configure that object to connect to a newly created
+    # TCPTap along with the required Live and RAW IP objects. Set the filter and interface
+    # after learning it from tmcc commands and other scripts in /var/emulab
     
+    set i 0
     foreach tcpclass $tcpclasses {
 	set tcpobjs [$tcpclass info instances]
 	
@@ -253,95 +277,50 @@ if { $nsetrafgen_present == 1 } {
 	    # of the FullTcp objects could be created as
 	    # as a result of a combined simulation and
 	    # emulation scenario
-	    if { [$tcpobj set objname] != {} } {
+	    set tcptbname [$tcpobj set tbname]
+	    if { $tcptbname != {} } {
 		$ns attach-agent $n0_FullTcp $tcpobj
-		#lappend objnamelist [$tcpobj set objname]
+
+		set trafrecord [split $tbtrafgens($tcptbname) ":"]
+		set myname [lindex $trafrecord 0]
+		set myport [lindex $trafrecord 1]
+		set peername [lindex $trafrecord 2]
+		set peerport [lindex $trafrecord 3]
+
+		# convert myname and peername to corresponding ipaddresses
+		# using the getipaddr helper subroutine
+		set myipaddr [getipaddr $myname]
+		set peeripaddr [getipaddr $peername]
+	    
+		# find interface name with a helper subroutine
+		set interface [getif $myipaddr]
+
+		# one TCPTap object per TCP class that we have instantiated
+		set tcptap($i) [new Agent/TCPTap]
+		$tcptap($i) nsipaddr $myipaddr
+		$tcptap($i) nsport $myport
+		$tcptap($i) extipaddr $peeripaddr 
+		$tcptap($i) extport $peerport
+	    
+		# open the bpf, set the filter for capturing incoming packets towards
+		# the current tcp object
+		set bpf_tcp($i) [new Network/Pcap/Live]
+		set dev_tcp($i) [$bpf_tcp($i) open readonly $interface]
+		$bpf_tcp($i) filter "tcp and dst $myipaddr and dst port $myport and src $peeripaddr and src port $peerport"
+	    
+		# associate the 2 network objects in the TCPTap object
+		$tcptap($i) network-incoming $bpf_tcp($i)
+		$tcptap($i) network-outgoing $ipnetcommon
+	    
+		# attach the TCPTap agent to node n1_FullTcp
+		$ns attach-agent $n0_FullTcp $tcptap($i)
+	    
+		# connect this tap and the particular tcp agent
+		$ns connect $tcpobj $tcptap($i)
+
+		incr i
 	    }
 	}
-    }
-    
-    foreach ftpobj [Application/FTP info instances] {
-	# objname is a instance variable that was put
-	# by TB parser on objects instantiated by it.
-	# we are concerned only with those. the rest
-	# of the FullTcp objects could be created as
-	# as a result of a combined simulation and
-	# emulation scenario
-	if { [$ftpobj set objname] != {} } {
-	    #lappend objnamelist [$ftpobj set objname]
-	}
-    }
-    
-    foreach telnetobj [Application/Telnet info instances] {
-	# objname is a instance variable that was put
-	# by TB parser on objects instantiated by it.
-	# we are concerned only with those. the rest
-	# of the FullTcp objects could be created as
-	# as a result of a combined simulation and
-	# emulation scenario
-	if { [$telnetobj set objname] != {} } {
-	    #lappend objnamelist [$telnetobj set objname]
-	}
-    }
-
-    # for each entry in `tmcc trafgens` that has NSE as the generator
-    # configure that object to connect to a newly created
-    # TCPTap along with the required Live and RAW IP objects. Set the filter and interface
-    # after learning it from tmcc commands and other scripts in /var/emulab
-    
-    set tmcctrafgens [open $CLIENTVARDIR/boot/tmcc.trafgens r]
-    set tmcctraf [read $tmcctrafgens]
-    close $tmcctrafgens
-    set trafgenlist [split $tmcctraf "\n"]
-    set formatstr {TRAFGEN=%s MYNAME=%s MYPORT=%u PEERNAME=%s PEERPORT=%u PROTO=%s ROLE=%s GENERATOR=%s}
-    variable i 0
-    foreach trafgen $trafgenlist {
-	
-	scan $trafgen $formatstr trafgen myname myport peername peerport proto role gen
-	if { $gen != "NSE" || $proto != "tcp" } {
-	    continue
-	}
-	
-	
-	# if the variable in $trafgen exists, we create a bunch of taps
-	# first do the tap part
-	if { [info exists $trafgen] == 1 } {
-	    
-	    # convert myname and peername to corresponding ipaddresses
-	    # using the getipaddr helper subroutine
-	    set myipaddr [getipaddr $myname]
-	    set peeripaddr [getipaddr $peername]
-	    
-	    # find interface name with a helper subroutine
-	    set interface [getif $myipaddr]
-	    
-	    # one TCPTap object per TCP class that we have instantiated
-	    set tcptap($i) [new Agent/TCPTap]
-	    $tcptap($i) nsipaddr $myipaddr
-	    $tcptap($i) nsport $myport
-	    $tcptap($i) extipaddr $peeripaddr
-	    $tcptap($i) extport $peerport
-	    
-	    # open the bpf, set the filter for capturing incoming packets towards
-	    # the current tcp object
-	    set bpf_tcp($i) [new Network/Pcap/Live]
-	    set dev_tcp($i) [$bpf_tcp($i) open readonly $interface]
-	    $bpf_tcp($i) filter "tcp and dst $myipaddr and dst port $myport and src $peeripaddr and src port $peerport"
-	    
-	    # associate the 2 network objects in the TCPTap object
-	    $tcptap($i) network-incoming $bpf_tcp($i)
-	    $tcptap($i) network-outgoing $ipnetcommon
-	    
-	    # attach the TCPTap agent to node n1_FullTcp
-	    $ns attach-agent $n1_FullTcp $tcptap($i)
-	    
-	    # connect this tap and the particular tcp agent
-	    set tcpagent($i) [expr \$$trafgen]
-	    $ns connect $tcpagent($i) $tcptap($i)
-	    
-	    incr i
-	}
-	
     }
 }
 
@@ -468,9 +447,6 @@ set nseswap_cmdline "$CLIENTBINDIR/tevc -s $boss -e $pid/$eid now $simobjname NS
 set evsink [new TbEventSink]
 $evsink event-server "elvin://$boss"
 $evsink nseswap_cmdline $nseswap_cmdline
-#if { $objnamelist != {} } {
-#    $evsink objnamelist [join $objnamelist ","]
-#}
 $evsink logfile $logpath
 [$ns set scheduler_] tbevent-sink $evsink
 
