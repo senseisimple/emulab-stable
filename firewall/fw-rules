@@ -38,8 +38,12 @@
 # Let through anything
 allow all from any to any			# 65534: OPEN
 
-# match existing dynamic rules first
-check-state					# 1: BASIC,CLOSED,ELABINELAB
+# match existing dynamic rules first (rule 1 is used as a temp rule)
+check-state					# 2: BASIC,CLOSED,ELABINELAB
+
+# XXX use ssh from boss to remove a tmp rule allowing all traffic
+# this is necessary to allow the ssh to complete!
+allow tcp from me to boss established		# 3: ELABINELAB
 
 # Can talk to myself
 allow all from me to me				# 10: BASIC,CLOSED,ELABINELAB
@@ -56,7 +60,7 @@ allow all from any to any frag			# 14: BASIC,CLOSED,ELABINELAB
 
 # Anti-spoofing?
 
-# allow DNS to boss early so other rules can use symbolic host names
+# DNS to NS
 allow udp from any to EMULAB_NS 53 keep-state	# 50: BASIC,CLOSED,ELABINELAB
 
 #
