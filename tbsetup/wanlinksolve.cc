@@ -14,7 +14,8 @@
  "weights" are values of latency time in milliseconds.
 
  switches: 
-   -v  Extra verbosity.
+   -v     Extra verbosity
+   -v -v  Jumbo verbosity 
 
    -2 <weight>
        Solve for 2nd (bandwidth) dimension;
@@ -59,8 +60,8 @@
 
  * One line containing a single number 'v'-- the number of virtual nodes.
  * 'v' lines containing the name of each virtual node.
-       If the name is prefaced with '*', then this node will be permanently
-       mapped ("fix"ed) to the physical node of the same name. 
+       appending a space then the name of a physical node will permanently
+       "fix" the mapping of this vnode to the named pnode.
  * 'v' lines each containing 'v' space delimited numbers;
        this is a V x V matrix of the _desired_ weight between vnodes.
        '-1's indicate "don't care"s.. (e.g. for the weight between two
@@ -81,6 +82,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <assert.h>
 #include <math.h>
 
 // To keep things lightweight, 
@@ -120,6 +122,25 @@ using namespace std;
 
 // keep freebsd from mumbling about gets(3) being unsafe.
 #define gets( x ) fgets( x, sizeof( x ), stdin  )
+
+#ifdef DEBUG
+int wedgecount;
+static inline void BEGIN_LOOP() { wedgecount = 0; } 
+static inline void IN_LOOP_hlp( int line ) 
+{ 
+  ++wedgecount;
+  if (wedgecount == 66666) { 
+    printf( "possibly wedged in line %i.\n", line );
+    assert(false);
+  }
+}
+#define IN_LOOP() IN_LOOP_hlp(__LINE__)
+#else
+
+#define BEGIN_LOOP()
+#define IN_LOOP()
+
+#endif
 
 // keep track of user names for nodes.
 static map< int, string > pnodeNames;
@@ -269,20 +290,33 @@ static inline void sortByError()
 // (if both are -1, e.g. not mapped to vnodes, nothing happens.)
 static inline void mutate( Solution * t )
 {
+  BEGIN_LOOP();
   while(1) {
+    IN_LOOP();
     // forecast calls for a 1% chance of mutation...
     if ((rand() % 1000) < MUTATE_PROB) { break; }
     
     if ((rand() % 3)) {
       // swap mutation. 
       int a, b;
+
+      BEGIN_LOOP();
       do {
+	IN_LOOP();
 	a = rand() % vnodes;
+      } while (fixed[a] != -1);
+
+      BEGIN_LOOP();
+      do {
+	IN_LOOP();
 	b = rand() % vnodes;
-      } while (fixed[a] != -1 || fixed[b] != -1);
-      int temp = t->vnode_mapping[a];
-      t->vnode_mapping[a] = t->vnode_mapping[b];
-      t->vnode_mapping[b] = temp;
+      } while (fixed[b] != -1);
+
+      if (a != b) {
+	int temp = t->vnode_mapping[a];
+	t->vnode_mapping[a] = t->vnode_mapping[b];
+	t->vnode_mapping[b] = temp;
+      }
     } else {
       // reassign mutation
       /*
@@ -297,7 +331,9 @@ static inline void mutate( Solution * t )
 
       int a, b;
       // find which vnode to remap
+      BEGIN_LOOP();
       do {
+	IN_LOOP();
 	a = rand() % vnodes;
       } while (fixed[a] != -1);
 
@@ -305,7 +341,9 @@ static inline void mutate( Solution * t )
       --t->pnode_uses[ t->vnode_mapping[a] ];
 
       // now find a suitable physical node.
+      BEGIN_LOOP();
       do {
+	IN_LOOP();
 	b = rand() % pnodes;
       } while (t->pnode_uses[b] >= maxplex[b]);
 
@@ -409,7 +447,9 @@ static inline void generateRandomSolution( Solution * t )
   for (int i = 0; i < vnodes; i++) {
     if (fixed[i] == -1) {
       int x;
+      BEGIN_LOOP();
       do {
+	IN_LOOP();
 	x = rand() % pnodes;
       } while( t->pnode_uses[x] >= maxplex[x] );
       ++t->pnode_uses[x];
@@ -426,6 +466,7 @@ void usage( char * appname )
 	  "Usage:\n"
 	  "%s [-v] [-2 <weight>] [-r <minrounds>] [-R <maxrounds>]\n\n"
 	  "  -v              extra verbosity\n"
+	  "  -v -v           jumbo verbosity\n"
 	  "  -m <penalty>    enable many-to-one virtual to physical mappings\n"
 	  "  -s <seed>       seed the random number generator with a specific value\n"
 	  "  -2 <weight>     enable solving for bandwidth;\n"
@@ -434,11 +475,14 @@ void usage( char * appname )
 	  "                  default: %i\n"
 	  "  -R <maxrounds>  set maximum rounds\n"
 	  "                  default: infinite (-1)\n\n", appname, DEFAULT_ROUNDS );
-  exit(-2);
+  exit(1);
 }
 
 int main( int argc, char ** argv )
 {
+  int available = 0;
+  int fixedNodeCount = 0;
+
   verbose = 0;
   dimensions = 1;
   d2weight = 1.0f / 1000.0f;
@@ -479,11 +523,11 @@ int main( int argc, char ** argv )
   char line[1024];
 
   {
-    if (verbose) { printf("How many physical nodes?\n"); }
+    if (verbose > 1) { printf("How many physical nodes?\n"); }
     gets( line );
     sscanf( line, "%i", &pnodes );
 
-    if (verbose) { printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); }
+    if (verbose > 1) { printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); }
     for (int i = 0; i < pnodes; i++) {
       char name[1024];
       gets( line );
@@ -493,21 +537,23 @@ int main( int argc, char ** argv )
     }
 
     if (userSpecifiedMultiplex) {
-      if (verbose) { printf("Enter %i numbers, one per line, indicating the"
+      if (verbose > 1) { printf("Enter %i numbers, one per line, indicating the"
 			    " maximum number of virtual nodes allowed on each"
 			    " physical node.\n", pnodes ); }
       for (int i = 0; i < pnodes; i++) {
 	gets( line );
 	sscanf( line, "%i", &(maxplex[i]));
+	available += maxplex[i];
       }
     } else {
       for (int i = 0; i < pnodes; i++) {
 	maxplex[i] = 1;
+	++available;
       }
     }
 
     for (int z = 0; z < dimensions; z++) {
-      if (verbose) {
+      if (verbose > 1) {
 	printf("Enter %ix%i grid o' actual %s.\n", pnodes, pnodes, 
 	     (z == 0) ? "latency" : "bandwidth");
       }
@@ -526,36 +572,44 @@ int main( int argc, char ** argv )
   } 
 
   {
-    if (verbose) { printf("How many virtual nodes?\n"); }
+    if (verbose > 1) { printf("How many virtual nodes?\n"); }
     gets( line );
     sscanf( line, "%i", &vnodes );
 
-    if (verbose) { printf("Okay, enter %i names for the virtual nodes, one per line.\n"
-			  "(Preface name with '*' to fix assignment to pnode of the same name.\n", vnodes ); }
+    if (vnodes > available) {
+      fprintf(stderr, 
+	      "More nodes required (%i) than can be mapped (%i).\n", 
+	      vnodes, available );
+      exit(2);
+    }
+
+    if (verbose > 1) { printf("Okay, enter %i names for the virtual nodes, one per line.\n"
+			      "to fix a node, suffix a space then the name of the physical node.\n", 
+			      vnodes ); }
+
     for (int i = 0; i < vnodes; i++) {
       char name[1024];
-      char *namep = name;
+      char pname[1024];
       gets( line );
-      sscanf( line, "%s", name );
-      if (namep[0] == '*') {
-	namep++;
-	map< string, int >::iterator it = reversePNodeNames.find( string( namep ) );
+      if (sscanf( line, "%s %s", name, pname ) == 2) {
+	map< string, int >::iterator it = reversePNodeNames.find( string( pname ) );
 	if (it == reversePNodeNames.end()) {
-	  fprintf(stderr,"vnode '%s' does not match any pnode; can't fix.\n", namep );
-	  exit(-1);
+	  fprintf(stderr,"pnode '%s' does not exist; can't fix.\n", pname );
+	  exit(3);
 	}
-	if (verbose) { 
-	  printf("Fixing assignment from vnode %s to pnode %s.\n", namep, namep );
+	if (verbose > 1) { 
+	  printf("Fixing assignment from vnode %s to pnode %s.\n", name, pname );
 	}
-	fixed[i] = reversePNodeNames[ string( namep ) ];
+	fixed[i] = reversePNodeNames[ string( pname ) ];
+	fixedNodeCount++;
       } else {
 	fixed[i] = -1;
       }
-      vnodeNames[i] = string( namep );
+      vnodeNames[i] = string( name );
     }
 
     for (int z = 0; z < dimensions; z++) {
-      if (verbose) {
+      if (verbose > 1) {
 	printf("Enter %ix%i grid o' desired %s (-1 is don't care.)\n", vnodes, vnodes, 
 	       (z == 0) ? "latency" : "bandwidth");
       }
@@ -577,32 +631,32 @@ int main( int argc, char ** argv )
     } 
   }
 
-  if (verbose) { printf("Thanks.. now running...\n"); }
+  if (fixedNodeCount < vnodes) {
+    if (verbose) { printf("Now running...\n"); }
 
-  {
-    for (int i = 0; i < SOLUTIONS; i++) {
-      generateRandomSolution( &(pool[i]) );
+    {
+      for (int i = 0; i < SOLUTIONS; i++) {
+	generateRandomSolution( &(pool[i]) );
+      }
+      sortByError();
     }
-    sortByError();
-  }
 
-  {
     int highestFoundRound = 0;
     float last = pool[0].error;
     for (int i = 0; i != maxrounds && (i < minrounds || i < highestFoundRound * 3); i++) {
       if (verbose && !(i % (minrounds / 10))) {
 	printf("Round %i. (best %4.3f)\n", i, pool[0].error);
       }
-
+      
       if (pool[0].error < last) {
 	if (verbose) {
 	  printf("Better solution found in round %i (error %4.3f)\n", 
-	       i, pool[0].error);
+		 i, pool[0].error);
 	}
 	last = pool[0].error;
 	highestFoundRound = i;
       }
-
+      
       for (int j = 0; j < CHILDREN_PER_ROUND; j++) {
 	// Overwrite a "bad" solution with the child of two "good" ones.
 	splice( &(pool[pickAWorst()]), 
@@ -611,10 +665,12 @@ int main( int argc, char ** argv )
       }
       sortByError();
       if (pool[0].error < EPSILON) { 
-	if (verbose) { printf("Found perfect solution.\n"); }
+	if (verbose > 1) { printf("Found perfect solution.\n"); }
 	break;
       }
     }
+  } else {
+    if (verbose) { printf("No non-fixed vnodes (or no vnodes at all,) so nothing to be done!\n"); }
   }
 
   {
@@ -631,10 +687,10 @@ int main( int argc, char ** argv )
     printf("\n");
 
     // dump a detailed report of the returned solution's errors.
-    if (verbose) { calcError<true>( &(pool[0]) ); }
+    if (verbose > 1) { calcError<true>( &(pool[0]) ); }
   }
 
-  if (verbose) { printf("Bye now.\n"); }
+  if (verbose > 1) { printf("Bye now.\n"); }
   return 0;
 }
 
