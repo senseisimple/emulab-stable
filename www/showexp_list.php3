@@ -19,15 +19,15 @@ if (! isset($showtype))
     $showtype="active";
 if (! isset($sortby))
     $sortby = "normal";
-if (! isset($idledays))
-    $idledays = "2";
+if (! isset($minidledays))
+    $minidledays = "2";
 
 echo "<b>Show:
          <a href='showexp_list.php3?showtype=active&sortby=$sortby'>active</a>,
          <a href='showexp_list.php3?showtype=batch&sortby=$sortby'>batch</a>,";
 if ($isadmin) 
      echo "\n<a href='showexp_list.php3?showtype=idle&sortby=$sortby".
-       "&idledays=$idledays'>idle</a>,";
+       "&minidledays=$minidledays'>idle</a>,";
 
 echo "\n       <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
       </b><br><br>\n";
@@ -49,7 +49,7 @@ elseif (! strcmp($showtype, "batch")) {
     $title  = "Batch";
 }
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
-    $clause = "(e.state='$TB_EXPTSTATE_ACTIVE') and (to_days(now())-to_days(expt_swapped)>=$idledays)";
+    $clause = "e.state='$TB_EXPTSTATE_ACTIVE') having (lastswap>=$minidledays";
     $title  = "Idle";
     $idle = 1;
 }
@@ -86,7 +86,8 @@ if ($isadmin) {
     
     $experiments_result =
 	DBQueryFatal("select pid,eid,expt_head_uid,expt_name, ".
-		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
+		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
+		     "(to_days(now())-to_days(expt_swapped)) as lastswap ".
 		     "from experiments as e $clause ".
 		     "order by $order");
 }
@@ -128,7 +129,8 @@ if (mysql_num_rows($experiments_result)) {
     if ($isadmin)
 	echo "<td width=17% align=center>Last Login</td>\n";
     if ($idle)
-      echo "<td width=4% align=center>Swap Req.</td>\n";
+      echo "<td width=4% align=center>Days Idle</td>
+<td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
                <a href='showexp_list.php3?showactive=$showactive&sortby=name'>
@@ -146,20 +148,24 @@ if (mysql_num_rows($experiments_result)) {
 	$huid = $row[expt_head_uid];
 	$name = $row[expt_name];
 	$date = $row[d];
-
+	$daysidle=0;
+	
 	if ($isadmin) {
 	    $foo = "&nbsp;";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
-	        if ($idle && $lastexpnodelogins["daysidle"]<$idledays)
+	        $daysidle=$lastexpnodelogins["daysidle"];
+	        if ($idle && $daysidle<$minidledays)
 		  continue;
 		$foo = $lastexpnodelogins["date"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
 	    } elseif (TBExptState($pid,$eid)=="active") {
+	        $daysidle=$row[lastswap];
 	        $foo = "$date Swapped In";
 	    }
 	}
 
-	if ($idle) $foo .= "</td><td align=center valign=center>
+	if ($idle) $foo .= "</td><td align=center>$daysidle</td>
+<td align=center valign=center>
 <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
 <img src=\"redball.gif\"></a>";
 	
