@@ -562,7 +562,7 @@ if ((isset($password1) && strcmp($password1, "")) &&
 		     "pswd_expires=$expires ".
 		     "WHERE uid='$target_uid'");
 
-    if (HASREALACCOUNT($uid)) {
+    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
     }
 }
@@ -634,7 +634,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     #
     # mkacct updates the user gecos
     #
-    if (HASREALACCOUNT($uid)) {
+    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
     }
 }
