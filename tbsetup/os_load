@@ -1,0 +1,331 @@
+#!/usr/bin/perl -wT
+use English;
+   
+#
+# So, I now realize that disk_images is rather badly named, or maybe just
+# has the wrong information in it. It does not describe disk images, but
+# instead describes OSs. What we really need is a disk_images table that
+# describes an "image". What partitions have what OSs in them, which we
+# can use to load up the partitions table for each node from something that
+# describes the image that just got dropped onto the disk. Well, such is
+# life. 
+#
+
+#
+# XXX Paper and plastic IP addresses wired into the kernel choice.
+#     Paths to the images are wired in.
+#     Path to netdisk is wired in.
+#     Need to reset the partitions when reloading the entire disk.
+# 
+
+#
+# Load an image onto a disk. We support the loading of an image
+# into a particular partition, or onto the entire disk. Partitions
+# are numbered from 1-4, with 0 being the special "entire disk" load.
+# 
+# usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]
+#
+my $rsh		= "sshtb -q";
+my $ssh		= "sshtb -q";
+my $TB		= "/usr/testbed/bin";
+my $NETDISK     = "/tftpboot/netdisk";
+my $PAPERADDR	= "155.99.214.70";
+my $PLASTICADDR	= "155.99.214.74";
+my $power	= "$TB/power";
+my $ping	= "/sbin/ping";
+my $dbg		= 1;
+my %waitfor     = ();
+my $SAVEUID	= $UID;
+my @row;
+my $name        = "";
+my $mereuser    = 0;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+
+if ( $#ARGV < 3) {
+    die("Usage: os_load <imageid> <imagepart> <imagepath> <node> [node ...]\n".
+	"Writes OS image to a node partition.\n");
+}
+my $imageid   = shift;
+my $imagepart = shift;
+my $imagepath = shift;
+my @nodes     = @ARGV;
+
+#
+# Figure out who called us. Root and admin types can do whatever they
+# want. Normal users can only change nodes in experiments in their
+# own projects.
+#
+if ($UID != 0) {
+    ($name) = getpwuid($UID)
+	or die "$UID not in passwd file";
+
+    $db_result = $DB->query("select admin from users where uid='$name'");
+    @row = $db_result->fetchrow_array();
+    if ($row[0] != 1) {
+	$mereuser = 1;
+    }
+}
+
+#
+# Mere Users cannot load the entire disk.
+#
+if ($mereuser && !$imagepart) {
+    die("Only can root or TB administrators can reload the entire disk");
+}
+
+#
+# Check to make sure that mere user is allowed to muck with nodes
+#
+if ($mereuser) {
+    foreach my $node (@nodes) {
+	$db_result = $DB->query("select reserved.node_id from reserved ".
+				"left join proj_memb on ".
+				"reserved.pid=proj_memb.pid and ".
+				"reserved.node_id='$node' ".
+				"where proj_memb.uid='$name'");
+	if ($db_result->numrows < 1) {
+	    die("You do not have permission to load images on $node");
+	}
+    }
+}
+
+#
+# We only support 0 or 4 right now.
+#
+if ($imagepart != 0 && $imagepart != 4) {
+    die("Only the entire disk or partition 4 can be loaded.");
+}
+
+#
+# The image has to be accessible, and it must reside in the right places.
+#
+if (! -e $imagepath) {
+    die("Cannot access $imagepath.");
+}
+if (! -f $imagepath) {
+    die("$imagepath is not a plain file.");
+}
+
+#
+# 0 means load the entire disk. 
+#
+my $diskpart = "";
+if ($imagepart) {
+    $diskpart = "wd0 s${imagepart}";
+}
+else {
+    $diskpart = "wd0";
+}
+
+#
+# XXX This test is wrong of course. Need a regex, and the project name.
+# 
+my $cmdline = "";
+if (index($imagepath, "/usr/testbed/images/") >= 0) {
+    $cmdline = "${PAPERADDR}:$imagepath $diskpart";
+}
+elsif (index($imagepath, "/proj/") >= 0) {
+    $cmdline = "${PLASTICADDR}:$imagepath $diskpart";
+}
+else {
+    die("Your image must reside in /usr/testbed/images or /proj");
+}
+
+#
+# Do the best we can
+# 
+foreach my $node (@nodes) {
+    my $pc = $node;
+	
+    print STDERR "Changing default OS for $pc to $imageid\n";
+    $sth = $DB->query("update nodes set ".
+		      "def_boot_image_id='$imageid',def_boot_path='' ".
+		      "where node_id='$pc'");
+    if ($sth == 0) {
+	die("Database update failed (nodes def_boot). Aborted...\n");
+    }
+
+    #
+    # Assign partition table entry.
+    # 
+    if ($imagepart) {
+	$sth = $DB->query("delete from partitions where ".
+			  "partition='$imagepart' and node_id='$pc'");
+
+	$sth = $DB->query("insert into partitions ".
+			  "(node_id,partition,image_id) ".
+			  "values ('$pc','$imagepart',$imageid)");
+	if ($sth == 0) {
+	    die("Database delete failed (partitions). Aborted...\n");
+	}
+    }
+
+    print STDERR "Setting up reload for $pc\n";
+    $sth = $DB->query("update nodes set ".
+		      "next_boot_path='$NETDISK',".
+		      "next_boot_cmd_line='$cmdline' ".
+		      "where node_id='$pc'");
+    if ($sth == 0) {
+	die("Database update failed (nodes next_boot). Aborted...\n");
+    }
+
+    # Untaint the argument. Sheer idiocy.
+    #
+    if ($pc =~ /^([-\@\w.]+)$/) {
+	$pc = $1;
+    }
+
+    #
+    # See if the machine is pingable. If its not pingable, then
+    # we just power cycle the machine rather than wait for a bunch
+    # of ssh/rsh commands to time out.
+    #
+    print STDERR "Pinging $pc ... \n" if $dbg;
+    if (-e $ping) {
+	open(PING, "$ping -c 4 $pc 2>&1 |");
+    }
+    else {
+	die("PING command $ping not found!\n");
+    }
+    do {
+    }
+    until ( <PING> =~ /transmitted, (\d*) packets received/ );
+    close(PING);
+    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
+
+    #
+    # Power cycle if the machine is dead. It will come back up with the
+    # proper OS, cause we modified the database above.
+    #
+    if ( $1 == 0 ) {
+	print STDERR "$pc appears to be dead. Power cycling ...\n";
+	PowerCycle($pc);
+	next;
+    }
+
+    #
+    # Machine is pingable at least. Try to reboot it gracefully,
+    # or power cycle anyway if that does not work. To do this, we must
+    # change our real UID to root so that ssh will work.
+    #
+    print STDERR "Rebooting $pc ...\n";
+    
+    $UID = 0;
+    if (system("$ssh -l root $pc /sbin/reboot") == 0) {
+	$UID = $SAVEUID;
+	print STDERR "$pc appears to be rebooting\n" if $dbg;
+	next;
+    }
+    $UID = $SAVEUID;
+
+    #
+    # Okay, before we power cycle lets really make sure. On FreeBSD, it might
+    # have rebooted, but since the connection is terminated, system returns
+    # an error status. So, lets ping it again and if its pingable, the
+    # reboot must have failed. If it is not pingable, I assume that the
+    # reboot really worked, and the exit value can be ignored.
+    #
+    my $exit_value = $? >> 8;
+    print STDERR "reboot returned $exit_value. Lets make sure it dies\n"
+	if $dbg;
+
+    if (WaitTillDead($pc) == 0) {
+	next;
+    }
+	
+    print STDERR "$pc appears to still be running Power cycling ...\n";
+    PowerCycle($pc);
+}
+
+print STDOUT "OS Reload Done!\n";
+exit 0;
+
+#
+# Power cycle a PC using the testbed power program.
+#
+sub PowerCycle {
+    local($pc) = @_;
+
+    if (system("$power cycle $pc") != 0) {
+	print STDERR "WARNING: Could not power cycle $pc. Skipping ...\n";
+    }
+}
+
+sub WaitTillAlive {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to come alive\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 30; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	    $_ = <PING>;
+	    if ( $_ =~ /bytes from/ ) {
+		print STDERR "Yep, $pc alive and well\n" if $dbg;
+		return 0;
+	    }
+	}
+	until ( $_ =~ /transmitted, (\d*) packets received/ );
+    }
+    close(PING);
+    print STDERR "$pc is not responding. Better check into it\n";
+    return 1;
+}
+
+sub WaitTillDead {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to die off\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 12; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	}
+	until ( <PING> =~ /transmitted, (\d*) packets received/ );
+
+	if ( $1 == 0 ) {
+	    print STDERR "Good, $pc must have rebooted.\n" if $dbg;
+	    return 0;
+	}
+    }
+    close(PING);
+    print STDERR "$pc is still alive.\n" if $dbg;
+    return 1;
+}
+
+sub OSFeatureSupported {
+    local($os)      = $_[0];
+    local($feature) = $_[1];
+
+    $db_result = $DB->query("select osfeatures from disk_images ".
+			    "where image_id='$os'");
+
+    if ($db_result->numrows < 1) {
+	return 0;
+    }
+    foreach $osfeature (split(',', $db_result->fetchrow_array())) {
+	if ($feature eq $osfeature) {
+	    return 1;
+	}
+    }
+    return 0;
+}

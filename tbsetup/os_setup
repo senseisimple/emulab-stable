@@ -27,6 +27,7 @@ my %imagepaths  = ();
 my %imageparts  = ();
 my %nodeos      = ();
 my %nodepath    = ();
+my %nodepart    = ();
 my %waitfor     = ();
 my $SAVEUID	= $UID;
 my @row;
@@ -45,7 +46,7 @@ my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
 
 if ( $#ARGV != 2) {
     die("Usage: os_setup <pid> <eid> <ir_file>\n". 	
-	"Sets node PS configuration from a .ir file.\n");
+	"Sets node OS configuration from a .ir file.\n");
 }
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -154,21 +155,26 @@ while (<IN>) {
     # First see if the OS spec is a local one from the images table. We
     # leave it up to the user to make sure the OS is capable of running
     # on the node! This local image stuff is pretty hacky right now. I'm
-    # only going to allow netboot type stuff.
+    # only going to allow netboot type stuff and stuff on partition 4.
     #
     if ($imagepaths{$os}) {
-	if ($imageparts{$os} ne "mb") {
-	    die("Improper local OS spec: $os. ".
-		"Partition can currently only be 'mb' (multiboot)");
+	if ($imageparts{$os} eq "4") {
+	    $nodepart{$node} = 4;
+	    $waitfor{$node}  = 0;
+	    next;
 	}
-	#
-	# Okay, now it gets really bad. I'm going to form the tftpboot
-	# path right here, since local OS specs are not in the database
-	# disk_images table.
-	# 
-	$nodepath{$node} = "/tftpboot/proj/$pid/$imagepaths{$os}";
-	$waitfor{$node}  = 0;
-	next;
+	if ($imageparts{$os} eq "mb") {
+	    #
+	    # Okay, now it gets really bad. I'm going to form the tftpboot
+	    # path right here, since local OS specs are not in the database
+	    # disk_images table.
+	    # 
+	    $nodepath{$node} = "/tftpboot/proj/$pid/$imagepaths{$os}";
+	    $waitfor{$node}  = 0;
+	    next;
+	}
+	die("Improper local OS spec: $os. ".
+	    "Partition can currently only be 4 or 'mb' (multiboot)");
     }
 
     #
@@ -218,6 +224,16 @@ foreach my $node ( keys %nodeos ) {
 		      "where node_id='$pc'");
     if ($sth == 0) {
 	die("Database update failed. Aborted...\n");
+    }
+
+    if ($nodepart{$node}) {
+	#
+	# At this point we would perhaps want to do an os_load, but I'm
+	# not ready to do that. Just skip the node and let the user deal
+	# with it.
+	#
+	printf STDERR "Skipping $node. You will need to load the OS.\n";
+	next;
     }
 
     #
