@@ -1,19 +1,15 @@
 #
 # This is the definitions file for Mac when he uses his own db.
 #
+. defs-default
+
 TBDBNAME=macdb
 TBOPSEMAIL=newbold@flux.utah.edu
 TBLOGSEMAIL=newbold@flux.utah.edu
 TBWWWEMAIL=newbold+www@cs.utah.edu
 TBAPPROVALEMAIL=newbold+approve@cs.utah.edu
 TBAUDITEMAIL=newbold@flux.utah.edu
-DELAYCAPACITY=2
-BOSSNODE=boss.emulab.net
-USERNODE=users.emulab.net
-OURDOMAIN=emulab.net
 TBSTATEDEMAIL=newbold@flux.utah.edu
 TBTESTSUITEEMAIL=newbold@flux.utah.edu
-WWWHOST=www.emulab.net
 WWW=www.emulab.net/dev/mac
 THISHOMEBASE=Mac.Emulab.Net
-FS_WITH_QUOTAS="/q /users"

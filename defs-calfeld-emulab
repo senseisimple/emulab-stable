@@ -4,23 +4,12 @@
 # Use the --with-TBDEFS=filename to specify your own. If you add a variable,
 # be sure to go and update configure.in.
 #
-TBDBNAME=tbdb
+. defs-default
+
 TBOPSEMAIL=calfeld@flux.utah.edu
 TBLOGSEMAIL=calfeld@flux.utah.edu
 TBWWWEMAIL=calfeld@flux.utah.edu
 TBAPPROVALEMAIL=calfeld@flux.utah.edu
 TBAUDITEMAIL=calfeld@flux.utah.edu
-DELAYCAPACITY=2
-BOSSNODE=boss.emulab.net
-USERNODE=users.emulab.net
-FSNODE=fs.emulab.net
-OURDOMAIN=emulab.net
-FSDIR_GROUPS=/groups
-FSDIR_PROJ=/q/proj
-FSDIR_USERS=/users
 TBSTATEDEMAIL=calfeld@flux.utah.edu
 TBTESTSUITEEMAIL=calfeld@flux.utah.edu
-WWWHOST=www.emulab.net
-THISHOMEBASE=Emulab.Net
-FS_WITH_QUOTAS="/q /groups /users"
-PLABSUPPORT=1

@@ -3,6 +3,7 @@
 #
 . defs-default
 
+TBDBNAME=lbsdb
 TBOPSEMAIL=stoller@flux.utah.edu
 TBLOGSEMAIL=stoller@flux.utah.edu
 TBWWWEMAIL=stoller@flux.utah.edu
@@ -10,5 +11,5 @@ TBAPPROVALEMAIL=stoller@flux.utah.edu
 TBAUDITEMAIL=stoller@flux.utah.edu
 TBSTATEDEMAIL=stoller@fast.cs.utah.edu
 TBTESTSUITEEMAIL=stoller@fast.cs.utah.edu
-WWW=www.emulab.net/dev/stoller
+WWW=www.emulab.net/~stoller/www
 THISHOMEBASE=Stoller.Emulab.Net

@@ -135,34 +135,6 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
-#
-# SSL Certificate stuff. Used to customize config files in ssl directory.
-# Note that OrganizationalUnit is set in the cnf file.
-# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
-#
-SSLCERT_COUNTRY="US"
-SSLCERT_STATE="Utah"
-SSLCERT_LOCALITY="Salt Lake City"
-SSLCERT_ORGNAME="Utah Network Testbed"
-#
-# Network config stuff. Obviously, this needs to be localized, but there are
-# too many defs files too worry about right now.
-#
-TESTBED_NETWORK=155.98.32.0
-TESTBED_NETMASK=255.255.240.0
-BOSSNODE_IP=155.98.32.70
-USERNODE_IP=155.98.33.74
-CONTROL_ROUTER_IP=155.98.36.1
-CONTROL_NETWORK=155.98.36.0
-CONTROL_NETMASK=255.255.252.0
-PRIVATE_NETWORK=155.98.32.0
-PRIVATE_ROUTER=155.98.32.1
-PRIVATE_NETMASK=255.255.255.0
-PUBLIC_NETWORK=155.98.33.0
-PUBLIC_ROUTER=155.98.33.1
-PUBLIC_NETMASK=255.255.255.0
-DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
-DHCPD_CONTROLNET_DECL=""
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -174,15 +146,20 @@ AC_ARG_WITH(TBDEFS,
 	AC_MSG_ERROR(Invalid TBDEFS - Must specify the value)
     fi
     TBDEFS="$withval"
+    TBPATH=`dirname $withval`
 ],[
     TBDEFS="$srcdir/defs-default"
+    TBPATH="$srcdir"
 ])
 
 if test -f $TBDEFS; then
     #
     # Remove the comments and newlines.  Really, that's what it does.
     #
+    OLDPATH=$PATH
+    PATH="$TBPATH:$PATH"
     eval `cat $TBDEFS | sed -n -e '{s/#.*$//;H;}; ${g;s/\n/ /g;s/  */ /g;p;}'`
+    PATH=$OLDPATH
 else
 	AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
 fi

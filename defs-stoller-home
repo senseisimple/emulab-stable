@@ -25,3 +25,30 @@ TBBASE=http://golden-gw.ballmoss.com:9876/~stoller/testbed
 TBSECURECOOKIES=0
 TBAUTHTIMEOUT=216000
 THISHOMEBASE=Stoller.Emulab.Net
+
+#
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
+#
+# Network config stuff. Used to generate initial named and dhcpd config files.
+#
+TESTBED_NETWORK=155.98.32.0
+TESTBED_NETMASK=255.255.240.0
+BOSSNODE_IP=155.98.32.70
+USERNODE_IP=155.98.33.74
+CONTROL_ROUTER_IP=155.98.36.1
+CONTROL_NETWORK=155.98.36.0
+CONTROL_NETMASK=255.255.252.0
+PRIVATE_NETWORK=155.98.32.0
+PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETMASK=255.255.255.0
+PUBLIC_NETWORK=155.98.33.0
+PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETMASK=255.255.255.0
+DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"

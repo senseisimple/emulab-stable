@@ -1,27 +1,14 @@
 #
 # This is the definitions file for Mac on Emulab.Net.
 #
-TBDBNAME=tbdb
+. defs-default
+
 TBOPSEMAIL=newbold@flux.utah.edu
 TBLOGSEMAIL=newbold@flux.utah.edu
 TBWWWEMAIL=newbold+www@cs.utah.edu
 TBAPPROVALEMAIL=newbold+approve@cs.utah.edu
 TBAUDITEMAIL=newbold@flux.utah.edu
-DELAYCAPACITY=2
-BOSSNODE=boss.emulab.net
-USERNODE=users.emulab.net
-FSNODE=fs.emulab.net
-OURDOMAIN=emulab.net
-FSDIR_GROUPS=/groups
-FSDIR_PROJ=/q/proj
-FSDIR_USERS=/users
 TBSTATEDEMAIL=newbold@flux.utah.edu
 TBTESTSUITEEMAIL=newbold@flux.utah.edu
-WWWHOST=www.emulab.net
 WWW=www.emulab.net/dev/mac
 THISHOMEBASE=Mac.Emulab.Net
-TBAUTHTIMEOUT=216000
-FS_WITH_QUOTAS="/q /groups /users"
-PLABSUPPORT=1
-PLAB_ROOTBALL="plabroot-10.tar.bz2"
-

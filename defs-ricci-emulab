@@ -1,7 +1,7 @@
 #
 # This is the definitions file for Rob on Emulab.Net.
 #
-TBDBNAME=tbdb
+. defs-default
 
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
@@ -11,18 +11,4 @@ TBLOGSEMAIL=ricci@cs.utah.edu
 TBAUDITEMAIL=ricci@cs.utah.edu
 TBSTATEDEMAIL=ricci@cs.utah.edu
 TBTESTSUITEEMAIL=ricci@cs.utah.edu
-
-BOSSNODE=boss.emulab.net
-USERNODE=users.emulab.net
-FSNODE=fs.emulab.net
-OURDOMAIN=emulab.net
-DELAYCAPACITY=2
-FSDIR_GROUPS=/groups
-FSDIR_PROJ=/q/proj
-FSDIR_USERS=/users
-
-WWWHOST=www.emulab.net
 WWW=www.emulab.net/dev/ricci
-FS_WITH_QUOTAS="/q /groups /users"
-PLABSUPPORT=1
-PLAB_ROOTBALL="plabroot-10.tar.bz2"
