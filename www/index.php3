@@ -9,7 +9,7 @@ require("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Home");
+PAGEHEADER("Emulab - Network Emulation Testbed Home");
 
 # Get some stats about current experiments
 

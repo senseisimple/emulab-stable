@@ -423,11 +423,18 @@ function PAGEBEGINNING( $title ) {
 	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
     } 
 
-    echo "</style>";
+    echo "</style>\n";
 
     if ($TBMAINSITE) {
-	echo "<meta NAME='keywords' CONTENT='network, emulation, internet, emulator'>";
-	echo "<meta NAME='ROBOTS' CONTENT='NOARCHIVE'>";
+	echo "<meta NAME=\"keywords\" ".
+	           "CONTENT=\"network, emulation, internet, emulator\">\n";
+	echo "<meta NAME=\"robots\" ".
+	           "CONTENT=\"NOARCHIVE\">\n";
+	echo "<meta NAME=\"description\" ".
+                   "CONTENT=\"emulab - network emulation testbed home\">\n";
+    }
+    else {
+	echo "<meta NAME=\"robots\" CONTENT=\"NOINDEX\">\n";
     }
 
     echo "</head>
@@ -608,10 +615,9 @@ function PAGEFOOTER() {
 
     ENDPAGE();
 
-    if ($TBMAINSITE) {
-	echo "<p>
-              <a href=\"$TBDOCBASE/netemu.php3\"></a>\n";
-    }
+    # Plug the home site from all others.
+    echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+
     echo "</body></html>\n";
 }
 
