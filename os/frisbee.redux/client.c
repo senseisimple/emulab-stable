@@ -49,6 +49,7 @@ int		idledelay = CLIENT_WRITER_IDLE_DELAY;
 int		startdelay = 0, startat = 0;
 
 int		nothreads = 0;
+int		nodecompress = 0;
 int		debug = 0;
 int		tracing = 0;
 char		traceprefix[64];
@@ -70,6 +71,7 @@ extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
 			       int nothreads, int dostype,
 			       unsigned long writebufmem);
 extern void	ImageUnzipSetMemory(unsigned long writebufmem);
+extern int	ImageWriteChunk(int chunkno, char *chunkdata);
 extern int	ImageUnzipChunk(char *chunkdata);
 extern void	ImageUnzipFlush(void);
 extern int	ImageUnzipQuit(void);
@@ -167,7 +169,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:O")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ON")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -276,6 +278,10 @@ main(int argc, char **argv)
 
 		case 'O':
 			randomize = 0;
+			break;
+
+		case 'N':
+			nodecompress = 1;
 			break;
 
 		case 'h':
@@ -721,8 +727,14 @@ ChunkerStartup(void)
 			decompblocks, writeridles);
 		wasidle = 0;
 
-		if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data))
-			pfatal("ImageUnzipChunk failed");
+		if (nodecompress) {
+			if (ImageWriteChunk(ChunkBuffer[i].thischunk,
+					    ChunkBuffer[i].blocks[0].data))
+				pfatal("ImageWriteChunk failed");
+		} else {
+			if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data))
+				pfatal("ImageUnzipChunk failed");
+		}
 
 		/*
 		 * Okay, free the slot up for another chunk.

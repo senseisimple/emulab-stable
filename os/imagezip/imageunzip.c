@@ -87,6 +87,7 @@ static struct timeval stamp;
 #endif
 int		 readmbr(int slice);
 int		 fixmbr(int slice, int dtype);
+static int	 write_subblock(int, char *);
 static int	 inflate_subblock(char *);
 void		 writezeros(off_t offset, off_t zcount);
 void		 writedata(off_t offset, size_t count, void *buf);
@@ -546,6 +547,28 @@ main(int argc, char **argv)
 	if (docrconly)
 		outfd = -1;
 	else if (argc == 2 && strcmp(argv[1], "-")) {
+		/*
+		 * XXX perform seek and MBR checks before we truncate
+		 * the output file.  If they have their input/output
+		 * arguments reversed, we don't want to truncate their
+		 * image file!  (I speak from bitter experience).
+		 */
+		if (slice && (outfd = open(argv[1], O_RDONLY, 0666)) >= 0) {
+			if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
+				fprintf(stderr, "Output file is not seekable, "
+					"cannot specify a slice\n");
+				exit(1);
+			}
+			if (readmbr(slice)) {
+				fprintf(stderr, "Failed to read MBR\n");
+				exit(1);
+			}
+			close(outfd);
+		}
+
+		/*
+		 * Open the output file for writing.
+		 */
 		if ((outfd =
 		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
@@ -750,6 +773,12 @@ ImageUnzipSetMemory(unsigned long _writebufmem)
 }
 
 int
+ImageWriteChunk(int chunkno, char *chunkdata)
+{
+	return write_subblock(chunkno, chunkdata);
+}
+
+int
 ImageUnzipChunk(char *chunkdata)
 {
 	return inflate_subblock(chunkdata);
@@ -896,6 +925,29 @@ DiskWriter(void *arg)
 	}
 }
 #endif
+
+/*
+ * Just write the raw, compressed chunk data to disk
+ */
+static int
+write_subblock(int chunkno, char *chunkbufp)
+{
+	writebuf_t	*wbuf;
+	off_t		offset, size, bytesleft;
+	
+	offset = chunkno * SUBBLOCKSIZE;
+	bytesleft = SUBBLOCKSIZE;
+	while (bytesleft > 0) {
+		size = (bytesleft >= OUTSIZE) ? OUTSIZE : bytesleft;
+		wbuf = alloc_writebuf(offset, size, 1, 1);
+		memcpy(wbuf->data, chunkbufp, size);
+		dowrite_request(wbuf);
+		chunkbufp += size;
+		offset += size;
+		bytesleft -= size;
+	}
+	return 0;
+}
 
 static int
 inflate_subblock(char *chunkbufp)
