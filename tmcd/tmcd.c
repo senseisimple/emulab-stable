@@ -41,6 +41,7 @@ static int doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dostartstat(int sock, struct in_addr ipaddr, char *rdata,int tcp);
 static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
@@ -58,6 +59,7 @@ struct command {
 	{ "delay",	dodelay },
 	{ "hostnames",	dohosts },
 	{ "rpms",	dorpms },
+	{ "deltas",	dodeltas },
 	{ "startupcmd",	dostartcmd },
 	{ "startstatus",dostartstat }, /* Leave this before "startstat" */
 	{ "startstat",	dostartstat },
@@ -918,6 +920,72 @@ dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		sprintf(buf, "RPM=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "RPM: %s", buf);
+		
+	} while (bp = sp);
+	
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return Delats stuff.
+ */
+static int
+dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "DELTAS: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Get Delta list for the node.
+	 */
+	res = mydb_query("select deltas from nodes where node_id='%s' ",
+			 1, nodeid);
+
+	if (!res) {
+		syslog(LOG_ERR, "DELTAS: %s: DB Error getting Deltas!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Text string is a colon separated list.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	
+	bp  = row[0];
+	sp  = bp;
+	do {
+		bp = strsep(&sp, ":");
+
+		sprintf(buf, "DELTA=%s\n", bp);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		syslog(LOG_INFO, "DELTAS: %s", buf);
 		
 	} while (bp = sp);
 	
