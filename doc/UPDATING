@@ -6,8 +6,28 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040112:
+       Big change to bootinfo sequence.
+
+       * Update DB with new contents of sql/database-fill.sql *and
+         sql/database-fill-suplement.sql.
+       * Rebuild pxeboot kernel from source (src/sys/boot/i386/emuboot).
+         Install emuboot to /tftpboot/pxeboot.emu
+       * Install new version of dhcpd.conf file that has all the PXE
+         crap removed and includes the single line:
+
+		filename "/tftpboot/pxeboot.emu";
+
+       * Restart dhcpd. 
+       * Kill proxydhcp. Be sure to install new 3.testbed.sh from the
+         rc.d directory to /usr/local/etc/rc.d, or just edit in place
+       * Restart bootinfo.
+       * Restart stated.
+       * Reboot all non allocated nodes so that they go into pxewait mode.
+
 20031215:
 	The mod_php4 port on boss should be recompiled with the
 	'xmlrpc' option, in addition to the 'mhash' option already
 	used. Apache on boss will need to be restarted after the new
 	port is installed.
+
