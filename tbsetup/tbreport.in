@@ -137,20 +137,26 @@ if (($state eq EXPTSTATE_ACTIVE) ||
     ($state eq EXPTSTATE_TESTING)) {
     my $query_result =
 	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname,".
-		     " n.sshdport from reserved as r ".
+		     "       n.sshdport,n.jailflag,nt.isremotenode ".
+		     "  from reserved as r ".
 		     "left join nodes as n on r.node_id=n.node_id ".
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
-		     " where r.pid='$pid' and r.eid='$eid'");
+		     "left join node_types as nt on nt.type=n.type ".
+		     "where r.pid='$pid' and r.eid='$eid'");
 
-    while (($v,$p,$t,$m,$o,$s) = $query_result->fetchrow_array()) {
+    while (($v,$p,$t,$m,$o,$s,$j,$r) = $query_result->fetchrow_array()) {
 	if (!$v) {
 	    $v = $p;
 	}
-	$v2pmap{$v}  = $p;
-	$p2type{$p}  = $t;
-	$p2osid{$p}  = $o;
-	$vv2pmap{$p} = $m;
-	$sshdport{$p}= $s;
+	$v2pmap{$v} = {
+	    PNODE	=> $p,
+	    TYPE	=> $t,
+	    OSID	=> $o,
+	    VVP		=> $m,
+	    SSHDPORT	=> $s,
+	    JAILED	=> $j,
+	    ISREMOTE    => $r,
+	};
     }
 }
 
@@ -208,10 +214,10 @@ if ($showmap &&
     print  "--------------- ------------ --------------- ------------\n";
     
     foreach $v (keys(%v2pmap)) {
-	$p = $v2pmap{$v};
-	$t = $p2type{$p};
-	$o = $p2osid{$p};
-	$m = $vv2pmap{$p};
+	my $p = $v2pmap{$v}->{PNODE};
+	my $t = $v2pmap{$v}->{TYPE};
+	my $o = $v2pmap{$v}->{OSID};
+	my $m = $v2pmap{$v}->{VVP};
 	printf "%-15s %-12s %-15s %s", $v, $t, $o, $p;
 	if ($m ne $p) {
 	    printf " ($m)";
@@ -236,11 +242,11 @@ if ($showmap &&
 	printf "%-15s %-10s %-20s\n", "ID", "Port", "SSH command";
 	print  "--------------- ---------- ----------------------\n";
 	foreach $v (keys(%v2pmap)) {
-	    my $p = $v2pmap{$v};
-	    my $s = $sshdport{$p};
-	    my $m = $vv2pmap{$p};
+	    my $p = $v2pmap{$v}->{PNODE};
+	    my $s = $v2pmap{$v}->{SSHDPORT};
+	    my $m = $v2pmap{$v}->{VVP};
 	    my $q = "$v.$eid.$pid.$DOMAIN";
-	    if ($m ne $p) {
+	    if ($v2pmap{$v}->{JAILED} && $v2pmap{$v}->{ISREMOTE}) {
 		printf "%-15s %-10s %-20s", $v, $s, "ssh -p $s $q";
 		print  "\n";
 	    }
@@ -332,7 +338,7 @@ if ($showlinks) {
 	    while (($vname,$member,$delay,$bandwidth,$lossrate) 
 		       = $result->fetchrow_array()) {
 		$member =~ /(.+):(\d+)/;
-		my ($pname,$card) = ($v2pmap{$1},$2);
+		my ($pname,$card) = ($v2pmap{$1}->{PNODE}, $2);
 
 		#
 		# Check to see if the 'physical' node name is just a
