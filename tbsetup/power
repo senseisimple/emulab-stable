@@ -35,6 +35,9 @@ $op = shift (@ARGV);
 if ($op eq "cycle") { $op = "cyc"; }
 $op = '-'.$op;
 @machines = @ARGV;
+foreach my $n (0..$#ARGV) {
+  $machines[$n]= "\L$machines[$n]"; #Lowercase everything...
+}
 #print out args
 #print "do \"$op\" to ",@machines,"\n";
 
@@ -57,12 +60,12 @@ while ( @_ = $sth->fetchrow_array()) {
 # user is authorized to control the nodes
 #
 
-my @OkNodes = ();
+my @OkNodes = ('lights');
 
 if ($user ne "root") {
   my @conds = ();
   foreach $node (@machines) {
-    push(@conds,"node_id='$node'");
+    push(@conds,"\Lnode_id='$node'");
   }
   my $cmd = 
     "select uid, node_id from reserved as r left join experiments as e ".
@@ -73,7 +76,7 @@ if ($user ne "root") {
   #print "$cmd\n";  
   while ( @_ = $sth->fetchrow_array()) {
     #print "Got '",join("'\t'",@_),"'\n";
-    push(@OkNodes, $_[1]);
+    push(@OkNodes, "\L$_[1]"); #make sure its lowercase
   }
 }
 
