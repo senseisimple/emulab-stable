@@ -17,12 +17,14 @@ echo "</ul>\n";
 
 echo "<h3>Students and Staff:</h3>\n";
 echo "<ul>\n";
+FLUXPERSON("abhijeet", "Abhijeet Joglekar");
 FLUXPERSON("danderse", "Dave Andersen");
 FLUXPERSON("calfeld", "Chris Alfeld");
 FLUXPERSON("barb", "Chad Barb");
 FLUXPERSON("mike", "Mike Hibler");
 FLUXPERSON("newbold", "Mac Newbold");
 FLUXPERSON("ricci", "Robert Ricci");
+FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("stoller", "Leigh Stoller");
 echo "</ul>\n";
 
