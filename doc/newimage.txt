@@ -1,0 +1,144 @@
+From testbed-request  Mon Dec 11 23:40:51 2000
+Return-Path: <mike>
+Received: (from mike@localhost)
+	by fast.cs.utah.edu (8.9.1/8.9.1) id XAA19700
+	for testbed-ops; Mon, 11 Dec 2000 23:40:51 -0700 (MST)
+Date: Mon, 11 Dec 2000 23:40:51 -0700 (MST)
+From: Mike Hibler <mike>
+Message-Id: <200012120640.XAA19700@fast.cs.utah.edu>
+To: testbed-ops
+Subject: creating a new disk image
+
+Leigh wanted to know all the things I do when creating a disk image,
+so I'll spew it out here as I remember it for archival.  This is still
+assuming that you load the current image on a testbed machine and update
+it "in place."  The idea of having the second disk on plastic where we
+keep a current image up-to-date, just ain't workin' (e.g., see Leigh's
+messages about installing ports).
+
+A. Linux:
+
+1. Update whatever files necessary.
+
+2. Reboot to single-user.  To do this, reboot and when you get the 
+   LILO prompt, type "linux -s".  Note: I prefer to reboot rather than
+   just shutdown to single user, to ensure that all processes are gone and
+   all filesystems unmounted.
+
+3. Mount the root filesystem RW:
+	mount -n -o remount,rw /
+   so you can update files.
+
+4. Remove /etc/ssh/ssh_host_key.  This will cause /etc/rc.d/rc.sysinit
+   to create a new host key when the machine reboots multiuser.  So make
+   sure you don't go multiuser before you cut the image.
+
+5. Zero out as much of the filesystem free space as possible.  I do this by
+   creating a big, zero-filled file in each filesystem and then removing it:
+
+	mount -at nonfs
+	foreach filesytem
+		cd <root of filesystem>
+		dd if=/dev/zero of=bigfile bs=1024k
+		rm bigfile
+	end
+
+   This isn't perfect since freed indirect blocks will still have non-zero
+   data, but its close enough.  This is also extremely painful under linux
+   as it appears that the disk cache grows without bounds to hold the new,
+   worthless file.  This can make the machine to thrash, causing an operation
+   that takes a minute or so on FreeBSD, to take 20 minutes on Linux. 
+
+6. If you are feeling frisky, zero out the swap partition as well.  For the
+   testbed machines this is currently /dev/hda3 BUT YOU REALLY WANT TO BE
+   SURE, so run:
+
+	fdisk -l /dev/hda
+
+   It should list a "Linux swap" partition.  Then do:
+
+	dd if=/dev/zero of=/dev/hda3 bs=4k seek=1
+
+   The "bs=4k" and "seek" are very important, together they cause dd to
+   skip the first 4k block in the swap area, which contains the swap file
+   information.  If it gets clobbered, it is not the end of the world, you
+   can always run mkswap under linux.
+
+7. Reboot to BSD to finish.  I have tried dd'ing off the linux partition
+   while running Linux, but it has always produced a corrupt image.  So
+   I dd everything from FreeBSD.
+
+B. FreeBSD:
+
+1. Update whatever files necessary.
+
+2. Reboot to single-user.  To do this, reboot and when you get the 
+   FreeBSD boot prompt:
+
+	Hit [Enter] to boot immediately, or any other key for command prompt.
+
+   Hit the space bar and type "boot -s".
+
+3. Mount the root filesystem RW:
+	mount -u /
+   so you can update files.
+
+4. Remove /etc/ssh/ssh_host_key and /etc/ssh/ssh_host_dsa_key.  This will
+   cause /etc/rc.network to create new host keys when the machine reboots
+   multiuser.  So make sure you don't go multiuser before you cut the image.
+
+5. Zero out as much of the filesystem free space as possible.  I do this by
+   creating a big, zero-filled file in each filesystem and then removing it:
+
+	mount -at ufs
+	foreach filesytem
+		cd <root of filesystem>
+		dd if=/dev/zero of=bigfile bs=1024k
+		rm bigfile
+	end
+
+   This isn't perfect since freed indirect blocks will still have non-zero
+   data, but its close enough.
+
+6. If you are feeling frisky, zero out the swap partition as well.  For the
+   testbed machines this is currently /dev/rad0s1b BUT YOU REALLY WANT TO BE
+   SURE, so do:
+
+	disklabel ad0
+
+   and see which partition is marked as "swap".  Then do:
+
+	dd if=/dev/zero of=/dev/rad0s1b bs=1024k
+
+   Note there is no meta-info in the FreeBSD swap partition so you can
+   just wipe away.
+
+
+C. Cutting the image:
+
+1. Boot up FreeBSD in single-user (you may already be there.
+
+2. Fire up the control net:
+	ifconfig fxp4 inet 155.99.214.xxx netmask 0xffffff00
+
+3. DD a disk image over to plastic.  Do this however you want but I prefer
+   good ole rsh.  I temporarily stick the machine in question into
+   plastic:/root/.rhosts and then (from the testbed machine):
+
+	dd if=/dev/rad0 bs=64k count=100156 | \
+		rsh 155.99.214.74 "dd of=/q/testbed/images/foo obs=64k"
+
+   which is about 6.5GB.  The count is simply the smallest amount necessary
+   to capture the partitions in question.  If you don't trust me, run
+   "fdisk ad0" and look at the start value for the last partition (which
+   we don't use currently).  This is the first 512-byte sector beyond BSD,
+   Linux and the Linux swap partition.   Then do the math.  I use 64k
+   blocksize cuz I'm an old fart.  DON'T FORGET TO REMOVE THE HOST FROM
+   PLASTIC'S /root/.rhosts FILE WHEN DONE.  You could just use ssh instead,
+   but I see no reason to encrypt/decrypt 6.5GB of data (though I am sure
+   there is some option to use NULL encryption...)
+
+4. On plastic, use /usr/testbed/bin/imagezip to compress the image (and
+   put the little magic header at the beginning).
+
+
