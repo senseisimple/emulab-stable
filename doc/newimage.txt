@@ -1,6 +1,8 @@
+Instructions for updating the node disk image.
+
 A. Linux:
 
-0. Update /etc/rc.d/testbed/supfile from the source (tmcd/linux)
+0. Update /etc/testbed/supfile from the source (tmcd/linux)
    directory.  With each new image, the sup release needs to be bumped
    and the checkouts file removed. See below for a more detailed
    explaination of this.
@@ -22,7 +24,7 @@ A. Linux:
 
 5. Run the testbed prepare script:
 
-	cd /etc/rc.d/testbed
+	cd /usr/local/etc/testbed
 	./prepare	
 
 6. Reboot to BSD to finish.  I have tried dd'ing off the linux partition
@@ -57,47 +59,22 @@ B. FreeBSD:
 
 5. Run the testbed prepare script:
 
-	cd /etc/testbed
+	cd /usr/local/etc/testbed
 	./prepare	
 
 ---------------------------------------------------------------------------
 
 C. Cutting the image:
 
-1. Boot up FreeBSD in single-user (you may already be there.
+1. Boot into the FreeBSD MFS (you can use the 'node_admin on' command to set
+   this up)
 
-2. Fire up the control net:
+2. Log in and run imagezip - to make a full-disk image, run:
 
-	ifconfig fxp4 inet 155.101.132.xxx netmask 0xfffffc00
-	route add -net 155.101.132 -interface fxp4
-	route add default 155.101.132.1
+   /usr/local/bin/imagezip -d /dev/rad0 <outfile>
 
-3. DD a disk image over to plastic.  Do this however you want but I prefer
-   good ole rsh.  I temporarily stick the machine in question into
-   plastic:/root/.rhosts and then (from the testbed machine):
-
-	dd if=/dev/rad0 bs=64k count=100156 | \
-		rsh 155.101.129.74 "dd of=/q/testbed/images/Full/wd0 obs=64k"
-
-   which is about 6.5GB.  The count is simply the smallest amount necessary
-   to capture the partitions in question.  If you don't trust me, run
-   "fdisk ad0" and look at the start value for the last partition (which
-   we don't use currently).  This is the first 512-byte sector beyond BSD,
-   Linux and the Linux swap partition.   Then do the math.  I use 64k
-   blocksize cuz I'm an old fart.  DON'T FORGET TO REMOVE THE HOST FROM
-   PLASTIC'S /root/.rhosts FILE WHEN DONE.  You could just use ssh instead,
-   but I see no reason to encrypt/decrypt 6.5GB of data (though I am sure
-   there is some option to use NULL encryption...)
-
-   Alternate:
-   On plastic, go to the images directory and use ssh. You must start
-   sshd on the client node first of course.
-
-	su1 ssh -c blowfish -n pcX 'dd if=/dev/rad0 bs=64k count=100156' | \
-			dd of=wd0 obs=64k
-
-4. On plastic, use /usr/testbed/bin/imagezip to compress the image (and
-   put the little magic header at the beginning).
+   The MFS will mount all the usual /users and /proj directories, so write it
+   into NFS somewhere, then move it into its final location on boss from there.
 
 
 CVSUP:
