@@ -5,10 +5,22 @@
 # All rights reserved.
 #
 import sys
+import getopt
 sys.path.append("@prefix@/lib")
 import socket
 import sshxmlrpc
-from emulabserver import emulabserver
+from emulabserver import *
+
+DEFAULT_MODULE = "experiment"
+module         = DEFAULT_MODULE
+
+#
+# Optional argument indicates what module the server wants to use. This
+# will probably change a lot in the future!
+#
+if len(sys.argv) > 1:
+    module = sys.argv[1]
+    pass
 
 #
 # This is invoked inside an SSH, typically from the paperbag shell.
@@ -16,7 +28,8 @@ from emulabserver import emulabserver
 # just a single request this way, and then exit. 
 # 
 # Construct and wrap our object.
-wrapper = sshxmlrpc.SSHServerWrapper(emulabserver())
+server  = eval(module + "()")
+wrapper = sshxmlrpc.SSHServerWrapper(server)
 # Handle the request on stdin and send the response to stdout.
 wrapper.serve_forever((sys.stdin, sys.stdout))
 sys.exit(0)
