@@ -218,6 +218,8 @@ elseif (! strcmp($sortby, "name"))
     $order = "e.expt_name";
 elseif (! strcmp($sortby, "pcs"))
     $order = "ncount DESC,e.pid,e.eid";
+elseif (! strcmp($sortby, "idle"))
+    $order = "canbeidle desc,idle_ignore,idlesec DESC,ncount desc,e.pid,e.eid";
 else 
     $order = "e.pid,e.eid";
 
@@ -230,47 +232,49 @@ if ($clause) {
 } else {
     $clause = "";
 }
-    
+
+# Notes about the queries below:
+# - idle is fudged by 121 seconds so that in the five minutes between 
+#   slothd reports we don't get active expts showing up as idle for 0.1 hrs
+
 if ($isadmin) {
     $experiments_result =
-	DBQueryFatal("select e.*,".
-		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
-                     "date_format(expt_swapped,'%c/%e') as dshort, ".
-		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
-                     "count(r.node_id) as ncount, swap_requests, ".
-		     "round((unix_timestamp(now()) - ".
-		     "unix_timestamp(last_swap_req))/3600,1) as lastreq, ".
-		     "ve.thumb_hash as thumb_hash ".
-		     "from experiments as e ".
-		     "left join vis_experiments as ve on ".
-		     "ve.pid=e.pid and ve.eid=e.eid ".
-                     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-                     "left join nodes as n on r.node_id=n.node_id ".
-                     "where (n.type!='dnard' or n.type is null) $clause ".
-                     "group by e.pid,e.eid ".
-		     "$having ".
-		     "order by $order");
+	DBQueryFatal("
+select e.*, date_format(expt_swapped,'%Y-%m-%d') as d, 
+date_format(expt_swapped,'%c/%e') as dshort, 
+(to_days(now())-to_days(expt_swapped)) as lastswap, 
+count(r.node_id) as ncount, swap_requests, 
+round((unix_timestamp(now())-unix_timestamp(last_swap_req))/3600,1) as lastreq,
+(unix_timestamp(now()) - unix_timestamp(max(greatest(
+last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
+(last_report is not null) as canbeidle,
+ve.thumb_hash as thumb_hash 
+from experiments as e 
+left join vis_experiments as ve on ve.pid=e.pid and ve.eid=e.eid 
+left join reserved as r on e.pid=r.pid and e.eid=r.eid 
+left join nodes as n on r.node_id=n.node_id
+left join node_activity as na on r.node_id=na.node_id
+where (n.type!='dnard' or n.type is null) $clause 
+group by e.pid,e.eid $having order by $order");
 }
 else {
     $experiments_result =
-	DBQueryFatal("select distinct e.*, ".
-                     "date_format(expt_swapped,'%Y-%m-%d') as d, ".
-                     "date_format(expt_swapped,'%c/%e') as dshort, ".
-                     "count(r.node_id) as ncount, ".
-		     "ve.thumb_hash as thumb_hash ".
-                     "from group_membership as g ".
-                     "left join experiments as e on ".
-                     "  g.pid=e.pid and g.pid=g.gid ".
-		     "left join vis_experiments as ve on ".
-		     "ve.pid=e.pid and ve.eid=e.eid ".
-                     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-                     "left join nodes as n on r.node_id=n.node_id ".
-                     "where (n.type!='dnard' or n.type is null) and ".
-                     " g.uid='$uid' and e.pid is not null ".
-		     "and e.eid is not null $clause ".
-                     "group by e.pid,e.eid ".
-		     "$having ".
-                     "order by $order");    
+	DBQueryFatal("
+select distinct e.*, date_format(expt_swapped,'%Y-%m-%d') as d, 
+date_format(expt_swapped,'%c/%e') as dshort, count(r.node_id) as ncount, 
+(unix_timestamp(now()) - unix_timestamp(max(greatest(
+last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
+(last_report is not null) as canbeidle,
+ve.thumb_hash as thumb_hash 
+from group_membership as g 
+left join experiments as e on g.pid=e.pid and g.pid=g.gid 
+left join vis_experiments as ve on ve.pid=e.pid and ve.eid=e.eid 
+left join reserved as r on e.pid=r.pid and e.eid=r.eid 
+left join nodes as n on r.node_id=n.node_id 
+left join node_activity as na on r.node_id=na.node_id
+where (n.type!='dnard' or n.type is null) and 
+ g.uid='$uid' and e.pid is not null and e.eid is not null $clause 
+group by e.pid,e.eid $having order by $order");    
 }
 if (! mysql_num_rows($experiments_result)) {
     USERERROR("There are no experiments running in any of the projects ".
@@ -284,9 +288,14 @@ if (mysql_num_rows($experiments_result)) {
 
     if ($idle) {
       echo "<p><center><b>Experiments that have been idle at least 
-$idlehours hours</b><br><a class='static' 
-href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb&noignore=1'>
+$idlehours hours</b><br>\n";
+      if ($noignore) {
+        echo "<a class='static' href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb'>\n
+Exclude idle-ignore experiments</a></center></p><br />\n";
+      } else {
+        echo "<a class='static' href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb&noignore=1'>\n
 Include idle-ignore experiments</a></center></p><br />\n";
+      }
     }
     
     $idlemark = "<b>*</b>";
@@ -455,19 +464,23 @@ if ($thumb && !$idle) {
 
     echo "</tr></table>";
 } else {
+
+    $ni = ($noignore ? "&noignore=$noignore" : "");
+    
     echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
               <th width=8%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pid$ni'>
                   PID</a></th>
               <th width=8%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=eid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=eid$ni'>
                   EID</a></th>
               <th align=center width=3%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs$ni'>
                   PCs</a><br>[<b>1</b>]</th>
               <th align=center width=3%>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=idle$ni'>
                Hours Idle</th>\n";
     
     if ($showlastlogin)
@@ -478,10 +491,10 @@ if ($thumb && !$idle) {
     }
 
     echo "    <th width=60%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name$ni'>
                   Name</a></th>
               <th width=4%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid$ni'>
                   Head UID</a></th>
             </tr>\n";
 
@@ -492,13 +505,15 @@ if ($thumb && !$idle) {
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
 	$state= $row["state"];
-	$isidle = $row["swap_requests"];
+	$ignore = $row['idle_ignore'];
+	$idlesec= $row["idlesec"];
+	$swapreqs = $row["swap_requests"];
+	$isidle = ($idlesec >= 3600*$idlehours);
 	$daysidle=0;
-	$idletime = round(TBGetExptIdleTime($pid,$eid),1);
-
-	$inactive = $idletime >= $idlehours;
-	if ($isidle && !$inactive) {
-	    $isidle = "";
+	$idletime = ($idlesec > 300 ? round($idlesec/3600,1) : 0);
+	
+	if ($swapreqs && !$isidle) {
+	    $swapreqs = "";
 	    mysql_query("update experiments set swap_requests='' ".
 			"where pid='$pid' and eid='$eid'");
 	}
@@ -534,7 +549,6 @@ if ($thumb && !$idle) {
 
 	if ($idle) {
 	    $stale = TBGetExptIdleStale($pid,$eid);
-	    $ignore = TBGetExptIdleIgnore($pid,$eid);
 	    # If it is ignored, skip it now.
 	    if ($ignore && !$noignore) { continue; }
 	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
@@ -548,7 +562,7 @@ if ($thumb && !$idle) {
 	    if ($ignore) { $label .= "ignore "; }
 	    if (!$swappable) { $label .= "unswap. "; }
 	    if ($label == "") { $label = "&nbsp;"; }
- 	    if ($inactive && !$stale && !$ignore && !$toosoon && $pcs) {
+ 	    if ($isidle && !$stale && !$ignore && !$toosoon && $pcs) {
 		$fooswap = "<td><a ".
 		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
 		    "<img border=0 src=\"redball.gif\"></a> $label</td>\n" ;
@@ -564,7 +578,7 @@ if ($thumb && !$idle) {
 	    $foo .= "</td>" . $fooswap . "\n"; 
 	}
 
-	if ($idle && ($str=="&nbsp;" || !$pcs || !$inactive)) { continue; }
+	if ($idle && ($str=="&nbsp;" || !$pcs || !$isidle)) { continue; }
 
 	$nodes   = 0;
 	$special = 0;
@@ -607,7 +621,11 @@ if ($thumb && !$idle) {
 	if ($idletime == -1) {
 	    echo "<td>&nbsp;</td>\n";
 	} else {
-	    echo "<td>$idletime</td>\n";
+	    if ($ignore && $idletime !=0) {
+		echo "<td>($idletime)</td>\n";
+	    } else {
+		echo "<td>$idletime</td>\n";
+	    }
 	}
 	
 	if ($showlastlogin) echo "$lastlogin\n";
