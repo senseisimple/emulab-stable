@@ -582,7 +582,7 @@ if ($showevents) {
 		"left join event_eventtypes as et on ex.eventtype=et.idx ".
 		"left join event_objecttypes as ot on ex.objecttype=ot.idx ".
 		"where ex.pid='$pid' and ex.eid='$eid' ".
-		"order by time,vnode,vname,idx");
+		"order by time,vnode,vname,ex.idx");
 
     if ($result->numrows) {
 	if ($verbose) {
