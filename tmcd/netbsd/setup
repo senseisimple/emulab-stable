@@ -259,19 +259,31 @@ print STDOUT "Checking Testbed Experiment Run Command configuration ... \n";
 
 open(TM,  "$TMCC $NODE $STARTUPCMD |")
     or die "Cannot start $TMCC: $!";
-while (<TM>) {
-    if ($_ =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/) {
-	open(RUN, ">$TMSTARTUPCMD")
-	    or die("Could not open $TMSTARTUPCMD");
-    
-	print  STDOUT "  Will run $1 as $2\n";
-	print  RUN    "$_\n";
+$_ = <TM>;
+close(TM)
+    or die $? ? "$TMCC exited with status $?" : "Error closing pipe: $!";
 
-	close(RUN);
-	chmod(0755, "$TMSTARTUPCMD");
-    }
+open(RUN, ">$TMSTARTUPCMD")
+    or die("Could not open $TMSTARTUPCMD");
+
+if (defined($_) && ($_ =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/)) {
+    print  STDOUT "  Will run $1 as $2\n";
+    print  RUN    "$_\n";
 }
-close(TM);
+#
+# No custom startup command given,
+# we create one which declares the node ready and set the status.
+# This is for the benefit of sharks which are allocated to an experiment
+# but that are not actively involved in the experiment, which happens
+# since sharks are allocated in units of a shelf (8).
+#
+else {
+    print  STDOUT "Marking node as READY\n";
+    printf RUN    "CMD='%s ready' UID=root\n", $TMCC;
+}
+
+close(RUN);
+chmod(0755, "$TMSTARTUPCMD");
 
 #
 # If node is free, reset to a moderately clean state.
