@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+
+# Location of ssh program
+$ssh = "/usr/local/bin/ssh";
+
+# Location of ssh-add program
+$add = "/usr/local/bin/ssh-add";
+
+# Remote host to connect to
+$host = "plastic.cs.utah.edu";
+
+# Make sure they're running ssh-agent
+if (!$ENV{SSH_AGENT_PID}) {
+	print "You should be running ssh-agent - To start it, run:\n";
+	print "eval `/usr/local/bin/ssh-agent`\n";
+	print "It would be a good idea to add this to your ~/.login file\n";
+}
+
+# FIXME: Maybe there's a better way to check for this?
+if (!`$add -l | grep -v "no identities"`) {
+	system $add;
+}
+
+# Current working directory:
+$cwd = $ENV{PWD};
+# Now, do the magic
+print "$ssh $host /home/ricci/paperbag dir=$cwd $0 @ARGV";
+system "$ssh $host '/home/ricci/paperbag dir=$cwd $0 @ARGV'";
