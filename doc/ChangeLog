@@ -1,3 +1,49 @@
+ricci       2003/12/01 13:48:18 MST
+
+  Modified files:
+    .                    configure configure.in
+    tbsetup              GNUmakefile.in assign_wrapper.in
+                         tbswap.in
+    tbsetup/ns2ir        tb_compat.tcl.in
+  Added files:
+    tbsetup              fetchtar.proxy.in tarfiles_setup.in
+                         webtarfiles_setup.in
+  Log:
+  New scripts: tarfiles_setup, fetchtar.proxy, and webtarfiles_setup .
+
+  The idea is to give us hooks for grabbing experimenters' tarballs (and
+  RPMs) from locations other than files on ops. Mainly, to remove
+  another dependance on users having shells on ops.
+
+  tarfiles_setup supports fetching files from http and ftp URLs right
+  now, through wget. It places them into the experiment directory, so
+  that they'll go away when the experiment is terminated, and the rest
+  of the chain (ie. downloading to clients and os_setup's checks)
+  remains unchaged.  It is now tarfiles_setup's job to copy tarballs and
+  RPMs from the virt_nodes table to the nodes table for allocated nodes.
+  This way, it can translate URLs into the local filenames it
+  constructs. It get invoked from tbswap.
+
+  Does the actual fetching over on ops, running as the user, with
+  fetchtar.proxy.
+
+  Should be idempotent, so we should be able to give the user a button
+  to run webtarfiles_setup (none exists yet) yet to 'freshen' their
+  tarballs. (We'd also have to somehow let the experiment's nodes know
+  they need to re-fetch their tarballs.)
+
+ricci       2003/11/20 18:37:34 MST
+
+  Added files:
+    utils/nsgen          lan.xml nsgen planetlab.xml
+  Log:
+  New script: nsgen - Generates an NS file from some supplied values
+  and a template. The idea is that it's a general tool for generating
+  NS files for standard topologies (ie. LANs), filling in some
+  user-supplied values. Has some features that are useful for NS files,
+  like default values and skipping or commenting out sections if values
+  for variables are not given.
+
 stoller     2003/11/17 17:30:37 MST
 
   Modified files:
