@@ -570,6 +570,7 @@ CREATE TABLE node_types (
   delay_capacity tinyint(4) NOT NULL default '0',
   virtnode_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
+  disktype enum('ad','da','ar') default NULL,
   delay_osid varchar(35) default NULL,
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',

@@ -6,7 +6,22 @@
 # Please indicate the CVS revision number your instructions refer to.
 # 
 
-1.112 - Made it illegal to put NULL values in interfaces.iface . Would be a
-    good idea to run:
-    	select * from interfaces where iface is null;
-    first, to make sure you don't have any!
+1.112: Made it illegal to put NULL values in interfaces.iface.
+       Run this first to make sure you don't have any (fix if you
+       do). 
+       
+	select * from interfaces where iface is null;
+	
+1.113: Add disktype to node_types for Mike:
+
+	alter table node_types add disktype enum('ad','da','ar') \
+		default NULL after control_iface;
+
+       Used by frisbee/imagezip. Locally, changed these types:
+
+	update node_types set disktype='ar' where type='pc600';
+	update node_types set disktype='ar' where type='pc850';
+	update node_types set disktype='ar' where type='pc1500';
+	update node_types set disktype='ar' where type='pcL440GX';
+	update node_types set disktype='ar' where type='pc2000';
+	update node_types set disktype='ar' where type='pc601';
