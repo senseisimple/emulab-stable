@@ -93,7 +93,7 @@ swig-pywrappers: event.i event.c tbevent.py.tail
 	cat $(SRCDIR)/tbevent.py.tail >> $(SRCDIR)/tbevent.py
 	touch $@
 
-$(SRCDIR)/event_wrap_py.c: swig-pywrappers
+# $(SRCDIR)/event_wrap_py.c: swig-pywrappers
 
 event_wrap_py.o: $(SRCDIR)/event_wrap_py.c
 	$(CC) -c $(CFLAGS_NOWARN) $(PYCORE) $<
@@ -129,7 +129,7 @@ client-libinstall:
 	$(INSTALL_PROGRAM) _tbevent.so $(DESTDIR)$(CLIENT_BINDIR)/_tbevent.so
 
 clean:
-	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py swig-pywrappers
+	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py
 
 $(INSTALL_DIR)/opsdir/lib/%: %
 	@echo "Installing $<"
