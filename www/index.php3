@@ -14,6 +14,11 @@ PAGEHEADER("Home");
 <img src="pix/front-left-med.jpg" align="right" >
 
 <p>
+<img src="new.gif" alt="&lt;NEW&gt;">
+<b><a href = "docwrapper.php3?docname=news.html">
+      Late Breaking News</a></b>
+
+<p>
 Welcome to Emulab. Emulab (sometimes called the Utah Network Testbed)
 is a new and unique type of experimental environment: a
 universally-available "Internet in a room" which will provide a new,
