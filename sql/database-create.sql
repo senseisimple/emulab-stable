@@ -1091,12 +1091,13 @@ CREATE TABLE virt_routes (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
+  src varchar(32) NOT NULL default '',
   dst varchar(32) NOT NULL default '',
   dst_type enum('host','net') NOT NULL default 'host',
   dst_mask varchar(15) default '255.255.255.0',
   nexthop varchar(32) NOT NULL default '',
   cost int(11) NOT NULL default '0',
-  PRIMARY KEY  (pid,eid,vname,dst)
+  PRIMARY KEY  (pid,eid,vname,src,dst)
 ) TYPE=MyISAM;
 
 #
