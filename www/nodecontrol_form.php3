@@ -28,16 +28,16 @@ $row = mysql_fetch_array($query_result);
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT experiments.* ".
-        "FROM experiments LEFT JOIN reserved ".
-        "ON experiments.pid=reserved.pid and experiments.eid=reserved.eid ".
-        "WHERE reserved.node_id=\"$node_id\"");
+	"select proj_memb.* from proj_memb left join reserved ".
+	"on proj_memb.pid=reserved.pid and proj_memb.uid='$uid' ".
+	"where reserved.node_id='$node_id'");
     if (mysql_num_rows($query_result) == 0) {
-        USERERROR("The node $node_id is not in an experiment", 1);
+        USERERROR("The node $node_id is not in an experiment ".
+		  "or not in the same project as you", 1);
     }
     $foorow = mysql_fetch_array($query_result);
-    $expt_head_uid = $foorow[expt_head_uid];
-    if ($expt_head_uid != $uid) {
+    $trust = $foorow[trust];
+    if ($trust != "local_root" && $trust != "group_root") {
         USERERROR("You do not have permission to modify node $node_id!", 1);
     }
 }
@@ -83,7 +83,7 @@ echo "<tr>
 echo "<tr>
           <td>Def Boot Image:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"def_boot_image_id\" size=\"20\"
+              <input type=\"text\" name=\"def_boot_image_id\" size=\"30\"
                      value=\"$def_boot_image_id\"></td>
       </tr>\n";
 
