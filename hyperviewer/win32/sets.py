@@ -1,3 +1,6 @@
+# This file came from the /usr/local/lib/python2.3 directory in another distribution.
+# It was missing from the Windows Python 2.2.3 distribution.
+
 """Classes to represent arbitrary sets (including sets of sets).
 
 This module implements sets using dictionaries whose values are
