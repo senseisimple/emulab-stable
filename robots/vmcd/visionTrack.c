@@ -35,12 +35,14 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 
 	distance = hypotf(vt->vt_position.x - curr->vt_position.x,
 			  vt->vt_position.y - curr->vt_position.y);
+#if 0
 	printf("  min %f %f - %f %f = %f\n",
 	       vt->vt_position.x,
 	       vt->vt_position.y,
 	       curr->vt_position.x,
 	       curr->vt_position.y,
 	       distance);
+#endif
 	if (distance < *distance_out) {
 	    retval = curr;
 	    *distance_out = distance;
@@ -97,14 +99,14 @@ int vtUpdate(struct lnMinList *now,
 	    if (mup->position.y > vc->vc_bottom)
 		vc->vc_bottom = mup->position.y;
 
-	    
+#if 0
 	    printf("vc %p %f %f %f %f\n",
 		   vc,
 		   vc->vc_left,
 		   vc->vc_right,
 		   vc->vc_top,
 		   vc->vc_bottom);
-	    
+#endif
 	    retval = (mup->status == MTP_POSITION_STATUS_CYCLE_COMPLETE);
 	}
 	break;

@@ -18,6 +18,7 @@ struct robot_object {
     unsigned long ro_flags;
     char *ro_name;
     int ro_id;
+    struct timeval ro_lost_timestamp;
 };
 
 struct robot_object *roFindRobot(struct lnMinList *list, int id);

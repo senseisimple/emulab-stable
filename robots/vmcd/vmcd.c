@@ -445,8 +445,12 @@ int main(int argc, char *argv[])
 	     * Send MTP_WIGGLE_STARTs for any unknown robots, this should stop
 	     * them and cause an IDLE wiggle_status to come back.
 	     */
+
 	    ro = (struct robot_object *)unknown_bots.lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
+		info("checking through unknown_bots; id %d\n",
+		     ro->ro_id
+		     );
 		if (!(ro->ro_flags & RF_WIGGLING)) {
 		    struct mtp_packet wmp;
 
@@ -476,6 +480,44 @@ int main(int argc, char *argv[])
 	    
 	    FD_SET(vmc_clients[0].vc_handle->mh_fd, &readfds);
 	    current_client = 0;
+	}
+
+	/*
+	 * Check which bots in the lost list have exceeded the timeout;
+	 * if any have, add them back to the unknown_bots list, and they
+	 * will be rewiggled once the next set of updates comes from the
+	 * vision system.
+	 */
+	if (!lnEmptyList(&lost_bots)) {
+	    struct robot_object *ro = NULL;
+	    struct robot_object *ro_next = NULL;
+	    struct timeval current;
+
+	    gettimeofday(&current,NULL);
+
+	    ro = (struct robot_object *)lost_bots.lh_Head;
+	    while (ro->ro_link.ln_Succ != NULL) {
+		if ((current.tv_sec - ro->ro_lost_timestamp.tv_sec) > 10) {
+		    // remove this guy
+		    ro_next = (struct robot_object *)ro->ro_link.ln_Succ;
+		    lnRemove(&ro->ro_link);
+		    // add him to unknown list
+		    lnAddTail(&unknown_bots,&ro->ro_link);
+		    info("robot %d exceeded the lost timeout, trying to "
+			 "reacquire.\n",
+			 ro->ro_id
+			 );
+		    // also have to unset the RF_WIGGLING flag
+		    ro->ro_flags &= ~RF_WIGGLING;
+		    ro = ro_next;
+		}
+		else {
+		    //info("robot %d did not exceed the lost timeout!\n",
+		    // ro->ro_id
+		    // );
+		    ro = (struct robot_object *)ro->ro_link.ln_Succ;
+		}
+	    }
 	}
 
 	/*
@@ -564,6 +606,14 @@ int main(int argc, char *argv[])
 				     */
 				    lnAddTail(&lost_bots,
 					      &wiggle_bot->ro_link);
+
+				    gettimeofday(&(wiggle_bot->ro_lost_timestamp),
+						 NULL);
+				    info("took a lost timestamp for robot"
+					 " %d\n",
+					 wiggle_bot->ro_id
+					 );
+
 				    wiggle_bot = NULL;
 				}
 				else {
@@ -608,9 +658,11 @@ int main(int argc, char *argv[])
 			}
 			
 			if (vtUpdate(&current_frame, vc, &mp, &vt_pool)) {
-			    printf("got frame from client %s:%d\n",
-				   vc->vc_hostname,
-				   vc->vc_port);
+			    if (debug > 1) {
+				printf("got frame from client %s:%d\n",
+				       vc->vc_hostname,
+				       vc->vc_port);
+			    }
 
 			    /*
 			     * Got all of the tracks from this client, clear
