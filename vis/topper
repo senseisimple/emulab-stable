@@ -3,6 +3,7 @@
 %color = (
   "pc850", "skyblue",
   "pc600", "steelblue",
+  "pc",    "steelblue",
   "shark", "darkblue",
   "lan",   "green",
   "delay", "orange"
