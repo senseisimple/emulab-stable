@@ -1525,8 +1525,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		/*
 		 * All groups! 
 		 */
-		res = mydb_query("select unix_name,unix_gid from groups",
-				 2, reqp->pid);
+		res = mydb_query("select unix_name,unix_gid from groups", 2);
 	}
 	else if (reqp->islocal || reqp->isvnode) {
 		res = mydb_query("select unix_name,unix_gid from groups "
@@ -4969,9 +4968,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 	/*
 	 * XXX sitevar fetching should be a library function
 	 */
-	res = mydb_query("select name,value,defaultvalue "
-			 "from sitevariables where name like 'watchdog/%%'",
-			 3, buf);
+	res = mydb_query("select name,value,defaultvalue from "
+			 "sitevariables where name like 'watchdog/%%'", 3);
 	if (!res || (nrows = (int)mysql_num_rows(res)) == 0) {
 		error("WATCHDOGINFO: no watchdog sitevars\n");
 		if (res)
@@ -5284,34 +5282,28 @@ COMMAND_PROTOTYPE(dofwinfo)
 
 	/*
 	 * Return firewall variables
-	 * XXX these could come out of the database
 	 */
 	if (vers > 21) {
-		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
-		       "EMULAB_BOSS", "boss");
-		client_writeback(sock, buf, strlen(buf), tcp);
-		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
-		       "EMULAB_FS", "fs");
-		client_writeback(sock, buf, strlen(buf), tcp);
-		OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
-		       "EMULAB_USERS", "users");
-		client_writeback(sock, buf, strlen(buf), tcp);
-#ifdef CONTROL_NETWORK
-		{
-			unsigned addr, bits = 32;
-			struct in_addr mask;
-
-			inet_aton(CONTROL_NETMASK, &mask);
-			addr = ~ntohl(mask.s_addr);
-			while (addr && (addr & 1)) {
-				addr >>= 1;
-				bits--;
-			}
-			OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s/%d\"\n",
-			       "EMULAB_CNET", CONTROL_NETWORK, bits);
+		res = mydb_query("select name,value from default_firewall_vars",
+				 2);
+		if (!res) {
+			error("FWINFO: %s: DB Error getting firewall vars!\n",
+			      reqp->nodeid);
+			nrows = 0;
+		} else
+			nrows = (int)mysql_num_rows(res);
+		for (n = nrows; n > 0; n--) {
+			row = mysql_fetch_row(res);
+			if (!row[0] || !row[1])
+				continue;
+			OUTPUT(buf, sizeof(buf), "VAR=%s VALUE=\"%s\"\n",
+			       row[0], row[1]);
 			client_writeback(sock, buf, strlen(buf), tcp);
 		}
-#endif
+		if (res)
+			mysql_free_result(res);
+		if (verbose)
+			info("FWINFO: %d variables\n", nrows);
 	}
 
 	/*
@@ -5337,7 +5329,7 @@ COMMAND_PROTOTYPE(dofwinfo)
 
 	mysql_free_result(res);
 	if (verbose)
-	    info("FWINFO: %d user rules in list\n", nrows);
+	    info("FWINFO: %d user rules\n", nrows);
 
 	/*
 	 * Get the default firewall rules from the DB and return them.
@@ -5362,7 +5354,7 @@ COMMAND_PROTOTYPE(dofwinfo)
 
 	mysql_free_result(res);
 	if (verbose)
-	    info("FWINFO: %d default rules in list\n", nrows);
+	    info("FWINFO: %d default rules\n", nrows);
 
 	return 0;
 }
