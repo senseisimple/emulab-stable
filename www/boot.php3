@@ -72,7 +72,7 @@ if (!$confirmed) {
                 sure you want to reboot node '$node_id?'
               </h2>\n";
 	
-	SHOWNODE($node_id);
+	SHOWNODE($node_id, 1);
     }
     else {
         echo "<font size=+2>Experiment <b>".
