@@ -62,7 +62,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON("Search Documentation", $TBDOCBASE, "search.php3");
-    WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
+    WRITESIDEBARBUTTON("Papers <img src=/new.gif>", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects Using $THISHOMEBASE", $TBDOCBASE,

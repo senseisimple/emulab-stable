@@ -26,6 +26,7 @@ FLUXPERSON("calfeld", "Chris Alfeld");
 FLUXPERSON("danderse", "Dave Andersen");
 FLUXPERSON("barb", "Chad Barb");
 FLUXPERSON("rchriste", "Russ Christensen");
+FLUXPERSON("aclement", "Austin Clements");
 FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("mike", "Mike Hibler");
 FLUXPERSON("abhijeet", "Abhijeet Joglekar");
