@@ -1,0 +1,22 @@
+# $FreeBSD: src/etc/group,v 1.19 1999/08/27 23:23:41 peter Exp $
+#
+wheel:*:0:root,mike,sclawson,lepreau,stoller,forys,kwright,danderse,newbold,calfeld
+daemon:*:1:daemon
+kmem:*:2:root
+sys:*:3:root
+tty:*:4:root
+operator:*:5:root,mike
+mail:*:6:
+bin:*:7:
+news:*:8:
+man:*:9:
+games:*:13:
+staff:*:20:root,mike,stoller,lepreau
+guest:*:31:root
+bind:*:53:
+uucp:*:66:
+xten:*:67:xten
+dialer:*:68:
+network:*:69:
+nogroup:*:65533:
+nobody:*:65534:

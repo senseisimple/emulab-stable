@@ -1,0 +1,267 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Initialize at boot time.
+#
+my $TMCC	= "/etc/testbed/tmcc";
+my $TMIFC       = "/etc/testbed/rc.ifc";
+my $TMDELAY	= "/etc/testbed/rc.delay";
+my $TMGROUP     = "/etc/testbed/group";
+my $TMPASSWD    = "/etc/testbed/master.passwd";
+my @CONFIGS	= ($TMIFC, $TMDELAY);
+my $REBOOTCMD   = "reboot";
+my $STATCMD     = "status";
+my $IFCCMD      = "ifconfig";
+my $ACCTCMD     = "accounts";
+my $DELAYCMD    = "delay";
+my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s\n";
+my $CP		= "/bin/cp -f";
+my $MKDB	= "/usr/sbin/pwd_mkdb -p";
+my $PW		= "/usr/sbin/pw";
+my $CHPASS	= "/usr/bin/chpass";
+my $IFACE	= "fxp";
+my $CTLIFACE    = "fxp4";
+my $project     = "";
+my $PROJDIR     = "/proj";
+my $MOUNTCMD	= "/sbin/mount 155.99.214.74:/q/proj/";
+
+#
+# This is a debugging thing for my home network.
+# 
+my $NODE	= "MYIP=155.99.214.136";
+$NODE		= "";
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# First clean up the node.
+#
+cleanup_node();
+
+#
+# Inform the master that we have rebooted.
+#
+open(TM, "$TMCC $NODE $REBOOTCMD |")
+    or die "Cannot start $TMCC: $!";
+close(TM)
+    or die $? ? "$TMCC exited with status $?" : "Error closing pipe: $!";
+
+#
+# See if this node is allocated to an experiment.
+#
+print STDOUT "Checking Testbed reservation status ... \n";
+
+open(TM, "$TMCC $NODE $STATCMD |")
+    or die "Cannot start $TMCC: $!";
+$_ = <TM>;
+close(TM)
+    or die $? ? "$TMCC exited with status $?" : "Error closing pipe: $!";
+
+if ($_ =~ /^FREE/) {
+    print STDOUT "  Free!\n";
+    exit(0);
+}
+if ($_ =~ /ALLOCATED=(\w*)\/(\w*)/) {
+    print STDOUT "  Allocated: $1/$2!\n";
+    $project = $1;
+}
+else {
+    die("Error getting reservation status\n");
+}
+
+#
+# Mount the project directory.
+# 
+print STDOUT "Mounting the project directory on $PROJDIR/$project ... \n";
+
+if (! mkdir("$PROJDIR/$project", 0770)) {
+    print STDERR "Could not make directory $PROJDIR/$project: $!\n";
+}
+
+if (system("$MOUNTCMD/$project $PROJDIR/$project") != 0) {
+    print STDERR "Could not mount project directory on $PROJDIR/$project.\n";
+}
+
+#
+# Okay, lets find out about interfaces.
+# Write a file of ifconfig lines, which will get executed.
+#
+print STDOUT "Checking Testbed interface configuration ... \n";
+
+#
+# Open a connection to the TMCD, and then open a local file into which
+# we write ifconfig commands (as a shell script).
+# 
+open(TM,  "$TMCC $NODE $IFCCMD |")
+    or die "Cannot start $TMCC: $!";
+open(IFC, ">$TMIFC")
+    or die("Could not open $TMIFC");
+print IFC "#!/bin/sh\n";
+    
+while (<TM>) {
+    $_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*)/;
+    printf STDOUT "  $IFCONFIG", $1, $2, $3;
+    printf IFC $IFCONFIG, $1, $2, $3;
+}
+close(TM);
+close(IFC);
+chmod(0755, "$TMIFC");
+
+#
+# Delay node configuration
+#
+print STDOUT "Checking Testbed delay configuration ... \n";
+my @delays;
+
+open(TM,  "$TMCC $NODE $DELAYCMD |")
+    or die "Cannot start $TMCC: $!";
+while (<TM>) {
+    push(@delays, $_);
+}
+close(TM);
+
+if (@delays) {
+    $count = 69;
+    
+#    foreach $delay (@delays) {
+#	print $delay;
+#    }
+    open(DEL, ">$TMDELAY")
+	or die("Could not open $TMDELAY");
+    print DEL "#!/bin/sh\n";
+    print DEL "sysctl -w net.link.ether.bridge=0\n";
+    print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
+    print DEL "sysctl -w net.link.ether.bridge_cfg=${CTLIFACE}:6,";
+
+    foreach $delay (@delays) {
+	$delay =~ /DELAY INT0=(\d) INT1=(\d) DELAY/;
+	print DEL "$IFACE$1:$count,$IFACE$2:$count,";
+	$count++;
+    }
+    print DEL "\n";
+    print DEL "sysctl -w net.link.ether.bridge=1\n";
+    print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+    print DEL "ipfw -f flush\n";
+
+    $count = 69;
+    $pipe  = 100;
+    foreach $delay (@delays) {
+	$delay =~
+	    /DELAY INT0=(\d) INT1=(\d) DELAY=(\d+) BW=([\d\.]+) PLR=([\d\.]+)/;
+
+	$iface1 = "$IFACE$1";
+	$iface2 = "$IFACE$2";
+	$p1     = $pipe += 10;
+	$p2     = $pipe += 10;
+	$delay  = $3;
+	$bandw  = $4;
+	$plr    = $5;
+	
+	print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
+	print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+	print DEL "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s ";
+	print DEL "plr $plr\n";
+	print DEL "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s ";
+	print DEL "plr $plr\n";
+
+	print STDOUT "  $iface1/$iface2 pipe $p1/$p2 config delay ";
+	print STDOUT "${delay}ms bw ${bandw}Mbit/s plr $plr\n";
+    
+	$count++;
+    }
+    print DEL "echo \"Delay Configuration Complete\"\n";
+
+    close(DEL);
+    chmod(0755, "$TMDELAY");
+}
+
+#
+# Account stuff. Again, open a connection to the TMCD, and receive
+# ADDGROUP and ADDUSER commands. We turn those into "pw" commands.
+#
+print STDOUT "Checking Testbed group/user configuration ... \n";
+
+open(TM, "$TMCC $NODE $ACCTCMD |")
+    or die "Cannot start $TMCC: $!";
+
+while (<TM>) {
+    if ($_ =~ /^ADDGROUP NAME=([0-9a-zA-Z]+) GID=([0-9]+)/) {
+	print STDOUT "  Group: $1/$2\n";
+
+	$group = $1;
+	$gid   = $2;
+
+	($exists) = getgrgid($gid);
+	if ($exists) {
+	    next;
+	}
+	
+	if (system("$PW groupadd $group -g $gid") != 0) {
+	    print STDERR "Error adding new group $1/$2: $!\n";
+	}
+	next;
+    }
+    if ($_ =~
+	/^ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(\d+) ROOT=(\d) NAME="(.*)"/)
+    {
+	$login = $1;
+	$pswd  = $2;
+	$uid   = $3;
+	$gid   = $4;
+	$root  = $5;
+	$name  = $6;
+	if ( $name =~ /^(([^:]+$|^))$/ ) {
+	    $name = $1;
+	}
+ 	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
+	($exists) = getpwuid($uid);
+	if ($exists) {
+	    next;
+	}
+
+	$GLIST = " ";
+	if ($root) {
+	    $GLIST = "-G wheel ";
+	}
+	
+	if (system("$PW useradd $login -u $uid -g $gid $GLIST ".
+	           "-d /users/$login -s /bin/tcsh -c \"$name\"") != 0) {
+	    print STDERR "Error adding new user $login\n";
+	    next;
+	}
+	if (system("$CHPASS -p $pswd $login") != 0) {
+	    print STDERR "Error changing password for user $login\n";
+	}
+	next;
+    }
+}
+close(TM);
+
+#
+# If node is free, reset to a moderately clean state.
+#
+sub cleanup_node () {
+    print STDOUT "Cleaning node; removing configuration files ...\n";
+    unlink @CONFIGS;
+
+    printf STDOUT "Resetting passwd and group files\n";
+    if (system("$CP -f $TMGROUP /etc/group") != 0) {
+	print STDERR "Could not copy default group file into place: $!\n";
+	exit(1);
+    }
+    
+    if (system("$CP -f $TMPASSWD /etc/master.passwd_testbed") != 0) {
+	print STDERR "Could not copy default passwd file into place: $!\n";
+	exit(1);
+    }
+    if (system("$MKDB /etc/master.passwd_testbed") != 0) {
+	print STDERR "Failure running pwd_mkdb on default password file: $!\n";
+	exit(1);
+    }
+}
+

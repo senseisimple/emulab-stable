@@ -1,0 +1,7 @@
+#!/bin/sh
+
+DIR=/usr/testbed/bin/tmcd
+
+killall tmcd
+${DIR}/tmcd > /dev/null 2>&1 &
+

@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ -x /etc/rc.d/testbed/setup  ]; then
+        echo "Setting up Testbed Configuration"
+	/etc/rc.d/testbed/setup
+fi
+
+if [ -x /etc/rc.d/testbed/rc.ifc  ]; then
+        echo "Setting up Testbed Interfaces"
+	/etc/rc.d/testbed/rc.ifc
+fi

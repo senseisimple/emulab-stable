@@ -1,0 +1,192 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Initialize at boot time.
+#
+my $TMCC	= "/etc/rc.d/testbed/tmcc";
+my $TMIFC       = "/etc/rc.d/testbed/rc.ifc";
+my $TMGROUP     = "/etc/rc.d/testbed/group";
+my $TMPASSWD    = "/etc/rc.d/testbed/passwd";
+my $TMSHADOW    = "/etc/rc.d/testbed/shadow";
+my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
+my @CONFIGS	= ($TMIFC);
+my $REBOOTCMD   = "reboot";
+my $STATCMD     = "status";
+my $IFCCMD      = "ifconfig";
+my $ACCTCMD     = "accounts";
+my $DELAYCMD    = "delay";
+my $IFCONFIG    = "/sbin/ifconfig eth%d inet %s netmask %s\n";
+my $CP		= "/bin/cp -f";
+my $USERADD	= "/usr/sbin/useradd";
+my $GROUPADD	= "/usr/sbin/groupadd";
+my $IFACE	= "eth";
+my $CTLIFACE    = "eth4";
+my $project     = "";
+my $PROJDIR     = "/proj";
+my $MOUNTCMD	= "/bin/mount 155.99.214.74:/q/proj/";
+
+#
+# This is a debugging thing for my home network.
+# 
+my $NODE	= "MYIP=155.99.214.136";
+$NODE		= "";
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# First clean up the node.
+#
+cleanup_node();
+
+#
+# Inform the master that we have rebooted.
+#
+open(TM, "$TMCC $NODE $REBOOTCMD |")
+    or die "Cannot start $TMCC: $!";
+close(TM)
+    or die $? ? "$TMCC exited with status $?" : "Error closing pipe: $!";
+
+#
+# See if this node is allocated to an experiment.
+#
+print STDOUT "Checking Testbed reservation status ... \n";
+
+open(TM, "$TMCC $NODE $STATCMD |")
+    or die "Cannot start $TMCC: $!";
+$_ = <TM>;
+close(TM)
+    or die $? ? "$TMCC exited with status $?" : "Error closing pipe: $!";
+
+if ($_ =~ /^FREE/) {
+    print STDOUT "  Free!\n";
+    exit(0);
+}
+if ($_ =~ /ALLOCATED=(\w*)\/(\w*)/) {
+    print STDOUT "  Allocated: $1/$2!\n";
+    $project = $1;
+}
+else {
+    die("Error getting reservation status\n");
+}
+    
+#
+# Mount the project directory.
+# 
+print STDOUT "Mounting the project directory on $PROJDIR/$project ... \n";
+
+if (! mkdir("$PROJDIR/$project", 0770)) {
+    print STDERR "Could not make directory $PROJDIR/$project: $!\n";
+}
+
+if (system("$MOUNTCMD/$project $PROJDIR/$project") != 0) {
+    print STDERR "Could not mount project directory on $PROJDIR/$project.\n";
+}
+
+#
+# Okay, lets find out about interfaces.
+# Write a file of ifconfig lines, which will get executed.
+#
+print STDOUT "Checking Testbed interface configuration ... \n";
+
+#
+# Open a connection to the TMCD, and then open a local file into which
+# we write ifconfig commands (as a shell script).
+# 
+open(TM,  "$TMCC $NODE $IFCCMD |")
+    or die "Cannot start $TMCC: $!";
+open(IFC, ">$TMIFC")
+    or die("Could not open $TMIFC");
+print IFC "#!/bin/sh\n";
+    
+while (<TM>) {
+    $_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*)/;
+    printf STDOUT "  $IFCONFIG", $1, $2, $3;
+    printf IFC $IFCONFIG, $1, $2, $3;
+}
+close(TM);
+close(IFC);
+chmod(0755, "$TMIFC");
+
+#
+# Account stuff. Again, open a connection to the TMCD, and receive
+# ADDGROUP and ADDUSER commands. We turn those into "pw" commands.
+#
+print STDOUT "Checking Testbed group/user configuration ... \n";
+
+open(TM, "$TMCC $NODE $ACCTCMD |")
+    or die "Cannot start $TMCC: $!";
+
+while (<TM>) {
+    if ($_ =~ /^ADDGROUP NAME=([0-9a-zA-Z]+) GID=([0-9]+)/) {
+	print STDOUT "  Group: $1/$2\n";
+
+	$group = $1;
+	$gid   = $2;
+
+	($exists) = getgrgid($gid);
+	if ($exists) {
+	    next;
+	}
+	
+	if (system("$GROUPADD -g $gid $group") != 0) {
+	    print STDERR "Error adding new group $1/$2: $!\n";
+	}
+	next;
+    }
+    if ($_ =~
+	/^ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(\d+) ROOT=(\d) NAME="(.*)"/)
+    {
+	$login = $1;
+	$pswd  = $2;
+	$uid   = $3;
+	$gid   = $4;
+	$root  = $5;
+	$name  = $6;
+	if ( $name =~ /^(([^:]+$|^))$/ ) {
+	    $name = $1;
+	}
+ 	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
+	($exists) = getpwuid($uid);
+	if ($exists) {
+	    next;
+	}
+	
+	$GLIST = " ";
+	if ($root) {
+	    $GLIST = "-G root ";
+	}
+	
+	if (system("$USERADD -u $uid -g $gid -p $pswd $GLIST ".
+	           "-d /users/$login -s /bin/tcsh -c \"$name\" $login") != 0) {
+	    print STDERR "Error adding new user $login\n";
+	    next;
+	}
+	next;
+    }
+}
+close(TM);
+
+#
+# If node is free, reset to a moderately clean state.
+#
+sub cleanup_node () {
+    print STDOUT "Cleaning node; removing configuration files ...\n";
+    unlink @CONFIGS;
+
+    printf STDOUT "Resetting passwd and group files\n";
+    if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
+	print STDERR "Could not copy default group file into place: $!\n";
+	exit(1);
+    }
+    
+    if (system("$CP -f $TMSHADOW $TMGSHADOW /etc") != 0) {
+	print STDERR "Could not copy default passwd file into place: $!\n";
+	exit(1);
+    }
+}
+
