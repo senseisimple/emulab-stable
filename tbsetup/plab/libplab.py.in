@@ -30,6 +30,10 @@ LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 AGENTIP = "dslice.planet-lab.org"
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
+TBOPS = "@TBOPSEMAIL@".replace("\\","")
+MAILTAG = "@THISHOMEBASE@"
+SCRIPTNAME = "Unknown" # should see if we can get the toplevel script name
+
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "plabnodes"
 
@@ -51,6 +55,8 @@ HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
 DEF_ROOTBALL_NAME = "plabroot-4.tgz"
+
+FREETRIES = 3
 
 verbose = 0
 debug = 0
@@ -158,6 +164,50 @@ def handleArgs(args):
         if o == "-d":
             debug = 1
     return args
+
+
+def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
+    """
+    Sends email to someone about something :)
+    """
+    Tag = MAILTAG.upper()
+    # damn, no good way to tell if this fails
+    sm = os.popen("/usr/sbin/sendmail -t", "w")
+    
+    #
+    # Sendmail will figure this out if not given.
+    # 
+    if From:
+	sm.write("From: %s\n" % From)
+        
+    if Headers:
+	sm.write("%s\n" % Headers)
+        
+    sm.write("X-NetBed: %s\n" % SCRIPTNAME)
+    sm.write("To: %s\n" % To)
+    sm.write("Subject: %s: %s\n" % (Tag, Subj))
+    sm.write("\n")
+    sm.write("%s\n" % Msg)
+    sm.write("\n")
+
+    if len(Files):
+        for fname in Files:
+            try:
+                infile = open(fname)
+            except IOError:
+                continue
+            
+            sm.write("\n--------- %s --------\n" % fname)
+
+            for line in infile.readlines():
+                sm.write(line)
+            
+            infile.close()
+    
+    sm.write("\n")
+    sm.close()
+    
+    return 1
 
 #
 # Plab abstraction
@@ -774,7 +824,31 @@ class Node:
         print "Freeing Plab node %s." % self.nodeid
         # XXX Should this wait a bit before nuking the VM?
         nodemgr = self._createNodemgrProxy()
-        ret = nodemgr.deletelease(self.slice.slicename)
+        freetries = FREETRIES
+        while 1:
+            try:
+                ret = nodemgr.deletelease(self.slice.slicename)
+            except:
+                print "Warning: couldn't delete the lease for %s on %s" % \
+                      (self.slice.slicename, self.nodeid)
+            else:
+                break
+
+            freetries = freetries - 1
+            if freetries > 0:
+                print "\t%s tries left." % freetries
+                time.sleep(1)
+            else:
+                print "Error: couldn't delete plab lease for " \
+                      "vnode %s after %s tries." % (self.nodeid, FREETRIES)
+                print "Sending email"
+                exc_strs = format_exception(sys.exc_info())
+                tbstr = "".join(exc_strs)
+                SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
+                         "dslice %s" % (self.nodeid, self.slice.slicename),
+                         "Sliver lease deletion failed:\n\n%s" % tbstr)
+                return None
+        
         if debug:
             print "Deleted lease/VM: %s" % `ret`
         DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
