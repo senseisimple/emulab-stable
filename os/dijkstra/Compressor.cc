@@ -71,31 +71,27 @@ void Compressor::compress(SingleSource const & newGraph,
 void Compressor::add(int dest, IPAddress destIp)
 {
     int firstHop = graph->getFirstHop(dest);
-    if ((destIp >> shift_10) == ip_10)
+    HostEntry::const_iterator pos;
+    pos = (*ipMap)[graph->getSource()].find(firstHop);
+    if (pos != (*ipMap)[graph->getSource()].end())
     {
-        root_10.addRoute(destIp, firstHop, IP_SIZE - shift_10);
-    }
-    else if ((destIp >> shift_172_16) == ip_172_16)
-    {
-        root_172_16.addRoute(destIp, firstHop, IP_SIZE - shift_172_16);
-    }
-    else if ((destIp >> shift_192_168) == ip_192_168)
-    {
-        root_192_168.addRoute(destIp, firstHop, IP_SIZE - shift_192_168);
-    }
-    else
-    {
-        HostEntry::const_iterator pos;
-        pos = (*ipMap)[graph->getSource()].find(firstHop);
-        if (pos != (*ipMap)[graph->getSource()].end())
+        if ((destIp >> shift_10) == ip_10)
+        {
+            root_10.addRoute(destIp, firstHop, IP_SIZE - shift_10);
+        }
+        else if ((destIp >> shift_172_16) == ip_172_16)
+        {
+            root_172_16.addRoute(destIp, firstHop, IP_SIZE - shift_172_16);
+        }
+        else if ((destIp >> shift_192_168) == ip_192_168)
+        {
+            root_192_168.addRoute(destIp, firstHop, IP_SIZE - shift_192_168);
+        }
+        else
         {
             // TODO: Figure out what cost means
             printRouteToIp(pos->second.first, pos->second.second,
                            ipToString(destIp), 1);
-        }
-        else
-        {
-            throw StringException("Internal error: Corruption in data structures: Compressor::add()");
         }
     }
 }

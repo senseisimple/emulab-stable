@@ -51,7 +51,7 @@ void SingleSource::route(int newSource)
     first_hop[source] = source;
     for (int i = 0; i < static_cast<int>(first_hop.size()); ++i)
     {
-        if (i != source)
+        if (i != static_cast<int>(pred_map[i]))
         {
             int current = i;
             while(static_cast<int>(pred_map[current]) != source)
@@ -59,6 +59,10 @@ void SingleSource::route(int newSource)
                 current = pred_map[current];
             }
             first_hop[i] = current;
+        }
+        else
+        {
+            first_hop[i] = i;
         }
     }
 }
