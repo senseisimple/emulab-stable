@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,3 +23,8 @@ teachswitch: GNUmakefile teachswitch.o
 teachswitch.o: teachswitch.c
 	$(CC) -c -o teachswitch.o $(CFLAGS) $<
 
+client-install: teachswitch
+	$(INSTALL_PROGRAM) teachswitch $(DESTDIR)$(CLIENT_BINDIR)
+
+clean:
+	rm -f *.o core teachswitch teachswitch.debug
