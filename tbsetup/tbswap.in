@@ -657,11 +657,11 @@ sub doSwapin($) {
 
     #
     # If user specified -reboot to update,
+    # and we are successfully performing the update,
     # then mark all nodes in experiment
     # so os_setup will reboot them.
     #
-    if (($type == UPDATE ||
-         $type == UPDATE_RECOVER) && $updateReboot) {
+    if (($type == UPDATE) && $updateReboot) {
 	print STDERR "Marking nodes for reboot.\n";
 	$db_result =
 	    DBQueryFatal("select rv.node_id ".
