@@ -587,7 +587,8 @@ CREATE TABLE nodes (
   sshdport int(11) NOT NULL default '11000',
   jailflag tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id),
-  KEY phys_nodeid (phys_nodeid)
+  KEY phys_nodeid (phys_nodeid),
+  KEY node_id (node_id,phys_nodeid)
 ) TYPE=MyISAM;
 
 --
@@ -803,7 +804,8 @@ CREATE TABLE reserved (
   eid varchar(32) NOT NULL default '',
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
-  PRIMARY KEY  (node_id)
+  PRIMARY KEY  (node_id),
+  KEY pid (pid,eid)
 ) TYPE=MyISAM;
 
 --
