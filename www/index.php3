@@ -16,7 +16,17 @@ if (isset($login)) {
 	    unset($uid);
     }
     else {
-        if (DOLOGIN($uid, $password)) {
+	#
+	# Look to see if already logged in. If the user hits reload,
+	# we are going to get another login post, and this could
+	# update the current login, but the other frame is also reloading,
+	# and has sent its cookie values in already. So, now the hash in
+	# DB will not match the hash that came with the other frame. 
+	#
+	if (CHECKLOGIN($uid) == 1) {
+            $login_status = "$uid Logged In";
+	}
+	elseif (DOLOGIN($uid, $password)) {
             $login_status = "Login Failed";
 	    unset($uid);
         }
