@@ -101,7 +101,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
 	tbsetup/ns2ir/parse.tcl \
-	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend \
+	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
 	tbsetup/checkpass/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
