@@ -1,0 +1,156 @@
+#!/usr/bin/perl -w
+#
+# checkports - Check to make sure that all ports for an experiment are
+# up
+#
+# TODO: Add duplex checking
+# TODO: Add the ability to check all ports at once
+#
+
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+
+use libdb;
+use snmpit_lib;
+
+use English;
+use Getopt::Long;
+use strict;
+
+sub usage {
+    print << "END";
+Usage: $0 [-h] <pid> <eid>
+-h    This message
+
+Checks all ports in pid/eid to make sure that the operational status (whether
+or not the port has carrier) matches the administrative status (whether or not
+the port is enabled.)
+END
+
+    return 1;
+}
+
+#
+# Process command-line arguments
+#
+my %opt = ();
+GetOptions(\%opt,'h');
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+my @oids = ('ifAdminStatus','ifOperStatus'); # The set of OIDs we care about
+
+if (@ARGV != 2) {
+    exit &usage;
+}
+
+snmpit_lib::init(0);
+
+my($pid,$eid) = (shift,shift);
+
+#
+# First, make sure the experiment exists
+#
+if (!ExpState($pid,$eid)) {
+    die "There is no experiment $eid in project $pid\n";
+}
+
+#
+# Make sure they have access to it
+#
+if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+    die "You do not have permission to view experiment $pid/$eid\n";
+}
+
+
+#
+# Get a list of all ports in the experiment
+#
+my @ports = getExperimentPorts($pid,$eid);
+
+#
+# Just exit now if there are no ports for this experiment
+#
+if (!@ports) {
+    print "There are no switch ports for $pid/$eid\n";
+    exit(0);
+}
+
+#
+# Find out which devices these ports are on
+#
+my %portMap = mapPortsToDevices(@ports);
+
+my @portinfo;
+foreach my $name (keys %portMap) {
+    my @ports = @{$portMap{$name}};
+
+    #
+    # Connect to the switch and get the data we want off of it
+    #
+    my $type = getDeviceType($name);
+    my $device;
+    SWITCH: for ($type) {
+	/cisco/ && do {
+	    require snmpit_cisco;
+	    $device = new snmpit_cisco($name);
+	    last;
+	};
+	/intel/ && do {
+	    require snmpit_intel;
+	    $device = new snmpit_intel($name);
+	    last;
+	};
+
+	# 'default' case
+	die "Unknown switch type ($type) for $name\n";
+    }
+    my @results = $device->getFields(\@ports,\@oids);
+
+    foreach my $result (@results) {
+	my $port = shift @ports;
+
+	#
+	# Try to translate the port name to the node's vname
+	#
+	$port =~ /^(.+):(\d+)/;
+	my $nickname;
+	if ($1) {
+	    my $portnum = $2;
+	    my ($junk, $vname);
+	    NodeidToExp($1,\$junk,\$junk,\$vname);
+	    $nickname = "$vname:$portnum";
+	}
+
+	#
+	# Throw this onto a list, so that we can sort it
+	#
+	push @portinfo, [$nickname,$port,@$result];
+    }
+}
+
+#
+# Finally, print out the results
+#
+my $errors = 0;
+foreach my $line (sort {$$a[0] cmp $$b[0]} @portinfo) {
+    my ($nickname,$port,$adminStatus,$operStatus) = @$line;
+    if ($adminStatus ne $operStatus) {
+	print "Switch port for $nickname ($port) should be $adminStatus, " .
+	    "but is $operStatus\n";
+	$errors++;
+    }
+}
+
+if ($errors) {
+    print "There were no errors found\n";
+    exit(1);
+} else {
+    print "There were $errors errors found\n";
+    exit(0);
+}
