@@ -20,10 +20,15 @@ BufferSlot slots[BufferSlotCount];
 int totalMB;
 uchar * finishedMBBitmap;
 
+unsigned int redundantKBs;  /* intraMB redundant */
+unsigned int redundantKBs2; /* MB redundant */
+
 void c_init( uint sizeM, uint bufferCount )
 {
   int i;
 
+  redundantKBs = 0;
+  redundantKBs2 = 0;
   /* ignoring BufferCount. */
   totalMB = sizeM;
 
@@ -115,13 +120,19 @@ void c_addKtoM( uint kb, uchar * data )
 	bsp->gotBitmap[ kbOffset ] = 1;
 	memcpy( bsp->data + byteOffset, data, 1024 );
 	bsp->gotCount++;
+      } else {
+	redundantKBs++;
       }
     }  
+  } else {
+    redundantKBs2++;
   }
 }
 
 int c_suggestK()
 {
+  static int lastMessage = 0;
+  static int lastMessageCount = 0;
   int i, j;
   int wasAtLeastOneFree = 0;
 
@@ -130,6 +141,17 @@ int c_suggestK()
       if (slots[i].gotCount != 1024) {
 	for (j = 0; j < 1024; j++) {
 	  if (!slots[i].gotBitmap[j]) {
+	    if (lastMessage != 1) {
+	      if (lastMessageCount) {
+		printf("ChunkerSK: Last ChunkerSK message repeated %i times.\n", 
+		       lastMessageCount );
+		lastMessageCount = 0;
+	      }
+	      printf("ChunkerSK: Suggesting kb from existing MB...\n");
+	      lastMessage = 1;
+	    } else {
+	      lastMessageCount++;
+	    }
 	    return (slots[i].mb * 1024 + j);
 	  }
 	}
@@ -144,16 +166,46 @@ int c_suggestK()
   for (i = 0; i < totalMB; i++) {
     if (!finishedMBBitmap[i] && !inProgressMB(i)) {
       if (wasAtLeastOneFree) {
+	if (lastMessage != 2) {
+	  if (lastMessageCount) {
+	    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+		   lastMessageCount );
+	    lastMessageCount = 0;
+	  }
+	  printf("ChunkerSK: Suggesting a new MB (%i)...\n", i);
+	  lastMessage = 2;
+	} else {
+	  lastMessageCount++;
+	}
 	/* incomplete MB, and we *can* deal with data */
 	return i * 1024;
       } else {
 	/* incomplete MB, but we cannot deal with data. */
+	if (lastMessage != 3) {
+	  if (lastMessageCount) {
+	    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+		   lastMessageCount );
+	    lastMessageCount = 0;
+	  }
+	  printf("ChunkerSK: Buffer full.\n", i);
+	  lastMessage = 3;
+	} else {
+	  lastMessageCount++;
+	}
 	return -1;
       }
     }
   }
 
   /* no incomplete MB -> done! */
+  if (lastMessageCount) {
+    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+	   lastMessageCount );
+    lastMessageCount = 0;
+  }
+  printf("ChunkerSK: No incomplete MB's - done.\n");
+  printf("ChunkerSK: %i redundant  KBs (MB needed, KB not)\n", redundantKBs);
+  printf("ChunkerSK: %i redundant2 KBs (MB not needed)\n", redundantKBs2);
   return -2;
 }
 
