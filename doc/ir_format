@@ -1,6 +1,11 @@
-Version 0.2
+Version 0.3
 
 ChangeLog:
+
+0.3:
+Incorporated a number of previous, unlogged changes.
+Added Seed section.
+Removed delay nodes from the virtual topology.
 
 0.2: 
 Added events section.
@@ -48,22 +53,20 @@ Topology: describes the base physical topology of the network.
 
 START topology
 START nodes
-# <node> <type> <links> [. <bandwidth> <delay>] 
+# <node> <type> <links> 
 # <node> refers to a string name that should be easily mappable
 # to a physical machine (IP address, hostname, etc.)
 # <type> is usually "pc", "dnard", or "delay"
 # <links> is a space separated list of link ids
-# <delay> and <bandwidth> are optional.  <delay> is in ms and 
-#   <bandwidth> is in Mbs.  These apply to all links going through.
-#   These nodes usually only have 2 links and are combined in later
-#   stages.  (See some documentation that will be written later)
 END nodes
 START links
-# <link> <src> <srcport> <dst> <dstport> 
+# <link> <src> <srcport> <dst> <dstport> <bandwidth_min> <bandwidth_max> <delay_min> <delay_max>
 # <link> is a unique link identifier.
 # <src> and <dst> are node identifiers (or lans).
 # <srcport> and <dstport> are integers.  A port of -1 indicates that
 # this information is N/A or unknown.
+# <bandwidth*> and <delay*> are optional.  They specify the boundaries of 
+# bandwidth and delay.
 END links
 START lans
 # <lan> <switch> <links>
@@ -132,19 +135,20 @@ START linkinfo
 # src, dst, srcport, dstport - redundant with topology
 END linkinfo
 
-VLAN: Describes the vlan configuration for each switches
-5/00 - Changed format.  No longer divided by switch and now each line is
-prefixed by the VLAN name (usually coresponds to the physical link the
-VLAN implements).
+START assignment
+# Information about how the mapping between physical and virtual
+# seed <seed>
+#
+# seed is the random seed used by assign_hw.
+END assignment
 
 START vlan
 # Records of the form:
-# switch <switch>
+# <vlan name> <mac1> <mac2> ... <macN>
 # ...
-# end
 #
-# The contents are one vlan to each line.  Each line being a list
-# of ports in that vlan.
+# The contents are one vlan to each line.
+# <vlan name> is usually the virtual link the vlan corresponds to.
 END vlan
 
 START events
