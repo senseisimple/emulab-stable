@@ -91,6 +91,56 @@ Defaults are
 seconds.
 
 .TP 0.5i
+.B lv1cmd, lv2cmd, lv3cmd
+Commands for the nice levels.  Jobs that reach a new level, and have their
+priorities changed, will cause the corresponding command to be executed.  The
+commands are executed using
+.B popen(3)
+and an informational message describing the offending job is piped in.  In
+addition, the following environment variables will be set, so you can reference
+them in the given command-line:
+
+.RS
+.TP 0.5i
+.B AND_HOST
+The host where
+.I and
+is running.
+
+.TP 0.5i
+.B AND_PID
+The process ID of the offending job.
+
+.TP 0.5i
+.B AND_PPID
+The parent process ID of the offending job.
+
+.TP 0.5i
+.B AND_USER
+The user name the offending job is running with.
+
+.TP 0.5i
+.B AND_GROUP
+The group name the offending job is running with.
+
+.TP 0.5i
+.B AND_COMMAND
+The command name of the offending job.
+.RE
+
+.RS
+Normally, the command is executed as "nobody", or the user specified by the
+.I cmduser
+setting.  While this environment is limiting, it is enough to send mail or
+perform some other simple communication.
+.RE
+
+.TP 0.5i
+.B cmduser
+The user name to use when running level commands.  The default value for
+this is "nobody", which should be sufficient for most uses.
+
+.TP 0.5i
 .B minuid, mingid
 Minimum user id and group id to be considered for renicing. 
 Processes whose user id is below 
@@ -160,6 +210,10 @@ lv1time 300
 lv2time 1800
 .br
 lv3time 3600
+.br
+# Get someone involved if they reach level 3
+.br
+lv3cmd mail -s "CPU Hog - $AND_COMMAND" bofh@foobar.com
 .br
 # Hosts foo, bar, baz are terminals and must
 .br

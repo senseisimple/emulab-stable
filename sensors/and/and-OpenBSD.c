@@ -1,7 +1,7 @@
 /*
 
     AND auto nice daemon - renice programs according to their CPU usage.
-    Copyright (C) 1999-2001 Patrick Schemitz <schemitz@users.sourceforge.net>
+    Copyright (C) 1999-2004 Patrick Schemitz <schemitz@users.sourceforge.net>
     http://and.sourceforge.net/
 
     This program is free software; you can redistribute it and/or modify
@@ -94,21 +94,31 @@ struct and_procent *openbsd_getnext ()
   strncpy(openbsd_proc.command,openbsd_pt[openbsd_next].kp_proc.p_comm,1023);
   openbsd_proc.command[1023] = 0;
   openbsd_proc.pid = openbsd_pt[openbsd_next].kp_proc.p_pid;
-  openbsd_proc.ppid = openbsd_pt[openbsd_next].kp_proc.p_ppid; /* FIXME that correct? */
-  openbsd_proc.nice = openbsd_pt[openbsd_next].kp_proc.p_nice-20;
+  // 
   openbsd_proc.uid = openbsd_pt[openbsd_next].kp_eproc.e_pcred.p_ruid;
   openbsd_proc.gid = openbsd_pt[openbsd_next].kp_eproc.e_pcred.p_rgid;
+#if defined(__FreeBSD__)
+  openbsd_proc.ppid = openbsd_pt[openbsd_next].kp_eproc.e_ppid;
+  openbsd_proc.nice = openbsd_pt[openbsd_next].kp_proc.p_nice;
+  openbsd_proc.stime =
+    openbsd_pt[openbsd_next].kp_eproc.e_stats.p_start.tv_sec;
+  openbsd_proc.utime =
+    openbsd_pt[openbsd_next].kp_proc.p_runtime / (1000 * 1000);
+  openbsd_proc.ctime =
+    openbsd_pt[openbsd_next].kp_eproc.e_stats.p_cru.ru_utime.tv_sec +
+    openbsd_pt[openbsd_next].kp_eproc.e_stats.p_cru.ru_stime.tv_sec;
+#else
   /* Adapted from top(1) port, as found in the misc@openbsd.org archive */
+  openbsd_proc.ppid = openbsd_pt[openbsd_next].kp_proc.p_ppid; /* FIXME that correct? */
+  openbsd_proc.nice = openbsd_pt[openbsd_next].kp_proc.p_nice-20;
   openbsd_proc.utime = (openbsd_pt[openbsd_next].kp_proc.p_uticks +
 			openbsd_pt[openbsd_next].kp_proc.p_sticks +
 			openbsd_pt[openbsd_next].kp_proc.p_iticks)
     / openbsd_hz;
-  /*
-    printf("%-20s  %5i  %3i  %i\n",openbsd_proc.command,openbsd_proc.pid,
-    openbsd_proc.nice,openbsd_proc.utime);
-  */
-  and_printf(3, "OpenBSD: process %s pid: %d ppid: %d\n", 
-             openbsd_proc.command, openbsd_proc.pid, openbsd_proc.ppid);
+#endif
+  and_printf(3, "OpenBSD: process %s pid: %d ppid: %d cpu_secs: %d\n",
+             openbsd_proc.command, openbsd_proc.pid, openbsd_proc.ppid,
+	     openbsd_proc.utime);
   openbsd_next++;
   return &openbsd_proc;
 }

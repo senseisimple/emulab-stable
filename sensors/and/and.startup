@@ -15,14 +15,15 @@
 #
 
 AND_FLAGS=""
-test -r /etc/rc.config && . /etc/rc.config
+
+# test -r /etc/rc.config && . /etc/rc.config
 
 case "$1" in
     start)
 	echo -n "Starting auto nice daemon:"
-	INSTALL_SBIN/and $AND_FLAGS >&/dev/null
-	ps axuw | grep -v grep | grep INSTALL_SBIN/and >/dev/null
-	if [ $? = 0 ]; then
+	INSTALL_SBIN/and $AND_FLAGS > /dev/null 2>&1
+	ps axuw | grep -v grep | grep INSTALL_SBIN/and > /dev/null
+	if test $? -eq 0; then
 	    echo " done"
 	    exit 0
 	else
@@ -32,8 +33,23 @@ case "$1" in
 	;;
     stop)
 	echo -n "Shutting down auto nice daemon:"
-        uname | grep OSF1 >/dev/null || killall INSTALL_SBIN/and
-	echo " done"
+	ps axuw | grep -v grep | grep INSTALL_SBIN/and > /dev/null
+	if test $? -eq 0; then
+	    kill `cat /var/run/and.pid`
+	    echo " done"
+	else
+	    echo " already stopped"
+	fi
+	exit 0
+	;;
+    reconfig)
+	echo -n "Reconfiguring auto nice daemon:"
+	if test -r "/var/run/and.pid"; then
+	    kill -HUP `cat /var/run/and.pid`
+	    echo " done"
+	else
+	    echo " no process"
+	fi
 	exit 0
 	;;
     restart)
@@ -42,8 +58,8 @@ case "$1" in
 	;;
     status)
 	echo -n "Checking for auto nice daemon: "
-	ps axuw | grep -v grep | grep INSTALL_SBIN/and >/dev/null
-	if [ $? = 0 ]; then
+	ps axuw | grep -v grep | grep INSTALL_SBIN/and > /dev/null
+	if test $? -eq 0; then
 	    echo "running"
 	    exit 0
 	else
@@ -52,6 +68,6 @@ case "$1" in
 	fi
 	;;
     *)
-	echo "Usage: $0 {start|stop|status|restart}"
+	echo "Usage: $0 {start|stop|status|reconfig|restart}"
 	exit 1
 esac

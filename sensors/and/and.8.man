@@ -129,6 +129,12 @@ Both files have their own manual pages.
 Contains logging and status information for debugging purposes. 
 Used in test mode only.
 
+.TP 0.5i
+.B /var/run/and.pid
+Process identifier file.  Stores the PID for the currently running
+.I and
+process.  This file is not written in test mode.
+
 .SH "SEE ALSO"
 .BR and.conf (5),
 .BR and.priorities (5),

@@ -1,94 +1,48 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# This is the Emulab specific makefile.
+#
+
+#
 # Makefile for auto nice daemon
 #
 # 1999-2004 Patrick Schemitz <schemitz@users.sourceforge.net>
 # http://and.sourceforge.net/
 #
 
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = sensors/and
+
+include $(OBJDIR)/Makeconf
+
+all: and doc and-emulab.conf
+
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 #
-# EMULAB PEOPLE LOOK HERE!
-#
-# This file is DEAD, edit the GNUmakefile.in if you want to change something.
-#
-# EMULAB PEOPLE LOOK HERE!
-#
-
-
-#######################################################################
-# Edit here to adapt to your system!                                  #
-#######################################################################
-
-
-#
-# Init script. 
-# (and.init.debian for Debian GNU/Linux or and.init for others;
-# leave empty for BSD!)
+# Init script.
 #
 INITSCRIPT=and.init
 
 #
-# Target directories. Examples for common configurations are
-# given below.
+# Install to the ops directory.
 #
-PREFIX=/usr/local
+PREFIX=$(INSTALL_DIR)/opsdir
 INSTALL_ETC=$(PREFIX)/etc
-INSTALL_INITD=/etc/init.d
+INSTALL_INITD=$(PREFIX)/etc/rc.d
 INSTALL_SBIN=$(PREFIX)/sbin
 INSTALL_MAN=$(PREFIX)/man
-
-# typical OpenBSD or FreeBSD configuration
-#PREFIX=/usr/local
-#INSTALL_ETC=/etc
-#INSTALL_INITD=
-#INSTALL_SBIN=$(PREFIX)/sbin
-#INSTALL_MAN=$(PREFIX)/man
-
-# typical Debian or SuSE 7.x configuration
-#PREFIX=/usr
-#INSTALL_ETC=/etc
-#INSTALL_INITD=/etc/init.d
-#INSTALL_SBIN=$(PREFIX)/sbin
-#INSTALL_MAN=$(PREFIX)/share/man
-
-# typical SuSE 6.x configuration
-#PREFIX=/usr
-#INSTALL_ETC=/etc
-#INSTALL_INITD=/sbin/init.d
-#INSTALL_SBIN=$(PREFIX)/sbin
-#INSTALL_MAN=$(PREFIX)/man
-
-# typical Redhat / Mandrake configuration
-#PREFIX=/usr
-#INSTALL_ETC=/etc
-#INSTALL_INITD=/etc/rc.d/init.d
-#INSTALL_SBIN=$(PREFIX)/sbin
-#INSTALL_MAN=$(PREFIX)/share/man
-
-# typical OSF/1 / Digital UNIX 4 configuration
-#PREFIX=/usr/local
-#INSTALL_ETC=/etc
-#INSTALL_INITD=/sbin/init.d
-#INSTALL_SBIN=$(PREFIX)/sbin
-#INSTALL_MAN=$(PREFIX)/man
-
-#
-# Install program
-#
-INSTALL=install
-
-
-#######################################################################
-# Stop editing here!                                                  #
-#######################################################################
-
-default: and $(INITSCRIPT) doc
 
 #
 # Version and date
 #
-VERSION=1.2.1
-DATE="09 Sep 2004"
+VERSION=1.2.1-emulab
+DATE="25 Oct 2004"
 
 #
 # Man pages
@@ -104,44 +58,16 @@ ARCH=$(shell uname)
 # Architecture-dependent settings: ANSI C compiler and linker
 #
 ifeq (${ARCH},Linux)
-  CC = gcc -ansi -pedantic -Wall -g
-  LD = gcc
   LIBS =
 else
 ifeq (${ARCH},OSF1)
-  CC = cc -ansi
-  LD = cc
   LIBS =
 else
 ifeq (${ARCH},OpenBSD)
-  CC = gcc
-  LD = gcc
   LIBS = -lkvm
 else
 ifeq (${ARCH},FreeBSD)
-  CC = gcc -Wall
-  LD = gcc
   LIBS = -lkvm
-else
-ifeq (${ARCH},SunOS)
-  CC = cc -D__SunOS__
-  LD = cc
-else
-ifeq (${ARCH},IRIX)
-  CC = cc
-  LD = cc
-else
-ifeq (${ARCH},IRIX64)
-  CC = cc
-  LD = cc
-else
-  # unsupported architecture
-  CC = false
-  LD = false
-  LIBS =
-endif
-endif
-endif
 endif
 endif
 endif
@@ -151,43 +77,46 @@ endif
 #
 # Build the auto-nice daemon.
 #
-and: and.o and-$(ARCH).o
+and: and.o $(INITSCRIPT) and-$(ARCH).o
 	$(LD) and.o and-$(ARCH).o -o and $(LIBS)
 
 
 #
 # Independent part: configuration management, priority database.
 #
+# XXX Emulab note: We cannot use INSTALL_ETC for the paths since those may
+# not exist on ops.
+#
 and.o: and.c and.h
 	$(CC) -DDEFAULT_INTERVAL=60 -DDEFAULT_NICE=0 \
-	  -DDEFAULT_CONFIG_FILE=\"$(INSTALL_ETC)/and.conf\" \
-	  -DDEFAULT_DATABASE_FILE=\"$(INSTALL_ETC)/and.priorities\" \
-	  -DAND_VERSION=\"$(VERSION)\" -DAND_DATE=\"$(DATE)\" -c and.c
+	  -DDEFAULT_CONFIG_FILE=\"$(INSTALL_DIR)/etc/and.conf\" \
+	  -DDEFAULT_DATABASE_FILE=\"$(INSTALL_DIR)/etc/and.priorities\" \
+	  -DAND_VERSION=\"$(VERSION)\" -DAND_DATE=\"$(DATE)\" -c $<
 
 
 #
 # Unix variant specific stuff
 #
-and-Linux.o: and.h and-Linux.c
-	$(CC) -c and-Linux.c
+and-Linux.o: and-Linux.c and.h
+	$(CC) -c $<
 
-and-OpenBSD.o: and.h and-OpenBSD.c
-	$(CC) -c and-OpenBSD.c
+and-OpenBSD.o: and-OpenBSD.c and.h
+	$(CC) -c $<
 
-and-FreeBSD.o: and.h and-OpenBSD.c
-	$(CC) -c and-OpenBSD.c -o and-FreeBSD.o
+and-FreeBSD.o: and-OpenBSD.c and.h
+	$(CC) -c $< -o $@
 
-and-OSF1.o: and.h and-OSF1.c
-	$(CC) -c and-OSF1.c
+and-OSF1.o: and-OSF1.c and.h
+	$(CC) -c $< $@
 
-and-IRIX.o: and.h and-OSF1.c
-	$(CC) -c and-OSF1.c -o and-IRIX.o
+and-IRIX.o: and-OSF1.c and.h
+	$(CC) -c $< -o $@
 
-and-IRIX64.o: and.h and-OSF1.c
-	$(CC) -c and-OSF1.c -o and-IRIX64.o
+and-IRIX64.o: and-OSF1.c and.h
+	$(CC) -c $< -o $@
 
-and-SunOS.o: and.h and-OSF1.c
-	$(CC) -c and-OSF1.c -o and-SunOS.o
+and-SunOS.o: and-OSF1.c and.h
+	$(CC) -c $< -o $@
 
 
 
@@ -195,7 +124,7 @@ and-SunOS.o: and.h and-OSF1.c
 # Create script for SysV init
 #
 and.init: and.startup
-	sed s:INSTALL_SBIN:$(INSTALL_SBIN):g < and.startup > and.init
+	sed s:INSTALL_SBIN:$(INSTALL_SBINDIR):g < $< > $@
 	chmod +x and.init
 
 
@@ -219,11 +148,15 @@ and.priorities.5:	and.priorities.5.man
 		sed s/__VERSION__/$(VERSION)/g | \
 		sed s/__DATE__/$(DATE)/g > $@
 
+#
+# Nothing to do for client install.
+#
+client client-install:
 
 #
 # Install and under $(PREFIX)/bin etc.
 #
-install: and $(INITSCRIPT) doc
+install: all
 	strip and
 #-mkdir $(PREFIX)
 	-mkdir -p $(DESTDIR)$(INSTALL_SBIN)
@@ -232,10 +165,9 @@ install: and $(INITSCRIPT) doc
 	-mkdir -p $(DESTDIR)$(INSTALL_MAN)/man5
 	-mkdir -p $(DESTDIR)$(INSTALL_MAN)/man8
 	$(INSTALL) -m 0755 and $(DESTDIR)$(INSTALL_SBIN)
-	test -e $(DESTDIR)$(INSTALL_ETC)/and.conf || \
-	   $(INSTALL) -m 0644 and.conf $(DESTDIR)$(INSTALL_ETC)
-	test -e $(DESTDIR)$(INSTALL_ETC)/and.priorities || \
-	   $(INSTALL) -m 0644 and.priorities $(DESTDIR)$(INSTALL_ETC)
+	$(INSTALL) -m 0644 and-emulab.conf $(DESTDIR)$(INSTALL_ETC)/and.conf
+	$(INSTALL) -m 0644 $(SRCDIR)/and-emulab.priorities \
+		$(DESTDIR)$(INSTALL_ETC)/and.priorities
 ifneq (${INITSCRIPT},)
 ifneq (${INSTALL_INITD},)
 	@echo "Installing SysV script in $(DESTDIR)$(INSTALL_INITD)"
@@ -283,6 +215,3 @@ uninstall:
 #
 clean:
 	rm -f *.o and and.init $(MANPAGES)
-
-distclean: clean
-	find . -name \*~ -exec rm \{\} \;

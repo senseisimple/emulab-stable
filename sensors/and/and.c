@@ -45,9 +45,15 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <regex.h>
 #include <values.h>
+#include <errno.h>
+#include <pwd.h>
+#include <grp.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #define DEBUG 0
 
@@ -60,6 +66,11 @@
 #ifdef __GNUC__
 int vsnprintf (char *str, size_t n, const char *format, va_list ap);
 #define HAVE_VSNPRINTF
+int snprintf (char *str, size_t n, const char *format, ...);
+#define HAVE_SNPRINTF
+#define and_snprintf snprintf
+#else
+#define and_snprintf sprintf
 #endif
 
 #include "and.h"
@@ -85,6 +96,8 @@ int vsnprintf (char *str, size_t n, const char *format, va_list ap);
 #ifndef DEFAULT_DATABASE_FILE
 #define DEFAULT_DATABASE_FILE "/etc/and.priorities"
 #endif
+
+#define AND_PIDFILE "/var/run/and.pid"
 
 #ifndef AND_VERSION
 #define AND_VERSION "1.0.7 or above (not compiled in)"
@@ -165,10 +178,12 @@ struct {
   bool lock_interval;
   unsigned interval;
   unsigned time_mark [3];
+  char *cmd[3];
   char affinity [5];
   int weight [PRI_N];
   int min_uid;
   int min_gid;
+  char *cmd_user;
 } and_config;
 
 
@@ -191,6 +206,10 @@ void set_defaults (int argc, char **argv)
   and_config.min_gid = 0;
   gethostname(and_config.hostname,511);
   and_config.hostname[511] = 0;
+  and_config.cmd[0] = "";
+  and_config.cmd[1] = "";
+  and_config.cmd[2] = "";
+  and_config.cmd_user = "nobody";
 }
 
 
@@ -286,8 +305,11 @@ void print_config ()
 	     "default nicelevel:     %2i\n"
 	     "interval     [sec]:   %3u\n"
 	     "level 0 from [sec]:   %3u\n"
+	     "level 0 cmd:          %s\n"
 	     "level 1 from [sec]:   %3u\n"
+	     "level 1 cmd:          %s\n"
 	     "level 2 from [sec]:   %3u\n"
+	     "level 2 cmd:          %s\n"
              "minimum uid:          %i\n"
              "minimum gid:          %i\n"
 	     "affinity:             %s\n"
@@ -299,8 +321,9 @@ void print_config ()
 	     (and_config.test?"just checkin'":"I'm serious."),
 	     and_config.verbose,
 	     and_config.nice_default, and_config.interval,
-	     and_config.time_mark[0], and_config.time_mark[1],
-	     and_config.time_mark[2], 
+	     and_config.time_mark[0], and_config.cmd[0],
+	     and_config.time_mark[1], and_config.cmd[1],
+	     and_config.time_mark[2], and_config.cmd[2],
              and_config.min_uid, and_config.min_gid,
              and_config.affinity,
 	     and_config.weight[PRI_U], and_config.weight[PRI_G],
@@ -603,6 +626,10 @@ void read_config ()
 	and_printf(0,"Configuration file line %i has invalid value for lv1time: %s.\n",
 		   line, value);
       }
+    } else if (strcmp(param,"lv1cmd")==0) {
+      if (buffer[strlen(buffer) - 1] == '\n')
+	buffer[strlen(buffer) - 1] = '\0';
+      and_config.cmd[0] = strdup(&buffer[strlen(param) + 1]);
     } else if (strcmp(param,"lv2time")==0) {
       if (uval < UINT_MAX)
 	and_config.time_mark[1] = uval;
@@ -611,6 +638,10 @@ void read_config ()
 	and_printf(0,"Configuration file line %i has invalid value for lv2time: %s.\n",
 		   line, value);
       }
+    } else if (strcmp(param,"lv2cmd")==0) {
+      if (buffer[strlen(buffer) - 1] == '\n')
+	buffer[strlen(buffer) - 1] = '\0';
+      and_config.cmd[1] = strdup(&buffer[strlen(param) + 1]);
     } else if (strcmp(param,"lv3time")==0) {
       if (uval < UINT_MAX)
 	and_config.time_mark[2] = uval;
@@ -618,6 +649,18 @@ void read_config ()
 	++bad;
 	and_printf(0,"Configuration file line %i has invalid value for lv3time: %s.\n",
 		   line, value);
+      }
+    } else if (strcmp(param,"lv3cmd")==0) {
+      if (buffer[strlen(buffer) - 1] == '\n')
+	buffer[strlen(buffer) - 1] = '\0';
+      and_config.cmd[2] = strdup(&buffer[strlen(param) + 1]);
+    } else if (strcmp(param,"cmduser")==0) {
+      if (strlen(value) > 0)
+	and_config.cmd_user = value;
+      else {
+	++bad;
+	and_printf(0,"Configuration file line %i has empty value for cmduser.\n",
+		   line);
       }
     } else if (strcmp(param,"affinity")==0) {
       bad_f = -1;
@@ -679,11 +722,12 @@ void read_config ()
 
 /* Compute new nice level for given command/uid/gid/utime */
 
-int and_getnice (int uid, int gid, char *command, struct and_procent *parent, unsigned cpu_seconds)
+int and_getnice (int uid, int gid, char *command, struct and_procent *parent, unsigned cpu_seconds, char **cmd_out)
 {
   int i, level, entry, exact = -1, last;
   struct and_procent *par;
   int exactness [PRI_MAXENTRIES];
+  *cmd_out = NULL;
   if (!command) {
     and_printf(0,"Process without command string encountered. Aborting.\n");
     abort();
@@ -769,12 +813,129 @@ int and_getnice (int uid, int gid, char *command, struct and_procent *parent, un
   while (level >= 0 && and_config.time_mark[level] > cpu_seconds) {
     --level;
   }
-  and_printf(2,"command=%s (%i,%i,%s) hit on entry=%i, exactness=%i, level=%i.\n",
+  and_printf(2,"command=%s (%i,%i,%s) hit on entry=%i, exactness=%i, level=%i, cs=%i.\n",
              command, uid, gid, (parent!=NULL?parent->command:"(orphan)"), 
-             entry, exact, level);
+             entry, exact, level, cpu_seconds);
+  *cmd_out = (level >= 0) ? and_config.cmd[level] : NULL;
   return (level >= 0 ? and_db.entry[entry].nl[level] : 0);
 }
 
+
+int and_exec (char *cmd, struct and_procent *current, int newnice)
+{
+  int rc, retval = -1;
+
+  assert(cmd != NULL);
+  assert(strlen(cmd) > 0);
+  assert(newnice != 0);
+  
+  switch (rc = fork()) {
+  case 0:
+    /* child */
+    if (getuid() == 0) {
+      char *user_name = "(unknown)", *group_name = "(unknown)";
+      int exit_value = EXIT_SUCCESS;
+      struct passwd *pw;
+      struct group *grp;
+      char buffer[2048];
+      FILE *file;
+
+      setenv("HOME", "", 1);
+      setenv("USER", and_config.cmd_user, 1);
+      
+      if ((pw = getpwnam(and_config.cmd_user)) == NULL) {
+	syslog(LOG_ERR,"unknown command user: %s",and_config.cmd_user);
+	exit(1);
+      }
+
+      if (setgid(pw->pw_gid) ||
+	  initgroups(and_config.cmd_user, pw->pw_gid) ||
+	  setuid(pw->pw_uid)) {
+	syslog(LOG_ERR,"unable to drop privileges: %s",strerror(errno));
+	exit(1);
+      }
+
+      setenv("AND_HOST", and_config.hostname, 1);
+      
+      if ((pw = getpwuid(current->uid)) != NULL)
+	user_name = pw->pw_name;
+      if ((grp = getgrgid(current->gid)) != NULL)
+	group_name = grp->gr_name;
+      
+      sprintf(buffer, "%d", current->pid);
+      setenv("AND_PID", buffer, 1);
+      sprintf(buffer, "%d", current->ppid);
+      setenv("AND_PPID", buffer, 1);
+      setenv("AND_USER", user_name, 1);
+      setenv("AND_GROUP", group_name, 1);
+      setenv("AND_COMMAND", current->command, 1);
+      
+      if ((file = popen(cmd, "w")) != NULL) {
+	char time_string[256];
+	time_t current_time;
+
+	current_time = time(NULL);
+	strftime(time_string, sizeof(time_string),
+		 "%H:%M",
+		 localtime(&current_time));
+
+	and_snprintf(buffer, sizeof(buffer),
+		     "\n"
+		     "[This is an automated message from the auto nice daemon (AND)]\n"
+		     "\n");
+	buffer[sizeof(buffer) - 1] = '\0';
+	fwrite(buffer, 1, strlen(buffer), file);
+	and_snprintf(buffer, sizeof(buffer),
+		     "A CPU hog has been detected at %s hours on %s:\n"
+		     "\n"
+		     "  pid\t\t%d\n"
+		     "  ppid\t\t%d\n"
+		     "  uid\t\t%d %s\n"
+		     "  gid\t\t%d %s\n"
+		     "  old nice\t%d\n"
+		     "  CPU seconds\t%d\n"
+		     "  command\t%s\n"
+		     "  start time\t%s"
+		     "\n"
+		     "Action taken:\n"
+		     "  %s %d\n",
+		     time_string,
+		     and_config.hostname,
+		     current->pid,
+		     current->ppid,
+		     current->uid, user_name,
+		     current->gid, group_name,
+		     current->nice,
+		     current->utime,
+		     current->command,
+		     ctime(&current->stime),
+		     (newnice > 0) ? "Changed nice to" : "Signalled process with",
+		     (newnice > 0) ? newnice : -newnice);
+	buffer[sizeof(buffer) - 1] = '\0';
+	fwrite(buffer, 1, strlen(buffer), file);
+	if (pclose(file) == -1) {
+	  syslog(LOG_ERR,"error while executing: %s",cmd);
+
+	  exit_value = EXIT_FAILURE;
+	}
+      }
+      else {
+	exit_value = EXIT_FAILURE;
+      }
+      
+      exit(exit_value);
+    }
+    break;
+  case -1:
+    break;
+  default:
+    /* parent */
+    retval = 0;
+    break;
+  }
+  
+  return (retval);
+}
 
 
 /**********************************************************************
@@ -812,10 +973,14 @@ struct and_procent* and_find_proc (struct and_procent *head, int ppid)
 void and_loop ()
 {
   struct and_procent *head, *current, *new, *proc;
+  int childstatus;
   int newnice;
   int njobs = 0;
   assert(and_getfirst != NULL);
   assert(and_getnext != NULL);
+  while (wait3(&childstatus,WNOHANG,NULL) > 0) {
+    // reaped child...
+  }
   head = NULL;
   current = NULL;
   proc = and_getfirst();
@@ -843,9 +1008,10 @@ void and_loop ()
   }
   current = head;
   while (current != NULL) {
+    char *cmd;
     njobs++;
     newnice = and_getnice(current->uid,current->gid,current->command,
-                          current->parent,current->utime);
+                          current->parent,current->utime,&cmd);
     if (current->uid != 0) {
       if (newnice) {
 	if (newnice > 0) {
@@ -858,6 +1024,9 @@ void and_loop ()
 			 current->command);
 	      setpriority(PRIO_PROCESS,current->pid,newnice);
 	    }
+	    if ((cmd != NULL) && (strlen(cmd) > 0)) {
+		and_exec(cmd, current, newnice);
+	    }
 	  }
 	} else {
 	  if (and_config.test)
@@ -867,6 +1036,9 @@ void and_loop ()
 	    and_printf(1,"kill %i %i (%s)\n",newnice,current->pid,
                        current->command);
 	    kill(current->pid,-newnice);
+	  }
+	  if ((cmd != NULL) && (strlen(cmd) > 0)) {
+	      and_exec(cmd, current, newnice);
 	  }
 	}
       }
@@ -945,6 +1117,7 @@ void and_getopt (int argc, char** argv)
 
 
 static int g_reload_conf;
+static bool g_looping = true;
 
 
 void and_trigger_readconf (int sig)
@@ -952,6 +1125,10 @@ void and_trigger_readconf (int sig)
   g_reload_conf = (sig == SIGHUP);
 }
 
+void and_trigger_stoplooping (int sig)
+{
+  g_looping = false;
+}
 
 void and_readconf ()
 {
@@ -961,15 +1138,17 @@ void and_readconf ()
   g_reload_conf = 0;
 }
 
-
 void and_worker ()
 {
   read_config();
   read_priorities();
+  signal(SIGTERM,and_trigger_stoplooping);
+  signal(SIGINT,and_trigger_stoplooping);
+  signal(SIGQUIT,and_trigger_stoplooping);
   signal(SIGHUP,and_trigger_readconf);
   and_printf(0,"AND ready.\n");
   g_reload_conf = 0;
-  while (1) {
+  while (g_looping) {
     if (g_reload_conf) {
       and_readconf();
     }
@@ -986,7 +1165,24 @@ int and_main (int argc, char** argv)
   if (and_config.test) {
     and_worker();
   } else {
-    if (fork() == 0) and_worker();
+    if (daemon(0,0) < 0) {
+      perror("Unable to daemonize");
+    }
+    else {
+      char pidbuf[32];
+      int pfd;
+      
+      if ((pfd = open(AND_PIDFILE, O_EXCL | O_CREAT | O_WRONLY)) < 0) {
+	and_printf(0,"Could not create pid file: %s\n",AND_PIDFILE);
+	exit(1);
+      }
+      fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
+      sprintf(pidbuf,"%d",getpid());
+      write(pfd,pidbuf,strlen(pidbuf));
+      close(pfd);
+      and_worker();
+      unlink(AND_PIDFILE);
+    }
   }
   return 0;
 }

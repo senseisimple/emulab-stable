@@ -46,10 +46,12 @@ struct and_procent {
   int uid;
   int gid;
   int nice;
-  unsigned utime;
+  time_t stime;			// process start time in seconds.
+  unsigned utime;		// CPU time in seconds.
+  unsigned ctime;		// reaped child CPU time in seconds.
   char command [1024];
   /* to be filled by and.c: */
-  struct and_procent *parent; 
+  struct and_procent *parent;
   struct and_procent *next;
 };
 

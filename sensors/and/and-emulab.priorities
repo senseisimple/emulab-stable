@@ -1,0 +1,66 @@
+#
+# Sample priority database for the auto-nice daemon, /etc/and.priorities
+#
+# Comments must have the # in the _first_ column!
+#
+# File format:
+#    user group job parent nice1 nice2 nice3
+# - user: user name or user id or * for all
+# - group: group name or group id or * for all
+# - job: executable (without path; may be a regexp) or * for all
+# - parent: keyword "parent=" or "ancestor=" followed by the 
+#   executable (without path; may be a regexp), or * for all
+# - nice1, nice2, nice3: nice levels for CPU usage ranges.
+#
+# At least one of user or group must be an asterisk *.
+#
+# After /etc/and.conf:lv1time seconds matching jobs are niced to nice1,
+# after /etc/and.conf:lv2time to nice2 and after /etc/and.conf:lv3time
+# to nice3.
+#
+# Read and.priorities(5) for details.
+#
+# 1999, 2000, 2004 Patrick Schemitz, schemitz@users.sourceforge.net
+#
+
+#
+# Philosophy:
+#
+# Knock everyone except for the well known daemons, ops is not a
+# general purpose machine, that is what the experimental nodes are for.
+# If you make any changes, note that a perceptive user might rename
+# his jobs' executables to obtain higher privilegue. So the values
+# must be sensible to that.  
+#
+
+#
+# Default entry -- moderate renicing at first, drop them further down
+# after that.
+#
+*	*	*       *	5	15	19
+
+#
+# daemon entry -- for the portmapper and such.
+#
+daemon	*	*	*	0	0	0
+
+#
+# The main elvind server.
+#
+nobody	*	elvind	*	0	0	0
+
+#
+# Sendmail stuff
+#
+smmsp	*	*	*	0	0	0
+
+#
+# The event scheduler, not sure about this, but for long running
+# experiments the scheduler ends up accumulating a lot of time.
+#
+# Note that we only do this for the mainline one, development
+# versions are not exempt.
+#
+*	*	event-sched	*	0	0	0
+
+*	*	sshd		*	0	5	15

@@ -1,0 +1,59 @@
+#
+# Emulab-ops configuration file for the auto nice daemon, /etc/and.conf
+#
+# Comments must have the # in the *first* column!
+#
+# Read and.conf(5) for details.
+#
+# 1999, 2000, 2004 Patrick Schemitz, schemitz@users.sourceforge.net
+# 
+
+#
+# Nice level for jobs that are not in and.priorities.
+# 0 = do not renice.
+#
+defaultnice 0
+
+#
+# Time interval between renice cycles, in seconds. Default is
+# 60 seconds.
+#
+interval 120
+
+#
+# Ranges for the nice levels. Jobs with less than lv1time seconds
+# CPU time are not reniced; jobs between lv1time and lv2time seconds
+# are reniced to the first level in an.priorities; jobs between
+# lv2time and lv3time seconds to the second level; jobs with more
+# than lv3time seconds are reniced to the third level.
+#
+lv1time 90
+lv2time 1800
+lv2cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (30 min.)" @TBOPSEMAIL@
+lv3time 7200
+lv3cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (2 hrs.)" @TBOPSEMAIL@
+
+#
+# Strategy for picking the right priority entry for a user/group/job
+# triple. The strategy is a permutation of "cgu", "c"ommand, "g"roup,
+# "u"ser. The order specifies the affinity of the priority lookup
+# method. "cug" means an exact match of the command has priority
+# over an exact match of the user or group. See the documentation
+# for more details.
+#
+affinity cpug
+
+#
+# Minimum user/group id to be even considered for renicing. Processes
+# with lower user/group id are ignored. This does not affect root
+# (user id 0), which is never, ever reniced.
+#
+minuid 1
+mingid 1
+
+# NOTE: Emulab user IDs start at 10000, so if you want to exempt the
+# core developers, comment out the above lines and uncomment the ones
+# below.
+#
+# minuid 10000
+# mingid 6000
