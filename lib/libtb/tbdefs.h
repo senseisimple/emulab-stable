@@ -80,6 +80,7 @@
 #define TBDB_IFACEROLE_EXPERIMENT	"expt"
 #define TBDB_IFACEROLE_JAIL		"jail"
 #define TBDB_IFACEROLE_FAKE		"fake"
+#define TBDB_IFACEROLE_GW		"gw"
 #define TBDB_IFACEROLE_OTHER		"other"
 
 /*
