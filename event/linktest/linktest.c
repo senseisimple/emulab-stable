@@ -221,6 +221,8 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_arguments(handle,
 					 notification, args, sizeof(args));
 
+	info("event: %s - %s - %s\n", objname, event, args);
+
 	/*
 	 * Dispatch the event. 
 	 */
@@ -250,7 +252,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	     */
 	    if(!linktest_pid) {
   	         pid_t mypid = getpid();
-	         setpgid(mypid,mypid);
+	         setpgid(0, mypid);
 
 		 /* Finally, execute the linktest script. */
 		 exec_linktest(args, sizeof(args));
@@ -389,7 +391,7 @@ void send_group_kill() {
 	 * Linktest run. This may include the linktest script
 	 * itself, and any children it forked.
 	 */
-	res = kill(-linktest_pid,SIGKILL);
+	res = killpg(linktest_pid, SIGTERM);
 	if(res < 0) {
 	  /*
 	   * Not a serious error, likely the process group
@@ -401,37 +403,18 @@ void send_group_kill() {
 
 static
 void send_kill_event() {
-	event_notification_t notification;
-	address_tuple_t	tuple;
-
 	/*
-	 * Construct an address tuple for generating the event.
+	 * Invoke external program; The local elvind is read-only, so to
+	 * send events we have to contact boss, but do not want a zillion
+	 * linktest daemons keeping a connection to boss open. tevc will
+	 * connect, send event, and exit. 
 	 */
-	tuple = address_tuple_alloc();
-	if (tuple == NULL) {
-	  error("could not allocate an address tuple");
+	char	buf[BUFSIZ];
+
+	sprintf(buf, "%s/tevc -e %s now %s %s",
+		CLIENT_BINDIR, pideid, "linktest", TBDB_EVENTTYPE_KILL);
+
+	if (system(buf) != 0) {
+		error("Could not invoke tevc to send KILL event\n");
 	}
-
-	/*
-	 * Set up event to send a kill...
-	 */
-	tuple->objtype  = TBDB_OBJECTTYPE_LINKTEST;
-	tuple->eventtype= TBDB_EVENTTYPE_KILL;
-	tuple->host	= ADDRESSTUPLE_ALL;
-	tuple->expt     = pideid;
-	  
-	/* Generate the event */
-	notification = event_notification_alloc(handle, tuple);
-	if (notification == NULL) {
-	  error("could not allocate notification");
-	}
-
-	/* Send the event */
-	if (event_notify(handle, notification) == 0) {
-	  error("could not send event notification");
-	}
-
-	/* Clean up */
-	event_notification_free(handle, notification);
-
 }

@@ -26,7 +26,7 @@ all:	binaries $(SCRIPT) $(SCRIPT_RUN) weblinktest
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS   += -DDEBUG
+CFLAGS   += -DDEBUG -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 CFLAGS	 += -O -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`

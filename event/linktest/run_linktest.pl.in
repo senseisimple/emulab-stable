@@ -276,20 +276,26 @@ if(my $pid =fork) {
     # Open child process to read in the output from ltevent,
     # and just print out the return values for feedback.
     #
-    open ARGS,"$args |" || die("*** $0:\n"."    Error running '$args'\n");
-    while(<ARGS>) {
+    my $ltpid = open(LTC, "$args |");
+    if (! $ltpid) {
+	die("*** $0:\n".
+	    "    Error running '$args'\n");
+    }
+    while(<LTC>) {
 	chomp;
 	if(/(\w+)\s(.*)/) {
 	    my $eventtype = $1;
 	    my $eventargs = $2;
-	    if($eventtype eq $STOPEVENT) {
+	    if ($eventtype eq $STOPEVENT) {
 		print "Linktest completed normally.\n"
 		    if($verbose);
-		exit;
-	    } elsif ($eventtype eq $KILLEVENT) {
-		print "Linktest has been cancelled due to a timeout or unrecoverable error.\n"
-			if ($verbose);
-		exit;
+		last;
+	    }
+	    elsif ($eventtype eq $KILLEVENT) {
+		print("Linktest has been cancelled due to a timeout ".
+		      "or unrecoverable error.\n")
+		    if ($verbose);
+		last;
 	    } else {
 		#
 		# Print out report messages if in verbose mode.
@@ -300,9 +306,11 @@ if(my $pid =fork) {
 	} else {
 	    # parse error, exit.
 	    print "error parsing: " . $_ . "\n";
-	    exit;
+	    last;
 	}
     }
+    kill('TERM', $ltpid);
+    close(LTC);
     exit;
 }
 
