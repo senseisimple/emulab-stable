@@ -1139,6 +1139,7 @@ sub dotrafficconfig()
     my $TM;
     my $boss;
     my $startnse = 0;
+    my $nseconfig = "";
     
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
@@ -1283,7 +1284,7 @@ sub dotrafficconfig()
 	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
 	$record_sep = $/;
 	undef($/);
-	my $nseconfig = <$TM>;
+	$nseconfig = <$TM>;
 	$/ = $record_sep;
 	print NSECFG $nseconfig;
 	CLOSETMCC($TM);
