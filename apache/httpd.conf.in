@@ -666,9 +666,10 @@ ServerSignature On
     </Directory>
 
     #
-    # Widearea distributions.
+    # Widearea/software distributions.
     #
     Alias /images/ "/z/testbed/distributions/"
+    Alias /downloads/ "/z/testbed/downloads/"
     <Directory /z/testbed/distributions>
         Options Indexes
         AllowOverride All
