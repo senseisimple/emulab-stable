@@ -48,6 +48,8 @@ post-install:
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C account post-install
 	@$(MAKE) -C security post-install
+	@$(MAKE) -C vis post-install
+	@$(MAKE) -C www post-install
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)

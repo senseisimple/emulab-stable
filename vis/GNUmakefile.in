@@ -28,6 +28,10 @@ install: \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/vis/, $(LIBEXEC_VIS))
 
+post-install:
+	chgrp tbvis $(INSTALL_LIBEXECDIR)/vis/prerender
+	chmod g+s $(INSTALL_LIBEXECDIR)/vis/prerender
+
 $(INSTALL_LIBEXECDIR)/vis/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBEXECDIR)/vis
