@@ -105,6 +105,7 @@ COMMAND_PROTOTYPE(donseconfigs);
 COMMAND_PROTOTYPE(dostate);
 COMMAND_PROTOTYPE(docreator);
 COMMAND_PROTOTYPE(dotunnels);
+COMMAND_PROTOTYPE(dovnodelist);
 
 struct command {
 	char	*cmdname;
@@ -135,6 +136,7 @@ struct command {
 	{ "creator",	docreator},
 	{ "state",	dostate},
 	{ "tunnels",	dotunnels},
+	{ "vnodelist",	dovnodelist},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2523,6 +2525,45 @@ COMMAND_PROTOTYPE(dotunnels)
 		nrows--;
 		info("TUNNELS: %s ISSERVER=%s PEERIP=%s PEERPORT=%s INET=%s\n",
 		     row[0], row[1], row[2], row[3], row[7]);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return vnode list for a widearea node.
+ */
+COMMAND_PROTOTYPE(dovnodelist)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	res = mydb_query("select r.node_id from reserved as r "
+			 "left join nodes as n on r.node_id=n.node_id "
+			 "left join node_types as nt on nt.type=n.type "
+			 "where nt.isvirtnode=1 and n.phys_nodeid='%s'",
+			 1, nodeid);
+
+	if (!res) {
+		error("VNODELIST: %s: DB Error getting vnode list\n", nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "%s\n", row[0]);
+		       
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		info("VNODELIST: %s\n", row[0]);
 	}
 	mysql_free_result(res);
 	return 0;
