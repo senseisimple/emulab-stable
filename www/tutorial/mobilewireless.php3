@@ -172,7 +172,7 @@ The current features of the mobile wireless testbed are:
 <ul>
 <li>Four <a href="http://www.acroname.com">Acroname Garcia</a> robots
 <li><a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a> single
-board computers for each robot.
+board computers for each robot. (<b><a href="<?php echo $TBBASE?>/doc/docwrapper.php3?docname=stargatenotes.html">Important Notes!</a></b>)
 <li>Roaming an area about 8 x 3.5 meters with a sheetrock-covered steel pillar in the middle.
 <li>Two statically-placed
 <a href="http://www.xbow.com/Products/productsdetails.aspx?sid=90">E-Mote</a>

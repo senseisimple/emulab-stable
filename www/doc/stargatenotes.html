@@ -1,0 +1,119 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>Notes on Stargate Testbed Nodes</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#PREFACE">Preface</a>
+<li> <a href="#NOTIMAGEABLE">Stargates are not imageable</a>
+<li> <a href="#ONEKERNEL">One kernel for all</a>
+<li> <a href="#NOEXPINT">No experimental network interfaces</a>
+<li> <a href="#MOTES">Directly attached Mica2 motes</a>
+<li> <a href="#LIMITEDRES">Limited resources</a>
+<li> <a href="#GARCIANOTES">Special note on Stargates attached to Emulab mobile nodes (garcias)</a>
+</ul>
+
+<hr>
+
+<ul>
+<li> <a NAME="PREFACE"></a>
+     <h3>Preface</h3>
+
+Emulab has deployed Intel Stargates on a limited basis for use in
+experiments.  So far, they are mounted on a handful of Garcia robots,
+with a couple more standalone units coming soon.
+<br><br>
+Emulab Stargate nodes are a lot like their PC node counterparts, with
+support for events, startup commands, tarball/rpm installation,
+account setup, and home directory access via NFS.  Users with
+local_root or greater permissions also have full root access on them,
+allowing arbitrary changes to the filesystem, running kernel, etc.
+<br><br>
+However, there are some important differences between stargates and
+regular PCs that should be noted:
+<p>
+
+<li> <a NAME="NOTIMAGEABLE"></a>
+     <h3>Stargates are not imageable</h3>
+
+It is not currently possible for users to create and use arbitrary OS
+images on these units (in contrast to a normal testbed PC node).
+After experiment swapin, a Stargate will contain the default Intel
+"PlatformX" linux kernel (2.4.19 with modifications for the Stargate),
+and a default Emulab root filesystem (of type jffs2).  Users may,
+however, overload this default filesystem with their own files using
+Emulabs tarball/rpm installation mechanism, or by making changes
+manually.  On experiment swapout, the units are resynched with a the
+standard filesystem image, reverting all user modifications.
+<br><br>
+For more info on the base linux software running on the Emulab
+Stargates, visit the <a href="http://platformx.sourceforge.net/">
+PlatformX Project</a> page at Sourceforge.
+<p>
+
+<li> <a NAME="ONEKERNEL"></a>
+     <h3>One kernel for all</h3>
+
+Users are currently limited to using the stock PlatformX kernel
+provided by Emulab.  Once we begin to provide OS image loading and
+saving support, replacing the kernel should become possible.  It may
+be possible to use the Linux "two-kernel monty" trick to load another
+kernel, but this has not been tested.  For info on building a Stargate
+kernel, please see the following page at the PlatformX project site:
+
+<a href="http://platformx.sourceforge.net/Documents/build/BuildKernel.html">Kernel Building</a>
+<p>
+
+<li> <a NAME="NOEXPINT"></a>
+     <h3>No experimental network interfaces</h3>
+
+The Emulab Stargates currently only have a single wifi interface, and
+it is used for control network connectivity.  Therefore, users do not
+have access to any dedicated experimental interfaces for artifact-free
+experimentation.  Communication between other machines is, of course,
+still possible via the control network interface.
+<br><br>
+We plan to add at least one additional network interface for
+experimentation to the Stargates in the not too distant future.  
+<p>
+
+<li> <a NAME="MOTES"></a>
+     <h3>Directly attached Mica2 motes</h3>
+
+The Emulab Stargates do have Mica2 motes attached, which can, of
+course, be used for wireless experimentation.  This can happen either
+in conjunction with the parent Stargate, or just on/between the motes
+themselves.  Emulab can automatically manage loading the images on
+these motes (as documented 
+<a href="http://www.emulab.net/tutorial/mobilewireless.php3">elsewhere</a>).
+<p>
+
+<li> <a NAME="LIMITEDRES"></a>
+     <h3>Limited resources</h3>
+
+Its prudent to not forget that these units are not full-featured PCs;
+they run at 400MHz, do not have hardware floating point units, have
+32MB of RAM, and only 64MB of flash disk (though we will likely expand
+the latter with an additional CF disk soon).  
+<br><br>
+Please also take care not to write at a high rate to the flash disks.
+Compared to regular old rotating magnetic media, these solid-state
+disks wear out quickly (good for about a million writes per block).
+The jffs2 filesystem amortizes the writes across the flash to help
+reduce wear on particular blocks, but please tread lightly anyway.
+<p>
+
+<li> <a NAME="GARCIANOTES"></a>
+     <h3>Special note on Stargates attached to Emulab mobile nodes (garcias)</h3>
+
+The Stargates coupled with our mobile nodes run a daemon that enables
+the motion of robots as driven by Emulab central (garcia_pilot).  If
+you don't want your experiment to (literally) stop in its tracks,
+please do not disable this process.
+<p>
+</ul>
