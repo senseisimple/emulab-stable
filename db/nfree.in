@@ -258,9 +258,11 @@ foreach my $n (@freed_nodes) {
     # machine. I think this is a hack, but its the best I can come up
     # with right now. 
     #
-    my $mapped_osid = MapNodeOSID($n, $osid);
-    if ($mapped_osid) {
-	$osid = $mapped_osid;
+    if (! $isvirt) {
+	my $mapped_osid = MapNodeOSID($n, $osid);
+	if ($mapped_osid) {
+	    $osid = $mapped_osid;
+	}
     }
 
     #
