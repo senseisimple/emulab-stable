@@ -2,7 +2,8 @@
 # libir.tcl
 #
 # API:
-#  ir read <file>
+#  ir read <file> [<section>]
+#    Note: if <section> is included ir write calls will not work.
 #  ir write <file>
 #  ir get <path> => <contents>
 #  ir set <path> <contents> 
@@ -22,7 +23,7 @@ namespace export ir
 
 # This describes the available commands.  To add a new one just
 # add a line for it and write the proc.  Format is: {proc arg1 arg2 ...}
-set cmds(read) {ir_read file}
+set cmds(read) {ir_read file *section*}
 set cmds(write) {ir_write file}
 set cmds(get) {ir_get path}
 set cmds(set) {ir_set path contents}
@@ -33,6 +34,7 @@ set cmds(exists) {ir_exists path}
 # contents - the contents of the current ir_file.  /_ is the type 
 # (dir | file).
 variable contents
+variable writable 1
 
 proc ir {cmd args} {
     variable cmds
@@ -45,16 +47,26 @@ proc ir {cmd args} {
     
     set prc [lindex $cinfo 0]
     set arginfo [lrange $cinfo 1 end]
+    set maxargs 0
+    set minargs 0
+    foreach arg $arginfo {
+	incr maxargs
+	if {[string index $arg 0] != "*"} {
+	    incr minargs
+	} 
+    }
     
-    if {[llength $args] != [llength $arginfo]} {
+    set numargs [llength $args]
+    if {$numargs < $minargs || $numargs > $maxargs} {
 	error "Bad args, should be: ir $cmd $arginfo"
     }
 
     return [eval "$prc $args"]
 }
 
-proc ir_read {file} {
-    variable contents
+proc ir_read {file {section {}}} {
+    variable contents 
+    variable writable
 
     # erase contents
     foreach name [array names contents] {
@@ -66,7 +78,26 @@ proc ir_read {file} {
     
     set cursec /
     set curcontents {}
-    while {[gets $fp line] >= 0} {
+    if {$section != {}} {
+	set writable 0
+	set found 0
+	while {[gets $fp line] >= 0} {
+	    if {[regexp "^\#" $line] || $line == {}} {continue}
+	    set first [lindex $line 0]
+	    if {$first == "START" &&
+		[lindex $line 1] == $section} {
+		set found 1
+		break
+	    }
+	}
+	if {$found == 0} {
+	    error "Could not find section: $section"
+	}
+    } else {
+	set writable 1
+	gets $fp line
+    }
+    while {1 == 1} {
 	if {[regexp "^\#" $line] || $line == {}} {continue}
 	set first [lindex $line 0]
 	if {$first == "START"} {
@@ -91,6 +122,7 @@ proc ir_read {file} {
 	    }
 	    lappend curcontents $line
 	}
+	if {[gets $fp line] < 0} {break}
     }
     if {$cursec != "/"} {
 	error "Missing ENDs ($cursec)"
@@ -101,6 +133,11 @@ proc ir_read {file} {
 
 proc ir_write {file} {
     variable contents
+    variable writable
+
+    if {$writable == 0} {
+	error "Can not write.  ir_read used in section form."
+    }
 
     set fp [open $file w]
     
