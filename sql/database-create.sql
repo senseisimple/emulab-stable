@@ -310,6 +310,17 @@ CREATE TABLE interfaces (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'ipsubnets'
+#
+
+CREATE TABLE ipsubnets (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  idx smallint(5) unsigned NOT NULL auto_increment,
+  PRIMARY KEY  (pid,eid,idx)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'last_reservation'
 #
 
