@@ -24,3 +24,4 @@ WWW=www.emulab.net/dev/shash
 THISHOMEBASE=Shash.Emulab.Net
 FS_WITH_QUOTAS="/q /users"
 PLABSUPPORT=1
+PLAB_ROOTBALL="plabroot-kwebb.tar.bz2"
