@@ -524,7 +524,7 @@ sub mkrootfs($)
     # Stash the control net IP if not the same as the host IP
     #
     if ($IP ne $hostip) {
-	mysystem("echo $IP >> $path/root/var/emulab/boot/myip");
+	mysystem("echo $IP > $path/root/var/emulab/boot/myip");
     }
 
     TBDebugTimeStamp("mkjail creating /var/log files");
