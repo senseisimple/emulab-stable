@@ -24,11 +24,13 @@
 #include <ctype.h>
 #include "event-sched.h"
 #include "log.h"
-#include "tbdb.h"
 #include "config.h"
 #ifdef	RPC
+#include "tbdefs.h"
 #include "rpc.h"
 #define main realmain
+#else
+#include "tbdb.h"
 #endif
 
 static void enqueue(event_handle_t handle,
