@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.5 2001-12-04 15:10:21 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.6 2001-12-19 11:18:07 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -444,7 +444,7 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
                 event_type_t type, void *data)
 {
     elvin_subscription_t subscription;
-    struct notify_callback_arg arg;
+    struct notify_callback_arg *arg;
     char expression[EXPRESSION_LENGTH];
 
     /* XXX: The declaration of expression has to go last, or the
@@ -463,12 +463,15 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
 
     TRACE("subscribing to event %s\n", expression);
 
-    arg.callback = callback; arg.data = data;
+    arg = xmalloc(sizeof(*arg));
+    /* XXX: Free this in an event_unsubscribe.. */
+    arg->callback = callback;
+    arg->data = data;
 
     subscription = elvin_sync_add_subscription(handle->server,
                                                expression, NULL, 1,
                                                notify_callback,
-                                               &arg,
+                                               arg,
                                                handle->status);
     if (subscription == NULL) {
         ERROR("elvin_sync_add_subscription failed: ");
