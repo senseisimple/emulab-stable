@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -28,7 +28,7 @@ my $schemadiff = "$testbed_srcdir/utils/schemadiff";
 # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
 # assumption, but maybe not always
 #
-my $mysqldump = "mysqldump $DBNAME";
+my $mysqldump = "mysqldump -d $DBNAME";
 
 #
 # We use Mysql module instead of the tesbed libraries, so that we can get
