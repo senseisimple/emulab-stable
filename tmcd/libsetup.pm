@@ -14,12 +14,13 @@ package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( libsetup_init inform_reboot cleanup_node check_status
+    qw ( libsetup_init cleanup_node check_status
 	 doifconfig dohostnames check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodesetup
 	 jailedsetup dojailconfig JailedNFSMounts findiface
+	 tmccdie tmcctimeout
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
 
@@ -175,7 +176,7 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 8; };
+sub TMCD_VERSION()	{ 9; };
 
 #
 # These are the TMCC commands. 
@@ -238,6 +239,11 @@ sub MFS()	{ if (-e "$ETCDIR/ismfs") { return 1; } else { return 0; } }
 # Same for a remote node.
 #
 sub REMOTE()	{ if (-e "$ETCDIR/isrem") { return 1; } else { return 0; } }
+
+#
+# Same for a control node.
+#
+sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 
 #
 # Are we jailed? See above.
@@ -329,15 +335,6 @@ sub RUNTMCC($;$$)
     close($TM)
 	or die $? ? "TMCC exited with status $?" : "Error closing pipe: $!";
     
-    return 0;
-}
-
-#
-# Inform the master we have rebooted.
-#
-sub inform_reboot()
-{
-    RUNTMCC(TMCCCMD_REBOOT);
     return 0;
 }
 
@@ -434,7 +431,7 @@ sub check_nickname()
 
 #
 # Process mount directives from TMCD. We keep track of all the mounts we
-# have added in here so that we delete just the accounts we added, when
+# have added in here so that we delete just the mounts we added, when
 # project membership changes. Same goes for project directories on shared
 # nodes. We use a simple perl DB for that.
 #
@@ -446,6 +443,24 @@ sub domounts()
     my %deletes;
     my %sfsmounts;
     my %sfsdeletes;
+
+    #
+    # Update our SFS hostid first. If this fails, dosfshostid will
+    # unset USESFS.
+    # 
+    if ($USESFS) {
+	if (! MFS()) {
+	    #
+	    # Setup SFS hostid.
+	    #
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+	else {
+	    # No SFS on the MFS.
+	    $USESFS = 0;
+	}
+    }
 
     $TM = OPENTMCC(TMCCCMD_MOUNTS, "USESFS=$USESFS");
 
@@ -1234,7 +1249,7 @@ sub doaccounts()
 
     my $pat = q(ADDUSER LOGIN=([0-9A-Za-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
-    $pat   .= q(SERIAL=(\d+));
+    $pat   .= q(SERIAL=(\d+) EMAIL="([-\w\@\.\+]+)");
 
     while (($login, $info) = each %newaccounts) {
 	if ($info =~ /$pat/) {
@@ -1246,6 +1261,7 @@ sub doaccounts()
 	    $hdir  = $7;
 	    $glist = $8;
 	    $serial= $9;
+	    $email = $10;
 	    if ( $name =~ /^(([^:]+$|^))$/ ) {
 		$name = $1;
 	    }
@@ -1297,39 +1313,35 @@ sub doaccounts()
 	    }
 
 	    #
-	    # Skip ssh stuff if a local node or not updating (if the
-	    # user did not exist, $doupdate will be true).
+	    # Remote nodes and local control nodes get this. 
 	    # 
-	    if (!REMOTE() || !$doupdate) {
-		next;
-	    }
+	    if ((REMOTE() || CONTROL()) && $doupdate) {
+		#
+		# Must ask for the current home dir since we rely on pw.conf.
+		#
+		my (undef,undef,undef,undef,
+		    undef,undef,undef,$homedir) = getpwuid($uid);
+		my $sshdir  = "$homedir/.ssh";
+		my $forward = "$homedir/.forward";
 
-	    #
-	    # Must ask for the current home dir since we rely on pw.conf.
-	    #
-	    my (undef,undef,undef,undef,
-		undef,undef,undef,$homedir) = getpwuid($uid);
-	    my $sshdir  = "$homedir/.ssh";
-	    my $forward = "$homedir/.forward";
+		#
+		# Create .ssh dir and populate it with an authkeys file.
+		#
+		TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
+		TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
 
-	    #
-	    # Create .ssh dir and populate it with an authkeys file.
-	    #
-	    TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
-	    TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
-
-	    #
-	    # Give user a .forward back to emulab.
-	    #
-	    if (! -e $forward) {
-
-		system("echo '${login}\@emulab.net' > $forward");
+		#
+		# Give user a .forward back to emulab.
+		#
+		if (! -e $forward) {
+		    system("echo '$email' > $forward");
 		
-		chown($uid, $gid, $forward) 
-		    or warn("*** Could not chown $forward: $!\n");
+		    chown($uid, $gid, $forward) 
+			or warn("*** Could not chown $forward: $!\n");
 		
-		chmod(0644, $forward) 
-		    or warn("*** Could not chmod $forward: $!\n");
+		    chmod(0644, $forward) 
+			or warn("*** Could not chmod $forward: $!\n");
+		}
 	    }
 	}
 	else {
@@ -1914,11 +1926,6 @@ sub dojailifconfig()
 sub bootsetup()
 {
     #
-    # Inform the master that we have rebooted.
-    #
-    inform_reboot();
-
-    #
     # Check allocation. Exit now if not allocated.
     #
     print STDOUT "Checking Testbed reservation status ... \n";
@@ -1933,20 +1940,6 @@ sub bootsetup()
     # Cleanup node. Flag indicates to gently clean ...
     # 
     cleanup_node(0);
-
-    if ($USESFS) {
-	if (! MFS()) {
-	    #
-	    # Setup SFS hostid.
-	    #
-	    print STDOUT "Setting up for SFS ... \n";
-	    dosfshostid();
-	}
-	else {
-	    # No SFS on the MFS.
-	    $USESFS = 0;
-	}
-    }
 
     #
     # Mount the project and user directories and symlink SFS "mounted"
@@ -2053,20 +2046,6 @@ sub nodeupdateaux()
 	    cleanup_node(1);
 	}
 	return 0;
-    }
-
-    if ($USESFS) {
-	if (! MFS()) {
-	    #
-	    # Setup SFS hostid.
-	    #
-	    print STDOUT "Setting up for SFS ... \n";
-	    dosfshostid();
-	}
-	else {
-	    # No SFS on the MFS.
-	    $USESFS = 0;
-	}
     }
 
     #
@@ -2282,11 +2261,6 @@ sub install_deltas ()
 #
 sub whatsmynickname()
 {
-    #
-    # Inform the master that we have rebooted. THIS MUST BE DONE!
-    #
-    inform_reboot();
-
     #
     # Check allocation. Exit now if not allocated.
     #
