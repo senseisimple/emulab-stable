@@ -12,6 +12,7 @@ SUBDIR		= named
 ETCDIR          = /etc
 NAMEDB_DIR	= $(ETCDIR)/namedb
 OURDOMAIN       = @OURDOMAIN@
+FORWARDERS      = @NAMED_FORWARDERS@
 
 # This is silly. Needs to be done properly.
 TESTBED_NETWORK = @TESTBED_NETWORK@

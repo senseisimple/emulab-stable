@@ -15,10 +15,7 @@
 #
 options {
     directory "/etc/namedb";
-    # Put forwarders here if you have them
-    #forwarders {
-    #    1.1.1.1;
-    #};
+    %forwarders%
 };
 
 view "internal" {

@@ -35,6 +35,7 @@ my $PRIVATE_NETMASK    = "@PRIVATE_NETMASK@";
 my $PUBLIC_NETWORK     = "@PUBLIC_NETWORK@";
 my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
 my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
+my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
@@ -82,6 +83,18 @@ while (<IF>) {
 	    }
 	    elsif ($2 eq "internal_network_dotted_reverse") {
 		print $1 . "${c}.${b}.${a}" . "$3\n";
+	    }
+	    elsif ($2 eq "forwarders") {
+		if ($NAMED_FORWARDERS eq "") {
+		    print "";
+		}
+		else {
+		    print $1 . "forwarders {\n";
+		    foreach my $forwarder (split(" ", $NAMED_FORWARDERS)) {
+			print $1 . $1 . "$forwarder;\n";
+		    }
+		    print $1 . "};\n";
+		}
 	    }
 	    else {
 		die("*** $0:\n".

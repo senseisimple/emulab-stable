@@ -63,6 +63,7 @@ PUBLIC_NETWORK=changeme
 PUBLIC_ROUTER=changeme
 PUBLIC_NETMASK=changeme
 DHCPD_DYNRANGE=changeme
+NAMED_FORWARDERS=changeme
 #
 # Must localize to avoid conflict with outer emulab frisbeed.
 #
