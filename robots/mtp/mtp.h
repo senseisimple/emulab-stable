@@ -79,15 +79,15 @@ typedef struct mtp_packet {
   unsigned char role;
   
   union {
-	struct mtp_control *control;
-	struct mtp_config_rmc *config_rmc;
-	struct mtp_config_vmc *config_vmc;
-	struct mtp_request_position *request_position;
-	struct mtp_request_id *request_id;
-	struct mtp_update_position *update_position;
-	struct mtp_update_id *update_id;
-	struct mtp_command_goto *command_goto;
-	struct mtp_command_stop *command_stop;
+    struct mtp_control *control;
+    struct mtp_config_rmc *config_rmc;
+    struct mtp_config_vmc *config_vmc;
+    struct mtp_request_position *request_position;
+    struct mtp_request_id *request_id;
+    struct mtp_update_position *update_position;
+    struct mtp_update_id *update_id;
+    struct mtp_command_goto *command_goto;
+    struct mtp_command_stop *command_stop;
   } data;
 
 } mtp_packet_t;
@@ -179,10 +179,10 @@ int mtp_encode_packet(char **buf,struct mtp_packet *packet);
 /* buf must be null-terminated */
 int mtp_decode_packet(char *buf,struct mtp_packet **packet);
 struct mtp_packet *mtp_make_packet( unsigned char opcode,
-									unsigned char role,
-									/* data's type is only known by opcode */
-									void *data
-									);
+				    unsigned char role,
+				    /* data's type is only known by opcode */
+				    void *data
+				    );
 /* data's type is known by opcode! */
 int mtp_calc_size(int opcode,void *data);
 
