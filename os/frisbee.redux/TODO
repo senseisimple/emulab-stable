@@ -1,3 +1,62 @@
+NEW FEATURES:
+
+1. Accommodate new usage.
+
+   There are a couple of other places where we could make good use of
+   frisbee technology.
+
+   One is in the Emulab infrastructure for using frisbee!
+   Our current technique for running frisbee involves running a memory
+   filesystem based FreeBSD system.  So each node downloads not only a
+   FreeBSD kernel but a multi-megabyte MFS image as well.  We could
+   modify the FreeBSD bootloader (from which our initial pxeboot program
+   is derived) to support a frisbee client.  In this way, multiple nodes
+   could download their kernels and MFSs more efficiently and we could
+   scale better.  The big problem here is that the bootload uses the PXE
+   API for its network support and it isn't clear that the UDP-level
+   services provided support multicast.  Lower-level (UNDI) services
+   do, so that might be a possibility.  Another possibility is to use
+   stub "real" drivers say from NetBSD.
+
+   Another use is for distributing arbitrary files.  In the Emulab
+   context this would be useful for implementing the features allowing
+   installation of tar and rpm files.  We could multicast distribute
+   the files to all nodes in an experiment at once.  A couple of things
+   are needed for this.  One is a discovery protocol in frisbee itself.
+   A frisbee client should be able to contact a known address and ask
+   for an addr/port to use to download a specific file.  While we can
+   get this info "out of band" (like we do now), it would be generally
+   useful to include this in frisbee itself.  The other needed feature
+   is the ability for the frisbee server to generate images on the fly.
+   I would propose that it not bother with compression when creating the
+   image, it would only do the chunking.  Three reasons for this: 1) it is
+   simpler and more efficient for the server, 2) the types of files I
+   envision us really wanting to distribute this way are already
+   compressed (tgz and rpm files), and 3) it makes out-of-order delivery
+   of blocks much easier.  To elaborate on the final point, one of the
+   nice things about frisbee is that clients can request blocks in any
+   order at any time.  For static images, the frisbee server can
+   handle this easily, every chunk is at a fixed offset in the image
+   file.  If we were to dynamically generate compressed images in the
+   server, and the first request it got was for the final chunk of the
+   image, the server would have to compress/chunk the entire source
+   file before being able to present that chunk.  By not compressing,
+   we know in advance, for any chunk, how much and which data will go
+   into that chunk.  Note that we could just say that exactly 1MB of
+   data will go into every chunk and still compress that, but there
+   is no point since we pad out every chunk to 1MB.
+
+   Now one could imagine a super, caching frisbee server that creates
+   compressed images on the fly and caches them for later use.  Perhaps
+   it would become more of a chunk server where it caches every chunk
+   it has ever fed up along with a hash of the chunk.  Here when a client
+   requests a specific file, we send back not only the addr/port to use
+   for the request, we also send back a list of chunk hashes for every
+   chunk in the file.  This is very like the HCP work at Stanford.
+
+
+ENHANCEMENTS:
+
 1. Better throttling of block re-requests at the client.
 
    Currently we have a variable, redodelay, in the client which is a
@@ -53,7 +112,7 @@
 
 4. Multi-thread the frisbee server.
 
-   We can make our network output intervals more consistant if we
+   We can make our network output intervals more consistent if we
    separate the disk reader from the network writer.  This would have a
    performance benefit for the imageunzip program which currently
    combines the reader and decompresser having only a separate writer
@@ -69,7 +128,7 @@
    Maybe should be a multiple of 32 to ensure bitmap is a multiple of 4
    in size.  Large chunk issues: 1) more potential wasted space per chunk,
    though mostly only in the last chunk, 2) It takes longer to accumulate
-   chunks at the client, potentially idling the decompesser and writer,
+   chunks at the client, potentially idling the decompresser and writer,
    3) takes more space to accumulate chunks, allowing for fewer in progress
    chunks.  So maybe 1448B/blk * 768 blks/chunk == 1.06MB/chunk.  PREQUEST
    BlockMaps come down from 128 bytes to 96.
