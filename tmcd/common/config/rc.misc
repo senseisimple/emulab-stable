@@ -85,6 +85,7 @@ exit(0);
 
 # More protos
 sub donodeid();
+sub docreator();
 
 #
 # Boot Action.
@@ -94,6 +95,7 @@ sub doboot()
     # Handled elsewhere for other node types.
     donodeid()
 	if (!PLAB() && !JAILED() && !IXP());
+    docreator();
 }
 
 #
@@ -118,7 +120,7 @@ sub doreconfig()
 #
 sub docleanup()
 {
-    unlink TMNODEID();
+    unlink TMNODEID(), TMCREATOR();
 }
 
 #
@@ -146,6 +148,34 @@ sub donodeid()
     }
     
     system("echo '$nodeid' > ". TMNODEID);
+    return 0;
+}
+
+#
+# Get experiment creator
+# 
+sub docreator()
+{
+    my $creator;
+    my @tmccresults;
+
+    if (tmcc(TMCCCMD_CREATOR, undef, \@tmccresults) < 0) {
+	fatal("Could not get creator from server!");
+    }
+    return 0
+	if (! @tmccresults);
+    
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /^CREATOR=([-\w]*)$/) {
+	$creator = $1;
+    }
+    else {
+	fatal("Bad creator line: $tmccresults[0]");
+    }
+    
+    system("echo '$creator' > ". TMCREATOR());
     return 0;
 }
 
