@@ -123,6 +123,39 @@ int main(int argc, char **argv) {
     info(build_info);
   }
 
+  /*
+   * Change to non-root user!
+   */
+  if (geteuid() == 0) {
+    struct passwd	*pw;
+    uid_t		uid;
+    gid_t		gid;
+
+    /*
+     * Must be a valid user of course.
+     */
+    if ((pw = getpwnam(RUNASUSER)) == NULL) {
+      error("invalid user: %s", RUNASUSER);
+      exit(1);
+    }
+    uid = pw->pw_uid;
+    gid = pw->pw_gid;
+
+    if (setgroups(1, &gid)) {
+      errorc("setgroups");
+      exit(1);
+    }
+    if (setgid(gid)) {
+      errorc("setgid");
+      exit(1);
+    }
+    if (setuid(uid)) {
+      errorc("setuid");
+      exit(1);
+    }
+    info("Flipped to user/group %d/%d\n", uid, gid);
+  }
+
   /* do our thing - just loop collecting data from clients, and insert into
      DB. 
   */

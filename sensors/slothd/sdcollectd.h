@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <syslog.h>
+#include <pwd.h>
+#include <grp.h>
 #include <tbdb.h>
 #include "log.h"
 
@@ -32,6 +34,7 @@
 #define BUFSIZE 1500
 #define MAXNUMIFACES 10
 #define MACADDRLEN 12
+#define RUNASUSER "nobody"
 
 #define NUMACTTYPES 4
 #define ACTSTRARRAY {"last_tty_act", "last_cpu_act", "last_net_act", "last_ext_act"}
