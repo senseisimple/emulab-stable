@@ -392,6 +392,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
+	db/sitevarscheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail \
 	discvr/GNUmakefile \

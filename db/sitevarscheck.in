@@ -1,0 +1,111 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+
+#
+# sitevarscheck - Make sure that the site variables in the currently-running
+# database match the ones in the checked-out source.
+# Exits with value 1 if the two
+# differ, 0 if they do not, and -1 if some error (such as the mysql server is
+# not running, or the database does not exist) prevents us from telling if
+# they differ or not
+#
+
+#
+# Configure variables
+#
+my $testbed_srcdir = "@top_srcdir@";
+my $DBNAME         = "@TBDBNAME@";
+
+my $master_sitevars = "$testbed_srcdir/sql/sitevars-create.sql";
+my $sitevarsdiff = "$testbed_srcdir/utils/sitevarsdiff";
+
+#
+# XXX: Requires that mysqldump be in caller's $PATH - probably an OK
+# assumption, but maybe not always
+#
+my $mysqldump = "mysqldump -t $DBNAME sitevariables";
+
+#
+# We use Mysql module instead of the testbed libraries, so that we can get
+# a more precise feel for what the error is.
+#
+use Mysql;
+
+#
+# Check to see if the mysqld is running by trying to connect to it.
+#
+my $dbh = Mysql->connect(undef,undef,undef,undef);
+if (!$dbh) {
+    fatal("Unable to connect to mysqld - Either it's not running or \n" .
+    	  "permission was denied.\n");
+}
+
+#
+# Check to see if the database exists
+#
+my @dbs = $dbh->listdbs();
+if (! grep (/^$DBNAME$/,@dbs)) {
+    fatal("Database $DBNAME does not exist in the running database\n");
+}
+undef $dbh;
+
+#
+# Make sure we can write the temporary file
+#
+my $db_sitevars = "/tmp/sitevarscheck.$$";
+open(SITEVARSFILE,">$db_sitevars") or
+    fatal("Unable to write to temporary file $db_sitevars: $!\n");
+close(SITEVARSFILE);
+
+#
+# Stick the output of mysqldump into a file
+#
+system "$mysqldump 2> /dev/null > $db_sitevars";
+
+#
+# ... and compare it to the sitevars from the source
+#
+my $diff = (system("$sitevarsdiff $db_sitevars $master_sitevars") >> 8);
+unlink($db_sitevars);
+
+if ($diff) {
+
+    print << "EOSTR";
+
+The sitevariables from $master_sitevars differs from
+the running database. As a safety measure, you will not be able to install
+until this is resolved.
+
+If you are a user of the emulab software outside of Utah, this is probably
+because your site variables have not been updated since the installation
+of an older version of the emulab software.
+Contact testbed-ops\@emulab.net for help in updating your database.
+
+If you're a developer at Utah, this is probably because you (or someone else)
+forgot to update sql/sitevars-create.sql .
+
+EOSTR
+
+    exit(1);
+} else {
+    exit(0);
+}
+
+sub fatal(@) {
+
+    # Offset the text with a few blank lines, so it doesn't get lost in the
+    # make messages
+    warn "\n\n";
+    warn "*** sitevarscheck - Unable to check database sitevars:\n";
+    warn @_;
+    warn "\n\n";
+
+    exit(-1);
+
+}

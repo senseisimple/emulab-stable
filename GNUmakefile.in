@@ -33,7 +33,7 @@ install:
 #
 # For installation on boss node (okay, paper).
 # 
-boss-install:	install-schemacheck install-subdirs install-mkdirs 
+boss-install:	install-schemacheck install-sitevarscheck install-subdirs install-mkdirs 
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 #
@@ -100,6 +100,15 @@ endif
 install-schemacheck:
 	@echo "Checking DB schema..."
 	$(SCHEMACHECK)
+
+ifeq ($(TBROOT),/usr/testbed)
+SITEVARSCHECK= cd $(OBJDIR)/db && perl sitevarscheck
+else
+SITEVARSCHECK= @echo "Skipping sitevars check, since prefix isn't /usr/testbed"
+endif
+install-sitevarscheck:
+	@echo "Checking Site variables..."
+	$(SITEVARSCHECK)
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs
