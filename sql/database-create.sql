@@ -422,6 +422,7 @@ CREATE TABLE node_types (
   control_iface text,
   delay_osid varchar(35) default NULL,
   pxe_boot_path text,
+  isvirtnode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -446,6 +447,7 @@ CREATE TABLE nodelog (
 CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
   type varchar(30) NOT NULL default '',
+  phys_nodeid varchar(10) default NULL,
   role enum('testnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
   def_boot_osid varchar(35) NOT NULL default '',
   def_boot_path text,
@@ -460,7 +462,7 @@ CREATE TABLE nodes (
   startupcmd tinytext,
   startstatus tinytext,
   ready tinyint(4) unsigned NOT NULL default '0',
-  priority smallint(6) NOT NULL default '-1',
+  priority int(11) NOT NULL default '-1',
   bootstatus enum('okay','failed','unknown') default 'unknown',
   status enum('up','possibly down','down','unpingable') default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
@@ -473,6 +475,16 @@ CREATE TABLE nodes (
   op_mode varchar(10) default NULL,
   op_mode_timestamp int(10) unsigned default NULL,
   PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'nodetypeXpid_permissions'
+#
+
+CREATE TABLE nodetypeXpid_permissions (
+  type varchar(30) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  PRIMARY KEY  (type,pid)
 ) TYPE=MyISAM;
 
 #
