@@ -272,6 +272,13 @@ foreach my $node (@nodes) {
 		    print "$node needs a reboot on remote node $pnode\n";
 		    $mode = "reboot";
 		}
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_RECONFIG()) {
+		    print "$node needs a reconfig on remote node $pnode\n";
+		    # We do not actually reconfig virtual nodes; just
+		    # reboot them. Might reconfig someday, in which case
+		    # this would move up into os_setup.
+		    $mode = "reboot";
+		}
 	    }
 	}
     }
