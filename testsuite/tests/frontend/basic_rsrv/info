@@ -1,0 +1,25 @@
+Just a basic initial test.
+
+Topology:
+
+          link1     link2
+         +-----node4-----+
+         |               |
+	node1	node2	node3
+	 |       |       |
+   lan1---------------------
+
+Delays:
+lan1	100Mb/0ms
+link1   100Mb/50ms
+link2   100Mb/100ms
+
+TB commands:
+None
+
+Warnings:
+None
+
+Errors:
+None
+

@@ -1,0 +1,10 @@
+insert into reserved values ('pc1','testbed','unavailable',0,'1');
+insert into reserved values ('pc2','testbed','unavailable',0,'2');
+insert into reserved values ('pc3','testbed','unavailable',0,'3');
+insert into reserved values ('pc4','testbed','unavailable',0,'4');
+insert into reserved values ('pc5','testbed','unavailable',0,'5');
+insert into reserved values ('pc6','testbed','unavailable',0,'6');
+insert into reserved values ('pc7','testbed','unavailable',0,'7');
+insert into reserved values ('pc8','testbed','unavailable',0,'8');
+insert into reserved values ('pc9','testbed','unavailable',0,'9');
+insert into reserved values ('pc10','testbed','unavailable',0,'10');
