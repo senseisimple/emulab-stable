@@ -123,6 +123,20 @@ if [ -x $BINDIR/evproxy -a -r $BOOTDIR/nickname ]; then
 	$BINDIR/evproxy -s $BOSSIP -e `cat $BOOTDIR/nickname | awk -F. '{print $3"/"$2}'`
 fi
 
+#
+# Start the linktest daemon. It talks to the elvind on boss also.
+#
+if [ ! -x $BOOTDIR/rc.delay -a -x $BINDIR/linktest -a -r $BOOTDIR/nickname ]; then
+	echo "Starting linktest daemon ..."
+	# XXX find our boss IP.
+	if [ -r $BOOTDIR/bossip ]; then
+		BOSSIP=`cat $BOOTDIR/bossip`
+	else
+		BOSSIP=`$BINDIR/tmcc bossinfo | awk '{print $2}'`
+	fi
+	$BINDIR/linktest -s $BOSSIP -e `cat $BOOTDIR/nickname | awk -F. '{print $3"/"$2}'`
+fi
+
 if [ -x $BINDIR/rc.agents  ]; then
 	$BINDIR/rc.agents
 fi
