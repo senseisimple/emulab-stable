@@ -25,6 +25,23 @@ if (! $isadmin) {
 unset($prefix);
 
 #
+# Verify page arguments.
+# 
+if (!isset($building) ||
+    strcmp($building, "") == 0) {
+    PAGEARGERROR("Must provide a building and an optional floor!");
+}
+# Sanitize for the shell.
+if (!preg_match("/^[-\w]+$/", $building)) {
+    PAGEARGERROR("Invalid building argument.");
+}
+
+# Optional floor argument. Sanitize for the shell.
+if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
+    PAGEARGERROR("Invalid floor argument.");
+}
+
+#
 # Run the script. It will produce two output files; an image and an areamap.
 # We want to embed both of these images into the page we send back. This
 # is painful!
@@ -33,7 +50,9 @@ unset($prefix);
 #
 function CLEANUP()
 {
-    if (isset($prefix)) {
+    global $prefix;
+    
+    if (isset($prefix) && (connection_aborted())) {
 	unlink("${prefix}.png");
 	unlink("${prefix}.map");
 	unlink($prefix);
@@ -46,13 +65,22 @@ register_shutdown_function("CLEANUP");
 # Create a tempfile to use as a unique prefix; it is not actually used but
 # serves the same purpose (the script uses ${prefix}.png and ${prefix}.map)
 # 
-$prefix = tempnam("/tmp", "floomap");
+$prefix = tempnam("/tmp", "floormap");
 
-$retval = SUEXEC("nobody", "nobody", "webfloormap -o $prefix MEB",
+#
+# Get the unique part to send back.
+#
+if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
+    TBERROR("Bad tempnam: $prefix", 1);
+}
+$uniqueid = $matches[1];
+
+$retval = SUEXEC("nobody", "nobody", "webfloormap -o $prefix " .
+		 (isset($floor) ? "-f $floor " : "") . "$building",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
-    SUEXECERROR(SUEXEC_ACTION_DIE);
+    SUEXECERROR(SUEXEC_ACTION_USERERROR);
     # Never returns.
     die("");
 }
@@ -65,42 +93,27 @@ if (! readfile("${prefix}.map")) {
     TBERROR("Could not read ${prefix}.map", 1);
 }
 
-#
-# Convert the image binary data into a javascript variable.
-#
-$fp = fopen("${prefix}.png", "r");
-if (! $fp) {
-    TBERROR("Could not open ${prefix}.png", 1);
-}
-
-echo "<script language=JavaScript>
-      <!--
-      function binary(d) {
-        var o = ''; 
-        for (var i=0; i<d.length; i=i+2)
-            o+=String.fromCharCode(eval('0x' +
-                                        (d.substring(i,i+2)).toString(16)));
-        return o;
-      } 
-      var imagedata = binary('";
-
-# Read image data and spit out hex representation of it.
-do {
-    $data = fread($fp, 8192);
-    if (strlen($data) == 0) {
-        break;
-    }
-    echo bin2hex($data);
-} while (true);
-fclose($fp);
-
-echo "');
-      //-->
-      </script>\n";
-
 # And the img ...
 echo "<center>
-      <img src=\"javascript:imagedata\" usemap=\"#floormap\">
+      <table class=nogrid align=center border=0 cellpadding=6 cellspacing=0>
+      <tr>
+         <td align=right>Free</td>
+         <td align=left><img src='/autostatus-icons/greenball.gif' alt=Free>
+          </td>
+      </tr>
+      <tr>
+         <td align=right>Reserved</td>
+         <td align=left><img src='/autostatus-icons/blueball.gif' alt=reserved>
+          </td>
+      </tr>
+      <tr>
+         <td align=right>Dead</td>
+         <td align=left><img src='/autostatus-icons/redball.gif' alt=Free>
+          </td>
+      </tr>
+      </table>
+      <br><br>
+      <img src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">
       </center>\n";
 
 #
