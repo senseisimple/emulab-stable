@@ -30,7 +30,7 @@ else {
     $query_result = mysql_db_query($TBDBNAME,
 	"select distinct i.* from images as i ".
 	"left join proj_memb as p on i.pid IS NULL or p.pid=i.pid ".
-	"where p.uid='$uid' order by i.osid");
+	"where p.uid='$uid' order by i.imageid");
 }
 if (! $query_result) {
     $err = mysql_error();

@@ -52,13 +52,16 @@ if (!$isadmin && $pid) {
 SHOWIMAGEID($imageid, 0);
 
 #
-# Edit option
+# Edit option, but only if admin or the imageid has a pid. No pid means
+# a global imageid, and only admin people can change those.
 #
-$fooid = rawurlencode($imageid);
-echo "<p><center>
-       Do you want to edit this ImageID?
-       <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
-      </center>\n";    
+if ($isadmin || $pid) {
+    $fooid = rawurlencode($imageid);
+    echo "<p><center>
+               Do you want to edit this ImageID?
+              <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
+            </center>\n";
+}
 
 #
 # Standard Testbed Footer

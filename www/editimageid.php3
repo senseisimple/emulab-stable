@@ -37,7 +37,14 @@ $pid = $row[pid];
 #
 # Verify that this uid is a member of the project that owns the IMAGEID.
 #
-if (!$isadmin && $pid) {
+if (!$isadmin) {
+    #
+    # Only admin people can edit imageids with no pid, since they are global.
+    #
+    if (!$pid) {
+	USERERROR("You do not have permission to edit ImageID $imageid!", 1);
+    }
+    
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\"");
     if (mysql_num_rows($query_result) == 0) {
