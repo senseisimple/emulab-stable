@@ -20,6 +20,9 @@ def main(args):
     me = args[0]
     alloctries = TRIES
     setuptries = TRIES
+
+    # don't do line buffering.
+    sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
     
     try:
         command, pid, eid, nodeid = libplab.handleArgs(args[1:])
