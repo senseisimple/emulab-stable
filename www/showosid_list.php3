@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -70,7 +70,7 @@ echo "Listed below are the OS Descriptors that you may use in your NS file
       a node is not loaded on that node when the experiment is swapped in,
       the Testbed system will automatically reload that node's disk with the
       appropriate image. You might notice that it takes a few minutes longer
-      to start start your experiment when selecting an OS that is not
+      to start your experiment when selecting an OS that is not
       already resident. Please be patient.
       <br>
       More information on how to create your own Images is in the
