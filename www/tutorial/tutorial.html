@@ -981,6 +981,12 @@ regular experiment and a batch mode experiment:
 </ul>
 <p>
 
+The batch system may also be used for "queuing" interactive experiments.
+By leaving out <tt>tb-set-node-startcmd</tt> commands, an experiment
+will be started when enough nodes are available, but then remain active
+until you (or the system) swap or terminate it.
+<p>
+
 <li> <a NAME="BatchExample"></a>
      <h3>A Batch Mode Example</h3>
 

@@ -35,6 +35,8 @@
      <li> <a href="#UTT-TOPO">Are there any constraints on my topology?</a>
      <li> <a href="#UTT-NODES">How many nodes can I ask for?</a>
      <li> <a href="#UTT-HOWLONG">How long can I keep using my nodes?</a>
+     <li> <a href="#UTT-QUEUE">I only need a couple of nodes but none are
+     				free, should I just keep trying?</a>
      <li> <a href="#UTT-TOOFEW">What if I need more nodes than are free?</a>
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
@@ -415,6 +417,34 @@
     with it for the weekend. Emulab usually gets heavy use on the
     weekends by users who need to make very large experiments, so it
     is important to leave as many nodes available as possible.
+    </p>
+
+<li><a NAME="UTT-QUEUE"></a>
+    <font size='+1'><b>I only need a couple of nodes but none are free,
+      			should I just keep trying?</b></font>
+    <p>
+    It is better for you and us if you don't just keep hitting the
+    submit button every few minutes.  It wastes your time and floods
+    us with email (we get every failure message you do!)
+    Instead, you can now use the
+    <a href="tutorial/tutorial.php3#BatchMode">Batch System</a>
+    to queue an interactive job.  By submitting your experiment as
+    a batch job, but without any
+    <a href="tutorial/tutorial.php3#Startupcmd"><tt>tb-set-node-startcmd</tt></a>
+    directives in your NS file, the job will be queued until nodes are
+    available.  For most experiments, this means just using your regular
+    NS file, and checking the Batch Mode Experiment box when you create
+    the experiment.
+    </p><p>
+    When your queued job is swapped in, you will be sent email to
+    inform you, and you can start working!
+    <b>Please note</b> that the
+    experiment will be idle when it is swapped in, and will be
+    <a href="swapping.html#idleswap">idle swapped</a> if you do not
+    get things running on the nodes in a short period of time.  If your
+    experiment does get swapped out before you can get to it, you can
+    always visit the experiment's information page and try again by
+    using the Queue Batch Experiment menu item.
     </p>
 
 <li><a NAME="UTT-TOOFEW"></a>
