@@ -34,11 +34,9 @@ capserver:	capserver.c capdecls.h
 #
 install:	all $(INSTALL_SBINDIR)/capserver
 
-real-install:	all $(INSTALL_SBINDIR)/capserver
-	install -s capture $(DESTDIR)/usr/site/bin
+real-install:	all $(INSTALL_SBINDIR)/capserver $(INSTALL_SBINDIR)/capture
 
-tipserv-install:	all
-	install -s capture $(DESTDIR)/usr/site/bin
+tipserv-install:	all $(INSTALL_SBINDIR)/capture
 
 clean:
 	rm -f *.o capture core errs Errs

@@ -22,9 +22,9 @@ if [ -x @prefix@/sbin/capserver  ]; then
         @prefix@/sbin/capserver
 fi
 
-if [ -x /usr/site/etc/capture.rc -a -d /var/log/tiplogs ]; then
-	echo -n " capture"
-	/usr/site/etc/capture.rc
+if [ -x @prefix@/etc/capture.rc -a -d /var/log/tiplogs ]; then
+        echo -n " capture"
+        @prefix@/etc/capture.rc
 fi
 
 if [ -x @prefix@/sbin/reload_daemon  ]; then
