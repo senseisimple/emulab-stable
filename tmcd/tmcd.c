@@ -32,6 +32,7 @@ static int	dostatus(int sock, struct in_addr ipaddr, char *request);
 static int	doifconfig(int sock, struct in_addr ipaddr, char *request);
 static int	doaccounts(int sock, struct in_addr ipaddr, char *request);
 static int	dodelay(int sock, struct in_addr ipaddr, char *request);
+static int	dohosts(int sock, struct in_addr ipaddr, char *request);
 
 struct command {
 	char	*cmdname;
@@ -42,6 +43,7 @@ struct command {
 	{ "ifconfig",  doifconfig },
 	{ "accounts",  doaccounts },
 	{ "delay",     dodelay },
+	{ "hostnames", dohosts },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -63,7 +65,7 @@ main()
 		exit(1);
 	}
 
-	i - 1;
+	i = 1;
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
 		syslog(LOG_ERR, "control setsockopt: %m");;
@@ -510,6 +512,218 @@ dodelay(int sock, struct in_addr ipaddr, char *request)
 }
 
 /*
+ * Return host table information.
+ */
+static int
+dohosts(int sock, struct in_addr ipaddr, char *request)
+{
+	MYSQL_RES	*reserved_result;
+	MYSQL_RES	*vnames_result;
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		*srcnodes, lastid[BUFSIZ], buf[BUFSIZ];
+	int		nreserved, first, i, nvnames;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "HOSTNAMES: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Need to find all of the nodes in the experiment.
+	 */
+	reserved_result = mydb_query("select node_id from reserved "
+				     "where pid='%s' and eid='%s'",
+				     1, pid, eid);
+	if (!reserved_result) {
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting reserved!",
+		       nodeid);
+		return 1;
+	}
+	
+	if ((nreserved = (int)mysql_num_rows(reserved_result)) == 0) {
+		mysql_free_result(reserved_result);
+		return 0;
+	}
+
+	/*
+	 * Build up an "or" clause of the src nodes to feed to the next query.
+	 */
+	row = mysql_fetch_row(reserved_result);
+	sprintf(buf, " src_node_id='%s' ", row[0]);
+	
+	srcnodes = (char *) malloc(strlen(buf) + 1);
+	if (!srcnodes) {
+		syslog(LOG_ERR, "dohosts: Out of Memory!");
+		mysql_free_result(reserved_result);
+		return 1;
+	}
+	strcpy(srcnodes, buf);
+
+	while (--nreserved) {
+		char	*tmp;
+		
+		row = mysql_fetch_row(reserved_result);
+		sprintf(buf, " or src_node_id='%s' ", row[0]);
+
+		tmp = (char *) malloc(strlen(buf) + strlen(srcnodes) + 1);
+		if (!tmp) {
+			syslog(LOG_ERR, "dohosts: Out of Memory!");
+			mysql_free_result(reserved_result);
+			free(srcnodes);
+			return 1;
+		}
+		strcpy(tmp, srcnodes);
+		strcat(tmp, buf);
+		free(srcnodes);
+		srcnodes = tmp;
+	}
+	mysql_free_result(reserved_result);
+
+	/*
+	 * First find our direct connect links by looking for all
+	 * connections for which we are either a src or dest. 
+	 */
+	vnames_result =
+		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
+			   "r.vname,i.card from virt_names as v "
+			   "left join reserved as r on "
+			   "v.dest_node_id=r.node_id "
+			   "left join interfaces as i on "
+			   "v.IP=i.IP and v.dest_node_id=i.node_id "
+			   "where dest_node_id='%s' or src_node_id='%s' "
+			   "order by dest_node_id,card",
+			   5, nodeid, nodeid);
+
+	if (!vnames_result) {
+		syslog(LOG_ERR,
+		       "dohosts: %s: DB Error getting direct vnames!", nodeid);
+		free(srcnodes);
+		return 1;
+	}
+	
+	if ((nvnames = (int)mysql_num_rows(vnames_result)) == 0) {
+		syslog(LOG_ERR, "dohosts: %s: No virtual names!", nodeid);
+		mysql_free_result(vnames_result);
+		return 0;
+	}
+
+	/*
+	 * Go through the list. The rules are:
+	 * 
+	 * 1) The outgoing links from the node making the request are given
+	 *    by dest_node_id equal to node_id. The first numbered of these
+	 *    links gets an alias to itself. 
+	 * 2) The incoming links to the node making the request are given
+	 *    by dest_node_id not equal to node_id. For each one of those
+	 *    there might be multiple incoming, but only the first link
+	 *    gets an alias. 
+	 *
+	 * First look for #1 cases.
+	 */
+	first = 1;
+	for (i = 0; i < nvnames; i++) {
+		MYSQL_ROW	vname_row = mysql_fetch_row(vnames_result);
+
+		if (strcmp(vname_row[0], nodeid))
+			continue;
+		
+		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
+			vname_row[3], vname_row[4], vname_row[2],
+			(first) ? vname_row[3] : " ");
+
+		if (first)
+			first = 0;
+			
+		client_writeback(sock, buf, strlen(buf));
+		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+	}
+	mysql_data_seek(vnames_result, 0);
+
+	/*
+	 * Now look for #2 cases.
+	 */
+	memset(lastid, 0, sizeof(lastid));
+	for (i = 0; i < nvnames; i++) {
+		MYSQL_ROW	vname_row = mysql_fetch_row(vnames_result);
+		char		*alias;
+
+		if (strcmp(vname_row[0], nodeid) == 0)
+			continue;
+
+		if (strcmp(vname_row[0], lastid))
+			alias = vname_row[3];
+		else
+			alias = " ";
+
+		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
+			vname_row[3], vname_row[4], vname_row[2], alias);
+			
+		client_writeback(sock, buf, strlen(buf));
+		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+		strcpy(lastid, vname_row[0]);
+	}
+
+	mysql_free_result(vnames_result);
+
+	/*
+	 * Now select out all the nodes that are not directly attached
+	 * to node making the request. These get non-aliased names.
+	 */
+	vnames_result =
+		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
+			   "r.vname,i.card from virt_names as v "
+			   "left join reserved as r on "
+			   "v.dest_node_id=r.node_id "
+			   "left join interfaces as i on "
+			   "v.IP=i.IP and v.dest_node_id=i.node_id "
+			   "where ( %s ) and "
+			   "(dest_node_id!='%s' and src_node_id!='%s') "
+			   "order by dest_node_id,card",
+			   5, srcnodes, nodeid, nodeid);
+
+	if (!vnames_result) {
+		syslog(LOG_ERR,
+		       "dohosts: %s: DB Error getting vnames!", nodeid);
+		free(srcnodes);
+		return 1;
+	}
+	
+	if ((nvnames = (int)mysql_num_rows(vnames_result)) == 0) {
+		syslog(LOG_ERR, "dohosts: %s: No virtual names!", nodeid);
+		mysql_free_result(vnames_result);
+		free(srcnodes);
+		return 0;
+	}
+
+	while (nvnames) {
+		MYSQL_ROW	vname_row;
+
+		vname_row = mysql_fetch_row(vnames_result);
+
+		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=  \n",
+			vname_row[3], vname_row[4], vname_row[2]);
+			
+		client_writeback(sock, buf, strlen(buf));
+		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+			
+		nvnames--;
+	}
+	mysql_free_result(vnames_result);
+	
+	return 0;
+}
+
+/*
  * DB stuff
  */
 MYSQL_RES *
@@ -517,7 +731,7 @@ mydb_query(char *query, int ncols, ...)
 {
 	MYSQL		db;
 	MYSQL_RES	*res;
-	char		querybuf[BUFSIZ];
+	char		querybuf[2*BUFSIZ];
 	va_list		ap;
 	int		n;
 
@@ -633,7 +847,8 @@ nodeidtoexp(char *nodeid, char *pid, char *eid)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select pid,eid from reserved where node_id='%s'",
+	res = mydb_query("select pid,eid from reserved "
+			 "where node_id='%s'",
 			 2, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "nodeidtoexp: %s: DB Error getting reserved!",
