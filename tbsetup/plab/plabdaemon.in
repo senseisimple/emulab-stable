@@ -1,14 +1,87 @@
 #!/usr/local/bin/python
 # -*- python -*-
 
-import sys
+import sys, os
 sys.path.append("@prefix@/lib")
+import syslog
 import getopt
 import libplab
 
+GETFREE_PERIOD = 2*60
+RENEW_PERIOD = 60*60
+
 def usage(me):
-    print "Usage: %s [ -vd ] { getfree [-i] | renew }" % me
+    print "Usage: %s [ -vd ] { getfree [-u] | renew }" % me
+    print "  Passing -u to getfree will cause it to only update"
+    print "  existing data and not fork off as a daemon"
     sys.exit(1)
+
+class logfile:
+    def __init__(self, logname):
+        self.buf = ""
+
+    def close(self):
+        syslog.closelog()
+
+    def flush(self): pass
+
+    def write(self, str):
+        # Ugh
+        self.buf += str
+        while self.buf.find("\n") >= 0:
+            pos = self.buf.find("\n")
+            line = self.buf[:pos]
+            self.buf = self.buf[pos+1:]
+            syslog.syslog(line)
+
+def daemonize(logname):
+    """
+    Fork off into a daemon process, redirecting stdout and stderr to
+    logfile.
+
+    Based on code from the ASPN Python Cookbook.
+    """
+    # First fork
+    if os.fork():
+        sys.exit(0)
+        
+    # Decouple from parent environment.
+    os.chdir("/") 
+    os.umask(0) 
+    os.setsid() 
+    
+    # Second fork
+    if os.fork():
+        sys.exit(0)
+
+    # Redirect standard fd's
+    si = open("/dev/null", 'r')
+    so = open("/dev/null", 'a+', 0)
+    os.dup2(si.fileno(), sys.stdin.fileno())
+    os.dup2(so.fileno(), sys.stdout.fileno())
+    os.dup2(so.fileno(), sys.stderr.fileno())
+
+    # Log output
+    syslog.openlog(logname, syslog.LOG_PID, syslog.LOG_USER)
+    sys.stdout = sys.stderr = logfile(logname)
+
+def doDaemon(func, period, logname):
+    """
+    Forks off into a daemon process with output directed to logfile, and
+    calls the given func every period seconds.
+    """
+    import time
+
+    if not libplab.debug:
+        daemonize(logname)
+    while True:
+        start = time.clock()
+        func()
+        end = time.clock()
+        if end - start < period:
+            wait = period - (end - start)
+            print "Sleeping %g seconds" % wait
+            time.sleep(wait)
 
 def main(args):
     me = args[0]
@@ -21,15 +94,18 @@ def main(args):
         plab = libplab.Plab()
         if command == "getfree":
             opts, args = getopt.getopt(args[1:], "i")
-            ignorenew = False
+            update = False
             for o, a in opts:
                 if o == "-i":
-                    ignorenew = True
+                    update = True
             if len(args):
                 usage(me)
-            plab.getFree(ignorenew)
+            if update:
+                plab.getFree(True)
+            else:
+                doDaemon(plab.getFree, GETFREE_PERIOD, "plabgetfree")
         elif command == "renew":
-            plab.renew()
+            doDaemon(plab.renew, RENEW_PERIOD, "plabrenew")
         else:
             usage(ms)
     except getopt.GetoptError:
