@@ -41,3 +41,8 @@ if [ -x @prefix@/sbin/lastlog_daemon  ]; then
         echo -n " lastlogd"
         @prefix@/sbin/lastlog_daemon
 fi
+
+if [ -x @prefix@/sbin/hmcd  ]; then
+	echo -n " hmcd"
+	@prefix@/sbin/hmcd
+fi
