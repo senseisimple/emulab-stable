@@ -503,16 +503,21 @@ sub handleCtrlEvent($$) {
 				      "FROM nodes where node_id='$node'");
 	    my ($pxepath,$osid) = $result->fetchrow();
 
+	    # Important note on ordering here:
+	    # Because setting a normal osid resets pxe path to PXEBOOT,
+	    # We need to read it out first, then set the osid, then set
+	    # the pxepath back to its original value at the end.
+
+	    $cmd = "$osselect $osid $node";
+	    system($cmd) and
+		notify("$node/$event: Couldn't clear next_boot_*\n".
+		       "\tcmd=$cmd\n\t*** $!\n");
+
 	    $pxepath = "-p ".$pxepath;
 	    if ($pxepath eq "-p ") { $pxepath="PXEBOOT"; };
 	    my $cmd = "$osselect -m $pxepath $node";
 	    system($cmd) and
 		notify("$node/$event: Couldn't clear next_pxe_boot_path\n".
-		       "\tcmd=$cmd\n\t*** $!\n");
-
-	    $cmd = "$osselect $osid $node";
-	    system($cmd) and
-		notify("$node/$event: Couldn't clear next_boot_*\n".
 		       "\tcmd=$cmd\n\t*** $!\n");
 
 	    info("Performed RESET for $node to $osid/$pxepath\n");
