@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# deletenode - a script for deleting a node from the database
+#
+
+use lib '@prefix@/lib';
+use libdb;
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# A list of all the tables we have to delete this node from, and the name of
+# the column(s) in that table that contains a node name
+#
+my %clean_tables = TBDB_PHYSICAL_NODE_TABLES;
+
+if (!TBAdmin()) {
+    die "Sorry, only testbed administrators can run this script!\n";
+}
+
+my $node = shift @ARGV;
+if (!$node || @ARGV) {
+    die "usage: deletenode <node>\n";
+}
+
+#
+# Start off with some serious sanity checks
+#
+
+#
+# First, make sure the node exists, and only let them delete experimental nodes
+#
+my $result = DBQueryFatal("select role from nodes where node_id='$node'");
+if ($result->num_rows() != 1) {
+    die "Node $node does not exist!\n";
+}
+my ($role) = $result->fetch_row();
+if ($role ne "testnode") {
+    die "Node $node is not a testnode!\n";
+}
+
+#
+# Don't let 'em delete a node that is allocated, except to hwdown
+#
+my ($pid, $eid);
+my $allocated = NodeidToExp($node,\$pid,\$eid);
+if ($allocated && (($pid ne NODEDEAD_PID) || ($eid ne NODEDEAD_EID))) {
+    die "Node must be free, or in the " . NODEDEAD_PID . "/" . NODEDEAD_EID .
+	"experiment!\n";
+}
+
+#
+# Make sure they know what they are getting themselves into
+#
+print "*** WARNING:\n";
+print "This will erase all evidence that $node ever existed in the testbed!\n";
+print "Are you SURE you want to continue? ";
+my $answer = <>;
+if ($answer !~ /^y/i) {
+    print "Okay, aborting...\n";
+    exit(1);
+}
+
+#
+# Okay, let's clean out them tables
+#
+while (my ($table, $clist) = each %clean_tables) {
+    foreach my $column (@$clist) {
+	print "Removing from table $table, column $column\n";
+	print "DELETE FROM $table WHERE $column='$node';\n";
+    }
+}
+
+exit 0;

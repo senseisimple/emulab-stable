@@ -141,6 +141,8 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_LOWVPORT TBDB_MAXVPORT TBDB_PORTRANGE
 
+	 TBDB_PHYSICAL_NODE_TABLES
+
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
@@ -594,6 +596,55 @@ sub TBDB_WEBKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/webkey"; }
 sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
 sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
 sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
+
+#
+# A hash of all tables that contain information about physical nodes - the
+# value for each key is the list of columns that could contain the node's ID.
+#
+sub TBDB_PHYSICAL_NODE_TABLES() {
+    return (
+	'current_reloads'	=> [ 'node_id' ],
+	'delays'		=> [ 'node_id' ],
+	'iface_counters'	=> [ 'node_id' ],
+	'interfaces'		=> [ 'node_id' ],
+	'interface_settings'	=> [ 'node_id' ],
+	'last_reservation'	=> [ 'node_id' ],
+	'linkdelays'		=> [ 'node_id' ],
+	'location_info'		=> [ 'node_id' ],
+	'next_reserve'		=> [ 'node_id' ],
+	'node_activity'		=> [ 'node_id' ],
+	'node_auxtypes'		=> [ 'node_id' ],
+	'node_features'		=> [ 'node_id' ],
+	'node_hostkeys'		=> [ 'node_id' ],
+	'node_idlestats'	=> [ 'node_id' ],
+	'node_status'   	=> [ 'node_id' ],
+	'node_rusage'		=> [ 'node_id' ],
+	'nodeipportnum'		=> [ 'node_id' ],
+	'nodelog'		=> [ 'node_id' ],
+	'nodes'			=> [ 'node_id', 'phys_nodeid' ],
+	'nodeuidlastlogin'	=> [ 'node_id' ],
+	'ntpinfo'		=> [ 'node_id' ],
+	'outlets'		=> [ 'node_id' ],
+	'partitions'		=> [ 'node_id' ],
+	'plab_slice_nodes'	=> [ 'node_id' ],
+	'port_counters'		=> [ 'node_id' ],
+	'reserved'		=> [ 'node_id' ],
+	'scheduled_reloads'	=> [ 'node_id' ],
+	'state_triggers'	=> [ 'node_id' ],
+	'switch_stacks'		=> [ 'node_id' ],
+	'tiplines'		=> [ 'node_id' ],
+	'tmcd_redirect'		=> [ 'node_id' ],
+	'tunnels'		=> [ 'node_id' ],
+	'uidnodelastlogin'	=> [ 'node_id' ],
+	'v2pmap'		=> [ 'node_id' ],
+	'veth_interfaces'	=> [ 'node_id' ],
+	'widearea_accounts'	=> [ 'node_id' ],
+	'widearea_delays'	=> [ 'node_id1', 'node_id2' ],
+	'widearea_nodeinfo'	=> [ 'node_id' ],
+	'widearea_recent'	=> [ 'node_id1', 'node_id2' ],
+	'wires'			=> [ 'node_id1', 'node_id2' ],
+    );
+}
 
 #
 # Auth stuff.
