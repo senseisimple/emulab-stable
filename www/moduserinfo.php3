@@ -28,7 +28,7 @@ $isadmin = ISADMIN($uid);
 $shelllist = array( 'tcsh' );
 # $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
 
-# used if db is NULL (shouldn't happen.)
+# used if db is NULL (should not happen.)
 $defaultshell = 'tcsh';
 
 #
@@ -206,9 +206,7 @@ function SPITFORM($formfields, $errors)
 	#
 	# Default Group
 	#
-
-	# $q = DBQueryWarn("select gid, pid
-
+		
 	# Default Shell
         echo "<tr><td colspan=2>Shell:</td>
                   <td class=left>";
@@ -257,6 +255,21 @@ function SPITFORM($formfields, $errors)
                              name=\"formfields[password2]\"
                              size=8></td>
              </tr>\n";
+
+        #
+	# Notes
+	#
+	if ($isadmin) {
+	    echo "<tr>
+                      <td colspan=2>Admin Notes:</td>
+                      <td class=left>
+                         <textarea name=\"formfields[notes]\"
+                                   rows=2 cols=40>" .
+		                   ereg_replace("\r", "", $formfields[notes]) .
+		        "</textarea>
+                      </td>
+                  </tr>\n";
+	}
 
     echo "<tr>
               <td colspan=3 align=center>
@@ -362,6 +375,7 @@ $defaults[usr_phone]   = $row[usr_phone];
 $defaults[usr_title]   = stripslashes($row[usr_title]);
 $defaults[usr_affil]   = stripslashes($row[usr_affil]);
 $defaults[usr_shell]   = stripslashes($row[usr_shell]);
+$defaults[notes]       = stripslashes($row[notes]);
 
 #
 # On first load, display a form consisting of current user values, and exit.
@@ -565,6 +579,18 @@ if ((isset($password1) && strcmp($password1, "")) &&
     if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
     }
+}
+
+#
+# Only admins can change the notes field. We do not bother to generate
+# any email or external updates for this.
+#
+if ($isadmin &&
+    strcmp($defaults[notes], $formfields[notes])) {
+    $notes = addslashes($formfields[notes]);
+
+    DBQueryFatal("UPDATE users SET notes='$notes' ".
+		 "WHERE uid='$target_uid'");
 }
 
 #

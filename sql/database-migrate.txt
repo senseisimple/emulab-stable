@@ -913,3 +913,9 @@ last_net_act,last_cpu_act,last_ext_act);
 		where role='ctrl' or role='ctrl' or role='fake';
        update veth_interfaces set mask='255.255.255.0';
        update tunnels set mask='255.255.255.0';
+
+1.177: Add notes field to the users table for storing admin only
+       notes.
+
+       alter table users add notes text after wideareajailroot;
+

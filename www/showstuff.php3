@@ -380,6 +380,7 @@ function SHOWUSER($uid) {
     $status      = $row[status];
     $admin       = $row[admin];
     $adminoff    = $row[adminoff];
+    $notes       = stripslashes($row[notes]);
 
     if (!strcmp($usr_addr2, ""))
 	$usr_addr2 = "&nbsp";
@@ -391,6 +392,8 @@ function SHOWUSER($uid) {
 	$usr_zip = "&nbsp";
     if (!strcmp($usr_country, ""))
 	$usr_country = "&nbsp";
+    if (!strcmp($notes, ""))
+	$notes = "&nbsp";
 
     #
     # Last Login info.
@@ -519,6 +522,13 @@ function SHOWUSER($uid) {
               <td>Last Node Login:</td>
               <td>$lastnodelogin</td>
           </tr>\n";
+
+    if (ISADMIN()) {
+	    echo "<tr>
+                      <td>Notes:</td>
+                      <td>$notes</td>
+                  </tr>\n";
+    }
     
     echo "</table>\n";
 
