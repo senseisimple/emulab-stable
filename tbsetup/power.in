@@ -25,29 +25,33 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $user = (getpwuid($<))[0]
-    || die "Cannot figure out who you are!\n";
+  || die "Cannot figure out who you are!\n";
 
-my $op = ""; #stores operation (on/off/cyc)
-my @machines = (); #stores machines to operate on
-my $ip = ""; #stores IP of a power controller
-my $outlet = 0; #stores number of an outlet
-my %IPList = (); #holds machine/ip pairs
-my %OutletList = (); #holds machine/outlet pairs
+my $op = "";			#stores operation (on/off/cyc)
+my @machines = ();		#stores machines to operate on
+my $ip = "";			#stores IP of a power controller
+my $outlet = 0;			#stores number of an outlet
+my %IPList = ();		#holds machine/ip pairs
+my %OutletList = ();		#holds machine/outlet pairs
 my $exitval = 0;
 my $snmpit="$TB/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
-die("Syntax:\npower on <machine> <machine> ...\n",
+die("Usage:\npower on <machine> <machine> ...\n",
     "power off <machine> <machine> ...\n",
-    "power cycle <machine> <machine> ...\n\nIncorrect Syntax.\n") 
-    if ( @ARGV < 2 );
+    "power cycle <machine> <machine> ...\n") 
+  if ( @ARGV < 2 );
 
 #Read in ARGV
 $op = shift (@ARGV);
 if ($op =~ /^(on|off|cycle)$/) {
   $op = $1;
-} else { die("Invalid command '$op'\n"); }
-if ($op eq "cycle") { $op = "cyc"; }
+} else {
+  die("Invalid command '$op'\n");
+}
+if ($op eq "cycle") {
+  $op = "cyc";
+}
 $op = '-'.$op;
 @machines = @ARGV;
 foreach my $n (0..$#ARGV) {
@@ -55,7 +59,7 @@ foreach my $n (0..$#ARGV) {
   # Untaint the arguments.
   #
   if ($machines[$n] =~ /^([-\@\w.]+)$/) {
-      $machines[$n] = $1;
+    $machines[$n] = $1;
   }
 }
 foreach my $n (0..$#ARGV) {
@@ -83,21 +87,25 @@ while ( @_ = $sth->fetchrow_array()) {
 # user is authorized to control the nodes
 #
 
-my @OkNodes = ('lights');
+my @OkNodes = ();
+
+my @conds = ();
+foreach $node (@machines) {
+  push(@conds,"\Lnode_id='$node'");
+  if ($node =~ /sh\d+/) {
+    push(@conds,"\Lnode_id like '$node-%'");
+  }
+}
 
 if ($user ne "root") {
-  my @conds = ();
-  foreach $node (@machines) {
-    push(@conds,"\Lnode_id='$node'");
-    if ($node =~ /sh\d+/) { push(@conds,"\Lnode_id like '$node%'"); }
-  }
   my $cmd = 
     "select uid, node_id from reserved as r left join experiments as e ".
-     "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
-     join(" or ",@conds).") and uid='$user';";
+      "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
+	join(" or ",@conds).") and uid='$user';";
 
-  $sth = $dbh->query($cmd);
-  #print "$cmd\n";  
+  $sth = $dbh->query($cmd)
+    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+  #print "$cmd\n";
   while ( @_ = $sth->fetchrow_array()) {
     #print "Got '",join("'\t'",@_),"'\n";
     my $node = "\L$_[1]";
@@ -106,21 +114,69 @@ if ($user ne "root") {
   }
 }
 
+@conds = ();
+foreach $node (@OkNodes) {
+  push(@conds,"\Lo.node_id='$node'");
+}
+
+@OkNodes = ();
+my %timelimited = ();
+
+my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
+  "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
+  "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
+  "on n.type=t.type where ".join(" or ",@conds);
+
+#print "Checking times: '$cmd'\n";
+$sth = $dbh->query($cmd)
+  || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+while ( @_ = $sth->fetchrow_array()) {
+  #print "Got '",join("'\t'",@_),"'\n";
+  my $node = "\L$_[0]";
+  $node =~ s/(sh\d+)-\d/$1/;
+  if ($_[1] <= 0) {
+    $timelimited{$node} = $_[2];
+  } else {
+    push(@OkNodes, "$node");
+  }
+}
+
+if (@OkNodes > 0) {
+  @conds = map {"\Lnode_id='$_'"} @OkNodes;
+  $cmd = "update outlets set last_power = NULL where ".join(" or ",@conds);
+  #print "Updating times: '$cmd'\n";
+  $sth = $dbh->query($cmd)
+    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+}
+
+push (@OkNodes,"lights");
 
 #foreach $item (sort keys(%IPList)) {
 #    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
 #}
 
+#foreach $node (keys %timelimited) {
+#  print "TIME_LIMITED: $node = $timelimited{$node}\n";
+#}
+
 foreach $node ( sort @machines) {
   my $Approved = 0;
-  foreach $ok (sort @OkNodes) { if ($node eq $ok) { $Approved = 1; } }
+  foreach $ok (sort @OkNodes) {
+    if ($node eq $ok) {
+      $Approved = 1;
+    }
+  }
   if (!$Approved && ($user ne "root")) {
     if ($node =~ /(sh\d+)-\d/) {
       print "$node: Sharks are controlled by shelf only. Use '$1'.\n"; 
+      $exitval++;
+    } elsif (defined ($timelimited{$node})) {
+      print "Node '$node' was power controlled within the last ".
+	$timelimited{$node}." seconds. Skipping...\n";
     } else {
       print "You are not authorized to control $node. Skipping...\n";
+      $exitval++;
     }
-    $exitval++;
   } else {
     $node =~ /(sh\d+)-(\d)/;
     if ( ! defined ($IPList{$node}) ) {
