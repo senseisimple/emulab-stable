@@ -170,6 +170,20 @@ fi
 AC_SUBST(OPT_CFLAGS)
 
 #
+# Enable event system. Relies on Elvin. Off by default.
+# 
+AC_ARG_ENABLE(events,
+[  --enable-events        Enable event system (default off)
+  --disable-events       Disable events (requires Elvin libraries)])
+
+if test "$enable_events" = "yes"; then
+	elvinfiles="event/GNUmakefile event/lib/GNUmakefile \
+		     event/sched/GNUmakefile event/test/GNUmakefile";
+else
+	elvinfiles="";
+fi
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -246,8 +260,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/cvsupd.sh \
-	event/GNUmakefile event/lib/GNUmakefile event/sched/GNUmakefile \
-        event/test/GNUmakefile \
+	$elvinfiles \
 	apache/GNUmakefile apache/apache.conf "
 
 #

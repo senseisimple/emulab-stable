@@ -26,6 +26,9 @@ ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
 ac_help="$ac_help
+  --enable-events        Enable event system (default off)
+  --disable-events       Disable events (requires Elvin libraries)"
+ac_help="$ac_help
   --enable-testmode     Enable test mode
   --disable-testmode    Disable test mode"
 
@@ -567,7 +570,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:571: checking host system type" >&5
+echo "configure:574: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -588,7 +591,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:592: checking build system type" >&5
+echo "configure:595: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -614,7 +617,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:618: checking for $ac_word" >&5
+echo "configure:621: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -646,7 +649,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:650: checking for $ac_word" >&5
+echo "configure:653: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -678,7 +681,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:682: checking for $ac_word" >&5
+echo "configure:685: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -710,7 +713,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:714: checking for $ac_word" >&5
+echo "configure:717: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -742,7 +745,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:746: checking for $ac_word" >&5
+echo "configure:749: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -774,7 +777,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:778: checking for $ac_word" >&5
+echo "configure:781: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1019,6 +1022,23 @@ fi
 
 
 #
+# Enable event system. Relies on Elvin. Off by default.
+# 
+# Check whether --enable-events or --disable-events was given.
+if test "${enable_events+set}" = set; then
+  enableval="$enable_events"
+  :
+fi
+
+
+if test "$enable_events" = "yes"; then
+	elvinfiles="event/GNUmakefile event/lib/GNUmakefile \
+		     event/sched/GNUmakefile event/test/GNUmakefile";
+else
+	elvinfiles="";
+fi
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -1052,7 +1072,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1056: checking for a BSD compatible install" >&5
+echo "configure:1076: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1161,8 +1181,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/cvsupd.sh \
-	event/GNUmakefile event/lib/GNUmakefile event/sched/GNUmakefile \
-        event/test/GNUmakefile \
+	$elvinfiles \
 	apache/GNUmakefile apache/apache.conf "
 
 #
