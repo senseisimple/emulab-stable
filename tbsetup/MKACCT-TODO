@@ -1,4 +1,4 @@
-$ID$
+$Id: MKACCT-TODO,v 1.2 2000-12-04 19:59:09 kwright Exp $
 
 (We can move this to attic when all the account/user setup stuff is
 finished.)
@@ -7,21 +7,34 @@ finished.)
 STUFF TO SET UP USER ACCOUNTS, DIRECTORIES ON CONTROL AND TESTBED NODES
 -----------------------------------------------------------------------
 
-- to finish mkacct-ctrl, version 1: 
-	- finish pw call in mkacct-ctrl
-	-  move user dir creation from mkacct to mkacct-ctrl
-
-- add installation stuff to makefiles (similar to mkprojdir)
+x add installation stuff to makefiles (similar to mkprojdir)
   for mkacct stuff. all must be setuid root.
 
-- remove user dir tar & removal from rmacct to rmacct-ctrl (see
-  note about rmacct-ctrl below)
+- fix UID EUID problem in mkacct
 
-- fix privs in mkacct and rmacct to check that:
+- add hooks for mkacct/rmacct into tbrun/end
+
+x rewrite mkacct because it sucks. it uses chpass and a gazillion
+  piped shell commands, some of which can be eliminated by using pw
+  or built-in shell functions (like chmod(), for example)
+
+x to finish mkacct-ctrl, version 1: 
+	x finish pw call in mkacct-ctrl
+	x move user dir creation from mkacct to mkacct-ctrl
+        x take out su1 calls; its setuid now (tried this but commands
+	  executed not as root but as real uid
+
+x remove user dir tar & removal from rmacct to rmacct-ctrl (see
+  note about rmacct-ctrl below); this entails changing call from
+  rmuser to pw userdel.
+
+x fix privs in mkacct and rmacct to check that:
 	- the $UID (real user ID)  has group_root in the project OR    
 	- $UID = 0
 	- the $UID has admin privs
   (currently, only check is that user is root (tbroot works))
+
+- bootstrap current users on plastic so they have accounts. 
 
 - add quota call (2-5MB) to /users in mkacct-ctrl
 
@@ -34,12 +47,6 @@ STUFF TO SET UP USER ACCOUNTS, DIRECTORIES ON CONTROL AND TESTBED NODES
 - create a script to rebuild the tb-user email list. call when a 
 	user is added. build from scratch using database fields
      	(general principle for db).
-
-- rewrite mkacct because it sucks. it uses chpass and a gazillion
-  piped shell commands, some of which can be eliminated by using pw
-  or built-in shell functions (like chmod(), for example)
-
-- add hooks for mkacct/rmacct into tbrun/end
 
 - do rmacct-ctrl: remove accounts from control node; called when
 	user removed from database. because there is no 
@@ -66,4 +73,6 @@ STUFF TO SET UP USER ACCOUNTS, DIRECTORIES ON CONTROL AND TESTBED NODES
 
 	Lbs
 
+- make regexps in mkacct-ctrl use //i convention and allow dashes 
+  for projects and experiments. 
 
