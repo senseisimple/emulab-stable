@@ -5,13 +5,11 @@ BUILDING THE EVENT SYSTEM
 
 To build the event system, you first need to obtain the Elvin publish/
 subscribe system.  You need both the Elvin client library (libelvin
-version 4.0) and the Elvin server (elvind version 4.0). You may either
-get them directly from http://elvin.dstc.com/ or from the Flux CVS
-repository (module names "libelvin" and "elvind").  Be sure to
-configure the Elvin library with "--enable-threads" to build support
-for Elvin's thread-safe "threaded" API.  Once the Elvin client library
-is built and installed, you may build the event system by doing a
-"make".
+version 4.0) and the Elvin server (elvind version 4.0). You can get
+them directly from http://elvin.dstc.com/. Be sure to configure the
+Elvin library with "--enable-threads" to build support for Elvin's
+thread-safe "threaded" API.  Once the Elvin client library is built
+and installed, you may build the event system by doing a "make".
 
 USING THE EVENT SYSTEM
 
