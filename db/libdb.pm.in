@@ -3,7 +3,8 @@ use English;
 require Mysql;
 
 #
-# A library of useful DB stuff. Mostly things that get done a lot. Saves typing.
+# A library of useful DB stuff. Mostly things that get done a lot.
+# Saves typing.
 #
 
 #
@@ -11,11 +12,17 @@ require Mysql;
 #
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
 
 #
 # Set up for querying the database.
 # 
 my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# Record last DB error string.
+#
+my $DBErrorString = "";
 
 #
 # Test admin status. Optional argument is the UID to test. If not provided,
@@ -138,11 +145,15 @@ sub ProjMember($;$)
 #
 # Issue a DB query. Argument is a string. Returns the actual query object, so
 # it is up to the caller to test it. I would not for one moment view this
-# as encapsulation of the DB interface. I'm just tired of typing the same silly
-# stuff over and over. 
+# as encapsulation of the DB interface. I'm just tired of typing the same
+# silly stuff over and over. 
 # 
 # usage: DBQuery(char *str)
 #        returns the query object result.
+#
+# Sets $DBErrorString is case of error; saving the original query string and
+# the error string from the DB module. Use DBFatal (below) to print/email
+# that string, and then exit.
 #
 sub DBQuery($)
 {
@@ -152,9 +163,9 @@ sub DBQuery($)
     $result = $DB->query($query);
 
     if (! $result) {
-	print "DB Query failed:\n".
-              "   Query: $query\n".
-	      "   Error: " . $DB->errstr . "\n";
+	$DBErrorString =
+	    "  Query: $query\n".
+	    "  Error: " . $DB->errstr . "\n";
     }
     return $result;
 }
@@ -170,9 +181,28 @@ sub DBQueryFatal($)
     $result = DBQuery($query);
 
     if (! $result) {
-	exit(-1);
+	DBFatal("DB Query failed");
     }
     return $result;
+}
+
+#
+# Die and send email after a failed DB query. First argument is the error
+# message to display. The contents of $DBErrorString is also printed.
+# 
+# usage: DBFatal(char *message)
+#
+sub DBFatal($)
+{
+    my($message) = $_[0];
+    my($text);
+
+    $text = "$message\n" . "$DBErrorString";
+
+    system("echo \"$text\" | /usr/bin/mail ".
+	   "-s 'TESTBED: DBFatal - $message' \"$TBOPS\"");
+
+    exit(-1);
 }
 
 1;
