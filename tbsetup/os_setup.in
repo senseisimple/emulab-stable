@@ -725,7 +725,8 @@ elsif (@vnodelist) {
 	# Build up maxwait as we go to be the highest of any pnode
         $maxwait = max($maxwait, 90 + (100 * $pnodevcount{$pnode}));
     }
-    print "(Waiting up to $maxwait seconds)\n";
+    if ($maxwait % 60 != 0) { $maxwait = (int($maxwait/60)+1) * 60; }
+    print "(Waiting up to ".($maxwait/60)." minutes)\n";
 
     my $u = 60; # Update the user every 60 seconds.
     my $total = scalar keys %vnodes;
