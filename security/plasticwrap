@@ -1,7 +1,13 @@
 #!/usr/bin/perl
 
 # Location of ssh program
-$ssh = "/usr/local/bin/ssh";
+if (-x "/usr/local/bin/ssh" ) {
+	$ssh = "/usr/local/bin/ssh";
+} elsif (-x "/usr/bin/ssh" ) {
+	$ssh = "/usr/bin/ssh";
+} else {
+	die "Unable to find ssh - please send mail to testbed-ops\@fast.cs.utah.edu\n";
+}
 
 # Remote host to connect to
 $host = "boss.emulab.net";
