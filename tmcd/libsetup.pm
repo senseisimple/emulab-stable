@@ -201,7 +201,7 @@ sub create_nicknames()
 {
     open(NICK, ">" . TMNICKNAME)
 	or die("Could not open nickname file: $!");
-    print NICK "$pid.$eid.$vname\n";
+    print NICK "$vname.$eid.$pid\n";
     close(NICK);
 
     return 0;
