@@ -11,7 +11,7 @@ use Exporter;
 		getTestSwitches getVlanPorts getExperimentVlans getDeviceNames
 	    	getDeviceType getInterfaceSettings mapPortsToDevices
 		getSwitchStack getStackType getTrunks getTrunksFromSwitches
-		tbsort );
+		getExperimentPorts tbsort );
 
 use English;
 use libdb;

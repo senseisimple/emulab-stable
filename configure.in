@@ -284,6 +284,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         tbsetup/webmkgroup tbsetup/mkgroup \
 	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
+	tbsetup/portstats \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
