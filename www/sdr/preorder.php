@@ -384,7 +384,8 @@ if (! isset($_POST['fakesubmit'])) {
 	  We are currently accepting pre-orders for the motherboard and
 	  the generic connector daughterboard, which provides dual raw coax
 	  connections (SMA connectors to external tuners or signal generators).
-          Ship date is expected to be mid-to-late November 2004.  When we have a firm
+	  The motherboard package includes a wall wart power supply and USB cable.
+          Ship date is expected to be mid-to-late November 2004.  When we approach ship
 	  date we will contact you to confirm/place your actual order.
 	  The quoted prices may change by a small amount, but we are able to guarantee
 	  that the cost of one motherboard plus one generic daughterboard will not
