@@ -14,7 +14,7 @@ sub usage()
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $TESTMODE	= "@TESTMODE@";
+my $TESTMODE	= @TESTMODE@;
 
 #
 # Testbed Support libraries
