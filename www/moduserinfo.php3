@@ -152,6 +152,12 @@ function SPITFORM($formfields, $errors)
         echo "    </td>
               </tr>\n";
 
+        #
+        # Country needs a default for older users.
+        #
+	if (! strcmp($formfields[usr_country], "")) {
+	    $formfields[usr_country] = "USA";
+	}
 
 	echo "<tr><td colspan=3>*Address:<br /><center>
 		<table>
@@ -318,7 +324,7 @@ $defaults[usr_addr2]   = stripslashes($row[usr_addr2]);
 $defaults[usr_city]    = stripslashes($row[usr_city]);
 $defaults[usr_state]   = stripslashes($row[usr_state]);
 $defaults[usr_zip]     = stripslashes($row[usr_zip]);
-$defaults[usr_country]     = stripslashes($row[usr_country]);
+$defaults[usr_country] = stripslashes($row[usr_country]);
 $defaults[usr_name]    = stripslashes($row[usr_name]);
 $defaults[usr_phone]   = $row[usr_phone];
 $defaults[usr_title]   = stripslashes($row[usr_title]);
