@@ -9,14 +9,14 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <syslog.h>
+#include <arpa/inet.h>
+#include <string.h>
 
 #ifdef USE_MYSQL_DB
 #include <mysql/mysql.h>
 
 static char dbname[] = TBDBNAME;
-static MYSQL db;
 static int parse_pathspec(char *path, struct in_addr *sip, char **filename);
-static int clear_next_pxeboot(char *node);
 
 #include <stdarg.h>
 

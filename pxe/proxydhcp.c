@@ -304,7 +304,6 @@ int findiface(struct sockaddr_in *client) {
 	for (i=0;i<ic.ifc_len;) {
 		struct in_addr ifaddr;
 		struct sockaddr_in *iftemp;
-		struct in_addr t;
 		struct ifreq *ifr = (struct ifreq *)((caddr_t)ic.ifc_req+i);
 #ifdef HAVE_SOCKADDR_SA_LEN
 		i += max(sizeof(struct sockaddr), ifr->ifr_addr.sa_len) +
@@ -340,7 +339,7 @@ main(int argc, char *argv[])
 	struct sockaddr_in server, client;
 	struct in_addr sip;
 	int clientlength;
-	int i, argn=1;
+	int argn=1;
 	char *p, bootprog[256], ifname[IFNAMSIZ+1];
 	char arguments[256];
 
@@ -442,8 +441,7 @@ main(int argc, char *argv[])
 			struct in_addr ina;
 		} cm;
 #endif		
-		struct config	*configp;
-		
+
 		clientlength = sizeof(client);
 #ifdef USE_RECVMSG
 #ifdef IP_RECVDSTADDR
