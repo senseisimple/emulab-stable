@@ -889,7 +889,7 @@ Phase "experiments", "Setting up system experiments", sub {
 	    PhaseSkip("Experiment Created")
 		if (-d "/proj/$pid/exp/$eid");
 	    ExecQuietFatal("$SUDO -u elabman $WAP $BATCHEXP ".
-			   "  -q -i -w -f -S 'System Experiment' ".
+			   "  -q -i -w -f -n -S 'System Experiment' ".
 			   "  -L 'System Experiment' ".
 			   "  -E '$desc - DO NOT DELETE' ".
 			   "  -p $pid -e $eid");
