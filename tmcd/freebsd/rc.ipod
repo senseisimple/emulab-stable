@@ -1,0 +1,68 @@
+#/bin/sh -
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Enable ICMP ping-of-death
+# Support both the old style (host only) and the new style (host+mask+key)
+#
+# This is a shell script instead of a perl script since we want to use this
+# in the frisbee MFS which does not include perl.
+#
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/rc.d/testbed
+fi
+
+# Grotesque sed/awk converts IP addrs into an integer for sysctl
+IPODINFO=`$BINDIR/tmcc ipodinfo`
+if [ x"$IPODINFO" != x ]; then
+	IPODHOST=`echo $IPODINFO | \
+		sed -e 's/.*HOST=\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1 \2 \3 \4/' | \
+		awk '{ printf "%d\n", $1*16777216+$2*65536+$3*256+$4 }'`
+	IPODMASK=`echo $IPODINFO | \
+		sed -e 's/.*MASK=\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1 \2 \3 \4/' | \
+		awk '{ printf "%d\n", $1*16777216+$2*65536+$3*256+$4 }'`
+	IPODHASH=`echo $IPODINFO | \
+		sed -e 's/.*HASH=\(.*\)/\1/'`
+
+	# See if this is new or old style IPoD
+	sysctl -w net.inet.icmp.ipod.enabled=0 >/dev/null 2>&1
+	case $? in
+	0)
+		# new style
+		sysctl -w net.inet.icmp.ipod.host=$IPODHOST >/dev/null
+		sysctl -w net.inet.icmp.ipod.mask=$IPODMASK >/dev/null
+		sysctl -w net.inet.icmp.ipod.hash=$IPODHASH >/dev/null
+		sysctl -w net.inet.icmp.ipod.enabled=1 >/dev/null
+		str="Authenticated"
+		;;
+	*)
+		sysctl -w net.inet.icmp.ipod_enabled=0 >/dev/null 2>&1
+		case $? in
+		0)
+			# old style
+			sysctl -w net.inet.icmp.ipod_host=$IPODHOST >/dev/null
+			sysctl -w net.inet.icmp.ipod_enabled=1 >/dev/null
+			str="Old-style"
+			;;
+		*)
+			# no style
+			echo "*** WARNING: no IPOD sysctls, not enabled"
+			exit 1
+		esac
+	esac
+	IPODHOST=`echo $IPODINFO | \
+		sed -e 's/.*HOST=\([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*\).*/\1/'`
+	IPODMASK=`echo $IPODINFO | \
+		sed -e 's/.*MASK=\([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*\).*/\1/'`
+	echo "$str IPOD enabled from $IPODHOST/$IPODMASK"
+else
+	echo "*** WARNING: no IPOD info, not enabled"
+fi
+
