@@ -2,13 +2,32 @@
 use English;
 
 #
+# Back up the DB, rolling the base and update logs. The approach is to
+# open up the index file and see what the name of the current update file
+# is. It has a numeric extension. Rename the base log to base.XXX,
+# and then snapshot the DB into backup.XXX So, the combination of
+# update.XXX and base.XXX is the DB history since the last time the script
+# was run. The file backup.XXX corresponds to the DB at this point in time.
+#
+# To restore (or track the changes of) a DB, simply take backup.XXX and 
+# apply the changes that are stored in update.XXX+1 (which are the changes
+# made since backup.XXX was made). This should give you a DB that is the
+# same as backup.XXX+1. You can go back further, and just apply all the
+# subsequent update.XXX files. 
+# 
+
+#
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
 
 my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
+my $BASE	= "base";
+my $BACK	= "tbdb";
+my $extension;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -32,13 +51,6 @@ if ($UID != 0) {
 }
 
 #
-# Format the name of the backups with date.
-#
-my $extension = TBDateTimeFSSafe();
-my $backname  = "tbdb-$extension";
-my $basename  = "base-$extension";
-    
-#
 # Create a temporary name for a log file and untaint it.
 #
 #
@@ -60,16 +72,40 @@ open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 if (! chdir($BACKUPDIR)) {
-    print STDERR "Could not chdir to $BACKUPDIR: $!\n";
-    fatal();
+    fatal("Could not chdir to $BACKUPDIR: $!");
 }
+
+#
+# Open up the index file to see what the current update file extension is.
+# The base/backup files correspond to this most recent update file, and
+# so should be named with that extension.
+#
+# Read through to the last line and get its extension. This becomes
+# the extension for the other files. No locking is needed.
+#
+open(IDX, "< $LOGDIR/update.index") or
+    fatal("Could not open $LOGDIR/update.index: $!");
+
+while (<IDX>) {
+    if ($_ =~ /^.*\.([0-9]*)$/) {
+	$extension = $1;
+    }
+}
+close(IDX);
+print "Extension:        $extension\n";
+
+my $backname  = "$BACK.$extension";
+my $basename  = "$BASE.$extension";
+
+print "Backup file name: $backname\n";
+print "Base file name:   $basename\n";
 
 #
 # Move base log out of the way since flush-logs will reset it too.
 #
-if (-e "$LOGDIR/base") {
-    if (system("/bin/mv $LOGDIR/base $LOGDIR/$basename")) {
-	print STDERR "Could not move $LOGDIR/base $LOGDIR/$basename!";
+if (-e "$LOGDIR/$BASE") {
+    if (system("/bin/mv $LOGDIR/$BASE $LOGDIR/$basename")) {
+	print STDERR "Could not move $LOGDIR/$BASE to $LOGDIR/$basename!";
     }
 }
 
@@ -77,35 +113,35 @@ if (-e "$LOGDIR/base") {
 # Do a mysqldump. This will reset the log files.
 #
 if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
-    print STDERR "mysqldump failed!\n";
-    fatal();
+    fatal("mysqldump failed!");
 }
 
+#
+# Compress the files.
+# 
 if (system("gzip -9 $backname")) {
-    print STDERR "gzip $backname failed!\n";
-    fatal();
+    fatal("gzip $backname failed!");
 }
 
-#
-# Compress the base log too, since they get huge!
-#
 if (! chdir($LOGDIR)) {
-    print STDERR "Could not chdir to $LOGDIR: $!\n";
-    fatal();
+    fatal("Could not chdir to $LOGDIR: $!");
 }
 
-if (-e $basename && system("gzip -9 $basename")) {
-    print STDERR "gzip $basename failed!\n";
-    fatal();
+if (-e "$basename" && system("gzip -9 $basename")) {
+    fatal("gzip $basename failed!");
 }
 
 #system("cat $logname | /usr/bin/mail -s '\"DB Backup Finished\"' stoller");
 unlink("$logname");
 exit 0;
 
-sub fatal {
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    
     system("cat $logname | /usr/bin/mail ".
-	   "-s '\"DB Backup Failed\"' testbed\@fast");
+	   "-s '\"DB Backup Failed\"' \"$TBOPS\"");
     unlink("$logname");
     exit(1);
 }
