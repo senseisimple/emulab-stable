@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -72,6 +72,9 @@ sub ntpdate() {
     # give the boss node's name
     #
     my $bossname = tmccbossname();
+    if (!defined($bossname)) {
+	return (1);
+    }
     my $ntpcmd   = "$ntpdate -b -s ";
     if (REMOTE()) {
 	$ntpcmd .= "-t 5 ";
