@@ -64,4 +64,7 @@ if (strlen( $nsdata ) > 50000) {
 
 fwrite($fp, $nsdata);
 fclose($fp);
+
+header("Content-Type: text/plain");
+echo "success!";
 ?>
