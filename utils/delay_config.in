@@ -99,7 +99,7 @@ if (defined($options{"s"})) {
     $srcvnode = $options{"s"};
 
     if ($srcvnode =~ /^([-\w]+)$/) {
-	$srcnode = $1;
+	$srcvnode = $1;
     }
     else {
 	die("*** Bad srcvnode name: $srcvnode.\n");
