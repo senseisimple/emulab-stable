@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -249,7 +249,7 @@ if (! $frontend) {
     #
     if (ExpNodes($pid, $eid) > 2) {
 	my $vlans_result =
-	    DBQueryFatal("select * from vlans where ".
+	    DBQueryFatal("select pid from virt_lans where ".
 			 "pid='$pid' and eid='$eid'");
     
 	if (!$vlans_result->numrows) {
@@ -271,9 +271,11 @@ if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
 #
 # Increment the project experiment count/lastdate. This is informational. 
 #
-DBQueryWarn("update projects ".
-	    "set expt_count=expt_count+1, expt_last=now() ".
-	    "where pid='$pid'");
+if (! $frontend) {
+    DBQueryWarn("update projects ".
+		"set expt_count=expt_count+1, expt_last=now() ".
+		"where pid='$pid'");
+}
 
 #
 # Gen up a date for the started field of the record, and insert it.
@@ -321,13 +323,26 @@ TBExptCloseLogFile($pid, $eid);
 #
 # Dump the report file and the log file to the user via email. 
 #
-my $message = 
-    "Your experiment `$eid' in project `$pid' is now configured.\n" .
-    "Here is the experiment summary detailing the nodes that were\n" .
-    "allocated to you. You may use the `Qualified Name' to log on\n" .
-    "to your nodes. See /etc/hosts on your nodes (when running\n" .
-    "FreeBSD, Linux, or NetBSD) for the IP mapping on each node\n" .
-    "\n" .
+my $message;
+
+if ($frontend) {
+    $message =
+	"Your experiment `$eid' in project `$pid' is now preloaded.\n" .
+	"You can check the web interface to see if it looks the way\n" .
+	"you expected it to. If so, you may swap the experiment in,\n" .
+	"or terminate it, at any time.\n" .
+        "\n";
+}
+else {
+    $message =
+	"Your experiment `$eid' in project `$pid' is now configured.\n" .
+	"Here is the experiment summary detailing the nodes that were\n" .
+	"allocated to you. You may use the `Qualified Name' to log on\n" .
+	"to your nodes. See /etc/hosts on your nodes (when running\n" .
+	"FreeBSD, Linux, or NetBSD) for the IP mapping on each node.\n" .
+        "\n";
+}
+$message .=
     "User:        $user_name\n" .
     "EID:         $eid\n" .
     "PID:         $pid\n" .
@@ -344,7 +359,8 @@ my $message =
    
 
 SENDMAIL("$user_name <$user_email>",
-	 "New Experiment Created: $pid/$eid",
+	 "New Experiment " . (($frontend == 0) ? "Created" : "Preloaded") .
+	 ": $pid/$eid",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
