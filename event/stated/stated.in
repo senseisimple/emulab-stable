@@ -23,6 +23,7 @@
 use lib '@prefix@/lib';
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = "@TBOPSEMAIL@";
+my $TBDBNAME = "@TBDBNAME@";
 
 $| = 1;
 
@@ -32,13 +33,6 @@ use libtestbed;
 use Getopt::Std;
 use strict;
 use English;
-
-#
-# Will need permissions to do something about nodes that have timed out
-#
-if ($UID != 0) {
-	die "This should only be run as root!\n";
-}
 
 #
 # Number of iterations (roughly, seconds) after which we'll reload 
@@ -53,32 +47,43 @@ my $reload_time = 3600;
 
 sub usage {
 	print << "END";
-Usage: $0 [-d] [-s server] [-p port] [-h]
+Usage: $0 [-d] [-s server] [-p port] [-f] [-h]
 -s server       Use specified server, instead of this site's bossnode
 -p port	        Use specified port
 -d              Turn on debugging output, and don't go into the background
+-f              Stay in the foreground, rather than forking
 -h              This message
 END
 }
 
 my %opt = ();
-getopts("ds:p:h",\%opt);
+getopts("ds:p:hf",\%opt);
 
 if ($opt{h}) { exit &usage; }
 if (@ARGV) { exit &usage; }
 
-my ($server,$port,$debug);
+my ($server,$port,$debug,$nofork);
 if ($opt{s}) { $server = $opt{s}; } else { $server = $BOSSNODE; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{d}) { $debug = 1; } else { $debug = 0; }
+if ($opt{f}) { $nofork = 1; } else { $nofork = 0; }
 
 #
 # Background
 #
-if (!$debug) {
-	if (TBBackGround("@prefix@/log/stated.log")) {
+my $logname = "@prefix@/log/stated.log";
+if (!$debug && !$nofork) {
+	if (TBBackGround($logname)) {
 		exit(0);
 	}
+} else {
+    if ($nofork) {
+	#
+	# Open our log file manually
+	#
+	open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+	open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+    }
 }
 
 my $URL = "elvin://$server";
@@ -249,6 +254,14 @@ sub handleEvent($$$) {
 
 	print "Got an event: ($objtype,$objname,$eventtype)\n";
 
+	#
+	# Check to see if another instance is supposed to be handling this node
+	#
+	if (!checkDBRedirect($objname)) {
+	    print "Got an event for node $objname, which isn't mine\n";
+	    return;
+	}
+
 	SWITCH: for ($objtype) {
 
 	    #
@@ -320,6 +333,43 @@ sub opModeTransition($$) {
 	DBQueryFatal("UPDATE nodes SET op_mode='$newmode', " .
 		     "op_mode_timestamp='$now' WHERE node_id='$node'");
 
+}
+
+#
+# Figure out if this node belongs to us (ie. if it's using our database.)
+# Returns 1 if it does, 0 if not
+#
+sub checkDBRedirect($) {
+
+	my ($node) = @_;
+
+	#
+	# XXX: I don't want to do this every time, for performance reaons,
+	# but we need to make sure that we don't get into an inconsistent 
+	# state
+	#
+	my $result = DBQueryFatal("SELECT testdb FROM nodes as n " .
+		"LEFT JOIN reserved as r ON n.node_id = r.node_id " .
+		"LEFT JOIN experiments as e ON r.pid = e.pid " .
+			"AND r.eid = e.eid " .
+		"WHERE n.node_id = '$node'");
+
+	if (!$result->num_rows()) {
+		notify("Got an event for a node ($node) I don't know about\n");
+		return 0;
+	}
+
+	my ($testdb) = $result->fetchrow();
+
+	#
+	# XXX: It's hokey to hardcode tbdb here, but....
+	#
+	if ((!$testdb && ($TBDBNAME eq "tbdb")) ||
+	    ($testdb && ($testdb eq $TBDBNAME))) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 #
