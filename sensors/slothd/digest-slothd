@@ -1,6 +1,12 @@
 #! /usr/bin/awk -f
 
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Digest slothd logs and generate a TCL file that contains resource usage data
 # that can be fed back into the mapper.
 #
