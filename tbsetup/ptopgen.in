@@ -109,16 +109,20 @@ if (defined($options{"e"})) {
 # Read class/type maps
 my $result =
     DBQueryFatal("select class,type,delay_capacity,".
-		 "   virtnode_capacity,isvirtnode,simnode_capacity ".
+		 "   virtnode_capacity,isvirtnode,simnode_capacity, " .
+		 "   speed, RAM ".
 		 "from node_types");
 while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt,$simcapacity) = $result->fetchrow_array) {
+	$virtcapacity,$isvirt,$simcapacity, $speed, $ram)
+	    = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
     $map->{'DELAYCAP'} = $delaycapacity;
     $map->{'VIRTCAP'}  = $virtcapacity;
     $map->{'SIMCAP'}   = $simcapacity;
     $map->{'ISVIRT'}   = $isvirt;
+    $map->{'SPEED'}    = $speed;
+    $map->{'RAM'}      = $ram;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
     $typemap{$type} = $map;
@@ -255,6 +259,8 @@ foreach $node (keys(%nodes)) {
     my $class = $typemap{$type}->{'CLASS'};
     my $delay_capacity = $typemap{$type}->{'DELAYCAP'};
     my $simnode_capacity = $typemap{$type}->{'SIMCAP'};
+    my $cpu_speed = $typemap{$type}->{'SPEED'};
+    my $ram = $typemap{$type}->{'RAM'};
     
     my @types = ("$type:1");
     my @features;
@@ -317,6 +323,11 @@ foreach $node (keys(%nodes)) {
 	push @types, "*lan:*";
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:400000";
+	# Add CPU and RAM information
+	push @features, "?+cpu:$cpu_speed";
+	push @features, "?+ram:$ram";
+	# This number can be use for fine-tuning packing
+	push @features, "?+virtpercent:100";
     }
 
     if ($simstuff && $simnode_capacity > 0) {
