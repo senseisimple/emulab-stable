@@ -747,10 +747,10 @@ elseif (! TBvalid_num_ron($formfields[proj_ronpcs])) {
 }
 if (!isset($formfields[proj_why]) ||
     strcmp($formfields[proj_why], "") == 0) {
-    $errors["Why?"] = "Missing Field";
+    $errors["How and Why?"] = "Missing Field";
 }
-elseif (! TBvalid_description($formfields[proj_why])) {
-    $errors["Why?"] = TBFieldErrorString();
+elseif (! TBvalid_why($formfields[proj_why])) {
+    $errors["How and Why?"] = TBFieldErrorString();
 }
 if ((!isset($formfields[proj_public]) ||
      strcmp($formfields[proj_public], "checked")) &&

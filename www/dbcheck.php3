@@ -218,6 +218,10 @@ function TBvalid_country($token) {
 function TBvalid_description($token) {
     return TBvalid_userdata($token);
 }
+function TBvalid_why($token) {
+    return TBcheck_dbslot($token, "projects", "why",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_integer($token) {
     return TBcheck_dbslot($token, "default", "int",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
