@@ -95,7 +95,7 @@ Then unmount/close the boot floopy.
 
 *** To create a new ISO file once you have modified the tree:
 
-       mkisofs -U -R -b floppies/boot.flp -c floppies/boot.catalog \
+       sudo mkisofs -U -R -b floppies/boot.flp -c floppies/boot.catalog \
 		-o /path/bootable.iso /FOO
 
 
