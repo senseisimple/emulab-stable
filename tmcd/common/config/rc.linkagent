@@ -171,8 +171,4 @@ sub doreconfig()
 #
 sub docleanup()
 {
-    # Remove config file; will be regenerated at next boot.
-    if (-e $CONFIG) {
-	unlink $CONFIG;
-    }
 }
