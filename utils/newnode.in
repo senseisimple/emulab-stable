@@ -120,7 +120,7 @@ my @node_ids = @ARGV;
 #
 # Now, loop through the nodes given, and add each one
 #
-my (@succeeded_nodes, @succeeded_IPs);
+my (@succeeded_nodes, @reboot_IPs);
 NODE: foreach my $node_id (@node_ids) {
     my $query_result;
 
@@ -400,7 +400,13 @@ NODE: foreach my $node_id (@node_ids) {
     print "$node_id succesfully added!\n";
 
     push @succeeded_nodes, $node_id;
-    push @succeeded_IPs, $tempIP;
+
+    #
+    # Only reboot regular nodes, not ops nodes
+    #
+    if ($role ne "ctrlnode") {
+	push @reboot_IPs, $tempIP;
+    }
 }
 
 #
@@ -450,7 +456,7 @@ if ($exports_rv) {
 # Start rebooting nodes
 #
 print "Rebooting nodes...\n";
-foreach my $IP (@succeeded_IPs) {
+foreach my $IP (@reboot_IPs) {
     print "Rebooting $IP\n";
     system "$newnode_reboot $IP\n";
 }
