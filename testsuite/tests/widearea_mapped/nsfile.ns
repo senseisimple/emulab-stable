@@ -1,0 +1,17 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set nodeA [$ns node]
+set nodeB [$ns node]
+set nodeC [$ns node]
+
+tb-set-hardware $nodeA pcvron
+tb-set-hardware $nodeB pcvron
+tb-set-hardware $nodeC pcvron
+
+set link0 [$ns duplex-link $nodeA $nodeB 2Mb 50ms DropTail]
+set link1 [$ns duplex-link $nodeA $nodeC 1Mb 75ms DropTail]
+set link2 [$ns duplex-link $nodeB $nodeC 0.5Mb 100ms DropTail]
+
+$ns run
+

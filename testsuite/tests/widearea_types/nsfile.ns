@@ -1,0 +1,17 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set nodeA [$ns node]
+set nodeB [$ns node]
+set nodeC [$ns node]
+set nodeD [$ns node]
+set nodeE [$ns node]
+
+tb-set-hardware $nodeA pcvroninet2
+tb-set-hardware $nodeB pcvroninet
+tb-set-hardware $nodeC pcvronintl
+tb-set-hardware $nodeD pcvrondsl
+tb-set-hardware $nodeE pcvwainet
+
+$ns run
+
