@@ -72,7 +72,8 @@ if ($detail != 0) { $detailstring = "-d $detail"; } else { $detailstring = ""; }
 # Spit out the image with a content header.
 #
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $detailstring -z $zoom $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology " .
+		"$detailstring -z $zoom $pid $eid", "r")) {
     header("Content-type: image/png");
     fpassthru($fp);
 }

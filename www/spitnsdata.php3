@@ -27,17 +27,22 @@ if (isset($nsdata) && strcmp($nsdata, "") != 0) {
     header("Content-Type: text/plain");
     echo "$nsdata";
 } elseif (isset($nsref) && strcmp($nsref,"") != 0 && ereg("^[0-9]+$", $nsref)) {
-    $nsfile = "/tmp/$uid-$nsref.nsfile";
-    if (! ($fp = fopen($nsfile, "r"))) {
-	TBERROR("Could not read temporary file $nsfile", 1);
+    $nsfile = "/tmp/$uid-$nsref.nsfile";    
+
+    if (! file_exists($nsfile)) {
+	PAGEHEADER("View Generated NS File");
+	USERERROR("Could not find temporary file \"$nsfile\"<br>" . 
+	          "(Did you copy and paste an URL incorrectly?)", 1);
+	PAGEFOOTER();
     } else {
+	$fp = fopen($nsfile, "r");
 	header("Content-Type: text/plain");
 	$contents = fread ($fp, filesize ($nsfile));
 	fclose($fp);
 	echo "$contents";
     }
 } else {
-    PAGEERROR("No NS file provided!");
+    USERERROR("No NS file provided!",1);
 }
 
 ?>
