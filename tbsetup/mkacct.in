@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -348,8 +348,9 @@ if ($control_node ne $BOSSNODE) {
     }
 
     print "Updating user $user password on $control_node.\n";
+    $pswd =~ s/\$/\\\\\\\$/g;
 
-    if (system("$SSH -host $control_node $CHPASS -p $pswd $user")) {
+    if (system("$SSH -host $control_node $CHPASS -p '$pswd' $user")) {
 	fatal("Could not change password for user $user on $control_node.\n");
     }
 }
