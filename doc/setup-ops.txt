@@ -123,3 +123,12 @@ archive files, one per line.
 hosts file - It's a good idea to put boss' name/IP address in /etc/hosts - ops
 is usually booted before boss (since the latter NFS mounts the former), so this
 will help things that want to look up boss' name before it boots.
+
+Sharing the /share directory - we export the /share/ directory on ops read-only
+to all of the nodes in the testbed. Put a line like this at the end of your
+/etc/exports.head file:
+/share          -network 155.101.128 -mask 255.255.255.0 -alldirs -maproot=root
+... except that you'll want to replace that network and netmask with the one
+your nodes reside in. Then, copy /etc/exports.head to /etc/exports .
+
+Once you're done with all of this, reboot ops.
