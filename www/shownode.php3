@@ -44,6 +44,38 @@ if (! $isadmin) {
     }
 }
 
+
+echo "<font size=+2>".
+     "Node <b>$node_id</b>";
+
+$query_result = DBQueryFatal("select r.vname,r.pid,r.eid from nodes as n ".
+	 		     "left join reserved as r on n.node_id=r.node_id ".
+  		             "where n.node_id='$node_id'");
+
+if (mysql_num_rows($query_result) != 0) {
+    $row = mysql_fetch_array($query_result);
+    $vname		= $row[vname];
+    $pid 		= $row[pid];
+    $eid		= $row[eid];
+
+    if ($vname != "") {
+#	    echo " (<b>".
+#        	 "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+#	         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>/".
+#        	 "$vname</b>)";
+
+	    echo " (<b>".
+        	 "$vname.".
+	         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
+        	 "<a href='showproject.php3?pid=$pid'>$pid</a>.".
+		 "$OURDOMAIN".
+                 "</b>)";
+
+    }
+}	
+
+echo "</font><br /><br />\n";
+
 SUBPAGESTART();
 SUBMENUSTART("Node Options");
 

@@ -52,7 +52,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 
 $expstate = TBExptState($exp_pid, $exp_eid);
 
-echo "<font size=+2><b>".
+echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "$eid</b></font>\n";
 echo "<br /><br />\n";
