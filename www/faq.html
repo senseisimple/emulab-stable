@@ -1390,6 +1390,25 @@
       rtproto commands will not do it.)
     </p>
 
+    <p>
+      When using multicast, there are a few issues you need to be aware
+      of. The first is the fact that multicast traffic will often find
+      the control network, rather than the experimental network, which
+      you don't want. See <a href = "tutorial/tutorial.php3#ControlNet">this
+	  section</a> of the tutorial for information about the control net.
+      There are two ways to work around the control net. The first is to
+      set a route for all multicast addresses (224.0.0.0/4) to go out the
+      experimental interface of your node. The second is to have your program
+      use the IP_MULTICAST_IF sockopt to bind to a particular interface.
+    </p>
+
+    <p>
+      You should also stay away from multicast addresses that have special
+      meanings, such as 224.0.0.1 . You can get a list of these addresses
+      from IANA <a href="http://www.iana.org/assignments/multicast-addresses">
+	  here</a>.
+    </p>
+
 </ul>
 
 <hr>
