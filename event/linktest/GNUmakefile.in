@@ -10,12 +10,13 @@ OBJDIR		= ../..
 SUBDIR		= event/linktest
 LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
+NSTOIRDIR	= $(TESTBED_SRCDIR)/tbsetup/ns2ir
 DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 SCRIPT_TBCOMPAT = tb_compat.tcl
-SCRIPT_NSTB_COMPAT = /usr/testbed/lib/ns2ir/nstb_compat.tcl
+SCRIPT_NSTB_COMPAT = nstb_compat.tcl
 
 SYSTEM	       := $(shell uname -s)
 
@@ -87,7 +88,7 @@ client-install: all
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 	$(INSTALL_PROGRAM) $(SCRIPT_TBCOMPAT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_TBCOMPAT)
-	$(INSTALL_PROGRAM) $(SCRIPT_NSTB_COMPAT) \
+	$(INSTALL_PROGRAM) $(NSTOIRDIR)/$(SCRIPT_NSTB_COMPAT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_NSTB_COMPAT)
 
 lt-install:
