@@ -51,6 +51,7 @@ int	infd, outfd, outcanseek;
 int	secsize	  = 512;	/* XXX bytes. */
 int	debug	  = 0;
 int     info      = 0;
+int     version   = 0;
 int     slicemode = 0;
 int     maxmode   = 0;
 int     slice     = 0;
@@ -197,9 +198,13 @@ main(argc, argv)
 	int	linuxfs	  = 0;
 	int	bsdfs     = 0;
 	int	rawmode	  = 0;
+	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "lbdihrs:c:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:")) != -1)
 		switch(ch) {
+		case 'v':
+			version++;
+			break;
 		case 'i':
 			info++;
 			break;
@@ -230,6 +235,12 @@ main(argc, argv)
 		}
 	argc -= optind;
 	argv += optind;
+
+	if (version || info || debug) {
+		fprintf(stderr, "%s\n", build_info);
+		if (version)
+			exit(0);
+	}
 
 	if (argc < 1 || argc > 2)
 		usage();
@@ -1137,7 +1148,8 @@ read_raw(void)
 }
 
 char *usagestr = 
- "usage: imagezip [-idlbhr] [-s #] [-c #] <image | device> [outputfilename]\n"
+ "usage: imagezip [-vidlbhr] [-s #] [-c #] <image | device> [outputfilename]\n"
+ " -v              Print version info and exit\n"
  " -i              Info mode only. Do not write an output file\n"
  " -d              Turn on debugging. Multiple -d options increase output\n"
  " -r              A `raw' image. No FS compression is attempted\n"
@@ -1145,7 +1157,7 @@ char *usagestr =
  " -s slice        Compress a particular slice (DOS numbering 1-4)\n"
  " -h              Print this help message\n"
  " image | device  The input image or a device special file (ie: /dev/rad2)\n"
- " outputfilename  The output file, when -i is not specified\n"
+ " outputfilename  The output file. Use - for stdout. \n"
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
  " -l              Linux slice only. Input must be a Linux slice image\n"

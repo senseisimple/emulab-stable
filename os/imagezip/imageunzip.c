@@ -56,6 +56,7 @@ static int	 doseek = 0;
 static int	 dofill = 0;
 static unsigned	 fillpat= 0;
 static int	 debug  = 0;
+static int	 version= 0;
 static int	 dots   = 1;
 static int	 dotcol;
 static long long total  = 0;
@@ -95,7 +96,8 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: "
-		"imageunzip [-d] [-s #] <input filename> [output filename]\n"
+		"imageunzip options <input filename> [output filename]\n"
+		" -v              Print version info and exit\n"
 		" -s slice        Output to DOS slice (DOS numbering 1-4)\n"
 		"                 NOTE: Must specify a raw disk device.\n"
 		" -z              Write zeros to free blocks.\n"
@@ -112,11 +114,16 @@ main(int argc, char **argv)
 {
 	int		i, ch, slice = 0;
 	struct timeval  stamp, estamp;
+	extern char	build_info[];
 
-	while ((ch = getopt(argc, argv, "dhs:zp:o")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:o")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
+			break;
+
+		case 'v':
+			version++;
 			break;
 
 		case 'o':
@@ -140,6 +147,12 @@ main(int argc, char **argv)
 		}
 	argc -= optind;
 	argv += optind;
+
+	if (version || debug) {
+		fprintf(stderr, "%s\n", build_info);
+		if (version)
+			exit(0);
+	}
 
 	if (argc < 1 || argc > 2)
 		usage();

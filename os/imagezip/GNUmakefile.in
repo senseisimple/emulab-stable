@@ -31,17 +31,20 @@ all:	imagezip imageunzip frisbee.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: $(NTFSDIR) imagezip.o
-	$(CC) $(CFLAGS) imagezip.o $(LIBS) -o imagezip
+imagezip: $(NTFSDIR) imagezip.o version.o 
+	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
 
-imageunzip: imageunzip.o 
-	$(CC) $(CFLAGS) imageunzip.o $(LIBS) -o imageunzip
+imageunzip: imageunzip.o version.o 
+	$(CC) $(CFLAGS) imageunzip.o version.o $(LIBS) -o imageunzip
 
 frisbee.o:	imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -o frisbee.o $<
 
 ntfs:
 	@$(MAKE) -C ntfs all
+
+version.c: imagezip.c imageunzip.c
+	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 
@@ -53,6 +56,6 @@ clean:
 	@if [ -d ntfs ]; then \
 		$(MAKE) -C ntfs clean; \
 	fi;
-	/bin/rm -f *.o imagezip imageunzip
+	/bin/rm -f *.o imagezip imageunzip version.c
 
 .PHONY:	$(NTFSDIR)
