@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Create a new OSID");
+PAGEHEADER("Create a new OS Descriptor");
 
 #
 # Only known and logged in users can create an OSID.
@@ -20,9 +20,9 @@ $isadmin = ISADMIN($uid);
 # informative. Be sure to correlate these checks with any changes made to
 # the project form. 
 #
-if (!isset($osid) ||
-    strcmp($osid, "") == 0) {
-  FORMERROR("OSID");
+if (!isset($osname) ||
+    strcmp($osname, "") == 0) {
+  FORMERROR("Descriptor Name");
 }
 if (!isset($pid) ||
     strcmp($pid, "") == 0) {
@@ -30,12 +30,18 @@ if (!isset($pid) ||
 }
 if (!isset($description) ||
     strcmp($description, "") == 0) {
-  FORMERROR("OSID Description");
+  FORMERROR("Description");
 }
 if (!isset($OS) ||
-    strcmp($OS, "") == 0) {
-  FORMERROR("Operating System (OS)");
+    strcmp($OS, "") == 0 ||
+    (strcmp($OS, "Linux") &&
+     strcmp($OS, "FreeBSD") &&
+     strcmp($OS, "NetBSD") &&
+     strcmp($OS, "OSKit") &&
+     strcmp($OS, "Unknown"))) {
+    FORMERROR("Operating System (OS)");
 }
+
 if (isset($os_path) &&
     strcmp($os_path, "") == 0) {
     unset($os_path);
@@ -46,11 +52,11 @@ if (isset($os_version) &&
 }
 
 #
-# Check osid for sillyness.
+# Check osname for sillyness.
 #
-if (! ereg("^[-_a-zA-Z0-9\.]+$", $osid)) {
-    USERERROR("The OSID must consist of alphanumeric characters and ".
-	      "dash, dot, or underscore!", 1);
+if (! ereg("^[-_a-zA-Z0-9\.]+$", $osname)) {
+    USERERROR("The Descriptor name must consist of alphanumeric characters ".
+	      "and dash, dot, or underscore!", 1);
 }
 
 if (isset($os_path)) {
@@ -64,21 +70,22 @@ if (isset($os_path)) {
     }
 }
 
-if (isset($os_version)) {
-    if (strcmp($os_version, "") &&
+if (! isset($os_version)) {
+    if (! $isadmin) {
+	USERERROR("You must supply a version string!", 1);
+    }
+    $os_version = "";
+}
+else if (strcmp($os_version, "") &&
 	! ereg("^[-_a-zA-Z0-9\.]+$", $os_version)) {
 	USERERROR("The version string contains invalid characters!", 1);
-    }
-}
-else {
-    $os_version = "";
 }
 
 #
 # Database limits
 #
-if (strlen($osid) > $TBDB_OSID_OSIDLEN) {
-    USERERROR("The OSID \"$osid\" is too long! Please select another.", 1);
+if (strlen($osname) > $TBDB_OSID_OSNAMELEN) {
+    USERERROR("The Descriptor name is too long! Please select another.", 1);
 }
 
 #
@@ -93,23 +100,25 @@ else {
 }
 
 #
-# Only admin types can set the PID to none (for sharing).
+# Verify permission.
 #
-if (!isset($pid) ||
-    strcmp($pid, "none") == 0) {
+if (!TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEOSID)) {
+    USERERROR("You do not have permission to create OS Descriptors ".
+	      "in Project $pid!", 1);
+}
+
+#
+# Only admin types can set the shared bit,
+#
+if (isset($os_shared) &&
+    strcmp($os_shared, "Yep") == 0) {
     if (!$isadmin) {
-	USERERROR("Only Emulab Administrators can specify 'none' for the ".
-                  "project.", 1);
+	USERERROR("Only Emulab Administrators can set the shared flag!", 1);
     }
-    unset($pid);
+    $os_shared = 1;
 }
 else {
-    #
-    # Verify permission.
-    #
-    if (!TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEOSID)) {
-	USERERROR("You do not have permission to create OSID $osid!", 1);
-    }
+    $os_shared = 0;
 }
 
 #
@@ -128,21 +137,8 @@ if (isset($os_feature_ipod)) {
 $os_features = join(",", $os_features_array);
 
 #
-# Of course, the OSID record may not already exist in the DB.
-#
-if (TBValidOSID($osid)) {
-    USERERROR("The OSID '$osid' already exists! Please select another.", 1);
-}
-
-#
 # And insert the record!
 #
-if (isset($pid)) {
-    $pid = "'$pid'";
-}
-else {
-    $pid = "NULL";
-}
 if (isset($os_path)) {
     $os_path = "'$os_path'";
 }
@@ -150,24 +146,56 @@ else {
     $os_path = "NULL";
 }
 
+DBQueryFatal("lock tables os_info write");
+
+#
+# Of course, the OS record may not already exist in the DB.
+#
+if (TBValidOS($pid, $osname)) {
+    DBQueryFatal("unlock tables");
+    USERERROR("The OS Descriptor '$osname' already exists in Project $pid! ".
+              "Please select another.", 1);
+}
+
+#
+# Just concat them to form a unique imageid. 
+# 
+$osid = "$pid-$osname";
+if (TBValidOSID($osid)) {
+    DBQueryFatal("unlock tables");
+    TBERROR("Could not form a unique osid for $pid/$osname!", 1);
+}
+
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
-		 "(osid, description, OS, version, path, magic, machinetype, ".
-		 " osfeatures, pid) ".
-		 "VALUES ('$osid', '$description', '$OS', '$os_version', ".
-		 "         $os_path, '$os_magic', '$os_machinetype', ".
-		 "         '$os_features', $pid)");
+		 "(osname, osid, description, OS, version, path, magic, ".
+		 " osfeatures, pid, shared) ".
+		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
+		 "        '$os_version', $os_path, '$os_magic', ".
+		 "        '$os_features', '$pid', $os_shared)");
+
+DBQueryFatal("unlock tables");
+
+SUBPAGESTART();
+SUBMENUSTART("More Options");
+WRITESUBMENUBUTTON("Delete this OS Descriptor",
+		   "deleteosid.php3?osid=$osid");
+WRITESUBMENUBUTTON("Create a new OS Descriptor",
+		   "newosid_form.php3");
+WRITESUBMENUBUTTON("Create a new Image Descriptor",
+		   "newimageid_explain.php3");
+WRITESUBMENUBUTTON("Back to OS Descriptor list",
+		   "showosid_list.php3");
+WRITESUBMENUBUTTON("Back to Image Descriptor list",
+		   "showimageid_list.php3");
+SUBMENUEND();
 
 #
 # Dump os_info record.
 # 
 SHOWOSINFO($osid);
 
-# Terminate option.
-echo "<p><center>
-       Do you want to remove this OSID?
-       <A href='deleteosid.php3?osid=$osid'>Yes</a>
-      </center>\n";    
+SUBPAGEEND();
 
 #
 # Standard Testbed Footer

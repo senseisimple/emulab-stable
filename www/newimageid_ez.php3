@@ -5,14 +5,31 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Create a new Image Descriptor (long form)");
+PAGEHEADER("Create a new Image Descriptor (EZ Form)");
 
 #
-# Only known and logged in users!
+# Only known and logged in users.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
+
+#
+# Default features. Needs to move someplace else!
+# 
+$featurelist         = array();
+$featurelist["ping"] = "ping";
+$featurelist["ssh"]  = "ssh";
+$featurelist["ipod"] = "ipod";
+
+#
+# Default OS strings. Needs to move someplace else!
+#
+$oslist            = array();
+$oslist["Linux"]   = "Linux";
+$oslist["FreeBSD"] = "FreeBSD";
+$oslist["NetBSD"]  = "NetBSD";
+$oslist["Other"]   = "Other";
 
 #
 # See what projects the uid can do this in.
@@ -31,45 +48,13 @@ $types_result =
     DBQueryFatal("select distinct type from nodes where role='testnode'");
 
 #
-# Helper function to write out a menu.
-#
-function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
-{
-    echo "<tr>
-            <td>*$caption:</td>";
-    echo "  <td><select name=\"formfields[$value]\">
-                <option value=X>Please Select </option>\n";
-
-    mysql_data_seek($osid_result, 0);
-
-    while ($row = mysql_fetch_array($osid_result)) {
-	$osid   = $row[osid];
-	$osname = $row[osname];
-	$pid    = $row[pid];
-	$selected = "";
-
-	if (strcmp($previous, "$osid") == 0)
-	    $selected = "selected";
-
-	echo "<option $selected value='$osid'>$pid - $osname</option>\n";
-    }
-    $selected = "";
-    if (strcmp($previous, "none") == 0)
-	$selected = "selected";
-	
-    echo "         <option $selected value=none>No OS</option>\n";
-    echo "       </select>";
-    echo "    </td>
-          </tr>\n";
-}
-
-#
 # Spit the form out using the array of data. 
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $uid, $projlist, $isadmin, $types_result;
+    global $uid, $projlist, $isadmin, $types_result, $oslist, $featurelist;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
+    global $TBDB_OSID_VERSLEN;
     
     if ($errors) {
 	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
@@ -89,31 +74,6 @@ function SPITFORM($formfields, $errors)
                   </tr>\n";
 	}
 	echo "</table><br>\n";
-    }
-
-    #
-    # Get the OSID list that the user has access to. Do not allow shared OSIDs,
-    # since we want to force mere users to create thier own versions.
-    #
-    if ($isadmin) {
-	$osid_result =
-	    DBQueryFatal("select * from os_info ".
-			 "where (path='' or path is NULL) and ".
-			 "      version!='' and version is not NULL ".
-			 "order by osid");
-    }
-    else {
-	$osid_result =
-	    DBQueryFatal("select distinct o.* from os_info as o ".
-			 "left join group_membership as m ".
-			 " on m.pid=o.pid ".
-			 "where m.uid='$uid' and ".
-			 "      (path='' or path is NULL) and ".
-			 "      version!='' and version is not NULL ".
-			 "order by o.pid,o.osid");
-    }
-    if (! mysql_num_rows($osid_result)) {
-	USERERROR("There are no OS Descriptors that you are able to use!", 1);
     }
 
     echo "<SCRIPT LANGUAGE=JavaScript>
@@ -144,7 +104,7 @@ function SPITFORM($formfields, $errors)
                  <em>(Fields marked with * are required)</em>
              </td>
           </tr>
-          <form action='newimageid.php3' method=post name=idform>\n";
+          <form action='newimageid_ez.php3' method=post name=idform>\n";
 
     #
     # Select Project
@@ -200,8 +160,8 @@ function SPITFORM($formfields, $errors)
     # Load Partition
     #
     echo "<tr>
-              <td>*Starting DOS Partition:<br>
-                  (1-4, 0 means entire disk)</td>
+              <td>*Which DOS Partition[<b>1</b>]:<br>
+                  (DOS partitions are numbered 1-4)</td>
               <td><select name=\"formfields[loadpart]\">
                           <option value=X>Please Select </option>\n";
 
@@ -218,42 +178,46 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
-    # Load length
-    #
+    # Select an OS
+    # 
     echo "<tr>
-              <td>*Number of DOS Partitions[<b>1</b>]:<br>
-                  (1, 2, 3, or 4)</td>
-              <td><select name=\"formfields[loadlength]\">
-                          <option value=X>Please Select </option>\n";
+             <td>*Operating System:<br>
+                (OS that is on the partition)</td>
+             <td><select name=\"formfields[os_name]\">
+                   <option value=none>Please Select </option>\n";
 
-    for ($i = 0; $i <= 4; $i++) {
+    while (list ($os, $value) = each($oslist)) {
 	$selected = "";
 
-	if (strcmp($formfields[loadlength], "$i") == 0)
+	if (isset($formfields[os_name]) &&
+	    strcmp($formfields[os_name], $os) == 0)
 	    $selected = "selected";
-	
-	echo "        <option $selected value=$i>$i </option>\n";
+
+	echo "<option $selected value=$os>$os &nbsp </option>\n";
     }
-    echo "       </select>";
-    echo "    </td>
+    echo "       </select>
+             </td>
           </tr>\n";
 
-    WRITEOSIDMENU("Partition 1 OS[<b>2</b>]",
-		  "part1_osid", $osid_result, $formfields[part1_osid]);
-    WRITEOSIDMENU("Partition 2 OS",
-		  "part2_osid", $osid_result, $formfields[part2_osid]);
-    WRITEOSIDMENU("Partition 3 OS",
-		  "part3_osid", $osid_result, $formfields[part3_osid]);
-    WRITEOSIDMENU("Partition 4 OS",
-		  "part4_osid", $osid_result, $formfields[part4_osid]);
-    WRITEOSIDMENU("Boot OS[<b>3</b>]",
-		  "default_osid", $osid_result, $formfields[default_osid]);
+    #
+    # Version String
+    #
+    echo "<tr>
+              <td>*OS Version:<br>
+                  (eg: 4.3, 7.2, etc.)</td>
+              <td class=left>
+                  <input type=text
+                         name=\"formfields[os_version]\"
+                         value=\"" . $formfields[os_version] . "\"
+	                 size=$TBDB_OSID_VERSLEN maxlength=$TBDB_OSID_VERSLEN>
+              </td>
+          </tr>\n";
 
     #
     # Path to image.
     #
     echo "<tr>
-              <td>Filename (full path) of Image[<b>4</b>]:<br>
+              <td>Filename (full path) of Image:<br>
                   (must reside in /proj)</td>
               <td class=left>
                   <input type=text
@@ -264,10 +228,32 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
+    # OS Features.
+    # 
+    echo "<tr>
+              <td>OS Features:</td>
+              <td>";
+
+    reset($featurelist);
+    while (list ($feature, $value) = each($featurelist)) {
+	$checked = "";
+	
+	if (isset($formfields["os_feature_$feature"]) &&
+	    ! strcmp($formfields["os_feature_$feature"], "checked"))
+	    $checked = "checked";
+
+	echo "<input $checked type=checkbox value=checked
+                     name=\"formfields[os_feature_$feature]\">
+                   $feature &nbsp\n";
+    }
+    echo "    </td>
+          </tr>\n";
+
+    #
     # Node Types.
     #
     echo "<tr>
-              <td>Node Types[<b>5</b>]:</td>
+              <td>Node Types[<b>2</b>]:</td>
               <td>\n";
 
     mysql_data_seek($types_result, 0);
@@ -290,7 +276,7 @@ function SPITFORM($formfields, $errors)
     # Node to Create image from.
     #
     echo "<tr>
-              <td>Node to Create Image from[<b>6</b>]:</td>
+              <td>Node to Create Image from[<b>3</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[node]\"
@@ -319,24 +305,6 @@ function SPITFORM($formfields, $errors)
                   </td>
               </tr>\n";
 
-        #
-        # Create mapping for this image.
-        #
-	echo "<tr>
-  	          <td>Create Mapping?:<br>
-                      (insert osid to imageid mappings)</td>
-                  <td class=left>
-                      <input type=checkbox
-                             name=\"formfields[makedefault]\"
-                             value=Yep";
-
-	if (isset($formfields[makedefault]) &&
-	    strcmp($formfields[makedefault], "Yep") == 0)
-	    echo "           checked";
-	
-	echo "                       > Yes
-                  </td>
-              </tr>\n";
     }
 
     echo "<tr>
@@ -350,27 +318,26 @@ function SPITFORM($formfields, $errors)
 
     echo "<h4><blockquote><blockquote><blockquote>
           <ol type=1 start=1>
-             <li>Only single slices or partial disks are allowed.
-  	         If you specify a non-zero starting load partition, the load
-	         load length must be one. If you specify zero
-	         for the starting load partition, then you can include any or
-	         all of the slices (1-4). Note that '0' means to start at the
-	         boot sector, while '1' means to start at the beginning of the
-	         first partition (typically starting at sector 63).
-             <li>If you are using a custom OS, you must
-                  <a href='newosid_form.php3'>create the OS Descriptor
-                  first!</a>
-             <li>The OS (partition) that is active when the node boots up.
-             <li>The image file must reside in the project directory.
-             <li>Specify the node types that this image will be able
-                  to work on (ie: can be loaded on and expected to work).
-             <li>If you already have a node customized, enter that node
-                 name (pcXXX) and the image will be auto created for you.
-                 Notification of completion will be sent to you via email. 
+             <li> If you don't know what partition you have customized,
+    	          here are some guidelines:
+  	         <ul>
+ 		    <li> if you customized one of our standard Linux
+		         images (RHL-*) then it is partition 2.
+
+                    <li> if you customized one of our standard BSD
+ 		         images (FBSD-*) then it is partition 1.
+
+                    <li> otherwise, feel free to ask us!
+                 </ul>
+             <li> Specify the node types that this image will be able
+                  to work on (can be loaded on and expected to work).
+             <li> If you already have a node customized, enter that node
+                  name (pcXXX) and the image will be auto created for you.
+                  Notification of completion will be sent to you via email. 
           </ol>
           </blockquote></blockquote></blockquote></h4>\n";
 }
-    
+
 #
 # On first load, display a virgin form and exit.
 #
@@ -388,6 +355,9 @@ if (! $submit) {
 #
 $errors = array();
 
+#
+# Project:
+# 
 if (!isset($formfields[pid]) ||
     strcmp($formfields[pid], "") == 0) {
     $errors["Project"] = "Not Selected";
@@ -400,6 +370,9 @@ elseif (!TBProjAccessCheck($uid, $formfields[pid],
     $errors["Project"] = "No enough permission";
 }
 
+#
+# Image Name:
+# 
 if (!isset($formfields[imagename]) ||
     strcmp($formfields[imagename], "") == 0) {
     $errors["Descriptor Name"] = "Missing Field";
@@ -416,96 +389,48 @@ else {
     }
 }
 
+#
+# Description
+#
 if (!isset($formfields[description]) ||
     strcmp($formfields[description], "") == 0) {
     $errors["Description"] = "Missing Field";
 }
 
+#
+# Load Partition
+#
 if (!isset($formfields[loadpart]) ||
     strcmp($formfields[loadpart], "") == 0 ||
     strcmp($formfields[loadpart], "X") == 0) {
-    $errors["Starting Partition"] = "Not Selected";
+    $errors["DOS Partition"] = "Not Selected";
 }
 elseif (! ereg("^[0-9]+$", $formfields[loadpart]) ||
 	$formfields[loadpart] < 0 || $formfields[loadpart] > 4) {
-    $errors["Starting Partition"] = "Must be 0,1,2,3, or 4!";
-}
-
-if (!isset($formfields[loadlength]) ||
-    strcmp($formfields[loadlength], "") == 0 ||
-    strcmp($formfields[loadlength], "X") == 0) {
-    $errors["#of Partitions"] = "Not Selected";
-}
-elseif (! ereg("^[0-9]+$", $formfields[loadlength]) ||
-	$formfields[loadlength] < 1 || $formfields[loadlength] > 4) {
-    $errors["#of Partitions"] = "Must be 1,2,3, or 4!";
-}
-elseif ($formfields[loadpart] != 0 && $formfields[loadlength] != 1) {
-    $errors["#of Partitions"] =
-	"Only single slices or<br> partial disks are allowed";
+    $errors["DOS Partition"] = "Must be 1,2,3, or 4!";
 }
 
 #
-# Check sanity of the OSIDs for each slice. Permission checks not needed.
-# Store the ones we care about and silently forget about the extraneous
-# OSIDs by setting the locals to NULL.
-#
-# XXX This loops creates locals part1_osid, part2_osid, part3_osid, and
-#     part4_osid on the fly. Look at $$foo. We use them below.
-#
-$osid_array = array();
-
-for ($i = 1; $i <= 4; $i++) {
-    $foo      = "part${i}_osid";	# Local variable dynamically created.
-    $thisosid = $formfields[$foo];
-
-    if (($formfields[loadpart] && $i == $formfields[loadpart]) ||
-	(!$formfields[loadpart] && $i <= $formfields[loadlength])) {
-
-	if (!isset($thisosid) ||
-	    strcmp($thisosid, "") == 0 ||
-	    strcmp($thisosid, "X") == 0) {
-	    $errors["Partition $i OS"] = "Must select an OS";
-	}
-	elseif (strcmp($thisosid, "none") == 0) {
-	    #
-	    # Allow admins to specify no OS for a partition.
-	    # 
-	    if (!$isadmin)	    
-		$errors["Partition $i OS"] = "Must select an OS";
-	    $$foo = "NULL";	    
-	}
-	elseif (!TBValidOSID($thisosid)) {
-	    $errors["Partition $i OS"] = "No such OS defined";
-	}
-	else {
-	    $$foo = "'$thisosid'";
-	    $osid_array[] = $thisosid;
-	}
-    }
-    else {
-	$$foo = "NULL";
-    }
-}
-
-#
-# Check the boot OS. Must be one of the OSes selected for a partition.
+# Select an OS
 # 
-if (!isset($formfields[default_osid]) ||
-    strcmp($formfields[default_osid], "") == 0 ||
-    strcmp($formfields[default_osid], "none") == 0) {
-    $errors["Boot OS"] = "Not Selected";
+if (!isset($formfields[os_name]) ||
+    strcmp($formfields[os_name], "") == 0 ||
+    strcmp($formfields[os_name], "none") == 0) {
+    $errors["OS"] = "Not Selected";
 }
-elseif (!TBValidOSID($formfields[default_osid])) {
-    $errors["Boot OS"] = "No such OS defined";
+elseif (! isset($oslist[$formfields[os_name]])) {
+    $errors["OS"] = "Invalid OS";
 }
-else {
-    for ($i = 0; $i < count($osid_array); $i++) {
-	if (strcmp($osid_array[$i], $formfields[default_osid]) == 0)
-	    break;
-    }
-    if ($i == count($osid_array)) 
-	$errors["Boot OS"] = "Invalid; Must be one of the partitions";
+
+#
+# Version String
+#
+if (!isset($formfields[os_version]) ||
+    strcmp($formfields[os_version], "") == 0) {
+    $errors["OS Version"] = "Missing Field";
+}
+elseif (! ereg("^[-_a-zA-Z0-9\.]+$", $formfields[os_version])) {
+    $errors["OS Version"] = "Contains invalid characters";
 }
 
 #
@@ -533,6 +458,23 @@ else {
 }
 
 #
+# OS Features.
+# 
+# As a side effect of validating, form the os features set as a string
+# for the insertion below. 
+#
+$os_features_array = array();
+
+while (list ($feature, $value) = each($featurelist)) {
+    if (isset($formfields["os_feature_$feature"]) &&
+	strcmp($formfields["os_feature_$feature"], "checked") == 0) {
+	$os_features_array[] = $feature;
+    }
+}
+$os_features = join(",", $os_features_array);
+
+#
+# Node Types:
 # See what node types this image will work on. Must be at least one!
 # Store the valid types in a new array for simplicity.
 #
@@ -555,7 +497,7 @@ if (! count($mtypes_array)) {
 }
 
 #
-# Check sanity of node name and that user can create an image from it.
+# Node.
 #
 if (isset($formfields[node]) &&
     strcmp($formfields[node], "")) {
@@ -582,18 +524,6 @@ if (count($errors)) {
 }
 
 #
-# Only admins have this option. Always on for mereusers, but default off
-# for admins. 
-#
-$makedefault = 0;
-
-if (! $isadmin ||
-    (isset($formfields[makedefault]) &&
-     strcmp($formfields[makedefault], "Yep") == 0)) {
-    $makedefault = 1;
-}
-
-#
 # Only admin types can set the shared bit for an image. Ignore silently.
 #
 $shared = 0;
@@ -611,20 +541,16 @@ $description = addslashes($formfields[description]);
 $pid         = $formfields[pid];
 $imagename   = $formfields[imagename];
 $loadpart    = $formfields[loadpart];
-$loadlength  = $formfields[loadlength];
-$default_osid= $formfields[default_osid];
 $path        = $formfields[path];
+$os_name     = $formfields[os_name];
+$os_version  = $formfields[os_version];
+
+DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 
 #
-# And insert the record!
+# Of course, the Image/OS records may not already exist in the DB.
 #
-
-DBQueryFatal("lock tables images write, osidtoimageid write");
-
-#
-# Of course, the Image record may not already exist in the DB.
-#
-if (TBValidImage($pid, $imagename)) {
+if (TBValidImage($pid, $imagename) || TBValidOS($pid, $imagename)) {
     DBQueryFatal("unlock tables");
 
     $errors["Descriptor Name"] = "Already in use in selected project";
@@ -634,104 +560,33 @@ if (TBValidImage($pid, $imagename)) {
 }
 
 #
-# Just concat them to form a unique imageid. 
+# Just concat them to form a unique imageid and osid.
 # 
 $imageid = "$pid-$imagename";
-if (TBValidImageID($imageid)) {
+if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
     DBQueryFatal("unlock tables");
-    TBERROR("Could not form a unique imageid for $pid/$imagename!", 1);
+    TBERROR("Could not form a unique ID for $pid/$imagename!", 1);
 }
 
-#
-# Mereusers are not allowed to create more than one osid/imageid mapping
-# for each machinetype. They cannot actually do that through the EZ form
-# since the osid/imageid has to be unique, but it can happen by mixed
-# use of the long form and the short form, or with multiple uses of the
-# long form. 
-#
-$typeclause = "type=" . "'$mtypes_array[0]'";
+DBQueryFatal("INSERT INTO images ".
+	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
+	     " part" . "$loadpart" . "_osid, ".
+	     " default_osid, path, pid, shared) ".
+	     "VALUES ".
+	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, 1, ".
+	     "   '$imageid', '$imageid', '$path', '$pid', $shared)");
 
-for ($i = 1; $i < count($mtypes_array); $i++) {
-    $typeclause = "$typeclause or type=" . "'$mtypes_array[$i]'";
-}
+DBQueryFatal("INSERT INTO os_info ".
+	     "(osname, osid, ezid, description, OS, version, path, magic, ".
+	     " osfeatures, pid) ".
+	     "VALUES ".
+	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
+	     "   '$os_version', NULL, NULL, '$os_features', '$pid')");
 
-$osidclause = "osid=" . "'$osid_array[0]'";
-    
-for ($i = 1; $i < count($osid_array); $i++) {
-    $osidclause = "$osidclause or osid=" . "'$osid_array[$i]'";
-}
-    
-$query_result =
-    DBQueryFatal("select osidtoimageid.*,images.pid,images.imagename ".
-		 " from osidtoimageid ".
-		 "left join images on ".
-		 " images.imageid=osidtoimageid.imageid ".
-		 "where ($osidclause) and ($typeclause)");
-
-if (mysql_num_rows($query_result)) {
-    if (!$isadmin || $makedefault) {
-	DBQueryFatal("unlock tables");
-
-	echo "<center>
-              There are other image descriptors that specify the 
-	      same OS descriptors for the same node types.<br>
-              There must be a
-	      unique mapping of OS descriptor to Image descriptor for
-              each node type! Perhaps you need to delete one of the
-              images below, or create a new OS descriptor to use in
-              this new Image descriptor.
-              </center><br>\n";
-
-	echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
-
-	echo "<tr>
-                  <td align=center>OSID</td>
-                  <td align=center>Type</td>
-                  <td align=center>ImageID</td>
-             </tr>\n";
-
-	while ($row = mysql_fetch_array($query_result)) {
-	    $imageid   = $row['imageid'];
-	    $url       = rawurlencode($imageid);
-	    $osid      = $row[osid];
-	    $type      = $row[type];
-	    $imagename = $row[imagename];
-	    
-	    echo "<tr>
-                      <td>$osid</td>
-	              <td>$type</td>
-                      <td><A href='showimageid.php3?&imageid=$url'>
-                             $imagename</A></td>
-	          </tr>\n";
-	}
-	echo "</table><br><br>\n";
-    
-	USERERROR("Please check the other Image descriptors and make the ".
-		  "necessary changes!", 1);
-    }
-}
-
-$query_result =
-    DBQueryFatal("INSERT INTO images ".
-		 "(imagename, imageid, description, loadpart, loadlength, ".
-		 " part1_osid, part2_osid, part3_osid, part4_osid, ".
-		 " default_osid, path, pid, shared) ".
-		 "VALUES ".
-		 "  ('$imagename', '$imageid', '$description', $loadpart, ".
-		 "   $loadlength, ".
-		 "   $part1_osid, $part2_osid, $part3_osid, $part4_osid, ".
-		 "   '$default_osid', '$path', '$pid', $shared)");
-
-
-if (!$isadmin || $makedefault) {
-    for ($i = 0; $i < count($mtypes_array); $i++) {
-	for ($j = 0; $j < count($osid_array); $j++) {
-	    DBQueryFatal("REPLACE INTO osidtoimageid ".
-			 "(osid, type, imageid) ".
-			 "VALUES ('$osid_array[$j]', '$mtypes_array[$i]', ".
-			 "        '$imageid')");
-	}
-    }
+for ($i = 0; $i < count($mtypes_array); $i++) {
+    DBQueryFatal("REPLACE INTO osidtoimageid ".
+		 "(osid, type, imageid) ".
+		 "VALUES ('$imageid', '$mtypes_array[$i]', '$imageid')");
 }
 
 DBQueryFatal("unlock tables");

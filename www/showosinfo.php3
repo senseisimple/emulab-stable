@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("OSID Information");
+PAGEHEADER("OS Descriptor Information");
 
 #
 # Only known and logged in users can end experiments.
@@ -22,28 +22,36 @@ if (!isset($osid) ||
 }
 
 if (! TBValidOSID($osid)) {
-    USERERROR("The OSID `$osid' is not a valid OSID.", 1);
+    USERERROR("The OS Descriptor '$osid' is not valid!", 1);
 }
 
 #
 # Verify permission.
 #
 if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_READINFO)) {
-    USERERROR("You do not have permission to access OSID $osid!", 1);
+    USERERROR("You do not have permission to access OS Descriptor $osid!", 1);
 }
+
+SUBPAGESTART();
+SUBMENUSTART("More Options");
+WRITESUBMENUBUTTON("Delete this OS Descriptor",
+		   "deleteosid.php3?osid=$osid");
+WRITESUBMENUBUTTON("Create a new OS Descriptor",
+		   "newosid_form.php3");
+WRITESUBMENUBUTTON("Create a new Image Descriptor",
+		   "newimageid_explain.php3");
+WRITESUBMENUBUTTON("Back to OS Descriptor list",
+		   "showosid_list.php3");
+WRITESUBMENUBUTTON("Back to Image Descriptor list",
+		   "showimageid_list.php3");
+SUBMENUEND();
 
 #
 # Dump os_info record.
 # 
 SHOWOSINFO($osid);
 
-# Terminate option.
-if (TBOSIDAccessCheck($uid, $osid, $TB_OSID_DESTROY)) {
-    echo "<p><center>
-           Do you want to remove this OSID?
-           <A href='deleteosid.php3?osid=$osid'>Yes</a>
-          </center>\n";
-}
+SUBPAGEEND();
 
 #
 # Standard Testbed Footer

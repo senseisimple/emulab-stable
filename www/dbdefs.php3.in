@@ -3,6 +3,7 @@
 # Database Constants
 #
 $TBDBNAME       = "@TBDBNAME@";
+$TBOPSPID	= "emulab-ops";
 
 $TBDB_UIDLEN    = 8;
 $TBDB_PIDLEN    = 12;
@@ -18,9 +19,11 @@ $TBDB_NODEIDLEN = 10;
 #
 $TBDB_EIDLEN    = 19;
 
-$TBDB_OSID_OSIDLEN         = 30;
+$TBDB_OSID_OSIDLEN         = 35;
+$TBDB_OSID_OSNAMELEN       = 20;
 $TBDB_OSID_VERSLEN         = 12;
-$TBDB_IMAGEID_IMAGEIDLEN   = 30;
+$TBDB_IMAGEID_IMAGEIDLEN   = 45;
+$TBDB_IMAGEID_IMAGENAMELEN = 30;
 
 #
 # User status field.
@@ -469,18 +472,19 @@ function TBOSIDAccessCheck($uid, $osid, $access_type)
     # No GIDs yet.
     #
     $query_result =
-	DBQueryFatal("SELECT pid FROM os_info WHERE osid='$osid'");
+	DBQueryFatal("SELECT pid,shared FROM os_info WHERE osid='$osid'");
     
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
     $row = mysql_fetch_array($query_result);
-    $pid = $row[pid];
+    $pid    = $row[pid];
+    $shared = $row[shared];
 
     #
     # Global OSIDs can be read by anyone.
     # 
-    if (!$pid) {
+    if ($shared) {
 	if ($access_type == $TB_OSID_READINFO) {
 	    return 1;
 	}
@@ -534,18 +538,19 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
     # No GIDs yet.
     #
     $query_result =
-	DBQueryFatal("SELECT pid FROM images WHERE imageid='$imageid'");
+	DBQueryFatal("SELECT pid,shared FROM images WHERE imageid='$imageid'");
     
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
-    $row = mysql_fetch_array($query_result);
-    $pid = $row[pid];
+    $row    = mysql_fetch_array($query_result);
+    $shared = $row[shared];
+    $pid    = $row[pid];
 
     #
-    # Global ImageIDs can be read by anyone.
+    # Global ImageIDs can be read by anyone but written by Admins only.
     # 
-    if (!$pid) {
+    if ($shared) {
 	if ($access_type == $TB_IMAGEID_READINFO) {
 	    return 1;
 	}
@@ -647,6 +652,18 @@ function TBValidGroup($pid, $gid)
 }
 
 #
+# Confirm a valid project.
+#
+# usage TBValidProject($pid)
+#       returns 1 if a valid project.
+#       returns 0 if not a valid project.
+#
+function TBValidProject($pid)
+{
+    return TBValidGroup($pid, $pid);
+}
+
+#
 # Confirm a group member.
 #
 # usage TBGroupMember($uid, $pid, $gid, &$approved)
@@ -674,6 +691,25 @@ function TBGroupMember($uid, $pid, $gid, &$approved)
 }
 
 #
+# Confirm a valid OS Descriptor in the specified project.
+#
+# usage TBValidOS($pid, $imagename)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidOS($pid, $osname)
+{
+    $query_result =
+	DBQueryFatal("select osid from os_info where ".
+		     "pid='$pid' and osname='$osname'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
 # Confirm a valid osid.
 #
 # usage TBValidOSID($osid)
@@ -692,7 +728,26 @@ function TBValidOSID($osid)
 }
 
 #
-# Confirm a valid imageid.
+# Confirm a valid image in the specified project.
+#
+# usage TBValidImage($pid, $imagename)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidImage($pid, $imagename)
+{
+    $query_result =
+	DBQueryFatal("select imageid from images where ".
+		     "pid='$pid' and imagename='$imagename'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Confirm a valid imageid (imageids are globally unique).
 #
 # usage TBValidImageID($imageid)
 #       returns 1 if valid
@@ -706,6 +761,48 @@ function TBValidImageID($imageid)
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
+    return 1;
+}
+
+#
+# Return info for an imageid.
+# 
+# usage TBImageInfo($imageid, &$imagename, &$pid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBImageInfo($imageid, &$imagename, &$pid)
+{
+    $query_result =
+	DBQueryFatal("select * from images where imageid='$imageid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $imagename = $row[imagename];
+    $pid       = $row[pid];
+    return 1;
+}
+
+#
+# Return info for an osid.
+# 
+# usage TBOSInfo($osid, &$osname, &$pid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBOSInfo($osid, &$osname, &$pid)
+{
+    $query_result =
+	DBQueryFatal("select * from os_info where osid='$osid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $osname = $row[osname];
+    $pid    = $row[pid];
     return 1;
 }
 

@@ -10,6 +10,8 @@ include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin
 SBIN_SCRIPTS	= vlandiff vlansync
+LIBEXEC_SCRIPTS	= webcreateimage
+
 #
 # These are the ones installed on plastic (users, control, etc). 
 # 
@@ -19,12 +21,13 @@ USERBINS        = create_image delay_config node_admin
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
-	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS))
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
 
 #
 # Control node installation (okay, plastic)

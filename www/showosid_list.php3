@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("OSID List");
+PAGEHEADER("OS Descriptor List");
 
 #
 #
@@ -24,14 +24,14 @@ $isadmin = ISADMIN($uid);
 #
 if ($isadmin) {
     $query_result =
-	DBQueryFatal("SELECT * FROM os_info order by osid");
+	DBQueryFatal("SELECT * FROM os_info order by pid,osname");
 }
 else {
     $query_result =
 	DBQueryFatal("select distinct o.* from os_info as o ".
-		     "left join group_membership as g on ".
-		     " o.pid IS NULL or g.pid=o.pid ".
-		     "where g.uid='$uid' order by o.osid");
+		     "left join group_membership as g on g.pid=o.pid ".
+		     "where g.uid='$uid' or o.shared=1 ".
+		     "order by o.pid,o.osname");
 }
 
 if (mysql_num_rows($query_result) == 0) {
@@ -47,27 +47,28 @@ echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td>OSID</td>
+          <td>Name</td>
           <td>PID</td>
           <td>Description</td>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
+    $osname  = $row[osname];
     $osid    = $row[osid];
     $descrip = $row[description];
     $pid     = $row[pid];
 
-    if (! $pid) {
-	$pid = "&nbsp";
-    }
-
     echo "<tr>
-              <td><A href='showosinfo.php3?osid=$osid'>$osid</A></td>
+              <td><A href='showosinfo.php3?osid=$osid'>$osname</A></td>
               <td>$pid</td>
               <td>$descrip</td>\n";
     echo "</tr>\n";
 }
 echo "</table>\n";
+
+echo "<br><center>
+      <a href='newosid_form.php3'>Create a new OS Descriptor.</a>
+      </center>\n";
 
 #
 # Standard Testbed Footer

@@ -14,6 +14,8 @@ sub usage {
 }
 
 my $TBROOT = "@prefix@";
+my $DOMAIN = "@OURDOMAIN@";
+
 use lib '@prefix@/lib';
 use libdb;
 require exitonwarn;
@@ -86,24 +88,30 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 
 # Virtual
 # Display node info
-my $result = DBQueryFatal("SELECT vname,ips,osid,cmd_line,rpms,deltas," .
+my $result = DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
 			  "startupcmd,tarfiles,type from virt_nodes where pid=\"$pid\"" .
 			  " and eid=\"$eid\"");
 print "Node Info:\n";
-printf "%-15s %-10s %-15s\n", "ID", "Type", "OSID";
+printf "%-15s %-10s %-15s\n", "ID", "Type", "OS";
 print "--------------- ---------- ---------------\n";
-while (($vname,$ips,$osid,$cmd_line,$rpms,$deltas,$startupcmd,$tarfiles,$type) 
-       = $result->fetchrow_array()) {
+while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
+	$tarfiles,$type) = $result->fetchrow_array()) {
     if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 	$p = $v2pmap{$vname};
 	if ($p ne "") {
-	    $subresult = DBQueryFatal("SELECT def_boot_osid,type from nodes" .
-				      " where node_id = \"$p\"");
+	    $subresult =
+		DBQueryFatal("SELECT def_boot_osid,type from nodes" .
+			     " where node_id = \"$p\"");
 	    ($osid,$type) = $subresult->fetchrow_array();
+	    $subresult->finish();
+
+	    $subresult =
+		DBQueryFatal("SELECT osname from os_info where osid='$osid'");
+	    ($osname) = $subresult->fetchrow_array();
 	    $subresult->finish();
 	}
     }
-    printf "%-15s %-10s %-15s\n", $vname, $type, $osid;
+    printf "%-15s %-10s %-15s\n", $vname, $type, $osname;
     if ($verbose) {
 	if ($cmd_line ne "") {
 	    printf "   %-17s %s\n", "Command Line:", $cmd_line;
@@ -155,7 +163,7 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     foreach $v (keys(%v2pmap)) {
 	$p = $v2pmap{$v};
 	if ($p eq "") {$p = $v;}
-	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.emulab.net";
+	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.$DOMAIN";
     }
     print "\n";
 

@@ -18,7 +18,7 @@ sub usage()
     print STDOUT "Usage: os_setup <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "";
+my  $optlist = "d";
 
 #
 # Configure variables
@@ -37,8 +37,10 @@ use libdb;
 use libtestbed;
 
 my $nodereboot	= "$TB/bin/node_reboot";
+my $os_load	= "$TB/bin/os_load";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
+my $failed      = 0;
 my @nodes       = ();
 my %osids       = ();
 my %waitfor     = ();
@@ -47,12 +49,13 @@ my $db_result;
 my @row;
 
 #
-# This stuff is BOGUS! Quick hack for paper deadline to make Jay happy.
-# If Frisbee works, this might be appropriate.
+# Ah, Frisbee works so lets do auto reloading for nodes that do not have
+# the proper OS loaded on it. This will be a hash of lists; for each
+# imageid, a list of the nodes to pass to os_load for that imageid. 
 #
-my $doreloading = 0;
-my $forcereload = 0;
-my %reload      = ();
+my %reloads     = ();
+my %reboots	= ();
+my $doautoload  = 1;
     
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -71,6 +74,10 @@ if (! getopts($optlist, \%options)) {
 if (@ARGV != 2) {
     usage();
 }
+if (defined($options{"d"})) {
+    $dbg = 1;
+}
+
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
 
@@ -117,14 +124,15 @@ if ($db_result->numrows < 1) {
     die("There are no nodes assigned to experiment '$eid' in project '$pid'.");
 }
 
-for ($i = 0; $i < $db_result->numrows; $i++) {
-    my %row      = $db_result->fetchhash();
+while (my %row = $db_result->fetchhash()) {
     my $node     = $row{'node_id'};
     my $osid     = $row{'def_boot_osid'};
+    my $type     = $row{'type'};
     my $bootpath = 0;
 
     push(@nodes, $node);
     $osids{$node} = $osid;
+    $reboots{$node} = 1;
 
     #
     # Make sure the files specified in the paths exist. We mount the
@@ -253,39 +261,58 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 	    # 
 	    if ($p_result->numrows == 0) {
 		#
-		# If its a specific Version, and its not loaded on the machine,
-		# its currently an error. Later we might reload.
+		# Check to see if a non specific version specified.
 		#
-		if (defined($osid_row{'version'}) &&
-		    $osid_row{'version'} ne "") {
-		    die("*** OSID $osid is not currently loaded on $node!\n");
-		}
+		if (! defined($osid_row{'version'}) ||
+		    $osid_row{'version'} eq "") {
 
-		#
-		# A non-specific version. Try to map it.
-		# 
-		my $o_result =
-		    DBQueryFatal("select o1.* from os_info as o1 ".
-				 "left join partitions as p ".
-				 "  on o1.osid=p.osid ".
-				 "left join os_info as o2 ".
-				 "  on o2.OS=o1.OS ".
-				 "where p.node_id='$node' ".
-				 "  and o2.osid='$osid'");
+		    #
+		    # A non-specific version. Try to map it.
+		    # 
+		    my $o_result =
+			DBQueryFatal("select o1.* from os_info as o1 ".
+				     "left join partitions as p ".
+				     "  on o1.osid=p.osid ".
+				     "left join os_info as o2 ".
+				     "  on o2.OS=o1.OS ".
+				     "where p.node_id='$node' ".
+				     "  and o2.osid='$osid'");
 
-		if ($o_result->numrows == 0) {
-		    die("*** $0:\n".
-			"    No mapping can be made for $osid on $node!\n".
-			"    Perhaps the disk needs reloading?\n");
+		    if ($o_result->numrows == 0) {
+			die("*** $0:\n".
+			    "    No mapping can be made for $osid on $node!\n".
+			    "    Perhaps the disk needs reloading?\n");
+		    }
+		    else {
+			my %o_row  = $o_result->fetchhash();
+			my $n_osid = $o_row{'osid'};
+
+			print "Mapping $osid on $node to $n_osid.\n";
+			DBQueryFatal("update nodes ".
+				     "set def_boot_osid='$n_osid' ".
+				     "where node_id='$node'");
+			$osids{$node} = $n_osid;
+		    }
 		}
 		else {
-		    my %o_row  = $o_result->fetchhash();
-		    my $n_osid = $o_row{'osid'};
-
-		    print "Mapping $osid on $node to $n_osid.\n";
-		    DBQueryFatal("update nodes set def_boot_osid='$n_osid' ".
-				 "where node_id='$node'");
-		    $osids{$node} = $n_osid;
+		    #
+		    # User wants a specific version of an OS, but its not
+		    # loaded on the machine. Issue a load if we can find
+		    # an image. This goo constructs a hashed array of lists.
+		    #
+		    if ((my $imageid = TBMapOSIDtoImageID($osid, $type))) {
+			if (! defined($reloads{$imageid})) {
+			    $reloads{$imageid} = [ $node ];
+			}
+			else {
+			    push(@{ $reloads{$imageid} }, $node);
+			}
+			delete $reboots{$node};
+		    }
+		    else {
+			die("*** $0:\n".
+			    "    No image can be found for $osid on $node!\n");
+		    }
 		}
 	    }
 	}
@@ -312,23 +339,45 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 	$canfail{$node} = 0;
     }
     
-    print STDOUT "$node - $osids{$node} - $waitfor{$node} - $canfail{$node}\n"
+    print STDERR "$node - $osids{$node} - $waitfor{$node} - $canfail{$node}\n"
 	if $dbg;
 }
 
 #
-# Fire off a mass reboot. The reboot script does this in parallel, so
-# no need to create any new children here. We just wait until it exits,
-# which means all the nodes are actually rebooting.
+# We need to issue the reboots and the reloads in parallel.
 #
 if (!$TESTMODE) {
-  if (system("$nodereboot @nodes")) {
-    die("*** Failed to reboot some nodes!");
-  }
+    my %pids  = ();
+    my $count = 0;
+    my $cmd;
+
+    if (keys(%reboots)) {
+	$cmd = "$nodereboot " . join(" ", keys(%reboots));
+	$pids{$cmd} = ForkCmd($cmd);
+    }
+
+    foreach my $imageid ( keys(%reloads) ) {
+	my @list = @{ $reloads{$imageid} };
+
+	sleep(5);
+	$pids{"$os_load -m $imageid @list"} =
+	    ForkCmd("$os_load -m $imageid @list");
+    }
+
+    foreach $cmd ( keys(%pids) ) {
+	my $pid = $pids{$cmd};
+
+	waitpid($pid, 0);
+	if ($?) {
+	    $failed++;
+	    print STDERR "*** Failed: $cmd\n";
+	}
+    }
 }
 
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
+sleep(2);
 my $waitstart = time;
 
 #
@@ -389,12 +438,13 @@ foreach my $node ( @nodes ) {
 		 "Thanks\n".
 		 "Testbed Operations\n");
 
-	die("*** Experiment will be now be terminated automatically.");
+	print STDERR "*** Experiment will be terminated automatically.\n";
+	$failed++;
     }
 }
 
 print STDOUT "OS Setup Done!\n";
-exit 0;
+exit $failed;
 
 #
 # Wait for a node to come back alive.
@@ -407,10 +457,7 @@ sub WaitTillAlive {
     #
     # Seems like a long time to wait, but it ain't!
     # 
-    my $maxwait = (60 * 6);
-    if ($reload{$pc}) {
-	$maxwait += (60 * 5);
-    }
+    my $maxwait = (60 * 5);
 
     #
     # Start a counter going, relative to the time we rebooted the first
@@ -440,7 +487,7 @@ sub WaitTillAlive {
 	$waittime = time - $waitstart;
 	if ($waittime > $maxwait) {
 	    print "$pc appears dead; its been ",
-	    (int ($waittime / 60))," minutes since reload started.\n";
+	    (int ($waittime / 60))," minutes since rebooted.\n";
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {
@@ -448,4 +495,43 @@ sub WaitTillAlive {
 	    print "Still waiting for $pc - its been $minutes minute(s)\n";
 	}
     }
+}
+
+#
+# Map an OSID to an imageid for a node type.
+#
+sub TBMapOSIDtoImageID($$)
+{
+    my ($osid, $type) = @_;
+
+    my $query_result =
+	DBQueryFatal("select imageid from osidtoimageid ".
+		     "where type='$type' and osid='$osid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my ($imageid) = $query_result->fetchrow_array();
+
+    return $imageid;
+}
+
+#
+# Fork a process to exec a command. Return the pid to wait on.
+# 
+sub ForkCmd($) {
+    my ($cmd) = @_;
+    my($mypid);
+
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    if ($dbg) {
+	print STDERR "Forking command: $cmd\n";
+    }
+
+    system($cmd);
+    exit($? >> 8);
 }

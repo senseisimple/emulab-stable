@@ -10,10 +10,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: create-image <imageid> <node>\n";
+    print STDOUT
+	"Usage: create_image [-p <pid>] <image descriptor> <node>\n" .
+	"Use -p to specify the project ID of the image descriptor.\n" .
+	"  Defaults to system project.\n";
     exit(-1);
 }
-my  $optlist = "";
+my  $optlist = "p:";
 
 #
 # Configure variables
@@ -21,6 +24,7 @@ my  $optlist = "";
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
+my $BOSSNODE	= "@BOSSNODE@";
 my $PROJROOT	= "/proj";
 my $TFTPDIR     = "/tftpboot";
 
@@ -42,17 +46,15 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-#
-# 
-#
-my $BOSSADDR	= "boss.emulab.net";
-my $freebsd     = "$BOSSADDR:$TFTPDIR/pxeboot.freebsd";
+my $freebsd     = "$BOSSNODE:$TFTPDIR/pxeboot.freebsd";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
 my $device      = "/dev/rad0";
 my $mereuser    = 0;
 my %imageid_row = ();
 my $debug       = 0;
+my $imageid;
+my $imagepid    = TB_OPSPID;
 my $logname;
 my @row;
 my $dbuid;
@@ -69,8 +71,8 @@ if (@ARGV != 2) {
     usage();
 }
 
-my $imageid  = $ARGV[0];
-my $node     = $ARGV[1];
+my $imagename  = $ARGV[0];
+my $node       = $ARGV[1];
 
 #
 # Untaint the arguments.
@@ -79,7 +81,25 @@ if ($node =~ /^([-\w]+)$/) {
     $node = $1;
 }
 else {
-    die("*** Tainted node name: $node\n");
+    die("*** Bad data in $node\n");
+}
+
+if ($imagename =~ /^([-\w\.\+]+)$/) {
+    $imagename = $1;
+}
+else {
+    die("*** Bad data in $imagename.\n");
+}
+    
+if (defined($options{"p"})) {
+    $imagepid = $options{"p"};
+	
+    if ($imagepid =~ /^([-\w\.\+]+)$/) {
+	$imagepid = $1;
+    }
+    else {
+	die("*** Bad data in $imagepid.\n");
+    }
 }
 
 #
@@ -126,19 +146,16 @@ if (! NodeidToExp($node, \$pid, \$eid)) {
 # the wrong one (which is likely to happen no matter what I do).
 #
 $db_result =
-    DBQueryFatal("select * from images where imageid='$imageid'");
+    DBQueryFatal("select * from images where ".
+		 "pid='$imagepid' and imagename='$imagename'");
     
 if ($db_result->numrows < 1) {
-    die("*** No such imageid $imageid!");
+    die("*** No such image descriptor $imagename in project $imagepid!");
 }
 %imageid_row = $db_result->fetchhash();
+$imageid = $imageid_row{'imageid'};
 
-my $imagepid = 0;
-if (defined($imageid_row{'pid'})) {
-    $imagepid = $imageid_row{'pid'};
-}
-    
-if ($mereuser && $imagepid &&
+if ($mereuser &&
     ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
     die("*** You do not have permission to use imageid $imageid!\n");
 }
@@ -228,48 +245,63 @@ if (!$query_result ||
 my $saved_pxebootpath = $row[0];
 my $saved_startupcmd  = $row[1];
 
-if (! DBQueryWarn("update nodes set pxe_boot_path='$freebsd', ".
-		  "startupcmd='$command', startstatus='none' ".
-		  "where node_id='$node'")) {
-    fatal("DB error updating node info for $node");
-}
+my $result   = 0;
+my $maxwait  = (60 * 20); # 20 minutes in seconds.
+my $sleepwait= 10;	  # seconds.
+my $maxloops = ($maxwait / $sleepwait);
+my $tries    = 2;
 
-#
-# Reboot node. If this fails must reset.
-#
-if (system("$nodereboot", "$node")) {
-    cleanup();
-    fatal("Failed to reboot $node!");
-}
-
-#
-# Now we wait for the status to flip. We don't want to wait too long of
-# course. 
-#
-my $result = 0;
-my $count  = 120;
-while ($count) {
-    $query_result =
-	DBQueryWarn("select startstatus from nodes where node_id='$node'");
-
-    if (!$query_result ||
-	$query_result->numrows < 1) {
-	cleanup();
-	fatal("DB error getting startstatus for $node");
+while ($tries) {
+    if (! DBQueryWarn("update nodes set pxe_boot_path='$freebsd', ".
+		      "startupcmd='$command', startstatus='none' ".
+		      "where node_id='$node'")) {
+	fatal("DB error updating node info for $node");
     }
- 
-    @row = $query_result->fetchrow_array();
-    $result = $row[0];
 
+    #
+    # Reboot node. If this fails must reset. Note race with update above.
+    # I think this is harmless; node will either be rebooted for no reason
+    # (load finished between these two ops) or the load will be redone a
+    # second time.
+    #
+    if (system("$nodereboot", "$node")) {
+	cleanup();
+	fatal("Failed to reboot $node!");
+    }
+
+    #
+    # Now we wait for the status to flip. We don't want to wait too long of
+    # course. 
+    #
+    my $count = $maxloops;
+    
+    while ($count) {
+	$query_result =
+	    DBQueryWarn("select startstatus from nodes where node_id='$node'");
+
+	if (!$query_result ||
+	    $query_result->numrows < 1) {
+	    cleanup();
+	    fatal("DB error getting startstatus for $node");
+	}
+ 
+	@row = $query_result->fetchrow_array();
+	$result = $row[0];
+
+	if ("$result" ne "none") {
+	    last;
+	}
+	if ($count && (($count % (60 / $sleepwait)) == 0)) {
+	    print "Still waiting ...\n";
+	}
+
+	sleep($sleepwait);
+	$count--;
+    }
     if ("$result" ne "none") {
 	last;
     }
-    if ($count && (($count % 6) == 0)) {
-	print "Still waiting ...\n";
-    }
-
-    sleep(10);
-    $count--;
+    $tries--;
 }
 cleanup();
 
@@ -284,7 +316,7 @@ if (system("$nodereboot", "$node")) {
 #
 # If we timed out or if the result code was bad.
 #
-if (! $count) {
+if (! $tries) {
     fatal("FAILED: Timed out generating image ... \n");
 }
 if ($result) {
@@ -292,7 +324,7 @@ if ($result) {
 }
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: Image Creation on $node Completed: $pid/$eid",
+	 "TESTBED: Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
 	 "You may now os_load this image on other nodes in your experiment.\n",
@@ -321,7 +353,7 @@ sub fatal($)
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Image Creation Failure on $node: $pid/$eid",
+	     "TESTBED: Image Creation Failure on $node: $pid/$imagename",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",

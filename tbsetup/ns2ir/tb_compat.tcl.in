@@ -54,12 +54,15 @@ namespace eval TBCOMPAT {
     }
     sql endquery $DB
 
-    # And a os table with valid OSIDs
+    # And a os table with valid OS Descriptor names. While we still call
+    # them "osids", we are using the user level name not the internal,
+    # globally unique name. We leave it to a later phase to deal with it.
+    #
     # We omit this check in anonymous mode.
     if {!${GLOBALS::anonymous}} {
 	variable osids
 	sql query $DB \
-	    "select osid from os_info where pid is NULL or pid = \"$pid\""
+	    "select osname from os_info where shared=1 or pid='$pid'"
 	while {[set row [sql fetchrow $DB]] != ""} {
 	    set osids($row) 1
 	}

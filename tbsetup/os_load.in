@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 use English;
 use Getopt::Std;
-   
+
 #
 # XXX boss.emulab.net and users.emulab.net wired in. 
 #     wd0 wired in. Should come from node_types table in DB
@@ -15,18 +15,19 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: os_load [-s] [-r | -n] [-i <imageid>] <node> [node ...]\n".
-	"       os_load [-s] [-r | -n] [-i <imageid>] -e pid,eid\n".
+	"Usage: os_load [-s] [[-p <pid>] -i <imagename>] [-m <imageid>] ".
+        "<node> [node ...]\n".
+	"       os_load [-s] [[-p <pid>] -i <imagename>] [-m <imageid>] ".
+        "-e pid,eid\n".
 	"       os_load -l\n".
-	"Use -i to specify an imageid. Use node default otherwise.\n".
+	"Use -i to specify an image name. Use node default otherwise.\n".
+	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -s to start reload, but do not wait for it to complete.\n".
-	"Use -e to reboot all the nodes in an experiment\n" .
-	"Use -l to get a list of images you are permitted to load.\n" .
-	"Use -r to use Frisbee to reload disks.\n" .
-	"Use -n to use netdisk to reload disks.\n";
+	"Use -e to reload all the nodes in an experiment.\n" .
+        "Use -l to get a list of images you are permitted to load.\n";
     exit(-1);
 }
-my  $optlist = "sldrni:e:";
+my  $optlist = "sldrni:e:p:m:b";
 
 #
 # Configure variables
@@ -64,7 +65,9 @@ my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @row;
 my $usedefault  = 1;
+my $imagename;
 my $imageid;
+my $imagepid    = TB_OPSPID;
 my %imageid_row;
 my @nodes       = ();
 my %retries	= ();
@@ -89,6 +92,9 @@ $| = 1; #Turn off line buffering on output
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"d"})) {
+    $dbg++;
+}
 if (defined($options{"l"})) {
     dolisting();
     exit(0);
@@ -105,15 +111,41 @@ if (defined($options{"r"})) {
 if (defined($options{"n"})) {
     $type = TB_RELOADTYPE_NETDISK;
 }
+
+if (defined($options{"i"}) && defined($options{"m"})) {
+    usage();
+}
+
 if (defined($options{"i"})) {
-    $imageid    = $options{"i"};
+    $imagename  = $options{"i"};
     $usedefault = 0;
 
-    if ($imageid =~ /^([-\@\w.\+]+)$/) {
+    if ($imagename =~ /^([-\w\.\+]+)$/) {
+	$imagename = $1;
+    }
+    else {
+	die("*** Bad data in $imagename.\n");
+    }
+    if (defined($options{"p"})) {
+	$imagepid = $options{"p"};
+	
+	if ($imagepid =~ /^([-\w\.\+]+)$/) {
+	    $imagepid = $1;
+	}
+	else {
+	    die("*** Bad data in $imagepid.\n");
+	}
+    }
+}
+if (defined($options{"m"})) {
+    $imageid = $options{"m"};
+    $usedefault = 0;
+
+    if ($imageid =~ /^([-\w\.\+]+)$/) {
 	$imageid = $1;
     }
     else {
-	die("*** Bad $imageid name.\n");
+	die("*** Bad data in $imageid\n");
     }
 }
 if (defined($options{"e"})) {
@@ -161,17 +193,29 @@ if ($UID && !TBAdmin($UID)) {
     $mereuser = 1;
 
     if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	die("*** You do not have permission to load images on one (or more) ".
-	    "of the nodes!\n");
+	die("*** $0:\n".
+            "    You do not have permission to load images on one (or more) ".
+	    "nodes!\n");
+    }
+    if (defined($imageid)) {
+	usage();
     }
 }
 
 #
-# See if allowed to load this image!
+# Convert external name to internal (imageid), and check permission.
 #
-if (defined($imageid) && $mereuser &&
-    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
-    die("*** You do not have permission to load imageid $imageid!\n");
+if (defined($imagename)) {
+    if (! ($imageid = TBImageID($imagepid, $imagename))) {
+	die("*** $0:\n".
+	    "    No such image $imagename in project $imagepid!\n");
+    }
+
+    if ($mereuser &&
+	! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
+	die("*** $0:\n".
+	    "    You do not have permission to load this image!\n");
+    }
 }
 
 #
@@ -194,6 +238,8 @@ foreach my $node (@nodes) {
     if ($usedefault) {
 	$imageid = $default_imageid;
     }
+
+    print STDERR "Using $imageid for for $node\n" if $dbg;
     
     my $db_result =
 	DBQueryFatal("select * from images where imageid='$imageid'");
@@ -208,6 +254,7 @@ foreach my $node (@nodes) {
     my $loadlen   = $imageid_row{'loadlength'};
     my $imagepath = $imageid_row{'path'};
     my $defosid   = $imageid_row{'default_osid'};
+    my $shared    = $imageid_row{'shared'};
 
     #
     # 0 means load the entire disk.
@@ -224,7 +271,7 @@ foreach my $node (@nodes) {
     # For now, all testbed default images come from paper and all pid specific
     # images come from plastic:/proj.
     # 
-    if (defined($imageid_row{'pid'})) {
+    if (! $shared) {
 	if (! ($imagepath =~ /^\/proj\//)) {
 	    die("*** $0:\n".
 		"    Your image must reside in /proj\n");
@@ -248,12 +295,12 @@ foreach my $node (@nodes) {
 		 "(node_id, image_id) values ('$node', '$imageid')");
 
     #
-    # If a mereuser is loading an image (which is not the default) then
+    # If loading an image (which is not the default) then
     # schedule a reload for it so that when the experiment is terminated
     # it will get a fresh default image before getting reallocated to
     # another experiment.
     #
-    if ($mereuser && $imageid ne $default_imageid) {
+    if ($imageid ne $default_imageid) {
 	if (! TBSetSchedReload($node, $default_imageid)) {
 	    print "*** $0:\n".
 		  "    WARNING: Could not schedule default reload for $node!";

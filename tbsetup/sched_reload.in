@@ -8,14 +8,13 @@ use Getopt::Std;
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload [-f | -p] [-r|-n] [-i <imageid>] <node> [node ...]
-#
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f | -p] [-r | -n] [-i <imageid>] ".
-	         "<node> [node ...]\n".
+    print STDOUT "Usage: sched_reload [-f | -p] [-r | -n] [-m <imageid>] ".
+	         "[[-p <pid>] -i <imagename>] <node> [node ...]\n".
 		 "       sched_reload <options> -e pid,eid\n".
-	"Use -i to specify an imageid. Use node default otherwise.\n".
+	"Use -i to specify an image name. Use node default otherwise.\n".
+	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
 	"Use -p to pend reload for the reload daemon.\n".
 	"Use -e to schedule a reload for all nodes in an experiment.\n".
@@ -23,7 +22,7 @@ sub usage()
 	"Use -n to use netdisk for reloading disks.\n";
     exit(-1);
 }
-my  $optlist = "fprni:e:";
+my  $optlist = "fprni:e:m:";
 
 #
 # Configure variables
@@ -53,7 +52,9 @@ my $pend	= 0;
 my $type	= TB_DEFAULT_RELOADTYPE;
 my @nodes       = ();
 my $usedefault  = 1;
+my $imagename;
 my $imageid;
+my $imagepid    = TB_OPSPID;
 my %imagenodes  = ();
 my @row;
 my $eidmode     = 0;
@@ -92,15 +93,40 @@ if (defined($options{"n"})) {
 if ($pend and $force) {
     usage();
 }
+if (defined($options{"i"}) && defined($options{"m"})) {
+    usage();
+}
 if (defined($options{"i"})) {
-    $imageid    = $options{"i"};
+    $imagename  = $options{"i"};
     $usedefault = 0;
 
-    if ($imageid =~ /^([-\@\w.\+]+)$/) {
+    if ($imagename =~ /^([-\w\.\+]+)$/) {
+	$imagename = $1;
+    }
+    else {
+	die("Bad data in $imagename.");
+    }
+    
+    if (defined($options{"p"})) {
+	$imagepid = $options{"p"};
+	
+	if ($imagepid =~ /^([-\w\.\+]+)$/) {
+	    $imagepid = $1;
+	}
+	else {
+	    die("*** Bad data in $imagepid.\n");
+	}
+    }
+}
+if (defined($options{"m"})) {
+    $imageid = $options{"m"};
+    $usedefault = 0;
+
+    if ($imageid =~ /^([-\w\.\+]+)$/) {
 	$imageid = $1;
     }
     else {
-	die("Bad data in $imageid.");
+	die("*** Bad data in $imageid\n");
     }
 }
 if (defined($options{"e"})) {
@@ -166,21 +192,18 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# Confirm a valid imageid if one was specified. Otherwise we are going
+# Confirm a valid imagename if one was specified. Otherwise we are going
 # to pull it out of the DB for each node.
 #
-if (defined($imageid)) {
-    my $query_result =
-	DBQueryFatal("select * from images where imageid='$imageid'");
-    
-    if ($query_result->numrows < 1) {
+if (defined($imagename)) {
+    if (! ($imageid = TBImageID($imagepid, $imagename))) {
 	die("*** $0:\n".
-	    "    No such imageid $imageid is registered in the DB!");
+	    "    No such image $imagename in project $imagepid!\n");
     }
 }
 
 #
-# A loop.
+# Loop through each node.
 # 
 my @load_list=();
 foreach my $node (@nodes) {

@@ -72,11 +72,10 @@ if ($isadmin) {
 else {
     $osid_result =
 	DBQueryFatal("select distinct o.*,p.osid from os_info as o ".
-		     "left join group_membership as m ".
-		     " on o.pid IS NULL or m.pid=o.pid ".
+		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where m.uid='$uid' and p.node_id='$node_id' ".
-		     " or o.path!='' ".
+		     " or o.path!='' or o.shared=1 ".
 		     "order by o.pid,o.osid");
 }
 
@@ -93,7 +92,7 @@ echo "<form action=\"nodecontrol.php3?refer=$refer\"
 echo "<tr>
           <td>Node ID:</td>
           <td class=\"left\"> 
-              <input type=\"readonly\" name=\"node_id\" value=\"$node_id\">
+              <input readonly type=readonly name=node_id value=\"$node_id\">
               </td>
       </tr>\n";
 
@@ -101,7 +100,7 @@ if ($vname) {
     echo "<tr>
               <td>Virtual Name:</td>
               <td class=left> 
-                  <input type=readonly name=vname value='$vname'>
+                  <input readonly type=readonly name=vname value='$vname'>
                   </td>
           </tr>\n";
 }
@@ -109,7 +108,7 @@ if ($vname) {
 echo "<tr>
           <td>Node Type:</td>
           <td class=\"left\"> 
-              <input type=\"readonly\" name=\"node_type\" value=\"$type\">
+              <input readonly type=readonly name=node_type value=\"$type\">
               </td>
       </tr>\n";
 
@@ -117,25 +116,23 @@ echo "<tr>
 # OSID, as a menu of those allowed.
 #
 echo "<tr>
-          <td>*Def Boot OSID:</td>";
-echo "    <td><select name=\"def_boot_osid\">\n";
-if ($def_boot_osid) {
-    echo "<option selected value='$def_boot_osid'>$def_boot_osid</option>\n";
+          <td>*Def Boot OS:</td>";
+echo "    <td><select name=def_boot_osid>\n";
+if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid)) {
+    echo "<option selected value='$def_boot_osid'>$osname </option>\n";
 }
                while ($row = mysql_fetch_array($osid_result)) {
+                  $osname = $row[osname];
                   $osid = $row[osid];
 		  $pid  = $row[pid];
-		  if (!$pid)
-		      $pid = "testbed";
 
-                  echo "<option ";
 		  if ($def_boot_osid == $osid) {
 		      continue;
 		  }
-                  echo "value=\"$osid\">$pid - $osid</option>\n";
+                  echo "<option value=$osid>$pid - $osname</option>\n";
                }
 if ($isadmin) {
-    echo "<option value=\"\">No OSID</option>\n";
+    echo "<option value=\"\">No OS</option>\n";
 }
 echo "       </select>";
 echo "    </td>
@@ -160,21 +157,20 @@ if ($isadmin) {
     mysql_data_seek($osid_result, 0);
 
     echo "<tr>
-              <td>Next Boot OSID:</td>";
+              <td>Next Boot OS:</td>";
     echo "    <td><select name=\"next_boot_osid\">\n";
-    echo "                <option value=\"\">No OSID</option>\n";
+    echo "                <option value=\"\">No OS</option>\n";
     
     while ($row = mysql_fetch_array($osid_result)) {
+	$osname = $row[osname];
 	$osid = $row[osid];
 	$pid  = $row[pid];
-	if (!$pid)
-	    $pid = "testbed";
 
 	echo "<option ";
 	if ($next_boot_osid == $osid) {
 	    echo "selected ";
 	}
-	echo "value=\"$osid\">$pid - $osid</option>\n";
+	echo "value=\"$osid\">$pid - $osname</option>\n";
     }
     echo "       </select>";
     echo "    </td>
@@ -197,7 +193,7 @@ if ($isadmin) {
 }
 
 echo "<tr>
-          <td>Startup Command[1]:</td>
+          <td>Startup Command[<b>1</b>]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"startupcmd\" size=\"60\"
                      maxlength=\"256\" value='$startupcmd'></td>
@@ -205,14 +201,14 @@ echo "<tr>
 
 
 echo "<tr>
-          <td>RPMs[2]:</td>
+          <td>RPMs[<b>2</b>]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"rpms\" size=\"60\"
                      maxlength=\"1024\" value=\"$rpms\"></td>
       </tr>\n";
 
 echo "<tr>
-          <td>Tarballs[3]:</td>
+          <td>Tarballs[<b>3</b>]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"tarballs\" size=\"60\"
                      maxlength=\"1024\" value=\"$tarballs\"></td>
@@ -226,18 +222,16 @@ echo "<tr>
      </form>
      </table>\n";
 
-echo "<p>
-      <dl COMPACT>
-        <dt> [1]
-           <dd> Node startup command must be a pathname. You may also include
+echo "<p><blockquote><blockquote>
+      <ol>
+        <li> Node startup command must be a pathname. You may also include
                 optional arguments.
-        <dt> [2]
-           <dd> RPMs must be a colon separated list of pathnames.
-        <dt> [3]
-           <dd> Tarballs must be a colon separated list of directory path
+        <li> RPMs must be a colon separated list of pathnames.
+        <li> Tarballs must be a colon separated list of directory path
                 and tarfile path (eg: /usr/site /foo/fee.tar.gz). The
                 directory is where the tarfile should be unpacked.
-      </dl>\n";
+      </ol>
+      </blockquote></blockquote>\n";
 
 #
 # Standard Testbed Footer

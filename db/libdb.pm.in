@@ -64,7 +64,7 @@ use Exporter;
 
 	 TB_EXPTPRIORITY_LOW TB_EXPTPRIORITY_HIGH
 
-	 TB_ASSIGN_TOOFEWNODES
+	 TB_ASSIGN_TOOFEWNODES TB_OPSPID
 
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
@@ -74,7 +74,7 @@ use Exporter;
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
-	 TBUnixGroupList
+	 TBUnixGroupList TBOSID TBImageID
 	 );
 
 # Must come after package declaration!
@@ -86,6 +86,7 @@ require Mysql;
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TBOPSPID	= "emulab-ops";
 
 #
 # Set up for querying the database. Note that fork causes a reconnect
@@ -218,6 +219,9 @@ sub TB_EXPTPRIORITY_HIGH()	{ 20; }
 
 # Assign exit status for too few nodes.
 sub TB_ASSIGN_TOOFEWNODES()	{ 2; }
+
+# System PID.
+sub TB_OPSPID()			{ $TBOPSPID; }
 
 #
 # We should list all of the DB limits.
@@ -553,18 +557,19 @@ sub TBOSIDAccessCheck($$$)
     # No GIDs yet.
     #
     my $query_result =
-	DBQueryFatal("SELECT pid FROM os_info WHERE osid='$osid'");
+	DBQueryFatal("SELECT pid,shared FROM os_info WHERE osid='$osid'");
     
     if ($query_result->numrows == 0) {
 	return 0;
     }
     my @row = $query_result->fetchrow_array();
     my $pid = $row[0];
+    my $shared = $row[1];
 
     #
     # Global OSIDs can be read by anyone.
     # 
-    if (!$pid) {
+    if ($shared) {
 	if ($access_type == TB_OSID_READINFO) {
 	    return 1;
 	}
@@ -612,18 +617,19 @@ sub TBImageIDAccessCheck($$$)
     # No GIDs yet.
     #
     my $query_result =
-	DBQueryFatal("SELECT pid FROM images WHERE imageid='$imageid'");
+	DBQueryFatal("SELECT pid,shared FROM images WHERE imageid='$imageid'");
     
     if ($query_result->numrows == 0) {
 	return 0;
     }
     my @row = $query_result->fetchrow_array();
     my $pid = $row[0];
+    my $shared = $row[1];
 
     #
     # Global ImageIDs can be read by anyone.
     # 
-    if (!$pid) {
+    if ($shared) {
 	if ($access_type == TB_IMAGEID_READINFO) {
 	    return 1;
 	}
@@ -1042,6 +1048,50 @@ sub DefaultImageID ($) {
 	DBQueryFatal("select imageid from node_types as t ".
 		     "left join nodes as n on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Convert user pid/name to internal imageid.
+#
+# usage: TBImageID(char *pid, char *imagename)
+#        returns imageid if its valid.
+#        returns 0 if not valid.
+#
+sub TBImageID ($$) {
+    my($pid, $imagename) = @_;
+
+    my $query_result =
+	DBQueryFatal("select imageid from images ".
+		     "where pid='$pid' and imagename='$imagename'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Convert user pid/name to internal osid.
+#
+# usage: TBOSID(char *pid, char *isname)
+#        returns osid if its valid.
+#        returns 0 if not valid.
+#
+sub TBOSID ($$) {
+    my($pid, $osname) = @_;
+
+    my $query_result =
+	DBQueryFatal("select osid from os_info ".
+		     "where pid='$pid' and osname='$osname'");
 
     if (! $query_result->num_rows) {
 	return 0;

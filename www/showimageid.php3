@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("ImageID Information");
+PAGEHEADER("Image Descriptor");
 
 #
 # Only known and logged in users can end experiments.
@@ -21,8 +21,8 @@ if (!isset($imageid) ||
     USERERROR("You must provide an ImageID.", 1);
 }
 
-if (!TBValidImageID($imageid)) {
-    USERERROR("The ImageID $imageid is not a valid ImageID.", 1);
+if (! TBValidImageID($imageid)) {
+    USERERROR("ImageID '$imageid' is not a valid ImageID!", 1);
 }
 
 #
@@ -32,26 +32,29 @@ if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_READINFO)) {
     USERERROR("You do not have permission to access ImageID $imageid.", 1);
 }
 
+SUBPAGESTART();
+SUBMENUSTART("More Options");
+$fooid = rawurlencode($imageid);
+WRITESUBMENUBUTTON("Edit this Image Descriptor",
+		   "editimageid_form.php3?imageid=$fooid");
+WRITESUBMENUBUTTON("Delete this Image Descriptor",
+		   "deleteimageid.php3?imageid=$fooid");
+WRITESUBMENUBUTTON("Create a new Image Descriptor",
+		   "newimageid_explain.php3");
+WRITESUBMENUBUTTON("Create a new OS Descriptor",
+		   "newosid_form.php3");
+WRITESUBMENUBUTTON("Back to Image Descriptor list",
+		   "showimageid_list.php3");
+WRITESUBMENUBUTTON("Back to OS Descriptor list",
+		   "showosid_list.php3");
+SUBMENUEND();
+
 #
 # Dump record.
 # 
 SHOWIMAGEID($imageid, 0);
 
-#
-# Edit option.
-#
-$fooid = rawurlencode($imageid);
-echo "<p><center>
-           Do you want to edit this ImageID?
-           <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
-         </center>\n";
-
-echo "<br><br>\n";
-
-echo "<p><center>
-           Do you want to delete this ImageID?
-           <A href='deleteimageid.php3?imageid=$fooid'>Yes</a>
-         </center>\n";
+SUBPAGEEND();
 
 #
 # Standard Testbed Footer

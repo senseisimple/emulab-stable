@@ -49,9 +49,9 @@ SHOWNODE($node_id);
 #
 # Edit option
 #
-echo "<p><center>
-           Do you want to edit this the node info?
-           <A href='nodecontrol_form.php3?node_id=$node_id'>Yes</a>
+echo "<br><center>
+           <A href='nodecontrol_form.php3?node_id=$node_id'>
+              Edit this the node info?</a>
          </center>\n";
 
 if ($isadmin) {

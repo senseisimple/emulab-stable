@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Edit ImageID Information");
+PAGEHEADER("Edit Image Descriptor");
 
 #
 # Only known and logged in users can end experiments.
@@ -21,15 +21,15 @@ if (!isset($imageid) ||
     USERERROR("You must provide an ImageID.", 1);
 }
 
-if (!TBValidImageID($imageid)) {
-    USERERROR("The ImageID $imageid is not a valid ImageID.", 1);
+if (! TBValidImageID($imageid)) {
+    USERERROR("ImageID '$imageid' is not a valid ImageID $pid!", 1);
 }
 
 #
 # Verify permission.
 #
 if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
-    USERERROR("You do not have permission to access ImageID $imageid.", 1);
+    USERERROR("You do not have permission to access ImageID $imageid!", 1);
 }
 
 SHOWIMAGEID($imageid, 1);

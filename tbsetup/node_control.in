@@ -6,6 +6,8 @@ use Getopt::Std;
 # usage: node_control [options] node [node ...]
 #        node_control [options] -e pid,eid
 #
+# XXX def_boot_osid and virt_nodes osname are not handled properly. 
+#
 sub usage()
 {
     print("Usage: node_control name=value [name=value ...] node [node ...]\n".
@@ -29,7 +31,7 @@ my %controlset =
  #
  #  Symbolic name   =>  Admin, Multi args, nodes DB field, virt_nodes DB field
  #
- default_boot_osid	=> [0, 0, "def_boot_osid",	"osid"],
+ default_boot_osid	=> [0, 0, "def_boot_osid",	undef],
  default_boot_path	=> [0, 0, "def_boot_path",	undef],
  default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line"],
  startup_command	=> [0, 0, "startupcmd",		"startupcmd"],

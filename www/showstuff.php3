@@ -33,7 +33,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
     $proj_sharks        = $row[num_sharks];
-    $proj_why           = $row[why];
+    $proj_why           = nl2br($row[why]);
     $control_node	= $row[control_node];
     $approved           = $row[approved];
     $expt_count         = $row[expt_count];
@@ -586,10 +586,10 @@ function SHOWNODES($pid, $eid) {
                 <td align=center>Default<br>OSID</td>
                 <td align=center>Default<br>Path</td>
                 <td align=center>Default<br>Cmdline</td>
-                <td align=center>Boot<br>Status[1]</td>
+                <td align=center>Boot<br>Status[<b>1</b>]</td>
                 <td align=center>Startup<br>Command</td>
-                <td align=center>Startup<br>Status[2]</td>
-                <td align=center>Ready<br>Status[3]</td>
+                <td align=center>Startup<br>Status[<b>2</b>]</td>
+                <td align=center>Ready<br>Status[<b>3</b>]</td>
               </tr>\n";
 	
 	$query_result = mysql_db_query($TBDBNAME,
@@ -635,9 +635,11 @@ function SHOWNODES($pid, $eid) {
                         </td>
                     <td>$vname</td>
                     <td>$type</td>\n";
-	    if ($def_boot_osid)
-		echo "<td><A href='showosinfo.php3?osid=$def_boot_osid'>
-                             $def_boot_osid</A></td>\n";
+	    if ($def_boot_osid) {
+		echo "<td>";
+		SPITOSINFOLINK($def_boot_osid);
+		echo "</td>";
+	    }
 	    else
 		echo "<td>&nbsp</td>\n";
 	    
@@ -650,18 +652,14 @@ function SHOWNODES($pid, $eid) {
                    </tr>\n";
 	}
 	echo "</table>\n";
-	echo "<h4><blockquote><blockquote><blockquote><blockquote>
-              <dl COMPACT>
-                <dt>[1]
-                    <dd>Node has rebooted successfully after experiment
-                        creation.
-                <dt>[2]
-                    <dd>Exit value of the node startup command. A value of
+	echo "<h4><blockquote><blockquote><blockquote>
+              <ol>
+                <li>Node has rebooted successfully after experiment creation.
+                <li>Exit value of the node startup command. A value of
                         666 indicates a testbed internal error.
-                <dt>[3]
-                    <dd>User application ready status, reported via TMCC.
-              </dl>
-              </blockquote></blockquote></blockquote></blockquote></h4>\n";
+                <li>User application ready status, reported via TMCC.
+              </ol>
+              </blockquote></blockquote></blockquote></h4>\n";
     }
 }
 
@@ -681,9 +679,10 @@ function SHOWOSINFO($osid) {
     $os_version     = $osrow[version];
     $os_path        = $osrow[path];
     $os_magic       = $osrow[magic];
-    $os_machinetype = $osrow[machinetype];
     $os_osfeatures  = $osrow[osfeatures];
     $os_pid         = $osrow[pid];
+    $os_shared      = $osrow[shared];
+    $os_osname      = $osrow[osname];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -695,8 +694,6 @@ function SHOWOSINFO($osid) {
 	$os_magic = "&nbsp";
     if (!$os_osfeatures)
 	$os_osfeatures = "&nbsp";
-    if (!$os_pid)
-	$os_pid = "&nbsp";
 
     #
     # Generate the table.
@@ -704,8 +701,13 @@ function SHOWOSINFO($osid) {
     echo "<table align=center border=1>\n";
 
     echo "<tr>
-            <td>OSID: </td>
-            <td class=\"left\">$osid</td>
+            <td>Name: </td>
+            <td class=\"left\">$os_osname</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Project: </td>
+            <td class=\"left\">$os_pid</td>
           </tr>\n";
 
     echo "<tr>
@@ -716,11 +718,6 @@ function SHOWOSINFO($osid) {
     echo "<tr>
             <td>Operating System: </td>
             <td class=\"left\">$os_OS</td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Project: </td>
-            <td class=\"left\">$os_pid</td>
           </tr>\n";
 
     echo "<tr>
@@ -739,13 +736,25 @@ function SHOWOSINFO($osid) {
           </tr>\n";
 
     echo "<tr>
-            <td>Node Type: </td>
-            <td class=\"left\">$os_machinetype</td>
+            <td>Features: </td>
+            <td class=\"left\">$os_osfeatures</td>
           </tr>\n";
 
     echo "<tr>
-            <td>Features: </td>
-            <td class=\"left\">$os_osfeatures</td>
+            <td>Shared?: </td>
+            <td class=left>\n";
+
+    if ($os_shared)
+	echo "Yes";
+    else
+	echo "No";
+    
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Internal ID: </td>
+            <td class=\"left\">$osid</td>
           </tr>\n";
 
     echo "</table>\n";
@@ -757,11 +766,13 @@ function SHOWOSINFO($osid) {
 function SHOWIMAGEID($imageid, $edit) {
     global $TBDBNAME;
 		
-    $query_result = mysql_db_query($TBDBNAME,
-		"SELECT * FROM images WHERE imageid='$imageid'");
+    $query_result =
+	DBQueryFatal("select * from images where imageid='$imageid'");
 
     $row = mysql_fetch_array($query_result);
 
+    $imagename   = $row[imagename];
+    $pid         = $row[pid];
     $description = $row[description];
     $loadpart	 = $row[loadpart];
     $loadlength	 = $row[loadlength];
@@ -771,11 +782,9 @@ function SHOWIMAGEID($imageid, $edit) {
     $part4_osid	 = $row[part4_osid];
     $default_osid= $row[default_osid];
     $path 	 = $row[path];
-    $pid	 = $row[pid];
     $loadaddr	 = $row[load_address];
+    $shared	 = $row[shared];
 
-    if (!$pid)
-	$pid = "&nbsp";
     if ($edit) {
 	if (!$description)
 	    $description = "";
@@ -806,8 +815,13 @@ function SHOWIMAGEID($imageid, $edit) {
     }
 
     echo "<tr>
-            <td>ImageID: </td>
-            <td class=\"left\">$imageid</td>
+            <td>Image Name: </td>
+            <td class=\"left\">$imagename</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Project: </td>
+            <td class=\"left\">$pid</td>
           </tr>\n";
 
     echo "<tr>
@@ -825,11 +839,6 @@ function SHOWIMAGEID($imageid, $edit) {
  	  </tr>\n";
 
     echo "<tr>
-            <td>Project: </td>
-            <td class=\"left\">$pid</td>
-          </tr>\n";
-
-    echo "<tr>
             <td>Load Partition: </td>
             <td class=\"left\">$loadpart</td>
           </tr>\n";
@@ -841,42 +850,46 @@ function SHOWIMAGEID($imageid, $edit) {
 
     if ($part1_osid) {
 	echo "<tr>
-                 <td>Slice 1 OSID: </td>
-                 <td class=\"left\">
-                    <A href='showosinfo.php3?osid=$part1_osid'>$part1_osid</A>
+                 <td>Partition 1 OS: </td>
+                 <td class=\"left\">";
+	SPITOSINFOLINK($part1_osid);
+	echo "   </td>
               </tr>\n";
     }
 
     if ($part2_osid) {
 	echo "<tr>
-                 <td>Slice 2 OSID: </td>
-                 <td class=\"left\">
-                    <A href='showosinfo.php3?osid=$part2_osid'>$part2_osid</A>
+                 <td>Partition 2 OS: </td>
+                 <td class=\"left\">";
+	SPITOSINFOLINK($part2_osid);
+	echo "   </td>
               </tr>\n";
     }
 
     if ($part3_osid) {
 	echo "<tr>
-                 <td>Slice 3 OSID: </td>
-                 <td class=\"left\">
-                    <A href='showosinfo.php3?osid=$part3_osid'>$part3_osid</A>
+                 <td>Partition 3 OS: </td>
+                 <td class=\"left\">";
+	SPITOSINFOLINK($part3_osid);
+	echo "   </td>
               </tr>\n";
     }
 
     if ($part4_osid) {
 	echo "<tr>
-                 <td>Slice 4 OSID: </td>
-                 <td class=\"left\">
-                    <A href='showosinfo.php3?osid=$part4_osid'>$part4_osid</A>
+                 <td>Partition 4 OS: </td>
+                 <td class=\"left\">";
+	SPITOSINFOLINK($part4_osid);
+	echo "   </td>
               </tr>\n";
     }
 
     if ($default_osid) {
 	echo "<tr>
-                 <td>Default OSID: </td>
-                 <td class=\"left\">
-                    <A href='showosinfo.php3?osid=$default_osid'>
-                       $default_osid</A>
+                 <td>Boot OS: </td>
+                 <td class=\"left\">";
+	SPITOSINFOLINK($default_osid);
+	echo "   </td>
               </tr>\n";
     }
 
@@ -892,6 +905,45 @@ function SHOWIMAGEID($imageid, $edit) {
 	echo "$path";
     }
     echo "  </td>
+          </tr>\n";
+
+    if (! $edit) {
+	echo "<tr>
+                  <td>Types: </td>
+                  <td class=left>\n";
+
+	$types_result =
+	    DBQueryFatal("select distinct type from osidtoimageid ".
+			 "where imageid='$imageid'");
+
+	if (mysql_num_rows($types_result)) {
+	    while ($row = mysql_fetch_array($types_result)) {
+		$type = $row[type];
+		echo "$type &nbsp ";
+	    }
+	}
+	else {
+	    echo "&nbsp";
+	}
+	echo "  </td>
+              </tr>\n";
+    }
+
+    echo "<tr>
+            <td>Shared?: </td>
+            <td class=left>\n";
+
+    if ($shared)
+	echo "Yes";
+    else
+	echo "No";
+    
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Internal ID: </td>
+            <td class=left>$imageid</td>
           </tr>\n";
 
     echo "<tr>
@@ -954,8 +1006,6 @@ function SHOWNODE($node_id) {
 	$def_boot_cmd_line = "&nbsp";
     if (!$def_boot_path)
 	$def_boot_path = "&nbsp";
-    if (!$next_boot_osid)
-	$next_boot_osid = "&nbsp";
     if (!$next_boot_path)
 	$next_boot_path = "&nbsp";
     if (!$next_boot_cmd_line)
@@ -995,8 +1045,10 @@ function SHOWNODE($node_id) {
           </tr>\n";
 
     echo "<tr>
-              <td>Def Boot OSID:</td>
-              <td class=left>$def_boot_osid</td>
+              <td>Def Boot OS:</td>
+              <td class=left>";
+    SPITOSINFOLINK($def_boot_osid);
+    echo "    </td>
           </tr>\n";
 
     echo "<tr>
@@ -1010,8 +1062,15 @@ function SHOWNODE($node_id) {
           </tr>\n";
 
     echo "<tr>
-              <td>Next Boot OSID:</td>
-              <td class=left>$next_boot_osid</td>
+              <td>Next Boot OS:</td>
+              <td class=left>";
+    
+    if ($next_boot_osid)
+	SPITOSINFOLINK($next_boot_osid);
+    else
+	echo "&nbsp";
+
+    echo "    </td>
           </tr>\n";
 
     echo "<tr>
@@ -1149,6 +1208,17 @@ function SHOWNODELOGENTRY($node_id, $log_id)
              <td>$entry</td>
           </tr>\n";
     echo "</table>\n";
+}
+
+#
+# Spit out an OSID link in user format.
+#
+function SPITOSINFOLINK($osid)
+{
+    if (! TBOSInfo($osid, $osname, $pid))
+	return;
+    
+    echo "<A href='showosinfo.php3?osid=$osid'>$osname</A>\n";
 }
 
 #

@@ -171,38 +171,32 @@ echo "<tr>
    </form>
  </table>\n";
 
-echo "<h4><blockquote><blockquote><blockquote>
-      <dl COMPACT>
-        <dt>[1]
-            <dd>Check if your experiment can be swapped out and swapped back 
+echo "<blockquote><blockquote><blockquote>
+      <ol>
+         <li>Check if your experiment can be swapped out and swapped back 
 	        in without harm to your experiment. Useful for scheduling when
 	        resources are tight. More information on swapping
 	        is contained in the 
 	        <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Emulab FAQ</a>.
-        <dt>[2]
-            <dd>You get brownie points for marking your experiments as Low
+         <li>You get brownie points for marking your experiments as Low
                 Priority, which indicates that we can swap you out before high
 	        priority experiments.
-        <dt>[3]
-            <dd>Leave as the default group, or pick a subgroup that
+         <li>Leave as the default group, or pick a subgroup that
                 corresponds to the project you selected.
-        <dt>[4]
-            <dd>Check this if you want to create a
+         <li>Check this if you want to create a
                 <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
                 batch mode</a> experiment.
-     </dl>
-     </blockquote></blockquote></blockquote></h4>\n";
+     </ol>
+     </blockquote></blockquote></blockquote>\n";
 
 echo "<p><blockquote>
       <ul>
          <li> Please <a href='nscheck_form.php3'>syntax check</a> your NS
               file first!
-         <li> If your NS file is using a custom OSID, you must
-              <a href='newosid_form.php3'>create the OSID first!</a>
          <li> You can view a <a href='showosid_list.php3'> list of OSIDs</a>
               that are available for you to use in your NS file.
-         <li> You can also view a <a href='showimageid_list.php3'> list of
-              ImageIDs.</a> 
+         <li> Create your own <a href='newimageid_explain.php3'>
+              custom disk images</a>.
       </ul>
       </blockquote>\n";
 

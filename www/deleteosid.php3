@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Delete an OSID");
+PAGEHEADER("Delete an OS Descriptor");
 
 #
 # Only known and logged in users can end experiments.
@@ -21,14 +21,60 @@ if (!isset($osid) ||
 }
 
 if (! TBValidOSID($osid)) {
-    USERERROR("The OSID `$osid' is not a valid OSID.", 1);
+    USERERROR("The OSID '$osid' is not valid!", 1);
 }
 
 #
 # Verify permission.
 #
 if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_DESTROY)) {
-    USERERROR("You do not have permission to access OSID $osid!", 1);
+    USERERROR("You do not have permission to delete OS Descriptor $osid!", 1);
+}
+
+#
+# Get user level info.
+#
+if (!TBOSInfo($osid, $osname, $pid)) {
+    USERERROR("OS Descriptor '$osid' is no longer valid!", 1);
+}
+
+#
+# Check to see if the OSID is being used. Force whatever images are using
+# it to be deleted or changed. This subsumes EZ created images/osids.
+#
+$query_result =
+    DBQueryFatal("select * from images ".
+		 "where part1_osid='$osid' or part2_osid='$osid' or ".
+		 "      part3_osid='$osid' or part4_osid='$osid' or ".
+		 "      default_osid='$osid'");
+
+if (mysql_num_rows($query_result)) {
+    echo "<center>The following images are using this OS Descriptor.<br>
+          They must be deleted first!</center><br>\n";
+          
+    echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
+
+    echo "<tr>
+              <td align=center>Image</td>
+              <td align=center>PID</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$imageid   = $row['imageid'];
+	$url       = rawurlencode($imageid);
+	$imagename = $row['imagename'];
+	$pid       = $row[pid];
+
+	echo "<tr>
+                <td><A href='showimageid.php3?imageid=$url'>$imagename</A>
+                    </td>
+	        <td>$pid</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+    
+    PAGEFOOTER();
+    return;
 }
 
 #
@@ -39,7 +85,7 @@ if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_DESTROY)) {
 #
 if ($canceled) {
     echo "<center><h2><br>
-          OSID termination canceled!
+          OS Descriptor removal canceled!
           </h2></center>\n";
     
     PAGEFOOTER();
@@ -49,7 +95,7 @@ if ($canceled) {
 if (!$confirmed) {
     echo "<center><h2><br>
           Are you <b>REALLY</b>
-          sure you want to delete OSID `$osid?'
+          sure you want to delete OS Descriptor '$osname' in Project $pid?
           </h2>\n";
     
     echo "<form action=\"deleteosid.php3\" method=\"post\">";
@@ -70,8 +116,11 @@ DBQueryFatal("DELETE FROM os_info WHERE osid='$osid'");
 
 echo "<p>
       <center><h2>
-      OSID `$osid' has been deleted!
+      OS Descriptor '$osname' in Project $pid has been deleted!
       </h2></center>\n";
+
+echo "<br>
+      <a href='showosid_list.php3'>Back to OS Descriptor list</a>\n";
 
 #
 # Standard Testbed Footer

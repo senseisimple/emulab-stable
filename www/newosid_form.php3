@@ -4,41 +4,28 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Create a new OSID Form");
+PAGEHEADER("Create a new OS Descriptor");
 
 #
-# Only known and logged in users can create a new OSID
+# Only known and logged in users
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
-# See what projects the uid is a member of. Must be at least one!
-# 
-$query_result =
-    DBQueryFatal("SELECT pid,trust FROM group_membership WHERE uid='$uid'");
-
+# See what projects the uid can do this in.
 #
-# See if proper trust level in any of them.
-#
-$okay = 0;
-while ($row = mysql_fetch_array($query_result)) {
-    $trust = $row[trust];
+$projlist = TBProjList($uid, $TB_PROJECT_MAKEOSID);
 
-    if (TBMinTrust($trust, $TBDB_TRUST_LOCALROOT)) {
-	$okay = 1;
-    }
-}
-mysql_data_seek($query_result, 0);
-
-if (!$okay) {
+if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".
-	      "you have permission to create new OSIDs", 1);
+	      "you have permission to create new OS Descriptors!", 1);
 }
 
 ?>
 <blockquote><blockquote>
-Use this page to create a customized Operating System Identifier (OSID),
+Use this page to create a customized Operating System Descriptor,
 for use with the <tt>tb-set-node-os</tt> command in your NS file.
 </blockquote></blockquote>
     
@@ -49,9 +36,24 @@ for use with the <tt>tb-set-node-os</tt> command in your NS file.
         <em>(Fields marked with * are required)</em>
     </td>
 </tr>
-<form action="newosid.php3" method="post">
+<form action="newosid.php3" method="post" name=idform>
 
 <?php
+
+#
+# Select Project
+#
+echo "<tr>
+          <td>*Select Project:</td>";
+echo "    <td><select name=pid>
+              <option value=''>Please Select &nbsp</option>\n";
+
+	      while (list($project) = each($projlist)) {
+		  echo "<option value='$project'>$project </option>\n";
+	      }
+echo "       </select>";
+echo "    </td>
+      </tr>\n";
 
 #
 # OSID:
@@ -59,9 +61,9 @@ for use with the <tt>tb-set-node-os</tt> command in your NS file.
 # Note DB max length.
 #
 echo "<tr>
-          <td>*OSID (no blanks):</td>
-          <td><input type=\"text\" name=\"osid\"
-                     size=$TBDB_OSID_OSIDLEN maxlength=$TBDB_OSID_OSIDLEN>
+          <td>*Descriptor Name (no blanks):</td>
+          <td><input type=\"text\" name=\"osname\"
+                     size=$TBDB_OSID_OSNAMELEN maxlength=$TBDB_OSID_OSNAMELEN>
               </td>
       </tr>\n";
 
@@ -75,34 +77,17 @@ echo "<tr>
       </tr>\n";
 
 #
-# Select Project
-#
-echo "<tr>
-          <td>*Select Project:</td>";
-echo "    <td><select name=\"pid\">";
-               while ($row = mysql_fetch_array($query_result)) {
-                  $project = $row[pid];
-		  $trust   = $row[trust];
-		  if (TBMinTrust($trust, $TBDB_TRUST_LOCALROOT)) {
-		      echo "<option value=\"$project\">$project</option>\n";
-		  }
-               }
-echo "        <option value=none>None</option>\n";
-echo "       </select>";
-echo "    </td>
-      </tr>\n";
-
-#
 # Select an OS
 # 
 echo "<tr>
           <td>*Select OS:</td>
-          <td><select name=\"OS\">
-               <option value=\"OSKit\">OSKit</option>
-               <option value=\"Unknown\">Unknown</option>
-               <option value=\"FreeBSD\">FreeBSD</option>
-               <option value=\"Linux\">Linux</option>
-               <option value=\"NetBSD\">NetBSD</option>
+          <td><select name=OS>
+               <option value=none>Please Select &nbsp</option>
+               <option value=Linux>Linux </option>
+               <option value=FreeBSD>FreeBSD </option>
+               <option value=NetBSD>NetBSD </option>
+               <option value=OSKit>OSKit </option>
+               <option value=Unknown>Other </option>
               </select>
           </td>
       </tr>\n";
@@ -111,7 +96,7 @@ echo "<tr>
 # Version String
 #
 echo "<tr>
-          <td>Version:</td>
+          <td>*Version:</td>
           <td><input type=\"text\" name=\"os_version\" 
                      size=$TBDB_OSID_VERSLEN maxlength=$TBDB_OSID_VERSLEN>
               </td>
@@ -127,24 +112,12 @@ echo "<tr>
       </tr>\n";
 
 #
-# Path to Multiboot image.
+# Magic string?
 #
 echo "<tr>
           <td>Magic (ie: uname -r -s):</td>
           <td><input type=\"text\" name=\"os_magic\" size=30>
               </td>
-      </tr>\n";
-
-#
-# Path to Multiboot image.
-#
-echo "<tr>
-          <td>Machine Type:</td>
-          <td><select name=\"os_machinetype\">
-               <option value=\"PC\">pc</option>
-               <option value=\"Shark\">shark</option>
-              </select>
-          </td>
       </tr>\n";
 
 echo "<tr>
@@ -154,6 +127,17 @@ echo "<tr>
               <input type=checkbox name=\"os_feature_ipod\">ipod &nbsp
           </td>
       </tr>\n";
+
+if ($isadmin) {
+    #
+    # Shared?
+    #
+    echo "<tr>
+	      <td>Shared?:<br>
+                  (available to all projects)</td>
+              <td><input type=checkbox name=os_shared value=Yep> Yes</td>
+          </tr>\n";
+}
 
 echo "<tr>
           <td align=center colspan=2>

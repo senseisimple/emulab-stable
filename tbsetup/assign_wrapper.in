@@ -851,9 +851,9 @@ foreach $pnode (keys(%p2vmap)) {
 }
 foreach $pair (@nodepairs) {
     ($pnode,$vnode) = @$pair;
-    my $result = DBQueryFatal("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
-			 "tarfiles,failureaction,routertype from virt_nodes" .
-			 " where pid=\"$pid\"" .
+    my $result = DBQueryFatal("SELECT osname,cmd_line,rpms,deltas," .
+			 " startupcmd,tarfiles,failureaction,routertype " .
+			 " from virt_nodes where pid=\"$pid\"" .
 			 " and eid=\"$eid\" and vname=\"$vnode\"");
     # The if statement will cause us to skip nodes that belong to
     # the experiment but aren't virtual.  I.e. delay nodes.
@@ -862,10 +862,20 @@ foreach $pair (@nodepairs) {
 			  " where node_id=\"$pnode\"");
     my ($type) = $result2->fetchrow_array;
     $result2->finish;
-    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+    if (($osname,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
 	 $failureaction,$routertype) = $result->fetchrow_array) {
-	if (!defined($osid) || $osid eq "") {
+	my $osid;
+	if (!defined($osname) || $osname eq "") {
 	    $osid = $defosids{$type};
+	}
+	#
+	# Map the user name into a specific OSID in the project or in
+	# the OPS project (a default image). 
+	# 
+	elsif (! ($osid = TBOSID($pid, $osname)) &&
+	       ! ($osid = TBOSID(TB_OPSPID, $osname))) {
+	    print STDERR "$0: *** Invalid OS $osname in project $pid!\n";
+	    exit(1);
 	}
 	DBQueryFatal("UPDATE nodes set def_boot_osid=\"$osid\"," .
 		       " def_boot_cmd_line='$cmdline'," .

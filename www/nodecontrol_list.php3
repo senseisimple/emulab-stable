@@ -74,16 +74,17 @@ while ($row = mysql_fetch_array($query_result)) {
               <td>$type</td>
               <td>$pid</td>
               <td>$eid</td>\n";
-    if ($def_boot_osid)
-	echo "<td>$def_boot_osid</td>\n";
+    if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid))
+	echo "<td>$osname</td>\n";
     else
 	echo "<td>&nbsp</td>\n";
     
     echo "    <td>$def_boot_path</td>
               <td>$def_boot_cmd_line</td>\n";
 
-    if ($next_boot_osid)
-	echo "<td>$next_boot_osid</td>\n";
+    if ($next_boot_osid && TBOSInfo($next_boot_osid, $osname, $ospid)) {
+	echo "<td>$osname</td>\n";
+    }
     else
 	echo "<td>&nbsp</td>\n";
     

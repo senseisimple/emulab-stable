@@ -162,7 +162,6 @@ if (mysql_num_rows($query_result)) {
 	          <td><A href='showuser.php3?target_uid=$leader'>$leader</A>
                       </td>
               </tr>\n";
-     
     }
 
     echo "</table>\n";

@@ -101,7 +101,7 @@ Node instproc updatedb {DB} {
     }
 
     # Update the DB
-    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype,fixed) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\",\"$fixed\")";
+    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osname,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype,fixed) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\",\"$fixed\")";
 }
 
 # add_lanlink lanlink

@@ -5,10 +5,10 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Edit ImageID Information");
+PAGEHEADER("Edit Image Descriptor");
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users allowed.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
@@ -21,15 +21,15 @@ if (!isset($imageid) ||
     USERERROR("You must provide an ImageID.", 1);
 }
 
-if (!TBValidImageID($imageid)) {
-    USERERROR("The ImageID $imageid is not a valid ImageID.", 1);
+if (! TBValidImageID($imageid)) {
+    USERERROR("ImageID '$imageid' is not a valid ImageID!", 1);
 }
 
 #
 # Verify permission.
 #
 if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
-    USERERROR("You do not have permission to access ImageID $imageid.", 1);
+    USERERROR("You do not have permission to access ImageID $imageid!", 1);
 }
 
 #
@@ -92,20 +92,24 @@ $insert_result = DBQueryFatal($query_string);
 
 SHOWIMAGEID($imageid, 0);
 
+#
 # Edit option.
+#
 $fooid = rawurlencode($imageid);
-echo "<p><center>
-       Do you want to edit this ImageID?
-       <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
-      </center>\n";
+echo "<br><center>
+           <A href='editimageid_form.php3?imageid=$fooid'>
+              Edit this ImageID?</a>
+         </center>\n";
+
+#
+# Delete option.
+#
+echo "<br><center>
+           <A href='deleteimageid.php3?&imageid=$fooid'>
+              Delete this ImageID?</a>
+         </center>\n";
 
 echo "<br><br>\n";
-
-# Delete option.
-echo "<p><center>
-       Do you want to delete this ImageID?
-       <A href='deleteimageid.php3?imageid=$fooid'>Yes</a>
-      </center>\n";    
 
 #
 # Standard Testbed Footer

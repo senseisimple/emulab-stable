@@ -126,8 +126,8 @@ while (1) {
     }
 
     #
-    # We can pull out all nodes that were not 'touched' (matched by the select above)
-    # during this pass
+    # We can pull out all nodes that were not 'touched' (matched by the
+    # select above) during this pass
     #
     foreach $node (keys %retried) {
 	if ($retried{$node} != $time) {
@@ -153,8 +153,8 @@ while (1) {
     }
 
     #
-    # We can pull out all nodes that were not 'touched' (matched by the select above)
-    # during this pass
+    # We can pull out all nodes that were not 'touched' (matched by the
+    # select above) during this pass
     #
     foreach $node (keys %warned) {
 	if ($warned{$node} != $time) {
@@ -163,7 +163,7 @@ while (1) {
     }
 
     #
-    # Find all of the free node that have not been reloaded (no pid entry
+    # Find all of the free nodes that have not been reloaded (no pid entry
     # in last_reservation, which is reset anytime a node is reloaded by
     # the system).
     #
@@ -253,12 +253,12 @@ while (1) {
 	}
 
 	#
-	# We only add the -i flag to os_load if we found a specific image
+	# We only add the -m flag to os_load if we found a specific image
 	# above. Omitting it causes os_load to pick the default image for
 	# the node's type
 	#
 	if ($imageid) {
-	    $os_load_flags .= " -i $imageid ";
+	    $os_load_flags .= " -m $imageid ";
 	}
 
 	if (system("$os_load $os_load_flags $node")) {
@@ -351,7 +351,7 @@ while (1) {
 	$retry = 1;
 	goto again;
     }
-    sleep(20);
+    sleep(10);
 }
 
 sub fatal($)
