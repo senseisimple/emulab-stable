@@ -245,7 +245,8 @@ public class WorkArea {
 	    }
 	}
 
-	r += "\n$ns run\n";
+	r += "\n$ns rtproto Static\n";
+	r += "$ns run\n";
 	r += "#netbuild-generated ns file ends.\n";
 	
 	return r;
