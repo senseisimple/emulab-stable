@@ -12,7 +12,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= sshxmlrpc_client.py
+BIN_SCRIPTS	= sshxmlrpc_client.py sslxmlrpc_client.py
 SBIN_SCRIPTS	= sshxmlrpc_server.py xmlrpcbag sslxmlrpc_server.py 
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
