@@ -93,7 +93,7 @@ class experiment:
             return argerror
 
         nsfilename = None
-        argstr     = ""
+        argstr     = "-q"
         
         for opt, val in argdict.items():
             if opt == "batch":
@@ -198,7 +198,7 @@ class experiment:
         if (argerror):
             return argerror
 
-        argstr = ""
+        argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
@@ -232,7 +232,7 @@ class experiment:
             return argerror
 
         nsfilename = None
-        argstr     = ""
+        argstr     = "-q"
         
         for opt, val in argdict.items():
             if opt == "wait":
@@ -295,7 +295,7 @@ class experiment:
         if (argerror):
             return argerror
 
-        argstr = ""
+        argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
                 if val == "true":
