@@ -2131,7 +2131,8 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			 "vnode,port,target_vnode,target_port "
 			 "from virt_trafgens as vi "
 			 "left join reserved as r on r.vname=vi.vnode "
-			 "where r.node_id='%s' and r.pid='%s' and r.eid='%s'",
+			 "where r.node_id='%s' and "
+			 " vi.pid='%s' and vi.eid='%s'",
 			 7, nodeid, pid, eid);
 
 	if (!res) {
