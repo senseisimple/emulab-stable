@@ -101,8 +101,8 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
-PLAB_ROOTBALL="plabroot-9.tar.bz2"
-PLAB_SLICEPREFIX="utah"
+PLAB_ROOTBALL="change.me"
+PLAB_SLICEPREFIX="utah_elab"
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 
@@ -149,6 +149,12 @@ AC_DEFINE_UNQUOTED(FSDIR_GROUPS, "$FSDIR_GROUPS")
 AC_DEFINE_UNQUOTED(FSDIR_USERS, "$FSDIR_USERS")
 if test -n "$FSDIR_SHARE"; then
     AC_DEFINE_UNQUOTED(FSDIR_SHARE, "$FSDIR_SHARE")
+fi
+
+if test $PLABSUPPORT -eq 1; then
+    if test "$PLAB_ROOTBALL" = "change.me"; then
+        AC_MSG_ERROR([plab support included but PLAB_ROOTBALL not defined.])
+    fi
 fi
 
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`

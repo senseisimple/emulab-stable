@@ -909,8 +909,8 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
-PLAB_ROOTBALL="plabroot-9.tar.bz2"
-PLAB_SLICEPREFIX="utah"
+PLAB_ROOTBALL="change.me"
+PLAB_SLICEPREFIX="utah_elab"
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 
@@ -1001,6 +1001,12 @@ if test -n "$FSDIR_SHARE"; then
 #define FSDIR_SHARE "$FSDIR_SHARE"
 EOF
 
+fi
+
+if test $PLABSUPPORT -eq 1; then
+    if test "$PLAB_ROOTBALL" = "change.me"; then
+        { echo "configure: error: plab support included but PLAB_ROOTBALL not defined." 1>&2; exit 1; }
+    fi
 fi
 
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
@@ -1307,7 +1313,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1311: checking for a BSD compatible install" >&5
+echo "configure:1317: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
