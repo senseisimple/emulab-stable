@@ -14,17 +14,18 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: os_load [-s | -w] [-r] [-i <imageid>] ".
+    print STDOUT "Usage: os_load [-s | -w] [-r | -n] [-i <imageid>] ".
 	         "<node> [node ...]\n".
 	"Use -i to specify an imageid. Use node default otherwise.\n".
 	"Use -s to setup reload only, but do not issue a reboot.\n".
 	"Use -w to block waiting for nodes to finish reloading.\n".
 	"    (-s and -w are mutually exclusive)\n".
 	"Use -l to get a list of images you are permitted to load.\n" .
-	"Use -r to use Frisbee support instead of netdisk (experimental).\n";
+	"Use -r to use Frisbee to reload disks.\n" .
+	"Use -n to use netdisk to reload disks.\n";
     exit(-1);
 }
-my  $optlist = "sldwri:";
+my  $optlist = "sldwrni:";
 
 #
 # Configure variables
@@ -65,7 +66,7 @@ my $setuponly   = 0;
 my $waitmode    = 0;
 my $failures    = 0;
 my $startwait   = 0;
-my $frisbee     = 0;
+my $type	= TB_DEFAULT_RELOADTYPE;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -95,7 +96,13 @@ if (defined($options{"w"})) {
     $waitmode = 1;
 }
 if (defined($options{"r"})) {
-    $frisbee = 1;
+    if (defined($options{"n"})) {
+	die "Only one of -r or -n should be given\n";
+    }
+    $type = TB_RELOADTYPE_FRISBEE;
+}
+if (defined($options{"n"})) {
+    $type = TB_RELOADTYPE_NETDISK;
 }
 if ($waitmode && $setuponly) {
     usage();
@@ -264,17 +271,19 @@ foreach my $node (@nodes) {
     
     print STDOUT "Setting up reload for $node\n";
     if (!$TESTMODE) {
-         if ($frisbee) {
+         if ($type eq TB_RELOADTYPE_FRISBEE) {
 	     DBQueryFatal("update nodes set ".
 	                  "next_pxe_boot_path='$FRISBEEPATH'" .
 	 		  "where node_id='$node'");
 	     system "$FRISBEELAUNCHER $imageid" and
 		 die "*** Unable to launch frisbee daemon\n";
-	 } else {
+	 } elsif ($type eq TB_RELOADTYPE_NETDISK) {
 	     DBQueryFatal("update nodes set ".
 	                  "next_boot_osid='$NETDISKOSID',".
 	 		  "next_boot_cmd_line='$cmdline' ".
 	 		  "where node_id='$node'");
+	} else {
+	    die "Unknown reload type ($type)\n";
 	}
     }
 }
@@ -306,8 +315,17 @@ while (@nodes) {
     my @batch = ();
     my $i;
 
-    for ($i = 0; $i < $MAXLOADS && @nodes > 0; $i++) {
-	push(@batch, shift(@nodes));
+    #
+    # If doing a netdisk load, only do a few at a time. For frisbee, we do
+    # 'em all
+    #
+    if ($type eq TB_RELOADTYPE_NETDISK) {
+	for ($i = 0; $i < $MAXLOADS && @nodes > 0; $i++) {
+	    push(@batch, shift(@nodes));
+	}
+    } elsif ($type eq TB_RELOADTYPE_FRISBEE) {
+	@batch = @nodes;
+	@nodes = ();
     }
     
     print "Issuing reload/reboot for @batch and then waiting ...\n";
@@ -388,11 +406,11 @@ sub WaitTillReloadDone {
     while (1) {
 	my ($query_result, @row);
 
-	if ($frisbee) {
+	if ($type eq TB_RELOADTYPE_FRISBEE) {
 	    $query_result =
 		DBQueryFatal("SELECT next_pxe_boot_path FROM nodes ".
 			     "where node_id='$pc'");
-	} else {
+	} elsif ($type eq TB_RELOADTYPE_NETDISK) {
 	    $query_result =
 		DBQueryFatal("SELECT next_boot_osid FROM nodes ".
 			     "where node_id='$pc'");

@@ -8,21 +8,22 @@ use Getopt::Std;
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload [-f | -p] [-r] [-i <imageid>] <node> [node ...]
+# usage: sched_reload [-f | -p] [-r|-n] [-i <imageid>] <node> [node ...]
 #
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f | -p] [-r] [-i <imageid>] ".
+    print STDOUT "Usage: sched_reload [-f | -p] [-r | -n] [-i <imageid>] ".
 	         "<node> [node ...]\n".
 		 "       sched_reload <options> -e pid,eid\n".
 	"Use -i to specify an imageid. Use node default otherwise.\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
 	"Use -p to pend reload for the reload daemon.\n".
 	"Use -e to schedule a reload for all nodes in an experiment.\n".
-	"Use -r to use Frisbee rather than netdisk (experimental).\n";
+	"Use -r to use Frisbee for reloading disks.\n" .
+	"Use -n to use netdisk for reloading disks.\n";
     exit(-1);
 }
-my  $optlist = "fpri:e:";
+my  $optlist = "fprni:e:";
 
 #
 # Configure variables
@@ -49,7 +50,7 @@ my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
 my $pend	= 0;
-my $frisbee	= 0;
+my $type	= TB_DEFAULT_RELOADTYPE;
 my @nodes       = ();
 my $usedefault  = 1;
 my $imageid;
@@ -80,8 +81,13 @@ if (defined($options{"p"})) {
     $pend = $options{"p"};
 }
 if (defined($options{"r"})) {
-    $frisbee = 1;
-	$osload .= " -r ";
+    if (defined($options{"n"})) {
+	die "Only one of -r or -n should be given\n";
+    }
+    $type = TB_RELOADTYPE_FRISBEE;
+}
+if (defined($options{"n"})) {
+	$type = TB_RELOADTYPE_NETDISK;
 }
 if ($pend and $force) {
     usage();
@@ -118,13 +124,14 @@ else {
     }
 }
 
-# This type will be put into the database, to allow programs 
-# such as nfree to figure out what kind of reload is supposed
-# to occur
-if ($frisbee) {
-    $type = TB_RELOADTYPE_FRISBEE;
-} else {
-    $type = TB_RELOADTYPE_NETDISK;
+#
+# Depending on the reload type, we pass different flags to os_load
+#
+my $osload_flags = "";
+if ($type eq TB_RELOADTYPE_NETDISK) {
+    $osload_flags .= ' -n ';
+} elsif ($type eq TB_RELOADTYPE_FRISBEE) {
+    $osload_flags .= ' -r ';
 }
 
 if ($eidmode) {
@@ -269,7 +276,7 @@ if ($pend) {
 foreach my $id ( keys(%imagenodes) ) {
     my @nodelist = @{ $imagenodes{$imageid} };
 
-    my $cmd = "$osload -i $id @nodelist";
+    my $cmd = "$osload $osload_flags -i $id @nodelist";
 
     print "Issuing $cmd\n";
     if (system($cmd)) {
