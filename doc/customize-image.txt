@@ -56,6 +56,13 @@ We will assume the machine is called "pc1" in the following directions.
   (or use "/dev/da0" for SCSI).  Image loading should take anywhere from
   45 seconds, to several minutes.
 
+  If the ssh returns with "Killed" then imageunzip ran out of memory.
+  By default, imageunzip will consume memory without bound for buffering
+  of pending disk writes.  In this case, retry the imageunzip with
+  "-W <num-MB>" where <num-MB> is a number of MB maximum to use for
+  disk buffering.  If the node you are loading has 512MB of memory, try
+  a number like 300.
+
 Now you can begin customizing the FreeBSD and Linux partitions.
 
 
