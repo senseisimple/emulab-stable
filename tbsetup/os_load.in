@@ -208,11 +208,6 @@ if (! @nodes) {
     exit(0);
 }
 
-print "@nodes\n";
-print "$imageid\n"
-    if (defined($imageid));
-exit(0);
-
 #
 # Okay, call into the library using a hash of arguments. Pass a reference
 # to the args array, and to a return parameter for the list of failed nodes.
