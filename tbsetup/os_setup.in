@@ -44,6 +44,7 @@ my @row;
 #
 # This stuff is BOGUS! Quick hack for paper deadline to make Jay happy.
 #
+my $doreloading = 0;
 my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "boss.emulab.net";
 my $IMAGE       = "/usr/testbed/images/wd0-all.ndz";
@@ -177,10 +178,12 @@ while (<IN>) {
     $db_result = $DB->query("select pid from last_reservation ".
 			    "where node_id='$node'");
     $reload{$node} = 0;
-    if ($db_result->numrows) {
-	@row = $db_result->fetchrow_array();
-	if ($row[0] ne $pid) {
-	    $reload{$node} = 1;
+    if ($doreloading) {
+	if ($db_result->numrows) {
+	    @row = $db_result->fetchrow_array();
+	    if ($row[0] ne $pid) {
+		$reload{$node} = 1;
+	    }
 	}
     }
 
@@ -393,8 +396,8 @@ sub WaitTillAlive {
     # loop doing a bunch of shorter pings.
     #
     my $lasttime = ( (time - $waitstart) > 60 ? 61 : (time - $waitstart));
-    for ($i = 0; $i < 40; $i++) {
-	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
+    for ($i = 0; $i < 120; $i++) {
+	open(PING, "$ping -c 3 -t 4 $pc 2>&1 |");
 	do {
 	    $_ = <PING>;
 	    if ( $_ =~ /bytes from/ ) {
