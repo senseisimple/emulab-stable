@@ -245,6 +245,9 @@ namespace eval GLOBALS {
     # Allow override of jail and delay osids.
     variable jail_osname {}
     variable delay_osname {}
+
+    # Use phys naming
+    variable use_physnaming 0
 }
 
 # Load all our classes

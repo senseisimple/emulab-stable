@@ -87,6 +87,9 @@ namespace eval TBCOMPAT {
     variable reserved_type
     variable reserved_node
     set reserved_list {}
+
+    # Physical node names
+    variable physnodes
 }
 
 # IP addresses routines.  These all do some checks and convert into set-ip
@@ -818,3 +821,14 @@ proc tb-set-node-lan-setting {lanlink node capkey capval} {
     }
     $lanlink set_member_setting $node $capkey $capval
 }
+
+#
+# Turn on or of the use of phys naming; if the user name for the node
+# matches a real node in the testbed, do an implicit fix-node to it.
+#
+proc tb-use-physnaming {onoff} {
+    var_import ::GLOBALS::use_physnaming
+
+    set use_physnaming $onoff
+}
+

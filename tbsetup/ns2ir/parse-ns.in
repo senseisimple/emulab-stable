@@ -451,6 +451,17 @@ sub GenDefsFile($)
 	}
     }
 
+    print TCL "# Physical Node Names\n";
+    $query_result =
+	DBQueryFatal("select n.node_id,nt.type from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where n.node_id=n.phys_nodeid and nt.isremotenode=0 ".
+		     "and n.role='testnode' and nt.type!='dnard'");
+
+    while (($node_id,$type) = $query_result->fetchrow_array()) {
+	print TCL "set physnodes($node_id) \"$type\"\n";
+    }
+
     print TCL "}\n";
     close(TCL);
 }

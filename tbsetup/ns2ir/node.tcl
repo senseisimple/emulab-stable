@@ -132,6 +132,8 @@ Node instproc updatedb {DB} {
     $self instvar nseconfig
     $self instvar simulated
     var_import ::TBCOMPAT::default_osids
+    var_import ::GLOBALS::use_physnaming
+    var_import ::TBCOMPAT::physnodes
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
@@ -166,6 +168,13 @@ Node instproc updatedb {DB} {
 	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" ]
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list "host-$self" "hosts-$type" 1.0]
 	set fixed "host-$self"
+    }
+
+    # Implicitly fix node if not already fixed.
+    if { $issubnode == 0 && $use_physnaming == 1 && $fixed == "" } {
+	if {[info exists physnodes($self)]} {
+		set fixed $self
+	}
     }
 
     # We need to generate the IP column from our iplist.
