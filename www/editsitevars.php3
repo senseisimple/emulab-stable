@@ -74,6 +74,8 @@ if (isset($edit)) {
 }
 
 if (isset($edited)) {
+    $value = addslashes("$value");
+    
     DBQueryFatal("UPDATE sitevariables ".
 		 "SET value='$value' ".
 		 "WHERE name='$name'");
