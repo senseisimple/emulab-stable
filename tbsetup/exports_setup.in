@@ -30,6 +30,7 @@ my $projdir     = "@FSDIR_PROJ@";
 my $usersdir    = "@FSDIR_USERS@";
 my $groupdir    = "@FSDIR_GROUPS@";
 my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
+my $WINSUPPORT  = @WINSUPPORT@;
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
@@ -155,10 +156,14 @@ utime $now, $now, $lockfile;
 #
 if (!$TESTMODE) {
   open(MAP, ">$exportstail") || fatal("Couldn't open $exportstail\n");
-  open(SMBMAP, ">$smbconftail") || fatal("Couldn't open $smbconftail\n");
+  if ($WINSUPPORT) {
+      open(SMBMAP, ">$smbconftail") || fatal("Couldn't open $smbconftail\n");
+  }
 } else {
   open(MAP, ">/dev/null") || fatal("Couldn't open /dev/null\n");
-  open(SMBMAP, ">/dev/null") || fatal("Couldn't open /dev/null\n");
+  if ($WINSUPPORT) {
+      open(SMBMAP, ">/dev/null") || fatal("Couldn't open /dev/null\n");
+  }
 }
 
 my $maphdr = 
@@ -169,7 +174,9 @@ my $maphdr =
     "\n";
 
 print MAP $maphdr;
-print SMBMAP $maphdr;
+if ($WINSUPPORT) {
+    print SMBMAP $maphdr;
+}
 
 #
 # First gather up all the nodes that are reserved and the required info.
@@ -319,21 +326,23 @@ while (@row = $nodes_result->fetchrow_array) {
     }
 
     # Build up Samba share permissions hash
-    foreach my $shareptr ( @smbshares ) {
-        my ($share, $path) = @{$shareptr};
-        if (! defined($globalsmbshares{$share}->{iplist})) {
-            $globalsmbshares{$share}->{path}   = $path;
-            $globalsmbshares{$share}->{iplist} = [ $ip ];
-        }
-        else {
-            # Make sure there are no share name collisions first!
-            if ($globalsmbshares{$share}->{path} ne $path) {
-                fatal("Share name collision!\n".
-                      "sharename:     $share\n".
-                      "original path: $globalsmbshares{$share}->{path}\n".
-                      "new path:      $path\n");
+    if ($WINSUPPORT) {
+        foreach my $shareptr ( @smbshares ) {
+            my ($share, $path) = @{$shareptr};
+            if (! defined($globalsmbshares{$share}->{iplist})) {
+                $globalsmbshares{$share}->{path}   = $path;
+                $globalsmbshares{$share}->{iplist} = [ $ip ];
             }
-            push(@{ $globalsmbshares{$share}->{iplist} }, $ip);
+            else {
+                # Make sure there are no share name collisions first!
+                if ($globalsmbshares{$share}->{path} ne $path) {
+                    fatal("Share name collision!\n".
+                          "sharename:     $share\n".
+                          "original path: $globalsmbshares{$share}->{path}\n".
+                          "new path:      $path\n");
+                }
+                push(@{ $globalsmbshares{$share}->{iplist} }, $ip);
+            }
         }
     }
 }
@@ -353,19 +362,21 @@ close(MAP);
 #
 # Spit out smb shares!
 #
-foreach my $share ( keys(%globalsmbshares) ) {
-    my @iplist = @{ $globalsmbshares{$share}->{iplist} };
-    my $path   = $globalsmbshares{$share}->{path};
+if ($WINSUPPORT) {
+    foreach my $share ( keys(%globalsmbshares) ) {
+        my @iplist = @{ $globalsmbshares{$share}->{iplist} };
+        my $path   = $globalsmbshares{$share}->{path};
 
-    print SMBMAP "[$share]\n";
-    print SMBMAP "\tpath        = $path\n";
-    print SMBMAP "\tbrowsable   = no\n";
-    print SMBMAP "\twritable    = yes\n";
-    print SMBMAP "\thosts allow = @iplist\n\n";
+        print SMBMAP "[$share]\n";
+        print SMBMAP "\tpath        = $path\n";
+        print SMBMAP "\tbrowsable   = no\n";
+        print SMBMAP "\twritable    = yes\n";
+        print SMBMAP "\thosts allow = @iplist\n\n";
+    }
+
+    print SMBMAP "\n";
+    close(SMBMAP);
 }
-
-print SMBMAP "\n";
-close(SMBMAP);
 
 #
 # Fire the new tail file over to the fileserver to finish. We cat the file
@@ -379,7 +390,9 @@ if (!$TESTMODE) {
   if ($dbg) {
       my $backup = "$TB/log/exports/" . TBDateTimeFSSafe();
       system("cp $exportstail $backup");
-      system("cp $smbconftail $backup");
+      if ($WINSUPPORT) {
+          system("cp $smbconftail $backup");
+      }
   }
 
   # First do the NFS exports
@@ -388,9 +401,11 @@ if (!$TESTMODE) {
   unlink("$exportstail");
 
   # Next the SMB shares
-  system("$SSH $PROG -S < $smbconftail") == 0 or
-    fatal("Failed: $SSH $PROG < $smbconftail: $?");
-  unlink("$smbconftail");
+  if ($WINSUPPORT) {
+      system("$SSH $PROG -S < $smbconftail") == 0 or
+          fatal("Failed: $SSH $PROG < $smbconftail: $?");
+      unlink("$smbconftail");
+  }
 
   #
   # Close the lock file. Exiting releases it, but might as well.
