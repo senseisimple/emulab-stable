@@ -227,7 +227,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	#
         # Create user account on control node.
         #
-	SUEXEC($uid, "flux", "mkacct-ctrl $project $user", 0);
+	SUEXEC($uid, "flux", "mkacct-ctrl $user", 0);
 
 	echo "<h3><p>
                   User $user was granted membership in project $project

@@ -1,9 +1,5 @@
 #!/usr/local/bin/perl -wT
 
-#
-# XXX Need to deal with errors!
-#
-
 use English;
 use Mysql;
 
@@ -14,11 +10,11 @@ my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
 
 my $PBAG   = "$TB/sbin/paperbag";
+my $ssh    = "ssh";
 
 my $me;                # alphanumeric username of $UID 
 
 my $user;              # kwright
-my $project;           # lkwbox
 my $pid;               # 6009
 
 my $dbh;               # database handle 
@@ -30,6 +26,7 @@ sanitize();
 dbsetup();
 check_credentials();
 dowork();
+print "$0 finished sucessfully.\n";
 exit(0);
 
 sub dbsetup() {
@@ -71,28 +68,27 @@ sub check_credentials() {
     #
     # User could be an admin user.
     #
-    $sth    = $dbh->query("select admin from users where uid='$me'");
-    @db_row = $sth->fetchrow_array();
-    if ($db_row[0] == 1) {
+    $sth = $dbh->query("select admin from users where uid='$me' and admin=1");
+    if (got_tuples($sth)) {
 	print "Testbed admin user allowed.\n";
 	return;
     } 
     #
     # Last resort: check if group_root for $project
     #
-    $db_query = "select trust from proj_memb where uid='$me' and pid='$project'";
+    $db_query = "select p1.trust from proj_memb as p1 ".
+      "left join proj_memb as p2 on p2.pid=p1.pid ".
+      "where p1.uid='$me' and p2.uid='$user' and p1.trust='group_root'";
     $sth      = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting trust for $me in $project.\n";
-    @db_row   = $sth->fetchrow_array();
-    if ($db_row[0] eq "group_root") {
-	print "Group_root privileges allowed.\n";
-	return;
+    if (got_tuples($sth)) {
+      print "Group_root privileges allowed.\n";
+      return;
     }
 
     #
     # If  we're here, we do not have the correct credentials
     #
-    print "Not root, a TB admin user, or group_root for $pid. Failed.\n";   
+    print "Not root, a TB admin user, or group_root for ${user}'s project. Failed.\n";   
     exit(1);
 }
 
@@ -106,19 +102,19 @@ sub dowork() {
     my $pswd;
     my $user_number;    # 1025
     my $fullname;       # Kristin Wright
-    my $groupname;      # lkwbox (same as project)
-    my $groupnumber;    # 6001
+    my @groupnames;     # lkwbox (same as projects)
+    my %groupnumbers;   # 6001
 
     #
     # Find control node.
     # Note: In the end, I simply assign to 'plastic' as control nodes
     #       not yet set in the database. 11/30/00 -lkw 
     #
-    $db_query     = "select control_node from projects where pid='$project'";
-    $sth          = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting control_node.\n";
-    @db_row       = $sth->fetchrow_array();
-    $control_node = $db_row[0];
+    #$db_query     = "select control_node from projects where pid='$project'";
+    #$sth          = $dbh->query($db_query);
+    #got_tuples($sth) or die "$0: Error selecting control_node.\n";
+    #@db_row       = $sth->fetchrow_array();
+    #$control_node = $db_row[0];
     $control_node = "plastic";           # see note above  
 
     # get user info
@@ -131,82 +127,144 @@ sub dowork() {
     $user_number = $db_row[1]; 
     $fullname    = $db_row[2];
 
-    # get group number
-    $db_query       = "select unix_gid from projects where pid='$project'";
+    # get group names
+    $db_query       = "select pid from proj_memb where uid='$user'";
     $sth            = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting group number.\n";
-    @db_row         = $sth->fetchrow_array();
-    $group_number   = $db_row[0];
+    got_tuples($sth) or die "$0: Error selecting group names.\n";
+    while (@db_row = $sth->fetchrow_array() ) {
+      push(@groupnames, $db_row[0]);
+    }
 
-    # XXX: I assume FreeBSD for now. Its 
-    # fairly firmly entrenched as our control node OS. -lkw
+    my @grouplist = map ( "pid='$_'", @groupnames);
 
+    # get group numbers
+    $db_query = "select pid,unix_gid from projects where ".
+      join(" or ",@grouplist);
+    $sth      = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting group numbers.\n";
+    while (@db_row = $sth->fetchrow_array()) {
+      $groupnumbers{$db_row[0]}=$db_row[1];
+    }
+
+    # Add some special cases for developers/admins
+    $sth=$dbh->query("select admin from users where uid='$user' and admin=1");
+    if (got_tuples($sth)) {
+      # I'm an admin, so add me to some groups:
+      push(@groupnames, "wheel", "flux");
+      $groupnumbers{"wheel"}=0;
+      $groupnumbers{"flux"}=601;
+    }     
+
+    # Assume FreeBSD for both nodes, since we control them.
 
     # The following user/group creation commands must be done as root. 
-
     $UID       = $EUID;
 
-    # 
-    # Create group on paper.
-    #
-    system("/usr/sbin/pw groupadd $project -g $group_number") == 0 or
-      print STDERR "Could not add group $project with gid $group_number to paper\n";
-    
+    foreach $group ( @groupnames ) {
+      $group_number = $groupnumbers{$group};
+      print "Checking for group $group (gid $group_number)\n";
+      # 
+      # Create groups on paper if they don't exist.
+      #
+      if (`grep $group /etc/group` eq "") { 
+	print "Adding group $group to paper\n";
+	system("/usr/sbin/pw groupadd $group -g $group_number") == 0 or
+	  print STDERR "Could not add group $group with gid $group_number to paper\n";
+      } else { print "Group $group already exists on paper.\n"; }
+
+      #
+      # Make groups on control node if they don't exist.
+      #
+      if (`$ssh $control_node grep $groupnames[0] /etc/group` eq "") { 
+	print "Adding group $group to $control_node.\n";
+	system("$ssh $control_node /usr/sbin/pw groupadd $group -g ".
+	       "$group_number") == 0 or
+	  print STDERR "Could not add group $group with gid $group_number to $control_node\n";
+      } else { print "Group $group already exists on $control_node.\n"; }
+    }
+
+    # Main project is first on list, rest go into new list
+    $project = shift @groupnames;
+    $grouplist = join(",",@groupnames);
+
     #
     # Make user on paper. We don't give them a password.
     #
-    print "Adding user $user to paper.\n";
-    system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
-	   "-k /usr/share/skel -m -d /users/$user -g $project -s $PBAG") == 0
-	or print STDERR "Could not add user $user to paper\n";
-	       
-    #
-    # Make group on control node.
-    #
-    print "Adding group $project to $control_node.\n";
-    system("/usr/local/bin/sshtb $control_node /usr/sbin/pw ".
-	   "groupadd $project -g $group_number") == 0 or
-	print STDERR "Could not add group $project with gid $group_number to ".
-	    "$control_node\n";
-    
+    if (`grep $user /etc/passwd` eq "") { 
+      print "Adding user $user to paper.\n";
+      system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
+	     "-k /usr/share/skel -m -d /users/$user ".
+	     "-g $project -G $grouplist -s $PBAG") == 0
+	       or print STDERR "Could not add user $user to paper\n";
+    } else {
+      print "User $user already exists on paper. Updating record.\n";
+      # MAKE SURE not to update the shell... if its someone who gets tcsh on 
+      # paper, we don't want to paperbag them...
+      system("/usr/sbin/pw usermod $user -u $user_number -c \"$fullname\" ".
+	     "-k /usr/share/skel -m -d /users/$user ".
+	     "-g $project -G $grouplist") == 0
+	       or print STDERR "Could not modify user $user on paper\n";
+    }
+
     #
     # Make user on control node. Note that we cannot get back any output from 
     # a command that we open for input so we divide acct creation into two 
     # pieces to maximize feedback. First we add the user account. Then we 
     # change the password.
     #
-    print "Adding user $user to $control_node.\n";
-    system("/usr/local/bin/sshtb $control_node " .
-	   "/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
-	   "-k /usr/share/skel -m -d /users/$user -g $project ".
-	   "-s /bin/tcsh") == 0
+    # Quote special chars for ssh and the shell on the other side
+    $fullname =~ s/\"/\'/g;
+    $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+    if (`$ssh $control_node grep $user /etc/passwd` eq "") { 
+      print "Adding user $user to $control_node.\n";
+      $str = "$ssh $control_node " .
+	     "'/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
+	     "-k /usr/share/skel -m -d /users/$user -g $project ".
+	     "-G $grouplist -s /bin/tcsh'";
+      system($str) == 0
 	or print STDERR "Could not add user $user to $control_node.\n";
-
-    system("/usr/local/bin/sshtb $control_node ".
-	   "/usr/bin/chpass -p $pswd $user") == 0
-	or print STDERR"Could not change password for user $user on $control_node.\n";
+      system("$ssh $control_node ".
+	     "/usr/bin/chpass -p $pswd $user") == 0
+	       or print STDERR"Could not change password for user $user on $control_node.\n";
+    } else {
+      print "User $user already exists on $control_node. Updating record.\n";
+      # DO NOT mess with the quoting... you have to escape all the escapes,
+      # because perl does the escapes once, then ssh takes them again,
+      # so \\\" becomes " by the time the shell gets it.
+      $str = "$ssh $control_node " .
+	     "/usr/sbin/pw usermod $user -u $user_number -c \\\"$fullname\\\" ".
+	     "-k /usr/share/skel -m -d /users/$user -g $project ".
+	     "-G $grouplist -s /bin/tcsh";
+     system($str) == 0       
+       or print STDERR "Could not modify user $user on $control_node.\n";
+      system("$ssh $control_node ".
+	     "/usr/bin/chpass -p $pswd $user") == 0
+	       or print STDERR"Could not change password for user $user on $control_node.\n";
+    }
 
     #
     # Set up the ssh key
     #
 
-    mkdir("/users/$user/.ssh", 0755);
-    chown($user_number, $group_number, "/users/$user/.ssh");
-
-    # Run commands below as the user
-    $EUID = $user_number;
-    $UID  = $EUID;
-
-    print "EUID: $EUID UID:$UID\n";
-    open(KEYGEN, "/usr/bin/ssh-keygen -P '' -f /users/$user/.ssh/identity 2>&1 |");
-    while (<KEYGEN>) { print $_; }
-    close(KEYGEN);
-
-    open(CP, "/bin/cp /users/$user/.ssh/identity.pub /users/$user/.ssh/authorized_keys 2>&1 |");
-    while (<CP>) { print $_; }
-    close(CP); 
-
-    chmod(0600, "/users/$user/.ssh/authorized_keys");
+    if (! -e "/users/$user/.ssh/" ) {
+      # Only do this if its not been done before.
+      print "Setting up ssh data...\n";
+      mkdir("/users/$user/.ssh", 0755);
+      chown($user_number, $group_number, "/users/$user/.ssh");      
+      # Run commands below as the user
+      $EUID = $user_number;
+      $UID  = $EUID;      
+      print "EUID: $EUID UID:$UID\n";
+      open(KEYGEN, "/usr/bin/ssh-keygen -P '' -f /users/$user/.ssh/identity 2>&1 |");
+      while (<KEYGEN>) { print $_; }
+      close(KEYGEN);
+      open(CP, "/bin/cp /users/$user/.ssh/identity.pub /users/$user/.ssh/authorized_keys 2>&1 |");
+      while (<CP>) { print $_; }
+      close(CP);       
+      chmod(0600, "/users/$user/.ssh/authorized_keys");
+    } else {
+      print "SSH data in /users/$user/.ssh/ appears to exist. Skipping.\n";
+    }
 }
 
 sub sanitize() {
@@ -217,26 +275,19 @@ sub sanitize() {
 
     ## check usage
     if ($#ARGV < 0) { 
-	die("Usage: mkacct <project> <username>\n" .
-	    "\tCreates given user account on appropriate control node.\n");
-    }
-
-    ## sanitize project
-    if ( $ARGV[0] =~ /^([A-Za-z0-9-]+)$/ ) {
-	$project = $1;
-    } else {
-	die "$0: Project argument $ARGV[0] has invalid characters.\n";
+	die("Usage: mkacct-ctrl <username>\n" .
+	    "\tCreates given user account on appropriate control nodes.\n");
     }
 
     ## sanitize user 
-    if ( $ARGV[1] =~ /^([a-z0-9]+)$/i ) {
+    if ( $ARGV[0] =~ /^([a-z0-9]+)$/i ) {
 	$user = $1;
     } else {
-	die "$0: User argument $ARGV[1] has invalid characters.\n";
+	die "$0: User argument $ARGV[0] has invalid characters.\n";
     }
 
     ## effective uid must be root
-    if ($> != 0) {
+    if ($EUID != 0) {
 	die("$0: Must have an EUID of 0 to create an account.\n");
     }
 
@@ -247,9 +298,6 @@ sub sanitize() {
 ### Return non-zero if we got tuples; 0 if not.
 ###
 sub got_tuples() {
-
-    my $sth = $_[0];
-    my $db_numrows = $sth->numrows;
-    return $db_numrows;
+    return $_[0]->numrows;
 }
 
