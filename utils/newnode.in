@@ -208,13 +208,15 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	# Get some more information about this interface type
 	#
-	my $iface_query = DBQueryFatal("SELECT max_speed, full_duplex " .
-	    "FROM interface_types WHERE type='$iface_type'");
+	my $iface_query = DBQueryFatal("SELECT max_speed, full_duplex, " .
+	    "connector FROM interface_types WHERE type='$iface_type'");
 	if (!$iface_query->num_rows()) {
 	    warn "Node $node_id failed: Interface $card is of unknown type " .
 	    	"$iface_type\n";
 	    next NODE;
 	}
+
+	my ($max_speed, $full_duplex, $connector) = $iface_query->fetchrow();
 
 	#
 	# Do a sanity check - make sure that we have a switch recorded for all
@@ -222,14 +224,13 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	unless ($force_unconnected_interfaces) {
 	    my $iface = "eth$card";
-	    if (($iface ne $control_iface) && !$switch_id) {
+	    if (($iface ne $control_iface) && ($connector !~ /wireless/i)
+		&& !$switch_id) {
 		warn "Node $node_id failed: Don't know which switch " .
 		    "card $iface is connected to\n";
 		next NODE;
 	    }
 	}
-
-	my ($max_speed, $full_duplex) = $iface_query->fetchrow();
 
 	#
 	# Stash it away...
