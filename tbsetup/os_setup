@@ -5,7 +5,8 @@ use English;
 # TODO: Delta stuff.
 #       Reload disk images.
 #       Finish up local OS spec stuff. Kinda hacky right now. Does not deal
-#       with command lines or disk images. Only does neboot type stuff.
+#       with command lines or disk images. Only does neboot type stuff and
+#	hardwires the path to /tftpboot/proj/$pid/$imagepaths{$os}
 #
 
 #
@@ -158,14 +159,14 @@ while (<IN>) {
     if ($imagepaths{$os}) {
 	if ($imageparts{$os} ne "mb") {
 	    die("Improper local OS spec: $os. ".
-		"Partition can only be 'mb' right now.");
+		"Partition can currently only be 'mb' (multiboot)");
 	}
 	#
 	# Okay, now it gets really bad. I'm going to form the tftpboot
 	# path right here, since local OS specs are not in the database
 	# disk_images table.
 	# 
-	$nodepath{$node} = "/proj/$pid/exp/$eid/tftpboot/$imagepaths{$os}";
+	$nodepath{$node} = "/tftpboot/proj/$pid/$imagepaths{$os}";
 	$waitfor{$node}  = 0;
 	next;
     }
@@ -186,11 +187,17 @@ while (<IN>) {
     }
     @row = $db_result->fetchrow_array();
     $nodepath{$node} = $row[1];
-    if ($row[1]) {
-	$waitfor{$node}  = 0;
+
+    #
+    # See if the OS that is going to be booted supports a ping feature.
+    # This is the only way we can tell if the machine has come back alive.
+    # If not, then we effectively do not support the os for anything at all.
+    #
+    if (OSFeatureSupported($os, "ping")) {
+	$waitfor{$node} = 1;
     }
     else {
-	$waitfor{$node}  = 1;
+	$waitfor{$node} = 0;
     }
 }
 
@@ -359,4 +366,22 @@ sub WaitTillDead {
     close(PING);
     print STDERR "$pc is still alive.\n" if $dbg;
     return 1;
+}
+
+sub OSFeatureSupported {
+    local($os)      = $_[0];
+    local($feature) = $_[1];
+
+    $db_result = $DB->query("select osfeatures from disk_images ".
+			    "where image_id='$os'");
+
+    if ($db_result->numrows < 1) {
+	return 0;
+    }
+    foreach $osfeature (split(',', $db_result->fetchrow_array())) {
+	if ($feature eq $osfeature) {
+	    return 1;
+	}
+    }
+    return 0;
 }

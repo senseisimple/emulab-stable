@@ -16,6 +16,7 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $PROJROOT = "/proj";
+my $TFTPROOT = "/tftpboot";
 my $dbh      = Mysql->connect("localhost","tbdb","script","none");
 my $db_result= "";
 
@@ -99,6 +100,19 @@ if (! chmod(0770, "$PROJROOT/$pid/exp")) {
 }
 if (! chown($uid, $gid, "$PROJROOT/$pid/exp")) {
     die("Could not chown $PROJROOT/$pid/exp to $uid/$gid: $!\n");
+}
+
+#
+# Make a few subdirs. If this gets long, make it a loop.
+# 
+if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
+    die("Could not make directory $TFTPROOT/proj/$pid: $!\n");
+}
+if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
+    die("Could not chmod directory $TFTPROOT/proj/$pid: $!\n");
+}
+if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
+    die("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!\n");
 }
 
 exit(0);

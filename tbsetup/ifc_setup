@@ -134,6 +134,15 @@ while (<IN>) {
       if ($node =~ /^([-\@\w.]+)$/) {
 	  $node = $1;
       }
+
+      #
+      # Lets see if the OS that is supposed to be running on the machine
+      # even supports ifconfig. Skip it if not. User has to deal with it.
+      #
+      if (OSFeatureSupported(CurrentNodeOS($node), "ifconfig") == 0) {
+	  print STDERR "$node does not support ifconfig. Skipping ...\n";
+	  next;
+      }
       
       print STDERR "Pinging $node ... \n" if $dbg;
       if (-e $ping) {
@@ -234,3 +243,35 @@ while (<IN>) {
 close(IN);
 
 print "End of input file.\nDone.\n";
+exit 0;
+
+sub OSFeatureSupported {
+    local($os)      = $_[0];
+    local($feature) = $_[1];
+
+    $db_result = $DB->query("select osfeatures from disk_images ".
+			    "where image_id='$os'");
+
+    if ($db_result->numrows < 1) {
+	return 0;
+    }
+    foreach $osfeature (split(',', $db_result->fetchrow_array())) {
+	if ($feature eq $osfeature) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+sub CurrentNodeOS {
+    local($node_id) = $_[0];
+
+    $db_result = $DB->query("select def_boot_image_id from nodes ".
+			    "where node_id='$node_id'");
+
+    if ($db_result->numrows < 1) {
+	die("Node $node_id is not in the nodes table");
+    }
+    @row = $db_result->fetchrow_array();
+    return $row[0];
+}
