@@ -20,7 +20,8 @@ TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
 #
 # For SSL enabled tmcd/tmcc
 #
-CFLAGS	+= -DWITHSSL -DETCDIR='"$(INSTALL_ETCDIR)"'
+CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
+SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
 
@@ -32,18 +33,22 @@ ifeq ($(EVENTSYS),1)
 endif
 
 tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ)
-	$(CC) $(CFLAGS) $(TMCDCFLAGS) -o tmcd $< \
+	$(CC) $(CFLAGS) $(SSLFLAGS) $(TMCDCFLAGS) -o tmcd $< \
 		version.o $(SSLOBJ) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
-tmcc: tmcc.o $(SSLOBJ)
-	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(SSLOBJ) $(LFLAGS) -static $(TMLIBS)
+tmcc: tmcc.c decls.h $(SSLOBJ)
+	$(CC) $(CFLAGS) $(SSLFLAGS) -static -g -o tmcc $< $(SSLOBJ) \
+		$(LFLAGS) $(TMLIBS)
+
+tmcc-nossl: tmcc.c decls.h
+	$(CC) $(CFLAGS) -static -g -o tmcc-nossl $< $(LFLAGS)
 
 findif: findif.o
 	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static
 
-tmcc.o:	tmcc.c decls.h
+ssl.o:	ssl.c ssl.h decls.h
 
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
