@@ -15,8 +15,9 @@ my $STALESLOP = 1 * 60;
 
 #
 # Age (in seconds) at which we consider metric data stale
+# Configured via site variable.
 #
-my $STALEAGE  = 30 * 60;
+my $STALEAGE;
 
 sub usage()
 {
@@ -138,6 +139,14 @@ if (TBSiteVarExists("plab/min_disk")) {
     $MINDISK = 10;
 }
 
+if (TBSiteVarExists("plab/stale_age")) {
+    $STALEAGE = TBGetSiteVar("plab/stale_age");
+    $STALEAGE = 0 if $STALEAGE < 0;
+} else {
+    $STALEAGE = 60;
+}
+$STALEAGE *= 60;
+
 print "\n=== plabmetrics ".
     "(metric=$LOADMETRIC, maxload=$MAXLOAD, mindisk=$MINDISK) ".
     "running at " . `date`
@@ -243,7 +252,14 @@ sub CheckMetrics()
 	$localdebug = 0;
     } elsif ($metricsage < 0) {
 	if (-$metricsage > $STALESLOP) {
+	    print "WARNING: $host: metric data in the future, ignoring\n"
+		if $localdebug;
 	    $metrics{$LOADMETRIC} = 999;
+	}
+    } elsif ($STALEAGE == 0) {
+	if ($metricsage > 4 * 60 * 60) {
+	    print "WARNING: $host: metric data older than 4 hours, using anyway\n"
+		if $localdebug;
 	}
     } elsif ($metricsage > $STALEAGE) {
 	print "WARNING: $host: stale metric data, ignoring\n"
@@ -259,18 +275,15 @@ sub CheckMetrics()
 	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
     }
-    if (!defined($metrics{disk_free})) {
-	print "WARNING: $host: no disk_free metric\n"
+    if (!defined($metrics{disk_free}) || !defined($metrics{disk_total})) {
+	print "WARNING: $host: no disk_free/disk_total metrics, assuming enough\n"
 	    if $localdebug;
-	$metrics{disk_free} = 0;
-    }
-    if (!defined($metrics{disk_total})) {
-	print "WARNING: $host: no disk_total metric\n"
-	    if $localdebug;
-	$metrics{disk_total} = $metrics{disk_free};
+	$metrics{disk_free} = $metrics{disk_total} = 1;
     }
     $metrics{disk_total} = 1
 	if $metrics{disk_total} == 0;
+    $metrics{disk_free} = $metrics{disk_total}
+	if $metrics{disk_free} > $metrics{disk_total};
 }
 
 #

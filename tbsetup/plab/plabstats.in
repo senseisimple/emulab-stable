@@ -387,18 +387,15 @@ sub CheckMetrics()
 	$metrics{bytes_out} = 0;
     }
 
-    if (!defined($metrics{disk_free})) {
-	print "* * * WARNING $host: no disk_free metric\n"
+    if (!defined($metrics{disk_free}) || !defined($metrics{disk_total})) {
+	print "* * * WARNING: $host: no disk_free/disk_total metrics\n"
 	    if $debug;
-	$metrics{disk_free} = 0;
-    }
-    if (!defined($metrics{disk_total})) {
-	print "* * * WARNING $host: no disk_total metric\n"
-	    if $debug;
-	$metrics{disk_total} = $metrics{disk_free};
+	$metrics{disk_free} = $metrics{disk_total} = 1;
     }
     $metrics{disk_total} = 1
 	if $metrics{disk_total} == 0;
+    $metrics{disk_free} = $metrics{disk_total}
+	if $metrics{disk_free} > $metrics{disk_total};
 }
 
 #
