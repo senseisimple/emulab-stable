@@ -688,6 +688,9 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'widearea_nodeinfo'	=> [ 'node_id' ],
 	'widearea_recent'	=> [ 'node_id1', 'node_id2' ],
 	'wires'			=> [ 'node_id1', 'node_id2' ],
+	'node_startloc'		=> [ 'node_id' ],
+	'node_history'		=> [ 'node_id' ],
+	'node_bootlogs'		=> [ 'node_id' ],
     );
 }
 
