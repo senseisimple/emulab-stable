@@ -10,6 +10,14 @@ $TBWWW          = "<$TBBASE/>";
 $TBAUTHDOMAIN   = ".mini.emulab.net";
 $TBSECURECOOKIES= 1;
 
+#
+# Title Page stuff.
+#
+$TITLECOLOR     = "#E04050";
+$BANNERCOLOR    = "#ABABE0";
+$THISHOMEBASE   = "Mini.Emulab.Net";
+$THISPROJECT    = "The Mini Network Testbed";
+
 $TBMAILADDR_OPS		= "minitestbed-ops@flux.cs.utah.edu";
 $TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
 $TBMAILADDR_WWW		= "minitestbed-www@flux.cs.utah.edu";

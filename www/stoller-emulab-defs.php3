@@ -10,6 +10,14 @@ $TBWWW          = "<$TBBASE/>";
 $TBAUTHDOMAIN   = ".emulab.net";
 $TBSECURECOOKIES= 1;
 
+#
+# Title Page stuff.
+#
+$TITLECOLOR     = "#E04050";
+$BANNERCOLOR    = "#ABABE0";
+$THISHOMEBASE   = "Stoller.Emulab.Net";
+$THISPROJECT    = "Stoller's Utah Network Testbed";
+
 $TBMAILADDR_OPS		= "stoller@fast.cs.utah.edu";
 $TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
 $TBMAILADDR_WWW		= "stoller@fast.cs.utah.edu";

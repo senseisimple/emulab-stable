@@ -29,15 +29,6 @@ $TBAUTHTIMEOUT  = 21600;
 $HTTPTAG        = "http://";
 
 #
-# Menu Formatting Stuff
-#
-# Color for the title on each page.
-$TITLECOLOR     = "#E04050";
-$BANNERCOLOR    = "#ABABE0";
-$THISHOMEBASE   = "Emulab.Net";
-$THISPROJECT    = "The Utah Network Testbed";
-
-#
 # This just spits out an email address in a page, so it does not need
 # to be configured per development tree. It could be though ...
 # 
