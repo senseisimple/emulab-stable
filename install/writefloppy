@@ -1,0 +1,111 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Write out a floppy with a unique identifier - for use with the CD-boot
+# system and newclient
+#
+
+#
+# Beep codes - beeps every few seonds
+# One beep - All's clear, pop the floppy out
+# Two beeps - Unrecoverable error
+# Three beeps - No floppy in the drive - stick one in, and the script will
+# continue
+#
+
+use strict;
+
+my $FLOPPYDEV  = "/dev/fd0";
+my $FORMAT     = "/sbin/newfs_msdos";
+my $MOUNTPOINT = "/mnt";
+my $MOUNT      = "/sbin/mount";
+my $UNMOUNT    = "/sbin/umount";
+
+#
+# Grab the node's identifier
+#
+if (@ARGV != 1) {
+    die "Usage: $0 <id>";
+}
+
+my ($id) = @ARGV;
+
+#
+# Make sure the floppy is readable
+#
+if (!checkfloppy()) {
+    beep(3,1);
+}
+
+#
+# Format that sucker
+#
+if (system "$FORMAT $FLOPPYDEV") {
+    print "Floppy format failed: $!\n";
+    beep(2);
+}
+
+#
+# Drop a file down with the unique identifier we were provided
+#
+if (system "$MOUNT -t msdos $FLOPPYDEV $MOUNTPOINT") {
+    print "Failed to mount floppy: $!\n";
+    beep(2);
+}
+
+if (!open(IDFILE,">$MOUNTPOINT/node.id")) {
+    print "Failed to write floppy: $!\n";
+}
+
+print IDFILE "$id\n";
+close(IDFILE);
+system "$UNMOUNT $MOUNTPOINT";
+
+#
+# Let the user know we're done
+#
+beep(1,1);
+
+#
+# Beep for a while - first argument is the number of beeps in each group. If
+# the second argument is non-zero, will stop beeping and return when the floppy
+# is inserted or removed
+#
+sub beep {
+    my ($count,$exitOnChange) = @_;
+
+    $count = 1 unless $count;
+
+    my $floppystate;
+    if ($exitOnChange) {
+	$floppystate = checkfloppy();
+    }
+
+    while (1) {
+	foreach my $i (1 .. $count) {
+	    syswrite STDOUT, "\a";
+	    select(undef, undef, undef,.2);
+	}
+
+	if ($exitOnChange && (checkfloppy() != $floppystate)) {
+	    return;
+	}
+
+	sleep(3);
+    }
+}
+
+#
+# Check to see if the floppy is readable - 1 if it is, 0 if not
+#
+sub checkfloppy {
+    open(FLOPPY,"<$FLOPPYDEV") or return 0;
+    close(FLOPPY);
+    return 1;
+}
