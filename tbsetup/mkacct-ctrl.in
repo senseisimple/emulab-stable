@@ -1,324 +1,325 @@
 #!/usr/local/bin/perl -wT
-
 use English;
-use Mysql;
+
+#
+# Create accounts.
+#
+# XXX - The control node is hardwired. Look for $CONTROL.
+#
+# usage: mkacct-ctrl <userid>
+# 
 
 #
 # Configure variables
 #
 my $TB      = "@prefix@";
-my $DBNAME  = "@TBDBNAME@";
+my $TBOPS   = "@TBOPSEMAIL@";
 
+my $HOMEDIR = "/users";
 my $PBAG    = "$TB/sbin/paperbag";
-my $ssh     = "ssh";
+my $SSH     = "ssh";
 my $CONTROL = "users.emulab.net";
+my $GROUPADD= "/usr/sbin/pw groupadd";
+my $USERADD = "/usr/sbin/pw useradd";
+my $USERMOD = "/usr/sbin/pw usermod";
+my $CHPASS  = "/usr/bin/chpass";
 
-my $me;                # alphanumeric username of $UID 
-
-my $user;              # kwright
-my $pid;               # 6009
-
-my $dbh;               # database handle 
-my $sth;               # statement handle
+my $user;
 my @db_row;
-my $db_query;
+my $query_result;
 
-sanitize();
-dbsetup();
-check_credentials();
-dowork();
-print "$0 finished sucessfully.\n";
-exit(0);
-
-sub dbsetup() {
-    $dbh = Mysql->connect("localhost", $DBNAME, "script", "none");
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("Must be root! Maybe its a development version?");
 }
 
 #
-# Figure out who called us. There are 3 possible scenarios:
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
 #
-# 1) Called from web UI as some TB admin user from the database 
-#    to create a project head's 
-#    account for a new project (called from approveproject.php3). 
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+push(@INC, "$TB/lib");
+require libtestbed;
+require libdb;
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: mkacct-ctrl <userid>\n");
+}
+$user = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Invalid uid '$user' contains illegal characters.\n");
+}
+
+#
+# Figure out who called us. Possible scenarios:
+#
+# 1) Called from web UI as some TB admin user to create a project head's 
+#    account for a new project.
 #
 # 2) Called as user with group_root for project to create a user
-#    account (from approveuser.php3).
+#    account.
 #
 # 3) Called from command line as user with group_root for project 
 #    to create a user account. 
 # 
 # 4) Called from command line as root.
 #
-sub check_credentials() {
+print "$UID\n";
 
-    print "Credential check: ";
-
-    #
-    # Make sure the UID is a valid UID in this machine's passwd file
-    #
-    my ($me) = getpwuid($UID) or die "$0: $UID not in passwd file";
+if ($UID && !TBAdmin($UID)) {
+    my ($me) = getpwuid($UID) or
+	fatal("$UID not in passwd file");
 
     #
-    # Check if we're root
+    # Check if group_root for the project.
     #
-    if ($UID == 0) {
-	print "Root user allowed.\n";
-	return;
-    } 
+    $query_result =
+	DBQueryFatal("select p1.trust from proj_memb as p1 ".
+		     "left join proj_memb as p2 on p2.pid=p1.pid ".
+		     "where p1.uid='$me' and ".
+		     "p2.uid='$user' and p1.trust='group_root'");
+
+    if ($query_result->numrows == 0) {
+	die("$0: $me does not have enough permission in ${user}'s project");
+    }
+}
+
+#
+# Get the user info (the the user being created).
+#
+$query_result =
+    DBQueryFatal("select usr_pswd,unix_uid,usr_name,usr_email ".
+		 "from users where uid='$user'");
+if ($query_result->numrows == 0) {
+    fatal("$user is not in the DB. This is bad.\n");
+}
+@db_row         = $query_result->fetchrow_array();
+my $pswd        = $db_row[0];
+my $user_number = $db_row[1]; 
+my $fullname    = $db_row[2];
+my $user_email  = $db_row[3];
+
+#
+# Get the group (projects user belongs to) names and numbers. 
+# 
+my @groupnames;
+my %groupnumbers;
+my @grouplist;
+
+#
+# Form a list project membership names.
+# 
+$query_result =
+    DBQueryFatal("select pid from proj_memb where ".
+		 "uid='$user' and trust!='none'");
+if ($query_result->numrows == 0) {
+    fatal("$user is not in any groups!\n");
+}
+while (@db_row = $query_result->fetchrow_array() ) {
+    push(@groupnames, $db_row[0]);
+}
+
+#
+# Now join that list with the projects information to the unix gids.
+# 
+$query_result =
+    DBQueryFatal("select pid,unix_gid from projects where ".
+		 join(" or ", map ( "pid='$_'", @groupnames)));
+if ($query_result->numrows == 0) {
+    fatal("Could not get the unix GIDs for the projects!\n");
+}
+# Should probably check to make sure the counts match.
+while (@db_row = $query_result->fetchrow_array()) {
+    $groupnumbers{$db_row[0]} = $db_row[1];
+}
+
+#
+# Add some special cases for admin types. Note hardwired gids!
+#
+if (TBAdmin($user)) {
+    push(@groupnames, "wheel", "flux");
+    $groupnumbers{"wheel"} = 0;
+    $groupnumbers{"flux"}  = 601;
+}
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
+
+#
+# Create groups on both the control and operations nodes. We assume
+# FreeBSD for both. 
+# 
+# All this stuff must be done as root (ssh).
+#
+$UID = $EUID;
+
+foreach my $group ( @groupnames ) {
+    my $group_number = $groupnumbers{$group};
+
+    print "Processing group $group (gid $group_number)\n";
     
-    #
-    # User could be an admin user.
-    #
-    $sth = $dbh->query("select admin from users where uid='$me' and admin=1");
-    if (got_tuples($sth)) {
-	print "Testbed admin user allowed.\n";
-	return;
-    } 
-    #
-    # Last resort: check if group_root for $project
-    #
-    $db_query = "select p1.trust from proj_memb as p1 ".
-      "left join proj_memb as p2 on p2.pid=p1.pid ".
-      "where p1.uid='$me' and p2.uid='$user' and p1.trust='group_root'";
-    $sth      = $dbh->query($db_query);
-    if (got_tuples($sth)) {
-      print "Group_root privileges allowed.\n";
-      return;
-    }
-
-    #
-    # If  we're here, we do not have the correct credentials
-    #
-    print "Not root, a TB admin user, or group_root for ${user}'s project. Failed.\n";   
-    exit(1);
-}
-
-### 
-### Find the right control node. Create an account for given
-### user with correct user info.
-### 
-sub dowork() {
-
-    my $control_node;
-    my $pswd;
-    my $user_number;    # 1025
-    my $user_email;     # foo@bar
-    my $fullname;       # Kristin Wright
-    my @groupnames;     # lkwbox (same as projects)
-    my %groupnumbers;   # 6001
-
-    #
-    # Find control node.
-    # Note: In the end, I simply assign to 'plastic' as control nodes
-    #       not yet set in the database. 11/30/00 -lkw 
-    #
-    #$db_query     = "select control_node from projects where pid='$project'";
-    #$sth          = $dbh->query($db_query);
-    #got_tuples($sth) or die "$0: Error selecting control_node.\n";
-    #@db_row       = $sth->fetchrow_array();
-    #$control_node = $db_row[0];
-    $control_node  = $CONTROL;           # see note above  
-
-    # get user info
-    $db_query       = "select usr_pswd,unix_uid,usr_name,usr_email ".
-	              "from users where uid='$user'";
-    $sth            = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting user fields.\n";
-    @db_row         = $sth->fetchrow_array();
-    $pswd        = $db_row[0];
-    $user_number = $db_row[1]; 
-    $fullname    = $db_row[2];
-    $user_email  = $db_row[3];
-
-    # get group names
-    $db_query       = "select pid from proj_memb where uid='$user' ".
-			" and trust!='none'";
-    $sth            = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting group names.\n";
-    while (@db_row = $sth->fetchrow_array() ) {
-      push(@groupnames, $db_row[0]);
-    }
-
-    my @grouplist = map ( "pid='$_'", @groupnames);
-
-    # get group numbers
-    $db_query = "select pid,unix_gid from projects where ".
-      join(" or ",@grouplist);
-    $sth      = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting group numbers.\n";
-    while (@db_row = $sth->fetchrow_array()) {
-      $groupnumbers{$db_row[0]}=$db_row[1];
-    }
-
-    # Add some special cases for developers/admins
-    $sth=$dbh->query("select admin from users where uid='$user' and admin=1");
-    if (got_tuples($sth)) {
-      # I'm an admin, so add me to some groups:
-      push(@groupnames, "wheel", "flux");
-      $groupnumbers{"wheel"}=0;
-      $groupnumbers{"flux"}=601;
-    }     
-
-    # Assume FreeBSD for both nodes, since we control them.
-
-    # The following user/group creation commands must be done as root. 
-    $UID       = $EUID;
-
-    foreach $group ( @groupnames ) {
-      $group_number = $groupnumbers{$group};
-      print "Checking for group $group (gid $group_number)\n";
-      # 
-      # Create groups on paper if they don't exist.
-      #
-      if (`egrep '^${group}:' /etc/group` eq "") { 
-	print "Adding group $group to paper\n";
-	system("/usr/sbin/pw groupadd $group -g $group_number") == 0 or
-	  print STDERR "Could not add group $group with gid $group_number to paper\n";
-      } else { print "Group $group already exists on paper.\n"; }
-
-      #
-      # Make groups on control node if they don't exist.
-      #
-      if (`$ssh $control_node egrep '^${group}:' /etc/group` eq "") { 
-	print "Adding group $group to $control_node.\n";
-	system("$ssh $control_node /usr/sbin/pw groupadd $group -g ".
-	       "$group_number") == 0 or
-	  print STDERR "Could not add group $group with gid $group_number to $control_node\n";
-      } else { print "Group $group already exists on $control_node.\n"; }
-    }
-
-    # Main project is first on list, rest go into new list
-    $project = shift @groupnames;
-    $grouplist = join(",",@groupnames);
-    if ($grouplist) {
-      $groupargument = "-G $grouplist";
-    }
-    else {
-      $groupargument = " ";
-    }
-
-    #
-    # Make user on paper. We don't give them a password.
-    #
-    if (`egrep '^${user}:' /etc/passwd` eq "") {
-      print "Adding user $user to paper.\n";
-      system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
-	     "-k /usr/share/skel -m -d /users/$user ".
-	     "-g $project $groupargument -s $PBAG") == 0
-	       or print STDERR "Could not add user $user to paper\n";
-    } else {
-      print "User $user already exists on paper. Updating record.\n";
-      # MAKE SURE not to update the shell... if its someone who gets tcsh on 
-      # paper, we don't want to paperbag them...
-      system("/usr/sbin/pw usermod $user -u $user_number -c \"$fullname\" ".
-	     "-g $project $groupargument") == 0
-	       or print STDERR "Could not modify user $user on paper\n";
-    }
-
-    #
-    # Make user on control node. Note that we cannot get back any output from 
-    # a command that we open for input so we divide acct creation into two 
-    # pieces to maximize feedback. First we add the user account. Then we 
-    # change the password.
-    #
-    # Quote special chars for ssh and the shell on the other side
-    $fullname =~ s/\"/\'/g;
-    $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
-    if (`$ssh $control_node egrep '^${user}:' /etc/passwd` eq "") { 
-      print "Adding user $user to $control_node.\n";
-      $str = "$ssh $control_node " .
-	     "'/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
-	     "-k /usr/share/skel -m -d /users/$user -g $project ".
-	     "$groupargument -s /bin/tcsh'";
-      system($str) == 0
-	or print STDERR "Could not add user $user to $control_node.\n";
-      system("$ssh $control_node ".
-	     "/usr/bin/chpass -p $pswd $user") == 0
-	       or print STDERR"Could not change password for user $user on $control_node.\n";
-    } else {
-      print "User $user already exists on $control_node. Updating record.\n";
-      # DO NOT mess with the quoting... you have to escape all the escapes,
-      # because perl does the escapes once, then ssh takes them again,
-      # so \\\" becomes " by the time the shell gets it.
-      $str = "$ssh $control_node ".
-	     "'/usr/sbin/pw usermod $user -u $user_number ".
-	     "-c \"$fullname\" -g $project $groupargument'";
-     system($str) == 0       
-       or print STDERR "Could not modify user $user on $control_node.\n";
-      system("$ssh $control_node ".
-	     "/usr/bin/chpass -p $pswd $user") == 0
-	       or print STDERR"Could not change password for user $user on $control_node.\n";
-    }
-
-    #
-    # Set up the ssh key
-    #
-
-    if (! -e "/users/$user/.ssh/" ) {
-      # Only do this if its not been done before.
-      print "Setting up ssh data...\n";
-      mkdir("/users/$user/.ssh", 0700);
-      chown($user_number, $group_number, "/users/$user/.ssh");      
-      # Run commands below as the user
-      $EUID = $user_number;
-      $UID  = $EUID;      
-      print "EUID: $EUID UID:$UID\n";
-      open(KEYGEN, "/usr/bin/ssh-keygen -P '' -f /users/$user/.ssh/identity 2>&1 |");
-      while (<KEYGEN>) { print $_; }
-      close(KEYGEN);
-      open(CP, "/bin/cp /users/$user/.ssh/identity.pub /users/$user/.ssh/authorized_keys 2>&1 |");
-      while (<CP>) { print $_; }
-      close(CP);       
-      chmod(0600, "/users/$user/.ssh/authorized_keys");
-    } else {
-      print "SSH data in /users/$user/.ssh/ appears to exist. Skipping.\n";
-    }
-
-    #
-    # Set up a .forward file so that any email to them gets forwarded off.
     # 
-    if (! -e "/users/$user/.forward" ) {
-      print "Setting up .forward file ...\n";
-      open(FOR, ">/users/$user/.forward");
-      print FOR "$user_email\n";
-      close(FOR);
-      chmod(0644, "/users/$user/.forward");
-    } else {
-      print "There appears to be a .forward file in /users/$user. Skipping.\n";
+    # Create group locally if it does not exist. egrep returns 1 when
+    # no matches are found.
+    #
+    if (system("egrep -q -s '^${group}:' /etc/group")) { 
+	print "Adding group $group to paper\n";
+
+	if (system("$GROUPADD $group -g $group_number")) {
+	    fatal("Could not add $group ($group_number) to local node!\n");
+	}
+    }
+
+    #
+    # Create group on the control node if it does not exist.
+    #
+    if (system("$SSH $control_node egrep -q -s '^${group}:' /etc/group")) {
+	print "Adding group $group to $control_node.\n";
+
+	if (system("$SSH $control_node $GROUPADD $group -g $group_number")) {
+	    fatal("Could not add $group ($group_number) to $control_node!\n");
+	}
     }
 }
 
-sub sanitize() {
+#
+# Construct an appropriate group list for the pw commands. Main project
+# is the first on the list, and that becomes the primary group. The rest
+# (if any) of the groups become a comma separated list for the -G option.
+#
+my $groupargument = " ";
+my $project       = shift @groupnames;
+my $grouplist     = join(",",@groupnames);
 
-    ## un-taint path
-    $ENV{'PATH'} = '/bin:/usr/bin';
-    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-    ## check usage
-    if ($#ARGV < 0) { 
-	die("Usage: mkacct-ctrl <username>\n" .
-	    "\tCreates given user account on appropriate control nodes.\n");
-    }
-
-    ## sanitize user 
-    if ( $ARGV[0] =~ /^([a-z0-9]+)$/i ) {
-	$user = $1;
-    } else {
-	die "$0: User argument $ARGV[0] has invalid characters.\n";
-    }
-
-    ## effective uid must be root
-    if ($EUID != 0) {
-	die("$0: Must have an EUID of 0 to create an account.\n");
-    }
-
+if ($grouplist) {
+    $groupargument = "-G $grouplist";
 }
 
+#
+# Make user on local. We don't give them a password since they are not
+# allowed to log in, except via paperbaf. Be sure not overwrite the shell
+# for a user who has a real shell. 
+#
+if (system("egrep -q -s '^${user}:' /etc/passwd")) {
+    print "Adding user $user ($user_number) to local node.\n";
 
-###
-### Return non-zero if we got tuples; 0 if not.
-###
-sub got_tuples() {
-    return $_[0]->numrows;
+    if (system("$USERADD $user -u $user_number -c \"$fullname\" ".
+	       "-k /usr/share/skel -m -d $HOMEDIR/$user ".
+	       "-g $project $groupargument -s $PBAG")) {
+	fatal("Could not add user $user to local node.");
+    }
+}
+else {
+    print "Updating user $user ($user_number) record on local node.\n";
+
+    #
+    # MAKE SURE not to update the shell
+    #
+    if (system("$USERMOD $user -u $user_number -c \"$fullname\" ".
+	       "-g $project $groupargument")) {
+	fatal("Could not modify user $user on local node.");
+    }
 }
 
+#
+# Make user account on control node. We do the password setup as separate
+# step since thats easier than trying to both via ssh.
+#
+# Quote special chars for ssh and the shell on the other side
+#
+$fullname =~ s/\"/\'/g;
+$fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+if (system("$SSH $control_node egrep -q -s '^${user}:' /etc/passwd")) {
+    print "Adding user $user ($user_number) to $control_node.\n";
+
+    if (system("$SSH $control_node '$USERADD ".
+	       "$user -u $user_number -c \"$fullname\" ".
+	       "-k /usr/share/skel -m -d $HOMEDIR/$user -g $project ".
+	       "$groupargument -s /bin/tcsh'")) {
+	fatal("Could not add user $user ($user_number) to $control_node.\n");
+    }
+}
+else {
+    print "Updating user $user record on $control_node.\n";
+
+    if (system("$SSH $control_node '$USERMOD ".
+	       "$user -u $user_number ".
+	       "-c \"$fullname\" -g $project $groupargument'")) {
+	fatal("Could not modify user $user record on $control_node.");
+    }
+}
+if (system("$SSH $control_node $CHPASS -p $pswd $user")) {
+    fatal("Could not change password for user $user on $control_node.\n");
+}
+
+#
+# Set up the ssh key, but only if not done so already.
+#
+if (! -e "$HOMEDIR/$user/.ssh/" ) {
+    print "Setting up ssh configuration for $user.\n";
+    
+    mkdir("$HOMEDIR/$user/.ssh", 0700) or
+	fatal("Could not mkdir $HOMEDIR/$user/.ssh: $!");
+    chown($user_number, $groupnumbers{$project}, "$HOMEDIR/$user/.ssh") or
+	fatal("Could not chown $HOMEDIR/$user/.ssh: $!");
+    
+    # Run commands below as the user
+    $EUID = $user_number;
+    $UID  = $EUID;
+
+    if (system("/usr/bin/ssh-keygen -P '' -f $HOMEDIR/$user/.ssh/identity")) {
+	fatal("Failure in ssh-keygen");
+    }
+    if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
+	       "$HOMEDIR/$user/.ssh/authorized_keys")) {
+	fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub to auth keys");
+    }
+    chmod(0600, "$HOMEDIR/$user/.ssh/authorized_keys") or
+	fatal("Could not chown $HOMEDIR/$user/.ssh/authorized_keys: $!");
+}
+
+#
+# Set up a .forward file so that any email to them gets forwarded off.
+#
+if (! -e "$HOMEDIR/$user/.forward" ) {
+    print "Setting up .forward file for $user.\n";
+
+    if (system("echo \"$user_email\" > $HOMEDIR/$user/.forward")) {
+	fatal("Could not create $HOMEDIR/$user/.forward");
+    }
+    chmod(0644, "$HOMEDIR/$user/.forward") or
+	fatal("Could not chown $HOMEDIR/$user/.forward");
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "TESTBED: mkacct-ctrl Failed", $msg);
+    die("$0: $msg");
+}
