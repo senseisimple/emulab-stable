@@ -82,7 +82,7 @@ install: all script-install subdir-install
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
-	@$(MAKE) -C plab install
+#	@$(MAKE) -C plab install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -92,7 +92,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
-	@$(MAKE) -C plab post-install
+#	@$(MAKE) -C plab post-install
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
@@ -162,7 +162,7 @@ clean:	subdir-clean
 subdir-clean:
 	@$(MAKE) -C checkpass clean
 	@$(MAKE) -C ns2ir clean
-	@$(MAKE) -C plab clean
+#	@$(MAKE) -C plab clean
 
 distclean:	subdir-distclean
 
