@@ -43,7 +43,7 @@ main(int argc, char **argv)
 	
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "s:p:d:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:d")) != -1) {
 		switch (c) {
 		case 'd':
 			debug = 1;
