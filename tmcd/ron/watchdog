@@ -1,0 +1,155 @@
+#!/usr/bin/perl -wT
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# The Emulab watchdog. Currently, not really much of a watchdog. After
+# boot setup (accounts and vnodes), All it does is look for new accounts
+# on a regular basis. It would be good to look for stale vnodes, but
+# there are too many race conditions to worry about.
+#
+sub usage()
+{
+    print "Usage: watchdog [-t timeout]\n";
+    exit(1);
+}
+my $optlist = "t:";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = "/usr/local/etc/testbed:/bin:/sbin:/usr/bin:/usr/local/bin:" .
+    "/usr/local/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/usr/local/etc/testbed";
+use libsetup;
+
+# Locals
+my $timeout = (60 * 30);	# In seconds of course. 
+my $logname = "/tmp/emulab-watchdog.debug";
+my $vndir   = "/var/testbed";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if (1 && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+#
+# Inform TMCD that we have rebooted, and are starting testbed setup.
+#
+print "Informing Emulab Operations that we've rebooted ...\n";
+system("tmcc state REBOOTED");
+
+# At bootup, look for new accounts.
+print "Looking for new Emulab accounts ...\n";
+system("update -i");
+
+# Also setup existing vnodes.
+bootvnodes();
+
+#
+# Inform TMCD that we are up and running.
+#
+print "Informing Emulab Operations that we're up and running ...\n";
+system("tmcc state ISUP");
+
+#
+# Loop!
+# 
+while (1) {
+    sleep($timeout);
+    
+    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+
+    print "Dogging it at $date\n";
+    
+    #
+    # Run account update. Use immediate mode so that it exits right away
+    # if the lock is taken (another update already running).
+    #
+    print "Looking for new Emulab accounts ...\n";
+    system("update -i");
+}
+
+#
+# Setup vnodes that are supposed to be setup. Technically, this is
+# only going to happen at reboot, to reset already existing vnodes.
+# The Testbed is going to crap out if it cannot get a vnode setup
+# when an experiment is swapped in.
+#
+sub bootvnodes() {
+    my %curvnodelist;
+    my @vnodes;
+
+    #
+    # Get the current set of vnodes that are supposed to be running on
+    # this node.
+    #
+    my $TM = OPENTMCC(TMCCCMD_VNODELIST);
+    while (<$TM>) {
+	chomp;
+	$curvnodelist{$_} = $_;
+    }
+    CLOSETMCC($TM);
+
+    @vnodes = keys(%curvnodelist);
+    print "Vnodelist from TMCD is @vnodes.\n";
+
+    #
+    # See what vnodes are currently setup.
+    #
+    opendir(DIR, $vndir) or
+	die("*** $0:\n".
+	    "    Could not opendir $vndir: $!\n");
+    @vnodes = grep { /^[^\.].*/ && -d "/tmp/$_" } readdir(DIR);
+    closedir DIR;
+
+    #
+    # Remove the old directories.
+    #
+    foreach my $vnode (@vnodes) {
+	system("rm -rf $vndir/$vnode");
+    }
+
+    foreach my $vnode (keys(%curvnodelist)) {
+	print "Setting up vnode $vnode ...\n";
+	system("vnodesetup $vnode");
+	sleep(5);
+    }
+}
+
+exit(0);
