@@ -1,0 +1,71 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: rc.linktest start | stop\n";
+    exit(1);
+}
+my $optlist	= "";
+my $action      = "start";
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    $action = $ARGV[0];
+
+    usage()
+	if ($action ne "start" and $action ne "stop");
+}
+
+my $logfile = "$LOGDIR/linktest.debug";
+my $pidfile = "/var/run/linktest.pid";
+
+# Stop.
+if ($action eq "stop") {
+    if (-e $pidfile) {
+	system("kill `cat $pidfile`");
+	# Does not unlink its own pidfile!
+	unlink($pidfile);
+    }
+    exit(0);
+}
+
+#
+# Need the keyfile. We talk to the elvind on boss, not locally.
+#
+my $boss    = tmccbossname();
+my $keyfile = TMEVENTKEY();
+
+#
+# Need the pid/eid. 
+# 
+my ($pid, $eid, $vname) = check_nickname();
+
+#
+# Start the daemon.
+#
+system("linktest -e $pid/$eid -s $boss -l $logfile -i $pidfile -k $keyfile");
+exit($? >> 0);

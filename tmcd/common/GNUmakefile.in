@@ -92,6 +92,7 @@ local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(BINDIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(BINDIR)/rc.agents
 	$(INSTALL) -m 755 $(SRCDIR)/rc.progagent $(BINDIR)/rc.progagent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(BINDIR)/rc.linktest
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(BINDIR)/rc.setup
 	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(BINDIR)/rc.slothd
 	# Symlink this cause we invoke it from boss, and its too much
