@@ -8,6 +8,9 @@ importance should be obvious. Whoever does this work *will* program in the
 dominate style of the existing, newly written, 4500 lines of code! Now, if
 I could just figure out how to add a php mode to emacs ...
 
+* Run arguments through addslashes to quote special characters since
+  things like ' in strings mess up database insertion. 
+  
 * Decouple root privs from begin experiment privs, as per Jay
   request. Default on for begin experiment, default off for root.
 
