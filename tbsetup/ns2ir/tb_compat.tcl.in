@@ -770,3 +770,30 @@ proc tb-set-delay-os {os} {
     set delay_osname $os
 }
 
+#
+# Allow type of lans (but not links) to be changed.
+#
+proc tb-set-protocol {lanlink protocol} {
+    if {[$lanlink info class] != "Lan"} {
+	perror "\[tb-set-protocol] $lanlink is not a lan."
+	return
+    }
+    $lanlink set protocol $protocol
+}
+
+#
+# XXX - We need to set the accesspoint for a wireless lan. I have no
+# idea how this will eventually be done, but for now just do it manually.
+# 
+proc tb-set-lan-accesspoint {lanlink node} {
+    if {[$lanlink info class] != "Lan"} {
+	perror "\[tb-set-lan-accesspoint] $lanlink is not a lan."
+	return
+    }
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-lan-accesspoint] $node is not a node."
+	return
+    }
+    $lanlink set_accesspoint $node
+}
+

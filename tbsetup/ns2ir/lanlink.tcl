@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -153,6 +153,9 @@ LanLink instproc init {s nodes bw d type} {
     # By default, a local link
     $self set widearea 0
 
+    # Default type is a plain "ethernet". User can change this.
+    $self set protocol "ethernet"
+
     # Colocation is on by default, but this only applies to emulated links
     # between virtual nodes anyway.
     $self set trivial_ok 1
@@ -171,6 +174,9 @@ LanLink instproc init {s nodes bw d type} {
 
     # Allow user to turn on veth devices on emulated links.
     $self set useveth 0
+
+    # XXX Allow user to set the accesspoint.
+    $self set accesspoint {}
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -338,6 +344,24 @@ LanLink instproc get_subnet {} {
 }
 
 #
+# XXX - Set the accesspoint for the lan to node. This is temporary.
+#
+LanLink instproc set_accesspoint {node} {
+    $self instvar accesspoint
+    $self instvar nodelist
+
+    foreach pair $nodelist {
+	set n [lindex $pair 0]
+	set p [lindex $pair 1]
+	if {$n == $node} {
+	    set accesspoint $node
+	    return {}
+	}
+    }
+    perror "set_accesspoint: No such node $node in lan $self."
+}
+
+#
 # Return the subnet of a lan. Actually, just return one of the IPs.
 #
 LanLink instproc get_netmask {} {
@@ -386,6 +410,13 @@ LanLink instproc rename_node {old new} {
     $self instvar rbandwidth
     $self instvar rdelay
     $self instvar rloss
+    $self instvar accesspoint
+
+    # XXX Temporary
+    if {$accesspoint == $old} {
+	set accesspoint $new
+    }
+    
     set newnodelist {}
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -434,6 +465,12 @@ Link instproc updatedb {DB} {
     $self instvar useveth
     $self instvar sim
     $self instvar netmask
+    $self instvar protocol
+
+    if {protocol != "ethernet"} {
+	perror "Link must be an ethernet only, not a $protocol"
+	return
+    }
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -506,6 +543,8 @@ Lan instproc updatedb {DB} {
     $self instvar useveth
     $self instvar sim
     $self instvar netmask
+    $self instvar protocol
+    $self instvar accesspoint
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -547,9 +586,14 @@ Lan instproc updatedb {DB} {
 	
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	set is_accesspoint 0
+	if {$node == $accesspoint} {
+	    set is_accesspoint 1
+	}
+
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint"]
 	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint]
 
 	$sim spitxml_data "virt_lans" $fields $values
     }
