@@ -527,11 +527,12 @@ CREATE TABLE nodes (
   routertype enum('none','ospf','static','manual') NOT NULL default 'none',
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
-  eventstate varchar(10) default NULL,
+  eventstate varchar(20) default NULL,
   state_timestamp int(10) unsigned default NULL,
-  op_mode varchar(10) default NULL,
+  op_mode varchar(20) default NULL,
   op_mode_timestamp int(10) unsigned default NULL,
   update_accounts smallint(6) default '0',
+  next_op_mode varchar(20) default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -605,7 +606,7 @@ CREATE TABLE os_info (
   path tinytext,
   magic tinytext,
   machinetype varchar(30) NOT NULL default '',
-  osfeatures set('ping','ssh','ipod') default NULL,
+  osfeatures set('ping','ssh','ipod','isup') default NULL,
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
   mustclean tinyint(4) NOT NULL default '1',
