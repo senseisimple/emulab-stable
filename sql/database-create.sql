@@ -1582,6 +1582,33 @@ CREATE TABLE virt_agents (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `virt_lan_member_settings`
+--
+
+CREATE TABLE virt_lan_member_settings (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  member varchar(32) NOT NULL default '',
+  capkey varchar(32) NOT NULL default '',
+  capval varchar(64) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,vname,member,capkey)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_lan_settings`
+--
+
+CREATE TABLE virt_lan_settings (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  capkey varchar(32) NOT NULL default '',
+  capval varchar(64) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,vname,capkey)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `virt_lans`
 --
 
