@@ -124,7 +124,9 @@ sub new($$$#@) {
     if (!$self->{LEADER}) {
 	# XXX: For simplicity, we assume for now that the leader is a Cisco
 	use snmpit_cisco;
-	$self->{LEADER} = new snmpit_cisco($self->{STACKID});
+	my $type = getDeviceType($self->{STACKID});
+	$self->{LEADER} = new snmpit_cisco($self->{STACKID}, $self->{DEBUG},
+	    $type, $community, $supports_private)
     }
 
     bless($self,$class);
