@@ -25,8 +25,7 @@ $isadmin = ISADMIN($uid);
 
 # temporarily make tcsh the only option until backend stuff
 # gets put into place.
-$shelllist = array( 'tcsh' );
-# $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
+$shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
 
 # used if db is NULL (should not happen.)
 $defaultshell = 'tcsh';

@@ -57,6 +57,9 @@ my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
 my $NOSUCHUSER  = 67;
 my $USEREXISTS  = 65;
+# Nasty. Should do this with /etc/pw.conf shellpath.
+my %shellpaths  = ("csh"  => "/bin/csh", "sh" => "/bin/sh",
+		   "tcsh" => "/bin/tcsh", "bash" => "/usr/local/bin/bash");
 
 my $errors      = 0;
 my $sfsupdate   = 0;
@@ -152,7 +155,8 @@ if (AuditStart(0)) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly from users as u ".
+		 " u.usr_email,u.status,u.webonly,u.usr_shell ".
+		 "from users as u ".
 		 "where u.uid='$user'");
 
 if ($query_result->numrows == 0) {
@@ -165,6 +169,7 @@ my $fullname    = $row[2];
 my $user_email  = $row[3];
 my $status      = $row[4];
 my $webonly     = $row[5];
+my $usr_shell   = $row[6];
 
 #
 # Get the users earliest project membership to use as the default group
@@ -404,17 +409,21 @@ sub UpdateUser(;$)
     }
 
     # Shell is different on local vs control node.
-    if (defined($freezeopt)) {
-	if ($freezeopt) {
-	    $locshellarg = "-s $NOLOGIN";
-	    $remshellarg = "-s $NOLOGIN";
+    if (defined($freezeopt) && $freezeopt) {
+	$locshellarg = "-s $NOLOGIN";
+	$remshellarg = "-s $NOLOGIN";
+    }
+    else {
+	$locshellarg = "-s $PBAG";
+
+	if (!defined($usr_shell) ||
+	    !exists($shellpaths{$usr_shell})) {
+	    $remshellarg = "-s " . $shellpaths{"tcsh"};
 	}
-	else {
-	    $locshellarg = "-s $PBAG";
-	    $remshellarg = "-s /bin/tcsh";
+	else  {
+	    $remshellarg = "-s " . $shellpaths{$usr_shell};
 	}
     }
-
     print "Updating user $user ($user_number) on local node.\n";
 
     $UID = 0;
@@ -561,10 +570,15 @@ sub GenerateSFSKey()
 
 	print "Generating sfs key\n";
 	$UID = 0;
-	if (system("$SSH -host $CONTROL '$SFSKEYGEN -KPn ".
-		   "$user\@ops.emulab.net $sfsdir/identity'")) {
+ 	if (system("$SSH -host $CONTROL '$SFSKEYGEN -KPn ".
+ 		   "$user\@ops.emulab.net $sfsdir/identity'")) {
 	    fatal("Failure in sfskey gen!");
-        }
+	}
+	# Version 7 stuff for later.
+	#if (system("$SSH -host $CONTROL '$SFSKEYGEN -KP ".
+	#	    "-l $user\@ops.emulab.net $sfsdir/identity'")) {
+	#    fatal("Failure in sfskey gen!");
+	#}
 	$UID = $SAVEUID;
 
 	chown($user_number, $default_groupgid, "$sfsdir/identity") or
@@ -579,6 +593,13 @@ sub GenerateSFSKey()
 	my $ident = `cat $sfsdir/identity`;
 
 	if ($ident =~ /.*,.*,.*,(.*),(.*)/) {
+	    # Version 6
+	    DBQueryFatal("replace into user_sfskeys ".
+			 "values ('$user', '$2', '${user}:${1}:${user}::', ".
+			 "now())");
+	}
+	elsif ($ident =~ /.*:.*:.*:(.*):(.*)/) {
+	    # Version 7
 	    DBQueryFatal("replace into user_sfskeys ".
 			 "values ('$user', '$2', '${user}:${1}:${user}::', ".
 			 "now())");
