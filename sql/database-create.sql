@@ -414,7 +414,7 @@ CREATE TABLE linkdelays (
   iface varchar(8) NOT NULL default '',
   ip varchar(15) NOT NULL default '',
   netmask varchar(15) NOT NULL default '255.255.255.0',
-  dir enum('xmit','recv') NOT NULL default 'xmit',
+  type enum('simplex','duplex') NOT NULL default 'duplex',
   eid varchar(32) default NULL,
   pid varchar(32) default NULL,
   vlan varchar(32) NOT NULL default '',
@@ -423,6 +423,10 @@ CREATE TABLE linkdelays (
   delay float(10,2) NOT NULL default '0.00',
   bandwidth int(10) unsigned NOT NULL default '100',
   lossrate float(10,3) NOT NULL default '0.000',
+  rpipe smallint(5) unsigned NOT NULL default '0',
+  rdelay float(10,2) NOT NULL default '0.00',
+  rbandwidth int(10) unsigned NOT NULL default '100',
+  rlossrate float(10,3) NOT NULL default '0.000',
   q_limit int(11) default '0',
   q_maxthresh int(11) default '0',
   q_minthresh int(11) default '0',
@@ -436,7 +440,7 @@ CREATE TABLE linkdelays (
   q_droptail int(11) default '0',
   q_red tinyint(4) default '0',
   q_gentle tinyint(4) default '0',
-  PRIMARY KEY  (node_id,vlan,vnode,dir)
+  PRIMARY KEY  (node_id,vlan,vnode)
 ) TYPE=MyISAM;
 
 --
