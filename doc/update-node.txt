@@ -135,7 +135,7 @@ B. Now we can begin the process:
     On boss:
 
 	cd /proj/emulab-ops/images
-	sudo cp -p FBSD47+RHL73-STD.ndz FBSD47-STD.ndz RHL73-STD.ndz /usr/testbed/imaegs/N/
+	sudo cp -p FBSD47+RHL73-STD.ndz FBSD47-STD.ndz RHL73-STD.ndz /usr/testbed/images/N/
 
 	cd /usr/testbed/images
 	sudo mv FBSD47+RHL73-STD.ndz FBSD47-STD.ndz RHL73-STD.ndz O/
