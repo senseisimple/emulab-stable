@@ -289,7 +289,7 @@ sub dodelays ()
     while (<$TM>) {
 	push(@delays, $_);
     }
-    CLOSETMCC($TM);
+    libsetup::CLOSETMCC($TM);
 
     if (@delays) {
 	$count    = 69;
