@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 
 my $rsh = "ssh";
 my $rcp = "scp";
@@ -16,13 +16,13 @@ chop;
 if ($_ ne "root") { die("This won't work unless you're root.\n"); }
 close(WHO);
 
-if (-e "$ARGV[$0]" ) {
-    open(IN,$ARGV[$0]) || die("Couldn't open $ARGV[$0]\n");
-} elsif (-e "/usr/testbed/etc/$ARGV[$0]") {
-    open(IN,"/usr/testbed/etc/$ARGV[$0]") || 
-	die("Couldn't open /usr/testbed/etc/$ARGV[$0]\n");
+if (-e "$ARGV[0]" ) {
+    open(IN,$ARGV[0]) || die("Couldn't open $ARGV[0]\n");
+} elsif (-e "/usr/testbed/etc/$ARGV[0]") {
+    open(IN,"/usr/testbed/etc/$ARGV[0]") || 
+	die("Couldn't open /usr/testbed/etc/$ARGV[0]\n");
 } else {
-    die ("Couldn't locate $ARGV[$0]\n");
+    die ("Couldn't locate $ARGV[0]\n");
 }
 my $last = "";
 my $OS = "Unknown";
@@ -55,7 +55,7 @@ while (<IN>) {
       open(UNAME,"$rsh $IP uname -a 2>&1 |");
       $_ = <UNAME>;
       #print $_;
-      if ($_ ) { @temp = split(" ",$_); $OS = $temp[$0]; }
+      if ($_ ) { @temp = split(" ",$_); $OS = $temp[0]; }
     } else {
       print STDERR "Can't reach $IP with ping. Skipping interface $IF.\n";
       $OS = "_NO_PING_";
@@ -100,7 +100,7 @@ while (<IN>) {
       close(COPY);
       open(CONF,"/etc/ifc_boot_input");
       while ( <CONF> ) { 
-	print "CONF>>$_";
+#	print "CONF>>$_";
 	if ( ! /ifconfig_fxp$IF=/ ) { 
 	  if ( /network_interfaces\s*=\s*\"([A-Za-z0-9_ ]*)\"/ ) {
 	    $_ = $1;
@@ -115,7 +115,7 @@ while (<IN>) {
 	    print TEMP "fxp$IF\"\n";
 	  }
 	  print TEMP $_; 
-	  print "KEPT\n"; 
+#	  print "KEPT\n"; 
 	} 
       }
       close(CONF);
