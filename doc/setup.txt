@@ -1,5 +1,5 @@
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Last updated  January 18, 2001
+##### Last updated  February 12, 2001
 ##### Tested on FreeBSD 4.3
 
 ##### Step 0
@@ -38,6 +38,11 @@ in the library directory for the latest version of tcl you have installed, so
 if you have tcl83 installed at the time, you will have tcl-sql support under
 8.3.X, but not under 8.2.X (which testbed scripts use)
 
+For the most part, subsitituting newer versions of the packages should be OK,
+but know that we haven't tested them... The one exception is version 3.23.47 
+of the mysql packages. In fact, we recommend 3.23.47, as it fixes some
+boot-time problems that we've had with 3.23.36 .
+
 ##### Step 2 - LEDA
 
 Currently, the LEDA library is required to compile some testbed software (we
@@ -56,14 +61,57 @@ group. Run this command as root.
 
 	pw groupadd tbadmin -g 99
 	
-Configure the testbed tree. For example, I have the testbed source in
-~/testbed, and use the ~/tbobj directory to do my builds in.
+Configure the testbed tree. Many of the configuration parameters are stored in
+a 'defs' file. Make a copy of the defs-default file (found in the root of
+the testbed tree,) and customize it for your site. The key variables
+are:
+WWWDEFS - The name of the defs file to use for the web pages. Instructions
+	for this file are below
+TBADMINGROUP - The name of the group you created above, probaby tbadmin
+TBOPSEMAIL - An email address for the 'operations staff'. Copies of
+	error messages, etc. will get sent to this address, and in some
+	cases users are directed to this address if they have questions and/or
+	problems.
+TBLOGSEMAIL - An email address to which some logs (experiment
+	creation/deletion, etc.) will get sent.
+DELAYCAPACITY - Maximum delay capacity of any nodes. Set to 1 prevent the
+	same node from acting as multiple delay nodes.
+BOSSNODE - Fully-qualified hostname of the boss node
+USERNODE - Fully-qualified hostname of the users node (the node to which
+	users will log on to control their nodes, etc.)
+FSNODE - Fully-qualified hostname of the NFS server. (In our setup, this is
+	the same machine as the users node.)
+OURDOMAIN - The domain in which this testbed lies
+FSDIR_GROUPS - The _real_ pathname (no symbolic links, etc.) of the groups
+	directory on the FSNODE. See the setup-ops.txt file for the
+	instructions for creating this directory.
+FSDIR_PROJ - Ditto, for the proj directory
+FSDIR_USERS - Ditto, for the users (home) directory
+
+Other variables can generally be left alone. Pass the name of this file to
+configure with the --with-TBDEFS option.
+
+You'll also need to make a defs file for the web system. This is found in
+the www/ directory of the testbed source tree. Copy default-defs.php3 to
+<name>-defs.php3, and put <name> into WWWDEFS in the main defs file. The
+main variables to worray about are:
+$WWWHOST, $TBAUTHDOMAIN - replace emulab.net with your domain
+$THISHOMEBASE, $THISPROJECT - Use the name of your site
+$TBMAIL* - These work like the mail addresses of the same names in the
+	defs file above. The new addresses are the approval address, to which
+	requests to start projects are sent, and the audit address, which is
+	CCed on certain mail sent to users.
+$TBMAINSITE - Set this to 0
+
+Now, build and install the software. For example, I have the testbed source in
+~/testbed, and use the ~/tbobj directory to do my builds in. To use the
+defs-ricci-emulab defs file in my home directory, I would do:
 
 cd ~/tbobj
-~/testbed/configure
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab
 gmake
 gmake boss-install
-gmake post-install
+sudo gmake post-install
 
 The 'post-install' target needs to be done as root, because certain scripts
 need to be setuid root.
@@ -72,7 +120,75 @@ need to be setuid root.
 
 See the file setup-db.txt in this directory 
 
-##### Step 5 - Misc. Files and Services
+
+##### Step 5 - Directories to create, and other misc. filesystem changes
+
+Logs - Create /usr/testbed/log, and link /var/log/testbed to it
+
+NFS - Make the machine an NFS server and client with the following in
+/etc/rc.conf:
+nfs_server_enable="YES"
+nfs_server_flags="-u -t -n 16"
+nfs_client_enable="YES"
+
+You also need some cross mounts between bossnode and fs. For example, on
+one of our boss nodes, we have the following in /etc/fstab
+
+    fs.mini.emulab.net:/z/users     /users  nfs     rw      0       0
+    fs.mini.emulab.net:/z/proj      /proj   nfs     rw      0       0
+    fs.mini.emulab.net:/z/groups    /groups nfs     rw      0       0
+    fs.mini.emulab.net:/var         /usr/testbed/usersvar nfs ro,soft,-b    0
+
+Note that you will need exports on the fs node (see setup-ops.txt).
+
+suidperl - In order for setuid perl scripts to work properly, you'll need to:
+chmod u+s /usr/bin/suidperl
+
+##### Step 6 - Services to set up
+
+DNS zones - We don't have documentation for creating these yet. Best bet right
+now is to ask Utah for a copy of theirs.
+Stick:
+named_enable="YES"
+in /etc/rc.conf
+
+inetd - In FreeBSD, you need to prevent inetd from rate-limiting connections
+(an attempt to defend against DOS attacks, but very annoying in a testbed
+environment). Put the following in /etc/rc.conf:
+inetd_flags="-wW -R 0"
+
+tftp - Should have the following line in /etc/inetd.conf
+tftp    dgram   udp wait    nobody  /usr/libexec/tftpd  tftpd /tftpboot /proj
+(make sure to HUP inetd)
+
+ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
+the line
+xntpd_enable="YES"
+in /etc/rc.conf. Check out the ntpd man page for configuration information.
+
+cvsupd - Minor changes to images can be distributed at boot time with cvsup.
+See doc/newimage.txt for an overview of setting up a sup tree. Make sure to
+copy over the old one (if it exists), and make sure cvsupd is running (there's
+an example rc.d script in the rc.d/ directory of the testbed CVS tree.) Create
+a group named 'root', with any gid. This is because cvsup uses the game of
+the group, rather than its gid, to determine what group the file should belong
+to. Since Linux uses 'root' instead of BSD's 'wheel', this is needed for the
+Linux sup tree.
+
+syslogd - Normally, sylogd on FreeBSD is run with the '-s' flag to prevent
+logging to it over the network. We use network logging, so we need this
+feature. Re-enable it by putting:
+syslogd_flags=""
+in /etc/rc.conf
+
+dhcpd - Need to install the dhcpd config file. The old (deprecated) location was
+/usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
+install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf .
+After you've filled the nodes and interfaces tables, (described in the database
+setup documentation) use the dhcpd_makeconf script, along with the template in
+the dhcpd directory of the CVS repository, to generate the dhcpd.conf file.
+
+##### Step 7 - Misc. Files and Services
 
 SNMP MIBs - MIBs go in /usr/local/share/snmp/mibs. In addition to the ones
 installed by the ucd-snmp package, you'll need MIBs for Cisco and Intel
@@ -89,35 +205,6 @@ to 666. Now, do an snmpwalk of some device (eg. 'snmpwalk cisco1 public') -
 this will force the .index file to get rebuilt. Suggestions of better ways to
 rebuild this file are welcome!
 
-DNS zones - Make sure to include the DNS configuration files from /etc/named/
-Stick:
-named-enable="YES"
-in /etc/rc.conf
-
-NFS - Make the machine an NFS server and client with the following in /etc/rc.conf:
-nfs_server_enable="YES"
-nfs_server_flags="-u -t -n 16"
-nfs_client_enable="YES"
-
-You also need some cross mounts between bossnode and fs. On bossnode:
-
-	fs.mini.emulab.net:/z/users     /users  nfs     rw      0       0
-	fs.mini.emulab.net:/z/proj      /proj   nfs     rw      0       0
-	fs.mini.emulab.net:/z/groups    /groups nfs     rw      0       0
-	fs.mini.emulab.net:/var         /usr/testbed/usersvar nfs ro,soft,-b    0
-
-Note that you will need exports on fs (see setup-ops.txt).
-	
-
-tftp - Should have the following line in /etc/inetd.conf
-tftp    dgram   udp wait    nobody  /usr/libexec/tftpd  tftpd /tftpboot /proj
-(make sure to HUP inetd)
-
-inetd - In FreeBSD, you need to prevent inetd from rate-limiting connections
-(an attempt to defend against DOS attacks, but very annoying in a testbed
-environment). Put the following in /etc/rc.conf:
-inetd_flags="-wW -R 0"
-
 SSH - If possible, grab the old machine's SSH host keys (from
 /etc/ssh/ssh_host*) and HUP sshd. Also, get the root identity and known_hosts
 files from the old machine (/root/.ssh/{identity,identity.pub,known_hosts}) -
@@ -125,10 +212,6 @@ Make sure to preserve file and directory permissions. You'll probably also want
 to add
 PermitRootLogin yes
 to /etc/ssh/sshd_config (and HUP sshd) so that you can log in as root remotely
-
-Grab the old /etc/master.passwd file, and run
-'cd /etc && pwd_mkdb -p master.passwd'
-Also grab the old /etc/groups file
 
 /etc/syslog.conf needs entries for some of our own services. Example:
 !bootinfo
@@ -146,13 +229,6 @@ Also grab the old /etc/groups file
 All of these logs should be created before you HUP syslogd or reboot - All of
 them can be world-readable
 
-DHCP - Need to install the dhcpd config file. The old (deprecated) location was
-/usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
-install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf .
-After you've filled the nodes and interfaces tables, (described in the database
-setup documentation) use the dhcpd_makeconf script, along with the template in
-the dhcpd directory of the CVS repository, to generate the dhcpd.conf file.
-
 RC scripts - The mysql-client rc script needs to run before ANY testbed
 services are started! The mysql server should also be started early in the
 process.  boot process. You can ensure this by changing directories to
@@ -161,17 +237,6 @@ process.  boot process. You can ensure this by changing directories to
 before proxydhcp, so rename 'dhcpd.sh' to '2.dhcpd.sh'. You will also need to
 install the '3.testbed.sh' and 'cvsupd.sh'  scripts (in the rc.d directory of
 the testbed tree)
-
-Logs - To avoid filling up /var, link /var/log/testbed to /usr/testbed/log
-
-CVSUPD - Minor changes to images can be distributed at boot time with cvsup.
-See doc/newimage.txt for an overview of setting up a sup tree. Make sure to
-copy over the old one (if it exists), and make sure cvsupd is running (there's
-an example rc.d script in the rc.d/ directory of the testbed CVS tree.) Create
-a group named 'root', with any gid. This is because cvsup uses the game of
-the group, rather than its gid, to determine what group the file should belong
-to. Since Linux uses 'root' instead of BSD's 'wheel', this is needed for the
-Linux sup tree.
 
 Apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
 3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
@@ -192,11 +257,6 @@ run out of /etc/crontab
 */5	*	*	*	*	root	/usr/testbed/sbin/node_status
 Don't forget to HUP cron!
 
-ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
-the line
-xntpd_enable="YES"
-in /etc/rc.conf. Check out the ntpd man page for configuration information.
-
 You may want a program to allow administrator-types to run stuff easily as root.
 Here at Utah, we have two: su1 (developed locally) and sudo (installed from
 FreeBSD ports) - don't forget to get it set up! Our strategy on boss was to
@@ -211,14 +271,6 @@ checkpass - in the testbed software:
   /usr/share/dict/{propernames,words} available (standard for FreeBSD).
   If they're in different places, edit the obvious makefile vars.
 
-syslogd - Normally, sylogd on FreeBSD is run with the '-s' flag to prevent
-logging to it over the network. We use network logging, so we need this
-feature. Re-enable it by putting:
-syslogd_flags=""
-in /etc/rc.conf
-
-suidperl - In order for setuid perl scripts to work properly, you'll need to:
-chmod u+s /usr/bin/suidperl
 
 SSH keys - Generate an SSH key for root by running ssh-keygen. Put an empty
 passphrase on it. You'll want to copy boss:/root/.ssh/identity.pub to
@@ -228,10 +280,11 @@ Process accounting - We generally turn on process accounting, by putting
 accounting_enable="YES"
 in /etc/rc.conf .
 
-##### Step 6 - Stuff to copy from an old boss node
+##### Copying from an old boss node
 
 If you're simply moving from one boss node to another, there are a few files
 and trees you'll want to make sure to copy over:
+
 /usr/testbed/images/
 /tftpboot/ (a link to /usr/testbed/tftpboot)
 /etc/namedb/
@@ -240,7 +293,6 @@ and trees you'll want to make sure to copy over:
 /usr/testbed/sup/
 /usr/site/
 
-##### Last-minute synching
 Right before bringing the new boss node online (if copying from an old boss
 node), make sure to have copy over the latest versions of:
 * The database
