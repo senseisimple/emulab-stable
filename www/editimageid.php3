@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -93,17 +93,6 @@ if (isset($path) && strcmp($path, "")) {
 else {
     $path = "NULL";
 }
-if (isset($loadaddr) && strcmp($loadaddr, "")) {
-    $foo = addslashes($loadaddr);
-
-    if (strcmp($loadaddr, $foo)) {
-	USERERROR("The load address must not contain special characters!", 1);
-    }
-    $loadaddr = "'$loadaddr'";
-}
-else {
-    $loadaddr = "NULL";
-}
 
 #
 # Create an update string
@@ -112,8 +101,40 @@ $query_string =
 	"UPDATE images SET             ".
 	"description=$description,     ".
 	"path=$path,                   ".
-	"magic=$magic,                 ".
-        "load_address=$loadaddr        ";
+	"magic=$magic                  ";
+
+#
+# Only admins can do this.
+# 
+if ($isadmin) {
+    if (isset($loadaddr) && strcmp($loadaddr, "")) {
+	$foo = addslashes($loadaddr);
+
+	if (strcmp($loadaddr, $foo)) {
+	    USERERROR("The load address contains special characters!", 1);
+	}
+	$loadaddr = "'$loadaddr'";
+    }
+    else {
+	$loadaddr = "NULL";
+    }
+
+    if (isset($frisbee_pid) && $frisbee_pid != "") {
+	if (! TBvalid_integer($frisbee_pid)) {
+	    USERERROR("The process id must must be a valid integer!", 1);
+	}
+    }
+    else {
+	$frisbee_pid = "NULL";
+    }
+
+    #
+    # Add to the query string.
+    # 
+    $query_string .= ",".
+        "load_address=$loadaddr,       ".
+        "frisbee_pid=$frisbee_pid      ";
+}
 
 $query_string = "$query_string WHERE imageid='$imageid'";
 
