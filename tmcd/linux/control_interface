@@ -1,0 +1,11 @@
+#!/bin/sh
+
+NODETYPE=`/etc/testbed/nodetype`
+
+if [ "$NODETYPE" = 'pc600' ]; then
+    echo 'eth4'
+elif [ "$NODETYPE" = 'pc850' ]; then
+    echo 'eth2'
+elif [ "$NODETYPE" = 'pc1500' ]; then
+    echo 'eth0'
+fi
