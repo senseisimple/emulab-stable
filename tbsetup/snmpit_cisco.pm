@@ -434,8 +434,7 @@ sub vlanNumberExists($$) {
     # or not
     #
     my $rv = $self->{SESS}->get([$VlanName,"1.$vlan_number"]);
-    if (!$rv) {
-	print "rv was $rv\n";
+    if (!$rv or $rv eq "NOSUCHINSTANCE") {
 	return 0;
     } else {
     	return 1;
@@ -568,7 +567,7 @@ sub createVlan($$;$$$) {
     my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan # is index
 
     #
-    # If they gave a VLAN number, make sure it exists
+    # If they gave a VLAN number, make sure it doesn't exist
     #
     if ($vlan_number) {
 	if ($self->vlanNumberExists($vlan_number)) {

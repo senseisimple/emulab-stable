@@ -278,7 +278,7 @@ sub createVlan($$$;$$$) {
     # What we do here depends on whether this stack uses VTP to synchronize
     # VLANs or not
     #
-    my $okay;
+    my $okay = 1;
     if ($self->{VTP}) {
 	#
 	# We just need to create the VLAN on the stack leader
@@ -293,8 +293,9 @@ sub createVlan($$$;$$$) {
 	#
 	my $vlan_number = undef;
 	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
+	    print "Creating VLAN on switch $devicename ... \n" if $self->{DEBUG};
 	    my $device = $self->{DEVICES}{$devicename};
-	    my $res = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
+	    my $res = $device->createVlan($vlan_id,$vlan_number,@otherargs);
 	    if (!$res) {
 		#
 		# Ooops, failed. Don't try any more
