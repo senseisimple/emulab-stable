@@ -29,6 +29,13 @@ my $DBNAME = "@TBDBNAME@";
 my $TBOPS  = "@TBOPSEMAIL@";
 my $TBLOGS = "@TBLOGSEMAIL@";
 
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
@@ -46,12 +53,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
-
-#
-# Testbed Support library
-# 
-push(@INC, "$TB/lib");
-require libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -85,49 +86,33 @@ my $expdir  = "$piddir/exp";
 my $eiddir  = "$expdir/$eid";
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
 # Get some user information. 
 #
-$query_result = $DB->query("SELECT uid,usr_name,usr_email,admin from users ".
-			   "WHERE unix_uid='$EUID'");
+my $query_result =
+    DBQueryFatal("SELECT uid,usr_name,usr_email from users ".
+		 "WHERE unix_uid='$EUID'");
 
-if (! $query_result) {
-    fatal("DB Error getting user information for uid $EUID\n");
-}
 if ($query_result->numrows < 1) {
     print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
     exit(1);
 }
 
-@row = $query_result->fetchrow_array();
-$uid        = $row[0];
-$user_name  = $row[1];
-$user_email = $row[2];
-$isadmin    = $row[3];
+my @row        = $query_result->fetchrow_array();
+my $uid        = $row[0];
+my $user_name  = $row[1];
+my $user_email = $row[2];
 
 #
 # Verify that this person is allowed to end the experiment. Must be
 # in the project membership table, or must be an admin type. Note that
 # any script down the line has to do an admin check also. 
 #
-if (! $isadmin) {
-    $query_result =
-	$DB->query("SELECT pid FROM proj_memb ".
-		   "WHERE uid=\"$uid\" and pid=\"$pid\"");
+if ($EUID && !TBAdmin($EUID) &&
+    ProjMember($pid, $EUID) != PROJMEMBERTRUST_ROOT) {
 
-    if (! $query_result) {
-	fatal("DB Error getting project membership for uid $uid\n");
-    }
-    
-    if ($query_result->numrows == 0) {
-	print STDOUT "Go Away! You are not a member of project $pid\n";
-	exit(1);
-    }
+    print STDOUT "Go Away! You do not have permission to end experiments ".
+	         "in project $pid\n";
+    exit(1);
 }
 
 #
@@ -137,18 +122,12 @@ if (! $isadmin) {
 # terminating conists of a couple of different experiment states down inside
 # the tb scripts. 
 #
-$query_result = $DB->query("lock tables experiments write");
-if (! $query_result) {
-    fatal("DB Error locking experiments table");
-}
+DBQueryFatal("lock tables experiments write");
 
 $query_result =
-    $DB->query("SELECT expt_terminating,state FROM experiments ".
-	       "WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("SELECT expt_terminating,state,expt_head_uid ".
+		 "FROM experiments WHERE eid='$eid' and pid='$pid'");
 
-if (! $query_result) {
-    fatal("DB Error getting experiment termination date for $pid/$eid\n");
-}
 if ($query_result->numrows < 1) {
     print STDOUT "No such experiment $pid/$eid exists!\n";
     exit(1);
@@ -182,21 +161,35 @@ if ($estate eq "prerunning" ||
     exit(1);
 }
 
+# Save experiment creator uid for later email message.
+my $expt_head = $row[2];
+
 #
 # Set the timestamp now, and unlock the experiments table.
 #
 $stamp = `date '+20%y-%m-%d %H:%M:%S'`;
 
-$query_result = $DB->query("UPDATE experiments SET expt_terminating='$stamp' ".
-			   "WHERE eid='$eid' and pid='$pid'");
-if (! $query_result) {
-    fatal("DB Error setting expt_terminating for experiment $pid/$eid\n");
-}
+DBQueryFatal("UPDATE experiments SET expt_terminating='$stamp' ".
+	     "WHERE eid='$eid' and pid='$pid'");
 
-$query_result = $DB->query("unlock tables");
-if (! $query_result) {
-    fatal("DB Error unlocking experiments table");
-}
+DBQueryFatal("unlock tables");
+
+#
+# At this point a failure is going to leave things in an inconsistent
+# state. Not much to do about that right now. 
+# 
+
+#
+# Get email address of the experiment head, which may be different than
+# the person who is actually terminating the experiment, since its polite
+# to let the original creator know whats going on. 
+# 
+my $query_result =
+    DBQueryFatal("SELECT usr_name,usr_email from users ".
+		 "WHERE uid='$expt_head'");
+@row = $query_result->fetchrow_array();
+my $expt_head_name  = $row[0];
+my $expt_head_email = $row[1];
 
 #
 # If not in batch mode, go into the background. Parent exits.
@@ -263,12 +256,8 @@ else {
 #
 # Done! Remove all trace from the DB.
 # 
-$query_result = $DB->query("DELETE from experiments ".
-			   "WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result) {
-    fatal("DB Error deleting experiment record for $pid/$eid\n");
-}
+DBQueryFatal("DELETE from experiments ".
+	     "WHERE eid='$eid' and pid='$pid'");
 
 print STDOUT "Termination Success\n";
 
@@ -284,7 +273,9 @@ if ($batch) {
 #
 if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
 			"TESTBED: Experiment $pid/$eid Terminated",
-			undef, "Bcc: $TBLOGS"))) {
+			undef,
+			"Cc:  $expt_head_name <$expt_head_email>\n".
+			"Bcc: $TBLOGS"))) {
     die("Cannot start mail program!");
 }
 
@@ -326,7 +317,9 @@ sub fatal($)
     #
     if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
 			    "TESTBED: Termination Failure: $pid/$eid",
-			    undef, "Cc: $TBOPS"))) {
+			    undef,
+			    "Cc: $expt_head_name <$expt_head_email>\n".
+			    "Cc: $TBOPS"))) {
 	die("Cannot start mail program!");
     }
 
@@ -390,12 +383,9 @@ sub ExpState ($$) {
     my($pid,$eid) = @_;
     
     my $query_result =
-	$DB->query("SELECT state FROM experiments ".
-		   "WHERE eid='$eid' and pid='$pid'");
+	DBQueryFatal("SELECT state FROM experiments ".
+		     "WHERE eid='$eid' and pid='$pid'");
 
-    if (! $query_result) {
-	fatal("DB Error getting experiment termination date for $pid/$eid\n");
-    }
     if ($query_result->numrows < 1) {
 	print STDOUT "No such experiment $pid/$eid exists!\n";
 	exit(1);
