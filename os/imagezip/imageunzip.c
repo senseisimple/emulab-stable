@@ -178,6 +178,7 @@ unsigned long		splits;
 int fsleep(unsigned int usecs);
 #endif
 
+#ifndef FRISBEE
 void
 dump_stats(int sig)
 {
@@ -210,6 +211,7 @@ dump_stats(int sig)
 			"writer idle: %lu, writes performed: %d\n",
 			decompblocks, writeridles, rdycount);
 }
+#endif
 
 void
 dump_writebufs(void)
