@@ -27,7 +27,7 @@ CFLAGS	= -O -g \
 suexec:	suexec.c suexec.h
 	$(CC) $(CFLAGS) -o suexec suexec.c
 
-install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS))
+install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) $(addprefix $(INSTALL_BINDIR)/, paperbag)
 	@echo "Don't forget to do a post-install as root"
 
 post-install:
