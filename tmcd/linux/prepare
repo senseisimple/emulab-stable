@@ -53,8 +53,16 @@ foreach my $dbfile (@DBFILES) {
 #
 # Run anacron to bring everything up to date. It never runs again.
 #
-print "Running cron jobs. This could take a few minutes ...\n";
+print "Running cron jobs.\n";
 system("anacron -d -f -s -n");
+
+#
+# Create locate and makewhatis DBs, which are no longer in weekly cron.
+#
+print "Building makewhatis DB. This could take a few minutes ...\n";
+system("/etc/cron.pend/makewhatis.cron");
+print "Building locate DB. This could take a few minutes ...\n";
+system("/etc/cron.pend/slocate.cron");
 
 #
 # Generate a dumpdates file. Use fstab to find out what filesystems

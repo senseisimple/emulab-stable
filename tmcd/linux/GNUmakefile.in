@@ -87,6 +87,15 @@ sysetc-install:	dir-install
 	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc3.d/S96testbed
 	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
 	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
+	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
+		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
+				$(SYSETCDIR)/cron.pend; \
+	fi
+	if [ -e $(SYSETCDIR)/cron.daily/makewhatis.cron ]; then \
+		mv -f $(SYSETCDIR)/cron.daily/makewhatis.cron \
+				$(SYSETCDIR)/cron.pend; \
+	fi
 
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
