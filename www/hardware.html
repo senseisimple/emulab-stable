@@ -12,6 +12,7 @@
 </h1>
 </center>
 
+<h3>Test Nodes</h3>
 <ul>
 <li>40 PC nodes (<b>pc1-40</b>), consisting of:
 
@@ -41,7 +42,7 @@ Antec IPC3480B</a>, with 300W PS and extra fan.
 <a
 href="http://www.intel.com/network/products/isp1100.htm">
 Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
-<li> 512MB PC100 ECC SDRAM.
+<li> 512MB PC133 ECC SDRAM.
 <li> 5 Intel EtherExpress Pro 10/100Mbps Ethernet ports:
 <ul>
 	<li>2 builtin on the motherboard
@@ -71,7 +72,11 @@ Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
 </ul>
 <p>
 
-<li> a users server (<b>users.emulab.net</b>), consisting of:
+</ul>
+<h3>Servers</h3>
+<ul>
+
+<li> a users, file, and serial line server (<b>users.emulab.net</b>), consisting of:
 
 <ul>
 <li> Dual 500MHz Intel Pentium III cpus
@@ -87,7 +92,7 @@ Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 </ul>
 <p>
 
-<li> an operations server (<b>boss.emulab.net</b>), consisting of:
+<li> a DB, web, and operations server, consisting of:
 
 <ul>
 <li> Dell PowerEdge 2550 Rack Mount Server
@@ -100,18 +105,44 @@ Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 </ul>
 <p>
 
+<li> a second serial line server, consisting of:
+<ul>
+<li> 1U box from <a href = "http://www.asacomputers.com/">ASA Computers</a>
+<li> 1 64-port
+	<a href="http://www.cyclades.com/products/svrbas/zseries.htm">
+	Cyclades-Ze PCI Multiport Serial Board</a> (model number SEZ0050).
+</ul>
+<p>
+
+<li> a serial line server for critical emulab machines, consisting of:
+<ul>
+<li> An ISP1100 box, like the "pc850" nodes above.
+<li> a 4-port serial card.
+</ul>
+<p>
+
+</ul>
+<h3>Switches and Routers</h3>
+<ul>
+
 <li> 3 <a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/c6000_ds.htm">
-Cisco 6509 high-end switches</a>.  Two function as the "testbed backplane," each filled with a
+Cisco 6509 high-end switches</a>.
+	Two function as the "testbed backplane" ("programmable patch panel"),
+	each filled with a
 	<a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/6nam_ds.htm">
 	Network Analysis Module</a>
 	and seven 48-port 10/100 ethernet modules,
-	giving 336 100Mbps ethernet ports on each.
-	The third 6509 functions as the core router for the testbed and
-	is configured with an assortment of router hardware
-	and software, Gigabit ethernet, OC-12 ATM (~600Mbps), and more 
+	giving 336 100Mbps ethernet ports on each.  They are linked with 2 Gbit interfaces.
+	The third 6509 contains an MSFC router card and functions as the core router for the testbed.
+	It is configured with full router software,
+	Gigabit ethernet, OC-12 ATM (~600Mbps), and more 
 	10/100 Ethernet ports.  A fourth 6509 provides expansion room.
         <!-- Another, but no pix: http://www.cisco.com/univercd/cc/td/doc/pcat/ca6000.htm -->
 <p>
+
+</ul>
+<h3>Power Controllers</h3>
+<ul>
 
 <li>10 APC MasterSwitch AP9210 8 port power controllers.<br>
     (The AP9210 is discontinued; replaced in the product line by the
@@ -122,9 +153,14 @@ Cisco 6509 high-end switches</a>.  Two function as the "testbed backplane," each
 	BayTech RPC27</a> 20 port remote power controllers.<br>
 <p>
 
-<li>10 <a href = "http://www.wrightline.com/products/freestnd.htm">
-Wrightline "Tech I" racks</a>: 44U, 34" deep, 8 are  19" wide, 2 are
-	24" with cable management.<br>
+</ul>
+<h3>Racks</h3>
+<ul>
+
+<li>13 <a href = "http://www.wrightline.com/products/freestnd.htm">
+	Wrightline "Tech I" racks</a>: 44U, 34" deep, 2 are
+	24" wide with cable management; the rest are 19" wide.
+	(Aug 2001: these appear to have been discontinued or renamed.)
 <p>
 
 </ul>
