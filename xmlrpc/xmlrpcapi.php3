@@ -33,7 +33,8 @@ if (!$printable) {
 #
 ?>
 <p>
-This page describes the XMLRPC interface to Emulab. Currently, the
+This page describes the <a href="http://www.xmlrpc.com">XMLRPC</a> interface
+to Emulab. Currently, the
 interface mainly supports experiment creation, modification, swapping,
 and termination. We also provide interfaces to several other common
 operations on nodes end experiments such as rebooting, reloading, link
@@ -55,7 +56,7 @@ keep yet another certificate around!
 </p>
 
 <p>
-The API is decribed in detail below. A demonstration client written in
+The API is described in detail below. A demonstration client written in
 Python is also available that you can use on your desktop to invoke
 commands from the shell. For example:
 
@@ -65,7 +66,7 @@ commands from the shell. For example:
 which says to create an experiment called "myexp" in the "myproj" project,
 swap it in immediately, wait for the exit status (instead of running
 asynchronously), passing inline the contents of <tt>nsfile.ns</tt> in your
-homedir on your desktop.  By default, the client will contact the RPC
+home directory on your desktop.  By default, the client will contact the RPC
 server at <tt><?php echo $BOSSNODE ?></tt>, but you can override that by
 using the <tt>-s hostname</tt> option.. If your login ID on the local
 machine is different then your login ID on Emulab, you can use the <tt>-l
@@ -157,14 +158,14 @@ experiments.
   <li><tt><b>startexp</b></tt>: Create an experiment. By default, the experiment
   is started as a <a href="tutorial/tutorial.php3#BatchMode"><em>batch</em></a>
   experiment, but you can use the <tt>batchmode</tt> option described below to
-  alter that behaviour. You can pass an NS file inline, or you can give the
+  alter that behavior. You can pass an NS file inline, or you can give the
   path of a file already on the Emulab fileserver.
   <br>
   <br>
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -195,7 +196,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -216,7 +217,7 @@ experiments.
    <tr>
     <td><tt>description</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>A pithy sentence describing your experiment</td>
    </tr>
    <tr>
@@ -229,7 +230,7 @@ experiments.
    <tr>
     <td><tt>noswap_reason</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>A sentence describing why your experiment cannot be swapped</td> 
    </tr>
    <tr>
@@ -245,7 +246,7 @@ experiments.
    <tr>
     <td><tt>noidleswap_reason</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>A sentence describing why your experiment cannot be idle swapped</td> 
    </tr>
    <tr>
@@ -282,7 +283,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -305,7 +306,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -328,7 +329,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -359,7 +360,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -392,7 +393,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -411,7 +412,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -430,7 +431,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -453,7 +454,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -469,7 +470,7 @@ experiments.
   <tr>
     <td><tt>aspect</tt></td>
     <td>string</td>
-    <td>Request information about specifc aspect of the experiment.</td>
+    <td>Request information about specific aspect of the experiment.</td>
   </tr>
   </table>
   
@@ -477,7 +478,7 @@ experiments.
   The <tt>aspect</tt> is one of:
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>description</td>
+    <th>Name</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -488,7 +489,7 @@ experiments.
    <tr>
     <td><tt>links</tt></td>
     <td>Request information about all of the links in your experiment,
-    including delay characteristics, ip address and mask</td>
+    including delay characteristics, IP address and mask</td>
    </tr>
   </table>
   
@@ -498,7 +499,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -525,7 +526,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -554,7 +555,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -568,9 +569,9 @@ experiments.
    <tr>
     <td><tt>src</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>If specified, change a duplex link asymmetrically; just the link from
-    the node specifed will be changed. <em>This option is ignored on lans; the
+    the node specified will be changed. <em>This option is ignored on lans; the
     entire lan must be changed</em></td>
    </tr>
   </table>
@@ -584,7 +585,7 @@ experiments.
   aforementioned manual pages:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>range</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Range</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -596,19 +597,19 @@ experiments.
    <tr>
     <td><tt>plr</tt></td>
     <td>number</td>
-    <td>0 &lt;= plr &lt 1</td>
+    <td>0 &lt;= plr &lt; 1</td>
     <td>Packet Loss Rate as a number between 0 and 1</td>
    </tr>
    <tr>
     <td><tt>delay</tt></td>
     <td>integer</td>
-    <td>&gt 0</td>
+    <td>&gt; 0</td>
     <td>Delay in milliseconds</td>
    </tr>
    <tr>
     <td><tt>limit</tt></td>
     <td>integer</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>Queue size in bytes or packets. Default is 50 ethernet sized packets</td>
    </tr>
    <tr>
@@ -623,25 +624,25 @@ experiments.
    <tr>
     <td><tt>maxthresh</tt></td>
     <td>integer</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>Maximum threshold for the average queue size</td>
    </tr>
    <tr>
     <td><tt>thresh</tt></td>
     <td>integer</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>Minimum threshold for the average queue size</td>
    </tr>
    <tr>
     <td><tt>linterm</tt></td>
     <td>integer</td>
-    <td>&gt 0</td>
+    <td>&gt; 0</td>
     <td>Packet dropping probability expressed as an integer (1/linterm)</td>
    </tr>
    <tr>
     <td><tt>q_weight</tt></td>
     <td>number</td>
-    <td>0 &lt;= plr &lt 1</td>
+    <td>0 &lt;= plr &lt; 1</td>
     <td>For calculating average queue size</td>
    </tr>
   </table>
@@ -651,7 +652,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -670,7 +671,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -688,7 +689,7 @@ experiments.
   The required arguments are:<br><br>
   <table cellpadding=2>
   <tr>
-    <td>name</td><td>type</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Description</th>
   </tr>
   <tr></tr>
   <tr>
@@ -707,7 +708,7 @@ experiments.
   The optional arguments are:<br><br>
   <table cellpadding=2>
    <tr>
-    <td>name</td><td>type</td><td>default</td><td>description</td>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
    </tr>
    <tr></tr>
    <tr>
@@ -721,13 +722,13 @@ experiments.
    <tr>
     <td><tt>imageid</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>Specify the imageid to load on all of the nodes</td>
    </tr>
    <tr>
     <td><tt>imageproj</tt></td>
     <td>string</td>
-    <td>&nbsp</td>
+    <td>&nbsp;</td>
     <td>Specify the Emulab project ID of the imageid. By default the
     system will look in the project of the experiment, and then in the
     system project for globally shared images.</td>
@@ -745,7 +746,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
    fails. The required arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>description</td>
+      <th>Name</th><th>Type</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -759,7 +760,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     The optional arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>default</td><td>description</td>
+      <th>Name</th><th>type</th><th>Default</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -777,7 +778,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
    The required arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>description</td>
+      <th>Name</th><th>Type</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -796,7 +797,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     The optional arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>default</td><td>description</td>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -822,7 +823,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     The required arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>description</td>
+      <th>Name</th><th>Type</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -836,7 +837,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     The optional arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <td>name</td><td>type</td><td>default</td><td>description</td>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -850,13 +851,13 @@ The <tt>node</tt> module lets you control nodes in your experiments.
      <tr>
       <td><tt>imageid</tt></td>
       <td>string</td>
-      <td>&nbsp</td>
+      <td>&nbsp;</td>
       <td>Specify the imageid to load on all of the nodes</td>
      </tr>
      <tr>
       <td><tt>imageproj</tt></td>
       <td>string</td>
-      <td>&nbsp</td>
+      <td>&nbsp;</td>
       <td>Specify the Emulab project ID of the imageid. By default the
       system will look in the system project for globally shared images.</td>
      </tr>
