@@ -32,6 +32,10 @@ if [ -x $BOOTDIR/rc.ifc ]; then
         $BOOTDIR/rc.ifc
 fi
 
+#
+# The check for rc.delay below is to support this being installed
+# on older 4.7 images!
+#
 if [ -x $BINDIR/delaysetup ]; then
 	echo "Checking Testbed delay configuration ..."
 	$BINDIR/delaysetup
@@ -49,6 +53,13 @@ if [ -x $BINDIR/delaysetup ]; then
 	        echo "Setting up Testbed interface routing ..."
 		$BOOTDIR/rc.route enable
 	fi
+elif [ -x $BOOTDIR/rc.delay ]; then
+        # Note: no routing on delay nodes.
+        echo "Setting up Testbed delay configuration ..."
+        $BOOTDIR/rc.delay
+elif [ -x $BOOTDIR/rc.route ]; then
+        echo "Setting up Testbed interface routing ..."
+	$BOOTDIR/rc.route enable
 fi
 
 if [ -x $BOOTDIR/rc.rpm  ]; then
