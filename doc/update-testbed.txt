@@ -22,14 +22,22 @@ Rough steps for upgrading your existing Emulab.
    in the new schema.  Diff the version of this file from the last release,
    with the version from this release to find which ones to apply.
 
-   If anything goes wrong with this step, contact us.  You can put back
-   the old db:
+   If all goes well, proceed to the next step.  Be aware that the
+   "boss-install" make target below will do further checks for missing
+   rows in DB tables.  That target will fail, and tell you what to do to
+   fix your DB, in that case.  It does the table check in two pieces,
+   so it is possible you will have to fix the DB, and restart the boss-install
+   twice.
+
+   If anything goes wrong with the DB update step, contact us.  You can
+   still abort the upgrade at this point by putting back the old db:
        mysql
        drop database tbdb;
        create database tbdb;
        quit
        mysql < db.backup
-   and bring the testbed back up if necessary.
+   and bringing the testbed back up.  After this step, you are committed
+   to the upgrade.
 
 5. Login to your tipservers (if you have them), cd to your build directory
    and do:
