@@ -3,9 +3,22 @@
  * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+#ifdef _WIN32
+/*Windows version should be linked to: WS2_32*/
+/*g++ -Wall -o tmcc tmcc.c -D_WIN32 -lWS2_32*/
+#include <winsock2.h>
+#include <unistd.h>
+#include <getopt.h>
+typedef int socklen_t;
+#define ECONNREFUSED WSAECONNREFUSED
+#endif
+
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
+#endif
 #include <sys/un.h>
 #include <sys/fcntl.h>
 #include <stdio.h>
@@ -20,17 +33,21 @@
 #include <time.h>
 #include <assert.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#endif
 #include "decls.h"
 #include "ssl.h"
 #ifndef STANDALONE
 #include "config.h"
 #endif
+#ifndef _WIN32
 #undef  BOSSNODE
 #ifndef BOSSNODE
 #include <resolv.h>
+#endif
 #endif
 
 #ifndef KEYFILE
@@ -132,6 +149,9 @@ main(int argc, char **argv)
 	char			*keyfile  = NULL;
 	char			*privkey  = NULL;
 	char			*proxypath= NULL;
+#ifdef _WIN32
+        WSADATA wsaData;
+#endif
 
 	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:")) != -1)
 		switch(ch) {
@@ -194,6 +214,14 @@ main(int argc, char **argv)
 			"You may not use the -k or -s with the -l option\n");
 		usage();
 	}
+
+#ifdef _WIN32
+        /*Windows requires us to start up the version of the network API that we want*/
+	if(WSAStartup( MAKEWORD( 2, 2 ), &wsaData )) {
+	        fprintf(stderr,"WSAStartup failed\n");
+		exit(1);
+	}
+#endif
 
 	if (!bossnode) {
 		int	port = 0;
@@ -356,6 +384,7 @@ getbossnode(char **bossnode, int *portp)
 		}
 	}
 	
+#ifndef _WIN32
 	/*
 	 * Nameserver goo 
 	 */
@@ -365,6 +394,7 @@ getbossnode(char **bossnode, int *portp)
 	if (he && he->h_name) 
 		*bossnode = strdup(he->h_name);
 	else
+#endif
 		*bossnode = strdup("UNKNOWN");
 	return 0;
 #endif
@@ -519,8 +549,8 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 static int
 dounix(char *data, int outfd, char *unixpath)
 {
-#ifdef  linux
-	fprintf(stderr, "unix domain socket mode not supported on linux!\n");
+#if defined(linux) || defined(_WIN32)
+	fprintf(stderr, "unix domain socket mode not supported on this platform!\n");
 	return -1;
 #else
 	int			n, sock, cc, length;
@@ -596,8 +626,8 @@ dounix(char *data, int outfd, char *unixpath)
 static void
 beproxy(char *localpath, struct in_addr serverip, char *partial)
 {
-#ifdef  linux
-	fprintf(stderr, "proxy mode not supported on linux!\n");
+#if defined(linux) || defined(_WIN32)
+	fprintf(stderr, "proxy mode not supported on this platform!\n");
 	exit(-1);
 #else
 	int			sock, newsock, cc, length;

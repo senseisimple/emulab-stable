@@ -34,9 +34,25 @@ int		isssl;
 #define READ		tmcd_sslread
 #define CLOSE		tmcd_sslclose
 #else
+#ifdef _WIN32
+inline int win_send(SOCKET s, const char FAR* buf, int len)
+{
+        return send(s,buf,len,0);
+}
+inline int win_recv(SOCKET s, char FAR* buf, int len)
+{
+        return recv(s,buf,len,0);
+}
+#define ACCEPT		accept
+#define CONNECT		connect
+#define WRITE		win_send
+#define READ		win_recv
+#define CLOSE		close
+#else
 #define ACCEPT		accept
 #define CONNECT		connect
 #define WRITE		write
 #define READ		read
 #define CLOSE		close
-#endif
+#endif /*_WIN32*/
+#endif /*WITHSSL*/
