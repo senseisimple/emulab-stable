@@ -10,7 +10,7 @@ import getopt
 import os
 
 from sshxmlrpc import *
-from emulabclient import emulabclient
+from emulabclient import *
 
 ##
 # The package version number

@@ -12,10 +12,11 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= sshxmlrpc_client.py
+BIN_SCRIPTS	= sshxmlrpc_client.py  client.py
 SBIN_SCRIPTS	= sshxmlrpc_server.py
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
+WWW_STUFF	= xmlapi.php3
 
 #
 # These are the ones installed on plastic (users, control, etc). 
@@ -33,7 +34,13 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
+	$(addprefix $(INSTALL_WWWDIR)/, $(WWW_STUFF)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+
+$(INSTALL_WWWDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
 #
 # Control node installation (okay, plastic)

@@ -9,6 +9,7 @@ import socket
 import os
 import popen2
 import getopt
+import string
 
 MAXNSFILESIZE = (1024 * 512)
 
@@ -17,21 +18,32 @@ MAXNSFILESIZE = (1024 * 512)
 # It includes the exit status of the command, and any output that it
 # wants to send back. Why not return a tuple? Well, it appears that the
 # python xmlrpc library requires that a singleton be returned from the
-# server.
+# server, and I do not want to depend on the "Fault" structure that XML
+# defines for return values.
 #
+RESPONSE_SUCCESS        = 0
+RESPONSE_BADARGS        = 1
+RESPONSE_ERROR          = 2
+RESPONSE_FORBIDDEN      = 3
+RESPONSE_BADVERSION     = 4
+RESPONSE_SERVERERROR    = 5
+RESPONSE_TOOBIG         = 6
+
 class ResponseBlock:
-    def __init__(self, exitval, output):
-        self.exitval = exitval
-        self.output  = output
+    def __init__(self, code, value=0, output=None):
+        self.code     = code
+        self.value    = value
+        self.output   = output
         return
 
 #
 # This class implements the client side of the XMLRPC interface to Emulab.
 # We do not try to do any serious argument processing here, but just pass
-# it all through to the server. This may not be ideal, but I do not want to
-# do argument processing and checking in multiple places! This whole approach
-# will need another look at some point, but the goal right now is to get
-# something that looks like an RPC interface running quickly.
+# it all through to the server.
+#
+# This is intended to serve as a demonstration of how to use the RPC
+# interface, and to provide a test harness (via sshxmlrpc_client.py)
+# for the server. 
 #
 class emulabclient:
     #
@@ -76,7 +88,7 @@ class emulabclient:
         # Dict that is passed along.
         #
         argdict = {};
-        opt_args, req_args = getopt.getopt(arglist, "iE:g:e:p:S:L:a:l:fw")
+        opt_args, req_args = getopt.getopt(arglist, "iE:g:S:L:a:l:fw")
         for opt, val in opt_args:
             if opt in ("-i"):
                 argdict["batchmode"] = 0
@@ -86,12 +98,6 @@ class emulabclient:
                 pass
             elif opt in ("-g"):
                 argdict["gid"] = val
-                pass
-            elif opt in ("-e"):
-                argdict["eid"] = val
-                pass
-            elif opt in ("-p"):
-                argdict["pid"] = val
                 pass
             elif opt in ("-S"):
                 argdict["swapable"]      = 0
@@ -115,8 +121,20 @@ class emulabclient:
                 pass
             pass
 
-        if len(req_args) == 1:
-            nsfilename = req_args[0]
+        #
+        # Next two args must be pid and eid. This differs from the batchexp
+        # command line interface, but is consistent with swapexp and endexp.
+        #
+        if len(req_args) < 2 or len(req_args) > 3:
+            print "batchexp: Must provide pid, eid, and optional NS file!"
+            return -1
+        
+        argdict["pid"] = req_args[0]
+        argdict["eid"] = req_args[1]
+
+        # Optional NS file. 
+        if len(req_args) == 3:
+            nsfilename = req_args[2]
             nsfilestr  = readnsfile(nsfilename, self.debug)
 
             # Watch for error reading NS file.
@@ -135,7 +153,13 @@ class emulabclient:
             print response["output"]
             pass
 
-        return response["exitval"]
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
 
     #
     # startexp is an alias for batchexp.
@@ -205,7 +229,13 @@ class emulabclient:
             print response["output"]
             pass
 
-        return response["exitval"]
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
 
     #
     # endexp.
@@ -243,7 +273,13 @@ class emulabclient:
             print response["output"]
             pass
 
-        return response["exitval"]
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
 
     #
     # nscheck. Syntax check an NS file. The wrinkle is that like above, we
@@ -276,11 +312,16 @@ class emulabclient:
             print response["output"]
             pass
 
-        return response["exitval"]
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
 
     #
-    # nscheck. Syntax check an NS file. The wrinkle is that like above, we
-    # need to pakcage up the NS file and pass it inline.
+    # create_image. Create a disk image from a node.
     #
     def create_image(self, *args):
         # The args are read-only, but I want a mutable version.
@@ -315,7 +356,77 @@ class emulabclient:
             print response["output"]
             pass
 
-        return response["exitval"]
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
+
+    #
+    # delay_config. Alter link characteristics. 
+    #
+    def delay_config(self, *args):
+        # The args are read-only, but I want a mutable version.
+        arglist = [a for a in args];
+
+	if len(arglist) == 0:
+            print "create_image: Must provide some arguments!"
+	    return -1
+
+        #
+        # Parse args. We do not try to do any checking, but rather just
+        # convert them to functional arguments and place them into the
+        # Dict that is passed along.
+        #
+        argdict = {};
+        opt_args, req_args = getopt.getopt(arglist, "ms:")
+        for opt, val in opt_args:
+            if opt in ("-m"):
+                argdict["modify_exp"] = 1
+                pass
+            if opt in ("-s"):
+                argdict["srcvnode"] = val
+                pass
+            pass
+
+        if len(req_args) < 4:
+            print "delay_config: Must provide pid, eid, link, param=value ...!"
+	    return -1
+
+        argdict["pid"]  = req_args.pop(0)
+        argdict["eid"]  = req_args.pop(0)
+        argdict["link"] = req_args.pop(0)
+
+        #
+        # The params are supplied as a separate dictionary. It is up to the
+        # server to reject ones it does not like. 
+        #
+        params = {}
+        for param in req_args:
+            plist = string.split(param, "=")
+            if len(plist) != 2:
+                print "delay_config: Parameters are of the form: param=value!"
+                return -1
+
+            params[plist[0]] = plist[1]
+            pass
+        argdict["params"] = params
+            
+        response = self.server.delay_config(self.VERSION, argdict)
+
+        if len(response["output"]):
+            print response["output"]
+            pass
+
+        if response["code"] != RESPONSE_SUCCESS:
+            if response["value"]:
+                return response["value"]
+            else:
+                return response["code"]
+            pass
+        return RESPONSE_SUCCESS
 
     pass
 

@@ -30,6 +30,8 @@ class SSHTransport:
             pass
 
 	self.user, self.realhost = urllib.splituser(host)
+
+        print self.user + " " + self.realhost + " " + handler
         
         # SSH to the host and call python on the handler.
         self.myChild = popen2.Popen3("ssh -x -l " + self.user + " "
