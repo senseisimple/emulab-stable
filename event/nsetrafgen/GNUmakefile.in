@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,8 +9,8 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/nsetrafgen
 INSTALL_SUPDIR	= /usr/testbed/sup/sup/FBSD45-STD/root
-INSTALL_FILES	= $(SRCDIR)/nseinput.tcl $(SRCDIR)/startnse
-INSTALL_NSE     = $(SRCDIR)/nse
+INSTALL_FILES	= nseinput.tcl $(SRCDIR)/startnse
+INSTALL_NSE     = nse
 
 include $(OBJDIR)/Makeconf
 
@@ -18,7 +18,7 @@ all: msg
 
 msg:
 	@echo ""
-	@echo -n "WARNING! You must first do a \"make buildnse\""
+	@echo -n "WARNING! You must first do a \"make buildnse\" "
 	@echo "if nse is not built"
 	@echo "WARNING! It takes about 15 minutes for buildnse"
 	@echo ""
@@ -30,19 +30,21 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # the testbed as well as ns configure script, we need to resort
 # to this kind of hack
 buildnse:
-	ln -s $(SRCDIR)/tbevent.h .
-	ln -s $(SRCDIR)/tbevent.cc .
-	ln -s $(SRCDIR)/tbnexthop.h .
-	ln -s $(SRCDIR)/tbnexthop.cc .
-	ln -s $(SRCDIR)/ip_fw.h .
-	ln -s $(SRCDIR)/../../lib/libtb/log.h .
-	ln -s $(SRCDIR)/../../lib/libtb/tbdefs.h .
-	ln -s $(SRCDIR)/../lib/event.h .
+	ln -sf $(SRCDIR)/tbevent.h .
+	ln -sf $(SRCDIR)/tbevent.cc .
+	ln -sf $(SRCDIR)/tbnexthop.h .
+	ln -sf $(SRCDIR)/tbnexthop.cc .
+	ln -sf $(SRCDIR)/ip_fw.h .
+	ln -sf $(SRCDIR)/../../lib/libtb/log.h .
+	ln -sf $(SRCDIR)/../../lib/libtb/tbdefs.h .
+	ln -sf $(SRCDIR)/../lib/event.h .
 	$(SRCDIR)/nse-install $(SRCDIR)/nse.patch
 
 sup-install:
-	cp -p $(INSTALL_FILES) $(INSTALL_SUPDIR)$(CLIENT_BINDIR)
-	cp -p $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
+	-mkdir -p $(INSTALL_SUPDIR)/$(CLIENT_BINDIR)/
+	-cp $(INSTALL_FILES) $(INSTALL_SUPDIR)/$(CLIENT_BINDIR)
+	-mkdir -p $(INSTALL_SUPDIR)/usr/local/bin/
+	-cp $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
 
 client-install:
 	cp -p $(INSTALL_FILES) $(DESTDIR)$(CLIENT_BINDIR)

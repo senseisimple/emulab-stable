@@ -602,9 +602,11 @@ handle_simevent(event_handle_t handle, sched_event_t *eventp)
 
 	/*
 	 * All we know about is the "SWAPOUT" and "HALT" event!
+	 * Also NSESWAP event
 	 */
 	if (strcmp(evtype, TBDB_EVENTTYPE_HALT) &&
-	    strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT)) {
+	    strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT) &&
+	    strcmp(evtype, TBDB_EVENTTYPE_NSESWAP)) {
 		error("cannot handle SIMULATOR event %s.\n", evtype);
 		return 0;
 	}

@@ -65,6 +65,12 @@ Agent instproc init {} {
     $self set generator "TG"
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
+    var_import ::GLOBALS::simulated
+    if { $simulated == 1 } {
+	$self set simulated 1
+    } else {
+	$self set simulated 0
+    }
 }
 Agent instproc set_node {node} {
     $self set node $node
@@ -108,6 +114,7 @@ Agent instproc updatedb {DB} {
     $self instvar generator
     $self instvar port
     $self instvar link
+    $self instvar simulated
 
     if {$node == {}} {
 	perror "\[updatedb] $self is not attached to a node."
@@ -140,10 +147,12 @@ Agent instproc updatedb {DB} {
 	set target_vname $destination
     }
 
-    # Update the DB
-    spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list $node $application $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator ]
+    if { $simulated == 0 } {
+	# Update the DB
+	spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list $node $application $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator ]
 
-    spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(TRAFGEN)]
+	spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(TRAFGEN)]
+    }
 }
 
 # get_nseconfig is only defined for subclasses that will be simulated by NSE
@@ -220,6 +229,7 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     $self instvar generator
     $self instvar port
     $self instvar link
+    $self instvar simulated
 
     if {$node == {}} {
 	perror "\[updatedb] $self is not attached to a node."
@@ -247,13 +257,15 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     set vname $self
     set target_vname $destination
 
-    # Update the DB
-    spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list  $node $vname $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator]
-    
-    spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $node $vname $objtypes(TRAFGEN) ]
+    if { $simulated == 0 } {
+	# Update the DB
+	spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list  $node $vname $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator]
 
-    if {$application != {}} {
-	spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(TRAFGEN) ]
+	spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $node $vname $objtypes(NSE) ]
+
+	if {$application != {}} {
+	    spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(NSE) ]
+	}
     }
 }
 
@@ -341,6 +353,12 @@ Application instproc init {} {
     $self set role {}
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
+    var_import ::GLOBALS::simulated
+    if { $simulated == 1 } {
+	$self set simulated 1
+    } else {
+	$self set simulated 0
+    }
 }
 Application instproc attach-agent {agent} {
     $self set agent $agent

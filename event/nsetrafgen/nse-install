@@ -17,3 +17,5 @@ fi
 cd ns-allinone-2.26
 ./install
 cp ns-2.26/nse ..
+cd ..
+strip nse

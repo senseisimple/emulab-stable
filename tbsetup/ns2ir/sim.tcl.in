@@ -307,7 +307,7 @@ Simulator instproc run {} {
  	append nsecfg_script "\$$simu use-scheduler RealTime\n\n"
  	append nsecfg_script $nseconfig
 
-	$self spitxml_data "nseconfigs" [list "vname" "nseconfig" ] [list $self $nsecfg_script ]
+	$self spitxml_data "nseconfigs" [list "vname" "nseconfig" ] [list fullsim $nsecfg_script ]
     }
     
     # Update the DB
@@ -503,8 +503,8 @@ Simulator instproc at {time eventstring} {
 	    # case when the above string has syntax errors. Maybe
 	    # just have a way reporting errors back to the
 	    # the user from the NSE that finds the syntax errors
-	    set otype TRAFGEN
-	    set etype MODIFY
+	    set otype NSE
+	    set etype NSEEVENT
 	    set args "\$$obj $cmd [lrange $event 2 end]"
 	    set vnode [$obj get_node]
 	    set vname $obj
@@ -981,12 +981,12 @@ proc spitxml_data {tag fields values} {
 }
 
 proc xmlencode {args} {
-    regsub -all "&" [eval concat $args] "\\&amp;" args
-    regsub -all "<" $args "\\&lt;" args
-    regsub -all ">" $args "\\&gt;" args
-    regsub -all "\"" $args "\\&\#34;" args
-    regsub -all "]" $args "\\&\#93;" args
-    regsub -all "'" $args "\\&\#39;" args
+    set retval [eval append retval $args]
+    regsub -all "&" $retval "\\&amp;" retval
+    regsub -all "<" $retval "\\&lt;" retval
+    regsub -all ">" $retval "\\&gt;" retval
+    regsub -all "\"" $retval "\\&\#34;" retval
+    regsub -all "]" $retval "\\&\#93;" retval
     
-    return $args
+    return $retval
 }

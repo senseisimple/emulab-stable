@@ -20,7 +20,7 @@ use Exporter;
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
-	 tmcctimeout libsetup_getvnodeid dotrafficconfig
+	 tmcctimeout libsetup_getvnodeid dotrafficconfig dosimulatorconfig
 	 ixpsetup dokeyhash donodeid libsetup_refresh
 
 	 MFS REMOTE JAILED PLAB LOCALROOTFS IXP
@@ -44,7 +44,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 13; };
+sub TMCD_VERSION()	{ 14; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -93,6 +93,16 @@ my $inplab;
 # is all done from outside.
 #
 my $inixp;
+
+#
+# The role of this pnode
+#
+my $role   = "";
+
+#
+# Flag is true if simulator (NSE) based traffic generation is present
+#
+my $simtrafgen = 0;
 
 #
 # Inside, there might be a tmcc proxy socket. 
@@ -237,6 +247,7 @@ sub TMTARBALLS()	{ CONFDIR() . "/rc.tarballs";}
 sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
 sub TMGATEDCONFIG()     { CONFDIR() . "/gated.conf";}
 sub TMTRAFFICCONFIG()	{ CONFDIR() . "/rc.traffic";}
+sub TMSIMULATORCONFIG()	{ CONFDIR() . "/rc.simulator";}
 sub TMTUNNELCONFIG()	{ CONFDIR() . "/rc.tunnel";}
 sub TMVTUNDCONFIG()	{ CONFDIR() . "/vtund.conf";}
 sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
@@ -310,6 +321,11 @@ sub PLAB()	{ if ($inplab) { return $vnodeid; } else { return 0; } }
 # Are we on an IXP
 #
 sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
+
+#
+# Are we hosting a simulator
+#
+sub SIMHOST()   { if ($role eq "simhost") { return 1; } else { return 0; } }
 
 #
 # Do not try this on the MFS since it has such a wimpy perl installation.
@@ -784,7 +800,6 @@ sub doifconfig (;$)
 	    warn("*** WARNING: ".
 		 "Cannot open file $BOOTDIR/tmcc.ifconfig: $!\n");
 	}
-	# More NSE goop below. 
     }
 
     my $ethpat  = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
@@ -794,6 +809,7 @@ sub doifconfig (;$)
     $vethpat   .= q(VMAC=(\w*) PMAC=(\w*));
 
     foreach my $iface (@tmccresults) {
+	my $ifacebak = $iface;
 	if ($iface =~ /$ethpat/) {
 	    my $inet     = $2;
 	    my $mask     = $3;
@@ -829,6 +845,12 @@ sub doifconfig (;$)
 
 		if (IXP()) {
 		    next;
+		}
+		if (SIMHOST()) {
+		    my $rtabpat = q(RTABID=(\d*));
+		    if ($ifacebak =~ /$rtabpat/) {
+			$rtabid = $1;
+		    }
 		}
 
 		my ($upline, $downline) =
@@ -866,6 +888,12 @@ sub doifconfig (;$)
 		    push(@xifslist, $iface);
 		}
 		next;
+	    }
+	    if (SIMHOST()) {
+		my $rtabpat = q(RTABID=(\d*));
+		if ($ifacebak =~ /$rtabpat/) {
+		    $rtabid = $1;
+		}
 	    }
 
 	    if ($pmac eq "none" ||
@@ -1818,10 +1846,6 @@ sub dotrafficconfig()
 {
     my $didopen = 0;
     my $pat;
-    my @tmccresults;
-    my $boss;
-    my $startnse = 0;
-    my $nseconfig = "";
     
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
@@ -1831,25 +1855,6 @@ sub dotrafficconfig()
 	return 1;
     }
 
-    if (tmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 || !@tmccresults) {
-	warn("*** WARNING: Could not get bossinfo from server!\n");
-	return -1;
-    }
-    ($boss) = split(" ", $tmccresults[0]);
-
-    #
-    # XXX hack: workaround for tmcc cmd failure inside TCL
-    #     storing the output of a few tmcc commands in
-    #     $BOOTDIR files for use by NSE
-    #
-    if (!REMOTE() && !JAILED()) {
-	if (!open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo")) {
-	    warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.bossinfo: $!\n");
-	    return -1;
-	}
-	print BOSSINFCFG "$tmccresults[0]";
-	close(BOSSINFCFG);
-    }
     my ($pid, $eid, $vname) = check_nickname();
 
     # We connect to the local elvind and talk to the master via the proxy.
@@ -1863,9 +1868,8 @@ sub dotrafficconfig()
     #     storing the output of a few tmcc commands in
     #     $BOOTDIR files for use by NSE
     #
-    # Also nse stuff is mixed up with traffic config right
-    # now because of having FullTcp based traffic generation.
-    # Needs to move to a different place
+    # If NSE traffic generation is present, flag it so that it can
+    # be dealt later
     if (!REMOTE() && !JAILED()) {
 	open(TRAFCFG, ">$BOOTDIR/tmcc.trafgens") or
 	    die "Cannot open file $BOOTDIR/tmcc.trafgens: $!";    
@@ -1908,14 +1912,8 @@ sub dotrafficconfig()
 
 	    # Skip if not specified as a TG generator. At some point
 	    # work in Shashi's NSE work.
-	    if ($generator ne "TG") {
-		$startnse = 1;
-		if (! $didopen) {
-		    open(RC, ">" . TMTRAFFICCONFIG)
-			or die("Could not open " . TMTRAFFICCONFIG . ": $!");
-		    print RC "#!/bin/sh\n";
-		    $didopen = 1;
-		}
+	    if ($generator eq "NSE") {
+		$simtrafgen = 1;
 		next;
 	    }
 
@@ -1945,55 +1943,76 @@ sub dotrafficconfig()
 	close(TRAFCFG);
     }
 
-    if( $startnse ) {
-	print RC "$BINDIR/startnse &\n";
-    }
-
-    #
-    # XXX hack: workaround for tmcc cmd failure inside TCL
-    #     storing the output of a few tmcc commands in
-    #     $BOOTDIR files for use by NSE
-    #
-    if (!REMOTE() && !JAILED()) {
-	my @nseconfigs = ();
-
-	if (tmcc(TMCCCMD_NSECONFIGS, undef, \@nseconfigs) < 0) {
-	    warn("*** WARNING: Could not get nseconfigs from server!\n");
-	}
-	if (open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs")) {
-	    foreach my $nseconfig (@nseconfigs) {
-		print NSECFG $nseconfig;
-	    }
-	    close(NSECFG);
-	}
-	else {
-	    warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.nseconfigs: $!");
-	}
-    }
-	    
-    # XXX hack: need a separate section for starting up NSE when we
-    #           support simulated nodes
-    if( ! $startnse ) {
-	
-	if( $nseconfig ) {
-
-	    # start NSE if 'tmcc nseconfigs' is not empty
-	    if ( ! $didopen ) {
-		open(RC, ">" . TMTRAFFICCONFIG)
-		    or die("Could not open " . TMTRAFFICCONFIG . ": $!");
-		print RC "#!/bin/sh\n";
-		$didopen = 1;	
-	    }
-	    print RC "$BINDIR/startnse &\n";
-	}
-    }
-    
     if ($didopen) {
 	printf RC "%s %s\n", TMCC(), TMCCCMD_READY();
 	close(RC);
 	chmod(0755, TMTRAFFICCONFIG);
     }
     return 0;
+}
+
+sub dosimulatorconfig()
+{
+    my @tmccresults;
+    my $boss;
+
+    if (REMOTE() || JAILED()) {
+	return -1;
+    }
+    
+    # XXX hack: workaround for tmcc cmd failure inside TCL
+    #     storing the output of a few tmcc commands in
+    #     $BOOTDIR files for use by NSE
+    #
+    if (tmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 || !@tmccresults) {
+	warn("*** WARNING: Could not get bossinfo from server!\n");
+	return -1;
+    }
+    ($boss) = split(" ", $tmccresults[0]);
+
+    if (!open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo")) {
+	warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.bossinfo: $!\n");
+	return -1;
+    }
+    print BOSSINFCFG "$tmccresults[0]";
+    close(BOSSINFCFG);
+
+    my @nseconfigs = ();
+
+    if (tmcc(TMCCCMD_NSECONFIGS, undef, \@nseconfigs) < 0) {
+	warn("*** WARNING: Could not get nseconfigs from server!\n");
+    }
+    if (open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs")) {
+	foreach my $nseconfig (@nseconfigs) {
+	    print NSECFG $nseconfig;
+	}
+	close(NSECFG);
+    }
+    else {
+	warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.nseconfigs: $!");
+    }
+    
+    my @routelist = ();
+
+    if (tmcc(TMCCCMD_ROUTELIST, undef, \@routelist) < 0) {
+	warn("*** WARNING: Could not get routelist from server!\n");
+    }
+    if (open(ROUTELIST, ">$BOOTDIR/tmcc.routelist")) {
+	foreach my $route (@routelist) {
+	    print ROUTELIST $route;
+	}
+	close(ROUTELIST);
+    }
+    else {
+	warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.routelist: $!");
+    }
+
+    open(RC, ">" . TMSIMULATORCONFIG)
+	or die("Could not open " . TMSIMULATORCONFIG . ": $!");
+    print RC "#!/bin/sh\n";
+    print RC "$BINDIR/startnse &\n";
+    close RC;
+    chmod(0755, TMSIMULATORCONFIG);
 }
 
 sub dotunnels(;$)
@@ -2379,6 +2398,35 @@ sub doplabconfig()
 }
 
 #
+# Get the role of the node
+# 
+sub dorole()
+{
+    my @tmccresults;
+
+    if (tmcc(TMCCCMD_ROLE, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get role from server!\n");
+	return -1;
+    }
+    return 0
+	if (! @tmccresults);
+    
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /([\w]*)/) {
+	# Storing the value into the global variable
+	$role = $1;
+    }
+    else {
+	warn "*** WARNING: Bad role line: $tmccresults[0]";
+	return -1;
+    }
+    
+    return 0;
+}
+
+#
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
 #
@@ -2454,6 +2502,15 @@ sub bootsetup()
     print STDOUT "Checking Testbed group/user configuration ... \n";
     doaccounts();
 
+    #
+    # Get the role of this node from tmcc which can be one of
+    # "node", "virthost", "delaynode" or "simhost".
+    # Mainly useful for simulation (nse) stuff
+    # Hopefully, this will come out of the tmcc cache and will not
+    # be expensive
+    #
+    dorole();
+    
     if (! MFS()) {
 	donodeid();
 	
@@ -2499,6 +2556,14 @@ sub bootsetup()
 	#
 	print STDOUT "Checking Testbed traffic generation configuration ...\n";
 	dotrafficconfig();
+
+	#
+	# Simulator (NSE) configuration
+	#
+	if ( $simtrafgen || SIMHOST() ) {
+	    print STDOUT "Setting up the simulator (nse) to run ...\n";
+	    dosimulatorconfig();
+	}
 
 	#
 	# RPMS

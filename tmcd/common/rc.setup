@@ -121,6 +121,11 @@ if [ -x $BOOTDIR/rc.traffic  ]; then
 	$BOOTDIR/rc.traffic
 fi
 
+if [ -x $BOOTDIR/rc.simulator  ]; then
+        echo "Starting Network Simulation ..."
+	$BOOTDIR/rc.simulator
+fi
+
 echo "Informing the testbed that we're up and running ..."
 $BINDIR/tmcc state ISUP
 

@@ -1,0 +1,291 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+    
+#
+# Parse an nse specification Since the parser runs arbitrary NS file for the user,
+# this cannot be safely done on boss without jumping through huge hoops
+# to secure tcl and the DB. Yuck! So, instead of running the parser on boss,
+# we run it over on ops. This first version operates like this:
+#
+# NB: This script is setuid.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: parse-nse [options] pid eid\n".
+        "Where options and arguments are those required by parse.tcl\n";
+ 
+    exit(-1);
+}
+my $optlist  = "nqp";
+my $passmode = 0;
+my $impotent = 0;
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+my $TESTMODE = @TESTMODE@;
+
+# Locals
+my $infile   = "nse.parse.input";
+my $outfile  = "nse.parse.output";
+my $SAVEUID  = $UID;
+my $dbuid;
+my $pid;
+my $eid;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if ($TESTMODE) {
+    # In testmode, drop privs (my devel tree at home is TESTMODE=1)
+    $EUID = $UID;
+}
+elsif ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"p"})) {
+    $passmode = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+
+$pid   = $ARGV[0];
+$eid   = $ARGV[1];
+   
+if (defined($pid)) {
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in argument: $pid.");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Bad data in argument: $eid.");
+    }
+}
+
+# Remove temps cause of swapin by alternates.
+unlink($infile);
+unlink($outfile);
+
+if (!$TESTMODE) {
+    #
+    # Get DB uid for sending over to ops. In testmode, it runs locally
+    # as the user running the testsuite, obviously.
+    #
+    if (! UNIX2DBUID($UID, \$dbuid)) {
+	die("*** $0:\n".
+	    "    You do not exist in the Emulab Database!\n");
+    }
+
+    # Run as the user for most of this script.
+    $EUID = $UID;
+}
+
+
+
+# Create the defs files.
+GenDefsFile($infile);
+
+my $query_result =
+    DBQueryFatal("select nseconfig from nseconfigs ".
+		 "where pid='$pid' and eid='$eid' and vname='fullsim'");
+while (my ($nseconfig) = $query_result->fetchrow_array()) {
+    open( NSECFG, ">>$infile" ) 
+	or die("Could not write NSE configuration to a file!\n");
+    # print a filler string
+    print NSECFG "###### begin nsfile ######\n";
+    print NSECFG "$nseconfig\n";
+    print NSECFG "###### end nsfile ######\n";
+    close(NSECFG);
+}
+
+#
+# Touch the output file, to avoid a root owned, 644 file. 
+#
+if (-e $outfile) {
+    unlink($outfile) or
+	die("*** $0:\n".
+	    "    Could not unlink $outfile\n");
+}
+system("touch $outfile") == 0 or
+    die("*** $0:\n".
+	"    Could not create $outfile\n");
+
+#
+# Build up a new command line to run the parser on ops, writing the
+# result back to a file if not in anonmode. Remember to tack on the
+# user ID to flip to, when not in testmode.
+#
+my $cmdargs = "$TB/libexec/nseparse/nse.parse.proxy ";
+$cmdargs .= " -u $dbuid"
+    if (defined($dbuid));
+$cmdargs .= " -n"
+    if (defined($options{"n"}));
+$cmdargs .= " -q"
+    if (defined($options{"q"}));
+$cmdargs .= " -p"
+    if ($passmode);
+$cmdargs .= " $pid $eid";
+
+#
+# Run parser, redirecting stdout to a file to capture the parser results.
+# Must flip to real root to run ssh.
+#
+if ($TESTMODE) {
+    #
+    # In testmode, no ssh. Just run locally.
+    #
+    system("$cmdargs < $infile >> $outfile");
+}
+else {
+    #
+    # In non-testmode, must flip to real root for the ssh, and then flip
+    # back afterwards.
+    # 
+    $EUID = $UID = 0;
+    system("sshtb -host $CONTROL $cmdargs < $infile >> $outfile");
+    $EUID = $UID = $SAVEUID;
+}
+
+# 
+# Error output went to stderr, so the caller captures that. 
+# 
+if ($?) {
+    my $exit_status = $? >> 8;
+    
+    die("Parser exited with error code $exit_status!\n");
+}
+exit(0)
+    if ($impotent);
+
+#
+# Run the XML converter on the output with -s option
+# to indicate that these are the results of parsing
+# the nse specifications
+#
+system("$TB/libexec/xmlconvert -s -x $outfile $pid $eid");
+
+if ($?) {
+    my $exit_status = $? >> 8;
+    
+    die("XML converter exited with error code $exit_status!\n");
+}
+
+exit(0);
+
+
+#
+# Open up a TCL file and write a bunch of TCL to it!
+#
+sub GenDefsFile($)
+{
+    my($fname) = $_[0];
+
+    open(TCL, "> $fname")
+	or die("Could not open TCL defs file for writing: $!\n");
+
+    print TCL "###### begin tcl defs ######\n";
+    print TCL "namespace eval GLOBALS {\n\n";
+
+    print TCL "# Event Object Types\n";
+    my $query_result =
+	DBQueryFatal("select idx,type from event_objecttypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+	print TCL "set objtypes($type) $idx\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Event Event Types\n";
+    $query_result =
+	DBQueryFatal("select idx,type from event_eventtypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+	print TCL "set eventtypes($type) $idx\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Virtual to Physical Mapping\n";
+    # Note that pnode here is the vname in the reserved table instead of the
+    # actual pnode (pc*). Thats coz the tmcc nseconfigs command looks up the
+    # reserved table vname to return nseconfigs and we want to store in the
+    # nseconfigs table based on pid,eid,vname where vname matches the vname
+    # in the reserved table
+    $query_result =
+	DBQueryFatal("select distinct v.vname,vn.type,vn.ips,r.vname from v2pmap as v " .
+		     "left join virt_nodes as vn on v.vname=vn.vname " .
+		     "left join reserved as r on r.node_id=v.node_id " .
+		     "where v.pid='$pid' and v.eid='$eid' " .
+		     "and vn.pid='$pid' and vn.eid='$eid'");
+    while (my ($vnode,$vtype,$ipports,$pnode) = $query_result->fetchrow_array()) {
+	print TCL "set v2pmapinfo($vnode) [list $vtype [list $ipports] $pnode]\n";
+    }
+    print TCL "\n\n";
+
+    print TCL "# Virtual Lans\n";
+    $query_result =
+	DBQueryFatal("select vname,member " .
+		     "from virt_lans where pid='$pid' and eid='$eid'");
+
+    while (my ($vname,$member) = $query_result->fetchrow_array()) {
+	print TCL "lappend lanlinks($vname) $member\n";
+    }
+    print TCL "\n";
+    
+    print TCL "}\n";
+    print TCL "###### end tcl defs ######\n";
+    close(TCL);
+}

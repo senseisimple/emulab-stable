@@ -24,10 +24,13 @@ sub usage()
  
     exit(-1);
 }
-my $optlist  = "x:nd";
+my $optlist  = "x:nds";
 my $fromxml  = 0;
 my $impotent = 0;
 my $debug    = 0;
+# Results of parsing nse specifications. Therefore different treatment.
+# In particular, we don't expect updates to the experiments table
+my $simparse = 0;
 
 #
 # Configure variables
@@ -105,6 +108,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"s"})) {
+    $simparse = 1;
+}
 if (defined($options{"x"})) {
     $fromxml = 1;
     $xmlfile = $options{"x"};
@@ -180,21 +186,27 @@ sub readXML($$$) {
 
     fatal($@)
 	if (eval { $parser->parse(*STDIN); return 1; } != 1);
-    
-    #
-    # Verify. 
-    #
-    # Must be exactly one experiments table row, and we prune out lots
-    # of stuff that is not allowed. Note that we never insert a
-    # experiment, but only allow updates of certain values. 
-    #
-    if (scalar(@{$virtual_tables{"experiments"}}) != 1) {
-	fatal("Must be exactly one experiments table row!");
-    }
-    my %experiments_table = %{@{$virtual_tables{"experiments"}}[0]};
-    foreach my $key (keys(%experiments_table)) {
-	delete($experiments_table{$key})
-	    if (!exists($experiment_fields{$key}));
+
+    # If these are the results of parsing the nse specifications,
+    # we don't expect updates to the experiments table
+    my %experiments_table;
+    if ( ! $simparse ) {
+
+	#
+	# Verify. 
+	#
+	# Must be exactly one experiments table row, and we prune out lots
+	# of stuff that is not allowed. Note that we never insert a
+	# experiment, but only allow updates of certain values. 
+	#
+	if (scalar(@{$virtual_tables{"experiments"}}) != 1) {
+	    fatal("Must be exactly one experiments table row!");
+	}
+	%experiments_table = %{@{$virtual_tables{"experiments"}}[0]};
+	foreach my $key (keys(%experiments_table)) {
+	    delete($experiments_table{$key})
+		if (!exists($experiment_fields{$key}));
+	}
     }
 
     #
@@ -218,7 +230,7 @@ sub readXML($$$) {
     # First the experiments table, which gets an update statement, if there
     # is anything to update.
     #
-    if (scalar(keys(%experiments_table))) {
+    if ( (! $simparse) && scalar(keys(%experiments_table))) {
 	my @setlist = ();
 
 	foreach my $key (keys(%experiments_table)) {
@@ -257,10 +269,13 @@ sub readXML($$$) {
 	next
 	    if ($table eq "experiments");
 
-	# Delete always.
-	DBQueryFatal("delete from $table ".
-		     "where eid='$eid' and pid='$pid'")
-	    if (!$impotent);
+	# Delete only during the initial parsing and not
+	# during parsing of nse specifications
+	if ( ! $simparse ) {
+	    DBQueryFatal("delete from $table ".
+			 "where eid='$eid' and pid='$pid'")
+		if (!$impotent);
+	}
 	next
 	    if (!defined($virtual_tables{$table}));
 

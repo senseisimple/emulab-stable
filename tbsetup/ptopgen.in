@@ -17,13 +17,15 @@ sub usage()
 	  "          in the ptopfile (as if they were free)\n" .
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
+	  "       -s Include stuff for topologies with simulated nodes\n".
 	  "       -m Override multiplex_factor\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:r";
+my $optlist = "s:e:m:vp:rS";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
+my $simstuff  = 0;
 
 #
 # Turn off line buffering on output
@@ -92,6 +94,9 @@ if (defined($options{"v"})) {
 if (defined($options{"r"})) {
     $widearea = 1;
 }
+if (defined($options{"S"})) {
+    $simstuff = 1;
+}
 if (defined($options{"p"})) {
     $pid = $options{"p"};
 }
@@ -104,14 +109,15 @@ if (defined($options{"e"})) {
 # Read class/type maps
 my $result =
     DBQueryFatal("select class,type,delay_capacity,".
-		 "   virtnode_capacity,isvirtnode ".
+		 "   virtnode_capacity,isvirtnode,simnode_capacity ".
 		 "from node_types");
 while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt) = $result->fetchrow_array) {
+	$virtcapacity,$isvirt,$simcapacity) = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
     $map->{'DELAYCAP'} = $delaycapacity;
     $map->{'VIRTCAP'}  = $virtcapacity;
+    $map->{'SIMCAP'}   = $simcapacity;
     $map->{'ISVIRT'}   = $isvirt;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
@@ -243,6 +249,7 @@ foreach $node (keys(%nodes)) {
     my $type  = $nodes{$node};
     my $class = $typemap{$type}->{'CLASS'};
     my $delay_capacity = $typemap{$type}->{'DELAYCAP'};
+    my $simnode_capacity = $typemap{$type}->{'SIMCAP'};
     
     my @types = ("$type:1");
     my @features;
@@ -256,16 +263,6 @@ foreach $node (keys(%nodes)) {
 
     if ($delay_capacity > 0) {
 	push @types, "delay:$delay_capacity";
-	    
-	#################################################################
-	### NSE Node hack. Instead of adding sim nodes into the
-	### database schema, I am just adding it here for now
-	### untill we can figure out how to add sim nodes into the
-	### nodes table.  One assumption is that if we the node
-	### type can support delay nodes, then it is a local node
-	### and therefore we can support sim nodes
-	#################################################################
-	push @types, "sim:100000";
     }
 
     #
@@ -305,6 +302,21 @@ foreach $node (keys(%nodes)) {
 	push @types, "*lan:*";
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:400000";
+    }
+
+    if ($simstuff && $simnode_capacity > 0) {
+	#
+	# Use user specified multiplex factor
+	#
+	if (defined($mfactor) && $mfactor <= $simnode_capacity) {
+	    push @types, "sim:$mfactor";
+	}
+	else {
+	    push @types, "sim:$simnode_capacity";
+	}
+	push @types, "*lan:*";
+	# Add trivial bw spec.
+	push @flags, "trivial_bw:100000";
     }
 
     # Add features

@@ -1221,6 +1221,7 @@ else
 		    event/trafgen/GNUmakefile \
 		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
+		    event/nsetrafgen/nseinput.tcl \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
 		    event/stated/waitForState \
@@ -1294,7 +1295,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1298: checking for a BSD compatible install" >&5
+echo "configure:1299: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1396,7 +1397,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
-	tbsetup/ns2ir/sim.tcl tbsetup/db2ns \
+	tbsetup/ns2ir/sim.tcl tbsetup/nseparse/GNUmakefile \
+	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
+	tbsetup/nseparse/nse.parse.tcl tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \

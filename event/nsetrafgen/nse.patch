@@ -1,1926 +1,32 @@
---- dist-ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
-+++ ns-allinone-2.26/install	Thu Jun  5 16:55:16 2003
-@@ -41,301 +41,47 @@
- # Get current path
- CUR_PATH=`pwd`
- 
--# Check if we are using Cygwin, and if so, if it is a bona fide install
--# Cygwin patches contributed by Nicolas Christin <nicolas@cs.virginia.edu>
-+if [ -x /usr/local/tcl8.3.2/bin/tclsh8.3 ] ; then
-+  V_TCLSH=/usr/local/tcl8.3.2/bin/tclsh8.3 
-+  export V_TCLSH
-+  WITHTCL_PATH=/usr/local/tcl8.3.2
-+  export WITHTCL_PATH
- 
--echo "============================================================"
--echo "* Testing for Cygwin environment"
--echo "============================================================"
--
--if [ -x /usr/bin/uname ]; then
--        # it may be a Cygwin install
--        test_cygwin=`uname | tr [a-z] [A-Z] | sed -e 's|.*CYGWIN.*|true|'`;
--        if  [ "${test_cygwin}" = "true" ]; then
--                echo "Cygwin detected";
--                echo "Note: Cygwin install is still considered EXPERIMENTAL";
--                echo "";
--                echo -n "Checking Cygwin version is >=1.3.12... "
--                cmaj=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\1/'`;
--                echo $cmaj | grep -v [0-9] >/dev/null 2>&1
--                if [ "$?" -eq "0" ]; then
--                        cmaj=0;
--                fi;
--                cmin=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\2/'`;
--                echo $cmin | grep -v [0-9] >/dev/null 2>&1
--                if [ "$?" -eq "0" ]; then
--                        cmin=0;
--                fi;
--                cpat=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\3/'`;
--                echo $cpat | grep -v [0-9] >/dev/null 2>&1
--                if [ "$?" -eq "0" ]; then
--                        cpat=0;
--                fi;
--                echo -n "$cmaj.$cmin.$cpat ";
--                if ([ "$cmaj" -gt "1" ]) || ([ "$cmaj" -eq "1" ] && [ $cmin -gt "3" ]) || ([ "$cmaj" -eq 1 ] && [ $cmin -eq "3" ] && [ "$cpat" -ge "12" ]); then
--                        echo "should be ok";
--                else
--                        echo "*** POSSIBLE PROBLEM ***";
--                        echo "";
--                        echo "ns-allinone-${NSVER} has not been tested under versions of Cygwin older than";
--                        echo "1.3.12. Your version ($cmaj.$cmin.$cpat) appears to be older than that. Success of";
--                        echo "the install process is therefore NOT GUARANTEED.";
--                        echo "";
--                        cygversion="failed";                
--		fi;
--                echo -n "Checking filesystems are mounted as UNIX filetype... ";
--                mount | grep "textmode" >/dev/null 2>&1;
--                if [ "$?" -eq "0" ]; then
--                        echo "*** NO! ***";
--                        mount_test="failed";
--                        echo "";
--                        echo "It appears that some of your Cygwin shares are mounted as DOS file";
--                        echo "type. This has not been tested, but is likely to result in failure of";
--                        echo "validation tests. Success of the install process is also NOT";
--                        echo "GUARANTEED.";
--                        echo "";
--                        echo "Refer to the Cygwin user guide for how to install Cygwin with the UNIX";
--                        echo "file text mode.";
--                        echo "";
--                else
--                        echo "yes";
--                        echo -n "Checking default mode is binmode... ";
--                        echo ${CYGWIN} | grep "nobinmode" >/dev/null 2>&1;
--                        if [ "$?" -eq "0" ]; then
--                                cyg_env_var="failed";
--                                echo "*** NO! ***";
--                                echo "";
--                                echo "Your \$CYGWIN environment variable specifies \"nobinmode\". This is";
--                                echo "likely to result in failure of validation tests, and (possibly) of";
--                                echo "the whole install process. You need to have the \$CYGWIN environment";
--                                echo "variable set to \"binmode\". Please refer to the Cygwin user guide for";
--                                echo "details on how to change this.";
--                                echo "";
--                        else 
--                                echo "yes";
--                        fi;
--                fi;                           
--                if [ "$cygversion" = "failed" ] || [ "$cyg_env_var" = "failed" ] || [ "$mount_test" = "failed" ]; then
--                        echo "";
--                        echo "Tests indicate that your installation of Cygwin may not be suitable for";
--                        echo "installing ns-2 allinone.";
--                        echo "";
--                        echo -n "Do you wish to proceed regardless? [y/n] "
--                        read answer;
--                        if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
--                                die "Installation aborted...";
--                        fi;
--                fi;
--                echo "Patching Tcl for Cygwin.";
--                if [ ! -f ./tcl${TCLVER}/generic/tcl.h.orig ]; then
--                        cp ./tcl${TCLVER}/generic/tcl.h ./tcl${TCLVER}/generic/tcl.h.orig;
--                        echo "The original tcl${TCLVER}/generic/tcl.h is backed up as tcl${TCLVER}/generic/tcl.h.orig";
--                        sed -e 's/\#define _TCL/\#define _TCL\`\`\#ifdef __CYGWIN__\`\#define HAVE_TM_ZONE 1\`\#endif \/\* __CYGWIN__ \*\//g' ./tcl${TCLVER}/generic/tcl.h.orig | tr '\`' '\n' > ./tcl${TCLVER}/generic/tcl.h;
--                fi;
--                touch ./tcl${TCLVER}/generic/tclStubInit.c;
--                echo "Patching sgb for Cygwin.";
--                cp ./sgb/Makefile ./sgb/Makefile.orig;
--                echo "The original sgb/Makefile is backed up as sgb/Makefile.orig";
--                sed -e 's|rm \(.*\)test_io test_graph test_flip test_sample\(.*\)|rm -f \1test_io.exe test_graph.exe test_flip.exe test_sample.exe\2|' ./sgb/Makefile.orig > ./sgb/Makefile;
--                echo "Setting executable format to .exe...";
--                EXE=".exe";
--        else
--                echo "Cygwin not detected, proceeding with regular install.";
--                EXE=;
--        fi;
--else
--        echo "Cygwin not detected, proceeding with regular install.";
--fi;
--
--
--
--# Compile and install xgraph
--
--echo "============================================================"
--echo "* Build XGraph-$XGRAPHVER"
--echo "============================================================"
--
--cd ./xgraph-$XGRAPHVER
--./configure --prefix=../
--if  [ "${test_cygwin}" = "true" ]; then
--       touch stamp-h;
--fi;
--if make
--then
--	echo "xgraph has been installed successfully. "
--else 
--	echo "Can not create xgraph; But xgraph is an optional package, continuing..."
--fi
--
--cd ../
--
--# Compile and install cweb and sgblib
--
--echo "============================================================"
--echo "* Build CWeb"
--echo "============================================================"
--
--cd ./cweb
--
--if [ ! -f ./Makefile ]
--then
--	echo "ns-allinone unable to install cweb for you. Please install it manually. cweb is used by sgb to create sgblibrary needed by scenario-generator. But this will not affect the use of ns as such, so continue.."
--else
--	echo "Making cweb"
--	touch *.c
--	make all || warn "cweb failed to make, but it's optional"
--	# xxx: other stuff will fail...
--	chmod 755 cweave${EXE}
--	chmod 755 ctangle${EXE}
--	cd ..
--	#echo "cd .."
--	if [ ! -d bin ]
--	then
--		mkdir bin
--	fi
--	cd bin
--	ln -s $CUR_PATH/cweb/cweave${EXE} cweave${EXE}
--	ln -s $CUR_PATH/cweb/ctangle${EXE} ctangle${EXE}
--fi
--
--cd ..
--PATH=$CUR_PATH/bin:$PATH
--export PATH
--
--echo "============================================================"
--echo "* Build Stanford GraphBase"
--echo "============================================================"
--
--cd ./sgb
--if [ ! -f ./Makefile ]
--	then
--	echo "Unable to create sgb library. This library is used by gt-itm and so for scenario generators. If you already have sgblib (possible if you are on solaris,sunos or freebsd platforms) you may still be able to run gt-itm. so continuing.."
--else
--	echo "Making sgb"
--	if make tests
--	then
--                if [ -f libgb.a ] ; then
--                        rm -f ../gt-itm/lib/libgb.a
--			cp libgb.a ../gt-itm/lib/libgb.a
--                else 
--		        echo "* Weird: sgb said it has been built but we can't find libgb.a! "
--			exit -1
--                fi
--	else
--	        echo "Unable to create sgb library, but it's optional, so continuing..."
--	fi
--fi
--
--cd ..
--
--# Compile and install gt-itm & sgb2ns
--
--echo "============================================================"
--echo "* Build GT-ITM"
--echo "============================================================"
--
--if [ -f ./gt-itm/lib/libgb.a ]
--then
-- if [ ! -f ./gt-itm/src/Makefile ] 
--    then
--    echo "ns-alline is unable to install gt-itm sgb2ns for you, please install"
--    echo "them manually. You can't run scenario generator without gt-itm"
--    echo "and sgb2ns. But it will not affect you use ns, so continue ..."
-- else
--    cd ./gt-itm/src
--    if make
--    then
--      echo "gt-itm has been installed successfully."
--    fi
--    
--    cd ../sgb2ns
--    if make
--    then
--      echo "sgb2ns has been installed successfully."
--    fi
--   cd ../../
-- fi
--else
--    echo "sgb lib not found. gt-itm & sgb2ns could not be installed. Continuing.."
--fi
--
--# Build zlib
--
--echo "============================================================"
--echo "* Build zlib"
--echo "============================================================"
--
--cd ./zlib-1.1.4
--
--if ./configure --exec-prefix=../ --prefix=../
--then
--	if make
--	then
--		echo "Zlib has been installed successfully."
--	else
--		warn "Zlib make failed, but it's optional Continue ..."
--	fi
--else
--	warn "Zlib-1.1.4 configuration failed, but it's optional, so continuing ..."
--fi
--
--cd ../
--
--# Build Tcl8.3.5
--
--echo "============================================================"
--echo "* Build tcl$TCLVER"
--echo "============================================================"
--
--cd ./tcl$TCLVER/unix
--if [ -f Makefile ] ; then 
--	make distclean
--fi
--
--blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
--to see if they have a fix for your platform.'
--./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
--if make 
--then 
--	echo "tcl$TCLVER make succeeded."
--	make install || die "tcl$TCLVER installation failed."
--	echo "tcl$TCLVER installation succeeded."
--	cp ../generic/*.h ../../include
- else
--	echo "tcl$TCLVER make failed! Exiting ..."
--	echo "For problems with Tcl/Tk see http://www.scriptics.com"
--	exit
--fi
- 
--cd ../../
-+  # Build Tcl8.3.5
-+
-+  echo "============================================================"
-+  echo "* Build tcl$TCLVER"
-+  echo "============================================================"
-+
-+  cd ./tcl$TCLVER/unix
-+  if [ -f Makefile ] ; then 
-+	  make distclean
-+  fi
-+
-+  blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
-+  to see if they have a fix for your platform.'
-+  ./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
-+  if make 
-+  then 
-+  	  echo "tcl$TCLVER make succeeded."
-+	  make install || die "tcl$TCLVER installation failed."
-+	  echo "tcl$TCLVER installation succeeded."
-+	  cp ../generic/*.h ../../include
-+  else
-+	  echo "tcl$TCLVER make failed! Exiting ..."
-+	  echo "For problems with Tcl/Tk see http://www.scriptics.com"
-+	  exit
-+  fi
- 
--# compile and install tk
-+  cd ../../
- 
--echo "============================================================"
--echo "* Build Tk$TKVER"
--echo "============================================================"
-+  WITHTCL_PATH=$CUR_PATH/tcl$TCLVER
-+  export WITHTCL_PATH
- 
--cd ./tk$TKVER/unix
--if [ -f Makefile ] ; then
--	make distclean
- fi
- 
--blame='Tk is not part of the ns project.  Please see www.Scriptics.com
--to see if they have a fix for your platform.'
--./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tk8.3.2 configuration failed! Exiting ..."
--if make 
--then
--	echo "tk$TKVER build succeeded."
--	make install || die "tk$TKVER installation failed."
--	echo "tk$TKVER installation succeeded."
--else
--	echo "tk$TKVER make failed! Exiting ..."
--	echo "For problems with Tcl/Tk see http://www.scriptics.com"
--	exit
--fi
--
--cd ../../
--
- #
- # Since our configures search for tclsh in $PATH, the following 
- # is needed. This is necessary for otcl/tclcl/ns/nam
-@@ -345,28 +91,40 @@
- LD_LIBRARY_PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$LD_LIBRARY_PATH
- export LD_LIBRARY_PATH
- 
--# Build otcl
-+if [ -d /usr/local/otcl-1.0a8 ] ; then
- 
--echo "============================================================"
--echo "* Build OTcl-$OTCLVER"
--echo "============================================================"
-+  WITHOTCL_PATH=/usr/local/otcl-1.0a8
-+  export WITHOTCL_PATH
- 
--cd ./otcl-$OTCLVER
-+else
- 
--blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
--for common problems and bug fixes.'
--./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
-+  # Build otcl
- 
--if make 
--then
--	echo "otcl-$OTCLVER has been installed successfully."
--else
--	echo "otcl-$OTCLVER make failed! Exiting ..."
--	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
--	exit
--fi
-+  echo "============================================================"
-+  echo "* Build OTcl-$OTCLVER"
-+  echo "============================================================"
-+
-+  cd ./otcl-$OTCLVER
-+
-+  blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
-+  for common problems and bug fixes.'
-+  ./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
- 
--cd ..
-+  if make 
-+  then
-+  	  echo "otcl-$OTCLVER has been installed successfully."
-+  else
-+	  echo "otcl-$OTCLVER make failed! Exiting ..."
-+	  echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
-+	  exit
-+  fi
-+
-+  cd ..
-+
-+  WITHOTCL_PATH=`pwd`/otcl-$OTCLVER
-+  export WITHOTCL_PATH
-+
-+fi
- 
- # Build tclcl
- 
-@@ -376,7 +134,7 @@
- 
- cd ./tclcl-$TCLCLVER
- 
--./configure || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
-+./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
- 
- if make
- then
-@@ -397,40 +155,20 @@
- echo "============================================================"
- 
- cd ./ns-$NSVER
--./configure || die "Ns configuration failed! Exiting ..."
-+./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "Ns configuration failed! Exiting ..."
- 
--if make
-+if make nse
- then
--	echo " Ns has been installed successfully." 
-+	echo " Nse has been installed successfully." 
- else
--	echo "Ns make failed!"
-+	echo "Nse make failed!"
- 	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
- 	exit
- fi
- 
- cd ../
- 
--# Build nam
--
--echo "============================================================"
--echo "* Build nam-$NAMVER"
--echo "============================================================"
--
--cd ./nam-$NAMVER
--
--./configure --with-tclcl=$CUR_PATH/tclcl-$TCLCLVER  || die "Nam configuration failed! Exiting ..."
--
--if make
--then 
--    echo "Nam has been installed successfully."
--else
--    echo "Nam make failed! Continue ..."
--    echo "See http://www.isi.edu/nsnam/ns-problems.html for problems"
--fi
--
--cd ../
--
--# Install nam, ns, xgraph into bin
-+# Install nse into bin
- 
- if [ ! -d bin ] ; then
-     mkdir bin
-@@ -438,55 +176,14 @@
- 
- cd bin
- 
--ln -s $CUR_PATH/ns-$NSVER/ns${EXE} ns${EXE}
--
--if test -x $CUR_PATH/nam-$NAMVER/nam${EXE}
--then
--    ln -s $CUR_PATH/nam-$NAMVER/nam${EXE} nam${EXE}
--else
--    echo "Please compile your nam separately."
--fi
--
--if test -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE}
--then
--    ln -s $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE} xgraph${EXE}
--else
--    echo "Please compile your xgraph separately."
--fi
--
--if test -x $CUR_PATH/gt-itm/bin/sgb2ns${EXE}
--then 
--    ln -s $CUR_PATH/gt-itm/bin/sgb2ns${EXE} sgb2ns${EXE}
--    ln -s $CUR_PATH/gt-itm/bin/sgb2hierns${EXE} sgb2hierns${EXE}
--    ln -s $CUR_PATH/gt-itm/bin/sgb2comns${EXE} sgb2comns${EXE}
--    ln -s $CUR_PATH/gt-itm/bin/itm${EXE} itm${EXE}
--    ln -s $CUR_PATH/gt-itm/bin/sgb2alt${EXE} sgb2alt${EXE}
--    ln -s $CUR_PATH/gt-itm/bin/edriver${EXE} edriver${EXE}
--else
--    echo "Please compile your gt-itm & sgb2ns separately."
--fi
-+ln -s $CUR_PATH/ns-$NSVER/nse nse
- 
- echo "Ns-allinone package has been installed successfully."
- echo "Here are the installation places:"
- echo "tcl$TCLVER:	$CUR_PATH/{bin,include,lib}"
--echo "tk$TKVER:		$CUR_PATH/{bin,include,lib}"
- echo "otcl:		$CUR_PATH/otcl-$OTCLVER"
- echo "tclcl:		$CUR_PATH/tclcl-$TCLCLVER"
--echo "ns:		$CUR_PATH/ns-$NSVER/ns"
--
--if [ -x $CUR_PATH/nam-$NAMVER/nam ]
--then
--echo "nam:	$CUR_PATH/nam-$NAMVER/nam"
--fi
--
--if [ -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph ]
--then
--echo "xgraph:	$CUR_PATH/xgraph-$XGRAPHVER"
--fi
--if [ -x $CUR_PATH/gt-itm/bin/sgb2ns ] 
--then
--echo "gt-itm:   $CUR_PATH/itm, edriver, sgb2alt, sgb2ns, sgb2comns, sgb2hierns"
--fi
-+echo "nse:		$CUR_PATH/ns-$NSVER/nse"
- 
- echo ""
- echo "----------------------------------------------------------------------------------"
---- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Jun  5 17:10:45 2003
-@@ -79,6 +79,14 @@
- 
- CFLAGS	= $(CCOPT) $(DEFINE)
- 
-+#### with event system
-+INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD -DGETTIME_TSC
-+LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
-+LIB += `elvin-config --libs vin4c`
-+STATIC += -static
-+####
-+
- # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
- # Also, gcc does not remove the .o before forking 'as', which can be a
- # problem if you don't own the file but can write to the directory.
-@@ -276,6 +284,7 @@
- 	mcast/lms-sender.o \
- 	@V_STLOBJ@
- 
-+OBJ_CC += ../../tbevent.o
- 
- # don't allow comments to follow continuation lines
- 
-@@ -303,6 +312,10 @@
- 	emulate/nat.o  \
- 	emulate/iptap.o \
- 	emulate/tcptap.o
-+
-+##### nse with event system
-+OBJ_EMULATE_CC += ../../tbnexthop.o
-+####
- 
- OBJ_EMULATE_C = \
- 	emulate/inet.o
---- dist-ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
-+++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Thu Jun  5 17:12:02 2003
-@@ -77,7 +77,7 @@
- {
-         if (running_) {
- 	        /* call the TCP advance method */
--		agent_->sendmsg(agent_->size());
-+		agent_->sendmsg(1); // send 1 byte packets instead of 1460
- 		/* reschedule the timer */
- 		double t = next();
- 		timer_.resched(t);
---- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Fri Jun  6 18:19:59 2003
-@@ -46,12 +46,42 @@
- #include "config.h"
- #include "scheduler.h"
- #include "packet.h"
-+#ifdef USEEVENTS
-+#include "tbevent.h"
-+#endif
- 
- 
- #ifdef MEMDEBUG_SIMULATIONS
- #include "mem-trace.h"
+--- dist-ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
++++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Nov 28 16:55:25 2003
+@@ -941,6 +941,8 @@
+ 		case PT_GAF:
+ 		case PT_PING:
+ 			break;
++		case PT_LIVE:
++			break;
+ 		default:
+ 			fprintf(stderr, "%s - invalid packet type (%s).\n",
+ 				__PRETTY_FUNCTION__, packet_info.name(ch->ptype()));
+--- dist-ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
++++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Nov 28 16:55:25 2003
+@@ -47,11 +47,13 @@
+ #define GCC_THROW
  #endif
- 
-+#ifdef MEASURE_EVENT_RATE
-+
-+unsigned long long event_dispatch_counter;
-+unsigned int events_per_sec_arr[70];
-+
-+#endif
-+
-+#ifdef GETTIME_TSC
-+
-+#define read_tsc()      \
-+    ({ \
-+        unsigned long low, high; \
-+        asm volatile( \
-+        ".byte 0x0f; .byte 0x31" \
-+        : "=d" (high), "=a" (low)); \
-+        ((unsigned long long)high << 32) | low; \
-+    })
-+
-+#define TSC_FREQ     851.94
-+#define TSC_COUNT_PERSEC (TSC_FREQ * 1000000)
-+
-+#endif
-+
-+#ifdef SCHED_DEBUG
-+static Tcl_HashTable newevents;
-+#endif
-+
- Scheduler* Scheduler::instance_;
- scheduler_uid_t Scheduler::uid_ = 1;
- 
-@@ -62,6 +92,9 @@
- 
- Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
- {
-+#ifdef SCHED_DEBUG
-+	  Tcl_InitHashTable( &newevents, TCL_ONE_WORD_KEYS );
-+#endif
- }
- 
- Scheduler::~Scheduler(){
-@@ -112,6 +145,17 @@
- 
- 	e->time_ = t;
- 	insert(e);
-+#ifdef SCHED_DEBUG
-+	int newentry = 0 ;
-+	Tcl_HashEntry *he = Tcl_CreateHashEntry( &newevents,
-+						 (char *)((unsigned int)e->uid_),
-+						 &newentry );
-+	if( newentry == 0 ) {
-+	  fprintf(stderr, "e->uid_ = %d already present. error\n", (unsigned int)e->uid_);
-+	} else {
-+	  Tcl_SetHashValue( he, (char *)h );
-+	}
-+#endif
- }
- 
- void
-@@ -579,7 +623,7 @@
- 	}
- } class_calendar_sched;
- 
--CalendarScheduler::CalendarScheduler() : cal_clock_(clock_) {
-+CalendarScheduler::CalendarScheduler() : cal_clock_(clock_), cached_head_(0) {
- 	reinit(4, 1.0, cal_clock_);
- }
- 
-@@ -598,6 +642,7 @@
- 		// may happen in RT scheduler
- 		cal_clock_ = e->time_;
- 		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
-+		cached_head_ = e;
- 	} else
- 		i = CALENDAR_HASH(e->time_);
- 
-@@ -703,6 +748,10 @@
- 	if (qsize_ == 0)
- 		return NULL;
- 
-+	if (cached_head_) {
-+	  return cached_head_;	  
-+	}
-+
- 	int l, i = lastbucket_;
- 	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
- 	double diff;
-@@ -755,7 +804,7 @@
- 	 */
- 	lastbucket_ = l;
-  	cal_clock_  = e->time_;
--	
-+	cached_head_ = e;
- 	return e;
- }
- 
-@@ -797,6 +846,8 @@
- 		resize(nbuckets_ >> 1, cal_clock_);
- 	}
- 
-+	cached_head_ = 0;
-+
- 	return e;
- }
- 
-@@ -926,6 +977,9 @@
- 
- 	--qsize_;
- 
-+	if ( e == cached_head_ )
-+	  cached_head_ = 0;
-+
- 	return;
- }
- 
-@@ -956,11 +1010,23 @@
- 	virtual void run();
- 	double start() const { return start_; }
- 	virtual void reset();
-+#ifdef USEEVENTS
-+	int command(int argc, const char*const* argv);
-+#endif
- protected:
- 	void sync() { clock_ = tod(); }
-+	virtual void dispatch(Event*, double);	// exec event, set clock_
- 	double tod();
- 	double slop_;	// allowed drift between real-time and virt time
- 	double start_;	// starting time
-+#ifdef USEEVENTS
-+        TbEventSink *evsink_;
-+#endif
-+#ifdef GETTIME_TSC
-+        unsigned long long basetsc_ ;
-+        double  oneontscfreq_;
-+        double  tscfreq_;
-+#endif
- };
- 
- static class RealTimeSchedulerClass : public TclClass {
-@@ -974,16 +1040,85 @@
- RealTimeScheduler::RealTimeScheduler() : start_(0.0)
- {
- 	bind("maxslop_", &slop_);
-+#ifdef USEEVENTS
-+        evsink_ = 0 ;
-+#endif
-+#ifdef GETTIME_TSC
-+        basetsc_ = 0 ;
-+	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
-+	tscfreq_ = TSC_COUNT_PERSEC;
-+#endif
-+}
-+
-+#ifdef USEEVENTS
-+  
-+int RealTimeScheduler::command(int argc, const char*const* argv)
-+{
-+  Tcl& tcl = Tcl::instance();
-+  if (instance_ == 0)
-+    instance_ = this;
-+  
-+  
-+  if( argc == 3 ) {
-+    if(strcmp(argv[1], "tbevent-sink") == 0) {
-+      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
-+      return(TCL_OK);
-+    } else if (strcmp(argv[1], "cpuspeed") == 0) {
-+      double ret;
-+      if( (ret = atof(argv[2])) != 0 ) {
-+	tscfreq_ = ret;
-+	oneontscfreq_ = 1.0 / tscfreq_;
-+      }
-+      return(TCL_OK);
-+    }
-+  }
-+
-+  return(Scheduler::command(argc, argv));
-+}  
-+
-+#endif
-+
-+/*
-+ * dispatch a single simulator event by setting the system
-+ * virtul clock to the event's timestamp and calling its handler.
-+ * Note that the event may have side effects of placing other items
-+ * in the scheduling queue
-+ */
-+
-+void
-+RealTimeScheduler::dispatch(Event* p, double t)
-+{
-+
-+#ifdef SCHED_DEBUG
-+	Tcl_HashEntry *he = Tcl_FindHashEntry(&newevents, (char *)((unsigned int)p->uid_));
-+	if( he ) {
-+	  Tcl_DeleteHashEntry(he);
-+	} else {
-+	  fprintf(stderr, "error. couldnt find event with uid = %d\n", (unsigned int)p->uid_);
-+	}
-+#endif
-+	clock_ = t;
-+	p->uid_ = -p->uid_;	// being dispatched
-+	p->handler_->handle(p);	// dispatch
-+#ifdef MEASURE_EVENT_RATE
-+	event_dispatch_counter++;
-+#endif
- }
- 
- double
- RealTimeScheduler::tod()
- {
-+#ifdef GETTIME_TSC
-+                 
-+        unsigned long long curtsc = read_tsc();
-+        return (((double)(curtsc - basetsc_)) * oneontscfreq_);
-+#else
- 	timeval tv;
- 	gettimeofday(&tv, 0);
- 	double s = tv.tv_sec;
- 	s += (1e-6 * tv.tv_usec);
- 	return (s - start_);
-+#endif
- }
- 
- void
-@@ -991,20 +1126,42 @@
- {
- 	clock_ = SCHED_START;
- 	start_ = tod();
-+#ifdef GETTIME_TSC   
-+        basetsc_ = read_tsc();
-+#endif
- }
- 
-+#ifdef SCHED_DEBUG
-+int done = 0;
-+#endif
-+
- void 
- RealTimeScheduler::run()
- { 
- 	static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
-+	static const double delta = 1.0e-4; // should be smaller than above
- 	const Event *p;
-+	bool gethead = true;
-+
-+#ifdef USEEVENTS
-+
-+	if( evsink_ ) {
-+	  evsink_->init();
-+	  evsink_->subscribe();
-+	}
-+
-+#endif
- 
- 	/*XXX*/
- 	instance_ = this;
- 
- 	while (!halted_) {
-+		if( gethead ) {
-+		  p = head();
-+		  gethead = false;
-+		}
- 		clock_ = tod();
--		p = head();
-+
- 		if (p && (clock_ - p->time_) > slop_) {
- 			fprintf(stderr,
- 				"RealTimeScheduler: warning: slop "
-@@ -1014,12 +1171,31 @@
- 		// handle "old events"
- 		while (p && p->time_ <= clock_) {
- 
-+#ifdef DISPATCH_IN_RT
- 			dispatch(deque(), clock_);
-+#else
-+			dispatch(deque(), p->time_);
-+#endif
- 			if (halted_)
- 				return;
- 			p = head();
- 			clock_ = tod();
- 		}
-+
-+#ifdef USEEVENTS
-+		if( evsink_ && evsink_->poll() == 1 ) {
-+		  gethead = true;
-+		  continue;
-+		}
-+#endif
-+
-+#ifdef SCHED_DEBUG
-+		if( clock_ >= 240.0 && done == 0 ) {
-+		  fprintf( stderr, "After 60 secs. Hash Stats for newevents = %s\n",
-+			   Tcl_HashStats(&newevents) );
-+		  done = 1;
-+		}
-+#endif
- 		
- 		if (!p) {
- 			// blocking wait for TCL events
-@@ -1031,12 +1207,14 @@
- 			if (diff > RTSCHEDULER_MINWAIT) {
- 				Tcl_Time to;
- 				to.sec = long(diff);
--				to.usec = long(1e6*(diff - to.sec));
-+				to.usec = long(1e6*((diff - delta) - to.sec)); // wait for delta less
- 				Tcl_WaitForEvent(&to);    // block
- 				clock_ = tod();
- 			}
- 		}
--		Tcl_DoOneEvent(TCL_DONT_WAIT);
-+		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
-+		  gethead = true;
-+		}
- 	}
- 	// we reach here only if halted
- }
---- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Thu Jun  5 18:17:20 2003
-@@ -98,7 +98,7 @@
- protected:
- 	void dumpq();	// for debug: remove + print remaining events
- 	void dispatch(Event*);	// execute an event
--	void dispatch(Event*, double);	// exec event, set clock_
-+	virtual void dispatch(Event*, double);	// exec event, set clock_
- 	Scheduler();
- 	virtual ~Scheduler();
- 	int command(int argc, const char*const* argv);
-@@ -176,6 +176,7 @@
- private:
- 	virtual void insert2(Event*);
- 	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
-+	const Event *cached_head_;
- 
- };
- 
---- dist-ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Thu Jun  5 18:18:08 2003
-@@ -186,6 +186,7 @@
- 	return TCL_OK;
- }
  
 +#if 0
- #ifndef WIN32
- void
- abort()
-@@ -200,6 +201,7 @@
- #endif /*abort*/
- 	/*NOTREACHED*/
+ RANDOM_RETURN_TYPE
+ random() GCC_THROW
+ {
+ 	printf("random() called in ns.\nRandom is not portable, please use Random::uniform() instead.\n");
+ 	abort();
  }
 +#endif
- #endif
  
- }
---- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Thu Jun  5 18:21:36 2003
-@@ -76,3 +76,40 @@
- 	if (status_ == TIMER_HANDLING)
- 		status_ = TIMER_IDLE;
- }
-+
-+#ifdef MEASURE_EVENT_RATE
-+
-+extern unsigned long long event_dispatch_counter;
-+
-+unsigned int idx;
-+
-+#define MAX_EVENT_ARR 70
-+
-+// circular buffer for the data
-+extern unsigned int events_per_sec_arr[MAX_EVENT_ARR];
-+
-+
-+void EventRateTimer::expire(Event *e) {
-+
-+  if ( idx % MAX_EVENT_ARR == MAX_EVENT_ARR-1 ) {
-+
-+    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
-+    event_dispatch_counter = 0;
-+    idx++;
-+    
-+    int i = 0 ;
-+    for( ; i < MAX_EVENT_ARR-1 ; i++ ) {
-+      fprintf(stderr, "%u, ", events_per_sec_arr[i] );
-+    }
-+    fprintf(stderr, "%u\n", events_per_sec_arr[MAX_EVENT_ARR-1] );    
-+  } else {
-+  
-+    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
-+    event_dispatch_counter = 0;
-+    idx++;
-+  }
-+  resched(1.0);    
-+    
-+}
-+
-+#endif
---- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Thu Jun  5 18:22:38 2003
-@@ -88,4 +88,15 @@
- // mode:c++
- // End:
- 
-+#ifdef MEASURE_EVENT_RATE
-+
-+class EventRateTimer : public TimerHandler {
-+
-+public:
-+  virtual void expire(Event *e) ;
-+
-+};
-+
-+#endif
-+
- #endif /* timer_handler_h */
---- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Jun  6 19:08:41 2003
-@@ -37,21 +37,82 @@
- #endif
- 
- #include "iptap.h"
-+#include <sys/time.h>
-+#include <netinet/in.h>
-+
-+#ifdef USEROUTES
-+#include "tbnexthop.h"
-+
-+static IPTapAgent *iface_to_iptap[IFNAMSIZ+1];
-+static Tcl_HashTable ip_to_iptap;
-+
-+// used for storing pairs for which we have created
-+// ipfw rules
-+struct SrcDestAddr {
-+  struct in_addr src;
-+  struct in_addr dst;
-+};
-+
-+#endif
-+
-+#ifdef MEASURE_EVENT_RATE
-+#include "timer-handler.h"
-+
-+EventRateTimer ert;
-+unsigned int firstpacket;
-+#endif
-+
-+#ifdef USEROUTES
-+#ifdef __cplusplus
-+extern "C" {
-+#endif
-+#include        "tbdefs.h"
-+#include        "log.h"
-+
-+#ifdef __cplusplus
-+}
-+#endif
-+#endif
- 
- 
- static class IPTapAgentClass : public TclClass {
-  public:
--	IPTapAgentClass() : TclClass("Agent/IPTap") {}
-+	IPTapAgentClass() : TclClass("Agent/IPTap") {
-+#ifdef USEROUTES
-+	  Tcl_InitHashTable( &ip_to_iptap, TCL_ONE_WORD_KEYS );
-+#endif
-+	}
- 	TclObject* create(int, const char*const*) {
-+#ifdef MEASURE_EVENT_RATE
-+	  // schedule the event rate 
-+	  if ( firstpacket == 0 ) {
-+	    ert.sched(1.0);
-+	    firstpacket++;
-+	  }
-+#endif
- 		return (new IPTapAgent());
- 	}
- } class_iptap_agent;
- 
- 
- IPTapAgent::IPTapAgent() 
-+#ifdef MEASURE_DELAYS  
-+                        :  firstpkt_in_burst(false),
-+			   max_delay(0.0), bpf_ts_to_iptap_max_delay(0.0),
-+			   bpf_ts_to_iptap_min_delay(100.0), data_idx(0)
-+#endif
- {
-   int i = 0;
-   index = 0;
-+#ifdef MEASURE_DELAYS
-+  memset( bpf_ts_to_iptap, 0, sizeof(bpf_ts_to_iptap));
-+#endif
-+#ifdef USEROUTES
-+  iface_index = 0;
-+  inet_aton( "255.255.255.0", &ipmask ); // default mask
-+  Tcl_InitHashTable( &rttable, TCL_ONE_WORD_KEYS );
-+  Tcl_InitHashTable( &ipfwruleexists, sizeof(SrcDestAddr) );
-+#endif
-   for (; i < MAX_PACKETS ; i++) {
-     ident[i] = -1;
-     offset[i] = -1;
-@@ -141,6 +202,52 @@
-   
-   /* TCP header info from the grabbed packet. */
-   unsigned char tcphlen;
-+
-+#ifdef MEASURE_DELAYS
-+
-+  double delay ;
-+  // This code keeps some delay data and drops the packet 
-+  if( firstpkt_in_burst ) {
-+    ts_firstpkt_in_burst = ts.tv_sec + ts.tv_usec * 1e-6 ;
-+    firstpkt_in_burst = false;
-+    delay = 0.0;
-+  } else {
-+    delay = double(ts.tv_sec + ts.tv_usec * 1e-6) - ts_firstpkt_in_burst;
-+    timeval tv;
-+    gettimeofday(&tv, 0);
-+    double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
-+    max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
-+  }
-+
-+
-+#endif
-+
-+  
-+#if 0
-+  timeval tv;
-+  gettimeofday(&tv, 0);
-+  double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
-+  max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
-+  bpf_ts_to_iptap[data_idx] = nowts - (ts.tv_sec + ts.tv_usec * 1e-6);
-+  bpf_ts_to_iptap_max_delay = MAX(bpf_ts_to_iptap[data_idx],
-+			      bpf_ts_to_iptap_max_delay);
-+  bpf_ts_to_iptap_min_delay = MIN(bpf_ts_to_iptap[data_idx],
-+			      bpf_ts_to_iptap_min_delay);
-+  data_idx = (data_idx+1) %
-+    (sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]));
-+
-+  Packet::free(p);
-+  return;
-+  
-+#endif
-+
-+#if 0 //MEASURE_EVENT_RATE
-+  // schedule the event rate 
-+  if ( firstpacket == 0 ) {
-+    ert.sched(1.0);
-+    firstpacket++;
-+  }
-+#endif
-   
-   /* 
-      At this point, all I have to do is to grab the ttl value 
-@@ -180,15 +287,116 @@
-   hdr_ip *ih = HDR_IP(p);
-   ih->ttl() = ttl;
- 
-+#ifdef USEROUTES
-+  /* code to look up the interface index
-+     over which we should spit out the
-+     packet. with this interface index, we
-+     find the iptap which is attached on
-+     the corresponding simulated node from
-+     where the packet will be spit out.
-+     This ensures that the packet traverses
-+     the simulated network and is spit out
-+     into the real world from the right place
-+  */
-+  //dst.s_addr = (u_int32_t)ntohl(ipheader->ip_dst.s_addr);
-+  IPTapAgent *dst_agent = 0;
-+
-+  // Try looking up a route for the host
-+  Tcl_HashEntry *localhe = Tcl_FindHashEntry( &rttable,
-+					      (char *)(ipheader->ip_dst.s_addr) );
-+
-+  // If that doesn't work, try a net route anding with the mask
-+  if( localhe == 0 ) {
-+    localhe = Tcl_FindHashEntry( &rttable,
-+				 (char *)(ipheader->ip_dst.s_addr & ipmask.s_addr) );
-+  }
-+
-+  RouteEntry *entry = 0;
-+  if( localhe != 0 && (entry = (RouteEntry *)Tcl_GetHashValue(localhe)) != 0 ) {
-+    
-+    dst_agent = iface_to_iptap[entry->nexthop_iface];
-+
-+    /* Some destinations, we don't need ipfw rules coz the destinations
-+       are directly connected */
-+    if( entry->ipfwruleneeded ) {
-+      
-+      /* Now we consult our hashtable based on source addresses and if an entry
-+	 exists, it means that we had previously inserted the rule */
-+      int newentry = 0;
-+      SrcDestAddr pair = {ipheader->ip_src,entry->dst};
-+      Tcl_HashEntry *ruleexists = Tcl_CreateHashEntry( &ipfwruleexists,
-+						       (char *)(&pair),
-+						       &newentry );
-+      
-+      if( newentry ) {      
-+	int rulenum = ipfw_addfwd( entry->nexthop, ipheader->ip_src,
-+				   entry->dst, ipmask, true );
-+	Tcl_SetHashValue( ruleexists, (char *)rulenum );
-+      } // else we don't need to do anything
-+    }
-+						     
-+  } else {
-+
-+    /* Routes were not installed for this dest. This means that the
-+       destination is directly connected. In that case, just look it
-+       up from the physical node's routing table and cache it in our
-+       rttable */
-+
-+    int nexthop_iface;
-+    if( (nexthop_iface = get_nexthop_if(ipheader->ip_dst)) != 0 ) {
-+
-+      dst_agent = iface_to_iptap[nexthop_iface];
-+      
-+      int newentry = 0;
-+      localhe = Tcl_CreateHashEntry( &rttable,
-+				     (char *)(ipheader->ip_dst.s_addr),
-+				     &newentry );
-+      
-+      RouteEntry *entry = 0;
-+      if( newentry ) {
-+	entry = new RouteEntry;
-+	Tcl_SetHashValue( localhe, (char *)entry);
-+      } else {
-+	entry = (RouteEntry *)Tcl_GetHashValue(localhe);
-+      }
-+      entry->dst = ipheader->ip_dst;
-+      entry->nexthop = ipheader->ip_dst;
-+      entry->nexthop_iface = nexthop_iface;
-+      entry->ipfwruleneeded = false;
-+    }
-+    
-+  }
-+
-+  if( dst_agent ) {
-+    ih->daddr() = dst_agent->addr();
-+    ih->dport() = dst_agent->port();
-+    goto injectsim;
-+  } 
-+
-+#if 0
-+ /* if we fail to map a dest iptap object, we drop the packet */
-+  fprintf( stderr, "dropping packet with dest ipaddr:%s at %f\n",
-+	   inet_ntoa(ipheader->ip_dst), Scheduler::instance().clock() );
-+#endif
-+  drop(p);
-+  return;
-+  
-+ injectsim:  
-+#endif
-+
-+#ifdef MEASURE_DELAYS
-+  Scheduler::instance().schedule( target_, p, max_delay );
-+#else 
-   // inject into simulator
-   target_->recv(p);
-+#endif
-   return;
- }
- 
- /*
-  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-  * 
-- * recvpkt then calls the network (net_) to receive as many packets
-+ * recvpkt then calls the network (net_incoming_) to receive as many packets
-  * as there are from the packet capture facility.
-  * For every packet received through the callback, it populates the ns packet
-  * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +405,17 @@
- void
- IPTapAgent::recvpkt()
- {
--  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
-+  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
- 	    name());
-     return;
-   }
-   
--  int cc = net_->recv(pkt_handler, this);
-+#ifdef MEASURE_DELAYS
-+  firstpkt_in_burst = true;
-+#endif
-+  int cc = net_incoming_->recv(pkt_handler, this);
-   if (cc <= 0) {
-     if (cc < 0) {
-       perror("recv");
-@@ -219,13 +430,100 @@
- }
- 
- 
-+#ifdef USEROUTES
-+  
-+int
-+IPTapAgent::command(int argc, const char*const* argv)
-+{
-+	Tcl& tcl = Tcl::instance();
-+
-+	if (argc == 2) {
-+#if MEASURE_DELAYS
-+	  if( strcmp(argv[1], "print_delays") == 0 ) {
-+	    printf("object %s : max_delay = %g "
-+		   "bpf_ts_to_iptap_max_delay = %g "
-+		   "bpf_ts_to_iptap_min_delay = %g\n",
-+		   name(), max_delay, bpf_ts_to_iptap_max_delay,
-+		   bpf_ts_to_iptap_min_delay);
-+	    for( int i=0; i<sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]) ; i++ )
-+	      printf("%.10f ", bpf_ts_to_iptap[i]);
-+	    printf("\n");
-+	    return (TCL_OK);
-+	  }
-+#endif
-+	} else if (argc == 3) {
-+		if (strcmp(argv[1], "network-incoming") == 0) {
-+			PcapNetwork *net_in_ = (PcapNetwork *)TclObject::lookup(argv[2]);
-+			if (net_in_ != 0) {
-+			  iface_index = if_nametoindex( net_in_->srcname() ) ;
-+			  if( iface_index > 0 && iface_index <= IFNAMSIZ ) {
-+			    iface_to_iptap[iface_index] = this;
-+			  }
-+			}
-+		} else if( strcmp(argv[1], "ipmask") == 0) {
-+		  struct in_addr tmpmask;
-+		  if( inet_aton( argv[2], &tmpmask ) == 1 ) {
-+		    ipmask = tmpmask;
-+		    return(TCL_OK);
-+		  } else {
-+		    return(TCL_ERROR);
-+		  }
-+		}
-+	} else if (argc == 4) {
-+	  if (strcmp(argv[1], "addroute") == 0 ) {
-+	    struct in_addr dst;
-+	    struct in_addr nexthop;
-+
-+	    if( inet_aton( argv[2], &dst ) == 0 ) {
-+	      fprintf( stderr, "IPTapAgent(%s): Invalid ipaddress %s\n",
-+		       name(), argv[2] );
-+	      return(TCL_ERROR);
-+	    }
-+	    if( inet_aton(argv[3], &nexthop) == 0 ) {
-+	      fprintf( stderr, "IPTapAgent(%s): Invalid ipaddress %s\n",
-+		       name(), argv[3] );
-+	      return(TCL_ERROR);
-+	    }
-+	    // entry exists
-+	    int nexthop_iface;
-+	    if( (nexthop_iface = get_nexthop_if(nexthop)) == 0 ) {
-+	      fprintf( stderr, "IPTapAgent(%s): Route nonexistent for nexthop %s\n",
-+		       argv[3] );
-+	      return(TCL_ERROR);
-+	    }
-+
-+	    // finds an entry if it exists, else creates a new one
-+	    int newentry = 0;
-+	    Tcl_HashEntry *he = Tcl_CreateHashEntry( &rttable,
-+						     (char *)(dst.s_addr),
-+						     &newentry );
-+	    
-+	    RouteEntry *entry = 0;
-+	    if( newentry ) {
-+	      entry = new RouteEntry;
-+	      Tcl_SetHashValue( he, (char *)entry);
-+	    } else {
-+	      entry = (RouteEntry *)Tcl_GetHashValue(he);
-+	    }
-+	    entry->dst = dst;
-+	    entry->nexthop = nexthop;
-+	    entry->nexthop_iface = nexthop_iface;
-+	    entry->ipfwruleneeded = true;
-+	    
-+	    return(TCL_OK);
-+	  }
-+	}
-+	return (TapAgent::command(argc, argv));
-+}
-+
-+#endif
- 
- 
- /*
-  * simulator schedules TapAgent::recv which calls sendpkt
-  *
-  * Grabs a ns packet, converts it into real packet 
-- * and injects onto the network using net_->send
-+ * and injects onto the network using net_outgoing_->send
-  */
- int
- IPTapAgent::sendpkt(Packet* p)
-@@ -236,7 +534,7 @@
-   unsigned short dglen;
-   struct ip *ipheader;
- 
--  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
- 	    name());
-@@ -245,7 +543,7 @@
-   
-   // send packet into the live network
-   hdr_cmn* hc = HDR_CMN(p);
--  if (net_ == NULL) {
-+  if (net_outgoing_ == NULL) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
- 	    name());
-@@ -282,7 +580,7 @@
-   ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
- 						sizeof(struct ip));
- 
--  if (net_->send(p->accessdata(), hc->size()) < 0) {
-+  if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
- 	    name(), p->accessdata(), hc->size(), strerror(errno));
-@@ -290,6 +588,11 @@
-     return (-1);
-     
-   }
-+#if 0
-+  if( hc->size() < 50 ) {
-+    fprintf( stderr, "sent pkt %d\n", hc->size());
-+  }
-+#endif
-   Packet::free(p);
-   TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
- 	  name(), hc->size());
---- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Jun  6 18:30:53 2003
-@@ -46,18 +46,45 @@
- #include "tcp.h"
- #include "ip.h"
- 
-+#ifdef USEROUTES
-+#include <net/if.h>
-+#endif
-+
- #define MAX_PACKETS 640
- 
-+#ifdef USEROUTES
-+
-+struct RouteEntry {
-+  struct in_addr dst;
-+  struct in_addr nexthop;
-+  int nexthop_iface;
-+  bool ipfwruleneeded;
-+};
-+
-+#endif
- 
- class IPTapAgent : public TapAgent {
- 
-  public:
-   IPTapAgent();
-+#ifdef USEROUTES
-+  int command(int, const char*const*);
-+#endif
- 
-  private:
-   int ident[MAX_PACKETS];      /* All three used for duplicate */
-   int offset[MAX_PACKETS];     /* packet detection. */
-   int index;
-+#ifdef USEROUTES
-+  uint16_t iface_index;
-+  struct in_addr ipmask;
-+  Tcl_HashTable rttable;
-+  Tcl_HashTable ipfwruleexists;
-+#endif
-+#ifdef MEASURE_DELAYS
-+  bool firstpkt_in_burst;
-+  double ts_firstpkt_in_burst;
-+#endif  
- 
-   unsigned short in_cksum(unsigned short *,int);
-   void recvpkt();
-@@ -66,6 +93,13 @@
-   void processpkt(Packet *, const struct timeval &);
-   static void pkt_handler(void *, Packet *, const struct timeval &);
- 
-+#ifdef MEASURE_DELAYS  
-+  double max_delay;
-+  double bpf_ts_to_iptap_max_delay;
-+  double bpf_ts_to_iptap_min_delay;
-+  int data_idx;
-+  double bpf_ts_to_iptap[80000];
-+#endif  
- };
- 
- #endif /* iptap_h */
---- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Fri Jun  6 14:16:06 2003
-@@ -69,83 +69,6 @@
- #include "tclcl.h"
- #include "packet.h"
- 
--/*
-- * observations about pcap library
-- *	device name is in the ifreq struct sense, should be doc'd
-- *	pcap_lookupdev returns a ptr to static data
-- *	q: does lookupdev only return devs in the AF_INET addr family?
-- *	why does pcap_compile require a netmask? seems odd
-- *	would like some way to tell it what buffer to use
-- *	arriving packets have the link layer hdr at the beginning, doc
-- *	not convenient/possible to open bpf read/write
-- *	no real way to know what file (/dev/bpf?) it is using
-- *		would be nice if pcap_lookdev helped out more by
-- *		returning ifnet or ifreq or whatever structure
-- *	pcap_lookupnet makes calls to get our addr, but
-- *		then tosses it anyhow, should get us addr and netmask
-- *	interface type codes could be via rfc1573
-- *		see freebsd net/if_types.h
-- *	want a way to set immed mode
-- *	pcap_next masks errors by returning 0 if pcap_dispatch fails
-- *	a pcap_t carries it's own internal buffer, and
-- *		_dispatch gives pointers into it when invoked [eek]
-- *	when you open pcap using a file, pcap_fileno always
-- *		returns -1; not so convenient
-- *	
-- */
--
--#define	PNET_PSTATE_INACTIVE	0
--#define	PNET_PSTATE_ACTIVE	1
--
--//
--// PcapNetwork: a "network" (source or possibly sink of packets)
--//	this is a base class only-- the derived classes are:
--//	PcapLiveNetwork [a live net; currently bpf + ethernet]
--//	PcapFileNetwork [packets from a tcpdump-style trace file]
--//
--
--class PcapNetwork : public Network {
--
--public:
--	PcapNetwork() : t_firstpkt_(0.0),
--		pfd_(-1), pcnt_(0), local_netmask_(0) { }
--	int rchannel() { return(pfd_); }
--	int schannel() { return(pfd_); }
--	virtual int command(int argc, const char*const* argv);
--
--	virtual int open(int mode, const char *) = 0;
--	virtual int skiphdr() = 0;
--	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
--	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
--	int send(u_char *buf, int len);			// write to net
--	int recv(netpkt_handler callback, void *clientdata); // get from net
--	void close();
--	void reset();
--
--	int filter(const char*);	// compile + install a filter
--	int stat_pkts();
--	int stat_pdrops();
--
--	double offset_;			// time offset to 1st pkt in a trace
--	double t_firstpkt_;		// ts of 1st pkt recvd
--
--protected:
--	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
--	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
--	virtual void bindvars() = 0;
--
--	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
--	char srcname_[PATH_MAX];		// device or file name
--	int pfd_;				// pcap fd
--	int pcnt_;				// # pkts counted
--	int state_;				// PNET_PSTATE_xxx (above)
--	int optimize_;				// bpf optimizer enable
--	pcap_t* pcap_;				// reference to pcap state
--	struct bpf_program bpfpgm_;		// generated program
--	struct pcap_stat pcs_;			// status
--
--	unsigned int local_netmask_;	// seems shouldn't be necessary :(
--};
- 
- //
- // PcapLiveNetwork: a live network tap
-@@ -539,6 +462,19 @@
- 				"warning: pcap/live (%s) couldn't set immed\n",
- 				name());
- 			perror("ioctl(BIOCIMMEDIATE)");
-+		}
-+		if (ioctl(pfd_, BIOCFLUSH, 0) < 0) {
-+			fprintf(stderr,
-+				"warning: pcap/live (%s) couldn't flush bpf buffer\n",
-+				name());
-+			perror("ioctl(BIOCFLUSH)");
-+		}
-+		int seesent = 0;
-+		if (ioctl(pfd_, BIOCSSEESENT, &seesent) < 0) {
-+			fprintf(stderr,
-+				"warning: pcap/live (%s) couldn't reset BIOCGSEESENT\n",
-+				name());
-+			perror("ioctl(BIOCGSEESENT)");
- 		}
- 	}
- #endif
---- dist-ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net.h	Fri Jun  6 13:59:46 2003
-@@ -75,4 +75,97 @@
- protected:
- 	int mode_;	// read/write bits (from fcntl.h)
- };
-+
-+#ifdef __cplusplus
-+extern "C" {
-+#include <pcap.h>
-+}
-+#else
-+#include <pcap.h>
-+#endif
-+
-+#include <sys/param.h>
-+
-+/*
-+ * observations about pcap library
-+ *	device name is in the ifreq struct sense, should be doc'd
-+ *	pcap_lookupdev returns a ptr to static data
-+ *	q: does lookupdev only return devs in the AF_INET addr family?
-+ *	why does pcap_compile require a netmask? seems odd
-+ *	would like some way to tell it what buffer to use
-+ *	arriving packets have the link layer hdr at the beginning, doc
-+ *	not convenient/possible to open bpf read/write
-+ *	no real way to know what file (/dev/bpf?) it is using
-+ *		would be nice if pcap_lookdev helped out more by
-+ *		returning ifnet or ifreq or whatever structure
-+ *	pcap_lookupnet makes calls to get our addr, but
-+ *		then tosses it anyhow, should get us addr and netmask
-+ *	interface type codes could be via rfc1573
-+ *		see freebsd net/if_types.h
-+ *	want a way to set immed mode
-+ *	pcap_next masks errors by returning 0 if pcap_dispatch fails
-+ *	a pcap_t carries it's own internal buffer, and
-+ *		_dispatch gives pointers into it when invoked [eek]
-+ *	when you open pcap using a file, pcap_fileno always
-+ *		returns -1; not so convenient
-+ *	
-+ */
-+
-+#define	PNET_PSTATE_INACTIVE	0
-+#define	PNET_PSTATE_ACTIVE	1
-+
-+//
-+// PcapNetwork: a "network" (source or possibly sink of packets)
-+//	this is a base class only-- the derived classes are:
-+//	PcapLiveNetwork [a live net; currently bpf + ethernet]
-+//	PcapFileNetwork [packets from a tcpdump-style trace file]
-+//
-+
-+class PcapNetwork : public Network {
-+
-+public:
-+	PcapNetwork() : t_firstpkt_(0.0),
-+		pfd_(-1), pcnt_(0), local_netmask_(0) { }
-+	int rchannel() { return(pfd_); }
-+	int schannel() { return(pfd_); }
-+	virtual int command(int argc, const char*const* argv);
-+
-+	virtual int open(int mode, const char *) = 0;
-+	virtual int skiphdr() = 0;
-+	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
-+	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
-+	int send(u_char *buf, int len);			// write to net
-+	int recv(netpkt_handler callback, void *clientdata); // get from net
-+	void close();
-+	void reset();
-+
-+	int filter(const char*);	// compile + install a filter
-+	int stat_pkts();
-+	int stat_pdrops();
-+
-+	double offset_;			// time offset to 1st pkt in a trace
-+	double t_firstpkt_;		// ts of 1st pkt recvd
-+
-+#ifdef USEROUTES
-+        inline char *srcname() { return(srcname_); }
-+#endif
-+
-+protected:
-+	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
-+	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
-+	virtual void bindvars() = 0;
-+
-+	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
-+	char srcname_[PATH_MAX];		// device or file name
-+	int pfd_;				// pcap fd
-+	int pcnt_;				// # pkts counted
-+	int state_;				// PNET_PSTATE_xxx (above)
-+	int optimize_;				// bpf optimizer enable
-+	pcap_t* pcap_;				// reference to pcap state
-+	struct bpf_program bpfpgm_;		// generated program
-+	struct pcap_stat pcs_;			// status
-+
-+	unsigned int local_netmask_;	// seems shouldn't be necessary :(
-+};
-+
- #endif
---- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Jun  6 16:42:44 2003
-@@ -46,7 +46,7 @@
- 	}
- } class_tap_agent;
- 
--TapAgent::TapAgent() : Agent(PT_LIVE), net_(NULL)
-+TapAgent::TapAgent() : Agent(PT_LIVE), net_outgoing_(NULL), net_incoming_(NULL)
- {
- 	bind("maxpkt_", &maxpkt_);
- }
-@@ -55,11 +55,11 @@
- // link in a network to the agent.  Assumes net_ is non-zero
- //
- int
--TapAgent::linknet()
-+TapAgent::linknet(Network *net)
- {
--	int mode = net_->mode();
--	int rchan = net_->rchannel();
--	int wchan = net_->schannel();
-+	int mode = net->mode();
-+	int rchan = net->rchannel();
-+	int wchan = net->schannel();
- 
- 	unlink();
- 	if (mode == O_RDONLY || mode == O_RDWR) {
-@@ -67,7 +67,7 @@
- 		if (rchan < 0) {
- 			fprintf(stderr,
- 		"TapAgent(%s): network %s not open for reading (mode:%d)\n",
--			    name(), net_->name(), mode);
-+			    name(), net->name(), mode);
- 			return (TCL_ERROR);
- 		}
- 		link(rchan, TCL_READABLE);
-@@ -77,13 +77,13 @@
- 		if (mode == -1) {
- 			fprintf(stderr,
- 			   "TapAgent(%s): Network(%s) not opened properly.\n",
--				name(), net_->name());
-+				name(), net->name());
- 			fprintf(stderr,
- 			   "(choose: readonly, readwrite, or writeonly)\n");
- 		} else {
- 			fprintf(stderr,
- 			    "TapAgent(%s): unknown mode %d in Network(%s)\n",
--				name(), mode, net_->name());
-+				name(), mode, net->name());
- 		}
- 		return (TCL_ERROR);
- 	}
-@@ -93,7 +93,7 @@
- 		if (wchan < 0) {
- 			fprintf(stderr,
- 			"TapAgent(%s): network %s not open for writing\n",
--			    name(), net_->name());
-+			    name(), net->name());
- 			return (TCL_ERROR);
- 		}
- 	}
-@@ -112,10 +112,25 @@
- 		} 
- 	}
- 	if (argc == 3) {
--		if (strcmp(argv[1], "network") == 0) {
--			net_ = (Network *)TclObject::lookup(argv[2]);
--			if (net_ != 0) {
--				return(linknet());
-+		if (strcmp(argv[1], "network-outgoing") == 0) {
-+			net_outgoing_ = (Network *)TclObject::lookup(argv[2]);
-+			/* We don't need to monitor outgoing network (by calling linknet()) coz
-+			   we just send packets to it. In case a particular
-+			   network object does both, the user has to explicitly
-+			   use the command network-incoming to monitor this fd */
-+			if (net_outgoing_ == 0) {
-+				fprintf(stderr,
-+				"TapAgent(%s): unknown network %s\n",
-+				    name(), argv[2]);
-+				return (TCL_ERROR);
-+			}
-+			return(TCL_OK);
-+		}	
-+
-+		if (strcmp(argv[1], "network-incoming") == 0) {
-+			net_incoming_ = (Network *)TclObject::lookup(argv[2]);
-+			if (net_incoming_ != 0) {
-+				return(linknet(net_incoming_));
- 			} else {
- 				fprintf(stderr,
- 				"TapAgent(%s): unknown network %s\n",
-@@ -135,7 +150,7 @@
- TapAgent::recvpkt()
- {
- 
--	if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
-+	if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
- 		fprintf(stderr,
- 		  "TapAgent(%s): recvpkt called while in write-only mode!\n",
- 		  name());
-@@ -155,7 +170,7 @@
- 	// fill up payload
- 	sockaddr addr;	// not really used (yet)
- 	double tstamp;
--	int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
-+	int cc = net_incoming_->recv(p->accessdata(), maxpkt_, addr, tstamp);
- 	if (cc <= 0) {
- 		if (cc < 0) {
- 			perror("recv");
-@@ -230,7 +245,7 @@
- int
- TapAgent::sendpkt(Packet* p)
- {
--	if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+	if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
- 		fprintf(stderr,
- 		    "TapAgent(%s): sendpkt called while in read-only mode!\n",
- 		    name());
-@@ -239,14 +254,14 @@
- 
- 	// send packet into the live network
- 	hdr_cmn* hc = HDR_CMN(p);
--	if (net_ == NULL) {
-+	if (net_outgoing_ == NULL) {
- 		fprintf(stderr,
- 	         "TapAgent(%s): sendpkt attempted with NULL net\n",
- 		 name());
- 		drop(p);
- 		return (-1);
- 	}
--	if (net_->send(p->accessdata(), hc->size()) < 0) {
-+	if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
- 		fprintf(stderr,
- 		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
- 		    name(), p->accessdata(), hc->size(), strerror(errno));
---- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Jun  6 16:44:51 2003
-@@ -71,8 +71,9 @@
- protected:
- 	int maxpkt_;		/* max size allocated to recv a pkt */
- 	void dispatch(int);	/* invoked via scheduler on I/O event */
--	int linknet();		/* establish I/O handler */
--	Network* net_;		/* live network object */
-+	int linknet(Network *);		/* establish I/O handler */
-+	Network* net_outgoing_;	/* live network object for outgoing packets */
-+	Network* net_incoming_;		/* live network object for incoming packets */
- 	double now() { return Scheduler::instance().clock(); }
- };
- 
---- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Jun  6 19:17:24 2003
-@@ -97,6 +97,11 @@
-       return (TCL_OK);
-     }
- 
-+    if (strcmp(argv[1], "nsport") == 0) {
-+      nsnode.sin_port = atoi(argv[2]);
-+      return (TCL_OK);
-+    }
-+
-     if (strcmp(argv[1], "advertised-window") == 0) {
-       adv_window = atoi(argv[2]);
-       return (TCL_OK);
-@@ -438,7 +443,7 @@
- /*
-  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-  * 
-- * recvpkt then calls the network (net_) to receive as many packets
-+ * recvpkt then calls the network (net_incoming_) to receive as many packets
-  * as there are from the packet capture facility.
-  * For every packet received through the callback, it converts to ns
-  * FullTcp packet and injects it into the simulator by calling target_->recv
-@@ -447,14 +452,14 @@
- void
- TCPTapAgent::recvpkt()
- {
--  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
-+  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-     fprintf(stderr,
- 	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
- 	    name());
-     return;
-   }
-   
--  int cc = net_->recv(pkt_handler, this);
-+  int cc = net_incoming_->recv(pkt_handler, this);
-   if (cc <= 0) {
-     if (cc < 0) {
-       perror("recv");
-@@ -474,7 +479,7 @@
-  * simulator schedules TapAgent::recv which calls sendpkt
-  *
-  * Grabs a ns Full TCP packet, converts it into real TCP packet 
-- * and injects onto the network using net_->send
-+ * and injects onto the network using net_outgoing_->send
-  *
-  */
- int
-@@ -486,7 +491,7 @@
-   int hlength = IP_HEADER_LEN + TCP_HEADER_LEN;
-   struct tcphdr *tcpheader;
- 
--  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
-     fprintf(stderr,
- 	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
- 	    name());
-@@ -495,7 +500,7 @@
-   
-   // send packet into the live network
-   hdr_cmn* ns_cmnhdr = HDR_CMN(p);
--  if (net_ == NULL) {
-+  if (net_outgoing_ == NULL) {
-     fprintf(stderr,
- 	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
- 	    name());
-@@ -543,7 +548,7 @@
-      Limits the packets going out to only IP + TCP header. 
-      ns will act as an ACK machine.
-    */
--  byteswritten = net_->send(packet, hlength + datalen);
-+  byteswritten = net_outgoing_->send(packet, hlength + datalen);
-   if (byteswritten < 0) {
-     fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
- 	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
---- dist-ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
-+++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Jun  6 16:54:24 2003
-@@ -44,6 +44,10 @@
- #include "ip.h"
- #include "connector.h"
- 
-+#ifdef ADD_ETHER_OVERHEAD
-+#include <net/ethernet.h>
-+#endif
-+
- class LinkDelay : public Connector {
-  public:
- 	LinkDelay();
-@@ -52,7 +56,11 @@
- 	void handle(Event* e);
- 	double delay() { return delay_; }
- 	inline double txtime(Packet* p) {
-+#ifndef ADD_ETHER_OVERHEAD
- 		return (8. * hdr_cmn::access(p)->size() / bandwidth_);
-+#else
-+		return (8. * (hdr_cmn::access(p)->size() + ETHER_HDR_LEN) / bandwidth_);
-+#endif
- 	}
- 	double bandwidth() const { return bandwidth_; }
- 	void pktintran(int src, int group);
+ #endif /* !WIN32 */
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Jun  6 17:14:57 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Nov 28 16:55:25 2003
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -2396,7 +502,7 @@
  	}
  //if (int(t_seqno_) > 1)
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Jun  6 17:18:37 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Nov 28 16:55:25 2003
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -2431,7 +537,7 @@
  	}
  	virtual void oldack() {			// what to do on old ack
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp.h	Wed Feb 26 15:11:25 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Jun  6 17:22:30 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Nov 28 16:55:25 2003
 @@ -56,6 +56,8 @@
  	int tcp_flags_;         /* TCP flags for FullTcp */
  	int last_rtt_;		/* more recent RTT measurement in ms, */
@@ -2449,30 +555,2988 @@
  };
  
  /* these are used to mark packets as to why we xmitted them */
---- dist-ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
-+++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Jun  6 17:23:54 2003
-@@ -47,11 +47,13 @@
- #define GCC_THROW
- #endif
- 
-+#if 0
- RANDOM_RETURN_TYPE
- random() GCC_THROW
- {
- 	printf("random() called in ns.\nRandom is not portable, please use Random::uniform() instead.\n");
- 	abort();
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Fri Nov 28 16:55:25 2003
+@@ -162,7 +162,7 @@
+ 	Simulator set AddressFormat_ HIER
+ 	Node enable-module "Hier"
+ 	if [$self multicast?] {
+-		$a set-mcastbits 1
++		$a set-mcastbits 3
+ 	}
+ 	eval $a set-idbits $hlevel $args
  }
+@@ -184,7 +184,7 @@
+ 	# One bit is set aside for mcast as default :: this waste of 1 bit 
+ 	# may be avoided, if mcast option is enabled before the initialization
+ 	# of Simulator.
+-	$a set-mcastbits 1
++	$a set-mcastbits 3
+ 	set lastbit [expr $node - [$a set mcastsize_]]
+ 	$a set-idbits 1 $lastbit
+ }
+@@ -269,9 +269,9 @@
+ 
+ AllocAddrBits instproc set-mcastbits {bit_num} {
+ 	$self instvar size_ mcastsize_
+-	if {$bit_num != 1} {
+-		error "setmcast : mcastbit > 1"
+-	}
++	#if {$bit_num != 1} {
++		#error "setmcast : mcastbit > 1"
++	#}
+ 	set mcastsize_ $bit_num
+ 
+ 	#chk to ensure there;s no change in size
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Fri Nov 28 16:55:25 2003
+@@ -347,6 +347,8 @@
+ Classifier set offset_ 0
+ Classifier set shift_ 0
+ Classifier set mask_ 0xffffffff
++# default IP mask is 255.255.255.0
++Classifier set ipmask_ 0xffffff00
+ Classifier set debug_ false
+ 
+ Classifier/Hash set default_ -1; # none
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Thu Dec  4 17:19:59 2003
+@@ -1,6 +1,6 @@
+ # -*-	Mode:tcl; tcl-indent-level:8; tab-width:8; indent-tabs-mode:t -*-
+ #
+-# Copyright (c) 1996 Regents of the University of California.
++# Copyright (c) 1996, 2003 Regents of the University of California.
+ # All rights reserved.
+ # 
+ # Redistribution and use in source and binary forms, with or without
+@@ -882,6 +882,9 @@
+ 	# Do all nam-related initialization here
+ 	$self init-nam
+ 
++	# XXX netbed specific 
++	#$self add-routes-to-neighbour-ips
++
+ 	# NIXVECTOR xxx?
+ 	# global simstart
+ 	# set simstart [clock seconds]
+@@ -1372,8 +1375,8 @@
+ 	$link_([$n1 id]:[$n2 id]) cost $c
+ }
+ 
+-Simulator instproc attach-agent { node agent } {
+-	$node attach $agent
++Simulator instproc attach-agent { node agent {port ""} } {
++	$node attach $agent $port
+ 	# $agent set nodeid_ [$node id]
+ }
+ 
+@@ -2045,3 +2048,177 @@
+ 	}
+ }
+     
++# XXX netbed changes
++Simulator instproc inet-aton ipaddr {
++    set c [regsub -all \\. $ipaddr " " addrlist]
++    if { $c == 0} { 
++        return [expr $ipaddr]
++    }
++    if { [llength $addrlist] != 4} {
++        error "Ill-formatted ip address $ipaddr, addrlistlth = [llength $addrlist]"
++    }
++    if { $c == 3 } {
++        set r 0
++        foreach a $addrlist {
++            if { $a < 0 || $a > 255 } {
++                error "Ill-formatted ip address $ipaddr, a = $a"
++            }
++            set r [expr ($r << 8) + $a]     
++        }
++        return $r
++    } else {
++        error "Ill-formatted ip address $ipaddr, c = $c"
++    }
++}
++
++# XXX netbed changes
++Simulator instproc inet-ntoa ipaddr {
++    set p1 [expr ($ipaddr >> 24) & 0xff]
++    set p2 [expr ($ipaddr >> 16) & 0xff]
++    set p3 [expr ($ipaddr >>  8) & 0xff]
++    set p4 [expr ($ipaddr >>  0) & 0xff]
++    return [format "%d\.%d\.%d\.%d" $p1 $p2 $p3 $p4]
++}
++
++# XXX netbed changes
++Simulator instproc add-ip { node ip } {
++
++    $self instvar iptonode_
++    $self instvar ipsubnetlist_
++
++    set iptonode_($ip) $node
++    $self cmd add-ip $node $ip
++    
++    set ip_masked [expr [$self inet-aton $ip] & [$self inet-aton "255.255.255.0"]]
++    lappend ipsubnetlist_($ip_masked) $ip
++}
++
++Simulator instproc add-ip-mask-target { ip mask target } {
++    $self instvar iptotarget_
++
++    set ipaton [$self inet-aton $ip]
++    set maskaton [$self inet-aton $mask]
++    set ipmask [$self inet-ntoa [expr $ipaton & $maskaton]]
++    
++    set iptotarget_($ipmask) $target
++}
++
++# XXX netbed changes
++Simulator instproc ip-to-node {ip} {
++    $self instvar iptonode_
++
++    if { [info exists iptonode_($ip)] } {
++	return $iptonode_($ip)
++    } else {
++	    return {}
++    }
++}
++
++# XXX netbed changes
++Simulator instproc ip-to-target {ip} {
++    $self instvar iptotarget_
++
++    if { [info exists iptotarget_($ip)] } {
++	return $iptotarget_($ip)
++    } else {
++	    return {}
++    }
++}
++
++## Should be called only after routing is computed
++## A good place is the run method
++## XXX netbed specific
++Simulator instproc add-routes-to-neighbour-ips {} {
++    $self instvar ipsubnetlist_
++    $self instvar iptotarget_
++    $self instvar link_
++
++    set rtlogic [$self get-routelogic]
++
++    foreach subnet [array names ipsubnetlist_] {
++	set subnet_aton [$self inet-aton $subnet]
++	foreach ip1 $ipsubnetlist_($subnet) {
++	    foreach ip2 $ipsubnetlist_($subnet) {
++		if( $ip1 == $ip2 ) {
++		    continue
++		}
++		set node1 $iptotarget_($ip1)
++		set node2 $iptotarget_($ip2)
++		set rt1id [$rtlogic lookup [$node1 id] [$node2 id]]
++		set rt2id [$rtlogic lookup [$node2 id] [$node1 id]]
++		$node1 add-route $subnet-aton $link_([$node1 id]:$rt1id)
++		$node2 add-route $subnet-aton $link_([$node2 id]:$rt2id)
++	    }
++	}
++    }
++}
++
++# XXX netbed changes
++Simulator instproc rlink { n1 n2ip {bw ""} {delay ""} {qtype ""} args } {
++    $self instvar rlink_ queueMap_ 
++
++    set sid [$n1 id]
++    set did [$self inet-aton $n2ip]
++
++    # If any of the bw/delay/qtype are not passed, it means
++    # that we have a link from a sim node to a real node.
++    # Any shaping will happen via a dummynet node
++    if { $bw == {} || $delay == {} || $qtype == {} } {	    
++	set rlink_($sid:$did) [new Rlink $n1 $n2ip]
++	$self add-ip-mask-target $n2ip 255.255.255.255 [$rlink_($sid:$did) head]
++	return $rlink_($sid:$did)
++    }
++    
++	
++    if { [info exists queueMap_($qtype)] } {
++	set qtype $queueMap_($qtype)
++    }
++    # construct the queue
++    set qtypeOrig $qtype
++    switch -exact $qtype {
++	ErrorModule {
++	    if { [llength $args] > 0 } {
++		set q [eval new $qtype $args]
++	    } else {
++		set q [new $qtype Fid]
++	    }
++	}
++	intserv {
++	    set qtype [lindex $args 0]
++	    set q [new Queue/$qtype]
++	}
++	default {
++	    if { [llength $args] == 0} {
++		set q [new Queue/$qtype]
++	    } else {
++		set q [new Queue/$qtype $args]
++	    }
++	}
++    }	
++    set rlink_($sid:$did) [new Rlink $n1 $n2ip $bw $delay $q]
++    $self add-ip-mask-target $n2ip 255.255.255.255 [$rlink_($sid:$did) head]
++    return $rlink_($sid:$did)
++}
++
++Simulator instproc ip-connect { agent ip port } {
++    set localnode [$self ip-to-node $ip]
++    if { $localnode != {} } {
++	set localagent [$localnode agent $port]
++	if { $localagent != {} } {
++	    $self connect $agent $localagent
++	} else {
++	    
++	}
++    } else {
++	set ipaton [$self inet-aton $ip]
++	$agent set dst_addr_ $ipaton
++	$agent set dst_port_ $port
++
++	$agent instvar node_
++	$node_ instvar nodeiplist_
++	# We just use one of the IP addresses of src node
++	# as the agent's src address
++	set srcipaton [$self inet-aton [lindex $nodeiplist_ 0]]
++	$agent set agent_addr_ $srcipaton
++    }
++}
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Tue Dec  2 00:57:03 2003
+@@ -1,5 +1,5 @@
+ #
+-# Copyright (c) 1996 Regents of the University of California.
++# Copyright (c) 1996, 2003 Regents of the University of California.
+ # All rights reserved.
+ # 
+ # Redistribution and use in source and binary forms, with or without
+@@ -63,6 +63,14 @@
+ 	return $head_
+ }
+ 
++# XXX netbed specific
++# Want to have the same method for both
++# node and link
++Link instproc entry {} {
++    $self instvar head_
++    return $head_
++}
++
+ Link instproc add-to-head { connector } {
+ 	$self instvar head_
+ 	$connector target [$head_ target]
+@@ -164,6 +172,123 @@
+ 	$self instvar link_
+ 	$em target [$link_ target]
+ 	$link_ target $em
++}
++
++# XXX netbed specific
++Link instproc set-ip {ip} {
++    $self instvar srcipaddr_ fromNode_
++
++    set srcipaddr_ $ip
++    $fromNode_ add-ip $ip
++
++    # Besides that, adding a route for
++    # the subnet with this link as the target
++    # will ensure that packets destined to the 
++    # neighbors will be routed to us
++    set ns_ [Simulator instance]
++    
++    set ipmasked [expr [$ns_ inet-aton $ip] & [$ns_ inet-aton 255.255.255.0]]
++    $fromNode_ add-route $ipmasked [$self head]
++
++    # Need to add mapping from subnet mask to link so that new routes being
++    # added can use this
++    $ns_ add-ip-mask-target $ip 255.255.255.0 [$self head]
++}
++
++# XXX netbed specific
++Class Rlink -superclass Link
++
++Rlink instproc init { src dstip {bw ""} {delay ""} {q ""} {lltype "DelayLink"} } {
++        $self next $src $dstip
++	$self instvar link_ queue_ head_ toNode_ ttl_
++	$self instvar drophead_ dstipaddr_ srcipaddr_ target_
++
++        set dstipaddr_ $dstip
++	set ns [Simulator instance]
++	set drophead_ [new Connector]
++	$drophead_ target [$ns set nullAgent_]
++
++	set head_ [new Connector]
++	$head_ set link_ $self
++
++        # If any of the bw/delay/qtype are not passed, it means
++	# that we have a link from a sim node to a real node.
++	# Any shaping will happen via a dummynet node
++        if { $bw == {} || $delay == {} || $q == {} } {
++	    set target_ [new Agent/IPTap]
++	    $ns attach-agent $src $target_
++	    $head_ target $target_
++	    return $self
++	}
++
++	#set head_ $queue_ -> replace by the following
++	# xxx this is hacky
++	if { [[$q info class] info heritage ErrModule] == "ErrorModule" } {
++		$head_ target [$q classifier]
++        } else {
++                $head_ target $q
++
++        }
++
++	set queue_ $q
++	set link_ [new $lltype]
++	$link_ set bandwidth_ $bw
++	$link_ set delay_ $delay
++
++	$queue_ target $link_
++	set target_ [new Agent/IPTap]
++
++	# put the ttl checker after the delay
++	# so we don't have to worry about accounting
++	# for ttl-drops within the trace and/or monitor
++	# fabric
++	#
++	set ttl_ [new TTLChecker]
++	$ttl_ target $target_
++	$self ttl-drop-trace
++	$link_ target $ttl_
++
++	$ns attach-agent $src $target_
++	$queue_ drop-target $drophead_
++
++	return $self
++	# Finally, if running a multicast simulation,
++	# put the iif for the neighbor node...
++#	if { [$ns multicast?] } {
++#		$self enable-mcast $src $dst
++#	}
++#        $ns instvar srcRt_
++#	if [info exists srcRt_] {
++#        	if { $srcRt_ == 1 } {
++#            	$self enable-src-rt $src $dst $head_
++#        	}
++#	}    
++}
++
++Rlink instproc ttl-drop-trace args {
++	$self instvar ttl_
++	if ![info exists ttl_] return
++	if {[llength $args] != 0} {
++		$ttl_ drop-target [lindex $args 0]
++	} else {
++		$self instvar drophead_
++		$ttl_ drop-target $drophead_
++	}
++}
++
++Rlink instproc srcipaddr {} {
++    $self instvar srcipaddr_
++    return $srcipaddr_
++}
++
++Rlink instproc dstipaddr {} {
++    $self instvar dstipaddr_
++    return $dstipaddr_
++}
++
++Rlink instproc target {} {
++    $self instvar target_
++    return $target_
+ }
+ 
+ Class SimpleLink -superclass Link
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Fri Nov 28 16:55:25 2003
+@@ -492,6 +492,13 @@
+ 		# at the port demuxer (if there is one)
+ 		$self add-route $address_ $dmux_
+ 	}
++	# XXX netbed specific
++	$self instvar nodeiplist_
++	set ns_ [Simulator instance]
++	foreach ip $nodeiplist_ {
++	    set ipaton [$ns_ inet-aton $ip]
++	    $self add-route $ipaton $dmux_
++	}
+ 	if { $port == "" } {
+ 		set port [$dmux_ alloc-port [[Simulator instance] nullagent]]
+ 	}
+@@ -569,3 +576,49 @@
+ 	$self instvar neighbor_
+ 	return [expr [lsearch $neighbor_ $node] != -1]
+ }
++
++# XXX netbed specific
++Node instproc add-ip { ip } {
++    set ns_ [Simulator instance]
++    $ns_ instvar iplist_
++    lappend iplist_ $ip
++
++    $self instvar nodeiplist_ dmux_
++    lappend nodeiplist_ $ip
++
++    set ip_aton [$ns_ inet-aton $ip]
++
++    if { $dmux_ != "" } {
++	# By adding the IP of this link to the node, we
++	# make sure that packets with the dstaddr == ip
++	# will be given to the port classifier
++	$self add-route $ip_aton $dmux_
++    }
++    $ns_ add-ip $self $ip
++}
++
++# XXX netbed specific
++Node instproc add-route-to-ip { ip nhopip {mask 255.255.255.255} } {
++    set ns_ [Simulator instance]
++
++    set ip_aton [$ns_ inet-aton $ip]
++    set mask_aton [$ns_ inet-aton $mask]
++    set ip_masked [expr $ip_aton & $mask_aton]
++    set node [$ns_ ip-to-node $nhopip]
++    if { $node != {} } {
++        $self add-route $ip_masked [[$ns_ link $self $node] head]
++	return
++    }
++
++    set target [$ns_ ip-to-target $nhopip]
++    if { $target == {} } {
++	set nhop_aton [$ns_ inet-aton $nhopip]
++	set target [$ns_ ip-to-target [$ns_ inet-ntoa \
++	    [expr $nhop_aton & [$ns_ inet-aton 255.255.255.0]]]]
++    }
++
++    if { $target != {} } {
++	$self add-route $ip_masked $target
++    }
++}
++
+--- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Feb 28 10:50:56 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Nov 28 16:55:25 2003
+@@ -125,6 +125,7 @@
+ 	$classifier_ set mask_ [AddrParams NodeMask 1]
+ 	$classifier_ set shift_ [AddrParams NodeShift 1]
+ 	# XXX Base should ALWAYS be the first module to be installed.
++        $classifier_ set ipmask_ [[Simulator instance] inet-aton 255.255.255.0]
+ 
+ 	$node install-entry $self $classifier_
+ }
+--- dist-ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
++++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Fri Nov 28 16:55:25 2003
+@@ -77,7 +77,7 @@
+ {
+         if (running_) {
+ 	        /* call the TCP advance method */
+-		agent_->sendmsg(agent_->size());
++		agent_->sendmsg(1); // send 1 byte packets instead of 1460
+ 		/* reschedule the timer */
+ 		double t = next();
+ 		timer_.resched(t);
+--- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Wed Feb 26 15:07:30 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Fri Nov 28 16:55:25 2003
+@@ -177,5 +177,17 @@
+ 	const char* hashkey(nsaddr_t, nsaddr_t dst, int) {
+ 		return (const char*) mshift(dst);
+ 	}
++	/* Since our address classifier (in flat 32 bit addressing) is
++	   a dest hash classifier, we do a naive longer prefix matching
++	   of the full IP address and then use ipmask_ to do a shorter
++	   prefix matching */
++	virtual int lookup(Packet* p) {
++		hdr_ip* h = hdr_ip::access(p);
++		int sl = get_hash(h->saddr(), h->daddr(), h->flowid());
++		if (sl >= 0 && sl <=maxslot_)
++		  return (sl);
++		return get_hash(h->saddr(), h->daddr() & ipmask_,
++				h->flowid());
++	}
+ };
+ 
+--- dist-ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Wed Feb 26 15:07:34 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Fri Nov 28 16:55:25 2003
+@@ -52,13 +52,14 @@
+ 
+ 
+ Classifier::Classifier() : 
+-	slot_(0), nslot_(0), maxslot_(-1), shift_(0), mask_(0xffffffff), nsize_(0)
++	slot_(0), nslot_(0), maxslot_(-1), shift_(0), mask_(0xffffffff), nsize_(0), ipmask_(0xffffff00)
+ {
+ 	default_target_ = 0;
+ 
+ 	bind("offset_", &offset_);
+ 	bind("shift_", &shift_);
+ 	bind("mask_", &mask_);
++	bind("ipmask_", &ipmask_);
+ }
+ 
+ int Classifier::classify(Packet *p)
+--- dist-ns-allinone-2.26/ns-2.26/classifier/classifier.h	Wed Feb 26 15:07:34 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.h	Fri Nov 28 16:55:25 2003
+@@ -82,10 +82,11 @@
+ 	int nslot_;
+ 	int maxslot_;
+ 	int offset_;		// offset for Packet::access()
+-	int shift_;
+-	int mask_;
++	u_int32_t shift_;
++	u_int32_t mask_;
+ 	NsObject *default_target_;
+ 	int nsize_;       //what size of nslot_ should be
++	u_int32_t ipmask_;
+ };
+ 
+ #endif
+--- dist-ns-allinone-2.26/ns-2.26/common/ip.h	Wed Feb 26 15:07:39 2003
++++ ns-allinone-2.26/ns-2.26/common/ip.h	Fri Nov 28 16:55:25 2003
+@@ -76,11 +76,11 @@
+ 	/* per-field member acces functions */
+ 	ns_addr_t& src() { return (src_); }
+ 	nsaddr_t& saddr() { return (src_.addr_); }
+-        int32_t& sport() { return src_.port_;}
++        u_int32_t& sport() { return src_.port_;}
+ 
+ 	ns_addr_t& dst() { return (dst_); }
+ 	nsaddr_t& daddr() { return (dst_.addr_); }
+-        int32_t& dport() { return dst_.port_;}
++        u_int32_t& dport() { return dst_.port_;}
+ 	int& ttl() { return (ttl_); }
+ 	/* ipv6 fields */
+ 	int& flowid() { return (fid_); }
+--- dist-ns-allinone-2.26/ns-2.26/common/packet.h	Wed Feb 26 15:07:40 2003
++++ ns-allinone-2.26/ns-2.26/common/packet.h	Fri Nov 28 16:55:25 2003
+@@ -519,8 +519,8 @@
+ 			abort();
+ 	}
+ 	init(p); // Initialize bits_[]
+-	(HDR_CMN(p))->next_hop_ = -2; // -1 reserved for IP_BROADCAST
+-	(HDR_CMN(p))->last_hop_ = -2; // -1 reserved for IP_BROADCAST
++	(HDR_CMN(p))->next_hop_ = (nsaddr_t)-2; // -1 reserved for IP_BROADCAST
++	(HDR_CMN(p))->last_hop_ = (nsaddr_t)-2; // -1 reserved for IP_BROADCAST
+ 	p->fflag_ = TRUE;
+ 	(HDR_CMN(p))->direction() = hdr_cmn::DOWN;
+ 	/* setting all direction of pkts to be downward as default; 
+--- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Tue Dec  9 14:58:51 2003
+@@ -46,12 +46,42 @@
+ #include "config.h"
+ #include "scheduler.h"
+ #include "packet.h"
++#ifdef USEEVENTS
++#include "tbevent.h"
 +#endif
  
- #endif /* !WIN32 */
---- dist-ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
-+++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Jun  6 17:24:39 2003
-@@ -941,6 +941,8 @@
- 		case PT_GAF:
- 		case PT_PING:
- 			break;
-+		case PT_LIVE:
-+			break;
- 		default:
- 			fprintf(stderr, "%s - invalid packet type (%s).\n",
- 				__PRETTY_FUNCTION__, packet_info.name(ch->ptype()));
+ 
+ #ifdef MEMDEBUG_SIMULATIONS
+ #include "mem-trace.h"
+ #endif
+ 
++#ifdef MEASURE_EVENT_RATE
++
++unsigned long long event_dispatch_counter;
++unsigned int events_per_sec_arr[70];
++
++#endif
++
++#ifdef GETTIME_TSC
++
++#define read_tsc()      \
++    ({ \
++        unsigned long low, high; \
++        asm volatile( \
++        ".byte 0x0f; .byte 0x31" \
++        : "=d" (high), "=a" (low)); \
++        ((unsigned long long)high << 32) | low; \
++    })
++
++#define TSC_FREQ     851.94
++#define TSC_COUNT_PERSEC (TSC_FREQ * 1000000)
++
++#endif
++
++#ifdef SCHED_DEBUG
++static Tcl_HashTable newevents;
++#endif
++
+ Scheduler* Scheduler::instance_;
+ scheduler_uid_t Scheduler::uid_ = 1;
+ 
+@@ -62,6 +92,9 @@
+ 
+ Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
+ {
++#ifdef SCHED_DEBUG
++	  Tcl_InitHashTable( &newevents, TCL_ONE_WORD_KEYS );
++#endif
+ }
+ 
+ Scheduler::~Scheduler(){
+@@ -112,6 +145,17 @@
+ 
+ 	e->time_ = t;
+ 	insert(e);
++#ifdef SCHED_DEBUG
++	int newentry = 0 ;
++	Tcl_HashEntry *he = Tcl_CreateHashEntry( &newevents,
++						 (char *)((unsigned int)e->uid_),
++						 &newentry );
++	if( newentry == 0 ) {
++	  fprintf(stderr, "e->uid_ = %d already present. error\n", (unsigned int)e->uid_);
++	} else {
++	  Tcl_SetHashValue( he, (char *)h );
++	}
++#endif
+ }
+ 
+ void
+@@ -579,7 +623,7 @@
+ 	}
+ } class_calendar_sched;
+ 
+-CalendarScheduler::CalendarScheduler() : cal_clock_(clock_) {
++CalendarScheduler::CalendarScheduler() : cal_clock_(clock_), cached_head_(0) {
+ 	reinit(4, 1.0, cal_clock_);
+ }
+ 
+@@ -598,6 +642,7 @@
+ 		// may happen in RT scheduler
+ 		cal_clock_ = e->time_;
+ 		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
++		cached_head_ = e;
+ 	} else
+ 		i = CALENDAR_HASH(e->time_);
+ 
+@@ -703,6 +748,10 @@
+ 	if (qsize_ == 0)
+ 		return NULL;
+ 
++	if (cached_head_) {
++	  return cached_head_;	  
++	}
++
+ 	int l, i = lastbucket_;
+ 	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
+ 	double diff;
+@@ -755,7 +804,7 @@
+ 	 */
+ 	lastbucket_ = l;
+  	cal_clock_  = e->time_;
+-	
++	cached_head_ = e;
+ 	return e;
+ }
+ 
+@@ -797,6 +846,8 @@
+ 		resize(nbuckets_ >> 1, cal_clock_);
+ 	}
+ 
++	cached_head_ = 0;
++
+ 	return e;
+ }
+ 
+@@ -926,6 +977,9 @@
+ 
+ 	--qsize_;
+ 
++	if ( e == cached_head_ )
++	  cached_head_ = 0;
++
+ 	return;
+ }
+ 
+@@ -956,11 +1010,23 @@
+ 	virtual void run();
+ 	double start() const { return start_; }
+ 	virtual void reset();
++#ifdef USEEVENTS
++	int command(int argc, const char*const* argv);
++#endif
+ protected:
+ 	void sync() { clock_ = tod(); }
++	virtual void dispatch(Event*, double);	// exec event, set clock_
+ 	double tod();
+ 	double slop_;	// allowed drift between real-time and virt time
+ 	double start_;	// starting time
++#ifdef USEEVENTS
++        TbEventSink *evsink_;
++#endif
++#ifdef GETTIME_TSC
++        unsigned long long basetsc_ ;
++        double  oneontscfreq_;
++        double  tscfreq_;
++#endif
+ };
+ 
+ static class RealTimeSchedulerClass : public TclClass {
+@@ -974,16 +1040,85 @@
+ RealTimeScheduler::RealTimeScheduler() : start_(0.0)
+ {
+ 	bind("maxslop_", &slop_);
++#ifdef USEEVENTS
++        evsink_ = 0 ;
++#endif
++#ifdef GETTIME_TSC
++        basetsc_ = 0 ;
++	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
++	tscfreq_ = TSC_COUNT_PERSEC;
++#endif
++}
++
++#ifdef USEEVENTS
++  
++int RealTimeScheduler::command(int argc, const char*const* argv)
++{
++  Tcl& tcl = Tcl::instance();
++  if (instance_ == 0)
++    instance_ = this;
++  
++  
++  if( argc == 3 ) {
++    if(strcmp(argv[1], "tbevent-sink") == 0) {
++      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
++      return(TCL_OK);
++    } else if (strcmp(argv[1], "cpuspeed") == 0) {
++      double ret;
++      if( (ret = atof(argv[2])) != 0 ) {
++	tscfreq_ = ret;
++	oneontscfreq_ = 1.0 / tscfreq_;
++      }
++      return(TCL_OK);
++    }
++  }
++
++  return(Scheduler::command(argc, argv));
++}  
++
++#endif
++
++/*
++ * dispatch a single simulator event by setting the system
++ * virtul clock to the event's timestamp and calling its handler.
++ * Note that the event may have side effects of placing other items
++ * in the scheduling queue
++ */
++
++void
++RealTimeScheduler::dispatch(Event* p, double t)
++{
++
++#ifdef SCHED_DEBUG
++	Tcl_HashEntry *he = Tcl_FindHashEntry(&newevents, (char *)((unsigned int)p->uid_));
++	if( he ) {
++	  Tcl_DeleteHashEntry(he);
++	} else {
++	  fprintf(stderr, "error. couldnt find event with uid = %d\n", (unsigned int)p->uid_);
++	}
++#endif
++	clock_ = t;
++	p->uid_ = -p->uid_;	// being dispatched
++	p->handler_->handle(p);	// dispatch
++#ifdef MEASURE_EVENT_RATE
++	event_dispatch_counter++;
++#endif
+ }
+ 
+ double
+ RealTimeScheduler::tod()
+ {
++#ifdef GETTIME_TSC
++                 
++        unsigned long long curtsc = read_tsc();
++        return (((double)(curtsc - basetsc_)) * oneontscfreq_);
++#else
+ 	timeval tv;
+ 	gettimeofday(&tv, 0);
+ 	double s = tv.tv_sec;
+ 	s += (1e-6 * tv.tv_usec);
+ 	return (s - start_);
++#endif
+ }
+ 
+ void
+@@ -991,20 +1126,42 @@
+ {
+ 	clock_ = SCHED_START;
+ 	start_ = tod();
++#ifdef GETTIME_TSC   
++        basetsc_ = read_tsc();
++#endif
+ }
+ 
++#ifdef SCHED_DEBUG
++int done = 0;
++#endif
++
+ void 
+ RealTimeScheduler::run()
+ { 
+ 	static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
++	static const double delta = 1.0e-4; // should be smaller than above
+ 	const Event *p;
++	bool gethead = true;
++
++#ifdef USEEVENTS
++
++	if( evsink_ ) {
++	  evsink_->init();
++	  evsink_->subscribe();
++	}
++
++#endif
+ 
+ 	/*XXX*/
+ 	instance_ = this;
+ 
+ 	while (!halted_) {
++		if( gethead ) {
++		  p = head();
++		  gethead = false;
++		}
+ 		clock_ = tod();
+-		p = head();
++
+ 		if (p && (clock_ - p->time_) > slop_) {
+ 			fprintf(stderr,
+ 				"RealTimeScheduler: warning: slop "
+@@ -1014,16 +1171,37 @@
+ 		// handle "old events"
+ 		while (p && p->time_ <= clock_) {
+ 
++#ifdef DISPATCH_IN_RT
+ 			dispatch(deque(), clock_);
++#else
++			dispatch(deque(), p->time_);
++#endif
+ 			if (halted_)
+ 				return;
+ 			p = head();
+ 			clock_ = tod();
+ 		}
++
++#ifdef USEEVENTS
++		if( evsink_ && evsink_->poll() == 1 ) {
++		  gethead = true;
++		  continue;
++		}
++#endif
++
++#ifdef SCHED_DEBUG
++		if( clock_ >= 240.0 && done == 0 ) {
++		  fprintf( stderr, "After 60 secs. Hash Stats for newevents = %s\n",
++			   Tcl_HashStats(&newevents) );
++		  done = 1;
++		}
++#endif
+ 		
+ 		if (!p) {
+ 			// blocking wait for TCL events
+-			Tcl_WaitForEvent(0); // no sim events, wait forever
++			// Tcl_WaitForEvent(0); // no sim events, wait forever
++			// XXX: But we can't afford to wait forever coz testbed
++			// events are not being polled here and we might miss them
+ 			clock_ = tod();
+ 		} else {
+ 			double diff = p->time_ - clock_;
+@@ -1031,12 +1209,14 @@
+ 			if (diff > RTSCHEDULER_MINWAIT) {
+ 				Tcl_Time to;
+ 				to.sec = long(diff);
+-				to.usec = long(1e6*(diff - to.sec));
++				to.usec = long(1e6*((diff - delta) - to.sec)); // wait for delta less
+ 				Tcl_WaitForEvent(&to);    // block
+ 				clock_ = tod();
+ 			}
+ 		}
+-		Tcl_DoOneEvent(TCL_DONT_WAIT);
++		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
++		  gethead = true;
++		}
+ 	}
+ 	// we reach here only if halted
+ }
+--- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Fri Nov 28 16:55:25 2003
+@@ -98,7 +98,7 @@
+ protected:
+ 	void dumpq();	// for debug: remove + print remaining events
+ 	void dispatch(Event*);	// execute an event
+-	void dispatch(Event*, double);	// exec event, set clock_
++	virtual void dispatch(Event*, double);	// exec event, set clock_
+ 	Scheduler();
+ 	virtual ~Scheduler();
+ 	int command(int argc, const char*const* argv);
+@@ -176,6 +176,7 @@
+ private:
+ 	virtual void insert2(Event*);
+ 	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
++	const Event *cached_head_;
+ 
+ };
+ 
+--- dist-ns-allinone-2.26/ns-2.26/common/simulator.cc	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.cc	Fri Nov 28 16:55:25 2003
+@@ -23,6 +23,7 @@
+ #include "object.h"
+ 
+ //class ParentNode;
++Simulator* Simulator::instance_;
+ 
+ static class SimulatorClass : public TclClass {
+ public:
+@@ -92,6 +93,25 @@
+ 			int id = atoi(argv[3]);
+ 			add_node(node, id);
+ 			return TCL_OK;
++		} else if (strcmp(argv[1], "add-ip") == 0) {
++			Node *node = (Node *)(TclObject::lookup(argv[2]));
++			if (node == NULL) {
++				tcl.add_errorf("Wrong object name %s",argv[2]);
++				return TCL_ERROR;
++			}
++			in_addr_t ip = inet_addr(argv[3]);
++			int newentry = 0;
++			Tcl_HashEntry *he = Tcl_CreateHashEntry( &iptonode,
++								 (char *)(ip),
++								 &newentry );
++			if ( newentry == 0 ) {
++				Node *n = (Node *)Tcl_GetHashValue( he );
++				tcl.add_errorf("IP address %s already belongs to node %s\n",
++					       argv[3], n->name() );
++				return TCL_ERROR;
++			}
++			Tcl_SetHashValue( he, (char *)node);	
++			return TCL_OK;
+ 		} 
+ 	}
+ 	return (TclObject::command(argc, argv));
+@@ -250,3 +270,11 @@
+ 	return l_head;
+ }
+ 
++Node * Simulator::ip_to_node(in_addr_t ip) {
++
++	Tcl_HashEntry *he = Tcl_FindHashEntry( &iptonode, (char *)ip );
++	if( he == 0 ) 
++		return 0;
++	else
++		return (Node *)Tcl_GetHashValue(he);
++}
+--- dist-ns-allinone-2.26/ns-2.26/common/simulator.h	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.h	Fri Nov 28 16:55:25 2003
+@@ -25,17 +25,21 @@
+ 
+ #include <tclcl.h>
+ #include "object.h"
++#include <sys/types.h>
+ 
+ class ParentNode;
+ class RouteLogic;
++class Node;
+ 
+ class Simulator : public TclObject {
+ public:
+       Simulator() : nodelist_(NULL), rtobject_(NULL), nn_(0), \
+-	size_(0) {}
++	size_(0) { Tcl_InitHashTable( &iptonode, TCL_ONE_WORD_KEYS ); instance_ = this; }
+       ~Simulator() {
+-	    delete []nodelist_; 
++	    delete []nodelist_;
++	    instance_ = 0;
+       }
++      static Simulator &instance() { return (*instance_); }
+ 	int command(int argc, const char*const* argv);
+ 	void populate_flat_classifiers();
+ 	void populate_hier_classifiers();
+@@ -45,12 +49,15 @@
+ 	char *append_addr(int level, int *addr);
+ 	void alloc(int n);
+ 	void check(int n);
++	Node *ip_to_node(in_addr_t);
+ 	
+ private:
+         ParentNode **nodelist_;
+ 	RouteLogic *rtobject_;
+ 	int nn_;
+ 	int size_;
++	Tcl_HashTable iptonode;
++	static Simulator *instance_;
+ };
+ 
+ #endif /* ns_simulator_h */
+--- dist-ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Fri Nov 28 16:55:25 2003
+@@ -186,6 +186,7 @@
+ 	return TCL_OK;
+ }
+ 
++#if 0
+ #ifndef WIN32
+ void
+ abort()
+@@ -200,6 +201,7 @@
+ #endif /*abort*/
+ 	/*NOTREACHED*/
+ }
++#endif
+ #endif
+ 
+ }
+--- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Fri Nov 28 16:55:25 2003
+@@ -76,3 +76,40 @@
+ 	if (status_ == TIMER_HANDLING)
+ 		status_ = TIMER_IDLE;
+ }
++
++#ifdef MEASURE_EVENT_RATE
++
++extern unsigned long long event_dispatch_counter;
++
++unsigned int idx;
++
++#define MAX_EVENT_ARR 70
++
++// circular buffer for the data
++extern unsigned int events_per_sec_arr[MAX_EVENT_ARR];
++
++
++void EventRateTimer::expire(Event *e) {
++
++  if ( idx % MAX_EVENT_ARR == MAX_EVENT_ARR-1 ) {
++
++    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
++    event_dispatch_counter = 0;
++    idx++;
++    
++    int i = 0 ;
++    for( ; i < MAX_EVENT_ARR-1 ; i++ ) {
++      fprintf(stderr, "%u, ", events_per_sec_arr[i] );
++    }
++    fprintf(stderr, "%u\n", events_per_sec_arr[MAX_EVENT_ARR-1] );    
++  } else {
++  
++    events_per_sec_arr[idx % MAX_EVENT_ARR] = event_dispatch_counter;
++    event_dispatch_counter = 0;
++    idx++;
++  }
++  resched(1.0);    
++    
++}
++
++#endif
+--- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Fri Nov 28 16:55:25 2003
+@@ -88,4 +88,15 @@
+ // mode:c++
+ // End:
+ 
++#ifdef MEASURE_EVENT_RATE
++
++class EventRateTimer : public TimerHandler {
++
++public:
++  virtual void expire(Event *e) ;
++
++};
++
++#endif
++
+ #endif /* timer_handler_h */
+--- dist-ns-allinone-2.26/ns-2.26/routing/address.cc	Wed Feb 26 15:09:15 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.cc	Fri Nov 28 16:55:25 2003
+@@ -120,7 +120,7 @@
+ 			}
+ 			else 
+ 				levels_ = temp;
+-			NodeShift_ = new int[levels_ + 1];
++			NodeShift_ = new u_int32_t[levels_ + 1];
+ 			for (i = 3, c = 1; c <= levels_; c++, i+=2)
+ 				NodeShift_[c] = atoi(argv[i]);
+ 			return (TCL_OK); 
+@@ -136,7 +136,7 @@
+ 			}
+ 			else 
+ 				levels_ = temp;
+-			NodeMask_ = new int[levels_ + 1];
++			NodeMask_ = new u_int32_t[levels_ + 1];
+ 			for (i = 3, c = 1; c <= levels_; c++, i+=2) 
+ 				NodeMask_[c] = atoi(argv[i]);
+ 			return (TCL_OK);
+--- dist-ns-allinone-2.26/ns-2.26/routing/address.h	Wed Feb 26 15:09:15 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.h	Fri Nov 28 16:55:25 2003
+@@ -61,10 +61,10 @@
+ 	// e.g 32 for level=1, 10/11/11 for level=3.
+ 	// used to check validity of address-str.
+ 	int *bpl_;
+-	int *NodeShift_;
+-	int *NodeMask_;
+-	int McastShift_;
+-	int McastMask_;
++	u_int32_t *NodeShift_;
++	u_int32_t *NodeMask_;
++	u_int32_t McastShift_;
++	u_int32_t McastMask_;
+ 	int levels_;
+  protected:
+ 	int command(int argc, const char*const* argv);
+--- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Sun Dec 14 20:48:47 2003
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 1997, 1998 The Regents of the University of California.
++ * Copyright (c) 1997, 1998, 2003 The Regents of the University of California.
+  * All rights reserved.
+  * 
+  * Redistribution and use in source and binary forms, with or without
+@@ -37,28 +37,79 @@
+ #endif
+ 
+ #include "iptap.h"
++#include "node.h"
++#include "simulator.h"
++#include <sys/time.h>
++#include <netinet/in.h>
++
++#include "tbnexthop.h"
++
++#ifdef MEASURE_EVENT_RATE
++#include "timer-handler.h"
++
++EventRateTimer ert;
++unsigned int firstpacket;
++#endif
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++#include        "tbdefs.h"
++#include        "log.h"
++
++#ifdef __cplusplus
++}
++#endif
+ 
+ 
+ static class IPTapAgentClass : public TclClass {
+  public:
+-	IPTapAgentClass() : TclClass("Agent/IPTap") {}
++	IPTapAgentClass() : TclClass("Agent/IPTap") {
++	}
+ 	TclObject* create(int, const char*const*) {
++#ifdef MEASURE_EVENT_RATE
++	  // schedule the event rate 
++	  if ( firstpacket == 0 ) {
++	    ert.sched(1.0);
++	    firstpacket++;
++	  }
++#endif
+ 		return (new IPTapAgent());
+ 	}
+ } class_iptap_agent;
+ 
+ 
+ IPTapAgent::IPTapAgent() 
++#ifdef MEASURE_DELAYS  
++                        :  firstpkt_in_burst(false),
++			   max_delay(0.0), bpf_ts_to_iptap_max_delay(0.0),
++			   bpf_ts_to_iptap_min_delay(100.0), data_idx(0)
++#endif
+ {
+   int i = 0;
+   index = 0;
++#ifdef MEASURE_DELAYS
++  memset( bpf_ts_to_iptap, 0, sizeof(bpf_ts_to_iptap));
++#endif
+   for (; i < MAX_PACKETS ; i++) {
+     ident[i] = -1;
+     offset[i] = -1;
+   }
+ 
++  sbuflen = rbuflen = ROUNDUP(sizeof(struct ip) + Packet::hdrlen_, sizeof(unsigned long) )
++                      + sizeof(unsigned long);
++  sendbuf = new unsigned char[sbuflen];
++  recvbuf = new unsigned char[rbuflen];
++  mtu = 1500; /* just assume default */
++  icmpagent = 0;
++  memset( &srcnodeipaddr, 0, sizeof(srcnodeipaddr) );
+ }
+ 
++IPTapAgent::~IPTapAgent()
++{
++  delete[] sendbuf;
++  delete[] recvbuf;
++}
+ 
+ /*
+  * Checking for duplicate packets.  Need to do this, if running
+@@ -141,7 +192,57 @@
+   
+   /* TCP header info from the grabbed packet. */
+   unsigned char tcphlen;
++
++#ifdef MEASURE_DELAYS
++
++  double delay ;
++  // This code keeps some delay data and drops the packet 
++  if( firstpkt_in_burst ) {
++    ts_firstpkt_in_burst = ts.tv_sec + ts.tv_usec * 1e-6 ;
++    firstpkt_in_burst = false;
++    delay = 0.0;
++  } else {
++    delay = double(ts.tv_sec + ts.tv_usec * 1e-6) - ts_firstpkt_in_burst;
++    timeval tv;
++    gettimeofday(&tv, 0);
++    double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
++    max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
++  }
++
++
++#endif
++
++  
++#if 0
++  timeval tv;
++  gettimeofday(&tv, 0);
++  double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
++  max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
++  bpf_ts_to_iptap[data_idx] = nowts - (ts.tv_sec + ts.tv_usec * 1e-6);
++  bpf_ts_to_iptap_max_delay = MAX(bpf_ts_to_iptap[data_idx],
++			      bpf_ts_to_iptap_max_delay);
++  bpf_ts_to_iptap_min_delay = MIN(bpf_ts_to_iptap[data_idx],
++			      bpf_ts_to_iptap_min_delay);
++  data_idx = (data_idx+1) %
++    (sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]));
++
++  Packet::free(p);
++  return;
+   
++#endif
++
++#if 0 //MEASURE_EVENT_RATE
++  // schedule the event rate 
++  if ( firstpacket == 0 ) {
++    ert.sched(1.0);
++    firstpacket++;
++  }
++#endif
++  
++  /* PcapNetwork created this packet and does not know how
++     to initialize it. So, we need to do that here by calling
++     the base Agent class's initpkt method */
++  initpkt(p);
+   /* 
+      At this point, all I have to do is to grab the ttl value 
+      from the received packet and put it in p's ttl field after
+@@ -180,15 +281,55 @@
+   hdr_ip *ih = HDR_IP(p);
+   ih->ttl() = ttl;
+ 
++  /* Route lookups need not be performed here in the new code.
++     The classifier has the correct rules. Just need to make sure
++     that destination IP address and port are stored in the header
++     of the ns packet. Need to decapsulate the payload into ns
++     bag of bits of a) it was encapsulated before and b) the dest
++     IP address is local in this simulator */
++
++  if( ipheader->ip_p == IPPROTO_ENCAP ) {
++
++    /* The IP address based classifier entries should route the packet
++       correctly to the final destination. However, if the packet is
++       destinated to a node in this instance of the simulator and it was
++       encapsulated, we need to decapsulate it here
++    */
++    //in_addr_t ip = ntohl( ipheader->ip_dst.s_addr );
++    in_addr_t ip = ipheader->ip_dst.s_addr;
++    Node *n = Simulator::instance().ip_to_node( ip );
++    if( n != 0 ) {
++      unsigned long *hdrbits = (unsigned long *)(ipheader + 1);
++
++      /* This should take care of copying all the header bits to this packet.
++	 The simulator instance from where this packet originated from should
++	 have filled the correct IP address and port numbers so that the packet
++	 can be routed correctly */
++      int lastnonzerobyte = uncompress( (unsigned long *)p->bits(), hdrbits,
++					(datagramlen - iphlen)/4 );
++      /* If there is an error in uncompress, we won't really know other than the
++	 fact that we copied junk into the packet. Something to worry about later
++      */
++    }
++  } else {
++    ih->daddr() = ntohl(ipheader->ip_dst.s_addr);
++    /* Dunno how to take care of ports yet */  
++  }
++
++
++#ifdef MEASURE_DELAYS
++  Scheduler::instance().schedule( target_, p, max_delay );
++#else 
+   // inject into simulator
+   target_->recv(p);
++#endif
+   return;
+ }
+ 
+ /*
+  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+  * 
+- * recvpkt then calls the network (net_) to receive as many packets
++ * recvpkt then calls the network (net_incoming_) to receive as many packets
+  * as there are from the packet capture facility.
+  * For every packet received through the callback, it populates the ns packet
+  * ttl value and inject it into the simulator by calling target_->recv
+@@ -197,14 +338,17 @@
+ void
+ IPTapAgent::recvpkt()
+ {
+-  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
++  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
+     fprintf(stderr,
+ 	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
+ 	    name());
+     return;
+   }
+   
+-  int cc = net_->recv(pkt_handler, this);
++#ifdef MEASURE_DELAYS
++  firstpkt_in_burst = true;
++#endif
++  int cc = net_incoming_->recv(pkt_handler, this);
+   if (cc <= 0) {
+     if (cc < 0) {
+       perror("recv");
+@@ -219,13 +363,64 @@
+ }
+ 
+ 
++int
++IPTapAgent::command(int argc, const char*const* argv)
++{
++	Tcl& tcl = Tcl::instance();
++
++	if (argc == 2) {
++#if MEASURE_DELAYS
++	  if( strcmp(argv[1], "print_delays") == 0 ) {
++	    printf("object %s : max_delay = %g "
++		   "bpf_ts_to_iptap_max_delay = %g "
++		   "bpf_ts_to_iptap_min_delay = %g\n",
++		   name(), max_delay, bpf_ts_to_iptap_max_delay,
++		   bpf_ts_to_iptap_min_delay);
++	    for( int i=0; i<sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]) ; i++ )
++	      printf("%.10f ", bpf_ts_to_iptap[i]);
++	    printf("\n");
++	    return (TCL_OK);
++	  }
++#endif
++	} else if (argc == 3) {
++		if (strcmp(argv[1], "network-incoming") == 0) {
++			PcapNetwork *net_in_ = (PcapNetwork *)TclObject::lookup(argv[2]);
++			if (net_in_ != 0) {
++			  /*
++			   * Although, we should get the MTU of the outgoing interface,
++			   * we just do it for the incoming one coz the outgoing net
++			   * object is just a RAW IP socket.
++			   */
++			  mtu = net_in_->getmtu();
++			}
++		} else if( strcmp(argv[1], "ipmask") == 0) {
++		  struct in_addr tmpmask;
++		  if( inet_aton( argv[2], &tmpmask ) == 1 ) {
++		    ipmask = tmpmask;
++		    return(TCL_OK);
++		  } else {
++		    return(TCL_ERROR);
++		  }
++		} else if (strcmp(argv[1], "icmpagent") == 0) {
++		  icmpagent = (IcmpAgent *)TclObject::lookup(argv[2]);
++		  if (icmpagent)
++		    return(TCL_OK);
++		  else
++		    return(TCL_ERROR);
++		} else if (strcmp(argv[1], "ipaddr") == 0) {
++		  srcnodeipaddr.s_addr = inet_addr(argv[2]);
++		  return(TCL_OK);
++		}
++	}
++	return (TapAgent::command(argc, argv));
++}
+ 
+ 
+ /*
+  * simulator schedules TapAgent::recv which calls sendpkt
+  *
+  * Grabs a ns packet, converts it into real packet 
+- * and injects onto the network using net_->send
++ * and injects onto the network using net_outgoing_->send
+  */
+ int
+ IPTapAgent::sendpkt(Packet* p)
+@@ -233,10 +428,11 @@
+   int byteswritten;
+   unsigned char *packet;
+   unsigned char received_ttl;
+-  unsigned short dglen;
++  unsigned short sendlen;
+   struct ip *ipheader;
++  u_short ip_off;
+ 
+-  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
++  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
+     fprintf(stderr,
+ 	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
+ 	    name());
+@@ -245,7 +441,7 @@
+   
+   // send packet into the live network
+   hdr_cmn* hc = HDR_CMN(p);
+-  if (net_ == NULL) {
++  if (net_outgoing_ == NULL) {
+     fprintf(stderr,
+ 	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
+ 	    name());
+@@ -273,27 +469,172 @@
+     return(-1);
+   }
+ 
++  /* Check what type of packet it is and if it is a normal
++     simulator packet as opposed to PT_LIVE, we need to
++     perform encapsulation */
+ 
+-  /* Modify the original packet with the new info. */
+-  packet = p->accessdata();
+-  ipheader = (struct ip *) packet;
+-  ipheader->ip_ttl = received_ttl;
+-  ipheader->ip_sum = 0;
+-  ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
+-						sizeof(struct ip));
+-
+-  if (net_->send(p->accessdata(), hc->size()) < 0) {
+-    fprintf(stderr,
+-	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
+-	    name(), p->accessdata(), hc->size(), strerror(errno));
++  if (hc->ptype_ == PT_LIVE) {
++    
++    /* Modify the original packet with the new info. */
++    packet = p->accessdata();
++    ipheader = (struct ip *) packet;
++    ipheader->ip_ttl = received_ttl;
++    ipheader->ip_sum = 0;
++    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
++						 sizeof(struct ip));
++
++    ip_off = ntohs(ipheader->ip_off);
++    if ( (hc->size() > mtu) && (ip_off & IP_DF) ) {
++      if (icmpagent) {
++	icmpagent->sendfragneeded(srcnodeipaddr, ipheader->ip_src, mtu, packet );
++      }
++      TDEBUG4("IPTapAgent(%s): Packet size (sz: %d) exceeded MTU: %d\n",
++	      name(), hc->size(), mtu);
++      drop(p);
++      return (-1);
++    } 
++
++    if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
++      fprintf(stderr,
++	      "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
++	      name(), p->accessdata(), hc->size(), strerror(errno));
++      drop(p);
++      return (-1);
++    
++    }
++#if 0
++    if( hc->size() < 50 ) {
++      fprintf( stderr, "sent pkt %d\n", hc->size());
++    }
++#endif
+     Packet::free(p);
+-    return (-1);
++    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
++	    name(), hc->size());
++  } else {
+     
++    unsigned long *hdrbits = 0;
++    memset( sendbuf, 0, sbuflen * sizeof(unsigned char) );
++    ipheader = (struct ip *)sendbuf;
++  
++    ipheader->ip_hl = (IP_HEADER_LEN / 4);
++    ipheader->ip_v = IPVERSION;
++    
++    ipheader->ip_id = 0;
++    ipheader->ip_ttl = received_ttl;
++    ipheader->ip_p = IPPROTO_ENCAP;
++    
++    ipheader->ip_src.s_addr = htonl(ih->saddr());
++    ipheader->ip_dst.s_addr = htonl(ih->daddr());
++
++    hdrbits = (unsigned long *)(ipheader + 1);
++    int size = compress( hdrbits, (unsigned long *)p->bits(), (Packet::hdrlen_+3)/4);
++
++    /* ip_len field should be in host byte order which the kernel will later
++       change to network byte order */
++    ipheader->ip_len = sendlen = size * sizeof(unsigned long) + sizeof(struct ip);
++
++    /* Converting values to network order since the class Network/IP will
++       convert it back to host order coz the kernel expects it that way */
++    ipheader->ip_len = htons(ipheader->ip_len);
++    ipheader->ip_off = htons(ipheader->ip_off);
++
++    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
++						 sizeof(struct ip));
++    
++
++    if (net_outgoing_->send(sendbuf, sendlen) < 0) {
++      fprintf(stderr,
++	      "IPTapAgent(%s): sendpkt compressed(%p, %d) error: %s\n",
++	      name(), sendbuf, size, strerror(errno));
++      drop(p);
++      return (-1);    
++    }
++    Packet::free(p);
++    TDEBUG3("IPTapAgent(%s): sent compressed packet (sz: %d)\n",
++	    name(), size);
+   }
+-  Packet::free(p);
+-  TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
+-	  name(), hc->size());
+-  return 0;
++    return 0;
+ }
+ 
+ 
++int IPTapAgent::compress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Returns total size of target buffer
++  // This code works only on buffers <= 0x10000 words long (about 250k bytes)
++  // Target buffer must be 1 word longer than source, to allow for the
++  // case where no zeros at all occur.
++ int offset = 0;
++ int skipping = 1;
++ int targoffset = 0;
++ int lth;
++
++ unsigned long* pCW = pTarget; // Control word pointer
++ // Format of control word is 16 bits of length, 16 bits of starting offset
++ *pCW = 0;  // All zero CW means done
++ while(offset < Count)
++   {
++     if (skipping)
++       {
++         if (pSource[offset] |= 0)
++           { // Time to stop skipping
++             skipping = 0;
++             pCW = &pTarget[targoffset];
++             *pCW = offset; // Set source offset, leave lth zero for now
++             targoffset++;  // Leave room for CW
++             lth = 0;       // Counts how many non-zero
++           }
++         else
++           { // Still zero, just skip it
++             offset++;
++           }
++       }
++     if (!skipping)
++       {
++         // First see if we found a zero
++         if (pSource[offset] == 0)
++           { // Found a zero, but just use it unless two in a row
++             if ((offset+1) < Count)
++               {
++                 if (pSource[offset+1] == 0)
++                   {
++                     skipping = 1; // Found two in a row, resume skipping
++                     *pCW |= (lth << 16);
++                     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++                     offset++; // And skip this one
++                   }
++               }
++           }
++       }
++     if (!skipping)
++       {
++         pTarget[targoffset++] = pSource[offset++];
++         lth++;
++       }
++   }
++ if (!skipping)
++   { // Need to update last CW
++     *pCW |= (lth << 16);
++     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++   }
++ return(targoffset);
++}
++
++int IPTapAgent::uncompress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Reverse above compression
++  // Target buffer MUST BE ZERO on entry!
++int offset = 0;
++int targoffset = 0;
++int lth;
++
++  while(offset < Count)
++    {
++      // Get next control word
++      targoffset = pSource[offset] & 0xffff;
++      lth = pSource[offset] >> 16;
++      offset++;
++      for (int i = 0; i < lth; i++)
++        { // Copy to target
++          pTarget[targoffset++] = pSource[offset++];
++        }
++    }
++  return(targoffset); // Last non-zero entry
++}
+--- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Sun Dec 14 20:48:23 2003
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 1997, 1998 The Regents of the University of California.
++ * Copyright (c) 1997, 1998, 2003 The Regents of the University of California.
+  * All rights reserved.
+  * 
+  * Redistribution and use in source and binary forms, with or without
+@@ -45,19 +45,34 @@
+ #include <sys/socket.h>
+ #include "tcp.h"
+ #include "ip.h"
++#include "icmp.h"
++
++#include <net/if.h>
++
++#define ROUNDUP(a, size) (((a) & ((size)-1)) ? (1 + ((a) | ((size)-1))) : (a))
+ 
+ #define MAX_PACKETS 640
+ 
++#define IP_HEADER_LEN         (sizeof(struct ip))
+ 
+ class IPTapAgent : public TapAgent {
+ 
+  public:
+   IPTapAgent();
++  ~IPTapAgent();
++  int command(int, const char*const*);
++  int compress(long unsigned int *, long unsigned int *, int);
++  int uncompress(long unsigned int *, long unsigned int *, int);
+ 
+  private:
+   int ident[MAX_PACKETS];      /* All three used for duplicate */
+   int offset[MAX_PACKETS];     /* packet detection. */
+   int index;
++  struct in_addr ipmask;
++#ifdef MEASURE_DELAYS
++  bool firstpkt_in_burst;
++  double ts_firstpkt_in_burst;
++#endif  
+ 
+   unsigned short in_cksum(unsigned short *,int);
+   void recvpkt();
+@@ -66,6 +81,20 @@
+   void processpkt(Packet *, const struct timeval &);
+   static void pkt_handler(void *, Packet *, const struct timeval &);
+ 
++#ifdef MEASURE_DELAYS  
++  double max_delay;
++  double bpf_ts_to_iptap_max_delay;
++  double bpf_ts_to_iptap_min_delay;
++  int data_idx;
++  double bpf_ts_to_iptap[80000];
++#endif
++  unsigned char *sendbuf;
++  unsigned int sbuflen;
++  unsigned char *recvbuf;
++  unsigned int rbuflen;
++  u_int16_t  mtu;
++  IcmpAgent *icmpagent;
++  struct in_addr  srcnodeipaddr;
+ };
+ 
+ #endif /* iptap_h */
+--- dist-ns-allinone-2.26/ns-2.26/emulate/icmp.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/icmp.cc	Sun Dec 14 01:32:59 2003
+@@ -1,5 +1,5 @@
+ /*    
+- * Copyright (c) 1998 Regents of the University of California.
++ * Copyright (c) 1998, 2003 Regents of the University of California.
+  * All rights reserved.
+  *    
+  * Redistribution and use in source and binary forms, with or without 
+@@ -50,6 +50,8 @@
+ #include "packet.h"
+ #include "emulate/net.h"
+ #include "emulate/internet.h"
++#include "ip.h"
++#include "icmp.h"
+ 
+ #ifndef IPPROTO_GGP
+ #define IPPROTO_GGP 3
+@@ -59,17 +61,6 @@
+ // icmp.cc -- a very limited-functionality set of icmp routines
+ // 
+ 
+-class IcmpAgent : public Agent {
+-public:
+-	IcmpAgent();
+-	void recv(Packet*, Handler*) { abort(); }
+-protected:
+-	void	sendredirect(in_addr& me, in_addr& target, in_addr& dest, in_addr& gw);
+-	int	command(int argc, const char*const* argv);
+-
+-	int	ttl_;
+-};
+-
+ static class IcmpAgentClass : public TclClass { 
+ public:
+         IcmpAgentClass() : TclClass("Agent/IcmpAgent") {}
+@@ -122,6 +113,62 @@
+ 	icp->icmp_cksum = 0;
+ 	icp->icmp_type = ICMP_REDIRECT;
+ 	icp->icmp_code = ICMP_REDIRECT_HOST;
++	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
++		8 + sizeof(ip) + 8);
++
++	send(p, 0);
++	return;
++}
++
++/*
++ * sendfragneeded -- send a packet to "target" containing a redirect
++ * for the network specified by "dst", so that the gateway "gw" is used
++ * also, forge the source address so as to appear to come from "me"
++ */
++
++void
++IcmpAgent::sendfragneeded(struct in_addr & me, struct in_addr & target, u_int16_t mtu, void *data )
++{
++	// make a simulator packet to hold the IP packet, which in turn
++	// holds: ip header, icmp header, embedded ip header, plus 64 bits
++	// data
++	int iplen = sizeof(ip) + 8 + sizeof(ip) + 8;
++        Packet* p = allocpkt(iplen);
++	hdr_cmn* hc = HDR_CMN(p);
++	/* When this packet gets sent out to the host by an IPTap eventually,
++	   it should not try to encapsulate this in any way. Just send it as
++	   it is */
++	hc->ptype_ = PT_LIVE;
++	ip* iph = (ip*) p->accessdata();
++	hc->size() = iplen;
++
++	// make an IP packet ready to send to target
++	// size will be min icmp + a dummy'd-up IP header
++	Internet::makeip(iph, iplen, ttl_, IPPROTO_ICMP, me, target);
++	iph->ip_off |= htons(IP_DF);
++	iph->ip_sum = Internet::in_cksum((u_short*) iph, 20);
++
++	// Store the destination addr in the NS packet for
++	// the simulator to route it
++	hdr_ip *ih = HDR_IP(p);
++	ih->daddr() = ntohl(target.s_addr);
++	ih->saddr() = ntohl(me.s_addr);
++
++	// make an ICMP host redirect, set the gwaddr field
++	icmp* icp = (icmp*) (iph + 1);
++	icp->icmp_nextmtu = htons(mtu);
++
++	// make an inner IP packet to go in the ICMP data, which will
++	// be used to indicate to the end host which routing table
++	// entry to update
++
++	ip* innerhdr = (ip*)((u_char*)icp + 8);	// past icmp hdr
++		// deprecated protocol inside
++	memcpy( innerhdr, data, sizeof(ip) + 8 );
++
++	icp->icmp_cksum = 0;
++	icp->icmp_type = ICMP_UNREACH;
++	icp->icmp_code = ICMP_UNREACH_NEEDFRAG;
+ 	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
+ 		8 + sizeof(ip) + 8);
+ 
+--- /dev/null	Mon Dec 15 19:07:19 2003
++++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (c) 1997, 1998, 2003 The Regents of the University of California.
++ * All rights reserved.
++ * 
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. All advertising materials mentioning features or use of this software
++ *    must display the following acknowledgement:
++ * 	This product includes software developed by the MASH Research
++ *	Group at the University of California, Berkeley.
++ * 4. Neither the name of the University nor of the Research Group may be used
++ *    to endorse or promote products derived from this software without
++ *    specific prior written permission.
++ * 
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *
++ */
++
++#ifndef icmp_h
++#define icmp_h
++
++class IcmpAgent : public Agent {
++public:
++	IcmpAgent();
++	void recv(Packet*, Handler*) { abort(); }
++	void    sendfragneeded(struct in_addr & me, struct in_addr & target, u_int16_t mtu, void *data );
++protected:
++	void	sendredirect(in_addr& me, in_addr& target, in_addr& dest, in_addr& gw);
++	int	command(int argc, const char*const* argv);
++
++	int	ttl_;
++};
++
++#endif
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Fri Nov 28 16:55:25 2003
+@@ -668,6 +668,20 @@
+ 				tcl.result("1");
+ 			return (TCL_OK);
+ 		}
++/* This may not be defined since it is a custom socket option that
++   was added. Look in <sys/socket.h> */
++#ifndef SO_RTABID
++#define SO_RTABID 0x1010
++#endif
++		if (strcmp(argv[1], "setrtabid") == 0) {
++			unsigned int rtabid = atoi(argv[2]);
++			if( ::setsockopt(ssock_, SOL_SOCKET, SO_RTABID,
++					 &rtabid, sizeof(rtabid)) < 0 ) {
++			  tcl.result(strerror(errno));
++			  return (TCL_ERROR);
++			}
++			return (TCL_OK);
++		}
+ 	}
+ 	return (Network::command(argc, argv));
+ }
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Sat Dec 13 21:57:03 2003
+@@ -1,5 +1,5 @@
+ /*-
+- * Copyright (c) 1998 The Regents of the University of California.
++ * Copyright (c) 1998, 2003 The Regents of the University of California.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+@@ -69,83 +69,6 @@
+ #include "tclcl.h"
+ #include "packet.h"
+ 
+-/*
+- * observations about pcap library
+- *	device name is in the ifreq struct sense, should be doc'd
+- *	pcap_lookupdev returns a ptr to static data
+- *	q: does lookupdev only return devs in the AF_INET addr family?
+- *	why does pcap_compile require a netmask? seems odd
+- *	would like some way to tell it what buffer to use
+- *	arriving packets have the link layer hdr at the beginning, doc
+- *	not convenient/possible to open bpf read/write
+- *	no real way to know what file (/dev/bpf?) it is using
+- *		would be nice if pcap_lookdev helped out more by
+- *		returning ifnet or ifreq or whatever structure
+- *	pcap_lookupnet makes calls to get our addr, but
+- *		then tosses it anyhow, should get us addr and netmask
+- *	interface type codes could be via rfc1573
+- *		see freebsd net/if_types.h
+- *	want a way to set immed mode
+- *	pcap_next masks errors by returning 0 if pcap_dispatch fails
+- *	a pcap_t carries it's own internal buffer, and
+- *		_dispatch gives pointers into it when invoked [eek]
+- *	when you open pcap using a file, pcap_fileno always
+- *		returns -1; not so convenient
+- *	
+- */
+-
+-#define	PNET_PSTATE_INACTIVE	0
+-#define	PNET_PSTATE_ACTIVE	1
+-
+-//
+-// PcapNetwork: a "network" (source or possibly sink of packets)
+-//	this is a base class only-- the derived classes are:
+-//	PcapLiveNetwork [a live net; currently bpf + ethernet]
+-//	PcapFileNetwork [packets from a tcpdump-style trace file]
+-//
+-
+-class PcapNetwork : public Network {
+-
+-public:
+-	PcapNetwork() : t_firstpkt_(0.0),
+-		pfd_(-1), pcnt_(0), local_netmask_(0) { }
+-	int rchannel() { return(pfd_); }
+-	int schannel() { return(pfd_); }
+-	virtual int command(int argc, const char*const* argv);
+-
+-	virtual int open(int mode, const char *) = 0;
+-	virtual int skiphdr() = 0;
+-	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
+-	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
+-	int send(u_char *buf, int len);			// write to net
+-	int recv(netpkt_handler callback, void *clientdata); // get from net
+-	void close();
+-	void reset();
+-
+-	int filter(const char*);	// compile + install a filter
+-	int stat_pkts();
+-	int stat_pdrops();
+-
+-	double offset_;			// time offset to 1st pkt in a trace
+-	double t_firstpkt_;		// ts of 1st pkt recvd
+-
+-protected:
+-	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
+-	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
+-	virtual void bindvars() = 0;
+-
+-	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
+-	char srcname_[PATH_MAX];		// device or file name
+-	int pfd_;				// pcap fd
+-	int pcnt_;				// # pkts counted
+-	int state_;				// PNET_PSTATE_xxx (above)
+-	int optimize_;				// bpf optimizer enable
+-	pcap_t* pcap_;				// reference to pcap state
+-	struct bpf_program bpfpgm_;		// generated program
+-	struct pcap_stat pcs_;			// status
+-
+-	unsigned int local_netmask_;	// seems shouldn't be necessary :(
+-};
+ 
+ //
+ // PcapLiveNetwork: a live network tap
+@@ -498,6 +421,7 @@
+ 		// use SIOCGIFADDR hook in bpf to get link addr
+ 		struct ifreq ifr;
+ 		struct sockaddr *sa = &ifr.ifr_addr;
++		int s;
+ #ifdef HAVE_SIOCGIFHWADDR
+ 		memset(&ifr, 0, sizeof(struct ifreq));
+ 		strcpy(ifr.ifr_name, devname);
+@@ -513,6 +437,19 @@
+ 			  name(), pfd_);
+ 		}
+ #endif
++#ifdef SIOCGIFMTU
++		memset(&ifr, 0, sizeof(ifr));
++		strncpy(ifr.ifr_name, devname, sizeof (ifr.ifr_name));
++		s = socket(AF_INET, SOCK_DGRAM, 0);
++		if (ioctl(s, SIOCGIFMTU, (caddr_t)&ifr) < 0) {
++			fprintf(stderr,
++			  "pcap/live (%s) SIOCGIFMTU on bpf fd %d\n",
++			  name(), pfd_);
++		} else {
++		  mtu_ = ifr.ifr_mtu;
++		}
++		::close(s);
++#endif
+ 		if (dlink_type_ != DLT_EN10MB) {
+ 			fprintf(stderr,
+ 				"sorry, only ethernet supported\n");
+@@ -539,6 +476,19 @@
+ 				"warning: pcap/live (%s) couldn't set immed\n",
+ 				name());
+ 			perror("ioctl(BIOCIMMEDIATE)");
++		}
++		if (ioctl(pfd_, BIOCFLUSH, 0) < 0) {
++			fprintf(stderr,
++				"warning: pcap/live (%s) couldn't flush bpf buffer\n",
++				name());
++			perror("ioctl(BIOCFLUSH)");
++		}
++		int seesent = 0;
++		if (ioctl(pfd_, BIOCSSEESENT, &seesent) < 0) {
++			fprintf(stderr,
++				"warning: pcap/live (%s) couldn't reset BIOCGSEESENT\n",
++				name());
++			perror("ioctl(BIOCGSEESENT)");
+ 		}
+ 	}
+ #endif
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.cc	Fri Dec 12 18:57:43 2003
+@@ -1,5 +1,5 @@
+ /*-
+- * Copyright (c) 1993-1994, 1998 The Regents of the University of California.
++ * Copyright (c) 1993-1994, 1998, 2003 The Regents of the University of California.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.h	Sat Dec 13 21:20:28 2003
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 1991-1994, 1998 Regents of the University of California.
++ * Copyright (c) 1991-1994, 1998, 2003 Regents of the University of California.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without
+@@ -55,7 +55,7 @@
+ 
+ class Network : public TclObject {
+ public:
+-	Network() : mode_(-1) { }
++	Network() : mode_(-1),mtu_(1500) { }
+ 	virtual int command(int argc, const char*const* argv);
+ 	virtual int send(u_char* buf, int len) = 0;
+ 	virtual int recv(u_char* buf, int len, sockaddr& from, double& ts) = 0;
+@@ -69,10 +69,102 @@
+ 	virtual int rchannel() = 0;
+ 	virtual int schannel() = 0;
+ 	int mode() { return mode_; }
++	u_int16_t getmtu() { return mtu_; }
+ 	static int nonblock(int fd);
+ 	static int parsemode(const char*);  // strings to mode bits
+ 	static char* modename(int);	    // and the reverse
+ protected:
+ 	int mode_;	// read/write bits (from fcntl.h)
++	u_int16_t mtu_;
+ };
++
++#ifdef __cplusplus
++extern "C" {
++#include <pcap.h>
++}
++#else
++#include <pcap.h>
++#endif
++
++#include <sys/param.h>
++
++/*
++ * observations about pcap library
++ *	device name is in the ifreq struct sense, should be doc'd
++ *	pcap_lookupdev returns a ptr to static data
++ *	q: does lookupdev only return devs in the AF_INET addr family?
++ *	why does pcap_compile require a netmask? seems odd
++ *	would like some way to tell it what buffer to use
++ *	arriving packets have the link layer hdr at the beginning, doc
++ *	not convenient/possible to open bpf read/write
++ *	no real way to know what file (/dev/bpf?) it is using
++ *		would be nice if pcap_lookdev helped out more by
++ *		returning ifnet or ifreq or whatever structure
++ *	pcap_lookupnet makes calls to get our addr, but
++ *		then tosses it anyhow, should get us addr and netmask
++ *	interface type codes could be via rfc1573
++ *		see freebsd net/if_types.h
++ *	want a way to set immed mode
++ *	pcap_next masks errors by returning 0 if pcap_dispatch fails
++ *	a pcap_t carries it's own internal buffer, and
++ *		_dispatch gives pointers into it when invoked [eek]
++ *	when you open pcap using a file, pcap_fileno always
++ *		returns -1; not so convenient
++ *	
++ */
++
++#define	PNET_PSTATE_INACTIVE	0
++#define	PNET_PSTATE_ACTIVE	1
++
++//
++// PcapNetwork: a "network" (source or possibly sink of packets)
++//	this is a base class only-- the derived classes are:
++//	PcapLiveNetwork [a live net; currently bpf + ethernet]
++//	PcapFileNetwork [packets from a tcpdump-style trace file]
++//
++
++class PcapNetwork : public Network {
++
++public:
++	PcapNetwork() : t_firstpkt_(0.0),
++		pfd_(-1), pcnt_(0), local_netmask_(0) { }
++	int rchannel() { return(pfd_); }
++	int schannel() { return(pfd_); }
++	virtual int command(int argc, const char*const* argv);
++
++	virtual int open(int mode, const char *) = 0;
++	virtual int skiphdr() = 0;
++	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
++	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
++	int send(u_char *buf, int len);			// write to net
++	int recv(netpkt_handler callback, void *clientdata); // get from net
++	void close();
++	void reset();
++
++	int filter(const char*);	// compile + install a filter
++	int stat_pkts();
++	int stat_pdrops();
++
++	double offset_;			// time offset to 1st pkt in a trace
++	double t_firstpkt_;		// ts of 1st pkt recvd
++        inline char *srcname() { return(srcname_); }
++
++protected:
++	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
++	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
++	virtual void bindvars() = 0;
++
++	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
++	char srcname_[PATH_MAX];		// device or file name
++	int pfd_;				// pcap fd
++	int pcnt_;				// # pkts counted
++	int state_;				// PNET_PSTATE_xxx (above)
++	int optimize_;				// bpf optimizer enable
++	pcap_t* pcap_;				// reference to pcap state
++	struct bpf_program bpfpgm_;		// generated program
++	struct pcap_stat pcs_;			// status
++
++	unsigned int local_netmask_;	// seems shouldn't be necessary :(
++};
++
+ #endif
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Nov 28 16:55:25 2003
+@@ -46,7 +46,7 @@
+ 	}
+ } class_tap_agent;
+ 
+-TapAgent::TapAgent() : Agent(PT_LIVE), net_(NULL)
++TapAgent::TapAgent() : Agent(PT_LIVE), net_outgoing_(NULL), net_incoming_(NULL)
+ {
+ 	bind("maxpkt_", &maxpkt_);
+ }
+@@ -55,11 +55,11 @@
+ // link in a network to the agent.  Assumes net_ is non-zero
+ //
+ int
+-TapAgent::linknet()
++TapAgent::linknet(Network *net)
+ {
+-	int mode = net_->mode();
+-	int rchan = net_->rchannel();
+-	int wchan = net_->schannel();
++	int mode = net->mode();
++	int rchan = net->rchannel();
++	int wchan = net->schannel();
+ 
+ 	unlink();
+ 	if (mode == O_RDONLY || mode == O_RDWR) {
+@@ -67,7 +67,7 @@
+ 		if (rchan < 0) {
+ 			fprintf(stderr,
+ 		"TapAgent(%s): network %s not open for reading (mode:%d)\n",
+-			    name(), net_->name(), mode);
++			    name(), net->name(), mode);
+ 			return (TCL_ERROR);
+ 		}
+ 		link(rchan, TCL_READABLE);
+@@ -77,13 +77,13 @@
+ 		if (mode == -1) {
+ 			fprintf(stderr,
+ 			   "TapAgent(%s): Network(%s) not opened properly.\n",
+-				name(), net_->name());
++				name(), net->name());
+ 			fprintf(stderr,
+ 			   "(choose: readonly, readwrite, or writeonly)\n");
+ 		} else {
+ 			fprintf(stderr,
+ 			    "TapAgent(%s): unknown mode %d in Network(%s)\n",
+-				name(), mode, net_->name());
++				name(), mode, net->name());
+ 		}
+ 		return (TCL_ERROR);
+ 	}
+@@ -93,7 +93,7 @@
+ 		if (wchan < 0) {
+ 			fprintf(stderr,
+ 			"TapAgent(%s): network %s not open for writing\n",
+-			    name(), net_->name());
++			    name(), net->name());
+ 			return (TCL_ERROR);
+ 		}
+ 	}
+@@ -112,10 +112,25 @@
+ 		} 
+ 	}
+ 	if (argc == 3) {
+-		if (strcmp(argv[1], "network") == 0) {
+-			net_ = (Network *)TclObject::lookup(argv[2]);
+-			if (net_ != 0) {
+-				return(linknet());
++		if (strcmp(argv[1], "network-outgoing") == 0) {
++			net_outgoing_ = (Network *)TclObject::lookup(argv[2]);
++			/* We don't need to monitor outgoing network (by calling linknet()) coz
++			   we just send packets to it. In case a particular
++			   network object does both, the user has to explicitly
++			   use the command network-incoming to monitor this fd */
++			if (net_outgoing_ == 0) {
++				fprintf(stderr,
++				"TapAgent(%s): unknown network %s\n",
++				    name(), argv[2]);
++				return (TCL_ERROR);
++			}
++			return(TCL_OK);
++		}	
++
++		if (strcmp(argv[1], "network-incoming") == 0) {
++			net_incoming_ = (Network *)TclObject::lookup(argv[2]);
++			if (net_incoming_ != 0) {
++				return(linknet(net_incoming_));
+ 			} else {
+ 				fprintf(stderr,
+ 				"TapAgent(%s): unknown network %s\n",
+@@ -135,7 +150,7 @@
+ TapAgent::recvpkt()
+ {
+ 
+-	if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
++	if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
+ 		fprintf(stderr,
+ 		  "TapAgent(%s): recvpkt called while in write-only mode!\n",
+ 		  name());
+@@ -155,7 +170,7 @@
+ 	// fill up payload
+ 	sockaddr addr;	// not really used (yet)
+ 	double tstamp;
+-	int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
++	int cc = net_incoming_->recv(p->accessdata(), maxpkt_, addr, tstamp);
+ 	if (cc <= 0) {
+ 		if (cc < 0) {
+ 			perror("recv");
+@@ -230,7 +245,7 @@
+ int
+ TapAgent::sendpkt(Packet* p)
+ {
+-	if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
++	if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
+ 		fprintf(stderr,
+ 		    "TapAgent(%s): sendpkt called while in read-only mode!\n",
+ 		    name());
+@@ -239,14 +254,14 @@
+ 
+ 	// send packet into the live network
+ 	hdr_cmn* hc = HDR_CMN(p);
+-	if (net_ == NULL) {
++	if (net_outgoing_ == NULL) {
+ 		fprintf(stderr,
+ 	         "TapAgent(%s): sendpkt attempted with NULL net\n",
+ 		 name());
+ 		drop(p);
+ 		return (-1);
+ 	}
+-	if (net_->send(p->accessdata(), hc->size()) < 0) {
++	if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
+ 		fprintf(stderr,
+ 		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
+ 		    name(), p->accessdata(), hc->size(), strerror(errno));
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Nov 28 16:55:25 2003
+@@ -43,7 +43,7 @@
+ #include "agent.h"
+ 
+ 
+-#define TAPDEBUG 1 
++#define TAPDEBUG 0
+ #ifdef TAPDEBUG
+ #define	TDEBUG(x) { if (TAPDEBUG) fprintf(stderr, (x)); }
+ #define	TDEBUG2(x,y) { if (TAPDEBUG) fprintf(stderr, (x), (y)); }
+@@ -71,8 +71,9 @@
+ protected:
+ 	int maxpkt_;		/* max size allocated to recv a pkt */
+ 	void dispatch(int);	/* invoked via scheduler on I/O event */
+-	int linknet();		/* establish I/O handler */
+-	Network* net_;		/* live network object */
++	int linknet(Network *);		/* establish I/O handler */
++	Network* net_outgoing_;	/* live network object for outgoing packets */
++	Network* net_incoming_;		/* live network object for incoming packets */
+ 	double now() { return Scheduler::instance().clock(); }
+ };
+ 
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Nov 28 16:55:25 2003
+@@ -97,6 +97,11 @@
+       return (TCL_OK);
+     }
+ 
++    if (strcmp(argv[1], "nsport") == 0) {
++      nsnode.sin_port = atoi(argv[2]);
++      return (TCL_OK);
++    }
++
+     if (strcmp(argv[1], "advertised-window") == 0) {
+       adv_window = atoi(argv[2]);
+       return (TCL_OK);
+@@ -438,7 +443,7 @@
+ /*
+  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+  * 
+- * recvpkt then calls the network (net_) to receive as many packets
++ * recvpkt then calls the network (net_incoming_) to receive as many packets
+  * as there are from the packet capture facility.
+  * For every packet received through the callback, it converts to ns
+  * FullTcp packet and injects it into the simulator by calling target_->recv
+@@ -447,14 +452,14 @@
+ void
+ TCPTapAgent::recvpkt()
+ {
+-  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
++  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
+     fprintf(stderr,
+ 	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
+ 	    name());
+     return;
+   }
+   
+-  int cc = net_->recv(pkt_handler, this);
++  int cc = net_incoming_->recv(pkt_handler, this);
+   if (cc <= 0) {
+     if (cc < 0) {
+       perror("recv");
+@@ -474,7 +479,7 @@
+  * simulator schedules TapAgent::recv which calls sendpkt
+  *
+  * Grabs a ns Full TCP packet, converts it into real TCP packet 
+- * and injects onto the network using net_->send
++ * and injects onto the network using net_outgoing_->send
+  *
+  */
+ int
+@@ -486,7 +491,7 @@
+   int hlength = IP_HEADER_LEN + TCP_HEADER_LEN;
+   struct tcphdr *tcpheader;
+ 
+-  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
++  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
+     fprintf(stderr,
+ 	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
+ 	    name());
+@@ -495,7 +500,7 @@
+   
+   // send packet into the live network
+   hdr_cmn* ns_cmnhdr = HDR_CMN(p);
+-  if (net_ == NULL) {
++  if (net_outgoing_ == NULL) {
+     fprintf(stderr,
+ 	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
+ 	    name());
+@@ -543,7 +548,7 @@
+      Limits the packets going out to only IP + TCP header. 
+      ns will act as an ACK machine.
+    */
+-  byteswritten = net_->send(packet, hlength + datalen);
++  byteswritten = net_outgoing_->send(packet, hlength + datalen);
+   if (byteswritten < 0) {
+     fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
+ 	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
+--- dist-ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
++++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Nov 28 16:55:25 2003
+@@ -44,6 +44,10 @@
+ #include "ip.h"
+ #include "connector.h"
+ 
++#ifdef ADD_ETHER_OVERHEAD
++#include <net/ethernet.h>
++#endif
++
+ class LinkDelay : public Connector {
+  public:
+ 	LinkDelay();
+@@ -52,7 +56,11 @@
+ 	void handle(Event* e);
+ 	double delay() { return delay_; }
+ 	inline double txtime(Packet* p) {
++#ifndef ADD_ETHER_OVERHEAD
+ 		return (8. * hdr_cmn::access(p)->size() / bandwidth_);
++#else
++		return (8. * (hdr_cmn::access(p)->size() + ETHER_HDR_LEN) / bandwidth_);
++#endif
+ 	}
+ 	double bandwidth() const { return bandwidth_; }
+ 	void pktintran(int src, int group);
+--- dist-ns-allinone-2.26/ns-2.26/mcast/lms.h	Wed Feb 26 15:08:58 2003
++++ ns-allinone-2.26/ns-2.26/mcast/lms.h	Fri Nov 28 16:55:25 2003
+@@ -64,7 +64,7 @@
+     nsaddr_t    src_;		// original source of mcast packet
+     nsaddr_t    group_;		// mcast group
+     nsaddr_t    tp_addr_;	// turning point address
+-    int	       	tp_port_;	// turning point port id 
++    u_int      	tp_port_;	// turning point port id 
+     int	       	tp_iface_;	// turning point interface
+     int	       	lo_, hi_;	// range of lost packets
+     double     	ts_;		// timestamp for RTT estimation
+--- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Sun Dec 14 20:38:54 2003
+@@ -79,6 +79,15 @@
+ 
+ CFLAGS	= $(CCOPT) $(DEFINE)
+ 
++#### with event system
++INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
++#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC
++CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC
++LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
++LIB += `elvin-config --libs vin4c`
++STATIC += -static
++####
++
+ # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
+ # Also, gcc does not remove the .o before forking 'as', which can be a
+ # problem if you don't own the file but can write to the directory.
+@@ -276,6 +285,7 @@
+ 	mcast/lms-sender.o \
+ 	@V_STLOBJ@
+ 
++OBJ_CC += ../../tbevent.o
+ 
+ # don't allow comments to follow continuation lines
+ 
+@@ -303,6 +313,10 @@
+ 	emulate/nat.o  \
+ 	emulate/iptap.o \
+ 	emulate/tcptap.o
++
++##### nse with event system
++OBJ_EMULATE_CC += ../../tbnexthop.o
++####
+ 
+ OBJ_EMULATE_C = \
+ 	emulate/inet.o
+--- dist-ns-allinone-2.26/ns-2.26/config.h	Wed Feb 26 15:07:55 2003
++++ ns-allinone-2.26/ns-2.26/config.h	Fri Nov 28 16:55:25 2003
+@@ -73,13 +73,13 @@
+  typedef unsigned char u_char;
+ typedef unsigned int u_int;
+ */
+-typedef int32_t nsaddr_t; 
+-typedef int32_t nsmask_t; 
++typedef u_int32_t nsaddr_t; 
++typedef u_int32_t nsmask_t; 
+ 
+ // 32-bit addressing support
+ struct ns_addr_t {
+-	int32_t addr_;
+-	int32_t port_;
++	u_int32_t addr_;
++	u_int32_t port_;
+ #ifdef __cplusplus
+ 	ns_addr_t& operator= (const ns_addr_t& n) {
+ 		addr_ = n.addr_;
+--- dist-ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
++++ ns-allinone-2.26/install	Mon Dec 15 19:04:53 2003
+@@ -41,301 +41,47 @@
+ # Get current path
+ CUR_PATH=`pwd`
+ 
+-# Check if we are using Cygwin, and if so, if it is a bona fide install
+-# Cygwin patches contributed by Nicolas Christin <nicolas@cs.virginia.edu>
++if [ -x /usr/local/tcl8.3.2/bin/tclsh8.3 ] ; then
++  V_TCLSH=/usr/local/tcl8.3.2/bin/tclsh8.3 
++  export V_TCLSH
++  WITHTCL_PATH=/usr/local/tcl8.3.2
++  export WITHTCL_PATH
+ 
+-echo "============================================================"
+-echo "* Testing for Cygwin environment"
+-echo "============================================================"
+-
+-if [ -x /usr/bin/uname ]; then
+-        # it may be a Cygwin install
+-        test_cygwin=`uname | tr [a-z] [A-Z] | sed -e 's|.*CYGWIN.*|true|'`;
+-        if  [ "${test_cygwin}" = "true" ]; then
+-                echo "Cygwin detected";
+-                echo "Note: Cygwin install is still considered EXPERIMENTAL";
+-                echo "";
+-                echo -n "Checking Cygwin version is >=1.3.12... "
+-                cmaj=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\1/'`;
+-                echo $cmaj | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cmaj=0;
+-                fi;
+-                cmin=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\2/'`;
+-                echo $cmin | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cmin=0;
+-                fi;
+-                cpat=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\3/'`;
+-                echo $cpat | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cpat=0;
+-                fi;
+-                echo -n "$cmaj.$cmin.$cpat ";
+-                if ([ "$cmaj" -gt "1" ]) || ([ "$cmaj" -eq "1" ] && [ $cmin -gt "3" ]) || ([ "$cmaj" -eq 1 ] && [ $cmin -eq "3" ] && [ "$cpat" -ge "12" ]); then
+-                        echo "should be ok";
+-                else
+-                        echo "*** POSSIBLE PROBLEM ***";
+-                        echo "";
+-                        echo "ns-allinone-${NSVER} has not been tested under versions of Cygwin older than";
+-                        echo "1.3.12. Your version ($cmaj.$cmin.$cpat) appears to be older than that. Success of";
+-                        echo "the install process is therefore NOT GUARANTEED.";
+-                        echo "";
+-                        cygversion="failed";                
+-		fi;
+-                echo -n "Checking filesystems are mounted as UNIX filetype... ";
+-                mount | grep "textmode" >/dev/null 2>&1;
+-                if [ "$?" -eq "0" ]; then
+-                        echo "*** NO! ***";
+-                        mount_test="failed";
+-                        echo "";
+-                        echo "It appears that some of your Cygwin shares are mounted as DOS file";
+-                        echo "type. This has not been tested, but is likely to result in failure of";
+-                        echo "validation tests. Success of the install process is also NOT";
+-                        echo "GUARANTEED.";
+-                        echo "";
+-                        echo "Refer to the Cygwin user guide for how to install Cygwin with the UNIX";
+-                        echo "file text mode.";
+-                        echo "";
+-                else
+-                        echo "yes";
+-                        echo -n "Checking default mode is binmode... ";
+-                        echo ${CYGWIN} | grep "nobinmode" >/dev/null 2>&1;
+-                        if [ "$?" -eq "0" ]; then
+-                                cyg_env_var="failed";
+-                                echo "*** NO! ***";
+-                                echo "";
+-                                echo "Your \$CYGWIN environment variable specifies \"nobinmode\". This is";
+-                                echo "likely to result in failure of validation tests, and (possibly) of";
+-                                echo "the whole install process. You need to have the \$CYGWIN environment";
+-                                echo "variable set to \"binmode\". Please refer to the Cygwin user guide for";
+-                                echo "details on how to change this.";
+-                                echo "";
+-                        else 
+-                                echo "yes";
+-                        fi;
+-                fi;                           
+-                if [ "$cygversion" = "failed" ] || [ "$cyg_env_var" = "failed" ] || [ "$mount_test" = "failed" ]; then
+-                        echo "";
+-                        echo "Tests indicate that your installation of Cygwin may not be suitable for";
+-                        echo "installing ns-2 allinone.";
+-                        echo "";
+-                        echo -n "Do you wish to proceed regardless? [y/n] "
+-                        read answer;
+-                        if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+-                                die "Installation aborted...";
+-                        fi;
+-                fi;
+-                echo "Patching Tcl for Cygwin.";
+-                if [ ! -f ./tcl${TCLVER}/generic/tcl.h.orig ]; then
+-                        cp ./tcl${TCLVER}/generic/tcl.h ./tcl${TCLVER}/generic/tcl.h.orig;
+-                        echo "The original tcl${TCLVER}/generic/tcl.h is backed up as tcl${TCLVER}/generic/tcl.h.orig";
+-                        sed -e 's/\#define _TCL/\#define _TCL\`\`\#ifdef __CYGWIN__\`\#define HAVE_TM_ZONE 1\`\#endif \/\* __CYGWIN__ \*\//g' ./tcl${TCLVER}/generic/tcl.h.orig | tr '\`' '\n' > ./tcl${TCLVER}/generic/tcl.h;
+-                fi;
+-                touch ./tcl${TCLVER}/generic/tclStubInit.c;
+-                echo "Patching sgb for Cygwin.";
+-                cp ./sgb/Makefile ./sgb/Makefile.orig;
+-                echo "The original sgb/Makefile is backed up as sgb/Makefile.orig";
+-                sed -e 's|rm \(.*\)test_io test_graph test_flip test_sample\(.*\)|rm -f \1test_io.exe test_graph.exe test_flip.exe test_sample.exe\2|' ./sgb/Makefile.orig > ./sgb/Makefile;
+-                echo "Setting executable format to .exe...";
+-                EXE=".exe";
+-        else
+-                echo "Cygwin not detected, proceeding with regular install.";
+-                EXE=;
+-        fi;
+-else
+-        echo "Cygwin not detected, proceeding with regular install.";
+-fi;
+-
+-
+-
+-# Compile and install xgraph
+-
+-echo "============================================================"
+-echo "* Build XGraph-$XGRAPHVER"
+-echo "============================================================"
+-
+-cd ./xgraph-$XGRAPHVER
+-./configure --prefix=../
+-if  [ "${test_cygwin}" = "true" ]; then
+-       touch stamp-h;
+-fi;
+-if make
+-then
+-	echo "xgraph has been installed successfully. "
+-else 
+-	echo "Can not create xgraph; But xgraph is an optional package, continuing..."
+-fi
+-
+-cd ../
+-
+-# Compile and install cweb and sgblib
+-
+-echo "============================================================"
+-echo "* Build CWeb"
+-echo "============================================================"
+-
+-cd ./cweb
+-
+-if [ ! -f ./Makefile ]
+-then
+-	echo "ns-allinone unable to install cweb for you. Please install it manually. cweb is used by sgb to create sgblibrary needed by scenario-generator. But this will not affect the use of ns as such, so continue.."
+-else
+-	echo "Making cweb"
+-	touch *.c
+-	make all || warn "cweb failed to make, but it's optional"
+-	# xxx: other stuff will fail...
+-	chmod 755 cweave${EXE}
+-	chmod 755 ctangle${EXE}
+-	cd ..
+-	#echo "cd .."
+-	if [ ! -d bin ]
+-	then
+-		mkdir bin
+-	fi
+-	cd bin
+-	ln -s $CUR_PATH/cweb/cweave${EXE} cweave${EXE}
+-	ln -s $CUR_PATH/cweb/ctangle${EXE} ctangle${EXE}
+-fi
+-
+-cd ..
+-PATH=$CUR_PATH/bin:$PATH
+-export PATH
+-
+-echo "============================================================"
+-echo "* Build Stanford GraphBase"
+-echo "============================================================"
+-
+-cd ./sgb
+-if [ ! -f ./Makefile ]
+-	then
+-	echo "Unable to create sgb library. This library is used by gt-itm and so for scenario generators. If you already have sgblib (possible if you are on solaris,sunos or freebsd platforms) you may still be able to run gt-itm. so continuing.."
+-else
+-	echo "Making sgb"
+-	if make tests
+-	then
+-                if [ -f libgb.a ] ; then
+-                        rm -f ../gt-itm/lib/libgb.a
+-			cp libgb.a ../gt-itm/lib/libgb.a
+-                else 
+-		        echo "* Weird: sgb said it has been built but we can't find libgb.a! "
+-			exit -1
+-                fi
+-	else
+-	        echo "Unable to create sgb library, but it's optional, so continuing..."
+-	fi
+-fi
+-
+-cd ..
+-
+-# Compile and install gt-itm & sgb2ns
+-
+-echo "============================================================"
+-echo "* Build GT-ITM"
+-echo "============================================================"
+-
+-if [ -f ./gt-itm/lib/libgb.a ]
+-then
+- if [ ! -f ./gt-itm/src/Makefile ] 
+-    then
+-    echo "ns-alline is unable to install gt-itm sgb2ns for you, please install"
+-    echo "them manually. You can't run scenario generator without gt-itm"
+-    echo "and sgb2ns. But it will not affect you use ns, so continue ..."
+- else
+-    cd ./gt-itm/src
+-    if make
+-    then
+-      echo "gt-itm has been installed successfully."
+-    fi
+-    
+-    cd ../sgb2ns
+-    if make
+-    then
+-      echo "sgb2ns has been installed successfully."
+-    fi
+-   cd ../../
+- fi
+-else
+-    echo "sgb lib not found. gt-itm & sgb2ns could not be installed. Continuing.."
+-fi
+-
+-# Build zlib
+-
+-echo "============================================================"
+-echo "* Build zlib"
+-echo "============================================================"
+-
+-cd ./zlib-1.1.4
+-
+-if ./configure --exec-prefix=../ --prefix=../
+-then
+-	if make
+-	then
+-		echo "Zlib has been installed successfully."
+-	else
+-		warn "Zlib make failed, but it's optional Continue ..."
+-	fi
+-else
+-	warn "Zlib-1.1.4 configuration failed, but it's optional, so continuing ..."
+-fi
+-
+-cd ../
+-
+-# Build Tcl8.3.5
+-
+-echo "============================================================"
+-echo "* Build tcl$TCLVER"
+-echo "============================================================"
+-
+-cd ./tcl$TCLVER/unix
+-if [ -f Makefile ] ; then 
+-	make distclean
+-fi
+-
+-blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
+-to see if they have a fix for your platform.'
+-./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
+-if make 
+-then 
+-	echo "tcl$TCLVER make succeeded."
+-	make install || die "tcl$TCLVER installation failed."
+-	echo "tcl$TCLVER installation succeeded."
+-	cp ../generic/*.h ../../include
+ else
+-	echo "tcl$TCLVER make failed! Exiting ..."
+-	echo "For problems with Tcl/Tk see http://www.scriptics.com"
+-	exit
+-fi
+ 
+-cd ../../
++  # Build Tcl8.3.5
++
++  echo "============================================================"
++  echo "* Build tcl$TCLVER"
++  echo "============================================================"
++
++  cd ./tcl$TCLVER/unix
++  if [ -f Makefile ] ; then 
++	  make distclean
++  fi
++
++  blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
++  to see if they have a fix for your platform.'
++  ./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
++  if make 
++  then 
++  	  echo "tcl$TCLVER make succeeded."
++	  make install || die "tcl$TCLVER installation failed."
++	  echo "tcl$TCLVER installation succeeded."
++	  cp ../generic/*.h ../../include
++  else
++	  echo "tcl$TCLVER make failed! Exiting ..."
++	  echo "For problems with Tcl/Tk see http://www.scriptics.com"
++	  exit
++  fi
+ 
+-# compile and install tk
++  cd ../../
+ 
+-echo "============================================================"
+-echo "* Build Tk$TKVER"
+-echo "============================================================"
++  WITHTCL_PATH=$CUR_PATH/tcl$TCLVER
++  export WITHTCL_PATH
+ 
+-cd ./tk$TKVER/unix
+-if [ -f Makefile ] ; then
+-	make distclean
+ fi
+ 
+-blame='Tk is not part of the ns project.  Please see www.Scriptics.com
+-to see if they have a fix for your platform.'
+-./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tk8.3.2 configuration failed! Exiting ..."
+-if make 
+-then
+-	echo "tk$TKVER build succeeded."
+-	make install || die "tk$TKVER installation failed."
+-	echo "tk$TKVER installation succeeded."
+-else
+-	echo "tk$TKVER make failed! Exiting ..."
+-	echo "For problems with Tcl/Tk see http://www.scriptics.com"
+-	exit
+-fi
+-
+-cd ../../
+-
+ #
+ # Since our configures search for tclsh in $PATH, the following 
+ # is needed. This is necessary for otcl/tclcl/ns/nam
+@@ -345,28 +91,40 @@
+ LD_LIBRARY_PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$LD_LIBRARY_PATH
+ export LD_LIBRARY_PATH
+ 
+-# Build otcl
++if [ -d /usr/local/otcl-1.0a8 ] ; then
+ 
+-echo "============================================================"
+-echo "* Build OTcl-$OTCLVER"
+-echo "============================================================"
++  WITHOTCL_PATH=/usr/local/otcl-1.0a8
++  export WITHOTCL_PATH
+ 
+-cd ./otcl-$OTCLVER
++else
+ 
+-blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
+-for common problems and bug fixes.'
+-./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
++  # Build otcl
+ 
+-if make 
+-then
+-	echo "otcl-$OTCLVER has been installed successfully."
+-else
+-	echo "otcl-$OTCLVER make failed! Exiting ..."
+-	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
+-	exit
+-fi
++  echo "============================================================"
++  echo "* Build OTcl-$OTCLVER"
++  echo "============================================================"
++
++  cd ./otcl-$OTCLVER
++
++  blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
++  for common problems and bug fixes.'
++  ./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
+ 
+-cd ..
++  if make 
++  then
++  	  echo "otcl-$OTCLVER has been installed successfully."
++  else
++	  echo "otcl-$OTCLVER make failed! Exiting ..."
++	  echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
++	  exit
++  fi
++
++  cd ..
++
++  WITHOTCL_PATH=`pwd`/otcl-$OTCLVER
++  export WITHOTCL_PATH
++
++fi
+ 
+ # Build tclcl
+ 
+@@ -376,7 +134,7 @@
+ 
+ cd ./tclcl-$TCLCLVER
+ 
+-./configure || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
++./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "tclcl-$TCLCLVER configuration failed! Exiting ..."
+ 
+ if make
+ then
+@@ -397,40 +155,20 @@
+ echo "============================================================"
+ 
+ cd ./ns-$NSVER
+-./configure || die "Ns configuration failed! Exiting ..."
++./configure --enable-static --enable-debug --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "Ns configuration failed! Exiting ..."
+ 
+-if make
++if make nse
+ then
+-	echo " Ns has been installed successfully." 
++	echo " Nse has been installed successfully." 
+ else
+-	echo "Ns make failed!"
++	echo "Nse make failed!"
+ 	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
+ 	exit
+ fi
+ 
+ cd ../
+ 
+-# Build nam
+-
+-echo "============================================================"
+-echo "* Build nam-$NAMVER"
+-echo "============================================================"
+-
+-cd ./nam-$NAMVER
+-
+-./configure --with-tclcl=$CUR_PATH/tclcl-$TCLCLVER  || die "Nam configuration failed! Exiting ..."
+-
+-if make
+-then 
+-    echo "Nam has been installed successfully."
+-else
+-    echo "Nam make failed! Continue ..."
+-    echo "See http://www.isi.edu/nsnam/ns-problems.html for problems"
+-fi
+-
+-cd ../
+-
+-# Install nam, ns, xgraph into bin
++# Install nse into bin
+ 
+ if [ ! -d bin ] ; then
+     mkdir bin
+@@ -438,55 +176,14 @@
+ 
+ cd bin
+ 
+-ln -s $CUR_PATH/ns-$NSVER/ns${EXE} ns${EXE}
+-
+-if test -x $CUR_PATH/nam-$NAMVER/nam${EXE}
+-then
+-    ln -s $CUR_PATH/nam-$NAMVER/nam${EXE} nam${EXE}
+-else
+-    echo "Please compile your nam separately."
+-fi
+-
+-if test -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE}
+-then
+-    ln -s $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE} xgraph${EXE}
+-else
+-    echo "Please compile your xgraph separately."
+-fi
+-
+-if test -x $CUR_PATH/gt-itm/bin/sgb2ns${EXE}
+-then 
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2ns${EXE} sgb2ns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2hierns${EXE} sgb2hierns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2comns${EXE} sgb2comns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/itm${EXE} itm${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2alt${EXE} sgb2alt${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/edriver${EXE} edriver${EXE}
+-else
+-    echo "Please compile your gt-itm & sgb2ns separately."
+-fi
++ln -s $CUR_PATH/ns-$NSVER/nse nse
+ 
+ echo "Ns-allinone package has been installed successfully."
+ echo "Here are the installation places:"
+ echo "tcl$TCLVER:	$CUR_PATH/{bin,include,lib}"
+-echo "tk$TKVER:		$CUR_PATH/{bin,include,lib}"
+ echo "otcl:		$CUR_PATH/otcl-$OTCLVER"
+ echo "tclcl:		$CUR_PATH/tclcl-$TCLCLVER"
+-echo "ns:		$CUR_PATH/ns-$NSVER/ns"
+-
+-if [ -x $CUR_PATH/nam-$NAMVER/nam ]
+-then
+-echo "nam:	$CUR_PATH/nam-$NAMVER/nam"
+-fi
+-
+-if [ -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph ]
+-then
+-echo "xgraph:	$CUR_PATH/xgraph-$XGRAPHVER"
+-fi
+-if [ -x $CUR_PATH/gt-itm/bin/sgb2ns ] 
+-then
+-echo "gt-itm:   $CUR_PATH/itm, edriver, sgb2alt, sgb2ns, sgb2comns, sgb2hierns"
+-fi
++echo "nse:		$CUR_PATH/ns-$NSVER/nse"
+ 
+ echo ""
+ echo "----------------------------------------------------------------------------------"

@@ -25,7 +25,8 @@ use Exporter;
 	     TMCCCMD_SFSHOSTID TMCCCMD_JAILCONFIG
 	     TMCCCMD_PLABCONFIG TMCCCMD_SUBCONFIG TMCCCMD_LINKDELAYS
 	     TMCCCMD_PROGRAMS TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
-	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT TMCCCMD_EVENTKEY
+	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT TMCCCMD_EVENTKEY TMCCCMD_ROUTELIST
+	     TMCCCMD_ROLE
 	     );
 
 # Must come after package declaration!
@@ -144,6 +145,8 @@ my %commandset =
       "ntprift"		=> {TAG => "ntpdrift"},
       "sdparams"	=> {TAG => "sdparams"},
       "eventkey"	=> {TAG => "eventkey"},
+      "routelist"	=> {TAG => "routelist"},
+      "role"		=> {TAG => "role"},
     );
 
 #
@@ -183,6 +186,8 @@ sub TMCCCMD_NODEID()    { $commandset{"nodeid"}->{TAG}; }
 sub TMCCCMD_NTPINFO()   { $commandset{"ntpinfo"}->{TAG}; }
 sub TMCCCMD_NTPDRIFT()  { $commandset{"ntpdrift"}->{TAG}; }
 sub TMCCCMD_EVENTKEY()  { $commandset{"eventkey"}->{TAG}; }
+sub TMCCCMD_ROUTELIST()	{ $commandset{"routelist"}->{TAG}; }
+sub TMCCCMD_ROLE()	{ $commandset{"role"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

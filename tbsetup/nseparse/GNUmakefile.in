@@ -1,0 +1,63 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/nseparse
+
+include $(OBJDIR)/Makeconf
+
+LIB_STUFF    =  nse.node.tcl nse.sim.tcl nse.null.tcl \
+		  nse.agent.tcl nse.parse.tcl
+BOSSLIBEXEC  = parse-nse
+USERLIBEXEC  = nse.parse.proxy
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: $(LIB_STUFF) $(BOSSLIBEXEC) $(USERLIBEXEC)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:	control-install \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(BOSSLIBEXEC)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/lib/nseparse/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/libexec/nseparse/, $(USERLIBEXEC))
+
+control-install: $(addprefix $(INSTALL_LIBDIR)/nseparse/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/nseparse/, $(USERLIBEXEC))
+
+post-install: 
+	chmod 775 $(INSTALL_LIBEXECDIR)
+	chown root $(INSTALL_LIBEXECDIR)/parse-nse
+	chmod u+s $(INSTALL_LIBEXECDIR)/parse-nse
+
+$(INSTALL_LIBDIR)/nseparse/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/nseparse
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBEXECDIR)/nseparse/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/nseparse
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/nseparse/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/nseparse
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/nseparse/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/nseparse
+	$(INSTALL) $< $@
+
+clean:

@@ -329,18 +329,21 @@ my %expt_stats = (# pnodes include jailnodes and delaynodes.
 		  maxlinks    => 0,
 );
 
-# XXX NSE hack: List of simulated nodes. All these will go
-# into one pc850. Needs to change in distributed nse.
-my @simnodelist;
-my %simnode_iplist = ();
-my %iptonodemap    = ();
 my $nsenode_id     = 0;
-# lans that have simulated nodes
-my %simnodelans    = ();
 
 # Counters for generating IDs.
 my $virtnode_id  = 0;
 my $veth_id      = 0;
+
+#
+# Every vnode on a pnode gets its own routing
+# table, thus an rtabid. In the case of simulated
+# nodes, we need rtabids only for border nodes
+# i.e. nodes that have links going out of the pnode.
+# Either way, new rtabids are requested via getrtabid(<vnode>,<pnode>)
+# when the interfaces table is updated or new veth_interfaces
+# are inserted. This hash maintains the rtabids per vnode
+my %vnode2rtabid = ();
 
 ######################################################################
 # Step 1 - Setup virtual topology
@@ -509,6 +512,8 @@ sub RunAssign ($)
 	if ($virtcount);
     $ptopargs   .= "-r "
 	if ($remotecount);
+    $ptopargs   .= "-S "
+	if ($simcount);
     system("ptopgen $ptopargs > $ptopfile");
 
     TBDebugTimeStamp("ptopgen finished");
@@ -1339,7 +1344,7 @@ foreach $plink (keys(%plinks)) {
 	    if (virtlanuseveth($lan)) {
 		#
 		# Create some new veth devices.
-		# 
+		#
 		$portA = NewVethIface($lan, $virtA, $nodeA, $portA);
 		$portB = NewVethIface($lan, $virtB, $nodeB, $portB);
 	    }
@@ -1729,11 +1734,6 @@ foreach $delayid (keys(%linkdelays)) {
     # 
 }
 
-# NSE hack: list of ip addresses of simulated nodes that
-# have an external link/lan and therefore have the corresponding
-# ip on the interface of the physical node
-my %simnode_extips = ();
-
 # For recording IP aliases. see below.
 my %IPaliases = ();
 
@@ -1765,6 +1765,7 @@ foreach $vnodeport (keys(%portmap)) {
 	#
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
+	my $rtabid = getrtabid($vnode, $pnode);
 	my $vvnode  = "NULL";
 
 	# Mark as being a jail interface by establishing a connection
@@ -1777,24 +1778,9 @@ foreach $vnodeport (keys(%portmap)) {
 	    printdb("IP: $pnode:$pport $ip\n");
 
 	    DBQueryFatal("update interfaces set ".
-			 " IP='$ip',IPaliases=NULL,mask='$mask',vnode_id=$vvnode " .
-			 "where node_id='$pnode' and iface='$pport'");
-
-	    #
-	    # If a sim node do something special? Avoid IP aliases too.
-	    #
-	    # XXX This appears to mean that in a sim node, the IP
-	    # address in the interface table is constantly overwritten?
-	    #
-	    if (virtnodeissim($vnode)) {
-		if (! defined( $simnode_extips{$vnode})) {
-		    $simnode_extips{$vnode} = [];
-		}
-		push(@{$simnode_extips{$vnode}}, $ips{$vnodeport});
-	    }
-	    else {
-		$IPaliases{"$pnode:$pport"} = 1;
-	    }
+			 " IP='$ip',IPaliases=NULL,mask='$mask',vnode_id=$vvnode," .
+			 "rtabid='$rtabid' where node_id='$pnode' and iface='$pport'");
+	    $IPaliases{"$pnode:$pport"} = 1;
 	}
 	else {
 	    printdb("IP: $pnode:$pport $ip (alias)\n");
@@ -1804,111 +1790,6 @@ foreach $vnodeport (keys(%portmap)) {
 			 "where node_id='$pnode' and iface='$pport'");
 	}
     }
-}
-
-# XXX NSE hack: We'll load the virt_routes table so as to
-# calculate next physical hop info for sim nodes.
-
-# This has a list of routes per node
-my %noderoutes = ();
-# This has routes based on node:dstip
-my %routes = ();
-
-my $res = DBQueryFatal("SELECT vname,dst,dst_type,dst_mask,nexthop " .
-		       "from virt_routes where pid='$pid' and eid='$eid'");
-while (($vname,$dstip,$dst_type,$dst_mask,$nexthop) = $res->fetchrow_array) {
-  if( ! defined($noderoutes{$vname}) ) {
-    $noderoutes{$vname} = [];
-  }
-  push(@{$noderoutes{$vname}}, [$dstip,$dst_type,$dst_mask,$nexthop]);
-  $routes{"$vname:$dstip"} = $nexthop;
-}
-
-# contains routes for sim nodes that have external links
-# This is again used to append to nseconfigs
-my %modified_simroutes = ();
-  
-# These hacks wont work in the distributed nse case. Needs fixing...
-# The algorithm traverses each route on the border sim node (i.e.
-# nodes that capture and inject packets into real links) to its
-# destination untill the hop is not a simulated node. 
-foreach $simnode (keys(%simnode_extips)) {
-  $modified_simroutes{$simnode} = [];
-  foreach $route (@{$noderoutes{$simnode}}) {
-    
-    my ($dstip,$dst_type,$dst_mask,$nexthop) =
-      @{$route}[0,1,2,3];
-
-    printdb "on simnode $simnode $dstip -> $nexthop with $dst_mask\n";
-    my $nhopip = $nexthop;
-    my $nhopnode = $iptonodemap{$nhopip};
-    while( 1 ) {
-
-      if (! virtnodeissim($nhopnode)) {
-	  push(@{$modified_simroutes{$simnode}}, [$dstip, $dst_mask, $nhopip]);
-	  last;
-      }
-
-      # store prev values
-      my $phopip = $nhopip;
-      my $phopnode = $nhopnode;
-      $nhopip = $routes{"$nhopnode:$dstip"};
-      if( ! defined($nhopip) || $nhopip eq "" ) {
-	# No route exists. Shouldn't have come till 
-	# here coz staticroutes would have croaked first
-	last;
-      }
-      $nhopnode = $iptonodemap{$nhopip};
-
-      # break if we loop around to the same node
-      if( $nhopnode eq $simnode ) {
-	last;
-      }
-    }
-  }
-}
-
-# NSE hack: need to update the ipaddrlist for sim nodes that
-# have links to the external world
-# Needs fix when we get distributed nse coz nseconfigs is per
-# nse physical node. Currently we only have one
-my $nseconfigs = "";
-
-foreach $simnode (keys(%simnode_iplist)) {
-  $nseconfigs .= "\n\$$simnode set ipaddrlist_ \[list ";
-  foreach $ipaddr (@{$simnode_iplist{$simnode}}) {
-    $nseconfigs .= "$ipaddr ";
-  }
-  $nseconfigs .= "\]\n";
-}
-
-foreach $simnode (keys(%simnode_extips)) {
-  # update nseconfigs
-  $nseconfigs .= "\$$simnode set nsenode_ipaddrlist \[list ";
-  foreach $ipaddr (@{$simnode_extips{$simnode}}) {
-    $nseconfigs .= "$ipaddr ";
-  }
-  $nseconfigs .= "\]\n";
-
-  if( scalar(@{$modified_simroutes{$simnode}}) ) {
-    $nseconfigs .= "\$$simnode set routes \{";
-  }
-  # appending routes for these sim nodes with external links
-  foreach $route (@{$modified_simroutes{$simnode}}) {
-    ($dstip, $dst_mask, $nhopip) = @{$route}[0,1,2];
-    printdb "installing routes on simnode $simnode - $dstip -> $nhopip\n";
-    $nseconfigs .= "DST=$dstip DST_MASK=$dst_mask NEXTHOP=$nhopip\n";
-  }
-
-  if( scalar(@{$modified_simroutes{$simnode}}) ) {
-    $nseconfigs .= "\}\n\n";
-  }
-      
-  
-}
-
-if( $nseconfigs ne "" ) {
-  $nseconfigs .= "set simcode_present 1\n";
 }
 
 #
@@ -2140,6 +2021,21 @@ foreach my $vnode (keys(%v2pmap)) {
 UploadStats();
 TBDebugTimeStamp("uploading finished");
 
+# If we have at least one simnode, we need to generate
+# otcl specifications for different physical nodes that
+# assign mapped the simulation to.
+# The reason we are doing it after uploading into the DB is
+# coz parse-nse script uses values from the DB. Otherwise, we
+# would have had to pass that information from assign_wrapper's
+# data structures
+if( $simcount > 0 ) {
+    TBDebugTimeStamp("generating otcl sub-specifications for make-simulated code");
+    if (system("parse-nse $pid $eid")) {
+	fatal($WRAPPER_FAILED, "NSE Parsing failed!\n");
+    }
+    TBDebugTimeStamp("generating otcl sub-specifications finished");
+}
+
 TBDebugTimeStamp("assign_wrapper finished");
 exit 0;
 
@@ -2228,25 +2124,9 @@ sub InitPnode($pnode, $vnode)
 		     " routertype='" . TBDB_ROUTERTYPE_STATIC() . "'" .
 		     " where node_id='$pnode'");
 
-	$vname = "nsenode${nsenode_id}";
+	$vname = "simhost-${nsenode_id}";
 	$role  = TBDB_RSRVROLE_SIMHOST;
 	$nsenode_id++;
-
-	# Right now, we have only one row for nseconfigs per experiment.
-	# This will change in the distributed nse case. Also reparsing of
-	# nseconfigs will have to be done for the distributed case
-	DBQueryFatal("update nseconfigs set vname='$vname' " .
-		     "where pid='$pid' and eid='$eid'");
-
-	# also append stuff to nse configs with ipaddr info for border nodes
-	# nseconfigs will be per nse physical node in the distributed
-	# case. needs fix later
-	if ($nseconfigs ne "") {
-	    DBQueryFatal("update nseconfigs set ".
-			 " nseconfig=CONCAT(nseconfig, '$nseconfigs') ".
-			 "where pid='$pid' and eid='$eid' and ".
-			 "      vname='$vname'");
-	}
     }
     elsif (virtnodeisremote($vnode) && $v2vmap{$vnode} ne $pnode) {
 	#
@@ -2651,8 +2531,8 @@ sub NewVethIface($$$;$)
     my $vvnode  = "NULL";
     my $newveth;
     my $mask    = virtlannetmask($lan);
+    my $rtabid = getrtabid($vnode, $pnode);
 
-    # Mark as being a jail interface by establishing a connection
     # to the nodes table entry for the virtnode. 
     if (virtnodeisjailed($vnode)) {
 	$vvnode = "'$v2vmap{$vnode}'";
@@ -2675,10 +2555,10 @@ sub NewVethIface($$$;$)
 	#
 	my $query_result = 
 	    DBQueryFatal("insert into veth_interfaces ".
-			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask) ".
+			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask, rtabid) ".
 			 "values ('$pnode', 0, '$mac', '$ip', " .
 			          (defined($pport) ? "'$pport'" : "NULL") .
-			 "        , $vvnode, '$mask')");
+			 "        , $vvnode, '$mask', '$rtabid')");
 	
 	my $newid = $query_result->insertid;
 	$newveth = "veth" . $newid;
@@ -2962,8 +2842,6 @@ sub LoadVirtNodes()
 	# SIM HACK
 	if ($issim) {
 	    $simcount++;
-	    push(@simnodelist, $vname);
-	    $simnode_iplist{$vname} = [];
 	}
 
 	# REMOTE HACK
@@ -2990,11 +2868,6 @@ sub LoadVirtNodes()
 	    my ($port,$ip) = split(":",$ipinfo);
 	    
 	    $ips{"$vname:$port"} = $ip;
-	    
-	    if ($issim) {
-		push(@{$simnode_iplist{$vname}}, $ip);
-	    }
-	    $iptonodemap{$ip} = $vname;
 	}
 
 	#
@@ -3163,6 +3036,7 @@ sub LoadVirtLans()
 	# Netmask for the entire lan.
 	$virt_lans{$vname}->{"MASK"}         = $rowref->{"mask"};
 	$virt_lans{$vname}->{"WIDEAREA"}     = $widearea;
+	# Whether all member nodes are simulated
 	$virt_lans{$vname}->{"ALLSIM"}       = 0;
 
 	#
@@ -3349,7 +3223,7 @@ sub LoadExperiment()
     $expt_stats{"vnodes"}   = $virtcount;
     $expt_stats{"wanodes"}  = $remotecount;
     $expt_stats{"plabnodes"}= $plabcount;
-    $expt_stats{"simnodes"} = scalar(@simnodelist);
+    $expt_stats{"simnodes"} = $simcount;
 }
 
 #
@@ -3394,7 +3268,7 @@ sub CreateTopFile()
 	    print TOPFILE "node $vname $type $subnodestr $desirestr\n";
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;
-	    }
+	    } 
 	    elsif (virtnodeissim($vname)) {
 		$simnode_count++;
 	    }
@@ -3436,9 +3310,8 @@ sub CreateTopFile()
 	my $nobwshaping = virtlannobwshape($lan);
 	foreach $member (@members) {
 	    ($node) = (split(":",$member))[0];
-	    if (virtnodetype($node) eq "sim") {
+	    if (virtnodeissim($node)) {
 		$simnodes++;
-		$simnodelans{$lan} = 1;
 	    } else {
 		if (virtnodeisvirt($node)) {
 		    $virtnodes++;
@@ -3463,14 +3336,17 @@ sub CreateTopFile()
 	    #
 	    $virt_lans{$lan}->{"USEVETH"} = 1;
 	}
+	#
+	# If all nodes in a lan/link are simulated, the lan/link could certainly
+	# be hosted on the same physical node. Also, if the lan/link is cut and
+	# members mapped to different physical nodes, we will use emulated links
+	# i.e. veth devices. 
+	#
 	if ($simnodes > 0 && $realnodes == 0) {
 	    $trivial_ok = 1;
-	    # The current support where all simulated nodes
-	    # are put on one PC does not support EMULATED links
-	    # or use veth devices
-	    $emulated = 0;
-	    $virt_lans{$lan}->{"EMULATED"} = 0;
-	    $virt_lans{$lan}->{"USEVETH"} = 0;
+	    $emulated = 1;
+	    $virt_lans{$lan}->{"EMULATED"} = 1;
+	    $virt_lans{$lan}->{"USEVETH"} = 1;
 	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
 	if ($#members == 1) {
@@ -3672,43 +3548,6 @@ sub CreateTopFile()
 	# If a LAN has only one member we don't do anything.
     }
 
-    # XXX NSE hack
-    #
-    # Will find a free randomly chosen pc850 and fix sim nodes to it
-    # Assign's scoring needs to be fixed so that the solution has
-    # as many sim nodes on a phy node as possible while maxing out
-    # its interfaces. Currently having sim:N where N is a large
-    # number in the ptop file does not guarantee that all these
-    # get mapped to a single phy node even when that mapping has no
-    # violations and a low score. distributed nse will fix this
-    #
-    if (scalar(@simnodelist)) {
-	my $fixednode;
-	my $type;
-	
-	open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
-	    or fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		     "Failed to start avail for NSE: $!");
-
-	while (<AVAIL>) {
-	    if (! /^\|/) {next};
-	    if (/node_id/) {next;}
-	    ($fixednode,$type) =
-		/^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;    
-	    last;
-	}
-	close(AVAIL);
-  
-	if (!defined($fixednode)) {
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "Insufficient PCs available to run NSE!");
-	}
-
-	foreach $simnode (@simnodelist) {
-	    print TOPFILE "fix-node $simnode $fixednode\n";
-	}
-    }
-
     #
     # Print out fixed nodes.  But _not_ nodes which aren't in the
     # experiment any more.
@@ -3778,6 +3617,9 @@ sub LoadPhysNode($)
 	#
 	$rowref->{"__reuse"} = "reboot";
 	$rowref->{"__pipeno"} = "100";
+
+	# Routing table id for different vnodes on pnode
+	$rowref->{"__rtabid"} = 0;
     }
     return $phys_nodes{$pnode};
 }
@@ -3881,6 +3723,32 @@ sub physnodenextpipe($)  {
 	if ($pipeno >= 65535);
     
     return $pipeno;
+}
+sub physnodenextrtabid($)  {
+    my $rtabid = $phys_nodes{$_[0]}->{"__rtabid"} += 1;
+    return $rtabid;
+}
+
+#
+# Takes vnode, pnode as arguments
+# and determines the correct routing table id
+#
+sub getrtabid($$) {
+    my ($vnode, $pnode) = @_;
+    my $rtabid;
+    my $numvnodesonpnode = scalar(@{$p2vmap{$pnode}});
+
+    if ($numvnodesonpnode > 1) {
+	if (! defined($vnode2rtabid{$vnode}) ) {
+	    $rtabid = physnodenextrtabid($pnode);
+	    $vnode2rtabid{$vnode} = $rtabid;
+	} else {
+	    $rtabid = $vnode2rtabid{$vnode};
+	}
+    } else {
+	$rtabid = $vnode2rtabid{$vnode} = 0;
+    }
+    return $rtabid;
 }
 
 #

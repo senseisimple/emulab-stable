@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -47,7 +47,7 @@ TbEventSink::callback(event_handle_t handle,
   
   info("Received Event: %lu:%ld \"%s\"\n", now.tv_sec, now.tv_usec, argsbuf);
 
-  // All events coming in to NSE should be MODIFY events and we just need to
+  // All events coming in to NSE should be NSEEVENT events and we just need to
   // evaluate the string in args. If the user sent code with wrong syntax,
   // we just print a warning in the log. Also we need a mechanism
   // to report the error back to the experimenter
@@ -164,19 +164,21 @@ TbEventSink::subscribe() {
   tuple->site      = ADDRESSTUPLE_ANY;
   tuple->group     = ADDRESSTUPLE_ANY;
   tuple->expt      = ADDRESSTUPLE_ANY;	/* pid/eid */
-  tuple->objtype   = TBDB_OBJECTTYPE_TRAFGEN;
+  tuple->objtype   = TBDB_OBJECTTYPE_NSE;
 
   if( objnamelist[0] != 0 ) {
     tuple->objname = objnamelist;
+    info( "NSE event subscription for object list: \"%s\" for node %s\n",
+	  tuple->objname, tuple->host);
   } else {
     tuple->objname   = ADDRESSTUPLE_ANY;
+    info( "NSE event subscription for node %s\n", tuple->host);
   }
   tuple->eventtype = ADDRESSTUPLE_ANY;
 
-  info( "TRAFGEN event subscription for object list: \"%s\" for node %s\n", tuple->objname, tuple->host);
   
   if (!event_subscribe(ehandle, callback, tuple, this)) {
-    fatal("could not subscribe to TRAFGEN events for objects %s", tuple->objname );
+    fatal("could not subscribe to NSE events for objects %s", tuple->objname );
   }
   address_tuple_free(tuple);
 
