@@ -217,6 +217,11 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Cc: $TBMAIL_CONTROL\n".
              "Errors-To: $TBMAIL_WWW");
 
+	#
+        # Create user account on control node.
+        #
+	SUEXEC($uid, "flux", "mkacct-ctrl $project $user", 0);
+
 	echo "<h3><p>
                   User $user was granted membership in project $project
                   with $newtrust permissions.
