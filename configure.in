@@ -469,6 +469,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode \
+	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/webvistopology \
 	vis/dbvistopology \

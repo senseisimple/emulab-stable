@@ -1,0 +1,33 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= utils/nsgen
+
+include $(OBJDIR)/Makeconf
+
+BIN_STUFF	= nsgen
+LIBEXEC_STUFF	= webnsgen
+
+XML_STUFF	= $(notdir $(wildcard $(SRCDIR)/*.xml))
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:	install-bin install-data
+
+install-bin:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
+		$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
+
+install-data:	$(addprefix $(INSTALL_ETCDIR)/nsgen/, $(XML_STUFF))
+
+$(INSTALL_ETCDIR)/nsgen/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_ETCDIR)/nsgen
+	$(INSTALL_DATA) $< $@

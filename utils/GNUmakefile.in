@@ -12,6 +12,8 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
+SUBDIRS		= nsgen
+
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping
@@ -26,13 +28,14 @@ USERBINS        = create_image delay_config node_admin
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
-	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	subdir-install
 
 #
 # Control node installation (okay, plastic)
@@ -48,5 +51,11 @@ LINKS=	cd $(INSTALL_BINDIR) && \
 endif
 control-install:
 	$(LINKS)
+
+#
+# Automate this part at some point.
+# 
+subdir-install:
+	@$(MAKE) -C nsgen install	
 
 clean:
