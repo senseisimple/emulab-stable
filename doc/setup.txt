@@ -1,360 +1,116 @@
 #####
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Tested on FreeBSD 4.3, FreeBSD 4.5, and FreeBSD 4.6
+##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6, and FreeBSD 4.7
 #####
 
-Note: steps labeled "Local Only" are only required when setting up a testbed
-with local nodes - they can be skipped in a widearea-only testbed.
+Follow the instructions in the setup-ops.txt file before the ones in this file.
 
-##### Step 0
+##### Step 0 - OS installation and setup
 
-First of all, the machine should be configured correctly for the network it is
-on, have the root password set, etc.
+Install FreeBSD on the machine you'll be using for your boss node, using the
+standard FreeBSD installation process. You don't need to worry about which ports
+to install, etc., as the ones required by this software will be installed
+automatically. You, will, however, have to make sure that you create a
+partition large enough to hold /usr/testbed - in addition to the testbed
+software, this is where many disk images will get stored.
 
-##### Step 1 - Package installation
+Make sure that you have the network correctly configured, and make sure that it
+has a hostname that resolves. The silly mysql-server port requires this.
 
-Install the necessary packages. The following are necessary, and are
-the default versions in the FreeBSD 4.3 "ports" collection:
-(Ports marked with an 'L' are only needed if you have local nodes.)
+Go ahead and create an account for yourself on boss. For now, just stick the
+home directory somewhere local, and move it to /users/ once you've got it
+mounted from ops (the boss-install script will set this up).
 
-  apache+mod_ssl-1.3.19+2.8.2 The Apache 1.3 webserver with SSL/TLS functionalit
-  boost-1.26.0	      Free peer-reviewed portable C++ source libraries
-  cvsupd-bin-16.1     A general network file distribution system optimized for C
-  fping-2.2b1         Quickly ping N hosts w/o flooding the network
-  gd-1.8.4_1          A graphics library for fast PNG creation
-  gmake-3.79.1        GNU version of 'make' utility
-  graphviz-1.7c       Graph Visualization Software from AT&T and Bell Labs
-L isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server
-  linuxthreads-2.1.3_2 POSIX pthreads implementation using rfork to generate ker
-  mhash-0.8.9         Library provides an easy way to access strong hashes such
-  mod_auth_mysql-2.20 Allows users to use MySQL databases for user authenticatio
-  mod_php4-4.1.1      PHP4 module for Apache
-  mysql-client-3.23.36 Multithreaded SQL database (client)
-  mysql-server-3.23.36 Multithreaded SQL database (server)
-  netpbm-9.12	      A toolkit for conversion of images between different formats
-  otcl-1.0a6          MIT Object Tcl
-  p5-DBI-1.15         The perl5 Database Interface.  Required for DBD::* modules
-  p5-GD-1.32_2        A perl5 interface to Gd Graphics Library
-  p5-Mysql-modules-1.2215 Perl5 modules for accessing MySQL databases
-L p5-SNMP-4.2.0       A perl5 module for interfacing with the CMU SNMP library
-L p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1
-  p5-BSD-Resource	    BSD resource goo
-  rpm-3.0.6_5         The Red Hat Package Manager
-  swig-1.1p5_5        Simplified Wrapper and Interface Generator
-  tcl-8.2.3           Tool Command Language
-  tcl-sql-20000114_1  TCL module for accessing MySQL databases
-L ucd-snmp-4.2        An extendable SNMP implimentation
-  vcg-1.30	      A Visualization Tool for compiler graphs
+##### Step 1 - Create a defs file
 
-IMPORTANT: The mhash package should be installed _before_ the mod_php4 port is
-built. When building mod_php4, you will be given a menu to choose the various
-features you want support for. Make sure to select support for mhash.
+The defs file will describe some of your setup, such as the hostnames of your
+boss and ops nodes, and email addresses that certain types of mail will be sent
+to.
 
-IMPORTANT: There is a bug in the g++ headers that come with FreeBSD 4.3 - we
-assume that it has been fixed in newer versions, but are not sure. BEFORE you
-build the testbed software, be sure to apply the 'g++.patch' file from the
-patches/ directory. (As root, 'patch -p0 < g++.patch') Also, the version of
-bosst from the FreeBSD package has a bug, sou you'll need to apply
-'boost.patch' (using the same method) before you build as well.
+Use the 'defs-example' file in the root of our source distribution as a
+template. It contains comments explaining the important variables to set.
 
-Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
-scripts, requires tcl82. When you install the tcl-sql package, it will be put
-in the library directory for the latest version of tcl you have installed, so
-if you have tcl83 installed at the time, you will have tcl-sql support under
-8.3.X, but not under 8.2.X (which testbed scripts use) Newer versions of
-the FreeBSD port have a TCL_VERSION variable you can use to get around
-this problem - Stick the line:
-TCL_VERSION=tcl8.2 in /etc/make.conf
-before building, and you should be fine.
+You'll also need to make a defs file for the web interface. This is found in
+the www/ directory of the testbed source tree. Copy example-defs.php3 to
+<name>-defs.php3, and put <name> into WWWDEFS in the main defs file. Important
+variables in this file are commented as well.
 
-For the most part, subsitituting newer versions of the packages should be OK,
-but know that we haven't tested them... The one exception is version 3.23.47 
-of the mysql packages. In fact, we recommend 3.23.47, as it fixes some
-boot-time problems that we've had with 3.23.36.
+##### Step 2 -  Unpacking and running configure
 
-Finally, you will need to download and install elvin, which is the core of our
-event system. You can download it from: http://elvin.dstc.edu.au/ . You'll
-need to grab both the C 'libelvin' distribution and elvind . So far, we have
-only tried releases in the 4.0 branch. Compile these two (libelvin first)
-with the standard untar/configure/make procedure. When configuring libelvin,
-be sure to give the '--enable-threads' option.
-
-Many of these packages need to be started by RC scripts. First, the
-mysql-client rc script needs to run before ANY testbed services are started!
-You can ensure this by changing directories to /usr/local/etc/rc.d and renaming
-'mysql-client.sh' to '1.mysql-client.sh'. Also, we use some different options
-when staring mysqld, so remove the 'mysql-server.sh'. (We'll replace it in a
-second.) Furthermore, dhcpd needs to start before proxydhcp, so rename
-'dhcpd.sh' to '2.dhcpd.sh'. You will also need to install the '3.testbed.sh',
-'cvsupd.sh', '2.elvind.sh', and '2.mysql-server.sh' scripts, which are in the
-rc.d directory of the testbed tree - you can install them by doing a 'gmake
-install' in that directory. Finally, remove the 'snmpd.sh' script, because
-we don't need to be running it, and it may have security vulernabilities.
-
-Notes for newer versions of FreeBSD: Newer versions of the mysql port install
-the starup script as '00mysql-client.sh' - you're fine either leaving it with
-that name, or renaming it as suggested above. Also, newer versions of the
-dhcpd port install their startup script as 'isc-dhcpd.sh.sample' - just
-rename this as suggested above.
-
-##### Step 2 - LEDA
-
-We rely on a software package call LEDA which we are not allowed to
-distribute (source *or* binary), and is currently not being
-distributed by the authors. As a result, we will distribute a binary
-for the one program (assign) that requires linking with the LEDA
-library. In the meantime we will be working on removing our dependence
-on the LEDA library.
-
-The program in question is assign (see the assign subdir). Please
-contact us if you need to replace it. The default operation of
-configure is to assume the existence of assign/assign.bin in the
-source tree. However, you can override that by using the configure 
-option --with-assignbinary=/path/to/assign/binary.
-
-##### Step 3 - Testbed tree configuration/installation
-
-It is best to add the following group before creating the following
-directories. Basically, testbed software should be in the tbadmin
-group. Run this command as root. (NOTE: The numeric gid used for the
-tbadmin group must be greater than 100)
-
-	pw groupadd tbadmin -g 101
-	
-Configure the testbed tree. Many of the configuration parameters are stored in
-a 'defs' file. Make a copy of the defs-default file (found in the root of
-the testbed tree,) and customize it for your site. The key variables
-are:
-WWWDEFS - The name of the defs file to use for the web pages. Instructions
-	for this file are below
-TBADMINGROUP - The name of the group you created above, probaby tbadmin
-TBOPSEMAIL - An email address for the 'operations staff'. Copies of
-	error messages, etc. will get sent to this address, and in some
-	cases users are directed to this address if they have questions and/or
-	problems.
-TBLOGSEMAIL - An email address to which some logs (experiment
-	creation/deletion, etc.) will get sent.
-DELAYCAPACITY - Maximum delay capacity of any nodes. Set to 1 prevent the
-	same node from acting as multiple delay nodes.
-BOSSNODE - Fully-qualified hostname of the boss node
-USERNODE - Fully-qualified hostname of the users node (the node to which
-	users will log on to control their nodes, etc.)
-FSNODE - Fully-qualified hostname of the NFS server. (In our setup, this is
-	the same machine as the users node.)
-OURDOMAIN - The domain in which this testbed lies
-FSDIR_GROUPS - The _real_ pathname (no symbolic links, etc.) of the groups
-	directory on the FSNODE. See the setup-ops.txt file for the
-	instructions for creating this directory.
-FSDIR_PROJ - Ditto, for the proj directory
-FSDIR_USERS - Ditto, for the users (home) directory
-
-Other variables can generally be left alone. Pass the name of this file to
-configure with the --with-TBDEFS option.
-
-You'll also need to make a defs file for the web system. This is found in
-the www/ directory of the testbed source tree. Copy default-defs.php3 to
-<name>-defs.php3, and put <name> into WWWDEFS in the main defs file. The
-main variables to worry about are:
-$WWWHOST, $TBAUTHDOMAIN - replace emulab.net with your domain
-$THISHOMEBASE, $THISPROJECT - Use the name of your site
-$TBMAIL* - These work like the mail addresses of the same names in the
-	defs file above. The new addresses are the approval address, to which
-	requests to start projects are sent, and the audit address, which is
-	CCed on certain mail sent to users.
-$TBMAINSITE - Set this to 0
-
-Create the /usr/testbed directory. Make sure that this directory is writable to
-the tbadmin group.
-
-Now, build and install the software. For example, I have the testbed source in
-~/testbed, and use the ~/tbobj directory to do my builds in. To use the
-defs-ricci-emulab defs file in my home directory, I would do:
-
+This works the same as it did on ops:
 cd ~/tbobj
-~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab
-gmake
-gmake boss-install
-sudo gmake post-install
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
-The 'post-install' target needs to be done as root, because certain scripts
-need to be setuid root.
+##### Step 3 - Running the boss installation script
 
-Also, you'll need to create the 'tbdb' database (described in the next step)
-before you can do the install, because we check to make sure that the software
-you're installing matches the running database. Obviously, this can't be done
-until the database is running.
+Again, this works the same as it did on boss, except that you run
+install/boss-install in the object tree, instead of ops-install.
 
-##### Step 4 - Database Creation
+Part way through, this script will bail out and prompt you to install some
+ports. Some of the ports we need on boss have interactive installations, and
+this generally takes a long time, and you want to see what's going on, right?
 
-See the file setup-db.txt in this directory 
+So, just cd to /usr/ports/misc/emulab-boss/ and run (as root) a 'make install'.
+There are a few things you'll need to know about the ports:
+* Installation of the mysql323-server port will fail if the name returned by
+  'hostname' doesn't resolve.
+* The php4 port will bring up a funky menu system to let you choose some
+  features to enable and disable. Enable 'mhash', and leave the rest alone
+* The snmp port asks all kinds of silly questions that don't matter, since
+  we're not going to be running snmpd on boss. Just take the defaults.
 
-##### Step 5 - Directories to create, and other misc. filesystem changes
+When you're done, re-run the boss-install script.
 
-NFS - Make the machine an NFS server and client with the following in
-/etc/rc.conf:
-nfs_server_enable="YES"
-nfs_server_flags="-u -t -n 16"
-nfs_client_enable="YES"
+Like the ops-install script, boss-install sets up paswordless sudo for anyone
+in the wheel group.
 
-You also need some cross mounts between bossnode and fs. For example, on
-one of our boss nodes, we have the following in /etc/fstab
+##### Step 4 - Installing from source.
 
-    fs.mini.emulab.net:/z/users     /users  nfs     rw      0       0
-    fs.mini.emulab.net:/z/proj      /proj   nfs     rw      0       0
-    fs.mini.emulab.net:/z/groups    /groups nfs     rw      0       0
-    fs.mini.emulab.net:/var         /usr/testbed/usersvar nfs ro,soft,-b    0
+In your object directory, do a 'gmake boss-install'. Then, as root, do a
+'gmake post-install'. The post-install target needs to run as root, so that
+it can make certain scripts setuid, etc.
 
-Note that you will need exports on the fs node (see setup-ops.txt).
+##### Step 5 - Setting up root ssh from boss to ops
 
-suidperl - In order for setuid perl scripts to work properly, you'll need to:
-chmod u+s /usr/bin/suidperl
+The boss node needs to be able to ssh in, as root, to the ops node. To set this
+up, copy root's public identity from boss (created by the boss-install script)
+to ops's authorized_keys file:
+scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
 
-##### Step 6 - Services to set up
+##### Step 6 - Filling the database
 
-DNS zones - We don't have documentation for creating these yet. Best bet right
-now is to ask Utah for a copy of theirs.
-Stick:
-named_enable="YES"
-in /etc/rc.conf
+See the file setup-db.txt in this directory for instructions on getting the
+proper information about your site and nodes into the database.
 
-apache - You should have installed apache with mod_ssl, and php4.
-have an auto-generated config file that you can install by changing to
-the apache subdir of your build tree and running 'gmake install'.
+##### Step 7 - Other miscellaneous things to set up
 
-Some apache installations may expect to find their
-config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
-ours gets installed.) Just symlink apache.conf to httpd.conf if you have
-trouble with this. Also our config file expects to find SSL certificates in:
+There are a few things we haven't been able to completely automate just yet,
+though we hope to soon. 
+
+DNS configuration - boss-install enables bind on your boss node, but does not
+set it up as a server for your domain. We don't have documentation for creating
+the zone files, etc yet. Best bet right now is to ask Utah for a copy of
+theirs.  Hopefully, there will be a script to auto-generate large portions of
+them from the database.
+
+SSL certificates - Our apache config file expects to find SSL certificates in:
 /usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
-SSLCertificateKeyFile /usr/local/etc/apache/ssl.key/www.<sitename>.net.key
-(where <sitename> is OURSITE from the configure defs file.) Make sure yours
-go there, or edit the apache.conf file appropriately.
-
-inetd - In FreeBSD, you need to prevent inetd from rate-limiting connections
-(an attempt to defend against DOS attacks, but very annoying in a testbed
-environment). Put the following in /etc/rc.conf:
-inetd_flags="-wW -R 0"
-
-Local  Only:
-tftp - Should have the following line in /etc/inetd.conf
-tftp    dgram   udp wait    nobody  /usr/libexec/tftpd  tftpd /tftpboot /proj
-(make sure to HUP inetd)
-
-ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
-the line
-xntpd_enable="YES"
-in /etc/rc.conf. Check out the ntpd man page for configuration information.
+/usr/local/etc/apache/ssl.key/www.<sitename>.net.key
+(where <sitename> is OURDOMAIN from the configure defs file.) 
+Generate a passwordless certificate (up to you if you want to get a 'real' one
+from Verisign, etc., or sign your own), and place the files from it in the
+above locations.
 
 cvsupd - Minor changes to images can be distributed at boot time with cvsup.
 See doc/newimage.txt for an overview of setting up a sup tree. Make sure to
-copy over the old one (if it exists), and make sure cvsupd is running (there's
-an example rc.d script in the rc.d/ directory of the testbed CVS tree.) Create
-a group named 'root', with any gid. This is because cvsup uses the name of
-the group, rather than its gid, to determine what group the file should belong
-to. Since Linux uses 'root' instead of BSD's 'wheel', this is needed for the
-Linux sup tree.
+copy over the old one (if it exists).
 
-Local Only:
-syslogd - Normally, sylogd on FreeBSD is run with the '-s' flag to prevent
-logging to it over the network. We use network logging, so we need this
-feature. Re-enable it by putting:
-syslogd_flags=""
-in /etc/rc.conf
-
-Local Only:
-dhcpd - Need to install the dhcpd config file. The old (deprecated) location was
-/usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
-install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf .
-After you've filled the nodes and interfaces tables, (described in the database
-setup documentation) use the dhcpd_makeconf script, along with the template in
-the dhcpd directory of the CVS repository, to generate the dhcpd.conf file.
-
-##### Step 7 - Misc. Files and Services
-
-Local Only:
-SNMP MIBs - MIBs go in /usr/local/share/snmp/mibs. In addition to the ones
-installed by the ucd-snmp package, you'll need MIBs for Cisco and Intel
-switches. You can grab the Cisco MIBs from:
-ftp.cisco.com/pub/mibs
-The Intel ones can be found from the site for the 510T switches at:
-http://www.intel.com/network/connectivity/products/exp510t.htm
-If you have SNMP-controllable APC power controllers, grab the 'PowerNet MIB'
-from:
-http://www.apcc.com/tools/download/
-Now, a step that involves some voodoo I don't quite understand: make sure that
-/usr/local/share/snmp/mibs/.index exists (touch it if it doesn't), and chmod it
-to 666. Now, do an snmpwalk of some device (eg. 'snmpwalk cisco1 public') -
-this will force the .index file to get rebuilt. Suggestions of better ways to
-rebuild this file are welcome!
-
-SSH - You'll probably also want to add
-PermitRootLogin yes
-to /etc/ssh/sshd_config (and HUP sshd) so that you can log in as root remotely
-
-/etc/syslog.conf needs entries for some of our own services. Example:
-!bootinfo
-*.*                     /usr/testbed/log/bootinfo.log
-!tmcd
-*.*                     /usr/testbed/log/tmcd.log
-!capture
-*.*                     /usr/testbed/log/tiplogs/capture.log
-!dhcpd
-*.*                     /usr/testbed/log/dhcpd.log
-!capserver
-*.*                     /usr/testbed/log/capserver.log
-!frisbeed
-*.*                     /usr/testbed/log/frisbeed.log
-All of these logs should be created before you HUP syslogd or reboot - All of
-them can be world-readable
-
-cron jobs: We currently have two cron jobs running for the testbed. Both can be
-run out of /etc/crontab
-45	1	*	*	*	root	/usr/testbed/sbin/backup
-*/5	*	*	*	*	root	/usr/testbed/sbin/node_status
-Don't forget to HUP cron!
-
-You may want a program to allow administrator-types to run stuff easily as root.
-Here at Utah, we have two: su1 (developed locally) and sudo (installed from
-FreeBSD ports) - don't forget to get it set up! Our strategy on boss was to
-give everyone in the wheel group unrestricted sudo access with:
-%wheel  ALL=(ALL) NOPASSWD: ALL
-
-checkpass - in the testbed software:
-    cd tbsetup/checkpass/cracklib,2.7
-    make all
-    make install
-  Note that these steps depend on having the dictionaries 
-  /usr/share/dict/{propernames,words} available (standard for FreeBSD).
-  If they're in different places, edit the obvious makefile vars.
-
-
-SSH keys - Generate an SSH key for root by running ssh-keygen. Put an empty
-passphrase on it. You'll want to copy boss:/root/.ssh/identity.pub to
-ops:/root/.ssh/authorized_keys so that boss has the appropriate access on ops.
-
-Process accounting - We generally turn on process accounting, by putting
-accounting_enable="YES"
-in /etc/rc.conf .
-
-##### Copying from an old boss node
-
-If you're simply moving from one boss node to another, there are a few files
-and trees you'll want to make sure to copy over:
-
-/usr/testbed/images/
-/tftpboot/ (a link to /usr/testbed/tftpboot)
-/etc/namedb/
-/etc/master.password
-/etc/group
-/usr/testbed/sup/
-/usr/site/
-/root/.ssh
-/etc/ssh
-
-Right before bringing the new boss node online (if copying from an old boss
-node), make sure to have a copy of the latest versions of:
-* The database
-* The sup tree
-* The dhcpd.conf file
-* The DNS records
-* The password file
+dhcpd - Once you've filled out the nodes  interfaces tables (instructions in
+setup-db.txt), you need to generate a config file for dhcpd. For this, you use
+the dhcpd_makeconf script (installed into /usr/testbed/sbin), which uses the
+template file in the dhcpd directory of the source distribution. Make sure to
+edit the template file to reflect your local IP addresses, and include all node
+types. Place the resulting config file (which dhcpd_makeconf spits to the
+standard output), in /usr/local/etc/dhcpd.conf .
+NOTE: This template file is for isc-dhcpd 2.x . It needs to be updated to work
+with isc-dhcpd 3.x .

@@ -1,171 +1,93 @@
 #####
 ##### Setting up the Utah Network Testbed software
-##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6
+##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6, and FreeBSD 4.7
 #####
 
 ##### Step 0 - OS installation and setup
 
-First of all, the machine should be configured correctly for the network it is
-on, have the root password set, etc.
+Install FreeBSD on the machine you'll be using for your ops node, using the
+standard FreeBSD installation process. You don't need to worry about which ports
+to install, etc., as the ones required by this software will be installed
+automatically. You do, however, need to partition your filesystems so that you
+have the proper amount of space for certain directories - see below for
+details.
 
-It is best to add the following group before creating the following
-directories. Basically, testbed software should be in the tbadmin
-group. Run this command as root.
-
-	pw groupadd tbadmin -g 101
-	
+Make sure that you have the network correctly configured.
 
 The following directories will need to exist on partitions that have enough
 space to hold them:
 
-/usr/testbed/ - Needs space for testbed software and logs. A few gig should be
-					plenty. Make sure that you (and anyone
-					else who will be installing software)
-					have permission to write to this
-					directory.
-/users/       - Needs space for user home directories. Amount of space required
+/usr/testbed/ - Needs space for testbed software and logs. A few gigs should be
+			plenty.
+/users/       - Needs space for user home directories. Amount of space required 
+			depends on how many users you expect to have.
+			Generally, though, we suggest that users store large
+			files related to their projects in the /proj directory.
 /proj/        - Needs space for project files. We recommend that this be larger
-					than /users, to encourage people to store files there, which
-					aids per-project accountability
-/groups/      - Needs enough space for files shared by groups. These are
-					primarily used by classes, if any.
-
+			than /users, to encourage people to store files here,
+			which aids per-project accountability.
+/groups/      - Needs enough space for files shared by the sub-groups of
+			projects. These are primarily used by classes, if any.
+/share/       - Exported read-only to all nodes, we use it for providing the
+			source for the FreeBSD and Linux versions we run to
+			experimenters.
+			
 You may want to enforce quotas on the user-writable filesystems.
 
-##### Step 1 - Package installation
+Make sure that, no matter how you decide to partition things up, you make
+symlinks to the appropriate places. ie., if you make one big filesystem called
+/z that has /users, /proj, and /groups in it, make sure you:
+ln -s /z/users /users
+ln -s /z/proj /proj
+... etc.
 
-Install the necessary packages. The following are necessary, and available as
-FreeBSD ports:
-gmake-3.79.1        GNU version of 'make' utility
+It's simplest if you don't create any users yet, and just log in a root for the
+time being. Our software will create users later, once you get boss set up.
 
-You may also want to install sudo to give your administrators root access (see
-the boss setup instructions for more details.)
+##### Step 1 - Unpacking and running configure
 
-##### Step 2 - Testbed tree configuration/installation
+At this point, you'll need to make a 'defs' file - see setup.txt for
+instructions for doing so. You'll use the same defs file on boss and ops.
 
-Configure the testbed tree. For example, I have the testbed source in ~/testbed,
-and use the ~/tbobj directory to do my builds in.
+Unpack the testbed source, and run it's configure script. Use the --with-TBDEFS
+option to configure to give it the path to your defs file.
 
-cd ~/tbobj --with-TBDEFS=/path/to/defs/file
-~/testbed/configure
-gmake ops-install
+For example, I have the testbed source in ~/testbed, my defs file in
+/users/ricci/testbed/defs-ricci, and use the ~/tbobj directory to do my builds
+in:
+cd ~/tbobj
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
-The defs file you use should be the same one you created for use on your
-boss nodes.
+##### Step 2 - Running the ops installation script
 
-##### Step 3 - Mail setup
+This part is brand-new, so please report any problems with it.
 
-We use our ops node to handle mail. You'll want to put:
-sendmail_enable="YES"
-into /etc/rc.conf/. Add the hostnames you'll be handling mail for to
-/etc/mail/local-host-names . Make sure to include your domain (eg. emulab.net),
-and your boss and ops node in this file.
+In the object tree you've configured (in my example above, ~/tbobj), there's an
+'install' subdirectory, with a script called 'ops-install'. Just run this
+script as root. It will take care of installing ports, and doing various other
+configuration of FreeBSD required to make it into an ops node. The script is
+designed so that you can run it as many times as you want, and it'll just skip
+stuff it's already done. If it fails, send the output to Utah so that we can
+fix it up. If it succeeds, follow any other instructions it may have, then
+reboot the machine.
 
-Create the /etc/mail/lists directory, which will be used to store mailing lists
-for testbed-users and testbed-activeusers, which can be used to conveniently
-send mail to all and all active users, respectively.
+(You may have to set the executable bit on this script, since configure won't -
+I'd like to get this solved at some point.)
 
-If you're running your testbed-ops list off a different mailserver, you
-might want to add something to your /etc/mail/aliases file like:
-testbed-ops:            testbed-ops@fast.cs.utah.edu
+You should be aware that, among other things, this script sets up sendmail, and
+sets up password-less 'sudo' for anyone in the 'wheel' group. If you don't want
+these for security reasons, you can undo them after the installation script is
+finished.
 
-Or, you can make a file containing all the people on the testbed-ops list
-(one address per line) in /etc/mail/lists, and add:
-testbed-ops:            :include:/etc/mail/lists/testbed-ops
+##### Step 3 - Installing from source
 
-##### Step 4 - Root access from boss
+To install the actual testbed software, simply do a 'gmake ops-install' in your
+object directory.
 
-By this time, you should have created an ssh identity for root on your boss
-node (see the boss setup instructions.) Copy boss:/root/.ssh/identity.pub to
-ops:/root/.ssh/authorized_keys , and chmod it to 600. Make sure you can
-ssh, as root, from boss to ops without a password.
+##### Step 4 - Setting up mailing lists
 
-##### Step 5 - Exports setup
-
-First, add the following lines to /etc/rc.conf, and restart the machine or
-start nfsd by hand:
-nfs_server_enable="YES"
-nfs_server_flags="-u -t -n 16"
-
-Create /etc/exports.head . This should contain exports of /users/, /proj/,
-/groups/, and /var/ to all other control nodes BUT NOT testbed nodes. When this
-is done, run $(BUILD_DIR)/tbsetup/exports_setup on the boss node, which will
-create an /etc/exports file by concatenating this with dynamically-generated
-exports of directories to nodes that need them.
-
-Here's an example exports.head file from one of our ops nodes:
-/z 155.101.143.2 -maproot=root -alldirs
-/var 155.101.143.2 -maproot=root -alldirs
-(Note, on this machine, /users, /proj, and /groups are all on the /z
-filesystem. You'll need a line for each filesystem that contains these
-three directories.)
-
-##### Step 5B - syslog setup.
-
-You need to add some lines to /etc/syslog.conf.
-
-Put this one after the ftp line:
-
-	# For Testbed user activity logging
-	auth.info				/var/log/logins
-
-Put this one at the end:
-
-	!capture
-	*.*					/var/log/capture.log
-
-Then create the files:
-
-	sudo touch /var/log/logins
-	sudo chmod 640 /var/log/logins
-	sudo touch /var/log/capture.log
-	sudo chmod 640 /var/log/capture.log
-
-Then restart syslog:
-
-	sudo kill -HUP `cat /var/run/syslog.pid`
-
-
-You also want entries in /etc/newsyslog.conf:
-
-	/var/log/logins                         640  7     200 *      Z
-	/var/log/capture.log			664  7     *    168
-	Z
-
-This is file is read hourly, so need to restart anything.
-	
-
-##### Step 6 - Capture setup
-
-If you don't have serial lines for all the nodes, you can skip this step.
-
-If you're using the Cyclades serial boards, you'll need a custom kernel. For
-Cycom-Y boards, include the following in your kernel config file:
-device          cy0
-device          cy1
-If you have Cyclom-Z boards, contact Utah, as we have custom drivers for them.
-
-Install capture by changing into the capture subdirectory of your build tree
-and running 'gmake tipserv-install'.
-
-Set up /etc/remote - Each node should have two lines, like:
-pc1:dv=/dev/tip/pc1:br#115200:nt:pa=none:
-pc1-tty:dv=/dev/cuac00:br#115200:nt:pa=none:
-The first line is for the normal case, of running capture and using tip to
-connecto to a running capture process. The second is for convenience when
-capture is not running.  Change the speed if your nodes' serial consoles are
-not running at 115200.  Of course, you'll need to change the cuac device for
-each node in the second line, to refelct where it's acutally attached. 
-
-Make a /usr/testbed/etc/capture.rc script to start up the capture process for
-each node at boot time. Each node should have a line like:
-/usr/testbed/bin/capture -r -s 115200 pc1 ttyC00 >/dev/null 2>&1 &
-As above, make sure to the the correct speed and tty device.
-
-/dev/tip
-
-##### Step 7 - Other
-
-It's useful to have the clocks on boss and ops relatively synchronized. During
-the setup of your boss node, you set up ntpd. You can use this on ops too, to
-synchronize their clocks.
+Optional. The ops-install script set up some mailing lists for the email
+addresses you set up in the defs file, in /etc/mail/lists . If you want to run
+these mailing lists off your ops node, you can put some people in them now.
+These are just standard sendmail list files - a list of addresses and/or
+archive files, one per line.
