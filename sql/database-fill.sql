@@ -280,11 +280,11 @@ REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PXEFBSD','REBOOTING',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('PXEFBSD','REBOOTED',60,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PXEFBSD','ISUP',0,'');
-REPLACE INTO state_timeouts VALUES ('NORMALv2','SHUTDOWN',120,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('PXEFBSD','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv2','BOOTING',180,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('NORMALv2','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('PXEFBSD','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv2','TBSETUP',600,'NOTIFY');
+REPLACE INTO state_timeouts VALUES ('NORMALv2','PXEWAKEUP',20,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMALv1','PXEWAKEUP',20,'REBOOT');
 
 --
 -- Dumping data for table `state_transitions`
@@ -293,6 +293,7 @@ REPLACE INTO state_timeouts VALUES ('NORMALv2','TBSETUP',600,'NOTIFY');
 
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAKEUP','BOOTING','BootInfo');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','SWAPPED','Error');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','ENDED','NoError');
@@ -376,22 +377,24 @@ REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','POSTED','ACTIVATING','SwapIn');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','PXEBOOT','KernelChange');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','BOOTING','BOOTING','DHCPRetry');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNAPPROVED','Verify');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNVERIFIED','Approve');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','UNVERIFIED','READY','Verify');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','UNAPPROVED','READY','Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','VERIFIED','Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','APPROVED','Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','APPROVED','READY','Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','VERIFIED','READY','Approve');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','FROZEN','READY','Thaw');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','FROZEN','Freeze');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','READY','Unlock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','LOCKED','Lock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','FROZEN','LOCKED','Lock');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','FROZEN','Freeze');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','UNVERIFIED','Un-Verify');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','UNAPPROVED','Un-Approve');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','UNAPPROVED','NEW','Un-Verify');
-REPLACE INTO state_transitions VALUES ('EXAMPLE','UNVERIFIED','NEW','Un-Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','APPROVED','Un-Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','VERIFIED','Un-Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','VERIFIED','NEW','Un-Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','APPROVED','NEW','Un-Approve');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVE','TERMINATING','SwapOut');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','TERMINATING','SWAPPED','SwapOut');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','SWAPPED','POSTED','RePost');
@@ -416,19 +419,23 @@ REPLACE INTO state_transitions VALUES ('EXPTSTATE','SWAPPED','ACTIVATING','SwapI
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_PARSE','MODIFY_RESWAP','NoError');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','ACTIVE','MODIFY_PARSE','Modify');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_RESWAP','ACTIVE','(No)Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAKEUP','PXEWAKEUP','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAIT','PXEWAKEUP','NodeAlloced');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','REBOOTED','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','BOOTING','REBOOTED','BootOkay');
 REPLACE INTO state_transitions VALUES ('PXEFBSD','SHUTDOWN','SHUTDOWN','Retry');
-REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','BOOTING','DHCPRetry');
-REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
-REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
-REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','BOOTING','KernelChange');
-REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','SHUTDOWN','Reboot');
-REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAIT','PXEWAIT','BootInfoRetry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','BOOTING','BootInfoRetry');
 REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','PXEWAIT','BootInfo; Free');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','BOOTING','BootInfo; NotFree');
 REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAKEUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','PXEWAIT','SHUTDOWN','Error');
 
 --
 -- Dumping data for table `state_triggers`
