@@ -17,8 +17,18 @@ use POSIX qw(setsid);
 
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-b | -w] [-i | -a | -f] [-r] [-e] ".
-	"<-s in | out | restart | modify | pause> <pid> <eid> [<nsfile>]\n";
+    print(STDERR
+	  "Usage: swapexp [-b | -w] [-i | -a | -f] [-r] [-e]\n".
+	  "               <-s in | out | restart | modify | pause>\n".
+	  "               <pid> <eid> [<nsfile>]\n".
+	  "switches and arguments:\n".
+	  "-w       - wait for non-batchmode experiment swap/modify\n".
+	  "-r       - reboot nodes when doing a modify experiment\n".
+	  "-e       - restart event scheduler when doing a modify experiment\n".
+	  "-s <op>  - Operation to perform; one of those listed above\n".
+	  "<pid>    - The project the experiment belongs to\n".
+	  "<eid>    - The experiment name (id)\n".
+	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
 my  $optlist = "biafres:w";

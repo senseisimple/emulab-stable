@@ -22,7 +22,12 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: endexp [-b | -w] <pid> <eid>\n";
+    print(STDERR
+	  "Usage: endexp [-b | -w] <pid> <eid>\n".
+	  "switches and arguments:\n".
+	  "-w       - wait for non-batchmode experiment terminate\n".
+	  "<pid>    - The project the experiment belongs to\n".
+	  "<eid>    - The experiment name (id)\n");
     exit(-1);
 }
 my $optlist = "bw";

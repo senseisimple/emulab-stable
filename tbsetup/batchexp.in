@@ -33,7 +33,7 @@ sub usage()
 	  "Usage: batchexp [-i [-w]] [-f] [-E description] [-g gid]\n".
 	  "                [-S reason] [-L reason] [-a <time>] [-l <time>]\n".
 	  "                -p <pid> -e <eid> <nsfile>\n".
-	  "switches:\n".
+	  "switches and arguments:\n".
 	  "-i       - swapin immediately; by default experiment is batched\n".
 	  "-w       - wait for non-batchmode experiment to preload or swapin\n".
 	  "-f       - preload experiment (do not swapin or queue yet)\n".
