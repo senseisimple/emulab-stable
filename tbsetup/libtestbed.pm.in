@@ -8,7 +8,8 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
-	 TBMakeLogname TB_BOSSNODE TBGenSecretKey TBDebugTimeStamp );
+	 TBMakeLogname TB_BOSSNODE TBGenSecretKey TBDebugTimeStamp
+	 TBDebugTimeStampsOn );
 
 my $MAILTAG  = "@OURDOMAIN@";
 my $BOSSNODE = "@BOSSNODE@";
@@ -139,7 +140,14 @@ sub TBDebugTimeStamp(@)
     }
 }
 
-
+#
+# Turn on timestamps locally. We could do this globally by using an
+# env variable to pass it along, but lets see if we need that.
+# 
+sub TBDebugTimeStampsOn()
+{
+    $TIMESTAMPS = 1;
+}
 
 #
 # Put ourselves into the background, directing output to the log file.
