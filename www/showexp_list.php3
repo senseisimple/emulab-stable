@@ -42,7 +42,9 @@ if (! strcmp($showtype, "all")) {
     $title  = "All";
 }
 elseif (! strcmp($showtype, "active")) {
-    $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+    # Active is now defined as "having nodes reserved" - we just depend on
+    # the fact that we skip expts with no nodes further down...
+    $clause = ""; 
     $title  = "Active";
     $active = 1;
 }
