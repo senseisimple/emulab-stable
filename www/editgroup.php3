@@ -264,7 +264,7 @@ TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 # in the group. This is the same script that gets run when the group
 # is first created.
 #
-#SUEXEC($uid, $unix_gid, "webgroupupdate $pid $gid", 1);
+SUEXEC($uid, $unix_gid, "webgroupupdate $pid $gid", 1);
 
 #
 # Show it again!
