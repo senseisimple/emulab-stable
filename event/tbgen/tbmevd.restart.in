@@ -2,6 +2,6 @@
 
 TBDIR=@prefix@
 
-killall tbevd
-exec ${TBDIR}/sbin/tbevd >>& $TBDIR/log/tbevd.log
+killall tbmevd
+exec ${TBDIR}/sbin/tbmevd >>& $TBDIR/log/tbmevd.log
 
