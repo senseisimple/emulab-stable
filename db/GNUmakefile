@@ -6,7 +6,7 @@ include ../GNUmakerules
 
 BINSCRIPTS	= avail inuse mac2if nalloc nfree nodeip ptopgen \
 		  showgraph tblog
-ALLSCRIPTS	= dbupdate usrud approve grpmemb user checkowner.tcl usrmod \
+ALLSCRIPTS	= dbupdate usrud grpmemb user checkowner.tcl usrmod \
 		  $(BINSCRIPTS)
 
 all:
