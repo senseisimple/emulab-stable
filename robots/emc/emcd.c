@@ -90,9 +90,39 @@ static elvin_error_t elvin_error;
 static struct mtp_packet config_rmc;
 static struct mtp_packet config_vmc;
 
+/* 
+ * these are for some global bounds checking on user-requested
+ * positions
+ */
+static struct camera_config *g_camera_config;
+int g_camera_config_size = 0;
+static struct obstacle_config *g_obstacle_config;
+int g_obstacle_config_size = 0;
+
+
 static struct rmc_client rmc_data;
 static struct vmc_client vmc_data;
 static mtp_handle_t emulab_handle = NULL;
+
+
+/* 
+ * returns 1 if x,y are inside the union of the boxes defined
+ * in the camera_config struct; 0 if not.
+ */
+static int position_in_camera(struct camera_config *cc,
+			      int cc_size,
+			      float x,
+			      float y
+			      );
+
+/*
+ * returns 0 if the position is not in a known obstacle; 1 if it is.
+ */
+static int position_in_obstacle(struct obstacle_config *oc,
+				int oc_size,
+				float x,
+				float y
+				);
 
 static void ev_callback(event_handle_t handle,
 			event_notification_t notification,
@@ -293,6 +323,9 @@ int main(int argc, char *argv[])
   hostname_list = robot_list_create();
   initial_position_list = robot_list_create();
   position_queue = robot_list_create();
+
+  g_camera_config = NULL;
+  g_obstacle_config = NULL;
   
   /* read config file into the above lists*/
   parse_config_file(config_file);
@@ -415,6 +448,44 @@ int main(int argc, char *argv[])
   event_main(handle);
   
   return retval;
+}
+
+static int position_in_camera(struct camera_config *cc,
+                              int cc_size,
+                              float x,
+                              float y
+                              ) {
+    int i;
+    int retval = 0;
+
+    for (i = 0; i < cc_size; ++i) {
+	if (x >= cc[i].x && y >= cc[i].y && 
+	    x <= (cc[i].x + cc[i].width) && y <= (cc[i].y + cc[i].height)) {
+	    retval = 1;
+	    break;
+	}
+    }
+
+    return retval;
+}
+
+static int position_in_obstacle(struct obstacle_config *oc,
+                                int oc_size,
+                                float x,
+                                float y
+                                ) {
+    int i;
+    int retval = 0;
+
+    for (i = 0; i < oc_size; ++i) {
+	if (x >= oc[i].xmin && y >= oc[i].ymin &&
+	    x <= oc[i].xmax && y <= oc[i].ymax) {
+	    retval = 1;
+	    break;
+	}
+    }
+
+    return retval;
 }
 
 int have_camera_config(char *hostname, int port,
@@ -586,6 +657,8 @@ void parse_config_file(char *config_file) {
   {
       struct robot_config *robot_val, *rc;
       struct robot_list_enum *e;
+      struct box *boxes_val;
+      int boxes_len;
       int lpc = 0;
       
       robot_val = malloc(sizeof(robot_config) * hostname_list->item_count);
@@ -596,12 +669,23 @@ void parse_config_file(char *config_file) {
 	  lpc += 1;
       }
       robot_list_enum_destroy(e);
+
+      boxes_len = cc_size;
+      boxes_val = (struct box *)malloc(sizeof(struct box) * boxes_len);
+      for (lpc = 0; lpc < boxes_len; ++lpc) {
+	  boxes_val[lpc].x = cc[lpc].x;
+	  boxes_val[lpc].y = cc[lpc].y;
+	  boxes_val[lpc].width = cc[lpc].width;
+	  boxes_val[lpc].height = cc[lpc].height;
+      }
       
       mtp_init_packet(&config_rmc,
 		      MA_Opcode, MTP_CONFIG_RMC,
 		      MA_Role, MTP_ROLE_EMC,
 		      MA_RobotLen, hostname_list->item_count,
 		      MA_RobotVal, robot_val,
+		      MA_BoundsLen, boxes_len,
+		      MA_BoundsVal, boxes_val,
 		      MA_ObstacleLen, oc_size,
 		      MA_ObstacleVal, oc,
 		      MA_TAG_DONE);
@@ -613,6 +697,11 @@ void parse_config_file(char *config_file) {
 		      MA_CameraLen, cc_size,
 		      MA_CameraVal, cc,
 		      MA_TAG_DONE);
+      /* don't free cc or oc! */
+      g_camera_config = cc;
+      g_camera_config_size = cc_size;
+      g_obstacle_config = oc;
+      g_obstacle_config_size = oc_size;
   }
 }
 
@@ -701,6 +790,7 @@ void ev_callback(event_handle_t handle,
   struct emc_robot_config *match = NULL;
   char objname[TBDB_FLEN_EVOBJNAME];
   robot_list_item_t *rli;
+  int in_obstacle, in_camera;
   
   if (! event_notification_get_objname(handle, notification,
 				       objname, sizeof(objname))) {
@@ -754,35 +844,65 @@ void ev_callback(event_handle_t handle,
 
     orientation = orientation * M_PI / 180.0;
 
-    mtp_init_packet(&mp,
-		    MA_Opcode, MTP_COMMAND_GOTO,
-		    MA_Role, MTP_ROLE_EMC,
-		    MA_CommandID, 1,
-		    MA_RobotID, match->id,
-		    MA_X, x,
-		    MA_Y, y,
-		    MA_Theta, orientation,
-		    MA_TAG_DONE);
 
-    if (rmc_data.handle != NULL) {
-      mtp_send_packet(rmc_data.handle, &mp);
+    if ((in_camera = position_in_camera(g_camera_config,g_camera_config_size,
+					x,y)) &&
+	!(in_obstacle = position_in_obstacle(g_obstacle_config,
+					     g_obstacle_config_size,
+					     x,y))
+	) {
+	
+
+	mtp_init_packet(&mp,
+			MA_Opcode, MTP_COMMAND_GOTO,
+			MA_Role, MTP_ROLE_EMC,
+			MA_CommandID, 1,
+			MA_RobotID, match->id,
+			MA_X, x,
+			MA_Y, y,
+			MA_Theta, orientation,
+			MA_TAG_DONE);
+
+	if (rmc_data.handle != NULL) {
+	    mtp_send_packet(rmc_data.handle, &mp);
+	}
+	else {
+	    mtp_print_packet(stdout, &mp);
+	    
+#if defined(TBDB_EVENTTYPE_COMPLETE)
+	    event_do(handle,
+		     EA_Experiment, pideid,
+		     EA_Type, TBDB_OBJECTTYPE_NODE,
+		     EA_Name, match->vname,
+		     EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		     EA_ArgInteger, "ERROR", 0,
+		     EA_ArgInteger, "CTOKEN", match->token,
+		     EA_TAG_DONE);
+#endif
+	}
+	
+	mtp_free_packet(&mp);
     }
     else {
-      mtp_print_packet(stdout, &mp);
+	int which_err_num;
 
+	which_err_num = (in_camera == 0)?1:2;
+
+	info("requested position either outside camera bounds or inside"
+	     " an obstacle!\n"
+	     );
 #if defined(TBDB_EVENTTYPE_COMPLETE)
-      event_do(handle,
-	       EA_Experiment, pideid,
-	       EA_Type, TBDB_OBJECTTYPE_NODE,
-	       EA_Name, match->vname,
-	       EA_Event, TBDB_EVENTTYPE_COMPLETE,
-	       EA_ArgInteger, "ERROR", 0,
-	       EA_ArgInteger, "CTOKEN", match->token,
-	       EA_TAG_DONE);
+	event_do(handle,
+		 EA_Experiment, pideid,
+		 EA_Type, TBDB_OBJECTTYPE_NODE,
+		 EA_Name, match->vname,
+		 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		 EA_ArgInteger, "ERROR", which_err_num,
+		 EA_ArgInteger, "CTOKEN", match->token,
+		 EA_TAG_DONE
+		 );
 #endif
     }
-
-    mtp_free_packet(&mp);
     
     // XXX What to do with the data?
     
@@ -1165,17 +1285,33 @@ int emulab_callback(elvin_io_handler_t handler,
     
     switch (mp->data.opcode) {
     case MTP_COMMAND_GOTO:
-      if (rmc_data.handle == NULL) {
-	error("no rmcd yet\n");
-      }
-      else if (mtp_send_packet(rmc_data.handle, mp) != MTP_PP_SUCCESS) {
-	error("could not forward packet to rmcd\n");
-      }
-      else {
-	info("forwarded goto\n");
-	
-	retval = 1;
-      }
+	if (position_in_camera(g_camera_config,g_camera_config_size,
+			       mp->data.mtp_payload_u.command_goto.position.x,
+			       mp->data.mtp_payload_u.command_goto.position.y
+			       ) &&
+	    !position_in_obstacle(g_obstacle_config,g_obstacle_config_size,
+				  mp->data.mtp_payload_u.command_goto.position.x,
+				  mp->data.mtp_payload_u.command_goto.position.y)
+	    ) {
+
+	    /* forward the packet on to rmc... */
+	    if (rmc_data.handle == NULL) {
+		error("no rmcd yet\n");
+	    }
+	    else if (mtp_send_packet(rmc_data.handle, mp) != MTP_PP_SUCCESS) {
+		error("could not forward packet to rmcd\n");
+	    }
+	    else {
+		info("forwarded goto\n");
+		
+		retval = 1;
+	    }
+	}
+	else {
+	    error("invalid position request (outside camera bounds or in"
+		  " an obstacle\n"
+		  );
+	}
       break;
     case MTP_REQUEST_POSITION:
       {
@@ -1284,7 +1420,7 @@ int vmc_callback(elvin_io_handler_t handler,
     error("invalid client %p\n", mp);
   }
   else {
-    if (debug) {
+    if (debug > 1) {
       fprintf(stderr, "vmc_callback: ");
       mtp_print_packet(stderr, mp);
     }

@@ -82,6 +82,7 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps);
 void pc_handle_packet(struct pilot_connection *pc, struct mtp_packet *mp);
 void pc_handle_signal(fd_set *rready, fd_set *wready);
 
+
 /**
  * How close does the robot have to be before it is considered at the intended
  * position.  Measurement is in meters(?).
@@ -101,7 +102,7 @@ void pc_handle_signal(fd_set *rready, fd_set *wready);
 /**
  * Maximum number of times to try and refine the position before giving up.
  */
-#define MAX_REFINE_RETRIES 3
+#define MAX_REFINE_RETRIES 5
 
 #define MAX_PILOT_CONNECTIONS 128
 
@@ -115,5 +116,8 @@ struct pilot_connection_data {
 };
 
 extern struct pilot_connection_data pc_data;
+
+int pc_point_in_bounds(struct pilot_connection_data *pcd,float x,float y);
+int pc_point_in_obstacle(struct pilot_connection_data *pcd,float x,float y);
 
 #endif

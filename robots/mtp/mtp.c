@@ -340,6 +340,7 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	case MA_Message:
 	    mp->data.mtp_payload_u.error.msg = va_arg(args, char *);
 	    break;
+#if 0
 	case MA_Horizontal:
 	    mp->data.mtp_payload_u.config_rmc.box.horizontal =
 		va_arg(args, double);
@@ -348,6 +349,7 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    mp->data.mtp_payload_u.config_rmc.box.vertical =
 		va_arg(args, double);
 	    break;
+#endif
 	case MA_RobotLen:
 	    mp->data.mtp_payload_u.config_rmc.robots.robots_len =
 		va_arg(args, int);
@@ -363,6 +365,14 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	case MA_CameraVal:
 	    mp->data.mtp_payload_u.config_vmc.cameras.cameras_val =
 		va_arg(args, struct camera_config *);
+	    break;
+	case MA_BoundsVal:
+	    mp->data.mtp_payload_u.config_rmc.bounds.bounds_val = 
+		va_arg(args, struct box *);
+	    break;
+	case MA_BoundsLen:
+	    mp->data.mtp_payload_u.config_rmc.bounds.bounds_len = 
+		va_arg(args, int);
 	    break;
 	case MA_ObstacleLen:
 	    mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_len =
@@ -673,12 +683,8 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
     case MTP_CONFIG_RMC:
 	fprintf(file,
 		" opcode:\tconfig-rmc\n"
-		"  num:\t\t%d\n"
-		"  horiz:\t%f\n"
-		"  vert:\t\t%f\n",
-		mp->data.mtp_payload_u.config_rmc.robots.robots_len,
-		mp->data.mtp_payload_u.config_rmc.box.horizontal,
-		mp->data.mtp_payload_u.config_rmc.box.vertical);
+		"  num:\t\t%d\n",
+		mp->data.mtp_payload_u.config_rmc.robots.robots_len);
 	for (lpc = 0;
 	     lpc < mp->data.mtp_payload_u.config_rmc.robots.robots_len;
 	     lpc++) {
@@ -689,6 +695,21 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    lpc,
 		    mcr->robots.robots_val[lpc].id,
 		    mcr->robots.robots_val[lpc].hostname);
+	}
+	for (lpc = 0;
+	     lpc < mp->data.mtp_payload_u.config_rmc.bounds.bounds_len;
+	     ++lpc
+	     ) {
+	    struct mtp_config_rmc *mcr = &mp->data.mtp_payload_u.config_rmc;
+	    
+	    fprintf(file,
+		    "  bound[%d]:\tx=%f,y=%f,width=%f,height=%f\n",
+		    lpc,
+		    mcr->bounds.bounds_val[lpc].x,
+		    mcr->bounds.bounds_val[lpc].y,
+		    mcr->bounds.bounds_val[lpc].width,
+		    mcr->bounds.bounds_val[lpc].height
+		    );
 	}
 	for (lpc = 0;
 	     lpc < mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_len;

@@ -184,14 +184,16 @@ struct obstacle_config {
     float zmax;
 };
 
-struct global_bound {
-    float horizontal;
-    float vertical;
+struct box {
+    float x;
+    float y;
+    float width;
+    float height;
 };
 
 struct mtp_config_rmc {
     robot_config robots<>;
-    global_bound box;
+    box bounds<>;
     obstacle_config obstacles<>;
 };
 

@@ -256,6 +256,8 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	    else {
 		float bearing;
 		rc_code_t rc;
+		int in_vision = 0;
+		int flipped_bearing = 0;
 
 		pc->pc_flags |= PCF_WAYPOINT;
 
@@ -297,95 +299,145 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		    info("debug: waypoint bearing %f\n", bearing);
 		}
 
-		if (rl.x0 == oc->xmin && rl.y0 == oc->ymin) {
-		    printf("  top left\n");
-		    if (bearing > -M_PI_4) {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymin;
+		/*
+		 * we need to make sure the generated waypoint is inside
+		 * the vision system bounds; if it's not, there are a couple
+		 * different approaches we can take (take the n+1st approach
+		 * if the nth approach failed...)
+		 *
+		 * 1. Flip the bearing across M_PI, and try again.
+		 * 2. Stall the bot; hopefully the obstacle will clear up.
+		 * 3. Back up from the obstacle, and move away from the vision
+		 *    system bounds; hopefully, this will give the robot
+		 *    a better chance at picking a decent waypoint.
+		 * 4. ?
+		 *
+		 * For now, we'll try 1, then 3.  I'm not familiar enough with
+		 * the state_change function to chance adding more states to
+		 * control if we've tried stalling.
+		 */
+		while (!in_vision) {
+
+		    if (rl.x0 == oc->xmin && rl.y0 == oc->ymin) {
+			printf("  top left\n");
+			if (bearing > -M_PI_4) {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+		    }
+		    else if (rl.x0 == oc->xmin && rl.y0 == oc->ymax) {
+			printf("  bottom left\n");
+			if (bearing > M_PI_4) {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+		    }
+		    else if (rl.x0 == oc->xmax && rl.y0 == oc->ymax) {
+			printf("  bottom right\n");
+			if (bearing > (M_PI_2 + M_PI_4)) {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+		    }
+		    else if (rl.x0 == oc->xmax && rl.y0 == oc->ymin) {
+			printf("  top right\n");
+			if (bearing < -(M_PI_2 + M_PI_4)) {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+		    }
+		    else if (rl.x0 == oc->xmin) {
+			printf("  left\n");
+			if (bearing > 0.0) {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+		    }
+		    else if (rl.x0 == oc->xmax) {
+			printf("  right\n");
+			if (bearing > M_PI_2) {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+		    }
+		    else if (rl.y0 == oc->ymin) {
+			printf("  top\n");
+			if (bearing < -M_PI_2) {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymin;
+			}
+		    }
+		    else if (rl.y0 == oc->ymax) {
+			printf("  bottom\n");
+			if (bearing < M_PI_2) {
+			    pc->pc_waypoint.x = oc->xmax;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
+			else {
+			    pc->pc_waypoint.x = oc->xmin;
+			    pc->pc_waypoint.y = oc->ymax;
+			}
 		    }
 		    else {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymax;
+			assert(0);
 		    }
-		}
-		else if (rl.x0 == oc->xmin && rl.y0 == oc->ymax) {
-		    printf("  bottom left\n");
-		    if (bearing > M_PI_4) {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		}
-		else if (rl.x0 == oc->xmax && rl.y0 == oc->ymax) {
-		    printf("  bottom right\n");
-		    if (bearing > (M_PI_2 + M_PI_4)) {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymax;
+
+		    if (pc_point_in_bounds(&pc_data,
+					   pc->pc_waypoint.x,
+					   pc->pc_waypoint.y
+					   )) {
+			in_vision = 1;
+			info("waypoint in vision\n");
 		    }
 		    else {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymin;
+			
+			if (!flipped_bearing) {
+			    flipped_bearing = 1;
+			    /* flip it */
+			    bearing = -bearing;
+			    info("flipped bearing in waypoint gen\n");
+			}
+			else {
+			    /* try moving backwards, and away from vision */
+			    info("could not find a waypoint!\n");
+
+			    /* XXX: how to find current direction of movement,
+			     * so we know which direction is "backwards" ?
+			     */
+
+			    assert(0);
+			}
 		    }
 		}
-		else if (rl.x0 == oc->xmax && rl.y0 == oc->ymin) {
-		    printf("  top right\n");
-		    if (bearing < -(M_PI_2 + M_PI_4)) {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		}
-		else if (rl.x0 == oc->xmin) {
-		    printf("  left\n");
-		    if (bearing > 0.0) {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		}
-		else if (rl.x0 == oc->xmax) {
-		    printf("  right\n");
-		    if (bearing > M_PI_2) {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		}
-		else if (rl.y0 == oc->ymin) {
-		    printf("  top\n");
-		    if (bearing < -M_PI_2) {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymin;
-		    }
-		}
-		else if (rl.y0 == oc->ymax) {
-		    printf("  bottom\n");
-		    if (bearing < M_PI_2) {
-			pc->pc_waypoint.x = oc->xmax;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		    else {
-			pc->pc_waypoint.x = oc->xmin;
-			pc->pc_waypoint.y = oc->ymax;
-		    }
-		}
-		
+		    
 		if (debug) {
 		    info("debug: %s waypoint %f %f\n",
 			 pc->pc_robot->hostname,
@@ -725,6 +777,10 @@ static void pc_handle_update(struct pilot_connection *pc,
 	    pc->pc_state = PS_ARRIVED;
 	}
 	break;
+
+    case MTP_POSITION_STATUS_ABORTED:
+	break;
+
     case MTP_POSITION_STATUS_CONTACT:
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 	pc->pc_flags |= PCF_CONTACT;
@@ -737,6 +793,8 @@ static void pc_handle_update(struct pilot_connection *pc,
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 
 	switch (pc->pc_state) {
+	case PS_PENDING_POSITION:
+	    
 	case PS_REFINING_POSITION:
 	    pc_change_state(pc, PS_REFINING_POSITION);
 	    break;
@@ -748,13 +806,11 @@ static void pc_handle_update(struct pilot_connection *pc,
 	    pc_change_state(pc, PS_PENDING_POSITION);
 	    break;
 	    
+
 	default:
 	    assert(0);
 	    break;
 	}
-	break;
-	
-    case MTP_POSITION_STATUS_ABORTED:
 	break;
 	
     default:
@@ -900,3 +956,49 @@ void pc_handle_signal(fd_set *rready, fd_set *wready)
 	}
     }
 }
+
+int pc_point_in_bounds(struct pilot_connection_data *pcd,float x,float y) {
+    int i;
+    struct box *boxes;
+    int boxes_len;
+    int retval = 0;
+
+    boxes = pcd->pcd_config->bounds.bounds_val;
+    boxes_len = pcd->pcd_config->bounds.bounds_len;
+
+    for (i = 0; i < boxes_len; ++i) {
+	if (x >= boxes[i].x && y >= boxes[i].y &&
+	    x <= (boxes[i].x + boxes[i].width) && 
+	    y <= (boxes[i].y + boxes[i].height)
+	    ) {
+	    retval = 1;
+	    break;
+	}
+    }
+
+    return retval;
+}
+
+int pc_point_in_obstacle(struct pilot_connection_data *pcd,float x,float y) {
+    int i;
+    struct obstacle_config *oc;
+    int oc_len;
+    int retval = 0;
+
+    oc = pcd->pcd_config->obstacles.obstacles_val;
+    oc_len = pcd->pcd_config->obstacles.obstacles_len;
+
+    for (i = 0; i < oc_len; ++i) {
+	if (x >= oc[i].xmin && y >= oc[i].ymin &&
+	    x <= oc[i].xmax && y <= oc[i].ymax
+	    ) {
+	    retval = 1;
+	    break;
+	}
+    }
+
+    return retval;
+
+}
+
+

@@ -134,6 +134,8 @@ typedef enum {
     MA_RobotVal,	 /*< (robot_config *) */
     MA_CameraLen,	 /*< (int) */
     MA_CameraVal,	 /*< (camera_config *) */
+    MA_BoundsVal,        /*< (box *) */
+    MA_BoundsLen,        /*< (int) */
     MA_ObstacleLen,	 /*< (int) */
     MA_ObstacleVal,	 /*< (obstacle_config *) */
     MA_RobotID,	 	 /*< (int) */
