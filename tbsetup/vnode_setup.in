@@ -180,7 +180,7 @@ foreach my $node (@nodes) {
 
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 30;
+	alarm 60;
 	waitpid($syspid, 0);
 	alarm 0;
 
