@@ -42,6 +42,7 @@ if (! strcmp($showtype, "all")) {
 elseif (! strcmp($showtype, "active")) {
     $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
     $title  = "Active";
+    $active = 1;
 }
 elseif (! strcmp($showtype, "batch")) {
     $clause = "e.batchmode=1";
@@ -50,11 +51,12 @@ elseif (! strcmp($showtype, "batch")) {
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     $clause = "(e.state='$TB_EXPTSTATE_ACTIVE') and (to_days(now())-to_days(expt_swapped)>=$idledays)";
     $title  = "Idle";
-    $idle=1;
+    $idle = 1;
 }
 else {
     $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
     $title  = "Active";
+    $active = 1;
 }
 
 #
@@ -176,8 +178,8 @@ if (mysql_num_rows($experiments_result)) {
 	  $usage[$n[0]] = $n[1];
 	}
 
-	# skip experiments with no nodes (for now, node==pc)
-	if ($usage["pc"]==0) continue;
+	# in idle or active, skip experiments with no nodes (for now, node==pc)
+	if (($idle || $active) && $usage["pc"]==0) continue;
 
 	$total_pcs += $usage["pc"];
 	$total_sharks += $usage["shark"];
