@@ -11,7 +11,7 @@ public class NodePropertiesArea extends PropertiesArea
     {
 	super();
 	addProperty("name", "name:","", true, false);
-	addProperty("hardware", "hardware:","<auto>", true, false );
+	addProperty("hardware", "hardware:","<auto>", true, true );
 	addProperty("osid", "os id:","<auto>", true, true );
     }
 };

@@ -80,13 +80,14 @@ class MagicTextField implements TextListener, FocusListener {
 		// alphaAllowed and its alphanumeric (or '-')
 		// (but not numeric or '-' if it is the first char)
 		// numAllowed and its numeric or "."
-		if (alphaAllowed && c == ' ') {
+		/*		if (alphaAllowed && c == ' ') {
 		    rep = rep.replace(' ', '-');
 		    i++;
-		} else if ((alphaAllowed && 
-			    (isAlphic( c ) || (i != 0 && (isNumeric(c) || c == '-')))) ||
+		    } else */
+		if ((alphaAllowed && 
+		    (isAlphic( c ) || (i != 0 && (isNumeric(c)/* || c == '-'*/)))) ||
 			   (specialAllowed && i != 0 &&
-			    (c == '_' || c == '+')) ||
+			    (c == '_' || c == '-' || c == '+')) ||
 			   (numAllowed &&
 			    (isNumeric( c ) || c == '.'))) {
 		    // legit.
