@@ -1,0 +1,123 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initialize (or tear down) interfaces (normal, veth, tunnels). Also
+# sets up (or tears down) the corresponding ipfw rules by invoking
+# delaysetup. This script is probably going to become sys independent
+# at some point and replace some code in ../common/rc.setup. For now,
+# its invoked only from the jail setup code.
+#
+sub usage()
+{
+    print "       ifsetup [-u | -i] [-j <vnodeid> -r rtabid]\n";
+    exit(1);
+}
+my $optlist	= "iuj:r:";
+my $install	= 0;
+my $uninstall	= 0;
+my $vnodeid;
+my $rtabid	= undef;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# Must be root.
+# 
+if ($EUID) {
+    die("*** $0:\n".
+	"    Must be run as root!\n");
+}
+
+# No can do.
+if (MFS()) {
+    print "Skipping delay configuration on MFS node!\n";
+    exit(0);
+}
+# Cannot use "use" cause of KFS test.
+require Socket;
+import Socket;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"i"})) {
+    $install = 1;
+}
+if (defined($options{"u"})) {
+    $uninstall = 1;
+}
+if (defined($options{"j"})) {
+    $vnodeid = $options{"j"};
+    libsetup_setvnodeid($vnodeid);
+    if (defined($options{r})) {
+	$rtabid = $options{"r"};
+    }
+}
+if (@ARGV) {
+    usage();
+}
+
+# Uninstall just looks for the file and runs it.
+if ($uninstall) {
+    system("delaysetup -u " . (defined($vnodeid) ? "-j $vnodeid" : "")); 
+    system(TMIFC . " disable")
+	if (-e TMIFC);
+    if (defined($vnodeid) && defined($rtabid)) {
+	system("route flush -rtabid $rtabid");
+    }
+    exit(0);
+}
+
+# Lets clean out old instructions.
+unlink TMIFC, TMROUTECONFIG, TMTUNNELCONFIG;
+
+#
+# Update the configuration. These are library functions. The router config
+# is run via the ifconfig, so just need to run that one.
+#
+dotunnels($rtabid);
+doifconfig($rtabid);
+dorouterconfig($rtabid);
+
+if (-e TMTUNNELCONFIG && $install) {
+    print "Starting Tunnels ...\n";
+    system(TMTUNNELCONFIG);
+    sleep(5);
+}
+
+if (-e TMIFC && $install) {
+    # Run non interface specific part of router config. 
+    system(TMROUTECONFIG . " enable")
+	if (-e TMROUTECONFIG);
+    system(TMIFC . " enable");
+}
+# Do the delaysetup stuff.
+system("delaysetup ".
+       ($install ? "-i " : "") .
+       (defined($vnodeid) ? "-j $vnodeid " : ""));
+exit(0);
+

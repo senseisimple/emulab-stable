@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
@@ -8,16 +8,21 @@ use English;
 use Getopt::Std;
 
 #
-# Setup/Update the system with new delays. Use -u for update mode, which
-# means to run the scripts so that the delays are installed.
+# Setup/Update the system with new delays. Use -i for install mode, which
+# means to run the scripts so that the delays are installed. Use -u for
+# uninstall mode, which really only makes sense when used in conjunction
+# with -j. BTW, none of the options make sense on a delaynode; they are
+# intended for use with linkdelays on end nodes. 
 #
 sub usage()
 {
-    print "Usage: delaysetup [-u]\n";
+    print "Usage: delaysetup [-i | -u] [-j <vnodeid>]\n";
     exit(1);
 }
-my $optlist = "u";
-my $update  = 0;
+my $optlist	= "iuj:";
+my $install	= 0;
+my $uninstall	= 0;
+my $vnodeid;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -34,6 +39,14 @@ $| = 1;
 use libsetup;
 
 #
+# Must be root.
+# 
+if ($EUID) {
+    die("*** $0:\n".
+	"    Must be run as root!\n");
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -41,8 +54,15 @@ use libsetup;
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"i"})) {
+    $install = 1;
+}
 if (defined($options{"u"})) {
-    $update = 1;
+    $uninstall = 1;
+}
+if (defined($options{"j"})) {
+    $vnodeid = $options{"j"};
+    libsetup_setvnodeid($vnodeid);
 }
 if (@ARGV) {
     usage();
@@ -57,31 +77,51 @@ my $KERNEL10000 = "/kernel.10000HZ";
 my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
 my $KERNELJAIL  = "/kernel.jail";	# Specific to jails (with linkdelays).
 my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel. 
-my $TMDELMAP	= $libsetup::TMDELMAP;	# Really comes from libloc.
 
 # This should never happen!
 if (REMOTE() || MFS()) {
     print "Skipping delay configuration on remote/MFS node!\n";
-    return 0;
+    exit(0);
+}
+
+# Uninstall just looks for the files, runs them, and exits.
+if ($uninstall) {
+    system(TMDELAY . " disable")
+	if (-e TMDELAY);
+	
+    system(TMLINKDELAY . " disable")
+	if (-e TMLINKDELAY);
+
+    # Kill delay agent. 
+    if (defined($vnodeid)) {
+	system("$BINDIR/rc.delayagent -j $vnodeid stop");
+    }
+    exit(0);
 }
 
 #
 # Update the delays configuration. Also run the the commands to make
-# the changes.
+# the changes. Since a node cannot be doing delays and linkdelays at the
+# same time, try each and exit.
 #
 DelaySetup();
-LinkDelaySetup();
+if (-e TMDELAY) {
+    system(TMDELAY . " enable")
+	if ($install);
+    exit(0);
+}
 
-if ($update) {
-    #
-    # Only one of these files will actually exist, since a node cannot
-    # be a delay node *and* have linkdelays. 
-    #
-    system(TMDELAY)
-	if (-e TMDELAY);
-	
-    system(TMLINKDELAY)
-	if (-e TMLINKDELAY);
+LinkDelaySetup();
+if (-e TMLINKDELAY) {
+    if ($install) {
+	system(TMLINKDELAY . " enable");
+
+	# Fire up a delay agent. 
+	if (defined($vnodeid)) {
+	    system("$BINDIR/rc.delayagent -j $vnodeid start");
+	}
+    }
+    exit(0);
 }
 exit(0);
 
@@ -107,8 +147,8 @@ sub DelaySetup()
 	my $count    = 69;
 	my $mindelay = 10000;
 
-	open(MAP, ">$TMDELMAP")
-	    or die("Could not open $TMDELMAP");
+	open(MAP, ">" . TMDELMAP)
+	    or die("Could not open " . TMDELMAP . ": $!");
     
 	open(DEL, ">" . TMDELAY)
 	    or die("Could not open " . TMDELAY . ": $!");
@@ -345,7 +385,8 @@ sub LinkDelaySetup()
     my $kernel;
     my $checkreplace = 0;
     my $gotjails = 0;
-    my $ruleno = 20000;
+    my $upcmds   = "";
+    my $downcmds = "";
 
     # Lets clean out old instructions.
     unlink TMLINKDELAY;
@@ -375,20 +416,12 @@ sub LinkDelaySetup()
     CLOSETMCC($TM);
 
     if (@delays) {
-	open(MAP, ">$TMDELMAP")
-	    or die("Could not open $TMDELMAP");
+	open(MAP, ">" . TMDELMAP)
+	    or die("Could not open " . TMDELMAP . ": $!");
     
 	open(DEL, ">" . TMLINKDELAY)
 	    or die("Could not open " . TMLINKDELAY . ": $!");
 	
-	print DEL "#!/bin/sh\n";
-	print DEL "ipfw -f flush\n";
-	#
-	# Turn off Flow-based IP (fast) forwarding since it causes packets 
-	# to bypass traffic shaping and ipfw. Stupid!
-	#
-	print DEL "sysctl -w net.inet.ip.fastforwarding=0\n";
-
 	foreach $delay (@delays) {
 	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
 	    $pat .= q(LINKNAME=([-\d\w]+) VNODE=([-\d\w]+) );
@@ -485,36 +518,32 @@ sub LinkDelaySetup()
 		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
 	    }
 
-	    print DEL "ifconfig $iface media 100baseTX mediaopt full-duplex";
-	    print DEL "\n";
+	    $upcmds .= "ifconfig $iface media 100baseTX mediaopt full-duplex";
+	    $upcmds .= "\n";
 
-	    print DEL "ipfw add $ruleno pipe $pipeno ip from any to ".
-		      "any out xmit $iface nexthop $inet:$mask\n";
+	    $upcmds .= "ipfw add $pipeno pipe $pipeno ip from any to ".
+		       "any out xmit $iface nexthop $inet:$mask\n";
 
-	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
-	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
+	    $upcmds .= "ipfw pipe $pipeno config delay ${delay}ms " .
+	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
 
-	    if ($type eq "duplex") {
-		my $dupruleno = $ruleno + 10;
+	    $downcmds .= "ipfw pipe delete $pipeno\n";
+	    $downcmds .= "ipfw delete $pipeno\n";
 		
+	    if ($type eq "duplex") {
 		#
 		# Want to force the reverse side to 1 queue slot to enforce
 		# the proper bandwidth. Not ideal, especially since at 1000HZ
 		# 1 queue slot is not enough. Make it 4 instead. 
-		# 
-		print DEL "ipfw add $dupruleno pipe $rpipeno ip from any ".
-		    "to any in recv $iface\n";
+		#
+		$upcmds .= "ipfw add $rpipeno pipe $rpipeno ip from any ".
+		           "to any in recv $iface\n";
 
-		print DEL "ipfw pipe $rpipeno config delay ${rdelay}ms ".
-		    "bw ${rbandw}Kbit/s plr $rplr queue 4\n";
-	    }
+		$upcmds .= "ipfw pipe $rpipeno config delay ${rdelay}ms ".
+		           "bw ${rbandw}Kbit/s plr $rplr queue 4\n";
 
-	    print STDOUT "  $iface pipe $pipeno config delay ";
-	    print STDOUT "${delay}ms bw ${bandw}Kbit/s plr $plr ";
-	    print STDOUT "$queue $redparams\n";
-	    if ($type eq "duplex") {
-		print STDOUT "  $iface pipe $rpipeno config delay ".
-		    "${rdelay}ms bw ${rbandw}Kbit/s plr $rplr queue 4\n";
+		$downcmds .= "ipfw pipe delete $rpipeno\n";
+		$downcmds .= "ipfw delete $rpipeno\n";
 	    }
 
 	    if ($type eq "duplex") {
@@ -524,12 +553,29 @@ sub LinkDelaySetup()
 	    else {
 		print MAP "$linkname simplex $vnode $iface $pipeno\n";
 	    }
-	    $ruleno += 100;
 	}
-	print DEL "echo \"Delay Configuration Complete\"\n";
+	close(MAP);
+
+	print DEL "#!/bin/sh\n";
+	print DEL "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+	# Main boot only. 
+	if (!defined($vnodeid)) {
+	    print DEL "ipfw -f flush\n";
+	}
+	print DEL "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
+	print DEL "case \"\$action\" in\n";
+	print DEL "  enable)\n";
+	print DEL "     $upcmds\n";
+	# Turn off Flow-based IP (fast) forwarding since it causes packets 
+	# to bypass traffic shaping and ipfw. Stupid!
+	print DEL "     sysctl -w net.inet.ip.fastforwarding=0\n";
+	print DEL "     ;;\n";
+	print DEL "  disable)\n";
+	print DEL "     $downcmds\n";
+	print DEL "     ;;\n";
+	print DEL "esac\n";
 	close(DEL);
 	chmod(0755, TMLINKDELAY);
-	close(MAP);
     
 	#
 	# Now do kernel configuration. All of the above work is wasted,
