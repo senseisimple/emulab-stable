@@ -11,14 +11,12 @@ echo "<p>
 
       <p>
       Unfortunately, we don't do those little reminder hints like \"What was
-      your first dog's maiden name?\" In fact, we do not save a clear
-      text version of your password!
+      your first dog's maiden name?.\" 
 
       <p>
       But if you send us an
       <a href='mailto:$TBMAILADDR_OPS?subject=I forgot my password'>email
-      message</a>, we will reset your password for you. We will even
-      tell you what we set it to!\n";
+      message</a>, we will fix things up for you!\n";
 
 #
 # Standard Testbed Footer
