@@ -19,6 +19,8 @@ table.stealth { border: 0px; background-color:#FFF; }
 td.stealth { background-color:#FFF; }
 img.stealth { background-color:#FFF; }
 
+table.topbar { border-bottom: solid 2px #000; }
+
 td.pad4 { padding: 4px; }
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
 td.paddedcell2 { padding: 0.5em; }
@@ -74,6 +76,14 @@ td.paddedcell2 { padding: 0.5em; }
 	padding-bottom: 0px;
 	margin: 0px; 
 	border: 0px; }
+
+.topbaropt {
+    	background-color: #fff;
+	padding-bottom: 0px;
+	padding-left: 8px;
+	padding-right: 8px;
+	text-align: center;
+}
 
 .menuopt, .menuoptb {
 	padding-left: 14px;
@@ -134,4 +144,4 @@ a.static:active  { color: #5555EE; text-decoration: underline; }
 a2  { padding: 4px; }
 a2:hover   { background-color: #E7E7F0; border: solid 1px #007; text-decoration: none; padding: 3px;}
 
-
+span.topbaroption { background-color:#E1E1EA; }

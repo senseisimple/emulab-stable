@@ -16,38 +16,76 @@ $drewheader       = 0;
 $BASEPATH	  = "";
 
 #
+# TOPBARCELL - Make a cell for the topbar
+#
+function TOPBARCELL($contents) {
+    echo "<td class=\"topbaropt\">";
+    echo "<span class=\"topbaroption\">&nbsp;";
+    echo $contents;
+    echo "&nbsp;</span>";
+    echo "</td>";
+    echo "\n";
+}
+
+#
+# SIDEBARCELL - Make a cell for the sidebar
+#
+function SIDEBARCELL($contents, $last = 0) {
+    echo "<tr>";
+    if ($last) {
+	echo "<td class=\"menuoptb\">";
+    } else {
+	echo "<td class=\"menuopt\">";
+    }
+    echo $contents;
+    echo "</td>";
+    echo "</tr>";
+    echo "\n";
+}
+
+#
+# WRITETOPBARBUTTON(text, base, link): Write a button in the topbar
+#
+function WRITETOPBARBUTTON($text, $base, $link ) {
+    $link = "$base/$link";
+    TOPBARCELL("<a href=\"$link\">$text</a>");
+}
+# same as above with "new" gif next to it.
+function WRITETOPBARBUTTON_NEW($text, $base, $link ) {
+    $link = "$base/$link";
+    TOPBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" />");
+}
+
+#
 # WRITESIDEBARBUTTON(text, link): Write a button on the sidebar menu.
 # We do not currently try to match the current selection so that its
 # link looks different. Not sure its really necessary.
 #
 function WRITESIDEBARBUTTON($text, $base, $link ) {
     $link = "$base/$link";
-    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>");
 }
 
 # same as above with "new" gif next to it.
 function WRITESIDEBARBUTTON_NEW($text, $base, $link ) {
     $link = "$base/$link";
-    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
-    echo "<img src=\"/new.gif\" /></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" />");
 }
 
 # same as above with "cool" gif next to it.
 function WRITESIDEBARBUTTON_COOL($text, $base, $link ) {
     $link = "$base/$link";
-    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
-    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />");
 }
 
 function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
     $link = "$link";
-    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>\n");
 }
 
 function WRITESIDEBARBUTTON_ABSCOOL($text, $base, $link ) {
     $link = "$link";
-    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
-    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />");
 }
 
 # same as above, but uses a slightly different style sheet so there
@@ -55,18 +93,82 @@ function WRITESIDEBARBUTTON_ABSCOOL($text, $base, $link ) {
 # The devil is, indeed, in the details.
 function WRITESIDEBARLASTBUTTON($text, $base, $link) {
     $link = "$base/$link";
-    echo "<tr><td class=\"menuoptb\"><a href=\"$link\">$text</a></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>",1);
 }
 
 function WRITESIDEBARLASTBUTTON_COOL($text, $base, $link) {
     $link = "$base/$link";
-    echo "<tr><td class=\"menuoptb\"><a href=\"$link\">$text</a>&nbsp;";
-    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />",1);
 }
 
 # writes a message to the sidebar, without clickability.
 function WRITESIDEBARNOTICE($text) {
-    echo "<tr><td class=\"menuopt\"><b>$text</b></td></tr>\n";
+    SIDEBARCELL("<b>$text</b>");
+}
+
+#
+# Something like the sidebar, but across the top, with only a few options.
+# Think Google. For PlanetLab users, but it would be easy enough to make
+# others. Still a work in progress.
+#
+function WRITEPLABTOPBAR() {
+    echo "<table class=\"topbar\" width=\"100%\" cellpadding=\"2\" cellspacing=\"0\" align=\"center\">\n";
+    global $login_status, $login_uid;
+    global $TBBASE, $TBDOCBASE, $BASEPATH;
+    global $THISHOMEBASE;
+
+    #
+    # get post time of most recent news;
+    # get both displayable version and age in days.
+    #
+    $query_result = 
+	DBQueryFatal("SELECT DATE_FORMAT(date, '%M&nbsp;%e') AS prettydate, ".
+		     " (TO_DAYS(NOW()) - TO_DAYS(date)) AS age ".
+		     "FROM webnews ".
+		     "ORDER BY date DESC ".
+		     "LIMIT 1");
+    $newsDate = "";
+    $newNews  = 0;
+
+    if ($login_uid) {
+	$newsBase = $TBBASE; 
+    } else {
+	$newsBase = $TBDOCBASE;
+    }
+
+    if ($row = mysql_fetch_array($query_result)) {
+	$newsDate = "(".$row[prettydate].")";
+	if ($row[age] < 7) {
+	    $newNews = 1;
+	}
+    }
+
+    WRITETOPBARBUTTON("Create a PlanetLab Slice",
+        $TBBASE, "plab_advanced.php3");
+
+    WRITETOPBARBUTTON("PlanetLab Nodes",
+        $TBBASE, "plabmetrics.php3");
+
+    WRITETOPBARBUTTON("Docs", $TBDOCBASE, "doc.php3");
+
+    if ($newNews) {
+	WRITETOPBARBUTTON_NEW("News", $newsBase, "news.php3");
+    } else {
+	WRITETOPBARBUTTON("News", $newsBase, "news.php3");
+    }
+
+
+    WRITETOPBARBUTTON("My Testbed",
+	$TBBASE,
+	"showuser.php3?target_uid=$login_uid");
+
+
+    WRITETOPBARBUTTON("Advanced Experiment",
+        $TBBASE, "beginexp.php3");
+
+    echo "</table>\n";
+    echo "<br>\n";
+
 }
 
 #
@@ -114,8 +216,8 @@ function WRITESIDEBAR() {
 	}
     }
 
+    echo "<FORM method=get ACTION=\"/cgi-bin/webglimpse/usr/testbed/webglimpse\">\n";
 ?>
-<FORM method=get ACTION="/cgi-bin/webglimpse/usr/testbed/webglimpse">
   <table class="menu" width=220 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
@@ -175,8 +277,10 @@ function WRITESIDEBAR() {
       <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced 
       Search</a> ]</td></tr>
     </td></tr>  
-  </table>
-</form>
+<?php # BACK TO PHP
+    echo "</table>\n";
+    echo "</form>\n";
+?>
 <table class="menu" width=220 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Interaction</b></td></tr>
 <?php # BACK TO PHP
@@ -398,7 +502,7 @@ function WRITESIDEBAR() {
 #
 # spits out beginning part of page
 #
-function PAGEBEGINNING( $title ) {
+function PAGEBEGINNING( $title, $nobanner = 0 ) {
     global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
     global $TBDIR, $WWW;
     global $MAINPAGE;
@@ -436,7 +540,9 @@ function PAGEBEGINNING( $title ) {
 
     echo "</head>
             <body bgcolor='#FFFFFF' 
-             topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>
+             topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
+    if (! $nobanner ) {
+	echo "
             <table cellpadding='0' cellspacing='0' width='100%'>
             <tr>
               <td valign='top' class='bannercell' 
@@ -444,10 +550,11 @@ function PAGEBEGINNING( $title ) {
               bgcolor=#3D627F ><img width=369 height=100 
               src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
               alt='$THISHOMEBASE - the network testbed' />";
-    if (!$MAINPAGE) {
-	echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
+	      if (!$MAINPAGE) {
+		  echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
+	      }
+	      echo "</td></tr></table>\n";
     }
-    echo "</td></tr></table>\n";
 
     echo "<table cellpadding='8' cellspacing='0' height='100%' width='100%'>
             <tr height='100%'>
@@ -472,7 +579,7 @@ function FINISHSIDEBAR()
 #
 # Spit out a vanilla page header.
 #
-function PAGEHEADER($title) {
+function PAGEHEADER($title,$view = array()) {
     global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
     global $BASEPATH, $SSL_PROTOCOL, $drewheader;
     global $TBMAINSITE;
@@ -530,8 +637,15 @@ function PAGEHEADER($title) {
 	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
     }
 
-    PAGEBEGINNING( $title );
-    WRITESIDEBAR();
+    if (isset($view['hide_banner'])) {
+	$nobanner = 1;
+    } else {
+	$nobanner = 0;
+    }
+    PAGEBEGINNING( $title, $nobanner );
+    if (!isset($view['hide_sidebar'])) {
+	WRITESIDEBAR();
+    }
     FINISHSIDEBAR();
     echo "<h2 class=\"nomargin\">\n";
 
@@ -560,6 +674,9 @@ function PAGEHEADER($title) {
     echo "</tr>\n";
     echo "<tr><td colspan=3 class=\"contentbody\" width=*>";
     echo "<!-- begin content -->\n";
+    if ($view['show_topbar'] == "plab") {
+	WRITEPLABTOPBAR();
+    }
 }
 
 #
