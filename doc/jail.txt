@@ -1,3 +1,0 @@
-A long long long time ago I started working on better Jail support.
-What follows is the story of my incredible journey (of woe).
-
