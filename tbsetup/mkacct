@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.27 2000-12-06 08:43:15 kwright Exp $
+# $Id: mkacct,v 1.28 2000-12-06 23:36:45 kwright Exp $
 
 use English;
 use Mysql;
@@ -100,7 +100,7 @@ sub doqueries() {
     # Find the machines
     
     print "Selecting machines...\n";
-    $db_query = "select IP from interfaces as ip " .
+    $db_query = "select IP,ip.node_id from interfaces as ip " .
 	        "left join reserved as r on r.node_id=ip.node_id ".
                 "left join experiments as e on r.eid = e.eid ".
                 "where e.eid = '$eid'";
@@ -108,7 +108,7 @@ sub doqueries() {
     got_tuples($sth) or die "$0: Error selecting nodes for $eid.\n";
     while (@row = $sth->fetchrow_array) {
 	if ($row[0] =~ /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/
-	    && is_node_ok($row[0])) {
+	    && is_node_ok($row[0],$row[1])) {
 	    push(@nodes, $row[0]);
 	    print "   $row[0]\n";
 	}
@@ -117,9 +117,16 @@ sub doqueries() {
 
 sub is_node_ok() {
 
-    my $node = $_[0];
+    my $node    = $_[0];
+    my $node_id = $_[1];
     my $numseen;
 
+    # make sure that the OS on the node supports mkacct. 
+    if (OSFeatureSupported(CurrentNodeOS($node_id), "mkacct") == 0) {
+        print "$node does not support mkacct. Skipping ...\n";
+	return 0;
+    }
+      
     # the node must be on the control new
     if ( ! ($node =~ /$control_subnet/) ) {
 	return 0;
@@ -355,4 +362,39 @@ sub make_user() {
 	print "$0: Warning: /users/$name doesn't exist.\n";
     }
 }
+
+sub OSFeatureSupported {
+
+    local($os)      = $_[0];
+    local($feature) = $_[1];
+
+    $db_result = $dbh->query("select osfeatures from disk_images ".
+			    "where image_id='$os'");
+    
+    if ($db_result->numrows < 1) {
+	return 0;
+    }
+    foreach $osfeature (split(',', $db_result->fetchrow_array())) {
+	if ($feature eq $osfeature) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+sub CurrentNodeOS {
+    local($node_id) = $_[0];
+
+    $db_result = $dbh->query("select def_boot_image_id from nodes ".
+			    "where node_id='$node_id'");
+
+    if ($db_result->numrows < 1) {
+	die("Node $node_id is not in the nodes table");
+    }
+    my @row = $db_result->fetchrow_array();
+    return $row[0];
+}
+
+
+
 
