@@ -13,21 +13,19 @@ use POSIX 'setsid';
 #
 # Install a tarfile. This script is run from the setup code on client nodes.
 #
-# usage: install-tarfile <installdir> <filename>
-#
 # Exit Value Matters!: 0 if installed okay
 #                      1 if already installed
 #                     -1 if something goes wrong.
 #
-# To ensure safety, the tar filename must start with /proj.
-# 
+# To ensure safety, the tar filename must start with /proj, except if
+# running with jail option. Must be run as root.
 #
 sub usage()
 {
-    print STDOUT "Usage: install-tarfile <installdir> <filename>\n";
+    print STDOUT "Usage: install-tarfile [-j] <installdir> <filename>\n";
     exit(-1);
 }
-my  $optlist = "";
+my $optlist  = "j";
 
 #
 # Turn off line buffering on output
@@ -37,7 +35,7 @@ $| = 1;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/etc/emulab";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -47,12 +45,14 @@ my $IDENTFILE      = "/var/db/testbed.tarfiles";
 my $tarfile        = "";
 my $decompressflag = "";
 my $installdir     = "/";
+my $jailmode	   = 0;
+my $jailfile       = "";
 
 #
 # Must be running as root to work. 
 #
 if ($EUID != 0) {
-    die("Must be run as root! Try using sudo or su1!");
+    die("Must be run as root! Try using sudo or su1!\n");
 }
 
 #
@@ -62,6 +62,9 @@ if ($EUID != 0) {
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
+}
+if (defined($options{"j"})) {
+    $jailmode = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -87,20 +90,6 @@ else {
 }
 
 #
-# The tarfile may only come from a /proj directory.
-#
-if (! ($tarfile =~ /^\/proj\//)) {
-    fatal("The tar file must reside in /proj");
-}
-
-#
-# Make sure its really there.
-#
-if (! -r $tarfile) {
-    fatal("$tarfile does not exist or is not accessible!");
-}
-
-#
 # Make sure the installdir exists!
 #
 if (! -d $installdir) {
@@ -117,6 +106,41 @@ if (-e $IDENTFILE) {
 	exit(1);
     }
 }
+
+#
+# The tarfile may only come from a /proj directory unless in jailmode in
+# which case we have to get it from the server. 
+#
+if (! $jailmode) {
+    if (! ($tarfile =~ /^\/proj\//)) {
+	fatal("The tar file must reside in /proj");
+    }
+
+    #
+    # Make sure its really there.
+    #
+    if (! -r $tarfile) {
+	fatal("$tarfile does not exist or is not accessible!");
+    }
+}
+else {
+    $jailfile = `mktemp /var/tmp/tarball.XXXXXX`;
+
+    if ($jailfile =~ /^([-\@\w\.\/]+)$/) {
+	$jailfile = $1;
+    }
+    else {
+	die("Bad data in jailfile name: $jailfile");
+    }
+    GetTarFile($tarfile, $jailfile);
+    #
+    # Dies on any failure!
+    #
+}
+
+#
+# Add to index first; if fails too bad.
+# 
 system("echo \"$tarfile\" >> $IDENTFILE") == 0 or
     fatal("Could not update $IDENTFILE");
 
@@ -140,6 +164,9 @@ if (! chdir($installdir)) {
 #
 # Run the tarfile. 
 #
+if ($jailmode) {
+    $tarfile = $jailfile;
+}
 system("tar $decompressflag -xf $tarfile");
 $exit_status = $? >> 8;
 
@@ -152,3 +179,59 @@ sub fatal {
     exit(-1);
 }
 
+#
+# Get a tarfile from the server via tmcc and stash.
+#
+sub GetTarFile($$)
+{
+    my ($tarfile, $jailfile) = @_;
+    my $buf;
+
+    #
+    # Protocol is a little odd. First word is the number of bytes
+    # (yes, limited to 31 bits of length!), then the data. If we do
+    # not get that much data, we fail. What about timeout option?
+    # Could take a while to get the entire file, but instead of a
+    # timeout let Emulab decide when its too long.
+    #
+    open(TMCC, "tmcc -t 300 tarball $tarfile |")
+	or fatal("Could not download tarfile from server!");
+
+    # Hokey C struct stuff
+    my $firstword = pack("i", 0);
+    
+    if (! sysread(TMCC, $firstword, length($firstword))) {
+	fatal("Could not read length of tarfile from server!");
+    }
+    my $bytelen = unpack("i", $firstword);
+    if ($bytelen == 0) {
+	fatal("Zero length of tarfile from server!");
+    }
+
+    #
+    # Open the target file and start dumping the data in.
+    #
+    open(JFILE, "> $jailfile")
+	or fatal("Could not open local file $jailfile: $!");
+
+    while ($bytelen) {
+	my $rlen = sysread(TMCC, $buf, 8192);
+
+	if (! defined($rlen)) {
+	    fatal("Error reading tarball $tarfile: $!");
+	}
+        if ($rlen == 0) {
+	    last;
+	}
+	if (! syswrite(JFILE, $buf)) {
+	    fatal("Error writing tarfile $jailfile: $!");
+	}
+	$bytelen -= $rlen;
+    }
+    if ($bytelen) {
+	fatal("Did not get the entire tarball! $bytelen bytes left.");
+    }
+    close(JFILE);
+    close(TMCC);
+    return 0;
+}
