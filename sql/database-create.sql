@@ -944,10 +944,11 @@ CREATE TABLE state_transitions (
 --
 
 CREATE TABLE state_triggers (
+  node_id varchar(10) NOT NULL default '',
   op_mode varchar(20) NOT NULL default '',
   state varchar(20) NOT NULL default '',
   trigger tinytext NOT NULL,
-  PRIMARY KEY  (op_mode,state)
+  PRIMARY KEY  (node_id,op_mode,state)
 ) TYPE=MyISAM;
 
 --

@@ -186,3 +186,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.128: Add usr_country column to users table.
        No recommended migration commands.
+
+1.129: Add node_id to state_triggers table, and change its primary key.
+
+       alter table state_triggers add 
+		node_id varchar(10) not null default '' first;
+       update state_triggers set node_id="*";
+       alter table state_triggers drop primary key;
+       alter table state_triggers add primary key (node_id,op_mode,state);
+
