@@ -1,10 +1,10 @@
 In case of emergency!
 
-Booting paper
--------------
+Booting paper/plastic/tipserv1
+------------------------------
 
-The tip line for paper is on snake.cs.utah.edu. (standard desktop
-machine).
+The tip lines for each of paper/plastic/tipserv1 are on snake.cs.utah.edu.
+(standard desktop machine).
 
 You can talk to power controller number 9 from snake by using "tip
 apc" to talk to power9. User is "apc", password is "^pwr".  The
@@ -22,16 +22,3 @@ will run on the serial line. You can interrupt the boot there.
 Note that Mike and I built/installed new boot blocks on paper/plastic
 and snake that run at 115200. The defaul is 9600 for all 3 stages.
 
-Booting plastic
----------------
-
-The tip line for plastic is on paper. Same comments as above apply.
-Remember that you can power cycle plastic from snake using the tip
-line to the APC.
-
-
-Booting tipserv1
-----------------
-
-The console line for tipserv1 is on plastic. At present there is no
-power controller for it.
