@@ -239,13 +239,15 @@ sub process_event_queue() {
     } else {
 	# mail is waiting. Only block until it is time to send it.
 	$wait = $lastmail + $mailgap - $now;
-	debug("Now $now, Mailgap $mailgap, lastmail $lastmail ==> wait $wait\n");
+	debug("Now $now, mailgap $mailgap, last $lastmail ==> wait $wait\n");
     }
     if ($wait < 0) { debug("Wait was $wait!\n"); $wait=0; }
     my $finish = $now + $wait;
-    while ($event_count != $lastcount || $wait > 0) {
+    while (($event_count != $lastcount || $wait > 0) &&
+	   !($sigrestart || $sigcleanup || $do_reload)) {
 	$lastcount = $event_count;
-	if ($wait<=0) {
+	# Don't block if we got a signal!
+	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload) {
 	    event_poll($handle);
 	} else {
 	    debug("Using blocking event poll - $wait seconds\n");
@@ -254,9 +256,10 @@ sub process_event_queue() {
 	    $now = time();
 	    # subtract seconds elapsed from my wait time
 	    $wait = $finish - $now;
-	    debug("Finished blocking event poll - $wait seconds remian\n");
+	    debug("Finished blocking event poll - $wait seconds remain\n");
 	    if ($event_count > 0 &&
-		(qsize() > 0 || $mailqueue || $do_reload)) {
+		(qsize() > 0 || $mailqueue ||
+		 $sigrestart || $sigcleanup || $do_reload)) {
 		$blockwait=0;
 		$wait=0;
 		#debug("Cancelling wait - timeouts/msgs waiting, or HUP'd\n");
@@ -278,11 +281,10 @@ while (1) {
 
     # Check for nodes that have passed their timeout
     if (!qhead($deadline,$node)) {
-	#if (($now % 10) == 0) {
-	#    print "Time is $now, deadline is $deadline for $node\n";
-	#}
+	info("HEAD: $node in ".($deadline-$now).", queue=".qsize()."\n");
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
+	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
 	    $notified = $nodes{$node}{notified};
 	    if (!$notified) {
 		handleCtrlEvent($node,$TBTIMEOUT);
@@ -672,19 +674,23 @@ sub opModeTransition($$;$) {
     if (!$nextstate) {
 	$nextstate=$oldstate;
     }
-    
+
     my $now = time();
     $nodes{$node}{state}     = $nextstate;
     $nodes{$node}{timestamp} = $now;
     $nodes{$node}{mode}           = $newmode;
     $nodes{$node}{mode_timestamp} = $now;
     $nodes{$node}{notified}       = 0;
-    
+
     info("$node: $mode/$oldstate => $newmode/$nextstate\n");
     DBQueryFatal("UPDATE nodes SET eventstate='$nextstate', ".
 		 "next_op_mode='', op_mode='$newmode', ".
 		 "state_timestamp='$now', ".
 		 "op_mode_timestamp='$now' WHERE node_id='$node'");
+
+    # Check if this state has a timeout, and if so, put it in the queue
+    setTimeout($newmode,$nextstate,$node,$now);
+
 }
 
 sub handleCtrlEvent($$) {
