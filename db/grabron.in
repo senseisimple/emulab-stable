@@ -76,7 +76,7 @@ sub upload_times($$$) {
     my $suceeded = 0;
     my $failed = 0;
     foreach my $time (@times) {
-	my ($src,$dst,$latency) = @$time;
+	my ($src,$dst,$latency,$stddev,$lossrate) = @$time;
 	if (!$ipmap{$src}) {
 	    warn "Got an IP ($src) that's not in the interfaces table\n";
 	    $failed++;
@@ -107,7 +107,8 @@ sub upload_times($$$) {
 	DBQueryFatal("replace into widearea_recent set IP1='$src'," .
 		" IP2='$dst', time=$latency, node_id1='$node_id1', " .
 		" iface1='$iface1', node_id2='$node_id2', iface2='$iface2', " .
-		" bandwidth=$bandwidth");
+		" bandwidth=$bandwidth, time_stddev='$stddev', " .
+		" lossrate='$lossrate'");
 
     }
 
@@ -189,16 +190,18 @@ sub get_times($) {
     my @return;
     foreach my $line (@data) {
 	chomp $line;
-	if (! ($line =~ /(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+.\d+\.\d+)\s+(\d+.\d+)\s+(\d+)\s+(\d+)/) ) {
+	if (! ($line =~ /(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+)\s+(\d+)/) ) {
 	    warn "Bad data line: $line\n";
 	    next;
 	}
 
-	my ($src,$dst,$avg,$successful,$unsuccessful) = ($1,$2,$3,$4,$5);
+	my ($src,$dst,$avg,$stddev,$successful,$unsuccessful)
+	    = ($1,$2,$3,$4,$5,$6);
 	if ($successful > 0) {
-	    push @return, [$src,$dst,$avg];
+	    my $lossrate = ($unsuccessful*1.0)/($successful + $unsuccessful);
+	    push @return, [$src,$dst,$avg,$stddev,$lossrate];
 	} elsif ($unsuccessful > 0) {
-	    push @return, [$src,$dst,undef];
+	    push @return, [$src,$dst,undef,$stddev,1];
 	}
     }
 
