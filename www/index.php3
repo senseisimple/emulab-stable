@@ -130,7 +130,7 @@ echo "<p><A href='addusr.php3";
 if (isset($auth_usr)) { echo "?$auth_usr"; }
 echo "'>Join a Project</A>";
 ?>
-<hr><A href='faq.html'>Testbed FAQ</a></p>
+<hr>
 <table cellpadding='0' cellspacing='0' width="100%">
 <form action="index.php3" method='post' target='fixed'>
 <?php
