@@ -228,11 +228,6 @@ if (! ( ((keys %UDP)>0) && ((keys %NULL)>0) &&
 
 print STDERR "Adding traffic generation commands to '$tbcmdsname'...\n";
 
-print TBCMDS "tb-create-os SEND x86/send mb\n";
-print TBCMDS "tb-create-os CONSUME x86/consume mb\n";
-print "tb-create-os SEND x86/send mb\n" if $debug;
-print "tb-create-os CONSUME x86/consume mb\n" if $debug;
-
 my @senders = ();
 my @consumers = ();
 
