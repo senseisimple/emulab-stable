@@ -1386,6 +1386,11 @@ sub doaccounts()
     # Repeat the same sequence for accounts, except we remove old accounts
     # first. 
     # 
+
+    # XXX: hack, hack, hack - Jay requested that user "games" be removed from
+    # plab nodes since conflicts with his UID.
+    os_userdel("games");
+
     while (($login, $info) = each %PWDDB) {
 	my $uid = $info;
 	
