@@ -3346,9 +3346,8 @@ nodeidtocontrolnet(char *nodeid, int *net)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select control_net from node_types as nt "
-			 "left join nodes as n "
-			 "on nt.type=n.type "
+	res = mydb_query("select control_net from nodes as n "
+			 "left join node_types as nt on nt.type=n.type "
 			 "where n.node_id='%s'",
 			 1, nodeid);
 
