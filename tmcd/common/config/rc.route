@@ -141,7 +141,8 @@ sub doboot()
     }
 
     # Special case for distributed route calculation.
-    if ($type eq "static-ddijk") {
+    if ($type eq "static" ||
+	$type eq "static-ddijk") {
 	if (ddijkstra(\@routes)) {
 	    close(RC);
 	    fatal("Could not get routes from ddijkstra!");
@@ -154,7 +155,8 @@ sub doboot()
     # Also check for use of gated/manual and remember it.
     #
     my $usegated  = (($type eq "gated" || $type eq "ospf") ? 1 : 0);
-    my $usemanual = (($type eq "manual" || $type eq "static") ? 1 : 0);
+    my $usemanual = (($type eq "manual" ||
+		      $type eq "static" || $type eq "static-old") ? 1 : 0);
 
     foreach my $rconfig (@routes) {
 	my $dip   = $rconfig->{"IPADDR"};
