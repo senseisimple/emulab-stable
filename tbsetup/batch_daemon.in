@@ -5,10 +5,9 @@ use Getopt::Std;
 #
 # Create a batch experiment.
 #
-# BIG ASS WARNING: This works great as long as paper does not reboot!
-# Needs some work if we want it to be stateless across reboots. 
-# 
 # usage: batch_daemon
+#
+# TODO: Use "logger" instead of writing a log file.
 #
 sub usage()
 {
@@ -239,7 +238,7 @@ sub dosomething($$)
 
 	print "Child PID $childpid exited with exit status $status\n";
 
-	sleep(15);
+	sleep(5);
 
 	unlink($logname);
 	return $status;
