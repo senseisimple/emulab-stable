@@ -132,6 +132,14 @@ char *usagestr =
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
+ "\n"
+ "tuning options (if you don't know what they are, don't use em!):\n"
+ " -C MB           Max MB of memory to use for network chunk buffering.\n"
+ " -W MB           Max MB of memory to use for disk write buffering.\n"
+ " -M MB           Max MB of memory to use for buffering\n"
+ "                 (Half used for network, half for disk).\n"
+ " -I ms           The time interval (millisec) between re-requests of a chunk.\n"
+ " -R #            The max number of chunks we will request ahead.\n"
  "\n";
 
 void
@@ -151,7 +159,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -250,6 +258,12 @@ main(int argc, char **argv)
 				if (maxinprogress > maxchunkbufs)
 					maxinprogress = maxchunkbufs;
 			}
+			break;
+
+		case 'I':
+			redodelay = atoi(optarg) * 1000;
+			if (redodelay < 0)
+				redodelay = 0;
 			break;
 
 		case 'h':
