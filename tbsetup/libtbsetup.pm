@@ -20,6 +20,9 @@ sub tbs_initdbi {
 sub tbs_initlog {
     my($logfile) = $_[0];
 
+    # Turn off line buffering.
+    $| = 1; 
+
     open(LOGFILE,">$logfile") || do {
 	print STDERR "Could not open $logfile for writing.\n";
 	exit(1);

@@ -100,14 +100,15 @@ if (system("/bin/cp", "$tempfile", "$nsfile") != 0) {
 #
 # Run the various scripts.
 #
-print STDOUT "Running $tbdir/tbprerun with arguments: $project $eid $nsfile\n";
+#print STDOUT "Running $tbdir/tbprerun with arguments: ".
+#             "$project $eid $nsfile\n";
 if (system("$tbdir/tbprerun $project $eid $nsfile") != 0) {
     print STDOUT "tbprerun failed!\n";
     dumplog();
     fatal();
 }
 
-print STDOUT "Running $tbdir/tbrun with arguments: $project $eid $irfile\n";
+#print STDOUT "Running $tbdir/tbrun with arguments: $project $eid $irfile\n";
 if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     print STDOUT "tbrun failed!\n";
     dumplog();
@@ -115,7 +116,8 @@ if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     fatal();
 }
 
-print STDOUT "Running tbreport with arguments: -v $project $eid $irfile 2>&1 > $repfile\n";
+#print STDOUT "Running tbreport with arguments: ".
+#             "-v $project $eid $irfile 2>&1 > $repfile\n";
 if (system("$tbdir/tbreport -v $project $eid $irfile 2>&1 > $repfile") != 0) {
     print STDOUT "tbreport failed!\n";
     dumplog();

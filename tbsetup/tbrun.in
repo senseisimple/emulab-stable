@@ -28,9 +28,9 @@ $logfile = "$prefix.log";
 
 &tbs_initlog($logfile);
 
-&tbs_out("Input: $irfile\n");
-&tbs_out("Log:   $logfile\n");
-&tbs_out("\n");
+#&tbs_out("Input: $irfile\n");
+#&tbs_out("Log:   $logfile\n");
+#&tbs_out("\n");
 
 if (! -r $irfile) {
     &tbs_out("$irfile does not exist or is not readable.\n");

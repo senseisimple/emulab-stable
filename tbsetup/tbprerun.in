@@ -70,7 +70,7 @@ if (! -r $irfile) {
     exit(1);
 }
 
-&tbs_out("Post parsing NS input.");
+#&tbs_out("Post parsing NS input.");
 if (&tbs_exec("postparse $nsfile $irfile")) {
     &tbs_out("Postparsing failed.\n");
     exit(1);
@@ -126,14 +126,14 @@ while ($done == 0) {
     }
 }
 
-&tbs_out("Syncing database with assignment.\n");
+#&tbs_out("Syncing database with assignment.\n");
 if (&tbs_exec("postassign $irfile")) {
     &tbs_out("Error syncing.\n");
     &cleanup();
     exit(1);
 }
 
-&tbs_out("!!! Any further errors will result in partial DB state.\n");
+#&tbs_out("!!! Any further errors will result in partial DB state.\n");
 
 &tbs_out("Allocating IP addresses.\n");
 if (&tbs_exec("handle_ip $irfile $nsfile")) {

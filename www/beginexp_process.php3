@@ -233,29 +233,23 @@ if (($pipe = popen("$TBSUEXEC_PATH $uid $gid ".
 }
 
 $count = 0;
+echo "<XMP>\n";
 while (!feof($pipe)) {
     $line = fgets($pipe, 1024);
     $output[$count] = $line;
     $count++;
 
-    if ((($now = time()) - $last) >= 5) {
-        $last = $now;
-        echo "Thinking ... \n<br>";
-        flush();
-    }
+    echo "$line";
+    flush();
 }
+echo "</XMP>\n";
+
 $retval = pclose($pipe);
 
 if ($retval) {
-    echo "<br><br><h2>
-          Setup Failure($retval): Output as follows:
-          </h2>
-          <br>
-          <XMP>\n";
-          for ($i = 0; $i < count($output); $i++) {
-	      echo "$output[$i]";
-          }
-    echo "</XMP>\n";
+    echo "<center><br><br><h2>
+          Setup Failure($retval)
+          </h2><br></center>\n";
 
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
@@ -263,22 +257,11 @@ if ($retval) {
     die("");
 }
 
-#
-# Debugging!
-# 
-if ($mydebug) {
-    echo "<XMP>\n";
-    for ($i = 0; $i < count($output); $i++) {
-        echo "$output[$i]";
-    }
-    echo "</XMP>\n";
-}
-
 echo "<center><br>";
 echo "<h2>Experiment Configured!<br>";
 echo "The ID for your experiment in project $exp_pid is $exp_id<br>";
-echo "Here is a summary of the nodes that were allocated<br>";
-echo "</h2></center><br>";
+echo "For your convenience, we have created a directory hierarchy on the<br>";
+echo "control node: $dirname\n";
 
 #
 # The tbdoit script dumps report output to stdout. Look for it in the
@@ -290,12 +273,9 @@ for ($i = 0; $i < count($output); $i++) {
         break;
 }
 $summary = "";
-echo "<XMP>\n";
 for ($i = $i + 1; $i < count($output); $i++) {
     $summary = "$summary $output[$i]";
-    echo "$output[$i]";
 }
-echo "</XMP>\n";
 
 #
 # Lets generate a mail message for now so that we can see whats happening.

@@ -158,11 +158,8 @@ if ( %reloads > 0 ) {
 }
 
 foreach $n ( @freed_nodes ) {
-  print "Resetting console for $n...\n";
   system("$consetup $n") == 0 or
     print STDERR "WARNING: $consetup $n failed!\n";
 }
-
-print "Done.\n";
 
 exit($error);

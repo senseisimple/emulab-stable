@@ -332,8 +332,8 @@ sub getmac {
     }
 };
 
-print "Running assign ($assign -b -t $ptopfile $topfile)\n";
-print "  Log in assign.log\n";
+#print "Running assign ($assign -b -t $ptopfile $topfile)\n";
+#print "  Log in assign.log\n";
 $run = 1;
 while ($run <= $maxrun) {
     printdb "run $run\n"; 
