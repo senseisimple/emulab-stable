@@ -160,7 +160,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	discvr/GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/dhcpd_makeconf db/nodelog db/webnodelog \
+	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \

@@ -1,0 +1,122 @@
+#!/usr/bin/perl -w
+use English;
+use Getopt::Std;
+use strict;
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
+
+my $TB        = "@prefix@";
+my $SETGROUPS = "$TB/sbin/setgroups";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Only root or admin types!
+# 
+if (($UID != 0) && (!TBAdmin($UID))) {
+    die("Only root or TB administrators can control UNIX groups.\n");
+}
+
+#
+# Proccess command-line args
+#
+my %opt = ();
+getopts('rhpa',\%opt);
+
+my ($uid, @gid);
+if ($opt{a} || $opt{r}) {
+    if (@ARGV < 2) {
+	die "Not enough arguments - see '$0 -h' for help\n";
+    }
+    $uid = shift @ARGV;
+    @gid = @ARGV;
+} else {
+    if (@ARGV != 0) {
+	die "Too many arguments - see '$0 -h' for help\n";
+    }
+}
+
+if ($opt{p}) {
+    #
+    # Print out groups in a format that looks vaguely like the /etc/group
+    # format
+    #
+    my %members = ();
+    my $result = DBQueryFatal("SELECT gid,uid FROM unixgroup_membership");
+    while (my ($gid,$uid) = $result->fetchrow() ) {
+	push @{$members{$gid}},$uid;
+    }
+
+    while (my ($gid,$members) = each %members) {
+	print "$gid:" . join(",",@$members) . "\n";
+    }
+} elsif ($opt{a}) {
+    #
+    # Add a user to the database
+    #
+    foreach my $gid (@gid) {
+	print "Adding user $uid to group $gid in the database\n";
+	if (checkGroup($uid,$gid)) {
+	    warn "User $uid is already in group $gid, skipping ...\n";
+	    next;
+	} else {
+	    DBQueryFatal("INSERT INTO unixgroup_membership SET uid='$uid', " .
+	    			"gid='$gid'");
+	}
+    }
+
+    print "Updating groups for $uid on control nodes\n";
+    if (system "$SETGROUPS $uid" ) {
+	warn "Group update for $uid failed\n";
+    }
+
+} elsif ($opt{r}) {
+    #
+    # Remove a user from the database
+    #
+    foreach my $gid (@gid) {
+	print "Removing $uid from group $gid in the database\n";
+	if (!checkGroup($uid,$gid)) {
+	    warn "User $uid is not in group $gid, skipping ...\n";
+	    next;
+	} else {
+	    DBQueryFatal("DELETE FROM unixgroup_membership WHERE uid='$uid' " .
+	    			"AND gid='$gid'");
+	}
+    }
+    
+    print "Updating groups for $uid on control nodes\n";
+    if (system "$SETGROUPS $uid" ) {
+	warn "Group update for $uid failed\n";
+    }
+
+} else {
+    #
+    # Usage message
+    #
+    warn "Usage: $0 <-h | -p | < <-a | -r> uid gid...> >\n";
+    warn "-h            This message\n";
+    warn "-p            Print group information\n";
+    warn "-a uid gid... Add a user to one (or more) groups\n";
+    warn "-r uid gid... Remove a user from one (or more) groups\n";
+    exit(-1);
+}
+
+
+#
+# Check to see if the given uid is in the given gid. Return 1 if it is, 0
+# if not.
+#
+sub checkGroup ($$) {
+    my ($uid,$gid) = @_;
+    my $result = DBQueryFatal("SELECT gid,uid FROM unixgroup_membership WHERE ".
+				"uid='$uid' AND gid='$gid'");
+    return ($result->num_rows() > 0);
+}
