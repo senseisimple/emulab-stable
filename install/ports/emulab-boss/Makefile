@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-boss
-PORTVERSION=	1.6
+PORTVERSION=	1.7
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -21,8 +21,9 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 # These are for the php4-extensions port
 #
-.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC -DWITH_CURL -DWITH_OPENSSL -DWITH_BZ2 \
-		-DWITH_CRACK -DWITH_GD -DWITH_MCRYPT -DWITH_MYSQL -DWITH_XML
+.MAKEFLAGS+=	WITH_MHASH=yes WITH_XMLRPC=yes WITH_CURL=yes WITH_OPENSSL=yes \
+		WITH_BZ2=yes WITH_CRACK=yes WITH_GD=yes WITH_MCRYPT=yes \
+		WITH_MYSQL=yes WITH_XML=yes
 
 #
 # Disgusting. When we build the php4 port, we have to tell it we're going to be
@@ -89,7 +90,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
 	swig1.1:${PORTSDIR}/devel/swig11 \
-	kmetis:${PORTSDIR}/math/metis
+	kmetis:${PORTSDIR}/math/metis \
+	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb
 
 
 USE_PERL5=	yes
