@@ -40,6 +40,8 @@
 long long totaledata = 0;
 long long totalrdata = 0;
 
+int totalchunks, donechunks;
+
 /*
  * In slice mode, we read the DOS MBR to find out where the slice is on
  * the raw disk, and then seek to that spot. This avoids sillyness in
@@ -175,6 +177,39 @@ unsigned long		splits;
 #ifndef CONDVARS_WORK
 int fsleep(unsigned int usecs);
 #endif
+
+void
+dump_stats(int sig)
+{
+	struct timeval estamp;
+
+	gettimeofday(&estamp, 0);
+	estamp.tv_sec -= stamp.tv_sec;
+	if (sig == 0 && debug != 1 && dots) {
+		while (dotcol++ <= 60)
+			fprintf(stderr, " ");
+		
+		fprintf(stderr, "%4ld %13qd\n", estamp.tv_sec, totaledata);
+	}
+	else {
+		if (sig) {
+			if (dots && dotcol)
+				fputc('\n', stderr);
+			if (totalchunks)
+				fprintf(stderr, "%d of %d chunks decompressed\n",
+					donechunks, totalchunks);
+			else
+				fprintf(stderr, "%d chunks decompressed\n",
+					donechunks);
+		}
+		fprintf(stderr, "Wrote %qd bytes (%qd actual) in %ld seconds\n",
+			totaledata, totalrdata, estamp.tv_sec);
+	}
+	if (debug)
+		fprintf(stderr, "decompressor blocked: %lu, "
+			"writer idle: %lu, writes performed: %d\n",
+			decompblocks, writeridles, rdycount);
+}
 
 void
 dump_writebufs(void)
@@ -413,7 +448,6 @@ main(int argc, char **argv)
 {
 	int		i, ch;
 	extern char	build_info[];
-	struct timeval  estamp;
 
 #ifdef NOTHREADS
 	nothreads = 1;
@@ -495,10 +529,14 @@ main(int argc, char **argv)
 	}
 
 	if (strcmp(argv[0], "-")) {
+		struct stat st;
+
 		if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
 			perror("opening input file");
 			exit(1);
 		}
+		if (fstat(infd, &st) == 0)
+			totalchunks = st.st_size / SUBBLOCKSIZE;
 	}
 	else
 		infd = fileno(stdin);
@@ -555,26 +593,24 @@ main(int argc, char **argv)
 	
 #ifdef FAKEFRISBEE
 	if (dofrisbee) {
-		struct stat st;
-		int numchunks, i;
+		int i;
 
-		if (fstat(infd, &st) < 0) {
-			fprintf(stderr, "Cannot stat input file\n");
+		if (totalchunks == 0) {
+			fprintf(stderr, "Must have statable input file\n");
 			exit(1);
 		}
-		numchunks = st.st_size / SUBBLOCKSIZE;
 
-		chunklist = (int *) calloc(numchunks+1, sizeof(*chunklist));
+		chunklist = (int *) calloc(totalchunks+1, sizeof(*chunklist));
 		assert(chunklist != NULL);
 
-		for (i = 0; i < numchunks; i++)
+		for (i = 0; i < totalchunks; i++)
 			chunklist[i] = i;
 		chunklist[i] = -1;
 
 		srandom((long)(stamp.tv_usec^stamp.tv_sec));
-		for (i = 0; i < 50 * numchunks; i++) {
-			int c1 = random() % numchunks;
-			int c2 = random() % numchunks;
+		for (i = 0; i < 50 * totalchunks; i++) {
+			int c1 = random() % totalchunks;
+			int c2 = random() % totalchunks;
 			int t1 = chunklist[c1];
 			int t2 = chunklist[c2];
 
@@ -585,6 +621,9 @@ main(int argc, char **argv)
 	}
 #endif
 
+#ifdef SIGINFO
+	signal(SIGINFO, dump_stats);
+#endif
 	while (1) {
 		int	count = sizeof(chunkbuf);
 		char	*bp   = chunkbuf;
@@ -620,6 +659,7 @@ main(int argc, char **argv)
 		}
 		if (inflate_subblock(chunkbuf))
 			break;
+		donechunks++;
 	}
  done:
 	close(infd);
@@ -631,24 +671,7 @@ main(int argc, char **argv)
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
 
-	gettimeofday(&estamp, 0);
-	estamp.tv_sec -= stamp.tv_sec;
-	if (debug != 1 && dots) {
-		while (dotcol++ <= 60)
-			fprintf(stderr, " ");
-		
-		fprintf(stderr, "%4ld %13qd\n", estamp.tv_sec, totaledata);
-	}
-	else {
-		fprintf(stderr, "Wrote %qd bytes (%qd actual) in %ld seconds\n",
-			totaledata, totalrdata, estamp.tv_sec);
-		fprintf(stderr, "%lu %lu %d\n",
-			decompblocks, writeridles, rdycount);
-	}
-	if (debug)
-		fprintf(stderr, "decompressor blocked: %lu, "
-			"writer idle: %lu, writes performed: %d\n",
-			decompblocks, writeridles, rdycount);
+	dump_stats(0);
 	if (docrconly)
 		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
 	dump_writebufs();
