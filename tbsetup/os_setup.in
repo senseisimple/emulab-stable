@@ -176,8 +176,6 @@ while (my %row = $db_result->fetchhash()) {
 	$nodeAllocStates{$node} = $nodeAllocState;
 	# only reboot node if assign_wrapper just pulled it into expt.
 	# (e.g. it isnt ALLOCSTATE_RES_READY)
-	#if (($nodeAllocState eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) ||
-	#    ($nodeAllocState eq TBDB_ALLOCSTATE_RES_INIT_CLEAN())) {
 	if ($nodeAllocState ne TBDB_ALLOCSTATE_RES_READY()) {
 	    $reboots{$node} = 1;
 	}
@@ -404,12 +402,7 @@ while (my %row = $db_result->fetchhash()) {
 }
 
 #
-# Now do osid setup for jailed nodes. We waited until the physnodes were
-# done above so that we can set the osid for the vnodes to the same
-# as the physnode. We rely on the fact that the user is not allowed to
-# set the OS for jailed nodes or for the physnodes that are hosting
-# jailed nodes, and the node_types table has the right stuff. Non-jailed
-# nodes do not need to be done.
+# Collect some info about vnodes. 
 #
 foreach my $vnode (keys(%vnodes)) {
     my $jailed = $vnodes{$vnode};
@@ -423,7 +416,6 @@ foreach my $vnode (keys(%vnodes)) {
 	die_noretry("*** $0:\n".
 	    "    Cannot determine phys_nodeid for $vnode!");
     }
-    my $n_osid;
 
     #
     # Count up the number of jailed nodes on this pnode, and add the
@@ -442,12 +434,7 @@ foreach my $vnode (keys(%vnodes)) {
 	#
 	next;
     }
-    $n_osid = $osids{$pnode};
-
-    system("$osselect $n_osid $vnode") and
-	die_noretry("*** Could not set boot OS to $n_osid for $vnode");
-
-    $osids{$vnode} = $n_osid;
+    # Nothing else to do for local jail nodes at this time ...
 }
 
 #
@@ -654,6 +641,7 @@ elsif (@vnodelist) {
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
 	}
@@ -684,14 +672,6 @@ elsif (@vnodelist) {
 	    print "*** Continuing with experiment setup anyway ...\n";
 	    next;
 	}
-
-	# Reserve it to down experiment. 
-	# MarkNodeDown($node);
-
-	# Send mail to testbed-ops about it
-#	SENDMAIL($TBOPS, "Virtual Node $node is down",
-#		 "Virtual node $node in pid/eid $pid/$eid appears to be ".
-#		 "unresponsive.\n\n");
 
 	print "*** Experiment will be terminated automatically.\n";
 	$failed++;
