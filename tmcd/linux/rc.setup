@@ -1,6 +1,7 @@
 #!/bin/sh
 
 #
+#
 # Inform TMCD that we've rebooted, and are starting testbed setup
 #
 if [ -x /etc/rc.d/testbed/tmcc ]; then
