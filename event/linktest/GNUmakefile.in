@@ -20,7 +20,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	$(DAEMON) $(LTEVENT) $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_TBCOMPAT)
+all:	binaries $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_TBCOMPAT)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -54,14 +54,15 @@ $(LIBTBDIR)/%.o:
 $(LIBEVENTDIR)/%.a:
 	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
 
+binaries: $(LOCAL_BINDIR)/$(DAEMON) $(LOCAL_BINDIR)/$(LTEVENT) 
 
-$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
+$(LOCAL_BINDIR)/$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
 	-mkdir $(LOCAL_BINDIR)
-	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $(LOCAL_BINDIR)/$@
+	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
-$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
+$(LOCAL_BINDIR)/$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
 	-mkdir $(LOCAL_BINDIR)
-	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $(LOCAL_BINDIR)/$@
+	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
 $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
 
