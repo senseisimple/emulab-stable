@@ -243,6 +243,7 @@ COMMAND_PROTOTYPE(dotmcctest);
 #define F_REMUDP	0x1	/* remote nodes can request using UDP */
 #define F_MINLOG	0x2	/* record minimal logging info normally */
 #define F_MAXLOG	0x4	/* record maximal logging info normally */
+#define F_ALLOCATED	0x8	/* node must be allocated to make call */
 
 struct command {
 	char	*cmdname;
@@ -253,46 +254,46 @@ struct command {
 	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
 	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
 	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
-	{ "ifconfig",	  FULLCONFIG_ALL,  0, doifconfig },
+	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
 	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
-	{ "delay",	  FULLCONFIG_ALL,  0, dodelay },
-	{ "linkdelay",	  FULLCONFIG_ALL,  0, dolinkdelay },
-	{ "hostnames",	  FULLCONFIG_NONE, 0, dohosts },
-	{ "rpms",	  FULLCONFIG_ALL,  0, dorpms },
-	{ "deltas",	  FULLCONFIG_NONE, 0, dodeltas },
-	{ "tarballs",	  FULLCONFIG_ALL,  0, dotarballs },
-	{ "startupcmd",	  FULLCONFIG_ALL,  0, dostartcmd },
-	{ "startstatus",  FULLCONFIG_NONE, 0, dostartstat }, /* Before startstat*/
+	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
+	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
+	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
+	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
+	{ "deltas",	  FULLCONFIG_NONE, F_ALLOCATED, dodeltas },
+	{ "tarballs",	  FULLCONFIG_ALL,  F_ALLOCATED, dotarballs },
+	{ "startupcmd",	  FULLCONFIG_ALL,  F_ALLOCATED, dostartcmd },
+	{ "startstatus",  FULLCONFIG_NONE, F_ALLOCATED, dostartstat }, /* Before startstat*/
 	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
-	{ "readycount",   FULLCONFIG_NONE, 0, doreadycount },
-	{ "ready",	  FULLCONFIG_NONE, 0, doready },
-	{ "mounts",	  FULLCONFIG_ALL,  0, domounts },
-	{ "sfshostid",	  FULLCONFIG_NONE, 0, dosfshostid },
+	{ "readycount",   FULLCONFIG_NONE, F_ALLOCATED, doreadycount },
+	{ "ready",	  FULLCONFIG_NONE, F_ALLOCATED, doready },
+	{ "mounts",	  FULLCONFIG_ALL,  F_ALLOCATED, domounts },
+	{ "sfshostid",	  FULLCONFIG_NONE, F_ALLOCATED, dosfshostid },
 	{ "loadinfo",	  FULLCONFIG_NONE, 0, doloadinfo},
 	{ "reset",	  FULLCONFIG_NONE, 0, doreset},
-	{ "routing",	  FULLCONFIG_ALL,  0, dorouting},
-	{ "trafgens",	  FULLCONFIG_ALL,  0, dotrafgens},
-	{ "nseconfigs",	  FULLCONFIG_ALL,  0, donseconfigs},
-	{ "creator",	  FULLCONFIG_ALL,  0, docreator},
+	{ "routing",	  FULLCONFIG_ALL,  F_ALLOCATED, dorouting},
+	{ "trafgens",	  FULLCONFIG_ALL,  F_ALLOCATED, dotrafgens},
+	{ "nseconfigs",	  FULLCONFIG_ALL,  F_ALLOCATED, donseconfigs},
+	{ "creator",	  FULLCONFIG_ALL,  F_ALLOCATED, docreator},
 	{ "state",	  FULLCONFIG_NONE, 0, dostate},
-	{ "tunnels",	  FULLCONFIG_ALL,  0, dotunnels},
+	{ "tunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotunnels},
 	{ "vnodelist",	  FULLCONFIG_PHYS, 0, dovnodelist},
-	{ "subnodelist",  FULLCONFIG_PHYS, 0, dosubnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, F_ALLOCATED, dosubnodelist},
 	{ "isalive",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, doisalive},
 	{ "ipodinfo",	  FULLCONFIG_NONE, 0, doipodinfo},
 	{ "ntpinfo",	  FULLCONFIG_PHYS, 0, dontpinfo},
 	{ "ntpdrift",	  FULLCONFIG_NONE, 0, dontpdrift},
-	{ "jailconfig",	  FULLCONFIG_VIRT, 0, dojailconfig},
-	{ "plabconfig",	  FULLCONFIG_VIRT, 0, doplabconfig},
-	{ "subconfig",	  FULLCONFIG_NONE, 0, dosubconfig},
+	{ "jailconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, dojailconfig},
+	{ "plabconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, doplabconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, F_ALLOCATED, dosubconfig},
         { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
-        { "programs",     FULLCONFIG_ALL,  0, doprogagents},
-        { "syncserver",   FULLCONFIG_ALL,  0, dosyncserver},
-        { "keyhash",      FULLCONFIG_ALL,  0, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  0, doeventkey},
-        { "fullconfig",   FULLCONFIG_NONE, 0, dofullconfig},
-        { "routelist",	  FULLCONFIG_PHYS, 0, doroutelist},
-        { "role",	  FULLCONFIG_PHYS, 0, dorole},
+        { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
+        { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
+        { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED, dokeyhash},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
+        { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
+        { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
         { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
         { "watchdoginfo", FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dodoginfo},
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
@@ -1023,8 +1024,15 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 */
 	if (!istcp && !reqp->islocal &&
 	    (command_array[i].flags & F_REMUDP) == 0) {
-		error("%s: Invalid request (%s) from remote node using UDP!\n",
+		error("%s: %s: Invalid UDP request from remote node\n",
 		      reqp->nodeid, command_array[i].cmdname);
+		goto skipit;
+	}
+
+	if (!reqp->allocated && (command_array[i].flags & F_ALLOCATED) != 0) {
+		if (verbose || (command_array[i].flags & F_MINLOG) == 0)
+			error("%s: %s: Invalid request from free node\n",
+			      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
 	}
 
@@ -1096,7 +1104,7 @@ COMMAND_PROTOTYPE(dostatus)
 	 * Now check reserved table
 	 */
 	if (! reqp->allocated) {
-		info("STATUS: %s: Node is free\n", reqp->nodeid);
+		info("STATUS: %s: FREE\n", reqp->nodeid);
 		strcpy(buf, "FREE\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		return 0;
@@ -1122,15 +1130,6 @@ COMMAND_PROTOTYPE(doifconfig)
 	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 	int		num_interfaces=0;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (! reqp->allocated) {
-		if (verbose)
-			info("IFCONFIG: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
@@ -1500,7 +1499,8 @@ COMMAND_PROTOTYPE(doaccounts)
 	 * Now check reserved table
 	 */
 	if ((reqp->islocal || reqp->isvnode) && !reqp->allocated) {
-		error("ACCOUNTS: %s: Node is free\n", reqp->nodeid);
+		error("%s: accounts: Invalid request from free node\n",
+		      reqp->nodeid);
 		return 1;
 	}
 
@@ -2007,12 +2007,6 @@ COMMAND_PROTOTYPE(dodelay)
 	int		nrows;
 
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
 	 * Get delay parameters for the machine. The point of this silly
 	 * join is to get the type out so that we can pass it back. Of
 	 * course, this assumes that the type is the BSD name, not linux.
@@ -2120,12 +2114,6 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	int		nrows;
 
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
 	 * Get link delay parameters for the machine. We store veth
 	 * interfaces in another dynamic table, so must join with both
 	 * interfaces and veth_interfaces to see which iface this link
@@ -2231,12 +2219,6 @@ COMMAND_PROTOTYPE(dohosts)
 		struct shareditem *shared;
 		struct hostentry  *next;
 	} *hosts = 0, *host;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
 
 	/*
 	 * Now use the virt_nodes table to get a list of all of the
@@ -2454,12 +2436,6 @@ COMMAND_PROTOTYPE(dorpms)
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
 	 * Get RPM list for the node.
 	 */
 	res = mydb_query("select rpms from nodes where node_id='%s' ",
@@ -2508,12 +2484,6 @@ COMMAND_PROTOTYPE(dotarballs)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE], *bp, *sp, *tp;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
 
 	/*
 	 * Get Tarball list for the node.
@@ -2579,12 +2549,6 @@ COMMAND_PROTOTYPE(dostartcmd)
 	char		buf[MYBUFSIZE];
 
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
 	 * Get run command for the node.
 	 */
 	res = mydb_query("select startupcmd from nodes where node_id='%s'",
@@ -2626,12 +2590,6 @@ COMMAND_PROTOTYPE(dostartstat)
 	int		exitstatus;
 
 	/*
-	 * Make sure currently allocated to an experiment!
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
 	 * Dig out the exit status
 	 */
 	if (! sscanf(rdata, "%d", &exitstatus)) {
@@ -2664,12 +2622,6 @@ COMMAND_PROTOTYPE(dostartstat)
  */
 COMMAND_PROTOTYPE(doready)
 {
-	/*
-	 * Make sure currently allocated to an experiment!
-	 */
-	if (!reqp->allocated)
-		return 0;
-
 	/*
 	 * Vnodes not allowed!
 	 */
@@ -2704,12 +2656,6 @@ COMMAND_PROTOTYPE(doreadycount)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		total, ready, i;
-
-	/*
-	 * Make sure currently allocated to an experiment!
-	 */
-	if (!reqp->allocated)
-		return 0;
 
 	/*
 	 * Vnodes not allowed!
@@ -2764,14 +2710,6 @@ COMMAND_PROTOTYPE(domounts)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 	int		usesfs;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("MOUNTS: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * Should SFS mounts be served?
@@ -3073,14 +3011,6 @@ COMMAND_PROTOTYPE(dosfshostid)
 	}
 	
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("dosfshostid: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
 	 * Dig out the hostid. Need to be careful about not overflowing
 	 * the buffer.
 	 */
@@ -3139,14 +3069,6 @@ COMMAND_PROTOTYPE(dorouting)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		n, nrows, isstatic = 0;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("ROUTES: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * Get the routing type from the nodes table.
@@ -3385,14 +3307,6 @@ COMMAND_PROTOTYPE(dotrafgens)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("TRAFGENS: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
 	res = mydb_query("select vi.vname,role,proto,"
 			 "  vnode,port,ip,target_vnode,target_port,target_ip, "
 			 "  generator "
@@ -3457,14 +3371,6 @@ COMMAND_PROTOTYPE(donseconfigs)
 
 	if (!tcp) {
 		error("NSECONFIGS: %s: Cannot do UDP mode!\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("NSECONFIGS: %s: Node is free\n", reqp->nodeid);
 		return 1;
 	}
 
@@ -3555,12 +3461,6 @@ COMMAND_PROTOTYPE(docreator)
 {
 	char		buf[MYBUFSIZE];
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
 	OUTPUT(buf, sizeof(buf), "CREATOR=%s\n", reqp->creator);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
@@ -3577,14 +3477,6 @@ COMMAND_PROTOTYPE(dotunnels)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		nrows;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("TRAFGENS: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	res = mydb_query("select vname,isserver,peer_ip,port,password, "
 			 " encrypt,compress,assigned_ip,proto,mask "
@@ -3678,11 +3570,6 @@ COMMAND_PROTOTYPE(dosubnodelist)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		nrows;
-
-	if (!reqp->allocated) {
-		error("SUBNODE: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	res = mydb_query("select r.node_id,nt.class from reserved as r "
 			 "left join nodes as n on r.node_id=n.node_id "
@@ -4319,10 +4206,6 @@ COMMAND_PROTOTYPE(dontpinfo)
 	}
 
 	/*
-	 * Node is allowed to be free?
-	 */
-
-	/*
 	 * First get the servers and peers.
 	 */
 	res = mydb_query("select type,IP from ntpinfo where node_id='%s'",
@@ -4434,10 +4317,6 @@ COMMAND_PROTOTYPE(dojailconfig)
 	if (!reqp->isvnode) {
 		/* Silent error is fine */
 		return 0;
-	}
-	if (!reqp->allocated) {
-		error("JAILCONFIG: %s: Node is free\n", reqp->nodeid);
-		return 1;
 	}
 	if (!reqp->jailflag)
 		return 0;
@@ -4556,10 +4435,6 @@ COMMAND_PROTOTYPE(doplabconfig)
 		/* Silent error is fine */
 		return 0;
 	}
-	if (!reqp->allocated) {
-		error("PLABCONFIG: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 	/* XXX Check for Plab-ness */
 
 	/*
@@ -4597,10 +4472,6 @@ COMMAND_PROTOTYPE(dosubconfig)
 {
 	if (!reqp->issubnode) {
 		error("SUBCONFIG: %s: Not a subnode\n", reqp->nodeid);
-		return 1;
-	}
-	if (!reqp->allocated) {
-		error("SUBCONFIG: %s: Node is free\n", reqp->nodeid);
 		return 1;
 	}
 
@@ -4701,14 +4572,6 @@ COMMAND_PROTOTYPE(doprogagents)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("PROGAGENTS: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
 	res = mydb_query("select vname,command from virt_programs "
 			 "where vnode='%s' and pid='%s' and eid='%s'",
 			 2, reqp->nickname, reqp->pid, reqp->eid);
@@ -4757,13 +4620,6 @@ COMMAND_PROTOTYPE(dosyncserver)
 {
 	char		buf[MYBUFSIZE];
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("SYNCSERVER: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 	if (!strlen(reqp->syncserver))
 		return 0;
 
@@ -4787,13 +4643,6 @@ COMMAND_PROTOTYPE(dokeyhash)
 {
 	char		buf[MYBUFSIZE];
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("KEYHASH: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 	if (!strlen(reqp->keyhash))
 		return 0;
 
@@ -4813,13 +4662,6 @@ COMMAND_PROTOTYPE(doeventkey)
 {
 	char		buf[MYBUFSIZE];
 
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("EVENTKEY: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 	if (!strlen(reqp->eventkey))
 		return 0;
 
@@ -4841,14 +4683,6 @@ COMMAND_PROTOTYPE(doroutelist)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		n, nrows;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("ROUTES: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * Get the routing type from the nodes table.
@@ -4955,14 +4789,6 @@ COMMAND_PROTOTYPE(dorole)
 	char		buf[MYBUFSIZE];
 
 	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated) {
-		error("ROLE: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
-
-	/*
 	 * Get the erole from the reserved table
 	 */
 	res = mydb_query("select erole from reserved where node_id='%s'",
@@ -5002,15 +4828,6 @@ COMMAND_PROTOTYPE(dofullconfig)
 	char		buf[MYBUFSIZE];
 	int		i;
 	int		mask;
-
-	/*
-	 * Now check reserved table. If free, give it a minimal status
-	 * section so that stuff works as normal. 
-	 */
-	if (!reqp->allocated) {
-		error("FULLCONFIG: %s: Node is free\n", reqp->nodeid);
-		return 1;
-	}
 
 	if (reqp->isvnode)
 		mask = FULLCONFIG_VIRT;
