@@ -189,6 +189,6 @@ while (my ($node) = $query_result->fetchrow_array) {
 	MarkPhysNodeDown($node);
 	TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
 		"'Moved to hwdown by node_status; ".
-		"$node has not reported in for more than $timeout seconds.'");
+		"did not report in for more than $timeout seconds.'");
     }
 }
