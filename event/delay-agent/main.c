@@ -122,8 +122,15 @@ int main(int argc, char **argv)
 
   if (debug)
      loginit(0, log_file);
-  else
-     loginit(1, "agent-thing");
+  else {
+      /* Become a daemon */
+      daemon(0, 0);
+      
+      if (log_file)
+	  loginit(0, log_file);
+      else
+	  loginit(1, "agent-thing");
+  }
 
   /* open the map file*/
   if(NULL == (mp = fopen(map_file,"r")))
