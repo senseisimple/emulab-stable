@@ -58,6 +58,12 @@ function WRITESIDEBARLASTBUTTON($text, $base, $link) {
     echo "<tr><td class=\"menuoptb\"><a href=\"$link\">$text</a></td></tr>\n";
 }
 
+function WRITESIDEBARLASTBUTTON_COOL($text, $base, $link) {
+    $link = "$base/$link";
+    echo "<tr><td class=\"menuoptb\"><a href=\"$link\">$text</a>&nbsp;";
+    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+}
+
 # writes a message to the sidebar, without clickability.
 function WRITESIDEBARNOTICE($text) {
     echo "<tr><td class=\"menuopt\"><b>$text</b></td></tr>\n";
@@ -301,20 +307,8 @@ function WRITESIDEBAR() {
 	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject.php3");
 	WRITESIDEBARLASTBUTTON("Join Project",  $TBBASE, "joinproject.php3");
     }
-    else {
-        #
-        # Standard options for anyone else not logged in.
-        #
-        if (! NOLOGINS()) {
-	    echo "<tr><td class='menuopt'>".
-	         "<center><a href='$TBBASE/reqaccount.php3'>".
-	         "<img border=0 src='requestaccount.gif' ".
-		 " alt='Request Account' />".
-	         "</a></center></td></tr>";
-	}
-    }
 
-    WRITESIDEBARBUTTON_COOL("Take our Survey",
+    WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
 	    $TBDOCBASE, "survey.php3");
 
     #
@@ -362,9 +356,17 @@ function WRITESIDEBAR() {
     elseif (!NOLOGINS()) {
       echo "<tr>";
       echo "<td class=\"menufooter\" align=center valign=center>";
+
+      echo "<a href=\"$TBBASE/reqaccount.php3\">";
+      echo "<img alt=\"Request Account\" border=0 ";
+      echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
+
+      echo "<br /><b>or</b><br />";
+
       echo "<a href=\"$TBBASE/login.php3\">";
       echo "<img alt=\"logon\" border=0 ";
       echo "src=\"$BASEPATH/logon.gif\"></a>\n";
+
       echo "</td></tr>\n";
     }
 
