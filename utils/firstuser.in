@@ -87,7 +87,9 @@ my $agid = (getgrnam($tbadmin))[2];
 if (!defined $agid) {
     die "Unable to get group ID for $tbadmin\n";
 }
-
+# And in the wheel group so elabman can sudo to root.
+my $Ggid = "wheel";
+    
 if (!$batchmode) {
     print "Creating user/project: Are you sure? (Y/N) ";
     if (<> !~ /Y/i) {
@@ -96,7 +98,7 @@ if (!$batchmode) {
 }
 
 print "Creating user on boss...\n";
-if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -h - " .
+if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G $Ggid -h - " .
        "-s /bin/nologin -c \"$protouser_name\"\n") {
        die "Unable to add user to the password file!\n";
 }
