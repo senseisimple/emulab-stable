@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -143,10 +143,7 @@ main(argc, argv)
 		exit(0);
 	}
 
-	if (info)
-		exit(rval);
-
-	if (purge) {
+	if (purge && !info) {
 		char	buf[SECSIZE];
 		
 		bzero(buf, sizeof(buf));
@@ -452,7 +449,8 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 	for (i = 0; i < maxconfigs; i++) {
 		if (configvals[i].type == CONFIG_IGNORE)
 			continue;
-		if (! configvals[i].value.string) {
+		if (configvals[i].type == CONFIG_STRING &&
+		    ! configvals[i].value.string) {
 			warnx("Config is missing: '%s'\n", configvals[i].name);
 			badconfig++;
 		}
