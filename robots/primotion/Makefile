@@ -17,7 +17,8 @@ CXXFLAGS = -DaUNIX -s -static
 # Build for i386:
 #ARCH=i686
 #CC=g++
-#CFLAGS=-DaUNIX -g
+#CXX=g++
+#CXXFLAGS=-DaUNIX -g
 
 
 CXXFLAGS += -I$(HOSTPATH)/aCommon \
@@ -48,6 +49,7 @@ LDFLAGS += -L$(HOSTPATH)/aRelease/aUnix/$(ARCH)/
 
 OBJECTSREQ=grobot gcallbacks gbehaviors simplepath
 OBJECTS=grobot.o gcallbacks.o gbehaviors.o simplepath.o mtp.o
+OBJECTS_GOROBOTC=grobot.o gcallbacks.o gbehaviors.o simplepath.o
 
 all: commotion pathmotion circle gorobot gorobotc
 
@@ -68,7 +70,7 @@ mtp_send: mtp.o
 	$(CC) -o mtp_send $(CXXFLAGS) $(LDFLAGS) ../mtp/mtp_send.c $<
 
 gorobotc: $(OBJECTSREQ)
-	$(CC) -o gorobotc $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
+	$(CC) -o gorobotc $(OBJECTS_GOROBOTC) $(CXXFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
 
 # %.o : %.c
 # 	$(CC) $(CFLAGS) -c -o $@ $< $(INCLUDES)
