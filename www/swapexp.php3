@@ -92,6 +92,9 @@ if (!$confirmed) {
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
+    echo "<p>
+          <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>
+             (Information on experiment swapping)</a>\n";
     echo "</center>\n";
 
     PAGEFOOTER();
