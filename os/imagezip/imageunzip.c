@@ -32,6 +32,27 @@ long long	total = 0;
 int		inflate_subblock(void);
 void		writezeros(off_t zcount);
 
+#ifdef linux
+#define devlseek	lseek
+#define devwrite	write
+#else
+static inline off_t devlseek(int fd, off_t off, int whence)
+{
+	off_t noff;
+	assert((off & (SECSIZE-1)) == 0);
+	noff = lseek(fd, off, whence);
+	assert(noff == (off_t)-1 || (noff & (SECSIZE-1)) == 0);
+	return noff;
+}
+
+static inline int devwrite(int fd, const void *buf, size_t size)
+{
+	assert((size & (SECSIZE-1)) == 0);
+	return write(fd, buf, size);
+}
+#endif
+
+
 int
 main(int argc, char **argv)
 {
@@ -197,7 +218,7 @@ inflate_subblock(void)
 			else
 				cc = size;
 
-			if ((cc = write(outfd, bp, cc)) != cc) {
+			if ((cc = devwrite(outfd, bp, cc)) != cc) {
 				if (cc < 0) {
 					perror("Writing uncompressed data");
 				}
@@ -263,7 +284,7 @@ writezeros(off_t zcount)
 	int	zcc;
 
 	if (doseek) {
-		if (lseek(outfd, zcount, SEEK_CUR) < 0) {
+		if (devlseek(outfd, zcount, SEEK_CUR) < 0) {
 			perror("Skipping ahead");
 			exit(1);
 		}
@@ -277,7 +298,7 @@ writezeros(off_t zcount)
 		else
 			zcc = BSIZE;
 		
-		if ((zcc = write(outfd, zeros, zcc)) != zcc) {
+		if ((zcc = devwrite(outfd, zeros, zcc)) != zcc) {
 			if (zcc < 0) {
 				perror("Writing Zeros");
 			}

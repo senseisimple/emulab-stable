@@ -80,6 +80,26 @@ int	read_linuxgroup(struct ext2_super_block *super,
 int	compress_image(void);
 void	usage(void);
 
+#ifdef linux
+#define devlseek	lseek
+#define devread		read
+#else
+static inline off_t devlseek(int fd, off_t off, int whence)
+{
+	off_t noff;
+	assert((off & (DEV_BSIZE-1)) == 0);
+	noff = lseek(fd, off, whence);
+	assert(noff == (off_t)-1 || (noff & (DEV_BSIZE-1)) == 0);
+	return noff;
+}
+
+static inline int devread(int fd, void *buf, size_t size)
+{
+	assert((size & (DEV_BSIZE-1)) == 0);
+	return read(fd, buf, size);
+}
+#endif
+
 /* Map partition number to letter */
 #define BSDPARTNAME(i)       ("ABCDEFGHIJK"[(i)])
 
@@ -206,7 +226,7 @@ read_image()
 #define DOSPARTSIZE \
 	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
 
-	if ((cc = read(infd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+	if ((cc = devread(infd, doslabel.pad2, DOSPARTSIZE)) < 0) {
 		warn("Could not read DOS label");
 		return 1;
 	}
@@ -310,7 +330,7 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	if (debug)
 		printf("  P%d (BSD Slice)\n", slice + 1 /* DOS Numbering */);
 	
-	if (lseek(infd, ((off_t)start) * secsize, SEEK_SET) < 0) {
+	if (devlseek(infd, ((off_t)start) * secsize, SEEK_SET) < 0) {
 		warn("Could not seek to beginning of BSD slice");
 		return 1;
 	}
@@ -318,12 +338,12 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	/*
 	 * Then seek ahead to the disklabel.
 	 */
-	if (lseek(infd, (off_t)(LABELSECTOR * secsize), SEEK_CUR) < 0) {
+	if (devlseek(infd, (off_t)(LABELSECTOR * secsize), SEEK_CUR) < 0) {
 		warn("Could not seek to beginning of BSD disklabel");
 		return 1;
 	}
 
-	if ((cc = read(infd, &dlabel, sizeof(dlabel))) < 0) {
+	if ((cc = devread(infd, &dlabel, sizeof(dlabel))) < 0) {
 		warn("Could not read BSD disklabel");
 		return 1;
 	}
@@ -399,13 +419,13 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 		return 1;
 	}
 
-	if (lseek(infd, ((off_t)offset * (off_t) secsize) + SBOFF,
+	if (devlseek(infd, ((off_t)offset * (off_t) secsize) + SBOFF,
 		  SEEK_SET) < 0) {
 		warnx("BSD Partition %d: Could not seek to superblock", part);
 		return 1;
 	}
 
-	if ((cc = read(infd, &fs, SBSIZE)) < 0) {
+	if ((cc = devread(infd, &fs, SBSIZE)) < 0) {
 		warn("BSD Partition %d: Could not read superblock", part);
 		return 1;
 	}
@@ -429,12 +449,12 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 		cgoff = fsbtodb(&fs.fs, cgtod(&fs.fs, i)) + offset;
 		dboff = fsbtodb(&fs.fs, cgstart(&fs.fs, i)) + offset;
 
-		if (lseek(infd, (off_t)cgoff * (off_t)secsize, SEEK_SET) < 0) {
+		if (devlseek(infd, (off_t)cgoff * (off_t)secsize, SEEK_SET) < 0) {
 			warn("BSD Partition %d: Could not seek to cg %d",
 			     part, i);
 			return 1;
 		}
-		if ((cc = read(infd, &cg, fs.fs.fs_bsize)) < 0) {
+		if ((cc = devread(infd, &cg, fs.fs.fs_bsize)) < 0) {
 			warn("BSD Partition %d: Could not read cg %d",
 			     part, i);
 			return 1;
@@ -528,16 +548,15 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 {
 #define LINUX_SUPERBLOCK_OFFSET	1024
 #define LINUX_SUPERBLOCK_SIZE 	1024
+#define LINUX_GRPSPERBLK	\
+	(LINUX_SUPERBLOCK_SIZE/sizeof(struct ext2_group_desc))
 
-	int		cc, i, numgroups, rval = 0;
-	union {
-		struct ext2_super_block super;
-		char pad[LINUX_SUPERBLOCK_SIZE];
-	} fs;
-	union {
-		struct ext2_group_desc	groupdesc;
-		char pad[LINUX_SUPERBLOCK_SIZE];
-	} group;
+	int			cc, i, numgroups, rval = 0;
+	struct ext2_super_block	fs;
+	struct ext2_group_desc	groups[LINUX_GRPSPERBLK];
+
+	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
+	assert((sizeof(groups) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 
 	if (debug)
 		printf("  P%d (Linux Slice)\n", slice + 1 /* DOS Numbering */);
@@ -545,13 +564,13 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	/*
 	 * Skip ahead to the superblock.
 	 */
-	if (lseek(infd, (((off_t)start) * secsize) +
+	if (devlseek(infd, (((off_t)start) * secsize) +
 		  LINUX_SUPERBLOCK_OFFSET, SEEK_SET) < 0) {
 		warnx("Linux Slice %d: Could not seek to superblock", slice);
 		return 1;
 	}
 
-	if ((cc = read(infd, &fs, LINUX_SUPERBLOCK_SIZE)) < 0) {
+	if ((cc = devread(infd, &fs, LINUX_SUPERBLOCK_SIZE)) < 0) {
 		warn("Linux Slice %d: Could not read superblock", slice);
 		return 1;
 	}
@@ -559,17 +578,16 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		warnx("Linux Slice %d: Truncated superblock", slice);
 		return 1;
 	}
- 	if (fs.super.s_magic != EXT2_SUPER_MAGIC) {
+ 	if (fs.s_magic != EXT2_SUPER_MAGIC) {
 		warnx("Linux Slice %d: Bad magic number in superblock", slice);
  		return (1);
  	}
 
 	if (debug) {
 		printf("        bfree %9d, size %9d\n",
-		       fs.super.s_free_blocks_count,
-		       EXT2_BLOCK_SIZE(&fs.super));
+		       fs.s_free_blocks_count, EXT2_BLOCK_SIZE(&fs));
 	}
-	numgroups = fs.super.s_blocks_count / fs.super.s_blocks_per_group;
+	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
 	
 	/*
 	 * Read each group descriptor. It says where the free block bitmap
@@ -579,30 +597,37 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	 * are free.
 	 */
 	for (i = 0; i <= numgroups; i++) {
-		if (lseek(infd, (((off_t)start) * secsize) +
-			        ((off_t) (EXT2_BLOCK_SIZE(&fs.super) +
-					  (i * sizeof(group.groupdesc)))),
-			  SEEK_SET) < 0) {
-			warnx("Linux Slice %d: "
-			      "Could not seek to Group %d", slice, i);
-			return 1;
+		int gix;
+		off_t soff;
+
+		gix = (i % LINUX_GRPSPERBLK);
+		if (gix == 0) {
+			soff = ((off_t)start * secsize) +
+				((off_t)(EXT2_BLOCK_SIZE(&fs) +
+					 (i * sizeof(struct ext2_group_desc))));
+			if (devlseek(infd, soff, SEEK_SET) < 0) {
+				warnx("Linux Slice %d: "
+				      "Could not seek to Group %d", slice, i);
+				return 1;
+			}
+
+			if ((cc = devread(infd, groups, sizeof(groups))) < 0) {
+				warn("Linux Slice %d: "
+				     "Could not read Group %d", slice, i);
+				return 1;
+			}
+			if (cc != sizeof(groups)) {
+				warnx("Linux Slice %d: "
+				      "Truncated Group %d", slice, i);
+				return 1;
+			}
 		}
 
-		if ((cc = read(infd, &group, sizeof(group))) < 0) {
-			warn("Linux Slice %d: "
-			     "Could not read Group %d", slice, i);
-			return 1;
-		}
-		if (cc != sizeof(group)) {
-			warnx("Linux Slice %d: Truncated Group %d", slice, i);
-			return 1;
-		}
-		
 		printf("        Group:%-2d\tBitmap %9d, bfree %9d\n", i,
-		       group.groupdesc.bg_block_bitmap,
-		       group.groupdesc.bg_free_blocks_count);
+		       groups[gix].bg_block_bitmap,
+		       groups[gix].bg_free_blocks_count);
 
-		rval = read_linuxgroup(&fs.super, &group.groupdesc, i, start);
+		rval = read_linuxgroup(&fs, &groups[gix], i, start);
 	}
 	
 	return 0;
@@ -627,7 +652,7 @@ read_linuxgroup(struct ext2_super_block *super,
 
 	offset  = (off_t)sliceoffset * secsize;
 	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
-	if (lseek(infd, offset, SEEK_SET) < 0) {
+	if (devlseek(infd, offset, SEEK_SET) < 0) {
 		warn("Linux Group %d: "
 		     "Could not seek to Group bitmap %d", i);
 		return 1;
@@ -644,7 +669,7 @@ read_linuxgroup(struct ext2_super_block *super,
 		return 1;
 	}
 
-	if ((cc = read(infd, bitmap, sizeof(bitmap))) < 0) {
+	if ((cc = devread(infd, bitmap, sizeof(bitmap))) < 0) {
 		warn("Linux Group %d: "
 		     "Could not read Group bitmap", i);
 		return 1;
@@ -735,7 +760,7 @@ read_raw(void)
 {
 	off_t	size;
 
-	if ((size = lseek(infd, (off_t) 0, SEEK_END)) < 0) {
+	if ((size = devlseek(infd, (off_t) 0, SEEK_END)) < 0) {
 		warn("lseeking to end of raw image");
 		return 1;
 	}
@@ -970,7 +995,7 @@ compress_image(void)
 		else
 			inputoffset = (off_t) 0;
 
-		if (lseek(infd, inputoffset, SEEK_SET) < 0) {
+		if (devlseek(infd, inputoffset, SEEK_SET) < 0) {
 			warn("Could not seek to start of image");
 			exit(1);
 		}
@@ -1112,7 +1137,7 @@ compress_image(void)
 		/*
 		 * Seek to the beginning of the data range to compress.
 		 */
-		lseek(infd, (off_t) inputoffset, SEEK_SET);
+		devlseek(infd, (off_t) inputoffset, SEEK_SET);
 
 		/*
 		 * The amount to compress is the size of the range, which
@@ -1370,7 +1395,7 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 			count = count & ~(secsize - 1);
 		}
 
-		cc = read(infd, inbuf, count);
+		cc = devread(infd, inbuf, count);
 		if (cc < 0) {
 			perror("reading input file");
 			exit(1);
