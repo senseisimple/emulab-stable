@@ -15,6 +15,19 @@ PAGEHEADER("Emulab Software Distributions");
 # programming in php!
 ?>
 
+<ul>
+<li> <img src="/new.gif" alt="&lt;NEW&gt;">
+     <a href="/downloads/frisbee-20030614.tar.gz">Frisbee Server and
+     Client</a>,
+     as described in our paper <cite><a href="pubs.php3">Fast, Scalable Disk
+     Imaging with Frisbee</a></cite>, to appear at
+     <a href='http://www.usenix.org/events/usenix03/'>USENIX 2003</a>.
+     Please take a look at the
+     <a href="/downloads/frisbee-README.txt">README</a> file for a better
+     idea of how we use Frisbee in the Testbed, and how to setup a
+     simple Frisbee demonstration on your network. 
+<ul>
+
 <?php
 
 
