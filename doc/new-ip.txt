@@ -38,6 +38,9 @@ The Master Plan (tm) for moving to our new IP subnets:
 
 * Generate new SSL certificate for paper?
 
+* Tell CS about new IPs for paper and plastic, for backup purposes (or, we
+  could leave their .212 interfaces alive)
+
 ***** VLANs to create
 
 * Outside: Consists only of cable running to outside router and a fake router interface
@@ -56,3 +59,13 @@ The Master Plan (tm) for moving to our new IP subnets:
   
 * Paper can get a .130 interface temporarily if the 'UDP helper' port (for
   DHCP) is problematic
+
+***** Simple IP allocation description
+
+* Private: 155.101.128/24
+
+* Public: 155.101.129/24
+
+* Control (sharks): 155.101.130/24
+
+* Control (PCs): 155.101.132/22
