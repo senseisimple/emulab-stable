@@ -58,6 +58,10 @@ my $lastdrift;
 my $rusagestr;
 my $curtime;
 
+# we periodically log something verbose even when verbose is not set
+my $speakupiv	= 300;
+my $speakup     = 0;
+
 # tmcc retries
 my $trytcp = 0;
 my $maxretries  = 3;
@@ -109,7 +113,8 @@ sub ntpdrift($);
 sub runcvsup($);
 sub sendrusage($);
 sub sendhkeys($);
-sub logmsg($);
+sub logmsg($;$);
+sub saysomething($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -254,6 +259,13 @@ setintervals($curtime);
 $firsttime = 0;
 
 #
+# If not verbose, log something verbose periodically anyway
+# so that we know we are not hung
+#
+qinsert($curtime + $speakupiv, \&saysomething)
+    if (!$verbose);
+
+#
 # Loop, sleeping and then processing events
 # 
 while (1) {
@@ -289,12 +301,10 @@ sub sendisalive($)
 	return;
     }
 
-    if ($verbose) {
-	if ($retry{isalive} == 0) {
-	    logmsg("isalive: sending\n");
-	} else {
-	    logmsg("isalive: resending, retry=$retry{isalive}\n");
-	}
+    if ($retry{isalive} == 0) {
+	logmsg("isalive: sending\n", 1);
+    } else {
+	logmsg("isalive: resending, retry=$retry{isalive}\n", 1);
     }
 
     my %tmccargs = ();
@@ -365,12 +375,10 @@ sub setintervals($)
 	return;
     }
 
-    if ($verbose) {
-	if ($retry{check} == 0) {
-	    logmsg("setintervals: fetching intervals\n");
-	} else {
-	    logmsg("setintervals: refetching intervals, retry=$retry{check}\n");
-	}
+    if ($retry{check} == 0) {
+	logmsg("setintervals: fetching intervals\n", 1);
+    } else {
+	logmsg("setintervals: refetching intervals, retry=$retry{check}\n", 1);
     }
 
     # XXX fake an argument to force request to TMCD and avoid the cache
@@ -527,8 +535,7 @@ sub ntpdrift($)
 	return;
     }
 
-    logmsg("ntpdrift: reporting NTP drift\n")
-	if ($verbose);
+    logmsg("ntpdrift: reporting NTP drift\n", 1);
 
     my $drift = `cat $driftfile`;
     chomp($drift);
@@ -586,12 +593,10 @@ sub sendrusage($)
 	return;
     }
 
-    if ($verbose) {
-	if ($retry{rusage} == 0) {
-	    logmsg("rusage: sending\n");
-	} else {
-	    logmsg("rusage: resending, retry=$retry{rusage}\n");
-	}
+    if ($retry{rusage} == 0) {
+	logmsg("rusage: sending\n", 1);
+    } else {
+	logmsg("rusage: resending, retry=$retry{rusage}\n", 1);
     }
 
     #
@@ -613,8 +618,7 @@ sub sendrusage($)
 	    goto resched;
 	}
     }
-    logmsg("rusage: sending: $rusagestr\n")
-	if ($verbose);
+    logmsg("rusage: sending: $rusagestr\n", 1);
 
     my %tmccargs = ();
     $tmccargs{timeout} = 3;
@@ -677,12 +681,10 @@ sub sendhkeys($)
 	return;
     }
 
-    if ($verbose) {
-	if ($retry{hkeys} == 0) {
-	    logmsg("hostkeys: sending\n");
-	} else {
-	    logmsg("hostkeys: resending, retry=$retry{hkeys}\n");
-	}
+    if ($retry{hkeys} == 0) {
+	logmsg("hostkeys: sending\n", 1);
+    } else {
+	logmsg("hostkeys: resending, retry=$retry{hkeys}\n", 1);
     }
 
     if (! -d $keydir) {
@@ -746,11 +748,25 @@ sub sendhkeys($)
 	if ($iv{hkeys});
 }
 
-sub logmsg($)
+sub saysomething($)
 {
-    my ($msg) = @_;
+    my ($curtime) = @_;
+    $speakup = 1;
+    qinsert($curtime + $speakupiv, \&saysomething);
+}
 
-    print strftime("%b %e %H:%M:%S", localtime)." watchdog[$$]: $msg";
+sub logmsg($;$)
+{
+    my ($msg, $verbmsg) = @_;
+
+    if (!defined($verbmsg)) {
+	$verbmsg = 0;
+    } elsif ($speakup) {
+	$verbmsg = 0;
+	$speakup = 0;
+    }
+    print strftime("%b %e %H:%M:%S", localtime)." watchdog[$$]: $msg"
+	if ($verbose || !$verbmsg);
 }
 
 #
