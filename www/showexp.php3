@@ -193,7 +193,7 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
     }
 
-    if (STUDLY() && $types['pcvm']) {
+    if (STUDLY() && $classes['pcvm']) {
 	WRITESUBMENUBUTTON("Record Feedback Data",
 			   "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=record");
     }
@@ -201,13 +201,13 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 
 if (($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_SWAPPED) &&
-    STUDLY() &&
-    $types['pcvm']) {
+    STUDLY()) {
     WRITESUBMENUBUTTON("Clear Feedback Data",
 		       "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=clear");
-    
-    WRITESUBMENUBUTTON("Remap Virtual Nodes",
-		       "remapexp.php3?pid=$exp_pid&eid=$exp_eid");
+    if ($classes['pcvm']) {
+	    WRITESUBMENUBUTTON("Remap Virtual Nodes",
+			       "remapexp.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 }
     
 # Wireless maps if experiment includes wireless lans.
