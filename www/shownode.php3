@@ -41,25 +41,29 @@ if (! $isadmin) {
     }
 }
 
+SUBPAGESTART();
+SUBMENUSTART("Node Options");
+
+#
+# Edit option
+#
+WRITESUBMENUBUTTON("Edit node info",
+		   "nodecontrol_form.php3?node_id=$node_id");
+
+if ($isadmin) {
+    WRITESUBMENUBUTTON("Access Node Log",
+		       "shownodelog.php3?node_id=$node_id");
+    WRITESUBMENUBUTTON("Free Node",
+		       "freenode.php3?node_id=$node_id");
+}
+SUBMENUEND();
+
 #
 # Dump record.
 # 
 SHOWNODE($node_id);
 
-#
-# Edit option
-#
-echo "<br><center>
-           <A href='nodecontrol_form.php3?node_id=$node_id'>
-              Edit this the node info?</a>
-         </center>\n";
-
-if ($isadmin) {
-    echo "<br><p>
-          <center>
-            <A href='shownodelog.php3?node_id=$node_id'>Node Log</a>
-          </center>\n";
-}
+SUBPAGEEND();
 
 #
 # Standard Testbed Footer
