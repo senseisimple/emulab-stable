@@ -151,7 +151,8 @@ else {
                      "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
                      "left join nodes as n on r.node_id=n.node_id ".
                      "where (n.type!='dnard' or n.type is null) and ".
-                     "      g.uid='$uid' $clause ".
+                     " g.uid='$uid' and e.pid is not null ".
+		     "and e.eid is not null $clause ".
                      "group by e.pid,e.eid ".
 		     "$having ".
                      "order by $order");
