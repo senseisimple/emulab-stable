@@ -1753,8 +1753,6 @@ sub dorpms ()
 sub dotarballs ()
 {
     my @tarballs   = ();
-    my $jailoption = (JAILED() ? "-j" : "");
-    # XXX Plab option?
     
     my $TM = OPENTMCC(TMCCCMD_TARBALL);
     while (<$TM>) {
@@ -1766,13 +1764,26 @@ sub dotarballs ()
 	return 0;
     }
     
+    #
+    # Use tmcc to copy tarfiles for remote/jailed nodes,
+    # otherwise access via NFS.
+    #
+    # XXX for now we always copy the tarfile when using NFS
+    # to avoid the stupid changing-exports-file server race
+    # (install-tarfile knows how to deal with said race when copying).
+    #
+    my $installoption = "c";
+    if (JAILED() || PLAB()) {
+	$installoption .= "-t";
+    }
+
     open(TARBALL, ">" . TMTARBALLS)
 	or die("Could not open " . TMTARBALLS . ": $!");
     print TARBALL "#!/bin/sh\n";
     
     foreach my $tarball (@tarballs) {
 	if ($tarball =~ /DIR=(.+)\s+TARBALL=(.+)/) {
-	    my $tbline = sprintf($TARINSTALL, $jailoption, $1, $2);
+	    my $tbline = sprintf($TARINSTALL, $installoption, $1, $2);
 		    
 	    print STDOUT  "  $tbline\n";
 	    print TARBALL "echo \"Installing Tarball $2 in dir $1 \"\n";
