@@ -1,12 +1,7 @@
-/* 
- * File:	decls.h
- * Description: 
- * Author:	Leigh Stoller
- * 		Computer Science Dept.
- * 		University of Utah
- * Date:	2-Aug-2001
- *
- * (c) Copyright 1992, 2000, University of Utah, all rights reserved.
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
  */
 
 #define SERVERPORT	855

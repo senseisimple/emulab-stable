@@ -1,12 +1,7 @@
-/* 
- * File:	capture.c
- * Description: 
- * Author:	Leigh Stoller
- * 		Computer Science Dept.
- * 		University of Utah
- * Date:	27-Jul-92
- *
- * (c) Copyright 1992, 2000-2001, University of Utah, all rights reserved.
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
  */
 
 /*
