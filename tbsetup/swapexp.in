@@ -139,7 +139,7 @@ else {
     usage();
 }
 
-if (@ARGV != (($inout eq "modify") ? 3 : 2)) {
+if ($inout ne "modify" && @ARGV != 2) {
     usage();
 }
 my $pid   = $ARGV[0];
@@ -166,7 +166,7 @@ my $userdir = TBExptUserDir($pid, $eid);
 my $tempnsfile;
 my $modnsfile;
 
-if ($inout eq "modify") {
+if ($inout eq "modify" && @ARGV > 2) {
     $tempnsfile = $ARGV[2];
 
     #
@@ -523,7 +523,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 #
 # Before going to background, we have to copy out the NS file!
 #
-if ($inout eq "modify") {
+if ($inout eq "modify" && defined($modnsfile)) {
     unlink($modnsfile);
     if (system("/bin/cp", "$tempnsfile", "$modnsfile")) {
 	die("*** $0:\n".
@@ -609,11 +609,14 @@ elsif ($inout eq "modify") {
     }
 
     #
-    # Rerun tbprerun if modifying.
+    # Rerun tbprerun if modifying, but only if new NS file provided.
+    # Yep, we allow reswap without changing the NS file. For Shashi and SIM. 
     #
-    print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
-    if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
-	$modifyError = "tbprerun failed!";
+    if (defined($modnsfile)) {
+	print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
+	if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
+	    $modifyError = "tbprerun failed!";
+	}
     }
 
     #
