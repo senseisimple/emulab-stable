@@ -171,7 +171,10 @@ main(int argc, char **argv)
 			info("Waiting for nodes in %s/%s to come up ...\n",
 			     pid, eid);
 
-		sleep(1);
+		/*
+		 * Don't want to pound the DB too much.
+		 */
+		sleep(3);
 	}
 
 	/*
