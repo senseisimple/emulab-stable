@@ -204,6 +204,16 @@ $query_result =
 genelist($query_result, "$TBOPS", "emulab-widearea-users");
 
 #
+# Another list of project leaders. 
+#
+$query_result =
+    DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
+		 "left join users as u on u.uid=p.head_uid ".
+		 "where p.approved!=0");
+
+genelist($query_result, "$TBOPS", "emulab-project-leaders");
+
+#
 # Regen project lists. Either all the lists, or just the projects
 # that "newuser" is a member of.
 # 
