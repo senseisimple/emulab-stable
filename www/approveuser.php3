@@ -340,10 +340,9 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     TBUserInfo($uid, $uid_name, $uid_email);
 
     #
-    # Email info for the group leader too.
+    # Email info for the proj/group leaders too.
     #
-    TBGroupLeader($project, $group, $groupleader);
-    TBUserInfo($groupleader, $phead_name, $phead_email);
+    $leaders = TBLeaderMailList($project,$group);
     
     #
     # Well, looks like everything is okay. Change the project membership
@@ -374,7 +373,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Thanks,\n".
              "Testbed Operations\n",
              "From: $uid_name <$uid_email>\n".
-             "Cc:  $phead_name <$phead_email>\n".
+             "Cc:  $leaders\n".
              "Bcc: $TBMAIL_AUDIT\n".
              "Errors-To: $TBMAIL_WWW");
 
@@ -484,7 +483,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Thanks,\n".
              "Testbed Operations\n",
              "From: $uid_name <$uid_email>\n".
-             "Cc:  $phead_name <$phead_email>\n".
+             "Cc:  $leaders\n".
              "Bcc: $TBMAIL_AUDIT\n".
              "Errors-To: $TBMAIL_WWW");
 

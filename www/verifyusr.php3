@@ -90,6 +90,8 @@ function INFORMLEADERS($uid) {
 	 TBGroupLeader($pid, $gid, $leader_uid);
 	 TBUserInfo($leader_uid, $leader_name, $leader_email);
 
+	 $allleaders = TBLeaderMailList($pid,$gid);
+
 	 if (strcmp($leader_uid, $uid)) {
 	     #
 	     # Send email only if this is not the group leader verifying
@@ -117,6 +119,7 @@ function INFORMLEADERS($uid) {
 		"Thanks,\n".
 		"Testbed Operations\n",
 		"From: $TBMAIL_APPROVAL\n".
+		"Cc: $allleaders\n".
 		"Bcc: $TBMAIL_AUDIT\n".
 		"Errors-To: $TBMAIL_WWW");
 	 }

@@ -627,7 +627,7 @@ if (! TBGroupMember($joining_uid, $pid, $pid, $approved)) {
 }
 
 #
-# Generate an email message to the group leader.
+# Generate an email message to the proj/group leaders.
 #
 $query_result =
     DBQueryFatal("select usr_name,usr_email,leader from users as u ".
@@ -639,6 +639,8 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 $leader_name = $row[0];
 $leader_email = $row[1];
 $leader_uid = $row[2];
+
+$allleaders = TBLeaderMailList($pid,$gid);
 
 #
 # The mail message to the leader. We send this for returning users
@@ -666,6 +668,7 @@ if ($returning) {
 	   "Thanks,\n".
 	   "Testbed Operations\n",
 	   "From: $TBMAIL_APPROVAL\n".
+	   "Cc: $allleaders\n".
 	   "Bcc: $TBMAIL_AUDIT\n".
 	   "Errors-To: $TBMAIL_WWW");
 }

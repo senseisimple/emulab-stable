@@ -909,7 +909,7 @@ function TBLeaderMailList($pid, $gid)
   $mailstr="";
   while ($row = mysql_fetch_array($query_result)) {
     if ($mailstr != "") { $mailstr .=", "; }
-    $mailstr .= $row[usr_name]." (".$row[uid].") <".$row[usr_email].">";
+    $mailstr .= '"'.$row[usr_name]." (".$row[uid].")\" <".$row[usr_email].">";
   }
   return $mailstr;
 }
