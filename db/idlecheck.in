@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+
+# idlecheck - See if node/expt is active
+
+# Configure variables
+use lib '@prefix@/lib';
+use libdb;
+use English;
+
+# Turn off line buffering on output
+$| = 1;
+
+$d = 0; #debug mode
+$h = 0; #help mode
+
+sub help {
+    die("Usage:\nidlecheck [-h] [-t hours] [-p pid -e eid] [-n node_id]
+ -h\tThis help message
+ -t\tNumber of hours of inactiviy required to be considered idle
+ -p\tSpecify a project
+ -e\tSpecify an experiment
+ -n\tSpecify a node
+Check activity for the given pid/eid or node, or for all experiments
+if no pid/eid is given. Currently the following qualify as activity:
+ * Packets sent/received on the experimental network
+ * Use of a tty
+Activity does not currently include:
+ * Computation (non-idle load averages)
+ * Control net traffic
+ * Control without the use of a tty\n"
+       );
+}
+
+print "Got ARGV = ",join(" ",@ARGV),"\n" if $d > 1;
+
+my %args = ();
+while ($#ARGV >= 0) {
+    $_ = shift;
+    $_ =~ /^(.)(.)/;
+    if ($1 ne '-') { next; }
+    if ($2 ne 'p' && $2 ne 'e' && $2 ne 'n' && 
+	$2 ne 'd' && $2 ne 'h' && $2 ne 't') { next; }
+    my $opt="\L$2";
+    my $val = shift if ($#ARGV >= 0 && ($ARGV[0] =~ /^[^-]/));
+    if (!defined($val)) { $val=1; }
+    $$opt=$val;
+    if ($d>1) { print "$opt = $$opt\n"; }
+}
+if ($h) { help(); }
+
+# Only root or admin types!
+if (($UID != 0) && (!TBAdmin($UID))) {
+    die("Only root or TB administrators can run idlecheck.\n");
+}
+
+# Configurable parameters
+my $idlehours = 24;
+my $minpph = 4; # Min packets per hour that an idle interface sends/rcvs
+
+my $minpkts = $idlehours * $minpph;
+my $idlesec = $idlehours * 3600;
+my $node1="";
+my $node2="";
+my $node3="";
+if ($n) {
+    $node1="a.node_id,";
+    $node2="and a.node_id=\"$n\"";
+    $node3=",node_id";
+}
+
+# This query finds how many packets the non-control net interfaces
+# have sent in the last $idlesec seconds, and saves it in a temporary
+# table. It then aggregates that and shows a list of pid/eid (and
+# maybe nodes) whose interfaces have each sent less than $minpkts
+# packets in the time period. It also makes sure to only count entries
+# since they've been swapped in, and makes sure they were swapped in
+# at least $idlesec seconds ago.
+
+for my $cmd ("drop table if exists idletemp;",
+	     "create temporary table idletemp 
+select r.pid,r.eid, $node1
+max(ipkts)-min(ipkts) as idiff , max(opkts)-min(opkts) as odiff
+from iface_counters as a
+left join reserved as r on a.node_id = r.node_id 
+left join interfaces as i on a.mac=i.mac 
+left join experiments as e on e.pid=r.pid and e.eid=r.eid
+where tstamp >= expt_swapped 
+and (unix_timestamp(now())-unix_timestamp(tstamp) <= $idlesec) 
+and (unix_timestamp(now())-unix_timestamp(expt_swapped) >= $idlesec) 
+and IP not like \"155.101.%\" $node2
+group by r.pid,r.eid,a.mac;",
+	     "select pid,eid, max(idiff), max(odiff) from idletemp 
+group by pid,eid $node3
+having (max(idiff) <= $minpkts) and (max(odiff) <= $minpkts);",
+	     "select r.pid,r.eid,max(last_tty) as lastuse ,max(tstamp) as t
+from node_idlestats as n 
+left join reserved as r on n.node_id=r.node_id
+left join experiments as e on e.pid=r.pid and e.eid=r.eid
+where tstamp >= expt_swapped and r.pid is not null and r.eid is not null
+group by pid,eid 
+having (unix_timestamp(now())-unix_timestamp(t) <= 7200)
+and (unix_timestamp(now())-unix_timestamp(lastuse) >= 86400)
+order by pid,eid,last_tty,tstamp;") {
+
+    print "Sending cmd:\n$cmd\n" if $d;
+    my $result = DBQueryFatal($cmd);
+    print $result->as_string();
+    if ($cmd =~ /^select /i && $result->numrows() == 0) {
+	# nothing that has been reporting regularly is idle...
+	exit(0);
+    }
+}
+
+exit(0);

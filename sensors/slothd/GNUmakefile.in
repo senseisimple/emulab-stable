@@ -4,6 +4,8 @@ TESTBED_SRCDIR  = @top_srcdir@
 OBJDIR          = ../..
 SUBDIR          = sensors/slothd
 
+SBIN_SCRIPTS    = sdisrunning sddeploy
+
 include $(OBJDIR)/Makeconf
 
 CC?=gcc
@@ -37,7 +39,7 @@ islinux:
 isfbsd:
 	@uname -s | grep BSD > /dev/null
 
-install:
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS))
 
 clean:
 	rm -f *.o $(PROGS) *~ core *.core

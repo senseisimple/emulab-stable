@@ -1185,11 +1185,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
-	discvr/GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
-	db/grabron \
+	db/grabron db/idlecheck discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
@@ -1198,6 +1197,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
 	security/plasticwrap \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
+	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/power \
