@@ -46,7 +46,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 # Spit out the image with a content header.
 #
 if ($fp = popen("$TBSUEXEC_PATH $uid nobody webvistopology $pid $eid", "r")) {
-    header("Content-type: image/jpeg");
+    header("Content-type: image/gif");
     fpassthru($fp);
 }
 
