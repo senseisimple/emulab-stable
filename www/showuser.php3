@@ -70,29 +70,34 @@ if ($yourpcs) {
 # Lets show Experiments.
 #
 $query_result =
-    DBQueryFatal("select * from experiments  ".
-		 "where expt_head_uid='$target_uid' order by pid,eid");
+    DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
+		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		 "where expt_head_uid='$target_uid' ".
+		 "group by e.pid,e.eid");
 
 if (mysql_num_rows($query_result)) {
     echo "<center>
           <h3>Current Experiments</h3>
           </center>
-          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
     echo "<tr>
               <td align=center>PID</td>
               <td align=center>EID</td>
-              <td align=center>Name</td>
+              <td align=center>Nodes</td>
+              <td align=center>Description</td>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
 	$pid  = $projrow[pid];
 	$eid  = $projrow[eid];
+	$nodes= $projrow["count(r.node_id)"];
 	$name = $projrow[expt_name];
 
         echo "<tr>
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+                 <td>$nodes</td>
                  <td>$name</td>
              </tr>\n";
     }
