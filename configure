@@ -1366,7 +1366,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/sitevarscheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
-	discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \

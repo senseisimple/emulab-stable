@@ -15,12 +15,12 @@ include Makeconf
 #   assign db lib 
 # Things that may have dependencies go next:
 #   @optional_subdirs@ (has event)
-#   discvr ipod os security sensors 
+#   ipod os security sensors 
 # Then things that only depend on stuff we've done:
 #   pxe tbsetup tmcd utils www tip capture vis
 # Then things that depend on stuff we just did:
 #
-SUBDIRS = lib db assign @optional_subdirs@ discvr ipod security sensors \
+SUBDIRS = lib db assign @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
 		sensors os
 
