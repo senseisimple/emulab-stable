@@ -71,6 +71,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/ifc_setup
 	chown root $(INSTALL_LIBTBDIR)/ifc_setup
 	chmod u+s $(INSTALL_LIBTBDIR)/ifc_setup
+	chown root $(INSTALL_LIBTBDIR)/delay_setup
+	chmod u+s $(INSTALL_LIBTBDIR)/delay_setup
 
 clean:
 	rm -f *.o $(BINS) core

@@ -1,8 +1,5 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
-my $rsh		= "su1 sshtb -q";
-my $ssh		= "su1 sshtb -q";
-my $rcp		= "su1 scptb -q";
 my $ping	= "/sbin/ping";
 my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
@@ -11,6 +8,14 @@ my $dbg		= 1;
 my $net		= "fxp";
 my $pipe	= 1;
 my $DBOSID	= "FBSD40-STD";
+
+my $rsh		= "sshtb -q";
+my $ssh		= "sshtb -q";
+my $rcp		= "scptb -q";
+
+# Scrub environment
+$ENV{PATH} = "/usr/testbed/bin:/bin:/usr/bin:/usr/local/bin";
+delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 
 my %delaynodes  = ();
 my %delaylinks  = ();
@@ -30,15 +35,11 @@ if ( $#ARGV < 0) {
 }
 
 #
-# Must run as root.
+# Must run, effectively, as root.
 # 
-open(WHO,"/usr/bin/whoami 2>&1 |");
-$_ = <WHO>;
-chop;
-if ($_ ne $me) {
+if ($> != 0) {
     die("This won't work unless you run as user $me\n");
 }
-close(WHO);
 
 #
 # Open up the ir file.
@@ -83,6 +84,19 @@ if ($virtsection == 1) {
 	my ($node,$pc) = split();
 	if ($node =~ /^delay/) {
 	    print STDERR "$node $pc\n" if $dbg;
+
+	    # We can safely untaint these variables
+	    if (!($node =~ /^(\w+\d*)$/)) {
+		die "Unexpected data in \$node : $node\n";
+	    } else {
+		$node = $1;
+	    }
+	    if (!($pc =~ /^(\w+\d*)$/)) {
+		die "Unexpected data in \$pc : $pc\n";
+	    } else {
+		$pc = $1;
+	    }
+
 	    $delaynodes{$node} = $pc;
 	}
     }
@@ -159,6 +173,7 @@ close(IN);
 foreach my $link ( keys %delayparams ) {
     my $node  = $delayparams{$link}[0];
     my $pc    = $delaynodes{$node};
+
 
     #
     # database goo. We check to make sure the default image is set to
