@@ -1150,7 +1150,6 @@ function SHOWNODE($node_id) {
 		
     $row = mysql_fetch_array($query_result);
 
-    $node_id            = $row[node_id]; 
     $phys_nodeid        = $row[phys_nodeid]; 
     $type               = $row[type];
     $vname		= $row[vname];
