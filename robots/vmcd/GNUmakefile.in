@@ -65,7 +65,6 @@ install: all
 ifeq ($(HAVE_MEZZANINE),yes)
 	-mkdir -p $(INSTALL_SBINDIR)
 	$(INSTALL_PROGRAM) vmc-client $(INSTALL_SBINDIR)/vmc-client
-	$(INSTALL_PROGRAM) vmcd $(INSTALL_SBINDIR)/vmcd
 else
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) vmcd $(INSTALL_DIR)/opsdir/sbin/vmcd

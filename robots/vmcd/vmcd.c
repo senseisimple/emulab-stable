@@ -140,6 +140,7 @@ static void siginfo(int sig)
 {
     got_siginfo = 1;
 }
+#endif
 
 static void dump_robot(struct robot_object *ro)
 {
@@ -229,7 +230,6 @@ static void dump_info(void)
     info(" Current frame:\n");
     dump_vision_list(&current_frame);
 }
-#endif
 
 static void usage(void)
 {
