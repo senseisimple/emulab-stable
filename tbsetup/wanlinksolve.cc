@@ -13,7 +13,26 @@
  For the application this was designed for,
  "weights" are values of latency time in milliseconds.
 
- switches: none.
+ switches: 
+   -v  Extra verbosity.
+
+   -2 <weight>
+       Solve for bandwidth dimension;
+       Penalty for error is sum of differences of natural logs,
+       multiplied by <weight>.
+       A good weight seems to be around 7, but the appropriate
+       value is pretty much application-dependent.
+
+   -r <minrounds>
+       Specify the minimum number of rounds to go before stopping.
+       Note that the algorithm won't actually stop until
+       round 3n, where "n" is the round which found the best solution so far,
+       or if it hits maxrounds.
+       default: DEFAULT_ROUNDS
+
+   -R <maxrounds>
+       Specify the absolute maximum number of rounds.
+       default: -1 (infinite)
 
  takes input from stdin, outputs to stdout.
 
@@ -24,6 +43,8 @@
  * 'p' lines each containing 'p' space-delimited numbers;
        this is a P x P matrix of the _actual_ weight from pnodes to 
        pnodes. For latencies, there are zeros along the diagonal.
+ ? 'p' lines, a P x P matrix of actual bandwidth ('-2' switch only)
+
 
  * One line containing a single number 'v'-- the number of virtual nodes.
  * 'v' lines containing the name of each virtual node
@@ -33,6 +54,7 @@
        not-connected vnodes.) 
        If link weights are symmetrical, this matrix will be its own
        transpose (symmetric over the diagonal.)
+ ? 'v' lines, a V x V matrix of desired bandwidth ('-2' switch only)
 
  output format:
  
@@ -44,6 +66,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <unistd.h>
 #include <math.h>
 
 // To keep things lightweight, 
@@ -51,15 +75,13 @@
 // accommodate up to MAX_NODES nodes.
 // These could be changed to STL vectors in the future.
 #define MAX_NODES 20
+#define MAX_DIMENSIONS 2
+
+#define DEFAULT_ROUNDS 160
 
 // The size of our "population."
 // (100,000 seems to work well.)
 #define SOLUTIONS 100000
-
-// The minimum number of rounds to go before stopping.
-// Note that the algorithm won't actually stop until
-// round 3n, where "n" is the round which found the best solution so far.
-#define ROUNDS 160
 
 // The number of new children to produce each round.
 // (20,000 seems to work well.)
@@ -92,8 +114,15 @@ static map< int, string > vnodeNames;
 
 static int pnodes, vnodes;
 
-static int pLatency[MAX_NODES][MAX_NODES];
-static int vDesiredLatency[MAX_NODES][MAX_NODES];
+static int pLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
+static int vDesiredLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
+
+static int dimensions;
+static float d2weight;
+
+static int verbose = 0;
+
+static int minrounds, maxrounds;
 
 class Solution
 {
@@ -146,24 +175,43 @@ static inline void calcError( Solution * t )
   }
 
   {
-    for (int x = 0; x < vnodes; x++) {
-      for (int y = 0; y < vnodes; y++) {
-	int should = vDesiredLatency[x][y];
-	if (should != -1) {
-	  int is     = pLatency[ vnode_mapping[x] ][ vnode_mapping[y] ];
-	  if (should != is) { 
-	    if (verbose) {
-	      printf("%s -> %s latency should be %i; is %i\n", 
-		     vnodeNames[x].c_str(), vnodeNames[y].c_str(), should, is );
+    for (int z = 0; z < dimensions; z++) {
+      for (int x = 0; x < vnodes; x++) {
+	for (int y = 0; y < vnodes; y++) {
+	  int should = vDesiredLatency[z][x][y];
+	  if (should != -1) {
+	    int is     = pLatency[z][ vnode_mapping[x] ][ vnode_mapping[y] ];
+	    if (should != is) { 
+	      float errDelta;
+
+	      if (z == 0) {
+		errDelta = sqrtf((float)(abs(should - is)));
+	      } else {
+		errDelta = d2weight * (float)(abs(should - is));
+	      }
+
+	      if (verbose) {
+		if (z == 0) {
+		  printf("%s -> %s latency (ms) should be %i; is %i (err [sqrt |a-b|] %4.3f)\n", 
+			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
+			 should, is, errDelta );
+		} else {
+		  printf("%s -> %s bandwidth (kB/s) should be ~%i; is ~%i (err [wt * ln (a/b)] %4.3f)\n", 
+			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
+			 (int)expf((float)should / 1000.0f), 
+			 (int)expf((float)is / 1000.0f),
+			 errDelta );
+		}
+	      }
+	      err += errDelta;
 	    }
-	    err += sqrtf((float)(abs(should - is))); 
 	  }
 	}
       }
     }
   }
 
-  if (verbose) { printf("error (sum of roots) of %4.3f\n", err ); }
+  if (verbose) { printf("error of %4.3f\n", err ); }
   t->error = err;
 } 
 
@@ -295,16 +343,61 @@ static inline void generateRandomSolution( Solution * t )
   calcError<false>( t );
 }
 
-int main()
+void usage( char * appname )
 {
+  fprintf(stderr,
+	  "Usage:\n"
+	  "%s [-v] [-2 <weight>] [-r <minrounds>] [-R <maxrounds>]\n\n"
+	  "  -v              extra verbosity\n"
+	  "  -2 <weight>     enable solving for bandwidth;\n"
+	  "                  multiply bandwidth penalties by <weight>.\n"
+	  "  -r <minrounds>  set minimum rounds (a.k.a. generations)\n"
+	  "                  default: %i\n"
+	  "  -R <maxrounds>  set maximum rounds\n"
+	  "                  default: infinite (-1)\n\n", appname, DEFAULT_ROUNDS );
+  exit(-2);
+}
+
+int main( int argc, char ** argv )
+{
+  verbose = 0;
+  dimensions = 1;
+  d2weight = 1.0f / 1000.0f;
+
+  minrounds = DEFAULT_ROUNDS;
+  maxrounds = -1;
+
+  int ch;
+
+  while ((ch = getopt(argc, argv, "v2:r:R:")) != -1) {
+    switch (ch) {
+    case 'v': 
+      verbose++; 
+      break;
+    case '2': 
+      dimensions = 2;
+      d2weight = atof( optarg ) / 1000.0f; 
+      break;
+    case 'r':
+      minrounds = atoi( optarg );
+      break;
+    case 'R':
+      maxrounds = atoi( optarg );
+      break;
+    default: 
+      usage( argv[0] );
+    }
+  }
+
+
   char line[1024];
 
   {
-    printf("How many physical nodes?\n");
+    if (verbose) { printf("How many physical nodes?\n"); }
     gets( line );
     sscanf( line, "%i", &pnodes );
 
-    printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); 
+    if (verbose) { printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); }
     for (int i = 0; i < pnodes; i++) {
       char name[1024];
       gets( line );
@@ -312,25 +405,31 @@ int main()
       pnodeNames[i] = string( name );
     }
 
-    printf("Enter %ix%i grid o' actual latency.\n", pnodes, pnodes);
-    for (int y = 0; y < pnodes; y++) {
-      char * linePos = line;
-      gets( line );
-      while (*linePos == ' ') { linePos++; } // skip leading whitespace
-      for (int x = 0; x < pnodes; x++) {
-	sscanf( linePos, "%i", &pLatency[x][y] );
-	while (*linePos != ' ' && *linePos != '\n') { linePos++; }
-	while (*linePos == ' ') { linePos++; }
+    for (int z = 0; z < dimensions; z++) {
+      if (verbose) {
+	printf("Enter %ix%i grid o' actual %s.\n", pnodes, pnodes, 
+	     (z == 0) ? "latency" : "bandwidth");
+      }
+      for (int y = 0; y < pnodes; y++) {
+	char * linePos = line;
+	gets( line );
+	while (*linePos == ' ') { linePos++; } // skip leading whitespace
+	for (int x = 0; x < pnodes; x++) {
+	  sscanf( linePos, "%i", &pLatency[z][x][y] );
+	  if (z == 1) { pLatency[z][x][y] = (int)( logf(pLatency[z][x][y]) * 1000.0f ); }
+	  while (*linePos != ' ' && *linePos != '\n') { linePos++; }
+	  while (*linePos == ' ') { linePos++; }
+	}
       }
     }
   } 
 
   {
-    printf("How many virtual nodes?\n");
+    if (verbose) { printf("How many virtual nodes?\n"); }
     gets( line );
     sscanf( line, "%i", &vnodes );
 
-    printf("Okay, enter %i names for the virtual nodes, one per line.\n", vnodes ); 
+    if (verbose) { printf("Okay, enter %i names for the virtual nodes, one per line.\n", vnodes ); }
     for (int i = 0; i < vnodes; i++) {
       char name[1024];
       gets( line );
@@ -338,20 +437,30 @@ int main()
       vnodeNames[i] = string( name );
     }
 
-    printf("Enter %ix%i grid o' desired latency (-1 is don't care.)\n", vnodes, vnodes);
-    for (int y = 0; y < vnodes; y++) {
-      char * linePos = line;
-      gets( line );
-      while (*linePos == ' ') { linePos++; } // skip leading whitespace
-      for (int x = 0; x < vnodes; x++) {
-	sscanf( linePos, "%i", &vDesiredLatency[x][y] );
-	while (*linePos != ' ' && *linePos != '\n') { linePos++; }
-	while (*linePos == ' ') { linePos++; }
+    for (int z = 0; z < dimensions; z++) {
+      if (verbose) {
+	printf("Enter %ix%i grid o' desired %s (-1 is don't care.)\n", vnodes, vnodes, 
+	       (z == 0) ? "latency" : "bandwidth");
       }
-    }
-  } 
+      for (int y = 0; y < vnodes; y++) {
+	char * linePos = line;
+	gets( line );
+	while (*linePos == ' ') { linePos++; } // skip leading whitespace
+	for (int x = 0; x < vnodes; x++) {
+	  sscanf( linePos, "%i", &vDesiredLatency[z][x][y] );
+	  if (z == 1) { 
+	    if (vDesiredLatency[z][x][y] != -1) {
+	      vDesiredLatency[z][x][y] = (int)(logf(vDesiredLatency[z][x][y]) * 1000.0f); 
+	    }
+	  }
+	  while (*linePos != ' ' && *linePos != '\n') { linePos++; }
+	  while (*linePos == ' ') { linePos++; }
+	}
+      }
+    } 
+  }
 
-  printf("Thanks.. now running...\n");
+  if (verbose) { printf("Thanks.. now running...\n"); }
 
   {
     for (int i = 0; i < SOLUTIONS; i++) {
@@ -363,14 +472,16 @@ int main()
   {
     int highestFoundRound = 0;
     float last = pool[0].error;
-    for (int i = 0; (i < ROUNDS) || (i < highestFoundRound * 3); i++) {
-      if (!(i % (ROUNDS / 10))) {
+    for (int i = 0; i != maxrounds && (i < minrounds || i < highestFoundRound * 3); i++) {
+      if (verbose && !(i % (minrounds / 10))) {
 	printf("Round %i. (best %4.3f)\n", i, pool[0].error);
       }
 
       if (pool[0].error < last) {
-	printf("Better solution found in round %i (error %4.3f)\n", 
+	if (verbose) {
+	  printf("Better solution found in round %i (error %4.3f)\n", 
 	       i, pool[0].error);
+	}
 	last = pool[0].error;
 	highestFoundRound = i;
       }
@@ -383,17 +494,17 @@ int main()
       }
       sortByError();
       if (pool[0].error < EPSILON) { 
-	printf("Found perfect solution.\n");
+	if (verbose) { printf("Found perfect solution.\n"); }
 	break;
       }
     }
   }
 
   {
-    printf("\nYour solution is as follows:\n");
+    if (verbose) { printf("\nYour solution is as follows:\n"); }
     for (int x = 0; x < pnodes; x++) {
       if (pool[0].pnode_mapping[x] != -1) {
-	printf("%s maps to %s\n", 
+	printf("%s mapsTo %s\n", 
 	       vnodeNames[pool[0].pnode_mapping[x]].c_str(),
 	       pnodeNames[x].c_str() );
       }
@@ -401,10 +512,10 @@ int main()
     printf("\n");
 
     // dump a detailed report of the returned solution's errors.
-    calcError<true>( &(pool[0]) );
+    if (verbose) { calcError<true>( &(pool[0]) ); }
   }
 
-  printf("Bye now.\n");
+  if (verbose) { printf("Bye now.\n"); }
   return 0;
 }
 
