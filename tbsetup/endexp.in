@@ -12,18 +12,13 @@ use Getopt::Std;
 #
 # This gets invoked from the Web interface. Terminate an experiment.
 # Most of the STDOUT prints are never seen since the web interface
-# repeats only errors. My plan is make this script the front end to
-# experiment termination and make tbend a backend program that no one
-# uses.
+# reports only errors, but this script is also intended to be run by the
+# user someday. Perhaps.
 #
 # The -b (batch) argument is so that this script can be part of a batchmode
 # that starts/ends experiments offline. In that case, we don't want to put
 # it into the background and send email, but just want an exit status 
 # returned to the batch system.
-#
-# Note about exit value. -1 means error. 0 means backgrounded. 1 means
-# termination happened immediately. The web page uses this to decide
-# what kind of message to give the user. 
 #
 sub usage()
 {
@@ -31,6 +26,30 @@ sub usage()
     exit(-1);
 }
 my  $optlist = "b";
+
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Termination is proceeding in the background. Notified later.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub ExitWithStatus($$)
+{
+    my ($status, $message) = @_;
+    
+    if ($status < 0) {
+	die("*** $0:\n".
+	    "    $message\n");
+    }
+    else {
+	print STDERR "$message\n";
+    }
+    exit($status);
+}
 
 #
 # Configure variables
@@ -129,6 +148,7 @@ if ($UID && !TBAdmin($UID) &&
 	"    You do not have permission to end this experiment!\n");
 }
 
+
 #
 # We have to protect against trying to end an experiment that is currently
 # in the process of being terminated. We use a "wrapper" state (actually
@@ -151,15 +171,7 @@ my $estate          = $hashrow{'state'};
 my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $ebatchstate     = $hashrow{'batchstate'};
-
-if (defined($hashrow{'expt_locked'})) {
-    $val = $hashrow{'expt_locked'};
-    
-    die("*** $0:\n".
-	"    It appears that $pid/$eid went into transition at $val.\n".
-	"    You will be notified via email when the experiment is no\n".
-	"    longer in transition.\n");
-}
+my $cancelflag      = $hashrow{'canceled'};
 
 #
 # Batch experiments get a different protocol to avoid races with the
@@ -182,6 +194,9 @@ if ($isbatchexpt) {
 	    if ($ebatchstate ne BATCHSTATE_TERMINATING);
     }
     else {
+	ExitWithStatus(1, "Batch experiment $pid/$eid is still canceling!")
+	    if ($cancelflag);
+
 	#
 	# Set the canceled flag. This will prevent the batch_daemon
 	# from trying to run it (once the table is unlocked). It might
@@ -194,52 +209,54 @@ if ($isbatchexpt) {
 	# If the state is POSTED or PAUSED, we can do it right away.
 	# Otherwise, have to let the batch daemon deal with it.
 	# 
-	if ($ebatchstate ne BATCHSTATE_POSTED &&
-	    $ebatchstate ne BATCHSTATE_PAUSED) {
-	    #
-	    # Exit with non zero status so that caller knows (web
-	    # server) that the batch experiment cannot be ended at
-	    # this time.
-	    #
-	    print "Batch experiment $pid/$eid is currently running.\n".
-	      "You will receive email notification when the experiment is\n".
-	      "torn down and you can reuse the experiment name\n";
-	    exit(0);
-	}
+	ExitWithStatus(0, 
+		       "Batch experiment $pid/$eid has been canceled.\n".
+		       "You will receive email when the experiment is\n".
+		       "torn down and you can reuse the experiment name.")
+	    if ($ebatchstate ne BATCHSTATE_POSTED &
+		$ebatchstate ne BATCHSTATE_PAUSED);
     }
     #
     # Let termination proceed normally. 
     # 
 }
+else {
+    #
+    # If the cancel flag is set, then user must wait for that to clear before
+    # we can do anything else.
+    #
+    ExitWithStatus(1,
+		   "Experiment $pid/$eid has its cancel flag set!.\n".
+		   "You must wait for that to clear before you can terminate ".
+		   "the experiment.\n")
+	if ($cancelflag);
 
-#
-# Okay, check state. We do not allow termination to start when the
-# experiment is in transition. A future task would be to allow this,
-# but for now the experiment must be in one of a few states to proceed
-#
-# Seems like too many states!
-#
-if ($estate eq EXPTSTATE_PRERUN ||
-    $estate eq EXPTSTATE_ACTIVATING ||
-    $estate eq EXPTSTATE_SWAPPING ||
-    $estate eq EXPTSTATE_TERMINATING) {
-    die("*** $0:\n".
-	"    It appears that experiment $pid/$eid is in transition.\n".
-	"    The user that created the experiment will be notified via\n".
-        "    email when the experiment is no longer in transition.\n");
+    #
+    # Okay, check state. We do not allow termination to start when the
+    # experiment is in transition. A future task would be to allow this,
+    # but for now the experiment must be in one of a few states to proceed.
+    #
+    if ($ebatchstate ne BATCHSTATE_PAUSED() &&
+	$ebatchstate ne BATCHSTATE_RUNNING()) {
+
+	ExitWithStatus(1,
+		       "Experiment $pid/$eid is currently in transition.\n".
+		       "You must wait until it is no longer $ebatchstate!");
+    }
 }
 
 #
-# Set the timestamp now, and unlock the experiments table.
+# Lock the experiment and change state so no one can mess with it.
 #
-DBQueryFatal("UPDATE experiments SET expt_locked=now() ".
-	     "WHERE eid='$eid' and pid='$pid'");
-
+TBLockExp($pid, $eid, BATCHSTATE_TERMINATING());
 DBQueryFatal("unlock tables");
 
 #
 # XXX - At this point a failure is going to leave things in an
-# inconsistent state.
+# inconsistent state. Be sure to call fatal() only since we are
+# going into the background, and we have to send email since no
+# one is going to see printed error messages (output goes into the
+# log file, which will be sent along in the email). 
 #
 
 #
@@ -251,8 +268,8 @@ my $expt_head_name;
 my $expt_head_email;
 
 if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
-    print STDERR "*** WARNING: ".
-	         "Could not determine name/email for $expt_head_login.\n";
+    print "*** WARNING: ".
+	  "Could not determine name/email for $expt_head_login.\n";
     $expt_head_name  = "TBOPS";
     $expt_head_email = $TBOPS;
 }
@@ -269,11 +286,10 @@ if (! $batch) {
 	#
 	# Parent exits normally
 	#
-	print STDOUT
-	    "Experiment $pid/$eid is now terminating\n".
-	    "You will be notified via email when the experiment has been\n".
-	    "torn down, and you can reuse the experiment name.\n";
-	exit(0);
+	ExitWithStatus(0,
+	       "Experiment $pid/$eid is now terminating.\n".
+	       "You will be notified via email when the experiment has been\n".
+	       "torn down, and you can reuse the experiment name.\n");
     }
 }
 
@@ -337,7 +353,7 @@ TBExptClearLogFile($pid, $eid);
 TBExptDestroy($pid, $eid);
 
 #
-# In batch mode, exit now.
+# In batch mode, exit now. 
 #
 if ($batch) {
     exit(0);
@@ -369,9 +385,8 @@ sub fatal($)
 
     #
     # Kill this for convenience later.
-    # 
-    DBQueryWarn("update experiments set expt_locked=NULL ".
-		"WHERE eid='$eid' and pid='$pid'");
+    #
+    TBUnLockExp($pid, $eid);
 
     # Copy over the log files so the user can see them.
     system("/bin/cp -Rfp $workdir/ $userdir/tbdata");

@@ -422,6 +422,17 @@ if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
     $maxrun = 1;
 }
 while (1) {
+    my $canceled;
+
+    print "Sleeping for a bit ...\n";
+    sleep(60);
+    
+    # Check cancel flag before continuing. 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    fatal(1, "*** $0:\n".
+	     "    Cancel flag set; aborting assign run!")
+	if ($canceled);
+
     print "Assign Run $currentrun\n";
 
     # Violation counts
@@ -491,6 +502,12 @@ while (1) {
     open(ASSIGNFP, "assign.log") or
 	fatal(65, "*** $0:\n".
 	          "    Could not open assign logfile!");
+
+    # Check cancel flag before continuing. 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    fatal(1, "*** $0:\n".
+	     "    Cancel flag set; aborting assign run!")
+	if ($canceled);
 
     if ($assignexitcode == 0)
     {
@@ -868,8 +885,8 @@ if ($needwanassign) {
 # Recoverability ends.
 # All fatal() calls from this point do not have the recoverable '64' bit set.
 #
-
 #
+
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
 # hokey in that the virtnodes just need to be allocated from the pool that
 # is on the real node. We know they are free, but we should go through
@@ -881,6 +898,12 @@ foreach my $pnode (keys(%virtnodes)) {
     my @plist = ();
     my @oplist = ();
     my @ovlist = ();
+
+    # Check cancel flag before continuing. 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    fatal(1, "*** $0:\n".
+	  "    Cancel flag set; aborting assign run!")
+	if ($canceled);
 
     #
     # If updating, need to watch for nodes that are already reserved.
@@ -1006,6 +1029,12 @@ foreach my $pnode (keys(%virtnodes)) {
 	}
     }
 }
+
+# Check cancel flag before continuing. 
+TBGetBatchCancelFlag($pid, $eid, \$canceled);
+fatal(1, "*** $0:\n".
+      "    Cancel flag set; aborting assign run!")
+    if ($canceled);
 
 # Set port range (see below for how we deal with update).
 TBExptSetPortRange();

@@ -84,12 +84,6 @@ function SPITFORM($formfields, $errors)
     }
 
     echo "<table align=center border=1>\n";
-    #      <tr>
-    #          <td align=center colspan=2>
-    #             <em>(Fields marked with * are required)</em>
-    #          </td>
-    #      </tr>\n";
-
     echo "<form name='form1' enctype=multipart/form-data
                 action=beginexp.php3 method=post>\n";
 
@@ -146,7 +140,8 @@ function SPITFORM($formfields, $errors)
 	}
     }
     echo "     </select>
-	<font size=-1>(Must be default or correspond to selected project)</font>
+	  <font size=-1>(Must be default or correspond to selected project)
+          </font>
              </td>
           </tr>\n";
 
@@ -255,12 +250,11 @@ function NormalSubmit() {
                     </tr></table></td></tr>\n";
     }
 
-#
-# Swapping
-#
-
+    #
+    # Swapping
+    #
     # Add in hidden fields to send swappable and noswap_reason, since
-    # they don't show on the form
+    # they do not show on the form
     echo "<tr>
 	      <td class='pad4'>
 		<a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
@@ -479,7 +473,7 @@ if (!isset($formfields[exp_description]) ||
 
 #
 # Swappable
-# Any of these which aren't "1" become "0".
+# Any of these which are not "1" become "0".
 #
 if (!isset($formfields[exp_swappable]) ||
     strcmp($formfields[exp_swappable], "1")) {
@@ -713,12 +707,8 @@ if (isset($syntax)) {
     # to the proper directory and to keep most of these details out
     # of this.
     #
-    $output = array();
-    $retval = 0;
-
-    $result =
-	exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webnscheck $nsfile", $output,
-	     $retval);
+    $retval = SUEXEC($uid, $TBADMINGROUP, "webnscheck $nsfile",
+		     SUEXEC_ACTION_IGNORE);
 
     echo "<div align=right>\n";
     echo "<a href='' onclick='window.close()'>Close Window</a>\n</div>\n";
@@ -727,17 +717,11 @@ if (isset($syntax)) {
     echo "</center>\n";
 
     if ($retval) {
-	echo "<br><br><h2>
-          Parse Failure($retval): Output as follows:
-          </h2>
-          <br>
-          <XMP>\n";
-	for ($i = 0; $i < count($output); $i++) {
-	    echo "$output[$i]\n";
-	}
-	echo "</XMP>\n";
-    
-	die("");
+	SUEXECERROR(SUEXEC_ACTION_DIE);
+        #
+        # Never returns ...
+        #
+        die("");
     }
 
     echo "<center><br>";
@@ -818,45 +802,32 @@ echo "<h2>Starting experiment configuration. Please wait a moment ...
 flush();
 
 #
-# Run the scripts. We use a script wrapper to deal with changing
-# to the proper directory and to keep most of these details out
-# of this. The user will be notified later. Its possible that the
-# script will return non-zero status, but there are just a couple
-# of conditions. Generally, the script exits and the user is told
-# of errors later.
-#
-$output = array();
-$retval = 0;
-$last   = time();
-
+# Run the backend script.
 #
 # Avoid SIGPROF in child.
 #
 set_time_limit(0);
 
-$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_name\" ".
-	       "$exp_priority $exp_swappable ".
-	       "-p $exp_pid -g $exp_gid -e $exp_id ".
-	       ($nonsfile ? "" : "$nsfile"),
- 	       $output, $retval);
+$retval = SUEXEC($uid, $unix_gid,
+		 "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_name\" ".
+		 "$exp_priority $exp_swappable ".
+		 "-p $exp_pid -g $exp_gid -e $exp_id ".
+		 ($nonsfile ? "" : "$nsfile"),
+		 SUEXEC_ACTION_IGNORE);
 
 if ($delnsfile) {
     unlink($nsfile);
 }
 
+#
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
 if ($retval) {
-    echo "<br><br><h2>
-          Setup Failure($retval): Output as follows:
-          </h2>
-          <br>
-          <XMP>\n";
-          for ($i = 0; $i < count($output); $i++) {
-              echo "$output[$i]\n";
-          }
-    echo "</XMP>\n";
-
-    PAGEFOOTER();
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+    #
+    # Never returns ...
+    #
     die("");
 }
 

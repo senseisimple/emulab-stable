@@ -537,7 +537,7 @@ function SHOWUSER($uid) {
 #
 # Show an experiment.
 #
-function SHOWEXP($pid, $eid) {
+function SHOWEXP($pid, $eid, $short = 0) {
     global $TBDBNAME, $TBDOCBASE;
     $nodecounts  = array();
 
@@ -575,8 +575,10 @@ function SHOWEXP($pid, $eid) {
     $exp_shared  = $exprow[shared];
     $exp_path    = $exprow[path];
     $batchmode   = $exprow[batchmode];
+    $canceled    = $exprow[canceled];
     $attempts    = $exprow[attempts];
     $batchstate  = $exprow[batchstate];
+    $expt_locked = $exprow[expt_locked];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
     $noswap_reason = stripslashes($exprow[noswap_reason]);
@@ -620,32 +622,40 @@ function SHOWEXP($pid, $eid) {
     else
 	$idle_ignore = "No";
 
+    if ($expt_locked)
+	$expt_locked = "($expt_locked)";
+    else
+	$expt_locked = "";
+
     #
     # Generate the table.
     #
     echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
 
-    echo "<tr>
-            <td>Name: </td>
-            <td class=left>$eid</td>
-          </tr>\n";
+    if (!$short) {
+	echo "<tr>
+                <td>Name: </td>
+                <td class=left>$eid</td>
+              </tr>\n";
 
-    echo "<tr>
-            <td>Long Name: </td>
-            <td class=\"left\">$exp_name</td>
-          </tr>\n";
+	echo "<tr>
+                <td>Long Name: </td>
+                <td class=\"left\">$exp_name</td>
+              </tr>\n";
 
-    echo "<tr>
-            <td>Project: </td>
-            <td class=\"left\">
-              <a href='showproject.php3?pid=$pid'>$pid</a></td>
-          </tr>\n";
+	echo "<tr>
+                <td>Project: </td>
+                <td class=\"left\">
+                  <a href='showproject.php3?pid=$pid'>$pid</a></td>
+              </tr>\n";
 
-    echo "<tr>
-            <td>Group: </td>
-            <td class=\"left\">
-              <a href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</a></td>
-          </tr>\n";
+        echo "<tr>
+                <td>Group: </td>
+                <td class=\"left\">
+                  <a href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</a>
+                </td>
+              </tr>\n";
+    }
 
     echo "<tr>
             <td>Experiment Head: </td>
@@ -653,134 +663,124 @@ function SHOWEXP($pid, $eid) {
               <a href='showuser.php3?target_uid=$exp_head'>$exp_head</a></td>
           </tr>\n";
 
-    echo "<tr>
-            <td>Created: </td>
-            <td class=\"left\">$exp_created</td>
-          </tr>\n";
-
-    if ($exp_swapped) {
-        echo "<tr>
-                <td>Last Swap/Modify: </td>
-                <td class=\"left\">$exp_swapped ($exp_swapuid)</td>
+    if (!$short) {
+	echo "<tr>
+                <td>Created: </td>
+                <td class=\"left\">$exp_created</td>
               </tr>\n";
-    }
 
-    if (ISADMIN()) {
-	echo "<tr>
-            <td><a
-            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
-            Swappable:</a></td>
-            <td class=\"left\">$swappable</td>
-          </tr>\n";
-    }
+	if ($exp_swapped) {
+	    echo "<tr>
+                    <td>Last Swap/Modify: </td>
+                    <td class=\"left\">$exp_swapped ($exp_swapuid)</td>
+                  </tr>\n";
+	}
+
+	if (ISADMIN()) {
+	    echo "<tr>
+                    <td><a href='$TBDOCBASE/docwrapper.php3?".
+		           "docname=swapping.html#swapping'>Swappable:</a></td>
+                    <td class=\"left\">$swappable</td>
+                  </tr>\n";
+	}
     
-    echo "<tr>
-            <td><a
-            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
-            Idle-Swap:</a></td>
-            <td class=\"left\">$idleswap</td>
-          </tr>\n";
-
-    echo "<tr>
-            <td><a 
-            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
-            Max. Duration:</a></td>
-            <td class=\"left\">$autoswap</td>
-          </tr>\n";
-
-    if (ISADMIN()) {
 	echo "<tr>
-            <td>Idle Ignore:</td>
-            <td class=\"left\">$idle_ignore</td>
-          </tr>\n";
-    }
-    
-    echo "<tr>
-            <td>Shared: </td>
-            <td class=\"left\">";
-    if ($exp_shared) {
-	echo "<A href='expaccess_form.php3?pid=$pid&eid=$eid'>Yes</a>";
-    }
-    else {
-	echo "No";
-    }
-    echo "   </td>
-          </tr>\n";
+                  <td><a href='$TBDOCBASE/docwrapper.php3?".
+	                 "docname=swapping.html#idleswap'>Idle-Swap:</a></td>
+                  <td class=\"left\">$idleswap</td>
+              </tr>\n";
 
-    echo "<tr>
-            <td>Path: </td>
-            <td class=left>$exp_path</td>
-          </tr>\n";
+	echo "<tr>
+                <td><a href='$TBDOCBASE/docwrapper.php3?".
+	               "docname=swapping.html#autoswap'>Max. Duration:</a></td>
+                <td class=\"left\">$autoswap</td>
+              </tr>\n";
+
+	if (ISADMIN()) {
+	    echo "<tr>
+                    <td>Idle Ignore:</td>
+                    <td class=\"left\">$idle_ignore</td>
+                 </tr>\n";
+	}
+    
+	echo "<tr>
+                <td>Path: </td>
+                <td class=left>$exp_path</td>
+              </tr>\n";
 
     echo "<tr>
             <td>Status: </td>
             <td class=\"left\">$exp_status</td>
           </tr>\n";
+    }
 
     if (count($nodecounts)) {
 	echo "<tr>
-            <td>Reserved Nodes: </td>
-            <td class=\"left\">\n";
+                 <td>Reserved Nodes: </td>
+                 <td class=\"left\">\n";
 	while (list ($class, $count) = each($nodecounts)) {
 	    echo "$count ($class) &nbsp ";
 	}
-	echo "</td>
-          </tr>\n";
-    } else {
+	echo "   </td>
+              </tr>\n";
+    }
+    elseif (!$short) {
 	if ($minnodes!="") {
 	    echo "<tr>
-            <td>Minumum Nodes: </td>
-            <td class=\"left\"><font color=green>
-               $minnodes (estimate)</font></td>
-          </tr>\n";
-	} else {
+                      <td>Minumum Nodes: </td>
+                      <td class=\"left\"><font color=green>
+                          $minnodes (estimate)</font></td>
+                  </tr>\n";
+	}
+	else {
 	    echo "<tr>
-            <td>Minumum Nodes: </td>
-            <td class=\"left\"><font color=green>
-               Unknown</font></td>
-          </tr>\n";
+                      <td>Minumum Nodes: </td>
+                      <td class=\"left\"><font color=green>Unknown</font></td>
+                  </tr>\n";
 	}
     }
-    if ($mem_usage || $cpu_usage) {
-	echo "<tr>
-                <td>Mem Usage Est: </td>
-                <td class=\"left\">$mem_usage</td>
-              </tr>\n";
+    if (!$short) {
+	if ($mem_usage || $cpu_usage) {
+	    echo "<tr>
+                      <td>Mem Usage Est: </td>
+                      <td class=\"left\">$mem_usage</td>
+                  </tr>\n";
 
-	echo "<tr>
-                <td>CPU Usage Est: </td>
-                <td class=\"left\">$cpu_usage</td>
-              </tr>\n";
-    }
+	    echo "<tr>
+                      <td>CPU Usage Est: </td>
+                      <td class=\"left\">$cpu_usage</td>
+                  </tr>\n";
+	}
 
-    $lastact = TBGetExptLastAct($pid,$eid);
-    $idletime = TBGetExptIdleTime($pid,$eid);
-    $stale = TBGetExptIdleStale($pid,$eid);
+	$lastact = TBGetExptLastAct($pid,$eid);
+	$idletime = TBGetExptIdleTime($pid,$eid);
+	$stale = TBGetExptIdleStale($pid,$eid);
     
-    if ($lastact != -1) {
-	echo "<tr>
-            <td>Last Activity: </td>
-            <td class=\"left\">$lastact</td>
-          </tr>\n";
+	if ($lastact != -1) {
+	    echo "<tr>
+                      <td>Last Activity: </td>
+                      <td class=\"left\">$lastact</td>
+                  </tr>\n";
 
-	if ($stale) { $str = "(stale)"; } else { $str = ""; }
+	    if ($stale) { $str = "(stale)"; } else { $str = ""; }
 	
-	echo "<tr>
-            <td>Idle Time: </td>
-            <td class=\"left\">$idletime hours $str</td>
-          </tr>\n";
-    }
+	    echo "<tr>
+                      <td>Idle Time: </td>
+                      <td class=\"left\">$idletime hours $str</td>
+                  </tr>\n";
+	}
 
-    if (! ($swapreqs=="" || $swapreqs==0)) {
-	echo "<tr>
-            <td>Swap Requests: </td>
-            <td class=\"left\">$swapreqs</td>
-          </tr>\n";
+	if (! ($swapreqs=="" || $swapreqs==0)) {
+	    echo "<tr>
+                      <td>Swap Requests: </td>
+                      <td class=\"left\">$swapreqs</td>
+                  </tr>\n";
 
-	echo "<tr>
-            <td>Last Swap Req.: </td>
-            <td class=\"left\">$lastswapreq</td>
-          </tr>\n";
+	    echo "<tr>
+                      <td>Last Swap Req.: </td>
+                      <td class=\"left\">$lastswapreq</td>
+                  </tr>\n";
+	}
     }
     
     if ($batchmode) {
@@ -791,7 +791,7 @@ function SHOWEXP($pid, $eid) {
 
 	    echo "<tr>
                     <td>Batch Status: </td>
-                    <td class=\"left\">$batchstate</td>
+                    <td class=\"left\">$batchstate $expt_locked</td>
                   </tr>\n";
 
 	    echo "<tr>
@@ -799,12 +799,26 @@ function SHOWEXP($pid, $eid) {
                     <td class=\"left\">$attempts</td>
                   </tr>\n";
     }
-
-    if (isset($syncserver)) {
+    else {
+	    echo "<tr>
+                    <td>Swap State: </td>
+                    <td class=\"left\">$batchstate $expt_locked</td>
+                  </tr>\n";
+    }
+    if ($canceled) {
 	echo "<tr>
-                <td>Sync Server: </td>
-                <td class=\"left\">$syncserver</td>
+                 <td>Cancel Flag: </td>
+                 <td class=\"left\">$canceled</td>
               </tr>\n";
+    }
+
+    if (!$short) {
+	if (isset($syncserver)) {
+	    echo "<tr>
+                      <td>Sync Server: </td>
+                      <td class=\"left\">$syncserver</td>
+                  </tr>\n";
+	}
     }
 
     echo "</table>\n";

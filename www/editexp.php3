@@ -487,16 +487,15 @@ if (count($errors)) {
 #
 # Converting the batchmode is tricky, but we can let the DB take care
 # of it by requiring that the experiment not be locked, and it be in
-# the swapped state. If the query fails, we know that the experiment
+# the paused state. If the query fails, we know that the experiment
 # was in transition.
 #
 if (!isset($formfields[batchmode])) {
     $formfields[batchmode] = 0;
 }
 if ($defaults[batchmode] != $formfields[batchmode]) {
-    $newbatchstate = TBDB_BATCHSTATE_PAUSED;
-    $exptstate     = $TB_EXPTSTATE_SWAPPED;
-    $success       = 0;
+    $batchstate = TBDB_BATCHSTATE_PAUSED;
+    $success    = 0;
 
     if (strcmp($formfields[batchmode], "1")) {
 	$batchmode = 0;
@@ -511,9 +510,9 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
 
     $query_result =
 	DBQueryFatal("update experiments set ".
-		     "   batchmode=$batchmode,batchstate='$newbatchstate' ".
+		     "   batchmode=$batchmode ".
 		     "where pid='$pid' and eid='$eid' and ".
-		     "     expt_locked is NULL and state='$exptstate'");
+		     "     expt_locked is NULL and batchstate='$batchstate'");
 
     $success = DBAffectedRows();
     
@@ -523,7 +522,8 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
     # Lets see if that worked. 
     #
     if (! $query_result || !$success) {
-	$errors["Batch Mode"] = "Experiment is in transition; try again later";
+	$errors["Batch Mode"] = "Experiment is running or in transition; ".
+	    "try again later";
 	
 	SPITFORM($formfields, $errors);
 	PAGEFOOTER();

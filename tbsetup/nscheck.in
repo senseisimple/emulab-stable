@@ -14,6 +14,11 @@ use Getopt::Std;
 #
 # usage: nscheck <nsfile>
 #
+# Exit value is important; 
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Parsed okay.
+# $status > 0 - Parse error. 
+#
 sub usage()
 {
     print STDOUT "Usage: nscheck <nsfile>\n";
@@ -26,6 +31,7 @@ my  $optlist = "";
 #
 my $TB       = "@prefix@";
 my $parser   = "$TB/libexec/parse-ns";
+my $status   = 0;
 
 #
 # Turn off line buffering on output
@@ -81,22 +87,27 @@ if (system("/bin/cp", "$tempfile", "$dirname/$nsfile")) {
 chdir($dirname) or
     fatal("Could not chdir to $dirname");
 
+#
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
+#
+# Be sure to exit with >0 staus
+#
 
 if (system("$parser -n -a $nsfile") != 0) {
-    fatal("NS Parse failed!");
+    print "NS Parse failed!\n";
+    $status = 1;
 }
 
 system("/bin/rm", "-rf", "$dirname");
-exit 0;
+exit $status;
 
 sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT "$mesg\n";
-
     system("/bin/rm", "-rf", "$dirname");
-    exit(-1);
+
+    die("*** $0:\n".
+	"    $mesg\n");
 }

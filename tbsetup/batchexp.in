@@ -79,7 +79,9 @@ my $idleswaptime = 60 * TBGetSiteVar("idle/threshold");
 my $autoswap = 0;
 my $autoswaptime = 10 * 60;
 my $idleignore = 0;
-my $priority  = TB_EXPTPRIORITY_LOW;
+my $priority   = TB_EXPTPRIORITY_LOW;
+my $exptstate  = EXPTSTATE_NEW();
+my $swapstate  = BATCHSTATE_ACTIVATING(); 
 
 #
 # Verify user and get his DB uid.
@@ -170,17 +172,19 @@ if ($query_result->numrows) {
 #
 # Insert the record. This reserves the pid/eid for us. If its a batchmode
 # experiment, we will update the record later so that the batch daemon
-# will recognize it.
+# will recognize it. We insert the record as locked and ACTIVATING so that
+# no one can mess with the experiment until later. 
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
-		  " idle_ignore, keyhash) ".
+		  " idle_ignore, keyhash, batchstate, expt_locked) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
-		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
+		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
-		  "'$autoswaptime', $idleignore, '$secretkey')")) {
+		  "'$autoswaptime', $idleignore, '$secretkey', ".
+		  "'$swapstate', now())")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -222,10 +226,14 @@ if (system("$mkexpdir $pid $gid $eid") != 0) {
 }
 
 #
-# If no NS file, we are done.
+# If no NS file, we are done. We must unlock it and reset its state
+# appropriately. We leave the experiment in the "new" state so that
+# the user is forced to do a modify first (to give it a topology). 
 #
-exit(0)
-    if (!defined($tempnsfile));
+if (!defined($tempnsfile)) {
+    TBUnLockExp($pid, $eid, BATCHSTATE_PAUSED);
+    exit(0);
+}
 
 #
 # Grab the working directory path, and thats where we work.
@@ -276,6 +284,9 @@ if ($nsfile_string) {
 # the startexp script to do the rest. It exits and so do we; user gets
 # email later. If its a batch experiment, update the experiment record
 # so that the batch daemon will see it and act.
+#
+# Note that we hand off to startexp with the experiment locked and ACTIVATING.
+# This is "okay" since no one else calls startexp.
 #
 if ($immediate) {
     my $optargs = "";

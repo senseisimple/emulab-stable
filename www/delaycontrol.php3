@@ -40,7 +40,7 @@ $query_result =
 $row = mysql_fetch_array($query_result);
 $gid         = $row[gid];
 $expt_locked = $row[expt_locked];
-$estate      = $row[state];
+$batchstate  = $row[batchstate];
 
 #
 # Look for transition progress and exit with error.
@@ -56,7 +56,7 @@ if ($expt_locked) {
 # when the experiment is swapped out, but we need to generate a form based
 # on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (strcmp($estate, $TB_EXPTSTATE_ACTIVE)) {
+if (strcmp($batchstate, TBDB_BATCHSTATE_RUNNING)) {
     USERERROR("Experiment $eid must be active to change its traffic ".
 	      "shaping configuration!", 1);
 }

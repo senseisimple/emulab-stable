@@ -13,15 +13,10 @@ use Getopt::Std;
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# The -b (batch) argument is so that this script can be part of a batchmode
-# that starts/ends experiments offline. In that case, we don't want to put
-# it into the background and send email, but just want an exit status 
-# returned to the batch system.
-#
 sub usage()
 {
     print STDOUT
-	"Usage: startexp [-f [-b]] [-g gid] <pid> <eid> <nsfile>\n";
+	"Usage: startexp [-f] [-b] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
 my  $optlist = "bg:f";
@@ -45,8 +40,8 @@ use libtestbed;
 
 my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
-my $batch    = 0;
 my $frontend = 0;
+my $nodetach = 0;
 my $errorstat= -1;
 my $logname;
 
@@ -88,14 +83,11 @@ if (@ARGV != 3) {
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 my $nsfile= $ARGV[2];
-if (defined($options{"b"})) {
-    $batch   = 1;
-}
 if (defined($options{"f"})) {
     $frontend = 1;
 }
-if ($batch && !$frontend) {
-    usage();
+if (defined($options{"b"})) {
+    $nodetach = 1;
 }
 if (defined($options{"g"})) {
     $gid = $options{"g"};
@@ -165,11 +157,16 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 }
 
 #
-# Check to make sure the experiment record exists. The experiment must
-# be in the "new" state when using this interface. 
+# We have to protect against trying to muck with an experiment that is
+# currently in transition. We use a "wrapper" state (actually a
+# timestamp so we can say when termination was requested) since
+# terminating consists of a couple of different experiment states down
+# inside the tb scripts.
 #
+DBQueryFatal("lock tables experiments write");
+
 $query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("select * from experiments where eid='$eid' and pid='$pid'");
 
 if (! $query_result->numrows) {
     die("*** $0:\n".
@@ -178,6 +175,7 @@ if (! $query_result->numrows) {
 
 my %row		= $query_result->fetchhash();
 my $estate	= $row{'state'};
+my $ebatchstate = $row{'batchstate'};
 my $expt_path   = $row{'path'};
 my $expt_name   = $row{'expt_name'};
 my $expt_created= $row{'expt_created'};
@@ -193,36 +191,31 @@ my $idleswaptime= $row{'idleswap_timeout'} / 60.0;
 my $autoswaptime= $row{'autoswap_timeout'} / 60.0;
 
 my $swapsettings = 
- #"Name:        $expt_name\n" .
   "Swappable:   $swappable".($swappablebit ? "\n" : " (Reason: $noswap)\n").
   "Idle-Swap:   $idleswap".
   ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: $noidleswap)\n").
   "Auto-Swap:   $autoswap".
   ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
-if ($estate ne EXPTSTATE_NEW) {
+if ($estate ne EXPTSTATE_NEW ||
+    $ebatchstate ne BATCHSTATE_ACTIVATING ||
+    !defined($row{'expt_name'})) {
     die("*** $0:\n".
-	"    Experiment $pid/$eid is already configured (or configuring)!\n");
+	"    Experiment $pid/$eid is not in the proper state!\n");
 }
 
 if (! chdir($workdir)) {
     die("*** $0:\n".
 	"    Could not chdir to $workdir: $!\n");
 }
-
-#
-# Lock the experiment record with the timestamp so that it cannot
-# terminated or swapped. This is basically a wrapper state for the
-# variety of actual states.
-#
-TBLockExp($pid, $eid);
+DBQueryFatal("unlock tables");
 
 #
 # The rest of this goes into the background so that the user sees
 # immediate response. We will send email later when the experiment
 # is actually torn down.
 #
-if (! $batch) {
+if (! $nodetach) {
     $logname = TBExptCreateLogFile($pid, $eid, "startexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
@@ -238,6 +231,7 @@ if (! $batch) {
 	exit(0);
     }
 }
+
 #
 # Gather statistics; start the clock ticking.
 #
@@ -297,11 +291,6 @@ if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
 }
 
 #
-# Must unlock before exit.
-#
-TBUnLockExp($pid, $eid);
-
-#
 # Gather statistics.
 #
 if ($frontend) {
@@ -326,16 +315,32 @@ TBSaveExpLogFiles($pid, $eid);
 system("cp -Rfp $workdir/ $userdir/tbdata");
 
 #
-# In batch mode, just exit without sending email. 
-#
-if ($batch) {
-    exit(0);
-}
-
-#
 # Close up the log file so the webpage stops.
 #
 TBExptCloseLogFile($pid, $eid);
+
+#
+# Must unlock before exit.
+#
+if ($frontend) {
+    TBUnLockExp($pid, $eid, BATCHSTATE_PAUSED());
+}
+else {
+    TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
+}
+
+#
+# Clear the cancel flag now that the operation is complete. Must be
+# done after we change the experiment state (above).
+#
+TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
+
+#
+# In nodetach mode, just exit without sending email. 
+#
+if ($nodetach) {
+    exit(0);
+}
 
 #
 # Dump the report file and the log file to the user via email. 
@@ -409,22 +414,21 @@ sub fatal()
     }
 
     #
-    # In batch mode, exit. Must unlock the experiment since the record
-    # is kept by the batch system until it is finished or canceled.
-    # The batch daemon might terminate the experiment based on the error.
-    #
-    if ($batch) {
-	TBUnLockExp($pid, $eid);
-	exit($errorstat);
-    }
-
-    #
     # Okay, we *are* going to terminate the experiment.
     # 
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
 
     # Clear the logfile so the webpage stops. 
     TBExptClearLogFile($pid, $eid);
+
+    #
+    # In nodetach mode, just exit without sending email. No need to unlock
+    # the experiment since its going to be killed. Better not to, just in
+    # case the user tries to muck with it. 
+    #
+    if ($nodetach) {
+	exit(0);
+    }
 
     #
     # Send a message to the testbed list. 

@@ -81,10 +81,10 @@ if (!$confirmed) {
 
 	echo "<center><font size=+2><br>
               Are you <b>REALLY</b>
-                sure you want to reboot all nodes in experiment $pid/$eid?
+                sure you want to reboot all nodes?
               </font>\n";
 
-	SHOWEXP($pid, $eid);
+	SHOWEXP($pid, $eid, 1);
     }
 
     

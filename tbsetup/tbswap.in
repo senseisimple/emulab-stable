@@ -67,9 +67,8 @@ my $updateReboot = 0;
 my $force  = 0;
 my $errors = 0;
 my $assignWrapperErrorCode = 0;
-
 my $state;
-
+my $canceled;
 my $os_setup_pid;
 my $cleanvlans;
 
@@ -342,11 +341,12 @@ if (! $errors) {
 	#   a) there were errors, 
 	#   b) doswapin() indicated (via return code 3) a retry is appropriate,
 	#   c) we haven't tried too many times already.
+	#   d) The cancelflag has not been set.
 	#
 	# NOTE that if $TESTMODE == 1, retries are impossible, since
         # $retry will never get set to 1.
 	#
-	while ($errors == 3 && $retries ) {
+	while ($errors == 3 && $retries && !$canceled) {
 	    $retries--;
 
 	    print STDERR "Cleaning up after errors; will try again.\n";
@@ -651,9 +651,6 @@ sub doSwapout($) {
 #              1 - failed swapin; cleanup required.
 #              3 - failed swapin; cleanup required; can retry.
 #              7 - failed swapin; assign failed; no cleanup.
-#
-#            Will set $retry = 1 if os_setup failed.
-#
 ##
 
 sub doSwapin($) {
@@ -702,6 +699,11 @@ sub doSwapin($) {
 
 	print "Mapped to physical reality!\n";
     }
+
+    # Check cancel flag before continuing. No retry, 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    return 1
+	if ($canceled);
 
     #
     # Look for any nodes in RES_TEARDOWN. These need to be released,
@@ -804,6 +806,11 @@ sub doSwapin($) {
 	}
     }
 
+    # Check cancel flag before continuing. No retry, 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    return 1
+	if ($canceled);
+
     #
     # These things need to get started before the nodes come up, so we'll
     # do them before the os_setup. Everything else can done in parallel with
@@ -828,6 +835,10 @@ sub doSwapin($) {
     }
     TBDebugTimeStamp("named finished");
 
+    # Check cancel flag before continuing. No retry, 
+    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    return 1
+	if ($canceled);
 
     #
     # If user specified -reboot to update,

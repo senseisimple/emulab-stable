@@ -477,19 +477,19 @@ function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
 
 
 # Usage: TBExptGroup($pid, $eid, &$gid)
-#	 returns 0 if expt doesn't exist.
+#	 returns 0 if expt does not exist.
 #        returns 1 if expt exists.
 function TBExptGroup($pid, $eid, &$gid)
 {
-  $query_result =
-    DBQueryFatal("SELECT gid FROM experiments WHERE ".
-		 "eid='$eid' and pid='$pid'");
-  if (mysql_num_rows($query_result) == 0) {
-    return 0;
-  }
-  $row  = mysql_fetch_array($query_result);
-  $gid  = $row[gid];
-  return 1;
+    $query_result =
+	DBQueryFatal("SELECT gid FROM experiments WHERE ".
+		     "eid='$eid' and pid='$pid'");
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row  = mysql_fetch_array($query_result);
+    $gid  = $row[gid];
+    return 1;
 }
 
 #

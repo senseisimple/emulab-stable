@@ -68,8 +68,9 @@ use Exporter;
 
 	 BATCHSTATE_POSTED BATCHSTATE_RUNNING BATCHSTATE_TERMINATING
 	 BATCHSTATE_ACTIVATING BATCHSTATE_PAUSED
+	 BATCHSTATE_RUNNING_LOCKED BATCHSTATE_MODIFYING
 	 BATCHMODE_CANCELTERM BATCHMODE_CANCELSWAP BATCHMODE_CANCELCLEAR
-	 TBBatchState TBSetBatchState TBSetBatchCancelFlag
+	 TBBatchState TBSetBatchState TBSetBatchCancelFlag TBGetBatchCancelFlag
 
 	 TB_NODELOGTYPE_MISC TB_NODELOGTYPES TB_DEFAULT_NODELOGTYPE 
 
@@ -285,6 +286,7 @@ sub NODEFAILMODE_FATAL()	{ "fatal"; }
 sub NODEFAILMODE_NONFATAL()	{ "nonfatal"; }
 sub NODEFAILMODE_IGNORE()	{ "ignore"; }
 
+# These are really "sub" states.
 sub EXPTSTATE_NEW()		{ "new"; }
 sub EXPTSTATE_PRERUN()		{ "prerunning"; }
 sub EXPTSTATE_SWAPPED()		{ "swapped"; }
@@ -294,11 +296,13 @@ sub EXPTSTATE_ACTIVE()		{ "active"; }
 sub EXPTSTATE_TESTING()		{ "testing"; }
 sub EXPTSTATE_TERMINATING()	{ "terminating"; }
 sub EXPTSTATE_TERMINATED()	{ "ended"; }
-sub EXPTSTATE_UPDATING()	{ "updating"; }
 
+# These are really experiment states (both batch *and* plain).
 sub BATCHSTATE_POSTED()		{ "posted"; }
 sub BATCHSTATE_ACTIVATING()	{ "activating"; }
 sub BATCHSTATE_RUNNING()	{ "active"; }
+sub BATCHSTATE_RUNNING_LOCKED()	{ "active_locked"; }
+sub BATCHSTATE_MODIFYING()	{ "modifying"; }
 sub BATCHSTATE_PAUSED()		{ "paused"; }
 sub BATCHSTATE_TERMINATING()	{ "terminating"; }
 # Cancel flags
@@ -1276,18 +1280,19 @@ sub TBSetExpSwapTime($$)
 }
 
 #
-# Lock Experiment.
+# Lock Experiment. Can also provide an optional new state.
 #
-# usage: TBLockExp(char *pid, char *eid)
+# usage: TBLockExp(char *pid, char *eid, char *newstate)
 #        returns 1 if okay.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub TBLockExp($$)
+sub TBLockExp($$;$)
 {
-    my($pid, $eid) = @_;
+    my($pid, $eid, $newstate) = @_;
 
     my $query_result =
 	DBQueryWarn("update experiments set expt_locked=now() ".
+		    (defined($newstate) ? ",batchstate='$newstate' " : "") .
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1298,18 +1303,18 @@ sub TBLockExp($$)
 }
 
 #
-# Test if Experiment is locked
+# Test if Experiment is locked. Can provide optional pointer to return state.
 #
-# usage: TBExpLocked(char *pid, char *eid)
+# usage: TBExpLocked(char *pid, char *eid, char **state)
 #        returns 1 if locked.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub TBExpLocked($$)
+sub TBExpLocked($$;$)
 {
-    my($pid, $eid) = @_;
+    my($pid, $eid, $curstate) = @_;
 
     my $query_result =
-	DBQueryWarn("select expt_locked from experiments ".
+	DBQueryWarn("select expt_locked,batchstate from experiments ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1317,25 +1322,28 @@ sub TBExpLocked($$)
 	return 0;
     }
     my @row = $query_result->fetchrow_array();
-    if (! defined($row[0])) {
-	return 0;
-    }
+
+    $$curstate = $row[1]
+	if (defined($curstate));
+    return 0
+	if (! defined($row[0]));
     return 1;
 }
 
 #
-# UnLock Experiment.
+# UnLock Experiment. Can also provide an optional new state.
 #
-# usage: TBUnLockExp(char *pid, char *eid)
+# usage: TBUnLockExp(char *pid, char *eid, char *newstate)
 #        returns 1 if okay.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub TBUnLockExp($$)
+sub TBUnLockExp($$;$)
 {
-    my($pid, $eid) = @_;
+    my($pid, $eid, $newstate) = @_;
 
     my $query_result =
 	DBQueryWarn("update experiments set expt_locked=NULL ".
+		    (defined($newstate) ? ",batchstate='$newstate' " : "") .
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1410,6 +1418,29 @@ sub TBSetBatchCancelFlag($$$)
 	$query_result->numrows == 0) {
 	return 0;
     }
+    return 1;
+}
+
+#
+# Get BatchMode cancel flag,
+#
+# usage: GetBatchCancel(char *pid, char *eid, char **flag)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBGetBatchCancelFlag($$$)
+{
+    my($pid, $eid, $flag) = @_;
+
+    my $query_result =
+	DBQueryWarn("select canceled from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    ($$flag) = $query_result->fetchrow_array();
     return 1;
 }
 

@@ -58,7 +58,7 @@ if ($speclocal) {
     # for the file before going to ground, so the user will get immediate
     # feedback if the filename is bogus.
     #
-    # Do not allow anything outside of /users or /proj. I don't think there
+    # Do not allow anything outside of /users or /proj. I do not think there
     # is a security worry, but good to enforce it anyway.
     #
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
@@ -84,33 +84,36 @@ else {
     $nonsfile = 0;
 }
 
-#
-# Run the script. We use a script wrapper to deal with changing
-# to the proper directory and to keep most of these details out
-# of this.
-#
-$output = array();
-$retval = 0;
-
-$result =
-    exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webnscheck $nsfile", $output,
-	    $retval);
-
 echo "<center>";
-echo "<h1>Syntax Check Results</h1>";
+echo "<h2>Starting Syntax Check. Please wait a moment ...</h2>";
 echo "</center>\n";
+flush();
 
+#
+# Run the script. 
+#
+$retval = SUEXEC($uid, "nobody", "webnscheck $nsfile",
+		 SUEXEC_ACTION_IGNORE);
+
+#
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+    #
+    # Never returns ...
+    #
+    die("");
+}
+
+# Parse Error.	 
 if ($retval) {
     echo "<br><br><h2>
           Parse Failure($retval): Output as follows:
           </h2>
           <br>
-          <XMP>\n";
-          for ($i = 0; $i < count($output); $i++) {
-              echo "$output[$i]\n";
-          }
-    echo "</XMP>\n";
-    
+          <XMP>$suexec_output</XMP>\n";
     PAGEFOOTER();
     die("");
 }

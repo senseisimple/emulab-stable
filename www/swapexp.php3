@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Only known and logged in users can end experiments.
@@ -27,8 +28,9 @@ if (!isset($eid) ||
 
 if (!isset($inout) ||
     (strcmp($inout, "in") && strcmp($inout, "out") &&
-     strcmp($inout, "pause") && strcmp($inout, "restart"))) {
-    USERERROR("The argument must be either in, out, or restart!", 1);
+     strcmp($inout, "pause") && strcmp($inout, "restart") &&
+     strcmp($inout, "instop"))) {
+    USERERROR("Improper inout argument!", 1);
 }
 
 # Canceled operation redirects back to showexp page. See below.
@@ -84,19 +86,6 @@ $idleswap_time = $row[idleswap_timeout];
 $idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
 
 #
-# Look for transition in progress and exit with error. 
-#
-$expt_locked = $row[expt_locked];
-if ($expt_locked) {
-    USERERROR("It appears that experiment $exp_eid went into transition at ".
-	      "$expt_locked.<br>".
-	      "You must wait until the experiment is no longer in transition.".
-	      "<br><br>".
-	      "When the transition has completed, a notification will be ".
-	      "sent via email to the user that initiated it.", 1);
-}
-
-#
 # Verify permissions.
 #
 if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
@@ -118,12 +107,16 @@ elseif (!strcmp($inout, "out")) {
 }
 elseif (!strcmp($inout, "pause")) {
     if (!$isbatch)
-	USERERROR("Only batch experiments can be 'paused!'", 1);
-    $action = "pause";
+	USERERROR("Only batch experiments can be dequeued!", 1);
+    $action = "Dequeue";
 }
 elseif (!strcmp($inout, "restart")) {
     $action = "restart";
 }
+
+echo "<font size=+2>Experiment <b>".
+     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 
 #
 # We run this twice. The first time we are checking for a confirmation
@@ -137,13 +130,11 @@ if (!$confirmed) {
     if ($force) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
-    echo "$action ";
-    if ($isbatch) {
-	echo "batch mode ";
-    }
-    echo "experiment '$exp_eid?'
+    echo "$action experiment '$exp_eid?'
           </h2>\n";
     
+    SHOWEXP($exp_pid, $exp_eid, 1);
+
     echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
                 method=post>";
 
@@ -197,11 +188,6 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
-echo "<br><br>\n";
-
 #
 # We run a wrapper script that does all the work of terminating the
 # experiment. 
@@ -225,38 +211,35 @@ set_time_limit(0);
 
 # Args for idleswap It passes them on to swapexp, or if it is just a
 # plain force swap, it passes -f for us.
-$args = "";
-if     ($idleswap) { $args = "-i"; }
-elseif ($autoswap) { $args = "-a"; }
+$args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
-$output = array();
-$retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       ($force ?
-		"webidleswap $args $exp_pid $exp_eid" :
-		"webswapexp -s $inout $exp_pid $exp_eid"),
- 	       $output, $retval);
+$retval = SUEXEC($uid, $unix_gid,
+		 ($force ?
+		  "webidleswap $args $exp_pid $exp_eid" :
+		  "webswapexp -s $inout $exp_pid $exp_eid"),
+		 SUEXEC_ACTION_IGNORE);
 
-if ($retval) {
-    echo "<br><br><h2>
-          State change failure($retval): Output as follows:
-          </h2>
-          <br>
-          <XMP>\n";
-          for ($i = 0; $i < count($output); $i++) {
-              echo "$output[$i]\n";
-          }
-    echo "</XMP>\n";
-
-    PAGEFOOTER();
+#
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+    #
+    # Never returns ...
+    #
     die("");
 }
 
 #
 # Exit status 0 means the experiment is swapping, or will be.
 #
-echo "<br><font size=+1>\n";
-if ($retval == 0) {
+echo "<br>\n";
+if ($retval) {
+    echo "<h3>Experiment $action could not proceed</h3>";
+    echo "<blockquote><pre>$suexec_output<pre></blockquote>";
+}
+else {
     if ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
 	    echo "Batch Mode experiments will be run when enough resources
@@ -267,6 +250,7 @@ if ($retval == 0) {
                   and when the last attempt was.\n";
 	}
 	elseif (strcmp($inout, "out") == 0) {
+
 	    echo "Batch mode experiments take a few moments to stop. Once
                   it does, the experiment will enter the 'paused' state.
                   You can requeue the batch experiment at that time.\n";
@@ -277,7 +261,7 @@ if ($retval == 0) {
                   please contact $TBMAILADDR.\n";
 	}
 	elseif (strcmp($inout, "pause") == 0) {
-	    echo "Your experiment has been paused. You may requeue your
+	    echo "Your experiment has been dequeued. You may requeue your
 		  experiment at any time.\n";
 	}
     }
@@ -300,7 +284,6 @@ if ($retval == 0) {
                 realtime</a>.\n";
     }
 }
-echo "</font>\n";
 
 #
 # Standard Testbed Footer

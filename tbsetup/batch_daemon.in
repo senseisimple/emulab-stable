@@ -119,7 +119,7 @@ if (! $debug) {
 # 
 while (1) {
     my($count, $i, $query_result, $pending_result, $running_result);
-    my(%row, %pending_row);
+    my(%pending_row);
     my $retry_wait = TBGetSiteVar("batch/retry_wait");
 
     # Do not allow zero!
@@ -159,8 +159,8 @@ while (1) {
 		    " e2.batchmode=1 and e2.batchstate='$BSTATE_RUNNING' and ".
 		    " e1.pid=e2.pid and e1.eid!=e2.eid ".
 		    "WHERE e2.eid is null and ".
-		    " e1.expt_head_uid!='stoller' and ".
 		    " e1.batchmode=1 and e1.canceled=0 and ".
+		    " e1.expt_locked is null and ".
 		    " e1.batchstate='$BSTATE_POSTED' and ".
 		    "  (e1.attempts=0 or ".
 		    "    ((UNIX_TIMESTAMP() - ".
@@ -170,8 +170,7 @@ while (1) {
     $running_result =
 	DBQuery("select * from experiments ".
 		"where batchmode=1 and batchstate='$BSTATE_RUNNING' ".
-		" and expt_head_uid!='stoller' ".
-		"ORDER BY expt_start");
+		"ORDER BY expt_start LIMIT 1");
 
     if (!$pending_result || !$running_result) {
 	print "DB Error getting batch info. Waiting a bit ...\n";
@@ -207,7 +206,6 @@ while (1) {
 	    goto pause;
 	}
     }
-    DBQueryWarn("unlock tables");
 
     #
     # Okay, first we check the status of running batch mode experiments
@@ -220,22 +218,64 @@ while (1) {
     # loop instead of in the child that started the experiment, its so that
     # we fire up again and look for them in the event that paper goes down.
     #
-    while (%row = $running_result->fetchhash()) {
-	my $canceled = $row{'canceled'};
+    if ($running_result->numrows) {
+	my %running_row = $running_result->fetchhash();
+	my $canceled    = $running_row{'canceled'};
+	
 	if ($canceled) {
+	    # Local vars!
+	    my $eid = $running_row{'eid'};
+	    my $pid = $running_row{'pid'};
+
+	    #
+	    # Have to set the state to busy so that no one will be able
+	    # to mess with the experiment while we deal with termination.
+	    # 
+	    TBSetBatchState($pid, $eid, BATCHSTATE_RUNNING_LOCKED());
+	    DBQueryWarn("unlock tables");
+	    
 	    # Look at the cancel flag.
 	    if ($canceled == BATCHMODE_CANCELTERM) {
-		dosomething("cancel", %row);
+		dosomething("cancel", %running_row);
 	    }
 	    elsif ($canceled == BATCHMODE_CANCELSWAP) {
-		dosomething("swap", %row);
+		dosomething("swap", %running_row);
 	    }
-	    next;
+	    else {
+		print "Improper cancel flag: $canceled\n";
+	    }
 	}
-	if (isexpdone(%row)) {
-	    dosomething("swap", %row);
-	    next;
+	else {
+	    #
+	    # Have to set the state to busy so that no one will be able
+	    # to mess with the experiment while trying to determine if
+	    # the batch is done.
+	    # 
+	    TBSetBatchState($pid, $eid, BATCHSTATE_RUNNING_LOCKED());
+	    DBQueryWarn("unlock tables");
+
+	    if (isexpdone(%running_row)) {
+		#
+		# Terminate the experiment. Set the state appropriately
+		# so that swapexp will accept it. It is okay to do this
+		# with the table unlocked since no one is allowed to mess
+		# with a batch experiment in the RUNNING_LOCKED state. 
+		# 
+		dosomething("swap", %running_row);
+	    }
+	    else {
+		#
+		# Reset the state to RUNNING. It is okay to do this with
+		# the table unlocked since no one is allowed to mess
+		# with a batch experiment in the RUNNING_LOCKED state.
+		# 
+		TBSetBatchState($pid, $eid, $BSTATE_RUNNING);
+	    }
 	}
+    }
+    else {
+	# no one above unlocked the tables ...
+	DBQueryWarn("unlock tables");
     }
 
     #
@@ -245,7 +285,7 @@ while (1) {
 	dosomething("start", %pending_row);
     }
   pause:
-    sleep(30);
+    sleep(15);
 }
 
 #
@@ -344,7 +384,7 @@ sub dosomething($$)
 	swapexp(%exphash);
     }
     elsif ($dowhat eq "cancel") {
-	cancelexp(1, %exphash);
+	cancelexp(%exphash);
     }
     exit(0);
 }
@@ -378,14 +418,28 @@ sub startexp($)
 		    "where eid='$eid' and pid='$pid'");
 
     if ($query_result) {
-	@row = $query_result->fetchrow_array();
+	my ($canceled) = $query_result->fetchrow_array();
+	$exphash{'canceled'} = $canceled;
 
-	if ($row[0]) {
-	    cancelexp($running);
+	# Yuck: This is strictly for the benefit of swapexp() below.
+	$exphash{'batchstate'} = BATCHSTATE_RUNNING
+	    if ($running);
+	
+	if ($canceled) {
+	    # Look at the cancel flag.
+	    if ($canceled == BATCHMODE_CANCELTERM) {
+		cancelexp(%exphash);
+	    }
+	    elsif ($canceled == BATCHMODE_CANCELSWAP) {
+		swapexp(%exphash);
+	    }
+	    else {
+		print "Improper cancel flag: $canceled\n";
+	    }
 	    #
 	    # Never returns, but just to be safe ...
 	    #
-	    exit(0);
+	    exit(-1);
 	}
     }
 
@@ -406,15 +460,18 @@ sub startexp($)
 			"where eid='$eid' and pid='$pid'");
 
 	#
-	# The exit value is important. If its -1 or 1, thats bad. Kill the
-	# batch off. Anything else implies an assign violation that is
-	# (hopefully) transient. We leave it up the user to kill cancel the
-	# batch if it looks like its never going to work.
+	# The exit value is important. If its -1 or 1, thats bad. Anything
+	# else implies an assign violation that is (hopefully) transient.
+	# We leave it up the user to kill the batch if it looks like its
+	# never going to work.
 	#
 	if ($exit_status == 1 || $exit_status == -1) {
+	    TBSetBatchState($pid, $eid, $BSTATE_PAUSED);
+	    TBUnLockExp($pid, $eid);
+	    
 	    email_status("Experiment startup has failed with a fatal error!\n".
-			 "Batch has been removed from the system.");
-	    TBExptDestroy($pid, $eid);
+			 "Batch has been dequeued so that you may check it.");
+
 	    exit($exit_status);
 	}
 	
@@ -440,8 +497,8 @@ sub startexp($)
 	# There is some state that needs to be reset so that another
 	# attempt can be made.
 	# 
-	SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	TBSetBatchState($pid, $eid, $BSTATE_POSTED);
+	TBUnLockExp($pid, $eid);
 	    
 	exit($exit_status);
     }
@@ -450,6 +507,7 @@ sub startexp($)
     # Well, it configured! Lets set it state to running.
     #
     TBSetBatchState($pid, $eid, $BSTATE_RUNNING);
+    TBUnLockExp($pid, $eid);
     
     email_status("Batch Mode experiment $pid/$eid is now running!\n".
 		 "Please consult the Web interface to see how it is doing.");
@@ -463,22 +521,26 @@ sub startexp($)
 #
 # A batch has completed. Swap it out. 
 #
-sub swapexp($)
+sub swapexp($;$)
 {
     my(%exphash)  = @_;
     my $canceled  = $exphash{'canceled'};
+    my $running   = ($exphash{'batchstate'} eq BATCHSTATE_RUNNING);
 
-    #
-    # Have to set the state to terminating or else swapexp will not accept it.
-    # 
-    TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
-    
-    system("$swapexp -b -s out $pid $eid");
-    if ($?) {
+    if ($running) {
 	#
-	# TB admin is going to have to clean up. 
+	# Have to set the state to terminating so that swap/end exp
+	# will accept it.
 	# 
-	fatal("Swapping out Batch Mode experiment $pid/$eid");
+	TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
+	
+	system("$swapexp -b -s out $pid $eid");
+	if ($?) {
+	    #
+	    # TB admin is going to have to clean up. 
+	    # 
+	    fatal("Swapping out Batch Mode experiment $pid/$eid");
+	}
     }
     #
     # Set the state to paused to ensure that it is not run again until
@@ -486,6 +548,7 @@ sub swapexp($)
     # 
     TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
     TBSetBatchState($pid, $eid, $BSTATE_PAUSED);
+    TBUnLockExp($pid, $eid);
     
     if ($canceled) {
 	email_status("Batch Mode experiment $pid/$eid has been stopped!");
@@ -503,13 +566,19 @@ sub swapexp($)
 #
 # Cancel an experiment. Never returns.
 #
-sub cancelexp($$)
+sub cancelexp($)
 {
-    my($running) = shift;
     my(%exphash) = @_;
     
+    #
+    # Have to set the state to terminating so that swap/end exp will accept it.
+    # 
     TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
-    
+
+    #
+    # It does not matter if the experiment is running; endexp does the
+    # right thing.
+    # 
     system("$endexp -b $pid $eid");
     if ($?) {
 	#
