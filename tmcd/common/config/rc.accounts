@@ -567,7 +567,7 @@ sub docleanup()
 # Generate ssh authorized_keys files. Either protocol 1 or 2.
 # Returns 0 on success, -1 on failure.
 #
-sub TBNewsshKeyfile($$$$$)
+sub TBNewsshKeyfile($$$$@)
 {
     my ($sshdir, $uid, $gid, $protocol, @pkeys) = @_;
     my $keyfile = "$sshdir/authorized_keys";
