@@ -245,13 +245,18 @@ main(int argc, char **argv)
 				*bp = toupper(*bp);
 				bp++;
 			}
-			if (*bp != '=')
-				fatal("Malformed argument: %s!", *argv);
-			if (*(bp-1) == '_')
+			if (*bp != '=') {
+			    /* Tcl strings are sent in an NSEEVENT. We
+			     * will allow arbitrary strings
+			     */
+			    sprintf(&buf[strlen(buf)], "%s", *argv);
+			} else {
+			    if (*(bp-1) == '_')
 				*(bp-1) = (char) NULL;
-			*bp++ = (char) NULL;
+			    *bp++ = (char) NULL;
 
-			sprintf(&buf[strlen(buf)], "%s=%s ", *argv, bp);
+			    sprintf(&buf[strlen(buf)], "%s=%s ", *argv, bp);
+			}
 			argc--;
 			argv++;
 		}
