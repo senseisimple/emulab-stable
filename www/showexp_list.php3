@@ -503,6 +503,12 @@ if ($thumb && !$idle) {
 	    $swappable= $row["swappable"];
 	    $swapreq=$row["swap_requests"];
 	    $lastswapreq=$row["lastreq"];
+	    if ($lastswapreq > $idletime) {
+		# My last request was from _before_ it was idle this time
+		mysql_query("update experiments set swap_requests='' ".
+			    "where pid='$pid' and eid='$eid'");
+		$swapreq=0;
+	    }
 	    $lastlogin = "<td>";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
