@@ -124,14 +124,30 @@ sub read_schema($) {
 	    # If we are in a table creation statement, we need to find out
 	    # what this line is trying to do...
 	    #
-	    if (/^\s*PRIMARY KEY\s*\((.+)\),?$/) {
+
+	    #
+	    # Fist, some cases of things we don't handle yet. None of these
+	    # are used by the testbed software yet, but we should support
+	    # them someday for completeness. For now, we have check for them
+	    # so that we don't accidentally treat them as columns
+	    #
+	    if (/^\s*.*\s+FOREIGN KEY\s+/) {
+		die "Found a FOREIGN KEY line, which we don't handle yet\n";
+	    } elsif (/^\s*CHECK\s*\((.+)\),?$/) {
+		die "Found a CHECK line, which we don't handle yet\n";
+	    } elsif (/^\s*UNIQUE (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+		die "Found a UNIQUE (INDEX) line, which we don't handle yet\n";
+	    } elsif (/^\s*FULLTEXT (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+		die "Found a FULLTEXT (INDEX) line, which we don't handle yet\n";
+
+	    } elsif (/^\s*PRIMARY KEY\s*\((.+)\),?$/) {
 
 		# A primary key
 		my $key = $1;
 		debug("Putting primary key $key in table $table_name\n");
 		$tables{$table_name}{PRIMARY}{$key} = 1;
 
-	    } elsif (/^\s*(KEY|INDEX)\s*(\w+)?\s*\((.+[^,])\),?$/) {
+	    } elsif (/^\s*(KEY|INDEX)\s+(\w+)?\s+\((.+[^,])\),?$/) {
 
 		# A key/index (synonmyms)
 		my ($name, $key) = ($2, $3);
