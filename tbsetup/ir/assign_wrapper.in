@@ -405,7 +405,7 @@ foreach $link (keys(%links)) {
 
 # TOP file
 # It's time to write out the top file.
-$topfile = "/tmp/$$.top";
+$topfile = "$$.top";
 open(TOPFILE,"> $topfile") || do {
     print STDERR "Could not open $topfile.";
     exit(1);
@@ -520,8 +520,15 @@ while ($run <= $maxrun) {
 	      print "Found garbage: $line\n";
 	  }
 	}
+    } else {
+	# spit out up to nodes
+	print "ASSIGN FAILED:\n";
+	while (<ASSIGNFP>) {
+	    if (/^Nodes:/) {last;}
+	    print "$_";
+	}
     }
-    
+
     while (<ASSIGNFP>) { } # Read anything left in the pipe before closing
 
     close(ASSIGNFP);
