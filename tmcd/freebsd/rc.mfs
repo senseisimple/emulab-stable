@@ -87,8 +87,8 @@ sub doboot()
     print("Doing Testbed Setup on an MFS\n");
 
     print("Informing Emulab Control that we have rebooted\n");
-    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
-	fatal("Error sending TBSETUP to Emulab Control!");
+    if (tmcc(TMCCCMD_STATE, "MFSSETUP") < 0) {
+	fatal("Error sending MFSSETUP to Emulab Control!");
     }
 
     if (-x "$RCDIR/rc.ipod") {
