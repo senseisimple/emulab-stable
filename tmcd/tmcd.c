@@ -303,6 +303,7 @@ char *usagestr =
  " -p portnum	   Specify a port number to listen on\n"
  " -c num	   Specify number of servers (must be %d <= x <= %d)\n"
  " -v              More verbose logging\n"
+ " -i ipaddr       Sets the boss IP addr to return (for multi-homed servers)\n"
  "\n";
 
 void
@@ -349,7 +350,7 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	extern char		build_info[];
 
-	while ((ch = getopt(argc, argv, "dp:c:Xv")) != -1)
+	while ((ch = getopt(argc, argv, "dp:c:Xvi:")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
@@ -365,6 +366,13 @@ main(int argc, char **argv)
 			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'i':
+			if (inet_aton(optarg, &myipaddr) == 0) {
+				fprintf(stderr, "invalid IP address %s\n",
+					optarg);
+				usage();
+			}
 			break;
 		case 'h':
 		case '?':
@@ -424,17 +432,20 @@ main(int argc, char **argv)
 	/*
 	 * Grab our IP for security check below.
 	 */
+	if (myipaddr.s_addr == 0) {
 #ifdef	LBS
-	strcpy(buf, BOSSNODE);
+		strcpy(buf, BOSSNODE);
 #else
-	if (gethostname(buf, sizeof(buf)) < 0)
-		pfatal("getting hostname");
+		if (gethostname(buf, sizeof(buf)) < 0)
+			pfatal("getting hostname");
 #endif
-	if ((he = gethostbyname(buf)) == NULL) {
-		error("Could not get IP (%s) - %s\n", buf, hstrerror(h_errno));
-		exit(1);
+		if ((he = gethostbyname(buf)) == NULL) {
+			error("Could not get IP (%s) - %s\n",
+			      buf, hstrerror(h_errno));
+			exit(1);
+		}
+		memcpy((char *)&myipaddr, he->h_addr, he->h_length);
 	}
-	memcpy((char *)&myipaddr, he->h_addr, he->h_length);
 
 	/*
 	 * If we were given a port on the command line, don't open the 
