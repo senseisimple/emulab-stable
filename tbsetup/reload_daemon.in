@@ -1,0 +1,231 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Look for nodes to reload.
+#
+#	usage: reload_daemon [-d]
+#
+# XXX - Hardwired to type "pc".
+#       Path to image and the partition are hardwired in.
+#
+# TODO: Use "logger" instead of writing a log file.
+#
+sub usage()
+{
+    print STDOUT "Usage: reload_daemon [-d]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my  $optlist = "d";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $DBNAME   = "@TBDBNAME@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+my $TYPE     = "pc";
+my $reloader = "$TB/sbin/sched_reload";
+my $IMAGE    = "/usr/testbed/images/wd0-all.ndz";
+my $PART     = 0;
+my $logfile  = "$TB/log/reloadlog";
+my $debug    = 0;
+
+#
+# Turn off line buffering on output (dots ...).
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+
+# Go to ground.
+if (! $debug) {
+    daemonize();
+}
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# Loop, looking for nodes to reload.
+# 
+while (1) {
+    my($count, $which, @row, $osid, $node);
+    
+    #
+    # Find all of the free node that have not been reloaded (no pid entry
+    # in last_reservation, which is reset anytime a node is reloaded by
+    # the system).
+    #
+    $query_result =
+	DBquery("select a.node_id from nodes as a ".
+		"left join reserved as b on a.node_id=b.node_id ".
+		"left join last_reservation as l on l.node_id=a.node_id ".
+		"where b.node_id is null and a.type='$TYPE' and l.pid!='' ".
+		"order by a.node_id");
+    if (! $query_result) {
+	print "DB Error getting free nodes. Waiting a bit.\n";
+	sleep(10);
+	next;
+    }
+    $count = $query_result->numrows;
+
+    if (! $count) {
+	sleep(10);
+	next;
+    }
+
+    #
+    # RAND() does not work in our version of mysql, so generate a random
+    # number with perl and pick out that node.
+    #
+    $which = int(rand($count));
+    $query_result->dataseek($which);
+    @row  = $query_result->fetchrow_array();
+    $node = $row[0];
+
+    #
+    # Query for the default OSID. I do this each time through the loop
+    # in case it gets changed in the DB.
+    #
+    $query_result =
+	DBquery("select image_id from node_types where type='$TYPE'");
+    
+    if (! $query_result) {
+	print "DB Error getting node type. Waiting a bit.\n";
+	sleep(10);
+	next;
+    }
+    @row  = $query_result->fetchrow_array();
+    $osid = $row[0];
+    
+    print "Trying to reload $node ...\n";
+    
+    #
+    # Call sched_reload with the "force" option, which says that if
+    # sched_reload cannot reserve the node (cause someone just got it)
+    # then don't schedule a reload for later. Just fail outright.
+    # We will try again in a bit.
+    #
+    if (system("$reloader -f $osid $PART $IMAGE $node")) {
+	#
+	# Could not get it. Wait and go around again.
+	#
+	print "Could not start a reload on $node. Waiting a bit.\n";
+	sleep(10);
+	next;
+    }
+    print "Reload of $node has started.\n";
+
+    #
+    # Reload was started. We want to wait until its finished.
+    #
+    $count = 0;
+    while ($count < 200) {
+	$query_result =
+	    DBquery("select pid,eid from reserved where node_id='$node'");
+	if (! $query_result) {
+	    print "DB Error getting reservation for $node. Waiting a bit\n";
+	    sleep(10);
+	    next;
+	}
+	if (! $query_result->numrows) {
+	    print "\nReload of $node appears to have finished.\n";
+	    last;
+	}
+	#
+	# Make sure its still in the "reloading" experiment. Its possible
+	# (although unlikely) that the node will get freed up by the TMCD
+	# when it reboots, and then reallocated to another experiment,
+	# before we get back here to check.
+	#
+	# XXX "testbed/reloading" wired in. 
+	#
+	@row  = $query_result->fetchrow_array();
+	if ($row[0] ne "testbed" || $row[1] ne "reloading") {
+	    print "\nReload of $node has finished.\n";
+	    last;
+	}
+	print ".";
+	$count++;
+	sleep(5);
+    }
+    if ($count == 200) {
+	fatal("$node appears to have wedged. Stopping reload daemon.");
+    }
+    sleep(30);
+}
+
+sub DBquery($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = $DB->query($query);
+
+    if (! $result) {
+	print "DB Query failed: $query\n";
+    }
+
+    return $result;
+}
+
+sub fatal {
+    local($msg) = $_[0];
+
+    system("echo \"$msg\" | /usr/bin/mail ".
+	   "-s 'TESTBED: Reload Daemon Died' $TBOPS");
+    die($msg);
+}
+
+#
+# Become a daemon.
+# 
+sub daemonize()
+{
+    my $mypid = fork();
+    if ($mypid) {
+	exit(0);
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller will continue to wait
+    # even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    #
+    # Open the batch log and start writing to it. 
+    #
+    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
+    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
+
+    return 0;
+}
