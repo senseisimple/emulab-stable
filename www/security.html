@@ -44,14 +44,21 @@ nodes.
 
 <h3>Firewalling</h3>
 
-Emulab blocks all of the <i>low numbered</i> ports (ports below 1024),
-with the exception of port 22 (Secure Shell). This is for the
-protection of experimentors, as well as to ensure that an errant
-application cannot become the source of a Denial of Service attack to
-sites outside of Emulab. If your application requires external access
-to other low numbered ports, please contact us to make special
-arrangements.
+<p>
+Emulab blocks all of the <i>low numbered</i> ports (ports below 1024), with the
+exception of ports 20 and 21 (FTP), 22 (Secure Shell), and 80 (HTTP). This is
+for the protection of experimentors, as well as to ensure that an errant
+application cannot become the source of a Denial of Service attack to sites
+outside of Emulab. If your application requires external access to other low
+numbered ports, please contact us to make special arrangements.
 
+<p>
+Emulab also prevents machines from using IP and MAC addresses other than their
+own on the control net. The control net router blocks all traffic not
+originating from the proper subnet, both to prevent IP spoofing and to prevent
+experimental traffic from accidentally making it to the 'real world' (say,
+through routing misconfiguration.) These restrictions are not present on the
+experimental net.
 
 <h3>Accounts</h3>
 
