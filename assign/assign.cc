@@ -455,7 +455,7 @@ void del_node_handler(GraphWin& gw)        { display_scc(gw); }
 
 void usage() {
 	fprintf(stderr,
-		"usage:  ann [-h] [-ao] [-s <switches>] [-n nodes/switch] [-c cap]\n"
+		"usage:  assign [-h] [-ao] [-s <switches>] [-n nodes/switch] [-c cap] [file]\n"
 		"           -h ...... brief help listing\n"
 		"           -s #  ... number of switches in cluster\n"
 		"           -n #  ... number of nodes per switch\n"
@@ -513,7 +513,10 @@ int main(int argc, char **argv)
 	if (argc == 1) {
 		ifstream infile;
 		infile.open(argv[0]);
-		/* XXX:  Check my return value, please */
+		if (!infile) {
+		  cerr << "Error opening file: " << argv[0] << "\n";
+		  exit(1);
+		}
 		parse_top(G, infile);
 		gw.update_graph();
 		node n;
