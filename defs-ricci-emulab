@@ -1,7 +1,7 @@
 #
 # This is the definitions file for Mac on Emulab.Net.
 #
-TBDBNAME=tbdb
+TBDBNAME=tbdb_ricci
 WWWDEFS=ricci-emulab
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu

@@ -1,17 +1,40 @@
 #!/usr/bin/perl -w
-use Mysql;
 use Getopt::Long;
+
+#
+# dhcpd_makeconf - helper script to create dhcpd.conf files from the database.
+# The template file should look like an ordinary dhcpd.conf file, but have
+# the string %%nodetype=<type> where you want entries for a set of nodes
+# filled out. For example:
+#
+# subnet 155.101.132.0 netmask 255.255.252.0 {
+#	option  routers                 155.101.132.1;
+#	option  domain-name-servers     155.101.128.70;
+#	option subnet-mask		255.255.252.0;
+#
+#	option dhcp-class-identifier "PXEClient";
+#
+#	# testbed PCs
+#	group {
+#		option dhcp-class-identifier "PXEClient";
+#
+#		%%nodetype=pc600
+#
+#		%%nodetype=pc850
+#
+#	}
+# }
+
 
 #
 # Configure variables
 #
-my $DBNAME  = "@TBDBNAME@";
+use lib "@prefix@/lib";
+use libdb;
 
 my %opt = ();
 GetOptions(\%opt,"h","v");
 if ($opt{h}) { exit &usage; }
-
-my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
 $infile = shift @ARGV; # || exit &usage;
 
@@ -24,15 +47,17 @@ while (<IF>) {
 		if ($opt{v}) {
 			$query .= ", r.vname ";
 		}
-		$query .= "FROM nodes AS n LEFT JOIN interfaces AS i ON n.node_id = i.node_id ";
-		$query .= "LEFT JOIN node_types AS t ON n.type = t.type ";
+		$query .= "FROM nodes AS n LEFT JOIN interfaces AS i ON ".
+		    " n.node_id = i.node_id LEFT JOIN node_types AS t " .
+		    " ON n.type = t.type ";
 		if ($opt{v}) {
 			$query .= "LEFT JOIN reserved AS r ON n.node_id = r.node_id ";
 		}
 		$query .= "WHERE n.type='$nodetype' AND i.card = t.control_net ";
 		$query .= "ORDER BY n.priority";
-		my $sth = $dbh->query($query);
-		while (@row = $sth->fetchrow) {
+
+		my $result = DBQueryFatal($query);
+		while (@row = $result->fetchrow) {
 			my $ip = $row[1];
 			my $mac = $row[2];
 			my $node_id;

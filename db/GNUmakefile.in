@@ -8,7 +8,7 @@ SUBDIR		= db
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= mac2if nalloc nfree nodeip
+BIN_SCRIPTS	= nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf
 LIBEXEC_SCRIPTS = 

@@ -1,20 +1,34 @@
 #!/usr/local/bin/perl -w
-use Mysql;
 use Getopt::Std;
 use strict;
 
+use lib "@prefix@/lib";
+use libdb;
+
+#
+# if2port - Given an interface (specified as node[:card]), find the
+# port on the switches that it's connected to. With the -v switch, gives
+# some human-readable information to help in following wires and diagnosing
+# problems.
+#
+
+#
 # IMPORTANT: This file contains some information specific to the Utah
 # Network Testbed! If you want to use it in another enviroment, change
-# the information below
+# the information below (%switches, %cards, %wires)
 
+#
 # Describes the location of each of the switches that nodes may be connected
 # to
+#
 my %switches = ( cisco1 => 'top right', cisco2 => 'bottom right',
 		 cisco3 => 'top left', cisco4 => 'bottom left');
 
+#
 # Description of the location of each chard on the back of a machine.
 # A hash, indexed by node type. Each value is an array reference, ordered
 # by the card order in the database 
+#
 my %cards = ( 'pc600' => [ 'second from left','third from left',
                           'second from right','rightmost','leftmost' ],
 	      'pc850' => [ 'left port of dual card', 'right port of dual card',
@@ -25,16 +39,11 @@ my %cards = ( 'pc600' => [ 'second from left','third from left',
 my %wires = ( Node => 'yellow', Control => 'red', Power => 'green',
 	Serial => 'white' );
 
-my ($node, $card);
-my $tbdb = "@TBDBNAME@";
-
 # Options: v = verbose, d = debug
 my %opt = ( v => 0, d => 0);
 
 getopts('vd',\%opt);
 
-my $dbh = Mysql->connect("localhost",$tbdb,"script","none");
-die "Unable to connect to database" unless $dbh;
 
 if (@ARGV < 1) {
 	exit &usage;
@@ -53,10 +62,11 @@ while (my $arg = shift @ARGV) {
 	}
 
 	&debug("Sending query $query\n");
-	my $sth = $dbh->query($query);
+
+	my $result = DBQueryFatal($query);
 
 	if ($opt{v}) {
-		while (my @row = $sth->fetchrow) {
+		while (my @row = $result->fetchrow) {
 			my $cardinfo = ${$cards{$row[8]}}[$row[1]];
 			my $switchinfo = $switches{$row[2]};
 			my $wireinfo = $wires{$row[7]};
@@ -65,11 +75,9 @@ while (my $arg = shift @ARGV) {
 				"$row[5] (length $row[6], color $wireinfo)\n";
 		}
 	} else {
-		print $sth->as_string;
+		print $result->as_string;
 	}
 }
-
-#print $sth->as_string();
 
 sub debug { warn @_,"\n" if $opt{d}; }
 
