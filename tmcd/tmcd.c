@@ -555,7 +555,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * I use this for testing. See below where I test redirect
 	 * if the verification fails. 
 	 */
-	if (redirect &&
+	if (!insecure && redirect &&
 	    redirect_client.sin_addr.s_addr != myipaddr.s_addr) {
 		char	buf1[32], buf2[32];
 		
@@ -940,7 +940,8 @@ COMMAND_PROTOTYPE(doaccounts)
 		res = mydb_query("select g.unix_name,g.unix_gid "
 				 "  from projects as p "
 				 "left join groups as g on p.pid=g.pid "
-				 "where FIND_IN_SET('%s',pcremote_ok)>0",
+				 "where p.approved!=0 and "
+				 "      FIND_IN_SET('%s',pcremote_ok)>0",
 				 2, nodetype);
 	}
 	if (!res) {
@@ -1047,7 +1048,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "left join groups as g on "
 				 "  g.pid=m.pid and g.gid=m.gid "
 				 "left join users as u on u.uid=m.uid "
-				 "where FIND_IN_SET('%s',pcremote_ok)>0 "
+				 "where p.approved!=0 "
+				 "      and FIND_IN_SET('%s',pcremote_ok)>0 "
 				 "      and m.trust!='none' "
 				 "      and u.status='active' "
 				 "order by u.uid",
