@@ -8,7 +8,6 @@ import libplab
 import xmlrpclib
 import time
 import socket
-import os
 
 TRIES = 3
 SLEEPINT = 5
@@ -22,9 +21,6 @@ def main(args):
     alloctries = TRIES
     setuptries = TRIES
 
-    # don't do line buffering.
-    sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
-    
     try:
         command, pid, eid, nodeid = libplab.handleArgs(args[1:])
     except getopt.GetoptError:

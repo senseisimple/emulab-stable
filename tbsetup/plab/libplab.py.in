@@ -21,6 +21,7 @@ import agent, agentproxy
 import nodemgr, nodemgrproxy
 import lease
 import string
+import traceback
 
 #
 # Constants
@@ -851,8 +852,9 @@ class Node:
                 print "Error: couldn't delete plab lease for " \
                       "vnode %s after %s tries." % (self.nodeid, FREETRIES)
                 print "Sending email"
-                exc_strs = format_exception(sys.exc_info())
-                tbstr = "".join(exc_strs)
+                einfo = sys.exc_info()
+                estrs = traceback.format_exception(einfo[0],einfo[1],einfo[2])
+                tbstr = "".join(estrs)
                 SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
                          "dslice %s" % (self.nodeid, self.slice.slicename),
                          "Sliver lease deletion failed:\n\n%s" % tbstr)
