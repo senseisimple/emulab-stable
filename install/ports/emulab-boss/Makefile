@@ -34,7 +34,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	rpm:${PORTSDIR}/archivers/rpm \
 	${LOCALBASE}/lib/tcl8.3/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
-	xvcg:${PORTSDIR}/graphics/vcg
+	xvcg:${PORTSDIR}/graphics/vcg \
+	tftp-hpa:${PORTSDIR}/misc/tftp-hpa
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
