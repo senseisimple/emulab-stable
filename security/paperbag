@@ -10,14 +10,42 @@
 # Turn off coredumps in ourself, and our children
 # Check to make sure only files/directories under user's $HOME can be
 #  passed as arguments, CD'ed to, etc
-# Some kind of readline support?
 
 # List of allowed commands - Mapping is from command entered by the user
 # to the actual binary to run
 $tb = "/usr/testbed/bin";
-%allowed = (	"nalloc" => "$tb/nalloc",
-		"nfree" => "$tb/nfree",
-		"avail" => "$tb/avail",
+%allowed = (	"avail"		=> "$tb/avail",
+		"delay_setup"	=> "$tb/delay_setup",
+		"genptop"	=> "$tb/genptop",
+		"ifc_filegen"	=> "$tb/ifc_filegen",
+		"ifc_setup"	=> "$tb/ifc_setup",
+		"inuse"		=> "$tb/inuse",
+		"ir2ifc"	=> "$tb/ir2ifc",
+		"mac2if"	=> "$tb/mac2if",
+		"mkacct"	=> "$tb/mkacct",
+		"nalloc"	=> "$tb/nalloc",
+		"nfree"		=> "$tb/nfree",
+		"nodeip"	=> "$tb/nodeip",
+		"ns"		=> "$tb/ns",
+		"oslib.tcl"	=> "$tb/oslib.tcl",
+		"power"		=> "$tb/power",
+		"ptopgen"	=> "$tb/ptopgen",
+		"resetvlans"	=> "$tb/resetvlans",
+		"rmacct"	=> "$tb/rmacct",
+		"savevlans"	=> "$tb/savevlans",
+		"showgraph"	=> "$tb/showgraph",
+		"snmpit"	=> "$tb/snmpit",
+		"tbdoit"	=> "$tb/tbdoit",
+		"tbend"		=> "$tb/tbend",
+		"tblog"		=> "$tb/tblog",
+		"tbprerun"	=> "$tb/tbprerun",
+		"tbreport"	=> "$tb/tbreport",
+		"tbrun"		=> "$tb/tbrun",
+		"tbstopit"	=> "$tb/tbstopit",
+		"trafgen"	=> "$tb/trafgen",
+		"turn"		=> "$tb/turn",
+		"vpower"	=> "$tb/vpower",
+		"vsnmpit"	=> "$tb/vsnmpit",
 # Here for testing - REMOVE LATER
 		"ls" => "/bin/ls");
 
@@ -35,7 +63,16 @@ ops.emulab.net\n";
 
 $debug = 1;
 $| = 1; # No line buffering, so that we can see the prompt
+$interactive = 1;
 
+if ($ARGV[0] eq "-c") { # We were called by sshd - transform args into a useful form
+	my $bigarg = pop @ARGV;
+	push(@ARGV,split(/\s+/,$bigarg));
+	shift @ARGV; # Dispose of -c
+	$interactive = 0;
+	&debug("New args are: " . join(",",@ARGV) . "\n");
+}
+	
 # Check for a leading dir= option, which tells us which directory to start from
 if (@ARGV && ($ARGV[0] =~ /dir=(.*)/)) {
 	shift @ARGV;
@@ -45,9 +82,9 @@ if (@ARGV && ($ARGV[0] =~ /dir=(.*)/)) {
 if (@ARGV) { # We were given command line arguments
 	$interactive = 0;
 	$command = $ARGV[0];
+	&debug("NON-INTERACTIVE: command is $command\n");
 	@args = @ARGV[1 .. $#ARGV];
-} else {
-	$interactive = 1;
+	&debug("NON-INTERACTIVE: args are " . join(",",@args) ."\n");
 }
 
 if ($interactive) {
@@ -64,6 +101,7 @@ do {{
 	foreach $string ($command, @args) {
 		if ($string !~ m|^([A-Za-z0-9._\-/]*)$|) {
 			print "Sorry, you used a forbidden character\n";
+			&debug("String was $string\n");
 			exit(-1);
 		} else {
 			$string = $1; # Untaint
