@@ -302,6 +302,11 @@ REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','BOOTING','SilentReboot');
+REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN','Retry');
@@ -429,6 +434,8 @@ REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_DIRTY_REBOOT','RES_WAIT_
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_WAIT_CLEAN','RES_READY','IsUp');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_WAIT_DIRTY','RES_READY','IsUp');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_READY','RELOAD_PENDING','Free');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','SHUTDOWN','Retry');
 
 --
 -- Dumping data for table `state_triggers`
@@ -440,6 +447,7 @@ REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','*','PXEBOOTING','PXEBOOT');
 REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
+REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 
 --
 -- Dumping data for table `table_regex`
@@ -467,11 +475,6 @@ REPLACE INTO table_regex VALUES ('experiments','wa_plr_solverweight','float','re
 REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','idleswap_timeout','int','redirect','default:int',1,2147483647,NULL);
-REPLACE INTO table_regex VALUES ('experiments','autoswap_timeout','int','redirect','default:int',1,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('nodes','node_id','text','regex','^[-\\w]+$',1,10,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','pid','text','redirect','projects:pid',0,0,NULL);
@@ -593,6 +596,11 @@ REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('nodes','bios_version','text','regex','^[-\\w\\.+]+$',0,64,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
+REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','idleswap_timeout','int','redirect','default:int',1,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('experiments','autoswap_timeout','int','redirect','default:int',1,2147483647,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
