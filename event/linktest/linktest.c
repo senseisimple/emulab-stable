@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -50,7 +50,7 @@ main(int argc, char **argv) {
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:")) != -1) {
 	  switch (c) {
 	  case 's':
 	    server = optarg;
