@@ -70,6 +70,8 @@ echo "</b><br />\n";
 #echo "\n       <a class='static' href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>all</a>.
 #      </b><br />\n";
 
+# Default value for showlastlogin
+$showlastlogin = 1;
 
 #
 # Handle showtype
@@ -80,6 +82,9 @@ if (! strcmp($showtype, "all")) {
 elseif (! strcmp($showtype, "active")) {
     # Active is now defined as "having nodes reserved" - we just depend on
     # the fact that we skip expts with no nodes further down...
+    # But for speed, explicitly exclude expts that say they are "swapped"
+    # (leave in activating, swapping, etc.)
+    $clause = "e.state !='$TB_EXPTSTATE_SWAPPED'";
     $title  = "Active";
     $having = "having (ncount>0)";
     $active = 1;
@@ -90,11 +95,14 @@ elseif (! strcmp($showtype, "batch")) {
 }
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     # Do not put active in the clause for same reason as active
+    # However, it takes a long time with so many swapped expts
+    $clause = "e.state !='$TB_EXPTSTATE_SWAPPED'";
     $title  = "Idle";
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
     $idlehours = 2;
+    $showlastlogin = 0; # don't show a lastlogin column
 }
 else {
     # See active above
@@ -210,15 +218,17 @@ else
 # Show a menu of all experiments for all projects that this uid
 # is a member of. Or, if an admin type person, show them all!
 #
+if ($clause) {
+    $clause = "and ($clause)";
+} else {
+    $clause = "";
+}
+    
 if ($isadmin) {
-    if ($clause)
-	$clause = "and ($clause)";
-    else
-        $clause = "";
-
     $experiments_result =
 	DBQueryFatal("select e.*,".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
+                     "date_format(expt_swapped,'%c/%e') as dshort, ".
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
                      "count(r.node_id) as ncount, swap_requests, ".
 		     "round((unix_timestamp(now()) - ".
@@ -233,43 +243,12 @@ if ($isadmin) {
                      "group by e.pid,e.eid ".
 		     "$having ".
 		     "order by $order");
-    if ($idle) {
-      # Run idlecheck and get the info
-      #print "<pre>Running idlecheck\n";
-      $x=exec("$TBSUEXEC_PATH $uid $TBADMINGROUP ".
-	      "webidlecheck -s -u -t $idlehours",
-	      $l, $rv);
-      reset($l);
-      while(list($index,$i) = each ($l)) {
-	list($ipid,$ieid,$word1, $word2, $word3) = split("[ \t/]+",$i);
-	#print "$ipid + $ieid + $word1 + $word2 + $word3\n";
-	$expt = "$ipid/$ieid";
-	$set = array($word1,$word2,$word3);
-	while(list($index,$tag) = each($set)) {
-	  if ($tag == "") { break; }
-	  if ($tag == "inactive") { $inactive[$expt]=1; }
-	  elseif ($tag == "stale") { $stale[$expt]=1; }
-	  elseif ($tag == "unswappable") { $unswap[$expt]=1; }
-	  else {
-	    if (defined($other[$expt])) { $other[$expt].=$tag; }
-	    else {$other[$expt]=$tag; }
-	  }
-	}
-	
-      }
-      #print "\nDone idlechecking...\n</pre>";
-    }
-      
 }
 else {
-    if ($clause)
-	$clause = "and ($clause)";
-    else
-        $clause = "";
-    
     $experiments_result =
 	DBQueryFatal("select distinct e.*, ".
                      "date_format(expt_swapped,'%Y-%m-%d') as d, ".
+                     "date_format(expt_swapped,'%c/%e') as dshort, ".
                      "count(r.node_id) as ncount, ".
 		     "ve.thumb_hash as thumb_hash ".
                      "from group_membership as g ".
@@ -284,7 +263,7 @@ else {
 		     "and e.eid is not null $clause ".
                      "group by e.pid,e.eid ".
 		     "$having ".
-                     "order by $order");
+                     "order by $order");    
 }
 if (! mysql_num_rows($experiments_result)) {
     USERERROR("There are no experiments running in any of the projects ".
@@ -347,7 +326,7 @@ if ($thumb && !$idle) {
 	$eid  = $row["eid"]; 
 	$huid = $row["expt_head_uid"];
 	$name = stripslashes($row["expt_name"]);
-	$date = $row["d"];
+	$date = $row["dshort"];
 	$thumb_hash = $row["thumb_hash"];
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
@@ -418,11 +397,11 @@ if ($thumb && !$idle) {
 		    $daysidle=$lastexpnodelogins["daysidle"];
 		    #if ($idle && $daysidle < 1)
 		    #  continue;
-		    $lastlogin .= $lastexpnodelogins["date"] . " " .
+		    $lastlogin .= $lastexpnodelogins["shortdate"] . " " .
 			"(" . $lastexpnodelogins["uid"] . ")";
 		} elseif ($state=="active") {
 		    $daysidle=$row["lastswap"];
-		    $lastlogin .= "$date Swapped In";
+		    $lastlogin .= "$date swapin";
 		}
 		# if ($lastlogin=="") { $lastlogin="<td>&nbsp;</td>\n"; }
 		if ($lastlogin != "") {
@@ -477,14 +456,16 @@ if ($thumb && !$idle) {
                   EID</a></th>
               <th align=center width=3%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
-                  PCs</a><br>[<b>1</b>]</th>\n";
+                  PCs</a><br>[<b>1</b>]</th>
+              <th align=center width=3%>
+               Hours Idle</th>\n";
     
-    if ($isadmin && !$idle)
+    if ($showlastlogin)
         echo "<th width=17% align=center>Last Login</th>\n";
-    if ($idle)
+    if ($idle) {
         #      "<th width=4% align=center>Days Idle</th>\n";
-	echo "<th width=4% align=center>Slothd Info</th>
-              <th width=4% align=center colspan=2>Swap Request</th>\n";
+	echo "<th width=4% align=center colspan=2>Swap Request</th>\n";
+    }
 
     echo "    <th width=60%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name'>
@@ -499,11 +480,14 @@ if ($thumb && !$idle) {
 	$eid  = $row["eid"]; 
 	$huid = $row["expt_head_uid"];
 	$name = stripslashes($row["expt_name"]);
-	$date = $row["d"];
+	$date = $row["dshort"];
 	$state= $row["state"];
 	$isidle = $row["swap_requests"];
 	$daysidle=0;
-	
+	$idletime = round(TBGetExptIdleTime($pid,$eid),1);
+	$stale = TBGetExptIdleStale($pid,$eid);
+	$ignore = TBGetExptIdleIgnore($pid,$eid);
+
 	if ($isadmin) {
 	    $swappable= $row["swappable"];
 	    $swapreq=$row["swap_requests"];
@@ -513,66 +497,47 @@ if ($thumb && !$idle) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
 	        #if ($idle && $daysidle < 1)
 		#  continue;
-		$lastlogin .= $lastexpnodelogins["date"] . " " .
+		$lastlogin .= $lastexpnodelogins["shortdate"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
 	    } elseif ($state=="active") {
 	        $daysidle=$row["lastswap"];
-	        $lastlogin .= "$date Swapped In";
+	        $lastlogin .= "$date swapin";
 	    }
 	    $lastlogin.="</td>\n";
 	    if ($lastlogin=="<td></td>\n") { $lastlogin="<td>&nbsp;</td>\n"; }
 	}
 
+	$inactive = $idletime >= $idlehours;
 	if ($idle) {
+	    # If it is ignored, skip it now.
+	    if ($ignore) { continue; }
 	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
-	    $foo = "<td align=left>";
-	    $expt = "$pid/$eid";
-	    $str="";
-	    if ($inactive[$expt]==1) {
-	      if ($stale[$expt]==1) {
-		$str .= "possibly&nbsp;inactive, ";
-	      } elseif  ($unswap[$expt]==1) {
-		$str .= "<b>probably&nbsp;inactive, unswappable</b>";
-	      } else {
-		$str .= "<b>inactive</b>";
-	      }
-	      if ($other[$expt]) { $str .= " ($other[$expt]) "; }
-	    }
-	    if ($stale[$expt]==1) { $str .= "<b>no&nbsp;report</b> "; }
-	    # For now, don't show this tag, it's redundant
-            #if ($unswap[$expt]==1) { $str .= "unswappable"; }
-	    if ($str=="") { $str="&nbsp;"; }
-	    # sanity check
-	    $slothderr=0;
-	    # This check won't work anymore now that a login today
-	    # doesn't mean it is active.
-	    #if ($daysidle==0 && $inactive[$expt]==1 && $stale[$expt]==0) {
-	    #  $str .= " (recently logged into)\n";
-	    #  $slothderr=1;
-	    #}
-	    $foo .= "$str</td>\n";
 	    if (isset($perexp_usage["$pid:$eid"]) &&
 		isset($perexp_usage["$pid:$eid"]["pc"])) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
 	    } else { $pcs=0; }
-	    $foo .= "<td align=center valign=center>\n";
- 	    if ($inactive[$expt]==1 && $stale[$expt]!=1 &&
-	        !$slothderr && $pcs) {
-	      $fooswap = "<td><a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
-			 "<img border=0 src=\"redball.gif\"></a></td>\n" ;
+	    $foo = "<td align=center valign=center>\n";
+ 	    if ($inactive && !$stale && !$ignore && $pcs) {
+		$fooswap = "<td><a ".
+		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
+		    "<img border=0 src=\"redball.gif\"></a></td>\n" ;
 	    } else {
-	      $fooswap = "<td></td>";
-	      if (!$pcs) { $foo .= "(no PCs)\n"; }
-	      else { $foo .="&nbsp;"; }
+		$label = "";
+		if ($stale) { $label .= "stale "; }
+		if ($ignore) { $label .= "ignore "; }
+		if ($label == "") { $label = "&nbsp;"; }
+		$fooswap = "<td>$label</td>";
+		if (!$pcs) { $foo .= "(no PCs)\n"; }
+		else { $foo .="&nbsp;"; }
 	    }
 	    if ($swapreq > 0) {
 	      $foo .= "&nbsp;$swapreq&nbsp;sent<br />".
-	              "<font size=-2>(${lastswapreq}&nbsp;hours&nbsp;ago)</font>\n";
+	              "<font size=-2>(${lastswapreq}&nbsp;hrs&nbsp;ago)</font>\n";
 	    }
 	    $foo .= "</td>" . $fooswap . "\n"; 
 	}
 
-	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
+	if ($idle && ($str=="&nbsp;" || !$pcs || !$inactive)) { continue; }
 
 	$nodes   = 0;
 	$special = 0;
@@ -612,7 +577,9 @@ if ($thumb && !$idle) {
 	else
             echo "<td>$nodes</td>\n";
 
-	if ($isadmin && !$idle) echo "$lastlogin\n";
+	echo "<td>$idletime</td>\n";
+	
+	if ($showlastlogin) echo "$lastlogin\n";
 	if ($idle) echo "$foo\n";
 
         echo "<td>$name</td>

@@ -1293,7 +1293,8 @@ function TBEventCount($pid, $eid)
 function TBExpUidLastLogins($pid, $eid)
 {
     $query_result =
-	DBQueryFatal("select n.*, to_days(now())-to_days(n.date) as daysidle ".
+	DBQueryFatal("select n.*, date_format(n.date,'%c/%e') as shortdate, ".
+		     "to_days(now())-to_days(n.date) as daysidle ".
 	             "from nodeuidlastlogin as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join experiments as e ".
@@ -1418,6 +1419,153 @@ function TBIPtoNodeID($ip) {
     }
     $row   = mysql_fetch_array($query_result);
     return $row[node_id];
+}
+
+#
+# Functions related to idle times
+#
+
+$lastact_query = "greatest(last_tty_act,last_net_act,last_cpu_act,".
+                 "last_ext_act)";
+
+#
+# Gets the time of last activity for a node
+#
+function TBGetNodeLastAct($pc) {
+    global $lastact_query;
+    $query_result =
+	DBQueryWarn("select $lastact_query as last_actfrom node_activity ".
+		    "where node_id='$pc'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[last_act];
+}
+
+#
+# Gets the time of idleness for a node, in hours
+#
+function TBGetNodeIdleTime($pc) {
+    global $lastact_query;
+    $query_result =
+	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
+		    "$lastact_query))/3600 as idle_time from node_activity ".
+		    "where node_id='$pc'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $t = $row[idle_time];
+    # if it is less than 5 minutes, it is not idle at all...
+    return ($t < 0.0834 ? 0 : $t);
+}
+
+#
+# Find out if a node's idle reports are stale
+#
+function TBGetNodeIdleStale($pc) {
+    global $lastact_query;
+
+    # We currently have a 5 minute interval for slothd between reports
+    # So give some slack in case a node reboots without reporting for a while
+    $staletime = 10; # in minutes
+    $stalesec = 60 * $staletime;
+    $query_result =
+	DBQueryWarn("select (unix_timestamp(now()) - ".
+		    "unix_timestamp(last_report )) as t ".
+		    "from node_activity where node_id='$pc'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return ($row[t]>$stalesec);
+}
+
+#
+# Gets the time of last activity for an expt
+#
+function TBGetExptLastAct($pid,$eid) {
+    global $lastact_query;
+    $query_result =
+	DBQueryWarn("select max($lastact_query) as last_act ".
+		    "from node_activity as na ".
+		    "left join reserved as r on na.node_id=r.node_id ".
+		    "where pid='$pid' and eid='$eid' ".
+		    "group by pid,eid");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[last_act];
+}
+
+#
+# Gets the time of idleness for an expt, in hours
+#
+function TBGetExptIdleTime($pid,$eid) {
+    global $lastact_query;
+    $query_result =
+	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
+		    "max($lastact_query) ))/3600 as idle_time ".
+		    "from node_activity as na ".
+		    "left join reserved as r on na.node_id=r.node_id ".
+		    "where pid='$pid' and eid='$eid' ".
+		    "group by pid,eid");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $t = $row[idle_time];
+    # if it is less than 5 minutes, it is not idle at all...
+    return ($t < 0.0834 ? 0 : $t);
+}
+
+#
+# Find out if an expt's idle report is stale
+#
+function TBGetExptIdleStale($pid,$eid) {
+    global $lastact_query;
+
+    # We currently have a 5 minute interval for slothd between reports
+    # So give some slack in case a node reboots without reporting for a while
+    $staletime = 10; # in minutes
+    $stalesec = 60 * $staletime;
+    $query_result =
+	DBQueryWarn("select (unix_timestamp(now()) - ".
+		    "unix_timestamp(min(last_report) )) as t ".
+		    "from node_activity as na ".
+		    "left join reserved as r on na.node_id=r.node_id ".
+		    "where pid='$pid' and eid='$eid' ".
+		    "group by pid,eid");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return ($row[t]>$stalesec);
+}
+
+#
+# Find out if an expt's idleness should be ignored
+#
+function TBGetExptIdleIgnore($pid,$eid) {
+    global $lastact_query;
+
+    $query_result =
+	DBQueryWarn("select idle_ignore from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[idle_ignore];
 }
 
 #

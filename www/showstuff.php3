@@ -600,6 +600,20 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$nodes</td>
           </tr>\n";
 
+    $lastact = TBGetExptLastAct($pid,$eid);
+    $idletime = TBGetExptIdleTime($pid,$eid);
+
+    echo "<tr>
+            <td>Last Activity: </td>
+            <td class=\"left\">$lastact</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Idle Time: </td>
+            <td class=\"left\">$idletime hours</td>
+          </tr>\n";
+    
+
     if ($batchmode) {
 	    echo "<tr>
                     <td>Batch Mode: </td>
@@ -651,20 +665,22 @@ function SHOWNODES($pid, $eid) {
                 <th>Node ID</th>
                 <th>$nodename</th>
                 <th>Type</th>
-                <th>Default<br>OSID</th>
-                <th>Default<br>Path</th>
-                <th>Default<br>Cmdline</th>
-                <th>Boot<br>Status[<b>1</b>]</th>
-                <th>Startup<br>Command</th>
-                <th>Startup<br>Status[<b>2</b>]</th>
-                <th>Ready<br>Status[<b>3</b>]</th>
+                <th>Default OSID</th>
+                <th>Node<br>Status</th>
+                <th>Last Active</th>
+                <th>Startup<br>Status[<b>1</b>]</th>
+                <th>Ready<br>Status[<b>2</b>]</th>
               </tr>\n";
 	
 	$query_result =
 	    DBQueryFatal("SELECT nodes.*,reserved.vname, ".
+	        "lower(date_format(greatest(last_tty_act,last_net_act,".
+		"last_cpu_act,last_ext_act),\"%c/%d&nbsp;%l:%i:%s&nbsp;%p\"))".
+		"as acttime, ".
 	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
-	        "FROM nodes LEFT JOIN reserved ".
-	        "ON nodes.node_id=reserved.node_id ".
+	        "FROM nodes LEFT JOIN node_activity ".
+		"on nodes.node_id=node_activity.node_id ".
+		"LEFT JOIN reserved ON nodes.node_id=reserved.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
 	        "ORDER BY type,priority");
 
@@ -672,26 +688,13 @@ function SHOWNODES($pid, $eid) {
 	    $node_id = $row[node_id];
 	    $vname   = $row[$vnamefield];
 	    $type    = $row[type];
-	    $def_boot_osid      = $row[def_boot_osid];
-	    $def_boot_path      = $row[def_boot_path];
-	    $def_boot_cmd_line  = $row[def_boot_cmd_line];
-	    $next_boot_path     = $row[next_boot_path];
-	    $next_boot_cmd_line = $row[next_boot_cmd_line];
-	    $startupcmd         = $row[startupcmd];
-	    $startstatus        = $row[startstatus];
-	    $readystatus        = $row[ready];
-	    $bootstatus         = $row[bootstatus];
+	    $def_boot_osid = $row[def_boot_osid];
+	    $startstatus   = $row[startstatus];
+	    $readystatus   = $row[ready];
+	    $status        = $row[status];
+	    $bootstate     = $row[eventstate];
+	    $acttime     = $row[acttime];
 
-	    if (!$def_boot_cmd_line)
-		$def_boot_cmd_line = "NULL";
-	    if (!$def_boot_path)
-		$def_boot_path = "NULL";
-	    if (!$next_boot_path)
-		$next_boot_path = "NULL";
-	    if (!$next_boot_cmd_line)
-		$next_boot_cmd_line = "NULL";
-	    if (!$startupcmd)
-		$startupcmd = "NULL";
 	    if (!$vname)
 		$vname = "--";
 	    if ($readystatus)
@@ -711,11 +714,14 @@ function SHOWNODES($pid, $eid) {
 	    }
 	    else
 		echo "<td>&nbsp</td>\n";
+
+	    if ($bootstate != "ISUP") {
+		echo "  <td>$status ($bootstate)</td>\n";
+	    } else {
+		echo "  <td>$status</td>\n";
+	    }
 	    
-	    echo "  <td>$def_boot_path</td>
-                    <td>$def_boot_cmd_line</td>
-                    <td align=center>$bootstatus</td>
-                    <td>$startupcmd</td>
+	    echo "  <td>$acttime</td>
                     <td align=center>$startstatus</td>
                     <td align=center>$readylabel</td>
                    </tr>\n";
@@ -723,7 +729,6 @@ function SHOWNODES($pid, $eid) {
 	echo "</table>\n";
 	echo "<h4><blockquote><blockquote><blockquote>
               <ol>
-                <li>Node has rebooted successfully after experiment creation.
                 <li>Exit value of the node startup command. A value of
                         666 indicates a testbed internal error.
                 <li>User application ready status, reported via TMCC.
@@ -1107,10 +1112,13 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 #
 function SHOWNODE($node_id) {
     $query_result =
-	DBQueryFatal("select n.*,r.vname,r.pid,r.eid,i.IP, ".
+	DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
+		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
+		     "last_ext_act) as last_act, ".
 		     " t.isvirtnode,t.isremotenode ".
 		     " from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
+		     "left join node_activity as na on n.node_id=na.node_id ".
 		     "left join node_types as t on t.type=n.type ".
 		     "left join interfaces as i on i.card=t.control_net ".
 		     " and i.node_id=n.node_id ".
@@ -1141,6 +1149,8 @@ function SHOWNODE($node_id) {
     $routertype         = $row[routertype];
     $eventstate         = $row[eventstate];
     $state_timestamp    = $row[state_timestamp];
+    $allocstate         = $row[allocstate];
+    $allocstate_timestamp= $row[allocstate_timestamp];
     $op_mode            = $row[op_mode];
     $op_mode_timestamp  = $row[op_mode_timestamp];
     $IP                 = $row[IP];
@@ -1149,7 +1159,13 @@ function SHOWNODE($node_id) {
     $ipport_low		= $row[ipport_low];
     $ipport_next	= $row[ipport_next];
     $ipport_high	= $row[ipport_high];
-
+    $last_act           = $row[last_act];
+    $last_tty_act       = $row[last_tty_act];
+    $last_net_act       = $row[last_net_act];
+    $last_cpu_act       = $row[last_cpu_act];
+    $last_ext_act       = $row[last_ext_act];
+    $last_report        = $row[last_report];
+    
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
     if (!$def_boot_path)
@@ -1212,22 +1228,91 @@ function SHOWNODE($node_id) {
           </tr>\n";
 
     echo "<tr>
-              <td>Control Net IP:</td>
-              <td class=left>$IP</td>
-          </tr>\n";
-
-    echo "<tr>
-              <td>Bios Version:</td>
-              <td class=left>$bios</td>
-          </tr>\n";
-
-    echo "<tr>
               <td>Def Boot OS:</td>
               <td class=left>";
     SPITOSINFOLINK($def_boot_osid);
     echo "    </td>
           </tr>\n";
 
+    if ($eventstate) {
+	$when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
+	echo "<tr>
+                 <td>EventState:</td>
+                 <td class=left>$eventstate ($when)</td>
+              </tr>\n";
+    }
+
+    if ($op_mode) {
+	$when = strftime("20%y-%m-%d %H:%M:%S", $op_mode_timestamp);
+	echo "<tr>
+                 <td>Operating Mode:</td>
+                 <td class=left>$op_mode ($when)</td>
+              </tr>\n";
+    }
+
+    if ($allocstate) {
+	$when = strftime("20%y-%m-%d %H:%M:%S", $allocstate_timestamp);
+	echo "<tr>
+                 <td>AllocState:</td>
+                 <td class=left>$allocstate ($when)</td>
+              </tr>\n";
+    }
+
+    #
+    # We want the last login for this node, but only if its *after* the
+    # experiment was created (or swapped in).
+    #
+    if ($lastnodeuidlogin = TBNodeUidLastLogin($node_id)) {
+
+	$foo = $lastnodeuidlogin["date"] . " " .
+	       $lastnodeuidlogin["time"] . " " .
+	       "(" . $lastnodeuidlogin["uid"] . ")";
+	
+	echo "<tr>
+                  <td>Last Login:</td>
+                  <td class=left>$foo</td>
+             </tr>\n";
+    }
+
+    if ($last_act) {
+        echo "<tr>
+                  <td>Last Activity:</td>
+                  <td class=left>$last_act</td>
+              </tr>\n";
+
+	$idletime = TBGetNodeIdleTime($node_id);
+	echo "<tr>
+                  <td>Idle Time:</td>
+                  <td class=left>$idletime hours</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Last Act. Report:</td>
+                  <td class=left>$last_report</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Last TTY Act.:</td>
+                  <td class=left>$last_tty_act</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Last Net. Act.:</td>
+                  <td class=left>$last_net_act</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Last CPU Act.:</td>
+                  <td class=left>$last_cpu_act</td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td>Last Ext. Act.:</td>
+                  <td class=left>$last_ext_act</td>
+              </tr>\n";
+
+    }
+    
     if (!$isvirtnode && !$isremotenode) {
         echo "<tr>
                   <td>Def Boot Path:</td>
@@ -1235,7 +1320,7 @@ function SHOWNODE($node_id) {
               </tr>\n";
 
         echo "<tr>
-                  <td>Def Boot Command Line:</td>
+                  <td>Def Boot Command&nbsp;Line:</td>
                   <td class=left>$def_boot_cmd_line</td>
               </tr>\n";
 
@@ -1302,37 +1387,15 @@ function SHOWNODE($node_id) {
           </tr>\n";
     }
 
-    if ($eventstate) {
-	$when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
-	echo "<tr>
-                 <td>EventState:</td>
-                 <td class=left>$eventstate ($when)</td>
-              </tr>\n";
-    }
+    echo "<tr>
+              <td>Control Net IP:</td>
+              <td class=left>$IP</td>
+          </tr>\n";
 
-    if ($op_mode) {
-	$when = strftime("20%y-%m-%d %H:%M:%S", $op_mode_timestamp);
-	echo "<tr>
-                 <td>Operating Mode:</td>
-                 <td class=left>$op_mode ($when)</td>
-              </tr>\n";
-    }
-
-    #
-    # We want the last login for this node, but only if its *after* the
-    # experiment was created (or swapped in).
-    #
-    if ($lastnodeuidlogin = TBNodeUidLastLogin($node_id)) {
-
-	$foo = $lastnodeuidlogin["date"] . " " .
-	       $lastnodeuidlogin["time"] . " " .
-	       "(" . $lastnodeuidlogin["uid"] . ")";
-	
-	echo "<tr>
-                  <td>Last Login:</td>
-                  <td class=left>$foo</td>
-             </tr>\n";
-    }
+    echo "<tr>
+              <td>Bios Version:</td>
+              <td class=left>$bios</td>
+          </tr>\n";
 
     if ($isremotenode) {
 	if ($isvirtnode) {
