@@ -30,6 +30,7 @@ from emulabclient import *
 # Configure variables
 TBDIR = "@prefix@"
 BOSSNODE = "@BOSSNODE@"
+BOSSEVENTPORT = "@BOSSEVENTPORT@"
 
 # Version
 VERSION = 0.1
@@ -1316,7 +1317,7 @@ class experiment:
         at.host    = BOSSNODE
 
         try:
-            mc = tbevent.EventClient(server="localhost")
+            mc = tbevent.EventClient(server="localhost", port=BOSSEVENTPORT)
             mc.subscribe(at)
             pass
         except:
