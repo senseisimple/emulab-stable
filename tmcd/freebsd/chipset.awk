@@ -11,11 +11,11 @@
 # upgraded pc600 reports:
 #    pcib0: <Intel 82443BX (440 BX) host to PCI bridge> on motherboard
 #
-/^pcib0: <Intel [0-9][0-9][0-9][0-9][0-9]BX .*(AGP disabled)>/ {
+/^pcib0: <Intel [0-9][0-9][0-9][0-9][0-9]BX host.*\(AGP disabled\)/ {
     print "BX";
     exit
 }
-/^pcib0: <Intel [0-9][0-9][0-9][0-9][0-9]BX / {
+/^pcib0: <Intel [0-9][0-9][0-9][0-9][0-9]BX \(440 BX\) host/ {
     print "BX-AGP";
     exit
 }
