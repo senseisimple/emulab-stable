@@ -1490,7 +1490,7 @@ COMMAND_PROTOTYPE(dodelay)
 			"LIMIT1=%s MAXTHRESH1=%s MINTHRESH1=%s WEIGHT1=%s "
 			"LINTERM1=%s QINBYTES1=%s BYTES1=%s "
 			"MEANPSIZE1=%s WAIT1=%s SETBIT1=%s " 
-			"DROPTAIL1=%s GENTLE1=%s\n",
+			"DROPTAIL1=%s GENTLE1=%s",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
 			row[7], row[8], row[9], row[10],
@@ -1509,6 +1509,7 @@ COMMAND_PROTOTYPE(dodelay)
 			sprintf(&buf[strlen(buf)],
 				" VNODE0=%s VNODE1=%s", row[37], row[38]);
 		}
+		strcat(buf, "\n");
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
