@@ -1,6 +1,6 @@
 #!/usr/bin/perl -wT
-use English;
-#use Getopt::Std;
+#use English;
+use Fcntl ':flock';
 
 sub usage() {
     print STDOUT "Usage: genelists\n".
@@ -14,9 +14,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 my $lockfile    = "/var/tmp/testbed_genelists_lockfile";
-my $active   = 0;
-my $userlist = 0;
-
+my $userlist;
 my $d = 0;
 
 if (@ARGV != 0) { usage(); }
@@ -27,7 +25,19 @@ $| = 1; # Turn off line buffering on output
 push(@INC, "$TB/lib");
 require libdb;
 
-foreach $active ( 0, 1 ) {
+# Set up a mutex so this doesn't get run twice at the same time
+
+open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+$count = 0;
+while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+    print "Another genelists in progress. Waiting a moment ...\n";
+    if ($count++ > 20) {
+	fatal("Could not get the lock after a long time!\n");
+    }
+    sleep(1);
+}
+
+foreach my $active ( 0, 1 ) {
 
   if ($active) {
     print "Getting Active Users\n" if $d;
