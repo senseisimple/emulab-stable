@@ -25,7 +25,7 @@ use libdb;
 $| = 1;
 
 # Set for more output.
-my $debug = 1;
+my $debug = 0;
 
 # RPC27 Prompt string
 my $RPC27_PROMPT = "RPC-27>";
