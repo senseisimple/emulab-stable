@@ -483,8 +483,8 @@ REPLACE INTO table_regex VALUES ('experiments','usemodelnet','int','redirect','d
 REPLACE INTO table_regex VALUES ('experiments','modelnet_cores','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','modelnet_edges','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
-REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','[-\\w]+',1,32,NULL);
-REPLACE INTO table_regex VALUES ('location_info','building','text','regex','[-\\w]+',1,32,NULL);
+REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('location_info','building','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','loc_x','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('location_info','loc_y','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('location_info','contact','text','redirect','users:usr_name',0,64,NULL);
@@ -505,7 +505,7 @@ REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vname','text','redirect','eventlist:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_agents','vnode','text','regex','(^[-\\w]+$)|(^\\*{1}$)',1,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_agents','vnode','text','regex','^([-\\w]+)|(\\*{1})$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
@@ -600,7 +600,7 @@ REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\
 REPLACE INTO table_regex VALUES ('default','text','text','regex','^[\\040-\\176]*$',0,65535,NULL);
 REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015]*$',0,4096,NULL);
 REPLACE INTO table_regex VALUES ('default','tinyint','int','regex','^[\\d]+$',-128,127,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
-REPLACE INTO table_regex VALUES ('default','boolean','int','regex','0|1',0,1,'Default regex for tiny int fields that are int booleans. Allow any 0 or 1');
+REPLACE INTO table_regex VALUES ('default','boolean','int','regex','^(0|1)$',0,1,'Default regex for tiny int fields that are int booleans. Allow any 0 or 1');
 REPLACE INTO table_regex VALUES ('default','tinyuint','int','regex','^[\\d]+$',0,255,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','int','int','regex','^[\\d]+$',-2147483648,2147483647,'Default regex for int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','float','float','regex','^[+-]?\\ *(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?$',-2147483648,2147483647,'Default regex for float fields. Allow any digits and the decimal point');
