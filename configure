@@ -1420,6 +1420,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
 	tbsetup/plab/etc/netbed_files/GNUmakefile \
+	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \

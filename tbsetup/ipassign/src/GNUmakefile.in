@@ -1,0 +1,51 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= tbsetup/ipassign/src
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+
+include $(OBJDIR)/Makeconf
+
+LIBEXEC_STUFF	= ipassign
+
+IPASSIGN_OBJECTS = Graph.o ipassign.o
+
+IPASSIGN_HEADERS = Exception.h Graph.h lib.h
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(LIBEXEC_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: all libexec-install
+
+#
+# Automate this part at some point.
+# 
+libexec-install:	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
+
+ipassign: $(IPASSIGN_OBJECTS) $(IPASSIGN_HEADERS)
+	$(CC) $(CFLAGS) $(IPASSIGN_OBJECTS) -lm -lmetis -o ipassign
+
+Graph.o: Graph.cc $(IPASSIGN_HEADERS)
+	$(CC) $(LDFLAGS) Graph.cc -o Graph.o 
+
+ipassign.o: ipassign.cc $(IPASSIGN_HEADERS)
+	$(CC) $(LDFLAGS) ipassign.cc -o ipassign.o
+
+post-install: 
+	chmod 775 $(INSTALL_LIBEXECDIR)
+
+clean:
+	rm -f ipassign.o Graph.o ipassign
+
+distclean:
