@@ -539,7 +539,7 @@ sub tmccgetconfig()
     }
    
     # XXX  Can't "use libsetup" in libtmcc to reference the WINDOWS() function.
-    my $arg = (-e "$ETCDIR/iscygwin") ? "pubkeys" : undef;
+    my $arg = (-e "$ETCDIR/iscygwin") ? "windows" : undef;
     if (runtmcc("fullconfig", $arg, \@tmccresults) < 0 ||
 	!scalar(@tmccresults)) {
 	warn("*** WARNING: Could not get fullconfig from tmcd!\n");

@@ -34,7 +34,7 @@ user=`id -un`
 if [ $user == root ]; then
     user=`tmcc creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
 fi
-pswd=`tmcc accounts | awk '/^ADDUSER LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
+pswd=`tmcc accounts windows | awk '/^ADDUSER LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
 if [ -z "$pswd" ]; then
     echo "No account for user $user, so no remote file access."
     sleep 5

@@ -254,6 +254,32 @@ function SPITFORM($formfields, $errors)
                              size=8></td>
              </tr>\n";
 
+	# Windows Password.  Initial random default is based on the Unix
+	# password hash.
+	# 
+	# A separate password is kept for experiment nodes running Windows.
+	# It is presented behind-the-scenes to rdesktop and Samba by our Web
+	# interface, but you may still need to type it.  The default password
+	# is randomly generated.  You may change it to something easier to
+	# remember.
+	#
+	echo "<tr>
+                  <td colspan=2>Windows Password[<b>1,4</b>]:</td>
+                  <td class=left>
+                      <input type=text
+                             name=\"formfields[w_password1]\"
+                             value=\"" . $formfields[w_password1] . "\"
+                             size=8></td>
+              </tr>\n";
+
+        echo "<tr>
+                  <td colspan=2>Retype Windows Password:</td>
+                  <td class=left>
+                      <input type=text
+                             name=\"formfields[w_password2]\"
+                             size=8></td>
+             </tr>\n";
+
         #
 	# Planetlab bit. This should really be a drop down menu of the choices.
 	#
@@ -312,6 +338,11 @@ function SPITFORM($formfields, $errors)
                  were added later, so
                  some early users will be forced to adjust their addresses
                  before they can proceed. Sorry for the inconvenience.
+            <li> A separate password is kept for experiment nodes running
+                 Windows.  It is presented behind-the-scenes to rdesktop and
+                 Samba by our Web interface, but you may still need to type
+                 it.  The default password is randomly generated.  You may
+                 change it to something easier to remember.
           </ol>
           </blockquote></blockquote>
           </h4>\n";
@@ -391,6 +422,22 @@ $defaults[usr_affil]   = $row[usr_affil];
 $defaults[usr_shell]   = $row[usr_shell];
 $defaults[notes]       = $row[notes];
 $defaults[user_interface] = $row[user_interface];
+
+# Show and keep the Windows password if user-set, otherwise fill in the random one.
+if (strcmp($row[usr_w_pswd],""))
+    $defaults[w_password1] = $defaults[w_password2] = $row[usr_w_pswd];
+else {
+    # The initial random default for the Windows Password is based on the Unix
+    # encrypted password, in particular the random salt if it's an MD5 crypt,
+    # consisting of the 8 characters after an initial "$1$" and followed by a "$". 
+    $unixpwd = explode('$', $row[usr_pswd]);
+    if (strlen($unixpwd[0]) > 0)
+	# When there's no $ at the beginning, it's not an MD5 hash.
+	$randpwd = substr($unixpwd[0],0,8);
+    else
+	$randpwd = substr($unixpwd[2],0,8); # The MD5 salt string.
+    $defaults[w_password1] = $defaults[w_password2] = $randpwd;
+}
 
 #
 # On first load, display a form consisting of current user values, and exit.
@@ -519,6 +566,22 @@ if (isset($formfields[password1]) &&
 	$errors["Password"] = "$checkerror";
     }
 }
+if (isset($formfields[w_password1]) &&
+    strcmp($formfields[w_password1], "")) {
+    if (!isset($formfields[w_password2]) ||
+	strcmp($formfields[w_password2], "") == 0) {
+	$errors["Retype Windows Password"] = "Missing Field";
+    }
+    elseif (strcmp($formfields[w_password1], $formfields[w_password2])) {
+	$errors["Retype Windows Password"] = "Two Windows Passwords Do Not Match";
+    }
+    elseif (! CHECKPASSWORD($formfields[target_uid],
+			    $formfields[w_password1],
+			    $formfields[usr_name],
+			    $formfields[usr_email], $checkerror)) {
+	$errors["Windows Password"] = "$checkerror";
+    }
+}
 if (count($errors)) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -538,6 +601,8 @@ $usr_phone    = $formfields[usr_phone];
 $usr_shell    = $formfields[usr_shell];
 $password1    = $formfields[password1];
 $password2    = $formfields[password2];
+$w_password1  = $formfields[w_password1];
+$w_password2  = $formfields[w_password2];
 
 if (! isset($formfields[usr_URL]) ||
     strcmp($formfields[usr_URL], "") == 0 ||
@@ -621,6 +686,20 @@ if ((isset($password1) && strcmp($password1, "")) &&
     if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
     }
+}
+
+#
+# See if the user is requesting to change the Windows password. We checked
+# them above when the form was submitted.
+#
+if ((isset($w_password1) && strcmp($w_password1, "")) &&
+    (isset($w_password2) && strcmp($w_password2, ""))) {
+
+    #
+    # Insert into database.
+    $insert_result =
+	DBQueryFatal("UPDATE users SET usr_w_pswd='$w_password1' ".
+		     "WHERE uid='$target_uid'");
 }
 
 #

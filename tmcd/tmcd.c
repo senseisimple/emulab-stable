@@ -1643,14 +1643,15 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "  u.emulab_pubkey,u.home_pubkey, "
 				 "  UNIX_TIMESTAMP(u.usr_modified), "
 				 "  u.usr_email,u.usr_shell, "
-				 "  u.widearearoot,u.wideareajailroot "
+				 "  u.widearearoot,u.wideareajailroot, "
+				 "  u.usr_w_pswd "
 				 "from group_membership as p "
 				 "left join users as u on p.uid=u.uid "
 				 "left join groups as g on "
 				 "     p.pid=g.pid and p.gid=g.gid "
 				 "where ((p.pid='%s')) and p.trust!='none' "
 				 "      and u.status='active' order by u.uid",
-				 16, reqp->pid);
+				 17, reqp->pid);
 	}
 	else if (reqp->jailflag) {
 		/*
@@ -1663,7 +1664,8 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  u.emulab_pubkey,u.home_pubkey, "
 			     "  UNIX_TIMESTAMP(u.usr_modified), "
 			     "  u.usr_email,u.usr_shell, "
-			     "  u.widearearoot,u.wideareajailroot "
+			     "  u.widearearoot,u.wideareajailroot, "
+			     "  u.usr_w_pswd "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on "
@@ -1671,7 +1673,7 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "where (p.pid='%s') and p.trust!='none' "
 			     "      and u.status='active' and u.admin=1 "
 			     "      order by u.uid",
-			     16, RELOADPID);
+			     17, RELOADPID);
 	}
 	else {
 		/*
@@ -1690,7 +1692,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "u.emulab_pubkey,u.home_pubkey, "
 				 "UNIX_TIMESTAMP(u.usr_modified), "
 				 "u.usr_email,u.usr_shell, "
-				 "u.widearearoot,u.wideareajailroot "
+				 "u.widearearoot,u.wideareajailroot, "
+				 "u.usr_w_pswd "
 				 "from projects as p "
 				 "left join group_membership as m "
 				 "  on m.pid=p.pid "
@@ -1702,7 +1705,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "      and m.trust!='none' "
 				 "      and u.status='active' "
 				 "order by u.uid",
-				 16, reqp->type);
+				 17, reqp->type);
 	}
 
 	if (!res) {
@@ -1726,6 +1729,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
 		char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
+		char		*pswd, *wpswd, wpswd_buf[9];
 
 		gidint     = -1;
 		tbadmin    = root = atoi(row[8]);
@@ -1780,6 +1784,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				break;
 			row = nextrow;
 		}
+
 		/*
 		 * widearearoot and wideareajailroot override trust values
 		 * from the project (above). Of course, tbadmin overrides
@@ -1793,6 +1798,30 @@ COMMAND_PROTOTYPE(doaccounts)
 
 			if (tbadmin)
 				root = 1;
+		}
+
+		/* There is an optional Windows password column. */
+		pswd = row[1];
+		wpswd = row[16];
+		if (strncmp(rdata, "windows", 7) == 0) {
+			if (wpswd != NULL && strlen(wpswd) > 0) {
+				row[1] = wpswd;
+			}
+			else {
+
+				/* The initial random default for the Windows Password
+				 * is based on the Unix encrypted password hash, in
+				 * particular the random salt when it's an MD5 crypt.
+				 * THis is the 8 characters after an initial "$1$" and
+				 * followed by a "$".  Just use the first 8 chars if
+				 * the hash is not an MD5 crypt.
+				 */
+				strncpy(wpswd_buf, 
+					(strncmp(pswd,"$1$",3)==0) ? pswd + 3 : pswd,
+					8);
+				wpswd_buf[8]='\0';
+				row[1] = wpswd_buf;
+			}
 		}
 		 
 		/*
@@ -1871,7 +1900,8 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * sending back pubkey stuff; it's never used except on CygWin.
 		 * Add an argument of "pubkeys" to get the PUBKEY data on CygWin.
 		 */
-		if (reqp->islocal && strncmp(rdata, "pubkeys", 7) != 0)
+		if (reqp->islocal && (strncmp(rdata, "pubkeys", 7) != 0
+				      || strncmp(rdata, "windows", 7) != 0))
 			goto skipsshkeys;
 
 		/*

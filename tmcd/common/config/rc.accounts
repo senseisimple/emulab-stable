@@ -111,8 +111,8 @@ sub doboot()
     my %GRPDB;
 
     print STDOUT "Checking Testbed user accounts configuration ... \n";
-
-    if (tmcc(TMCCCMD_ACCT, undef, \@tmccresults) < 0) {
+    my $arg = WINDOWS() ? "windows" : undef;
+    if (tmcc(TMCCCMD_ACCT, $arg, \@tmccresults) < 0) {
 	fatal("Could not get account info from server!");
     }
     # Important; if no results then do nothing. We do not want to remove
