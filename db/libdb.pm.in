@@ -59,6 +59,10 @@ use Exporter;
 
 	 TB_DEFAULT_RELOADTYPE TB_RELOADTYPE_FRISBEE TB_RELOADTYPE_NETDISK
 
+	 TB_EXPTPRIORITY_LOW TB_EXPTPRIORITY_HIGH
+
+	 TB_ASSIGN_TOOFEWNODES
+
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
@@ -66,7 +70,7 @@ use Exporter;
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload
+	 TBSetSchedReload MapNodeOSID
 	 );
 
 # Must come after package declaration!
@@ -199,6 +203,13 @@ sub TB_DEFAULT_NODELOGTYPE()	{ TB_NODELOGTYPE_MISC; }
 sub TB_RELOADTYPE_NETDISK()	{ "netdisk"; }
 sub TB_RELOADTYPE_FRISBEE()	{ "frisbee"; }
 sub TB_DEFAULT_RELOADTYPE()	{ TB_RELOADTYPE_NETDISK; }
+
+# Experiment priorities.
+sub TB_EXPTPRIORITY_LOW()	{ 0; }
+sub TB_EXPTPRIORITY_HIGH()	{ 20; }
+
+# Assign exit status for too few nodes.
+sub TB_ASSIGN_TOOFEWNODES()	{ 2; }
 
 #
 # We should list all of the DB limits.
@@ -806,7 +817,20 @@ sub ExpNodes($$)
 	return ();
     }
     while (@row = $query_result->fetchrow_array()) {
-	push(@nodes, $row[0]);
+	$node = $row[0];
+
+	#
+	# Taint check. I do not understand this sillyness, but if I
+	# taint check these node names, I avoid warnings throughout.
+	# 
+	if ($node =~ /^([\w]+)$/) {
+	    $node = $1;
+	    
+	    push(@nodes, $node);
+	}
+	else {
+	    print "*** $0: WARNING: Bad node name: $node.\n";
+	}
     }
     return @nodes;
 }
@@ -1260,6 +1284,73 @@ sub MapNumericUID($)
 	$name = $uid;
     }
     return $name;
+}
+
+#
+# Map a generic OSID to a specific OSID for the actual node in question.
+# The intent is that, for example, RHL-STD needs to be mapped to the
+# specific version of RHL that is loaded on the machine. This bit of code
+# does that mapping, return 0 if no mapping could be made.
+#
+# usage: MapNodeOSID(char *node, char *osid)
+#        Return the new osid if mapping successful (or actual osid loaded).
+#        Return 0 for all errors and if mapping not possible.
+#
+sub MapNodeOSID($$)
+{
+    my ($node, $osid) = @_;
+    
+    #
+    # See id this this OSID is actually loaded on the machine. 
+    #
+    my $p_result =
+	DBQueryWarn("select * from partitions ".
+		    "where node_id='$node' and osid='$osid'");
+    if (!$p_result) {
+	return 0;
+    }
+
+    if ($p_result->numrows) {
+	return $osid;
+    }
+
+    #
+    # Get OSID info.
+    # 
+    my $osid_result =
+	DBQueryWarn("select * from os_info where osid='$osid'");
+	
+    if (!$osid_result || $osid_result->numrows == 0) {
+	return 0;
+    }
+    my %osid_row   = $osid_result->fetchhash();
+
+    #
+    # If its a specific Version, and its not loaded on the machine,
+    # nothing to do.
+    #
+    if (defined($osid_row{'version'}) && $osid_row{'version'} ne "") {
+	return 0;
+    }
+
+    #
+    # Try to map from a generic name to the specific name of the OS
+    # that *is* loaded. 
+    # 
+    my $o_result =
+	DBQueryWarn("select o1.* from os_info as o1 ".
+		    "left join partitions as p on o1.osid=p.osid ".
+		    "left join os_info as o2 on o2.OS=o1.OS ".
+		    "where p.node_id='$node' and o2.osid='$osid'");
+
+    if (!$o_result || $o_result->numrows == 0) {
+	return 0;
+    }
+
+    my %o_row  = $o_result->fetchhash();
+    my $n_osid = $o_row{'osid'};
+
+    return $n_osid;
 }
 
 1;
