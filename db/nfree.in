@@ -133,24 +133,26 @@ foreach $reload ( keys(%reloads)) {
   print STDERR "Reload for @list complete.\n";
 }
 
-print "Locking tables.\n";
-$cmd = "lock tables nodes read, node_types read, reloads read, ".
-  "interfaces write, reserved write";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
-
-foreach $n (keys(%reloads)) {
-  # Change reservation (don't delete or we'll get races)
-  $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
-    "node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++ && next);
+if ( %reloads > 0 ) {
+  print "Locking tables.\n";
+  $cmd = "lock tables nodes read, node_types read, reloads read, ".
+    "interfaces write, reserved write";
+  $sth = $dbh->query($cmd) 
+    || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+  
+  foreach $n (keys(%reloads)) {
+    # Change reservation (don't delete or we'll get races)
+    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
+      "node_id='$n'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++ && next);
+  }
+  
+  print "Unlocking tables.\n";
+  $cmd = "unlock tables";
+  $sth = $dbh->query($cmd) 
+    || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
-
-print "Unlocking tables.\n";
-$cmd = "unlock tables";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
 exit($error);
