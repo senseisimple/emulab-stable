@@ -3,10 +3,12 @@ Parser README
 Operation
 ---------
 
-parse.tcl [-q] [-n] pid eid ns_file
+parse.tcl [-q] [-n] -a ns_file
+parse.tcl [-q] [-n] [-a] pid eid ns_file
 
 -q - Quiet Mode - Omit messages about unsupported features.
 -n - Impotent Mode - Do not update DB; just display any messages and exit.
+-a - Anonymous Mode - Do not do pid/gid based checks. Syntax check only.
 
 parse.tcl will interpret the NS file including all TB commands and
 update the virt_lans, and virt_nodes tables appropriately.  parse.tcl
