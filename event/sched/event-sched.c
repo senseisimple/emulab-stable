@@ -41,15 +41,15 @@ static int	debug;
 static void	cleanup(void);
 static void	quit(int);
 
-#define MAXAGENTS	200
-static struct {
+struct agent {
 	char    nodeid[TBDB_FLEN_NODEID];
 	char    vnode[TBDB_FLEN_VNAME];
 	char	objname[TBDB_FLEN_EVOBJNAME];
 	char	objtype[TBDB_FLEN_EVOBJTYPE];
 	char	ipaddr[32];
-} agents[MAXAGENTS];
-static int	numagents;
+};
+static struct agent	*agents;
+static int		numagents;
 
 void
 usage()
@@ -368,6 +368,12 @@ get_static_events(event_handle_t handle)
 		return 0;
 	}
 	nrows = mysql_num_rows(res);
+	agents = calloc(nrows, sizeof(struct agent));
+	if (agents == NULL) {
+		error("cannot allocate memory, too many agents (%d)\n", nrows);
+		return 0;
+	}
+
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
@@ -406,9 +412,6 @@ get_static_events(event_handle_t handle)
 			strcpy(agents[numagents].ipaddr, ADDRESSTUPLE_ALL);
 		}
 		numagents++;
-		if (numagents >= MAXAGENTS) {
-			fatal("Too many agents!");
-		}
 	}
 	mysql_free_result(res);
 	
