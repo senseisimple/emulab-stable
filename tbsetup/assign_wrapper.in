@@ -1145,6 +1145,7 @@ foreach my $pnode (keys(%virtnodes)) {
     my @oplist = ();
     my @ovlist = ();
 
+    TBDebugTimeStamp("reserving vnodes on $pnode started");
     printdb "On pnode $pnode: vnodes @vlist\n";
 
     # Check cancel flag before continuing. 
@@ -1254,9 +1255,11 @@ foreach my $pnode (keys(%virtnodes)) {
 	}
 	else {
 	    print "Reserving on $pnode: @plist ...\n";
+	    TBDebugTimeStamp("nalloc vnodes on $pnode started");
 	    if (system("nalloc $pid $eid @plist")) {
 		fatal("Failed to reserve @plist (on $pnode)");
 	    }
+	    TBDebugTimeStamp("nalloc vnodes on $pnode finished");
 	}
     }
 
@@ -1304,6 +1307,7 @@ foreach my $pnode (keys(%virtnodes)) {
 				TBDB_ALLOCSTATE_RES_TEARDOWN());
 	}		
     }
+    TBDebugTimeStamp("reserving vnodes on $pnode finished");
 }
 
 # Check cancel flag before continuing. 
@@ -4318,6 +4322,8 @@ sub physinterfacetype($$) {
 
 sub LoadPhysResources()
 {
+    TBDebugTimeStamp("LoadPhysResources started");
+    
     foreach my $pnode (keys(%p2vmap)) {
 	my @vnodes = @{$p2vmap{$pnode}};
 
@@ -4363,6 +4369,7 @@ sub LoadPhysResources()
 	    physnodesetvnode($vpnode, $vnode);
 	}
     }
+    TBDebugTimeStamp("LoadPhysResources finished");
 }
 sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
 sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
