@@ -259,12 +259,13 @@ function WRITESIDEBAR() {
 #
 function WRITEBANNER($title) {
     global $BANNERCOLOR, $THISPROJECT, $THISHOMEBASE, $BASEPATH;
+    global $login_uid;
 
     echo "<!-- This is the page Banner -->\n";
 
     echo "<table cellpadding=0 cellspacing=0 border=0 width=50%>";
     echo "<tr>
-            <td align=left valign=top width=\"0%\">
+            <td align=left valign=top width=0%>
              <table cellpadding=5 cellspacing=0 border=0 bgcolor=\"#880000\">
               <tr>
                 <td>
@@ -276,7 +277,7 @@ function WRITEBANNER($title) {
               </tr>
              </table>
             </td>
-            <td align=left valign=top width=100%>
+            <td align=left valign=top width=70%>
                 <table cellpadding=5 cellspacing=0 border=0
                          bgcolor=$BANNERCOLOR>
                   <tr>
@@ -287,6 +288,33 @@ function WRITEBANNER($title) {
                        </font>
                      </b>
                    </td>
+                  <tr>
+                </table>
+            </td>
+            <td align=left valign=center width=50%>
+                <table cellpadding=0 cellspacing=0 border=0>
+                  <tr>
+                   <td nowrap align=right>\n";
+    if ($login_uid && ISADMININSTRATOR()) {
+	if (ISADMIN($login_uid)) {
+	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=1>
+	             <img src='/autostatus-icons/greenball.gif'
+                          alt='Admin On'></a>\n";
+	}
+	else {
+	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=0>
+	             <img src='/autostatus-icons/redball.gif'
+                          alt='Admin Off'></a>\n";
+	}
+    }
+    else {
+	echo "       <b>
+                       <font size=5 face=helvetica color=\"#000000\">
+                            &nbsp
+                       </font>
+                     </b>\n";
+    }
+    echo "         </td>
                   <tr>
                 </table>
             </td>
@@ -310,7 +338,7 @@ function WRITETITLE($title) {
                  #
     
     echo "     </td>
-               <td align=left>
+               <td align=left width=\"90%\">
                    <b><font size=5 color=$TITLECOLOR>$title</font></b>
                </td>
             </tr>

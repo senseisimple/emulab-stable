@@ -281,9 +281,10 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
 }
 
 #
-# Is this user an admin type? Its actually incorrect to look at the
-# $uid. Its the currently logged in user that has to be admin. So
-# ignore the uid and make sure there is a login status.
+# Is this user an admin type, and is his admin bit turned on.
+# Its actually incorrect to look at the $uid. Its the currently logged
+# in user that has to be admin. So ignore the uid and make sure
+# there is a login status.
 #
 function ISADMIN($uid) {
     global $CHECKLOGIN_STATUS;
@@ -293,6 +294,18 @@ function ISADMIN($uid) {
 
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINOFF)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
+}
+
+# Is this user a real administrator (ignore onoff bit).
+function ISADMININSTRATOR() {
+    global $CHECKLOGIN_STATUS;
+    
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS)
+	TBERROR("ISADMIN: $uid is not logged in!", 1);
+
+    return (($CHECKLOGIN_STATUS &
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
 }
 
@@ -375,9 +388,9 @@ function DOLOGIN($uid, $password) {
 	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
 
 	#
-	# Clear adminoff on new logins.
+	# Set adminoff on new logins.
 	#
-	DBQueryFatal("update users set adminoff=0 where uid='$uid'");
+	DBQueryFatal("update users set adminoff=1 where uid='$uid'");
 
 	return 0;
     }
