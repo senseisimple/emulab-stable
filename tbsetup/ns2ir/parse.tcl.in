@@ -255,27 +255,33 @@ proc new {class args} {
 # This takes a bandwidth specifier in the form of <amt><unit> where
 # <unit> is any of b, bps, kb, kbps, Mb, Mbps, Gb, or Gbps.  If no
 # unit is given then bytes (b) is assumed.  It returns the bandwidth
-# in Mbps.
+# in Kbps.
 proc parse_bw {bspec} {
     # Default to bytes
     if {[scan $bspec "%f%s" bw unit] == 1} {
 	set unit b
     }
-    
+
     switch -- $unit {
-	b {return [expr int($bw/1000000)]} 
-	bps {return [expr int($bw/1000000)]} 
-	kb {return [expr int($bw/1000)]}
-	kbps {return [expr int($bw/1000)]}
-	Mb {return [expr int($bw)]}
-	Mbps {return [expr int($bw)]}
-	Gb {return [expr int($bw*1000)]}
-	Gbps {return [expr int($bw*1000)]}
+	b {set val [expr int($bw/1000)]} 
+	bps {set val [expr int($bw/1000)]} 
+	kb {set val [expr int($bw)]}
+	kbps {set val [expr int($bw)]}
+	Mb {set val [expr int($bw*1000)]}
+	Mbps {set val [expr int($bw*1000)]}
+	Gb {set val [expr int($bw*1000000)]}
+	Gbps {set val [expr int($bw*1000000)]}
 	default {
 	    perror "Unknown bandwidth unit $unit."
-	    return 100
+	    set val 100000
 	}
     }
+
+    if {$val < 10} {
+	perror "Bandwidth of $val Kbs is too low."
+	return 0
+    }
+    return $val
 }
 
 # parse_delay dspec
