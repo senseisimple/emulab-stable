@@ -102,8 +102,9 @@ sub initStateWait( $@ ) {
 
     %$tuple = ( objtype   => join(",",TBDB_TBEVENT_NODESTATE,
 				  TBDB_TBEVENT_TBFAILED),
-		eventtype => join(",",@$states, TBDB_COMMAND_REBOOT  ),
-	        objname   => join(",",@nodes) );
+		eventtype => join(",",@$states, TBDB_COMMAND_REBOOT  ) );
+		#eventtype => join(",",@$states, TBDB_COMMAND_REBOOT  ),
+	        #objname   => join(",",@nodes) );
 
     if ($debug) { print "Success: $tuple\n"; }
     if ($debug > 0) {
@@ -220,7 +221,8 @@ sub endStateWait() {
 1;
 
 END {
-    if ($handle && event_unregister($handle) == 0) {
-        die "Unable to unregister with event system\n";
+    if ($handle!=0 && event_unregister($handle) == 0) {
+        warn "Unable to unregister with event system\n";
     }
+    1;
 }
