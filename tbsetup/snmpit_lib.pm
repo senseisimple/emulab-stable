@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
 #
-# EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# EMULAB-LGPL
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
