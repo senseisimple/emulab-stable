@@ -19,6 +19,7 @@ use Exporter;
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts
+	 os_fwconfig_line os_fwrouteconfig_line
        );
 
 # Must come after package declaration!
@@ -466,6 +467,8 @@ sub os_routing_add_manual($$$$$;$)
 	$cmd = "$ROUTE add -host $destip gw $gate";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE add -net $destip netmask $destmask gw $gate";
+    } elsif ($routetype eq "default") {
+	$cmd = "$ROUTE add default gw $gate";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";
@@ -483,6 +486,8 @@ sub os_routing_del_manual($$$$$;$)
 	$cmd = "$ROUTE delete -host $destip";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE delete -net $destip netmask $destmask gw $gate";
+    } elsif ($routetype eq "default") {
+	$cmd = "$ROUTE delete default";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";
@@ -539,6 +544,49 @@ sub os_getnfsmounts($)
     close(MOUNT);
     %$rptr = %mounted;
     return 0;
+}
+
+sub os_fwconfig_line($@)
+{
+    my ($fwinfo, @fwrules) = @_;
+    my ($upline, $downline);
+    my $errstr = "*** WARNING: Linux firewall not implemented\n";
+
+
+    warn $errstr;
+    $upline = "echo $errstr; exit 1";
+    $downline = "echo $errstr; exit 1";
+
+    return ($upline, $downline);
+}
+
+sub os_fwrouteconfig_line($$$)
+{
+    my ($orouter, $fwrouter, $routestr) = @_;
+    my ($upline, $downline);
+
+    #
+    # XXX assume the original default route should be used to reach servers.
+    #
+    # For setting up the firewall, this means we create explicit routes for
+    # each host via the original default route.
+    #
+    # For tearing down the firewall, we just remove the explicit routes
+    # and let them fall back on the now re-established original default route.
+    #
+    $upline  = "for vir in $routestr; do\n";
+    $upline .= "        $ROUTE delete \$vir >/dev/null 2>&1\n";
+    $upline .= "        $ROUTE add -host \$vir gw $orouter || {\n";
+    $upline .= "            echo \"Could not establish route for \$vir\"\n";
+    $upline .= "            exit 1\n";
+    $upline .= "        }\n";
+    $upline .= "    done";
+
+    $downline  = "for vir in $routestr; do\n";
+    $downline .= "        $ROUTE delete \$vir >/dev/null 2>&1\n";
+    $downline .= "    done";
+
+    return ($upline, $downline);
 }
 
 1;

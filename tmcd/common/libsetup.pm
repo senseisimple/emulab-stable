@@ -19,7 +19,7 @@ use Exporter;
 	 check_nickname	bootsetup startcmdstatus whatsmynickname 
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
-	 ixpsetup libsetup_refresh gettopomap
+	 ixpsetup libsetup_refresh gettopomap getfwconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -835,6 +835,73 @@ sub gettunnelconfig($)
     @$rptr = @tunnels;
     return 0;
 }
+
+#
+# Return the firewall configuration. We parse tmcd output here and return
+# a list of hash entries to the caller.
+#
+sub getfwconfig($$)
+{
+    my ($infoptr, $rptr) = @_;		# Return info and rule list to caller.
+    my @tmccresults = ();
+    my $fwinfo      = {};
+    my @fwrules     = ();
+
+    $$infoptr = undef;
+    @$rptr = ();
+    if (tmcc(TMCCCMD_FIREWALLINFO, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get firewall info from server!\n");
+	return -1;
+    }
+
+    my $rempat = q(TYPE=remote FWIP=([0-9\.]*));
+    my $fwpat  = q(TYPE=(\w+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*));
+    my $rpat   = q(RULENO=(\d*) RULE="(.*)");
+
+    foreach my $line (@tmccresults) {
+	if ($line =~ /TYPE=(\w+)/) {
+	    my $type = $1;
+	    if ($type eq "none") {
+		$fwinfo->{"TYPE"} = $type;
+		$$infoptr = $fwinfo;
+		return 0;
+	    }
+	    if ($line =~ /$rempat/) {
+		my $fwip = $1;
+
+		$fwinfo->{"TYPE"} = "remote"
+		    if (!defined($fwinfo->{"TYPE"}));
+		$fwinfo->{"FWIP"} = $fwip;
+	    } elsif ($line =~ /$fwpat/) {
+		my $style = $2;
+		my $inif = $3;
+		my $outif = $4;
+
+		$fwinfo->{"TYPE"} = $type;
+		$fwinfo->{"STYLE"} = $style;
+		$fwinfo->{"IN_IF"}  = $inif;
+		$fwinfo->{"OUT_IF"} = $outif;
+	    } else {
+		warn("*** WARNING: Bad firewall info line: $line\n");
+	    }
+	} elsif ($line =~ /$rpat/) {
+	    my $ruleno = $1;
+	    my $rule = $2;
+
+	    my $fw = {};
+	    $fw->{"RULENO"} = $ruleno;
+	    $fw->{"RULE"} = $rule;
+	    push(@fwrules, $fw);
+	} else {
+	    warn("*** WARNING: Bad firewall info line: $line\n");
+	}
+    }
+
+    $$infoptr = $fwinfo;
+    @$rptr = @fwrules;
+    return 0;
+}
+
 
 #
 # All we do is store it away in the file. This makes it avail later.

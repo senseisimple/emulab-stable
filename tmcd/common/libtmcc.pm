@@ -27,6 +27,7 @@ use Exporter;
 	     TMCCCMD_PROGRAMS TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
 	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT TMCCCMD_EVENTKEY TMCCCMD_ROUTELIST
 	     TMCCCMD_ROLE TMCCCMD_RUSAGE TMCCCMD_WATCHDOGINFO TMCCCMD_HOSTKEYS
+	     TMCCCMD_FIREWALLINFO
 	     );
 
 # Must come after package declaration!
@@ -152,6 +153,7 @@ my %commandset =
       "rusage"		=> {TAG => "rusage"},
       "watchdoginfo"	=> {TAG => "watchdoginfo"},
       "hostkeys"	=> {TAG => "hostkeys"},
+      "firewallinfo"	=> {TAG => "firewallinfo"},
     );
 
 #
@@ -195,6 +197,7 @@ sub TMCCCMD_ROLE()	{ $commandset{"role"}->{TAG}; }
 sub TMCCCMD_RUSAGE()	{ $commandset{"rusage"}->{TAG}; }
 sub TMCCCMD_WATCHDOGINFO(){ $commandset{"watchdoginfo"}->{TAG}; }
 sub TMCCCMD_HOSTKEYS()  { $commandset{"hostkeys"}->{TAG}; }
+sub TMCCCMD_FIREWALLINFO(){ $commandset{"firewallinfo"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

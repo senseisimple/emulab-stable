@@ -136,6 +136,16 @@ sub doboot()
 	}
     }
 
+    #
+    # Get the firewall up
+    #
+    if (-x "$RCDIR/rc.firewall") {
+	system("$RCDIR/rc.firewall");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.firewall");
+	}
+    }
+
     if (-x "$BINDIR/tbshutdown") {
         print("Starting up shutdown notification daemon\n");
         system("$BINDIR/tbshutdown");

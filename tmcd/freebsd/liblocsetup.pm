@@ -21,6 +21,7 @@ use Exporter;
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts
+	 os_fwconfig_line os_fwrouteconfig_line
        );
 
 # Must come after package declaration!
@@ -173,7 +174,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	if ($aliases ne "") {
 	    # Must do this first to avoid lo0 routes.
 	    $uplines .= "\n    ".
-		"sysctl -w net.link.ether.inet.useloopback=0\n";
+		"sysctl net.link.ether.inet.useloopback=0\n";
 
 	    foreach my $alias (split(',', $aliases)) {
 		my $ifalias = sprintf($IFALIAS, $iface, $alias);
@@ -398,9 +399,9 @@ sub os_routing_enable_forward()
 	$cmd = "# IP forwarding is enabled outside the jail";
     } else {
 	# No Fast Forwarding when operating with linkdelays. 
-	$cmd  = "sysctl -w net.inet.ip.forwarding=1\n" .
+	$cmd  = "sysctl net.inet.ip.forwarding=1\n" .
 	        "    if [ ! -e $fname ]; then\n" .
-	        "        sysctl -w net.inet.ip.fastforwarding=1\n" .
+	        "        sysctl net.inet.ip.fastforwarding=1\n" .
 		"    fi\n";
     }
     return $cmd;
@@ -430,9 +431,11 @@ sub os_routing_add_manual($$$$$;$)
 	$cmd = "$ROUTE add $rtabopt -host $destip $gate";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE add $rtabopt -net $destip $gate $destmask";
+    } elsif ($routetype eq "default") {
+	$cmd = "$ROUTE add $rtabopt default $gate";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
-	$cmd = "";
+	$cmd = "false";
     }
 
     return $cmd;
@@ -448,9 +451,11 @@ sub os_routing_del_manual($$$$$;$)
 	$cmd = "$ROUTE delete $rtabopt -host $destip";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE delete $rtabopt -net $destip $gate $destmask";
+    } elsif ($routetype eq "default") {
+	$cmd = "$ROUTE delete $rtabopt default";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
-	$cmd = "";
+	$cmd = "false";
     }
 
     return $cmd;
@@ -509,6 +514,59 @@ sub os_getnfsmounts($)
     close(MOUNT);
     %$rptr = %mounted;
     return 0;
+}
+
+sub os_fwconfig_line($@)
+{
+    my ($fwinfo, @fwrules) = @_;
+    my ($upline, $downline);
+
+    $upline = "kldload ipfw.ko >/dev/null 2>&1\n";
+    foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
+	$upline .= "    ipfw add $rule->{RULENO} $rule->{RULE} || {\n";
+	$upline .= "        echo 'WARNING: could not load ipfw rule:'\n";
+	$upline .= "        echo '  $rule->{RULE}'\n";
+	$upline .= "        exit 1\n";
+	$upline .= "    }\n";
+    }
+    $upline .= "    sysctl net.inet.ip.redirect=0\n";
+    $upline .= "    sysctl net.inet.ip.forwarding=1";
+
+    $downline  = "sysctl net.inet.ip.forwarding=0\n";
+    $downline .= "    sysctl net.inet.ip.redirect=1\n";
+    $downline .= "    ipfw -q flush\n";
+    $downline .= "    kldunload ipfw.ko >/dev/null 2>&1";
+
+    return ($upline, $downline);
+}
+
+sub os_fwrouteconfig_line($$$)
+{
+    my ($orouter, $fwrouter, $routestr) = @_;
+    my ($upline, $downline);
+
+    #
+    # XXX assume the original default route should be used to reach servers.
+    #
+    # For setting up the firewall, this means we create explicit routes for
+    # each host via the original default route.
+    #
+    # For tearing down the firewall, we just remove the explicit routes
+    # and let them fall back on the now re-established original default route.
+    #
+    $upline  = "for vir in $routestr; do\n";
+    $upline .= "        $ROUTE -q delete \$vir >/dev/null 2>&1\n";
+    $upline .= "        $ROUTE -q add \$vir $orouter || {\n";
+    $upline .= "            echo \"Could not establish route for \$vir\"\n";
+    $upline .= "            exit 1\n";
+    $upline .= "        }\n";
+    $upline .= "    done";
+
+    $downline  = "for vir in $routestr; do\n";
+    $downline .= "        $ROUTE -q delete \$vir >/dev/null 2>&1\n";
+    $downline .= "    done";
+
+    return ($upline, $downline);
 }
 
 1;
