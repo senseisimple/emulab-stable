@@ -6,6 +6,9 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 set updir [file dirname $scriptdir]
 
 source $updir/ir/libir.tcl
+load $updir/lib/sql.so
+set DB [sql connect]
+sql selectdb $DB tbdb
 
 namespace import TB_LIBIR::ir
 
@@ -79,7 +82,15 @@ foreach link [array names ipmap] {
 	      [lindex $ipmap($link) 0] \
 	      [lindex $t 1] [lindex $ipmap($link) 1]]
     if {$verbose == 1} {
-	puts [format "%-20s %-15s %-20s %-15s" "" $macmap([lindex $ipmap($link) 0]) "" $macmap([lindex $ipmap($link) 1])]
+	set smac $macmap([lindex $ipmap($link) 0])
+	set dmac $macmap([lindex $ipmap($link) 1])
+	sql query $DB "select IFC from interfaces where mac = \"$smac\""
+	set sifc [sql fetchrow $DB]
+	sql endquery $DB
+	sql query $DB "select IFC from interfaces where mac = \"$dmac\""
+	set difc [sql fetchrow $DB]
+	sql endquery $DB
+	puts [format "%20s %-15s %20s %-15s" /dev/eth$sifc $smac /dev/eth$difc $dmac]
     }
 }
 
