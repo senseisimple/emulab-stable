@@ -114,8 +114,6 @@ if (mysql_num_rows($query_result)) {
     echo "</table>\n";
 }
 
-echo "</center>\n";
-
 #
 # Lets show projects.
 #
