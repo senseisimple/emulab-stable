@@ -14,9 +14,14 @@
 # XXX - this is rather hackish right now.  This should be rewritten using
 # irlib when, if ever, that is written.
 
-set testbed "testbed.ptop"
-set macs "./macs.txt"
-set assign "../assign_hw/assign"
+if {[file dirname [info script]] == "."} {
+    set updir ".."
+} else {
+    set updir [file dirname [file dirname [info script]]]
+}
+set testbed "[file dirname [info script]]/testbed.ptop"
+set assign "$updir/assign_hw/assign"
+
 set maxrun 5
 set switchports 32
 
@@ -159,14 +164,6 @@ foreach link [array names plinks] {
 }
 puts $fp "END links"
 puts $fp "END virtual"
-
-# read macs file
-puts "Reading macs ($macs)"
-set macfp [open $macs r]
-while {[gets $macfp line] >= 0} {
-    set mac([lindex $line 0]) [lrange $line 1 end]
-}
-close $macfp
 
 ## now we apprend the vlan section
 # first we need to read in macs
