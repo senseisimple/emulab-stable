@@ -80,7 +80,7 @@ void usage();
 #define PTYNAME		"%s/tip/%s-pty"
 #define DEVNAME		"%s/%s"
 #define BUFSIZE		4096
-#define DROP_THRESH	8192
+#define DROP_THRESH	(32*1024)
 
 char 	*Progname;
 char 	*Pidname;
@@ -167,21 +167,21 @@ main(argc, argv)
 	 * Open up run/log file, console tty, and controlling pty.
 	 */
 	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
-		die("open(%s) : %s", Logname, geterr(errno));
+		die("%s: open: %s", Logname, geterr(errno));
 	if (chmod(Logname, 0640) < 0)
-		die("chmod(%s) : %s", Logname, geterr(errno));
+		die("%s: chmod: %s", Logname, geterr(errno));
 
 	if (runfile) {
 		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0666)) < 0)
-			die("open(%s) : %s", Runname, geterr(errno));
+			die("%s: open: %s", Runname, geterr(errno));
 		if (chmod(Runname, 0640) < 0)
-			die("chmod(%s) : %s", Runname, geterr(errno));
+			die("%s: chmod: %s", Runname, geterr(errno));
 	}
 	
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
-		die("open(%s) : %s", Ptyname, geterr(errno));
+		die("%s: open: %s", Ptyname, geterr(errno));
 	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK, 0666)) < 0)
-		die("open(%s) : %s", Devname, geterr(errno));
+		die("%s: open: %s", Devname, geterr(errno));
 
 	if (ioctl(devfd, TIOCEXCL, 0) < 0)
 		warn("TIOCEXCL %s: %s", Devname, geterr(errno));
@@ -224,22 +224,22 @@ in()
 			if ((errno == EWOULDBLOCK) || (errno == EINTR))
 				continue;
 			else
-				die("read(%s) : %s", Devname, geterr(errno));
+				die("%s: read: %s", Devname, geterr(errno));
 		}
 		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
 				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 
 		if (write(logfd, buf, cc) < 0)
-			die("write(%s) : %s", Logname, geterr(errno));
+			die("%s: write: %s", Logname, geterr(errno));
 
 		if (runfile) {
 			if (write(runfd, buf, cc) < 0)
-				die("write(%s) : %s", Runname, geterr(errno));
+				die("%s: write: %s", Runname, geterr(errno));
 		}
 
 		if (write(ptyfd, buf, cc) < 0) {
 			if ((errno != EIO) && (errno != EWOULDBLOCK))
-				die("write(%s) : %s", Ptyname, geterr(errno));
+				die("%s: write: %s", Ptyname, geterr(errno));
 		}
 		(void) sigsetmask(omask);
 	}
@@ -267,7 +267,7 @@ out()
 				continue;
 			}
 			else
-				die("read(%s) : %s", Ptyname, geterr(errno));
+				die("%s: read: %s", Ptyname, geterr(errno));
 		}
 		(void) sigsetmask(omask);
 
@@ -275,7 +275,7 @@ out()
 				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 
 		if (write(devfd, buf, cc) < 0)
-			die("write(%s) : %s", Devname, geterr(errno));
+			die("%s: write: %s", Devname, geterr(errno));
 		
 		(void) sigsetmask(omask);
 	}
@@ -309,10 +309,28 @@ capture()
 	 * I keep thinking (use threads) that there is a better way to do
 	 * this (use threads).  Hmm...
 	 */
-	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
-		die("fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
 	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
-		die("fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+		die("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+	/*
+	 * It gets better!
+	 * In FreeBSD 4.0 and beyond, the fcntl fails because the slave
+	 * side is not open even though the only effect of this call is
+	 * to set the file description's FNONBLOCK flag (i.e. the pty and
+	 * tty code do nothing additional).  Turns out that we could use
+	 * ioctl instead of fcntl to set the flag.  The call will still
+	 * fail, but the flag will be left set.  Rather than rely on that
+	 * dubious behavior, I temporarily open the slave, do the fcntl
+	 * and close the slave again.
+	 */
+#ifdef __FreeBSD__
+	if ((n = open(Ttyname, O_RDONLY, 0666)) < 0)
+		die("%s: open: %s", Ttyname, geterr(errno));
+#endif
+	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
+		die("%s: fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
+#ifdef __FreeBSD__
+	close(n);
+#endif
 
 	n = devfd;
 	if (devfd < ptyfd)
@@ -339,7 +357,7 @@ capture()
 				warn("input select interrupted, continuing");
 				continue;
 			}
-			die("select(%s): %s", Devname, geterr(errno));
+			die("%s: select: %s", Devname, geterr(errno));
 		}
 		if (i == 0) {
 			warn("No fds ready!");
@@ -350,9 +368,9 @@ capture()
 			errno = 0;
 			cc = read(devfd, buf, sizeof(buf));
 			if (cc < 0)
-				die("read(%s) : %s", Devname, geterr(errno));
+				die("%s: read: %s", Devname, geterr(errno));
 			if (cc == 0)
-				die("read(%s) : EOF", Devname);
+				die("%s: read: EOF", Devname);
 			errno = 0;
 
 			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
@@ -373,25 +391,25 @@ capture()
 #endif
 						goto dropped;
 					}
-					die("write(%s) : %s",
+					die("%s: write: %s",
 					    Ptyname, geterr(errno));
 				}
 				if (i == 0)
-					die("write(%s) : zero-length", Ptyname);
+					die("%s: write: zero-length", Ptyname);
 			}
 dropped:
 			i = write(logfd, buf, cc);
 			if (i < 0)
-				die("write(%s) : %s", Logname, geterr(errno));
+				die("%s: write: %s", Logname, geterr(errno));
 			if (i != cc)
-				die("write(%s) : incomplete", Logname);
+				die("%s: write: incomplete", Logname);
 			if (runfile) {
 				i = write(runfd, buf, cc);
 				if (i < 0)
-					die("write(%s) : %s",
+					die("%s: write: %s",
 					    Runname, geterr(errno));
 				if (i != cc)
-					die("write(%s) : incomplete", Runname);
+					die("%s: write: incomplete", Runname);
 			}
 			(void) sigsetmask(omask);
 
@@ -405,7 +423,7 @@ dropped:
 				/* XXX commonly observed */
 				if (errno == EIO || errno == EAGAIN)
 					continue;
-				die("read(%s) : %s", Ptyname, geterr(errno));
+				die("%s: read: %s", Ptyname, geterr(errno));
 			}
 			if (cc == 0) {
 				select(0, 0, 0, 0, &timeout);
@@ -428,11 +446,11 @@ dropped:
 #endif
 						goto dropped2;
 					}
-					die("write(%s) : %s",
+					die("%s: write: %s",
 					    Devname, geterr(errno));
 				}
 				if (i == 0)
-					die("write(%s) : zero-length", Devname);
+					die("%s: write: zero-length", Devname);
 			}
 dropped2:
 			(void) sigsetmask(omask);
@@ -456,9 +474,9 @@ reinit(int sig)
 	close(logfd);
 	
 	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
-		die("open(%s) : %s", Logname, geterr(errno));
+		die("%s: open: %s", Logname, geterr(errno));
 	if (chmod(Logname, 0640) < 0)
-		die("chmod(%s) : %s", Logname, geterr(errno));
+		die("%s: chmod: %s", Logname, geterr(errno));
 	
 	dolog(LOG_NOTICE, "new log started");
 
@@ -480,9 +498,9 @@ newrun(int sig)
 	close(runfd);
 
 	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
-		die("open(%s) : %s", Runname, geterr(errno));
+		die("%s: open: %s", Runname, geterr(errno));
 	if (chmod(Runname, 0640) < 0)
-		die("chmod(%s) : %s", Runname, geterr(errno));
+		die("%s: chmod: %s", Runname, geterr(errno));
 	
 	dolog(LOG_NOTICE, "new run started");
 }
@@ -513,7 +531,7 @@ shutdown(int sig)
 	close(ptyfd);
 	
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
-		die("open(%s) : %s", Ptyname, geterr(errno));
+		die("%s: open: %s", Ptyname, geterr(errno));
 
 	/* XXX so we don't have to recompute the select mask */
 	if (ptyfd != ofd) {
@@ -522,8 +540,16 @@ shutdown(int sig)
 		ptyfd = ofd;
 	}
 
+#ifdef __FreeBSD__
+	/* see explanation in capture() above */
+	if ((ofd = open(Ttyname, O_RDONLY, 0666)) < 0)
+		die("%s: open: %s", Ttyname, geterr(errno));
+#endif
 	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
-		die("fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
+		die("%s: fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
+#ifdef __FreeBSD__
+	close(ofd);
+#endif
 	
 	dolog(LOG_NOTICE, "pty reset");
 }
@@ -543,7 +569,7 @@ warn(format, arg0, arg1, arg2, arg3)
 {
 	char msgbuf[BUFSIZE];
 
-	sprintf(msgbuf, format, arg0, arg1, arg2, arg3);
+	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
 	dolog(LOG_WARNING, msgbuf);
 }
 
@@ -552,7 +578,7 @@ die(format, arg0, arg1, arg2, arg3)
 {
 	char msgbuf[BUFSIZE];
 
-	sprintf(msgbuf, format, arg0, arg1, arg2, arg3);
+	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
 	dolog(LOG_ERR, msgbuf);
 	quit(0);
 }
@@ -561,7 +587,7 @@ dolog(level, msg)
 {
 	char msgbuf[BUFSIZE];
 
-	sprintf(msgbuf, "%s - %s", Machine, msg);
+	snprintf(msgbuf, BUFSIZE, "%s - %s", Machine, msg);
 	syslog(level, msgbuf);
 }
 
@@ -622,15 +648,15 @@ writepid()
 	char buf[8];
 	
 	if ((fd = open(Pidname, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0)
-		die("open(%s) : %s", Pidname, geterr(errno));
+		die("%s: open: %s", Pidname, geterr(errno));
 
 	if (chmod(Pidname, 0644) < 0)
-		die("chmod(%s) : %s", Pidname, geterr(errno));
+		die("%s: chmod: %s", Pidname, geterr(errno));
 	
 	(void) sprintf(buf, "%d\n", getpid());
 	
 	if (write(fd, buf, strlen(buf)) < 0)
-		die("write(%s) : %s", Pidname, geterr(errno));
+		die("%s: write: %s", Pidname, geterr(errno));
 	
 	(void) close(fd);
 }
@@ -646,19 +672,19 @@ int speed;
 	int bits;
 	
 	if (ioctl(devfd, TIOCGETP, (char *)&sgbuf) < 0)
-		die("TIOCGETP(%s) : %s", Device, geterr(errno));
+		die("%s: ioctl(TIOCGETP): %s", Device, geterr(errno));
 	sgbuf.sg_ispeed = sgbuf.sg_ospeed = speed;
 	sgbuf.sg_flags = RAW|TANDEM;
 	bits = LDECCTQ;
 	if (ioctl(devfd, TIOCSETP, (char *)&sgbuf) < 0)
-		die("TIOCSETP(%s) : %s", Device, geterr(errno));
+		die("%s: ioctl(TIOCSETP): %s", Device, geterr(errno));
 	if (ioctl(devfd, TIOCLBIS, (char *)&bits) < 0)
-		die("TIOCLBIS(%s) : %s", Device, geterr(errno));
+		die("%s: ioctl(TIOCLBIS): %s", Device, geterr(errno));
 #else
 	struct termios t;
 
 	if (tcgetattr(devfd, &t) < 0)
-		die("tcgetattr(%s) : %s", Devname, geterr(errno));
+		die("%s: tcgetattr: %s", Devname, geterr(errno));
 	(void) cfsetispeed(&t, speed);
 	(void) cfsetospeed(&t, speed);
 	cfmakeraw(&t);
@@ -671,7 +697,7 @@ int speed;
 #endif
 	t.c_cc[VSTART] = t.c_cc[VSTOP] = _POSIX_VDISABLE;
 	if (tcsetattr(devfd, TCSAFLUSH, &t) < 0)
-		die("tcsetattr(%s) : %s", Devname, geterr(errno));
+		die("%s: tcsetattr: %s", Devname, geterr(errno));
 #endif
 }
 
