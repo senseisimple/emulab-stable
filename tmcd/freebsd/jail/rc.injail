@@ -95,7 +95,7 @@ sub doboot()
     }
 
     #
-    # Do this after *before* config scripts. At the moment we use a hacky test
+    # Do this *before* config scripts. At the moment we use a hacky test
     # in vnodesetup to see if the watchdog is running, which tells vnodesetup
     # that the vnode has finished setting up. By doing it now, we allow vnode
     # setup to proceed in parallel (okay, at most two are going to partially
