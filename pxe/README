@@ -15,13 +15,17 @@ first does the following:
 The above steps are not specific to the testbed.  Starting with the execution
 of the downloaded boot program, a testbed specific protocol takes over:
 
-4. The PXE-loaded boot program (pxeboot from the OSKit) speaks a custom hack
-   UDP protocol ("defined" in oskit/boot/bootwhat.h) with yet another server.
+4. The PXE-loaded boot program (pxeboot, a client built atop the FreeBSD
+   standalone boot environment) speaks a custom hack UDP protocol
+   ("defined" in bootwhat.h) with yet another server.
 
 5. This server (bootinfo* in this directory) is responsible for determining,
    in a testbed-specific way, what action should be performed by the client.
    This action is either boot from a specific partition on the hard disk
    or download (via TFTP) a particular multiboot OSKit kernel (e.g., netboot)
+   Bootinfo has a variety of backends, tracing the evolutionary path of
+   where it got its info from.  Currently we use the mysql backend which
+   talks to our DB.
 
 6. Finally, pxeboot transfers control either to the first-level boot code
    in the indicated hard disk partition or to the OSKit kernel it has just
