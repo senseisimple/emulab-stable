@@ -4,7 +4,7 @@
 $ssh = "/usr/local/bin/ssh";
 
 # Remote host to connect to
-$host = "paper.cs.utah.edu";
+$host = "paper.emulab.net";
 
 # String to turn off password authentications
 $nopass = "-o 'BatchMode yes'";

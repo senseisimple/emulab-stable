@@ -2,11 +2,11 @@
 
 #
 # Split up an image and imagezip it. Beware, the sector offsets and sizes
-# are hardcoded in here.
+# are mhardcoded in here.
 #
 
 image=wd0
-zip=imagezip
+zip=/q/testbed/image/imagezip
 
 #
 # Boot block: start 0, size 63

@@ -24,7 +24,7 @@ my $IFACE	= "fxp";
 my $CTLIFACE    = "fxp4";
 my $project     = "";
 my $PROJDIR     = "/proj";
-my $MOUNTCMD	= "/sbin/mount 155.99.214.74:/q/proj/";
+my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
 
 #
 # This is a debugging thing for my home network.

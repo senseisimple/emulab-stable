@@ -25,7 +25,7 @@ my $IFACE	= "eth";
 my $CTLIFACE    = "eth4";
 my $project     = "";
 my $PROJDIR     = "/proj";
-my $MOUNTCMD	= "/bin/mount 155.99.214.74:/q/proj/";
+my $MOUNTCMD	= "/bin/mount fs.emulab.net:/q/proj/";
 
 #
 # This is a debugging thing for my home network.

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: rmacct-ctrl.in,v 1.1 2001-01-04 01:17:09 stoller Exp $
+### $Id: rmacct-ctrl.in,v 1.2 2001-02-06 16:46:43 stoller Exp $
 
 use English;
 use Mysql;
@@ -16,6 +16,7 @@ my $me;                # alphanumeric username of $UID
 my $USERROOT = "/users";
 my $YES      = "YES";
 my $NO       = "NO";
+my $CONTROL  = "users.emulab.net";
 
 my $user;              # kwright
 my $project = 0;       # lkwbox
@@ -122,7 +123,7 @@ sub dowork() {
 	    # print "No control node for project $project in database.\n";
 	}
     }
-    $control_node = "plastic";                     # see note above.
+    $control_node = $CONTROL;                     # see note above.
 
     # I assume FreeBSD. Its 
     # firmly entrenched as our control node OS. -lkw

@@ -26,7 +26,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $PROJROOT = "/proj";
 my $dbh      = Mysql->connect("localhost",$DBNAME,"script","none");
 my $db_result= "";
-my $control_node = "plastic";
+my $control_node = "plastic.emulab.net";
 
 #
 # Check args.
