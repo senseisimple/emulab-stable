@@ -86,7 +86,7 @@ sub tb_compare {
 	}
 	for ($i=0;$i<$#row;++$i) {
 	    if ($row[$i] ne $result[$i]) {
-		tb_fail("$rowi/$i - Found $row[$i], expected $result[$i].\n");
+		tb_fail("$rowi/$i - Found $row[$i], expected $result[$i].");
 	    }
 	}
 	$rowi++;
