@@ -40,8 +40,8 @@ $cbr1 attach-agent $tcp0
 set null0 [new Agent/Null]
 $ns attach-agent $n3 $null0
 
-#Create a TCPSINK agent (a traffic sink) and attach it to node n3
-set null1 [new Agent/TCPSINK]
+#Create a TCPSink agent (a traffic sink) and attach it to node n3
+set null1 [new Agent/TCPSink]
 $ns attach-agent $n3 $null1
 
 #Connect the traffic sources with the traffic sink
