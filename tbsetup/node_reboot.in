@@ -306,9 +306,7 @@ for my $node ( keys(%virtnodes) ) {
 }
 
 if ($failed) {
-    if ($debug) {
-	print STDERR "$failed real nodes could not be rebooted\n";
-    }
+    print STDERR "$failed real nodes could not be rebooted\n";
     exit($failed);
 }
 
@@ -334,6 +332,7 @@ if ($waitmode) {
 	$failed++;
     }
 }
+print "Done. There were $failed failures to reboot.\n";
 exit $failed;
 
 #
