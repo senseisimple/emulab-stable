@@ -1394,6 +1394,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/newnode_reboot \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
+	tbsetup/plab/plabmetrics \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \

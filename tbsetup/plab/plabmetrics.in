@@ -1,0 +1,276 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use XML::Parser;
+
+sub usage()
+{
+    print STDOUT
+	"Usage: plabmetrics [-d] [-n] [-f <xmlfile>]\n";
+    exit(-1);
+}
+my $optlist = "dnf:";
+my $debug   = 0;
+my $impotent= 0;
+my $xmlfile;
+
+#
+# Only real root can call this.
+# 
+if (0 && $UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my $tempfile	= "/tmp/plabxml.$$";
+my %nodemap     = ();
+
+# Current cluster and host.
+my $cluster;
+my $host;
+my $IP;
+my %metrics;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 5;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug   = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $xmlfile = $options{"f"};
+
+    # Note different taint check (allow /).
+    if ($xmlfile =~ /^([-\w.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	die("Tainted xmlfile name: $xmlfile");
+    }
+}
+
+#
+# Grab the node list from the DB in one query, which we use later to
+# map from the IP we get from the XML output, to our node_id. 
+#
+my $query_result =
+    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "where nt.isremotenode=1 and nt.isvirtnode=0");
+
+while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
+    $nodemap{$IP} = $nodeid;
+}
+
+#
+# Download the metrics from the plab site.
+#
+if (defined($xmlfile)) {
+    fatal("Could not copy $xmlfile to $tempfile!")
+	if (system("cp -pf $xmlfile $tempfile"));
+}
+else {
+    #
+    # Must prevent hangs ...
+    #
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 60;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	fatal("Timed out downloading XML data from web site!")
+	    if ($? == 15);
+	    
+	fatal("Could not download XML data from web site!")
+	    if ($?);
+    }
+    else {
+	exec("/usr/local/bin/wget -q -O $tempfile ".
+	     "http://www.planet-lab.org/xml/gmetad.xml");
+	exit(0);
+    }
+}
+
+#
+# Finally, run the parser.
+#
+$p1 = new XML::Parser(Style => 'Tree');
+$p1->setHandlers('Start'   => \&StartElement,
+		 'End'     => \&EndElement);
+
+fatal($@)
+    if (eval { $p1->parsefile($tempfile); return 1; } != 1);
+
+unlink($tempfile)
+    if (-e $tempfile);
+exit(0);
+
+#
+# Insert the metrics we care about. Called for each node.
+#
+sub InsertMetrics()
+{
+    if (defined($nodemap{$IP})) {
+	my $nodeid   = $nodemap{$IP};
+	my $load_one = $metrics{load_one};
+	my $scaled;
+
+	#
+	# Scale load according to Mike. 
+	#
+	if ($load_one > 3.0) {
+	    $scaled = 1.0;
+	}
+	else {
+	    $scaled = $load_one / 3.0;
+	}
+		
+	if ($debug) {
+	    print STDERR "$nodeid ($host) $load_one $scaled\n";
+	}
+
+	if (!$impotent) {
+	    DBQueryWarn("replace delayed into node_features ".
+			" (node_id, feature, weight) ".
+			" values ('$nodeid', '+load', $scaled)");
+	}
+    }
+}
+
+#
+# Start an element.
+# 
+sub StartElement ($$$)
+{
+    my ($expat, $element, %attrs) = @_;
+
+    SWITCH: for ($element) {
+	/^CLUSTER/i && do {
+	    fatal("Out of Sync: CLUSTER!")
+		if (defined($cluster) || defined($host));
+	    
+	    fatal("Malformed CLUSTER Element!")
+		if (!defined($attrs{"NAME"}));
+	    
+	    $cluster = $attrs{"NAME"};
+	    last SWITCH;
+	};
+	/^HOST/i && do {
+	    fatal("Out of Sync: HOST!")
+		if (defined($host) || !defined($cluster));
+	    
+	    fatal("Malformed HOST Element!")
+		if (!defined($attrs{"NAME"}));
+	    
+	    $host = $attrs{"NAME"};
+	    $IP   = $attrs{"IP"};
+	    last SWITCH;
+	};
+	/^METRIC/i && do {
+	    fatal("Out of Sync: METRIC!")
+		if (!defined($host) || !defined($cluster));
+
+	    fatal("Malformed METRIC Element!")
+		if (!defined($attrs{"NAME"}) ||
+		    !defined($attrs{"VAL"}));
+		
+	    $metrics{$attrs{"NAME"}} = $attrs{"VAL"};
+	    last SWITCH;
+	};
+    }
+}
+
+#
+# End an element.
+# 
+sub EndElement ($$)
+{
+    my ($expat, $element) = @_;
+
+    SWITCH: for ($element) {
+	/^CLUSTER/i && do {
+	    fatal("Out of Sync (End): CLUSTER!")
+		if (!defined($cluster) || defined($host));
+	    
+	    undef($cluster);
+	    last SWITCH;
+	};
+	/^HOST/i && do {
+	    fatal("Out of Sync (End): HOST!")
+		if (!defined($host) || !defined($cluster));
+
+	    InsertMetrics();
+
+	    undef($host);
+	    undef($IP);
+	    %metrics = ();
+	    last SWITCH;
+	};
+	/^METRIC/i && do {
+	    fatal("Out of Sync (End): METRIC!")
+		if (!defined($host) || !defined($cluster));
+
+	    last SWITCH;
+	};
+    }
+}
+
+
+
+sub fatal {
+    my $msg = $_[0];
+
+    SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+
+    unlink($tempfile)
+	if (defined($tempfile) && -e $tempfile);
+    die($msg);
+}
