@@ -1,0 +1,52 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# 
+# Makefile for the standalone version of imagezip/unzip.
+# (Standalone meaning not part of the Netbed build environment.)
+#
+BINDIR=	/usr/local/bin
+
+.if defined(NOTHREADS)
+PTHREADCFLAGS	= -DNOTHREADS
+PTHREADLIBS	=
+.else
+PTHREADCFLAGS	= -D_THREAD_SAFE \
+		  -I/usr/local/include/pthread/linuxthreads
+PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+.endif
+
+CFLAGS		= -Wall -O2 -g -static
+LIBS 		= -lz $(PTHREADLIBS)
+UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
+UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
+
+all:	imagezip imageunzip imagedump
+
+imagezip: imagezip.o version.o 
+	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
+
+imageunzip: imageunzip.o version.o 
+	$(CC) $(CFLAGS) imageunzip.o version.o $(UNZIPLIBS) -o imageunzip
+
+imageunzip.o:	imageunzip.c
+	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
+
+imagedump: imagedump.o version.o
+	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
+
+version.c: imagezip.c imageunzip.c imagedump.c
+	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
+
+install:
+	$(INSTALL) imagezip $(DESTDIR)$(BINDIR)/imagezip
+	$(INSTALL) imageunzip $(DESTDIR)$(BINDIR)/imageunzip
+	$(INSTALL) imagedump $(DESTDIR)$(BINDIR)/imagedump
+
+clean:
+	rm -f *.o imagezip imageunzip imagedump version.c
+
+.include <bsd.prog.mk>

@@ -9,6 +9,10 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= os/imagezip
 
+DISTFILES	= TODO ext2_fs.h imagehdr.h linux_types.h queue.h \
+		  imagedump.c imagedump.8 imagezip.c imagedump.8 \
+		  imageunzip.c imageunzip.8
+
 WITH_NTFS	= @WINSUPPORT@
 
 include $(OBJDIR)/Makeconf
@@ -55,17 +59,22 @@ ntfs:
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
+install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDIR)/imagedump
 
 client-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin
 	$(INSTALL_PROGRAM) imagezip $(DESTDIR)/usr/local/bin/imagezip
 	$(INSTALL_PROGRAM) imageunzip $(DESTDIR)/usr/local/bin/imageunzip
+	$(INSTALL_PROGRAM) imagedump $(DESTDIR)/usr/local/bin/imagedump
 
 clean:
 	@if [ -d ntfs ]; then \
 		$(MAKE) -C ntfs clean; \
 	fi;
-	/bin/rm -f *.o imagezip imageunzip version.c
+	/bin/rm -f *.o imagezip imageunzip imagedump version.c
+
+imagezip.tar: Makefile.sa $(DISTFILES)
+	(cd $(SRCDIR); cp -p Makefile.sa Makefile; \
+		tar cf - Makefile $(DISTFILES); rm -f Makefile) > imagezip.tar
 
 .PHONY:	$(NTFSDIR)

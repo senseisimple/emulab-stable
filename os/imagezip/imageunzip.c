@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,9 +24,11 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/disklabel.h>
-#include <pthread.h>
 #include "imagehdr.h"
 #include "queue.h"
+#ifndef NOTHREADS
+#include <pthread.h>
+#endif
 
 /*
  * Define this if you want to test frisbee's random presentation of chunks
@@ -71,7 +73,6 @@ static int	 debug = 0;
 static int	 outfd;
 static int	 dofill = 0;
 static int	 nothreads = 0;
-static pthread_t child_pid;
 static int	 rdycount;
 static int	 imageversion = 1;
 #ifndef FRISBEE
@@ -83,15 +84,11 @@ static int	 dotcol;
 static char	 chunkbuf[SUBBLOCKSIZE];
 static struct timeval stamp;
 #endif
-static void	 threadinit(void);
-static void	 threadwait(void);
-static void	 threadquit(void);
 int		 readmbr(int slice);
 int		 fixmbr(int slice, int dtype);
 static int	 inflate_subblock(char *);
 void		 writezeros(off_t offset, off_t zcount);
 void		 writedata(off_t offset, size_t count, void *buf);
-void	        *DiskWriter(void *arg);
 
 static void	getrelocinfo(blockhdr_t *hdr);
 static void	applyrelocs(off_t offset, size_t cc, void *buf);
@@ -99,7 +96,6 @@ static void	applyrelocs(off_t offset, size_t cc, void *buf);
 static int	 seekable;
 static off_t	 nextwriteoffset;
 
-static int	writeinprogress; /* XXX */
 static int	imagetoobigwarned;
 
 #ifdef FAKEFRISBEE
@@ -114,6 +110,21 @@ static int	*chunklist, *nextchunk;
  */
 unsigned long decompidles;
 unsigned long writeridles;
+
+#ifdef NOTHREADS
+#define		threadinit()
+#define		threadwait()
+#define		threadquit()
+#else
+static void	 threadinit(void);
+static void	 threadwait(void);
+static void	 threadquit(void);
+static void	*DiskWriter(void *arg);
+
+static int	writeinprogress; /* XXX */
+static pthread_t child_pid;
+static pthread_mutex_t	freelist_mutex, readyqueue_mutex;	
+static pthread_cond_t	freelist_condvar, readyqueue_condvar;	
 
 /*
  * A queue of ready to write data blocks.
@@ -132,14 +143,14 @@ typedef struct {
 static queue_head_t	readyqueue;
 static readyblock_t	*freelist;
 #define READYQSIZE	256
-
-static pthread_mutex_t	freelist_mutex, readyqueue_mutex;	
-static pthread_cond_t	freelist_condvar, readyqueue_condvar;	
+#endif
 
 static void
 dowrite_request(off_t offset, off_t size, void *buf)
 {
+#ifndef NOTHREADS
 	readyhdr_t *hdr;
+#endif
 	
 	/*
 	 * Adjust for partition start and ensure data fits
@@ -160,18 +171,30 @@ dowrite_request(off_t offset, off_t size, void *buf)
 
 	totaledata += size;
 
-	/*
-	 * Null buf means its a request to zero.
-	 * If we are not filling, just return.
-	 */
+	if (nothreads) {
+		/*
+		 * Null buf means its a request to zero.
+		 * If we are not filling, just return.
+		 */
+		if (buf == NULL) {
+			if (dofill)
+				writezeros(offset, size);
+		} else {
+			assert(size <= OUTSIZE+SECSIZE);
+
+			/*
+			 * Handle any relocations
+			 */
+			applyrelocs(offset, (size_t)size, buf);
+			writedata(offset, (size_t)size, buf);
+		}
+		return;
+	}
+
+#ifndef NOTHREADS
 	if (buf == NULL) {
 		if (!dofill)
 			return;
-
-		if (nothreads) {
-			writezeros(offset, size);
-			return;
-		}
 
 		if ((hdr = (readyhdr_t *)malloc(sizeof(readyhdr_t))) == NULL) {
 			fprintf(stderr, "Out of memory\n");
@@ -192,11 +215,6 @@ dowrite_request(off_t offset, off_t size, void *buf)
 		 * Handle any relocations
 		 */
 		applyrelocs(offset, cc, buf);
-
-		if (nothreads) {
-			writedata(offset, cc, buf);
-			return;
-		}
 
 		/*
 		 * Try to allocate a block. Wait if none available.
@@ -222,6 +240,7 @@ dowrite_request(off_t offset, off_t size, void *buf)
 	queue_enter(&readyqueue, hdr, readyhdr_t *, chain);
 	pthread_mutex_unlock(&readyqueue_mutex);
 	pthread_cond_signal(&readyqueue_condvar);
+#endif
 }
 
 static inline int devread(int fd, void *buf, size_t size)
@@ -256,6 +275,9 @@ main(int argc, char **argv)
 	extern char	build_info[];
 	struct timeval  estamp;
 
+#ifdef NOTHREADS
+	nothreads = 1;
+#endif
 	while ((ch = getopt(argc, argv, "vdhs:zp:onFD:")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
@@ -326,7 +348,7 @@ main(int argc, char **argv)
 	else
 		infd = fileno(stdin);
 
-	if (argc == 2) {
+	if (argc == 2 && strcmp(argv[1], "-")) {
 		if ((outfd =
 		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
@@ -558,6 +580,7 @@ ImageUnzipQuit(void)
 }
 #endif
 
+#ifndef NOTHREADS
 static void *readyqueuemem;
 
 static void
@@ -634,6 +657,51 @@ threadquit(void)
 	free(readyqueuemem);
 	freelist = 0;
 }
+
+void *
+DiskWriter(void *arg)
+{
+	readyblock_t	*rdyblk = 0;
+
+	while (1) {
+		pthread_testcancel();
+
+		pthread_mutex_lock(&readyqueue_mutex);
+		if (queue_empty(&readyqueue)) {
+/*			fprintf(stderr, "Writer idle\n"); */
+			writeridles++;
+			do {
+				pthread_cond_wait(&readyqueue_condvar,
+						  &readyqueue_mutex);
+				pthread_testcancel();
+			} while (queue_empty(&readyqueue));
+		}
+		queue_remove_first(&readyqueue, rdyblk,
+				   readyblock_t *, header.chain);
+		writeinprogress = 1; /* XXX */
+		pthread_mutex_unlock(&readyqueue_mutex);
+
+		if (rdyblk->header.zero) {
+			writezeros(rdyblk->header.offset, rdyblk->header.size);
+			free(rdyblk);
+			writeinprogress = 0; /* XXX, ok as unlocked access */
+			continue;
+		}
+		rdycount++;
+
+		assert(rdyblk->header.size <= OUTSIZE+SECSIZE);
+		writedata(rdyblk->header.offset, (size_t)rdyblk->header.size,
+			  rdyblk->buf);
+		writeinprogress = 0; /* XXX, ok as unlocked access */
+
+		pthread_mutex_lock(&freelist_mutex);
+		rdyblk->header.chain.next = (void *) freelist;
+		freelist = rdyblk;
+		pthread_mutex_unlock(&freelist_mutex);
+		pthread_cond_signal(&freelist_condvar);
+	}
+}
+#endif
 
 static int
 inflate_subblock(char *chunkbufp)
@@ -870,7 +938,8 @@ writezeros(off_t offset, off_t zcount)
 		}
 		nextwriteoffset = offset;
 	} else if (offset != nextwriteoffset) {
-		fprintf(stderr, "Attempted non-contiguous write\n");
+		fprintf(stderr, "Non-contiguous write @ %qu (should be %qu)\n",
+			offset, nextwriteoffset);
 		exit(1);
 	}
 
@@ -904,7 +973,8 @@ writedata(off_t offset, size_t size, void *buf)
 	else if (offset == nextwriteoffset)
 		cc = write(outfd, buf, size);
 	else {
-		fprintf(stderr, "Attempted non-contiguous write\n");
+		fprintf(stderr, "Non-contiguous write @ %qu (should be %qu)\n",
+			offset, nextwriteoffset);
 		exit(1);
 	}
 		
@@ -1009,50 +1079,6 @@ fixmbr(int slice, int dtype)
 			slice, dostype);
 	}
 	return 0;
-}
-
-void *
-DiskWriter(void *arg)
-{
-	readyblock_t	*rdyblk = 0;
-
-	while (1) {
-		pthread_testcancel();
-
-		pthread_mutex_lock(&readyqueue_mutex);
-		if (queue_empty(&readyqueue)) {
-/*			fprintf(stderr, "Writer idle\n"); */
-			writeridles++;
-			do {
-				pthread_cond_wait(&readyqueue_condvar,
-						  &readyqueue_mutex);
-				pthread_testcancel();
-			} while (queue_empty(&readyqueue));
-		}
-		queue_remove_first(&readyqueue, rdyblk,
-				   readyblock_t *, header.chain);
-		writeinprogress = 1; /* XXX */
-		pthread_mutex_unlock(&readyqueue_mutex);
-
-		if (rdyblk->header.zero) {
-			writezeros(rdyblk->header.offset, rdyblk->header.size);
-			free(rdyblk);
-			writeinprogress = 0; /* XXX, ok as unlocked access */
-			continue;
-		}
-		rdycount++;
-
-		assert(rdyblk->header.size <= OUTSIZE+SECSIZE);
-		writedata(rdyblk->header.offset, (size_t)rdyblk->header.size,
-			  rdyblk->buf);
-		writeinprogress = 0; /* XXX, ok as unlocked access */
-
-		pthread_mutex_lock(&freelist_mutex);
-		rdyblk->header.chain.next = (void *) freelist;
-		freelist = rdyblk;
-		pthread_mutex_unlock(&freelist_mutex);
-		pthread_cond_signal(&freelist_condvar);
-	}
 }
 
 static struct blockreloc *reloctable;
