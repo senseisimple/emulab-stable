@@ -101,18 +101,7 @@ $usr_phone = addslashes($usr_phone);
 #
 # See if this is a new user or one returning.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid=\"$joining_uid\"");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error retrieving info for $joining_uid: $err\n", 1);
-}
-if (mysql_num_rows($query_result) > 0) {
-    $returning = 1;
-}
-else {
-    $returning = 0;
-}
+$returning = TBCurrentUser($joining_uid);
 
 #
 # If a user returning, then the login must be valid to continue any further.

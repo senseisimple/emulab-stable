@@ -178,15 +178,7 @@ if (mysql_num_rows($query_result)) {
 #
 # See if this is a new user or one returning.
 #
-$pswd_result =
-    DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$proj_head_uid'");
-
-if ($row = mysql_fetch_row($pswd_result)) {
-    $returning = 1;
-}
-else {
-    $returning = 0;
-}
+$returning = TBCurrentUser($proj_head_uid);
 
 #
 # If a user returning, then the login must be valid to continue any further.

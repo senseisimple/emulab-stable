@@ -595,6 +595,21 @@ function TBUserInfo($uid, &$user_name, &$user_email)
 }
 
 #
+# Confirm a current user or not.
+#
+# usage TBCurrentUser($uid)
+#       returns 1 if a valid user.
+#       returns 0 if not a valid user.
+#
+function TBCurrentUser($uid)
+{
+    $query_result =
+	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
 # Confirm a valid pid/gid
 #
 # usage TBValidGroup($pid, $gid)
@@ -886,7 +901,7 @@ function TBExpUidLastLogins($pid, $eid)
 }
 
 #
-#
+# Number of globally free PCs.
 #
 function TBFreePCs()
 {
@@ -896,6 +911,20 @@ function TBFreePCs()
 		     "left join node_types as nt on a.type=nt.type ".
 		     "where b.node_id is null and a.role='testnode' ".
 		     "  and a.type like 'pc%'");
+
+    return mysql_num_rows($query_result);
+}
+
+function TBUserPCs($uid)
+{
+    $query_result =
+	DBQueryFatal("select a.node_id from nodes as a ".
+		     "left join reserved as b on a.node_id=b.node_id ".
+		     "left join node_types as nt on a.type=nt.type ".
+                     "left join experiments as e on b.pid=e.pid and ".
+                     " b.eid=e.eid ".
+		     "where e.expt_head_uid='$uid' and e.pid!='emulab-ops' ".
+		     "  and a.role='testnode' and a.type like 'pc%'");
 
     return mysql_num_rows($query_result);
 }

@@ -101,7 +101,6 @@ $usr_URL     = $row[usr_URL];
 $usr_addr    = $row[usr_addr];
 $usr_name    = $row[usr_name];
 $usr_phone   = $row[usr_phone];
-$usr_passwd  = $row[usr_pswd];
 $usr_title   = $row[usr_title];
 $usr_affil   = $row[usr_affil];
 
