@@ -42,7 +42,7 @@ ALLCERTS	= $(CERTS)
 #
 # Name and rootball revision
 #
-ROOTBALLREV	= 6
+ROOTBALLREV	= 7
 ROOTBALLNAME	= plabroot-$(ROOTBALLREV).tgz
 
 include $(OBJDIR)/Makeconf
@@ -73,6 +73,7 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
 			plabroot/usr/local/etc/emulab
 	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
+	cp /dev/null plabroot/usr/local/etc/emulab/isrem
 
 mkdirtree:
 	mkdir -p plabroot/usr/local/etc/emulab
