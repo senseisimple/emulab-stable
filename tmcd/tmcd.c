@@ -1059,7 +1059,8 @@ COMMAND_PROTOTYPE(doifconfig)
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
 			 " IPaliases,iface,role,mask,rtabid "
 			 "from interfaces where node_id='%s' and %s",
-			 11, reqp->pnodeid, buf);
+			 11, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+			 buf);
 
 	/*
 	 * We need pnodeid in the query. But error reporting is done
