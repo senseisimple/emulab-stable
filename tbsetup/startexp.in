@@ -33,6 +33,7 @@ my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my $cleanme  = 0;
 my $batch    = 0;
+my $errorstat= -1;
 
 #
 # For debugging all this goo. Leaves the experiment directory intact,
@@ -210,15 +211,18 @@ if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
 }
 
 #
-# Run the various scripts.
+# Run the various scripts. We want to propogate the error from tbprerun
+# and tbrun back out, hence the bogus looking errorstat variable.
 #
 if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
+    $errorstat = $? >> 8;
     fatal("tbprerun failed!\n");
 }
 # So fatal errors run tbend.
 $cleanme = 1;
 
 if (system("$tbdir/tbrun -nologfile $pid $eid $irfile") != 0) {
+    $errorstat = $? >> 8;
     fatal("tbrun failed!\n");
 }
 
@@ -343,10 +347,10 @@ exit 0;
 
 sub fatal()
 {
-    my($mesg) = $_[0];
+    my($mesg)     = $_[0];
 
     print STDOUT "$mesg\n";
-    print STDOUT "Cleaning up ...\n";
+    print STDOUT "Cleaning up and exiting with status $errorstat ...\n";
 
     #
     # If we got far enough to allocate nodes, must run tbend.
@@ -370,11 +374,21 @@ sub fatal()
     # In batch mode, exit. Make sure to delete tempns file. 
     #
     if ($batch) {
+	if (open(IN, "$eiddir/assign.log")) {
+	    print STDOUT "\n\n--------- assign.log --------\n\n";
+	    
+	    while (<IN>) {
+		print STDOUT "$_";
+	    }
+	    close(IN);
+	}
+	
 	if (chdir($expdir)) {
-	    system("/bin/mv", "-f", "$eid", "$eid-$PID");
+	    system("/bin/rm", "-rf", "${eid}-TBfailed");
+	    system("/bin/mv", "-f", "$eid", "${eid}-TBfailed");
 	}
 	unlink("$tempns");
-	exit(-1);
+	exit($errorstat);
     }
 
     #
@@ -389,7 +403,7 @@ sub fatal()
     print MAIL $mesg;
 
     if (open(IN, "$tempns")) {
-	print MAIL "\n\n---------\n\n";
+	print MAIL "\n\n--------- $tempns ---------\n\n";
 
 	while (<IN>) {
 	    print MAIL "$_";
@@ -399,7 +413,7 @@ sub fatal()
     }
 
     if (open(IN, "$logname")) {
-	print MAIL "\n\n---------\n\n";
+	print MAIL "\n\n--------- $logname ---------\n\n";
 	
 	while (<IN>) {
 	    print MAIL "$_";
@@ -408,7 +422,7 @@ sub fatal()
     }
 
     if (open(IN, "$eiddir/assign.log")) {
-	print MAIL "\n\n---------\n\n";
+	print MAIL "\n\n--------- assign.log --------\n\n";
 	
 	while (<IN>) {
 	    print MAIL "$_";
@@ -420,9 +434,10 @@ sub fatal()
     unlink("$tempns");
     unlink("$logname");
     if (chdir($expdir)) {
-	system("/bin/mv", "-f", "$eid", "$eid-$PID");
+	system("/bin/rm", "-rf", "${eid}-TBfailed");
+	system("/bin/mv", "-f", "$eid", "${eid}-TBfailed");
     }
-    exit(-1);
+    exit($errorstat);
 }
 
 #

@@ -104,6 +104,7 @@ if (&tbs_exec("postparse $tbcmdfile $irfile")) {
 }
 
 # Now we do a loop with assign/nalloc until we work or give up
+$assign_exitval = 0;
 $run = 0;
 $done = 0;
 &tbs_out("Starting assignment.\n");
@@ -112,6 +113,9 @@ while ($done == 0) {
     $run++;
     if ($run > $maxruns) {
 	&tbs_out("Too many runs - Giving up.\n");
+	if ($assign_exitval) {
+	    exit($assign_exitval);
+	}
 	exit(1);
     }
     &tbs_out("Run: $run\n");
@@ -123,7 +127,9 @@ while ($done == 0) {
     }
     
     &tbs_out("Allocating resources - This may take a while.\n");
-    if (&tbs_exec("assign_wrapper $irfile $ptopfile")) {
+    $assign_exitval = &tbs_exec("assign_wrapper $irfile $ptopfile");
+    $assign_exitval = $assign_exitval >> 8;
+    if ($assign_exitval) {
 	&tbs_out("Failed to allocate resources.\n");
     } else {
 	# now we need to read what resources are needed from the IR file

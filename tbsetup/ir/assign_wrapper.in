@@ -437,11 +437,11 @@ $num_sshelves = $#t+1;
 $num_pcs = $#t+1 - int($delayindex/2);
 if ($num_pcs > $avail_pcs) {
     print STDERR "Insufficient PCs to do mapping.  Have $avail_pcs; need $num_pcs.\n";
-    exit(777);
+    exit(77);
 }
 if ($num_sshelves > $avail_sshelves) {
     print STDERR "Insufficient Shark Shelves to do mapping.  Have $avail_sshelves; need $num_sshelves.\n";
-    exit(777);
+    exit(77);
 }
 
 
