@@ -7,31 +7,8 @@
 
 . /etc/emulab/paths.sh
 
-if [ -r $BOOTDIR/control_interface ]; then
-    cat $BOOTDIR/control_interface
+if [ -r $BOOTDIR/controlif ]; then
+    cat $BOOTDIR/controlif
 else
-    NODETYPE=`$BINDIR/nodetype`
-    case $NODETYPE in
-    pc300|pc733|pc850|i2|pc1800)
-	echo 'fxp0'
-	;;
-    pcL440GX)
-	echo 'fxp1'
-	;;
-    pc600|pc850a)
-	echo 'fxp4'
-	;;
-    pc1500|pc2000)
-	echo 'xl0'
-	;;
-    pc3000|pc2400-aero)
-	echo 'em0'
-	;;
-    pc2400-orbit)
-	echo 'fxp0'
-	;;
-    *)
-	echo 'unknown'
-	;;
-    esac
+    echo 'unknown'
 fi

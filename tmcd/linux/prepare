@@ -24,6 +24,19 @@ my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $VARACCTDIR  = "/var/account";
 
+#
+# Dead wood in $BINDIR
+# If you remove/move a script, list it here so that it goes away when the
+# image is remade.
+#
+my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
+		   "rc.injail", "rc.ipod", "rc.mfs", "rc.progagent",
+		   "rc.setup", "rc.slothd", "rc.testbed",
+		   "batchcmddone", "bootsetup", "install-tarfile",
+		   "jailsetup", "update_delays", "rc/rc.linux",
+		   "sethostname" # replaced by sethostname.dhclient on linux
+		   );
+
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
@@ -183,6 +196,15 @@ foreach my $dir (@VARDIRS) {
 	system("rm -rf $VARDIR/$dir/*");
     }
 }
+
+print "Clearing out old Emulab scripts and binaries in $BINDIR ...\n";
+foreach my $file (@DEADFILES) {
+    if (-f "$BINDIR/$file") {
+	unlink("$BINDIR/$file") or
+	    warn("*** could not remove $BINDIR/$file\n");
+    }
+}
+system("rm -f /etc/pump.conf");
 
 print "Removing backup files in /etc\n";
 

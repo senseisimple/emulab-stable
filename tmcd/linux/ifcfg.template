@@ -1,14 +1,3 @@
-DEVICE="eth0"
-
-. /etc/emulab/paths.sh
-
-if [ "`control_interface`" = "$DEVICE" ]; then
-	BOOTPROTO="dhcp"
-	ONBOOT="yes"
-else
-	ONBOOT="no"
-fi
-
 IPADDR=""
 NETMASK=""
 IPXNETNUM_802_2=""

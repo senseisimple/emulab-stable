@@ -20,7 +20,7 @@ echo $new_routers > $BOOTDIR/routerip
 echo $new_ip_address > $BOOTDIR/myip
 echo $new_subnet_mask > $BOOTDIR/mynetmask
 if [ -n "$interface" ]; then
-    echo $interface > $BOOTDIR/control_interface
+    echo $interface > $BOOTDIR/controlif
 fi
 
 #

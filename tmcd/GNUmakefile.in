@@ -93,6 +93,11 @@ install:	$(INSTALL_SBINDIR)/tmcd \
 client-install: client
 	@$(MAKE) -C $(MDSUBDIR) install
 
+mfs: client
+
+mfs-install: mfs
+	@$(MAKE) -C $(MDSUBDIR) mfs-install
+
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)/tmcd

@@ -47,8 +47,6 @@ dir-install:
 
 baselinux-install: dir-install
 	(cd ../linux; $(MAKE) client-install)
-	rm -f $(SYSETCDIR)/pump.conf
-#	rm -f $(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth?
 
 common-install:	dir-install
 	(cd ../common; $(MAKE) local-install)

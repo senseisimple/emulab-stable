@@ -1,0 +1,31 @@
+#
+# HACK: run dhclient on all interfaces, and do nothing else
+#
+# Note that this file's name (eth99) cannot overlap with an actual
+# existing interface or dhclient will loop.  dhclient-script invokes
+# the source-config function which sources the ifcfg-ethN file.  Thus
+# if this script were called "ifcfg-eth0" and eth0 was the DHCPable
+# interface, we would wind up recursively invoking dhclient (trust me,
+# I tried it :-)
+#
+DEVICE="eth99"
+IFACETYPES="3c59x eepro100 e1000 tulip"
+
+#
+# First, probe for all our supported ethernet types
+#
+modprobe -qa $IFACETYPES
+
+#
+# If dhclient returns success, then it has configured the first interface
+# and gone into background mode.  At that point we don't care about it any
+# more and just kill it.  We also set ONBOOT=no to prevent ifup (our caller)
+# from doing any further configuration on this fake interface.
+#
+if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
+	killall dhclient
+        ONBOOT="no"
+else
+	# eat flaming death
+        exit 1
+fi

@@ -24,7 +24,7 @@ SCRIPTS		= sethostname sethostname.dhclient
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	pump.conf supfile $(SCRIPTS)
+all:	supfile $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -85,21 +85,12 @@ etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 600 $(SRCDIR)/gshadow $(ETCDIR)/gshadow
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(ETCDIR)/hosts
 
-sysetc-install:	dir-install pump.conf
-	$(INSTALL) -m 644 ./pump.conf $(SYSETCDIR)/pump.conf
+sysetc-install:	dir-install ifcfgs
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks $(SYSETCDIR)/dhclient-enter-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks $(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
-	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth0 \
-			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth0
-	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth1 \
-			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth1
-	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth2 \
-			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth2
-	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth3 \
-			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth3
-	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth4 \
-			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth4
+	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
 	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc3.d/S96testbed
@@ -126,22 +117,19 @@ sysetc-remove:
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc/rc.linux
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp
-	$(INSTALL) -m 755 ./sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 ./sethostname.dhclient $(BINDIR)/sethostname.dhclient
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/healthd.conf $(BINDIR)/healthd.conf
+	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
+	$(INSTALL) -m 755 $(SRCDIR)/mkextrafs.pl $(BINDIR)/mkextrafs.pl
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(BINDIR)/control_interface
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
-	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
-	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
-	$(INSTALL) -m 755 $(SRCDIR)/mkextrafs.pl $(BINDIR)/mkextrafs.pl
-	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
-				$(BINDIR)/control_interface
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
@@ -155,3 +143,7 @@ sfs-install:
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/var
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/usr
+
+# create ifcfg-eth? files
+ifcfgs:	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
+	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template

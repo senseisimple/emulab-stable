@@ -208,3 +208,4 @@ foreach my $file (@DEADFILES) {
 	    warn("*** could not remove $BINDIR/$file\n");
     }
 }
+system("rm -f /etc/start_if*");

@@ -1,7 +1,0 @@
-#!/bin/sh
-
-. /etc/emulab/paths.sh
-
-if [ `$BINDIR/control_interface` = 'fxp0' ]; then
-	dhcp_interfaces="$dhcp_interfaces fxp0";
-fi

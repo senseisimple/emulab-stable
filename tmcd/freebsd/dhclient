@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Ignore interfaces passed in and just dhcp on all of them.
+# Since we are invoked by telling rc.conf to DHCP on lo0, we must
+# also correctly reset lo0's state.
+#
+ifconfig lo0 down
+ifconfig lo0 inet 127.0.0.1
+
+/sbin/dhclient $flags
+exit $?
