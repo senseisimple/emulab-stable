@@ -31,7 +31,7 @@ del types
 
 
 
-hvmain = _hv.hvmain
+hvMain = _hv.hvMain
 
 hvKill = _hv.hvKill
 
