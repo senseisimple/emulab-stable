@@ -9,6 +9,19 @@
 <h1>Emulab - Tutorial</h1>
 </center>
 
+<h2>Contents</h2>
+<ul>
+<li> <a href="#LoggingIn">Logging into the Web Interface</a>
+<li> <a href="#Designing">Designing a Network Topology</a>
+<li> <a href="#Beginning">Beginning the Experiment</a>
+<li> <a href="#UsingNodes">Using your Nodes</a>
+<li> <a href="#RootAccess">I need <b>root</b> access!</a>
+<li> <a href="#Wedged">My node is wedged!</a>
+<li> <a href="#Finished">I've finished my experiment</a>
+<li> <a href="#Help">Getting Help!</a>
+</ul>
+
+<a NAME="LoggingIn"></a>
 <h3>Logging Into the Web Interface</h3>
 
 <p>
@@ -21,6 +34,7 @@ getting an Emulab account, go to the <b><a href =
 "http://www.emulab.net/auth.html"> "How To Get Started"</a></b> page.
 
 
+<a NAME="Designing"></a>
 <h3>Designing a Network Topology</h3>
 <p>
 The Testbed's power lies in its ability to assume many different
@@ -112,10 +126,13 @@ going to node C:
 	tb-set-ip-interface $NodeB $NodeC 192.168.42.42	</code></pre>
 
 <p>
-Another example ns script that shows off using the power of Tcl to
-generate topologies is <a href=example.ns>here</a>.
+If you would like to try the above example, the completed <a
+href="basic.ns">NS file</a> can be run as an experiment in your
+project. Another example ns script that shows off using the power of
+Tcl to generate topologies is <a href=example.ns>here</a>.
 
 
+<a NAME="Beginning"></a>
 <h3>Beginning the Experiment</h3>
 
 <p>
@@ -190,6 +207,8 @@ A few points should be noted:
      by the system to use 192.168.XXX.XXX subnets.
 </ul>
 
+
+<a NAME="UsingNodes"></a>
 <h3>Using your Nodes</h3>
 
 <p>
@@ -241,7 +260,8 @@ hope to provide tools to assist in the configuration, but for now you
 are on your own.
 
 
-<h3>I need "root" access!</h3>
+<a NAME="RootAccess"></a>
+<h3>I need <b>root</b> access!</h3>
 
 <p>
 If you need to customize the configuration, or perhaps reboot nodes,
@@ -249,9 +269,10 @@ you can use the "sudo" command, located in <code>/usr/local/bin</code>
 on FreeBSD and Linux, and <code>/usr/pkg/bin</code> on NetBSD. Our
 policy is very liberal; you can customize the configuration in any way
 you like, provided it does not violate Emulab's
-<a href = "policies.html">administrative policies</a>.
+<a href = "../policies.html">administrative policies</a>.
 
 
+<a NAME="Wedged"></a>
 <h3>My node is wedged!</h3>
 
 <p>
@@ -270,6 +291,33 @@ aware that you may power cycle only nodes in projects that you are
 member of. Also, power cycling nodes should only be used as a <b>last
 resort</b>, since constant power cycling can damage the nodes over the
 long term. Please try to reboot your nodes first (see above).
+
+<a NAME="Finished"></a>
+<h3>I've finished my experiment</h3>
+
+When your experiment is completed, and you no longer need the
+resources that have been allocated to it, you will need to terminate
+the experiment via the Emulab Web Interface. Click on the "End An
+Experiment" link. You will be presented with a list of all of the
+experiments in all of the projects for which you have the
+authorization to terminate experiments. Select the experiment you want
+to terminate by clicking on the button in the "Terminate" column on
+the right hand side. You will be asked to <b>confirm</b> your choice.
+The Testbed configuration system will then tear down your experiment,
+and send you an email message when the process is complete. At this
+point you are allowed to reuse the experiment name (say, if you wanted
+to create a similar experiment with different parameters).
+
+<a NAME="Help"></a>
+<h3>Getting Help!</h3>
+
+If you have any questions or problems, or just want to comment on
+Emulab's operation (maybe you want to suggest an improvement to one of
+the Web pages), feel free to contact us by sending email to
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">Testbed
+Operations (testbed-ops@flux.cs.utah.edu)</a>. Also note that much of
+the software is in development, and occasionally things might break or
+not work as you expect. Again, please feel free to contact us.
 
 <hr>
 <address>
