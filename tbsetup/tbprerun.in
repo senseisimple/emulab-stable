@@ -56,7 +56,7 @@ $tbcmdfile = "tbcmds";
 
 # This routine is called after reservation and frees the reservation.
 sub cleanup {
-    &tbs_exec("nfree $eid $pid");
+    &tbs_exec("nfree $pid $eid");
 };
 
 if ($dolog) {
