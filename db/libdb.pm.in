@@ -97,6 +97,7 @@ use Exporter;
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
+	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID
@@ -1819,6 +1820,61 @@ sub TBWideareaNodeID($$)
     return 1;
 }
 
+#
+# Mark a node as needing account updates. This variant does it based
+# on node type, and all of the nodes of that type are marked. This is
+# used for marking widearea nodes. 
+#
+# usage TBNodeUpdateAccountsByType(char type)
+#    Returns 1 all the time.
+#
+sub TBNodeUpdateAccountsByType($)
+{
+    my ($nodetype) = @_;
+
+    #
+    # No point in incrementing the flag past 2 since all that does is
+    # cause needless updates.
+    #
+    DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		 "where type='$nodetype' and update_accounts<2");
+
+    return 1;
+}
+
+#
+# Mark a node as needing account updates. This variant does it based
+# on pid; all of the nodes in that pid are marked. Not very efficient!
+#
+# usage TBNodeUpdateAccountsByPid(char pid)
+#    Returns 1 all the time.
+#
+sub TBNodeUpdateAccountsByPid($)
+{
+    my ($pid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select r.node_id from reserved as r ".
+		    "left join nodes as n on r.node_id=n.node_id ".
+		    "where r.pid='$pid' and n.update_accounts=0");
+
+    if (! $query_result ||
+	! $query_result->numrows) {
+	return 1;
+    }
+    
+    while (@row = $query_result->fetchrow_array()) {
+	my $nodeid = $row[0];
+
+	#
+	# No point in incrementing the flag past 2 since all that does is
+	# cause needless updates.
+	#
+	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		     "where node_id='$nodeid' and update_accounts<2");
+    }
+    return 1;
+}
 
 #
 # Issue a DB query. Argument is a string. Returns the actual query object, so

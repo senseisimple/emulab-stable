@@ -204,7 +204,7 @@ if (! @nodes) {
 }
 
 #
-# For widearea nodes, just update flag them in the DB. The nodes will
+# For widearea nodes, just flag them in the DB. The nodes will
 # notice this and suck the data over when they can.
 #
 foreach my $node ( @nodes ) {
