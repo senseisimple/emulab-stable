@@ -264,6 +264,69 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
     };
 };
 
+Phase "syslog", "Setting up syslog", sub {
+    Phase "sysconf", "Editing $SYSLOG_CONF", sub {
+	DoneIfEdited($SYSLOG_CONF);
+	AppendToFileFatal($SYSLOG_CONF,
+	    "!bootinfo",  "*.*\t\t\t\t\t\t$LOGDIR/bootinfo.log",
+	    "!tmcd",      "*.*\t\t\t\t\t\t$LOGDIR/tmcd.log",
+	    "!capture",   "*.*\t\t\t\t\t\t$LOGDIR/capture.log",
+	    "!dhcpd",     "*.*\t\t\t\t\t\t$LOGDIR/dhcpd.log",
+	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
+	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
+	    "!frisbee",   "*.*\t\t\t\t\t\t$LOGDIR/frisbee.log",
+	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
+	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
+	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
+	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
+	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
+	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
+    };
+
+    Phase "logdir", "Creating log directory", sub {
+	DoneIfExists($LOGDIR);
+	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+    };
+
+    Phase "logdir", "Creating mysql log directory", sub {
+	DoneIfExists($MYSQL_LOGDIR);
+	mkdir $MYSQL_LOGDIR, 0775 or
+	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
+	ExecQuietFatal("$CHOWN mysql:mysql $LOGDIR");
+    };
+
+    Phase "logfiles", "Creating log files", sub {
+	foreach my $logfile (@LOGFILES) {
+	    Phase $logfile, $logfile, sub {
+		DoneIfExists($logfile);
+		CreateFileFatal($logfile);
+		ExecQuietFatal("$CHGRP tbadmin $logfile");
+		ExecQuietFatal("$CHMOD 640 $logfile");
+	    };
+	}
+    };
+
+    Phase "newsyslog", "Setting up $NEWSYSLOG_CONF", sub {
+	DoneIfEdited($NEWSYSLOG_CONF);
+	AppendToFileFatal($NEWSYSLOG_CONF,
+	    "$LOGDIR/tmcd.log               640  9     1000 *     Z",
+	    "$LOGDIR/stated.log             640  9     300  *     Z",
+	    "$LOGDIR/osselect.log           640  9     300  *     Z",
+	    "$LOGDIR/power.log              640  7     300  *     Z",
+	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
+	    "$LOGDIR/tftpd.log              640  7     200  *     Z",
+	    "$LOGDIR/dhcpd.log              640  7     200  *     Z",
+	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",
+	    "$LOGDIR/capserver.log          640  5     200  *     Z",
+	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
+	    "$LOGDIR/tevd.log               640  3     200  *     Z",
+	    "$LOGDIR/suexec.log             640  3     200  *     Z",
+	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
+	        "/var/run/lastlog_daemon.pid");
+    };
+};
+
 Phase "database", "Setting up database", sub {
     Phase "mysql", "Starting mysql", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
@@ -373,69 +436,6 @@ Phase "mibs", "Fetching Cisco MIBs", sub {
 	    FetchFileFatal($mibURL,$localfile);
 	};
     }
-};
-
-Phase "syslog", "Setting up syslog", sub {
-    Phase "sysconf", "Editing $SYSLOG_CONF", sub {
-	DoneIfEdited($SYSLOG_CONF);
-	AppendToFileFatal($SYSLOG_CONF,
-	    "!bootinfo",  "*.*\t\t\t\t\t\t$LOGDIR/bootinfo.log",
-	    "!tmcd",      "*.*\t\t\t\t\t\t$LOGDIR/tmcd.log",
-	    "!capture",   "*.*\t\t\t\t\t\t$LOGDIR/capture.log",
-	    "!dhcpd",     "*.*\t\t\t\t\t\t$LOGDIR/dhcpd.log",
-	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
-	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
-	    "!frisbee",   "*.*\t\t\t\t\t\t$LOGDIR/frisbee.log",
-	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
-	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
-	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
-	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
-	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
-	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
-    };
-
-    Phase "logdir", "Creating log directory", sub {
-	DoneIfExists($LOGDIR);
-	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
-	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
-    };
-
-    Phase "logdir", "Creating mysql log directory", sub {
-	DoneIfExists($MYSQL_LOGDIR);
-	mkdir $MYSQL_LOGDIR, 0775 or
-	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
-	ExecQuietFatal("$CHOWN mysql:mysql $LOGDIR");
-    };
-
-    Phase "logfiles", "Creating log files", sub {
-	foreach my $logfile (@LOGFILES) {
-	    Phase $logfile, $logfile, sub {
-		DoneIfExists($logfile);
-		CreateFileFatal($logfile);
-		ExecQuietFatal("$CHGRP tbadmin $logfile");
-		ExecQuietFatal("$CHMOD 640 $logfile");
-	    };
-	}
-    };
-
-    Phase "newsyslog", "Setting up $NEWSYSLOG_CONF", sub {
-	DoneIfEdited($NEWSYSLOG_CONF);
-	AppendToFileFatal($NEWSYSLOG_CONF,
-	    "$LOGDIR/tmcd.log               640  9     1000 *     Z",
-	    "$LOGDIR/stated.log             640  9     300  *     Z",
-	    "$LOGDIR/osselect.log           640  9     300  *     Z",
-	    "$LOGDIR/power.log              640  7     300  *     Z",
-	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
-	    "$LOGDIR/tftpd.log              640  7     200  *     Z",
-	    "$LOGDIR/dhcpd.log              640  7     200  *     Z",
-	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",
-	    "$LOGDIR/capserver.log          640  5     200  *     Z",
-	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
-	    "$LOGDIR/tevd.log               640  3     200  *     Z",
-	    "$LOGDIR/suexec.log             640  3     200  *     Z",
-	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
-	        "/var/run/lastlog_daemon.pid");
-    };
 };
 
 Phase "cron", "Adding cron jobs", sub {
