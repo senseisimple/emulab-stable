@@ -7,26 +7,6 @@
         date: March 6, 2002
 */
 
-/*
-Copyright 2003 by Steven S. Skiena; all rights reserved.
-
-Permission is granted for use in non-commerical applications
-provided this copyright notice remains intact and unchanged.
-
-This program appears in my book:
-
-"Programming Challenges: The Programming Contest Training Manual"
-by Steven Skiena and Miguel Revilla, Springer-Verlag, New York 2003.
-
-See our website www.programming-challenges.com for additional information.
-
-This book can be ordered from Amazon.com at
-
-http://www.amazon.com/exec/obidos/ASIN/0387001638/thealgorithmrepo/
-
-*/
-
-
 #include <iostream>
 #include <map>
 #include <string>
@@ -34,171 +14,367 @@ http://www.amazon.com/exec/obidos/ASIN/0387001638/thealgorithmrepo/
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
-#include "wgraph.h"
+#include "Exception.h"
+#include "dijkstra.h"
+#include "SingleSource.h"
+#include "bitmath.h"
+#include "IpTree.h"
 
 using namespace std;
 
-#define MAXINT  100007
-
-int parent[MAXV];               /* discovery relation */
-int firstHop[MAXV];
-int distanceList[MAXV];             /* distance vertex is from start */
-
-
-
-void dijkstra(graph *g, int start)           /* WAS prim(g,start) */
+// The command line options given to us.
+namespace arg
 {
-        int i,j;                        /* counters */
-        bool intree[MAXV];              /* is the vertex in the tree yet? */
-        int v;                          /* current vertex to process */
-        int w;                          /* candidate next vertex */
-        int weight;                     /* edge weight */
-        int dist;                       /* best current distance from start */
-
-        for (i=1; i<=g->nvertices; i++) {
-                intree[i] = false;
-                distanceList[i] = MAXINT;
-                parent[i] = -1;
-        }
-
-        distanceList[start] = 0;
-        v = start;
-        firstHop[v] = v;
-
-        while (intree[v] == false) {
-                intree[v] = true;
-                for (i=0; i<g->degree[v]; i++) {
-                        w = g->edges[v][i].v;
-                        weight = g->edges[v][i].weight;
-/* CHANGED */           if (distanceList[w] > (distanceList[v]+weight)) {
-/* CHANGED */                   distanceList[w] = distanceList[v]+weight;
-/* CHANGED */                   parent[w] = v;
-                                if (firstHop[v] == start)
-                                {
-                                    firstHop[w] = w;
-                                }
-                                else
-                                {
-                                    firstHop[w] = firstHop[v];
-                                }
-                        }
-                }
-
-                v = 1;
-                dist = MAXINT;
-                for (i=1; i<=g->nvertices; i++)
-                        if ((intree[i] == false) && (dist > distanceList[i])) {
-                                dist = distanceList[i];
-                                v = i;
-                        }
-        }
-/*for (i=1; i<=g->nvertices; i++) printf("%d %d\n",i,distanceList[i]);*/
+    string source;
+    bool runAll = true;
+    bool compress = false;
+    bool strong = true;
 }
 
-void print_route(graph * g, int source, int dest)
-{
-    multimap< int, pair<string, string> >::iterator sourcePos;
-    sourcePos = g->ip[source].find(firstHop[dest]);
-    if (sourcePos == g->ip[source].end())
-    {
-        cerr << "ddijk: internal error: route not found" << endl;
-        exit(1);
-    }
-    string sourceIp = sourcePos->second.first;
-    string firstHopIp = sourcePos->second.second;
+// Figure out what the users command line wishes are and set arg::*
+// appropriately.
+void processArgs(int argc, char * argv[]);
+void execute(void);
 
-    multimap< int, pair<string, string> >::iterator pos;
-    pos = g->ip[dest].begin();
-    multimap< int, pair<string, string> >::iterator limit;
-    limit = g->ip[dest].end();
+// Translate the input into a convenient represenation
+void inputEdges(SingleSource & graph, HostHostToIpMap & ip,
+                map<string, int> & nameToIndex, int numEdges);
+
+// When we input edges, we translate the host labels into an internal
+// numeric representation. When printing an error message, we want to
+// translate the numbers involved back to the labels. This function
+// serves that purpose. Note that this is a linear operation. But that
+// is ok, because this function should only be used when presenting an
+// error.
+string reverseMap(int index, map<string,int> const & nameToIndex);
+
+// Print all the routes that the command line options say we should.
+void printAllRoutes(SingleSource & graph, HostHostToIpMap const & ip,
+                    map<string, int> const & nameToIndex);
+void printRoutesFromHost(int source, SingleSource const & graph,
+                         HostHostToIpMap const & ip);
+
+// Print all routes from a particular host to a particular host
+void printRoutesToHost(int source, int dest, SingleSource const & graph,
+                       HostHostToIpMap const & ip);
+
+// Calculate the source ip address and the first hop ip address
+// between a particular pair of hosts.
+void calculateSourceInfo(int source, int dest,
+                         SingleSource const & graph,
+                         HostHostToIpMap const & ip,
+                         string & OutSourceIp, string & OutFirstHopIp);
+
+// Print a route from a host to a specific ip address on another host.
+void printRouteToIp(string sourceIp, string firstHopIp, string destIp,
+                    int cost);
+
+
+//-----------------------------------------------------------------------------
+
+int main(int argc, char * argv[])
+{
+    try
+    {
+        processArgs(argc, argv);
+        execute();
+    }
+    catch(exception & error)
+    {
+        cerr << argv[0] << ": " << error.what() << endl;
+        return 1;
+    }
+    return 0;
+}
+
+//-----------------------------------------------------------------------------
+
+void processArgs(int argc, char * argv[])
+{
+    // The if/else/if/else construct is cumbersome. Is there a better way?
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strncmp(argv[i], "--source=", sizeof("--source=") - 1) == 0)
+        {
+            arg::runAll = false;
+            arg::source = argv[i] + sizeof("--source=") - 1;
+        }
+        else if (strncmp(argv[i], "--all", sizeof("--all") - 1) == 0)
+        {
+            arg::runAll = true;
+        }
+        else if (strncmp(argv[i], "--compress", sizeof("--compress") - 1) == 0)
+        {
+            arg::compress = true;
+        }
+        else if (strncmp(argv[i], "--strong", sizeof("--strong") - 1) == 0)
+        {
+            arg::strong = true;
+        }
+        else if (strncmp(argv[i], "--weak", sizeof("--weak") - 1) == 0)
+        {
+            arg::strong = false;
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void execute(void)
+{
+    map<string, int> nameToIndex;
+
+    int i = 0;
+    int numVertices = 0;
+    int numEdges = 0;
+
+    cin >> numVertices >> numEdges;
+    SingleSource graph(numVertices);
+    HostHostToIpMap ip(numVertices);
+
+    // If a problem occurs, we need to translate from our internal ids
+    // to labels recognizable by the user.
+    try
+    {
+        inputEdges(graph, ip, nameToIndex, numEdges);
+        printAllRoutes(graph, ip, nameToIndex);
+    }
+    catch(EdgeInsertException & error)
+    {
+        error.setMessage(reverseMap(error.getSource(), nameToIndex),
+                         reverseMap(error.getDest(), nameToIndex),
+                         intToString(error.getCost()));
+        throw error;
+    }
+    catch (RouteNotFoundException & error)
+    {
+        error.setMessage(reverseMap(error.getSource(), nameToIndex),
+                         reverseMap(error.getDest(), nameToIndex),
+                         reverseMap(error.getFirstHop(), nameToIndex));
+        throw error;
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+string reverseMap(int index, map<string,int> const & nameToIndex)
+{
+    // linear search
+    string result = "[ERROR-IN-ERROR: reverse mapping failed: index="
+        + intToString(index) + "]";
+    map<string,int>::const_iterator pos = nameToIndex.begin();
+    map<string,int>::const_iterator limit = nameToIndex.end();
+    for ( ; pos != limit; ++pos)
+    {
+        if (pos->second == index)
+        {
+            result = pos->first;
+        }
+    }
+    return result;
+}
+
+//-----------------------------------------------------------------------------
+
+void inputEdges(SingleSource & graph, HostHostToIpMap & ip,
+                map<string, int> & nameToIndex, int numEdges)
+{
+    string firstHost, secondHost;
+    string firstIp, secondIp;
+    int weight = 0;
+    int vertexCounter = 0;
+
+    for (int i = 0; i < numEdges; ++i)
+    {
+        cin >> firstHost >> firstIp >> secondHost >> secondIp >> weight;
+
+        map<string,int>::iterator firstPos = nameToIndex.find(firstHost);
+        if (firstPos == nameToIndex.end())
+        {
+            firstPos = nameToIndex.insert(make_pair(firstHost,
+                                                    vertexCounter)).first;
+            ++vertexCounter;
+            if (static_cast<size_t>(vertexCounter) > ip.size())
+            {
+                throw TooManyHostsException(static_cast<int>(ip.size()));
+            }
+        }
+
+        map<string,int>::iterator secondPos = nameToIndex.find(secondHost);
+        if (secondPos == nameToIndex.end())
+        {
+            secondPos = nameToIndex.insert(make_pair(secondHost,
+                                                     vertexCounter)).first;
+            ++vertexCounter;
+            if (static_cast<size_t>(vertexCounter) > ip.size())
+            {
+                throw TooManyHostsException(static_cast<int>(ip.size()));
+            }
+        }
+
+        graph.insertEdge(firstPos->second, secondPos->second, weight);
+        ip[firstPos->second].insert(make_pair(secondPos->second,
+                                              make_pair(firstIp,
+                                                        secondIp)));
+        ip[secondPos->second].insert(make_pair(firstPos->second,
+                                               make_pair(secondIp,
+                                                         firstIp)));
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void printAllRoutes(SingleSource & graph, HostHostToIpMap const & ip,
+                    map<string, int> const & nameToIndex)
+{
+    if (arg::runAll)
+    {
+        map<int, string> indexToName;
+        map<string, int>::const_iterator pos = nameToIndex.begin();
+        map<string, int>::const_iterator limit = nameToIndex.end();
+        for ( ; pos != limit; ++pos)
+        {
+            indexToName[pos->second] = pos->first;
+        }
+        for (int i = 0; i < graph.getVertexCount(); ++i)
+        {
+            cout << indexToName[i] << endl;
+            graph.route(i);
+            if (arg::compress)
+            {
+                Compressor temp;
+                temp.compress(graph, ip);
+            }
+            else
+            {
+                printRoutesFromHost(i, graph, ip);
+            }
+            cout << "%%" << endl;
+        }
+    }
+    else
+    {
+        map<string,int>::const_iterator sourcePos;
+        sourcePos = nameToIndex.find(arg::source);
+        if (sourcePos == nameToIndex.end())
+        {
+            throw InvalidSourceException(arg::source);
+        }
+        graph.route(sourcePos->second);
+        if (arg::compress)
+        {
+            Compressor temp;
+            temp.compress(graph, ip);
+        }
+        else
+        {
+            printRoutesFromHost(sourcePos->second, graph, ip);
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void printRoutesFromHost(int source, SingleSource const & graph,
+                         HostHostToIpMap const & ip)
+{
+    for (int i = 0; i < graph.getVertexCount(); ++i)
+    {
+        if (i != source)
+        {
+            printRoutesToHost(source, i, graph, ip);
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void printRoutesToHost(int source, int dest, SingleSource const & graph,
+                       HostHostToIpMap const & ip)
+{
+    string sourceIp;
+    string firstHopIp;
+    calculateSourceInfo(source, dest, graph, ip, sourceIp, firstHopIp);
+
+    multimap< int, pair<string, string> >::const_iterator pos;
+    pos = ip[dest].begin();
+    multimap< int, pair<string, string> >::const_iterator limit;
+    limit = ip[dest].end();
     string previous;
 
     for ( ; pos != limit; ++pos)
     {
-        if (pos->second.first != firstHopIp && pos->second.first != previous)
+        string const & destIp = pos->second.first;
+        if (destIp != previous)
         {
-            cout << "ROUTE DEST=" << pos->second.first
-                 << " DESTTYPE=host DESTMASK=255.255.255.255 NEXTHOP="
-                 << firstHopIp << " COST=" << distanceList[dest] << " SRC="
-                 << sourceIp << endl;
-            previous = pos->second.first;
+            printRouteToIp(sourceIp, firstHopIp, destIp,
+                           graph.getDistance(dest));
+            previous = destIp;
         }
     }
 }
 
-int main(int argc, char * argv[])
+//-----------------------------------------------------------------------------
+
+void calculateSourceInfo(int source, int dest,
+                         SingleSource const & graph,
+                         HostHostToIpMap const & ip,
+                         string & outSourceIp, string & outFirstHopIp)
 {
-    if (argc == 2)
+    multimap< int, pair<string, string> >::const_iterator sourcePos;
+    sourcePos = ip[source].find(graph.getFirstHop(dest));
+    if (sourcePos == ip[source].end())
     {
-        string arg(argv[1]);
-        string firstHost, secondHost;
-        string firstIp, secondIp;
-        map<string, int> nameToIndex;
-        int weight = 0;
+        throw RouteNotFoundException(source, dest, graph.getFirstHop(dest));
+    }
+    outSourceIp = sourcePos->second.first;
+    outFirstHopIp = sourcePos->second.second;
+}
 
-        graph g;
-        int i = 0;
-        int vertexCounter = 1;
-        int numEdges = 0;
+//-----------------------------------------------------------------------------
 
-        initialize_graph(&g);
-        cin >> g.nvertices >> numEdges;
+void printRouteToIp(string sourceIp, string firstHopIp, string destIp,
+                    int cost)
+{
+    if (destIp != firstHopIp)
+    {
+        cout << "ROUTE DEST=" << destIp
+             << " DESTTYPE=host DESTMASK=255.255.255.255 NEXTHOP="
+             << firstHopIp << " COST=" << cost << " SRC="
+             << sourceIp << endl;
+    }
+}
 
-        for (i = 1; i <= numEdges; ++i)
-        {
-            cin >> firstHost >> firstIp >> secondHost >> secondIp >> weight;
-            map<string,int>::iterator firstPos = nameToIndex.find(firstHost);
-            if (firstPos == nameToIndex.end())
-            {
-                firstPos = nameToIndex.insert(make_pair(firstHost,
-                                                        vertexCounter)).first;
-                ++vertexCounter;
-            }
-            map<string,int>::iterator secondPos = nameToIndex.find(secondHost);
-            if (secondPos == nameToIndex.end())
-            {
-                secondPos = nameToIndex.insert(make_pair(secondHost,
-                                                         vertexCounter)).first;
-                ++vertexCounter;
-            }
-            insert_edge(&g, firstPos->second, secondPos->second, false,
-                        weight);
-            g.ip[firstPos->second].insert(make_pair(secondPos->second,
-                                                    make_pair(firstIp,
-                                                              secondIp)));
-            g.ip[secondPos->second].insert(make_pair(firstPos->second,
-                                                     make_pair(secondIp,
-                                                               firstIp)));
-        }
+//-----------------------------------------------------------------------------
 
-        map<string,int>::iterator sourcePos = nameToIndex.find(arg);
-        if (sourcePos == nameToIndex.end())
-        {
-            cerr << "Invalid source name in command line" << endl;
-            return 1;
-        }
 
-//        read_graph(&g,false);
-        dijkstra(&g,sourcePos->second);
 
-        for (i=1; i<=g.nvertices; i++)
-        {
-            if (i != sourcePos->second)
-            {
-                print_route(&g,sourcePos->second,i);
-            }
-//            find_path(source,i,parent);
-        }
-        return 0;
+void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
+                        int netMaskSize, int cost)
+{
+    if (netMaskSize == 32)
+    {
+        printRouteToIp(sourceIp, firstHopIp, destSubnet, cost);
     }
     else
     {
-        cerr << "Incorrect number of arguments" << endl;
-        return 1;
+        IPAddress netMask = 0xffffffff << (32 - netMaskSize);
+        cout << "ROUTE DEST=" << destSubnet << " DESTTYPE=net DESTMASK="
+             << ipToString(netMask) << " NEXTHOP=" << firstHopIp << " COST="
+             << cost << " SRC=" << sourceIp << endl;
     }
-
 }
 
 
 
+//-----------------------------------------------------------------------------
+
+string intToString(int num)
+{
+    ostringstream stream;
+    stream << num;
+    return stream.str();
+}
+//-----------------------------------------------------------------------------

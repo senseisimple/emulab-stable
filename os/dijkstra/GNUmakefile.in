@@ -17,10 +17,8 @@ all:	dijkstra
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-dijkstra:	dijkstra.o wgraph.o wgraph.h
-	$(CXX) $(CFLAGS) dijkstra.o wgraph.o $(LIBS) -o dijkstra
-
-wgraph.o:	wgraph.cc wgraph.h
+dijkstra:	dijkstra.o bitmath.o bitmath.h Exception.h SingleSource.h IpTree.h dijkstra.h
+	$(CXX) $(CFLAGS) dijkstra.o bitmath.o $(LIBS) -o dijkstra
 
 client-install: dijkstra
 	$(INSTALL_PROGRAM) dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra
