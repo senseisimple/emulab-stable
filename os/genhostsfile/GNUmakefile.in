@@ -1,0 +1,32 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= os/genhostsfile
+
+include $(OBJDIR)/Makeconf
+
+CFLAGS	= -Wall -O2 -g -static -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
+LIBS    = ${OBJDIR}/lib/libtb/libtb.a
+
+all:	genhostsfile genfromdb genfromtopo
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+genhostsfile:	genhostsfile.o
+	$(CC) $(CFLAGS) genhostsfile.o $(LIBS) -o genhostsfile
+
+wgraph.o:	wgraph.cc wgraph.h
+
+install:	$(INSTALL_LIBEXECDIR)/genhostsfile
+
+client-install: genhostsfile
+	$(INSTALL_PROGRAM) genhostsfile $(DESTDIR)$(CLIENT_BINDIR)/genhostsfile
+
+clean:
+	rm -f *.o genhostsfile genfromtopo genfromdb

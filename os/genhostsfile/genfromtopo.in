@@ -1,0 +1,125 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# usage: genfromtopo
+#
+sub usage()
+{
+    print("Usage: genfromtopo\n");
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $genhosts    = "$TB/libexec/genhostsfile";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+my $OUT = *STDOUT;
+my $topomap = {};
+my $section;
+my @slots;
+    
+while (<STDIN>) {
+    if ($_ =~ /^\#\s*([-\w]*): ([-\w,]*)$/) {
+	$section = $1;
+	@slots = split(",", $2);
+
+	$topomap->{$section} = [];
+	next;
+    }
+    chomp($_);
+    my @values = split(",", $_);
+    my $rowref = {};
+    
+    for (my $i = 0; $i < scalar(@values); $i++) {
+	$rowref->{$slots[$i]} = $values[$i];
+    }
+    push(@{ $topomap->{$section} }, $rowref);
+}
+
+
+my %nodes = ();
+my %lans  = ();;
+
+# The nodes section tells us the name of each node, and all its links.
+foreach my $noderef (@{ $topomap->{"nodes"} }) {
+    my $vname  = $noderef->{"vname"};
+    my $links  = $noderef->{"links"};
+    my $count  = 0;
+
+    $nodes{$vname} = [];
+
+    # Links is a string of "$lan1:$ip1 $lan2:$ip2 ..."
+    foreach my $link (split(" ", $links)) {
+	my ($lan,$ip) = split(":", $link);
+
+	push(@{ $nodes{$vname} }, "$count:$ip");
+	$lans{"$vname:$count"} = $lan;
+	$count++;
+    }
+}
+
+#
+# First spit out virt_nodes
+#
+print $OUT scalar(keys(%nodes)) . "\n";
+
+foreach my $node (keys(%nodes)) {
+    @members = @{ $nodes{$node} };
+
+    print $OUT "$node,";
+    print $OUT join(" ", @members);
+    print $OUT "\n";
+
+}
+
+#
+# Then spit out virt_lans.
+# 
+print $OUT scalar(keys(%lans)) . "\n";
+
+foreach my $member (keys(%lans)) {
+    my $lan = $lans{$member};
+
+    print $OUT "$lan,$member\n";
+}
+
+exit(0);
