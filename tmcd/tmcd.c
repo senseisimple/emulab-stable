@@ -3654,7 +3654,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,pt.class,pt.type, "
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
 				 " nv.sfshostid,e.eventkey,vt.isplabdslice, "
-				 " e.veth_encapsulate "
+				 " e.veth_encapsulate,ps.admin "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3669,8 +3669,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " i.iface=pt.control_iface "
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
+				 "left join plab_slices as ps on "
+				 " ps.pid=e.pid and ps.eid=e.eid "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 23, reqp->vnodeid, inet_ntoa(ipaddr));
+				 24, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3720,14 +3722,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
 	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
 	reqp->isplabdslice = (! strcasecmp(row[21], "0") ? 0 : 1);
-	reqp->isplabsvc    = 0;
-
-	/* XXX cough, cough... */
-	if (reqp->isplabdslice) {
-		char *pcp = strstr(reqp->vnodeid, "-20");
-		if (pcp && pcp[3] == 0)
-			reqp->isplabsvc = 1;
-	}
+	reqp->isplabsvc    = (row[23] && strcasecmp(row[23], "0")) ? 1 : 0;
 
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
