@@ -56,7 +56,7 @@ foreach my $dbfile (@DBFILES) {
 #
 # Build the locate database. I hate that its never there!
 #
-if (-x /usr/libexec/locate.updatedb) {
+if (-x "/usr/libexec/locate.updatedb") {
     print "Building the locate database ... Be patient, will ya!\n";
     system("/usr/libexec/locate.updatedb");
 }
