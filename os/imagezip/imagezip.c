@@ -542,7 +542,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 
 /*
  * Operate on a linux slice. I actually don't have a clue what a linux
- * slice looks like. I just now that in our images, the linux slice
+ * slice looks like. I just know that in our images, the linux slice
  * has the boot block in the first sector, part of the boot in the
  * second sector, and then the superblock for the one big filesystem
  * in the 3rd sector. Just start there and move on.
@@ -1166,17 +1166,24 @@ compress_image(void)
 		/*
 		 * Compress the chunk.
 		 */
-		if (debug) {
+		if (debug < 3) {
 			printf("Compressing range: %14qd --> ", inputoffset);
 			fflush(stdout);
 		}
 
 		size = compress_chunk(rangesize, &partial, &blkhdr->size);
 	
-		if (debug) {
+		if (debug >= 3) {
+			printf("%14qd -> %12qd %10d %10d %10d %d\n",
+			       inputoffset, inputoffset + size,
+			       prange->start - inputminsec,
+			       (int) (size / secsize), 
+			       blkhdr->size, partial);
+		}
+		else if (debug) {
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= stamp.tv_sec;
-			printf("%12qd in %ld seconds\n",
+			printf("%12qd in %ld seconds.\n",
 			       inputoffset + size, estamp.tv_sec);
 		}
 		else {
