@@ -191,6 +191,15 @@ echo "<h3>Setting up experiment. This may take a few minutes ...
 flush();
 
 #
+# XXX
+# Set the permissions on the NS file so that the scripts can get to it.
+# It is owned by nobody, and most likely protected. This leaves the
+# script open for a short time. A potential security hazard we should
+# deal with at some point.
+#
+chmod($exp_nsfile, 0666);
+
+#
 # Run the scripts. We use a script wrapper to deal with changing
 # to the proper directory and to keep some of these details out
 # of this. We just want to know if the experiment setup worked.
