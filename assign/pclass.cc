@@ -74,6 +74,17 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
     if ((bit == b->types.end()) || ! ( *(*bit).second == *a_type_record) )
       return 0;
   }
+  // We have to check in both directions, or b might have a type that a does
+  // not
+  for (tb_pnode::types_map::iterator it=b->types.begin();
+       it!=b->types.end();++it) {
+    const crope &b_type = (*it).first;
+    tb_pnode::type_record *b_type_record = (*it).second;
+    
+    tb_pnode::types_map::iterator bit = a->types.find(b_type);
+    if ((bit == a->types.end()) || ! ( *(*bit).second == *b_type_record) )
+      return 0;
+  }
 
   // check subnode information
   if (a->subnode_of != b->subnode_of) {
