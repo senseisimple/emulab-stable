@@ -319,7 +319,7 @@ function showrange ($showby, $sortby, $range) {
     }
 
     $query_result =
-	DBQueryFatal("select s.pid,s.eid,t.uid,t.action, ".
+	DBQueryFatal("select s.pid,s.eid,t.uid,t.action,t.exptidx, ".
 		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
 		     "  UNIX_TIMESTAMP(t.tstamp) as ttstamp ".
 		     " from testbed_stats as t ".
@@ -341,6 +341,7 @@ function showrange ($showby, $sortby, $range) {
 	$pid     = $row["pid"];
 	$eid     = $row["eid"];
 	$uid     = $row["uid"];
+	$idx	 = $row["exptidx"];
 	$tstamp  = $row["ttstamp"];
 	$action  = $row["action"];
 	$pnodes  = $row["pnodes1"];
@@ -348,6 +349,35 @@ function showrange ($showby, $sortby, $range) {
 
 	if ($pnodes == 0)
 	    continue;
+
+	#
+	# If a swapmod, and there is no record, one of two things. Either
+	# it was swapped in before the interval, or the experiment was
+	# was swapped out, and the user did a swapmod on it. We need to
+	# know that, since swapmod of a swapped out experiment does not
+	# count! 
+	# 
+	if ($action == "swapmod" &&
+	    ! isset($expt_start["$pid:$eid"])) {
+	    $swapper_result =
+		DBQueryFatal("select action from testbed_stats ".
+			     "where exptidx=$idx and ".
+			     "      UNIX_TIMESTAMP(tstamp)<$tstamp ".
+			     "order by tstamp desc");
+
+	    while ($srow = mysql_fetch_assoc($swapper_result)) {
+		$saction = $srow["action"];
+
+		if ($saction != "swapmod")
+		    break;
+	    }
+	    if (!$srow ||
+		($saction == "swapout" || $saction == "preload"))
+		continue;
+	    
+	    if ($debug)
+		echo "M $pid $eid $idx $saction<br>\n";
+	}
 
 	if (!isset($pid_summary[$pid])) {
 	    $pid_summary[$pid] = array('pnodes'   => 0,
@@ -363,7 +393,7 @@ function showrange ($showby, $sortby, $range) {
 	}
 
 	if ($debug) 
-	    echo "$pid $eid $uid $tstamp $action $pnodes<br>\n";
+	    echo "$idx $pid $eid $uid $tstamp $action $pnodes<br>\n";
 
 	switch ($action) {
         case "start":
@@ -390,14 +420,15 @@ function showrange ($showby, $sortby, $range) {
                 # no start/swapin event was returned. Add a record for it.
 	        #
 		$diff = $tstamp - $spanstart;
-		if ($debug)
-		    echo "M $pid $eid $uid $action $diff $pnodes $pnodes2<br>";
 		if ($action == "swapmod") {
                     # A pain. We need the number of pnodes for the original
 		    # version of the experiment, not the new version.
 		    $pnodes = $pnodes2;
 		}
 	    }
+	    if ($debug) 
+		echo "S $pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
+	    
 	    $pid_summary[$pid]["pnodes"]   += $pnodes;
 	    $pid_summary[$pid]["pseconds"] += $pnodes * $diff;
 	    $pid_summary[$pid]["eseconds"] += $diff;
