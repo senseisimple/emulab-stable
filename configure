@@ -1494,7 +1494,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	apache/GNUmakefile apache/httpd.conf \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
-	xmlrpc/webxmlrpc \
+	xmlrpc/webxmlrpc script_wrapper.py.in \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
