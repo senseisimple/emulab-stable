@@ -227,6 +227,11 @@ int add_all_ethernet = 0;
  */
 int no_zero = 0;
 
+/*
+ * Whether we should include or skip interfaces that have no IP address
+ */
+int include_ipless_interfaces = 0;
+
 #ifdef EVENTSYS
 /*
  * Time to subtract out of each timestamp reported to clients - this allows
@@ -311,6 +316,8 @@ void usage(char *progname) {
 		       "-o            Print output to stdout\n"
 		       "-t            tcpdump mode\n"
 		       "-b filter     Use the given bpf filter\n"
+		       "-I            Include interfaces that have no IP "
+			             "address\n"
 #ifdef EVENTSYS
 		       "-e pid/eid    Wait for a time start for experiment\n"
 		       "-s server     Use <server> for event server\n"
@@ -377,7 +384,7 @@ int main (int argc, char **argv) {
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:I")) != -1)
 		switch(ch) {
 		case 'f':
 			/* Find the first empty slot */
@@ -423,6 +430,9 @@ int main (int argc, char **argv) {
 #endif
 		case 'h':
 			usage(argv[0]);
+			break;
+		case 'I':
+			include_ipless_interfaces = 1;
 			break;
 		default:
 			fprintf(stderr,"Bad argument\n");
@@ -539,8 +549,10 @@ int main (int argc, char **argv) {
 		/*
 		 * Only care about INET4 interfaces
 		 */
-		if (ifr->ifr_addr.sa_family != AF_INET)
-			continue;
+		if (!include_ipless_interfaces) {
+		    if (ifr->ifr_addr.sa_family != AF_INET)
+			    continue;
+		}
 
 		name = ifr->ifr_name;
 		if (!strcmp(name,lastname)) {
@@ -587,8 +599,10 @@ int main (int argc, char **argv) {
 #else
 			if (getaddr(name,&ifaddr)) {
 				/* Has carrier, but no IP */
-				printf("down (with carrier)\n");
-				continue;
+				if (!include_ipless_interfaces) {
+					printf("down (with carrier)\n");
+					continue;
+				}
 			}
 #endif
 
