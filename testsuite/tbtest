@@ -630,7 +630,8 @@ sub step_test {
 	# Start stated
 	if ($type eq "full") {
 	  # Returns non-zero for failures
-	  system("$path/install/sbin/stated") and 
+	  system("$path/install/sbin/withadminprivs ".
+		 "$path/install/sbin/stated") and
 	    die "Error running $path/install/sbin/stated: $!\n";
 	}
 	

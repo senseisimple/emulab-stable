@@ -20,10 +20,12 @@
 # Configure variables
 use lib '@prefix@/lib';
 my $TB = "@prefix@";
+my $REALTB = "/usr/testbed"; # So we know if we're the "real" stated or not
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = "@TBSTATEDEMAIL@";
 my $REALTBOPS = "@TBOPSEMAIL@";
 my $TBDBNAME = "@TBDBNAME@";
+my $REALTBDBNAME = "tbdb"; # So we know if we're using the "real" db
 my $osselect = "$TB/bin/os_select";
 
 $| = 1;
@@ -65,11 +67,12 @@ END
 }
 
 # Only root should run this - it won't work when run as a user...
-if ($UID) {
+# (Or, let an admin run it if it isn't the real one in /usr/testbed/ )
+if ($UID && ( $TB == $REALTB || ! TBAdmin($UID) ) ) {
     die("Only root can run this script!\n");
 }
 
-my @args = @ARGV;		# save a copy for restart before we mess with them.
+my @args = @ARGV;    # save a copy for restart before we mess with them.
 my %opt = ();
 getopts("ds:p:h",\%opt);
 
@@ -111,7 +114,7 @@ my $lastmail = time() - $mailgap + 2; # Send a digest of startup msgs after 2s.
 my %msgs = ();
 
 my $pidfile;
-if ( $TB eq "/usr/testbed" ) {
+if ( $TB eq $REALTB ) {
     $pidfile = "/var/run/stated.pid";
 } else {
     $ext = $TB;
@@ -690,7 +693,7 @@ sub checkDBRedirect($) {
     # XXX: It's hokey to hardcode tbdb here, but....
 
     #debug("checkDBRedirect: $node => $testdb (I'm $TBDBNAME)\n");
-    if ((!$testdb && ($TBDBNAME eq "tbdb")) ||
+    if ((!$testdb && ($TBDBNAME eq $REALTBDBNAME)) ||
 	($testdb && ($testdb eq $TBDBNAME))) {
 	return 1;
     } else {
