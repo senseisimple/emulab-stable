@@ -741,22 +741,26 @@ class Plab:
             print "Got known pnodes:"
             print known
 
+#
+# Disable up/down marking - we now do this normally via isalive from
+# the emulab service slice.  Eventually, this code should be removed.
+#
         # Mark known nodes that are not available as down and make sure
         # those that are available are marked as up
-        todown = []  # List of nodeid's
-        toup = []  # List of nodeid's
-        for ip in known.keys():
-            if not ip in avail:
-                todown.append(known[ip])
-            else:
-                toup.append(known[ip])
-        if verbose:
-            print "%d known Plab nodes not available" % len(todown)
-            print "%d known Plab nodes available" % len(toup)
-        self.__setVnodesStatus(todown, "down")
-        self.__setPnodesStatus(todown, "down")
-        self.__setVnodesStatus(toup, "up")
-        self.__setPnodesStatus(toup, "up")
+        #todown = []  # List of nodeid's
+        #toup = []  # List of nodeid's
+        #for ip in known.keys():
+        #    if not ip in avail:
+        #        todown.append(known[ip])
+        #    else:
+        #        toup.append(known[ip])
+        #if verbose:
+        #    print "%d known Plab nodes not available" % len(todown)
+        #    print "%d known Plab nodes available" % len(toup)
+        #self.__setVnodesStatus(todown, "down")
+        #self.__setPnodesStatus(todown, "down")
+        #self.__setVnodesStatus(toup, "up")
+        #self.__setPnodesStatus(toup, "up")
 
         # Add new nodes
         toadd = []  # List of IP's

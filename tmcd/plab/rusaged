@@ -39,7 +39,7 @@ my $action	= "start";
 my $logname	= "$LOGDIR/rusaged.debug";
 my $pidfile	= "/var/run/emulab-rusaged.pid";
 my $debug	= 0;
-my $isalivewait = 300; # Seconds to wait.
+my $isalivewait = 60; # Seconds to wait.
 my $svcslice    = "utah_elab_svc";
 
 #
