@@ -38,7 +38,8 @@ my $TB		= "@prefix@";
 		"readycount"	=> "$TB/bin/readycount",
 		"eventsys_control" => "$TB/bin/eventsys_control",
 		"tbresize"	=> "$TB/bin/tbresize",
-		"batchexp"	=> "$TB/bin/batchexp"
+		"batchexp"	=> "$TB/bin/batchexp",
+		"nscheck"	=> "$TB/bin/nscheck"
 	   );
 
 # Need to provide a simple path, because some scripts we call need one
