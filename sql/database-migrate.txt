@@ -797,7 +797,7 @@ last_net_act,last_cpu_act,last_ext_act);
        update node_types set max_interfaces=3 where type='pcL440GX';
 
 
-1.168: As per Jay's request, start recording the start time as well as
+1.167: As per Jay's request, start recording the start time as well as
        the end time, in the testbed_stats table. So we know how long
        things like swapin take, etc. Below, we convert the current
        timestamp into the "end" time, and add a new "start" time,
@@ -807,3 +807,21 @@ last_net_act,last_cpu_act,last_ext_act);
 			end_time datetime default NULL;
 	alter table testbed_stats add start_time datetime \
 			default NULL after idx;
+
+1.168: Add "role" to reserved table, to make explicit how a node is
+       being used in an experiment (node, virthost, delaynode,
+       simnode). This is for helping to simplify the swapmod code
+       support in assign, and to eventually fix the delaynode problem.
+       Yes, we could use the vname and a set convention, but thats a
+       silly way to do it!
+
+       alter table reserved add erole \
+	       enum('node','virthost','delaynode','simnode') \
+		NOT NULL default 'node' after vname;
+
+       Note, that only physical nodes can take on different roles;
+       virtual nodes can only be plain (experimental) nodes.
+
+       I contemplated putting this into the nodes table instead, but a
+       node has no role when its not reserved, so it seemed like the
+       wrong place for it.

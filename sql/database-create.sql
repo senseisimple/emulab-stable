@@ -1037,6 +1037,7 @@ CREATE TABLE reserved (
   eid varchar(32) NOT NULL default '',
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
+  erole enum('node','virthost','delaynode','simnode') NOT NULL default 'node',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname)
 ) TYPE=MyISAM;
