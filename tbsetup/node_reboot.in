@@ -341,8 +341,8 @@ exit $failed;
 # that it can wait on all the children later.
 # 
 sub RebootNode {
-    local($pc) = @_;
-    local($status, $syspid, $mypid);
+    my ($pc) = @_;
+    my ($status, $syspid, $mypid);
 
     print STDOUT "Rebooting $pc ...\n";
 
@@ -508,7 +508,7 @@ sub RebootVNode($$) {
 # Power cycle a PC using the testbed power program.
 #
 sub PowerCycle {
-    local($pc) = @_;
+    my ($pc) = @_;
 
     system("$power cycle $pc");
     return $? >> 8;
@@ -518,7 +518,7 @@ sub PowerCycle {
 # Wait until a machine stops returning ping packets.
 # 
 sub WaitTillDead {
-    local($pc) = @_;
+    my ($pc) = @_;
 
     print STDERR "Waiting for $pc to die off\n" if $debug;
     
@@ -541,9 +541,9 @@ sub WaitTillDead {
 # Returns 1 if host is responding to pings, 0 otherwise
 #
 sub DoesPing {
-    local($pc) = @_;
-    local($status);
-    local($saveuid);
+    my ($pc) = @_;
+    my $status;
+    my $saveuid;
 
     $saveuid = $UID;
     $UID = 0;
