@@ -70,7 +70,7 @@ while ( ($now - $start) < $t && $done < $total ) {
     debug("Returned at $now: finished=".join(",",@finished).
 	  "  failed=".join(",",@failed)."\n".
 	  "Still waiting for ".($total-$done)." nodes\n");
-    debug("COND: now-start=".($now-$start).",t=$t, done=$done, total=$total\n");
+    debug("COND: now-start=".($now-$start).",t=$t,done=$done,total=$total\n");
 }
 
 debug("All done at $now: finished=".join(",",@finished).

@@ -25,6 +25,10 @@
 # desired state(s) or failed, or timeout is reached (if given and
 # non-zero). Returns lists of nodes.
 #
+# $rv = cancelWait($node);
+#
+# "Nevermind..." for state waiting. Returns 0 on success.
+#
 # $rv = endStateWait();
 #
 # Stop listening for states. Call this soon after waitForState.
@@ -35,7 +39,7 @@ package StateWait;
 
 use Exporter;
 @ISA = "Exporter";
-@EXPORT = qw ( initStateWait waitForState endStateWait );
+@EXPORT = qw ( initStateWait waitForState cancelWait endStateWait );
 
 # Any 'use' or 'require' stuff must come here, after 'package'
 # Note that whatever script is using us has already done a "use lib" to
@@ -57,7 +61,7 @@ my $tuple;
 
 my @done = ();
 my @failures = ();
-my @nodes = ();
+my $nodecount = ();
 my %remain = ();
 
 #
@@ -66,7 +70,8 @@ my %remain = ();
 
 sub initStateWait( $@ ) {
     my $states = shift;
-    @nodes = @_;
+    my @nodes = @_;
+    $nodecount = scalar(@nodes);
     # states is an arrayref
     if ($debug) {
 	print "initStateWait: states=(".join(",",@$states).
@@ -121,7 +126,7 @@ sub doEvent( $$$ ) {
     my $objtype   = event_notification_get_objtype($handle, $event);
     my $objname   = event_notification_get_objname($handle, $event);
     my $eventtype = event_notification_get_eventtype($handle, $event);
-    if ($debug > 1) {
+    if ($debug ) {
 	print "Event: $time $site $expt $group $host $objtype $objname " .
 	  "$eventtype\n";
     }
@@ -145,7 +150,7 @@ sub waitForState( $$;$ ) {
     my $now = ($timeout > 0 ? time() : 0);
     my $deadline = ($timeout > 0 ? $now + $timeout : 1);
     my $total = scalar(@done) + scalar(@failures);
-    while ($total < scalar(@nodes) && $now < $deadline) {
+    while ($total < $nodecount && $now < $deadline) {
 	if ($timeout > 0) {
 	    if ($debug) {
 		print "waitForState: done=(".join(",",@done)."), ".
@@ -164,39 +169,34 @@ sub waitForState( $$;$ ) {
     @$failed=@failures;
     if ($debug) {
 	print "waitForState: finished=(".join(",",@$finished)."), ".
-	  "failed=(".join(",",@$failed).")\n";
+	  "failed=(".join(",",@$failed)."), ".
+	    "notdone=(".join(",",keys %remain).")\n";
+	print "  Wait for state returning now...\n"
     }
     return 0;
 }
 
-sub endStateWait() {
+sub cancelWait( $ ) {
+    # Important thing to remember: This will never get called while
+    # we're in the middle of a waitForState call, so we just need to
+    # make sure things are consistent next time they call it.
+    my $node = @_;
+    if (!defined($remain{$node})) {
+	return 1;
+    }
+    delete $remain{$node};
+    $nodecount--;
+    return 0;
+}
 
+sub endStateWait() {
+    %remain = ();
     if (event_unregister($handle) == 0) {
         die "Unable to unregister with event system\n";
     }
     if ($debug) { print "endStateWait\n"; }
     return 0;
 }
-
-# Don't enable this unless you fix it first...
-if (0) {
-    # do some testing...
-    my @states=("SHUTDOWN","ISUP");
-    my @finished=();
-    my @failed=("foo");
-    print "Failed was (".join(",",@failed).")\n";
-    initStateWait(["ISUP"],pc52);
-    waitForState(\@finished,\@failed);
-    endStateWait();
-    print "Failed was (".join(",",@failed).")\n";
-
-    initStateWait(\@states,pc31,pc32);
-    waitForState(\@finished,\@failed);
-    endStateWait();
-    print "Failed was (".join(",",@failed).")\n";
-
-}
-
 
 # Always end a package successfully!
 1;
