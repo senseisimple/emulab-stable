@@ -258,7 +258,10 @@ if (strcmp($privIP, "1.1.1.1")) {
 		$upgrade_instructions =
 		    "slice1_image=slice1.ndz\n" .
 		    "slice1_sig=slice1.ndz.sig\n" .
-		    "slice1_md5=d326a1f604489c43b488fa80a88221f4";
+		    "slice1_md5=d326a1f604489c43b488fa80a88221f4\n" .
+		    "slicex_slice=3\n" .
+		    "slicex_mount=/users";
+		    
 		break;
 	    default:
 		SPITSTATUS(CDROMSTATUS_UPGRADEERROR);
