@@ -3,19 +3,30 @@ use English;
 
 #
 # Set the hostname for the node according to the current experiment.
-# Run from /etc/dhclient-exit-hooks
+# Run from /etc/dhclient-exit-hooks.
+#
+#	usage: sethostname [domain]
+#
+# We get the domain from dhclient script setup, and pass it through.
+# Otherwise, we have no safe way to determine the domain.
 # 
 
-push(@INC, "/etc/testbed");
-require setuplib;
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
 
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+#
 # Turn off line buffering on output
+#
 $| = 1;
 
 #
@@ -30,29 +41,36 @@ if (! ($curname =~ /.+/)) {
 }
 
 #
-# Inform the master that we have rebooted. THIS MUST BE DONE!
-#
-inform_reboot();
-
-#
-# Check allocation. Exit now if not allocated.
-#
-my ($pid, $eid, $vname) = check_status();
-if (! $pid) {
+# Make sure we get a valid domainname. If not then do not reset the hostname.
+# 
+if (! @ARGV) {
     exit 0;
 }
 
+$domain = $ARGV[0];
+if ($domain =~ /\./) {
+    $domain = ".$domain";
+}
+else {
+    exit 0;
+}
+
+my $nickname = whatsmynickname();
+if (! $nickname) {
+    print STDOUT "No Testbed nickname available!\n";
+    exit(0);
+}
+
 #
-# Otherwise, sethostname
-# 
-my $nickname= "$vname.$eid.$pid";
+# No prints. Something screwy in dhclient causes these prints
+# to go into resolv.conf!
+#
+#print STDOUT "Resetting hostname to ${nickname}${domain} ... ";
 
-print STDOUT "Resetting hostname to $nickname ... ";
-
-if (system("hostname $nickname")) {
-    print STDOUT "*** FAILED!\n";
+if (system("hostname", "${nickname}${domain}")) {
+#   print STDOUT "*** FAILED!\n";
     exit 1;
 }
 
-print STDOUT "Done!\n";
+#print STDOUT "Done!\n";
 exit 0;

@@ -1,75 +1,23 @@
 #!/usr/bin/perl -wT
 use English;
 
-push(@INC, "/etc/testbed");
-require setuplib;
-
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# First clean up the node.
-#
-cleanup_node();
-
-#
-# Inform the master that we have rebooted.
-#
-inform_reboot();
-
-#
-# Check allocation. Exit now if not allocated.
-#
-if (! check_status()) {
-    exit(0);
-}
-
-#
-# Setup a nicknames file. 
-#
-create_nicknames();
-
-#
-# Mount the project directory.
-#
-mount_projdir();
-
-#
-# Okay, lets find out about interfaces.
-#
-doifconfig();
-
-#
-# Host names configuration (/etc/hosts). 
-#
-dohostnames();
-
-#
-# Check for delay config.
-#
-dodelays();
-
-#
-# Do account stuff.
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
 # 
-doaccounts();
+use lib "/etc/testbed";
+use libsetup;
 
 #
-# RPMS
-# 
-dorpms();
-
+# Then invoke the bootsetup routine in the library. All the work happens
+# in there. 
 #
-# Tar Balls
-# 
-dotarballs();
+bootsetup();
 
-#
-# Experiment startup Command.
-#
-dostartupcmd();
-
-exit(0);
+exit 0;

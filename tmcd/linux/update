@@ -15,9 +15,8 @@ use lib "/etc/rc.d/testbed";
 use libsetup;
 
 #
-# Then invoke the bootsetup routine in the library. All the work happens
-# in there. 
+# Update the system with new accounts/mounts/etc.
 #
-bootsetup();
+nodeupdate();
 
 exit 0;

@@ -4,20 +4,19 @@ use English;
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/rc.d/testbed";
+use lib "/etc/testbed";
 use libsetup;
 
 #
-# Then invoke the bootsetup routine in the library. All the work happens
-# in there. 
+# Update the system with new accounts/mounts/etc.
 #
-bootsetup();
+nodeupdate();
 
 exit 0;

@@ -4,4 +4,6 @@
 # See if the Testbed configuration software wants to change the hostname.
 # Installed into /etc.
 # 
-exec /etc/testbed/sethostname
+/etc/testbed/sethostname $new_domain_name
+
+exit 0

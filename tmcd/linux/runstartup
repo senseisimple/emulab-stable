@@ -2,17 +2,11 @@
 use English;
 
 #
-# We are run out of the at daemon as root.
-#
-my $TMCC	 = "/etc/rc.d/testbed/tmcc";
-my $TMSTARTUPCMD = "/etc/rc.d/testbed/startupcmd";
-my $logname;
-
-#
-# Load the testbed library.
-#
-push(@INC, "/etc/rc.d/testbed");
-require setuplib;
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 #
 # Untaint path
@@ -21,11 +15,23 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Prototypes.
+#
+sub fatal($);
+sub background();
+
+#
+# Turn off line buffering on output
+#
+
+$| = 1;
+
+#
 # Get the config parameters so we can open up a log file in the proper
 # location. See below.
 #
-my ($pid, $eid, $vname) = check_status();
-if (! defined($pid)) {
+my ($pid, $eid, $vname);
+if (! (($pid, $eid, $vname) = check_status())) {
     fatal("Could not determine pid/eid");
 }
 
@@ -42,8 +48,8 @@ if (background()) {
 #
 # Open up the command file, which tells us what to do.
 #
-open(CMD, "$TMSTARTUPCMD") or
-    fatal("Could not open $TMSTARTUPCMD: $!");
+open(CMD, TMSTARTUPCMD) or
+    fatal("Could not open " . TMSTARTUPCMD . ": $!");
 
 my $runcmd;
 my $login;
@@ -56,7 +62,7 @@ while (<CMD>) {
 }
 
 if (!defined($runcmd) || !defined($login)) {
-    fatal("$TMSTARTUPCMD not in proper format!");
+    fatal(TMSTARTUPCMD . " not in proper format!");
 }
 (undef,undef,$uid,$gid,undef,undef,undef,undef) = getpwnam($login) or
     fatal("Could not determine UID for $login");
@@ -83,8 +89,8 @@ else {
     $EGID = $GID = $gid;
     $EUID = $UID = $uid;
 
-    exec($runcmd);
-    fatal("Could not exec $runcmd");
+    exec($runcmd) or
+	fatal("Could not exec $runcmd: $!");
 }
 
 print STDOUT "$runcmd returned $stat\n";
@@ -92,8 +98,7 @@ print STDOUT "$runcmd returned $stat\n";
 #
 # Use the TMCC to tell the TMCD what the exit status was.
 #
-system("$TMCC startstatus $stat");
-
+startcmdstatus($stat);
 exit(0);
 
 sub fatal($)
@@ -105,8 +110,7 @@ sub fatal($)
     #
     # Use the TMCC to tell the TMCD that we screwed the pooch.
     #
-    system("$TMCC startstatus 666");
-
+    startcmdstatus(666);
     exit(-1);
 }
 
@@ -150,7 +154,6 @@ sub background()
     chmod(0644, $logname);
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-
 
     return 0;
 }

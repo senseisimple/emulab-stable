@@ -7,10 +7,11 @@ use English;
 my $reboot      = 0;
 
 #
-# Load the testbed library.
-#
-push(@INC, "/etc/rc.d/testbed");
-require setuplib;
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 #
 # Untaint path
@@ -23,25 +24,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 $| = 1;
 
-#
-# Inform the master that we have rebooted.
-#
-#
-# Inform the master that we have rebooted.
-#
-inform_reboot();
-
-#
-# Check allocation. Exit now if not allocated.
-#
-if (! check_status()) {
-    exit(0);
-}
-
-#
-# Mount the project directory.
-#
-mount_projdir();
+print STDOUT "Checking Testbed Delta configuration ... \n";
 
 #
 # Delta configuration.

@@ -16,10 +16,11 @@ my $HISTORY     = "/.bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 
 #
-# Load the testbed library.
-#
-push(@INC, "/etc/rc.d/testbed");
-require setuplib;
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/rc.d/testbed";
+use libsetup;
 
 #
 # Untaint path
