@@ -48,7 +48,7 @@ if (isset($os_version) &&
 #
 # Check osid for sillyness.
 #
-if (! ereg("^[\.-_a-zA-Z0-9]+$", $osid)) {
+if (! ereg("^[-_a-zA-Z0-9\.]+$", $osid)) {
     USERERROR("The OSID must consist of alphanumeric characters and ".
 	      "dash, dot, or underscore!", 1);
 }
@@ -58,7 +58,7 @@ if (isset($os_path)) {
 	unset($os_path);
     }
     else {
-	if (! ereg("^[\.-_a-zA-Z0-9\/]+$", $os_path)) {
+	if (! ereg("^[-_a-zA-Z0-9\/\.]+$", $os_path)) {
 	    USERERROR("The path contains invalid characters!", 1);
 	}
     }
@@ -66,7 +66,7 @@ if (isset($os_path)) {
 
 if (isset($os_version)) {
     if (strcmp($os_version, "") &&
-	! ereg("^[\.-_a-zA-Z0-9]+$", $os_version)) {
+	! ereg("^[-_a-zA-Z0-9\.]+$", $os_version)) {
 	USERERROR("The version string contains invalid characters!", 1);
     }
 }

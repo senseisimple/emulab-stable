@@ -56,16 +56,16 @@ if (isset($loadaddr) &&
 #
 # Check ID and others for sillyness.
 #
-if (! ereg("^[\.-_a-zA-Z0-9]+$", $imageid)) {
+if (! ereg("^[-_a-zA-Z0-9\.]+$", $imageid)) {
     USERERROR("The ImageID must consist of alphanumeric characters and ".
 	      "dash, dot, or underscore!", 1);
 }
-if (! ereg("^[\.-_a-zA-Z0-9\/]+$", $path)) {
+if (! ereg("^[-_a-zA-Z0-9\/\.]+$", $path)) {
     USERERROR("The path contains invalid characters!", 1);
 }
 
 if (isset($loadaddr) &&
-    !ereg("^[\.0-9]+$", $loadaddr)) {
+    !ereg("^[0-9\.]+$", $loadaddr)) {
 	USERERROR("The load address contains invalid characters!", 1);
 }
 
