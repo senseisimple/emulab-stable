@@ -917,7 +917,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+	if (islocal && nodeidtoexp(nodeid, pid, eid, gid)) {
 		error("ACCOUNTS: %s: Node is free\n", nodeid);
 		return 1;
 	}
