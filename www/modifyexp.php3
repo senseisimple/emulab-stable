@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -161,7 +161,16 @@ if (! isset($nsdata)) {
     USERERROR("NSdata CGI variable missing (How did that happen?)",1);
 }
 
-$nsfile = tempnam("/tmp", "$pid-$eid.nsfile.");
+#
+# Generate a hopefully unique filename that is hard to guess.
+# See backend scripts.
+# 
+list($usec, $sec) = explode(' ', microtime());
+srand((float) $sec + ((float) $usec * 100000));
+$foo = rand();
+    
+$nsfile = "/tmp/$uid-$foo.nsfile";
+
 if (! ($fp = fopen($nsfile, "w"))) {
     TBERROR("Could not create temporary file $nsfile", 1);
 }
