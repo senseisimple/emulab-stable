@@ -75,7 +75,7 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  
 diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 --- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_dgram.c	Tue Apr 23 17:34:32 2002
++++ tg2.0/src/tg/prot_dgram.c	Wed Apr 24 13:40:20 2002
 @@ -198,6 +198,22 @@
  	for (;;)
  		{
@@ -115,10 +115,12 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  		return (-1);
  		}
  	else
-@@ -609,6 +627,9 @@
+@@ -609,6 +627,11 @@
  	justrcvd = 0;
  	sta = close(fd);    
  	log_teardown(NULL, sta == 0 ? -1 : sta);
++	if (fd == sfd)
++		sfd = -1;
 +#ifdef USEEVENTS
 +	firsttime = 1;
 +#endif
