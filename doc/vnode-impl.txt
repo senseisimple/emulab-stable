@@ -367,7 +367,50 @@ associated with a virtual node have the same ID, every virtual node has
 its own unique ID.  The route table ID is a local-node only value, different
 physical nodes can use the same ID for different purposes.
 
-C3. More about the startup pieces.
+C3. Virtual routing tables.
+
+The virtual routing table code originally came from the FreeBSD multiple
+routing table work done by Scandariato and Risso:
+
+http://softeng.polito.it/riccardo/docs/paper_eurobsd02.ps.gz
+
+but had to be hacked mightily here to make it reasonably complete and
+generally functional.  The general idea is to have a set of routing tables
+associated with IPv4.  Each is identified by its index, the rtabid, which
+is used in various places through the network subsystem.  Network interfaces
+are associated with a routing table so that incoming packets are tagged
+with the route table to use when making forwarding decisions.  Sockets can
+similarly be associated so that outgoing packets will use a specific routing
+table.  When applied to routing sockets, this allows routes to be added to
+specific routing tables.  Finally, mbufs themselves are tagged with an
+rtabid for those contexts in which the originating socket or interface
+is unavailable.
+
+To this basic framework we added an rtabid to the jail structure so that
+all sockets created by a jail are tagged with the appropriate rtabid.
+This ensures that all jail traffic is controlled by a particular routing
+table.  We also made innumerable bug fixes, mostly related to ensuring that
+the correct rtabid was available in the numerous code paths where routes are
+created, cloned, looked up, or removed.  Many of these places were missed
+because they were not exercised in the paths the authors used.  The ARP
+code in particular required extensive violence as it didn't work at all
+(the authors were just using tunnel interfaces, so ARP wasn't a problem).
+
+The code is ifdef'ed in our source tree under MULTI_RTABLES_INET and is
+pervasive.  In part, this was intentional on the part of the authors,
+as they desired to change the underlying BSD code as little as possible.
+For example, instead of changing the generic rtalloc routine to accept
+an extra parameter that would be ignored without the MULTI_RTABLES code,
+they added a new ifdef'ed routine for handling the extra param.  Thus
+every place that calls rtalloc had to be ifdef'ed to call multi_rtalloc
+instead.  The upside is that it is easy to identify (and isolate) the
+changes required by multiple tables.  But the fact that the changes are
+so wide-spread also indicates to me that we are virtualizing in the wrong
+place.  In retrospect, the multiple network stack work done by Zec, which
+virtualizes the entire network stack, would have been a better approach.
+ 
+
+C4. More about the startup pieces.
 
 vnodesetup hangs around so that you can signal it and easily
  reboot the vnode.  I guess the idea is that it is also jail/vserver
