@@ -13,7 +13,7 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
-if (!$isadmin) {
+if (!$isadmin && !STUDLY()) {
     USERERROR("Not enough permission.", 1);
 }
 
@@ -54,7 +54,7 @@ if ($confirmed) {
 else {
     $body_str .= "Update last power time for:<br>";
     $body_str .= "<form action='powertime.php3' method=get><br><table>";
-    $body_str .= "<tr><th>Update?</th><th>Node ID</th></tr>";
+    $body_str .= "<tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr>";
     foreach (split(",", $node_id) as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
@@ -64,6 +64,13 @@ else {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
 	
+	$query_result =
+		DBQueryFatal("SELECT (UNIX_TIMESTAMP(NOW()) - ".
+			     "UNIX_TIMESTAMP(last_power)) ".
+			     "FROM outlets WHERE node_id='$ni'");
+	$row = mysql_fetch_array($query_result);
+	$last_power_min = floor($row[0] / 60);
+	
 	$body_str .= "<tr>
 		      <td class=pad4 align=center>
 		        <input type=checkbox
@@ -72,6 +79,7 @@ else {
 			       checked>
 		      </td>
 		      <td class=pad4>$ni</td>
+		      <td class=pad4><b>$last_power_min</b> minutes ago</td>
 		     </tr>";
     }
     $body_str .= "</table><br>";

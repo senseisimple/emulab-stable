@@ -46,7 +46,22 @@ echo "<font size=+2>".
 #
 if (! $isadmin &&
     ! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
-    SHOWNODE($node_id, SHOWNODE_NOPERM);
+
+    if (STUDLY()) {
+	    SUBPAGESTART();
+	    
+	    SUBMENUSTART("Node Options");
+	    WRITESUBMENUBUTTON("Update Power State",
+			       "powertime.php3?node_id=$node_id");
+	    SUBMENUEND();
+	    
+	    SHOWNODE($node_id, SHOWNODE_NOPERM);
+	    
+	    SUBPAGEEND();
+    }
+    else {
+	    SHOWNODE($node_id, SHOWNODE_NOPERM);
+    }
     PAGEFOOTER();
     return;
 }
@@ -137,6 +152,9 @@ if ($isadmin) {
 		       "freenode.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Set Node Location",
 		       "setnodeloc.php3?node_id=$node_id");
+}
+
+if ($isadmin || STUDLY()) {
     WRITESUBMENUBUTTON("Update Power State",
 		       "powertime.php3?node_id=$node_id");
 }
