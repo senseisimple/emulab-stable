@@ -70,7 +70,7 @@ echo "<tr>
 # UserName:
 #
 echo "<tr>
-          <td>*Username:</td>
+          <td>*Username (no blanks, lowercase):</td>
           <td class=\"left\">
               <input name=\"proj_head_uid\"";
 if ($row) {
