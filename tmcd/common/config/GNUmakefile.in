@@ -20,7 +20,7 @@ SUBDIR		= tmcd/common/config
 SCRIPTS		= $(addprefix $(SRCDIR)/, \
                     rc.config rc.misc rc.mounts rc.accounts rc.route \
 		    rc.tunnels rc.ifconfig rc.delays rc.hostnames \
-		    rc.syncserver rc.linkagent \
+		    rc.syncserver rc.linkagent rc.localize \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
 		    rc.startcmd rc.simulator rc.topomap rc.firewall)
 
