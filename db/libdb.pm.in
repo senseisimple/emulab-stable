@@ -891,7 +891,7 @@ sub ExpNodes($$)
 	# Taint check. I do not understand this sillyness, but if I
 	# taint check these node names, I avoid warnings throughout.
 	# 
-	if ($node =~ /^([\w]+)$/) {
+	if ($node =~ /^([-\w]+)$/) {
 	    $node = $1;
 	    
 	    push(@nodes, $node);

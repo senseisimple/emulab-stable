@@ -92,7 +92,7 @@ if (@ARGV) {
 	#
 	# Taint check first! Solves silly perl problems.
 	# 
-	if ($n =~ /^([\w]+)$/) {
+	if ($n =~ /^([-\w]+)$/) {
 	    $n = $1;
 	}
 	else {
