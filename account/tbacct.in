@@ -60,7 +60,6 @@ my $USEREXISTS  = 65;
 
 my $errors      = 0;
 my $sfsupdate   = 0;
-my $user;
 my @row;
 my $query_result;
 
@@ -114,8 +113,8 @@ if (defined($options{"f"})) {
 if (@ARGV != 2) {
     usage();
 }
-$cmd = $ARGV[0];
-$arg = $ARGV[1];
+my $cmd  = $ARGV[0];
+my $user = $ARGV[1];
 
 #
 # Untaint the arguments.

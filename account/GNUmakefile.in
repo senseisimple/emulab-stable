@@ -39,7 +39,7 @@ post-install:
 	chown root $(INSTALL_SBINDIR)/addpubkey
 	chmod u+s $(INSTALL_SBINDIR)/addpubkey
 
-control-install:	$(addprefix $(INSTALL_SBINDIR)/, tbacc.proxy)
+control-install:
 
 clean:
 	rm -f *.o core
