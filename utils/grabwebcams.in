@@ -47,6 +47,7 @@ $| = 1;
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libdb;
+use libtestbed;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
