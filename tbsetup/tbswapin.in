@@ -86,8 +86,7 @@ sub cleanup {
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 }
 
-print "Beginning swapin in for $pid/$eid\n";
-
+print "Beginning swapin in for $pid/$eid. " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("tbswapin started");
 
 if (! ($state = ExpState($pid, $eid))) {
@@ -246,6 +245,6 @@ if (!SetExpState($pid, $eid, EXPTSTATE_ACTIVE)) {
     exit(1);
 }
 
-print "Swapin finished.\n";
+print "Swapin finished. " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("tbswapin finished");
 exit(0);
