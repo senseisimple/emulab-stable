@@ -1852,7 +1852,36 @@ function SHOWNODE($node_id) {
 	    SHOWWIDEAREANODE($node_id, 1);
 	}
     }
+
+    #
+    # Show any auxtypes the node has
+    #
+    $query_result =
+	DBQueryFatal("select type, count from node_auxtypes ".
+		     "where node_id='$node_id'");
+    
+    if (mysql_num_rows($query_result) != 0) {
+	echo "<tr>
+               <td align=center colspan=2>
+                   Auxiliary Types
+               </td>
+             </tr>\n";
+
+        echo "<tr><th>Type</th><th>Count</th>\n";
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $type  = $row[type];
+	    $count = $row[count];
+	    echo "<tr>
+	    	      <td>$type</td>
+		      <td class=left>$count</td>
+		  </td>\n";
+	}
+    
+    }
+		
     echo "</table>\n";
+
 }
 
 #
