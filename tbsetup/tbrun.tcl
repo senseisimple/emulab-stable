@@ -96,46 +96,12 @@ if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2> $tmpio" err]} {
 }
 readfifo $tmpioFP "SNMPIT: "
 
-#outs "PLACEHOLDER - Verifying virtual network."
-
-outs "PLACEHOLDER - Copying disk images."
-
 outs "Resetting OS and rebooting."
 if {[catch "exec $os_setup $pid $eid $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error running $os_setup. ($err)"
     exit 1
 }
 
-outs "PLACEHOLDER - Verifying OS functionality."
-
-# XXX - This should only be done for linux/freebsd OSs
-outs "Setting up interfaces."
-if {[catch "exec cat $irFile | $ir2ifc | sort > $ifcfile 2>@ $logFp" err]} {
-    outs stderr "Error generating $ifcfile ($err)"
-    exit 1
-}
-
-outs "Setting up delay nodes"
-if {[catch "exec $delay_setup $irFile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error running $delay_setup. ($err)"
-    exit 1
-}
-
-
-if {[catch "exec $ifcboot $pid $eid $ifcfile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error setting interfaces ($err)"
-    exit 1
-}
-
-outs "PLACEHOLDER - Installing secondary packages."
-
-outs "Creating user accounts."
-if {[catch "exec $mkacct $eid $pid >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error running $mkacct. ($err)"
-    exit 1
-}
-
-outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
 
 close $tmpioFP
