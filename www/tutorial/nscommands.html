@@ -17,7 +17,8 @@
   <li><a href="#TCL">TCL, NS, and node names</a>
   <li><a href="#ORDER">Ordering issues</a>
   <li><a href="#HARD">Hardware Commands</a>
-  <li><a href="#IP">IP Commands</a>
+  <li><a href="#IP">IP Address Commands</a>
+  <li><a href="#ROUTE">IP Routing Commands</a>
   <li><a href="#OS">OS Commands</a>
   <li><a href="#LOSS">Link Loss Commands</a>
 </ul>
@@ -151,11 +152,11 @@ tb-set-hardware $node4 shark
      <code>pc850</code>, and <code>shark</code> are
      supported types.  <code>pc</code> is the default type.
   <li>No current types have any additional arguments.
-</dl>
+</ul>
 
 <hr>
 
-<a name="IP"></a><h3>IP Commands</h3>
+<a name="IP"></a><h3>IP Address Commands</h3>
 
 <p>Each node will be assigned an IP address for each interface that is
 in use.  The following commands will allow you to explicitly set those
@@ -272,6 +273,36 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
   <li>This command is converted internally to either tb-set-ip-link or
       tb-set-ip-lan.  It is possible that error messages will report
       either of those commands instead of tb-set-ip-interface.
+</ul>
+
+
+<hr>
+
+<a name="ROUTE"></a><h3>IP Routing Commands</h3>
+
+We currently provide a simple mechanism for setting up default IP routes
+between nodes in an experiment.
+
+<h4>tb-set-ip-routing</h4>
+
+<pre>
+tb-set-ip-routing <i>protocol</i>.
+
+tb-set-ip-routing none
+tb-set-ip-routing ospf
+</pre>
+
+<dl>
+  <dt><i>protocol</i> - The routing protocol to use.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li><code>none</code> is the default protocol;
+      i.e., no default routing is setup.
+  <li><code>ospf</code> is implemented by running <tt>gated</tt>
+      on all nodes in the experiment.
 </ul>
 
 <hr>
@@ -555,5 +586,3 @@ tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
       three commands appropriately.  See above for more information.
   </li>
 </ul>
-
- 

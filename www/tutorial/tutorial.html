@@ -33,6 +33,8 @@
             How do I know when all my nodes are ready?</a>
     <li> <a href="#Delta">
             Customizing an OS (How to create a <i>delta</i>)</a>
+    <li> <a href="#Routing">
+            Setting up IP routing between nodes</a>
     </ul>
 <li> <a href="#BatchMode">Batch Mode Experiments</a>
 <li> <a href="#CustomOS">Creating your own disk image</a>
@@ -445,6 +447,7 @@ not work as you expect. Again, please feel free to contact us.
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
 <li> <a href="#Delta">Customizing an OS (How to create a <i>delta</i>)</a>
+<li> <a href="#Routing">Setting up IP routing between nodes</a>
 </ul>
 <p>
 
@@ -665,6 +668,179 @@ $ns run					</code></pre>
      mechanism, feel free to contact us so that we can arrange to
      create a complete snapshot of your system.
 </ul>
+
+<li> <a NAME="Routing"></a>
+     <h3>Setting up IP routing between nodes</h3>
+<p>
+
+As Emulab strives to make all aspects of the network controllable by the
+user, we do not attempt to impose any IP routing architecture or protocol
+by default.
+However, many users are more interested in end-to-end aspects and don't
+want to be bothered with setting up routes.  For those users we provide
+an option to automatically set up routes on nodes which run one of our
+provided FreeBSD or Linux disk images.
+
+<p>
+You can use the <tt>tb-set-ip-routing</tt> command in your NS file to
+enable automatic routing:
+<code><pre>
+tb-set-ip-routing <i>protocol</i>
+</pre></code>
+where <i>protocol</i> is either <code>none</code>, the default for no
+automatic routing, or <code>ospf</code> to enable <code>gated</code>
+running the OSPF protocol on all nodes in the experiment.
+In the future we may add support for automatic pre-computation of static
+routes as well as the ability for users to specify per-node routing
+information in the NS file.
+
+<p>
+If you do want to setup and manage routing yourself, you can use the
+<tt>tb-set-node-startup</tt> command in your NS file to specify a
+per-node script in your home directory to set up routing at boot time.
+You can use this startup script to setup either static routes or to
+fire up a routing daemon, as the following examples illustrate.
+
+<p>
+The simplest topology requiring routing is one in which two nodes,
+<i>client</i> and <i>server</i> are each connected via a single link
+to <i>router</i>.  In order to get router to correctly forward packets
+between client and server, you would add this line to your NS file:
+
+<code><pre>
+tb-set-node-startup $router /proj/pid/router-startup
+</pre></code>
+
+This will make router run the <code>router-startup</code> script
+from you project directory.  That script looks like:
+
+<code><pre>
+#!/bin/sh
+if [ `uname` = "FreeBSD" ]
+then
+    sudo sysctl -w net.inet.ip.forwarding=1
+    sudo sysctl -w net.inet.ip.fastforwarding=1
+else
+    sudo sysctl -w net.ipv4.conf.all.forwarding=1
+fi
+exit 0
+</pre></code>
+
+These commands ensure that the router node will forward IP packets.
+Note the use of <code>sudo</code> which is necessary since startup scripts
+run as you and not as root.
+
+Now to get client and server to talk to each other through this router,
+you would add these lines to your NS file:
+
+<code><pre>
+tb-set-node-startup $client /proj/pid/clientroutecmd
+tb-set-node-startup $server /proj/pid/serverroutecmd
+</pre></code>
+
+This will have the client and the server each call a small script
+to set up routes. To add a route (on client) to interface 0 of the
+server through router, you would run a script called
+<code>clientroutecmd</code> that looks like this:
+
+<code><pre>
+#!/bin/sh
+if [ `uname` = "FreeBSD" ]
+then
+    sudo route add server-0 router
+else
+    sudo route add server-0 gw router
+fi
+exit 0
+</pre></code>
+
+Similarly, to add a route (on server) to interface 0 of the client
+through router, you would use this <code>serverroutecmd</code> script:
+
+<code><pre>
+#!/bin/sh
+if [ `uname` = "FreeBSD" ]
+then
+    sudo route add client-0 router
+else
+    sudo route add client-0 gw router
+fi
+exit 0
+</pre></code>
+
+That should do it. You will now have a router node that really
+routes and forwards packets, and a client and a server that know
+how to talk to each other through a gateway router.
+Note that this setup can be generalized to work for any topology
+where all nodes are directly connected to a single router node.
+However, every node would need a custom script with a route add command
+for every other node or you would need to use a subnet route as in
+the next example.
+
+<p>
+In complex topologies with multiple routers, each end node will need
+a route to the entire experimental network, through its local router.
+For FreeBSD, this is done with:
+
+<code><pre>
+#!/bin/sh
+if [ `uname` = "FreeBSD" ]
+then
+    sudo route add -net 192.168.0.0 -netmask 255.255.0.0 myrouter
+else
+    sudo route add -net 192.168.0.0 netmask 255.255.0.0 gw myrouter
+fi
+exit 0
+</pre></code>
+
+You might be tempted to just set the default route for each node to
+<code>myrouter</code>, but be aware that such a route would prevent
+you from contacting the outside world.  The default route <em>must</em>
+be set to use the control network interface.
+
+<p>
+You can make a single script that will handle all end nodes, by replacing
+<code>myrouter</code> in the above commands with <code>$1</code>,
+and specifying the router in your NS file:
+
+<code><pre>
+tb-set-node-startup $clientA {/proj/pid/router-startup router0}
+tb-set-node-startup $clientB {/proj/pid/router-startup router1}
+</pre></code>
+
+For multiple routers, the startup script for each router will need to
+contain a set of routes for all subnets it is not directly connected
+to. This will differ, depending on the topology you are using. To make
+this task easier, you can use the <code>tb-set-ip</code> command in your NS
+file, so that you know which subnets will be assigned to which nodes.
+
+<p>
+If you want to enable dynamic routing,
+you can also use the startup script to fire off a routing daemon.
+A startup script might look like:
+
+<code><pre>
+#!/bin/sh
+if [ `uname` = "FreeBSD" ]
+then
+    sudo sysctl -w net.inet.ip.forwarding=1
+    sudo sysctl -w net.inet.ip.fastforwarding=1
+else
+    sudo sysctl -w net.ipv4.conf.all.forwarding=1
+fi
+sudo gated -f /proj/pid/gated.conf
+exit 0
+</pre></code>
+
+One complication of using a routing daemon, is that you need to
+avoid using the control network interface in the configuration.
+Since every node in the testbed is directly connected to the
+control network LAN, a naive routing daemon configuration will
+discover that any node is just one hop away via the control
+network and <em>all</em> inter-node traffic will be routed via
+that interface.  
+See one of the installed <tt>/etc/testbed/gated*.conf</tt>
+files for an example of how to avoid this pitfall.
 
 <!-- This ends the Advanced Tutorial Section -->
 </ul>

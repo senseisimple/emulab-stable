@@ -72,6 +72,12 @@
      <ul>
      <li> <a href="#SEC-1">Is Emulab Firewalled?</a>
      </ul>
+
+<li> <a href="#TR">Troubleshooting</a>
+     <ul>
+     <li> <a href="#TR-1">My experiment is setup, but I cannot
+     			  send packets between some of the nodes, why?</a>
+     </ul>
 </ul>
 
 <hr>
@@ -551,114 +557,23 @@
     <h3>How can I turn on routing or set up routes automatically 
     in my nodes?</h3>
     <p>
-    You can use command mentioned above (<tt>tb-set-node-startup</tt>)
-    in your NS file to specify a simple script in your home directory
-    that will do this.
+    By default, we do not setup any static routes or run any routing daemon
+    on nodes in an experiment.  However, we do provide an option for
+    those experimentors who do not want to manage routing themselves and
+    who are using one of our provided FreeBSD or Linux disk images.
+    Simply adding:
+<pre>
+tb-set-ip-routing ospf
+</pre>
+    to your NS file will enable <code>gated</code> running the OSPF
+    protocol on all nodes in the experiment.
     </p>
-
-    <h4>Simple Topologies</h4>
     <p>
-    For instance, if I had a node called router,
-    and wanted to turn on routing in it, I would add this line
-    to my NS file:
-<pre>
-tb-set-node-startup $router /users/myname/router-startup
-</pre>
-    That would cause router to run my
-    router-startup script, which should look like this for FreeBSD:
-<pre>
-#!/bin/sh
-sudo sysctl -w net.inet.ip.forwarding=1
-sudo sysctl -w net.inet.ip.fastforwarding=1
-exit 0
-</pre>
-
-    Or this, for Linux:
-<pre>
-#!/bin/sh
-sudo sysctl -w net.ipv4.conf.all.forwarding=1
-</pre>
-
-    That will make sure that routing gets turned on when my router
-    node boots. Now say I have a client on one side of the router,
-    and a server on the other side, and I want to establish a route
-    from the client to the server through the router, and vice
-    versa. I would add these lines to my NS file:
-<pre>
-tb-set-node-startup $client /users/myname/clientroutecmd
-tb-set-node-startup $server /users/myname/serverroutecmd
-</pre>
-    This will have the client and the server each call a small script
-    to set up routes. To add a route (on client) to interface 0 of the
-    server through router, I would run a script called clientroutecmd
-    that looks like this (for a node running FreeBSD):
-<pre>
-#!/bin/sh
-sudo route add server-0 router
-exit 0
-</pre>
-
-    Or, for Linux:
-<pre>
-#!/bin/sh
-sudo route add server-0 gw router
-exit 0
-</pre>
-
-    Similarly, to add a route (on server) to interface 0 of the client
-    through router, I would use this serverroutecmd script:
-<pre>
-#!/bin/sh
-sudo route add client-0 router
-exit 0
-</pre>
-    That should do it. We now will have a router node that really
-    routes and forwards packets, and a client and a server that know
-    how to talk to each other through a gateway router.
-    </p>
-
-    <h4>Complex Topologies</h4>
-    <p>
-    In complex topologies with multiple routers, each end node will need
-    a route to the entire experimental network, through its local router.
-    For FreeBSD, this is done with:
-<pre>
-#!/bin/sh
-sudo route add -net 192.168.0.0 -netmask 255.255.0.0 myrouter
-exit 0
-</pre>
-    Or, for Linux,
-<pre>
-#!/bin/sh
-sudo route add -net 192.168.0.0 netmask 255.255.0.0 gw myrouter
-exit 0
-</pre>
-    </p>
-
-    <p>
-    You can make a single script that will handle all end nodes, by replacing
-    "myrouter" in the above commands with "$1", and specifying the router in
-    your NS file:
-<pre>
-tb-set-node-startup $clientA {/users/myname/router-startup router0}
-tb-set-node-startup $clientB {/users/myname/router-startup router1}
-</pre>
-    </p>
-
-    <p>
-    For multiple routers, the startup script for each router will need to
-    contain a set of routes for all subnets it is not directly connected
-    to. This will differ, depending on the topology you are using. To make
-    this task easier, you can use the <tt>tb-set-ip</tt> command in your NS
-    file, so that you know which subnets will be assigned to which nodes.
-    </p>
-
-    <p>
-    Please see the
-    <a href="tutorial/docwrapper.php3?docname=nscommands.html">Extensions</a>
-    page for a summary of all Emulab NS extensions, and the
-    <a href = "tutorial/tutorial.php3">Emulab Tutorial</a> for an
-    example.
+    Please see
+    "Setting up IP routing between nodes"
+    in the
+    <a href="tutorial/tutorial.php3">Emulab Tutorial</a>
+    for more information about IP routing setup options.
     </p>
     
 <li><a NAME="SWS-6"></a>
@@ -717,5 +632,27 @@ tb-set-node-startup $clientB {/users/myname/router-startup router1}
     attack to sites outside of Emulab. If your application requires external
     access to other low numbered ports, please contact us to make special
     arrangements.
+    </p>
+</ul>
+
+<hr>
+
+<a NAME="TR"></a>
+<h3>Troubleshooting</h3>
+<ul>
+<li><a NAME="TR-1"></a>
+    <h3>My experiment is setup, but I cannot
+	send packets between some of the nodes, why?</h3>
+    <p>
+    The most common reason is that your topology
+    includes nodes which are not directly connected, and you have
+    not setup any routing.  Refer to
+    "<a href="#SWS-5">How can I turn on routing or set up routes
+    automatically in my nodes?</a>" for details.  If you cannot
+    send packets between two machines which are directly connected
+    (via a link or a lan), then there are two possibilities:
+    either the nodes did not properly negotiate their speed and
+    duplex with the Cisco switch, or the physical wire is loose
+    or bad.  In these cases, you should contact us for help.
     </p>
 </ul>
