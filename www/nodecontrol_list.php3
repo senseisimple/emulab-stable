@@ -43,6 +43,7 @@ echo "<tr>
           <td>PID</td>
           <td>EID</td>
           <td>Def Image</td>
+          <td>Def Path</td>
           <td>Def Cmdline</td>
           <td>Next Path</td>
           <td>Next Cmdline</td>
@@ -52,12 +53,15 @@ while ($row = mysql_fetch_array($query_result)) {
     $node_id            = $row[node_id]; 
     $type               = $row[type];
     $def_boot_image_id  = $row[def_boot_image_id];
+    $def_boot_path      = $row[def_boot_path];
     $def_boot_cmd_line  = $row[def_boot_cmd_line];
     $next_boot_path     = $row[next_boot_path];
     $next_boot_cmd_line = $row[next_boot_cmd_line];
 
     if (!$def_boot_cmd_line)
         $def_boot_cmd_line = "NULL";
+    if (!$def_boot_path)
+        $def_boot_path = "NULL";
     if (!$next_boot_path)
         $next_boot_path = "NULL";
     if (!$next_boot_cmd_line)
@@ -91,6 +95,7 @@ while ($row = mysql_fetch_array($query_result)) {
               <td>$pid</td>
               <td>$eid</td>
               <td>$def_boot_image_id</td>
+              <td>$def_boot_path</td>
               <td>$def_boot_cmd_line</td>
               <td>$next_boot_path</td>
               <td>$next_boot_cmd_line</td>

@@ -58,6 +58,7 @@ echo "<center><h1>
 $node_id            = $row[node_id]; 
 $type               = $row[type];
 $def_boot_image_id  = $row[def_boot_image_id];
+$def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
 $next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
@@ -95,6 +96,14 @@ echo "<tr>
               <input type=\"text\" name=\"def_boot_image_id\" size=\"30\"
                      value=\"$def_boot_image_id\"></td>
       </tr>\n";
+
+echo "<tr>
+          <td>Def Boot Path:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"def_boot_path\" size=\"40\"
+                     value=\"$def_boot_path\"></td>
+      </tr>\n";
+
 
 echo "<tr>
           <td>Def Boot Command Line:</td>
