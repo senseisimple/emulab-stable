@@ -558,9 +558,9 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select card,IP,IPalias,MAC from interfaces "
-			 "where node_id='%s'",
-			 4, nodeid);
+	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex "
+			 "from interfaces where node_id='%s'",
+			 6, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "IFCONFIG: %s: DB Error getting interfaces!",
 		       nodeid);
@@ -575,7 +575,10 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		if (row[1] && row[1][0]) {
-			int card = atoi(row[0]);
+			int card    = atoi(row[0]);
+			char *speed  = "100";
+			char *unit   = "Mbps";
+			char *duplex = "full";
 
 			/*
 			 * INTERFACE can go away when all machines running
@@ -609,6 +612,19 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			 */
 			strcat(buf, " MAC=");
 			strcat(buf, row[3]);
+
+			/*
+			 * Tack on speed and duplex. 
+			 */
+			if (row[4] && row[4][0]) {
+				speed = row[4];
+			}
+			if (row[5] && row[5][0]) {
+				duplex = row[5];
+			}
+			
+			sprintf(&buf[strlen(buf)],
+				" SPEED=%s%s DUPLEX=%s", speed, unit, duplex);
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
