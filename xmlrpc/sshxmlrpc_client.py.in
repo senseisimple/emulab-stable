@@ -15,7 +15,7 @@ from emulabclient import *
 ##
 # The package version number
 #
-PACKAGE_VERSION = "0.1"
+PACKAGE_VERSION = 0.1
 
 # Default server
 XMLRPC_SERVER   = "@BOSSNODE@"
@@ -26,6 +26,9 @@ xmlrpc_server   = XMLRPC_SERVER
 # User supplied login ID to use (overrides env variable USER if exists).
 login_id        = os.environ["USER"]
 
+# The default RPC module to invoke.
+module          = "experiment"
+
 # Debugging output.
 debug           = 0
 
@@ -35,17 +38,19 @@ debug           = 0
 def usage():
     print "Make a request to the Emulab XML-RPC (SSH-based) server."
     print ("Usage: " + sys.argv[0] 
-                     + " [-hV] [-l login] [-s server] <method> [<args>]")
+                     + " [-hV] [-l login] [-s server] [-m module] "
+                     + "<method> [param=value ...]")
     print
     print "Options:"
     print "  -h, --help\t\t  Display this help message"
     print "  -V, --version\t\t  Show the version number"
     print "  -s, --server\t\t  Set the server hostname"
     print "  -l, --login\t\t  Set the login id (defaults to $USER)"
+    print "  -m, --module\t\t  Set the RPC module (defaults to experiment)"
     print
     print "Required arguments:"
     print "  method\t\t  The method to execute on the server"
-    print "  args\t\t\t  The method arguments"
+    print "  params\t\t\t  The method arguments in param=value format"
     print
     print "Example:"
     print ("  "
@@ -74,6 +79,9 @@ try:
         elif opt in ("-l", "--login"):
 	    login_id = val
             pass
+        elif opt in ("-m", "--module"):
+	    module = val
+            pass
         elif opt in ("-d"):
 	    debug = 1
             pass
@@ -89,19 +97,46 @@ except getopt.error, e:
     pass
 
 # Get a handle on the server,
-server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server + "/sshxmlrpc")
+server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
+                        "/xmlrpc/" + module)
 
-# Get a handle on the emulab client object, giving it the transport to use.
-client = emulabclient(server, debug);
+# Get a pointer to the function we want to invoke.
+meth = getattr(server, req_args[0])
 
-# Get a pointer to the client side of the function we want to invoke.
-meth = getattr(client, req_args[0])
-
-# The rest of the list is passed as is.
+# Pop off the method, and then convert the rest of the arguments. Be sure to
+# add the version.
 req_args.pop(0)
 
+params = {}
+for param in req_args:
+    plist = string.split(param, "=")
+    if len(plist) != 2:
+        print "Parameters are of the form: param=value!"
+        sys.exit(-1)
+    
+    params[plist[0]] = plist[1]
+    pass
+meth_args = [ PACKAGE_VERSION, params ]
+
 #
-# Make the call. The clientside class will do whatever it needs before
-# invoking the equiv method on the server side.
+# Make the call. 
 #
-sys.exit(apply(meth, req_args))
+response = apply(meth, meth_args)
+
+#
+# Parse the Response, which is a Dictionary. See ResponseBlock in the
+# emulabclient.py module. The XML standard converts classes to a plain
+# Dictionary, hence the code below. 
+# 
+if len(response["output"]):
+    print response["output"]
+    pass
+
+if response["code"] != RESPONSE_SUCCESS:
+    if response["value"]:
+        sys.exit(response["value"])
+    else:
+        sys.exit(response["code"])
+    pass
+sys.exit(RESPONSE_SUCCESS)
+

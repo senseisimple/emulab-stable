@@ -57,32 +57,35 @@ Python is also available that you can use on your desktop to invoke
 commands from the shell. For example:
 
     <code><pre>
-    $ sshxmlrpc_client.py startexp -i -w mypid myeid ~/nsfile.ns</code></pre>
+    $ sshxmlrpc_client.py startexp batch=false wait=true pid="mypid" eid="myeid" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
 
-which says to create an experiment called "myeid" in the "mypid"
-project, swap it in immediately, wait for the exit status (instead of
-running asynchronously), using the NS file nsfile.ns in your home dir.
-By default, the client will contact the RPC server at
-<tt><?php echo $BOSSNODE ?></tt>, but you can override that by using
-the <tt>-s hostname</tt> option to sshxmlrpc_client. If your login ID
-on the local machine is different then your login ID at Emulab, you
-can use the <tt>-l login</tt> option. For example:
+which says to create an experiment called "myeid" in the "mypid" project,
+swap it in immediately, wait for the exit status (instead of running
+asynchronously), passing inline the contents of nsfile.ns in your home dir.
+By default, the client will contact the RPC server at <tt><?php echo
+$BOSSNODE ?></tt>, but you can override that by using the <tt>-s
+hostname</tt> option to sshxmlrpc_client. If your login ID on the local
+machine is different then your login ID at Emulab, you can use the <tt>-l
+login</tt> option. For example:
 
     <code><pre>
     $ sshxmlrpc_client.py -s boss.emulab.net -l rellots startexp ...</code></pre>
 
-which would invoke the RPC server on <tt>boss.emulab.net</tt>, using the login
-ID <tt>rellots</tt> (for the purposes of SSH authentication). You will
-be prompted for your SSH passphrase, unless you are running an SSH
-agent and the key you have uploaded to Emulab has been added to your
-local agent.
+which would invoke the RPC server on <tt>boss.emulab.net</tt>, using the
+login ID <tt>rellots</tt> (for the purposes of SSH authentication).  You
+will be prompted for your SSH passphrase, unless you are running an SSH
+agent and the key you have uploaded to Emulab has been added to your local
+agent.
 </p>
 
 <p>
 The <tt>sshxmlrpc_client</tt> python program is a simple demonstration of
-how to use Emulab's RPC server. It converts command lines into RPCs to the
-server, and prints out the results that the server sends back, exiting with
-whatever status code the server returned. You can use this client program
+how to use Emulab's RPC server. If you do not give provide a method
+and arguments on the command line, it will enter a command loop where
+you can type in commands (method and arguments) and wait for responses
+from the server. It converts your command lines into RPCs to the
+server, and prints out the results that the server sends back (exiting with
+whatever status code the server returned). You can use this client program
 as is, or you can write your own client program in whatever language you
 like, as long as you speak to the server over an SSH connection. The API
 for the server is broken into several different modules that export a

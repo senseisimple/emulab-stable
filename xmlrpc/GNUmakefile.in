@@ -12,11 +12,11 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= sshxmlrpc_client.py  client.py
+BIN_SCRIPTS	= sshxmlrpc_client.py
 SBIN_SCRIPTS	= sshxmlrpc_server.py
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
-WWW_STUFF	= xmlapi.php3
+WWW_STUFF	= xmlrpcapi.php3
 
 #
 # These are the ones installed on plastic (users, control, etc). 
