@@ -985,6 +985,13 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments change batchstate batchstate varchar(16) \
 	        default NULL;
 
+       Note that you need to update fields in the DB so that
+       experiments will be in the proper states for operating on
+       (after the new scripts are installed, nothing will swap).
+       To do that run:
+
+		sql/newstates.pl | mysql tbdb
+
 1.188: Add a virt_node_desires table to finally be able to pass node
        desires into assign.
 
@@ -1007,3 +1014,5 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table interfaces modify role enum('ctrl','expt','jail','fake', \
            'other','gw');
+
+1.193: 
