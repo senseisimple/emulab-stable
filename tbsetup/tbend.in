@@ -51,6 +51,11 @@ if (&tbs_exec("resetvlans " . join(" ",@nodes))) {
     exit(1);
 }
 
+&tbs_out("Backing up VLAN configuration\n");
+if (&tbs_exec("savevlans")) {
+    &tbs_out("WARNING: Failed to back up VLAN configuration\n");
+}
+
 &tbs_out("Freeing resources\n");
 if (&tbs_exec("nfree $pid $eid")) {
     &tbs_out("Failed to free resources.\n");

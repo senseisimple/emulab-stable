@@ -308,7 +308,7 @@ sub GetToken {
 	  $tries = 10;
 	} else {
 	  print STDERR time,
-	  "Try #$tries - Result is $RetVal - Waiting 2 seconds\n";
+	  "Try #$tries - Result is $RetVal - Waiting 2 seconds\n" if $debug;
 	  select (undef, undef, undef, 2); #wait 2 seconds
 	}
       }
