@@ -4755,15 +4755,15 @@ COMMAND_PROTOTYPE(doixpconfig)
 	 * Get the "control" net address for the IXP from the interfaces
 	 * table. This is really a virtual pci/eth interface.
 	 */
-	res = mydb_query("select i1.IP,i1.iface,i2.iface,i2.mask "
+	res = mydb_query("select i1.IP,i1.iface,i2.iface,i2.mask,i2.IP "
 			 " from nodes as n "
 			 "left join node_types as nt on n.type=nt.type "
 			 "left join interfaces as i1 on i1.node_id=n.node_id "
 			 "     and i1.iface=nt.control_iface "
 			 "left join interfaces as i2 on i2.node_id='%s' "
-			 "     and i2.card=255 "
+			 "     and i2.card=i1.card "
 			 "where n.node_id='%s'",
-			 4, reqp->pnodeid, reqp->nodeid);
+			 5, reqp->pnodeid, reqp->nodeid);
 	
 	if (!res) {
 		error("IXPCONFIG: %s: DB Error getting config!\n",
@@ -4788,16 +4788,8 @@ COMMAND_PROTOTYPE(doixpconfig)
 		return 1;
 	}
 	inet_aton(CHECKMASK(row[3]), &mask_addr);	
-	inet_aton(row[0], &bcast_addr);	
-	inet_aton(row[0], &gw_addr);
+	inet_aton(row[0], &bcast_addr);
 
-	/*
-	 * Not sure we should do this here?
-	 */
-	gw_addr.s_addr = (gw_addr.s_addr & mask_addr.s_addr) |
-		htonl(ntohl(~mask_addr.s_addr) - 1);
-	strcpy(gw_ip, inet_ntoa(gw_addr));
-	
 	bcast_addr.s_addr = (bcast_addr.s_addr & mask_addr.s_addr) |
 		(~mask_addr.s_addr);
 	strcpy(bcast_ip, inet_ntoa(bcast_addr));
@@ -4811,7 +4803,7 @@ COMMAND_PROTOTYPE(doixpconfig)
 		"HOST_IFACE=\"%s\"\n"
 		"NETMASK=\"%s\"\n",
 		row[0], row[1], bcast_ip, reqp->nickname,
-		gw_ip, row[2], row[3]);
+		row[4], row[2], row[3]);
 		
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
