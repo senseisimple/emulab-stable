@@ -95,6 +95,7 @@ local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.bootsetup $(RCDIR)/rc.bootsetup
 	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(RCDIR)/rc.slothd
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(RCDIR)/rc.linktest
+	$(INSTALL) -m 755 $(SRCDIR)/rc.inelab $(RCDIR)/rc.inelab
 	# Symlink this cause we invoke it from boss, and its too much
 	# of a hassle to worry about right now.
 	rm -f $(ETCDIR)/update

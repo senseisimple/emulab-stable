@@ -1,0 +1,856 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
+#
+# TODO:
+#  * Put admin people in local homedirs. 
+#
+#
+use English;
+use Getopt::Std;
+use Socket;
+use IO::Handle;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "ds";
+my $action  = "boot";
+my $debug   = 0;
+my $skipit  = 0;	# Temporary until images updated.
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo. Put it someplace where prepare script will leave it.
+my $LOGFILE    = "/usr/mkelab.debug";
+my %elabconfig = ();
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (REMOTE() || JAILED() || DELAYHOST());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'d'})) {
+    $debug = 1;
+}
+if (defined($options{'s'})) {
+    $skipit = 1;
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# More stuff we need below.
+my $TBDIR;
+my $domain;
+my ($pid,$eid,undef) = check_nickname();
+my $file    = TMCREATOR();
+my $creator = `cat $file`;
+chomp($creator);
+
+my $hostname = `hostname`;
+chomp($hostname);
+my ($bossname, $bossip) = tmccbossinfo();
+
+#
+# Find out our domain name, so that we can qualify the localhost entry
+#
+if ($hostname =~ /[^.]+\.(.+)/) {
+    $domain = $1;
+}
+
+#
+# Find the outer domain for sending email to creator.
+#
+my $outer_domain;
+if ($bossname =~ /[^.]+\.(.+)/) {
+    $outer_domain = $1;
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos
+sub SetupFatal($);
+sub mysystem($);
+sub SetupOpsNode();
+sub SetupBossNode();
+sub CreateDefsFile($);
+sub SetupSendMail($$);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @tmccresults;
+
+    if (tmcc(TMCCCMD_EMULABCONFIG, undef, \@tmccresults) < 0) {
+	fatal("Could not get Inner Emulab Config info from server!");
+    }
+    # If no results then do nothing. No inner elab.
+    return 0
+	if (! @tmccresults);
+
+    #
+    # This is temporary until images are up to date.
+    #
+    if (! $skipit) {
+	print "*** Installing current software first ... \n";
+	
+	mysystem("cd /users/stoller/testbed/obj-real/tmcd/common; ".
+		 "gmake local-install");
+	exec($PROGRAM_NAME, ("-s"));
+	die("*** $0:\n".
+	    "    Could not re-exec script!\n");
+    }
+
+    if (!$debug) {
+	print "Redirecting output to $LOGFILE\n";
+
+	open(STDERR, ">  $LOGFILE") or die("opening $LOGFILE for STDERR: $!");
+	open(STDOUT, ">> $LOGFILE") or die("opening $LOGFILE for STDOUT: $!");
+
+	#
+	# Turn off line buffering on output
+	#
+	STDOUT->autoflush(1);
+	STDERR->autoflush(1);
+    }
+    
+    #
+    # Turn the tmcc results into a hash first. Then call the boss or ops
+    # setup function.
+    #
+    foreach my $line (@tmccresults) {
+	if ($line =~ /^(.*)="(.+)"$/ ||
+	    $line =~ /^(.*)=(.+)$/) {
+	    $emulabconfig{$1} = $2;
+	}
+    }
+
+    #
+    # XXX To avoid NFS errors while copying goo from outer boss.
+    # 
+    system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    
+    system("sysctl vfs.nfs.eacces_retry_count=5 >/dev/null 2>&1");    
+
+    if ($emulabconfig{"ROLE"} eq "ops") {
+	SetupOpsNode();
+    }
+    elsif ($emulabconfig{"ROLE"} eq "boss") {
+	SetupBossNode();
+    }
+    print "Done!\n";
+    return 0;
+}
+
+#
+# Setup an ops node.
+#
+sub SetupOpsNode()
+{
+    print "Setting up an Ops node ...\n";
+    $TBDIR = "/q";
+
+    #
+    # Create a ${TBDIR} from the extra slice and put everything there.
+    # 
+    mysystem("mkdir ${TBDIR}")
+	if (! -d "${TBDIR}");
+    mysystem("$BINDIR/mkextrafs.pl -f ${TBDIR}");
+    mysystem("mkdir ${TBDIR}/testbed");
+    mysystem("mkdir ${TBDIR}/testbed/src");
+    mysystem("mkdir ${TBDIR}/testbed/obj");
+
+    print "Copying over current testbed software from /proj\n";
+    mysystem("mkdir ${TBDIR}/testbed/src/testbed");
+    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src");
+
+    #
+    # Stash the IP of the outer emulab for tmcc (and script above).
+    # We use an IP to avoid DNS issues (there will be a DNS running inside).
+    # Ditto for the current router. Need that for later (rc.inelab).
+    # 
+    mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
+    mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
+
+    #
+    # Run the prepare script to clear out the current accounts and such.
+    # From this point on will need to log in as root,
+    #
+    print "Clearing out existing accounts and such\n";
+    mysystem("$BINDIR/prepare");
+
+    #
+    # Remove the outer testbed startup script.
+    # See new code in dhclient-exit-hooks
+    #
+    mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
+
+    #
+    # Do this as a separate step cause we need the NFS mounts, but
+    # must do the unmounts before running ops-install. 
+    # 
+    print "Installing the ops metaport.\n";
+    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20041102";
+    mysystem("pkg_add emulab-ops-1.4 >/tmp/perrs 2>&1");
+
+    #
+    # Clean up a few things on the image and create symlinks into ${TBDIR} for
+    # /proj, /users, and /groups. Also allows /share to be created/
+    #
+    mysystem("umount -A -t nfs");
+    # In case umount fails!
+    mysystem("cd /; mv -f users users.old");
+    mysystem("cd /; mv -f proj proj.old");
+    # Groups might not exists
+    mysystem("cd /; mv -f groups groups.old")
+	if (-d "/groups");
+    mysystem("mkdir ${TBDIR}/users ${TBDIR}/proj ${TBDIR}/groups");
+    mysystem("ln -s ${TBDIR}/users /users");
+    mysystem("ln -s ${TBDIR}/proj /proj");
+    mysystem("ln -s ${TBDIR}/groups /groups");
+
+    #
+    # Setup a stub /share using slice 2 of the image.
+    #
+    mysystem("$BINDIR/mkextrafs.pl -f -s 2 /share");
+
+    #
+    # Need these for rc.conf.
+    # 
+    my $bossnode_ip = $emulabconfig{"BOSSIP"};
+    my $opsnode_ip  = $emulabconfig{"OPSIP"};
+
+    #
+    # Need control network.
+    #
+    my $control_network = inet_ntoa(inet_aton($opsnode_ip) &
+				    inet_aton("255.255.255.0")) . "/24";
+
+    #
+    # Need to create an /etc/rc.conf that is more suitable for ops.
+    # I took most of this from our real ops node. It will be modified
+    # by the ops-install script below.
+    #
+    print "Creating a new /etc/rc.conf\n";
+    open(RC, ">/etc/rc.conf") or
+	SetupFatal("Could not open /etc/rc.conf for writing: $!");
+
+    print RC "inetd_enable=\"YES\"\n";
+    print RC "sendmail_enable=\"YES\"\n";
+    print RC "sshd_enable=\"YES\"\n";
+
+    print RC "ntpdate_enable=\"YES\"\n";
+    print RC "ntpdate_flags=\"boss\"\n";
+    print RC "xntpd_enable=\"YES\"\n";
+    print RC "linux_enable=\"YES\"\n";
+    print RC "accounting_enable=\"YES\"\n";
+
+    print RC "nfs_server_enable=\"YES\"\n";
+    print RC "nfs_server_flags=\"-u -t -n 8\"\n";
+    print RC "nfs_client_enable=\"YES\"\n";
+    print RC "mountd_flags=\"-r -p 900\"\n";
+
+    print RC "syslogd_flags=\"-a $control_network\"\n";
+
+    print RC "network_interfaces=\"lo0\"\n";
+    print RC "ifconfig_lo0=\"DHCP\"\n";
+    print RC "dhcp_program=\"$BINDIR/dhclient\"\n";
+
+    print RC "defaultrouter=\"$bossnode_ip\"\n";
+    print RC "hostname=\"" . $emulabconfig{"OPSNODE"} . "." . $domain . "\"\n";
+    close(RC);
+
+    #
+    # Create a defs file. Note that this will move to boss at some point.
+    #
+    CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+
+    #
+    # Configure an object tree. 
+    #
+    mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
+    mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
+	     "   ../../src/testbed/configure ".
+	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab");
+
+    #
+    # Create the ops node.
+    #
+    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; perl ops-install -b");
+
+    #
+    # And install the ops side.
+    #
+    mysystem("cd ${TBDIR}/testbed/obj/testbed; gmake ops-install");
+
+    #
+    # Lets populate the mail lists with the creator of the experiment so
+    # that email goes someplace useful.
+    # 
+    opendir(DIR, "/etc/mail/lists") or
+	SetupFatal("Cannot opendir /etc/mail/lists: $!");
+    my @lists = grep { $_ ne "." && $_ ne ".." } readdir(DIR);
+    closedir(DIR);
+
+    foreach my $list (@lists) {
+	mysystem("echo ${creator}\@${outer_domain} > /etc/mail/lists/$list");
+    }
+
+    #
+    # Ack! The prepare script above killed the pid file for mountd. This
+    # is going to matter later when boss sets up and tries to add accounts.
+    # We could reboot ops, but for now its easier if I let both nodes setup
+    # before rebooting either one. So, restart mountd so it will create a
+    # new pid file in /var/run. Another idea might be that we do not run
+    # prepare, or scale it back for inner elab. Needs more thought.
+    #
+    mysystem("killall mountd");
+    mysystem("mountd -r");
+
+    #
+    # Need to create a resolv.conf that points to inner boss. This is the
+    # last thing we do cause after this, stuff is probably going to stop
+    # working properly!
+    # 
+    print "Creating a new /etc/resolv.conf\n";
+    open(RC, ">/etc/resolv.conf") or
+	SetupFatal("Could not open /etc/resolv.conf for writing: $!");
+
+    print RC "domain $domain\n";
+    print RC "search $domain\n";
+    print RC "nameserver $bossnode_ip\n";
+    close(RC);
+}
+
+sub SetupBossNode()
+{
+    print "Setting up a Boss node ...\n";
+    $TBDIR = "/usr";
+
+    #
+    # Create a ${TBDIR}/testbed from the extra slice and put everything there.
+    # 
+    mysystem("mkdir ${TBDIR}/testbed")
+	if (! -d "${TBDIR}/testbed");
+    mysystem("$BINDIR/mkextrafs.pl -f ${TBDIR}/testbed");
+    mysystem("mkdir ${TBDIR}/testbed/src");
+    mysystem("mkdir ${TBDIR}/testbed/obj");
+
+    print "Copying over current testbed software from /proj\n";
+    mysystem("mkdir ${TBDIR}/testbed/src/testbed");
+    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src");
+
+    print "Copying over initial dbstate from /proj\n";
+    mysystem("mkdir ${TBDIR}/testbed/stuff");
+    mysystem("cp -p /proj/$pid/exp/$eid/dbstate.tar.gz ${TBDIR}/testbed/stuff");
+
+    # Copy over creators ssl certificate for XMLRPC. See below.
+    mysystem("cp -p ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff");
+
+    # Still waiting for Rob to fix packages. This is some extra goo.
+    mysystem("cp -p /proj/$pid/exp/$eid/extras.tar.gz ${TBDIR}/testbed/stuff");
+
+    #
+    # Stash the IP of the outer emulab for tmcc (and script above).
+    # We use an IP to avoid DNS issues (there will be a DNS running inside).
+    # 
+    mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
+    mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
+
+    #
+    # Need outer control router IP below too.
+    #
+    if (! -e "$BOOTDIR/routerip") {
+	SetupFatal("$BOOTDIR/routerip does not exist!");
+    }
+    my $outer_routerip = `cat $BOOTDIR/routerip`;
+    chomp($outer_routerip);
+
+    #
+    # And we need the name of the control interface for natd below.
+    #
+    if (! -e "$BOOTDIR/controlif") {
+	SetupFatal("$BOOTDIR/controlif does not exist!");
+    }
+    my $outer_controlif = `cat $BOOTDIR/controlif`;
+    chomp($outer_controlif);
+
+    #
+    # Run the prepare script to clear out the current accounts and such.
+    # From this point on will need to log in as root,
+    #
+    print "Clearing out existing accounts and such\n";
+    mysystem("$BINDIR/prepare");
+  
+    #
+    # Remove the outer testbed startup script.
+    # See new code in dhclient-exit-hooks
+    #
+    mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
+
+    #
+    # Create a bigger /var/db/mysql (before installing mysql!)
+    #
+    mysystem("mkdir /var/db/mysql")
+	if (! -d "/var/db/mysql");
+    mysystem("$BINDIR/mkextrafs.pl -f -s 2 /var/db/mysql");
+
+    #
+    # Do this as a separate step cause we need the NFS mounts, but
+    # must do the unmounts before running ops-install. 
+    # 
+    print "Installing the boss metaport.\n";
+    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20041102";
+    mysystem("pkg_add -f -v emulab-boss-1.7 >/tmp/perrs 2>&1");
+
+    #
+    # Extra stuff to fix up php package stuff. Ask Rob!
+    #
+    mysystem("tar xzf ${TBDIR}/testbed/stuff/extras.tar.gz -C /");
+
+    #
+    # We no longer need anything from NFS, and we need to unmount everything
+    # so we can mount new NFS filesystems in their proper places. 
+    # 
+    mysystem("umount -A -t nfs");
+    
+    #
+    # Need to create an /etc/rc.conf that is more suitable for boss.
+    # I took most of this from our real ops node. It will be modified
+    # by the ops-install script below.
+    #
+    print "Creating a new /etc/rc.conf\n";
+    open(RC, ">/etc/rc.conf") or
+	SetupFatal("Could not open /etc/rc.conf for writing: $!");
+
+    print RC "kern_securelevel_enable=\"NO\"\n";
+    print RC "sendmail_enable=\"YES\"\n";
+    print RC "sshd_enable=\"YES\"\n";
+
+    print RC "ntpdate_enable=\"YES\"\n";
+    # Points to outer boss
+    print RC "ntpdate_flags=\"${bossip}\"\n";
+    print RC "linux_enable=\"YES\"\n";
+    print RC "accounting_enable=\"YES\"\n";
+
+    print RC "nfs_server_enable=\"YES\"\n";
+    print RC "nfs_server_flags=\"-u -t -n 8\"\n";
+    print RC "nfs_client_enable=\"YES\"\n";
+
+    print RC "network_interfaces=\"lo0\"\n";
+    print RC "ifconfig_lo0=\"DHCP\"\n";
+    print RC "dhcp_program=\"$BINDIR/dhclient\"\n";
+
+    #
+    # Use natd so that internal control network can talk to outside world.
+    # Maybe make an option?
+    #
+    print RC "firewall_enable=\"YES\"\n";
+    print RC "firewall_type=\"open\"\n";
+    print RC "natd_interface=\"${outer_controlif}\"\n";
+    print RC "natd_enable=\"YES\"\n";
+    print RC "natd_flags=\"-use_sockets -unregistered_only -same_ports ".
+	"-dynamic -log_facility local6\"\n";
+
+    # Points to outer control router.
+    print RC "defaultrouter=\"$outer_routerip\"\n";
+    print RC "hostname=\"" . $emulabconfig{"BOSSNODE"} . "." . $domain . "\"\n";
+    # We act as the router for the inner ops and inner nodes.
+    print RC "gateway_enable=\"YES\"\n";
+
+    print RC "check_quotas=\"NO\"\n";
+    close(RC);
+
+    #
+    # Create a defs file. Note that this will move to boss at some point.
+    #
+    CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+
+    #
+    # Configure an object tree. 
+    #
+    mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
+    mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
+	     "   ../../src/testbed/configure ".
+	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab");
+
+    #
+    # Create the boss node. This will also install the software.
+    #
+    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
+	     "   perl boss-install -b -w ElabInElab");
+
+    #
+    # The above script wiped out the outer emulab root ssh pub keys from ops.
+    # We want to add them back so we can ssh into the node from outer Emulab.
+    #
+    mysystem("cat /root/.ssh/authorized_keys | ssh " . $emulabconfig{"OPSIP"} .
+	     " '(cat >> /root/.ssh/authorized_keys)'");
+
+    #
+    # Unpack the tftpboot directory. It would be nice if this was part
+    # of boss install too. 
+    #
+    print "Copying over tftpboot tar file from web server and unpacking\n";
+    mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
+	     "http://www.emulab.net/downloads/tftpboot-new.tar.gz");
+
+    mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
+	     "    -C /tftpboot");
+
+    # Its the generic stuff; must localize.
+    mysystem("cd /tftpboot; mv pxeboot.emu-sio pxeboot.emu; ".
+	     "              mv freebsd410 freebsd ; mv frisbee410 frisbee");
+
+    #
+    # Copy the creators ssl certificate into place. This allows the
+    # inner boss to invoke the XMLRPC server on the outer boss for
+    # doing things like power control, vlan setup, etc.
+    #
+    mysystem("cp -p ${TBDIR}/testbed/stuff/emulab.pem ".
+	     "      /usr/testbed/etc/outer_emulab.pem");
+
+    #
+    # Set up a bunch of DB stuff.  This part will eventually be optional,
+    # resulting in a naked setup that will need to be configured the rest of
+    # the way by hand. 
+    #
+    #
+    # Unpack the initial DB contents and load it into the DB.
+    #
+    mysystem("mkdir /tmp/dbstate.$$");
+    mysystem("tar xzf ${TBDIR}/testbed/stuff/dbstate.tar.gz ".
+	     "    -C /tmp/dbstate.$$");
+    
+    opendir(DIR, "/tmp/dbstate.$$") or
+	SetupFatal("Cannot opendir /tmp/dbstate.$$: $!");
+    my @tables = grep { $_ ne "." && $_ ne ".." } readdir(DIR);
+    closedir(DIR);
+
+    foreach my $table (@tables) {
+	mysystem("echo \"load data infile '/tmp/dbstate.$$/$table' ".
+		 "replace into table $table\" | mysql tbdb");
+    }
+
+    #
+    # We need to actually create the project and users from the DB state.
+    #
+    mysystem("sudo -u elabman /usr/testbed/sbin/withadminprivs ".
+	     "  /usr/testbed/sbin/mkproj $pid");
+
+    #
+    # Create the users that are part of the project. We need to know those
+    # users though, so ask mysql.
+    #
+    my $cmd   = "select distinct uid from group_membership where pid='$pid'";
+    my @users = split("\n", `echo \"$cmd\" | mysql tbdb`);
+    # Chop first line from mysql results.
+    shift(@users);
+
+    foreach my $uid (@users) {
+	mysystem("sudo -u elabman /usr/testbed/sbin/withadminprivs ".
+		 "  /usr/testbed/sbin/tbacct add $uid");
+    }
+
+    #
+    # Get the list of admin users (subset of above). These users get real
+    # accounts on boss. Note that for elabinelab, its fine to share a home
+    # dir between boss and ops (not allowed on a real Emulab).
+    #
+    $cmd   = "select distinct u.uid from group_membership as m ".
+             "left join users as u on u.uid=m.uid ".
+	     "where u.admin=1 and u.status='active'";
+    @users = split("\n", `echo \"$cmd\" | mysql tbdb`);
+    # Chop first line from mysql results.
+    shift(@users);
+
+    foreach my $uid (@users) {
+	mysystem("pw usermod -n $uid -s /bin/tcsh");
+    }
+
+    #
+    # Need to regen the dhcpd config file after loading the DB above.
+    #
+    mysystem("/usr/testbed/sbin/dhcpd_makeconf -i");
+
+    #
+    # Ditto for named config.
+    #
+    mysystem("/usr/testbed/sbin/named_setup");
+}
+
+#
+# Create a defs file by starting with the stub file, and turning it into
+# a real defs file. We should probably do this on the boss side, but its
+# easier to localize here for now. 
+# 
+sub CreateDefsFile($)
+{
+    my ($defsfile) = @_;
+    
+    print "Creating defs file from stub defs file\m";
+    
+    my $bossnode_ip     = $emulabconfig{"BOSSIP"};
+    my $opsnode_ip      = $emulabconfig{"OPSIP"};
+    my $control_network = inet_ntoa(inet_aton($opsnode_ip) &
+				    inet_aton("255.255.255.0"));
+    my $dynrange_low    = inet_ntoa(inet_aton($control_network) |
+				    inet_aton("0.0.0.200"));
+    my $dynrange_high   = inet_ntoa(inet_aton($control_network) |
+				    inet_aton("0.0.0.249"));
+
+    open(INDEFS, $defsfile) or
+	SetupFatal("Could not open stub defs-elabinelab: $!");
+    open(OUTDEFS, "> /tmp/defs-elabinelab") or
+	SetupFatal("Could not open new defs-elabinelab: $!");
+
+    while (<INDEFS>) {
+	my $key;
+	my $val;
+	
+	if ($_ =~ /^([-\w]*)="(.+)"$/ ||
+	    $_ =~ /^([-\w]*)=(.+)$/) {
+	    $key = $1;
+	    $val = $2;
+
+	    #
+	    # Look for things that include "changeme". Emails are special.
+	    #
+	    if ($val =~ /^(.*)\@(changeme)$/) {
+		my $opsnode = $emulabconfig{"OPSNODE"}; 
+		print OUTDEFS "${key}=${1}\@${opsnode}.${domain}\n";
+		next;
+	    }
+	    if (! ($val =~ /changeme/)) {
+		print OUTDEFS $_;
+		next;
+	    }
+	
+	    SWITCH: for ($key) {
+		/^BOSSNODE$/ && do {
+		    my $bossnode = $emulabconfig{"BOSSNODE"}; 
+		    print OUTDEFS "BOSSNODE=${bossnode}.${domain}\n";
+		    last SWITCH;
+		};
+		/^OUTERBOSSNODE$/ && do {
+		    print OUTDEFS "OUTERBOSSNODE=${bossname}\n";
+		    last SWITCH;
+		};
+		/^USERNODE$/ && do {
+		    my $opsnode = $emulabconfig{"OPSNODE"}; 
+		    print OUTDEFS "USERNODE=${opsnode}.${domain}\n";
+		    last SWITCH;
+		};
+		/^FSNODE$/ && do {
+		    my $opsnode = $emulabconfig{"OPSNODE"}; 
+		    print OUTDEFS "FSNODE=${opsnode}.${domain}\n";
+		    last SWITCH;
+		};
+		/^OURDOMAIN$/ && do {
+		    print OUTDEFS "OURDOMAIN=${domain}\n";
+		    last SWITCH;
+		};
+		/^WWWHOST$/ && do {
+		    my $bossnode = $emulabconfig{"BOSSNODE"}; 
+		    print OUTDEFS "WWWHOST=${bossnode}.${domain}\n";
+		    last SWITCH;
+		};
+		/^THISHOMEBASE$/ && do {
+		    print OUTDEFS "THISHOMEBASE=MyEmulab.Net\n";
+		    last SWITCH;
+		};
+		/^TESTBED_NETWORK$/ && do {
+		    print OUTDEFS "TESTBED_NETWORK=$control_network\n";
+		    last SWITCH;
+		};
+		/^TESTBED_NETMASK$/ && do {
+		    print OUTDEFS "TESTBED_NETMASK=255.255.255.0\n";
+		    last SWITCH;
+		};
+		/^BOSSNODE_IP$/ && do {
+		    print OUTDEFS "BOSSNODE_IP=$bossnode_ip\n";
+		    last SWITCH;
+		};
+		/^USERNODE_IP$/ && do {
+		    print OUTDEFS "USERNODE_IP=$opsnode_ip\n";
+		    last SWITCH;
+		};
+		/^CONTROL_ROUTER_IP$/ && do {
+		    print OUTDEFS "CONTROL_ROUTER_IP=$bossnode_ip\n";
+		    last SWITCH;
+		};
+		/^CONTROL_NETWORK$/ && do {
+		    print OUTDEFS "CONTROL_NETWORK=$control_network\n";
+		    last SWITCH;
+		};
+		/^CONTROL_NETMASK$/ && do {
+		    print OUTDEFS "CONTROL_NETMASK=255.255.255.0\n";
+		    last SWITCH;
+		};
+		/^PRIVATE_NETWORK$/ && do {
+		    print OUTDEFS "PRIVATE_NETWORK=$control_network\n";
+		    last SWITCH;
+		};
+		/^PRIVATE_ROUTER$/ && do {
+		    print OUTDEFS "PRIVATE_ROUTER=$bossnode_ip\n";
+		    last SWITCH;
+		};
+		/^PRIVATE_NETMASK$/ && do {
+		    print OUTDEFS "PRIVATE_NETMASK=255.255.255.0\n";
+		    last SWITCH;
+		};
+		/^PUBLIC_NETWORK$/ && do {
+		    print OUTDEFS "PUBLIC_NETWORK=$control_network\n";
+		    last SWITCH;
+		};
+		/^PUBLIC_ROUTER$/ && do {
+		    print OUTDEFS "PUBLIC_ROUTER=$bossnode_ip\n";
+		    last SWITCH;
+		};
+		/^PUBLIC_NETMASK$/ && do {
+		    print OUTDEFS "PUBLIC_NETMASK=255.255.255.0\n";
+		    last SWITCH;
+		};
+		/^DHCPD_DYNRANGE$/ && do {
+		    print OUTDEFS "DHCPD_DYNRANGE=".
+			"\"$dynrange_low $dynrange_high\"\n";
+		    last SWITCH;
+		};
+		
+		print OUTDEFS $_;
+	    }
+	}
+	else {
+		print OUTDEFS $_;
+	}
+    }
+    close(INDEFS);
+    close(OUTDEFS);
+    mysystem("cat /tmp/defs-elabinelab");
+    mysystem("mv -f /tmp/defs-elabinelab $defsfile");
+}
+
+#
+# Print error and exit.
+#
+sub SetupFatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+#
+# Send email. This should come from a library. 
+#
+sub SetupSendMail($$)
+{
+    my ($isfatal, $msg) = @_;
+
+    if (! open(MAIL, "|/usr/sbin/sendmail -t")) {
+	die("*** $0:\n".
+	    "    SENDMAIL: Could not start sendmail: $!\n".
+	    "    $msg\n");
+    }
+    print MAIL "From: ${creator}\@${hostname}\n";
+    print MAIL "To: ${creator}\@${outer_domain}\n";
+    if ($isfatal) {
+	print MAIL "Subject: ElabInElab setup failure on $hostname\n";
+    }
+    else {
+	print MAIL "Subject: ElabInElab setup completed on $hostname\n";
+    }
+    print MAIL "\n";
+    print MAIL "$msg\n";
+    print MAIL "\n";
+
+    if (open(IN, "$LOGFILE")) {
+	print MAIL "\n--------- $LOGFILE --------\n";
+
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
+    
+    print MAIL "\n";
+    if (! close(MAIL)) {
+	print "SENDMAIL: Could not finish sendmail: $!\n";
+    }
+}
+
+#
+# Run a command string.
+#
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print "Command: '$command\'\n";
+
+    system($command);
+    if ($?) {
+	SetupFatal("Command failed: $? - $command");
+    }
+}
