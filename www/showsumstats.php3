@@ -151,16 +151,16 @@ function showsummary ($showby, $sortby) {
     # Gather some totals first.
     #
     $pnode_total  = 0;
-    $phours_total = 0;
-    $ehours_total = 0;
+    $pdays_total  = 0;
+    $edays_total  = 0;
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pnodes  = $row["allexpt_pnodes"];
-	$phours  = $row["pnode_days"];
-	$ehours  = $row["expt_days"];
+	$pdays   = $row["pnode_days"];
+	$edays   = $row["expt_days"];
 	
 	$pnode_total  += $pnodes;
-	$phours_total += $phours;
-	$ehours_total += $ehours;
+	$pdays_total  += $pdays;
+	$edays_total  += $edays;
     }
 
     SUBPAGESTART();
@@ -171,11 +171,11 @@ function showsummary ($showby, $sortby) {
            <tr><td nowrap align=right><b>Pnodes</b></td>
                <td align=left>$pnode_total</td>
            </tr>
-           <tr><td nowrap align=right><b>Pnode Hours</b></td>
-               <td align=left>$phours_total</td>
+           <tr><td nowrap align=right><b>Pnode Days</b></td>
+               <td align=left>$pdays_total</td>
            </tr>
-           <tr><td nowrap align=right><b>Expt Hours</b></td>
-               <td align=left>$ehours_total</td>
+           <tr><td nowrap align=right><b>Expt Days</b></td>
+               <td align=left>$edays_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
@@ -437,17 +437,17 @@ function showrange ($showby, $sortby, $range) {
     # Gather some totals first.
     #
     $pnode_total  = 0;
-    $phours_total = 0;
-    $ehours_total = 0;
+    $pdays_total  = 0;
+    $edays_total  = 0;
 
     foreach ($table as $key => $value) {
 	$pnodes  = $value["pnodes"];
-	$phours  = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
-	$ehours  = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
+	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
+	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
 	$pnode_total  += $pnodes;
-	$phours_total += $phours;
-	$ehours_total += $ehours;
+	$pdays_total  += $pdays;
+	$edays_total  += $edays;
     }
 
     SUBPAGESTART();
@@ -458,11 +458,11 @@ function showrange ($showby, $sortby, $range) {
            <tr><td nowrap align=right><b>Pnodes</b></td>
                <td align=left>$pnode_total</td>
            </tr>
-           <tr><td nowrap align=right><b>Pnode Hours</b></td>
-               <td align=left>$phours_total</td>
+           <tr><td nowrap align=right><b>Pnode Days</b></td>
+               <td align=left>$pdays_total</td>
            </tr>
-           <tr><td nowrap align=right><b>Expt Hours</b></td>
-               <td align=left>$ehours_total</td>
+           <tr><td nowrap align=right><b>Expt Days</b></td>
+               <td align=left>$edays_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
@@ -491,8 +491,8 @@ function showrange ($showby, $sortby, $range) {
 	$heading = $key;
 	$pnodes  = $value["pnodes"];
 	$current = $value["current"];
-	$phours  = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
-	$ehours  = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
+	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
+	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
 	# We caught a swapout, where the swapin was before the interval
 	# being looked at.
@@ -507,8 +507,8 @@ function showrange ($showby, $sortby, $range) {
 	echo "<tr>
                 <td><A href='$link${heading}'>$heading $current</A></td>
                 <td>$pnodes</td>
-                <td>$phours</td>
-                <td>$ehours</td>
+                <td>$pdays</td>
+                <td>$edays</td>
               </tr>\n";
     }
     echo "</table>\n";
