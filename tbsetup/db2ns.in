@@ -79,5 +79,4 @@ foreach $lan (keys(%lans)) {
 }
 
 print "\$ns run\n";
-
-
+exit(0);

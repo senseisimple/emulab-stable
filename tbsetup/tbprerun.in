@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+use English;
 
 # tbprerun
 
@@ -8,114 +9,81 @@
 # virt_nodes and virt_lans.  After this script ends successfully the
 # NS file is no longer necessary.
 
-use DBI;
+#
+# Configure variables
+#
+my $TBROOT   = "@prefix@";
 
-# Set up paths
-$TBDB = "@TBDBNAME@";
-$TBROOT = "@prefix@";
+# Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/sbin:$TBROOT/bin";
 
-# Turn off line buffering.
-$| = 1; 
-
+#
+# Testbed Support libraries
+#
 use lib "@prefix@/lib";
-use libtbsetup;
+use libdb;
+use libtestbed;
 
-require exitonwarn; # exitonwarn isn't really a module, so just require it
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
-if ($#ARGV < 2 || $#ARGV > 3 ||
-    ($#ARGV == 3 && $ARGV[0] ne "-nologfile")) {
-    print STDERR "Syntax: $0 [-nologfile] pid eid ns_file\n";
+if ($#ARGV != 2) {
+    print STDERR "Syntax: $0 pid eid ns_file\n";
     exit(1);
 }
-
-if ($#ARGV == 3) {
-    shift;
-    $dolog = 0;
-}
-else {
-    $dolog = 1;
-}
-($pid,$eid,$nsfile) = @ARGV;
-
-$dbh=&tbs_initdbi($TBDB);
-
-$logfile = "$pid-$eid.log";
-
-if ($dolog) {
-    &tbs_initlog($logfile);
-    &tbs_out("Log:    $logfile\n");
-}
-
-&tbs_out("Input:  $nsfile\n");
-&tbs_out("\n");
-&tbs_out("Beginning pre run for $pid-$eid ($nsfile). " 
-	 . &ctime(time) . "\n");
+my ($pid,$eid,$nsfile) = @ARGV;
 
 if (! -r $nsfile) {
-    &tbs_out("$nsfile does not exist or is not readable.\n");
+    print STDERR "*** NS File '$nsfile' does not exist!\n";
     exit(1);
 }
 
-&tbs_out("Checking sanity.\n");
-$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" . 
-		   " and eid = \"$eid\"");
-$sth->execute();
-if (! (($state) = $sth->fetchrow_array())) {
-    &tbs_out("$0: *** No entry in experiments table.  Insane.\n");
+my $state;
+
+print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
+
+if (! ($state = ExpState($pid, $eid))) {
+    print STDERR "*** No such experiment $pid/$eid\n";
     exit(1);
 }
-$sth->finish();
-if ($state ne "new") {
-    &tbs_out("$0: *** Experiment is not in the proper state: $state\n");
+if ($state ne EXPTSTATE_NEW) {
+    print STDERR "*** Experiment is not in the proper state: $state\n";
+    exit(1);
+}
+if (! SetExpState($pid, $eid, EXPTSTATE_PRERUN)) {
+    print STDERR "*** Failed to set intermediate experiment state.\n";
     exit(1);
 }
 
-$sth = $dbh->prepare("UPDATE experiments set state = \"prerunning\"" . 
-		     "where pid = \"$pid\" and eid = \"$eid\"");
-if (! $sth->execute()) {
-    &tbs_out("$0: *** Failed to set intermediate state.\n");
-    exit(1);
-}
-$sth->finish();
-
+#
+# Cleanup if something goes wrong. 
+# 
 sub cleanup {
-    &tbs_out("Cleaning up\n");
-    &tbs_out("Clearing virtual state.\n");
-    if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
-		   " and eid = \"$eid\"")) {
-	
-	&tbs_out("$0: *** Could not clear virt_nodes table.\n");
-    }
-    if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
-		   " and eid = \"$eid\"")) {
-	&tbs_out("$0: *** Could not clear virt_lans table.\n");
-    }
-    if (! $dbh->do("UPDATE experiments set state = \"new\"" . 
-		   "where pid = \"$pid\" and eid = \"$eid\"")) {
-	&tbs_out("$0: *** Could not reset experiment state.\n");
-    }
-};
+    print STDERR "Cleaning up after errors.\n";
+    DBQueryWarn("DELETE from virt_nodes where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from virt_lans  where pid='$pid' and eid='$eid'");
+    SetExpState($pid, $eid, EXPTSTATE_NEW);
+}
 
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
-&tbs_out("Running parser.\n");
-if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
-    &tbs_out("$0: *** Parsing failed.\n");
+print "Running parser ... " . TBTimeStamp() . "\n";
+if (system("parse.tcl $pid $eid $nsfile")) {
+    print STDERR "*** Parsing failed.\n";
+    cleanup();
+    exit(1);
+}
+print "Parser done! Marking as prerunned. " . TBTimeStamp() . "\n";
+
+if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
+    print STDERR "*** Failed to set experiment state!\n";
+    cleanup();
     exit(1);
 }
 
-&tbs_out("Marking as prerunned.\n");
-$sth = $dbh->prepare("UPDATE experiments set state = \"swapped\"" . 
-		     "where pid = \"$pid\" and eid = \"$eid\"");
-if (! $sth->execute()) {
-    &tbs_out("$0: *** Failed to set state.\n");
-    cleanup;
-    exit(1);
-}
-$sth->finish();
+print "Pre run finished. " . TBTimeStamp() . "\n";
+exit(0);
 
-&tbs_out("Pre run finished - " . &ctime(time) . "\n");
-
-0;

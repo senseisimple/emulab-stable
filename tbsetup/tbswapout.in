@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+use English;
 
 # tbswapout
 
@@ -9,158 +10,131 @@
 # When this script succesfully completes the testbed will be in
 # a state for tbswapin or tbend to be run.
 
-use DBI;
+sub usage()
+{
+    print STDERR "Usage: $0 [-force] pid eid\n";
+    exit(-1);
+}
 
-# Set up paths
-$TESTMODE = @TESTMODE@;
-$TBDB = "@TBDBNAME@";
-$TBROOT = "@prefix@";
+#
+# Configure variables
+#
+my $TBROOT   = "@prefix@";
+my $TESTMODE = @TESTMODE@;
+
+# Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/sbin:$TBROOT/bin";
 
-# Turn off line buffering.
-$| = 1; 
-
+#
+# Testbed Support libraries
+#
 use lib "@prefix@/lib";
-use libtbsetup;
-
+use libdb;
+use libtestbed;
 require exitonwarn; # exitonwarn isn't really a module, so just require it
 
-$dolog = 1;
-$force = 0;
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
-sub show_help {
-    print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
-    exit(1);
-};
+my $force  = 0;
+my $errors = 0;
+my $state;
 
 while ($#ARGV > 1) {
     $arg = shift;
-    if ($arg eq "-nologfile") {
-	$dolog = 0;
-    } elsif ($arg eq "-force") {
+    if ($arg eq "-force") {
 	$force = 1;
     } else {
-	&show_help;
+	usage();
     }
 }
-if ($#ARGV != 1) {
-    &show_help;
+if ($#ARGV < 1) {
+    usage();
 }
-($pid,$eid) = @ARGV;
+my ($pid,$eid) = @ARGV;
 
-$dbh = &tbs_initdbi($TBDB);
+print "Beginning swapout for $pid/$eid. " . TBTimeStamp() . "\n";
 
-$logfile = "$pid-$eid.log";
-
-if ($dolog) {
-    &tbs_initlog($logfile);
-    &tbs_out("Log:    $logfile\n");
-}
-
-&tbs_out("Beginning swap out for $pid-$eid. " 	 . &ctime(time) . "\n");
-
-
-&tbs_out("Checking sanity.\n");
-$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
-		     " and eid = \"$eid\"");
-$sth->execute();
-if (! (($state) = $sth->fetchrow_array())) {
-    &tbs_out("$0: *** No entry in experiments table.  Insane.\n");
+if (! ($state = ExpState($pid, $eid))) {
+    print STDERR "*** No such experiment $pid/$eid\n";
     exit(1);
 }
-if ($force == 0) {
+if (! $force) {
     if ($TESTMODE) {
-	if ($state ne "testing") {
-	    &tbs_out("$0: *** Experiment should be in testing.\n");
-	    exit(1);
-	}
-    } else {
-	if ($state eq "swapped") {
-	    &tbs_out("$0: *** Experiment already swapped. ".
-		     "Try swapping in first or use -force.\n");
-	    exit(1);
-	} elsif ($state ne "active") {
-	    &tbs_out("$0: *** Experiment is not running $state." .
-		     " Try -force option\n");
+	if ($state ne EXPTSTATE_TESTING) {
+	    print STDERR "*** Experiment should be in testing state.\n";
 	    exit(1);
 	}
     }
-} elsif ($state ne "active") {
-    &tbs_out("$0: *** WARNING: Ignoring experimental state of $state.\n");
+    elsif ($state eq EXPTSTATE_SWAPPED) {
+	print STDERR "*** Experiment is already swapped out.\n" .
+	             "    Try swapping in first or use -force.\n";
+	exit(1);
+    }
+    elsif ($state ne EXPTSTATE_ACTIVE) {
+	print STDERR "*** Experiment is not running\n".
+	             "    Try swapping in first or use -force.\n";
+	exit(1);
+    }
 }
-
-if (! $dbh->do("UPDATE experiments set state=\"swapping\" " .
-	       "where pid=\"$pid\" and eid=\"$eid\"")) {
-    &tbs_out("$0: *** Could not set intermediate experiment state.\n");
+elsif ($state ne EXPTSTATE_ACTIVE) {
+    print STDERR "*** WARNING: Ignoring improper state: $state.\n";
 }
-
-$errors = 0;
+if (! SetExpState($pid, $eid, EXPTSTATE_SWAPPING)) {
+    print STDERR "*** Failed to set intermediate experiment state.\n";
+    exit(1);
+}
 
 if (! $TESTMODE) {
-    &tbs_out("Clearing VLANs\n");
-    if (&tbs_exec("snmpit -reset $pid $eid")) {
-	&tbs_out("$0: *** Failed to reset VLANs\n");
+    print "Clearing VLANs.\n";
+    if (system("snmpit -reset $pid $eid")) {
+	print STDERR "*** Failed to reset VLANs.\n";
 	$errors = 1;
     }
     
-    &tbs_out("Backing up VLAN configuration\n");
-    if (&tbs_exec("savevlans")) {
-	&tbs_out("$0: *** WARNING: Failed to back up VLAN configuration\n");
+    print "Backing up VLAN configuration.\n";
+    if (system("savevlans")) {
+	print STDERR "*** WARNING: Failed to back up VLAN configuration.\n";
     }
 }
     
-&tbs_out("Freeing resources\n");
-if (&tbs_exec("nfree $pid $eid")) {
-    &tbs_out("$0: *** Failed to free resources.\n");
+print "Freeing resources.\n";
+if (system("nfree $pid $eid")) {
+    print STDERR "*** Failed to free resources.\n";
     $errors=1;
 }
 
 if (! $TESTMODE) {
-    &tbs_out("Resetting mountpoints\n");
-    if (&tbs_exec("exports_setup")) {
-	&tbs_out("$0: *** Failed to reset mountpoints.\n");
+    print "Resetting mountpoints.\n";
+    if (system("exports_setup")) {
+	print STDERR "*** Failed to reset mountpoints.\n";
 	$errors=1;
     }
     
-    &tbs_out("Resetting named maps.\n");
-    if (&tbs_exec("named_setup")) {
-	&tbs_out("$0: *** Failed to reset named map.\n");
-	#
-	# This is a non-fatal error.
-	# 
+    print "Resetting named maps.\n";
+    if (system("named_setup")) {
+	print "*** WARNING: Failed to reset named map.\n";
     }
 
-    &tbs_out("Resetting email lists.\n");
-    if (&tbs_exec("genelists")) {
-	&tbs_out("$0: *** Failed to reset email lists.\n");
-	#
-	# This is a non-fatal error.
-	# 
+    print "Resetting email lists.\n";
+    if (system("genelists")) {
+	print "*** WARNING: Failed to reset email lists.\n";
     }
 }
 
-&tbs_out("Resetting DB.\n");
-
-if (! $dbh->do("DELETE from delays where pid = \"$pid\" and eid=\"$eid\"")) {
-    &tbs_out("$0: *** Could not clear delays table.\n");
-    $errors = 1;
-}
-if (! $dbh->do("DELETE from vlans where pid = \"$pid\" and eid = \"$eid\"")) {
-    &tbs_out("$0: *** Could not clear vlans table.\n");
-    $errors = 1;
-}
+print "Resetting DB.\n";
+DBQueryWarn("DELETE from delays where pid='$pid' and eid='$eid'")
+    or $errors++;
+DBQueryWarn("DELETE from vlans  where pid='$pid' and eid='$eid'")
+    or $errors++;
 
 if ($errors == 0) {
-    &tbs_out("Marking as dormant.\n");
-    if (! $dbh->do("UPDATE experiments set state=\"swapped\"" .
-		   " where pid=\"$pid\" and eid=\"$eid\"")) {
-	&tbs_out("$0: *** Could not set experiment state.\n");
-	$errors = 1;
-    }
+    SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
+	or $errors++;
 }
 
-&tbs_out("Swap out finished - " . &ctime(time) . "\n");
-
+print "Swapout finished. " . TBTimeStamp() . "\n";
 exit $errors;
-

@@ -1,12 +1,13 @@
 #!/usr/bin/perl -w
 use English;
+use POSIX qw(strftime);
 
 package libtestbed;
 use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( SENDMAIL OPENMAIL );
+    qw ( SENDMAIL OPENMAIL TBTimeStamp);
 
 # A library of useful stuff.
 
@@ -78,6 +79,16 @@ sub OPENMAIL($$;$$)
     print MAIL "\n";
 
     return(*MAIL);
+}
+
+#
+# Return a timestamp. We don't care about day/date/year. Just the time mam.
+# 
+# TBTimeStamp()
+#
+sub TBTimeStamp()
+{
+    return POSIX::strftime("%H:%M:%S", localtime());
 }
 
 1;

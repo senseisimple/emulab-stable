@@ -2,8 +2,14 @@
 use English;
 require Mysql;
 
+#
 # A library of useful DB stuff. Mostly things that get done a lot.
 # Saves typing.
+#
+# XXX: The notion of "uid" is a tad confused. A unix uid is a number,
+#      while in the DB a user uid is a string (equiv to unix login).
+#      Needs to be cleaned up.
+#
 
 package libdb;
 use Exporter;
@@ -14,9 +20,14 @@ use Exporter;
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
 	 PROJMEMBERTRUST_TRUSTED DBLIMIT_NSFILESIZE
 
+	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
+	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_TESTING
+	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED
+
 	 TBAdmin NodeAccessCheck ProjMember ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
-	 UIDInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBQuoteSpecial
+	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
+	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState
 
 	 );
 
@@ -50,6 +61,16 @@ sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
 sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
 sub NODEBOOTSTATUS_UNKNOWN()	{ "unknown"; }
 sub NODESTARTSTATUS_NOSTATUS()	{ "none"; }
+
+sub EXPTSTATE_NEW()		{ "new"; }
+sub EXPTSTATE_PRERUN()		{ "prerunning"; }
+sub EXPTSTATE_SWAPPED()		{ "swapped"; }
+sub EXPTSTATE_SWAPPING()	{ "swapping"; }
+sub EXPTSTATE_ACTIVATING()	{ "activating"; }
+sub EXPTSTATE_ACTIVE()		{ "active"; }
+sub EXPTSTATE_TESTING()		{ "testing"; }
+sub EXPTSTATE_TERMINATING()	{ "terminating"; }
+sub EXPTSTATE_TERMINATED()	{ "ended"; }
 
 #
 # We want valid project membership to be non-zero for easy membership
@@ -167,28 +188,25 @@ sub NodeAccessCheck($;$)
 
 #
 # Check project membership. First argument is the project to check.
-# Second argument is optional uid, defaults to the current uid.
+# Second argument is optional DB uid, defaults to the current uid.
 # The return argument encodes the trust membership for members. 
 #
-# usage: ProjMember(char *pid, [int uid])
+# usage: ProjMember(char *pid, [char *dbuid])
 #        returns PROJMEMBERTRUST_NONE if uid is not a member or trust=none.
 #        returns PROJMEMBERTRUST_USER if uid is a mere user in pid.
 #        returns PROJMEMBERTRUST_ROOT if uid is a root user in pid.
 # 
 sub ProjMember($;$)
 {
-    my($pid, $uid) = @_;
+    my($pid, $dbuid) = @_;
 
-    if (!defined($uid)) {
-	$uid = $UID;
+    if (!defined($dbuid) && !UNIX2DBUID($UID, \$dbuid)) {
+	die("$UID is not in the Emulab DB.\n");
     }
-
-    my ($name) = getpwuid($uid)
-	or die "$uid not in passwd file\n";
 
     my $query_result =
 	DBQueryFatal("select trust from proj_memb where ".
-		     "uid='$name' and pid='$pid'");
+		     "uid='$dbuid' and pid='$pid'");
 
     if ($query_result->numrows == 0) {
 	return PROJMEMBERTRUST_NONE;
@@ -231,6 +249,52 @@ sub ExpLeader($$)
 
     my @row = $query_result->fetchrow_array();
     return $row[0];
+}
+
+#
+# Return Experiment state.
+#
+# usage: ExpState(char *pid, char *eid)
+#        returns state if a valid pid/eid.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub ExpState($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select state from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Set Experiment state.
+#
+# usage: SetExpState(char *pid, char *eid, char *state)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub SetExpState($$$)
+{
+    my($pid, $eid, $state) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set state='$state' ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
 }
 
 #
@@ -342,21 +406,44 @@ sub NodeidToExp ($$$) {
 }
 
 #
-# Map UID to user_login, user_name, and user_email.
+# Map login (db uid) to a user_name and user_email.
 #
-# usage: UIDInfo(int uid, \$login, \$name, \$email)
+# usage: UserDBInfo(char *dbuid, \$name, \$email)
 #        returns 1 if the UID is okay.
 #        returns 0 if the UID is bogus.
 #
-sub UIDInfo ($$$$) {
-    my($uid, $userlogin, $username, $useremail) = @_;
-
-    my($name) = getpwuid($uid)
-	or die "$uid not in passwd file\n";
+sub UserDBInfo ($$$) {
+    my($dbuid, $username, $useremail) = @_;
 
     my $query_result =
-	DBQueryFatal("select uid,usr_name,usr_email from users ".
-		     "where uid='$name'");
+	DBQueryFatal("select usr_name,usr_email from users ".
+		     "where uid='$dbuid'");
+
+    if ($query_result->num_rows < 1) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $$username  = $row[0];
+    $$useremail = $row[1];
+    return 1;
+}
+
+#
+# Map UID to DB UID (login). Does a DB check to make sure user is known to
+# the DB (user obviously has a regular account), and that account will
+# always match what the DB says. Redundant, I know. But consider it a
+# sanity (or consistency) check. 
+#
+# usage: UNIX2DBUID(int uid, \$login)
+#        returns 1 if the UID is okay.
+#        returns 0 if the UID is bogus.
+#
+sub UNIX2DBUID ($$) {
+    my($unix_uid, $userlogin) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid from users where unix_uid='$unix_uid'");
 
     if ($query_result->num_rows < 1) {
 	return 0;
@@ -364,8 +451,6 @@ sub UIDInfo ($$$$) {
 
     my @row = $query_result->fetchrow_array();
     $$userlogin = $row[0];
-    $$username  = $row[1];
-    $$useremail = $row[2];
     return 1;
 }
 
@@ -392,7 +477,7 @@ sub DBQuery($)
     if (! $result) {
 	$DBErrorString =
 	    "  Query: $query\n".
-	    "  Error: " . $DB->errstr . "\n";
+	    "  Error: " . $DB->errstr;
     }
     return $result;
 }
@@ -451,12 +536,13 @@ sub DBWarn($)
 	$progname = "Tainted";
     }
 
-    $text = "In TB script: $progname\n\n $message\n" . "$DBErrorString";
+    $text = "$message - In $progname\n" .
+  	    "$DBErrorString\n";
 
-    print STDERR "$text\n";
+    print STDERR "*** $text\n";
 
     system("echo \"$text\" | /usr/bin/mail ".
-	   "-s 'TESTBED: DBFatal - $message' \"$TBOPS\"");
+	   "-s 'TESTBED: DBError - $message' \"$TBOPS\"");
 }
 
 #

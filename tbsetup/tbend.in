@@ -1,116 +1,95 @@
 #!/usr/bin/perl -w
+use English;
 
 # tbend
 
 # This is the fourth and final program in the
 # tbprerun/tbswapin/tbswapout/.../tbend sequences.  It's purpose is to
 # reverse what tbprerun did.  I.e. clear the virt_nodes and virt_lans
-# tables.  
+# tables.
+sub usage()
+{
+    print STDERR "Usage: $0 [-force] pid eid\n";
+    exit(-1);
+}
 
-use DBI;
+#
+# Configure variables
+#
+my $TBROOT   = "@prefix@";
 
-# Set up paths
-$TBDB = "@TBDBNAME@";
-$TBROOT = "@prefix@";
+# Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/sbin:$TBROOT/bin";
 
-# Turn off line buffering.
-$| = 1; 
-
+#
+# Testbed Support libraries
+#
 use lib "@prefix@/lib";
-use libtbsetup;
-
+use libdb;
+use libtestbed;
 require exitonwarn; # exitonwarn isn't really a module, so just require it
 
-$dolog = 1;
-$force = 0;
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+my $force  = 0;
+my $errors = 0;
+my $state;
+
 while ($#ARGV > 1) {
     $arg = shift;
-    if ($arg eq "-nologfile") {
-	$dolog = 0;
-    } elsif ($arg eq "-force") {
+    if ($arg eq "-force") {
 	$force = 1;
     } else {
-	print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
-	exit(1);
+	usage();
     }
 }
 if ($#ARGV < 1) {
-    print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
+    usage();
+}
+my ($pid,$eid) = @ARGV;
+
+print "Beginning cleanup for $pid/$eid. " . TBTimeStamp() . "\n";
+
+if (! ($state = ExpState($pid, $eid))) {
+    print STDERR "*** No such experiment $pid/$eid\n";
     exit(1);
 }
-($pid,$eid) = @ARGV;
-
-$dbh = &tbs_initdbi($TBDB);
-
-$logfile = "$pid-$eid.log";
-
-if ($dolog) {
-    &tbs_initlog($logfile);
-    &tbs_out("Log:    $logfile\n");
-}
-
-&tbs_out("Beginning cleanup for $pid-$eid. "
-	 . &ctime(time) . "\n");
-
-$errors = 0;
-
-&tbs_out("Checking sanity.\n");
-$sth = $dbh->prepare("SELECT state from experiments where pid = \"$pid\"" .
-		     " and eid = \"$eid\"");
-$sth->execute();
-if (! (($state) = $sth->fetchrow_array())) {
-    &tbs_out("$0: *** No entry in experiments table.  Insane.\n");
-    exit(1);
-}
-if ($force == 0) {
-    if ($state eq "active") {
-	&tbs_out("$0: *** Experiment already running." .
-		 " Try swapping out first.\n");
-	exit(1);
-    } elsif ($state ne "swapped") {
-	&tbs_out("$0: *** Experiment in strange state: $state.\n");
+if (! $force) {
+    if ($state eq EXPTSTATE_ACTIVE) {
+	print STDERR "*** Experiment is running. Must be swapped out.\n";
 	exit(1);
     }
-} elsif ($state ne "swapped") {
-    &tbs_out("$0: *** WARNING: Ignoring experimental state of $state.\n");
+    elsif ($state ne EXPTSTATE_SWAPPED) {
+	print STDERR "*** Experiment is in the wrong state: $state.\n";
+	exit(1);
+    }
+}
+elsif ($state ne EXPTSTATE_SWAPPED) {
+    print STDERR "*** WARNING: Ignoring improper state: $state.\n";
+}
+if (! SetExpState($pid, $eid, EXPTSTATE_TERMINATING)) {
+    print STDERR "*** Failed to set intermediate experiment state.\n";
+    exit(1);
 }
 
-if (! $dbh->do("UPDATE experiments set state = \"terminating\" " . 
-	       "where pid=\"$pid\" and eid=\"$eid\"")) {
-    &tbs_out("$0: *** Could not set intermediate experiment state.\n");
-}
-
-&tbs_out("Clearing virtual state.\n");
-if (! $dbh->do("DELETE from virt_nodes where pid = \"$pid\"" . 
-	       " and eid = \"$eid\"")) {
-
-    &tbs_out("$0: *** Could not clear virt_nodes table.\n");
-    $errors = 1;
-}
-if (! $dbh->do("DELETE from virt_lans where pid = \"$pid\"" . 
-	       " and eid = \"$eid\"")) {
-    &tbs_out("$0: *** Could not clear virt_lans table.\n");
-    $errors = 1;
-}
-if (! $dbh->do("DELETE from portmap where pid = \"$pid\"" . 
-	       " and eid = \"$eid\"")) {
-    &tbs_out("$0: *** Could not clear portmap table.\n");
-    $errors = 1;
-}
-$sth->finish();
+print "Clearing out virtual state.\n";
+DBQueryWarn("DELETE from virt_nodes where pid='$pid' and eid='$eid'") or
+    $errors++;
+DBQueryWarn("DELETE from virt_lans  where pid='$pid' and eid='$eid'") or
+    $errors++;
+DBQueryWarn("DELETE from portmap    where pid='$pid' and eid='$eid'") or
+    $errors++;
 
 if ($errors == 0) {
-    &tbs_out("Marking as ended.\n");
-    if (! $dbh->do("UPDATE experiments set state = \"ended\"" . 
-		   " where pid=\"$pid\" and eid=\"$eid\"")) {
-	&tbs_out("$0: *** Could not set experiment state.\n");
-	$errors = 1;
-    }
+    SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or
+	$errors++;
 }
 
-&tbs_out("Cleanup finished - " . &ctime(time) . "\n");
+print "Cleanup finished! " . TBTimeStamp() . "\n";
 
 # We exit with whether we had errors or not.
 exit $errors;

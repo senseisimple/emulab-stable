@@ -54,6 +54,7 @@ my %imageid_row = ();
 my $logname     = 0;
 my $debug       = 0;
 my @row;
+my $dbuid;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -89,8 +90,16 @@ else {
 }
 
 #
-# Figure out who called us. Root and admin types can do whatever they
-# want. Normal users can only run this on nodes in their own experiments.
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
+    exit(1);
+}
+
+#
+# Root and admin types can do whatever they want. Normal users can only
+# run this on nodes in their own experiments.
 #
 if ($UID && !TBAdmin($UID)) {
     if (! NodeAccessCheck(\$node)) {
@@ -108,10 +117,9 @@ if ($UID && !TBAdmin($UID)) {
 #
 # Get email info for user.
 #
-my $user_login;
 my $user_name;
 my $user_email;
-if (! UIDInfo($UID, \$user_login, \$user_name, \$user_email)) {
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     die("Cannot determine user name and email address");
 }
 
@@ -144,7 +152,7 @@ if (defined($imageid_row{'pid'})) {
     $imagepid = $imageid_row{'pid'};
 }
     
-if ($mereuser && $imagepid && !ProjMember($imagepid)) {
+if ($mereuser && $imagepid && !ProjMember($imagepid, $dbuid)) {
     die("You do not have permission to load imageid $imageid!");
 }
 

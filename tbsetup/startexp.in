@@ -33,6 +33,13 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
 my $TBINFO   = "$TB/expinfo";
 
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
@@ -57,10 +64,6 @@ $| = 1;
 # 
 $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-# Testbed Support library
-use lib "@prefix@/lib";
-use libtbsetup;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -114,12 +117,15 @@ my $repfile = "$eid.report";
 my $tempns  = "$tempfile.$$";
 my $user_name  = "Startexp Script";
 my $user_email = "$TBOPS";
+my $dbuid;
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($EUID, \$dbuid)) {
+    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
+    exit(1);
+}
 
 #
 # Check to make sure the experiment record exists. The experiment must
@@ -131,56 +137,36 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Note that tbprerun is going verify and change this state.
 #
 $query_result =
-    $DB->query("SELECT state FROM experiments ".
-	       "WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result) {
-    fatal("DB Error getting experiment record $pid/$eid\n");
-}
+    DBQueryFatal("SELECT state FROM experiments ".
+		 "WHERE eid='$eid' and pid='$pid'");
 if ($query_result->numrows < 1) {
     print STDOUT "No experiment record for $pid/$eid exists!\n";
     exit(1);
 }
 @row = $query_result->fetchrow_array();
-if ($row[0] ne "new") {
+if ($row[0] ne EXPTSTATE_NEW) {
     die("Experiment $pid/$eid is already configured (or still configuring)!\n".
 	"You are not allowed to reconfigure experiments unless you\n".
 	"first terminate the existing experiment via the web interface.\n");
 }
 
 #
-# Get some user information. 
+# Get email info for user.
 #
-$query_result =
-    $DB->query("SELECT uid,usr_name,usr_email from users ".
-	       "WHERE unix_uid='$EUID'");
-
-if (! $query_result) {
-    fatal("DB Error getting user information for uid $EUID\n");
-}
-if ($query_result->numrows < 1) {
-    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
+my $user_name;
+my $user_email;
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    print STDOUT "Cannot determine your name and email address.\n";
     exit(1);
 }
-
-@row = $query_result->fetchrow_array();
-$uid        = $row[0];
-$user_name  = $row[1];
-$user_email = $row[2];
 
 #
 # Verify that this person is allowed to start the experiment. Must be
 # in the project membership table.
 #
-$query_result =
-    $DB->query("SELECT pid FROM proj_memb ".
-	       "WHERE uid=\"$uid\" and pid=\"$pid\"");
-
-if (! $query_result) {
-    fatal("DB Error getting project membership for uid $uid\n");
-}
-if ($query_result->numrows == 0) {
-    print STDOUT "Go Away! You are not a member of project $pid\n";
+if (ProjMember($pid, $dbuid) != PROJMEMBERTRUST_ROOT) {
+    print STDOUT
+	"You do not have permission so start experiments in project $pid\n";
     exit(1);
 }
 
@@ -235,30 +221,30 @@ if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
 # Run the various scripts. We want to propogate the error from tbprerun
 # and tbrun back out, hence the bogus looking errorstat variable.
 #
-if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
+if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!\n");
 }
 # So fatal errors run tbend.
-$estate = "prerunned";
+$estate = EXPTSTATE_PRERUN;
 
-if (system("$tbdir/tbswapin -nologfile $pid $eid") != 0) {
+if (system("$tbdir/tbswapin  $pid $eid") != 0) {
     $errorstat = $? >> 8;
     fatal("tbswapin failed!\n");
 }
 # So fatal errors run tbswapout,
-$estate = "active";
+$estate = EXPTSTATE_ACTIVE;
 
 if (system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile") != 0) {
     fatal("tbreport failed!\n");
 }
 
 #
-# Increment the experiment count, and date. This is informational. 
+# Increment the project experiment count/lastdate. This is informational. 
 #
-$DB->query("update projects ".
-	   "set expt_count=expt_count+1, expt_last=NOW() ".
-	   "where pid='$pid'");
+DBQueryWarn("update projects ".
+	    "set expt_count=expt_count+1, expt_last=NOW() ".
+	    "where pid='$pid'");
 
 #
 # In batchmode, send the report to stdout for the batch daemon.
@@ -272,9 +258,8 @@ if ($batch) {
 # Grab the experiment info for the mail message below.
 #
 $query_result =
-    $DB->query("SELECT expt_name,expt_created,expt_expires from experiments ".
-	       "WHERE eid='$eid' and pid='$pid'");
-
+    DBQueryWarn("SELECT expt_name,expt_created,expt_expires from experiments ".
+		"WHERE eid='$eid' and pid='$pid'");
 if (! $query_result) {
     fatal("DB Error getting experiment record for $pid/$eid\n");
 }
@@ -307,17 +292,17 @@ if ($infodir =~ /^([-\@\w.]+)$/) {
 $nsfile_string = `cat $nsfile`;
 
 if ($nsfile_string) {
-    $nsfile_string = $DB->quote($nsfile_string);
+    $nsfile_string = DBQuoteSpecial($nsfile_string);
 
-    $DB->query("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
+    DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
 
     #
     # I could strlen check the string, but the webserver has a limit,
     # plus the DB is going to truncate it if its longer. Doing it here
     # would be a third (call it redundant) check. 
     # 
-    $DB->query("insert into nsfiles (pid, eid, nsfile) ".
-	       "VALUES('$pid', '$eid', $nsfile_string)");
+    DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
+		"VALUES('$pid', '$eid', $nsfile_string)");
 }
 
 #
@@ -406,13 +391,8 @@ sub fatal()
     #
     # Now we can remove all trace from the DB since it failed.
     # 
-    $query_result =
-	$DB->query("DELETE from experiments WHERE eid='$eid' and pid='$pid'");
-
-    if (! $query_result) {
-	print STDOUT "DB Error deleting experiment record for $pid/$eid\n";
-    }
-
+    DBQueryWarn("DELETE from experiments WHERE eid='$eid' and pid='$pid'");
+    DBQueryWarn("DELETE from nsfiles WHERE eid='$eid' and pid='$pid'");
 
     #
     # In batch mode, exit. Make sure to delete tempns file. 
@@ -492,14 +472,14 @@ sub fatal()
 # 
 sub tbendit()
 {
-    if ($estate eq "active") {
-	print "Running tbswapout with arguments: -nologfile $pid $eid\n";
-	if (system("$tbdir/tbswapout -nologfile $pid $eid") != 0) {
+    if ($estate eq EXPTSTATE_ACTIVE) {
+	print "Running tbswapout with arguments: $pid $eid\n";
+	if (system("$tbdir/tbswapout $pid $eid") != 0) {
 	    print "tbswapout failed!\n";
 	}
     }
-    print "Running tbend with arguments: -nologfile -force $pid $eid\n";
-    if (system("$tbdir/tbend -nologfile -force $pid $eid") != 0) {
+    print "Running tbend with arguments: -force $pid $eid\n";
+    if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	print "tbend failed!\n";
     }
 }
