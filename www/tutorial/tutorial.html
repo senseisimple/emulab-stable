@@ -70,10 +70,13 @@ the following:
 
 <p>
 An NS file which would describe such a topology is as follows. First
-off, all NS files start with a simple prolog:
+off, all NS files start with a simple prolog, declaring a simulator 
+and including a file that allow you to use the special 
+<code>tb-</code> commands:
 	<code><pre>
 	# This is a simple ns script. Comments start with #.
-	set ns [new Simulator]			</code></pre>
+	set ns [new Simulator]			
+        source tb_compat.tcl                   </code></pre>
 
 <p>
 Then define the 4 nodes in the topology.
