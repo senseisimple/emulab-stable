@@ -17,18 +17,19 @@ my $TB		= "@prefix@";
 my $TESTMODE	= "@TESTMODE@";
 
 #
-# Load the Testbed support stuff. 
+# Testbed Support libraries
 #
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 # Turn off line buffering on output
 $| = 1; 
 
-my $SSH		= "$TB/bin/sshtb -n -l root plastic.emulab.net";
+my $SSH		= "$TB/bin/sshtb -n -l root ";
 my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
 my $TBPID	= "flux";
-my $cmdargs     = "";
+my %cmdargs     = ();
 my @row;
 
 # un-taint path
@@ -73,7 +74,7 @@ foreach my $node (@nodes) {
     # Need the project for the node since that is the group.
     #
     # HACK! If its a shark shelf, then need a wildcard query so we can
-    # the nodes.
+    # find the nodes.
     #
     if ($node =~ /sh\d+/) {
 	$db_result =
@@ -91,14 +92,45 @@ foreach my $node (@nodes) {
     else {
 	$pid = $TBPID;
     }
-	
-    $cmdargs = "$cmdargs $node $pid";
+
+    #
+    # Now we need to know *where* the tip line lives, since there are
+    # multiple tip servers. We want to group these still, so use an
+    # array of command arguments, indexed by the tip server.
+    #
+    $db_result =
+	DBQueryFatal("select server from tiplines where node_id='$node'");
+    
+    if ($db_result->numrows == 0) {
+	print STDERR "*** No tip server defined for $node\n";
+	exit 1;
+    }
+    @row    = $db_result->fetchrow_array();
+    $server = $row[0];
+
+    if (defined($cmdargs{$server})) {
+	$cmdargs{$server} = $cmdargs{$server} . " $node $pid";
+    }
+    else {
+	$cmdargs{$server} = "$node $pid ";
+    }
 }
 
+if ($TESTMODE) {
+    exit 0;
+}
+
+#
+# Run the console setup program on the tip server nodes.
+# 
 $UID = 0;
-if (! $TESTMODE) {
-  system("$SSH $PROG $cmdargs") == 0 or
-    die("Failed: $SSH $PROG $cmdargs: $?");
+foreach my $server (keys(%cmdargs)) {
+    my $args = $cmdargs{$server};
+
+    if (system("$SSH $server $PROG $args")) {
+	print STDERR "*** Failed: $SSH $server $PROG $args: $?\n";
+	exit 1;
+    }
 }
 
 exit 0;

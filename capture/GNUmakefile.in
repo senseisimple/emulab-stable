@@ -5,9 +5,11 @@ SUBDIR		= capture
 
 include $(OBJDIR)/Makeconf
 
-all: capture
+all: capture capserver
 
 include $(TESTBED_SRCDIR)/GNUmakerules
+
+DBFLAGS	+= -DTBDBNAME='"$(TBDBNAME)"' -I/usr/local/include
 
 DESTDIR=
 
@@ -17,14 +19,18 @@ DESTDIR=
 #
 CFLAGS= -g -O2 -DLOG_DROPS -DUSESOCKETS
 
-capture: capture.c
+capture: capture.c capdecls.h
 	cc $(CFLAGS) -o capture $<
+
+capserver:	capserver.c capdecls.h
+	cc $(CFLAGS) $(DBFLAGS) -o capserver $< \
+		-L/usr/local/lib/mysql -lmysqlclient
 
 #
 # Do not install by default.
 #
 install:
-real-install:	all
+real-install:	all $(INSTALL_SBINDIR)/capserver
 	install -s capture $(DESTDIR)/usr/site/bin
 
 clean:

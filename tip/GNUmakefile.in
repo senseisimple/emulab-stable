@@ -9,7 +9,7 @@ all:	tip
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CC = gcc -g -O2 -DUSESOCKETS
+CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
        remote.o tip.o value.o vars.o getcap.o

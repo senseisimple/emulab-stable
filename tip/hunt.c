@@ -36,8 +36,18 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.4 2001-07-31 21:58:35 stoller Exp $";
+	"$Id: hunt.c,v 1.5 2001-08-09 18:40:43 stoller Exp $";
 #endif /* not lint */
+
+#ifdef USESOCKETS
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include "capdecls.h"
+
+int	socket_open(char *devname);
+#endif
 
 #include "tip.h"
 
@@ -45,13 +55,6 @@ static const char rcsid[] =
 #include <err.h>
 #ifndef LINUX
 #include <libutil.h>
-#endif
-
-#ifdef USESOCKETS
-#include <sys/socket.h>
-#include <netinet/in.h>
-
-int	socket_open(char *devname);
 #endif
 
 extern char *getremote();
@@ -74,7 +77,7 @@ hunt(name)
 	register char *cp;
 	sig_t f;
 	int res;
-
+	
 	f = signal(SIGALRM, dead);
 	while ((cp = getremote(name))) {
 		deadfl = 0;
@@ -98,7 +101,7 @@ hunt(name)
 		if (setjmp(deadline) == 0) {
 			alarm(10);
 #ifdef USESOCKETS
-			if ((FD = socket_open(cp)) >= 0) {
+			if ((FD = socket_open(name)) >= 0) {
 				HW = 0;
 				alarm(0);
 				signal(SIGALRM, SIG_DFL);
@@ -143,34 +146,74 @@ hunt(name)
  *
  */
 int
-socket_open(char *devname)
+socket_open(char *tipname)
 {
 	int			sock;
 	struct sockaddr_in	name;
-	char			aclname[BUFSIZ], buf[BUFSIZ];
-	int			aclbits[3];
+	char			aclname[BUFSIZ];
+	char			b1[256], b2[256];
+	secretkey_t		key;
 	int			port;
+	char			hostname[MAXHOSTNAMELEN];
 	FILE			*fp;
+	struct hostent	       *he;
 
-	(void) sprintf(aclname, "%s.acl", devname);
+	(void) sprintf(aclname, "%s/%s.acl", TIPPATH, tipname);
 
 	if ((fp = fopen(aclname, "r")) == NULL) {
 		return -1;
 	}
-	fscanf(fp, "%d %x %x %x", &port,
-	       &aclbits[0], &aclbits[1], &aclbits[2]);
+
+	/* For sanity check below */
+	bzero(hostname, sizeof(hostname));
+	bzero(&key, sizeof(key));
+	port = 0;
+	
+	while (fscanf(fp, "%s %s\n", &b1, &b2) != EOF) {
+		if (strcmp(b1, "host:") == 0) {
+			strcpy(hostname, b2);
+		}
+		else if (strcmp(b1, "port:") == 0) {
+			port = atoi(b2);
+		}
+		else if (strcmp(b1, "keylen:") == 0) {
+			key.keylen = atoi(b2);
+		}
+		else if (strcmp(b1, "key:") == 0) {
+			strcpy(key.key, b2);
+		}
+		else {
+			fprintf(stderr, "Unknown ACL: %s %s\n", b1, b2);
+			fclose(fp);
+			return -1;
+		}
+	}
 	fclose(fp);
+
+	/* Make sure we got everything we need */
+	if (port == 0 || strlen(hostname) == 0 ||
+	    key.keylen == 0 || strlen(key.key) == 0) {
+		fprintf(stderr, "Incomplete ACL\n");
+		return -1;
+	}
+
+	/* Create name. */
+	name.sin_family = AF_INET;
+	name.sin_port   = htons(port);
+
+	he = gethostbyname(hostname);
+	if (! he) {
+		fprintf(stderr, "Unknown hostname %s: %s\n",
+			hostname, hstrerror(h_errno));
+		return -1;
+	}
+	memcpy ((char *)&name.sin_addr, he->h_addr, he->h_length);
 
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
 		return sock;
 	}
-
-	/* Create name. */
-	name.sin_family = AF_INET;
-	inet_aton("127.0.0.1", &name.sin_addr);
-	name.sin_port   = htons(port);
 
 	/* Caller picks up and displays error */
 	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
@@ -179,9 +222,9 @@ socket_open(char *devname)
 	}
 
 	/*
-	 * Send the acl bits.
+	 * Send the secretkey.
 	 */
-	if (write(sock, aclbits, sizeof(aclbits)) != sizeof(aclbits)) {
+	if (write(sock, &key, sizeof(key)) != sizeof(key)) {
 		close(sock);
 		return -1;
 	}

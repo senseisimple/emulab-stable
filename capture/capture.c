@@ -6,7 +6,7 @@
  * 		University of Utah
  * Date:	27-Jul-92
  *
- * (c) Copyright 1992, 2000, University of Utah, all rights reserved.
+ * (c) Copyright 1992, 2000-2001, University of Utah, all rights reserved.
  */
 
 /*
@@ -22,6 +22,8 @@
  * A LITTLE hack to record output from a tty device to a file, and still
  * have it available to tip using a pty/tty pair.
  */
+
+#define SAFEMODE
 	
 #include <sys/param.h>
 
@@ -49,7 +51,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <setjmp.h>
+#include <netdb.h>
 #endif
+#include "capdecls.h"
 
 #define geterr(e)	strerror(e)
 
@@ -73,7 +78,6 @@ void usage();
 /*
  *  Configurable things.
  */
-#define DEVPATH		"/dev"
 #ifdef HPBSD
 #define LOGPATH		"/usr/adm/tiplogs"
 #else
@@ -82,9 +86,9 @@ void usage();
 #define PIDNAME		"%s/%s.pid"
 #define LOGNAME		"%s/%s.log"
 #define RUNNAME		"%s/%s.run"
-#define TTYNAME		"%s/tip/%s"
-#define PTYNAME		"%s/tip/%s-pty"
-#define ACLNAME		"%s/tip/%s.acl"
+#define TTYNAME		"%s/%s"
+#define PTYNAME		"%s/%s-pty"
+#define ACLNAME		"%s/%s.acl"
 #define DEVNAME		"%s/%s"
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
@@ -97,12 +101,15 @@ char	*Ttyname;
 char	*Ptyname;
 char	*Devname;
 char	*Machine;
+char	*Bossnode = BOSSNODE;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
 #ifdef  USESOCKETS
-int	sockfd, tipactive, portnum;
+int		   sockfd, tipactive, portnum;
 struct sockaddr_in tipclient;
-int	ACLbits[3];
+secretkey_t	   secretkey;
+char		   ourhostname[MAXHOSTNAMELEN];
+int		   needshake;
 #endif
 
 int
@@ -120,8 +127,12 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:H")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:it")) != EOF)
 		switch (op) {
+
+		case 'b':
+			Bossnode = optarg;
+			break;
 
 		case 'H':
 			++hwflow;
@@ -161,9 +172,9 @@ main(argc, argv)
 	Logname = newstr(strbuf);
 	(void) sprintf(strbuf, RUNNAME, LOGPATH, argv[0]);
 	Runname = newstr(strbuf);
-	(void) sprintf(strbuf, TTYNAME, DEVPATH, argv[0]);
+	(void) sprintf(strbuf, TTYNAME, TIPPATH, argv[0]);
 	Ttyname = newstr(strbuf);
-	(void) sprintf(strbuf, PTYNAME, DEVPATH, argv[0]);
+	(void) sprintf(strbuf, PTYNAME, TIPPATH, argv[0]);
 	Ptyname = newstr(strbuf);
 	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
 	Devname = newstr(strbuf);
@@ -181,13 +192,13 @@ main(argc, argv)
 	/*
 	 * Open up run/log file, console tty, and controlling pty.
 	 */
-	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
+	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0640)) < 0)
 		die("%s: open: %s", Logname, geterr(errno));
 	if (chmod(Logname, 0640) < 0)
 		die("%s: chmod: %s", Logname, geterr(errno));
 
 	if (runfile) {
-		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0666)) < 0)
+		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0640)) < 0)
 			die("%s: open: %s", Runname, geterr(errno));
 		if (chmod(Runname, 0640) < 0)
 			die("%s: chmod: %s", Runname, geterr(errno));
@@ -219,16 +230,18 @@ main(argc, argv)
 	portnum = ntohs(name.sin_port);
 
 	if (listen(sockfd, 1) < 0)
-		die("listen(): listening on socket: %s", geterr(errno));
+		die("listen(): %s", geterr(errno));
 
-	genaclfile();
+	if (gethostname(ourhostname, sizeof(ourhostname)) < 0)
+		die("gethostname(): %s", geterr(errno));
 
-	dolog(LOG_NOTICE, "listening on TCP port %d", portnum);
+	createkey();
+	dolog(LOG_NOTICE, "Ready! Listening on TCP port %d", portnum);
 #else
-	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
+	if ((ptyfd = open(Ptyname, O_RDWR)) < 0)
 		die("%s: open: %s", Ptyname, geterr(errno));
 #endif
-	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK, 0666)) < 0)
+	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK)) < 0)
 		die("%s: open: %s", Devname, geterr(errno));
 
 	if (ioctl(devfd, TIOCEXCL, 0) < 0)
@@ -343,9 +356,6 @@ capture()
 	int drop_todev_chars = 0;
 #endif
 
-	timeout.tv_sec  = 0;
-	timeout.tv_usec = 10000;	/* ~115 chars at 115.2 kbaud */
-
 	/*
 	 * XXX for now we make both directions non-blocking.  This is a
 	 * quick hack to achieve the goal that capture never block
@@ -374,7 +384,7 @@ capture()
 	 * and close the slave again.
 	 */
 #ifdef __FreeBSD__
-	if ((n = open(Ttyname, O_RDONLY, 0666)) < 0)
+	if ((n = open(Ttyname, O_RDONLY)) < 0)
 		die("%s: open: %s", Ttyname, geterr(errno));
 #endif
 	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
@@ -411,7 +421,13 @@ capture()
 		}
 #endif
 		fds = sfds;
-		i = select(fdcount, &fds, NULL, NULL, NULL);
+#ifdef	USESOCKETS
+		if (needshake)
+			timeout.tv_sec  = 15;
+		else
+#endif
+			timeout.tv_sec  = 30;
+		i = select(fdcount, &fds, NULL, NULL, &timeout);
 		if (i < 0) {
 			if (errno == EINTR) {
 				warn("input select interrupted, continuing");
@@ -420,14 +436,20 @@ capture()
 			die("%s: select: %s", Devname, geterr(errno));
 		}
 		if (i == 0) {
+#ifdef	USESOCKETS
+			if (needshake) {
+				handshake();
+				continue;
+			}
+#else
 			warn("No fds ready!");
 			sleep(1);
+#endif
 			continue;
 		}
 #ifdef	USESOCKETS
 		if (FD_ISSET(sockfd, &fds)) {
-			if (clientconnect())
-				continue;
+			clientconnect();
 		}
 #endif	/* USESOCKETS */
 		if (FD_ISSET(devfd, &fds)) {
@@ -512,7 +534,10 @@ dropped:
 				close(ptyfd);
 				tipactive = 0;
 				continue;
-#else				
+#else
+				/* ~115 chars at 115.2 kbaud */
+				timeout.tv_sec  = 0;
+				timeout.tv_usec = 10000;
 				select(0, 0, 0, 0, &timeout);
 				continue;
 #endif
@@ -561,7 +586,7 @@ reinit(int sig)
 	 */
 	close(logfd);
 	
-	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
+	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0640)) < 0)
 		die("%s: open: %s", Logname, geterr(errno));
 	if (chmod(Logname, 0640) < 0)
 		die("%s: chmod: %s", Logname, geterr(errno));
@@ -573,8 +598,9 @@ reinit(int sig)
 }
 
 /*
- * SIGUSR1 means we want to close the old run file (because it has probably
- * been moved) and start a new version of it.
+ * SIGUSR1 means we want to close the old run file and start a new version
+ * of it. The run file is not rolled or saved, so we unlink it to make sure
+ * that no one can hang onto an open fd.
  */
 void
 newrun(int sig)
@@ -584,8 +610,9 @@ newrun(int sig)
 	 * because we blocked SIGUSR1 during the write.
 	 */
 	close(runfd);
+	unlink(Runname);
 
-	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
+	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0640)) < 0)
 		die("%s: open: %s", Runname, geterr(errno));
 	if (chmod(Runname, 0640) < 0)
 		die("%s: chmod: %s", Runname, geterr(errno));
@@ -603,18 +630,19 @@ void
 terminate(int sig)
 {
 #ifdef	USESOCKETS
-	genaclfile();
+	if (tipactive) {
+		shutdown(ptyfd, SHUT_RDWR);
+		close(ptyfd);
+		FD_CLR(ptyfd, &sfds);
+		ptyfd = 0;
+		tipactive = 0;
+		dolog(LOG_INFO, "%s revoked", inet_ntoa(tipclient.sin_addr));
+	}
+	else
+		dolog(LOG_INFO, "revoked");
 
-	if (!tipactive)
-		return;
-
-	shutdown(ptyfd, SHUT_RDWR);
-	close(ptyfd);
-	FD_CLR(ptyfd, &sfds);
-	ptyfd = 0;
-	tipactive = 0;
-
-	dolog(LOG_INFO, "%s shutdown", inet_ntoa(tipclient.sin_addr));
+	/* Must be done *after* all the above stuff is done! */
+	createkey();
 #else
 	int ofd = ptyfd;
 	
@@ -632,7 +660,7 @@ terminate(int sig)
 		dolog(LOG_WARNING, "could not revoke access to tty");
 	close(ptyfd);
 	
-	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
+	if ((ptyfd = open(Ptyname, O_RDWR)) < 0)
 		die("%s: open: %s", Ptyname, geterr(errno));
 
 	/* XXX so we don't have to recompute the select mask */
@@ -644,7 +672,7 @@ terminate(int sig)
 
 #ifdef __FreeBSD__
 	/* see explanation in capture() above */
-	if ((ofd = open(Ttyname, O_RDONLY, 0666)) < 0)
+	if ((ofd = open(Ttyname, O_RDONLY)) < 0)
 		die("%s: open: %s", Ttyname, geterr(errno));
 #endif
 	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
@@ -756,7 +784,7 @@ writepid()
 	int fd;
 	char buf[8];
 	
-	if ((fd = open(Pidname, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0)
+	if ((fd = open(Pidname, O_WRONLY|O_CREAT|O_TRUNC, 0644)) < 0)
 		die("%s: open: %s", Pidname, geterr(errno));
 
 	if (chmod(Pidname, 0644) < 0)
@@ -904,9 +932,9 @@ val2speed(val)
 int
 clientconnect()
 {
-	int	length = sizeof(tipclient);
-	int	newfd;
-	char	bits[sizeof(ACLbits)];
+	int		cc, length = sizeof(tipclient);
+	int		newfd;
+	secretkey_t     key;
 
 	newfd = accept(sockfd, (struct sockaddr *)&tipclient, &length);
 	if (newfd < 0)
@@ -927,21 +955,30 @@ clientconnect()
 	ptyfd = newfd;
 
 	/*
-	 * Read the first part to verify the ACLbits. We must get the proper
-	 * bits or this is not a valid tip connection.
+	 * Read the first part to verify the key. We must get the
+	 * proper bits or this is not a valid tip connection.
 	 */
-	if (read(ptyfd, bits, sizeof(bits)) != sizeof(bits)) {
+	if ((cc = read(ptyfd, &key, sizeof(key))) <= 0) {
 		close(ptyfd);
-		dolog(LOG_NOTICE, "%s connecting, error reading aclbits",
+		dolog(LOG_NOTICE, "%s connecting, error reading key",
 		      inet_ntoa(tipclient.sin_addr));
 		return 1;
 	}
-	if (bcmp(bits, ACLbits, sizeof(ACLbits))) {
+	/* Verify size of the key is sane */
+	if (cc != sizeof(key) ||
+	    key.keylen != strlen(key.key) ||
+	    strncmp(secretkey.key, key.key, key.keylen)) {
 		close(ptyfd);
-		dolog(LOG_NOTICE, "%s connecting, aclbits do not match",
+		dolog(LOG_NOTICE,
+		      "%s connecting, secret key does not match",
 		      inet_ntoa(tipclient.sin_addr));
 		return 1;
 	}
+#ifndef SAFEMODE
+	/* Do not spit this out into a public log file */
+	dolog(LOG_INFO, "Key: %d: %s",
+	      secretkey.keylen, secretkey.key);
+#endif
 	
 	/*
 	 * See Mike comments (use threads) above.
@@ -961,38 +998,173 @@ clientconnect()
 }
 
 /*
- * Simple access permission system for now.
- * Write out an acl file, which has the port number and "key". If
- * the user can read this file, then he knows what port to connect on
- * and what magic string to send. We eventually need to extend this to a
- * tipserver of some kind, that talks to the database and does the
- * permission checks. 
+ * Generate our secret key and write out the file that local tip uses
+ * to do a secure connect.
  */
-genaclfile()
+int
+createkey()
 {
-	char	aclname[BUFSIZ], buf[BUFSIZ];
-	int	fd;
+	int			cc, i, fd;
+	unsigned char		buf[BUFSIZ], aclname[BUFSIZ];
+	FILE		       *fp;
 
-	if ((fd = open("/dev/urandom", O_RDONLY, 0666)) < 0)
-		die("/dev/random: open: %s", geterr(errno));
-
-	if (read(fd, ACLbits, sizeof(ACLbits)) != sizeof(ACLbits)) 
-		die("/dev/random: read: %s", geterr(errno));
-	close(fd);
-
-	(void) sprintf(aclname, ACLNAME, DEVPATH, Machine);
-
-	if ((fd = open(aclname, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0)
-		die("%s: open: %s", aclname, geterr(errno));
-
-	(void) sprintf(buf, "%d\n0x%x 0x%x 0x%x\n", portnum,
-		       ACLbits[0], ACLbits[1], ACLbits[2]);
+	/*
+	 * Generate the key. Should probably generate a random
+	 * number of random bits ...
+	 */
+	if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
+		syslog(LOG_ERR, "opening /dev/urandom: %m");
+		exit(1);
+	}
 	
-	if (write(fd, buf, strlen(buf)) != strlen(buf))
-		die("%s: write: %s", aclname, geterr(errno));
+	if ((cc = read(fd, buf, DEFAULTKEYLEN)) != DEFAULTKEYLEN) {
+		if (cc < 0)
+			syslog(LOG_ERR, "Reading random bits: %m");
+		else
+			syslog(LOG_ERR, "Reading random bits");
+		exit(1);
+	}
 	close(fd);
+	
+	/*
+	 * Convert into ascii text string since that is easier to
+	 * deal with all around.
+	 */
+	secretkey.key[0] = 0;
+	for (i = 0; i < DEFAULTKEYLEN; i++) {
+		int len = strlen(secretkey.key);
+		
+		snprintf(&secretkey.key[len],
+			 sizeof(secretkey.key) - len,
+			 "%x", (unsigned int) buf[i]);
+	}
+	secretkey.keylen = strlen(secretkey.key);
 
-	if (chmod(aclname, 0640) < 0)
-		die("%s: chmod: %s", aclname, geterr(errno));
+#ifndef SAFEMODE
+	/* Do not spit this out into a public log file */
+	dolog(LOG_INFO, "NewKey: %d: %s", secretkey.keylen, secretkey.key);
+#endif
+	
+	/*
+	 * First write out the info locally so local tip can connect.
+	 * This is still secure in that we rely on unix permission, which
+	 * is how most of our security is based anyway.
+	 */
+	(void) sprintf(aclname, ACLNAME, TIPPATH, Machine);
+
+	/*
+	 * We want to control the mode bits when this file is created.
+	 * Sure, could change the umask, but I hate that function.
+	 */
+	(void) unlink(aclname);
+	if ((fd = open(aclname, O_WRONLY|O_CREAT|O_TRUNC, 0640)) < 0)
+		die("%s: open: %s", aclname, geterr(errno));
+	if ((fp = fdopen(fd, "w")) == NULL)
+		die("fdopen(%s)", aclname, geterr(errno));
+
+	fprintf(fp, "host:   %s\n", ourhostname);
+	fprintf(fp, "port:   %d\n", portnum);
+	fprintf(fp, "keylen: %d\n", secretkey.keylen);
+	fprintf(fp, "key:    %s\n", secretkey.key);
+	fclose(fp);
+
+	/*
+	 * Send the info over.
+	 */
+	handshake();
+	return 1;
+}
+
+/*
+ * Contact the boss node and tell it our local port number and the secret
+ * key we are using.
+ */
+static	jmp_buf deadline;
+static	int	deadbossflag;
+
+void
+deadboss()
+{
+	deadbossflag = 1;
+	longjmp(deadline, 1);
+}
+
+int
+handshake()
+{
+	int			sock, cc, err = 0;
+	struct sockaddr_in	name;
+	struct hostent	       *he;
+	whoami_t		whoami;
+
+	/*
+	 * Global. If we fail, we keep trying from the main loop. This
+	 * allows local tip to operate while still trying to contact the
+	 * server periodically so remote tip can connect.
+	 */
+	needshake = 1;
+
+	/*
+	 * Don't do this if a local tip session is active. Typically, it
+	 * means something is wrong, and that it would be a bad idea to
+	 * interrupt a tip session without a potentially blocking operation,
+	 * as that would really annoy the user. When the tip goes inactive,
+	 * we will try again normally. 
+	 */
+	if (tipactive)
+	    return 0;
+
+	/* Our whoami info. */
+	strcpy(whoami.nodeid, Machine);
+	whoami.portnum = portnum;
+	memcpy(&whoami.key, &secretkey, sizeof(secretkey));
+
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		die("socket(): %s", geterr(errno));
+	}
+
+	/* For alarm. */
+	deadbossflag = 0;
+	signal(SIGALRM, deadboss);
+	if (setjmp(deadline)) {
+		alarm(0);
+		signal(SIGALRM, SIG_DFL);
+		warn("Timed out connecting to %s\n", Bossnode);
+		close(sock);
+		return -1;
+	}
+	alarm(5);
+
+	/* Need to map the hostname. */
+	he = gethostbyname(Bossnode);
+	if (! he) {
+		die("gethostbyname(bossnode): %s", hstrerror(h_errno));
+	}
+	memcpy ((char *)&name.sin_addr, he->h_addr, he->h_length);
+	name.sin_family = AF_INET;
+	name.sin_port   = htons(SERVERPORT);
+
+	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
+		warn("connect(bossnode): %s", geterr(errno));
+		err = -1;
+		goto done;
+	}
+
+	if ((cc = write(sock, &whoami, sizeof(whoami))) != sizeof(whoami)) {
+		if (cc < 0)
+			warn("write(bossnode): %s", geterr(errno));
+		else
+			warn("write(bossnode): Failed");
+		err = -1;
+		close(sock);
+		goto done;
+	}
+	close(sock);
+	needshake = 0;
+ done:
+	alarm(0);
+	signal(SIGALRM, SIG_DFL);
+	return err;
 }
 #endif

@@ -27,7 +27,7 @@ LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  assign_wrapper ptopgen
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
-                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm
+                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
