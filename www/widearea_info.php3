@@ -58,7 +58,9 @@ else
 function SPITDATA($table, $title, $showtype, $plain)
 {
     $query_result1 =
-	DBQueryFatal("select * from $table order by node_id1");
+	DBQueryFatal("select t.*,n.priority from $table as t ".
+		     "left join nodes as n on n.node_id=t.node_id1 ".
+		     "order by n.priority");
     
     # PHP arrays are strange wrt "each" function. Need two copies.
     $nodenamesrow = array();
@@ -74,16 +76,18 @@ function SPITDATA($table, $title, $showtype, $plain)
 	$plr      = $row[lossrate];
 	$start    = $row[start_time];
 	$end      = $row[end_time];
+	$pri      = $row[priority];
     
 	$glom1    = $node_id1;
 	$glom2    = $node_id2;
 
-        # echo "Got $glom1 to $glom2 in $msectime ms<br>\n";
+        #echo "Got $glom1 to $glom2 $pri<br>\n";
 	
-	$nodenamesrow[$glom1] = 1;
-	$nodenamesrow[$glom2] = 1;
-	$nodenamescol[$glom1] = 1;
-	$nodenamescol[$glom2] = 1;
+	$nodenamesrow[$glom1] = $pri;
+	$nodenamescol[$glom1] = $pri;
+
+#	$nodenamesrow[$glom2] = 1;
+#	$nodenamescol[$glom2] = 1;
 
 	$speeds[ $glom1 . "+" . $glom2 ] = $time * 1000;
 	$bws[ $glom1 . "+" . $glom2 ] = $bw;
@@ -94,8 +98,10 @@ function SPITDATA($table, $title, $showtype, $plain)
 	
 	
     }
-    ksort($nodenamesrow);
-    ksort($nodenamescol);
+    asort($nodenamesrow, SORT_NUMERIC);
+    reset($nodenamesrow);
+    asort($nodenamescol, SORT_NUMERIC);
+    reset($nodenamescol);
 
     if (! $plain) {
 	echo "<center>

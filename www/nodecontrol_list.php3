@@ -88,8 +88,14 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 echo "<center><b>
-       View: $view
-      </b></center><br>\n";
+       View: $view\n";
+
+if (! strcmp($showtype, "widearea")) {
+    echo "<br>
+          <a href=widearea_info.php3>(Widearea Info)</a>\n";
+}
+
+echo "</b></center><br>\n";
 
 echo "<table border=2 cellpadding=2 cellspacing=2
        align='center'>\n";
@@ -167,7 +173,7 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     else {
 	if ($pid)
-	    echo "<td>&nbsp</td>\n";
+	    echo "<td>No</td>\n";
 	else
 	    echo "<td>Yes</td>\n";
     }
