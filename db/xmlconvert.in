@@ -230,7 +230,7 @@ sub readXML($$$) {
 	    else {
 		# Sanity check. The particular set of fields should not need
 		# anything more than alphanumeric.
-		if ($val =~ /^[\d\w]+$/) {
+		if ($val =~ /^[-\d\w]+$/) {
 		    push(@setlist, "$key='$val'");
 		}
 		else {
