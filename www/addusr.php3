@@ -64,7 +64,7 @@ echo "<table align=\"center\" border=\"1\">
 		} elseif ($n > 1) { # if more than one option make a select button
 			echo "<select name=\"grp\">\n";
 			while ($row = mysql_fetch_row($result)) {
-                        	$gid = $row[gid];
+                        	$gid = $row[0];
                         	echo "<option value=$gid>$gid</option>\n";
                 	}
 			echo "</select></th></tr>\n";
