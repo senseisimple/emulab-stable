@@ -116,7 +116,9 @@ Optional. The ops-install script set up some mailing lists for the email
 addresses you set up in the defs file, in /etc/mail/lists . If you want to run
 these mailing lists off your ops node, you can put some people in them now.
 These are just standard sendmail list files - a list of addresses and/or
-archive files, one per line.
+archive files, one per line. If you chose to use archive files, give a path
+to the file you'd like sendmail to stick all correspondance in, and create
+this file.
 
 ##### Step 5 - Other miscellaneous things to set up
 
