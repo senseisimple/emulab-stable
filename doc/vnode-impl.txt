@@ -56,28 +56,77 @@ in regular files, they are also easy and efficient to move or clone.
 Why virtual ethernet interfaces?
 
 An important part of BSD jails is the ability to restrict them to specific
-IP addresses.  But the jail mechanism does not ...
+IP addresses.  While the jail mechanism does provide some degree of network
+virtualization as described above, it falls short of what is needed in our
+environment.  In particular, though jails have their own distinct IP
+addresses, those IP addresses are associated directly with physical
+interfaces which are shared among all jails.  Thus, interface-centric
+operations such as tcpdump or ipfw/dummynet either are not correctly
+isolated or require special handling in many different places.
 
-   - allows attaching of ipfw/dummynet
-   - ensures jail sees only traffic it should without overly limiting
-     to specific target IPs
-   - encapsulation
+Further, with jails, when packets leave a physical host they lose the
+identity of the virtual node (jail) that was the most-recent hop of the
+packet.  This identity is essential for handling the "revisitation"
+problem, where multiple nodes in a topology can be located on the same
+physical node.  The loss occurs because packets from the jails are
+multiplexed on to physical interfaces.  The IP header of a packet does
+contains a virtual node IP address, but it is that of the originator of
+the IP packet, not that of the most-recent hop router.  The MAC address
+in the wire packet will be for the physical node, not the virtual node
+that sent it (since there is no virtual MAC).  Preserving the necessary
+information in the ethernet packet would require help from the switching
+fabric, either by supporting VLANs or by supporting arbitrary numbers of
+fake MAC addresses per switch port (where the fake addresses would be
+derived from the virtual IP addresses).
 
-The BSD virtual ethernet driver, which we wrote, is a goofy hybrid of a
-virtual device, an encapsulating device and a bridging device.  It allows
-us to create lots and lots of ethernet interfaces (virtualization), multiplex
-them on physical interfaces or tie them together in a loopback fashion
-(bridging) and have them communicate transparently through our switch
-fabric (encapsulation).
+We solve all of these problems in one fell swoop, with a virtual ethernet
+device.  The BSD virtual ethernet (veth) driver, which we wrote, is a goofy
+hybrid of a virtual device, an encapsulating device and a bridging device.
+It allows us to create lots and lots of ethernet interfaces (virtualization),
+multiplex them on physical interfaces or tie them together in a loopback
+fashion (bridging) and have them communicate transparently through our
+switch fabric (encapsulation).
+
+Virtualization gives us per-jail interfaces above the physical interface to
+which we can apply jail-specific ipfw/dummynet rules or on which the jail
+processes can operate.  Bridging allows the correct routing of packets at
+the link level so that virtual interfaces only receive the packets that
+they should.  Two attributes of a virtual ethernet device define the
+bridged topology.  The "parent interface" attribute associates a virtual
+device with a physical device allowing for multiplexing/demultiplexing
+of virtual devices on physical devices.  A 16-bit tag, essentially identical
+to that of the 802.1q VLAN standard, identifies a broadcast domain for a
+set of veths, all veths with the same tag will see each other's traffic.
+Finally, encapsulation preserves the virtual link information
+necessary to implement revisitation (the tag) when crossing physical links,
+without making any assumptions about the switching fabric.
 
 
 Why virtual routing tables?
 
-   - cannot have multiple veths in the same subnet without this
-   - needed to route packets correctly through a topo when endpoints
-     are on the same host (ow, gets short-circuited).
-   - needed to support multiple vnodes with different routes to same
-     destination
+While virtual ethernet devices are sufficient to enable construction of
+virtual ethernet topologies, they are not sufficient to support arbitrary
+IP topologies.  This is due to shared IP infrastructure, in particular,
+the routing table.  Since the routing table is indexed by destination
+and returns a next-hop address, it is only possible to have one entry
+per destination.  But with a physical node hosting multiple jails
+representing different virtual nodes at different points in the topology,
+we need to be able to support multiple routes to (next hops for) a single
+destination.
+
+The obvious solution is to virtualize the IP routing table.  To do so,
+we started with the FreeBSD work done by Scandariato and Risso which
+implements multiple IP routing tables to support multiple VPN end points
+on a physical node.  Routing tables are identified by a small integer
+routing table id (rtabid).  Rtabids are the glue that bind together
+jails, virtual interfaces and routing tables.  Our extended jails each
+have a unique rtabid and thus every jail has its own routing table.
+Virtual ethernet interfaces are likewise associated with an rtabid when
+they are created, forming a unique set of virtual interfaces per jail.
+Incoming packets for the same destination can thus be differentiated
+by the rtabid of the receiving interface and can be routed differently
+based on the content of the associated routing table.
+
 
 B. Implementation
 
