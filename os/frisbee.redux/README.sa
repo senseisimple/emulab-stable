@@ -1,4 +1,4 @@
-Frisbee README version 0.2 of Wed Jun 18 10:35:17 MDT 2003.
+Frisbee README version 0.3 of Wed Jul  1 13:42:19 MDT 2003.
 (This is a possibly out of date copy of:
 http://www.emulab.net/downloads/frisbee-README.txt
 Check there for the latest.)
@@ -45,8 +45,8 @@ It also includes the associated image creation tool.
 
 	We use FreeBSD, you should too.  It should build on any
 	reasonably recent 4.x version.  You will need to install
-	the linuxthreads port, vintage 2.2.3.  You can build single-
-	threaded versions of the imagezip/unzip tools if you don't
+	the linuxthreads port, version 2.2.3 or later.  You can build
+	single-threaded versions of the imagezip/unzip tools if you don't
 	want to do this, but you gotta have the threads if you
 	want Frisbee.
 
@@ -69,12 +69,18 @@ It also includes the associated image creation tool.
 	requires more Emulab infrastructure than you would be interested
 	in setting up, so for this release we provide an ISO image of a
 	bootable FreeBSD system, complete with the frisbee client and
-	image creation tool installed.
+	image creation tool installed:
 
-	Burn this puppy on a CD and boot it up.  It will prompt you
-	for some info about the system (network interface, IP configuration),
-	request that you set a root password, and then should come up to a
-	login prompt where you can login as root.
+	http://www.emulab.net/downloads/frisbee-fs.iso
+
+	Burn this puppy on a CD and boot it up.  Note that booting the CD
+	by itself will NOT destroy the contents of your disk, it just brings
+	the machine up as a multi-user FreeBSD system.  As the CD boots,
+	it will prompt you for some info about the system (network interface,
+	IP configuration), request that you set a root password, and then
+	should come up to a login prompt where you can login as root.
+	Setting a root password is optional, but be aware that the system
+	will happily allow password-less root SSH if you don't.
 
 	To install an image, you need to run the frisbee server (frisbeed).
 	Run the server:
@@ -126,6 +132,40 @@ It also includes the associated image creation tool.
 	This can take quite awhile, again depending on the size of the
 	source disk/partition, how full it is, and what type of compression
 	is being used.
+
+6. I did everything you said, but it doesn't work!
+
+	The most common, non-obvious failure mode is for the client and
+	server to start up and just sit there apparently doing nothing.
+
+	The first thing to try is to restart both client and server with
+	the -d (debug) option.  We cleverly send all diagnostic output
+	to syslog unless you use -d, so it is quite possible that the
+	client and server are complaining about something, but you don't
+	see the messages.
+
+	Now, if the client (or server) complains that gethostbyname cannot
+	lookup the host name, your name resolution isn't working right,
+	maybe because your client machine isn't in the DNS.  To get around
+	this, explicitly specify the IP address of the appropriate interface
+	with "-i <myipaddr>".
+
+	If client and server still do nothing, it is possible that a firewall
+	is blocking the traffic or, if you are using multicast, that multicast
+	traffic is not being forwarded by your hub/switch/router.  If you can,
+	run a tcpdump on the server and see if you see any traffic from the
+	client, it should be periodically requesting data.  If you are
+	multicasting, try unicasting to one client and see if that works.
+	Try different port numbers as well if you might be going through a
+	firewall.
+
+	If you are using multicast and it is working, but much slower than
+	you expect, recall that dumb switches will just broadcast the
+	traffic and you will be limited by the slowest active port on the
+	switch.  If, like me, you have multiple machines connected with
+	100Mbit on a dual-speed switch also hosting your 10Mbit internet
+	connection, then you are not going to multicast any faster than
+	10Mbit/sec.  Unicast individual machines instead.
 --------------------------------
 
 [1] As I am sure everyone is aware, the *real* Frisbee is a trademark of
