@@ -437,7 +437,7 @@ int mapping_precheck() {
 		// 'interfaces' due to the fact that it can have interswitch
 		// links
 		if ((pnode->total_interfaces >= v->num_links) ||
-			pnode->current_type.compare("switch")) {
+			(!pnode->current_type.compare("switch"))) {
 		    matched_links++;
 		} else {
 		    potential_match = false;
