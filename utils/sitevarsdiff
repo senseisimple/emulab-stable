@@ -1,0 +1,188 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
+#
+# schemadiff - Find the differences between two database schemas, as reported
+# by mysqldump. Can print out a summary of changes, or SQL commands to make
+# the necessary changes
+#
+
+use strict;
+use Getopt::Std; 
+
+#
+# Default settings for the options
+#
+my $debug = 0;
+my $sql = 1;
+my $quiet = 0;
+
+#
+# Return value - number of differences between the two files
+#
+my $diff = 0;
+
+#
+# Process command-line args
+#
+my %opt;
+getopts('hdsq', \%opt); 
+if ($opt{h}) {
+    exit &usage;
+}
+if ($opt{d}) {
+    $debug = 1;
+}
+if ($opt{s}) {
+    $sql = 0;
+}
+if ($opt{q}) {
+    $quiet = 1;
+    $sql = 0;
+    $debug = 0;
+}
+
+if (@ARGV != 2) {
+    exit &usage
+}
+
+my ($file1,$file2) = @ARGV;
+
+my %sitevars1 = ();
+my %sitevars2 = ();
+
+my %sitevars  = ();
+
+read_sitevars(\%sitevars1, $file1);
+read_sitevars(\%sitevars2, $file2);
+
+#
+# Take a union of the keynames.
+#
+foreach my $i (keys %sitevars1) { $sitevars{$i} = 1; }
+foreach my $i (keys %sitevars2) { $sitevars{$i} = 1; }
+
+foreach my $i (keys %sitevars) {
+    if (exists $sitevars1{$i} && exists $sitevars2{$i}) {
+	my @setClause = ();
+	if ($sitevars1{$i}{"dval"} ne $sitevars2{$i}{"dval"}) {	
+	    push @setClause, "defaultvalue=" . $sitevars2{$i}{"dval"};
+	}
+	if ($sitevars1{$i}{"desc"} ne $sitevars2{$i}{"desc"}) {	
+	    push @setClause, "description=" . $sitevars2{$i}{"desc"};
+	}
+	if (@setClause) {
+	    $diff++;
+	    if (!$quiet) { print "# sitevar $i was changed.\n"; }
+	    if ($sql) {
+		print "UPDATE sitevariables SET " . 
+		      join(",",@setClause) . " " .
+		      "WHERE name=$i;\n\n";
+	    }
+	}
+    } elsif (exists $sitevars1{$i} && ! exists $sitevars2{$i}) {
+	$diff++;
+	if (!$quiet) { print "# sitevar $i was deleted.\n"; }
+	if ($sql) {
+	    print "DELETE FROM sitevariables WHERE name=$i;\n\n";
+	}
+    } elsif (! exists $sitevars1{$i} && exists $sitevars2{$i}) {
+	$diff++;
+	if (!$quiet) { print "# sitevar $i was added.\n"; }
+	if ($sql) {
+	    print "INSERT INTO sitevariables VALUES ".
+		  "(".
+	          "$i,".
+	          "NULL" . ",".
+	          $sitevars2{$i}{"dval"} . ",".
+	          $sitevars2{$i}{"desc"} .
+	          ");\n\n";
+	}
+    }
+}
+
+if ($diff > 0) {
+    exit(1);
+} else {
+    exit(0);
+}
+
+######################################################################
+# Subs
+######################################################################
+
+sub read_sitevars($$) {
+
+    my $hashref = shift;
+    
+    #
+    # Open the file
+    #
+    my $filename = shift;
+    open(FH,"<$filename") or die "Unable to open $filename: $!\n";
+
+    while(<FH>) {
+	my ($name, $val, $dval, $desc);
+
+	if (/^INSERT INTO sitevariables/) {
+	    #
+	    # Either match NULL, or
+	    #   a quote followed by some number of:
+	    #     + characters which aren't backslashes or quotes, or
+	    #     + slashes followed by any character
+	    #   followed by a closed quote.
+	    #
+	    my $match = "^(('([^\\']|(\\\\.))*')|(NULL))";
+	    s/^INSERT INTO sitevariables VALUES \(//;
+	    ($name) = /${match},/;
+	    s/${match},// or die "bad parse $_";
+	    ($val) = /${match},/;
+	    s/${match},// or die "bad parse $_";
+	    ($dval) = /${match},/;
+	    s/${match},// or die "bad parse $_";
+	    ($desc) = /${match}\);/;
+	    s/${match}\);// or die "bad parse $_";
+
+            debug("Adding variable $name...\n");
+            ${$hashref}{$name}{"dval"} = $dval;
+            ${$hashref}{$name}{"desc"} = $desc;
+        }
+    }
+
+    close (FH);
+}
+
+#
+# Print the message, only if the gloabal $debug variable is set
+#
+sub debug(@) {
+    if ($debug) {
+	print @_;
+    }
+}
+
+#
+# Usage message
+#
+sub usage() {
+    print "usage: $0 [-h] [-s] [-d] <file1> <file2>\n";
+    print "Prints on stdout a set of SQL commands to change the database\n";
+    print "from file1 so that it has the same sitevars as the database from\n";
+    print "file2 (same argument order as diff)\n\n";
+    print "-h    This message\n";
+    print "-s    Summary: Don't print SQL statments to apply changes\n";
+    print "-q    Quiet: Don't print anything, just return a value\n";
+    print "-d    Turn on debugging output\n";
+    return 1;
+}
+
+
+
+
+
