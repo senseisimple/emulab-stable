@@ -819,6 +819,17 @@ CREATE TABLE state_transitions (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'state_triggers'
+#
+
+CREATE TABLE state_triggers (
+  op_mode varchar(20) NOT NULL default '',
+  state varchar(20) NOT NULL default '',
+  trigger tinytext NOT NULL,
+  PRIMARY KEY  (op_mode,state)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'switch_paths'
 #
 
