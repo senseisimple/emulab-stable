@@ -7,10 +7,16 @@
 #                                                                       #
 #########################################################################
 
-#
-# Configure variables
-#
-my $TB     = "@prefix@";
+BEGIN { 
+  #
+  # Configure variables
+  #
+  my $TB     = "@prefix@";
+
+  # This needs to go in BEGIN so it happens before the use clauses...
+  push(@INC,$TB."/lib");
+}
+
 my $DBNAME = "@TBDBNAME@";
 
 # snmpit uses modules that implement the interface to a given switch
@@ -25,28 +31,21 @@ my $DBNAME = "@TBDBNAME@";
 # getStats	print various stats
 # vlanLock	Get a vlan editing lock/token/buffer, and
 # vlanUnlock	Release it when done
-# setupVlan	(ports) - takes a list of ports, and vlans them
-# removeVlan	(vlans) - takes a list of vlan numbers
+# setupVlan	(name,ports) - takes a list of ports, and vlans them
+# removeVlan	(vlan) - takes vlan number
 # listVlans	returns a list of entries, with each entry having an
 # 		ID, a name, and a list of members (pcX:Y)
 
-#
-# Source Code Map
-# ===============
-#
-# Section            Subroutines
-# -------            -----------
-# MAIN               myMain
-# COMMANDS           GetToken, ReleaseToken, OneVLAN, AutoVLANConfig,
-#                    RemoveVLAN, UpdateField
-# INFO               ListVLANs, ShowPorts, GetStats
-# TRANSLATION        ReadTranslationTable, readifIndex
-# PERMISSIONS        NodeCheck
-# HELPERS            ParseArgs, ReadIRFile
-#
-
 use English;
 use Mysql;
+
+#Uncomment this when we really need to be able to handle intel switches
+#use snmpit_intel;
+
+use snmpit_cisco;
+use snmpit_lib;
+
+snmpit_lib::init($DBNAME);
 
 $| = 1; # Turn off line buffering on output
 
@@ -61,22 +60,10 @@ my $device;
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
-my %Dev=();
-# %Dev maps device names to device IPs
-my %Interfaces=();
-my %Ports=();
-my %ifIndex=();
-# %Interfaces maps tbxxMM:N<==>MAC 
-# %Ports maps tbxxMM:N<==>switch:port  
-# %ifIndex maps card.port<==>ifIndex
-
 &myMain;
 
-###
-###
-### MAIN SECTION
-###
-###
+# Numerically sort
+sub num { $a <=> $b; }
 
 sub myMain {
   
@@ -113,151 +100,77 @@ sub myMain {
 #  print "\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup spd=$spd s=$s f=$f l=$l",
 #  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
 #  "off=$off cyc=$cyc all=$all device=$device\n" if $debug;
-  
-  use SNMP;
-  
-  $SNMP::debugging = ($debug - 5) if $debug > 5;
-  
-  &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
-  if ($device eq "Intel") {
-    &SNMP::addMibFiles('/usr/local/share/snmp/mibs/INTEL-GEN-MIB.txt', 
-		       '/usr/local/share/snmp/mibs/INTEL-S500-MIB.txt',
-		       '/usr/local/share/snmp/mibs/INTEL-VLAN-MIB.txt');
-  } elsif ($device eq "APC") {
-     &SNMP::addMibFiles('/usr/local/share/snmp/mibs/PowerNet-MIB.txt');
-  } elsif ($device eq "Cisco") {
-    &SNMP::addMibFiles('/usr/local/share/snmp/mibs/CISCO-STACK-MIB.txt', 
-	       '/usr/local/share/snmp/mibs/CISCO-VTP-MIB.txt',
-	       '/usr/local/share/snmp/mibs/CISCO-VLAN-MEMBERSHIP-MIB.txt');
-  }
-  
-  $SNMP::save_descriptions = 1; # must be set prior to mib initialization
-  SNMP::initMib();		# parses default list of Mib modules 
-    
-  $SNMP::use_enums = 1;		#use enum values instead of only ints
-  print "Opening SNMP session to $i..." if $debug;
-  my $sess = new SNMP::Session(DestHost => $i);
-  my $sess2 =new SNMP::Session(DestHost => $i, Community => 'private');
-  print "".(defined $sess ? "Succeeded" : "Failed")."\n" if $debug;
-  
-  if ($device eq "Cisco") {
-    readifIndex(\$sess);
-  }
 
   #
   # Port Level Control
   #
-  if ($d || $e) {
-    my $Admin = ".1.3.6.1.2.1.2.2.1.7";
-    my $Status = "";
-    $Status = "down" if ($d);
-    $Status = "up" if ($e);
-    if ($device eq "Intel") {
-      if (! &UpdateField(\$sess,\$Admin,\@p,\$Status,\$b,\$c,\$v)) {
-	print STDERR "Port ",($d?"disable":"enable")," failed.\n";
-      }          
-    } elsif ($device eq "Cisco") {
-      @p = map { $ifIndex{$_} } @p;
-      if (! &UpdateField(\$sess,\$Admin,\@p,\$Status,\$b,\$c,\$v)) {
-	print STDERR "Port ",($d?"disable":"enable")," failed.\n";
-      }          
-    } else { 
-      die("Invalid option '",($d?"disable":"enable"),"' for device ".
-	  "of type $device.\n");
-    }
+  if ($d) {
+    my $rv = $device->portControl("disable",@p);
+    print "Port disable for @p had $rv failures.\n";
+  } elsif ($e) {
+    my $rv = $device->portControl("enable",@p);
+    print "Port enable for @p had $rv failures.\n";
   }
-  
+
   if ($spd) {
-    if ($device eq "Intel") {
-      my $Speed = ".1.3.6.1.4.1.343.6.10.2.4.1.10.1.1";
-      if (! &UpdateField(\$sess,\$Speed,\@p,\$spd,\$b,\$c,\$v)) {
-	print STDERR "Port Speed change failed.\n";
-      }    
-    } elsif ($device eq "Cisco") {      
-      my $AdminSpeed = ".1.3.6.1.4.1.9.5.1.4.1.1.9";
-      if (! &UpdateField(\$sess,\$AdminSpeed,\@p,\$spd,\$b,\$c,\$v)) {
-	print STDERR "Port Speed change failed.\n";
-      }    
-    } else { 
-      die("Invalid option speed='$spd' for device of type $device.\n");
-    }
+    my $rv = $device->portControl($spd,@p);
+    print "Port speed change for @p had $rv failures.\n";
   }
-  
+
   if ($dup) {
-    if ($device eq "Intel") {
-      my $duplex = ".1.3.6.1.4.1.343.6.10.2.4.1.11.1.1";
-      if (! &UpdateField(\$sess,\$duplex,\@p,\$dup,\$b,\$c,\$v)) {
-	print STDERR "Port Duplex change failed.\n";
-      }    
-    } elsif ($device eq "Cisco") {      
-      my $duplex = ".1.3.6.1.4.1.9.5.1.4.1.1.10";
-      if (! &UpdateField(\$sess,\$duplex,\@p,\$dup,\$b,\$c,\$v)) {
-	print STDERR "Port Duplex change failed.\n";
-      }    
-    } else { 
-      die("Invalid option duplex='$dup' for device of type $device.\n");
-    }
+    my $rv = $device->portControl($dup,@p);
+    print "Port duplex change for @p had $rv failures.\n";
   }
-  
+
   if ($a) {
-    if ($device eq "Intel") {
-      my $Auto = ".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1";
-      my $aOp = ( $a=~/en/ ? "auto" : "manual");
-      if (! &UpdateField(\$sess,\$Auto,\@p,\$a,\$b,\$c,\$v)) {
-	print STDERR "Port Auto-Configuration change failed.\n";
-      }    
-#    } elsif ($device eq "Cisco") {
-      
-    } else { 
-      die("Invalid option '$a' for device of type $device.\n");
-    }
+    my $rv = $device->portControl("auto",@p);
+    print "Port auto-configuration change for @p had $rv failures.\n";
   }
-  
+
   #Show always goes after changes, so that they are reflected.
   if ($s) {
-    &ShowPorts(\$sess,\$i,\$v);
+    $device->showPorts;
   }
-  
+
   if ($g) {
-    &GetStats(\$sess,\$i,\$v);
+    $device->getStats;
   }
-  
+
   #
   # VLANs
   #
   if (@vlan) {
     #This is to make ONE vlan - for multiple, use -f AutoVLAN from file
-    if ($device eq "Intel" || $device eq "Cisco") {
-      &GetToken(\$sess,\$v);
-      &OneVLAN(\$sess,\$m,\@vlan,\$v);
-      &ReleaseToken(\$sess,$v,$u);
+    if ($device ne "APC") {
+      $device->vlanLock;
+      $device->setupVlan($m,@vlan);
+      $device->vlanUnlock;
     } else { 
       die("Invalid option 'make VLAN' for device of type $device.\n");
     }
   }
 
   if ($f) {
-    &AutoVLANConfig(\$sess,\$f,\$v,\$u);
+    &AutoVLANConfig(\$f);
   }
-  
+
   if (@r) {
-    if ($device eq "Intel" || $device eq "Cisco") {
-      &GetToken(\$sess,\$v);	
-      foreach my $x (sort num @r)
-	{
-	  &RemoveVLAN(\$sess,\$x,\$v,\$i);
-	}
-      &ReleaseToken(\$sess,$v,$u);
+    if ($device ne "APC") {
+      $device->vlanLock;	
+      foreach my $x (sort num @r) {
+	$device->removeVlan($x);
+      }
+      $device->vlanUnlock;
     } else { 
-      die("Invalid option 'remove VLAN(s)' for device of type $device.\n");
+      die("Invalid option 'remove VLAN' for device of type $device.\n");
     }
   }
 
   #List VLANs is always after $f and @vlan, so that changes made are reflected
   if ($l) {
-    &ListVLANs(\$sess,\$v);
+    $device->listVlans;
   }
-  
+
   #
   # Power Control
   #
@@ -288,1003 +201,26 @@ sub myMain {
   
 }
 
-###
-###
-### END OF MAIN
-###
-###
-
-###
-###
-### COMMANDS SECTION
-###
-###
-
-#
-# SUB GetToken----------------------
-#
-
-sub GetToken {
-  local(*sess,*v) = @_;
-  if ($device eq "Intel") {
-    my $TokenOwner = '.1.3.6.1.4.1.343.6.11.4.5';
-    my $TokenReq = '.1.3.6.1.4.1.343.6.11.4.6';
-    my $TokenReqResult = '.1.3.6.1.4.1.343.6.11.4.7';
-    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
-    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
-    #The zeros and ones are a magic number it needs...
-    my $Num = pack("C*",0,0,0,0,1,1);
-    my $RetVal = 0;
-    my $tries = 0;
-    while ($RetVal ne "success" && $tries < 10) {
-      $tries += 1;
-      $sess->set([[$TokenReq,0,$Num,"OCTETSTR"]]);
-      $RetVal = $sess->get([[$TokenReqResult,0]]);
-      while ($RetVal eq "notReady") {
-	$RetVal = $sess->get([[$TokenReqResult,0]]);
-	print "*VLAN Token Claim Result is $RetVal\n" if ($v);
-	select (undef, undef, undef, .25); #wait 1/4 second
-      }
-      print "VLAN Token Claim Result is $RetVal\n" if ($v);
-      if ($RetVal ne 'success') {
-	my $Owner = $sess->get([[$TokenOwner,0]]);
-	if ($Owner ne "0.0.0.0") { 
-	  $tries = 10;
-	} else {
-	  print STDERR time,
-	  "Try #$tries - Result is $RetVal - Waiting 2 seconds\n" if $debug;
-	  select (undef, undef, undef, 2); #wait 2 seconds
-	}
-      }
-    }
-    if ($RetVal ne 'success') {
-      my $Owner = $sess->get([[$TokenOwner,0]]);
-      print STDERR "VLAN Token Claim Result is $RetVal\n";
-      die("Can't edit VLANs: Token taken by $Owner\n");
-    }
-  } elsif ($device eq "Cisco") {
-    my $EditOp = '.1.3.6.1.4.1.9.9.46.1.4.1.1.1'; # use index 1
-    my $BufferOwner = '.1.3.6.1.4.1.9.9.46.1.4.1.1.3'; # use index 1
-    $RetVal = $sess->set([[$EditOp,1,"copy","INTEGER"]]);
-    print "Token Request Set gave ",(defined($RetVal)?$RetVal:"undef."),
-      "\n" if $v;
-    $RetVal = 
-      $sess->set([[$BufferOwner,1,substr(`uname -n`,0,-1),"OCTETSTR"]]);
-    $RetVal = $sess->get([[$BufferOwner,1]]);
-    print "Token Owner is $RetVal\n" if $v;
-  } else {
-    die("Invalid option 'get edit token' for device of type $device.\n");
-  }
-}
-
-#
-# SUB ReleaseToken----------------------
-#
-
-sub ReleaseToken {
-  local(*sess,$v,$u) = @_;
-  if ($device eq "Intel") {
-    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
-    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
-    my $TokenConfirmState = '.1.3.6.1.4.1.343.6.11.1.18';
-    my $save = ($u ? "saveWithConfirmOption" : "save");
-    print "Releasing Token with $save command\n" if ($v);
-    $sess->set([[$TokenRelease,0,$save,"INTEGER"]]);
-    my $RetVal = $sess->get([[$TokenReleaseResult,0]]);
-    print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-    while ($RetVal eq "notReady") {
-      $RetVal = $sess->get([[$TokenReleaseResult,0]]);
-      print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-      select (undef, undef, undef, .25); #wait 1/4 second
-    }
-    if ($u) {
-      $RetVal = $sess->get([[$TokenConfirmState,0]]);
-      print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-      while ($RetVal eq "notReady") {
-	sleep(2);
-	$RetVal = $sess->get([[$TokenConfirmState,0]]);
-	print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-      }
-      if ($RetVal eq "ready")
-	{
-	  $RetVal = $sess->set([[$TokenConfirmState,0,"confirm","INTEGER"]]);
-	  print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-	}
-      while (!($RetVal =~ /Conf/i)) {
-	$RetVal = $sess->get([[$TokenConfirmState,0]]);
-	print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-      }	
-      if ($RetVal ne "confirmedNewConf") {
-	die("VLAN Reconfiguration Failed. No changes saved.\n");
-      }
-    } else {
-      if ($RetVal ne 'success') {
-	print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-	die("$RetVal VLAN Reconfiguration Failed. No changes saved.\n");
-      }
-    }   
-  } elsif ($device eq "Cisco") {
-    my $EditOp = '.1.3.6.1.4.1.9.9.46.1.4.1.1.1'; # use index 1
-    my $ApplyStatus = '.1.3.6.1.4.1.9.9.46.1.4.1.1.2'; # use index 1
-    $RetVal = $sess->set([[$EditOp,1,"apply","INTEGER"]]);
-    print "Apply set: '$RetVal'\n" if $v;
-    my $RetVal = $sess->get([[$ApplyStatus,1]]);
-    print "Apply gave $RetVal\n" if $v;
-    while ($RetVal eq "inProgress") { 
-      $RetVal = $sess->get([[$ApplyStatus,1]]);
-      print "Apply gave $RetVal\n" if $v;
-    }
-    my $ApplyRetVal = $RetVal;
-    if ($RetVal ne "succeeded") {
-      print "Apply failed: Gave $RetVal\n" if $v;
-      # If $u is false, release buffer
-      if (!$u) {
-	$RetVal = $sess->set([[$EditOp,1,"release","INTEGER"]]);
-	print "Release: '$RetVal'\n" if $v; 
-	if (! $RetVal ) {
-	  die("VLAN Reconfiguration Failed. No changes saved.\n");
-	}
-      }
-    } else { 
-      print "Apply Succeeded.\n" if $v; 
-      # If I succeed, release buffer
-      $RetVal = $sess->set([[$EditOp,1,"release","INTEGER"]]);
-      if (! $RetVal ) {
-	die("VLAN Reconfiguration Failed. No changes saved.\n");
-      }
-      print "Release: '$RetVal'\n" if $v; 
-    }
-    return $ApplyRetVal;
-  } else {
-    die("Invalid option 'release edit token' for device of type $device.\n");
-  }
-}
-
-#
-# SUB OneVLAN----------------------
-#
-
-sub OneVLAN {
-  #This is to be called ONLY after the edit token has already been taken!
-  local(*sess,*m,*vlan,*v) = @_;
-  foreach $mac (@vlan) {
-    my $node = $Interfaces{$mac};
-    if (! NodeCheck($node)) { 
-      print STDERR "You are not authorized to control $node.\n";
-      return 1;
-    }
-  }
-
-  if ($device eq "Intel") {
-    my $NextVLANId = '.1.3.6.1.4.1.343.6.11.1.6';
-    my $Vlan = $sess->get([[$NextVLANId,0]]);
-    my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
-    my $RetVal = "Undef.";
-    if ( !$m 
-	 #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
-	 || ($m =~ /^l(\d)+-(\d)+/)
-	 #End of Temp fix
-       ) { $m = $Vlan; }
-    print "  Creating VLAN $m as VLAN #$Vlan: @vlan ... ";
-    $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
-    print "",($RetVal? "Succeeded":"Failed"),".\n";
-    if (! defined ($RetVal) ) {
-      &ReleaseToken(*sess,$v,1);
-      die("VLAN name \"$m\" not unique.\n");
-    }
-    my @x;
-    my $n=0;
-    while(@vlan != 0 && $n < @vlan) {
-      my $i=0;
-      while ($i < 6 ) {
-	$x[$i] = hex ("0x".substr($vlan[$n],2*$i,2) );
-	$i++;
-      }
-      my $MacObjOID = ".1.3.6.1.4.1.343.6.11.1.10.1.3.$Vlan." . 
-	"$x[0].$x[1].$x[2].$x[3].$x[4].$x[5]";
-      print "    Adding MAC Address $vlan[$n] ".
-	"($Vlan.$x[0].$x[1].$x[2].$x[3].$x[4].$x[5])... ";
-      $RetVal = $sess->set([[$MacObjOID,0,$vlan[$n],"OCTETSTR"]]);
-      print "",($RetVal? "Succeeded":"Failed"), ".\n";
-      $n++;
-    }
-  } elsif ($device eq "Cisco") {
-    my $okay = 0;
-    my $attempts = 0;
-    my $VlanType = '.1.3.6.1.4.1.9.9.46.1.4.2.1.3.1'; # vlan # is index
-    my $VlanName = '.1.3.6.1.4.1.9.9.46.1.4.2.1.4.1'; # vlan # is index
-    my $VlanSAID = '.1.3.6.1.4.1.9.9.46.1.4.2.1.6.1'; # vlan # is index
-    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
-    while (($okay == 0) && ($attempts <3)) {
-      $attempts++;
-      print "***Okay=$okay, Attempts=$attempts (limit of 3)\n" if $debug;
-      my $N = 2;      
-      my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
-      print "Row $N got '$RetVal'  " if $debug;
-      while ($RetVal ne '') {
-	$N += 1;
-	$RetVal = $sess->get([[$VlanRowStatus,$N]]);
-	print "Row $N got '$RetVal'  " if $debug;
-      }
-      print "\nUsing Row $N\n" if $debug;
-      my $SAID = pack("H*",sprintf("%08x",$N+100000));
-      if ( !$m 
-	   #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
-	   || ($m =~ /^l(\d)+-(\d)+/)
-	   #End of Temp fix
-	 ) { $m = $N; }
-      print "  Creating VLAN $m as VLAN #$N: @vlan ... ";
-      # Yes, this next line MUST happen all in one set command....
-      $RetVal = $sess->set([[$VlanRowStatus,$N,"createAndGo","INTEGER"],
-			    [$VlanType,$N,"ethernet","INTEGER"],
-			    [$VlanName,$N,$m,"OCTETSTR"],
-			    [$VlanSAID,$N,$SAID,"OCTETSTR"]]);
-      print "",($RetVal? "Succeeded":"Failed"), ".\n";
-      if (!$RetVal) { 
-	print STDERR "VLAN Create '$m' as VLAN $N failed.\n"; 
-      } else {
-	$RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
-	print "Got $RetVal from Release Token\n" if $debug;
-	# If RetVal isn't succeeded, then I can try and fix it
-	my $tries = 0;
-	&GetToken(\$sess,\$v);
-	if ($RetVal eq "succeeded") { $okay = 1; }
-	while ($RetVal ne "succeeded") {
-	  $tries += 1;
-	  if ($RetVal eq "someOtherError" && $tries <= 2) {
-	    #Duplicate name... correct and try again..
-	    my $name = $sess->get([[$VlanName,$N]]);
-	    print STDERR "VLAN name '$name' might already be in use. ".
-	      "Renaming to '_$name'.\n";
-	    $name = $sess->set([[$VlanName,$N,"_$name","OCTETSTR"]]);
-	    $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
-	    print "Got $RetVal from Release Token\n" if $debug;
-	    &GetToken(\$sess,\$v); 
-	  } else {
-	    # Try again from the beginning... maybe we're using a bad VLAN #
-	    print STDERR "VLAN creation failed.".
-	      ($attempts<3 ?" Trying again...\n":
-	       " Third failure, giving up.\n");
-	    $okay=0;
-	    last;
-	  }
-	  if ($RetVal eq "succeeded") { $okay = 1; }
-	}
-	print "***Out of loop: Okay = $okay\n" if $debug;
-	if ($okay == 0) { next; }
-	# VLAN exists now - Add the ports:
-	# @vlan is a list of MACs, so I need to find out what they are...
-	my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
-	foreach $mac (@vlan) {
-	  my $if = $Interfaces{$mac};
-	  if ($if =~ /(sh\d+)-\d(:\d)/) { $if = "$1$2"; }
-	  my $port = (split(":",$Ports{$if}))[1];
-	  my $IF = $ifIndex{$port};
-	  print "Found $mac -> $if -> $port -> $IF\n" if $debug;
-	  if (!defined $IF) {
-	    print "    Addding MAC address $mac - port not found ... Failed\n";
-	    next;
-	  }
-	  print "    Adding MAC Address $mac (ifIndex $IF) ... ";
-	  $RetVal = $sess->set([[$PortVlanMemb,$IF,$N,'INTEGER']]);
-	  print "",($RetVal? "Succeeded":"Failed"), ".\n";
-	  my $Admin = ".1.3.6.1.2.1.2.2.1.7";
-	  my $Status = "up";
-	  if (! &UpdateField(\$sess,\$Admin,[$IF],\$Status,\$b,\$c,\$v)) {
-	    print STDERR "Port enable failed.\n";
-	  }          
-	}
-	#If everything went okay, break out of the loop
-	$okay = 1;
-      }
-    }
-  } else { 
-    die("Invalid option 'create VLAN' for device of type $device.\n");
-  }
-}
-
-#
-# SUB AutoVLANConfig ----------------------
-#
 
 sub AutoVLANConfig {
-  local(*sess,*f,*v,*u) = @_;
+  local(*f) = @_;
   my @VLANS= ();
   my @names= ();
-  if (($device eq "Intel") || ($device eq "Cisco")) {
-    &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
-    print "AutoVLAN got VLANs named: ",join (" ",@names),"\n" if $debug;
-    &GetToken(\$sess,\$v);
-    my $m="";
-    my @vlan=();
-    while (@VLANS) {
-      @vlan = @{shift(@VLANS)};
-      $m = shift @names;
-      print "Making $m with: ",join(' ',@vlan),"\n" if $debug;
-      &OneVLAN(\$sess,\$m,\@vlan,\$v);
-    }
-    &ReleaseToken(\$sess,$v,$u);
-  } else { 
-    die("Invalid option 'VLANs from file' for device of type $device.\n");
+  &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
+  print "AutoVLAN got VLANs named: ",join (" ",@names),"\n" if $debug;
+  $device->vlanLock;
+  my $m="";
+  my @vlan=();
+  while (@VLANS) {
+    @vlan = @{shift(@VLANS)};
+    $m = shift @names;
+    print "Making $m with: ",join(' ',@vlan),"\n" if $debug;
+    $device->setupVlan($m,@vlan);
   }
+  $device->vlanUnlock;
 }
 
-#
-# SUB RemoveVLAN ----------------------
-#
 
-sub RemoveVLAN {
-  local(*sess,*r,*v,*i) = @_;
-  if ($device eq "Intel") {
-    my $DeleteOID = ".1.3.6.1.4.1.343.6.11.1.9.1.4";
-    my $RetVal = "Undef.";
-    print "  Removing VLAN #$r ... ";
-    if ($r == 24) {
-      print STDERR "VLAN #$r is the Control VLAN, and cannot be removed.\n";
-    } else {
-      $RetVal = $sess->set([[$DeleteOID,$r,"delete","INTEGER"]]);
-      print "",($RetVal? "Succeeded":"Failed"),".\n";
-      if (! defined ($RetVal) ) {
-	print STDERR "VLAN #$r does not exist on this switch.\n";
-      }
-    }
-  } elsif ($device eq "Cisco") {
-    # Check the which ports are in the vlan, and make sure that we own them
-    my $VlanPortVlan = ["vlanPortVlan",0]; # index by module.port, gives vlan #
-    my $RetVal = $sess->getnext($VlanPortVlan);
-    my @data = @{$VlanPortVlan};
-    my @ports = ();
-    my $i = $sess->{DestHost};
-    do {
-      if ($RetVal != 1) {
-	print "Got $RetVal   \t" if $debug;
-	print "$data[0]\t$data[1]\t$data[2]\t" if $debug;
-	print "('$data[1]' " if $debug;
-	$node = $Ports{"$i:$data[1]"};
-	print "== $node)\n" if $debug;
-	if ($RetVal == $r) {
-	  push(@ports,$data[1]);
-	  if (!NodeCheck($node)) {
-	    print STDERR "You are not authorized to control $node.\n";
-	    return 1;
-	  }
-	}
-	#do the getnext at the end, because if we're on the last, the next
-	#one is junk to all the processing instructions...
-      }
-      $RetVal = $sess->getnext($VlanPortVlan);
-      @data = @{$VlanPortVlan};
-    } while ( $data[0] =~ /^vlanPortVlan/ ) ;    
-    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
-    if ($r == 1) {
-      print STDERR "VLAN #$r is the Control VLAN, and cannot be removed.\n";
-    } else {
-      print "  Removing VLAN #$r ... ";
-      my $RetVal = $sess->set([[$VlanRowStatus,$r,"destroy","INTEGER"]]);
-      print "",($RetVal? "Succeeded":"Failed"),".\n";
-      if (! defined $RetVal) { 
-	print STDERR "VLAN #$r does not exist on this switch.\n";
-	return;
-      }
-      foreach my $port ( @ports ) {
-	my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index=ifIndex
-	my $portIfIndex = ".1.3.6.1.4.1.9.5.1.4.1.1.11";
-	$index = $sess->get([["$portIfIndex.$port"]]);
-	print "Setting VLAN to 1..." if $debug;
-	$RetVal = $sess->set([[$PortVlanMemb,$index,1,'INTEGER']]);
-	print "",($RetVal? "Succeeded.\n":"Failed=$RetVal.\n") if $debug;
-	my $Admin = ".1.3.6.1.2.1.2.2.1.7";
-	my $Status = "down";
-	print "Disabling port $index..." if $debug;
-	if (! &UpdateField(\$sess,\$Admin,[$index],\$Status,\$b,\$c,\$v)) {
-	  print STDERR "Port disable failed.\n";
-	}          
-      }
-    }
-  } else { 
-    die("Invalid option 'remove VLAN' for device of type $device.\n");
-  }
-}
-
-#
-# SUB UpdateField----------------------
-#
-
-sub UpdateField {
-  local(*session,*OID,*ports,*val,*b,*c,*v)= @_;
-  my $Status = 0;
-  my $retval;
-  my $i = $session->{DestHost};
-  foreach my $port (@ports) {
-    my $trans = $ifIndex{$port};
-    if (defined $trans) {
-      if (defined ($Ports{"$i:$trans"})) {
-	$trans = "$trans,".$Ports{"$i:$trans"};
-      } else {
-	$trans = "$trans,".$Ports{"$i:$port"};
-      }
-    } else { $trans = "???"; }
-    print "Checking port $port ($trans) for $val..." if $v;
-    $Status = $session->get([[$OID,$port]]);
-    if (!defined $Status) { 
-      print STDERR "Port $port ($trans), change to $val: No answer from device\n"; 
-    } else {
-      print "Okay.\nPort $port was $Status\n" if $v;
-      if ($Status ne $val) {
-	print "Setting $port to $val..." if $v;
-	if ($device eq "Intel") {
-	  # The empty sub {} is there to force it into async mode
-	  $session->set([[$OID,$port,$val,"INTEGER"]],sub {});
-	} else {
-	  # Don't use async
-	  $retval = $session->set([[$OID,$port,$val,"INTEGER"]]);
-	  print "Set returned '$retval'" if $v;
-	}
-	if ($b) {
-	  while ($Status ne $val) { 
-	    $Status=$session->get([[$OID,$port]]);
-	    print "Value for $port was ",$Status,"\n" if ($v);
-	  }
-	  print "Okay.\n";
-	} else { print "\n"; }
-      }
-    }
-  }
-  if ( (!$b) && $c ) {
-    my $loops=0;
-    my $max_loops=10;
-    my %notdone=();
-    my @done=();
-    foreach my $port (@ports) {
-      $Status=$session->get([[$OID,$port]]);
-      print "Value for $port was ",$Status,"\n" if ($v);
-      if ($Status ne $val) {
-	$notdone{$port}=1;
-      }
-    }
-    while ( %notdone && $loops < $max_loops ) {
-      if ($loops > 5) { sleep($loops-5); }
-      foreach my $port (sort num keys(%notdone)) {
-	$Status=$session->get([[$OID,$port]]);
-	print "Value for $port was ",$Status,"\n" if ($v);
-	if ($Status eq $val) {
-	  push(@done,$port);
-	}
-      }
-      foreach my $i (@done) { delete $notdone{$i}};
-      $loops++;
-    }
-    if ($loops==$max_loops) {
-      foreach my $port (sort num keys(%notdone)) {
-	print STDERR "Port $port Change not verified!\n";
-      }
-      return(0);		#Return False!
-    }
-  }
-  1;
-}
-
-###
-###
-### END OF COMMANDS
-###
-###
-
-###
-###
-### INFO SECTION
-###
-###
-
-#
-# Sort functions:
-#
-
-#used for numerical sort...
-sub num { $a <=> $b; }
-
-#used for alphanumerical sort...
-sub alphanum { 
-  $a =~ /^([a-z]*)([0-9]*)/;
-  $a_let = $1;
-  $a_num = ($2 || 0);
-  $b =~ /^([a-z]*)([0-9]*)/;
-  $b_let = $1;
-  $b_num = ($2 || 0);
-  if ($a_let eq $b_let) {
-    return $a_num <=> $b_num;
-  } else {
-    return $a_let cmp $b_let;
-  }
-  return 0;
-}
-
-#
-# SUB ListVLANs ----------------------
-#
-
-sub ListVLANs {
-  local(*sess,*v) = @_;
-  my %Names = ();
-  my %Members = ();
-  my @data = ();
-  my $mac = "";
-  my $node= "";
-  my @vlan = ();
-  if ($device eq "Intel") {
-    my $field = ["vlanPolicyVlanTable",0];
-    #do one to get the first field...
-    $sess->getnext($field);
-    do {
-      @data = @{$field};
-      print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
-      if ($data[0] =~ /policyVlanName/) { $Names{$data[1]} = $data[2]; }
-      if ($data[0] =~ /MacRuleVlanId/) 
-	{ 
-	  my @vlan=();
-	  if (defined ( @{$Members{$data[2]}} ) ) { @vlan =@{$Members{$data[2]}}; }
-	  $_= sprintf("%d:%02x%02x%02x%02x%02x%02x", split(/\./,$data[1]));
-	  @_= split(/:/,$_);
-	  $mac = $_[1];
-	  if (defined ( $Interfaces{$mac} ) ) {
-	    $node = $Interfaces{$mac};
-	  } else { $node = $mac; }
-	  push(@vlan, $node);
-	  $Members{$data[2]} = \@vlan;
-	}
-      #do the getnext at the end, because if we're on the last, the next
-      #one is junk to all the processing instructions...
-      $sess->getnext($field);
-    } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/) ;
-  } elsif ($device eq "Cisco") {
-    print "Getting VLAN info...\n" if $debug;
-    #my $VlanIndex = ["vlanIndex",0]; # index by vlan #
-    # We don't need VlanIndex really...
-    my $VlanName = ["vtpVlanName",0]; # index by 1.vlan #
-    my $VlanPortVlan = ["vlanPortVlan",0]; # index by module.port, gives vlan #
-    #do one to get the first field...
-    my $RetVal = $sess->getnext($VlanName);
-    if (!defined $RetVal) { die("No response from device\n"); }
-    @data = @{$VlanName};
-    my $num = 0;
-    do {
-      $data[1] =~ /\.(.*)/;
-      $num = $1;
-      print "Got $RetVal   \t" if $debug;
-      print "$data[0]\t$data[1] ($num)\t$data[2]\n" if $debug;
-      if ( !$Names{$num} && $num < 1000 ) { $Names{$num} = $RetVal; }
-      #do the getnext at the end, because if we're on the last, the next
-      #one is junk to all the processing instructions...
-      $RetVal = $sess->getnext($VlanName);
-      @data = @{$VlanName};
-    } while ( $data[0] =~ /^vtpVlanName/ ) ;
-    $RetVal = $sess->getnext($VlanPortVlan);
-    @data = @{$VlanPortVlan};
-    my $i = $sess->{DestHost};
-    do {
-      if ($RetVal != 1) {
-	print "Got $RetVal   \t" if $debug;
-	print "$data[0]\t$data[1]\t$data[2]\t" if $debug;
-	my @vlan=();
-	if (defined (@{$Members{$data[2]}})) { @vlan =@{$Members{$data[2]}}; }
-	print "('$data[1]' " if $debug;
-	($node = $Ports{"$i:$data[1]"}) || ($node = "???");
-	print "== $node)\n" if $debug;
-	push(@vlan, $node) unless ($node =~ /^empty:/);
-	$Members{$data[2]} = \@vlan;
-	#do the getnext at the end, because if we're on the last, the next
-	#one is junk to all the processing instructions...
-      }
-      $RetVal = $sess->getnext($VlanPortVlan);
-      @data = @{$VlanPortVlan};
-    } while ( $data[0] =~ /^vlanPortVlan/ ) ;
-
-  } else { 
-    die("Invalid option 'list VLANs' for device of type $device.\n");
-  }
-  print "ID  Name\t\t\t    Members of VLAN\n";
-  print "--------------------------------------------------\n";
-  my $id;
-  # I'm trying out using formats. See perldoc perlform for details.
-  format = 
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-($id),($Names{$id}),(defined(@{$Members{$id}})?join("  ",sort alphanum (@{$Members{$id}})):"")
-.
-  foreach $id ( sort num keys (%Names) ) {
-    write;
-  }
-}
-
-#
-# SUB ShowPorts ----------------------
-#
-
-sub ShowPorts {
-  local(*sess,*i,*v) = @_;
-  my %Able = ();
-  my %Link = ();
-  my %auto = ();
-  my %speed = ();
-  my %duplex = ();
-  my %vlanNames = ();
-  my %portNames = ();
-  my $MinPorts;
-  my $MaxPorts;
-  if ($device eq "Intel") {
-    $MinPorts = 1;
-    $MaxPorts = 24;
-  } elsif ($device eq "Cisco") {
-    $MinPorts = 10;
-    $MaxPorts = 393;    
-  } else { 
-    die("Invalid option 'show port config' for device of type $device.\n");
-  }
-  my $ifTable = ["ifAdminStatus",0];
-  my @data=();
-  #do one to get the first field...
-  $sess->getnext($ifTable);
-  do {
-    @data = @{$ifTable};
-    print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
-    if (($data[1] >= $MinPorts) && ($data[1] <= $MaxPorts)) {
-      if ($data[0] =~ /AdminStatus/) { 
-	$Able{$data[1]} = ($data[2]=~/up/ ? "yes" : "no");
-	print "(Last was admin=$Able{$data[1]})\n" if $debug;
-      }
-      if ($data[0] =~ /OperStatus/) { 
-	$Link{$data[1]} = $data[2]; 
-	print "(Last was oper=$Link{$data[1]})\n" if $debug;
-      } 
-    }
-    #do the getnext at the end, because if we're on the last, the next
-    #one is junk to all the processing instructions...
-    $sess->getnext($ifTable);
-  } while ( $data[0] =~ /^i(f)(.*)Status$/) ;
-  if ($device eq "Intel") {
-    my $portConf = ["portConfSpeed",0];
-    #do one to get the first field...
-    $sess->getnext($portConf);
-    do {
-      @data = @{$portConf};
-      $data[1] =~ s/\./:/g;
-      $data[1] = (split(":",$data[1]))[2];
-      print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
-      if (($data[1] >= $MinPorts) && ($data[1] <= $MaxPorts)) {
-	if ($data[0] =~ /Speed/) {
-	  $data[2] =~ s/speed//;
-	  $data[2] =~ s/autodetect/\(auto\)/i;
-	  $speed{$data[1]} = $data[2]; 
-	}
-	if ($data[0] =~ /Duplex/) { 
-	  $data[2] =~ s/autodetect/\(auto\)/i;
-	  $duplex{$data[1]} = $data[2]; 
-	} 
-	if ($data[0] =~ /AutoNeg/) { $auto{$data[1]} = $data[2]; } 
-      }
-      #do the getnext at the end, because if we're on the last, the next
-      #one is junk to all the processing instructions...
-      $sess->getnext($portConf);
-    } while ( $data[0] =~ /^portConf(Speed|Duplex|AutoNeg)$/);
-    my $field = ["vlanPolicyVlanTable",0];
-    my $mac="";
-    my $id=0;
-    #do one to get the first field...
-    $sess->getnext($field);
-    do {
-      @data = @{$field};
-      print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
-      if ($data[0] =~ /policyVlanName/) { $vlanNames{$data[1]} = $data[2]; }
-      if ($data[0] =~ /MacRuleVlanId/) 
-	{ 
-	  my @vlan=();
-	  if (defined ( @{$MACs{$data[2]}} ) ) { @vlan =@{$MACs{$data[2]}}; }
-	  $_= sprintf("%d:%02x%02x%02x%02x%02x%02x", split(/\./,$data[1]));
-	  @_= split(/:/,$_);
-	  $id= $_[0];
-	  $mac = $_[1];
-	  $portNames{$mac}=$vlanNames{$id};
-	}
-      #do the getnext at the end, because if we're on the last, the next
-      #one is junk to all the processing instructions...
-      $sess->getnext($field);
-    } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/);
-  } elsif ($device eq "Cisco") {
-    
-  } else { 
-    die("Invalid option 'show port config' for device of type $device.\n");
-  }
-  #Next line is to eliminate some incorrect warnings...
-  if (%Link){};if (%portNames){};if (%duplex){};if (%auto){};
-  my $switch = (defined $Dev{$i} ? $Dev{$i} : "--unknown--");
-  print "Port Configuration, Testbed Switch $switch ($i)\n";
-  print "Port Interface\tVLAN\tEnabled\tLink\tAutoNeg\tSpeed\t\tDuplex\n";
-  print "----------------------------------------------------------------";
-  print "------------\n";
-  foreach my $id ( sort num keys (%Able) ) {
-    my $vlan;
-    my $switchport = join(":",$i,$id);
-    my $ifname = $Ports{$switchport};
-    if (! defined ($ifname) ) { $ifname = "\t"; }
-    if (! defined ($auto{$id}) ) { $auto{$id} = "\t"; }
-    if (! defined ($speed{$id}) ) { $speed{$id} = "        "; }
-    if (! defined ($duplex{$id}) ) { $duplex{$id} = "\t"; }
-    if ($id < 100) { print " "; }
-    if ($id < 10) { print " "; }
-    print $id,"  ";
-    print $ifname,"\t";
-    if (defined ($Interfaces{$ifname})) {
-      $vlan = $portNames{$Interfaces{$ifname}};
-    }
-    if ( defined $vlan) {
-      print $vlan;
-    }
-    print "\t";
-    print $Able{$id},"\t",$Link{$id},"\t";
-    print $auto{$id},"\t",$speed{$id},"\t";
-    if (length ($speed{$id}) < 8 ) { print "\t"; }
-    print $duplex{$id},"\n";
-  }
-}
-
-#
-# SUB GetStats ----------------------
-#
-
-sub GetStats {
-  local(*sess,*i,*v) = @_;
-  my $MinPorts;
-  my $MaxPorts;
-  if ($device eq "Intel") {
-    $MinPorts = 1;
-    $MaxPorts = 24;
-  } elsif ($device eq "Cisco") {
-    $MinPorts = 10;
-    $MaxPorts = 393;    
-  } else { 
-    die("Invalid option 'get port statistics' for device of type $device.\n");
-  }
-  my $ifTable = ["ifInOctets",0];
-  my %inOctets=();
-  my %inUcast=();
-  my %inNUcast=();
-  my %inDiscard=();
-  my %inErr=();
-  my %inUnkProt=();
-  my %outOctets=();
-  my %outUcast=();
-  my %outNUcast=();
-  my %outDiscard=();
-  my %outErr=();
-  my %outQLen=();
-  my @data=();
-  #do one to get the first field...
-  $sess->getnext($ifTable);
-  do {
-    @data = @{$ifTable};
-    print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
-    if (($data[1] >= $MinPorts) && ($data[1] <= $MaxPorts)) {
-      if    ($data[0]=~/InOctets/)  {$inOctets{$data[1]}  = $data[2];} 
-      elsif ($data[0]=~/InUcast/)   {$inUcast{$data[1]}   = $data[2];}
-      elsif ($data[0]=~/InNUcast/)  {$inNUcast{$data[1]}  = $data[2];}
-      elsif ($data[0]=~/InDiscard/) {$inDiscard{$data[1]} = $data[2];}
-      elsif ($data[0]=~/InErrors/)  {$inErr{$data[1]}     = $data[2];}
-      elsif ($data[0]=~/InUnknownP/){$inUnkProt{$data[1]} = $data[2];}
-      elsif ($data[0]=~/OutOctets/) {$outOctets{$data[1]} = $data[2];}
-      elsif ($data[0]=~/OutUcast/)  {$outUcast{$data[1]}  = $data[2];}
-      elsif ($data[0]=~/OutNUcast/) {$outNUcast{$data[1]} = $data[2];}
-      elsif ($data[0]=~/OutDiscard/){$outDiscard{$data[1]}= $data[2];}
-      elsif ($data[0]=~/OutErrors/) {$outErr{$data[1]}    = $data[2];}
-      elsif ($data[0]=~/OutQLen/)   {$outQLen{$data[1]}   = $data[2];}
-    }
-    $sess->getnext($ifTable);
-  } while ( $data[0] =~ /^i[f](In|Out)/) ;
-  my $switch = (defined $Dev{$i} ? $Dev{$i} : "--unknown--");
-  print "Port Statistics, Testbed Switch $switch ($i)\n";
-  print "\t\t\t     InUcast   InNUcast  In        In      Unknown\t".
-    "\t  OutUcast  OutNUcast Out       Out      Out Queue\n";
-  print "Port Interface\tIn Octets    Packets   Packets   Discards  Errors".
-    "  Proto.    Out Octets   Packets   Packets   Discards  Errors   ".
-      "Length\n";
-  print "------------------------------------------------------------------";
-  print "------------------------------------------------------------------";
-  print "------\n";
-  foreach my $port ( sort num keys (%inOctets) ) {
-    my $vlan;
-    my $switchport = join(":",$i,$port);
-    my $ifname = $Ports{$switchport};
-    if (! defined ($ifname) ) { $ifname = "         "; }
-    if ($port < 10) { print " "; }
-    print " ",$port,"  ";
-    print $ifname,"\t";
-    my $n=0;
-    my $str="";
-    print $str=$inOctets{$port};
-    foreach $n (length($str)..12) {print " ";}
-    print $str=$inUcast{$port};
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$inNUcast{$port}; 
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$inDiscard{$port};
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$inErr{$port}; 
-    foreach $n (length($str)..7) {print " ";}
-    print $str=$inUnkProt{$port};
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$outOctets{$port}; 
-    foreach $n (length($str)..12) {print " ";}
-    print $str=$outUcast{$port};
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$outNUcast{$port}; 
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$outDiscard{$port};
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$outErr{$port}; 
-    foreach $n (length($str)..9) {print " ";}
-    print $str=$outQLen{$port},"\n";
-  }
-}
-
-###
-###
-### END OF INFO
-###
-###
-
-###
-###
-### TRANSLATION SECTION
-###
-###
-
-#
-# SUB ReadTranslationTable ----------------------
-#
-
-sub ReadTranslationTable {
-  local(*Table,*PortTable) = @_;
-  # This function gets called with %Interfaces and %Ports
-  # They hold tbxxMM:N<==>MAC and tbxxMM:N<==>switch:port respectively
-  my $name="";
-  my $mac="";
-  my $switchport="";
-
-  print "FILLING %Interfaces\n" if $debug;
-  $sth = $dbh->query("select * from interfaces;");
-  while ( @_ = $sth->fetchrow_array()) {
-    $name = "$_[0]:$_[1]";
-    if ($_[2] != 1) {$name .=$_[2]; }
-    $mac = "$_[3]";
-    $Table{$name} = $mac;
-    $Table{$mac} = $name;
-    print "Got $mac <==> $name\n" if $debug > 1;
-  }
-
-  print "FILLING %Ports\n" if $debug;
-  $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
-		     "from wires where node_id2 like 'cisco%';");
-  while ( @_ = $sth->fetchrow_array()) {
-    $name = "$_[0]:$_[1]";
-    print "Name='$name'\t" if $debug > 2;
-    if (defined ($Dev{$_[3]}) ) { $_[3] = $Dev{$_[3]}; }
-    else { 
-      print STDERR "SNMPIT: Warning: Device '$_[3]' from database unknown\n";
-      $_[3] = $Dev{"cisco"}; 
-    }
-    print "Dev='$_[3]'\t" if $debug > 2;
-    $switchport = join(":",($_[3],$_[4]));
-    print "switchport='$switchport'\t" if $debug > 2;
-    if ($device eq "Cisco" ) { $switchport .=".$_[5]"; }
-    print "switchport='$switchport'\n" if $debug > 2;
-    $PortTable{$name} = $switchport;
-    $PortTable{$switchport} = $name;
-    print "READ: '$name' <==> '$switchport'\n" if $debug > 1;
-  }
-}
-
-#
-# SUB readifIndex ----------------------
-#
-
-sub readifIndex {
-  local(*sess) = @_;
-  my @list=();
-  my $entry;
-  my $modport;
-  my %Mod_Port = ();
-  foreach $entry ( keys %Ports ) {
-    if ($entry =~ /\./) {
-      $modport = (split(":",$entry))[1];
-      push(@list,$modport);
-    }
-  }
-  # For now, just look on the switch I'm interested in...
-  # Later, we might have to see which switch the port is on and check that one
-  my $portIfIndex = ".1.3.6.1.4.1.9.5.1.4.1.1.11.";
-  foreach $modport ( @list ) {
-    print "Finding ifIndex: $modport..." if $debug > 1;
-    $index = $sess->get([["$portIfIndex$modport"]]);
-    if (defined $index) { 
-      print "Found $index\n" if $debug > 1;
-      $ifIndex{$modport} = $index;
-      $ifIndex{$index} = $modport;
-    } else { print "None Found\n" if $debug > 1; }
-  }
-}
-
-###
-###
-### END OF TRANSLATION
-###
-###
-
-###
-###
-### PERMISSIONS SECTION
-###
-###
-
-#
-# SUB NodeCheck ----------------------
-#
-
-sub NodeCheck {
-  local($node) = @_;
-
-  my $self = (getpwuid($UID))[0]
-    || die "Cannot figure out who you are!\n";
-
-  print "Checking authorization for $node..." if $debug;
-
-  # If my uid or my euid are root, its okay
-  if ( ($UID == 0) || ($EUID == 0) ) { 
-    print "(Root!) Okay.\n" if $debug;
-    return 1;
-  }
-
-  my $cmd =
-    "select uid,admin from users where uid='$self' and admin=1;";
-  $sth = $dbh->query($cmd);
-  print "$cmd\n" if $debug > 1;
-
-  if ($sth->numrows > 0) {
-    print "(Admin!) Okay.\n" if $debug;
-    return 1;
-  }
-
-  if ( $node =~ /^([^:]*)/ ) { $node=$1; }
-  if ( $node =~ /(sh\d+)/ ) { $node= $1."-1"; }
-
-  $cmd =
-    "select uid, node_id from reserved as r left join proj_memb as pm ".
-    "on pm.pid=r.pid where node_id='$node' and uid='$self';";
-  $sth = $dbh->query($cmd);
-  print "$cmd\n" if $debug > 1;
-
-  if ($sth->numrows > 0) {
-    print "Okay.\n" if $debug;
-    return 1;
-  }
-
-  print "Denied.\n" if $debug;
-  print STDERR "Authorization Failed for control to node $node.\n";
-  return 0;
-}
-
-###
-###
-### END OF PERMISSIONS
-###
-###
-
-###
-###
-### HELPERS SECTION
-###
-###
-
-#
-# SUB PARSEARGS----------------------
-#
 sub ParseArgs {
   local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,*g,
 	*on,*off,*cyc,*all,*outlets) = @_;
@@ -1418,41 +354,45 @@ sub ParseArgs {
     if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
 	  ||$on||$off||$cyc));
 
-  $sth = $dbh->query("select i.node_id,i.IP from interfaces as i ".
-		     "left join nodes as n on n.node_id=i.node_id ".
-		     "where n.type!='pc' and n.type!='shark'");
-  while ( @_ = $sth->fetchrow_array()) {
-    $name = "$_[0]";
-    $ip = "$_[1]";
-    $Dev{$name} = $ip;
-    $Dev{$ip} = $name;
-    print "Devices: $name <==> $ip\n" if $debug > 1;
+  if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
+  if ( defined Dev($i) ) {
+    if (Dev($i) =~ /cisco/i) {
+      $device = new snmpit_cisco($i);
+    } elsif ($i =~ /cisco/i) {
+      $device = new snmpit_cisco(Dev($i));
+#    } elsif ($i =~ /intel/ || Dev($i) =~ /intel/) {
+#      $device = new snmpit_intel;
+    } else { $device="APC"; }
+  } else { 
+    die ("\"$i\" is not a known device.\n");
+#     my $str= "\"$i\" is not a known device:\nPossible completions are:\n";
+#     foreach $name (sort keys %Dev) {
+#       if ($name =~ /[a-zA-Z]/) { $str .= "$name/".Dev($name)."\n"; }
+#     }
+#    die($str);	
   }
 
-  if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
-  if ( defined $Dev{$i} ) {
-    if (($Dev{$i} =~ /cisco/i) || ($i =~ /cisco/i) ) { $device = "Cisco"; } 
-    else { $device="APC"; }
-  } else { 
-    my $str= "\"$i\" is not a known device:\nPossible completions are:\n";
-    foreach $name (sort keys %Dev) {
-      if ($name =~ /[a-zA-Z]/) { $str .= "$name/$Dev{$name}\n"; }
-    }
-    die($str);	
-  }
-  if ( $i =~ /[a-zA-Z]/) { $i = $Dev{$i}; }
+# A useful snippet of code for finding out what device we've got...
+#  if (ref($device)) {
+#    print "Checking type: ",$device->isa(snmpit_intel)," for intel, ";
+#    print $device->isa(snmpit_cisco)," for cisco\n";
+#  } else { print "Type '$device' is not a ref.\n"; }
+
+  if ( $i =~ /[a-zA-Z]/) { $i = Dev($i); }
   die("\"$i\" is not a switch. Illegal operation requested.\n")
-    if ( !($device =~ /^(Intel)|(Cisco)$/)  && 
+    if ( ($device eq "APC" )  && 
 	 ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
   die("\"$i\" is not a power controller.\n") 
     if ( $device ne "APC" && ($on||$off||$cyc) );
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
   my $n=0;
-  while( $device eq "Intel" && (@p != 0 && $n < @p) ) {
-    die("Invalid port ",$p[$n],": Must be 1-24\n") 
-      if ($p[$n] =~ /\D/ || $p[$n]>24 || $p[$n]<1);
-    $n++;
+  if ($device->isa(snmpit_intel)) {
+    while( @p != 0 && $n < @p ) {
+      die("Invalid port ",$p[$n],": Must be 1-24\n") 
+	if ($p[$n] =~ /\D/ || $p[$n]>24 || $p[$n]<1);
+      $n++;
+    }
   }
   die("Which ports do I reconfigure?\n") if (!@p &&($d||$e||$dup||$spd||$a));
   $dup = "\L$dup\E";		#lowercase it all...
@@ -1461,39 +401,46 @@ sub ParseArgs {
   die("Invalid speed $spd: Must be 10 or 100\n") 
     if (!($spd=~/^10$|^100$|^0$/));
   if (defined($spd) && ($spd != 0)) {
-    if ($device eq "Intel") {
-      $spd="speed${spd}Mbit";
-    } else {
-      $spd= "s${spd}000000";
-    }
+    $spd= "${spd}mbit";
   }
-  if ($s || $g || @vlan || $f || @r || $l || @p) {
-    print "READING TRANSLATIONS\n" if $debug;
-    &ReadTranslationTable(\%Interfaces,\%Ports);
-  }
-
   print "original ports: \t@p\n" if ($debug && @p);
   @p = map(lc,@p);
-  @p = map { 
+  @p = map {
+    my $orig = $_;
+    my $pnum = 0;
+    if ($_ =~ /^[0-9\.]+$/) { $_ = portnum($i.":$_"); }
+    if (!defined $_) {
+      die("Invalid port '$orig' not known. Try '<node>:<if>'.\n"); 
+    }
+    print "$_ => ",macport($_)," => ",portnum($_),"\n" if $debug;
+    if (defined portnum($_)) { 
+      @_ = split(":", portnum($_));
+      $pnum = $_[1];
+    } else { die("Invalid port '$orig' not known. Try 'pcX:Y'.\n"); }
     if (! NodeCheck($_) ) { die("You are not authorized to control $_.\n"); }
-    if (defined $Ports{$_}) { 
-      @_ = split(":", $Ports{$_});
-      $_[1];
-    } else { die("Invalid port '$_': Should be '<node>:<if>'.\n"); }
+    $_;
   } @p;
   print "translated ports: \t@p\n" if ($debug && @p);
-
   $n=0;
   while(@vlan != 0 && $n < @vlan) {
     $vlan[$n] = lc $vlan[$n];
-    print "Checking node $vlan[$n]\n" if $debug;
+    print "Checking node $vlan[$n] for validity...\n" if $debug;
     if ($vlan[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$n] = "$1-1:0"; }
-    if (defined $Interfaces{$vlan[$n]}) { $vlan[$n]=$Interfaces{$vlan[$n]}; }
-    # Allow people to specify addresses with colons or dots
-    $vlan[$n] =~ s/[:\.]//g;
-    print "Found MAC $vlan[$n]\n" if $debug;
-    die("Invalid MAC Address ",$vlan[$n],". Must be 6 byte Hex value.\n")
-      if (!(($vlan[$n]=~/^([a-f]|\d)*$/i)&&(length ($vlan[$n])== 12)));
+    if (defined macport($vlan[$n])) { 
+      if ($vlan[$n]=~/^([a-f]|\d)*$/i) {
+	$vlan[$n]=macport($vlan[$n]);
+	print "Found node $vlan[$n]\n";
+      }
+    } else {
+      # Allow people to specify addresses with colons or dots
+      $vlan[$n] =~ s/[:\.]//g;
+      if (defined macport($vlan[$n])) {
+	$vlan[$n]=macport($vlan[$n]);
+	print "Found node $vlan[$n]\n";
+      } else {
+	die("Invalid VLAN member '$vlan[$n]': must be 'pcX:Y' or MAC.\n");
+      }
+    }
     $n++;
   }
   die("Can't use file mode with manual vlan creation.\n") if ($f && @vlan);
@@ -1561,15 +508,5 @@ sub ReadIRFile {
   }   
   close (IR);
 }
-
-###
-###
-### END OF HELPERS
-###
-###
-
-#
-# SUB ----------------------
-#
 
 ##### EOF #####
