@@ -24,10 +24,11 @@ use English;
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
-my $rsh		= "sshtb -q";
-my $ssh		= "sshtb -q";
+my $ssh		= "ssh -q";
 my $power	= "$TB/bin/power";
 my $ping	= "/sbin/ping";
+my $mail        = "/usr/bin/mail";
+my $tbops       = "testbed-ops\@flux.cs.utah.edu";
 my $dbg		= 0;
 my %imagepaths  = ();
 my %imageparts  = ();
@@ -63,22 +64,24 @@ my $ir  = $ARGV[2];
 # Figure out who called us. Only root, tbroot, people with admin status
 # in the DB, or the owner of the experiment can run this script.
 #
+
+$db_result = $DB->query("select expt_head_uid from experiments ".
+			"where eid='$eid' and pid='$pid'");
+if ($db_result->numrows < 1) {	
+  die("There is no experiment '$eid' in project '$pid'.\n");
+}
+
 if ($UID != 0) {
     my ($me) = getpwuid($UID)
 	or die "$UID not in passwd file";
 
-    $db_result = $DB->query("select expt_head_uid from experiments ".
-			    "where eid='$eid' and pid='$pid'");
-    if ($db_result->numrows < 1) {	
-	die("There is no experiment '$eid' in project '$pid'.\n");
-    }
     @row = $db_result->fetchrow_array();
     if ($row[0] ne "$me") {
 	print STDERR "Checking for admin status ...\n" if $dbg;
 	$db_result = $DB->query("select admin from users where uid='$me'");
         @row = $db_result->fetchrow_array();
 	if ($row[0] != 1) {
-	    die("mkprojdir: You must be root or a TB administrator\n");
+	    die("os_setup: You must be root or a TB administrator\n");
 	}
     }
 }
@@ -249,8 +252,8 @@ foreach my $node ( keys %nodeos ) {
     # Fire off a reboot process so that we can overlap them all.
     # We need the pid so we can wait for them all before preceeding.
     #
-    $pid = RebootNode($pc);
-    $pids{$pc} = $pid;
+    $mypid = RebootNode($pc);
+    $pids{$pc} = $mypid;
 }
 
 #
@@ -258,9 +261,9 @@ foreach my $node ( keys %nodeos ) {
 #
 foreach my $node ( keys %nodeos ) {
     my $pc	= $node;
-    my $pid     = $pids{$pc};
+    my $mypid     = $pids{$pc};
 
-    waitpid($pid, 0);
+    waitpid($mypid, 0);
     if ($?) {
 	die("Reboot of node $pc failed!");
     }
@@ -268,11 +271,14 @@ foreach my $node ( keys %nodeos ) {
 
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
+my $waitstart = time;
+
 #
 # Now lets wait for them to come back alive.
 #
 foreach my $node ( keys %nodeos ) {
-    my $pc	= $node;
+    $node =~ /^([a-zA-Z0-9_\-]*)$/;
+    my $pc = $1;
 
     #
     # Don't bother to wait for nodes that are running foreign OSs since
@@ -287,8 +293,33 @@ foreach my $node ( keys %nodeos ) {
 	print STDOUT "$pc is alive and well\n";
 	next;
     }
-    print STDOUT "$pc is not responding. Better check into it\n";
-    die("Oops, $pc did not come back alive!");
+
+    print STDOUT "$pc may be down. This has been reported to testbed-ops.\n";
+    print STDOUT "Please end this experiment, and try again.\n";
+    
+    # Reserve it to testbed down
+
+    $cmd = "update reserved set pid='testbed',eid='down' ".
+      "where eid='$eid' and pid='$pid' and node_id='$pc'";
+    print "Using '$cmd'\n" if $dbg;
+    $db_result = $DB->query($cmd) 
+      || print STDERR "WARNING: Couldn't change reservation:".
+	$DB->errmsg."\n";
+    if ($db_result->num_rows < 1 ) {
+      print STDERR "WARNING: Couldn't change reservation!\n";
+    }
+
+    # Send mail to testbed-ops about it
+    open(MAIL,"| $mail -s \"TESTBED: $pc down?\" $tbops");
+    print MAIL "User ".getpwuid($SAVEUID)." was running expt. $eid\n";
+    print MAIL "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata/$ir\n";
+    print MAIL "but $pc appears to be unresponsive.\n";
+    print MAIL "\nPlease look into this matter. $pc has been reserved to\n";
+    print MAIL "the testbed/down experiment until this has been resolved.\n\n";
+    print MAIL "Thanks,\nTestbed Operations\ntestbed-ops\@flux.cs.utah.edu\n";
+    close(MAIL);
+    
+    die("Oops, $pc did not come back alive!\n");
 }
 
 print STDOUT "OS Setup Done!\n";
@@ -306,7 +337,7 @@ sub PowerCycle {
 }
 
 sub WaitTillAlive {
-    local($pc) = @_;
+    my ($pc) = @_;
 
     print STDERR "Waiting for $pc to come alive\n" if $dbg;
     #
@@ -314,8 +345,9 @@ sub WaitTillAlive {
     # packets are sent from all the pings, before it will exit. So,
     # loop doing a bunch of shorter pings.
     #
+    my $lasttime = ( (time - $waitstart) > 60 ? 61 : (time - $waitstart));
     for ($i = 0; $i < 40; $i++) {
-	open(PING, "$ping -c 4 $pc 2>&1 |");
+	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
 	do {
 	    $_ = <PING>;
 	    if ( $_ =~ /bytes from/ ) {
@@ -324,9 +356,18 @@ sub WaitTillAlive {
 	    }
 	}
 	until ( $_ =~ /transmitted, (\d*) packets received/ );
+	my $curtime = time - $waitstart;
+	print "Waited ",$curtime," seconds...\n" if $dbg;
+	if ( $curtime % 60 < $lasttime % 60 ) { 
+	  print STDERR "Still waiting for $pc - its been ",
+	  (int ($curtime/60))," min.\n";
+	}
+	$lasttime = $curtime;
+	# If I wait more than 150 seconds (2.5 min) it must be dead...
+	if ($i > 3 && $curtime > 150) { last; }
     }
     close(PING);
-    print STDERR "$pc is not responding. Better check into it\n" if $dbg;
+    print STDERR "$pc is not responding. Better check into it.\n" if $dbg;
     return 1;
 }
 
@@ -339,9 +380,9 @@ sub RebootNode {
 
     print STDOUT "Rebooting $pc ...\n";
 
-    $pid = fork();
-    if ($pid) {
-	return $pid;
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
     }
 
     #
@@ -351,7 +392,7 @@ sub RebootNode {
     #
     print STDERR "Pinging $pc ... \n" if $dbg;
     if (-e $ping) {
-	open(PING, "$ping -c 4 $pc 2>&1 |");
+	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
     }
     else {
 	die("PING command $ping not found!\n");
@@ -388,7 +429,7 @@ sub RebootNode {
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
 	alarm 15;
-	waitpid($pid, 0);
+	waitpid($mypid, 0);
 	alarm 0;
 
 	#
@@ -403,7 +444,7 @@ sub RebootNode {
     }
     else {
 	$UID = 0;
-	exec("$ssh -l root $pc /sbin/reboot");
+	exec("$ssh $pc /sbin/reboot");
 	exit(0);
     }
     
@@ -438,7 +479,7 @@ sub WaitTillDead {
     # loop doing a bunch of shorter pings.
     #
     for ($i = 0; $i < 15; $i++) {
-	open(PING, "$ping -c 4 $pc 2>&1 |");
+	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
 	do {
 	}
 	until ( <PING> =~ /transmitted, (\d*) packets received/ );
