@@ -505,6 +505,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
+	www/swish.conf www/websearch \
 	vis/GNUmakefile vis/webvistopology \
 	vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
