@@ -129,7 +129,7 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  
 diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 --- dist-tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_stream.c	Wed Apr 24 11:44:28 2002
++++ tg2.0/src/tg/prot_stream.c	Thu May  2 15:18:49 2002
 @@ -147,6 +147,22 @@
  	for (;;)
  		{
@@ -297,7 +297,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  			    (void)close(sfd);
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Wed Apr 24 11:41:35 2002
++++ tg2.0/src/tg/tg.y	Thu May  2 14:13:33 2002
 @@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
@@ -372,7 +372,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			{
  			/* (Re-)Start logging to a new file */
  			time_t now;
-@@ -1144,6 +1161,10 @@
+@@ -1144,11 +1161,15 @@
  
  			generate(tx_asn, cur_tg, lasttime);
  			}
@@ -383,6 +383,12 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		}
  
  	/* Finished, tear down connection.				*/
+ 
+-	if ((*(prot.prot->teardown))(tx_asn) == -1)
++	if (tx_asn >= 0 && (*(prot.prot->teardown))(tx_asn) == -1)
+ 		{
+ 
+ 		/* log the teardown error. */
 @@ -1156,6 +1177,7 @@
  		perror("do_actions: protocol teardown");
  		exit(-1);
