@@ -1,0 +1,61 @@
+Plans for the control switch VLANs, and description of which traffic should
+(and should not) be allowed to cross between VLANs.
+
+***** VLAN Mebers
+
+* External: Just the wire to the Netcomm router
+
+* Public: Plastic
+
+* Private: paper, power controllers, IP interfaces to switches
+
+* Control: All testbed nodes control network interfaces
+
+***** What to allow
+
+1) External <-> Private
+   ssh             for logging in
+   http            web server
+   smtp            outbound, mail sent from the web server
+   ntp             time synch
+   dns             name server
+   nsr             networker filesave to/from envy
+   
+2) External <-> Public
+   ssh             for logging in
+   high ports      for user proxies
+   nsr             networker filesave to/from envy
+   smtp            outbound, mail
+   ftp             give users easy access to /users space (anonymous only?)
+   nfs             only to .212 subnet
+   snmp            get machine information
+   
+3) External <-> Control
+   ssh             for logging in
+   hight ports     allow users to run their own 
+   snmp            get machine information
+   
+4) Private <-> Public
+   ssh             as always
+   nfs             plastic:/proj mounted on paper
+                   plastic:/users mounted on paper
+                   paper:/usr/testbed/tftpboot/proj on plastic
+   ntp             time
+   dns             name server
+   
+5) Private <-> Control
+   ssh             as always
+   ntp             time synch                                                      
+   dns             name server
+   dhcp            including forwarded broadcasts                                  
+   proxydhcp       extended DHCP support (for PXE)                                 
+   tftp            for loading pxeboot, pxeboot loading multiboot kernels
+   bootinfo        pxeboot <-> bootinfo daemon                                     
+   tmcd            the testbed master control daemon
+   nfs             images from netdisk
+   
+6. Public <-> Control
+   ssh             as always
+   nfs             /users, all FSes for dnards
+   high ports      talk to user proxies on plastic
+   snmp            get machine information
