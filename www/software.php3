@@ -17,6 +17,16 @@ PAGEHEADER("Emulab Software Distributions");
 
 <ul>
 <li> <img src="/new.gif" alt="&lt;NEW&gt;">
+     <a href="/downloads/netlab-client.jar">
+     Emulab GUI Client JAR</a>.
+     This is the initial release of a new GUI client for creating and
+     interacting with experiments.  The GUI provides an alternative to using
+     the web-based interface or logging into users.emulab.net and using the
+     command line tools.
+     Please take a look at the
+     <a href="netlab/client.php3">tutorial</a>
+     for more information.
+<li> <img src="/new.gif" alt="&lt;NEW&gt;">
      <a href="/downloads/frisbee-snapshot-20040312.tar.gz">
      Updated Frisbee Server and Client Source Snapshot</a>.
      This is a ``snapshot'' of the current development tree.  This version

@@ -196,9 +196,12 @@ function SPITFORM($formfields, $errors)
                 <b><a href='nscheck_form.php3'>syntax check it first</a></b>
 	    <li><b>If you do not have an NS file:</b><br> You may want to
 		<b><a href='buildui/bui.php3'>go to the NetBuild GUI</a></b>
-		to graphically create one<font size=-2>
+		to graphically create one online<font size=-2>
 		(<a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>Additional 
-		information</a>)</font>
+		information</a>)</font>.<br>
+                Or, you can download the Emulab
+                <a href='netlab/client.php3'><b>client</b></a> and graphically
+                create one from your desktop.
 	     </ul></p><br>";
 	} else {
 	    if (isset($view['plab_ns_message'])) {
