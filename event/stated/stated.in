@@ -8,7 +8,7 @@
 #
 # stated - A daemon to monitor the states of nodes in the testbed. Recives
 # state change notification through the event system, and writes the new
-# state into the database. Also watches for invalid transitions, timeouts, 
+# state into the database. Also watches for invalid transitions, timeouts,
 # and performs other state-related control functions.
 #
 # Send it a HUP signal to get it to reload the timeout and transition
@@ -57,7 +57,7 @@ my $mailgap = 15;		# in seconds
 my $lastmail = time() - $mailgap + 2; # Send a digest of startup msgs after 2s.
 my %msgs = ();
 
-# Number of iterations (roughly, seconds) after which we'll reload 
+# Number of iterations (roughly, seconds) after which we'll reload
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
 my $reload_time = 600;
@@ -129,6 +129,9 @@ my $TBANYMODE    = TBDB_NODEOPMODE_ANY;
 my $TBRESET      = TBDB_TBCONTROL_RESET;
 my $TBRELOADDONE = TBDB_TBCONTROL_RELOADDONE;
 my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
+my $PXEBOOT      = TBDB_TBCONTROL_PXEBOOT;
+my $BOOTING      = TBDB_TBCONTROL_BOOTING;
+my $CHECKGENISUP = TBDB_TBCONTROL_CHECKGENISUP;
 my $TBNOTIMEOUT  = TBDB_NO_STATE_TIMEOUT;
 my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
@@ -157,7 +160,7 @@ if (!$debug) {
 	$pidfile = "$TB/locks/stated.pid";
     }
     debug("Using pidfile $pidfile\n");
-    
+
     if (-e $pidfile) {
 	my $otherpid = `cat $pidfile`;
 	my $running = `ps -auxww | grep $otherpid | grep -v grep`;
@@ -200,7 +203,7 @@ if ($port) {
     $URL .= ":$port";
 }
 
-# Connect to the event system, and subscribe the the events we want 
+# Connect to the event system, and subscribe the the events we want
 my $handle = event_register($URL,0);
 if (!$handle) {
     fatal("Unable to register with event system\n");
@@ -341,7 +344,7 @@ while (1) {
 	$blockwait=1;
 	debug("---Blocking wait okay---\n");
     }
-		
+
     if ($do_reload || ($now - $last_reload > $reload_time)) {
 	reload();
 	$do_reload = 0;
@@ -387,7 +390,7 @@ sub readStates(;@) {
 	if ($dbtag ne $nodes{$node_id}{"tag"}) {
 	    remTimeout($node_id);
 	}
-	
+
 	#
 	# If there's an entry in oldnodes for this node, and it
 	# hasn't changed state or time, use the old entry (so that
@@ -451,7 +454,7 @@ sub getValid() {
 #
 sub getModeTrans() {
     #debug("getModeTrans called\n");
-    my $result = 
+    my $result =
       DBQueryFatal("SELECT op_mode1, state1, op_mode2, state2 " .
 		   "FROM mode_transitions order by op_mode1,state1");
 
@@ -473,22 +476,42 @@ sub getModeTrans() {
 #
 sub getTriggers() {
     debug("getTriggers called\n");
-    
+
     debug("anymode ==> '$TBANYMODE'\n");
 
-    # Grab global triggers
-    my $result = 
+    # A note about triggers:
+    #
+    # "per-node" triggers only affect their specific node in a
+    # particular mode/state, and are run first of all. "global"
+    # triggers are triggers for a given mode/state that affect all
+    # nodes, and are run after any per-node triggers. "Any-mode"
+    # triggers are tied to a state, and occur in that state in any
+    # mode. The any-mode triggers are over-ridden by global triggers,
+    # and if an "Any-mode" trigger for state XYZ exists as well as a
+    # global trigger for mode FOOBAR state XYZ, then when I arrive in
+    # XYZ any per-node triggers will be run. Then, if I'm in mode
+    # FOOBAR, only the global trigger will run. If I'm in any other
+    # mode, only the any-mode trigger will run.
+
+    # (our "*" is stored as $TBANYMODE)
+    # Per-node triggers have a specific node_id
+    # Global triggers have "*" as the node_id
+    # Any-mode triggers have "*" as the mode, and can be global or per-node
+
+    # Grab global triggers (including any-mode)
+    my $result =
       DBQueryFatal("SELECT op_mode, state, trigger " .
 		   "FROM state_triggers where node_id='$TBANYMODE' ".
 		   "order by op_mode,state");
     my %t;
     while (my ($mode, $state, $trig) = $result->fetchrow()) {
-	$t{"$mode:$state"} = $trig;
-	debug("trig($mode:$state)\t => $trig\n");
+	my @trigs = split(/\s*,\s*/,$trig);
+	$t{"$mode:$state"} = \@trigs;
+	debug("trig($mode:$state)\t => ".join(',',@trigs)."\n");
     }
 
-    # Grab per-node triggers
-    $result = 
+    # Grab per-node triggers (including any-mode)
+    $result =
       DBQueryFatal("SELECT node_id, op_mode, state, trigger " .
 		   "FROM state_triggers where node_id!='$TBANYMODE' ".
 		   "order by op_mode,state");
@@ -497,6 +520,8 @@ sub getTriggers() {
 	$t{"$n:$mode:$state"} = \@trigs;
 	debug("trig($n:$mode:$state)\t => ".join(',',@trigs)."\n");
     }
+
+    debug(hash_recurse(%t));
 
     return %t;
 }
@@ -511,9 +536,11 @@ sub handleEvent($$$) {
     my $eventtype = event_notification_get_eventtype($handle,$notification);
 
     $event_count++;
-    
+
     #
-    # For readability, only do this on the main stated.
+    # For readability, only do this on the main stated. This will print all
+    # events, which gets cumbersome with debugging versions, so we'll print
+    # only applicable events in debug versions, after we decide they apply.
     #
     if ($dbtag eq "") {
 	debug("Got an event: ($objtype,$objname,$eventtype)\n");
@@ -524,7 +551,7 @@ sub handleEvent($$$) {
     #
     if ($objtype ne $TBCOMMAND) {
 	my $node = $objname;
-	
+
 	#
 	# If we have never seen this node, reload.
 	#
@@ -532,17 +559,18 @@ sub handleEvent($$$) {
 	    reload();
 
 	    # Still not defined, someone screwed up! This could end up
-	    # churning via reload(). Bad. 
+	    # churning via reload(). Bad.
 	    if (defined($nodes{$node})) {
 		notify("Got $objtype/$eventtype for nonexistent $node!\n");
 		return;
 	    }
 	}
-	
+
 	#
 	# If a stated_tag was specified on the command line, ignore those
-	# nodes that do not match. 
+	# nodes that do not match.
 	#
+	#debug("dbtag='$dbtag', node $node='".$nodes{$node}{"tag"}."'\n");
 	if ($dbtag ne $nodes{$node}{"tag"}) {
 	    # Record when main stated ignores a node.
 	    info("Got $objtype/$eventtype for $node, which is not mine\n")
@@ -554,12 +582,17 @@ sub handleEvent($$$) {
 	    return;
 	}
     }
-    # Makes it easier to run a debugging version.
+
+    #
+    # If this is a debugging version, then this event is for one of my
+    # nodes, so I can print out the event now. (Main version prints earlier.)
+    #
     if ($dbtag ne "") {
 	debug("Got an event: ($objtype,$objname,$eventtype)\n");
     }
-  SWITCH: for ($objtype) {
-	
+
+ SWITCH: for ($objtype) {
+
 	(/$TBNODESTATE/) && do {
 	    stateTransition($objname,$eventtype);
 	    last;
@@ -637,106 +670,113 @@ sub stateTransition($$) {
     #
     setTimeout($mode,$newstate,$node,$now);
 
-    #
-    # See if we jumped into the PXEBOOT kernel. Bootinfo will send
-    # PXEBOOTING every time a node contacts it, which is our indicator that
-    # the node is in the first phase of booting. At this point we want to
-    # switch state machines since the entire boot process is governed by a
-    # single state machine that is independent of the OS that the node will
-    # eventually boot.  Rather then encode that in each state machine, we
-    # use a special machine with a defined entrypoint (PXEBOOTING) and a
-    # defined exitpoint (BOOTING). See below for where we jump back out
-    # of this state machine.
-    #
-    # XXX should this be done with a trigger?
-    #
-    if ($newstate eq TBDB_NODESTATE_PXEBOOTING) {
-	#
-	# Jumped in. We need to change the opmode so that the state
-	# transitions are legal. We do not bother to save the old opmode
-	# since we can figure it out later when we leave.
-	#
-	if ($mode ne $PXEKERNEL) {
-	    info("$node: Forcing mode transition into $PXEKERNEL!\n");
-	    opModeTransition($node, $PXEKERNEL, 1);
-	    $mode=$PXEKERNEL;
-	}
-    }
-
-    # Check if this is TBDB_NODESTATE_BOOTING, which has actions.
-    if ($newstate eq TBDB_NODESTATE_BOOTING) {
-	#
-	# See if we are in the right mode/osid. 
-	#
-	my ($bootosid,$bootopmode) = TBBootWhat($node, $debug);
-
-	info("$node: BootWhat says $bootosid (mode $bootopmode).\n");
-	DBQueryFatal("update nodes set osid='$bootosid' ".
-		     "where node_id='$node'");
-	
-	if ($bootopmode ne $mode) {
-	    if ($mode eq $PXEKERNEL) {
-		#
-		# If we came from PXE boot, then we have to jump out of the
-		# PXEKERNEL state machine into whatever state machine is
-		# current for the node. Since we came through bootinfo,
-		# we know that the node is doing what it is supposed to, and
-		# that this change matches what the node is booting. 
-		#
-		info("$node: Forcing mode transition out of $PXEKERNEL!\n");
-		opModeTransition($node, $bootopmode, 1);
-		$mode=$bootopmode;
-	    }
-	    elsif ($oldstate eq TBDB_NODESTATE_ISUP) {
-		#
-		# Skipped SHUTDOWN, which could result in a missed opmode
-		# transition. Can this really happen anymore?
-		# 
-		info("$node: Came from ISUP! Checking for mode transition\n");
-		my $query_result =
-		    DBQueryWarn("select next_op_mode from nodes ".
-				"where node_id='$node'");
-		my ($nextmode) = $query_result->fetchrow();
-		if ($nextmode) {
-		    info("$node: Forcing mode transition!\n");
-		    opModeTransition($node, $nextmode, 1);
-		    $mode=$nextmode;
-		}
-	    }
-	    else {
-		my $str = "$node is running $bootosid, but in mode $mode\n".
-		    "instead of mode $bootopmode!\n";
-		
-		if ($bootopmode eq "RELOAD") {
-		    #
-		    # For now, only force if we're going into reload mode,
-		    # so we don't get stuck looping in reloading.
-		    # Can this happen anymore?
-		    #
-		    DBQueryFatal("UPDATE nodes SET op_mode='$bootopmode', ".
-				 "op_mode_timestamp=unix_timestamp(now()) ".
-				 "WHERE node_id='$node'");
-		    $nodes{$node}{mode} = $bootopmode;
-		    $nodes{$node}{mode_timestamp} = $now;
-		    $str .= "Forced op_mode to $bootopmode.\n";
-		}
-		notify($str);
-	    }
-	}
-	checkGenISUP($node);
-    }
-
     # Check if this state has any triggers
-    my @nodetrigs = GetNodeTriggerList($node,$mode,$newstate);
-    if (defined($triggers{"$mode:$newstate"}) ||
-        (@nodetrigs > 0) ) {
-	# check for global triggers
-	my @trigs = split(/\s*,\s*/,$triggers{"$mode:$newstate"});
-	# Run all the triggers
-	debug("Running triggers. Global=".join("/",@trigs).
-	      "   node=".join("/",@nodetrigs)."\n");
-	foreach ( @trigs , @nodetrigs) {
+    my @nodetrigs = GetNodeTriggerList($node,$mode,$newstate,1);
+    my @trigs = GetNodeTriggerList($node,$mode,$newstate);
+    if (@trigs > 0) {
+	debug("Running triggers: ".join("/",@trigs)."\n");
+	foreach ( @trigs) {
 	    my $trig = $_;
+	    /^$PXEBOOT$/ && do {
+		#
+		# See if we jumped into the PXEBOOT kernel. Bootinfo
+		# will send PXEBOOTING every time a node contacts it,
+		# which is our indicator that the node is in the first
+		# phase of booting. At this point we want to switch
+		# state machines since the entire boot process is
+		# governed by a single state machine that is
+		# independent of the OS that the node will eventually
+		# boot.  Rather then encode that in each state
+		# machine, we use a special machine with a defined
+		# entrypoint (PXEBOOTING) and a defined exitpoint
+		# (BOOTING). See below for where we jump back out of
+		# this state machine.
+		#
+		# Jumped in. We need to change the opmode so that
+		# the state transitions are legal. We do not
+		# bother to save the old opmode since we can
+		# figure it out later when we leave.
+		#
+		debug("Running $PXEBOOT trigger\n");
+		if ($mode ne $PXEKERNEL) {
+		    info("$node: Forcing mode transition into $PXEKERNEL!\n");
+		    opModeTransition($node, $PXEKERNEL, 1);
+		    $mode=$PXEKERNEL;
+		}
+		next;
+	    };
+	    /^$BOOTING$/ && do {
+		#
+		# See if we are in the right mode/osid.
+		#
+		my ($bootosid,$bootopmode) = TBBootWhat($node, $debug);
+
+		info("$node: BootWhat says $bootosid (mode $bootopmode).\n");
+		DBQueryFatal("update nodes set osid='$bootosid' ".
+			     "where node_id='$node'");
+
+		if ($bootopmode ne $mode) {
+		    if ($mode eq $PXEKERNEL) {
+			#
+			# If we came from PXE boot, then we have to
+			# jump out of the PXEKERNEL state machine into
+			# whatever state machine is current for the
+			# node. Since we came through bootinfo, we
+			# know that the node is doing what it is
+			# supposed to, and that this change matches
+			# what the node is booting.
+			#
+			info("$node: Forcing mode transition out of $PXEKERNEL!\n");
+			opModeTransition($node, $bootopmode, 1);
+			$mode=$bootopmode;
+		    }
+		    elsif ($oldstate eq TBDB_NODESTATE_ISUP) {
+			#
+			# Skipped SHUTDOWN, which could result in a
+			# missed opmode transition. Can this really
+			# happen anymore?
+			#
+			info("$node: Came from ISUP! ".
+			     "Checking for mode transition\n");
+			my $query_result =
+			  DBQueryWarn("select next_op_mode from nodes ".
+				      "where node_id='$node'");
+			my ($nextmode) = $query_result->fetchrow();
+			if ($nextmode) {
+			    info("$node: Forcing mode transition!\n");
+			    opModeTransition($node, $nextmode, 1);
+			    $mode=$nextmode;
+			}
+		    }
+		    else {
+			my $str = "$node is running $bootosid, but in ".
+			  "mode $mode\ninstead of mode $bootopmode!\n";
+			
+			if ($bootopmode eq "RELOAD") {
+			    #
+			    # For now, only force if we're going into
+			    # reload mode, so we don't get stuck
+			    # looping in reloading.  Can this happen
+			    # anymore?
+			    #
+			    DBQueryFatal("UPDATE nodes SET ".
+					 "op_mode='$bootopmode', ".
+					 "op_mode_timestamp=".
+					 "unix_timestamp(now()) ".
+					 "WHERE node_id='$node'");
+			    $nodes{$node}{mode} = $bootopmode;
+			    $nodes{$node}{mode_timestamp} = $now;
+			    $str .= "Forced op_mode to $bootopmode.\n";
+			}
+			notify($str);
+		    }
+		}
+		next;
+	    };
+	    /^$CHECKGENISUP$/ && do {
+		checkGenISUP($node);
+		next;
+	    };
 	    /^$TBRESET$/ && do {
 		# We successfully booted, so clear some flags
 		$nodes{$node}{noretry}   = 0;
@@ -764,9 +804,13 @@ sub stateTransition($$) {
 	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
 	}
-	# Clear any of the node triggers that we ran
-	debug("Clearing node triggers: ".join("/",@nodetrigs)."\n");
-	ClearNodeTrigger($node,$mode,$newstate,@nodetrigs);
+	# Clear any of the node triggers that we ran.
+	# (Don't clear all of them, because some of the triggers we ran
+	# may have caused others to be set, and we don't want to nuke them.)
+	if (@nodetrigs > 0) {
+	    debug("Clearing node triggers: ".join("/",@nodetrigs)."\n");
+	    ClearNodeTrigger($node,$mode,$newstate,@nodetrigs);
+	}
     }
 
     # Check if this state can trigger a mode transition
@@ -789,7 +833,7 @@ sub opModeTransition($$;$) {
     if (!defined($force)) { $force = 0; }
 
     info("$node: Mode change to $newmode requested ($force)\n");
-    
+
     # Check for invalid transitions
     my ($oldstate, $mode, $nextstate);
     $oldstate = $nodes{$node}{state};
@@ -848,12 +892,12 @@ sub handleCtrlEvent($$) {
 	/^$TBRESET$/ && do {
 	    #
 	    # Clear next_boot_path with os_select.
-	    # 
+	    #
 	    $cmd = "$osselect -d -c -1 $node";
 	    system($cmd) and
 		notify("$node/$event: Could not clear next_boot_path!\n");
-	    
-	    info("Performed RESET for $node\n");
+
+	    info("Performed $TBRESET for $node\n");
 	    next;
 	};
 	/^$TBRELOADDONE$/ && do {
@@ -906,19 +950,19 @@ sub handleCtrlEvent($$) {
 	    #
 	    if ($curstate eq $PXEWAKEUP) {
 		my $optarg = ($debug ? "-d " : "");
-		
+
 		if ($timedout < 3) {
 		    #
-		    # Try again. 
-		    # 
+		    # Try again.
+		    #
 		    info("Node $node has timed out $timedout times in ".
 			 "$PXEWAKEUP!\n".
 			 "Sending it a another wakeup command\n");
 		}
 		else {
 		    #
-		    # Failed too many times, power cycle instead. 
-		    # 
+		    # Failed too many times, power cycle instead.
+		    #
 		    notify("Node $node has timed out $timedout times in ".
 			   "$PXEWAKEUP!\n".
 			   "Sending it a reboot command\n");
@@ -1087,7 +1131,7 @@ sub checkGenISUP($) {
 
     # If os will send ISUP on its own, do nothing here.
     if ($can{"isup"}) {
-	debug("$node: Will send own ISUP\n"); 
+	debug("$node: Will send own ISUP\n");
 	return 0;
     }
 
@@ -1099,7 +1143,7 @@ sub checkGenISUP($) {
 	return 0;
     }
 
-    # If os doesn't support ping or isup, stated sends ISUP just after 
+    # If os doesn't support ping or isup, stated sends ISUP just after
     # the node gets to BOOTING (a bit early, but the best we can do)
 
     debug("$node: OS doesn't ping - sending ISUP\n");
@@ -1116,7 +1160,7 @@ sub checkDBRedirect($) {
     my ($node) = @_;
 
     # XXX: I don't want to do this every time, for performance reaons,
-    # but we need to make sure that we don't get into an inconsistent 
+    # but we need to make sure that we don't get into an inconsistent
     # state
     my $result=DBQueryFatal("SELECT testdb FROM nodes as n " .
 			    "LEFT JOIN reserved as r ON n.node_id=r.node_id ".
@@ -1212,15 +1256,39 @@ sub AddNodeTrigger( $$$@ ) {
 }
 
 # @list = GetNodeTriggerList($node, $mode, $state);
-sub GetNodeTriggerList( $$$ ) {
-    my ($node, $mode, $state) = @_;
+sub GetNodeTriggerList( $$$ ; $ ) {
+    my ($node, $mode, $state, $justnode) = @_;
+
+    if (!defined($justnode)) { $justnode=0; }
+
+    debug("Getting Triggers: $node $mode $state $justnode\n");
+
+    # First grab any per-node, mode-specific triggers
     my @l = ();
     if (defined($triggers{"$node:$mode:$state"})) {
 	push(@l,@{$triggers{"$node:$mode:$state"}});
     }
+    debug("Per-node, mode-specific: ($node:$mode:$state) ".join(",",@l)."\n");
+
+    # Then grab per-node, any-mode triggers
     if (defined($triggers{"$node:$TBANYMODE:$state"})) {
 	push(@l,@{$triggers{"$node:$TBANYMODE:$state"}});
     }
+    debug("Per-node, any-mode: ($node:$TBANYMODE:$state) ".join(",",@l)."\n");
+
+    # If they just want per-node triggers, bail now.
+    if ($justnode) { return @l; }
+
+    # Next check for global triggers. If there's a mode-specific
+    # entry, then use it. Otherwise, use the any-mode entry, if any.
+    if (defined($triggers{"$mode:$state"})) {
+	push(@l,@{$triggers{"$mode:$state"}});
+	debug("Global, mode-specific: ($mode:$state) ".join(",",@l)."\n");
+    } elsif (defined($triggers{"$TBANYMODE:$state"})) {
+	push(@l,@{$triggers{"$TBANYMODE:$state"}});
+	debug("Global, any-mode: ($TBANYMODE:$state) ".join(",",@l)."\n");
+    }
+
     return @l;
 }
 
@@ -1242,8 +1310,12 @@ sub ClearNodeTrigger( $$$ ; @ ) {
 		     "where node_id='$node' and state='$state' and ".
 		     "(op_mode='$mode' or op_mode='$TBANYMODE')");
     } else {
-	# Subtract @trigs from @reallist
+	# Only delete the specified triggers, and leave the others.
+	# This means we need to compute the proper trigger string,
+	# then replace into the database with AddNodeTrigger.
 	my %temptrigs = ();
+	# Get just the per-node triggers
+	@reallist = GetNodeTriggerList($node,$mode,$state,1);
 	foreach $k (@reallist) { $temptrigs{$k} = 1; }
 	debug("Reallist = ".join("/",@reallist).", trigs=".
 	      join("/",@trigs).".\n");
@@ -1253,15 +1325,21 @@ sub ClearNodeTrigger( $$$ ; @ ) {
 		debug("Clearing $t\n");
 	    }
 	}
+	#
 	# Note: This doesn't quite do the right thing with triggers
 	# for a fixed mode vs TBANYMODE. So if you start using this
 	# code, make sure and debug it first!
+	#
+	# It currently never is used, because we never add any
+	# per-node triggers, since we now free immediately after
+	# reload.
+	#
 	my @newtrigs = keys %temptrigs;
 	debug("Newlist = ".join("/",@newtrigs).".\n");
 	delete($triggers{"$node:$mode:$state"});
 	if (@newtrigs > 0) {
 	    AddNodeTrigger($node,$mode,$state,@newtrigs);
-	} 
+	}
     }
 
     return 0;
@@ -1437,7 +1515,7 @@ sub restart {
     $lastmail=0;
     notify("",1);
     announce("Stated restarted\n");
-    exec("$prog $params") or 
+    exec("$prog $params") or
       do {
 	  my $msg = "Couldn't restart stated! cmd='$prog $params'\n".
 	    "Error: ($?) $!\n";

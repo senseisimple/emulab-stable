@@ -287,6 +287,7 @@ REPLACE INTO state_timeouts VALUES ('PXEKERNEL','PXEWAKEUP',20,'REBOOT');
 
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('PCVM','ISUP','BOOTING','Crash');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','SWAPPED','Error');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','ENDED','NoError');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_RESWAP','SWAPPING','Nonrecover Error');
@@ -339,7 +340,6 @@ REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','SHUTDOWN','Retry')
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN','Reboot');
-REPLACE INTO state_transitions VALUES ('PCVM','ISUP','BOOTING','Crash');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
@@ -356,6 +356,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','PXEBOOTING','BOOTING','BootIn
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','POSTED','ACTIVATING','SwapIn');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','PXEBOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','PXEBOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEWAIT','Free');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN','Reboot');
@@ -410,7 +411,6 @@ REPLACE INTO state_transitions VALUES ('PXEKERNEL','SHUTDOWN','PXEBOOTING','Boot
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','BOOTING','Not Free');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAKEUP','PXEWAKEUP','Retry');
-REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','PXEBOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','PXEBOOTING','KernelChange');
@@ -428,14 +428,11 @@ REPLACE INTO state_transitions VALUES ('NETBOOT','PXEBOOTING','BOOTING','BootInf
 --
 
 
-REPLACE INTO state_triggers VALUES ('*','NORMAL','ISUP','RESET');
-REPLACE INTO state_triggers VALUES ('*','NORMALv1','ISUP','RESET');
-REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONE','RESET, RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
-REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
-REPLACE INTO state_triggers VALUES ('*','PXEFBSD','ISUP','RESET');
-REPLACE INTO state_triggers VALUES ('*','NORMALv2','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','*','PXEBOOTING','PXEBOOT');
+REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
 
 --
 -- Dumping data for table `table_regex`
