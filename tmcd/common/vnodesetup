@@ -470,8 +470,8 @@ sub killvnode() {
 		"$mpid!\n";
 	    last;
 	}
-	sleep(2);
-	$i += 2;
+	sleep(1);
+	$i += 1;
     }
 
     if ($doplab) {
@@ -537,8 +537,8 @@ sub cleanup()
 	#
 	$SIG{TERM} = 'IGNORE';
 	kill('TERM', -$pgrp);
-	print "Waiting 2 seconds for process group to die off ...\n";
-	sleep(2);
+	print "Waiting 1 second for process group to die off ...\n";
+	sleep(1);
     }
 
     #
@@ -713,7 +713,7 @@ sub removeconfdir($)
 sub hackwaitandexit()
 {
     my $now   = time();
-    my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
+    my $goofy = CONFDIR() . "/proceed";
     my $count = 60;
 	
     while ($count--) {

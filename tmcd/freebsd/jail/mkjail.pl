@@ -91,6 +91,8 @@ my $NFSMOUNT_REMOTE = 0;	# too much load on NFS server
 #
 my $JAILPATH	= "/var/emulab/jails";
 my $ETCJAIL     = "/etc/jail";
+my $DEVCACHEMEM = "$JAILPATH/devmem";
+my $DEVCACHENMEM= "$JAILPATH/devnomem";
 my $LOCALFS	= LOCALROOTFS();
 my $LOCALMNTPNT = "/local";
 my $TMCC	= "$BINDIR/tmcc";
@@ -279,6 +281,11 @@ else {
 TBDebugTimeStamp("mkjail done with root fs");
 
 #
+# Lets tell the caller it can proceed. 
+#
+system("touch $JAILPATH/$vnodeid/proceed");
+
+#
 # If the jail has its own IP, must insert the control network alias.
 # We use a 255.255.255.255 netmask since there might be multiple
 # virtual nodes from the same subnet on this node. 
@@ -389,8 +396,8 @@ sub mkrootfs($)
     TBDebugTimeStamp("mkjail vnconfig, label, newfs, tunefs, mount");
     mysystem("vnconfig -s labels vn${vndevice} root.vnode");
     mysystem("disklabel -r -w vn${vndevice} auto");
-    mysystem("newfs -U -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
-    mysystem("tunefs -m 2 -o time /dev/vn${vndevice}c");
+    mysystem("newfs -U -b 8192 -f 1024 -i 16384 -c 15 /dev/vn${vndevice}c");
+    mysystem("tunefs -m 5 -o time /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
     TBDebugTimeStamp("mkjail vnconfig, label, newfs, tunefs, mount done!");
     push(@mntpoints, "$path/root");
@@ -437,26 +444,54 @@ sub mkrootfs($)
     # /dev is also special. It gets a very restricted set of entries.
     # Note that we create some BPF devices since they work in our jails.
     #
-    TBDebugTimeStamp("mkjail creating /dev directory");
-    my $makedevs = "bpf31";
+    # Set up the dev directory cache; running MAKEDEV is incredibly slow,
+    # but copying a directory device entries is really fast!
+    #
+    if (! -e $DEVCACHEMEM) {
+	TBDebugTimeStamp("mkjail creating /dev cached copy");
+	
+	mkdir($DEVCACHEMEM, 0755) or
+	    fatal("Could not mkdir $DEVCACHEMEM: $!");
+	mkdir($DEVCACHENMEM, 0755) or
+	    fatal("Could not mkdir $DEVCACHENMEM: $!");
+
+	# Jails with JAIL_DEVMEM get more devices.
+	mysystem("cd $DEVCACHEMEM; cp -p /dev/MAKEDEV .; ".
+		 " ./MAKEDEV bpf31 std pty0; " .
+		 # Remove some extraneous devices.
+		 "rm -f pci io klog console; " .
+		 #
+		 # "Link" /dev/console to /dev/null We actually create a
+		 # separate special file rather than just linking in case
+		 # anyone mucks with the permissions on /dev/console.
+		 #
+		 "hier cp null console; chmod 600 console");
+
+	# Otherwise no devmem.
+	mysystem("cd $DEVCACHENMEM; cp -p /dev/MAKEDEV .; ".
+		 " ./MAKEDEV bpf31 jail; " .
+		 # Remove some extraneous devices.
+		 "rm -f pci io klog console; " .
+		 #
+		 # "Link" /dev/console to /dev/null We actually create a
+		 # separate special file rather than just linking in case
+		 # anyone mucks with the permissions on /dev/console.
+		 #
+		 "hier cp null console; chmod 600 console");
+    }
+
+    #
+    # Now copy contents of cached device directory.
+    # 
+    TBDebugTimeStamp("mkjail copying cached /dev directory");
+    
     if ($jailflags & $JAIL_DEVMEM) {
-	$makedevs .= " std pty0";
+	mysystem("hier cp $DEVCACHEMEM $path/root/dev");
     }
     else {
-	$makedevs .= " jail";
+	mysystem("hier cp $DEVCACHENMEM $path/root/dev");
     }
-    mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV $makedevs");
-
-    # Remove some extraneous devices.
-    mysystem("cd $path/root/dev; rm -f pci io klog console; ");
     
-    #
-    # "Link" /dev/console to /dev/null
-    # We actually create a separate special file rather than just linking
-    # in case anyone mucks with the permissions on /dev/console.
-    #
-    mysystem("cd $path/root/dev; hier cp null console; chmod 600 console");
-
     #
     # Create stub /var and create the necessary log files.
     #
@@ -633,7 +668,7 @@ sub restorerootfs($)
  	if ($debug);
 
     mysystem("vnconfig -s labels vn${vndevice} root.vnode");
-    mysystem("fsck -y /dev/vn${vndevice}c");
+    mysystem("fsck -p -y /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
     push(@mntpoints, "$path/root");
 
