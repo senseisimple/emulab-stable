@@ -11,7 +11,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( AuditStart AuditEnd );
+    qw ( AuditStart AuditEnd AuditAbort AuditFork );
 
 # After package decl.
 use English;
@@ -28,8 +28,10 @@ use libtestbed;
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
 my $SCRIPTNAME	= "Unknown";
 my $USERNAME    = "Unknown";
+my $GCOS        = "Unknown";
 my @SAVEARGV	= @ARGV;
 my $SAVEPID	= $PID;
 
@@ -48,8 +50,9 @@ else {
 }
 
 # The user running the script.
-if (my ($name) = getpwuid($UID)) {
+if (my ($name,undef,undef,undef,undef,undef,$gcos) = getpwuid($UID)) {
     $USERNAME = $name;
+    $GCOS     = $gcos;
 }
 
 #
@@ -149,6 +152,37 @@ sub AuditStart($;$)
 sub AuditEnd()
 {
     SendAuditMail(0);
+    return 0;
+}
+
+#
+# Abort an Audit. Dump the log file and do not send email.
+#
+sub AuditAbort()
+{
+    if ($auditing) {
+	$auditing = 0;
+
+	if (defined($logfile)) {
+	    #
+	    # This should be okay; the process will keep writing to it,
+	    # but will be deleted once the process ends and its closed.
+	    #
+	    unlink($logfile);
+	    undef($logfile);
+	}
+    }
+    return 0;
+}
+
+#
+# Ug, forked children result in multiple copies. It does not happen often
+# since most forks result in an exec.
+#
+sub AuditFork()
+{
+    $auditing = 0;
+    return 0;
 }
 
 #
@@ -172,15 +206,17 @@ sub SendAuditMail($)
 	    $subject = "Failed: $subject";
 	}
 
-	my $body     = "$SCRIPTNAME @SAVEARGV\n" . "Invoked by $USERNAME";
+	my $body     = "$SCRIPTNAME @SAVEARGV\n" .
+	               "Invoked by $USERNAME ($GCOS)";
 	if ($?) {
 	    $body   .= "\nExited with status: $?";
 	}
+	my $FROM     = "$GCOS <${USERNAME}\@${OURDOMAIN}>";
 
-	SENDMAIL($TBAUDIT, $subject, $body, $USERNAME, undef, ());
+	SENDMAIL($TBAUDIT, $subject, $body, $FROM, undef, ());
 
 	# Success and no log ...
-	if ($exitstatus == 0 && !defined($logfile)) {
+	if ($exitstatus == 0 && !(defined($logfile) && -s $logfile)) {
 	    return;
 	}
 
@@ -192,7 +228,7 @@ sub SendAuditMail($)
 	my $HDRS  = "Reply-To: $TBOPS";
 	my @FILES = ();
 	
-	if (defined($logfile)) {
+	if (defined($logfile) && -s $logfile) {
 	    $TO    = $TBLOGS;
 	    @FILES = ($logfile);
 	    $HDRS .= "\nCC: $TBOPS" if ($?);
@@ -200,9 +236,9 @@ sub SendAuditMail($)
 	else {
 	    $TO    = $TBOPS;
 	}
-	SENDMAIL($TO, $subject, $body, $USERNAME, $HDRS, @FILES);
+	SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES);
 
-	if (defined($logfile)) {
+	if ($? == 0 && defined($logfile)) {
 	    unlink($logfile);
 	}
     }
