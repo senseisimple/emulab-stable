@@ -981,7 +981,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows, gidint;
-	int		tbadmin;
+	int		tbadmin, didwidearea = 0;
 
 	if (! tcp) {
 		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
@@ -1177,6 +1177,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		return 0;
 	}
 
+ again:
 	row = mysql_fetch_row(res);
 	while (nrows) {
 		MYSQL_ROW	nextrow;
@@ -1373,6 +1374,33 @@ COMMAND_PROTOTYPE(doaccounts)
 		row = nextrow;
 	}
 	mysql_free_result(res);
+
+	if (!(islocal || isvnode) && !didwidearea) {
+		didwidearea = 1;
+
+		/*
+		 * Sleazy. The only real downside though is that
+		 * we could get some duplicate entries, which won't
+		 * really harm anything on the client.
+		 */
+		res = mydb_query("select distinct "
+				 "u.uid,'*',u.unix_uid,u.usr_name, "
+				 "w.trust,'guest','guest',31,u.admin, "
+				 "UNIX_TIMESTAMP(u.usr_modified) "
+				 "from widearea_accounts as w "
+				 "left join users as u on u.uid=w.uid "
+				 "where w.trust!='none' and "
+				 "      u.status='active' and node_id='%s' "
+				 "order by u.uid",
+				 10, nodeid);
+
+		if (res) {
+			if (mysql_num_rows(res))
+				goto again;
+			else
+				mysql_free_result(res);
+		}
+	}
 	return 0;
 }
 
