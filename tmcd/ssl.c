@@ -207,7 +207,7 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 		error("sslaccept: reading request");
 		if (cc == 0)
 			errno = EIO;
-		return -1;
+		goto badauth;
 	}
 	if (strncmp(nosslbuf, SPEAKSSL, strlen(SPEAKSSL))) {
 		/*
@@ -225,20 +225,25 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 	if (! (ssl = SSL_new(ctx))) {
 		tmcd_sslerror();
 		errno = EIO;
-		return -1;
+		goto badauth;
 	}
 	if (! SSL_set_fd(ssl, newsock)) {
 		tmcd_sslerror();
 		errno = EIO;
-		return -1;
+		goto badauth;
 	}
 	if (SSL_accept(ssl) <= 0) {
 		tmcd_sslerror();
 		errno = EAUTH;
-		return -1;
+		goto badauth;
 	}
 	
 	return newsock;
+ badauth:
+	error("sslaccept: error speaking to %s\n",
+	      inet_ntoa(((struct sockaddr_in *)addr)->sin_addr));
+	tmcd_sslclose(newsock);
+	return -1;
 }
 
 /*
