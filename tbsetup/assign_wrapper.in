@@ -34,7 +34,8 @@ my  $WRAPPER_FAILED_BANDWIDTH    = 0x04;	# Bandwidth violation
 my  $WRAPPER_FAILED_LINKUSERS    = 0x08;	# Linkusers violation
 my  $WRAPPER_FAILED_DESIRES      = 0x10;	# Desires violation
 my  $WRAPPER_FAILED_UNASSIGNED   = 0x20;	# Unassigned violation
-my  $WRAPPER_FAILED_CANRECOVER   = 0x80;        # Can recover, retry.
+my  $WRAPPER_FAILED_CANRECOVER   = 0x10;        # Can recover, retry.
+my $WRAPPER_DIED_A_HORRIBLE_DEATH= 0x80;	# Do not use this.
 # Set this once we modify DB state; forces no recover in fatal().
 my $NoRecover = 0;
     
