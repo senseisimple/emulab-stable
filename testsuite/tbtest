@@ -373,7 +373,7 @@ sub step_init {
 	print STDERR "ERROR: Could not copy defs file.\n";
 	doexit(1);
     }
-    open(DEFS,">>$path/defs");
+    open(DEFS,">$path/defs");
     print DEFS "TBDBNAME=$testdb\n";
     print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
     print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
@@ -389,6 +389,10 @@ sub step_init {
     } else {
 	$testmode = "--enable-testmode --disable-events";
     }
+    open(CONF,">$path/config");
+    print CONF "$basedir/../configure \\\n".
+      "--prefix=$path/install \\\n$testmode \\\n--with-TBDEFS=$path/defs\n";
+    close(CONF);
     tbexec("$basedir/../configure --prefix=$path/install $testmode ".
 	   "--with-TBDEFS=$path/defs",
 	   "$path/configure.log");
