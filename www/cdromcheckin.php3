@@ -31,22 +31,12 @@ function SPITSTATUS($status)
 #
 # This page is not intended to be invoked by humans!
 #
-if ((!isset($cdkey) || !strcmp($cdkey, "")) ||
-    (!isset($privkey) || !strcmp($privkey, "")) ||
-    (!isset($IP) || !strcmp($IP, ""))) {
+if ((!isset($cdkey) || !strcmp($cdkey, ""))) {
     SPITSTATUS(CDROMSTATUS_MISSINGARGS);
     return;
 }
 
-if (!ereg("[0-9a-zA-Z]+", $cdkey) ||
-    !ereg("[0-9a-zA-Z ]+", $privkey) ||
-    !ereg("[0-9\.]+", $IP)) {
-    SPITSTATUS(CDROMSTATUS_INVALIDARGS);
-    return;
-}
-
-if (isset($wahostname) &&
-    !ereg("[-_0-9a-zA-Z\.]+", $wahostname)) {
+if (!ereg("[0-9a-zA-Z]+", $cdkey)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -62,6 +52,47 @@ if (! mysql_num_rows($query_result)) {
 }
 $row    = mysql_fetch_array($query_result);
 $cdvers = $row[version];
+
+#
+# Node is requesting latest instructions. Give it the script. This could
+# be on a per CDROM basis, but for now all versions get the same thing.
+# I know, the hardwired paths are bad; move into the cdroms DB table, even
+# if duplicated. 
+# 
+if (isset($needscript)) {
+    header("Content-Type: text/plain");
+    echo "MD5=d8b6b1cf6ea43abc33b0d700d6e4cda8\n";
+    echo "URL=http://${WWWHOST}/images/netbed-setup.pl\n";
+    echo "emulab_status=0\n";
+    return;
+}
+
+#
+# Otherwise, move onto config instructions.
+#
+if ((!isset($privkey) || !strcmp($privkey, "")) ||
+    (!isset($IP) || !strcmp($IP, ""))) {
+    SPITSTATUS(CDROMSTATUS_MISSINGARGS);
+    return;
+}
+
+if (!ereg("[0-9a-zA-Z ]+", $privkey) ||
+    !ereg("[0-9\.]+", $IP)) {
+    SPITSTATUS(CDROMSTATUS_INVALIDARGS);
+    return;
+}
+
+if (isset($wahostname) &&
+    !ereg("[-_0-9a-zA-Z\.]+", $wahostname)) {
+    SPITSTATUS(CDROMSTATUS_INVALIDARGS);
+    return;
+}
+
+if (isset($roottag) &&
+    !ereg("[0-9a-zA-Z]+", $roottag)) {
+    SPITSTATUS(CDROMSTATUS_INVALIDARGS);
+    return;
+}
 
 #
 # Grab the privkey record. First squeeze out any spaces.
@@ -153,10 +184,11 @@ if (strcmp($privIP, "1.1.1.1")) {
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
 
-    if (0) {
+    if (1) {
     if ($cdvers == 3) {
 	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
 	    echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	    echo "slicex_slice=3\n";
 	    echo "slicex_mount=/users\n";
     }
     }
@@ -231,6 +263,7 @@ else {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
 	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
@@ -239,6 +272,7 @@ else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
 	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
