@@ -42,7 +42,7 @@ ALLCERTS	= $(CERTS)
 #
 # Name and rootball revision
 #
-ROOTBALLREV	= 5
+ROOTBALLREV	= 6
 ROOTBALLNAME	= plabroot-$(ROOTBALLREV).tgz
 
 include $(OBJDIR)/Makeconf
@@ -63,7 +63,7 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	chmod u+s plabroot/usr/local/etc/emulab/update
 	$(INSTALL_PROGRAM) $(OSSCRIPTS)   plabroot/usr/local/bin
 	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
-	$(INSTALL) -m 600  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
+	$(INSTALL) -m 440  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
 					  plabroot/etc/sudoers
 	ln -fs suidperl  plabroot/usr/bin/sperl5.6.1
 	$(INSTALL_PROGRAM) -s tmcc        plabroot/usr/local/etc/emulab/tmcc
