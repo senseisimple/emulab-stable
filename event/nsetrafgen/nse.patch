@@ -1,5 +1,5 @@
 --- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
-+++ ns-allinone-2.1b9/install	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/install	Mon Jan 27 22:54:31 2003
 @@ -39,224 +39,82 @@
  
  # Get current path
@@ -413,7 +413,7 @@
  echo ""
  echo "----------------------------------------------------------------------------------"
 --- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Jan 27 22:54:31 2003
 @@ -78,6 +78,14 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
@@ -450,7 +450,7 @@
  OBJ_EMULATE_C = \
  	emulate/inet.o
 --- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Mon Jan 27 22:54:31 2003
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -461,7 +461,7 @@
  		double t = next();
  		timer_.resched(t);
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Thu Jan 30 19:34:17 2003
 @@ -41,14 +41,46 @@
  
  #include <stdlib.h>
@@ -574,31 +574,15 @@
  	}
  }
  
-@@ -133,11 +184,23 @@
+@@ -133,6 +184,7 @@
  {
  	if (t < clock_) {
  		fprintf(stderr, "ns: scheduler going backwards in time from %f to %f.\n", clock_, t);
 +		abort();
  	}
  
-+#ifdef SCHED_DEBUG
-+	Tcl_HashEntry *he = Tcl_FindHashEntry(&newevents, (char *)((unsigned int)p->uid_));
-+	if( he ) {
-+	  Tcl_DeleteHashEntry(he);
-+	} else {
-+	  fprintf(stderr, "error. couldnt find event with uid = %d\n", (unsigned int)p->uid_);
-+	}
-+#endif
  	clock_ = t;
- 	p->uid_ = -p->uid_;	// being dispatched
- 	p->handler_->handle(p);	// dispatch
-+#ifdef MEASURE_EVENT_RATE
-+	event_dispatch_counter++;
-+#endif
- }
- 
- void
-@@ -161,7 +224,8 @@
+@@ -161,7 +213,8 @@
  	void handle(Event* event);
  } at_handler;
  
@@ -608,7 +592,7 @@
  {
  	AtEvent* at = (AtEvent*)e;
  	Tcl::instance().eval(at->proc_);
-@@ -174,7 +238,8 @@
+@@ -174,7 +227,8 @@
  	clock_ = SCHED_START;
  }
  
@@ -618,7 +602,7 @@
  {
  	Tcl& tcl = Tcl::instance();
  	if (instance_ == 0)
-@@ -220,7 +285,7 @@
+@@ -220,7 +274,7 @@
  		if (strcmp(argv[1], "at") == 0 ||
  		    strcmp(argv[1], "cancel") == 0) {
  			Event* p = lookup(STRTOUID(argv[2]));
@@ -627,7 +611,7 @@
  				/*XXX make sure it really is an atevent*/
  				cancel(p);
  				AtEvent* ae = (AtEvent*)p;
-@@ -286,7 +351,8 @@
+@@ -286,7 +340,8 @@
  	}
  } class_list_sched;
  
@@ -637,7 +621,7 @@
  {
  	double t = e->time_;
  	Event** p;
-@@ -303,7 +369,8 @@
+@@ -303,7 +358,8 @@
   * must free the event if necessary; this routine only removes
   * it from the scheduler queue.
   */
@@ -647,7 +631,7 @@
  {
  	Event** p;
  	if (e->uid_ <= 0)	// event not in queue
-@@ -316,7 +383,8 @@
+@@ -316,7 +372,8 @@
  	e->uid_ = - e->uid_;
  }
  
@@ -657,7 +641,7 @@
  {
  	Event* e;
  	for (e = queue_; e != 0; e = e->next_)
-@@ -397,9 +465,9 @@
+@@ -397,9 +454,9 @@
  Heap::heap_delete(void* elem)
  {
  	int	i;
@@ -669,7 +653,7 @@
  		swap(i, parent(i));
  	}
  	(void) heap_extract_min();
-@@ -485,9 +553,10 @@
+@@ -485,9 +542,10 @@
  	void*	min;				  /* return value */
  	unsigned int	i;
  	unsigned int	l, r, x;
@@ -682,7 +666,7 @@
  	h_elems[0] = h_elems[--h_size];
  // Heapify:
  	i = 0;
-@@ -523,7 +592,8 @@
+@@ -523,7 +581,8 @@
  	}
  } class_heap_sched;
  
@@ -692,7 +676,7 @@
  {
  	Event* e;
  	
-@@ -553,6 +623,8 @@
+@@ -553,6 +612,8 @@
   *  Comm. of ACM, 31(10):1220-1227, Oct 1988
   */
  
@@ -701,7 +685,7 @@
  static class CalendarSchedulerClass : public TclClass {
  public:
  	CalendarSchedulerClass() : TclClass("Scheduler/Calendar") {}
-@@ -561,212 +633,305 @@
+@@ -561,212 +622,312 @@
  	}
  } class_calendar_sched;
  
@@ -709,7 +693,7 @@
 -	reinit(2, 1.0, 0.0);
 -	resizeenabled_ = 1;
 -	max_ = 0.0;
-+CalendarScheduler::CalendarScheduler() : cal_clock_(clock_) {
++CalendarScheduler::CalendarScheduler() : cal_clock_(clock_), cached_head_(0) {
 +	reinit(4, 1.0, cal_clock_);
  }
  
@@ -729,6 +713,7 @@
 +		// may happen in RT scheduler
 +		cal_clock_ = e->time_;
 +		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
++		cached_head_ = e;
 +	} else
 +		i = CALENDAR_HASH(e->time_);
 +
@@ -795,7 +780,9 @@
 +		return;
 +	}
 +}
-+
+ 
+-	if (++qsize_ > top_threshold_)
+-		resize(nbuckets_<<1);
 +void 
 +CalendarScheduler::insert2(Event* e)
 +{
@@ -823,9 +810,7 @@
 +				;
 +			newhead = (before == head);
 +		}
- 
--	if (++qsize_ > top_threshold_)
--		resize(nbuckets_<<1);
++
 +		e->next_ = before;
 +		e->prev_ = before->prev_;
 +		before->prev_ = e;
@@ -906,6 +891,10 @@
 -		buckettop_ = width_*(n+1.5);
 -		prevtop_ = buckettop_ - lastbucket_ * width_;
 +
++	if (cached_head_) {
++	  return cached_head_;	  
++	}
++	
 +	int l, i = lastbucket_;
 +	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
 +	double diff;
@@ -958,7 +947,7 @@
 +	 */
 +	lastbucket_ = l;
 + 	cal_clock_  = e->time_;
-+	
++	cached_head_ = e;
 +	return e;
 +}
 +
@@ -1001,6 +990,8 @@
 +		resize(nbuckets_ >> 1, cal_clock_);
 +	}
 +
++	cached_head_ = 0;
++	
 +	return e;
  }
  
@@ -1169,7 +1160,7 @@
  	return nw;
  }
  
-@@ -776,77 +941,91 @@
+@@ -776,77 +937,95 @@
   * must free the event if necessary; this routine only removes
   * it from the scheduler queue.
   *
@@ -1248,6 +1239,9 @@
 +
 +	--qsize_;
 +
++	if ( e == cached_head_ )
++	  cached_head_ = 0;
++
 +	return;
 +}
 +
@@ -1293,6 +1287,7 @@
  protected:
  	void sync() { clock_ = tod(); }
 -	int rwait(double);	// sleep
++	virtual void dispatch(Event*, double);	// exec event, set clock_
  	double tod();
  	double slop_;	// allowed drift between real-time and virt time
  	double start_;	// starting time
@@ -1307,7 +1302,7 @@
  };
  
  static class RealTimeSchedulerClass : public TclClass {
-@@ -860,16 +1039,58 @@
+@@ -860,16 +1039,85 @@
  RealTimeScheduler::RealTimeScheduler() : start_(0.0)
  {
  	bind("maxslop_", &slop_);
@@ -1319,8 +1314,8 @@
 +	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
 +	tscfreq_ = TSC_COUNT_PERSEC;
 +#endif
- }
- 
++}
++
 +#ifdef USEEVENTS
 +  
 +int RealTimeScheduler::command(int argc, const char*const* argv)
@@ -1349,6 +1344,33 @@
 +
 +#endif
 +
++/*
++ * dispatch a single simulator event by setting the system
++ * virtul clock to the event's timestamp and calling its handler.
++ * Note that the event may have side effects of placing other items
++ * in the scheduling queue
++ */
++
++void
++RealTimeScheduler::dispatch(Event* p, double t)
++{
++
++#ifdef SCHED_DEBUG
++	Tcl_HashEntry *he = Tcl_FindHashEntry(&newevents, (char *)((unsigned int)p->uid_));
++	if( he ) {
++	  Tcl_DeleteHashEntry(he);
++	} else {
++	  fprintf(stderr, "error. couldnt find event with uid = %d\n", (unsigned int)p->uid_);
++	}
++#endif
++	clock_ = t;
++	p->uid_ = -p->uid_;	// being dispatched
++	p->handler_->handle(p);	// dispatch
++#ifdef MEASURE_EVENT_RATE
++	event_dispatch_counter++;
++#endif
+ }
+ 
  double
  RealTimeScheduler::tod()
  {
@@ -1366,7 +1388,7 @@
  }
  
  void
-@@ -877,81 +1098,81 @@
+@@ -877,81 +1125,93 @@
  {
  	clock_ = SCHED_START;
  	start_ = tod();
@@ -1385,8 +1407,10 @@
  { 
 -	Event *p;
 -	double now;
-+        static const double RTSCHEDULER_MINWAIT = 1.0e3; // don't wait for less
++        static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
++	static const double delta = 1.0e-4; // should be smaller than above
 +	const Event *p;
++	bool gethead = true;
 +
 +#ifdef USEEVENTS
 +
@@ -1402,18 +1426,14 @@
  	while (!halted_) {
 -		now = tod();
 -		if ((now - clock_) > slop_) {
-+		clock_ = tod();
-+		p = head();
-+		if (p && (clock_ - p->time_) > slop_) {
- 			fprintf(stderr,
+-			fprintf(stderr,
 -			"RealTimeScheduler: warning: slop %f exceeded limit %f [now:%f, clock_:%f]\n",
 -				now - clock_, slop_, now, clock_);
-+				"RealTimeScheduler: warning: slop "
-+				"%f exceeded limit %f [clock_:%f, p->time_:%f]\n",
-+				clock_ - p->time_, slop_, clock_, p->time_);
++		if( gethead ) {
++		  p = head();
++		  gethead = false;
  		}
-+		// handle "old events"
-+		while (p && p->time_ <= clock_) {
++		clock_ = tod();
  
 -		//
 -		// first handle any "old events"
@@ -1445,7 +1465,19 @@
 -				insert(p);
 -			}
 -			continue;
++		if (p && (clock_ - p->time_) > slop_) {
++			fprintf(stderr,
++				"RealTimeScheduler: warning: slop "
++				"%f exceeded limit %f [clock_:%f, p->time_:%f]\n",
++				clock_ - p->time_, slop_, clock_, p->time_);
++		}
++		// handle "old events"
++		while (p && p->time_ <= clock_) {
++#ifdef DISPATCH_IN_RT
 +			dispatch(deque(), clock_);
++#else
++			dispatch(deque(), p->time_);
++#endif
 +			if (halted_)
 +				return;
 +			p = head();
@@ -1469,6 +1501,7 @@
 - */
 +#ifdef USEEVENTS
 +		if( evsink_ && evsink_->poll() == 1 ) {
++		  gethead = true;
 +		  continue;
 +		}
 +#endif
@@ -1500,18 +1533,20 @@
 +			if (diff > RTSCHEDULER_MINWAIT) {
 +				Tcl_Time to;
 +				to.sec = long(diff);
-+				to.usec = long(1e6*(diff - to.sec));
++				to.usec = long(1e6*((diff - delta) - to.sec)); // wait for delta less
 +				Tcl_WaitForEvent(&to);    // block
 +				clock_ = tod();
 +			}
 +		}
-+		Tcl_DoOneEvent(TCL_DONT_WAIT);
++		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
++		  gethead = true;
++		}
  	}
 -	return -1;
 +	// we reach here only if halted
  }
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Mon Jan 27 23:33:07 2003
 @@ -56,6 +56,7 @@
  class Event {
  public:
@@ -1538,6 +1573,15 @@
  		return (clock_);
  	}
  	virtual void sync() {};
+@@ -97,7 +98,7 @@
+ protected:
+ 	void dumpq();	// for debug: remove + print remaining events
+ 	void dispatch(Event*);	// execute an event
+-	void dispatch(Event*, double);	// exec event, set clock_
++	virtual void dispatch(Event*, double);	// exec event, set clock_
+ 	Scheduler();
+ 	virtual ~Scheduler();
+ 	int command(int argc, const char*const* argv);
 @@ -109,11 +110,13 @@
  
  class ListScheduler : public Scheduler {
@@ -1582,7 +1626,7 @@
  protected:
  	Heap* hp_;
  };
-@@ -141,38 +145,37 @@
+@@ -141,38 +145,38 @@
  class CalendarScheduler : public Scheduler {
  public:
  	CalendarScheduler();
@@ -1635,11 +1679,12 @@
  private:
  	virtual void insert2(Event*);
 +	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
++	const Event *cached_head_;
  
  };
  
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Mon Jan 27 22:54:31 2003
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -1657,7 +1702,7 @@
  
  }
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Mon Jan 27 22:54:31 2003
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -1700,7 +1745,7 @@
 +
 +#endif
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Mon Jan 27 22:54:31 2003
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -1718,7 +1763,7 @@
 +
  #endif /* timer_handler_h */
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Mon Nov 11 14:59:27 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue Jan 28 16:38:49 2003
 @@ -37,21 +37,82 @@
  #endif
  
@@ -1937,7 +1982,7 @@
    datagramlen = ntohs(ipheader->ip_len);
  
    /* Put all the info in the ns headers. */
-@@ -208,13 +272,246 @@
+@@ -208,13 +272,248 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -2026,10 +2071,12 @@
 +    ih->dport() = dst_agent->port();
 +    goto injectsim;
 +  } 
-+  
++
++#if 0
 + /* if we fail to map a dest iptap object, we drop the packet */
 +  fprintf( stderr, "dropping packet with dest ipaddr:%s at %f\n",
 +	   inet_ntoa(ipheader->ip_dst), Scheduler::instance().clock() );
++#endif
 +  drop(p);
 +  return;
 +  
@@ -2184,7 +2231,7 @@
  
  /*
   * simulator schedules TapAgent::recv which calls sendpkt
-@@ -231,23 +528,24 @@
+@@ -231,23 +530,24 @@
    unsigned short dglen;
    struct ip *ipheader;
  
@@ -2217,7 +2264,7 @@
    /*
      At this point, we should grab the ttl field from the ns
      packet, put it in the IP header of the actual packet,
-@@ -277,13 +575,29 @@
+@@ -277,13 +577,29 @@
    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
  						sizeof(struct ip));
  
@@ -2249,7 +2296,7 @@
  	  name(), hc->size());
    return 0;
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Mon Nov 11 14:54:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Mon Jan 27 22:54:31 2003
 @@ -38,29 +38,68 @@
  
  #include "tap.h"
@@ -2320,7 +2367,7 @@
  
  #endif /* iptap_h */
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Mon Jan 27 22:54:31 2003
 @@ -57,92 +57,25 @@
  
  #ifdef __cplusplus
@@ -2527,7 +2574,7 @@
  	}
  #endif
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Mon Jan 27 22:54:31 2003
 @@ -49,12 +49,16 @@
  #undef interface
  #endif
@@ -2652,7 +2699,7 @@
  };
  #endif
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Mon Jan 27 22:54:31 2003
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -2787,7 +2834,7 @@
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Mon Jan 27 22:54:31 2003
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -2801,7 +2848,7 @@
  };
  
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Mon Jan 27 22:54:31 2003
 @@ -97,6 +97,11 @@
        return (TCL_OK);
      }
@@ -2988,7 +3035,7 @@
  }
  
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Mon Jan 27 22:54:31 2003
 @@ -38,6 +38,7 @@
  
  #include "tap.h"
@@ -3020,7 +3067,7 @@
   public:
    TCPTapAgent();
 --- dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Nov  1 18:03:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Mon Jan 27 22:54:31 2003
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -3045,7 +3092,7 @@
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Mon Jan 27 22:54:31 2003
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -3521,7 +3568,7 @@
  	}
  //if (int(t_seqno_) > 1)
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Mon Jan 27 22:54:31 2003
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -3556,7 +3603,7 @@
  	}
  	virtual void oldack() {			// what to do on old ack
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Mon Jan 27 22:54:31 2003
 @@ -54,6 +54,8 @@
  	int ackno_;             /* ACK number for FullTcp */
  	int hlen_;              /* header len (bytes) for FullTcp */
@@ -3575,7 +3622,7 @@
  
  /* these are used to mark packets as to why we xmitted them */
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Mon Jan 27 22:54:31 2003
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -3591,7 +3638,7 @@
  
  #endif /* !WIN32 */
 --- dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Apr  1 16:07:28 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Fri Nov  8 19:01:45 2002
++++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Jan 27 22:54:31 2003
 @@ -826,6 +826,8 @@
  			break;
  		case PT_GAF:
