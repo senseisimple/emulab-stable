@@ -23,12 +23,13 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $PRERENDER_CMD = "@prefix@/libexec/vis/prerender";
+my $THUMBRENDER_CMD = "@prefix@/bin/dbvistopology -t 128";
 
 sub usage {
-    die "Usage:\prerender_all [-v]";
+    die "Usage:\prerender_all [-v] [-t]";
 }
 
-my $optlist = "v";
+my $optlist = "vt";
 
 %options = ();
 
@@ -39,6 +40,10 @@ if ( defined($options{"v"}) ) {
     $PRERENDER_CMD .= " -v";
 }
 
+if ( defined($options{"t"}) ) { 
+    $PRERENDER_CMD .= " -t";
+}
+
 my $result = DBQueryFatal("SELECT pid,eid FROM experiments");
 
 while (my ($pid,$eid) = $result->fetchrow) {
@@ -47,5 +52,7 @@ while (my ($pid,$eid) = $result->fetchrow) {
 	print STDERR "Prerender of $pid/$eid FAILED!\n";
     }
 }
+
+
 
 exit(0);

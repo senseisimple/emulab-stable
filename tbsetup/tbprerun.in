@@ -112,7 +112,7 @@ print "Parser done! " . TBTimeStamp() . "\n";
 
 TBDebugTimeStamp("prerender started in background");
 print "Precomputing visualization (in background)...\n";
-system("prerender $pid $eid &");
+system("prerender -t $pid $eid &");
 
 TBDebugTimeStamp("routes started");
 print "Setting up static routes (if requested) ... \n";

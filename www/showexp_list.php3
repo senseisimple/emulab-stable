@@ -121,8 +121,11 @@ if ($isadmin) {
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
                      "count(r.node_id) as ncount, swap_requests, ".
 		     "round((unix_timestamp(now()) - ".
-		     "unix_timestamp(last_swap_req))/3600,1) as lastreq ".
+		     "unix_timestamp(last_swap_req))/3600,1) as lastreq, ".
+		     "ve.thumb_hash as thumb_hash ".
 		     "from experiments as e ".
+		     "left join vis_experiments as ve on ".
+		     "ve.pid=e.pid and ve.eid=e.eid ".
                      "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
                      "left join nodes as n on r.node_id=n.node_id ".
                      "where (n.type!='dnard' or n.type is null) $clause ".
@@ -165,10 +168,13 @@ else {
     $experiments_result =
 	DBQueryFatal("select distinct e.*, ".
                      "date_format(expt_swapped,'%Y-%m-%d') as d, ".
-                     "count(r.node_id) as ncount ".
+                     "count(r.node_id) as ncount, ".
+		     "ve.thumb_hash as thumb_hash ".
                      "from group_membership as g ".
                      "left join experiments as e on ".
                      "  g.pid=e.pid and g.pid=g.gid ".
+		     "left join vis_experiments as ve on ".
+		     "ve.pid=e.pid and ve.eid=e.eid ".
                      "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
                      "left join nodes as n on r.node_id=n.node_id ".
                      "where (n.type!='dnard' or n.type is null) and ".
@@ -238,6 +244,7 @@ if ($thumb && !$idle) {
 	$huid = $row["expt_head_uid"];
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["d"];
+	$thumb_hash = $row["thumb_hash"];
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
 #	echo "<table style=\"float: none;\" width=256 height=192><tr><td>".
@@ -246,12 +253,16 @@ if ($thumb && !$idle) {
 #	echo "<td width=50%>".
 #	echo "<tr
 
+#	Should create on demand.
+
 	echo "<td>".
              "<table border=0 cellpadding=4 cellspacing=0>".
 	     "<tr>".
 	     "<td width=128 align=center>".
 	     "<img border=1 width=128 height=128 class='stealth' ".
-	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
+#	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
+#	     " src='thumbs/$pid.$eid.png' />".
+	     " src='thumbs/tn$thumb_hash.png' />".
              "</td>" .
 	     "<td align=left class='paddedcell'>".
 	     "<b>".

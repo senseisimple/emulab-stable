@@ -1246,6 +1246,17 @@ CREATE TABLE virt_vtypes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'vis_experiments'
+--
+
+CREATE TABLE vis_experiments (
+  eid varchar(32) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  thumb_hash varchar(64) NOT NULL default '',
+  PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'vis_nodes'
 --
 

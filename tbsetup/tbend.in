@@ -106,7 +106,7 @@ DBQueryWarn("DELETE from ipport_ranges  where pid='$pid' and eid='$eid'") or
     $errors++;
 
 print "Removing visualization data...\n";
-system("prerender -r $pid $eid");
+system("prerender -r -t $pid $eid");
 
 if ($errors == 0) {
     SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or
@@ -117,3 +117,4 @@ print "Cleanup finished! " . TBTimeStamp() . "\n";
 
 # We exit with whether we had errors or not.
 exit $errors;
+

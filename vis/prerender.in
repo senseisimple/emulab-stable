@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use Digest::MD5  qw(md5 md5_hex md5_base64);
 
 # Need this module to use mktemp (commented out below)
 # use File::MkTemp;
@@ -22,7 +23,7 @@ use libdb;
 $| = 1;
 
 # Untaint the path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/libexec/vis';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #my $NEATO_CMD = "neato -Gstart=5 -Gepsilon=0.0001 -Goverlap=scale -Gsep=1";
@@ -30,15 +31,17 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.001 -Goverlap=scale -Gpack=true -Gsep=4 -Gmclimit=30";
 #my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Goverlap=scale -Gmaxiter=20000 -Gpack=true";
 my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Gmaxiter=20000 -Gpack=true";
+my $THUMB_CMD = "render -t 128";
 
 sub dprint($);
 
 sub usage {
-    die "Usage:\nprerender [-v] [-r] <pid> <eid>\n" .
-        "    -r  Just remove vis info from DB\n";
+    die "Usage:\nprerender [-v] [-r] [-t] <pid> <eid>\n" .
+        "    -r  Just remove vis info from DB\n".
+        "    -t  Generate (or remove) thumbnail\n";
 }
 
-my $optlist = "rv";
+my $optlist = "rvt";
 
 %options = ();
 
@@ -46,22 +49,55 @@ if (!getopts($optlist, \%options)) { usage; }
 if (@ARGV != 2) { usage; }
 
 my $debug = 0;
-if ( defined($options{"v"}) ) { $debug++; }
+
+if ( defined($options{"v"}) ) { 
+    $debug++; 
+    # pass verbosity along to thumbnail render.
+    $THUMB_CMD .= " -v"; 
+}
+
+#my ($pid) = $ARGV[0];
+#my ($eid) = $ARGV[1];
+my ($pid) = $ARGV[0] =~ /([0-9a-zA-Z\-]+)/;
+my ($eid) = $ARGV[1] =~ /([0-9a-zA-Z\-]+)/;
+
+if ( defined($options{"t"}) ) { 
+    my $result = DBQueryFatal("SELECT thumb_hash FROM vis_experiments " .
+			      "WHERE pid='$pid' AND eid='$eid'");
+    ($thumb) = $result->fetchrow;
+
+    if (!$thumb) {
+	if (defined($options{"r"})) {
+	    print STDERR "Warning! No thumbnail found to remove.\n";
+	} else {
+	    # If we're not removing the experiment, we need to generate a thumbhash.
+	    # Hash a lot of random junk.
+	    $thumb = md5_hex( rand(99999) . "-$$-$pid-$eid-XYzzY" );
+	    DBQueryFatal("INSERT INTO vis_experiments (pid,eid,thumb_hash) VALUES ".
+			 "('$pid','$eid','$thumb')");
+	}
+    }
+
+    if ($thumb) { 
+	dprint "Thumb hash is '$thumb'.\n"; 
+    } else {
+	dprint "No thumb hash.\n";
+    }
+}
 
 # for the mungeName function, below.
 $mungeUID = 0;
 
-my $pid = $ARGV[0];
-my $eid = $ARGV[1];
-
-### First, wipe out the old layout.
-
-DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
-
 ### If they specified -r, meaning they just wanted to remove vis info 
-### from the DB, we quit now.
-
-if (defined($options{"r"})) { exit; }
+### from the DB, we do it and quit.
+if (defined($options{"r"})) {
+    if ($thumb) {
+	system("/bin/rm @prefix@/www/thumbs/tn$thumb.png");
+    }
+    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
+    DBQueryFatal("DELETE FROM vis_experiments WHERE pid='$pid' AND eid='$eid'");
+    exit; 
+}
 
 ### Now, read experiment virtual info from the DB.
 
@@ -377,6 +413,9 @@ unlink $tempfile;
 
 ### Put new data into db.
 
+# First, wipe out the old layout.
+DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
+
 foreach $node (keys %nodes) {
     if (exists $nodes{ $node }{"type"} &&
         exists $nodes{ $node }{"x_best"} &&
@@ -387,6 +426,14 @@ foreach $node (keys %nodes) {
 		     "'" . $nodes{ $node }{"type"} . "', " .
 		     "'" . $nodes{ $node }{"x_best"}    . "', " .
 		     "'" . $nodes{ $node }{"y_best"}    . "') ");
+    }
+}
+
+### Generate thumbnail, if called for.
+
+if ($thumb) {
+    if (system("$THUMB_CMD $pid $eid > @prefix@/www/thumbs/tn$thumb.png")) {
+	print STDERR "Error generating thumbnail.\n";
     }
 }
 
