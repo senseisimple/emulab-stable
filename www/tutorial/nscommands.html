@@ -283,7 +283,7 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
 <pre>
 tb-set-node-os <i>node</i> <i>os</i>
 
-tb-set-node-os $node1 FBSD40-STD
+tb-set-node-os $node1 FBSD-STD
 tb-set-node-os $node1 MY_OS
 </pre>
 
@@ -298,9 +298,9 @@ tb-set-node-os $node1 MY_OS
   <li>The OSID can either by one of the standard OS's we provide or
       a custom OSID, created via the web interface.
   <li>If no OS is specified for a node a default OS is chosen based on
-      the nodes type.  This is currently RHL62-STD for PCs.
-  <li>The currently available standard OS types are: FBSD40-STD,
-      RHL62-STD, NBSD14-STD (should not be used on PC nodes), and
+      the nodes type.  This is currently RHL-STD for PCs.
+  <li>The currently available standard OS types are: FBSD-STD,
+      RHL-STD, NBSD14-STD (should not be used on PC nodes), and
       NETBOOT-STD (oskit netboot kernel for loading other
       operating systems over the network).
 </ul>

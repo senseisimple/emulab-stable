@@ -149,13 +149,13 @@ In addition to the standard NS syntax above, a number of
 extensions</a> have been added that allow you
 to better control your experiment. For example, you may specify what
 Operating System is booted on your nodes. We currently support FreeBSD
-4.0 and Linux RedHat 6.2, as well as
+4.3 and Linux RedHat 7.1, as well as
 <a href="http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
-testbed PCs. By default, Linux RedHat 6.2 is selected.
+testbed PCs. By default, Linux RedHat 7.1 is selected.
 
 	<code><pre>
-	tb-set-node-os $NodeA FBSD40-STD
-	tb-set-node-os $NodeC RHL62-STD		</code></pre>
+	tb-set-node-os $NodeA FBSD-STD
+	tb-set-node-os $NodeC RHL-STD		</code></pre>
 
 <p>
 You may also control what IP addresses are assigned to the
@@ -579,7 +579,7 @@ can be submitted to the "Begin Experiment" page.
 set ns [new Simulator]			
 source tb_compat.tcl
 set nodeA [$ns node]
-tb-set-node-os $nodeA FBSD40-STD
+tb-set-node-os $nodeA FBSD-STD
 $ns run					</code></pre>
 
 When you have received email notification that the experiment has
@@ -621,8 +621,8 @@ set ns [new Simulator]
 source tb_compat.tcl
 set nodeA [$ns node]
 set nodeB [$ns node]
-tb-set-node-os $nodeA FBSD40-STD
-tb-set-node-os $nodeB RHL62-STD
+tb-set-node-os $nodeA FBSD-STD
+tb-set-node-os $nodeB RHL-STD
 tb-set-node-deltas $nodeA /proj/testbed/deltas/silly-freebsd.delta
 tb-set-node-deltas $nodeB /proj/testbed/deltas/silly-linux.delta
 tb-set-node-startup $nodeA /usr/site/bin/run-my-experiment

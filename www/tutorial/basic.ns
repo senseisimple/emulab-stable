@@ -14,8 +14,8 @@ $ns duplex-link $NodeB $NodeC 100Mb .1ms DropTail
 $ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail
 
 # Set the OS on a couple.
-tb-set-node-os $NodeA FBSD40-STD
-tb-set-node-os $NodeC RHL62-STD         
+tb-set-node-os $NodeA FBSD-STD
+tb-set-node-os $NodeC RHL-STD         
 
 # Set IP address of node B on the port going to node C
 tb-set-ip-interface $NodeB $NodeC 192.168.42.42 

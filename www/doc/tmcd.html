@@ -72,7 +72,7 @@ fxp2) should be configured to the given IP addresses and netmasks.
 The <b>TMCC</b> is a simple client program that runs on the testbed
 nodes and handles the details of connecting to the <b>TMCD</b>,
 issuing the request, getting the response, and printing it out. It has
-been compiled on FreeBSD 4.0, Redhat Linux 6.2, and Netbsd 1.4, and
+been compiled on FreeBSD 4.x, Redhat Linux 6.2 and 7.1, and Netbsd 1.4, and
 should compile on just about any operating system. Alternatively, you
 can integrate the TMCC into your own programs. Briefly, the TMCC
 connects to port 7777 (UDP or TCP) on <b>boss.emulab.net</b>, writes a
@@ -87,7 +87,7 @@ source code for the TMCC is available upon request by sending email to
 <li> <a NAME="SETUP"></a>
      <h3>Node Setup Script</h3>
 
-The Emulab versions of FreeBSD 4.0, Redhat Linux 6.2, and Netbsd 1.4
+The Emulab versions of FreeBSD 4.3, Redhat Linux 7.1, and Netbsd 1.4
 all run a <i>setup</i> script at bootup that uses the TMCC client to
 configure the node. All of the interfaces are configured, user
 accounts for each of the members of the project are created, NFS
@@ -149,7 +149,7 @@ node with no network links, the response to this request will be null):
 INTERFACE=Z INET=X.X.X.X MASK=Y.Y.Y.Y	</code></pre>
 
 Which says that network interface "Z" is assigned to IP address
-"X.X.X.X" with netmask "Y.Y.Y.Y". On Redhat 6.2, the setup script
+"X.X.X.X" with netmask "Y.Y.Y.Y". On Redhat 7.1, the setup script
 would take this information and issue the following ifconfig command:
 
 <code><pre>
