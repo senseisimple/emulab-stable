@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -32,7 +32,9 @@ if (! $isadmin) {
 # implies denying the project leader account, when there is just a single
 # project pending for that project leader. 
 #
-$query_result = DBQueryFatal("SELECT * from projects ".
+$query_result = DBQueryFatal("SELECT *, ".
+			     " DATE_FORMAT(created, '%m/%d/%y') as day_created ".
+			     " from projects ".
 			     "where approved='0' order by created desc");
 			     
 if (mysql_num_rows($query_result) == 0) {
@@ -66,6 +68,7 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $headuid  = $projectrow[head_uid];
     $Purl     = $projectrow[URL];
     $Pname    = $projectrow[name];
+    $Pcreated = $projectrow[day_created];
 
     $userinfo_result =
 	DBQueryFatal("SELECT * from users where uid='$headuid'");
@@ -76,6 +79,7 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $title	= $row[usr_title];
     $affil	= $row[usr_affil];
     $phone	= $row[usr_phone];
+    $status     = $row[status];
 
     echo "<tr>
               <td height=15 colspan=6></td>
@@ -85,12 +89,17 @@ while ($projectrow = mysql_fetch_array($query_result)) {
                   <A href='approveproject_form.php3?pid=$pid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td rowspan=2>
-                  <A href='showproject.php3?pid=$pid'>$pid</A></td>
+                  <A href='showproject.php3?pid=$pid'>$pid</A>
+                  <br>$Pcreated</td>
               <td rowspan=2>
                   <A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>
-              <td>$name</td>
-              <td>$title</td>
+              <td>$name";
+    if ($status == TBDB_USERSTATUS_UNVERIFIED) {
+	echo " (<font color=red>" . TBDB_USERSTATUS_UNVERIFIED . "</font>)";
+    }
+    echo "         </td>";
+    echo "    <td>$title</td>
               <td>$email</td>
           </tr>\n";
     echo "<tr>
