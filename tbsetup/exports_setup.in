@@ -38,6 +38,10 @@ my $lockfile    = "/var/tmp/testbed_exports_lockfile";
 my $dbg		= 0;
 my @row; 
 
+# For determining file server mountpoints (XXX BSD specific)
+my $MOUNTPROG	= "/sbin/mount";
+my $EXPORT_PAT	= q(on ([\S]+)\s\(.*NFS exported.*\));
+
 #
 # We don't want to run this script unless its the real version.
 #
@@ -174,6 +178,8 @@ my %ipgroups	= ();
 my %lastfslist  = ();
 my $lastpid     = "";
 my $lastgid     = "";
+
+my @mountpoints = fsinit();
 
 # For each node:
 #	determine the list of directories accessible
@@ -333,21 +339,35 @@ sub fatal {
 }
 
 #
+# Get mount info from the FS node and use that to determine actual mount
+# points for exported filesystems.  We generate a list of mount points from
+# longest to shortest so that we will match the most specific one in fsof.
+#
+sub fsinit() {
+    my @rawmounts;
+
+    foreach my $mount (split('\n', `$SSH $MOUNTPROG`)) {
+	if ($mount =~ /$EXPORT_PAT/) {
+	    push(@rawmounts, $1);
+	}
+    }
+
+    sub revlen { length($b) <=> length($a) };
+    return sort revlen @rawmounts;
+}
+
+#
 # Return a unique (per-FS) string identifying the filesystem of
 # the given path.
-#
-# XXX for the moment, we just return the first component of the path
-# assuming everything is mounted at the top level.  Clearly this needs
-# to be fixed.
-#
-# Fixing probably involves either parsing the output of mount or df to
-# compare against or using $dev as returned by the stat call.  Both of
-# these options require ssh callouts to the ops node where the actual
-# filesystems are.
 #
 sub fsof($) {
     my($path) = @_;
 
-    $path =~ s#^(/[^/]*).*#$1#;
-    return $path;
+    foreach my $mount (@mountpoints) {
+	if ($path =~ /^$mount/) {
+	    return $mount;
+	}
+    }
+    print "WARNING: exports_setup: could not find FS for $path\n";
+    return "";
 }
