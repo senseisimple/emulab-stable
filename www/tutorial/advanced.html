@@ -55,7 +55,7 @@ example.
 Each link is has an NS "Queue" object associated with it, which you
 can modify to suit your needs. (<em>currently, there is a single queue
 object per duplex link; you can cannot set the parameters
-asymmetrically). The following paramsters can be changed, and are
+asymmetrically). The following parameters can be changed, and are
 defined in the NS manual (see Section 7.3):
 	<code><pre>
 	set queue0 [[$ns link $nodeA $nodeB] queue]
@@ -119,7 +119,7 @@ Lastly, a set of events to control your applications and link
 characteristics: 
 	<code><pre>
 	$ns at 60.0  "$cbr0  start"
-	$ns at 70.0  "$link0 bandwidth 10Mb"
+	$ns at 70.0  "$link0 bandwidth 10Mb duplex"
 	$ns at 80.0  "$link0 delay 10ms"
 	$ns at 90.0  "$link0 plr 0.05"
 	$ns at 100.0 "$link0 down"
@@ -229,5 +229,64 @@ Some points worth mentioning:
      specify an operation or parameter that is not approprate (say,
      "link0 start" instead of "link0 up"), the event is silently
      dropped. We expect to add error feedback in the future.
+</ul>
+
+<p>
+<h3>
+Supported Events
+</h3>
+
+This is a (mostly) comprehensive list of events that you can specify,
+either in your NS file or as a dynamic event on the command line. In
+the listings below, the use of "link0", "cbr0", etc. are included to
+clarify the syntax; the actual object names will depend on your NS
+file. Also note that when sending events from the command line with
+<tt>tevc</tt>, you should not include the dollar ($) sign. For
+example:
+
+<blockquote>
+<table border=0>
+<tr>
+ <td> NS File:</td>
+ <td><code></pre>$ns at 3.0 "$link0 down"</pre></code></td>
+</tr>
+<tr>
+ <td> tevc:</td>
+ <td><code></pre>tevc -e pid/eid +3.0 link0 down</pre></code>
+ </td>
+</tr>
+</table>
+</blockquote>
+ 
+<ul>
+<li> Links:
+     <ul>
+     <li> $link0 up
+     <li> $link0 down
+     <li> $link0 bandwidth 10Mb duplex
+     <li> $link0 delay 10ms
+     <li> $link0 plr 0.1
+     </ul>
+
+<li> Queues: Queues are special. In your NS file you modify the actual
+     queue, while on the command line you use the link that queue is
+     part of.
+     <ul>
+     <li> $queue0 set queue-in-bytes_ 0
+     <li> $queue0 set limit_ 75
+     <li> $queue0 set maxthresh_ 20
+     <li> $queue0 set thresh_ 7
+     <li> $queue0 set linterm_ 11
+     <li> $queue0 set q_weight_ 0.004</code></pre>
+     </ul>
+
+<li> CBR
+     <ul>
+     <li> $cbr0 start
+     <li> $cbr0 set packetSize_ 512
+     <li> $cbr0 set interval_ 0.01
+     <li> $cbr0 set rate_ 10Mbs
+     <li> $cbr0 stop 
+     </ul>
 </ul>
 
