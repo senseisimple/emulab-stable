@@ -199,54 +199,57 @@ COMMAND_PROTOTYPE(doslothdparams);
 COMMAND_PROTOTYPE(doprogagents);
 COMMAND_PROTOTYPE(dosyncserver);
 COMMAND_PROTOTYPE(dokeyhash);
+COMMAND_PROTOTYPE(dofullconfig);
 
 struct command {
 	char	*cmdname;
+	int	full;
 	int    (*func)(int, tmcdreq_t *, char *, int, int);
 } command_array[] = {
-	{ "reboot",	doreboot },
-	{ "nodeid",	donodeid },
-	{ "status",	dostatus },
-	{ "ifconfig",	doifconfig },
-	{ "accounts",	doaccounts },
-	{ "delay",	dodelay },
-	{ "linkdelay",	dolinkdelay },
-	{ "hostnamesV2",dohostsV2 },	/* This will go away */
-	{ "hostnames",	dohosts },
-	{ "rpms",	dorpms },
-	{ "deltas",	dodeltas },
-	{ "tarballs",	dotarballs },
-	{ "startupcmd",	dostartcmd },
-	{ "startstatus",dostartstat }, /* Leave this before "startstat" */
-	{ "startstat",	dostartstat },
-	{ "readycount", doreadycount },
-	{ "ready",	doready },
-	{ "log",	dolog },
-	{ "mounts",	domounts },
-	{ "sfshostid",	dosfshostid },
-	{ "loadinfo",	doloadinfo},
-	{ "reset",	doreset},
-	{ "routing",	dorouting},
-	{ "trafgens",	dotrafgens},
-	{ "nseconfigs",	donseconfigs},
-	{ "creator",	docreator},
-	{ "state",	dostate},
-	{ "tunnels",	dotunnels},
-	{ "vnodelist",	dovnodelist},
-	{ "subnodelist",dosubnodelist},
-	{ "isalive",	doisalive},
-	{ "ipodinfo",	doipodinfo},
-	{ "ntpinfo",	dontpinfo},
-	{ "ntpdrift",	dontpdrift},
-	{ "tarball",	doatarball},
-	{ "rpm",	doanrpm},
-	{ "jailconfig",	dojailconfig},
-	{ "plabconfig",	doplabconfig},
-	{ "subconfig",	dosubconfig},
-        { "sdparams",   doslothdparams},
-        { "programs",   doprogagents},
-        { "syncserver", dosyncserver},
-        { "keyhash",    dokeyhash},
+	{ "reboot",	  0, doreboot },
+	{ "nodeid",	  1, donodeid },
+	{ "status",	  0, dostatus },
+	{ "ifconfig",	  1, doifconfig },
+	{ "accounts",	  1, doaccounts },
+	{ "delay",	  1, dodelay },
+	{ "linkdelay",	  1, dolinkdelay },
+	{ "hostnamesV2",  0, dohostsV2 },	/* This will go away */
+	{ "hostnames",	  1, dohosts },
+	{ "rpms",	  1, dorpms },
+	{ "deltas",	  0, dodeltas },
+	{ "tarballs",	  1, dotarballs },
+	{ "startupcmd",	  1, dostartcmd },
+	{ "startstatus",  0, dostartstat }, /* Leave this before "startstat" */
+	{ "startstat",	  0, dostartstat },
+	{ "readycount",   0, doreadycount },
+	{ "ready",	  0, doready },
+	{ "log",	  0, dolog },
+	{ "mounts",	  0, domounts },
+	{ "sfshostid",	  0, dosfshostid },
+	{ "loadinfo",	  0, doloadinfo},
+	{ "reset",	  0, doreset},
+	{ "routing",	  1, dorouting},
+	{ "trafgens",	  1, dotrafgens},
+	{ "nseconfigs",	  1, donseconfigs},
+	{ "creator",	  1, docreator},
+	{ "state",	  0, dostate},
+	{ "tunnels",	  1, dotunnels},
+	{ "vnodelist",	  1, dovnodelist},
+	{ "subnodelist",  1, dosubnodelist},
+	{ "isalive",	  0, doisalive},
+	{ "ipodinfo",	  0, doipodinfo},
+	{ "ntpinfo",	  1, dontpinfo},
+	{ "ntpdrift",	  0, dontpdrift},
+	{ "tarball",	  0, doatarball},
+	{ "rpm",	  0, doanrpm},
+	{ "jailconfig",	  0, dojailconfig},
+	{ "plabconfig",	  0, doplabconfig},
+	{ "subconfig",	  0, dosubconfig},
+        { "sdparams",     1, doslothdparams},
+        { "programs",     1, doprogagents},
+        { "syncserver",   1, dosyncserver},
+        { "keyhash",      1, dokeyhash},
+        { "fullconfig",   0, dofullconfig},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4748,8 +4751,8 @@ COMMAND_PROTOTYPE(doixpconfig)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	struct in_addr  mask_addr, bcast_addr, gw_addr;
-	char		bcast_ip[16], gw_ip[16];
+	struct in_addr  mask_addr, bcast_addr;
+	char		bcast_ip[16];
 
 	/*
 	 * Get the "control" net address for the IXP from the interfaces
@@ -4810,14 +4813,16 @@ COMMAND_PROTOTYPE(doixpconfig)
 	return 0;
 }
 
-/* return slothd params - just compiled in for now. */
+/*
+ * return slothd params - just compiled in for now.
+ */
 COMMAND_PROTOTYPE(doslothdparams) 
 {
-  char buf[MYBUFSIZE];
+	char buf[MYBUFSIZE];
   
-  sprintf(buf, "%s", SDPARAMS);
-  client_writeback(sock, buf, strlen(buf), tcp);
-  return 0;
+	sprintf(buf, "%s\n", SDPARAMS);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	return 0;
 }
 
 /*
@@ -4928,6 +4933,33 @@ COMMAND_PROTOTYPE(dokeyhash)
 	if (verbose)
 		info("%s", buf);
 	
+	return 0;
+}
+
+/*
+ * Return entire config.
+ */
+COMMAND_PROTOTYPE(dofullconfig)
+{
+	char		buf[MYBUFSIZE];
+	int		i;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("FULLCONFIG: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	for (i = 0; i < numcommands; i++) {
+		if (command_array[i].full) {
+			sprintf(buf, "*** %s\n", command_array[i].cmdname);
+			client_writeback(sock, buf, strlen(buf), tcp);
+
+			command_array[i].func(sock, reqp, rdata, tcp, vers);
+		}
+	}
 	return 0;
 }
 
