@@ -11,19 +11,17 @@ Temp. worker co-ordination: Mac
 ***** Hardware
 **********************************************************************
 ISP110s:
-	Status: Ordered, 69 recived, at least 2 need to be returned
-	Next shipment: ??
+	Status: Ordered, 94 received, 1 returned
+	Next shipment: 25-30, Monday 8/20
 	Responsible: Rob
-	Note: Rails are currently backordered, should be in 8/14 or 8/15
+	Note: Rails are currently backordered
 
 Network cables:
-	Status: Most have arrived, still waiting for serial cables and hoods
-	Next Shipment: ??
+	Status: Received
 	Responsible: Mac
 
 Rackmount nuts/screws:
-	Status: Ordered
-	Will ship: Friday, 8/10 
+	Status: Received
 	Responsible: Mac
 
 3ft Power cables from ValCom:
@@ -98,7 +96,7 @@ Pick control net ineterface:
 Decide on machine numbering scheme:
 	Responsible: ??
 	Status: Done
-	Start at pc42
+	Start at pc41
 
 Serial server:
 	What machines can we use the Cyclades card in?
@@ -128,6 +126,9 @@ Power outlets:
 	Responsible: Rob
 	Status: Found 2, need 4 more
 	Note: Any outlets we find under the floor are fair game
+
+Label power cables:
+	Responsible: Rob
 
 **********************************************************************
 ***** Testbed state to update
