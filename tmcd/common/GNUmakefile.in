@@ -69,6 +69,7 @@ common-script-install:	dir-install vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
 	$(INSTALL) -m 755 vnodesetup $(BINDIR)/vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
+	$(INSTALL) -m 755 $(SRCDIR)/batchcmddone $(BINDIR)/batchcmddone
 
 local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup

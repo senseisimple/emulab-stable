@@ -1,0 +1,48 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# Report that batch command for this node is done. Report status.
+#
+sub usage()
+{
+    print "Usage: batchcmddone <status>\n";
+    exit(1);
+}
+my $stat;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+usage()
+    if (@ARGV != 1);
+$stat = $ARGV[0];
+
+# Sanity Check
+if ($stat =~ /^(\d*)$/) {
+    $stat = $1;
+}
+else {
+    print "*** $0:\n" .
+	  "    WARNING: Invalid exit status $stat. Reporting default.\n";
+    $stat = 666;
+}
+
+#
+# Then invoke the bootsetup routine in the library. All the work happens
+# in there. 
+#
+startcmdstatus($stat);
+
+exit 0;
