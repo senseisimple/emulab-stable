@@ -121,6 +121,15 @@ Then create the files:
 Then restart syslog:
 
 	sudo kill -HUP `cat /var/run/syslog.pid`
+
+
+You also want entries in /etc/newsyslog.conf:
+
+	/var/log/logins                         640  7     200 *      Z
+	/var/log/capture.log			664  7     *    168
+	Z
+
+This is file is read hourly, so need to restart anything.
 	
 
 ##### Step 6 - Capture setup
