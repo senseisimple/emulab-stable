@@ -155,6 +155,11 @@ void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
       exit(1);
     }
     setsockopt(sock,IPPROTO_IP,IP_MULTICAST_TTL,&ttl,sizeof(ttl));
+    
+    { /* disable local echo */
+      u_char loop = 0;
+      setsockopt(sock, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+    }
   } else
 #endif /* MCAST */
   { 
