@@ -15,6 +15,7 @@
 ######################################################################
 
 Class Simulator
+Class Program -superclass NSObject
 
 Simulator instproc init {args} {
     # A counter for internal ids
@@ -46,6 +47,10 @@ Simulator instproc init {args} {
     # event list is a list of {time vnode vname otype etype args atstring}
     $self set event_list {}
     $self set event_count 0
+
+    # Program list.
+    $self instvar prog_list;
+    array set prog_list {}
 }
 
 # node
@@ -142,6 +147,7 @@ Simulator instproc run {} {
     $self instvar lanlink_list
     $self instvar node_list
     $self instvar event_list
+    $self instvar prog_list
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::errors
@@ -209,6 +215,9 @@ Simulator instproc run {} {
     }
     foreach vtype [array names vtypes] {
 	$vtype updatedb $DB
+    }
+    foreach prog [array names prog_list] {
+	$prog updatedb $DB
     }
     
     foreach event $event_list {
@@ -433,6 +442,36 @@ Simulator instproc at {time eventstring} {
 	    set vnode {}
 	    set vname $obj
 	}
+	"Program" {
+	    set otype PROGRAM
+	    set vname $obj
+	    set vnode [$obj set node]
+    
+	    switch -- $cmd {
+		"start" {
+		    set etype START
+		    set arg  [$obj set command]
+		    set args "COMMAND=$arg"
+		}
+		"stop" {
+		    set etype STOP
+		}
+		"kill" {
+		    set etype KILL
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+	            set arg [lindex $event 2]
+		    set args "SIGNAL=$arg"
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set okargs 1
+	}
 	"Simulator" {
 	    switch -- $cmd {
 		"bandwidth" {
@@ -494,6 +533,12 @@ Simulator instproc rename_node {old new} {
     set node_list($new) {}
 }
 
+Simulator instproc rename_program {old new} {
+    $self instvar prog_list
+    unset prog_list($old)
+    set prog_list($new) {}
+}
+
 # find_link <node1> <node2>
 # This is just an accesor to the link_map datastructure.  If no
 # link is known between <node1> and <node2> the empty list is returned.
@@ -536,3 +581,50 @@ Simulator instproc use_subnet {subnet} {
     $self instvar subnets
     set subnets($subnet) {}
 }
+
+# program
+Simulator instproc program {} {
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar prog_list
+
+    set id n[incr id_counter]
+    Program $id $self
+    set prog_list($id) {}
+    set last_class $id
+
+    return $id
+}
+
+Program instproc init {s} {
+    $self set sim $s
+
+    $self set node {}
+    $self set command {}
+}
+
+Program instproc rename {old new} {
+    [$self set sim] rename_program $old $new
+}
+
+# updatedb DB
+# This adds rows to the virt_trafgens table corresponding to this agent.
+Program instproc updatedb {DB} {
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+    var_import ::GLOBALS::objtypes
+    $self instvar node
+    $self instvar command
+
+    if {$node == {}} {
+	perror "\[updatedb] $self has no node."
+	return
+    }
+    if {$command == {}} {
+	perror "\[updatedb] $self has no command."
+	return
+    }
+
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$self','$objtypes(PROGRAM)')";
+}
+

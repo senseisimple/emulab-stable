@@ -27,6 +27,7 @@ Class Application -superclass NSObject
 Class Application/Traffic/CBR -superclass Application
 Class Application/FTP -superclass Application
 Class Application/Telnet -superclass Application
+Class Application/Program -superclass Application
 
 namespace eval GLOBALS {
     set new_classes(Agent/UDP) {}
@@ -89,6 +90,7 @@ Agent instproc rename {old new} {
 Agent instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::objtypes
     $self instvar application
     $self instvar destination
     $self instvar node
@@ -109,7 +111,7 @@ Agent instproc updatedb {DB} {
     set target_port [$destination set port]
 
     if {$role == "sink"} {
-	set application [$destination set application]
+	set application $self
 	set proto [$destination set proto]
     }
 #   set src_link [lindex [$node set portlist] 0]
@@ -118,6 +120,7 @@ Agent instproc updatedb {DB} {
     # Update the DB
     sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port,generator) values ('$pid','$eid','$node','$application','$role','$proto', $port,'$target_vnode',$target_port,'$generator')";
 
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
 }
 
 # get_nseconfig is only defined for subclasses that will be simulated by NSE
@@ -233,6 +236,7 @@ Agent/TCP/FullTcp instproc listen {} {
 Agent/TCP/FullTcp instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::objtypes
     $self instvar application
     $self instvar destination
     $self instvar node
@@ -257,7 +261,11 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     # Update the DB
     sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port,generator) values ('$pid','$eid','$node','$vname','$role','$proto', $port,'$target_vnode',$target_port,'$generator')";
 
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$vname','$objtypes(TRAFGEN)')";
 
+    if {$application != {}} {
+	sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
+    }
 }
 
 # Agent/TCP/FullTcp
@@ -508,3 +516,4 @@ Application/Telnet instproc get_nseconfig {} {
 
     return $nseconfig
 }
+

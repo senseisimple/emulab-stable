@@ -160,6 +160,21 @@ namespace eval GLOBALS {
 set GLOBALS::DB [sql conn]
 sql selectdb ${GLOBALS::DB} @TBDBNAME@
 
+namespace eval GLOBALS {
+    # A mapping of event objects.
+    variable objtypes
+
+    sql query $DB \
+	    "select idx,type from event_objecttypes"
+    
+    while {[set row [sql fetchrow $DB]] != ""} {
+	set idx [lindex $row 0]
+	set type [lindex $row 1]
+	set objtypes($type) $idx
+    }
+    sql endquery $DB
+}
+
 # Load all our classes
 source ${GLOBALS::libdir}/nsobject.tcl
 source ${GLOBALS::libdir}/sim.tcl
