@@ -9,7 +9,6 @@ sub usage()
     print STDOUT "Usage: console_setup node [node ...]\n";
     exit(-1);
 }
-my  $optlist = "";
 
 #
 # Configure variables
@@ -39,10 +38,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
-if (! getopts($optlist, \%options)) {
-    usage();
-}
 if (@ARGV == 0) {
     usage();
 }
