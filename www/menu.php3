@@ -44,6 +44,12 @@ function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
     echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
 }
 
+function WRITESIDEBARBUTTON_ABSCOOL($text, $base, $link ) {
+    $link = "$link";
+    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
+    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+}
+
 # same as above, but uses a slightly different style sheet so there
 # is more padding below the last button.
 # The devil is, indeed, in the details.
@@ -107,13 +113,28 @@ function WRITESIDEBAR() {
   <table class="menu" width=220 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
-    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
-    WRITESIDEBARBUTTON_NEW("Other Emulabs", $TBDOCBASE,
-                  "docwrapper.php3?docname=otheremulabs.html");
+    if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
+	$rootEmulab = 1;
+    } else {
+	$rootEmulab = 0;
+    }
 
-    
-    WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
-			   $TBDOCBASE, "cdrom.php");
+    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
+
+
+    if ($rootEmulab) {
+	WRITESIDEBARBUTTON_NEW("Other Emulabs", $TBDOCBASE,
+			       "docwrapper.php3?docname=otheremulabs.html");
+	WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
+				$TBDOCBASE, "cdrom.php");
+    } else {
+	WRITESIDEBARBUTTON_ABS("Utah Emulab", $TBDOCBASE,
+			       "http://www.emulab.net/");
+	# Link ALWAYS TO UTAH
+	WRITESIDEBARBUTTON_ABSCOOL("Join Netbed (CD)",
+			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
+
+    }
 
     if ($newNews) {
 	WRITESIDEBARBUTTON_NEW("News $newsDate", $newsBase, "news.php3");
@@ -122,14 +143,20 @@ function WRITESIDEBAR() {
     }
 
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
-    WRITESIDEBARBUTTON("Papers", $TBDOCBASE, "pubs.php3");
-    WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
-    WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
-    WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
-    WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
-		       "projectlist.php3");
-    WRITESIDEBARLASTBUTTON("Sponsors", $TBDOCBASE,
-		       "docwrapper.php3?docname=sponsors.html");
+
+    if ($rootEmulab) {
+	WRITESIDEBARBUTTON("Papers", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
+	WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
+	WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
+	WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
+			   "projectlist.php3");
+	WRITESIDEBARLASTBUTTON("Sponsors", $TBDOCBASE,
+			       "docwrapper.php3?docname=sponsors.html");
+    } else {
+	WRITESIDEBARLASTBUTTON("Projects on Emulab", $TBDOCBASE,
+			       "projectlist.php3");
+    }
 
     # create the search bit, then the second table for the Web Interface.
 ?>
