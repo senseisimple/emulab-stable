@@ -12,11 +12,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS = -O2 -g
 LIBS = -lz
 
-imagezip: imagezip.c
-	$(CC) $(CFLAGS) imagezip.c $(LIBS) -o imagezip
+imagezip: imagezip.o
+	$(CC) $(CFLAGS) imagezip.o $(LIBS) -o imagezip
 
-imageunzip: imageunzip.c
-	$(CC) $(CFLAGS) imageunzip.c $(LIBS) -o imageunzip
+imageunzip: imageunzip.o
+	$(CC) $(CFLAGS) imageunzip.o $(LIBS) -o imageunzip
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 

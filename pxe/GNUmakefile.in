@@ -20,29 +20,31 @@ DBFLAG	= -DUSE_MYSQL_DB
 #DBFLAG = -DUSE_CFILE_DB
 #DBFLAG = -DUSE_NULL_DB
 DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
+DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
 
-CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
+INCS    = -I/usr/local/include
+INCS   += -I/n/moab/z/mike/flux/install.debug/include
+#INCS  += -I/n/moab/z/stoller/oskit-debug/install/include
+#INCS  += -I/build/oskit-debug/install/include
+
+CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
 		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"'
-INCS	= -I/n/moab/z/mike/flux/install.debug/include
-#INCS	= -I/n/moab/z/stoller/oskit-debug/install/include
-#INCS	= -I/build/oskit-debug/install/include
 
-proxydhcp: proxydhcp.c
-	cc $(CFLAGS) -o proxydhcp proxydhcp.c $(LFLAGS)
+proxydhcp: proxydhcp.o
+	cc $(CFLAGS) -o proxydhcp proxydhcp.o $(LFLAGS)
 
-bootinfo: bootinfo.c $(DBSRC) bootinfo_mysql.c
-	cc $(CFLAGS) $(DBFLAG) $(INCS) -I/usr/local/include \
-		-o bootinfo bootinfo.c $(DBSRC) \
+bootinfo: bootinfo.o $(DBOBJ)
+	cc $(CFLAGS) $(DBFLAG) $(INCS) \
+		-o bootinfo bootinfo.o $(DBOBJ) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 testmysql: bootinfo_mysql.c
-	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) -I/usr/local/include \
-		-o testmysql bootinfo_mysql.c \
+	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) \
+		-o testmysql $< \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 testcfile: bootinfo_cfile.c
-	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile \
-		bootinfo_cfile.c $(LFLAGS)
+	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile $< $(LFLAGS)
 
 install:	all
 
@@ -54,4 +56,4 @@ install:	$(INSTALL_SBINDIR)/proxydhcp \
 		$(INSTALL_ETCDIR)/bootinfo.conf
 
 clean: 
-	rm -f proxydhcp bootinfo testmysql
+	rm -f *.o core proxydhcp bootinfo testmysql

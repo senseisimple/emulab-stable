@@ -12,16 +12,17 @@ all:	tmcd tmcc
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-tmcd: tmcd.c
-	$(CC) $(CFLAGS) -DTBDBNAME='"$(TBDBNAME)"' -g -o tmcd tmcd.c \
-		-I/usr/local/include \
+CFLAGS	+= -DTBDBNAME='"$(TBDBNAME)"' -I/usr/local/include
+
+tmcd: tmcd.o
+	$(CC) $(CFLAGS) -o tmcd tmcd.o \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
-tmcc: tmcc.c
-	$(CC) $(CFLAGS) -g -o tmcc tmcc.c $(LFLAGS)
+tmcc: tmcc.o
+	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(LFLAGS)
 
-tmcc.c:	decls.h
-tmcd.c:	decls.h
+tmcc.o:	tmcc.c decls.h
+tmcd.o:	tmcd.c decls.h
 
 install:	all
 

@@ -18,7 +18,7 @@ DESTDIR=
 CFLAGS= -g -O2 -DLOG_DROPS
 
 capture: capture.c
-	cc $(CFLAGS) -o capture capture.c
+	cc $(CFLAGS) -o capture $<
 
 #
 # Do not install by default.
