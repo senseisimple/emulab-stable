@@ -302,6 +302,9 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 			 pc->pc_robot->hostname);
 		}
 
+		gettimeofday(&(pc->pc_waypoint_timestamp),NULL);
+		pc->pc_waypoint_tries = 21;
+
 		pc->pc_tries_remaining = 0;
 		pc->pc_obstacle_count = 0;
 	    }
