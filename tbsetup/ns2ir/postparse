@@ -198,21 +198,16 @@ if ($@) {
     print STDERR "Incomplete IR - Could not find /topology/lans\n";
     exit(1);
 }
-@links = split("\n",$raw);
-@newlinks = ();
-foreach (@links) {
-    @info = split;
-    if (defined($lanloss{$info[0]})) {
-	$loss = $lanloss{$info[0]}
+@lans = split("\n",$raw);
+@newlans = ();
+foreach (@lans) {
+    ($lan,$prefix,$postfix) = /^([^ ]+) ("[^\"]+" [^ ]+ [^ ]+)[ \t]+(.*)$/;
+    if (defined($lanloss{$lan})) {
+	$loss = $lanloss{$lan}
     } else {
 	$loss = "0.0";
     }
-    # This is kind of ugly because it has a sub list.
-    # Works very nicely in TCL though.
-    @t = split("\"");
-    @t2 = split("[ \t]+",$t[2]);
-    $s = "$t[0]\"$t[1]\" $t2[1] $t2[2] $lanloss{$info[0]} " . join(" ",@t2[3..$#t2]);
-    push(@newlans,$s);
+    push(@newlans,"$lan $prefix $loss $postfix");
 }
 if ($#newlans != -1) {
     &ir_set("/topology/lans",join("\n",@newlans) . "\n");
