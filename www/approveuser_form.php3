@@ -29,7 +29,7 @@ echo "
             <td>&nbsp</td>
             <td>Postpone</td>
             <td>-</td>
-            <td>Do nothing; user remains pending decision</td>
+            <td>Do nothing; application remains, pending a decision.</td>
         </tr>
         <tr>
             <td>&nbsp</td>
