@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(REMOTE LOCALROOTFS);
+use libsetup qw(REMOTE LOCALROOTFS TBDebugTimeStamp);
 use libtmcc;
 
 #
@@ -170,6 +170,8 @@ if ($vnodeid =~ /^[\w]*-(\d+)$/) {
     $idnumber = $1;
 }
 
+TBDebugTimeStamp("mkjail starting to do real work");
+
 #
 # Get the parent IP.
 # 
@@ -234,6 +236,7 @@ if (! -e $vnodeid) {
 	fatal("Could not mkdir $vnodeid in $JAILPATH: $!");
 }
 else {
+    TBDebugTimeStamp("mkjail getting jail config");
     getjailconfig("$JAILPATH/$vnodeid");
 }
 
@@ -243,6 +246,7 @@ chomp($phys_cnet_if);
 #
 # See if special options supported, and if so setup args as directed.
 #
+TBDebugTimeStamp("mkjail setting jail options");
 setjailoptions();
 
 #
@@ -261,15 +265,18 @@ print("Setting up jail for $vnodeid using $IP\n")
 if (-e "$vnodeid/root") {
     #
     # Try to pick up where we left off.
-    # 
+    #
+    TBDebugTimeStamp("mkjail restoring root fs");
     restorerootfs("$JAILPATH/$vnodeid");
 }
 else {
     #
     # Create the root filesystem.
     #
+    TBDebugTimeStamp("mkjail creating root fs");
     mkrootfs("$JAILPATH/$vnodeid");
 }
+TBDebugTimeStamp("mkjail done with root fs");
 
 #
 # If the jail has its own IP, must insert the control network alias.
@@ -291,6 +298,7 @@ if ($jailflags & $JAIL_ROUTING) {
 # Set up jail interfaces. We pass it the rtabid as well, and the script
 # does all the right stuff. 
 #
+TBDebugTimeStamp("mkjail doing ifsetup for jail");
 mysystem("ifsetup -j $vnodeid ".
 	 (($jailflags & $JAIL_ROUTING) ? "-r $routetabid " : "") .
 	 "boot");
@@ -299,7 +307,9 @@ mysystem("ifsetup -j $vnodeid ".
 # Start the tmcc proxy. This path will be valid in both the outer
 # environment and in the jail!
 #
+TBDebugTimeStamp("mkjail starting the tmcc proxy");
 startproxy("$JAILPATH/$vnodeid");
+TBDebugTimeStamp("mkjail tmcc proxy is running");
 
 #
 # Start the jail. We do it in a child so we can send a signal to the
@@ -316,6 +326,8 @@ else {
     $SIG{TERM} = 'DEFAULT';
     $ENV{'TMCCVNODEID'} = $vnodeid;
 
+    TBDebugTimeStamp("mkjail starting the jail");
+    
     my $cmd = "jail $jailoptions $JAILPATH/$vnodeid/root $jailhostname $IP ".
 	"/etc/jail/injail -v $vnodeid";
     if ($interactive) {
@@ -349,8 +361,10 @@ sub mkrootfs($)
     
     #
     # Lots of zeros. Note we oseek to create a big hole.
-    # 
+    #
+    TBDebugTimeStamp("mkjail doing the dd");
     mysystem("dd if=/dev/zero of=root.vnode bs=512 oseek=$vnsize count=1");
+    TBDebugTimeStamp("mkjail done with the dd");
 
     #
     # Find a free vndevice. We start with the obvious choice, and if that
@@ -372,11 +386,13 @@ sub mkrootfs($)
     print("Using vn${vndevice}\n")
  	if ($debug);
 
+    TBDebugTimeStamp("mkjail vnconfig, label, newfs, tunefs, mount");
     mysystem("vnconfig -s labels vn${vndevice} root.vnode");
     mysystem("disklabel -r -w vn${vndevice} auto");
     mysystem("newfs -U -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
     mysystem("tunefs -m 2 -o time /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
+    TBDebugTimeStamp("mkjail vnconfig, label, newfs, tunefs, mount done!");
     push(@mntpoints, "$path/root");
 
     #
@@ -421,6 +437,7 @@ sub mkrootfs($)
     # /dev is also special. It gets a very restricted set of entries.
     # Note that we create some BPF devices since they work in our jails.
     #
+    TBDebugTimeStamp("mkjail creating /dev directory");
     my $makedevs = "bpf31";
     if ($jailflags & $JAIL_DEVMEM) {
 	$makedevs .= " std pty0";
@@ -445,6 +462,8 @@ sub mkrootfs($)
     #
     # NOTE: I stole this little diddy from /etc/rc.diskless2.
     #
+    TBDebugTimeStamp("mkjail creating /var");
+    
     mysystem("mtree -nqdeU -f /etc/mtree/BSD.var.dist ".
 	     "-p $path/root/var >/dev/null 2>&1");
     mysystem("mkdir -p $path/root/$path");
@@ -462,6 +481,8 @@ sub mkrootfs($)
 		fatal("Could not mkdir 'dir' in $path/root/var/emulab: $!");
 	}
     }
+    TBDebugTimeStamp("mkjail copying the tmcc cache");
+    
     tmcccopycache($vnodeid, "$path/root");
 
     #
@@ -470,6 +491,8 @@ sub mkrootfs($)
     if ($IP ne $hostip) {
 	mysystem("echo $IP >> $path/root/var/emulab/boot/myip");
     }
+
+    TBDebugTimeStamp("mkjail creating /var/log files");
 
     #
     # Get a list of all the plain files and create zero length versions
@@ -483,6 +506,8 @@ sub mkrootfs($)
     foreach my $log (@logs) {
 	mysystem("touch $path/root/var/log/$log");
     }
+
+    TBDebugTimeStamp("mkjail configuring etc files");
 
     #
     # Now a bunch of stuff to set up a nice environment in the jail.
@@ -516,6 +541,8 @@ sub mkrootfs($)
 	     "sed -e 's/127\.0\.0\.1/$hostip/' > ".
 	     "$path/root/etc/resolv.conf");
 
+    TBDebugTimeStamp("mkjail setting up password/group files");
+
     #
     # Password/group file stuff. If remote the jail picks them up. Locally
     # we start with current set of accounts on the physnode, since this is
@@ -535,6 +562,8 @@ sub mkrootfs($)
 	mysystem("cp -p $DBDIR/passdb.db $path/root/$DBDIR");
 	mysystem("cp -p $DBDIR/groupdb.db $path/root/$DBDIR");
     }
+    
+    TBDebugTimeStamp("mkjail mounting NFS filesystems");
     
     #
     # Give the jail an NFS mount of the local project directory. This one
@@ -567,6 +596,7 @@ sub mkrootfs($)
 	mysystem("$BINDIR/rc/rc.mounts ".
 		 "-j $vnodeid $path/root $NFSMOUNT_REMOTE boot");
     }
+    TBDebugTimeStamp("mkjail mounting NFS filesystems done");
 
     cleanmess($path);
     return 0;
