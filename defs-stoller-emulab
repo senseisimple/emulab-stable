@@ -7,7 +7,6 @@ TBLOGSEMAIL=stoller@flux.utah.edu
 TBWWWEMAIL=stoller@flux.utah.edu
 TBAPPROVALEMAIL=stoller@flux.utah.edu
 TBAUDITEMAIL=stoller@flux.utah.edu
-IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net

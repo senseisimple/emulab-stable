@@ -13,7 +13,6 @@ TBAPPROVALEMAIL=shash+mini-approve@cs.utah.edu
 TBAUDITEMAIL=shash+mini-log@cs.utah.edu
 TBACTIVEARCHIVE=shash+activearch@cs.utah.edu
 TBUSERSARCHIVE=shash+usersarch@cs.utah.edu
-IPBASE=192.168
 JAILIPBASE=172.16.0.0
 JAILIPMASK=255.240.0.0
 DELAYCAPACITY=1
