@@ -114,9 +114,10 @@ option --with-assignbinary=/path/to/assign/binary.
 
 It is best to add the following group before creating the following
 directories. Basically, testbed software should be in the tbadmin
-group. Run this command as root.
+group. Run this command as root. (NOTE: The numeric gid used for the
+tbadmin group must be greater than 100)
 
-	pw groupadd tbadmin -g 99
+	pw groupadd tbadmin -g 101
 	
 Configure the testbed tree. Many of the configuration parameters are stored in
 a 'defs' file. Make a copy of the defs-default file (found in the root of
