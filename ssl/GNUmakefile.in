@@ -12,7 +12,7 @@ SUBDIR		= ssl
 
 include $(OBJDIR)/Makeconf
 
-all:	emulab.pem server.pem localnode.pem ronnode.pem wanode.pem
+all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
