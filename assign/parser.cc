@@ -12,6 +12,11 @@
 
 #include "parser.h"
 
+#ifdef DEBUG_PARSER
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
 
 string_vector split_line(crope line,char split_char)
 {
@@ -19,12 +24,21 @@ string_vector split_line(crope line,char split_char)
   crope::const_iterator next_space,prev_space;
   prev_space = line.begin();
 
+  DEBUG(cerr << "Parsing line " << line << endl;)
+
   while ((next_space = find(prev_space,line.end(),' ')) != line.end()) {
-    parsed.push_back(line.substr(prev_space,next_space));
+    if (next_space != prev_space) { // Skip multiple spaces
+      parsed.push_back(line.substr(prev_space,next_space));
+      DEBUG(cerr << "Pushing string: " << line.substr(prev_space,next_space) <<
+	  endl;)
+    }
     prev_space = ++next_space;
   }
-  if (prev_space != next_space)
+  if (prev_space != next_space) {
     parsed.push_back(line.substr(prev_space,next_space));
+    DEBUG(cerr << "Pushing string: " << line.substr(prev_space,next_space) <<
+	endl;)
+  }
   
   return parsed;
 }
