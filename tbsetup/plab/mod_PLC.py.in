@@ -12,6 +12,7 @@ import xmlrpclib
 import getopt
 import fcntl
 import time
+import calendar
 
 from libtestbed import *
 
@@ -26,9 +27,14 @@ debug = 0
 #
 DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
 DEF_PLC_USER = "lepreau@cs.utah.edu"
-DEF_PLC_PASS = "phurds"
-DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
+DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
+
+MAX_PLC_LEASELEN = 2*30*24*60*60   # defined by PLC as two months
+MIN_LEASE_ADDTIME = 23*60*60       # less than a day used? leave it be then..
+MAX_LEASE_SLOP = 600 # (ten minutes)
+MAX_CACHE_TIME = 3600 # (one hour)
 DEF_PLC_SHARES = 30 # XXX: totally arbitrary
+
 EMULABMAN_EMAIL = "emulabman@emulab.net"
 
 PLC_LOCKFILE = "/tmp/.PLC-lock"
@@ -99,6 +105,9 @@ class PLCagent:
             raise
         return
 
+    def getSliceName(self):
+        return self.__slice['sliceName']
+
     def createSlice(self):
         return self.__server.createSlice(self.__slice, self.__auth)
 
@@ -156,12 +165,16 @@ class mod_PLC:
     def __init__(self, noIS = False):
         self.modname = "mod_PLC"
         self.noIS = noIS
+        self.__PLCagent = None
+        self.__sliceexpdict = {}
+        self.__sliceexptime = 0
         return
 
     def createSlice(self, slice):
 
-        agent = PLCagent(slice.slicename)
+        agent = self.__getAgent(slice.slicename)
         res = None
+        now = calendar.timegm(time.gmtime())
 
         try:
             res = tryXmlrpcCmd(agent.createSlice)
@@ -186,7 +199,7 @@ class mod_PLC:
         
         try:
             res = tryXmlrpcCmd(agent.AssignShares,
-                               (DEF_PLC_LEASELEN,
+                               (MAX_PLC_LEASELEN,
                                 DEF_PLC_SHARES))
             if debug:
                 print res
@@ -196,65 +209,87 @@ class mod_PLC:
             print "Failed to assign shares to slice %s" % slice.slicename
             raise
         
-        leaseend = time.time() + DEF_PLC_LEASELEN
+        leaseend = now + MAX_PLC_LEASELEN
         return (res, None, leaseend)
 
     def deleteSlice(self, slice):
-        agent = PLCagent(slice.slicename)
-        tryXmlrpcCmd(agent.deleteSlice)
+        agent = self.__getAgent(slice.slicename)
+        tryXmlrpcCmd(agent.deleteSlice, OKstrs = ["does not exist"])
         pass
 
     def renewSlice(self, slice):
-        agent = PLCagent(slice.slicename)
-        res = None
+        agent = self.__getAgent(slice.slicename)
+        ret = 0
+        now = calendar.timegm(time.gmtime()) # make explicit that we want UTC
+ 
+        # Get current PLC timeout for this slice
+        leaseend = self.getSliceExpTime(slice.slicename)
+
+        # Warn that we weren't able to get the exp. time from PLC,
+        # but don't fail - try to renew anyway.
+        if not leaseend:
+            print "Couldn't get slice expiration time from PLC!"
+            leaseend = slice.leaseend
+            pass
+
+        # Allow some slop in our recorded time versus PLC's.  This is necessary
+        # since we calculate the expiration locally.  If we are off by too much
+        # then adjust to PLC's recorded expiration.
+        if abs(leaseend - slice.leaseend) > MAX_LEASE_SLOP:
+            print "Warning: recorded lease for %s doesn't agree with PLC" % \
+                  slice.slicename
+            print "\tRecorded: %s  Actual: %s" % (slice.leaseend, leaseend)
+            slice.leaseend = leaseend
+            pass
+
+        # Expired!  Just bitch about it; try renewal anyway.  The renewal
+        # code in liabplab will send email.
+        if leaseend < now:
+            print "Slice %s (%s/%s) has expired!" % \
+                  (slice.slicename, slice.pid, slice.eid)
+            pass
+
+        # Max out leaseend as far as (politically) possible
+        addtime = now + MAX_PLC_LEASELEN - leaseend
+
+        # If the lease is within delta of the max, don't bother.
+        if addtime < MIN_LEASE_ADDTIME:
+            print "Slice %s (%s/%s) doesn't need to be renewed" % \
+                  (slice.slicename, slice.pid, slice.eid)
+            return 1
         
         try:
             res = tryXmlrpcCmd(agent.AssignShares,
-                               (DEF_PLC_LEASELEN,
-                                DEF_PLC_SHARES))
+                               (addtime,
+                                DEF_PLC_SHARES),
+                               NOKstrs = ["does not Exist",
+                                          "unknown within Planetlab"])
+            ret = 1
             if debug:
-                print res
+                print "AssignShares returns: %s" % res
                 pass
             pass
         except:
-            print "Failed to assign shares to slice %s" % slice.slicename
-            raise
+            print "Failed to extend lease for slice %s" % slice.slicename
+            ret = 0
+            pass
+        else:
+            # XXX: This may not be accurate - PLC _accumulates_ renewal time.
+            slice.leaseend = now + addtime
+            pass
         
-        leaseend = time.time() + DEF_PLC_LEASELEN
-        return (res, None, leaseend)
+        return ret
 
     def createNode(self, node):
         # add the node to the PLC slice.
-        agent = PLCagent(node.slice.slicename)
-        tries = 3
-        while 1:
-            TIMESTAMP("createnode started on %s try %d." % (node.nodeid,
-                                                         DEF_TRIES-tries+1))
-            try:
-                res = tryXmlrpcCmd(agent.AssignNodes, node.IP,
-                                   inittries=tries, raisefault=True)
-                if debug:
-                    print res
-                    pass
-                pass
-            
-            # We may have actually gotten the lease/vm even though
-            # the xmlrpc call appeared to fail.  We check for this
-            # condition here, which will show up on subsequent
-            # allocation attempts.
-            except xmlrpclib.Fault, e:
-                if e.faultString.find("already assigned") != -1:
-                    print "Lease for %s already exists." % node.nodeid
-                    break
-                elif e.triesleft > 0:
-                    tries = e.triesleft
-                else:
-                    raise
-                pass
-            # success
-            else:
-                break
+        agent = self.__getAgent(node.slice.slicename)
 
+        TIMESTAMP("createnode started on %s" % (node.nodeid))
+                  
+        res = tryXmlrpcCmd(agent.AssignNodes, node.IP,
+                           OKstrs = ["already assigned"])
+        if debug:
+            print res
             pass
 
         if not self.noIS:
@@ -277,46 +312,66 @@ class mod_PLC:
         return (res, None, None)
 
     def freeNode(self, node):
-        agent = PLCagent(node.slice.slicename)
+        agent = self.__getAgent(node.slice.slicename)
         res = None
-        tries = 3
-        while 1:
-            TIMESTAMP("freenode %s try %d started." % (node.nodeid,
-                                                         DEF_TRIES-tries+1))
-            try:
-                res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP,
-                                   inittries=tries, raisefault=True)
-                if debug:
-                    print res
-                    pass
-                pass
-            
-            # Node may not actually be assigned to the slice, causing
-            # the xmlrpc call to fail stating this fact.  If it ain't
-            # here, then we're done.
-            except xmlrpclib.Fault, e:
-                if e.faultString.find("not assigned") != -1:
-                    print "%s isn't allocate to PLC slice %s." % \
-                          (node.nodeid, node.slice.slicename)
-                    break
-                elif e.triesleft > 0:
-                    tries = e.triesleft
-                else:
-                    print "Failed to release node %s from slice %s" % \
-                          (node.nodeid, node.slice.slicename)
-                    raise
-                pass
-            # success
-            else:
-                break
-            
-            pass
 
+        try:
+            res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP,
+                               OKstrs = ["not assigned"])
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to release node %s from slice %s" % \
+                  (node.nodeid, node.slice.slicename)
+            raise
+        
         TIMESTAMP("freenode %s finished." % node.nodeid)
         return res
 
     def renewNode(self, node, length = 0):
         return(0,None,None)
 
-    pass # end of mod_PLC class
+    def getSliceExpTime(self, slicename):
+        """
+        Grab the expiration time for a slice according to PLC.
+        Entries are cached for a time specified in this module by
+        MAX_CACHE_TIME.  Returns seconds since the epoch in UTC.
+        """
+        agent = self.__getAgent(slicename)
+        # Refresh the slice expiration cache if:
+        # 1) cache is cold
+        # 2) cache is too old
+        # 3) given slice is not in cache
+        if not self.__sliceexpdict or \
+           self.__sliceexptime < time.time() - MAX_CACHE_TIME or \
+           not self.__sliceexpdict.has_key(slicename):
+            sdict = tryXmlrpcCmd(agent.listSlice)
+            for entry in sdict:
+                self.__sliceexpdict[entry['slicename']] = entry
+                pass
+            self.__sliceexptime = time.time()
+            pass
 
+        if not self.__sliceexpdict.has_key(slicename):
+            print "Slice %s unknown to PLC" % slicename
+            return None
+
+        exptime = self.__sliceexpdict[slicename]['expires']
+        leaseend = calendar.timegm(time.strptime(exptime, "%Y-%m-%d %H:%M:%S"))
+
+        return leaseend
+
+    def __getAgent(self, slicename):
+        """
+        Returns a PLC agent object for the specified slice.  May cache.
+        """
+        if not self.__PLCagent or \
+           not self.__PLCagent.getSliceName() == slicename:
+            self.__PLCagent = PLCagent(slicename)
+            pass
+
+        return self.__PLCagent
+
+    pass # end of mod_PLC class

@@ -12,7 +12,7 @@ from libtestbed import *
 import libplab
 import getopt
 
-RENEW_PERIOD = 60*60
+RENEW_PERIOD = 6*60*60  # every six hours
 
 def usage(me):
     print "Usage: %s [ -vd ]" % me

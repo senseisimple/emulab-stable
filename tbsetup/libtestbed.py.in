@@ -120,6 +120,7 @@ def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
     sm.close()
     
     return 1
+
 #
 # General library functions
 #
@@ -325,6 +326,7 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
 def tryXmlrpcCmd(cmd, args = (),
                  inittries = DEF_TRIES,
                  sleepint = DEF_SLEEPINT,
+                 OKstrs=[], NOKstrs=[], callback=None,
                  raisefault = False):
     """
     This helper/wrapper function's job is to invoke the commands to the
@@ -337,20 +339,27 @@ def tryXmlrpcCmd(cmd, args = (),
      inittries:  <int> number of retries before the function gives up
                  and reraises the last caught exception.
      sleepint:   <int> how long to sleep (in seconds) between retries.
+     OKstrs:     <list> success strings to check against any XMLRPC faults.
+                 If one is seen, then return 'success' (0)
+     NOKstrs:    <list> failure strings to check against any XMLRPC faults.
+                 If one is seen, then return 'failure' (1)
+     callback:   <func_ptr> pointer to a function to call when an XMLRPC
+                 fault is encountered.  it should return and integer, where:
+                 0 means success; 1 means fail; and -1 means keep trying.
      raisefault: <boolean> indicates whether or not to reraise an
                  xmlrpclib Fault exception when caught.  When true it
                  also adds a new 'triesleft' member to the Fault class
                  instance containing the number of attempts this
                  function had remaining when the Fault exception was
-                 encountered.
+                 encountered. XXX: DEPRECATED!
 
     RETURNS:
-     This function returns the result returned by the passed in command.
+     This function returns the result returned by the passed in RPC.
 
     SIDE EFFECTS:
      Invokes the passed in command with the passed in arguments.
      Catches protocol/socket exceptions for command retry.
-     (Optionally) catches xmlrpclib.Fault exceptions for command retry.
+     Catches xmlrpclib.Fault exceptions for potential command retry.
      Adds a 'triesleft' member to all exceptions reraised prior to tries=0.
      Understands TimeoutError exceptions, and will reraise them.
      
@@ -361,6 +370,7 @@ def tryXmlrpcCmd(cmd, args = (),
     if debug:
         print "About to perform command %s with args:\n\t%s" % \
               (cmd, args)
+
     while 1:
         tries = tries - 1
         try:
@@ -373,28 +383,68 @@ def tryXmlrpcCmd(cmd, args = (),
                     return cmd(args)
             else:
                 return cmd()
+            pass
+        # RPC returned a fault - process it here.
         except xmlrpclib.Fault, e:
+
+            # If a callback fault handler was passed, then call it to assess
+            # the damage first.
+            if callback:
+                cres = callback(e.faultCode, e.faultString)
+                if cres == 0:
+                    return "Fault received, but operation succeeded."
+                elif cres == 1:
+                    raise
+                pass
+
+            # If any of these string appears in the fault, then the desired
+            # outcome of the function has been met, so return success.
+            for fstr in OKstrs:
+                if e.faultString.find(fstr) != -1:
+                    return fstr
+                pass
+            # If any of these strings are found, then the RPC failed, no
+            # sense retrying.
+            for fstr in NOKstrs:
+                if e.faultString.find(fstr) != -1:
+                    raise
+                pass
+            
             print "XML-RPC Fault happened while executing agent " \
                   "command: %s" % cmd.func_name
             print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
+            # Raise xmlrpc exception, if requested.  Report tries left in
+            # fault object.
+            # XXX: this really should be removed once we've determined that
+            #      no existing code uses this facility.
             if raisefault:
                 e.triesleft = tries
                 raise xmlrpclib.Fault, e
+            pass
+
+        # Jump out if we receive a timeout exception.
         except TimeoutError, e:
             if debug:
                 print "Caught a timeout error, setting triesleft and raising."
             e.triesleft = tries
             raise TimeoutError, e
+
+        # Communications errors are non-fatal unless they occur
+        # several times in a row.
         except (socket.error, xmlrpclib.ProtocolError), e:
             print "Encountered problem communicating with agent " \
                   "while executing command: %s" % cmd.func_name
             if debug:
                 print "Exception is of type: %s" % e
+                pass
+            pass
 
         if tries > 0:
             print "Sleeping for %s seconds, then retrying %s command" % \
                   (sleepint, cmd.func_name)
             time.sleep(sleepint)
+            pass
+        
         else:
             # XXX: perhaps this should raise its own, new type of
             # exception.

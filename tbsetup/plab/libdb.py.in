@@ -104,3 +104,40 @@ def DBQueryFatal(*args):
     if ret == None:
         raise RuntimeError, "DBQueryFatal failed"
     return ret
+
+
+def TBSiteVarExists(name):
+    name = DBQuoteSpecial(name)
+
+    qres = DBQueryFatal("select name from sitevariables "
+                        "where name=%s", (name,))
+
+    if len(qres) > 0:
+        return 1
+    else:
+        return 0
+    pass
+
+
+def TBGetSiteVar(name):
+    name = DBQuoteSpecial(name)
+
+    qres = DBQueryFatal("select value, defaultvalue from sitevariables "
+                        "where name=%s", (name,))
+
+    if len(qres) > 0:
+        value, defaultvalue = qres[0]
+
+        if value: return value
+        elif defaultvalue: return defaultvalue
+
+        pass
+    
+    raise RuntimeException, \
+          "*** attempted to fetch unknown site variable name!"
+
+
+def DBQuoteSpecial(str):
+    TBDBConnect()
+    return __dbConnection.escape_string(str)
+
