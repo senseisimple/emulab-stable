@@ -53,6 +53,8 @@ install: all
 	install -c tbsetup/ir/extract_tb.tcl /usr/testbed/bin/extract_tb
 	install -c tbsetup/ir/handle_ip.tcl /usr/testbed/bin/handle_ip
 	install -c tbsetup/ns2ir/parse.tcl /usr/testbed/bin/parse
+	cp -r tbsetup /usr/testbed/lib/tbsetup
+	cp -r db /usr/testbed/lib/db
 	@$(MAKE) -C tbsetup/checkpass install
 
 
