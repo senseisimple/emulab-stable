@@ -5602,10 +5602,17 @@ COMMAND_PROTOTYPE(dobootlog)
 		 * Note that tmcc version 22 now closes its write side.
 		 */
 		if (vers >= 22 && tcp && !isssl) {
-			int cc = READ(sock, &buf[len], sizeof(buf) - len);
+			char *bp = &buf[len];
+			
+			while (len < sizeof(buf)) {
+				int cc = READ(sock, bp, sizeof(buf) - len);
 
-			if (cc > 0)
+				if (cc <= 0)
+					break;
+
 				len += cc;
+				bp  += cc;
+			}
 		}
 		
 		if ((cp = (char *) malloc((2*len)+1)) == NULL) {
