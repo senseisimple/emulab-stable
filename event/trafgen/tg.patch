@@ -1,6 +1,18 @@
+diff -ru dist-tg2.0/src/tg/config.h tg2.0/src/tg/config.h
+--- dist-tg2.0/src/tg/config.h	Thu Jan 24 16:30:09 2002
++++ tg2.0/src/tg/config.h	Thu May  9 13:44:05 2002
+@@ -14,7 +14,7 @@
+ 
+ /* Maximum packet buffer size.						*/
+ 
+-#define MAX_PKT_SIZE		8192 /* 3072	/* Sized for Ethernet.	*/
++#define MAX_PKT_SIZE		65536 /* 3072	/* Sized for Ethernet.	*/
+ 
+ /* Maximum value from random-number generator.				*/
+ 
 diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
 --- dist-tg2.0/src/tg/log.c	Thu Jan 24 16:30:09 2002
-+++ tg2.0/src/tg/log.c	Wed Mar 13 12:43:19 2002
++++ tg2.0/src/tg/log.c	Thu May  9 11:04:44 2002
 @@ -268,6 +268,11 @@
  	char		*cp = buf;
  	char		ctl;
@@ -61,17 +73,28 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  	/* Encode record type.						*/
  
  	*cp++ = LOGTYPE_TEARDOWN;
-@@ -567,6 +592,11 @@
- 	char		buf[100];
+@@ -568,6 +593,11 @@
  	char		*cp = buf;
  	char		ctl;
-+
+ 
 +#ifdef USEEVENTS
 +	if (log_fp == NULL)
 +		return;
 +#endif
- 
++
  	/* Encode record type.						*/
+ 
+ 	*cp++ = LOGTYPE_TX;
+@@ -717,6 +747,10 @@
+ 
+ 	extern FILE	*log_fp;
+ 	
++#ifdef USEEVENTS
++	if (log_fp == NULL)
++		return;
++#endif
+ 	if (log_fp != stdout &&  log_fp != stderr) 
+ 	  (void) fclose (log_fp);
  
 diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 --- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
@@ -297,7 +320,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  			    (void)close(sfd);
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Thu May  2 14:13:33 2002
++++ tg2.0/src/tg/tg.y	Fri May  3 13:27:53 2002
 @@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
@@ -372,7 +395,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			{
  			/* (Re-)Start logging to a new file */
  			time_t now;
-@@ -1144,11 +1161,15 @@
+@@ -1144,6 +1161,10 @@
  
  			generate(tx_asn, cur_tg, lasttime);
  			}
@@ -383,21 +406,19 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		}
  
  	/* Finished, tear down connection.				*/
- 
--	if ((*(prot.prot->teardown))(tx_asn) == -1)
-+	if (tx_asn >= 0 && (*(prot.prot->teardown))(tx_asn) == -1)
- 		{
- 
+@@ -1154,8 +1175,11 @@
  		/* log the teardown error. */
-@@ -1156,6 +1177,7 @@
+ 
  		perror("do_actions: protocol teardown");
++#ifndef USEEVENTS
  		exit(-1);
++#endif
  		}
 +	active_tx_asn = -1;
  
  	return;
  	}
-@@ -1341,6 +1363,12 @@
+@@ -1341,6 +1365,12 @@
  
  		if (arrival != 0)
  			(*(prot.prot->sleep_till))(&nextpkt_tv);
@@ -410,7 +431,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		lasttime = nextpkt_tv;
  
  		/* Did we exceed the limit on the number of packets to send? */
-@@ -1382,6 +1410,10 @@
+@@ -1382,6 +1412,10 @@
  						   pktlen,
  						   &(cur_tg->stop_before),
  						   &pktid);
@@ -421,11 +442,11 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			}
  		}
  	}
-@@ -2096,5 +2128,16 @@
+@@ -2096,5 +2130,16 @@
  	char		*addr;
  {
  
-+	if (active_tx_asn >= 0 && (*(prot.prot->teardown))(active_tx_asn) == -1)
++	if ((*(prot.prot->teardown))(active_tx_asn) == -1)
 +		{
 +
 +		/* log the teardown error. */
