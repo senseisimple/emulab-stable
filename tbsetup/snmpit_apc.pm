@@ -37,8 +37,11 @@ sub new($$;$) {
     }
 
     $SNMP::debugging = ($debug - 5) if $debug > 5;
-    &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
-    &SNMP::addMibFiles('/usr/local/share/snmp/mibs/PowerNet-MIB.txt');
+    my $mibpath = "/usr/local/share/snmp/mibs";
+    &SNMP::addMibDirs($mibpath);
+    &SNMP::addMibFiles("$mibpath/RFC1155-SMI.txt",
+	"$mibpath/PowerNet-MIB.txt");
+
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
     SNMP::initMib();              # parses default list of Mib modules
     $SNMP::use_enums = 1;         #use enum values instead of only ints
