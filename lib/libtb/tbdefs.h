@@ -17,6 +17,7 @@
 #define TBDB_FLEN_EVOBJTYPE	128
 #define TBDB_FLEN_EVOBJNAME	128
 #define TBDB_FLEN_EVEVENTTYPE	128
+#define TBDB_FLEN_PRIVKEY	64
 
 /*
  * Event system stuff.
