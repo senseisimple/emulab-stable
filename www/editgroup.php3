@@ -182,7 +182,7 @@ if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
 			  "trust to users in $pid/$gid!", 1 );
 	    }
 	    
-	    TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust);
+	    TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, 1);
 	}
     }
 }
