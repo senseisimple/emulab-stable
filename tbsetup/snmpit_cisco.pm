@@ -352,7 +352,8 @@ sub vlanUnlock($;$) {
 	    $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
 	    $self->debug("Release: '$RetVal'\n");
 	    if (! $RetVal ) {
-		die("VLAN Reconfiguration Failed. No changes saved.\n");
+		warn("VLAN Reconfiguration Failed. No changes saved.\n");
+		return 0;
 	    }
 	}
     } else { 
@@ -360,7 +361,8 @@ sub vlanUnlock($;$) {
 	# If I succeed, release buffer
 	$RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
 	if (! $RetVal ) {
-	    die("VLAN Reconfiguration Failed. No changes saved.\n");
+	    warn("VLAN Reconfiguration Failed. No changes saved.\n");
+	    return 0;
 	}
 	$self->debug("Release: '$RetVal'\n");
     }

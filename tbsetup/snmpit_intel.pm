@@ -318,7 +318,8 @@ sub vlanUnlock($;$) {
 	# Make sure the confirmation was confirmed
 	#
 	if ($RetVal ne "confirmedNewConf") {
-	    die("VLAN Reconfiguration Failed. No changes saved.\n");
+	    warn("VLAN Reconfiguration Failed ($RetVal). No changes saved.\n");
+	    return 0;
 	}
 
     } else { # if $self->{CONFIRM}
@@ -326,7 +327,8 @@ sub vlanUnlock($;$) {
 	# Just check the return value
 	#
 	if ($RetVal ne 'success') {
-	    die("VLAN Reconfiguration Failed: $RetVal. No changes saved.\n");
+	    warn("VLAN Reconfiguration Failed: $RetVal. No changes saved.\n");
+	    return 0;
 	}
     }
 }
