@@ -14,12 +14,18 @@ use Getopt::Std;
 #
 my $debug = 0;
 my $sql = 1;
+my $quiet = 0;
+
+#
+# Return value - number of differences between the two files
+#
+my $diff = 0;
 
 #
 # Process command-line args
 #
 my %opt;
-getopts('hds', \%opt); 
+getopts('hdsq', \%opt); 
 if ($opt{h}) {
     exit &usage;
 }
@@ -29,6 +35,12 @@ if ($opt{d}) {
 if ($opt{s}) {
     $sql = 0;
 }
+if ($opt{q}) {
+    $quiet = 1;
+    $sql = 0;
+    $debug = 0;
+}
+
 
 if (@ARGV != 2) {
     exit &usage
@@ -67,6 +79,15 @@ compare_keys($schema1,$schema2,@common_tables);
 # in if we ever need it (for example, if we start using the special features
 # of InnoDB tables)
 #
+
+#
+# Give our caller back some useful information
+#
+if ($diff > 0) {
+    exit(1);
+} else {
+    exit(0);
+}
 
 ######################################################################
 # Subs
@@ -230,17 +251,17 @@ sub compare_tables($$) {
     # Removed tables are easy to handle 
     #
     foreach my $table (@$removed) {
-	print "# Table $table was removed\n";
-	if ($sql) {
-	    print "DROP TABLE $table;\n\n";
-	}
+	$diff++;
+	if (!$quiet) { print "# Table $table was removed\n"; }
+	if ($sql) { print "DROP TABLE $table;\n\n"; }
     }
 
     #
     #
     #
     foreach my $table (@$added) {
-	print "# Table $table was added\n";
+	$diff++;
+	if (!$quiet) { print "# Table $table was added\n"; }
 	if ($sql) {
 	    print "CREATE TABLE $table (\n";
 
@@ -296,14 +317,20 @@ sub compare_keys($$@) {
 	    diff_keys($schema1->{$table}{PRIMARY},$schema2->{$table}{PRIMARY});
 
 	foreach my $key (@$removed) {
-	    print "# Primary key ($key) was removed from table $table\n";
+	    $diff++;
+	    if (!$quiet) {
+		print "# Primary key ($key) was removed from table $table\n";
+	    }
 	    if ($sql) {
 		print "ALTER TABLE $table DROP PRIMARY KEY;\n\n";
 	    }
 	}
 
 	foreach my $key (@$added) {
-	    print "# Primary key ($key) was added to table $table\n";
+	    $diff++;
+	    if (!$quiet) {
+		print "# Primary key ($key) was added to table $table\n";
+	    }
 	    if ($sql) {
 		print "ALTER TABLE $table ADD PRIMARY KEY ($key);\n\n";
 	    }
@@ -319,16 +346,22 @@ sub compare_keys($$@) {
 	    diff_keys($schema1->{$table}{KEYS},$schema2->{$table}{KEYS});
 
 	foreach my $name (@$added) {
+	    $diff++;
 	    my $key = $schema2->{$table}{KEYS}{$name};
-	    print "# Key $name ($key) was added to table $table\n";
+	    if (!$quiet) { 
+		print "# Key $name ($key) was added to table $table\n";
+	    }
 	    if ($sql) {
 		print "ALTER TABLE $table ADD INDEX $name ($key);\n\n";
 	    }
 	}
 
 	foreach my $name (@$removed) {
+	    $diff++;
 	    my $key = $schema1->{$table}{KEYS}{$name};
-	    print "# Key $name ($key) was removed from table $table\n";
+	    if (!$quiet) {
+		print "# Key $name ($key) was removed from table $table\n";
+	    }
 	    if ($sql) {
 		print "ALTER TABLE $table DROP INDEX $name;\n\n";
 	    }
@@ -370,13 +403,17 @@ sub compare_columns($$@) {
 		    $schema1->{$table}{COLUMNS}{$removed->[$j]};
 
 		if ($old_definition eq $new_definition) {
+		    $diff++;
+
 		    #
 		    # Found a renamed column
 		    #
 		    my $oldname = $removed->[$j];
 		    my $newname = $added->[$i];
 
-		    print "# Column $oldname was renamed to $newname\n";
+		    if (!$quiet) {
+			print "# Column $oldname was renamed to $newname\n";
+		    }
 		    if ($sql) {
 			print "ALTER TABLE $table CHANGE COLUMN $oldname " .
 			    "$newname $new_definition;\n\n";
@@ -420,7 +457,10 @@ sub compare_columns($$@) {
 	foreach my $column (@{ $schema2->{$table}{ORDERED_COLUMNS} }) {
 	    my ($name, $definition) = @$column;
 	    if ($added{$name}) {
-		print "# Column $name was added to table $table\n";
+		$diff++;
+		if (!$quiet) {
+		    print "# Column $name was added to table $table\n";
+		}
 		if ($sql) {
 		    my $location;
 		    if ($last_column) {
@@ -439,7 +479,10 @@ sub compare_columns($$@) {
 	# Handle columns that were removed
 	#
 	foreach my $column (@$removed) {
-	    print "# Column $column was removed from table $table\n";
+	    $diff++;
+	    if (!$quiet) {
+		print "# Column $column was removed from table $table\n";
+	    }
 	    if ($sql) {
 		print "ALTER TABLE $table DROP COLUMN $column;\n\n";
 	    }
@@ -452,7 +495,10 @@ sub compare_columns($$@) {
 	foreach my $column (@$common) {
 	    if ($schema1->{$table}{COLUMNS}{$column} ne
 		    $schema2->{$table}{COLUMNS}{$column} ) {
-		print "# Column $column in table $table has changed\n";
+		$diff++;
+		if (!$quiet) {
+		    print "# Column $column in table $table has changed\n";
+		}
 		if ($sql) {
 		    print "ALTER TABLE $table MODIFY $column ",
 		    $schema2->{$table}{COLUMNS}{$column}, ";\n\n";
@@ -507,6 +553,7 @@ sub usage() {
     print "file2 (same argument order as diff)\n\n";
     print "-h    This message\n";
     print "-s    Summary: Don't print SQL statments to apply changes\n";
+    print "-q    Quiet: Don't print anything, just return a value\n";
     print "-d    Turn on debugging output\n";
     return 1;
 }
