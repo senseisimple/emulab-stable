@@ -1,0 +1,97 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# This gets invoked from the Web interface. CD into the proper directory
+# and do the tb stuff.
+#
+# usage: mkexpdir <pid> <eid>
+#
+my $tbdir    = "/usr/testbed/bin/";
+my $projroot = "/proj";
+my $tbdata   = "tbdata";
+my @dirlist  = ($tbdata, "bin", "tmp", "logs");
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Check args.
+# 
+if (@ARGV != 2) {
+    print STDOUT "Usage: mkexpdir <pid> <eid>\n";
+    exit(-1);
+}
+my $project = $ARGV[0];
+my $eid     = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($project =~ /^([-\@\w.]+)$/) {
+    $project = $1;
+}
+if ($eid =~ /^([-\@\w.]+)$/) {
+    $eid = $1;
+}
+
+my $piddir  = "$projroot/$project";
+my $expdir  = "$piddir/exp";
+my $eiddir  = "$expdir/$eid";
+
+#
+# We create a directory structure for the experiment in the project directory.
+#
+if (! chdir($expdir)) {
+    print STDOUT "Could not chdir to $expdir: $!\n";
+    exit(-1);
+}
+
+if (! mkdir($eid, 0770)) {
+    print STDOUT "Could not mkdir $eid in $piddir: $!\n";
+    exit(-1);
+}
+
+if (! chmod(0770, "$eid")) {
+    print STDOUT "Could not chmod $eid to 0770 in $piddir: $!\n";
+    rmdir($eid);
+    exit(-1);
+}
+
+if (! chdir($eid)) {
+    print STDOUT "Could not chdir to $eid in $piddir: $!\n";
+    rmdir($eid);
+    exit(-1);
+}
+
+#
+# Create the experiment directory list in the new directory.
+#
+foreach $dir (@dirlist) {
+    if (! mkdir($dir, 0770)) {
+	print STDOUT "Could not mkdir $dir in $eiddir: $!\n";
+	fatal();
+    }
+
+    if (! chmod(0770, "$dir")) {
+	print STDOUT "Could not chmod $dir to 0770 in $eiddir: $!\n";
+	fatal();
+    }
+}
+
+exit(0);
+
+sub fatal()
+{
+    if (! chdir($expdir)) {
+	print STDOUT "In Fatal: Could not chdir to $expdir!\n";
+	exit(-1);
+    }
+    system("rm -r $eid");
+
+    exit(-1);
+}
+
