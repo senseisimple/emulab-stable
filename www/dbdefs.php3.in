@@ -6,6 +6,7 @@ require("dbcheck.php3");
 
 $TBDBNAME       = "@TBDBNAME@";
 $TBOPSPID	= "emulab-ops";
+$NODEDEAD_PID   = $TBOPSPID;
 $NODEDEAD_EID   = "hwdown";
 
 # All these constants need to go at some point, replaced by data from

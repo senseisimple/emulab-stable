@@ -67,18 +67,38 @@ else {
 #
 # Figure out what channels are in use for the current building. We only
 # have one building (MEB) at the moment, so this is quite easy.
+# Also determine what the free,reserved,dead counts are. 
 #
-$channels = array();
+$channels   = array();
+$nodecounts = array();
+
+$nodecounts["free"]     = 0;
+$nodecounts["reserved"] = 0;
+$nodecounts["dead"]     = 0;
 
 $query_result =
-    DBQueryFatal("select loc.*,s.capval from location_info as loc ".
+    DBQueryFatal("select loc.*,s.capval,r.pid,r.eid from location_info as loc ".
 		 "left join interface_settings as s on ".
-		 "     s.node_id=loc.node_id and s.capkey='channel'");
+		 "     s.node_id=loc.node_id and s.capkey='channel' ".
+		 "left join reserved as r on r.node_id=loc.node_id");
 
 while ($row = mysql_fetch_array($query_result)) {
     $channel   = $row["capval"];
     $node_id   = $row["node_id"];
     $locfloor  = $row["floor"];
+    $rpid      = $row["pid"];
+    $reid      = $row["eid"];
+
+    if ((!isset($pid) && !(isset($rpid))) ||
+	(isset($pid) && isset($rpid) && $pid == $rpid)) {
+	$nodecounts["free"]++;
+    }
+    elseif ($rpid == $NODEDEAD_PID && $reid == $NODEDEAD_EID) {
+	$nodecounts["dead"]++;
+    }
+    else {
+	$nodecounts["reserved"]++;
+    }
 
     # Make sure an empty list is displayed if nothing allocated on a floor.
     if (!isset($channels[$locfloor])) {
@@ -156,47 +176,48 @@ if (isset($pid)) {
     echo "Wireless nodes in experiment <b>".
          "<a href='showproject.php3?pid=$pid'>$pid</a>/".
          "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b>\n";
-    echo "<table class=nogrid align=center border=0 vpsace=8
-                 cellpadding=6 cellspacing=0>
+
+    echo "<table align=center border=2 cellpadding=5 cellspacing=2>
  	  <tr>
-            <td align=right>Experiment Nodes</td>
-            <td align=left>
+            <td align=right>
                 <img src='/autostatus-icons/greenball.gif' alt=Experiment>
-             </td>
+                <b>Experiment</b></td>
+            <td align=left> &nbsp; " . $nodecounts["free"] . "</td>
           </tr>
           <tr>
-            <td align=right>Other Nodes</td>
-            <td align=left>
+            <td align=right>
                 <img src='/autostatus-icons/blueball.gif' alt=Other>
-             </td>
+                <b>Other Nodes</b></td>
+            <td align=left> &nbsp; " . $nodecounts["reserved"] . "</td>
           </tr>
           <tr>
-            <td align=right>Dead</td>
-            <td align=left><img src='/autostatus-icons/redball.gif' alt=Dead>
-              </td>
+            <td align=right>
+                <img src='/autostatus-icons/redball.gif' alt=Dead>
+                <b>Dead</b></td>
+            <td align=left> &nbsp; " . $nodecounts["dead"] . "</td>
           </tr>
           </table>
           Click on the dots below to see information about the node\n";
 }
 else {
-    echo "<table class=nogrid align=center border=0 vpsace=5
-                 cellpadding=6 cellspacing=0>
+    echo "<table align=center border=2 cellpadding=5 cellspacing=2>
  	  <tr>
-            <td align=right>Free</td>
-            <td align=left>
+            <td align=right>
                 <img src='/autostatus-icons/greenball.gif' alt=Free>
-             </td>
+                <b>Free</b></td>
+            <td align=left> &nbsp; " . $nodecounts["free"] . "</td>
           </tr>
           <tr>
-            <td align=right>Reserved</td>
-            <td align=left>
+            <td align=right>
                 <img src='/autostatus-icons/blueball.gif' alt=reserved>
-             </td>
+                <b>Reserved</b></td>
+            <td align=left> &nbsp; " . $nodecounts["reserved"] . "</td>
           </tr>
           <tr>
-            <td align=right>Dead</td>
-            <td align=left><img src='/autostatus-icons/redball.gif' alt=Dead>
-              </td>
+            <td align=right>
+                <img src='/autostatus-icons/redball.gif' alt=Dead>
+                <b>Dead</b></td>
+            <td align=left> &nbsp; " . $nodecounts["dead"] . "</td>
           </tr>
           </table>
           Click on the dots below to see information about the node\n";
