@@ -88,6 +88,7 @@ my $LOGDIR       = "$PREFIX/log";
 my $MYSQL_LOGDIR = "$LOGDIR/mysql";
 my $RCDIR        = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR = "$PREFIX/usersvar";
+my $OPSDIR_DIR   = "$PREFIX/opsdir";
 my $PORTSDIR     = "/usr/ports/misc";
 my $MIBPATH      = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR     = "$PREFIX/tftpboot";
@@ -102,7 +103,8 @@ my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
 #
 my @TESTBED_DIRS = ($PREFIX);
 
-my @MOUNTPOINTS = ("$PREFIX/usersvar", "/users", "/proj", "/groups", "/share");
+my @MOUNTPOINTS = ("$PREFIX/usersvar", "$PREFIX/opsdir",
+		   "/users", "/proj", "/groups", "/share");
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
@@ -150,12 +152,6 @@ Phase "groups", "Creating groups", sub {
 	    PhaseSkip("tbadmin group already exists");
 	}
 	ExecQuietFatal("$PW groupadd tbadmin -g 101");
-    };
-    Phase "tbvis", "Creating tbvis group", sub {
-	if (getgrnam("tbvis")) {
-	    PhaseSkip("tbvis group already exists");
-	}
-	ExecQuietFatal("$PW groupadd tbvis -g 102");
     };
     Phase "root", "Creating root group", sub {
 	if (getgrnam("root")) {
@@ -358,6 +354,7 @@ Phase "mounts", "Setting up mounts of fs and ops", sub {
 	"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
 	"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
 	"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0",
+	"$USERNODE:/usr/testbed\t\t$OPSDIR_DIR\tnfs\trw,soft,-b,nodev,nosuid\t0\t0",
 	"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b,nodev,nosuid\t0\t0");
     # XXX - Do we want to do a 'mount -a' at this point?
 };
