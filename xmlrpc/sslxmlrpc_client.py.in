@@ -47,6 +47,9 @@ xmlrpc_port     = XMLRPC_PORT
 # The default RPC module to invoke.
 module          = "experiment"
 
+# The default path
+path            = TBROOT
+
 # Where to find the default certificate in the users home dir.
 default_cert    = "/.ssl/emulab.pem"
 certificate     = None;
@@ -170,7 +173,7 @@ try:
     opts, req_args =  getopt.getopt(sys.argv[1:],
                       "dhVc:s:m:p:r",
                       [ "help", "version", "rawmode", "server=", "module=",
-                        "cert=", "port="])
+                        "cert=", "port=", "path="])
     # ... act on them appropriately, and
     for opt, val in opts:
         if opt in ("-h", "--help"):
@@ -201,6 +204,9 @@ try:
             pass
         elif opt in ("-d", "--debug"):
 	    debug = 1
+            pass
+        elif opt in ("--path",):
+	    path = val
             pass
         elif opt in ("-r", "--rawmode"):
 	    rawmode = 1
@@ -268,7 +274,7 @@ ctx.set_verify(SSL.verify_none, 16)
 ctx.set_allow_unknown_ca(0)
 
 # This is parsed by the Proxy object.
-URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port) + TBROOT
+URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port) + path
 if debug:
     print >>sys.stderr, URI
     pass
