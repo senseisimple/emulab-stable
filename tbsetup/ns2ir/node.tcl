@@ -355,3 +355,19 @@ Node instproc add_routes_to_DB {DB} {
 	$sim spitxml_data "virt_routes" [list "vname" "dst" "nexthop" "dst_type" ] [list $self $dstip $hopip $type ]
     }
 }
+
+#
+# Create a program object to run on the node when the experiment starts.
+#
+Node instproc start-command {command} {
+    $self instvar sim
+
+    set newprog [new Program $sim]
+    $newprog set node $self
+    $newprog set command $command
+
+    # Starts at time 0
+    $sim at 0  "$newprog start"
+
+    return $newprog
+}
