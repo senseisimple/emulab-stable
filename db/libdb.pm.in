@@ -165,6 +165,7 @@ use vars qw(@ISA @EXPORT);
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
+	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
 
 	 TBNodeType TBNodeTypeProcInfo
 
@@ -3190,7 +3191,7 @@ sub TBExptSetThumbNail($$$)
 #
 # Get the port range for an experiment.
 #
-# usage TBControlNetIP(char *pid, char *eid, int \*low, int \*high)
+# usage TBExptPortRange(char *pid, char *eid, int \*low, int \*high)
 #	Return 1 if success.
 #	Return 0 if error.
 #
@@ -3214,7 +3215,7 @@ sub TBExptPortRange($$$$)
 #
 # Get elabinelab flag for an experiment.
 #
-# usage TBControlNetIP(char *pid, char *eid, int \*elabinelab)
+# usage TBExptIsElabInElab(char *pid, char *eid, int \*elabinelab)
 #	Return 1 if success.
 #	Return 0 if error.
 #
@@ -3515,6 +3516,172 @@ sub TBNodeStateWait ($$$$) {
 	}
 	sleep(1);
     }
+}
+
+#
+# Control net VLAN firewall stuff.
+#
+# reserved:cnet_vlan is set for a allocated node if the node is behind a
+#       firewall.  In this case, cnet_vlan indicates the VLAN number that
+#	this nodes' control net interface is a part of.
+#
+# firewalls:fwname is the virtual name of the node which is a firewall
+#	for a particular experiment.
+#
+# firewalls:vlan is the VLAN number of the firewalled control net.
+#
+# It is possible for a node to be both a firewall and behind another
+# firewall.  In that case, the firewalls table vlan column for
+# pid/eid/thisnode-virt-name is the VLAN number for the firewalled control
+# net that thisnode is implementing.  Thisnode's reserved table cnet_vlan
+# column will contain the VLAN number of the firewalled control net that
+# thisnode is a part of.
+#
+
+#
+# Determine if there is a firewall for a particular experiment.
+# Optionally returns the pname of the firewall node and the VLAN info.
+#
+# XXX this will need to change if we support multiple firewalls per experiment.
+#
+sub TBExptFirewall ($$;$$$) {
+    my ($pid, $eid, $fwnodep, $fwvlanidp, $fwvlanp) = @_;
+    my $query_result;
+
+    #
+    # Short form: is there a firewall?
+    # Only check the firewalls table so that we can be called for a swapped
+    # experiment (swapped experiments don't have reserved table info).
+    #
+    if (!defined($fwnodep)) {
+	$query_result =
+	    DBQueryWarn("SELECT eid FROM firewalls ".
+			"WHERE pid='$pid' and eid='$eid'");
+	if (!$query_result || $query_result->num_rows == 0) {
+	    return 0;
+	}
+	return 1;
+    }
+
+    #
+    # Long form: want at least the name of the firewall node returned.
+    # The experiment should be swapped in or else the returned node_id
+    # will be NULL.
+    #
+    $query_result =
+	DBQueryWarn("SELECT r.node_id,f.vlan,f.vlanid FROM firewalls AS f ".
+		    "LEFT JOIN reserved AS r ".
+		    "  ON f.pid=r.pid AND f.eid=r.eid AND f.fwname=r.vname ".
+		    "WHERE f.pid='$pid' and f.eid='$eid'");
+    if (!$query_result || $query_result->num_rows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    if (!defined($row[0])) {
+	print STDERR "*** WARNING: attempted fetch of Firewall info for ".
+	    "swapped experiment $pid/$eid\n";
+	$$fwnodep = ""
+	    if (defined($fwnodep));
+    } else {
+	$$fwnodep = $row[0]
+	    if (defined($fwnodep));
+    }
+    $$fwvlanp = $row[1]
+	if (defined($fwvlanp));
+    $$fwvlanidp = $row[2]
+	if (defined($fwvlanidp));
+    return 1;
+}
+
+#
+# Set (fwvlan!=undef) or clear (fwvlan==undef) the firewall VLAN number
+# for an experiment.
+#
+# XXX this will need to change if we support multiple firewalls per experiment.
+#
+sub TBSetExptFirewallVlan($$$$) {
+    my ($pid, $eid, $fwvlanid, $fwvlan) = @_;
+    my $fwnode;
+
+    if (!TBExptFirewall($pid, $eid, \$fwnode)) {
+	return 0;
+    }
+
+    if (!defined($fwvlanid)) {
+	$fwvlanid = "NULL";
+    }
+    if (!defined($fwvlan)) {
+	$fwvlan = "NULL";
+    }
+
+    #
+    # Change the firewalls table entry to reflect the VLAN
+    #
+    DBQueryWarn("UPDATE firewalls set vlan=$fwvlan,vlanid=$fwvlanid ".
+		"WHERE pid='$pid' AND eid='$eid'");
+
+    #
+    # Change the reserved table entries for all firewalled nodes to reflect it.
+    #
+    # XXX when clearing, we don't bother with reserved since the row may
+    # already be gone.
+    #
+    if (defined($fwvlan)) {
+	DBQueryWarn("UPDATE reserved set cnet_vlan=$fwvlan ".
+		    "WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'");
+    }
+}
+
+#
+# Determines if a node is part of a firewalled experiment.
+# If so, optionally returns the name and VLAN number for the firewall.
+#
+sub TBNodeFirewall ($$$) {
+    my ($nodeid, $fwnodep, $fwvlanp) = @_;
+
+    #
+    # If they are only interested in a yes/no answer, just look in the
+    # nodes table to set if the cnet_vlan is non-null.
+    #
+    if (!defined($fwnodep) && !defined($fwvlanp)) {
+	my $query_result =
+	    DBQueryWarn("select cnet_vlan from reserved ".
+			"where node_id='$nodeid'");
+
+	if (!$query_result || $query_result->num_rows == 0) {
+	    return 0;
+	}
+	my ($res) = $query_result->fetchrow_array();
+	if (!defined($res) || $res eq "") {
+	    return 0;
+	}
+	return 1;
+    }
+
+    #
+    # Otherwise extract the firewall name and vlan number for the node
+    # This is probably not the best query in the world.  The first join
+    # matches up nodes with their firewall info, the second "resolves"
+    # each firewall's virtname to a physname.
+    #
+    my $query_result =
+	DBQueryWarn("SELECT r2.node_id,f.vlan FROM firewalls AS f ".
+		    "LEFT JOIN reserved AS r ".
+		    "  ON r.pid=f.pid AND r.eid=f.eid AND r.cnet_vlan=f.vlan ".
+		    "LEFT JOIN reserved AS r2 ".
+		    "  ON r2.pid=f.pid AND r2.eid=f.eid AND r2.vname=f.fwname ".
+		    "WHERE r.node_id='$nodeid'");
+    if (!$query_result || $query_result->num_rows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $$fwnodep = $row[0]
+	if (defined($fwnodep));
+    $$fwvlanp = $row[1]
+	if (defined($fwvlanp));
+    return 1;
 }
 
 #
