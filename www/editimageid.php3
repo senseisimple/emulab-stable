@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -260,7 +260,7 @@ function SPITFORM($imageid, $formfields, $errors)
 	               size=20 maxlength=256>";
     }
     else {
-	echo "$loadaddr";
+	echo $formfields[load_address];
     }
     echo "  </td>
           </tr>\n";
@@ -276,7 +276,7 @@ function SPITFORM($imageid, $formfields, $errors)
 	               size=6 maxlength=10>";
     }
     else {
-	echo "$frisbee_pid";
+	echo $formfields[frisbee_pid];
     }
     echo "  </td>
           </tr>\n";
@@ -391,7 +391,7 @@ if ($isadmin) {
     if (isset($formfields[load_address]) && $formfields[load_address] != "") {
 	$foo = addslashes($formfields[load_address]);
 
-	if (strcmp($loadaddr, $foo)) {
+	if (strcmp($formfields[load_address], $foo)) {
 	    $errors["Load Address"] = "Contains	illegal characters!";
 	}
 	$updates[] = "load_address='$foo'";
