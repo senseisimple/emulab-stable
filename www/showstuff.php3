@@ -954,7 +954,7 @@ function SHOWNODE($node_id) {
 }
 
 #
-# Show log
+# Show log.
 # 
 function SHOWNODELOG($node_id)
 {
@@ -979,6 +979,7 @@ function SHOWNODELOG($node_id)
     echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
 
     echo "<tr>
+             <td align=center>Delete?</td>
              <td align=center>Date</td>
              <td align=center>ID</td>
              <td align=center>Type</td>
@@ -994,6 +995,9 @@ function SHOWNODELOG($node_id)
 	$entry      = $row[entry];
 
 	echo "<tr>
+ 	         <td align=center>
+                  <A href='deletenodelog.php3?node_id=$node_id&log_id=$log_id'>
+                     <img alt='o' src='redball.gif'></A></td>
                  <td>$date</td>
                  <td>$log_id</td>
                  <td>$type</td>
@@ -1001,6 +1005,39 @@ function SHOWNODELOG($node_id)
                  <td>$entry</td>
               </tr>\n";
     }
+    echo "</table>\n";
+}
+
+#
+# Show one log entry.
+# 
+function SHOWNODELOGENTRY($node_id, $log_id)
+{
+    $query_result =
+	DBQueryFatal("select * from nodelog where ".
+		     "node_id='$node_id' and log_id=$log_id");
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+
+    echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
+
+    $row = mysql_fetch_array($query_result);
+    
+    $type       = $row[type];
+    $log_id     = $row[log_id];
+    $reporter   = $row[reporting_uid];
+    $date       = $row[reported];
+    $entry      = $row[entry];
+
+    echo "<tr>
+             <td>$date</td>
+             <td>$log_id</td>
+             <td>$type</td>
+             <td>$reporter</td>
+             <td>$entry</td>
+          </tr>\n";
     echo "</table>\n";
 }
 
