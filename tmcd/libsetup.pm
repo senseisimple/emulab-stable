@@ -5,6 +5,7 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# TODO: .forward files for users. Back to emulab.
 
 #
 # Common routines and constants for the client bootime setup stuff.
@@ -17,13 +18,14 @@ use Exporter;
 	 create_nicknames doifconfig dohostnames
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
-	 TBBackGround TBForkCmd remotenodeupdate remotenodevnodesetup
+	 TBBackGround TBForkCmd vnodesetup
+	 jailedsetup dojailconfig
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE
+	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
-	 TMTRAFFICCONFIG TMROUTECONFIG TMVNODEDIR
+	 TMTRAFFICCONFIG TMROUTECONFIG
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
@@ -36,64 +38,127 @@ use Exporter;
 use English;
 
 #
-# This is the home of the setup library on the client machine. The including
-# program has to tell us this by calling the init routine below. For example,
-# it is /etc/testbed on FreeBSD and /etc/rc.d/testbed on Linux.
+# For virtual (multiplexed nodes). If defined, tack onto tmcc command.
+# and use in pathnames. Used in conjunction with jailed virtual nodes.
 #
-my $SETUPDIR;
+my $vnodeid;
 
+#
+# True is running inside a jail. Set just below. 
+# 
+my $injail;
+
+# Load up the paths. Its conditionalized to be compatabile with older images.
+# Note this file has probably already been loaded by the caller.
+BEGIN
+{
+    if (! -e "/etc/emulab/paths.pm") {
+	die("Yikes! Could not require /etc/emulab/paths.pm!\n");
+    }
+    require "/etc/emulab/paths.pm";
+    import emulabpaths;
+
+    #
+    # Determine if running inside a jail. This affects the paths below.
+    #
+    if (-e "$BOOTDIR/jailname") {
+	open(VN, "$BOOTDIR/jailname");
+	$vnodeid = <VN>;
+	close(VN);
+
+	if ($vnodeid =~ /^([-\w]+)$/) {
+	    $vnodeid = $1;
+	}
+	else {
+	    die("Bad data in vnodeid: $vnodeid");
+	}
+	$injail = 1;
+    }
+
+    # Make sure these exist!
+    if (! -e "$VARDIR/logs") {
+	mkdir("$VARDIR", 0775);
+	mkdir("$VARDIR/jails", 0775);
+	mkdir("$VARDIR/db", 0755);
+	mkdir("$VARDIR/logs", 0775);
+	mkdir("$VARDIR/boot", 0775);
+    }
+}
+
+#
+# The init routine. This is deprecated, but left behind in case an old
+# liblocsetup is run against a new libsetup. Whenever a new libsetup
+# is installed, better install the path module (see above) too!
+#
 sub libsetup_init($)
 {
     my($path) = @_;
 
-    $SETUPDIR = $path;
+    $ETCDIR  = $path;
+    $BINDIR  = $path;
+    $VARDIR  = $path;
+    $BOOTDIR = $path
 }
 
 #
-# This "local" library provides the OS dependent part. Must load this after
-# defining the above function cause the local library invokes it to set the
-# $SETUPDIR
+# This "local" library provides the OS dependent part. 
 #
 use liblocsetup;
-
-#
-# For virtual (multiplexed nodes). If defined, tack onto tmcc command.
-# and use in pathnames. Not sure how this will be used later with jailed
-# virtual nodes, since they will run in their own environment, but without
-# jail we have to share the same namespace.
-#
-my $vnodeid	= "";
-my $vnodedir;
 
 #
 # These are the paths of various files and scripts that are part of the
 # setup library.
 #
-sub TMCC()		{ "$SETUPDIR/tmcc"; }
-sub TMIFC()		{ "$SETUPDIR/rc.ifc"; }
-sub TMRPM()		{ "$SETUPDIR/rc.rpm"; }
-sub TMTARBALLS()	{ "$SETUPDIR/rc.tarballs"; }
-sub TMSTARTUPCMD()	{ "$SETUPDIR/startupcmd"; }
-sub TMHOSTS()		{ "$SETUPDIR/hosts"; }
-sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
-sub FINDIF()		{ "$SETUPDIR/findif"; }
+sub TMCC()		{ "$BINDIR/tmcc"; }
+sub TMHOSTS()		{ "$ETCDIR/hosts"; }
+sub FINDIF()		{ "$BINDIR/findif"; }
+sub LOCALROOTFS()	{ "/users/local"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
-sub TMROUTECONFIG()     { ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.route";}
-sub TMTRAFFICCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.traffic";}
-sub TMTUNNELCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.tunnel";}
-sub TMVTUNDCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/vtund.conf";}
 #
-# These go in /var/db/emulab. Good for jails!
+# This path is valid only *outside* the jail when its setup.
 # 
-sub TMMOUNTDB()		{ "/var/db/emulab/mountdb"; }
-sub TMSFSMOUNTDB()	{ "/var/db/emulab/sfsmountdb"; }
-sub TMPASSDB()		{ "/var/db/emulab/passdb"; }
-sub TMGROUPDB()		{ "/var/db/emulab/groupdb"; }
+sub JAILDIR()		{ "$VARDIR/jails/$vnodeid"; }
 
-# Make sure this exists!
-if (! -e "/var/db/emulab") {
-    mkdir("/var/db/emulab", 0775);
+#
+# Okay, here is the path mess. There are three environments.
+# 1. A local node where everything goes in one place ($VARDIR/boot).
+# 2. A virtual node inside a jail ($VARDIR/boot).
+# 3. A virtual node outside a jail (JAILDIR()).
+#
+# As for #3, whether setting up a old-style virtual node or a new style
+# jailed node, the code that sets it up needs a different per-vnode path.
+#
+sub CONFDIR() {
+    if ($injail) {
+	return $BOOTDIR;
+    }
+    if ($vnodeid) {
+	return JAILDIR();
+    }
+    return $BOOTDIR;
 }
+
+#
+# These go in /var/emulab. Good for all environments!
+# 
+sub TMMOUNTDB()		{ $VARDIR . "/db/mountdb"; }
+sub TMSFSMOUNTDB()	{ $VARDIR . "/db/sfsmountdb"; }
+sub TMPASSDB()		{ $VARDIR . "/db/passdb"; }
+sub TMGROUPDB()		{ $VARDIR . "/db/groupdb"; }
+#
+# The rest of these depend on the environment running in (inside/outside jail).
+# 
+sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
+sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
+sub TMJAILCONFIG()	{ CONFDIR() . "/jailconfig";}
+sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
+sub TMIFC()		{ CONFDIR() . "/rc.ifc"; }
+sub TMRPM()		{ CONFDIR() . "/rc.rpm";}
+sub TMTARBALLS()	{ CONFDIR() . "/rc.tarballs";}
+sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
+sub TMTRAFFICCONFIG()	{ CONFDIR() . "/rc.traffic";}
+sub TMTUNNELCONFIG()	{ CONFDIR() . "/rc.tunnel";}
+sub TMVTUNDCONFIG()	{ CONFDIR() . "/vtund.conf";}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -109,7 +174,7 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 6; };
+sub TMCD_VERSION()	{ 7; };
 
 #
 # These are the TMCC commands. 
@@ -137,11 +202,12 @@ sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_ROUTELIST()	{ "routelist"; }
+sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
 
 #
 # Some things never change.
 # 
-my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s";
+my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s %s";
 my $DELTAINSTALL= "/usr/local/bin/install-delta %s";
 my $VTUND       = "/usr/local/sbin/vtund";
 
@@ -164,12 +230,17 @@ $tmcctimeout    = 0;
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
 # this is computed on the fly instead of once.
-sub MFS()	{ if (-e "$SETUPDIR/ismfs") { return 1; } else { return 0; } }
+sub MFS()	{ if (-e "$ETCDIR/ismfs") { return 1; } else { return 0; } }
 
 #
 # Same for a remote node.
 #
-sub REMOTE()	{ if (-e "$SETUPDIR/isrem") { return 1; } else { return 0; } }
+sub REMOTE()	{ if (-e "$ETCDIR/isrem") { return 1; } else { return 0; } }
+
+#
+# Are we jailed? See above.
+#
+sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
 
 #
 # Open a TMCC connection and return the "stream pointer". Caller is
@@ -189,7 +260,7 @@ sub OPENTMCC($;$$)
     if (!defined($options)) {
 	$options = "";
     }
-    if ($vnodeid ne "") {
+    if (defined($vnodeid)) {
 	$vn = "-n $vnodeid";
     }
     if ($tmcctimeout) {
@@ -270,6 +341,7 @@ sub cleanup_node ($) {
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
     unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
     unlink TMMOUNTDB . ".db";
+    unlink TMSFSMOUNTDB . ".db";
 
     #
     # If scrubbing, remove the password/group file DBs so that we revert
@@ -370,7 +442,7 @@ sub domounts()
     if (MFS()) {
 	while (($remote, $local) = each %mounts) {
 	    if (! -e $local) {
-		if (! os_mkdir($local, 0770)) {
+		if (! os_mkdir($local, "0770")) {
 		    warn "*** WARNING: Could not make directory $local: $!\n";
 		    next;
 		}
@@ -398,7 +470,7 @@ sub domounts()
 	}
 
 	if (! -e $local) {
-	    if (! os_mkdir($local, 0770)) {
+	    if (! os_mkdir($local, "0770")) {
 		warn "*** WARNING: Could not make directory $local: $!\n";
 		next;
 	    }
@@ -486,7 +558,7 @@ sub domounts()
 	    $dir =~ s/(.*)\/[^\/]*$/$1/;
 	    if ($dir ne "" && ! -e $dir) {
 		print STDOUT "  Making directory $dir\n";
-		if (! os_mkdir($dir, 755)) {
+		if (! os_mkdir($dir, "0755")) {
 		    warn "*** WARNING: Could not make directory $local: $!\n";
 		    next;
 		}
@@ -884,19 +956,19 @@ sub doaccounts()
 	    #
 	    my $gname = "$1";
 	    
-	    if (REMOTE()) {
+	    if (REMOTE() && !JAILED()) {
 		$gname = "emu-${gname}";
 	    }
 	    $newgroups{"$gname"} = $2
 	}
-	elsif ($_ =~ /^ADDUSER LOGIN=([0-9a-z]+)/) {
+	elsif ($_ =~ /^ADDUSER LOGIN=([0-9A-Za-z]+)/) {
 	    #
 	    # Account info goes in the hash table.
 	    # 
 	    $newaccounts{$1} = $_;
 	    next;
 	}
-	elsif ($_ =~ /^PUBKEY LOGIN=([0-9a-z]+) KEY="(.*)"/) {
+	elsif ($_ =~ /^PUBKEY LOGIN=([0-9A-Za-z]+) KEY="(.*)"/) {
 	    #
 	    # Keys go into hash as a list of keys.
 	    #
@@ -1070,7 +1142,7 @@ sub doaccounts()
 	delete($PWDDB{$login});
     }
 
-    my $pat = q(ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
+    my $pat = q(ADDUSER LOGIN=([0-9A-Za-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
     $pat   .= q(SERIAL=(\d+));
 
@@ -1138,7 +1210,7 @@ sub doaccounts()
 	    # Skip ssh stuff if a local node or not updating (if the
 	    # user did not exist, $doupdate will be true).
 	    # 
-	    if (!REMOTE() || !$doupdate) {
+	    if ((!REMOTE() && !JAILED()) || !$doupdate) {
 		next;
 	    }
 
@@ -1279,7 +1351,8 @@ sub dorpms ()
 #
 sub dotarballs ()
 {
-    my @tarballs = ();
+    my @tarballs   = ();
+    my $jailoption = (JAILED() ? "-j" : "");
 
     my $TM = OPENTMCC(TMCCCMD_TARBALL);
     while (<$TM>) {
@@ -1297,7 +1370,7 @@ sub dotarballs ()
     
     foreach my $tarball (@tarballs) {
 	if ($tarball =~ /DIR=(.+)\s+TARBALL=(.+)/) {
-	    my $tbline = sprintf($TARINSTALL, $1, $2);
+	    my $tbline = sprintf($TARINSTALL, $jailoption, $1, $2);
 		    
 	    print STDOUT  "  $tbline\n";
 	    print TARBALL "echo \"Installing Tarball $2 in dir $1 \"\n";
@@ -1334,7 +1407,7 @@ sub dostartupcmd ()
     open(RUN, ">" . TMSTARTUPCMD)
 	or die("Could not open $TMSTARTUPCMD: $!");
     
-    if ($startupcmd =~ /CMD=(\'.+\') UID=([0-9a-z]+)/) {
+    if ($startupcmd =~ /CMD=(\'.+\') UID=([0-9A-Za-z]+)/) {
 	print  STDOUT "  Will run $1 as $2\n";
 	print  RUN    "$startupcmd";
     }
@@ -1374,11 +1447,11 @@ sub dotrafficconfig()
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
-    #     $SETUPDIR files for use by NSE
+    #     $BOOTDIR files for use by NSE
     #
     if (! REMOTE()) {
-	open(BOSSINFCFG, ">$SETUPDIR/tmcc.bossinfo") or
-	    die "Cannot open file $SETUPDIR/tmcc.bossinfo: $!";
+	open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo") or
+	    die "Cannot open file $BOOTDIR/tmcc.bossinfo: $!";
 	print BOSSINFCFG "$bossinfo";
 	close(BOSSINFCFG);
     }
@@ -1386,7 +1459,7 @@ sub dotrafficconfig()
     CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_status();
 
-    my $cmdline = "$SETUPDIR/trafgen -s $boss";
+    my $cmdline = "$BINDIR/trafgen -s $boss";
     if ($pid) {
 	$cmdline .= " -E $pid/$eid";
     }
@@ -1394,7 +1467,7 @@ sub dotrafficconfig()
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
-    #     $SETUPDIR files for use by NSE
+    #     $BOOTDIR files for use by NSE
     #
     # Also nse stuff is mixed up with traffic config right
     # now because of having FullTcp based traffic generation.
@@ -1405,22 +1478,22 @@ sub dotrafficconfig()
 	$record_sep = $/;
 	undef($/);
 	$TM = OPENTMCC(TMCCCMD_IFC);
-	open(IFCFG, ">$SETUPDIR/tmcc.ifconfig") or
-	    die "Cannot open file $SETUPDIR/tmcc.ifconfig: $!";
+	open(IFCFG, ">$BOOTDIR/tmcc.ifconfig") or
+	    die "Cannot open file $BOOTDIR/tmcc.ifconfig: $!";
 	print IFCFG <$TM>;
 	close(IFCFG);
 	CLOSETMCC($TM);
 
 	$TM = OPENTMCC(TMCCCMD_ROUTELIST);
-	open(ROUTELIST, ">$SETUPDIR/tmcc.routelist") or
-	    die "Cannot open file $SETUPDIR/tmcc.routelist: $!";
+	open(ROUTELIST, ">$BOOTDIR/tmcc.routelist") or
+	    die "Cannot open file $BOOTDIR/tmcc.routelist: $!";
         print ROUTELIST <$TM>;
 	close(ROUTELIST);
 	CLOSETMCC($TM);
 	$/ = $record_sep;
 	
-	open(TRAFCFG, ">$SETUPDIR/tmcc.trafgens") or
-	    die "Cannot open file $SETUPDIR/tmcc.trafgens: $!";    
+	open(TRAFCFG, ">$BOOTDIR/tmcc.trafgens") or
+	    die "Cannot open file $BOOTDIR/tmcc.trafgens: $!";    
     }
 
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
@@ -1495,18 +1568,18 @@ sub dotrafficconfig()
     }
 
     if( $startnse ) {
-	print RC "$SETUPDIR/startnse &\n";
+	print RC "$BINDIR/startnse &\n";
     }
     CLOSETMCC($TM);
 
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
-    #     $SETUPDIR files for use by NSE
+    #     $BOOTDIR files for use by NSE
     #
     if (! REMOTE()) {
-	open(NSECFG, ">$SETUPDIR/tmcc.nseconfigs") or
-	    die "Cannot open file $SETUPDIR/tmcc.nseconfigs: $!";
+	open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs") or
+	    die "Cannot open file $BOOTDIR/tmcc.nseconfigs: $!";
 	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
 	$record_sep = $/;
 	undef($/);
@@ -1530,7 +1603,7 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;	
 	    }
-	    print RC "$SETUPDIR/startnse &\n";
+	    print RC "$BINDIR/startnse &\n";
 	}
     }
     
@@ -1664,6 +1737,34 @@ sub dotunnels()
 }
 
 #
+# All we do is store it away in the file. This makes it avail later.
+# 
+sub dojailconfig()
+{
+    my @configstrings;
+
+    $TM = OPENTMCC(TMCCCMD_JAILCONFIG);
+    while (<$TM>) {
+	push(@configstrings, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (! @configstrings) {
+	return 0;
+    }
+
+    open(RC, ">" . TMJAILCONFIG)
+	or die("Could not open " . TMJAILCONFIG . ": $!");
+
+    foreach my $str (@configstrings) {
+	print RC $str;
+    }
+    close(RC);
+    chmod(0755, TMJAILCONFIG);
+    return 0;
+}
+
+#
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
 #
@@ -1785,10 +1886,20 @@ sub bootsetup()
 #
 #
 # Node update. This gets fired off after reboot to update accounts,
-# mounts, etc. Its the start of shared node support. Quite rough at
-# the moment. 
+# mounts, etc. Quite rough at the moment. 
 #
 sub nodeupdate()
+{
+    if (REMOTE()) {
+	local $tmcctimeout = 10;
+	nodeupdateaux();
+    }
+    else {
+	nodeupdateaux();
+    }
+}
+
+sub nodeupdateaux()
 {
     #
     # Check allocation. If the node is now free, then do a cleanup
@@ -1798,9 +1909,11 @@ sub nodeupdate()
     # whose accounts have been killed. Need to check the atq also for
     # queued commands.
     #
-    if (! check_status()) {
-	print "Node is free. Cleaning up password and group files.\n";
-	cleanup_node(1);
+    if (!REMOTE() && !check_status()) {
+	if (! JAILED()) {
+	    print "Node is free. Cleaning up password and group files.\n";
+	    cleanup_node(1);
+	}
 	return 0;
     }
 
@@ -1828,8 +1941,10 @@ sub nodeupdate()
     #
     # Host names configuration (/etc/hosts). 
     #
-    print STDOUT "Checking Testbed hostnames configuration ... \n";
-    dohostnames();
+    if (!REMOTE()) {
+	print STDOUT "Checking Testbed hostnames configuration ... \n";
+	dohostnames();
+    }
 
     #
     # Do account stuff.
@@ -1841,84 +1956,81 @@ sub nodeupdate()
 }
 
 #
-# Remote node update. This gets fired off after reboot to update
-# accounts, mounts, etc. Its the start of shared node support. Quite
-# rough at the moment.
-#
-sub remotenodeupdate()
-{
-    #
-    # Do account stuff.
-    #
-    {
-	local $tmcctimeout = 10;
-    
-	if ($USESFS) {
-	    #
-	    # Setup SFS hostid.
-	    #
-	    print STDOUT "Setting up for SFS ... \n";
-	    dosfshostid();
-	}
-
-	print STDOUT "Checking Testbed group/user configuration ... \n";
-	doaccounts();
-
-	print STDOUT "Mounting project and home directories ... \n";
-	domounts();
-    }
-
-    return 0;
-}
-
-#
-# This happens inside a jail. We have to pass the vnode, which is actually
-# the hostname for the jailed environment. 
+# This happens inside a jail. 
 #
 sub jailedsetup()
 {
-    my $hostname = `hostname`;
+    #
+    # Currently, we rely on the outer environment to set our hostname
+    # to our vnodeid!
+    #
+    my $vid = `hostname`;
     
-    # Untaint and strip newline.
-    if ($hostname =~ /^([-\w\.]+)$/) {
-	$hostname = $1;
+    if ($vid =~ /^([-\w]+)$/) {
+	$vid = $1;
     }
     else {
-	die("Tainted hostname $hostname!\n");
+	die("Bad data in vnodeid: $vid");
     }
-    
-    #
-    # Set global vnodeid for tmcc commands.
-    #
-    $vnodeid  = $hostname;
 
+    #
+    # Set global vnodeid for tmcc commands. Must be before all the rest!
+    #
+    $vnodeid  = $vid;
+    $injail   = 1;
+
+    #
+    # Create a file inside so the rest of the libsetup code knows its
+    # inside a jail.
+    #
+    system("echo '$vid' > " . TMJAILNAME());
+    
     #
     # Do account stuff.
     #
     {
-	local $tmcctimeout = 10;
-    
+	print STDOUT "Checking Testbed reservation status ... \n";
+	if (! check_status()) {
+	    print STDOUT "  Free!\n";
+	    return 0;
+	}
+	print STDOUT "  Allocated! $pid/$eid/$vname\n";
+
+	#
+	# Setup a nicknames file. 
+	#
+	create_nicknames();
+
+	#
+	# Setup SFS hostid.
+	#
 	if ($USESFS) {
-	    #
-	    # Setup SFS hostid.
-	    #
 	    print STDOUT "Setting up for SFS ... \n";
 	    dosfshostid();
 	}
 
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
+
+	print STDOUT "Checking Testbed Tarball configuration ... \n";
+	dotarballs();
+
+	print STDOUT "Checking Testbed traffic generation configuration ...\n";
+	dotrafficconfig();
+
+	print STDOUT "Checking Testbed Experiment Startup Command ... \n";
+	dostartupcmd();
     }
 
-    return 0;
+    return $vnodeid;
 }
 
 #
-# Remote Node virtual node setup.
+# Remote Node virtual node setup. This happens outside the jailed env.
 #
-sub remotenodevnodesetup($$)
+sub vnodesetup($)
 {
-    my ($vid, $vdir) = @_;
+    my ($vid) = @_;
 
     #
     # Set global vnodeid for tmcc commands.
@@ -1928,16 +2040,37 @@ sub remotenodevnodesetup($$)
     #
     # This is the directory where the rc files go.
     #
-    if (! -e $vdir) {
+    if (! -e JAILDIR()) {
 	die("*** $0:\n".
-	    "    No such directory: $vdir\n");
+	    "    No such directory: " . JAILDIR() . "\n");
     }
-    $vnodedir = $vdir;
 
     # Do not bother if somehow got released.
     if (! check_status()) {
 	print "Node is free!\n";
 	return undef;
+    }
+
+    #
+    # Create /local directories for users. 
+    #
+    if (! -e LOCALROOTFS()) {
+	os_mkdir(LOCALROOTFS(), "0755");
+    }
+    if (-e LOCALROOTFS()) {
+	my $piddir = LOCALROOTFS() . "/$pid";
+	my $eiddir = LOCALROOTFS() . "/$pid/$eid";
+
+	if (! -e $piddir) {
+	    mkdir($piddir, 0777) or
+		die("*** $0:\n".
+		    "    mkdir filed - $piddir: $!\n");
+	}
+	if (! -e $eiddir) {
+	    mkdir($eiddir, 0777) or
+		die("*** $0:\n".
+		    "    mkdir filed - $eiddir: $!\n");
+	}
     }
 
     #
@@ -1958,7 +2091,13 @@ sub remotenodevnodesetup($$)
     print STDOUT "Checking Testbed traffic generation configuration ...\n";
     dotrafficconfig();
 
-    return 0;
+    #
+    # Getting jail config.
+    #
+    print STDOUT "Checking Testbed jail configuration ...\n";
+    dojailconfig();
+
+    return ($pid, $eid, $vname);
 }
 
 #
