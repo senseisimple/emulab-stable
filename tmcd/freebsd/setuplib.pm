@@ -15,6 +15,7 @@ my $TMPASSWD    = "/etc/testbed/master.passwd";
 my $TMHOSTS     = "/etc/testbed/hosts";
 my $HOSTSFILE   = "/etc/hosts";
 my $TMNICKNAME  = "/etc/testbed/nickname";
+my $FINDIF	= "/etc/testbed/findif";
 my @CONFIGS	= ($TMIFC, $TMDELAY, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME,
 		   $TMTARBALLS);
 my $REBOOTCMD   = "reboot";
@@ -29,7 +30,7 @@ my $STARTUPCMD  = "startupcmd";
 my $DELTACMD    = "deltas";
 my $STARTSTATCMD= "startstatus";
 my $READYCMD    = "ready";
-my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s ".
+my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s ".
 		  "media 100baseTX mediaopt full-duplex\n";
 my $RPMINSTALL  = "/usr/local/bin/rpm -i %s\n";
 my $CP		= "/bin/cp -f";
@@ -160,9 +161,20 @@ sub doifconfig ()
     print IFC "#!/bin/sh\n";
     
     while (<TM>) {
-	$_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*)/;
-	printf STDOUT "  $IFCONFIG", $1, $2, $3;
-	printf IFC $IFCONFIG, $1, $2, $3;
+	if ($_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*)/) {
+	    my $iface;
+
+	    if ($iface = findiface($4)) {
+		printf STDOUT "  $IFCONFIG", $iface, $2, $3;
+		printf IFC $IFCONFIG, $iface, $2, $3;
+	    }
+	    else {
+		print STDERR "Bad MAC: $4\n";
+	    }
+	}
+	else {
+	    print STDERR "Bad ifconfig line: $_\n";
+	}
     }
     close(TM);
     close(IFC);
@@ -598,6 +610,27 @@ sub cleanup_node () {
 	print STDERR "Failure running pwd_mkdb on default password file: $!\n";
 	exit(1);
     }
+}
+
+#
+# Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
+# 
+sub findiface($)
+{
+    my($mac) = @_;
+    my($iface);
+
+    open(FIF,  "$FINDIF $mac |")
+	or die "Cannot start $FINDIF: $!";
+
+    $iface = <FIF>;
+    
+    if (! close(FIF)) {
+	return 0;
+    }
+    
+    $iface =~ s/\n//g;
+    return $iface;
 }
 
 1;

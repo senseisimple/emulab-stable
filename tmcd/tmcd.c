@@ -523,9 +523,9 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select card,IP,IPalias from interfaces "
+	res = mydb_query("select card,IP,IPalias,MAC from interfaces "
 			 "where node_id='%s'",
-			 3, nodeid);
+			 4, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "IFCONFIG: %s: DB Error getting interfaces!",
 		       nodeid);
@@ -542,6 +542,12 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		if (row[1] && row[1][0]) {
 			int card = atoi(row[0]);
 
+			/*
+			 * INTERFACE can go away when all machines running
+			 * updated (MAC based) setup. Right now MAC is at
+			 * the end (see below) cause of the sharks, but they
+			 * should be dead soon too.
+			 */
 			sprintf(buf, "INTERFACE=%d INET=%s MASK=%s",
 				card, row[1], NETMASK);
 
@@ -561,6 +567,13 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			}
 			else if (card == control_net)
 				goto skipit;
+
+			/*
+			 * Tack on MAC, which should go up above after
+			 * Sharks are sunk.
+			 */
+			strcat(buf, " MAC=");
+			strcat(buf, row[3]);
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);

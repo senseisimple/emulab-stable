@@ -8,7 +8,7 @@ SUBDIR		= tmcd
 
 include $(OBJDIR)/Makeconf
 
-all:	tmcd tmcc tmcd.restart
+all:	tmcd tmcc tmcd.restart findif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -19,7 +19,10 @@ tmcd: tmcd.o
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 tmcc: tmcc.o
-	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(LFLAGS)
+	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(LFLAGS) -static
+
+findif: findif.o
+	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static
 
 tmcc.o:	tmcc.c decls.h
 tmcd.o:	tmcd.c decls.h

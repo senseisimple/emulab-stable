@@ -15,6 +15,7 @@ my $TMSHADOW    = "/etc/rc.d/testbed/shadow";
 my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
 my $TMHOSTS     = "/etc/rc.d/testbed/hosts";
 my $TMNICKNAME  = "/etc/rc.d/testbed/nickname";
+my $FINDIF	= "/etc/rc.d/testbed/findif";
 my $HOSTSFILE   = "/etc/hosts";
 my @CONFIGS	= ($TMIFC, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME, $TMTARBALLS);
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
@@ -28,7 +29,7 @@ my $RPMCMD      = "rpms";
 my $TARBALLCMD  = "tarballs";
 my $STARTUPCMD  = "startupcmd";
 my $DELTACMD    = "deltas";
-my $IFCONFIG    = "/sbin/ifconfig eth%d inet %s netmask %s\n";
+my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s\n";
 my $RPMINSTALL  = "/bin/rpm -i %s\n";
 my $CP		= "/bin/cp -f";
 my $USERADD	= "/usr/sbin/useradd";
@@ -153,9 +154,20 @@ sub doifconfig ()
     print IFC "#!/bin/sh\n";
     
     while (<TM>) {
-	$_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*)/;
-	printf STDOUT "  $IFCONFIG", $1, $2, $3;
-	printf IFC $IFCONFIG, $1, $2, $3;
+	if ($_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*)/) {
+	    my $iface;
+
+	    if ($iface = findiface($4)) {
+		printf STDOUT "  $IFCONFIG", $iface, $2, $3;
+		printf IFC $IFCONFIG, $iface, $2, $3;
+	    }
+	    else {
+		print STDERR "Bad MAC: $4\n";
+	    }
+	}
+	else {
+	    print STDERR "Bad ifconfig line: $_\n";
+	}
     }
     close(TM);
     close(IFC);
@@ -439,6 +451,27 @@ sub cleanup_node () {
 	print STDERR "Could not copy default passwd file into place: $!\n";
 	exit(1);
     }
+}
+
+#
+# Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
+# 
+sub findiface($)
+{
+    my($mac) = @_;
+    my($iface);
+
+    open(FIF,  "$FINDIF $mac |")
+	or die "Cannot start $FINDIF: $!";
+
+    $iface = <FIF>;
+    
+    if (! close(FIF)) {
+	return 0;
+    }
+    
+    $iface =~ s/\n//g;
+    return $iface;
 }
 
 1;
