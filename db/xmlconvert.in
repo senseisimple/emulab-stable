@@ -8,10 +8,15 @@
 
 use English;
 use Getopt::Std;
+use XML::Parser;
     
 #
 # Convert between XML and DB representation of a virtual experiment.
 # Very simple, no DTDs, DOMs, XSLs, etc. Just the facts ...
+#
+# XXX We do not regex the data carefully enough before inserting it into
+# the DB. We run quotemeta() over it, but we should be more careful about
+# per-slot checks.
 #
 sub usage()
 {
@@ -57,6 +62,7 @@ my %virtual_tables = ("experiments"		=> undef,
 # XXX
 # The experiment table is special. Only certain fields are allowed to
 # be updated. Not sure what the right approach for this is.
+# Note that I regex the data before inserting it below.
 #
 my %experiment_fields = ("multiplex_factor"		=> 1,
 			 "forcelinkdelays"		=> 1,
@@ -147,12 +153,17 @@ exit(0);
 # This code is silly. Overly stylized (one tag per line!). Should
 # use the XML::Parser package instead. But this was easy and fun for a
 # first cut. 
-# 
+#
+# State variables for parsing code below.
+my $current_expt;
+my $current_table;
+my $current_row;
+my $current_slot;
+my $current_data;
+
 sub readXML($$$) {
     my ($pid, $eid, $xmlfile) = @_;
     my %experiment;
-    my $line;
-    my $tablename;
 
     if ($xmlfile ne "-") {
 	open(STDIN, "< $xmlfile")
@@ -160,121 +171,21 @@ sub readXML($$$) {
     }
 
     #
-    # We want to see a proper XML header. However, if this is coming out
-    # of the parser, there could be some user output ahead of it. At some
-    # point we need to fix how we deal with user output, but for now lets
-    # just eat up the lines till we see the header, printing them to stdout
-    # so that it ends up in the log.
+    # Create a parser.
     #
-    while (<STDIN>) {
-	chomp($_);
-	last
-	    if ($_ eq $XMLHEADER);
+    my $parser = new XML::Parser(Style => 'Tree');
+    $parser->setHandlers('Start'   => \&StartElement,
+			 'End'     => \&EndElement,
+			 'Char'    => \&ProcessElement);
 
-	print STDOUT "$_\n";
-    }
-    fatal("Improper XML header line")
-	if (! defined($_));
-
-    #
-    # The next line should be the virtual_experiment line, with the
-    # pid/eid. We check that, but otherwise ignore the pid/eid.
-    #
-    $line = <STDIN>;
-    if ($line =~ /^<virtual_experiment pid='([-\w]+)' eid='([-\w]+)'>$/) {
-	if ($pid ne $1 || $eid ne $2) {
-	    fatal("pid/eid mismatch: $line");
-	}
-    }
-    else {
-	fatal("Improper virtual_experiment line: $line");
-    }
-
-    #
-    # Now read in each table, and its rows (which could be more than 1).
-    # There can be only one experiments row, of course.
-    #
-    while (<STDIN>) {
-	if ($_ =~ /^\s*<\/virtual_experiment>$/) {
-	    last;
-	}
-	
-	# Each loop is a new table.
-	if (defined($tablename)) {
-	    fatal("Parser out of sync at tablename: $_");
-	}
-	
-	# Table name.
-	if ($_ =~ /^\s*<([-\w]+)>/) {
-	    $tablename = $1;
-
-	    if (! exists($virtual_tables{$tablename})) {
-		fatal("Unknown virtual table: $_");
-	    }
-	    #
-	    # New table. Define a list. Note that the parser will spit
-	    # out the table start/end tags multiple times, since the
-	    # parser is written in such a way that its not possible to
-	    # flatten it out. Thats okay.
-	    #
-	    if (! defined($virtual_tables{$tablename})) {
-		$virtual_tables{$tablename} = [];
-	    }
-	    print "Starting new table: $tablename\n"
-		if ($debug);
-
-	    #
-	    # Next is either the table terminator, or the start of a new
-	    # row in the current table.
-	    #
-	    my $row;
-	    while (<STDIN>) {
-		if ($_ =~ /^\s*(<[-\w\/]+>)$/) {
-		    if ($1 eq "</$tablename>") {
-			undef($tablename);
-			goto newtable;
-		    }
-		    elsif ($1 eq "<row>") {
-			fatal("Parser out of sync at row: $_")
-			    if (defined($row));
-			print "  Starting new row\n"
-			    if ($debug);
-			$row = {};
-		    }
-		    elsif ($1 eq "</row>") {
-			fatal("Parser out of sync at /row: $_")
-			    if (!defined($row));
-			push(@{$virtual_tables{$tablename}}, $row);
-			undef($row);
-		    }
-		}
-		elsif ($_ =~ /^\s*\<([-\w]+)\>(.*)\<\/\1\>$/) {
-		    fatal("Parser out of sync at entity: $_")
-			if (!defined($row));
-		    #
-		    # Always toss out pid/eid, since we insert our own!
-		    #
-		    if ($1 ne "pid" && $1 ne "eid") {
-			$row->{$1} = xmldecode($2);
-			print "    Entering new element: $1: $row->{$1}\n"
-			    if ($debug);
-		    }
-		}
-		else {
-		    fatal("Malformed entity: $_");
-		}
-	    }
-	}
-	else {
-	    fatal("Malformed table name: $_");
-	}
-      newtable:
-    }
+    fatal($@)
+	if (eval { $parser->parse(*STDIN); return 1; } != 1);
+    
     #
     # Verify. 
     #
     # Must be exactly one experiments table row, and we prune out lots
-    # of stuff that is not allowed. Note that we never insert a new
+    # of stuff that is not allowed. Note that we never insert a
     # experiment, but only allow updates of certain values. 
     #
     if (scalar(@{$virtual_tables{"experiments"}}) != 1) {
@@ -309,7 +220,7 @@ sub readXML($$$) {
     #
     if (scalar(keys(%experiments_table))) {
 	my @setlist = ();
-	
+
 	foreach my $key (keys(%experiments_table)) {
 	    my $val = $experiments_table{$key};
 	    
@@ -317,7 +228,14 @@ sub readXML($$$) {
 		push(@setlist, "$key=NULL");
 	    }
 	    else {
-		push(@setlist, "$key='$val'");
+		# Sanity check. The particular set of fields should not need
+		# anything more than alphanumeric.
+		if ($val =~ /^[\d\w]+$/) {
+		    push(@setlist, "$key='$val'");
+		}
+		else {
+		    fatal("Illegal characters in table data: $key/$val");
+		}
 	    }	    
 	}
 	my $query = "update experiments ".
@@ -362,7 +280,7 @@ sub readXML($$$) {
 		    push(@values, "NULL");
 		}
 		else {
-		    push(@values, "'$val'");
+		    push(@values, DBQuoteSpecial($val));
 		}	    
 		push(@fields, $key);
 	    }
@@ -376,6 +294,139 @@ sub readXML($$$) {
 	}
     }
     return 0;
+}
+
+#
+# XML::Parser routines.
+#
+#
+# Start an element.
+# 
+sub StartElement ($$$)
+{
+    my ($expat, $element, %attrs) = @_;
+
+    if ($element eq "virtual_experiment") {
+	fatal("Out of sync at experiment start: $element")
+	    if (defined($current_expt) ||
+		defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	$current_expt = "$pid/$eid";
+	
+	#
+	# Sanity check pid/eid.
+	#
+	if ((exists($attrs{'pid'}) && $attrs{'pid'} ne $pid) ||
+	    (exists($attrs{'eid'}) && $attrs{'eid'} ne $eid)) {
+	    fatal("pid/eid mismatch!");
+	}
+    }
+    elsif (exists($virtual_tables{$element})) {
+	#
+	# A new table start.
+	#
+	fatal("Out of sync at element start: $element")
+	    if (!defined($current_expt) ||
+		defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	$current_table = $element;
+
+	if (! defined($virtual_tables{$element})) {
+	    $virtual_tables{$element} = [];
+	}
+	print "Starting new table: $element\n"
+	    if ($debug);
+    }
+    elsif ($element eq "row") {
+	fatal("Out of sync at row start: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	$current_row = {};
+    }
+    else {
+	fatal("Out of sync at slot start: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		!defined($current_row) ||
+		defined($current_slot));
+	$current_slot = $element;
+	$current_data = "";
+    }
+}
+
+#
+# End an element.
+# 
+sub EndElement ($$)
+{
+    my ($expat, $element) = @_;
+
+    if ($element eq "virtual_experiment") {
+	fatal("Out of sync at experiment start: $element")
+	    if (!defined($current_expt) ||
+		defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	undef($current_expt);
+    }
+    elsif (exists($virtual_tables{$element})) {
+	#
+	# A table termination.
+	#
+	fatal("Out of sync at element end: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	undef($current_table);
+    }
+    elsif ($element eq "row") {
+	fatal("Out of sync at row end: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		!defined($current_row) ||
+		defined($current_slot));
+
+	print "Adding new row to table $current_table\n"
+	    if ($debug);
+	
+	push(@{$virtual_tables{$current_table}}, $current_row);
+	undef($current_row);
+    }
+    else {
+	fatal("Out of sync at slot end: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		!defined($current_row) ||
+		!defined($current_slot));
+    
+	#
+	# Always ignore pid/eid.
+	#
+	if ($current_slot ne "pid" && $current_slot ne "eid") {
+	    print "    Entering new slot: $current_slot: $current_data\n"
+		if ($debug);
+	    $current_row->{$current_slot} = $current_data;
+	}
+	undef($current_slot);
+	undef($current_data);
+    }
+}
+
+#
+# Process stuff inside a slot.
+# 
+sub ProcessElement ($$)
+{
+    my ($expat, $string) = @_;
+
+    if (defined($current_slot)) {
+	$current_data .= xmldecode($string);
+    }
 }
 
 #
@@ -482,8 +533,9 @@ sub xmlencode($)
     my %specialchars = ('&' => '&amp;',
 			'<' => '&lt;',
 			'>' => '&gt;',
-			"'" => '&apos;',
-			'"' => '&quot;');
+			"'" => '&#39;',
+			"]" => '&#93;',
+			'"' => '&#34;');
 
     $string =~ s/([&<>"'])/$specialchars{$1}/ge;
     return $string;
@@ -496,8 +548,9 @@ sub xmldecode($)
     my %specialchars = ('&amp;'  => '&',
 			'&lt;'   => '<',
 			'&gt;'   => '>',
-			'&apos;' => "'",
-			'&quot;' => '"');
+			'&#39;'  => "'",
+			'&#93;'  => ']',
+			'&#34;'  => '"');
 
     $string =~ s/(&\w+;)/$specialchars{$1}/ge;
     return $string;

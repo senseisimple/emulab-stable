@@ -948,16 +948,7 @@ Simulator instproc spitxml_finish {} {
 }
 
 Simulator instproc spitxml_data {tag fields values} {
-    puts "  <$tag>"
-    puts "    <row>"
-    foreach field $fields {
-	set value  [lindex $values 0]
-	set values [lrange $values 1 end]
-
-	puts "      <$field>$value</$field>"
-    }
-    puts "    </row>"
-    puts "  </$tag>"
+    ::spitxml_data $tag $fields $values
 }
 
 #
@@ -970,9 +961,21 @@ proc spitxml_data {tag fields values} {
     foreach field $fields {
 	set value  [lindex $values 0]
 	set values [lrange $values 1 end]
+	set value_esc [xmlencode $value]
 
-	puts "      <$field>$value</$field>"
+	puts "      <$field>$value_esc</$field>"
     }
     puts "    </row>"
     puts "  </$tag>"
+}
+
+proc xmlencode {args} {
+    regsub -all "&" [eval concat $args] "\\&amp;" args
+    regsub -all "<" $args "\\&lt;" args
+    regsub -all ">" $args "\\&gt;" args
+    regsub -all "\"" $args "\\&\#34;" args
+    regsub -all "]" $args "\\&\#93;" args
+    regsub -all "'" $args "\\&\#39;" args
+    
+    return $args
 }
