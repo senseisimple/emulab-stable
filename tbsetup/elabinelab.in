@@ -279,6 +279,10 @@ sub DumpDBGoo()
 		     "     v.pid=r.pid and v.eid=r.eid ".
 		     "where r.pid='$pid' and r.eid='$eid'");
     while (my ($node_id,$role) = $query_result->fetchrow_array()) {
+	# Like, the firewall node.
+	next
+	    if (!defined($role));
+	
 	$noderoles{$node_id} = $role;
 	$bossnode = $node_id
 	    if ($role eq 'boss');
