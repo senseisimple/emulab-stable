@@ -25,6 +25,10 @@ if {[file exists $updir/../assign/assign]} {
     set assign "$updir/../assign"
 }
 
+load /usr/testbed/lib/sql.so
+set DB [sql connect]
+sql selectdb $DB tbdb
+
 set maxrun 5
 set delaythresh .25
 
@@ -89,13 +93,15 @@ foreach link [array names links] {
     set dst [lindex $links($link) 2]
     set bw [string trimright [lindex $links($link) 4] "MbmB"]
     set delay [string trimright [lindex $links($link) 6] "msMS"]
+    set loss [lindex $links($link) 8]
     if {($bw != 100 && $bw != 10) ||
-	$delay > $delaythresh} {
+	($delay > $delaythresh) ||
+	($loss > 0)} {
 	# we need a delay node
 	set nodes(delay$delayI) [list delay]
 	set rlinks(dsrc_$link) [list $src -1 delay$delayI -1 100Mb 100Mb 1ms 1ms]
 	set rlinks(ddst_$link) [list $dst -1 delay$delayI -1 100Mb 100Mb 1ms 1ms]
-	lappend delayinfo "$link delay$delayI $bw $delay"
+	lappend delayinfo "$link delay$delayI $bw $delay $loss"
 	incr delayI
     } else {
 	set rlinks($link) $links($link)
@@ -176,6 +182,7 @@ puts $fp "START virtual"
 puts $fp "START nodes"
 foreach switch [array names map] {
     foreach pair $map($switch) {
+	set v2pmap([lindex $pair 0]) [lindex $pair 1]
 	puts $fp "$pair"
     }
 }
@@ -261,6 +268,7 @@ foreach link [array names linktmpb] {
     set llen [llength $linktmpb($link)]
     set i 0
     foreach l $linktmpb($link) {
+	set vlaninfo($link-$i) $l
 	puts $fp "$link-$i $l"
 	incr i
     }
@@ -278,5 +286,39 @@ puts $fp "END delay"
 close $fp
 
 file delete $tmpfile
+
+# Add delay info to database
+# Note on interface numbers:  A delayed link has two vlans
+# <link>-0 and <link>-1 the second mac of -0 and the first mac
+# of -1 are the two macs on the delay node and correspond to the two
+# intercaces.
+foreach line $delayinfo {
+    set link [lindex $line 0]
+    set node [lindex $line 1]
+    set bw [lindex $line 2]
+    set delay [lindex $line 3]
+    set loss [lindex $line 4]
+    
+    # extra macs of the two interfaces
+    set mac0 [lindex $vlaninfo($link-0) 1]
+    set mac1 [lindex $vlaninfo($link-1) 0]
+
+    # use database to get interface numbers
+    sql query $DB "select card from interfaces where mac = \"$mac0\""
+    set int0 [sql fetchrow $DB]
+    sql endquery $DB
+    sql query $DB "select card from interfaces where mac = \"$mac1\""
+    set int1 [sql fetchrow $DB]
+    sql endquery $DB
+    
+    # find the physical node for this dely
+    set pnode $v2pmap($node)
+
+    # remove any current entry in the delays table
+    sql exec $DB "delete from delays where node_id = \"$pnode\""
+    
+    # add this entry
+    sql exec $DB "insert into delays (node_id,card0,card1,delay,bandwidth,lossrate) values (\"$pnode\",\"$int0\",\"$int1\",\"$delay\",\"$bw\",\"$loss\")"
+}
 
 puts "Done"
