@@ -204,14 +204,14 @@ sub intersect {
 
 # get_macs link - Returns all MAC addresses associated with a link.  Because
 # a link can pass through a delay node this may be more than two.  Returns
-# a string.
+# an array.
 sub get_macs {
-    local($i)=0;
     local($macs)=[];
-
-    while (defined($vlanmap{"$_[0]-$i"})) {
-	push(@$macs,@{$vlanmap{"$_[0]-$i"}});
-	$i++;
+    if (defined($vlanmap{"dsrc_$_[0]"})) {
+	push(@$macs,@{$vlanmap{"dsrc_$_[0]"}});
+    } 
+    if (defined($vlanmap{"ddst_$_[0]"})) {
+	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
     }
 
     return $macs;
