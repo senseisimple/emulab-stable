@@ -931,6 +931,18 @@ CREATE TABLE user_pubkeys (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'user_sfskeys'
+#
+
+CREATE TABLE user_sfskeys (
+  uid varchar(8) NOT NULL default '',
+  comment varchar(128) NOT NULL default '',
+  pubkey text,
+  stamp datetime default NULL,
+  PRIMARY KEY  (uid,comment)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'users'
 #
 
