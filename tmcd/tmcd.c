@@ -1447,14 +1447,14 @@ COMMAND_PROTOTYPE(dodelay)
 		 "q0_droptail,q0_gentle, "
 		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
 		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
-		 "q1_droptail,q1_gentle "
+		 "q1_droptail,q1_gentle,vnode0,vnode1 "
                  " from delays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=iface0 "
 		 "left join interfaces as j on "
 		 " j.node_id=d.node_id and j.iface=iface1 "
 		 " where d.node_id='%s'",	 
-		 37, reqp->nodeid);
+		 39, reqp->nodeid);
 	if (!res) {
 		error("DELAY: %s: DB Error getting delays!\n", reqp->nodeid);
 		return 1;
@@ -1490,7 +1490,7 @@ COMMAND_PROTOTYPE(dodelay)
 			"LIMIT1=%s MAXTHRESH1=%s MINTHRESH1=%s WEIGHT1=%s "
 			"LINTERM1=%s QINBYTES1=%s BYTES1=%s "
 			"MEANPSIZE1=%s WAIT1=%s SETBIT1=%s " 
-			"DROPTAIL1=%s GENTLE1=%s \n",
+			"DROPTAIL1=%s GENTLE1=%s\n",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
 			row[7], row[8], row[9], row[10],
@@ -1504,6 +1504,11 @@ COMMAND_PROTOTYPE(dodelay)
 			row[29], row[30], row[31],
 			row[32], row[33], row[34],
 			row[35], row[36]);
+
+		if (vers >= 8 && row[37] && row[38]) {
+			sprintf(&buf[strlen(buf)],
+				" VNODE0=%s VNODE1=%s", row[37], row[38]);
+		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
@@ -1535,8 +1540,9 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	 * join is to get the type out so that we can pass it back. Of
 	 * course, this assumes that the type is the BSD name, not linux.
 	 */
-	res = mydb_query("select i.MAC,dir,vlan,d.ip,netmask, "
+	res = mydb_query("select i.MAC,type,vlan,vnode,d.ip,netmask, "
 		 "pipe,delay,bandwidth,lossrate, "
+		 "rpipe,rdelay,rbandwidth,rlossrate, "
 		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
 		 "q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit, " 
 		 "q_droptail,q_gentle "
@@ -1544,7 +1550,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 " where d.node_id='%s'",	 
-		 22, reqp->nodeid);
+		 27, reqp->nodeid);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -1558,20 +1564,22 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "LINKDELAY IFACE=%s DIR=%s "
-			"LINKNAME=%s INET=%s MASK=%s "
+		sprintf(buf, "LINKDELAY IFACE=%s TYPE=%s "
+			"LINKNAME=%s VNODE=%s INET=%s MASK=%s "
 			"PIPE=%s DELAY=%s BW=%s PLR=%s "
+			"RPIPE=%s RDELAY=%s RBW=%s RPLR=%s "
 			"RED=%s LIMIT=%s MAXTHRESH=%s MINTHRESH=%s WEIGHT=%s "
 			"LINTERM=%s QINBYTES=%s BYTES=%s "
 			"MEANPSIZE=%s WAIT=%s SETBIT=%s "
-			"DROPTAIL=%s GENTLE=%s \n",
+			"DROPTAIL=%s GENTLE=%s\n",
 			row[0],  row[1],
-			row[2],  row[3],  row[4],
-			row[5],	 row[6],  row[7],  row[8],
-			row[9],	 row[10], row[11], row[12], row[13],
-			row[14], row[15], row[16],
-			row[17], row[18], row[19],
-			row[20], row[21]);
+			row[2],  row[3],  row[4],  row[5],
+			row[6],	 row[7],  row[8],  row[9],
+			row[10], row[11], row[12], row[14],
+			row[14], row[15], row[16], row[17], row[18],
+			row[19], row[20], row[21],
+			row[22], row[23], row[24],
+			row[25], row[26]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
