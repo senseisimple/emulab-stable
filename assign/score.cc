@@ -352,8 +352,6 @@ void remove_node(vvertex vv)
   } else if (tr->current_load >= tr->max_load) {
     // If the pnode is still over its max load, reduce the penalty to adjust
     // for the new load.
-    // XXX - This shouldn't ever happen, right? I don't think we can ever
-    // over-assign to a pnode.
     SDEBUG(cerr << "  reducing penalty, new load=" <<
 	pnode->current_type_record->current_load <<
 	   " (>= " << pnode->current_type_record->max_load << ")" << endl);
@@ -524,18 +522,6 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	  return 1;
 	} else {
 	  SDEBUG(cerr << "  compatible types" << endl);
-	  if (pnode->current_type_record->current_load
-	      == pnode->current_type_record->max_load) {
-	    /* XXX - We could ignore this check and let the code
-	       at the end of the routine penalize for going over
-	       load.  Failing here seems to work better though. */
-
-	    // XXX is this a bug?  do we need to revert the pnode/vnode to
-	    // it's initial state.
-	    SDEBUG(cerr << "  node is full" << endl);
-	    cerr << "  node is full" << endl;
-	    return 1;
-	  }
 	}
       }
     }

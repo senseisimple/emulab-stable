@@ -101,6 +101,9 @@ bool prune_pclasses = false;
 
 // Whether or not we should use the experimental support for dynamic pclasses
 bool dynamic_pclasses = false;
+
+// Whether or not to allow assign to temporarily over-subscribe pnodes
+bool allow_overload = false;
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -307,6 +310,7 @@ void print_help()
 #endif
   cerr << "  -T          - Doing some scoring self-testing." << endl;
   cerr << "  -H <float>  - Try <float> times harder." << endl;
+  cerr << "  -o          - Allow overloaded pnodes to be considered." << endl;
   exit(2);
 }
  
@@ -538,7 +542,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:o")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -579,6 +583,8 @@ int main(int argc,char **argv)
 	print_help();
       }
       break;
+    case 'o':
+      allow_overload = true; break;
     default:
       print_help();
     }

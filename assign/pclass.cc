@@ -149,7 +149,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
 	if (pclass_equiv(PG,curP,(*dit).second)) {
 	  // found the right class
 	  found_class=1;
-	  curclass->add_member(curP);
+	  curclass->add_member(curP,false);
 	  break;
 	} 
       }
@@ -161,7 +161,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
       pclasses.push_back(n);
       canonical_members[n]=curP;
       n->name = curP->name;
-      n->add_member(curP);
+      n->add_member(curP,false);
     }
   }
 
@@ -191,9 +191,8 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
       tb_pclass *n = new tb_pclass;
       pclasses.push_back(n);
       n->name = pnode->name + "-own";
-      n->add_member(pnode);
+      n->add_member(pnode,true);
       n->disabled = true;
-      pnode->my_own_class = n;
     }
   }
 
@@ -232,7 +231,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
   return 0;
 }
 
-int tb_pclass::add_member(tb_pnode *p)
+int tb_pclass::add_member(tb_pnode *p, bool is_own_class)
 {
   tb_pnode::types_map::iterator it;
   for (it=p->types.begin();it!=p->types.end();++it) {
@@ -243,7 +242,11 @@ int tb_pclass::add_member(tb_pnode *p)
     members[type]->push_back(p);
   }
   size++;
-  p->my_class=this;
+  if (is_own_class) {
+      p->my_own_class=this;
+  } else {
+      p->my_class=this;
+  }
   return 0;
 }
 
@@ -274,6 +277,11 @@ void assert_own_class_invariant(tb_pnode *p) {
   }
   if (own_class && other_class) {
     cerr << "Uh oh, in own and other class!" << endl;
+    pclass_debug();
+    abort();
+  }
+  if (!own_class && !other_class) {
+    cerr << "In neither class!" << endl;
     pclass_debug();
     abort();
   }
@@ -356,7 +364,7 @@ int pclass_unset(tb_pnode *p)
 #endif
   }
 
-  if (p->my_own_class) {
+  if (p->my_own_class && (p->total_load == 1)) {
     p->my_own_class->disabled = true;
   }
 

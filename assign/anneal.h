@@ -60,6 +60,7 @@ extern pclass_list pclasses;
 extern pnode_pvertex_map pnode2vertex;
 extern double absbest;
 extern int absbestviolated, iters, iters_to_best;
+extern bool allow_overload;
 
 #ifdef PER_VNODE_TT
 extern pclass_types vnode_type_table;

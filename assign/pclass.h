@@ -75,7 +75,7 @@ public:
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
   typedef hash_map<crope,tb_pnodeset*> pclass_members_set;
 
-  int add_member(tb_pnode *p);
+  int add_member(tb_pnode *p, bool is_own_class);
 
   crope name;			// purely for debugging
   int size;

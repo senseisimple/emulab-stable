@@ -58,7 +58,7 @@ tb_pnode *find_pnode(tb_vnode *vn)
   int num_types = tt.first;
   pclass_vector *acceptable_types = tt.second;
   
-  tb_pnode *newpnode;
+  tb_pnode *newpnode = NULL;
 
   /*
   int enabled_pclasses = 0;
@@ -77,6 +77,13 @@ tb_pnode *find_pnode(tb_vnode *vn)
   int first = i;
   for (;;) {
     i = (i+1)%num_types;
+
+    // Skip pclasses that have been disabled
+    if ((*acceptable_types)[i]->disabled) {
+	i = std::rand()%num_types;
+	continue;
+    }
+
 #ifdef PCLASS_SIZE_BALANCE
     int acceptchance = 1000 * (*acceptable_types)[i]->size * 1.0 /
 	npnodes;
@@ -84,11 +91,15 @@ tb_pnode *find_pnode(tb_vnode *vn)
 	continue;
     }
 #endif
-#ifdef LOAD_BALANCE
+
+    // For load balancing only
 REDO_SEARCH:
     tb_pnode* firstmatch = NULL;
-#endif
-#ifdef FIND_PNODE_SEARCH
+
+#ifndef FIND_PNODE_SEARCH
+    // If not searching for the pnode, just grab the front one
+    newpnode = (*acceptable_types)[i]->members[vn->type]->front();
+#else
 #ifdef PER_VNODE_TT
     // If using PER_VNODE_TT and vclasses, it's possible that there are
     // some pclasses in this node's type table that can't be used right now,
@@ -96,10 +107,6 @@ REDO_SEARCH:
     // type
     if ((*acceptable_types)[i]->members.find(vn->type) ==
 	    (*acceptable_types)[i]->members.end()) {
-	continue;
-    }
-    if ((*acceptable_types)[i]->disabled) {
-	i = std::rand()%num_types;
 	continue;
     }
 #endif
@@ -110,7 +117,7 @@ REDO_SEARCH:
     for (int j = 0; j < skip; j++) {
 	it++;
     }
-#endif
+#endif // LOAD_BALANCE
     while (it != (*acceptable_types)[i]->members[vn->type]->L.end()) {
 #ifdef LOAD_BALANCE
 	if ((*it)->typed) {
@@ -133,15 +140,16 @@ REDO_SEARCH:
 	} else {
 	    break;
 	}
-#else
+#else // LOAD_BALANCE
 	if ((*it)->typed && ((*it)->current_type.compare(vn->type) ||
-		    ((*it)->current_type_record->current_load >=
-		     (*it)->current_type_record->max_load))) {
+		 (!allow_overload &&
+		  ((*it)->current_type_record->current_load >=
+		   (*it)->current_type_record->max_load)))) {
 	    it++;
 	} else {
 	    break;
 	}
-#endif
+#endif // LOAD_BALANCE
     }
     if (it == (*acceptable_types)[i]->members[vn->type]->L.end()) {
 #ifdef LOAD_BALANCE
@@ -151,15 +159,13 @@ REDO_SEARCH:
 	} else {
 	    newpnode = NULL;
 	}
-#else
+#else // LOAD_BALANCE
 	newpnode = NULL;
-#endif
+#endif // LOAD_BALANCE
     } else {
 	newpnode = *it;
     }
-#else
-    newpnode = (*acceptable_types)[i]->members[vn->type]->front();
-#endif
+#endif // FIND_PNODE_SEARCH
 #ifdef PCLASS_DEBUG
     cerr << "Found pclass: " <<
       (*acceptable_types)[i]->name << " and node " <<
