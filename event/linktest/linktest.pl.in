@@ -18,6 +18,8 @@ use constant SEND_RATE => 400; # rude sends 1 more than specified here.
 use constant PACK_COUNT => 401;
 use constant HI_BW => 90000000; # pathrate test only accurate 1-90 Mbps
 use constant LO_BW =>  1000000;
+use constant BSD => "FreeBSD";
+use constant LAT_TOL => 0.71; # units of ms
 
 ##############################################################################
 # Globals
@@ -31,6 +33,7 @@ my $hostname; # this host
 my $eid; # experiment id
 my $pid; # project id
 my $gid; # group id
+my $platform; #results of uname
 
 my @verts; # verts: list of text strings containing host names.
            # sorted alphabetically
@@ -53,8 +56,10 @@ my $expt_path;
 # log path (ie tbdata/linktest) set by init.
 my $log_path;
 
-# full path to custom NS build. # TODO: this should get a configure variable.
-my $ns_cmd = "/users/davidand/bin/ns"; 
+# full path to custom NS build. 
+# TODO: this should get a configure variable.
+# NOTE: this is platform and linktest specific!
+my $ns_cmd = "ns"; 
 
 # full path to custom tb_compat.tcl. # TODO: this should be a configure variable.L
 my $lt_path = "/users/davidand/testbed/event/linktest";
@@ -64,6 +69,7 @@ my $lt_path = "/users/davidand/testbed/event/linktest";
 ##############################################################################
 
 # if there is an arg, just count steps and return.
+# this was a quick hack to survey number of synch steps on production files.
 
 # figure out which file to use
 # get the nsfile path 
@@ -79,8 +85,14 @@ if (@ARGV) {
     if ( defined($ENV{TEST_NS_SCRIPT}) ) {
 	$ns_file = $ENV{TEST_NS_SCRIPT};
     } else {
-	# TODO: adjust for groups
-	$ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
+	# TODO: support groups!
+	# if they modified, use the modify; else use the default.
+	my $modname = "/proj/$pid/exp/$eid/tbdata/" . $eid . "-modify.ns";
+	if (-e $modname ) {
+	    $ns_file = $modname;
+	} else {
+	    $ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
+	}
     }
 }
 
@@ -91,13 +103,22 @@ if (@ARGV) {
 # is there a synch server? if not that's a problem (unless have a default)
 die "no synch server defined in: $ns_file\n" unless defined($synserv);
 
-&debug_top;
+    &debug_top;
+    &debug("start stat\n");
+    &stat_rt_test if defined($rtproto) && $rtproto eq "Static";
 
-&stat_rt_test if defined($rtproto) && $rtproto eq "Static";
+    &debug("start onehop\n");
+    &onehop_test;
 
-&onehop_test;
-&stream_test;
-&bw_test;
+    if($platform eq BSD) {
+	&debug("start ping lat\n");	
+	# had problems with ntpq so use ping instead for latency on BSD.
+	&ping_latency_test;
+    }
+    &debug("start stream\n");
+    &stream_test;
+    &debug("start bw\n");
+    &bw_test;
 
 
 ##############################################################################
@@ -146,7 +167,7 @@ sub onehop_test {
  
 # stream test
 #
-# check latency and loss.
+# check loss and possibly latency on non-BSD.
 sub stream_test {
     # repeatedly:
     #   get test assignments.
@@ -168,8 +189,7 @@ sub stream_test {
 
 	    # determine if this machine is the source or the dest.
 	    if($hostname eq $edge->src
-	       
-) {
+	       ) {
 		# wait for crude startup
 		&barrier($barrier_name);
 		# generate config file
@@ -193,14 +213,59 @@ sub stream_test {
 		&barrier($barrier_name);
 		# test occurs
 		&barrier($barrier_name);
+		&debug("killing crud\n");
 		system "kill -9 $crude_pid";
 		# analyze log for latency and loss.
-		&analyze_stream($edge);
+		if($platform eq BSD) {
+		    &analyze_stream($edge,0);
+		} else {
+		    &analyze_stream($edge,1);
+		}
 	    }
 	    &barrier();
 	}
     }
 }
+
+sub ping_latency_test {
+    die "not supported!" unless $platform eq BSD;
+    my @edge_copy = @edges;
+
+    # all nodes will execute the same reductions on the edge list
+    # on their own so that the number of barriers is the same.
+    while(@edge_copy) {
+	my ($edge,$other_edge) = &get_twoway_assign(\@edge_copy);
+	if(defined($edge) && defined($other_edge)) {
+	    
+	    # do a RTT test for the link and see if it adds up.
+	    if($hostname eq $edge->src ) {
+		
+		# set deadline to prevent long waits
+		my $cmd = "sudo ping -c " . PACK_COUNT . " -q  -i " . (1 / SEND_RATE) . " -m 1 -t 1 " . $edge->dst . " 2> " . ERROR_LOG;
+		my @results = `$cmd`;
+		foreach my $result (@results) {
+		    # find the results line we care about
+		    if($result =~ /\/(\d+\.\d+)\//) {
+			my $mean = $1;
+			my $expected = $edge->delay + $other_edge->delay;
+			$expected *= 1000 ; # units of ms
+			&debug("expected: $expected\n");
+			my $bestfit = $expected + (-0.10888 - 0.00236 * $expected)  ;
+			my $diff = abs($bestfit - $mean);
+			&debug("pinglat mean: $mean expected $bestfit $diff\n");
+			if($diff>LAT_TOL) {
+			    &error("Latency test outside of best fit line by: $diff\n");
+			}
+
+		    }
+		}
+	    }
+
+	}
+	&barrier();
+    }
+}
+
 
 sub bw_test {
     
@@ -210,16 +275,35 @@ sub bw_test {
     #   run pathrate_rcv
     #   analyze log results 
 
-    my $snd_pid = fork();
-    if(!$snd_pid) {
-	open(STDOUT, ">/dev/null"); # redirct output to null
-	exec "pathrate_snd -i";
+    my @edge_copy;
+    my $needed = 0;
+    my $snd_pid = undef;
+
+    # check first to see if bw test is ever needed.
+    @edge_copy = @edges;
+    while(@edge_copy && !$needed) {
+	my $edge = &get_assign(\@edge_copy);
+	if(defined($edge)
+	   && $hostname eq $edge->src
+	   && $edge->bw <= HI_BW
+	   && $edge->bw >= LO_BW) {
+	    $needed = 1;
+	}
     }
-    # wait for sender ready.
-    sleep(1);
+
+    if($needed) {
+	$snd_pid = fork();
+	if(!$snd_pid) {
+	    open(STDOUT, ">/dev/null"); # redirct output to null
+	    exec "pathrate_snd -i";
+	}
+	# wait for sender ready.
+	sleep(1);
+    }
+
     &barrier();
 
-    my @edge_copy = @edges;
+    @edge_copy = @edges;
 
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
@@ -241,8 +325,9 @@ sub bw_test {
 	&barrier();
     }
 
-    system "kill -9 $snd_pid";
-
+    if(defined($snd_pid)) {
+	system "kill -9 $snd_pid";
+    }
 
 }
 
@@ -261,6 +346,7 @@ sub get_topo {
     die "could not find NS script: $ns_file\n" unless -e $ns_file;
 
     my @ns_output = `$ns_cmd $ns_file`;
+    die "no ns output!" unless @ns_output;
     foreach my $line (@ns_output) {
 	chomp ($line);
 
@@ -355,6 +441,10 @@ sub init {
     $expt_path = "/proj/$pid/exp/$eid/tbdata";
     $log_path = "/proj/$pid/exp/$eid/tbdata/linktest";
 
+    my @results = `uname`;
+    $platform = $results[0];
+    chomp($platform);
+
 }    
 
 # pings a node. 
@@ -367,15 +457,21 @@ sub ping_node {
     # set deadline to prevent long waits
     my $cmd;
     if($ttl) {
-	$cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 -t $ttl 2> " . ERROR_LOG;
+	if($platform eq BSD) {
+	    $cmd = "sudo ping -c 10 -q  -i 0.1 -m $ttl $host 2> " . ERROR_LOG;
+	} else {
+	    $cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 -t $ttl 2> " . ERROR_LOG;
+	}
     } else {
-	$cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 2> " . ERROR_LOG;
+	$cmd = "sudo ping -c 10 -q -i 0.1 -t 1 $host 2> " . ERROR_LOG;
     }
 
     my @results = `$cmd`;
     foreach my $result (@results) {
 	# find the results line we care about
-	if($result =~ /(\d+) received/) {
+	if($platform eq BSD && $result =~ /(\d+) packets received/) {
+	    return $1;
+	} elsif($result =~ /(\d+) received/) {
 	    return $1;
 	}
     }
@@ -412,22 +508,79 @@ sub get_assign {
     return $task; # or undef if no jobs left for this machine.
 }
 
+# like above get assign but returns a pair of edges.
+sub get_twoway_assign {
+
+    my ($todo_ref) = @_; # must maintain sorted order invariant
+    my $task = undef;
+    my $other_task = undef;
+
+    # build a fresh hash to see which nodes are in use.
+    my %inuse;
+    foreach (@verts) {
+	$inuse{$_}=0;
+    }
+
+    for(my $i=0;$i<@{$todo_ref};$i++) {
+	my $edge = @{$todo_ref}[$i];
+	if(!(
+	     $inuse{$edge->src} || $inuse {$edge->dst})) {
+	    $inuse{$edge->src} = 1;
+	    $inuse{$edge->dst} = 1;
+
+	    $task = @{$todo_ref}[$i];
+	    splice(@{$todo_ref},$i,1); 
+
+	    for(my $j=0;$j<@{$todo_ref};$j++) {
+		my $other_edge = @{$todo_ref}[$j];
+		if($other_edge->src eq $task->dst
+		   && $other_edge->dst eq $task->src) {
+		    $other_task = @{$todo_ref}[$j];
+		    splice(@{$todo_ref},$j,1); 
+		}
+
+	    }
+
+	}
+    }
+
+    # each machine should reduce the todo list the same way due to
+    # alphabetic sorting of info from the ns file.
+    # only thing left to do is return this machines' assignment for processing.
+    return ($task,$other_task); # or undef if no jobs left for this machine.
+
+
+}
+
+
 # PRE: stream test has been run and results are in CRUDE_DAT
 # POST: reports errors if any to the log location.
 # @param: the edge being analyzed
+# @param: parameter to analyze.
+#
+#  due to accuracy problems with the one-way test on BSD, 
+#  an alternate test is used on that platform.
+#  $param==1 means loss and latency
+#  $param==0 means just loss.
 #
 # note, runs on the dest.
 sub analyze_stream {
-    my ($edge) = @_;
+    my ($edge, $param) = @_;
+    my $Os ; # offset sender
+    my $Or ; # offset receiver
+    
+    &debug("analyze stream\n");
     # decode the log.
     system "crude -d " . CRUDE_DAT . " > " . CRUDE_DEC;
 
-     # get clock offsets
-    my $Os = &get_offset($edge->src);
-    $Os /= 1000; # convert to microseconds
-    my $Or = &get_offset($edge->dst);
-    $Or /= 1000;
-   
+    if($param) {
+	# get clock offsets.
+	# these don't work on vnodes.
+	$Os = &get_offset($edge->src);
+	$Os /= 1000; # convert to microseconds
+	$Or = &get_offset($edge->dst);
+	$Or /= 1000;
+    }
     # scan the log. since it's just the mean, don't bother with a statistics
     # library, use an accumulator instead.
     my $count = 0;
@@ -435,19 +588,21 @@ sub analyze_stream {
     open FLOG,"" . CRUDE_DEC || die("could not open " . CRUDE_DEC);
     while(<FLOG>) {
 	if(/Tx=(\d+\.\d+).*Rx=(\d+\.\d+)/) {
-	    my $Ts = $1;
-	    my $Tr = $2;
-	    
-	    my $owd = $Tr + $Or - ( $Ts + $Os);
-	    # convert to ms
-	    $owd *= 1000;
-
-	    # subtract transmit delay (queue and prop are 0)
-	    # L2 bit size of packets: 20 (UDP) 8 (IP) 18 (ETH) 20 (PAY) = 68B = 528b
-	    # need to think some more about this...
+	    if($param) {
+		my $Ts = $1;
+		my $Tr = $2;
+		
+		my $owd = $Tr + $Or - ( $Ts + $Os);
+		# convert to ms
+		$owd *= 1000;
+		
+		# subtract transmit delay (queue and prop are 0)
+		# L2 bit size of packets: 20 (UDP) 8 (IP) 18 (ETH) 20 (PAY) = 68B = 528b
+		# need to think some more about this...
 #	    my $Dt = (1 / ( $edge->bw * 1024/512 )) * 1000;
 #	    $owd -=  $Dt;
-	    $sum += $owd;
+		$sum += $owd;
+	    }
 	    $count++;
 	}
     }
@@ -456,23 +611,20 @@ sub analyze_stream {
 	&error("no packets sent!");
 	return;
     }
-    my $mean = ($sum / $count);
-    &debug("mean latency: $mean\n");
-    
+    if($param) {
+	my $mean = ($sum / $count);
+	&debug("mean latency: $mean\n");
+	my $expected = $edge->delay * 1000; # units of ms
 
-    # TODO: redo the analysis using hypothesis testing with the null
-    # hypothesis being that the test passed.
-
-    # also, the loss stuff is fishy since we're estimating the
-    # population without using the standard error
-
-    # now the part using magic numbers.
-    my $bestfit = -0.10888 - 0.00236 * $edge->delay;
-    my $diff = abs($bestfit - $mean);
-    if($diff>0.71) {
-	&error("Latency test outside of best fit line by: $diff\n");
+	# now the latency part using magic numbers.
+	my $bestfit = $expected + (-0.10888 - 0.00236 * $expected );
+	my $diff = abs($bestfit - $mean);
+	if($diff>LAT_TOL) {
+	    &error("Latency test outside of best fit line by: $diff\n");
+	}
     }
     
+    # loss part, always occurs.
     my $expected = &round(PACK_COUNT * $edge->loss);
     my $sd = sqrt( $expected * (1 - $edge->loss));
     my $actual = PACK_COUNT - $count;
@@ -505,7 +657,7 @@ sub analyze_bw {
     }
     close LOGF;
 
-    # note crappy margin of error. more work needed, or maybe another tool.
+    # note that margin of error is 3Mb with pathrate.
 #    &debug($edge->bw . " lo $lo hi $hi\n");
     $lo -= 3; # units of mb
     $hi += 3;
@@ -521,7 +673,12 @@ sub analyze_bw {
 # get ntpq offset of the specified host
 sub get_offset {
     my ($host) = @_;
-    my @result = `/usr/sbin/ntpq -c rl $host | grep ^offset`;
+    my @result;
+    if($platform eq BSD) {
+	@result = `ntpq -c rl $host | grep ^offset`;
+    } else {
+	@result = `/usr/sbin/ntpq -c rl $host | grep ^offset`;
+    }
     if( $result[0] =~ /^offset=(-*\d+\.\d+)/) {
 	return $1;
     }
