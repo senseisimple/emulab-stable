@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,11 @@
 #
 
 use English;
+
+my $dist = 0;
+if (@ARGV && $ARGV[0] eq "-i") {
+    $dist = 1;
+}
 
 #
 # Configure variables
@@ -45,7 +50,8 @@ while (my ($table_name) = $result->fetchrow()) {
 #
 # Run mysqldump, and read its stdout
 #
-open(FH,"$mysqldump -t $DBNAME $table_names |") or
+open(FH, "$mysqldump " .
+     ($dist ? "--add-locks" : "") . " -t $DBNAME $table_names |") or
     die "Unable to run $mysqldump: $!\n";
 
 #
@@ -62,4 +68,8 @@ while (<FH>) {
 	$1 ne '*') { next; }
 
     print;
+
+    if ($dist && /LOCK TABLES ([-\w]*) WRITE/i) {
+	print "DELETE FROM $1;\n";
+    }
 }

@@ -32,5 +32,11 @@ db-fill:
 	@/usr/testbed/sbin/wap /usr/testbed/sbin/export_tables \
 	  > database-fill.sql
 
+db-fill-dist:
+	@/usr/testbed/sbin/wap /usr/testbed/sbin/export_tables -i \
+	  > database-fill.sql
+
 sitevars:
 	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
+
+dist:	db-fill-dist
