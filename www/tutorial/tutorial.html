@@ -20,6 +20,7 @@
     <li> <a href="#UsingNodes">Using your Nodes</a>
     <li> <a href="#RootAccess">I need <b>root</b> access!</a>
     <li> <a href="#Wedged">My node is wedged!</a>
+    <li> <a href="#Scrogged">I've scrogged my disk!</a>
     <li> <a href="#Finished">I've finished my experiment</a>
     <li> <a href="#Help">Getting Help!</a>
     </ul>
@@ -61,6 +62,7 @@ images on your nodes.
 <li> <a href="#UsingNodes">Using your Nodes</a>
 <li> <a href="#RootAccess">I need <b>root</b> access!</a>
 <li> <a href="#Wedged">My node is wedged!</a>
+<li> <a href="#Scrogged">I've scrogged my disk!</a>
 <li> <a href="#Finished">I've finished my experiment</a>
 <li> <a href="#Help">Getting Help!</a>
 </ul>
@@ -377,6 +379,28 @@ option to specify the project and experiment names. For example:
 will reboot all of the nodes reserved in the "multicast" experiment in
 the "testbed" project. This option is provided as a shorthand method
 for rebooting large groups of nodes.
+
+<p>
+<li> <a NAME="Scrogged"></a>
+     <h3>I've scrogged my disk!</h3>
+
+<p>
+Scrogging your disk is certainly not as common, but it does happen.
+You can either terminate your experiment, and recreate it (which will
+allocate another group of nodes), or if you prefer you can reload the
+disk image yourself. You will of course lose anything you have stored
+on that disk; it is a good idea to store only data that can be easily
+recreated, or else store it in your project directory in <tt>/proj</tt>.
+Reloading your disk with a fresh copy of the default image is easy,
+and requires no intervention by Emulab staff:
+
+	<code><pre><xmp>
+	os_load -w <node> [node ... ]			</xmp></code></pre>
+
+The <tt>-w</tt> option causes os_load to wait (not exit) until the
+nodes have been reloaded. This is the preferred mode of operation
+since otherwise you will need to check the console lines of each node
+to determine when the load is done.
 
 <p>
 <li> <a NAME="Finished"></a>

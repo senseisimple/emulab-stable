@@ -18,6 +18,7 @@
      <li> <a href="#GS-1">How do I start a project?</a>
      <li> <a href="#GS-2">How do I join a project?</a>
      <li> <a href="#GS-3">I have an Emulab account. Now what?</a>
+     <li> <a href="#GS-PATH">Do I need to change my PATH variable?</a>
      <li> <a href="#GS-4">Can I be in more than one project?</a>
      <li> <a href="#GS-5">Can I change my Emulab password?</a>
      <li> <a href="#GS-6">I'm a project leader. Can I designate TAs?</a>
@@ -27,10 +28,11 @@
 <li> <a href="#UTT">Using the Testbed</a>
      <ul>
      <li> <a href="#UTT-1">Is there a tutorial?</a>
-     <li> <a href="#UTT-1A">How many nodes can I ask for?</a>
+     <li> <a href="#UTT-NODES">How many nodes can I ask for?</a>
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
      <li> <a href="#UTT-4">Can I reboot (power cycle) my nodes?</a>
+     <li> <a href="#UTT-SCROGGED">I've scrogged my disk! Now what?</a>
      <li> <a href="#UTT-5">Where do I store files needed by my experiment?</a>
      <li> <a href="#UTT-6">Are my files on <b>users.emulab.net</b>
                            backed up (filesaved)?</a>
@@ -134,11 +136,14 @@
     </p>
     <p>
     Your password starts out the same as the password you initially
-    supplied to the Start (or Join) web page. The skeleton <i>dot</i>
-    files that are provided to all new Emulab users will contain
-    <tt>/usr/testbed/bin</tt> in the <tt>PATH</tt> setting. This
-    directory holds a number of utilities and programs that some (but
-    not all) Emulab users will need in order to conduct experiments.
+    supplied to the Start (or Join) web page.
+
+<li><a NAME="GS-PATH"></a>
+    <h3>Do I need any special directories in my PATH variable?</h3>
+    <p>
+    There are several useful (although not required) programs installed on
+    <tt>users.emulab.net</tt> in <tt>/usr/testbed/bin</tt>. You should edit
+    your dot files to include that directory in your search path. 
     </p>
 
 <li><a NAME="GS-4"></a>
@@ -213,7 +218,7 @@
     on using the Testbed.
     </p>
 
-<li><a NAME="UTT-1A"></a>
+<li><a NAME="UTT-NODES"></a>
     <h3>How many nodes can I ask for?</h3>
     <p>
     You can ask for as many nodes as are currently available! You can
@@ -283,6 +288,18 @@
     on a single controller. The <tt>node_reboot</tt> does its best to
     cleanly reboot individual sharks, but if a single shark is
     unresponsive, the entire shelf will be power cycled.
+    </p>
+
+<li><a NAME="UTT-SCROGGED"></a>
+    <h3>I've scrogged my disk! Now what?</h3>
+    <p>
+    If you manage to corrupt a disk (or slice), no worries. You can easily
+    repair the damage yourself by reloading a fresh copy of the default
+    disk image. You will of course lose anything you have stored on that
+    disk; it is a good idea to store only data that can be easily recreated, 
+    or else store it in your project directory in <tt>/proj</tt>. Disk
+    reloading is covered in more detail in the
+    <a href="tutorial/tutorial.php3#Scrogged">Emulab Tutorial</a>.
     </p>
 
 <li><a NAME="UTT-5"></a>
