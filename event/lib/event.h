@@ -76,6 +76,7 @@ typedef struct {
 address_tuple_t	address_tuple_alloc(void);
 int		address_tuple_free(address_tuple_t);
 
+#ifndef SWIG /* SWIG doesn't handle these, so we have to hide them from it */
 #ifndef NO_EVENT_MACROS
 #define event_notification_get_site(handle, note, buf, len) \
         event_notification_get_string(handle, note, "SITE", buf, len)
@@ -117,6 +118,7 @@ int		address_tuple_free(address_tuple_t);
 #define event_notification_set_sender(handle, note, buf) \
         event_notification_put_string(handle, note, "___SENDER___", buf)
 #endif /* ifndef NO_EVENT_MACROS */
+#endif /* ifndef SWIG */
 
 
 /* The "any host" string: */
