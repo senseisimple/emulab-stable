@@ -1306,3 +1306,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	   not null default 0;
        alter table experiments add column ipassign_args varchar(255) \
 	   default NULL;
+
+1.127: Add cable and len columns to the new_interfaces table, so that when
+       we're adding a small number of nodes by hand, we can set these:
+
+       alter table new_interfaces add cable smallint;
+       alter table new_interfaces add len tinyint;

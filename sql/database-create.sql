@@ -606,6 +606,8 @@ CREATE TABLE new_interfaces (
   switch_id varchar(10) default NULL,
   switch_card tinyint(3) default NULL,
   switch_port tinyint(3) default NULL,
+  cable smallint(6) default NULL,
+  len tinyint(4) default NULL,
   PRIMARY KEY  (new_node_id,card)
 ) TYPE=MyISAM;
 
