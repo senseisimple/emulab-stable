@@ -870,6 +870,7 @@ CREATE TABLE users (
   cvsweb tinyint(4) NOT NULL default '0',
   emulab_pubkey text,
   home_pubkey text,
+  adminoff tinyint(4) default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
