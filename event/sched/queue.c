@@ -12,11 +12,12 @@
 #include <semaphore.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <errno.h>
 #include "event-sched.h"
 
 /* The size of the event queue (i.e., the number of events that can be
    pending at any given time). */
-#define EVENT_QUEUE_LENGTH 131072
+#define EVENT_QUEUE_LENGTH (1024 * 32)
 
 /* The event queue.  The event queue is implemented as a priority
    queue using the implicit tree (array) representation.  The head of
@@ -32,9 +33,10 @@ static sched_event_t event_queue[EVENT_QUEUE_LENGTH];
 static int event_queue_tail = 0;
 
 static pthread_mutex_t event_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t event_queue_cond = PTHREAD_COND_INITIALIZER;
 
 /* Producer/consumer semaphores. */
-static sem_t empty_slot, event_to_consume;
+static sem_t event_to_consume;
 
 static int initialized = 0;
 
@@ -59,7 +61,6 @@ event_is_more_recent(sched_event_t event1, sched_event_t event2)
 void
 sched_event_init(void)
 {
-    sem_init(&empty_slot, 0, EVENT_QUEUE_LENGTH);
     sem_init(&event_to_consume, 0, 0);
     initialized = 1;
 }
@@ -72,9 +73,6 @@ sched_event_enqueue(sched_event_t event)
     int parent, child;
 
     assert(initialized);
-
-    /* Wait until there is an empty slot in the event queue. */
-    sem_wait(&empty_slot);
 
     pthread_mutex_lock(&event_queue_mutex);
 
@@ -123,6 +121,9 @@ sched_event_enqueue(sched_event_t event)
     /* Signal that there is now an event to be consumed. */
     sem_post(&event_to_consume);
 
+    /* Signal that there is a new event */
+    pthread_cond_signal(&event_queue_cond);
+
     return 1;
 }
 
@@ -159,11 +160,39 @@ sched_event_dequeue(sched_event_t *event, int wait)
 
     assert(event_queue_tail > 0);
 
-    /* Remove the next event from the priority queue. */
+    /*
+     * Wait for the time to arrive of the first event. We will get
+     * woken up early if a new event comes in, so must recheck each
+     * time. This allows newer events to sneak in, obviously.
+     */
+    while (1) {
+	    struct timespec      fireme;
+	    int			 err;
+		    
+	    *event = event_queue[EVENT_QUEUE_HEAD];
 
-    /* Store the item at the head of the queue in *EVENT; this is the
-       event that should fire next. */
-    *event = event_queue[EVENT_QUEUE_HEAD];
+	    TIMEVAL_TO_TIMESPEC(&event->time, &fireme);
+
+	    TRACE("sleeping until time=(tv_sec=%ld, tv_usec=%ld).\n",
+		  event->time.tv_sec, event->time.tv_usec);
+
+	    if ((err = pthread_cond_timedwait(&event_queue_cond,
+					      &event_queue_mutex, &fireme))
+		!= 0) {
+		    if (err != ETIMEDOUT) {
+			    ERROR("pthread_cond_timedwait failed: %d", err);
+			    return -1;
+		    }
+		    
+		    /*
+		     * Timed out. Still want to check to make sure
+		     * the head has not changed.
+		     */
+		    if (event->notification ==
+			event_queue[EVENT_QUEUE_HEAD].notification)
+			    break;
+	    }
+    }
 
     /* Restore the heap property.  To do this, we move the leaf
        EVENT_QUEUE[EVENT_QUEUE_TAIL] to the root and propogate it down
@@ -208,9 +237,6 @@ sched_event_dequeue(sched_event_t *event, int wait)
     sched_event_queue_verify();
 
     pthread_mutex_unlock(&event_queue_mutex);
-
-    /* Signal that there is now an empty slot in the event queue. */
-    sem_post(&empty_slot);
 
     return 1;
 }

@@ -272,50 +272,17 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
     event_notification_free(handle, event.notification);
 }
 
-/* Returns the amount of time until EVENT fires. */
-static struct timeval
-sched_time_until_event_fires(sched_event_t event)
-{
-    struct timeval now, time;
-
-    gettimeofday(&now, NULL);
-
-    time.tv_sec = event.time.tv_sec - now.tv_sec;
-    time.tv_usec = event.time.tv_usec - now.tv_usec;
-    if (time.tv_usec < 0) {
-        time.tv_sec -= 1;
-        time.tv_usec += 1000000;
-    }
-
-    return time;
-}
-
 /* Dequeue events from the event queue and fire them at the
    appropriate time.  Runs in a separate thread. */
 static void
 dequeue(event_handle_t handle)
 {
     sched_event_t next_event;
-    struct timeval next_event_wait, now;
-    int foo;
+    struct timeval now;
 
-    while (sched_event_dequeue(&next_event, 1) != 0) {
-        /* Determine how long to wait before firing the next event. */
-    again:
-        next_event_wait = sched_time_until_event_fires(next_event);
-
-        /* If the event's firing time is in the future, then use
-           select to wait until the event should fire. */
-        if (next_event_wait.tv_sec >= 0 && next_event_wait.tv_usec > 0) {
-            if ((foo = select(0, NULL, NULL, NULL, &next_event_wait)) != 0) {
-		/*
-		 * I'll assume that this fails cause of a pthread
-		 * related signal issue.
-		 */
-		ERROR("select did not timeout %d %d\n", foo, errno);
-		goto again;
-            }
-        }
+    while (1) {
+	if (sched_event_dequeue(&next_event, 1) < 0)
+	    break;
 
         /* Fire event. */
 	if (debug > 1)
