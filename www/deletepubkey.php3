@@ -133,9 +133,14 @@ DBQueryFatal("delete from user_pubkeys ".
 	     "where uid='$target_uid' and idx='$key'");
 
 #
-# update authkeys files and nodes.
+# update authkeys files and nodes, but only if user has a real account.
+# The -w option can only be used on real users, and deleting a key does
+# not require anything by the outside script if not a real user; it
+# will complain and die!
 #
-ADDPUBKEY($uid, "webaddpubkey -w $target_uid");
+if (HASREALACCOUNT($target_uid)) {
+    ADDPUBKEY($uid, "webaddpubkey -w $target_uid");
+}
 
 header("Location: showpubkeys.php3?target_uid=$target_uid");
 
