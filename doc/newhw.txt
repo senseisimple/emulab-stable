@@ -15,11 +15,13 @@ ISP110s:
 	Responsible: Rob
 	RMAs: 1 returned, replacement recieved
 	To be RMA'ed: (called Jamie 9/18)
-		pc83 (NMI errors)
-		pc48 (simply dead, though it worked at first)
-		pc51 (often hangs)
-		pc111 (used to boot, lights come on, but no serial/network traffic)
-		pc110's hard drive (I/O errors when doing md5 of whole disk)
+		Still in our possesion:
+			pc83 (NMI errors)
+		Returned 9/26:
+			pc48 (simply dead, though it worked at first)
+			pc51 (often hangs)
+			pc111 (used to boot, lights come on, but no serial/network traffic)
+			pc110's hard drive (I/O errors when doing md5 of whole disk)
 
 Network cables:
 	Status: Received
