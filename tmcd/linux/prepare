@@ -4,7 +4,6 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 require 'ctime.pl';
 
@@ -14,6 +13,7 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
+my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
@@ -23,11 +23,8 @@ my $NTPDRIFT    = "/etc/ntp/drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Turn off line buffering on output
@@ -38,7 +35,6 @@ $| = 1;
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/rc.d/testbed";
 use libsetup;
 
 #
@@ -53,6 +49,12 @@ foreach my $dbfile (@DBFILES) {
 	    die("Could not unlink $dbfile");
     }
 }
+
+#
+# Run anacron to bring everything up to date. It never runs again.
+#
+print "Running cron jobs. This could take a few minutes ...\n";
+system("anacron -d -f -s -n");
 
 #
 # Generate a dumpdates file. Use fstab to find out what filesystems
@@ -139,4 +141,11 @@ if (-f $SFSUSERS) {
 }
 if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
+}
+
+print "Clearing out directories in $VARDIR ...\n";
+foreach my $dir (@VARDIRS) {
+    if (-d "$VARDIR/$dir") {
+	system("rm -rf $VARDIR/$dir/*");
+    }
 }
