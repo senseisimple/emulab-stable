@@ -1,0 +1,54 @@
+5.2M	./bin
+ 12K	./boot/defaults
+403K	./boot
+1.0K	./dev/fd
+ 68K	./dev
+104K	./etc/defaults
+2.0K	./etc/gnats
+ 47K	./etc/isdn
+1.0K	./etc/kerberosIV
+217K	./etc/mail
+ 50K	./etc/mtree
+ 12K	./etc/namedb
+ 82K	./etc/periodic
+3.0K	./etc/ppp
+1.0K	./etc/skel
+ 35K	./etc/ssh
+9.0K	./etc/ssl
+ 17K	./etc/uucp
+1.0K	./etc/X11
+1.1M	./etc
+1.0K	./mnt
+1.0K	./proc
+5.0K	./root
+8.9M	./sbin
+1.0K	./tmp
+ 12M	./usr/bin
+579K	./usr/site
+5.9M	./usr/lib
+8.8M	./usr/libdata
+539K	./usr/libexec
+1.0K	./usr/local
+1.0K	./usr/obj
+6.6M	./usr/sbin
+1.0K	./usr/src
+ 34M	./usr
+1.0K	./var/account
+3.0K	./var/at
+1.0K	./var/backups
+2.0K	./var/crash
+2.0K	./var/cron
+4.0K	./var/db
+ 61K	./var/games
+1.0K	./var/heimdal
+1.0K	./var/log
+1.0K	./var/mail
+1.0K	./var/msgs
+1.0K	./var/preserve
+2.0K	./var/run
+1.0K	./var/rwho
+ 15K	./var/spool
+2.0K	./var/tmp
+ 20K	./var/yp
+120K	./var
+ 50M	.

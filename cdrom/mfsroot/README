@@ -1,0 +1,66 @@
+*** Create an mfsroot directory tree from the CD:
+
+So, follow the steps to create another copy of the fixit CD on hardisk.
+The cut it way back so that it fits in a 64 MB filesystem. This is not as
+hard as it seems. See the FILES file in this directory for a dump of the
+top level directories, which should give you a good idea of what to cut
+back. Note that you do not need any .a libs or any _p (profile) libs!
+You do not the compat libs either.
+
+Note that you cannot use this mfsroot on the CDROM cause it has to fit into
+a 2.8MB floopy boot image. Its good for booting via PXE or for putting in
+/boot on your disk.
+
+Copy in fstab and rc.conf from this directory to /etc of your new directory
+tree. Edit the rc.conf to make sure the DHCP interfaces are correct.
+
+You also want to give it a root password. You can do that by using the -d
+option to vipw:
+
+	vipw -d /FOO/etc
+
+Create the ssh host keys in /FOO/etc/ssh:
+
+	/usr/bin/ssh-keygen -N "" -f /FOO/etc/ssh/ssh_host_key
+	/usr/bin/ssh-keygen -d -N "" -f /FOO/etc/ssh/ssh_host_dsa_key
+
+Edit /etc/ssh/sshd_config to allow root login:
+
+	PermitRootLogin yes
+
+Make sure you have a termcap file in /etc:
+
+	rm -f /FOO/etc/termcap
+	cp /etc/termcap /FOO/etc/termcap
+
+Edit /FOO/etc/ttys and turn on the serial console:
+
+	console "/usr/libexec/getty std.115200" unknown on secure
+
+Create /FOO/usr/site/bin and stash useful (required) stuff in it:
+
+	-rwxr-xr-x  1 root  wheel  205084 Jun 26 06:15 hier*
+	-rwxrwxr-x  1 root  wheel   90952 Jun 26 12:25 imageunzip*
+	-rwxrwxr-x  1 root  wheel  129174 Jun 26 10:49 imagezip*
+	-r-xr-xr-x  1 root  wheel  124532 Jun 26 10:48 wget*
+
+Create /FOO/usr/local/lib and copy in libintl.so.2, which is needed
+by wget, unless you go and reconfig it to statically link.
+
+
+*** Create the image file.
+
+	dd if=/dev/zero of=mfsroot bs=64k count=1024
+	vnconfig -e -s labels vn0 mfsroot
+	disklabel -r -w vn0 auto
+	newfs /dev/vn0c
+	mkdir -p /mnt/mfs 
+	mount /dev/vn0c /mnt/mfs
+	su1 hier cp /FOO /mnt/mfs
+	umount /mnt/mfs
+	vnconfig -u vn0
+	cat mfsroot | gzip > mfsroot.gz
+
+Copy this file and a kernel to /boot, or to the tftp boot directory.  Its
+pretty big though, and perhaps not the best for PXE booting, but it will
+work.

@@ -1,0 +1,113 @@
+*** To duplicate the CD:
+
+	dd if=/dev/acd0c of=file.iso bs=2048
+
+
+*** To mount the ISO file:
+
+	vnconfig -e vn0c file.iso
+	mount -t cd9660 /dev/vn0c /mnt
+
+
+*** Copy the CDROM:
+
+Note that this is read only. Use hier to make a complete copy of the
+filesystem. You could also just mount the cd normally and copy it off.
+
+	su1 hier cp /mnt /FOO
+
+I then removed CVS-REPO and commerce from the root directory of the
+copy, which frees up about 350 MB!
+
+
+*** Modify the copy of the CD image so that it can go multiuser:
+
+Copy in fstab, rc.conf, and rc.cdroot from this directory to /etc of your
+new directory tree. Edit the rc.conf to make sure the DHCP interfaces are
+correct.
+
+You also want to give it a root password. You can do that by using the -d
+option to vipw:
+
+	vipw -d /FOO/etc
+
+Create the ssh host keys in /FOO/etc/ssh:
+
+	/usr/bin/ssh-keygen -N "" -f /FOO/etc/ssh/ssh_host_key
+	/usr/bin/ssh-keygen -d -N "" -f /FOO/etc/ssh/ssh_host_dsa_key
+
+Edit /FOO/etc/ssh/sshd_config to allow root login:
+
+	PermitRootLogin yes
+
+Edit /FOO/etc/ttys and turn on the serial console if you want to use
+the serial console. 
+
+	console "/usr/libexec/getty std.115200" unknown on secure
+
+Create /FOO/usr/site/bin and stash useful (required) stuff in it:
+
+	-rwxr-xr-x  1 root  wheel  205084 Jun 26 06:15 hier*
+	-rwxrwxr-x  1 root  wheel   90952 Jun 26 12:25 imageunzip*
+	-rwxrwxr-x  1 root  wheel  129174 Jun 26 10:49 imagezip*
+	-r-xr-xr-x  1 root  wheel  124532 Jun 26 10:48 wget*
+
+Create /FOO/usr/local/lib and copy in libintl.so.2, which is needed
+by wget, unless you go and reconfig it to statically link.
+
+	
+*** Create a bootable CD that does not run from the mini fs.
+
+So, the problem with bootable CDs is that they really boot from a
+floopy image on the CD. The mfsroot that the fixit disk runs from is
+inside the floopy image. Obviously, thats too small to be very useful,
+and you cannot run from the CD since its read-only, and we really want
+to go multiuser so that we can use all the good tools including ssh!
+We are going to make a minor change to floopy image so that it does not
+load the mini mfsroot, and so that it boots directly from the CDROM.
+This is okay; it will initially boot up with / read-only.
+
+First off, you need to mount the floopy image from the CD.
+
+	cd /FOO/floppies
+	vnconfig vn0 boot.flp 
+	mount /dev/vn0 /mnt/floopy
+
+Edit /mnt/floopy/boot/loader.rc:
+
+	load /kernel
+	set vfs.root.mountfrom="cd9660:acd0a"
+	autoboot 10
+
+Compress and copy kernel.GENERIC from the CDROM to the boot floopy image.
+
+	cat /FOO/kernel.GENERIC | gzip -9 > /mnt/floopy/kernel.gz
+
+This is necessary cause something about the original kernel on the boot
+floopy does not work correctly when putting /dev on an mfs. Also, it does
+not drop into that userconfig interface on boot.
+
+Then unmount/close the boot floopy.
+
+	umount /mnt/floopy
+	vnconfig -u vn0
+
+
+*** To create a new ISO file once you have modified the tree:
+
+       mkisofs -U -R -b floppies/boot.flp -c floppies/boot.catalog \
+		-o /path/bootable.iso /FOO
+
+
+*** To burn the CD I used used the windows box. The plextor software
+    comes with Easy CD Creator, which lets you create a CD from a
+    .iso file. The File menu has "Create CD from file" option, which
+    worked really slick. There are BSD programs to do this, but I do
+    not know what they are. I have a samba connection, so I browsed the
+    .iso file from my unix box. It will warn about reading from across the
+    network, but it works just fine cause of the burnproof thing the
+    plextor does.
+
+
+
+

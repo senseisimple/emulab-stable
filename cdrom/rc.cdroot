@@ -1,0 +1,103 @@
+# Copyright (c) 1999  Matt Dillon
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+#
+# rc.cdroot
+#
+
+# chkerr:
+#
+# Routine to check for error
+#
+#	checks error code and drops into shell on failure.
+#	if shell exits, terminates script as well as /etc/rc.
+#
+chkerr() {
+	case $1 in
+	0)
+		;;
+	*)
+		echo "$2 failed: dropping into /bin/sh"
+		/bin/sh
+		# RESUME
+		;;
+	esac
+}
+
+#
+# Create a real /tmp
+#
+/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -i 1024 -T minimum dummy /tmp
+chkerr $? "MFS mount on /tmp"
+
+#
+# Duplicate /etc using /tmp as a temporary location.
+#
+/usr/site/bin/hier cp /etc /tmp/etc
+chkerr $? "hier cp /etc to /tmp/etc"
+
+/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -T minimum dummy /etc
+chkerr $? "MFS mount on /etc"
+
+/usr/site/bin/hier cp /tmp/etc /etc
+chkerr $? "hier cp /tmp/etc to /etc"
+
+/bin/rm -rf /tmp/etc
+chkerr $? "rm -rf /tmp/etc"
+
+#
+# Duplicate /var using /tmp as a temporary location.
+#
+/usr/site/bin/hier cp /var /tmp/var
+chkerr $? "hier cp /var to /tmp/var"
+
+/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -T minimum dummy /var
+chkerr $? "MFS mount on /var"
+
+/usr/site/bin/hier cp /tmp/var /var
+chkerr $? "hier cp /tmp/var to /var"
+
+/bin/rm -rf /tmp/var
+chkerr $? "rm -rf /tmp/var"
+
+#
+# Duplicate /dev using /tmp as a temporary location.
+#
+/usr/site/bin/hier cp /dev /tmp/dev
+chkerr $? "hier cp /dev to /tmp/dev"
+
+/sbin/mount_mfs -s 8192 -b 8192 -f 1024 -i 1024 -T minimum dummy /dev
+chkerr $? "MFS mount on /dev"
+
+/usr/site/bin/hier cp /tmp/dev /dev
+chkerr $? "hier cp /tmp/dev to /dev"
+
+/bin/rm -rf /tmp/dev
+chkerr $? "rm -rf /tmp/dev"
+
+chmod 666 /dev/pty[pqrsPQRS]*
+chown root:wheel /dev/pty[pqrsPQRS]*
+
+exit 0
