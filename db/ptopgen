@@ -2,53 +2,67 @@
 #
 # Generates a ptop file from the output of an avail command.
 # Takes input on STDIN and output goes to STDOUT
-# Also requires file testbed.ptop, in /usr/testbed/etc/ or ./
 #
-#
+
+use Mysql;
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
 my $d = 0; #debug
 my %nodes = ();
+my %links = ();
+my $node;
 
 while (<>) {
   if (!/^\|/ ) {next;}
   if ( /^\|node_id/) {next;}
-  /^\|(\S*) *\|/;
-  $nodes{$1} = 1;
-  print STDERR "Got '$1'   \t" if $d;
+  /^\|([a-zA-Z0-9-]*) *\|/;
+  $node=$1;
+  if ($node =~/tbpc/) {
+    $nodes{$node} = 1;
+    print STDERR "Got '$node' \t" if $d;
+  } elsif ($node =~ /(tbsh.*)-1/ ) {
+    $nodes{$node} = 1;
+    print STDERR "Got '$node' \t" if $d;
+  }
 }
 
 print STDERR "\n" if $d;
 
-if ( -e "/usr/testbed/etc/testbed.ptop") {
-  open(PTOP,"/usr/testbed/etc/testbed.ptop")
-    || die("Couldn't open /usr/testbed/etc/testbed.ptop\n");
-} elsif ( -e "testbed.ptop" ) {
-  open(PTOP,"testbed.ptop")
-    || die("Couldn't open testbed.ptop\n");
-} elsif ( -e "/home/newbold/db/testbed.ptop" ) {
-  open(PTOP,"/home/newbold/db/testbed.ptop")
-    || die("Couldn't open /home/newbold/db/testbed.ptop\n");
-} else { die("Couldn't locate testbed.ptop.\n"); }
+my @list = sort keys %nodes;
+foreach my $item (@list) { 
+  print STDERR "From '$item'\t" if $d;
+  $item = "node_id='$item'"; 
+  print STDERR "To '$item'\n" if $d;
+}
+my $cond = join (" or ",@list);
 
-while (<PTOP>) {
-  chop;
-  if (/^\#/) {next;}
-  print STDERR "Read '$_' \t" if $d;
-  if (/^node (\S*) (\S*)/) {
-    my ($node,$type) = ($1,$2);
-    print STDERR "Node $node ($type)\n" if $d;
-    if ($type eq 'switch' ) {
-      $nodes{$node} = 1;
-    }
-    if (defined $nodes{$node}) {
-      print $_,"\n";
-    }
-  } elsif (/^link (\S*) (\S*) (\S*)/) {
-    print STDERR "\nGrabbed link $2 $3\t" if $d;
-    my ($node) = split(/:/,$2);
-    my $switch = $3;
-    print STDERR "Link $node<==>$switch\n" if $d;
-    if (defined $nodes{$node} && defined $nodes{$switch}) {
-      print $_,"\n";
-    }
+my $query = "select node_id,card,MAC from interfaces where $cond";
+
+print STDERR "Using query $query\n" if $d;
+
+my $sth = $dbh->query($query);
+
+while (my @row = $sth->fetchrow()) {
+  if ( $row[0] =~ /tbpc/ ) {
+    $links{$row[0]."-".$row[1]} = $row[2];
+  } else {
+    $links{$row[0]} = $row[2];
+  }
+}
+
+# In every ptop
+print "node cisco switch\n";
+
+# Give the nodes:
+foreach $node (sort keys %nodes) {
+  if ($node =~ /tbpc/) {
+    print "node $node pc:1 delay:2\n";
+    print "link $node-0 $node:$links{$node.'-0'} cisco 100 1\n";
+    print "link $node-1 $node:$links{$node.'-1'} cisco 100 1\n";
+    print "link $node-2 $node:$links{$node.'-2'} cisco 100 1\n";
+    print "link $node-3 $node:$links{$node.'-3'} cisco 100 1\n";
+  } else {
+    print "node $node shark_shelf:1\n";
+    print "link $node $node:$links{$node} cisco 100 1\n";
   }
 }
