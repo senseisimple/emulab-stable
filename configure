@@ -17,6 +17,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-WWWDEFS=name		Specify WWW defintions ("default" default)"
 ac_help="$ac_help
+  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@fast default)"
+ac_help="$ac_help
   --with-LEDA			Specify LEDA path (/usr/testbed default)"
 ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
@@ -559,7 +561,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:563: checking host system type" >&5
+echo "configure:565: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -580,7 +582,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:584: checking build system type" >&5
+echo "configure:586: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -606,7 +608,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:610: checking for $ac_word" >&5
+echo "configure:612: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -638,7 +640,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:642: checking for $ac_word" >&5
+echo "configure:644: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -670,7 +672,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:674: checking for $ac_word" >&5
+echo "configure:676: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -702,7 +704,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:706: checking for $ac_word" >&5
+echo "configure:708: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -734,7 +736,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:738: checking for $ac_word" >&5
+echo "configure:740: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -804,6 +806,30 @@ fi
 
 
 
+#
+# Okay, I know this is improper usage of --with. Too bad.
+#
+# Check whether --with-TBOPSEMAIL or --without-TBOPSEMAIL was given.
+if test "${with_TBOPSEMAIL+set}" = set; then
+  withval="$with_TBOPSEMAIL"
+  
+    if test "$withval" = "yes"; then
+	{ echo "configure: error: Invalid TBOPSEMAIL - Must specify the value" 1>&2; exit 1; }
+    fi
+    TBOPSEMAIL="$withval"
+
+else
+  
+    TBOPSEMAIL="testbed-ops@fast.cs.utah.edu"
+
+fi
+
+TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
+
+
+#
+# LEDA library path
+#
 # Check whether --with-LEDA or --without-LEDA was given.
 if test "${with_LEDA+set}" = set; then
   withval="$with_LEDA"
@@ -859,7 +885,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:863: checking for a BSD compatible install" >&5
+echo "configure:889: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1114,6 +1140,7 @@ s%@RANLIB@%$RANLIB%g
 s%@STRIP@%$STRIP%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
+s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@LEDA@%$LEDA%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g

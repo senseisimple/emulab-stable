@@ -15,6 +15,7 @@ exec_prefix	= @exec_prefix@
 
 TBROOT		= @prefix@
 TBDBNAME	= @TBDBNAME@
+TBOPSEMAIL	= @TBOPSEMAIL@
 CPPFLAGS	= @CPPFLAGS@
 CFLAGS	       += @CFLAGS@
 CXXFLAGS       += @CXXFLAGS@

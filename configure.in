@@ -41,6 +41,25 @@ AC_ARG_WITH(WWWDEFS,
 ])
 AC_SUBST(WWWDEFS)
 
+#
+# Okay, I know this is improper usage of --with. Too bad.
+#
+AC_ARG_WITH(TBOPSEMAIL,
+[  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@fast default)],
+[
+    if test "$withval" = "yes"; then
+	AC_MSG_ERROR(Invalid TBOPSEMAIL - Must specify the value)
+    fi
+    TBOPSEMAIL="$withval"
+],[
+    TBOPSEMAIL="testbed-ops@fast.cs.utah.edu"
+])
+TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
+AC_SUBST(TBOPSEMAIL)
+
+#
+# LEDA library path
+#
 AC_ARG_WITH(LEDA,
 [  --with-LEDA			Specify LEDA path (/usr/testbed default)],
 [
