@@ -51,12 +51,12 @@ if (@ARGV) {
 #
 # Delay node configuration goop.
 #
-my $KERNEL100   = "/kernel.100HZ";
+my $KERNEL100	= "/kernel.100HZ";
 my $KERNEL1000  = "/kernel.1000HZ";
 my $KERNEL10000 = "/kernel.10000HZ";
 my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
-my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000, $KERNELDELAY); 
-my $kernel      = $KERNEL100;
+my $KERNELJAIL  = "/kernel.jail";	# Specific to jails (with linkdelays).
+my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel. 
 my $TMDELMAP	= $libsetup::TMDELMAP;	# Really comes from libloc.
 
 # This should never happen!
@@ -114,6 +114,7 @@ sub DelaySetup()
 	    or die("Could not open " . TMDELAY . ": $!");
 	
 	print DEL "#!/bin/sh\n";
+	# Turn these off before setting bridge_cfg.
 	print DEL "sysctl -w net.link.ether.bridge=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_cfg=";
@@ -127,6 +128,7 @@ sub DelaySetup()
 	    $count++;
 	}
 	print DEL "\n";
+	# Now turn them back on.
 	print DEL "sysctl -w net.link.ether.bridge=1\n";
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
 	print DEL "ipfw -f flush\n";
@@ -328,42 +330,8 @@ sub DelaySetup()
  	}
 	$checkreplace = 1;
     }
-    else {
-	return 0;
-    }
-
-    print STDOUT "Checking kernel configuration ... \n";
     if ($checkreplace) {
-	#
-	# Make sure we are running the correct kernel. 
-	#
-	if (-e $kernel) {
-	    if (system("cmp -s /kernel $kernel") != 0) {
-		if (system("cp -f /kernel /kernel.save")) {
-		    print STDOUT
-			"Could not backup /kernel! Aborting kernel change\n";
-		}
-		else {
-		    if (system("cp -f $kernel /kernel")) {
-			print STDOUT "Could not cp $kernel to /kernel! ".
-			    "Aborting kernel change\n";
-		    }
-		    else {
-			system("sync");
-			system("reboot");
-			#
-			# Make sure that, even if the reboot command returns
-			# before the node is totally down, this process doesn't
-			# exit (otherwise, we would proceed with testbed setup)
-			#
-			sleep(10000);
-		    }
-		}
-	    }
-	}
-	else {
-	    print STDOUT "Kernel $kernel does not exist!\n";
-	}
+	checkkernel($kernel);
     }
     return 0;
 }
@@ -374,13 +342,33 @@ sub DelaySetup()
 sub LinkDelaySetup()
 {
     my @delays;
-    my $checkreplace;
     my $kernel;
+    my $checkreplace = 0;
+    my $gotjails = 0;
+    my $ruleno = 20000;
 
     # Lets clean out old instructions.
     unlink TMLINKDELAY;
 
-    my $TM = OPENTMCC(TMCCCMD_LINKDELAYS);
+    #
+    # We need to know if any jailed nodes. That changes which kernel
+    # we want to boot. Temporary until the jail stuff is better tested.
+    #
+    my $TM = OPENTMCC(TMCCCMD_VNODELIST);
+    while (<$TM>) {
+	if ($_ =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+	    if ($2) {
+		$gotjails++;
+	    }
+	}
+    }
+    CLOSETMCC($TM);
+    if ($gotjails) {
+	$kernel = $KERNELJAIL;
+	$checkreplace = 1;
+    }
+
+    $TM = OPENTMCC(TMCCCMD_LINKDELAYS);
     while (<$TM>) {
 	push(@delays, $_);
     }
@@ -427,7 +415,7 @@ sub LinkDelaySetup()
 	    my $rbandw    = $13;
 	    my $rplr      = $14;
 	    my $red       = $15;
-		
+	    
 	    #
 	    # Only a few of these NS RED params make sense for dummynet,
 	    # but they all come through; someday they might be used.
@@ -494,18 +482,20 @@ sub LinkDelaySetup()
 	    print DEL "ifconfig $iface media 100baseTX mediaopt full-duplex";
 	    print DEL "\n";
 
-	    print DEL "ipfw add pipe $pipeno ip from any to ".
-		      "$inet:$mask out xmit $iface\n";
+	    print DEL "ipfw add $ruleno pipe $pipeno ip from $inet to ".
+		      "any out xmit $iface\n";
 
 	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
 	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
 
 	    if ($type eq "duplex") {
+		my $dupruleno = $ruleno + 10;
+		
 		#
 		# Want to force the reverse side to 1 queue slot to enforce
 		# the proper bandwidth. Not ideal. 
 		# 
-		print DEL "ipfw add pipe $rpipeno ip from $inet:$mask ".
+		print DEL "ipfw add $dupruleno pipe $rpipeno ip from any ".
 		    "to $inet in recv $iface\n";
 
 		print DEL "ipfw pipe $rpipeno config delay ${rdelay}ms ".
@@ -527,6 +517,7 @@ sub LinkDelaySetup()
 	    else {
 		print MAP "$linkname simplex $vnode $iface $pipeno\n";
 	    }
+	    $ruleno += 100;
 	}
 	print DEL "echo \"Delay Configuration Complete\"\n";
 	close(DEL);
@@ -537,45 +528,50 @@ sub LinkDelaySetup()
 	# Now do kernel configuration. All of the above work is wasted,
 	# but such is life.
 	#
-	$kernel = $KERNEL1000;
+	if (!$gotjails) {
+	    $kernel = $KERNELLDELAY;
+	}
 	$checkreplace = 1;
     }
-    else {
-	return 0;
-    }
-
-    print STDOUT "Checking kernel configuration ... \n";
     if ($checkreplace) {
-	#
-	# Make sure we are running the correct kernel. 
-	#
-	if (-e $kernel) {
-	    if (system("cmp -s /kernel $kernel") != 0) {
-		if (system("cp -f /kernel /kernel.save")) {
-		    print STDOUT
-			"Could not backup /kernel! Aborting kernel change\n";
+	checkkernel($kernel);
+    }
+    return 0;
+}
+
+#
+# Check kernel config, and reboot.
+#
+sub checkkernel($)
+{
+    my($kernel) = @_;
+    
+    print STDOUT "Making sure node is running $kernel ... \n";
+
+    if (-e $kernel) {
+	if (system("cmp -s /kernel $kernel") != 0) {
+	    if (system("cp -f /kernel /kernel.save")) {
+		print "Could not backup /kernel! Aborting kernel change\n";
+	    }
+	    else {
+		if (system("cp -f $kernel /kernel")) {
+		    print "Could not cp $kernel to /kernel! ".
+			"Aborting kernel change\n";
 		}
 		else {
-		    if (system("cp -f $kernel /kernel")) {
-			print STDOUT "Could not cp $kernel to /kernel! ".
-			    "Aborting kernel change\n";
-		    }
-		    else {
-			system("sync");
-			system("reboot");
-			#
-			# Make sure that, even if the reboot command returns
-			# before the node is totally down, this process doesn't
-			# exit (otherwise, we would proceed with testbed setup)
-			#
-			sleep(10000);
-		    }
+		    system("sync");
+		    system("reboot");
+		    #
+		    # Make sure that, even if the reboot command returns
+		    # before the node is totally down, this process doesn't
+		    # exit (otherwise, we would proceed with testbed setup)
+		    #
+		    sleep(10000);
 		}
 	    }
 	}
-	else {
-	    print STDOUT "Kernel $kernel does not exist!\n";
-	}
     }
-    return 0;
+    else {
+	print "Kernel $kernel does not exist!\n";
+    }
 }
