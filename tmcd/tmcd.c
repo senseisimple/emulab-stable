@@ -2259,12 +2259,13 @@ COMMAND_PROTOTYPE(dotrafgens)
 	}
 
 	res = mydb_query("select vi.vname,role,proto,"
-			 "vnode,port,target_vnode,target_port,generator "
+			 "vnode,port,ip,target_vnode,target_port,target_ip, "
+			 "generator "
 			 "from virt_trafgens as vi "
 			 "left join reserved as r on r.vname=vi.vnode "
 			 "where r.node_id='%s' and "
 			 " vi.pid='%s' and vi.eid='%s'",
-			 8, nodeid, pid, eid);
+			 10, nodeid, pid, eid);
 
 	if (!res) {
 		error("TRAFGENS: %s: DB Error getting virt_trafgens\n",
@@ -2277,13 +2278,28 @@ COMMAND_PROTOTYPE(dotrafgens)
 	}
 
 	while (nrows) {
+		char myname[TBDB_FLEN_VNAME+2];
+		char peername[TBDB_FLEN_VNAME+2];
+		
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "TRAFGEN=%s MYNAME=%s-0 MYPORT=%s "
-			"PEERNAME=%s-0 PEERPORT=%s "
+		if (row[5] && row[5][0]) {
+			strcpy(myname, row[5]);
+			strcpy(peername, row[8]);
+		}
+		else {
+			/* This can go away once the table is purged */
+			strcpy(myname, row[3]);
+			strcat(myname, "-0");
+			strcpy(peername, row[6]);
+			strcat(peername, "-0");
+		}
+
+		sprintf(buf, "TRAFGEN=%s MYNAME=%s MYPORT=%s "
+			"PEERNAME=%s PEERPORT=%s "
 			"PROTO=%s ROLE=%s GENERATOR=%s\n",
-			row[0], row[3], row[4], row[5], row[6],
-			row[2], row[1], row[7]);
+			row[0], myname, row[4], peername, row[7],
+			row[2], row[1], row[9]);
 		       
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
