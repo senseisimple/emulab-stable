@@ -147,11 +147,22 @@ tip/capture state:
 ***** Procedures
 **********************************************************************
 Serial/BIOS setup: (not complete)
-	1. Set the PXE boot order
-	2. Set serial speed to 115.2k baud, no flow control
-	3. Set the power-on boot action to "always on"
-	4. Password protection:
-	Note: Possibly scriptable
+	1. Main menu
+		processor serial number -> disabled
+	2. Security menu
+		set supervisor password (NOT user password)
+		user level access -> view only
+	3. Boot menu
+		after power fail -> power on
+		1st boot -> <first PXE choice>
+		2nd boot -> floppy
+		3rd boot -> IDE-HD
+		the rest -> disable
+	4. System management menu
+		serial baud -> 115200
+		flow control -> none
+
+	Note: Possibly scriptable, but probably not worth it
 
 MAC Address gathering: (Rob and Mike will set up)
 	1. Set up a pool of dynamic DHCP addresses - unknown (aka new) machines
