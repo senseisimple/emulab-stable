@@ -73,6 +73,7 @@ if ($0 =~ m|/|) {
 }
 
 $path = $pwd;
+$TB = "$path/install";
 
 $ENV{'PATH'} = "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:$basedir:.";
 $basepath = $ENV{'PATH'};
@@ -391,9 +392,9 @@ sub step_init {
     }
     open(CONF,">$path/config");
     print CONF "$basedir/../configure \\\n".
-      "--prefix=$path/install \\\n$testmode \\\n--with-TBDEFS=$path/defs\n";
+      "--prefix=$TB \\\n$testmode \\\n--with-TBDEFS=$path/defs\n";
     close(CONF);
-    tbexec("$basedir/../configure --prefix=$path/install $testmode ".
+    tbexec("$basedir/../configure --prefix=$TB $testmode ".
 	   "--with-TBDEFS=$path/defs",
 	   "$path/configure.log");
     
@@ -429,7 +430,7 @@ sub step_init {
 	prints "ERROR: Could not connect to new DB.\n";
 	doexit(1);
     };
-    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";
+    $ENV{'PATH'} = "$basepath:$TB/bin:$TB/sbin";
 
     #
     # Clear our extraneous stuff.
@@ -565,7 +566,7 @@ sub step_test {
     prints "Testlist: $testlist\n";
 
     # Let's add some stuff to our path
-    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";
+    $ENV{'PATH'} = "$basepath:$TB/bin:$TB/sbin";
     
     my @tests;
     my $testmode;
@@ -630,9 +631,8 @@ sub step_test {
 	# Start stated
 	if ($type eq "full") {
 	  # Returns non-zero for failures
-	  system("$path/install/sbin/withadminprivs ".
-		 "$path/install/sbin/stated") and
-	    die "Error running $path/install/sbin/stated: $!\n";
+	  system("$TB/sbin/stated") and
+	    die "Error running '$TB/sbin/stated': $!\n";
 	}
 	
 	# We're now ready to run the test.
@@ -676,7 +676,9 @@ sub step_test {
 	}
 
 	if ($type eq "full") {
-	    my $statedpidfile = "$path/install/locks/stated.pid";
+	    my $ext = $TB;
+	    $ext =~ s/\//\./g;
+	    my $statedpidfile = "/var/run/stated$ext.pid";
 	    my $statedpid = `cat $statedpidfile` ||
 	      prints "WARNING: Unable to find stated pid: $!\n";
 	    if (! kill(15, $statedpid) ) {
