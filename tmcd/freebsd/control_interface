@@ -21,6 +21,9 @@ pc600|pc850a)
 pc1500|pc2000)
     echo 'xl0'
     ;;
+pc2400-aero)
+    echo 'em0'
+    ;;
 *)
     echo 'unknown';
     ;;

@@ -31,6 +31,9 @@ elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
 	echo unknown
    	;;
 esac
+# For Aerospace Corp nodes
+elif [ $cpuspeed = "2400" ]; then
+	echo pc${cpuspeed}-aero;
 # For Wiconsin nodes - they have a different node typing scheme
 elif [ $cpuspeed = "2500" ]; then
 	echo i2;

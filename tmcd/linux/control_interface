@@ -8,7 +8,7 @@
 
 NODETYPE=`nodetype`
 case $NODETYPE in
-pc300|pc1500|pc2000)
+pc300|pc1500|pc2000|pc2400-aero)
     echo 'eth0'
     ;;
 i2)

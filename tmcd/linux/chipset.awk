@@ -13,17 +13,17 @@
 #
 /^[ ]+Host bridge: Intel Corp.*[0-9][0-9][0-9][0-9][0-9]BX.*\(AGP disabled\)/ {
     print "BX";
-    next
+    exit
 }
 /^[ ]+Host bridge: Intel Corp.*[0-9][0-9][0-9][0-9][0-9]BX/ {
     print "BX-AGP";
-    next
+    exit
 }
 /^[ ]+Host bridge: Intel Corp.*[0-9][0-9][0-9][0-9][0-9]GX/ {
     print "GX";
-    next
+    exit
 }
 /^[ ]+Host bridge:.*/ {
     print "??";
-    next
+    exit
 }
