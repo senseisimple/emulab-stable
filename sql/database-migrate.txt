@@ -726,3 +726,21 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table node_types add jail_osid varchar(35) default NULL
 		after delay_osid
 
+1.159: Remove old slots from experiment_stats table that were moved to
+       experiment_resources table in revision 1.143.
+
+        alter table experiment_stats drop vnodes;
+	alter table experiment_stats drop pnodes;
+	alter table experiment_stats drop wanodes;
+	alter table experiment_stats drop simnodes;
+	alter table experiment_stats drop jailnodes;
+	alter table experiment_stats drop delaynodes;
+	alter table experiment_stats drop linkdelays;
+	alter table experiment_stats drop walinks;
+	alter table experiment_stats drop links;
+	alter table experiment_stats drop lans;
+	alter table experiment_stats drop shapedlinks;
+	alter table experiment_stats drop shapedlans;
+	alter table experiment_stats drop minlinks;
+	alter table experiment_stats drop maxlinks;
+       
