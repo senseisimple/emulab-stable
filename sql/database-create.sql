@@ -8,12 +8,12 @@
 # Table structure for table 'virt_agents'
 #
 
-create table virt_agents (
+CREATE TABLE virt_agents (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
   vnode varchar(32) NOT NULL default '',
-  objecttype smallint unsigned NOT NULL default 0,
+  objecttype smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY (pid,eid,vname,vnode)
 ) TYPE=MyISAM;
 
