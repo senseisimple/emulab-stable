@@ -763,3 +763,10 @@ last_net_act,last_cpu_act,last_ext_act);
        create table node_type_features (type varchar(30) not null,
 	   feature varchar(30) not null, weight float not null default 0.0,
 	   primary key (type,feature));
+
+1.162: Add columns to the new_interfaces table indicating where the interface
+       is plugged into a switch:
+
+       alter table new_interfaces add column switch_id char(10);
+       alter table new_interfaces add column switch_card tinyint(3);
+       alter table new_interfaces add column switch_port tinyint(3);
