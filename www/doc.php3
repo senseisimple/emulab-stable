@@ -58,6 +58,10 @@ PAGEHEADER("Documentation");
           About Project Groups</a></b>
      <p>
 
+<li><b><a href = "doc/docwrapper.php3?docname=internals.html">
+          Emulab Internals</a></b><img src="new.gif">
+     <p>
+
 <li><b><a href = "doc/docwrapper.php3?docname=hw-recommend.html">
           Want to build your own Testbed?</a></b>
      <p>
