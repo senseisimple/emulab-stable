@@ -25,7 +25,7 @@ if (isset($target_uid) && $target_uid == "") {
 # Get current login.
 # Only admin users can logout someone other then themself.
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+LOGGEDINORDIE($uid, CHECKLOGIN_MODMASK);
 
 if (!isset($target_uid))
     $target_uid = $uid;
