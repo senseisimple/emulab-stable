@@ -1,4 +1,14 @@
-Version 0.1
+Version 0.2
+
+ChangeLog:
+
+0.2: 
+Added events section.
+
+0.1:
+Initial revision
+
+----------------------------------------------------------------------
 
 Conventions:
 
@@ -130,6 +140,18 @@ START vlan
 # of ports in that vlan.
 END vlan
 
+START events
+# Records of the form:
+# <offset in seconds (floating point)> <event> <arguments>
+# Event types include:
+#   link_down <link>
+#   link_up <link>
+#   power_cycle <node>
+#   power_off <node>
+#   power_on <node>
+# Future events might include traffic control, routing changes, etc.
+END events
+
 ----------------------------------------------------------------------
 
 Other possible sections:
@@ -137,7 +159,6 @@ Other possible sections:
 software - describes what software to install on what nodes
 data - describes data collection
 control - describes control
-events - central repository of events
 user - describes basic information of user (contact, etc.)
 traffic - describes traffic generation
 agents - describes agents
