@@ -276,11 +276,11 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
-             <td>isphantom:</td>
+             <td>isjailed:</td>
              <td class=left>
                  <input type=text
-                        name=\"formfields[isphantom]\"
-                        value=\"" . $formfields[isphantom] . "\"
+                        name=\"formfields[isjailed]\"
+                        value=\"" . $formfields[isjailed] . "\"
 	                size=2>
              </td>
           </tr>\n";
@@ -362,7 +362,7 @@ if ($new_type) {
     $defaults = array("class" => "pc", "power_time" => 60, "imageable" => 1,
 	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
 	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
-        "ismodelnet" => 0, "isphantom" => 0, "isdynamic" => 0,
+        "ismodelnet" => 0, "isjailed" => 0, "isdynamic" => 0,
 	"issimnode" => 0, "simnode_capacity" => 20, "bootdisk_unit" => 0);
 } else {
     #
@@ -637,13 +637,13 @@ if (isset($formfields[ismodelnet]) && $formfields[ismodelnet] != "") {
     }
 }
 
-# isphantom
-if (isset($formfields[isphantom]) && $formfields[isphantom] != "") {
-    if (! TBvalid_boolean($formfields[isphantom])) {
-	$errors["isphantom"] = TBFieldErrorString();
+# isjailed
+if (isset($formfields[isjailed]) && $formfields[isjailed] != "") {
+    if (! TBvalid_boolean($formfields[isjailed])) {
+	$errors["isjailed"] = TBFieldErrorString();
     }
     else {
-	$inserts["isphantom"] = $formfields[isphantom];
+	$inserts["isjailed"] = $formfields[isjailed];
     }
 }
 
