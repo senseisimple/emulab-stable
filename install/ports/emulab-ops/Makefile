@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-ops
-PORTVERSION=	1.0
+PORTVERSION=	1.1
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -11,7 +11,11 @@ EXTRACT_ONLY=	#none
 
 MAINTAINER=	ricci@cs.utah.edu
 
-RUN_DEPENDS=	gmake:${PORTSDIR}/devel/gmake
+LIB_DEPENDS= lthread.2:${PORTSDIR}/devel/linuxthreads \
+	vin4.2:${PORTSDIR}/misc/libelvin
+
+RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
+	sudo:${PORTSDIR}/security/sudo
 
 NO_BUILD=	yes
 
