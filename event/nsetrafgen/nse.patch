@@ -1089,6 +1089,26 @@
  };
  
  #endif
+--- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Wed Feb 26 15:07:33 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Fri Jan 16 17:27:47 2004
+@@ -26,9 +26,17 @@
+ #endif
+ 
+ #include "classifier-port.h"
++#include "packet.h"
++
++#ifdef PACKET_DECAPSULATE
++extern bool PacketDecapsulateIfNeeded(Packet *p);
++#endif
+ 
+ int PortClassifier::classify(Packet *p) 
+ {
++#ifdef PACKET_DECAPSULATE
++	::PacketDecapsulateIfNeeded(p);
++#endif
+ 	// Port classifier returns the destination port.  No shifting
+ 	// or masking is required since in the 32-bit addressing,
+ 	// ports are stored in a seperate variable.
 --- dist-ns-allinone-2.26/ns-2.26/common/ip.h	Wed Feb 26 15:07:39 2003
 +++ ns-allinone-2.26/ns-2.26/common/ip.h	Fri Nov 28 16:55:25 2003
 @@ -76,11 +76,11 @@
@@ -1106,8 +1126,19 @@
  	/* ipv6 fields */
  	int& flowid() { return (fid_); }
 --- dist-ns-allinone-2.26/ns-2.26/common/packet.h	Wed Feb 26 15:07:40 2003
-+++ ns-allinone-2.26/ns-2.26/common/packet.h	Fri Nov 28 16:55:25 2003
-@@ -519,8 +519,8 @@
++++ ns-allinone-2.26/ns-2.26/common/packet.h	Fri Jan 16 16:09:19 2004
+@@ -325,6 +325,10 @@
+ 	inline int& ref_count() { return (ref_count_); }
+ 	static inline Packet* alloc();
+ 	static inline Packet* alloc(int);
++        static inline int compress(unsigned long* pTarget, 
++				   unsigned long* pSource, int Count);
++	static inline int uncompress(unsigned long* pTarget, 
++				     unsigned long* pSource, int Count);
+ 	inline void allocdata(int);
+ 	// dirty hack for diffusion data
+ 	inline void initdata() { data_  = 0;}
+@@ -519,8 +523,8 @@
  			abort();
  	}
  	init(p); // Initialize bits_[]
@@ -1118,6 +1149,95 @@
  	p->fflag_ = TRUE;
  	(HDR_CMN(p))->direction() = hdr_cmn::DOWN;
  	/* setting all direction of pkts to be downward as default; 
+@@ -607,6 +611,88 @@
+                         p->bits_[offset + i + 12], p->bits_[offset + i + 13],
+                         p->bits_[offset + i + 14], p->bits_[offset + i + 15]);
+         }
++}
++
++inline int Packet::compress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Returns total size of target buffer
++  // This code works only on buffers <= 0x10000 words long (about 250k bytes)
++  // Target buffer must be 1 word longer than source, to allow for the
++  // case where no zeros at all occur.
++ int offset = 0;
++ int skipping = 1;
++ int targoffset = 0;
++ int lth;
++
++ unsigned long* pCW = pTarget; // Control word pointer
++ // Format of control word is 16 bits of length, 16 bits of starting offset
++ *pCW = 0;  // All zero CW means done
++ while(offset < Count)
++   {
++     if (skipping)
++       {
++         if (pSource[offset] |= 0)
++           { // Time to stop skipping
++             skipping = 0;
++             pCW = &pTarget[targoffset];
++             *pCW = offset; // Set source offset, leave lth zero for now
++             targoffset++;  // Leave room for CW
++             lth = 0;       // Counts how many non-zero
++           }
++         else
++           { // Still zero, just skip it
++             offset++;
++           }
++       }
++     if (!skipping)
++       {
++         // First see if we found a zero
++         if (pSource[offset] == 0)
++           { // Found a zero, but just use it unless two in a row
++             if ((offset+1) < Count)
++               {
++                 if (pSource[offset+1] == 0)
++                   {
++                     skipping = 1; // Found two in a row, resume skipping
++                     *pCW |= (lth << 16);
++                     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++                     offset++; // And skip this one
++                   }
++               }
++           }
++       }
++     if (!skipping)
++       {
++         pTarget[targoffset++] = pSource[offset++];
++         lth++;
++       }
++   }
++ if (!skipping)
++   { // Need to update last CW
++     *pCW |= (lth << 16);
++     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++   }
++ return(targoffset);
++}
++
++inline int Packet::uncompress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Reverse above compression
++  // Target buffer MUST BE ZERO on entry!
++int offset = 0;
++int targoffset = 0;
++int lth;
++
++  while(offset < Count)
++    {
++      // Get next control word
++      targoffset = pSource[offset] & 0xffff;
++      lth = pSource[offset] >> 16;
++      offset++;
++      for (int i = 0; i < lth; i++)
++        { // Copy to target
++          pTarget[targoffset++] = pSource[offset++];
++        }
++    }
++  return(targoffset); // Last non-zero entry
+ }
+ 
+ #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
 +++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Tue Jan  6 17:17:48 2004
 @@ -46,12 +46,42 @@
@@ -1717,7 +1837,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Thu Jan 15 13:16:30 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Jan 16 16:39:32 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -1806,11 +1926,20 @@
  
  /*
   * Checking for duplicate packets.  Need to do this, if running
-@@ -141,7 +192,57 @@
+@@ -131,17 +182,61 @@
+ IPTapAgent::processpkt(Packet *p, const struct timeval &ts)
+ {
+   struct ip *ipheader;
+-  struct tcphdr *tcpheader;
+-  unsigned char *buf;
    
-   /* TCP header info from the grabbed packet. */
-   unsigned char tcphlen;
-+
+   /* Ip header information from the grabbed packet. */
+-  int iphlen;  
+   unsigned short datagramlen;
+   unsigned char ttl;
+   
+-  /* TCP header info from the grabbed packet. */
+-  unsigned char tcphlen;
 +#ifdef MEASURE_DELAYS
 +
 +  double delay ;
@@ -1864,7 +1993,16 @@
    /* 
       At this point, all I have to do is to grab the ttl value 
       from the received packet and put it in p's ttl field after
-@@ -180,15 +281,56 @@
+@@ -150,8 +245,6 @@
+   */
+ 
+   ipheader = (struct ip *) p->accessdata();
+-  buf = p->accessdata();
+-  iphlen = ipheader->ip_hl * 4;
+   ttl = ipheader->ip_ttl;
+   if (!(--ttl)) {
+     fprintf(stderr,
+@@ -180,15 +273,29 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -1875,35 +2013,8 @@
 +     bag of bits of a) it was encapsulated before and b) the dest
 +     IP address is local in this simulator */
 +
-+  if( ipheader->ip_p == IPPROTO_ENCAP ) {
-+
-+    /* The IP address based classifier entries should route the packet
-+       correctly to the final destination. However, if the packet is
-+       destinated to a node in this instance of the simulator and it was
-+       encapsulated, we need to decapsulate it here
-+    */
-+    //in_addr_t ip = ntohl( ipheader->ip_dst.s_addr );
-+    in_addr_t ip = ipheader->ip_dst.s_addr;
-+    Node *n = Simulator::instance().ip_to_node( ip );
-+    if( n != 0 ) {
-+      unsigned long *hdrbits = (unsigned long *)(ipheader + 1);
-+
-+      /* This should take care of copying all the header bits to this packet.
-+	 The simulator instance from where this packet originated from should
-+	 have filled the correct IP address and port numbers so that the packet
-+	 can be routed correctly */
-+      int lastnonzerobyte = uncompress( (unsigned long *)p->bits(), hdrbits,
-+					(datagramlen - iphlen)/4 );
-+      /* If there is an error in uncompress, we won't really know other than the
-+	 fact that we copied junk into the packet. Something to worry about later
-+      */
-+      goto inject;
-+    }
-+  } 
 +  ih->daddr() = ntohl(ipheader->ip_dst.s_addr);
 +  /* Dunno how to take care of ports yet */  
-+
-+inject:
 +
 +#ifdef MEASURE_DELAYS
 +  Scheduler::instance().schedule( target_, p, max_delay );
@@ -1922,7 +2033,7 @@
   * as there are from the packet capture facility.
   * For every packet received through the callback, it populates the ns packet
   * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +339,17 @@
+@@ -197,14 +304,17 @@
  void
  IPTapAgent::recvpkt()
  {
@@ -1942,7 +2053,7 @@
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -219,13 +364,64 @@
+@@ -219,13 +329,64 @@
  }
  
  
@@ -2008,7 +2119,7 @@
   */
  int
  IPTapAgent::sendpkt(Packet* p)
-@@ -233,10 +429,11 @@
+@@ -233,10 +394,11 @@
    int byteswritten;
    unsigned char *packet;
    unsigned char received_ttl;
@@ -2022,7 +2133,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -245,7 +442,7 @@
+@@ -245,7 +407,7 @@
    
    // send packet into the live network
    hdr_cmn* hc = HDR_CMN(p);
@@ -2031,7 +2142,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +470,173 @@
+@@ -273,27 +435,110 @@
      return(-1);
    }
  
@@ -2091,7 +2202,7 @@
 +    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
 +	    name(), hc->size());
 +  } else {
-     
++    
 +    unsigned long *hdrbits = 0;
 +    memset( sendbuf, 0, sbuflen * sizeof(unsigned char) );
 +    ipheader = (struct ip *)sendbuf;
@@ -2107,7 +2218,7 @@
 +    ipheader->ip_dst.s_addr = htonl(ih->daddr());
 +
 +    hdrbits = (unsigned long *)(ipheader + 1);
-+    int size = compress( hdrbits, (unsigned long *)p->bits(), (Packet::hdrlen_+3)/4);
++    int size = Packet::compress( hdrbits, (unsigned long *)p->bits(), (Packet::hdrlen_+3)/4);
 +
 +    /* ip_len field should be in host byte order which the kernel will later
 +       change to network byte order */
@@ -2120,7 +2231,7 @@
 +
 +    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
 +						 sizeof(struct ip));
-+    
+     
 +
 +    if (net_outgoing_->send(sendbuf, sendlen) < 0) {
 +      fprintf(stderr,
@@ -2140,87 +2251,24 @@
 +    return 0;
  }
  
++bool PacketDecapsulateIfNeeded(Packet *p) {
++    hdr_cmn *hc = HDR_CMN(p);
++    if ( hc->ptype_ != PT_LIVE )
++	return false;
++
++    struct ip *ipheader = (struct ip *)p->accessdata();
++    if (!ipheader || ipheader->ip_p != IPPROTO_ENCAP )
++	return false;
++
++    unsigned long *hdrbits = (unsigned long *)(ipheader + 1);
++    unsigned short datagramlen = ntohs(ipheader->ip_len);
++    int iphlen = ipheader->ip_hl * 4;
++
++    /* This should take care of copying all the header bits to this packet. */
++    int lastnonzerobyte = Packet::uncompress( (unsigned long *)p->bits(), hdrbits,
++				              (datagramlen - iphlen)/4 );
  
-+int IPTapAgent::compress(unsigned long* pTarget, unsigned long* pSource, int Count)
-+{ // Returns total size of target buffer
-+  // This code works only on buffers <= 0x10000 words long (about 250k bytes)
-+  // Target buffer must be 1 word longer than source, to allow for the
-+  // case where no zeros at all occur.
-+ int offset = 0;
-+ int skipping = 1;
-+ int targoffset = 0;
-+ int lth;
-+
-+ unsigned long* pCW = pTarget; // Control word pointer
-+ // Format of control word is 16 bits of length, 16 bits of starting offset
-+ *pCW = 0;  // All zero CW means done
-+ while(offset < Count)
-+   {
-+     if (skipping)
-+       {
-+         if (pSource[offset] |= 0)
-+           { // Time to stop skipping
-+             skipping = 0;
-+             pCW = &pTarget[targoffset];
-+             *pCW = offset; // Set source offset, leave lth zero for now
-+             targoffset++;  // Leave room for CW
-+             lth = 0;       // Counts how many non-zero
-+           }
-+         else
-+           { // Still zero, just skip it
-+             offset++;
-+           }
-+       }
-+     if (!skipping)
-+       {
-+         // First see if we found a zero
-+         if (pSource[offset] == 0)
-+           { // Found a zero, but just use it unless two in a row
-+             if ((offset+1) < Count)
-+               {
-+                 if (pSource[offset+1] == 0)
-+                   {
-+                     skipping = 1; // Found two in a row, resume skipping
-+                     *pCW |= (lth << 16);
-+                     //*pCW |= (0x1L << 31); // just for debugging, mark cw
-+                     offset++; // And skip this one
-+                   }
-+               }
-+           }
-+       }
-+     if (!skipping)
-+       {
-+         pTarget[targoffset++] = pSource[offset++];
-+         lth++;
-+       }
-+   }
-+ if (!skipping)
-+   { // Need to update last CW
-+     *pCW |= (lth << 16);
-+     //*pCW |= (0x1L << 31); // just for debugging, mark cw
-+   }
-+ return(targoffset);
-+}
-+
-+int IPTapAgent::uncompress(unsigned long* pTarget, unsigned long* pSource, int Count)
-+{ // Reverse above compression
-+  // Target buffer MUST BE ZERO on entry!
-+int offset = 0;
-+int targoffset = 0;
-+int lth;
-+
-+  while(offset < Count)
-+    {
-+      // Get next control word
-+      targoffset = pSource[offset] & 0xffff;
-+      lth = pSource[offset] >> 16;
-+      offset++;
-+      for (int i = 0; i < lth; i++)
-+        { // Copy to target
-+          pTarget[targoffset++] = pSource[offset++];
-+        }
-+    }
-+  return(targoffset); // Last non-zero entry
++    return true;
 +}
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
 +++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Sun Dec 14 20:48:23 2003
@@ -2386,7 +2434,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Thu Jan 15 14:50:05 2004
+--- /dev/null	Fri Jan 16 18:05:42 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
@@ -3004,15 +3052,15 @@
      int	       	lo_, hi_;	// range of lost packets
      double     	ts_;		// timestamp for RTT estimation
 --- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Sun Dec 14 20:38:54 2003
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Fri Jan 16 16:33:49 2004
 @@ -79,6 +79,15 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC
-+CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC
++#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE
++CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
