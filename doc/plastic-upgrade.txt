@@ -1,0 +1,133 @@
+################################################## TODO
+Mike:
+* Port cyclades driver
+* Re-setup Networker
+	
+Rob:
+* Install new versions of ports/packages
+* Setup sendmail
+* Get correct inetd services running
+* Set up forwarding http server (if necessary)
+
+Unassigned:
+* Compile custom kernel (w/ tons of mbufs, etc.)
+
+################################################## ISSUES
+Open issues:
+* Do we need to move over stuff in /usr/site?
+* NIS no longer necessary?
+* Do we still need a forwarding http server?
+
+Kernel issues:
+* Lots o' mbufs
+* Make sure to have the ccd driver
+
+Custom stuff installed on plastic:
+capture
+tip
+plasticwrap
+
+Stuff running out of inetd:
+ftp
+telnet
+shell
+login
+finger
+comsat
+ntalk
+tftp
+
+Other (not necessarily custom):
+nfsd (make sure lots of nfsd's are running)
+xntpd
+amd
+
+Currently installed packages on plastic:
+(Grabbed from pkg_info by ricci on Fri May 11 14:51:00 MDT 2001)
+
+ORBit-0.5.3_1       High-performance CORBA ORB with support for the C language
+OpenSSH-2.1.1       OpenBSD's secure shell client and server (remote login progr
+OpenSSH-askpass-1.2.2 Graphical password applet for entering SSH passphrase
+XFree86-libraries-4.0.1 X11R6.4/XFree86-4.0 include/(shared) library kit
+apache+mod_ssl-1.3.12+2.6.6_1 The Apache 1.3 webserver with SSL/TLS functionality
+apache+ssl-1.3.12.1.40 Apache-SSL: Apache secure webserver integrating OpenSSL
+autoconf-2.13       Automatically configure source code on many Un*x platforms
+bsdi-netscape-navigator-4.75 Netscape Navigator with 128-bit encryption for BSDI BSD/OS
+bzip2-1.0.1         A block-sorting file compressor
+cvsup-bin-16.1      A general network file distribution system optimized for CVS
+cvsupd-bin-16.1     A general network file distribution system optimized for CVS
+emacs-20.7          GNU editing macros
+esound-0.2.19       A sound library for enlightenment package
+gettext-0.10.35     GNU gettext package
+glib-1.2.8          Some useful routines of C programming
+glimpse-4.12.6      Text search engine
+gmake-3.79.1        GNU version of 'make' utility
+gmysql-0.3.3        GTK+ frontend for mysql
+gnomelibs-1.2.4_1   Libraries for GNOME, a GNU desktop environment
+gtk-1.2.8           General Toolkit for X11 GUI
+gtksql-0.3          Graphical query tool for PostgreSQL and/or MySQL
+imlib-1.9.8.1       A graphic library for enlightenment package
+javavmwrapper-1.1   Wrapper script for various Java Virtual Machines
+jove-4.16           Jonathan's Own Version of Emacs
+jpeg-6b             IJG's jpeg compression utilities
+libaudiofile-0.1.9  A sound library for SGI audio file
+libungif-4.1.0b1    Tools and library routines for working with GIF images
+lsof-4.51           Lists information about open files (similar to fstat(1))
+lynx-ssl-2.8.3.1    A non-graphical, text-based ssl-enabled World-Wide Web clien
+m4-1.4              GNU's m4
+man2html-3.0.1      Convert nroff(1) man pages to HTML
+mm-1.1.3            Shared memory library for applications with pre-forked proce
+mtools-3.9.6        A collection of tools for manipulating MSDOS files
+mysql-client-3.22.32 Multithreaded SQL database (client)
+mysql-navigator-0.3.2 MySQL database server administration package for Gnome deskt
+mysql-server-3.22.32 Multithreaded SQL database (server)
+mysqltcl-1.53       TCL module for accessing MySQL databases based on msqltcl
+netscape-remote-1.0 Utility to pass commands to running netscape process
+netscape-wrapper-2000.07.07 Netscape wrapper to avoid multiple invocation and more
+nmap-2.53           Port scanning utility for large networks
+otcl-1.0a5          MIT Object Tcl
+p5-AppConfig-1.52   A Perl module for reading configuration files
+p5-BSD-Resource-1.08 Perl5 module to access BSD process resource limit and priori
+p5-ConfigReader-0.5 Perl5 module to read directives from a configuration file
+p5-Crypt-Blowfish-2.06 Perl5 interface to the Blowfish encryption alogorithm
+p5-DBI-1.14         The perl5 Database Interface.  Required for DBD::* modules
+p5-Data-ShowTable-3.3 Perl5 module to pretty-print arrays of data
+p5-Errno-1.09       A perl5 module providing access to System errno constants
+p5-Error-0.13       Perl module to provide Error/exception support for perl: Err
+p5-MyObject-1.2     Accesses data in a MySQL database as Perl objects
+p5-Mysql-modules-1.2214 Perl5 modules for accessing MySQL databases
+p5-SNMP-3.1.0       A perl5 module for interfacing with the CMU SNMP library
+p5-SNMP_Session-0.75 A perl5 module for providing rudimentary access to SNMPv1 ag
+p5-Socket6-0.07     Perl module to support getaddrinfo() and getnameinfo()
+p5-Tcl-b2           A Tcl extension module for Perl5
+p5-TclTk-b2         Perl5 module to access to Tk via the Tcl extension
+p5-Tk-800.021       A re-port of a perl5 interface to Tk8.0p2
+pam_mysql-0.4       A pam module for authenticating with MySQL
+png-1.0.8_1         Library for manipulating PNG images
+py-MySQL-1.4        Access a MySQL database through Python
+py-MySQLdb-0.2.2    Access a MySQL database through Python
+python-1.6          An interpreted object-oriented programming language
+rpm-2.5.6           The Red Hat Package Manager
+rsync-2.4.6         A network file distribution/synchronization utility
+ruby-1.6.0          An object-oriented interpreted scripting language
+ruby-mysql-2.3.1    Ruby module for accessing MySQL databases, which has the sam
+skill-4.0           SuperKILL, kill or renice processes by pid, name, tty or uid
+sup-2.0             CMU's Software Update Protocol package
+tcl-8.2.3           Tool Command Language
+tcl-8.3.1           Tool Command Language
+tcl-sql-20000114_1  TCL module for accessing MySQL databases
+tcsh-6.09.03        An extended C-shell with many useful features
+tiff-3.5.5          Tools and library routines for working with TIFF images
+tk-8.2.3            Graphical toolkit for TCL
+tk-8.3.1            Graphical toolkit for TCL
+traceroute-991603   Version of 'traceroute' that shows the AS network number of 
+ttcp-1.12           Benchmarking tool for analysing TCP and UDP performance
+ucd-snmp-4.1.2      An extendable SNMP implimentation
+unzip-5.41          List, test and extract compressed files in a ZIP archive
+vim-6.0r            Vi "workalike", with many additional features
+xemacs-20.4         XEmacs text editor version 20
+xemacs-packages-1.5 Basic XEmacs elisp packages(basic)
+xforms-0.89         A graphical user interface toolkit for X Window System
+xmysql-1.10         X11 front end to the MySQL database engine
+xmysqladmin-1.0     X11 front end to the mysqladmin command of the MySQL databas
+xpm-3.4k            The X Pixmap library
