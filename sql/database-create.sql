@@ -243,12 +243,11 @@ CREATE TABLE groups (
 CREATE TABLE iface_counters (
   node_id varchar(10) NOT NULL default '',
   tstamp datetime NOT NULL default '0000-00-00 00:00:00',
-  mac varchar(12) NOT NULL default '000000000000',
-  ipkts int NOT NULL default '0',
-  opkts int NOT NULL default '0',
-  PRIMARY KEY  (node_id, tstamp, mac)
-) TYPE = MyISAM;
-
+  mac varchar(12) NOT NULL default '0',
+  ipkts int(11) NOT NULL default '0',
+  opkts int(11) NOT NULL default '0',
+  PRIMARY KEY  (node_id,tstamp,mac)
+) TYPE=MyISAM;
 
 #
 # Table structure for table 'images'
