@@ -68,6 +68,7 @@ extern double score;
 extern int violated;
 extern violated_info vinfo;
 extern bool allow_trivial_links;
+extern bool greedy_link_assignment;
 
 /*
  * Scoring functions

@@ -260,13 +260,38 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 #ifdef TRIVIAL_LINK_BW
   else if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
       // Trivial link - we may get to remove violations
-      if (src_pnode->trivial_bw &&
-	      (src_pnode->trivial_bw_used > src_pnode->trivial_bw)) {
-	  SSUB(SCORE_TRIVIAL_PENALTY);
-	  vinfo.bandwidth--;
-	  violated--;
+      SDEBUG(cerr << "  trivial bandwidth used " <<
+	      src_pnode->trivial_bw_used << " max is " <<
+	      src_pnode->trivial_bw << " subtracting " <<
+	      vlink->delay_info.bandwidth << endl);
+      if (src_pnode->trivial_bw) {
+	int old_over_bw;
+	if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
+	  old_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
+	} else {
+	  old_over_bw = 0;
+	}
+
+	src_pnode->trivial_bw_used -= vlink->delay_info.bandwidth;
+
+	int new_over_bw;
+	if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
+	  new_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
+	} else {
+	  new_over_bw = 0;
+	}
+
+	if (old_over_bw) {
+	  if (!new_over_bw) {
+	    violated--;
+	    vinfo.bandwidth--;
+	  }
+	  double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
+	    src_pnode->trivial_bw;
+	  SSUB(SCORE_TRIVIAL_PENALTY * removed_bandwidth_percent);
+	}
       }
-      src_pnode->trivial_bw_used -= vlink->delay_info.bandwidth;
+
       unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
   }
 #endif
@@ -527,12 +552,35 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
     break;
   case tb_link_info::LINK_TRIVIAL:
   #ifdef TRIVIAL_LINK_BW
-    if (dst_pnode->trivial_bw) {
+    SDEBUG(cerr << "  trivial bandwidth used " <<
+	    src_pnode->trivial_bw_used << " max is " <<
+	    src_pnode->trivial_bw << " adding " << vlink->delay_info.bandwidth
+	    << endl);
+    if (src_pnode->trivial_bw) {
+      int old_over_bw;
+      if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
+	old_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
+      } else {
+	old_over_bw = 0;
+      }
+
       dst_pnode->trivial_bw_used += vlink->delay_info.bandwidth;
-      if (dst_pnode->trivial_bw_used > dst_pnode->trivial_bw) {
-	SADD(SCORE_TRIVIAL_PENALTY);
-	vinfo.bandwidth++;
-	violated++;
+
+      int new_over_bw;
+      if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
+	new_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
+      } else {
+	new_over_bw = 0;
+      }
+	
+      if (new_over_bw) {
+	if (!old_over_bw) {
+	  violated++;
+	  vinfo.bandwidth++;
+	}
+	double added_bandwidth_percent = (new_over_bw - old_over_bw) * 1.0 /
+	  src_pnode->trivial_bw;
+	SADD(SCORE_TRIVIAL_PENALTY * added_bandwidth_percent);
       }
     }
     break;
@@ -940,8 +988,9 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	  
 	  // Choose a link
 	  int index;
-	  if (!deterministic) {
-	    float choice = std::random()%(int)total_weight;
+	  if (!deterministic && !greedy_link_assignment) {
+	    float choice;
+	    choice = std::random()%(int)total_weight;
 	    for (index = 0;index < resolution_index;++index) {
 	      switch (resolutions[index].type) {
 	      case tb_link_info::LINK_DIRECT:

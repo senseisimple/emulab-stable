@@ -650,10 +650,19 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
 	      // this node, then removing it, is the same one we would have
 	      // gotten otherwise
 	      double oldscore = get_score();
+	      double tempscore;
 	      if (!add_node(vv,newpos,false,true)) {
+		tempscore = get_score();
 		remove_node(vv);
 	      }
-	      assert(oldscore == get_score());
+	      if (oldscore != get_score()) {
+		cerr << "Scoring problem adding a mapping - oldscore was " <<
+		  oldscore <<  " newscore is " << newscore << " tempscore was "
+		  << tempscore << endl;
+		cerr << "I was tring to map " << vn->name << " to " <<
+		  newpnode->name << endl;
+		abort();
+	      }
 	    }
 	    if (add_node(vv,newpos,false,true) != 0) {
 	      unassigned_nodes.push(vvertex_int_pair(vv,std::random()));

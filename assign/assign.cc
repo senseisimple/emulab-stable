@@ -107,6 +107,10 @@ bool dynamic_pclasses = false;
 
 // Whether or not to allow assign to temporarily over-subscribe pnodes
 bool allow_overload = false;
+
+// Forces assign to do greedy link assignment, by chosing the first link in its
+// list, which is usually the lowest-cost
+bool greedy_link_assignment = false;
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -573,7 +577,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:o")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:og")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -616,6 +620,8 @@ int main(int argc,char **argv)
       break;
     case 'o':
       allow_overload = true; break;
+    case 'g':
+      greedy_link_assignment = true; break;
     default:
       print_help();
     }
