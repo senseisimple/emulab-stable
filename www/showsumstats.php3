@@ -238,7 +238,7 @@ function edaycmp ($a, $b) {
 
 function showrange ($showby, $sortby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
-    $debug = 0;
+    $debug = 1;
     
     switch ($range) {
         case "day":
@@ -328,7 +328,7 @@ function showrange ($showby, $sortby, $range) {
 		     "left join experiment_resources as r1 on ".
 		     "  r1.idx=t.rsrcidx ".
 		     "left join experiment_resources as r2 on ".
-		     "  r2.idx=s.lastrsrc and s.lastrsrc is not null ".
+		     "  r2.idx=r1.lastidx and r1.lastidx is not null ".
 		     "where t.exitcode = 0 && ".
 		     "    ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.tstamp)) ".
 		     "     < $wclause) ".
@@ -393,7 +393,7 @@ function showrange ($showby, $sortby, $range) {
 	}
 
 	if ($debug) 
-	    echo "$idx $pid $eid $uid $tstamp $action $pnodes<br>\n";
+	    echo "$idx $pid $eid $uid $tstamp $action $pnodes $pnodes2<br>\n";
 
 	switch ($action) {
         case "start":
@@ -440,11 +440,10 @@ function showrange ($showby, $sortby, $range) {
 	    # Basically, start the clock ticking again with the new
 	    # number of pnodes.
 	    if ($action == "swapmod") {
-		# Yuck, we redefined uid above, but we want to start the
-		# new record for the current swapper.
-		$uid = $row["uid"];
-		$expt_start["$pid:$eid"] = array('pnodes' => $pnodes,
-						 'uid'    => $uid,
+		# Yuck, we redefined uid/pnodes above, but we want to start the
+		# new record for the current swapper/#pnodes.
+		$expt_start["$pid:$eid"] = array('pnodes' => $row['pnodes1'],
+						 'uid'    => $row['uid'],
 						 'pid'    => $pid,
 						 'stamp'  => $tstamp);
 	    }

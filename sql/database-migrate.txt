@@ -693,3 +693,31 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter ignore table comments modify 
 		column_name varchar(64) not null default "";
 
+1.158: Add chain field to experiment_resources to make it easier to
+       step back through experiment history, and keep the join size
+       down.
+
+        alter table experiment_resources add lastidx int(10)
+			unsigned default NULL after exptidx;
+	alter table experiment_resources add index(lastidx);
+
+	my $query_result =
+	    DBQueryWarn("select idx,exptidx from experiment_resources ".
+			"order by exptidx,tstamp asc");
+
+	my $lastexpt = -1;
+	my $lastidx  = -1;
+
+	while (($idx,$exptidx) = $query_result->fetchrow_array()) {
+	    if ($exptidx != $lastexpt) {
+		print "update experiment_resources set lastidx=NULL ".
+		    "where exptidx=$exptidx and idx=$idx;\n";
+		$lastexpt = $exptidx;
+		$lastidx  = $idx;
+		next;
+	    }
+	    print "update experiment_resources set lastidx=$lastidx ".
+		"where exptidx=$exptidx and idx=$idx;\n";
+	    $lastidx  = $idx;
+	}
+	

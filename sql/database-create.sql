@@ -172,6 +172,7 @@ CREATE TABLE eventlist (
 CREATE TABLE experiment_resources (
   idx int(10) unsigned NOT NULL auto_increment,
   exptidx int(10) unsigned NOT NULL default '0',
+  lastidx int(10) unsigned default NULL,
   tstamp datetime default NULL,
   vnodes smallint(5) unsigned default '0',
   pnodes smallint(5) unsigned default '0',
@@ -188,7 +189,8 @@ CREATE TABLE experiment_resources (
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   PRIMARY KEY  (idx),
-  KEY exptidx (exptidx)
+  KEY exptidx (exptidx),
+  KEY lastidx (lastidx)
 ) TYPE=MyISAM;
 
 --

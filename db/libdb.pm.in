@@ -3252,8 +3252,8 @@ sub GatherSwapStats($$$$$;$)
 	$flags & TBDB_STATS_FLAGS_PREMODIFY) {
 	$query_result = 
 	    DBQueryWarn("insert into experiment_resources ".
-			" (idx, tstamp, exptidx) ".
-			"values (0, now(), $exptidx)");
+			" (idx, tstamp, exptidx, lastidx) ".
+			"values (0, now(), $exptidx, $rsrcidx)");
 	if (! $query_result ||
 	    ! $query_result->insertid) {
 	    print STDERR
