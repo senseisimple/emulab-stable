@@ -96,8 +96,8 @@ C. What to do on boss:
 4a. Add entries into the tiplines table. The "server" field is where
     the actual capture process runs:
 
-    INSERT INTO tiplines VALUES ('pc1', 'users.emulab.net',0,0,'');
-    INSERT INTO tiplines VALUES ('pc111','tipserv1.emulab.net',0,0,'');
+    INSERT INTO tiplines VALUES ('pc1','pc1','users.emulab.net',0,0,'');
+    INSERT INTO tiplines VALUES ('pc111','pc111','tipserv1.emulab.net',0,0,'');
 
     You need to add the usual lines in /etc/remote on the machine
     where the capture process runs. In addition, add a line on users
