@@ -170,6 +170,12 @@ ClientNetInit(void)
 	return 1;
 }
 
+unsigned long
+ClientNetID(void)
+{
+	return ntohl(myipaddr.s_addr);
+}
+
 int
 ServerNetInit(void)
 {

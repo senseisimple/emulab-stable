@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1127,7 +1127,11 @@ PlayFrisbee(void)
 	 * sequence above, and its important that each client have a different
 	 * sequence!
 	 */
+#ifdef __FreeBSD__
 	srandomdev();
+#else
+	srandom(ClientNetID() ^ stamp.tv_sec ^ stamp.tv_usec ^ getpid());
+#endif
 
 	/*
 	 * A random number ID. I do not think this is really necessary,

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,8 @@ SHAREDOBJS	= log.o network.o trace.o utils.o
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
 
 # get 64-bit off_t and pread/pwrite protos
-LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
+		  -D_XOPEN_SOURCE=500 -D_BSD_SOURCE=1
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)
@@ -53,7 +54,7 @@ CFLAGS		+= -DCONDVARS_WORK
 #CLIENTLIBS	+= `elvin-config --libs vin4c`
 #EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
-all: frisbeed
+all: frisbee frisbeed
 
 frisbee: $(CLIENTOBJS)
 	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
