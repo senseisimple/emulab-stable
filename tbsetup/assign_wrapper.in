@@ -246,7 +246,7 @@ while (($vname,$member) = $result->fetchrow_array) {
 	$lancount{$vname} = 0;
     }
     $lancount{$vname} += 1;
-    if ($lancount{$vname} > 2 && $vnodelans{$vname}) {
+    if ($lancount{$vname} > 2 && defined($vnodelans{$vname})) {
 	die("*** $0:\n".
 	    "    Virtual node $node in lan $vname not allowed!\n");
     }
