@@ -21,6 +21,7 @@ push(@INC,$TBSETUPLIB);
 # Turn off line buffering.
 $| = 1; 
 
+require exitonwarn;
 require libtbsetup;
 
 if ($#ARGV < 2 || $#ARGV > 3 ||

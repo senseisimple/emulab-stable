@@ -5,6 +5,8 @@
 
 my $TBROOT = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
+push(@INC,"$TBROOT/lib");
+require exitonwarn;
 
 #
 # Turn off line buffering on output

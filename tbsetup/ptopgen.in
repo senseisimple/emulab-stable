@@ -10,6 +10,9 @@ $switch_speed = 100;
 use DBI;
 my $TBDB = "@TBDBNAME@";
 my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
+my $TBROOT = "@prefix@";
+push(@INC,"$TBROOT/lib");
+require exitonwarn;
 
 %switches=();
 %used_switches=();
@@ -58,7 +61,6 @@ $sharklinks = "";
 foreach $node (keys(%nodes)) {
     if ($node =~ /^sh/) {
 	print "node $node shark-shelf:1\n";
-	$sharklinks .= "link link-$node $node:$node/eth0 cisco1 100 1\n";
     } else {
 	$text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
 	$delay_capacity = $nodetypes{$nodes{$node}};
@@ -107,12 +109,27 @@ sub get_ifacebw {
     }
 };
 
+# SHARK
+$sth = $dbh->prepare("SELECT node_id1,node_id2 from wires" .
+		     " where type=\"Dnard\"");
+$sth->execute;
+while (($node1,$node2) = $sth->fetchrow_array) {
+    if (defined($nodes{$node1}) && 
+	(defined($nodes{$node2}) || defined($switches{$node2}))) {
+	# Hack until the DB makes sense
+	if ($node2 ne "cisco1") {next;}
+	print "link link-$node1 $node1:$node1/eth0 $node2 100 1\n";
+    }
+}
+$sth->finish;
+# END SHARK
+
 $sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\"");
 $sth->execute;
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $sth->fetchrow_array) {
-    if (defined($nodes{$node1}) && 
+    if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
 	(defined($nodes{$node2}) || defined($switches{$node2}))) {
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
@@ -126,13 +143,29 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	if (defined($switches{$node2})) {
 	    $used_switches{$node2} = 1;
 	}
-	# !!! - Here we use our knowledge that in the wires table links
-	# to the switch always come as node2.
-	print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-	    " $node2:$iface2 $bw 1\n";
-    }
+	if (defined($switches{$node1})) {
+	    $used_switches{$node1} = 1;
+	}
+	if (defined($switches{$node1}) && defined($switches{$node2})) {
+	    # interswitch link
+	    if (defined($interconnects{"$node1:$node2"})) {
+		$interconnects{"$node1:$node2"} += $bw;
+	    } else {
+		$interconnects{"$node1:$node2"} = $bw;
+	    }
+	} else {
+	    # !!! - Here we use our knowledge that in the wires table links
+	    # to the switch always come as node2.
+	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
+		" $node2:$iface2 $bw 1\n";
+	}
+    } 
 }
 $sth->finish;
+foreach $interconnect (keys(%interconnects)) {
+    ($src,$dst) = split(":",$interconnect);
+    print "link link-$interconnect $src $dst $interconnects{$interconnect} 1\n";
+}
 
 print $sharklinks;
 

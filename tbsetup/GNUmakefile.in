@@ -26,7 +26,7 @@ LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  webstartexp webendexp webbatchexp webkillbatchexp \
 		  assign_wrapper ptopgen
 
-LIB_STUFF       = libtbsetup.pm libtestbed.pm snmpit_intel.pm \
+LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm
 
 #

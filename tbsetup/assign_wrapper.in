@@ -27,6 +27,10 @@ $DELAYCAPACITY = @DELAYCAPACITY@;
 $TBROOT = "@prefix@";
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 $TBDB = "@TBDBNAME@";
+$TBLIB = "$TBROOT/lib";
+push(@INC,$TBLIB);
+
+require exitonwarn;
 
 $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
     die "Could not connect to DB.\n";
@@ -398,7 +402,7 @@ while (1) {
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
 		     " where b.node_id is null" .
-		     " and a.role='testnode'");
+		     " and a.role='testnode' and a.type!='dnard'");
     
     if ($numnodes < $minimum_nodes) {
 	print STDERR "$0: *** Insufficient nodes available.\n";
@@ -995,12 +999,15 @@ foreach $pnode (keys(%p2vmap)) {
 
 foreach $vnodeport (keys(%portbw)) {
     ($vnode,$vport) = split(":",$vnodeport);
-    $pnode = $v2pmap{$vnode};
-    $pport = $portmap{$vnodeport};
-    $dbh->do("update interfaces set current_speed=\"$portbw{$vnodeport}\"" .
-	     " where node_id=\"$pnode\" and iface=\"$pport\"") || do {
-		 print STDERR "$0: *** Could not update current_speed on" .
-		     " interfaces.  Giving up.\n";
-		 exit(1);
-	     }
+    # SHARK HACK
+    if (defined($v2pmap{$vnode})) {
+	$pnode = $v2pmap{$vnode};
+	$pport = $portmap{$vnodeport};
+	$dbh->do("update interfaces set current_speed=\"$portbw{$vnodeport}\"" .
+		 " where node_id=\"$pnode\" and iface=\"$pport\"") || do {
+		     print STDERR "$0: *** Could not update current_speed on" .
+			 " interfaces.  Giving up.\n";
+		     exit(1);
+		 }
+    }
 }
