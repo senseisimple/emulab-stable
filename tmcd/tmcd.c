@@ -4879,12 +4879,9 @@ COMMAND_PROTOTYPE(doprogagents)
 		return 1;
 	}
 
-	res = mydb_query("select v.vname from virt_agents as v "
-			 "left join event_objecttypes as e on "
-			 "  e.idx=v.objecttype "
-			 "where e.type='PROGRAM' and "
-			 "      v.vnode='%s' and v.pid='%s' and v.eid='%s'",
-			 1, reqp->nickname, reqp->pid, reqp->eid);
+	res = mydb_query("select vname,command from virt_programs "
+			 "where vnode='%s' and pid='%s' and eid='%s'",
+			 2, reqp->nickname, reqp->pid, reqp->eid);
 
 	if (!res) {
 		error("PROGRAM: %s: DB Error getting virt_agents\n",
@@ -4906,7 +4903,10 @@ COMMAND_PROTOTYPE(doprogagents)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "AGENT=%s\n", row[0]);
+		sprintf(buf, "AGENT=%s", row[0]);
+		if (vers >= 13)
+			sprintf(&buf[strlen(buf)], " COMMAND='%s'", row[1]);
+		strcat(buf, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;

@@ -44,7 +44,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 12; };
+sub TMCD_VERSION()	{ 13; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -363,14 +363,22 @@ sub cleanup_node ($) {
 #
 sub check_status ()
 {
-    my $status;
     my @tmccresults;
 
     if (tmcc(TMCCCMD_STATUS, undef, \@tmccresults) < 0) {
 	warn("*** WARNING: Could not get status from server!\n");
 	return -1;
     }
-    $status = $tmccresults[0];
+    #
+    # This is possible if the boss node does not now about us yet.
+    # We want to appear free. Specifically, it could happen on the
+    # MFS when trying to bring in brand new nodes. tmcd will not know
+    # anything about us, and return no info. 
+    #
+    return 0
+	if (! @tmccresults);
+
+    my $status = $tmccresults[0];
 
     if ($status =~ /^FREE/) {
 	unlink TMNICKNAME;
@@ -1843,17 +1851,10 @@ sub dotrafficconfig()
     }
     my ($pid, $eid, $vname) = check_nickname();
 
-    my $cmdline = "$BINDIR/trafgen -s ";
-    # Inside a jail, we connect to the local elvind and talk to the
-    # master via the proxy.
-    if (JAILED()) {
-	$cmdline .= "localhost"
-    }
-    else {
-	$cmdline .= "$boss"
-    }
+    # We connect to the local elvind and talk to the master via the proxy.
+    my $cmdline = "$BINDIR/trafgen -s localhost ";
     if ($pid) {
-	$cmdline .= " -E $pid/$eid";
+	$cmdline .= " -E $pid/$eid -k " . TMEVENTKEY();
     }
 
     #

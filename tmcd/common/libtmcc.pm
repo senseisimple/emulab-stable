@@ -97,6 +97,10 @@ sub tmcccopycache($$)
 	warn("*** WARNING: No such directory $root!\n");
 	return -1;
     }
+    if (-d $todir) {
+	system("rm -rf $todir") == 0 ||
+	    warn("*** WARNING: Could not remove old cache $todir!\n");
+    }
     return system("cp -rp $fromdir $todir");
 }
 

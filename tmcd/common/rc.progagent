@@ -63,38 +63,11 @@ if (! -s TMPROGAGENTS) {
 }
 
 #
-# The progagent always talks to the local elvind on FreeBSD, which
-# talks to boss. Otherwise, it talks to boss directly. 
+# The progagent always talks to the local elvind, which talks to boss. 
 #
-my $bossname;
-if ($OSNAME eq "freebsd") {
-    $bossname = "localhost";    
-}
-else {
-    $bossname = tmccbossname();
-}
-
-#
-# Open up the command file, which tells us what to do.
-#
-open(CMD, TMPROGAGENTS) or
-    fatal("Could not open " . TMPROGAGENTS . ": $!");
-
-my @agents;
-my $login;
-
-while (<CMD>) {
-    if ($_ =~ /^UID=([-\w]+)$/) {
-	$login  = $1;
-    }
-    elsif ($_ =~ /^AGENT=([-\w]+)$/) {
-	push (@agents, $1);
-    }
-}
-
-if (! @agents || !defined($login)) {
-    fatal(TMPROGAGENTS . " not in proper format!");
-}
+my $elvind  = "localhost";
+my $config  = TMPROGAGENTS();
+my $keyfile = TMEVENTKEY();
 
 #
 # Need the pid/eid. 
@@ -105,12 +78,10 @@ my ($pid, $eid, $vname) = check_nickname();
 # Start the program agent. It will become the user. It must be started
 # as root of course to do this. 
 #
-my $agentlist = join(" -a ", @agents);
+print "Starting Program Agent ...\n";
 
-print "Starting Program Agent ($login, @agents) ...\n";
-
-system("program-agent -e $pid/$eid -s $bossname -u $login -l $logfile ".
-       "-a $agentlist -i $pidfile &");
+system("program-agent -e $pid/$eid -s $elvind -l $logfile ".
+       "-i $pidfile -k $keyfile -c $config &");
 exit($? >> 0);
 
 sub fatal($)

@@ -46,6 +46,7 @@ if (@ARGV) {
 }
 # Must do this *after* setting vnode id.
 my $MAPFILE = TMDELMAP();
+my $KEYFILE = TMEVENTKEY();
 my $logfile;
 my $pidfile;
 
@@ -85,16 +86,10 @@ print "Starting Delay Agent ...\n";
 my ($pid, $eid, $vname) = check_nickname();
 
 #
-# We use the tmcc to figure out where the Testbed Event Daemon is running.
-# Don't worry about the port for now. When for a jail, we use localhost
-# to talk to the local elvind and the evproxy. Maybe just do this all the
-# time and not worry about the extra 1ms of transit delay?
+# The agent always talks to the local elvind, which talks to boss. 
 #
-my $bossname = "localhost";
-if (! defined($vnodeid)) {
-    $bossname = tmccbossname();
-}
+my $elvind = "localhost";
 
-system("delay-agent -s $bossname -E $pid/$eid ".
-       "-f $MAPFILE -l $logfile -i $pidfile &");
+system("delay-agent -s $elvind -E $pid/$eid ".
+       "-f $MAPFILE -l $logfile -i $pidfile -k $KEYFILE &");
 exit($? >> 0);
