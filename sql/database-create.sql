@@ -716,6 +716,7 @@ CREATE TABLE node_types (
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   isremotenode tinyint(4) NOT NULL default '0',
+  issubnode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 

@@ -842,3 +842,8 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add sync_server varchar(32) \
 		default NULL after idle_ignore;
 
+1.171: Add issubnode slot for dealing with IXP type things.
+
+	alter table node_types add issubnode tinyint(4) NOT NULL default '0' \
+		after isremotenode;
+
