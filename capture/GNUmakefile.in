@@ -9,7 +9,7 @@ all: capture capserver capture-tty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DBFLAGS	+= -DTBDBNAME='"$(TBDBNAME)"' -I/usr/local/include
+DBFLAGS	+= -I/usr/local/include
 
 DESTDIR=
 
@@ -17,10 +17,10 @@ DESTDIR=
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS= -g -O2 -DLOG_DROPS
+CFLAGS= -g -O2 -DLOG_DROPS -I${OBJDIR}
 
 capture: capture.c capdecls.h
-	cc $(CFLAGS) -DUSESOCKETS -DBOSSNODE='"$(BOSSNODE)"' -o capture $<
+	cc $(CFLAGS) -DUSESOCKETS -o capture $<
 
 capture-tty: capture.c capdecls.h
 	cc $(CFLAGS) -o capture-tty $<

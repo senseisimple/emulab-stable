@@ -55,6 +55,7 @@
 #include <netdb.h>
 #endif
 #include "capdecls.h"
+#include "config.h"
 
 #define geterr(e)	strerror(e)
 

@@ -23,7 +23,9 @@
 #include <stdarg.h>
 #include <mysql/mysql.h>
 #include <sys/time.h>
+#include <grp.h>
 #include "capdecls.h"
+#include "config.h"
 
 #define TESTMODE
 
@@ -34,6 +36,7 @@
 static int	debug = 0;
 static int	portnum = SERVERPORT;
 static char     *dbname = DEFAULT_DBNAME;
+static gid_t	admingid;
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
 
@@ -59,6 +62,7 @@ main(int argc, char **argv)
 	int			length, i, err = 0;
 	struct sockaddr_in	name;
 	struct timeval		timeout;
+	struct group		*group;
 
 	while ((ch = getopt(argc, argv, "dp:")) != -1)
 		switch(ch) {
@@ -84,6 +88,15 @@ main(int argc, char **argv)
 
 	if (!debug)
 		(void)daemon(0, 0);
+
+	/*
+	 * Grab the GID for the default group.
+	 */
+	if ((group = getgrnam(TBADMINGROUP)) == NULL) {
+		syslog(LOG_ERR, "Getting GID for %s", TBADMINGROUP);
+		exit(1);
+	}
+	admingid = group->gr_gid;
 
 	/*
 	 * Setup TCP socket
@@ -220,7 +233,7 @@ main(int argc, char **argv)
 			 * Default to root/root.
 			 */
 			tipown.uid = 0;
-			tipown.gid = 0;
+			tipown.gid = admingid;
 		}
 		mysql_free_result(res);
 
