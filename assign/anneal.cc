@@ -108,6 +108,43 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
     }
   }
 
+  // Check for 'local' desires - the reason we take the time to do this here is
+  // that they are actually, in many ways, like types with vn->typecount > 1.
+  if (matched && !vn->desires.empty()) {
+    tb_vnode::desires_map::iterator desire_it;
+    for (desire_it = vn->desires.begin();
+	desire_it != vn->desires.end();
+	desire_it++) {
+      if (desire_it->first[0] != '?') {
+	continue;
+      }
+      if (desire_it->first[1] != '+') {
+	continue;
+      }
+      tb_pnode::features_map::iterator feature_it =
+	pn->features.find(desire_it->first);
+      if (feature_it == pn->features.end()) {
+	matched = false;
+	break;
+      }
+      // If we are allowing overloading, do so only to a limited degree
+      if (allow_overload) {
+	if ((feature_it->second < desire_it->second)
+	    && (feature_it->second - desire_it->second)
+	        < (desire_it->second * 2)) {
+	  matched = false;
+	  break;
+	}
+      } else {
+	// No overloading, and this would put us over the limit
+	if (feature_it->second < desire_it->second) {
+	  matched = false;
+	  break;
+	}
+      }
+    }
+  }
+
   return matched;
 }
 
