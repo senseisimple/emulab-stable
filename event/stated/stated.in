@@ -560,7 +560,7 @@ sub handleEvent($$$) {
 
 	    # Still not defined, someone screwed up! This could end up
 	    # churning via reload(). Bad.
-	    if (defined($nodes{$node})) {
+	    if (! defined($nodes{$node})) {
 		notify("Got $objtype/$eventtype for nonexistent $node!\n");
 		return;
 	    }
