@@ -413,7 +413,21 @@ $vlan_id,$pideid,          $vname,    $members
 	my $result = DBQueryFatal("select pid, eid, virtual from " .
 				  "vlans where id='$vlan_id'");
 	my ($eid,$pid);
-	($eid,$pid,$vname) = $result->fetchrow();
+	($pid,$eid,$vname) = $result->fetchrow();
+
+	#
+	# Permissions check - people only get to see
+	#
+	if ((!$eid) || (!$pid)) {
+	    if (!TBAdmin()) {
+		&debug("Failed TBAdmin check\n");
+		next;
+	    }
+	} elsif (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	    &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
+	    next;
+	}
+
 
 	if (!$vname) { $vname = ""; }
 	$members = join(" ",@$memberref);
@@ -422,7 +436,7 @@ $vlan_id,$pideid,          $vname,    $members
 	# Setup $pideid for a more compact display
 	#
 	if ($eid && $pid) {
-	    $pideid = "$eid/$pid";
+	    $pideid = "$pid/$eid";
 	} else {
 	    $pideid = "";
 	}
@@ -460,6 +474,20 @@ $port,    $enabled,$up,$speed,$duplex
     $FORMAT_NAME = 'portlist';
     foreach my $line (sort {tbsort($$a[0],$$b[0])} @portList) {
 	($port,$enabled,$up,$speed,$duplex) = @$line;
+	#
+	# Only let people see information about ports in their experiments
+	#
+	$port =~ /^(.+):/;
+	my $node = $1;
+
+	&debug("node is $node\n");
+	if (!$node) {
+	    if (!TBAdmin($UID)) {
+		next;
+	    }
+	} elsif (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,$node)) {
+	    next;
+	}
 	write;
     }
 
