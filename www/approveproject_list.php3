@@ -64,7 +64,6 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $headuid  = $projectrow[head_uid];
     $Purl     = $projectrow[URL];
     $Pname    = $projectrow[name];
-    $Paffil   = $projectrow[affil];
 
     $userinfo_result = mysql_db_query($TBDBNAME,
 	"SELECT * from users where uid=\"$headuid\"");
