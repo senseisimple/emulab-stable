@@ -1234,3 +1234,8 @@ last_net_act,last_cpu_act,last_ext_act);
 		default '' after def_boot_cmd_line;
 	alter table os_info add mfs tinyint(4) NOT NULL default '0' \
 		after max_concurrent;
+
+1.217: Add slot to nodes table to facilitate better stated debugging.
+      
+	alter table nodes add stated_tag varchar(32) default NULL \
+			after sfshostid;
