@@ -29,7 +29,8 @@ use Exporter;
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP
-	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY TMCREATOR
+	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
+	 TMCREATOR TMSWAPPER
        );
 
 # Must come after package declaration!
@@ -213,6 +214,7 @@ sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 sub TMROLE()		{ CONFDIR() . "/role";}
 sub TMSIMRC()		{ CONFDIR() . "/rc.simulator";}
 sub TMCREATOR()		{ CONFDIR() . "/creator";}
+sub TMSWAPPER()		{ CONFDIR() . "/swapper";}
 
 #
 # This is a debugging thing for my home network.

@@ -166,7 +166,7 @@ sub docreator()
 	if (! @tmccresults);
     
     #
-    # There should be just one string. Ignore anything else.
+    # There should be one string for the creator of the experiment...
     #
     if ($tmccresults[0] =~ /^CREATOR=([-\w]*)/) {
 	$creator = $1;
@@ -174,8 +174,19 @@ sub docreator()
     else {
 	fatal("Bad creator line: $tmccresults[0]");
     }
-    
     system("echo '$creator' > ". TMCREATOR());
+
+    #
+    # ... and another string for the user who swapped it in.
+    #
+    if ($tmccresults[0] =~ / SWAPPER=([-\w]*)/) {
+	$swapper = $1;
+    }
+    else {
+	fatal("Bad swapper line: $tmccresults[0]");
+    }
+    system("echo '$swapper' > ". TMSWAPPER());
+
     return 0;
 }
 
