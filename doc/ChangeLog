@@ -1,3 +1,63 @@
+kwebb       2003/07/22 18:48:44 MDT
+
+  Modified files:
+    tmcd/linux           GNUmakefile.in 
+  Added files:
+    tmcd/linux           delaysetup 
+  Log:
+  Here we have the Linux delaysetup startup script - first revision.  This
+  uses iproute2+tc, modprobe, and iptables to setup traffic shaping.
+  A few notes are warranted:
+  
+  1) [g]red is not yet supported
+     - need to make these modules classful in the kernel first
+  
+  2) sysctls are used here to up the amount of buffer space available for
+     sk_bufs (socket buffers).  Couldn't see a place to do this in the kernel
+     config.
+  
+  3) Only linkdelay support is implemented
+     - probably could add normal delay-node support without too much trouble.
+  
+  4) reverse pipe numbers are (currently) ignored
+     - not needed since the IMQ device used to shape incoming traffic
+       is distinct from the actual interface - no namespace collision.
+  
+  5) Kernel selection is similar to FBSD: check running kernel, and reboot
+     if the kernel version isn't what we expect (have to rerun lilo too)
+  
+kwebb       2003/07/22 18:40:34 MDT
+
+  Added files:
+    delay/linux          README 
+    delay/linux/iptables_mods iptables-1.2.6a-imq.diff-3 
+    delay/linux/kmods    patch-combined-linkdelays-2.4.18 
+    delay/linux/tc_mods  
+                         patch-combined-iproute2-2.4.7-now-ss020116-try 
+  Log:
+  This commit represents the culmination of my work on linux traffic shaping.
+  Both changes to the kernel, and to userland control applications are included
+  in this checkin.  At present, these files are combined patches; I'll be
+  separating out the Emulab specific additions/changes in the near future.
+  
+  The best resource (currently) for understanding the Linux traffic control
+  mechanisms is at the Linux Diffserv project home page (under Documentation):
+  http://diffserv.sourceforge.net/
+  
+  The most noteworthy contributions I've made are the PLR module and DELAY
+  module port and enhancement.  These two modules are classful (though they
+  don't use classification filters) and can be chained together with other
+  modules such as the Heirarchical Token Bucket (used for limiting bandwith).
+  See: http://luxik.cdi.cz/~devik/qos/htb/
+  
+  Note that this checkin also includes the patches necessary to obtain
+  Intermediate Queueing Devices (IMQ) and HTB control under iproute2+tc.  The
+  IMQ devices allow the attachment of qdiscs on the incoming side of a real
+  interface (can't do this without them). See: http://trash.net/~kaber/imq/
+  
+  The Linux Advanced Routing HOWTO is another good source of information:
+  http://lartc.org
+
 stoller     2003/07/15 15:25:03 MDT
 
   Modified files:
