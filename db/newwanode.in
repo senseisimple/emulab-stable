@@ -222,7 +222,7 @@ for ($i = 1; $i < 9; $i++) {
 DBQueryFatal("insert into interfaces ".
 	     "(node_id, card, port, IP, interface_type, iface) ".
 	     "values ('$nodename', $control_net, 1, '$nodeip', ".
-	     "        'fxp0', 'eth0')");
+	     "        'fxp', 'eth0')");
 
 #
 # Again, this is bogus.
