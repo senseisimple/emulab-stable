@@ -330,6 +330,9 @@ sub mkrootfs($)
     # Find a free vndevice.
     #
     for (my $i = 0; $i < $MAXVNDEVS; $i++) {
+	# Make sure the dev entries exist!
+	mysystem("(cd /dev; ./MAKEDEV vn${i})");
+	
 	system("vnconfig -c vn${i} root.vnode");
 	if (! $?) {
 	    $vndevice = $i;
