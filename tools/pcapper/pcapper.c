@@ -70,7 +70,7 @@
 /*
  * Program run to determine the control interface.
  */
-#define CONTROL_IFACE "/etc/testbed/control_interface"
+#define CONTROL_IFACE CLIENT_BINDIR "/control_interface"
 
 /*
  * Wire overhead not seen by pcapper:
