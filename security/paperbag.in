@@ -18,22 +18,11 @@ my $TB		= "@prefix@";
 
 # List of allowed commands - Mapping is from command entered by the user
 # to the actual binary to run
-%allowed = (	"avail"		=> "$TB/bin/avail",
-		"inuse"		=> "$TB/bin/inuse",
-		"if2port"	=> "$TB/sbin/if2port",
-		"mac2if"	=> "$TB/bin/mac2if",
-		"nalloc"	=> "$TB/bin/nalloc",
+%allowed = (	"nalloc"	=> "$TB/bin/nalloc",
 		"nfree"		=> "$TB/bin/nfree",
-		"nodeip"	=> "$TB/bin/nodeip",
-		"ns"		=> "$TB/bin/ns",
-		"power"		=> "$TB/bin/power",
-		"snmpit"	=> "$TB/bin/snmpit",
-		"tbprerun"	=> "$TB/bin/tbprerun",
-		"tbreport"	=> "$TB/bin/tbreport",
-		"tbrun"		=> "$TB/bin/tbrun",
-		"tbend"		=> "$TB/bin/tbend",
-		"vpower"	=> "$TB/bin/vpower",
-		"vsnmpit"	=> "$TB/bin/vsnmpit");
+		"node_reboot"	=> "$TB/bin/node_reboot",
+		"os_load"	=> "$TB/bin/os_load",
+		"snmpit"	=> "$TB/bin/snmpit");
 
 # Need to provide a simple path, because some scripts we call need one
 $ENV{PATH} = "$TB/bin:/bin:/usr/bin:/usr/local/bin";

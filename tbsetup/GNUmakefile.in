@@ -15,7 +15,7 @@ BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
 		  node_reboot
 
 # Stuff that mere users get on plastic.
-USERS_BIN       = snmpit os_load node_reboot
+USERBINS        = snmpit os_load node_reboot
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon
@@ -88,7 +88,7 @@ post-install:
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy)
 	cd $(INSTALL_BINDIR) && \
-		list='$(BIN_STUFF)'; for file in $$list; do \
+		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;

@@ -12,6 +12,9 @@ BIN_SCRIPTS	= mac2if nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup
 LIBEXEC_SCRIPTS = ptopgen
 
+# Stuff installed on plastic for mere users.
+USERBINS	= nalloc nfree 
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
@@ -29,7 +32,7 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 #
 control-install:
 	cd $(INSTALL_BINDIR) && \
-		list='$(BIN_SCRIPTS)'; for file in $$list; do \
+		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;
