@@ -6,16 +6,6 @@
 #
 ############################################################
 
-# useful values are 0, 1, 2 and 3
-my $verbose = 0;
-#If there is -d or -v, turn it on right now...
-if ( join(" ",@ARGV) =~ /^-[d|v](\s*)(\d*)\s[oc]/ ) {
-    shift;
-    if (defined $1 && $1 ne "") { shift; }
-    if (defined $2 && $2 ne "") { $verbose = $2; } else { $verbose = 1; }
-}
-print "VERBOSE ON: Set to level $verbose\n" if $verbose;
-
 #
 # Configure variables
 #
@@ -27,6 +17,16 @@ use event;
 use libtestbed;
 use strict;
 use English;
+use Getopt::Std;
+
+sub usage() {
+    print << "END";
+Usage: $0 [-v n] [-e] <on|off|cycle> <node ...>
+-e     Surpress sending of event - for use by scripts that have already sent it
+-v n   Run with verbosity level n
+END
+    1;
+}
 
 #
 # Un-taint path since this gets called from setuid scripts.
@@ -43,10 +43,34 @@ my %OutletList = ();		#holds machine/outlet pairs
 my $exitval = 0;
 
 #
+# Process command-line arguments
+#
+my %opt = ();
+getopts("v:he",\%opt);
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+# useful values are 0, 1, 2 and 3
+my $verbose = 0;
+if ($opt{v}) {
+    $verbose = $opt{v};
+}
+print "VERBOSE ON: Set to level $verbose\n" if $verbose;
+
+my $sendevent = 1;
+if ($opt{e}) {
+    $sendevent = 0;
+}
+
+#
 # Must have at least an op and a machine, so at least 2 ARGV
 #
-die("Usage:\npower [-v[n]] [on|off|cycle] <node> [<node>] ...\n",
-    "n = verbosity level (0-3)\n") if ( @ARGV < 2 );
+if (@ARGV < 2) {
+    exit &usage;
+}
+
 
 #
 # Read in ARGV
@@ -55,7 +79,7 @@ $op = shift (@ARGV);
 if ($op =~ /^(on|off|cycle)$/) {
     $op = $1;
 } else {
-    die("Invalid command '$op'\n");
+    exit &usage;
 }
 
 #
@@ -204,10 +228,12 @@ foreach my $power_id (keys %outlets) {
     if (!$errors) {
 	foreach my $node (@nodes) {
 	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
-	    EventSendFatal(objtype   => "TBNODESTATE",
-	    	           objname   => $node,
-			   eventtype => "REBOOTING",
-			   host      => TB_BOSSNODE);
+	    if ($sendevent) {
+		EventSendFatal(objtype   => "TBNODESTATE",
+			       objname   => $node,
+			       eventtype => "REBOOTING",
+			       host      => TB_BOSSNODE);
+	    }
 	}
     } else {
 	$exitval += $errors;

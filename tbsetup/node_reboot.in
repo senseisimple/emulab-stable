@@ -36,7 +36,7 @@ use libtestbed;
 use event;
 
 my $ssh		= "$TB/bin/sshtb -n";
-my $power	= "$TB/bin/power";
+my $power	= "$TB/bin/power -e";
 my $ipod	= "$TB/sbin/ipod";
 my $ping	= "/sbin/ping";
 my %pids	= ();
