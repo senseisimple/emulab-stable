@@ -87,7 +87,7 @@ esac]
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	capture/GNUmakefile \
-	db/GNUmakefile db/nalloc db/nfree \
+	db/GNUmakefile db/nalloc db/nfree db/if2port \
 	discvr/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/imagezip/GNUmakefile \
