@@ -105,6 +105,7 @@ static unsigned int magic;
 static unsigned long chunkcount;
 static uint32_t nextsector;
 static uint32_t fmax, fmin, franges, amax, amin, aranges;
+static uint32_t adist[8]; /* <4k, <8k, <16k, <32k, <64k, <128k, <256k, >=256k */
 
 static void
 dumpfile(char *name, int fd)
@@ -122,6 +123,7 @@ dumpfile(char *name, int fd)
 	fmax = amax = 0;
 	fmin = amin = ~0;
 	franges = aranges = 0;
+	memset(adist, 0, sizeof(adist));
 
 	if (!isstdin) {
 		struct stat st;
@@ -243,10 +245,23 @@ dumpfile(char *name, int fd)
 		printf("  %d free ranges: %qu/%qu/%qu ave/min/max size\n",
 		       franges, SECTOBYTES(sectfree)/franges,
 		       SECTOBYTES(fmin), SECTOBYTES(fmax));
-	if (aranges)
+	if (aranges) {
+		int minsz, maxsz, i;
+
 		printf("  %d allocated ranges: %qu/%qu/%qu ave/min/max size\n",
 		       aranges, SECTOBYTES(sectinuse)/aranges,
 		       SECTOBYTES(amin), SECTOBYTES(amax));
+		printf("  size distribution:\n");
+		maxsz = 4*SECSIZE;
+		for (i = 0; i < 7; i++) {
+			maxsz *= 2;
+			if (adist[i])
+				printf("    < %dk bytes: %d\n",
+				       maxsz/1024, adist[i]);
+		}
+		if (adist[i])
+			printf("    >= %dk bytes: %d\n", maxsz/1024, adist[i]);
+	}
 }
 
 static int
@@ -359,6 +374,22 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			amin = count;
 		else if (count > amax)
 			amax = count;
+		if (count < 8)
+			adist[0]++;
+		else if (count < 16)
+			adist[1]++;
+		else if (count < 32)
+			adist[2]++;
+		else if (count < 64)
+			adist[3]++;
+		else if (count < 128)
+			adist[4]++;
+		else if (count < 256)
+			adist[5]++;
+		else if (count < 512)
+			adist[6]++;
+		else
+			adist[7]++;
 		aranges++;
 
 		if (dumpmap) {
