@@ -1,6 +1,6 @@
 
 ipassign requires the METIS library.
 
-To compile, simply run the 'build' shell script. This will create ipassign and
-its associated utilities in the bin/ directory. To test, run bin/autocheck
-from the mini-root.
+This is compiled with the rest of Emulab build process. If you wish to run automated regression testing, you will have to build that seperately. Simply compile src/autocheck.cc into bin/autocheck and compile src/boolcmp.cc into bin/boolcmp and then run bin/autocheck. Make sure that you are in the ipassign directory so that autocheck can find the configuration file in etc/autocheck.conf
+
+
