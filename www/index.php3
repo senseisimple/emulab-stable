@@ -13,52 +13,78 @@ PAGEHEADER("Home");
 
 ?>
 
-<p>
-Welcome to Emulab.  Emulab (sometimes called the Utah Network Testbed)
-is a new and unique type of experimental environment: a
-universally-available "Internet Emulator" which provides a
-new balance between control and realism.  Several hundred
-machines, combined with secure, user-friendly web-based tools, and driven
-by <it>ns</it>-compatible scripts, allow you
-to remotely reserve, configure and control machines and links down to
-the hardware level:
-packet loss, latency, bandwidth, packet ordering,
-buffer space all can be user-defined. Even the operating system disk
-contents can be securely and fully replaced with custom images.
+<p><em>Netbed</em>, an outgrowth of <em>Emulab</em>, provides
+integrated access to three disparate experimental environments:
+simulated, emulated, and wide-area network testbeds.  Netbed strives
+to preserve the control and ease of use of simulation, without
+sacrificing the realism of emulation and live network experimentation.
 </p>
+
 <p>
-The Testbed currently features high-speed Cisco switches connecting,
-with over 5 miles of cabling, 168 core nodes (PCs) and 160 edge nodes
-(Compaq DNARD Sharks). The core nodes can be
-used as edge nodes, simulated routers, traffic-shaping nodes, or
-traffic generators.  During an experiment's time slots, the experiment
-(and associated researchers) get exclusive use of the assigned
-machines, including root access if desired.  Until we finish designing
-and building smarter scheduling and state-saving software, and obtain
-the disk space, scheduling is manual and done at coarse granularity
-(days).
+Netbed unifies all three environments under a common user interface,
+and integrates the three into a common framework.  This framework
+provides abstractions, services, and namespaces common to all, such as
+allocation and naming of nodes and links.  By mapping the abstractions
+into domain-specific mechanisms and internal names, Netbed masks much
+of the heterogeneity of the three approaches.
 </p>
+
+<p> <em>Wide-area resources</em>: Netbed currently includes
+approximately 32 nodes geographically distributed across approximately
+25 sites, largely the machines in the "MIT distributed testbed."
+Experimenters with a valid research use can get non-root shell access
+to these shared nodes, with ssh keys and other aspects automatically
+managed by Netbed.  Secure shared filesystem access is coming soon via
+SFS.
+</p>
+
 <p>
-We provide some default software (e.g. Redhat Linux and FreeBSD on the PCs,
-NetBSD on the Sharks) that many users want. The basic software
-configuration on your nodes includes accounts for project members,
-root access, DNS service, compilers and linkers. But fundamentally,
-the software you run on it, including all bits on the disks, is
-replaceable and up to you.  The same applies to the network's
+<em>"Emulab Classic,"</em> a key part of Netbed, is a universally-available
+time- and space-shared network emulator which achieves new levels of
+ease of use.
+Several hundred
+PCs in racks, combined with secure, user-friendly web-based tools, and driven
+by <it>ns</it>-compatible scripts or a Java GUI, allow you
+to remotely configure and control machines and links down to
+the hardware level.  Packet loss, latency, bandwidth, queue sizes--
+all can be user-defined.  Even the OS disk
+contents can be fully and securely replaced with custom images by any experimenter;
+Netbed can load ten or a hundred disks in 2.5 minutes total.
+</p>
+
+<p> Utah's local installation currently features high-speed Cisco
+switches connecting 5 100Mbit interfaces on each of 168 PCs.  The
+<a href = "http://www.uky.emulab.net">University of Kentucky</a>'s installation
+contains 48 similarly networked PCs.
+The PC nodes can be used as
+edge nodes running arbitrary programs, simulated routers,
+traffic-shaping nodes, or traffic generators.  While an "experiment"
+is running, the experiment (and its associated researchers) get
+exclusive use of the assigned machines, including root access.  </p>
+
+<p>
+We provide default OS software (Redhat Linux 7.1 and FreeBSD 4.5);
+the default configuration on your nodes includes accounts for project members,
+root access, DNS service, and standard compilers, linkers, and editors.
+Fundamentally, however,
+all the software you run on it, including all bits on the disks, is
+replaceable and entirely your choice.  The same applies to the network's
 characteristics, including its topology: configurable by users.
+
+
 </p>
 <br /><br />
 <a href='pix/side-crop-big.jpg'>
-   <img src='pix/side-crop-small.jpg' align=right /></a>
+   <img src='pix/side-crop-smaller.jpg' align=right /></a>
 
 <h3>Links to help you get started:</h3>
 <ul>
 <li><b><a href = "docwrapper.php3?docname=auth.html">
           Authorization Scheme, Policy, and "How To Get Started"</a></b>
-<li><b><a href = "docwrapper.php3?docname=hardware.html">
-          Hardware Overview</a></b>
 <li><b><a href = "docwrapper.php3?docname=software.html">
-          Software Overview</a></b>
+          Overview of Installed Software</a></b>
+<li><b><a href = "docwrapper.php3?docname=hardware.html">
+          Hardware Overview, "Emulab Classic"</a></b>
 <li><b><a href = "docwrapper.php3?docname=security.html">
           Security Issues</a></b>
 <li><b><a href = "docwrapper.php3?docname=policies.html">
@@ -72,4 +98,3 @@ characteristics, including its topology: configurable by users.
 PAGEFOOTER();
 
 ?>
-

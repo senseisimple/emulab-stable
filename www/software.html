@@ -5,15 +5,19 @@
   -->
 <center>
 <h1>
-    Software Overview
+    Overview of Installed Software
 </h1>
 </center>
 
 <ul>
+<li><b>Wide-area nodes</b>: FreeBSD 4.6 with additions for robustness
+    and for participation in the wide area testbed.
+
+<p>
 <li><b>boss.emulab.net</b>: Master node, database, web server, name server, trusted disk-image server
     <p>
-    Also known as <b>www.emulab.net</b>.
-    Runs FreeBSD 4.3-RELEASE.  This is the master machine for the testbed
+    Also known as <b>www.netbed.org</b>.
+    Runs FreeBSD 4.5-RELEASE.  This is the master machine for the testbed
     software.  Runs all the critical software components and thus is not
     directly accessible by testbed users.  Moderates (via the database)
     access to node power cycling and disk-image loading as well as providing
@@ -23,7 +27,7 @@
 <li><b>users.emulab.net</b>: Control node, NFS server, test node serial line server and console access point
     <p>
     Also known as <b>ops.emulab.net</b>.
-    Runs FreeBSD 4.3-RELEASE.  This is the main server machine for users
+    Runs FreeBSD 4.5-RELEASE.  This is the main server machine for users
     of the testbed and is where home directories and all project files
     live. While most of the testbed configuration process is done via
     the Web interface, a few things must be done while logged into
@@ -32,14 +36,16 @@
     files will already have this directory in your path.
     
     <p>
-    This is also our "serial-line console" server.  Experimenters can access
+    This is also one of Emulab's "serial-line console" servers.  Experimenters can access
     the console of any testbed node (using <code>tip</code>) from here.
     Console output of all nodes is also logged here.
+
+<h3>Machines used only for ``Emulab Classic'':</h3>
 
 <p>
 <li><b>tipserv1.emulab.net</b>: additional test node serial line server
     <p>
-    Runs FreeBSD 4.3-RELEASE.
+    Runs FreeBSD 4.5-RELEASE.
     Provides physical serial line ports for additional testbed nodes.
     Not directly accessible by testbed users, hosted serial lines are
     accessed by users via a proxy agent on users.emulab.net.
@@ -84,7 +90,8 @@
     and only read-only access is allowed without the password.
 
 <p>
-<li><b>sh[1-20]-[1-8].emulab.net</b>: testbed <a href="hardware.html#tbshark">Shark</a> nodes
+<li><em>(Currently unavailable)</em><br>
+<b>sh[1-20]-[1-8].emulab.net</b>: testbed <a href="hardware.html#tbshark">Shark</a> nodes
     <p>
     The Sharks run NetBSD by default, with the filesystems provided via
     NFS. You may also boot your own OSKit kernels. At this time, no support

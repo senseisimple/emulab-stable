@@ -71,7 +71,7 @@ function WRITESIDEBAR() {
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
-    WRITESIDEBARBUTTON_ABS("Kentucky Emulab", $TBDOCBASE,
+    WRITESIDEBARBUTTON_ABS("Univ. Kentucky Emulab", $TBDOCBASE,
 			   "http://www.uky.emulab.net");
     
     WRITESIDEBARBUTTON_NEW("Join Netbed (CD)",
@@ -82,7 +82,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON_NEW("Papers", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
-    WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
+    WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
 		       "projectlist.php3");
     WRITESIDEBARLASTBUTTON("Sponsors", $TBDOCBASE,
@@ -426,7 +426,7 @@ function PAGEFOOTER() {
             </tr><tr>
               <td class="contentbody">
 	        <center><font size=-1>
-		[&nbsp;<a href="http://www.cs.utah.edu/flux"
+		[&nbsp;<a href="http://www.cs.utah.edu/flux/"
                 >The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
 		[&nbsp;<a href="http://www.cs.utah.edu/"
                 >School&nbsp;of&nbsp;Computing</a>&nbsp;]
@@ -436,10 +436,7 @@ function PAGEFOOTER() {
 		<br>
                 <!-- begin copyright -->
                 <font size=-2>
-                    &copy; 2000-2002 
-                    <a href="http://www.utah.edu/">University of Utah</a>
-                    and the 
-                    <a href="http://www.cs.utah.edu/flux/">Flux Group</a>.
+                    &copy; 2000-2002 The University of Utah.
 <a href="<?php echo "$TBDOCBASE"; ?>/docwrapper.php3?docname=copyright.html">
                     All rights reserved.</a>
                   </font>
