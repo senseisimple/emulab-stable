@@ -54,6 +54,28 @@ namespace eval TBCOMPAT {
     }
     sql endquery $DB
 
+    # The permissions table. Entries in this table indicate who is allowed
+    # to use nodes of a particular type. No entries means anyone can use it.
+    #
+    # We omit this check in anonymous mode.
+    #
+    if {!${GLOBALS::anonymous}} {
+	variable nodetypeXpid_permissions
+    
+	sql query $DB "select type,pid from nodetypeXpid_permissions"
+	while {[set row [sql fetchrow $DB]] != ""} {
+	    set type  [lindex $row 0]
+	    set allow [lindex $row 1]
+
+	    if {([info exists nodetypeXpid_permissions($type)])} {
+		lappend nodetypeXpid_permissions($type) $allow
+	    } else {
+		set nodetypeXpid_permissions($type) [list $allow]
+	    }
+	}
+	sql endquery $DB
+    }
+
     # And a os table with valid OS Descriptor names. While we still call
     # them "osids", we are using the user level name not the internal,
     # globally unique name. We leave it to a later phase to deal with it.
@@ -114,8 +136,26 @@ proc tb-set-hardware {node type args} {
 	perror "\[tb-set-hardware] Invalid hardware type $type."
 	return
     }
+    if {! ${GLOBALS::anonymous}} {
+	var_import ::TBCOMPAT::nodetypeXpid_permissions
+	var_import ::GLOBALS::pid
+	set allowed 0
+	
+	if {[info exists nodetypeXpid_permissions($type)]} {
+	    foreach allowedpid $nodetypeXpid_permissions($type) {
+		if {$allowedpid == $pid} {
+		    set allowed 1
+		}
+	    }
+	}
+	if {! $allowed} {
+	    perror "\[tb-set-hardware] No permission to use type $type."
+	    return
+	}
+    }
     $node set type $type
 }
+
 proc tb-set-node-os {node os} {
     if {! ${GLOBALS::anonymous}} {
 	var_import ::TBCOMPAT::osids
