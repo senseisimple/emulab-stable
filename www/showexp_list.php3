@@ -170,7 +170,7 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<center><b>Experiments that have been idle at least 24 hours</b></center><p>\n";
+      echo "<p><center><b>Experiments that have been idle at least 24 hours</b></center></p><br />\n";
     }
     
     $idlemark = "<b>*</b>";
@@ -212,10 +212,10 @@ if (mysql_num_rows($experiments_result)) {
             <tr>
               <th width=8%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
-                  PID</th>
+                  PID</a></th>
               <th width=8%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
-                  EID</th>
+                  EID</a></th>
               <th align=center width=3%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
                   PCs</a><br>[<b>1</b>]</th>\n";
@@ -225,14 +225,14 @@ if (mysql_num_rows($experiments_result)) {
     if ($idle)
         #      "<th width=4% align=center>Days Idle</th>\n";
 	echo "<th width=4% align=center>Slothd Info</th>
-              <th width=4% align=center>Swap Req.</th>\n";
+              <th width=4% align=center colspan=2>Swap Request</th>\n";
 
     echo "    <th width=60%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
-                  Name</th>
+                  Name</a></th>
               <th width=4%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
-                  Head UID</th>
+                  Head UID</a></th>
             </tr>\n";
 
     while ($row = mysql_fetch_array($experiments_result)) {
@@ -297,16 +297,18 @@ if (mysql_num_rows($experiments_result)) {
 	    $foo .= "<td align=center valign=center>\n";
  	    if ($inactive[$expt]==1 && $stale[$expt]!=1 &&
 	        !$slothderr && $pcs) {
-	      $foo .= "  <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\"> 
-  <img src=\"redball.gif\"></a>\n" ;
+	      $fooswap = "<td><a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
+			 "<img border=0 src=\"redball.gif\"></a></td>\n" ;
 	    } else {
+	      $fooswap = "<td></td>";
 	      if (!$pcs) { $foo .= "(no PCs)\n"; }
 	      else { $foo .="&nbsp;"; }
 	    }
 	    if ($swapreq > 0) {
-	      $foo .= "&nbsp;$swapreq&nbsp;sent ${lastswapreq}&nbsp;hrs&nbsp;ago\n";
+	      $foo .= "&nbsp;$swapreq&nbsp;sent<br />".
+	              "<font size=-2>(${lastswapreq}&nbsp;hours&nbsp;ago)</font>\n";
 	    }
-	    $foo .= "</td>\n"; 
+	    $foo .= "</td>" . $fooswap . "\n"; 
 	}
 
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
