@@ -431,7 +431,7 @@ CREATE TABLE node_types (
 
 CREATE TABLE nodeipportnum (
   node_id varchar(10) NOT NULL default '',
-  port smallint(5) unsigned NOT NULL default '5000',
+  port smallint(5) unsigned NOT NULL default '11000',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
