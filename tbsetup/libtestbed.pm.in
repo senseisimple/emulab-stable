@@ -23,7 +23,8 @@ use Fcntl;
 use IO::Handle;
 use File::Basename;
 
-my $MAILTAG  = "@OURDOMAIN@";
+#my $MAILTAG  = "@OURDOMAIN@";
+my $MAILTAG  = "@THISHOMEBASE@";
 my $BOSSNODE = "@BOSSNODE@";
 my $TIMESTAMPS = "@TIMESTAMPS@";
 my $TBOPSEMAIL = "@TBOPSEMAIL@";
