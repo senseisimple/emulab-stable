@@ -2962,8 +2962,17 @@ COMMAND_PROTOTYPE(dosfshostid)
 	 * the buffer.
 	 */
 	sprintf(buf, "%%%ds", sizeof(nodehostid));
-	if (! sscanf(rdata, buf, nodehostid)) {
+	if (sscanf(rdata, buf, nodehostid) != 1) {
 		error("dosfshostid: No hostid reported!\n");
+		return 1;
+	}
+
+	/*
+	 * No slashes allowed! This path is going into a symlink below. 
+	 */
+	if (index(nodehostid, '/')) {
+		error("dosfshostid: %s Invalid hostid: %s!\n",
+		      reqp->nodeid, nodehostid);
 		return 1;
 	}
 
@@ -2985,12 +2994,16 @@ COMMAND_PROTOTYPE(dosfshostid)
 	/*
 	 * Stash into the DB too.
 	 */
-	if (mydb_update("update nodes set sfshostid='%s' "
-			"where node_id='%s'", nodehostid, reqp->nodeid)) {
+	mysql_escape_string(buf, nodehostid, strlen(nodehostid));
+	
+	if (mydb_update("update node_hostkeys set sfshostid='%s' "
+			"where node_id='%s'", buf, reqp->nodeid)) {
 		error("SFSHOSTID: %s: DB Error setting sfshostid!\n",
 		      reqp->nodeid);
 		return 1;
 	}
+	if (verbose)
+		info("SFSHOSTID: %s: %s\n", reqp->nodeid, nodehostid);
 	return 0;
 }
 
@@ -3649,7 +3662,7 @@ mydb_query(char *query, int ncols, ...)
 int
 mydb_update(char *query, ...)
 {
-	char		querybuf[MYBUFSIZE];
+	char		querybuf[8 * 1024];
 	va_list		ap;
 	int		n;
 
@@ -3698,7 +3711,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,pt.class,pt.type, "
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
-				 " nv.sfshostid,e.eventkey,vt.isplabdslice, "
+				 " nk.sfshostid,e.eventkey,vt.isplabdslice, "
 				 " e.veth_encapsulate,ps.admin "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
@@ -3716,6 +3729,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " vt.type=nv.type "
 				 "left join plab_slices as ps on "
 				 " ps.pid=e.pid and ps.eid=e.eid "
+				 "left join node_hostkeys as nk on "
+				 " nk.node_id=nv.node_id "
 				 "where nv.node_id='%s' and i.IP='%s'",
 				 24, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
@@ -3726,7 +3741,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
-				 " n.sfshostid,e.eventkey,0, "
+				 " nk.sfshostid,e.eventkey,0, "
 				 " e.veth_encapsulate,0 "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
@@ -3736,6 +3751,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.pid=r.pid and e.eid=r.eid "
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
+				 "left join node_hostkeys as nk on "
+				 " nk.node_id=n.node_id "
 				 "where i.IP='%s'",
 				 24, inet_ntoa(ipaddr));
 	}
@@ -5052,9 +5069,90 @@ COMMAND_PROTOTYPE(dodoginfo)
 }
 
 /*
- * XXX implement me!
+ * XXX Stash ssh host keys into the DB. 
  */
 COMMAND_PROTOTYPE(dohostkeys)
 {
+#define MAXKEY		1024
+#define RSAV1_STR	"SSH_HOST_KEY='"
+#define RSAV2_STR	"SSH_HOST_RSA_KEY='"
+#define DSAV2_STR	"SSH_HOST_DSA_KEY='"
+	
+	char	*bp, rsav1[2*MAXKEY], rsav2[2*MAXKEY], dsav2[2*MAXKEY];
+	char	buf[MAXKEY];
+
+	printf("%s\n", rdata);
+
+	/*
+	 * The maximum key length we accept is 1024 bytes, but after we
+	 * run it through mysql_escape_string() it could potentially double
+	 * in size (although that is very unlikely).
+	 */
+	rsav1[0] = rsav2[0] = dsav2[0] = (char) NULL;
+
+	/*
+	 * Sheesh, perl string matching would be so much easier!
+	 */
+	bp = rdata;
+	while (*bp) {
+		char	*ep, *kp, *thiskey = (char *) NULL;
+		
+		while (*bp == ' ')
+			bp++;
+		if (! *bp)
+			break;
+
+		if (! strncasecmp(bp, RSAV1_STR, strlen(RSAV1_STR))) {
+			thiskey = rsav1;
+			bp += strlen(RSAV1_STR);
+		}
+		else if (! strncasecmp(bp, RSAV2_STR, strlen(RSAV2_STR))) {
+			thiskey = rsav2;
+			bp += strlen(RSAV2_STR);
+		}
+		else if (! strncasecmp(bp, DSAV2_STR, strlen(DSAV2_STR))) {
+			thiskey = dsav2;
+			bp += strlen(DSAV2_STR);
+		}
+		else {
+			error("HOSTKEYS: %s: Unexpected data (0) '%s'!\n",
+			      reqp->nodeid, bp);
+			return 1;
+		}
+		kp = buf;
+		ep = &buf[sizeof(buf) - 1];
+
+		/* Copy the part between the single quotes to the holding buf */
+		while (*bp && *bp != '\'' && kp < ep)
+			*kp++ = *bp++;
+		if (*bp != '\'') {
+			error("HOSTKEYS: %s: Unexpected data (1) '%s'!\n",
+			      reqp->nodeid, bp);
+			return 1;
+		}
+		bp++;
+		*kp = '\0';
+
+		/* Okay, turn into something for mysql statement. */
+		thiskey[0] = '\'';
+		mysql_escape_string(&thiskey[1], buf, strlen(buf));
+		strcat(thiskey, "'");
+	}
+	if (mydb_update("update node_hostkeys set "
+			"       sshrsa_v1=%s,sshrsa_v2=%s,sshdsa_v2=%s "
+			"where node_id='%s'",
+			(rsav1[0] ? rsav1 : "NULL"),
+			(rsav2[0] ? rsav2 : "NULL"),
+			(dsav2[0] ? dsav2 : "NULL"),
+			reqp->nodeid)) {
+		error("HOSTKEYS: %s: setting hostkeys!\n", reqp->nodeid);
+		return 1;
+	}
+	if (verbose) {
+		info("sshrsa_v1=%s,sshrsa_v2=%s,sshdsa_v2=%s\n",
+		     (rsav1[0] ? rsav1 : "NULL"),
+		     (rsav2[0] ? rsav2 : "NULL"),
+		     (dsav2[0] ? dsav2 : "NULL"));
+	}
 	return 0;
 }
