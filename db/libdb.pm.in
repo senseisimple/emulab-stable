@@ -150,6 +150,7 @@ use vars qw(@ISA @EXPORT);
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
+	 TBResolveNextOSID
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
 	 TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
@@ -1913,6 +1914,46 @@ sub TBOSCountInstances ($;@)
     my $current_count = $query_result->num_rows();
 
     return $current_count;
+}
+
+#
+# Resolve a 'generic' OSID (ie. FBSD-STD) to a real OSID
+#
+# Note: It's okay to call this function with a 'real' OSID, but it would be
+# waseful to do so.
+#
+# usage: TBResolveNextOSID(char *osid)
+# returns: The 'real' OSID that the OSID resolves to, or undef if there is a
+#          problem (ie. unknown OSID)
+#
+sub TBResolveNextOSID($)
+{
+    my ($osid) = @_;
+    my $next_osid = $osid;
+    my $input_osid = $osid;
+
+    my $count = 0;
+    do {
+	#
+	# Just a guard to make sure we don't end up in a loop
+	#
+	if ($count++ > 10) {
+	    warn "Resolving $input_osid: Circular reference\n";
+	}
+
+	$osid = $next_osid;
+	my $result = DBQueryWarn("select nextosid from os_info where
+	    osid='$osid';");
+
+	if ($result->num_rows() != 1) {
+	    warn "Resolving $input_osid: Unable to fetch os_info for $osid!\n";
+	    return undef;
+	}
+
+	($next_osid) = $result->fetchrow();
+    } while ($next_osid);
+    
+    return $osid;
 }
 
 #

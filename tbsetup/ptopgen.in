@@ -252,14 +252,15 @@ while (my ($osid,$type) = $result->fetchrow()) {
 # We also have to resolve the 'generic' OSIDs, which use the nextosid field to
 # redirect to another OSID
 #
-$result = DBQueryFatal("select osid, nextosid from os_info where " .
+$result = DBQueryFatal("select osid from os_info where " .
     "nextosid is not null");
-while (my ($osid, $nextosid) = $result->fetchrow()) {
+while (my ($osid) = $result->fetchrow()) {
     #
     # Check to see if they were allowed to use the real OSID
     #
-    if ($osid_node_types{$nextosid}) {
-	foreach my $type (@{$osid_node_types{$nextosid}}) {
+    my $realosid = TBResolveNextOSID($osid);
+    if ($osid_node_types{$realosid}) {
+	foreach my $type (@{$osid_node_types{$realosid}}) {
 	    push @{$node_type_osids{$type}}, $osid;
 	}
     }
