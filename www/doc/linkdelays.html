@@ -8,16 +8,27 @@
 </center>
 
 <h3>Per-Link Delays:</h3>
-In order to conserve nodes, it is possible (when using FreeBSD) to
+In order to conserve nodes, it is possible to
 specify that instead of doing traffic shaping on separate delay nodes
 (which eats up a node for every two links), it be done on the nodes
-that are actually generating the traffic. Just like normal delay
-nodes, end node (sometimes called per-link) traffix shaping uses IPFW
+that are actually generating the traffic. 
+
+Under FreeBSD, just like normal delay
+nodes, end node (sometimes called per-link) traffic shaping uses IPFW
 to direct traffic into the proper Dummynet pipe. On each node in a
 duplex link or lan, a set of ipfw rules and Dummynet pipes is
 setup. As traffic enters or leaves your node, ipfw looks at the packet
 and stuffs it into the proper Dummynet pipe. At the proper time,
-Dummynet takes the packet and sends it on its way. To specify this in
+Dummynet takes the packet and sends it on its way. 
+
+Under Linux, end node traffic shaping is performed by the packet
+scheduler modules, part of the kernel NET3 implementation.  Each
+packet is added to the appropriate scheduler queue tree and shaped as
+specified in your NS file.  Note that Linux traffic shaping currently
+only supports the drop-tail queueing discipline; gred and red are not
+available yet.
+
+To specify end node shaping in
 your NS file, simply setup a normal link or lan, and then mark it as
 wanting to use end node traffic shaping. For example:
     <code><pre>
@@ -27,16 +38,21 @@ wanting to use end node traffic shaping. For example:
     tb-set-endnodeshaping $link0 1
     tb-set-endnodeshaping $lan0 1		</code></pre>
 
-Please be aware though, that the kernel is different than the standard
-kernel in a couple of ways.
+Please be aware though, that the kernels are different than the standard
+ones in a couple of ways:
 <ul>
-<li> The kernel runs at a 1000HZ clockrate instead of 100HZ. That is,
-the timer interrupts 1000 times per second instead of 100. This finer
-granularity allows Dummynet to do a better job of scheduling packets.
+<li> The kernel runs at a 1000HZ (1024HZ in Linux) clockrate instead
+of 100HZ. That is, the timer interrupts 1000 (1024) times per second
+instead of 100. This finer granularity allows the traffic shapers to
+do a better job of scheduling packets.
 
-<li> IPFW and Dummynet are compiled into the kernel, which affects the
-network stack; all incoming and outgoing packets are sent into ipfw to
-be matched on.
+<li> Under FreeBSD, IPFW and Dummynet are compiled into the kernel,
+which affects the network stack; all incoming and outgoing packets are
+sent into ipfw to be matched on.  Under Linux, packet scheduling
+exists implicitly, but uses lightweight modules by default.
+
+<li> The packet timing mechanism in the linkdelay Linux kernel uses a
+slightly heavier (but more precise) method.
 
 <li> Flow-based IP forwarding is turned off. This is also known as
 IP <em>fast forwarding</em> in the FreeBSD kernel. Note that
@@ -56,7 +72,8 @@ after the experiment is swapped in, you can put this in your NS file:
     tb-force-endnodeshaping   1 	</code></pre>
 
 <h3>Multiplexed Links:</h3>
-Another feature we have added is <em>multiplexed</em> (sometimes called
+Another feature we have added (FreeBSD only) is <em>multiplexed</em> 
+(sometimes called
 <em>emulated</em>) links. An emulated link is one that can be multiplexed
 over a physical link along with other links. Say your
 experimental nodes have just 1 physical interface (call it fxp0), but
@@ -117,7 +134,7 @@ interfaces, without oversubscribing the 400Mbs aggregate bandwidth
 available to the node that is assigned to the router. <em> Note:
 while it may sound a little like channel bonding, it is not!</em>
 
-<h3>Technical Discussion:</h3>
+<h3>FreeBSD Technical Discussion:</h3>
 
 First, lets just look at what happens with per-link delays on a duplex
 link. In this case, an ipfw pipe is setup on each node. The rule for
@@ -203,3 +220,71 @@ out which flow a incoming packet is part of. When a packet arrives at
 an interface, there is nothing in the packet to indicate which IP
 alias the packet was intended for (or which it came from) when the
 packet is not destined for the local node (is being forwarded).
+
+<h3>Linux Technical Discussion</h3> 
+
+Traffic shaping under Linux uses the NET3 packet scheduling modules, a
+heirarchically composable set of disciplines providing facilities such
+as bandwith limiting, packet loss, and packet delay (the latter two
+are Emulab extensions).  As in the FreeBSD case, simplex (outgoing)
+link shaping is used on point-to-point links, while duplex shaping
+(going out, and coming in an interface) is used with LANs.  See the
+previous section to understand why this is done.
+
+<br>
+<br>
+Unlike FreeBSD, Linux traffic shaping modules must be connected
+directly to a network device, and hence don't require a firewall
+directive to place packets into them.  This means that all packets
+must pass through the shaping tree connected to a particular
+interface.  Note that filters may be used on the shapers themselvels
+to discriminate traffic flows, so its not strictly the case that all
+traffic must be shaped if modules are attached.  However, all traffic
+to an interface, at the least, is queued and dequeued through the root
+module of the shaping heirarchy.  And all interfaces have at least a
+root module, but it is normally just a fast FIFO.  Also of note is the
+fact that Linux traffic shaping normally only happens on the outgoing
+side of an interface, and requires a special virtual network device
+(known as an intermediate queueing device or IMQ) to capture incoming
+packets for shaping.  This also requires the aid of the Linux
+firewalling facility, iptables, to divert the packets to the IMQs
+prior to routing.  Here is an example duplex-link configuration with
+50Mbps of bandwidth, a 0.05 PLR, and 20ms of delay in both directions:
+
+<br>
+<br>
+Outgoing side setup commands:
+
+    <code><pre>
+    # implicitly sets up class 1:1
+    tc qdisc add dev eth0 root handle 1 plr 0.05
+
+    # attach to class 1:1 and tell the module the default place to send 
+    # traffic is to class 2:1 (could attach filters to discriminate)
+    tc qdisc add dev eth0 parent 1:1 handle 2 htb default 1
+
+    # class 2:1 does the actual limiting
+    tc class add dev eth0 parent 2 classid 2:1 htb rate 50Mbit ceil 50Mbit
+
+    # attach to class 2:1, also implicitly creates class 3:1, and attaches
+    # a FIFO queue to it.
+    tc qdisc add dev eth0 parent 2:1 handle 3 delay usecs 20000
+    </code></pre>
+
+The incoming side setup commands will look the same, but with eth0
+replaced by imq0.  Also, we have to tell the kernel to send packets
+coming into eth0 to imq0 (where they will be shaped): 
+
+    <code><pre>
+    iptables -t mangle -A PREROUTING -i eth0 -j IMQ --todev 0
+    </code></pre>
+
+A flood ping sequence utilizing eth0 (echo->echo-reply) would
+experience a round trip delay of 40 ms, be restricted to 50Mbit, and
+have a 10% chance of losing packets.  The doubling of numbers is due
+to shaping as packets go out, and come back in the interface.
+
+<br>
+<br>
+At the time of writing, we don't support multiplexed links under
+Linux, so no explicit matching against nexthop is necessary.
