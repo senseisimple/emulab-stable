@@ -9,6 +9,9 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 my @list = "";
 my $n=0;
 foreach my $mac ( @ARGV ) { 
+  $mac =~ s/^(\d):/0$1:/;
+  $mac =~ s/:(\d):/:0$1:/g;
+  $mac =~ s/://g;
   $list[$n] ="MAC='\L$mac'";
   $n++;
 }
