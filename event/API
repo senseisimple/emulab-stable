@@ -46,7 +46,7 @@
       #include <event.h>
 
       int event_notify(event_handle_t handle,
-                       event_notification notification);
+                       event_notification_t notification);
 
   Send the event notification NOTIFICATION.  NOTIFICATION is
   allocated by event_notification_alloc, and may optionally
@@ -59,7 +59,7 @@
       #include <event.h>
 
       int event_schedule(event_handle_t handle,
-                         event_notification notification,
+                         event_notification_t notification,
                          struct timeval *time);
 
   Schedule the event notification NOTIFICATION to be sent at time
