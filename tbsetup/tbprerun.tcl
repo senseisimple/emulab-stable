@@ -44,6 +44,16 @@ proc unlock {} {
     }
 }
 
+proc cleanup {} {
+    global pid eid nfree logFp
+    outs "Cleaning up and freeing resources!"
+    
+    if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp" err]} {
+        outs stderr "Error freeing resources. ($err)"
+	exit 1
+    }
+}
+
 ### Bootstrapping code.  The whole purpose of this is to find the
 # directory containing the script.
 set file [info script]
@@ -76,6 +86,7 @@ set avail "$updir/db/avail"
 set ptopgen "$updir/db/ptopgen"
 set ptopfile "/tmp/testbed[pid].ptop"
 set reserve "$updir/db/nalloc"
+set nfree "$updir/db/nfree"
 set libir "$scriptdir/ir/libir.tcl"
 set maxtries 5
 
@@ -192,12 +203,14 @@ while {$done == 0} {
 outs "Allocating IP addresses."
 if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error allocating IP addresses. ($err)"
+    cleanup
     exit 1
 }
 
 outs "Parsing OS information."
 if {[catch "exec $handle_os $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error parsing OS information. ($err)"
+    cleanup
     exit 1
 }
 
