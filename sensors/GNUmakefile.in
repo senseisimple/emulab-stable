@@ -1,0 +1,33 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= lib
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS	= slothd
+
+all:	$(SUBDIRS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+slothd:
+	@$(MAKE) -C slothd all
+
+install: 
+	@$(MAKE) -C slothd install
+
+clean:		subdir-clean
+
+subdir-clean:
+	@$(MAKE) -C slothd clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C slothd distclean
+
+.PHONY:	$(SUBDIRS)
