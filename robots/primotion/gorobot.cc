@@ -35,6 +35,8 @@ static int looping = 1;
 
 static int robot_id = -1;
 
+static float theta;
+
 static void sigquit(int signal)
 {
     looping = 0;
@@ -61,6 +63,7 @@ static void handle_client_packet(grobot &bot,
     case MTP_COMMAND_GOTO:
 	/* Record our robot id. */
 	robot_id = mp->data.command_goto->robot_id;
+	theta = mp->data.command_goto->position.theta;
 	bot.dgoto(mp->data.command_goto->position.x,
 		  mp->data.command_goto->position.y,
 		  mp->data.command_goto->position.theta);
@@ -262,7 +265,7 @@ int main(int argc, char *argv[])
 
 		mup.robot_id = robot_id;
 		bot.getDisplacement(mup.position.x, mup.position.y);
-		mup.position.theta = 0;
+		mup.position.theta = theta;
 		if (rc < 0) {
 		    mup.status = MTP_POSITION_STATUS_ERROR;
 		}

@@ -26,6 +26,10 @@ static int readall(int fd,char *buffer,unsigned int len)
   if (rc < 0) {
     retval = rc;
   }
+  else if (off == 0) {
+    errno = ENOTCONN;
+    retval = -1;
+  }
   else if (off != len) {
     errno = EIO;
     retval = -1;

@@ -22,7 +22,7 @@ CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 CFLAGS	       += -I${SRCDIR}/../mtp
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
-LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
+LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb
 
 LIBS	 += -lmtp -ltb
 
@@ -30,6 +30,10 @@ test_rmcd.sh: rmcd
 
 rmcd: rmcd.o ../mtp/libmtp.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ rmcd.o $(LIBS)
+
+install: all
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL_PROGRAM) rmcd $(INSTALL_DIR)/opsdir/sbin/rmcd
 
 clean:
 	rm -f *.o

@@ -258,6 +258,11 @@ static void handle_emc_packet(int emc_fd)
     else {
 	struct gorobot_conn *gc;
 	
+	if (debug) {
+	    fprintf(stderr, "emc packet: ");
+	    mtp_print_packet(stderr, mp);
+	}
+	
 	switch (mp->opcode) {
 	case MTP_COMMAND_GOTO:
 	    if ((gc = find_gorobot(mp->data.command_goto->robot_id)) == NULL) {
@@ -479,29 +484,39 @@ static void handle_gc_packet(struct gorobot_conn *gc, int emc_fd)
 	fatal("bad packet from gorobot!\n");
     }
     else if (mp->opcode == MTP_UPDATE_POSITION) {
-	struct mtp_update_position mup;
-	struct mtp_packet *ump;
 
-	/* Always update emcd and save the new estimated position. */
-	mup.robot_id = gc->gc_robot->id;
-	conv_r2a(&mup.position,
-		 &gc->gc_actual_pos,
-		 &mp->data.update_position->position);
-	gc->gc_actual_pos = mup.position;
-	gc->gc_flags &= ~GCF_VISION_POSITION;
-	mup.status = MTP_POSITION_STATUS_MOVING;
-	
-	if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
-				   MTP_ROLE_RMC,
-				   &mup)) == NULL) {
-	    fatal("cannot allocate packet");
+	if (debug) {
+	    fprintf(stderr, "gorobot packet: ");
+	    mtp_print_packet(stderr, mp);
 	}
-	else if (mtp_send_packet(emc_fd, ump) != MTP_PP_SUCCESS) {
-	    fatal("request id failed");
+
+	if ((mp->data.update_position->position.x != 0.0f) ||
+	    (mp->data.update_position->position.y != 0.0f) ||
+	    (mp->data.update_position->position.theta != 0.0f)) {
+	    struct mtp_update_position mup;
+	    struct mtp_packet *ump;
+	    
+	    /* Update emcd and save the new estimated position. */
+	    mup.robot_id = gc->gc_robot->id;
+	    conv_r2a(&mup.position,
+		     &gc->gc_actual_pos,
+		     &mp->data.update_position->position);
+	    gc->gc_actual_pos = mup.position;
+	    gc->gc_flags &= ~GCF_VISION_POSITION;
+	    mup.status = MTP_POSITION_STATUS_MOVING;
+	    
+	    if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
+				       MTP_ROLE_RMC,
+				       &mup)) == NULL) {
+		fatal("cannot allocate packet");
+	    }
+	    else if (mtp_send_packet(emc_fd, ump) != MTP_PP_SUCCESS) {
+		fatal("request id failed");
+	    }
+	    
+	    mtp_free_packet(ump);
+	    ump = NULL;
 	}
-	
-	mtp_free_packet(ump);
-	ump = NULL;
 	
 	switch (mp->data.update_position->status) {
 	case MTP_POSITION_STATUS_IDLE:
@@ -647,7 +662,7 @@ int main(int argc, char *argv[])
 	else
 	    loginit(1, "vmcclient");
     }
-  
+    
     if (pidfile) {
 	FILE *fp;
     

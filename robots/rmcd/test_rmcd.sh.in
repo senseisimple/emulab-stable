@@ -68,7 +68,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
     -w -i 1 -x 6 -y 7 -o 0.44 -C 1 command-goto
 
-check_output "init -> request-position failed?" <<EOF
+check_output "init -> command-goto failed?" <<EOF
 Packet: length 36; version 1; role 1
  opcode:	update-position
   id:		1
@@ -85,7 +85,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
     -w -i 1 -x 7 -y 8 -o 0.44 -C 1 command-goto
 
-check_output "init -> request-position failed?" <<EOF
+check_output "init -> command-goto (2) failed?" <<EOF
 Packet: length 36; version 1; role 1
  opcode:	update-position
   id:		1
@@ -106,7 +106,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
     -w -i 1 -x 7 -y 8 -o 0.44 -C 1 command-goto
 
-check_output "init -> request-position failed?" <<EOF
+check_output "init -> command-goto (3) failed?" <<EOF
 Packet: length 36; version 1; role 1
  opcode:	update-position
   id:		1

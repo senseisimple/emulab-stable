@@ -12,6 +12,8 @@
 
 grobot::grobot()
 {
+    dx_est = 0.0f;
+    dy_est = 0.0f;
 }
 
 grobot::~grobot()

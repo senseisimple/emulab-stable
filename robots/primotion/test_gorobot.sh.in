@@ -48,7 +48,7 @@ Packet: length 36; version 1; role 1
   id:		1
   x:		5.000000
   y:		7.000000
-  theta:	0.000000
+  theta:	1.200000
   status:	4
   timestamp:	0.000000
 Packet: length 36; version 1; role 1

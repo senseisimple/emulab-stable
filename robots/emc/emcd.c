@@ -67,7 +67,7 @@ static char *pideid;
 
 static char *progname;
 
-static int debug;
+static int debug = 0;
 
 static int port = EMC_SERVER_PORT;
 static int command_seq_no = 0;
@@ -290,7 +290,7 @@ int main(int argc, char *argv[])
     else
       loginit(1, "emcd");
   }
-
+  
   signal(SIGSEGV, sigpanic);
   signal(SIGBUS, sigpanic);
   
@@ -690,6 +690,11 @@ int unknown_client_callback(elvin_io_handler_t handler,
   mtp_packet_t *mp = NULL;
   int rc, retval = 0;
 
+  /*
+   * NB: We remove the handler before adding the new one because elvin calls
+   * FD_CLR(fd, ...) here and we do not want it clearing the bit after it was
+   * set by the add.
+   */
   elvin_sync_remove_io_handler(handler, eerror);
   
   if (((rc = mtp_receive_packet(fd, &mp)) != MTP_PP_SUCCESS) ||
@@ -758,6 +763,10 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	    error("unable to add rmc_callback handler");
 	  }
 	  else {
+	    if (debug) {
+	      info("established rmc connection\n");
+	    }
+	    
 	    // add descriptor to list, etc:
 	    rmc_data.sock_fd = fd;
 	    if (rmc_data.position_list == NULL)
@@ -784,6 +793,10 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	error("unable to add elvin io handler");
       }
       else {
+	if (debug) {
+	  info("established emulab connection\n");
+	}
+	
 	emulab_sock = fd;
 	
 	retval = 1;
@@ -845,9 +858,15 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	    error("unable to add vmc_callback handler");
 	  }
 	  else {
+	    if (debug) {
+	      info("established vmc connection\n");
+	    }
+	    
 	    // add descriptor to list, etc:
 	    vmc_data.sock_fd = fd;
-	    vmc_data.position_list = robot_list_create();
+	    if (vmc_data.position_list == NULL) {
+		vmc_data.position_list = robot_list_create();
+	    }
 
 	    retval = 1;
 	  }
@@ -885,13 +904,16 @@ int rmc_callback(elvin_io_handler_t handler,
   mtp_packet_t *mp = NULL;
   int rc, retval = 0;
 
-  info("rmc packet\n");
-  
   if (((rc = mtp_receive_packet(fd, &mp)) != MTP_PP_SUCCESS) ||
       (mp->version != MTP_VERSION)) {
     error("invalid client %p\n", mp);
   }
   else {
+    if (debug) {
+      fprintf(stderr, "rmc_callback: ");
+      mtp_print_packet(stderr, mp);
+    }
+    
     switch (mp->opcode) {
     case MTP_REQUEST_POSITION:
       {
@@ -904,8 +926,6 @@ int rmc_callback(elvin_io_handler_t handler,
 	struct mtp_update_position *rmc_up;
 	struct mtp_update_position up_copy;
 	struct mtp_packet *wb;
-	
-	info("request pos\n");
 	
 	vmc_up = (struct mtp_update_position *)
 	  robot_list_search(vmc_data.position_list, my_id);
@@ -961,13 +981,10 @@ int rmc_callback(elvin_io_handler_t handler,
 	*up_copy = *(mp->data.update_position);
 	robot_list_append(rmc->position_list, my_id, up_copy);
 
-	info("update pos\n");
-	
 	switch (mp->data.update_position->status) {
 	case MTP_POSITION_STATUS_ERROR:
 	case MTP_POSITION_STATUS_COMPLETE:
 	  if (emulab_sock != -1) {
-	    info("complete!\n");
 	    mtp_send_packet(emulab_sock, mp);
 	  }
 	  break;
@@ -1033,6 +1050,11 @@ int emulab_callback(elvin_io_handler_t handler,
     error("invalid client %p\n", mp);
   }
   else {
+    if (debug) {
+      fprintf(stderr, "emulab_callback: ");
+      mtp_print_packet(stderr, mp);
+    }
+    
     switch (mp->opcode) {
     case MTP_COMMAND_GOTO:
       if (rmc_data.sock_fd == -1) {
@@ -1146,6 +1168,11 @@ int vmc_callback(elvin_io_handler_t handler,
     error("invalid client %p\n", mp);
   }
   else {
+    if (debug) {
+      fprintf(stderr, "vmc_callback: ");
+      mtp_print_packet(stderr, mp);
+    }
+    
     switch (mp->opcode) {
     case MTP_UPDATE_POSITION:
       {
@@ -1163,10 +1190,6 @@ int vmc_callback(elvin_io_handler_t handler,
           malloc(sizeof(struct mtp_update_position));
         *up_copy = *(mp->data.update_position);
         robot_list_append(vmc->position_list, my_id, up_copy);
-        
-        info("update for %d %p\n",
-             my_id,
-             robot_list_search(vmc_data.position_list, my_id));
         
         // also, if status is MTP_POSITION_STATUS_COMPLETE || 
         // MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
@@ -1359,24 +1382,25 @@ int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
     error("could not re-add update callback\n");
   }
 
-  e = robot_list_enum(vmc_data.position_list);
-  while ((mup = (struct mtp_update_position *)
-	  robot_list_enum_next_element(e)) != NULL) {
-    struct emc_robot_config *erc;
-
-    erc = robot_list_search(hostname_list, mup->robot_id);
-    printf("update %s %f %f\n", erc->vname, mup->position.x, mup->position.y);
-    event_do(handle,
-	     EA_Experiment, pideid,
-	     EA_Type, TBDB_OBJECTTYPE_NODE,
-	     EA_Event, TBDB_EVENTTYPE_MODIFY,
-	     EA_Name, erc->vname,
-	     EA_ArgFloat, "X", mup->position.x,
-	     EA_ArgFloat, "Y", mup->position.y,
-	     EA_ArgFloat, "ORIENTATION", mup->position.theta,
-	     EA_TAG_DONE);
+  if (vmc_data.position_list) {
+    e = robot_list_enum(vmc_data.position_list);
+    while ((mup = (struct mtp_update_position *)
+	    robot_list_enum_next_element(e)) != NULL) {
+      struct emc_robot_config *erc;
+      
+      erc = robot_list_search(hostname_list, mup->robot_id);
+      event_do(handle,
+	       EA_Experiment, pideid,
+	       EA_Type, TBDB_OBJECTTYPE_NODE,
+	       EA_Event, TBDB_EVENTTYPE_MODIFY,
+	       EA_Name, erc->vname,
+	       EA_ArgFloat, "X", mup->position.x,
+	       EA_ArgFloat, "Y", mup->position.y,
+	       EA_ArgFloat, "ORIENTATION", mup->position.theta,
+	       EA_TAG_DONE);
+    }
+    robot_list_enum_destroy(e);
   }
-  robot_list_enum_destroy(e);
   
   return retval;
 }
