@@ -49,13 +49,15 @@ long CurrentFreeBlockSize ()
         return (block_range.end - block_range.ptr);
 }
 
-int BlockFree (long start, long end)
+int BlockFree (long start, long size)
 {
 
 /* called only for EXPLICIT_CKPT_DELETE. Shouldn't be called for 
    LAST_CKPT_AUTO_DELETE at all */
 
     struct FreeSpaceQueue* temp = head;
+    long end = (start + size) % shadow_size;
+    /*printf ("Freeing blocks %ld to %ld\n", start, end);*/
     while (temp != 0)
     {
         if (temp->start == (end + 1) % shadow_size)
@@ -79,7 +81,6 @@ long BlockAlloc (int size)
 {
     struct FreeSpaceQueue* temp = 0;
     long retVal;
-    printf ("\nCalling BlockAlloc\n");
     switch (reclaim_method)
     {
      case LAST_CKPT_AUTO_DELETE:
@@ -95,8 +96,8 @@ long BlockAlloc (int size)
      case EXPLICIT_CKPT_DELETE:
          while (CurrentFreeBlockSize () < size)
          {
-             printf ("size = %d, free_block_size = %d\n", size, CurrentFreeBlockSize());
-             printf ("end = %ld, ptr = %ld\n", block_range.end, block_range.ptr);
+             /*printf ("size = %d, free_block_size = %d\n", size, CurrentFreeBlockSize());
+             printf ("end = %ld, ptr = %ld\n", block_range.end, block_range.ptr);*/
              if (-1 == MergeWithNextFreeBlockRange ( CurrentFreeBlockSize() ))
              {
                  printf ("Error! No more free space on disk\n");     
@@ -107,7 +108,7 @@ long BlockAlloc (int size)
     }
     retVal = block_range.ptr;
     block_range.ptr += size;
-    printf ("Allocating %d blocks starting %d\n", size, retVal);
+    /*printf ("Allocating %d blocks starting %d\n", size, retVal);*/
     return retVal;
 }
 
