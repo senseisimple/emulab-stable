@@ -370,6 +370,7 @@ function SPITFORM($formfields, $returning, $errors)
               </td>
           </tr>\n";
 
+    if (0) {
     echo "<tr>
               <td colspan=2>*Estimated #of
         <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
@@ -381,11 +382,12 @@ function SPITFORM($formfields, $returning, $errors)
                          size=4>
               </td>
           </tr>\n";
+    }
 
     echo "<tr>
               <td colspan=2>*Estimated #of
         <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
-                             RON PCs</a>:</td>
+                             MIT Testbed PCs</a>:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_ronpcs]\"
@@ -627,7 +629,9 @@ if (!isset($formfields[proj_pcs]) ||
 }
 elseif (! ereg("^[0-9]+$", $formfields[proj_pcs])) {
     $errors["#of PCs"] = "Must be numeric";
+
 }
+if (0) {
 if (!isset($formfields[proj_plabpcs]) ||
     strcmp($formfields[proj_plabpcs], "") == 0) {
     $errors["#of Planetlab PCs"] = "Missing Field";
@@ -635,6 +639,7 @@ if (!isset($formfields[proj_plabpcs]) ||
 elseif (! ereg("^[0-9]+$", $formfields[proj_plabpcs])) {
     $errors["#of Planetlab PCs"] = "Must be numeric";
 }
+} 
 if (!isset($formfields[proj_ronpcs]) ||
     strcmp($formfields[proj_ronpcs], "") == 0) {
     $errors["#of RON PCs"] = "Missing Field";
@@ -765,7 +770,8 @@ $proj_funders      = addslashes($formfields[proj_funders]);
 $proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
 $proj_members      = $formfields[proj_members];
 $proj_pcs          = $formfields[proj_pcs];
-$proj_plabpcs      = $formfields[proj_plabpcs];
+#$proj_plabpcs      = $formfields[proj_plabpcs];
+$proj_plabpcs      = 0;
 $proj_ronpcs       = $formfields[proj_ronpcs];
 $proj_why	   = addslashes($formfields[proj_why]);
 $proj_expires      = date("Y:m:d", time() + (86400 * 120));
