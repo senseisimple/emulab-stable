@@ -1390,6 +1390,7 @@ CREATE TABLE widearea_nodeinfo (
   state tinytext,
   country tinytext,
   zip tinytext,
+  external_node_id tinytext,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 

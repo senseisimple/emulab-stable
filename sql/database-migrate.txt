@@ -140,7 +140,7 @@ last_net_act,last_cpu_act,last_ext_act);
        These fields had never been used, so the type change and init
        are okay.
 
-1.223: Create empty 'sitevariables' table with the following schema:
+1.123: Create empty 'sitevariables' table with the following schema:
 
        CREATE TABLE sitevariables (
          name text NOT NULL,
@@ -150,9 +150,19 @@ last_net_act,last_cpu_act,last_ext_act);
 	 KEY name (name(32))
        ) TYPE=MyISAM;
 
-1.224: Change address fields in widearea_nodeinfo to tinytext:
+1.124: Change address fields in widearea_nodeinfo to tinytext:
 
        ALTER TABLE widearea_nodeinfo CHANGE city city tinytext
        ALTER TABLE widearea_nodeinfo CHANGE state state tinytext
        ALTER TABLE widearea_nodeinfo CHANGE country country tinytext
        ALTER TABLE widearea_nodeinfo CHANGE zip zip tinytext
+
+1.125: Add 'external_node_id' field to widearea_nodeinfo.
+       This is pretty much a comment field for now; 
+       NULL is a safe value, but if a node is a RON node
+       "ron:" followed by the name of the node in the ron
+       hosts table (in the external-to-emulab ron db) is
+       the preferred value. (This may facilitate automatic
+       db synchronization later.)
+
+       ALTER TABLE widearea_nodeinfo ADD COLUMN external_node_id tinytext
