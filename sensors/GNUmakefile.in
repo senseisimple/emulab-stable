@@ -13,7 +13,12 @@ SUBDIRS	= slothd
 SYSTEM            := $(shell uname -s)
 
 ifeq ($(SYSTEM),FreeBSD)
+FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
+
+# XXX not on FreeBSD 5 til I get a chance to fix it
+ifneq ($(FBSDVERSION),FreeBSD5)
 SUBDIRS	+= canaryd
+endif
 endif
 
 ###############################################################################
