@@ -127,6 +127,7 @@ Node instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
+    var_import ::GLOBALS::enforce_user_restrictions
     
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
@@ -140,13 +141,22 @@ Node instproc updatedb {DB} {
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
-	if {$isvirt} {
+	if {$enforce_user_restrictions && $isvirt} {
 	    perror "You may not specify an OS for virtual nodes ($self)!"
 	    return
 	}
 	# Do not allow user to set os for host running virt nodes.
-	if {$virthost} {
+	if {$enforce_user_restrictions && $virthost} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
+	    return
+	}
+    }
+    #
+    # For now, restrict local virtnodes to edge nodes, not routers.
+    #
+    if {$type == "pcvm" && $enforce_user_restrictions} {
+	if {[llength $portlist] > 1} {
+	    perror "Virtual node $self must be an edge node (lans/links = 1)"
 	    return
 	}
     }
