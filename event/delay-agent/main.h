@@ -92,10 +92,10 @@
 /* Parameters for RED and gentle RED*/
 typedef struct {
   /* from ip_dummynet.h*/
-  int w_q ;               /* queue weight (scaled) */
+  double w_q ;               /* queue weight */
   int max_th ;            /* maximum threshold for queue (scaled) */
   int min_th ;            /* minimum threshold for queue (scaled) */
-  int max_p ;             /* maximum value for p_b (scaled) */
+  double max_p ;             /* maximum value for p_b */
 } structRed_params;
 
 /* link status*/   
