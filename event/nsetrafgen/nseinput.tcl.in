@@ -349,6 +349,11 @@ if { $simcode_present == 1 } {
 
     exec sysctl -w net.inet.ip.forwarding=0 net.inet.ip.fastforwarding=0
     
+    # Disabling and Enabling interfaces so that routes are all
+    # flushed and we can start cleanly
+    exec $CLIENTVARDIR/boot/rc.ifc disable
+    exec $CLIENTVARDIR/boot/rc.ifc enable
+
     # Now, we configure IPTaps for links between real and simulated nodes
     set i 0    
     
@@ -413,12 +418,6 @@ if { $simcode_present == 1 } {
 		set tbnodename [$srcnode set tbname]
 
 		if { [info exists tbroutes($tbnodename)] } {
-		    # We don't wanna be flushing the main
-		    # routing table's routes or we'll be
-		    # cutting off the control net.
-		    if { $rtabid > 0 } {
-			exec route flush -rtabid $rtabid
-		    }
 		    foreach route $tbroutes($tbnodename) {
 			set rt [split $route ":"]
 			set ip [lindex $rt 0]
