@@ -57,6 +57,7 @@ endif
 ifeq ($(SYSTEM),CYGWIN_NT-5.1)
 # Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
 MDSUBDIR  = cygwinxp
+TMSLIBS   += -lminires
 endif
 
 ifeq ($(EVENTSYS),1)
@@ -81,7 +82,7 @@ tmcc-shared: tmcc.c decls.h $(SSLOBJ)
 		$(LFLAGS) $(TMLIBS)
 
 tmcc-nossl: tmcc.c decls.h
-	$(CC) $(CFLAGS) -static -g -o tmcc-nossl $< $(LFLAGS)
+	$(CC) $(CFLAGS) -static -g -o tmcc-nossl $< $(LFLAGS) $(TMSLIBS)
 
 findif: findif.o
 	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static

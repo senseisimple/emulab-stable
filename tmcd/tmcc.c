@@ -49,7 +49,7 @@ typedef int socklen_t;
 #endif
 #ifndef _WIN32
 #  undef  BOSSNODE
-#  if !defined(BOSSNODE) && !defined(__CYGWIN__)
+#  if !defined(BOSSNODE)
 #    include <resolv.h>
 #  endif
 #endif
@@ -417,7 +417,7 @@ getbossnode(char **bossnode, int *portp)
 		}
 	}
 	
-#  if ! defined(_WIN32) && ! defined(__CYGWIN__)
+#  if ! defined(_WIN32)
 	{
 		/*
 		 * Nameserver goo 

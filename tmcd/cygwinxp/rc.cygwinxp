@@ -57,3 +57,13 @@ else
     # Change hostname and computername, rename My Computer, reboot on success.
     /usr/local/etc/emulab/WSName /N:$nodeid /REBOOT /MCN
 fi
+
+# Sometimes the network stack gets out of sync: 'ipconfig /all' reports different
+# status on the interfaces than 'netsh interface show interface'.  This might help.
+netsh interface reset all
+
+# Windows DHCP doesn't make a /etc/resolv.h, which tmcc needs for bossinfo.
+# Make one from nslookup output.
+ipconfig /all | awk \
+    '/^ *Connection-specific DNS Suffix/{print "search", $NF} \
+     /^ *DNS Servers/{print "nameserver", $NF}' > /etc/resolv.conf
