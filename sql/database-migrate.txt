@@ -2141,3 +2141,8 @@ last_net_act,last_cpu_act,last_ext_act);
        appropriate place in reserved.  Then do:
 
 	alter table nodes drop column cnet_vlan;
+
+1.285: More firewall state.  Possibly temporary hack, store unique vlan
+       ID in firewalls table:
+
+	alter table firewalls add vlanid int(11) default NULL;

@@ -411,6 +411,7 @@ CREATE TABLE firewalls (
   type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
   style enum('open','closed','basic') NOT NULL default 'basic',
   vlan int(11) default NULL,
+  vlanid int(11) default NULL,
   PRIMARY KEY  (pid,eid,fwname),
   KEY vlan (vlan)
 ) TYPE=MyISAM;
