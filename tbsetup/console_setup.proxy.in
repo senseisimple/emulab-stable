@@ -100,7 +100,8 @@ foreach my $node ( keys %nodepid ) {
     kill('USR1', $procid) or
 	die("Could not signal(USR1) process $procid for log $filename");
     # Give capture the chance to react.
-    sleep(1);
+    # Don't use sleep cause 1 second too long wait when doing 25 nodes!
+    select(undef, undef, undef, 0.2);
 
     #
     # If the file does not exist, touch it. We have this problem with

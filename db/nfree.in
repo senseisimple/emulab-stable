@@ -209,21 +209,26 @@ if ( @reloaded > 0 ) {
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
 
-my @sharks=();
-
-foreach $n ( @freed_nodes ) {
-  if ($n =~ /(sh\d+)/) {
-    # Its a shark - do the shelf if it hasn't been done yet
-    my $shelf = $1;
-    if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
-      push (@sharks,$shelf);
-      system("$consetup $shelf") == 0 or
-	print STDERR "WARNING: $consetup $shelf failed!\n";
+if (@freed_nodes) {
+    my @conlist=();
+    my @sharks=();
+    
+    foreach $n ( @freed_nodes ) {
+	if ($n =~ /(sh\d+)/) {
+	    # Its a shark - do the shelf if it hasn't been done yet
+	    my $shelf = $1;
+	    if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
+		push(@sharks,$shelf);
+		push(@conlist,$shelf);
+	    }
+	}
+	else {
+	    push(@conlist,$n);
+	}
     }
-  } else {
-    system("$consetup $n") == 0 or
-      print STDERR "WARNING: $consetup $n failed!\n";
-  }
+    system("$consetup @conlist") == 0 or
+	print STDERR "WARNING: $consetup @conlist failed!\n";
 }
 
 exit($error);
+
