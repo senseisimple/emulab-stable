@@ -26,6 +26,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 #
 sub fatal($);
 sub ntpstart();
+sub ntpdate();
 
 #
 # Turn off line buffering on output
@@ -45,6 +46,7 @@ my $newfile     = "/tmp/ntp.conf.new";
 my $ntpfile     = "/etc/ntp.conf";
 my $driftfile   = "/etc/ntp.drift";
 my $pidfile	= "/var/run/ntpd.pid";
+my $ntpdate     = "/usr/sbin/ntpdate";
 my $debug       = 0;
 
 #
@@ -57,6 +59,37 @@ sub ntpstart () {
     }
     system("@ARGV");
     return ($? >> 8);
+}
+
+#
+# Run ntpdate to get the time set correctly before starting ntpd
+#
+sub ntpdate() {
+    #
+    # We need to give -b to set time directly (instead of using adjtime()), and
+    # give the boss node's name
+    #
+    my ($bossname) = split(" ", `tmcc bossinfo`);
+    my $ntpcmd = "$ntpdate -b -s ";
+    if (REMOTE()) {
+	$ntpcmd .= "-t 5 ";
+    }
+    $ntpcmd .= "$bossname";
+
+    if ($debug) {
+	print "$ntpcmd\n";
+	return 0;
+    }
+    system("$ntpcmd");
+    return ($? >> 8);
+}
+
+#
+# First, run ntpdate so that we start out with the time set correctly. If
+# it fails, we just warn about it, and let things continue anyway
+#
+if (ntpdate()) {
+    warn "WARNING: ntpdate failed!\n";
 }
 
 #
