@@ -202,10 +202,10 @@ if ($newprefix || $addnumber) {
 	    $prefix = $matches[1];
 	    $number = $matches[2];
 	    if ($addnumber) {
-	        if (is_string($number)) {
-		    $number = chr(ord($number) + $addnumber);
-		} else {
+	        if (is_numeric($number)) {
 		    $number = $number + $addnumber;
+		} else {
+		    $number = chr(ord($number) + $addnumber);
 		}
 	    }
 	    if ($newprefix) {
