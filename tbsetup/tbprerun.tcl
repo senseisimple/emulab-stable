@@ -1,5 +1,19 @@
 #!/usr/local/bin/tclsh
 
+proc outs {args} {
+    global logFp
+    if {[llength $args] == 1} {
+	set out stdout
+	set s [lindex $args 0]
+    } else {
+	set out [lindex $args 0]
+	set s [lindex $args 1]
+    }
+    
+    puts $out $s
+    puts $logFp $s
+}
+
 if {[file dirname [info script]] == "."} {
     set updir ".."
 } else {
@@ -24,35 +38,37 @@ if {[catch "open $logFile w" logFp]} {
     exit 1
 }
 
-puts "Input: $nsFile"
-puts "Output: $irFile"
-puts "Log: $logFile"
+outs "Input: $nsFile"
+outs "Output: $irFile"
+outs "Log: $logFile"
+outs ""
+outs "Beginning Testbed pre run for $nsFile. [clock format [clock seconds]]"
 
 if {! [file exists $nsFile]} {
-    puts stderr "$nsFile does not exist"
+    outs stderr "$nsFile does not exist"
     exit 1
 }
 
-puts "Parsing ns input."
+outs "Parsing ns input."
 if {[catch "exec $ns2ir $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
-    puts stderr "Error parsing ns input. ($err)"
+    outs stderr "Error parsing ns input. ($err)"
     exit 1
 }
 if {! [file exists $irFile]} {
-    puts stderr "$irFile not generated.  Make sure you have a 'run' command in your ns file."
+    outs stderr "$irFile not generated.  Make sure you have a 'run' command in your ns file."
     exit 1
 }
 
-puts "PLACEHOLDER - Determining available resources."
+outs "PLACEHOLDER - Determining available resources."
 
-puts "Allocating resources - This may take a while."
+outs "Allocating resources - This may take a while."
 if {[catch "exec $assign $irFile >@ $logFp 2>@ $logFp" err]} {
-    puts stderr "Error allocating resources. ($err)"
+    outs stderr "Error allocating resources. ($err)"
     exit 1
 }
 
-puts "PLACEHODLER - Reserving resources."
+outs "PLACEHODLER - Reserving resources."
 
-puts "Setup finished - $irFile generated."
+outs "Setup finished - $irFile generated."
 
 

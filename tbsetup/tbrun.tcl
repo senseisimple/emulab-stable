@@ -1,5 +1,20 @@
 #!/usr/local/bin/tclsh
 
+
+proc outs {args} {
+    global logFp
+    if {[llength $args] == 1} {
+	set out stdout
+	set s [lindex $args 0]
+    } else {
+	set out [lindex $args 0]
+	set s [lindex $args 1]
+    }
+    
+    puts $out $s
+    puts $logFp $s
+}
+
 if {[file dirname [info script]] == "."} {
     set updir ".."
 } else {
@@ -17,32 +32,34 @@ set t [split $nsFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set logFile "$prefix.log"
 
-if {[catch "open $logFile w" logFp]} {
+if {[catch "open $logFile a+" logFp]} {
     puts stderr "Could not open $logFile for writing."
     exit 1
 }
 
-puts "Input: $irFile"
-puts "Log: $logFile"
+outs "Input: $irFile"
+outs "Log: $logFile"
 
 if {! [file exists $irFile]} {
-    puts stderr "$irFile does not exist"
+    outs stderr "$irFile does not exist"
     exit 1
 }
 
-puts "Setting up VLANs"
+outs "Beginning Testbed run for $irFile. [clock format [clock seconds]]"
+
+outs "Setting up VLANs"
 
 if {[catch "exec $snmpit $irFile >@ $logFp 2>@ $logFp" err]} {
-    puts stderr "Error running $smpit. ($err)"
+    outs stderr "Error running $smpit. ($err)"
     exit 1
 }
 
-puts "PLACEHOLDER - Verifying virtual network."
-puts "PLACEHOLDER - Copying disk images."
-puts "PLACEHOLDER - Booting for the first time."
-puts "PLACEHOLDER - Verifyin OS functionality."
-puts "PLACEHOLDER - Setting up interfaces."
-puts "PLACEHOLDER - Installing secondary pacakages."
-puts "PLACEHOLDER - Rebooting."
-puts "Testbed ready for use."
+outs "PLACEHOLDER - Verifying virtual network."
+outs "PLACEHOLDER - Copying disk images."
+outs "PLACEHOLDER - Booting for the first time."
+outs "PLACEHOLDER - Verifyin OS functionality."
+outs "PLACEHOLDER - Setting up interfaces."
+outs "PLACEHOLDER - Installing secondary pacakages."
+outs "PLACEHOLDER - Rebooting."
+outs "Testbed ready for use."
 
