@@ -2318,3 +2318,18 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table switch_stacks drop primary key;
 	alter table switch_stacks add index (node_id);
 	alter table switch_stacks add column (is_primary tinyint(1) not null default '1');
+
+1.301: Add node history table at Mike's request to track what
+       experiments are assigned to over time.
+
+	CREATE TABLE node_history (
+	  history_id int(10) unsigned NOT NULL auto_increment,
+	  node_id varchar(32) NOT NULL default '',
+	  op enum('alloc','free','move') NOT NULL default 'alloc',
+	  uid varchar(8) NOT NULL default '',
+	  exptidx int(10) unsigned default NULL,
+	  stamp int(10) unsigned default NULL,
+	  PRIMARY KEY  (history_id),
+	  KEY node_id (node_id)
+	) TYPE=MyISAM;
+

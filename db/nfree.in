@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -328,6 +328,9 @@ foreach my $n (@freed_nodes) {
 		    "vname='$n' where node_id='$n'")
 	    || $error++;
 	
+	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
+			 $next_pid, $next_eid);
+	
 	DBQueryWarn("delete from next_reserve where node_id='$n'")
 	    || $error++;
 
@@ -352,6 +355,9 @@ foreach my $n (@freed_nodes) {
 	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".
 		    "vname='$n' where node_id='$n'") || $error++;
 
+	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
+			 $reloadpid, $pendingeid);
+
 	# This little sillyness is for disk reloading.
 	# Kill the last reservation since this path is special.
 	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
@@ -373,6 +379,8 @@ foreach my $n (@freed_nodes) {
     print "Releasing node '$n' ... ";
     if (DBQueryWarn("delete from reserved where node_id='$n'")) {
 	print "Succeeded.\n";
+	
+	TBSetNodeHistory($n, TB_NODEHISTORY_OP_FREE, $UID, $pid, $eid);
     }
     else {
 	print "Failed!\n";

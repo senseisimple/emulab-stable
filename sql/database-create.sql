@@ -906,6 +906,21 @@ CREATE TABLE node_features (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_history`
+--
+
+CREATE TABLE node_history (
+  history_id int(10) unsigned NOT NULL auto_increment,
+  node_id varchar(32) NOT NULL default '',
+  op enum('alloc','free','move') NOT NULL default 'alloc',
+  uid varchar(8) NOT NULL default '',
+  exptidx int(10) unsigned default NULL,
+  stamp int(10) unsigned default NULL,
+  PRIMARY KEY  (history_id),
+  KEY node_id (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_hostkeys`
 --
 

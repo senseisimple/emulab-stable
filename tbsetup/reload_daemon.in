@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -312,6 +312,11 @@ while (1) {
 	    next;
 	} else {
 	    print "Pending nodes moved to $RELOADEID at ".`date`;
+
+	    foreach my $n (@pending_list) {
+		TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
+				 $RELOADPID, $RELOADEID);
+	    }
 	}
 	# It is now safe to clear this.
 	@retry_list = ();

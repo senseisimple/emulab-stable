@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -203,6 +203,10 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED
 
 	 TBExptSetPanicBit TBExptGetPanicBit TBExptClearPanicBit
+
+	 TB_NODEHISTORY_OP_FREE TB_NODEHISTORY_OP_ALLOC TB_NODEHISTORY_OP_MOVE
+	 TBSetNodeHistory
+
 	 );
 
 # Must come after package declaration!
@@ -452,6 +456,11 @@ sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
 sub TB_NODELOGTYPE_MISC		{ "misc"; }
 sub TB_NODELOGTYPES()		{ ( TB_NODELOGTYPE_MISC ) ; }
 sub TB_DEFAULT_NODELOGTYPE()	{ TB_NODELOGTYPE_MISC; }
+
+# Node History Stuff.
+sub TB_NODEHISTORY_OP_FREE	{ "free"; }
+sub TB_NODEHISTORY_OP_ALLOC	{ "alloc"; }
+sub TB_NODEHISTORY_OP_MOVE	{ "move"; }
 
 # Reload Types.
 sub TB_RELOADTYPE_NETDISK()	{ "netdisk"; }
@@ -2667,6 +2676,8 @@ sub MarkPhysNodeDown($)
 		 "where node_id='$pnode'");
 
     DBQueryFatal("unlock tables");
+
+    TBSetNodeHistory($pnode, TB_NODEHISTORY_OP_MOVE, $UID, $pid, $eid);
 }
 
 #
@@ -4726,6 +4737,25 @@ sub TBGetUniqueIndex($)
     DBQueryFatal("unlock tables");
 
     return $curidx;
+}
+
+sub TBSetNodeHistory($$$$$)
+{
+    my ($nodeid, $op, $uid, $pid, $eid) = @_;
+    my $exptidx;
+
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return 0;
+    }
+    if ($uid =~ /^[0-9]+$/) {
+	$uid = ($uid == 0 ? "root" : MapNumericUID($uid));
+    }
+    
+    return DBQueryWarn("insert into node_history set ".
+		       "  history_id=0, node_id='$nodeid', op='$op', ".
+		       "  uid='$uid', stamp=UNIX_TIMESTAMP(now()), ".
+		       "  exptidx=$exptidx");
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

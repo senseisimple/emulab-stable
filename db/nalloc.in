@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -76,6 +76,7 @@ my $noalloc	  = 0;
 my @vals	  = ();
 my @nodes	  = ();
 my @need_consetup = 0;
+my @need_history  = ();
 
 TBDebugTimeStamp("nalloc started");
 #
@@ -153,6 +154,10 @@ foreach my $n (@node_names) {
 	    next;
 	}
     }
+    else {
+	# Freshly allocated nodes need a history entry.
+	push(@need_history, $n);
+    }
 
     #
     # Add info the list of nodes to reserve; done in a single query below.
@@ -183,6 +188,8 @@ TBDebugTimeStamp("nalloc allocated all nodes");
 DBQueryFatal("unlock tables");
 TBDebugTimeStamp("nalloc unlocked tables");
 
+# Okay, not safe to do this
+
 # Update node_activity table; no need to do this with tables locked.
 if (!$error && (!$noalloc || $partial) && @nodes) {
     print "Resetting node activity\n"
@@ -193,6 +200,10 @@ if (!$error && (!$noalloc || $partial) && @nodes) {
 		"where " . join(" or ",map("node_id='$_'", @nodes)));
 
     TBDebugTimeStamp("nalloc updated node_activity table");
+
+    foreach my $n (@need_history) {
+	TBSetNodeHistory($n, TB_NODEHISTORY_OP_ALLOC, $UID, $pid, $eid);
+    }
 }
 
 # Now setup consoles if needed.
