@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -267,17 +267,6 @@ while (my %row = $db_result->fetchhash()) {
 	}
     }
 
-    #
-    # XXX - Check for existence of the delta files. We do this here
-    # cause its easier than looking for a failure later, when the node
-    # tries to install the delta. Not a general solution though. Needs
-    # more thought.
-    #
-    foreach my $delta (split(":", $row{'deltas'})) {
-	if (! -f $delta) {
-	    die_noretry("*** Delta file $delta for node $node does not exist!");
-	}
-    }
     #
     # XXX - Ditto for RPMs.
     #

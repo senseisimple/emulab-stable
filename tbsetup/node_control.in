@@ -43,7 +43,6 @@ my %controlset =
  startup_command	=> [0, 0, "startupcmd",		"startupcmd",0, ""],
  tarfiles		=> [0, 1, "tarballs",		"tarfiles",  0, ""],
  rpms			=> [0, 1, "rpms",		"rpms",      0, ""],
- deltas			=> [0, 1, "deltas",		"deltas",    0, ""],
  next_boot_osid         => [1, 0, "next_boot_osid",     undef,       1, "-1"],
  next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef,       0, ""],
  temp_boot_osid         => [1, 0, "temp_boot_osid",     undef,       1, "-t"],

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -198,9 +198,6 @@ if ($shownodes) {
 	}
 	if ($rpms ne "") {
 	    printf "   %-17s %s\n", "RPMS:", $rpms;
-	}
-	if ($deltas ne "") {
-	    printf "   %-17s %s\n", "Deltas:", $deltas;
 	}
 	if ($tarfiles ne "") {
 	    printf "   %-17s %s\n", "Tarfiles:", $tarfiles;
