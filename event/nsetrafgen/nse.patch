@@ -515,7 +515,7 @@
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
 +CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD -DGETTIME_TSC
-+LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
++LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
 +####
