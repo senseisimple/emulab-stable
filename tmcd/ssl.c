@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -414,8 +414,9 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 	 */
 #if 1
 	if (!islocal &&
-	    strcmp(unitname, "pcwa") && strcmp(unitname, "pcron")) {
-		error("sslverify: unitname mismatch: %s!=pcwa|pcron\n",
+	    strcmp(unitname, "pcwa") && strcmp(unitname, "pcron")
+	    strcmp(unitname, "pcplab")) {
+		error("sslverify: unitname mismatch: %s!=pcwa|pcron|pcplab\n",
 		      unitname, type);
 		return -1;
 	}
