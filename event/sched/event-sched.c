@@ -48,13 +48,16 @@ main(int argc, char **argv)
 	event_handle_t handle;
 	char *server = NULL;
 	char *port = NULL;
+	char *log = NULL;
 	char buf[BUFSIZ];
 	int c, count;
+
+	progname = argv[0];
 
 	/* Initialize event queue semaphores: */
 	sched_event_init();
 
-	while ((c = getopt(argc, argv, "s:p:d")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:dl:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug = 1;
@@ -64,6 +67,9 @@ main(int argc, char **argv)
 			break;
 		case 'p':
 			port = optarg;
+			break;
+		case 'l':
+			log = optarg;
 			break;
 		default:
 			fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
@@ -78,7 +84,10 @@ main(int argc, char **argv)
 	pid = argv[0];
 	eid = argv[1];
 
-	loginit("event-sched", !debug);
+	if (debug)
+		loginit(0, log);
+	else
+		loginit(1, "event-sched");
 
 	/*
 	 * Set up DB state.
@@ -125,6 +134,8 @@ main(int argc, char **argv)
 	if (event_subscribe(handle, enqueue, tuple, NULL) == NULL) {
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
+
+	daemon(1, 1);
 
 	/*
 	 * Hacky. Need to wait until all nodes in the experiment are

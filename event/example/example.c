@@ -57,7 +57,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	loginit("sample", 0);
+	loginit(0, 0);
 
 	/*
 	 * Get our IP address. Thats how we name ourselves to the

@@ -61,7 +61,11 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	loginit("tbmevd", !debug);
+	if (debug)
+		loginit(0, 0);
+	else
+		loginit(1, "tbmevd");
+
 
 	/*
 	 * Set up DB state.

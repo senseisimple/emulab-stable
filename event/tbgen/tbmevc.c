@@ -62,7 +62,8 @@ main(int argc, char **argv)
 
 	if (argc != 1)
 		usage();
-	loginit("tbmevc", 0);
+	
+	loginit(0, 0);
 
 	/*
 	 * Uppercase event tags for now. Should be wired in list instead.
