@@ -20,12 +20,13 @@ $isadmin = ISADMIN($uid);
 #
 if ($isadmin) {
     $query_result = mysql_db_query($TBDBNAME,
-	"select pid,eid,expt_name from experiments");
+	"select pid,eid,expt_name from experiments order by pid,eid");
 }
 else {
     $query_result = mysql_db_query($TBDBNAME,
 	"select e.pid,eid,expt_name from experiments as e ".
-	"left join proj_memb as p on p.pid=e.pid where p.uid='$uid'");
+	"left join proj_memb as p on p.pid=e.pid where p.uid='$uid' ".
+	"order by e.pid,eid");
 }
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no experiments to ".

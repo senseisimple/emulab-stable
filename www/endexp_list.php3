@@ -17,7 +17,8 @@ LOGGEDINORDIE($uid);
 #
 $query_result = mysql_db_query($TBDBNAME,
 	"select e.pid,eid,expt_name from experiments as e ".
-	"left join proj_memb as p on p.pid=e.pid where p.uid='$uid'");
+	"left join proj_memb as p on p.pid=e.pid where p.uid='$uid' ".
+	"order by e.pid,eid");
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no experiments running in any of the projects ".

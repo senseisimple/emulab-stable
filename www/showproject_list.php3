@@ -28,11 +28,11 @@ $isadmin = ISADMIN($uid);
 #
 if ($isadmin) {
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects");
+	"SELECT * FROM projects order by pid");
 }
 else {
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects where head_uid='$uid'");
+	"SELECT * FROM projects where head_uid='$uid' order by pid");
 }
 if (! $query_result) {
     $err = mysql_error();
