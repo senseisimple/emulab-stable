@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -96,11 +96,11 @@ foreach my $node (@nodes) {
     # Determine the unix group for the node. 
     #
     $db_result =
-	DBQueryFatal("select g.unix_name from groups as g ".
-		     "left join experiments as e ".
-		     " on g.pid=e.pid and g.gid=e.gid ".
-		     "left join reserved as r ".
-		     " on e.pid=r.pid and e.eid=r.eid ".
+	DBQueryFatal("select g.unix_name from reserved as r ".
+		     "left join experiments as e on ".
+		     " r.pid=e.pid and r.eid=e.eid ".
+		     "left join groups as g on ".
+		     " g.pid=e.pid and g.gid=e.gid ".
 		     "where r.node_id='$node'");
 
     if ($db_result->numrows > 0) {
