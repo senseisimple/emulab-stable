@@ -1741,3 +1741,6 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table interfaces change current_speed \
               current_speed enum('0','10','100','1000') \
 	      NOT NULL default '0';
+
+1.263: I fixed typo in previous revision; nothing to do, skip to next
+       entry.
