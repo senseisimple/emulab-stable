@@ -44,7 +44,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 14; };
+sub TMCD_VERSION()	{ 15; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -806,7 +806,7 @@ sub doifconfig (;$)
     $ethpat    .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" IFACE=(\w*));
 
     my $vethpat = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) ID=(\d*) );
-    $vethpat   .= q(VMAC=(\w*) PMAC=(\w*));
+    $vethpat   .= q(VMAC=(\w*) PMAC=(\w*) RTABID=(\d*) ENCAPSULATE=(\d*));
 
     foreach my $iface (@tmccresults) {
 	my $ifacebak = $iface;
@@ -855,7 +855,7 @@ sub doifconfig (;$)
 
 		my ($upline, $downline) =
 		    os_ifconfig_line($iface, $inet, $mask,
-				     $speed, $duplex, $aliases,$rtabid);
+				     $speed, $duplex, $aliases, $rtabid);
 		    
 		$upcmds   .= "$upline\n    "
 		    if (defined($upline));
@@ -882,6 +882,8 @@ sub doifconfig (;$)
 	    my $id       = $4;
 	    my $vmac     = $5;
 	    my $pmac     = $6; 
+	    my $nrtabid  = $7;
+	    my $encap    = $8;
 
 	    if (JAILED()) {
 		if ($iface = findiface($vmac)) {
@@ -889,11 +891,23 @@ sub doifconfig (;$)
 		}
 		next;
 	    }
+
+	    #
+	    # A bit of history.
+	    #
+	    # Route table IDs were originally computed locally for
+	    # vnodes and passed into this function.  When simnodes
+	    # came along, we changed it so that rtabids were generated
+	    # on boss and stored in the DB.  Til we have a chance to
+	    # reconcile this, we ignore the rtabid returned for vnodes
+	    # and only use it for simnodes.
+	    #
+	    # Also ensure that encapsulation is always used for simnodes
+	    # til we get a chance to revisit that!
+	    #
 	    if (SIMHOST()) {
-		my $rtabpat = q(RTABID=(\d*));
-		if ($ifacebak =~ /$rtabpat/) {
-		    $rtabid = $1;
-		}
+		$rtabid = $nrtabid;
+		$encap = 1;
 	    }
 
 	    if ($pmac eq "none" ||
@@ -902,7 +916,8 @@ sub doifconfig (;$)
 		    if (defined($iface));
 
 		my ($upline, $downline) =
-		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,$rtabid);
+		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,
+				     $rtabid, $encap);
 		    
 		$upcmds   .= "$upline\n    ";
 		$upcmds   .= TMROUTECONFIG . " $inet up\n    ";

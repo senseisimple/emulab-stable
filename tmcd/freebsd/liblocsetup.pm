@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -188,9 +188,9 @@ sub os_ifconfig_line($$$$$$;$)
 #
 # Specialized function for configing locally hacked veth devices.
 #
-sub os_ifconfig_veth($$$$$;$)
+sub os_ifconfig_veth($$$$$;$$)
 {
-    my ($iface, $inet, $mask, $id, $vmac, $rtabid) = @_;
+    my ($iface, $inet, $mask, $id, $vmac, $rtabid, $encap) = @_;
     my ($uplines, $downlines);
 
     #
@@ -229,6 +229,14 @@ sub os_ifconfig_veth($$$$$;$)
     }
 
     $uplines  .= "$IFCONFIGBIN veth${id} inet $inet netmask $mask";
+
+    #
+    # link1 on the veth device implies no encapsulation
+    #
+    if (!$encap) {
+	$uplines .= " link1";
+    }
+
     $downlines = "$IFCONFIGBIN veth${id} down\n    ".
 	         "$IFCONFIGBIN veth${id} destroy";
     return ($uplines, $downlines);
