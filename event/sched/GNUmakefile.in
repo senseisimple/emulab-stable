@@ -66,19 +66,19 @@ DEPS = \
 	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
 	../lib/event.h
 
-queue.o:		$(DEPS)
-listNode.o:		$(DEPS)
-error-record.o:		$(DEPS)
-local-agent.o:		$(DEPS)
-group-agent.o:		$(DEPS)
-simulator-agent.o:	$(DEPS)
-node-agent.o:		$(DEPS)
-event-sched_rpc.o:	$(DEPS)
+queue.o:		queue.c $(DEPS)
+listNode.o:		listNode.c $(DEPS)
+error-record.o:		error-record.c $(DEPS)
+local-agent.o:		local-agent.c $(DEPS)
+group-agent.o:		group-agent.c $(DEPS)
+simulator-agent.o:	simulator-agent.cc $(DEPS)
+node-agent.o:		node-agent.cc $(DEPS)
+event-sched_rpc.o:	event-sched.c $(DEPS)
 	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
 rpc.o:			rpc.cc rpc.h event-sched.h
 	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
 
-rrpc.o:			$(DEPS)
+rrpc.o:			rpc.cc $(DEPS)
 	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
 install: event-sched_rrpc
