@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -47,7 +47,7 @@ echo "<tr>
                       </center></td>
 
           <td rowspan>
-              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"51200\">
+              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"512000\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               <br>
               <br>

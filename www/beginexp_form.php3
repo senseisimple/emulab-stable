@@ -377,7 +377,7 @@ function SPITFORM($formfields, $errors)
                       <td class='pad4'>Upload<br>
 			<font size='-1'>(50k&nbsp;max)</font></td>
                       <td class='pad4'>
-                        <input type=hidden name=MAX_FILE_SIZE value=51200>
+                        <input type=hidden name=MAX_FILE_SIZE value=512000>
 	                <input type=file
                                name=exp_nsfile
                                value=\"" . $formfields[exp_nsfile] . "\"
