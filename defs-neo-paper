@@ -1,0 +1,7 @@
+#
+# This is the definitions file for neo-paper.emulab.net
+#
+TBDBNAME=tbdb
+WWWDEFS=neo-paper
+TBOPSEMAIL='Testbed Operations <testbed-ops@flux.cs.utah.edu>'
+TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
