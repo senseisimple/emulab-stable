@@ -83,6 +83,8 @@ my $SSH_CONFIG      = "/etc/ssh/ssh_config";
 
 my $RNDC_KEY        = "/usr/local/etc/rndc.key";
 
+my $LOADER_CONF	    = "/boot/loader.conf";
+
 #
 # Some directories we care about
 #
@@ -535,6 +537,13 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 Phase "rndc", "Setting up rndc for control of nameserver", sub {
     DoneIfExists($RNDC_KEY);
     ExecQuietFatal("$RNDC_CONFGEN -a -r /dev/urandom");
+};
+
+Phase "loader.conf", "Setting up $LOADER_CONF", sub {
+    DoneIfEdited($LOADER_CONF);
+    AppendToFileFatal($LOADER_CONF,
+	"kern.hz=1000"
+    );
 };
 
 print "----------------------------------------------------------------------\n";
