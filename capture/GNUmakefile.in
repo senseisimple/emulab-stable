@@ -15,7 +15,7 @@ DESTDIR=
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS= -g -O2 -DLOG_DROPS
+CFLAGS= -g -O2 -DLOG_DROPS -DUSESOCKETS
 
 capture: capture.c
 	cc $(CFLAGS) -o capture $<

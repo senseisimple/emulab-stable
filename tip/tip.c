@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)tip.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: tip.c,v 1.2 2000-12-27 00:49:35 mike Exp $";
+	"$Id: tip.c,v 1.3 2001-07-24 15:13:40 stoller Exp $";
 #endif /* not lint */
 
 /*
@@ -725,6 +725,7 @@ help(c)
 void
 ttysetup (int speed)
 {
+#ifndef USESOCKETS
 #if HAVE_TERMIOS
 	struct termios termios;
 	tcgetattr (FD, &termios);
@@ -749,6 +750,7 @@ ttysetup (int speed)
 	ioctl(FD, TIOCSETP, (char *)&arg);
 	ioctl(FD, TIOCLBIS, (char *)&bits);
 #endif /* HAVE_TERMIOS */
+#endif /* USESOCKETS */
 }
 
 /*

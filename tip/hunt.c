@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.2 2000-12-27 00:49:34 mike Exp $";
+	"$Id: hunt.c,v 1.3 2001-07-24 15:13:40 stoller Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -47,6 +47,12 @@ static const char rcsid[] =
 #include <libutil.h>
 #endif
 
+#ifdef USESOCKETS
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+int	socket_open(char *devname);
+#endif
 
 extern char *getremote();
 extern char *rindex();
@@ -91,9 +97,13 @@ hunt(name)
 			break;
 		if (setjmp(deadline) == 0) {
 			alarm(10);
+#ifdef USESOCKETS
+			FD = socket_open(cp);
+#else
 			FD = open(cp, O_RDWR);
 			if (FD >= 0)
 				ioctl(FD, TIOCEXCL, 0);
+#endif
 		}
 		alarm(0);
 		if (FD < 0) {
@@ -101,6 +111,7 @@ hunt(name)
 			deadfl = 1;
 		}
 		if (!deadfl) {
+#ifndef USESOCKETS
 #if HAVE_TERMIOS
 			struct termios t;
 
@@ -113,6 +124,7 @@ hunt(name)
 			ioctl(FD, TIOCHPCL, 0);
 #endif
 #endif /* HAVE_TERMIOS */
+#endif /* USESOCKETS */
 			signal(SIGALRM, SIG_DFL);
 			return ((int)cp);
 		}
@@ -123,3 +135,55 @@ hunt(name)
 	signal(SIGALRM, f);
 	return (deadfl ? -1 : (int)cp);
 }
+
+#ifdef USESOCKETS
+/*
+ *
+ */
+int
+socket_open(char *devname)
+{
+	int			sock;
+	struct sockaddr_in	name;
+	char			aclname[BUFSIZ], buf[BUFSIZ];
+	int			aclbits[3];
+	int			port;
+	FILE			*fp;
+
+	(void) sprintf(aclname, "%s.acl", devname);
+
+	if ((fp = fopen(aclname, "r")) < 0) {
+		return -1;
+	}
+	fscanf(fp, "%d %x %x %x", &port,
+	       &aclbits[0], &aclbits[1], &aclbits[2]);
+	fclose(fp);
+
+	/* Create socket from which to read. */
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		return sock;
+	}
+
+	/* Create name. */
+	name.sin_family = AF_INET;
+	inet_aton("127.0.0.1", &name.sin_addr);
+	name.sin_port   = htons(port);
+
+	/* Caller picks up and displays error */
+	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
+		close(sock);
+		return -1;
+	}
+
+	/*
+	 * Send the acl bits.
+	 */
+	if (write(sock, aclbits, sizeof(aclbits)) != sizeof(aclbits)) {
+		close(sock);
+		return -1;
+	}
+
+	return sock;
+}
+#endif

@@ -44,13 +44,19 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/termios.h>
+#ifdef USESOCKETS
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
 
 #define geterr(e)	strerror(e)
 
 void quit(int);
 void reinit(int);
 void newrun(int);
-void shutdown(int);
+void terminate(int);
 void cleanup(void);
 void capture();
 void usage();
@@ -78,6 +84,7 @@ void usage();
 #define RUNNAME		"%s/%s.run"
 #define TTYNAME		"%s/tip/%s"
 #define PTYNAME		"%s/tip/%s-pty"
+#define ACLNAME		"%s/tip/%s.acl"
 #define DEVNAME		"%s/%s"
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
@@ -92,6 +99,11 @@ char	*Devname;
 char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
+#ifdef  USESOCKETS
+int	sockfd, tipactive, portnum;
+struct sockaddr_in tipclient;
+int	ACLbits[3];
+#endif
 
 int
 main(argc, argv)
@@ -102,6 +114,9 @@ main(argc, argv)
 	int flags, op, i;
 	extern int optind;
 	extern char *optarg;
+#ifdef  USESOCKETS
+	struct sockaddr_in name;
+#endif
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
@@ -161,7 +176,7 @@ main(argc, argv)
 	signal(SIGHUP, reinit);
 	if (runfile)
 		signal(SIGUSR1, newrun);
-	signal(SIGUSR2, shutdown);
+	signal(SIGUSR2, terminate);
 
 	/*
 	 * Open up run/log file, console tty, and controlling pty.
@@ -177,9 +192,42 @@ main(argc, argv)
 		if (chmod(Runname, 0640) < 0)
 			die("%s: chmod: %s", Runname, geterr(errno));
 	}
+#ifdef  USESOCKETS
+	/*
+	 * Create and bind our socket.
+	 */
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd < 0)
+		die("socket(): opening stream socket: %s", geterr(errno));
+
+	i = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+		       (char *)&i, sizeof(i)) < 0)
+		die("setsockopt(): SO_REUSEADDR: %s", geterr(errno));
 	
+	/* Create wildcard name. */
+	name.sin_family = AF_INET;
+	name.sin_addr.s_addr = INADDR_ANY;
+	name.sin_port = 0;
+	if (bind(sockfd, (struct sockaddr *) &name, sizeof(name)))
+		die("bind(): binding stream socket: %s", geterr(errno));
+
+	/* Find assigned port value and print it out. */
+	i = sizeof(name);
+	if (getsockname(sockfd, (struct sockaddr *)&name, &i))
+		die("getsockname(): %s", geterr(errno));
+	portnum = ntohs(name.sin_port);
+
+	if (listen(sockfd, 1) < 0)
+		die("listen(): listening on socket: %s", geterr(errno));
+
+	genaclfile();
+
+	dolog(LOG_NOTICE, "listening on TCP port %d", portnum);
+#else
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
 		die("%s: open: %s", Ptyname, geterr(errno));
+#endif
 	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK, 0666)) < 0)
 		die("%s: open: %s", Devname, geterr(errno));
 
@@ -281,11 +329,13 @@ out()
 	}
 }
 #else
+static fd_set	sfds;
+static int	fdcount;
 void
 capture()
 {
-	fd_set sfds, fds;
-	int n, i, cc, lcc, omask;
+	fd_set fds;
+	int i, cc, lcc, omask;
 	char buf[BUFSIZE];
 	struct timeval timeout;
 #ifdef LOG_DROPS
@@ -311,6 +361,7 @@ capture()
 	 */
 	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
 		die("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+#ifndef USESOCKETS
 	/*
 	 * It gets better!
 	 * In FreeBSD 4.0 and beyond, the fcntl fails because the slave
@@ -331,14 +382,23 @@ capture()
 #ifdef __FreeBSD__
 	close(n);
 #endif
+#endif /* USESOCKETS */
 
-	n = devfd;
-	if (devfd < ptyfd)
-		n = ptyfd;
-	++n;
 	FD_ZERO(&sfds);
 	FD_SET(devfd, &sfds);
+	fdcount = devfd;
+#ifdef  USESOCKETS
+	if (devfd < sockfd)
+		fdcount = sockfd;
+	FD_SET(sockfd, &sfds);
+#else
+	if (devfd < ptyfd)
+		fdcount = ptyfd;
 	FD_SET(ptyfd, &sfds);
+#endif	/* USESOCKETS */
+
+	fdcount++;
+
 	for (;;) {
 #ifdef LOG_DROPS
 		if (drop_topty_chars >= DROP_THRESH) {
@@ -351,7 +411,7 @@ capture()
 		}
 #endif
 		fds = sfds;
-		i = select(n, &fds, NULL, NULL, NULL);
+		i = select(fdcount, &fds, NULL, NULL, NULL);
 		if (i < 0) {
 			if (errno == EINTR) {
 				warn("input select interrupted, continuing");
@@ -364,6 +424,12 @@ capture()
 			sleep(1);
 			continue;
 		}
+#ifdef	USESOCKETS
+		if (FD_ISSET(sockfd, &fds)) {
+			if (clientconnect())
+				continue;
+		}
+#endif	/* USESOCKETS */
 		if (FD_ISSET(devfd, &fds)) {
 			errno = 0;
 			cc = read(devfd, buf, sizeof(buf));
@@ -375,6 +441,10 @@ capture()
 
 			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
 					 sigmask(SIGUSR1)|sigmask(SIGUSR2));
+#ifdef	USESOCKETS
+			if (!tipactive)
+				goto dropped;
+#endif
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(ptyfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
@@ -394,8 +464,13 @@ capture()
 					die("%s: write: %s",
 					    Ptyname, geterr(errno));
 				}
-				if (i == 0)
+				if (i == 0) {
+#ifdef	USESOCKETS
+					goto disconnected;
+#else
 					die("%s: write: zero-length", Ptyname);
+#endif
+				}
 			}
 dropped:
 			i = write(logfd, buf, cc);
@@ -426,8 +501,21 @@ dropped:
 				die("%s: read: %s", Ptyname, geterr(errno));
 			}
 			if (cc == 0) {
+#ifdef	USESOCKETS
+			disconnected:
+				/*
+				 * Other end disconnected.
+				 */
+				dolog(LOG_INFO, "%s disconnecting",
+				      inet_ntoa(tipclient.sin_addr));
+				FD_CLR(ptyfd, &sfds);
+				close(ptyfd);
+				tipactive = 0;
+				continue;
+#else				
 				select(0, 0, 0, 0, &timeout);
 				continue;
+#endif
 			}
 			errno = 0;
 
@@ -512,8 +600,22 @@ newrun(int sig)
  * sure everyone is gone.
  */
 void
-shutdown(int sig)
+terminate(int sig)
 {
+#ifdef	USESOCKETS
+	genaclfile();
+
+	if (!tipactive)
+		return;
+
+	shutdown(ptyfd, SHUT_RDWR);
+	close(ptyfd);
+	FD_CLR(ptyfd, &sfds);
+	ptyfd = 0;
+	tipactive = 0;
+
+	dolog(LOG_INFO, "%s shutdown", inet_ntoa(tipclient.sin_addr));
+#else
 	int ofd = ptyfd;
 	
 	/*
@@ -552,6 +654,7 @@ shutdown(int sig)
 #endif
 	
 	dolog(LOG_NOTICE, "pty reset");
+#endif	/* USESOCKETS */
 }
 
 /*
@@ -583,12 +686,18 @@ die(format, arg0, arg1, arg2, arg3)
 	quit(0);
 }
 
-dolog(level, msg)
+dolog(level, format, arg0, arg1, arg2, arg3)
+	int level;
+	char *format, *arg0, *arg1, *arg2, *arg3;
 {
 	char msgbuf[BUFSIZE];
 
-	snprintf(msgbuf, BUFSIZE, "%s - %s", Machine, msg);
-	syslog(level, msgbuf);
+	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
+	if (debug) {
+		fprintf(stderr, "%s - %s\n", Machine, msgbuf);
+		fflush(stderr);
+	}
+	syslog(level, "%s - %s\n", Machine, msgbuf);
 }
 
 void
@@ -790,3 +899,100 @@ val2speed(val)
 
 	return (0);
 }
+
+#ifdef USESOCKETS
+int
+clientconnect()
+{
+	int	length = sizeof(tipclient);
+	int	newfd;
+	char	bits[sizeof(ACLbits)];
+
+	newfd = accept(sockfd, (struct sockaddr *)&tipclient, &length);
+	if (newfd < 0)
+		die("accept(): accepting new client: %s", geterr(errno));
+
+	/*
+	 * Is there a better way to do this? I suppose we
+	 * could shut the main socket down, and recreate
+	 * it later when the client disconnects, but that
+	 * sounds horribly brutish!
+	 */
+	if (tipactive) {
+		close(newfd);
+		dolog(LOG_NOTICE, "%s connecting, but tip is active",
+		      inet_ntoa(tipclient.sin_addr));
+		return 1;
+	}
+	ptyfd = newfd;
+
+	/*
+	 * Read the first part to verify the ACLbits. We must get the proper
+	 * bits or this is not a valid tip connection.
+	 */
+	if (read(ptyfd, bits, sizeof(bits)) != sizeof(bits)) {
+		close(ptyfd);
+		dolog(LOG_NOTICE, "%s connecting, error reading aclbits",
+		      inet_ntoa(tipclient.sin_addr));
+		return 1;
+	}
+	if (bcmp(bits, ACLbits, sizeof(ACLbits))) {
+		close(ptyfd);
+		dolog(LOG_NOTICE, "%s connecting, aclbits do not match",
+		      inet_ntoa(tipclient.sin_addr));
+		return 1;
+	}
+	
+	/*
+	 * See Mike comments (use threads) above.
+	 */
+	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", geterr(errno));
+
+	FD_SET(ptyfd, &sfds);
+	if (ptyfd >= fdcount) {
+		fdcount = ptyfd;
+		fdcount++;
+	}
+	tipactive = 1;
+
+	dolog(LOG_INFO, "%s connecting", inet_ntoa(tipclient.sin_addr));
+	return 0;
+}
+
+/*
+ * Simple access permission system for now.
+ * Write out an acl file, which has the port number and "key". If
+ * the user can read this file, then he knows what port to connect on
+ * and what magic string to send. We eventually need to extend this to a
+ * tipserver of some kind, that talks to the database and does the
+ * permission checks. 
+ */
+genaclfile()
+{
+	char	aclname[BUFSIZ], buf[BUFSIZ];
+	int	fd;
+
+	if ((fd = open("/dev/urandom", O_RDONLY, 0666)) < 0)
+		die("/dev/random: open: %s", geterr(errno));
+
+	if (read(fd, ACLbits, sizeof(ACLbits)) != sizeof(ACLbits)) 
+		die("/dev/random: read: %s", geterr(errno));
+	close(fd);
+
+	(void) sprintf(aclname, ACLNAME, DEVPATH, Machine);
+
+	if ((fd = open(aclname, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0)
+		die("%s: open: %s", aclname, geterr(errno));
+
+	(void) sprintf(buf, "%d\n0x%x 0x%x 0x%x\n", portnum,
+		       ACLbits[0], ACLbits[1], ACLbits[2]);
+	
+	if (write(fd, buf, strlen(buf)) != strlen(buf))
+		die("%s: write: %s", aclname, geterr(errno));
+	close(fd);
+
+	if (chmod(aclname, 0640) < 0)
+		die("%s: chmod: %s", aclname, geterr(errno));
+}
+#endif
