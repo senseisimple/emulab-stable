@@ -26,7 +26,8 @@ case "$1" in
 	esac
 
 		[ -x ${BINDIR}/healthd ] \
-                && ${BINDIR}/healthd -f ${BINDIR}/healthd.conf -S -q -p boss 180 \
+                && ${BINDIR}/healthd -f ${BINDIR}/healthd.conf -S -q -p \
+		boss.emulab.net 180 \
                 && echo -n ' healthd'
 		;;
 	stop)
