@@ -192,6 +192,10 @@ $row = mysql_fetch_row($unixgid_result);
 $unix_gid = $row[0];
 $unix_gid++;
 
+#
+# The whole group vs. project issue needs to be fixed! For now insert into
+# both.
+# 
 $newgroup_command = "INSERT INTO groups ".
      "(gid,grp_created,grp_expires,grp_name,".
      "grp_URL,grp_head_uid,cntrl_node,unix_gid)".
@@ -200,7 +204,16 @@ $newgroup_command = "INSERT INTO groups ".
 $newgroup_result  = mysql_db_query($TBDBNAME, $newgroup_command);
 if (! $newgroup_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding adding new group $gid: $err\n", 1);
+    TBERROR("Database Error adding new group $gid: $err\n", 1);
+}
+
+$newproj_command = "INSERT INTO projects ".
+     "(pid, proj_created, proj_expires, proj_name, proj_head_uid) ".
+     "VALUES ('$gid', now(), '$grp_expires', '$grp_name', '$grp_head_uid')";
+$newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
+if (! $newproj_result) {
+    $err = mysql_error();
+    TBERROR("Database Error adding new project $gid: $err\n", 1);
 }
 
 $newmemb_result = mysql_db_query($TBDBNAME,
@@ -208,8 +221,7 @@ $newmemb_result = mysql_db_query($TBDBNAME,
 			"values ('$grp_head_uid','$gid','none');");
 if (! $newmemb_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding adding new group membership: $gid: $err\n",
-            1);
+    TBERROR("Database Error adding new group membership: $gid: $err\n", 1);
 }
 
 mail($TBMAIL_APPROVAL,
