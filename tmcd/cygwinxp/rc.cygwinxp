@@ -70,3 +70,6 @@ netsh interface reset all
 ipconfig /all | awk \
     '/^ *Connection-specific DNS Suffix/{print "search", $NF} \
      /^ *DNS Servers/{print "nameserver", $NF}' > /etc/resolv.conf
+
+# Start up the service which will deliver a SHUTDOWN state event on reboot.
+cygrunsrv -S EmulabShutdown

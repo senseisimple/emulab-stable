@@ -94,6 +94,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/startsshd $(BINDIR)/startsshd
 	$(INSTALL) -m 755 $(SRCDIR)/stopsshd $(BINDIR)/stopsshd
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -c -m 755 -o root -g wheel -d /sbin
 	$(INSTALL) -m 755 $(SRCDIR)/reboot /sbin/reboot
 	ln -f -s /bin/shutdown /sbin/shutdown

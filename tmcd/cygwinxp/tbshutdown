@@ -1,0 +1,39 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# tbshutdown
+#
+# A simple daemon that is started automatically as a CygWin service
+# with the --termsig option, so it gets killed with SIGTERM on reboot.
+# When it gets killed, it sends a notification to the testbed.
+#
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+use libtmcc;
+
+# Set up some signal handlers
+$SIG{INT}  = \&cleanup;
+$SIG{QUIT} = \&cleanup;
+$SIG{ABRT} = \&cleanup;
+$SIG{TERM} = \&cleanup;
+$SIG{KILL} = \&cleanup;
+
+# Then fall asleep until we're sent a signal
+
+sleep;
+
+exit(0);
+
+sub cleanup {
+    # This is our signal handler.
+    tmcc(TMCCCMD_STATE, "SHUTDOWN");
+    exit(0);
+}
