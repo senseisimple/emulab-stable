@@ -29,6 +29,7 @@ The test directory holds the following files:
 	tests/<test>/
 		test.log	Main log of everything.
 		nsfile.ns	The NS file used.
+		db.txt ***	The state of the database.
 		*		Any files created by tbsetup stuff.
 	test.log		Master log file.  Output of tbtest.
 	configure.log		Log of 'configure'
@@ -46,6 +47,7 @@ The test directory holds the following files:
 	
 * - Appears only in frontend (default) mode.
 ** - Appears only in full mode.
+*** - Only exists for failed tests.
 # - Empty except under error conditions.
 
 Note: cleanup.log, unavailable.log, and free.log appear only in full
@@ -150,6 +152,7 @@ Options:
   -path <path> - Path to directory to store test files.
   -frontend - Run in frontend mode.
   -full - Run in full mode.
+  -exitonfail - Exit on any failure.
 Mode:
   run <db> <testdir> [<pid> <eid> <num>]
   init <db> [<pid> <eid> <num>]
@@ -189,6 +192,11 @@ testbed under the given experiment and then use those nodes to run the
 tests.
 
 -single can take a list of tests.
+
+-exitonfail is best used in conjunction with -leavedb.  It causes
+tbtest to exit on the first test failure, thus no later tests will
+corrupt the DB.  The user of this option is a matter of taste, as you
+can always use tests/<test>/db.txt to restore the database state.
 
 
 Test Format

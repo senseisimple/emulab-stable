@@ -16,6 +16,7 @@
 #   -full - Do full testing.
 #   -frontend - Do frontend only testing.#
 #   -leavedb - Avoids removing the DB on exit.
+#   -exitonfail - Exit on the first failure.
 #
 # <mode> is one of:
 #    run <db> <testdir> [<pid> <eid> <num>] - Do everything.
@@ -68,6 +69,7 @@ sub show_help {
     print STDERR "  -path <path> - Path to directory to store test files.\n";
     print STDERR "  -frontend - Run in frontend mode.\n";
     print STDERR "  -full - Run in full mode.\n";
+    print STDERR "  -exitonfail - Exit on any failure.\n";
     print STDERR "Mode:\n";
     print STDERR "  run <db> <testdir> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
@@ -85,6 +87,7 @@ sub show_help {
 
 $mode = "";
 $leavedb = 0;
+$exitonfail = 0;
 
 while (($#ARGV > -1) && ($mode eq "")) {
     $arg = shift;
@@ -97,6 +100,8 @@ while (($#ARGV > -1) && ($mode eq "")) {
 	$type = "full";
     } elsif ($arg eq "-leavedb") {
 	$leavedb = 1;
+    } elsif ($arg eq "-exitonfail") {
+	$exitonfail = 1;
     } else {
 	$mode = $arg;
     }
@@ -520,6 +525,7 @@ sub step_test {
 	    if (tbexect("cat $testdir/$test/dbstate | mysql $testdb",TESTLOG)) {
 		prints "FAIL - Could not evaluate dbstate.\n";
 		$fail++;
+		if ($exitonfail) {doexit(1);}
 		next;
 	    }
 	}
@@ -550,6 +556,7 @@ sub step_test {
 		    prints "ERROR: Could not grab copy of database.\n";
 		    doexit(1);
 		}
+		if ($exitonfail) {doexit(1);}
 	    } else {
 		$unknown++;
 		$status = "UKNONW";
