@@ -3,7 +3,7 @@ package event;
 require Exporter;
 require DynaLoader;
 @ISA = qw(Exporter DynaLoader);
-@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll c_event_poll_blocking dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get  );
+@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_register_withkeyfile event_register_withkeydata event_unregister c_event_poll c_event_poll_blocking dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe event_notification_insert_hmac event_notification_pack event_notification_unpack xmalloc xrealloc allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get event_handle_keydata_set event_handle_keydata_get event_handle_keylen_set event_handle_keylen_get event_notification_elvin_notification_set event_notification_elvin_notification_get event_notification_has_hmac_set event_notification_has_hmac_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get  );
 package eventc;
 bootstrap event;
 var_event_init();
@@ -51,6 +51,22 @@ sub event_register {
     tie %resulthash, "event_handle", $result;
     return bless \%resulthash, "event_handle";
 }
+sub event_register_withkeyfile {
+    my @args = @_;
+    my $result = eventc::event_register_withkeyfile(@args);
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "event_handle", $result;
+    return bless \%resulthash, "event_handle";
+}
+sub event_register_withkeydata {
+    my @args = @_;
+    my $result = eventc::event_register_withkeydata(@args);
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "event_handle", $result;
+    return bless \%resulthash, "event_handle";
+}
 sub event_unregister {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
@@ -78,12 +94,14 @@ sub dont_use_this_function_because_it_does_not_work {
 sub event_notify {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notify(@args);
     return $result;
 }
 sub event_schedule {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_schedule(@args);
     return $result;
 }
@@ -92,83 +110,102 @@ sub event_notification_alloc {
     $args[0] = tied(%{$args[0]});
     $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_alloc(@args);
-    return $result;
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "event_notification", $result;
+    return bless \%resulthash, "event_notification";
 }
 sub event_notification_free {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_free(@args);
     return $result;
 }
 sub event_notification_clone {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_clone(@args);
-    return $result;
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "event_notification", $result;
+    return bless \%resulthash, "event_notification";
 }
 sub event_notification_get_double {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_double(@args);
     return $result;
 }
 sub event_notification_get_int32 {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_int32(@args);
     return $result;
 }
 sub event_notification_get_int64 {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_int64(@args);
     return $result;
 }
 sub event_notification_get_opaque {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_opaque(@args);
     return $result;
 }
 sub c_event_notification_get_string {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::c_event_notification_get_string(@args);
     return $result;
 }
 sub event_notification_put_double {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_put_double(@args);
     return $result;
 }
 sub event_notification_put_int32 {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_put_int32(@args);
     return $result;
 }
 sub event_notification_put_int64 {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_put_int64(@args);
     return $result;
 }
 sub event_notification_put_opaque {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_put_opaque(@args);
     return $result;
 }
 sub event_notification_put_string {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_put_string(@args);
     return $result;
 }
 sub event_notification_remove {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_remove(@args);
     return $result;
 }
@@ -177,6 +214,26 @@ sub c_event_subscribe {
     $args[0] = tied(%{$args[0]});
     $args[2] = tied(%{$args[2]});
     my $result = eventc::c_event_subscribe(@args);
+    return $result;
+}
+sub event_notification_insert_hmac {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
+    my $result = eventc::event_notification_insert_hmac(@args);
+    return $result;
+}
+sub event_notification_pack {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
+    my $result = eventc::event_notification_pack(@args);
+    return $result;
+}
+sub event_notification_unpack {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    my $result = eventc::event_notification_unpack(@args);
     return $result;
 }
 *xmalloc = *eventc::xmalloc;
@@ -212,6 +269,7 @@ sub enqueue_callback_data {
 sub perl_stub_callback {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::perl_stub_callback(@args);
     return $result;
 }
@@ -225,72 +283,84 @@ sub stub_event_subscribe {
 sub event_notification_get_string {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_string(@args);
     return $result;
 }
 sub event_notification_get_site {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_site(@args);
     return $result;
 }
 sub event_notification_get_expt {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_expt(@args);
     return $result;
 }
 sub event_notification_get_group {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_group(@args);
     return $result;
 }
 sub event_notification_get_host {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_host(@args);
     return $result;
 }
 sub event_notification_get_objtype {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_objtype(@args);
     return $result;
 }
 sub event_notification_get_objname {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_objname(@args);
     return $result;
 }
 sub event_notification_get_eventtype {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_eventtype(@args);
     return $result;
 }
 sub event_notification_get_arguments {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_arguments(@args);
     return $result;
 }
 sub event_notification_set_arguments {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_set_arguments(@args);
     return $result;
 }
 sub event_notification_get_sender {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_get_sender(@args);
     return $result;
 }
 sub event_notification_set_sender {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
+    $args[1] = tied(%{$args[1]});
     my $result = eventc::event_notification_set_sender(@args);
     return $result;
 }
@@ -341,7 +411,7 @@ sub STORE {
 
 sub FIRSTKEY {
     my $self = shift;
-    $ITERATORS{$self} = ['server', 'status', ];
+    $ITERATORS{$self} = ['server', 'status', 'keydata', 'keylen', ];
     my $first = shift @{$ITERATORS{$self}};
     return $first;
 }
@@ -353,7 +423,71 @@ sub NEXTKEY {
         my $member = shift @{$ITERATORS{$self}};
         return $member;
     } else {
-        $ITERATORS{$self} = ['server', 'status', ];
+        $ITERATORS{$self} = ['server', 'status', 'keydata', 'keylen', ];
+        return ();
+    }
+}
+
+
+############# Class : event_notification ##############
+
+package event_notification;
+@ISA = qw( event );
+%OWNER = ();
+%BLESSEDMEMBERS = (
+);
+
+%ITERATORS = ();
+sub DISOWN {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    delete $OWNER{$ptr};
+    };
+
+sub ACQUIRE {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    $OWNER{$ptr} = 1;
+    };
+
+sub FETCH {
+    my ($self,$field) = @_;
+    my $member_func = "eventc::event_notification_${field}_get";
+    my $val = &$member_func($self);
+    if (exists $BLESSEDMEMBERS{$field}) {
+        return undef if (!defined($val));
+        my %retval;
+        tie %retval,$BLESSEDMEMBERS{$field},$val;
+        return bless \%retval, $BLESSEDMEMBERS{$field};
+    }
+    return $val;
+}
+
+sub STORE {
+    my ($self,$field,$newval) = @_;
+    my $member_func = "eventc::event_notification_${field}_set";
+    if (exists $BLESSEDMEMBERS{$field}) {
+        &$member_func($self,tied(%{$newval}));
+    } else {
+        &$member_func($self,$newval);
+    }
+}
+
+sub FIRSTKEY {
+    my $self = shift;
+    $ITERATORS{$self} = ['elvin_notification', 'has_hmac', ];
+    my $first = shift @{$ITERATORS{$self}};
+    return $first;
+}
+
+sub NEXTKEY {
+    my $self = shift;
+    $nelem = scalar @{$ITERATORS{$self}};
+    if ($nelem > 0) {
+        my $member = shift @{$ITERATORS{$self}};
+        return $member;
+    } else {
+        $ITERATORS{$self} = ['elvin_notification', 'has_hmac', ];
         return ();
     }
 }
@@ -429,6 +563,7 @@ package callback_data;
 @ISA = qw( event );
 %OWNER = ();
 %BLESSEDMEMBERS = (
+    callback_notification => 'event_notification',
     next => 'callback_data',
 );
 
