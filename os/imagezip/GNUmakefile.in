@@ -9,7 +9,7 @@ all:	imagezip imageunzip frisbee.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS = -O -g -static
+CFLAGS = -O2 -g -static
 LIBS   = -lz
 
 imagezip: imagezip.o
