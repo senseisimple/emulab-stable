@@ -864,6 +864,21 @@ function TBCurrentUser($uid)
 }
 
 #
+# Confirm a current WikiName or not.
+#
+# usage TBCurrentWikiName($uid)
+#       returns 1 if a current wikiname.
+#       returns 0 if not a current wikiname
+#
+function TBCurrentWikiName($wikiname)
+{
+    $query_result =
+	DBQueryFatal("SELECT usr_pswd FROM users WHERE wikiname='$wikiname'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
 # Check to see if an email is being used twice.
 #
 # usage TBCurrentEmail($email)
@@ -1498,6 +1513,14 @@ function TBCvswebAllowed($uid) {
     $query_result =
         DBQueryFatal("select cvsweb from users ".
 		     "WHERE uid='$uid' and cvsweb=1");
+
+    return mysql_num_rows($query_result);
+}
+
+function TBWikiOnlyUser($uid) {
+    $query_result =
+        DBQueryFatal("select wikionly from users ".
+		     "WHERE uid='$uid' and wikionly=1");
 
     return mysql_num_rows($query_result);
 }

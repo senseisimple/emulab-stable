@@ -52,7 +52,8 @@ function SPITFORM($formfields, $returning, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
     global $usr_keyfile;
     global $ACCOUNTWARNING, $EMAILWARNING;
-
+    global $WIKISUPPORT, $WIKIURL;
+    
     PAGEHEADER("Start a New Testbed Project");
 
     echo "<center><font size=+1>
@@ -92,6 +93,34 @@ function SPITFORM($formfields, $returning, $errors)
 	}
 	echo "</table><br>\n";
     }
+    echo "<SCRIPT LANGUAGE=JavaScript>
+              function SetWikiName(theform) 
+              {
+	          var validchars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                  var usrname    = theform['formfields[usr_name]'].value;
+                  var wikiname   = '';
+                  var docap      = 1;
+
+		  for (var i = 0; i < usrname.length; i++) {
+                      var letter = usrname.charAt(i).toLowerCase();
+
+                      if (validchars.indexOf(letter) == -1) {
+                          if (letter == ' ') {
+                              docap = 1;
+                          }
+                          continue;
+                      }
+                      else {
+                          if (docap == 1) {
+                              letter = usrname.charAt(i).toUpperCase()
+                              docap  = 0;
+                          }
+                          wikiname = wikiname + letter;
+                      }
+                  }
+                  theform['formfields[wikiname]'].value = wikiname;
+              }
+          </SCRIPT>\n";
 
     echo "<table align=center border=1> 
           <tr>
@@ -100,7 +129,7 @@ function SPITFORM($formfields, $returning, $errors)
             </td>
           </tr>\n
 
-          <form enctype=multipart/form-data
+          <form enctype=multipart/form-data name=myform
                 action=newproject.php3 method=post>\n";
 
     if (! $returning) {
@@ -141,9 +170,26 @@ function SPITFORM($formfields, $returning, $errors)
                       <input type=text
                              name=\"formfields[usr_name]\"
                              value=\"" . $formfields[usr_name] . "\"
+                             onchange=\"SetWikiName(myform);\"
 	                     size=30>
                   </td>
               </tr>\n";
+
+	#
+	# WikiName
+	#
+	if ($WIKISUPPORT) {
+	    echo "<tr>
+                      <td colspan=2>*
+                          <a href=${WIKIURL}/TWiki/WikiName
+                            target=_blank>WikiName</a>:<td class=left>
+                          <input type=text
+                                 name=\"formfields[wikiname]\"
+                                 value=\"" . $formfields[wikiname] . "\"
+	                         size=30>
+                      </td>
+                  </tr>\n";
+	}
 
         #
 	# Title/Position:
@@ -592,7 +638,18 @@ if (! $returning) {
     if (count($tokens) < 2) {
 	$errors["Full Name"] = "Please provide a first and last name";
     }
-    
+    if ($WIKISUPPORT) {
+	if (!isset($formfields[wikiname]) ||
+	    strcmp($formfields[wikiname], "") == 0) {
+	    $errors["WikiName"] = "Missing Field";
+	}
+	elseif (! TBvalid_wikiname($formfields[wikiname])) {
+	    $errors["WikiName"] = TBFieldErrorString();
+	}
+	elseif (TBCurrentWikiName($formfields[wikiname])) {
+	    $errors["WikiName"] = "Already in use. Pick another";
+	}
+    }
     if (!isset($formfields[usr_affil]) ||
 	strcmp($formfields[usr_affil], "") == 0) {
 	$errors["Affiliation"] = "Missing Field";
@@ -795,6 +852,7 @@ if (!$returning) {
     $usr_phone         = $formfields[usr_phone];
     $password1         = $formfields[password1];
     $password2         = $formfields[password2];
+    $wikiname          = ($WIKISUPPORT ? $formfields[wikiname] : "");
     $usr_returning     = "No";
 
     if (! isset($formfields[usr_URL]) ||
@@ -891,6 +949,7 @@ else {
     $usr_country   = $row[usr_country];
     $usr_phone	   = $row[usr_phone];
     $usr_URL       = $row[usr_URL];
+    $wikiname      = $row[wikiname];
     $usr_returning = "Yes";
 }
 $pid               = $formfields[pid];
@@ -954,14 +1013,14 @@ if (! $returning) {
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
 	 " usr_URL,usr_title,usr_affil,usr_phone,usr_shell,usr_pswd,unix_uid,".
-	 " status,pswd_expires,usr_modified) ".
+	 " status,pswd_expires,usr_modified,wikiname) ".
 	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
          "'$usr_email', ".
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
 	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
 	 "'$usr_phone', 'tcsh', '$encoding', NULL, 'newuser', ".
-	 "date_add(now(), interval 1 year), now())");
+	 "date_add(now(), interval 1 year), now(), '$wikiname')");
 
     DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");
     

@@ -200,6 +200,10 @@ function TBvalid_usrname($token) {
     return TBcheck_dbslot($token, "users", "usr_name",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_wikiname($token) {
+    return TBcheck_dbslot($token, "users", "wikiname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_email($token) {
     return TBcheck_dbslot($token, "users", "usr_email",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);

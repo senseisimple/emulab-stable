@@ -19,7 +19,8 @@ include("showstuff.php3");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid,
-	      CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|CHECKLOGIN_WEBONLY);
+	      CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|
+	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 $isadmin = ISADMIN($uid);
 
 
@@ -29,13 +30,16 @@ $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
 # used if db slot for user is NULL (should not happen.)
 $defaultshell = 'tcsh';
 
+# See below.
+$wikionly = 0;
+
 #
 # Spit the form out using the array of data and error strings (if any).
 # 
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
-    global $target_uid;
+    global $target_uid, $wikionly;
     global $shelllist, $defaultshell;
     
     #
@@ -66,10 +70,13 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
 
+    # For indicating that fields are optional or not.
+    $optfield = ($wikionly ? "" : "*");
+
     echo "<table align=center border=1> 
           <tr>
             <td align=center colspan=3>
-                Fields marked with * are required.
+                <b>Fields marked with * are required.</b>
             </td>
           </tr>\n
 
@@ -107,20 +114,20 @@ function SPITFORM($formfields, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td colspan=2>*Title/Position:</td>
+                  <td colspan=2>${optfield}Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
                              value=\"" . $formfields[usr_title] . "\"
 	                     size=30>
                   </td>
-              </tr>\n";
+               </tr>\n";
 
         #
-	# Affiliation:
+   	# Affiliation:
 	# 
 	echo "<tr>
-                  <td colspan=2>*Institutional<br>Affiliation:</td>
+                  <td colspan=2>${optfield}Institutional<br>Affiliation:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_affil]\"
@@ -146,7 +153,7 @@ function SPITFORM($formfields, $errors)
 	# Email:
 	#
 	echo "<tr>
-                  <td colspan=2>*Email Address[<b>1</b>]:</td>
+                  <td colspan=2>Email Address[<b>1</b>]:</td>
                   <td class=left> ";
 	if ($isadmin)
 	    echo "    <input type=text ";
@@ -167,8 +174,11 @@ function SPITFORM($formfields, $errors)
 	    $formfields[usr_country] = "USA";
 	}
 
-	echo "<tr><td colspan=3>*Address:<br /><center>
-		<table>
+	#
+	# Postal Address
+        #
+	echo "<tr><td colspan=3>${optfield}Address:<br /><center>
+	      <table>
 		  <tr><td>Line 1</td><td colspan=3>
                     <input type=text
                            name=\"formfields[usr_addr]\"
@@ -201,17 +211,13 @@ function SPITFORM($formfields, $errors)
 	                   size=15></td></tr>
                </table></center></td></tr>";
 
-	#
-	# Default Group
-	#
-		
-	# Default Shell
-        echo "<tr><td colspan=2>Shell:</td>
+        # Default Shell
+	echo "<tr><td colspan=2>Shell:</td>
                   <td class=left>";
-        echo "<select name=\"formfields[usr_shell]\">";
+	echo "<select name=\"formfields[usr_shell]\">";
 	foreach ($shelllist as $s) {
 	    if ((!isset($formfields[usr_shell]) &&
-		0 == strcmp($defaultshell, $s)) ||
+		 0 == strcmp($defaultshell, $s)) ||
 		0 == strcmp($formfields[usr_shell],$s)) {
 		$sel = "selected='1'";
 	    } else {
@@ -219,13 +225,13 @@ function SPITFORM($formfields, $errors)
 	    }
 	    echo "<option value='$s' $sel>$s</option>";
 	}	
-        echo "</select></td></tr>";
+	echo "</select></td></tr>";
 
 	#
 	# Phone
 	#
 	echo "<tr>
-                  <td colspan=2>*Phone #:</td>
+                  <td colspan=2>${optfield}Phone #:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_phone]\"
@@ -238,6 +244,7 @@ function SPITFORM($formfields, $errors)
 	# Password. Note that we do not resend the password. User
 	# must retype on error.
 	#
+	echo "<tr></tr>\n";
 	echo "<tr>
                   <td colspan=2>Password[<b>1</b>]:</td>
                   <td class=left>
@@ -254,50 +261,54 @@ function SPITFORM($formfields, $errors)
                              size=8></td>
              </tr>\n";
 
-	# Windows Password.  Initial random default is based on the Unix
-	# password hash.
-	# 
-	# A separate password is kept for experiment nodes running Windows.
-	# It is presented behind-the-scenes to rdesktop and Samba by our Web
-	# interface, but you may still need to type it.  The default password
-	# is randomly generated.  You may change it to something easier to
-	# remember.
-	#
-	echo "<tr>
-                  <td colspan=2>Windows Password[<b>1,4</b>]:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[w_password1]\"
-                             value=\"" . $formfields[w_password1] . "\"
-                             size=8></td>
-              </tr>\n";
+	if (!$wikionly) {
+	    #
+            # Windows Password.  Initial random default is based on the Unix
+	    # password hash.
+	    #   
+	    # A separate password is kept for experiment nodes running Windows.
+	    # It is presented behind-the-scenes to rdesktop and Samba by our
+	    # Web# interface, but you may still need to type it.
+	    # The default password is randomly generated.
+	    # You may change it to something easier to remember.
+	    #
+	    echo "<tr>
+                      <td colspan=2>Windows Password[<b>1,4</b>]:</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"formfields[w_password1]\"
+                                 value=\"" . $formfields[w_password1] . "\"
+                                 size=8></td>
+                  </tr>\n";
 
-        echo "<tr>
-                  <td colspan=2>Retype Windows Password:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[w_password2]\"
-                             size=8></td>
-             </tr>\n";
+	    echo "<tr>
+                      <td colspan=2>Retype Windows Password:</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"formfields[w_password2]\"
+                                 size=8></td>
+                 </tr>\n";
 
-        #
-	# Planetlab bit. This should really be a drop down menu of the choices.
-	#
-	if ($formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
-	    $checked = "checked";
-	} else {
-	    $checked = "";
+            #
+	    # Planetlab bit. This should really be a drop down menu of the
+	    #                choices.
+            #
+	    if ($formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
+		$checked = "checked";
+	    } else {
+		$checked = "";
+	    }
+
+	    echo "<tr>
+		      <td colspan=2>Use simplified PlanetLab view:</td>
+		      <td class=left>
+		         <input type='checkbox'
+                                name=\"formfields[user_interface]\"
+                                value=\"" . TBDB_USER_INTERFACE_PLAB . "\"
+			        $checked>
+		      </td>
+	          </tr>\n";
 	}
-
-	echo "<tr>
-		  <td colspan=2>Use simplified PlanetLab view:</td>
-		  <td class=left>
-		     <input type='checkbox'
-                            name=\"formfields[user_interface]\"
-                            value=\"" . TBDB_USER_INTERFACE_PLAB . "\"
-			    $checked>
-		  </td>
-	      </tr>\n";
 
         #
 	# Notes
@@ -328,8 +339,9 @@ function SPITFORM($formfields, $errors)
             <li> Please consult our
                  <a href = 'docwrapper.php3?docname=security.html'>
                  security policies</a> for information
-                 regarding passwords and email addresses.
-            <li> You can also
+                 regarding passwords and email addresses.\n";
+    if (!$wikionly) {
+	echo "<li> You can also
                  <a href='showpubkeys.php3?target_uid=$target_uid'>
                  edit your ssh public keys</a> and your
                  <a href='showsfskeys.php3?target_uid=$target_uid'>
@@ -342,8 +354,9 @@ function SPITFORM($formfields, $errors)
                  Windows.  It is presented behind-the-scenes to rdesktop and
                  Samba by our Web interface, but you may still need to type
                  it.  The default password is randomly generated.  You may
-                 change it to something easier to remember.
-          </ol>
+                 change it to something easier to remember.\n";
+    }
+    echo "</ol>
           </blockquote></blockquote>
           </h4>\n";
 }
@@ -422,6 +435,7 @@ $defaults[usr_affil]   = $row[usr_affil];
 $defaults[usr_shell]   = $row[usr_shell];
 $defaults[notes]       = $row[notes];
 $defaults[user_interface] = $row[user_interface];
+$wikionly              = $row[wikionly];
 
 # Show and keep the Windows password if user-set, otherwise fill in the random one.
 if (strcmp($row[usr_w_pswd],""))
@@ -456,13 +470,6 @@ $errors = array();
 #
 # These fields are required!
 #
-if (!isset($formfields[usr_title]) ||
-    strcmp($formfields[usr_title], "") == 0) {
-    $errors["Title/Position"] = "Missing Field";
-}
-elseif (! TBvalid_title($formfields[usr_title])) {
-    $errors["Title/Position"] = TBFieldErrorString();
-}
 if (!isset($formfields[usr_name]) ||
     strcmp($formfields[usr_name], "") == 0) {
     $errors["Full Name"] = "Missing Field";
@@ -476,17 +483,34 @@ $tokens = preg_split("/[\s]+/", $formfields[usr_name],
 if (count($tokens) < 2) {
     $errors["Full Name"] = "Please provide a first and last name";
 }
-
-if (!isset($formfields[usr_affil]) ||
-    strcmp($formfields[usr_affil], "") == 0) {
-    $errors["Affiliation"] = "Missing Field";
+if (!$wikionly) {
+    # WikiOnly can leave these fields blank, but must error check them anyway.
+    if (!isset($formfields[usr_title]) ||
+	strcmp($formfields[usr_title], "") == 0) {
+	$errors["Title/Position"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_affil]) ||
+	strcmp($formfields[usr_affil], "") == 0) {
+	$errors["Affiliation"] = "Missing Field";
+    }
 }
-elseif (! TBvalid_affiliation($formfields[usr_affil])) {
+if (isset($formfields[usr_title]) &&
+    ! TBvalid_title($formfields[usr_title])) {
+    $errors["Title/Position"] = TBFieldErrorString();
+}
+if (isset($formfields[usr_affil]) &&
+    ! TBvalid_affiliation($formfields[usr_affil])) {
     $errors["Affiliation"] = TBFieldErrorString();
 }
 if (!isset($formfields[usr_shell]) ||
     !in_array($formfields[usr_shell], $shelllist)) {
     $errors["Shell"] = "Invalid Shell";
+}
+if (isset($formfields[usr_URL]) &&
+    strcmp($formfields[usr_URL], "") &&
+    strcmp($formfields[usr_URL], $HTTPTAG) &&
+    ! CHECKURL($formfields[usr_URL], $urlerror)) {
+    $errors["Home Page URL"] = $urlerror;
 }
 if (!isset($formfields[usr_email]) ||
     strcmp($formfields[usr_email], "") == 0) {
@@ -495,13 +519,7 @@ if (!isset($formfields[usr_email]) ||
 elseif (! TBvalid_email($formfields[usr_email])) {
     $errors["Email Address"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_URL]) &&
-    strcmp($formfields[usr_URL], "") &&
-    strcmp($formfields[usr_URL], $HTTPTAG) &&
-    ! CHECKURL($formfields[usr_URL], $urlerror)) {
-    $errors["Home Page URL"] = $urlerror;
-}
-if (!$isadmin) {
+if (!$isadmin && !$wikionly) {
     # Admins can leave these fields blank, but must error check them anyway.
     if (!isset($formfields[usr_addr]) ||
 	strcmp($formfields[usr_addr], "") == 0) {
@@ -553,7 +571,7 @@ if (isset($formfields[usr_country]) &&
     !TBvalid_country($formfields[usr_zip])) {
     $errors["Zip/Postal Code"] = TBFieldErrorString();
 }
-if (isset($formfields[usr_phone]) &&
+if (isset($formfields[usr_phone]) && $formfields[usr_phone] != "" &&
     !TBvalid_phone($formfields[usr_phone])) {
     $errors["Phone #"] = TBFieldErrorString();
 }
@@ -596,10 +614,12 @@ if (count($errors)) {
     return;
 }
 
-$usr_title    = addslashes($formfields[usr_title]);
 $usr_name     = addslashes($formfields[usr_name]);
-$usr_affil    = addslashes($formfields[usr_affil]);
 $usr_email    = $formfields[usr_email];
+$password1    = $formfields[password1];
+$password2    = $formfields[password2];
+$usr_title    = addslashes($formfields[usr_title]);
+$usr_affil    = addslashes($formfields[usr_affil]);
 $usr_addr     = addslashes($formfields[usr_addr]);
 $usr_city     = addslashes($formfields[usr_city]);
 $usr_state    = addslashes($formfields[usr_state]);
@@ -607,8 +627,6 @@ $usr_zip      = addslashes($formfields[usr_zip]);
 $usr_country  = addslashes($formfields[usr_country]);
 $usr_phone    = $formfields[usr_phone];
 $usr_shell    = $formfields[usr_shell];
-$password1    = $formfields[password1];
-$password2    = $formfields[password2];
 $w_password1  = $formfields[w_password1];
 $w_password2  = $formfields[w_password2];
 
@@ -691,7 +709,13 @@ if ((isset($password1) && strcmp($password1, "")) &&
 		     "pswd_expires=$expires ".
 		     "WHERE uid='$target_uid'");
 
-    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
+    if ($wikionly) {
+	if ($CHECKLOGIN_STATUS & CHECKLOGIN_ACTIVE) {
+	    SUEXEC("nobody", "nobody", "webtbacct passwd $target_uid",
+		   SUEXEC_ACTION_DIE);
+	}
+    }
+    elseif (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
 	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
     }
 }
@@ -700,8 +724,9 @@ if ((isset($password1) && strcmp($password1, "")) &&
 # See if the user is requesting to change the Windows password. We checked
 # them above when the form was submitted.
 #
-if ((isset($w_password1) && strcmp($w_password1, "")) &&
-    (isset($w_password2) && strcmp($w_password2, ""))) {
+if (!$wikionly &&
+    ((isset($w_password1) && strcmp($w_password1, "")) &&
+     (isset($w_password2) && strcmp($w_password2, "")))) {
 
     #
     # Insert into database.
@@ -802,6 +827,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "Phone:             $usr_phone\n".
 	   "Title:             $usr_title\n".
 	   "Shell:             $usr_shell\n",
+	   "WikiOnly:	       $wikionly\n",
 	   "From: $TBMAIL_OPS\n".
 	   $BCC .
 	   "Errors-To: $TBMAIL_WWW");

@@ -44,6 +44,7 @@ define("CHECKLOGIN_ADMINOFF",		0x020000);
 define("CHECKLOGIN_WEBONLY",		0x040000);
 define("CHECKLOGIN_PLABUSER",		0x080000);
 define("CHECKLOGIN_STUDLY",		0x100000);
+define("CHECKLOGIN_WIKIONLY",		0x200000);
 
 #
 # Constants for tracking possible login attacks.
@@ -151,7 +152,8 @@ function CHECKLOGIN($uid) {
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
-		     "       user_interface,n.type,u.stud,u.wikiname " .
+		     "       user_interface,n.type,u.stud,u.wikiname, ".
+		     "       u.wikionly " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -189,6 +191,7 @@ function CHECKLOGIN($uid) {
 	$type     = $row[10];
 	$stud     = $row[11];
 	$wikiname = $row[12];
+	$wikionly = $row[13];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -296,6 +299,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ADMINOFF;
     if ($webonly)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_WEBONLY;
+    if ($wikionly)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_WIKIONLY;
     if ($trusted)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
     if ($stud)
@@ -390,6 +395,8 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
         USERERROR("Your account has not been approved yet!", 1);
     if (($status & CHECKLOGIN_WEBONLY) && ! ISADMIN($uid))
         USERERROR("Your account does not permit you to access this page!", 1);
+    if (($status & CHECKLOGIN_WIKIONLY) && ! ISADMIN($uid))
+        USERERROR("Your account does not permit you to access this page!", 1);
 
     #
     # Lastly, check for nologins here. This heads off a bunch of other
@@ -432,6 +439,19 @@ function STUDLY() {
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY));
+}
+
+function WIKIONLY() {
+    global $CHECKLOGIN_STATUS;
+    
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	$uid=GETUID();
+	TBERROR("WIKIONLY: $uid is not logged in!", 1);
+    }
+
+    return (($CHECKLOGIN_STATUS &
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_WIKIONLY)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_WIKIONLY));
 }
 
 # Is this user a real administrator (ignore onoff bit).
@@ -823,16 +843,18 @@ function LASTWEBLOGIN($uid) {
 
 function HASREALACCOUNT($uid) {
     $query_result =
-	DBQueryFatal("select status,webonly from users where uid='$uid'");
+	DBQueryFatal("select status,webonly,wikionly from users ".
+		     "where uid='$uid'");
 
     if (!mysql_num_rows($query_result)) {
 	return 0;
     }
     $row = mysql_fetch_array($query_result);
-    $status  = $row[0];
-    $webonly = $row[1];
+    $status   = $row[0];
+    $webonly  = $row[1];
+    $wikionly = $row[2];
 
-    if ($webonly ||
+    if ($webonly || $wikionly ||
 	(strcmp($status, TBDB_USERSTATUS_ACTIVE) &&
 	 strcmp($status, TBDB_USERSTATUS_FROZEN))) {
 	return 0;

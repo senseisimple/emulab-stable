@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -11,7 +11,8 @@ include("showstuff.php3");
 # Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
+	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 $isadmin = ISADMIN($uid);
 
 #
@@ -39,6 +40,7 @@ else {
 if (! ($userstatus = TBUserStatus($target_uid))) {
     USERERROR("The user $target_uid is not a valid user", 1);
 }
+$wikionly = TBWikiOnlyUser($target_uid);
 
 #
 # Verify that this uid is a member of one of the projects that the
@@ -178,7 +180,7 @@ SUBMENUSTART("User Options");
 # 
 WRITESUBMENUBUTTON("Edit Profile",  "moduserinfo.php3?target_uid=$target_uid");
 
-if ($isadmin || !strcmp($uid, $target_uid)) {
+if (!$wikionly && ($isadmin || !strcmp($uid, $target_uid))) {
     WRITESUBMENUBUTTON("Edit SSH Keys",
 		       "showpubkeys.php3?target_uid=$target_uid");
     WRITESUBMENUBUTTON("Edit SFS Keys",

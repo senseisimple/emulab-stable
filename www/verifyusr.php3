@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,7 +16,8 @@ PAGEHEADER("Confirm Verification");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid,
-	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|CHECKLOGIN_WEBONLY);
+	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
+	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 
 #
 # Must provide the key!
@@ -30,12 +31,14 @@ if (!isset($key) || strcmp($key, "") == 0) {
 # Grab the status and do the modification.
 #
 $query_result =
-    DBQueryFatal("select status from users where uid='$uid'");
+    DBQueryFatal("select status,wikionly from users ".
+		 "where uid='$uid'");
 
 if (($row = mysql_fetch_row($query_result)) == 0) {
     TBERROR("Database Error retrieving status for $uid!", 1);
 }
-$status = $row[0];
+$status   = $row[0];
+$wikionly = $row[1];
 
 #
 # No multiple verifications!
@@ -216,24 +219,50 @@ if (strcmp($status, TBDB_USERSTATUS_UNVERIFIED) == 0) {
 	 "that are now available to you will appear.\n";
 }
 elseif (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0) {
-    DBQueryFatal("update users set status='unapproved' where uid='$uid'");
+    $newstatus = ($wikionly ? "active" : "unapproved");
+    
+    DBQueryFatal("update users set status='$newstatus' where uid='$uid'");
 
     TBMAIL($TBMAIL_AUDIT,
 	   "User '$uid' has been verified",
 	   "\n".
 	   "User '$uid' has been verified.\n".
-           "Status has been changed from 'newuser' to 'unapproved'\n".
+           "Status has been changed from 'newuser' to '$newstatus'\n".
 	   "\n".
 	   "Testbed Operations\n",
 	   "From: $TBMAIL_OPS\n".
 	   "Errors-To: $TBMAIL_WWW");
 
-    INFORMLEADERS($uid);
+    if ($wikionly) {
+	#
+	# For wikionly accounts, build the account now.
+	# Just builds the wiki account of course (nothing else).
+	#
+	SUEXEC("nobody", $TBADMINGROUP, "webtbacct add $uid",
+	       SUEXEC_ACTION_DIE);
 
-    echo "<p>".
-	 "You have now been verified. However, your application ".
-	 "has not yet been approved. You will receive ".
-	 "email when that has been done.\n";
+	#
+	# The backend sets the actual WikiName
+	# 
+	$query_result =
+	    DBQueryFatal("select wikiname from users where uid='$uid'");
+
+	if (($row = mysql_fetch_row($query_result)) == 0) {
+	    TBERROR("Database Error retrieving status for $uid!", 1);
+	}
+	$wikiname = $row[0];
+
+	echo "You have been verified. You may now access the Wiki at<br>".
+	    "<a href='$WIKIURL/$wikiname'>$WIKIURL/$wikiname</a>\n";
+    }
+    else {
+	INFORMLEADERS($uid);
+
+	echo "<p>".
+	     "You have now been verified. However, your application ".
+	    "has not yet been approved. You will receive ".
+	    "email when that has been done.\n";
+    }
 }
 else {
     TBERROR("Bad user status '$status' for $uid!", 1);

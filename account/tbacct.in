@@ -167,7 +167,8 @@ if (AuditStart(0)) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin,u.usr_w_pswd ".
+		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin, ".
+		 " u.usr_w_pswd,u.wikionly ".
 		 "from users as u ".
 		 "where u.uid='$user'");
 
@@ -184,6 +185,7 @@ my $webonly     = $row[5];
 my $usr_shell   = $row[6];
 my $usr_admin   = $row[7];
 my $wpswd       = $row[8];
+my $wikionly    = $row[9];
 
 #
 # Get the users earliest project membership to use as the default group
@@ -273,8 +275,18 @@ sub AddUser()
     #
     # Check status. Only active users get accounts built.
     #
-    if ($webonly || $status ne USERSTATUS_ACTIVE) {
+    if ($webonly || $wikionly || $status ne USERSTATUS_ACTIVE) {
 	if ($webonly) {
+	    return 0;
+	}
+	if ($wikionly) {
+	    $EUID = $UID;
+
+	    # And to the wiki if enabled.
+	    system("$ADDWIKIUSER $user")
+		if ($WIKISUPPORT && !$batch);
+	    
+	    $EUID = 0;
 	    return 0;
 	}
 	fatal("$user is not active! Cannot build an account!");

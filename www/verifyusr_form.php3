@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -16,7 +16,8 @@ PAGEHEADER("New User Verification");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid,
-	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|CHECKLOGIN_WEBONLY);
+	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
+	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 
 echo "<p>
       The purpose of this page is to verify, for security purposes, that

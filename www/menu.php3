@@ -357,10 +357,18 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Change Your Password",
 				   $TBBASE, "moduserinfo.php3");
 	    }
-	    elseif ($login_status & CHECKLOGIN_WEBONLY) {
+	    elseif ($login_status & CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY) {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
+
+		if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
+		    $wikiname = $CHECKLOGIN_WIKINAME;
+		
+		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
+					       "${WIKIURL}/Main/$wikiname",
+					       "${WIKIURL}/Main/$wikiname");
+		}
 	    
 		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
