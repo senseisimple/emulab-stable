@@ -442,13 +442,8 @@ main(int argc, char **argv)
 			break;
 
 		case 's':
-#ifndef linux
 			slice = atoi(optarg);
 			break;
-#else
-			fprintf(stderr, "slice mode not supported in Linux\n"); 
-			exit(1);
-#endif
 
 		case 'D':
 			dostype = atoi(optarg);
@@ -541,7 +536,6 @@ main(int argc, char **argv)
 		seekable = 1;
 
 	if (slice) {
-#ifndef linux
 		off_t	minseek;
 		
 		if (readmbr(slice)) {
@@ -554,10 +548,6 @@ main(int argc, char **argv)
 			perror("Setting seek pointer to slice");
 			exit(1);
 		}
-#else
-		fprintf(stderr, "Slice mode in Linux!\n");
-		exit(1);
-#endif
 	}
 
 	threadinit();
@@ -711,7 +701,6 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 		seekable = 1;
 
 	if (slice) {
-#ifndef linux
 		off_t	minseek;
 		
 		if (readmbr(slice)) {
@@ -724,10 +713,6 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 			perror("Setting seek pointer to slice");
 			exit(1);
 		}
-#else
-		fprintf(stderr, "Slice mode in Linux!\n");
-		exit(1);
-#endif
 	}
 	threadinit();
 	return 0;
@@ -1244,7 +1229,6 @@ writedata(off_t offset, size_t size, void *buf)
 	totalrdata += cc;
 }
 
-#ifndef linux
 #include "sliceinfo.h"
 
 static long long outputmaxsize = 0;
@@ -1328,7 +1312,6 @@ fixmbr(int slice, int dtype)
 	}
 	return 0;
 }
-#endif
 
 static struct blockreloc *reloctable;
 static int numrelocs;
