@@ -14,24 +14,28 @@
  *	syslogd_flags="-a 155.101.132.0/22"
  *
  * This program parses that file and inserts a bunch of entries into the DB.
- * See the update comands below. 
+ * See the update comands below.
  *
- * This program should be run from cron on a periodic basis, say twice an
- * hour. Also note that there should be an entry in /etc/syslog.conf on
- * the users node that sends auth.info to /var/log/logins, which should
- * periodically cleaned with an entry in /etc/newsyslog.conf to keep it from
- * filling up the filesystem. The /etc/crontab entry should look like this:
+ * The entry in users:/etc/syslog.conf to capture the syslog data coming
+ * from the nodes:
  *
- *	5,35   *   *   *   *       root    /usr/testbed/sbin/genlastlog.wrapper
+ *	auth.info			/var/log/logins
  *
- * and the /etc/newsyslog.conf entry should look like this:
+ * while on each experimental node:
+ * 
+ *	auth.info			@users.emulab.net
+ *
+ * Of course, you need to make sure /var/log/logins is cleaned periodically,
+ * so put an entry in /etc/newsyslog.conf:
  *
  *	/var/log/logins           640  7     500 *     Z
  *
- * To prevent information loss that can occurr if the log file is rolled,
- * we actually read the first roll file (it is gzipped of course). This
- * causes us to do some extra work, but its not too bad. 
+ * To prevent information loss that can occurr between the primary file
+ * and the first roll file (logins.0.gz), the program actually reads the
+ * first roll file (it is gzipped of course). This causes us to do some
+ * extra work, but thats okay since we really do not want to lose that data.
  */
+
 #include <stdio.h>
 #include <time.h>
 #include <sys/types.h>
@@ -89,6 +93,7 @@ main(int argc, char **argv)
 	gzFile	       *infp;
 	char		buf[BUFSIZ], *bp;
 	struct hostent  *he;
+	int		errors = 0;
 	
 	progname = argv[0];
 
@@ -121,6 +126,7 @@ main(int argc, char **argv)
 
 		if ((infp = gzopen(buf, "r")) == NULL) {
 			syslog(LOG_ERR, "Opening %s: %m", buf);
+			errors++;
 		}
 		else {
 			doit(infp);
@@ -136,6 +142,7 @@ main(int argc, char **argv)
 
 		if ((infp = gzopen(buf, "r")) == NULL) {
 			syslog(LOG_ERR, "Opening %s: %m", buf);
+			errors++;
 		}
 		else {
 			doit(infp);
@@ -145,7 +152,7 @@ main(int argc, char **argv)
 	alarm(0);
 
 	syslog(LOG_NOTICE, "genlastlog ending");
-	exit(0);
+	exit(errors);
 	
 }
 

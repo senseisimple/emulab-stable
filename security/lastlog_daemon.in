@@ -1,0 +1,95 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Generate lastlog info from syslog data on users node.
+#
+#	usage: lastlog_daemon [-d]
+#
+# TODO: Use "logger" instead of writing a log file.
+#
+sub usage()
+{
+    print STDOUT "Usage: lastlog_daemon [-d]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my  $optlist = "d";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+# Testbed Support library
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+my $genlastlog  = "$TB/sbin/genlastlog";
+my $logfile     = "$TB/log/genlastlog";
+
+#
+# Turn off line buffering on output (dots ...).
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+
+#
+# Only root and TB Admins.
+#
+if ($UID && !TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be root or a TB administrator\n");
+}
+ 
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
+}
+
+#
+# And just loop.
+#
+while (1) {
+    print "Running at " . TBTimeStamp() . "\n";
+    
+    if (system("$genlastlog")) {
+	my $exit_status = $? >> 8;
+
+	print "Exited with status $exit_status at " . TBTimeStamp() . "\n";
+
+	SENDMAIL($TBOPS, "TESTBED: Genlastlog Failed!",
+		 "Failed with exit value $exit_status.\n".
+		 "Please look at the syslog entries for genlastlog!");
+    }
+    sleep(60 * 15);
+}
+
+exit(0);
+
+    

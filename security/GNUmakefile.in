@@ -10,7 +10,7 @@ include $(OBJDIR)/Makeconf
 
 BINS		= suexec lastlogin
 SCRIPTS		= plasticwrap
-SBINS		= paperbag genlastlog genlastlog.wrapper
+SBINS		= paperbag genlastlog lastlog_daemon
 
 #
 # Force dependencies on the scripts so that they will be rerun through
