@@ -11,20 +11,23 @@ my %types = ("powercycle"=>1,"error"=>1,"note"=>1,"critical"=>1);
 
 if ($#ARGV<0) {
   die(" Usage: tblog -i|-s [-n <node_id>] [-u <uid>] [-t <type>] ".
-      "-m 'message text'\n\t[-b <time>] [-a <time>]\n".
+      "-m 'message text'\n\t[-b <time>] [-a <time>] [-e <exact>] [-c <complex>]\n".
       " -i Insert entry\n -s Search log\n -n Node ID\n -u User ID\n".
       " -t Entry type (".join(", ",sort keys %types).")\n".
-      " -m Message\n -b Before this time\n -a After this time\n");
+      " -m Message\n -b Before this time\n -a After this time\n".
+      " -e Exact match for message\n -c Complex query use AND &&, OR ||, NOT ! and node, uid, time, type, or message='somestring'.\n");
 }
 
 my $i=0;
-my $s=0;
+my $s=0;  
 my $node  ="";
 my $uid   ="";
-my $type  ="note";
+my $type  ="";
 my $msg   ="";
 my $before="";
 my $after ="";
+my $exact = 0;
+my $cmplx ="";
 
 while (@ARGV != 0) {
   $_ = shift(@ARGV);
@@ -38,6 +41,8 @@ while (@ARGV != 0) {
   elsif (/^-m(.*)/) { $msg  = ($1 ? $1 : shift(@ARGV));}
   elsif (/^-b(.*)/) {$before= ($1 ? $1 : shift(@ARGV));}
   elsif (/^-a(.*)/) { $after= ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-e(.*)/) { $exact= 1;}
+  elsif (/^-c(.*)/) { $cmplx= ($1 ? $1 : shift(@ARGV));}
   elsif (/^-h(.*)/) { exec "$0";}
   else  {die("Unknown Option: $_\n");}
 }
@@ -46,60 +51,85 @@ while (@ARGV != 0) {
 #print "Got Args:\n";
 #print "i=$i s=$s n=$node u=$uid t='$type' m='$msg' b='$before' a='$after'\n";
 
-if ( $i==$s ) {die("You must select exactly one of '-i' or '-s'.\n");}
-if ( !defined $types{$type} ) {
-  die("Invalid type '$type'. Must be in (".join(" ",sort keys %types).").\n");
+if ( $i==$s ) {
+    die("You must select exactly one of '-i' or '-s'.\n");
+}
+if ( $type ne "" && !defined $types{$type} ) {
+    die("Invalid type '$type'. Must be in (".join(" ",sort keys %types).").\n");
 }
 if ( $i && (!defined $msg || !$msg) ) { 
-  die("You must specify a message string.\n"); 
+    die("You must specify a message string.\n"); 
 }
+
+# Escape any special characters in the message
+if (defined $msg) {
+    $msg =~ s/([^\\])([\'\"\\])/$1\\$2/;
+}
+
+#print "Message updated to '$msg'\n";
+
 
 my $dbh = DBI->connect ("DBI:mysql:database=tbdb;host=localhost")
     || die "Could not connect to TBDB.\n";
 
 # SEARCH THE LOG
 if ($s) { # constructs the where clause of the mysql command
-    my $param = "WHERE log_type='$type'";
-    if ($node ne "") {
-	$param .= " AND node_id='$node'"; 
+    if ($cmplx ne "") {
+	$cmplx =~ s/^node=/node_id=/g;
+	$cmplx =~ s/^time=/entry_time=/g;
+	$cmplx =~ s/^type/log_type/g;
+	$sth = $dbh->prepare("SELECT * FROM log WHERE $cmplx");
+    } else {
+	my $param = "WHERE";
+	if ($node ne "") {
+	    $param .= " AND" if ($param ne "WHERE");
+	    $param .= " node_id='$node'";
+	}
+	if ($uid ne "") {
+	    $param .= " AND" if ($param ne "WHERE");
+	    $param .= " uid='$uid'";
+	}
+	if ($msg ne "") {
+	    $param .= " AND" if ($param ne "WHERE");
+	    if ($exact) {
+		$param .= " message='$msg'";
+	    } else {
+		$param .= " message LIKE '%$msg%'";
+	    }
+	}
+	if ($before ne "") {
+	    my $relbef = parsedate($before);
+	    $param .= " AND" if ($param ne "WHERE");
+	    $param .= " entry_time<=FROM_UNIXTIME($relbef)";
+	}
+	if ($after ne "") {
+	    my $relaft = parsedate($after);
+	    $param .= " AND" if ($param ne "WHERE");
+	    $param .= " entry_time>=FROM_UNIXTIME($relaft)";
+	}
+	$sth = $dbh->prepare("SELECT * FROM log $param");
     }
-    if ($uid ne "") {
-	$param .= " AND uid='$uid'";
-    }
-    if ($msg ne "") { # right now searching by message is not very useful
-	$param .= " AND message='$msg'";
-    }
-    if ($before ne "") {
-	my $relbef = parsedate($before);
-	$param .= " AND entry_time<='$relbef'";
-    }
-    if ($after ne "") {
-	my $relaft = parsedate($after);
-	$param .= " AND entry_time>='$relaft'";
-    }
-    # now query the database and return matching records
-    my $sth = $dbh->prepare("SELECT * FROM log $param");
     $sth->execute || die "Could not query database: $sth->errstr.\n";
     while(@log = $sth->fetchrow_array) {
-	foreach (@log) {
-	    print "$_: ";
-	}
-	print "\n";
+	($entry_id, $node_id, $uid, $entry_time, $log_type, $message) = @log;
+	my $sth2 = $dbh->prepare("SELECT UNIX_TIMESTAMP($entry_time)");
+	$sth2->execute || die "Failure to execute time manipulations.\n";
+	my ($reltime) = ($sth2->fetchrow_array);
+	my $fancytime = strftime("%c", $reltime);
+	print "$entry_id:$node_id:$uid:$fancytime:$log_type:$message.\n";
     }
 }
 
 
 # INSERT AN ENTRY
 if ($i) {
-    my $sth = $dbh->prepare
-	("INSERT INTO log VALUES ('', '$node', '$uid', now(), '$type', '$msg')");
+    if (!defined $type || $type eq "") { $type = "note"; }
+    $uid = (getpwuid($<))[0];
+    my $query = "INSERT INTO log VALUES ('', '$node', '$uid', now(), '$type', '$msg')";
+    print "$query\n";    
+    my $sth = $dbh->prepare($query);
     $sth->execute
-	|| die "Can't insert the entry: $sth->errstr.\n";
+	|| die "Failed to insert the entry into the log: $sth->errstr.\n";
 }
 
 $dbh->disconnect;
-# this should happen automatically anyway, but it can't hurt.
-
-
-
-
