@@ -42,8 +42,9 @@ my $init = 0 ; # Start out uninitialized
 
 sub init {
   $DBNAME = shift;
+  $debug = shift || $debug;
   $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-  print "Database initialized.\n" if $debug;
+  print "Database initialized. (debug level $debug)\n" if $debug;
   &ReadTranslationTable;
   return 0;
 }
@@ -167,7 +168,20 @@ sub tableVlans {
   $sth = $dbh->
     query("select id,members from vlans where pid='$pid' and eid='$eid'");
   while (@row = $sth->fetchrow_array()) {
-    $table{$row[0]} = $row[1];
+    my @list = split(" ",$row[1]);
+    foreach $port (@list) {
+      my ($node,$card) = split(":",$port);
+      if ($card =~ /[a-zA-Z]/) {
+	# specified ala ethX
+	my $sth2 = $dbh->
+	  query("select card from interfaces where node_id='$node' ".
+		"and iface='$card'");
+	$card = ($sth2->fetchrow_array())[0];
+	print "Had '$port', changed to '$node:$card'\n" if $debug;
+	$port = "$node:$card";
+      }
+    }
+    $table{$row[0]} = join(" ",@list);
   }
   return %table;
 }

@@ -16,6 +16,13 @@ BEGIN {
   push(@INC,$TB."/lib");
 }
 
+my $debug = 0;
+#If there is debug, turn it on right now...
+if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) {
+  if ( defined $1 && $1 ne "") { $debug = $1; } else { $debug = 1; }
+  print "DEBUG MODE ON: Set to level $debug\n";
+}
+
 use English;
 
 #Uncomment this when we really need to be able to handle intel switches
@@ -24,16 +31,9 @@ use snmpit_cisco;
 use snmpit_apc;
 use snmpit_lib;
 
-snmpit_lib::init($DBNAME);
+snmpit_lib::init($DBNAME, $debug);
 
 $| = 1; # Turn off line buffering on output
-
-my $debug = 0;
-#If there is debug, turn it on right now...
-if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) {
-  if ( defined $1 && $1 ne "") { $debug = $1; } else { $debug = 1; }
-  print "DEBUG MODE ON: Set to level $debug\n";
-}
 
 my $device;
 my $pid;
@@ -373,8 +373,8 @@ sub ParseArgs {
     if (defined macport($vlan[$n])) {
       if ($vlan[$n]=~/^([a-f]|\d)*$/i) {
 	$vlan[$n]=macport($vlan[$n]);
-	print "Found node $vlan[$n]\n";
       }
+      print "Found node $vlan[$n]\n";
     } else {
       # Allow people to specify addresses with colons or dots
       $vlan[$n] =~ s/[:\.]//g;
@@ -397,9 +397,12 @@ sub ParseArgs {
       print "There were no VLANs in the database table for '$pid' '$eid'\n";
       exit(0);
     } else {
-      if ($debug) {
-	foreach $id (keys %vlantable) {
-	  print "id: $id\t$vlantable{$id}\n";
+      foreach $id (keys %vlantable) {
+	print "id: $id\t$vlantable{$id}\n" if $debug;
+	foreach $node (split (" ",$vlantable{$id})) {
+	  if (!defined macport($node)) {
+	    die("Invalid node found in VLANs table: '$node'\n");
+	  }
 	}
       }
     }
