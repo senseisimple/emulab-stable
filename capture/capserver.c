@@ -220,8 +220,12 @@ main(int argc, char **argv)
 		}
 		if ((int)mysql_num_rows(res)) {
 			row = mysql_fetch_row(res);
+
 			tipown.uid = 0;
-			tipown.gid = atoi(row[0]);
+			if (row[0])
+				tipown.gid = atoi(row[0]);
+			else
+				tipown.gid = admingid;
 		}
 		else {
 			/*
