@@ -44,8 +44,10 @@
 #include <signal.h>
 #include <paths.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
+#include <netdb.h>
 #include <sys/socket.h>
 
 #include "log.h"
@@ -116,6 +118,10 @@ static int vmc_callback(elvin_io_handler_t handler,
 			void *rock,
 			elvin_error_t eerror);
 
+static int update_callback(elvin_timeout_t timeout,
+			   void *rock,
+			   elvin_error_t eerror);
+
 static void parse_config_file(char *filename);
 static void parse_movement_file(char *filename);
 
@@ -167,7 +173,7 @@ int main(int argc, char *argv[])
   char *logfile = NULL;
   char *pidfile = NULL;
   char *eport = NULL;
-  char buf[BUFSIZ];
+  char buf[BUFSIZ], buf2[BUFSIZ];
   char *idx;
   FILE *fp;
   
@@ -314,6 +320,11 @@ int main(int argc, char *argv[])
 	     (eport ? eport : ""));
     server = buf;
   }
+
+  if (!keyfile && pideid) {
+    snprintf(buf2, sizeof(buf2), "/proj/%s/exp/%s/tbdata/eventkey", pid, eid);
+    keyfile = buf2;
+  }
   
   /*
    * Register with the event system. 
@@ -356,6 +367,14 @@ int main(int argc, char *argv[])
 				       elvin_error)) == NULL) {
     fatal("could not register I/O callback");
   }
+
+  if (elvin_sync_add_timeout(NULL,
+			     EMC_UPDATE_HZ,
+			     update_callback,
+			     NULL,
+			     elvin_error) == NULL) {
+    fatal("could not add timeout");
+  }
   
   event_main(handle);
   
@@ -380,24 +399,25 @@ void parse_config_file(char *config_file) {
   // read line by line
   while (fgets(line, sizeof(line), fp) != NULL) {
     int id;
-    char *hostname;
+    char *hostname, *vname;
     float init_x;
     float init_y;
     float init_theta;
 
     // parse the line
     // sorry, i ain't using regex.h to do this simple crap
-    // lines look like '5 garcia1.flux.utah.edu 6.5 4.234582 0.38'
+    // lines look like '5 garcia1.flux.utah.edu 6.5 4.234582 0.38 garcia1'
     // the regex would be '\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+'
     // so basically, 5 non-whitespace groups separated by whitespace (tabs or
     // spaces)
 
     // we use strtok_r because i'm complete
     char *token = NULL;
-    char *delim = " \t";
+    char *delim = " \t\n";
     char *state = NULL;
-    struct robot_config *rc;
+    struct emc_robot_config *rc;
     struct position *p;
+    struct hostent *he;
     
     ++line_no;
 
@@ -436,11 +456,26 @@ void parse_config_file(char *config_file) {
     }
     init_theta = (float)atof(token);
 
+    token = strtok_r(NULL,delim,&state);
+    if (token == NULL) {
+      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
+      continue;
+    }
+    vname = strdup(token);
 	
     // now we save this data to the lists:
-    rc = (struct robot_config *)malloc(sizeof(struct robot_config));
+    rc = (struct emc_robot_config *)malloc(sizeof(struct emc_robot_config));
     rc->id = id;
     rc->hostname = hostname;
+    if ((he = gethostbyname(hostname)) == NULL) {
+      fprintf(stderr, "error: unknown robot: %s\n", hostname);
+      free(hostname);
+      free(rc);
+      continue;
+    }
+    memcpy(&rc->ia, he->h_addr, he->h_length);
+    rc->vname = vname;
+    
     robot_list_append(hostname_list,id,(void*)rc);
     p = (struct position *)malloc(sizeof(struct position *));
     p->x = init_x;
@@ -535,7 +570,58 @@ void ev_callback(event_handle_t handle,
 		 event_notification_t notification,
 		 void *data)
 {
-  printf("event callback\n");
+  char host[TBDB_FLEN_IP];
+  struct in_addr ia;
+  
+  event_notification_get_host(handle, notification, host, sizeof(host));
+
+  if (!inet_aton(host, &ia)) {
+    error("event's host value is not an IP address: %s\n", host);
+  }
+  else {
+    struct emc_robot_config *match = NULL;
+    robot_list_item_t *rli;
+    
+    for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
+      struct emc_robot_config *erc = rli->data;
+      
+      if (erc->ia.s_addr == ia.s_addr) {
+	match = erc;
+	break;
+      }
+    }
+
+    if (match == NULL) {
+      error("no match for IP: %s\n", host);
+    }
+    else {
+      char *value, args[BUFSIZ];
+      float x, y, orientation;
+      
+      event_notification_get_arguments(handle,
+				       notification, args, sizeof(args));
+      
+      if (event_arg_get(args, "X", &value) > 0) {
+	if (sscanf(value, "%f", &x) != 1) {
+	  error("X argument in event is not a float: %s\n", value);
+	}
+      }
+      
+      if (event_arg_get(args, "Y", &value) > 0) {
+	if (sscanf(value, "%f", &y) != 1) {
+	  error("Y argument in event is not a float: %s\n", value);
+	}
+      }
+      
+      if (event_arg_get(args, "ORIENTATION", &value) > 0) {
+	if (sscanf(value, "%f", &orientation) != 1) {
+	  error("ORIENTATION argument in event is not a float: %s\n", value);
+	}
+      }
+
+      // XXX What to do with the data?
+    }
+  }
 }
 
 int acceptor_callback(elvin_io_handler_t handler,
@@ -624,6 +710,7 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	    r.robots[i] = *rc;
 	    i += 1;
 	  }
+	  robot_list_enum_destroy(e);
 	  
 	  // write back an rmc_config packet
 	  if ((wb = mtp_make_packet(MTP_CONFIG_RMC,
@@ -665,7 +752,11 @@ int unknown_client_callback(elvin_io_handler_t handler,
 					 emulab_callback,
 					 NULL,
 					 eerror) == NULL) {
+	      error("unable to add elvin io handler");
+      }
+      else {
 	emulab_sock = fd;
+	
 	retval = 1;
       }
       break;
@@ -679,8 +770,12 @@ int unknown_client_callback(elvin_io_handler_t handler,
 					 vmc_callback,
 					 &vmc_data,
 					 eerror) == NULL) {
+	error("unable to add elvin io handler");
+      }
+      else {
 	vmc_data.sock_fd = fd;
 	vmc_data.position_list = robot_list_create();
+	
 	retval = 1;
       }
       break;
@@ -773,8 +868,6 @@ int rmc_callback(elvin_io_handler_t handler,
 	free(up);
 	up = NULL;
 
-	info("theta %f\n", mp->data.update_position->position.theta);
-	
 	up_copy = (struct mtp_update_position *)
 	  malloc(sizeof(struct mtp_update_position));
 	*up_copy = *(mp->data.update_position);
@@ -846,11 +939,112 @@ int vmc_callback(elvin_io_handler_t handler,
 		 void *rock,
 		 elvin_error_t eerror)
 {
-  char buf[1024];
-  int retval = 0;
+  struct vmc_client *vmc = rock;
+  mtp_packet_t *mp = NULL;
+  int rc, retval = 0;
   
-  printf("vmc callback\n");
-  read(fd, buf, sizeof(buf));
+  if (((rc = mtp_receive_packet(fd, &mp)) != MTP_PP_SUCCESS) ||
+      (mp->version != MTP_VERSION)) {
+    error("invalid client %p\n", mp);
+  }
+  else {
+    switch (mp->opcode) {
+    case MTP_UPDATE_POSITION:
+      {
+	// store the latest data in teh robot position/status list
+	// in vmc_data
+	int my_id = mp->data.update_position->robot_id;
+	struct mtp_update_position *up = (struct mtp_update_position *)
+	  robot_list_remove_by_id(vmc->position_list, my_id);
+	struct mtp_update_position *up_copy;
+
+	free(up);
+	up = NULL;
+
+	up_copy = (struct mtp_update_position *)
+	  malloc(sizeof(struct mtp_update_position));
+	*up_copy = *(mp->data.update_position);
+	robot_list_append(vmc->position_list, my_id, up_copy);
+	
+	// also, if status is MTP_POSITION_STATUS_COMPLETE || 
+	// MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
+	// command to vmc from the movement list.
+
+	// later ....
+
+	retval = 1;
+      }
+      break;
+      
+    default:
+      {
+	struct mtp_packet *wb;
+	struct mtp_control c;
+	
+	error("received bogus opcode from VMC: %d\n", mp->opcode);
+	
+	c.id = -1;
+	c.code = -1;
+	c.msg = "protocol error: bad opcode";
+	wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &c);
+	mtp_send_packet(vmc->sock_fd,wb);
+
+	free(wb);
+	wb = NULL;
+      }
+      break;
+    }
+  }
+  
+  mtp_free_packet(mp);
+  mp = NULL;
+
+  if (!retval) {
+    info("dropping connection %d\n", fd);
+
+    elvin_sync_remove_io_handler(handler, eerror);
+
+    vmc->sock_fd = -1;
+    
+    close(fd);
+    fd = -1;
+  }
+  
+  return retval;
+}
+
+int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
+{
+  struct mtp_update_position *mup;
+  struct robot_list_enum *e;
+  int retval = 1;
+
+  if (elvin_sync_add_timeout(timeout,
+			     EMC_UPDATE_HZ,
+			     update_callback,
+			     rock,
+			     eerror) == NULL) {
+    error("could not re-add update callback\n");
+  }
+
+  e = robot_list_enum(vmc_data.position_list);
+  while ((mup = (struct mtp_update_position *)
+	  robot_list_enum_next_element(e)) != NULL) {
+    struct emc_robot_config *erc;
+
+    erc = robot_list_search(hostname_list, mup->robot_id);
+    printf("update %s %f %f\n", erc->vname, mup->position.x, mup->position.y);
+    event_do(handle,
+	     EA_Experiment, pideid,
+	     EA_Type, TBDB_OBJECTTYPE_NODE,
+	     EA_Event, TBDB_EVENTTYPE_MODIFY,
+	     EA_Name, erc->vname,
+	     EA_ArgFloat, "X", mup->position.x,
+	     EA_ArgFloat, "Y", mup->position.y,
+	     EA_ArgFloat, "ORIENTATION", mup->position.theta,
+	     EA_TAG_DONE);
+  }
+  robot_list_enum_destroy(e);
   
   return retval;
 }

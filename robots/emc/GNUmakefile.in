@@ -11,7 +11,7 @@ SUBDIR		= robots/emc
 
 include $(OBJDIR)/Makeconf
 
-PROGS = emcd
+PROGS = emcd loclistener
 TESTS = test_emcd.sh
 
 all: $(PROGS)
@@ -36,6 +36,7 @@ emcd: emcd.o robot_list.o ../mtp/libmtp.a
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/opsdir/sbin/emcd
+	$(INSTALL_PROGRAM) loclistener $(INSTALL_SBINDIR)/loclistener
 
 clean:
 	rm -f *.o

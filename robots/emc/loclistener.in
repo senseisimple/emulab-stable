@@ -1,0 +1,134 @@
+#! /usr/bin/env python
+
+import os, os.path
+import re
+import sys
+import time
+import getopt
+
+prefix = "@prefix@"
+
+TBPATH = os.path.join(prefix, "lib")
+if TBPATH not in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
+from libdb import *
+from tbevent import *
+
+server = "ops"
+port = None
+pideid = None
+
+usage = ""
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:],
+                               "hs:p:e:",
+                               [ "help",
+                                 "server=",
+                                 "port=",
+                                 "experiment=" ])
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            sys.stderr.write(usage)
+            sys.exit()
+            pass
+        elif opt in ("-s", "--server"):
+            server = val
+            pass
+        elif opt in ("-p", "--port"):
+            port = val
+            pass
+        elif opt in ("-e", "--experiment"):
+            pideid = val
+            pass
+        else:
+            sys.stderr.write("Unhandled option: " + opt + "\n")
+            pass
+        pass
+
+    if not pideid:
+        raise getopt.error("error: -e option must be given")
+    pass
+except getopt.error:
+    sys.stderr.write(usage)
+    sys.exit(2)
+    pass
+
+class LocationInfoUpdater(EventClient):
+
+    def handle_event(self, event):
+        if not re.match("^[-\w]*$", event.getObjName()):
+            sys.stderr.write("error: bad node name in event: %s\n" %
+                             event.getObjName())
+            pass
+        else:
+            res = DBQueryFatal("SELECT li.node_id,li.loc_x,li.loc_y FROM "
+                               "reserved AS r "
+                               "LEFT JOIN location_info AS li ON "
+                               "  li.node_id=r.node_id "
+                               "WHERE r.vname=%s and r.pid=%s and r.eid=%s",
+                               (event.getObjName(), pid, eid))
+
+            if len(res) == 0:
+                sys.stderr.write("error: node not in experiment\n")
+                pass
+            else:
+                if not res[0][0]:
+                    node_id = event.getObjName()
+                    pass
+                else:
+                    node_id = res[0][0]
+                    pass
+                
+                update = {}
+                for arg in event.getArguments().split():
+                    try:
+                        key, value = arg.split('=')
+                        if key == "X" or key == "x":
+                            update["loc_x"] = str(float(value))
+                            pass
+                        elif key == "Y" or key == "y":
+                            update["loc_y"] = str(float(value))
+                            pass
+                        else:
+                            sys.stderr.write("warning: unknown key: %s\n" %
+                                             key)
+                            pass
+                        pass
+                    except:
+                        sys.stderr.write("error: bad argument: %s\n" % arg)
+                        pass
+                    pass
+
+                if len(update) > 0:
+                    clause = ",".join(["=".join(i) for i in update.items()])
+                    
+                    DBQueryFatal("UPDATE location_info SET "
+                                 + clause
+                                 + " WHERE node_id=%s",
+                                 (node_id,))
+                    pass
+                pass
+            pass
+        
+        return
+
+    pass
+
+pid, eid = pideid.split('/')
+
+liu = LocationInfoUpdater(server=server,
+                          port=port,
+                          keyfile=("/proj/%s/exp/%s/tbdata/eventkey" %
+                                   (pid, eid)))
+
+at = address_tuple()
+at.objtype = "NODE"
+at.expt = pideid
+at.eventtype = "MODIFY"
+
+liu.subscribe(at)
+
+liu.run()

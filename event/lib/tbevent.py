@@ -228,6 +228,27 @@ event_notification_pack = _tbevent.event_notification_pack
 
 event_notification_unpack = _tbevent.event_notification_unpack
 
+event_arg_get = _tbevent.event_arg_get
+
+event_arg_dup = _tbevent.event_arg_dup
+EA_TAG_DONE = _tbevent.EA_TAG_DONE
+EA_Site = _tbevent.EA_Site
+EA_Experiment = _tbevent.EA_Experiment
+EA_Group = _tbevent.EA_Group
+EA_Host = _tbevent.EA_Host
+EA_Type = _tbevent.EA_Type
+EA_Name = _tbevent.EA_Name
+EA_Event = _tbevent.EA_Event
+EA_Arguments = _tbevent.EA_Arguments
+EA_ArgInteger = _tbevent.EA_ArgInteger
+EA_ArgFloat = _tbevent.EA_ArgFloat
+EA_ArgString = _tbevent.EA_ArgString
+EA_When = _tbevent.EA_When
+
+event_do_v = _tbevent.event_do_v
+
+event_do = _tbevent.event_do
+
 xmalloc = _tbevent.xmalloc
 
 xrealloc = _tbevent.xrealloc
@@ -453,7 +474,7 @@ class EventClient:
     Event client class, mostly just wraps the SWIG'd versions of the functions.
     """
     
-    def __init__(self, server=None, port=None, url=None):
+    def __init__(self, server=None, port=None, url=None, keyfile=None):
         """
         Construct an EventClient object.
 
@@ -475,7 +496,14 @@ class EventClient:
                 url = url + ":" + port
                 pass
             pass
-        self.handle = event_register(url, 0)
+
+        if keyfile:
+            self.handle = event_register_withkeyfile(url, 0, keyfile)
+            pass
+        else:
+            self.handle = event_register(url, 0)
+            pass
+        
         self.timeout = 0
         
         if not _hack_handle:

@@ -614,7 +614,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/newnode_sshkeys/GNUmakefile \
 	mote/GNUmakefile mote/tbuisp \
 	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
-	robots/emc/test_emcd.sh "
+	robots/emc/test_emcd.sh robots/emc/loclistener "
 
 #
 # Do this for easy distclean.

@@ -141,6 +141,7 @@ Node instproc updatedb {DB} {
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::use_physnaming
     var_import ::TBCOMPAT::physnodes
+    var_import ::TBCOMPAT::objtypes
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
@@ -238,6 +239,8 @@ Node instproc updatedb {DB} {
 	set weight $desirelist($desire)
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list $self $desire $weight]
     }
+
+    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $self $self $objtypes(NODE)]
 }
 
 # add_lanlink lanlink

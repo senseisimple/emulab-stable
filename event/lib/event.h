@@ -214,6 +214,28 @@ int event_notification_unpack(event_handle_t handle,
 			    event_notification_t *notification,
 			    unsigned char *data, int len);
 
+int event_arg_get(char *args, char *key, char **value);
+int event_arg_dup(char *args, char *key, char **value);
+
+typedef enum {
+    EA_TAG_DONE,
+    EA_Site,
+    EA_Experiment,
+    EA_Group,
+    EA_Host,
+    EA_Type,
+    EA_Name,
+    EA_Event,
+    EA_Arguments,
+    EA_ArgInteger,
+    EA_ArgFloat,
+    EA_ArgString,
+    EA_When,
+} ea_tag_t;
+
+int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args);
+int event_do(event_handle_t handle, ea_tag_t tag, ...);
+
 /* util.c */
 void *xmalloc(int size);
 void *xrealloc(void *p, int size);

@@ -1611,3 +1611,222 @@ event_notification_unpack(event_handle_t handle,
 	return 0;
 }
 
+static char *match_quote(char *str)
+{
+	char *retval = NULL;
+	int count;
+	
+	assert(str != NULL);
+	assert(str[0] == '{');
+	
+	for (count = 1, str++; (count > 0) && *str; str++) {
+		switch (*str) {
+		case '{':
+			count += 1;
+			break;
+		case '}':
+			count -= 1;
+			break;
+		default:
+			break;
+		}
+	}
+	
+	if (count == 0)
+		retval = str - 1;
+	
+	return retval;
+}
+
+int event_arg_get(char *args, char *key, char **value_out)
+{
+	static char *WHITESPACE = " \t";
+	
+	int retval = -1;
+
+	*value_out = NULL;
+	args += strspn(args, WHITESPACE);
+	while( (args[0] != '\0') && (retval < 0) ) {
+		char *key_end;
+
+		if (strlen(args) == 0) {
+		}
+		else if ((key_end = strchr(args, '=')) == NULL) {
+			errno = EINVAL;
+			break;
+		}
+		else if (strncasecmp(args, key, (key_end - args)) != 0) {
+			errno = ESRCH;
+		}
+		else if (key_end[1] == '{') {
+			char *value_end;
+			
+			if ((value_end = match_quote(&key_end[1])) == NULL) {
+				errno = EINVAL;
+				break;
+			}
+			else {
+				*value_out = &key_end[2];
+				retval = (value_end - *value_out);
+			}
+		}
+		else if (key_end[1] == '\'') {
+			char *value_end;
+
+			*value_out = &key_end[2];
+			if ((value_end = strchr(*value_out, '\'')) == NULL) {
+				errno = EINVAL;
+				break;
+			}
+			else {
+				retval = (value_end - *value_out);
+			}
+		}
+		else {
+			*value_out = &key_end[1];
+			retval = strcspn(*value_out, WHITESPACE);
+		}
+		
+		args += strcspn(args, WHITESPACE);
+		args += strspn(args, WHITESPACE);
+	}
+	
+	return retval;
+}
+
+int event_arg_dup(char *args, char *key, char **value_out)
+{
+	char *value;
+	int retval;
+
+	*value_out = NULL;
+	if ((retval = event_arg_get(args, key, &value)) >= 0) {
+		if ((*value_out = malloc(retval + 1)) != NULL) {
+			strncpy(*value_out, value, retval);
+			(*value_out)[retval] = '\0';
+		}
+		else {
+			retval = -1;
+			errno = ENOMEM;
+		}
+	}
+	return retval;
+}
+
+int event_do_v(event_handle_t handle, ea_tag_t tag, va_list args)
+{
+	address_tuple_t tuple;
+	int retval = 0;
+
+	if ((tuple = address_tuple_alloc()) == NULL) {
+		ERROR("could not allocate address tuple");
+		errno = ENOMEM;
+	}
+	else {
+		char *arg_name, *event_args, *event_args_cursor;
+		char event_args_buffer[1024] = "";
+		struct timeval *when = NULL;
+		event_notification_t en;
+
+		event_args = event_args_buffer;
+		event_args_cursor = event_args_buffer;
+		
+		while (tag != EA_TAG_DONE) {
+			switch (tag) {
+			case EA_Site:
+				tuple->site = va_arg(args, char *);
+				break;
+			case EA_Experiment:
+				tuple->expt = va_arg(args, char *);
+				break;
+			case EA_Group:
+				tuple->group = va_arg(args, char *);
+				break;
+			case EA_Host:
+				tuple->host = va_arg(args, char *);
+				break;
+			case EA_Type:
+				tuple->objtype = va_arg(args, char *);
+				break;
+			case EA_Name:
+				tuple->objname = va_arg(args, char *);
+				break;
+			case EA_Event:
+				tuple->eventtype = va_arg(args, char *);
+				break;
+			case EA_Arguments:
+				event_args = va_arg(args, char *);
+				break;
+			case EA_ArgInteger:
+				arg_name = va_arg(args, char *);
+				sprintf(event_args_cursor,
+					" %s=%d",
+					arg_name,
+					va_arg(args, int));
+				event_args_cursor += strlen(event_args_cursor);
+				break;
+			case EA_ArgFloat:
+				arg_name = va_arg(args, char *);
+				sprintf(event_args_cursor,
+					" %s=%f",
+					arg_name,
+					va_arg(args, double));
+				event_args_cursor += strlen(event_args_cursor);
+				break;
+			case EA_ArgString:
+				arg_name = va_arg(args, char *);
+				sprintf(event_args_cursor,
+					" %s=%s",
+					arg_name,
+					va_arg(args, char *));
+				event_args_cursor += strlen(event_args_cursor);
+				break;
+			case EA_When:
+				when = va_arg(args, struct timeval *);
+				break;
+			default:
+				ERROR("unknown tag value");
+				errno = EINVAL;
+				return 0;
+			}
+			tag = va_arg(args, ea_tag_t);
+		}
+		
+		if ((en = event_notification_alloc(handle, tuple)) == NULL) {
+			ERROR("could not allocate notification");
+			errno = ENOMEM;
+		}
+		else {
+			struct timeval tv;
+
+			if (when == NULL) {
+				when = &tv;
+				gettimeofday(when, NULL);
+			}
+			if (strlen(event_args) > 0) {
+				event_notification_set_arguments(handle,
+								 en,
+								 event_args);
+			}
+			retval = event_schedule(handle, en, when);
+			event_notification_free(handle, en);
+			en = NULL;
+		}
+		address_tuple_free(tuple);
+		tuple = NULL;
+	}
+	
+	return retval;
+}
+
+int event_do(event_handle_t handle, ea_tag_t tag, ...)
+{
+	va_list args;
+	int retval;
+
+	va_start(args, tag);
+	retval = event_do_v(handle, tag, args);
+	va_end(args);
+	
+	return retval;
+}

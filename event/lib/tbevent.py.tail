@@ -154,7 +154,7 @@ class EventClient:
     Event client class, mostly just wraps the SWIG'd versions of the functions.
     """
     
-    def __init__(self, server=None, port=None, url=None):
+    def __init__(self, server=None, port=None, url=None, keyfile=None):
         """
         Construct an EventClient object.
 
@@ -176,7 +176,14 @@ class EventClient:
                 url = url + ":" + port
                 pass
             pass
-        self.handle = event_register(url, 0)
+
+        if keyfile:
+            self.handle = event_register_withkeyfile(url, 0, keyfile)
+            pass
+        else:
+            self.handle = event_register(url, 0)
+            pass
+        
         self.timeout = 0
         
         if not _hack_handle:
