@@ -57,6 +57,12 @@ if (!TBAdmin()) {
     die "Sorry, only testbed administrators can run this script!\n";
 }
 
+#
+# We seem to have to do this so that ssh gets proper root permissions to read
+# the key file. Argh.
+#
+$UID = $EUID = 0;
+
 if (@ARGV < 1) {
     die "Usage: $0 <node_id> ...\n";
 }
