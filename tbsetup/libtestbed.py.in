@@ -8,6 +8,7 @@ import syslog
 import traceback
 import xmlrpclib
 
+from optparse import OptionParser
 from warnings import warn
 
 #
@@ -29,30 +30,24 @@ DEF_TIMEOUT  = 1*60     # default timeout interval
 MAXCONSECEXC = 3
 
 #
-# informational output control variables
+# Global Variable "namespace" and command line argument parser setup
 #
-debug   = 0
-verbose = 0
+gv = False
+parser = OptionParser()
+parser.add_option("-v", "--verbose", dest="verbose", default=False,
+                  action="store_true", help="Say more about internal stuff")
+parser.add_option("-d", "--debug", dest="debug", default=False,
+                  action="store_true", help="Say A LOT about internal stuff")
 
-#
-# Handle generic arguments.
-#
 def handleArgs(args):
     """
     Takes a list of command-line arguments, interprets those at the
     beginning that are meant for libplab (-vd), and returns the remainder
     of the arguments.
     """
-    global verbose, debug
-    import getopt
-    opts, args = getopt.getopt(args, "vd")
-
-    for o, a in opts:
-        if o == "-v":
-            verbose = 1
-        if o == "-d":
-            debug = 1
-    return args
+    global parser, gv
+    gv, unparsed_args = parser.parse_args(args)
+    return unparsed_args
 
 def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
     """
@@ -181,7 +176,7 @@ def enable_sigs(osigs):
 #
 class TimeoutError: pass
 def alrmhandler(signum, frame):
-    if debug:
+    if gv.debug:
         print "Timeout! Raising TimeoutError."
     raise TimeoutError
 
@@ -282,7 +277,7 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
             try: exval = os.wait()[1]
             except: exval = 256
         else:
-            if debug:
+            if gv.debug:
                 if os.WIFEXITED(exval):
                     print "Process complete, exit value: %d" % \
                           os.WEXITSTATUS(exval)
@@ -298,7 +293,7 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
     # child
     else:
         def sigusrexit(signum, frame):
-            if debug:
+            if gv.debug:
                 print "Received SIGUSR1, bailing out"
             os._exit(1)
 
@@ -352,7 +347,7 @@ def tryXmlrpcCmd(cmd, args = (),
 
     tries = inittries
     
-    if debug:
+    if gv.debug:
         print "About to perform command %s with args:\n\t%s" % \
               (cmd, args)
     while 1:
@@ -375,14 +370,14 @@ def tryXmlrpcCmd(cmd, args = (),
                 e.triesleft = tries
                 raise xmlrpclib.Fault, e
         except TimeoutError, e:
-            if debug:
+            if gv.debug:
                 print "Caught a timeout error, setting triesleft and raising."
             e.triesleft = tries
             raise TimeoutError, e
         except (socket.error, xmlrpclib.ProtocolError), e:
             print "Encountered problem communicating with agent " \
                   "while executing command: %s" % cmd.func_name
-            if debug:
+            if gv.debug:
                 print "Exception is of type: %s" % e
 
         if tries > 0:

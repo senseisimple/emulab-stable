@@ -85,8 +85,9 @@ if (defined($options{"d"})) {
 # Local vars
 #
 my $logfile = "$TB/log/plabmonitord";
-my @nodes = ();
-my $SLEEPINT = 300;  # five minutes between alloc retries.
+my @oldnodes = ();
+my $LOOPINT = 1800;  # 1/2 hour between successive loops.
+my $BATCHNUM = 40;
 
 #
 # daemonize
@@ -106,8 +107,11 @@ print "Plab Monitor Daemon starting... pid $$, at ".`date`;
 #
 while (1) {
 
+    my $start = time();
+
     print "--------------------------------------------------------------". 
           "----------------\n";
+    print "Starting plabmonitord loop at ". TimeStamp() ."\n";
 
     my $query_result =
 	DBQueryWarn("select r1.node_id,n1.phys_nodeid from reserved as r1 ".
@@ -120,102 +124,141 @@ while (1) {
 		    "order by rand()");
 
     if (!$query_result) {
-	print "Failed to get node list from DB! Waiting a bit ...\n";
+	print "Failed to get node list from DB! Waiting a while ...\n";
 	goto loop;
     }
 
     #
     # Build up current node list
     #
-    my @newnodes = ();
+    my @nodes = ();
     while (my ($vnode,$pnode) = $query_result->fetchrow_array()) {
-        if (search($vnode, @nodes)) {
-            push (@newnodes, [$vnode, $pnode]);
+        if (search($vnode, @oldnodes)) {
+            # We've seen this node before, put it on the end.
+            push (@nodes, [$vnode, $pnode]);
         }
         else {
-            unshift(@newnodes, [$vnode, $pnode]);
+            # We haven't seen this one, put it on the front.
+            unshift(@nodes, [$vnode, $pnode]);
         }
     }
 
-    @nodes = @newnodes;
+    @oldnodes = ();
 
-    foreach my $nmap (@nodes) {
-        my ($vnode, $pnode) = @$nmap;
-	my $revive = 0;
+    while (my @batch = splice(@nodes,0,$BATCHNUM)) {
+        my @batch2 = grep(nodeprecheck($_), @batch);
+        my @vnodes = map {$_->[0]} @batch2;
+        my @pnodes = map {$_->[1]} @batch2;
 
-        sleep(5);
-
-
-        # * Try full vnode_setup on node - mgmt sliver.
-        #   - If (multiple?) fail, try to delete node/sliver from mgmt slice.
-        #     (can we push out this action?)
-        #
-
-        #
-        # Make sure the node is still in $NODEDEAD_*
-        #
-        my $query_result = DBQueryWarn("select node_id from reserved where ".
-                                       "node_id = '$pnode' and ".
-                                       "pid = '$NODEDEAD_PID' and ".
-                                       "eid = '$NODEDEAD_EID'");
-	if (!$query_result) {
-            print "Node entry DB check failed!  Waiting a bit ...\n";
-            last;
-        }
-        
-        if (!$query_result->num_rows()) {
-            print "Node was removed out from under us! Continuing on ...\n";
-            next;
-        }
-        
+        sleep 5;
+    
         print "##############################################################################\n";
-	print "### Checking $vnode on $pnode at " . TimeStamp() . "\n";
-
-	#
-	# Try to tear it down, set it up, and wait for ISUP.
-	#
-
-        # Bah, can't do unassign->assign in plab right now since unassign
-        # is async, and may clobber the immediate assign afterward.
+        print "### Checking vnodes: @vnodes on pnodes: @pnodes at ".
+            TimeStamp() . "\n";
+    
         #
-	#system("vnode_setup -f -k -d $PLABMOND_PID $PLABMOND_EID $vnode");
-	system("vnode_setup -f -d $PLABMOND_PID $PLABMOND_EID $vnode");
-	if ($?) {
-	    print "Failed to allocate $vnode on $pnode\n";
-        } else {
-            if (! TBNodeStateWait($vnode, TBDB_NODESTATE_ISUP, time(), 120)) {
-                $revive = 1;
-            }
+        # Try to setup the vnodes.
+        #
+        system("vnode_setup -f -d -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @vnodes");
+
+        print "sleeping for a bit.\n"
+            if ($debug);
+        sleep(180); # wait a bit..
+        print "Checking vnode_setup run status\n";
+        my @failed = grep(nodepostalloc($_), @batch2);
+        
+        # If any fail, try to tear them down.
+        if (@failed) {
+            my @fvnodes = map {$_->[0]} @failed;
+            my @fpnodes = map {$_->[1]} @failed;
+            
+            print "vnode_setup failed for the following vnodes: @fvnodes\n";
+            system("vnode_setup -f -d -k $PLABMOND_PID $PLABMOND_EID @fvnodes");
         }
 
-	#
-	# That all worked. Move the pnode out of hwdown and back into
-	# normal holding experiment.
-	#
-	if ($revive &&
-	    DBQueryWarn("update reserved set ".
-			"  pid='$PLABHOLDING_PID',eid='$PLABHOLDING_EID' ".
-			"where node_id='$pnode'")) {
-	    print "$pnode brought back from the afterworld at ".
-		TimeStamp() . "\n";
-	    
-	    TBSetNodeLogEntry($pnode, "root", TB_DEFAULT_NODELOGTYPE(),
-			      "'Moved to $PLABHOLDING_EID; ".
-			      "plab node $vnode setup okay by monitor.'");
-
-	    SENDMAIL($TBOPS, "$pnode is alive",
-		     "$pnode has been brought back from the afterworld!",
-		     $TBOPS);	    
-	} else {
-            print "Leaving $pnode in hwdown!\n";
-        }
+        # Keep track of failed nodes for next daemon loop iteration.
+        push(@oldnodes, @failed);
     }
+
   loop:
-    sleep($SLEEPINT);
+    my $leftover = $LOOPINT - (time() - $start);
+    $leftover = ($leftover > 0) ? $leftover : 0;
+    print "Sleeping for $leftover seconds.\n";
+    sleep($leftover);
 }
 
-exit(0);
 
+sub nodepostalloc($) {
+    my ($vnode, $pnode) = @{$_[0]};
+    my $retval = 1;
+    my $state = TBDB_NODESTATE_UNKNOWN();
+
+    if (TBGetNodeEventState($vnode, \$state) && 
+        $state eq TBDB_NODESTATE_ISUP()) 
+    {
+        $revive = 1;
+    }
+
+    print "State for $vnode is $state\n";
+
+    #
+    # That all worked. Move the pnode out of hwdown and back into
+    # normal holding experiment.
+    #
+    if ($revive &&
+        DBQueryWarn("update reserved set ".
+                    "  pid='$PLABHOLDING_PID',eid='$PLABHOLDING_EID' ".
+                    "where node_id='$pnode'")) {
+        print "$pnode brought back from the afterworld at ".
+            TimeStamp() . "\n";
+        
+        TBSetNodeLogEntry($pnode, "root", TB_DEFAULT_NODELOGTYPE(),
+                          "'Moved to $PLABHOLDING_EID; ".
+                          "plab node $vnode setup okay by monitor.'");
+        
+        SENDMAIL($TBOPS, "$pnode is alive",
+                 "$pnode has been brought back from the afterworld!",
+                 $TBOPS);
+        $retval = 0;
+    } else {
+        print "Leaving $pnode in hwdown!\n";
+        $retval = 1
+    }
+
+    return $retval;
+}
+
+
+sub nodeprecheck($) {
+    my ($vnode, $pnode) = @{$_[0]};
+    my $retval = 1;
+
+    # * Try full vnode_setup on node - mgmt sliver.
+    #   - If (multiple?) fail, try to delete node/sliver from mgmt slice.
+    #     (can we push out this action?)
+    #
+    
+    #
+    # Make sure the node is still in $NODEDEAD_*
+    #
+    my $query_result = DBQueryWarn("select node_id from reserved where ".
+                                   "node_id = '$pnode' and ".
+                                   "pid = '$NODEDEAD_PID' and ".
+                                   "eid = '$NODEDEAD_EID'");
+    if (!$query_result) {
+        print "Node entry DB check failed!  Waiting a bit ...\n";
+        return;
+    }
+        
+    if (!$query_result->num_rows()) {
+        print "Node was removed out from under us! Continuing on ...\n";
+        return;
+    }
+
+    return $retval;
+}
+
+    
 sub fatal($)
 {
     local($msg) = $_[0];

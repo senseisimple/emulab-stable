@@ -4,8 +4,17 @@ import sys
 sys.path.append("@prefix@/lib")
 
 import xmlrpclib
+import getopt
 
+import libtestbed
 from libtestbed import *
+
+#
+# Setup mod_PLC's parse args
+#
+parser.add_option("--noIS", dest="noIS", action="store_true",
+                  default=False,
+                  help="Don't run InstantiateSliver() in mod_PLC")
 
 #
 # PLC constants
@@ -92,7 +101,11 @@ class PLCagent:
 class mod_PLC:
     def __init__(self):
         self.modname = "mod_PLC"
-        pass
+        self.noIS = False
+        if hasattr(libtestbed.gv,"noIS"):
+            self.noIS = libtestbed.gv.noIS
+            pass
+        return
 
     def createSlice(self, slice):
 
@@ -101,7 +114,7 @@ class mod_PLC:
 
         try:
             res = tryXmlrpcCmd(agent.createSlice)
-            if debug:
+            if libtestbed.gv.debug:
                 print res
                 pass
             pass
@@ -112,7 +125,7 @@ class mod_PLC:
         try:
             res = tryXmlrpcCmd(agent.AssignUsers,
                                EMULABMAN_EMAIL)
-            if debug:
+            if libtestbed.gv.debug:
                 print res
                 pass
             pass
@@ -124,7 +137,7 @@ class mod_PLC:
             res = tryXmlrpcCmd(agent.AssignShares,
                                (DEF_PLC_LEASELEN,
                                 DEF_PLC_SHARES))
-            if debug:
+            if libtestbed.gv.debug:
                 print res
                 pass
             pass
@@ -148,7 +161,7 @@ class mod_PLC:
             res = tryXmlrpcCmd(agent.AssignShares,
                                (DEF_PLC_LEASELEN,
                                 DEF_PLC_SHARES))
-            if debug:
+            if libtestbed.gv.debug:
                 print res
                 pass
             pass
@@ -169,7 +182,7 @@ class mod_PLC:
             try:
                 res = tryXmlrpcCmd(agent.AssignNodes, node.IP,
                                    inittries=tries, raisefault=True)
-                if debug:
+                if libtestbed.gv.debug:
                     print res
                     pass
                 pass
@@ -193,21 +206,22 @@ class mod_PLC:
 
             pass
 
-        # push changes out immediately.
-        try:
-            TIMESTAMP("Starting InstantiateSliver() on %s." % node.nodeid)
-            res = tryXmlrpcCmd(agent.InstantiateSliver, node.IP)
-            TIMESTAMP("InstantiateSliver() complete on %s." % node.nodeid)
-            if debug:
-                print res
+        if not self.noIS:
+            # push changes out immediately.
+            try:
+                TIMESTAMP("Starting InstantiateSliver() on %s." % node.nodeid)
+                res = tryXmlrpcCmd(agent.InstantiateSliver, node.IP)
+                TIMESTAMP("InstantiateSliver() complete on %s." % node.nodeid)
+                if libtestbed.gv.debug:
+                    print res
+                    pass
                 pass
+            except:
+                print "Failed to instantiate sliver %s on slice %s" % \
+                      (node.nodeid, node.slice.slicename)
+                self.freeNode(node)
+                raise
             pass
-        
-        except:
-            print "Failed to instantiate sliver %s on slice %s" % \
-                  (node.nodeid, node.slice.slicename)
-            self.freeNode(node)
-            raise
         
         return (res, None, None)
 
@@ -215,7 +229,7 @@ class mod_PLC:
         agent = PLCagent(node.slice.slicename)
         try:
             res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP)
-            if debug:
+            if libtestbed.gv.debug:
                 print res
                 pass
             pass

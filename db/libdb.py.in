@@ -11,6 +11,7 @@ import pwd
 
 import MySQLdb
 
+import libtestbed
 from libtestbed import *
 
 __dbName = "@TBDBNAME@"
@@ -33,7 +34,7 @@ def TBDBConnect():
         name = "uid%d" % uid
     dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
 
-    if debug:
+    if libtestbed.gv.debug:
         print "Connecting to db %s as %s" % (__dbName, dbuser)
 
     # Connect, with retries
@@ -55,7 +56,7 @@ def DBQueryFatal(queryPat, querySub = (), asDict = False):
     else:
         cursor = __dbConnection.cursor()
 
-    if debug:
+    if libtestbed.gv.debug:
         print "Executing DB query %s" % queryPat
 
     tries = __dbQueryMaxtries
@@ -63,7 +64,7 @@ def DBQueryFatal(queryPat, querySub = (), asDict = False):
         try:
             cursor.execute(queryPat, querySub)
             ret = cursor.fetchall()
-            if debug:
+            if libtestbed.gv.debug:
                 rs = `ret`
                 if len(rs) > 60:
                     rs = rs[:60] + "..."

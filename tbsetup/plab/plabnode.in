@@ -5,14 +5,21 @@ import sys
 sys.path.append("@prefix@/lib")
 import getopt
 import libtestbed
+from libtestbed import *
 import libplab
 import time
+
+#
+# Add parser options.
+#
+parser.add_option("-f", "--force", dest="force", default=False,
+                  action="store_true", help="Force vserver creation.")
 
 TRIES = 3
 SLEEPINT = 5
 
 def usage(me):
-    print "Usage: %s [ -vd ] { alloc | free } [-f] pid eid nodeid" % me
+    print "Usage: %s [ -vdf ] { alloc | free } pid eid nodeid" % me
     sys.exit(1)
 
 def main(args):
@@ -22,7 +29,7 @@ def main(args):
     Force = False
     
     try:
-        args = libtestbed.handleArgs(args[1:])
+        args = handleArgs(args[1:])
     except getopt.GetoptError:
         usage(me)
     except ValueError:
@@ -32,19 +39,13 @@ def main(args):
     if not len(args):
         usage(me)
         pass
-    
-    command = args[0]
-    opts, args = getopt.getopt(args[1:], "f")
-    for o, a in opts:
-        if o == "-f":
-            Force = True
 
-    pid, eid, nodeid = args
+    command, pid, eid, nodeid = args
     plab = libplab.Plab()
     slice = plab.loadSlice(pid, eid)
 
     if command == "alloc":
-        node = slice.createNode(nodeid, force=Force)
+        node = slice.createNode(nodeid, force=libtestbed.gv.force)
         
         while 1:
             try:

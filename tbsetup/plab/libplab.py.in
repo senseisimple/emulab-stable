@@ -1,13 +1,14 @@
 # -*- python -*-
 """
-Library for interfacing with Plab and, specifically, dslice.  This
-abstracts out the concepts of Plab central, slices, and nodes.  All
-data (except static things like certificates) is kept in the Emulab
-DB.  Unlike the regular dslice svm, this one supports dynamically
-changing which nodes are in a slice.
+Library for interfacing with Plab.  This abstracts out the concepts of
+Plab central, slices, and nodes.  All data (except static things like
+certificates) is kept in the Emulab DB.  Unlike the regular dslice
+svm, this one supports dynamically changing which nodes are in a
+slice.
 
-This requires an already obtained dslice certficate and key.  By default
-it expects to find these in the @prefix@/etc/plab/ subdirectory.
+This requires an already obtained dslice certficate and key.  By
+default it expects to find these in the @prefix@/etc/plab/
+subdirectory.
 """
 
 import sys
@@ -26,6 +27,7 @@ from warnings import warn
 #
 # Testbed and DB access libs
 #
+import libtestbed
 from libtestbed import *
 from libdb import *
 
@@ -47,6 +49,7 @@ RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
 RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
 FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
+NODEPROBEINT  = 10
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
@@ -85,6 +88,13 @@ NODEPREFIX  = "plab"
 
 BADSITECHARS = re.compile(r"\W+")
 PLABBASEPRIO = 20000
+
+#
+# Additions to parser
+#
+parser.add_option("--pollNode", action="store_true", dest="pollNode",
+                  default=False,
+                  help="Poll node before attempting to set it up.")
 
 #
 # var to track failed renewals
@@ -165,11 +175,11 @@ class siteParser:
 
         
 class Plab:
-    def __init__(self, agent = None):
+    def __init__(self, agent=None):
         if not agent:
             self.agent = agents[DEF_AGENT]()
             pass
-        if debug:
+        if libtestbed.gv.debug:
             print "Using module: %s" % self.agent.modname
             pass
         pass
@@ -222,12 +232,12 @@ class Plab:
         except:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to agent: %s: %s" % (extype, exval)
-            if debug:
+            if libtestbed.gv.debug:
                 print extrace
             print "Going back to sleep until next scheduled poll"
             return
 
-        if debug:
+        if libtestbed.gv.debug:
             print "Got advertisement list:"
             print avail
             pass
@@ -246,7 +256,7 @@ class Plab:
 
         # Get node info we already have.
         known = self.__getKnownPnodes()
-        if debug:
+        if libtestbed.gv.debug:
             print "Got known pnodes:"
             print known
             pass
@@ -255,6 +265,7 @@ class Plab:
         toadd = []  # List of node entries to add to DB
         toupdate = [] # List of node entries to update in the DB
         for nodeent in avail:
+            nodeent['SITE'] = BADSITECHARS.sub("-", nodeent['SITE'])
             nid = nodeent['NODEID']
             if not known.has_key(nid):
                 toadd.append((nodeent, False))
@@ -271,7 +282,7 @@ class Plab:
                 
         if len(toadd):
             if ignorenew:
-                if verbose:
+                if libtestbed.gv.verbose:
                     print "%d new Plab nodes, but ignored for now" % len(toadd)
                     pass
                 pass
@@ -281,11 +292,11 @@ class Plab:
                 print "There are %d new/changed Plab nodes." % len(toadd)
                 for nodeent, update in toadd:
                     self.__findLinkType(nodeent)
-                    if debug:
+                    if libtestbed.gv.debug:
                         print "Found linktype %s for node %s" % \
                               (nodeent['LINKTYPE'], nodeent['IP'])
-                        pass
-                    self.__addNode(nodeent, update)                    
+                        pass                    
+                    self.__addNode(nodeent, update)
                     nodestr = "%s\t\t%s\t\t%s\t\t%s\t\t%s\n" % \
                               (nodeent['NODEID'],
                                nodeent['IP'],
@@ -410,7 +421,6 @@ class Plab:
         nodeid = NODEPREFIX + nodeent['NODEID']
         priority = PLABBASEPRIO + int(nodeent['NODEID'])
         hostonly = nodeent['HNAME'].replace(".", "-")
-        site = BADSITECHARS.sub("-", nodeent['SITE'])
         
         print "Creating pnode %s as %s, priority %d." % \
               (nodeent['IP'], nodeid, priority)
@@ -432,7 +442,7 @@ class Plab:
             DBQueryFatal("replace into widearea_nodeinfo"
                          " (node_id, contact_uid, hostname, site)"
                          " values (%s, %s, %s, %s)",
-                         (nodeid, 'bnc', nodeent['HNAME'], site))
+                         (nodeid, 'bnc', nodeent['HNAME'], nodeent['SITE']))
 
             DBQueryFatal("replace into interfaces"
                          " (node_id, card, port, IP, interface_type,"
@@ -472,7 +482,7 @@ class Plab:
                 vprio = (priority * 100) + (n+1)
                 sshdport = 38000+(n+1)
                 vnodeid = "%s-%d" % (nodeid, n+1)
-                if verbose:
+                if libtestbed.gv.verbose:
                     print "Creating vnode %s, priority %d" % (vnodeid, vprio)
                     pass
                     
@@ -523,7 +533,7 @@ class Plab:
         it doesn't change.
         """
         if not hasattr(self, "__getNodetypeInfoCache"):
-            if debug:
+            if libtestbed.gv.debug:
                 print "Getting node type info"
                 pass
             res = DBQueryFatal("select osid, control_iface"
@@ -541,7 +551,7 @@ class Plab:
         addNode helper function.  Returns a (nodeid, priority) tuple of
         the next free nodeid and priority for Plab nodes.
         """
-        if debug:
+        if libtestbed.gv.debug:
             print "Getting next free nodeid"
         DBQueryFatal("lock tables nextfreenode write")
         try:
@@ -731,7 +741,7 @@ class Slice:
         XXX This should probably be made lazy, since not all operations
         really need it
         """
-        if verbose:
+        if libtestbed.gv.verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
         res = DBQueryFatal("select slicename, slicemeta from plab_slices"
                            " where pid = %s and eid = %s",
@@ -843,6 +853,12 @@ class Node:
         self.nodeid = nodeid
         self.IP = self.__findIP()
         self.nodemeta = None
+        self.pollNode = False
+
+        if hasattr(gv,"pollNode"):
+            self.pollNode = gv.pollNode
+            pass
+        return
 
     # XXX: may want to rethink signal handling here.
     def _create(self, force=False):
@@ -878,6 +894,20 @@ class Node:
                       self.slice.slicename, self.nodeid,
                       self.nodemeta, self.leaselen))
 
+        if self.pollNode:
+            TIMESTAMP("Waiting for %s to respond" % self.nodeid)
+            while True:
+                try:
+                    self.__perform("/bin/true")
+                    pass
+                except:
+                    time.sleep(NODEPROBEINT)
+                    pass
+                else: break
+                pass
+            TIMESTAMP("Node %s ready." % self.nodeid)
+            pass        
+
         TIMESTAMP("createnode %s finished." % self.nodeid)
         return
 
@@ -886,7 +916,7 @@ class Node:
         Loads an already allocated node from the DB.  Don't call this
         directly, use Slice.loadNode instead.
         """
-        if verbose:
+        if libtestbed.gv.verbose:
             print "Loading node %s" % self.nodeid
         res = DBQueryFatal("select slicename, nodemeta"
                            " from plab_slice_nodes where node_id = %s",
@@ -975,7 +1005,7 @@ class Node:
         TIMESTAMP("emulabify %s finished." % self.nodeid)
 
     def addToGroup(self, user, group):
-        if verbose:
+        if libtestbed.gv.verbose:
             print "Adding %s to group %s on node %s" % \
                   (user, group, self.nodeid)
         self.__perform("sudo /usr/sbin/usermod -G %s %s" % (group, user))
@@ -985,11 +1015,11 @@ class Node:
         Unpacks a locally stored gzip'd tarball to the specified path
         (default /) on the remote node.  Always done as remote root.
         """
-        if verbose:
+        if libtestbed.gv.verbose:
             print "Unpacking tgz %s to %s on %s" % \
                   (tgzpath, destpath, self.nodeid)
         try:
-            if debug:
+            if libtestbed.gv.debug:
                 print "Trying to grab rootball through loopback service"
             self.__perform("sudo wget -q -nH -P /tmp " +
                            ROOTBALL_URL + tgzname)
@@ -1004,7 +1034,7 @@ class Node:
         """
         Executes the given command on the remote node via sshtb
         """
-        if debug:
+        if libtestbed.gv.debug:
             print "Performing '%s' on %s" % (command, self.nodeid)
         if os.spawnl(os.P_WAIT, SSH, SSH, "-host", self.nodeid, command):
             raise RuntimeError, "ssh '%s' failed" % command
@@ -1015,7 +1045,7 @@ class Node:
         as root.
         """
         import popen2
-        if debug:
+        if libtestbed.gv.debug:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
         # dd is a bit overbearing for this job, but I can't do something
@@ -1043,6 +1073,6 @@ class Node:
         assert (len(res) > 0), \
                "No IP found for nodeid %s" % self.nodeid
         ((IP, ), ) = res
-        if debug:
+        if libtestbed.gv.debug:
             print "Found IP %s for node %s" % (IP, self.nodeid)
         return IP

@@ -3,7 +3,9 @@
 import sys
 sys.path.append("@prefix@/lib")
 import libtestbed
+from libtestbed import *
 import libplab
+import getopt
 
 RENEW_PERIOD = 60*60
 
@@ -14,16 +16,17 @@ def usage(me):
 
 def main(args):
     me = args[0]
+
     try:
-        args = libtestbed.handleArgs(args[1:])
+        args = handleArgs(args[1:])
     except getopt.GetoptError:
         usage(me)
         pass
-
+    
     plab = libplab.Plab()
-    daemon = libtestbed.pydaemon(libtestbed.pydaemon.SYSLOG)
+    daemon = pydaemon(pydaemon.SYSLOG)
 
-    if not libtestbed.debug:
+    if not libtestbed.gv.debug:
         daemon.daemonize()
         pass
     

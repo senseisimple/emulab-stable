@@ -18,10 +18,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: vnode_setup [-f] [-k] <pid> <eid> [node ...]\n";
+    print STDOUT "Usage: vnode_setup [-f] [-k] [-n <number>] <pid> <eid> [node ...]\n";
     exit(-1);
 }
-my  $optlist = "fdk";
+my  $optlist = "fdkn:";
 
 #
 # We don't want to run this script unless its the real version.
@@ -46,9 +46,9 @@ my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
 my $killmode    = 0;
+my $numbatch    = 10;
 my $dbuid;
 
-my $MAX_CHILDREN = 8;
 my $CHILD_TIMEOUT = 960;  # 15 + 1 mins slop - plab needs a LOOOONNNGG TIME....
 
 #
@@ -85,6 +85,15 @@ if (defined($options{"d"})) {
 if (defined($options{"k"})) {
     $killmode = 1;
 }
+if (defined($options{"n"})) {
+    if ($options{"n"} =~ /^(\d+)$/) {
+        $numbatch = $1;
+    }
+    else {
+        die ("*** Bad data in numbatch: $options{'n'}");
+    }
+}
+
 my $pid   = shift(@ARGV);
 my $eid   = shift(@ARGV);
 
@@ -278,7 +287,11 @@ foreach my $node (@nodes) {
 
 my $children = 0;
 my %child_vnodes = ();
+print "Running at parallelization: $numbatch\n";
 while (1) {
+
+    # Space out the invocation of child processes a little.
+    sleep(3);
 
     #
     # We're done when we've hit the last vnode, and we've outlived all of our
@@ -291,7 +304,7 @@ while (1) {
     #
     # There are more free slots
     #
-    if (($children <= $MAX_CHILDREN) && @vnodes) {
+    if (($children < $numbatch) && @vnodes) {
 	#
 	# Look for a vnode that is not on a pnode we're already working on
 	# 
@@ -321,9 +334,9 @@ while (1) {
 	    $UID = 0;
 
 	    if ($plab && $mode eq "setup") {
-		if (TBForkCmd("$TB/sbin/plabnode alloc ". 
+		if (TBForkCmd("$TB/sbin/plabnode ". 
                               ($force ? "-f" : "").
-                              " $pid $eid $vnode", 1)) {
+                              " alloc $pid $eid $vnode", 1)) {
 		    print STDERR "*** $0:\n" .
                         "    Plab node allocation failed\n";
 		    # Should check DB state instead.
