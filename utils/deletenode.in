@@ -13,6 +13,8 @@
 use lib '@prefix@/lib';
 use libdb;
 
+use Getopt::Std;
+
 # Turn off line buffering on output
 $| = 1;
 
@@ -26,9 +28,21 @@ if (!TBAdmin()) {
     die "Sorry, only testbed administrators can run this script!\n";
 }
 
+#
+# Handle command-line arguments
+#
+sub usage {
+    die "usage: deletenode <node>\n";
+}
+
+my %options = ();
+if (!getopts("b",\%options)) {
+    usage();
+}
+
 my $node = shift @ARGV;
 if (!$node || @ARGV) {
-    die "usage: deletenode <node>\n";
+    usage();
 }
 
 #
@@ -60,13 +74,18 @@ if ($allocated && (($pid ne NODEDEAD_PID) || ($eid ne NODEDEAD_EID))) {
 #
 # Make sure they know what they are getting themselves into
 #
-print "*** WARNING:\n";
-print "This will erase all evidence that $node ever existed in the testbed!\n";
-print "Are you SURE you want to continue? ";
-my $answer = <>;
-if ($answer !~ /^y/i) {
-    print "Okay, aborting...\n";
-    exit(1);
+# Note: the -b (batch) option is intentionally undocumented, it should only be
+# used from other scripts that have already asked for confirmation
+#
+unless ($options{b}) {
+    print "*** WARNING:\n";
+    print "This will erase all evidence that $node ever existed in the testbed!\n";
+    print "Are you SURE you want to continue? ";
+    my $answer = <>;
+    if ($answer !~ /^y/i) {
+	print "Okay, aborting...\n";
+	exit(1);
+    }
 }
 
 #
@@ -75,7 +94,7 @@ if ($answer !~ /^y/i) {
 while (my ($table, $clist) = each %clean_tables) {
     foreach my $column (@$clist) {
 	print "Removing from table $table, column $column\n";
-	print "DELETE FROM $table WHERE $column='$node';\n";
+	DBQueryFatal("DELETE FROM $table WHERE $column='$node';");
     }
 }
 
