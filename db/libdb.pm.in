@@ -199,6 +199,7 @@ TBDBConnect();
 
 sub TBdbfork()
 {
+    select(undef, undef, undef, 0.3);
     undef($DB);
     TBDBConnect();
 }
