@@ -12,3 +12,5 @@ $(INSTALLDIR)/%: %
 	@echo Installing $@
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL) $< $@
+
+all:

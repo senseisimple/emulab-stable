@@ -1,6 +1,8 @@
 DESTDIR=
 CFLAGS= -O -DNBPG=2048
 
+all: capture
+
 capture: capture.c
 	cc $(CFLAGS) -o capture capture.c
 
