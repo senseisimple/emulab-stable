@@ -34,21 +34,22 @@ int		mydb_update(char *query, ...);
 /*
  * Commands we support.
  */
-static int doreboot(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dostatus(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dodelay(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dohosts(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dorpms(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int dostartstat(int sock, struct in_addr ipaddr, char *request,int tcp);
-static int doready(int sock, struct in_addr ipaddr, char *request,int tcp);
-static int doreadycount(int sock, struct in_addr ipaddr,char *request,int tcp);
+static int doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dostartstat(int sock, struct in_addr ipaddr, char *rdata,int tcp);
+static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
+static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int sock, struct in_addr ipaddr, char *request, int tcp);
+	int    (*func)(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 } command_array[] = {
 	{ "reboot",	doreboot },
 	{ "status",	dostatus },
@@ -58,10 +59,11 @@ struct command {
 	{ "hostnames",	dohosts },
 	{ "rpms",	dorpms },
 	{ "startupcmd",	dostartcmd },
-	{ "startstatus",dostartstat }, /* Leave this before next one */
+	{ "startstatus",dostartstat }, /* Leave this before "startstat" */
 	{ "startstat",	dostartstat },
 	{ "readycount", doreadycount },
 	{ "ready",	doready },
+	{ "log",	dolog },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -154,7 +156,7 @@ main(int argc, char **argv)
 		struct sockaddr_in oclient;
 #endif
 		int		   clientsock, length = sizeof(client);
-		char		   buf[BUFSIZ], *bp, *cp;
+		char		   buf[MYBUFSIZE], *bp, *cp;
 		int		   cc, nfds, istcp;
 		fd_set		   fds;
 
@@ -181,7 +183,7 @@ main(int argc, char **argv)
 			/*
 			 * Read in the command request.
 			 */
-			if ((cc = read(clientsock, buf, BUFSIZ - 1)) <= 0) {
+			if ((cc = read(clientsock, buf, MYBUFSIZE - 1)) <= 0) {
 				if (cc < 0)
 					syslog(LOG_ERR, "Reading request: %m");
 				syslog(LOG_ERR, "Connection aborted");
@@ -192,7 +194,7 @@ main(int argc, char **argv)
 			istcp = 0;
 			clientsock = udpsock;
 
-			cc = recvfrom(clientsock, buf, BUFSIZ - 1,
+			cc = recvfrom(clientsock, buf, MYBUFSIZE - 1,
 				      0, (struct sockaddr *)&client, &length);
 			if (cc <= 0) {
 				if (cc < 0)
@@ -203,11 +205,6 @@ main(int argc, char **argv)
 		}
 
 		buf[cc] = '\0';
-		bp = buf;
-		while (*bp++) {
-			if (*bp == '\r' || *bp == '\n')
-				*bp = '\0';
-		}
 		bp = buf;
 #ifdef TESTMODE
 		/*
@@ -230,28 +227,44 @@ main(int argc, char **argv)
 		assert(cp);
 		strcpy(cp, bp);
 		
-		syslog(LOG_INFO, "%s REQUEST: %s",
-		       inet_ntoa(client.sin_addr), cp);
-
 		/*
 		 * Figure out what command was given.
 		 */
-		for (i = 0; i < numcommands; i++) {
+		for (i = 0; i < numcommands; i++)
 			if (strncmp(cp, command_array[i].cmdname,
-				    strlen(command_array[i].cmdname)) == 0) {
-			        err = command_array[i].func(clientsock,
-							    client.sin_addr,
-							    cp, istcp);
+				    strlen(command_array[i].cmdname)) == 0)
 				break;
-			}
-		}
+
+		/*
+		 * And execute it.
+		 */
 		if (i == numcommands)
-			syslog(LOG_INFO, "%s Invalid Request: %s",
+			syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
 			       inet_ntoa(client.sin_addr), cp);
-		else
+		else {
+			bp = cp + strlen(command_array[i].cmdname);
+
+			/*
+			 * XXX hack, don't log "log" contents,
+			 * both for privacy and to keep our syslog smaller.
+			 */
+			if (command_array[i].func == dolog)
+				syslog(LOG_INFO, "%s REQUEST: log %d chars",
+				       inet_ntoa(client.sin_addr), strlen(bp));
+			else
+				syslog(LOG_INFO, "%s REQUEST: %s",
+				       inet_ntoa(client.sin_addr),
+				       command_array[i].cmdname);
+
+			err = command_array[i].func(clientsock,
+						    client.sin_addr,
+						    bp, istcp);
+
 			syslog(LOG_INFO, "%s REQUEST: %s: returned %d",
-			       inet_ntoa(client.sin_addr), cp, err);
-		
+			       inet_ntoa(client.sin_addr),
+			       command_array[i].cmdname, err);
+		}
+
 		free(cp);
 #ifdef TESTMODE
 		client = oclient;
@@ -272,7 +285,7 @@ main(int argc, char **argv)
  * Accept notification of reboot. 
  */
 static int
-doreboot(int sock, struct in_addr ipaddr, char *request, int tcp)
+doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	char		nodeid[32];
@@ -347,13 +360,13 @@ doreboot(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return status of node. Is it allocated to an experiment, or free.
  */
 static int
-dostatus(int sock, struct in_addr ipaddr, char *request, int tcp)
+dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		nickname[128];
-	char		buf[BUFSIZ];
+	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STATUS: %s: No such node", inet_ntoa(ipaddr));
@@ -387,14 +400,14 @@ dostatus(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return ifconfig information to client.
  */
 static int
-doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp)
+doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ];
+	char		buf[MYBUFSIZE];
 	int		control_net, nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -478,14 +491,14 @@ doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return account stuff.
  */
 static int
-doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp)
+doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ];
+	char		buf[MYBUFSIZE];
 	int		nrows, gid;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -582,14 +595,14 @@ doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return account stuff.
  */
 static int
-dodelay(int sock, struct in_addr ipaddr, char *request, int tcp)
+dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ];
+	char		buf[MYBUFSIZE];
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -642,7 +655,7 @@ dodelay(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return host table information.
  */
 static int
-dohosts(int sock, struct in_addr ipaddr, char *request, int tcp)
+dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*reserved_result;
 	MYSQL_RES	*vnames_result;
@@ -650,7 +663,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		*srcnodes, lastid[BUFSIZ], buf[BUFSIZ];
+	char		*srcnodes, lastid[MYBUFSIZE], buf[MYBUFSIZE];
 	int		nreserved, first, i, nvnames;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -850,14 +863,14 @@ dohosts(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return RPM stuff.
  */
 static int
-dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
+dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ], *bp, *sp;
+	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "DELAY: %s: No such node",
@@ -917,14 +930,14 @@ dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
  * of the experiment creator to run it as!
  */
 static int
-dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp)
+dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ], *bp, *sp;
+	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STARTUPCMD: %s: No such node",
@@ -1000,7 +1013,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Accept notification of start command exit status. 
  */
 static int
-dostartstat(int sock, struct in_addr ipaddr, char *request, int tcp)
+dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	char		nodeid[32];
@@ -1015,13 +1028,11 @@ dostartstat(int sock, struct in_addr ipaddr, char *request, int tcp)
 	}
 
 	/*
-	 * Dig out the exit status, which is after the request.
+	 * Dig out the exit status
 	 */
-	while (isalpha(*request))
-		request++;
-	while (isspace(*request))
-		request++;
-	exitstatus = request;
+	while (isspace(*rdata))
+		rdata++;
+	exitstatus = rdata;
 
 	syslog(LOG_INFO, "STARTSTAT: "
 	       "%s is reporting startup command exit status: %s",
@@ -1056,7 +1067,7 @@ dostartstat(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Accept notification of ready for action
  */
 static int
-doready(int sock, struct in_addr ipaddr, char *request, int tcp)
+doready(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	char		nodeid[32];
 	char		pid[64];
@@ -1098,14 +1109,14 @@ doready(int sock, struct in_addr ipaddr, char *request, int tcp)
  * Return ready bits count (NofM)
  */
 static int
-doreadycount(int sock, struct in_addr ipaddr, char *request, int tcp)
+doreadycount(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		buf[BUFSIZ];
+	char		buf[MYBUFSIZE];
 	int		total, ready, i;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1158,6 +1169,57 @@ doreadycount(int sock, struct in_addr ipaddr, char *request, int tcp)
 	return 0;
 }
 
+static char logfmt[] = "/proj/%s/logs/%s.log";
+
+/*
+ * Log some text to a file in the /proj/<pid>/exp/<eid> directory.
+ */
+static int
+dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		logfile[sizeof(pid)+sizeof(eid)+sizeof(logfmt)];
+	FILE		*fd;
+	time_t		curtime;
+	char		*tstr;
+
+	/*
+	 * Find the pid/eid of the requesting node
+	 */
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "LOG: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_ERR, "LOG: %s: Node is free", nodeid);
+		return 1;
+	}
+
+	snprintf(logfile, sizeof(logfile)-1, logfmt, pid, eid);
+	fd = fopen(logfile, "a");
+	if (fd == NULL) {
+		syslog(LOG_ERR, "LOG: %s: Could not open %s\n",
+		       inet_ntoa(ipaddr), logfile);
+		return 1;
+	}
+
+	curtime = time(0);
+	tstr = ctime(&curtime);
+	tstr[19] = 0;	/* no year */
+	tstr += 4;	/* or day of week */
+
+	while (isspace(*rdata))
+		rdata++;
+
+	fprintf(fd, "%s: %s\n\n%s\n=======\n", tstr, inet_ntoa(ipaddr), rdata);
+	fclose(fd);
+
+	return 0;
+}
+
 /*
  * DB stuff
  */
@@ -1166,7 +1228,7 @@ mydb_query(char *query, int ncols, ...)
 {
 	MYSQL		db;
 	MYSQL_RES	*res;
-	char		querybuf[2*BUFSIZ];
+	char		querybuf[2*MYBUFSIZE];
 	va_list		ap;
 	int		n;
 
@@ -1214,7 +1276,7 @@ int
 mydb_update(char *query, ...)
 {
 	MYSQL		db;
-	char		querybuf[BUFSIZ];
+	char		querybuf[MYBUFSIZE];
 	va_list		ap;
 	int		n;
 

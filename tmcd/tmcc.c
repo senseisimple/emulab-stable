@@ -18,12 +18,6 @@
 #include <netdb.h>
 #include "decls.h"
 
-#ifdef LBS
-#define	MASTERNODE	"206.163.153.25"
-#else
-#define	MASTERNODE	"boss.emulab.net"
-#endif
-
 void		sigcatcher(int foo);
 
 int
@@ -36,7 +30,7 @@ main(int argc, char **argv)
 #endif
 	struct hostent		*he;
 	struct in_addr		serverip;
-	char			buf[BUFSIZ], *bp, *response = "";
+	char			buf[MYBUFSIZE], *bp, *response = "";
 #ifdef UDPTEST
 	int			useudp = 0;
 	void			doudp(int argc, char **argv);
@@ -190,7 +184,7 @@ doudp(int argc, char **argv)
 	struct sockaddr_in	name, client;
 	struct hostent		*he;
 	struct in_addr		serverip;
-	char			buf[BUFSIZ], *bp, *response = "";
+	char			buf[MYBUFSIZE], *bp, *response = "";
 
 	if (argc < 2 || argc > 3) {
 		fprintf(stderr, "usage: %s <command>\n", argv[0]);
