@@ -170,7 +170,7 @@ if (! $isadmin) {
 	DBQueryFatal("SELECT * FROM projects as p ".
 		     "left join group_membership as g on ".
 		     "     p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid'");
+		     "where g.uid='$uid' and g.trust!='none'");
 				   
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("You are not a member of any projects!", 1);

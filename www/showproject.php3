@@ -43,13 +43,8 @@ if (mysql_num_rows($query_result) == 0) {
 #
 # Verify that this uid is a member of the project being displayed.
 #
-if (!$isadmin) {
-    $query_result = 
-        DBQueryFatal("SELECT trust FROM group_membership ".
-		     "WHERE uid='$uid' and pid='$pid' and gid='$pid'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not a member of Project $pid.", 1);
-    }
+if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
+    USERERROR("You are not a member of Project $pid.", 1);
 }
 
 SHOWPROJECT($pid, $uid);
