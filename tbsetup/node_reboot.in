@@ -31,7 +31,7 @@ sub usage()
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.
-my  $optlist = "dfe:nwrkar";
+my  $optlist = "dfe:nwrkac";
 
 #
 # Configure variables
@@ -113,7 +113,7 @@ if (defined($options{"r"})) {
 if (defined($options{"a"})) {
     $freemode = 1;
 }
-if (defined($options{"r"})) {
+if (defined($options{"c"})) {
     $reconfig = 1;
 }
 if (defined($options{"n"}) && !defined($options{"w"})) {
@@ -199,7 +199,7 @@ else {
 
     # Untaint the nodes.
     foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\@\w]+)$/) {
+	if ($node =~ /^([-\w]+)$/) {
 	    $node = $1;
 	}
 	else {

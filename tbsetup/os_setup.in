@@ -509,7 +509,7 @@ if (!$TESTMODE) {
     # Fire off the reconfigs.
     #
     if (keys(%reconfigs)) {
-	$cmd = "$nodereboot -r " . join(" ", keys(%reconfigs));
+	$cmd = "$nodereboot -c " . join(" ", keys(%reconfigs));
 	$pids{$cmd} = ForkCmd($cmd);
     }
 
