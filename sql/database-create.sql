@@ -1042,8 +1042,6 @@ CREATE TABLE webdb_table_permissions (
 #
 
 CREATE TABLE widearea_delays (
-  IP1 varchar(15) default NULL,
-  IP2 varchar(15) default NULL,
   time double default NULL,
   node_id1 varchar(10) NOT NULL default '',
   iface1 varchar(10) NOT NULL default '',
@@ -1062,8 +1060,6 @@ CREATE TABLE widearea_delays (
 #
 
 CREATE TABLE widearea_recent (
-  IP1 varchar(15) default NULL,
-  IP2 varchar(15) default NULL,
   time double default NULL,
   node_id1 varchar(10) NOT NULL default '',
   iface1 varchar(10) NOT NULL default '',
