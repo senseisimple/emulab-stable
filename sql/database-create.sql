@@ -247,7 +247,9 @@ CREATE TABLE iface_counters (
   mac varchar(12) NOT NULL default '0',
   ipkts int(11) NOT NULL default '0',
   opkts int(11) NOT NULL default '0',
-  PRIMARY KEY  (node_id,tstamp,mac)
+  PRIMARY KEY  (node_id,tstamp,mac),
+  KEY macindex (mac),
+  KEY node_idindex (node_id)
 ) TYPE=MyISAM;
 
 #
@@ -307,7 +309,8 @@ CREATE TABLE interfaces (
   iface text,
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
-  PRIMARY KEY  (node_id,card,port)
+  PRIMARY KEY  (node_id,card,port),
+  KEY mac (mac)
 ) TYPE=MyISAM;
 
 #
@@ -920,8 +923,8 @@ CREATE TABLE virt_lans (
   rdelay float(10,2) default NULL,
   rbandwidth int(10) unsigned default NULL,
   rlossrate float(10,3) default NULL,
-  cost float NOT NULL default '1'
-  widearea tinyint(4) default '0',
+  cost float NOT NULL default '1',
+  widearea tinyint(4) default '0'
 ) TYPE=MyISAM;
 
 #
