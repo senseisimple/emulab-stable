@@ -15,10 +15,10 @@ use English;
 #
 my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
+my $CONTROL = "@USERNODE@";
 
 my $HOMEDIR = "/users";
 my $SSH     = "$TB/bin/sshtb";
-my $CONTROL = "users.emulab.net";
 my $USERDEL = "/usr/sbin/pw userdel";
 my $GENELISTS = "$TB/sbin/genelists";
 
@@ -132,17 +132,7 @@ if (system("$SSH $control_node '$USERDEL $user'")) {
 #
 # Rename the user directory instead of deleting it.
 # 
-my $newname = "$HOMEDIR/$user-" . `date +20%y%m%d-%H.%M.%S`;
-
-#
-# Untaint the new name since it was constructed with date. Dopey.
-#
-if ($newname =~ /^([-\w.\/]+)$/) {
-    $newname = $1;
-}
-else {
-    fatal("Tainted newname $newname");
-}
+my $newname = "$HOMEDIR/$user-" . TBDateTimeFSSafe();
 
 if (! -e "$HOMEDIR/$user") {
     fatal("User directory '$HOMEDIR/$user' does not exist!");

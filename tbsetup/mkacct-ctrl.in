@@ -14,11 +14,11 @@ use English;
 #
 my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
+my $CONTROL = "@USERNODE@";
 
 my $HOMEDIR = "/users";
 my $PBAG    = "$TB/sbin/paperbag";
 my $SSH     = "$TB/bin/sshtb";
-my $CONTROL = "users.emulab.net";
 my $GROUPADD= "/usr/sbin/pw groupadd";
 my $USERADD = "/usr/sbin/pw useradd";
 my $USERMOD = "/usr/sbin/pw usermod";

@@ -26,11 +26,12 @@ use Exporter;
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
-	 ExpNodes
+	 ExpNodes DBDateTime
 	 );
 
 # Must come after package declaration!
 use English;
+use POSIX qw(strftime);
 require Mysql;
 
 # Configure variables
@@ -614,7 +615,7 @@ sub DBFatal($)
 #
 # Quote a string for DB insertion.
 #
-# usage: DBQuoteSpecial(char *string);
+# usage: char *DBQuoteSpecial(char *string);
 #
 sub DBQuoteSpecial($)
 {
@@ -623,6 +624,17 @@ sub DBQuoteSpecial($)
     $string = $DB->quote($string);
 
     return $string;
+}
+
+#
+# Return a (current) string suitable for DB insertion in datetime slot.
+# Of course, you can use this for anything you like!
+#
+# usage: char *DBDateTime();
+#
+sub DBDateTime()
+{
+    return strftime("20%y-%m-%d %H:%M:%S", localtime());
 }
 
 1;

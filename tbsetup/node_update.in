@@ -9,6 +9,9 @@ use Getopt::Std;
 #
 # XXX There is an inherent race condition with using this script. What if
 # nodes are released while it is running?
+#
+# The output is all jumbled together since the updates are issued in parallel.
+# Might be a pain when debugging. 
 # 
 # usage: node_update [-b] <pid> <eid>
 #
@@ -122,6 +125,10 @@ if ($UID && ! TBAdmin()) {
     }
 }
 
+#
+# Batchmode (as from the web interface) goes to background and reports
+# later via email.
+# 
 if ($batchmode) {
     #
     # Create a temporary name for a log file.
@@ -151,6 +158,20 @@ if (system("$expsetup")) {
 }
 # Give ops a chance to react.
 sleep(2);
+
+#
+# A sanity check. Lets make sure the experiment is in the swapped in
+# state so that we are not trying to update nodes that are still booting
+# or swapping out, etc. 
+#
+if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE) {
+    fatal("The experiment $pid/$eid must be fully activated first!\n".
+	  "Please try again later, after activation. The experiment leader\n".
+	  "will receive email notification when the experiment has been\n".
+	  "fully activated, or you can check the status via the web ".
+	  "interface.\n");
+    exit(1);
+}
 
 #
 # Get the list of nodes that need to be "updated."

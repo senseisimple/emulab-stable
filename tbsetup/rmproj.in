@@ -1,12 +1,10 @@
 #!/usr/local/bin/perl -wT
-use Mysql;
 use English;
 
 #
 # Remove a project. We delete the project directory hierarchy and the
 # we remove the group from /etc/group. Actually, the project directory
-# is *renamed* from $pid to $pid-`date +20%y%m%d-%H.%M.%S` since we do
-# not want to be so destructive.
+# is *renamed* since we do not want to be so destructive.
 #
 # usage: rmprojdir <pid>
 #
@@ -16,18 +14,31 @@ use English;
 #
 # Configure variables
 #
-my $TB     = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
-my $SSH    = "$TB/bin/sshtb";
-
-# un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
 
 my $PROJROOT = "/proj";
-my $dbh      = Mysql->connect("localhost",$DBNAME,"script","none");
-my $db_result= "";
-my $control_node = "plastic.emulab.net";
+my $SSH      = "$TB/bin/sshtb";
+my $GROUPDEL = "/usr/sbin/pw groupdel";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 #
 # Check args.
@@ -51,52 +62,35 @@ else {
 # Figure out who called us. Only root or people with admin status
 # can run this script.
 #
-if ($UID != 0) {
-    my ($me) = getpwuid($UID)
-	or die "$UID not in passwd file";
-    
-    $db_result = $dbh->query("select admin from users where uid='$me'");
-    my @row = $db_result->fetchrow_array();
-    if ($row[0] != 1) {
-	die("rmprojdir: ".
-	    "You must be root or TB admin to remove a project directory\n");
-    }
+if ($UID && !TBAdmin($UID)) {
+    die("*** You must be root or TB admin to remove a project directory\n");
 }
 
 #
 # Ensure that the project is not in the database!
 #
-$db_result = $dbh->query("select head_uid ".
-			 "from projects where pid='$pid'");
-if ($db_result->numrows == 1) {	
-    die("Project '$pid' is still in the database!\n");
+my $query_result =
+    DBQueryFatal("select head_uid from projects where pid='$pid'");
+
+if ($query_result->numrows) {
+    die("*** Project '$pid' is still in the database!\n");
 }
 
 #
 # Rename the project directory.
 # 
-my $newname = "$pid-" . `date +20%y%m%d-%H.%M.%S`;
-
-#
-# Untaint the new name since it was constructed with date. Dopey.
-#
-if ($newname =~ /^([-\@\w.]+)$/) {
-    $newname = $1;
-}
+my $newname = "$pid-" . TBDateTimeFSSafe();
 
 if (! chdir($PROJROOT)) {
-    print STDOUT "Could not chdir to $PROJROOT!\n";
-    exit(-1);
+    die("*** Could not chdir to $PROJROOT: $!\n");
 }
 
 if (! -e $pid) {
-    print STDOUT "Project directory '$pid' does not exist!\n";
-    exit(-1);
+    die("*** Project directory '$pid' does not exist!\n");
 }
 
 if (! rename($pid, $newname)) {
-    print STDOUT "Could not rename project directory $pid to $newname: $!\n";
-    exit(-1);
+    die("*** Could not rename project directory $pid to $newname: $!\n");
 }
 
 #
@@ -104,20 +98,17 @@ if (! rename($pid, $newname)) {
 # allowed to look inside.
 #
 if (! chmod(0700, $newname)) {
-    print STDOUT "Could not chmod directory $newname to 0700: $!\n";
-    exit(-1);
+    die("*** Could not chmod directory $newname to 0700: $!\n");
 }
 if (! chown(0, 0, $newname)) {
-    print STDOUT "Could not chown directory $newname to 0/0: $!\n";
-    exit(-1);
+    die("*** Could not chown directory $newname to 0/0: $!\n");
 }
 
 #
 # Now remove the group from the group file on both plastic and paper.
 #
-if (system("/usr/sbin/pw groupdel $pid")) {
-    print STDOUT "Could not remove group $pid fron operatons node (paper)\n";
-    exit(-1);
+if (system("$GROUPDEL $pid")) {
+    die("*** Could not remove group $pid fron operatons node (paper)\n");
 }
 
 #
@@ -125,9 +116,8 @@ if (system("/usr/sbin/pw groupdel $pid")) {
 # 
 $UID = 0;
 
-if (system("$SSH $control_node /usr/sbin/pw groupdel $pid")) {
-    print STDOUT "Could not remove group $pid fron control node (plastic)\n";
-    exit(-1);
+if (system("$SSH $CONTROL $GROUPDEL $pid")) {
+    die("*** Could not remove group $pid fron control node ($CONTROL)\n");
 }
 
 exit(0);

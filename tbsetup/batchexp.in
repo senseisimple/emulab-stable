@@ -176,12 +176,9 @@ if (system("$parser -n -a $nsfile") != 0) {
 }
 
 #
-# Gen up the creation time.
+# Gen up the creation time for the batch record.
 #
-$created = `date '+%Y:%m:%d %H:%M:%S'`;
-if ($created =~ /^([-\@\w: ]+)$/) {
-    $created = $1;
-}
+$created = DBDateTime();
 
 #
 # Insert the record. We leave this to very last cause the batch daemon

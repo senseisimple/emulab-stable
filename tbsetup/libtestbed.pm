@@ -7,7 +7,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround );
+    qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe );
 
 # A library of useful stuff.
 
@@ -89,6 +89,17 @@ sub OPENMAIL($$;$$)
 sub TBTimeStamp()
 {
     return POSIX::strftime("%H:%M:%S", localtime());
+}
+
+#
+# Another routine for creating a file name based on the current date and
+# time. The format is slightly different so that it can be a proper filename.
+#
+# usage: char *TBDateTimeFSSafe()
+#
+sub TBDateTimeFSSafe()
+{
+    return POSIX::strftime("20%y%m%d-%H.%M.%S", localtime());
 }
 
 #
