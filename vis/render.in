@@ -229,6 +229,8 @@ $lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png n
 
 $colors{"black"} =  $im->colorAllocate(0,0,0);
 $colors{"darkblue"} =  $im->colorAllocate(0,0,96);
+$colors{"darkred"} =  $im->colorAllocate(128,0,0);
+$colors{"red"} =  $im->colorAllocate(192,0,0);
 $colors{"blue"} =  $im->colorAllocate(0,0,192);
 $colors{"paleblue"} =  $im->colorAllocate(127,127,192);
 $colors{"green"} =  $im->colorAllocate(0,96,0);
@@ -264,8 +266,41 @@ foreach $i (@links) {
   ($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
   ($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
 
-  $im->line( $x1, $y1, $x2, $y2, $colors{"paleblue"} );
-#  print "Link: $i\n";
+  if (exists $linklabels{ $i }) {
+      my $foo   = $linklabels{ $i };
+      my $red   = $colors{"red"};
+      my $green = $colors{"green"};      
+      my $blue  = $colors{"blue"};
+      my $black = $colors{"black"};
+
+      if ($foo =~ /^\!rs/) {
+	  $im->setStyle($red); 
+      } elsif ($foo =~ /^\!bs/) {
+	  $im->setStyle($blue); 
+      } elsif ($foo =~ /^\!ks/) {
+	  $im->setStyle($black); 
+      } elsif ($foo =~ /^\!ro/) {
+	  $im->setStyle($red, gdTransparent);
+      } elsif ($foo =~ /^\!bo/) {
+	  $im->setStyle($blue, gdTransparent);
+      } elsif ($foo =~ /^\!ko/) {
+	  $im->setStyle($black, gdTransparent);
+      } elsif ($foo =~ /^\!ra/) {
+	  $im->setStyle($red, $red, gdTransparent);
+      } elsif ($foo =~ /^\!ba/) {
+	  $im->setStyle($blue, $blue, gdTransparent);
+      } elsif ($foo =~ /^\!ka/) {
+	  $im->setStyle($black, $black, gdTransparent);
+      } else {
+	  $im->setStyle($colors{"paleblue"}); 
+      }
+  } else {
+      $im->setStyle($colors{"paleblue"}); 
+  }
+  
+  #$im->line( $x1, $y1, $x2, $y2, $colors{"paleblue"} );
+  
+  $im->line( $x1, $y1, $x2, $y2, gdStyled );
 }
 
 # render nodes.
@@ -278,12 +313,21 @@ foreach $i (keys %nodes) {
   $cname = $nodes{$i}{"color"};
   $c = $colors{ $cname } || $colors{"blue"};
 
-  $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
-  $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
+  if ($cname eq "red") {
+      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"darkred"} );
+      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"darkred"} );
+  } else {
+      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
+      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
+  }
+
   $im->filledRectangle( $x - 14, $y - 14, 
 			$x + 14, $y + 14, $colors{"white"} );
 
-  if ($nodeicon && ($cname eq "skyblue" || $cname eq "steelblue")) {
+  if ($nodeicon && ($cname eq "skyblue" || 
+		    $cname eq "steelblue" ||
+		    $cname eq "blue" ||
+		    $cname eq "red")) {
     $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
   } elsif ($lanicon && $cname eq "green") {
     $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
@@ -303,6 +347,8 @@ foreach $i (@links) {
 	($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
 	($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
 	($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
+
+	$linklabels{ $i } =~ s/^\!..//;
 	
 	my @lines = split " ", $linklabels{ $i };
 
