@@ -36,6 +36,7 @@ use strict;
 my $UISP   = "$TB/bin/uisp";
 my $SGUISP = "/usr/local/bin/uisp";
 my $SSHTB  = "$TB/bin/sshtb";
+my $POWER  = "$TB/bin/power";
 my $DEBUG  = 1;
 
 #
@@ -225,6 +226,30 @@ MOTE: foreach my $mote (@motes) {
 	    # We do the upload by sshing to the toe stargate and running
 	    # uisp
 	    $upload_method = "ssh";
+
+	    my $nodestate;
+	    if (! TBGetNodeEventState($host, \$nodestate) ||
+		$nodestate eq TBDB_NODESTATE_POWEROFF) {
+		warn "$host: power cycling";
+		
+		system("$POWER cycle $host");
+		if ($?) {
+		    $errors++;
+		    warn "Mote host ($host) failed to power up.";
+		    next MOTE;
+		}
+	    }
+	    
+	    my $actual_state;
+	    if (TBNodeStateWait($host,
+				time,
+				(60*6),
+				\$actual_state,
+				(TBDB_NODESTATE_ISUP,))) {
+		$errors++;
+		warn "Mote host ($host) is not up.";
+		next MOTE;
+	    }
 
 	    last TSWITCH;
 	};
