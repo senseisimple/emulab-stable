@@ -175,7 +175,7 @@ foreach my $node ( keys %nodepid ) {
     if (-e $aclname) {
 	chown(0, $gid, $aclname) or
 	    die("Could not chown(0, $gid) $aclname: $!");
-	chmod(0600, $aclname) or
+	chmod(0640, $aclname) or
 	    die("Could not chmod(0660) $aclname: $!");
     }
 }
