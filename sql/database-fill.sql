@@ -473,7 +473,7 @@ REPLACE INTO table_regex VALUES ('nodes','node_id','text','regex','^[-\\w]+$',1,
 REPLACE INTO table_regex VALUES ('nseconfigs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\015]*$',0,65535,NULL);
+REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\015]*$',0,16777215,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.]+$',2,20,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
