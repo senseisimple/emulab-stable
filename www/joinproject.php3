@@ -17,7 +17,7 @@ $uid = GETLOGIN();
 #
 if ($uid) {
     LOGGEDINORDIE($uid);
-    $proj_head_uid = $uid;
+    $joining_uid = $uid;
     $returning = 1;
 }
 else {
@@ -32,15 +32,9 @@ else {
 # 
 function SPITFORM($formfields, $returning, $errors)
 {
-    global $TBDB_UIDLEN, $TBDB_PIDLEN;
-
-    PAGEHEADER("Start a New Testbed Project");
+    global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
     
-    echo "<center><font size=+1>
-             If you are a student
-             <font color=red>(undergrad or graduate)</font>, please
-             <a href=auth.html>read this first</a>!
-          </font></center><br>\n";
+    PAGEHEADER("Apply for Project Membership");
 
     if ($errors) {
 	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
@@ -70,18 +64,9 @@ function SPITFORM($formfields, $returning, $errors)
             </td>
           </tr>\n
 
-          <form action=newproject.php3 method=post>\n";
+          <form action=joinproject.php3 method=post>\n";
 
     if (! $returning) {
-        #
-        # Start user information stuff. Presented for new users only.
-        #
-	echo "<tr>
-                  <td colspan=2>
-                      Project Head Information
-                  </td>
-              </tr>\n";
-
         #
         # UserName:
         #
@@ -89,8 +74,8 @@ function SPITFORM($formfields, $returning, $errors)
                   <td>*Username (no blanks, lowercase):</td>
                   <td class=left>
                       <input type=text
-                             name=\"formfields[proj_head_uid]\"
-                             value=\"" . $formfields[proj_head_uid] . "\"
+                             name=\"formfields[joining_uid]\"
+                             value=\"" . $formfields[joining_uid] . "\"
 	                     size=$TBDB_UIDLEN
 	                     maxlength=$TBDB_UIDLEN>
                   </td>
@@ -209,15 +194,6 @@ function SPITFORM($formfields, $returning, $errors)
     }
 
     #
-    # Project information
-    #
-    echo "<tr><td colspan=2><hr></td></tr>
-          <tr><td colspan=2>
-               Project Information <em>(replace the example entries)</em>
-              </td>
-          </tr>\n";
-
-    #
     # Project Name:
     #
     echo "<tr>
@@ -231,114 +207,16 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     #
-    # Project Description:
+    # Group Name:
     #
     echo "<tr>
-              <td>*Project Description:</td>
+              <td>Group Name:<br>
+              (Leave blank unless you <em>know</em> the group name)</td>
               <td class=left>
                   <input type=text
-                         name=\"formfields[proj_name]\"
-                         value=\"" . $formfields[proj_name] . "\"
-	                 size=40>
-              </td>
-          </tr>\n";
-
-    #
-    # URL:
-    #
-    echo "<tr>
-              <td>*URL:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[proj_URL]\"
-                         value=\"" . $formfields[proj_URL] . "\"
-                         size=45>
-              </td>
-          </tr>\n";
-
-    #
-    # Publicly visible.
-    #
-    echo "<tr>
-              <td>*Can we list your project publicly as an \"Emulab User?\":
-                  <br>
-                  (See our <a href=\"projectlist.php3\"
-                              target=\"Users\">Users</a> page)
-              </td>
-              <td><input type=checkbox value=checked
-                         name=\"formfields[proj_public]\"
-                         " . $formfields[proj_public] . ">
-                         Yes &nbsp
- 	          <br>
-                  *If \"No\" please tell us why not:<br>
-                  <input type=text
-                         name=\"formfields[proj_whynotpublic]\"
-                         value=\"" . $formfields[proj_whynotpublic] . "\"
-	                 size=45>
-             </td>
-      </tr>\n";
-
-    #
-    # Funders/Grant numbers
-    #
-    echo "<tr>
-              <td>*Funding Sources and Grant Numbers:<br>
-                  (Type \"none\" if not funded)</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[proj_funders]\"
-                         value=\"" . $formfields[proj_funders] . "\"
-	                 size=45>
-              </td>
-          </tr>\n";
-
-    #
-    # Nodes and PCs and Users
-    #
-    echo "<tr>
-              <td>*Estimated #of Project Members:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[proj_members]\" 
-                         value=\"" . $formfields[proj_members] . "\"
-                         size=4>
-              </td>
-          </tr>\n";
-
-    echo "<tr>
-              <td>*Estimated #of PCs:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[proj_pcs]\"
-                         value=\"" . $formfields[proj_pcs] . "\"
-                         size=4>
-              </td>
-          </tr>\n";
-
-    echo "<tr>
-              <td>*Estimated #of Sharks:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[proj_sharks]\"
-                         value=\"" . $formfields[proj_sharks] . "\"
-                         size=4>
-              </td>
-          </tr>\n";
-
-    #
-    # Why!
-    # 
-    echo "<tr>
-              <td colspan=2>
-               *Please describe how and why you'd like to use the testbed.
-              </td>
-          </tr>
-          <tr>
-              <td colspan=2 align=center class=left>
-                  <textarea name=\"formfields[proj_why]\"
-                    rows=10 cols=60>" .
-	            ereg_replace("\r", "", $formfields[proj_why]) .
-	            "</textarea>
+                         name=\"formfields[gid]\"
+                         value=\"" . $formfields[gid] . "\"
+	                 size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
               </td>
           </tr>\n";
 
@@ -363,18 +241,19 @@ function SPITFORM($formfields, $returning, $errors)
 }
 
 #
-# The conclusion of a newproject request. See below.
+# The conclusion of a join request. See below.
 # 
 if (isset($finished)) {
-    PAGEHEADER("Start a New Testbed Project");
+    PAGEHEADER("Apply for Project Membership");
 
-    echo "<center><h2>
-           Your project request has been successfully queued.
-          </h2></center>
-          Testbed Operations has been notified of your application.
-          Most applications are reviewed within a day; some even within
-          the hour, but sometimes as long as a week (rarely). We will notify
-          you by e-mail when a decision has been made.\n";
+    #
+    # Generate some warm fuzzies.
+    #
+    echo "<p>
+          The project leader has been notified of your application.
+          He/She will make a decision and either approve or deny your
+          application, and you will be notified via email as soon as a
+          decision has been made.";
 
     if (! $returning) {
 	echo "<br>
@@ -384,6 +263,7 @@ if (isset($finished)) {
               When you receive the message, please follow the instructions
               contained in the message on how to verify your account.\n";
     }
+
     PAGEFOOTER();
     return;
 }
@@ -393,10 +273,7 @@ if (isset($finished)) {
 #
 if (! isset($submit)) {
     $defaults = array();
-    $defaults[proj_URL] = "$HTTPTAG";
     $defaults[usr_URL] = "$HTTPTAG";
-    $defaults[proj_sharks] = "0";
-    $defaults[proj_public] = "checked";
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
@@ -412,21 +289,21 @@ $errors = array();
 # These fields are required!
 #
 if (! $returning) {
-    if (!isset($formfields[proj_head_uid]) ||
-	strcmp($formfields[proj_head_uid], "") == 0) {
+    if (!isset($formfields[joining_uid]) ||
+	strcmp($formfields[joining_uid], "") == 0) {
 	$errors["Username"] = "Missing Field";
     }
     else {
-	if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[proj_head_uid])) {
+	if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[joining_uid])) {
 	    $errors["UserName"] =
 		"Must be lowercase alphanumeric only<br>".
 		"and must begin with a lowercase alpha";
 	}
-	elseif (strlen($formfields[proj_head_uid]) > $TBDB_UIDLEN) {
+	elseif (strlen($formfields[joining_uid]) > $TBDB_UIDLEN) {
 	    $errors["UserName"] =
-		"Too long! Must be less than or equal to $TBDB_UIDLEN";
+		"Too long! Must be less than or to $TBDB_UIDLEN";
 	}
-	elseif (TBCurrentUser($formfields[proj_head_uid])) {
+	elseif (TBCurrentUser($formfields[joining_uid])) {
 	    $errors["UserName"] =
 		"Already in use. Select another";
 	}
@@ -486,79 +363,16 @@ if (! $returning) {
     elseif (strcmp($formfields[password1], $formfields[password2])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
-    elseif (! CHECKPASSWORD($formfields[proj_head_uid],
+    elseif (! CHECKPASSWORD($formfields[joining_uid],
 			    $formfields[password1],
 			    $formfields[usr_name],
 			    $formfields[usr_email], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
 }
-
 if (!isset($formfields[pid]) ||
     strcmp($formfields[pid], "") == 0) {
     $errors["Project Name"] = "Missing Field";
-}
-else {
-    if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[pid])) {
-	$errors["Project Name"] =
-	    "Must be alphanumeric (includes _ and -)<br>".
-	    "and must begin with an alpha";
-    }
-    elseif (strlen($formfields[pid]) > $TBDB_PIDLEN) {
-	$errors["Project Name"] =
-	    "Too long! Must be less than or equal to $TBDB_PIDLEN";
-    }
-    elseif (TBValidProject($formfields[pid])) {
-	$errors["Project Name"] =
-	    "Already in use. Select another";
-    }
-}
-if (!isset($formfields[proj_name]) ||
-    strcmp($formfields[proj_name], "") == 0) {
-    $errors["Project Description"] = "Missing Field";
-}
-if (!isset($formfields[proj_URL]) ||
-    strcmp($formfields[proj_URL], "") == 0 ||
-    strcmp($formfields[proj_URL], $HTTPTAG) == 0) {    
-    $errors["Project URL"] = "Missing Field";
-}
-elseif (! CHECKURL($formfields[proj_URL], $urlerror)) {
-    $errors["Project URL"] = $urlerror;
-}
-if (!isset($formfields[proj_funders]) ||
-    strcmp($formfields[proj_funders], "") == 0) {
-    $errors["Funding Sources"] = "Missing Field";
-}
-if (!isset($formfields[proj_members]) ||
-    strcmp($formfields[proj_members], "") == 0) {
-    $errors["#of Members"] = "Missing Field";
-}
-elseif (! ereg("^[0-9]+$", $formfields[proj_members])) {
-    $errors["#of Members"] = "Must be numeric";
-}
-if (!isset($formfields[proj_pcs]) ||
-    strcmp($formfields[proj_pcs], "") == 0) {
-    $errors["#of PCs"] = "Missing Field";
-}
-elseif (! ereg("^[0-9]+$", $formfields[proj_pcs])) {
-    $errors["#of PCs"] = "Must be numeric";
-}
-if (!isset($formfields[proj_sharks]) ||
-    strcmp($formfields[proj_sharks], "") == 0) {
-    $errors["#of Sharks"] = "Missing Field";
-}
-elseif (! ereg("^[0-9]+$", $formfields[proj_sharks])) {
-    $errors["#of Sharks"] = "Must be numeric";
-}
-if (!isset($formfields[proj_why]) ||
-    strcmp($formfields[proj_why], "") == 0) {
-    $errors["Why?"] = "Missing Field";
-}
-if ((!isset($formfields[proj_public]) ||
-     strcmp($formfields[proj_public], "checked")) &&
-    (!isset($formfields[proj_whynotpublic]) ||
-     strcmp($formfields[proj_whynotpublic], "") == 0)) {
-    $errors["Why Not Public?"] = "Missing Field";
 }
 
 if (count($errors)) {
@@ -571,7 +385,7 @@ if (count($errors)) {
 # Certain of these values must be escaped or otherwise sanitized.
 #
 if (!$returning) {
-    $proj_head_uid     = $formfields[proj_head_uid];
+    $joining_uid       = $formfields[joining_uid];
     $usr_title         = addslashes($formfields[usr_title]);
     $usr_name          = addslashes($formfields[usr_name]);
     $usr_affil         = addslashes($formfields[usr_affil]);
@@ -580,7 +394,6 @@ if (!$returning) {
     $usr_phone         = $formfields[usr_phone];
     $password1         = $formfields[password1];
     $password2         = $formfields[password2];
-    $usr_returning     = "Yes";
 
     if (! isset($formfields[usr_URL]) ||
 	strcmp($formfields[usr_URL], "") == 0 ||
@@ -596,73 +409,72 @@ else {
     # Grab info from the DB for the email message below. Kinda silly.
     #
     $query_result =
-	DBQueryFatal("select * from users where uid='$proj_head_uid'");
+	DBQueryFatal("select * from users where uid='$joining_uid'");
     
     $row = mysql_fetch_array($query_result);
     
-    $usr_title	   = $row[usr_title];
-    $usr_name	   = $row[usr_name];
-    $usr_affil	   = $row[usr_affil];
-    $usr_email	   = $row[usr_email];
-    $usr_addr	   = $row[usr_addr];
-    $usr_phone	   = $row[usr_phone];
-    $usr_URL       = $row[usr_URL];
-    $usr_returning = "Yes";
+    $usr_title	= $row[usr_title];
+    $usr_name	= $row[usr_name];
+    $usr_affil	= $row[usr_affil];
+    $usr_email	= $row[usr_email];
+    $usr_addr	= $row[usr_addr];
+    $usr_phone	= $row[usr_phone];
+    $usr_URL    = $row[usr_URL];
 }
-$pid               = $formfields[pid];
-$proj_name	   = addslashes($formfields[proj_name]);
-$proj_URL          = $formfields[proj_URL];
-$proj_funders      = addslashes($formfields[proj_funders]);
-$proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
-$proj_members      = $formfields[proj_members];
-$proj_pcs          = $formfields[proj_pcs];
-$proj_sharks       = $formfields[proj_sharks];
-$proj_why	   = addslashes($formfields[proj_why]);
-$proj_expires      = date("Y:m:d", time() + (86400 * 120));
+$pid          = $formfields[pid];
+$usr_expires  = date("Y:m:d", time() + (86400 * 120));
 
-if (!isset($formfields[proj_public]) ||
-    strcmp($formfields[proj_public], "checked")) {
-    $proj_public = "No";
-    $public = 0;
+if (isset($formfields[gid]) && strcmp($formfields[gid], "")) {
+    $gid = $formfields[gid];
 }
 else {
-    $proj_public = "Yes";
-    $public = 1;
+    $gid = $pid;
 }
 
-#
-# Check that we can guarantee uniqueness of the unix group name.
-# 
-$query_result =
-    DBQueryFatal("select gid from groups where unix_name='$pid'");
+if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $pid) ||
+    strlen($pid) > $TBDB_PIDLEN || ! TBValidProject($pid)) {
+    $errors["Project Name"] = "Invalid Project Name";
+}
+elseif (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $gid) ||
+	strlen($gid) > $TBDB_GIDLEN ||
+	!TBValidGroup($pid, $gid)) {
+    $errors["Group Name"] = "Invalid Group Name";
+}
+elseif (TBGroupMember($joining_uid, $pid, $gid, $approved)) {
+    $errors["Membership"] = "You are already a member";
+}
 
-if (mysql_num_rows($query_result)) {
-    TBERROR("Could not form a unique Unix group name for $pid!", 1);
+if (count($errors)) {
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
 }
 
 #
 # For a new user:
 # * Create a new account in the database.
+# * Add user email to the list of email address.
 # * Generate a mail message to the user with the verification key.
-# 
+#
 if (! $returning) {
     $encoding = crypt("$password1");
 
     DBQueryFatal("INSERT INTO users ".
-	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	 " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
-	 " status,pswd_expires) ".
-	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
-	 "'$usr_email', '$usr_addr', '$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
-	 "date_add(now(), interval 1 year))");
+	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
+	" usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,".
+	" status,pswd_expires) ".
+	"VALUES ('$joining_uid', now(), '$usr_expires', '$usr_name', ".
+        "'$usr_email', ".
+	"'$usr_addr', '$usr_URL', '$usr_phone', '$usr_title', '$usr_affil', ".
+        "'$encoding', NULL, 'newuser', ".
+	"date_add(now(), interval 1 year))");
+    
+    $key = GENKEY($joining_uid);
 
-    $key = GENKEY($proj_head_uid);
-
-    TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
+    TBMAIL("$usr_name '$joining_uid' <$usr_email>",
 	 "Your New User Key",
 	 "\n".
-         "Dear $usr_name:\n\n".
+         "Dear $usr_name ($joining_uid):\n\n".
          "This is your account verification key: $key\n\n".
          "Please return to:\n\n".
 	 "         $TBWWW\n\n".
@@ -670,7 +482,7 @@ if (! $returning) {
 	 "applied. You will then find an option on the menu called\n".
 	 "'New User Verification'. Select this option, and on the page\n".
 	 "enter your key. You will then be verified as a user. When you \n".
-	 "have been both verified and approved by Testbed Operations, you \n".
+	 "have been both verified and approved by the project leader, you \n".
 	 "will be marked as an active user, and will be granted full access\n".
 	 "to your user account.\n\n".
          "Thanks,\n".
@@ -682,67 +494,64 @@ if (! $returning) {
 }
 
 #
-# Now for the new Project
-# * Create a new project in the database.
-# * Create a new default group for the project.
-# * Create a new group_membership entry in the database, default trust=none.
-# * Generate a mail message to testbed ops.
+# Add to the group, but with trust=none. The project/group leader will have
+# to upgrade the trust level, making the new user real.
 #
-DBQueryFatal("INSERT INTO projects ".
-	     "(pid, created, expires, name, URL, head_uid, ".
-	     " num_members, num_pcs, num_sharks, why, funders, unix_gid, ".
-	     " public, public_whynot)".
-	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
-	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
-	     "        '$proj_pcs', '$proj_sharks', '$proj_why', ".
-	     "        '$proj_funders', NULL, $public, '$proj_whynotpublic')");
-
-DBQueryFatal("INSERT INTO groups ".
-	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
-	     "VALUES ('$pid', '$pid', '$proj_head_uid', now(), ".
-	     "        'Default Group', NULL, '$pid')");
-
-DBQueryFatal("insert into group_membership ".
-	     "(uid, gid, pid, trust, date_applied) ".
-	     "values ('$proj_head_uid','$pid','$pid','none', now())");
+$query_result =
+    DBQueryFatal("insert into group_membership ".
+		 "(uid,gid,pid,trust,date_applied) ".
+		 "values ('$joining_uid','$gid','$pid','none', now())");
 
 #
-# Grab the unix GID that was assigned.
+# This could be a new user or an old user trying to join a specific group
+# in a project. If the user is new to the project too, then must insert
+# a group_membership in the default group for the project. 
 #
-TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+if (! TBGroupMember($joining_uid, $pid, $pid, $approved)) {
+    DBQueryFatal("insert into group_membership ".
+		 "(uid,gid,pid,trust,date_applied) ".
+		 "values ('$joining_uid','$pid','$pid','none', now())");
+}
+
+#
+# Generate an email message to the group leader.
+#
+$query_result =
+    DBQueryFatal("select usr_name,usr_email,leader from users as u ".
+		 "left join groups as g on u.uid=g.leader ".
+		 "where g.pid='$pid' and g.gid='$gid'");
+if (($row = mysql_fetch_row($query_result)) == 0) {
+    TBERROR("DB Error getting email address for group leader $leader!", 1);
+}
+$leader_name = $row[0];
+$leader_email = $row[1];
+$leader_uid = $row[2];
 
 #
 # The mail message to the approval list.
-# 
-TBMAIL($TBMAIL_APPROVAL,
-     "New Project '$pid' ($proj_head_uid)",
-     "'$usr_name' wants to start project '$pid'.\n".
+#
+TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+     "$joining_uid $pid Project Join Request",
+     "$usr_name is trying to join your group $gid in project $pid.\n".
      "\n".
-     "Name:            $usr_name ($proj_head_uid)\n".
-     "Returning User?: $usr_returning\n".
+     "Contact Info:\n".
+     "Name:            $usr_name\n".
+     "Emulab ID:       $joining_uid\n".
      "Email:           $usr_email\n".
      "User URL:        $usr_URL\n".
-     "Project:         $proj_name\n".
-     "Expires:         $proj_expires\n".
-     "Project URL:     $proj_URL\n".
-     "Public URL:      $proj_public\n".
-     "Why Not Public:  $proj_whynotpublic\n".
-     "Funders:         $proj_funders\n".
      "Title:           $usr_title\n".
      "Affiliation:     $usr_affil\n".
      "Address:         $usr_addr\n".
      "Phone:           $usr_phone\n".
-     "Members:         $proj_members\n".
-     "PCs:             $proj_pcs\n".
-     "Sharks:          $proj_sharks\n".
-     "Unix GID:        $unix_name ($unix_gid)\n".
-     "Reasons:\n$proj_why\n\n".
-     "Please review the application and when you have made a decision,\n".
-     "go to $TBWWW and\n".
-     "select the 'Project Approval' page.\n\nThey are expecting a result ".
-     "within 72 hours.\n", 
-     "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-     "Reply-To: $TBMAIL_APPROVAL\n".
+     "\n".
+     "Please return to $TBWWW,\n".
+     "log in, and select the 'New User Approval' page to enter your\n".
+     "decision regarding $usr_name's membership in your project.\n\n".
+     "Thanks,\n".
+     "Testbed Ops\n".
+     "Utah Network Testbed\n",
+     "From: $TBMAIL_APPROVAL\n".
+     "Bcc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");
 
 #
@@ -750,6 +559,6 @@ TBMAIL($TBMAIL_APPROVAL,
 # in it. The back button skips over the post and to the form.
 # See above for conclusion.
 # 
-header("Location: newproject.php3?finished=1");
+header("Location: joinproject.php3?finished=1");
 
 ?>

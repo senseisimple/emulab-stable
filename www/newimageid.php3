@@ -397,7 +397,7 @@ elseif (!TBValidProject($formfields[pid])) {
 }
 elseif (!TBProjAccessCheck($uid, $formfields[pid],
 			   $formfields[pid], $TB_PROJECT_MAKEIMAGEID)) {
-    $errors["Project"] = "No enough permission";
+    $errors["Project"] = "Not enough permission";
 }
 
 if (!isset($formfields[imagename]) ||
@@ -412,7 +412,8 @@ else {
     }
     elseif (strlen($formfields[imagename]) > $TBDB_IMAGEID_IMAGENAMELEN) {
 	$errors["Descriptor Name"] =
-	    "Too long! Must be less than or equal to $TBDB_UIDLEN";
+	    "Too long! ".
+	    "Must be less than or equal to $TBDB_IMAGEID_IMAGENAMELEN";
     }
 }
 

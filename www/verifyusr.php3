@@ -51,10 +51,11 @@ if (strcmp($status, "unverified") == 0) {
         TBERROR("Database Error setting status for $uid: $err\n", 1);
     }
 
-    echo "<h3>Because your project leader has already approved ".
+    echo "<p>".
+         "Because your project leader has already approved ".
 	 "your membership in the project, you are now an active user ".
 	 "of emulab.  Click on the 'Home' link at your left, and any options ".
-	 "that are now available to you will appear.</h3>\n";
+	 "that are now available to you will appear.\n";
 }
 elseif (strcmp($status, "newuser") == 0) {
     $query_result = mysql_db_query($TBDBNAME,
@@ -64,9 +65,10 @@ elseif (strcmp($status, "newuser") == 0) {
         TBERROR("Database Error setting status for $uid: $err\n", 1);
     }
 
-    echo "<h3>You have now been verified. However, your application ".
+    echo "<p>".
+	 "You have now been verified. However, your application ".
 	 "has not yet been approved by the project leader. You will receive ".
-	 "email when that has been done.</h3>\n";
+	 "email when that has been done.\n";
 }
 else {
     USERERROR("You have already been verified, $uid. If you did not perform ".

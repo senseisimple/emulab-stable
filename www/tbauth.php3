@@ -220,6 +220,11 @@ function DOLOGIN($uid, $password) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBSECURECOOKIES;
 
+    if (! isset($password) ||
+	strcmp($password, "") == 0) {
+	return -1;
+    }
+
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
     if (! $query_result) {

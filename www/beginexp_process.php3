@@ -2,11 +2,41 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
+# No PAGEHEADER since we spit out a Location header later. See below.
 #
-PAGEHEADER("Beginning a Testbed Experiment");
 
-$mydebug   = 0;
+#
+# Spit the form out using the array of data. 
+# 
+function SPITFORM($formfields, $errors)
+{
+    global $TBDB_PIDLEN, $TBDB_GIDLEN;
+    
+    PAGEHEADER("Begin a Testbed Experiment");
+
+    if ($errors) {
+	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
+              <tr>
+                 <td align=center colspan=3>
+                   <font color=red>
+                      Oops, please fix the following errors!
+                   </font>
+                 </td>
+              </tr>\n";
+
+	while (list ($name, $message) = each ($errors)) {
+	    echo "<tr>
+                     <td align=right><font color=red>$name:</font></td>
+                     <td>&nbsp &nbsp</td>
+                     <td align=left><font color=red>$message</font></td>
+                  </tr>\n";
+	}
+	echo "</table><br>\n";
+    }
+
+}
+
+
 $delnsfile = 0;
 
 #

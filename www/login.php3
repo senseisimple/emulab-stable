@@ -5,58 +5,108 @@
 require("defs.php3");
 
 #
-# This page gets loaded as the result of a login click.
-#
-# $uid will be set by the login form. If the login is okay, we zap
-# the user back to the main page. If the login fails, put continue
-# with a normal page, but with an error message.
-#
-if (isset($login)) {
-    #
-    # Login button pressed. 
-    #
-    if (!isset($uid) ||
-        strcmp($uid, "") == 0) {
-            $login_status = $STATUS_LOGINFAIL;
+# Must not be logged in already!
+# 
+if (($known_uid = GETUID()) != FALSE) {
+    if (CHECKLOGIN($known_uid) == $CHECKLOGIN_LOGGEDIN) {
+	PAGEHEADER("Login");
+
+	echo "<h3>
+              You are still logged in. Please log out first if you want
+              to log in as another user!
+              </h3>\n";
+	    
+	PAGEFOOTER();
+	die("");
     }
-    else {
-	#
-	# Look to see if already logged in. If the user hits reload,
-	# we are going to get another login post, and this could
-	# update the current login. Try to avoid that if possible.
-        #
-	if (CHECKLOGIN($uid) == 1) {
-            $login_status = $STATUS_LOGGEDIN;
-	}
-	elseif (DOLOGIN($uid, $password)) {
-            $login_status = $STATUS_LOGINFAIL;
-        }
-        else {
-            $login_status = $STATUS_LOGGEDIN;
-        }
-    }
-}
-else {
-    $login_status = $STATUS_LOGGEDIN;
 }
 
-if ($login_status == $STATUS_LOGGEDIN) {
-    #
-    # Zap back to front page in secure mode.
-    # 
-    header("Location: $TBBASE/");
+#
+# Spit out the form.
+# 
+function SPITFORM($uid, $failed)
+{
+    global $TBDB_UIDLEN, $TBBASE;
+    
+    PAGEHEADER("Login");
+
+    if ($failed) {
+	echo "<center>
+              <font size=+1 color=red>
+	      Login attempt failed! Please try again.
+              </font>
+              </center><br>\n";
+    }
+
+    echo "<center>
+          <font size=+1>
+          Please login to our secure server.<br>
+          (You must have cookies enabled)
+          </font>
+          </center>\n";
+
+    echo "<table align=center border=1>
+          <form action='${TBBASE}/login.php3' method=post>
+          <tr>
+              <td>Username:</td>
+              <td><input type=text
+                         value=\"$uid\"
+                         name=uid size=$TBDB_UIDLEN></td>
+          </tr>
+              <tr>
+              <td>Password:</td>
+              <td><input type=password name=password size=12></td>
+          </tr>
+          <tr>
+             <td align=center colspan=2>
+                 <b><input type=submit value=Login name=login></b></td>
+          </tr>
+          </form>
+          </table>\n";
+
+    echo "<center><h2>
+          <a href='password.php3'>Forgot your password?</a>
+          </h2></center>\n";
+}
+
+#
+# If not clicked, then put up a form.
+#
+if (! isset($login)) {
+    SPITFORM($known_uid, 0);
+    PAGEFOOTER();
     return;
 }
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Login Failed");
-
-echo "<center><h3>Login attempt failed! Please try again.</h3></center>\n";
-
-#
-# Standard Testbed Footer
+# Login clicked.
 # 
-PAGEFOOTER();
+if (!isset($uid) ||
+    strcmp($uid, "") == 0) {
+    $login_status = $STATUS_LOGINFAIL;
+}
+else {
+    if (DOLOGIN($uid, $password)) {
+	$login_status = $STATUS_LOGINFAIL;
+    }
+    else {
+	$login_status = $STATUS_LOGGEDIN;
+    }
+}
+
+#
+# Failed, then try again with an error message.
+# 
+if ($login_status == $STATUS_LOGINFAIL) {
+    SPITFORM($uid, 1);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Zap back to front page in secure mode.
+# 
+header("Location: $TBBASE/");
+return;
+
 ?>

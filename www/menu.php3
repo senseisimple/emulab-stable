@@ -64,11 +64,11 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
     WRITESIDEBARBUTTON("News (new Nov 29)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
-    WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
+    WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
+    WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON("Search Documentation", $TBDOCBASE, "search.php3");
-    WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
-    WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
+    WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects Using $THISHOMEBASE", $TBDOCBASE,
@@ -126,7 +126,7 @@ function WRITESIDEBAR() {
 
 	if ($status == "active" && $pswd_expired) {
 	    WRITESIDEBARBUTTON("Change your Password",
-			       $TBBASE, "modusr_form.php3");
+			       $TBBASE, "moduserinfo.php3");
 	}
 	elseif ($status == "active") {
 	    WRITESIDEBARBUTTON("My $THISHOMEBASE",
@@ -158,11 +158,11 @@ function WRITESIDEBAR() {
 	    }
 	    
 	    WRITESIDEBARBUTTON("Begin an Experiment",
-			       $TBBASE, "beginexp_form.php3");
+			       $TBBASE, "beginexp.php3");
 	    WRITESIDEBARBUTTON("Experiment Information",
 			       $TBBASE, "showexp_list.php3");
 	    WRITESIDEBARBUTTON("Update user information",
-			       $TBBASE, "modusr_form.php3");
+			       $TBBASE, "moduserinfo.php3");
 	    WRITESIDEBARBUTTON("Node Reservation Status",
 			       $TBBASE, "reserved.php3");
 	    WRITESIDEBARBUTTON("Node Up/Down Status",
@@ -182,8 +182,8 @@ function WRITESIDEBAR() {
     # Standard options for anyone.
     #
     if ($login_status != $STATUS_NOLOGINS) {
-	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject_form.php3");
-	WRITESIDEBARBUTTON("Join Project",  $TBBASE, "addusr.php3");
+	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject.php3");
+	WRITESIDEBARBUTTON("Join Project",  $TBBASE, "joinproject.php3");
     }
 
     switch ($login_status) {
@@ -225,7 +225,7 @@ function WRITESIDEBAR() {
     else {
 	echo "<tr>
                <td align=center height=50 valign=center>
-                <a href=\"$TBBASE/login_form.php3\">
+                <a href=\"$TBBASE/login.php3\">
 	           <img alt=\"logon\" border=0
                         src=\"$BASEPATH/logon.gif\"></a>
                </td>
@@ -280,11 +280,11 @@ function WRITEBANNER($title) {
 
     echo "<!-- This is the page Banner -->\n";
 
-    echo "
-                <a href='$BASEPATH/pix/merge-med.jpg'>
-                   <img src='$BASEPATH/pix/merge-mini.jpg'
-                        border=2 align=right></a>
-            \n";
+#    echo "
+#                <a href='$BASEPATH/pix/merge-med.jpg'>
+#                   <img src='$BASEPATH/pix/merge-mini.jpg'
+#                        border=2 align=right></a>
+#            \n";
     
     echo "<table cellpadding=0 cellspacing=0 border=0 width=50%>";
     echo "<tr>
@@ -419,6 +419,11 @@ function PAGEHEADER($title) {
     elseif (NOLOGINS()) {
 	$login_status = $STATUS_NOLOGINS;
     }
+
+    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+    header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT"); 
+    header("Cache-Control: no-cache, must-revalidate");
+    header("Pragma: no-cache");
 
     echo "<html>
           <head>

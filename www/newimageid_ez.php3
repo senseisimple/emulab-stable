@@ -385,7 +385,8 @@ else {
     }
     elseif (strlen($formfields[imagename]) > $TBDB_IMAGEID_IMAGENAMELEN) {
 	$errors["Descriptor Name"] =
-	    "Too long! Must be less than or equal to $TBDB_UIDLEN";
+	    "Too long! ".
+	    "Must be less than or equal to $TBDB_IMAGEID_IMAGENAMELEN";
     }
 }
 
