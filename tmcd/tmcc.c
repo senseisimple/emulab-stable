@@ -20,6 +20,12 @@
 #include "config.h"
 
 #undef BOSSNODE
+#ifdef BOSSNODE
+#define DEFAULT_BOSSNODE BOSSNODE
+#else
+#define DEFAULT_BOSSNODE NULL
+#endif
+#define BOSSNODEFILE	 "/usr/local/etc/bossnode"
 
 void		sigcatcher(int foo);
 char		*getbossnode(void);
@@ -51,7 +57,7 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-	char			*bossnode = NULL;
+	char			*bossnode = DEFAULT_BOSSNODE;
 	int			version = CURRENT_VERSION;
 #ifdef UDP
 	int			useudp = 0;
@@ -85,6 +91,26 @@ main(int argc, char **argv)
 	}
 	argv += optind;
 
+	/*
+	 * How do we find our bossnode?
+	 *
+	 * 1. Command line.
+	 * 2. Compiled in.
+	 * 3. /usr/local/etc/bossnode
+	 * 4. nameserver goo below.
+	 */
+	if (!bossnode) {
+		FILE	*fp;
+		
+		if ((fp = fopen(BOSSNODEFILE, "r")) != NULL) {
+			if (fgets(buf, sizeof(buf), fp)) {
+				if ((bp = strchr(buf, '\n')))
+					*bp = (char) NULL;
+				bossnode = strdup(buf);
+			}
+			fclose(fp);
+		}
+	}
 	if (!bossnode)
 		bossnode = getbossnode();
 	he = gethostbyname(bossnode);
