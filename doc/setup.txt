@@ -19,8 +19,10 @@ install (of course, grab your favorite editors, etc.) - the ones our software
 needs will be installed automatically later.  You, will, however, have to make
 sure that you create a partition large enough to hold /usr/testbed - in
 addition to the testbed software, this is where many disk images will get
-stored. Also, the /var partition will need to be large enough to hold the
-database - 100MB extra for the database should be sufficient.
+stored. The /var partition will need to be large enough to hold the database -
+100MB extra for the database should be sufficient. Also, since we'll be building
+and installing a lot of software from the ports tree, you'll want to make sure
+that /usr is at least 2 GB.
 
 Make sure that you have the network correctly configured, and make sure that it
 has a hostname that resolves. The silly mysql-server port requires this.
