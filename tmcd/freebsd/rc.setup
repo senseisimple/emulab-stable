@@ -53,7 +53,7 @@ if [ -x /etc/testbed/rc.healthd ]; then
 fi
 
 if [ -x /etc/testbed/slothd ]; then
-	echo "Starting idle detector ..."
+	echo "Starting usage detector ..."
 	/etc/testbed/slothd
 fi
 

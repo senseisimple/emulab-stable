@@ -44,7 +44,7 @@ if [ -x /etc/rc.d/testbed/rc.healthd ]; then
 fi
 
 if [ -x /etc/rc.d/testbed/slothd ]; then
-            echo "Starting idle detector ..."
+            echo "Starting usage detector ..."
             /etc/rc.d/testbed/slothd
 fi
 
