@@ -74,20 +74,21 @@ def DBQuery(queryPat, querySub = (), asDict = False):
         except MySQLdb.MySQLError:
             tries -= 1
             if tries == 0:
-                raise
+                break
             else:
                 time.sleep(1)
                 try:
                     __dbConnection.ping()
-                except MySQLdb.MySQLError: pass
-    tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
+                except MySQLdb.MySQLError:
+                    pass
+    tbmsg  = queryPat % cursor.connection.literal(querySub)
+    tbmsg += "\n\n"
+    tbmsg += "".join(traceback.format_exception(*sys.exc_info()))
     SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
-    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
+    return None
 
 def DBQueryFatal(*args):
-    try:
-        ret = DBQuery(*args)
+    ret = DBQuery(*args)
+    if ret:
         return ret
-    except MySQLdb.MySQLError:
-        return None
-
+    raise RuntimeError, "DBQueryFatal failed"
