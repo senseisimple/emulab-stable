@@ -68,7 +68,7 @@ sub check {
     my $ssh="sshtb -q";
     my $node = shift;
     my $cmd1 = "ps auxwww | grep slothd | grep -v grep";
-    my $cmd2 = "/etc/testbed/slothd -f";
+    my $cmd2 = "'rm -f /tmp/.sdpid ; /etc/testbed/slothd -f'";
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
     # some funky state.
@@ -81,24 +81,23 @@ sub check {
 	#print "$syspid - Alarm set.\n";
         waitpid($syspid, 0);
 	my $rv = $?;
-	#print "$syspid - Done waiting. Got '$rv'\n";
+	if ($rv > 255) { $rv /= 256; }
+	#print "$syspid - Done waiting. Got '$rv' ",$rv/256," ",$rv%256,"\n";
         alarm 0;
 	if ($rv == 15) { 
-	    #print "Node is wedged.\n"; 
-	    $str="unreachable"; 
-	} elsif ($rv == 256) { 
-	    #print "Node is not running sshd.\n"; 
-	    $str="SSH not available"; 
-	} elsif ($rv == 512) { 
-	    $str="not running, couldn't start slothd"; 
+	    $str="operation timed out"; 
+	#} elsif ($rv == 256) { 
+	#    $str="SSH not available"; 
 	} elsif ($rv == 0) {
 	    $str="running";
 	} elsif ($rv == 1) {
 	    $str="not running";
 	} elsif ($rv == 2) {
 	    $str="not running, started";
+	} elsif ($rv == 3) { 
+	    $str="not running, couldn't start slothd"; 
 	} else {
-	    $str="I don't know what happened...$rv";
+	    $str="I don't know what happened...returned $rv";
 	}
     } else {
 	# child
@@ -110,12 +109,34 @@ sub check {
 	} else {
 	    #print "not running. ";
 	    if ($opts{"s"}) {
+		my $f = "/tmp/tmp-$node-$$";
+		open (STDERR, "> $f") || 
+		  warn("Couldn't open $f: $!\n");
 		$str = `sudo $ssh $node $cmd2`;
-		if ($str) {
-		    #print "(start returned '$str') ";
+		my $rv = $?;
+		if ($rv > 255) { $rv /= 256; }
+		#print "\n(start=$rv)\n";
+		#system("ls -l $f");
+		if ( -s "$f") {
+		    $rv=127;
+		    print "Error starting slothd:\n";
+		    system("cat $f");
 		}
-		#print "started...";
-		exit(2);
+		system("rm $f");
+		#print "(start=$rv)\n";
+		if ($str) {
+		    print "(start returned '$str') ";
+		}
+		if ($rv==1) {
+		    # success
+		    exit(2);
+		} elsif ($rv==127) {
+		    # error trying to run slothd
+		    exit(3);
+		} else {
+		    # I dunno...
+		    exit($rv);
+		}
 	    }
 	    #print "\n";
 	    exit(1);
