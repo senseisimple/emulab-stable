@@ -162,7 +162,7 @@ $SIG{KILL} = \&cleanup;
 
 # Set up some notification throttling
 my $mailgap = 15; # in seconds
-my $lastmail = time - $mailgap + 1; # Send a digest of startup msgs after 1s.
+my $lastmail = time - $mailgap + 2; # Send a digest of startup msgs after 2s.
 my %msgs = ();
 
 info("stated starting up\n");
@@ -837,6 +837,7 @@ sub restart {
     notify("sigprocmask: sig unblock failed! $?, $!\n");
     die("\n");
   }
+  notify("Stated restarted\n");
   exec("$prog $params") or 
     do {
       my $msg = "Couldn't restart stated! cmd='$prog $params'\n".
@@ -848,14 +849,14 @@ sub restart {
 
 # This gets called if we catch a signal (TERM, etc.)
 sub cleanup {
-  info("Signal received, exiting\n");
+  notify("Signal received, exiting\n");
   # now do the normal exit stuff in END {}
   exit(0);
 }
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
-  info("Exiting, cleaning up\n");
+  notify("Stated exiting, cleaning up\n");
   if (defined($lockfile) && $lockfile ne "") { unlink $lockfile; }
   # clean up Syslog
   closelog();
