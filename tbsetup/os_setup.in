@@ -479,6 +479,7 @@ while ( @nodes ) {
 	     "is resolved.\n");
 
     print "*** Experiment will be terminated automatically.\n";
+    $failed++;
 }
 TBDebugTimeStamp("waiting finished");
 
