@@ -37,7 +37,9 @@ This page describes the XMLRPC interface to Emulab. Currently, the
 interface mainly supports experiment creation, modification, swapping,
 and termination. We also provide interfaces to several other common
 operations on nodes end experiments such as rebooting, reloading, link
-delay configuration, etc.
+delay configuration, etc. This interface is a work in progress; it
+will improve and grow over time. If there is something missing you
+need, please send us email.
 </p>
 
 <p>
@@ -101,7 +103,7 @@ where each <em>module</em> exports some methods. Each method is of the
 form (in Python speak):
 
     <code><pre>
-    def startexp(self, version, arguments):
+    def startexp(version, arguments):
         return EmulabResponse(RESPONSE_SUCCESS, value=0, output="Congratulations")</code></pre>
 
 The arguments to each method:
@@ -120,7 +122,7 @@ might:
     args["proj"] = "myproj"
     args["exp"] = "myexp"
     args["direction"]  = "out"
-    response = server->swapexp(CURRENTVERSION, args)</code></pre>
+    response = server.swapexp(CURRENTVERSION, args)</code></pre>
 </ul>
 
 The client specifies the <tt>proj</tt> and <tt>exp</tt> of the experiment
@@ -142,7 +144,7 @@ Dictionary) of the form:
 
 Unless specifically stated, the return value of most commands is a
 simple integer reflecting an exit code from the server, and some
-output that to help you determine what went wrong. Otherwise, the
+output to help you determine what went wrong. Otherwise, the
 return value is documented in each method description. 
 
 <ul>
