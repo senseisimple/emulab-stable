@@ -1,12 +1,15 @@
-INSTALL_DIR	= /usr/testbed
-INSTALL_BINDIR	= $(INSTALL_DIR)/bin
-INSTALL		= /usr/bin/install -c
+#
+# Insert Copyright Here.
+#
+include ../Makeconf
+include ../GNUmakerules
 
 DBFLAG	= -DUSE_MYSQL_DB #-DUSE_CFILE_DB #-DUSE_NULL_DB
 DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
 
 CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG
 INCS	= -I/n/moab/z/mike/flux/install.debug/include
+#INCS	= -I/build/oskit-debug/install/include
 
 all: proxydhcp bootinfo
 
@@ -28,14 +31,19 @@ testcfile: bootinfo_cfile.c
 		$(LFLAGS)
 
 install:	all
-	-mkdir $(INSTALL_BINDIR)	
-	-mkdir $(INSTALL_BINDIR)/pxe
-	$(INSTALL) proxydhcp $(INSTALL_BINDIR)/pxe
-	$(INSTALL) -m 444 proxydhcp.conf $(INSTALL_BINDIR)/pxe
-	$(INSTALL) -m 755 proxydhcp.restart $(INSTALL_BINDIR)/pxe
-	$(INSTALL) bootinfo $(INSTALL_BINDIR)/pxe
-	$(INSTALL) -m 755 bootinfo.restart $(INSTALL_BINDIR)/pxe
-	$(INSTALL) -m 444 bootinfo.conf $(INSTALL_DIR)/etc/bootinfo.conf
+
+install:	$(INSTALL_BINDIR)/pxe/proxydhcp \
+		$(INSTALL_BINDIR)/pxe/bootinfo
+	$(INSTALL_DATA) proxydhcp.conf $(INSTALL_BINDIR)/pxe
+	$(INSTALL_PROGRAM) proxydhcp.restart $(INSTALL_BINDIR)/pxe
+	$(INSTALL_PROGRAM) bootinfo.restart $(INSTALL_BINDIR)/pxe
+	-mkdir -p $(INSTALL_DIR)/etc
+	$(INSTALL_DATA) bootinfo.conf $(INSTALL_DIR)/etc/bootinfo.conf
+
+$(INSTALL_BINDIR)/pxe/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_BINDIR)/pxe
+	$(INSTALL_PROGRAM) $< $@
 
 clean: 
 	rm -f proxydhcp bootinfo testmysql
