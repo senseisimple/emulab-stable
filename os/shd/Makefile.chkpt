@@ -1,0 +1,11 @@
+# $FreeBSD: src/sbin/shdconfig/Makefile,v 1.2.10.1 2001/04/25 10:58:12 ru Exp $
+
+PROG=  shdconfig
+SRCS=  shdconfig.c trie.c
+CFLAGS+=	-I${.CURDIR}/../../sys -g
+LDADD+=		-lkvm
+DPADD+=		${LIBKVM}
+BINGRP=		kmem
+BINMODE=	2555
+
+.include <bsd.prog.mk>
