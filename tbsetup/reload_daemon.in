@@ -218,43 +218,65 @@ while (1) {
 	$idle=0;
     }
 
-    #
-    # RAND() does not work in our version of mysql, so generate a random
-    # number with perl and pick out that node.
-    #
-    $which = int(rand($count));
-    $query_result->dataseek($which);
-    %hrow  = $query_result->fetchhash();
-    $node  = $hrow{'node_id'};
-    $pid   = $hrow{'pid'};
-    $eid   = $hrow{'eid'};
+    # Grab all the nodes that match
+    my @node_list = ();
+    my @pending_list = ();
+    my %pid = ();
+    my %eid = ();
+    while ( %hrow  = $query_result->fetchhash() ) {
+	$node  = $hrow{'node_id'};
+	push(@node_list,$node);
+	$pid = $hrow{'pid'};
+	$eid = $hrow{'eid'};
+	$pid{$node}   = $pid;
+	$eid{$node}   = $eid;
+	if ($pid eq $RELOADPID && $eid eq $PENDINGEID) {
+	    push(@pending_list,$node);
+	} else {
+	    push(@other_list,$node);
+	}
+    }
 
-    print "Trying to reload $node ... \n";
+    my $nodes = join(" ",@node_list);
+    print "Trying to reload $nodes ... \n";
 
     #
     # What we do depends on whether its a free node or a node reserved
     # into the reload pending experiment.
     #
-    if ((defined($pid) && $pid eq $RELOADPID) &&
-	(defined($eid) && $eid eq $PENDINGEID)) {
+    if (@pending_list > 0) {
 	#
 	# Query for the imageid from the reloads table.
 	#
-	$query_result =
-	    DBQueryWarn("select image_id from scheduled_reloads " .
-			"where node_id='$node'");
-    
-	if ((! $query_result) || (!$query_result->numrows())) {
-	    #
-	    # If this node didn't make it into the scheduled_reloads table
-	    # for some reason, then we load it with the default image and
-	    # type
-	    #
-	    $imageid = "";
+	my %images = ();
+	my %imagenodes = ();
+	foreach $node (@pending_list) {
+	    $query_result =
+	      DBQueryWarn("select image_id from scheduled_reloads " .
+			  "where node_id='$node'");
 
-	} else {
-	    @row     = $query_result->fetchrow_array();
-	    $imageid = $row[0];
+	    if ((! $query_result) || (!$query_result->numrows())) {
+		#
+		# If this node didn't make it into the scheduled_reloads table
+		# for some reason, then we load it with the default image and
+		# type
+		#
+		$imageid = "";
+
+	    } else {
+		@row     = $query_result->fetchrow_array();
+		$imageid = $row[0];
+	    }
+	    $images{$node} = $imageid;
+	    if (defined(@{$imagenodes{$imageid}})) {
+		push(@{$imagenodes{$imageid}},$node);
+	    } else {
+		$imagenodes{$imageid} = [$node];
+	    }
+	    if ($debug) {
+		print "$node => $images{$node} == $imageid (".
+		  join(",",@{$imagenodes{$imageid}}).")\n";
+	    }
 	}
 	
 	#
@@ -263,32 +285,45 @@ while (1) {
 	# We change the reservation EID over and fire up an os_load
 	# directly.
 	#
-	if (! DBQueryWarn("update reserved set eid='$RELOADEID' where ".
-			  "node_id='$node'")) {
-	    print "Could not update EID for $node. Waiting a bit.\n";
+	my $cond = join(" or ",map("node_id='$_'",@pending_list));
+	if (! DBQueryWarn("update reserved set eid='$RELOADEID' ".
+			  "where $cond")) {
+	    print "Could not update EID for ".join(" ",@pending_list).
+	      ". Waiting a bit.\n";
 	    next;
 	}
 	
-	my $os_load_flags = "";
+	# Now run an os_load for each image
+	
+	foreach $imageid (keys %imagenodes) {
 
-	#
-	# We only add the -m flag to os_load if we found a specific image
-	# above. Omitting it causes os_load to pick the default image for
-	# the node's type
-	#
-	if ($imageid) {
-	    $os_load_flags .= " -m $imageid ";
-	}
+	    my $nodelist = join(" ",@{$imagenodes{$imageid}});
+	    my $os_load_flags = "";
 
-	if (system("$os_load $os_load_flags $node")) {
 	    #
-	    # This should not fail! 
+	    # We only add the -m flag to os_load if we found a specific image
+	    # above. Omitting it causes os_load to pick the default image for
+	    # the node's type
 	    #
-	    fatal("$os_load failed on $node. That's not supposed to happen.\n".
-		  "Please check the reload daemon log before restarting!\n");
+	    if ($imageid) {
+		$os_load_flags .= " -m $imageid ";
+	    }
+
+	    print "Running '$os_load $os_load_flags $nodelist'\n";
+
+	    if (system("$os_load $os_load_flags $nodelist")) {
+		#
+		# This should not fail! 
+		#
+		fatal("$os_load failed on $nodelist. ".
+		      "That's not supposed to happen.\n".
+		      "Please check the reload daemon log ".
+		      "before restarting!\n");
+	    }
 	}
     }
-    else {
+	
+    if (@other_list > 0 ) {
 	#
 	# Call sched_reload with the "force" option, which says that if
 	# sched_reload cannot reserve the node (cause someone just got it)
@@ -299,84 +334,28 @@ while (1) {
 	# default, and sched_reload will pick that up from the database
 	# in the absence of a -i option. 
 	#
-	if (system("$sched_reload -f $node")) {
+	if (system("$sched_reload -f $nodes")) {
 	    #
 	    # Could not get it. Wait and go around again.
 	    #
-	    print "$sched_reload failed on $node. Waiting a bit.\n";
+	    print "$sched_reload failed on $nodes. Waiting a bit.\n";
 	    next;
 	}
 
     }
     $stamp = DBDateTime();
 	
-    print "Reload of $node has started at $stamp.\n";
+    print "Reload of $nodes has started at $stamp.\n";
 
     #
     # For Frisbee reloads, we don't wait for the node to finish reloading,
     # since the whole point is to let many nodes load at once.
     #
     #if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
-	print "Not waiting for frisbee reload of $node.\n";
+	print "Not waiting for frisbee reload of $nodes.\n";
 	next;
     #}
 
-    #
-    # START OBSOLETE SECTION
-    #
-
-    #
-    # Reload was started. We want to wait until its finished.
-    #
-    $retry = 0;
-  again:
-    $count = 0;
-    while ($count < 130) {
-	$query_result =
-	    DBQueryWarn("select pid,eid from reserved where node_id='$node'");
-	if (! $query_result) {
-	    print "DB Error getting reservation for $node. Waiting a bit\n";
-	    next;
-	}
-	$stamp = DBDateTime();
-
-	if (! $query_result->numrows) {
-	    print "\nReload of $node appears to have finished at $stamp.\n";
-	    last;
-	}
-	#
-	# Make sure its still in the "reloading" experiment. Its possible
-	# (although unlikely) that the node will get freed up by the TMCD
-	# when it reboots, and then reallocated to another experiment,
-	# before we get back here to check.
-	#
-	@row  = $query_result->fetchrow_array();
-	if ($row[0] ne "$RELOADPID" || $row[1] ne "$RELOADEID") {
-	    print "\nReload of $node has finished at $stamp.\n";
-	    last;
-	}
-	print ".";
-	if (($count % 70) == 0) {
-	    print "\n";
-	}
-	$count++;
-	sleep(5);
-    }
-    if ($count == 130) {
-	if ($retry) {
-	    fatal("$node appears to have wedged. Stopping reload daemon.\n");
-	}
-	if (system("$reboot -f $node")) {
-	    fatal("$node was wedged, but could not be power cycled.\n");
-	}
-	print "\nReload appears wedged. Power cycling and trying once more!\n";
-	$retry = 1;
-	goto again;
-    }
-    sleep(10);
-    #
-    # END OBSOLETE SECTION
-    #
 }
 
 sub fatal($)
