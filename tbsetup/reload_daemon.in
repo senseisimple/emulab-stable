@@ -29,6 +29,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 
 my $TYPE     = "pc";
 my $reloader = "$TB/sbin/sched_reload";
+my $reboot   = "$TB/bin/node_reboot";
 my $logfile  = "$TB/log/reloadlog";
 my $debug    = 0;
 
@@ -79,7 +80,7 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Loop, looking for nodes to reload.
 # 
 while (1) {
-    my($count, $which, @row, $imageid, $node);
+    my($count, $which, @row, $imageid, $node, $retry);
     
     #
     # Find all of the free node that have not been reloaded (no pid entry
@@ -149,6 +150,8 @@ while (1) {
     #
     # Reload was started. We want to wait until its finished.
     #
+    $retry = 0;
+  again:
     $count = 0;
     while ($count < 200) {
 	$query_result =
@@ -180,7 +183,15 @@ while (1) {
 	sleep(5);
     }
     if ($count == 200) {
-	fatal("$node appears to have wedged. Stopping reload daemon.");
+	if ($retry) {
+	    fatal("$node appears to have wedged. Stopping reload daemon.");
+	}
+	if (system("$reboot -f $node")) {
+	    fatal("$node was wedged, but could not be power cycled.");
+	}
+	print "\nReload appears wedged. Power cycling and trying once more!\n";
+	$retry = 1;
+	goto again;
     }
     sleep(30);
 }
