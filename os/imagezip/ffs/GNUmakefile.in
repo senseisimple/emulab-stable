@@ -12,7 +12,7 @@ MAINDIR		= $(SRCDIR)/..
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS		+= $(SUBDIRCFLAGS)
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -I$(SRCDIR)
 
 all:	libffs.a
 

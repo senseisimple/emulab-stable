@@ -12,7 +12,7 @@ MAINDIR		= $(SRCDIR)/..
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS		+= $(SUBDIRCFLAGS) -I$(SRCDIR)
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -I$(SRCDIR)
 
 all:	libextfs.a
 

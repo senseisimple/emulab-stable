@@ -20,7 +20,7 @@ endif
 ifndef HAVE_GCC3
 CC		= gcc30
 endif
-CFLAGS		+= $(SUBDIRCFLAGS) -Ilibntfs/ntfsprogs/include
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(MAINDIR) -Ilibntfs/ntfsprogs/include
 ifndef LINUX
 CFLAGS		+= -I$(SRCDIR)/extra_bsd_includes \
 		   -I$(SRCDIR)/liblocale/include
