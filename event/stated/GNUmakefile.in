@@ -16,4 +16,5 @@ all:
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install:	$(addprefix $(INSTALL_SBINDIR)/, stated) \
-		$(addprefix $(INSTALL_LIBDIR)/, TimeoutQueue.pm) 
+		$(addprefix $(INSTALL_LIBDIR)/, TimeoutQueue.pm) \
+		$(addprefix $(INSTALL_LIBDIR)/, StateWait.pm) 
