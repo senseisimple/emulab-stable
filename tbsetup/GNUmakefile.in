@@ -27,7 +27,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup mkacct setgroups mkproj \
-		  exports_setup.proxy vnode_setup
+		  exports_setup.proxy vnode_setup eventsys_start
 
 LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \

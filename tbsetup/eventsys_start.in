@@ -1,0 +1,122 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+
+#
+# Start event schedulers for all swapped-in experiments.
+# Run whenever the boss node is rebooted.
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+my $EVENTSYS    = @EVENTSYS@;
+my $TESTMODE    = @TESTMODE@;
+
+my $evcontrol	= "$TB/bin/eventsys_control";
+
+#
+# Only root can do this.
+#
+if ($UID) {
+    die("*** $0:\n".
+	"    You do not have permission to control the event system!\n");
+}
+
+#
+# The event system is currently optional.
+#
+if (! $EVENTSYS) {
+    exit(0);
+}
+
+#
+# Do nothing when testing.
+#
+if ($TESTMODE) {
+    print "Testing run - no event system.\n";
+    exit(0);
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $uid;
+my $gid;
+my $pid;
+my $eid;
+
+#
+# Find all the active experiments.  For us active implies swapped-in.
+#
+$query_result = DBQueryFatal("select pid,eid,expt_head_uid,gid ".
+			     "from experiments where state='active'");
+
+while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
+    my $unix_uid;
+    my $group;
+    my $unix_gid;
+
+    #
+    # Figure out the unix uid/gid
+    #
+    $unix_uid = getpwnam($uid);
+    if (!defined($unix_uid)) {
+	failed("no unix uid for DB uid $uid", $pid, $eid);
+	next;
+    }
+    if (!TBGroupUnixInfo($pid, $gid, \$unix_gid, \$group)) {
+	failed("no unix gid for DB gid $gid", $pid, $eid);
+	next;
+    }
+
+    #
+    # Set real uid/gid to that of the user.
+    # Set some environment too.
+    #
+    $EGID = $GID = $unix_gid;
+    $EUID = $UID = $unix_uid;
+    $ENV{'USER'} = $uid;
+
+    system("$evcontrol start $pid $eid");
+    if ($?) {
+	failed("$evcontrol failed, status=$?", $pid, $eid);
+    } else {
+	print "Started event scheduler for $pid/$eid\n";
+    }
+
+    # set uid back to root
+    $EUID = $UID = 0;
+}
+
+exit 0;
+
+sub failed($$$)
+{
+    (my $msg, my $pid, my $eid) = @_;
+
+    warn("$msg");
+    warn("WARNING: did not start event scheduler for $pid/$eid");
+}
