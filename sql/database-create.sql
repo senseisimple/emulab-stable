@@ -1638,7 +1638,7 @@ CREATE TABLE virt_simnode_attributes (
   vname varchar(32) NOT NULL default '',
   nodeweight smallint(5) unsigned NOT NULL default '1',
   eventrate int(11) unsigned NOT NULL default '0',
-  KEY pid (pid,eid,vname)
+  PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --

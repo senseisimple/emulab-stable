@@ -1215,3 +1215,15 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table nseconfigs modify nseconfig mediumtext;
        alter table nsfiles modify nsfile mediumtext;
+
+1.215  Fixed the PRIMARY KEYs for virt_simnode_attributes by
+       dropping the table and re-creating it correctly.
+
+       create table virt_simnode_attributes ( \
+         pid varchar(12) NOT NULL default '', \
+         eid varchar(32) NOT NULL default '', \
+         vname varchar(32) NOT NULL default '', \
+         nodeweight smallint(5) unsigned not null default '1', \
+         eventrate int(11) unsigned not null default '0', \
+         PRIMARY KEY (pid,eid,vname));
+
