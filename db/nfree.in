@@ -220,10 +220,5 @@ if (@freed_nodes) {
 	print STDERR "WARNING: $consetup @conlist failed!\n";
 }
 
-if (@freed_nodes || @reloaded) {
-    system("$exportsetup") == 0 or
-	print STDERR "WARNING: $exportsetup failed!\n";
-}
-
 exit($error);
 

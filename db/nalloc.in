@@ -120,9 +120,6 @@ if (!$error && @nodes) {
 
     system("$consetup @conlist") == 0 or
 	print STDERR "WARNING: $consetup @conlist failed!\n";
-
-    system("$exportsetup") == 0 or
-	print STDERR "WARNING: $exportsetup failed!\n";
 }
 
 exit($error);
