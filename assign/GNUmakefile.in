@@ -18,13 +18,14 @@ OBJS=score.o parse_top.o parse_ptop.o config.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3 -fomit-frame-pointer -m486
 CXXFLAGS = -I${LEDA}/incl
-# Pick one of the two below.
-#CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
-#CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486 -DUSE_OPTIMAL
-CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG
-#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG -DUSE_OPTIMAL
+# Pick one of the few below.
+CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
+#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG
 #CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
-#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE -DUSE_OPTIMAL
+
+# If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
+# option. Use OP={0,1} on the command line at run time... :)
+
 DEPLIBS=$(OBJS)
 
 assign: ${DEPLIBS} ${OBJS} assign.o
