@@ -77,9 +77,7 @@ install: all script-install subdir-install
 # 
 subdir-install:
 	@$(MAKE) -C checkpass install	
-ifneq ($(OURDOMAIN),emulab.net)
 	@$(MAKE) -C ns2ir install
-endif
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -88,9 +86,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm)
 
 post-install: 
-ifneq ($(OURDOMAIN),emulab.net)
 	@$(MAKE) -C ns2ir post-install
-endif
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
