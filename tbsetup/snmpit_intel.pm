@@ -864,6 +864,13 @@ sub listVlans($) {
 
     foreach my $vlan_id ( sort {$a <=> $b} keys %Names ) {
 	#
+	# Special case - we don't want to list the System VLAN, as that's
+	# where ports that are not in use go. (This is the same as ignoring
+	# VLAN #1 on Cisco's
+	#
+	next if ($Names{$vlan_id} eq "System");
+
+	#
 	# Check for members to avoid pushing an undefined value into
 	# the array (which causes warnings elsewhere)
 	#
