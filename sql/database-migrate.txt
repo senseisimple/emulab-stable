@@ -19,9 +19,9 @@
 
        Used by frisbee/imagezip. Locally, changed these types:
 
-	update node_types set disktype='ar' where type='pc600';
-	update node_types set disktype='ar' where type='pc850';
-	update node_types set disktype='ar' where type='pc1500';
-	update node_types set disktype='ar' where type='pcL440GX';
-	update node_types set disktype='ar' where type='pc2000';
-	update node_types set disktype='ar' where type='pc601';
+	update node_types set disktype='ad' where type='pc600';
+	update node_types set disktype='ad' where type='pc850';
+	update node_types set disktype='ad' where type='pc1500';
+	update node_types set disktype='ad' where type='pcL440GX';
+	update node_types set disktype='ad' where type='pc2000';
+	update node_types set disktype='ad' where type='pc601';
