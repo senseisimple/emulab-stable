@@ -109,8 +109,10 @@ if (isset($deletekey)) {
 PAGEHEADER("Widearea Private Keys");
 
 $query_result =
-    DBQueryFatal("select wa.*,i.node_id from widearea_privkeys as wa ".
+    DBQueryFatal("select wa.*,i.node_id,cd.version ".
+		 " from widearea_privkeys as wa ".
 		 "left join interfaces as i on wa.IP=i.IP ".
+		 "left join cdroms as cd on wa.cdkey=cd.cdkey ".
 		 "order by requested DESC");
 
 if (! mysql_num_rows($query_result)) {
@@ -126,6 +128,7 @@ echo "<tr>
           <td>IP</td>
           <td>Node</td>
           <td>Key</td>
+	  <td>CD</td>
           <td>Requested</td>
           <td>Updated</td>
       </tr>\n";
@@ -138,6 +141,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $privkey = $row[privkey];
     $IP      = $row[IP];
     $nodeid  = $row[node_id];
+    $cdvers  = $row[version];
 
     echo "<tr>
               <td align=center>
@@ -154,6 +158,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "<td>&nbsp</td>\n";
     }
     echo "    <td>$privkey</td>
+	      <td align=center>$cdvers</td>
 	      <td>$requested</td>
 	      <td>$updated</td>
          </tr>\n";
