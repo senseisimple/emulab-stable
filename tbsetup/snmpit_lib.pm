@@ -10,7 +10,7 @@ use Exporter;
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
 		getTestSwitches getVlanPorts getExperimentVlans getDeviceNames
 	    	getDeviceType getInterfaceSettings mapPortsToDevices
-		getSwitchStack tbsort );
+		getSwitchStack getStackType tbsort );
 
 use English;
 use libdb;
@@ -305,6 +305,22 @@ sub getSwitchStack($) {
     } else {
 	my ($stack_id) = ($result->fetchrow());
 	return $stack_id;
+    }
+}
+
+#
+# Returns the type of the given stack_id
+#
+sub getStackType($) {
+    my $stack = shift;
+    my $result = DBQueryFatal("SELECT stack_type FROM switch_stack_types WHERE " .
+    		"stack_id='$stack'");
+    if (!$result->numrows()) {
+	print STDERR "No stack found called $stack\n";
+	return undef;
+    } else {
+	my ($stack_type) = ($result->fetchrow());
+	return $stack_type;
     }
 }
 
