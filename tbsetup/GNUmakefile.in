@@ -26,7 +26,7 @@ USERBINS        = os_load node_reboot nscheck node_update savelogs \
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
-		  rmgroup mkgroup mkacct setgroups mkproj \
+		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser
 
@@ -36,7 +36,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  assign_wrapper ptopgen webnodeupdate \
 		  webdelay_config \
 		  webrmgroup webswapexp webnodecontrol \
-		  webmkgroup webmkacct websetgroups webmkproj \
+		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
 		  webidlecheck webnodereboot webrmuser
 
@@ -94,8 +94,6 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmproj
 	chown root $(INSTALL_SBINDIR)/rmgroup
 	chmod u+s $(INSTALL_SBINDIR)/rmgroup
-	chown root $(INSTALL_SBINDIR)/mkacct
-	chmod u+s $(INSTALL_SBINDIR)/mkacct
 	chown root $(INSTALL_SBINDIR)/mkgroup
 	chmod u+s $(INSTALL_SBINDIR)/mkgroup
 	chown root $(INSTALL_SBINDIR)/frisbeelauncher

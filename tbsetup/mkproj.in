@@ -23,7 +23,7 @@ use English;
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
-my $MKACCT   = "$TB/sbin/mkacct";
+my $MKACCT   = "$TB/sbin/tbacct add";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";

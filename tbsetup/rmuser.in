@@ -25,9 +25,8 @@ my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
 
 my $HOMEDIR	= "/users";
-my $SSH		= "$TB/bin/sshtb";
 my $SETGROUPS	= "$TB/sbin/setgroups";
-my $USERDEL	= "/usr/sbin/pw userdel";
+my $DELACCT	= "$TB/sbin/tbacct del";
 
 my $dbuid;
 my $user;
@@ -239,33 +238,22 @@ DBQueryFatal("delete from userslastlogin where uid='$user'");
 #
 # Remove user from both local and control node.
 #
-# All this stuff must be done as root (ssh).
-#
-$UID = $EUID;
+$EUID = $UID;
 
-print "Removing user $user from local node.\n";
-if (system("$USERDEL $user")) {
-    if (($? >> 8) != 67) {
-	fatal("Could not remove user $user from local node.");
-    }
-}
+system("$DELACCT $user") == 0 or
+    fatal("$DELACCT $user failed!");
 
-if ($control_node ne $BOSSNODE) {
-    print "Removing user $user from $control_node.\n";
-    if (system("$SSH -host $control_node '$USERDEL $user'")) {
-	if (($? >> 8) != 67) {
-	    fatal("Could not remove user $user from $control_node.");
-	}
-    }
-}
+$EUID = 0;
 
 #
 # Rename the users home dir if its there.
 #
 if (-d "$HOMEDIR/$user") {
-    my $newname = "HOMEDIR/$user-" . TBDateTimeFSSafe();
+    my $newname = "$HOMEDIR/$user-" . TBDateTimeFSSafe();
 
     if (rename("$HOMEDIR/$user", $newname)) {
+	print "Renamed homedir to $newname. Remember to delete it!\n";
+	
 	#
 	# Chown the owner/group to root and set the permissions so no
 	# one is allowed to look inside.
