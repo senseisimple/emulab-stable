@@ -267,6 +267,36 @@ sub DoneIfIdentical($$) {
 }
 
 #
+# Check to see if filesystem already mounted
+#
+sub DoneIfMounted($)
+{
+    my ($dir) = @_;
+
+    #
+    # Grab the output of the mount command and parse. 
+    #
+    if (! open(MOUNT, "/sbin/mount|")) {
+	PhaseFail("Cannot run mount command");
+    }
+    while (<MOUNT>) {
+	if ($_ =~ /^([-\w\.\/:\(\)]+) on ([-\w\.\/]+) \((.*)\)$/) {
+	    # Search for nfs string in the option list.
+	    foreach my $opt (split(',', $3)) {
+		if ($opt eq "nfs") {
+		    if ($dir eq $2) {
+			close(MOUNT);
+			PhaseSkip("NFS dir $dir already mounted");
+		    }
+		}
+	    }
+	}
+    }
+    close(MOUNT);
+    return;
+}
+
+#
 # Append some text to a configuration file, with a special testbed tag that 
 # will help inform the user of what's been done, and help future invocations
 # tell that this has already been done. Returns undef if it succeeds, or
