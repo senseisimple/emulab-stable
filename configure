@@ -28,7 +28,6 @@ ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
 ac_help="$ac_help
-  --enable-events        Enable event system (default off)
   --disable-events       Disable events (requires Elvin libraries)"
 ac_help="$ac_help
   --enable-testmode     Enable test mode
@@ -572,7 +571,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:576: checking host system type" >&5
+echo "configure:575: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -593,7 +592,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:597: checking build system type" >&5
+echo "configure:596: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -619,7 +618,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:623: checking for $ac_word" >&5
+echo "configure:622: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -651,7 +650,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:655: checking for $ac_word" >&5
+echo "configure:654: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -683,7 +682,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:687: checking for $ac_word" >&5
+echo "configure:686: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -715,7 +714,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:719: checking for $ac_word" >&5
+echo "configure:718: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -747,7 +746,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:751: checking for $ac_word" >&5
+echo "configure:750: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -779,7 +778,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:783: checking for $ac_word" >&5
+echo "configure:782: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1057,7 +1056,7 @@ fi
 
 
 #
-# Enable event system. Relies on Elvin. Off by default.
+# Disable event system. Relies on Elvin. On by default.
 # 
 # Check whether --enable-events or --disable-events was given.
 if test "${enable_events+set}" = set; then
@@ -1066,16 +1065,17 @@ if test "${enable_events+set}" = set; then
 fi
 
 
-if test "$enable_events" = "yes"; then
+if test "$enable_events" = "no"; then
+	eventfiles="";
+        EVENTSYS=0;
+else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
-                    event/example/GNUmakefile event/trafgen/GNUmakefile";
+                    event/example/GNUmakefile event/trafgen/GNUmakefile \
+                    event/delay-agent/GNUmakefile";
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;
-else
-	eventfiles="";
-        EVENTSYS=0;
 fi
 
 
@@ -1219,9 +1219,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
-	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif vis/top2png vis/render \
+	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
+	vis/top2png vis/render \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/cvsupd.sh \
+	rc.d/cvsupd.sh rc.d/2.elvind.sh \
 	$eventfiles \
 	apache/GNUmakefile apache/apache.conf "
 
