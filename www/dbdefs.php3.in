@@ -85,15 +85,16 @@ $TB_EXPT_MAX			= $TB_EXPT_UPDATEACCOUNTS;
 $TB_PROJECT_READINFO		= 1;
 $TB_PROJECT_MAKEGROUP		= 2;
 $TB_PROJECT_EDITGROUP		= 3;
-$TB_PROJECT_DELGROUP		= 4;
-$TB_PROJECT_LEADGROUP		= 5;
-$TB_PROJECT_ADDUSER		= 6;
-$TB_PROJECT_DELUSER             = 7;
-$TB_PROJECT_MAKEOSID		= 8;
-$TB_PROJECT_DELOSID		= 9;
-$TB_PROJECT_MAKEIMAGEID		= 10;
-$TB_PROJECT_DELIMAGEID		= 11;
-$TB_PROJECT_CREATEEXPT		= 12;
+$TB_PROJECT_GROUPGRABUSERS      = 4;
+$TB_PROJECT_DELGROUP		= 5;
+$TB_PROJECT_LEADGROUP		= 6;
+$TB_PROJECT_ADDUSER		= 7;
+$TB_PROJECT_DELUSER             = 8;
+$TB_PROJECT_MAKEOSID		= 9;
+$TB_PROJECT_DELOSID		= 10;
+$TB_PROJECT_MAKEIMAGEID		= 11;
+$TB_PROJECT_DELIMAGEID		= 12;
+$TB_PROJECT_CREATEEXPT		= 13;
 $TB_PROJECT_MIN			= $TB_PROJECT_READINFO;
 $TB_PROJECT_MAX			= $TB_PROJECT_CREATEEXPT;
 
@@ -239,6 +240,7 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
     global $TB_PROJECT_READINFO;
     global $TB_PROJECT_MAKEGROUP;
     global $TB_PROJECT_EDITGROUP;
+    global $TB_PROJECT_GROUPGRABUSERS;
     global $TB_PROJECT_DELGROUP;
     global $TB_PROJECT_LEADGROUP;
     global $TB_PROJECT_ADDUSER;
@@ -304,10 +306,18 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $mintrust = $TBDB_TRUST_PROJROOT;
 	}
 	else {
-	    # Editing a group requires privs in the project, not group!
-	    $gid = $pid;
 	    $mintrust = $TBDB_TRUST_GROUPROOT;
 	}
+    }
+    elseif ($access_type == $TB_PROJECT_GROUPGRABUSERS) {
+	if (strcmp($gid, $pid) == 0) {
+	    $mintrust = $TBDB_TRUST_PROJROOT;
+	}
+	else {
+	    # Grabbing users requires privs in the project, not group!
+	    $gid = $pid;
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	}	
     }
     elseif ($access_type == $TB_PROJECT_DELUSER) {
 	$mintrust = $TBDB_TRUST_PROJROOT;

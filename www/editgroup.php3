@@ -47,6 +47,14 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 }
 
 #
+# See if user is allowed to add non-members to group.
+# 
+$grabusers = 0;
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
+    $grabusers = 1;
+}
+
+#
 # Grab the current user list for the group. The group leader cannot be
 # removed! Do not include members that have not been approved to main
 # group either! This will force them to go through the approval page first.
@@ -169,32 +177,34 @@ if (mysql_num_rows($curmembers_result)) {
 # Go through the list of non members. For each one, check to see if
 # the checkbox for that person was checked. If so, add the person
 # to the group membership, with the trust level specified.
-# 
-if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
+# Only do this if user has permission to grab users. 
+#
+
+if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
     while ($row = mysql_fetch_array($nonmembers_result)) {
 	$user = $row[0];
 	$foo  = "add_$user";
 	
 	if (isset($$foo)) {
-            #
-            # There should be a corresponding trust variable in the POST vars.
-            # Note that we construct the variable name and indirect to it.
-            #
-            $bar      = "$user\$\$trust";
+	    #
+	    # There should be a corresponding trust variable in the POST vars.
+	    # Note that we construct the variable name and indirect to it.
+	    #
+	    $bar      = "$user\$\$trust";
 	    $newtrust = $$bar;
-	
+	    
 	    if (!$newtrust || strcmp($newtrust, "") == 0) {
 		TBERROR("Error finding trust for $user in editgroup.php3",
 			1);
 	    }
-
+	    
 	    if (strcmp($newtrust, "user") &&
 		strcmp($newtrust, "local_root") &&
 		strcmp($newtrust, "group_root")) {
 		TBERROR("Invalid trust $newtrust for $user in editgroup.php3.",
 			1);
 	    }
-	
+	    
 	    TBCheckTrustConsistency($user, $pid, $gid, $newtrust);
 	}
     }
@@ -243,21 +253,22 @@ if (mysql_num_rows($curmembers_result)) {
 # the checkbox for that person was checked. If so, add the person
 # to the group membership, with the trust level specified.
 # 
-if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
-    mysql_data_seek($nonmembers_result, 0);
 
+if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
+    mysql_data_seek($nonmembers_result, 0);
+    
     while ($row = mysql_fetch_array($nonmembers_result)) {
 	$user = $row[0];
 	$foo  = "add_$user";
 	
 	if (isset($$foo)) {
-            #
-            # There should be a corresponding trust variable in the POST vars.
-            # Note that we construct the variable name and indirect to it.
-            #
-            $bar      = "$user\$\$trust";
+	    #
+	    # There should be a corresponding trust variable in the POST vars.
+	    # Note that we construct the variable name and indirect to it.
+	    #
+	    $bar      = "$user\$\$trust";
 	    $newtrust = $$bar;
-	
+	    
 	    DBQueryFatal("insert into group_membership ".
 			 "(uid, pid, gid, trust, ".
 			 " date_applied,date_approved) ".

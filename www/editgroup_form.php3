@@ -47,6 +47,14 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 }
 
 #
+# See if user is allowed to add non-members to group.
+# 
+$grabusers = 0;
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
+    $grabusers = 1;
+}
+
+#
 # Grab the user list for the group. Provide a button selection of people
 # that can be removed. The group leader cannot be removed!
 # Do not include members that have not been approved
@@ -84,7 +92,7 @@ echo "<br><center>
       </center>\n";
 
 if (mysql_num_rows($curmembers_result) ||
-    mysql_num_rows($nonmembers_result)) {
+    ($grabusers && mysql_num_rows($nonmembers_result))) {
     echo "<br>
           <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
           <table align=center border=1>\n";
@@ -156,7 +164,7 @@ if (mysql_num_rows($curmembers_result)) {
     echo "</tr>\n";
 }
 
-if (mysql_num_rows($nonmembers_result)) {
+if ($grabusers && mysql_num_rows($nonmembers_result)) {
     echo "<tr><td align=center colspan=2 nowrap=1>
           <br>
           <font size=+1><b>Add Group Members</b></font>[<b>1</b>].
@@ -188,7 +196,7 @@ if (mysql_num_rows($nonmembers_result)) {
 }
 
 if (mysql_num_rows($curmembers_result) ||
-    mysql_num_rows($nonmembers_result)) {
+    ($grabusers && mysql_num_rows($nonmembers_result))) {
     echo "<tr>
              <td align=center colspan=2>
                  <b><input type=submit value=Submit></b>
