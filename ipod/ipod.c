@@ -123,7 +123,8 @@ int makehosts(char **hostlist)
 
 void usage(char *prog)
 {
-   fprintf(stderr, "%s [ -i identityfile ] target [ target ... ]\n", prog);
+   fprintf(stderr, "%s [ -s src ] [ -i identityfile ] target [ target ... ]\n",
+	   prog);
 }
 
 /*
@@ -244,16 +245,18 @@ main(int argc, char **argv)
    struct in_addr fromaddr;
    int timeout = 5;  /* Default to 5 seconds */
    int identityfile;
-
-   fromaddr.s_addr = 0;
+   char *fromname = NULL;
 
    progname = argv[0];
 
    querytype = IPOD_ICMPTYPE;  /* the magical death packet number */
 
-   while ((ch = getopt(argc, argv, "i:")) != -1)
+   while ((ch = getopt(argc, argv, "s:i:")) != -1)
       switch(ch)
       {
+      case 's':
+	  fromname = optarg;
+	  break;
       case 'i':
 	 if (optarg[0] == '-')
 	    identityfile = 0;
@@ -285,6 +288,23 @@ main(int argc, char **argv)
       exit(-1);
    }
 
+   bzero(&fromaddr, sizeof(fromaddr));
+   if (fromname) {
+       if (!inet_aton(fromname, &fromaddr)) {
+	   struct hostent *hp;
+	   if ((hp = gethostbyname(fromname)) == NULL) {
+	       /* Could not resolve it.  Skip it. */
+	       fprintf(stderr, "%s: unknown host\n",
+		       fromname);
+	       exit(-1);
+	   }
+	   else {
+	       memcpy(&fromaddr.s_addr,
+		      hp->h_addr_list[0],
+		      hp->h_length);
+	   }
+       }
+   }
    hostcount = makehosts(argv);
 
    s = get_icmp_socket();
