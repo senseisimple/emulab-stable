@@ -28,7 +28,7 @@ proc getipaddr {name} {
 
 # consults tmcc ifconfig and findif to find the interface name
 # returns the interface name for ipaddr
-proc getmac {ipaddr} {
+proc getif {ipaddr} {
 
     set tmccifconfig [open /etc/testbed/tmcc.ifconfig r]
     set ifconf [read $tmccifconfig]
@@ -38,6 +38,29 @@ proc getmac {ipaddr} {
 	scan $ifconfig "INTERFACE=%s INET=%s MASK=%s MAC=%s " iface inet mask mac
 	if { $inet == $ipaddr } {
 	    return [exec findif $mac]
+	}
+    }
+
+    puts stderr "NSE: Could not find the interface name for $ipaddr"
+    return ""
+}
+
+proc getmac {ipaddr} {
+
+    set tmccifconfig [open /etc/testbed/tmcc.ifconfig r]
+    set ifconf [read $tmccifconfig]
+    close $tmccifconfig
+    set ifconfiglist [split $ifconf "\n"]
+    foreach ifconfig $ifconfiglist {
+	scan $ifconfig "INTERFACE=%s INET=%s MASK=%s MAC=%s " iface inet mask mac
+	if { $inet == $ipaddr } {
+	    set macaddrchars [split $mac ""]
+	    set i 0
+	    while { $i < [llength $macaddrchars] } {
+		lappend mac2chars "[lindex $macaddrchars $i][lindex $macaddrchars [expr $i + 1]]"
+		set i [expr $i + 2]
+	    }
+	    return [join $mac2chars ":"]
 	}
     }
 
@@ -164,7 +187,7 @@ if { $nsetrafgen_present == 1 } {
 	    set peeripaddr [getipaddr $peername]
 	    
 	    # find interface name with a helper subroutine
-	    set interface [getmac $myipaddr]
+	    set interface [getif $myipaddr]
 	    
 	    # one TCPTap object per TCP class that we have instantiated
 	    set tcptap($i) [new Agent/TCPTap]
@@ -210,7 +233,7 @@ if { $simcode_present == 1 } {
 	}
 	set nodeinst_ipaddr [$nodeinst set nsenode_ipaddr]
 	if { $nodeinst_ipaddr != {} } {
-	    set iface [getmac $nodeinst_ipaddr]
+	    set iface [getif $nodeinst_ipaddr]
 	    
 	    # one iptap per node that has real - simulated link
 	    set iptap($i) [new Agent/IPTap]
@@ -219,7 +242,12 @@ if { $simcode_present == 1 } {
 	    # except for the current host itself
 	    set bpf_ip($i) [new Network/Pcap/Live]
 	    set dev_ip($i) [$bpf_ip($i) open readonly $iface]
-	    $bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr"
+	    set nodeinst_mac [getmac $nodeinst_ipaddr]
+	    if { $nodeinst_mac != {} } {
+		$bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr and not ether src $nodeinst_mac"
+	    } else {
+		$bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr"
+	    }
 	    
 	    # associate the 2 network objects in the IPTap object
 	    $iptap($i) network-outgoing $ipnet
