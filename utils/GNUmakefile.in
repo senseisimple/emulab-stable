@@ -1,0 +1,37 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= utils
+
+include $(OBJDIR)/Makeconf
+
+BIN_SCRIPTS	= delay_config
+SBIN_SCRIPTS	= 
+LIBEXEC_SCRIPTS = 
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:
+	cd $(INSTALL_BINDIR) && \
+		list='$(BIN_SCRIPTS)'; for file in $$list; do \
+			rm -f $$file; \
+			ln -s plasticwrap $$file; \
+		done;
+
+clean:
