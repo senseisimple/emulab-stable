@@ -44,6 +44,7 @@ case "$1" in
 	killproc watchdog
 	killproc evproxy
 	killproc linktest
+	killproc emulab-syncd
 	echo "Informing the testbed we're rebooting ..."
 	$BINDIR/tmcc state SHUTDOWN
 	RETVAL=$?
