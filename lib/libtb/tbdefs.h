@@ -13,7 +13,9 @@
 #define TBDB_FLEN_EVEVENTTYPE	128
 
 /*
- * Event system stuff
+ * Event system stuff.
+ *
+ * If you add to these two lists, make sure you add to the arrays in tbdefs.c
  */
 #define TBDB_OBJECTTYPE_TESTBED	"TBCONTROL"
 #define TBDB_OBJECTTYPE_LINK	"LINK"
