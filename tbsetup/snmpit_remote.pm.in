@@ -1,0 +1,138 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Some ElabInElab support for managing vlans via outer boss node.
+#
+package snmpit_remote;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( RemoteDoVlansFromTables RemoteDoReset );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use English;
+use libdb;
+use libtestbed;
+use snmpit_lib;
+use libxmlrpc;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $RPCSERVER   = "@OUTERBOSS_NODENAME@";
+my $RPCPORT     = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT     = "@OUTERBOSS_SSLCERTNAME@";
+
+# Locals
+my $didsetup	= 0;
+
+#
+# Configure xmlrpc library to talk to outer boss.
+#
+sub ConfigXMLRPC()
+{
+    return 0
+	if ($didsetup);
+    
+    libxmlrpc::Config({"server"  => $RPCSERVER,
+		       "verbose" => 1,
+		       "cert"    => $RPCCERT,
+		       "portnum" => $RPCPORT});
+
+    $didsetup = 1;
+    return 0;
+}
+
+#
+# Ask outer boss to setup a bunch of vlans for an experiment.
+#
+sub RemoteDoVlansFromTables(@)
+{
+    my @vlans     = @_;
+    my $vlantable = {};
+
+    return 0
+	if (! @vlans);
+
+    my $result =
+	DBQueryFatal("select virtual,members,id from vlans where " .
+		     # Join "id='foo'" with ORs
+		     join(' OR ', map("id='$_'",@vlans)));
+
+    return 0
+	if (! $result->numrows);
+    
+    while (my ($virtual,$members,$id) = $result->fetchrow()) {
+	# $members is a space-seprated list
+
+	$vlantable->{$id} = {};
+	$vlantable->{$id}->{"virtual"} = $virtual;
+	$vlantable->{$id}->{"members"} = {};
+	
+	foreach my $port (split /\s+/,$members) {
+	    # Due to the inconsistent nature of our tables (curses!), we
+	    # have to do some conversion here
+	    $port =~ /^(.+):(.+)/;
+	    my ($node,$iface) = ($1,$2);
+	    if (!defined($node) || !defined($iface)) {
+		warn "WARNING: Bad node in VLAN: $port - skipping\n";
+		next;
+	    }
+	    my $result =
+		DBQueryFatal("select current_speed,duplex from interfaces " .
+			     "where node_id='$node' and iface='$iface'");
+	    if (!$result->num_rows()) {
+		warn "WARNING: Bad node/iface pair in VLAN: $port - skipping\n";
+		next;
+	    }
+	    my ($speed,$duplex) = $result->fetchrow();
+
+	    $vlantable->{$id}->{"members"}->{$port} = {};
+	    $vlantable->{$id}->{"members"}->{$port}->{"speed"} = $speed;
+	    $vlantable->{$id}->{"members"}->{$port}->{"duplex"} = $duplex;
+	}
+    }
+    return 0
+	if (! keys(%$vlantable));
+
+    ConfigXMLRPC();
+
+    my $rval = libxmlrpc::CallMethod("elabinelab", "vlans",
+				     {"op"    => "setup",
+				      "arg"   => $vlantable});
+    if (!defined($rval)) {
+	return -1;
+    }
+    return $rval;
+}
+
+#
+# Ask outer boss to tear down a bunch of vlans for an experiment.
+#
+sub RemoteDoReset(@)
+{
+    my @vlans     = @_;
+    
+    return 0
+	if (! @vlans);
+    
+    ConfigXMLRPC();
+
+    my $rval = libxmlrpc::CallMethod("elabinelab", "vlans",
+				     {"op"    => "destroy",
+				      "arg"   => join(",", @vlans)});
+    if (!defined($rval)) {
+	return -1;
+    }
+    return $rval;
+}
+
+# End with true
+1;
+

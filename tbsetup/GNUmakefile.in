@@ -27,7 +27,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
-		  newnode_reboot savelogs.proxy eventsys.proxy
+		  newnode_reboot savelogs.proxy eventsys.proxy \
+		  elabinelab snmpit.proxy 
 
 CTRLBIN_STUFF   = console_setup.proxy exports_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
@@ -46,7 +47,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
 		  snmpit_cisco_stack.pm snmpit_intel_stack.pm \
-		  snmpit_foundry.pm snmpit_stack.pm \
+		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py 
 
 #
@@ -159,6 +160,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/tarfiles_setup
 	chown root $(INSTALL_BINDIR)/savelogs
 	chmod u+s $(INSTALL_BINDIR)/savelogs
+	chown root $(INSTALL_SBINDIR)/elabinelab
+	chmod u+s $(INSTALL_SBINDIR)/elabinelab
 
 #
 # Control node installation (okay, plastic)

@@ -1,0 +1,546 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# TODO: ntpinfo table.
+#       Current source directory? From where?
+#
+use English;
+use Getopt::Std;
+
+#
+# Do things necessary for setting up inner elab experiment. 
+#
+sub usage()
+{
+    print STDOUT "Usage: elabinelab [-d] [-g] pid eid\n";
+ 
+    exit(-1);
+}
+my $optlist  = "dg";
+my $debug    = 1;
+my $dbgooonly= 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL	= "@USERNODE@";
+my $TBOPSPID    = TBOPSPID();
+my $SSH		= "$TB/bin/sshtb";
+my $nodereboot  = "$TB/bin/node_reboot";
+my $makeconf    = "$TB/sbin/dhcpd_makeconf";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my $PROJROOT	= PROJROOT();
+my $SAVEUID     = $UID;
+my $workdir;
+my %noderoles	= ();
+my $opsnode;
+my $bossnode;
+my @expnodes    = ();
+my $dbuid;
+my $user_name;
+my $user_email;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"g"})) {
+    $dbgooonly = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+my ($pid,$eid) = @ARGV;
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
+$workdir = TBExptWorkDir($pid, $eid);
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
+}
+
+CopyMFS()
+    if (0);
+DumpDBGoo();
+exit(0)
+    if ($dbgooonly);
+
+#
+# SSH into the ops node and fire off the script that builds it. We redirect
+# output and email it to TBOPS for debugging. 
+#
+$UID = 0;
+print "Setting up opsnode on $opsnode\n";
+system("$SSH -host $opsnode /users/stoller/i.sh > /tmp/opsnode.$$ 2>&1");
+if ($?) {
+    $UID = $SAVEUID;
+    SENDMAIL("$user_name <$user_email>",
+	     "ElabInElab Failure: $pid/$eid",
+	     "Error build the ops node ($opsnode)",
+	     $TBOPS,
+	     "Cc: $TBOPS",
+	     ("/tmp/opsnode.$$"));
+    system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+    print STDERR "*** $0:\n".
+	         "    Error building the opsnode ($opsnode)!\n";
+    exit(($debug ? 0 : -1));
+}
+print "Setting up bossnode on $bossnode\n";
+system("$SSH -host $bossnode /users/stoller/i.sh > /tmp/bossnode.$$ 2>&1");
+if ($?) {
+    $UID = $SAVEUID;
+    SENDMAIL("$user_name <$user_email>",
+	     "ElabInElab Failure: $pid/$eid",
+	     "Error build the boss node ($bossnode)",
+	     $TBOPS,
+	     "Cc: $TBOPS",
+	     ("/tmp/bossnode.$$"));
+    system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+    print STDERR "*** $0:\n".
+	         "    Error building the bossnode ($bossnode)!\n";
+    exit(($debug ? 0 : -1));
+}
+
+# Send these log files off now so that we can look at them.
+SENDMAIL("$user_name <$user_email>",
+	 "ElabInElab Setup Log: $pid/$eid",
+	 "Logs for building ops/boss ($opsnode/$bossnode)",
+	 $TBOPS,
+	 "Cc: $TBOPS",
+	 ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
+system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+$EUID = $UID = $SAVEUID;
+
+#
+# Restart DHCPD before going into os_setup, since DHCPD must be ready
+# before nodes come back up and start sending out DHCP requests.
+# 
+print "Regenerating DHCPD config file and restarting daemon.\n";
+system("$makeconf -i -r");
+if ($?) {
+    die("*** $0:\n".
+	"    Failed to reconfig/restart DHCPD.\n");
+}
+
+# Reboot ops and wait for it to come back.
+system("$nodereboot -w $opsnode");
+if ($?) {
+    die("*** $0:\n".
+	"    Error rebooting the opsnode ($opsnode)!\n");
+}
+# Reboot boss and wait for it to come back.
+system("$nodereboot -w $bossnode");
+if ($?) {
+    die("*** $0:\n".
+	"    Error rebooting the bossnode ($bossnode)!\n");
+}
+# Reboot the experimental nodes. They will come up inside the inner elab.
+# DO NOT WAIT! They are not going to report ISUP from this point on. 
+if (@expnodes) {
+    system("$nodereboot @expnodes");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the expnodes (@expnodes)!\n");
+    }
+}
+exit(0);
+
+#
+# Copy the necessary tftpboot files into the project directory so that
+# the inner elab boss can get them later when it sets up. 
+#
+sub CopyMFS()
+{
+    system("tar cf - -C /tftpboot ".
+	   "      pxeboot.emu freebsd frisbee freebsd.newnode | ".
+	   "   gzip | $SSH -1 -F /dev/null -host $CONTROL ".
+	   "   '(cat > /$PROJROOT/$pid/exp/$eid/tftpboot.tar.gz)'");
+    
+    if ($?) {
+	die("*** $0:\n".
+	    "    Could not create tftpboot.tar.gz\n");
+    }
+    return 0;
+}
+
+#
+# Dump parts of the DB that are needed for inner elab to run. The idea
+# is to create a set of files named by the table name. Note that mysqld
+# cannot write to the project tree cause of directory permissions. Put the
+# files into the workdir for now, and them copy them over. 
+#
+sub DumpDBGoo()
+{
+    my $statedir = "$workdir/elabinelab";
+
+    if (-d $statedir) {
+	system("rm -rf $statedir");
+    }
+    mkdir($statedir, 0777) or
+	die("*** $0:\n".
+	    "    Could not mkdir $statedir\n");
+    
+    chmod(0777, $statedir) or
+	die("*** $0:\n".
+	    "    Could not chmod $statedir\n");
+
+    #
+    # Get the role for each node.
+    #
+    my $query_result =
+	DBQueryFatal("select r.node_id,v.inner_elab_role from reserved as r ".
+		     "left join virt_nodes as v on v.vname=r.vname and ".
+		     "     v.pid=r.pid and v.eid=r.eid ".
+		     "where r.pid='$pid' and r.eid='$eid'");
+    while (my ($node_id,$role) = $query_result->fetchrow_array()) {
+	$noderoles{$node_id} = $role;
+	$bossnode = $node_id
+	    if ($role eq 'boss');
+	$opsnode = $node_id
+	    if ($role eq 'ops');
+	push(@expnodes, $node_id)
+	    if ($role eq 'node');
+    }
+
+    #
+    # These tables are dumped completely.
+    #
+    my @FULLTABLES = ("node_types", "interface_types",
+		      "interface_capabilities",
+		      "switch_paths", "switch_stack_types", "switch_stacks",
+		      "node_type_features", "node_types_auxtypes", "osid_map");
+
+    #
+    # These tables are dumped by role (node/ops). For each one dump the table
+    # as is, unless its the ops node. For that one we want to change its
+    # node_id to "ops" and its type to ops.
+    #
+    my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
+		      "node_rusage", "node_hostkeys", "node_idlestats",
+		      "partitions");
+
+    #
+    # These tables are dumped by project ID.
+    #
+    my @PROJTABLES = ("project_stats", "projects", "group_stats", "groups");
+
+    #
+    # These tables are dumped by user ID (for the project).
+    #
+    my @USERTABLES = ("users", "user_pubkeys", "user_stats");
+
+    foreach my $table (@FULLTABLES) {
+	unlink("$statedir/$table");
+	DBQueryWarn("select * from $table ".
+		    "into outfile '$statedir/$table'")
+	    or die("*** $0:\n".
+		   "    Could not dump table $table\n");
+    }
+
+    foreach my $table (@NODETABLES) {
+	unlink("$statedir/$table");
+	#
+	# Create a temporary table.
+	#
+	DBQueryWarn("create temporary table temp_${table} ".
+		    "select t.* from reserved as r ".
+		    "left join $table as t on t.node_id=r.node_id ".
+		    "left join virt_nodes as v on v.vname=r.vname and ".
+		    "     v.pid=r.pid and v.eid=r.eid ".
+		    "where r.pid='$pid' and r.eid='$eid' and ".
+		    "      t.node_id is not null and ".
+		    "      (v.inner_elab_role='node' or ".
+		    "       v.inner_elab_role='ops')")
+	    or die("*** $0:\n".
+		   "    Could not create temporary table temp_$table\n");
+	#
+	# Rename the ops node in each table. For the nodes table, there is a
+	# bunch of other stuff to do.
+	#
+	DBQueryFatal("update temp_${table} set node_id='ops' ".
+		     "where node_id='$opsnode'");
+
+	if ($table eq "nodes") {
+	    DBQueryFatal("update temp_${table} set ".
+			 " type='ops', ".
+			 " phys_nodeid='ops', ".
+			 " role='ctrlnode', ".
+			 " op_mode='OPSNODEBSD' ".
+			 "where node_id='ops'");
+
+	    # Also add the nodes that correspond to the "trunk" wires.
+	    DBQueryFatal("insert into temp_${table} ".
+			 "select distinct n.* from wires as w ".
+			 "left join nodes as n on w.node_id1=n.node_id or ".
+			 "     w.node_id2=n.node_id ".
+			 "where w.type='Trunk'");
+	}
+    
+	DBQueryWarn("select * from temp_$table ".
+		    "into outfile '$statedir/$table'")
+	    or die("*** $0:\n".
+		   "    Could not dump table $table\n");
+    }
+
+    foreach my $table (@PROJTABLES) {
+	unlink("$statedir/$table");
+	DBQueryWarn("select * from $table ".
+		    "where pid='$pid' ".
+		    "into outfile '$statedir/$table'")
+	    or die("*** $0:\n".
+		   "    Could not dump table $table\n");
+    }
+
+    foreach my $table (@USERTABLES) {
+	unlink("$statedir/$table");
+	DBQueryWarn("select t.* from group_membership as gm ".
+		    "left join users as u on u.uid=gm.uid ".
+		    "left join $table as t on t.uid=u.uid ".
+		    "where gm.pid='$pid' and gm.gid=gm.pid ".
+		    " and t.uid is not NULL and ".
+		    " u.status='" . USERSTATUS_ACTIVE() . "' ".
+		    "into outfile '$statedir/$table'")
+	    or die("*** $0:\n".
+		   "    Could not dump table $table\n");
+    }
+
+    # The group_membership is also special.
+    DBQueryWarn("select gm.* from group_membership as gm ".
+		"left join users as u on u.uid=gm.uid ".
+		"where gm.pid='$pid' and ".
+		" u.status='" . USERSTATUS_ACTIVE() . "' ".
+		"into outfile '$statedir/group_membership'")
+	or die("*** $0:\n".
+	       "    Could not dump table group_membership\n");
+
+    #
+    # Initial images; not that these images are not going to exist inside!
+    # 
+    DBQueryWarn("select * from images ".
+		"where pid='$pid' or (pid='$TBOPSPID' and global=1) ".
+		"into outfile '$statedir/images'")
+	or die("*** $0:\n".
+	       "    Could not dump table images\n");
+	    
+    DBQueryWarn("create temporary table temp_os_info ".
+		"select * from os_info ".
+		"where pid='$pid' or (pid='$TBOPSPID' and shared=1)")
+	or die("*** $0:\n".
+	       "    Could not create table temp_os_info\n");
+
+    # Ack. The MFS paths have a hardcoded "boss" in them, but that is going
+    # to resolve incorrectly to an inner control IP, which will not work
+    # from the pxeboot kernel since it uses the outer control network.
+    # Just remove the host spec; pxeboot will do the right thing.
+    $query_result =
+	DBQueryFatal("select osid,path from temp_os_info ".
+		     "where path like '%:%'");
+    
+    while (my ($osid,$hostpath) = $query_result->fetchrow_array()) {
+	my ($host,$path) = $hostpath =~ /^(.*):(.*)$/;
+
+	DBQueryFatal("update temp_os_info set path='$path' where osid='$osid'");
+    }
+
+    DBQueryWarn("select * from temp_os_info ".
+		"into outfile '$statedir/os_info'")
+	or die("*** $0:\n".
+	       "    Could not dump table os_info\n");
+	    
+    DBQueryWarn("select o.* from osidtoimageid as o ".
+		"left join images as i on i.imageid=o.imageid ".
+		"where i.pid='$pid' or (i.pid='$TBOPSPID' and i.global=1) ".
+		"into outfile '$statedir/osidtoimageid'")
+	or die("*** $0:\n".
+	       "    Could not dump table osidtoimageid\n");
+
+    #
+    # interfaces table. Need to tag the interfaces being used as the control
+    # network, with the proper tag so they do not say they experimental
+    # interfaces in the inner emulab. Use a temp table again.
+    #
+    DBQueryWarn("create temporary table temp_interfaces ".
+		"select t.* from reserved as r ".
+		"left join interfaces as t on t.node_id=r.node_id ".
+		"left join virt_nodes as v on v.vname=r.vname and ".
+		"     v.pid=r.pid and v.eid=r.eid ".
+		"where r.pid='$pid' and r.eid='$eid' and ".
+		"      (v.inner_elab_role='node' or v.inner_elab_role='ops')")
+	or die("*** $0:\n".
+	       "    Could not create temporary table temp_interfaces\n");
+
+    # First, mark the real control network as "other" to avoid it being
+    # thought of as the control network!.
+    DBQueryWarn("update temp_interfaces ".
+		"set role='" . TBDB_IFACEROLE_OUTER_CONTROL() . "' " .
+		"where role='" . TBDB_IFACEROLE_CONTROL() . "'")
+	or die("*** $0:\n".
+	       "    Could not delete control ifaces from temp_interfaces\n");
+
+    DBQueryWarn("update temp_interfaces set ".
+		" role='" . TBDB_IFACEROLE_CONTROL() . "' " .
+		"where IP!='' and role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	or die("*** $0:\n".
+	       "    Could not update roles in temp_interfaces\n");
+
+    # And rename the ops node as above.
+    DBQueryWarn("update temp_interfaces set node_id='ops' ".
+		"where node_id='$opsnode'")
+	or die("*** $0:\n".
+	       "    Could not ops node_id in temp_interfaces\n");
+
+    # Also add the interfaces that correspond to the "trunk" wires.
+    DBQueryFatal("insert into temp_interfaces ".
+		 "select distinct i.* from wires as w ".
+		 "left join interfaces as i on w.node_id1=i.node_id or ".
+		 "     w.node_id2=i.node_id ".
+		 "where w.type='Trunk'");
+
+    DBQueryWarn("select * from temp_interfaces ".
+		"into outfile '$statedir/interfaces'")
+	or die("*** $0:\n".
+	       "    Could not dump table interfaces\n");
+
+    # And the wires table. Strip out the control wires; not needed.
+    DBQueryWarn("create temporary table temp_wires ".
+		"select t.* from reserved as r ".
+		"left join virt_nodes as v on v.vname=r.vname and ".
+		"     v.pid=r.pid and v.eid=r.eid ".
+		"left join wires as t on t.node_id1=r.node_id and ".
+		"     t.type='Node' ".
+		"where r.pid='$pid' and r.eid='$eid' and ".
+		"      (v.inner_elab_role='node' or v.inner_elab_role='ops') ")
+	or die("*** $0:\n".
+	       "    Could not create temporary table temp_wires\n");
+
+    # And rename the ops node as above.
+    DBQueryWarn("update temp_wires set node_id1='ops' ".
+		"where node_id1='$opsnode'")
+	or die("*** $0:\n".
+	       "    Could not ops node_id in temp_wires\n");
+
+    # But we need to take out the wires that are being used as the
+    # inner control network, or at least mark them as Control.
+    $query_result =
+	DBQueryWarn("select node_id,card,port from temp_interfaces ".
+		    "where role='" . TBDB_IFACEROLE_CONTROL() . "' ");
+
+    while (my ($node_id,$card,$port) = $query_result->fetchrow_array()) {
+	DBQueryWarn("update temp_wires set type='Control' ".
+		    "where node_id1='$node_id' and card1=$card and ".
+		    "      port1=$port");
+    }
+    # Okay, now add the "trunk" wires in without any alteration.
+    DBQueryWarn("insert into temp_wires ".
+		"select * from wires where type='Trunk'") 
+	or die("*** $0:\n".
+	       "    Could not add trunk lines to temp_wires\n");
+
+    DBQueryWarn("select * from temp_wires ".
+		"into outfile '$statedir/wires'")
+	or die("*** $0:\n".
+	       "    Could not dump table wires\n");
+
+    #
+    # Ack, we need to create a reservation for the opsnode, or else it will
+    # look free and it will not be able to check in.
+    #
+    DBQueryWarn("create temporary table temp_reserved ".
+		"select r.* from reserved as r ".
+		"left join virt_nodes as v on v.vname=r.vname and ".
+		"     v.pid=r.pid and v.eid=r.eid ".
+		"where r.pid='$pid' and r.eid='$eid' ".
+		"      and (v.inner_elab_role='ops')")
+	or die("*** $0:\n".
+	       "    Could not create temporary table temp_reserved\n");
+    DBQueryWarn("update temp_reserved set ".
+		"   node_id='ops', ".
+		"   pid='$TBOPSPID', ".
+		"   eid='opsnodes' ".
+		"where node_id='$opsnode'")
+	or die("*** $0:\n".
+	       "    Could not update temporary table temp_reserved\n");
+    DBQueryWarn("select * from temp_reserved ".
+		"into outfile '$statedir/reserved'")
+	or die("*** $0:\n".
+	       "    Could not dump table reserved\n");
+
+    #
+    # Tar up the directory and send it over to ops.
+    #
+    $UID = 0;
+    system("tar cf - -C $statedir . | ".
+	   "   gzip | $SSH -1 -F /dev/null -host $CONTROL ".
+	   "   '(cat > /$PROJROOT/$pid/exp/$eid/dbstate.tar.gz)'");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Could not create dbstate.tar.gz\n");
+    }
+    $UID = $SAVEUID;
+    return 0;
+}
+
+
+
+

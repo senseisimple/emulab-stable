@@ -330,6 +330,7 @@ my $noidleswap  = $hashrow{'noidleswap_reason'};
 my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
 my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
 my $rendering   = $hashrow{'prerender_pid'};
+my $elabinelab  = $hashrow{'elab_in_elab'};
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
@@ -734,7 +735,7 @@ if ($inout ne "restart" && -e $repfile) {
 #
 if ($inout eq "out") {
     my $optarg = (($force || $idleswap) ? "-force" : "");
-    
+
     print STDOUT "Running 'tbswap out $optarg $pid $eid'\n";
     if (system("$tbdir/tbswap out $optarg $pid $eid") != 0) {
 	$errorstat = $? >> 8;
@@ -744,7 +745,9 @@ if ($inout eq "out") {
 	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
 }
 elsif ($inout eq "in") {
-    print STDOUT "Running 'tbswap in $pid $eid'\n";
+    my $optarg = "";
+    
+    print STDOUT "Running 'tbswap in $optarg $pid $eid'\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
@@ -803,9 +806,19 @@ elsif ($inout eq "modify") {
     }
     else {
 	SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
-	    
-	my $optarg = ($reboot ? "-reboot" : "");
-	$optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
+
+	my $optarg = "";
+	#
+	# For elabinelab experiments; ignore reboot/eventsys_restart,
+	# and force noreconfig; none of it will work or make sense. 
+	#
+	if ($elabinelab) {
+	    $optarg = "-noreconfig";
+	}
+	else {
+	    $optarg  = ($reboot ? "-reboot" : "");
+	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
+	}
 
 	print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
 	if (system("$tbdir/tbswap update $optarg $pid $eid") == 0) {
@@ -1054,8 +1067,10 @@ sub cleanup()
 	# Note: $estate is indeed still set appropriately!
 	#
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    print "Running 'tbswap out -force $pid $eid'\n";
-	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
+	    my $optarg = "-force";
+    
+	    print "Running 'tbswap out $optarg $pid $eid'\n";
+	    if (system("$tbdir/tbswap out $optarg $pid $eid") != 0) {
 		print "tbswap out failed!\n";
 		$stat = $? >> 8;
 	    }

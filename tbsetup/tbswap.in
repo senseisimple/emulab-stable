@@ -67,7 +67,8 @@ $| = 1;
 
 my $updateReboot   = 0;
 my $updateReconfig = 1;
-my $updateEventsys_restart = 0;
+my $update_Eventsys_restart = 0;
+my $elabinelab     = 0;
 my $force  = 0;
 my $errors = 0;
 my $updatehosed = 0;
@@ -101,6 +102,9 @@ while ($#ARGV > 1) {
 	$force = 1;
     } elsif ($arg eq "-reboot") {
 	$updateReboot = 1;
+	$updateReconfig = 0;
+    } elsif ($arg eq "-noreconfig") {
+	$updateReboot   = 0;
 	$updateReconfig = 0;
     } elsif ($arg eq "-eventsys_restart" && $swapop eq "update") {
 	$update_Eventsys_restart = 1;
@@ -162,6 +166,11 @@ if (!$force) {
 	    "    Experiment should be MODIFY_RESWAP. Currently $state.\n")
 	    if ($state ne EXPTSTATE_MODIFY_RESWAP);
     }
+}
+# Get elabinelab status. See below.
+if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
+    die("*** $0:\n".
+	"    Could not get elabinelab status for experiment $pid/$eid\n");
 }
 
 #
@@ -322,8 +331,9 @@ sub doSwapout($) {
     }
 
     if (! $TESTMODE) { 
-	if (! $DISABLE_EVENTS) {
-	    if ($type >= RETRY || ($update_Eventsys_restart && $type == UPDATE) ) {
+	if (! ($DISABLE_EVENTS || $elabinelab)) {
+	    if ($type >= RETRY ||
+		($update_Eventsys_restart && $type == UPDATE) ) {
 		print "Stopping the event system\n";
 		if (system("eventsys_control stop $pid $eid")) {
 		    print STDERR "*** Failed to stop the event system.\n";
@@ -331,7 +341,6 @@ sub doSwapout($) {
 		}
 	    }
 	}
-
 	#
 	# Clean up any VLANs in experiment.
 	#
@@ -443,6 +452,18 @@ sub doSwapout($) {
     }
 
     if (! $TESTMODE) {
+	#
+	# Restart DHCPD as soon as possible after freeing the nodes; they
+	# are going into a reload, so DHCPD better be ready for them!
+	# 
+	if ($elabinelab) {
+	    print "Regenerating DHCPD config file and restarting daemon.\n";
+	    if (system("dhcpd_makeconf -i -r")) {
+		print STDERR "*** Failed to reconfig/restart DHCPD.\n";
+		$swapout_errors = 1;
+	    }
+	}
+
 	#
 	# If the experiment has no Plab dslice nodes left, but still has
 	# a Plab slice, destroy the slice
@@ -860,7 +881,7 @@ sub doSwapin($) {
     # Don't do this during an update, since we didn't kill the 
     # event system previously, so starting it again will fail!
     # 
-    if (! $DISABLE_EVENTS) {
+    if (! ($DISABLE_EVENTS || $elabinelab)) {
 	if ( $update_Eventsys_restart || 
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    print "Starting the event system.\n";
@@ -871,6 +892,19 @@ sub doSwapin($) {
 	    }
 	    TBDebugTimeStamp("eventsys_control finished");
 	}
+    }
+
+    #
+    # ElabinElab setup. This might not be the right place for this!
+    #
+    if ($elabinelab && !$TESTMODE &&  $type == REAL) {
+	print "Setting up elabinelab. This could take a while!\n";
+	TBDebugTimeStamp("elabinelab setup started");
+	if (system("elabinelab $pid $eid")) {
+	    print STDERR "*** Failed to setup elabinelab!\n";
+	    return 1;
+	}
+	TBDebugTimeStamp("elabinelab setup finished");
     }
 
     return 0;

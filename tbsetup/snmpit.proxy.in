@@ -1,0 +1,409 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Snmpit proxy for ElabInElab.
+#
+sub usage()
+{
+    print STDOUT "Usage: snmpit.proxy [-d] -p <pid> -e <eid> ".
+	"setup|destroy arg [arg ...]\n";
+ 
+    exit(-1);
+}
+my $optlist  = "dnp:e:";
+my $debug    = 0;
+my $impotent = 0;
+my $pid;
+my $eid;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 60;
+
+# Protos
+sub SetupVlans();
+sub DestroyVlans();
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"p"})) {
+    $pid = $options{"p"};
+    
+    #
+    # Untaint the arguments.
+    #
+    if ($pid =~ /^([-\w\.]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Tainted argument $pid!\n");
+    }
+}
+if (defined($options{"e"})) {
+    $eid = $options{"e"};
+
+    if ($eid =~ /^([-\w\.]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Tainted argument $eid!\n");
+    }
+}
+usage()
+    if (!@ARGV || !defined($pid) || !defined($eid));
+
+my $op = shift(@ARGV);
+
+#
+# Sanity check. Must be an ElabInElab experiment and user must have
+# permission (be the creator).
+#
+if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
+    die("*** $0:\n",
+	"    Experiment $pid/$eid is not active!\n");
+}
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to swap or modify this experiment!\n");
+}
+
+#
+# I'm going to serialize this for now. When the script exits, the lock
+# will be released.
+#
+DBQueryFatal("select get_lock('snmpit.proxy', 999999)");
+
+if ($op eq "setup") {
+    exit(SetupVlans());
+}
+elsif ($op eq "destroy") {
+    exit(DestroyVlans());
+}
+
+#
+# Setup vlans for an inner emulab. ARGV holds a set of strings that look
+# like:
+#	id,node:iface,speed,duplex,vtag
+# which came in from the XMLRPC server. For each vlan id, gather up all
+# if its member ports (node:iface), along with the speed and duplex for
+# each port, which goes into the interfaces table so that the real snmpit
+# can find the right values. 
+# 
+sub SetupVlans()
+{
+    my $vlantable = {};
+    my %vtagtable = ();
+    my %nodes     = ();
+    my @outer_ids = ();
+    my $errors    = 0;
+	
+    while (@ARGV) {
+	my $str = shift(@ARGV);
+
+	if ($str =~ /^(\d+),([\w:]+),(\d*),(full|half),([-\w]+)$/) {
+	    my $id     = $1;
+	    my $port   = $2;
+	    my $speed  = $3;
+	    my $duplex = $4;
+	    my $vtag   = $5;
+	    my $node;
+	    my $iface;
+
+	    if (! exists($vlantable->{$id})) {
+		$vlantable->{$id} = {};
+		$vtagtable{$id}   = $vtag;
+	    }
+	    $vlantable->{$id}->{$port} = [$speed, $duplex];
+
+	    # For doing access and sanity checks below.
+	    if ($port =~ /^(.+):(.+)$/) {
+		($node,$iface) = ($1, $2);
+	    }
+	    $nodes{$node} = []
+		if (!exists($nodes{$node}));
+	    push(@{ $nodes{$node} }, $iface);
+	}
+	else {
+	    die("*** $0:\n",
+		"    SetupVlans: Cannot parse '$str'!\n");
+	}
+    }
+
+    #
+    # First check permission on the nodes. snmpit is going to repeat this
+    # operation, but we have to do it here cause we first mess with the
+    # speed and duplex values in the interfaces table for each node, cause
+    # snmpit uses those values when setting up the vlan.
+    #
+    if (!TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYVLANS, keys(%nodes))) {
+	die("*** $0:\n",
+	    "    You do not have permission to modify some of the nodes\n" .
+	    "    that will be affected by the operation you requested\n");
+    }
+
+    #
+    # Sanity check the inner id numbers. If they already exist in the
+    # mapping table, then bail now. We could probably support this, but
+    # I do not see a reason to yet.
+    #
+    my $query_result =
+	DBQueryFatal("select * from elabinelab_vlans ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     # Join "id='foo'" with ORs
+		     "(" .
+		       join(' OR ', map("inner_id='$_'", keys(%$vlantable))) .
+		     ")");
+    if ($query_result->numrows) {
+	my @ids = keys(%$vlantable);
+	
+	die("*** $0:\n",
+	    "    One of the inner vlan ids (@ids) already exists!\n");
+    }
+
+    #
+    # Okay, sanity check the interfaces for each node. They have to be real
+    # interfaces, marked as TBDB_IFACEROLE_EXPERIMENT(), nothing else. Also,
+    # the IP must not be set; if the IP is set, its being used for the inner
+    # control network, and we do not let those interfaces change.
+    #
+    foreach my $node (keys(%nodes)) {
+	my @ifaces = @{ $nodes{$node} };
+
+	my $query_result =
+	    DBQueryFatal("select node_id,iface from interfaces ".
+			 "where node_id='$node' and IP='' and ".
+			 # Join "iface='foo'" with ORs
+			 "(" . join(' OR ', map("iface='$_'", @ifaces)) . ")");
+
+	if ($query_result->numrows != scalar(@ifaces)) {
+	    die("*** $0:\n",
+		"    One of the ifaces (@ifaces) for $node cannot be changed\n");
+	}
+    }
+
+    #
+    # Okay, set the speed and duplex for all the interfaces. 
+    #
+    foreach my $id (keys(%$vlantable)) {
+	foreach my $port (keys(%{ $vlantable->{$id} })) {
+	    my ($speed, $duplex) = @{ $vlantable->{$id}->{$port} };
+	    my ($node,$iface)    = ($port =~ /^(.+):(.+)$/);
+
+	    if ($debug) {
+		print STDERR "$id $node:$iface $speed $duplex\n";
+	    }
+	    if (! $impotent) {
+		DBQueryFatal("update interfaces set ".
+			     "   current_speed=$speed,duplex='$duplex'".
+			     "where node_id='$node' and iface='$iface'");
+	    }
+	}
+    }
+
+    #
+    # Okay, create an actual members list to insert into the DB vlans table.
+    # We need to remember the association between the inner id and the outer
+    # id, so after we insert the vlans entry, get the ID that was assigned and
+    # remember it in the elabinelab_vlans table for later when the inner elab
+    # requests deletion (see DestroyVlans() below).
+    #
+    # Note that on failure we keep going, which mirrors how snmpit operates.
+    # Not sure if this is the right approach though.
+    # 
+    foreach my $id (keys(%$vlantable)) {
+	my $vtag    = $vtagtable{$id};
+	my @members = keys(%{ $vlantable->{$id} });
+	my $mstring = "@members";
+
+	if ($debug) {
+	    print STDERR "$pid $eid $id $mstring\n";
+	}
+	next
+	    if ($impotent);
+
+	# Insert outer vlans entry.
+	my $query_result =
+	    DBQueryWarn("insert into vlans (id,pid,eid,virtual,members) ".
+			"values (0, '$pid', '$eid', '$vtag', '$mstring')");
+	if (!$query_result || !$query_result->numrows) {
+	    print STDERR "*** $0:\n".
+		         "    Could not insert vlan table entry for $id\n";
+	    $errors++;
+	    next;
+	}
+	my $outer_id = $query_result->insertid;
+
+	# Insert mapping between inner and outer vlan entries.
+	$query_result =
+	    DBQueryWarn("insert into elabinelab_vlans ".
+			 "       (pid,eid,inner_id,outer_id) ".
+			 "values ('$pid', '$eid', $id, $outer_id)");
+	if (!$query_result || !$query_result->numrows) {
+	    #
+	    # Failed, must remove vlans entry too. We keep going though
+	    # 
+	    print STDERR "*** $0:\n".
+		         "    Could not insert elabinelab_vlans table entry ".
+			 "for $id/$outer_id\n";
+
+	    DBQueryFatal("delete from vlans where id='$outer_id'");
+	    $errors++;
+	    next;
+	}
+	print STDERR "Mapping inner id $id to outer id $outer_id\n";
+	print STDERR "  $mstring\n";
+	# Okay, save outer_id up for passing to snmpit below.
+	push(@outer_ids, $outer_id);
+    }
+    # Now call snmpit to create the actual vlans.
+    if ($debug) {
+	print STDERR "Running 'snmpit -t $pid $eid @outer_ids'\n";
+    }
+    return $errors
+	if ($impotent);
+    
+    system("$TB/bin/snmpit -t $pid $eid @outer_ids");
+    if ($?) {
+	#
+	# Yuck failed. We leave things as is, and wait for experiment
+	# teardown to destroy any vlans that managed to get set up.
+	# Obviously, we must leave the vlans in the DB or else we will not
+	# be able to clean up later. 
+	# This mirrors what happens when snmpit fails during a normal setup.
+	#
+	print STDERR "*** $0:\n".
+	             "    snmpit -t failed!\n";
+	$errors = $? >> 8;
+    }
+    return $errors;
+}
+
+#
+# Destroy a set of vlans. We get a list of inner vlan ID numbers for the
+# inner elab vlans table. We have to map those to outer vlan table id
+# numbers, and then remove those from the DB and from the switches.
+# 
+sub DestroyVlans()
+{
+    my @inner_ids = ();
+    my @outer_ids = ();
+    my %mapping   = ();
+
+    my $query_result =
+	DBQueryFatal("select inner_id,outer_id from elabinelab_vlans ".
+		     "where pid='$pid' and eid='$eid'");
+
+    while (my ($inner_id,$outer_id) = $query_result->fetchrow()) {
+	$mapping{$inner_id} = $outer_id;
+    }
+    
+    #
+    # Sanity check; make sure the set of vlans we got on the command line
+    # (from the inner elab via the RPC server) are really vlans we have
+    # already setup. Anything that does not match, skip with a warning, but
+    # go ahead and tear down ones that match.
+    #
+    while (@ARGV) {
+	my $id = shift(@ARGV);
+
+	if (! ($id =~ /^\d+$/)) {
+	    print STDERR "*** $0:\n".
+		         "    Illegal characters in id: $id\n";
+	    next;
+	}
+
+	if (!exists($mapping{$id})) {
+	    print STDERR "*** $0:\n".
+		         "    No such elabinelab_vlans table entry: $id\n";
+	    next;
+	}
+	push(@inner_ids, $id);
+	push(@outer_ids, $mapping{$id});
+    }
+    # If no vlans, do nothing! snmpit will end up removing all the vlans!
+    return 0
+	if (! @outer_ids);
+    return 0
+	if ($impotent);
+
+    #
+    # Okay, ask snmpit to tear down these vlans. 
+    #
+    if ($debug) {
+	print STDERR "Running 'snmpit -r $pid $eid @outer_ids'\n";
+    }
+    system("$TB/bin/snmpit -r $pid $eid @outer_ids");
+    if ($?) {
+	#
+	# Yuck failed. We leave things as is, and wait for the inner elab
+	# to request experiment teardown again. This mirrors what happens
+	# on a normal swapout; snmpit -r can be retried until all of the
+	# vlans are finally gone; At that point the DB state can be removed.
+	#
+	print STDERR "*** $0:\n".
+	             "    snmpit -r failed!\n";
+	return $? >> 8;
+    }
+
+    #
+    # Okay, remove the outer vlan table entries first. 
+    #
+    if ($debug) {
+	print STDERR "Removing @outer_ids from vlans table\n";
+    }
+    DBQueryFatal("delete from vlans ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 # Join "id='foo'" with ORs
+		 "(" . join(' OR ', map("id='$_'", @outer_ids)) . ")");
+
+    #
+    # Since the above worked, we can remove the mappings too.
+    # 
+    if ($debug) {
+	print STDERR "Removing @inner_ids from elabinelab_vlans table\n";
+    }
+    DBQueryFatal("delete from elabinelab_vlans ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 # Join "id='foo'" with ORs
+		 "(" . join(' OR ', map("inner_id='$_'", @inner_ids)) . ")");
+
+    return 0;
+}

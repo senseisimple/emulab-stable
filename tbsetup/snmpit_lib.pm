@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-LGPL
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
@@ -179,13 +178,18 @@ sub getVlanPorts (@) {
 }
 
 #
-# Returns an array of all VLAN id's used by a given experiment
+# Returns an array of all VLAN id's used by a given experiment.
+# Optional list of vlan ids restricts operation to just those vlans,
 #
-sub getExperimentVlans ($$) {
-    my ($pid, $eid) = @_;
+sub getExperimentVlans ($$@) {
+    my ($pid, $eid, @optvlans) = @_;
 
     my $result =
-	DBQueryFatal("SELECT id FROM vlans WHERE pid='$pid' AND eid='$eid'");
+	DBQueryFatal("SELECT id FROM vlans WHERE pid='$pid' AND eid='$eid' ".
+		     (@optvlans ?
+		      "and (" . join(' OR ', map("id='$_'", @optvlans)) . ")" :
+		      ""));
+    
     my @vlans = (); 
     while (my @row = $result->fetchrow()) {
 	push @vlans, $row[0];

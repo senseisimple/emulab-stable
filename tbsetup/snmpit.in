@@ -1,11 +1,9 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-LGPL
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 
 #
 # snmpit - A tool for setting up VLANs on SNMP-controllable switches
@@ -17,10 +15,12 @@
 
 use lib '@prefix@/lib';
 my $TESTMODE = @TESTMODE@;
+my $ELABINELAB = @ELABINELAB@;
 my $TB = '@prefix@';
 
 use libdb;
 use snmpit_lib;
+use snmpit_remote;
 
 use English;
 use Getopt::Long;
@@ -59,6 +59,7 @@ General:
 VLAN Control:
   -t <pid> <eid>    Create all VLANs from database tables for an experiment
   -r <pid> <eid>    Remove all VLANs from database tables for an experiment
+                        (you can provide an optional list of vlan ids)
   -l                List all VLANs
   -w                Used with -l, includes device-specific VLAN number
   -M                Used with -l, print MAC addresses instead of port numbers
@@ -113,6 +114,7 @@ if ($opt{v}) {
 my $pid;
 my $eid;
 my @ports;
+my @optvlanids = ();
 
 #
 # Some operations have mandatory agruments - for others, make sure that
@@ -127,6 +129,9 @@ if ($opt{t} || $opt{r}) {
 	exit &usage;
     } else {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
+    if (@ARGV) {
+	@optvlanids = @ARGV;
     }
 } elsif ($opt{d} || $opt{e} || $opt{a} || $opt{p} || $opt{u} || $opt{m}) {
     #
@@ -357,7 +362,7 @@ foreach my $command (@commands) {
 	    last;
 	};
 	(/tables/) && do {
-	    @vlans = getExperimentVlans($pid,$eid);
+	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    @ports = getVlanPorts(@vlans);
 	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
 	    last;
@@ -366,7 +371,7 @@ foreach my $command (@commands) {
 	    #
 	    # When we reset, we operate on all test switches, just to be safe
 	    #
-	    @vlans = getExperimentVlans($pid,$eid);
+	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
 	    last;
 	};
@@ -394,10 +399,12 @@ foreach my $command (@commands) {
     # Find out which stack each device belongs to
     #
     my %stacks = ();
-    foreach my $devicename (@devicenames) {
-	my $stack = getSwitchStack($devicename);
-	if (defined($stack)) {
-	    push @{$stacks{$stack}}, $devicename;
+    if (! $ELABINELAB) {
+	foreach my $devicename (@devicenames) {
+	    my $stack = getSwitchStack($devicename);
+	    if (defined($stack)) {
+		push @{$stacks{$stack}}, $devicename;
+	    }
 	}
     }
 
@@ -740,6 +747,13 @@ sub doVlansFromTables($@) {
     }
     my ($stack) = @$stacks;
 
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	return RemoteDoVlansFromTables(@vlans);
+    }
+
     foreach my $vlan (@vlans) {
 	my @ports = getVlanPorts($vlan);
 	if ($stack->vlanExists($vlan)) {
@@ -794,6 +808,13 @@ sub doVlansFromTables($@) {
 sub doReset($@) {
     my $stacks = shift;
     my @vlans = @_;
+
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	return RemoteDoReset(@vlans);
+    }
 
     my $errors = 0;
     #
