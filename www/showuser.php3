@@ -3,18 +3,6 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Show User Information");
-
-#
-# Note the difference with which this page gets it arguments!
-# I invoke it using GET arguments, so uid and pid are are defined
-# without having to find them in URI (like most of the other pages
-# find the uid).
-#
-
-#
 # Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
@@ -28,6 +16,16 @@ $isadmin = ISADMIN($uid);
 if (!isset($target_uid) ||
     strcmp($target_uid, "") == 0) {
     USERERROR("You must provide a User ID.", 1);
+}
+
+#
+# Standard Testbed Header, now that we know what we want to say.
+#
+if (strcmp($uid, $target_uid)) {
+    PAGEHEADER("Information for User: $target_uid");
+}
+else {
+    PAGEHEADER("My Emulab.Net");
 }
 
 #
@@ -51,11 +49,6 @@ if (!$isadmin &&
 		  "information!", 1);
     }
 }
-
-#
-# Show user info.
-# 
-SHOWUSER($target_uid);
 
 #
 # Lets show projects.
@@ -124,12 +117,21 @@ if (mysql_num_rows($query_result)) {
 echo "</center>\n";
 
 #
+# Show user info.
+#
+echo "<center>
+      <h3>Profile</h3>
+      </center>\n";
+
+SHOWUSER($target_uid);
+
+#
 # Edit option.
 #
 if ($isadmin ||
     TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
 
-    echo "<p><p><center>
+    echo "<br><br><center>
            <A href='modusr_form.php3?target_uid=$target_uid'>
               Edit User Info?</a>
          </center>\n";
