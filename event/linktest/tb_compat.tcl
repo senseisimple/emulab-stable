@@ -38,6 +38,7 @@ proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
 proc tb-set-uselinkdelays {onoff} {}
 proc tb-set-forcelinkdelays {onoff} {}
+proc tb-set-sync-server { ss } {}
 
 Class Program
 
@@ -80,7 +81,6 @@ variable hosts
 variable lans
 variable links
 # optional items
-variable synserver {}
 variable rtproto {}
 
 rename set real_set
@@ -296,7 +296,7 @@ proc join_lans {} {
 
 
 proc output {} {
-    global hosts lans links lt_links synserver rtproto
+    global hosts lans links lt_links rtproto
 
     foreach name [array names hosts] {
 	puts "h $hosts($name)"
@@ -304,9 +304,6 @@ proc output {} {
     foreach link $lt_links {
 	puts "[$link toString]"
 
-    }
-    if { [llength $synserver]>0} {
-	puts "y $synserver"
     }
     if { [llength $rtproto]>0} {
 	puts "r $rtproto"
@@ -378,18 +375,18 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
     global lt_links
     foreach lt $lt_links {
 	if { 
-	    $lan == [$lt dst] 
+	    $lan == [$lt src] 
 	    &&
-	    $node == [$lt src]
+	    $node == [$lt dst]
 	} {
 	    $lt set_delay $fromdelay
 	    $lt set_bw $frombw
 	    $lt set_loss $fromloss
 	}
 	if { 
-	    $lan == [$lt src] 
+	    $lan == [$lt dst] 
 	    &&
-	    $node == [$lt dst]
+	    $node == [$lt src]
 	} {
 	    $lt set_delay $todelay
 	    $lt set_bw $tobw
@@ -401,8 +398,4 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
 
 }
 
-proc tb-set-sync-server {svr} {
-    global synserver hosts
-    real_set synserver $hosts($svr)
-}
 
