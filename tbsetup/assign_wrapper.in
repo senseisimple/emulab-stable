@@ -2561,7 +2561,7 @@ sub InitPnode($pnode, $vnode)
 		     " where node_id='$pnode'");
 
 	$vname = "nsenode${nsenode_id}";
-	DBQueryFatal("update reserved set vname='$vname'" .
+	DBQueryFatal("update reserved set vname='$vname',erole='simnode' " .
 		     "where node_id='$pnode'");
 	$nsenode_id++;
 
@@ -2602,7 +2602,7 @@ sub InitPnode($pnode, $vnode)
 	#
 	$vname = newvhostvname($pnode);
 
-	DBQueryFatal("update reserved set vname='$vname' " .
+	DBQueryFatal("update reserved set vname='$vname',erole='virthost' " .
 		     "where node_id='$pnode'");
 
 	$expt_stats{"jailnodes"} += 1;
@@ -2647,7 +2647,8 @@ sub InitPnode($pnode, $vnode)
 			 " ready=0" .
 			 " where node_id=\"$pnode\"");
 
-	    DBQueryFatal("update reserved set vname='$vname' " .
+	    DBQueryFatal("update reserved set ".
+			 "       vname='$vname',erole='delaynode' " .
 			 "where node_id='$pnode'");
 
 	    $expt_stats{"delaynodes"} += 1;

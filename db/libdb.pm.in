@@ -112,6 +112,9 @@ use Exporter;
 
 	 TBDB_JAILIPBASE TBDB_JAILIPMASK
 
+	 TBDB_RSRVROLE_NODE TBDB_RSRVROLE_VIRTHOST TBDB_RSRVROLE_DELAYNODE
+	 TBDB_RSRVROLE_SIMNODE
+
 	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBSetNodeAllocState TBGetNodeAllocState
@@ -496,6 +499,12 @@ my $TBDB_STATS_STARTCLOCK;
 # Jail.
 sub TBDB_JAILIPBASE()		{ "@JAILIPBASE@"; }
 sub TBDB_JAILIPMASK()		{ "@JAILIPMASK@"; }
+
+# Reserved node "roles"
+sub TBDB_RSRVROLE_NODE()	{ "node"; }
+sub TBDB_RSRVROLE_VIRTHOST()	{ "virthost"; }
+sub TBDB_RSRVROLE_DELAYNODE()	{ "delaynode"; }
+sub TBDB_RSRVROLE_SIMNODE()	{ "simnode"; }
 
 #
 # Auth stuff.
