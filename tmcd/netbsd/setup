@@ -35,7 +35,9 @@ my $project     = "";
 my $eid         = "";
 my $vname       = "";
 my $PROJDIR     = "/proj";
-my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
+my $USERDIR     = "/users";
+my $PROJMOUNTCMD= "/sbin/mount fs.emulab.net:/q/$PROJDIR/%s $PROJDIR/%s";
+my $USERMOUNTCMD= "/sbin/mount fs.emulab.net:$USERDIR/%s $USERDIR/%s";
 my $HOSTNAME    = "%s\t%s-%s %s\n";
 
 #
@@ -108,7 +110,7 @@ if (! -e "$PROJDIR/$project") {
     }
 }
 
-if (system("$MOUNTCMD/$project $PROJDIR/$project") != 0) {
+if (system(sprintf($PROJMOUNTCMD, $project, $project)) != 0) {
     print STDERR "Could not mount project directory on $PROJDIR/$project.\n";
 }
 
@@ -205,6 +207,21 @@ while (<TM>) {
 	}
  	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
 
+	if (! -e "$USERDIR/$login") {
+	    if (! mkdir("$USERDIR/$login", 0770)) {
+		print STDERR "Could not mkdir $USERDIR/$login: $!\n";
+		next;
+	    }
+	}
+	
+	if (system("mount | egrep -q ' $USERDIR/$login '")) {
+	    if (system(sprintf($USERMOUNTCMD, $login, $login)) != 0) {
+		print STDERR
+		    "Could not mount users directory on $USERDIR/$login.\n";
+		next;
+	    }
+	}
+
 	($exists) = getpwuid($uid);
 	if ($exists) {
 	    if ($root) {
@@ -223,7 +240,7 @@ while (<TM>) {
 	# Do not give the -d argument. Breaks on netbsd, leaving the field
 	# empty in the password file. Instead, I changed /etc/usermgmt.conf
 	# on all the nodes so that home dirs default to /users, and that
-	# seems to work okay
+	# seems to work okay.
 	# 
 	if (system("$USERADD -u $uid -g $gid -p $pswd $GLIST ".
 	           "-s /bin/tcsh -c \"$name\" $login") != 0) {

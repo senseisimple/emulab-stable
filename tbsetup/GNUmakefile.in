@@ -13,8 +13,10 @@ SUBDIRS		= checkpass ir ns2ir
 BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
 		  os_load savevlans startexp endexp batchexp killbatchexp
 
+CONTROL_BIN     = power snmpit os_load
+
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
-		  batch_daemon
+		  batch_daemon exports_setup
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup \
@@ -71,6 +73,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/os_setup
 	chown root $(INSTALL_SBINDIR)/named_setup
 	chmod u+s $(INSTALL_SBINDIR)/named_setup
+	chown root $(INSTALL_SBINDIR)/exports_setup
+	chmod u+s $(INSTALL_SBINDIR)/exports_setup
 	chown root $(INSTALL_BINDIR)/os_load
 	chmod u+s $(INSTALL_BINDIR)/os_load
 	chown root $(INSTALL_BINDIR)/savevlans
@@ -83,7 +87,8 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
+			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy)
 	cd $(INSTALL_BINDIR) && \
 		list='$(BIN_STUFF)'; for file in $$list; do \
 			rm -f $$file; \

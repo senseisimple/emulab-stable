@@ -2,4 +2,4 @@
 # When the release is bumped, be sure to remove sup/sup/FBSD40-STD/checkouts
 # on the client.
 #
-FBSD40-STD host=boss.emulab.net base=/etc/testbed/sup prefix=/ preserve release=20010325
+FBSD40-STD host=boss.emulab.net base=/etc/testbed/sup prefix=/ preserve release=20010329

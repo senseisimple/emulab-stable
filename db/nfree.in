@@ -17,6 +17,7 @@ if ($#ARGV < 1) {
 
 my $error = 0;
 my $consetup="$TB/libexec/console_setup";
+my $exportsetup="$TB/sbin/exports_setup";
 my $osload="$TB/bin/os_load";
 my $reloadpid="testbed";
 my $reloadeid="reloading";
@@ -228,6 +229,11 @@ if (@freed_nodes) {
     }
     system("$consetup @conlist") == 0 or
 	print STDERR "WARNING: $consetup @conlist failed!\n";
+}
+
+if (@freed_nodes || @reloaded) {
+    system("$exportsetup") == 0 or
+	print STDERR "WARNING: $exportsetup failed!\n";
 }
 
 exit($error);

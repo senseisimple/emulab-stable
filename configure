@@ -967,7 +967,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/savevlans tbsetup/ir/extract_tb \
 	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
-	tbsetup/named_setup \
+	tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \

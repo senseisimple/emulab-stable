@@ -61,6 +61,12 @@ if (&tbs_exec("savevlans")) {
     &tbs_out("WARNING: Failed to back up VLAN configuration\n");
 }
 
+&tbs_out("Setting up mountpoints\n");
+if (&tbs_exec("exports_setup")) {
+    &tbs_out("Failed to setup mountpoints.\n");
+    exit(1);
+}
+
 &tbs_out("Resetting OS and rebooting.\n");
 if (&tbs_exec("os_setup $pid $eid $irfile")) {
     &tbs_out("Failed to reset OS and reboot nodes.\n");

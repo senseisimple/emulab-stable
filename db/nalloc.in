@@ -5,14 +5,15 @@ use English;
 #
 # Configure variables
 #
-my $TB     = "@prefix@/libexec";
+my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
 if ($#ARGV < 1) {die("Usage: nalloc <pid> <eid> <node> <node> <...>\n");}
 
-my $consetup="$TB/console_setup";
+my $consetup="$TB/libexec/console_setup";
+my $exportsetup="$TB/sbin/exports_setup";
 my $error = 0;
 my $pid = shift;
 my $eid = shift;
@@ -111,6 +112,9 @@ if (!$error && @nodes) {
     }
     system("$consetup @conlist") == 0 or
 	print STDERR "WARNING: $consetup @conlist failed!\n";
+
+    system("$exportsetup") == 0 or
+	print STDERR "WARNING: $exportsetup failed!\n";
 }
 
 exit($error);

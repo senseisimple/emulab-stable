@@ -39,7 +39,9 @@ my $project     = "";
 my $eid         = "";
 my $vname       = "";
 my $PROJDIR     = "/proj";
-my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
+my $USERDIR     = "/users";
+my $PROJMOUNTCMD= "/sbin/mount fs.emulab.net:/q/$PROJDIR/%s $PROJDIR/%s";
+my $USERMOUNTCMD= "/sbin/mount fs.emulab.net:$USERDIR/%s $USERDIR/%s";
 my $HOSTNAME    = "%s\t%s-%s %s\n";
 my $kernel      = "/kernel.100HZ";
 
@@ -113,7 +115,7 @@ if (! -e "$PROJDIR/$project") {
     }
 }
 
-if (system("$MOUNTCMD/$project $PROJDIR/$project") != 0) {
+if (system(sprintf($PROJMOUNTCMD, $project, $project)) != 0) {
     print STDERR "Could not mount project directory on $PROJDIR/$project.\n";
 }
 
@@ -329,6 +331,21 @@ while (<TM>) {
 	}
  	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
 
+	if (! -e "$USERDIR/$login") {
+	    if (! mkdir("$USERDIR/$login", 0770)) {
+		print STDERR "Could not mkdir $USERDIR/$login: $!\n";
+		next;
+	    }
+	}
+
+	if (system("mount | egrep -s ' $USERDIR/$login '")) {
+	    if (system(sprintf($USERMOUNTCMD, $login, $login)) != 0) {
+		print STDERR
+		    "Could not mount users directory on $USERDIR/$login.\n";
+		next;
+	    }
+	}
+
 	($exists) = getpwuid($uid);
 	if ($exists) {
 	    if ($root) {
@@ -347,7 +364,7 @@ while (<TM>) {
 	}
 
 	if (system("$PW useradd $login -u $uid -g $gid $GLIST ".
-	           "-d /users/$login -s /bin/tcsh -c \"$name\"") != 0) {
+	           "-d $USERDIR/$login -s /bin/tcsh -c \"$name\"") != 0) {
 	    print STDERR "Error adding new user $login\n";
 	    next;
 	}

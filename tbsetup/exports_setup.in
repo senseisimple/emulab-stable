@@ -1,0 +1,219 @@
+#!/usr/bin/perl -wT
+use English;
+use Fcntl ':flock';
+
+#
+# Create an /etc/exports.tail file based on current reserved table and project
+# members. Fire that tail over to the fileserver where it is concatenated with
+# the head file to become the new /etc/exports
+#
+# usage: exports_setup
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Note no -n option. We redirect stdin from the new exports file below.
+my $SSH		= "sshtb -q -l root fs.emulab.net";
+my $PROG	= "/usr/testbed/sbin/exports_setup.proxy";
+my $exportstail = "/var/tmp/exports.tail";
+my $lockfile    = "/var/tmp/testbed_exports_lockfile";
+my $projdir     = "/proj";
+my $usersdir    = "/users";
+my $dbg		= 0;
+my @row;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("Must be root! Maybe its a development version?");
+}
+# XXX Hacky!
+#if ($TB ne "/usr/testbed") {
+#    die("Wrong version. Maybe its a development version?");
+#}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# This script always does the right thing, so it does not matter who
+# calls it. 
+#
+
+#
+# We need to serialize this script to avoid a trashed map file. Use
+# a dummy file in /var/tmp, opened for writing and flock'ed. 
+#
+open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+$count = 0;
+while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+    print "Another /etc/exports update in progress. Waiting a moment ...\n";
+    if ($count++ > 20) {
+	fatal("Could not get the lock after a long time!\n");
+    }
+    sleep(1);
+}
+
+#
+# We stick the new map entries into the tail file. First zero it out.
+#
+open(MAP, ">$exportstail") || fatal("Couldn't open $exportstail\n");
+print MAP "\n";
+print MAP "#\n";
+print MAP "# DO NOT EDIT below this point. Auto generated entries!\n";
+print MAP "#\n";
+print MAP "\n";
+
+#
+# We export to particular nodes, based on the experiment that is allocated
+# to the node. Since we want the exports file to be based on IP numbers,
+# we need this crazy join to find out the type of the node, so we can find
+# the control network card number, so we can find the IP address for that
+# card.
+#
+$db_result =
+    DBquery("select reserved.node_id,reserved.pid,interfaces.IP ".
+	    "from reserved ".
+	    "left join nodes on reserved.node_id=nodes.node_id ".
+	    "left join node_types on node_types.type=nodes.type ".
+	    "left join interfaces on reserved.node_id=interfaces.node_id and ".
+	    "interfaces.card=node_types.control_net ".
+	    "where interfaces.IP!='NULL' order by reserved.pid,interfaces.IP");
+
+#
+# Generate a per project directory line, listing all of the nodes for
+# that project. We could do it one per line, but too messy.
+#
+if ($db_result->numrows > 0) {
+    my $lastpid  = 0;
+    my @hostlist = ();
+    
+    print MAP "#\n";
+    print MAP "# Export Project directories\n";
+    print MAP "#\n";
+
+    while (@row = $db_result->fetchrow_array) {
+	my $node_id = $row[0];
+	my $pid     = $row[1];
+	my $ip      = $row[2];
+
+	if (!$lastpid) {
+	    $lastpid = $pid;
+	    push(@hostlist, $ip);
+	    next;
+	}
+
+	if ($pid ne $lastpid) {
+	    print MAP "$projdir/$lastpid -maproot=root @hostlist\n";
+	    @hostlist = ();
+	    $lastpid = $pid;
+	}
+	push(@hostlist, $ip);
+    }
+    print MAP "$projdir/$lastpid -maproot=root @hostlist\n";
+}
+
+#
+# Now we need the users list for exporting from /users. We need to export
+# all of the project members to all of the machines in that projects
+# experiments. Also, since we again want the IPs, we need all of that crazy
+# join again. Silly!
+#
+$db_result =
+   DBquery("select proj_memb.uid,interfaces.IP from reserved ".
+	   "left join proj_memb on proj_memb.pid=reserved.pid ".
+	   "left join nodes on reserved.node_id=nodes.node_id ".
+	   "left join node_types on node_types.type=nodes.type ".
+	   "left join interfaces on reserved.node_id=interfaces.node_id ".
+	   "and interfaces.card=node_types.control_net ".
+	   "where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
+	   "order by proj_memb.uid");
+
+#
+# Generate a per user directory line, listing all of the nodes for
+# that user. We could do it one per line, but too messy.
+#
+if ($db_result->numrows > 0) {
+    my $lastuid = 0;
+    my @hostlist = ();
+    
+    print MAP "#\n";
+    print MAP "# Export User directories\n";
+    print MAP "#\n";
+
+    while (@row = $db_result->fetchrow_array) {
+	my $uid     = $row[0];
+	my $ip      = $row[1];
+
+	if (!$lastuid) {
+	    $lastuid = $uid;
+	    push(@hostlist, $ip);
+	    next;
+	}
+
+	if ($uid ne $lastuid) {
+	    print MAP "$usersdir/$lastuid -maproot=root @hostlist\n";
+	    @hostlist = ();
+	    $lastuid = $uid;
+	}
+	push(@hostlist, $ip);
+    }
+    print MAP "$usersdir/$lastuid -maproot=root @hostlist\n";
+}
+
+print MAP "\n";
+close(MAP);
+
+#
+# Fire the new tail file over to the fileserver to finish. We cat the file
+# right into it.
+#
+$UID = 0;
+system("$SSH $PROG < $exportstail") == 0 or
+    fatal("Failed: $SSH $PROG < $exportstail: $?");
+
+unlink("$exportstail");
+
+#
+# Close the lock file. Exiting releases it, but might as well.
+#
+close(LOCK);
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    system("echo \"$msg\" | /usr/bin/mail ".
+	   "-s 'TESTBED: Named Setup Failed' $TBOPS");
+    die($msg);
+}
+
+sub DBquery($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = $DB->query($query);
+
+    if (! $result) {
+	print "DB Query failed: $query\n";
+    }
+
+    return $result;
+}
+
