@@ -18,28 +18,35 @@ $thumbCount = 0;
 
 function GENPLIST ($which, $query_result)
 {
-    global $thumbCount, $TBOPSPID;
+    global $thumbCount, $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
 
     echo "<center><h3>$which</h3></center>\n";
     echo "<table border=2 cols=4 cellpadding=2
                  cellspacing=2 align=center><tr>";
 
-    while (($row = mysql_fetch_array($query_result)) && $thumbCount < 50) {
+    while (($row = mysql_fetch_array($query_result)) && $thumbCount < 100) {
 	$pid        = $row["pid"];
 	$eid        = $row["eid"];
 	$pnodes     = $row["pnodes"];
 	$thumb_hash = $row["thumb_hash"];
 	$swapdate   = $row["swapdate"];
+	$state      = $row["state"];
 
 	if ($pid == $TBOPSPID || $pnodes == 0 || !isset($thumb_hash) ||
 	    !isset($swapdate)) {
 	    continue;
 	}
+	if ($state == $TB_EXPTSTATE_ACTIVE) {
+	    $swapdate = "";
+	}
+	else {
+	    $swapdate = "<br>$swapdate";
+	}
 
 	echo "<td align=center>";
 	echo "<img border=1 width=128 height=128 class='stealth' ".
 	    " src='thumbs/tn$thumb_hash.png'>".
-	    " <br>$swapdate" .
+	    " $swapdate" .
 	    "</td>";
 
 	$thumbcount++;
