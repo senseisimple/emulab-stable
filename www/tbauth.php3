@@ -332,7 +332,7 @@ function ISADMINISTRATOR() {
 #
 # Attempt a login.
 # 
-function DOLOGIN($uid, $password) {
+function DOLOGIN($uid, $password, $adminmode) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBSECURECOOKIES;
 
@@ -342,13 +342,14 @@ function DOLOGIN($uid, $password) {
     }
 
     $query_result =
-	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
+	DBQueryFatal("SELECT usr_pswd,admin FROM users WHERE uid='$uid'");
 
     #
     # Check password in the database against provided. 
     #
     if ($row = mysql_fetch_row($query_result)) {
         $db_encoding = $row[0];
+	$isadmin     = $row[1];
         $encoding = crypt("$password", $db_encoding);
         if (strcmp($encoding, $db_encoding)) {
             return -1;
@@ -376,8 +377,16 @@ function DOLOGIN($uid, $password) {
 	#
 	# Create a last login record.
 	#
-	DBQueryFatal("REPLACE into lastlogin (uid, time) ".
+	DBQueryFatal("REPLACE into lastlogin (uid, time) ".	
 		     " VALUES ('$uid', NOW())");
+
+	#
+	# Usage stats. I think lastlogin can go now.
+	#
+	#DBQueryFatal("update user_stats set ".
+	#	     " weblogin_count=weblogin_count+1, ".
+	#	     " weblogin_last=now() ".
+	#	     "where uid='$uid'");
 
 	#
 	# Issue the cookie requests so that subsequent pages come back
@@ -406,9 +415,17 @@ function DOLOGIN($uid, $password) {
 	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
 
 	#
-	# Set adminoff on new logins.
+	# Set adminoff on new logins, unless user requested to be
+	# logged in as admin (and is an admin of course!). This is
+	# primarily to bypass the nologins directive which makes it
+	# impossible for an admin to login when the web interface is
+	# turned off. 
 	#
-	DBQueryFatal("update users set adminoff=1 where uid='$uid'");
+	$adminoff = 1;
+	if ($adminmode && $isadmin) {
+	    $adminoff = 0;
+	}
+	DBQueryFatal("update users set adminoff=$adminoff where uid='$uid'");
 
 	return 0;
     }
@@ -492,7 +509,7 @@ function LASTWEBLOGIN($uid) {
     global $TBDBNAME;
 
     $query_result =
-	DBQueryFatal("SELECT time from lastlogin where uid='$uid'");
+        DBQueryFatal("SELECT time from lastlogin where uid='$uid'");
     
     if (mysql_num_rows($query_result)) {
 	$lastrow      = mysql_fetch_array($query_result);

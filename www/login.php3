@@ -15,6 +15,10 @@ if (!isset($key) || !strcmp($key, "")) {
 if (!isset($vuid) || !strcmp($vuid, "")) {
     $vuid = 0;
 }
+# Allow adminmode to be passed along.
+if (!isset($adminmode)) {
+    $adminmode = 0;
+}
 # Allow referrer to be passed along.
 if (!isset($referrer) || !strcmp($referrer, "")) {
     $referrer = 0;
@@ -54,7 +58,7 @@ if (($known_uid = GETUID()) != FALSE) {
 #
 # Spit out the form.
 # 
-function SPITFORM($uid, $key, $referrer, $failed)
+function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
@@ -99,6 +103,9 @@ function SPITFORM($uid, $key, $referrer, $failed)
     if ($referrer) {
 	echo "<input type=hidden name=referrer value=$referrer>\n";
     }
+    if ($adminmode) {
+	echo "<input type=hidden name=adminmode value=1>\n";
+    }
 
     echo "</form>
           </table>\n";
@@ -130,7 +137,7 @@ if (0 && NOLOGINS()) {
 if (! isset($login)) {
     if ($vuid)
 	$known_uid = $vuid;
-    SPITFORM($known_uid, $key, $referrer, 0);
+    SPITFORM($known_uid, $key, $referrer, 0, $adminmode);
     PAGEFOOTER();
     return;
 }
@@ -147,7 +154,7 @@ if (!isset($uid) ||
     $login_status = $STATUS_LOGINFAIL;
 }
 else {
-    if (DOLOGIN($uid, $password)) {
+    if (DOLOGIN($uid, $password, $adminmode)) {
 	$login_status = $STATUS_LOGINFAIL;
     }
     else {
@@ -159,7 +166,7 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, $key, $referrer, 1);
+    SPITFORM($uid, $key, $referrer, 1, $adminmode);
     PAGEFOOTER();
     return;
 }
