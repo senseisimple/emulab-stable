@@ -81,8 +81,8 @@ set delayinfo {}
 foreach link [array names links] {
     set src [lindex $links($link) 0]
     set dst [lindex $links($link) 2]
-    set bw [string trimright [lindex $links($link) 4] "Mb"]
-    set delay [string trimright [lindex $links($link) 6] "ms"]
+    set bw [string trimright [lindex $links($link) 4] "MbmB"]
+    set delay [string trimright [lindex $links($link) 6] "msMS"]
     if {($bw != 100 && $bw != 10) ||
 	$delay > $delaythresh} {
 	# we need a delay node
