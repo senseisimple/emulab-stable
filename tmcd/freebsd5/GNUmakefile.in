@@ -18,11 +18,17 @@ SUBDIR		= tmcd/freebsd5
 
 include $(OBJDIR)/Makeconf
 
-all:	supfile
+SCRIPTS		= sethostname
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	supfile $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		=
+DESTDIR		= 
 SYSETCDIR	= $(DESTDIR)/etc
 JAILDIR		= $(SYSETCDIR)/jail
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
