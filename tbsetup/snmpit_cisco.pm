@@ -273,7 +273,7 @@ sub vlanLock($) {
     # has it locked.
     #
     my $tries = 1;
-    my $max_tries = 20;
+    my $max_tries = 40;
     while ($tries <= $max_tries) {
     
 	#
@@ -299,7 +299,7 @@ sub vlanLock($) {
 	}
 	$tries++;
 
-	sleep(1);
+	sleep(3);
     }
 
     if ($tries > $max_tries) {
