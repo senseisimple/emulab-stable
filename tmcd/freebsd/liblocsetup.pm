@@ -40,6 +40,9 @@ BEGIN
 	my $BOOTDIR = "/etc/testbed";
     }
 }
+# Convenience.
+sub REMOTE()	{ return libsetup::REMOTE(); }
+sub MFS()	{ return libsetup::MFS(); }
 
 #
 # Various programs and things specific to FreeBSD and that we want to export.
@@ -90,6 +93,10 @@ my $TMCCCMD_DELAY = "delay";
 # 
 sub os_cleanup_node ($) {
     my ($scrub) = @_;
+
+    if (REMOTE()) {
+	return 0;
+    }
 
     unlink $TMDELAY;
     unlink $TMDELMAP;
@@ -228,16 +235,21 @@ sub os_usermod($$$$$)
 sub os_useradd($$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root) = @_;
+    my $args;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "wheel");
     }
     if ($glist ne "") {
-	$glist = "-G $glist";
+	$args .= "-G $glist ";
+    }
+    # If remote, let it decide where to put the homedir.
+    if (!REMOTE()) {
+	$args .= "-d $homedir ";
     }
 
-    if (system("$USERADD $login -u $uid -g $gid $glist ".
-	       "-m -d $homedir -s /bin/tcsh -c \"$gcos\"") != 0) {
+    if (system("$USERADD $login -u $uid -g $gid $args ".
+	       "-m -s /bin/tcsh -c \"$gcos\"") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
@@ -286,10 +298,13 @@ sub os_mkdir($$)
 # 
 sub os_setup()
 {
-    if (! libsetup::MFS()) {
-	print STDOUT "Checking Testbed delay configuration ... \n";
-	dodelays();
+    # This should never happen!
+    if (REMOTE() || MFS()) {
+	print "Ignoring os setup on remote/MFS node!\n";
+	return 0;
     }
+    print STDOUT "Checking Testbed delay configuration ... \n";
+    dodelays();
 }
 
 #
@@ -297,10 +312,14 @@ sub os_setup()
 #
 sub update_delays()
 {
-    if (! libsetup::MFS()) {
-	dodelays();
-	system($TMDELAY);
+    # This should never happen!
+    if (REMOTE() || MFS()) {
+	print "Ignoring update delay on remote/MFS node!\n";
+	return 0;
     }
+    dodelays();
+    system($TMDELAY);
+    return 0;
 }
     
 sub dodelays ()
@@ -594,8 +613,13 @@ sub os_routing_enable_forward()
 {
     my $cmd;
 
-    $cmd = "sysctl -w net.inet.ip.forwarding=1\n";
-    $cmd .= "sysctl -w net.inet.ip.fastforwarding=1";
+    if (REMOTE()) {
+	$cmd = "echo 'IP forwarding not turned on!'";
+    }
+    else {
+	$cmd = "sysctl -w net.inet.ip.forwarding=1\n";
+	$cmd .= "sysctl -w net.inet.ip.fastforwarding=1";
+    }
     return $cmd;
 }
 
@@ -603,7 +627,12 @@ sub os_routing_enable_gated()
 {
     my $cmd;
 
-    $cmd = "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
+    if (REMOTE()) {
+	$cmd = "echo 'GATED IS NOT ALLOWED!'";
+    }
+    else {
+	$cmd = "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
+    }
     return $cmd;
 }
 
