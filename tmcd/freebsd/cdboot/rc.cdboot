@@ -214,6 +214,8 @@ sub doboot()
 	    # reboot cycle!
 	    #
 	    if (system("$RCDIR/rc.frisbee -noreboot") == 0) {
+		print("Waiting a few seconds for events to settle ...\n");
+		sleep(10);
 		goto bootinfo;
 	    }
 	    # Failed, drop into MFS for easy debug and reboot later.
