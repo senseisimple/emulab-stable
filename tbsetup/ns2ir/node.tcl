@@ -233,10 +233,10 @@ Node instproc find_commonlan {node} {
     foreach ll $portlist {
 	set match [$node find_port $ll]
 	if {$match != -1} {
-	    break
+	    return $ll
 	}
     }
-    return $match
+    return {}
 }
 
 # ip port
@@ -342,14 +342,17 @@ Node instproc add_routes_to_DB {DB} {
 
 	#
 	# Convert hop to IP address. Need to find the link between the
-	# the this node and the hop. This is easy if its a link. If its
+	# this node and the hop. This is easy if its a link. If its
 	# a lan, then its ugly.
 	#
 	set hoplink [$sim find_link $self $hop]
 	if {$hoplink == {}} {
-	    set port [$self find_commonlan $hop]
+	    set hoplan [$self find_commonlan $hop]
+	    set port [$hop find_port $hoplan]
+	    set srcip [$self ip [$self find_port $hoplan]]
 	} else {
 	    set port [$hop find_port $hoplink]
+	    set srcip [$self ip [$self find_port $hoplink]]
 	}
 	if {$port == -1} {
 	    perror "\[add-route] Cannot find a link from $self to $hop!"
@@ -392,7 +395,7 @@ Node instproc add_routes_to_DB {DB} {
 		return
 	    }
 	}
-	$sim spitxml_data "virt_routes" [list "vname" "dst" "nexthop" "dst_type" "dst_mask"] [list $self $dstip $hopip $type $mask]
+	$sim spitxml_data "virt_routes" [list "vname" "src" "dst" "nexthop" "dst_type" "dst_mask"] [list $self $srcip $dstip $hopip $type $mask]
     }
 }
 
