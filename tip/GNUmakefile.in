@@ -5,11 +5,12 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-all:	tip tiptunnel
+all:	tip tiptunnel console
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CC = gcc -g -O2 -DUSESOCKETS -DWITHSSL -I$(TESTBED_SRCDIR)/capture
+#CC = gcc -g -O2 -DUSESOCKETS -DWITHSSL -I$(TESTBED_SRCDIR)/capture
+CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
        remote.o tip.o value.o vars.o getcap.o
@@ -26,14 +27,24 @@ SSLLIBS		= -lssl -lcrypto
 tip:	$(OBJS)
 	$(CC) -static -o tip $(OBJS) $(LIBS)
 
+tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
+	$(CC) -DWITHSSL -o tiptunnel.o -c $<
+
+# 'console' is tiptunnel, without SSL, and with localmode on by default.
+
+console.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
+	$(CC) -DLOCALBYDEFAULT -o console.o -c $<
+
 tiptunnel: tiptunnel.o
 	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS) 
 
+console: console.o
+	$(CC) -o console console.o
+
 $(OBJS): tipconf.h tip.h
 
-tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 
-control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel
+control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console
 
 clean:
-	rm -f $(OBJS) tiptunnel.o tip tiptunnel
+	rm -f $(OBJS) tiptunnel.o console.o tip tiptunnel console

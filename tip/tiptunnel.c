@@ -15,6 +15,7 @@
 
 #include "capdecls.h"
 
+int localmode = 0;
 
 #define DEFAULT_PROGRAM "xterm -T TIP -e telnet %s %s"
 
@@ -66,10 +67,21 @@ char * certString = NULL;
 
 int main( int argc, char ** argv )
 {
+  const char * name = argv[0];
   int op;
 
-  while ((op = getopt( argc, argv, "sp:rd" )) != -1) {
+#ifdef LOCALBYDEFAULT
+  localmode++;
+#endif
+
+  while ((op = getopt( argc, argv, "hlsp:rd" )) != -1) {
     switch (op) {
+      case 'h':
+        usage(name);
+        break;
+      case 'l':
+	localmode++;
+	break;
       case 'p':
         tunnelPort = atoi( optarg );
 	break;
@@ -86,7 +98,7 @@ int main( int argc, char ** argv )
   argv += optind;
 
   if (argc < 1) {
-    usage();
+    usage( name );
   }
 
   if (argc > 1) {
@@ -95,7 +107,13 @@ int main( int argc, char ** argv )
     programToLaunch = DEFAULT_PROGRAM;
   }
 
-  loadAcl( argv[0] );
+  if (localmode) {
+    char localAclName[1024];
+    sprintf( localAclName, "/var/log/tiplogs/%s.acl", argv[0] );
+    loadAcl( localAclName );
+  } else {
+    loadAcl( argv[0] );
+  }
 
 #ifdef WITHSSL
   if (usingSSL) { 
@@ -118,23 +136,35 @@ int main( int argc, char ** argv )
 
   if (programToLaunch) {
     char portString[12];
-    char runString[1024];
-    char * foo;
 
     sprintf( portString, "%i", tunnelPort );
 
-    /*
-      if (debug) printf("Launching %s with args localhost, %s.\n",
-		      programToLaunch, portString );
-    */
+    if (localmode) {
+      if (!fork()) {
+	char * foo[4];
+	foo[0] = "telnet";
+	foo[1] = "localhost";
+	foo[2] = portString;
+	foo[3] = NULL;
+	execvp( "telnet", foo );
+	exit(666);
+      }
+    } else {
+      char runString[1024];
+      char * foo;
 
-    sprintf(runString, programToLaunch, "localhost", portString);
-    for (foo = runString; *foo; foo++);
-    foo[0] = ' ';
-    foo[1] = '&';
-    foo[2] = '\0';
-    if (debug) printf("Running '%s'\n", runString);
-    system( runString );
+      sprintf(runString, programToLaunch, "localhost", portString);
+
+      if (debug) printf("Running '%s'\n", runString);
+
+      for (foo = runString; *foo; foo++);
+      foo[0] = ' ';
+      foo[1] = '&';
+      foo[2] = '\0';
+
+      system( runString );
+    }
+   
     /*
     if (!fork()) {
       execlp( programToLaunch, 
@@ -142,23 +172,43 @@ int main( int argc, char ** argv )
     }
     */
   }
+  //if (localmode) { sleep(3); }
   doTunnelConnection();
   if (debug) { printf("tiptunnel closing.\n"); }
 }
 
-void usage()
+void usage(const char * name)
 {
+#ifdef LOCALBYDEFAULT
+
   printf("Usage:\n"
-	 "tiptunnel [-p <portnum>] [-d] [-r] aclfile [program]\n"
+	 "%s [-d] <pcname>\n"
+	 "-d               turns on more verbose debug messages\n"
+	 "<pcname>         name of machine to connect to (e.g. \"pc42\")\n",
+	 name
+	 );
+
+#else
+
+  printf("Usage:\n"
+	 "%s [-l] [-p <portnum>] [-d] [-r] aclfile [<program>]\n"
+	 "-l               enables local mode.\n"
+	 "                 acl file will be looked for in:\n"
+	 "                 /var/log/tiplogs/<aclfile>.acl\n"
+	 "                 (also, server certificate will not be checked)\n"
 	 "-p <portnum>     specifies tunnel port number\n"
-	 "-d               turns on more verbose messages\n"
+	 "-d               turns on more verbose debug messages\n"
 	 "-r               allows connections to tunnel from non-localhost\n"
 	 "\n"
-	 "[program]        path of program to launch; default is\n"
+	 "<program>        (non-local-mode only)\n"
+	 "                 path of program to launch; default is\n"
 	 "                 \"%s\"\n",
+	 name,
          DEFAULT_PROGRAM
 	 //"-k keeps accepting connections until killed"
 	 );
+
+#endif
   exit(-1);
 }
 
@@ -346,6 +396,11 @@ acceptor:
     exit(-1);
   }
 
+  if (conSock == 0) {
+    if (debug) { printf("Zero consock. Retrying.\n" ); }
+    goto acceptor;
+  }
+
   { 
     /*
       lets pretend that we are a telnetd (RFC854).. 
@@ -390,6 +445,7 @@ acceptor:
 	if (debug) { printf("conSock read %i; exiting.\n", got); }
 	return;
       }
+
 
       /*  
 	  we could implement some kind of search to remove 
@@ -532,7 +588,7 @@ void sslConnect()
 	   digestHex );
   }
 
-  if (0 != strcmp( certString, digestHex )) {
+  if (/*!localmode && */0 != strcmp( certString, digestHex )) {
     fprintf(stderr, 
 	    "Server does not have certificate described in ACL:\n"
 	    "ACL's  cert digest: %s\n" 
