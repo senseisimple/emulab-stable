@@ -22,6 +22,7 @@
 
 static int detail = 0;
 static int dumpmap = 0;
+static int ignorev1 = 0;
 static int infd = -1;
 
 static unsigned long long wasted;
@@ -40,10 +41,13 @@ main(int argc, char **argv)
 	int ch, version = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "dmv")) != -1)
+	while ((ch = getopt(argc, argv, "dimv")) != -1)
 		switch(ch) {
 		case 'd':
 			detail++;
+			break;
+		case 'i':
+			ignorev1++;
 			break;
 		case 'm':
 			dumpmap++;
@@ -181,7 +185,11 @@ dumpfile(char *name, int fd)
 				return;
 			}
 
-			chunkcount = hdr->blocktotal;
+			if (ignorev1) {
+				chunkcount = 0;
+				checkindex = 0;
+			} else
+				chunkcount = hdr->blocktotal;
 			if ((filesize / SUBBLOCKSIZE) != chunkcount) {
 				if (chunkcount != 0) {
 					if (isstdin)
@@ -197,9 +205,11 @@ dumpfile(char *name, int fd)
 						       (filesize/SUBBLOCKSIZE),
 						       chunkcount);
 				} else if (magic == COMPRESSED_V1) {
-					printf("%s: WARNING: zero chunk count, "
-					       "ignoring block fields\n",
-					       name);
+					if (!ignorev1)
+						printf("%s: WARNING: "
+						       "zero chunk count, "
+						       "ignoring block fields\n",
+						       name);
 					checkindex = 0;
 				}
 			}
@@ -208,7 +218,7 @@ dumpfile(char *name, int fd)
 			       name, filesize,
 			       (unsigned long)(filesize / SUBBLOCKSIZE),
 			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
-		} else if (chunkno == 1) {
+		} else if (chunkno == 1 && !ignorev1) {
 			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
 
 			/*

@@ -11,7 +11,7 @@
 .Nd dump information about an imagezip compressed image file
 .Sh SYNOPSIS
 .Nm
-.Op Fl dv
+.Op Fl div
 .Ar imagefile ...
 .Sh DESCRIPTION
 The
@@ -36,6 +36,15 @@ One or more
 .Fl d
 options can be specified to dump various levels of structure within the
 image file.
+.Pp
+The
+.Fl i
+option tells
+.Nm
+to ignore the deprecated blockindex field in chunk headers.
+You need this option when running
+.Nm
+on pieces of a split image.
 .Pp
 The
 .Fl v
