@@ -15,8 +15,14 @@ LIBS = -lz
 imagezip: imagezip.o
 	$(CC) $(CFLAGS) imagezip.o $(LIBS) -o imagezip
 
+newzip: newzip.o
+	$(CC) $(CFLAGS) newzip.o $(LIBS) -o newzip
+
 imageunzip: imageunzip.o
 	$(CC) $(CFLAGS) imageunzip.o $(LIBS) -o imageunzip
+
+newunzip: newunzip.o
+	$(CC) $(CFLAGS) newunzip.o $(LIBS) -o newunzip
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 
