@@ -712,6 +712,21 @@ CREATE TABLE node_idlestats (
   PRIMARY KEY  (node_id,tstamp)
 ) TYPE=MyISAM;
 
+
+--
+-- Table structure for table `node_rusage`
+--
+
+CREATE TABLE node_rusage (
+  node_id varchar(10) NOT NULL default '',
+  load_1min float NOT NULL default '0',
+  load_5min float NOT NULL default '0',
+  load_15min float NOT NULL default '0',
+  disk_used float  NOT NULL default '0',
+  status_timestamp datetime default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
 --
 -- Table structure for table `node_status`
 --

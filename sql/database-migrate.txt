@@ -1195,3 +1195,15 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table reserved add simhost_violation tinyint(3) \
                unsigned not null default '0';
+
+1.212: Add resource usage table.
+
+	CREATE TABLE node_rusage (
+	  node_id varchar(10) NOT NULL default '',
+	  load_1min float NOT NULL default '0',
+	  load_5min float NOT NULL default '0',
+	  load_15min float NOT NULL default '0',
+	  disk_used float  NOT NULL default '0',
+	  status_timestamp datetime default NULL,
+	  PRIMARY KEY  (node_id)
+	) TYPE=MyISAM;
