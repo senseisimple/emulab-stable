@@ -27,6 +27,7 @@
      <li> <a href="#UTT-1">Is there a tutorial?</a>
      <li> <a href="#UTT-NETBUILD">Do you have a <b>GUI</b> to help me
                                    create experiments?</a>
+     <li> <a href="#UTT-TOPO">Are there any constraints on my topology?</a>
      <li> <a href="#UTT-NODES">How many nodes can I ask for?</a>
      <li> <a href="#UTT-HOWLONG">How long can I keep using my nodes?</a>
      <li> <a href="#UTT-TOOFEW">What if I need more nodes than are free?</a>
@@ -255,6 +256,22 @@
     <p>
     To access the GUI, please log in and go to the Begin Experiment page.
     <em>Note: you need a Java compliant browser.</em>
+    </p>
+
+<li><a NAME="UTT-TOPO"></a>
+    <h3>Are there any constraints on my topology?</h3>
+    <p>
+    Yes, but only those imposed by the physical hardware that is
+    currently available in our testbed. The constraints that people
+    most commonly run into are the maximum speed of our links
+    (100Mbps) and the maximum number of network interface cards (NICs)
+    in our machines. You can't get any links faster than 100Mbps,
+    since we don't yet have gigabit links for experimenters to
+    use. Our nodes each have 4 experimental network interfaces, so
+    each node can be a member of up to 4 links or LANs. A good
+    strategy for making your topology fit within those limits is to
+    replace multiple links to a node with a LAN or with a router
+    node. Ask Testbed Operations if you need further assistance.
     </p>
 
 <li><a NAME="UTT-NODES"></a>
