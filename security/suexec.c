@@ -278,6 +278,18 @@ int main(int argc, char *argv[])
      * outout sent to stderr, so make sure it all goes to stdout.
      */
     dup2(1, 2);
+    {
+	    int i, max;
+
+	    /*
+	     * Close all other descriptors. I think this is the wrong
+	     * place for this since a program can be run from the web
+	     * server without going through suexec!
+	     */
+	    max = getdtablesize();
+	    for (i = 3; i < max; i++)
+		    (void) close(i); 
+    }
 #endif
 
     /*
