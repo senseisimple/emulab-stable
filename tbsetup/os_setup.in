@@ -17,7 +17,7 @@ require 'ctime.pl';
 # experiment creation to continue.
 #
 # TODO: Reload disk images.
-# 
+#
 # usage: os_setup <pid> <eid>
 #
 # errorcode:  0 - all reboots succeeded.
@@ -81,14 +81,14 @@ my @row;
 #
 # Ah, Frisbee works so lets do auto reloading for nodes that do not have
 # the proper OS loaded on it. This will be a hash of lists; for each
-# imageid, a list of the nodes to pass to os_load for that imageid. 
+# imageid, a list of the nodes to pass to os_load for that imageid.
 #
 my %reloads     = ();
 my %reboots	= ();
 my %rebooted    = ();
 my $doautoload  = 1;
 my $dolastload  = 1;
-    
+
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
@@ -171,7 +171,7 @@ $db_result =
 		 "left join node_types as nt on nt.type=n.type ".
 		 "where r.pid='$pid' and r.eid='$eid'");
 
-if ($db_result->numrows < 1) {	
+if ($db_result->numrows < 1) {
     print "There are no nodes in experiment '$eid' in project '$pid'.\n";
     exit 0;
 }
@@ -217,7 +217,7 @@ while (my %row = $db_result->fetchhash()) {
     #
     # Make sure the files specified in the paths exist. We mount the
     # user tftp directory on boss node, so we can ignore the IP address,
-    # and just check the path directly. 
+    # and just check the path directly.
     #
     if (defined($row{'def_boot_path'})) {
 	my $path = $row{'def_boot_path'};
@@ -275,13 +275,13 @@ while (my %row = $db_result->fetchhash()) {
 	    die_noretry("*** RPM $rpm for node $node does not exist!");
 	}
     }
-    
+
     #
     # XXX - Ditto for tarfiles.
     #
     foreach my $tarspec (split(":", $row{'tarballs'})) {
 	my ($dir, $tar) = split(" ", $tarspec);
-	
+
 	if (! -f $tar) {
 	    die_noretry("*** Tarfile $tar for node $node does not exist!");
 	}
@@ -291,13 +291,13 @@ while (my %row = $db_result->fetchhash()) {
     # If there is a path specified, then we don't worry anymore about it.
     # The user must know what is going on. The OSID might have a path
     # associated with it, which means the same thing; we don't worry about
-    # it. 
+    # it.
     #
     if (!$bootpath && !$jailnode && !$plabnode && !$subnode) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
-	# 
+	#
 	if (! $osid) {
 	    die_noretry(
 	        "*** $node has no bootpath and no def_boot_osid set!");
@@ -308,20 +308,20 @@ while (my %row = $db_result->fetchhash()) {
 	#
 	my $osid_result =
 	    DBQueryFatal("select * from os_info where osid='$osid'");
-	
+
 	if ($osid_result->numrows == 0) {
 	    die_noretry("*** No such OSID $osid is defined!");
 	}
-	
+
 	my %osid_row   = $osid_result->fetchhash();
 
 	#
 	# If there is an actual path, its an OSKit kernel not an image.
-	# 
+	#
 	if (! defined($osid_row{'path'}) || $osid_row{'path'} eq "") {
 	    #
 	    # Not an OSKit kernel.
-	    # Make sure this OSID is actually loaded on the machine. 
+	    # Make sure this OSID is actually loaded on the machine.
 	    #
 	    my $p_result =
 		DBQueryFatal("select * from partitions ".
@@ -329,8 +329,8 @@ while (my %row = $db_result->fetchhash()) {
 
 	    #
 	    # If not loaded, then see if the user was looking for the generic
-	    # name of the OS that is loaded. 
-	    # 
+	    # name of the OS that is loaded.
+	    #
 	    if ($p_result->numrows == 0) {
 		#
 		# Check to see if a non specific version specified.
@@ -340,7 +340,7 @@ while (my %row = $db_result->fetchhash()) {
 
 		    #
 		    # A non-specific version. There needs to be a way to
-		    # map it to another osid. 
+		    # map it to another osid.
 		    #
 		    if (!defined($osid_row{'nextosid'})) {
 			die_noretry(
@@ -348,11 +348,11 @@ while (my %row = $db_result->fetchhash()) {
 			    "    No mapping can be made for $osid ($node)!");
 		    }
 		    my $nextosid = $osid_row{'nextosid'};
-		    
+		
 		    #
 		    # See if the nextosid is already on the disk. If not,
 		    # it needs to be loaded.
-		    # 
+		    #
 		    my $o_result =
 			DBQueryFatal("select osid from partitions as p ".
 				     "where p.node_id='$node' and ".
@@ -361,18 +361,18 @@ while (my %row = $db_result->fetchhash()) {
 		    if (! $o_result->numrows) {
 			#
 			# User wants a specific version of an OS, but its not
-			# loaded on the machine. 
+			# loaded on the machine.
 			#
 			print "Mapping $osid on $node to $nextosid ".
 			    "and setting up a reload.\n";
-			
+
 			SetupReload($node, $nextosid, $type);
 			$osids{$node} = $nextosid;
 		    }
 		    else {
 			#
-			# Already loaded. 
-			# 
+			# Already loaded.
+			#
 			print "Mapping $osid on $node to $nextosid.\n";
 
 			if ($dolastload &&
@@ -390,14 +390,14 @@ while (my %row = $db_result->fetchhash()) {
 		else {
 		    #
 		    # User wants a specific version of an OS, but its not
-		    # loaded on the machine. 
+		    # loaded on the machine.
 		    #
 		    SetupReload($node, $osid, $type);
 		}
 	    }
 	    else {
 		#
-		# OSID is loaded, but might need to be cleaned. 
+		# OSID is loaded, but might need to be cleaned.
 		#
 		if ($dolastload &&
 		    defined($row{'pid'}) && $row{'pid'} ne $pid) {
@@ -406,18 +406,18 @@ while (my %row = $db_result->fetchhash()) {
 	    }
 	}
     }
-    
+
     #
     # Set the canfail bit.
     #
     $canfail{$node} = (($failmode eq NODEFAILMODE_FATAL()) ? 0 : 1);
-    
+
     print STDERR "$node - $osids{$node} - $canfail{$node}\n"
 	if $dbg;
 }
 
 #
-# Collect some info about vnodes. 
+# Collect some info about vnodes.
 #
 foreach my $vnode (keys(%vnodes)) {
     my $jailed = $vnodes{$vnode};
@@ -449,7 +449,7 @@ foreach my $vnode (keys(%vnodes)) {
 	#
 	next;
     }
-    
+
     # Nothing else to do for local jail nodes at this time ...
 }
 
@@ -524,7 +524,7 @@ foreach my $imageid ( keys(%reloads) ) {
 
     foreach my $node ( @list ) {
 	my $mode;
-	
+
 	if (!TBGetNodeOpMode($node, \$mode)) {
 	    print "*** Error getting operational mode for $node!\n";
 	    $failed++;
@@ -565,7 +565,7 @@ while ( @nodelist ) {
 	print "$node is alive and well\n";
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
-	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();	
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
 	next;
     }
 
@@ -573,7 +573,7 @@ while ( @nodelist ) {
 	$retries{$node} -= 1;
 
 	print "*** Rebooting $node and waiting again ...\n";
-	
+
 	if (system("$nodereboot $node") == 0) {
 	    push(@nodelist, $node);
 	    $waitstart{$node} = time;
@@ -583,14 +583,14 @@ while ( @nodelist ) {
     }
 
     SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
-	
+
     print "*** WARNING: $node may be down.\n".
 	  "    This has been reported to testbed-ops.\n";
-	
+
     if ($canfail{$node}) {
 	# Send mail to testbed-ops and to the user about it.
 	my ($user) = getpwuid($UID);
-	
+
 	SENDMAIL($user_email_to, "Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
@@ -611,7 +611,7 @@ while ( @nodelist ) {
     # Reserve it to down experiment.
     MarkNodeDown($node);
     TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_DOWN() );
-    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();	
+    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 
     # Send mail to testbed-ops about it
     SENDMAIL($TBOPS, "Node $node is down",
@@ -647,7 +647,7 @@ my @vnodelist = keys(%vnodes);
 foreach my $vnode (@vnodelist) {
     my $pnode  = $vnode2pnode{$vnode};
 
-    # Remote node, always does setup. 
+    # Remote node, always does setup.
     next
 	if (!exists($nodes{$pnode}));
     # Not rebooted, so leave allocstate alone for vnode_setup.
@@ -710,14 +710,14 @@ elsif (@vnodelist) {
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
 	}
-	
+
 	print "*** WARNING: $node did not boot!\n";
 
 	if ($plabvnodes{$node}) {
 	    #
 	    # We move the pnode into hwdown so that it will not be considered
 	    # again, until the plab monitor daemon determines that it is
-	    # really working again. 
+	    # really working again.
 	    #
 	    # XXX Need to deal with the same pnode being used twice.
 	    #
@@ -726,11 +726,11 @@ elsif (@vnodelist) {
 			      "'Moved to hwdown; ".
 			      "$node ($pid/$eid) failed to setup'");
 	}
-	
+
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.
 	    my ($user) = getpwuid($UID);
-	
+
 	    SENDMAIL($user_email_to, "Virtual Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
@@ -767,7 +767,7 @@ print "*** There were $failedplab failed plab nodes\n"
 
 TBDebugTimeStamp("os_setup finished");
 
-# No retry if vnodes failed. Indicates a fatal problem. 
+# No retry if vnodes failed. Indicates a fatal problem.
 exit(-1)
     if ($failedvnodes);
 exit(1)
@@ -817,7 +817,7 @@ sub SetupReload($$$)
 
 #
 # Fork a process to exec a command. Return the pid to wait on.
-# 
+#
 sub ForkCmd($) {
     my ($cmd) = @_;
     my($mypid);
