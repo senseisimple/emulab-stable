@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -161,6 +161,12 @@ else {
           number of nodes in the experiment.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
+
+    echo "<br><br>
+          If you are the morbid type, you can watch the experiment die in
+          <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+          realtime</a>.\n";
+    
 }
 echo "</h3>\n";
 
