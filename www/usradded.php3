@@ -108,12 +108,19 @@ else {
 # project membership, but I don't like that.
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects WHERE pid=\"$pid\"");
+	"SELECT pid FROM projects WHERE pid=\"$pid\"");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error retrieving info for $pid: $err\n", 1);
 }
 if (mysql_num_rows($query_result) == 0) {
+    USERERROR("No such project $pid. Please go back and try again.", 1);
+}
+#
+# XXX String compare to ensure case match. 
+#
+$row = mysql_fetch_row($query_result);
+if (strcmp($row[0], $pid)) {
     USERERROR("No such project $pid. Please go back and try again.", 1);
 }
 
