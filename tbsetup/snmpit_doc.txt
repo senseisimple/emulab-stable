@@ -4,41 +4,14 @@ Documentation for snmpit
 snmpit uses modules that implement the interface to a given switch
 model (ie Cisco Catalyst 6509, Intel EhterExpress 510T, etc). They are
 responsable for all communication (typically over SNMP) to the switch. 
-These modules should support these actions:
 
-new(ip,args)	Initializes snmp session to IP, "arg=val" sets
-		module parameters, ignores unsupported args
-portControl(cmd,ports)
-		cmd = {enable, disable, 10mbit, 100mbit, full, half, auto}
-		ports = list of "pcX:Y"
-showPorts	print settings of all ports
-getStats	print various stats
-vlanLock	Get a vlan editing lock/token/buffer, and
-vlanUnlock	Release it when done
-setupVlan	(name,ports) - takes a list of ports, and vlans them
-removeVlan	(vlan) - takes vlan number
-listVlans	returns a list of entries, with each entry having an ID,
-		a name, and a list of members (pcX:Y), tab delimited
+The organization is basically that snmpit itself deals with stack objects,
+which deal with (possibly multiple) switch objects on the backend. So, snmpit
+makes a snmpit_cisco_stack object, and gives it a list of switches, which
+snmpit_cisco_stack uses to create a snmpit_cisco object for each switch. The
+stack objects basically just know how to do things like the the VLAN lists from
+all of their switches and collate them into one big list that they can return
+to the caller.
 
-Notes:
-showPorts and getStats currently print their results directly. This
-makes sense, since the output could be quite different for different
-switch types. This also prevents snmpit itself from using these
-functions to determine certain things about the state. In the future,
-it would be good to have them return data structures, like listVlans
-does, and have snmpit be able to use this info.
-
-Features supported in snmpit itself:
- - auto vlan config from file or from db
- - device type discovery and command dispatch
-
-Power control has also been moved into its own module, snmpit_apc.pm. 
-It supports new(ip,args) as above, and power(cmd,port) where cmd is 
-"on", "off", or "cyc[le]" and port is 1-8.
-
-snmpit library interface
-------------------------
-(see comment at top of snmpit_lib.pm)
-
-The snmpit library handles all the database transactions. It makes
-available all the translations that a module might need to do.
+The API for the stack objects is currently not documented - look at one of the
+existing ones.
