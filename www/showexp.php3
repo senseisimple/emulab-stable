@@ -97,8 +97,9 @@ if ($expstate) {
 WRITESUBMENUBUTTON("Terminate this Experiment",
 		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
+$editflip = ($edit ? 0 : 1);
 WRITESUBMENUBUTTON("Edit Experiment Meta-Data",
-		   "showexp.php3?pid=$exp_pid&eid=$exp_eid&edit=1");
+		   "showexp.php3?pid=$exp_pid&eid=$exp_eid&edit=$editflip");
 
 #
 # Admin and project/experiment leader get this option.
