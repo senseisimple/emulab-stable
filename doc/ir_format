@@ -38,9 +38,10 @@ Topology: describes the base physical topology of the network.
 
 START topology
 START nodes
-# <node> <links>
+# <node> <type> <links>
 # <node> refers to a string name that should be easily mappable
 # to a physical machine (IP address, hostname, etc.)
+# <type> is usually "pc", "dnard", or "delay"
 # <links> is a space separated list of link ids
 END nodes
 START links
