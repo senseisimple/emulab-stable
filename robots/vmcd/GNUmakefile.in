@@ -27,13 +27,13 @@ CFLAGS	       += -I${SRCDIR}/../mtp
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 ifeq ($(SYSTEM),Linux)
-CFLAGS	       += -I${SRCDIR}/../mezzanine/libmezz -I${SRCDIR}/../mezzanine/mezzanine
+CFLAGS	       += -I${MEZZ_INSTALL}/include 
 CFLAGS         += -DHAVE_MEZZANINE
 endif
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib 
 ifeq ($(SYSTEM),Linux)
-LDFLAGS		= -L../mezzanine/libmezz
+LDFLAGS		+= -L${MEZZ_INSTALL}/lib
 endif
 
 LIBS	 += -lmtp -ltb -lm 
