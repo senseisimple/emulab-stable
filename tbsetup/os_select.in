@@ -133,8 +133,8 @@ if ($UID && !TBAdmin($UID)) {
         fatal("os_select: You do not have permission to modify ".
 	    "one or more of the nodes.\n");
     }
-    debug("Access granted to all nodes requested.\n");
-} else { debug("Running as an admin.\n"); }
+    debug("$UID: Access granted to all nodes requested.\n");
+} else { debug("$UID: Running as an admin.\n"); }
 
 my $pernodeopmode=0;
 my $opmode = os_opmode($osid);
