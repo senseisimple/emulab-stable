@@ -964,7 +964,7 @@ sub addroutestorc($rc)
     open(RC, ">$rc") or
 	fatal("Could not open $rc to append static routes");
 
-    my $routerip  = getcnetrouter();
+    my $routerip  = getcnetrouter($USEVCNETROUTES);
     my $hostip    = `cat $BOOTDIR/myip`;
     chomp($hostip);
 
@@ -975,36 +975,41 @@ sub addroutestorc($rc)
     print RC "route_default=\"default $routerip\"\n";
     print RC "route_lo0=\"localhost -interface lo0\"\n";
     print RC "route_host=\"$hostip localhost\"\n";
+
     if ($IP ne $hostip) {
+	#
 	# Setup a route for all jails on this node, to the loopback.
+	#
 	print RC "static_routes=\"\$static_routes jailnet\"\n";
 	print RC "route_jailnet=\"-net $IP -interface lo0 255.255.255.0\"\n";
 
+	#
+	# All other jails are reachable via the control net interface.
+	#
 	print RC "static_routes=\"\$static_routes privnet\"\n";
 	print RC "route_privnet=\"-net $IP -interface $phys_cnet_if $IPMASK\"\n";
+	#
+	# If using the virtual control net for routes, also make sure that
+	# nodes are reachable with their real control net addresses directly.
+	#
+	if ($USEVCNETROUTES) {
+	    print RC "static_routes=\"\$static_routes rcnet\"\n";
+	    print RC "route_rcnet=\"-net $hostip -netmask " . getcnetmask(0) .
+		" -interface $phys_cnet_if\"\n";
+	}
     }
 
     #
-    # XXX I don't think this is really a virtual control net issue, but
-    # rather a gated issue.  However, this is the only hook I have right now.
-    #
-    # This just in!  It looks like whatever the gated problem was, it went
-    # away after fixing numerous other bugs.  But I'll leave the conditional
-    # here for a little while just in case...
-    #
-    if (1 || !$USEVCNETROUTES) {
-	#
-	# Now a list of routes for each of the IPs the jail has access
-	# to. The idea here is to override the interface route such that
-	# traffic to the local interface goes through lo0 instead. This
-	# avoids going through traffic shaping when, say, pinging your own
-	# interface!
-	# 
-	foreach my $ip (@jailips) {
-	    print RC "static_routes=\"ip${count} \$static_routes\"\n";
-	    print RC "route_ip${count}=\"$ip -interface lo0\"\n";
-	    $count++;
-	}
+    # Now a list of routes for each of the IPs the jail has access
+    # to. The idea here is to override the interface route such that
+    # traffic to the local interface goes through lo0 instead. This
+    # avoids going through traffic shaping when, say, pinging your own
+    # interface!
+    # 
+    foreach my $ip (@jailips) {
+	print RC "static_routes=\"ip${count} \$static_routes\"\n";
+	print RC "route_ip${count}=\"$ip -interface lo0\"\n";
+	$count++;
     }
     close(RC);
     return 0;
@@ -1134,11 +1139,13 @@ sub clearcnethostalias($)
     }
 }
 
-sub getcnetrouter()
+sub getcnetrouter($)
 {
+    my ($usevcnet) = @_;
+
     my $routerip;
 
-    if (!$USEVCNETROUTES) {
+    if (!$usevcnet) {
 	$routerip = `cat $BOOTDIR/routerip`;
 	chomp($routerip);
     } else {
@@ -1147,4 +1154,22 @@ sub getcnetrouter()
     }
 
     return $routerip;
+}
+
+sub getcnetmask($)
+{
+    my ($usevcnet) = @_;
+
+    my $cnetmask = "255.255.255.0";
+
+    if (!$usevcnet) {
+	if (-e "$BOOTDIR/mynetmask") {
+	    $cnetmask = `cat $BOOTDIR/mynetmask`;
+	    chomp($cnetmask);
+	}
+    } else {
+	$cnetmask = $JAILCNETMASK;
+    }
+
+    return $cnetmask;
 }
