@@ -41,8 +41,8 @@ lib/libulsshxmlrpcpp.a
 lib/libulsshxmlrpcpp.la
 lib/libulsshxmlrpcpp.so
 lib/libulsshxmlrpcpp.so.0
-lib/libulxmlrpcpp
-lib/libulxmlrpcpp.10
+lib/libulxmlrpcpp.so
+lib/libulxmlrpcpp.so.10
 lib/libulxmlrpcpp.a
 lib/libulxmlrpcpp.la
 share/ulxmlrpcpp/httpd/index.html
