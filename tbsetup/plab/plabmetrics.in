@@ -22,15 +22,16 @@ my $STALEAGE;
 sub usage()
 {
     print STDOUT
-	"Usage: plabmetrics [-d] [-n] [-f <xmlfile>]\n";
+	"Usage: plabmetrics [-d] [-i minutes ] [-n] [-f <xmlfile>]\n";
     exit(-1);
 }
-my $optlist = "dnf:";
+my $optlist = "di:nf:";
 my $debug   = 0;
 my $impotent= 0;
+my $interval= 5;
 my $xmlfile;
 my $now     = time();
-my $nowminutes = (localtime($now))[1];
+my $mailit  = 1;
 
 #
 # Only real root can call this.
@@ -95,6 +96,9 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"i"})) {
+    $interval = $options{"i"};
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -173,11 +177,23 @@ else {
 	waitpid($syspid, 0);
 	alarm 0;
 
-	fatal("Timed out downloading XML data from web site!",1)
-	    if ($? == 15);
-	    
-	fatal("Could not download XML data from web site!")
-	    if ($?);
+	my $failed = $?;
+	my $lasttime = $now;
+	if (-e "$agedfile") {
+	    $lasttime -= (stat($agedfile))[9];
+	}
+	$lasttime = int($lasttime / 60);
+	if ($failed) {
+	    # only send mail for the first missed interval
+	    if ($lasttime >= 2 * $interval) {
+		$mailit = 0;
+	    }
+	    fatal("Timed out downloading XML data from web site!")
+		if ($failed == 15);
+	    fatal("Could not download XML data from web site!");
+	} elsif ($lasttime >= 2 * $interval) {
+	    nonfatal("Successful download of XML data after $lasttime minutes!");
+	}
     }
     else {
 	exec("/usr/local/bin/wget -q -O $tempfile ".
@@ -424,8 +440,8 @@ sub fatal {
     my $msg = $_[0];
     my $quiet = (defined($_[1]) ? $_[1] : 0);
 
-    if (!$quiet || ($quiet && ($nowminutes < 6))) {
-        SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+    if ($mailit) {
+	SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
     }
     print "$msg\n"
 	if $debug;
@@ -433,4 +449,14 @@ sub fatal {
     unlink($tempfile)
 	if (defined($tempfile) && -e $tempfile);
     die($msg);
+}
+
+sub nonfatal {
+    my $msg = $_[0];
+
+    SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+    print "Would send mail\n";
+
+    print "$msg\n"
+	if $debug;
 }
