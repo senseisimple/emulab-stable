@@ -1,0 +1,122 @@
+##### Setting up the Utah Network Testbed software
+##### Robert Ricci
+##### Last updated January 16, 2002
+##### Tested on FreeBSD 4.3
+
+##### Step 0 - OS installation and setup
+
+First of all, the machine should be configured correctly for the network it is
+on, have the root password set, etc.
+
+The following directories will need to exist on partitions that have enough
+space to hold them:
+
+/usr/testbed/ - Needs space for testbed software and logs. A few gig should be
+					plenty
+/users/       - Needs space for user home directories. Amount of space required
+/proj/        - Needs space for project files. We recommend that this be larger
+					than /users, to encourage people to store files there, which
+					aids per-project accountability
+/groups/      - Needs enough space for files shared by groups. These are
+					primarily used by classes, if any.
+
+You may want to enforce quotas on the user-writable filesystems.
+
+##### Step 1 - Package installation
+
+Install the necessary packages. The following are necessary, and available as
+FreeBSD ports:
+gmake-3.79.1        GNU version of 'make' utility
+
+You may also want to install sudo to give your administrators root access (see
+the boss setup instructions for more details.)
+
+##### Step 2 - Testbed tree configuration/installation
+
+Configure the testbed tree. For example, I have the testbed source in ~/testbed,
+and use the ~/tbobj directory to do my builds in.
+
+cd ~/tbobj
+~/testbed/configure
+gmake
+gmake ops-install
+
+##### Step 3 - Mail setup
+
+We use our ops node to handle mail. You'll want to put:
+sendmail_enable="YES"
+into /etc/rc.conf/. Add the hostnames you'll be handling mail for to
+/etc/mail/local-host-names . Make sure to include your domain (eg. emulab.net),
+and your boss and ops node in this file.
+
+Create the /etc/mail/lists directory, which will be used to store mailing lists
+for testbed-users and testbed-activeusers, which can be used to conveniently
+send mail to all and all active users, respectively.
+
+Add the following entries to your /etc/mail/aliases file:
+testbed-activeusers:    :include:/etc/mail/lists/testbed-active-users
+testbed-active-users:   :include:/etc/mail/lists/testbed-active-users
+testbed-users:          :include:/etc/mail/lists/testbed-users
+
+If you're running your testbed-ops list off a different mailserver, you
+might want to add something like:
+testbed-ops:            testbed-ops@fast.cs.utah.edu
+
+Or, you can make a file containing all the people on the testbed-ops list
+(one address per line) in /etc/mail/lists, and add:
+testbed-ops:            :include:/etc/mail/lists/testbed-ops
+
+##### Step 4 - Root access from boss
+
+By this time, you should have created an ssh identity for root on your boss
+node (see the boss setup instructions.) Copy boss:/root/.ssh/identity.pub to
+ops:/root/.ssh/authorized_keys , and chmod it to 600. Make sure you can
+ssh, as root, from boss to ops without a password.
+
+##### Step 5 - Exports setup
+
+First, add the following lines to /etc/rc.conf, and restart the machine or
+start nfsd by hand:
+nfs_server_enable="YES"
+nfs_server_flags="-u -t -n 16"
+
+Create /etc/exports.head . This should contain exports of /users/, /proj/, and
+/groups/ to all other control nodes BUT NOT testbed nodes. When this is done,
+run exports_setup on the boss node, which will create an /etc/exports file
+by concatenating this with dynamically-generated exports of directories to
+nodes that need them.
+
+##### Step 6 - Capture setup
+
+If you don't have serial lines for all the nodes, you can skip this step.
+
+If you're using the Cyclades serial boards, you'll need a custom kernel. For
+Cycom-Y boards, include the following in your kernel config file:
+device          cy0
+device          cy1
+If you have Cyclom-Z boards, contact Utah, as we have custom drivers for them.
+
+Install capture by changing into the capture subdirectory of your build tree
+and running 'gmake tipserv-install'.
+
+Set up /etc/remote - Each node should have two lines, like:
+pc1:dv=/dev/tip/pc1:br#115200:nt:pa=none:
+pc1-tty:dv=/dev/cuac00:br#115200:nt:pa=none:
+The first line is for the normal case, of running capture and using tip to
+connecto to a running capture process. The second is for convenience when
+capture is not running.  Change the speed if your nodes' serial consoles are
+not running at 115200.  Of course, you'll need to change the cuac device for
+each node in the second line, to refelct where it's acutally attached. 
+
+Make a /usr/testbed/etc/capture.rc script to start up the capture process for
+each node at boot time. Each node should have a line like:
+/usr/testbed/bin/capture -r -s 115200 pc1 ttyC00 >/dev/null 2>&1 &
+As above, make sure to the the correct speed and tty device.
+
+/dev/tip
+
+##### Step 7 - Other
+
+It's useful to have the clocks on boss and ops relatively synchronized. During
+the setup of your boss node, you set up ntpd. You can use this on ops too, to
+synchronize their clocks.
