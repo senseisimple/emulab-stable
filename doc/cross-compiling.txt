@@ -70,8 +70,8 @@ Cross-compiling openssl for arm:
 Finally, build the testbed tree:
 
   env ELVIN_CONFIG=/tmp/elvin-install/bin/elvin-config \
-      LDFLAGS=-L/tmp/stargate-install/usr/local/lib \
-      CPPFLAGS=-I/tmp/stargate-install/usr/local/include \
+      LDFLAGS=-L/tmp/stargate-install/usr/local/ssl/lib \
+      CFLAGS=-I/tmp/stargate-install/usr/local/ssl/include \
       ../testbed/configure --host=arm-linux --build=i686-linux \
       --with-brainstem=/proj/testbed/src/brainstem
 
@@ -80,3 +80,18 @@ Finally, build the testbed tree:
   gmake client
 
   gmake client-install DESTDIR=/tmp/stargate-install
+
+
+Random notes:
+
+hostname isn't set right, it's always "stargate" instead of the emulab
+one, have to run sethostname.dhclient manually.
+
+had to build, statically link, and install mktemp since its missing
+and needed by install-tarfile.
+
+made a fake /sbin/consoletype
+
+copied /etc/sysconfig/network from a pc
+
+added /var/tmp, /var/db to /etc/rcS.d/S05mountall.sh for install-tarfile
