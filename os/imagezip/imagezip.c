@@ -534,7 +534,10 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		struct ext2_super_block super;
 		char pad[LINUX_SUPERBLOCK_SIZE];
 	} fs;
-	struct ext2_group_desc	groupdesc;
+	union {
+		struct ext2_group_desc	groupdesc;
+		char pad[LINUX_SUPERBLOCK_SIZE];
+	} group;
 
 	if (debug)
 		printf("  P%d (Linux Slice)\n", slice + 1 /* DOS Numbering */);
@@ -577,28 +580,29 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	 */
 	for (i = 0; i <= numgroups; i++) {
 		if (lseek(infd, (((off_t)start) * secsize) +
-			  (EXT2_BLOCK_SIZE(&fs.super)+(i * sizeof(groupdesc))),
+			        ((off_t) (EXT2_BLOCK_SIZE(&fs.super) +
+					  (i * sizeof(group.groupdesc)))),
 			  SEEK_SET) < 0) {
 			warnx("Linux Slice %d: "
 			      "Could not seek to Group %d", slice, i);
 			return 1;
 		}
 
-		if ((cc = read(infd, &groupdesc, sizeof(groupdesc))) < 0) {
+		if ((cc = read(infd, &group, sizeof(group))) < 0) {
 			warn("Linux Slice %d: "
 			     "Could not read Group %d", slice, i);
 			return 1;
 		}
-		if (cc != sizeof(groupdesc)) {
+		if (cc != sizeof(group)) {
 			warnx("Linux Slice %d: Truncated Group %d", slice, i);
 			return 1;
 		}
 		
 		printf("        Group:%-2d\tBitmap %9d, bfree %9d\n", i,
-		       groupdesc.bg_block_bitmap,
-		       groupdesc.bg_free_blocks_count);
+		       group.groupdesc.bg_block_bitmap,
+		       group.groupdesc.bg_free_blocks_count);
 
-		rval = read_linuxgroup(&fs.super, &groupdesc, i, start);
+		rval = read_linuxgroup(&fs.super, &group.groupdesc, i, start);
 	}
 	
 	return 0;
@@ -646,7 +650,7 @@ read_linuxgroup(struct ext2_super_block *super,
 		return 1;
 	}
 	if (cc != sizeof(bitmap)) {
-		warnx("Linux Group %d: Truncated Group bitmap", i);
+		warnx("Linux Group %d: Truncated Group bitmap", index);
 		return 1;
 	}
 
