@@ -105,7 +105,7 @@ print "Checking authorization for '$user'\n" if $verbose;
 my %outlets = ();
 foreach my $node (@machines) {
     if (!TBNodeAccessCheck($user,TB_NODEACCESS_POWERCYCLE,$node)) {
-	warn "You are not authorized to control $node. Skipping...";
+	warn "You are not authorized to control $node. Skipping...\n";
 	next;
     }
 
@@ -183,7 +183,7 @@ foreach my $power_id (keys %outlets) {
     if ($type eq "APC") {
 	my $device = new snmpit_apc($IP,$verbose);
 	if (!defined $device) {
-	    warn "Unable to contact controller for $nodestr. Skipping..\n";
+	    warn "Unable to contact controller for $nodestr. Skipping...\n";
 	    next;
 	} else {
 	    print "Calling device->power($op,@outlets)\n"
