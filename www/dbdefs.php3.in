@@ -884,6 +884,21 @@ function TBExpUidLastLogins($pid, $eid)
 }
 
 #
+#
+#
+function TBFreePCs()
+{
+    $query_result =
+	DBQueryFatal("select a.node_id from nodes as a ".
+		     "left join reserved as b on a.node_id=b.node_id ".
+		     "left join node_types as nt on a.type=nt.type ".
+		     "where b.node_id is null and a.role='testnode' ".
+		     "  and a.type like 'pc%'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
 # DB Interface.
 #
 
