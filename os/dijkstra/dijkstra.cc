@@ -104,22 +104,24 @@ void print_route(graph * g, int source, int dest)
         cerr << "ddijk: internal error: route not found" << endl;
         exit(1);
     }
+    string sourceIp = sourcePos->second.first;
+    string firstHopIp = sourcePos->second.second;
 
     multimap< int, pair<string, string> >::iterator pos;
     pos = g->ip[dest].begin();
     multimap< int, pair<string, string> >::iterator limit;
     limit = g->ip[dest].end();
+    string previous;
 
-    string sourceIp = sourcePos->second.first;
-    string firstHopIp = sourcePos->second.second;
     for ( ; pos != limit; ++pos)
     {
-        if (pos->second.first != firstHopIp)
+        if (pos->second.first != firstHopIp && pos->second.first != previous)
         {
             cout << "ROUTE DEST=" << pos->second.first
                  << " DESTTYPE=host DESTMASK=255.255.255.255 NEXTHOP="
                  << firstHopIp << " COST=" << distanceList[dest] << " SRC="
                  << sourceIp << endl;
+            previous = pos->second.first;
         }
     }
 }
