@@ -12,46 +12,46 @@ node tbpc07 pc:1 delay:2
 node tbpc08 pc:1 delay:2
 node tbpc09 pc:1 delay:2
 node tbpc10 pc:1 delay:2
-link alpha gamma 400 1
-link beta gamma 400 1
-link delta gamma 400 1
-link tbpc01:00d0b713f399 alpha 100 1
-link tbpc01:00d0b713f6c9 alpha 100 1
-link tbpc01:00d0b713f273 alpha 100 1
-link tbpc01:00d0b713f443 alpha 100 1
-link tbpc02:00d0b713f28e alpha 100 1
-link tbpc02:00d0b713f5d5 alpha 100 1
-link tbpc02:00d0b713f5e8 alpha 100 1
-link tbpc02:00d0b713f35c alpha 100 1
-link tbpc03:00d0b713f5ad alpha 100 1
-link tbpc03:00d0b713f425 alpha 100 1
-link tbpc03:00d0b713f419 alpha 100 1
-link tbpc03:00d0b713f290 alpha 100 1
-link tbpc04:00d0b713f4f0 alpha 100 1
-link tbpc04:00d0b713f644 alpha 100 1
-link tbpc04:00d0b713f492 alpha 100 1
-link tbpc04:00d0b713f65a alpha 100 1
-link tbpc05:00d0b713f473 alpha 100 1
-link tbpc05:00d0b713f178 alpha 100 1
-link tbpc05:00d0b713f5a5 alpha 100 1
-link tbpc05:00d0b713f524 alpha 100 1
-link tbpc06:00d0b713f607 alpha 100 1
-link tbpc06:00d0b713f41c alpha 100 1
-link tbpc06:00d0b713f603 alpha 100 1
-link tbpc06:00d0b7254638 alpha 100 1
-link tbpc07:00d0b713f636 beta 100 1
-link tbpc07:00d0b713f277 beta 100 1
-link tbpc07:00d0b726c1ca beta 100 1
-link tbpc07:00d0b713f44f beta 100 1
-link tbpc08:00d0b713f6cd beta 100 1
-link tbpc08:00d0b713f465 beta 100 1
-link tbpc08:00d0b713f5d7 beta 100 1
-link tbpc08:00d0b713f605 beta 100 1
-link tbpc09:009027ca71a6 beta 100 1
-link tbpc09:009027ca5cff beta 100 1
-link tbpc09:009027ca9835 beta 100 1
-link tbpc09:009027c7e056 beta 100 1
-link tbpc10:00d0b713f398 beta 100 1
-link tbpc10:00d0b713f288 beta 100 1
-link tbpc10:00d0b713f515 beta 100 1
-link tbpc10:00d0b713f56e beta 100 1
+link alpha_gamma alpha gamma 400 1
+link beta_gamma beta gamma 400 1
+link delta_gamma delta gamma 400 1
+link 01_alpha_1 tbpc01:00d0b713f399 alpha 100 1
+link 01_alpha_2 tbpc01:00d0b713f6c9 alpha 100 1
+link 01_alpha_3 tbpc01:00d0b713f273 alpha 100 1
+link 01_alpha_4 tbpc01:00d0b713f443 alpha 100 1
+link 02_alpha_1 tbpc02:00d0b713f28e alpha 100 1
+link 02_alpha_2 tbpc02:00d0b713f5d5 alpha 100 1
+link 02_alpha_3 tbpc02:00d0b713f5e8 alpha 100 1
+link 02_alpha_4 tbpc02:00d0b713f35c alpha 100 1
+link 03_alpha_1 tbpc03:00d0b713f5ad alpha 100 1
+link 03_alpha_2 tbpc03:00d0b713f425 alpha 100 1
+link 03_alpha_3 tbpc03:00d0b713f419 alpha 100 1
+link 03_alpha_4 tbpc03:00d0b713f290 alpha 100 1
+link 04_alpha_1 tbpc04:00d0b713f4f0 alpha 100 1
+link 04_alpha_2 tbpc04:00d0b713f644 alpha 100 1
+link 04_alpha_3 tbpc04:00d0b713f492 alpha 100 1
+link 04_alpha_4 tbpc04:00d0b713f65a alpha 100 1
+link 05_alpha_1 tbpc05:00d0b713f473 alpha 100 1
+link 05_alpha_2 tbpc05:00d0b713f178 alpha 100 1
+link 05_alpha_3 tbpc05:00d0b713f5a5 alpha 100 1
+link 05_alpha_4 tbpc05:00d0b713f524 alpha 100 1
+link 06_alpha_1 tbpc06:00d0b713f607 alpha 100 1
+link 06_alpha_2 tbpc06:00d0b713f41c alpha 100 1
+link 06_alpha_3 tbpc06:00d0b713f603 alpha 100 1
+link 06_alpha_4 tbpc06:00d0b7254638 alpha 100 1
+link 07_beta_1 tbpc07:00d0b713f636 beta 100 1
+link 07_beta_2 tbpc07:00d0b713f277 beta 100 1
+link 07_beta_3 tbpc07:00d0b726c1ca beta 100 1
+link 07_beta_4 tbpc07:00d0b713f44f beta 100 1
+link 08_beta_1 tbpc08:00d0b713f6cd beta 100 1
+link 08_beta_2 tbpc08:00d0b713f465 beta 100 1
+link 08_beta_3 tbpc08:00d0b713f5d7 beta 100 1
+link 08_beta_4 tbpc08:00d0b713f605 beta 100 1
+link 09_beta_1 tbpc09:009027ca71a6 beta 100 1
+link 09_beta_2 tbpc09:009027ca5cff beta 100 1
+link 09_beta_3 tbpc09:009027ca9835 beta 100 1
+link 09_beta_4 tbpc09:009027c7e056 beta 100 1
+link 10_beta_1 tbpc10:00d0b713f398 beta 100 1
+link 10_beta_2 tbpc10:00d0b713f288 beta 100 1
+link 10_beta_3 tbpc10:00d0b713f515 beta 100 1
+link 10_beta_4 tbpc10:00d0b713f56e beta 100 1
