@@ -437,7 +437,8 @@ sub dofloor($$)
     my $query = "select loc.*,r.pid,r.eid,r.vname ".
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
-		"where loc.building='$building'";
+		"where loc.building='$building' " .
+		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
     my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
 
     my $newnodes_query = "select * from new_nodes ".
