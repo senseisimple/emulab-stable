@@ -1,16 +1,42 @@
 #!/usr/bin/perl -wT
 use English;
+use Getopt::Std;
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff. This script cannot do any damage since it can
 # only create directories where the caller has the permission to do so.
 #
-# usage: mkexpdir <pid> <eid>
+sub usage()
+{
+    print STDOUT "Usage: mkexpdir <pid> <gid> <eid>\n";
+    exit(-1);
+}
+
 #
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+#
+# Should be configured.
+# 
 my $projroot = "/proj";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $tbdata   = "tbdata";
 my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot");
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 #
 # Untaint the path
@@ -21,26 +47,48 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Check args.
 # 
-if (@ARGV != 2) {
-    print STDOUT "Usage: mkexpdir <pid> <eid>\n";
-    exit(-1);
+if (@ARGV != 3) {
+    usage();
 }
-my $project = $ARGV[0];
-my $eid     = $ARGV[1];
+my $pid   = $ARGV[0];
+my $gid   = $ARGV[1];
+my $eid   = $ARGV[2];
 
 #
 # Untaint the arguments.
 #
-if ($project =~ /^([-\@\w.]+)$/) {
-    $project = $1;
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted project name: $pid!\n");
 }
 if ($eid =~ /^([-\@\w.]+)$/) {
     $eid = $1;
 }
+else {
+    die("Tainted experiment name: $eid!\n");
+}
+if ($gid =~ /^([-\@\w.]+)$/) {
+    $gid = $1;
+}
+else {
+    die("Tainted group name: $gid!\n");
+}
 
-my $piddir  = "$projroot/$project";
+my $piddir  = "$projroot/$pid";
 my $expdir  = "$piddir/exp";
 my $eiddir  = "$expdir/$eid";
+
+#
+# Unix info for the group
+#
+my $unix_gid;
+my $unix_name;
+
+if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
+    die("*** No info for project/group $pid/$gid!");
+}
 
 #
 # We create a directory structure for the experiment in the project directory.
@@ -57,6 +105,12 @@ if (! mkdir($eid, 0770)) {
 
 if (! chmod(0770, "$eid")) {
     print STDOUT "Could not chmod $eid to 0770 in $expdir: $!\n";
+    rmdir($eid);
+    exit(-1);
+}
+
+if (! chown($UID, $unix_gid, "$eid")) {
+    print STDOUT "Could not chown $eid to $UID/$unix_gid in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }
@@ -81,6 +135,13 @@ foreach $dir (@dirlist) {
 	fatal();
     }
 }
+
+#
+# Update the DB. This leaves the decision about where the directory
+# is created, in this script. 
+#
+DBQueryFatal("update experiments set path='$eiddir' ".
+	     "where pid='$pid' and eid='$eid'");
 
 exit(0);
 

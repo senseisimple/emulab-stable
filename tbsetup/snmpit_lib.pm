@@ -202,8 +202,13 @@ sub NodeCheck {
   if ( $node =~ /(sh\d+)/ ) { $node= $1."-1"; }
 
   $cmd =
-    "select uid, node_id from reserved as r left join proj_memb as pm ".
-    "on pm.pid=r.pid where node_id='$node' and uid='$self';";
+	"select uid,node_id from reserved as n ".
+	"left join experiments as e on ".
+	"     e.pid=n.pid and e.eid=n.eid ".
+	"left join group_membership as g on ".
+	"     g.pid=e.pid and g.gid=e.gid ".
+	"where g.uid='$self' and n.node_id='$node';";
+      
   print "$cmd\n" if $debug > 1;
   $sth = $dbh->query($cmd);
 

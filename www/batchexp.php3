@@ -110,47 +110,45 @@ elseif ($specupload) {
 # It may not exist in either the current experiments list, or the
 # batch experiments list.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM experiments ".
-        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
-if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
+$query_result =
+    DBQueryFatal("SELECT eid FROM experiments ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
+if (mysql_num_rows($query_result)) {
+    USERERROR("The experiment name '$exp_id' you have chosen is already ".
               "in use in project $exp_pid. Please select another.", 1);
 }
 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM batch_experiments ".
-        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
-if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
-              "in use in project $exp_pid. Please select another.", 1);
+$query_result =
+    DBQueryFatal("SELECT eid FROM batch_experiments ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
+if (mysql_num_rows($query_result)) {
+    USERERROR("The batch experiment name '$exp_id' you have chosen is ".
+              "already in use in project $exp_pid. Please select another.", 1);
 }
 
 #
-# Next, is this person a member of the project specified, and is the trust
-# equal to group or local root?
+# Check group. If none specified, then use default group.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM proj_memb WHERE pid=\"$exp_pid\" and uid=\"$uid\"");
-if (($row = mysql_fetch_array($query_result)) == 0) {
-    USERERROR("You are not a member of Project $exp_pid, so you cannot begin ".
-            "an experiment in that project.", 1);
+if (!isset($exp_gid) ||
+    strcmp($exp_gid, "") == 0) {
+	$exp_gid = $exp_pid;
 }
-$trust = $row[trust];
-if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
-    USERERROR("You are not group or local root in Project $exp_pid, so you ".
-              "cannot begin an experiment in that project.", 1);
+if (!TBValidGroup($exp_pid, $exp_gid)) {
+    USERERROR("No such group $exp_gid in project $exp_gid!", 1);
 }
 
 #
-# We need the unix gid for the project for running the scripts below.
+# Verify permissions.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
+if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
+    USERERROR("You do not have permission to begin a batch experiment in "
+	      "in Project/Group $exp_pid/$exp_gid!", 1);
 }
-$gid = $row[0];
+
+#
+# We need the unix gid for the group for running the scripts below.
+#
+TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
 # Create a temporary file with the goo in it.
@@ -167,6 +165,7 @@ if (! $fp) {
 # 
 fputs($fp, "EID:	$exp_id\n");
 fputs($fp, "PID:	$exp_pid\n");
+fputs($fp, "GID:	$exp_gid\n");
 fputs($fp, "name:       $exp_name\n");
 fputs($fp, "expires:    $exp_expires\n");
 fputs($fp, "nsfile:	$nsfile\n");
@@ -197,7 +196,7 @@ $output = array();
 $retval = 0;
 $last   = time();
 
-$result = exec("$TBSUEXEC_PATH $uid $gid webbatchexp $tmpfname",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid webbatchexp $tmpfname",
  	       $output, $retval);
 
 #

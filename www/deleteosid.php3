@@ -11,7 +11,6 @@ PAGEHEADER("Delete an OSID");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
 
 #
 # Must provide the OSID!
@@ -21,38 +20,15 @@ if (!isset($osid) ||
   USERERROR("The OSID was not provided!", 1);
 }
 
-#
-# Check to make sure thats this is a valid OSID.
-#
-$query_result = mysql_db_query($TBDBNAME,
-       "SELECT pid FROM os_info WHERE osid='$osid'");
-if (mysql_num_rows($query_result) == 0) {
+if (! TBValidOSID($osid)) {
     USERERROR("The OSID `$osid' is not a valid OSID.", 1);
 }
-$row = mysql_fetch_array($query_result);
-$pid = $row[pid];
 
 #
-# Verify that this uid is a member of the project that owns the OSID,
-# and that the uid has root permission.
+# Verify permission.
 #
-if (!$isadmin) {
-    if (!isset($pid) || strcmp($pid, "") == 0) {
-	USERERROR("You do not have permission to delete OSID `$osid'", 1);
-    }
-
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\" ".
-	"and (trust='local_root' or trust='group_root')");
-    
-    if (! $query_result) {
-	$err = mysql_error();
-	TBERROR("Database Error finding project membership: $uid: $err\n", 1);
-    }
-    if (mysql_num_rows($query_result) == 0) {
-	USERERROR("You do have permission to delete an OSID in ".
-		  "project: `$pid'.", 1);
-    }
+if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_DESTROY)) {
+    USERERROR("You do not have permission to access OSID $osid!", 1);
 }
 
 #
@@ -90,12 +66,7 @@ if (!$confirmed) {
 #
 # Delete the record,
 #
-$query_result = mysql_db_query($TBDBNAME,
-       "DELETE FROM os_info WHERE osid=\"$osid\"");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error deleting OSID `$osid': $err\n", 1);
-}
+DBQueryFatal("DELETE FROM os_info WHERE osid='$osid'");
 
 echo "<p>
       <center><h2>

@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+use English;
 
 # This is a very simple program that convers the virt_* tables in the DB
 # into a NS file.  Not the original NS file, but a NS file that, if parsed
@@ -16,17 +17,18 @@ if ($#ARGV != 1) {
 ($pid,$eid) = @ARGV;
 
 #
-# Make sure they have access to the experiment
-#
-if ((!TBAdmin()) && (!ProjMember($pid))) {
-    die "You are not a member of project %pid";
-}
-
-#
 # Make sure the experiment exists
 #
 if (!ExpState($pid,$eid)) {
     die "There is no experiment $eid in project $pid\n";
+}
+
+#
+# Make sure they have access to the experiment
+#
+if (!TBAdmin($UID) &&
+    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+    die("*** You do not have permission to access this experiment!\n");
 }
 
 print "source tb_compat.tcl\n";

@@ -22,29 +22,15 @@ $isadmin = ISADMIN($uid);
 #
 # Get the project list.
 #
-if ($isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT u.* FROM users as u order by u.uid");
-}
-else {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select distinct u.* from users as u ".
-	"left join proj_memb as p1 on u.uid=p1.uid ".
-	"left join proj_memb as p2 on p1.pid=p2.pid ".
-	"where p2.uid='$uid' order by u.uid");
-}
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting user list: $err\n", 1);
+if (! $isadmin) {
+    USERERROR("You do not have permission to view the user list!", 1);
 }
 
+$query_result =
+    DBQueryFatal("SELECT u.* FROM users as u order by u.uid");
+
 if (mysql_num_rows($query_result) == 0) {
-	if ($isadmin) {
-	    USERERROR("There are no users!", 1);
-	}
-	else {
-	    USERERROR("There are no users in any of your projects!", 1);
-	}
+    USERERROR("There are no users!", 1);
 }
 
 #
@@ -84,7 +70,7 @@ while ($row = mysql_fetch_array($query_result)) {
     # Suck out a list of projects too.
     #
     $projmemb_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb where uid='$thisuid' order by pid");
+	"SELECT pid FROM group_membership where uid='$thisuid' order by pid");
 
     echo "<tr>\n";
 

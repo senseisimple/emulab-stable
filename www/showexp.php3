@@ -13,46 +13,37 @@ PAGEHEADER("Show Experiment Information");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-$isadmin = ISADMIN($uid);
-
 #
-# Verify form arguments.
+# Verify page arguments.
 # 
-if (!isset($exp_pideid) ||
-    strcmp($exp_pideid, "") == 0) {
-    USERERROR("You must provide an experiment ID.", 1);
+if (!isset($pid) ||
+    strcmp($pid, "") == 0) {
+    USERERROR("You must provide a Project ID.", 1);
 }
 
-#
-# First get the project (PID) from the form parameter, which came in
-# as <pid>$$<eid>.
-#
-$exp_eid = strstr($exp_pideid, "$$");
-$exp_eid = substr($exp_eid, 2);
-$exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "$$", 0));
+if (!isset($eid) ||
+    strcmp($eid, "") == 0) {
+    USERERROR("You must provide an Experiment ID.", 1);
+}
+$exp_eid = $eid;
+$exp_pid = $pid;
 
 #
-# Check to make sure thats this is a valid PID/EID tuple.
+# Check to make sure this is a valid PID/EID tuple.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments WHERE ".
-        "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments WHERE ".
+		 "eid='$exp_eid' and pid='$exp_pid'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The experiment $exp_eid is not a valid experiment ".
             "in project $exp_pid.", 1);
 }
 
 #
-# Verify that this uid is a member of the project for the experiment
-# being displayed.
+# Verify Permission.
 #
-if (!$isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not a member of Project $exp_pid for ".
-                  "Experiment: $exp_eid.", 1);
-    }
+if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
 #
@@ -63,7 +54,7 @@ SHOWEXP($exp_pid, $exp_eid);
 # Terminate option.
 echo "<p><center>
        Do you want to terminate this experiment?
-       <A href='endexp.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
+       <A href='endexp.php3?pid=$exp_pid&eid=$exp_eid'>Yes</a>
       </center>\n";    
 
 #

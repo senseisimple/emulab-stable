@@ -109,6 +109,16 @@ if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
 }
 
 #
+# Check early that we can guarantee uniqueness of the unix group name.
+# 
+$query_result =
+    DBQueryFatal("select gid from groups where unix_name='$pid'");
+
+if (mysql_num_rows($query_result)) {
+    TBERROR("Could not form a unique Unix group name for $pid!", 1);
+}
+
+#
 # Check that email address looks reasonable. We need the domain for
 # below anyway.
 #
@@ -156,23 +166,20 @@ else {
 #
 # This is a new project request. Make sure it does not already exist.
 #
-$project_query  = "SELECT pid FROM projects WHERE pid=\"$pid\"";
-$project_result = mysql_db_query($TBDBNAME, $project_query);
+$project_result =
+    DBQueryFatal("SELECT pid FROM projects WHERE pid='$pid'");
 
 if ($row = mysql_fetch_row($project_result)) {
-  USERERROR("The project name \"$pid\" you have chosen is already in use. ".
-            "Please select another.", 1);
+    USERERROR("The project name \"$pid\" you have chosen is already in use. ".
+              "Please select another.", 1);
 }
 
 #
 # See if this is a new user or one returning.
 #
-$pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$proj_head_uid\"";
-$pswd_result = mysql_db_query($TBDBNAME, $pswd_query);
-if (!$pswd_result) {
-    $err = mysql_error();
-    TBERROR("Database Error retrieving info for $proj_head_uid: $err\n", 1);
-}
+$pswd_result =
+    DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$proj_head_uid'");
+
 if ($row = mysql_fetch_row($pswd_result)) {
     $returning = 1;
 }
@@ -241,28 +248,21 @@ else {
 # * Generate a mail message to the user with the verification key.
 # 
 if (! $returning) {
-    $unixuid_query  = "SELECT unix_uid FROM users ORDER BY unix_uid DESC";
-    $unixuid_result = mysql_db_query($TBDBNAME, $unixuid_query);
-    $row = mysql_fetch_row($unixuid_result);
-    $unix_uid = $row[0];
-    $unix_uid++;
     $encoding = crypt("$password1");
+    
     $newuser_command = "INSERT INTO users ".
         "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
         "usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
         "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
         "'$usr_email', '$usr_addr', '$usr_url', '$usr_title', '$usr_affil', ".
-        "'$usr_phones', '$encoding', ".
-        "'$unix_uid', 'newuser')";
-    $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
-    if (! $newuser_result) {
-        $err = mysql_error();
-        TBERROR("Database Error adding adding new user $proj_head_uid: $err\n",
-                1);
-    }
+        "'$usr_phones', '$encoding', NULL, 'newuser')";
+
+    DBQueryFatal($newuser_command);
+
     $key = GENKEY($proj_head_uid);
 
-    mail("$usr_name '$proj_head_uid' <$usr_email>", "TESTBED: Your New User Key",
+    mail("$usr_name '$proj_head_uid' <$usr_email>",
+	 "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
          "    Here is your key to verify your account on the ".
@@ -287,43 +287,39 @@ if (! $returning) {
 #
 # Now for the new Project
 # * Create a new project in the database.
-# * Create a new project_membership entry in the database, default trust=none.
+# * Create a new default group for the project.
+# * Create a new group_membership entry in the database, default trust=none.
 # * Generate a mail message to testbed ops.
 #
-$newproj_command = "INSERT INTO projects ".
-     "(pid, created, expires, name, URL, head_uid, ".
-     " num_members, num_pcs, num_sharks, why, funders, unix_gid, ".
-     " public, public_whynot)".
-     "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
-     "'$proj_head_uid', '$proj_members', '$proj_pcs', '$proj_sharks', ".
-     "'$proj_why', '$proj_funders', NULL, $public, '$proj_whynotpublic')";
-$newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
-if (! $newproj_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new project $pid: $err\n", 1);
-}
+DBQueryFatal("INSERT INTO projects ".
+	     "(pid, created, expires, name, URL, head_uid, ".
+	     " num_members, num_pcs, num_sharks, why, funders, unix_gid, ".
+	     " public, public_whynot)".
+	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
+	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
+	     "        '$proj_pcs', '$proj_sharks', '$proj_why', ".
+	     "        '$proj_funders', NULL, $public, '$proj_whynotpublic')");
 
-$newmemb_result = mysql_db_query($TBDBNAME,
-			"insert into proj_memb (uid,pid,trust)".
-			"values ('$proj_head_uid','$pid','none');");
-if (! $newmemb_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new project membership: $pid: $err\n", 1);
-}
+DBQueryFatal("INSERT INTO groups ".
+	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
+	     "VALUES ('$pid', '$pid', '$proj_head_uid', now(), ".
+	     "        'Default Group', NULL, '$pid')");
+
+DBQueryFatal("insert into group_membership ".
+	     "(uid, gid, pid, trust, date_applied) ".
+	     "values ('$proj_head_uid','$pid','$pid','none', now())");
 
 #
 # Grab the unix GID that was assigned.
-# 
-$unixgid_result = mysql_db_query($TBDBNAME,
-	"SELECT unix_gid FROM projects where pid='$pid'");
-$row = mysql_fetch_row($unixgid_result);
-$unix_gid = $row[0];
+#
+TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
 #
 # The mail message to the approval list.
 # 
 mail($TBMAIL_APPROVAL,
-     "TESTBED: New Project '$pid' ($proj_head_uid)", "'$usr_name' wants to start project '$pid'.\n".
+     "TESTBED: New Project '$pid' ($proj_head_uid)",
+     "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
      "Name:            $usr_name ($proj_head_uid)\n".
      "Email:           $usr_email\n".

@@ -2,8 +2,8 @@
 #
 # This is an included file. No headers or footers or includes!
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects WHERE pid=\"$pid\"");
+$query_result =
+    DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The project $pid is not a valid project.", 1);
 }

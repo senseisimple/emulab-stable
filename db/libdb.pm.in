@@ -16,17 +16,50 @@ use Exporter;
     qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
 	 NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
-	 PROJMEMBERTRUST_ROOT DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
+	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
+	 PROJMEMBERTRUST_PROJROOT
+
+	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust
+
+	 TB_NODEACCESS_READINFO TB_NODEACCESS_MODIFYINFO
+	 TB_NODEACCESS_LOADIMAGE TB_NODEACCESS_REBOOT
+	 TB_NODEACCESS_POWERCYCLE TB_NODEACCESS_MIN TB_NODEACCESS_MAX
+
+	 TB_USERINFO_READINFO TB_USERINFO_MODIFYINFO
+	 TB_USERINFO_MIN TB_USERINFO_MAX
+
+	 TB_EXPT_READINFO TB_EXPT_MODIFY TB_EXPT_DESTROY
+	 TB_EXPT_MIN TB_EXPT_MAX
+
+	 TB_PROJECT_READINFO TB_PROJECT_MAKEGROUP
+	 TB_PROJECT_EDITGROUP TB_PROJECT_DELGROUP
+	 TB_PROJECT_LEADGROUP TB_PROJECT_ADDUSER
+	 TB_PROJECT_DELUSER TB_PROJECT_MAKEOSID
+	 TB_PROJECT_DELOSID TB_PROJECT_MAKEIMAGEID TB_PROJECT_DELIMAGEID
+	 TB_PROJECT_CREATEEXPT TB_PROJECT_MIN TB_PROJECT_MAX
+
+	 TB_OSID_READINFO TB_OSID_CREATE
+	 TB_OSID_DESTROY TB_OSID_MIN TB_OSID_MAX
+
+	 TB_IMAGEID_READINFO TB_IMAGEID_MODIFYINFO
+	 TB_IMAGEID_CREATE TB_IMAGEID_DESTROY
+	 TB_IMAGEID_ACCESS TB_IMAGEID_MIN TB_IMAGEID_MAX
+	 
+	 DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
 
 	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
 	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_TESTING
 	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED
 
-	 TBAdmin NodeAccessCheck ProjMember ExpLeader MarkNodeDown
+	 BATCHSTATE_POSTED BATCHSTATE_RUNNING BATCHSTATE_TERMINATED
+	 TBBatchState TBSetBatchState
+
+	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
+	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
-	 ExpNodes DBDateTime DefaultImageID 
+	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 );
 
 # Must come after package declaration!
@@ -76,6 +109,11 @@ sub EXPTSTATE_TESTING()		{ "testing"; }
 sub EXPTSTATE_TERMINATING()	{ "terminating"; }
 sub EXPTSTATE_TERMINATED()	{ "ended"; }
 
+sub BATCHSTATE_POSTED()		{ "posted"; }
+sub BATCHSTATE_ACTIVATING()	{ "activating"; }
+sub BATCHSTATE_RUNNING()	{ "active"; }
+sub BATCHSTATE_TERMINATING()	{ "terminating"; }
+
 #
 # We want valid project membership to be non-zero for easy membership
 # testing. Specific trust levels are encoded thusly.
@@ -83,11 +121,188 @@ sub EXPTSTATE_TERMINATED()	{ "ended"; }
 sub PROJMEMBERTRUST_NONE()	{ 0; }
 sub PROJMEMBERTRUST_USER()	{ 1; }
 sub PROJMEMBERTRUST_ROOT()	{ 2; }
+sub PROJMEMBERTRUST_LOCALROOT()	{ 2; }
+sub PROJMEMBERTRUST_GROUPROOT()	{ 3; }
+sub PROJMEMBERTRUST_PROJROOT()	{ 4; }
+sub PROJMEMBERTRUST_ADMIN()	{ 5; }
+
+#
+# Access types. Duplicated in the web interface. Make changes there too!
+# 
+# Things you can do to a node.
+sub TB_NODEACCESS_READINFO()	{ 1; }
+sub TB_NODEACCESS_MODIFYINFO()	{ 2; }
+sub TB_NODEACCESS_LOADIMAGE()	{ 3; }
+sub TB_NODEACCESS_REBOOT()	{ 4; }
+sub TB_NODEACCESS_POWERCYCLE()	{ 5; }
+sub TB_NODEACCESS_MIN()		{ TB_NODEACCESS_READINFO; }
+sub TB_NODEACCESS_MAX()		{ TB_NODEACCESS_POWERCYCLE; }
+
+# User Info (modinfo web page, etc).
+sub TB_USERINFO_READINFO()	{ 1; }
+sub TB_USERINFO_MODIFYINFO()	{ 2; }
+sub TB_USERINFO_MIN()		{ TB_USERINFO_READINFO; }
+sub TB_USERINFO_MAX()		{ TB_USERINFO_MODIFYINFO; }
+
+# Experiments (also batch experiments).
+sub TB_EXPT_READINFO()		{ 1; }
+sub TB_EXPT_MODIFY()		{ 2; }
+sub TB_EXPT_DESTROY()		{ 3; }
+sub TB_EXPT_MIN()		{ TB_EXPT_READINFO; }
+sub TB_EXPT_MAX()		{ TB_EXPT_DESTROY; }
+
+# Projects.
+sub TB_PROJECT_READINFO()	{ 1; }
+sub TB_PROJECT_MAKEGROUP()	{ 2; }
+sub TB_PROJECT_EDITGROUP()	{ 3; }
+sub TB_PROJECT_DELGROUP()	{ 4; }
+sub TB_PROJECT_LEADGROUP()	{ 5; }
+sub TB_PROJECT_ADDUSER()	{ 6; }
+sub TB_PROJECT_DELUSER()	{ 7; }
+sub TB_PROJECT_MAKEOSID		{ 8; }
+sub TB_PROJECT_DELOSID		{ 9; }
+sub TB_PROJECT_MAKEIMAGEID	{ 10; }
+sub TB_PROJECT_DELIMAGEID	{ 11; }
+sub TB_PROJECT_CREATEEXPT	{ 12; }
+sub TB_PROJECT_MIN()		{ TB_PROJECT_READINFO; }
+sub TB_PROJECT_MAX()		{ TB_PROJECT_CREATEEXPT; }
+
+# OSIDs 
+sub TB_OSID_READINFO()		{ 1; }
+sub TB_OSID_CREATE()		{ 2; }
+sub TB_OSID_DESTROY()		{ 3; }
+sub TB_OSID_MIN()		{ TB_OSID_READINFO; }
+sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
+
+# ImageIDs
+sub TB_IMAGEID_READINFO()	{ 1; }
+sub TB_IMAGEID_MODIFYINFO()	{ 2; }
+sub TB_IMAGEID_CREATE()		{ 3; }
+sub TB_IMAGEID_DESTROY()	{ 4; }
+sub TB_IMAGEID_ACCESS()		{ 5; }
+sub TB_IMAGEID_MIN()		{ TB_IMAGEID_READINFO; }
+sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
 
 #
 # We should list all of the DB limits.
 #
 sub DBLIMIT_NSFILESIZE()	{ (1024 * 16); }
+
+#
+# Auth stuff.
+#
+
+#
+# Convert a trust string to the above numeric values.
+#
+sub TBTrustConvert($)
+{
+    my($trust_string) = @_;
+    my $trust_value = 0;
+
+    #
+    # Convert string to value. Perhaps the DB should have done it this way?
+    # 
+    if ($trust_string eq "none") {
+	$trust_value = PROJMEMBERTRUST_NONE;
+    }
+    elsif ($trust_string eq "user") {
+	$trust_value = PROJMEMBERTRUST_USER;
+    }
+    elsif ($trust_string eq "local_root") {
+	$trust_value = PROJMEMBERTRUST_LOCALROOT;
+    }
+    elsif ($trust_string eq "group_root") {
+	$trust_value = PROJMEMBERTRUST_GROUPROOT;
+    }
+    elsif ($trust_string eq "project_root") {
+	$trust_value = PROJMEMBERTRUST_PROJROOT;
+    }
+    elsif ($trust_string eq "admin") {
+	$trust_value = PROJMEMBERTRUST_ADMIN;
+    }
+    else {
+	    die("*** Invalid trust value $trust_string!");
+    }
+
+    return $trust_value;
+}
+
+#
+# Return true if the given trust string is >= to the minimum required.
+# The trust value can be either numeric or a string; if a string its
+# first converted to the numeric equiv.
+#
+sub TBMinTrust($$)
+{
+    my ($trust_value, $minimum) = @_;
+
+    if ($minimum < PROJMEMBERTRUST_NONE ||
+	$minimum > PROJMEMBERTRUST_ADMIN) {
+	    die("*** Invalid minimum trust $minimum!");
+    }
+
+    #
+    # Sleazy? How do you do a typeof in perl?
+    #
+    if (length($trust_value) != 1) {
+	$trust_value = TBTrustConvert($trust_value);
+    }
+    
+    return $trust_value >= $minimum;
+}
+
+#
+# Determine the trust level for a uid/pid/gid. That is, each uid will have
+# a different trust level depending on the project/group in question.
+# Return that trust level as one of the numeric values above. 
+# 
+# usage: TBGrpTrust($dbuid, $pid, $gid)
+#        returns numeric trust value if a group member.
+#        returns PROJMEMBERTRUST_NONE if not a group member.
+# 
+sub TBGrpTrust($$$)
+{
+    my ($uid, $pid, $gid) = @_;
+
+    #
+    # No group, then use the default group.
+    #
+    if (! $gid) {
+	$gid = $pid;
+    }
+
+    my $query_result =
+	DBQueryFatal("select trust from group_membership ".
+		     "where uid='$uid' and pid='$pid' and gid='$gid'");
+
+    #
+    # No membership is the same as no trust. True? Maybe an error instead?
+    #
+    if ($query_result->numrows == 0) {
+	return PROJMEMBERTRUST_NONE;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $trust_string = $row[0];
+
+    return TBTrustConvert($trust_string);
+}
+
+#
+# Determine the project trust level for a uid/pid. This is the trust level
+# for the default group in the project.
+#
+# usage: TBProjTrust($dbuid, $pid)
+#        returns numeric trust value if a project member.
+#        returns PROJMEMBERTRUST_NONE if not a project member.
+# 
+sub TBProjTrust($$)
+{
+    my ($uid, $pid) = @_;
+    
+    return TBGrpTrust($uid, $pid, $pid);
+}
 
 #
 # Test admin status. Optional argument is the UID or Name to test. If not
@@ -130,60 +345,144 @@ sub TBAdmin(;$)
 }
 
 #
-# Check access permission to a list of nodes. First argument is a *reference*
-# to a single node, or a list of nodes. Second argument is optional uid,
-# defaults to the current uid.
+# Project permission checks. The group id (gid) can be undef, in which case
+# the pid is used (ie: a default group check is made).
 #
-# usage: NodeAccessCheck(array or scalar \@nodelist, [int uid])
-#        returns 1 if the uid is allowed to muck with all the nodes.
-#        returns 0 if the uid is not allowed to muck with at least one of the
-#                  nodes.
-#
-sub NodeAccessCheck($;$)
+# Usage: TBProjAccessCheck($uid, $pid, $gid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+sub TBProjAccessCheck($$$$)
 {
-    my($list, $uid) = @_;
-    my(@nodelist);
+    my ($uid, $pid, $gid, $access_type) = @_;
+    my $mintrust;
 
-    if (!defined($uid)) {
-	$uid = $UID;
-    }
-
-    if (ref($list) eq "ARRAY") {
-	@nodelist = @$list;
-    }
-    elsif (ref($list) eq "SCALAR") {
-	@nodelist = ($$list);
-    }
-
-    if (!defined(@nodelist) ||
-	scalar(@nodelist) == 0) {
-	die("NodeAccessCheck:\n".
-	    "  First parameter should be a reference to a node (scalar), ".
-	    "or a list of nodes!\n");
+    if ($access_type < TB_PROJECT_MIN ||
+	$access_type > TB_PROJECT_MAX) {
+	die("*** Invalid access type: $access_type!");
     }
 
     #
-    # Admin types can do anything to any node. So can Root.
-    #
-    if ($uid == 0 || TBAdmin($uid)) {
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin($uid)) {
 	return 1;
     }
-
-    my ($name) = getpwuid($uid)
-	or die "$uid not in passwd file\n";
+    $uid = MapNumericUID($uid);
 
     #
-    # Check to make sure that mere user is allowed to muck with nodes.
+    # No group, then use the default group.
     #
-    foreach my $node (@$nodelist) {
+    if (! defined($gid)) {
+	$gid = $pid;
+    }
+
+    if ($access_type == TB_PROJECT_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    elsif ($access_type == TB_PROJECT_CREATEEXPT) {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+    else {
+	die("*** Unexpected access type: $access_type!");
+    }
+
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+}
+
+#
+# Experiment permission checks.
+#
+# Usage: TBExptAccessCheck($uid, $pid, $eid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+sub TBExptAccessCheck($$$$)
+{
+    my ($uid, $pid, $eid, $access_type) = @_;
+    my $mintrust;
+
+    if ($access_type < TB_EXPT_MIN ||
+	$access_type > TB_EXPT_MAX) {
+	die("*** Invalid access type: $access_type!");
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin($uid)) {
+	return 1;
+    }
+    $uid = MapNumericUID($uid);
+
+    my $query_result =
+	DBQueryFatal("SELECT gid FROM experiments WHERE ".
+		     "eid='$eid' and pid='$pid'");
+    
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    my $gid = $row[0];
+
+    if ($access_type == TB_EXPT_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+}
+
+#
+# Determine if uid can access a node or list of nodes.
+#
+# Usage: TBNodeAccessCheck($uid, $access_type, $node_id, ...)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+sub TBNodeAccessCheck($$@)
+{
+    my ($uid, $access_type) = (shift, shift);
+    my @nodelist = @_;
+    my $mintrust;
+
+    if ($access_type < TB_NODEACCESS_MIN ||
+	$access_type > TB_NODEACCESS_MAX) {
+	die("*** Invalid access type: $access_type!");
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin($uid)) {
+	return 1;
+    }
+    $uid = MapNumericUID($uid);
+ 
+    if ($access_type == TB_NODEACCESS_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    foreach my $node (@nodelist) {
 	my $query_result =
-	    DBQueryFatal("select reserved.node_id from reserved ".
-			 "left join proj_memb on ".
-			 "reserved.pid=proj_memb.pid and ".
-			 "reserved.node_id='$node' ".
-			 "where proj_memb.uid='$name'");
+	    DBQueryFatal("select trust from reserved as n ".
+			 "left join experiments as e on ".
+			 "     e.pid=n.pid and e.eid=n.eid ".
+			 "left join group_membership as g on ".
+			 "     g.pid=e.pid and g.gid=e.gid ".
+			 "where g.uid='$uid' and n.node_id='$node'");
 
 	if ($query_result->numrows == 0) {
+	    return 0;
+	}
+	my @row = $query_result->fetchrow_array();
+
+	if (! TBMinTrust($row[0], $mintrust)) {
 	    return 0;
 	}
     }
@@ -191,45 +490,121 @@ sub NodeAccessCheck($;$)
 }
 
 #
-# Check project membership. First argument is the project to check.
-# Second argument is optional DB uid, defaults to the current uid.
-# The return argument encodes the trust membership for members. 
+# Access checks for an OSID. Tests for tbadmin.
 #
-# usage: ProjMember(char *pid, [char *dbuid])
-#        returns PROJMEMBERTRUST_NONE if uid is not a member or trust=none.
-#        returns PROJMEMBERTRUST_USER if uid is a mere user in pid.
-#        returns PROJMEMBERTRUST_ROOT if uid is a root user in pid.
+# Usage: TBOSIDAccessCheck($uid, $osid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
 # 
-sub ProjMember($;$)
+sub TBOSIDAccessCheck($$$)
 {
-    my($pid, $dbuid) = @_;
+    my ($uid, $osid, $access_type) = @_;
+    my $mintrust;
 
-    if (!defined($dbuid) && !UNIX2DBUID($UID, \$dbuid)) {
-	die("$UID is not in the Emulab DB.\n");
+    if ($access_type < TB_OSID_MIN || $access_type > TB_OSID_MAX) {
+	die("*** Invalid access type $access_type!");
     }
 
+    #
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin($uid)) {
+	return 1;
+    }
+    $uid = MapNumericUID($uid);
+
+    #
+    # No GIDs yet.
+    #
     my $query_result =
-	DBQueryFatal("select trust from proj_memb where ".
-		     "uid='$dbuid' and pid='$pid'");
-
+	DBQueryFatal("SELECT pid FROM os_info WHERE osid='$osid'");
+    
     if ($query_result->numrows == 0) {
-	return PROJMEMBERTRUST_NONE;
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    my $pid = $row[0];
+
+    #
+    # Global OSIDs can be read by anyone.
+    # 
+    if (!$pid) {
+	if ($access_type == TB_OSID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+    
+    #
+    # Otherwise must have proper trust in the project.
+    # 
+    if ($access_type == TB_OSID_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
 
+    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
+}
+
+#
+# Access checks for an ImageID
+#
+# Usage: TBImageIDAccessCheck($uid, $imageid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+sub TBImageIDAccessCheck($$$)
+{
+    my ($uid, $imageid, $access_type) = @_;
+    my $mintrust;
+
+    if ($access_type < TB_IMAGEID_MIN || $access_type > TB_IMAGEID_MAX) {
+	die("*** Invalid access type $access_type!");
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin($uid)) {
+	return 1;
+    }
+    $uid = MapNumericUID($uid);
+
+    #
+    # No GIDs yet.
+    #
+    my $query_result =
+	DBQueryFatal("SELECT pid FROM images WHERE imageid='$imageid'");
+    
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
     my @row = $query_result->fetchrow_array();
-    if ($row[0] eq "none") {
-	return PROJMEMBERTRUST_NONE;
-    }
-    if ($row[0] eq "user") {
-	return PROJMEMBERTRUST_USER;
-    }
-    if ($row[0] eq "group_root" || $row[0] eq "local_root") {
-	return PROJMEMBERTRUST_ROOT;
-    }
+    my $pid = $row[0];
+
     #
-    # Should never happen.
+    # Global ImageIDs can be read by anyone.
+    # 
+    if (!$pid) {
+	if ($access_type == TB_IMAGEID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+
     #
-    DBFatal("Improper response in ProjMember()");
+    # Otherwise must have proper trust in the project.
+    # 
+    if ($access_type == TB_IMAGEID_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
 }
 
 #
@@ -245,6 +620,29 @@ sub ProjLeader($)
 
     my $query_result =
 	DBQueryFatal("select head_uid from projects where pid='$pid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Return Group leader. 
+#
+# usage: GroupLeader(char *pid, char *gid)
+#        returns char *leader if a valid pid.
+#        returns 0 if an invalid pid.
+# 
+sub GroupLeader($$)
+{
+    my($pid, $gid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select leader from groups where ".
+		     "pid='$pid' and gid='$gid'");
 
     if ($query_result->numrows == 0) {
 	return 0;
@@ -324,6 +722,52 @@ sub SetExpState($$$)
 }
 
 #
+# Return BatchMode state.
+#
+# usage: TBBatchState(char *pid, char *eid)
+#        returns state if a valid pid/eid.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBBatchState($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select batchstate from experiments ".
+		    "where eid='$eid' and pid='$pid' and batchmode=1");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Set BatctMode state.
+#
+# usage: SetBatchState(char *pid, char *eid, char *state)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBSetBatchState($$$)
+{
+    my($pid, $eid, $state) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set batchstate='$state',batchmode=1 ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
 # Return a list of all the nodes in an experiment.
 #
 # usage: ExpNodes(char *pid, char *eid)
@@ -351,7 +795,9 @@ sub ExpNodes($$)
 }
 
 #
-# Mark a node as down, moving it to special pid/eid. First argument is nodeid.
+# Mark a node as down. We schedule a next reservation for it so that it
+# remains in the users experiment through the termination so that there
+# are no permission errors (say, from snmpit).
 #
 # usage: MarkNodeDown(char *nodeid)
 #
@@ -506,6 +952,30 @@ sub UserDBInfo ($$$) {
 }
 
 #
+# Map pid,gid to its unix_gid and unix_name.
+#
+# usage: TBGroupUnixInfo(char $pid, char *gid, \$unix_gid, \$unix_name)
+#        returns 1 if okay.
+#        returns 0 if bogus.
+#
+sub TBGroupUnixInfo ($$$$) {
+    my($pid, $gid, $unix_gid, $unix_name) = @_;
+
+    my $query_result =
+	DBQueryFatal("select unix_gid,unix_name from groups ".
+		     "where pid='$pid' and gid='$gid'");
+
+    if ($query_result->num_rows < 1) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $$unix_gid  = $row[0];
+    $$unix_name = $row[1];
+    return 1;
+}
+
+#
 # Map UID to DB UID (login). Does a DB check to make sure user is known to
 # the DB (user obviously has a regular account), and that account will
 # always match what the DB says. Redundant, I know. But consider it a
@@ -524,8 +994,16 @@ sub UNIX2DBUID ($$) {
     if ($query_result->num_rows < 1) {
 	return 0;
     }
-
     my @row = $query_result->fetchrow_array();
+
+    my ($pwname) = getpwuid($unix_uid) or
+	die("*** $unix_uid is not in the password file!");
+
+    if ($row[0] ne $pwname) {
+	warn("*** WARNING: $pwname does not match $row[0]\n");
+	return 0;
+    }
+
     $$userlogin = $row[0];
     return 1;
 }
@@ -632,7 +1110,7 @@ sub DBFatal($)
 
     DBWarn($message);
 
-    exit(1);
+    die("\n");
 }
 
 #
@@ -653,11 +1131,35 @@ sub DBQuoteSpecial($)
 # Return a (current) string suitable for DB insertion in datetime slot.
 # Of course, you can use this for anything you like!
 #
-# usage: char *DBDateTime();
+# usage: char *DBDateTime(int seconds-to-add);
 #
-sub DBDateTime()
+sub DBDateTime(;$)
 {
-    return strftime("20%y-%m-%d %H:%M:%S", localtime());
+    my($seconds) = @_;
+
+    if (! defined($seconds)) {
+	$seconds = 0;
+    }
+    
+    return strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
+}
+
+#
+# Helper. Test if numeric. Convert to dbuid if numeric.
+#
+sub MapNumericUID($)
+{
+    my ($uid) = @_;
+    my $name;
+    
+    if ($uid =~ /^[0-9]+$/) {
+	UNIX2DBUID($uid, \$name)
+	    or die("*** $uid not a valid Emulab user!\n");
+    }
+    else {
+	$name = $uid;
+    }
+    return $name;
 }
 
 1;

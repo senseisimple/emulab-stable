@@ -33,12 +33,18 @@ my @row;
 # We don't want to run this script unless its the real version.
 #
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
-#if ($TB ne "/usr/testbed") {
-#    die("Wrong version. Maybe its a development version?\n");
-#}
+if ($TB ne "/usr/testbed") {
+#    print STDERR "*** $0:\n".
+#	         "    Wrong version. Maybe its a development version?\n";
+    #
+    # Let experiment continue setting up.
+    # 
+#    exit(0);
+}
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
@@ -199,16 +205,16 @@ if (@ipseq) {
 #
 $db_result =
    DBQueryFatal("select distinct reserved.node_id,reserved.pid,".
-		"proj_memb.uid,interfaces.IP from reserved ".
+		"g.uid,interfaces.IP from reserved ".
 		"left join exppid_access as a ".
 		" on a.exp_pid=reserved.pid and a.exp_eid=reserved.eid ".
-		"left join proj_memb on proj_memb.pid=reserved.pid ".
-		" or proj_memb.pid=a.pid ".
+		"left join group_membership as g on g.pid=a.pid or ".
+		"          (g.pid=reserved.pid and g.gid=g.pid) ".
 		"left join nodes on reserved.node_id=nodes.node_id ".
 		"left join node_types on node_types.type=nodes.type ".
 		"left join interfaces on reserved.node_id=interfaces.node_id ".
 		"and interfaces.card=node_types.control_net ".
-		"where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
+		"where interfaces.IP!='NULL' and g.trust!='none' ".
 		"order by reserved.pid,reserved.node_id");
 
 %iphash = ();

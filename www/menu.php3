@@ -102,8 +102,9 @@ function WRITESIDEBAR() {
         # See if group_root in any projects, not just the last one in the DB!
         #
 	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT trust FROM proj_memb ".
-		"WHERE uid='$login_uid' and trust='group_root'");
+		"SELECT trust FROM group_membership ".
+		"WHERE uid='$login_uid' and ".
+		"      (trust='group_root' or trust='project_root')");
 	if (mysql_num_rows($query_result)) {
 	    $trusted = 1;
 	}

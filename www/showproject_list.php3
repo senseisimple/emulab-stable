@@ -24,18 +24,16 @@ $isadmin = ISADMIN($uid);
 # Get the project list.
 #
 if ($isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects order by pid");
+    $query_result = DBQueryFatal("SELECT * FROM projects order by pid");
 }
 else {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects where head_uid='$uid' order by name");
+    $query_result =
+	DBQueryFatal("SELECT * FROM projects as p ".
+		     "left join group_membership as g on ".
+		     "     p.pid=g.pid and g.pid=g.gid ".
+		     "where g.uid='$uid'");
 }
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting project list: $err\n", 1);
-}
-
+				   
 if (mysql_num_rows($query_result) == 0) {
 	if ($isadmin) {
 	    USERERROR("There are no projects!", 1);

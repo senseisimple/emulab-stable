@@ -3,9 +3,7 @@ use English;
 use Getopt::Std;
 
 #
-# Create a batch experiment.
-#
-# usage: killbatchexp $pid $eid
+# Cancel batch experiment.
 #
 sub usage()
 {
@@ -18,6 +16,7 @@ my  $optlist = "";
 # Configure variables
 #
 my $TB       = "@prefix@";
+my $batchdir = "$TB/batch";
 
 #
 # Testbed Support libraries
@@ -25,10 +24,6 @@ my $TB       = "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-my $tbbindir = "$TB/bin/";
-my $batchdir = "$TB/batch";
-my $projroot = "/proj";
 
 #
 # Untaint the path
@@ -61,8 +56,14 @@ my $eid = $ARGV[1];
 if ($pid =~ /^([-\@\w.]+)$/) {
     $pid = $1;
 }
+else {
+    die("Tainted argument $pid\n");
+}
 if ($eid =~ /^([-\@\w.]+)$/) {
     $eid = $1;
+}
+else {
+    die("Tainted argument $eid\n");
 }
 
 #

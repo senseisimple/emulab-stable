@@ -115,11 +115,14 @@ foreach $node (@machines) {
 my %timelimited = ();
 
 if ($user ne "root") {
-  my $cmd = 
-    "select uid, node_id from reserved as r left join experiments as e ".
-      "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
-	join(" or ",@conds).") and uid='$user';";
-
+  my $cmd =
+	"select uid,node_id from reserved as n ".
+	"left join experiments as e on ".
+	"     e.pid=n.pid and e.eid=n.eid ".
+	"left join group_membership as g on ".
+	"     g.pid=e.pid and g.gid=e.gid ".
+	"where (" . join(" or ",@conds) . ") g.uid='$user';";
+			 
   print "Checking authorization for '$user': '$cmd'\n" if $verbose;
   $sth = $dbh->query($cmd)
     || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";

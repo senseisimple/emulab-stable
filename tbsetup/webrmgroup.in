@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# This gets invoked from the Web interface. Simply a wrapper ...
+#
+# usage: webrmgroup arguments ...
+#
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Run the real thing, and never return.
+# 
+exec "$TB/sbin/rmgroup", @ARGV;
+
+die("webrmgroup: Could not exec rmgroup: $!");

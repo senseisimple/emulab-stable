@@ -39,11 +39,13 @@ use libtestbed;
 # We don't want to run this script unless its the real version.
 #
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
 if ($TB ne "/usr/testbed") {
-    die("Wrong version. Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Wrong version. Maybe its a development version?\n");
 }
 
 #
@@ -76,7 +78,8 @@ foreach my $active ( 0, 1 ) {
 	# All active users on the testbed
 	if (! ($query_result =
 	       DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
-		       "left join proj_memb as p on e.pid=p.pid ".
+		       "left join group_membership as p ".
+		       "     on e.pid=p.pid and p.pid=p.gid ".
 		       "left join users as u on u.uid=p.uid ".
 		       "where u.status='active' order by u.usr_email"))) {
 	    DBFatal("Getting Active Users!");

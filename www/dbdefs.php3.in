@@ -6,6 +6,8 @@ $TBDBNAME       = "@TBDBNAME@";
 
 $TBDB_UIDLEN    = 8;
 $TBDB_PIDLEN    = 12;
+$TBDB_GIDLEN	= 12;
+$TBDB_UNIXGLEN	= 16;
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not
@@ -17,5 +19,864 @@ $TBDB_EIDLEN    = 19;
 
 $TBDB_OSID_OSIDLEN   = 30;
 $TBDB_OSID_VERSLEN   = 12;
+
+#
+# Trust. Define the trust level as an increasing value. Then define a
+# function to return whether the given trust is high enough.
+#
+$TBDB_TRUST_NONE		= 0;
+$TBDB_TRUST_USER		= 1;
+$TBDB_TRUST_LOCALROOT		= 2;
+$TBDB_TRUST_GROUPROOT		= 3;
+$TBDB_TRUST_PROJROOT		= 4;
+$TBDB_TRUST_ADMIN		= 5;
+
+#
+# These are the permission types. Different operations for the varying
+# types of things we need to control access to.
+#
+# Things you can do to a node.
+$TB_NODEACCESS_READINFO		= 1;
+$TB_NODEACCESS_MODIFYINFO	= 2;
+$TB_NODEACCESS_LOADIMAGE	= 3;
+$TB_NODEACCESS_REBOOT		= 4;
+$TB_NODEACCESS_POWERCYCLE	= 5;
+$TB_NODEACCESS_MIN		= $TB_NODEACCESS_READINFO;
+$TB_NODEACCESS_MAX		= $TB_NODEACCESS_POWERCYCLE;
+
+# User Info (modinfo web page, etc).
+$TB_USERINFO_READINFO		= 1;
+$TB_USERINFO_MODIFYINFO		= 2;
+$TB_USERINFO_MIN		= $TB_USERINFO_READINFO;
+$TB_USERINFO_MAX		= $TB_USERINFO_MODIFYINFO;
+
+# Experiments (also batch experiments).
+$TB_EXPT_READINFO		= 1;
+$TB_EXPT_MODIFY			= 2;	# Allocate/dealloc nodes
+$TB_EXPT_DESTROY		= 3;
+$TB_EXPT_MIN			= $TB_EXPT_READINFO;
+$TB_EXPT_MAX			= $TB_EXPT_DESTROY;
+
+# Projects.
+$TB_PROJECT_READINFO		= 1;
+$TB_PROJECT_MAKEGROUP		= 2;
+$TB_PROJECT_EDITGROUP		= 3;
+$TB_PROJECT_DELGROUP		= 4;
+$TB_PROJECT_LEADGROUP		= 5;
+$TB_PROJECT_ADDUSER		= 6;
+$TB_PROJECT_DELUSER             = 7;
+$TB_PROJECT_MAKEOSID		= 8;
+$TB_PROJECT_DELOSID		= 9;
+$TB_PROJECT_MAKEIMAGEID		= 10;
+$TB_PROJECT_DELIMAGEID		= 11;
+$TB_PROJECT_CREATEEXPT		= 12;
+$TB_PROJECT_MIN			= $TB_PROJECT_READINFO;
+$TB_PROJECT_MAX			= $TB_PROJECT_CREATEEXPT;
+
+# OSIDs 
+$TB_OSID_READINFO		= 1;
+$TB_OSID_MODIFYINFO		= 2;
+$TB_OSID_DESTROY		= 3;
+$TB_OSID_MIN			= $TB_OSID_READINFO;
+$TB_OSID_MAX			= $TB_OSID_DESTROY;
+
+# ImageIDs
+$TB_IMAGEID_READINFO		= 1;
+$TB_IMAGEID_MODIFYINFO		= 2;
+$TB_IMAGEID_ACCESS		= 3;
+$TB_IMAGEID_DESTROY		= 4;
+$TB_IMAGEID_MIN			= $TB_IMAGEID_READINFO;
+$TB_IMAGEID_MAX			= $TB_IMAGEID_DESTROY;
+
+#
+# Convert a trust string to the above numeric values.
+#
+function TBTrustConvert($trust_string)
+{
+    global $TBDB_TRUST_NONE;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    global $TBDB_TRUST_GROUPROOT;
+    global $TBDB_TRUST_PROJROOT;
+    global $TBDB_TRUST_ADMIN;
+    $trust_value = 0;
+
+    #
+    # Convert string to value. Perhaps the DB should have done it this way?
+    # 
+    if (strcmp($trust_string, "none") == 0) {
+	    $trust_value = $TBDB_TRUST_NONE;
+    }
+    elseif (strcmp($trust_string, "user") == 0) {
+	    $trust_value = $TBDB_TRUST_USER;
+    }
+    elseif (strcmp($trust_string, "local_root") == 0) {
+	    $trust_value = $TBDB_TRUST_LOCALROOT;
+    }
+    elseif (strcmp($trust_string, "group_root") == 0) {
+	    $trust_value = $TBDB_TRUST_GROUPROOT;
+    }
+    elseif (strcmp($trust_string, "project_root") == 0) {
+	    $trust_value = $TBDB_TRUST_PROJROOT;
+    }
+    elseif (strcmp($trust_string, "admin") == 0) {
+	    $trust_value = $TBDB_TRUST_ADMIN;
+    }
+    else {
+	    TBERROR("Invalid trust value $trust_string!", 1);
+    }
+
+    return $trust_value;
+}
+
+#
+# Return true if the given trust string is >= to the minimum required.
+# The trust value can be either numeric or a string; if a string its
+# first converted to the numeric equiv.
+#
+function TBMinTrust($trust_value, $minimum)
+{
+    global $TBDB_TRUST_NONE;
+    global $TBDB_TRUST_ADMIN;
+
+    if ($minimum < $TBDB_TRUST_NONE || $minimum > $TBDB_TRUST_ADMIN) {
+	    TBERROR("Invalid minimum trust $minimum!", 1);
+    }
+
+    #
+    # Sleazy?
+    #
+    if (gettype($trust_value) == "string") {
+	$trust_value = TBTrustConvert($trust_value);
+    }
+    
+    return $trust_value >= $minimum;
+}
+
+#
+# Determine the trust level for a uid/pid/gid. That is, each uid will have
+# a different trust level depending on the project/group in question.
+# Return that trust level as one of the numeric values above. 
+# 
+function TBGrpTrust($uid, $pid, $gid)
+{
+    global $TBDB_TRUST_NONE;
+
+    #
+    # No group, then use the default group.
+    #
+    if (! $gid) {
+	$gid = $pid;
+    }
+
+    $query_result =
+	DBQueryFatal("select trust from group_membership ".
+		     "where uid='$uid' and pid='$pid' and gid='$gid'");
+
+    #
+    # No membership is the same as no trust. True? Maybe an error instead?
+    # 
+    if (mysql_num_rows($query_result) == 0) {
+	return $TBDB_TRUST_NONE;
+    }
+    $row = mysql_fetch_array($query_result);
+    $trust_string = $row[trust];
+
+    return TBTrustConvert($trust_string);
+}
+
+#
+# Determine the project trust level for a uid/pid. This is the trust level
+# for the default group in the project.
+# 
+function TBProjTrust($uid, $pid)
+{
+    return TBGrpTrust($uid, $pid, $pid);
+}
+
+#
+# Project permission checks. The group id (gid) can be zero, in which case
+# the pid is used (ie: a default group check is made).
+#
+# Usage: TBProjAccessCheck($uid, $pid, $gid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBProjAccessCheck($uid, $pid, $gid, $access_type)
+{
+    global $TB_PROJECT_READINFO;
+    global $TB_PROJECT_MAKEGROUP;
+    global $TB_PROJECT_EDITGROUP;
+    global $TB_PROJECT_DELGROUP;
+    global $TB_PROJECT_LEADGROUP;
+    global $TB_PROJECT_ADDUSER;
+    global $TB_PROJECT_DELUSER;
+    global $TB_PROJECT_MAKEOSID;
+    global $TB_PROJECT_DELOSID;
+    global $TB_PROJECT_MAKEIMAGEID;
+    global $TB_PROJECT_DELIMAGEID;
+    global $TB_PROJECT_CREATEEXPT;
+    global $TB_PROJECT_MIN;
+    global $TB_PROJECT_MAX;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    global $TBDB_TRUST_GROUPROOT;
+    global $TBDB_TRUST_PROJROOT;
+    $mintrust;
+
+    if ($access_type < $TB_PROJECT_MIN ||
+	$access_type > $TB_PROJECT_MAX) {
+	TBERROR("Invalid access type: $access_type!", 1);
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (ISADMIN($uid)) {
+	return 1;
+    }
+
+    #
+    # No group, then use the default group.
+    #
+    if (! $gid) {
+	$gid = $pid;
+    }
+
+    if ($access_type == $TB_PROJECT_READINFO) {
+	$mintrust = $TBDB_TRUST_USER;
+    }
+    elseif ($access_type == $TB_PROJECT_MAKEGROUP ||
+	    $access_type == $TB_PROJECT_EDITGROUP ||
+	    $access_type == $TB_PROJECT_DELGROUP) {
+	$mintrust = $TBDB_TRUST_PROJROOT;
+    }
+    elseif ($access_type == $TB_PROJECT_LEADGROUP) {
+	#
+	# Must be at least local root to lead a group.
+	# 
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+    elseif ($access_type == $TB_PROJECT_MAKEOSID ||
+	    $access_type == $TB_PROJECT_MAKEIMAGEID ||
+	    $access_type == $TB_PROJECT_CREATEEXPT) {
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+    elseif ($access_type == $TB_PROJECT_ADDUSER) {
+	if ($gid == $pid) {
+	    $mintrust = $TBDB_TRUST_PROJROOT;
+	}
+	else {
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	}
+    }
+    else {
+	TBERROR("Unexpected access type: $access_type!", 1);
+    }
+
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+}
+
+#
+# Experiment permission checks.
+#
+# Usage: TBExptAccessCheck($uid, $pid, $eid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBExptAccessCheck($uid, $pid, $eid, $access_type)
+{
+    global $TB_EXPT_READINFO;
+    global $TB_EXPT_MODIFY;
+    global $TB_EXPT_DESTROY;
+    global $TB_EXPT_MIN;
+    global $TB_EXPT_MAX;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    global $TBDB_TRUST_GROUPROOT;
+    global $TBDB_TRUST_PROJROOT;
+    $mintrust;
+
+    if ($access_type < $TB_EXPT_MIN ||
+	$access_type > $TB_EXPT_MAX) {
+	TBERROR("Invalid access type: $access_type!", 1);
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (ISADMIN($uid)) {
+	return 1;
+    }
+
+    $query_result =
+	DBQueryFatal("SELECT gid FROM experiments WHERE ".
+		     "eid='$eid' and pid='$pid'");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $gid = $row[pid];
+
+    if ($access_type == $TB_EXPT_READINFO) {
+	$mintrust = $TBDB_TRUST_USER;
+    }
+    else {
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+}
+
+#
+# Determine if uid can access a node (read or modify).
+#
+# Usage: TBNodeAccessCheck($uid, $node_id, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBNodeAccessCheck($uid, $node_id, $access_type)
+{
+    global $TB_NODEACCESS_READINFO;
+    global $TB_NODEACCESS_MODIFYINFO;
+    global $TB_NODEACCESS_LOADIMAGE;
+    global $TB_NODEACCESS_REBOOT;
+    global $TB_NODEACCESS_POWERCYCLE;
+    global $TB_NODEACCESS_MIN;
+    global $TB_NODEACCESS_MAX;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    $mintrust;
+
+    if ($access_type < $TB_NODEACCESS_MIN ||
+	$access_type > $TB_NODEACCESS_MAX) {
+	TBERROR("Invalid access type: $access_type!", 1);
+    }
+
+    $query_result =
+	DBQueryFatal("select node_id,trust from reserved as n ".
+		     "left join experiments as e on ".
+		     "     e.pid=n.pid and e.eid=n.eid ".
+		     "left join group_membership as g on ".
+		     "     g.pid=e.pid and g.gid=e.gid ".
+		     "where g.uid='$uid' and n.node_id='$node_id'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $foorow = mysql_fetch_array($query_result);
+    $trust  = $foorow[trust];
+
+    if ($access_type == $TB_NODEACCESS_READINFO) {
+	$mintrust = $TBDB_TRUST_USER;
+    }
+    else {
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+
+    return TBMinTrust($trust, $mintrust);
+}
+
+#
+# Determine if uid can access a another user record (read or modify).
+#
+# Usage: TBUserInfoAccessCheck($uid, $target_uid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBUserInfoAccessCheck($uid, $target_uid, $access_type)
+{
+    global $TB_USERINFO_READINFO;
+    global $TB_USERINFO_MODIFYINFO;
+    global $TB_USERINFO_MIN;
+    global $TB_USERINFO_MAX;
+
+    if ($access_type < $TB_USERINFO_MIN || $access_type > $TB_USERINFO_MAX) {
+	TBERROR("Invalid access type $access_type!", 1);
+    }
+
+    if (strcmp($uid, $target_uid) == 0) {
+	return 1;
+    }
+
+    #
+    # This join will allow the operation if the current user is in the same
+    # group (any group) as the target user, but with root permissions.
+    # 
+    $query_result =
+	DBQueryFatal("select g.trust from group_membership as g ".
+		     "left join group_membership as authed on ".
+		     "     g.pid=authed.pid and g.gid=authed.gid and ".
+		     "     g.uid='$target_uid' ".
+		     "where authed.uid='$uid' and ".
+		     "      (authed.trust='group_root' or ".
+		     "       authed.trust='project_root')");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Access checks for an OSID. Tests for tbadmin.
+#
+# Usage: TBOSIDAccessCheck($uid, $osid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBOSIDAccessCheck($uid, $osid, $access_type)
+{
+    global $TB_OSID_READINFO;
+    global $TB_OSID_MODIFYINFO;
+    global $TB_OSID_DESTROY;
+    global $TB_OSID_MIN;
+    global $TB_OSID_MAX;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    $mintrust;
+
+    if ($access_type < $TB_OSID_MIN || $access_type > $TB_OSID_MAX) {
+	TBERROR("Invalid access type $access_type!", 1);
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (ISADMIN($uid)) {
+	return 1;
+    }
+
+    #
+    # No GIDs yet.
+    #
+    $query_result =
+	DBQueryFatal("SELECT pid FROM os_info WHERE osid='$osid'");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $pid = $row[pid];
+
+    #
+    # Global OSIDs can be read by anyone.
+    # 
+    if (!$pid) {
+	if ($access_type == $TB_OSID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+    
+    #
+    # Otherwise must have proper trust in the project.
+    # 
+    if ($access_type == $TB_OSID_READINFO) {
+	$mintrust = $TBDB_TRUST_USER;
+    }
+    else {
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+
+    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
+}
+
+#
+# Access checks for an ImageID
+#
+# Usage: TBImageIDAccessCheck($uid, $imageid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+# 
+function TBImageIDAccessCheck($uid, $imageid, $access_type)
+{
+    global $TB_IMAGEID_READINFO;
+    global $TB_IMAGEID_MODIFYINFO;
+    global $TB_IMAGEID_DESTROY;
+    global $TB_IMAGEID_ACCESS;
+    global $TB_IMAGEID_MIN;
+    global $TB_IMAGEID_MAX;
+    global $TBDB_TRUST_USER;
+    global $TBDB_TRUST_LOCALROOT;
+    $mintrust;
+
+    if ($access_type < $TB_IMAGEID_MIN || $access_type > $TB_IMAGEID_MAX) {
+	TBERROR("Invalid access type $access_type!", 1);
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (ISADMIN($uid)) {
+	return 1;
+    }
+
+    #
+    # No GIDs yet.
+    #
+    $query_result =
+	DBQueryFatal("SELECT pid FROM images WHERE imageid='$imageid'");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $pid = $row[pid];
+
+    #
+    # Global ImageIDs can be read by anyone.
+    # 
+    if (!$pid) {
+	if ($access_type == $TB_IMAGEID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+
+    #
+    # Otherwise must have proper trust in the project.
+    # 
+    if ($access_type == $TB_IMAGEID_READINFO) {
+	$mintrust = $TBDB_TRUST_USER;
+    }
+    else {
+	$mintrust = $TBDB_TRUST_LOCALROOT;
+    }
+
+    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
+}
+
+#
+# Return the Unix GID Name and Number for a group. This is distinct from
+# the name we use within the Testbed system.
+#
+# usage: TBGroupUnixInfo($pid, $gid, &$unix_name, &$unix_gid)
+#
+function TBGroupUnixInfo($pid, $gid, &$unix_name, &$unix_gid)
+{
+    $query_result =
+	DBQueryFatal("select unix_name,unix_gid from groups ".
+		     "where pid='$pid' and gid='$gid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	TBERROR("No such group $gid in project $pid!", 1);
+    }
+    $row = mysql_fetch_array($query_result);
+    $unix_gid  = $row[unix_gid];
+    $unix_name = $row[unix_name];
+}
+
+#
+# Get name and email info for a uid. Args are pass by reference.
+#
+# usage: TBUserInfo($uid, $user_name, $user_email)
+#
+function TBUserInfo($uid, &$user_name, &$user_email)
+{
+    $query_result =
+	DBQueryFatal("select usr_name,usr_email from users where uid='$uid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	TBERROR("No such user $uid!", 1);
+    }
+    $row = mysql_fetch_array($query_result);
+    $user_name  = $row[usr_name];
+    $user_email = $row[usr_email];
+}
+
+#
+# Confirm a valid pid/gid
+#
+# usage TBValidGroup($pid, $gid)
+#       returns 1 if a valid group.
+#       returns 0 if not a valid group
+#
+function TBValidGroup($pid, $gid)
+{
+    $query_result =
+	DBQueryFatal("select pid,gid from groups as g ".
+		     "where pid='$pid' and gid='$gid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+
+    #
+    # XXX String compare to ensure case match. 
+    #
+    $row = mysql_fetch_row($query_result);
+    if (strcmp($row[0], $pid) ||
+	strcmp($row[1], $gid)) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Confirm a group member.
+#
+# usage TBGroupMember($uid, $pid, $gid, &$approved)
+#       returns 1 if a member.
+#       returns 0 if not a member.
+#
+function TBGroupMember($uid, $pid, $gid, &$approved)
+{
+    global $TBDB_TRUST_USER;
+	
+    $approved = 0;
+    
+    $query_result =
+	DBQueryFatal("select trust from group_membership ".
+		     "where uid='$uid' and pid='$pid' and gid='$gid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    $trust = $row[0];
+
+    $approved = TBMinTrust($trust, $TBDB_TRUST_USER);
+    return 1;
+}
+
+#
+# Confirm a valid osid.
+#
+# usage TBValidOSID($osid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidOSID($osid)
+{
+    $query_result =
+	DBQueryFatal("select osid from os_info where osid='$osid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Confirm a valid imageid.
+#
+# usage TBValidImageID($imageid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidImageID($imageid)
+{
+    $query_result =
+	DBQueryFatal("select imageid from images where imageid='$imageid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Confirm a valid experiment.
+#
+# usage TBValidExperiment($pid, $eid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidExperiment($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select eid from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Confirm a valid batch,
+#
+# usage TBValidBatch($pid, $eid)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBValidBatch($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select eid from batch_experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Return Project Leader.
+#
+# usage TBProjLeader($pid, &$projleader)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBProjLeader($pid, &$projleader)
+{
+    $query_result =
+	DBQueryFatal("select head_uid from projects where pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $projleader  = $row[head_uid];
+    
+    return 1;
+}
+
+#
+# Return a list of projects for which the uid is allowed to perform the
+# requested operation. Only a couple of access options are supported since
+# to be totally general would require too many DB operations. Not worth
+# the effort or the expense.
+#
+function TBProjList($uid, $access_type)
+{
+    global $TB_PROJECT_CREATEEXPT;
+    global $TB_PROJECT_MAKEOSID;
+    global $TB_PROJECT_MAKEIMAGEID;
+    $result = array();
+    
+    if ($access_type != $TB_PROJECT_CREATEEXPT &&
+	$access_type != $TB_PROJECT_MAKEOSID &&
+	$access_type != $TB_PROJECT_MAKEIMAGEID) {
+	TBERROR("Invalid access type $access_type!", 1);
+    }
+    
+    $query_result =
+	DBQueryFatal("SELECT distinct pid FROM group_membership ".
+		     "WHERE uid='$uid' and ".
+		     "      (trust='project_root' or trust='group_root' or ".
+		     "       trust='local_root')");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return $result;
+    }
+
+    $i = 0;
+    while ($row = mysql_fetch_array($query_result)) {
+	$pid = $row[pid];
+
+	$result[$i] = $pid;
+	$i++;
+    }
+    return $result;
+}
+
+#
+# DB Interface.
+#
+
+#
+# Record last DB error string.
+#
+$DBErrorString = "";
+
+#
+# This mirrors the routine in the PERL code. The point is to avoid
+# writing the same thing repeatedly, get consistent error handling,
+# and make sure that mail is sent to the testbed list when things go
+# wrong!
+#
+# Argument is a string. Returns the actual query object, so it is up to
+# the caller to test it. I would not for one moment view this as
+# encapsulation of the DB interface. 
+# 
+# usage: DBQuery(char *str)
+#        returns the query object result.
+#
+# Sets $DBErrorString is case of error; saving the original query string and
+# the error string from the DB module. Use DBFatal (below) to print/email
+# that string, and then exit.
+#
+function DBQuery($query)
+{
+    global	$TBDBNAME;
+    global	$DBErrorString;
+    
+    $result = mysql_db_query($TBDBNAME, $query);
+
+    if (! $result) {
+	$DBErrorString =
+	    "  Query: $query\n".
+	    "  Error: " . mysql_error();
+    }
+    return $result;
+}
+
+#
+# Same as above, but die on error. 
+# 
+function DBQueryFatal($query)
+{
+    $result = DBQuery($query);
+
+    if (! $result) {
+	DBFatal("DB Query failed");
+    }
+    return $result;
+}
+
+#
+# Same as above, but just send email on error. This info is useful
+# to the TB system, but the caller has to retain control.
+# 
+function DBQueryWarn($query)
+{
+    $result = DBQuery($query);
+
+    if (! $result) {
+	DBWarn("DB Query failed");
+    }
+    return $result;
+}
+
+#
+# Warn and send email after a failed DB query. First argument is the error
+# message to send. The contents of $DBErrorString is also sent. We do not
+# print this stuff back to the user since we might leak stuff out that we
+# should not.
+# 
+# usage: DBWarn(char *message)
+#
+function DBWarn($message)
+{
+    global	$PHP_SELF, $DBErrorString;
+    
+    $text = "$message - In $PHP_SELF\n" .
+  	    "$DBErrorString\n";
+
+    TBERROR($text, 0);
+}
+
+#
+# Same as above, but die after the warning.
+# 
+# usage: DBFatal(char *message);
+#
+function DBFatal($message)
+{
+    global $TBMAILADDR;
+
+    DBWarn($message);
+
+    echo "<p><p>
+	  Unexpected Error. Could not continue. Please contact $TBMAILADDR\n";
+
+    PAGEFOOTER();
+    die("");
+}
 
 ?>

@@ -23,13 +23,10 @@ if (! $isadmin) {
 #
 # Suck out info for all the nodes.
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM nodes WHERE role='testnode' ".
-	"ORDER BY priority");
-
-if (! $query_result) {
-    TBERROR("Database Error retrieving node information", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT nodes.*,reserved.pid,reserved.eid FROM nodes ".
+		 "left join reserved on nodes.node_id=reserved.node_id ".
+		 "WHERE role='testnode' ORDER BY priority");
 
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
@@ -57,6 +54,8 @@ while ($row = mysql_fetch_array($query_result)) {
     $next_boot_osid     = $row[next_boot_osid];
     $next_boot_path     = $row[next_boot_path];
     $next_boot_cmd_line = $row[next_boot_cmd_line];
+    $pid                = $row[pid];
+    $eid                = $row[eid];
 
     if (!$def_boot_cmd_line)
         $def_boot_cmd_line = "&nbsp";
@@ -66,31 +65,13 @@ while ($row = mysql_fetch_array($query_result)) {
         $next_boot_path = "&nbsp";
     if (!$next_boot_cmd_line)
         $next_boot_cmd_line = "&nbsp";
-
-    #
-    # If the node is reserved, lets get the PID/EID from that table
-    #
-    $reserved_result = mysql_db_query($TBDBNAME,
-	"SELECT eid,pid from reserved where node_id='$node_id'");
-    if (! $reserved_result) {
-        $err = mysql_error();
-        TBERROR("Database Error reading reserved table for $node_id: $err\n",
-                1);
-    }
-    if ($resrow = mysql_fetch_row($reserved_result)) {
-	$eid = $resrow[0];
-	$pid = $resrow[1];
-    }
-    else {
-	$eid = "--";
+    if (!$pid)
 	$pid = "--";
-    }
+    if (!$eid)
+	$eid = "--";
 
     echo "<tr>
-              <td align=center>
-                  <A href='nodecontrol_form.php3?node_id=$node_id&refer=list'>
-                     <img alt=\"o\" src=\"redball.gif\"></A></td>
-              <td>$node_id</td>
+              <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>
               <td>$type</td>
               <td>$pid</td>
               <td>$eid</td>\n";

@@ -106,15 +106,12 @@ if (! UserDBInfo($user_login, \$user_name, \$user_email)) {
 }
 
 #
-# Verify that this person is allowed to end the experiment. Must be
-# in the project membership table, or must be an admin type. Note that
-# any script down the line has to do an admin check also. 
+# Verify that this person is allowed to end the experiment.
+# Note that any script down the line has to do an admin check also. 
 #
 if ($EUID && !TBAdmin($EUID) &&
-    ProjMember($pid, $user_login) != PROJMEMBERTRUST_ROOT) {
-
-    print STDOUT "Go Away! You do not have permission to end experiments ".
-	         "in project $pid\n";
+    !TBExptAccessCheck($user_login, $pid, $eid, TB_EXPT_DESTROY)) {
+    print STDOUT "You do not have permission to end this experiment!\n";
     exit(1);
 }
 
@@ -313,6 +310,12 @@ sub fatal($)
     local $MAIL;
     
     print STDOUT $mesg;
+
+    #
+    # Kill this for convenience later.
+    # 
+    DBQueryWarn("update experiments set expt_terminating=NULL ".
+		"WHERE eid='$eid' and pid='$pid'");
 
     #
     # In batch mode, exit without sending the email. 

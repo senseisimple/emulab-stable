@@ -23,10 +23,10 @@ if (!isset($node_id) ||
 #
 # Check to make sure that this is a valid nodeid
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM nodes WHERE node_id=\"$node_id\"");
+$query_result =
+    DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id is not a valid nodeid", 1);
+  USERERROR("The node $node_id is not a valid nodeid!", 1);
 }
 $row = mysql_fetch_array($query_result);
 
@@ -36,17 +36,7 @@ $row = mysql_fetch_array($query_result);
 #
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select proj_memb.* from proj_memb left join reserved ".
-	"on proj_memb.pid=reserved.pid and proj_memb.uid='$uid' ".
-	"where reserved.node_id='$node_id'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("The node $node_id is not in an experiment ".
-		  "or not in the same project as you", 1);
-    }
-    $foorow = mysql_fetch_array($query_result);
-    $trust = $foorow[trust];
-    if ($trust != "local_root" && $trust != "group_root") {
+    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
         USERERROR("You do not have permission to modify node $node_id!", 1);
     }
 }
@@ -70,22 +60,21 @@ $startupcmd         = $row[startupcmd];
 # pid of the user when not an admin type, of course.
 #
 if ($isadmin) {
-    $osid_result = mysql_db_query($TBDBNAME,
-	"select o.*,p.osid from os_info as o ".
-	"left join partitions as p on o.osid=p.osid ".
-	"where p.node_id='$node_id' or o.path!='' order by o.osid");
+    $osid_result =
+	DBQueryFatal("select o.*,p.osid from os_info as o ".
+		     "left join partitions as p on o.osid=p.osid ".
+		     "where p.node_id='$node_id' or o.path!='' ".
+		     "order by o.osid");
 }
 else {
-    $osid_result = mysql_db_query($TBDBNAME,
-	"select distinct o.*,p.osid from os_info as o ".
-	"left join proj_memb as m on o.pid IS NULL or m.pid=o.pid ".
-	"left join partitions as p on o.osid=p.osid ".
-	"where m.uid='$uid' and p.node_id='$node_id' or o.path!='' ".
-	"order by o.pid,o.osid");
-}
-if (! $osid_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting OSID list: $err\n", 1);
+    $osid_result =
+	DBQueryFatal("select distinct o.*,p.osid from os_info as o ".
+		     "left join group_membership as m ".
+		     " on o.pid IS NULL or m.pid=o.pid ".
+		     "left join partitions as p on o.osid=p.osid ".
+		     "where m.uid='$uid' and p.node_id='$node_id' ".
+		     " or o.path!='' ".
+		     "order by o.pid,o.osid");
 }
 
 echo "<table border=2 cellpadding=0 cellspacing=2

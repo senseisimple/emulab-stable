@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
 {
     int userdir = 0;		/* ~userdir flag             */
     uid_t uid;			/* user information          */
-    gid_t gid;			/* target group placeholder  */
+    gid_t gid, primary_gid;	/* target group placeholder  */
     char *target_uname;		/* target user name          */
     char *target_gname;		/* target group name         */
     char *target_homedir;	/* target home directory     */
@@ -411,6 +411,7 @@ int main(int argc, char *argv[])
      * Save these for later since initgroups will hose the struct
      */
     uid = pw->pw_uid;
+    primary_gid  = pw->pw_gid;
     actual_uname = strdup(pw->pw_name);
     target_homedir = strdup(pw->pw_dir);
 
@@ -441,6 +442,30 @@ int main(int argc, char *argv[])
 	exit(108);
     }
 
+#ifdef TESTBED
+    {
+	int groups[NGROUPS], ngroups, i;
+
+	ngroups = NGROUPS;
+	getgrouplist(actual_uname, primary_gid, groups, &ngroups);
+	if (ngroups == NGROUPS) {
+		log_err("emerg: failed to getgroups (%ld: %s)\n", gid, cmd);
+		exit(109);
+	}
+	for (i = 0; i < ngroups; i++) {
+		if (groups[i] == gid)
+			break;
+	}
+	if (i == ngroups)
+		groups[ngroups++] = gid;
+	
+	if (((setgid(primary_gid)) != 0) ||
+	    (setgroups(ngroups, groups) != 0)) {
+		log_err("emerg: failed to setgid (%ld: %s)\n", gid, cmd);
+		exit(109);
+	}
+    }
+#else
     /*
      * Change UID/GID here so that the following tests work over NFS.
      *
@@ -451,6 +476,7 @@ int main(int argc, char *argv[])
 	log_err("emerg: failed to setgid (%ld: %s)\n", gid, cmd);
 	exit(109);
     }
+#endif
 
     /*
      * setuid() to the target user.  Error out on fail.

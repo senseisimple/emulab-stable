@@ -67,35 +67,12 @@ else {
 }
 
 #
-# Figure out who called us. Possible scenarios:
-#
-# 1) Called from web UI as some TB admin user to create a project head's 
-#    account for a new project.
-#
-# 2) Called as user with group_root for project to create a user
-#    account.
-#
-# 3) Called from command line as user with group_root for project 
-#    to create a user account. 
-# 
-# 4) Called from command line as root.
+# Only TB admins are allowed to do this. At some point permit project
+# leaders to delete accounts in their projects, but for now lets not.
+# There are issues of people in multiple projects.
 #
 if ($UID && !TBAdmin($UID)) {
-    my ($me) = getpwuid($UID) or
-	fatal("$UID not in passwd file");
-
-    #
-    # Check if group_root for the project.
-    #
-    $query_result =
-	DBQueryFatal("select p1.trust from proj_memb as p1 ".
-		     "left join proj_memb as p2 on p2.pid=p1.pid ".
-		     "where p1.uid='$me' and ".
-		     "p2.uid='$user' and p1.trust='group_root'");
-
-    if ($query_result->numrows == 0) {
-	die("$0: $me does not have enough permission in ${user}'s project");
-    }
+    die("$0: You do not have enough permission to run this script!\n");
 }
 
 #
@@ -109,15 +86,6 @@ my $control_node = $CONTROL;
 # All this stuff must be done as root (ssh).
 #
 $UID = $EUID;
-
-#
-# Run genelists to update the email lists. This is a convenient
-# spot to do this. Errors are non-fatal; the testbed list will
-# will find out about problems via email from genelists. Note that
-# this command must be run when EUID==UID==0 because its a setuid
-# PERL script.
-#
-system("$GENELISTS");
 
 print "Removing user $user from local node.\n";
 if (system("$USERDEL $user")) {

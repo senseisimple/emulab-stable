@@ -1,0 +1,352 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create/Update a group.
+#
+# usage: group-update [-b] <pid> <gid>
+#
+sub usage()
+{
+    print STDOUT "Usage: group-update -b <pid> <gid>\n";
+    exit(-1);
+}
+my  $optlist = "b";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $PROJROOT    = "/proj";
+
+my $SSH         = "$TB/bin/sshtb";
+my $GROUPADD    = "/usr/sbin/pw groupadd";
+my $USERMOD     = "/usr/sbin/pw usermod";
+my $mkacct      = "$TB/libexec/mkacct-ctrl";
+
+my $batchmode   = 0;
+my $dbuid;
+my $user;
+my @db_row;
+my $query_result;
+my $leader;
+my $groupdir;
+my $logname;
+my $user_name;
+my $user_email;
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"b"})) {
+    $batchmode = 1;
+}
+my $pid = $ARGV[0];
+my $gid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($gid =~ /^([-\@\w]+)$/) {
+    $gid = $1;
+}
+else {
+    die("Bad data in gid: $gid.");
+}
+
+#
+# Get user DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** You do not exist in the Emulab Database!\n");
+}
+
+#
+# Get email info for mail.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** Cannot determine email info for you!\n");
+}
+
+#
+# This script always does the right thing, so it does not matter who
+# calls it. But we guard it anyway in the case where ops/boss are the
+# same.
+# 
+if (!TBAdmin($UID)) {
+    #
+    # Must be project root for the project or group root for the group.
+    #
+    $query_result =
+	DBQueryFatal("select trust from group_membership ".
+		     "where pid='$pid' and uid='$dbuid' and gid='$pid' and ".
+		     "trust='project_root'");
+    
+    if ($query_result->numrows == 0) {
+	$query_result =
+	    DBQueryFatal("select trust from group_membership ".
+			 "where pid='$pid' and uid='$dbuid' and gid='$gid' ".
+			 "and trust='group_root'");
+
+	if ($query_result->numrows == 0) {
+	    die("*** $dbuid does not have permission to update groups!\n");
+	}
+    }
+}
+
+if (! ($leader = GroupLeader($pid, $gid))) {
+    die("*** Could not determine group leader for $pid/$gid!\n");
+}
+
+#
+# Unix info for the group
+#
+my $unix_gid;
+my $unix_name;
+
+if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
+    die("*** No info for project/group $pid/$gid!");
+}
+
+#
+# In batch mode, go to background and send email later.
+# 
+if ($batchmode) {
+    #
+    # Create a temporary name for a log file.
+    #
+    $logname = `mktemp /tmp/group-update-$pid-$gid.XXXXXX`;
+    chop($logname);
+    
+    if (TBBackGround($logname)) {
+	#
+	# Parent exits normally
+	#
+	print STDOUT
+	    "Creating/Updating project/group $pid/$gid\n".
+	    "You will be notified via email when the update is complete.\n";
+	exit(0);
+    }
+}
+
+# 
+# Create group locally if it does not exist. egrep returns 1 when
+# no matches are found.
+#
+if (system("egrep -q -s '^${unix_name}:' /etc/group")) {
+    print "Adding group $unix_name to local node ...\n";
+
+    if (system("$GROUPADD $unix_name -g $unix_gid")) {
+	fatal("*** Could not add $unix_gid ($unix_gid) to local node!\n");
+    }
+}
+
+#
+# Perl and ssh Sillyness!
+#
+$UID = $EUID;
+
+#
+# Create group on the control node if it does not exist.
+#
+if (system("$SSH $control_node egrep -q -s '^${unix_name}:' /etc/group")) {
+    print "Adding group $unix_name to $control_node.\n";
+
+    if (system("$SSH $control_node $GROUPADD $unix_name -g $unix_gid")) {
+	fatal("*** Could not add $unix_name ($unix_gid) to $control_node!\n");
+    }
+}
+
+#
+# Create the group directory if it does not already exist.
+#
+$groupdir = "$PROJROOT/$pid/groups/$gid";
+
+if (! -e $groupdir) {
+    if (! mkdir("$groupdir", 0770)) {
+	fatal("*** Could not make directory $groupdir: $!");
+    }
+
+    if (! chmod(0770, "$groupdir")) {
+	fatal("*** Could not chmod directory $groupdir: $!");
+    }
+
+    $unix_uid = getpwnam($leader);
+
+    if (! chown($unix_uid, $unix_gid, "$groupdir")) {
+	fatal("*** Could not chown $groupdir to $leader/$gid: $!");
+    }
+}
+
+#
+# Grab the current user list for the group. These are people to add to
+# the group list if they are not already in it.
+#
+$curmembers_result =
+    DBQueryWarn("select distinct m.uid from group_membership as m ".
+		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
+		 "left join projects as p on p.pid=m.pid ".
+		 "where m.pid='$pid' and m.gid='$gid'");
+if (! $curmembers_result) {
+    fatal("*** Could not determine current members of $pid/$gid!");
+}
+
+#
+# I don't want to mess with this now. Just use mkacct-ctrl, which is bad
+# cause it does more than we want it to.
+#
+
+while (%row = $curmembers_result->fetchhash) {
+    $uid    = $row{'uid'};
+
+    if (system("$mkacct $uid")) {
+	fatal("*** $mkacct $uid failed!");
+    }
+}
+
+#
+# Grab the user list from the project. These are the people who are
+# *not* in the group.
+# 
+$nonmembers_result =
+    DBQueryFatal("select m.uid,m.trust from group_membership as m ".
+		 "left join group_membership as a on ".
+		 "     a.uid=m.uid and a.pid=m.pid and a.gid='$gid' ".
+		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL");
+if (! $nonmembers_result) {
+    fatal("*** Could not determine non members of $pid/$gid!");
+}
+
+while (%row = $nonmembers_result->fetchhash) {
+    $uid    = $row{'uid'};
+
+    if (system("$mkacct $uid")) {
+	fatal("*** $mkacct $uid failed!");
+    }
+}
+
+email_status("Group Update Completed!");
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    donotify($mesg, "Failure", 1);
+
+    exit(-1);
+}
+
+sub email_status($)
+{
+    my($mesg) = $_[0];
+
+    donotify($mesg, "Status", 0);
+}
+
+sub donotify($$$)
+{
+    my($mesg, $subtext, $iserr) = @_;
+    my($subject, $from, $to, $hdrs);
+    my $MAIL;
+
+    print STDOUT "$mesg\n";
+
+    if (! $batchmode) {
+	return;
+    }
+
+    $subject = "TESTBED: Group Update $subtext $pid/$gid";
+    $from    = $TBOPS;
+    $hdrs    = "Reply-To: $TBOPS";
+    
+    #
+    # An error goes just to Testbed Operations. Normal status messages go
+    # to the user and to the Testbed Logs address.
+    # 
+    if ($iserr) {
+	$to = "$TBOPS";
+    }
+    else {
+	$to   = "$user_name <$user_email>";
+	$hdrs = "Bcc: $TBLOGS\n".
+	        "$hdrs";
+    }
+
+    if (! ($MAIL = OPENMAIL($to, $subject, $from, $hdrs))) {
+	die("Cannot start mail program!");
+    }
+
+    print $MAIL $mesg;
+
+    if (defined($logname) && open(IN, "$logname")) {
+	print $MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print $MAIL "$_";
+	}
+	close(IN);
+    }
+
+    close($MAIL);
+}
+
+

@@ -35,7 +35,7 @@
 static int	debug = 0;
 static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
-static int	nodeidtoexp(char *nodeid, char *pid, char *eid);
+static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
 static int	iptonodeid(struct in_addr ipaddr, char *bufp);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
@@ -394,6 +394,7 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "REBOOT: %s: No such node", inet_ntoa(ipaddr));
@@ -408,7 +409,7 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * to deschedule an admin reload, which is supposed to happen when
 	 * the node is released.
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "REBOOT: %s: Node is free", nodeid);
 		return 0;
 	}
@@ -468,6 +469,7 @@ dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		nickname[128];
 	char		buf[MYBUFSIZE];
 
@@ -479,7 +481,7 @@ dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "STATUS: %s: Node is free", nodeid);
 		strcpy(buf, "FREE\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -510,6 +512,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		control_net, nrows;
 
@@ -522,7 +525,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "IFCONFIG: %s: Node is free", nodeid);
 		return 1;
 	}
@@ -614,8 +617,9 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE];
-	int		nrows, gid;
+	int		nrows, gidint;
 	int		shared = 0, tbadmin;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -627,7 +631,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: Node is free", nodeid);
 		return 1;
 	}
@@ -637,17 +641,18 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * We have the pid name, but we need the GID number from the
 	 * projects table to send over. 
 	 */
-	res = mydb_query("select pid,unix_gid from projects where pid='%s'",
+	res = mydb_query("select unix_name,unix_gid from groups "
+			 "where pid='%s'",
 			 2, pid);
 #else
 	/*
-	 * Get a list of pid/unix_gid for each group that is allowed
+	 * Get a list of gid/unix_gid for each group that is allowed
 	 * access to the experiments nodes. This is the owner of the
 	 * node, plus the additional pids granted access. 
 	 */
-	res = mydb_query("select p.pid,unix_gid from projects as p "
-			 "left join exppid_access as a on p.pid=a.pid "
-			 "where p.pid='%s' or "
+	res = mydb_query("select g.unix_name,g.unix_gid from groups as g "
+			 "left join exppid_access as a on g.pid=a.pid "
+			 "where g.pid='%s' or "
 			 "      (a.exp_pid='%s' and a.exp_eid='%s')",
 			 2, pid, pid, eid);
 #endif
@@ -670,8 +675,8 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			return 1;
 		}
 
-		gid = atoi(row[1]);
-		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gid);
+		gidint = atoi(row[1]);
+		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
 
@@ -683,11 +688,15 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * Now onto the users in the project.
 	 */
 #ifdef  NOSHAREDEXPTS
-	res = mydb_query("select u.uid,u.usr_pswd,u.unix_uid,u.usr_name,"
-			 "p.trust from users as u "
-			 "left join proj_memb as p on p.uid=u.uid "
-			 "where p.pid='%s' and u.status='active'",
-			 5, pid);
+	res = mydb_query("select distinct "
+			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			 "  p.trust,p.pid,p.gid,g.unix_gid,u.admin "
+			 "from users as u "
+			 "left join group_membership as p on p.uid=u.uid "
+			 "left join groups as g on p.pid=g.pid "
+			 "where p.pid='%s' and p.gid='%s' "
+			 "      and u.status='active' order by u.uid",
+			 9, pid, eid, pid, gid);
 #else
 	/*
 	 * See if a shared experiment. Used below.
@@ -718,16 +727,29 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * group and a list of aux groups for that user. It might be cleaner
 	 * to do this as multiple querys, but this makes it atomic.
 	 */
-	res = mydb_query("select distinct "
-			 "u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "p.trust,p.pid,pr.unix_gid,u.admin from users as u "
-			 "left join proj_memb as p on p.uid=u.uid "
-			 "left join exppid_access as a "
-			 " on a.exp_pid='%s' and a.exp_eid='%s' "
-			 "left join projects as pr on p.pid=pr.pid "
-			 "where (p.pid='%s' or p.pid=a.pid) "
+	if (strcmp(pid, gid)) {
+		res = mydb_query("select distinct "
+			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin "
+			 "from users as u "
+			 "left join group_membership as p on p.uid=u.uid "
+			 "left join groups as g on p.pid=g.pid "
+			 "where ((p.pid='%s' and p.gid='%s')) "
 			 "      and u.status='active' order by u.uid",
-			 8, pid, eid, pid);
+			 9, pid, gid);
+	}
+	else {
+		res = mydb_query("select distinct "
+			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin "
+			 "from users as u "
+			 "left join group_membership as p on p.uid=u.uid "
+			 "left join groups as g on "
+			 "     p.pid=g.pid and p.gid=g.gid "
+			 "where ((p.pid='%s')) "
+			 "      and u.status='active' order by u.uid",
+			 9, pid);
+	}
 #endif
 	if (!res) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting users!", pid);
@@ -747,10 +769,10 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
 
-		gid     = -1;
+		gidint     = -1;
+		tbadmin    = root = atoi(row[8]);
 		
 		while (1) {
-			tbadmin = root = atoi(row[7]);
 			
 			/*
 			 * The whole point of this mess. Figure out the
@@ -758,19 +780,32 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			 * distinction between main and aux is unecessary, as
 			 * long as the entire set is represented.
 			 */
-			if (strcmp(row[5], pid) == 0) {
-				gid = atoi(row[6]);
+			if (strcmp(row[5], pid) == 0 &&
+			    strcmp(row[6], gid) == 0) {
+				gidint = atoi(row[7]);
 
 				/*
 				 * Only people in the main pid can get root
 				 * at this time, so do this test here.
 				 */
 				if ((strcmp(row[4], "local_root") == 0) ||
-				    (strcmp(row[4], "group_root") == 0))
+				    (strcmp(row[4], "group_root") == 0) ||
+				    (strcmp(row[4], "project_root") == 0))
 					root = 1;
 			}
 			else {
-				auxgids[gcount++] = atoi(row[6]);
+				int k, newgid = atoi(row[7]);
+				
+				/*
+				 * Avoid dups, which can happen because of
+				 * different trust levels in the join.
+				 */
+				for (k = 0; k < gcount; k++) {
+				    if (auxgids[k] == newgid)
+					goto skipit;
+				}
+				auxgids[gcount++] = newgid;
+			skipit:
 			}
 			nrows--;
 
@@ -791,8 +826,8 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		 * then use one from the list. Then convert the rest of
 		 * the list for the GLIST argument below.
 		 */
-		if (gid == -1) {
-			gid = auxgids[--gcount];
+		if (gidint == -1) {
+			gidint = auxgids[--gcount];
 		}
 		glist[0] = '\0';
 		for (i = 0; i < gcount; i++) {
@@ -813,7 +848,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			"ADDUSER LOGIN=%s "
 			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
 			"HOMEDIR=%s/%s GLIST=%s\n",
-			row[0], row[1], row[2], gid, root, row[3],
+			row[0], row[1], row[2], gidint, root, row[3],
 			USERDIR, row[0], glist);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -837,6 +872,7 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
@@ -849,7 +885,7 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -911,6 +947,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 	char *tmp, *buf, *vname_list;
 	char pid[64], eid[64];
+	char		gid[64];
 	char nickname[128]; /* XXX: Shouldn't be statically sized, potential buffer
 						 * overflow
 						 */ 
@@ -943,7 +980,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 	/*
 	 * Figure out which of our interfaces is on the control network
@@ -1194,6 +1231,7 @@ dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1205,7 +1243,7 @@ dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -1260,6 +1298,7 @@ dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp, *tp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1271,7 +1310,7 @@ dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -1329,6 +1368,7 @@ dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1340,7 +1380,7 @@ dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -1396,6 +1436,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1407,7 +1448,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -1478,6 +1519,7 @@ dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		*exitstatus;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1500,7 +1542,7 @@ dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "STARTSTAT: %s: Node is free", nodeid);
 		return 0;
 	}
@@ -1531,6 +1573,7 @@ doready(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "READY: %s: No such node",
@@ -1541,7 +1584,7 @@ doready(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "READY: %s: Node is free", nodeid);
 		return 0;
 	}
@@ -1575,6 +1618,7 @@ doreadycount(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		total, ready, i;
 
@@ -1587,7 +1631,7 @@ doreadycount(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "READYCOUNT: %s: Node is free", nodeid);
 		return 0;
 	}
@@ -1639,6 +1683,7 @@ dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		logfile[sizeof(pid)+sizeof(eid)+sizeof(logfmt)];
 	FILE		*fd;
 	time_t		curtime;
@@ -1652,7 +1697,7 @@ dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		       inet_ntoa(ipaddr));
 		return 1;
 	}
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "LOG: %s: Node is free", nodeid);
 		return 1;
 	}
@@ -1690,8 +1735,9 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE];
-	int		nrows, gid;
+	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "MOUNTS: %s: No such node",
@@ -1702,7 +1748,7 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_ERR, "MOUNTS: %s: Node is free", nodeid);
 		return 1;
 	}
@@ -1746,15 +1792,17 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 */
 #ifdef  NOSHAREDEXPTS
 	res = mydb_query("select u.uid from users as u "
-			 "left join proj_memb as p on p.uid=u.uid "
-			 "where p.pid='%s' and u.status='active'",
+			 "left join group_membership as p on p.uid=u.uid "
+			 "where p.pid='%s' and p.pid=p.gid and "
+			 "      u.status='active'",
 			 1, pid);
 #else
 	res = mydb_query("select distinct u.uid from users as u "
 			 "left join exppid_access as a "
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
-			 "left join proj_memb as p on p.uid=u.uid "
-			 "where p.pid='%s' or p.pid=a.pid",
+			 "left join group_membership as p on p.uid=u.uid "
+			 "where ((p.pid='%s' and p.pid=p.gid) or p.pid=a.pid) "
+			 "       and u.status='active'",
 			 1, pid, eid, pid);
 #endif
 	if (!res) {
@@ -1795,6 +1843,7 @@ doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1806,7 +1855,7 @@ doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -1859,6 +1908,7 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -1870,7 +1920,7 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Now check reserved table
 	 */
-	if (nodeidtoexp(nodeid, pid, eid))
+	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
 
 	/*
@@ -2071,14 +2121,16 @@ iptonodeid(struct in_addr ipaddr, char *bufp)
  * Map nodeid to PID/EID pair.
  */
 static int
-nodeidtoexp(char *nodeid, char *pid, char *eid)
+nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select pid,eid from reserved "
+	res = mydb_query("select r.pid,r.eid,e.gid from reserved as r "
+			 "left join experiments as e on "
+			 "     e.pid=r.pid and e.eid=r.eid "
 			 "where node_id='%s'",
-			 2, nodeid);
+			 3, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "nodeidtoexp: %s: DB Error getting reserved!",
 		       nodeid);
@@ -2093,6 +2145,7 @@ nodeidtoexp(char *nodeid, char *pid, char *eid)
 	mysql_free_result(res);
 	strcpy(pid, row[0]);
 	strcpy(eid, row[1]);
+	strcpy(gid, row[2]);
 
 	return 0;
 }
@@ -2171,6 +2224,7 @@ checkdbredirect(struct in_addr ipaddr)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
+	char		gid[64];
 	char		newdb[128];
 	
 	/*
@@ -2181,7 +2235,7 @@ checkdbredirect(struct in_addr ipaddr)
 		       inet_ntoa(ipaddr));
 		return 1;
 	}
-	if (nodeidtoexp(nodeid, pid, eid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		syslog(LOG_INFO, "CHECKDBREDIRECT: %s: Node is free", nodeid);
 		return 0;
 	}

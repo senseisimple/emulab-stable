@@ -13,8 +13,6 @@ PAGEHEADER("ImageID Information");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-$isadmin = ISADMIN($uid);
-
 #
 # Verify form arguments.
 # 
@@ -23,27 +21,15 @@ if (!isset($imageid) ||
     USERERROR("You must provide an ImageID.", 1);
 }
 
-#
-# Check to make sure thats this is a valid Image.
-#
-$query_result = mysql_db_query($TBDBNAME,
-       "SELECT pid FROM images WHERE imageid='$imageid'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The ImageID `$imageid' is not a valid ImageID.", 1);
+if (!TBValidImageID($imageid)) {
+    USERERROR("The ImageID $imageid is not a valid ImageID.", 1);
 }
-$row = mysql_fetch_array($query_result);
-$pid = $row[pid];
 
 #
-# Verify that this uid is a member of the project that owns the IMAGEID.
+# Verify permission.
 #
-if (!$isadmin && $pid) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\"");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not a member of the project that owns ".
-		  "ImageID $imageid.", 1);
-    }
+if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_READINFO)) {
+    USERERROR("You do not have permission to access ImageID $imageid.", 1);
 }
 
 #
@@ -52,10 +38,9 @@ if (!$isadmin && $pid) {
 SHOWIMAGEID($imageid, 0);
 
 #
-# Edit option, but only if admin or the imageid has a pid. No pid means
-# a global imageid, and only admin people can change those.
+# Edit option.
 #
-if ($isadmin || $pid) {
+if (TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
     $fooid = rawurlencode($imageid);
     echo "<p><center>
                Do you want to edit this ImageID?

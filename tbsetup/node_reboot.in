@@ -98,6 +98,14 @@ if (defined($options{"e"})) {
 #
 if ($eidmode) {
     my @row;
+
+    #
+    # Verify permission to muck with this experiment.
+    #
+    if ($UID && !TBAdmin($UID) &&
+	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+	die("*** You not have permission to reboot nodes in $pid/$eid!\n");
+    }
     
     my $query_result =
 	DBQueryFatal("select node_id from reserved where ".
@@ -127,17 +135,14 @@ else {
     
 	push(@nodes, $node);
     }
-}
 
-#
-# Figure out who called us. Root and admin types can do whatever they
-# want. Normal users can reboot nodes in their experiment.
-#
-if ($UID && !TBAdmin($UID)) {
-    foreach my $node (@nodes) {
-	if (! NodeAccessCheck(\$node)) {
-	    die("You do not have permission to reboot $node\n");
-	}
+    #
+    # Verify permission to reboot these nodes.
+    #
+    if ($UID && !TBAdmin($UID) &&
+	! TBNodeAccessCheck($UID, TB_NODEACCESS_REBOOT, @nodes)) {
+	die("You do not have permission to reboot one (or more) ".
+	    "of the nodes!\n");
     }
 }
 

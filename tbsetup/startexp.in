@@ -15,14 +15,15 @@ use Getopt::Std;
 #       save off the file in the expinfo directory. The caller (batch daemon) 
 #       opens the file and just passes the name in. I do not like this!
 #
-# usage: startexp [-b logfile] <pid> <eid> <nsfile>
+# usage: startexp [-b logfile] [-g gid] <pid> <eid> <nsfile>
 #
 sub usage()
 {
-    print STDOUT "Usage: startexp [-b logfile] <pid> <eid> <nsfile>\n";
+    print STDOUT
+	"Usage: startexp [-b logfile] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
-my  $optlist = "b:";
+my  $optlist = "b:g:";
 
 #
 # Configure variables
@@ -90,6 +91,12 @@ if (defined($options{"b"})) {
 	die "Bad data in logfile name: $logname";
     }
 }
+if (defined($options{"g"})) {
+    $gid = $options{"g"};
+}
+else {
+    $gid = $pid;
+}
 
 #
 # Untaint the arguments.
@@ -99,6 +106,9 @@ if ($pid =~ /^([-\@\w]+)$/) {
 }
 if ($eid =~ /^([-\@\w]+)$/) {
     $eid = $1;
+}
+if ($gid =~ /^([-\@\w]+)$/) {
+    $gid = $1;
 }
 # Note different taint check (allow /).
 if ($tempfile =~ /^([-\w.\/]+)$/) {
@@ -128,8 +138,17 @@ if (! UNIX2DBUID($EUID, \$dbuid)) {
 }
 
 #
+# Verify that this person is allowed to start the experiment. 
+#
+if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    print STDOUT
+	"You do not have permission to start experiments in project $pid\n";
+    exit(1);
+}
+
+#
 # Check to make sure the experiment record exists. The experiment must
-# be in the "new" state when using this interface. Th prevents the same
+# be in the "new" state when using this interface. This prevents the same
 # pid/eid from being used twice, as could happen by mistake if the user
 # invoked this directly without being clueful. The goal is to eventually
 # script experiment creation and termination completely.
@@ -155,16 +174,6 @@ if ($row[0] ne EXPTSTATE_NEW) {
 #
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     print STDOUT "Cannot determine your name and email address.\n";
-    exit(1);
-}
-
-#
-# Verify that this person is allowed to start the experiment. Must be
-# in the project membership table.
-#
-if (ProjMember($pid, $dbuid) != PROJMEMBERTRUST_ROOT) {
-    print STDOUT
-	"You do not have permission so start experiments in project $pid\n";
     exit(1);
 }
 
@@ -199,7 +208,7 @@ if (! $batch) {
 #
 # Create a directory structure for the experiment in the project directory.
 #
-if (system("$TB/libexec/mkexpdir $pid $eid") != 0) {
+if (system("$TB/libexec/mkexpdir $pid $gid $eid") != 0) {
     fatal("$tbdir/mkexpdir failed\n");
 }
 

@@ -5,8 +5,6 @@ use Getopt::Std;
 #
 # Create a batch experiment.
 #
-# usage: batchexp <batchfile>
-#
 sub usage()
 {
     print STDOUT "Usage: batchexp <batchfile>\n";
@@ -29,7 +27,7 @@ use libtestbed;
 
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
-my $parser   = "/usr/testbed/libexec/ns2ir/parse.tcl";
+my $parser   = "$TB/libexec/ns2ir/parse.tcl";
 my $projroot = "/proj";
 my $dirname;
 
@@ -74,19 +72,21 @@ else {
 #
 my $eid;
 my $pid;
+my $gid;
+my $dbuid;
 my $longname;
 my $expires;
 my $webnsfile;
 
 parse_batchfile($tempfile) or
-    fatal("Could not parse batchfile $tempfile");
+    fatal("*** Could not parse batchfile $tempfile");
 
 #
 # Sanity check a few things.
 #
 if (!defined($eid) || !defined($pid) || !defined($longname) ||
     !defined($expires) || !defined($webnsfile)) {
-    fatal("Batchfile is incomplete!");
+    fatal("*** Batchfile is incomplete!");
 }
 $nsfile = "$eid.ns";
 
@@ -96,50 +96,33 @@ $nsfile = "$eid.ns";
 $dirname = "$batchdir/$pid-$eid";
 
 mkdir($dirname, 0775) or
-    fatal("Could not mkdir $dirname: $!");
+    fatal("*** Could not mkdir $dirname: $!");
 
 chdir($dirname) or
-    fatal("Could not chdir to $dirname: $!");
+    fatal("*** Could not chdir to $dirname: $!");
 
 #
 # Copy in the batch file. Web script is responsible for removing the
 # original.
 #
 if (system("/bin/cp", "$tempfile", "batchfile")) {
-    fatal("Could not copy $tempfile to $dirname");
+    fatal("*** Could not copy $tempfile to $dirname");
 }
 
 #
-# Now a bunch of DB checks.
+# Verify user and get his DB uid.
 #
-# First off, get some user information. 
-#
-$query_result =
-    DBQuery("SELECT uid from users WHERE unix_uid='$EUID'");
-
-if ($query_result->numrows < 1) {
-    fatal("Go Away! You do not exist in the Emulab Database.");
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    fatal("*** You do not exist in the Emulab Database!");
 }
-
-@row = $query_result->fetchrow_array();
-$uid        = $row[0];
 
 #
 # Make sure UID is allowed to create experiments in this project.
 #
-$query_result =
-    DBQuery("SELECT trust from proj_memb WHERE uid='$uid' and pid='$pid'");
-
-if ($query_result->numrows == 0) {
-    fatal("Go Away! You are not a member of project $pid!");
-}
-
-@row = $query_result->fetchrow_array();
-$trust = $row[0];
-
-if ($trust ne "local_root" &&
-    $trust ne "group_root") {
-    fatal("Go Away! You are not a trusted member of project $pid!");
+if (!TBAdmin($UID) &&
+    !TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    fatal("*** You do not have permission to create experiments ".
+	  "in project $pid";
 }
 
 #
@@ -150,7 +133,7 @@ $query_result =
 		 "WHERE eid='$eid' and pid='$pid'");
 
 if ($query_result->numrows) {
-    fatal("Experiment $eid in project $pid already exists!");
+    fatal("*** Experiment $eid in project $pid already exists!");
 }
 
 $query_result =
@@ -158,21 +141,21 @@ $query_result =
 		 "WHERE eid='$eid' and pid='$pid'");
 
 if ($query_result->numrows) {
-    fatal("Batch experiment $eid in project $pid already exists!");
+    fatal("*** Batch experiment $eid in project $pid already exists!");
 }
 
 #
 # Now we can get the NS file! 
 #
 if (system("/bin/cp", "$webnsfile", "$nsfile")) {
-    fatal("Could not copy $webnsfile to $dirname/$nsfile");
+    fatal("*** Could not copy $webnsfile to $dirname/$nsfile");
 }
 
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 
 if (system("$parser -n -a $nsfile") != 0) {
-    fatal("NS Parse failed!");
+    fatal("*** NS Parse failed!");
 }
 
 #
@@ -185,10 +168,10 @@ $created = DBDateTime();
 # is looking for batch experiments to run. Easy race avoidance.
 #
 DBQueryFatal("INSERT INTO batch_experiments ".
-	     "(eid, pid, created, expires, ".
+	     "(eid, pid, gid, created, expires, ".
 	     " name, creator_uid, status) ".
-	     "VALUES ('$eid', '$pid', '$created', '$expires', ".
-	     "'$longname', '$uid', 'new')");
+	     "VALUES ('$eid', '$pid', '$gid', '$created', '$expires', ".
+	     "'$longname', '$dbuid', 'new')");
 
 exit 0;
 
@@ -222,6 +205,10 @@ sub parse_batchfile()
 	}
 	if ($_ =~ /^PID:\s+([-\@\w.]*)/) {
 	    $pid = $1;
+	    next;
+	}
+	if ($_ =~ /^GID:\s+([-\@\w.]*)/) {
+	    $gid = $1;
 	    next;
 	}
 	if ($_ =~ /^name:\s+([-\@\w. ]*)/) {

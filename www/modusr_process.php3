@@ -1,5 +1,6 @@
 <?php
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -21,11 +22,21 @@ if (!isset($target_uid) ||
   FORMERROR("Username");
 }
 
+#
+# Admin types can change anyone. Otherwise, must be project root, or group
+# root in at least one of the same groups. This is not exactly perfect, but
+# it will do. You should not make someone group root if you do not trust
+# them to behave.
+#
 if ($uid != $target_uid) {
     $isadmin = ISADMIN($uid);
+
     if (! $isadmin) {
-	USERERROR("You do not have permission to modify user information ".
-		  "for other users", 1);
+	if (! TBUserInfoAccessCheck($uid, $target_uid,
+				    $TB_USERINFO_MODIFYINFO)) {
+	    USERERROR("You do not have permission to modify user information ".
+		      "for other users", 1);
+	}
     }
 }
 
@@ -159,16 +170,15 @@ if (! $insert_result) {
 # Create the user accounts. Must be done *before* we create the
 # project directory!
 # 
-SUEXEC($target_uid, "flux", "mkacct-ctrl $target_uid", 0);	 	
+SUEXEC($uid, "flux", "mkacct-ctrl $target_uid", 0);	 	
 
-?>
-<center>
-<br>
-<br>
-<h3>User information successfully modified!</h3><p>
-</center>
+echo "<center>
+      <br>
+      <h3>User information successfully modified!</h3><p>
+      </center>\n";
 
-<?php
+SHOWUSER($target_uid);
+
 #
 # Standard Testbed Footer
 # 

@@ -17,7 +17,8 @@ my $TB       = "@prefix@";
 
 my $PROJROOT = "/proj";
 my $TFTPROOT = "/tftpboot";
-my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms");
+my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
+		"groups");
 
 #
 # Untaint the path
@@ -62,27 +63,24 @@ if ($UID && !TBAdmin($UID)) {
     die("mkprojdir: You must be root or a TB administrator\n");
 }
 
-#
-# We need several bits of info from the database.
-#
-# * The project gid.
-# * The project leader uid.
-#
-$db_result =
-    DBQueryFatal("select unix_gid,head_uid from projects where pid='$pid'");
+my $head;
 
-if ($db_result->numrows < 1) {	
-    die("There is no project '$pid'.\n");
+#
+# We need the project leader name.
+#
+if (! ($head = ProjLeader($pid))) {
+    die("*** $0:\n".
+	"    Could not get project leader for project $pid!\n");
 }
-@row = $db_result->fetchrow_array();
-my $gid  = $row[0];
-my $head = $row[1];
 
 #
 # This acts as check (and we need the numeric uid) in case mkacct failed!
 # 
-my ($login,$pass,$uid) = getpwnam($head)
+my (undef,undef,$uid) = getpwnam($head)
     or die "$head not in passwd file";
+
+my (undef,undef,$gid) = getgrnam($pid);
+    or die "$pid not in group file";
 
 #
 # Okay, do it.

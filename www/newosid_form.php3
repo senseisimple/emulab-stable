@@ -15,17 +15,25 @@ LOGGEDINORDIE($uid);
 #
 # See what projects the uid is a member of. Must be at least one!
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" ".
-	"and (trust='local_root' or trust='group_root')");
-    
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error finding project membership: $uid: $err\n", 1);
+$query_result =
+    DBQueryFatal("SELECT pid,trust FROM group_membership WHERE uid='$uid'");
+
+#
+# See if proper trust level in any of them.
+#
+$okay = 0;
+while ($row = mysql_fetch_array($query_result)) {
+    $trust = $row[trust];
+
+    if (TBMinTrust($trust, $TBDB_TRUST_LOCALROOT)) {
+	$okay = 1;
+    }
 }
-if (mysql_num_rows($query_result) == 0) {
+mysql_data_seek($query_result, 0);
+
+if (!$okay) {
     USERERROR("You do not appear to be a member of any Projects in which ".
-	      "you have permission (root) to create new OSIDs", 1);
+	      "you have permission to create new OSIDs", 1);
 }
 
 ?>
@@ -74,7 +82,10 @@ echo "<tr>
 echo "    <td><select name=\"pid\">";
                while ($row = mysql_fetch_array($query_result)) {
                   $project = $row[pid];
-                  echo "<option value=\"$project\">$project</option>\n";
+		  $trust   = $row[trust];
+		  if (TBMinTrust($trust, $TBDB_TRUST_LOCALROOT)) {
+		      echo "<option value=\"$project\">$project</option>\n";
+		  }
                }
 echo "        <option value=none>None</option>\n";
 echo "       </select>";

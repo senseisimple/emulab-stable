@@ -19,26 +19,28 @@ $isadmin = ISADMIN($uid);
 # is a member of. Or, if an admin type person, show them all!
 #
 if ($isadmin) {
-    $experiments_result = mysql_db_query($TBDBNAME,
-	"select pid,eid,expt_head_uid,expt_name from experiments ".
-	"order by pid,eid,expt_name");
+    $experiments_result =
+	DBQueryFatal("select pid,eid,expt_head_uid,expt_name from ".
+		     "experiments order by pid,eid,expt_name");
 
-    $batch_result = mysql_db_query($TBDBNAME,
-	"select pid,eid,creator_uid,name from batch_experiments ".
-	"order by pid,eid,name");
+    $batch_result =
+	DBQueryFatal("select pid,eid,creator_uid,name from batch_experiments ".
+		     "order by pid,eid,name");
 }
 else {
-    $experiments_result = mysql_db_query($TBDBNAME,
-	"select e.pid,eid,expt_head_uid,expt_name from experiments as e ".
-	"left join proj_memb as p on p.pid=e.pid ".
-	"where p.uid='$uid' ".
-	"order by e.pid,eid,expt_name");
+    $experiments_result =
+	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name from ".
+		     "experiments as e ".
+		     "left join group_membership as g on g.pid=e.pid ".
+		     "where g.uid='$uid' ".
+		     "order by e.pid,eid,expt_name");
 
-    $batch_result = mysql_db_query($TBDBNAME,
-	"select e.pid,eid,creator_uid,name from batch_experiments as e ".
-	"left join proj_memb as p on p.pid=e.pid ".
-	"where p.uid='$uid' ".
-	"order by e.pid,eid,name");
+    $batch_result =
+	DBQueryFatal("select distinct e.pid,eid,creator_uid,name from ".
+		     "batch_experiments as e ".
+		     "left join group_membership as g on g.pid=e.pid ".
+		     "where g.uid='$uid' ".
+		     "order by e.pid,eid,name");
 }
 if (mysql_num_rows($experiments_result) == 0 &&
     mysql_num_rows($batch_result) == 0) {
@@ -71,11 +73,14 @@ if (mysql_num_rows($experiments_result)) {
 	$huid = $row[expt_head_uid];
 	$name = $row[expt_name];
 
-	$usage_query = mysql_db_query($TBDBNAME,
-	  "select nt.class, count(*) from reserved as r left join nodes as n ".
-	  "on r.node_id=n.node_id left join node_types as nt ".
-	  "on n.type=nt.type where r.pid='$pid' and r.eid='$eid' ".
-	  "group by nt.class;");
+	$usage_query =
+	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
+			 "left join nodes as n ".
+			 " on r.node_id=n.node_id ".
+			 "left join node_types as nt ".
+			 " on n.type=nt.type ".
+			 "where r.pid='$pid' and r.eid='$eid' ".
+			 "group by nt.class;");
 
 	$usage["pc"]="";
 	$usage["shark"]="";
@@ -88,12 +93,12 @@ if (mysql_num_rows($experiments_result)) {
 
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                <td><A href='showexp.php3?exp_pideid=$pid\$\$$eid'>
+                <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
                 <td>".$usage["pc"]." &nbsp;</td>
                 <td>".$usage["shark"]." &nbsp;</td>
 	        <td align=center>
-                    <A href='endexp.php3?exp_pideid=$pid\$\$$eid'>
+                    <A href='endexp.php3?pid=$pid&eid=$eid'>
                        <img alt=\"o\" src=\"redball.gif\"></A></td>
                 <td>$name</td>
                 <td><A href='showuser.php3?target_uid=$huid'>
@@ -129,7 +134,7 @@ if (mysql_num_rows($batch_result)) {
 
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                <td><A href='showbatch.php3?exp_pideid=$pid\$\$$eid'>
+                <td><A href='showbatch.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
                 <td><A href='showuser.php3?target_uid=$huid'>
                        $huid</A></td>

@@ -33,24 +33,22 @@ if (!isset($target_uid) ||
 #
 # Check to make sure thats this is a valid UID.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM users WHERE uid=\"$target_uid\"");
+$query_result =
+    DBQueryFatal("SELECT * FROM users WHERE uid='$target_uid'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The user $target_uid is not a valid user", 1);
 }
 
 #
 # Verify that this uid is a member of one of the projects that the
-# target_uid is in. 
+# target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select proj_memb.* from proj_memb ".
-        "left join proj_memb as foo ".
-        "on proj_memb.pid=foo.pid and proj_memb.uid='$target_uid' ".
-        "where foo.uid='$uid'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not in the same Project as $target_uid.", 1);
+if (!$isadmin &&
+    strcmp($uid, $target_uid)) {
+
+    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
+	USERERROR("You do not have permission to view this user's ".
+		  "information!", 1);
     }
 }
 

@@ -186,7 +186,7 @@ else {
 }
 
 #
-# The only common field!
+# The only common fields!
 #
 # Note PID max length.
 # 
@@ -196,6 +196,18 @@ echo "<tr>
               <input type=\"text\" name=\"pid\"
                      size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN></td>
       </tr>\n";
+
+#
+# Note GID max length.
+# 
+echo "<tr>
+          <td>Group:<br>
+              (Leave blank unless you <em>know</em> the group name)</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"gid\"
+                     size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN></td>
+      </tr>\n";
+
 
 ?>
 <td colspan="2" align="center">

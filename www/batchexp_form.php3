@@ -13,19 +13,13 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
-# See what projects the uid is a member of. Must be at least one!
-# 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" ".
-	"and (trust='local_root' or trust='group_root')");
-    
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error finding project membership: $uid: $err\n", 1);
-}
-if (mysql_num_rows($query_result) == 0) {
+# See what projects the uid can create experiments in. Must be at least one.
+#
+$projlist = TBProjList($uid, $TB_PROJECT_CREATEEXPT);
+
+if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".
-	      "you have permission (root) to create new experiments.", 1);
+	      "you have permission to create new experiments.", 1);
 }
 ?>
 
@@ -51,10 +45,11 @@ echo "<form enctype=\"multipart/form-data\"
 echo "<tr>
           <td colspan=2>*Select Project:</td>";
 echo "    <td><select name=\"exp_pid\">";
-               while ($row = mysql_fetch_array($query_result)) {
-                  $project = $row[pid];
-                  echo "<option value=\"$project\">$project</option>\n";
-               }
+              for ($i = 0; $i < count($projlist); $i++) {
+                  $project = $projlist[$i];
+
+		  echo "<option value=\"$project\">$project</option>\n";
+	      }
 echo "       </select>";
 echo "    </td>
       </tr>\n";
@@ -72,7 +67,7 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-          <td colspan=2>*Long Name:</td>
+          <td colspan=2>*Description:</td>
           <td><input type=\"text\" name=\"exp_name\" size=\"40\">
               </td>
       </tr>\n";
@@ -101,7 +96,7 @@ echo "<tr>
       </tr>\n";
 
 #
-# Expires, Starts, Ends. Also the hidden Created field.
+# Expires.
 #
 $utime     = time();
 $year      = date("Y", $utime);
@@ -118,6 +113,16 @@ echo "<tr>
           <td><input type=\"text\" value=\"$year:$month:$rest\"
                      name=\"exp_expires\"></td>
      </tr>\n";
+
+#
+# Select a group
+# 
+echo "<tr>
+          <td colspan=2>Group:<br>(leave blank to use default group)</td>
+          <td><input type=\"text\" name=\"exp_gid\"
+                     size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
+              </td>
+      </tr>\n";
 
 ?>
 

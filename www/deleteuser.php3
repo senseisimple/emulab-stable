@@ -25,12 +25,8 @@ $isadmin = ISADMIN($uid);
 #
 # Confirm a real user
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT uid FROM users where uid='$target_uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting user $target_uid: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT status FROM users where uid='$target_uid'");
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No such user '$target_uid'", 1);
 }
@@ -93,31 +89,21 @@ if (!$confirmed_twice) {
 }
 
 #
-# The project membership table needs to be cleansed.
+# The group membership table needs to be cleaned.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"delete FROM proj_memb where uid='$target_uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error removing $target_uid from project ".
-	    "membership table: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("delete FROM group_membership where uid='$target_uid'");
+
+#
+# Remove the user account before killing the user entry.
+#
+SUEXEC($uid, "flux", "rmacct-ctrl $target_uid", 0);
 
 #
 # Then the users table,
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"delete FROM users where uid='$target_uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error removing $target_uid from users table: ".
-	    "$err\n", 1);
-}
-
-#
-# Remove the user account from the control nodes.
-#
-SUEXEC($uid, "flux", "rmacct-ctrl $target_uid", 0);
+$query_result =
+    DBQueryFatal("delete FROM users where uid='$target_uid'");
 
 #
 # Warm fuzzies.
@@ -129,11 +115,7 @@ echo "<center><h2>
 #
 # Generate an email to the testbed list so we all know what happened.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"select usr_name,usr_email FROM users where uid='$uid'");
-$row = mysql_fetch_row($query_result);
-$uid_name  = $row[0];
-$uid_email = $row[1];
+TBUserInfo($uid, $uid_name, $uid_email);
 
 mail($TBMAIL_OPS,
      "TESTBED: User $target_uid removed",

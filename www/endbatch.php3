@@ -32,39 +32,19 @@ $exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
 #
 # Check to make sure thats this is a valid PID/EID tuple.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM batch_experiments WHERE ".
-        "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The experiment $exp_eid is not a valid batch mode experiment ".
-            "in project $exp_pid.", 1);
+if (! TBValidBatch($exp_pid, $exp_eid)) {
+    USERERROR("The experiment $exp_eid is not a valid batch mode experiment ".
+	      "in project $exp_pid.", 1);
 }
-$row = mysql_fetch_array($query_result);
 
 #
-# Verify that this uid is a member of the project for the experiment
+# Verify Permission.that this uid is a member of the project for the experiment
 # being displayed, or is an admin type.
 #
-if (! $isadmin) {
-    $query_result =
-	mysql_db_query($TBDBNAME,
-		       "SELECT pid,trust FROM proj_memb ".
-		       "WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
-    
-    if (mysql_num_rows($query_result) == 0) {
-	USERERROR("You are not a member of Project $exp_pid for ".
-		  "Experiment: $exp_eid.", 1);
-    }
-    
-    if (($row = mysql_fetch_row($query_result)) == 0) {
-	TBERROR("Database Error: Getting trust for uid $uid.", 1);
-    }
-    $trust = $row[1];
-    
-    if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
-	USERERROR("You are not group or local root in Project $exp_pid, ".
-		  "so you cannot end batch experiments", 1);
-    }
+if (! $isadmin &&
+    ! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
+    USERERROR("You do not have permission to end batch experiments in ".
+	      "project/group $exp_pid/$exp_gid!", 1);
 }
 
 #
@@ -100,20 +80,22 @@ if (!$confirmed) {
 }
 
 #
-# We need the unix gid for the project for running the scripts below.
+# We need the gid.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
-}
-$gid = $row[0];
+$query_result =
+    DBQueryFatal("SELECT gid FROM batch_experiments WHERE ".
+		 "eid='$exp_eid' and pid='$exp_pid'");
+$row = mysql_fetch_array($query_result);
+$exp_gid = $row[gid];
+
+#
+# and the unix stuff.
+# 
+TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
 # We run a wrapper script that does all the work of terminating the
 # experiment. 
-#
-#   tbstopit <pid> <eid>
 #
 echo "<center><br>";
 echo "<h3>Starting Batch Mode Experiment Cancelation. Please wait a moment ...
@@ -128,7 +110,8 @@ flush();
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $gid webkillbatchexp $exp_pid $exp_eid",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
+	       "webkillbatchexp $exp_pid $exp_eid",
  	       $output, $retval);
 
 if ($retval && $retval != 1) {

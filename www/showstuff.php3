@@ -140,6 +140,133 @@ function SHOWPROJECT($pid, $thisuid) {
 }
 
 #
+# A Group
+#
+function SHOWGROUP($pid, $gid) {
+    $query_result =
+	DBQueryFatal("SELECT * FROM groups WHERE pid='$pid' and gid='$gid'");
+    $row = mysql_fetch_array($query_result);
+
+    echo "<table align=center border=1>\n";
+
+    $leader	= $row[leader];
+    $created	= $row[created];
+    $description= $row[description];
+    $expt_count = $row[expt_count];
+    $expt_last  = $row[expt_last];
+    $unix_gid   = $row[unix_gid];
+    $unix_name  = $row[unix_name];
+
+    if (!$expt_last) {
+	$expt_last = "&nbsp";
+    }
+
+    #
+    # Generate the table.
+    # 
+    echo "<tr>
+              <td>GID: </td>
+              <td class=\"left\">$gid</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>PID: </td>
+              <td class=\"left\">$pid</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Description: </td>
+              <td class=\"left\">$description</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Unix GID: </td>
+              <td class=\"left\">$unix_gid</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Unix Group Name: </td>
+              <td class=\"left\">$unix_name</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Group Leader: </td>
+              <td class=\"left\">
+                <A href='showuser.php3?target_uid=$leader'>$leader</A></td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Created: </td>
+              <td class=\"left\">$created</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Experiments Created:</td>
+              <td class=\"left\">$expt_count</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Date of last experiment:</td>
+              <td class=\"left\">$expt_last</td>
+          </tr>\n";
+    
+    echo "</table>\n";
+}
+
+#
+# A list of Group members.
+#
+function SHOWGROUPMEMBERS($pid, $gid) {
+    $query_result =
+	DBQueryFatal("SELECT m.*,u.* FROM group_membership as m ".
+		     "left join users as u on u.uid=m.uid ".
+		     "WHERE pid='$pid' and gid='$gid'");
+    
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+
+    echo "<center>
+          <h3>Group Members</h3>
+          </center>
+          <table align=center border=1>\n";
+
+    echo "<tr>
+              <td align=center>Name</td>
+              <td align=center>UID</td>
+              <td align=center>Privs</td>
+              <td align=center>Approved?</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+        $target_uid = $row[uid];
+	$usr_name   = $row[usr_name];
+	$status     = $row[status];
+	$trust      = $row[trust];
+
+        echo "<tr>
+                  <td>$usr_name</td>
+                  <td>
+                    <A href='showuser.php3?target_uid=$target_uid'>
+                       $target_uid</A>
+                  </td>
+                  <td>$trust</td>\n";
+	    
+	if (strcmp($status, "active") == 0 ||
+	    strcmp($status, "unverified") == 0) {
+	    echo "<td align=center>
+                      <img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+	}
+	else {
+	    echo "<td align=center>
+                      <img alt=\"N\" src=\"redball.gif\"></td>\n";
+	}
+	echo "</tr>\n";
+    }
+    echo "</table>\n";
+}
+
+#
 # A User
 #
 function SHOWUSER($uid) {
@@ -240,12 +367,14 @@ function SHOWUSER($uid) {
 function SHOWEXP($pid, $eid) {
     global $TBDBNAME;
 		
-    $query_result = mysql_db_query($TBDBNAME,
-		"SELECT * FROM experiments WHERE ".
-		"eid=\"$eid\" and pid=\"$pid\"");
+    $query_result =
+	DBQueryFatal("SELECT * FROM experiments WHERE ".
+		     "eid='$eid' and pid='$pid'");
+    if (($exprow = mysql_fetch_array($query_result)) == 0) {
+	TBERROR("Experiment $eid in project $pid is gone!\n", 1);
+    }
 
-    $exprow = mysql_fetch_array($query_result);
-
+    $exp_gid     = $exprow[gid];
     $exp_expires = $exprow[expt_expires];
     $exp_name    = $exprow[expt_name];
     $exp_created = $exprow[expt_created];
@@ -264,7 +393,7 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Name: </td>
             <td class=\"left\">
-                <A href='shownsfile.php3?exp_pideid=$pid\$\$$eid'>
+                <A href='shownsfile.php3?pid=$pid&eid=$eid'>
                    $eid</a></td>
           </tr>\n";
 
@@ -276,6 +405,12 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Project: </td>
             <td class=\"left\">$pid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Group: </td>
+            <td class=\"left\">
+                <A href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</td>
           </tr>\n";
 
     echo "<tr>
@@ -336,7 +471,6 @@ function SHOWNODES($pid, $eid) {
               </center>
               <table align=center border=1>
               <tr>
-                <td align=center>Change</td>
                 <td align=center>Node ID</td>
                 <td align=center>Node Name</td>
                 <td align=center>Type</td>
@@ -388,10 +522,8 @@ function SHOWNODES($pid, $eid) {
 		$readylabel = "No";
 
 	    echo "<tr>
-                    <td align=center>
-                       <A href='nodecontrol_form.php3?node_id=$node_id&refer=$pid\$\$$eid'>
-                            <img alt=\"o\" src=\"redball.gif\"></A></td>
-                    <td>$node_id</td>
+                    <td><A href='shownode.php3?node_id=$node_id'>$node_id</a>
+                        </td>
                     <td>$vname</td>
                     <td>$type</td>\n";
 	    if ($def_boot_osid)
@@ -697,6 +829,109 @@ function SHOWIMAGEID($imageid, $edit) {
               </tr>
               </form>\n";
     }
+
+    echo "</table>\n";
+}
+
+#
+# Show node record.
+#
+function SHOWNODE($node_id) {
+    $query_result =
+	DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	TBERROR("The node $node_id is not a valid nodeid!", 1);
+    }
+		
+    $row = mysql_fetch_array($query_result);
+
+    $node_id            = $row[node_id]; 
+    $type               = $row[type];
+    $def_boot_osid      = $row[def_boot_osid];
+    $def_boot_path      = $row[def_boot_path];
+    $def_boot_cmd_line  = $row[def_boot_cmd_line];
+    $next_boot_osid     = $row[next_boot_osid];
+    $next_boot_path     = $row[next_boot_path];
+    $next_boot_cmd_line = $row[next_boot_cmd_line];
+    $rpms               = $row[rpms];
+    $tarballs           = $row[tarballs];
+    $startupcmd         = $row[startupcmd];
+
+    if (!$def_boot_cmd_line)
+	$def_boot_cmd_line = "&nbsp";
+    if (!$def_boot_path)
+	$def_boot_path = "&nbsp";
+    if (!$next_boot_osid)
+	$next_boot_osid = "&nbsp";
+    if (!$next_boot_path)
+	$next_boot_path = "&nbsp";
+    if (!$next_boot_cmd_line)
+	$next_boot_cmd_line = "&nbsp";
+    if (!$rpms)
+	$rpms = "&nbsp";
+    if (!$tarballs)
+	$tarballs = "&nbsp";
+    if (!$startupcmd)
+	$startupcmd = "&nbsp";
+
+    echo "<table border=2 cellpadding=0 cellspacing=2
+                 align=center>\n";
+
+    echo "<tr>
+              <td>Node ID:</td>
+              <td class=left>$node_id</td>
+      </tr>\n";
+
+    echo "<tr>
+              <td>Node Type:</td>
+              <td class=left>$type</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Def Boot OSID:</td>
+              <td class=left>$def_boot_osid</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Def Boot Path:</td>
+              <td class=left>$def_boot_path</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Def Boot Command Line:</td>
+              <td class=left>$def_boot_cmd_line</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Next Boot OSID:</td>
+              <td class=left>$next_boot_osid</td>
+          </tr>\n";
+
+    echo "<tr>
+             <td>Next Boot Path:</td>
+             <td class=left>$next_boot_path</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Next Boot Command Line:</td>
+              <td class=left>$next_boot_cmd_line</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Startup Command:</td>
+              <td class=left>$startupcmd</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>RPMs:</td>
+              <td class=left>$rpms</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Tarballs:</td>
+              <td class=left>$tarballs</td>
+      </tr>\n";
 
     echo "</table>\n";
 }

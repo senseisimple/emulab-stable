@@ -23,18 +23,15 @@ $isadmin = ISADMIN($uid);
 # Get the project list.
 #
 if ($isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM os_info order by osid");
+    $query_result =
+	DBQueryFatal("SELECT * FROM os_info order by osid");
 }
 else {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select distinct o.* from os_info as o ".
-	"left join proj_memb as p on o.pid IS NULL or p.pid=o.pid ".
-	"where p.uid='$uid' order by o.osid");
-}
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting user list: $err\n", 1);
+    $query_result =
+	DBQueryFatal("select distinct o.* from os_info as o ".
+		     "left join group_membership as g on ".
+		     " o.pid IS NULL or g.pid=o.pid ".
+		     "where g.uid='$uid' order by o.osid");
 }
 
 if (mysql_num_rows($query_result) == 0) {

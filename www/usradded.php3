@@ -24,8 +24,8 @@ if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   FORMERROR("Full Name");
 } else if (! ereg("^[a-zA-Z0-9 .\-]+$", $usr_name)) {
-    USERERROR("Your Full Name can only contain alphanumeric characters, '-', " .
-			"and '.'", 1);
+    USERERROR("Your Full Name can only contain alphanumeric characters, ".
+	      "'-', and '.'", 1);
 }
 
 if (!isset($pid) ||
@@ -161,25 +161,28 @@ else {
 }
 
 #
-# Lets verify the project name and quit early if the project is bogus.
+# If no group name provided, then use the "default group." 
+#
+if (!isset($gid) ||
+    strcmp($gid, "") == 0) {
+    $gid = $pid;
+}
+
+#
+# Lets verify the project/group and quit early if its bogus.
 # We could let things continue, resulting in a valid account but no
-# project membership, but I don't like that.
-# 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM projects WHERE pid=\"$pid\"");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error retrieving info for $pid: $err\n", 1);
-}
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("No such project $pid. Please go back and try again.", 1);
-}
+# membership, but I don't like that.
 #
-# XXX String compare to ensure case match. 
+if (! TBValidGroup($pid, $gid)) {
+    USERERROR("No such project or group $pid/$gid. ".
+              "Please go back and try again.", 1);
+}
+
 #
-$row = mysql_fetch_row($query_result);
-if (strcmp($row[0], $pid)) {
-    USERERROR("No such project $pid. Please go back and try again.", 1);
+# Don't try to join twice!
+#
+if (TBGroupMember($joining_uid, $pid, $gid, $approved)) {
+    USERERROR("You have already applied for membership in $pid/$gid!", 1);
 }
 
 #
@@ -246,57 +249,43 @@ if (! $returning) {
 }
 
 #
-# Don't try to join twice!
-# 
-$query_result = mysql_db_query($TBDBNAME,
-	"select * from proj_memb where uid='$joining_uid' and pid='$pid'");
-if (mysql_num_rows($query_result) > 0) {
-    die("<h3><br><br>".
-        "You have already applied for membership in project: $pid.".
-        "</h3>");
-}
-
-#
-# Add to the project, but with trust=none. The project leader will have
+# Add to the group, but with trust=none. The project/group leader will have
 # to upgrade the trust level, making the new user real.
 #
-$date_applied = date("Y:m:d", time());
-		     
-$query_result = mysql_db_query($TBDBNAME,
-	"insert into proj_memb (uid,pid,trust,date_applied) ".
-        "values ('$joining_uid','$pid','none','$date_applied');");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding adding user $joining_uid to ".
-            "project $pid: $err\n", 1);
+$query_result =
+    DBQueryFatal("insert into group_membership ".
+		 "(uid,gid,pid,trust,date_applied) ".
+		 "values ('$joining_uid','$gid','$pid','none', now())");
+
+#
+# This could be a new user or an old user trying to join a specific group
+# in a project. If the user is new to the project too, then must insert
+# a group_membership in the default group for the project. 
+#
+if (! TBGroupMember($joining_uid, $pid, $pid, $approved)) {
+    DBQueryFatal("insert into group_membership ".
+		 "(uid,gid,pid,trust,date_applied) ".
+		 "values ('$joining_uid','$pid','$pid','none', now())");
 }
 
 #
-# Generate an email message to the project leader. We have to get the
-# email message out of the database, of course.
+# Generate an email message to the group leader.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT head_uid FROM projects WHERE pid='$pid'");
+$query_result =
+    DBQueryFatal("select usr_name,usr_email,leader from users as u ".
+		 "left join groups as g on u.uid=g.leader ".
+		 "where g.pid='$pid' and g.gid='$gid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
-    $err = mysql_error();
-    TBERROR("Database Error getting project leader for project $pid: $err\n",
-             1);
-}
-$leader_uid = $row[0];
-
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_name,usr_email FROM users WHERE uid='$leader_uid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    $err = mysql_error();
-    TBERROR("Database Error getting email address for project leader ".
-            "$leader_uid: $err\n", 1);
+    TBERROR("DB Error getting email address for group leader $leader!", 1);
 }
 $leader_name = $row[0];
 $leader_email = $row[1];
+$leader_uid = $row[2];
 
 mail("$leader_name '$leader_uid' <$leader_email>",
      "TESTBED: $joining_uid $pid Project Join Request",
-     "\n$usr_name ($joining_uid) is trying to join your project ($pid).\n".
+     "\n$usr_name ($joining_uid) is trying to join your group $gid\n".
+     "in project $pid\n".
      "$usr_name has the\n".
      "Testbed username $joining_uid and email address $usr_email.\n".
      "$usr_name's phone number is $usr_phone and address $usr_addr.\n\n".

@@ -13,9 +13,9 @@ $auth_usr = GETLOGIN();
 LOGGEDINORDIE($auth_usr);
 
 echo "
-      <h2>Approve new users in your Project</h2>
-      Use this page to approve new members of your Project.  Once
-      approved, they will be able to log into machines in your Project's
+      <h2>Approve new users in your Project or Group</h2>
+      Use this page to approve new members of your Project or Group.  Once
+      approved, they will be able to log into machines in your Project's 
       experiments. Be sure to toggle the menu options appropriately for
       each pending user. 
 
@@ -67,48 +67,52 @@ echo "
         </tr>
         <tr>
             <td>&nbsp</td>
-            <td>Root</td>
+            <td>Local Root</td>
             <td>-</td>
             <td>User may create/destroy experiments in your project and
                 has root privileges on machines in your experiments</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Group Root</td>
+            <td>-</td>
+            <td>In addition to Local Root privileges, user may also
+                approve new group members and 
+                modify user info for other users within the group. This
+                level of trust is typically given only to TAs and the
+                like.</td>
         </tr>
       </table>
       \n";
 
 #
-# Find all of the groups that this person has group_root in, and then in
-# all of those groups, all of the people who are awaiting to be approved
-# (status = none).
+# Find all of the groups that this person has project/group root in, and 
+# then in all of those groups, all of the people who are awaiting to be
+# approved (status = none).
 #
-# First off, just determine if this person has group_root anywhere.
+# First off, just determine if this person has group/project root anywhere.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid='$auth_usr' ".
-                "and trust='group_root'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting project info for $auth_usr: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT pid FROM group_membership WHERE uid='$auth_usr' ".
+		 "and (trust='group_root' or trust='project_root')");
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("You do not have Project Root permissions in any Project.", 1);
+    USERERROR("You do not have Root permissions in any Project or Group.", 1);
 }
 
 #
 # Okay, so this operation sucks out the right people by joining the
-# proj_memb table with itself. Kinda obtuse if you are not a natural
+# group_membership table with itself. Kinda obtuse if you are not a natural
 # DB guy. Sorry. Well, obtuse to me.
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT proj_memb.* ".
-        "FROM proj_memb LEFT JOIN proj_memb as authed ".
-        "ON proj_memb.pid=authed.pid and proj_memb.uid!='$auth_usr' ".
-           "and proj_memb.trust='none' ".
-        "WHERE authed.uid='$auth_usr' and authed.trust='group_root'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting approvable users for $auth_usr: $err\n",
-             1);
-}
+$query_result =
+    DBQueryFatal("SELECT g.* FROM group_membership as g ".
+		 "LEFT JOIN group_membership as authed ".
+		 "ON g.pid=authed.pid and g.gid=authed.gid and ".
+		 "   g.uid!='$auth_usr' and g.trust='none' ".
+		 "WHERE authed.uid='$auth_usr' and ".
+		 "      (authed.trust='group_root' or ".
+		 "       authed.trust='project_root')");
+
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("You have no new project members who need approval.", 1);
 }
@@ -118,9 +122,9 @@ if (mysql_num_rows($query_result) == 0) {
 # form inside this table is that the selection fields are constructed with
 # name= on the fly, from the uid of the user to be approved. In other words:
 #
-#             uid     menu     project
-#	name=stoller$$approval-testbed value=approved,denied,postpone
-#	name=stoller$$trust-testbed value=user,local_root
+#             uid     menu     project/group
+#	name=stoller$$approval-testbed/testbed value=approved,denied,postpone
+#	name=stoller$$trust-testbed/testbed value=user,local_root
 #
 # so that we can go through the entire list of post variables, looking
 # for these. The alternative is to work backwards, and I do not like that.
@@ -131,6 +135,7 @@ echo "<table width=\"100%\" border=2 cellpadding=2 cellspacing=2
 echo "<tr>
           <td rowspan=2>User</td>
           <td rowspan=2>Project</td>
+          <td rowspan=2>Group</td>
           <td rowspan=2>Date<br>Applied</td>
           <td rowspan=2>Action</td>
           <td rowspan=2>Trust</td>
@@ -153,6 +158,7 @@ echo "<form action='approveuser.php3' method='post'>\n";
 while ($usersrow = mysql_fetch_array($query_result)) {
     $newuid        = $usersrow[uid];
     $pid           = $usersrow[pid];
+    $gid           = $usersrow[gid];
     $date_applied  = $usersrow[date_applied];
 
     #
@@ -162,8 +168,19 @@ while ($usersrow = mysql_fetch_array($query_result)) {
 	$date_applied = "--";
     }
 
-    $userinfo_result = mysql_db_query($TBDBNAME,
-	"SELECT * from users where uid=\"$newuid\"");
+    #
+    # Only project leaders get to add someone as group root.
+    # 
+    TBProjLeader($pid, $projleader);
+    if (strcmp($auth_usr, $projleader) == 0) {
+	    $isleader = 1;
+    }
+    else {
+	    $isleader = 0;
+    }
+
+    $userinfo_result =
+	DBQueryFatal("SELECT * from users where uid='$newuid'");
 
     $row	= mysql_fetch_array($userinfo_result);
     $name	= $row[usr_name];
@@ -183,9 +200,10 @@ while ($usersrow = mysql_fetch_array($query_result)) {
           <tr>
               <td rowspan=2>$newuid</td>
               <td rowspan=2>$pid</td>
+              <td rowspan=2>$gid</td>
               <td rowspan=2>$date_applied</td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$approval-$pid\">
+                  <select name=\"$newuid\$\$approval-$pid/$gid\">
                           <option value='postpone'>Postpone</option>
                           <option value='approve'>Approve</option>
                           <option value='deny'>Deny</option>
@@ -193,10 +211,13 @@ while ($usersrow = mysql_fetch_array($query_result)) {
                   </select>
               </td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$trust-$pid\">
+                  <select name=\"$newuid\$\$trust-$pid/$gid\">
                           <option value='user'>User</option>
-                          <option value='local_root'>Root</option>
-                  </select>
+                          <option value='local_root'>Local Root</option>\n";
+    if ($isleader) {
+	    echo "        <option value='group_root'>Group Root</option>\n";
+    }
+    echo "        </select>
               </td>\n";
 
     echo "    <td>&nbsp;$name&nbsp;</td>
@@ -214,7 +235,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
           </tr>\n";
 }
 echo "<tr>
-          <td align=center colspan=10>
+          <td align=center colspan=11>
               <b><input type='submit' value='Submit' name='OK'></td>
       </tr>
       </form>

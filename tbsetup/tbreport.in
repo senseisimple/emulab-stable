@@ -42,20 +42,22 @@ if (@ARGV != 2) {
 }
 
 my ($pid,$eid) = @ARGV;
+my $state;
 
 #
-# Make sure the experimenter is a member of the right project, and that
-# the experiment really exists.
-#
-if ((!ProjMember($pid)) && (!TBAdmin())) {
-	die "You are not a member of project $pid\n";
+# Experiment must exist.
+# 
+if (!($state = ExpState($pid,$eid))) {
+    die("There is no experiment $eid in project $pid\n");
 }
 
-my $state = ExpState($pid,$eid); 
-
-if (!$state) {
-    print STDERR "Can not find experiment $eid.\n";
-    exit(1);
+#
+# User must have permission to view the experiment.
+#
+if ($UID) {
+    if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+        die("*** You not have permission to view this experiment!\n");
+    }
 }
 
 print "Experiment: $eid\n";

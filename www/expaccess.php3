@@ -109,7 +109,12 @@ if (isset($addpid) && strcmp($addpid, "")) {
     }
 }
 
-SUEXEC($uid, $pid, "webnodeupdate -b $pid $eid", 1);
+#
+# Grab the unix GID for running scripts.
+#
+TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+
+SUEXEC($uid, $unix_gid, "webnodeupdate -b $pid $eid", 1);
 
 echo "<center>
       <h3>Access Permissions Changed.</h3>
@@ -129,7 +134,7 @@ echo "<p>
          Back to access management page</a>\n";
 
 echo "<p>
-      <a href='showexp.php3?exp_pideid=$pid\$\$$eid'>
+      <a href='showexp.php3?pid=$pid&eid=$eid'>
          Back to experiment information page</a>\n";
 
 #

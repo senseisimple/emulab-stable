@@ -23,12 +23,8 @@ if (! $isadmin) {
 #
 # Confirm a real project
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT head_uid FROM projects where pid='$pid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting project head_uid: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT head_uid FROM projects where pid='$pid'");
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No such project '$pid'", 1);
 }
@@ -39,7 +35,7 @@ $head_uid = $row[0];
 # Check user. 
 #
 if (!$isadmin) {
-    if ($uid != $head_uid) {
+    if (strcmp($uid, $head_uid)) {
 	USERERROR("Only the project leader or an administrator may ".
 		  "terminate a project!", 1);
     }
@@ -48,12 +44,8 @@ if (!$isadmin) {
 #
 # Check to see if there are any active experiments. Abort if there are.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments where pid='$pid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting experiment list for $pid: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments where pid='$pid'");
 if (mysql_num_rows($query_result)) {
     USERERROR("Project '$pid' has active experiments. You must terminate ".
 	      "those experiments before you can remove the project!", 1);
@@ -109,26 +101,16 @@ if (!$confirmed_twice) {
 }
 
 #
-# The project membership table needs to be cleansed.
+# The group membership table needs to be cleaned.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"delete FROM proj_memb where pid='$pid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error removing $pid from project membership table: ".
-	    "$err\n", 1);
-}
+$query_result =
+    DBQueryFatal("delete FROM group_membership where pid='$pid'");
 
 #
 # Then the project table itself.
 # 
-$query_result = mysql_db_query($TBDBNAME,
-	"delete FROM projects where pid='$pid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error removing $pid from project table: ".
-	    "$err\n", 1);
-}
+$query_result =
+    DBQueryFatal("delete FROM projects where pid='$pid'");
 
 #
 # Remove the project directory. 
@@ -145,9 +127,11 @@ echo "<center><h2>
 #
 # Generate an email to the testbed list so we all know what happened.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"select usr_name,usr_email FROM users where uid='$uid'");
-$row = mysql_fetch_row($query_result);
+$query_result =
+    DBQueryFatal("select usr_name,usr_email FROM users where uid='$uid'");
+if (($row = mysql_fetch_row($query_result)) == 0) {
+    DBFatal("Getting user info for $uid");
+}
 $uid_name  = $row[0];
 $uid_email = $row[1];
 

@@ -79,39 +79,32 @@ if ($node =~ /^([-\w]+)$/) {
     $node = $1;
 }
 else {
-    fatal("Tainted node name: $node");
+    die("*** Tainted node name: $node\n");
 }
 # Note different taint check (allow /).
 if ($filename =~ /^([-\w.\/]+)$/) {
     $filename = $1;
 }
 else {
-    fatal("Tainted output filename: $filename");
+    die("*** Tainted output filename: $filename\n");
 }
 
 #
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
-    exit(1);
+    die("*** You do not exist in the Emulab Database.\n");
 }
 
 #
-# Root and admin types can do whatever they want. Normal users can only
-# run this on nodes in their own experiments.
+# Verify Permission.
 #
 if ($UID && !TBAdmin($UID)) {
-    if (! NodeAccessCheck(\$node)) {
+    $mereuser = 1;
+
+    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
 	die("*** You do not have permission to create an image from $node\n");
     }
-    if ($node =~ /^([-\w]+)$/) {
-	$node = $1;
-    }
-    else {
-	fatal("Tainted node name: $node");
-    }
-    $mereuser = 1;
 }
 
 #
@@ -120,7 +113,7 @@ if ($UID && !TBAdmin($UID)) {
 my $user_name;
 my $user_email;
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("Cannot determine user name and email address");
+    die("*** Cannot determine user name and email address");
 }
 
 #
@@ -131,7 +124,7 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 my $pid;
 my $eid;
 if (! NodeidToExp($node, \$pid, \$eid)) {
-    die("Could not map $node to its pid/eid");
+    die("*** Could not map $node to its pid/eid");
 }
 
 #
@@ -143,7 +136,7 @@ $db_result =
     DBQueryFatal("select * from images where imageid='$imageid'");
     
 if ($db_result->numrows < 1) {
-    die("No such imageid $imageid!");
+    die("*** No such imageid $imageid!");
 }
 %imageid_row = $db_result->fetchhash();
 
@@ -152,8 +145,9 @@ if (defined($imageid_row{'pid'})) {
     $imagepid = $imageid_row{'pid'};
 }
     
-if ($mereuser && $imagepid && !ProjMember($imagepid, $dbuid)) {
-    die("You do not have permission to load imageid $imageid!");
+if ($mereuser && $imagepid &&
+    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
+    die("*** You do not have permission to use imageid $imageid!\n");
 }
 
 #

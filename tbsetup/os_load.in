@@ -132,42 +132,19 @@ foreach my $node ( @ARGV ) {
 #
 if ($UID && !TBAdmin($UID)) {
     $mereuser = 1;
-}
 
-#
-# Check to make sure that mere user is allowed to muck with nodes
-#
-if ($mereuser) {
-    foreach my $node (@nodes) {
-	if (! NodeAccessCheck(\$node)) {
-	    die("You do not have permission to load images on $node.\n");
-	}
+    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
+	die("You do not have permission to load images on one (or more) ".
+	    "of the nodes!\n");
     }
 }
 
 #
-# Grab the imageid description from the DB. The permission check for this
-# is that mere user can load an image from any project he/she is a member of,
-# or any image that has a null pid field, since those are defined to be
-# open to anyone. 
+# See if allowed to load this image!
 #
-if (defined($imageid)) {
-    my $db_result =
-	DBQueryFatal("select * from images where imageid='$imageid'");
-    
-    if ($db_result->numrows < 1) {
-	die("*** No such imageid $imageid is defined in the DB!\n");
-    }
-    %imageid_row = $db_result->fetchhash();
-
-    my $imagepid = 0;
-    if (defined($imageid_row{'pid'})) {
-	$imagepid = $imageid_row{'pid'};
-    }
-    
-    if ($mereuser && $imagepid && !ProjMember($imagepid)) {
-	die("*** You do not have permission to load imageid $imageid!\n");
-    }
+if (defined($imageid) && $mereuser &&
+    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
+    die("*** You do not have permission to load imageid $imageid!\n");
 }
 
 #
@@ -349,8 +326,8 @@ sub dolisting()
 	
 	$query_result =
 	    DBQueryFatal("select distinct i.* from images as i ".
-			 "left join proj_memb as p on ".
-			 " i.pid IS NULL or p.pid=i.pid ".
+			 "left join group_membership as p on ".
+			 " i.pid IS NULL or (p.pid=i.pid and p.gid=p.pid) ".
 			 "where p.uid='$me' order by i.pid,i.imageid");
     }
     else {

@@ -50,7 +50,8 @@ my @nodes = @ARGV;
 # nodes are specified since this script always does the right thing.
 #
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?\n");
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 
 #
@@ -83,7 +84,12 @@ foreach my $node (@nodes) {
     }
     else {
 	$db_result =
-	    DBQueryFatal("select pid from reserved where node_id='$node'");
+	    DBQueryFatal("select g.unix_name from groups as g ".
+			 "left join experiments as e ".
+			 " on g.pid=e.pid and g.gid=e.gid ".
+			 "left join reserved as r ".
+			 " on e.pid=r.pid and e.eid=r.eid ".
+			 "where r.node_id='$node'");
     }
     if ($db_result->numrows > 0) {
 	@row = $db_result->fetchrow_array();

@@ -62,7 +62,7 @@ function GENKEY ($name) {
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death) {
-    global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR
+    global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR;
 
     mail($TBMAIL_OPS,
          "TESTBED WEB ERROR REPORT",
@@ -153,10 +153,11 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
 		   $output, $retval);
 
     if ($retval) {
-	$foo = "";
+	$foo = "<XMP>\n";
         for ($i = 0; $i < count($output); $i++) {
 	      $foo = "$foo $output[$i]";
 	}
+        $foo = "$foo </XMP>\n";
 	
 	TBERROR("suexec failure. Cmd was \"$cmdandargs\". Error output:\n\n".
                 "$foo", $die);

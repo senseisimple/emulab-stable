@@ -15,6 +15,7 @@ use English;
 my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
 my $CONTROL = "@USERNODE@";
+my $TESTMODE= "@TESTMODE@";
 
 my $HOMEDIR = "/users";
 my $PBAG    = "$TB/sbin/paperbag";
@@ -73,37 +74,29 @@ else {
 }
 
 #
-# Figure out who called us. Possible scenarios:
+# This script always does the right thing, but we prefer that mere users
+# do not run it, except when its for themselves. Otherwise, make sure that
+# user has group/project root in at least one project, which indicates they
+# have some level of responsibility.
 #
-# 1) Called from web UI as some TB admin user to create a project head's 
-#    account for a new project.
-#
-# 2) Called as user with group_root for project to create a user
-#    account.
-#
-# 3) Called from command line as user with group_root for project 
-#    to create a user account.
-#
-# 4  Called from web UI as some random user trying to change his own
-#    account info or password.
-# 
-# 5) Called from command line as root.
-#
-my ($me) = getpwuid($UID) or
-    fatal("$UID not in passwd file");
+if ($UID && !TBAdmin($UID)) {
+    my $dbuid;
 
-if ($UID && !TBAdmin($UID) && ($me ne $user)) {
-    #
-    # Check if group_root for the project.
-    #
-    $query_result =
-	DBQueryFatal("select p1.trust from proj_memb as p1 ".
-		     "left join proj_memb as p2 on p2.pid=p1.pid ".
-		     "where p1.uid='$me' and ".
-		     "p2.uid='$user' and p1.trust='group_root'");
+    if (! UNIX2DBUID($UID, \$dbuid)) {
+	die("You are not a valid emulab user!\n");
+    }
+    if ($dbuid ne $user) {
+	#
+	# Check if group_root/project_root anyplace.
+	#
+	$query_result =
+	    DBQueryFatal("select trust from group_membership ".
+			 "where uid='$dbuid' and ".
+			 "trust='project_root' or trust='group_root'");
 
-    if ($query_result->numrows == 0) {
-	die("$0: $me does not have enough permission in ${user}'s project");
+	if ($query_result->numrows == 0) {
+	    die("$0: You do not have permission to run this script!\n");
+	}
     }
 }
 
@@ -124,45 +117,36 @@ my $user_email  = $db_row[3];
 
 #
 # Get the group (projects user belongs to) names and numbers. 
-# 
+#
 my @groupnames;
 my %groupnumbers;
 my @grouplist;
 
 #
-# Form a list project membership names.
+# Form a list of project (group) membership names. We do this in two
+# steps to ensure that we get the default group membership, since we
+# want that to be the user's primary group. Not sure this really matters
+# all that much, but might as well. 
 # 
 $query_result =
-    DBQueryFatal("select pid from proj_memb where ".
-		 "uid='$user' and trust!='none'");
+    DBQueryFatal("select g.unix_name,g.unix_gid from group_membership as m ".
+		 "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
+		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none'");
 if ($query_result->numrows == 0) {
     fatal("$user is not in any groups!\n");
 }
 while (@db_row = $query_result->fetchrow_array() ) {
     push(@groupnames, $db_row[0]);
-}
-
-#
-# Now join that list with the projects information to the unix gids.
-# 
-$query_result =
-    DBQueryFatal("select pid,unix_gid from projects where ".
-		 join(" or ", map ( "pid='$_'", @groupnames)));
-if ($query_result->numrows == 0) {
-    fatal("Could not get the unix GIDs for the projects!\n");
-}
-# Should probably check to make sure the counts match.
-while (@db_row = $query_result->fetchrow_array()) {
     $groupnumbers{$db_row[0]} = $db_row[1];
 }
 
-#
-# Add some special cases for admin types. Note hardwired gids!
-#
-if (TBAdmin($user)) {
-    push(@groupnames, "wheel", "flux");
-    $groupnumbers{"wheel"} = 0;
-    $groupnumbers{"flux"}  = 601;
+$query_result =
+    DBQueryFatal("select g.unix_name,g.unix_gid from group_membership as m ".
+		 "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
+		 "where m.uid='$user' and m.pid!=m.gid and m.trust!='none'");
+while (@db_row = $query_result->fetchrow_array() ) {
+    push(@groupnames, $db_row[0]);
+    $groupnumbers{$db_row[0]} = $db_row[1];
 }
 
 #
@@ -224,6 +208,19 @@ foreach my $group ( @groupnames ) {
 my $groupargument = " ";
 my $project       = shift @groupnames;
 my $grouplist     = join(",",@groupnames);
+
+#
+# Add some special cases for admin types. Groups must exist already, and
+# probably will. flux is bad ...
+#
+if (TBAdmin($user)) {
+    if ($grouplist) {
+	$grouplist = "$grouplist,wheel,flux";
+    }
+    else {
+	$grouplist = "wheel,flux";
+    }
+}
 
 if ($grouplist) {
     $groupargument = "-G $grouplist";

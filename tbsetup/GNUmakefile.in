@@ -19,12 +19,14 @@ USERBINS        = os_load node_reboot nscheck node_update savelogs
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
-		  console_reset db2ns bwconfig frisbeelauncher
+		  console_reset db2ns bwconfig frisbeelauncher group-update \
+		  rmgroup
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp webkillbatchexp \
-		  assign_wrapper ptopgen webnodeupdate
+		  assign_wrapper ptopgen webnodeupdate webgroupupdate \
+		  webrmgroup
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm
@@ -68,6 +70,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkprojdir
 	chown root $(INSTALL_LIBEXECDIR)/rmproj
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmproj
+	chown root $(INSTALL_SBINDIR)/rmgroup
+	chmod u+s $(INSTALL_SBINDIR)/rmgroup
 	chown root $(INSTALL_LIBEXECDIR)/mkacct-ctrl
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkacct-ctrl
 	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
@@ -78,6 +82,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/exports_setup
 	chown root $(INSTALL_BINDIR)/savevlans
 	chmod u+s $(INSTALL_BINDIR)/savevlans
+	chown root $(INSTALL_SBINDIR)/group-update
+	chmod u+s $(INSTALL_SBINDIR)/group-update
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
 	chown root $(INSTALL_BINDIR)/node_reboot

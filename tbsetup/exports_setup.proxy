@@ -1,5 +1,6 @@
 #!/usr/bin/perl -wT
 use English;
+use Errno;
 use Fcntl ':flock';
 
 #
@@ -94,8 +95,9 @@ $mpid =~ s/\n//;
 if ($mpid =~ /^([-\@\w.]+)$/) {
     $mpid = $1;
 }
-kill('HUP', $mpid) or
+if (kill('HUP', $mpid) == 0) {
     fatal("Could not kill(HUP) process $mpid (mountd): $!");
+}
 
 #
 # Allow time to react since HUP'ing mountd causes all mounts to briefly

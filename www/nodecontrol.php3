@@ -1,5 +1,6 @@
 <?php
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -15,10 +16,10 @@ LOGGEDINORDIE($uid);
 #
 # Check to make sure that this is a valid nodeid
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT node_id FROM nodes WHERE node_id=\"$node_id\"");
+$query_result =
+    DBQueryFatal("SELECT node_id FROM nodes WHERE node_id='$node_id'");
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The node $node_id is not a valid nodeid", 1);
+    USERERROR("The node $node_id is not a valid nodeid!", 1);
 }
 
 #
@@ -27,17 +28,7 @@ if (mysql_num_rows($query_result) == 0) {
 #
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select proj_memb.* from proj_memb left join reserved ".
-	"on proj_memb.pid=reserved.pid and proj_memb.uid='$uid' ".
-	"where reserved.node_id='$node_id'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("The node $node_id is not in an experiment ".
-		  "or not in the same project as you", 1);
-    }
-    $foorow = mysql_fetch_array($query_result);
-    $trust = $foorow[trust];
-    if ($trust != "local_root" && $trust != "group_root") {
+    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
         USERERROR("You do not have permission to modify node $node_id!", 1);
     }
 }
@@ -67,15 +58,22 @@ if ($isadmin) {
 }
 $query_string = "$query_string WHERE node_id=\"$node_id\"";
 
-$insert_result = mysql_db_query($TBDBNAME, $query_string);
-if (! $insert_result) {
-    $err = mysql_error();
-    TBERROR("Database Error changing node setup for $node_id: $err", 1);
-}
+DBQueryFatal($query_string);
 
 echo "<center>
-      <h3>Node Parameters Changed!</h3>
-      </center>";
+      <br>
+      <h3>Node parameters successfully modified!</h3><p>
+      </center>\n";
+
+SHOWNODE($node_id);
+
+#
+# Edit option.
+#
+echo "<p><center>
+           Do you want to edit this the node info?
+           <A href='nodecontrol_form.php3?node_id=$node_id'>Yes</a>
+         </center>\n";
 
 #
 # Standard Testbed Footer

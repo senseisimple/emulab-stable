@@ -11,35 +11,35 @@ PAGEHEADER("Terminate a Testbed Experiment");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
 
 #
 # Must provide the EID!
 # 
-if (!isset($exp_pideid) ||
-    strcmp($exp_pideid, "") == 0) {
+if (!isset($pid) ||
+    strcmp($pid, "") == 0) {
+  USERERROR("The project ID was not provided!", 1);
+}
+
+if (!isset($eid) ||
+    strcmp($eid, "") == 0) {
   USERERROR("The experiment ID was not provided!", 1);
 }
 
-#
-# First get the project (PID) from the form parameter, which came in
-# as <pid>$$<eid>.
-#
-$exp_eid = strstr($exp_pideid, "\$\$");
-$exp_eid = substr($exp_eid, 2);
-$exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
+$exp_eid = $eid;
+$exp_pid = $pid;
 
 #
 # Check to make sure thats this is a valid PID/EID tuple.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments WHERE ".
-        "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments WHERE ".
+		 "eid='$exp_eid' and pid='$exp_pid'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The experiment $exp_eid is not a valid experiment ".
             "in project $exp_pid.", 1);
 }
 $row = mysql_fetch_array($query_result);
+$exp_gid = $row[gid];
 
 #
 # Look for termination in progress and exit with error. Other state
@@ -71,29 +71,10 @@ if ($batchmode) {
 }
 
 #
-# Verify that this uid is a member of the project for the experiment
-# being displayed, or is an admin type. Must be group or local root.
-# This test is also duplicated by the backend, but nice to catch here.
+# Verify permissions.
 #
-if (! $isadmin) {
-    $query_result =
-	mysql_db_query($TBDBNAME,
-		       "SELECT pid,trust FROM proj_memb ".
-		       "WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
-    
-    if (mysql_num_rows($query_result) == 0) {
-	USERERROR("You are not a member of Project $exp_pid for ".
-		  "Experiment: $exp_eid.", 1);
-    }
-    if (($row = mysql_fetch_row($query_result)) == 0) {
-	TBERROR("Database Error: Getting trust for uid $uid.", 1);
-    }
-    $trust = $row[1];
-    
-    if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
-	USERERROR("You are not group or local root in Project $exp_pid, ".
-		  "so you cannot end experiments", 1);
-    }
+if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
+    USERERROR("You do not have permission to end experiment $exp_eid!", 1);
 }
 
 #
@@ -117,7 +98,7 @@ if (!$confirmed) {
           sure you want to terminate Experiment '$exp_eid?'
           </h2>\n";
     
-    echo "<form action=\"endexp.php3\" method=\"post\">";
+    echo "<form action='endexp.php3?pid=$exp_pid&eid=$exp_eid' method=post>";
     echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
@@ -130,13 +111,9 @@ if (!$confirmed) {
 
 #
 # We need the unix gid for the project for running the scripts below.
+# Note usage of default group in project.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
-}
-$gid = $row[0];
+TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
 # We run a wrapper script that does all the work of terminating the
@@ -157,7 +134,7 @@ flush();
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $gid webendexp $exp_pid $exp_eid",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid webendexp $exp_pid $exp_eid",
  	       $output, $retval);
 
 if ($retval) {

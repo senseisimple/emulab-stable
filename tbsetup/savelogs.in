@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+use English;
 
 # Save the tiplogs from an experiment
 
@@ -31,8 +32,8 @@ my $tiplogdir =	"/proj/$pid/tiplogs";
 my $savedir = 	"$tiplogdir/$eid";
 
 # Make sure the user is in the correct project
-if (! ProjMember($pid)) {
-	die "You must be a member of project $pid to use this script\n";
+if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+    die "You do not have permission for $pid/$eid to use this script\n";
 }
 
 # Now, we get a list of all nodes...

@@ -26,10 +26,6 @@ if (!isset($exp_name) ||
     strcmp($exp_name, "") == 0) {
   FORMERROR("Experiment Name (long)");
 }
-if (!isset($exp_created) ||
-    strcmp($exp_created, "") == 0) {
-  FORMERROR("Experiment Created");
-}
 
 #
 # Only known and logged in users can begin experiments. 
@@ -124,59 +120,46 @@ else {
 #
 # Make sure the PID/EID tuple does not already exist in the database.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM experiments ".
-        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
-if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
+$query_result =
+    DBQueryFatal("SELECT eid FROM experiments ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
+if (mysql_num_rows($query_result)) {
+    USERERROR("The experiment name '$exp_id' you have chosen is already ".
               "in use in project $exp_pid. Please select another.", 1);
 }
 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM batch_experiments ".
-        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
-if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_id\" you have chosen is a current ".
+$query_result =
+    DBQueryFatal("SELECT eid FROM batch_experiments ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
+if (mysql_num_rows($query_result)) {
+    USERERROR("The experiment name '$exp_id' you have chosen is a current ".
               "batch mode experiment in project $exp_pid. ".
               "Please select another name.", 1);
 }
 
 #
-# Next, is this person a member of the project specified, and is the trust
-# equal to group or local root?
+# Check group. If none specified, then use default group.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM proj_memb WHERE pid=\"$exp_pid\" and uid=\"$uid\"");
-if (($row = mysql_fetch_array($query_result)) == 0) {
-    USERERROR("You are not a member of Project $exp_pid, so you cannot begin ".
-            "an experiment in that project.", 1);
+if (!isset($exp_gid) ||
+    strcmp($exp_gid, "") == 0) {
+	$exp_gid = $exp_pid;
 }
-$trust = $row[trust];
-if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
-    USERERROR("You are not group or local root in Project $exp_pid, so you ".
-              "cannot begin an experiment in that project.", 1);
+if (!TBValidGroup($exp_pid, $exp_gid)) {
+    USERERROR("No such group $exp_gid in project $exp_gid!", 1);
 }
 
 #
-# We need the unix gid for the project for running the scripts below.
+# Verify permissions.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
+if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
+    USERERROR("You do not have permission to begin experiments in ".
+	      "in Project/Group $exp_pid/$exp_gid!", 1);
 }
-$gid = $row[0];
 
 #
-# We need the users name and email.
+# We need the email address for messages below.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_name,usr_email from users where uid=\"$uid\"");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
-}
-$user_name = $row[0];
-$user_email = $row[1];
+TBUserInfo($uid, $user_name, $user_email);
 
 #
 # Set the experiment state bit to "new".
@@ -196,21 +179,22 @@ else {
 # valid when the tb scripts run. We need to remove the entry if any of
 # this fails!
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"INSERT INTO experiments ".
-        "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, state, shared) ".
-        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$expt_state', $exp_shared)");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
-}
+DBQueryFatal("INSERT INTO experiments ".
+	     "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
+	     "expt_head_uid, state, shared) ".
+	     "VALUES ('$exp_id', '$exp_pid', '$exp_gid', now(), ".
+	     "        '$exp_expires', ".
+	     "        '$exp_name', '$uid', '$expt_state', $exp_shared)");
 
 #
 # This is where the experiment hierarchy is going to be created.
 #
 $dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
+
+#
+# Grab the unix GID for running scripts.
+#
+TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
 # If an experiment "shell" give some warm fuzzies and be done with it.
@@ -219,7 +203,7 @@ $dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
 # to clear it out of the database.
 #
 if ($nonsfile) {
-    $retval = SUEXEC($uid, $gid, "mkexpdir $exp_pid $exp_id", 0);
+    $retval = SUEXEC($uid, $unix_gid, "mkexpdir $exp_pid $exp_id", 0);
 
     echo "<center><br>
           <h2>Experiment Configured!</h2>
@@ -239,6 +223,7 @@ if ($nonsfile) {
 	     "User:        $uid\n".
              "EID:         $exp_id\n".
              "PID:         $exp_pid\n".
+             "GID:         $exp_gid\n".
              "Name:        $exp_name\n".
              "Created:     $exp_created\n".
              "Expires:     $exp_expires\n",
@@ -276,8 +261,8 @@ $last   = time();
 # 
 set_time_limit(0);
 
-$result = exec("$TBSUEXEC_PATH $uid $gid webstartexp $exp_pid ".
-	       "$exp_id $nsfile",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
+	       "webstartexp -g $exp_gid $exp_pid $exp_id $nsfile",
  	       $output, $retval);
 
 if ($retval) {

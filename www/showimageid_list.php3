@@ -23,18 +23,14 @@ $isadmin = ISADMIN($uid);
 # Get the project list.
 #
 if ($isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM images order by imageid");
+    $query_result = DBQueryFatal("SELECT * FROM images order by imageid");
 }
 else {
-    $query_result = mysql_db_query($TBDBNAME,
-	"select distinct i.* from images as i ".
-	"left join proj_memb as p on i.pid IS NULL or p.pid=i.pid ".
-	"where p.uid='$uid' order by i.imageid");
-}
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting user list: $err\n", 1);
+    $query_result =
+	DBQueryFatal("select distinct i.* from images as i ".
+		     "left join group_membership as g on ".
+		     "     i.pid IS NULL or g.pid=i.pid ".
+		     "where g.uid='$uid' order by i.imageid");
 }
 
 if (mysql_num_rows($query_result) == 0) {
@@ -57,6 +53,7 @@ echo "<tr>
 
 while ($row = mysql_fetch_array($query_result)) {
     $imageid    = $row[imageid];
+    # Must encode the imageid since Rob started using plus signs in the names.
     $url        = rawurlencode($imageid);
     $descrip    = $row[description];
     $pid        = $row[pid];

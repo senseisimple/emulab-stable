@@ -94,29 +94,20 @@ else {
 #
 # Only admin types can set the PID to none (for sharing).
 #
-if (strcmp($pid, "none") == 0) {
+if (!isset($pid) ||
+    strcmp($pid, "none") == 0) {
     if (!$isadmin) {
-	USERERROR("Only Emulab Administrators can specify `none' for the ".
+	USERERROR("Only Emulab Administrators can specify 'none' for the ".
                   "project.", 1);
     }
     unset($pid);
 }
-
-#
-# Check that uid has permission to create an OSID in the project specified.
-#
-if (!$isadmin) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\" ".
-	"and (trust='local_root' or trust='group_root')");
-    
-    if (! $query_result) {
-	$err = mysql_error();
-	TBERROR("Database Error finding project membership: $uid: $err\n", 1);
-    }
-    if (mysql_num_rows($query_result) == 0) {
-	USERERROR("You do have permission to create an OSID in ".
-		  "project: `$pid'.", 1);
+else {
+    #
+    # Verify permission.
+    #
+    if (!TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEOSID)) {
+	USERERROR("You do not have permission to create OSID $osid!", 1);
     }
 }
 
@@ -137,16 +128,9 @@ $os_features = join(",", $os_features_array);
 
 #
 # Of course, the OSID record may not already exist in the DB.
-# 
-$query_result = mysql_db_query($TBDBNAME,
-       "SELECT osid FROM os_info WHERE osid=\"$osid\"");
-    
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error finding os_info record: $osid: $err\n", 1);
-}
-if (mysql_num_rows($query_result) != 0) {
-    USERERROR("The OSID `$osid' already exists. Please select another", 1);
+#
+if (TBValidOSID($osid)) {
+    USERERROR("The OSID '$osid' already exists! Please select another.", 1);
 }
 
 #
@@ -165,16 +149,13 @@ else {
     $os_path = "NULL";
 }
 
-$query_result = mysql_db_query($TBDBNAME,
-	"INSERT INTO os_info ".
-	"(osid, description, OS, version, path, magic, machinetype, ".
-	" osfeatures, pid) ".
-	"VALUES ('$osid', '$description', '$OS', '$os_version', $os_path, ".
-        "        '$os_magic', '$os_machinetype', '$os_features', $pid)");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new OSID $osid: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("INSERT INTO os_info ".
+		 "(osid, description, OS, version, path, magic, machinetype, ".
+		 " osfeatures, pid) ".
+		 "VALUES ('$osid', '$description', '$OS', '$os_version', ".
+		 "         $os_path, '$os_magic', '$os_machinetype', ".
+		 "         '$os_features', $pid)");
 
 #
 # Dump os_info record.

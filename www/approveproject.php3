@@ -27,11 +27,8 @@ echo "<center><h1>
 #
 # Grab the head_uid for this project. This verifies it is a valid project.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT head_uid from projects where pid='$pid'");
-if (! $query_result) {
-    TBERROR("Database Error restrieving project leader for $pid", 1);
-}
+$query_result = 
+    DBQueryFatal("SELECT head_uid from projects where pid='$pid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
     TBERROR("Unknown project $pid", 1);
 }
@@ -47,11 +44,9 @@ $headuid = $row[0];
 # and we will change it to "unapproved" or "active", respectively.
 # If the status is "active", we leave it alone. 
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT status,usr_email,usr_name from users where uid='$headuid'");
-if (! $query_result) {
-    TBERROR("Database Error restrieving user status for $headuid", 1);
-}
+$query_result = 
+    DBQueryFatal("SELECT status,usr_email,usr_name from users ".
+		 "where uid='$headuid'");
 if (mysql_num_rows($query_result) == 0) {
     TBERROR("Unknown user $headuid", 1);
 }
@@ -62,14 +57,12 @@ $headname      = $row[2];
 #echo "Status = $curstatus, Email = $headuid_email<br>\n";
 
 #
-# Then we check that the headuid is really listed in the proj_memb
-# table, just to be sure.
+# Then we check that the headuid is really listed in the group_membership
+# table (default group), just to be sure. 
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT trust from proj_memb where uid='$headuid' and pid='$pid'");
-if (! $query_result) {
-    TBERROR("Database Error retrieving trust for $headuid in $pid", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT trust from group_membership where ".
+		 "uid='$headuid' and pid='$pid' and gid='$pid'");
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("User $headuid is not the leader of project $pid.", 1);
 }
@@ -108,23 +101,15 @@ elseif (strcmp($approval, "moreinfo") == 0) {
 elseif ((strcmp($approval, "deny") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
     #
-    # Must delete the proj_memb and project records since we require a
-    # new application once denied. Send the luser email to let him know. 
+    # Must delete the group_membership and project records since we require a
+    # new application once denied. Send the luser email to let him know.
+    # This order is actually important. Release project record last to
+    # avoid (incredibly unlikely) name collision with another new project.
     #
-    $query_result = mysql_db_query($TBDBNAME,
-	    "delete from proj_memb where uid='$headuid' and pid='$pid'");
-    if (! $query_result) {
-        TBERROR("Database Error removing project membership record for ".
-                "project $pid (user: $headuid) after being denied.",
-                1);
-    }
-    $query_result = mysql_db_query($TBDBNAME,
-	    "delete from projects where pid='$pid'");
-    if (! $query_result) {
-        TBERROR("Database Error removing project record for project ".
-                "project $pid (user: $headuid) after being denied.",
-                1);
-    }
+    DBQueryFatal("delete from group_membership ".
+		 "where uid='$headuid' and pid='$pid' and gid='$pid'");
+    DBQueryFatal("delete from groups where pid='$pid' and gid='$pid'");
+    DBQueryFatal("delete from projects where pid='$pid'");
 
     mail("$headname '$headuid' <$headuid_email>",
          "TESTBED: Project '$pid' Denied",
@@ -145,13 +130,7 @@ elseif ((strcmp($approval, "deny") == 0) ||
     # from the database.
     #
     if (strcmp($approval, "destroy") == 0) {
-        $query_result = mysql_db_query($TBDBNAME,
-	    "delete from users where uid='$headuid'");
-        if (! $query_result) {
-	    TBERROR("Database Error removing user record for $headuid ".
-                    "after project $pid was denied(destroyed).", 
-                    1);
-        }
+	DBQueryFatal("delete from users where uid='$headuid'");
 
         mail("$headname '$headuid' <$headuid_email>",
              "TESTBED: Account '$headuid' Terminated",
@@ -173,22 +152,14 @@ elseif ((strcmp($approval, "deny") == 0) ||
 }
 elseif (strcmp($approval, "approve") == 0) {
     #
-    # Change the trust value in proj_memb to group_root, and set the
+    # Change the trust value in group_membership to group_root, and set the
     # project "approved" field to true. 
     #
-    $query_result = mysql_db_query($TBDBNAME,
-	    "UPDATE proj_memb set trust='group_root' ".
-            "WHERE uid='$headuid' and pid='$pid'");
-    if (! $query_result) {
-        TBERROR("Database Error adding $headuid to project $pid.", 1);
-    }
+    DBQueryFatal("UPDATE group_membership ".
+		 "set trust='project_root',date_approved=now() ".
+		 "WHERE uid='$headuid' and pid='$pid' and gid='$pid'");
 
-    $query_result = mysql_db_query($TBDBNAME,
-        "UPDATE projects set approved='1' WHERE pid='$pid'");
-    if (! $query_result) {
-        TBERROR("Database Error setting approved field for ".
-                "project $pid.", 1);
-    }
+    DBQueryFatal("UPDATE projects set approved='1' WHERE pid='$pid'");
 
     #
     # Change the status if necessary. This only happens for new users
@@ -206,13 +177,8 @@ elseif (strcmp($approval, "approve") == 0) {
 	    TBERROR("Invalid $headuid status $curstatus in ".
                     "approveproject.php3", 1);
         }
-        $query_result = mysql_db_query($TBDBNAME,
-	    "UPDATE users set status='$newstatus' WHERE uid='$headuid'");
-        if (! $query_result) {
-            TBERROR("Database Error changing $headuid status to ".
-                    "$newstatus.",
-                    1);
-        }
+	DBQueryFatal("UPDATE users set status='$newstatus' ".
+		     "WHERE uid='$headuid'");
     }
 
     mail("$headname '$headuid' <$headuid_email>",
