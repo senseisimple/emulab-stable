@@ -54,6 +54,7 @@ sub myMain {
     use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
     use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/arch/auto/SNMP';
     use SNMP;
+
 #$SNMP::debugging = 1;
     
     &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
@@ -170,7 +171,7 @@ sub myMain {
 	    if ($on)     { $op = "outletOn";    }
 	    elsif ($off) { $op = "outletOff";   }
 	    else         { $op = "outletReboot";}
-	    if (! &UpdateField(\$sess2,$CtlOID,\@outlets,$op,\$b,\$c,\$v)) {
+	    if (! &UpdateField(\$sess2,\$CtlOID,\@outlets,\$op,\$b,\$c,\$v)) {
 		print STDERR "Outlet #@outlets control failed.\n";
 		}
 	}
@@ -579,19 +580,23 @@ sub UpdateField {
     foreach my $port (@ports) {
 	#print "Processing port $port, $OID, to $val. Last was $Status.\n";
 	$Status = $session->get([[$OID,$port]]);
-	print "Value for $port was $Status\n" if ($v);
-	if ($Status ne $val) {
+	if (!defined $Status) { 
+	  print "Port $port, change to $val: No answer from device\n"; 
+	} else {
+	  print "Value for $port was $Status\n" if ($v);
+	  if ($Status ne $val) {
 	    print "Setting value for $port to $val\n" if ($v);
 	    #The empty sub {} is there to force it into async mode
 	    $session->set([[$OID,$port,$val,"INTEGER"]],sub {});
 	    if ($b) {
-		while ($Status ne $val) { 
-		    $Status=$session->get([[$OID,$port]]);
-		    print "Value for $port was ",$Status,"\n" if ($v);
-		}
+	      while ($Status ne $val) { 
+		$Status=$session->get([[$OID,$port]]);
+		print "Value for $port was ",$Status,"\n" if ($v);
+	      }
 	    }
+	  }
 	}
-    }
+      }
     if ( (!$b) && $c ) {
 	my $loops=0;
 	my $max_loops=20;
