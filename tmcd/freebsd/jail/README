@@ -1,6 +1,12 @@
 These are files to support building jails on freebsd machines.
-They go in /etc/jail on the host machine. The rest of the support
-is currently in ../ron, but will be merged at some point.
+They go in /etc/jail on the host machine. Other support is scattered
+in the parent directory and in ../ron.
 
-There is a dup set of passwd/group files here. They can probably
-be merged at some point.
+There is a dup set of passwd/group files here that are used inside the
+jail. This ensures that the user (who might be root) does not get a
+password file with anything important in it.
+
+More information can be found at:
+
+	http://www.emulab.net/doc/docwrapper.php3?docname=jail.html
+
