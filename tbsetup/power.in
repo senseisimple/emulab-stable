@@ -141,7 +141,6 @@ foreach my $node (@machines) {
     # Associate this node with the power controller it is attached to
     #
     push @{$outlets{$power_id}}, [$node, $outlet];
-    }
 }
 
 print "machines= ",join(" ",@machines),"\n" if $verbose;
