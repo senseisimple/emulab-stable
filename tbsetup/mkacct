@@ -1,253 +1,175 @@
 #!/usr/local/bin/perl -wT
 
-### 
-### $Id: mkacct,v 1.24 2000-11-29 21:35:33 kwright Exp $
-###
-### Address 'lkw' comments:
-### Break up into subroutines, possibly libraries. We'll
-### need some of the same things for the removal script.
-###
-### mkacct - Makes accounts for all users in this experiment's project.
-### Adds accounts to currently booted OS only.
-###
+# $Id: mkacct,v 1.25 2000-12-04 00:07:58 kwright Exp $
 
+use English;
 use Mysql;
 
-## un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+my $me;                # alphanumeric username of $UID 
 
-## check usage
-if ($#ARGV < 0) { 
-    die("Usage: mkacct <eid>\n".
-	"\tCreates user accounts by experiment.\n");
-}
+my $eid;               # experiment ID from command line
+my $group_name;        # project/group that the above EID belongs to
+my $group_number;      # the number associated with group_name
 
-## sanitize EID arg
-my $eid = $ARGV[0];
-if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
-    die("Invalid eid '$eid' contains illegal characters.\n"); 
-}
+my $dbh;               # database handle 
+my $sth;               # statement handle
+my @db_row;
+my $db_query;
 
-##
-## Check for valid user. This script is setuid tbroot but
-## the effective userid must be a user in the experiment.
-## Add check for latter. -lkw 11/29/00
-##
-open(WHO,"/usr/bin/whoami 2>&1 |");
-chop($_ = <WHO>);
-close(WHO);
-if ($_ ne "root") { die("Must be root.\n"); }
+my %epasswd;           # encrypted passwords 
+my %user_number;       # user number (ex: would be 1025 for user kwright)
+my %fullname;          # also known as the "comment field" in /etc/passwd 
 
-##
-## Open database
-##
-my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my @nodes;             # Nodes belonging to this experiment.
 
-##
-## If the EID doesn't exist, it's invalid.
-##
-print "Checking that $eid is a valid EID...";
-my $cmd = "select eid from experiments where eid='$eid'";
-my $sth = $dbh->query($cmd);
-my $rows =0;
+sanitize();
+dbsetup();
+check_credentials();
+dowork();
 
-## Must put in check that $sth defined. May be undefined if
-## query command above is syntactically incorrect which could
-## conceivably be caused by a weird eid argument. -kw
-while ($sth->fetchrow_array) {
-    $rows += 1;
-}
-if ( $rows != 1 ) { 
-    die("Invalid eid '$eid' (not in database).\n"); 
-} else {
-    print "ok.\n";
-}
+sub doqueries() {
 
-##
-## Select user parameters for users in given experiment.
-##
-print "Selecting users...\n";
-$cmd = 
-  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name, p.control_node, p.pid ".
-  "from experiments as e ".
-  "left join projects as p on e.pid = p.pid ".
-  "left join proj_memb as pm on p.pid = pm.pid ".
-  "left join users as u on u.uid = pm.uid ".
-  "where e.eid = '$eid'";
-$sth = $dbh->query($cmd);
-my %passwd = ();
-my %unix_uid = ();
-my %fullname = ();
-while (@row = $sth->fetchrow_array) {
-    if ( @row == 6 ) {
-	if ( $row[0] =~ /^([a-z0-9]+)$/ ) {
-	    $user = $1;
-	} else {
-	    die "Username from database invalid\n";
-	}
-
-	if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
-	    $passwd{$user} = $1;
-	} else {
-	    die "encrypted passwd from database not valid.\n";
-	}
-
-	if ( $row[2] =~ /^(\d+)$/ &&                # unix UID
-	     $row[2] < 32000 ) {                    # unix UID must be < 32000 
-	    $unix_uid{$user} = $1;
-	} else {
-	    die "unix UID from passwd not valid.\n";
-	}
-
-	if ( $row[3] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
-	    $fullname{$user} = $1;
-	} else {
-	    die "Fullname from database not valid.\n";
-	} 
-
-	if ( $row[4] =~ /^(([^:]+$|^))$/ ) {          # control node 
-	    $control_node = $1;
-	} else {
-	    die "Control node from database not valid.\n";
-	} 
-
-	if ( $row[5] =~ /^([a-z0-9]+)$/ ) {          # project/group name
-	    $group = $1;
-	} else {
-	    die "Group name from database not valid.\n";
-	} 
-
-	
-    } else {
-	die "User data query did not return correct number of elements.\n";
-    }
-
-    print "\t$user\n";    
-}
-
-print "Control node: $control_node\n";
-
-##
-## Select group ID for experiment.
-##
-print "Selecting group ID for experiment...";
-$cmd = 
-  "select unix_gid from projects as p ".
-  "left join experiments as e on e.pid = p.pid ".
-  "where e.eid = '$eid'";
-$sth = $dbh->query($cmd);
-if (@row = $sth->fetchrow_array) {
-    if ( $row[0] =~ /^(\d+)$/ &&             # unix GID
-	 $row[0] < 65536 ) {                 # unix GID must be < 65535 
-	$unix_gid = $1;
-	print "$group ($unix_gid)\n";
-    } else {
-	die("Invalid group ID.\n"); 
-    }
-}
- 
-##
-## Select machines.
-##
-print "Selecting machines...";
-$cmd = 
-  "select IP from interfaces as ip ".
-  "left join reserved as r on r.node_id=ip.node_id ".
-  "left join experiments as e on r.eid = e.eid ".
-  "where e.eid = '$eid' and card=4";
-$sth = $dbh->query($cmd);
-my @nodes = ();
-while (@row = $sth->fetchrow_array) {
-    push(@nodes,$row[0]);
-    print " $row[0] ";
-}
-##
-## XXX control nodes not currently set correctly by
-## web interface (not yet implemented); all projects
-## use plastic as their control node. Even if it did,
-## it looks as if the database type is a string not an
-## IP address.  
-##
-##push(@nodes, $control_node);
-## Note: Commented out on 11/28 because it was thought to
-## be better to 
-#push(@nodes, "155.99.212.74"); 
-#print " 155.99.212.74";
-#print "\n";
-
-
-##
-## For each machine, ping to see if its alive.
-## If alive, determine if its FreeBSD or Linux and
-## create the user accounts. 
-##
-my $last = "";
-my $OS = "";
-my $IP = "";
-foreach $IP (@nodes) {
-    ## If this machine is not the same as the last one, get the OS
-    ## Check also that the IP address is valid (some interfaces might
-    ## not have an IP address). 
-
-    if ( $IP ne $last && $IP =~ /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/) {
-	$IP = $1;
-        $last = $IP;
-	
-         if (-e "/bin/ping") {
-            open(PING,"/bin/ping -c 1 $IP 2>&1 |");
-        } else {
-            open(PING,"/sbin/ping -c 1 $IP 2>&1 |");
-        }
-        do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
-	close(PING); 
-
-        if ( $1 <= 0 ) {
-
-	    die "Couldn't ping machine $IP\n";
-
-	} else {  
-
-	    print "Checking OS on $IP...";
-            open(UNAME,"/usr/local/bin/sshtb $IP uname 2>&1 |");
-            $_ = <UNAME>;
-	    print $_;
-
-	    ## FreeBSD says "155.99.214.129: Connection refused"
-	    ##    and can also say "Host key doesn't match..."  
-	    ##    and can also say "@@@@@@... WARNING HOST ID CHANGED..."
-            if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) 
-		 || ($_ =~/^@+/) ) { 
-	      
-		print "Uname failed on $IP:$_";
-		while (<UNAME>) {
-		  print;
-		}
-		close(UNAME);
-		die("\n"); 
-	    } else { 
-		$OS = $_;
+    print "Selecting users...\n";
+    $db_query = 
+	"select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
+        "from experiments as e " .
+	"left join projects as p on e.pid = p.pid " .
+	"left join proj_memb as pm on p.pid = pm.pid " .
+	"left join users as u on u.uid = pm.uid ".
+	"where e.eid = '$eid'";
+    
+    $sth = $dbh->query($db_query);
+    while (@row = $sth->fetchrow_array) {
+	if ( @row == 4 ) {
+	    if ( $row[0] =~ /^([a-z0-9]+)$/ ) {     # no uppercase
+		$name = $1;
+	    } else {
+		die "Username $row[0] from database invalid\n";
 	    }
-	    close(UNAME);
 
-        } 
+	    if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
+		$epasswd{$name} = $1;
+	    } else {
+		die "Encrypted passwd $row[1] from database not valid.\n";
+	    }
 
-        if ( $OS =~ /Linux/ ) {  
-	    
-	    ## 1) Use groupadd to add group
-	    ## 2) Use useradd to add users
-	    ##
-	    ## Rather than use useradd's defaults (which are normally
-	    ## fine), we're explicit.
-	    ##  
-	    ## If either the group or the user exists, groupadd and useradd
-            ## will report it and move on.
+	    if ( $row[2] =~ /^(\d+)$/ &&                # unix UID
+		 $row[2] < 32000 ) {                    # must be < 32000 
+		$user_number{$name} = $1;
+	    } else {
+		die "unix UID $row[2] from database not valid.\n";
+	    }
 
-	    print "Creating group $unix_gid on $IP.\n";
-	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $unix_gid $group 2>&1 |");
+	    if ( $row[3] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
+		$fullname{$name} = $1;
+	    } else {
+		die "Fullname $row[3] from database not valid.\n";
+	    } 
+
+	} else {
+	    die "User data query did not return correct number of fields.\n";
+	}
+
+	print "\t$name\n";    
+    }
+
+    # 
+    # Find the group name (which is the same as the project) and
+    # group number, and control node for the project. 
+    #
+    # Note: In the end, I simply assign to 'plastic' as control 
+    # nodes are not yet set in the database. 12/3/00 -lkw
+    #
+    $db_query       = "select p.unix_gid, p.pid, p.control_node " .
+	              "from projects as p, experiments as e " .
+		      "where p.pid=e.pid and e.eid='$eid'";	       
+    $sth            = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting group fields.\n";
+    @db_row         = $sth->fetchrow_array();
+    $group_number   = $db_row[0];
+    $group_name     = $db_row[1];
+    $control_node   = $db_row[2];
+    $control_node   = "plastic";          # see note above
+
+    print "Group: $group_name [$group_number].\n";
+    print "Control node: $control_node.\n";
+
+    # Find the machines
+    
+    print "Selecting machines...\n";
+    $db_query = "select IP from interfaces as ip " .
+	        "left join reserved as r on r.node_id=ip.node_id ".
+                "left join experiments as e on r.eid = e.eid ".
+                "where e.eid = '$eid'";
+    $sth = $dbh->query($db_query);
+    got_tuples($sth) or die "$0: Error selecting nodes for $eid.\n";
+    while (@row = $sth->fetchrow_array) {
+	if ($row[0] =~ /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/
+	    && is_node_ok($row[0])) {
+	    push(@nodes, $row[0]);
+	    print "   $row[0]\n";
+	}
+    }
+}
+
+sub is_node_ok() {
+
+    my $node = $_[0];
+    my $numseen;
+
+    # check for duplicates
+    if ( grep($node, @nodes) ) {
+	print "$node is a duplicate. Skipping.\n";
+	return 0;
+    }
+   
+    open(PING,"/sbin/ping -c 1 $node 2>&1 |");
+    do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
+    close(PING); 
+    if ( !$1 ) {
+	print "Couldn't ping $node. Skipping.\n";
+	return 0;
+    }
+
+    # If we're here, the node passed the tests we've done so far.
+    return 1;
+}
+
+sub dowork() {
+
+    doqueries();
+
+    # Ping nodes to see if alive. If alive, determine if 
+    # machine is running FreeBSD or Linux or <other>.   If 
+    # <other>, skip that node. If we don't skip, create the
+    # group info and user accounts and directories.
+
+    my $OS = "";
+    my $IP = "";
+
+    NODE: foreach $node (@nodes) {
+
+	$OS = get_os($node);
+	next NODE if !$OS; 
+
+	if ( $OS =~ /Linux/ ) {
+
+	    #
+	    # 1) Use groupadd to add group
+	    # 2) Use useradd to add users
+	    #
+	    # Rather than use useradd's defaults (which are normally
+	    # fine), we're explicit.
+	    #  
+	    # If either the group or the user exists, groupadd and useradd
+            # will report it and move on.
+            #
+
+	    print "Creating group $unix_gid on $node.\n";
+	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $group_number $group_name 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
-	    my $i = 1;
+
 	    foreach my $user (keys %passwd) {
 
 		print "Creating user $user on $IP.\n";
@@ -258,109 +180,178 @@ foreach $IP (@nodes) {
 
 	} elsif ($OS =~ /FreeBSD/) { 
 
-	    ## 1) Create groups
-	    ## 2) Create user accts 
-	    ## 3) Create home directories
+	    #
+	    # Make group
+	    # Note: If I don't do an su1 below, the command will be executed
+	    #       as the user $UID. XXX Need to address. -lkw
+	    #
+	    print "Adding group $group_name to $node.\n";
+	    open(ADDGROUP, "/usr/site/bin/su1 /usr/local/bin/sshtb $node /usr/sbin/pw groupadd $group_name -g $group_number 2>&1 |");
+	    while (<ADDGROUP>) { print "$_"; }
+	    close(ADDGROUP);
 
-	    ## Fetch remote group information
-	    open(SCP, "/usr/local/bin/scp -pq $IP:/etc/group /tmp/group.$IP |");
-	    while ( <SCP> ) { print $_; }
-	    close SCP;
-
-	    ## Does the group already exist?
-	    open(GROUP, "+</tmp/group.$IP") or die "Couldn't open /tmp/group.$IP\n";
-	    my $prev = 0;
-	    while ( <GROUP> ) {
-		if ( $_ =~ /^$group:/ ) { 
-		    $prev = 1;
-		}
+	    foreach my $name (keys %epasswd) {
+		make_user($name, $node); 
 	    }
 
-	    if ( !$prev ) {
-		print "Adding group $group to $IP\n"; 
-		print GROUP "$group:*:$unix_gid:\n";
-		close GROUP;
-		open(SCP, "/usr/local/bin/scp -pq /tmp/group.$IP $IP:/etc/group |");
-		while ( <SCP> ) { print $_; }
-		close SCP;
-	    } else {
-		print "Group $group already exists on $IP\n";
-		close GROUP;
-	    }
-
- 	    ## Fetch remote login information
-	    open(SCP, "/usr/local/bin/scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
-	    while ( <SCP> ) { print $_; }
-	    close SCP;
-
-	    my $addon   = "";
-	    $chpassf = "/tmp/chpasstmp";
-	    open (TMPCHPASS, ">$chpassf") or die "Couldn't open $chpassf for writing.\n";
-	    print TMPCHPASS "#!/bin/sh\n";
-
-	    foreach my $user (keys %passwd) {
-
-		## Check if the user account already exists.
-		my $prev = 0;
-		open(MPWD, "/tmp/master.passwd.$IP");
-		while ( <MPWD> ) {
-		    if ( $_ =~ /^$user:/ ) { 
-			$prev = 1;
-			print "Account $user exists on $IP\n";
-		    }
-		}
-		close MPWD;
-
-		### LKW: I initially created the account by using 'ssh chpass',
-		### but that stopped working for some reason unknown to me.
-		### I replaced it with the script-creation, scp it, source it 
-		### seen below. 
-
-		if ( $prev == 0 ) {
-		    print "Adding $user to $IP\n";
-		    $addon = "$user:$passwd{$user}:$unix_uid{$user}:" .
-			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
-			     "/bin/tcsh";
-
-		    print TMPCHPASS "/usr/bin/chpass -a '$addon'\n";
-		}		
-
-		## Create home directory
-		if ( -e "/users/$user" ) {
-		    print "/users/$user already exists.\n";
-		} else  { 
-		    print "Creating /users/$user.\n";
-		    open(MKDIR, "/bin/mkdir /users/$user 2>&1 |");
-		    while ( <MKDIR> ) { print "$_"; }
-		    close(MKDIR); 
-		    
-		    ## If created, chown and chgrp
-		    if (-e "/users/$user") {
-			open(CHOWN, "/usr/sbin/chown $unix_uid{$user} /users/$user 2>&1 |" );
-			while ( <CHOWN> ) {print "$_"; }
-			close(CHOWN); 
-
-			open(CHGRP, "/usr/bin/chgrp $unix_gid /users/$user 2>&1 |" );
-			while ( <CHGRP> ) {print "$_"; }
-			close(CHGRP); 
-		    }
-		}
-	    }
-	    close TMPCHPASS;
-	    open(SCP2, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
-	    while ( <SCP2> ) { print $_; }
-	    close SCP2;
-
-	    print "Commiting password changes to $IP.\n";
-	    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
-	    while ( <CHPASS> ) {print "\t$_"; }
-	    close(CHPASS);
-
-	} else {
-	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
     }
 }
 
+sub dbsetup() {
+    $dbh = Mysql->connect("localhost", "tbdb", "script", "none");
+}
 
-exit(0);
+sub sanitize() {
+
+    ## un-taint path
+    $ENV{'PATH'} = '/bin:/usr/bin';
+    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+    ## check usage
+    if ($#ARGV < 0) { 
+	die("Usage: mkacct <eid>\n" .
+	    "\tCreates user accounts by experiment.\n");
+    }
+
+    ## sanitize eid
+    if ( $ARGV[0] =~ /^([a-z0-9-]+)$/i ) {
+	$eid = $1;
+    } else {
+	die "$0: EID $ARGV[0] has invalid characters.\n";
+    }
+
+    ## effective uid must be root
+    if ($> != 0) {
+	die("$0: Must have an EUID of 0 to create accounts.\n");
+    }
+
+}
+
+#
+# Figure out who called us. There are 3 possible scenarios:
+#
+# 1) Called as some user belonging to the project associated with EID
+#    (from beginexp_process.php3).
+#
+# 2) Called from command line as user belonging to the project associated
+#    with given EID.
+#
+# 3) Called from command line as root.
+#
+# 4) Called from command line as an admin user.
+#
+sub check_credentials() {
+
+    print "Credential check: ";
+
+    #
+    # Make sure the UID is a valid UID in this machine's passwd file
+    #
+    my ($me) = getpwuid($UID) or die "$0: $UID not in passwd file";
+
+    #
+    # Check if we're root
+    #
+    if ($UID == 0) {
+	print "Root user allowed.\n";
+	return;
+    } 
+    
+    #
+    # User could be an admin user.
+    #
+    $sth    = $dbh->query("select admin from users where uid='$me'");
+    @db_row = $sth->fetchrow_array();
+    if ($db_row[0] == 1) {
+	print "$me member of experiment $eid. Allowed.\n";
+	return;
+    } 
+
+    #
+    # See if we belong to the project that this experiment is in.
+    # All we have to check here is that a tuple exists (if $me isn't
+    # in the experiment, no tuples will be selected).
+    #
+    $db_query = "select pid from proj_memb as p, experiments as e" . 
+	        "where eid='$eid' and e.pid=p.pid and uid='$me'";
+    $sth      = $dbh->query($db_query);
+    if (got_tuples($sth)) {
+	return;
+    }
+
+    #
+    # If we're here, we do not have the correct credentials
+    #
+    print "Not root, a TB admin user, or group_root for $eid. Failed.\n";   
+    exit(1);
+}
+
+###
+### Return non-zero if we got tuples; 0 if not.
+###
+sub got_tuples() {
+
+    my $sth = $_[0];
+    my $db_numrows = $sth->numrows;
+    return $db_numrows;
+}
+
+sub get_os() {
+
+    my $node = $_[0];
+
+    print "Checking OS on $node...";
+
+    # Get the first line. If the first line isn't what we expect,
+    # print the rest and return 0 for failure.
+
+    open(UNAME,"/usr/site/bin/su1 /usr/local/bin/sshtb $node uname 2>&1 |");
+    $_ = <UNAME>;
+    if ( !($_ =~ /Linux/ or $_ =~ /FreeBSD/) ) {
+	
+	print "uname returned unexpected value on $node:\n";
+	print $_;
+	while (<UNAME>) {
+	    print;
+	}
+	return 0;
+    }
+
+    print "$_";
+    return $_;
+} 
+
+sub make_user() {
+
+    my $name = $_[0];
+    my $node = $_[1];
+
+    print "Adding user $name to $node.\n";
+
+    my $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $node " .
+	      "/usr/sbin/pw useradd $name -u $user_number{$name} " .
+		  "-d /users/$name -g $group_number -s /bin/tcsh";
+    # We couldn't do the -c for some reason.  
+    #		  "-c \"$fullname{$name}\" ";
+
+    open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd on $node.";
+    while (<PWADD>) { print "$_"; }
+    close(PWADD);
+    
+    # Note: tried to take the su1 out below, but pipe was then executed
+    #       as $UID rather than 0. XXX fix by moding $> and $<.
+
+    open(CHPASS, "/usr/site/bin/su1 /usr/local/bin/sshtb $node " .
+	 "/usr/bin/chpass -p $epasswd{$name} $name 2>&1 |"); 
+    while (<CHPASS>) { print "$_"; }
+    close(CHPASS);
+
+    # Need to warn if /users/$user doesn't exist. It should have been
+    # created when the user was added to the database. 
+
+    if ( !(-e "/users/$name") ) {
+	print "$0: Warning: /users/$name doesn't exist.\n";
+    }
+}
+
