@@ -326,7 +326,8 @@ the upper left hand corner, with positive X going right and positive Y going
 down.  You can also click on the map to get a specific set of coordinates.
 Note that any coordinates you specify must not fall inside an obstacle, or they will
 be rejected by the system.  A Java applet that updates in real time is linked
-from
+from the above page, or can be accessed directly
+<a href="<?php echo $TBBASE ?>/robotrack/robotrack.php3">here.</a>
 
 <p>
 With this NS file you can now create your first mobile experiment.  Actually
