@@ -17,7 +17,8 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd2 \
 	lthread.2:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
-	snmp.4:${PORTSDIR}/net/net-snmp4
+	snmp.4:${PORTSDIR}/net/net-snmp4 \
+	vin4.2:${PORTSDIR}/misc/libelvin
 
 RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	cvsup:${PORTSDIR}/net/cvsup-without-gui \
@@ -35,7 +36,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	rpm:${PORTSDIR}/archivers/rpm \
 	${LOCALBASE}/lib/tcl8.3/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	xvcg:${PORTSDIR}/graphics/vcg \
-	tftp-hpa:${PORTSDIR}/misc/tftp-hpa
+	tftp-hpa:${PORTSDIR}/misc/tftp-hpa \
+	elvind:${PORTSDIR}/misc/elvind
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
