@@ -50,6 +50,15 @@ my $template_file = shift @ARGV;
 my ($template,$variables) = readTemplate($template_file);
 processOptions($variables,@vars);
 my $nsfile = substitute($template,$variables);
+if ($outfile) {
+    open(OF,">$outfile") or die "Unable to open $outfile: $!\n";
+    print OF $nsfile;
+    close OF;
+} else {
+    print $nsfile;
+}
+
+exit 0;
 
 #
 # Read the template XML file
@@ -103,7 +112,10 @@ sub processOptions($@) {
 #
 # Replace variables embedded in the template
 #
-sub substitute($template,$variables) {
+sub substitute($s) {
+    my ($template,$variables) = @_;
+    my $nsfile = "";
+
     #
     # Loop through each section of the template
     #
@@ -143,8 +155,9 @@ sub substitute($template,$variables) {
 	    }
             $lines =~ s/<(\w+)>/$value/;
         }
-        print $lines;
+        $nsfile .= $lines;
     }
+    return $nsfile;
 }
 
 #
