@@ -33,6 +33,12 @@ static char hostname[MAXHOSTNAMELEN];
 static char ipaddr[32];
 
 /*
+ * Count of how many handles are in use, so that we can avoid cleaning up until
+ * the last one is unregistered
+ */
+static int handles_in_use = 0;
+
+/*
  * Register with the testbed event system.  NAME specifies the name of
  * the event server.  Returns a pointer to a handle that may be passed
  * to other event system routines if the operation is successful, NULL
@@ -158,6 +164,11 @@ event_register(char *name, int threaded)
     handle->server = server;
     handle->status = status;
 
+    /*
+     * Keep track of how many handles we have outstanding
+     */
+    handles_in_use++;
+
     return handle;
 }
 
@@ -184,6 +195,8 @@ event_unregister(event_handle_t handle)
         return 0;
     }
 
+    TRACE("disconnect completed\n");
+
     /* Clean up: */
 
     if (elvin_handle_free(handle->server, handle->status) == 0) {
@@ -191,11 +204,20 @@ event_unregister(event_handle_t handle)
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
-    if (handle->cleanup(1, handle->status) == 0) {
-        ERROR("could not clean up Elvin state: ");
-        elvin_error_fprintf(stderr, handle->status);
-        return 0;
+
+    TRACE("free completed\n");
+
+    if (handles_in_use == 1) {
+	if (handle->cleanup(1, handle->status) == 0) {
+	    ERROR("could not clean up Elvin state: ");
+	    elvin_error_fprintf(stderr, handle->status);
+	    return 0;
+	}
+
+	TRACE("cleanup completed\n");
     }
+
+    handles_in_use--;
 
     free(handle);
 
