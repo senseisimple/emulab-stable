@@ -254,9 +254,6 @@ sub LinkDelaySetup()
             # XXX: temporarily select between delay, plr, and [g]red
             # until they become classful queues.
             
-            print DEL "mii-tool --force 100baseTx-FD $iface";
-            print DEL "\n";
-
             print DEL "ifconfig $iface txqueuelen $queue\n";
 
             print DEL "$TC qdisc add dev $iface handle $pipeno root ";

@@ -284,8 +284,10 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines = "/sbin/mii-tool --force=$media $iface\n    ";
     }
 
-    $uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
-    $downlines = "$IFCONFIGBIN $iface down";
+    if ($inet ne "") {
+	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
+	$downlines = "$IFCONFIGBIN $iface down";
+    }
     
     return ($uplines, $downlines);
 }

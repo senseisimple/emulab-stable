@@ -1297,17 +1297,21 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * back every single time!
 	 */
 	if (vers >= 18 && !reqp->isvnode) {
+		/*
+		 * First do phys interfaces underlying veth interfaces
+		 */
 		res = mydb_query("select distinct "
 				 "       i.interface_type,i.mac, "
 				 "       i.current_speed,i.duplex "
 				 "  from veth_interfaces as v "
 				 "left join interfaces as i on "
 				 "  i.node_id=v.node_id and i.iface=v.iface "
-				 "where v.iface is not null and v.node_id='%s'",
+				 "where v.iface is not null and "
+				 "      v.node_id='%s'",
 				 4, reqp->pnodeid);
 		if (!res) {
 			error("IFCONFIG: %s: "
-			      "DB Error getting interfaces underlying veths!\n",
+			     "DB Error getting interfaces underlying veths!\n",
 			      reqp->nodeid);
 			return 1;
 		}
@@ -1323,6 +1327,54 @@ COMMAND_PROTOTYPE(doifconfig)
 				       "IPALIASES=\"\" IFACE= "
 				       "RTABID= LAN=\n",
 				       row[0], row[1], row[2], row[3]);
+
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("IFCONFIG: %s", buf);
+			nrows--;
+		}
+		mysql_free_result(res);
+
+		/*
+		 * Now do phys interfaces underlying delay interfaces.
+		 */
+		res = mydb_query("select i.interface_type,i.MAC,"
+				 "       i.current_speed,i.duplex, "
+				 "       j.interface_type,j.MAC,"
+				 "       j.current_speed,j.duplex "
+				 " from delays as d "
+				 "left join interfaces as i on "
+				 "    i.node_id=d.node_id and i.iface=iface0 "
+				 "left join interfaces as j on "
+				 "    j.node_id=d.node_id and j.iface=iface1 "
+				 "where d.node_id='%s'",
+				 8, reqp->pnodeid);
+		if (!res) {
+			error("IFCONFIG: %s: "
+			    "DB Error getting interfaces underlying delays!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		nrows = (int)mysql_num_rows(res);
+		while (nrows) {
+			char *bufp   = buf;
+			row = mysql_fetch_row(res);
+
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       "INTERFACE IFACETYPE=%s "
+				       "INET= MASK= MAC=%s "
+				       "SPEED=%sMbps DUPLEX=%s "
+				       "IPALIASES=\"\" IFACE= "
+				       "RTABID= LAN=\n",
+				       row[0], row[1], row[2], row[3]);
+
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       "INTERFACE IFACETYPE=%s "
+				       "INET= MASK= MAC=%s "
+				       "SPEED=%sMbps DUPLEX=%s "
+				       "IPALIASES=\"\" IFACE= "
+				       "RTABID= LAN=\n",
+				       row[4], row[5], row[6], row[7]);
 
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)

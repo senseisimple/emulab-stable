@@ -88,6 +88,8 @@ if (REMOTE() || MFS()) {
     exit(0);
 }
 
+print "Checking Testbed delay configuration ... \n";
+
 # Uninstall just looks for the files, runs them, and exits.
 if ($uninstall) {
     system(TMDELAY . " disable")
@@ -316,10 +318,6 @@ sub DelaySetup
 		$redparams2 .= "$weight2/$minthresh2/$maxthresh2/$max_p";
 	    }
 
-	    print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex";
-	    print DEL "\n";
-	    print DEL "ifconfig $iface2 media 100baseTX mediaopt full-duplex";
-	    print DEL "\n";
 	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
 	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
