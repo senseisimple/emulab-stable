@@ -375,18 +375,18 @@ function DOLOGIN($uid, $password, $adminmode) {
 	}
 
 	#
-	# Create a last login record.
+	# Create a last login record. This is now obsolete. 
 	#
 	DBQueryFatal("REPLACE into lastlogin (uid, time) ".	
 		     " VALUES ('$uid', NOW())");
 
 	#
-	# Usage stats. I think lastlogin can go now.
+	# Usage stats. 
 	#
-	#DBQueryFatal("update user_stats set ".
-	#	     " weblogin_count=weblogin_count+1, ".
-	#	     " weblogin_last=now() ".
-	#	     "where uid='$uid'");
+	DBQueryFatal("update user_stats set ".
+		     " weblogin_count=weblogin_count+1, ".
+		     " weblogin_last=now() ".
+		     "where uid='$uid'");
 
 	#
 	# Issue the cookie requests so that subsequent pages come back
@@ -509,7 +509,7 @@ function LASTWEBLOGIN($uid) {
     global $TBDBNAME;
 
     $query_result =
-        DBQueryFatal("SELECT time from lastlogin where uid='$uid'");
+        DBQueryFatal("SELECT weblogin_last from user_stats where uid='$uid'");
     
     if (mysql_num_rows($query_result)) {
 	$lastrow      = mysql_fetch_array($query_result);

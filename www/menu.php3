@@ -540,38 +540,38 @@ function PAGEFOOTER() {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
     global $TBMAINSITE, $SSL_PROTOCOL;
 
-#    echo "<!-- Force full window! -->
-#	  <base target=_top>
+    $today = getdate();
+    $year  = $today["year"];
 
-?>
-<!-- end content -->
+    echo "<!-- end content -->
               </td>
-            </tr><tr>
-              <td colspan=2 class="contentbody">
-	        <center><font size=-1>
-		[&nbsp;<a href="http://www.cs.utah.edu/flux/"
-                >The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
-		[&nbsp;<a href="http://www.cs.utah.edu/"
-                >School&nbsp;of&nbsp;Computing</a>&nbsp;]
-		[&nbsp;<a href="http://www.utah.edu/"
-                >The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]
+            </tr>
+            <tr>
+              <td colspan=2 class=contentbody>
+	        <center>
+                <font size=-1>
+		[&nbsp;<a href=http://www.cs.utah.edu/flux/>
+                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a>&nbsp;]
+		[&nbsp;<a href=http://www.cs.utah.edu/>
+                    School&nbsp;of&nbsp;Computing</a>&nbsp;]
+		[&nbsp;<a href=http://www.utah.edu/>
+                    The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]
 		</font>
 		<br>
                 <!-- begin copyright -->
                 <font size=-2>
-<a href="<?php echo "$TBDOCBASE"; ?>/docwrapper.php3?docname=copyright.html">
-                    Copyright &copy; 2000-2002 The University of Utah</a>
-                  </font>
-                  <br />
+                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                    Copyright &copy; 2000-$year The University of Utah</a>
+                </font>
+                <br>
 		</center>
                 <p align=right>
 		  <font size=-2>
                     Problems?
-	            Contact <?php echo "$TBMAILADDR\n"; ?>
+	            Contact $TBMAILADDR; 
                   </font>
                 </p>
-                <!-- end copyright -->
-<?php
+                <!-- end copyright -->\n";
 
     ENDPAGE();
 
