@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl,v 1.1 2000-11-30 09:24:21 kwright Exp $
+### $Id: mkacct-ctrl,v 1.3 2000-11-30 22:17:46 kwright Exp $
 
 use English;
 use Mysql;
@@ -129,7 +129,8 @@ sub dowork() {
     @db_row         = $sth->fetchrow_array();
     $group_number   = $db_row[0];
 
-    # XXX: We assume FreeBSD 
+    # XXX: I assume FreeBSD for now. Its 
+    # fairly firmly entrenched as our control node OS. -lkw
 
     #
     # Make group
@@ -137,22 +138,57 @@ sub dowork() {
     #       as the user $UID.
     #
     print "Adding group $project to $control_node.\n";
-    open (ADDGROUP, "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node /usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
-    while ( <ADDGROUP> ) { print "\tgroupadd: $_"; }
-    close (ADDGROUP);
+    open(ADDGROUP, "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node /usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
+    while (<ADDGROUP>) { print "$_"; }
+    close(ADDGROUP);
     
     #
-    # Make user
+    # Make user. Note that we cannot get back any output from a command
+    # that we open for input so we divide acct creation into two pieces to
+    # maximize feedback. First we add the user account. Then we change the
+    # password.
     #
     print "Adding user $user to $control_node.\n";
-    my $cmd = "/usr/site/bin/su1 /usr/local/bin/sstb $control_node " .
+    my $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
 	      "/usr/sbin/pw useradd $user -u $user_number -c $fullname " .
-	      "-d /users/$user -g $project -s /bin/tcsh -h $WR"; 	  
-    my $pid = open2(\*RD, \*WR, $cmd);
-    print (WR, "$pswd");
-    while (<RD>) { print "\tuseradd: $_"; }
-    close(WR);
-    close(RD); 
+	      "-d /users/$user -g $project -s /bin/tcsh"; 	  
+    open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd.";
+    while (<PWADD>) { print "$_"; }
+    $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
+           "/usr/sbin/pw usermod $user -h 0"; 
+    close(PWADD);
+    
+    # Note: tried to take the su1 out below, but pipe was then executed
+    #       as $UID rather than 0.
+    open(CHPASS, "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
+	         "/usr/bin/chpass -p $pswd $user 2>&1 |"); 
+    while (<CHPASS>) { print "$_"; }
+    close(CHPASS);
+
+    # Note: The PWMOD stmts below do indeed modify the passwd field, but 
+    # we store the encrypted passwd and usermod takes unencrypted passwd 
+    # so the passwd field ends up wrong. Decided to use chpass (see above).
+    # 11/30/00 -lkw 
+    #
+    # open (PWMOD, "|$cmd") or die "$0: Could not open pw usermod.";
+    # print PWMOD $pswd;
+    # close(PWMOD); 
+
+    #
+    # Create home directory
+    #
+    if ( -e "/users/$user" ) {
+        print "/users/$user already exists.\n";
+    } else  { 
+
+        print "Creating /users/$user.\n";
+	mkdir("/users/$user", 0770) or die "$0: Could not make /users/$user: $!\n";
+      
+	# If created, change owner and group
+	if (-e "/users/$user") {
+	    chown($user_number, $group_number, "/users/$user") or die "$0: Could not chown /users/$user: $!.\n";
+	}
+    }
 }
 
 sub sanitize() {
