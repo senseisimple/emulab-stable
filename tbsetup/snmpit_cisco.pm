@@ -443,8 +443,8 @@ sub listVlans {
   do {
     $data[1] =~ /\.(.*)/;
     $num = $1;
-    print "Got $RetVal   \t" if $debug;
-    print "$data[0]\t$data[1] ($num)\t$data[2]\n" if $debug;
+    print "Got $RetVal   \t" if $debug > 1;
+    print "$data[0]\t$data[1] ($num)\t$data[2]\n" if $debug > 1;
     if ( !$Names{$num} && $num < 1000 ) { $Names{$num} = $RetVal; }
     #do the getnext at the end, because if we're on the last, the next
     #one is junk to all the processing instructions...
@@ -456,13 +456,13 @@ sub listVlans {
   my $i = $sess->{DestHost};
   do {
     if ($RetVal != 1) {
-      print "Got $RetVal   \t" if $debug;
-      print "$data[0]\t$data[1]\t$data[2]\t" if $debug;
+      print "Got $RetVal   \t" if $debug > 1;
+      print "$data[0]\t$data[1]\t$data[2]\t" if $debug > 1;
       my @vlan=();
       if (defined (@{$Members{$data[2]}})) { @vlan =@{$Members{$data[2]}}; }
-      print "('$data[1]' " if $debug;
+      print "('$data[1]' " if $debug > 1;
       ($node = portnum("$ip:$data[1]")) || ($node = "?");
-      print "== $node)\n" if $debug;
+      print "== $node)\n" if $debug > 1;
       push(@vlan, $node) if ! ($node =~ /^empty/);
       $Members{$data[2]} = \@vlan;
       #do the getnext at the end, because if we're on the last, the next

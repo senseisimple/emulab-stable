@@ -37,10 +37,12 @@ my $device;
 my $pid;
 my $eid;
 my $t = 0; #VLANs from db table
+my $reset = 0; #reset VLANs
 my $n;     #VLAN # to move ports into
 my %vlantable = ();
 my @vlanlist = ();
 my %vlansbyname = ();
+my %vlanids = ();
 
 &myMain;
 
@@ -152,6 +154,22 @@ sub myMain {
     $device->vlanUnlock;
   }
 
+  if ($reset) {
+    getvlans();
+    $device->vlanLock;
+    my @vlan;
+    foreach $id (keys %vlantable) {
+      @vlan = sort split(" ",$vlantable{$id});
+      if (vlanexists($id,@vlan)) {
+	if ( ($num = vlannum($id)) > 0) {
+	  print "VLAN #$num $id exists with ",join(" ",@vlan),"\n";
+	  $device->removeVlan($num);
+	} else {print STDERR "Couldn't find VLAN nubmer for '$id'\n";}
+      } else {print STDERR "Couldn't find VLAN '$id' (",join(" ",@vlan),")\n";}
+    }
+    $device->vlanUnlock;
+  }
+
   if (@r) {
     $device->vlanLock;	
     foreach my $x (sort num @r) {
@@ -198,7 +216,9 @@ sub getvlans {
   foreach $entry (@vlanlist) {
     my ($id,$name,$memberstr) = split ("\t", $entry);
     $vlansbyname{$name} = $memberstr;
-    print "vlansbyname: $name -> $memberstr\n" if $debug;
+    $vlanids{$name} = $id;
+    $vlanids{$id} = $name;
+    print "vlans: #$id -> $name -> $memberstr\n" if $debug;
   }
 }
 
@@ -209,6 +229,16 @@ sub vlanexists {
   if (defined $vlansbyname{$m} && $vlansbyname{$m} eq $members) {
     print "Found $m == $vlansbyname{$m}\n" if $debug;
     return 1;
+  }
+  return 0;
+}
+
+sub vlannum {
+  my $n = shift;
+  print "Checking $n...\n" if $debug;
+  if (defined $vlanids{$n}) {
+    print "Found $n == $vlanids{$n}\n" if $debug;
+    return $vlanids{$n};
   }
   return 0;
 }
@@ -261,6 +291,8 @@ sub ParseArgs {
     elsif (/^-f(.*)/) {$f = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-t(.*)/) {$t = 1; $pid = ($1 ? $1 : shift(@CMDS));
 		       $eid = shift(@CMDS); }
+    elsif (/^-reset(.*)/) {$reset = 1; $pid = ($1 ? $1 : shift(@CMDS));
+			   $eid = shift(@CMDS); }
     elsif (/^-m(.*)/) {$m = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ?
 			      ($1 ? $1 : shift(@CMDS)) : "");}
     elsif (/^-vlan(.*)/) {
@@ -299,8 +331,8 @@ sub ParseArgs {
       "snmpit - A general purpose SNMP tool\n",
       "Syntax:\n",
       " snmpit [-h] [-v] -i<ip>\n",
-      "\t[-u] [-l] [-t <pid> <eid>] [-m<vlan name>] [-vlan<port>]\n",
-      "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
+      "\t[-u] [-l] [-f<filename>] [-m<vlan name>] [-vlan<port>]\n",
+      "\t[-t <pid> <eid>] [-reset <pid> <eid>] [-r<vlan #> <vlan #> ... ]\n",
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
       "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
     # Hidden Power control functionality
@@ -309,29 +341,30 @@ sub ParseArgs {
   if ($help > 1) {
     print
       "\nGeneral:\n",
-      "  -h    Display this help message\n",
-      "  -v    Verbose mode (now ",($v?"on":"off"),")\n",
-      "  -i    IP address or switch name\n",
+      "  -h     Display this help message\n",
+      "  -v     Verbose mode (now ",($v?"on":"off"),")\n",
+      "  -i     IP address or switch name\n",
       "\nVLAN Control:\n",
-      "  -u    Wait for Update of VLAN tables (takes ~10 seconds)\n",
-      "  -l    List all VLANs on switch (ell, not #1)\n",
-      "  -t    Use Table in database to set up VLANs\n",
-      "  -m    Make a VLAN called <name> (optional)\n",
-      "  -vlan Put ports in new VLAN (may be <node>:<if> or MAC)\n",
-      "  -f    File mode - Automatically set up group of VLANs\n",
-      "  -r    Remove VLAN(s) (specify VLAN number)\n",
+      "  -u     Wait for Update of VLAN tables (takes ~10 seconds)\n",
+      "  -l     List all VLANs on switch (ell, not #1)\n",
+      "  -m     Make a VLAN called <name> (optional)\n",
+      "  -vlan  Put ports in new VLAN (may be <node>:<if> or MAC)\n",
+      "  -f     File mode - Automatically set up group of VLANs\n",
+      "  -t     Use Table in database to set up VLANs for pid/eid\n",
+      "  -reset Reset VLAN(s) for nodes in pid/eid\n",
+      "  -r     Remove VLAN(s) (specify VLAN number)\n",
       "\nPort Control:\n",
-      "  +b/-b Blocking mode (now ",($b?"on":"off"),")\n",
-      "  +c/-c Confirm Changes (now ",($c?"on":"off"),")\n",
-      "  -g    Get Statistics\n",
-      "  -s    Show Port Configurations\n",
-      "  -p    List of port numbers and ranges (port = <node>:<if>)\n",
-      "  -d    Disable port(s)\n",
-      "  -e    Enable port(s)\n",
-      "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
-      "  -spd  Port Speed (10 or 100 Mbits)\n",
-      "  -dup  Port Duplex (half or full)\n",
-      "  -n    Change port VLAN #\n";
+      "  +b/-b  Blocking mode (now ",($b?"on":"off"),")\n",
+      "  +c/-c  Confirm Changes (now ",($c?"on":"off"),")\n",
+      "  -g     Get Statistics\n",
+      "  -s     Show Port Configurations\n",
+      "  -p     List of port numbers and ranges (port = <node>:<if>)\n",
+      "  -d     Disable port(s)\n",
+      "  -e     Enable port(s)\n",
+      "  +a/-a  Enable/Disable Port Auto-Negotiation of speed/duplex\n",
+      "  -spd   Port Speed (10 or 100 Mbits)\n",
+      "  -dup   Port Duplex (half or full)\n",
+      "  -n     Change port VLAN #\n";
     # Hidden Power control functionality
     # "  -on   Turn on outlets\n",
     # "  -off  Turn off outlets\n",
@@ -345,7 +378,7 @@ sub ParseArgs {
   die("\b\n") if ($help);
   #Now die on any combinations that don't make sense...
   die("What shall I do?\n")
-    if (!($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||$t||@r||$l
+    if (!($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||$t||$reset||@r||$l
 	  ||$powerop));
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd)); 
@@ -356,10 +389,13 @@ sub ParseArgs {
   die("Invalid speed $spd: Must be 10 or 100\n")
     if (!($spd=~/^10$|^100$|^0$/));
   if (defined($spd) && ($spd != 0)) { $spd= "${spd}mbit"; }
-  die("Only one of -f, -t and -vlan may be used.\n")
-    if (($f && @vlan) || ($f && $t) || ($t && @vlan));
+  die("Only one of -f, -t, -reset, and -vlan may be used.\n")
+    if (($f && @vlan) || ($reset && $t) || ($t && @vlan) ||
+	($reset && @vlan) || ($f && $t) || ($f && $reset));
   die("Project and expt must be specified with -t: '-t <pid> <eid>'\n")
     if ($t && ((!defined $pid) || (!defined $eid)));
+  die("Project and expt must be specified with -reset: '-reset <pid> <eid>'\n")
+    if ($reset && ((!defined $pid) || (!defined $eid)));
   # If everything is okay so far, initialize snmpit_lib
   snmpit_lib::init($DBNAME, $debug);
   if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
@@ -384,10 +420,11 @@ sub ParseArgs {
   }
   if ($debug) {
     if (ref($device)) {
-      print "Checking type: ",$device->isa(snmpit_intel)," for intel, ";
-      print $device->isa(snmpit_cisco)," for cisco, ";
-      print $device->isa(snmpit_apc)," for APC\n";
-    } else { print "Type '$device' is not a ref.\n"; }
+      print "Checking type:\n";
+      print $device->isa(snmpit_intel)||"0"," for intel\n";
+      print $device->isa(snmpit_cisco)||"0"," for cisco\n";
+      print $device->isa(snmpit_apc)||"0"," for APC\n";
+    } else { print "Type '$device' is not a ref!\n"; }
   }
   if ( $i =~ /[a-zA-Z]/) { $i = Dev($i); }
   die("\"$i\" is not a switch. Illegal operation requested.\n")
@@ -442,7 +479,7 @@ sub ParseArgs {
     }
     $num++;
   }
-  if ($t) {
+  if ($t || $reset) {
     if ( ! vlanid("$pid:$eid")) {
       print "There were no VLANs in the database table for '$pid' '$eid'\n";
       exit(0);
