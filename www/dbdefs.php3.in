@@ -86,9 +86,9 @@ $TB_USERINFO_MAX		= $TB_USERINFO_MODIFYINFO;
 $TB_EXPT_READINFO		= 1;
 $TB_EXPT_MODIFY			= 2;	# Allocate/dealloc nodes
 $TB_EXPT_DESTROY		= 3;
-$TB_EXPT_UPDATEACCOUNTS		= 4;
+$TB_EXPT_UPDATE			= 4;
 $TB_EXPT_MIN			= $TB_EXPT_READINFO;
-$TB_EXPT_MAX			= $TB_EXPT_UPDATEACCOUNTS;
+$TB_EXPT_MAX			= $TB_EXPT_UPDATE;
 
 # Projects.
 $TB_PROJECT_READINFO		= 1;
@@ -136,6 +136,7 @@ define("TBDB_IFACEROLE_CONTROL",	"ctrl");
 define("TBDB_IFACEROLE_EXPERIMENT",	"expt");
 define("TBDB_IFACEROLE_JAIL",		"jail");
 define("TBDB_IFACEROLE_FAKE",		"fake");
+define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
 
 #
@@ -504,7 +505,7 @@ function TBExptAccessCheck($uid, $pid, $eid, $access_type)
     global $TB_EXPT_READINFO;
     global $TB_EXPT_MODIFY;
     global $TB_EXPT_DESTROY;
-    global $TB_EXPT_UPDATEACCOUNTS;
+    global $TB_EXPT_UPDATE;
     global $TB_EXPT_MIN;
     global $TB_EXPT_MAX;
     global $TBDB_TRUST_USER;

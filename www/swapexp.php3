@@ -80,6 +80,7 @@ if (mysql_num_rows($query_result) == 0) {
 $row           = mysql_fetch_array($query_result);
 $exp_gid       = $row[gid];
 $isbatch       = $row[batchmode];
+$batchstate    = $row[batchstate];
 $swappable     = $row[swappable];
 $idleswap_bit  = $row[idleswap];
 $idleswap_time = $row[idleswap_timeout];
@@ -102,8 +103,14 @@ if (!strcmp($inout, "in")) {
 elseif (!strcmp($inout, "out")) {
     if ($isbatch) 
 	$action = "swapout";
-    else
-	$action = "swapout";
+    else {
+	if (! strcmp($batchstate, TBDB_BATCHSTATE_ACTIVATING)) {
+	    $action = "cancel";
+	}
+	else {
+	    $action = "swapout";
+	}
+    }
 }
 elseif (!strcmp($inout, "pause")) {
     if (!$isbatch)
@@ -266,22 +273,35 @@ else {
 	}
     }
     else {
-	if (strcmp($inout, "in") == 0)
-	    $howlong = "two to ten";
-	else
-	    $howlong = "less than two";
+	if (strcmp($inout, "out") == 0 &&
+	    strcmp($batchstate, TBDB_BATCHSTATE_ACTIVATING) == 0) {
+
+	    echo "Your experiment swapin has been marked for cancelation.
+                  It typically takes a few minutes for this to be recognized,
+                  assuming you made your request early enough. You will
+                  be notified via email when the original swapin request has
+                  either aborted or finished.\n";
+	}
+	else {
+	    if (strcmp($inout, "in") == 0)
+		$howlong = "two to ten";
+	    else
+		$howlong = "less than two";
     
-	echo "Your experiment has started its $action.
-             You will be notified via email when the operation is complete.
-             This typically takes $howlong minutes, depending on the
-             number of nodes in the experiment.
-             <br><br>
-             If you do not receive email notification within a reasonable
-             amount of time, please contact $TBMAILADDR.
-             <br><br>
-             While you are waiting, you can watch the log in
-             <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
-                realtime</a>.\n";
+	    echo "Your experiment has started its $action.
+                 You will be notified via email when the operation is complete.
+                 This typically takes $howlong minutes, depending on the
+                 number of nodes in the experiment.\n";
+	}
+	echo "<br><br>
+              If you do not receive
+              email notification within a reasonable amount of time,
+              please contact $TBMAILADDR.\n";
+
+	echo "<br><br>
+              While you are waiting, you can watch the log in
+              <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+              realtime</a>.\n";
     }
 }
 

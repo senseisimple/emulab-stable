@@ -35,6 +35,13 @@ if (!isset($key) ||
     strcmp($key, "") == 0) {
     SPITERROR(400, "You must provide an key.");
 }
+if (!isset($stamp) || !strcmp($stamp, "")) {
+    unset($stamp);
+}
+# We ignore MD5 for now. 
+if (!isset($md5) || !strcmp($md5, "")) {
+    unset($md5);
+}
 
 #
 # Make sure a reserved node.
@@ -87,18 +94,30 @@ register_shutdown_function("SPEWCLEANUP");
 #
 $nodeid = escapeshellarg($nodeid);
 $file   = escapeshellarg($file);
+$arg    = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 
 #
 # Run once with just the verify option to see if the file exists.
 # Then do it for real, spitting out the data. Sure, the user could
 # delete the file in the meantime, but thats his problem. 
 #
-$retval = SUEXEC($creator, $gid, "spewrpmtar -v $nodeid $file",
+$retval = SUEXEC($creator, $gid, "spewrpmtar -v $arg $nodeid $file",
 		 SUEXEC_ACTION_IGNORE);
 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    SPITERROR(500, "Could not verify file!");
+}
+
+#
+# An expected error.
+# 
 if ($retval) {
-    SPITERROR(404, "Could not find $file!");
-} 
+    if ($retval == 2) {
+	SPITERROR(304, "File has not changed");
+    }
+    SPITERROR(404, "Could not verify file: $retval!");
+}
 
 #
 # Okay, now do it for real. 

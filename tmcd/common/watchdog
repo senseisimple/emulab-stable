@@ -229,7 +229,7 @@ sub startisalive()
 		if ($failed ||
 		    $tmccresults[0] =~ /^UPDATE=1$/) {
 		    print "Running an update at $date ...\n";
-		    system("update -i");
+		    system("update -i -a");
 		    $failed = $?;
 		}
 		last;

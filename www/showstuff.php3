@@ -1468,7 +1468,7 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 #
 # Show node record.
 #
-function SHOWNODE($node_id) {
+function SHOWNODE($node_id, $short = 0) {
     $query_result =
 	DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
 		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
@@ -1564,24 +1564,27 @@ function SHOWNODE($node_id) {
 	}
     }
 
-    if ($vname) {
-	echo "<tr>
-                  <td>Virtual Name:</td>
-                  <td class=left>$vname</td>
-              </tr>\n";
-    }
+    if (!$short) {
+	if ($vname) {
+	    echo "<tr>
+                      <td>Virtual Name:</td>
+                      <td class=left>$vname</td>
+                  </tr>\n";
+	}
 
-    if ($pid) {
-	echo "<tr>
-                <td>Project: </td>
-                <td class=\"left\">
-                    <a href='showproject.php3?pid=$pid'>$pid</a></td>
-              </tr>\n";
+	if ($pid) {
+	    echo "<tr>
+                      <td>Project: </td>
+                      <td class=\"left\">
+                          <a href='showproject.php3?pid=$pid'>$pid</a></td>
+                  </tr>\n";
 
-	echo "<tr>
-                  <td>Experiment:</td>
-                  <td><a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></td>
-               </tr>\n";
+	    echo "<tr>
+                      <td>Experiment:</td>
+                      <td><a href='showexp.php3?pid=$pid&eid=$eid'>
+                             $eid</a></td>
+                  </tr>\n";
+	}
     }
 
     echo "<tr>
@@ -1589,127 +1592,128 @@ function SHOWNODE($node_id) {
               <td class=left>$type</td>
           </tr>\n";
 
-    echo "<tr>
-              <td>Def Boot OS:</td>
-              <td class=left>";
-    SPITOSINFOLINK($def_boot_osid);
-    echo "    </td>
-          </tr>\n";
-
-    if ($eventstate) {
-	$when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
+    if (!$short) {
 	echo "<tr>
-                 <td>EventState:</td>
-                 <td class=left>$eventstate ($when)</td>
-              </tr>\n";
-    }
-
-    if ($op_mode) {
-	$when = strftime("20%y-%m-%d %H:%M:%S", $op_mode_timestamp);
-	echo "<tr>
-                 <td>Operating Mode:</td>
-                 <td class=left>$op_mode ($when)</td>
-              </tr>\n";
-    }
-
-    if ($allocstate) {
-	$when = strftime("20%y-%m-%d %H:%M:%S", $allocstate_timestamp);
-	echo "<tr>
-                 <td>AllocState:</td>
-                 <td class=left>$allocstate ($when)</td>
-              </tr>\n";
-    }
-
-    #
-    # We want the last login for this node, but only if its *after* the
-    # experiment was created (or swapped in).
-    #
-    if ($lastnodeuidlogin = TBNodeUidLastLogin($node_id)) {
-
-	$foo = $lastnodeuidlogin["date"] . " " .
-	       $lastnodeuidlogin["time"] . " " .
-	       "(" . $lastnodeuidlogin["uid"] . ")";
-	
-	echo "<tr>
-                  <td>Last Login:</td>
-                  <td class=left>$foo</td>
-             </tr>\n";
-    }
-
-    if ($last_act) {
-        echo "<tr>
-                  <td>Last Activity:</td>
-                  <td class=left>$last_act</td>
-              </tr>\n";
-
-	$idletime = TBGetNodeIdleTime($node_id);
-	echo "<tr>
-                  <td>Idle Time:</td>
-                  <td class=left>$idletime hours</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Last Act. Report:</td>
-                  <td class=left>$last_report</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Last TTY Act.:</td>
-                  <td class=left>$last_tty_act</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Last Net. Act.:</td>
-                  <td class=left>$last_net_act</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Last CPU Act.:</td>
-                  <td class=left>$last_cpu_act</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Last Ext. Act.:</td>
-                  <td class=left>$last_ext_act</td>
-              </tr>\n";
-
-    }
-    
-    if (!$isvirtnode && !$isremotenode) {
-        echo "<tr>
-                  <td>Def Boot Path:</td>
-                  <td class=left>$def_boot_path</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Def Boot Command&nbsp;Line:</td>
-                  <td class=left>$def_boot_cmd_line</td>
-              </tr>\n";
-
-        echo "<tr>
-                  <td>Next Boot OS:</td>
+                  <td>Def Boot OS:</td>
                   <td class=left>";
-    
-        if ($next_boot_osid)
-	    SPITOSINFOLINK($next_boot_osid);
-	else
-	    echo "&nbsp";
-
-	echo "    </td>
+        SPITOSINFOLINK($def_boot_osid);
+        echo "    </td>
               </tr>\n";
 
-	echo "<tr>
-                 <td>Next Boot Path:</td>
-                 <td class=left>$next_boot_path</td>
-              </tr>\n";
+	if ($eventstate) {
+	    $when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
+	    echo "<tr>
+                     <td>EventState:</td>
+                     <td class=left>$eventstate ($when)</td>
+                  </tr>\n";
+	}
 
-	echo "<tr>
-                  <td>Next Boot Command Line:</td>
-                  <td class=left>$next_boot_cmd_line</td>
-              </tr>\n";
+	if ($op_mode) {
+	    $when = strftime("20%y-%m-%d %H:%M:%S", $op_mode_timestamp);
+	    echo "<tr>
+                     <td>Operating Mode:</td>
+                     <td class=left>$op_mode ($when)</td>
+                  </tr>\n";
+	}
+
+	if ($allocstate) {
+	    $when = strftime("20%y-%m-%d %H:%M:%S", $allocstate_timestamp);
+	    echo "<tr>
+                     <td>AllocState:</td>
+                     <td class=left>$allocstate ($when)</td>
+                  </tr>\n";
+	}
+
+        #
+        # We want the last login for this node, but only if its *after* the
+        # experiment was created (or swapped in).
+        #
+	if ($lastnodeuidlogin = TBNodeUidLastLogin($node_id)) {
+	    $foo = $lastnodeuidlogin["date"] . " " .
+		$lastnodeuidlogin["time"] . " " .
+		"(" . $lastnodeuidlogin["uid"] . ")";
+	
+	    echo "<tr>
+                      <td>Last Login:</td>
+                      <td class=left>$foo</td>
+                 </tr>\n";
+	}
+
+	if ($last_act) {
+            echo "<tr>
+                      <td>Last Activity:</td>
+                      <td class=left>$last_act</td>
+                  </tr>\n";
+
+	    $idletime = TBGetNodeIdleTime($node_id);
+	    echo "<tr>
+                      <td>Idle Time:</td>
+                      <td class=left>$idletime hours</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Last Act. Report:</td>
+                      <td class=left>$last_report</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Last TTY Act.:</td>
+                      <td class=left>$last_tty_act</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Last Net. Act.:</td>
+                      <td class=left>$last_net_act</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Last CPU Act.:</td>
+                      <td class=left>$last_cpu_act</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Last Ext. Act.:</td>
+                      <td class=left>$last_ext_act</td>
+                  </tr>\n";
+	}
     }
-    elseif ($isvirtnode) {
-	if (!$isplabdslice) {
+
+    if (!$short) {
+	if (!$isvirtnode && !$isremotenode) {
+	    echo "<tr>
+                      <td>Def Boot Path:</td>
+                      <td class=left>$def_boot_path</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Def Boot Command&nbsp;Line:</td>
+                      <td class=left>$def_boot_cmd_line</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Next Boot OS:</td>
+                      <td class=left>";
+    
+	    if ($next_boot_osid)
+		SPITOSINFOLINK($next_boot_osid);
+	    else
+		echo "&nbsp";
+
+	    echo "    </td>
+                  </tr>\n";
+
+	    echo "<tr>
+                     <td>Next Boot Path:</td>
+                     <td class=left>$next_boot_path</td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>Next Boot Command Line:</td>
+                      <td class=left>$next_boot_cmd_line</td>
+                  </tr>\n";
+	}
+	elseif ($isvirtnode) {
+	    if (!$isplabdslice) {
 		echo "<tr>
                           <td>IP Port Low:</td>
                           <td class=left>$ipport_low</td>
@@ -1724,12 +1728,12 @@ function SHOWNODE($node_id) {
                           <td>IP Port High:</td>
                           <td class=left>$ipport_high</td>
                       </tr>\n";
+	    }
+	    echo "<tr>
+                      <td>SSHD Port:</td>
+                     <td class=left>$sshdport</td>
+                  </tr>\n";
 	}
-
-	echo "<tr>
-                  <td>SSHD Port:</td>
-                  <td class=left>$sshdport</td>
-              </tr>\n";
     }
 
     echo "<tr>
@@ -1742,83 +1746,81 @@ function SHOWNODE($node_id) {
               <td class=left>$tarballs</td>
           </tr>\n";
 
-    if (!$isremotenode) {
-	echo "<tr>
-                  <td>RPMs:</td>
-                  <td class=left>$rpms</td>
-              </tr>\n";
-    }
-
-    if (!$isvirtnode && !$isremotenode) {
-	echo "<tr>
-                  <td>Router Type:</td>
-                  <td class=left>$routertype</td>
+    echo "<tr>
+              <td>RPMs:</td>
+              <td class=left>$rpms</td>
           </tr>\n";
-    }
 
-    if ($IP) {
-	echo "<tr>
-                  <td>Control Net IP:</td>
-                  <td class=left>$IP</td>
-              </tr>\n";
-    }
-    elseif ($phys_IP) {
-	echo "<tr>
-                  <td>Physical IP:</td>
-                  <td class=left>$phys_IP</td>
-              </tr>\n";
-    }
-
-    if ($rsrvrole) {
-	echo "<tr>
-                  <td>Role:</td>
-                  <td class=left>$rsrvrole</td>
-              </tr>\n";
-    }
-
-    if ($bios) {
-	echo "<tr>
-                  <td>Bios Version:</td>
-                  <td class=left>$bios</td>
-              </tr>\n";
-    }
-
-    if ($isremotenode) {
-	if ($isvirtnode) {
-	    SHOWWIDEAREANODE($phys_nodeid, 1);
-	}
-	else {
-	    SHOWWIDEAREANODE($node_id, 1);
-	}
-    }
-
-    #
-    # Show any auxtypes the node has
-    #
-    $query_result =
-	DBQueryFatal("select type, count from node_auxtypes ".
-		     "where node_id='$node_id'");
-    
-    if (mysql_num_rows($query_result) != 0) {
-	echo "<tr>
-               <td align=center colspan=2>
-                   Auxiliary Types
-               </td>
-             </tr>\n";
-
-        echo "<tr><th>Type</th><th>Count</th>\n";
-
-	while ($row = mysql_fetch_array($query_result)) {
-	    $type  = $row[type];
-	    $count = $row[count];
+    if (!$short) {
+	if (!$isvirtnode && !$isremotenode) {
 	    echo "<tr>
-	    	      <td>$type</td>
-		      <td class=left>$count</td>
-		  </td>\n";
+                      <td>Router Type:</td>
+                      <td class=left>$routertype</td>
+                  </tr>\n";
 	}
+
+	if ($IP) {
+	    echo "<tr>
+                      <td>Control Net IP:</td>
+                      <td class=left>$IP</td>
+                  </tr>\n";
+	}
+	elseif ($phys_IP) {
+	    echo "<tr>
+                      <td>Physical IP:</td>
+                      <td class=left>$phys_IP</td>
+                  </tr>\n";
+	}
+
+	if ($rsrvrole) {
+	    echo "<tr>
+                      <td>Role:</td>
+                      <td class=left>$rsrvrole</td>
+                  </tr>\n";
+	}
+
+	if ($bios) {
+	    echo "<tr>
+                      <td>Bios Version:</td>
+                      <td class=left>$bios</td>
+                  </tr>\n";
+	}
+
+	if ($isremotenode) {
+	    if ($isvirtnode) {
+		SHOWWIDEAREANODE($phys_nodeid, 1);
+	    }
+	    else {
+		SHOWWIDEAREANODE($node_id, 1);
+	    }
+	}
+
+        #
+        # Show any auxtypes the node has
+        #
+	$query_result =
+	    DBQueryFatal("select type, count from node_auxtypes ".
+			 "where node_id='$node_id'");
     
+	if (mysql_num_rows($query_result) != 0) {
+	    echo "<tr>
+                      <td align=center colspan=2>
+                      Auxiliary Types
+                      </td>
+                  </tr>\n";
+
+	    echo "<tr><th>Type</th><th>Count</th>\n";
+
+	    while ($row = mysql_fetch_array($query_result)) {
+		$type  = $row[type];
+		$count = $row[count];
+		echo "<tr>
+    	    	          <td>$type</td>
+		          <td class=left>$count</td>
+		      </td>\n";
+	    }
+	}
     }
-		
     echo "</table>\n";
 
 }

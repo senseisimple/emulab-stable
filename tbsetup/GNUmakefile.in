@@ -140,8 +140,6 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/node_reboot
 	chown root $(INSTALL_SBINDIR)/newnode_reboot
 	chmod u+s $(INSTALL_SBINDIR)/newnode_reboot
-	chown root $(INSTALL_BINDIR)/node_update
-	chmod u+s $(INSTALL_BINDIR)/node_update
 	chown root $(INSTALL_SBINDIR)/vnode_setup
 	chmod u+s $(INSTALL_SBINDIR)/vnode_setup
 	chown root $(INSTALL_BINDIR)/eventsys_control

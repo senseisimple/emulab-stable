@@ -1,17 +1,14 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
-use POSIX 'setsid';
+use POSIX qw(mktime);
 
 # Drag in path stuff so we can find emulab stuff.
-# XXX Temporary until I have the new tmcc library finished!
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
@@ -54,15 +51,22 @@ my $copymode	   = 0;
 my $debug	   = 0;
 my $copyfile;
 my $nodeid;
+my $keyhash;
+my $filemd5;
+my @identlines     = ();
+my $installed      = 0;
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 #
 use libsetup;
+use libtmcc;
 
 # Protos
-sub GetRPMFile($$$);
+sub GetRPMFile($$$$$$$);
+sub GetMD5($);
+sub WriteIdentFile();
 
 #
 # Must be running as root to work. 
@@ -112,14 +116,39 @@ else {
 }
 
 #
-# Check to make sure this RPM has not already been installed. Update
-# the file now. If the rpm fails, we got big problems.
-#
+# Check to make sure this rpm has not already been installed.
+# If so, we get the old timestamp and md5 so we can compare against
+# current ones.
+# We need to update the stamp/md5 in place in case it has changed, so
+# copy out all the identlines so we can write them back later. We do not
+# copyout the current one of course; we make up a new line at the end
+# of this script based on the new info.
+# 
 if (-e $IDENTFILE) {
-    if (! system("egrep -q -s '^${rpm}' $IDENTFILE")) {
-	print STDOUT "RPM $rpm has already been installed!\n";
-	exit(1);
+    if (!open(IDENT, $IDENTFILE)) {
+	fatal("Could not open $IDENTFILE: $!");
     }
+    while (<IDENT>) {
+	if ($_ =~ /^([-\w\.\/]*) ([\d]*) ([\w]*)$/) {
+	    my $file = $1;
+	    my $stamp= $2;
+	    my $md5  = $3;
+
+	    if ($file eq $rpm) {
+		#
+		# Save the info and continue;
+		#
+		$oldstamp = $stamp;
+		$oldmd5   = $md5;
+		next;
+	    }
+	    push(@identlines, "$file $stamp $md5");
+	}
+	else {
+	    warn("*** WARNING: Bad line in $IDENTFILE: $_\n");
+	}
+    }
+    close(IDENT);
 }
 
 #
@@ -133,6 +162,28 @@ if (! $copymode) {
     if (! -r $rpm) {
 	fatal("$rpm does not exist or is not accessible!");
     }
+
+    #
+    # Compare timestamp. If no change, we are done. 
+    #
+    (undef,undef,undef,undef,undef,undef,
+     undef,undef,undef,$filestamp) = stat($rpm);
+
+    if (defined($oldstamp) && $oldstamp >= $filestamp) {
+	print STDOUT "RPM $rpm has already been installed!\n";
+	exit(1);
+    }
+    #
+    # Otherwise compare MD5.
+    #
+    $filemd5 = GetMD5($rpm);
+    if (defined($oldmd5) && $filemd5 eq $oldmd5) {
+	print STDOUT "RPM $rpm has already been installed!\n";
+	# Must write a new ident file to avoid repeated checks.
+	push(@identlines, "$rpm $filestamp $filemd5");
+	WriteIdentFile();
+	exit(1);
+    }
 }
 else {
     $copyfile = `mktemp /var/tmp/rpm.XXXXXX`;
@@ -143,18 +194,29 @@ else {
     else {
 	die("Bad data in copyfile name: $copyfile");
     }
-    GetRPMFile($rpm, $copyfile, $usewget);
     #
-    # Dies on any failure!
+    # Dies on any failure.
+    # Returns >0 if server copy has not been modifed.
+    # Returns =0 if okay to install, and gives us new stamp/md5.
     #
+    if (GetRPMFile($rpm, $copyfile, $usewget,
+		   $oldstamp, $oldmd5, \$filestamp, \$filemd5)) {
+	print STDOUT "RPM $rpm has already been installed!\n";
+	if (defined($filestamp) && $filestamp != $oldstamp) {
+	    # Must write a new ident file to avoid repeated checks.
+	    push(@identlines, "$rpm $filestamp $oldmd5");
+	    WriteIdentFile();
+	}
+	unlink($copyfile)
+	    if (-e $copyfile);
+	exit(1);
+    }
 }
 
 #
-# Add to index first; if fails too bad.
-# 
-if (system("echo \"$rpm\" >> $IDENTFILE")) {
-    fatal("Could not update $IDENTFILE");
-}
+# Okay, add new info to the list for update.
+#
+push(@identlines, "$rpm $filestamp $filemd5");
 
 #
 # Run the RPM. 
@@ -162,12 +224,18 @@ if (system("echo \"$rpm\" >> $IDENTFILE")) {
 if ($copymode) {
     $rpm = $copyfile;
 }
-system("rpm -i $rpm");
+system("rpm -U --force --nodeps $rpm");
 $exit_status = $? >> 8;
 if ($copymode) {
     unlink($copyfile);
 }
 
+#
+# Recreate the index file if the install was okay.
+#
+if (!$exit_status) {
+    WriteIdentFile();
+}
 exit($exit_status);
 
 sub fatal {
@@ -183,19 +251,33 @@ sub fatal {
 #
 # Get an RPM from the server via tmcc and stash.
 #
-sub GetRPMFile($$$)
+sub GetRPMFile($$$$$$$)
 {
-    my ($rpm, $copyfile, $usewget) = @_;
+    my ($rpm, $copyfile, $usewget,
+	$oldstamp, $oldmd5, $filestamp, $filemd5) = @_;
     my $buf;
-    my $bytelen;
 
     #
     # If copying via NFS, must watch for read errors and retry.
     #
     if (! $usewget) {
+	#
+	# Compare timestamp. If no change, we are done. 
+	#
+	my (undef,undef,undef,undef,undef,undef,undef,$bytelen,
+	    undef,$stamp) = stat($rpm);
+
+	if (defined($oldstamp) && $oldstamp >= $stamp) {
+	    print STDOUT "Timestamp ($stamp) for $rpm unchanged!\n"
+		if ($debug);
+	    return 1;
+	}
+	# Must do this for caller so that if the MD5 has not changed,
+	# the caller can update the timestamp in the ident file.
+	$$filestamp = $stamp;
+	
 	open(TMCC, "< $rpm")
 	    or fatal("Could not open rpm on server!");
-	$bytelen = (stat($rpm))[7];
 
 	#
 	# Open the target file and start dumping the data in.
@@ -237,6 +319,17 @@ sub GetRPMFile($$$)
 	}
 	close(JFILE);
 	close(TMCC);
+
+	#
+	# Compare md5.
+	#
+	my $md5 = GetMD5($copyfile);
+	if (defined($oldmd5) && $oldmd5 eq $md5) {
+	    print STDOUT "MD5 ($md5) for $rpm unchanged!\n"
+		if ($debug);
+	    return 2;
+	}
+	$$filemd5   = $md5;
     }
     else {
 	#
@@ -274,10 +367,8 @@ sub GetRPMFile($$$)
 
 	#
 	# Lastly, need our boss node.
-	# 
-	my ($www) = split(" ", `tmcc bossinfo`);
-	die("Could not get bossinfo!")
-	    if ($?);
+	#
+	my ($www) = tmccbossname();
 
 	if ($www =~ /^[-\w]+\.(.*)$/) {
 	    $www = "www.${1}";
@@ -285,22 +376,120 @@ sub GetRPMFile($$$)
 	else {
 	    fatal("Tainted bossinfo $www!");
 	}
+	$www  = "https://${www}";
+	#$www = "https://${www}/dev/stoller";
+	#$www = "http://golden-gw.ballmoss.com:9876/~stoller/testbed";
 
 	#
 	# Okay, run wget with the proper arguments. 
 	#
-	my $cmd = "wget -q -O $copyfile ".
+	my $cmd = "wget -nv -O $copyfile ".
 	          ($debug ? "--server-response " : "") .
-	          "'https://${www}/spewrpmtar.php3".
-	          "?nodeid=${nodeid}&file=${rpm}&key=${keyhash}'";
+	          "'${www}/spewrpmtar.php3".
+	          "?nodeid=${nodeid}&file=${rpm}&key=${keyhash}".
+		  (defined($oldstamp) ? "&stamp=$oldstamp" : "") .
+		  (defined($oldmd5)   ? "&md5=$oldmd5" : "") .
+		  "'";		      
     
 	if ($debug) {
 	    print STDERR "$cmd\n";
 	}
-	system($cmd);
 
-	fatal("Could not retrieve $rpm from $www")
-	    if ($?);
+	#
+	# We need to read back the response to see if the file was
+	# unchanged. This is dumb; why doesn't wget exit with reasonable
+	# error codes?
+	#
+	my $nochange = 0;
+	if (!open(WGET, "$cmd 2>&1 |")) {
+	    fatal("Cannot start wget: $!\n");
+	}
+	while (<WGET>) {
+	    print $_
+		if ($debug);
+
+	    # Ick!
+	    if ($_ =~ /^.* ERROR 304.*$/i) {
+		$nochange = 1;
+	    }
+	}
+	if (! close(WGET)) {
+	    if ($?) {
+		fatal("Could not retrieve $rpm from $www")
+		    if (!$nochange);
+		# Otherwise, not modifed. 
+		print STDOUT "Timestamp for $rpm unchanged!\n"
+		    if ($debug);
+		return 1;
+	    }
+	    else {
+		fatal("Error closing wget pipe: $!\n");
+	    }
+	}
+	# Must do this for caller so that if the MD5 has not changed,
+	# the caller can update the timestamp in the ident file.
+	#
+	# Always use GM time for this. The server expects it.
+	$$filestamp = mktime(gmtime(time()));
+	
+	#
+	# We got a file. Compare the MD5 now. 
+	#
+	my $md5 = GetMD5($copyfile);
+	if (defined($oldmd5) && $oldmd5 eq $md5) {
+	    print STDOUT "MD5 ($md5) for $rpm unchanged!\n"
+		if ($debug);
+	    return 2;
+	}
+	$$filemd5 = $md5;
     }
     return 0;
+}
+
+#
+# Get MD5 of file.
+#
+sub GetMD5($)
+{
+    my ($file) = @_;
+    my $md5;
+
+    if ($OSNAME eq "linux") {
+	$md5 = `md5sum $file`;
+    
+	if ($md5 =~ /^([\w]*)\s*.*$/) {
+	    $md5 = $1;
+	}
+	else {
+	    fatal("Bad MD5 for $file: $md5.");
+	}
+    }
+    elsif ($OSNAME eq "freebsd") {
+	$md5 = `md5 -q $file`;
+    
+	if ($md5 =~ /^([\w]*)$/) {
+	    $md5 = $1;
+	}
+	else {
+	    fatal("Bad MD5 for $file: $md5.");
+	}
+    }
+    else {
+	fatal("Do not know how to compute MD5s!");
+    }
+    return $md5;
+}
+
+#
+# Recreate the ident file.
+#
+sub WriteIdentFile()
+{
+    if (!open(IDENT, "> $IDENTFILE")) {
+	fatal("Could not open $IDENTFILE for writing: $!");
+    }
+    foreach my $id (@identlines) {
+	print IDENT "$id\n";
+    }
+    close(IDENT);
 }

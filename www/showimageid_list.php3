@@ -76,7 +76,7 @@ echo "Listed below are the Images that you can load on your nodes with the
       a node is not loaded on that node when the experiment is swapped in,
       the Testbed system will automatically reload that node's disk with the
       appropriate image. You might notice that it takes a few minutes longer
-      to start start your experiment when selecting an OS that is not
+      to start your experiment when selecting an OS that is not
       already resident. Please be patient.
       <br>
       More information on how to create your own Images is in the

@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use POSIX qw(mktime);
 
 #
 # Spew a tar/rpm file to stdout. 
@@ -14,13 +15,28 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: spewtarfile [-v] <nodeid> <file>\n".
+    print STDERR "Usage: spewtarfile [-v] [t timestamp] <nodeid> <file>\n".
 	"Spew a tar/rpm for an experiment.\n";
     exit(-1);
 }
-my $optlist   = "v";
+my $optlist   = "vt:";
 my $debug     = 1;
 my $doverify  = 0;
+my $timestamp;			# GM Time.
+
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Proceeding.
+# $status > 0 - Expected error. No such file, not modified, etc.
+#               1. File could not be verified.
+#               2. File has not changed since timestamp.
+#               3. File could not be opened for reading.
+#
   
 #
 # Configure variables
@@ -53,6 +69,16 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"v"})) {
     $doverify = 1;
+}
+if (defined($options{"t"})) {
+    $timestamp = $options{"t"};
+
+    if ($timestamp =~ /^([\d]+)$/) {
+	$timestamp = $1;
+    }
+    else {
+	die("*** Bad data in timestamp: $timestamp\n");
+    }
 }
 if (@ARGV != 2) {
     usage();
@@ -90,12 +116,13 @@ my $gid     = ExpGroup($pid, $eid);
 my $creator = ExpLeader($pid, $eid);
 my $bytelen = 0;
 
-exit(1)
-    if (!VerifyFile());
+if (my $retval = VerifyFile()) {
+    exit($retval);
+}
 exit(0)
     if ($doverify);
-exit(2)
-    if (!SpewFile());
+exit(3)
+    if (SpewFile() != 0);
 exit(0);
 
 #
@@ -141,11 +168,12 @@ sub SpewFile()
 	fatal("Did not get the entire file! $bytelen bytes left.");
     }
     close(FD);
-
+    return 0;
 }
 
 #
-# Verify that we can return this file, return 0 if not allowed. 
+# Verify that we can return this file, return error if not allowed.
+# Otherwise return 0 for okay.
 #
 sub VerifyFile()
 {
@@ -157,7 +185,7 @@ sub VerifyFile()
 	if ($debug) {
 	    print STDERR "VerifyFile: Could not verify $file!\n";
 	}
-	return 0;
+	return 1;
     }
 
     #
@@ -183,15 +211,15 @@ sub VerifyFile()
 	if ($debug) {
 	    print STDERR "$translated is not in /proj or /groups!\n";
 	}
-	return 0;
+	return 1;
     }
 
     #
     # Stat the file to confirm that its either owned by the experiment
     # creator, or in the gid of the experiment.
     #
-    (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$bytelen)
-	= stat($translated);
+    (undef,undef,undef,undef,$stat_uid,$stat_gid,undef,$bytelen,
+     undef,$mtime) = stat($translated);
 
     my ($unix_uid, $unix_gid, $unix_gname);
 
@@ -206,10 +234,19 @@ sub VerifyFile()
 	if ($debug) {
 	    print STDERR "$translated has wrong uid/gid!\n";
 	}
-	return 0;
+	return 1;
     }
+
+    #
+    # Check timestamp if supplied. Remember, we get GM timestamps, so
+    # must convert the local stamp.
+    #
+    $mtime = mktime(gmtime($mtime));
+    return 2
+	if (defined($timestamp) && $timestamp >= $mtime);
+    
     $file = $translated;
-    return 1;
+    return 0;
 }
 
 #
