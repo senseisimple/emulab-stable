@@ -1303,11 +1303,11 @@ sub SetExpState($$$)
     my($pid, $eid, $state) = @_;
 
     if ($EVENTSYS) {
-	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		       objname   => "$pid/$eid",
-		       eventtype => $state,
-		       expt      => "$pid/$eid",
-		       host      => $BOSSNODE);
+	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		      objname   => "$pid/$eid",
+		      eventtype => $state,
+		      expt      => "$pid/$eid",
+		      host      => $BOSSNODE);
     }
 
     my $query_result =
@@ -1363,11 +1363,11 @@ sub TBLockExp($$;$)
 	return 0;
     }
     if ($EVENTSYS && defined($newstate)) {
-	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		       objname   => "$pid/$eid",
-		       eventtype => $newstate,
-		       expt      => "$pid/$eid",
-		       host      => $BOSSNODE);
+	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		      objname   => "$pid/$eid",
+		      eventtype => $newstate,
+		      expt      => "$pid/$eid",
+		      host      => $BOSSNODE);
     }
     return 1;
 }
@@ -1421,11 +1421,11 @@ sub TBUnLockExp($$;$)
 	return 0;
     }
     if ($EVENTSYS && defined($newstate)) {
-	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		       objname   => "$pid/$eid",
-		       eventtype => $newstate,
-		       expt      => "$pid/$eid",
-		       host      => $BOSSNODE);
+	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		      objname   => "$pid/$eid",
+		      eventtype => $newstate,
+		      expt      => "$pid/$eid",
+		      host      => $BOSSNODE);
     }
     return 1;
 }
@@ -2486,7 +2486,7 @@ sub TBExptSetLogFile($$$)
 {
     my ($pid, $eid, $logname) = @_;
 
-    DBQueryFatal("update experiments set logfile='$logname' ".
+    DBQueryWarn("update experiments set logfile='$logname' ".
 		 "where pid='$pid' and eid='$eid'");
 }
 
@@ -2494,8 +2494,8 @@ sub TBExptClearLogFile($$)
 {
     my ($pid, $eid) = @_;
 
-    DBQueryFatal("update experiments set logfile=NULL,logfile_open=0 ".
-		 "where pid='$pid' and eid='$eid'");
+    DBQueryWarn("update experiments set logfile=NULL,logfile_open=0 ".
+		"where pid='$pid' and eid='$eid'");
 }
 
 #
@@ -2510,7 +2510,7 @@ sub TBExptOpenLogFile($$)
 {
     my ($pid, $eid) = @_;
 
-    DBQueryFatal("update experiments set logfile_open=1 ".
+    DBQueryWarn("update experiments set logfile_open=1 ".
 		 "where pid='$pid' and eid='$eid'");
 }
 
@@ -2518,7 +2518,7 @@ sub TBExptCloseLogFile($$)
 {
     my ($pid, $eid) = @_;
 
-    DBQueryFatal("update experiments set logfile_open=0 ".
+    DBQueryWarn("update experiments set logfile_open=0 ".
 		 "where pid='$pid' and eid='$eid'");
 }
 
