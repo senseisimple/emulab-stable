@@ -421,14 +421,6 @@ void remove_node(vvertex vv)
   }
 
   /*
-   * Score the fact that we now have one more unassigned vnode
-   */
-  vnode->assigned = false;
-  SADD(SCORE_UNASSIGNED);
-  vinfo.unassigned++;
-  violated++;
-  
-  /*
    * Now, take care of the virtual links that are attached to the vnode
    */
   voedge_iterator vedge_it,end_vedge_it;
@@ -513,6 +505,15 @@ void remove_node(vvertex vv)
       violated--;
     }
   }
+
+  /*
+   * Score the fact that we now have one more unassigned vnode
+   */
+  vnode->assigned = false;
+  SADD(SCORE_UNASSIGNED);
+  vinfo.unassigned++;
+  violated++;
+  
 
   /*
    * Scoring for features and desires
@@ -1659,11 +1660,11 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
  * because they are stateful (ie. we have to explicitly add and subtract them,
  * we can't just compute the current value statelessly.)
  * 
- * Right now, these are all or nothing - we do violations, but no scores
  */
 double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
                         int &out_fd_violated) {
   tb_vnode::desires_map::iterator desire_it;
+  double score = 0.0f;
   if (!vnode->desires.empty()) {
     for (desire_it = vnode->desires.begin();
 	desire_it != pnode->features.end();++desire_it) {
@@ -1673,6 +1674,7 @@ double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 	feature_it = pnode->features.find(desire_it->first);
 	if (feature_it == pnode->features.end()) {
 	  // Didn't find the feature - violation!
+	  score += SCORE_MISSING_LOCAL_FEATURE;
 	  out_fd_violated++;
 	} else {
 	  // Found the feature, score it
@@ -1688,6 +1690,7 @@ double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 	      feature_it->second -= desire_it->second;
 	      if ((oldvalue >= 0) && (feature_it->second < 0)) {
 		// This one pushed us over the edge, violation!
+		score += SCORE_OVERUSED_LOCAL_FEATURE;
 		out_fd_violated++;
 	      }
 	      break;
@@ -1701,12 +1704,13 @@ double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
     }
   }
 
-  return 0;
+  return score;
 }
 
 double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
                            int &out_fd_violated) {
   tb_vnode::desires_map::iterator desire_it;
+  double score = 0.0f;
   if (!vnode->desires.empty()) {
     for (desire_it = vnode->desires.begin();
 	desire_it != pnode->features.end();++desire_it) {
@@ -1718,6 +1722,7 @@ double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 	  // Didn't find the feature, so we just removed a violation (note -
 	  // out_fd_violted gets subtracted from the total violation count, so
 	  // adding to it causes a violation to be removed.)
+	  score += SCORE_MISSING_LOCAL_FEATURE;
 	  out_fd_violated++;
 	} else {
 	  // Found the feature, score it
@@ -1736,6 +1741,7 @@ double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 		// (note - out_fd_violted gets subtracted from the total
 		// violation count, so adding to it causes a violation to be
 		// removed.)
+		score += SCORE_OVERUSED_LOCAL_FEATURE;
 		out_fd_violated++;
 	      }
 	      break;
@@ -1749,7 +1755,7 @@ double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
     }
   }
 
-  return 0;
+  return score;
 }
 
 /*

@@ -87,6 +87,8 @@ static float SCORE_SWITCH = 0.5;/* Cost of using a switch.*/
 static float SCORE_UNASSIGNED = 1.0;/* Cost of an unassigned node*/
 static float SCORE_DESIRE = 1.0;/* Multiplier for desire costs*/
 static float SCORE_FEATURE = 1.0;/* Multiplier for feature weights*/
+static float SCORE_MISSING_LOCAL_FEATURE = 1.0;
+static float SCORE_OVERUSED_LOCAL_FEATURE = 0.5;
 #ifdef NO_PCLASS_PENALTY
 static float SCORE_PCLASS = 0.0; /* Cost of each pclass */
 #else
