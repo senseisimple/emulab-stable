@@ -121,6 +121,11 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
+          <td>Expires: </td>
+          <td class=\"left\">$proj_expires</td>
+      </tr>\n";
+
+echo "<tr>
           <td colspan='2'>Why?</td>
       </tr>\n";
 

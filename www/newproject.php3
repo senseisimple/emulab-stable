@@ -239,6 +239,7 @@ mail($TBMAIL_APPROVAL,
      "Name:          $usr_name ($proj_head_uid)\n".
      "Email:         $usr_email\n".
      "Project:       $proj_name\n".
+     "Expires:	     $proj_expires\n".
      "URL:           $proj_URL\n".
      "Title:         $usr_title\n".
      "Affiliation:   $usr_affil\n".
