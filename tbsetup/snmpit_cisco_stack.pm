@@ -258,6 +258,8 @@ sub createVlan($$;@) {
 	    $okay = 0;
 	}
     }
+
+    return $okay;
 }
 
 #
