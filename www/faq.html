@@ -114,6 +114,9 @@
                           shows a different packet-loss (or delay). Why?</a>
      <li> <a href="#TR-5">I decreased the bandwidth on a link and now the
                           ping time between the nodes has increased. Why?</a>
+     <li> <a href="#TR-6">I wrote a small TCP application to test the
+     bandwidth of a link/LAN. I do not observe the bandwidth that I
+     asked for. Why?</a>
      </ul>
 </ul>
 
@@ -1468,5 +1471,44 @@
     router to the destination. The ping reply packet will see the same
     6ms of wire time. If your delay is again 10ms, then the ping
     roundtrip is 52ms. 
-    </p>    
+    </p>
+
+ <li><a NAME="TR-6"></a>
+     <font size='+1'><b>I wrote a small TCP application to test the
+    bandwidth of a link/LAN. I do not observe the bandwidth that I
+    asked for. Why?</b></font>
+    
+    <p>
+    
+    Short answer: TCP needs large send and receive socket buffers in
+    order for its throughput to approach the capacity of long fat
+    networks (LFN) i.e. link/LANs with a large bandwidth-delay product
+    (BDP). Use UDP instead, if your intention is just to test the
+    bandwidth. If you need to tune the throughput of your TCP
+    application, refer to <a
+    href="http://www.psc.edu/networking/perf_tune.html">"Enabling High
+    Performance Data Transfers"</a>.
+    </p>
+
+    <p>
+    
+    Long Answer: In order to observe the bandwidth that you specify,
+    it is necessary to keep the data pipe between the sender and the
+    receiver full. For a reliable window based protocol such as TCP,
+    the window size represents the number of unacknowledged bytes. TCP
+    needs to keep the unacknowledged bytes around untill the acks for
+    them are received. These bytes are retained in socket buffers. On
+    a link/LAN with bandwidth B and round-trip-time (RTT) D, the
+    sender TCP needs to be able to transmit B times D bytes before
+    expecting any acknowledgement, if the data pipe has to be kept
+    full. The effective sending window is dependent on receiver
+    advertised window besides other things. It is necessary to have
+    sender and receiver socket buffers at least as high as BxD. If you
+    only care about optimal end-to-end TCP throughput, then the socket
+    buffers need to be BxD where B is the bandwidth of the bottleneck
+    link and D is the end-to-end RTT. Refer to the following <a
+    href="http://www.ssfnet.org/Exchange/tcp/tcpTutorialNotes.html">"TCP
+    mini-tutorial"</a> or a basic TCP/IP book for the gory details.
+    
+    </p>
 </ul>
