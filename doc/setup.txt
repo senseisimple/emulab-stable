@@ -18,6 +18,7 @@ cvsupd-bin-16.1     A general network file distribution system optimized for CV
 fping-2.2b1         Quickly ping N hosts w/o flooding the network
 gmake-3.79.1        GNU version of 'make' utility
 isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server c
+mod_auth_mysql-2.20 Allows users to use MySQL databases for user authentication
 mod_php3-3.0.18     PHP3 module for Apache
 mysql-client-3.23.36 Multithreaded SQL database (client)
 mysql-server-3.23.36 Multithreaded SQL database (server)
@@ -183,6 +184,9 @@ logging to it over the network. We use network logging, so we need this
 feature. Re-enable it by putting:
 syslogd_flags=""
 in /etc/rc.conf
+
+suidperl - In order for setuid perl scripts to work properly, you'll need to:
+chmod u+s /usr/bin/suidperl
 
 ##### Step 6 - Stuff to copy from an old boss node
 
