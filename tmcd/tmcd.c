@@ -2387,58 +2387,10 @@ COMMAND_PROTOTYPE(dotarballs)
 }
 
 /*
- * Return Deltas stuff.
+ * This is deprecated, but left in case old images reference it.
  */
 COMMAND_PROTOTYPE(dodeltas)
 {
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
-	char		buf[MYBUFSIZE], *bp, *sp;
-
-	/*
-	 * Now check reserved table
-	 */
-	if (!reqp->allocated)
-		return 0;
-
-	/*
-	 * Get Delta list for the node.
-	 */
-	res = mydb_query("select deltas from nodes where node_id='%s' ",
-			 1, reqp->nodeid);
-
-	if (!res) {
-		error("DELTAS: %s: DB Error getting Deltas!\n", reqp->nodeid);
-		return 1;
-	}
-
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
-	}
-
-	/*
-	 * Text string is a colon separated list.
-	 */
-	row = mysql_fetch_row(res);
-	if (! row[0] || !row[0][0]) {
-		mysql_free_result(res);
-		return 0;
-	}
-	
-	bp  = row[0];
-	sp  = bp;
-	do {
-		bp = strsep(&sp, ":");
-
-		OUTPUT(buf, sizeof(buf), "DELTA=%s\n", bp);
-		client_writeback(sock, buf, strlen(buf), tcp);
-		if (verbose)
-			info("DELTAS: %s", buf);
-		
-	} while ((bp = sp));
-	
-	mysql_free_result(res);
 	return 0;
 }
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -16,7 +16,7 @@ use Exporter;
 @EXPORT =
     qw ( libsetup_init libsetup_setvnodeid libsetup_settimeout cleanup_node 
 	 doifconfig dohostnames domounts dotunnels check_nickname
-	 doaccounts dorpms dotarballs dostartupcmd install_deltas
+	 doaccounts dorpms dotarballs dostartupcmd 
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
@@ -2921,18 +2921,6 @@ sub startcmdstatus($)
     my($status) = @_;
 
     return(tmcc(TMCCCMD_STARTSTAT, "$status"));
-}
-
-#
-# Install deltas is deprecated.
-#
-sub install_deltas ()
-{
-    #
-    # No longer supported, but be sure to return 0.
-    #
-    print "*** WARNING: No longer supporting testbed deltas!\n";
-    return 0;
 }
 
 #

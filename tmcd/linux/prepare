@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -12,7 +12,7 @@ require 'ctime.pl';
 # each of the FreeBSD and Linux partitions.
 #
 my $DUMPDATES   = "/etc/dumpdates";
-my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
+my @DBFILES     = ("/var/db/testbed.tarfiles");
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ use Exporter;
 	     tmcccopycache
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
 	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_HOSTS TMCCCMD_RPM
-	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_DELTA TMCCCMD_STARTSTAT
+	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_STARTSTAT
 	     TMCCCMD_READY TMCCCMD_MOUNTS TMCCCMD_ROUTING TMCCCMD_TRAFFIC
 	     TMCCCMD_BOSSINFO TMCCCMD_TUNNEL TMCCCMD_NSECONFIGS
 	     TMCCCMD_VNODELIST TMCCCMD_SUBNODELIST TMCCCMD_ISALIVE
@@ -120,7 +120,6 @@ my %commandset =
       "rpms"		=> {TAG => "rpms"},
       "tarballs"	=> {TAG => "tarballs"},
       "startupcmd"	=> {TAG => "startupcmd"},
-      "deltas"		=> {TAG => "deltas"},
       "startstatus"	=> {TAG => "startstatus"},
       "ready"		=> {TAG => "ready"},
       "mounts"		=> {TAG => "mounts"},
@@ -163,7 +162,6 @@ sub TMCCCMD_HOSTS()	{ $commandset{"hostnames"}->{TAG}; }
 sub TMCCCMD_RPM()	{ $commandset{"rpms"}->{TAG}; }
 sub TMCCCMD_TARBALL()	{ $commandset{"tarballs"}->{TAG}; }
 sub TMCCCMD_STARTUP()	{ $commandset{"startupcmd"}->{TAG}; }
-sub TMCCCMD_DELTA()	{ $commandset{"deltas"}->{TAG}; }
 sub TMCCCMD_STARTSTAT()	{ $commandset{"startstatus"}->{TAG}; }
 sub TMCCCMD_READY()	{ $commandset{"ready"}->{TAG}; }
 sub TMCCCMD_MOUNTS()	{ $commandset{"mounts"}->{TAG}; }

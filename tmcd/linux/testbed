@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -9,8 +9,7 @@
 #
 # testbed       Do some testbed stuff,
 #
-# description:	Installs deltas (forcing reboot if necessary).
-#		On shutdown, it informs the testbed we are rebooting
+# description:	On shutdown, it informs the testbed we are rebooting
 #		and terminates any lingering daemons.
 
 # Source function library.
