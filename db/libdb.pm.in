@@ -25,6 +25,7 @@ use Exporter;
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT
 
+	 PROJROOT GROUPROOT USERROOT
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
 
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust
@@ -192,7 +193,10 @@ my $EVENTSYS    = "@EVENTSYS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPSPID	= "emulab-ops";
-my $SCRIPTNAME = "Unknown";
+my $SCRIPTNAME  = "Unknown";
+my $PROJROOT    = "/proj";
+my $GROUPROOT   = "/groups";
+my $USERROOT    = "/users";
 
 if ($EVENTSYS) {
     require event;
@@ -277,6 +281,9 @@ sub PLABMOND_PID()		{ $TBOPSPID; }
 sub PLABMOND_EID()		{ "plab-monitor"; }
 sub PLABHOLDING_PID()		{ $TBOPSPID; }
 sub PLABHOLDING_EID()		{ "plabnodes"; }
+sub PROJROOT()			{ $PROJROOT; }
+sub GROUPROOT()			{ $GROUPROOT; }
+sub USERROOT()			{ $USERROOT; }
 
 sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
 sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
@@ -2527,6 +2534,7 @@ sub TBExptDestroy($$)
 
     my $workdir = TBExptWorkDir($pid, $eid);
     my $userdir = TBExptUserDir($pid, $eid);
+    my $gid     = ExpGroup($pid, $eid);
 
     #
     # Try to remove experiment directory. We allow for it not being there
@@ -2543,6 +2551,12 @@ sub TBExptDestroy($$)
     if (system("/bin/rm -rf $workdir")) {
 	print "*** WARNING: Not able to remove $workdir\n";
 	print "             Someone will need to do this by hand.\n";
+    }
+    # Yuck.
+    if ($pid ne $gid) {
+	my $eidlink = "$PROJROOT/$pid/exp/$eid";
+	unlink($eidlink)
+	    if (-l $eidlink);
     }
 
     #

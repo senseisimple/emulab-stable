@@ -28,8 +28,8 @@ my $TBOPS    = "@TBOPSEMAIL@";
 #
 # Should be configured.
 # 
-my $projroot = "/proj";
-my $grouproot= "/groups";
+my $projroot = PROJROOT();
+my $grouproot= GROUPROOT();
 
 #
 # Testbed Support libraries
@@ -172,7 +172,7 @@ if (! chown($UID, $unix_gid, "$workdir")) {
 if ($pid ne $gid) {
     # XXX Bad. This link should be removed when the experiment is removed.
     unlink($eidlink)
-	if (-e $eidlink);
+	if (-l $eidlink);
     symlink($eiddir, $eidlink) or
 	fatal("Could not symlink($eiddir, $eidlink): $!");
 }
