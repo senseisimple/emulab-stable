@@ -5,6 +5,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= sensors
+EVENTSYS	= @EVENTSYS@
 
 include $(OBJDIR)/Makeconf
 
@@ -17,7 +18,9 @@ FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 
 # XXX not on FreeBSD 5 til I get a chance to fix it
 ifneq ($(FBSDVERSION),FreeBSD5)
+ifeq ($(EVENTSYS),1) # Also, we have to have the event system enabled
 SUBDIRS	+= canaryd
+endif
 endif
 endif
 
