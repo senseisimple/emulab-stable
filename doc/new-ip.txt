@@ -1,26 +1,26 @@
 The Master Plan (tm) for moving to our new IP subnets:
 
-* Mail users explaining downtime
+X Mail users explaining downtime
 
 * Fix hardcoded things in datbase/files (see Leigh's mail for list)
 
-* Set up experimental simulation on test Cisco
+X Set up experimental simulation on test Cisco
 
 * Save configurations on ciscos 1 and 2
 
-* Put Netcomm port in own VLAN, enable, set up routing in Cisco2
+X Put Netcomm port in own VLAN, enable, set up routing in Cisco2
 
-* Move plastic to new VLAN, change IP, route
+X Move plastic to new VLAN, change IP, route
 
-* Move paper to new VLAN, change IP, rotue
+X Move paper to new VLAN, change IP, rotue
 
 * Move control network ports to new VLAN, reboot testbed machines
 
 ***** IP addresses to change
 
-* Paper's .214 interface becomes .128 - Fix local routing table
+X Paper's .214 interface becomes .128 - Fix local routing table
 
-* Plastic's .214 interface becomes .129 - Fix routing
+X Plastic's .214 interface becomes .129 - Fix routing
 
 * Cisco1's IP interface (becomes a .128)
 
@@ -30,9 +30,11 @@ The Master Plan (tm) for moving to our new IP subnets:
 	
 * All testbed nodes become .132's (in dchp and proxydhcp config)
 	
+* Make changes permanent on paper/plastic
+	
 ***** Misc things to do
 
-* Set up the UDP helper port to forward from the control VLAN to 
+X Set up the UDP helper port to forward from the control VLAN to 
 
 * Get DNS records (forward and reverse) to agree with new setup
 
@@ -45,21 +47,21 @@ The Master Plan (tm) for moving to our new IP subnets:
 
 ***** VLANs to create
 
-* Outside: Consists only of cable running to outside router and a fake router interface
+X Outside: Consists only of cable running to outside router and a fake router interface
 
-* Private: Already exists as VLAN 666 - Add paper's interface (3/25) to this
+X Private: Already exists as VLAN 666 - Add paper's interface (3/25) to this
   (Power controllers are 4/30-44 (evens)) and cisco1 (4/23) and  cisco4 (4/2)
 
-* Public: For now, just plastic's interface (3/23) and router
+X Public: For now, just plastic's interface (3/23) and router
 
-* Control: All tbpcs (3/1-20,3/29-48), router, temporarily 214 net wire (4/27)
+X Control: All tbpcs (3/1-20,3/29-48), router, temporarily 214 net wire (4/27)
 
 ***** Some kludges to get around potential problems
 
 * Paper and plastic should be able to keep their .212 interfaces for an
   indefine period of time
   
-* Paper can get a .130 interface temporarily if the 'UDP helper' port (for
+X Paper can get a .130 interface temporarily if the 'UDP helper' port (for
   DHCP) is problematic
 
 ***** Simple IP allocation description
@@ -71,3 +73,8 @@ The Master Plan (tm) for moving to our new IP subnets:
 * Control (sharks): 155.101.130/24
 
 * Control (PCs): 155.101.132/22
+
+
+***** NOTE:
+ip address 155.99.238.130 255.255.255.252                       
+ip route 0.0.0.0 0.0.0.0 155.99.238.129               
