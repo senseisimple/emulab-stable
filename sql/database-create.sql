@@ -859,7 +859,8 @@ CREATE TABLE nodes (
 CREATE TABLE nodetypeXpid_permissions (
   type varchar(30) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
-  PRIMARY KEY  (type,pid)
+  PRIMARY KEY  (type,pid),
+  KEY pid (pid)
 ) TYPE=MyISAM;
 
 --

@@ -1104,3 +1104,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table projects modify pcremote_ok \
 		set('pcplabphys','pcron','pcwa') default NULL;
 
+1.202: Add an index to nodetypeXpid_permissions to make it more efficient
+       to get a list of what types a project is allowed to use.
+
+       alter table nodetypeXpid_permissions add key (pid);
