@@ -36,7 +36,12 @@ DBQueryFatal("update users set adminoff=$adminoff where uid='$target_uid'");
 
 #
 # Spit out a redirect 
-# 
-header("Location: $TBBASE/showuser.php3?target_uid=$target_uid");
+#
+if (isset($HTTP_REFERER) && strcmp($HTTP_REFERER, "")) {
+    header("Location: $HTTP_REFERER");
+}
+else {
+    header("Location: $TBBASE/showuser.php3?target_uid=$target_uid");
+}
 
 ?>
