@@ -228,7 +228,9 @@ foreach $node (keys(%nodes)) {
     # Shark hack
     if ($nodes{$node} ne "shark") {
 	print TOPFILE "node $node $nodes{$node}\n";
-	$nodes++;
+	if ($nodes{$node} ne "shark-shelf") {
+	    $nodes++;
+	}
     }
     # End Shark hack
 }
