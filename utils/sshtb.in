@@ -1,2 +1,83 @@
-#!/bin/sh
-exec @SSH@ @SSH_ARGS@ $*
+#!/usr/bin/perl -w
+use English;
+
+#
+# An ssh frontend to determine if the node is local or remote, and to
+# add in special options.
+#
+# NOTE THE DIFFERENT SYNTAX!
+# 
+
+sub usage()
+{
+    print STDOUT
+	"Usage: sshtb [ssh args] -host <hostname> [command and args ...]\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $SSH	        = "@SSH@";
+my $SSH_ARGS	= '@SSH_ARGS@';
+
+# Locals
+my $debug	= 0;
+my @args;
+my $hostname;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/libexec:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# We run through the args looking for -host. We save everything else.
+#
+if (@ARGV < 2) {
+    usage();
+}
+
+# Find everything before the -host.
+while (@ARGV) {
+    my $arg = shift(@ARGV);
+    if ($arg eq "-host") {
+	$hostname = shift(@ARGV);
+	last;
+    }
+    push(@args, $arg);
+}
+
+if (!defined($hostname)) {
+    usage();
+}
+
+#
+# Different stuff for remote nodes.
+#
+my $cmd;
+
+if (! TBValidNodeName($hostname) || !TBIsNodeRemote($hostname)) {
+    $cmd = "$SSH $SSH_ARGS @args $hostname @ARGV";
+}
+else {
+    $cmd = "$SSH $SSH_ARGS @args -l emulabman $hostname @ARGV";
+}
+if ($debug) {
+    print "$cmd\n";
+}
+system("$cmd");
+
+exit($CHILD_ERROR >> 8);

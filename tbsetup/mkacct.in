@@ -221,10 +221,10 @@ else {
 $fullname =~ s/\"/\'/g;
 $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
 
-if (system("$SSH $control_node egrep -q -s '^${user}:' /etc/passwd")) {
+if (system("$SSH -host $control_node egrep -q -s '^${user}:' /etc/passwd")) {
     print "Adding user $user ($user_number) to $control_node.\n";
 
-    if (system("$SSH $control_node ".
+    if (system("$SSH -host $control_node ".
 	       "'$USERADD $user -u $user_number -c \"$fullname\" ".
 	       "-k /usr/share/skel -m -d $HOMEDIR/$user ".
 	       "-g $default_groupname -s /bin/tcsh'")) {
@@ -237,7 +237,7 @@ else {
     #
     # MAKE SURE not to update anything else!
     #
-    if (system("$SSH $control_node ".
+    if (system("$SSH -host $control_node ".
 	       "'$USERMOD $user -c \"$fullname\"'")) {
 	fatal("Could not modify user $user record on $control_node.");
     }
@@ -245,7 +245,7 @@ else {
 
 print "Updating user $user password on $control_node.\n";
 
-if (system("$SSH $control_node $CHPASS -p $pswd $user")) {
+if (system("$SSH -host $control_node $CHPASS -p $pswd $user")) {
     fatal("Could not change password for user $user on $control_node.\n");
 }
 

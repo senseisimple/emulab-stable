@@ -31,7 +31,6 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $ssh		= "$TB/bin/sshtb -n";
-my $sshremote	= "$TB/bin/sshremote -n";
 my $expsetup    = "$TB/sbin/exports_setup";
 my $batchmode   = 0;
 my $maxchildren = 20;
@@ -303,10 +302,10 @@ sub UpdateNode {
     }
     else {
 	if ($isremote) {
-	    exec("$sshremote $node /usr/local/etc/testbed/update");
+	    exec("$ssh -host $node /usr/local/etc/testbed/update");
 	}
 	else {
-	    exec("$ssh $node /etc/testbed/update");
+	    exec("$ssh -host $node /etc/testbed/update");
 	}
 	exit(0);
     }

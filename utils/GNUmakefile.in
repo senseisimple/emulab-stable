@@ -8,7 +8,7 @@ SUBDIR		= utils
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= delay_config sshtb create_image node_admin sshremote
+BIN_SCRIPTS	= delay_config sshtb create_image node_admin
 SBIN_SCRIPTS	= vlandiff vlansync
 LIBEXEC_SCRIPTS	= webcreateimage
 

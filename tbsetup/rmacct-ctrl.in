@@ -93,7 +93,7 @@ if (system("$USERDEL $user")) {
 }
 
 print "Removing user $user from $control_node.\n";
-if (system("$SSH $control_node '$USERDEL $user'")) {
+if (system("$SSH -host $control_node '$USERDEL $user'")) {
     fatal("Could not remove user $user from $control_node.\n");
 }
 

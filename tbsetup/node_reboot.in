@@ -339,7 +339,7 @@ sub RebootNode {
 	}
     }
     else {
-	exec("$ssh $pc /sbin/reboot");
+	exec("$ssh -host $pc /sbin/reboot");
 	exit(0);
     }
 

@@ -24,7 +24,7 @@ my $usersdir    = "@FSDIR_USERS@";
 my $groupdir    = "@FSDIR_GROUPS@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
-my $SSH		= "$TB/bin/sshtb -l root $FSNODE";
+my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $PROG	= "/usr/testbed/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $lockfile    = "/var/tmp/testbed_exports_lockfile";

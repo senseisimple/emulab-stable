@@ -119,7 +119,7 @@ if (system("$GROUPDEL $unix_name")) {
 # 
 $UID = 0;
 
-if (system("$SSH $CONTROL $GROUPDEL $unix_name")) {
+if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
     warn("*** WARNING: ".
 	 "Could not remove group $pid from from $CONTROL!\n");
 }
@@ -137,7 +137,7 @@ while (@db_row = $query_result->fetchrow_array() ) {
 }
 
 foreach my $tipserver ( @tipservers ) {
-    if (system("$SSH $tipserver $GROUPDEL $unix_name")) {
+    if (system("$SSH -host $tipserver $GROUPDEL $unix_name")) {
 	warn("*** WARNING: ".
 	     "Could not remove group $pid from $tipserver!\n");
 	$errors++;

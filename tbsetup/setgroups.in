@@ -318,7 +318,7 @@ foreach my $uid (@userlist) {
 
     print "Updating user $uid record on $control_node.\n";
 
-    if (system("$SSH $control_node ".
+    if (system("$SSH -host $control_node ".
 	       "'$USERMOD $uid -g $project $groupargument'")) {
 	fatal("Could not modify user $uid record on $control_node.");
     }

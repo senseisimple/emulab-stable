@@ -134,7 +134,7 @@ $UID = 0;
 foreach my $server (keys(%cmdargs)) {
     my $args = $cmdargs{$server};
 
-    if (system("$SSH $server $PROG $args")) {
+    if (system("$SSH -host $server $PROG $args")) {
 	print STDERR "*** Failed: $SSH $server $PROG $args: $?\n";
 	exit 1;
     }

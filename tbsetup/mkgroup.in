@@ -227,10 +227,12 @@ $UID = $EUID;
 #
 # Create group on the control node if it does not exist.
 #
-if (system("$SSH $control_node egrep -q -s '^${unix_name}:' /etc/group")) {
+if (system("$SSH -host $control_node ".
+	   "egrep -q -s '^${unix_name}:' /etc/group")) {
     print "Adding group $unix_name to $control_node.\n";
 
-    if (system("$SSH $control_node $GROUPADD $unix_name -g $unix_gid")) {
+    if (system("$SSH -host $control_node ".
+	       "$GROUPADD $unix_name -g $unix_gid")) {
 	fatal("*** Could not add $unix_name ($unix_gid) to $control_node!\n");
     }
 }
@@ -246,10 +248,12 @@ while (@db_row = $query_result->fetchrow_array() ) {
 }
 
 foreach my $tipserver ( @tipservers ) {
-    if (system("$SSH $tipserver egrep -q -s '^${unix_name}:' /etc/group")) {
+    if (system("$SSH -host $tipserver ".
+	       "egrep -q -s '^${unix_name}:' /etc/group")) {
 	print "Adding group $unix_name to $tipserver\n";
 
-	if (system("$SSH $tipserver $GROUPADD $unix_name -g $unix_gid")) {
+	if (system("$SSH -host $tipserver ".
+		   "$GROUPADD $unix_name -g $unix_gid")) {
 	    fatal("*** Could not add $unix_name ($unix_gid) to $tipserver!\n");
 	}
     }

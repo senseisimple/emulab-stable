@@ -21,7 +21,7 @@ my $TBALL       = "@TBUSERSARCHIVE@";
 my $PROJROOT	= "/proj";
 
 # Note no -n option. We redirect stdin from the new exports file below.
-my $SSH		= "$TB/bin/sshtb -l root $USERS";
+my $SSH		= "$TB/bin/sshtb -l root -host $USERS";
 my $PROG	= "/usr/testbed/sbin/genelists.proxy";
 my $lockfile    = "/var/tmp/testbed_genelists_lockfile";
 my $tempfile    = "/var/tmp/testbed_genelists_tempfile";

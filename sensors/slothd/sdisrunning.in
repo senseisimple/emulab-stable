@@ -64,7 +64,6 @@ foreach my $n (sort pcnum @nodes) {
 exit 0;
 
 sub check {
-    #my $ssh="sshtb -o \"FallBackToRsh no\" -o \"ConnectionAttempts 3\" -q";
     my $ssh="sshtb -q";
     my $node = shift;
     my $cmd1 = "ps auxwww | grep slothd | grep -v grep";
@@ -101,7 +100,7 @@ sub check {
 	}
     } else {
 	# child
-	$str = `sudo $ssh $node $cmd1`;
+	$str = `sudo $ssh -host $node $cmd1`;
 	#print "$syspid - ssh succeeded:'$str'\n";
 	if ($str) {
 	    #print "running.\n";
@@ -112,7 +111,7 @@ sub check {
 		my $f = "/tmp/tmp-$node-$$";
 		open (STDERR, "> $f") || 
 		  warn("Couldn't open $f: $!\n");
-		$str = `sudo $ssh $node $cmd2`;
+		$str = `sudo $ssh -host $node $cmd2`;
 		my $rv = $?;
 		if ($rv > 255) { $rv /= 256; }
 		#print "\n(start=$rv)\n";

@@ -26,7 +26,6 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $ssh		= "$TB/bin/sshtb -n";
-my $sshremote	= "$TB/bin/sshremote -n";
 my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
@@ -220,10 +219,10 @@ foreach my $node (@nodes) {
 	$UID = 0;
     
 	if ($isremote) {
-	    exec("$sshremote $pnode /usr/local/etc/testbed/vnodesetup $args");
+	    exec("$ssh -host $pnode /usr/local/etc/testbed/vnodesetup $args");
 	}
 	else {
-	    exec("$ssh $pnode /etc/testbed/vnodesetup $args");
+	    exec("$ssh -host $pnode /etc/testbed/vnodesetup $args");
 	}
 	die("*** $0:\n".
 	    "    exec failed!\n");
