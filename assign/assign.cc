@@ -560,7 +560,7 @@ int mapping_precheck() {
 // unretryable error
 void exit_unretryable(int signal) {
     cerr << "Killed with signal " << signal << " - exiting!" << endl;
-    _exit(3);
+    _exit(2);
 }
 
 int main(int argc,char **argv)
