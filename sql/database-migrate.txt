@@ -2543,3 +2543,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	  orientation float NOT NULL default '0',
 	  PRIMARY KEY  (node_id,building,floor)
 	) TYPE=MyISAM;
+
+1.324: Add a label field and a draw boolean to the obstacles
+       table. The label is a tag for the box, and the draw flag says
+       whether to draw the obstacle as a rectangle. The intent is to
+       move away from fixed obstacles and labels in the jpeg files,
+       and instead draw them dynamically. Kinda simple to start with;
+       lets see if we can represent everything we need ...
+
+	alter table obstacles add label tinytext;
+	alter table obstacles add draw tinyint(1) NOT NULL default '0';
