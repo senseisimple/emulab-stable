@@ -621,6 +621,10 @@ Simulator instproc at {time eventstring} {
 		    set otype SIMULATOR
 		    set etype HALT
 		}
+		"terminate" {
+		    set otype SIMULATOR
+		    set etype HALT
+		}
 		"swapout" {
 		    set otype SIMULATOR
 		    set etype SWAPOUT
