@@ -971,7 +971,7 @@ if test -f $TBDEFS; then
     #
     OLDPATH=$PATH
     PATH="$TBPATH:$PATH"
-    eval `cat $TBDEFS | sed -n -e '{s/#.*$//;H;}; ${g;s/\n/ /g;s/  */ /g;p;}'`
+    . $TBDEFS
     PATH=$OLDPATH
 else
 	{ echo "configure: error: Definitions file $TBDEFS was not found." 1>&2; exit 1; }
