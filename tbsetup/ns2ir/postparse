@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl 
 
 # This handles some of the TB commands. 
 
@@ -15,6 +15,12 @@ if ($#ARGV != 1) {
 }
 
 ($nsfile,$irfile) = @ARGV;
+
+use DBI;
+
+$driver = "mysql";
+$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost") 
+    || die "Could not connect to DB.\n";
 
 # This contains a list of error messages
 @ERRORS = ();
@@ -33,6 +39,45 @@ if ($@) {
 }
 @nodes = split("\n",$raw);
 
+# Set up a nodes array, just membership
+foreach (@nodes) {
+    split;
+    $nodes{$_[0]} = 1;
+}
+
+# Read in lans from ir file.
+$raw = eval {&ir_get("/topology/lans")};
+if ($@) {
+    print STDERR "Incomplete IR - No /topology/lans ($@)\n";
+    exit(1);
+}
+# Shove it in a membership array
+foreach (split("\n",$raw)) {
+    split;
+    $lans{$_[0]} = 1;
+}
+
+# Read in links
+$raw = eval {&ir_get("/topology/links")};
+if ($@) {
+    print STDERR "Incomplete IR - No /topology/links ($@)\n";
+    exit(1);
+}
+# Shove it in a membership array
+foreach (split("\n",$raw)) {
+    split;
+    $links{"$_[1]:$_[3]"} = 1;
+}
+
+# Read in possible hardware types - we add shark_shelf manually
+$hwtypes{"shark-shelf"} = 1;
+$sth = $dbh->prepare("SELECT type from node_types");
+$sth->execute;
+while (@row = $sth->fetchrow_array) {
+    $hwtypes{$row[0]} = 1;
+}
+$sth->finish;
+
 open(NSFILE,$nsfile) || do {
     print STDERR "Could not open $nsfile\n";
     exit(1);
@@ -46,22 +91,63 @@ while (<NSFILE>) {
     @line = split;
     if ($line[1] eq "set-hardware") {
 	if ($#line != 3) {
+	    print "!\n";
 	    push(@ERRORS,"Syntax: set-hardware node type");
-	} else {
-	    # hwtype(node) = type
-	    $hwtype{$line[2]} = $line[3];
+	    next;
+	} 
+	if (! defined($nodes{$line[2]})) {
+	    push(@ERRORS,"$line[2] is not a valid node.");
+	    next;
 	}
+	if (! defined($hwtypes{$line[3]})) {
+	    push(@ERRORS,"$line[3] is not a valid hw type.");
+	    next;
+	}
+	# hwtype(node) = type
+	$hwtype{$line[2]} = $line[3];
     } elsif ($line[1] eq "set-link-loss") {
 	if ($#line != 4) {
 	    push(@ERRORS,"Syntax: set-link-loss src dst loss_rate");
+	    next;
+	}
+	if ((! defined($nodes{$line[2]})) &&
+	    (! defined($lans{$line[2]}))) {
+	    push(@ERRORS,"$line[2] is not a valid node.");
+	    next;
+	}
+	if ((! defined($nodes{$line[3]})) &&
+	    (! defined($lans{$line[3]}))) {
+	    push(@ERRORS,"$line[3] is not a valid node.");
+	    next;
+	}
+	if (! defined($links{"$line[2]:$line[3]"})) {
+	    push(@ERRORS,"No link between $line[2] and $line[3]");
+	    next;
+	}
+	if ( ((! ($line[4] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
+	      (! ($line[4] =~ /^\.[0-9]+$/))) ||
+	     ($line[4] < 0) || ($line[4] > 1)) {
+	    push(@ERRORS,"$line[4] not between 0.0 and 1.0");
+	    next;
+	}
+	# linkloss(src:dst) = loss
+	$linkloss{"$line[2]:$line[3]"} = $line[4];
+    } elsif ($line[1] eq "set-lan-loss") {
+	if ($#line != 3) {
+	    push(@ERRORS,"Syntax: set-lan-loss lan loss_rate");
 	} else {
-	    # linkloss(src:dst) = loss
-	    if ( (! ($line[4] =~ /[0-9]*(\.[0-9]+)?/)) ||
-		 ($line[4] < 0) || ($line[4] > 1)) {
-		push(@ERRORS,"$line[4] must be between 0.0 and 1.0");
-	    } else {
-		$linkloss{"$line[2]:$line[3]"} = $line[4];
+	    if (! defined($lans{$line[2]})) {
+		push(@ERRORS,"$line[2] is not a valid lan.");
+		next;
 	    }
+	    if ( ((! ($line[3] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
+		  (! ($line[3] =~ /^\.[0-9]+$/))) ||
+		 ($line[3] < 0) || ($line[3] > 1)) {
+		push(@ERRORS, "$line[3] not between 0.0 and 1.0");
+		next;
+	    } 
+	    # lanloss(lan) = loss
+	    $lanloss{$line[2]} = $line[3];
 	}
     }
 }
@@ -105,5 +191,23 @@ foreach (@links) {
     }
 }
 &ir_set("/topology/links",join("\n",@newlinks) . "\n");
+
+# Set lan loss
+$raw = eval{&ir_get("/topology/lans")};
+if ($@) {
+    print STDERR "Incomplete IR - Could not find /topology/lans\n";
+    exit(1);
+}
+@links = split("\n",$raw);
+@newlinks = ();
+foreach (@links) {
+    @info = split;
+    if (defined($lanloss{$info[0]})) {
+	push(@newlans,"$_ $lanloss{$info[0]}");
+    } else {
+	push(@newlans,"$_ 0.0");
+    }
+}
+&ir_set("/topology/lans",join("\n",@newlans) . "\n");
 
 &ir_write($irfile);
