@@ -36,17 +36,16 @@ Please log in again.</h3>\n</body></html>";
 }
 echo "
 <h1>Approve new users in your Project</h1>
-<h3><p>
-This page will let you approve new members of your Project. Once approved,
-they will be able to log into machines in your Projects's experiments.</p>
+Use this page to approve new members of your Project.  Once approved,
+they will be able to log into machines in your Project's experiments.</p>
 <p> If you desire, you may set their trust/privilege levels to give them
 more or less access to your nodes:
-<ol>
-<li>User - Can log into machines in your experiments.
-<li>Local Root - Can have root access on machines, can create new experiments.
+<ul>
+	<li>User - Can log into machines in your experiments.
+	<li>Local Root - Granted root access on your project's machines; can create new experiments.
 ";
 #echo "<li>Group Root - Can approve users, create projects, and update any project info or personal info for project members.";
-echo "</ol>
+echo "</ul>
 </p></h3>\n";
 $query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
 $result = mysql_db_query("tbdb", $query);
