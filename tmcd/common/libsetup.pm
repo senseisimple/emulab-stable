@@ -644,6 +644,50 @@ sub getrouterconfig($$)
 	$$ptype = "none";
 	return 0;
     }
+
+    #
+    # Special case. If the routertype is "static-ddijk" then we run our
+    # dijkstra program on the linkmap, and use that to feed the code
+    # below (it outputs exactly the same goo).
+    #
+    # XXX: If we change the return from tmcd, the output of dijkstra will
+    # suddenly be wrong. Yuck, need a better solution. 
+    #
+    if ($type eq "static-ddijk") {
+	#
+	# We get the linkmap from the proj directory. 
+	#
+	my ($pid, $eid, $vname) = check_nickname();
+	my $linkmap = "/proj/$pid/exp/$eid/tbdata/linkmap";
+
+	if (! -e $linkmap) {
+	    warn("*** WARNING: $linkmap does exist!\n");
+	    @$rptr  = ();
+	    $$ptype = undef;
+	    return -1;
+	}
+
+	if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra $vname |")) {
+	    warn("*** WARNING: Could not invoke dijkstra on linkmap!\n");
+	    @$rptr  = ();
+	    $$ptype = undef;
+	    return -1;
+	}
+	while (<DIJK>) {
+	    push(@tmccresults, $_);
+	}
+	if (! close(DIJK)) {
+	    if ($?) {
+		warn("*** WARNING: dijkstra exited with status $?!\n");
+	    }
+	    else {
+		warn("*** WARNING: Error closing dijkstra pipe: $!\n");
+	    }
+	    @$rptr  = ();
+	    $$ptype = undef;
+	    return -1;
+	}
+    }
     
     #
     # ROUTERTYPE=manual
