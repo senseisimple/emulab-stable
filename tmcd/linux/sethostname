@@ -33,6 +33,11 @@ if (@ARGV) {
 }
 
 #
+# Inform the master that we have rebooted. THIS MUST BE DONE!
+#
+inform_reboot();
+
+#
 # Check allocation. Exit now if not allocated.
 #
 my ($pid, $eid, $vname) = check_status();

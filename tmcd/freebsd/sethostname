@@ -19,6 +19,22 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1;
 
 #
+# Check to see if hostname actually set yet. The dhclient exit hook gets
+# invoked no matter what, and typically the first or second DHCP fails,
+# and then this script runs tmcc, which fails and prints an annoying
+# warning.
+#
+my $curname = `hostname -s`;
+if (! ($curname =~ /.+/)) {
+    exit 0;
+}
+
+#
+# Inform the master that we have rebooted. THIS MUST BE DONE!
+#
+inform_reboot();
+
+#
 # Check allocation. Exit now if not allocated.
 #
 my ($pid, $eid, $vname) = check_status();
