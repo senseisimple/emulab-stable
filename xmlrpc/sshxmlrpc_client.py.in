@@ -101,8 +101,17 @@ def do_method(server, method_and_args):
         if len(plist) != 2:
             print "Parameters are of the form: param=value!"
             return -1
+        value = plist[1]
+
+        #
+        # If the first character of the argument looks like a dictionary,
+        # try to evaluate it.
+        #
+        if value[0] == "{":
+            value = eval(value);
+            pass
     
-        params[plist[0]] = plist[1]
+        params[plist[0]] = value
         pass
     meth_args = [ PACKAGE_VERSION, params ]
 
