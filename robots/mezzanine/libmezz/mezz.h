@@ -21,7 +21,7 @@
  * Desc: Mezzanine IPC interface
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezz.h,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: mezz.h,v 1.2 2005-01-20 15:07:43 johnsond Exp $
  * Notes:
  *
  *  This library sets up a shared, memory-mapped object for exchanging
@@ -44,7 +44,7 @@
 // Some constants
 #define MEZZ_MAX_AREA 768*576  // Maximum number of pixels in the image.
 #define MEZZ_MAX_MASK    18    // Maximum number of points in the mask.
-#define MEZZ_MAX_DEWARP  32    // Maximum number of dewarping calibration points.
+#define MEZZ_MAX_DEWARP  64    // Maximum number of dewarping calibration points.
 #define MEZZ_MAX_CLASSES  4    // Maximum number of color classes we recognize.
 #define MEZZ_MAX_BLOBS  100    // Maximum number of blobs we will extract.
 #define MEZZ_MAX_OBJECTS 100   // Maximum number of extracted objects.
