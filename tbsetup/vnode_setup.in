@@ -277,6 +277,13 @@ foreach my $node (@nodes) {
 		    "    Virtual node $node teardown failure!\n");
 	    }
 	}
+
+	if ($plab && $killmode) {
+	    if (system("$TB/sbin/plabnode -v -d free $pid $eid $node")) {
+		warn("*** $0:\n".
+		     "    Plab node free failed");
+	    }
+	}
     }
     else {
 	my $args = ($killmode ? "-k " : " ");
@@ -297,13 +304,6 @@ foreach my $node (@nodes) {
 	exec("$ssh -host $node $CLIENT_BIN/vnodesetup $args");
 	die("*** $0:\n".
 	    "    exec failed!\n");
-
-	if ($plab && $killmode) {
-	    if (system("$TB/sbin/plabnode -v -d free $pid $eid $node")) {
-		warn("*** $0:\n".
-		     "    Plab node free failed");
-	    }
-	}
     }
 }
 
