@@ -89,15 +89,21 @@ if (! TBExpLeader($pid, $eid, $expleader)) {
 TBUserInfo($expleader, $expleader_name, $expleader_email);
 
 if (! TBProjLeader($pid, $projleader)) {
-    TBERROR("Could not determine experiment leader!", 1);
+    TBERROR("Could not determine project leader!", 1);
 }
 TBUserInfo($projleader, $projleader_name, $projleader_email);
+
+$q=DBQueryWarn("select count(*) as c from reserved ".
+	       "where pid='$pid' and eid='$eid'");
+$r=mysql_fetch_array($q);
+$c=$r["c"];
 
 TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid: Please Swap or Terminate Experiment",
      "Hi, this is an automated message from Emulab.Net.\n".
      "\n".
-     "It appears that your experiment '$eid' in project '$pid' is inactive.\n".
+     "It appears that the $c nodes in your experiment '$eid' \n".
+     "in project '$pid' are inactive.\n".
      "We would appreciate it if you could either terminate or swap this\n".
      "experiment out so that the nodes will be available for use by\n".
      "other experimenters. You can do this by logging into the Emulab Web\n".
