@@ -290,5 +290,5 @@ foreach my $node (@nodes) {
 #
 # Only if all nodes setup okay.
 # 
-print STDOUT "Vnode Setup Done!\n";
+print STDOUT "Vnode $mode done!\n";
 exit 0;
