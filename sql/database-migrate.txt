@@ -2106,3 +2106,17 @@ last_net_act,last_cpu_act,last_ext_act);
           enum('ctrl','expt','jail','fake','other','gw','outer_ctrl') \
 	  default NULL;
 
+1.271: Add elabinelab_vlans table for mapping inner elab vlan ids to
+       auto assigned outer elab vlan ids. 
+
+	CREATE TABLE elabinelab_vlans (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  inner_id int(11) unsigned NOT NULL default 0,
+	  outer_id int(11) unsigned NOT NULL default 0,
+	  PRIMARY KEY  (pid,eid,inner_id)
+	) TYPE=MyISAM;
+
+
+
+	  

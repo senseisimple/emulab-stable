@@ -151,6 +151,18 @@ CREATE TABLE deltas (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `elabinelab_vlans`
+--
+
+CREATE TABLE elabinelab_vlans (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  inner_id int(11) unsigned NOT NULL default 0,
+  outer_id int(11) unsigned NOT NULL default 0,
+  PRIMARY KEY  (pid,eid,inner_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `emulab_indicies`
 --
 
