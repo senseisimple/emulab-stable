@@ -1010,6 +1010,7 @@ CREATE TABLE users (
   admin tinyint(4) default '0',
   dbedit tinyint(4) default '0',
   stud tinyint(4) default '0',
+  webonly tinyint(4) default '0',
   pswd_expires date default NULL,
   cvsweb tinyint(4) NOT NULL default '0',
   emulab_pubkey text,
@@ -1186,6 +1187,19 @@ CREATE TABLE webdb_table_permissions (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'widearea_accounts'
+#
+
+CREATE TABLE widearea_accounts (
+  uid varchar(8) NOT NULL default '',
+  node_id varchar(10) NOT NULL default '',
+  trust enum('none','user','local_root') default NULL,
+  date_applied date default NULL,
+  date_approved datetime default NULL,
+  PRIMARY KEY  (uid,node_id)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'widearea_delays'
 #
 
@@ -1215,6 +1229,7 @@ CREATE TABLE widearea_privkeys (
   cdkey varchar(64) default NULL,
   nextprivkey varchar(64) default NULL,
   rootkey varchar(64) default NULL,
+  lockkey varchar(64) default NULL,
   requested datetime NOT NULL default '0000-00-00 00:00:00',
   updated datetime NOT NULL default '0000-00-00 00:00:00',
   PRIMARY KEY  (privkey,IP)
