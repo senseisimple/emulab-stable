@@ -17,6 +17,11 @@ if [ -x @prefix@/sbin/tmcd.restart  ]; then
         @prefix@/sbin/tmcd.restart
 fi
 
+if [ -x @prefix@/sbin/tevd.restart  ]; then
+        echo -n " tevd"
+        @prefix@/sbin/tevd.restart
+fi
+
 if [ -x @prefix@/sbin/proxydhcp.restart  ]; then
 	echo -n " proxydhcp"
 	@prefix@/sbin/proxydhcp.restart
