@@ -24,14 +24,14 @@
 void		sigcatcher(int foo);
 char		*getbossnode(void);
 #ifdef UDP
-void		doudp(int argc, char **argv, struct in_addr, int port);
+void		doudp(int, char **, int, struct in_addr, int);
 #endif
 
-
 char *usagestr = 
- "usage: tmcc [-u] [-p #] [-s server] <command>\n"
+ "usage: tmcc [-u] [-v versnum] [-p #] [-s server] <command>\n"
  " -s server	   Specify a tmcd server to connect to\n"
  " -p portnum	   Specify a port number to connect to\n"
+ " -v versnum	   Specify a version number for tmcd\n"
  " -u		   Use UDP instead of TCP\n"
  "\n";
 
@@ -48,26 +48,27 @@ main(int argc, char **argv)
 {
 	int			sock, data, n, cc, ch, portnum;
 	struct sockaddr_in	name;
-#if 0
-	struct timeval		tv;
-#endif
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
 	char			*bossnode = NULL;
+	int			version = CURRENT_VERSION;
 #ifdef UDP
 	int			useudp = 0;
 #endif
 
 	portnum = TBSERVER_PORT;
 
-	while ((ch = getopt(argc, argv, "s:p:u")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:u")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
 			break;
 		case 's':
 			bossnode = optarg;
+			break;
+		case 'v':
+			version = atoi(optarg);
 			break;
 #ifdef UDP
 		case 'u':
@@ -94,6 +95,9 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	if (! version)
+		
+
 	/*
 	 * Handle built-in "bossinfo" command
 	 */
@@ -104,7 +108,7 @@ main(int argc, char **argv)
 
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv, serverip, portnum);
+		doudp(argc, argv, version, serverip, portnum);
 		/*
 		 * Never returns.
 		 */
@@ -148,37 +152,20 @@ main(int argc, char **argv)
 		close(sock);
 		exit(1);
 	}
-#if 0
-#ifndef linux
-	tv.tv_sec  = 30;
-	tv.tv_usec = 0;
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt SO_RCVTIMEO");
-		close(sock);
-		exit(1);
-	}
-#endif
-#endif
+
+	/* Start with version number */
+	sprintf(buf, "VERSION=%d ", version);
+
 	/*
 	 * Since we've gone through a getopt() pass, argv[0] is now the
 	 * first argument
 	 */
-	switch(argc) {
-	case 1:
-		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[0]);
-		break;
-	case 2:
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[0], argv[1]);
-		break;
-	case 3:
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s %s",
-			     argv[0], argv[1], argv[2]);
-		break;
-	default:
-		fprintf(stderr, "Too many command arguments!\n");
-		exit(1);
+	n = strlen(buf);
+	while (argc && n < sizeof(buf)) {
+		n += snprintf(&buf[n], sizeof(buf) - n, "%s ", argv[0]);
+		argc--;
+		argv++;
 	}
-		
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
 		exit(1);
@@ -253,7 +240,7 @@ getbossnode(void)
  * Not very robust, send a single request, read a single reply. 
  */
 void
-doudp(int argc, char **argv, struct in_addr serverip, int portnum)
+doudp(int argc, char **argv, int vers, struct in_addr serverip, int portnum)
 {
 	int			sock, length, n, cc;
 	struct sockaddr_in	name, client;
@@ -271,26 +258,18 @@ doudp(int argc, char **argv, struct in_addr serverip, int portnum)
 	name.sin_addr   = serverip;
 	name.sin_port = htons(portnum);
 
+	sprintf(buf, "VERSION=%d ", vers);
+
 	/*
 	 * Since we've gone through a getopt() pass, argv[0] is now the
 	 * first argument
 	 */
-	switch(argc) {
-	case 1:
-		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[0]);
-		break;
-	case 2:
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[0], argv[1]);
-		break;
-	case 3:
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s %s",
-			     argv[0], argv[1], argv[2]);
-		break;
-	default:
-		fprintf(stderr, "Too many command arguments!\n");
-		exit(1);
+	n = strlen(buf);
+	while (argc && n < sizeof(buf)) {
+		n += snprintf(&buf[n], sizeof(buf) - n, "%s ", argv[0]);
+		argc--;
+		argv++;
 	}
-		
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
 		exit(1);

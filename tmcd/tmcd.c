@@ -33,7 +33,6 @@
 #define RELOADEID	"reloading"
 
 #define TESTMODE
-#define VERSION		3
 #define NETMASK		"255.255.255.0"
 
 /* Defined in configure and passed in via the makefile */
@@ -62,6 +61,7 @@ int		mydb_update(char *query, ...);
 static int	udpchild;
 static int	numchildren;
 static int	maxchildren = MINCHILDREN;
+static int	killme;
 
 #ifdef EVENTSYS
 int			myevent_send(address_tuple_t address);
@@ -71,41 +71,45 @@ static event_handle_t	event_handle = NULL;
 /*
  * Commands we support.
  */
-static int doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dooldhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int donewhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dostartstat(int sock, struct in_addr ipaddr, char *rdata,int tcp);
-static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
-static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int doloadinfo(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int dotrafgens(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int donseconfigs(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int dostate(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int docreator(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+#define COMMAND_PROTOTYPE(x) \
+	static int \
+	x(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
+
+COMMAND_PROTOTYPE(doreboot);
+COMMAND_PROTOTYPE(dostatus);
+COMMAND_PROTOTYPE(doifconfig);
+COMMAND_PROTOTYPE(doaccounts);
+COMMAND_PROTOTYPE(dodelay);
+COMMAND_PROTOTYPE(dohosts);
+COMMAND_PROTOTYPE(dohostsV2);
+COMMAND_PROTOTYPE(dorpms);
+COMMAND_PROTOTYPE(dodeltas);
+COMMAND_PROTOTYPE(dotarballs);
+COMMAND_PROTOTYPE(dostartcmd);
+COMMAND_PROTOTYPE(dostartstat);
+COMMAND_PROTOTYPE(doready);
+COMMAND_PROTOTYPE(doreadycount);
+COMMAND_PROTOTYPE(dolog);
+COMMAND_PROTOTYPE(domounts);
+COMMAND_PROTOTYPE(doloadinfo);
+COMMAND_PROTOTYPE(doreset);
+COMMAND_PROTOTYPE(dorouting);
+COMMAND_PROTOTYPE(dotrafgens);
+COMMAND_PROTOTYPE(donseconfigs);
+COMMAND_PROTOTYPE(dostate);
+COMMAND_PROTOTYPE(docreator);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+	int    (*func)(int, struct in_addr, char *, int, int);
 } command_array[] = {
 	{ "reboot",	doreboot },
 	{ "status",	dostatus },
 	{ "ifconfig",	doifconfig },
 	{ "accounts",	doaccounts },
 	{ "delay",	dodelay },
-	{ "hostnamesV2",donewhosts },
-	{ "hostnames",	dooldhosts },
+	{ "hostnamesV2",dohostsV2 },	/* This will go away */
+	{ "hostnames",	dohosts },
 	{ "rpms",	dorpms },
 	{ "deltas",	dodeltas },
 	{ "tarballs",	dotarballs },
@@ -150,12 +154,21 @@ usage()
 	exit(1);
 }
 
+static void
+cleanup()
+{
+	signal(SIGHUP, SIG_IGN);
+	killpg(0, SIGHUP);
+	killme = 1;
+}
+
 int
 main(int argc, char **argv)
 {
 	int			tcpsock, udpsock, ch;
 	int			length, i, status, pid;
 	struct sockaddr_in	name;
+	extern char		build_info[];
 
 	while ((ch = getopt(argc, argv, "dp:c:")) != -1)
 		switch(ch) {
@@ -182,7 +195,8 @@ main(int argc, char **argv)
 		usage();
 
 	openlog("tmcd", LOG_PID, LOG_USER);
-	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
+	syslog(LOG_NOTICE, "daemon starting (version %d)", CURRENT_VERSION);
+	syslog(LOG_NOTICE, "%s", build_info);
 
 	if (! debug)
 		(void)daemon(0, 0);
@@ -256,12 +270,16 @@ main(int argc, char **argv)
 	}
 	syslog(LOG_NOTICE, "listening on UDP port %d", ntohs(name.sin_port));
 
+	signal(SIGTERM, cleanup);
+	signal(SIGINT, cleanup);
+	signal(SIGHUP, cleanup);
+
 	/*
 	 * Now fork a set of children to handle requests. We keep the
 	 * pool at a set level. No need to get too fancy at this point. 
 	 */
 	while (1) {
-		while (numchildren < maxchildren) {
+		while (!killme && numchildren < maxchildren) {
 			int doudp = (udpchild ? 0 : 1);
 			if ((pid = fork()) < 0) {
 				syslog(LOG_ERR, "forking server: %m");
@@ -274,6 +292,10 @@ main(int argc, char **argv)
 				continue;
 			}
 			/* Child does useful work! Never Returns! */
+			signal(SIGTERM, SIG_DFL);
+			signal(SIGINT, SIG_DFL);
+			signal(SIGHUP, SIG_DFL);
+			
 			if (doudp) 
 				udpserver(udpsock);
 			else
@@ -294,12 +316,13 @@ main(int argc, char **argv)
 		numchildren--;
 		if (pid == udpchild)
 			udpchild = 0;
+		if (killme && !numchildren)
+			break;
 	}
  done:
 	close(tcpsock);
 	close(udpsock);
 	syslog(LOG_NOTICE, "daemon terminating");
-	kill(0, SIGTERM);
 	exit(0);
 }
 
@@ -381,11 +404,27 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 {
 	struct sockaddr_in redirect_client;
 	int		   redirect = 0;
-	char		   *bp, *cp;
+	char		   buf[BUFSIZ], *bp;
 	int		   i, cc, err = 0;
+	int		   version = DEFAULT_VERSION;
 
 	cc = strlen(rdata);
 	bp = rdata;
+
+	while (isspace(*bp))
+		bp++;
+	
+	/*
+	 * Look for VERSION. 
+	 */
+	if (sscanf(bp, "VERSION=%d", &i)) {
+		version = i;
+
+		while (! isspace(*bp))
+			bp++;
+		while (isspace(*bp))
+			bp++;
+	}
 
 	/*
 	 * Look for REDIRECT, which is a proxy request for a
@@ -393,25 +432,17 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * for testing. Might become a general tmcd redirect at
 	 * some point, so that we can test new tmcds.
 	 */
-	if (strncmp("REDIRECT=", bp, strlen("REDIRECT=")) == 0) {
-		char *tp;
-		
-		bp += strlen("REDIRECT=");
-		tp = bp;
-		while (! isspace(*tp))
-			tp++;
-		*tp++ = '\0';
+	if (sscanf(bp, "REDIRECT=%30s", buf)) {
 		redirect_client = *client;
 		redirect        = 1;
-		inet_aton(bp, &client->sin_addr);
-		bp = tp;
-	}
-	if ((cp = (char *) malloc(cc + 1)) == NULL) {
-		syslog(LOG_ERR, "Out of memory");
-		return 1;
-	}
-	strcpy(cp, bp);
-		
+		inet_aton(buf, &client->sin_addr);
+
+		while (! isspace(*bp))
+			bp++;
+		while (isspace(*bp))
+			bp++;
+	}		
+
 #ifndef	TESTMODE
 	/*
 	 * IN TESTMODE, we allow redirect.
@@ -447,7 +478,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * Figure out what command was given.
 	 */
 	for (i = 0; i < numcommands; i++)
-		if (strncmp(cp, command_array[i].cmdname,
+		if (strncmp(bp, command_array[i].cmdname,
 			    strlen(command_array[i].cmdname)) == 0)
 			break;
 
@@ -456,43 +487,43 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 */
 	if (i == numcommands) {
 		syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
-		       inet_ntoa(client->sin_addr), cp);
+		       inet_ntoa(client->sin_addr), bp);
 		goto skipit;
 	}
 	else {
-		bp = cp + strlen(command_array[i].cmdname);
+		bp += strlen(command_array[i].cmdname);
 
 		/*
 		 * XXX hack, don't log "log" contents,
 		 * both for privacy and to keep our syslog smaller.
 		 */
 		if (command_array[i].func == dolog)
-			syslog(LOG_INFO, "%s REQUEST: log %d chars",
+			syslog(LOG_INFO, "%s log %d chars",
 			       inet_ntoa(client->sin_addr), strlen(bp));
 		else
-			syslog(LOG_INFO, "%s REQUEST: %s",
+			syslog(LOG_INFO, "%s vers:%d %s",
 			       inet_ntoa(client->sin_addr),
-			       command_array[i].cmdname);
+			       version, command_array[i].cmdname);
 
-		err = command_array[i].func(sock, client->sin_addr, bp, istcp);
+		err = command_array[i].func(sock, client->sin_addr,
+					    bp, istcp, version);
 
-		syslog(LOG_INFO, "%s REQUEST: %s: returned %d",
+		syslog(LOG_INFO, "%s %s: returned %d",
 		       inet_ntoa(client->sin_addr),
 		       command_array[i].cmdname, err);
 	}
 
  skipit:
-	free(cp);
-	if (!istcp)
-		client_writeback_done(sock, &client);
+	if (!istcp) 
+		client_writeback_done(sock,
+				      redirect ? &redirect_client : client);
 	return 0;
 }
 
 /*
  * Accept notification of reboot. 
  */
-static int
-doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doreboot)
 {
 	MYSQL_RES	*res;	
 	char		nodeid[32];
@@ -583,8 +614,7 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return status of node. Is it allocated to an experiment, or free.
  */
-static int
-dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dostatus)
 {
 	char		nodeid[32];
 	char		pid[64];
@@ -624,8 +654,7 @@ dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return ifconfig information to client.
  */
-static int
-doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doifconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -745,8 +774,7 @@ doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return account stuff.
  */
-static int
-doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doaccounts)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -826,13 +854,14 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 #ifdef  NOSHAREDEXPTS
 	res = mydb_query("select distinct "
 			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,p.pid,p.gid,g.unix_gid,u.admin "
+			 "  p.trust,p.pid,p.gid,g.unix_gid,u.admin, "
+			 "  u.emulab_pubkey,u.home_pubkey "
 			 "from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on p.pid=g.pid "
 			 "where p.pid='%s' and p.gid='%s' "
 			 "      and u.status='active' order by u.uid",
-			 9, pid, eid, pid, gid);
+			 11, pid, eid, pid, gid);
 #else
 	/*
 	 * See if a shared experiment. Used below.
@@ -866,25 +895,27 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	if (strcmp(pid, gid)) {
 		res = mydb_query("select distinct "
 			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin "
+			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+			 "  u.emulab_pubkey,u.home_pubkey "
 			 "from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on p.pid=g.pid "
 			 "where ((p.pid='%s' and p.gid='%s')) "
 			 "      and u.status='active' order by u.uid",
-			 9, pid, gid);
+			 11, pid, gid);
 	}
 	else {
 		res = mydb_query("select distinct "
 			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin "
+			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+			 "  u.emulab_pubkey,u.home_pubkey "
 			 "from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on "
 			 "     p.pid=g.pid and p.gid=g.gid "
 			 "where ((p.pid='%s')) "
 			 "      and u.status='active' order by u.uid",
-			 9, pid);
+			 11, pid);
 	}
 #endif
 	if (!res) {
@@ -988,8 +1019,11 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			USERDIR, row[0], glist);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
 
+		syslog(LOG_INFO, "ACCOUNTS: "
+			"ADDUSER LOGIN=%s "
+			"UID=%s GID=%d ROOT=%d GLIST=%s",
+			row[0], row[2], gidint, root, glist);
 		row = nextrow;
 	}
 	mysql_free_result(res);
@@ -1000,8 +1034,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return account stuff.
  */
-static int
-dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dodelay)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1109,25 +1142,15 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return host table information.
  */
-static int dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int);
-
-static int
-dooldhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dohostsV2)
 {
-	return(dohosts(sock, ipaddr, rdata, tcp, 1));
+	/*
+	 * This will go away. Ignore version and assume latest.
+	 */
+	return(dohosts(sock, ipaddr, rdata, tcp, CURRENT_VERSION));
 }
 
-static int
-donewhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
-{
-	return(dohosts(sock, ipaddr, rdata, tcp, 2));
-}
-
-/*
- * Return host table information.
- */
-static int
-dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
+COMMAND_PROTOTYPE(dohosts)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1320,7 +1343,8 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 	 */
 	host = hosts;
 	while (host) {
-		if (vers == 1) {
+		/* Old format */
+		if (vers == 2) {
 			sprintf(buf,
 				"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
 				host->vname, host->virtiface,
@@ -1359,8 +1383,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 /*
  * Return RPM stuff.
  */
-static int
-dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dorpms)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1426,8 +1449,7 @@ dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return Tarball stuff.
  */
-static int
-dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dotarballs)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1496,8 +1518,7 @@ dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return Deltas stuff.
  */
-static int
-dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dodeltas)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1564,8 +1585,7 @@ dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
  * Return node run command. We return the command to run, plus the UID
  * of the experiment creator to run it as!
  */
-static int
-dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dostartcmd)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1648,8 +1668,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Accept notification of start command exit status. 
  */
-static int
-dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dostartstat)
 {
 	char		nodeid[32];
 	char		pid[64];
@@ -1702,8 +1721,7 @@ dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Accept notification of ready for action
  */
-static int
-doready(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doready)
 {
 	char		nodeid[32];
 	char		pid[64];
@@ -1745,8 +1763,7 @@ doready(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return ready bits count (NofM)
  */
-static int
-doreadycount(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doreadycount)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1813,8 +1830,7 @@ static char logfmt[] = "/proj/%s/logs/%s.log";
 /*
  * Log some text to a file in the /proj/<pid>/exp/<eid> directory.
  */
-static int
-dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dolog)
 {
 	char		nodeid[32];
 	char		pid[64];
@@ -1863,8 +1879,7 @@ dolog(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return mount stuff.
  */
-static int
-domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(domounts)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1980,8 +1995,7 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return routing stuff.
  */
-static int
-dorouting(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dorouting)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -2045,8 +2059,7 @@ dorouting(int sock, struct in_addr ipaddr, char *rdata, int tcp)
  * Return address from which to load an image, along with the partition that
  * it should be written to
  */
-static int
-doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doloadinfo)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -2101,8 +2114,7 @@ doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
  * or next_boot_osid is set, clear both along with next_boot_cmd_line.
  * If neither is set, do nothing. Produces no output to the client.
  */
-static int
-doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(doreset)
 {
 	MYSQL_RES	*res;	
 	char		nodeid[32];
@@ -2187,8 +2199,7 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return trafgens info
  */
-static int
-dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dotrafgens)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -2252,8 +2263,7 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return nseconfigs info
  */
-static int
-donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(donseconfigs)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -2314,12 +2324,10 @@ donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Report that the node has entered a new state
  */
-static int
-dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(dostate)
 {
 	char		nodeid[32];
 	char 		*newstate;
-	time_t		now;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -2368,8 +2376,7 @@ dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return creator of experiment. Total hack. Must kill this.
  */
-static int
-docreator(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+COMMAND_PROTOTYPE(docreator)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
