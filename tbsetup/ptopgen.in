@@ -46,6 +46,9 @@ use libdb;
 %used_switches=();
 my $switchtouse;
 
+my $DEADPID = NODEDEAD_PID();
+my $DEADEID = NODEDEAD_EID();
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -89,10 +92,25 @@ else {
 }
 
 # Find available nodes
-$result = DBQueryFatal("select a.node_id,a.type from" .
-		     " nodes as a left join reserved as b" .
-		     " on a.node_id=b.node_id" .
-		     " where b.node_id is null and a.role = \"testnode\"");
+#
+# VIRTNODES HACK: If the node is a virtual node, then in addition to
+# to being free, the underlying physnode has to either be free, or
+# not in the hwdown group. Either way, the the underlying physnode has
+# to be "up", as determined by the autostatus stuff; this will prevent us
+# from allocating a dead virtual node to an experiment. 
+# This is especially hacky. We need another mechanism for this.
+#
+$result =
+    DBQueryFatal("select a.node_id,a.type from nodes as a ".
+		 "left join reserved as b on a.node_id=b.node_id ".
+		 "left join reserved as m on a.phys_nodeid=m.node_id ".
+		 "left join nodes as n on a.phys_nodeid=n.node_id ".
+		 "left join node_types as nt on a.type=nt.type ".
+		 "where b.node_id is null and a.role='testnode' and ".
+		 "      (nt.isvirtnode=0 || ".
+		 "       (n.status='up' and (m.node_id is null || ".
+		 "        m.pid!='$DEADPID' || m.eid!='$DEADEID')))");
+
 while (($node,$type) = $result->fetchrow_array) {
     # Shark hack
     if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
