@@ -60,6 +60,12 @@ function SPITFORM($formfields, $errors)
 	}
 	echo "</table><br>\n";
     }
+    else {
+	echo "<b>
+              Looking for a <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
+	      to help you create your topology?
+              <a href='buildui/bui.php3'>Check it out!</a></b>\n<br><br>";
+    }
 
     echo "<table align=center border=1> 
           <tr>
