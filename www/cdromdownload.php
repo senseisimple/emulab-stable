@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -14,7 +14,7 @@ PAGEHEADER("Download the latest CD image");
 ?>
 If you have a CD-R drive you can burn your own installation disk.<br>
 <br>
-The latest CD image is <a href=/images/netbed-0.3.iso>netbed-0.3.iso</a>.
+The latest CD image is <a href=/images/netbed-1.0.iso>netbed-1.0.iso</a>.
 <?php
 #
 # Standard Footer.

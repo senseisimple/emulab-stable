@@ -235,10 +235,10 @@ if (strcmp($privIP, "1.1.1.1")) {
 	SPITSTATUS(CDROMSTATUS_BADIPADDR);
 	return;
     }
-#    if (strcmp($REMOTE_ADDR, $IP)) {
-#	SPITSTATUS(CDROMSTATUS_BADREMOTEIP);
-#	return;
-#    }
+    if (strcmp($REMOTE_ADDR, $IP)) {
+	SPITSTATUS(CDROMSTATUS_BADREMOTEIP);
+	return;
+    }
 
     $upgrade_instructions = 0;
     #
@@ -394,13 +394,14 @@ elseif ($cdvers == 69) {
     }
 }
 else {
+    # This is netbed-1.0.iso in the distributions directory!
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
 	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
 	# Still return this for the root tag. Might change later.
-	echo "slice1_md5=d326a1f604489c43b488fa80a88221f4\n";
+	echo "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=https://${WWWHOST}/images/slicex-v4.tar.gz\n";
@@ -408,15 +409,15 @@ else {
     }
     else {
 	echo "fdisk=image.fdisk\n";
-	echo "fdisk_sig=image.fdisk.sig\n";
+	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_sig=slice1.ndz.sig\n";
+	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
 	# Still return this for the root tag. Might change later.
-	echo "slice1_md5=0cec709b70a53ce9fd0d90f5ae386aea\n";
+	echo "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
-	echo "slicex_sig=slicex.tar.gz.sig\n";
+	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
     }
 }
 echo "emulab_status=0\n";
