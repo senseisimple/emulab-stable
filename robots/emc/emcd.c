@@ -502,6 +502,7 @@ void parse_config_file(char *config_file) {
     }
     memcpy(&rc->ia, he->h_addr, he->h_length);
     rc->vname = vname;
+    rc->token = ~0;
     
     robot_list_append(hostname_list,id,(void*)rc);
     p = (struct position *)malloc(sizeof(struct position *));
@@ -597,60 +598,93 @@ void ev_callback(event_handle_t handle,
 		 event_notification_t notification,
 		 void *data)
 {
-  char host[TBDB_FLEN_IP];
-  struct in_addr ia;
+  struct emc_robot_config *match = NULL;
+  char objname[TBDB_FLEN_EVOBJTYPE];
+  robot_list_item_t *rli;
   
-  event_notification_get_host(handle, notification, host, sizeof(host));
+  if (! event_notification_get_objname(handle, notification,
+				       objname, sizeof(objname))) {
+    error("Could not get objname from notification!\n");
+  }
   
-  if (!inet_aton(host, &ia)) {
-    error("event's host value is not an IP address: %s\n", host);
+  for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
+    struct emc_robot_config *erc = rli->data;
+    
+    if (strcmp(erc->vname, objname) == 0) {
+      match = erc;
+      break;
+    }
+  }
+  
+  if (match == NULL) {
+    error("no match for host\n");
   }
   else {
-    struct emc_robot_config *match = NULL;
-    robot_list_item_t *rli;
+    struct mtp_command_goto mcg;
+    char *value, args[BUFSIZ];
+    float x, y, orientation;
+    struct mtp_packet *mp;
     
-    for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
-      struct emc_robot_config *erc = rli->data;
-      
-      if (erc->ia.s_addr == ia.s_addr) {
-        match = erc;
-        break;
+    event_notification_get_arguments(handle, notification, args, sizeof(args));
+    
+    if (event_arg_get(args, "X", &value) > 0) {
+      if (sscanf(value, "%f", &x) != 1) {
+	error("X argument in event is not a float: %s\n", value);
       }
     }
     
-    if (match == NULL) {
-      error("no match for IP: %s\n", host);
+    if (event_arg_get(args, "Y", &value) > 0) {
+      if (sscanf(value, "%f", &y) != 1) {
+	error("Y argument in event is not a float: %s\n", value);
+      }
+    }
+    
+    if (event_arg_get(args, "ORIENTATION", &value) > 0) {
+      if (sscanf(value, "%f", &orientation) != 1) {
+	error("ORIENTATION argument in event is not a float: %s\n", value);
+      }
+    }
+    
+    event_notification_get_int32(handle, notification,
+				 "TOKEN", (int32_t *)&match->token);
+
+    orientation = orientation * M_PI / 180.0;
+
+    mcg.command_id = 1;
+    mcg.robot_id = match->id;
+    mcg.position.x = x;
+    mcg.position.y = y;
+    mcg.position.theta = orientation;
+
+    if ((mp = mtp_make_packet(MTP_COMMAND_GOTO,
+			      MTP_ROLE_EMULAB,
+			      &mcg)) == NULL) {
+      error("could not allocate packet\n");
+    }
+    else if (rmc_data.sock_fd != -1) {
+      
+      mtp_send_packet(rmc_data.sock_fd, mp);
     }
     else {
-      char *value, args[BUFSIZ];
-      float x, y, orientation;
+      mtp_print_packet(stdout, mp);
       
-      event_notification_get_arguments(handle,
-                                       notification, args, sizeof(args));
-      
-      if (event_arg_get(args, "X", &value) > 0) {
-        if (sscanf(value, "%f", &x) != 1) {
-          error("X argument in event is not a float: %s\n", value);
-        }
-      }
-      
-      if (event_arg_get(args, "Y", &value) > 0) {
-        if (sscanf(value, "%f", &y) != 1) {
-          error("Y argument in event is not a float: %s\n", value);
-        }
-      }
-      
-      if (event_arg_get(args, "ORIENTATION", &value) > 0) {
-        if (sscanf(value, "%f", &orientation) != 1) {
-          error("ORIENTATION argument in event is not a float: %s\n", value);
-        }
-      }
-      
-      // XXX What to do with the data?
-
-      // construct a COMMAND_GOTO packet and send to rmc.
-
+      event_do(handle,
+	       EA_Experiment, pideid,
+	       EA_Type, TBDB_OBJECTTYPE_NODE,
+	       EA_Name, match->vname,
+	       EA_Event, TBDB_EVENTTYPE_COMPLETE,
+	       EA_ArgInteger, "ERROR", 0,
+	       EA_ArgInteger, "CTOKEN", match->token,
+	       EA_TAG_DONE);
     }
+
+    mtp_free_packet(mp);
+    mp = NULL;
+    
+    // XXX What to do with the data?
+    
+    // construct a COMMAND_GOTO packet and send to rmc.
+    
   }
 }
 
@@ -974,7 +1008,8 @@ int rmc_callback(elvin_io_handler_t handler,
 	struct mtp_update_position *up = (struct mtp_update_position *)
 	  robot_list_remove_by_id(rmc->position_list, my_id);
 	struct mtp_update_position *up_copy;
-
+	struct emc_robot_config *erc;
+	
 	free(up);
 	up = NULL;
 
@@ -983,11 +1018,26 @@ int rmc_callback(elvin_io_handler_t handler,
 	*up_copy = *(mp->data.update_position);
 	robot_list_append(rmc->position_list, my_id, up_copy);
 
+	erc = robot_list_search(hostname_list,
+				mp->data.update_position->robot_id);
 	switch (mp->data.update_position->status) {
 	case MTP_POSITION_STATUS_ERROR:
 	case MTP_POSITION_STATUS_COMPLETE:
 	  if (emulab_sock != -1) {
 	    mtp_send_packet(emulab_sock, mp);
+	  }
+	  if (erc->token != ~0) {
+	    event_do(handle,
+		     EA_Experiment, pideid,
+		     EA_Type, TBDB_OBJECTTYPE_NODE,
+		     EA_Name, erc->vname,
+		     EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		     EA_ArgInteger, "ERROR",
+		     mp->data.update_position->status ==
+		     MTP_POSITION_STATUS_ERROR ? 1 : 0,
+		     EA_ArgInteger, "CTOKEN", erc->token,
+		     EA_TAG_DONE);
+	    erc->token = ~0;
 	  }
 	  break;
 	}
@@ -1170,7 +1220,7 @@ int vmc_callback(elvin_io_handler_t handler,
     error("invalid client %p\n", mp);
   }
   else {
-    if (debug) {
+    if (0 && debug) {
       fprintf(stderr, "vmc_callback: ");
       mtp_print_packet(stderr, mp);
     }

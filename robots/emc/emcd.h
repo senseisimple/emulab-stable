@@ -7,6 +7,7 @@ struct emc_robot_config {
   char *hostname;
   char *vname;
   struct in_addr ia;
+  int token;
 };
 
 struct rmc_client {
