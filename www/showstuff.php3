@@ -992,6 +992,28 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 }
 
 #
+# Add a LED'ish applet that turn's on/off based on the output of a URL.
+#
+# @param uid The logged-in user ID.
+# @param auth The value of the user's authentication cookie.
+# @param pipeurl The url the applet should connect to to get LED status.  This
+# string must include any parameters, or if there are none, end with a '?'.
+#
+# Example:
+#   SHOWBLINKENLICHTEN($uid,
+#                      $HTTP_COOKIE_VARS[$TBAUTHCOOKIE],
+#                      "ledpipe.php3?node=em1");
+#
+function SHOWBLINKENLICHTEN($uid, $auth, $pipeurl, $width = 10, $height = 10) {
+	echo "
+          <applet code='BlinkenLichten.class' width='$width' height='$height'>
+            <param name='pipeurl' value='$pipeurl'>
+            <param name='uid' value='$uid'>
+            <param name='auth' value='$auth'>
+          </applet>\n";
+}
+
+#
 # Show Node information for an experiment.
 #
 function SHOWNODES($pid, $eid, $sortby) {

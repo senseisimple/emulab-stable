@@ -37,6 +37,7 @@ FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
 FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(wildcard $(SRCDIR)/*.ico)
+FILES  += $(wildcard $(SRCDIR)/*.class)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml $(SRCDIR)/ssh-mime.pl \
 	  $(SRCDIR)/ssh-mime-windows.pl
 
