@@ -255,7 +255,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 {
 	char		*cp = SPEAKSSL;
 	int		cc;
-	X509		*peer;
+	X509		*peer = NULL;
 	char		cname[256];
 	struct hostent	*he;
 	struct in_addr  ipaddr, cnameip;
@@ -307,6 +307,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 	 */
 	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
 				  NID_commonName, cname, sizeof(cname));
+	X509_free(peer);
 
 	/*
 	 * On the client, the common name must map to the same
@@ -330,7 +331,6 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 		      cname, buf, inet_ntoa(cnameip));
 		goto badauth;
 	}
-	
 	return 0;
 
  badauth:
@@ -344,7 +344,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 int
 tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 {
-	X509		*peer;
+	X509		*peer = NULL;
 	char		cname[256], unitname[256];
 
 	if (SSL_get_verify_result(ssl) != X509_V_OK) {
@@ -367,7 +367,8 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
 				  NID_commonName,
 				  cname, sizeof(cname));
-
+	X509_free(peer);
+	
 	/*
 	 * On the server, things are a bit more difficult since
 	 * we share a common cert locally and a per group cert remotely.
@@ -389,7 +390,6 @@ tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
 		      unitname, type);
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -458,8 +458,17 @@ tmcd_sslread(int sock, void *buf, size_t nbytes)
 int
 tmcd_sslclose(int sock)
 {
+	int	error;
+
 	if (ssl) {
-		SSL_shutdown(ssl);
+		if (! (error = SSL_shutdown(ssl))) {
+			shutdown(sock, SHUT_WR);
+			error = SSL_shutdown(ssl);
+		}
+		if (error < 0) {
+			tmcd_sslprint("SSL_shutdown: ");
+			tmcd_sslerror();
+		}
 		SSL_free(ssl);
 		ssl = NULL;
 	}
