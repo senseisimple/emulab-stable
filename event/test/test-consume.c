@@ -1,6 +1,6 @@
 /* test-consume.c: Test delivery of events (consumer). */
 
-static char rcsid[] = "$Id: test-consume.c,v 1.1 2001-11-02 04:47:14 imurdock Exp $";
+static char rcsid[] = "$Id: test-consume.c,v 1.2 2001-11-06 17:24:16 imurdock Exp $";
 
 #include <event.h>
 
@@ -11,9 +11,22 @@ int
 main(int argc, char **argv)
 {
     event_handle_t handle;
+    char *server = NULL;
+    int c;
+
+    while ((c = getopt(argc, argv, "s:")) != -1) {
+        switch (c) {
+          case 's':
+              server = optarg;
+              break;
+          default:
+              fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
+              return 1;
+        }
+    }
 
     /* Register with the event system: */
-    handle = event_register();
+    handle = event_register(server);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;
