@@ -1,0 +1,4 @@
+libexec/tftpd
+man/man8/tftpd.8
+etc/rc.d/tftpd-hpa.sh
+etc/tftpd.rules
