@@ -31,20 +31,23 @@ my %id = ();
 
 my $result = DBQueryFatal("select id,members from vlans");
 while (@row = $result->fetchrow_array()) {
-    my @list = split(" ",$row[1]);
+    my ($vlan_id, $members) = @row;
+    my @list = split(" ",$members);
+
     foreach $port (@list) {
 	my ($node,$card) = split(":",$port);
 	if ($card =~ /[a-zA-Z]/) {
 	    # specified ala ethX
 	    my $result2 = DBQueryFatal("select card from interfaces ".
 		    "where node_id='$node' and iface='$card'");
-	    $card = ($result2->fetchrow_array())[0];
-	    if ($debug) { print "Had '$port', changed to '$node:$card'\n"; }
+	    ($card) = $result2->fetchrow_array();
+	    debug("Had '$port', changed to '$node:$card'\n");
 	    $port = "$node:$card";
 	}
     }
-    $table{$row[0]} = join(" ",sort @list);
-    if ($debug) { print "In table: vlan $row[0]: $table{$row[0]}\n"; }
+
+    $table{$vlan_id} = \@list;
+    debug("In table: vlan $vlan_id: $table{$vlan_id}\n");
 }
 
 # Get all the vlans from the switch
@@ -54,20 +57,23 @@ my $vlan=0;
 open(LIST,"snmpit -l |") || die ("vlandiff: couldn't run snmpit: $!\n");
 while(<LIST>) {
     chop;
-    if (/(^ID)|(^--)|(^1 )/) { next; }
-    s/[\t ]+/ /g;
-    if ( /^(\d+)\s+(\S+)(?:\s+(.*))?$/ ) {
-	if (!defined $3) { $list = ""; } else { $list = $3; }
-	if ($2 ne "default") {
-	    $switch{$2} = join(" ", sort split(" ",$list));
-	    $id{$2} = $1;
-	    $vlan = $2;
-	    if ($debug) { print "On switch: vlan #$1 $2: $switch{$2}\n"; }
-	}
+
+    # Skip heaer lines
+    if (/(^VLAN)|(^--)/) { next; }
+
+    # Ignore the pid/eid and vlan_name
+    if ( /^(\S+)\s+\S*\s+\S*\s+(.*)$/ ) {
+	my $vlan_id = $1;
+	my $members = $2;
+	debug("VLAN id $vlan_id has members $members\n");
+	$switch{$vlan_id} = [ split(" ",$members) ];
+	$vlan = $vlan_id;
     } elsif ( /^\s+(.*)?$/ ) {
-	if (!defined $1) { $list = ""; } else { $list = $1; }
-	$switch{$vlan} .= " ".join(" ", sort split(" ",$list));
-	if ($debug) { print "On switch: vlan #$id{$vlan} $vlan: $switch{$vlan}\n"; }
+	# These lines are continuations of multi-line meber lists
+	my $members = $1;
+	if (!defined $members) { $list = ""; } else { $list = $members; }
+	push @{$switch{$vlan}}, split(" ",$list);
+	debug("On switch: vlan $vlan: $switch{$vlan}\n");
     }
 }
 close(LIST);
@@ -75,13 +81,15 @@ close(LIST);
 # Compare all of them...
 
 foreach $key (sort keys %table) {
-    if ( defined $switch{$key} && ($switch{$key} eq $table{$key}) ) {
-	# If its in both lists, delete it from both
-	if ($debug) {
-	    print "vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n"
+    if ( defined $switch{$key} ) {
+	# Hacky 'one liner' list comparison
+	if (join("\0",sort(@{$switch{$key}}))
+		eq join("\0",sort(@{$table{$key}}))) {
+	    # If its in both lists, delete it from both
+	    debug("vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n");
+	    delete $switch{$key};
+	    delete $table{$key};
 	}
-	delete $switch{$key};
-	delete $table{$key};
     }
 }
 
@@ -92,7 +100,7 @@ my $rv = 0;
 if (keys %table) {
     print "In vlans table only:\n";
     foreach $key(sort keys %table) {
-	print "$key\t$table{$key}\n";
+	print "$key\t", join(" ",@{$table{$key}}), "\n";
     }
     $rv++;
 }
@@ -100,16 +108,20 @@ if (keys %table) {
 if (keys %switch) {
     print "On switch only:\n";
     foreach $key(sort keys %switch) {
-	print "#",$id{"$key"},": $key\t$switch{$key}\n";
+	print "$key\t", join(" ",@{$switch{$key}}), "\n";
     }
     $rv++;
 }
 
-if ($debug) {
-    print "Exiting with value $rv\n";
-}
+debug("Exiting with value $rv\n");
 
 
 # Return 0 if same, 1 for a one-sided diff, 2 for a two-sided diff
 # (Could be changed to return total # of different vlans)
 exit($rv);
+
+sub debug(@) {
+    if ($debug) {
+	warn @_;
+    }
+}
