@@ -56,6 +56,7 @@ ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event post-install
 endif
 	@$(MAKE) -C mote post-install
+	@$(MAKE) -C tools post-install
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)
