@@ -727,6 +727,40 @@ CREATE TABLE switch_stacks (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'testsuite_preentables'
+#
+
+CREATE TABLE testsuite_preentables (
+  table_name varchar(128) NOT NULL default '',
+  action enum('drop','clean','prune') default 'drop',
+  PRIMARY KEY  (table_name)
+) TYPE=MyISAM;
+
+#
+# Dumping data for table 'testsuite_preentables'
+#
+
+INSERT INTO testsuite_preentables VALUES ('comments','drop');
+INSERT INTO testsuite_preentables VALUES ('iface_counters','drop');
+INSERT INTO testsuite_preentables VALUES ('lastlogin','drop');
+INSERT INTO testsuite_preentables VALUES ('login','drop');
+INSERT INTO testsuite_preentables VALUES ('loginmessage','drop');
+INSERT INTO testsuite_preentables VALUES ('node_idlestats','drop');
+INSERT INTO testsuite_preentables VALUES ('nodelog','drop');
+INSERT INTO testsuite_preentables VALUES ('nodeuidlastlogin','drop');
+INSERT INTO testsuite_preentables VALUES ('nologins','drop');
+INSERT INTO testsuite_preentables VALUES ('userslastlogin','drop');
+INSERT INTO testsuite_preentables VALUES ('uidnodelastlogin','drop');
+INSERT INTO testsuite_preentables VALUES ('next_reserve','clean');
+INSERT INTO testsuite_preentables VALUES ('last_reservation','clean');
+INSERT INTO testsuite_preentables VALUES ('current_reloads','clean');
+INSERT INTO testsuite_preentables VALUES ('scheduled_reloads','clean');
+INSERT INTO testsuite_preentables VALUES ('users','prune');
+INSERT INTO testsuite_preentables VALUES ('projects','prune');
+INSERT INTO testsuite_preentables VALUES ('group_membership','prune');
+INSERT INTO testsuite_preentables VALUES ('groups','prune');
+
+#
 # Table structure for table 'tiplines'
 #
 
