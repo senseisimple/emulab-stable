@@ -1,4 +1,5 @@
 <?php
+include("defs.php3");
 echo "<html>
       <head>
       <title>Joining a project</title>
@@ -159,11 +160,11 @@ if (isset($pid)) { #add a project to the database
        "Testbed username $uid and email address $usr_email.\n$usr_name's ".
        "phone number is $usr_phone and address $usr_addr.\n".
        "\nPlease return ".
-       "to <https://plastic.cs.utah.edu/tbdb.html>, log in,\nand select the ".
+       "to $TBWWW, log in,\nand select the ".
        "'New User Approval' page to enter your decision regarding\n".
        "$usr_name's membership in your project".
-       "\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
-       "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+       "\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
+       "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
        "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
        "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
   if ($newuser==1) {
@@ -172,7 +173,7 @@ if (isset($pid)) { #add a project to the database
 	 "Network Testbed. As promised,\nhere is your key to verify your ".
 	 "account. Your key is:\n\n".
 	 crypt("TB_".$uid."_USR",strlen($uid)+13)."\n\n\t Please ".
-	 "return to <https://plastic.cs.utah.edu/tbdb.html> and log in,\n".
+	 "return to $TBWWW and log in,\n".
 	 "using the user name and password you gave us when you applied. ".
 	 "You will\nthen find an option on the menu called ".
 	 "'New User Verification'. Select it,\nand on that page enter in ".
@@ -180,8 +181,8 @@ if (isset($pid)) { #add a project to the database
 	 "verified as a user. When you have been ".
 	 "both verified and\napproved by the head of your project, you will be ".
 	 "marked as an active user,\nand will be granted full access to your ".
-	 "user account.\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
-         "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+	 "user account.\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
+         "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
          "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
          "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
     echo "

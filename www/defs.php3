@@ -2,8 +2,8 @@
 #
 # Standard definitions!
 #
-$TBWWW          = "<https://plastic.cs.utah.edu/tbdb.html>";
-$TBMAIL_CONTROL = "Testbed Control <testbed-control@flux.cs.utah.edu>";
+$TBWWW          = "<https://www.emulab.net/tbdb.html>";
+$TBMAIL_CONTROL = "Testbed Ops <testbed-ops@flux.cs.utah.edu>";
 $TBMAIL_WWW     = "Testbed WWW <testbed-www@flux.cs.utah.edu>";
 $TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
 $TBDBNAME       = "tbdb";

@@ -39,8 +39,8 @@ Please log in again.</h3>\n</body></html>";
 <p> The purpose of this page is to verify, for security purposes, that
 information given in your application is correct. If you never received a
 key at the email address given on your application, please contact
-<a href="mailto:testbed-control@flux.cs.utah.edu">
-Testbed Control (testbed-control@flux.cs.utah.edu)</a>
+<a href="mailto:testbed-ops@flux.cs.utah.edu">
+Testbed Ops (testbed-ops@flux.cs.utah.edu)</a>
 for further assistance.
 </p>
 <?php

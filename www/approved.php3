@@ -94,8 +94,8 @@ while ($row = mysql_fetch_row($found)) {
 	   "\nThis message is to notify you that you have been approved ".
 	   "as a member of \nthe $gid group with $trust permissions.\n".
 	   "\nYour status as a Testbed user is now $newstatus.".
-	   "\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
-           "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+	   "\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
+           "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
            "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
            "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
       echo "<h3><p>User $uid was changed to status $newstatus and ";
@@ -113,8 +113,8 @@ while ($row = mysql_fetch_row($found)) {
 	   "\nThis message is to notify you that you have been denied ".
 	   "as a member of \nthe $gid group.\n".
 	   "\nYour status as a Testbed user is still $status.".
-	   "\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
-           "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+	   "\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
+           "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
            "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
            "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
       echo "<h3><p>User $uid was denied membership in your group.</p></h3>\n";

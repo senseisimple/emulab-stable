@@ -179,7 +179,7 @@ if (! $returning) {
 	 "be marked as an active user, and will be granted full access to\n".
   	 "your user account.\n\n".
          "Thanks,\n".
-         "Testbed Control\n".
+         "Testbed Ops\n".
          "Utah Network Testbed\n",
          "From: $TBMAIL_CONTROL\n".
          "Cc: $TBMAIL_WWW\n".
@@ -191,7 +191,7 @@ if (! $returning) {
 # * Bump the unix GID.
 # * Create a new group in the database.
 # * Create a new group_membership entry in the database, default trust=none.
-# * Generate a mail message to testbed control
+# * Generate a mail message to testbed ops.
 #
 $unixgid_query  = "SELECT unix_gid FROM groups ORDER BY unix_gid DESC";
 $unixgid_result = mysql_db_query($TBDBNAME, $unixgid_query);
@@ -226,7 +226,7 @@ mail($TBMAIL_APPROVAL,
      "Affiliation:\t$grp_affil\nAddress:\t$grp_addr\n".
      "Phone:\t\t$usr_phones\n\n".
      "Reasons:\n$why\n\nPlease review the application and when you have\n".
-     "made a decision, go to <https://plastic.cs.utah.edu/tbdb.html> and\n".
+     "made a decision, go to $TBWWW and\n".
      "select the 'Group Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
      "From: $usr_name <$email>\n".

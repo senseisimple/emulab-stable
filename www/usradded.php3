@@ -158,7 +158,7 @@ if (! $returning) {
 	 "be marked as an active user, and will be granted full access to\n".
   	 "your user account.\n\n".
          "Thanks,\n".
-         "Testbed Control\n".
+         "Testbed Ops\n".
          "Utah Network Testbed\n",
          "From: $TBMAIL_CONTROL\n".
          "Cc: $TBMAIL_WWW\n".
@@ -232,7 +232,7 @@ mail("$group_leader_email",
      "log in, and select the 'New User Approval' page to enter your\n".
      "decision regarding $usr_name's membership in your project\n\n".
      "Thanks,\n".
-     "Testbed Control\n".
+     "Testbed Ops\n".
      "Utah Network Testbed\n",
      "From: $TBMAIL_CONTROL\n".
      "Cc: $TBMAIL_WWW\n".

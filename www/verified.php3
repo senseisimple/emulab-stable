@@ -71,8 +71,8 @@ if (isset($uid) && isset($pswd) && isset($key)) {
       } else {
 	echo "<h3>You have already been verified, $uid. If you did not ".
 	  "perform this verification, please notify ".
-	  "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">".
-	  "Testbed Control (testbed-control@flux.cs.utah.edu)</a> immediately.</h3>\n";
+	  "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">".
+	  "Testbed Ops (testbed-ops@flux.cs.utah.edu)</a> immediately.</h3>\n";
       }
     } else {
       echo "<h3>The given password is incorrect. Please go back to ".
@@ -90,14 +90,10 @@ if (isset($uid) && isset($pswd) && isset($key)) {
     "enter the correct password and key.</h3>\n";
 }
 ?>
-<p>Please contact 
-<a href="mailto:testbed-control@flux.cs.utah.edu">Testbed Control
-(testbed-control@flux.cs.utah.edu)</a> 
+<p>Please contact
+<a href="mailto:testbed-ops@flux.cs.utah.edu">
+Testbed Ops (testbed-ops@flux.cs.utah.edu)</a> 
 if you need further assistance.
 </p>
 </body>
 </html>
-
-
-
-

@@ -2,7 +2,7 @@
 <head>
 <title>Utah Network Testbed</title>
 <link rel='stylesheet' href='tbstyle.css' type='text/css'>
-<base href='https://plastic.cs.utah.edu/' target='dynamic'>
+<base href='https://www.emulab.net/' target='dynamic'>
 </head>
 <body>
 <a href="welcome.html"><h3>Utah Network Testbed</h3></a>
@@ -110,8 +110,8 @@ if (isset($auth_usr)) {
   } elseif ($status == "unapproved") {
     echo "Your account has not been approved yet. Please try back ";
     echo "later. Contact ";
-    echo "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">";
-    echo "Testbed Control (testbed-control@flux.cs.utah.edu)</a>";
+    echo "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">";
+    echo "Testbed ops (testbed-ops@flux.cs.utah.edu)</a>";
     echo " for further assistance.\n";  
   } elseif (($status == "newuser") || ($status == "unverified")) {
     echo "<A href='verify.php3?$auth_usr'>New User Verification</A>\n";
@@ -119,8 +119,8 @@ if (isset($auth_usr)) {
     echo "Your account has been changed to status $status, and is ";
     echo "currently unusable. Please contact your group leader to find out ";
     echo "why. If you need further help, contact ";
-    echo "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">";
-    echo "Testbed Control (testbed-control@flux.cs.utah.edu)</a>.";
+    echo "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">";
+    echo "Testbed Ops (testbed-ops@flux.cs.utah.edu)</a>.";
   }
 }
 ?>
