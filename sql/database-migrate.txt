@@ -1474,3 +1474,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (pid,eid,vname,capkey)
 	) TYPE=MyISAM;
 
+1.239: Add "wirelesslans" slot to experiment_resources table.
+
+       alter table experiment_resources add
+          wirelesslans smallint(5) unsigned default '0' after shapedlans;

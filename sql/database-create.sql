@@ -187,6 +187,7 @@ CREATE TABLE experiment_resources (
   lans smallint(5) unsigned default '0',
   shapedlinks smallint(5) unsigned default '0',
   shapedlans smallint(5) unsigned default '0',
+  wirelesslans smallint(5) unsigned default '0',
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   thumbnail mediumblob,
