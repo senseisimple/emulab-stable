@@ -214,6 +214,11 @@ my $noidleswap  = $hashrow{'noidleswap_reason'};
 my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
 my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
 
+if ($inout ne "out") {
+    # I'm going to update this below, so fix the value before I use it.
+    $idleswaptime = $idleswap_time / 60.0;
+}
+
 my $swapsettings = 
  #"Name:        $expt_name\n" .
   "Swappable:   $swappablestr".
