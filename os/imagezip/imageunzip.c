@@ -42,7 +42,7 @@ int	slice;
 
 #define SECSIZE 512
 #define BSIZE	(32 * 1024)
-#define OUTSIZE (2 * BSIZE)
+#define OUTSIZE (1 * BSIZE)
 char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
 int		infd, outfd;

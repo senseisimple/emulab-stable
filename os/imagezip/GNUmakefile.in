@@ -10,21 +10,19 @@ all:	imagezip imageunzip
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS = -O -g -static
-LIBS = -lz
+LIBS   = -lz
 
 imagezip: imagezip.o
 	$(CC) $(CFLAGS) imagezip.o $(LIBS) -o imagezip
 
-newzip: newzip.o
-	$(CC) $(CFLAGS) newzip.o $(LIBS) -o newzip
-
-imageunzip: imageunzip.o
+imageunzip: imageunzip.o 
 	$(CC) $(CFLAGS) imageunzip.o $(LIBS) -o imageunzip
 
-newunzip: newunzip.o
-	$(CC) $(CFLAGS) newunzip.o $(LIBS) -o newunzip
-
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
+
+client-install: 
+	$(INSTALL_PROGRAM) imagezip /usr/local/bin/imagezip
+	$(INSTALL_PROGRAM) imageunzip /usr/local/bin/imageunzip
 
 clean:
 	/bin/rm -f *.o imagezip imageunzip
