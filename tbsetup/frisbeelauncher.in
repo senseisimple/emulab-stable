@@ -49,7 +49,7 @@ if ($imageid =~ /^([-\@\w\+]+)$/) {
 my $filename = &get_filename($imageid);
 
 # Make sure that the user can read the image file or bomb out right now.
-if (! -r $filename) {
+if (! -R $filename) {
 	die("You do not have permission to read the image file for\n".
 	    "imageid $imageid: $filename\n");
 }
