@@ -1,10 +1,22 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
+
+# Page arguments.
+$printable = $_GET['printable'];
+$docname   = $_GET['docname'];
+
+# Pedantic page arument checking. Good practice!
+if (!isset($docname) ||
+    (isset($printable) && !($printable == "1" || $printable == "0"))) {
+    PAGEARGERROR();
+}
+if (!isset($printable))
+    $printable = 0;
 
 #
 # Standard Testbed Header
@@ -20,13 +32,13 @@ if (!$printable) {
 $first = substr($docname, 0, 1);
 if (strcmp($first, ".") == 0 ||
     strcmp($first, "/") == 0) {
-    USERERROR("Invalid document name: $docname!", 1);
+    USERERROR("Illegal document name: $docname!", 1);
 }
 #
 # Nothing that looks like a ../ is allowed anywhere in the name
 #
 if (strstr($docname, "../")) {
-    USERERROR("Invalid document name: $docname!", 1);
+    USERERROR("Illegal document name: $docname!", 1);
 }
 
 if ($printable) {

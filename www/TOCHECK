@@ -14,7 +14,10 @@ Here is what I think we need to do:
 * Anything that goes to the shell needs even tighter checks.
 
 * Kill all the stripslashes call on data that came from the DB since
-  they are not needed (no slashes stored in the DB). 
+  they are not needed (no slashes stored in the DB).
+
+* Make sure we use addslashes on all stuff going into DB slots (update
+  and insert statements). 
 
 apc.php
 approveproject.php3
@@ -49,8 +52,8 @@ deletepubkey.php3
 deletesfskey.php3
 deleteuser.php3
 doc.php3
-doc/docwrapper.php3
-docwrapper.php3
+doc/docwrapper.php3		X
+docwrapper.php3			X
 editexp.php3
 editgroup.php3
 editgroup_form.php3
@@ -145,8 +148,8 @@ swapexp.php3
 tbauth.php3
 toggle.php
 top2image.php3
-tutorial/docwrapper.php3
-tutorial/tutorial.php3
+tutorial/docwrapper.php3	X
+tutorial/tutorial.php3		X
 updateaccounts.php3
 updown.php3
 verifyusr.php3

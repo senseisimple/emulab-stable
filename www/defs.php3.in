@@ -159,6 +159,13 @@ function FORMERROR($field) {
 }
 
 #
+# A page argument error. 
+# 
+function PAGEARGERROR() {
+    USERERROR("Invalid page arguments: " . $_SERVER['REQUEST_URI'], 1);
+}
+
+#
 # SUEXEC stuff.
 #
 # Save this stuff so we can generate better error messages and such.

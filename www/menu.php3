@@ -622,7 +622,7 @@ function PAGEERROR($msg) {
     global $drewheader;
 
     if (! $drewheader)
-	PAGEHEADER("");
+	PAGEHEADER("Page Error");
 
     echo "$msg\n";
 
