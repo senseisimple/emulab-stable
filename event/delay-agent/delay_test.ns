@@ -1,0 +1,93 @@
+# Testing the delay agent
+source tb_compat.tcl
+set ns [new Simulator]
+
+# Create two nodes
+set nodeA [$ns node]
+set nodeB [$ns node]
+
+# Create a RED duplex link
+set link0 [$ns duplex-link $nodeA $nodeB 100Mb 0ms RED]
+#set link0 [$ns duplex-link $nodeA $nodeB 100Mb 0ms DropTail]
+
+# Get the queue object for the nodeA/NodeB link and modify its RED params.
+set queue0 [[$ns link $nodeA $nodeB] queue]
+$queue0 set gentle_ 1
+$queue0 set queue-in-bytes_ 0
+$queue0 set limit_ 50
+$queue0 set maxthresh_ 20
+$queue0 set thresh_ 7
+$queue0 set linterm_ 11
+$queue0 set q_weight_ 0.004
+
+# Create a UDP agent and attach it to node nodeA
+set udp0 [new Agent/UDP]
+$ns attach-agent $nodeA $udp0
+
+# Create a CBR traffic source and attach it to udp0
+set cbr0 [new Application/Traffic/CBR]
+$cbr0 set packetSize_ 500
+$cbr0 set interval_ 0.05
+#$cbr0 set interval_ 0.001
+$cbr0 attach-agent $udp0
+
+# Create a TCP agent and attach it to node nodeA
+set tcp0 [new Agent/TCP]
+$ns attach-agent $nodeA $tcp0
+
+# Create a CBR traffic source and attach it to tcp0
+set cbr1 [new Application/Traffic/CBR]
+$cbr1 set packetSize_ 500
+$cbr1 set interval_ 0.05
+#$cbr1 set interval_ 0.001
+$cbr1 attach-agent $tcp0
+
+# Create a Null agent (a UDP traffic sink) and attach it to node nodeB
+set null0 [new Agent/Null]
+$ns attach-agent $nodeB $null0
+
+# Create a TCPSINK agent (a TCP traffic sink) and attach it to node nodeB
+set null1 [new Agent/TCPSINK]
+$ns attach-agent $nodeB $null1
+
+# Connect the traffic sources with the traffic sinks
+$ns connect $udp0 $null0  
+$ns connect $tcp0 $null1
+
+# And some events. 
+$ns at 20.0  "$cbr0  start"
+$ns at 30.0 "$link0 down"
+$ns at 40.0 "$link0 up"
+$ns at 50.0  "$link0 bandwidth 10Mb duplex"
+$ns at 51.0  "$link0 bandwidth 100Mb duplex"
+$ns at 60.0  "$link0 delay 10ms"
+$ns at 70.0  "$link0 plr 0.05"
+$ns at 100.0 "$cbr0  stop"
+                           
+$ns at 120.0 "$cbr1  start"
+#$ns at 120.0 "$cbr1  set packetSize_ 512"
+#$ns at 120.0 "$cbr1  set interval_ 0.1"
+$ns at 130.0 "$link0 down"
+$ns at 140.0 "$link0 up"
+$ns at 150.0  "$link0 delay 100ms"
+$ns at 160.0  "$link0 bandwidth 10Mb duplex"
+$ns at 161.0  "$link0 bandwidth 100Mb duplex"
+$ns at 210.0    "$queue0 set thresh_ 5 ; $queue0 set linterm_ 10"
+$ns at 215.0    "$queue0 set maxthresh_ 30 ; $queue0 set q_weight_ 0.5"
+$ns at 220.0    "$queue0 set queue-in-bytes_ 0"
+$ns at 230.0    "$queue0 set limit_ 30"
+$ns at 240.0 "$cbr1  stop"
+
+
+
+$ns at 250.0  "$cbr0  start"
+$ns at 260.0  "$link0 bandwidth 10Mb duplex"
+$ns at 261.0  "$link0 bandwidth 100Mb duplex"
+$ns at 270.0  "$link0 delay 10ms"
+$ns at 280.0  "$link0 plr 0.05"
+$ns at 290.0 "$link0 down"
+$ns at 300.0 "$link0 up"
+$ns at 310.0 "$cbr0  stop"
+
+#Run the simulation
+$ns run
