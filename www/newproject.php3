@@ -228,7 +228,7 @@ else {
         } 
     }
     else {
-        TBERROR("TESTBED: checkpass failure\n".
+        TBERROR("checkpass failure\n".
                 "\n$usr_name ($proj_head_uid) just tried to set up a testbed ".
                 "account,\n".
                 "but checkpass pipe did not open (returned '$mypipe').", 1);
@@ -256,8 +256,8 @@ if (! $returning) {
 
     $key = GENKEY($proj_head_uid);
 
-    mail("$usr_name '$proj_head_uid' <$usr_email>",
-	 "TESTBED: Your New User Key",
+    TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
+	 "Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
          "    Here is your key to verify your account on the ".
@@ -312,8 +312,8 @@ TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 #
 # The mail message to the approval list.
 # 
-mail($TBMAIL_APPROVAL,
-     "TESTBED: New Project '$pid' ($proj_head_uid)",
+TBMAIL($TBMAIL_APPROVAL,
+     "New Project '$pid' ($proj_head_uid)",
      "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
      "Name:            $usr_name ($proj_head_uid)\n".

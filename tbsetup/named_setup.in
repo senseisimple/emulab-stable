@@ -159,6 +159,6 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    SENDMAIL($TBOPS, "TESTBED: Named Setup Failed", $msg);
+    SENDMAIL($TBOPS, "Named Setup Failed", $msg);
     die($msg);
 }

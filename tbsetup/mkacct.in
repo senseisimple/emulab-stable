@@ -281,6 +281,6 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    SENDMAIL($TBOPS, "TESTBED: mkacct-ctrl Failed", $msg);
+    SENDMAIL($TBOPS, "mkacct Failed", $msg);
     die("$0: $msg\n");
 }

@@ -131,7 +131,7 @@ if ((isset($new_password1) && strcmp($new_password1, "")) ||
         } 
     }
     else {
-	TBERROR("TESTBED: checkpass failure\n".
+	TBERROR("checkpass failure\n".
                "$usr_name ($target_uid) just tried change his password\n".
                "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
@@ -188,8 +188,8 @@ $insert_result =
 #
 TBUserInfo($uid, $uid_name, $uid_email);
 
-mail("$usr_name <$usr_email>",
-     "TESTBED: User Information for '$target_uid' Modified",
+TBMAIL("$usr_name <$usr_email>",
+     "User Information for '$target_uid' Modified",
      "\n".
      "User information for '$target_uid' changed by '$uid'.\n".
      "\n".

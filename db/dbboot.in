@@ -67,7 +67,7 @@ DBQueryFatal("update images set load_address=''");
 #
 DBQueryFatal("delete from login");
 
-system("cat $logname | /usr/bin/mail -s '\"DB Boot Finished\"' stoller");
+#SENDMAIL("stoller", "DB Boot Finished", "", undef, undef, ($logname));
 unlink("$logname");
 exit 0;
 
@@ -75,9 +75,7 @@ sub fatal($) {
     my ($msg) = @_;
 
     print STDERR "$msg\n";
-    
-    system("cat $logname | /usr/bin/mail ".
-	   "-s '\"DB Boot Failed\"' \"$TBOPS\"");
+    SENDMAIL($TBOPS, "DB Boot Failed", $msg, undef, undef, ($logname));
     unlink("$logname");
     exit(1);
 }

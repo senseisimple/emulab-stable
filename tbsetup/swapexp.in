@@ -310,7 +310,7 @@ my $message =
     "in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: Experiment $pid/$eid Swapped $inout",
+	 "Experiment $pid/$eid Swapped $inout",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
@@ -345,7 +345,7 @@ sub fatal($)
     # Send a message to the testbed list. Append the logfile.
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Swap${inout} Failure: $pid/$eid",
+	     "Swap${inout} Failure: $pid/$eid",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc:  $expt_head_name <$expt_head_email>\n".

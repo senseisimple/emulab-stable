@@ -51,6 +51,24 @@ function GENKEY ($name) {
 }
 
 #
+# Wrap up the mail function so we can prepend a tag to the subject
+# line that indicates what testbed. Useful when multiple testbed
+# email to the same list.
+#
+# 
+function TBMAIL($to, $subject, $message, $headers = 0)
+{
+    global $THISHOMEBASE;
+
+    $subject = strtoupper($THISHOMEBASE) . ": $subject";
+
+    if ($headers)
+	    return mail($to, $subject, $message, $headers);
+    else
+	    return mail($to, $subject, $message);
+}
+
+#
 # Internal errors should be reported back to the user simply. The actual 
 # error information should be emailed to the list for action. The script
 # should then terminate if required to do so.
@@ -58,8 +76,8 @@ function GENKEY ($name) {
 function TBERROR ($message, $death, $xmp = 0) {
     global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR;
 
-    mail($TBMAIL_OPS,
-         "TESTBED WEB ERROR REPORT",
+    TBMAIL($TBMAIL_OPS,
+         "WEB ERROR REPORT",
          "\n".
          "$message\n\n".
          "Thanks,\n".

@@ -410,7 +410,7 @@ foreach my $node ( @nodes ) {
 	# Send mail to testbed-ops and to the user about it.
 	my ($user) = getpwuid($UID);
 	
-	SENDMAIL($user, "TESTBED: Node $node is down",
+	SENDMAIL($user, "Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
 		 "is nonfatal, although you might encounter other problems\n".
@@ -431,7 +431,7 @@ foreach my $node ( @nodes ) {
 	MarkNodeDown($node);
 
 	# Send mail to testbed-ops about it
-	SENDMAIL($TBOPS, "TESTBED: Node $node is down",
+	SENDMAIL($TBOPS, "Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Please look into this matter. $node has been reserved\n".
 		 "by the Testbed until this matter has been resolved.\n\n".

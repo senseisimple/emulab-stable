@@ -317,7 +317,7 @@ my $message =
     "in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: Experiment $pid/$eid Terminated",
+	 "Experiment $pid/$eid Terminated",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
@@ -352,7 +352,7 @@ sub fatal($)
     # Send a message to the testbed list. Append the logfile.
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Termination Failure: $pid/$eid",
+	     "Termination Failure: $pid/$eid",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc:  $expt_head_name <$expt_head_email>\n".

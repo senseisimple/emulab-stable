@@ -1149,7 +1149,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup \
 	tbsetup/webmkacct tbsetup/mkacct \
-	tbsetup/webmkproj tbsetup/mkproj \
+	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \

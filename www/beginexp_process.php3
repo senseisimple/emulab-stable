@@ -268,8 +268,8 @@ if ($nonsfile) {
           </h3>\n";
 
     if (1) {
-	mail("$user_name '$uid' <$user_email>", 
-	     "TESTBED: '$exp_pid' '$exp_id' New Experiment Created",
+	TBMAIL("$user_name '$uid' <$user_email>", 
+	     "New Experiment Created: $exp_pid/$exp_id",
 	     "User:        $uid\n".
              "EID:         $exp_id\n".
              "PID:         $exp_pid\n".

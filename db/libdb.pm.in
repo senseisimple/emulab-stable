@@ -1375,10 +1375,9 @@ sub DBWarn($)
     $text = "$message - In $progname\n" .
   	    "$DBErrorString\n";
 
-    print STDERR "*** $text\n";
+    print STDERR "*** $text";
 
-    system("echo \"$text\" | /usr/bin/mail ".
-	   "-s 'TESTBED: DBError - $message' \"$TBOPS\"");
+    libtestbed::SENDMAIL($TBOPS, "DBError - $message", $text);
 }
 
 #

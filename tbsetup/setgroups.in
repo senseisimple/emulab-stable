@@ -368,7 +368,7 @@ sub donotify($$)
     }
 
     SENDMAIL($to,
-	     "TESTBED: Group Update $subtext",
+	     "Group Update $subtext",
 	     $mesg, $from, $hdrs,
 	     ($logname));
 }

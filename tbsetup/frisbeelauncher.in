@@ -115,7 +115,7 @@ while (1) {
 		waitpid($child_pid, 0);
 
 		if ($?) {
-			SENDMAIL($TBOPS, "TESTBED: Frisbeed Failed!",
+			SENDMAIL($TBOPS, "Frisbeed Failed!",
 				 "Imageid: $imageid\n".
 				 "Address: $address\n\n".
 				 "Process $child_pid exited with value $?.\n".

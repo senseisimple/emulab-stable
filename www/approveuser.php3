@@ -360,8 +360,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 			 "where uid='$user' and pid='$project' and ".
 			 "      gid='$group'");
 
-        mail("$user_name '$user' <$user_email>",
-             "TESTBED: Membership Denied in '$project/$group'",
+        TBMAIL("$user_name '$user' <$user_email>",
+             "Membership Denied in '$project/$group'",
 	     "\n".
              "This message is to notify you that you have been denied\n".
 	     "membership in project/group $project/$group.\n".
@@ -470,8 +470,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 			     "WHERE uid='$user'");
 	}
 
-        mail("$user_name '$user' <$user_email>",
-             "TESTBED: Membership Approved in '$project/$group' ",
+        TBMAIL("$user_name '$user' <$user_email>",
+             "Membership Approved in '$project/$group' ",
 	     "\n".
 	     "This message is to notify you that you have been approved\n".
 	     "as a member of project/group $project/$group with\n".

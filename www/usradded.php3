@@ -151,7 +151,7 @@ else {
         } 
     }
     else {
-        TBERROR("TESTBED: checkpass failure\n".
+        TBERROR("checkpass failure\n".
                 "\n$usr_name ($joining_uid) just tried to set up a testbed ".
                 "account,\n".
                 "but checkpass pipe did not open (returned '$mypipe').", 1);
@@ -210,7 +210,8 @@ if (! $returning) {
 
     $key = GENKEY($joining_uid);
 
-    mail("$usr_name '$joining_uid' <$usr_email>", "TESTBED: Your New User Key",
+    TBMAIL("$usr_name '$joining_uid' <$usr_email>",
+	 "Your New User Key",
 	 "\n".
          "Dear $usr_name ($joining_uid):\n\n".
          "\tHere is your key to verify your account on the ".
@@ -285,8 +286,8 @@ $leader_uid = $row[2];
 #
 # The mail message to the approval list.
 #
-mail("$leader_name '$leader_uid' <$leader_email>",
-     "TESTBED: $joining_uid $pid Project Join Request",
+TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+     "Project Join Request: $joining_uid $pid",
      "$usr_name is trying to join your group $gid in project $pid.\n".
      "\n".
      "Contact Info:\n".

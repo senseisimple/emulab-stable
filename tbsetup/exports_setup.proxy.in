@@ -38,6 +38,12 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
+# Testbed Support libraries
+# 
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
 # Take our input and write it to the tail file.
 #
 open(TAIL, ">$exportstail") || fatal("Couldn't open $exportstail\n");
@@ -110,8 +116,7 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'TESTBED: Named Setup Failed' $TBOPS");
+    SENDMAIL($TBOPS, "Exports Setup Failed", $msg);    
     die($msg);
 }
 

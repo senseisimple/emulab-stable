@@ -131,7 +131,7 @@ if (-e "$basename" && system("gzip -9 $basename")) {
     fatal("gzip $basename failed!");
 }
 
-#system("cat $logname | /usr/bin/mail -s '\"DB Backup Finished\"' stoller");
+#SENDMAIL("stoller", "DB Backup Finished", "", undef, undef, ($logname));
 unlink("$logname");
 exit 0;
 
@@ -139,9 +139,8 @@ sub fatal($) {
     my ($msg) = @_;
 
     print STDERR "$msg\n";
-    
-    system("cat $logname | /usr/bin/mail ".
-	   "-s '\"DB Backup Failed\"' \"$TBOPS\"");
+
+    SENDMAIL($TBOPS, "DB Backup Failed", $msg, undef, undef, ($logname));
     unlink("$logname");
     exit(1);
 }

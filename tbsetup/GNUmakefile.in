@@ -99,7 +99,8 @@ post-install:
 # Control node installation (okay, plastic)
 #
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
-			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy)
+			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
+			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	cd $(INSTALL_BINDIR) && \
 		list='$(USERBINS)'; for file in $$list; do \
 			rm -f $$file; \

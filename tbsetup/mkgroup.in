@@ -326,7 +326,7 @@ sub donotify($$)
     }
 
     SENDMAIL($to,
-	     "TESTBED: Group Creation " . $subtext . ": $pid/$gid",
+	     "Group Creation " . $subtext . ": $pid/$gid",
 	     $mesg, $from, $hdrs,
 	     ($logname));
 }

@@ -82,8 +82,8 @@ if (strcmp($approval, "postpone") == 0) {
           </h3>\n";
 }
 elseif (strcmp($approval, "moreinfo") == 0) {
-    mail("$headname '$headuid' <$headuid_email>",
-         "TESTBED: Project '$pid' Approval Postponed",
+    TBMAIL("$headname '$headuid' <$headuid_email>",
+         "Project '$pid' Approval Postponed",
          "\n".
          "This message is to notify you that your project application\n".
          "for $pid has been postponed until we have more information.\n".
@@ -115,8 +115,8 @@ elseif ((strcmp($approval, "deny") == 0) ||
     DBQueryFatal("delete from groups where pid='$pid' and gid='$pid'");
     DBQueryFatal("delete from projects where pid='$pid'");
 
-    mail("$headname '$headuid' <$headuid_email>",
-         "TESTBED: Project '$pid' Denied",
+    TBMAIL("$headname '$headuid' <$headuid_email>",
+         "Project '$pid' Denied",
          "\n".
          "This message is to notify you that your project application\n".
          "for $pid has been denied.\n".
@@ -136,8 +136,8 @@ elseif ((strcmp($approval, "deny") == 0) ||
     if (strcmp($approval, "destroy") == 0) {
 	DBQueryFatal("delete from users where uid='$headuid'");
 
-        mail("$headname '$headuid' <$headuid_email>",
-             "TESTBED: Account '$headuid' Terminated",
+        TBMAIL("$headname '$headuid' <$headuid_email>",
+             "Account '$headuid' Terminated",
     	     "\n".
              "This message is to notify you that your account has been \n".
              "terminated because your project $pid was denied.\n".
@@ -185,8 +185,8 @@ elseif (strcmp($approval, "approve") == 0) {
 		     "WHERE uid='$headuid'");
     }
 
-    mail("$headname '$headuid' <$headuid_email>",
-         "TESTBED: Project '$pid' Approval",
+    TBMAIL("$headname '$headuid' <$headuid_email>",
+         "Project '$pid' Approval",
          "\n".
 	 "This message is to notify you that your project $pid\n".
 	 "has been approved.\n".

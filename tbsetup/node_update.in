@@ -279,10 +279,10 @@ sub NotifyUser($$)
     }
 
     if ($iserr) {
-	$subject = "TESTBED: Node Update Failed $pid/$eid";
+	$subject = "Node Update Failed $pid/$eid";
     }
     else {
-	$subject = "TESTBED: Node Update Success $pid/$eid";
+	$subject = "Node Update Success $pid/$eid";
     }
     $from  = $TBOPS;
     $hdrs  = "Reply-To: $TBOPS";

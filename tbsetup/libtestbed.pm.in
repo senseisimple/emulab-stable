@@ -10,6 +10,8 @@ use Exporter;
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
 	 TBMakeLogname );
 
+my $MAILTAG = "@OURDOMAIN@";
+
 # A library of useful stuff.
 
 # Send an email message via sendmail -t.
@@ -23,6 +25,7 @@ use Exporter;
 sub SENDMAIL($$$;$$@)
 {
     my($To, $Subject, $Message, $From, $Headers, @Files) = @_;
+    my $tag = uc($MAILTAG);
 
     if (! open(MAIL, "|/usr/sbin/sendmail -t")) {
 	print STDERR "SENDMAIL: Could not start sendmail: $!\n";
@@ -36,7 +39,7 @@ sub SENDMAIL($$$;$$@)
 	print MAIL "From: $From\n";
     }
     print MAIL "To: $To\n";
-    print MAIL "Subject: $Subject\n";
+    print MAIL "Subject: $tag: $Subject\n";
     if (defined($Headers)) {
 	print MAIL "$Headers\n";
     }
@@ -88,7 +91,7 @@ sub OPENMAIL($$;$$)
 	print MAIL "From: $From\n";
     }
     print MAIL "To: $To\n";
-    print MAIL "Subject: $Subject\n";
+    print MAIL "Subject: $tag: $Subject\n";
     if (defined($Headers)) {
 	print MAIL "$Headers\n";
     }

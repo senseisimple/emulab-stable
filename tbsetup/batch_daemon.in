@@ -594,7 +594,7 @@ sub donotify($$$)
 
     print STDOUT "$mesg";
 
-    $subject = "TESTBED: Batch Mode Experiment $subtext $pid/$eid";
+    $subject = "Batch Mode Experiment $subtext $pid/$eid";
     $from    = $TBOPS;
     $hdrs    = "Reply-To: $TBOPS";
     

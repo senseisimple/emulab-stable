@@ -195,6 +195,6 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    SENDMAIL($TBOPS, "TESTBED: mkproj $pid Failed", $msg);
+    SENDMAIL($TBOPS, "mkproj $pid Failed", $msg);
     die("$0: $msg\n");
 }

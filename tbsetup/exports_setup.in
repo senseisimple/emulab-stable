@@ -226,7 +226,7 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    SENDMAIL($TBOPS, "TESTBED: Exports Setup Failed", $msg);
+    SENDMAIL($TBOPS, "Exports Setup Failed", $msg);
     die($msg);
 }
 

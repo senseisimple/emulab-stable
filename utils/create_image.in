@@ -324,7 +324,7 @@ if ($result) {
 }
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: Image Creation on $node Completed: $pid/$imagename",
+	 "Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
 	 "You may now os_load this image on other nodes in your experiment.\n",
@@ -353,7 +353,7 @@ sub fatal($)
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Image Creation Failure on $node: $pid/$imagename",
+	     "Image Creation Failure on $node: $pid/$imagename",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",

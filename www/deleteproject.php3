@@ -145,8 +145,8 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 $uid_name  = $row[0];
 $uid_email = $row[1];
 
-mail($TBMAIL_OPS,
-     "TESTBED: Project $pid removed",
+TBMAIL($TBMAIL_OPS,
+     "Project $pid removed",
      "Project '$pid' has been removed by $uid ($uid_name).\n\n".
      "Please remember to remove the backup directory in /proj\n\n",
      "From: $uid_name <$uid_email>\n".

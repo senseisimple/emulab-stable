@@ -314,7 +314,7 @@ my $message =
    
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: New Experiment Created: $pid/$eid",
+	 "New Experiment Created: $pid/$eid",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
@@ -349,7 +349,7 @@ sub fatal()
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Experiment Configure Failure: $pid/$eid",
+	     "Experiment Configure Failure: $pid/$eid",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",

@@ -42,6 +42,10 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 $| = 1;
 
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtestbed;
+
 if (@ARGV != 1 || ($ARGV[0] ne "-all" && $ARGV[0] ne "-active")) {
     usage();
 }
@@ -74,8 +78,7 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'TESTBED: Named Setup Failed' $TBOPS");
+    SENDMAIL($TBOPS, "genelists.proxy failure", $msg);
     die($msg);
 }
 

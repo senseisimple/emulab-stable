@@ -117,8 +117,8 @@ echo "<center><h2>
 #
 TBUserInfo($uid, $uid_name, $uid_email);
 
-mail($TBMAIL_OPS,
-     "TESTBED: User $target_uid removed",
+TBMAIL($TBMAIL_OPS,
+     "User $target_uid removed",
      "User '$target_uid' has been removed by $uid ($uid_name).\n\n".
      "Please remember to remove the backup directory in /users\n\n",
      "From: $uid_name <$uid_email>\n".
