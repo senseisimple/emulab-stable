@@ -51,7 +51,7 @@ $libdb::DBQUERY_MAXTRIES = 5;
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
 my $reload_time = 600;
-my $last_reload = 0;
+my $last_reload = time;
 
 # Process command-line arguments
 
@@ -99,6 +99,7 @@ if ($opt{d}) {
 }
 
 # Grab some constants into variables
+my $TBANYMODE    = TBDB_NODEOPMODE_ANY;
 my $TBRESET      = TBDB_TBCONTROL_RESET;
 my $TBRELOADDONE = TBDB_TBCONTROL_RELOADDONE;
 my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
@@ -107,6 +108,9 @@ my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
 my $TBCONTROL    = TBDB_TBEVENT_TBCONTROL;
 my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
+
+# This only gets used here, so it isn't in a lib constant.
+my $TBFREENODE = "FREENODE";
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -350,14 +354,32 @@ sub getModeTrans() {
 # Read the list of states which trigger an action
 #
 sub getTriggers() {
-    #debug("getTriggers called\n");
+    debug("getTriggers called\n");
+    
+    debug("anymode ==> '$TBANYMODE'\n");
+
+    # Grab global triggers
     my $result = 
       DBQueryFatal("SELECT op_mode, state, trigger " .
-		   "FROM state_triggers order by op_mode,state");
+		   "FROM state_triggers where node_id='$TBANYMODE' ".
+		   "order by op_mode,state");
     my %t;
-    while (my ($mode,$state, $trig) = $result->fetchrow()) {
+    while (my ($mode, $state, $trig) = $result->fetchrow()) {
 	$t{"$mode:$state"} = $trig;
+	debug("trig($mode:$state)\t => $trig\n");
     }
+
+    # Grab per-node triggers
+    $result = 
+      DBQueryFatal("SELECT node_id, op_mode, state, trigger " .
+		   "FROM state_triggers where node_id!='$TBANYMODE' ".
+		   "order by op_mode,state");
+    while (my ($n, $mode, $state, $trig) = $result->fetchrow()) {
+	my @trigs = split(/\s*,\s*/,$trig);
+	$t{"$n:$mode:$state"} = \@trigs;
+	debug("trig($n:$mode:$state)\t => ".join(',',@trigs)."\n");
+    }
+
     return %t;
 }
 
@@ -478,10 +500,16 @@ sub stateTransition($$) {
 	checkGenISUP($node);
     }
 
-    # Check if this state is the "successful boot" state
-    if (defined($triggers{"$mode:$newstate"})) {
+    # Check if this state has any triggers
+    my @nodetrigs = GetNodeTriggerList($node,$mode,$newstate);
+    if (defined($triggers{"$mode:$newstate"}) ||
+        (@nodetrigs > 0) ) {
+	# check for global triggers
 	my @trigs = split(/\s*,\s*/,$triggers{"$mode:$newstate"});
-	foreach ( @trigs ) {
+	# Run all the triggers
+	debug("Running triggers. Global=".join("/",@trigs).
+	      "   node=".join("/",@nodetrigs)."\n");
+	foreach ( @trigs , @nodetrigs) {
 	    my $trig = $_;
 	    /^$TBRESET$/ && do {
 		# Check if we really need to do a reset
@@ -497,8 +525,15 @@ sub stateTransition($$) {
 		handleCtrlEvent($node,$trig);
 		next;
 	    };
+	    /^$TBFREENODE$/ && do {
+		handleCtrlEvent($node,$trig);
+		next;
+	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
 	}
+	# Clear any of the node triggers that we ran
+	debug("Clearing node triggers: ".join("/",@nodetrigs)."\n");
+	ClearNodeTrigger($node,$mode,$newstate,@nodetrigs);
     }
 
     # Check if this state can trigger a mode transition
@@ -537,9 +572,7 @@ sub opModeTransition($$;$) {
 	}
     }
     if (defined($modeTrans{"$mode:$oldstate"}) || $force) {
-	if ($force) {
-	    $nextstate=$trans{$newmode};
-	} else {
+	if (!$force) {
 	    debug("Mode Transition check:\n");
 	    my $translist = join(",",@{$modeTrans{"$mode:$oldstate"}});
 	    #debug("translist=$translist\n");
@@ -620,9 +653,19 @@ sub handleCtrlEvent($$) {
 	    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
 		DBQueryFatal("delete from scheduled_reloads ".
 			     "where node_id='$node'");
-		DBQueryFatal("delete from reserved where node_id='$node'");
-		info("Released $node from $pid/$eid\n");
+		AddNodeTrigger($node, $TBANYMODE, TBDB_NODESTATE_ISUP,
+			       $TBFREENODE)
+		  && notify("$node: Couldn't add trigger $TBFREENODE!\n");
+		info("Set up freeing of $node from $pid/$eid\n");
 	    }
+	    next;
+	};
+	/^$TBFREENODE$/ && do {
+	    # Don't need pid/eid, but we should put it in the log
+	    my ($pid,$eid);
+	    NodeidToExp($node,\$pid,\$eid);
+	    DBQueryFatal("delete from reserved where node_id='$node'");
+	    info("Released $node from $pid/$eid\n");
 	    next;
 	};
 	/^$TBTIMEOUT$/ && do {
@@ -730,6 +773,86 @@ sub reload() {
     %valid     = getValid();
     %modeTrans = getModeTrans();
     %triggers  = getTriggers();
+}
+
+#
+# Some functions for node triggers
+#
+
+# $rv   = AddNodeTrigger($node, $mode, $state, @triglist);
+sub AddNodeTrigger( $$$@ ) {
+    my ($node, $mode, $state, @trigs) = @_;
+    if (@trigs == 0) { return 1; }
+    if (defined($triggers{"$node:$mode:$state"})) {
+	my %t = ();
+	foreach $k (@{$triggers{"$node:$mode:$state"}}) { $t{$k} = 1; }
+	my @newtrigs = ();
+	foreach $k (@trigs) { if (!defined($t{$k})) { push(@newtrigs,$k); } }
+	push(@{$triggers{"$node:$mode:$state"}},@newtrigs);
+    } else {
+	$triggers{"$node:$mode:$state"} = \@trigs;
+    }
+    my $triglist = join(",",@{$triggers{"$node:$mode:$state"}});
+    DBQueryFatal("replace into state_triggers ".
+		 "(node_id,op_mode,state,trigger) values ".
+		 "('$node','$mode','$state','$triglist')");
+    return 0;
+}
+
+# @list = GetNodeTriggerList($node, $mode, $state);
+sub GetNodeTriggerList( $$$ ) {
+    my ($node, $mode, $state) = @_;
+    my @l = ();
+    if (defined($triggers{"$node:$mode:$state"})) {
+	push(@l,@{$triggers{"$node:$mode:$state"}});
+    }
+    if (defined($triggers{"$node:$TBANYMODE:$state"})) {
+	push(@l,@{$triggers{"$node:$TBANYMODE:$state"}});
+    }
+    return @l;
+}
+
+# $rv   = ClearNodeTrigger($node, $mode, $state, @triglist);
+# Note: When not clearing all triggers, ordering is not preserved!
+sub ClearNodeTrigger( $$$ ; @ ) {
+    my ($node, $mode, $state, @trigs) = @_;
+    # We have to keep any triggers that aren't on the list, but the
+    # most common case will be that the list they give us is the whole
+    # list anyway. So treat that case special.
+    my @reallist = GetNodeTriggerList($node,$mode,$state);
+    # empty list means clear all...
+    if ((@trigs==0) || join(",",sort @reallist) eq join(",",sort @trigs)) {
+	# Same list... just nuke the entry
+	debug("Clearing all triggers for $node...\n");
+	delete($triggers{"$node:$mode:$state"});
+	delete($triggers{"$node:$TBANYMODE:$state"});
+	DBQueryFatal("delete from state_triggers ".
+		     "where node_id='$node' and state='$state' and ".
+		     "(op_mode='$mode' or op_mode='$TBANYMODE')");
+    } else {
+	# Subtract @trigs from @reallist
+	my %temptrigs = ();
+	foreach $k (@reallist) { $temptrigs{$k} = 1; }
+	debug("Reallist = ".join("/",@reallist).", trigs=".
+	      join("/",@trigs).".\n");
+	foreach $t (@trigs) {
+	    if (defined($temptrigs{$t})) {
+		delete($temptrigs{$t});
+		debug("Clearing $t\n");
+	    }
+	}
+	# Note: This doesn't quite do the right thing with triggers
+	# for a fixed mode vs TBANYMODE. So if you start using this
+	# code, make sure and debug it first!
+	my @newtrigs = keys %temptrigs;
+	debug("Newlist = ".join("/",@newtrigs).".\n");
+	delete($triggers{"$node:$mode:$state"});
+	if (@newtrigs > 0) {
+	    AddNodeTrigger($node,$mode,$state,@newtrigs);
+	} 
+    }
+
+    return 0;
 }
 
 sub os_opmode() {
