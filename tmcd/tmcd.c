@@ -49,7 +49,7 @@ static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-static int	iptonodeid(struct in_addr, char *, char *, char *, int *);
+static int	iptonodeid(struct in_addr, char *,char *,char *,char *,int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
 static int	checkdbredirect(char *nodeid);
@@ -437,48 +437,77 @@ static int
 handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 {
 	struct sockaddr_in redirect_client;
-	int		   redirect = 0;
+	int		   redirect = 0, isvnode = 0;
 	char		   buf[BUFSIZ], *bp, *cp;
 	char		   nodeid[TBDB_FLEN_NODEID];
+	char		   vnodeid[TBDB_FLEN_NODEID];
 	char		   class[TBDB_FLEN_NODECLASS];
 	char		   type[TBDB_FLEN_NODETYPE];
-	int		   i, cc, islocal, err = 0;
+	int		   i, islocal, err = 0;
 	int		   version = DEFAULT_VERSION;
 
-	cc = strlen(rdata);
+	/*
+	 * Look for special tags. 
+	 */
 	bp = rdata;
+	while ((bp = strsep(&rdata, " ")) != NULL) {
+		/*
+		 * Look for VERSION. 
+		 */
+		if (sscanf(bp, "VERSION=%d", &i) == 1) {
+			version = i;
+			
+			if (debug) {
+				info("VERSION %d\n", version);
+			}
+			
+			continue;
+		}
 
-	while (isspace(*bp))
-		bp++;
+		/*
+		 * Look for REDIRECT, which is a proxy request for a
+		 * client other than the one making the request. Good
+		 * for testing. Might become a general tmcd redirect at
+		 * some point, so that we can test new tmcds.
+		 */
+		if (sscanf(bp, "REDIRECT=%30s", buf)) {
+			redirect_client = *client;
+			redirect        = 1;
+			inet_aton(buf, &client->sin_addr);
 
-	/*
-	 * Look for VERSION. 
-	 */
-	if (sscanf(bp, "VERSION=%d", &i)) {
-		version = i;
+			info("REDIRECTED from %s to %s\n",
+			     inet_ntoa(redirect_client.sin_addr), buf);
 
-		while (! isspace(*bp))
-			bp++;
-		while (isspace(*bp))
-			bp++;
+			continue;
+		}
+		
+		/*
+		 * Look for VNODE. This is used for virtual nodes.
+		 * It indicates which of the virtual nodes (on the physical
+		 * node) is talking to us. Currently no perm checking.
+		 * Very temporary approach; should be done via a per-vnode
+		 * cert or a key.
+		 */
+		if (sscanf(bp, "VNODEID=%30s", buf)) {
+			isvnode = 1;
+			strncpy(vnodeid, buf, sizeof(vnodeid));
+
+			if (debug) {
+				info("VNODEID %s\n", buf);
+			}
+			continue;
+		}
+
+		/*
+		 * An empty token (two delimiters next to each other)
+		 * is indicated by a null string. If nothing matched,
+		 * and its not an empty token, it must be the actual
+		 * command and arguments. Break out.
+		 */
+		if (*bp) {
+			break;
+		}
 	}
-
-	/*
-	 * Look for REDIRECT, which is a proxy request for a
-	 * client other than the one making the request. Good
-	 * for testing. Might become a general tmcd redirect at
-	 * some point, so that we can test new tmcds.
-	 */
-	if (sscanf(bp, "REDIRECT=%30s", buf)) {
-		redirect_client = *client;
-		redirect        = 1;
-		inet_aton(buf, &client->sin_addr);
-
-		while (! isspace(*bp))
-			bp++;
-		while (isspace(*bp))
-			bp++;
-	}		
 
 	/* Start with default DB */
 	strcpy(dbname, DEFAULT_DBNAME);
@@ -486,8 +515,16 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Map the ip to a nodeid.
 	 */
-	if (iptonodeid(client->sin_addr, nodeid, class, type, &islocal)) {
-		error("No such node: %s\n", inet_ntoa(client->sin_addr));
+	if ((err = iptonodeid(client->sin_addr, (isvnode ? vnodeid : NULL),
+			      nodeid, class, type, &islocal))) {
+		if (err == 2) {
+			error("No such node vnode mapping %s on %s\n",
+			      vnodeid, nodeid);
+		}
+		else {
+			error("No such node: %s\n",
+			      inet_ntoa(client->sin_addr));
+		}
 		goto skipit;
 	}
 
@@ -2521,7 +2558,7 @@ mydb_update(char *query, ...)
  * Map IP to node ID (plus other info).
  */
 static int
-iptonodeid(struct in_addr ipaddr,
+iptonodeid(struct in_addr ipaddr, char *vnodeid,
 	   char *nodeid, char *class, char *type, int *islocal)
 {
 	MYSQL_RES	*res;
@@ -2557,6 +2594,32 @@ iptonodeid(struct in_addr ipaddr,
 	strcpy(type,   row[1]);
 	*islocal = (! strcasecmp(class, "pcremote") ? 0 : 1);
 
+	if (! vnodeid)
+		return 0;
+	
+	/*
+	 * If a vnodeid has been provided, then we want to check to make
+	 * sure its really mapped onto this node. Substitute the vnodeid
+	 * for the nodeid. Temporary solution.
+	 */
+	res = mydb_query("select n.phys_nodeid from node_types as t "
+			 "left join nodes as n on t.type=n.type "
+			 "where n.node_id='%s' and t.isvirtnode=1 "
+			 "  and n.phys_nodeid='%s'",
+			 1, vnodeid, nodeid);
+
+	if (!res) {
+		error("iptonodeid: %s: DB Error getting vnode mapping: %s!\n",
+		      nodeid, vnodeid);
+		return 2;
+	}
+
+	if (! (int)mysql_num_rows(res)) {
+		mysql_free_result(res);
+		return 2;
+	}
+	mysql_free_result(res);
+	strcpy(nodeid, vnodeid);
 	return 0;
 }
  
@@ -2679,7 +2742,7 @@ checkdbredirect(char *nodeid)
 	char		gid[64];
 	
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		info("CHECKDBREDIRECT: %s: Node is free\n", nodeid);
+		/* info("CHECKDBREDIRECT: %s: Node is free\n", nodeid); */
 		return 0;
 	}
 
