@@ -99,6 +99,8 @@ if (isset($uid)) {
         if ($admin) {
             echo "<A href='approveproject_list.php3?uid=$uid'>
                      New Project Approval</A><p>\n";
+            echo "<A href='showproject_list.php3?uid=$uid'>
+                     Project Information</A><p>\n";
             echo "<A href='nodecontrol_list.php3?uid=$uid'>
                      Node Control</A><p>\n";
         }
