@@ -44,9 +44,10 @@ struct agent {
 };
 
 extern struct lnList agents;
-  
+
 enum {
 	SEB_COMPLETE_EVENT,
+	SEB_TIME_START,
 	SEB_SENDS_COMPLETE,
 	SEB_SINGLE_HANDLER,
 };
@@ -54,6 +55,7 @@ enum {
 enum {
 	/** Flag for events that are COMPLETEs and should not be forwarded. */
 	SEF_COMPLETE_EVENT = (1L << SEB_COMPLETE_EVENT),
+	SEF_TIME_START = (1L << SEB_TIME_START),
 	/** Flag for events that will send back a COMPLETE. */
 	SEF_SENDS_COMPLETE = (1L << SEB_SENDS_COMPLETE),
 	SEF_SINGLE_HANDLER = (1L << SEB_SINGLE_HANDLER),

@@ -117,7 +117,7 @@ $locations = array();
 $vnames = array();
 
 $query_result =
-    DBQueryFatal("select loc.*,r.vname from location_info as loc ".
+    DBQueryFatal("select loc.*,r.vname,r.pid,r.eid from location_info as loc ".
 		 "left join reserved as r on r.node_id=loc.node_id ".
 		 "where loc.floor='$floor' and loc.building='$building'");
 
@@ -127,12 +127,15 @@ while ($row = mysql_fetch_array($query_result)) {
     $loc_y     = $row["loc_y"];
     $orient    = $row["orientation"];
 
-    if (isset($pid) && isset($row["vname"]))
+    if ((isset($pid) && $pid == $row["pid"]) &&
+	(isset($eid) && $eid == $row["eid"]) &&
+	isset($row["vname"])) {
 	$vnames[$node_id] = $row["vname"];
+    }
 
     if (isset($pixels_per_meter) && $pixels_per_meter) {
-	$meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
-	$meters_y = sprintf("%.3f", $loc_y / $pixels_per_meter);
+	$meters_x = sprintf("%.2f", $loc_x / $pixels_per_meter);
+	$meters_y = sprintf("%.2f", $loc_y / $pixels_per_meter);
 
 	$locations[$node_id] = "x=$meters_x, y=$meters_y meters";
     }
@@ -141,6 +144,19 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     if (isset($orient)) {
 	$locations[$node_id] .= ", o=" . sprintf("%.1f", $orient) . "&#176;";
+    }
+}
+
+$event_time_start = array();
+if (isset($pid) && isset($eid)) {
+    $query_result =
+	DBQueryFatal("SELECT parent,arguments FROM eventlist WHERE " .
+		     "pid='$pid' and eid='$eid' and objecttype=3 and ".
+		     "eventtype=1 ORDER BY parent");
+    if (mysql_num_rows($query_result)) {
+	while ($row = mysql_fetch_array($query_result)) {
+	    $event_time_start[$row["parent"]] = $row["arguments"];
+	}
     }
 }
 
@@ -221,14 +237,10 @@ echo "<center>\n";
 # Wrap the image and zoom controls together in an input form.
 echo "<form method=\"post\" action=\"robotmap.php3\">\n";
 
+echo "Click on the image to get its X,Y coordinates<br>\n";
 # The image may be clicked to get node info or set a new center-point.
-echo "  Click on the dots below to see information about the robot\n";
-echo "  <br>\n";
-echo "  Click elsewhere to get its x,y location.\n";
-echo "  <br>\n";
 if ($isadmin || TBWebCamAllowed($uid)) {
-    echo "  There is a nifty <a href=webcam.php3>webcam image</a> of the";
-    echo "   robots too\n";
+    echo "  <a href=webcam.php3>Webcam View</a> (Updated every five seconds)";
     echo "  <br>\n";
 }
 
@@ -239,12 +251,32 @@ if (isset($map_x) && isset($map_y)) {
 	$meters_x = sprintf("%.3f", $map_x / $pixels_per_meter);
 	$meters_y = sprintf("%.3f", $map_y / $pixels_per_meter);
     
-	echo "Last click location was x=$meters_x, y=$meters_y meters.\n";
+	echo "Last click location was x=<b>$meters_x</b>, y=<b>$meters_y</b> meters.\n";
     }
     else {
 	echo "Last click location was x=$map_x, y=$map_y pixels\n";
     }
     echo "<br>\n";
+}
+
+if (isset($pid) && isset($eid)) {
+    $current_time = time();
+    foreach ($event_time_start as $key => $value) {
+	$event_time_elapsed = $current_time - $value;
+	if ($key == "") {
+	    echo "Elapsed event time: ";
+	}
+	else {
+	    echo "Elapsed time for timeline '$key': ";
+	}
+	$minutes = floor($event_time_elapsed / 60);
+	$seconds = $event_time_elapsed % 60;
+	echo "<b>" . $minutes . "m " . $seconds . "s </b>(<b>" .
+		sprintf("%.1f", $event_time_elapsed) . "s</b>)<br>";
+    }
+    if (empty($event_time_start)) {
+	echo "<i><b>Elapsed event time: Not started yet</b></i>";
+    }
 }
 
 echo "  <input name=map type=image style=\"border: 2px solid\" ";
@@ -277,7 +309,8 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
       <tr><th colspan=2>Legend</th></tr>
       <tr>
           <td><img src=\"floormap/map_legend_node.gif\"></td>
-          <td>Robot Actual Position</td>
+          <td>Robot Actual Position<br>
+              <font size=\"-1\">(Click dots for more information)</font></td>
       </tr>
       <tr>
           <td><img src=\"floormap/map_legend_node_dst.gif\"></td>
@@ -328,13 +361,17 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
           <td><input type=checkbox
                      name=\"formfields[show_cameras]\"
                      value=Yep
-                     $cam_checked>Show Camera Bounds</input></td>
+                     $cam_checked>Show <a
+ href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Tracking
+ Camera</a> Bounds</input></td>
       </tr>
       <tr>
           <td><input type=checkbox
                      name=\"formfields[show_exclusion]\"
                      value=Yep
-                     $excl_checked>Show Exclusion Zones</input></td>
+                     $excl_checked>Show <a
+ href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Exclusion
+ Zones</a></input></td>
       </tr>
       <tr><td colspan=2 align=center><input type=submit value=Update></td></tr>
       </table>

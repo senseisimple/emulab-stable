@@ -21,6 +21,7 @@ use libtestbed;
 my $WWW      = "@WWW@";
 my $TBOPS      = "@TBOPSEMAIL@";
 my $default_tries = 10;
+my $time_tolerance = 250;
 
 # Turn off line buffering on output
 $| = 1;
@@ -40,7 +41,7 @@ sub mailctrl($@) {
     foreach my $node (@nodes) {
 
 	my $dbres = DBQueryFatal(
-		"select (CURRENT_TIMESTAMP - last_power) < 500 " .
+		"select (CURRENT_TIMESTAMP - last_power) < $time_tolerance " .
 		"from outlets where node_id='$node'");
 	
 	if ($dbres->num_rows() == 0) {
@@ -74,7 +75,7 @@ sub mailctrl($@) {
 	    
 	    while (!$ok) {
 		my $dbres = DBQueryFatal(
-			"select (CURRENT_TIMESTAMP - last_power) < 500 " .
+			"select (CURRENT_TIMESTAMP - last_power) < $time_tolerance " .
 			"from outlets where node_id='$node'");
 		
 		if ($dbres->num_rows() == 0) {

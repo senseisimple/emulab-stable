@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -313,7 +313,7 @@ MOTE: foreach my $mote (@motes) {
     # XXX - We have to reboot stargates after loading the mote. Disgusting,
     # there should be some better way
     if ($upload_method eq "ssh") {
-	if (system("$SSHTB -host $host shutdown -r now")) {
+	if (system("$TB/bin/node_reboot $host")) {
 	    $errors++;
 	    warn "Failed to upload code to $mote";
 	}

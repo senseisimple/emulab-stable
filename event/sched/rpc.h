@@ -59,6 +59,7 @@ void RPC_drop(void);
 int RPC_exppath(char *pid, char *eid, char *path_out, size_t path_size);
 int RPC_waitforrobots(event_handle_t handle, char *pid, char *eid);
 int RPC_waitforactive(char *pid, char *eid);
+int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear);
 int RPC_agentlist(event_handle_t handle, char *pid, char *eid);
 int RPC_grouplist(event_handle_t handle, char *pid, char *eid);
 int RPC_eventlist(char *pid, char *eid,
@@ -82,6 +83,7 @@ extern int AddRobot(event_handle_t handle,
 		    double init_y,
 		    double init_orientation);
 
+extern const char *XMLRPC_ROOT;
 #ifdef __cplusplus
 }
 #endif

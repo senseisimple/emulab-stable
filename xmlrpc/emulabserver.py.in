@@ -2683,6 +2683,72 @@ class experiment:
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
+
+    def event_time_start(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+        
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        tl_clause = ""
+        tl_insert = ""
+        if argdict.has_key("timeline"):
+            if not re.match("^[-\w]*$", argdict["timeline"]):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed timeline!")
+            else:
+                tl_clause = " and parent='%s'" % (argdict["timeline"],)
+                tl_insert = ",parent='%s'" % (argdict["timeline"],)
+                pass
+            pass
+        
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        if argdict.has_key("time"):
+            value = float(argdict["time"])
+            
+            # XXX remove hardcoded event/object types.
+            DBQueryFatal("DELETE FROM eventlist WHERE "
+                         "pid=%s and eid=%s and objecttype=3 and eventtype=1"
+                         + tl_clause,
+                         (argdict["proj"], argdict["exp"]))
+
+            if value > 0:
+                DBQueryFatal("INSERT INTO eventlist SET "
+                             "pid=%s,eid=%s,objecttype=3,eventtype=1,"
+                             "arguments=%s" + tl_insert,
+                             (argdict["proj"], argdict["exp"], value))
+                pass
+            
+            result = "ok"
+            pass
+        else:
+            result = DBQueryFatal("SELECT parent,arguments FROM eventlist "
+                                  "WHERE pid=%s and eid=%s and objecttype=3 "
+                                  "and eventtype=1",
+                                  (argdict["proj"], argdict["exp"]),
+                                  True)
+
+            if len(result) == 0:
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="Event time has not started yet")
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=`result`, value=result)
     
     pass
 

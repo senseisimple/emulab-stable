@@ -12,6 +12,7 @@
 
 #include <assert.h>
 
+#include "rpc.h"
 #include "timeline-agent.h"
 
 /**
@@ -313,6 +314,12 @@ static int timeline_agent_immediate(local_agent_t la, sched_event_t *se)
 	else if (strcmp(evtype, TBDB_EVENTTYPE_START) == 0) {
 		struct timeval now, then;
 		int token, lpc;
+
+		if (strcmp(la->la_agent->name, "__ns_timeline") != 0) {
+			RPC_grab();
+			RPC_notifystart(pid, eid, la->la_agent->name, 1);
+			RPC_drop();
+		}
 		
 		event_notification_get_int32(la->la_handle,
 					     se->notification,

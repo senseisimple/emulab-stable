@@ -137,8 +137,8 @@ if ($isadmin) {
 		       "freenode.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Set Node Location",
 		       "setnodeloc.php3?node_id=$node_id");
-    WRITESUBMENUBUTTON("Update Power Time",
-		       "power.php3?node_id=$node_id");
+    WRITESUBMENUBUTTON("Update Power State",
+		       "powertime.php3?node_id=$node_id");
 }
 SUBMENUEND();
 

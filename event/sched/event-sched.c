@@ -59,6 +59,7 @@ char	pideid[BUFSIZ];
 char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
 int	debug;
+const char *XMLRPC_ROOT = TBROOT;
 
 struct lnList agents;
 
@@ -100,6 +101,7 @@ usage(void)
 		"  -d          Turn on debugging\n"
 		"  -s server   Specify location of elvind server. "
 		"(Default: localhost)\n"
+		"  -r          Use the standard RPC path. (Current: %s)\n"
 		"  -p port     Specify port number of elvind server\n"
 		"  -l logfile  Specify logfile to direct output\n"
 		"  -k keyfile  Specify keyfile name\n"
@@ -107,7 +109,8 @@ usage(void)
 		"Required arguments:\n"
 		"  pid         The project ID of the experiment\n"
 		"  eid         The experiment ID\n",
-		progname);
+		progname,
+		TBROOT);
 	exit(-1);
 }
 
@@ -137,7 +140,7 @@ main(int argc, char *argv[])
 	lnNewList(&sequences);
 	lnNewList(&groups);
 
-	while ((c = getopt(argc, argv, "hVs:p:dl:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVrs:p:dl:k:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -148,6 +151,9 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			debug++;
+			break;
+		case 'r':
+			XMLRPC_ROOT = "/usr/testbed";
 			break;
 		case 's':
 			server = optarg;
@@ -381,8 +387,6 @@ main(int argc, char *argv[])
 	if (get_static_events(handle) < 0) {
 		fatal("could not get static event list");
 	}
-
-	RPC_drop();
 
 	/* Dequeue events and process them at the appropriate times: */
 	dequeue(handle);
@@ -622,7 +626,7 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 			sched_event_enqueue(event);
 			return;
 		}
-		
+
 		if (sends_complete(agentp, eventtype))
 			event.flags |= SEF_SENDS_COMPLETE;
 		
@@ -662,6 +666,10 @@ handle_event(event_handle_t handle, sched_event_t *se)
 	else if (event_notify(handle, se->notification) == 0) {
 		error("could not fire event\n");
 		return;
+	}
+	else if (se->flags & SEF_TIME_START) {
+		RPC_notifystart(pid, eid, "", 1);
+		RPC_drop();
 	}
 }
 
@@ -1057,7 +1065,7 @@ get_static_events(event_handle_t handle)
 	event.time.tv_usec = 0;
 	event.agent.s = NULL;
 	event.length = 1;
-	event.flags = 0;
+	event.flags = SEF_TIME_START;
 	timeline_agent_append(ns_sequence, &event);
 
 	
@@ -1176,10 +1184,14 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 {
 	char *value, argsbuf[BUFSIZ] = "";
 	char objname[TBDB_FLEN_EVOBJNAME];
+	char objtype[TBDB_FLEN_EVOBJTYPE];
 	int rc, ctoken = ~0, agerror = 0;
 	
 	event_notification_get_objname(handle, eventp->notification,
 				       objname, sizeof(objname));
+
+	event_notification_get_objtype(handle, eventp->notification,
+				       objtype, sizeof(objtype));
 
 	event_notification_get_arguments(handle, eventp->notification,
 					 argsbuf, sizeof(argsbuf));
@@ -1228,6 +1240,12 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 				    eventp->agent.s,
 				    ctoken,
 				    agerror);
+
+	if (strcmp(objtype, TBDB_OBJECTTYPE_TIMELINE) == 0) {
+		RPC_grab();
+		RPC_notifystart(pid, eid, objname, 0);
+		RPC_drop();
+	}
 	
 	return 1;
 }

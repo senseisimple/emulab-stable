@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -160,6 +160,14 @@ if ($action eq "start" && !$force && !ExpNodes($pid, $eid)) {
     print("*** There are no nodes in $pid/$eid. ".
 	  "Not starting a scheduler.\n");
     exit(0);
+}
+
+#
+# Delete the TIME START event.
+#
+if ($action eq "replay" || $action eq "stop") {
+    DBQueryFatal("DELETE FROM eventlist WHERE " .
+		 "pid='$pid' and eid='$eid' and objecttype=3 and eventtype=1");
 }
 
 # Need the unix_gid info to pass to boss.

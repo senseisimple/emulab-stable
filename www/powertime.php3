@@ -36,11 +36,19 @@ if ($confirmed) {
 	if (!TBValidNodeName($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
-	
-	DBQueryFatal("update outlets " .
-		     "set last_power=CURRENT_TIMESTAMP " .
-		     "where node_id='$ni'");
-	$body_str .= "<b>$ni</b><br>";
+
+	if (isset($poweron) && $poweron == "Yep") {
+		DBQueryFatal("update outlets " .
+			     "set last_power=CURRENT_TIMESTAMP " .
+			     "where node_id='$ni'");
+	}
+	if (!isset($poweron) || $poweron != "Yep") {
+		DBQueryFatal("update nodes " .
+			     "set eventstate='POWEROFF'," .
+			     "state_timestamp=unix_timestamp(NOW()) " .
+			     "where node_id='$ni'");
+	}
+	$body_str .= "<b>$ni</b> $poweron<br>";
     }
 }
 else {
@@ -67,7 +75,8 @@ else {
 		     </tr>";
     }
     $body_str .= "</table><br>";
-    $body_str .= "<input type=submit name=confirmed value=Confirm></form>";
+    $body_str .= "<input type=checkbox name=poweron value=Yep checked>Power On";
+    $body_str .= "<br><input type=submit name=confirmed value=Confirm></form>";
 }
 
 $body_str .= "</center>";

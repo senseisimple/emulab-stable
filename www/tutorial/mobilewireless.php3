@@ -92,7 +92,7 @@ function NLCEMPTY()
 <center>
     <h2>Emulab Tutorial - Mobile Wireless Networking</h2>
 
-    <i><font size=-1>
+    <i><font size="-1">
 
     Note: This part of the testbed is in the prototype stage, so the hardware
     and software may behave in unexpected ways.
@@ -149,7 +149,7 @@ The current features of the mobile wireless testbed are:
 board computers for each robot.
 <li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">Mica2 
 motes</a> attached to each stargate.
-<li>Four cameras for visual tracking of the robots.
+<li>Four overhead cameras for visual tracking of the robots.
 <li>A <a href="<?php echo $TBBASE ?>/webcam.php3">webcam</a> for viewing the
 robots in their habitat.
 <li>An <a href="<?php echo $TBBASE ?>/robotmap.php3">abstract map</a> of the
@@ -176,7 +176,7 @@ limitations you should be aware of:
 so there is staff available to assist with problems.
 <li>There is no space sharing, only one mobile experiment can be swapped-in at
 a time.
-<li>Batteries must be replaced manually by the operator when capacity is low.
+<li>Batteries must be replaced manually by the operator when levels are low.
 </ul>
 
 We hope to overcome these limitations over time, however, we are also eager to
@@ -201,7 +201,10 @@ Creating a mobile wireless experiment is very similar to creating a regular
 Emulab experiment: you construct an NS file, swap in the experiment, and then
 you can log into the nodes to run your programs.  There are, of course, some
 extra commands and settings that pertain to the physical manifestations of the
-robots.
+robots.  This tutorial will take you through the process of: creating a mobile
+experiment, moving the robots to various destinations, creating random motion
+scenarios, and "attaching" transmitter and receiver motes to the robots in your
+experiment.
 
 <?php NLCBODYEND() ?>
 
@@ -225,7 +228,7 @@ robots.
 Lets start with a simple NS script that will allocate a single robot located in
 our building:
 
-<blockquote>
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
 <pre>set ns [new Simulator]
 source tb_compat.tcl
 
@@ -241,6 +244,10 @@ $node(0) set Y_ 2.49
 
 $ns run</pre>
 </blockquote>
+<center>
+<font size="-2">Figure 1: Example NS file with mobile nodes.</font>
+</center>
+<br>
 
 Some parts of that example should be familiar to regular experimenters, so we
 will focus mainly on the new bits of code.  First, we specified the physical
@@ -295,15 +302,10 @@ for use, you can swap-in your experiment and begin to work.
 
 <?php NLCBODYBEGIN() ?>
 
-Now that you have a node allocated, lets make it mobile.  Emulab will have
-already moved the node to its initial position on swap-in, so moving the robot
-again is done by sending it a SETDEST event with the coordinates, much like
-sending START and STOP events to <a
-href="docwrapper.php3?docname=advanced.html">traffic generators</a> and <a
-href="docwrapper.php3?docname=advanced.html">program objects</a>.  However,
-before moving it for the first time, you might want to check its current
-position in the <a href="<?php echo $TBBASE ?>/robotmap.php3">map</a> and/or <a
-href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
+Now that you have a node allocated, lets make it mobile.  During swap-in,
+Emulab will start moving the node to its initial position, you can watch its
+progress by using the "Robot Map" menu item on the experiment page and checking
+out the <a href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
 
 <p>
 <table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
@@ -319,20 +321,39 @@ href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
 </tr>
 </table>
 
+<p>
+Take a few moments to familiarize yourself with those pages since we'll be
+making use of them during the rest of the tutorial.  One important item to note
+is the "Elapsed event time" value, which displays how much time has elapsed
+since the robots have reached their initial positions.  The elapsed time is
+also connected to when <code>"$ns at"</code> events in the NS file are run.  In
+this case, there were no events in the NS file, so we'll be moving the robot by
+sending dynamic SETDEST events, much like sending START and STOP events to <a
+href="docwrapper.php3?docname=advanced.html">traffic generators</a> and <a
+href="docwrapper.php3?docname=advanced.html#ProgramObjects">program
+objects</a>.
+
 <!-- XXX We need to give them a clue on which way the webcam is pointing in -->
 <!-- relation to the robot map. -->
 
 <p>
-Now that you have a good idea of where the robot is, lets move it up a meter.
-To do this, you will need to log in to ops.emulab.net and run:
+Once the robot has reached its initial position, lets move it up a meter.  To
+do this, you will need to log in to ops.emulab.net and run:
 
-<blockquote>
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
 <pre>1 ops:~> tevc -e <b>proj</b>/<b>exp</b> now node-0 SETDEST X=3.0 Y=1.5</pre>
+</blockquote>
+<blockquote>
+<center>
+<font size="-2">Figure 2: Command to send an event that will move the robot to
+the coordinates (3.0, 1.5).  Don't forget to change <b>proj</b>/<b>exp</b> to
+match your project and experiment IDs.</font>
+</center>
 </blockquote>
 
 <!-- mention that one setdest will override the previous. --> 
 
-Then, check back with the map and webcam to see the results of your handywork.
+Then, check back with the map and webcam to see the results of your handiwork.
 Try moving it around a few more times to get a feel for how things work and
 where the robot can go.  Note that the robot should automatically navigate
 around obstacles in the area, like the pole in the middle, so you do not have
@@ -343,9 +364,14 @@ In addition to driving the robot with dynamic events, you can specify a static
 set of events in the NS file.  For example, you can issue the same move as
 above at T +5 seconds by adding:
 
-<blockquote>
-<code>$ns at 5.0 "$node(0) setdest 3.01 1.5 0.1"</code>
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
+<pre>$ns at 5.0 "$node(0) setdest 3.01 1.5 0.1"</pre>
 </blockquote>
+<center>
+<font size="-2">Figure 3: NS syntax that moves the robot to the same
+destination as in Figure 2.</font>
+</center>
+<br>
 
 Note that "setdest" takes a third argument, the speed, in addition to the X and
 Y coordinates.  The robot's speed is currently fixed at 0.1 meters per second.
@@ -364,8 +390,8 @@ Y coordinates.  The robot's speed is currently fixed at 0.1 meters per second.
 
 Generating destination points for nodes can become quite a tedious task, so we
 provide a modified version of the NS-2 "setdest" tool that will produce a valid
-set of destination points for a given area.  The tool is installed ops and
-takes the following arguments:
+set of destination points for a given area.  The tool, called "tbsetdest", is
+installed on ops and takes the following arguments:
 
 <blockquote>
 <ul>
@@ -379,15 +405,31 @@ roaming around.  Currently, MEB-ROBOTS is the only area available.
 </blockquote>
 
 Now, taking your existing NS file, we'll add another node to make things more
-interesting and use "tbsetdest" to produce some random motion for both robots:
+interesting:
+
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
+<pre><i>...</i>
+$ns node-config -topography $topo
+
+set node(0) [$ns node]
+<b>set node(1) [$ns node]</b></pre>
+</blockquote>
+<center>
+<font size="-2">Figure 4: Excerpt of the original NS file with an additional
+node.
+</font>
+</center>
+<br>
+
+Then, use "tbsetdest" to produce some random motion for both robots:
 
 <blockquote>
-<pre>2 ops:~> tbsetdest -n 2 -t 60 -a MEB-ROBOTS</pre>
+<pre>2 ops:~> /usr/testbed/bin/tbsetdest -n 2 -t 60 -a MEB-ROBOTS</pre>
 </blockquote>
 
 Here is some sample output from the tool:
 
-<blockquote>
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
 <pre>$node(0) set X_ 3.01
 $node(0) set Y_ 2.49
 $node(1) set X_ 1.22
@@ -398,25 +440,23 @@ set rtl [$ns event-timeline]
 #
 $rtl at 0.50 "$node(0) setdest 0.92 3.28 0.10"
 $rtl at 0.50 "$node(1) setdest 0.61 3.02 0.10"
-$rtl at 9.00 "$node(1) setdest 0.61 3.02 0.00"
 $rtl at 9.50 "$node(1) setdest 0.88 2.09 0.10"
-$rtl at 19.14 "$node(1) setdest 0.88 2.09 0.00"
 $rtl at 19.64 "$node(1) setdest 2.80 2.07 0.10"
-$rtl at 22.87 "$node(0) setdest 0.92 3.28 0.00"
 $rtl at 23.37 "$node(0) setdest 5.62 2.79 0.10"
-$rtl at 38.93 "$node(1) setdest 2.80 2.07 0.00"
 $rtl at 39.43 "$node(1) setdest 4.98 1.65 0.10"
 #
 # Destination Unreachables: 0
 #</pre>
 </blockquote>
+<center>
+<font size="-2">Figure 5: Sample "tbsetdest" output.</font>
+</center>
+<br>
 
 You can then add the second node and motion events by clicking on the "Modify
 Experiment" menu item on the experiment web page and:
 
 <ol>
-<li>Adding "<code>set node(1) [$ns node]</code>" after "<code>node(0)</code>"
-is created;
 <li>Copying and pasting the "tbsetdest" output into the NS file before the
 "<code>$ns run</code>" command; and
 <li>Starting the modify.
@@ -438,11 +478,18 @@ queued when the event system starts up.  This feature can be useful for testing
 your experiment by just (re)queueing subsets of events.
 
 <p>
-Once the modify completes, you can start the robots on their way by running the
-following on ops:
+Once the modify completes, wait for the robots to reach their initial position
+and then start the robots on their way by running the following on ops:
 
-<blockquote>
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
 <pre>3 ops:~> tevc -e <b>proj</b>/<b>exp</b> now rtl START</pre>
+</blockquote>
+<blockquote>
+<center>
+<font size="-2">Figure 6: Command to start the "rtl" timeline.  Again, don't
+forget to change <b>proj</b>/<b>exp</b> to match your project and experiment
+IDs.</font>
+</center>
 </blockquote>
 
 <?php NLCBODYEND() ?>
@@ -467,7 +514,7 @@ the robots carries a Mica2 mote (pictured on the right), which is a popular
 device used in wireless sensor networks.  We'll be using the motes on the
 mobile nodes you already have allocated and loading them with <a
 href="http://www.tinyos.net">TinyOS</a> demo kernels, one that will be sending
-traffic and the other recieving.
+traffic and the other receiving.
 
 <?php NLCBODYEND() ?>
 
@@ -487,19 +534,25 @@ traffic and the other recieving.
 Adding a couple of motes to your existing experiment can be done by doing a
 modify and adding the following NS code:
 
-<blockquote>
-<pre>$ns node-config -topography ""
+<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
+<pre>## BEGIN mote nodes
+$ns node-config -topography ""
 
-set mote(0) [$ns node]
-tb-set-hardware $mote(0) mica2
-tb-set-node-os $mote(0) TinyOS-RfmLed
-tb-fix-node $mote(0) $node(0)
+set receiver [$ns node]
+tb-set-hardware $receiver mica2
+tb-set-node-os $receiver TinyOS-RfmLed
+tb-fix-node $receiver $node(0)
 
-set mote(1) [$ns node]
-tb-set-hardware $mote(1) mica2
-tb-set-node-os $mote(1) TinyOS-CntRfm
-tb-fix-node $mote(1) $node(1)</pre>
+set transmitter [$ns node]
+tb-set-hardware $transmitter mica2
+tb-set-node-os $transmitter TinyOS-CntRfm
+tb-fix-node $transmitter $node(1)
+## END mote nodes</pre>
 </blockquote>
+<center>
+<font size="-2">Figure 7: NS syntax used to "attach" motes to a robot.</font>
+</center>
+<br>
 
 This code creates two mote nodes and "attaches" each of them to one of the
 mobile nodes.  The OSs to be loaded on the mote nodes are the receiver,

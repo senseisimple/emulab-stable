@@ -231,7 +231,7 @@ if ($types['garcia']) {
 
 # Blinky lights - but only if they have nodes of the correct type in their
 # experiment
-if ($types['garcia'] || $classes['sg']) {
+if ($classes['mote']) {
     WRITESUBMENUBUTTON("Show Blinky Lights",
 		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid","moteleds");
 }

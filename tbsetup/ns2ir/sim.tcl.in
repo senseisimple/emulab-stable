@@ -472,7 +472,7 @@ Simulator instproc run {} {
     foreach node [lsort [array names node_list]] {
 	$node updatedb "sql"
 
-	if { $default_sync_server == {} } {
+	if { $default_sync_server == {} && ![$node set issubnode] } {
 	    set default_sync_server $node
 	}
     }
@@ -1177,8 +1177,7 @@ Simulator instproc make_event {outer event} {
 		    ::GLOBALS::named-args [lrange $evargs 3 end] {
 			-orientation 0
 		    }
-		    set o [expr $(-orientation) * 3.14159 / 180.0]
-		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$o"
+		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$(-orientation)"
 		}
 		unknown {
 		    punsup "$obj $cmd $evargs"

@@ -123,6 +123,9 @@ foreach my $subnode (keys(%subnodelist)) {
 	    last SWITCH;
 	};
 	/^mote$/i && do {
+	    libsetup_setvnodeid($subnode);
+	    configtmcc("subnode", $subnode);
+	    tmcc(TMCCCMD_STATE, "ISUP");
 	    last SWITCH;
 	};
 	print "Invalid subnode type: $type\n";

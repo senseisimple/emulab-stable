@@ -8,6 +8,7 @@
 
 #include <sys/param.h>
 
+#include <math.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <assert.h>
@@ -183,7 +184,7 @@ RPC_invoke(char *method,
 	va_start(args, tag);
 	try
 	{
-		emulab::ServerProxy proxy(rcp.proto, false, TBROOT);
+		emulab::ServerProxy proxy(rcp.proto, false, XMLRPC_ROOT);
 		
 		*er_out = proxy.invoke(method, tag, args);
 		
@@ -229,7 +230,7 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 	
 	try
 	{
-		emulab::ServerProxy proxy(rcp.proto, false, TBROOT);
+		emulab::ServerProxy proxy(rcp.proto, false, XMLRPC_ROOT);
 		
 		*er = proxy.invoke(method,
 				   emulab::SPA_String, "proj", pid,
@@ -297,6 +298,33 @@ RPC_waitforactive(char *pid, char *eid)
 	assert(strlen(eid) > 0);
 
 	return RPC_invoke(pid, eid, "experiment.waitforactive", &er);
+}
+
+int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear)
+{
+	emulab::EmulabResponse er;
+	double time_start = 0.0;
+	
+	assert(pid != NULL);
+	assert(strlen(pid) > 0);
+	assert(eid != NULL);
+	assert(strlen(eid) > 0);
+	assert(timeline != NULL);
+
+	if (set_or_clear) {
+		struct timeval tv;
+		
+		gettimeofday(&tv, NULL);
+		time_start = tv.tv_sec + ((double)tv.tv_usec) / 1000000;
+	}
+	
+	return RPC_invoke("experiment.event_time_start",
+			  &er,
+			  emulab::SPA_String, "pid", pid,
+			  emulab::SPA_String, "eid", eid,
+			  emulab::SPA_String, "timeline", timeline,
+			  emulab::SPA_Double, "time", time_start,
+			  emulab::SPA_TAG_DONE);
 }
 
 static int
@@ -428,7 +456,9 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 		bldg = loc.getMember("building");
 		x = ((ulxr::Double)loc.getMember("loc_x")).getDouble();
 		y = ((ulxr::Double)loc.getMember("loc_y")).getDouble();
-		orientation = ((ulxr::Double)loc.getMember("orientation")).getDouble();
+		orientation = ((ulxr::Double)loc.getMember("orientation")).
+			getDouble();
+		orientation *= M_PI/ 180.0;
 		if ((agent = (struct agent *)
 		     lnFindName(&agents, vname)) == NULL) {
 			error("unknown robot %s\n", vname);
