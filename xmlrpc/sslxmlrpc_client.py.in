@@ -168,7 +168,7 @@ def do_method(server, method_and_args):
 try:
     # Parse the options,
     opts, req_args =  getopt.getopt(sys.argv[1:],
-                      "dhVs:m:p:r",
+                      "dhVc:s:m:p:r",
                       [ "help", "version", "rawmode", "server=", "module=",
                         "cert=", "port="])
     # ... act on them appropriately, and
