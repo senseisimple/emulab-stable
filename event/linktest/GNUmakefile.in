@@ -8,12 +8,16 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/linktest
+LIBTBDIR    = $(OBJDIR)/lib/libtb
+LIBEVENTDIR = ../lib
+DAEMON	        = linktest
+SCRIPT		= linktest.pl
 
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	script
+all:	$(DAEMON) $(SCRIPT)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -23,28 +27,44 @@ CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
 
 LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb -lcrypto
+LIBS     += -levent -lcrypto -lssl
 LIBS     += `elvin-config --libs vin4c`
 ifeq ($(SYSTEM),Linux)
 LIBS     += -ldl
+LOCAL_BINDIR	= linux
 endif
 
-OBJS	= linktest.o
-TESTS	 = linktest
+ifeq ($(SYSTEM),FreeBSD)
+LOCAL_BINDIR	= fbsd
+endif
 
-$(TESTS):	$(OBJS) script
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-$(OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
+LIBTB_OBJS	= $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
+DAEMON_OBJS	= linktest.o
 
-script:	linktest.pl
-	chmod 755 linktest.pl
+# Rules to make sure that some libraries we need from other directories get
+# built first
+$(LIBTBDIR)/%.o:
+	@$(MAKE) -C $(LIBTBDIR) $(@F)
+
+$(LIBEVENTDIR)/%.a:
+	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
+
+
+$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
+	-mkdir $(LOCAL_BINDIR)
+	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $(LOCAL_BINDIR)/$@
+
+$(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
 
 install:
 
-client-install: 
-	$(INSTALL_TEST) $(TESTS) \
-			$(DESTDIR)$(CLIENT_BINDIR)/$(TESTS)
+client-install:
+	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(DAEMON) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
+	$(INSTALL_PROGRAM) $(SCRIPT) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 
 clean:
 	/bin/rm -f *.o $(TESTS)
+	/bin/rm -f $(LOCAL_BINDIR)/$(DAEMON)

@@ -25,7 +25,7 @@ static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
 
 static void
-start_linktest(char *args);
+start_linktest(char *args, int);
 
 void
 usage(char *progname)
@@ -183,7 +183,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 * Dispatch the event. 
 	 */
 	if (strcmp(event, TBDB_EVENTTYPE_START) == 0)
-		start_linktest(args);
+          start_linktest(args, sizeof(args));
 	else {
 		error("Invalid event: %s\n", event);
 		return;
@@ -191,18 +191,36 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 }
 
-/*
-  what does this do? take arguments from the tevc command and pass them
-  through to the linktest script.
-*/
-
-
+/* start one linktest at a time.
+ */
+#define MAX_ARGS 10
 static void
-start_linktest(char *args) {
+start_linktest(char *args, int buflen) {
+  static int running = 0; /* is linktest currently running? */
+  pid_t lt_pid;
+  int status;
+  char *word;
+  char *argv[MAX_ARGS];
+  int i=0;
+
+  if(running) return;
+  running = 1;
+
+
+  word = strtok(args," \t");
+  do {
+    argv[i++] = word;
+  } while ((word = strtok(NULL," \t"))
+           && (i<MAX_ARGS));
+  argv[i] = NULL;
+
   info("starting linktest.\n");
-  info(LINKTEST_SCRIPT);
-
-   
-
+  
+  lt_pid = fork();
+  if(!lt_pid) {
+    execv( LINKTEST_SCRIPT,argv);
+  }
+  waitpid(lt_pid, &status, 0);
+  running = 0;
 
 }

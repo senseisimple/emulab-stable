@@ -1,5 +1,5 @@
 #ifndef __LINKTEST_H_
 #define __LINKTEST_H_
 
-#define LINKTEST_SCRIPT "@LINKTEST_SCRIPT@"
+#define LINKTEST_SCRIPT "@CLIENT_BINDIR@" "/linktest.pl"
 #endif

@@ -60,6 +60,7 @@ AC_SUBST(PLABSUPPORT)
 AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
 AC_SUBST(PLAB_SLICEPREFIX)
+AC_SUBST(LINKTEST_NSPATH)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -103,6 +104,7 @@ PLABSUPPORT=0
 PLAB_ROOTBALL="plabroot-8.tgz"
 PLAB_SLICEPREFIX="emulab"
 TBLOGFACIL="local5"
+LINKTEST_NSPATH="/share/linktest-ns"
 
 #
 # Okay, I know this is improper usage of --with. Too bad.

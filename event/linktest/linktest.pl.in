@@ -8,6 +8,9 @@ use Class::Struct;
 use Getopt::Std;
 use constant STATIC => "Static";
 
+# path to linktest special ns
+use constant LINKTEST_NSPATH => "@LINKTEST_NSPATH@";
+
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
 use constant CRUDE_DEC => "/tmp/crude.dec"; # decoded binary data
@@ -134,6 +137,19 @@ if(($cumulative && $testlevel >=BW_LEVEL)
 # Test procedures
 ##############################################################################
 
+# does the current node have a link?
+# @return: 1 for yes, 0 else
+sub linked_node {
+    my $node = shift @_;
+    foreach my $edge (@links) {
+        if($node eq $edge->src
+           || $node eq $edge->dst) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 
 # Static routing test
 # 
@@ -174,7 +190,9 @@ sub static_rt_test {
     my @waitlist;
     # fork processes to run the pings in parallel.
     for(my $i=0;$i<@host_copy;$i++) {
-	if(defined($host_copy[$i])) {
+	if(defined($host_copy[$i])
+           && linked_node($host_copy[$i])
+           ) {
 	    my $dst = $host_copy[$i];
 	    my $pid = fork();
 	    if(!$pid) {
@@ -522,11 +540,10 @@ sub init {
     $platform = $results[0];
     chomp($platform);
 
-    # TODO: this should get a configure variable.
     if($platform eq BSD) {
-	$ns_cmd = "/users/davidand/binf/ns";
+	$ns_cmd = LINKTEST_NSPATH ."/fbsd/ns";
     } elsif ($platform eq LINUX) {
-	$ns_cmd = "/users/davidand/binl/ns";
+	$ns_cmd = LINKTEST_NSPATH ."/linux/ns";
     } else {
 	die "unsupported platform!";
     }
