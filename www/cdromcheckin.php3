@@ -45,6 +45,12 @@ if (!ereg("[0-9a-zA-Z]+", $cdkey) ||
     return;
 }
 
+if (isset($wahostname) &&
+    !ereg("[-_0-9a-zA-Z\.]+", $wahostname)) {
+    SPITSTATUS(CDROMSTATUS_INVALIDARGS);
+    return;
+}
+
 #
 # Make sure this is a valid CDkey.
 #
@@ -85,8 +91,33 @@ if (isset($updated) && $updated == 1) {
 	DBQueryFatal("update widearea_privkeys ".
 		     "set IP='$IP' ".
 		     "where privkey='$privkey'");
-	
-	SUEXEC("nobody", $TBADMINGROUP, "webnewwanode -w -t pcwa -i $IP", 0);
+
+	#
+	# Generate a nickname if given hostname.
+	#
+	$nickname = "";
+	$type     = "pcwa";
+	if (isset($wahostname)) {
+	    $nickname .= "-n ";
+	    
+	    if (strpos($wahostname, ".")) {
+		$nickname .= str_replace(".", "-", $wahostname);
+	    }
+	    else {
+		$nickname .= $wahostname;
+	    }
+
+            #
+            # XXX Parse hostname to see if a ron node.
+	    # Silly, but effective since we will never have anything else
+	    # besides wa/ron.
+            #
+	    if (strstr($wahostname, ".ron.")) {
+		$type = "pcron";
+	    }
+	}
+	SUEXEC("nobody", $TBADMINGROUP,
+	       "webnewwanode -w $nickname -t $type -i $IP", 0);
     }
     DBQueryFatal("update widearea_privkeys ".
 		 "set privkey=nextprivkey,updated=now(),nextprivkey=NULL ".
@@ -116,16 +147,16 @@ if (strcmp($privIP, "1.1.1.1")) {
     #
     $newkey = GENHASH();
     DBQueryFatal("update widearea_privkeys ".
-		 "set nextprivkey='$newkey',updated=now() ".
+		 "set nextprivkey='$newkey',updated=now(),cdkey='$cdkey' ".
 		 "where IP='$IP' and privkey='$privkey'");
 
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
 
     if (0) {
-    if ($cdvers == 2) {
-	    echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
-	    echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
+    if ($cdvers == 3) {
+	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
+	    echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
 	    echo "slicex_mount=/users\n";
     }
     }
@@ -154,7 +185,7 @@ if (mysql_num_rows($query_result)) {
 # 
 $newkey = GENHASH();
 DBQueryFatal("update widearea_privkeys ".
-	     "set nextprivkey='$newkey',updated=now()".
+	     "set nextprivkey='$newkey',updated=now(),cdkey='$cdkey'".
 	     "where privkey='$privkey'");
 
 header("Content-Type: text/plain");
@@ -199,7 +230,7 @@ else {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	echo "slice1_md5=5bd32b4980473c332fefd54e59208210\n";
+	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
@@ -207,7 +238,7 @@ else {
     else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=5bd32b4980473c332fefd54e59208210\n";
+	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
