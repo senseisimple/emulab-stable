@@ -2584,3 +2584,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	  vnode varchar(32) NOT NULL default '',
 	  PRIMARY KEY  (pid,eid,host,vnode)
 	) TYPE=MyISAM;
+
+1.329: Add some booleans to obstacles table to 1) control the drawing of
+       the exclusion zone on a per-obstacle basis, and 2) show the
+       tooltip.
+
+	alter table obstacles add no_exclusion tinyint(1) NOT NULL \
+                default '0';
+	alter table obstacles add no_tooltip tinyint(1) NOT NULL \
+                default '0';
+

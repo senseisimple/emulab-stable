@@ -1279,6 +1279,8 @@ CREATE TABLE obstacles (
   description tinytext,
   label tinytext,
   draw tinyint(1) NOT NULL default '0',
+  no_exclusion tinyint(1) NOT NULL default '0',
+  no_tooltip tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (obstacle_id)
 ) TYPE=MyISAM;
 
