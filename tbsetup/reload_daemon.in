@@ -7,9 +7,6 @@ use Getopt::Std;
 #
 #	usage: reload_daemon [-d]
 #
-# XXX - Hardwired to type "pc600".
-#       Path to image and the partition are hardwired in.
-#
 # TODO: Use "logger" instead of writing a log file.
 #
 sub usage()
@@ -86,7 +83,7 @@ if (! $debug) {
 # 
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
-    my($pid, $eid, $type, $reload_type);
+    my($pid, $eid, $reload_type);
 
     #
     # Partial delay between loops in case of an error.
@@ -99,7 +96,7 @@ while (1) {
     # the system).
     #
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid,n.type from nodes as a ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid from nodes as a ".
 		    "left join reserved as b on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
 		    "left join node_types as n on n.type=a.type where ".
@@ -127,7 +124,6 @@ while (1) {
     $node  = $hrow{'node_id'};
     $pid   = $hrow{'pid'};
     $eid   = $hrow{'eid'};
-    $type  = $hrow{'type'};
 
     print "Trying to reload $node ... \n";
 
