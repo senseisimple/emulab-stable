@@ -62,7 +62,7 @@ echo "name=\"email\"></td></tr>
 $mytime = date("m/d/Y", time() + (86400 * 90)); #add 30 days 
 echo "\"$mytime\""; 
 echo "name=\"grp_expires\"></td>
-	<td>Mailing<br>Address:</td><td class=\"left\">";
+	<td>*Mailing<br>Address:</td><td class=\"left\">";
 if (isset($row)) {
   echo "<input type=\"readonly\" value=\"$row[usr_addr]\" name=\"usr_addr\">";
 } else {

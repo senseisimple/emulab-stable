@@ -115,10 +115,10 @@ if (isset($gid) && isset($password1) && isset($email) &&
   }
   echo "
 <H1>Group '$gid' successfully added.</h1>
-<h2>The Approval Committee has been notified of your application.
-Most applications are reviewed within 72 hours. We will notify
+<h2>The review committee has been notified of your application.
+Most applications are reviewed within one week. We will notify
 you by e-mail at '$usr_name&nbsp;&lt;$email>' of their decision
-regarding your proposed group '$gid'.\n";
+regarding your proposed project '$gid'.\n";
   if (! $returning) {
     echo "
 <p>In the meantime, for
