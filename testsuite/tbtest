@@ -36,6 +36,12 @@ use POSIX;
 
 $| = 1;
 
+#
+# Set our WITH_TB_ADMIN_PRIVS environment variable, so that we have the
+# privs we need to clear experiments out of the test database, etc.
+#
+$ENV{WITH_TB_ADMIN_PRIVS} = 1;
+
 $pwd = `/bin/pwd`;
 chop $pwd;
 

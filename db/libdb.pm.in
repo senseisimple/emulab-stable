@@ -469,6 +469,15 @@ sub TBAdmin(;$)
     my($uid) = @_;
     my($name);
 
+    #
+    # No one is considered an admin unless they have the magic environment
+    # variable set (so that you have to be a bit more explict about wanting
+    # admin privs.) Use the withadminprivs script to get this variable set.
+    #
+    if (!$ENV{WITH_TB_ADMIN_PRIVS}) {
+	return 0;
+    }
+
     if (!defined($uid)) {
 	$uid = $UID;
     }
