@@ -155,6 +155,13 @@ if (&tbs_exec("handle_ip $irfile $tbcmdfile")) {
     exit(1);
 }
 
+&tbs_out("Setting up virtual names.\n");
+if (&tbs_exec("handle_virt $irfile")) {
+    &tbs_out("Failed to handle virtual names.\n");
+    &cleanup();
+    exit(1);
+}
+
 &tbs_out("Setting up OS state.\n");
 if (&tbs_exec("handle_os $irfile $tbcmdfile")) {
     &tbs_out("Failed to set up OS state.\n");
