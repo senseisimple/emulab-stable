@@ -24,13 +24,17 @@ A. FreeBSD (while running single user):
   Change the root password, this file will get installed by prepare.
 
 * /etc/ssh/ssh_host*
-  Generate new host keys.  Actually, copy from an existing image.
+  Generate new host keys.  Actually, copy from an existing image if
+  available (i.e., we use a single host key across all images and OSes
+  within a testbed).
 
 * /etc/emulab/{client,emulab}.pem
-  Generate a new one.  From Leigh:
-      Just need to cd into the ssl directory and do a gmake
-      (on their boss of course!) then a gmake boss-installX.
-      The images need emulab.pem and client.pem from that directory.
+  Generate new ones.  This needs to be done on the site's boss node.
+  Go into the build tree "ssl" subdirectory and edit the *.cnf.in files
+  to update the "[ req_distinguished_name ]" section with the appropriate
+  country, state, city, etc.  Then do a "gmake boss-installX" which generates
+  the certs and installs the server-side.  Grab the emulab.pem and client.pem
+  from that directory to put in the images.
 
 * Unmount filesystems, and remount root read-only to be safe:
   cd /
