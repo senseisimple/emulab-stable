@@ -69,7 +69,7 @@ Python is also available that you can use on your desktop to invoke
 commands from the shell. For example:
 
     <code><pre>
-    $ sshxmlrpc_client.py startexp batch=false wait=true proj="myproj" exp="myexp" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
+    sshxmlrpc_client.py startexp batch=false wait=true proj="myproj" exp="myexp" nsfilestr="`cat ~/nsfile.ns`"</code></pre>
 
 which says to create an experiment called "myexp" in the "myproj" project,
 swap it in immediately, wait for the exit status (instead of running
@@ -81,7 +81,7 @@ machine is different then your login ID on Emulab, you can use the <tt>-l
 login</tt> option. For example:
 
     <code><pre>
-    $ sshxmlrpc_client.py -s boss.emulab.net -l rellots startexp ...</code></pre>
+    sshxmlrpc_client.py -s boss.emulab.net -l rellots startexp ...</code></pre>
 
 which would invoke the RPC server on <tt>boss.emulab.net</tt>, using the
 login ID <tt>rellots</tt> (for the purposes of SSH authentication).  You
@@ -107,8 +107,71 @@ href="downloads/xmlrpc/"><tt>sslxmlrpc_client</tt></a> as long as you
 request an SSL certificate as described above. Once you have a
 certificate, use the <tt>--cert=</tt> option to tell the demonstration
 client where to find your certificate. You will be prompted for the
-private key passphrase when it attempts to contact the server. 
+private key passphrase when it attempts to contact the server.
 
+<p>
+A more sophisticated client called
+<a href="downloads/xmlrpc/"><tt>script_wrapper.py</tt></a> provides a
+traditional command line interface to Emulab, using the SSH transport
+described above. The client should run on any machine that has Python
+and SSH (or Putty) installed. For example, to swap the <tt>myexp</tt>
+experiment in the <tt>testbed</tt> project in:
+
+    <code><pre>
+    script_wrapper.py --server=boss.emulab.net swapexp -e testbed,myexp in</code></pre>
+
+Each command has its own --help option:
+
+    <code><pre>
+    script_wrapper.py swapexp --help
+    
+    swapexp -e pid,eid in|out
+    swapexp pid eid in|out
+    where:
+         -w   - Wait for experiment to finish swapping
+         -e   - Project and Experiment ID
+         in   - Swap experiment in  (must currently be swapped out)
+        out   - Swap experiment out (must currently be swapped in)</code></pre>
+
+A complete list of Emulab commands available via the script wrapper is
+available with the --help command:
+
+    <code><pre>
+    script_wrapper.py --help
+    Usage: wrapper [wrapper options] command [command args and opts]
+    
+    Commands:
+        readycount   Get readycounts for nodes in experiment (deprecated).
+        startexp     Start an Emulab experiment.
+        savelogs     Save console tip logs to experiment directory.
+        endexp       Terminate an experiment.
+        eventsys_control Start/Stop/Restart the event system.
+        batchexp     Synonym for startexp.
+        node_list    Print physical mapping of nodes in an experiment.
+        expinfo      Get information about an experiment.
+        node_admin   Boot selected nodes into FreeBSD MFS.
+        create_image Create a disk image from a node.
+        delay_config Change the link shaping characteristics for a link or lan.
+        modexp       Modify experiment.
+        nscheck      Check and NS file for parser errors.
+        swapexp      Swap experiment in or out.
+        os_load      Reload disks on selected nodes or all nodes.
+        portstats    Get portstats from the switches.
+        link_config  Change interface parameters for a wireless link.
+        node_reboot  Reboot selected nodes or all nodes in an experiment.</code></pre>
+
+As a convenience, you can symlink <tt>script_wrapper.py</tt> to each of the
+commands listed above, and avoid having to type the wrapper name:
+
+    <code><pre>
+    ln -s script_wrapper.py swapexp
+
+    swapexp --server=boss.emulab.net -e testbed,myexp in</code></pre>
+
+This has already been done in <tt>users.emulab.net:/usr/testbed/bin</tt>,
+so each of the above commands is already on your path.
+
+<h3>Server API</h3>
 <p>
 The API for the server is broken into several different modules that
 export a number of methods, each of which is described below. Each
