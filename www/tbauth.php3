@@ -452,8 +452,8 @@ function ISPLABUSER() {
 	# For logged-in users, we recorded it in the the login status
 	#
 	return (($CHECKLOGIN_STATUS &
-		 (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER)) ==
-		(CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER));
+		 (CHECKLOGIN_PLABUSER)) ==
+		(CHECKLOGIN_PLABUSER));
     }
 }
 
