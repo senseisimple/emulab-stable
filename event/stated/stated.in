@@ -70,7 +70,7 @@ if ($opt{d}) { $debug = 1; } else { $debug = 0; }
 # Background
 #
 if (!$debug) {
-	if (TBBackGround("/var/log/testbed/stated.log")) {
+	if (TBBackGround("@prefix@/log/stated.log")) {
 		exit(0);
 	}
 }
