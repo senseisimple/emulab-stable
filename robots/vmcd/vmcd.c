@@ -21,9 +21,9 @@
 #include "robotObject.h"
 #include "visionTrack.h"
 
-static int debug = 0;
+int debug = 0;
 
-static int looping = 1;
+static volatile int looping = 1;
 
 static char *emc_hostname = NULL, *emc_path = NULL;
 static int emc_port = 0;
@@ -46,9 +46,10 @@ static struct mtp_config_vmc vmc_config;
 static struct vision_track vt_pool_nodes[TRACK_POOL_SIZE];
 static struct lnMinList vt_pool;
 
-static char *fake_userdata = NULL;
-
 static struct robot_object ro_pool_nodes[16];
+
+static struct lnMinList known_bots, unknown_bots, wiggling_bots, lost_bots;
+static struct lnMinList last_frame, current_frame, wiggle_frame;
 
 /**
  * Here's how the algorithm will lay out: when we get update_position packets
@@ -105,6 +106,83 @@ static void sigpanic(int sig)
     sleep(120);
     exit(1);
 }
+
+#if defined(SIGINFO)
+/* SIGINFO-related stuff */
+
+/**
+ * Variable used to tell the main loop that we received a SIGINFO.
+ */
+static int got_siginfo = 0;
+
+/**
+ * Handler for SIGINFO that sets the got_siginfo variable and breaks the main
+ * loop so we can really handle the signal.
+ *
+ * @param sig The actual signal number received.
+ */
+static void siginfo(int sig)
+{
+    got_siginfo = 1;
+}
+
+static void dump_robot(struct robot_object *ro)
+{
+    info("  %d: %s; flags=%x\n", ro->ro_id, ro->ro_name, ro->ro_flags);
+}
+
+static void dump_robot_list(struct lnMinList *list)
+{
+    struct robot_object *ro;
+    
+    ro = (struct robot_object *)list->lh_Head;
+    while (ro->ro_link.ln_Succ != NULL) {
+	dump_robot(ro);
+	ro = (struct robot_object *)ro->ro_link.ln_Succ;
+    }
+}
+
+static void dump_vision_track(struct vision_track *vt)
+{
+    info("  %d: %.2f %.2f %.2f; age=%d; %s\n",
+	 vt->vt_client->vc_port,
+	 vt->vt_position.x,
+	 vt->vt_position.y,
+	 vt->vt_position.theta,
+	 vt->vt_age,
+	 (vt->vt_userdata == NULL) ?
+	 "(unknown)" :
+	 ((struct robot_object *)vt->vt_userdata)->ro_name);
+}
+
+static void dump_vision_list(struct lnMinList *list)
+{
+    struct vision_track *vt;
+    
+    vt = (struct vision_track *)list->lh_Head;
+    while (vt->vt_link.ln_Succ != NULL) {
+	dump_vision_track(vt);
+	vt = (struct vision_track *)vt->vt_link.ln_Succ;
+    }
+}
+
+static void dump_info(void)
+{
+    info("Unknown robots:\n");
+    dump_robot_list(&unknown_bots);
+    info("Wiggling robots:\n");
+    dump_robot_list(&wiggling_bots);
+    info("Lost robots:\n");
+    dump_robot_list(&lost_bots);
+
+    info("Wiggle frame:\n");
+    dump_vision_list(&wiggle_frame);
+    info("Last frame:\n");
+    dump_vision_list(&last_frame);
+    info("Current frame:\n");
+    dump_vision_list(&current_frame);
+}
+#endif
 
 static void usage(void)
 {
@@ -201,8 +279,6 @@ static int parse_client_options(int *argcp, char **argvp[])
 
 int main(int argc, char *argv[])
 {
-    struct lnMinList known_bots, unknown_bots, wiggling_bots, lost_bots;
-    struct lnMinList last_frame, current_frame, wiggle_frame;
     int lpc, current_client = 0, retval = EXIT_SUCCESS;
     struct robot_object *wiggle_bot = NULL;
     fd_set readfds;
@@ -217,6 +293,7 @@ int main(int argc, char *argv[])
     lnNewList(&last_frame);
     lnNewList(&current_frame);
     lnNewList(&wiggle_frame);
+    
     lnNewList(&known_bots);
     lnNewList(&unknown_bots);
     lnNewList(&wiggling_bots);
@@ -236,7 +313,7 @@ int main(int argc, char *argv[])
         if (logfile)
             loginit(0, logfile);
         else
-            loginit(1, "vmcclient");
+            loginit(1, "vmcd");
     }
     
     if (pidfile) {
@@ -254,7 +331,11 @@ int main(int argc, char *argv[])
     
     signal(SIGSEGV, sigpanic);
     signal(SIGBUS, sigpanic);
-    
+
+#if defined(SIGINFO)
+    signal(SIGINFO, siginfo);
+#endif
+
     /* connect to emc and send init packet */
     /* in future, vmc will be a separate identity that emc can connect to
      * as necessary; vmc will not connect to emc.
@@ -371,6 +452,13 @@ int main(int argc, char *argv[])
         fd_set rreadyfds;
         int rc;
 
+#if defined(SIGINFO)
+	if (got_siginfo) {
+	    dump_info();
+	    got_siginfo = 0;
+	}
+#endif
+
 	if (current_client == vmc_client_count) {
 	    struct vision_track *vt, *vt_unknown = NULL;
 	    int unknown_track_count = 0;
@@ -448,9 +536,6 @@ int main(int argc, char *argv[])
 
 	    ro = (struct robot_object *)unknown_bots.lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
-		info("checking through unknown_bots; id %d\n",
-		     ro->ro_id
-		     );
 		if (!(ro->ro_flags & RF_WIGGLING)) {
 		    struct mtp_packet wmp;
 
@@ -507,8 +592,6 @@ int main(int argc, char *argv[])
 			 "reacquire.\n",
 			 ro->ro_id
 			 );
-		    // also have to unset the RF_WIGGLING flag
-		    ro->ro_flags &= ~RF_WIGGLING;
 		    ro = ro_next;
 		}
 		else {
@@ -564,7 +647,6 @@ int main(int argc, char *argv[])
 			struct mtp_wiggle_status *mws;
 			struct vision_track *vt;
 			struct robot_object *ro;
-			float distance;
 			
 			if (debug > 0) {
 			    mtp_print_packet(stdout, &mp);
@@ -587,6 +669,7 @@ int main(int argc, char *argv[])
 				     */
 				    lnRemove(&ro->ro_link);
 				    lnAddTail(&wiggling_bots, &ro->ro_link);
+				    ro->ro_flags &= ~RF_WIGGLING;
 				}
 				break;
 				
@@ -619,16 +702,15 @@ int main(int argc, char *argv[])
 				else {
 				    info("found wiggle ! %p\n", vt);
 				    vt->vt_userdata = wiggle_bot;
-				    wiggle_bot->ro_flags &= ~RF_WIGGLING;
 				    lnAddTail(&known_bots,
 					      &wiggle_bot->ro_link);
 				    wiggle_bot = NULL;
-				    /*
-				     * Return the frame we snapshotted awhile
-				     * ago to the pool.
-				     */
-				    lnAppendList(&vt_pool, &wiggle_frame);
 				}
+				/*
+				 * Return the frame we snapshotted awhile ago
+				 * to the pool.
+				 */
+				lnAppendList(&vt_pool, &wiggle_frame);
 				break;
 				
 			    default:
@@ -663,10 +745,11 @@ int main(int argc, char *argv[])
 	    if (FD_ISSET(vc->vc_handle->mh_fd, &rreadyfds)) {
 		do {
 		    struct mtp_packet mp;
+		    mtp_error_t rc;
 		    
-		    if (mtp_receive_packet(vc->vc_handle,
-					   &mp) != MTP_PP_SUCCESS) {
-			fatal("bad packet from vmc-client\n");
+		    if ((rc = mtp_receive_packet(vc->vc_handle,
+						 &mp)) != MTP_PP_SUCCESS) {
+			fatal("bad packet from vmc-client %d\n", rc);
 		    }
 		    else {
 			if (debug > 2) {
@@ -675,7 +758,7 @@ int main(int argc, char *argv[])
 			}
 			
 			if (vtUpdate(&current_frame, vc, &mp, &vt_pool)) {
-			    if (debug > 1) {
+			    if (debug > 2) {
 				printf("got frame from client %s:%d\n",
 				       vc->vc_hostname,
 				       vc->vc_port);
