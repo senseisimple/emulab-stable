@@ -80,7 +80,7 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
     if ($adminmode == 1)
 	$pagearg  = "?adminmode=1";
     if ($key)
-	$pagearg .= "&key=$key";
+	$pagearg .= (($adminmode == 1) ? "&" : "?") . "key=$key";
 
     echo "<table align=center border=1>
           <form action='${TBBASE}/login.php3${pagearg}' method=post>
