@@ -4,7 +4,7 @@ Class link
 # link src srcport dst dstport
 
 link instproc print {file} {
-    global nodeid_map prefix
+    global nodeid_map prefix lanlist
     if {[info exists nodeid_map([$self set src])]} {
 	set srcname $nodeid_map([$self set src])
     } else {
@@ -14,6 +14,12 @@ link instproc print {file} {
 	set dstname $nodeid_map([$self set dst])
     } else {
 	set dstname [$self set dst]
+    }
+    if {[lsearch $lanlist [$self set src]] != -1} {
+	set srcname $prefix-$srcname
+    }
+    if {[lsearch $lanlist [$self set dst]] != -1} {
+	set dstname $prefix-$dstname
     }
     if {[info exists nodeid_map(l[$self set id])]} {
 	set linkname $nodeid_map(l[$self set id])
