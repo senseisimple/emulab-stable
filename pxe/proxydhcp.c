@@ -89,6 +89,139 @@ static event_handle_t	event_handle = NULL;
 address_tuple_t         tuple;
 int                     ip2nodeid(struct in_addr, char *, int);
 char                    nodeid[16];
+
+/* Cache to avoid duplicate BOOTING events */
+#define EVENTCACHESIZE 128
+typedef struct {
+    int in_addr;
+    int  lastmsg;
+} ec_elt;
+int ec_elt_size = sizeof(ec_elt);
+
+ec_elt evcache[EVENTCACHESIZE];
+ec_elt ec_tmp;
+ec_elt ec_new;
+
+/* front/back of array - hard bounds */
+ec_elt* ec_front;
+ec_elt* ec_back;
+/* head/tail of list - move around as list changes */
+ec_elt* ec_head;
+ec_elt* ec_tail;
+ec_elt* ec_ptr;
+
+/*
+ * Minimum interval between sending events for the same node, in
+ * seconds.  Should be less than the shortest possible valid time
+ * between BOOTING events. For a pc600, that is just under 60 seconds,
+ * and for pc850s, it is more.
+ */
+int min_interval = 60; 
+
+/* Something to hold the time... */
+struct timeval now;
+int rv;
+
+/* Some support functions for the event cache */
+ec_elt* ec_next(ec_elt* ptr) {
+    if (ptr < ec_front || ptr > ec_back) { return 0; }
+    ptr += ec_elt_size;
+    if (ptr==ec_back) { ptr = ec_front; }
+    return ptr;
+}
+
+ec_elt* ec_prev(ec_elt* ptr) {
+    if (ptr < ec_front || ptr > ec_back) { return 0; }
+    if (ptr==ec_front) { ptr = ec_back; }
+    ptr -= ec_elt_size;
+    return ptr;
+}
+
+ec_elt* ec_find(uint addr) {
+    ec_ptr=ec_head;
+    while (ec_ptr != ec_tail) {
+	if (ec_ptr->in_addr == addr) {
+	    return ec_ptr;
+	} else { ec_ptr = ec_next(ec_ptr); }
+    }
+    return 0;
+}
+
+ec_elt* ec_insert(ec_elt elt) {
+    printf("head=%d\ttail=%d\n",ec_head,ec_tail);
+    if (ec_next(ec_tail)==ec_head) {
+	/* cache is full, make a victim */
+	ec_tail = ec_prev(ec_tail);
+	ec_head = ec_prev(ec_head);
+    } else {
+	/* still have room, don't victimize anything */
+	ec_head = ec_prev(ec_head);
+    }
+    printf("head=%d\ttail=%d\n",ec_head,ec_tail);
+    ec_head->in_addr = elt.in_addr;
+    ec_head->lastmsg = elt.lastmsg;
+    return ec_head;
+}
+
+ec_elt* ec_reinsert(ec_elt* elt) {
+    if (elt < ec_front || elt > ec_back) { return 0; }
+    ec_tmp.in_addr = elt->in_addr;
+    ec_tmp.lastmsg = elt->lastmsg;
+    ec_tail = ec_prev(ec_tail);
+    while (elt!=ec_tail) {
+	ec_ptr = elt;
+	elt = ec_next(elt);
+	ec_ptr->in_addr = elt->in_addr;
+	ec_ptr->lastmsg = elt->lastmsg;
+    }
+    return ec_insert(ec_tmp);
+}
+
+void ec_print() {
+    int count = 0;
+    ec_ptr = ec_head;
+    printf("Event cache:\n");
+    while (ec_ptr != ec_tail) {
+	printf("%d:\t%u\t%d\n",count,ec_ptr->in_addr,ec_ptr->lastmsg);
+	ec_ptr = ec_next(ec_ptr);
+	count++;
+    }
+    printf("---\n");
+}
+
+/*
+ * The big kahuna. If it's already there, update its time and reinsert
+ * it, and return 1 if it is recent enough, or return 0 if it is too
+ * old. If it isn't there, insert it and return 0.
+ */
+int ec_check(uint addr) {
+    int newtime,oldtime;
+    rv = gettimeofday(&now,0);
+    newtime = now.tv_sec;
+    printf("Checking %u at %d\n",addr,newtime);
+    ec_print();
+    ec_ptr = ec_find(addr);
+    printf("find returned %d\n",ec_ptr);
+    if (ec_ptr) {
+	/* Found it. Update time, reinsert. */
+	oldtime = ec_ptr->lastmsg;
+	ec_ptr->lastmsg = newtime;
+	ec_reinsert(ec_ptr);
+	ec_print();
+	printf("Time difference: %d (limit=%d)\n",
+	       newtime-oldtime,min_interval);
+	if (oldtime + min_interval < newtime) { return 0; } else { return 1; }
+    } else {
+	/* Not found. Insert it and return 0. */
+	ec_new.in_addr = addr;
+	ec_new.lastmsg = newtime;
+	printf("Inserting %u,%d\n",addr,newtime);
+	ec_insert(ec_new);
+	ec_print();
+	return 0;
+    }
+}
+	     
 #endif
 
 /*
@@ -236,6 +369,13 @@ main(int argc, char *argv[])
 		memcpy((char *)&default_sip, he->h_addr, sizeof(default_sip));
 	}
 #endif
+#ifdef EVENTSYS
+		ec_front=&evcache[0];
+		ec_back=&evcache[EVENTCACHESIZE];
+		ec_head=ec_front;
+		ec_tail=ec_front;
+#endif
+		
 	printf("Server started on port %d\n\n", ntohs(server.sin_port));
 	while (1) {
 		int rb;
@@ -256,7 +396,6 @@ main(int argc, char *argv[])
 		struct config	*configp;
 		
 		clientlength = sizeof(client);
-
 #ifdef USE_RECVMSG
 #ifdef IP_RECVDSTADDR
 		if (setsockopt(servsock, IPPROTO_IP, IP_RECVDSTADDR, &on,
@@ -317,28 +456,38 @@ main(int argc, char *argv[])
 		/*
 		 * By this point, we know it is a DHCP packet that we
 		 * need to respond to, so the node must be booting.
-		 * So we send out a change to state BOOTING.
+		 * So we send out a change to state BOOTING if we
+		 * haven't sent one recently.
 		 */
-		/* XXX: Maybe we don't need to alloc a new tuple every time */
-		tuple = address_tuple_alloc();
-		if (tuple != NULL &&
-		    !ip2nodeid(client.sin_addr, nodeid, sizeof(nodeid))) {
-
+		printf("Searching for %s in cache\n",
+		       inet_ntoa((*((struct in_addr*)
+				    &client.sin_addr))));
+		if (!ec_check((int)(client.sin_addr.s_addr))) {
+		    tuple = address_tuple_alloc();
+		    if (tuple != NULL &&
+			!ip2nodeid(client.sin_addr, nodeid, sizeof(nodeid))) {
+			
 		        tuple->host      = BOSSNODE;
 			tuple->objtype   = "TBNODESTATE";
 			tuple->objname   = nodeid;
 			tuple->eventtype = "BOOTING";
 			
 			if (myevent_send(tuple)) {
-			          fprintf(stderr, "Couldn't send state "
-					  "event for %s\n",nodeid);
+			    fprintf(stderr, "Couldn't send state "
+				    "event for %s\n",nodeid);
 			}
 			printf("Successfully sent state event for %s\n",
 			       nodeid);
 			address_tuple_free(tuple);
-		} else {
+		    } else {
 		        fprintf(stderr, "Couldn't lookup nodeid for %s\n",
-				inet_ntoa((*((struct in_addr*)data))));
+				inet_ntoa((*((struct in_addr*)
+					     &client.sin_addr))));
+		    }
+		} else {
+		    printf("Quenching duplicate event for %s\n",
+				inet_ntoa((*((struct in_addr*)
+					     &client.sin_addr))));
 		}
 #endif /* EVENTSYS */
 		
