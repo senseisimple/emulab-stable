@@ -1030,6 +1030,7 @@ sub UpdateNodeTypeXpidPermissions()
 		    "  libadminctrl_table TO nodetypeXpid_permissions ");
 
     DBQueryWarn("drop table if exists libadminctrl_table");
+    DBQueryWarn("drop table if exists libadminctrl_backup");
     DBQueryWarn("select release_lock('libadminctrl')");
     return -1
 	if (!$query_result);
@@ -1061,6 +1062,7 @@ sub TBAdmissionControlCheck($$$$)
     
     #
     # Admin people do not get checks (when in admin mode of course).
+
     #
     return 1
 	if (TBAdmin($uid));
@@ -1070,6 +1072,9 @@ sub TBAdmissionControlCheck($$$$)
     #
     return 1
 	if ($pid eq TBOPSPID());
+
+    $debug = 1
+	if (TBGetSiteVar("swap/admission_control_debug"));
 
     #
     # Now we need the number of nodes needed by the experiment.
@@ -1108,6 +1113,9 @@ sub TBAdmissionControlCheck($$$$)
 # 
 sub TBUpdateNodeTypeXpidPermissions()
 {
+    $debug = 1
+	if (TBGetSiteVar("swap/admission_control_debug"));
+
     return UpdateNodeTypeXpidPermissions();
 }
    
