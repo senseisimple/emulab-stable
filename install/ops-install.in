@@ -61,6 +61,7 @@ my $SH         = "/bin/sh";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
+my $GMAKE      = "/usr/local/bin/gmake";
 
 #
 # Some files we edit/create
