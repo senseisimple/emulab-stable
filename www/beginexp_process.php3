@@ -125,7 +125,7 @@ if (! $query_result) {
 
 #
 # If an experiment "shell" give some warm fuzzies and be done with it.
-# The user us responsible for running the tb scripts on his/her own!
+# The user is responsible for running the tb scripts on his/her own!
 # The user will need to come back and terminate the experiment though
 # to clear it out of the database.
 #
@@ -138,6 +138,19 @@ if ($nonsfile) {
           yourself.
           </h2></center><br>\n";
 
+    if (1) {
+	mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
+	     "User:        $uid\n".
+             "EID:         $exp_id\n".
+             "PID:         $exp_pid\n".
+             "Name:        $exp_name\n".
+             "Created:     $exp_created\n".
+             "Expires:     $exp_expires\n".
+             "Start:       $exp_start\n".
+             "End:         $exp_end\n",
+             "From: $TBMAIL_WWW\n".
+             "Errors-To: $TBMAIL_WWW");
+    }
     echo "</body>
           </html>\n";
     die("");
@@ -274,7 +287,7 @@ echo "</XMP>\n";
 #
 # Lets generate a mail message for now so that we can see whats happening.
 #
-if (0) {
+if (1) {
 mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
      "User:        $uid\n".
      "EID:         $exp_id\n".
