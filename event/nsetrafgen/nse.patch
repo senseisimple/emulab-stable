@@ -1,0 +1,257 @@
+Index: ns-2/ns-2.1b8a/Makefile.in
+===================================================================
+RCS file: /x/flux/CVS/ns-2/ns-2.1b8a/Makefile.in,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Makefile.in
+*** ns-2/ns-2.1b8a/Makefile.in	2002/02/20 22:48:03	1.1.1.1
+--- ns-2/ns-2.1b8a/Makefile.in	2002/03/21 01:28:13
+***************
+*** 69,74 ****
+--- 69,82 ----
+  
+  CFLAGS	= $(CCOPT) $(DEFINE)
+  
++ #### with event system
++ INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb
++ CFLAGS += `elvin-config --cflags vin4c` -DUSEEVENTS
++ LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
++ LIB += `elvin-config --libs vin4c`
++ STATIC += -static
++ ####
++ 
+  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
+  # Also, gcc does not remove the .o before forking 'as', which can be a
+  # problem if you don't own the file but can write to the directory.
+***************
+*** 219,224 ****
+--- 227,236 ----
+  	emulate/nat.o  \
+  	emulate/iptap.o \
+  	emulate/tcptap.o
++ 
++ ##### nse with event system
++ OBJ_EMULATE_CC += ../../tbevent.o
++ ####
+  
+  OBJ_EMULATE_C = \
+  	emulate/inet.o
+Index: ns-2/ns-2.1b8a/scheduler.cc
+===================================================================
+RCS file: /x/flux/CVS/ns-2/ns-2.1b8a/scheduler.cc,v
+retrieving revision 1.3
+diff -c -r1.3 scheduler.cc
+*** ns-2/ns-2.1b8a/scheduler.cc	2002/03/14 23:46:45	1.3
+--- ns-2/ns-2.1b8a/scheduler.cc	2002/03/21 01:28:13
+***************
+*** 44,49 ****
+--- 44,50 ----
+  #include "config.h"
+  #include "scheduler.h"
+  #include "packet.h"
++ #include "tbevent.h"
+  #include <unistd.h>
+  
+  #ifdef MEMDEBUG_SIMULATIONS
+***************
+*** 821,832 ****
+--- 822,841 ----
+  	virtual void run();
+  	double start() const { return start_; }
+  	virtual void reset();
++ #ifdef USEEVENTS
++ 	int command(int argc, const char*const* argv);
++ #endif
+  protected:
+  	void sync() { clock_ = tod(); }
+  	int rwait(double);	// sleep
+  	double tod();
+  	double slop_;	// allowed drift between real-time and virt time
+  	double start_;	// starting time
++ 
++ #ifdef USEEVENTS
++         TbEventSink *evsink_;
++ #endif
++   
+  };
+  
+  static class RealTimeSchedulerClass : public TclClass {
+***************
+*** 839,847 ****
+--- 848,882 ----
+  
+  RealTimeScheduler::RealTimeScheduler() : start_(0.0)
+  {
++ 
++ #ifdef USEEVENTS
++         evsink_ = 0 ;
++ #endif
++        
+  	bind("maxslop_", &slop_);
+  }
+  
++ #ifdef USEEVENTS
++   
++ int RealTimeScheduler::command(int argc, const char*const* argv)
++ {
++   Tcl& tcl = Tcl::instance();
++   if (instance_ == 0)
++     instance_ = this;
++   
++   
++   if( argc == 3 ) {
++     if(strcmp(argv[1], "tbevent-sink") == 0) {
++       evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
++       return(TCL_OK);
++     }
++   }
++ 
++   return(Scheduler::command(argc, argv));
++ }  
++ 
++ #endif
++ 
+  double
+  RealTimeScheduler::tod()
+  {
+***************
+*** 864,869 ****
+--- 899,917 ----
+  	Event *p;
+  	double now;
+  
++ #ifdef USEEVENTS
++ 
++ 	if( evsink_ ) {
++ 	  evsink_->init();
++ 	  evsink_->subscribe();
++ 
++ 	  // Our time starts now
++ 	  reset();
++ 
++ 	}
++ 
++ #endif
++ 	
+  	/*XXX*/
+  	instance_ = this;
+  
+***************
+*** 914,919 ****
+--- 962,972 ----
+  		//
+  		sync();
+  		Tcl_DoOneEvent(TCL_DONT_WAIT);
++ #ifdef USEEVENTS
++ 		if( evsink_ ) {
++ 		  evsink_->poll();
++ 		}
++ #endif
+  	}
+  
+  	return;	// we reach here only if halted
+***************
+*** 930,937 ****
+  {
+  	while (1) {
+  		sync();
+  		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+! 			return (1);
+  		if (deadline <= tod())
+  			return 0;
+           usleep(0);
+--- 983,1001 ----
+  {
+  	while (1) {
+  		sync();
++ #ifndef USEEVENTS
+  		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+!   		        return(1);
+! #else
+! 		
+! 		int ret1 = Tcl_DoOneEvent(TCL_DONT_WAIT);
+! 		int ret2 = 0;
+! 		if( evsink_ ) {
+! 		  ret2 = evsink_->poll();
+! 		}
+! 		if( ret1 || ret2 )
+! 		  return(1);
+! #endif
+  		if (deadline <= tod())
+  			return 0;
+           usleep(0);
+Index: ns-2/ns-2.1b8a/random.cc
+===================================================================
+RCS file: /x/flux/CVS/ns-2/ns-2.1b8a/random.cc,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 random.cc
+*** ns-2/ns-2.1b8a/random.cc	2002/02/20 22:48:04	1.1.1.1
+--- ns-2/ns-2.1b8a/random.cc	2002/03/21 01:28:13
+***************
+*** 47,57 ****
+--- 47,61 ----
+  #define GCC_THROW
+  #endif
+  
++ #if 0
++ 
+  RANDOM_RETURN_TYPE
+  random() GCC_THROW
+  {
+  	printf("random() called in ns.\nRandom is not portable, please use Random::uniform() instead.\n");
+  	abort();
+  }
++ 
++ #endif
+  
+  #endif /* !WIN32 */
+Index: ns-2/ns-2.1b8a/tclAppInit.cc
+===================================================================
+RCS file: /x/flux/CVS/ns-2/ns-2.1b8a/tclAppInit.cc,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 tclAppInit.cc
+*** ns-2/ns-2.1b8a/tclAppInit.cc	2002/02/20 22:48:04	1.1.1.1
+--- ns-2/ns-2.1b8a/tclAppInit.cc	2002/03/21 01:28:13
+***************
+*** 183,188 ****
+--- 183,189 ----
+  	return TCL_OK;
+  }
+  
++ #if 0
+  #ifndef WIN32
+  void
+  abort()
+***************
+*** 197,202 ****
+--- 198,204 ----
+  #endif /*abort*/
+  	/*NOTREACHED*/
+  }
++ #endif
+  #endif
+  
+  }
+Index: ns-2/ns-2.1b8a/telnet.cc
+===================================================================
+RCS file: /x/flux/CVS/ns-2/ns-2.1b8a/telnet.cc,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 telnet.cc
+*** ns-2/ns-2.1b8a/telnet.cc	2002/02/20 22:48:05	1.1.1.1
+--- ns-2/ns-2.1b8a/telnet.cc	2002/03/21 01:28:13
+***************
+*** 77,83 ****
+  {
+          if (running_) {
+  	        /* call the TCP advance method */
+! 		agent_->sendmsg(agent_->size());
+  		/* reschedule the timer */
+  		double t = next();
+  		timer_.resched(t);
+--- 77,83 ----
+  {
+          if (running_) {
+  	        /* call the TCP advance method */
+! 		agent_->sendmsg(1); // send 1 byte every interval
+  		/* reschedule the timer */
+  		double t = next();
+  		timer_.resched(t);

@@ -3,15 +3,13 @@ as part of the FBSD disk image or it should be part of
 /usr/testbed/sup/sup/FBSD43-STD/root*/etc/testbed on the boss node.
 
 a) nseinput.tcl and startnse present in this directory
-b) NSE executable file. To build it, do a "cvs co ns-2" in this
-   directory or elsewhere. The main branch of the ns-2 cvs tree
-   will contain the latest files to build an NSE suitable for
-   emulab.
+b) NSE executable file. To build it the first time, chdir to
+   this directory. Then do a
 
-   cvs co ns-2
-   cd ns-2
-   ./install
-   cp ns-2.1b8a/nse <sup_directory>
+   ./nse-install
+
+c) Then do a
+   cp nse nseinput.tcl startnse <sup_directory>
 
 The current NSE trafgen comes with a major caveat:
 

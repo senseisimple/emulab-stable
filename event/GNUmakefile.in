@@ -8,7 +8,7 @@ SUBDIR		= event
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= lib sched tbgen example trafgen delay-agent
+SUBDIRS	= lib sched tbgen example trafgen delay-agent nsetrafgen
 
 all:	$(SUBDIRS)
 
@@ -29,6 +29,12 @@ example:
 trafgen:
 	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
 	@$(MAKE) -C trafgen all
+
+nsetrafgen:
+	@echo ""
+	@echo "WARNING! You must first install NSE if you want NSE traffic generation"
+	@echo "WARNING! See $(SRCDIR)/nsetrafgen/README"
+	@echo ""
 
 delay-agent:
 	@$(MAKE) -C delay-agent all

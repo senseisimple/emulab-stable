@@ -1,0 +1,9 @@
+#!/bin/sh
+if [ ! -d ns-2 ]; then
+    echo "Checking out ns-2 source to ."
+    cvs co ns-2
+    patch -p0 < nse.patch
+    cd ns-2
+    ./install
+    cp ns-2.1b8a/nse ..
+fi
