@@ -45,7 +45,6 @@ and use the ~/tbobj directory to do my builds in.
 
 cd ~/tbobj
 ~/testbed/configure
-gmake
 gmake ops-install
 
 ##### Step 3 - Mail setup
