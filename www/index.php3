@@ -105,7 +105,7 @@ if (isset($auth_usr)) {
     }
     # Every active user can do these options
     echo "<b>Update user information";
-    #echo "<p><A href='modify.html'>Update user information</A>\n";
+    echo "<p><A href='modusr_form.php3?auth_usr'>Update user information</A>\n";
     echo "</p>\n";
   } elseif ($status == "unapproved") {
     echo "Your account has not been approved yet. Please try back ";
