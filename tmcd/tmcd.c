@@ -921,11 +921,12 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * directly connected ones while looping through them.
 	 */
 	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(r.vname,':',i.card), i.card = t.control_net "
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(r.vname,':',p.vport), i.card = t.control_net "
 				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
 				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
 				"LEFT JOIN node_types AS t ON n.type = t.type "
-				"WHERE IP IS NOT NULL AND IP != '' AND pid='%s' AND eid='%s'"
+				"LEFT JOIN portmap AS p ON i.iface = p.pport AND p.vnode=r.vname "
+				"WHERE IP IS NOT NULL AND IP != '' AND r.pid='%s' AND r.eid='%s'"
 				"ORDER BY node_id DESC, IP",
 				6,pid,eid);
 
