@@ -43,6 +43,8 @@ static int dohosts(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dorpms(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dostartstat(int sock, struct in_addr ipaddr, char *request,int tcp);
+static int doready(int sock, struct in_addr ipaddr, char *request,int tcp);
+static int doreadycount(int sock, struct in_addr ipaddr,char *request,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -56,7 +58,10 @@ struct command {
 	{ "hostnames",	dohosts },
 	{ "rpms",	dorpms },
 	{ "startupcmd",	dostartcmd },
+	{ "startstatus",dostartstat }, /* Leave this before next one */
 	{ "startstat",	dostartstat },
+	{ "readycount", doreadycount },
+	{ "ready",	doready },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -234,7 +239,7 @@ main(int argc, char **argv)
 		for (i = 0; i < numcommands; i++) {
 			if (strncmp(cp, command_array[i].cmdname,
 				    strlen(command_array[i].cmdname)) == 0) {
-				err = command_array[i].func(clientsock,
+			        err = command_array[i].func(clientsock,
 							    client.sin_addr,
 							    cp, istcp);
 				break;
@@ -1044,6 +1049,112 @@ dostartstat(int sock, struct in_addr ipaddr, char *request, int tcp)
 		       nodeid);
 		return 1;
 	}
+	return 0;
+}
+
+/*
+ * Accept notification of ready for action
+ */
+static int
+doready(int sock, struct in_addr ipaddr, char *request, int tcp)
+{
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "READY: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Make sure currently allocated to an experiment!
+	 */
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_INFO, "READY: %s: Node is free", nodeid);
+		return 0;
+	}
+
+	/*
+	 * Update the ready_bits table.
+	 */
+	if (mydb_update("update nodes set ready=1 "
+			"where node_id='%s'", nodeid)) {
+		syslog(LOG_ERR, "READY: %s: DB Error setting ready bit!",
+		       nodeid);
+		return 1;
+	}
+
+	syslog(LOG_INFO, "READY: %s: Node is reporting ready", nodeid);
+
+	/*
+	 * Nothing is written back
+	 */
+	return 0;
+}
+
+/*
+ * Return ready bits count (NofM)
+ */
+static int
+doreadycount(int sock, struct in_addr ipaddr, char *request, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[BUFSIZ];
+	int		total, ready, i;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "READYCOUNT: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Make sure currently allocated to an experiment!
+	 */
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_INFO, "READYCOUNT: %s: Node is free", nodeid);
+		return 0;
+	}
+
+	/*
+	 * See how many are ready. This is a non sync protocol. Clients
+	 * keep asking until N and M are equal. Can only be used once
+	 * of course, after experiment creation.
+	 */
+	res = mydb_query("SELECT ready FROM nodes "
+			 "LEFT JOIN reserved "
+			 "ON nodes.node_id=reserved.node_id "
+			 "WHERE reserved.eid='%s' and reserved.pid='%s'",
+			 1, eid, pid);
+
+	if (!res) {
+		syslog(LOG_ERR, "READYCOUNT: %s: DB Error getting ready bits",
+		       nodeid);
+		return 1;
+	}
+
+	ready = 0;
+	total = (int) mysql_num_rows(res);
+	if (total) {
+		for (i = 0; i < total; i++) {
+			row = mysql_fetch_row(res);
+
+			if (atoi(row[0]))
+				ready++;
+		}
+	}
+
+	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
+	client_writeback(sock, buf, strlen(buf), tcp);
+		
+	syslog(LOG_INFO, "READYCOUNT: %s: %s", nodeid, buf);
+
 	return 0;
 }
 

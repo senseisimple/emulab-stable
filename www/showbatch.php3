@@ -58,7 +58,8 @@ if (!$isadmin) {
 
 echo "<center>
        <h1>Batch Mode Experiment Information</h1>
-       <table align=center border=1>\n";
+      </center>
+      <table align=center border=1>\n";
 
 $created   = $exprow[created];
 $expires   = $exprow[expires];

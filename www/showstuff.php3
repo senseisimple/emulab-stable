@@ -275,7 +275,8 @@ function SHOWNODES($pid, $eid) {
                 <td align=center>Default<br>Path</td>
                 <td align=center>Default<br>Cmdline</td>
                 <td align=center>Startup<br>Command</td>
-                <td align=center>Startup<br>Status</td>
+                <td align=center>Startup<br>Status[1]</td>
+                <td align=center>Ready<br>Status[2]</td>
               </tr>\n";
 	
 	$query_result = mysql_db_query($TBDBNAME,
@@ -296,6 +297,7 @@ function SHOWNODES($pid, $eid) {
 	    $next_boot_cmd_line = $row[next_boot_cmd_line];
 	    $startupcmd         = $row[startupcmd];
 	    $startstatus        = $row[startstatus];
+	    $readystatus        = $row[ready];
 
 	    if (!$def_boot_cmd_line)
 		$def_boot_cmd_line = "NULL";
@@ -309,6 +311,10 @@ function SHOWNODES($pid, $eid) {
 		$startupcmd = "NULL";
 	    if (!$vname)
 		$vname = "--";
+	    if ($readystatus)
+		$readylabel = "Yes";
+	    else
+		$readylabel = "No";
 
 	    echo "<tr>
                     <td align=center>
@@ -322,9 +328,18 @@ function SHOWNODES($pid, $eid) {
                     <td>$def_boot_cmd_line</td>
                     <td>$startupcmd</td>
                     <td align=center>$startstatus</td>
+                    <td align=center>$readylabel</td>
                  </tr>\n";
 	}
 	echo "</table>\n";
+	echo "<h4><blockquote><blockquote><blockquote><blockquote>
+              <dl COMPACT>
+                <dt>[1]
+                    <dd>Exit value of the node startup command.
+                <dt>[2]
+                    <dd>User application has reported ready via TMCC.
+              </dl>
+              </blockquote></blockquote></blockquote></blockquote></h4>\n";
     }
 }
 

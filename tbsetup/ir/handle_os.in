@@ -176,7 +176,8 @@ if (! &ir_exists("/cmdline")) {
 foreach (split("\n",&ir_get("/cmdline"))) {
     ($node,$cmdline) = /^([^ ]+)(.*)$/;
     $cmdline =~ s/^ //;
-    $sth = $dbh->prepare("UPDATE nodes set def_boot_cmd_line = \"$cmdline\" where node_id = \"$nodemap{$node}\"");
+    $sth = $dbh->prepare("UPDATE nodes set def_boot_cmd_line = \"$cmdline\" ".
+			 "where node_id = \"$nodemap{$node}\"");
     $sth->execute;
     $sth->finish;
 }
@@ -187,7 +188,8 @@ if (! &ir_exists("/startup")) {
 foreach (split("\n",&ir_get("/startup"))) {
     ($node,$cmdline) = /^([^ ]+)(.*)$/;
     $cmdline =~ s/^ //;
-    $sth = $dbh->prepare("UPDATE nodes set startupcmd = \"$cmdline\", startstatus = \"none\" where node_id = \"$nodemap{$node}\"");
+    $sth = $dbh->prepare("UPDATE nodes set startupcmd = \"$cmdline\" ".
+			 "where node_id = \"$nodemap{$node}\"");
     $sth->execute;
     $sth->finish;
 }
@@ -199,7 +201,16 @@ foreach (split("\n",&ir_get("/rpms"))) {
     ($node,$rpms) = /^([^ ]+)(.*)$/;
     $rpms =~ s/^ //;
     $rpms =~ s/ /:/g;
-    $sth = $dbh->prepare("UPDATE nodes set rpms = \"$rpms\" where node_id = \"$nodemap{$node}\"");
+    $sth = $dbh->prepare("UPDATE nodes set rpms = \"$rpms\" ".
+			 "where node_id = \"$nodemap{$node}\"");
+    $sth->execute;
+    $sth->finish;
+}
+
+foreach (keys(%nodemap)) {
+    $node = $_;
+    $sth = $dbh->prepare("UPDATE nodes set ready=0,startstatus = \"none\" ".
+			 "where node_id = \"$node\"");
     $sth->execute;
     $sth->finish;
 }
