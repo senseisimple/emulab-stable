@@ -1,6 +1,8 @@
 #!/usr/bin/perl -wT
 use Getopt::Std;
 use English;
+use Errno;
+use POSIX qw(setsid);
 
 #
 # Setup a single virtual experiment.
@@ -15,6 +17,12 @@ my $optlist = "k";
 my $killit  = 0;
 
 #
+# XXX deal with left over setups.
+#     left over directories.
+#     kill vtun log files.
+# 
+
+#
 # Turn off line buffering on output
 #
 $| = 1;
@@ -22,8 +30,8 @@ $| = 1;
 #
 # Untaint path
 #
-$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/local/bin:" .
-    "/usr/local/sbin:/usr/local/etc/testbed:/etc/testbed";
+$ENV{'PATH'} = "/usr/local/etc/testbed:/bin:/sbin:/usr/bin:/usr/local/bin:" .
+    "/usr/local/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -59,8 +67,9 @@ else {
 #
 # Hacky. All this path stuff is hacky.
 # 
-my $logname = "/tmp/tbvnode-${vnodeid}.debug";
-my $pidfile = "/var/run/tbvnode-${vnodeid}.pid";
+my $logname  = "/tmp/tbvnode-${vnodeid}.debug";
+my $pidfile  = "/var/run/tbvnode-${vnodeid}.pid";
+my $vnodedir = "/var/testbed/$vnodeid";
 
 #
 # If killing the virtual node, then kill the manager process. We use
@@ -72,32 +81,38 @@ if ($killit) {
 	die("*** $0:\n".
 	    "    No pid for $vnodeid manager!\n");
     }
-    $mpid = `cat $pidfile`;
-    $mpid =~ s/\n//;
-    # untaint
-    if ($mpid =~ /^([-\@\w.]+)$/) {
-	$mpid = $1;
-    }
-    else {
-	die("*** $0:\n".
-	    "    Bad data in pid: $mpid!\n");
-    }
-    
-    if (kill('TERM', $mpid) == 0) {
-	die("*** $0:\n".
-	    "    Could not kill(TERM) process $mpid: $!");
-    }
-    exit(0)
+    exit(killvnode());
 }
 
 #
-# Invoke remotevnodesetup routine in the setup library. This will talk
-# to tmcd and create the rc files.
+# If the pidfile still exists, then something went wrong with a
+# previous experiment (or teardown).
 #
-remotenodevnodesetup($vnodeid);
+if (-e $pidfile) {
+    print "Killing an already running vnode manager!\n";
+
+    if (killvnode() == 0) {
+	if (-e $pidfile) {
+	    die("*** $0:\n".
+		"    Not able to kill running vnode manager!\n");
+	}
+    }
+    elsif ($!{ESRCH}) {
+	#
+	# If there was no such process, kill the pid file and go on.
+	# 
+	system("rm -f $pidfile");
+	system("rm -rf $vnodedir");
+    }
+    else {
+	die("*** $0:\n".
+	    "    Not able to kill running vnode manager!\n");
+    }
+}
 
 #
-# Okay, lets detach now and continue on
+# Okay, lets and continue on so that ssh from Emulab exits right away.
+# It will figure out we are okay via the ISUP. 
 #
 if (TBBackGround($logname)) {
     #
@@ -107,18 +122,72 @@ if (TBBackGround($logname)) {
 }
 
 #
-# Become real root so that route command works!
+# Change our process group since we are a daemon. Not usually important,
+# but we get called from the watchdog, and we do not want to be in
+# its process group, or it will die when we get killed.
 #
-$UID = 0;
+POSIX::setsid();
 
 #
 # Write our pid into the pid file so we can be killed later (when the
-# experiment is torn down).
+# experiment is torn down). We must do this first so that we can be
+# killed before we change the sig handlers
 #
 open(PFILE, "> $pidfile")
     or die("Could not open $pidfile: $!");
 print PFILE "$PID\n";
 close(PFILE);
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    print "Exiting\n";
+    kill('TERM', -$pgrp);
+    sleep(15);
+    system("rm -rf $vnodedir");
+    system("rm -f $pidfile");
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Kill existing directory in case its still there.
+# 
+if (-e $vnodedir) {
+    system("rm -rf $vnodedir");
+}
+mkdir($vnodedir, 0755) or
+    die("*** $0:\n".
+	"    Could not mkdir $vnodedir: $!\n");
+
+#
+# Inform the TMCD we are setting up. Use REBOOTED event for simplicity!
+#
+system("tmcc -n $vnodeid state REBOOTED");
+
+#
+# Invoke remotevnodesetup routine in the setup library. This will talk
+# to tmcd and create the rc files.
+#
+if (!defined(remotenodevnodesetup($vnodeid, $vnodedir))) {
+    #
+    # Hmm, suddenly got free. 
+    # 
+    system("rm -f $pidfile");
+    system("rm -rf $vnodedir");
+    exit(0);
+}
+
+#
+# Become real root so that route command works!
+#
+$UID = 0;
 
 #
 # Okay, now startup the scripts.
@@ -141,23 +210,6 @@ sleep(1);
 system("tmcc -n $vnodeid state ISUP");
 
 #
-# Setup a handler to catch TERM, and kill our process group.
-#
-my $pgrp = getpgrp(0);
-
-sub handler () {
-    print "Exiting\n";
-    $SIG{TERM} = 'IGNORE';
-    $SIG{INT} = 'IGNORE';
-    kill('TERM', -$pgrp);
-    sleep(10);
-    system("rm -rf " . TMVNODEDIR);
-    exit(0);
-}
-$SIG{TERM} = \&handler;
-$SIG{INT}  = \&handler;
-
-#
 # Now we just sit and wait to be killed off by a signal sent to the
 # process group. Everything should get killed. 
 #
@@ -165,5 +217,37 @@ while (1) {
     sleep 5;
 }
 
+#
+# Routine to kill a vnode manager by sending it a signal.
+#
+sub killvnode() {
+    my $mpid = `cat $pidfile`;
+    $mpid =~ s/\n//;
+    # untaint
+    if ($mpid =~ /^([-\@\w.]+)$/) {
+	$mpid = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in pid: $mpid!\n");
+    }
+    if (kill('TERM', $mpid) == 0) {
+	print"*** Could not kill(TERM) process $mpid: $!\n";
+	return -1;
+    }
+    
+    #
+    # Wait for the pidfile to be removed. Do not wait too long though. 
+    # 
+    for (my $i = 0; $i < 30;) {
+	sleep(5);
+	if (! -e $pidfile) {
+	    return 0;
+	}
+	$i += 5;
+    }
+    print "*** Not able to kill running vnode manager process $mpid!\n";
+    return 0;
+}
 
 exit 0;
