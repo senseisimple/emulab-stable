@@ -85,6 +85,9 @@ HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.html)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.jpg)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
 
+USRPFILES  = $(wildcard $(SRCDIR)/usrp/*.php)
+USRPFILES += $(wildcard $(SRCDIR)/usrp/*.html)
+
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
 DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
@@ -118,6 +121,7 @@ ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
+ALLUSRP   = $(notdir $(USRPFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
@@ -128,6 +132,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
+	$(addprefix $(INSTALL_WWWDIR)/usrp/, $(ALLUSRP)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
