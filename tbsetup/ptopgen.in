@@ -11,7 +11,8 @@ use Getopt::Std;
 
 sub usage()
 {
-    print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor]\n" .
+    print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
+	  "[-n c/e]\n".
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
@@ -19,15 +20,18 @@ sub usage()
 	  "       -r Include stuff for topologies with widearea nodes\n".
 	  "       -s Include stuff for topologies with simulated nodes\n".
 	  "       -a Include even reserved nodes\n".
-	  "       -m Override multiplex_factor\n");
+	  "       -m Override multiplex_factor\n".
+	  "       -n Add in modelnet core and edge node features\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:rSa";
+my $optlist = "s:e:m:vp:rSan:";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
 my $simstuff  = 0;
 my $allnodes  = 0;
+my $mnetcores = 0;
+my $mnetedges = 0;
 
 #
 # Turn off line buffering on output
@@ -104,6 +108,15 @@ if (defined($options{"p"})) {
 }
 if (defined($options{"a"})) {
     $allnodes = 1;
+}
+if (defined($options{"n"})) {
+    if ($options{"n"} =~ /(\d*),(\d*)/) {
+	$mnetcores = $1;
+	$mnetedges = $2;
+    }
+    else {
+	usage();
+    }
 }
 if (defined($options{"e"})) {
     $exempt_eid = $options{"e"};
@@ -389,6 +402,14 @@ foreach $node (keys(%nodes)) {
 	push(@features,"already_reserved:0");
     }
 
+    # Add in modelnet stuff.
+    if ($mnetcores) {
+	push(@types, "modelnet-core:$mnetcores");
+    }
+    if ($mnetedges) {
+	push(@types, "modelnet-edge:$mnetedges");
+    }
+
     #
     # Handle subnodes
     #
@@ -428,39 +449,23 @@ foreach $node (keys(%nodes)) {
 # physnode. 
 #
 if ($widearea) {
-    my $free_condition = "b.node_id is null";
-    if ($allnodes) {
-	$free_condition = "1";
-    }
     $result =
-	DBQueryFatal("select count(a.node_id),a.phys_nodeid,aa.type, ".
-		     "  ns.status,m.pid,m.eid,wn.site ".
-		     "  from nodes as a ".
- 		     "left join reserved as b on a.node_id=b.node_id ".
-		     "left join nodes as aa on aa.node_id=a.phys_nodeid ".
-		     "left join reserved as m on a.phys_nodeid=m.node_id ".
-		     "left join node_status as ns on ".
-		     "     a.phys_nodeid=ns.node_id ".
-		     "left join node_types as t on t.type=a.type ".
+	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site ".
+		     "from nodes as n ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "left join reserved as r on r.node_id=n.node_id ".
+		     "left join node_status as ns on ns.node_id=n.node_id ".
 		     "left join widearea_nodeinfo as wn on ".
-		     "     wn.node_id=a.phys_nodeid ".
-		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
-		     "        $free_condition) ".
-		     "group by a.phys_nodeid");
+		     "     wn.node_id=n.node_id ".
+		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
+		     "        nt.isvirtnode=0)");
     
-    while (($count,$physnode,$ptype,$status,$mpid,$meid,$site)
-	    = $result->fetchrow_array) {
+    while (($physnode,$ptype,$status,$mpid,$meid,$site)
+	   = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
 	my @features;
 	my @flags;
-
-	# capacity is smaller of mfactor, number of unallocated virtual node
-	# and the per-auxtype capacity below.
-	my $virtnode_capacity = $count;
-	if (defined($mfactor) && $mfactor <= $virtnode_capacity) {
-	    $virtnode_capacity = $mfactor;
-	}
 
 	#
 	# Mark any nodes that are not up with a feature, so that they won't
@@ -485,10 +490,12 @@ if ($widearea) {
 	foreach my $auxinfo (@{$auxtypes{$physnode}}) {
 	    my ($auxtype,$count) = split(":", $auxinfo);
 
-	    if ($count > $virtnode_capacity) {
-		$auxinfo = "$auxtype:$virtnode_capacity";
+	    if (defined($mfactor) && $mfactor <= $count) {
+		$auxinfo = "$auxtype:$mfactor";
 	    }
-
+	    else {
+		$auxinfo = "$auxtype:$count";
+	    }
 	    push(@types, $auxinfo);
 	}
 
