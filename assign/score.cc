@@ -1219,6 +1219,11 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       if (vlink->emulated) {
 	// For emulated links, we need to do bin packing. Right now, we use the
 	// first-fit approximation; there may be a better one
+	
+	// Skip any links that already have non-emulated links assigned to them
+	if (plink->nonemulated > 0) {
+	    continue;
+	}
 	if (available_bandwidth >= vlink->delay_info.bandwidth) {
 	  best_pedge = *pedge_it;
 	  found_best = true;
