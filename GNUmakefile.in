@@ -90,6 +90,11 @@ tipserv-install:
 	@$(MAKE) -C capture tipserv-install
 	@$(MAKE) -C tbsetup tipserv-install
 
+client-install: 
+	@$(MAKE) -C event client-install
+	@$(MAKE) -C os client-install
+	@$(MAKE) -C tmcd client-install
+
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
 # tell, you can't put ifeq()'s inside of targets
