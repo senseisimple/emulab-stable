@@ -209,17 +209,6 @@ OURDOMAIN.internal.db.head .
 There are a few things we haven't been able to completely automate just yet,
 though we hope to soon. 
 
-DNS configuration - boss-install enables bind on your boss node, but does not
-set it up as a server for your domain. We don't have documentation for creating
-the zone files, etc yet. Best bet right now is to ask Utah for a copy of
-theirs. You need to include boss and ops in your domain, but NOT the nodes -
-these will be added for you automatically.  Once done, add 127.0.0.1 as the
-first nameserver in /etc/resolv.conf . Also, add boss as the first nameserver
-on ops, too. If you're running under the .emulab.net domain, too, make sure to
-get Utah to delegate the subdomain to you. If you have any hardware (eg.
-switches or power controllers) on a private subnet, add them to /etc/hosts,
-with the same name they've been give in the database.
-
 hosts file - It's a good idea to put ops' name/IP address in /etc/hosts - this
 helps out NFS mounts, which are typically done before the nameserver is started,
 and is generally helpful if things go wrong with the nameserver.
