@@ -2090,3 +2090,11 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table nodes add cnet_vlan int(11) default NULL;
 
        alter table firewalls add index(vlan);
+
+1.270: Add another role for interfaces; an outer control network role,
+       used for ElabinElab.
+
+       alter table interfaces change role role \
+          enum('ctrl','expt','jail','fake','other','gw','outer_ctrl') \
+	  default NULL;
+
