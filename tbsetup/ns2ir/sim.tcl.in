@@ -1264,13 +1264,13 @@ Simulator instproc make_event {outer event} {
 		    } else {
 			set default_command [$obj set command]
 		    }
-		    ::GLOBALS::named-args $evargs {
-			-command $default_command
-			-dir {}
-			-timeout {}
-			-expected-exit-code {}
-			-tag {}
-		    }
+		    ::GLOBALS::named-args $evargs [list \
+			-command $default_command \
+			-dir {} \
+			-timeout {} \
+			-expected-exit-code {} \
+			-tag {} \
+		    ]
 		    if {$(-dir) != {}} {
 			set args "DIR={$(-dir)} "
 		    }
@@ -1289,7 +1289,9 @@ Simulator instproc make_event {outer event} {
 			    set args "${args}TIMEOUT={$to} "
 			}
 		    }
-		    set args "${args}COMMAND=$(-command)"
+		    if {$(-command) != {}} {
+			set args "${args}COMMAND=$(-command)"
+		    }
 		}
 		"start" {
 		    set etype START
