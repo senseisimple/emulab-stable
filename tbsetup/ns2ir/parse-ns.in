@@ -427,7 +427,7 @@ sub GenDefsFile($)
 
     print TCL "# Robot areas\n";
     $query_result =
-	DBQueryFatal("select distinct building from location_info");
+	DBQueryFatal("select distinct building from node_startloc");
     while (my ($building,$floor) = $query_result->fetchrow_array()) {
 	print TCL "set areas($building) 1\n";
     }

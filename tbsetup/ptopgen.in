@@ -160,10 +160,10 @@ while (($class,$type,$delaycapacity,
     $permissions{$type}  = 1;
 }
 
-# Read location_info
-$result = DBQueryFatal("select node_id,building from location_info");
+# Read node_startloc
+$result = DBQueryFatal("select node_id,building from node_startloc");
 while (($node,$building) = $result->fetchrow_array) {
-    $areamap{$node} = "area-$building";
+    $areamap{$node} .= " area-$building:0";
 }
 
 #
@@ -427,7 +427,7 @@ foreach $node (keys(%nodes)) {
     }
 
     if (defined($areamap{$node})) {
-	push @features, $areamap{$node} . ":0";
+	push @features, $areamap{$node};
     }
 
     my $cpu_ram_features_present = 0;
