@@ -29,4 +29,4 @@ install: all
 	@echo "Where should we stick these things?"
 
 clean:
-	/bin/rm -rf $(OBJS) ${POBJS} divertest.o divertest libdivert.a
+	/bin/rm -rf $(OBJS) ${POBJS} divertest.o divertest libdivert.a libdivert_p.a
