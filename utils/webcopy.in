@@ -72,8 +72,8 @@ if ($dst =~ /^(($pr|$FSDIR_PROJ|$gr|$FSDIR_GROUPS)\/[-\w\/.]+)$/) {
 }
 
 system("cp $src $dst");
-if ($dst) {
+if (-e $dst) {
     chmod(0644, $dst);
 }
 
-exit $?
+exit $?;
