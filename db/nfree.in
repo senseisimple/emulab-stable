@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -203,18 +203,14 @@ foreach my $n (@freed_nodes) {
 
     # Find the default values for its node type.
     my $result =
-	DBQueryFatal("select nt.osid,nt.pxe_boot_path, " .
+	DBQueryFatal("select nt.osid, " .
 		     "       n.def_boot_osid,n.def_boot_path, ".
-		     "       nt.isvirtnode, nt.imageable, o.osid ".
+		     "       nt.isvirtnode, nt.imageable ".
 		     " from nodes as n " .
 		     "left join node_types as nt on n.type=nt.type " .
-		     "left join os_info as o on o.path=nt.pxe_boot_path " .
 		     "where node_id='$n'");
-    my ($osid, $pxe_boot_path, $def_boot_osid, $def_boot_path,
-	$isvirt, $imageable, $pxe_osid) = $result->fetchrow_array();
-    if (!defined($pxe_osid) || $pxe_osid eq "") {
-	$pxe_osid = "-p $pxe_boot_path";
-    }
+    my ($osid, $def_boot_osid, $def_boot_path,
+	$isvirt, $imageable) = $result->fetchrow_array();
 
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
@@ -259,28 +255,12 @@ foreach my $n (@freed_nodes) {
 	}
     }
 
-    # Reset the OS to the default osid for the node type
-    #
-    # XXX disabled while forced reload hack is in place
-    #system("$osselect -m $pxe_osid $n");
-    #system("$osselect $osid $n");
-
-    # Clean up the nodes table so that its in a moderately clean state.
-
-    #foreach $var ( 'osid','pxe_boot_path','n') {
-	#print "\$$var = ";
-	#if (!defined ${$var}) {
-	#    print "(null)";
-	#} else {
-	#    print ${$var};
-        #}
-        #print "\n";
-    #}
     my $allocFreeState = TBDB_ALLOCSTATE_FREE_DIRTY();
 
     DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
 		"tarballs='',failureaction='fatal', routertype='none', ".
 		"def_boot_cmd_line='',next_boot_cmd_line='', ".
+		"temp_boot_osid='', ".
 		"update_accounts=0,ipport_next=ipport_low, ".
 		"sfshostid=NULL,allocstate='$allocFreeState' ".
 		"where node_id='$n'") || $error++;
