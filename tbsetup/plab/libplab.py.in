@@ -30,6 +30,7 @@ import traceback
 LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 AGENTIP = "dslice.planet-lab.org"
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
+RENEW_TIMEOUT = 1*60     # Give the node 1 minute to respond
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
@@ -590,11 +591,17 @@ class Plab:
         # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
         # returns the local time
         import time
+        from signal import signal, alarm, SIGALRM
+        from traceback import format_exception_only
+        from xmlrpclib import Fault
         endtime = int(time.mktime(time.gmtime())) + RENEW_TIME
         res = DBQueryFatal("select pid, eid, node_id from plab_slice_nodes"
                            " where %s > unix_timestamp(leaseend)",
                            (endtime, ))
         loadedSlices = {}
+        class TimeoutError(StandardError): pass
+        def alrmhandler(signum, frame): raise TimeoutError
+        signal(SIGALRM, alrmhandler)
         for pid, eid, nodeid in res:
             try:
                 slice = loadedSlices[(pid, eid)]
@@ -602,7 +609,19 @@ class Plab:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
-            node.renew()
+            try:
+                alarm(RENEW_TIMEOUT)
+                node.renew()
+                alarm(0)
+            except TimeoutError:
+                print "Timeout waiting for renewal of sliver %s" % nodeid
+            except Fault, e:
+                print "Got XMLRPC fault while renewing %s:\n\t%s" % \
+                      (nodeid, e.faultString)
+            except:
+                tb = "".join(format_exception_only(*sys.exc_info()[:2]))
+                print "unknown exception while trying to renew %s\n%s" % \
+                      (nodeid, tb)
 
     def _createAgentProxy(self, insecure = False):
         """
