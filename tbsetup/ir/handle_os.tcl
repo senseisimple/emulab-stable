@@ -3,7 +3,7 @@
 #XXX - Add DB checking
 
 #XXX - Move this to the database
-set DEFAULT_OS RHL62-STD
+set DEFAULT_OS FBSD40-STD
 
 if {[llength $argv] != 2} {
     puts stderr "Syntax: $argv0 ir_file ns_file"
