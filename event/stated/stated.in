@@ -8,23 +8,22 @@
 #
 # stated - A daemon to monitor the states of nodes in the testbed. Recives
 # state change notification through the event system, and writes the new
-# state into the database.
-#
-# In the future, will watch for invalid state transitions, and watch for nodes
-# that time out.
+# state into the database. Also watches for invalid transitions, timeouts, 
+# and performs other state-related control functions.
 #
 # Send it a HUP signal to get it to reload the timeout and transition
 # information. Periodically reloads this information regardless, though.
 #
+# Will restart when sent SIGUSR1, by exec'ing its executable again.
+#
 
-#
 # Configure variables
-#
 use lib '@prefix@/lib';
+my $TB = "@prefix@";
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = '@TBSTATEDEMAIL@';
 my $TBDBNAME = "@TBDBNAME@";
-my $osselect = "@prefix@/bin/os_select";
+my $osselect = "$TB/bin/os_select";
 
 $| = 1;
 
@@ -34,45 +33,40 @@ use libtestbed;
 use Getopt::Std;
 #use strict;
 use English;
-use POSIX qw(strftime);
+use POSIX; # for strftime, and sigprocmask and friends
+use Sys::Syslog;
 
-#
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
-#
 my $reload_time = 3600;
 
-#
 # Process command-line arguments
-#
 
 sub usage {
 	print << "END";
-Usage: $0 [-d] [-s server] [-p port] [-f] [-h]
+Usage: $0 [-h] [-d] [-s server] [-p port]
+-h              This message
+-d              Turn on debugging output, and don't go into the background
 -s server       Use specified server, instead of this site's bossnode
 -p port	        Use specified port
--d              Turn on debugging output, and don't go into the background
--f              Stay in the foreground, rather than forking
--h              This message
+Send SIGHUP to reload database state, or SIGUSR1 to restart completely.
 END
 }
 
+my @args = @ARGV; # save a copy for restart before we mess with them.
 my %opt = ();
-getopts("ds:p:hf",\%opt);
+getopts("ds:p:h",\%opt);
 
 if ($opt{h}) { exit &usage; }
 if (@ARGV) { exit &usage; }
 
-my ($server,$port,$debug,$nofork);
+my ($server,$port,$debug);
 if ($opt{s}) { $server = $opt{s}; } else { $server = $BOSSNODE; }
 if ($opt{p}) { $port = $opt{p}; }
 if ($opt{d}) { $debug = 1; } else { $debug = 0; }
-if ($opt{f}) { $nofork = 1; } else { $nofork = 0; }
 
-#
 # Grab some constants into variables
-#
 my $TBRESET      = TBDB_TBCONTROL_RESET;
 my $TBRELOADDONE = TBDB_TBCONTROL_RELOADDONE;
 my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
@@ -81,30 +75,21 @@ my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
 my $TBCONTROL    = TBDB_TBEVENT_TBCONTROL;
 
-#
 # Background
-#
-my $logname = "@prefix@/log/stated.log";
-if (!$debug && !$nofork) {
-	if (TBBackGround($logname)) {
-		exit(0);
-	}
-} else {
-    if ($nofork) {
-	#
-	# Open our log file manually
-	#
-	open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-	open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-    }
+if (!$debug) {
+  # We use syslog, so redirect the output to nothing
+  if (TBBackGround("/dev/null")) { exit(0); }
+  # set up syslog
+  openlog("stated","pid","user");
 }
+
+# Change my $0 so that it is easier to see in a ps/top
+$0 = "$0";
 
 my $URL = "elvin://$server";
 if ($port) { $URL .= ":$port"; }
 
-#
 # Connect to the event system, and subscribe the the events we want 
-#
 my $handle = event_register($URL,0);
 if (!$handle) { die "Unable to register with event system\n"; }
 
@@ -117,28 +102,27 @@ if (!event_subscribe($handle,\&handleEvent,$tuple)) {
 	die "Could not subscribe to events\n";
 }
 
-#
 # Read in the pre-existing node states, and timeout and valid transition
 # information from the database
-#
 my %nodes     = readStates();
 my %timeouts  = getTimeouts();
 my %valid     = getValid();
 my %modeTrans = getModeTrans();
 my %triggers  = getTriggers();
 
-#
 # Gets set if a reload of state from the database should happen.
-#
 my $do_reload = 0;
 
-#
 # Make the daemon reload database state on a sighup - but I'm worried
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
-#
-$SIG{HUP} = sub { info("Recieved a SIGHUP\n"); $do_reload = 1; };
-$SIG{INT} = \&cleanup;
+$SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
+
+# Set up other signals. Unblock USR1 in case we're here because of a
+# restart, and it still think's we're handling USR1.
+$SIG{USR1} = \&restart;
+$SIG{USR2} = \&cleanup;
+$SIG{INT}  = \&cleanup;
 $SIG{QUIT} = \&cleanup;
 $SIG{ABRT} = \&cleanup;
 $SIG{TERM} = \&cleanup;
@@ -146,9 +130,7 @@ $SIG{KILL} = \&cleanup;
 
 info("stated starting up\n");
 
-#
-# Now, we just poll for events, and watch for 
-#
+# Now, we just poll for events, and watch for timeouts
 my $iterations = 0;
 while (1) {
 	event_poll($handle);
@@ -184,9 +166,7 @@ while (1) {
 	sleep(1);
 }
 
-#
 # Read the current states of nodes from the database
-#
 sub readStates(;@) {
     	my %oldnodes = @_;
 
@@ -474,15 +454,19 @@ sub handleCtrlEvent($$) {
 
     foreach ($event) {
 	/^$TBRESET$/ && do {
-	    system("$osselect -m PXEBOOT $node") and
-		notify("$node/$event: Couldn't clear next_pxe_boot_path\n");
+	    my $cmd = "$osselect -m PXEBOOT $node";
+	    system($cmd) and
+		notify("$node/$event: Couldn't clear next_pxe_boot_path\n".
+		       "\tcmd=$cmd\n\t*** $!\n");
 
 	    my $result = DBQueryFatal("SELECT def_boot_osid FROM nodes ".
 				      "where node_id='$node'");
 	    my ($osid) = $result->fetchrow();
 
-	    system("$osselect $osid $node") and
-		notify("$node/$event: Couldn't clear next_boot_*\n");
+	    $cmd = "$osselect $osid $node";
+	    system($cmd) and
+		notify("$node/$event: Couldn't clear next_boot_*\n".
+		       "\tcmd=$cmd\n\t*** $!\n");
 
 	    info("Performed RESET for $node to $osid\n");
 	    next;
@@ -510,10 +494,10 @@ sub handleCtrlEvent($$) {
 	    }
 	    notify("Node $node has timed out in state $mode/$state".
 		   ($action ne "" ? "\n\tRequested action $action." : "").
-		   "\n");
+		   "\n".`/home/newbold/z/bin/statetime | grep $node`);
 	    next;
 	};
-	notify("Unknown CtrlEvent: $event\n");
+	notify("$node: Unknown CtrlEvent: $event\n");
     }
 }
 
@@ -661,33 +645,64 @@ sub notify($) {
 	} else {
 	    print "notify: Not sending mail in debug mode\n";
 	}
-	info($message);
+	info($message,1);
 }
 
-sub info($) {
+sub info($;$) {
     my $message = shift;
-    # Print out log entries like this:
-    # Sep 20 09:36:00 stated[238]: Reloading state from database
-    print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
-}
-
-#
-# This gets called if we catch a signal (TERM, etc.)
-#
-sub cleanup {
-    info("Signal received, exiting\n");
-    exit(0);
-}
-
-#
-# This gets called if we die of 'natural causes' (exit, die, etc.)
-#
-END {
-    if ($handle) {
-	info("Exiting, cleaning up\n");
-	if (event_unregister($handle) == 0) {
-	    die "Unable to unregister with event system\n";
-	}
+    my $notice = shift || 0;
+    if (!$debug) {
+      # Use syslog
+      my $prio="info";
+      if ($notice) { $prio = "notice"; }
+      syslog($prio,$message);
+    } else {
+      # Print out log entries like this:
+      # Sep 20 09:36:00 stated[238]: Reloading state from database
+      print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
     }
+}
+
+# This gets called if we catch a signal USR1
+sub restart {
+  my $params = join(" ",@args);
+  my $prog = "";
+  # If we're started from an abosolute path, use that.
+  if ($0 =~ /^\//) { $prog = $0; } else { $prog = "$TB/sbin/stated"; }
+  info("SIGUSR1 received, restarting from '$prog".
+       ($params ne "" ? " $params" : "")."'\n");
+  if ($handle && event_unregister($handle) == 0) {
+    warn "Unable to unregister with event system\n";
+  }
+  if (!defined(sigprocmask(SIG_UNBLOCK, POSIX::SigSet->new(SIGUSR1,SIGHUP)))) {
+    notify("sigprocmask: sig unblock failed! $?, $!\n");
+    die("\n");
+  }
+  exec("$prog $params") or 
+    do {
+      my $msg = "Couldn't restart stated! cmd='$prog $params'\n".
+	"Error: ($?) $!\n";
+      notify($msg);
+      die($msg);
+    };
+}
+
+# This gets called if we catch a signal (TERM, etc.)
+sub cleanup {
+  info("Signal received, exiting\n");
+  # now do the normal exit stuff in END {}
+  exit(0);
+}
+
+# This gets called if we die of 'natural causes' (exit, die, etc.)
+END {
+  if ($handle) {
+    info("Exiting, cleaning up\n");
+    if (event_unregister($handle) == 0) {
+      die "Unable to unregister with event system\n";
+    }
+  }
+  # clean up Syslog if we were using it.
+  if (!$debug) { closelog(); }
 }
 
