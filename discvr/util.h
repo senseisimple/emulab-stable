@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.h,v 1.1 2000-07-06 17:42:39 kwright Exp $
+ * $Id: util.h,v 1.2 2000-07-13 19:04:28 kwright Exp $
  */
 
 void 
@@ -34,4 +34,4 @@ void
 print_tdinq(const char *mesg);
 
 void
-print_tdreply(const char *mesg);
+print_tdreply(const char *mesg, size_t nbytes); 

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: packet.h,v 1.1 2000-07-06 17:42:37 kwright Exp $
+ * $Id: packet.h,v 1.2 2000-07-13 19:04:28 kwright Exp $
  */
 
 #ifndef _TOPD_PACKET_H_
@@ -43,6 +43,8 @@
  */
 typedef struct topd_inqid {
         struct timeval     tdi_tv;
+        u_int16_t          tdi_ttl;
+        u_int16_t          tdi_factor;
         u_char             tdi_nodeID[ETHADDRSIZ];
 } topd_inqid_t;
 
@@ -59,8 +61,10 @@ typedef struct topd_inqid {
  * interfaces belonging to the neighbor's parent.
  */
 struct topd_nbor {
-  u_char  tdnbor_route[ETHADDRSIZ];
-  u_char  tdnbor_nbor[ETHADDRSIZ];
+  u_char  tdnbor_pnode[ETHADDRSIZ]; /* path nodeID */
+  u_char  tdnbor_pif[ETHADDRSIZ];   /* path if */
+  u_char  tdnbor_dnode[ETHADDRSIZ]; /* dest nodeID */
+  u_char  tdnbor_dif[ETHADDRSIZ];   /* dest if */
 };
 
 struct topd_nborlist {
