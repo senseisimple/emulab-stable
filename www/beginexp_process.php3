@@ -199,10 +199,9 @@ else {
 $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end, state, shared) ".
+        "expt_head_uid, state, shared) ".
         "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end', ".
-        "'$expt_state', $exp_shared)");
+        "'$exp_name', '$uid', '$expt_state', $exp_shared)");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
@@ -242,9 +241,7 @@ if ($nonsfile) {
              "PID:         $exp_pid\n".
              "Name:        $exp_name\n".
              "Created:     $exp_created\n".
-             "Expires:     $exp_expires\n".
-             "Start:       $exp_start\n".
-             "End:         $exp_end\n",
+             "Expires:     $exp_expires\n",
              "From: $TBMAIL_WWW\n".
 	     "Bcc: $TBMAIL_LOGS\n".
              "Errors-To: $TBMAIL_WWW");

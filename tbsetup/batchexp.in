@@ -185,9 +185,9 @@ $created = `date '+%Y:%m:%d %H:%M:%S'`;
 # is looking for batch experiments to run. Easy race avoidance.
 #
 DBQueryFatal("INSERT INTO batch_experiments ".
-	     "(eid, pid, created, started, expires, ".
+	     "(eid, pid, created, expires, ".
 	     " name, creator_uid, status) ".
-	     "VALUES ('$eid', '$pid', '$created', '$created', '$expires', ".
+	     "VALUES ('$eid', '$pid', '$created', '$expires', ".
 	     "'$longname', '$uid', 'new')");
 
 exit 0;

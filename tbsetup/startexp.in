@@ -266,6 +266,17 @@ $expt_name     = $row[0];
 $expt_created  = $row[1];
 $expt_expires  = $row[2];
 
+#
+# Gen up a date for the started field of the record, and insert it.
+# 
+$expt_started  = `date '+20%y-%m-%d %H:%M:%S'`;
+if ($expt_started =~ /^([-\@\w: ]+)$/) {
+    $expt_started = $1;
+    
+    DBQueryWarn("update experiments set expt_start='$expt_started' ".
+		"WHERE eid='$eid' and pid='$pid'");
+}
+
 print STDOUT "Setup Success\n";
 
 #
@@ -334,6 +345,7 @@ print $MAIL "PID:         $pid\n";
 print $MAIL "Name:        $expt_name\n";
 print $MAIL "Created:     $expt_created\n";
 print $MAIL "Expires:     $expt_expires\n";
+print $MAIL "Started:     $expt_started\n";
 print $MAIL "Directory:   $eiddir\n\n";
 
 if (open(IN, "$repfile")) {

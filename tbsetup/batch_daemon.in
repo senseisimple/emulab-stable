@@ -323,9 +323,9 @@ sub startexp($)
     $query_result =
 	DBQueryFatal("insert into experiments ".
 		     "(eid, pid, expt_created, expt_name, ".
-		     "expt_head_uid, expt_start, state, batchmode) ".
+		     "expt_head_uid, state, batchmode) ".
 		     "VALUES ('$eid', '$pid', '$rightnow', '$longname', ".
-		     "'$creator', '$rightnow', 'new', 1)");
+		     "'$creator', 'new', 1)");
 
     #
     # Try to start the experiment. If it fails, the experiment is gone.

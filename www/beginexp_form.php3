@@ -113,21 +113,8 @@ echo "<tr>
           <td colspan=2>Expiration date:</td>
           <td><input type=\"text\" value=\"$year:$month:$rest\"
                      name=\"exp_expires\"></td>
-     </tr>\n";
-
-echo "<tr>
-          <td colspan=2>Experiment starts:</td>
-          <td><input type=\"text\" value=\"$year:$thismonth:$rest\"
-                     name=\"exp_start\"></td>
 	  <td><input type=\"hidden\" value=\"$year:$thismonth:$rest\"
                      name=\"exp_created\"></td>
-          
-     </tr>\n";
-
-echo "<tr>
-	  <td colspan=2>Experiment ends:</td>
-          <td><input type=\"text\" value=\"$year:$month:$rest\"
-                     name=\"exp_end\"></td>
      </tr>\n";
 
 echo "<tr>

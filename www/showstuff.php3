@@ -273,18 +273,13 @@ function SHOWEXP($pid, $eid) {
           </tr>\n";
 
     echo "<tr>
-            <td>Starts: </td>
-            <td class=\"left\">$exp_start</td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Ends: </td>
-            <td class=\"left\">$exp_end</td>
-          </tr>\n";
-
-    echo "<tr>
             <td>Expires: </td>
             <td class=\"left\">$exp_expires</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Started: </td>
+            <td class=\"left\">$exp_start</td>
           </tr>\n";
 
     echo "<tr>
