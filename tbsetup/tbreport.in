@@ -58,6 +58,9 @@ my %p2osid;
 my %vv2pmap;
 my $hasremote  = 0;
 my $hasplab    = 0;
+my %ipmap;
+my %macmap;
+my %membermap;
 
 getopts('hnmdlevbr',\%opt);
 
@@ -310,21 +313,35 @@ if ($showmap && $state eq EXPTSTATE_ACTIVE) {
 # Links and Lans
 #
 if ($showlinks) {
-    my %ipmap;
-
     $virtnodes_result->dataseek(0);
 
     while (($vname,$ips) = $virtnodes_result->fetchrow_array()) {
 	foreach $ipinfo (split(" ",$ips)) {
 	    ($port,$ip) = split(":",$ipinfo);
 	    $ipmap{"$vname:$port"} = $ip;
+	    $macmap{$ip}->{"MEMBER"} = "$vname:$port";
 	}
     }
 
     my $result =
+	DBQueryFatal("select i.ip,i.mac,i.iface from reserved as r ".
+		     "left join interfaces as i on r.node_id=i.node_id ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      i.ip is not NULL and i.ip!=''");
+
+    while (($ip,$mac,$iface) = $result->fetchrow_array()) {
+	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $mac = "$1:$2:$3:$4:$5:$6";
+	}
+	$macmap{$ip}->{"MAC"}   = $mac;
+	$macmap{$ip}->{"IFACE"} = $iface;
+    }
+
+    $result =
 	DBQueryFatal("select vname,member,mask,delay,bandwidth,lossrate, ".
-		     "rdelay,rbandwidth,rlossrate,protocol ".
-		     "from virt_lans where pid='$pid' and eid='$eid' ".
+		     "       rdelay,rbandwidth,rlossrate,protocol ".
+		     "  from virt_lans as v ".
+		     "where pid='$pid' and eid='$eid' ".
 		     "order by vname,member");
 
     if ($result->numrows) {
@@ -345,6 +362,25 @@ if ($showlinks) {
 	print "\n";
     }
 
+    if ($state eq EXPTSTATE_ACTIVE && $result->numrows) {
+	$result->dataseek(0);
+
+	print  "Physical Lan/Link Mapping:\n";
+	printf "%-15s %-15s %-15s %-20s %-9s\n",
+	       "ID", "Member", "IP", "MAC", "NodeID";
+	print  "--------------- --------------- --------------- ".
+	       "-------------------- ---------\n";
+
+	while (($vname,$member) = $result->fetchrow_array()) {
+	    my ($vname,$port) = split(":", $member);
+	    
+	    printf "%-15s %-15s %-15s %-20s %-9s\n", $vname,
+	           $member, $ipmap{$member}, $macmap{$ipmap{$member}}->{"MAC"},
+	           $v2pmap{$vname}->{PNODE};
+	}
+	print "\n";
+    }
+
     # Queue info.
     $result =
 	DBQueryFatal("select vname,member,q_limit,q_maxthresh,q_minthresh, ".
@@ -355,7 +391,7 @@ if ($showlinks) {
 
     if ($result->numrows) {
 	print  "Virtual Queue Info:\n";
-	printf "%-15s %-15s %-15s %-7s %s\n",
+	printf "%-15s %-15s %-10s %-7s %s\n",
 	       "ID", "Member", "Q Limit", "Type",
 	       "weight/min_th/max_th/linterm";
 	print  "--------------- --------------- ---------- ".
@@ -365,7 +401,7 @@ if ($showlinks) {
 		$q_weight,$q_linterm,$q_qinbytes,$q_red,$q_gentle)
 	       = $result->fetchrow_array()) {
 
-	    printf("%-15s %-15s %-15s %-7s %s\n", $vname, $member,
+	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
 		   $q_limit . ($q_qinbytes ? " bytes" : " slots"),
 		   ($q_red ? ($q_gentle ? "GRED" : "RED") : "Tail"),
 		   ($q_red ? "$q_weight/$q_minthresh/$q_maxthresh/$q_linterm" :
