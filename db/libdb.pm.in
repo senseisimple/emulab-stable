@@ -1389,8 +1389,8 @@ sub DefaultImageID ($) {
     my($nodeid) = @_;
 
     my $query_result =
-	DBQueryFatal("select imageid from node_types as t ".
-		     "left join nodes as n on t.type=n.type ".
+	DBQueryFatal("select imageid from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
     if (! $query_result->num_rows) {
