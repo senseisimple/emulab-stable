@@ -31,10 +31,11 @@ UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 ifeq ($(WITH_NTFS),1)
 CC		= gcc30
 INCS		= -I$(SRCDIR)/ntfs/extra_bsd_includes \
-		  -I$(SRCDIR)/ntfs/linux-ntfs/include \
-		  -Intfs/linux-ntfs -I$(SRCDIR)
+		  -I$(SRCDIR)/liblocale/include \
+		  -Intfs/libntfs/ntfsprogs/include \
+		  -I$(SRCDIR)
 CFLAGS		+= -DWITH_NTFS $(INCS)
-LIBS		+= -Lntfs -lntfs
+LIBS		+= -Lntfs -lntfs -llocale
 NTFSDIR		= ntfs
 endif
 
