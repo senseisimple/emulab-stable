@@ -76,4 +76,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
         Nothing special needs to be done.
 
+1.118: Add nobwshaping slot to the virt_lans table. Set in the front
+       end, used in assign_wrapper.
 
+	alter table virt_lans add nobwshaping tinyint(4) default '0' \
+			after uselinkdelay;
+
+        Nothing special needs to be done.

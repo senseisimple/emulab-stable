@@ -1187,6 +1187,7 @@ CREATE TABLE virt_lans (
   widearea tinyint(4) default '0',
   emulated tinyint(4) default '0',
   uselinkdelay tinyint(4) default '0',
+  nobwshaping tinyint(4) default '0',
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
