@@ -605,7 +605,7 @@ if ($isadmin &&
 }
 
 #
-# Change the plab bit to a simple 1 or 0
+# Set the plab bit seperately since no need to call out to the backend.
 #
 if (isset($formfields[user_interface]) &&
     $formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
@@ -613,6 +613,11 @@ if (isset($formfields[user_interface]) &&
 }
 else {
     $user_interface = TBDB_USER_INTERFACE_EMULAB;
+}
+if ($defaults[user_interface] != $user_interface) {
+    DBQueryFatal("update users set ".
+		 "user_interface='$user_interface' ".
+		 "where uid=\"$target_uid\"");
 }
 
 #
@@ -632,7 +637,6 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     strcmp($defaults[usr_title], $formfields[usr_title]) ||
     strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
     strcmp($defaults[usr_shell], $formfields[usr_shell]) ||
-    strcmp($defaults[user_interface], $formfields[user_interface]) ||
     # Check this too, since we want to call out if the email addr changed.
     strcmp($defaults[usr_email], $formfields[usr_email])) {
 
@@ -649,7 +653,6 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 		 "usr_title=\"$usr_title\",     ".
 		 "usr_affil=\"$usr_affil\",     ".
 		 "usr_shell=\"$usr_shell\",     ".
-		 "user_interface=\"$user_interface\",	".
 		 "usr_modified=now()            ".
 		 "WHERE uid=\"$target_uid\"");
 
