@@ -42,6 +42,7 @@ if (($UID != 0) && (!TBAdmin())) {
 }
 
 #
+# Part 1: Set the node_status.status column for nodes.
 # The idea is simple; any nodes that have not reported in (isalive in
 # tmcd) within the last XX seconds are moved to the down category.
 #
@@ -90,19 +91,6 @@ while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
     }
 
     #
-    # If the plab management sliver hasn't checked in for a couple of
-    # hours, move the pnode to hwdown.
-    #
-    if ($isplab && !$isvirt) {
-        if ($timediff > 7200) {
-            MarkNodeDown($node);
-	    TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
-			      "'Moved to hwdown; ".
-			      "$node has not reported in for a long time.'");
-        }
-    }
-
-    #
     # Repeat the time check to avoid dropping a node that just came up.
     #
     if ($debug) {
@@ -112,4 +100,26 @@ while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
         DBQueryFatal("update node_status set status='$newstatus' ".
 	  	     "where node_id='$node'");
     }
+}
+
+#
+# Part 2: Push nodes into hwdown that have been down for quite a while.
+# For now, we only do this for planetlab physnodes, but we may want to do
+# it for others, too.
+#
+my $timeout = TBGetSiteVar("watchdog/isalive/dead_time") * 60;
+$query_result =
+    DBQueryFatal("SELECT n.node_id from nodes as n " .
+		 "left join node_status as ns on ns.node_id=n.node_id ".
+		 "left join reserved as r on r.node_id=n.node_id " .
+		 "where n.type='pcplabphys' " .
+		 "    and now() - ns.status_timestamp > $timeout " .
+		 "    and !(r.pid='" . NODEDEAD_PID . "' and r.eid='" .
+		      NODEDEAD_EID . "')");
+
+while (my ($node) = $query_result->fetchrow_array) {
+    MarkPhysNodeDown($node);
+    TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
+	"'Moved to hwdown by node_status; ".
+	"$node has not reported in for a long time.'");
 }
