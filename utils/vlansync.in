@@ -23,8 +23,7 @@ if ($args =~ /:-h/) {
       "The -f[orce] option will delete any extra vlans from the switch.\n");
 }
 
-# Keep this disabled until its safe (after merging dbtoir branch)
-#if ($args =~ /:-f/) { $force = 1; }
+if ($args =~ /:-f/) { $force = 1; }
 
 open(DIFF,"vlandiff |");
 
@@ -60,7 +59,7 @@ if ($debug) {
   print "Found extras: @extras\n";
 }
 
-if ($force && $#extras > 0 ) {
+if ($force && @extras > 0 ) {
   print "Removing extra VLANs: @extras\n";
   system("snmpit -r @extras");
 }
