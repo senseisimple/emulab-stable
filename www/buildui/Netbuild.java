@@ -690,8 +690,8 @@ public class Netbuild extends java.applet.Applet
 	dragStarted = false;
 	
 	Dimension d = getSize();
-	appWidth    = d.width; //640;
-	appHeight   = d.height; //480;
+	appWidth    = d.width - 1; //640;
+	appHeight   = d.height - 1; //480;
 
         propAreaWidth = 160;
 	paletteWidth  = 80;
@@ -740,6 +740,7 @@ public class Netbuild extends java.applet.Applet
 		    propAreaX + propAreaWidth, appHeight );
 		   
 	g.setColor( Color.black );
+	g.drawRect( 0, 0, appWidth, appHeight );
 	g.drawRect( 0, 0, paletteWidth, appHeight );
 	g.drawRect( workAreaX, 0, workAreaWidth, appHeight );
 	g.drawRect( propAreaX, 0, 
