@@ -51,6 +51,19 @@ A. Things to understand up front:
      use is implemented as a template I think).  I think I just copied over
      the installed headers from a BSD box.
 
+   - Dhclient.  On FreeBSD and RedHat > 7, this should be standard.
+     (We used to use "pump" for RedHat 7, but we couldn't make it work
+     efficiently for multiple interfaces.  So, we switched to dhclient
+     there as well.)  You will need to grab a RedHat 7 RPM from somewhere,
+     I found one at pbone.net:
+
+       http://rpm.pbone.net/index.php3/stat/4/idpl/1073819/com/dhclient-3.0pl2-1.norlug.i386.rpm.html
+
+     When installing the RPM, you will need to use "--nodeps" to avoid its
+     dependency on some initscripts RPM (those scripts presumably just
+     provide the boot time rc boilerplate to call dhclient, we have our
+     own and don't need it).
+
    - Perl.  On FreeBSD 5, perl is not installed by default.  Make sure you
      have a version of perl5 installed.
 
