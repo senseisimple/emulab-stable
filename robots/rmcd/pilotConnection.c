@@ -266,7 +266,8 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	int lpc;
 
 	if (debug) {
-	    info("debug: plotting waypoint for %s\n",
+	    info("debug: plotting waypoint %d for %s\n",
+		 pc->pc_waypoint_tries,
 		 pc->pc_robot->hostname);
 	}
 	
@@ -305,8 +306,9 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		pc->pc_obstacle_count = 0;
 	    }
 	    else if ((rc_clip_line(&rl, oc) == 0) ||
-		     (hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1) < 0.20) ||
-		     ((oc->id == -1000) && (pc->pc_waypoint_tries > 20))) {
+		     (hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1) < 0.20) ) {
+		     //((oc->id == -1000))) {
+		     //((oc->id == -1000) && (pc->pc_waypoint_tries > 20))) {
 		
 		if (debug) {
 		    info("debug: %s cleared obstacle\n",
@@ -319,6 +321,15 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		pc->pc_obstacle_count -= 1;
 		lpc -= 1;
 		pc->pc_waypoint_tries = 0;
+	    }
+	    else if (pc->pc_waypoint_tries > 20) {
+		if (debug) {
+		    info("debug: %s could not clear obstacle; taking "
+			 "timestamp.\n",
+			 pc->pc_robot->hostname
+			 );
+		}
+		gettimeofday(&(pc->pc_waypoint_timestamp),NULL);
 	    }
 	    else {
 		float bearing;
@@ -531,7 +542,8 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	}
     }
 
-    if (!(pc->pc_flags & PCF_WAYPOINT)) {
+    /* XXX: not sure about the added condition... */
+    if (!(pc->pc_flags & PCF_WAYPOINT) && pc->pc_waypoint_tries <= 20) {
 	float distance, theta;
 
 	mtp_polar(&pc->pc_actual_pos, &pc->pc_goal_pos, &distance, &theta);
@@ -651,51 +663,76 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	}
 	else if (pc->pc_flags & PCF_VISION_POSITION) {
 	    pc_plot_waypoint(pc);
-	    
-	    if (!(pc->pc_flags & PCF_WAYPOINT))
-		pc->pc_tries_remaining -= 1;
-	    
-	    if (!(pc->pc_flags & PCF_WAYPOINT) &&
-		((pc->pc_tries_remaining <= 0) ||
-		 (cmp_pos(&pc->pc_actual_pos, &pc->pc_goal_pos)))) {
-		struct robot_position rp;
+
+	    /* this condition true means that pc_plot_waypoint could 
+	     * not return with a valid waypoint because we've exceeded
+	     * the number of possible waypoint tries
+	     */
+	    if (!(pc->pc_flags & PCF_WAYPOINT) && 
+		pc->pc_waypoint_tries > 20
+		) {
+		/*
+		 * we need to let this guy sleep for 10s, then try him again
+		 */
+
+		/* then when the timeout expires, change state to PS_ARRIVED,
+		 * and let the cycles continue...
+		 */
+
+		info("waypoint_tries exceeded for robot %d; letting him rest"
+		     " for a bit...\n",
+		     pc->pc_robot->id
+		     );
 		
-		ps = PS_REFINING_ORIENTATION;
-		
-		memset(&rp, 0, sizeof(rp));
-		rp.theta = pc->pc_goal_pos.theta - pc->pc_actual_pos.theta;
-		mtp_init_packet(&pmp,
-				MA_Opcode, MTP_COMMAND_GOTO,
-				MA_Role, MTP_ROLE_RMC,
-				MA_Position, &rp,
-				MA_RobotID, pc->pc_robot->id,
-				MA_CommandID, 1,
-				MA_TAG_DONE);
-		send_pmp = 1;
 	    }
 	    else {
-		struct robot_position rp_rel;
+	    
+		if (!(pc->pc_flags & PCF_WAYPOINT))
+		    pc->pc_tries_remaining -= 1;
 		
-		/* Not there yet, contiue refining. */
-		pc->pc_last_pos = pc->pc_actual_pos;
-		conv_a2r(&rp_rel,
-			 &pc->pc_actual_pos,
-			 (pc->pc_flags & PCF_WAYPOINT) ?
-			 &pc->pc_waypoint :
-			 &pc->pc_goal_pos);
-		mtp_init_packet(&pmp,
-				MA_Opcode, MTP_COMMAND_GOTO,
-				MA_Role, MTP_ROLE_RMC,
-				MA_RobotID, pc->pc_robot->id,
-				MA_CommandID, 1,
-				MA_Position, &rp_rel,
-				MA_TAG_DONE);
-		send_pmp = 1;
+		if (!(pc->pc_flags & PCF_WAYPOINT) &&
+		    ((pc->pc_tries_remaining <= 0) ||
+		     (cmp_pos(&pc->pc_actual_pos, &pc->pc_goal_pos)))) {
+		    struct robot_position rp;
+		    
+		    ps = PS_REFINING_ORIENTATION;
+		    
+		    memset(&rp, 0, sizeof(rp));
+		    rp.theta = pc->pc_goal_pos.theta - pc->pc_actual_pos.theta;
+		    mtp_init_packet(&pmp,
+				    MA_Opcode, MTP_COMMAND_GOTO,
+				    MA_Role, MTP_ROLE_RMC,
+				    MA_Position, &rp,
+				    MA_RobotID, pc->pc_robot->id,
+				    MA_CommandID, 1,
+				    MA_TAG_DONE);
+		    send_pmp = 1;
+		}
+		else {
+		    struct robot_position rp_rel;
+		    
+		    /* Not there yet, contiue refining. */
+		    pc->pc_last_pos = pc->pc_actual_pos;
+		    conv_a2r(&rp_rel,
+			     &pc->pc_actual_pos,
+			     (pc->pc_flags & PCF_WAYPOINT) ?
+			     &pc->pc_waypoint :
+			     &pc->pc_goal_pos);
+		    mtp_init_packet(&pmp,
+				    MA_Opcode, MTP_COMMAND_GOTO,
+				    MA_Role, MTP_ROLE_RMC,
+				    MA_RobotID, pc->pc_robot->id,
+				    MA_CommandID, 1,
+				    MA_Position, &rp_rel,
+				    MA_TAG_DONE);
+		    send_pmp = 1;
+		}
 	    }
 	}
 	break;
 	
     case PS_ARRIVED:
+	info ("case arrived...\n");
 	mtp_init_packet(&mp,
 			MA_Opcode, MTP_UPDATE_POSITION,
 			MA_Role, MTP_ROLE_RMC,
@@ -892,6 +929,8 @@ static void pc_handle_update(struct pilot_connection *pc,
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 
 	switch (pc->pc_state) {
+	    //	    /* XXX: is this right? */
+	    //	case PS_ARRIVED:
 	case PS_PENDING_POSITION:
 	case PS_REFINING_POSITION:
 	    if (mup->command_id == 1)
@@ -1079,8 +1118,38 @@ void pc_handle_signal(fd_set *rready, fd_set *wready)
 
 void pc_handle_timeout(struct timeval *current_time)
 {
+    int lpc;
+    struct pilot_connection *pc;
+
     assert(current_time != NULL);
 
+    /*
+     * We go through all the pilot connections, checking to see whose 
+     * pc_waypoint_tries have exceeded the threshold; then we check those
+     * pilot connections' timestamps; if any have exceeded, we want to allow
+     * them to continue trying to reach the waypoint.
+     */
+    
+    for (lpc = 0; lpc < pc_data.pcd_connection_count; lpc++) {
+	pc = &(pc_data.pcd_connections[lpc]);
+	
+	if (pc->pc_waypoint_tries > 20) {
+	    info("checking timestamp for stopped robot %d\n",
+		 pc->pc_robot->id
+		 );
+	    if ((current_time->tv_sec - pc->pc_waypoint_timestamp.tv_sec) > 
+		10
+		) {
+		pc->pc_waypoint_tries = 0;
+
+		pc_change_state(pc,PS_PENDING_POSITION);
+		info("changed state for stopped robot %d to PS_ARRIVED\n",
+		     pc->pc_robot->id
+		     );
+		
+	    }
+	}
+    }
     
 }
 

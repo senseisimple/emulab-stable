@@ -52,6 +52,7 @@ struct pilot_connection {
     struct obstacle_config pc_obstacles[32];
     unsigned int pc_obstacle_count;
     unsigned int pc_waypoint_tries;
+    struct timeval pc_waypoint_timestamp;
 };
 
 #define REL2ABS(_dst, _theta, _rpoint, _apoint) { \
