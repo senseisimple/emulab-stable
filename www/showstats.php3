@@ -27,40 +27,46 @@ if (! $isadmin) {
 }
 
 echo "Show <a class='static' href='showexpstats.php3'>
-              Experiment Stats</a><br>\n";
+              Experiment Stats</a><br><br>\n";
 
 #
 # Right now we show just the last 200 records entered. 
 #
 $query_result =
-    DBQueryFatal("select * from testbed_stats order by idx desc limit 200");
+    DBQueryFatal("select t.*,e.* from testbed_stats as t ".
+		 "left join experiment_stats as e on e.idx=t.exptidx ".
+		 "order by t.idx desc limit 200");
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No testbed stats records in the system!", 1);
 }
 
-#
-# Use first row to get the column headers (no pretty printing yet).
-# 
-$row = mysql_fetch_assoc($query_result);
-
-echo "<table align=center border=1>\n";
-echo "<tr>\n";
-foreach($row as $key => $value) {
-    $key = str_replace("_", " ", $key);
-    
-    echo "<th><font size=-1>$key</font></th>\n";
-}
-echo "</tr>\n";
-
-mysql_data_seek($query_result, 0);
+echo "<table align=center border=1>
+      <tr>
+        <th>IDX</th>
+        <th>Pid</th>
+        <th>Eid</th>
+        <th>Time</th>
+        <th>Action</th>
+        <th>ExitCode</th>
+      </tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    echo "<tr>\n";
-    foreach($row as $key => $value) {
-	echo "<td nowrap>$value</td>\n";
-    }
-    echo "</tr>\n";
+    $idx     = $row[idx];
+    $pid     = $row[pid];
+    $eid     = $row[eid];
+    $when    = $row[tstamp];
+    $action  = $row[action];
+    $ecode   = $row[exitcode];
+	
+    echo "<tr>
+            <td><a href=showexpstats.php3?record=$idx>$idx</a></td>
+            <td>$pid</td>
+            <td>$eid</td>
+            <td>$when</td>
+            <td>$action</td>
+            <td>$ecode</td>
+          </tr>\n";
 }
 echo "</table>\n";
 

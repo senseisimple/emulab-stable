@@ -27,13 +27,26 @@ if (! $isadmin) {
 }
 
 #
-# Right now we show just the last 50 records entered. 
+# Right now we show just the last N records entered, unless the user
+# requested a specific record. 
 #
-$query_result =
-    DBQueryFatal("select * from experiment_stats order by idx desc limit 100");
+if (isset($record) && strcmp($record, "")) {
+    $query_result =
+	DBQueryFatal("select * from experiment_stats ".
+		     "where idx=$record");
 
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("No experiment records in the system!", 1);
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("No such experiment record $record in the system!", 1);
+    }
+}
+else {
+    $query_result =
+	DBQueryFatal("select * from experiment_stats ".
+		     "order by idx desc limit 100");
+
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("No experiment records in the system!", 1);
+    }
 }
 
 #
