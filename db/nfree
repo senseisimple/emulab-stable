@@ -91,18 +91,21 @@ foreach my $n (@node_names) {
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++);
   }
-  
-  # Find the control net interface for this node type
-  $sth = $dbh->query("select control_net from node_types as t left join ".
-		     "nodes  as n on n.type=t.type where node_id='$n'");
-  my @row= $sth->fetchrow_array();
-  my $control= $row[0];
-  # Clean out all IPs except the control net
-  $cmd = "update interfaces set IP='' where node_id='$n' and card!='$control'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
-  
+
+  if (! ($n =~ /^tbsh/)) { #If its not a shark
+    # Find the control net interface for this node type
+    $sth = $dbh->query("select control_net from node_types as t left join ".
+		       "nodes  as n on n.type=t.type where node_id='$n'");
+    my @row= $sth->fetchrow_array();
+    my $control= $row[0];
+    # Clean out all IPs except the control net
+    $cmd = 
+      "update interfaces set IP='' where node_id='$n' and card!='$control'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++);
+  }
+
 }
 
 foreach $reload ( keys(%reloads)) {
