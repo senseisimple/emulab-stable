@@ -1,0 +1,104 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+EVENTSYS	= @EVENTSYS@
+OBJDIR		= ..
+SUBDIR		= ssl
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+#
+# The openssl config file.
+#
+SSLCONF		= $(SRCDIR)/openssl.cnf
+
+#
+# You do not want to run these targets unless you are sure you
+# know what you are doing! You really do not want to install these
+# unless you are very sure you know what you are doing. You could
+# mess up all the clients when the CA changes out from under them.
+#
+pems:	emulab.pem server.pem client.pem
+
+emulab.pem:	dirsmade $(SSLCONF)
+	#
+	# Create the Certificate Authority.
+	# The certificate (no key!) is installed on both boss and remote nodes.
+	#
+	openssl req -new -x509 -config $(SSLCONF) \
+		    -keyout cakey.pem -out cacert.pem
+	cp cacert.pem emulab.pem
+
+server.pem:	dirsmade $(SSLCONF)
+	#
+	# Create the server side private key and certificate request.
+	#
+	openssl req -new -config $(SSLCONF) \
+		-keyout servkey.pem -out servreq.pem
+	#
+	# Combine key and cert request.
+	#
+	cat servkey.pem servreq.pem > newreq.pem
+	#
+	# Sign the server cert request, creating a server certificate.
+	#
+	openssl ca -policy policy_anything -config $(SSLCONF) \
+		-out servcert.pem \
+		-cert cacert.pem -keyfile cakey.pem \
+		-infiles newreq.pem
+	#
+	# Combine the key and the certificate into one file which is installed
+	# on boss and used by tmcd.
+	#
+	cat servkey.pem servcert.pem > server.pem
+	rm -f newreq.pem
+
+client.pem:	dirsmade $(SSLCONF)
+	#
+	# Create a client side private key and certificate request.
+	#
+	openssl req -new -config $(SSLCONF) \
+		-keyout clientkey.pem -out clientreq.pem 
+	#
+	# Sign the client cert request, creating a client certificate.
+	#
+	openssl ca -policy policy_anything -config $(SSLCONF) \
+		-out clientcert.pem \
+	        -cert cacert.pem -keyfile cakey.pem \
+		-infiles clientreq.pem
+	#
+	# Combine the key and the certificate into one file which is installed
+	# on each remote node and used by tmcc. Installed on boss too so
+	# we can test tmcc there.
+	#
+	cat clientkey.pem clientcert.pem > client.pem
+
+dirsmade:
+	-mkdir -p certs
+	-mkdir -p newcerts
+	-mkdir -p crl
+	echo "01" > serial
+	touch index.txt
+	touch dirsmade
+
+#
+# You do not want to run these targets unless you are sure you
+# know what you are doing!
+# 
+boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/server.pem \
+		$(INSTALL_ETCDIR)/client.pem
+
+client-install:	$(INSTALL_ETCDIR)/client.pem
+
+clean:
+	rm -f *.pem serial index.txt *.old dirsmade
+	rm -rf certs crl
+
+

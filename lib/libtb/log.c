@@ -95,6 +95,19 @@ error(const char *fmt, ...)
 }
 
 void
+errorc(const char *fmt, ...)
+{
+	va_list args;
+	char	buf[BUFSIZ];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	error("%s : %s\n", buf, strerror(errno));
+}
+
+void
 fatal(const char *fmt, ...)
 {
 	va_list args;
@@ -122,7 +135,7 @@ pwarning(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 
-	warning("%s : %s", buf, strerror(errno));
+	warning("%s : %s\n", buf, strerror(errno));
 }
 
 void

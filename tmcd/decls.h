@@ -3,7 +3,7 @@
  */
 
 #define TBSERVER_PORT	7777
-#define MYBUFSIZE	1024
+#define MYBUFSIZE	2048
 
 /*
  * As the tmcd changes, incompatable changes with older version of

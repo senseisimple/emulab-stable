@@ -13,24 +13,32 @@ all:	tmcd tmcc tmcd.restart findif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	+= -O -g -Wall -DUDP -I${OBJDIR} -I/usr/local/include
+CFLAGS	+= -O -g -Wall -DUDP \
+		-I${OBJDIR} -I/usr/local/include -I${TESTBED_SRCDIR}/lib/libtb
+TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
+
+#
+# For SSL enabled tmcd/tmcc
+#
+#CFLAGS += -DWITHSSL -DETCDIR='"$(INSTALL_ETCDIR)"'
+#TMLIBS	+= -lssl -lcrypto
+#SSLOBJ  = ssl.o
 
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS = `elvin-config --cflags vin4c` \
 		     -I$(TESTBED_SRCDIR)/event/lib -DEVENTSYS
-	TMCDLIBS    = ${OBJDIR}/event/lib/libevent.a \
-                          ${OBJDIR}/lib/libtb/libtb.a
+	TMCDLIBS    = ${OBJDIR}/event/lib/libevent.a
 	ELVINFLAGS = `elvin-config --libs vin4c`
 endif
 
-
-tmcd: tmcd.c ${TMCDLIBS} decls.h version.o
+tmcd: tmcd.c ${TMCDLIBS} decls.h version.o $(SSLOBJ)
 	$(CC) $(CFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		version.o $(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
-		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS)
+		version.o $(SSLOBJ) \
+		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
+		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS) $(TMLIBS) 
 
-tmcc: tmcc.o
-	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(LFLAGS) -static
+tmcc: tmcc.o $(SSLOBJ)
+	$(CC) $(CFLAGS) -g -o tmcc tmcc.o $(SSLOBJ) $(LFLAGS) -static $(TMLIBS)
 
 findif: findif.o
 	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static

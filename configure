@@ -1179,6 +1179,7 @@ esac
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
+	ssl/GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \

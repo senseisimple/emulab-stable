@@ -16,6 +16,8 @@
 #include <mysql/mysql.h>
 #include "decls.h"
 #include "config.h"
+#include "ssl.h"
+#include "log.h"
 
 #ifdef EVENTSYS
 #include "event.h"
@@ -197,12 +199,21 @@ main(int argc, char **argv)
 	if (maxchildren < MINCHILDREN || maxchildren > MAXCHILDREN)
 		usage();
 
-	openlog("tmcd", LOG_PID, LOG_USER);
-	syslog(LOG_NOTICE, "daemon starting (version %d)", CURRENT_VERSION);
-	syslog(LOG_NOTICE, "%s", build_info);
-
-	if (! debug)
-		(void)daemon(0, 0);
+#ifdef  WITHSSL
+	if (tmcd_server_sslinit()) {
+		error("SSL init failed!\n");
+		exit(1);
+	}
+#endif
+	if (debug) 
+		loginit(0, 0);
+	else {
+		/* Become a daemon */
+		daemon(0, 0);
+		loginit(1, "tmcd");
+	}
+	info("daemon starting (version %d)\n", CURRENT_VERSION);
+	info("%s\n", build_info);
 
 	/*
 	 * Setup TCP socket for incoming connections.
@@ -211,35 +222,31 @@ main(int argc, char **argv)
 	/* Create socket from which to read. */
 	tcpsock = socket(AF_INET, SOCK_STREAM, 0);
 	if (tcpsock < 0) {
-		syslog(LOG_ERR, "opening stream socket: %m");
-		exit(1);
+		pfatal("opening stream socket");
 	}
 
 	i = 1;
 	if (setsockopt(tcpsock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
-		syslog(LOG_ERR, "control setsockopt: %m");;
+		pwarning("setsockopt(SO_REUSEADDR)");;
 	
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
 	name.sin_port = htons((u_short) portnum);
 	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
-		syslog(LOG_ERR, "binding stream socket: %m");
-		exit(1);
+		pfatal("binding stream socket");
 	}
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
 	if (getsockname(tcpsock, (struct sockaddr *) &name, &length)) {
-		syslog(LOG_ERR, "getting socket name: %m");
-		exit(1);
+		pfatal("getsockname");
 	}
 	if (listen(tcpsock, 20) < 0) {
-		syslog(LOG_ERR, "listening on socket: %m");
-		exit(1);
+		pfatal("listen");
 	}
-	syslog(LOG_NOTICE, "listening on TCP port %d", ntohs(name.sin_port));
-
+	info("listening on TCP port %d\n", ntohs(name.sin_port));
+	
 	/*
 	 * Setup UDP socket
 	 */
@@ -247,31 +254,28 @@ main(int argc, char **argv)
 	/* Create socket from which to read. */
 	udpsock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udpsock < 0) {
-		syslog(LOG_ERR, "opening dgram socket: %m");
-		exit(1);
+		pfatal("opening dgram socket");
 	}
 
 	i = 1;
 	if (setsockopt(udpsock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
-		syslog(LOG_ERR, "control setsockopt: %m");;
+		pwarning("setsockopt(SO_REUSEADDR)");;
 	
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
 	name.sin_port = htons((u_short) portnum);
 	if (bind(udpsock, (struct sockaddr *) &name, sizeof(name))) {
-		syslog(LOG_ERR, "binding stream socket: %m");
-		exit(1);
+		pfatal("binding dgram socket");
 	}
 
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
 	if (getsockname(udpsock, (struct sockaddr *) &name, &length)) {
-		syslog(LOG_ERR, "getting socket name: %m");
-		exit(1);
+		pfatal("getsockname");
 	}
-	syslog(LOG_NOTICE, "listening on UDP port %d", ntohs(name.sin_port));
+	info("listening on UDP port %d\n", ntohs(name.sin_port));
 
 	signal(SIGTERM, cleanup);
 	signal(SIGINT, cleanup);
@@ -295,7 +299,7 @@ main(int argc, char **argv)
 		while (!killme && numchildren < maxchildren) {
 			int doudp = (udpchild ? 0 : 1);
 			if ((pid = fork()) < 0) {
-				syslog(LOG_ERR, "forking server: %m");
+				errorc("forking server");
 				goto done;
 			}
 			if (pid) {
@@ -321,11 +325,10 @@ main(int argc, char **argv)
 		 */
 		pid = waitpid(-1, &status, 0);
 		if (pid < 0) {
-			syslog(LOG_ERR, "waitpid failed: %m");
+			errorc("waitpid failed");
 			continue;
 		}
-		syslog(LOG_ERR, "server %d exited with status 0x%x!",
-		       pid, status);
+		error("server %d exited with status 0x%x!\n", pid, status);
 		numchildren--;
 		if (pid == udpchild)
 			udpchild = 0;
@@ -333,9 +336,9 @@ main(int argc, char **argv)
 			break;
 	}
  done:
-	close(tcpsock);
+	CLOSE(tcpsock);
 	close(udpsock);
-	syslog(LOG_NOTICE, "daemon terminating");
+	info("daemon terminating\n");
 	exit(0);
 }
 
@@ -350,7 +353,7 @@ udpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc;
 	
-	syslog(LOG_INFO, "udpserver starting");
+	info("udpserver starting\n");
 
 	/*
 	 * Wait for udp connections.
@@ -361,8 +364,8 @@ udpserver(int sock)
 			      0, (struct sockaddr *)&client, &length);
 		if (cc <= 0) {
 			if (cc < 0)
-				syslog(LOG_ERR, "Reading request: %m");
-			syslog(LOG_ERR, "Connection aborted");
+				errorc("Reading UDP request");
+			error("UDP Connection aborted\n");
 			continue;
 		}
 		buf[cc] = '\0';
@@ -382,32 +385,32 @@ tcpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
 	
-	syslog(LOG_INFO, "tcpserver starting");
+	info("tcpserver starting\n");
 
 	/*
 	 * Wait for TCP connections.
 	 */
 	while (1) {
 		length  = sizeof(client);
-		newsock = accept(sock, (struct sockaddr *)&client, &length);
+		newsock = ACCEPT(sock, (struct sockaddr *)&client, &length);
 		if (newsock < 0) {
-			syslog(LOG_ERR, "accepting connection: %m");
+			errorc("accepting TCP connection");
 			continue;
 		}
 
 		/*
 		 * Read in the command request.
 		 */
-		if ((cc = read(newsock, buf, MYBUFSIZE - 1)) <= 0) {
+		if ((cc = READ(newsock, buf, MYBUFSIZE - 1)) <= 0) {
 			if (cc < 0)
-				syslog(LOG_ERR, "Reading request: %m");
-			syslog(LOG_ERR, "Connection aborted");
-			close(newsock);
+				errorc("Reading TCP request");
+			error("TCP connection aborted\n");
+			CLOSE(newsock);
 			continue;
 		}
 		buf[cc] = '\0';
 		handle_request(newsock, &client, buf, 1);
-		close(newsock);
+		CLOSE(newsock);
 	}
 	exit(1);
 }
@@ -469,7 +472,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
 		strcpy(buf2, inet_ntoa(client->sin_addr));
 			
-		syslog(LOG_INFO, "%s INVALID REDIRECT: %s", buf1, buf2);
+		info("%s INVALID REDIRECT: %s\n", buf1, buf2);
 		goto skipit;
 	}
 #endif
@@ -499,8 +502,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * And execute it.
 	 */
 	if (i == numcommands) {
-		syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
-		       inet_ntoa(client->sin_addr), bp);
+		info("%s INVALID REQUEST: %.8s\n",
+		     inet_ntoa(client->sin_addr), bp);
 		goto skipit;
 	}
 	else {
@@ -511,19 +514,19 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * both for privacy and to keep our syslog smaller.
 		 */
 		if (command_array[i].func == dolog)
-			syslog(LOG_INFO, "%s log %d chars",
-			       inet_ntoa(client->sin_addr), strlen(bp));
+			info("%s log %d chars\n",
+			     inet_ntoa(client->sin_addr), strlen(bp));
 		else
-			syslog(LOG_INFO, "%s vers:%d %s",
-			       inet_ntoa(client->sin_addr),
-			       version, command_array[i].cmdname);
+			info("%s vers:%d %s\n",
+			     inet_ntoa(client->sin_addr),
+			     version, command_array[i].cmdname);
 
 		err = command_array[i].func(sock, client->sin_addr,
 					    bp, istcp, version);
 
-		syslog(LOG_INFO, "%s %s: returned %d",
-		       inet_ntoa(client->sin_addr),
-		       command_array[i].cmdname, err);
+		info("%s %s: returned %d\n",
+		     inet_ntoa(client->sin_addr),
+		     command_array[i].cmdname, err);
 	}
 
  skipit:
@@ -545,11 +548,11 @@ COMMAND_PROTOTYPE(doreboot)
 	char		gid[64];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "REBOOT: %s: No such node", inet_ntoa(ipaddr));
+		error("REBOOT: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
-	syslog(LOG_INFO, "REBOOT: %s is reporting a reboot", nodeid);
+	info("REBOOT: %s is reporting a reboot\n", nodeid);
 
 	/*
 	 * Clear the current_reloads for this node, in case it just finished
@@ -559,11 +562,11 @@ COMMAND_PROTOTYPE(doreboot)
 	 * if there is no entry for this node) or to check first, which
 	 * might waste time?
 	 */
-	syslog(LOG_INFO, "doreload: %s: Clearing current_reloads", nodeid);
+	info("doreload: %s: Clearing current_reloads\n", nodeid);
 	if (mydb_update("delete from current_reloads where node_id='%s'",
 		        nodeid)) {
-	    syslog(LOG_ERR, "doreload: %s: DB Error clearing current_reloads!",
-		    nodeid);
+	    error("doreload: %s: DB Error clearing current_reloads!\n",
+		  nodeid);
 	    return 1;
 	}
 
@@ -574,12 +577,11 @@ COMMAND_PROTOTYPE(doreboot)
 	 * the node is released.
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "REBOOT: %s: Node is free", nodeid);
+		info("REBOOT: %s: Node is free\n", nodeid);
 		return 0;
 	}
 
-	syslog(LOG_INFO, "REBOOT: %s: Node is in experiment %s/%s",
-	       nodeid, pid, eid);
+	info("REBOOT: %s: Node is in experiment %s/%s\n", nodeid, pid, eid);
 
 	/*
 	 * XXX This must match the reservation made in sched_reload
@@ -597,8 +599,7 @@ COMMAND_PROTOTYPE(doreboot)
 	res = mydb_query("select node_id from scheduled_reloads where node_id='%s'",
 			 1, nodeid);
 	if (!res) {
-		syslog(LOG_ERR, "REBOOT: %s: DB Error getting reload!",
-		       nodeid);
+		error("REBOOT: %s: DB Error getting reload!\n", nodeid);
 		return 1;
 	}
 	if ((int)mysql_num_rows(res) == 0) {
@@ -608,18 +609,16 @@ COMMAND_PROTOTYPE(doreboot)
 	mysql_free_result(res);
 
 	if (mydb_update("delete from scheduled_reloads where node_id='%s'", nodeid)) {
-		syslog(LOG_ERR, "REBOOT: %s: DB Error clearing reload!",
-		       nodeid);
+		error("REBOOT: %s: DB Error clearing reload!\n", nodeid);
 		return 1;
 	}
-	syslog(LOG_INFO, "REBOOT: %s cleared reload state", nodeid);
+	info("REBOOT: %s cleared reload state\n", nodeid);
 
 	if (mydb_update("delete from reserved where node_id='%s'", nodeid)) {
-		syslog(LOG_ERR, "REBOOT: %s: DB Error clearing reload!",
-		       nodeid);
+		error("REBOOT: %s: DB Error clearing reload!\n", nodeid);
 		return 1;
 	}
-	syslog(LOG_INFO, "REBOOT: %s cleared reserved state", nodeid);
+	info("REBOOT: %s cleared reserved state\n", nodeid);
 
 	return 0;
 }
@@ -637,7 +636,7 @@ COMMAND_PROTOTYPE(dostatus)
 	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "STATUS: %s: No such node", inet_ntoa(ipaddr));
+		error("STATUS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -645,7 +644,7 @@ COMMAND_PROTOTYPE(dostatus)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "STATUS: %s: Node is free", nodeid);
+		info("STATUS: %s: Node is free\n", nodeid);
 		strcpy(buf, "FREE\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		return 0;
@@ -660,7 +659,7 @@ COMMAND_PROTOTYPE(dostatus)
 	sprintf(buf, "ALLOCATED=%s/%s NICKNAME=%s\n", pid, eid, nickname);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
-	syslog(LOG_INFO, "STATUS: %s: %s", nodeid, buf);
+	info("STATUS: %s: %s", nodeid, buf);
 	return 0;
 }
 
@@ -679,8 +678,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	int		control_net, nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "IFCONFIG: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("IFCONFIG: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -688,7 +686,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "IFCONFIG: %s: Node is free", nodeid);
+		info("IFCONFIG: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -697,7 +695,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * we don't want to mess with that.
 	 */
 	if (nodeidtocontrolnet(nodeid, &control_net)) {
-		syslog(LOG_ERR, "IFCONFIG: %s: No Control Network", nodeid);
+		error("IFCONFIG: %s: No Control Network\n", nodeid);
 		return 1;
 	}
 
@@ -708,13 +706,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "from interfaces where node_id='%s'",
 			 6, nodeid);
 	if (!res) {
-		syslog(LOG_ERR, "IFCONFIG: %s: DB Error getting interfaces!",
-		       nodeid);
+		error("IFCONFIG: %s: DB Error getting interfaces!\n", nodeid);
 		return 1;
 	}
 
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		syslog(LOG_ERR, "IFCONFIG: %s: No interfaces!", nodeid);
+		error("IFCONFIG: %s: No interfaces!\n", nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
@@ -774,7 +771,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
-			syslog(LOG_INFO, "IFCONFIG: %s", buf);
+			info("IFCONFIG: %s\n", buf);
 		}
 	skipit:
 		nrows--;
@@ -800,8 +797,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	int		shared = 0, tbadmin;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("ACCOUNTS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -809,7 +805,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: Node is free", nodeid);
+		error("ACCOUNTS: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -834,12 +830,12 @@ COMMAND_PROTOTYPE(doaccounts)
 			 2, pid, pid, eid);
 #endif
 	if (!res) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting gids!", pid);
+		error("ACCOUNTS: %s: DB Error getting gids!\n", pid);
 		return 1;
 	}
 
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: No Project!", pid);
+		error("ACCOUNTS: %s: No Project!\n", pid);
 		mysql_free_result(res);
 		return 1;
 	}
@@ -847,7 +843,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		if (!row[1] || !row[1][1]) {
-			syslog(LOG_ERR, "ACCOUNTS: %s: No Project GID!", pid);
+			error("ACCOUNTS: %s: No Project GID!\n", pid);
 			mysql_free_result(res);
 			return 1;
 		}
@@ -855,7 +851,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		gidint = atoi(row[1]);
 		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "ACCOUNTS: %s", buf);
+		info("ACCOUNTS: %s\n", buf);
 
 		nrows--;
 	}
@@ -884,12 +880,12 @@ COMMAND_PROTOTYPE(doaccounts)
 			 1, pid, eid);
 	
 	if (!res) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting shared!", pid);
+		error("ACCOUNTS: %s: DB Error getting shared!\n", pid);
 		return 1;
 	}
 
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: No Experiment %s!", pid, eid);
+		error("ACCOUNTS: %s: No Experiment %s!\n", pid, eid);
 		mysql_free_result(res);
 		return 0;
 	}
@@ -933,12 +929,12 @@ COMMAND_PROTOTYPE(doaccounts)
 	}
 #endif
 	if (!res) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting users!", pid);
+		error("ACCOUNTS: %s: DB Error getting users!\n", pid);
 		return 1;
 	}
 
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		syslog(LOG_ERR, "ACCOUNTS: %s: No Users!", pid);
+		error("ACCOUNTS: %s: No Users!\n", pid);
 		mysql_free_result(res);
 		return 0;
 	}
@@ -1047,10 +1043,10 @@ COMMAND_PROTOTYPE(doaccounts)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 
-		syslog(LOG_INFO, "ACCOUNTS: "
-			"ADDUSER LOGIN=%s "
-			"UID=%s GID=%d ROOT=%d GLIST=%s",
-			row[0], row[2], gidint, root, glist);
+		info("ACCOUNTS: "
+		     "ADDUSER LOGIN=%s "
+		     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
+		     row[0], row[2], gidint, root, glist);
 		row = nextrow;
 	}
 	mysql_free_result(res);
@@ -1073,8 +1069,7 @@ COMMAND_PROTOTYPE(dodelay)
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "DELAY: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("DELAY: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1107,8 +1102,7 @@ COMMAND_PROTOTYPE(dodelay)
 		 " where d.node_id='%s'",	 
 		 37, nodeid);
 	if (!res) {
-		syslog(LOG_ERR, "DELAY: %s: DB Error getting delays!",
-		       nodeid);
+		error("DELAY: %s: DB Error getting delays!\n", nodeid);
 		return 1;
 	}
 
@@ -1124,8 +1118,7 @@ COMMAND_PROTOTYPE(dodelay)
 		 * some bogus values in the DB.
 		 */
 		if (!row[0] || !row[1] || !row[2] || !row[3]) {
-			syslog(LOG_ERR, "DELAY: %s: DB values are bogus!",
-			       nodeid);
+			error("DELAY: %s: DB values are bogus!\n", nodeid);
 			mysql_free_result(res);
 			return 1;
 		}
@@ -1159,7 +1152,7 @@ COMMAND_PROTOTYPE(dodelay)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
-		syslog(LOG_INFO, "DELAY: %s", buf);
+		info("DELAY: %s\n", buf);
 	}
 	mysql_free_result(res);
 
@@ -1201,8 +1194,7 @@ COMMAND_PROTOTYPE(dohosts)
 	} *hosts = 0, *host;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "HOSTNAMES: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("HOSTNAMES: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1225,8 +1217,7 @@ COMMAND_PROTOTYPE(dohosts)
 			 3, pid, eid);
 
 	if (!res) {
-		syslog(LOG_ERR, "HOSTNAMES: %s: DB Error getting virt_nodes!",
-		       nodeid);
+		error("HOSTNAMES: %s: DB Error getting virt_nodes!\n", nodeid);
 		return 1;
 	}
 	if (! (nrows = mysql_num_rows(res))) {
@@ -1256,7 +1247,7 @@ COMMAND_PROTOTYPE(dohosts)
 
 			if (! (host = (struct hostentry *)
 			              calloc(1, sizeof(*host)))) {
-				syslog(LOG_ERR, "HOSTNAMES: Out of memory!");
+				error("HOSTNAMES: Out of memory!\n");
 				exit(1);
 			}
 
@@ -1281,8 +1272,7 @@ COMMAND_PROTOTYPE(dohosts)
 			 2, pid, eid);
 
 	if (!res) {
-		syslog(LOG_ERR, "HOSTNAMES: %s: DB Error getting virt_lans!",
-		       nodeid);
+		error("HOSTNAMES: %s: DB Error getting virt_lans!\n", nodeid);
 		rv = 1;
 		goto cleanup;
 	}
@@ -1393,7 +1383,7 @@ COMMAND_PROTOTYPE(dohosts)
 				 host->vname : " ");
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+		info("HOSTNAMES: %s\n", buf);
 
 		host = host->next;
 	}
@@ -1421,8 +1411,7 @@ COMMAND_PROTOTYPE(dorpms)
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "TARBALLS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("TARBALLS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1439,8 +1428,7 @@ COMMAND_PROTOTYPE(dorpms)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "RPMS: %s: DB Error getting RPMS!",
-		       nodeid);
+		error("RPMS: %s: DB Error getting RPMS!\n", nodeid);
 		return 1;
 	}
 
@@ -1465,7 +1453,7 @@ COMMAND_PROTOTYPE(dorpms)
 
 		sprintf(buf, "RPM=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "RPM: %s", buf);
+		info("RPM: %s\n", buf);
 		
 	} while ((bp = sp));
 	
@@ -1487,8 +1475,7 @@ COMMAND_PROTOTYPE(dotarballs)
 	char		buf[MYBUFSIZE], *bp, *sp, *tp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "TARBALLS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("TARBALLS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1505,8 +1492,7 @@ COMMAND_PROTOTYPE(dotarballs)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "TARBALLS: %s: DB Error getting tarballs!",
-		       nodeid);
+		error("TARBALLS: %s: DB Error getting tarballs!\n", nodeid);
 		return 1;
 	}
 
@@ -1534,7 +1520,7 @@ COMMAND_PROTOTYPE(dotarballs)
 
 		sprintf(buf, "DIR=%s TARBALL=%s\n", bp, tp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "TARBALLS: %s", buf);
+		info("TARBALLS: %s\n", buf);
 		
 	} while ((bp = sp));
 	
@@ -1556,8 +1542,7 @@ COMMAND_PROTOTYPE(dodeltas)
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "DELTAS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("DELTAS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1574,8 +1559,7 @@ COMMAND_PROTOTYPE(dodeltas)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "DELTAS: %s: DB Error getting Deltas!",
-		       nodeid);
+		error("DELTAS: %s: DB Error getting Deltas!\n", nodeid);
 		return 1;
 	}
 
@@ -1600,7 +1584,7 @@ COMMAND_PROTOTYPE(dodeltas)
 
 		sprintf(buf, "DELTA=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "DELTAS: %s", buf);
+		info("DELTAS: %s\n", buf);
 		
 	} while ((bp = sp));
 	
@@ -1623,8 +1607,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "STARTUPCMD: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("STARTUPCMD: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1641,8 +1624,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "STARTUPCMD: %s: DB Error getting "
-		       "startup command!",
+		error("STARTUPCMD: %s: DB Error getting startup command!\n",
 		       nodeid);
 		return 1;
 	}
@@ -1672,8 +1654,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 			 1, eid, pid);
 
 	if (!res) {
-		syslog(LOG_ERR, "STARTUPCMD: %s: DB Error getting UID!",
-		       nodeid);
+		error("STARTUPCMD: %s: DB Error getting UID!\n", nodeid);
 		return 1;
 	}
 
@@ -1687,7 +1668,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 	mysql_free_result(res);
 	
 	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "STARTUPCMD: %s", buf);
+	info("STARTUPCMD: %s\n", buf);
 	
 	return 0;
 }
@@ -1704,8 +1685,7 @@ COMMAND_PROTOTYPE(dostartstat)
 	int		exitstatus;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "STARTSTAT: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("STARTSTAT: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1713,20 +1693,20 @@ COMMAND_PROTOTYPE(dostartstat)
 	 * Dig out the exit status
 	 */
 	if (! sscanf(rdata, "%d", &exitstatus)) {
-		syslog(LOG_ERR, "STARTSTAT: %s: Invalid exit status: %s",
+		error("STARTSTAT: %s: Invalid exit status: %s\n",
 		       inet_ntoa(ipaddr), rdata);
 		return 1;
 	}
 	
-	syslog(LOG_INFO, "STARTSTAT: "
-	       "%s is reporting startup command exit status: %d",
-	       nodeid, exitstatus);
+	info("STARTSTAT: "
+	     "%s is reporting startup command exit status: %d\n",
+	     nodeid, exitstatus);
 
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "STARTSTAT: %s: Node is free", nodeid);
+		info("STARTSTAT: %s: Node is free\n", nodeid);
 		return 0;
 	}
 
@@ -1737,8 +1717,8 @@ COMMAND_PROTOTYPE(dostartstat)
 	 */
 	if (mydb_update("update nodes set startstatus='%d' "
 			"where node_id='%s'", exitstatus, nodeid)) {
-		syslog(LOG_ERR, "STARTSTAT: %s: DB Error setting exit status!",
-		       nodeid);
+		error("STARTSTAT: %s: DB Error setting exit status!\n",
+		      nodeid);
 		return 1;
 	}
 	return 0;
@@ -1755,8 +1735,7 @@ COMMAND_PROTOTYPE(doready)
 	char		gid[64];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "READY: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("READY: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1764,7 +1743,7 @@ COMMAND_PROTOTYPE(doready)
 	 * Make sure currently allocated to an experiment!
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "READY: %s: Node is free", nodeid);
+		info("READY: %s: Node is free\n", nodeid);
 		return 0;
 	}
 
@@ -1773,12 +1752,11 @@ COMMAND_PROTOTYPE(doready)
 	 */
 	if (mydb_update("update nodes set ready=1 "
 			"where node_id='%s'", nodeid)) {
-		syslog(LOG_ERR, "READY: %s: DB Error setting ready bit!",
-		       nodeid);
+		error("READY: %s: DB Error setting ready bit!\n", nodeid);
 		return 1;
 	}
 
-	syslog(LOG_INFO, "READY: %s: Node is reporting ready", nodeid);
+	info("READY: %s: Node is reporting ready\n", nodeid);
 
 	/*
 	 * Nothing is written back
@@ -1801,8 +1779,7 @@ COMMAND_PROTOTYPE(doreadycount)
 	int		total, ready, i;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "READYCOUNT: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("READYCOUNT: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1810,7 +1787,7 @@ COMMAND_PROTOTYPE(doreadycount)
 	 * Make sure currently allocated to an experiment!
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "READYCOUNT: %s: Node is free", nodeid);
+		info("READYCOUNT: %s: Node is free\n", nodeid);
 		return 0;
 	}
 
@@ -1826,8 +1803,8 @@ COMMAND_PROTOTYPE(doreadycount)
 			 1, eid, pid);
 
 	if (!res) {
-		syslog(LOG_ERR, "READYCOUNT: %s: DB Error getting ready bits",
-		       nodeid);
+		error("READYCOUNT: %s: DB Error getting ready bits.\n",
+		      nodeid);
 		return 1;
 	}
 
@@ -1846,7 +1823,7 @@ COMMAND_PROTOTYPE(doreadycount)
 	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
 	client_writeback(sock, buf, strlen(buf), tcp);
 		
-	syslog(LOG_INFO, "READYCOUNT: %s: %s", nodeid, buf);
+	info("READYCOUNT: %s: %s\n", nodeid, buf);
 
 	return 0;
 }
@@ -1871,20 +1848,19 @@ COMMAND_PROTOTYPE(dolog)
 	 * Find the pid/eid of the requesting node
 	 */
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "LOG: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("LOG: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "LOG: %s: Node is free", nodeid);
+		info("LOG: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
 	snprintf(logfile, sizeof(logfile)-1, logfmt, pid, eid);
 	fd = fopen(logfile, "a");
 	if (fd == NULL) {
-		syslog(LOG_ERR, "LOG: %s: Could not open %s\n",
-		       inet_ntoa(ipaddr), logfile);
+		error("LOG: %s: Could not open %s\n",
+		      inet_ntoa(ipaddr), logfile);
 		return 1;
 	}
 
@@ -1917,8 +1893,7 @@ COMMAND_PROTOTYPE(domounts)
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "MOUNTS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("MOUNTS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -1926,7 +1901,7 @@ COMMAND_PROTOTYPE(domounts)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_ERR, "MOUNTS: %s: Node is free", nodeid);
+		error("MOUNTS: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -1955,7 +1930,7 @@ COMMAND_PROTOTYPE(domounts)
 			 "where exp_pid='%s' and exp_eid='%s'",
 			 1, pid, eid);
 	if (!res) {
-		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
+		error("MOUNTS: %s: DB Error getting users!\n", pid);
 		return 1;
 	}
 
@@ -1993,12 +1968,12 @@ COMMAND_PROTOTYPE(domounts)
 			 1, pid, eid, pid, gid);
 #endif
 	if (!res) {
-		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
+		error("MOUNTS: %s: DB Error getting users!\n", pid);
 		return 1;
 	}
 
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		syslog(LOG_ERR, "MOUNTS: %s: No Users!", pid);
+		error("MOUNTS: %s: No Users!\n", pid);
 		mysql_free_result(res);
 		return 0;
 	}
@@ -2011,7 +1986,7 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		syslog(LOG_INFO, "MOUNTS: %s", buf);
+		info("MOUNTS: %s\n", buf);
 	}
 	mysql_free_result(res);
 
@@ -2032,8 +2007,7 @@ COMMAND_PROTOTYPE(dorouting)
 	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "ROUTES: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("ROUTES: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2041,7 +2015,7 @@ COMMAND_PROTOTYPE(dorouting)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_ERR, "ROUTES: %s: Node is free", nodeid);
+		error("ROUTES: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -2052,8 +2026,7 @@ COMMAND_PROTOTYPE(dorouting)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "ROUTES: %s: DB Error getting router type!",
-		       nodeid);
+		error("ROUTES: %s: DB Error getting router type!\n", nodeid);
 		return 1;
 	}
 
@@ -2076,7 +2049,7 @@ COMMAND_PROTOTYPE(dorouting)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "ROUTES: %s", buf);
+	info("ROUTES: %s\n", buf);
 
 	return 0;
 }
@@ -2093,8 +2066,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "doloadinfo: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("doloadinfo: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2107,8 +2079,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 			 2, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "doloadinfo: %s: DB Error getting "
-		       "loading address!",
+		error("doloadinfo: %s: DB Error getting loading address!\n",
 		       nodeid);
 		return 1;
 	}
@@ -2130,7 +2101,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "doloadinfo: %s", buf);
+	info("doloadinfo: %s\n", buf);
 	
 	return 0;
 }
@@ -2146,8 +2117,7 @@ COMMAND_PROTOTYPE(doreset)
 	char		nodeid[32];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "doreset: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("doreset: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2160,9 +2130,8 @@ COMMAND_PROTOTYPE(doreset)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "doreset: %s: DB Error checking for "
-		       "next_pxe_boot_path!",
-		       nodeid);
+		error("doreset: %s: DB Error checking for "
+		      "next_pxe_boot_path!\n", nodeid);
 		return 1;
 	}
 
@@ -2172,12 +2141,11 @@ COMMAND_PROTOTYPE(doreset)
 	 */
 	if ((int)mysql_num_rows(res) > 0) {
 		mysql_free_result(res);
-		syslog(LOG_INFO, "doreset: %s: Clearing next_pxe_boot_path",
-			nodeid);
+		info("doreset: %s: Clearing next_pxe_boot_path\n", nodeid);
 		if (mydb_update("update nodes set next_pxe_boot_path='' "
 			"where node_id='%s'", nodeid)) {
-		    syslog(LOG_ERR, "doreset: %s: DB Error clearing "
-			    "next_pxe_boot_path!", nodeid);
+		    error("doreset: %s: DB Error clearing "
+			  "next_pxe_boot_path!\n", nodeid);
 		    return 1;
 		}
 		return 0;
@@ -2194,8 +2162,8 @@ COMMAND_PROTOTYPE(doreset)
 			 2, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "doreset: %s: DB Error checking for "
-		       "next_boot_path or next_boot_osid!",
+		error("doreset: %s: DB Error checking for "
+		      "next_boot_path or next_boot_osid!\n",
 		       nodeid);
 		return 1;
 	}
@@ -2206,13 +2174,12 @@ COMMAND_PROTOTYPE(doreset)
 	 */
 	if ((int)mysql_num_rows(res) > 0) {
 		mysql_free_result(res);
-		syslog(LOG_INFO, "doreset: %s: Clearing next_boot_*",
-			nodeid);
+		info("doreset: %s: Clearing next_boot_*\n", nodeid);
 		if (mydb_update("update nodes set next_boot_path='',"
 			"next_boot_osid='',next_boot_cmd_line='' "
 			"where node_id='%s'", nodeid)) {
-		    syslog(LOG_ERR, "doreset: %s: DB Error clearing "
-			    "next_boot_*!", nodeid);
+		    error("doreset: %s: DB Error clearing next_boot_*!\n",
+			  nodeid);
 		    return 1;
 		}
 		return 0;
@@ -2237,8 +2204,7 @@ COMMAND_PROTOTYPE(dotrafgens)
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "TRAFGENS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("TRAFGENS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2246,7 +2212,7 @@ COMMAND_PROTOTYPE(dotrafgens)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_ERR, "TRAFGENS: %s: Node is free", nodeid);
+		error("TRAFGENS: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -2259,8 +2225,8 @@ COMMAND_PROTOTYPE(dotrafgens)
 			 8, nodeid, pid, eid);
 
 	if (!res) {
-		syslog(LOG_ERR, "TRAFGENS: %s: DB Error getting virt_trafgens",
-		       nodeid);
+		error("TRAFGENS: %s: DB Error getting virt_trafgens\n",
+		      nodeid);
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
@@ -2280,7 +2246,7 @@ COMMAND_PROTOTYPE(dotrafgens)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		syslog(LOG_INFO, "TRAFGENS: %s", buf);
+		info("TRAFGENS: %s\n", buf);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -2300,14 +2266,13 @@ COMMAND_PROTOTYPE(donseconfigs)
 	int		nrows;
 
 	if (!tcp) {
-		syslog(LOG_ERR, "NSECONFIGS: %s: Cannot do UDP mode!",
-		       inet_ntoa(ipaddr));
+		error("NSECONFIGS: %s: Cannot do UDP mode!\n",
+		      inet_ntoa(ipaddr));
 		return 1;
 	}
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "NSECONFIGS: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("NSECONFIGS: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2315,7 +2280,7 @@ COMMAND_PROTOTYPE(donseconfigs)
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_ERR, "NSECONFIGS: %s: Node is free", nodeid);
+		error("NSECONFIGS: %s: Node is free\n", nodeid);
 		return 1;
 	}
 
@@ -2326,8 +2291,7 @@ COMMAND_PROTOTYPE(donseconfigs)
 			 1, nodeid, pid, eid);
 
 	if (!res) {
-		syslog(LOG_ERR, "NSECONFIGS: %s: DB Error getting nseconfigs",
-		       nodeid);
+		error("NSECONFIGS: %s: DB Error getting nseconfigs\n", nodeid);
 		return 1;
 	}
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
@@ -2359,8 +2323,7 @@ COMMAND_PROTOTYPE(dostate)
 #endif
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "STATE: %s: No such node",
-				inet_ntoa(ipaddr));
+		error("STATE: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2390,7 +2353,7 @@ COMMAND_PROTOTYPE(dostate)
 	/* XXX: Maybe we don't need to alloc a new tuple every time through */
 	tuple = address_tuple_alloc();
 	if (tuple == NULL) {
-		syslog(LOG_ERR, "dostate: Unable to allocate address tuple!");
+		error("dostate: Unable to allocate address tuple!\n");
 		return 1;
 	}
 
@@ -2400,7 +2363,7 @@ COMMAND_PROTOTYPE(dostate)
 	tuple->eventtype = newstate;
 
 	if (myevent_send(tuple)) {
-		syslog(LOG_ERR,"dostate: Error sending event\n");
+		error("dostate: Error sending event\n");
 	}
 
 	address_tuple_free(tuple);
@@ -2424,8 +2387,7 @@ COMMAND_PROTOTYPE(docreator)
 	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "CREATOR: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("CREATOR: %s: No such node\n", inet_ntoa(ipaddr));
 		return 1;
 	}
 
@@ -2443,8 +2405,7 @@ COMMAND_PROTOTYPE(docreator)
 			 1, eid, pid);
 
 	if (!res) {
-		syslog(LOG_ERR, "CREATOR: %s: DB Error getting UID!",
-		       nodeid);
+		error("CREATOR: %s: DB Error getting UID!\n", nodeid);
 		return 1;
 	}
 
@@ -2457,7 +2418,7 @@ COMMAND_PROTOTYPE(docreator)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "CREATOR: %s", buf);
+	info("CREATOR: %s\n", buf);
 
 	return 0;
 }
@@ -2488,8 +2449,7 @@ mydb_connect()
 	mysql_init(&db);
 	if (mysql_real_connect(&db, 0, 0, 0,
 			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
-		syslog(LOG_ERR, "%s: connect failed: %s",
-			dbname, mysql_error(&db));
+		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
 		return 1;
 	}
 	strcpy(db_dbname, dbname);
@@ -2515,7 +2475,7 @@ mydb_query(char *query, int ncols, ...)
 	va_start(ap, ncols);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
 	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
+		error("query too long for buffer\n");
 		return (MYSQL_RES *) 0;
 	}
 
@@ -2523,24 +2483,23 @@ mydb_query(char *query, int ncols, ...)
 		return (MYSQL_RES *) 0;
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			dbname, mysql_error(&db));
+		error("%s: query failed: %s\n", dbname, mysql_error(&db));
 		mydb_disconnect();
 		return (MYSQL_RES *) 0;
 	}
 
 	res = mysql_store_result(&db);
 	if (res == 0) {
-		syslog(LOG_ERR, "%s: store_result failed: %s",
-			dbname, mysql_error(&db));
+		error("%s: store_result failed: %s\n",
+		      dbname, mysql_error(&db));
 		mydb_disconnect();
 		return (MYSQL_RES *) 0;
 	}
 
 	if (ncols && ncols != (int)mysql_num_fields(res)) {
-		syslog(LOG_ERR, "%s: Wrong number of fields returned "
-		       "Wanted %d, Got %d",
-			dbname, ncols, (int)mysql_num_fields(res));
+		error("%s: Wrong number of fields returned "
+		      "Wanted %d, Got %d\n",
+		      dbname, ncols, (int)mysql_num_fields(res));
 		mysql_free_result(res);
 		return (MYSQL_RES *) 0;
 	}
@@ -2557,7 +2516,7 @@ mydb_update(char *query, ...)
 	va_start(ap, query);
 	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
 	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
+		error("query too long for buffer\n");
 		return 1;
 	}
 
@@ -2565,8 +2524,7 @@ mydb_update(char *query, ...)
 		return 1;
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			dbname, mysql_error(&db));
+		error("%s: query failed: %s\n", dbname, mysql_error(&db));
 		mydb_disconnect();
 		return 1;
 	}
@@ -2585,14 +2543,13 @@ iptonodeid(struct in_addr ipaddr, char *bufp)
 	res = mydb_query("select node_id from interfaces where IP='%s'", 1,
 			 inet_ntoa(ipaddr));
 	if (!res) {
-		syslog(LOG_ERR, "iptonodeid: %s: DB Error getting interfaces!",
-		       inet_ntoa(ipaddr));
+		error("iptonodeid: %s: DB Error getting interfaces!\n",
+		      inet_ntoa(ipaddr));
 		return 1;
 	}
 
 	if (! (int)mysql_num_rows(res)) {
-		syslog(LOG_ERR, "Cannot map IP %s to nodeid",
-		       inet_ntoa(ipaddr));
+		error("Cannot map IP %s to nodeid\n", inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
 	}
@@ -2618,8 +2575,7 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 			 "where node_id='%s'",
 			 3, nodeid);
 	if (!res) {
-		syslog(LOG_ERR, "nodeidtoexp: %s: DB Error getting reserved!",
-		       nodeid);
+		error("nodeidtoexp: %s: DB Error getting reserved!\n", nodeid);
 		return 1;
 	}
 
@@ -2641,8 +2597,8 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 	}
 	else {
 		strcpy(gid, pid);
-		syslog(LOG_ERR, "nodeidtoexp: %s: No GID for %s/%s (pid/eid)!",
-		       nodeid, pid, eid);
+		error("nodeidtoexp: %s: No GID for %s/%s (pid/eid)!\n",
+		      nodeid, pid, eid);
 	}
 
 	return 0;
@@ -2661,9 +2617,8 @@ nodeidtonickname(char *nodeid, char *nickname)
 			 "where node_id='%s'",
 			 1, nodeid);
 	if (!res) {
-		syslog(LOG_ERR, "nodeidtonickname: %s: "
-		       "DB Error getting reserved!",
-		       nodeid);
+		error("nodeidtonickname: %s: DB Error getting reserved!\n",
+		      nodeid);
 		return 1;
 	}
 
@@ -2696,7 +2651,7 @@ nodeidtocontrolnet(char *nodeid, int *net)
 			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "nodeidtocontrolnet: %s: DB Error!", nodeid);
+		error("nodeidtocontrolnet: %s: DB Error!\n", nodeid);
 		return 1;
 	}
 
@@ -2728,12 +2683,12 @@ checkdbredirect(struct in_addr ipaddr)
 	 * Find the nodeid.
 	 */
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: No such node",
-		       inet_ntoa(ipaddr));
+		error("CHECKDBREDIRECT: %s: No such node\n",
+		      inet_ntoa(ipaddr));
 		return 1;
 	}
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		syslog(LOG_INFO, "CHECKDBREDIRECT: %s: Node is free", nodeid);
+		info("CHECKDBREDIRECT: %s: Node is free\n", nodeid);
 		return 0;
 	}
 
@@ -2745,14 +2700,14 @@ checkdbredirect(struct in_addr ipaddr)
 			 1, eid, pid);
 			 
 	if (!res) {
-		syslog(LOG_ERR, "CHECKDBREDIRECT: "
-		       "%s: DB Error getting testdb from table!", nodeid);
+		error("CHECKDBREDIRECT: "
+		      "%s: DB Error getting testdb from table!\n", nodeid);
 		return 1;
 	}
 
 	if (mysql_num_rows(res) == 0) {
-		syslog(LOG_INFO, "CHECKDBREDIRECT: "
-		       "%s: Hmm, experiment not there anymore!", nodeid);
+		info("CHECKDBREDIRECT: "
+		     "%s: Hmm, experiment not there anymore!\n", nodeid);
 		mysql_free_result(res);
 		return 0;
 	}
@@ -2770,8 +2725,8 @@ checkdbredirect(struct in_addr ipaddr)
 	 * on the main DB. 
 	 */
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: %s DB does not exist",
-		       inet_ntoa(ipaddr), dbname);
+		error("CHECKDBREDIRECT: %s: %s DB does not exist\n",
+		      inet_ntoa(ipaddr), dbname);
 		strcpy(dbname, DEFAULT_DBNAME);
 	}
 	mysql_free_result(res);
@@ -2793,8 +2748,8 @@ event_connect()
 	if (event_handle) {
 		return 0;
 	} else {
-		syslog(LOG_ERR,"event_connect: Unable to register with "
-				"event system!");
+		error("event_connect: "
+		      "Unable to register with event system!\n");
 		return 1;
 	}
 }
@@ -2812,22 +2767,21 @@ int myevent_send(address_tuple_t tuple) {
 
 	notification = event_notification_alloc(event_handle,tuple);
 	if (notification == NULL) {
-		syslog(LOG_ERR,"myevent_send: Unable to allocate "
-			"notification!");
+		error("myevent_send: Unable to allocate notification!");
 		return 1;
 	}
 
 	if (event_notify(event_handle, notification) == NULL) {
 		event_notification_free(event_handle, notification);
 
-		syslog(LOG_ERR,"myevent_send: Unable to send notification!");
+		error("myevent_send: Unable to send notification!");
 		/*
 		 * Let's try to disconnect from the event system, so that
 		 * we'll reconnect next time around.
 		 */
 		if (!event_unregister(event_handle)) {
-			syslog(LOG_ERR,"myevent_send: Unable to unregister "
-					"with event system!");
+			error("myevent_send: "
+			      "Unable to unregister with event system!");
 		}
 		event_handle = NULL;
 		return 1;
@@ -2855,13 +2809,12 @@ client_writeback(int sock, void *buf, int len, int tcp)
 	
 	if (tcp) {
 		while (len) {
-			if ((cc = write(sock, bufp, len)) <= 0) {
+			if ((cc = WRITE(sock, bufp, len)) <= 0) {
 				if (cc < 0) {
-					syslog(LOG_ERR,
-					       "writing to client: %m");
+					errorc("writing to TCP client");
 					return -1;
 				}
-				syslog(LOG_ERR, "write to client aborted");
+				error("write to TCP client aborted");
 				return -1;
 			}
 			len  -= cc;
@@ -2870,12 +2823,12 @@ client_writeback(int sock, void *buf, int len, int tcp)
 	} else {
 		if (udpfd != sock) {
 			if (udpfd != -1)
-				syslog(LOG_ERR, "UDP reply in progress!?");
+				error("UDP reply in progress!?");
 			udpfd = sock;
 			udpix = 0;
 		}
 		if (udpix + len > sizeof(udpbuf)) {
-			syslog(LOG_ERR, "client data write truncated");
+			error("client data write truncated");
 			len = sizeof(udpbuf) - udpix;
 		}
 		memcpy(&udpbuf[udpix], bufp, len);
@@ -2897,12 +2850,12 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 		udpfd = sock;
 
 	if (sock != udpfd)
-		syslog(LOG_ERR, "UDP reply out of sync!");
+		error("UDP reply out of sync!");
 	else {
 		err = sendto(udpfd, udpbuf, udpix, 0,
 			     (struct sockaddr *)client, sizeof(*client));
 		if (err < 0)
-			syslog(LOG_ERR, "sendto client: %m");
+			errorc("writing to UDP client");
 	}
 	udpfd = -1;
 	udpix = 0;

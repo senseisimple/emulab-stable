@@ -18,6 +18,7 @@
 #include <netdb.h>
 #include "decls.h"
 #include "config.h"
+#include "ssl.h"
 
 #undef BOSSNODE
 #ifdef BOSSNODE
@@ -140,7 +141,12 @@ main(int argc, char **argv)
 		abort();
 	}
 #endif
-
+#ifdef  WITHSSL
+	if (tmcd_client_sslinit()) {
+		printf("SSL initialization failed!\n");
+		exit(1);
+	}
+#endif
 	while (1) {
 		/* Create socket from which to read. */
 		sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -154,7 +160,7 @@ main(int argc, char **argv)
 		name.sin_addr   = serverip;
 		name.sin_port = htons(portnum);
 
-		if (connect(sock,
+		if (CONNECT(sock,
 			    (struct sockaddr *) &name, sizeof(name)) == 0) {
 			break;
 		}
@@ -165,17 +171,17 @@ main(int argc, char **argv)
 		}
 		else {
 			perror("connecting stream socket");
+			CLOSE(sock);
 			exit(1);
 		}
-		close(sock);
+		CLOSE(sock);
 	}
 
 	data = 1;
 	if (setsockopt(sock, SOL_SOCKET,
 		       SO_KEEPALIVE, &data, sizeof(data)) < 0) {
 		perror("setsockopt SO_KEEPALIVE");
-		close(sock);
-		exit(1);
+		goto bad;
 	}
 
 	/* Start with version number */
@@ -193,7 +199,7 @@ main(int argc, char **argv)
 	}
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
-		exit(1);
+		goto bad;
 	}
 
 	/*
@@ -201,23 +207,23 @@ main(int argc, char **argv)
 	 */
 	bp = buf;
 	while (n) {
-		if ((cc = write(sock, bp, n)) <= 0) {
+		if ((cc = WRITE(sock, bp, n)) <= 0) {
 			if (cc < 0) {
 				perror("Writing to socket:");
-				exit(1);
+				goto bad;
 			}
 			fprintf(stderr, "write aborted");
-			exit(1);
+			goto bad;
 		}
 		bp += cc;
 		n  -= cc;
 	}
 
 	while (1) {
-		if ((cc = read(sock, buf, sizeof(buf))) <= 0) {
+		if ((cc = READ(sock, buf, sizeof(buf))) <= 0) {
 			if (cc < 0) {
 				perror("Reading from socket:");
-				exit(1);
+				goto bad;
 			}
 			break;
 		}
@@ -230,8 +236,11 @@ main(int argc, char **argv)
 	}
 	printf("%s", response);
 
-	close(sock);
+	CLOSE(sock);
 	exit(0);
+ bad:
+	CLOSE(sock);
+	exit(1);
 }
 
 void
