@@ -168,13 +168,13 @@ foreach my $n (@freed_nodes) {
     my $result =
 	DBQueryFatal("select control_net,nt.osid,nt.pxe_boot_path, " .
 		     "n.def_boot_osid,n.def_boot_path, ".
-		     "nt.isvirtnode, o.osid ".
+		     "nt.isvirtnode, nt.imageable, o.osid ".
 		     "from node_types as nt " .
 		     "left join nodes as n on n.type=nt.type " .
 		     "left join os_info as o on o.path=nt.pxe_boot_path " .
 		     "where node_id='$n'");
     my ($control, $osid, $pxe_boot_path, $def_boot_osid, $def_boot_path,
-	$isvirt, $pxe_osid) = $result->fetchrow_array();
+	$isvirt, $imageable, $pxe_osid) = $result->fetchrow_array();
     if (!defined($pxe_osid) || $pxe_osid eq "") {
 	$pxe_osid = "-p $pxe_boot_path";
     }
@@ -184,7 +184,7 @@ foreach my $n (@freed_nodes) {
     # touched by the kernel. If a def_boot_path was set, there is nothing
     # we can figure out, so just reload it. This needs to be more general
     # purpose.
-    if ($isvirt) {
+    if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
 	$mustclean = 0;
     } elsif (! defined($def_boot_osid) ||
@@ -213,7 +213,7 @@ foreach my $n (@freed_nodes) {
     # Map the default OSID to something that is actually loaded on the
     # machine. I think this is a hack, but its the best I can come up
     # with right now.
-    if (! $isvirt) {
+    if (! $isvirt && $imageable) {
 	my $mapped_osid = MapNodeOSID($n, $osid);
 	if ($mapped_osid) {
 	    $osid = $mapped_osid;
@@ -283,7 +283,7 @@ foreach my $n (@freed_nodes) {
 		     "where node_id='$n'");
 
     # XXX force reload hack!
-    if ( !$TESTMODE && (!$isvirt || $result->numrows()) ) {
+    if ( !$TESTMODE && ((!$isvirt && $imageable) || $result->numrows()) ) {
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set ".
