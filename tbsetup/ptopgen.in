@@ -192,7 +192,7 @@ $result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
 		     " from interfaces");
 while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     $interfacemap{"$node:$card:$port"} = $iface;
-    if ($type ne "") {
+    if ((defined $type) && ($type ne "")) {
 	$interfacetypes{"$node:$card:$port"} = $type;
     }
 }
