@@ -1787,7 +1787,7 @@ int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
       float orientation;
       
       erc = robot_list_search(hostname_list, mup->robot_id);
-      orientation = mup->position.theta * 180.0 / M_PI;
+      orientation = mtp_theta(mup->position.theta) * 180.0 / M_PI;
       if (!cmp_fuzzy(erc->last_update_pos.x, mup->position.x, 0.02) ||
 	  !cmp_fuzzy(erc->last_update_pos.y, mup->position.y, 0.02) ||
 	  !cmp_fuzzy(erc->last_update_pos.theta, mup->position.theta, 0.04)) {
