@@ -6,6 +6,10 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040601:
+	The p5-Time-HiRes port is now required on boss - install it from
+	/usr/ports/devel/p5-Time-HiRes .
+
 20040420:
 	Switched web search button backend from webglimpse to swish-e.
         Just need to go to /usr/ports/www/swish-e and install the port.
