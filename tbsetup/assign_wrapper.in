@@ -301,6 +301,7 @@ my $forcelinkdelays;
 my $usewatunnels;
 my $multiplex_factor;
 my $experiment_idx;
+my $useprepass;
 
 # For admission control. Not well defined yet.
 my $cpu_usage;
@@ -605,15 +606,14 @@ sub RunAssign ()
 
     # If doing an experiment with virtnodes, use the prepass wrapper for assign
     # Turned off for now, because it needs some work.
-    #if ($virtcount) {
-    #	$cmd = "assign_prepass";
-    #	$cmdargs = "-m $multiplex_factor $cmdargs"
-    #	    if ($multiplex_factor);
-    #} else {
-    #	$cmd = "assign";
-    #}
+    if ($useprepass) {
+    	$cmd = "assign_prepass";
+    	$cmdargs = "-m $multiplex_factor $cmdargs"
+    	    if ($multiplex_factor);
+    } else {
+    	$cmd = "assign";
+    }
 
-    $cmd = "assign";
     print "$cmd $cmdargs\n";
 
     #
@@ -3648,11 +3648,12 @@ sub LoadExperiment()
 	DBQueryFatal("select uselinkdelays,forcelinkdelays,".
 		     "       multiplex_factor,usewatunnels, ".
 		     "       cpu_usage,mem_usage,allowfixnode, ".
-		     "       jail_osname,delay_osname,idx ".
+		     "       jail_osname,delay_osname,idx, " .
+		     "       useprepass " .
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx) =
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx,$o8) =
 	$query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
@@ -3670,6 +3671,8 @@ sub LoadExperiment()
 	if (!defined($mem_usage));
     $fix_current_resources = $o7
 	if (!defined($fix_current_resources));
+    $useprepass = $o8
+	if (!defined($useprepass));
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {

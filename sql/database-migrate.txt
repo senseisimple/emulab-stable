@@ -1547,3 +1547,8 @@ last_net_act,last_cpu_act,last_ext_act);
 		 enum('none','ospf','static','manual','static-ddijk') \
 		 NOT NULL default 'none',	
 
+1.247:  Add a 'useprepass' column to the experiments table to enable or
+        disable the assign prepass.
+
+	 alter table experiments add column useprepass tinyint(1) \
+		 default 0 not null;
