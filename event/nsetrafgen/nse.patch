@@ -1,6 +1,6 @@
 diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
 --- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
-+++ ns-allinone-2.1b9/install	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/install	Sun Oct  6 21:54:17 2002
 @@ -39,224 +39,82 @@
  
  # Get current path
@@ -415,14 +415,14 @@ diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
  echo "----------------------------------------------------------------------------------"
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/Makefile.in
 --- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Wed Jun 19 12:09:34 2002
++++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Sun Oct  6 23:17:08 2002
 @@ -78,6 +78,14 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD
++CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD -DGETTIME_TSC
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
@@ -453,7 +453,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/
  	emulate/inet.o
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Sun Oct  6 21:54:17 2002
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -465,15 +465,32 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1
  		timer_.resched(t);
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Jun 19 12:06:51 2002
-@@ -44,11 +44,22 @@
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Sun Oct  6 22:22:18 2002
+@@ -31,24 +31,58 @@
+  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  * SUCH DAMAGE.
+  *
+- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.65 2002/04/10 20:37:46 haldar Exp $
++ * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.69 2002/07/23 21:35:21 yuri Exp $
+  */
+ 
+ #ifndef lint
+ static const char rcsid[] =
+-    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.65 2002/04/10 20:37:46 haldar Exp $ (LBL)";
++    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.cc,v 1.69 2002/07/23 21:35:21 yuri Exp $ (LBL)";
+ #endif
+ 
+ #include <stdlib.h>
+ #include <limits.h>
++#include <math.h>
++
  #include "config.h"
  #include "scheduler.h"
  #include "packet.h"
 +#ifdef USEEVENTS
 +#include "tbevent.h"
 +#endif
-+#include <unistd.h>
++
  
  #ifdef MEMDEBUG_SIMULATIONS
  #include "mem-trace.h"
@@ -486,22 +503,805 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +
 +#endif
 +
++#ifdef GETTIME_TSC
++
++#define read_tsc()      \
++    ({ \
++        unsigned long low, high; \
++        asm volatile( \
++        ".byte 0x0f; .byte 0x31" \
++        : "=d" (high), "=a" (low)); \
++        ((unsigned long long)high << 32) | low; \
++    })
++
++#define TSC_FREQ     851.94
++#define TSC_COUNT_PERSEC (TSC_FREQ * 1000000)
++
++#endif
++
++#ifdef SCHED_DEBUG
++static Tcl_HashTable newevents;
++#endif
++
++
  Scheduler* Scheduler::instance_;
  scheduler_uid_t Scheduler::uid_ = 1;
  
-@@ -138,6 +149,11 @@
- 	clock_ = t;
- 	p->uid_ = -p->uid_;	// being dispatched
- 	p->handler_->handle(p);	// dispatch
-+
-+#ifdef MEASURE_EVENT_RATE
-+	event_dispatch_counter++;
+@@ -59,6 +93,9 @@
+ 
+ Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
+ {
++#ifdef SCHED_DEBUG
++	  Tcl_InitHashTable( &newevents, TCL_ONE_WORD_KEYS );
 +#endif
-+
+ }
+ 
+ Scheduler::~Scheduler(){
+@@ -76,11 +113,14 @@
+  * is much harder (because we've lost all context about who did
+  * the scheduling).
+  */
+-void Scheduler::schedule(Handler* h, Event* e, double delay)
++void 
++Scheduler::schedule(Handler* h, Event* e, double delay)
+ {
+ 	// handler should ALWAYS be set... if it's not, it's a bug in the caller
+ 	if (!h) {
+-		printf("Scheduler: attempt to schedule an event with a NULL handler.  Don't DO that.\n");
++		fprintf(stderr,
++			"Scheduler: attempt to schedule an event with a NULL handler."
++			"  Don't DO that.\n");
+ 		abort();
+ 	};
+ 	if (e->uid_ > 0) {
+@@ -91,7 +131,9 @@
+ 	if (delay < 0) {
+ 		// You probably don't want to do this
+ 		// (it probably represents a bug in your simulation).
+-		fprintf(stderr, "warning: ns Scheduler::schedule: scheduling event\n\twith negative delay (%f) at time %f.\n", delay, clock_);
++		fprintf(stderr, 
++			"warning: ns Scheduler::schedule: scheduling event\n\t"
++			"with negative delay (%f) at time %f.\n", delay, clock_);
+ 	}
+ 
+ 	if (uid_ < 0) {
+@@ -104,6 +146,17 @@
+ 
+ 	e->time_ = t;
+ 	insert(e);
++#ifdef SCHED_DEBUG
++	int newentry = 0 ;
++	Tcl_HashEntry *he = Tcl_CreateHashEntry( &newevents,
++						 (char *)((unsigned int)e->uid_),
++						 &newentry );
++	if( newentry == 0 ) {
++	  fprintf(stderr, "e->uid_ = %d already present. error\n", (unsigned int)e->uid_);
++	} else {
++	  Tcl_SetHashValue( he, (char *)h );
++	}
++#endif
  }
  
  void
-@@ -841,12 +857,20 @@
+@@ -117,7 +170,7 @@
+ 	 * Patch by Thomas Kaemer <Thomas.Kaemer@eas.iis.fhg.de>.
+ 	 */
+ 	while (!halted_ && (p = deque())) {
+-		dispatch(p);
++		dispatch(p, p->time_);
+ 	}
+ }
+ 
+@@ -133,11 +186,23 @@
+ {
+ 	if (t < clock_) {
+ 		fprintf(stderr, "ns: scheduler going backwards in time from %f to %f.\n", clock_, t);
++		abort();
+ 	}
+ 
++#ifdef SCHED_DEBUG
++	Tcl_HashEntry *he = Tcl_FindHashEntry(&newevents, (char *)((unsigned int)p->uid_));
++	if( he ) {
++	  Tcl_DeleteHashEntry(he);
++	} else {
++	  fprintf(stderr, "error. couldnt find event with uid = %d\n", (unsigned int)p->uid_);
++	}
++#endif
+ 	clock_ = t;
+ 	p->uid_ = -p->uid_;	// being dispatched
+ 	p->handler_->handle(p);	// dispatch
++#ifdef MEASURE_EVENT_RATE
++	event_dispatch_counter++;
++#endif
+ }
+ 
+ void
+@@ -161,7 +226,8 @@
+ 	void handle(Event* event);
+ } at_handler;
+ 
+-void AtHandler::handle(Event* e)
++void 
++AtHandler::handle(Event* e)
+ {
+ 	AtEvent* at = (AtEvent*)e;
+ 	Tcl::instance().eval(at->proc_);
+@@ -174,7 +240,8 @@
+ 	clock_ = SCHED_START;
+ }
+ 
+-int Scheduler::command(int argc, const char*const* argv)
++int 
++Scheduler::command(int argc, const char*const* argv)
+ {
+ 	Tcl& tcl = Tcl::instance();
+ 	if (instance_ == 0)
+@@ -220,7 +287,7 @@
+ 		if (strcmp(argv[1], "at") == 0 ||
+ 		    strcmp(argv[1], "cancel") == 0) {
+ 			Event* p = lookup(STRTOUID(argv[2]));
+-      if (p != 0) {
++			if (p != 0) {
+ 				/*XXX make sure it really is an atevent*/
+ 				cancel(p);
+ 				AtEvent* ae = (AtEvent*)p;
+@@ -286,7 +353,8 @@
+ 	}
+ } class_list_sched;
+ 
+-void ListScheduler::insert(Event* e)
++void 
++ListScheduler::insert(Event* e)
+ {
+ 	double t = e->time_;
+ 	Event** p;
+@@ -303,7 +371,8 @@
+  * must free the event if necessary; this routine only removes
+  * it from the scheduler queue.
+  */
+-void ListScheduler::cancel(Event* e)
++void 
++ListScheduler::cancel(Event* e)
+ {
+ 	Event** p;
+ 	if (e->uid_ <= 0)	// event not in queue
+@@ -316,7 +385,8 @@
+ 	e->uid_ = - e->uid_;
+ }
+ 
+-Event* ListScheduler::lookup(scheduler_uid_t uid)
++Event* 
++ListScheduler::lookup(scheduler_uid_t uid)
+ {
+ 	Event* e;
+ 	for (e = queue_; e != 0; e = e->next_)
+@@ -397,9 +467,9 @@
+ Heap::heap_delete(void* elem)
+ {
+ 	int	i;
+-		if ((i = heap_member(elem)) == 0)
++	if ((i = heap_member(elem)) == 0)
+ 		return 0;
+-		for (--i; i; i = parent(i)) {
++	for (--i; i; i = parent(i)) {
+ 		swap(i, parent(i));
+ 	}
+ 	(void) heap_extract_min();
+@@ -485,9 +555,10 @@
+ 	void*	min;				  /* return value */
+ 	unsigned int	i;
+ 	unsigned int	l, r, x;
+-		if (h_size == 0)
++
++	if (h_size == 0)
+ 		return 0;
+-		min = h_elems[0].he_elem;
++	min = h_elems[0].he_elem;
+ 	h_elems[0] = h_elems[--h_size];
+ // Heapify:
+ 	i = 0;
+@@ -523,7 +594,8 @@
+ 	}
+ } class_heap_sched;
+ 
+-Event* HeapScheduler::lookup(scheduler_uid_t uid)
++Event* 
++HeapScheduler::lookup(scheduler_uid_t uid)
+ {
+ 	Event* e;
+ 	
+@@ -553,6 +625,8 @@
+  *  Comm. of ACM, 31(10):1220-1227, Oct 1988
+  */
+ 
++#define CALENDAR_HASH(t) ((int)fmod((t)/width_, nbuckets_))
++
+ static class CalendarSchedulerClass : public TclClass {
+ public:
+ 	CalendarSchedulerClass() : TclClass("Scheduler/Calendar") {}
+@@ -561,212 +635,305 @@
+ 	}
+ } class_calendar_sched;
+ 
+-CalendarScheduler::CalendarScheduler() {
+-	reinit(2, 1.0, 0.0);
+-	resizeenabled_ = 1;
+-	max_ = 0.0;
++CalendarScheduler::CalendarScheduler() : cal_clock_(clock_) {
++	reinit(4, 1.0, cal_clock_);
+ }
+ 
+ CalendarScheduler::~CalendarScheduler() {
++	// XXX free events?
+ 	delete [] buckets_;
+ 	qsize_ = 0;
++	stat_qsize_ = 0;
+ }
+ 
+-void CalendarScheduler::insert(Event* e)
++void 
++CalendarScheduler::insert(Event* e)
+ {
++	int i;
++	if (cal_clock_ > e->time_) {
++		// may happen in RT scheduler
++		cal_clock_ = e->time_;
++		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
++	} else
++		i = CALENDAR_HASH(e->time_);
++
++	Event *head = buckets_[i].list_;
++	Event *before=0;
++
++	if (!head) {
++		buckets_[i].list_ = e;
++		e->next_ = e->prev_ = e;
++		++stat_qsize_; 
++		++buckets_[i].count_;
++	} else {
++		bool newhead;
++		if (e->time_ >= head->prev_->time_) {
++			// insert at the tail
++			before = head;
++			newhead = false;
++		} else {
++			// insert event in time sorted order, FIFO for sim-time events
++			for (before = head; e->time_ >= before->time_; before = before->next_)
++				;
++			newhead = (before == head);
++		}
+ 
+-	/* (e->time_ * oneonwidth) needs to be less than the
+-	 * largest integer on the machine for the mapping
+-	 * of time to bucket to work properly.  if it is not
+-	 * we need to re-calculate the width.
+-	 */
+-	if (e->time_ > max_) {
+-		max_ = e->time_;
+-		if (e->time_ * oneonwidth_ > ULONG_MAX) {
+-			resize(nbuckets_);
++		e->next_ = before;
++		e->prev_ = before->prev_;
++		before->prev_ = e;
++		e->prev_->next_ = e;
++		if (newhead) {
++			buckets_[i].list_ = e;
++			//assert(e->time_ <= e->next_->time_);
++		}
++		//assert(e->prev_ != e);
++		if (e->prev_->time_ != e->time_) {
++			// unique timing
++			++stat_qsize_; 
++			++buckets_[i].count_;
+ 		}
+ 	}
+-	// bucket number and address
+-	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_); 
+-	Event** p = buckets_ + i;
+-
+-	// insert event in stable time sorted order
+-	while ((*p != NULL) && (e->time_ >= (*p)->time_))
+-		p = &(*p)->next_;
++	++qsize_;
++	//assert(e == buckets_[i].list_ ||  e->prev_->time_ <= e->time_);
++	//assert(e == buckets_[i].list_->prev_ || e->next_->time_ >= e->time_);
+ 
+-	e->next_ = *p;
+-	*p = e;
++  	if (stat_qsize_ > top_threshold_) {
++  		resize(nbuckets_ << 1, cal_clock_);
++		return;
++	}
++}
++
++void 
++CalendarScheduler::insert2(Event* e)
++{
++	// Same as insert, but for inserts e *before* any same-time-events, if
++	//   there should be any.  Since it is used only by CalendarScheduler::newwidth(),
++	//   some important checks present in insert() need not be performed.
+ 
+-	if (++qsize_ > top_threshold_)
+-		resize(nbuckets_<<1);
++	int i = CALENDAR_HASH(e->time_);
++	Event *head = buckets_[i].list_;
++	Event *before=0;
++	if (!head) {
++		buckets_[i].list_ = e;
++		e->next_ = e->prev_ = e;
++		++stat_qsize_; 
++		++buckets_[i].count_;
++	} else {
++		bool newhead;
++		if (e->time_ > head->prev_->time_) { //strict LIFO, so > and not >=
++			// insert at the tail
++			before = head;
++			newhead = false;
++		} else {
++			// insert event in time sorted order, LIFO for sim-time events
++			for (before = head; e->time_ > before->time_; before = before->next_)
++				;
++			newhead = (before == head);
++		}
++
++		e->next_ = before;
++		e->prev_ = before->prev_;
++		before->prev_ = e;
++		e->prev_->next_ = e;
++		if (newhead) {
++			buckets_[i].list_ = e;
++			//assert(e->time_ <= e->next_->time_);
++		}
++
++		if (e != e->next_ && e->next_->time_ != e->time_) {
++			// unique timing
++			++stat_qsize_; 
++			++buckets_[i].count_;
++		}
++	}
++	//assert(e == buckets_[i].list_ ||  e->prev_->time_ <= e->time_);
++	//assert(e == buckets_[i].list_->prev_ || e->next_->time_ >= e->time_);
++
++	++qsize_;
++	// no need to check resizing
+ }
+ 
+-Event*
+-CalendarScheduler::deque()
++const Event*
++CalendarScheduler::head()
+ {
+ 	if (qsize_ == 0)
+ 		return NULL;
+-	for (;;) {
+-		int i = lastbucket_;
+-		
+-		// check for an event this `year'
+-		do {
+-			Event* e = buckets_[i];
+-			if ((e != NULL) && (e->time_ < buckettop_)) {
+-				buckets_[i] = e->next_;
+-				lastbucket_ = i;
+-				last_clock_ = e->time_;
+-				if (--qsize_ < bot_threshold_)
+-					resize(nbuckets_>>1);
+-				return e;
+-			} else {
+-				if (++i == nbuckets_) {
+-					i = 0;
+-				/* Brad Karp, karp@eecs.harvard.edu:
+-				   at the end of each year, eliminate roundoff
+-				   error in buckettop_ */
+-					buckettop_ = prevtop_ + nbuckets_ * width_;
+-					prevtop_ = buckettop_;
+-					
+-				} else {
+-					buckettop_+= width_;
+-				}
+-			}
+-		} while (i != lastbucket_);
+-		
+-		// or direct search for the minimum event
+-		int pos = 0;
+-		Event* min;
+-		do {
+-			min = buckets_[pos++];
+-		} while (min == NULL);
+-		pos--;
+-		
+-		int k;
+-		for (k = pos+1; k < nbuckets_; k++) {
+-			Event* e = buckets_[k];
+-			if ((e != NULL) && (e->time_ < min->time_)) {
+-				min = e; pos = k;
+-			}
+-		}
+-		
+-		// adjust year and resume
+-		lastbucket_ = pos;
+-		last_clock_ = min->time_;
+-		unsigned long n = (unsigned long)(min->time_ * oneonwidth_);
+-		buckettop_ = width_*(n+1.5);
+-		prevtop_ = buckettop_ - lastbucket_ * width_;
++
++	int l, i = lastbucket_;
++	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
++	double diff;
++	Event *e, *min_e = NULL;
++#define CAL_DEQUEUE(x) 						\
++do { 								\
++	if ((e = buckets_[i].list_) != NULL) {			\
++		diff = e->time_ - cal_clock_;			\
++		if (diff < diff##x##_)	{			\
++			l = i;					\
++			goto found_l;				\
++		}						\
++		if (min_e == NULL || min_e->time_ > e->time_) {	\
++			min_e = e;				\
++			l = i;					\
++		}						\
++	}							\
++	if (++i == nbuckets_) i = 0;				\
++} while (0)
++		 
++	// CAL_DEQUEUE applied successively will find the event to
++	// dequeue (within one year) and keep track of the
++	// minimum-priority event seen so far; the argument controls
++	// the criteria used to decide whether the event should be
++	// considered `within one year'.  Importantly, the number of
++	// buckets should not be less than 4.
++	CAL_DEQUEUE(0); 
++	CAL_DEQUEUE(1); 
++	for (; i != lastbucket_dec; ) {
++		CAL_DEQUEUE(2);
++	}
++	// one last bucket is left unchecked - take the minimum
++	// [could have done CAL_DEQUEUE(3) with diff3_ = bwidth*(nbuck*3/2-1)]
++	e = buckets_[i].list_;
++	if (min_e != NULL && 
++	    (e == NULL || min_e->time_ < e->time_))
++		e = min_e;
++	else {
++		//assert(e);
++		l = i;
++	}
++ found_l:
++	//assert(buckets_[l].count_ >= 0);
++	//assert(buckets_[l].list_ == e);
++
++	/* l is the index of the bucket to dequeue, e is the event */
++	/* 
++	 * still want to advance lastbucket_ and cal_clock_ to save
++	 * time when deque() follows. 
++	 */
++	lastbucket_ = l;
++ 	cal_clock_  = e->time_;
++	
++	return e;
++}
++
++Event* 
++CalendarScheduler::deque()
++{
++	Event *e = const_cast<Event *>(head());
++
++	if (!e)
++		return 0;
++
++	int l = lastbucket_;
++
++	// update stats and unlink
++	if (e->next_ == e || e->next_->time_ != e->time_) {
++		--stat_qsize_;
++		//assert(stat_qsize_ >= 0);
++		--buckets_[l].count_;
++		//assert(buckets_[l].count_ >= 0);
++
+ 	}
+-	//return deque();
++	--qsize_;
++
++	if (e->next_ == e)
++		buckets_[l].list_ = 0;
++	else {
++		e->next_->prev_ = e->prev_;
++		e->prev_->next_ = e->next_;
++		buckets_[l].list_ = e->next_;
++	}
++
++	e->next_ = e->prev_ = NULL;
++
++
++	//if (buckets_[l].count_ == 0)
++	//	assert(buckets_[l].list_ == 0);
++
++ 	if (stat_qsize_ < bot_threshold_) {
++		resize(nbuckets_ >> 1, cal_clock_);
++	}
++
++	return e;
+ }
+ 
+-void CalendarScheduler::reinit(int nbuck, double bwidth, double start)
++void 
++CalendarScheduler::reinit(int nbuck, double bwidth, double start)
+ {
+-	buckets_ = new Event*[nbuck];
+-	memset(buckets_, 0, sizeof(Event*)*nbuck);
++	buckets_ = new Bucket[nbuck];
++
++	memset(buckets_, 0, sizeof(Bucket)*nbuck); //faster than ctor
++
+ 	width_ = bwidth;
+-	oneonwidth_ = 1.0 / width_;
+ 	nbuckets_ = nbuck;
+-	buckbits_ = nbuck-1;
+ 	qsize_ = 0;
+-	last_clock_ = start;
+-	long n = (long)(start * oneonwidth_);
+-	lastbucket_ = n & buckbits_;
+-	buckettop_ = width_*(n+1.5);
+-	prevtop_ = buckettop_ - lastbucket_ * width_;
++	stat_qsize_ = 0;
++
++	lastbucket_ =  CALENDAR_HASH(start);
++
++	diff0_ = bwidth*nbuck/2;
++	diff1_ = diff0_ + bwidth;
++	diff2_ = bwidth*nbuck;
++	//diff3_ = bwidth*(nbuck*3/2-1);
++
+ 	bot_threshold_ = (nbuck >> 1) - 2;
+ 	top_threshold_ = (nbuck << 1);
+ }
+ 
+-void CalendarScheduler::resize(int newsize)
++void 
++CalendarScheduler::resize(int newsize, double start)
+ {
+-	if (!resizeenabled_) return;
++	double bwidth = newwidth(newsize);
++
++	if (newsize < 4)
++		newsize = 4;
+ 
+-	double bwidth = newwidth();
+-	Event** oldb = buckets_;
++	Bucket *oldb = buckets_;
+ 	int oldn = nbuckets_;
+ 
++	reinit(newsize, bwidth, start);
++
+ 	// copy events to new buckets
+-	reinit(newsize, bwidth, clock_);
+ 	int i;
+-	for (i = oldn-1; i >= 0; i--) {
+-		Event* e = oldb[i];
+-		while (e != NULL) {
+-			Event* en = e->next_;
+-			insert(e);
+-			e = en;
++
++	for (i = 0; i < oldn; ++i) {
++		// we can do inserts faster, if we use insert2, but to
++		// preserve FIFO, we have to start from the end of
++		// each bucket and use insert2
++		if  (oldb[i].list_) {
++			Event *tail = oldb[i].list_->prev_;
++			Event *e = tail; 
++			do {
++				Event* ep = e->prev_;
++				e->next_ = e->prev_ = 0;
++				insert2(e);
++				e = ep;
++			} while (e != tail);
+ 		}
+ 	}
+ 	delete [] oldb;
+ }
+ 
+-#define MIN_WIDTH (1.0e-6)
+-#define MAX_HOLD  25
+-
++// take samples from the most populated bucket.
+ double
+-CalendarScheduler::newwidth()
++CalendarScheduler::newwidth(int newsize)
+ {
+-	static Event* hold[MAX_HOLD];
+-	int nsamples;
+-
+-	if (qsize_ < 2) return 1.0;
+-	if (qsize_ < 5) nsamples = qsize_;
+-	else nsamples = 5 + qsize_ / 10;
+-	if (nsamples > MAX_HOLD) nsamples = MAX_HOLD;
+-
+-	// dequue and requeue sample events to gauge width
+-	double olp = clock_;
+-	double olt = buckettop_;
+-	int olb = lastbucket_;
+-	double olbt = prevtop_;
+-
+-	resizeenabled_ = 0;
+-	for (int i = 0; i < nsamples; i++) hold[i] = deque();
+-	// insert in the inverse order and using insert2 to take care of same-time events.
+-	for (int j = nsamples-1; j >= 0; j--) insert2(hold[j]);
+-	resizeenabled_ = 1;
+-
+-	clock_ = olp;
+-	buckettop_ = olt;
+-	prevtop_ = olbt;
+-	lastbucket_ = olb;
+-
+-	// try to work out average cluster separation
+-	double asep = (hold[nsamples-1]->time_ - hold[0]->time_) / (nsamples-1);
+-	double asep2 = 0.0;
+-	//double min = (clock_ + 1.0) * MIN_WIDTH; 
+-	int count = 0;
+-
+-	for (int k = 1; k < nsamples; k++) {
+-		double diff = hold[k]->time_ - hold[k-1]->time_;
+-		if (diff < 2.0*asep) { asep2 += diff; count++; }
+-	}
+-
+-	// but don't let things get too small for numerical stability
+-	//double nw = count ? 3.0*(asep2/count) : asep;
+-	//if (nw < min) nw = min;
+-
+-	// if count==0, i.e if all samples are scheduled at the same time, we don't know better than to keep the old estimate
+-	double nw;
+-	if (count == 0) {
+-		nw = width_;
+-	} else {
+-		nw = 3.0*asep2/count;
++	int i;
++	short max_bucket = 0; // index of the fullest bucket
++	for (i = 1; i < nbuckets_; ++i) {
++		if (buckets_[i].count_ > buckets_[max_bucket].count_)
++			max_bucket = i;
+ 	}
++	int nsamples = buckets_[max_bucket].count_;
+ 
+-	/* need to make sure that time_/width_ can be represented as
+-	 * an int.  see the comment at the start of insert().
+-	 */
+-	/* optimisation suggested by Yuri is to increase value of
+-	 * new-width by a factor and leave some space for future events,
+-	 * so that we won't be resizing the queue everytime e->time_ 
+-	 * > max_. 
+-	 */
+-	   
+-	if (max_/nw > ULONG_MAX) {
+-		//nw = max_/ULONG_MAX;
+-		nw = max_ * CALENDAR_ALPHA / ULONG_MAX;
+-	}
++	if (nsamples <= 4) return width_;
++	
++	double nw = buckets_[max_bucket].list_->prev_->time_ 
++		- buckets_[max_bucket].list_->time_;
++	assert(nw > 0);
++	
++	nw /= ((newsize < nsamples) ? newsize : nsamples); // min (newsize, nsamples)
++	nw *= 4.0;
++	
+ 	return nw;
+ }
+ 
+@@ -776,77 +943,90 @@
+  * must free the event if necessary; this routine only removes
+  * it from the scheduler queue.
+  *
+- * xxx: we may cancel the last event and invalidate the value of max_
+- * xxx: thus using wider buckets than really necessary
+  */
+-void CalendarScheduler::cancel(Event* e)
++void 
++CalendarScheduler::cancel(Event* e)
+ {
+-	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_);
+-
+ 	if (e->uid_ <= 0)	// event not in queue
+ 		return;
+-	for (Event** p = buckets_ + i; (*p) != NULL; p = &(*p)->next_)
+-		if ((*p) == e) {
+-			(*p) = (*p)->next_;
+-			e->uid_ = - e->uid_;
+-			qsize_--;
+-			return; 
+-		}
+-	abort();
+-}
+ 
+-Event* CalendarScheduler::lookup(scheduler_uid_t uid)
+-{
+-	for (int i = 0; i < nbuckets_; i++)
+-		for (Event* p = buckets_[i]; p != NULL; p = p->next_)
+-			if (p->uid_== uid) return p;
+-	return NULL;
+-}
++	int i = CALENDAR_HASH(e->time_);
+ 
+-void CalendarScheduler::insert2(Event* e)
+-{
+-	// Same as insert, but for inserts e *before* any same-time-events, if
+-	//   there should be any.  Since it is used only by CalendarScheduler::newwidth(),
+-	//   some important checks present in insert() need not be performed.
++	assert(e->prev_->next_ == e);
++	assert(e->next_->prev_ == e);
+ 
+-	// bucket number and address
+-	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_); 
+-	Event** p = buckets_ + i;
+-
+-	// insert event in stable time sorted order
+-	while ((*p != NULL) && (e->time_ > (*p)->time_)) // > instead of >=!
+-		p = &(*p)->next_;
++	if (e->next_ == e || 
++	    (e->next_->time_ != e->time_ &&
++	    (e->prev_->time_ != e->time_))) { 
++		--stat_qsize_;
++		assert(stat_qsize_ >= 0);
++		--buckets_[i].count_;
++		assert(buckets_[i].count_ >= 0);
++	}
++
++	if (e->next_ == e) {
++		assert(buckets_[i].list_ == e);
++		buckets_[i].list_ = 0;
++	} else {
++		e->next_->prev_ = e->prev_;
++		e->prev_->next_ = e->next_;
++		if (buckets_[i].list_ == e)
++			buckets_[i].list_ = e->next_;
++	}
+ 
+-	e->next_ = *p;
+-	*p = e;
+-	++qsize_;
++	if (buckets_[i].count_ == 0)
++		assert(buckets_[i].list_ == 0);
++
++	e->uid_ = -e->uid_;
++	e->next_ = e->prev_ = NULL;
++
++	--qsize_;
++
++	return;
++}
++
++Event * 
++CalendarScheduler::lookup(scheduler_uid_t uid)
++{
++	for (int i = 0; i < nbuckets_; i++) {
++		Event* head =  buckets_[i].list_;
++		Event* p = head;
++		if (p) {
++			do {
++				if (p->uid_== uid) 
++					return p;
++				p = p->next_;
++			} while (p != head);
++		}
++	}
++	return NULL;
+ }
+ 
+ #ifndef WIN32
+ #include <sys/time.h>
+ #endif
+ 
+-/*
+- * Really should instance the list/calendar/heap discipline
+- * inside a RealTimeScheduler or VirtualTimeScheduler
+- */
+-
+-#ifdef notyet
+ class RealTimeScheduler : public CalendarScheduler {
+-#endif
+-
+-class RealTimeScheduler : public ListScheduler {
+ public:
+ 	RealTimeScheduler();
  	virtual void run();
  	double start() const { return start_; }
  	virtual void reset();
@@ -510,28 +1310,31 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +#endif
  protected:
  	void sync() { clock_ = tod(); }
- 	int rwait(double);	// sleep
+-	int rwait(double);	// sleep
  	double tod();
  	double slop_;	// allowed drift between real-time and virt time
  	double start_;	// starting time
-+
 +#ifdef USEEVENTS
 +        TbEventSink *evsink_;
 +#endif
-+  
++#ifdef GETTIME_TSC
++        unsigned long long basetsc_ ;
++        double  oneontscfreq_;
++#endif
  };
  
  static class RealTimeSchedulerClass : public TclClass {
-@@ -859,9 +883,35 @@
- 
+@@ -860,16 +1040,51 @@
  RealTimeScheduler::RealTimeScheduler() : start_(0.0)
  {
-+
+ 	bind("maxslop_", &slop_);
 +#ifdef USEEVENTS
 +        evsink_ = 0 ;
 +#endif
-+       
- 	bind("maxslop_", &slop_);
++#ifdef GETTIME_TSC
++        basetsc_ = 0 ;
++	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
++#endif
  }
  
 +#ifdef USEEVENTS
@@ -558,274 +1361,168 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  double
  RealTimeScheduler::tod()
  {
-@@ -876,7 +926,12 @@
- RealTimeScheduler::reset()
- {
- 	clock_ = SCHED_START;
--	start_ = tod();
++#ifdef GETTIME_TSC
++                 
++        unsigned long long curtsc = read_tsc();
++        return (((double)(curtsc - basetsc_)) * oneontscfreq_);
 +
-+	timeval tv;
-+	gettimeofday(&tv, 0);
-+	double s = tv.tv_sec;
-+	s += (1e-6 * tv.tv_usec);
-+	start_ = s;
++#else
+ 	timeval tv;
+ 	gettimeofday(&tv, 0);
+ 	double s = tv.tv_sec;
+ 	s += (1e-6 * tv.tv_usec);
+ 	return (s - start_);
++#endif
  }
  
- void RealTimeScheduler::run()
-@@ -884,6 +939,19 @@
- 	Event *p;
- 	double now;
+ void
+@@ -877,81 +1092,81 @@
+ {
+ 	clock_ = SCHED_START;
+ 	start_ = tod();
++#ifdef GETTIME_TSC   
++        basetsc_ = read_tsc();
++#endif
+ }
  
+-void RealTimeScheduler::run()
++#ifdef SCHED_DEBUG
++int done = 0;
++#endif
++
++void 
++RealTimeScheduler::run()
+ { 
+-	Event *p;
+-	double now;
++        static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
++	const Event *p;
++
 +#ifdef USEEVENTS
 +
 +	if( evsink_ ) {
 +	  evsink_->init();
 +	  evsink_->subscribe();
-+
-+	  // Our time starts now
-+	  reset();
-+
 +	}
-+
+ 
 +#endif
-+	
  	/*XXX*/
  	instance_ = this;
  
-@@ -899,7 +967,7 @@
- 		// first handle any "old events"
- 		//
- 		while ((p = deque()) != NULL && (p->time_ <= now)) {
+ 	while (!halted_) {
+-		now = tod();
+-		if ((now - clock_) > slop_) {
++		clock_ = tod();
++		p = head();
++		if (p && (clock_ - p->time_) > slop_) {
+ 			fprintf(stderr,
+-			"RealTimeScheduler: warning: slop %f exceeded limit %f [now:%f, clock_:%f]\n",
+-				now - clock_, slop_, now, clock_);
++				"RealTimeScheduler: warning: slop "
++				"%f exceeded limit %f [clock_:%f, p->time_:%f]\n",
++				clock_ - p->time_, slop_, clock_, p->time_);
+ 		}
++		// handle "old events"
++		while (p && p->time_ <= clock_) {
+ 
+-		//
+-		// first handle any "old events"
+-		//
+-		while ((p = deque()) != NULL && (p->time_ <= now)) {
 -			dispatch(p);
-+			dispatch(p, clock_);
+-		}
+-
+-		//
+-		// now handle a "future event", if there is one
+-		//
+-		if (p != NULL) {
+-			int rval = rwait(p->time_);
+-			if (rval < 0) {
+-				fprintf(stderr, "RTScheduler: wait problem\n");
+-				abort();
+-			} else if (rval == 0) {
+-				//
+-				// proper time to dispatch sim event... do so
+-				//
+-				dispatch(p, clock_);
+-			} else {
+-				//
+-				// there was a simulator event which fired, and
+-				// may have added something to the queue, which
+-				// could cause our event p to not be the next,
+-				// so put p back into the event queue and cont
+-				//
+-				insert(p);
+-			}
+-			continue;
++			dispatch(deque(), clock_);
++			if (halted_)
++				return;
++			p = head();
++			clock_ = tod();
  		}
  
- 		//
-@@ -932,6 +1000,11 @@
- 		//
- 		sync();
- 		Tcl_DoOneEvent(TCL_DONT_WAIT);
+-		//
+-		// no sim events to handle at all, check with tcl
+-		//
+-		sync();
+-		Tcl_DoOneEvent(TCL_DONT_WAIT);
+-	}
+-
+-	return;	// we reach here only if halted
+-}
+-
+-/*
+- * wait until the specified amount has elapsed, or a tcl event has happened,
+- * whichever comes first.  Return 1 if a tcl event happened, 0 if the
+- * deadline has been reached, or -1 on error (shouldn't happen).
+- */
 +#ifdef USEEVENTS
-+		if( evsink_ ) {
-+		  evsink_->poll();
++		if( evsink_ && evsink_->poll() == 1 ) {
++		  continue;
 +		}
 +#endif
- 	}
  
- 	return;	// we reach here only if halted
-@@ -948,8 +1021,208 @@
- {
- 	while (1) {
- 		sync();
-+#ifndef USEEVENTS
- 		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+-int
+-RealTimeScheduler::rwait(double deadline)
+-{
+-	while (1) {
+-		sync();
+-		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
 -			return (1);
-+  		        return(1);
-+#else
+-		if (deadline <= tod())
+-			return 0;
++#ifdef SCHED_DEBUG
++		if( clock_ >= 240.0 && done == 0 ) {
++		  fprintf( stderr, "After 60 secs. Hash Stats for newevents = %s\n",
++			   Tcl_HashStats(&newevents) );
++		  done = 1;
++		}
++#endif
 +		
-+		int ret1 = Tcl_DoOneEvent(TCL_DONT_WAIT);
-+		int ret2 = 0;
-+		if( evsink_ ) {
-+		  ret2 = evsink_->poll();
-+		}
-+		if( ret1 || ret2 )
-+		  return(1);
-+#endif
-+		if (deadline <= tod())
-+			return 0;
-+	}
-+	return -1;
-+}
-+
-+class RealTimeCalendarScheduler : public CalendarScheduler {
-+public:
-+	RealTimeCalendarScheduler();
-+	virtual void run();
-+	double start() const { return start_; }
-+	virtual void reset();
-+#ifdef USEEVENTS
-+	int command(int argc, const char*const* argv);
-+#endif
-+protected:
-+	void sync() { clock_ = tod(); }
-+	int rwait(double);	// sleep
-+	double tod();
-+	double slop_;	// allowed drift between real-time and virt time
-+	double start_;	// starting time
-+
-+#ifdef USEEVENTS
-+        TbEventSink *evsink_;
-+#endif
-+  
-+};
-+
-+static class RealTimeCalendarSchedulerClass : public TclClass {
-+public:
-+	RealTimeCalendarSchedulerClass() : TclClass("Scheduler/RealTimeCalendar") {}
-+	TclObject* create(int /* argc */, const char*const* /* argv */) {
-+		return (new RealTimeCalendarScheduler);
-+	}
-+} class_realtimecalendar_sched;
-+
-+RealTimeCalendarScheduler::RealTimeCalendarScheduler() : start_(0.0)
-+{
-+
-+#ifdef USEEVENTS
-+        evsink_ = 0 ;
-+#endif
-+       
-+	bind("maxslop_", &slop_);
-+}
-+
-+#ifdef USEEVENTS
-+  
-+int RealTimeCalendarScheduler::command(int argc, const char*const* argv)
-+{
-+  Tcl& tcl = Tcl::instance();
-+  if (instance_ == 0)
-+    instance_ = this;
-+  
-+  
-+  if( argc == 3 ) {
-+    if(strcmp(argv[1], "tbevent-sink") == 0) {
-+      evsink_ = (TbEventSink *)TclObject::lookup(argv[2]);
-+      return(TCL_OK);
-+    }
-+  }
-+
-+  return(Scheduler::command(argc, argv));
-+}  
-+
-+#endif
-+
-+double
-+RealTimeCalendarScheduler::tod()
-+{
-+	timeval tv;
-+	gettimeofday(&tv, 0);
-+	double s = tv.tv_sec;
-+	s += (1e-6 * tv.tv_usec);
-+	return (s - start_);
-+}
-+
-+void
-+RealTimeCalendarScheduler::reset()
-+{
-+	clock_ = SCHED_START;
-+
-+	timeval tv;
-+	gettimeofday(&tv, 0);
-+	double s = tv.tv_sec;
-+	s += (1e-6 * tv.tv_usec);
-+	start_ = s;
-+}
-+
-+void RealTimeCalendarScheduler::run()
-+{ 
-+	Event *p;
-+	double now;
-+
-+#ifdef USEEVENTS
-+
-+	if( evsink_ ) {
-+	  evsink_->init();
-+	  evsink_->subscribe();
-+
-+	  // Our time starts now
-+	  reset();
-+
-+	}
-+
-+#endif
-+	
-+	/*XXX*/
-+	instance_ = this;
-+
-+	while (!halted_) {
-+		now = tod();
-+		if ((now - clock_) > slop_) {
-+			fprintf(stderr,
-+			"RealTimeCalendarScheduler: warning: slop %f exceeded limit %f [now:%f, clock_:%f]\n",
-+				now - clock_, slop_, now, clock_);
-+		}
-+
-+		//
-+		// first handle any "old events"
-+		//
-+		while ((p = deque()) != NULL && (p->time_ <= now)) {
-+			dispatch(p, clock_);
-+		}
-+
-+		//
-+		// now handle a "future event", if there is one
-+		//
-+		if (p != NULL) {
-+			int rval = rwait(p->time_);
-+			if (rval < 0) {
-+				fprintf(stderr, "RTScheduler: wait problem\n");
-+				abort();
-+			} else if (rval == 0) {
-+				//
-+				// proper time to dispatch sim event... do so
-+				//
-+				dispatch(p, clock_);
-+			} else {
-+				//
-+				// there was a simulator event which fired, and
-+				// may have added something to the queue, which
-+				// could cause our event p to not be the next,
-+				// so put p back into the event queue and cont
-+				//
-+				insert(p);
++		if (!p) {
++			// blocking wait for TCL events
++		        Tcl_WaitForEvent(0); // no sim events, wait forever
++			clock_ = tod();
++		} else {
++			double diff = p->time_ - clock_;
++			// blocking wait only if there is enough time
++			if (diff > RTSCHEDULER_MINWAIT) {
++				Tcl_Time to;
++				to.sec = long(diff);
++				to.usec = long(1e6*(diff - to.sec));
++				Tcl_WaitForEvent(&to);    // block
++				clock_ = tod();
 +			}
-+			continue;
 +		}
-+
-+		//
-+		// no sim events to handle at all, check with tcl
-+		//
-+		sync();
 +		Tcl_DoOneEvent(TCL_DONT_WAIT);
-+#ifdef USEEVENTS
-+		if( evsink_ ) {
-+		  evsink_->poll();
-+		}
-+#endif
-+	}
-+
-+	return;	// we reach here only if halted
-+}
-+
-+/*
-+ * wait until the specified amount has elapsed, or a tcl event has happened,
-+ * whichever comes first.  Return 1 if a tcl event happened, 0 if the
-+ * deadline has been reached, or -1 on error (shouldn't happen).
-+ */
-+
-+int
-+RealTimeCalendarScheduler::rwait(double deadline)
-+{
-+	while (1) {
-+		sync();
-+#ifndef USEEVENTS
-+		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
-+  		        return(1);
-+#else
-+		
-+		int ret1 = Tcl_DoOneEvent(TCL_DONT_WAIT);
-+		int ret2 = 0;
-+		if( evsink_ ) {
-+		  ret2 = evsink_->poll();
-+		}
-+		if( ret1 || ret2 )
-+		  return(1);
-+#endif
- 		if (deadline <= tod())
- 			return 0;
  	}
+-	return -1;
++	// we reach here only if halted
+ }
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Sun Oct  6 21:54:17 2002
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -844,7 +1541,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/
  }
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Sun Oct  6 21:54:17 2002
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -888,7 +1585,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1
 +#endif
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Sun Oct  6 21:54:17 2002
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -907,12 +1604,13 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b
  #endif /* timer_handler_h */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Wed Jun 19 12:06:51 2002
-@@ -37,11 +37,42 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Sun Oct  6 23:08:01 2002
+@@ -37,21 +37,64 @@
  #endif
  
  #include "iptap.h"
 +#include "net.h"
++#include <sys/time.h>
  
 +#ifdef USEROUTES
 +#include "tbnexthop.h"
@@ -952,21 +1650,124 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
  	TclObject* create(int, const char*const*) {
  		return (new IPTapAgent());
  	}
-@@ -52,6 +83,9 @@
+ } class_iptap_agent;
+ 
+ 
+-IPTapAgent::IPTapAgent() 
++IPTapAgent::IPTapAgent()
++#ifdef MEASURE_DELAYS  
++                        :  firstpkt_in_burst(false),
++			   max_delay(0.0), bpf_ts_to_iptap_max_delay(0.0),
++			   bpf_ts_to_iptap_min_delay(100.0), data_idx(0)
++#endif
  {
    int i = 0;
    index = 0;
++#ifdef MEASURE_DELAYS
++  memset( bpf_ts_to_iptap, 0, sizeof(bpf_ts_to_iptap));
++#endif
 +#ifdef USEROUTES
 +  iface_index = 0;
 +#endif
    for (; i < MAX_PACKETS ; i++) {
      ident[i] = -1;
      offset[i] = -1;
-@@ -143,8 +177,16 @@
+@@ -120,20 +163,21 @@
+   
+ }
+ 
++void
++IPTapAgent::pkt_handler(void *clientdata, Packet *p, const struct timeval &ts)
++{
++  IPTapAgent *inst = (IPTapAgent *)clientdata;
++  inst->processpkt(p, ts);
++}
++
++//#define MAX(a,b) ((a)>(b)?(a):(b))
++
++
+ 
+-/*
+- * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+- * 
+- * recvpkt then calls the network (net_) to receive a packet from 
+- * the bpf. Once it has the packet, it populates the ns packet ttl 
+- * value and inject it into the simulator by calling target_->recv
+- * 
+- */
+ void
+-IPTapAgent::recvpkt()
++IPTapAgent::processpkt(Packet *p, const struct timeval &ts)
+ {
+   struct ip *ipheader;
+-  struct tcphdr *tcpheader;
+   unsigned char *buf;
+   
+   /* Ip header information from the grabbed packet. */
+@@ -143,45 +187,39 @@
    
    /* TCP header info from the grabbed packet. */
    unsigned char tcphlen;
-+
+-  
+-  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
+-    fprintf(stderr,
+-	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
+-	    name());
+-    return;
+-  }
+-  
+-  if (maxpkt_ <= 0) {
+-    fprintf(stderr,
+-	    "IPTapAgent(%s): recvpkt: maxpkt_ value too low (%d)\n",
+-	    name(), maxpkt_);
+-    return;
+-  }
+-  
+ 
+-  // allocate packet and a data payload
+-  Packet* p = allocpkt(maxpkt_);
++#ifdef MEASURE_DELAYS
+ 
+-  // fill up payload
+-  sockaddr addr;	// not really used (yet)
+-  double tstamp;
+-  int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
+-  if (cc <= 0) {
+-    if (cc < 0) {
+-      perror("recv");
+-    }
+-    Packet::free(p);
+-    return;
+-  }
+-  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
++  // This code keeps some delay data and drops the packet 
++  if( firstpkt_in_burst ) {
++    ts_firstpkt_in_burst = ts.tv_sec + ts.tv_usec * 1e-6 ;
++    firstpkt_in_burst = false;
++  }
++  timeval tv;
++  gettimeofday(&tv, 0);
++  double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
++  max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
++  bpf_ts_to_iptap[data_idx] = nowts - (ts.tv_sec + ts.tv_usec * 1e-6);
++  bpf_ts_to_iptap_max_delay = MAX(bpf_ts_to_iptap[data_idx],
++			      bpf_ts_to_iptap_max_delay);
++  bpf_ts_to_iptap_min_delay = MIN(bpf_ts_to_iptap[data_idx],
++			      bpf_ts_to_iptap_min_delay);
++  data_idx = (data_idx+1) %
++    (sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]));
+ 
+-  /* 
+-     At this point, all I have to do is to grab the ttl value 
+-     from the received packet and put it in p's ttl field after
+-     decrementing it. It's ok, if we don't recalculate the checksum
+-     of the actual packet, because we'll do it at the end anyways.
+-  */
++  Packet::free(p);
++  return;
++  
++#endif
+ 
 +#ifdef MEASURE_EVENT_RATE
 +  // schedule the event rate 
 +  if ( firstpacket == 0 ) {
@@ -974,40 +1775,24 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +    firstpacket++;
 +  }
 +#endif
-   
--  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
-+  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
- 	    name());
-@@ -165,7 +207,7 @@
-   // fill up payload
-   sockaddr addr;	// not really used (yet)
-   double tstamp;
--  int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
-+  int cc = net_incoming_->recv(p->accessdata(), maxpkt_, addr, tstamp);
-   if (cc <= 0) {
-     if (cc < 0) {
-       perror("recv");
-@@ -193,11 +235,13 @@
++  
+   ipheader = (struct ip *) p->accessdata();
+   buf = p->accessdata();
+   iphlen = ipheader->ip_hl * 4;
+@@ -193,12 +231,6 @@
      return;
    }
  
-+  /**** DONT NEED THE FOLLOWING CODE IF WE USE APPROPRIATE PCAP FILTERS
-+	THAT HAVE "not ether src xx:xx:xx:xx:xx:xx" in it           ****/
-   /* Discard if duplicate. */
+-  /* Discard if duplicate. */
 -  if (isDuplicate(ntohs(ipheader->ip_id), ntohs(ipheader->ip_off))) {
 -    Packet::free(p);
 -    return;
 -  }
-+  //  if (isDuplicate(ntohs(ipheader->ip_id), ntohs(ipheader->ip_off))) {
-+  //    Packet::free(p);
-+  //    return;
-+  //  }  
-   
+-  
    datagramlen = ntohs(ipheader->ip_len);
  
-@@ -208,13 +252,83 @@
+   /* Put all the info in the ns headers. */
+@@ -208,13 +240,146 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -1066,14 +1851,77 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    return;
  }
  
+ 
++/*
++ * ns scheduler calls TapAgent::dispatch which calls recvpkt.
++ * 
++ * recvpkt then calls the network (net_) to receive a packet from 
++ * the bpf. Once it has the packet, it populates the ns packet ttl 
++ * value and inject it into the simulator by calling target_->recv
++ * 
++ */
++void
++IPTapAgent::recvpkt()
++{
++  struct ip *ipheader;
++  struct tcphdr *tcpheader;
++  unsigned char *buf;
++  
++  /* Ip header information from the grabbed packet. */
++  int iphlen;  
++  unsigned short datagramlen;
++  unsigned char ttl;
++  
++  /* TCP header info from the grabbed packet. */
++  unsigned char tcphlen;
+ 
++  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
++    fprintf(stderr,
++	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
++	    name());
++    return;
++  }
++  
++  // Should be Net/Pcap/Live. This calls back pkt_handler
++  // for every packet it sees in the pcap buffer
++#ifdef MEASURE_DELAYS
++  firstpkt_in_burst = true;
++#endif
++  int cc = net_incoming_->recv(pkt_handler, this);
++  if (cc <= 0) {
++    if (cc < 0) {
++      perror("recv");
++    }
++    return;
++  }
++  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
++
++  // nothing to do coz pkt_handler would have called processpkt()
++  // that would have injected packets into the simulator
++}
++
 +#ifdef USEROUTES
 +  
 +int
 +IPTapAgent::command(int argc, const char*const* argv)
 +{
 +	Tcl& tcl = Tcl::instance();
- 
-+	if (argc == 3) {
++
++	if (argc == 2) {
++#if MEASURE_DELAYS
++	  if( strcmp(argv[1], "print_delays") == 0 ) {
++	    printf("object %s : max_delay = %g "
++		   "bpf_ts_to_iptap_max_delay = %g "
++		   "bpf_ts_to_iptap_min_delay = %g\n",
++		   name(), max_delay, bpf_ts_to_iptap_max_delay,
++		   bpf_ts_to_iptap_min_delay);
++	    for( int i=0; i<sizeof(bpf_ts_to_iptap)/sizeof(bpf_ts_to_iptap[0]) ; i++ )
++	      printf("%.10f ", bpf_ts_to_iptap[i]);
++	    printf("\n");
++	    return (TCL_OK);
++	  }
++#endif
++	} else if (argc == 3) {
 +		if (strcmp(argv[1], "network-incoming") == 0) {
 +			PcapNetwork *net_in_ = (PcapNetwork *)TclObject::lookup(argv[2]);
 +			if (net_in_ != 0) {
@@ -1086,12 +1934,12 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
 +	}
 +	return (TapAgent::command(argc, argv));
 +}
- 
++
 +#endif
  
  /*
   * simulator schedules TapAgent::recv which calls sendpkt
-@@ -231,23 +345,24 @@
+@@ -231,23 +396,24 @@
    unsigned short dglen;
    struct ip *ipheader;
  
@@ -1124,7 +1972,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    /*
      At this point, we should grab the ttl field from the ns
      packet, put it in the IP header of the actual packet,
-@@ -277,13 +392,22 @@
+@@ -277,13 +443,29 @@
    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
  						sizeof(struct ip));
  
@@ -1144,14 +1992,21 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
      return (-1);
      
    }
++
++#if 0
++  if( hc->size() < 50 ) {
++    fprintf( stderr, "sent pkt %d\n", hc->size());
++  }
++#endif
++  
 +  Packet::free(p); // memory leak fix from 2.1b8a 
    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
  	  name(), hc->size());
    return 0;
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Wed Jun 19 12:06:51 2002
-@@ -38,24 +38,35 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Sun Oct  6 23:07:23 2002
+@@ -38,29 +38,54 @@
  
  #include "tap.h"
  #include <netinet/in.h>
@@ -1185,13 +2040,32 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.
 +#ifdef USEROUTES
 +  uint16_t iface_index;
 +#endif
++#ifdef MEASURE_DELAYS
++  bool firstpkt_in_burst;
++  double ts_firstpkt_in_burst;
++#endif  
  
    unsigned short in_cksum(unsigned short *,int);
    void recvpkt();
+   int sendpkt(Packet*);
+   int isDuplicate(unsigned short, unsigned short);
++  void processpkt(Packet *, const struct timeval &);
++  static void pkt_handler(void *, Packet *, const struct timeval &);
++
++#ifdef MEASURE_DELAYS  
++  double max_delay;
++  double bpf_ts_to_iptap_max_delay;
++  double bpf_ts_to_iptap_min_delay;
++  int data_idx;
++  double bpf_ts_to_iptap[80000];
++#endif  
+ };
+ 
+ #endif /* iptap_h */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Wed Jun 19 12:06:51 2002
-@@ -57,10 +57,18 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Sun Oct  6 23:04:43 2002
+@@ -57,92 +57,25 @@
  
  #ifdef __cplusplus
  extern "C" {
@@ -1210,10 +2084,10 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
  #endif
  
  #include "config.h"
-@@ -68,81 +76,6 @@
+ #include "scheduler.h"
  #include "net.h"
  #include "tclcl.h"
- 
+-
 -/*
 - * observations about pcap library
 - *	device name is in the ifreq struct sense, should be doc'd
@@ -1289,16 +2163,138 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
 -
 -	unsigned int local_netmask_;	// seems shouldn't be necessary :(
 -};
++#include "packet.h"
  
  //
  // PcapLiveNetwork: a live network tap
+@@ -187,7 +120,7 @@
+ private:
+ 	// XXX somewhat specific to bpf-- this stuff is  a hack until pcap
+ 	// can be fixed to allow for opening the bpf r/w
+-#ifdef MT_OWN_PCAP
++#ifdef MY_OWN_PCAP
+ 	pcap_t * pcap_open_live(char *, int slen, int prom, int, char *, int);
+ 	int bpf_open(pcap_t *p, char *errbuf, int how);
+ #endif
+@@ -307,6 +240,12 @@
+         const u_char *pkt;
+ };   
+ 
++struct pcap_singleton_callback {
++        netpkt_handler callback;
++        void *clientdata;
++        PcapNetwork *net;
++};   
++
+ void
+ PcapNetwork::phandler(u_char* userdata, const pcap_pkthdr* ph, const u_char* pkt)
+ {
+@@ -315,10 +254,50 @@
+ 	ps->pkt = (u_char*)pkt;
+ }
+ 
++bool small_recd = false;
++
++void
++PcapNetwork::phandler_callback(u_char* userdata, const pcap_pkthdr* ph, const u_char* pkt)
++{
++	pcap_singleton_callback *ps = (pcap_singleton_callback*) userdata;	
++
++	Packet *p = Packet::alloc(ph->caplen);
++	PcapNetwork *inst = ps->net;
++	
++	if (++(inst->pcnt_) == 1) {
++		// mark time stamp of first pkt
++		inst->t_firstpkt_ = ph->ts.tv_sec + ph->ts.tv_usec * 0.000001;
++	}
++
++	// link layer header will be placed at the beginning from pcap
++	int s = inst->skiphdr();	// go to IP header
++	memcpy(p->accessdata(), pkt + s, ph->caplen - s);
++
++	ps->callback(ps->clientdata, p, ph->ts);
++}
++
+ int
+-PcapNetwork::recv(u_char *buf, int len, sockaddr& /*fromaddr*/, double &ts)
++PcapNetwork::recv(netpkt_handler callback, void *clientdata)
+ {
++	if (state_ != PNET_PSTATE_ACTIVE) {
++		fprintf(stderr, "warning: net/pcap obj(%s) read-- not active\n",
++			name());
++		return -1;
++	}
++
++	int pktcnt = -1;		// all in buffer, or until error
++	int np;			// counts # of pkts dispatched
++	pcap_singleton_callback ps = { callback, clientdata, this };
++	
++	np = pcap_dispatch(pcap_, pktcnt, phandler_callback, (u_char *)&ps);
++
++	//assert( pcap_->cc == 0 );
++	return np;
++}
+ 
++int
++PcapNetwork::recv(u_char *buf, int len, sockaddr& /*fromaddr*/, double &ts)
++{
+ 	if (state_ != PNET_PSTATE_ACTIVE) {
+ 		fprintf(stderr, "warning: net/pcap obj(%s) read-- not active\n",
+ 			name());
+@@ -356,7 +335,7 @@
+ 		// mark time stamp of first pkt
+ 		t_firstpkt_ = ph->ts.tv_sec + ph->ts.tv_usec * 0.000001;
+ 	}
+-
++	
+ 	int n = MIN(ph->caplen, (unsigned)len);
+ 	ts = gents(ph);	// mark with timestamp
+ 	// link layer header will be placed at the beginning from pcap
+@@ -489,6 +468,19 @@
+ 				"warning: pcap/live (%s) couldn't set immed\n",
+ 				name());
+ 			perror("ioctl(BIOCIMMEDIATE)");
++		}
++		if (ioctl(pfd_, BIOCFLUSH, 0) < 0) {
++			fprintf(stderr,
++				"warning: pcap/live (%s) couldn't flush bpf buffer\n",
++				name());
++			perror("ioctl(BIOCFLUSH)");
++		}
++		int seesent = 0;
++		if (ioctl(pfd_, BIOCSSEESENT, &seesent) < 0) {
++			fprintf(stderr,
++				"warning: pcap/live (%s) couldn't reset BIOCGSEESENT\n",
++				name());
++			perror("ioctl(BIOCGSEESENT)");
+ 		}
+ 	}
+ #endif
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b9/emulate/net.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Wed Jun 19 12:06:51 2002
-@@ -64,4 +64,102 @@
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Sun Oct  6 23:06:56 2002
+@@ -49,12 +49,16 @@
+ #undef interface
+ #endif
+ 
++class Packet;
++typedef void (*netpkt_handler)(void *userdata, Packet *p, const struct timeval &ts);
++
+ class Network : public TclObject {
+ public:
+ 	Network() : mode_(-1) { }
+ 	virtual int command(int argc, const char*const* argv);
+ 	virtual int send(u_char* buf, int len) = 0;
+ 	virtual int recv(u_char* buf, int len, sockaddr& from, double& ts) = 0;
++	virtual int recv(netpkt_handler callback, void *clientdata) {} // callback called for every packet
+ 	virtual int rchannel() = 0;
+ 	virtual int schannel() = 0;
+ 	int mode() { return mode_; }
+@@ -63,5 +67,105 @@
+ 	static char* modename(int);	    // and the reverse
  protected:
  	int mode_;	// read/write bits (from fcntl.h)
- };
++};
 +
 +#ifdef __cplusplus
 +extern "C" {
@@ -1366,6 +2362,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b
 +	virtual int skiphdr() = 0;
 +	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
 +	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
++	int recv(netpkt_handler callback, void *clientdata); // get from net
 +	int send(u_char *buf, int len);			// write to net
 +	void close();
 +	void reset();
@@ -1383,6 +2380,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b
 +
 +protected:
 +	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
++	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
 +	virtual void bindvars() = 0;
 +
 +	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
@@ -1396,11 +2394,11 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b
 +	struct pcap_stat pcs_;			// status
 +
 +	unsigned int local_netmask_;	// seems shouldn't be necessary :(
-+};
+ };
  #endif
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Sun Oct  6 21:54:17 2002
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -1536,7 +2534,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1
  		    name(), p->accessdata(), hc->size(), strerror(errno));
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Sun Oct  6 21:54:17 2002
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -1551,81 +2549,138 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b
  
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Wed Jun 19 12:06:51 2002
-@@ -91,6 +91,12 @@
-       }
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Sun Oct  6 23:02:17 2002
+@@ -33,7 +33,7 @@
+ 
+ #ifndef lint
+ static const char rcsid[] =
+-    "@(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/emulate/tcptap.cc,v 1.2 2001/09/20 19:05:21 alefiyah Exp $ (ISI)";
++    "@(#) $Header: /home/anoncvs/PUBLIC_CVSROOT/ns-2/emulate/tcptap.cc,v 1.4 2002/09/23 23:25:05 alefiyah Exp $ (ISI)";
+ #endif
+ 
+ #include "tcptap.h"
+@@ -97,6 +97,11 @@
        return (TCL_OK);
      }
-+
+ 
 +    if (strcmp(argv[1], "nsport") == 0) {
 +      nsnode.sin_port = atoi(argv[2]);
 +      return (TCL_OK);
 +    }
 +
-     
-     if (strcmp(argv[1], "extport") == 0) {
-       extnode.sin_port = atoi(argv[2]);
-@@ -198,6 +204,8 @@
-   ipheader->ip_v = IPVERSION;
+     if (strcmp(argv[1], "advertised-window") == 0) {
+       adv_window = atoi(argv[2]);
+       return (TCL_OK);
+@@ -298,18 +303,15 @@
  
-   ipheader->ip_len = length;
-+  ipheader->ip_off = IP_DF; /* most common now. fragmentation is quite bad on
-+			       performance */
-   ipheader->ip_id = 0;
-   ipheader->ip_ttl = ttl;
-   ipheader->ip_p = protocol;
-@@ -318,7 +326,7 @@
+ }
+ 
++void
++TCPTapAgent::pkt_handler(void *clientdata, Packet *p, const struct timeval &ts)
++{
++  TCPTapAgent *inst = (TCPTapAgent *)clientdata;
++  inst->processpkt(p, ts);
++}
+ 
+-
+-/*
+- * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+- * 
+- * recvpkt then calls the network (net_) to receive a packet from 
+- * the bpf. Once it has the packet, it converts to ns FullTCP packet
+- * format and inject it into the simulator by calling target_->recv
+- * 
+- */
+ void
+-TCPTapAgent::recvpkt()
++TCPTapAgent::processpkt(Packet *p, const struct timeval &ts)
+ {
+   struct ip *ipheader;
+   struct tcphdr *tcpheader;
+@@ -318,36 +320,6 @@
    /* Ip header information from the grabbed packet. */
    unsigned char ttl;
    
 -  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
-+  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-     fprintf(stderr,
- 	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
- 	    name());
-@@ -338,7 +346,7 @@
-   // fill up payload
-   sockaddr addr;	// not really used (yet)
-   double tstamp;
+-    fprintf(stderr,
+-	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
+-	    name());
+-    return;
+-  }
+-  
+-  if (maxpkt_ <= 0) {
+-    fprintf(stderr,
+-	    "TCPTapAgent(%s): recvpkt: maxpkt_ value too low (%d)\n",
+-	    name(), maxpkt_);
+-    return;
+-  }
+-  
+-  // allocate packet and a data payload
+-  Packet* p = allocpkt(maxpkt_);
+-
+-  // fill up payload
+-  sockaddr addr;	// not really used (yet)
+-  double tstamp;
 -  int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
-+  int cc = net_incoming_->recv(p->accessdata(), maxpkt_, addr, tstamp);
-   if (cc <= 0) {
-     if (cc < 0) {
-       perror("recv");
-@@ -406,8 +414,21 @@
-   ns_tcphdr->flags() = 0;
-   if (tcpheader->th_flags & TH_FIN)
-     ns_tcphdr->flags() |= TH_FIN;
--  if (tcpheader->th_flags & TH_SYN) 
-+  if (tcpheader->th_flags & TH_SYN) {
-         ns_tcphdr->flags() |= TH_SYN;
-+
-+
-+	/* For server side TCP in NSE, we need to store
-+	   the source addr and port for the next packet
-+	   we send => we ignore the command settings.
-+	   We gotta check if this is a SYN+ACK in which case
-+	   we are not server side */
-+	if( (tcpheader->th_flags & TH_ACK) == 0 ) {
-+	  extnode.sin_port =  ntohs(tcpheader->th_sport);
-+	  extnode.sin_addr = ipheader->ip_src;
-+	}
-+  }
-+
-   if (tcpheader->th_flags & TH_RST) 
-         ns_tcphdr->flags() |= TH_RST;
-   if (tcpheader->th_flags & TH_PUSH) 
-@@ -462,6 +483,9 @@
+-  if (cc <= 0) {
+-    if (cc < 0) {
+-      perror("recv");
+-    }
+-    Packet::free(p);
+-    return;
+-  }
+-  TDEBUG4("%f: TCPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
+-
+   /* Code to drop packet, if needed 
+   dropp++;
+   if ((dropp % 10) == 0) {
+@@ -461,12 +433,45 @@
+   hdr_cmn *ns_cmnhdr = HDR_CMN(nspacket);
    ns_cmnhdr->size() = ntohs(ipheader->ip_len);
  
- 
-+  // We no longer need Packet p. memory leak fix from 2.1b8a 
 +  Packet::free(p);
-+  
+ 
    // inject into simulator
    target_->recv(nspacket);
    return;
-@@ -474,7 +498,7 @@
+ }
+ 
++/*
++ * ns scheduler calls TapAgent::dispatch which calls recvpkt.
++ * 
++ * recvpkt then calls the network (net_incoming_) to receive as many packets
++ * as there are from the packet capture facility.
++ * For every packet received through the callback, it converts to ns
++ * FullTcp packet and injects it into the simulator by calling target_->recv
++ * 
++ */
++void
++TCPTapAgent::recvpkt()
++{
++  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
++    fprintf(stderr,
++	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
++	    name());
++    return;
++  }
++  
++  int cc = net_incoming_->recv(pkt_handler, this);
++  if (cc <= 0) {
++    if (cc < 0) {
++      perror("recv");
++    }
++    return;
++  }
++  TDEBUG4("%f: TCPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
++
++  // nothing to do coz pkt_handler would have called processpkt()
++  // that would have injected packets into the simulator
++}
++
+ 
+ 
+ 
+@@ -474,7 +479,7 @@
   * simulator schedules TapAgent::recv which calls sendpkt
   *
   * Grabs a ns Full TCP packet, converts it into real TCP packet 
@@ -1634,76 +2689,41 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-
   *
   */
  int
-@@ -486,7 +510,7 @@
+@@ -486,25 +491,24 @@
    int hlength = IP_HEADER_LEN + TCP_HEADER_LEN;
    struct tcphdr *tcpheader;
  
 -  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
-     fprintf(stderr,
- 	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
- 	    name());
-@@ -495,7 +519,7 @@
-   
-   // send packet into the live network
-   hdr_cmn* ns_cmnhdr = HDR_CMN(p);
--  if (net_ == NULL) {
 +  if (net_outgoing_ == NULL) {
      fprintf(stderr,
- 	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
+-	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
++	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -508,6 +532,10 @@
++    drop(p);
+     return (-1);
+   }
+-  
+-  // send packet into the live network
+-  hdr_cmn* ns_cmnhdr = HDR_CMN(p);
+-  if (net_ == NULL) {
++
++  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
+     fprintf(stderr,
+-	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
++	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
+ 	    name());
+-    drop(p);
+     return (-1);
+   }
+   
++  // send packet into the live network
++  hdr_cmn* ns_cmnhdr = HDR_CMN(p);
+   hdr_tcp* ns_tcphdr = HDR_TCP(p);
+-
    hdr_ip * ns_iphdr = HDR_IP(p);
    received_ttl = ns_iphdr->ttl_;
  
-+  if (ns_tcphdr->tcp_flags_ & TH_SYN) {
-+      hlength += 4; // adding 4 bytes for MSS option
-+  }
-+
-   // Here we check if ns has sent any data in the packet.
-   datalen = ns_cmnhdr->size() - ns_tcphdr->hlen();
-   packet = (unsigned char *) calloc (1, sizeof(unsigned char) * 
-@@ -528,30 +556,49 @@
- 
-   tcp_gen((char *)tcpheader, nsnode.sin_port, extnode.sin_port, p);
- 
--#ifndef LINUX_TCP_HEADER
--  tcpheader->th_sum = trans_check(IPPROTO_TCP, (char *) tcpheader,
--				  sizeof(struct tcphdr) + datalen,
--				  nsnode.sin_addr, extnode.sin_addr);
--#else 
--  tcpheader->check = trans_check(IPPROTO_TCP, (char *) tcpheader,
--				  sizeof(struct tcphdr) + datalen,
--				  nsnode.sin_addr, extnode.sin_addr);
-+  unsigned short thsum = 0;
-+  // In the case of SYN packet, we negotiate MSS
-+   if (ns_tcphdr->tcp_flags_ & TH_SYN) {
-+       unsigned char *mss_opt = (unsigned char *) (packet + IP_HEADER_LEN + TCP_HEADER_LEN);
-+       *mss_opt++ = 0x02;
-+       *mss_opt++ = 0x04;
-+
-+       unsigned short *mss_val = (unsigned short *)mss_opt;
-+       *mss_val = htons(ns_tcphdr->maxseg());
-+       
-+       tcpheader->th_off += 1;
-+
-+       thsum = trans_check(IPPROTO_TCP, (char *) tcpheader,
-+				       sizeof(struct tcphdr) + 4 + datalen, 
-+				       nsnode.sin_addr, extnode.sin_addr);
-+   } else {
-+       thsum = trans_check(IPPROTO_TCP, (char *) tcpheader,
-+	  			       sizeof(struct tcphdr) + datalen,
-+				       nsnode.sin_addr, extnode.sin_addr);
-+   }
- 
--#endif 
-+#ifndef LINUX_TCP_HEADER
-+   tcpheader->th_sum = thsum;
-+#else
-+   tcpheader->check = thsum;
-+#endif
- 
-   /* 
+@@ -543,16 +547,18 @@
       Limits the packets going out to only IP + TCP header. 
       ns will act as an ACK machine.
     */
@@ -1713,19 +2733,29 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-
      fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
  	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
      Packet::free(p);
-+    free(packet); // freeing the calloc'ed packet. memory leak fix from 2.1b8a  
++    free(packet);
      return (-1);
      
    }
    
-+  free(packet); // freeing the calloc'ed packet. memory leak fix from 2.1b8a 
-+
-   TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), hc->size());
+-  TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), hc->size());
++  free(packet);
++  TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), byteswritten);
    return 0;
  }
+ 
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Sun Oct  6 22:59:30 2002
+@@ -30,7 +30,7 @@
+  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  * SUCH DAMAGE.
+  *
+- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/emulate/tcptap.h,v 1.2 2001/12/20 18:18:44 haldar Exp $ (ISI)
++ * @(#) $Header: /home/anoncvs/PUBLIC_CVSROOT/ns-2/emulate/tcptap.h,v 1.4 2002/09/23 23:27:10 alefiyah Exp $ (ISI)
+  */
+ 
+ #ifndef tcptap_h
 @@ -38,6 +38,7 @@
  
  #include "tap.h"
@@ -1734,9 +2764,31 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2
  #include <netinet/ip.h>
  #include <netinet/tcp.h>
  #include <sys/socket.h>
+@@ -50,10 +51,10 @@
+ #define DEFAULT_ADV_WINDOW    65535 /* Large enough so that min(cong, adv 
+ 					window) is cong */
+ #define DEFAULT_EXT_PORT       8192
+-#define DEFAULT_EXT_ADDR "128.9.160.95"
++#define DEFAULT_EXT_ADDR "192.168.123.116"
+ 
+ #define DEFAULT_NS_PORT        16384
+-#define DEFAULT_NS_ADDR   "10.0.0.1"
++#define DEFAULT_NS_ADDR   "192.168.123.253"
+ 
+ 
+ #define TCPIP_BASE_PKTSIZE      40      /* base TCP/IP header in real life */
+@@ -93,6 +94,8 @@
+   void tcp_gen(char *, unsigned short, unsigned short, Packet *);
+   void recvpkt();
+   int sendpkt(Packet*);
++  void processpkt(Packet *, const struct timeval &);
++  static void pkt_handler(void *, Packet *, const struct timeval &);
+   
+  public:
+   TCPTapAgent();
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h ns-allinone-2.1b9/ns-2.1b9/link/delay.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Nov  1 18:03:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Oct  6 21:54:17 2002
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -1760,20 +2812,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h ns-allinone-2.1b9/ns-2.1b9
  	}
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
-diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl
---- dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Wed Apr 10 16:44:10 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Wed Jun 19 12:06:51 2002
-@@ -66,6 +66,7 @@
- CMUTrace set debug_ false
- 
- Scheduler/RealTime set maxslop_ 0.010; # max allowed slop b4 error (sec)
-+Scheduler/RealTimeCalendar set maxslop_ 0.010; # max allowed slop b4 error (sec)
- 
- #
- # Queues and associated
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Sun Oct  6 21:54:17 2002
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -2250,7 +3291,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.
  //if (int(t_seqno_) > 1)
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Oct  6 21:54:17 2002
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -2286,7 +3327,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1
  	virtual void oldack() {			// what to do on old ack
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Sun Oct  6 21:54:17 2002
 @@ -54,6 +54,8 @@
  	int ackno_;             /* ACK number for FullTcp */
  	int hlen_;              /* header len (bytes) for FullTcp */
@@ -2306,7 +3347,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tc
  /* these are used to mark packets as to why we xmitted them */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.1b9/tools/random.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Wed Jun 19 12:06:51 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Sun Oct  6 21:54:17 2002
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -2323,7 +3364,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.
  #endif /* !WIN32 */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Apr  1 16:07:28 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Wed Jun 19 12:10:28 2002
++++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Sun Oct  6 21:54:17 2002
 @@ -826,6 +826,8 @@
  			break;
  		case PT_GAF:
