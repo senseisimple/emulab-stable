@@ -80,13 +80,19 @@ include("dbdefs.php3");
 function TBMAIL($to, $subject, $message, $headers = 0)
 {
     global $THISHOMEBASE;
+    global $SCRIPT_NAME;
 
     $subject = strtoupper($THISHOMEBASE) . ": $subject";
 
-    if ($headers)
-	    return mail($to, $subject, $message, $headers);
-    else
-	    return mail($to, $subject, $message);
+    $tag = "X-NetBed: " . basename($SCRIPT_NAME);
+    
+    if ($headers) {
+	$headers = "$headers\n" . $tag;
+    }
+    else {
+	$headers = $tag;
+    }
+    return mail($to, $subject, $message, $headers);
 }
 
 #
