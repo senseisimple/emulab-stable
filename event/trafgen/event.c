@@ -43,8 +43,8 @@ usage()
 {
 	fprintf(stderr,
 		"Usage: %s [-s serverip] [-p serverport] [-l logfile] "
-		"[ -N name ] [ -T targetip.targetport ] [-P proto] [-R role] "
-		"[ -E pid/eid ]\n",
+		"[ -N name ] [ -S srcip.srcport ] [ -T targetip.targetport ] "
+		"[-P proto] [-R role] [ -E pid/eid ]\n",
 		progname);
 	exit(-1);
 }
@@ -75,13 +75,14 @@ tgevent_init(int argc, char *argv[])
 	char *ipaddr = NULL;
 	char *myname = NULL;
 	char buf[BUFSIZ], ipbuf[BUFSIZ];
-	struct sockaddr tmp;
-	int c;
+	struct sockaddr saddr, taddr;
+	int c, gotsaddr = 0;
 
 	progname = argv[0];
-	memset(&tmp, 0, sizeof(tmp));
+	memset(&saddr, 0, sizeof(saddr));
+	memset(&taddr, 0, sizeof(taddr));
 	
-	while ((c = getopt(argc, argv, "s:p:T:P:R:N:l:E:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:S:T:P:R:N:l:E:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -89,8 +90,13 @@ tgevent_init(int argc, char *argv[])
 		case 'p':
 			port = optarg;
 			break;
+		case 'S':
+			if (!ipport_atoaddr(optarg, &saddr))
+				badaddr();
+			gotsaddr = 1;
+			break;
 		case 'T':
-			if (!ipport_atoaddr(optarg, &tmp))
+			if (!ipport_atoaddr(optarg, &taddr))
 				badaddr();
 			break;
 		case 'P':
@@ -120,11 +126,19 @@ tgevent_init(int argc, char *argv[])
 		badprot();
 
 	if (prot.qos & QOS_SERVER) {
-		prot.src = tmp;
+		prot.src = taddr;
 		prot.qos |= QOS_SRC;
 	} else {
-		prot.dst = tmp;
+		prot.dst = taddr;
 		prot.qos |= QOS_DST;
+		/*
+		 * Can specify source address to bind local interface
+		 * of sender.
+		 */
+		if (gotsaddr) {
+			prot.src = saddr;
+			prot.qos |= QOS_SRC;
+		}
 	}
 
 	argc -= optind;

@@ -152,12 +152,22 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
  
 diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 --- dist-tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_tcp.c	Wed Mar 13 09:16:49 2002
-@@ -184,7 +184,7 @@
++++ tg2.0/src/tg/prot_tcp.c	Tue Apr  2 23:20:41 2002
+@@ -184,7 +184,17 @@
  			return (-1);
  		}	
  
 -		if ((connect(sfd, &(prot->dst), sizeof(prot->dst)) < 0) &
++		/* Bind to a local address if desired.			*/
++		if (prot->qos & QOS_SRC)
++			{
++			if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
++				{
++				(void)close(sfd);
++				return (-1);
++				}
++			}
++
 +		if ((connect(sfd, &(prot->dst), sizeof(prot->dst)) < 0) &&
  		    (errno != EINPROGRESS))
  			{
