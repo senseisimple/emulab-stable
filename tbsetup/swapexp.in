@@ -86,7 +86,8 @@ my $waitmode = 0;
 my $quiet    = 0;
 my $eventsys_restart   = 0;
 my $errorstat= -1;
-my $modifyHosed = 0;
+my $modifyHosed   = 0;
+my $modifySwapped = 0;
 
 my $inout;
 my $logname;
@@ -769,8 +770,12 @@ elsif ($inout eq "modify") {
 		# up the exit reporting! Anyway, fatal() needs to know the
 		# the right state to go back to (no longer ACTIVE).
 		#
+		# XXX This errorstat (0x40) is important to testbed_stats!
+		# We should probably put in a swapout record instead.
+		#
 		$estate = EXPTSTATE_SWAPPED;
 		$termswapstate = EXPTSTATE_SWAPPED;
+		$modifySwapped = 1;
                 # Old accounting info.
 		TBSetExpSwapTime($pid, $eid);
 	    }
@@ -964,7 +969,17 @@ sub fatal($)
 	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $errorstat);
     }
     elsif ($inout eq "modify") {
+	#
+	# If the modify fails, and the experiment is swapped out, then
+	# insert a record for that since that is different then a modify
+	# that fails, but results in the experiment being restored the
+	# way it was. 
+	#
 	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, $errorstat);
+	
+	if ($modifySwapped) {
+	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
+	}
     }
 
     #
@@ -978,6 +993,8 @@ sub fatal($)
     # If hosed, we entirely terminate the experiment.
     #
     if ($modifyHosed) {
+	my $stat = 0;
+	    
 	#
 	# Note: $estate is indeed still set appropriately!
 	#
@@ -985,13 +1002,23 @@ sub fatal($)
 	    print "Running 'tbswap out -force $pid $eid'\n";
 	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
 		print "tbswap out failed!\n";
+		$stat = $? >> 8;
 	    }
+	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $stat);
 	}
 
+	$stat = 0;
 	print "Running 'tbend -force $pid $eid'\n";
 	if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	    print "tbend failed!\n";
+	    $stat = $? >> 8;
 	}
+	
+	#
+	# Okay, we are going to destroy the experiment below.
+	# 
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
+	
 	# Must override since we are so badly hosed. 
 	$termswapstate = EXPTSTATE_TERMINATED;
     }
