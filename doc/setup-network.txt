@@ -23,7 +23,7 @@ these switches if they are Ciscos.)
 
 We basically have 5 VLANs on the control network:
 'external' contains our connection to the outside world
-'private' contains the boss node, and our backup server
+'private' contains the boss node, and our tape backup server
 'public' contains our ops node
 'control' contains the control net interfaces of all experimental nodes
 'control-hardware' contains all IP-controllable devices (namely, power
@@ -31,8 +31,9 @@ We basically have 5 VLANs on the control network:
 	interface on the boss node. This VLAN uses private IP addresses,
 	and does NOT contain a router interface.
 
-This is done for security - we route (using a module in our control-net switch)
-between these VLANs, and do some firewalling between each of them. The main
+This is done for security - we route (using an 'L3 switching' module in our
+control-net switch) between these VLANs, and do some firewalling between each
+of them. You could also do the routing with a real router or a PC. The main
 goals are:
 1) Protect both control and experimental nodes from the outside world (and
    vice-versa - we don't want people attacking the outside world from our nodes)
