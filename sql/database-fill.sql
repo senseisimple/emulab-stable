@@ -556,7 +556,7 @@ REPLACE INTO table_regex VALUES ('virt_nodes','deltas','text','regex','^([-\\w\\
 REPLACE INTO table_regex VALUES ('virt_nodes','startupcmd','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','tarfiles','text','regex','^([-\\w\\.\\/\\+]+\\s+[-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','vname','text','regex','^[-\\w]+$',1,32,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',0,12,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',0,30,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(fatal|nonfatal|ignore)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','regex','^[-\\w]*$',0,10,NULL);

@@ -1744,7 +1744,7 @@ CREATE TABLE virt_nodes (
   startupcmd tinytext,
   tarfiles text,
   vname varchar(32) NOT NULL default '',
-  type varchar(12) default NULL,
+  type varchar(30) default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static','manual','static-ddijk') NOT NULL default 'none',
   fixed text NOT NULL,

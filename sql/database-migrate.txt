@@ -1720,3 +1720,9 @@ last_net_act,last_cpu_act,last_ext_act);
                  default NULL after jail_osid;
        alter table node_types add modelnetedge_osid varchar(35) 
                  default NULL after modelnetcore_osid;
+
+1.260: Change virt_nodes:type to length 30 instead of 12 (to match the rest
+       of the database).
+
+	alter table virt_nodes change type type varchar(30) default NULL;
+
