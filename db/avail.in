@@ -1,5 +1,14 @@
 #!/usr/local/bin/perl -w
-use Mysql;
+
+#
+# avail - prints a list of all available nodes
+#
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
 
 my $d = 0; #debug mode
 
@@ -17,8 +26,6 @@ if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) {
       "that have that string in that field.\n"
      );
 }
-
-my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
 
 print "Got ARGS = ",join(" ",@ARGV),"\n" if $d;
 
@@ -83,10 +90,9 @@ my $cmd = "select $cols from $join where $cond order by priority";
 
 print "Sending cmd:\n$cmd\n" if $d;
 
-my $sth = $dbh->
-    query($cmd);
+my $result = DBQueryFatal($cmd);
 
-print $sth->as_string();
+print $result->as_string();
 
 # Hacky. Batch daemon depends on this exit code.
-exit($sth->numrows);
+exit($result->numrows);

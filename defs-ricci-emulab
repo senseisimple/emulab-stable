@@ -8,3 +8,4 @@ TBLOGSEMAIL=ricci@cs.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 OURDOMAIN=emulab.net
+DELAYCAPACITY=2

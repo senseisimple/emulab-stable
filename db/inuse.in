@@ -1,10 +1,25 @@
 #!/usr/local/bin/perl -w
-use Mysql;
 
-my $dbh = Mysql->connect("localhost","@TBDBNAME@","script","none");
+#
+# inuse - print a list of all testbed nodes that are allocated to
+# experiments
+#
 
-my $sth = $dbh->
-    query("select r.* from reserved as r left join nodes as n on r.node_id=n.node_id order by priority");
+use English;
 
-print $sth->as_string();
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
+
+
+if (($UID != 0) && (!TBAdmin())) {
+	die "Sorry, only testbed administrators can use this script\n";
+}
+
+my $result = DBQueryFatal("select r.* from reserved as r left join nodes " .
+		" as n on r.node_id=n.node_id order by priority");
+
+print $result->as_string();
 

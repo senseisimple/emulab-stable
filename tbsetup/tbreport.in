@@ -1,52 +1,69 @@
 #!/usr/bin/perl -w
 
-# tbreport
-# This just provides the necessary information from the IR file.
+#
+# tbreport - given a pid and eid, print out useful information, including
+# a list of nodes and links, about the experiment. Only useful when the
+# experiment is in the active, swapped, or testing states
+#
+
+sub usage {
+    print "Usage: $0 [-h] [-v] pid eid\n";
+    print "-h		Shows this message\n";
+    print "-v		Give verbose output\n";
+    return 1;
+}
 
 my $TBROOT = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
-push(@INC,"$TBROOT/lib");
+use lib '@prefix@/lib';
+use libdb;
 require exitonwarn;
+use Getopt::Long;
 
 #
 # Turn off line buffering on output
 #
 $| = 1;
 
-use DBI;
-$dbh = DBI->connect("DBI:mysql:database=$DBNAME;host=localhost") 
-    || die "Could not connect to DB.\n";
+#
+# Get options
+#
+my %opt = ();
+my $verbose = 0;
+GetOptions(\%opt,"h","v");
 
-
-$verbose = 0;
-if ($#ARGV == 2) {
-    ($v,$pid,$eid) = @ARGV;
-    if ($v ne "-v") {
-	print STDERR "Syntax: $0 [-v] pid eid\n";
-	exit(1);
-    }
+if ($opt{h}) {
+    exit &usage;
+}
+if ($opt{v}) {
     $verbose = 1;
-} elsif ($#ARGV == 1) {
-    ($pid,$eid) = @ARGV;
-} else {
-    print STDERR "Syntax: $0 [-v] pid eid\n";
-    exit(1);
+}
+if (@ARGV != 2) {
+    exit &usage;
 }
 
-# Experiment
-$sth=$dbh->prepare("SELECT state from experiments where" . 
-		   " pid=\"$pid\" and eid=\"$eid\"");
-$sth->execute();
-if (! ($state = $sth->fetchrow_array())) {
+my ($pid,$eid) = @ARGV;
+
+#
+# Make sure the experimenter is a member of the right project, and that
+# the experiment really exists.
+#
+if ((!ProjMember($pid)) && (!TBAdmin())) {
+	die "You are not a member of project $pid\n";
+}
+
+my $state = ExpState($pid,$eid); 
+
+if (!$state) {
     print STDERR "Can not find experiment $eid.\n";
     exit(1);
 }
-$sth->finish();
+
 print "Experiment: $eid\n";
 print "State: $state\n";
 print "\n";
 
-if (($state ne "swapped") && ($state ne "active") && ($state ne "testing")) {
+if (($state ne EXPTSTATE_SWAPPED) && ($state ne EXPTSTATE_ACTIVE) &&
+		($state ne EXPTSTATE_TESTING)) {
     # nothing to do
     print "No more information available.\n";
     exit(0);
@@ -54,15 +71,14 @@ if (($state ne "swapped") && ($state ne "active") && ($state ne "testing")) {
 
 # Virtual
 # Display node info
-$sth=$dbh->prepare("SELECT vname,ips,osid,cmd_line,rpms,deltas,startupcmd," .
-		   "tarfiles,type from virt_nodes where pid=\"$pid\"" .
+my $result = DBQueryFatal("SELECT vname,ips,osid,cmd_line,rpms,deltas," .
+	"startupcmd,tarfiles,type from virt_nodes where pid=\"$pid\"" .
 		   " and eid=\"$eid\"");
-$sth->execute();
 print "Node Info:\n";
 printf "%-15s %-10s %-15s\n", "ID", "Type", "OSID";
 print "--------------- ---------- ---------------\n";
 while (($vname,$ips,$osid,$cmd_line,$rpms,$deltas,$startupcmd,$tarfiles,$type) 
-       = $sth->fetchrow_array()) {
+       = $result->fetchrow_array()) {
     printf "%-15s %-10s %-15s\n", $vname, $type, $osid;
     if ($verbose) {
 	if ($cmd_line ne "") {
@@ -86,60 +102,60 @@ while (($vname,$ips,$osid,$cmd_line,$rpms,$deltas,$startupcmd,$tarfiles,$type)
 	$ipmap{"$vname:$port"} = $ip;
     }
 }
-$sth->finish();
+$result->finish();
 print "\n";
 
 # Display link info
-if ($state eq "swapped") {
-    $sth=$dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+if ($state eq EXPTSTATE_SWAPPED) {
+    my $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-    $sth->execute();
     print "Lan/Link Info:\n";
     printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member",
     "IP", "Delay", "Bandwidth", "Loss Rate";
     print "--------------- --------------- --------------- ----------"
 	. " ---------- ----------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
-	   = $sth->fetchrow_array()) {
+	   = $result->fetchrow_array()) {
 	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
 	$member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
-    $sth->finish();
+    $result->finish();
     print "\n";
 }
 
 # Mapping
-if (($state eq "active") || ($state eq "testing")) {
+if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     print "Node Mapping:\n";
     printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
     print "--------------- --------------- --------------------\n";
-    $sth = $dbh->prepare("SELECT vname,node_id from reserved" .
+    my $result = DBQueryFatal("SELECT vname,node_id from reserved" .
 			 " where pid=\"$pid\" and eid=\"$eid\"");
-    $sth->execute();
-    while (($v,$p) = $sth->fetchrow_array()) {
+    while (($v,$p) = $result->fetchrow_array()) {
+	# If they have no virtual name, we use the physical one
+	if (!$v) {
+	    $v = $p;
+	}
 	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.emulab.net";
     }
-    $sth->finish();
+    $result->finish();
     print "\n";
 
-    $sth=$dbh->prepare("SELECT vnode,vport,pport from portmap" .
+    $result = DBQueryFatal("SELECT vnode,vport,pport from portmap" .
 		       " where pid=\"$pid\" and eid=\"$eid\"");
-    $sth->execute;
-    while (($vnode,$vport,$pport) = $sth->fetchrow_array) {
+    while (($vnode,$vport,$pport) = $result->fetchrow_array) {
 	$portmap{"$vnode:$vport"} = $pport;
     }
-    $sth->finish;
+    $result->finish;
 
-    $sth=$dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+    $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-    $sth->execute();
     print "Lan/Link Info:\n";
     printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member", 
     "IP", "Delay", "Bandwidth", "Loss Rate";
     print "--------------- --------------- --------------- ----------"
 	. " ---------- ----------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
-	   = $sth->fetchrow_array()) {
+	   = $result->fetchrow_array()) {
 	($vnode,$vport) = split(":",$member);
 	if (defined($portmap{$member})) {
 	    $pport = $portmap{$member};
@@ -148,9 +164,9 @@ if (($state eq "active") || ($state eq "testing")) {
 	    $pport = "eth0";
 	}
 	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
-	"$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	    "$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
-    $sth->finish();
+    $result->finish();
 }
 
 0;

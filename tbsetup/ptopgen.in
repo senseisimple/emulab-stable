@@ -7,44 +7,39 @@ $switch_speed = 100;
 
 ######################################################################
 
-use DBI;
-my $TBDB = "@TBDBNAME@";
-my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
 my $TBROOT = "@prefix@";
-push(@INC,"$TBROOT/lib");
+use lib '@prefix@/lib';
 require exitonwarn;
+use libdb;
 
 %switches=();
 %used_switches=();
 
 # Read class/type maps
-$sth = $dbh->prepare("select class,type,delay_capacity from node_types");
-$sth->execute;
-while (($class,$type,$delaycapacity) = $sth->fetchrow_array) {
+my $result = DBQueryFatal("select class,type,delay_capacity from node_types");
+while (($class,$type,$delaycapacity) = $result->fetchrow_array) {
     $classes{$type} = $class;
     $nodetypes{$type} = $delaycapacity;
 }
-$sth->finish;
+$result->finish;
 
 # switches can't delay
 $nodetypes{"switch"} = 0;
 
 # Print switches
-$sth = $dbh->prepare("select node_id from nodes where role = \"testswitch\"");
-$sth->execute;
-while (($switch) = $sth->fetchrow_array) {
+$result = DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
+while (($switch) = $result->fetchrow_array) {
     print "node $switch switch:1\n";
     $switches{$switch} = 1;
 }
-$sth->finish;
+$result->finish;
 
 # Find available nodes
-$sth = $dbh->prepare("select a.node_id,a.type from" .
+$result = DBQueryFatal("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
 		     " where b.node_id is null and a.role = \"testnode\"");
-$sth->execute;		
-while (($node,$type) = $sth->fetchrow_array) {
+while (($node,$type) = $result->fetchrow_array) {
     # Shark hack
     if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
 	if ($number == 1) {
@@ -54,7 +49,7 @@ while (($node,$type) = $sth->fetchrow_array) {
 	$nodes{$node} = $type;
     }
 }
-$sth->finish;
+$result->finish;
 
 
 $sharklinks = "";
@@ -72,54 +67,27 @@ foreach $node (keys(%nodes)) {
 }
 
 # Read interfaces
-$sth = $dbh->prepare("SELECT node_id,card,port,iface,interface_type" .
+$result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
 		     " from interfaces");
-$sth->execute;
-while (($node,$card,$port,$iface,$type) = $sth->fetchrow_array) {
+while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     $interfacemap{"$node:$card:$port"} = $iface;
     if ($type ne "") {
 	$interfacetypes{"$node:$card:$port"} = $type;
     }
 }
-$sth->finish;
+$result->finish;
 
 # Read interface types
-$sth = $dbh->prepare("SELECT type,max_speed from interface_types");
-$sth->execute;
-while (($type,$speed) = $sth->fetchrow_array) {
+$result = DBQueryFatal("SELECT type,max_speed from interface_types");
+while (($type,$speed) = $result->fetchrow_array) {
     $interfacespeeds{$type} = $speed;
 }
-$sth->finish;
+$result->finish;
 
-# Print out links
-sub get_iface {
-    ($node,$card,$port) = @_;
-    if (defined($interfacemap{"$node:$card:$port"})) {
-	return $interfacemap{"$node:$card:$port"};
-    } else {
-	# shark hack
-	if ($node =~ /^sh/) {
-	    return "eth0";
-	} else {
-	    return "(null)";
-	}
-	# end shark hack 
-    }
-};
-sub get_ifacebw {
-    ($node,$card,$port) = @_;
-    if (defined($interfacetypes{"$node:$card:$port"})) {
-	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}};
-    } else {
-	return $switch_speed;
-    }
-};
-
-$sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
+$result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\" or type=\"Trunk\"");
-$sth->execute;
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
-       $sth->fetchrow_array) {
+       $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
 	(defined($nodes{$node2}) || defined($switches{$node2}))) {
 	$iface1 = get_iface($node1,$card1,$port1);
@@ -152,7 +120,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	}
     } 
 }
-$sth->finish;
+$result->finish;
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
     print "link link-$interconnect $src $dst $interconnects{$interconnect} 1\n";
@@ -166,5 +134,32 @@ foreach $switch (keys(%used_switches)) {
 	print "node lan-$switch-$i lan:1\n";
 	print "link link-lan-$switch-$i lan-$switch-${i}:lan-$switch-$i" .
 	    " $switch 100000 1000\n";
+    }
+}
+
+
+# Print out links
+sub get_iface {
+    ($node,$card,$port) = @_;
+    if (defined($interfacemap{"$node:$card:$port"})) {
+	return $interfacemap{"$node:$card:$port"};
+    } else {
+	# shark hack
+	if ($node =~ /^sh/) {
+	    return "eth0";
+	} else {
+	    return "(null)";
+	}
+	# end shark hack 
+    }
+};
+
+# Find the bandwidth for an interface
+sub get_ifacebw {
+    ($node,$card,$port) = @_;
+    if (defined($interfacetypes{"$node:$card:$port"})) {
+	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}};
+    } else {
+	return $switch_speed;
     }
 }
