@@ -10,6 +10,7 @@
 #define	TBDB_FLEN_NODEID	(12 + 1)
 #define	TBDB_FLEN_VNAME		(32 + 1)
 #define	TBDB_FLEN_EID		(32 + 1)
+#define	TBDB_FLEN_UID		(8  + 1)
 #define	TBDB_FLEN_PID		(12 + 1)
 #define	TBDB_FLEN_GID		(16 + 1)
 #define	TBDB_FLEN_NODECLASS	(10 + 1)
