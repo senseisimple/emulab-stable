@@ -1,6 +1,7 @@
+Only in tg2.0/src/tg: #prot_dgram.c#
 diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
 --- dist-tg2.0/src/tg/log.c	Thu Jan 24 16:30:09 2002
-+++ tg2.0/src/tg/log.c	Mon Feb 25 09:45:15 2002
++++ tg2.0/src/tg/log.c	Wed Mar 13 12:43:19 2002
 @@ -268,6 +268,11 @@
  	char		*cp = buf;
  	char		ctl;
@@ -75,7 +76,7 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  
 diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 --- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_dgram.c	Wed Feb 27 17:45:48 2002
++++ tg2.0/src/tg/prot_dgram.c	Wed Mar 20 10:20:15 2002
 @@ -198,6 +198,21 @@
  	for (;;)
  		{
@@ -98,9 +99,25 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  		/* Set up for select:  get fd bitmaps.			*/
  
  		rfds = fds;
+@@ -427,6 +442,7 @@
+ 
+ 			if (fromlen == 0)
+ 				{
++				(*(prtab->buffer_free))(buf);
+ 				errno = EBADF;
+ 				return (-1);
+ 				}
+@@ -489,6 +505,7 @@
+ 
+ 	if (!dgram_get_packets(fd, endtout))
+ 		{
++		(*(prtab->buffer_free))(buf);
+ 		return (-1);
+ 		}
+ 	else
 diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 --- dist-tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_stream.c	Tue Feb 26 11:00:24 2002
++++ tg2.0/src/tg/prot_stream.c	Wed Mar 20 10:21:08 2002
 @@ -147,6 +147,19 @@
  	for (;;)
  		{
@@ -121,9 +138,17 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
  		/* Set up for select:  get fd bitmaps.			*/
  
  		rfds = fds;
+@@ -440,6 +453,7 @@
+ 	    /* new connections while we are waiting to write.		*/
+ 
+             if (!stream_get_packets(fd, endtout)) {
++		buffer_generic_free(buf);
+ 		return (-1);
+             } else {
+ 
 diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 --- dist-tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_tcp.c	Tue Feb 26 16:17:46 2002
++++ tg2.0/src/tg/prot_tcp.c	Wed Mar 13 09:16:49 2002
 @@ -184,7 +184,7 @@
  			return (-1);
  		}	
@@ -133,9 +158,20 @@ diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
  		    (errno != EINPROGRESS))
  			{
  			(void)close(sfd);
+diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
+--- dist-tg2.0/src/tg/prot_test.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_test.c	Wed Mar 20 09:11:30 2002
+@@ -447,6 +447,7 @@
+ 
+ 	if (!test_get_packets(prtab, fd, endtout))
+ 		{
++		buffer_generic_free(buf);
+ 		return (-1);
+ 		}
+ 	else
 diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
 --- dist-tg2.0/src/tg/prot_udp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_udp.c	Wed Feb 27 17:25:22 2002
++++ tg2.0/src/tg/prot_udp.c	Wed Mar 13 09:16:49 2002
 @@ -205,7 +205,7 @@
  				return (-1);
  				}
@@ -156,7 +192,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  	        {
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Wed Feb 27 17:25:44 2002
++++ tg2.0/src/tg/tg.y	Wed Mar 13 09:16:49 2002
 @@ -133,7 +133,10 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
