@@ -41,7 +41,6 @@ function find_switch_macs(&$mac_list) {
 	$switch = $matches[1];
 	$card = $matches[2];
 	$port = $matches[3];
-	echo "Class is ($class), (" . $mac_list[$MAC]["class"] . ")";
 	if ($mac_list[$MAC] && (!$mac_list[$MAC]["class"] ||
 	    ($mac_list[$MAC]["class"] == $class))) {
 	    $mac_list[$MAC]["switch"] = $switch;
