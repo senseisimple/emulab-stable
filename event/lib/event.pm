@@ -725,7 +725,7 @@ use libtestbed;
 #
 
 #
-# Warn and send email after a failed event send. First argument is the error
+# Warn after a failed event send. First argument is the error
 # message to display. The contents of $EventErrorString is also printed.
 # 
 # usage: EventWarn(char *message)
@@ -747,8 +747,6 @@ sub EventWarn($) {
 		"$EventErrorString\n";
 
 	print STDERR "*** $text";
-
-	libtestbed::SENDMAIL($TBOPS, "EventError - $message", $text);
 }
 
 #
