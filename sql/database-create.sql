@@ -998,6 +998,7 @@ CREATE TABLE widearea_delays (
   node_id2 varchar(10) NOT NULL default '',
   iface2 varchar(10) NOT NULL default '',
   bandwidth double default NULL,
+  time_stddev float NOT NULL default '0',
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
@@ -1014,6 +1015,7 @@ CREATE TABLE widearea_recent (
   node_id2 varchar(10) NOT NULL default '',
   iface2 varchar(10) NOT NULL default '',
   bandwidth double default NULL,
+  time_stddev float NOT NULL default '0',
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
