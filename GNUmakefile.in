@@ -85,6 +85,8 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/images
 	-chmod 775 $(INSTALL_TOPDIR)/images
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
+	-mkdir -p $(INSTALL_TOPDIR)/ssl
+	-chmod 770 $(INSTALL_TOPDIR)/ssl
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
