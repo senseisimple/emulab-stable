@@ -16,24 +16,36 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
-# Admin users can do this.
+# Admin users can see all projects, while normal users can only see
+# projects for which they are the leader.
+#
+# XXX Should we form the list from project members instead of leaders?
 #
 $isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    USERERROR("You do not have admin privledges!", 1);
-}
 
 #
-# Show a menu of all projects.
+# Get the project list.
 #
-$query_result = mysql_db_query($TBDBNAME,
+if ($isadmin) {
+    $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM projects");
+}
+else {
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM projects where head_uid='$uid'");
+}
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting project list: $err\n", 1);
 }
+
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("There are no projects!", 1);
+	if ($isadmin) {
+	    USERERROR("There are no projects!", 1);
+	}
+	else {
+	    USERERROR("You are not a leader of any projects!", 1);
+	}
 }
 
 echo "<center><h3>

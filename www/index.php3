@@ -94,8 +94,6 @@ if (isset($uid)) {
         if ($admin) {
             echo "<A href='approveproject_list.php3'>
                      New Project Approval</A><p>\n";
-            echo "<A href='showproject_list.php3'>
-                     Project Information</A><p>\n";
             echo "<A href='nodecontrol_list.php3'>
                      Node Control</A><p>\n";
         }
@@ -107,6 +105,8 @@ if (isset($uid)) {
         # Since a user can be a member of more than one project,
         # display this option, and let the form decide if the user is
         # allowed to do this.
+        echo "<p><A href='showproject_list.php3'>
+                    Project Information</A><p>\n";
         echo "<p><A href='beginexp_form.php3'>
                     Begin an Experiment</A>\n";
         echo "<p><A href='endexp_form.php3'>
