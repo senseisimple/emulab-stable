@@ -64,16 +64,6 @@ void ConservativeAssigner::addLan(int bits, int weight, vector<size_t> nodes)
 
 void ConservativeAssigner::ipAssign(void)
 {
-    // TODO: When I fix the disconnected graphs problem, remove this.
-    // The reason that this is here is that disconnected graphs don't
-    // cause an error until route calculation. The error that is caused
-    // is not obviously due to the graph not being connected. Therefore,
-    // this is provided as a hint until that is fixed.
-    if (!(isConnected(0)))
-    {
-        cerr << "Graph is not connected" << endl;
-    }
-
     // These hold a METIS-ready conversion of the LAN-graph data.
     std::vector<int> partitionArray;
     std::vector<int> graphIndexArray;
@@ -141,6 +131,11 @@ void ConservativeAssigner::ipAssign(void)
         makeConnected(loop);
         ++loop;
     }
+
+    // Calculate the list of super-partitions. These are the
+    // fully-connected subgraphs in the possibly disconnected
+    // super-graph. There should usually only be one super-partition.
+    calculateSuperPartitions();
 
     //////////////////////////////////////////////////////
     // find out which bits go to which subnet
@@ -271,12 +266,10 @@ void ConservativeAssigner::graph(vector<Assigner::NodeLookup> & nodeToLevel,
         (levelMakeup.back())[m_lanList[i].partition].push_back(i);
     }
 
-    levelMakeup.push_back(LevelLookup());
-    levelMakeup.back().resize(1);
-    for (i = 0; i < levelMakeup[1].size(); ++i)
-    {
-        levelMakeup.back().back().push_back(i);
-    }
+    // Add our super-partitions to the hierarchy. Each super-partition
+    // is a fully-connected sub-graph in a possibly disconnected
+    // graph.
+    levelMakeup.push_back(m_superPartitionList);
 
     // set up the lan weights.
     lanWeights.resize(m_lanList.size());
@@ -491,7 +484,7 @@ bool ConservativeAssigner::isConnected(int whichPartition)
 
 void ConservativeAssigner::makeConnected(int whichPartition)
 {
-    // breadth first search. This is very similar to isConnected()
+    // breadth first search.
     queue<size_t> nextConnection;
     size_t first = 0;
     size_t numInPartition = 0;
@@ -558,5 +551,93 @@ void ConservativeAssigner::makeConnected(int whichPartition)
         ++m_partitionCount;
     }
 }
+namespace
+{
+    enum TouchedT
+    {
+        NotTouched,
+        Touched,
+        OldTouched
+    };
+}
 
+void ConservativeAssigner::calculateSuperPartitions(void)
+{
+    vector<TouchedT> touch;
+    queue<size_t> nextConnection;
+    set<size_t> currentResult;
+    touch.resize(m_lanList.size());
+    fill(touch.begin(), touch.end(), NotTouched);
 
+    // Initialize first. 'first' is the arbitrary initial node in the
+    // breadth-first search.
+    size_t first = 0;
+    while (first < touch.size()
+           && (touch[first] == Touched || touch[first] == OldTouched))
+    {
+        ++first;
+    }
+
+    while (first < touch.size())
+    {
+        // Run a breadth-first search through the graph, marking the
+        // LANs we find as Touched. The partition of each LAN is added
+        // to the list of partitions in the super-partition we are
+        // constructing.
+        touch[first] = Touched;
+        nextConnection.push(first);
+        currentResult.clear();
+        while (!(nextConnection.empty()))
+        {
+            size_t current = nextConnection.front();
+            nextConnection.pop();
+            for (size_t i = 0; i < m_lanList[current].nodes.size(); ++i)
+            {
+                size_t currentNode = m_lanList[current].nodes[i];
+                for (size_t j = 0; j < m_nodeToLan[currentNode].size(); ++j)
+                {
+                    size_t destLan = m_nodeToLan[currentNode][j];
+                    if (touch[destLan] == NotTouched)
+                    {
+                        touch[destLan] = Touched;
+                        nextConnection.push(destLan);
+                        currentResult.insert(m_lanList[destLan].partition);
+                    }
+                }
+            }
+        }
+
+        // The currentResult holds all of the partitions in the fully
+        // connected super-partition. So we add the list to the
+        // super-partition list.
+        if (!(currentResult.empty()))
+        {
+            m_superPartitionList.push_back(vector<size_t>());
+            m_superPartitionList.back().reserve(currentResult.size());
+            set<size_t>::iterator pos = currentResult.begin();
+            set<size_t>::iterator limit = currentResult.end();
+            for ( ; pos != limit; ++pos)
+            {
+                m_superPartitionList.back().push_back(*pos);
+            }
+        }
+
+        // We change all of the elements that were 'Touched' into
+        // 'OldTouched' to distinguish between the current iteration
+        // of the graph and previous ones.
+        for (size_t i = 0; i < touch.size(); ++i)
+        {
+            if (touch[i] == Touched)
+            {
+                touch[i] = OldTouched;
+            }
+        }
+
+        // get next first
+        while (first < touch.size()
+               && (touch[first] == Touched || touch[first] == OldTouched))
+        {
+            ++first;
+        }
+    }
+}

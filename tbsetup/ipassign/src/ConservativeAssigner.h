@@ -88,6 +88,8 @@ private:
     // If a particular partition is disconnected, seperate it into two
     // partitions.
     void makeConnected(int whichPartition);
+
+    void calculateSuperPartitions(void);
 private:
     // Information about each LAN, indexed by the number assigned to each
     // LAN.
@@ -109,6 +111,11 @@ private:
     // This pointer is used polymorphically to determine which partitioning
     // method to use.
     Partition * m_partition;
+    // The super-partition table. Each vector contains all of the
+    // partitions inside the super-partition. The number of
+    // super-partitions is the number of internally connected
+    // sub-graphs in the (possibly disconnected) graph.
+    std::vector< std::vector<size_t> > m_superPartitionList;
 };
 
 #endif

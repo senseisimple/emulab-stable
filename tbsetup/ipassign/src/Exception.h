@@ -131,17 +131,5 @@ public:
     }
 };
 
-// TODO:
-// Can be thrown during route calculation. This should be removed once
-// the disconnected graph problem is fixed.
-class NoTopLevelException : public StringException
-{
-public:
-    explicit NoTopLevelException(std::string const & error)
-        : StringException("Routing Graph had no top level: " + error)
-    {
-    }
-};
-
 #endif
 

@@ -94,39 +94,11 @@ void NetRouter::setup(void)
         throw NoGraphToRouteException("");
     }
 
-    // the top level should contain only a single partition
-    if (m_levelMakeup.back().size() > 1)
-    {
-        throw NoTopLevelException("");
-    }
+    // The top level may contain more than one single partition. If it
+    // does, that represents a disconnected graph and routes are
+    // calculated only within each partition.
 
-    size_t total = 0;
-    for (i = 0; i < m_levelMakeup[0].size(); ++i)
-    {
-        for (j = 0; j < m_levelMakeup[0][i].size(); ++j)
-        {
-            size_t node = m_levelMakeup[0][i][j];
-            total += m_nodeToLevel[0][node].size() - 1;
-        }
-    }
-    double result = static_cast<double>(total) / m_levelMakeup[0].size();
-    cerr << "Average degree: " << result << endl;
-
-/*    if (m_nodeToLevel[1][859].size() == 2)
-    {
-        cerr << "859 partitions: " << m_nodeToLevel[1][859][0] << " " << m_nodeToLevel[1][859][1] << endl;
-        for (size_t i = 0; i < 2; ++i)
-        {
-            size_t currentPartition = m_nodeToLevel[1][859][i];
-            cerr << "Lans in " << i << ": ";
-            for (size_t j = 0; j < m_levelMakeup[1][currentPartition].size(); ++j)
-            {
-                cerr << m_levelMakeup[1][currentPartition][j] << " ";
-            }
-            cerr << endl;
-        }
-        }*/
-
+    // Remove any pre-existing connections between hosts.
     borderConnections.clear();
     reverseBorderConnections.clear();
 
