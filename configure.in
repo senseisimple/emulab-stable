@@ -21,6 +21,26 @@ fi
 
 AC_SUBST(PATH)
 
+CPPFLAGS="-I/usr/local/include"
+
+# BEGIN Python detection.
+AC_PATH_PROGS(PYTHON, python python2.4 python2.3 python2.2)
+
+if test x"$PYTHON" = x""; then
+    AC_MSG_ERROR([python not detected])
+fi
+
+PYTHON_VERSION=`${PYTHON} -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2`
+PYTHON_PATH=`dirname ${PYTHON}`
+PYTHON_PATH=`dirname ${PYTHON_PATH}`
+PYTHON_INCLUDE="${PYTHON_PATH}/include/python${PYTHON_VERSION}"
+CPPFLAGS="${CPPFLAGS} -I${PYTHON_INCLUDE}"
+AC_CHECK_HEADERS([Python.h],
+		 [],
+		 [AC_MSG_ERROR("Cannot find Python.h in ${PYTHON_INCLUDE}")])
+AC_SUBST(PYTHON_INCLUDE)
+# END Python detection.
+
 AC_CHECK_TOOL(CC,gcc)
 AC_CHECK_TOOL(CXX,g++)
 AC_CHECK_TOOL(AR,ar)
@@ -551,6 +571,15 @@ fi
 AC_SUBST(EXE_SUFFIX)
 
 #
+# Check for ulsshxmlrpc header
+#
+
+AC_CHECK_HEADERS([ulxmlrpcpp/ulxr_config.h],
+		 [AC_DEFINE(HAVE_ULXMLRPCPP)
+		  HAVE_ULXMLRPCPP="yes"])
+AC_SUBST(HAVE_ULXMLRPCPP)
+
+#
 # Check for the robot vision system dependencies.
 #
 AC_CHECK_HEADERS([linux/videodev.h],
@@ -584,19 +613,6 @@ else
 	TESTMODE=0
 fi
 AC_SUBST(TESTMODE)
-
-# Deal with Python mess.
-changequote(START, END)dnl
-PYTHON_VERSION=`python -V 2>&1 | sed -E -e 's/^[a-zA-Z\ ]*//' -e 's/([0-9].[0-9]).*$/\1/'`
-changequote([, ])dnl
-PYTHON_INCLUDE="/usr/local/include/python${PYTHON_VERSION}"
-PYTHON_HEADER="${PYTHON_INCLUDE}/Python.h"
-
-if test ! -f $PYTHON_HEADER; then
-	AC_MSG_ERROR([Cannot find the Python header file Python.h])
-fi
-
-AC_SUBST(PYTHON_INCLUDE)
 
 # Make sure $INSTALL is valid at any depth in our tree, i.e. make it absoulte.
 # This can be needed when no valid install is found and autoconf falls back on
