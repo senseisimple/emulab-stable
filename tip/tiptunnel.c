@@ -10,6 +10,7 @@
 
 #ifdef WITHSSL
 #include <openssl/ssl.h>
+#include <openssl/err.h>
 #endif /* WITHSSL */
 
 #include "capdecls.h"
@@ -294,6 +295,7 @@ void doCreateTunnel()
 
 void doTunnelConnection()
 {
+  int i;
   int conSock;
   struct sockaddr_in name;
   socklen_t namelen = sizeof( name );
@@ -322,6 +324,30 @@ acceptor:
     exit(-1);
   }
 
+  { 
+    /*
+      lets pretend that we are a telnetd (RFC854).. 
+      It will be crackling good fun! 
+
+      we enable "SUPPRESS GO AHEAD" and "ECHO",
+      thus (through something commonly called "kludge line mode")
+      telling the client _not_ to send a line at a time (and not to echo locally.) 
+
+      I'm actually not totally sure why this works, but I'm afraid if I 
+      think too hard about it, it will stop.
+    */
+
+    const char telnet_commands[] = 
+    { 
+      // IAC WILL SUPPRESS GO AHEAD:
+      255, 251, 3,
+      // IAC WILL ECHO:
+      255, 251, 1   
+    };
+
+    write( conSock, telnet_commands, sizeof( telnet_commands ) );
+  }
+
   while (1) {
     fd_set fds;
     char buf[4096];
@@ -343,9 +369,20 @@ acceptor:
 	return;
       }
 
-      if (writeFunc( /*sock,*/ buf, got ) < 0) {
-	perror("write sock");
-	return;
+      /*  
+	  we could implement some kind of search to remove 
+	  "IAC DO SUPPRESS GO AHEAD" and "IAC DO ECHO" bytes from the stream,
+	  or just trash any packet starting in "IAC" (255).
+	  Yeah.
+      */
+
+      if ((unsigned char)buf[0] != 255) {
+	if (writeFunc( /*sock,*/ buf, got ) < 0) {
+	  perror("write sock");
+	  return;
+	}
+      } else {
+	printf( "Tossed %i bytes beginning with IAC.\n", got);
       }
     }
 
@@ -356,6 +393,15 @@ acceptor:
 	if (debug) { printf("sock read %i; exiting.\n", got); }
 	return;
       }
+
+      /*
+      for(i = 0; i < got; i++ ) {
+	if ((unsigned char)buf[i] > 127) {
+	  printf("Special %i\n", (unsigned int)(unsigned char)buf[i] );
+	}
+      }
+      printf("%i server->consock\n", got );
+      */
 
       if (write( conSock, buf, got ) < 0) {
 	perror("write conSock");
@@ -372,6 +418,7 @@ void initSSL()
 {
   SSL_library_init();
   ctx = SSL_CTX_new( SSLv23_method() );
+  SSL_load_error_strings();
   
   //  if (!(SSL_CTX_load_verify_location( ctx, CA_LIST, 0 ))
 }
@@ -384,15 +431,44 @@ void sslConnect()
   X509 * peer;
   BIO * sbio;
   int i;
+  
+  // inform server of desire to use SSL
+  {
+    secretkey_t sslHintKey;
+    char ret[4];
+
+    sslHintKey.keylen = 7;
+    strncpy( sslHintKey.key, "USESSL", 7 );
+    write( sock, &sslHintKey, sizeof( sslHintKey ) );
+    /*
+    if (4 != read( sock, ret, 4 ) || 
+	0 != strncmp( ret, "OKAY", 4) ) {
+      fprintf( stderr, "Didnt get SSL OKAY from server.\n");
+      exit(-1);
+    }
+    */
+  } 
 
   ssl = SSL_new( ctx );
   SSL_set_fd( ssl, sock );
 
+  /*
+  i = 0;
+  while (1) {
+    char * n = SSL_get_cipher_list( ssl, i );
+    if (!n) { break;}
+    printf("Cipher #%i is %s\n", i, n );
+    i++;
+  }
+  */
+
   // sbio = BIO_new_socket( sock, BIO_NOCLOSE );
   // SSL_set_bio( ssl, sbio, sbio );
+  sleep(1);
   
   if (SSL_connect( ssl ) <= 0) {
     fprintf(stderr, "SSL Connect error.\n");
+    ERR_print_errors_fp( stderr );
     exit(-1);
   }
 
