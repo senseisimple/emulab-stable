@@ -1,7 +1,9 @@
+#include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <syslog.h>
 
 #include "f_common.h"
 #include "f_timer.h"
@@ -54,7 +56,8 @@ void goodClient( uint id )
       return;
     }
   }
-  printf("goodClient() called on non-existent id 0x%08x\n", id);
+  syslog( LOG_WARNING, 
+          "goodClient() called on non-existent id 0x%08x\n", id);
 }
 
 /* sets a client as being "naughty" (increments dropcount.)
@@ -67,7 +70,7 @@ int naughtyClient( uint id )
       return (++clientNaughtiness[i]) > NAUGHTY_THRESHOLD ? 1 : 0;
     }
   }
-  printf("naughtyClient() called on non-existent id 0x%08x\n", id);
+  syslog( LOG_WARNING, "naughtyClient() called on unknown id 0x%08x\n", id);
   return 0;
 }
 
@@ -77,7 +80,7 @@ void removeClient( uint id )
   int i;
   for (i = 0; i < MAX_CLIENTS; i++) {
     if (clientList[i] == id ) {
-      printf("* Removing client (id=0x%08x)\n", id );
+      syslog( LOG_INFO, "Removing client (id=0x%08x)\n", id );
       clientList[i] = 0;
       return;
     }
@@ -100,17 +103,56 @@ void addClient( uint id )
   }
 
   if (place == -1) {
-    printf("!! TOO MANY DAMN CLIENTS. (%i max)\n", MAX_CLIENTS );
+    syslog(LOG_WARNING, "TOO MANY DAMN CLIENTS. (%i max)\n", MAX_CLIENTS );
   } else { 
-    printf("* Adding client (id=0x%08x)\n", id );
+    syslog(LOG_INFO, "Adding client (id=0x%08x)\n", id );
     clientList[ place ] = id;
     clientNaughtiness[ place ] = 0;
+  }
+}
+
+
+char filename[256];
+char sendAddress[256];
+int  port;
+
+void usage(char * appname)
+{
+  fprintf(stderr, 
+	  "%s: Usage:\n"
+	  "%s: %s <filename> [<serveraddress> [<port>]]\n"
+	  "%s: (default is 234.5.6.7, port 3564.)\n",
+	  appname, appname, appname, appname );
+}
+
+void handleArgs( int argc, char ** argv )
+{
+  int i;
+  
+  port = 3564;
+  strcpy( sendAddress, "234.5.6.7" );
+
+  if (argc > 1) {
+    strcpy( filename, argv[1] );
+    if (argc > 2) {
+      strcpy( sendAddress, argv[2] );
+      if (argc > 3) {
+	port = atoi( argv[3] );
+      }
+    }
+  } else {
+    syslog(LOG_ERR, "Fatal - Insufficient arguments." );
+    usage("frisbeed" /* argv[0] */);
+    exit(1);
   }
 }
 
 int main( int argc, char ** argv )
 {
   int gotNonRequestYet;
+
+  openlog("frisbeed", LOG_PERROR | LOG_PID, LOG_USER );
+  atexit( closelog );
 
   memset( clientList, 0, sizeof( clientList ) );
   clientListPos = 0;
@@ -119,35 +161,25 @@ int main( int argc, char ** argv )
   pollSequence = 0;
   pollSequenceValid = 0;
 
-  if ( argc != 5 ) {
-    printf("!!! Wrong number of arguments.\n"
-	   "Usage:\n"
-           "server <filename> <myport> <serveraddress> <serverport>\n\n"
-           "Broadcast example:\n"
-           "server foo.image 7000 168.192.0.255 7000\n\n"
-           "Other example:\n"
-	   "server bar.image 3447 biff.foo.org 3447\n\n" );
-    exit( -1 );
-  }  
- 
-  printf( "* Opening file \"%s\" for input.\n", argv[1]);
+  handleArgs( argc, argv );
 
-  inFile = open( argv[1], O_RDONLY );
+  syslog(LOG_INFO, "Using file \"%s\" for input.", filename );
+  syslog(LOG_INFO, "Sending to net address %s, port %i", sendAddress, port );
+ 
+  inFile = open( filename, O_RDONLY );
 
   if ( inFile == -1) {
-    perror("!!! Error opening file");
-    exit(-1);
+    syslog(LOG_ERR, "Fatal - Couldn't open file \"%s\" for reading: %m\n", filename);
+    exit(1);
   }
 
   t_init();
 
   packetTotal = lseek( inFile, 0, SEEK_END ) / 1024;
 
-  printf( "* %ik in file.\n", packetTotal );
+  syslog(LOG_INFO, "File \"%s\" opened; contains %ikB.\n", filename, packetTotal );
 
-  n_initLookup( atoi( argv[2] ),
-	        atoi( argv[4] ),
-		argv[3] );
+  n_initLookup( port, port, sendAddress );
 
   t_setTimer( POLL_WAIT );
   gotNonRequestYet = 0;
@@ -192,25 +224,27 @@ int main( int argc, char ** argv )
 	  }
 	  /* "fall through" to polling code */
 	} else {
-	  printf("! Bad or duplicate request: psv = %i; p.ps = %i; ps = %i; p.pi = %i; pt = %i;\n ", 
-		 pollSequenceValid, 
-		 pr->pollSequence, 
-		 pollSequence,
-		 pr->packetId,
-		 packetTotal );
+	  syslog( LOG_WARNING, 
+                  "Bad or duplicate request:"
+                  "psv = %i; p.ps = %i; ps = %i; p.pi = %i; pt = %i;\n ", 
+		  pollSequenceValid, 
+		  pr->pollSequence, 
+		  pollSequence,
+		  pr->packetId,
+		  packetTotal );
 	  /* don't poll again.. a viscious cycle.. */
 	  gotNonRequestYet = 1;
 	  continue; /* continue with while as long as poll timer is > 0*/
 	}
       } else if (p.type == NPT_ALIVE) {
 	PacketAlive * pa = (PacketAlive *)&p;
-	/* printf("Alive hint received\n"); */
+	syslog( LOG_DEBUG, "Alive hint received\n");
 	addClient( pa->clientId );
 	gotNonRequestYet = 1;
 	continue; /* continue with while as long as poll timer is > 0*/
       } else if (p.type == NPT_GONE) {
 	PacketGone * pg = (PacketGone *)&p;
-	/* printf("Gone hint received\n"); */
+	syslog( LOG_DEBUG, "Gone hint received\n");
 	removeClient( pg->clientId );
 	if (pg->clientId == lastAddress) {
 	  /* we are in the process of polling them, so poll someone else */
@@ -228,10 +262,11 @@ int main( int argc, char ** argv )
 
       if (lastAddress != 0) {
         /* client didn't seem to do its job */
-	printf("! Poll failed to produce results.\n");
+	syslog( LOG_WARNING, "Poll failed to produce results.\n");
 	if (naughtyClient( lastAddress )) {
           /* too many dropped polls in a row. */
-	  printf("Removing client 0x%08x for being naughty.\n", lastAddress);
+	  syslog( LOG_WARNING,
+                  "Removing client 0x%08x for being naughty.\n", lastAddress);
 	  removeClient( lastAddress ); 
 	}
 	/* we timed out.. no request received. */

@@ -1,4 +1,4 @@
-all:	frisbee fromage
+all:	userfrisbee frisbeed
 
 CFLAGS = -O -g
 
@@ -8,18 +8,22 @@ CFRISBEEFLAGS = -O -g
 FROMAGELIBS = -lz -L/usr/local/lib -llthread -llgcc_r
 FRISBEELIBS = -L/usr/local/lib
 
-fromage: fromage.o f_chunker.o f_frisbee.o f_network.o f_timer.o
-	$(CC) $(CFROMAGEFLAGS) fromage.o f_chunker.o f_frisbee.o f_network.o f_timer.o $(FROMAGELIBS) -o fromage
-	cp fromage fromage.debug
-	strip fromage
+f_network_withsyslog.c: f_network.c
+	echo "#define SYSLOG" > f_network_withsyslog.c
+	cat f_network.c >> f_network_withsyslog.c
 
-frisbee: server.o f_network.o f_timer.o
-	$(CC) $(CFRISBEEFLAGS) server.o f_network.o f_timer.o $(FRISBEELIBS) -o frisbee
-	cp frisbee frisbee.debug
-	strip frisbee
+userfrisbee: fromage.o f_chunker.o f_frisbee.o f_network.o f_timer.o
+	$(CC) $(CFROMAGEFLAGS) fromage.o f_chunker.o f_frisbee.o f_network.o f_timer.o $(FROMAGELIBS) -o userfrisbee
+	cp userfrisbee userfrisbee.debug
+	strip userfrisbee
+
+frisbeed: server.o f_network_withsyslog.o f_timer.o
+	$(CC) $(CFRISBEEFLAGS) server.o f_network_withsyslog.o f_timer.o $(FRISBEELIBS) -o frisbeed
+	cp frisbeed frisbeed.debug
+	strip frisbeed
 
 tidy:
 	-/bin/rm -f *.o 
 
 clean:	tidy
-	-/bin/rm fromage frisbee fromage.debug frisbee.debug
+	-/bin/rm userfrisbee frisbeed userfrisbee.debug frisbeed.debug

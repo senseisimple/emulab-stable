@@ -10,12 +10,14 @@
 #include <netdb.h>
 #include <string.h>
 #include <errno.h>
-
 #include <unistd.h>
-
 #include <net/if.h>
 #include <net/route.h>
 #include <sys/ioctl.h>
+
+#ifdef SYSLOG
+#include <syslog.h>
+#endif
 
 #include "f_common.h"
 #include "f_network.h"
@@ -79,7 +81,11 @@ void n_initLookup( ushort receivePort, ushort sendPort, const char * sendName )
 {
   struct hostent * he = gethostbyname( sendName );
   if ( he == NULL ) {
-    printf("!!! Bad hostname \"%s\"\n", sendName );
+#ifdef SYSLOG
+    syslog( LOG_ERR, "Bad hostname \"%s\"\n", sendName );
+#else
+    fprintf(stderr, "Bad hostname \"%s\"\n", sendName );
+#endif
     exit(-1);
   }
   assert( he->h_addr_list[0] != NULL );
@@ -103,8 +109,14 @@ void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
   name.sin_port   = htons( receivePort );
   name.sin_addr.s_addr = htonl( INADDR_ANY );
 
-  traceprintf("n_init(): Binding to port %i, sending to 0x%08x:%i\n", 
+#ifdef SYSLOG
+  syslog( LOG_INFO, 
+	 "Binding to port %i, sending to 0x%08x:%i\n", 
 	 receivePort, sendAddress, sendPort );
+#else
+  printf( "Binding to port %i, sending to 0x%08x:%i\n", 
+	  receivePort, sendAddress, sendPort );
+#endif  
 
   while ( bind( sock, (struct sockaddr *)&name, sizeof( name )) < 0 ) {
     perror("n_init(): bind()");
@@ -125,7 +137,11 @@ void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
     mreq.imr_multiaddr.s_addr = nboSendAddress;
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     
+#ifdef SYSLOG
+    syslog( LOG_INFO, "Using multicast.\n");
+#else
     printf("Using multicast...\n");
+#endif
     if (setsockopt(sock,IPPROTO_IP,IP_ADD_MEMBERSHIP,&mreq,sizeof(mreq)) < 0) {
       perror("setsockopt");
       exit(1);
@@ -196,7 +212,9 @@ void n_packetSend(Packet * p)
 	perror("n_packetSend(): sendto()");
 	usleep(50);
 	if (count++ == 8) { 
+	  /*
 	  traceprintf("n_packetSend(): aborted send\n");
+	  */
 	  break;
 	}
       }
