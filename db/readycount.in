@@ -24,14 +24,18 @@ use strict;
 
 sub usage {
     print << "END";
-Usage: $0 [-h] [-c] [-l] <pid> <eid> [node ...]
+Usage: $0 [-h] [-c | -s] [-l] <pid> <eid> [node ...]
 -h    This message
--c    Clear, rather than set, ready bits. If no node is given, clear ready
-      bits for all nodes
+-s    Set ready bits
+-c    Clear ready bits
+-p    Use physical node IDs with -c or -s, rather than virtual ones. In
+      this case, no pid and eid should be given.
 -l    List ready status for each node in the experiment
 
 If no nodes are given, gives a summary of the nodes that have reported ready.
-If nodes are given, reports them as being ready (or clears their ready bits
+If nodes are given, reports just status for the listed nodes. If -s or -c is
+given, sets or clears ready bits for the listed nodes, or all
+them as being ready (or clears their ready bits
 if -c is given)
 END
 
@@ -42,33 +46,50 @@ END
 # Process command-line arguments
 #
 my %opt = ();
-GetOptions(\%opt,'l','h','c');
-if (@ARGV < 2) {
+GetOptions(\%opt,'l','h','c','s','p');
+if (($opt{p} && (@ARGV < 1)) || (!$opt{p} && (@ARGV < 2))) {
     exit &usage;
 }
-my ($pid, $eid) = (shift @ARGV, shift @ARGV);
+
+my ($pid, $eid);
+if (!$opt{p}) {
+    ($pid, $eid) = (shift @ARGV, shift @ARGV);
+}
 my @nodes = @ARGV;
 
 if ($opt{h}) {
     exit &usage;
 }
 
-if ($opt{l} && ($opt{c} || @nodes)) {
+if ($opt{l} && ($opt{c} || $opt{s})) {
     exit &usage;
 }
 
-# Make sure that the experiment actually exists
-if (!ExpState($pid,$eid)) {
-    die("There is no experiment '$eid' in project '$pid'.\n");
+if ($opt{s} && $opt{c}) {
+    die "-s and -c are mutually exclusive\n";
 }
 
-# Make sure the user has the ability to modify this experiment
-if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die("You do not have permission to modify '$eid' in project '$pid'.\n");
+# Make sure that the user has permission to modify the experiment, if using
+# virtual mode, or modify the nodes, if using physical names.
+if ($opt{p}) {
+    if (!TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYINFO,@nodes)) {
+	die "You do not have permission to modify one or more nodes\n";
+    }
+} else {
+    if (!ExpState($pid,$eid)) {
+	die("There is no experiment '$eid' in project '$pid'.\n");
+    }
+
+    # Make sure the user has the ability to modify this experiment
+    if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+	die("You do not have permission to modify '$eid' in project '$pid'.\n");
+    }
 }
 
-if ($opt{c} || @nodes) {
-    my @pnodes;
+my @pnodes;
+if ($opt{p}) {
+    @pnodes = @nodes;
+} else {
     if (!@nodes) {
 	@pnodes = ExpNodes($pid,$eid);
     } else {
@@ -81,6 +102,9 @@ if ($opt{c} || @nodes) {
 	    }
 	}
     }
+}
+
+if ($opt{c} || $opt{s}) {
     my $newbit = 1;
     if ($opt{c}) {
 	$newbit = 0;
@@ -89,15 +113,16 @@ if ($opt{c} || @nodes) {
 	DBQueryFatal("update nodes set ready=$newbit where node_id='$pnode'");
     }
 } else {
-    my $result = DBQueryFatal("select ready, vname " .
-	"from reserved left join nodes on nodes.node_id=reserved.node_id " . 
-	"where reserved.eid='$eid' and reserved.pid='$pid'");
     my $ready = 0;
     my $total = 0;
-    while (my @row = $result->fetchrow()) {
-	my ($isready, $vname) = @row;
+    foreach my $pnode (@pnodes) {
+	my $result = DBQueryFatal("select ready, vname, nodes.node_id " .
+	    "from nodes left join reserved on nodes.node_id=reserved.node_id ".
+	    "where nodes.node_id='$pnode'");
+	my ($isready, $vname, $pname) = $result->fetchrow();
+	my $name = $opt{p}? $pname : $vname;
 	if ($opt{l}) {
-	    print "$vname\t$isready\n";
+	    print "$name\t$isready\n";
 	}
 	if ($isready) {
 	    $ready++;
