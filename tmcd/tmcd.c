@@ -60,7 +60,6 @@ int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
-static void	IsAlive(int sock, char *nodeid, int istcp);
 
 /* thread support */
 #define MAXCHILDREN	25
@@ -107,6 +106,7 @@ COMMAND_PROTOTYPE(dostate);
 COMMAND_PROTOTYPE(docreator);
 COMMAND_PROTOTYPE(dotunnels);
 COMMAND_PROTOTYPE(dovnodelist);
+COMMAND_PROTOTYPE(doisalive);
 
 struct command {
 	char	*cmdname;
@@ -138,6 +138,7 @@ struct command {
 	{ "state",	dostate},
 	{ "tunnels",	dotunnels},
 	{ "vnodelist",	dovnodelist},
+	{ "isalive",	doisalive},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -568,7 +569,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			/*
 			 * Simple "isalive" support for remote nodes.
 			 */
-			IsAlive(sock, nodeid, istcp);
+			doisalive(sock, nodeid, rdata, istcp, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -583,9 +584,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			/*
 			 * Simple "isup" daemon support!
 			 */
-			mydb_update("update nodes set status='up' "
-				    "where node_id='%s'", nodeid);
-			client_writeback(sock, "\n", strlen("\n"), istcp);
+			doisalive(sock, nodeid, rdata, istcp, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -949,6 +948,18 @@ COMMAND_PROTOTYPE(doaccounts)
 	}
 	mysql_free_result(res);
 
+	/*
+	 * Each time a node picks up accounts, decrement the update
+	 * counter. This is a very poor approach. See node_update and
+	 * doisalive below.
+	 */
+	if (mydb_update("update nodes set update_accounts=update_accounts-1 "
+			"where node_id='%s' and update_accounts!=0",
+			nodeid)) {
+		error("ACCOUNTS: %s: DB Error setting exit update_accounts!\n",
+		      nodeid);
+	}
+			 
 	/*
 	 * Now onto the users in the project.
 	 */
@@ -3121,13 +3132,41 @@ directly_connected(struct node_interface *interfaces, char *iface) {
 /*
  * IsAlive(). Mark nodes as being alive. 
  */
-static void
-IsAlive(int sock, char *nodeid, int istcp)
+COMMAND_PROTOTYPE(doisalive)
 {
+	MYSQL_RES	*res;
+	int		doaccounts = 0;
+	char		buf[MYBUFSIZE];
+
 	mydb_update("update nodes "
 		    "set status='up',status_timestamp=now() "
 		    "where node_id='%s'", nodeid);
 
-	client_writeback(sock, "\n", strlen("\n"), istcp);
+	/*
+	 * Return info about what needs to be updated. 
+	 */
+	res = mydb_query("select update_accounts from nodes "
+			 "where node_id='%s' and update_accounts!=0",
+			 1, nodeid);
+			 
+	if (!res) {
+		error("ISALIVE: %s: DB Error getting account info!\n", nodeid);
+		return 1;
+	}
+	if (mysql_num_rows(res)) {
+		doaccounts = 1;
+	}
+	mysql_free_result(res);
+
+	/*
+	 * At some point, maybe what we will do is have the client
+	 * make a request asking what needs to be updated. Right now,
+	 * just return yes/no and let the client assume it knows what
+	 * to do (update accounts).
+	 */
+	sprintf(buf, "UPDATE=%d\n", doaccounts);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	return 0;
 }
   
