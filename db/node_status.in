@@ -59,10 +59,14 @@ my $query_result =
 		 # Jailed and PLAB virtnodes report every 600 seconds.
 		 # Must be allocated to an experiment to be considerd.
 		 " ((nt.isvirtnode=1 && r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > 900)) || ".
+		 "   ((now() - ns.status_timestamp) > 1000)) || ".
 		 # Local phys nodes report every 180 seconds.
 		 "  (nt.isvirtnode=0 && nt.isremotenode=0 && ".
-		 "   ((now() - ns.status_timestamp) > 300)))");
+		 "   ((now() - ns.status_timestamp) > 300)) || ".
+		 # Remote phys nodes check in every 60 seconds.
+		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
+		 "   ((now() - ns.status_timestamp) > 100)))");
+		 
 
 while (my ($node,$status,$pid,$remote,$isvirt,$timediff) =
        $query_result->fetchrow_array) {
