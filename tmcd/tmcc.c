@@ -17,6 +17,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "decls.h"
+#include "config.h"
 
 #undef BOSSNODE
 

@@ -13,13 +13,14 @@
 #include <assert.h>
 #include <mysql/mysql.h>
 #include "decls.h"
+#include "config.h"
 
 /*
  * XXX This needs to be localized!
  */
-#define FSPROJDIR	FSNODE ":/q/proj"
-#define FSGROUPDIR	FSNODE ":/q/groups"
-#define FSUSERDIR	FSNODE ":/users"
+#define FSPROJDIR	FSNODE ":" FSDIR_PROJ
+#define FSGROUPDIR	FSNODE ":" FSDIR_GROUPS
+#define FSUSERDIR	FSNODE ":" FSDIR_USERS
 #define PROJDIR		"/proj"
 #define GROUPDIR	"/groups"
 #define USERDIR		"/users"
