@@ -1233,7 +1233,7 @@ class experiment:
             argdict["state"] = [argdict["state"],]
             pass
         
-        res = DBQueryFatal("select state,gid from experiments "
+        res = DBQueryFatal("select state from experiments "
                            "where pid=%s and eid=%s",
                            (argdict["proj"], argdict["exp"]))
 
@@ -1252,6 +1252,7 @@ class experiment:
         #
         # First, see if the experiment is already in the desired state,
         #
+        state = res[0][0]
         if (state in argdict["state"]):
             return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
 
@@ -1330,6 +1331,14 @@ class experiment:
         del(mc)
         
         return EmulabResponse(RESPONSE_SUCCESS, value=retval, output=retval)
+
+    #
+    # Wrap up above for a simple "waitforactive" to avoid leaking more
+    # goo out then needed (eventstates).
+    #
+    def waitforactive(self, version, argdict):
+        argdict["state"] = "active";
+        return self.statewait(version, argdict);
         
     #
     # Return the node/link mappings for an experiment.

@@ -722,7 +722,48 @@ experiments.
     <td>The Emulab ID of the experiment</td>
   </tr>
   </table>
+
+  <br>
+  <li><tt><b>waitforactive</b></tt>: Wait for an experiment to reach
+  the <em>active</em> state. Typically, you would use this if you
+  launched a swapin asynchronously, and then wanted to wait later for
+  the swapin to complete. 
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  </table>
   
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>timeout</tt></td>
+    <td>integer</td>
+    <td><i>forever</i></td>
+    <td>Timeout after this many <b>seconds</b>. The return code is
+        is <tt>RESPONSE_SUCCESS</tt> if experiment reaches the active state or
+	<tt>RESPONSE_TIMEDOUT</tt> if the timer expires.
+    </td>
+   </tr>
+  </table>
+    
+
   <br>
   <li><tt><b>statewait</b></tt>: Wait for an experiment to reach a particular
   state. State is one of swapped, active, swapping, activating, etc. If the
