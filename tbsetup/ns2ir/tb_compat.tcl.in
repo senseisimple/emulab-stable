@@ -212,7 +212,7 @@ proc tb-set-node-rpms {node args} {
 	perror "\[tb-set-node-rpms] No rpms given."
 	return
     }
-    $node set rpms [join $args :]
+    $node set rpms [join $args ";"]
 }
 proc tb-set-node-startup {node cmd} {
     $node set startup $cmd
