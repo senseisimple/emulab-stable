@@ -6,6 +6,15 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040226:
+	Re-worked the way named_setup handles virtual nodes and unroutable
+	IP addresses - no point in handling the two differently. Thus, the
+	'vnodes.<OURDOMAIN>.db' DNS zone file is no longer generated.
+	Instead, if you have a mix of routable and unroutable IP addresses,
+	you'll need to switch to using the '<OURDOMAIN>.internal.db' zone
+	file - see Step 6 of doc/setup.txt for instructions on setting up
+	this file.
+
 20040121:
 	Changed the 3.testbed.sh rc.d script to handle 'start' and 'stop'
 	arguments properly. Install a fresh copy of rc.d/3.testbed.sh into
