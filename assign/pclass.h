@@ -62,7 +62,7 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : size(0), used(0), refcount(0) {;}
+  tb_pclass() : name(), size(0), used(0), refcount(0) {;}
 
   typedef hash_map<crope,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
@@ -108,7 +108,11 @@ typedef hash_map<crope,tt_entry> pclass_types;
 #define PCLASS_FDS_WEIGHT 2
 
 /* routines defined in pclass.cc */
-int generate_pclasses(tb_pgraph &PG);// sets pclasses and type_table globals
+// Sets pclasses and type_table globals -
+// Takes two arguments - a physical graph, and a flag indicating whether or not
+// each physical node should get its own pclass (effectively disabling
+// pclasses)
+int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode);
 
 /* The following two routines sets and remove mappings in pclass
    datastructures */

@@ -56,18 +56,8 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	crope name = parsed_line[1];
 	bool isswitch = false;
 	pvertex pv = add_vertex(PG);
-	tb_pnode *p = new tb_pnode();
+	tb_pnode *p = new tb_pnode(name);
 	put(pvertex_pmap,pv,p);
-	p->name = name;
-	p->typed = false;
-	p->max_load = 0;
-	p->current_load = 0;
-	p->pnodes_used = 0;
-	p->total_interfaces = 0;
-#ifdef TRIVIAL_LINK_BW
-	p->trivial_bw = 0;
-	p->trivial_bw_used = 0;
-#endif
 	
 	unsigned int i;
 	for (i = 2;
@@ -199,24 +189,17 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       
       for (int cur = 0;cur<num;++cur) {
 	pedge pe = (add_edge(srcv,dstv,PG)).first;
-	tb_plink *pl = new tb_plink();
+	tb_plink *pl = new tb_plink(name,tb_plink::PLINK_NORMAL,srcmac,dstmac);
 	put(pedge_pmap,pe,pl);
 	pl->delay_info.bandwidth = ibw;
 	pl->delay_info.delay = idelay;
 	pl->delay_info.loss = gloss;
-	pl->bw_used = 0;
-	pl->name = name;
-	pl->emulated = 0;
-	pl->nonemulated = 0;
 #ifdef FIX_PLINK_ENDPOINTS
 	pl->fixends = fixends;
 #endif
 #ifdef PENALIZE_BANDWIDTH
 	pl->penalty = penalty;
 #endif
-	pl->type = tb_plink::PLINK_NORMAL;
-	pl->srcmac = srcmac;
-	pl->dstmac = dstmac;
 	if (ISSWITCH(srcnode) && ISSWITCH(dstnode)) {
 	  if (cur != 0) {
 	    cout <<

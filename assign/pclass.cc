@@ -60,12 +60,6 @@ struct hashlinkinfo {
 // mapping between links that preserves bw, and destination.
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
-  // We disable pclasses by simply never considering any two nodes to be
-  // equivalent
-  if (!use_pclasses) {
-    return 0;
-  }
-  
   typedef hash_multiset<link_info,hashlinkinfo> link_set;
   
   // check type information
@@ -127,7 +121,7 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
    list of all equivalence classes) and type_table (and table of
    physical type to list of classes that can satisfy that type) are
    set by this routine. */
-int generate_pclasses(tb_pgraph &PG) {
+int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode) {
   typedef hash_map<tb_pclass*,tb_pnode*,hashptr<tb_pclass*> > pclass_pnode_map;
   typedef hash_map<crope,pclass_list*> name_pclass_list_map;
 
@@ -138,20 +132,26 @@ int generate_pclasses(tb_pgraph &PG) {
   tie(vit,vendit) = vertices(PG);
   for (;vit != vendit;++vit) {
     cur = *vit;
-    tb_pclass *curclass;
     bool found_class = 0;
     tb_pnode *curP = get(pvertex_pmap,cur);
-    pclass_pnode_map::iterator dit;
-    for (dit=canonical_members.begin();dit!=canonical_members.end();
-	 ++dit) {
-      curclass=(*dit).first;
-      if (pclass_equiv(PG,curP,(*dit).second)) {
-	// found the right class
-	found_class=1;
-	curclass->add_member(curP);
-	break;
-      } 
+    tb_pclass *curclass;
+
+    // If we're putting each pnode in its own pclass, don't bother to find
+    // existing pclasses that it matches
+    if (!pclass_for_each_pnode) {
+      pclass_pnode_map::iterator dit;
+      for (dit=canonical_members.begin();dit!=canonical_members.end();
+	  ++dit) {
+	curclass=(*dit).first;
+	if (pclass_equiv(PG,curP,(*dit).second)) {
+	  // found the right class
+	  found_class=1;
+	  curclass->add_member(curP);
+	  break;
+	} 
+      }
     }
+
     if (found_class == 0) {
       // new class
       tb_pclass *n = new tb_pclass;

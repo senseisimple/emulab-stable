@@ -151,10 +151,22 @@ typedef slist<crope> name_slist;
  */
 typedef hash_map<crope,int> name_count_map;
 
+/*
+ * A hash function for pointers
+ */
 template <class T> struct hashptr {
   size_t operator()(T const &A) const {
     return (size_t) A;
   }
 };
+
+/*
+ * Misc. debugging stuff
+ */
+#ifdef ROB_DEBUG
+#define RDEBUG(a) a
+#else
+#define RDEBUG(a)
+#endif
 
 #endif

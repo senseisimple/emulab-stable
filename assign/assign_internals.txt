@@ -200,8 +200,10 @@ Overview of the Code
 
 CC Files:
 
-assign.cc - Contains the simulated annealing loop and all
-initialization code, including main().
+assign.cc - Contains all initialization code, including main().
+
+anneal.cc - Contains the simulated annealing loop and related
+functions.
 
 score.cc - Contains init_score, add_node, remove_node and all
 associated helper routines.
@@ -217,6 +219,9 @@ the pclasses, and the code to maintain the pclasses.
 
 vclass.cc - Contains the code to setup vclasses and calculate score
 deltas when nodes are mapped and unmapped..
+
+solution.cc - Contains the code to print out solutions and other
+graphs.
 
 Header Files:
 

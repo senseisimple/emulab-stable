@@ -8,16 +8,19 @@
 #define __PHYSICAL_H
 
 #include "common.h"
+
 // Icky, but I can't include virtual.h here
 class tb_vnode;
 typedef hash_set<tb_vnode*,hashptr<tb_vnode*> > tb_vnode_set;
 
+// Class forward declarations - defined below
 class tb_pclass;
 class tb_pnode;
 class tb_switch;
 class tb_plink;
 class tb_slink;
 
+// typedefs
 typedef property<vertex_data_t,tb_pnode*> PNodeProperty;
 typedef property<edge_data_t,tb_plink*> PEdgeProperty;
 typedef property<vertex_data_t,tb_switch*> SNodeProperty;
@@ -57,6 +60,8 @@ typedef hash_map<svertex,switch_dist_map*>switch_dist_map_map;
 typedef list<pedge> pedge_path;
 typedef list<pvertex> pvertex_list;
 
+// Globals, declared in assign.cc
+
 extern tb_pgraph_vertex_pmap pvertex_pmap;
 extern tb_pgraph_edge_pmap pedge_pmap;
 extern tb_sgraph_vertex_pmap svertex_pmap;
@@ -64,8 +69,49 @@ extern tb_sgraph_edge_pmap sedge_pmap;
 
 class tb_pnode {
 public:
-  tb_pnode() {;}
+  tb_pnode() { tb_pnode("(unnamed)"); }
+  tb_pnode(crope _name) : types(), features(), name(_name), typed(false),
+			  max_load(0), current_load(0), switches(),
+			  sgraph_switch(), switch_used_links(0),
+			  total_interfaces(0), used_interfaces(0),
+			  total_bandwidth(0), my_class(NULL), assigned_nodes(),
+			  trivial_bw(0), trivial_bw_used(0) {;}
 
+  typedef hash_map<crope,int> types_map;
+  typedef hash_map<crope,double> features_map;
+
+  // contains max nodes for each type
+  types_map types;
+
+  // contains cost of each feature
+  features_map features;
+
+  crope name;			// name of the node
+  bool typed;			// has it been typed
+  crope current_type;		// type the node is currently being used as
+  int max_load;			// maxmium load for current type
+  int current_load;		// how many vnodes are assigned to this pnode
+  pvertex_set switches;		// what switches the node is attached to
+
+  svertex sgraph_switch;	// only for switches, the corresponding
+				// sgraph switch.
+  int switch_used_links;	// only for switches, how many links are
+				// in use.  Switch is in use whenever > 0
+
+  int total_interfaces;		// total number of links leaving the node
+  int used_interfaces;		// number of links that are currently in use
+  int total_bandwidth;		// total bandwidth of all this nodes' links
+
+  tb_pclass *my_class;		// the pclass this node belongs to
+
+  tb_vnode_set assigned_nodes;	// the set of vnodes currently assigned
+
+  int trivial_bw;		// the maximum amount of trivial bandwidth
+  				// available
+  int trivial_bw_used;		// the amount of bandwidth currently used by
+  				// trivial links
+	
+  // Output operator for debugging
   friend ostream &operator<<(ostream &o, const tb_pnode& node)
     {
       o << "tb_pnode: " << node.name << " (" << &node << ")" << endl;
@@ -85,49 +131,11 @@ public:
 	o << " " << get(pvertex_pmap,*it)->name;
       }
       o << endl;
-      o << " pnodes_used="<< node.pnodes_used << " sgraph_switch=" <<
-	node.sgraph_switch << " my_class=" << node.my_class << endl;
+      o << " sgraph_switch=" << node.sgraph_switch
+	  << " my_class=" << node.my_class << endl;
       return o;
     }
 
-  typedef hash_map<crope,int> types_map;
-  typedef hash_map<crope,double> features_map;
-
-  // contains max nodes for each type
-  types_map types;
-
-  // contains cost of each feature
-  features_map features;
-
-  crope current_type;
-  bool typed;			// has it been typed
-  int max_load;			// maxmium load for current type
-  int current_load;		// how many vnodes are assigned to this pnode
-  crope name;
-  pvertex_set switches;		// what switches the node is attached to
-  int pnodes_used;		// for switch nodes
-  svertex sgraph_switch;	// only for switches, the corresponding
-				// sgraph switch.
-  int switch_used_links;	// only for switches, how many links are
-				// in use.  Switch is in use whenever > 0
-  int total_interfaces;
-#ifdef PENALIZE_UNUSED_INTERFACES
-  int used_interfaces;
-#endif
-#ifdef PER_VNODE_TT
-  int total_bandwidth;
-#endif
-
-  tb_pclass *my_class;
-
-#ifdef SMART_UNMAP
-  tb_vnode_set assigned_nodes;
-#endif
-
-#ifdef TRIVIAL_LINK_BW
-  int trivial_bw;
-  int trivial_bw_used;
-#endif
 };
 
 class tb_switch {
@@ -143,7 +151,6 @@ public:
   pvertex mate;			// match in PG
 };
 
-#ifdef FIX_PLINK_ENDPOINTS
 // Hasher for pairs
 template <class T> struct pairhash { 
     size_t operator()(pair<T,T> const &A) const {
@@ -154,16 +161,36 @@ template <class T> struct pairhash {
 
 typedef pair<crope,crope> nodepair;
 typedef hash_map<nodepair,int,pairhash<crope> > nodepair_count_map;
-#endif
 
 class tb_plink {
 public:
-#ifdef FIX_PLINK_ENDPOINTS
-  tb_plink():current_count(0) {;}
-#else
-  tb_plink() {;}
-#endif
+  typedef enum {PLINK_NORMAL,PLINK_INTERSWITCH,PLINK_LAN} plinkType;
 
+  tb_plink(crope _name, plinkType _type, crope _srcmac, crope _dstmac)
+    : name(_name), srcmac(_srcmac), dstmac(_dstmac), type(_type),
+      delay_info(), bw_used(0), emulated(0), nonemulated(0),
+      penalty(0.0), fixends(false), current_endpoints(), current_count(0),
+      vedge_counts() {;}
+
+  crope name;			// the name
+  crope srcmac,dstmac;		// source and destination MAC addresses.
+
+  plinkType type;		// type of the link
+  tb_delay_info delay_info;	// the delay characteristics of this link
+  int bw_used;			// how much is used
+
+  int emulated;			// number of emulated vlinks
+  int nonemulated;		// number of nonemulated vlinks
+  float penalty;		// penaly for bandwidth used
+
+  bool fixends;                 // if using as a emulated link, fix endpoints
+  nodepair current_endpoints;	// pnodes at the endpoints of the vlink using
+  				// this plink
+  int current_count;		// number of mapped vlinks that share these
+				// pnode endpoints
+  nodepair_count_map vedge_counts; // list, and count, of all pairs of pnode
+				   // endpoints sharing this link
+				   
   friend ostream &operator<<(ostream &o, const tb_plink& link)
   {
     o << "tb_plink: " << link.name << " (" << &link << ")" << endl;
@@ -186,26 +213,6 @@ public:
     o << link.delay_info;
     return o;
   }
-
-  typedef enum {PLINK_NORMAL,PLINK_INTERSWITCH,PLINK_LAN} plinkType;
-
-  plinkType type;
-  tb_delay_info delay_info;	// the delay characteristics of this link
-  int bw_used;			// how much is used
-  crope srcmac,dstmac;		// source and destination MAC addresses.
-  crope name;			// The name
-  int emulated;			// number of emulated vlinks
-  int nonemulated;		// number of nonemulated vlinks
-  bool interswitch;		// is this an interswitch link
-#ifdef PENALIZE_BANDWIDTH
-  float penalty;
-#endif
-#ifdef FIX_PLINK_ENDPOINTS
-  bool fixends;                 // If using as a emulated link, fix endpoints
-  nodepair_count_map vedge_counts;
-  nodepair current_endpoints;
-  int current_count;
-#endif
 };
 
 class tb_slink {
@@ -222,5 +229,12 @@ public:
 };
 
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
+
+/*
+ * Globals
+ */
+
+/* The physical graph, defined in assign.cc */
+extern tb_pgraph PG;
 
 #endif

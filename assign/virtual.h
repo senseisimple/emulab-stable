@@ -146,6 +146,13 @@ typedef list<vvertex> vvertex_list;
 
 int parse_top(tb_vgraph &G, istream& i);
 
+/*
+ * Globals
+ */
+
+/* The virtual graph, defined in assign.cc */
+extern tb_vgraph VG;
+
 #endif
 
 

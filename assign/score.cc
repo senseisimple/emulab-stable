@@ -36,7 +36,7 @@ using namespace boost;
 
 extern switch_pred_map_map switch_preds;
 
-extern bool use_pclasses;
+extern bool disable_pclasses;
 
 double score;			// The score of the current mapping
 int violated;			// How many times the restrictions
@@ -94,11 +94,6 @@ void init_score()
   SDEBUG(cerr << "SCORE: Initializing" << endl);
   score=0;
   violated=0;
-  vinfo.unassigned = vinfo.pnode_load = 0;
-  vinfo.no_connection = vinfo.link_users = vinfo.bandwidth = 0;
-#ifdef FIX_PLINK_ENDPOINTS
-  vinfo.incorrect_endpoints = 0;
-#endif
 
   vvertex_iterator vvertex_it,end_vvertex_it;
   tie(vvertex_it,end_vvertex_it) = vertices(VG);
@@ -118,6 +113,7 @@ void init_score()
   }
   pvertex_iterator pvertex_it,end_pvertex_it;
   tie(pvertex_it,end_pvertex_it) = vertices(PG);
+  /*
   for (;pvertex_it!=end_pvertex_it;++pvertex_it) {
     tb_pnode *pn=get(pvertex_pmap,*pvertex_it);
     pn->typed=false;
@@ -125,6 +121,7 @@ void init_score()
     pn->pnodes_used=0;
     pn->switch_used_links=0;
   }
+  */
   pedge_iterator pedge_it,end_pedge_it;
   tie(pedge_it,end_pedge_it) = edges(PG);
   for (;pedge_it!=end_pedge_it;++pedge_it) {
@@ -246,7 +243,7 @@ void remove_node(vvertex vv)
 #endif
 
   // pclass
-  if (use_pclasses && pnode->my_class && (pnode->my_class->used == 0)) {
+  if ((!disable_pclasses) && pnode->my_class && (pnode->my_class->used == 0)) {
     SDEBUG(cerr << "  freeing pclass" << endl);
     SSUB(SCORE_PCLASS);
   }
@@ -786,7 +783,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   vinfo.desires += fd_violated;
 
   // pclass
-  if (use_pclasses && pnode->my_class && (pnode->my_class->used == 0)) {
+  if ((!disable_pclasses) && pnode->my_class && (pnode->my_class->used == 0)) {
     SDEBUG(cerr << "  new pclass" << endl);
     SADD(SCORE_PCLASS);
   }
@@ -1296,23 +1293,17 @@ pvertex make_lan_node(vvertex vv)
 	 " largest_switch_count=" << largest_switch_count << endl);
   
   pvertex pv = add_vertex(PG);
-  tb_pnode *p = new tb_pnode();
+  tb_pnode *p = new tb_pnode(vnode->name);
   put(pvertex_pmap,pv,p);
-  p->name += vnode->name; // Just in case - this gets reset below
   p->typed = true;
   p->current_type = "lan";
   p->max_load = 1;
-  p->current_load = 0;
-  p->pnodes_used = 0;
   p->types["lan"] = 1;
-  p->my_class = NULL;
   
-  // If the below is false then we have an orphined lan node which will
+  // If the below is false then we have an orphaned lan node which will
   // quickly be destroyed when add_node fails.
   if (largest_switch_count != 0) {
     pedge pe = (add_edge(pv,largest_switch,PG)).first;
-    tb_plink *pl = new tb_plink();
-    put(pedge_pmap,pe,pl);
 
     p->name = "lan-";
     p->name += get(pvertex_pmap,largest_switch)->name;
@@ -1321,24 +1312,19 @@ pvertex make_lan_node(vvertex vv)
 
     // Build a link name that looks like the ones we used to supply in the ptop
     // file
-    pl->name = "link-";
-    pl->name += p->name;
+    crope link_name = "link-";
+    link_name += p->name;
+    tb_plink *pl = new tb_plink(link_name, tb_plink::PLINK_LAN,
+	    p->name, "(null)");
 
-    pl->type = tb_plink::PLINK_LAN;
-
-    pl->srcmac = p->name;
-    //pl->dstmac = get(pvertex_pmap,largest_switch)->name;
-    pl->dstmac = "(null)";
-
-    pl->bw_used = 0;
-    pl->emulated = pl->nonemulated = 0;
     p->switches.insert(largest_switch);
+    put(pedge_pmap,pe,pl);
 
 #ifdef FIX_PLINK_ENDPOINTS
     pl->fixends = false;
 #endif
   } else {
-    p->name += "orphin";
+    p->name += "orphan";
   }
 
   return pv;
@@ -1373,3 +1359,4 @@ void delete_lan_node(pvertex pv)
   remove_vertex(pv,PG);
   delete pnode;
 }
+
