@@ -65,8 +65,6 @@ STD_DEVEL_PATH = "/usr/testbed/devel"
 # connection, any subsequent requests will reuse the same module.
 #
 ALLOWED_PATHS  = [ STD_PATH, "@prefix@" ]
-ALLOWED_PATHS.extend(map(lambda x: os.path.join(STD_DEVEL_PATH, x),
-                         os.listdir(STD_DEVEL_PATH)))
 
 # syslog facility
 LOGFACIL	= "@TBLOGFACIL@"
@@ -229,6 +227,17 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             return -1
         
         return int(userQuery[0][0])
+
+    #
+    # Check if the user is an admin.
+    #
+    def isadminuser(self, uid):
+        res = DBQueryFatal("select admin from users where uid=%s", (uid,))
+
+        if len(res) == 0:
+            return 0
+
+        return res[0][0]
     
     #
     # Check the certificate serial number. 
@@ -282,6 +291,12 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         if self.uid == -1:
             self.logit('User "%s" is not active' % self.user)
             raise Exception('User "%s" is not active' % self.user)
+
+        self.admin = self.isadminuser(self.user)
+        if not self.admin:
+            ALLOWED_PATHS.extend(map(lambda x: os.path.join(STD_DEVEL_PATH, x),
+                                     os.listdir(STD_DEVEL_PATH)))
+            pass
         
         self.glist = self.getusergroups(self.user);
         if len(self.glist) == 0:

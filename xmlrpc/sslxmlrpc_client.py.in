@@ -15,12 +15,19 @@
 #
 
 import sys
-sys.path.append("@prefix@/lib")
 import getopt
-import os
+import os, os.path
+import xmlrpclib
+
+TBROOT = "@prefix@"
+TBPATH = os.path.join(TBROOT, "lib")
+
+if TBPATH not in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
 from emulabclient import *
 
-import xmlrpclib
 from M2Crypto.m2xmlrpclib import SSL_Transport
 from M2Crypto import SSL
 
@@ -213,7 +220,7 @@ ctx.set_verify(SSL.verify_none, 16)
 ctx.set_allow_unknown_ca(0)
 
 # This is parsed by the Proxy object.
-URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port)
+URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port) + TBROOT
 if debug:
     print URI
     pass
