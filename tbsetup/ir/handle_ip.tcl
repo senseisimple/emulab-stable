@@ -5,8 +5,12 @@
 
 set scriptdir [file dirname [info script]]
 set updir [file dirname $scriptdir]
-set mactable "$updir/switch_tools/intel510/macslist"
+#set mactable "$updir/switch_tools/intel510/macslist"
 source "$scriptdir/libir.tcl"
+load $updir/../lib/sql.so
+set DB [sql connect]
+sql selectdb $DB tbdb
+
 namespace import TB_LIBIR::ir
 
 if {[llength $argv] != 2} {
@@ -70,34 +74,15 @@ foreach pair [ir get /virtual/nodes] {
     set rvnodemap([lindex $pair 1]) [lindex $pair 0]
 }
 # Parse mac list
-if {[catch "open $mactable r" fp]} {
-    puts stderr "Can not open $mactable ($fp)"
-    exit 1
-}
-set cur_node {}
-set macs {}
-while {[gets $fp line] >= 0} {
-    if {[string index $line 0] == "\#"} {continue}
-    set t [split [lindex $line 0] :]
-    set node [lindex $t 0]
-    set port [lindex $t 1]
-    set mac [lindex $line 1]
-    if {$port == "c"} {continue}
-    if {$cur_node == {}} {
-	set cur_node $node
-	set macs [list $mac]
-    } elseif {$cur_node == $node} {
-	lappend macs $mac
-    } else {
-	# Only save for nodes we care about
-	if {[info exists rvnodemap($cur_node)]} {
-	    set MACTABLE($rvnodemap($cur_node)) $macs
-	}
-	set cur_node $node
-	set macs [list $mac]
+# This is pretty dumb but is quick to do
+sql query $DB "select node_id,MAC from interfaces"
+while {[set row [sql fetchrow $DB]] != {}} {
+    set node [lindex $row 0]
+    set mac [lindex $row 1]
+    if {[info exists rvnodemap($node)]} {
+	lappend MACTABLE($rvnodemap($node)) $mac
     }
 }
-close $fp
 
 # Loop through virtual links
 if {! [ir exists /topology/links]} {
@@ -254,6 +239,9 @@ foreach line $ip_section {
 puts $fp "END map"
 puts $fp "START mac"
 foreach line $ip_mac_section {
+    set mac [lindex $line 0]
+    set ip [lindex $line 1]
+    sql exec $DB "update interfaces set IP = '$ip' where MAC = '$mac'"
     puts $fp $line
 }
 puts $fp "END mac"
