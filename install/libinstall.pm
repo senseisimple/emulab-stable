@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,11 @@
 # A simple library for use in the installation scripts, to make them seem a
 # little more legitimate, instead of the quick hacks they are.
 #
+
+#
+# Make sure that output gets printed right away
+#
+$| = 1;
 
 #
 # Magic string that shows up in files we've already edited 
@@ -20,6 +25,11 @@ my $MAGIC_TESTBED_END = "End of testbed-added configuration";
 
 sub MAGIC_TESTBED_START { $MAGIC_TESTBED_START; }
 sub MAGIC_TESTBED_END { $MAGIC_TESTBED_END; }
+
+#
+# Some programs we may call
+#
+my $FETCH = "/usr/bin/fetch";
 
 #
 # Let's pretend perl's exception mechanism has a sane name for the function
@@ -85,7 +95,7 @@ sub Phase($$$) {
     my $message = "";
     my $die = 0;
     if ($hasSubPhase) {
-	print  "| " x ($depth -1) . "+-" . "--" x (25 - $depth);
+	print  "| " x ($depth -1) . "+-" . "--" x (24 - $depth) . "> ";
     }
 
     #
@@ -209,8 +219,20 @@ sub PhaseWasSkipped($) {
 #
 sub DoneIfExists($) {
     my ($filename) = @_;
+    if (!$filename) { PhaseFail("Bad filename passed to DoneIfExists"); }
     if (-e $filename) {
 	PhaseSkip("File $filename already exists");
+    }
+}
+
+#
+# Same as above, but done if it doesn't exist
+#
+sub DoneIfDoesntExist($) {
+    my ($filename) = @_;
+    if (!$filename) { PhaseFail("Bad filename passed to DoneIfExists"); }
+    if (!-e $filename) {
+	PhaseSkip("File $filename does not exist");
     }
 }
 
@@ -220,6 +242,7 @@ sub DoneIfExists($) {
 #
 sub DoneIfEdited($) {
     my ($filename) = @_;
+    if (!$filename) { PhaseFail("Bad filename passed to DoneIfEdited"); }
     open(FH,$filename) or return;
     if (grep /$MAGIC_STRING/, <FH>) {
 	PhaseSkip("File $filename has already been edited\n");
@@ -326,6 +349,51 @@ sub ExecQuiet(@) {
 sub ExecQuietFatal(@) {
     if (ExecQuiet(@_)) {
 	PhaseFail("Unable to execute: ");
+    }
+}
+
+#
+# HUP a daemon, if it's PID file exists. If we can't kill it, we assume that
+# it's because it wasn't running, and skip the phase. Fails if it has trouble
+# reading the pid file.
+# Takes the name of the daemon as an argument, and assumes
+# that the pid file is /var/run/$name.pid
+#
+sub HUPDaemon($) {
+    my ($name) = @_;
+    my $pidfile = "/var/run/$name.pid";
+    PhaseSkip("$name is not running") unless (-e $pidfile);
+    open(PID,$pidfile) or PhaseFail("Unable to open pidfile $pidfile");
+    my $pid = <PID>;
+    chomp $pid;
+    close PID;
+
+    PhaseFail("Bad pid ($pid) in $pidfile\n") unless ($pid =~ /^\d+$/);
+    if (!kill 1, $pid) {
+	PhaseSkip("$name does not seem to be running");
+    }
+}
+
+#
+# Fetch a file from the network, using any protocol supported by fetch(1).
+# Arguments are URL and a local filename. Retunrns 1 if succesful, 0 if not.
+#
+sub FetchFile($$) {
+    my ($URL, $localname) = @_;
+    if (ExecQuiet("$FETCH -o $localname $URL")) {
+	return 0;
+    } else {
+	return 1;
+    }
+}
+
+#
+# Same as above, but failure is fatal
+#
+sub FetchFileFatal($$) {
+    my ($URL, $localname) = @_;
+    if (!FetchFile($URL,$localname)) {
+	PhaseFail("Unable to fetch $URL");
     }
 }
 
