@@ -200,7 +200,7 @@ if (! chown($uid, $gid, "$GRPROOT/$pid")) {
 #
 # Create experiment working directory.
 #
-my $workdir = TBExptWorkDir($pid, $eid);
+my $workdir = TBDB_EXPT_WORKDIR() . "/$pid";
 
 if (! mkdir("$workdir", 0770)) {
     fatal("Could not make directory $workdir: $!");
