@@ -56,9 +56,17 @@ util.o:		util.c
 #
 # These three targets are for the perl binding to the event system
 # 
-#$(SRCDIR)/event_wrap.c:	event.i	event.c event.pm.tail
-#	swig -exportall -dnone -perl5 -shadow -I$(SRCDIR) $(SRCDIR)/event.i
-#	cat $(SRCDIR)/event.pm.tail >> event.pm
+
+#
+# SWIG has some horribly annyonying behavior and bugs that we have to work
+# around, so we normally check the SWIG-generated code into CVS. This is a
+# maintainer target for regenerating the SWIG wrappers - see README for full
+# instructions
+#
+swig-wrappers:	event.i	event.c event.pm.tail
+	swig1.1 -exportall -dnone -perl5 -shadow -I$(SRCDIR) $(SRCDIR)/event.i
+	cat $(SRCDIR)/event.pm.tail >> event.pm
+	mv event.pm  $(SRCDIR)
 
 event_wrap.o:	$(SRCDIR)/event_wrap.c
 	$(CC) -c $(CFLAGS_NOWARN) -I/usr/libdata/perl/5.00503/mach/CORE $<
