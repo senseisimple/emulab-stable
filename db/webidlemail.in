@@ -22,6 +22,6 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/bin/idlemail", @ARGV;
+exec "$TB/sbin/idlemail", @ARGV;
 
 die("webidlemail: Could not exec idlemail: $!");
