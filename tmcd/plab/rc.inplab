@@ -111,14 +111,6 @@ sub doboot()
 	}
     }
 
-    if (-x "$BINDIR/rusaged") {
-        print("Starting testbed rusage daemon\n");
-	system("$BINDIR/rusaged start");
-	if ($?) {
-	    fatal("Error running $BINDIR/rusaged");
-	}
-    }
-
     #
     # At this point, if we are a free node just return. Something went wacky.
     #

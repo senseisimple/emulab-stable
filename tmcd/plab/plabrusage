@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# PLAB rusage probe.  Returns a TMCD-style string suitable for returning
+# to...TMCD!
+#
+sub usage()
+{
+    print STDERR "Usage: plabrusage\n";
+    exit(1);
+}
+my $optlist = "";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my $logname	= "$LOGDIR/plabusage.log";
+my $stats	= "";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Get the load average. Linux only right now.
+#
+if (open(LA, "/proc/loadavg")) {
+    $_ = <LA>;
+
+    if ($_ =~ /^([\d\.]+)\s+([\d\.]+)\s+([\d\.]+)\s+.*$/) {
+	$stats .= " LA1=$1 LA5=$2 LA15=$3";
+    }
+    else {
+	print STDERR "Could not parse loadav: $_";
+	exit(1);
+    }
+    close(LA);
+}
+else {
+    print STDERR "Could not open /proc/loadav: !$\n";
+    exit(1);
+}
+
+#
+# Grab disk usage.
+#
+if (open(DF, "df -P -k -l / |")) {
+    # Consume all output ...
+    while (<DF>) {
+	next
+	    if ($_ =~ /^filesystem.*/i);
+	
+	if ($_ =~ /^[-\w\.\/]+\s+\d+\s+\d+\s+\d+\s+(\d+)%\s+([-\w\.\/]+)$/) {
+	    if ($2 eq "/") {
+		$stats .= " DUSED=$1";
+	    }
+	}
+    }
+    close(DF);
+}
+else {
+    print STDERR "Could not start df process: !$\n";
+    exit(1);
+}
+
+print $stats;
+
+exit(0);
