@@ -131,11 +131,6 @@ if (mysql_num_rows($query_result) == 0) {
 # * Generate a mail message to the user with the verification key.
 #
 if (! $returning) {
-    $unixuid_query  = "SELECT unix_uid FROM users ORDER BY unix_uid DESC";
-    $unixuid_result = mysql_db_query($TBDBNAME, $unixuid_query);
-    $row = mysql_fetch_row($unixuid_result);
-    $unix_uid = $row[0];
-    $unix_uid++;
     $encoding = crypt("$password1");
 
     $newuser_command = "INSERT INTO users ".
@@ -143,7 +138,7 @@ if (! $returning) {
 	"usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
 	"VALUES ('$uid',now(),'$usr_expires','$usr_name','$usr_email',".
 	"'$usr_addr', '$usr_url', '$usr_phone','$usr_title','$usr_affil',".
-        "'$encoding','$unix_uid','newuser')";
+        "'$encoding',NULL,'newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
         $err = mysql_error();
