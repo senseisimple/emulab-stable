@@ -84,8 +84,9 @@ $exp_gid = $row[gid];
 $batch   = $row[batchmode];
 $swappable=$row[swappable];
 $idleswap_bit=$row[idleswap];
+$idleswap_time=$row[idleswap_timeout];
 
-$idlethresh=TBGetSiteVar("idle/threshold");
+$idlethresh=min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
 
 #
 # Look for transition in progress and exit with error. 
@@ -162,8 +163,10 @@ if (!$confirmed) {
     echo "</form>\n";
 
     if ($inout!="out" && $idleswap_bit) {
-	echo "<p>Note: The Idle-Swap time for your experiment will be
-		 updated to $idlethresh hours.</p>\n";
+	if ($idleswap_time / 60.0 != $idlethresh) {
+	    echo "<p>Note: The Idle-Swap time for your experiment will be
+		 reset to $idlethresh hours.</p>\n";
+	}
     }
     
     if (!strcmp($inout, "restart")) {
