@@ -5,6 +5,9 @@
 $TBDIR          = "@prefix@/";
 $WWWDEFS        = "@WWWDEFS@";
 
+# Overridden by the defs file!
+$TBMAINSITE     = 0;
+
 #
 # Include configure selected definitions.
 #
@@ -44,7 +47,7 @@ include("dbdefs.php3");
 # Generate the KEY from a name
 #
 function GENKEY ($name) {
-     return crypt("TB_"."$name"."_USR", strlen($name) + 13);
+    return crypt("TB_"."$name"."_USR", strlen($name) + 13);
 }
 
 #
@@ -52,7 +55,7 @@ function GENKEY ($name) {
 # error information should be emailed to the list for action. The script
 # should then terminate if required to do so.
 #
-function TBERROR ($message, $death) {
+function TBERROR ($message, $death, $xmp = 0) {
     global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR;
 
     mail($TBMAIL_OPS,
@@ -65,9 +68,12 @@ function TBERROR ($message, $death) {
          "Errors-To: $TBMAIL_WWW");
 
     # Allow sendmail to run.
-    sleep(1); 
-
+    sleep(1);
+    
     if ($death) {
+	if ($xmp)
+	    $message = "<XMP>$message</XMP>\n";
+	
             $msg = "<font size=+1><br>
                     $message
 	            <br>	
@@ -142,14 +148,14 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
 		   $output, $retval);
 
     if ($retval) {
-	$foo = "<XMP>\n";
+	$foo = "";
         for ($i = 0; $i < count($output); $i++) {
 	      $foo = "$foo $output[$i]";
 	}
-        $foo = "$foo </XMP>\n";
 	
-	TBERROR("suexec failure. Cmd was \"$cmdandargs\". Error output:\n\n".
-                "$foo", $die);
+	TBERROR("SUEXEC failure: '$cmdandargs'\n".
+		"Error output:\n\n".
+                "$foo", $die, 1);
     }
     return $retval;
 }
@@ -170,7 +176,7 @@ function VERIFYURL($url) {
 	    USERERROR("URL ($url) must begin with $HTTPTAG. ".
 		      "Please go back and fix it up.", 1);
 	}
-	$fp = @fopen($url, "r");
+	$fp = fopen($url, "r");
 	if (! $fp) {
 	    USERERROR("URL ($url) is not valid (cannot be accessed). ".
 		      "Please go back and fix it up.", 1);
@@ -178,6 +184,56 @@ function VERIFYURL($url) {
 	fclose($fp);
     }
     return 0;
+}
+
+#
+# Verify a URL.
+#
+function CHECKURL($url, &$error) {
+    global $HTTPTAG;
+
+    if (strlen($url)) {
+	if (strstr($url, " ")) {
+	    $error = "URL is malformed; spaces are not allowed!";
+	    return 0;
+	}
+	
+	if (strcmp($HTTPTAG, substr($url, 0, strlen($HTTPTAG)))) {
+	    $error = "URL is malformed; must begin with $HTTPTAG!";
+	    return 0;
+	}
+	
+	$fp = @fopen($url, "r");
+	if (! $fp) {
+	    $error = "URL is not valid; Cannot be accessed!";
+	    return 0;
+	}
+	fclose($fp);
+    }
+    return 1;
+}
+
+#
+# Check a password.
+#
+function CHECKPASSWORD($uid, $password, $name, $email, &$error)
+{
+    global $TBCHKPASS_PATH;
+    
+    $mypipe =
+	popen(escapeshellcmd("$TBCHKPASS_PATH $password $uid '$name:$email'"),
+	      "w+");
+    
+    if ($mypipe) { 
+        $retval=fgets($mypipe, 1024);
+        if (strcmp($retval,"ok\n") != 0) {
+	    $error = "$retval";
+	    return 0;
+	}
+	return 1;
+    }
+    TBERROR("Checkpass Failure! Returned '$mypipe'.\n\n".
+	    "$TBCHKPASS_PATH $password $uid '$name:$email'", 1);
 }
 
 #
