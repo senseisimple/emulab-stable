@@ -155,7 +155,7 @@ echo "    </td>
       </tr>\n";
 
 #
-# PawwordL and Postal Address:
+# Password and Postal Address:
 #
 echo "<tr>
          <td>*Password:</td>

@@ -91,18 +91,22 @@ if (isset($auth_usr)) {
     if ($trust == "group_root") {
       # Only group leaders can do these options
       echo "<A href='approval.php3?$auth_usr'>New User Approval</A>\n";
-      echo "<p>Add a New User";
+      #echo "<p>Add a New User";
       #echo "<p><A href='addusr.php3?$auth_usr'>Add a New User</A>";
-      echo "</p>";
+      #echo "</p>";
     }
-    if (($trust == "group_root") || ($trust == "local_root")) {
-      # Only local root people can do these options
-      echo "Begin an Experiment";
-      #echo "<p><A href='addexp.php3?$auth_usr'>Begin an Experiment</A>\n";
-      echo "</p>";
-    }
-    # Every active user can do these options
-    echo "<p><A href='modusr_form.php3?$auth_usr'>Update user information</A>\n";
+    # Since a user can be a member of more than one project (grp),
+    # display this option, and let the form decide if the user is
+    # allowed to do this.
+    echo "<p><A href='beginexp_form.php3?$auth_usr'>
+                  Begin an Experiment</A>\n";
+    echo "<p><A href='endexp_form.php3?$auth_usr'>
+                  End an Experiment</A>\n";
+    # Every active user can do these options. For
+    echo "<p><A href='showexp_form.php3?$auth_usr'>
+             Show experiment information</A>\n";
+    echo "<p><A href='modusr_form.php3?$auth_usr'>
+             Update user information</A>\n";
     echo "</p>\n";
   } elseif ($status == "unapproved") {
     echo "Your account has not been approved yet. Please try back ";
