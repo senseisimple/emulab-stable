@@ -616,6 +616,7 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		eid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows, gid;
+	int		shared = 0, tbadmin;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: No such node",
@@ -689,6 +690,27 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			 5, pid);
 #else
 	/*
+	 * See if a shared experiment. Used below.
+	 */
+	res = mydb_query("select shared from experiments "
+			 "where pid='%s' and eid='%s'",
+			 1, pid, eid);
+	
+	if (!res) {
+		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting shared!", pid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		syslog(LOG_ERR, "ACCOUNTS: %s: No Experiment %s!", pid, eid);
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	shared = atoi(row[0]);
+	mysql_free_result(res);
+	
+	/*
 	 * This crazy join is going to give us multiple lines for each
 	 * user that is allowed on the node, where each line (for each user)
 	 * differs by the project PID and it unix GID. The intent is to
@@ -698,14 +720,14 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 */
 	res = mydb_query("select distinct "
 			 "u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "p.trust,p.pid,pr.unix_gid from users as u "
+			 "p.trust,p.pid,pr.unix_gid,u.admin from users as u "
 			 "left join proj_memb as p on p.uid=u.uid "
 			 "left join exppid_access as a "
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
 			 "left join projects as pr on p.pid=pr.pid "
 			 "where (p.pid='%s' or p.pid=a.pid) "
 			 "      and u.status='active' order by u.uid",
-			 7, pid, eid, pid);
+			 8, pid, eid, pid);
 #endif
 	if (!res) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting users!", pid);
@@ -725,12 +747,13 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
 
-		gid = -1;
+		gid     = -1;
 		
 		while (1) {
+			tbadmin = root = atoi(row[7]);
 			
 			/*
-			 * This is whole point of this mess. Figure out the
+			 * The whole point of this mess. Figure out the
 			 * main GID and the aux GIDs. Perhaps trying to make
 			 * distinction between main and aux is unecessary, as
 			 * long as the entire set is represented.
@@ -778,6 +801,13 @@ doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			if (i < gcount-1)
 				strcat(glist, ",");
 		}
+
+		/*
+		 * Override root when a shared experiment, except for
+		 * TB admin people.
+		 */
+		if (shared && !tbadmin)
+			root = 0;
 
 		sprintf(buf,
 			"ADDUSER LOGIN=%s "
