@@ -39,6 +39,7 @@ public:
   int bandwidth;		// maximum bandwidth of this link
   int bw_used;			// how much is used
   int users;			// number of users in direct links
+  char *srcmac,*dstmac;		// source and destination MAC addresses.
 };
 
 class tb_route {

@@ -7,7 +7,7 @@
  *   <type> = <t>[:<max>]
  *   <t>    = pc | switch | dnard
  *   <max>  = how many virtual entities of that type per physical entity.
- * link <src> <dst> <size> <number>
+ * link <src>[:<mac>] <dst>[:<mac>] <size> <number>
  */
 
 #include <LEDA/graph_alg.h>
@@ -87,11 +87,9 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	    PG[no1].types[TYPE_PC].name = "pc";
 	    PG[no1].types[TYPE_PC].max = iload;
 	  } else if (strcmp(t,"dnard") == 0) {
-	    // XXX
 	    PG[no1].types[TYPE_DNARD].name = "dnard";
 	    PG[no1].types[TYPE_DNARD].max = iload;
 	  } else if (strcmp(t,"delay") == 0) {
-	    // XXX - add detection of max based on # of links
 	    PG[no1].types[TYPE_DELAY].name = "delay";
 	    PG[no1].types[TYPE_DELAY].max = iload;
 	  } else if (strcmp(t,"delay_pc") == 0) {
@@ -116,8 +114,14 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  != 4) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
-	string s1(n1);
-	string s2(n2);
+	char *snode,*smac;
+	char *dnode,*dmac;
+	smac = n1;
+	dmac = n2;
+	snode = strsep(&smac,":");
+	dnode = strsep(&dmac,":");
+	string s1(snode);
+	string s2(dnode);
 	node node1 = nmap.access(s1);
 	node node2 = nmap.access(s2);
 	for (int i = 0; i < num; ++i) {
@@ -125,6 +129,14 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  PG[ed1].bandwidth=size;
 	  PG[ed1].bw_used=0;
 	  PG[ed1].users=0;
+	  if (smac)
+	    PG[ed1].srcmac = strdup(smac);
+	  else
+	    PG[ed1].srcmac = NULL;
+	  if (dmac)
+	    PG[ed1].dstmac = strdup(dmac);
+	  else
+	    PG[ed1].dstmac = NULL;
 	}
 #define ISSWITCH(n) (PG[n].types[TYPE_SWITCH].max == 1)
 	if (ISSWITCH(node1) &&

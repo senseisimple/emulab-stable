@@ -448,6 +448,7 @@ void print_solution()
 {
   node n;
   cout << "Best solution: " << absbest << endl;
+  cout << "Nodes:" << endl;
   forall_nodes(n,G) {
     if (!G[n].posistion) {
       cout << "unassigned: " << G[n].name << endl;
@@ -461,6 +462,44 @@ void print_solution()
 
     }
   }
+  cout << "End Nodes" << endl;
+  cout << "Edges:" << endl;
+  edge e;
+  forall_edges(e,G) {
+    tb_vlink &v = G[e];
+    tb_plink *p,*p2,*p3,*p4;
+#define PMKNAME(p) PG[PG.source(p)].name << "-" << PG[PG.target(p)].name
+    cout << G[G.source(e)].name << "-" << G[G.target(e)].name;
+    if (v.type == tb_vlink::LINK_DIRECT) {
+      p = &PG[v.plink];
+      cout << " direct " << PMKNAME(v.plink) << " (" <<
+	p->srcmac << "," << p->dstmac << ")" << endl;
+    } else if (v.type == tb_vlink::LINK_INTRASWITCH) {
+      p = &PG[v.plink];
+      p2 = &PG[v.plink_two];
+      cout << " intraswitch " << PMKNAME(v.plink) << " (" <<
+	p->srcmac << "," << p->dstmac << ") " <<
+	PMKNAME(v.plink_two) << " (" << p2->srcmac << "," << p2->dstmac <<
+	")" << endl;
+    } else if (v.type == tb_vlink::LINK_INTERSWITCH) {
+      p = &PG[v.plink];
+      p3 = &PG[v.plink_local_one];
+      p4 = &PG[v.plink_local_two];
+      cout << " interswitch " << PMKNAME(v.plink) << " (" <<
+	p->srcmac << "," << p->dstmac << ")";
+      if (v.plink_two) {
+	p2 = &PG[v.plink_two];
+	cout << " " << PMKNAME(v.plink_two) << " (" << p2->srcmac << "," <<
+	  p2->dstmac <<	")";
+      }
+      cout << " " << PMKNAME(v.plink_local_one) << " (" << p3->srcmac << "," <<
+	p3->dstmac << ") " << PMKNAME(v.plink_local_two) << " (" <<
+	p4->srcmac << "," << p4->dstmac << ")" << endl;
+    } else {
+      cout << "Unknown link type" << endl;
+    }
+  }
+  cout << "End Edges" << endl;
   cout << "End solution" << endl;
 }
 
