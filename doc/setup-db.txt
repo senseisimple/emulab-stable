@@ -111,6 +111,8 @@ These experiments are:
 hwdown - Nodes that are down due to hardware failure
 reloading - Nodes that are having their disks automatically reloaded
 reloadpending - Nodes that are awaiting disk reloading
+oldreserved - For use in holding nodes while modifying an experiment.
+nfree-locked - For use in transitioning nodes from reserved to free.
 
 Any other 'holding' experiments that you want for operations should be put
 into the emulab-ops project.
