@@ -32,7 +32,9 @@ if (! $isadmin) {
 # implies denying the project leader account, when there is just a single
 # project pending for that project leader. 
 #
-$query_result = DBQueryFatal("SELECT * from projects where approved='0'");
+$query_result = DBQueryFatal("SELECT * from projects ".
+			     "where approved='0' order by created desc");
+			     
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no projects to approve!", 1);
 }
