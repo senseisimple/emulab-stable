@@ -608,23 +608,50 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	for (pvertex_set::iterator switch_it = pnode->switches.begin();
 	     switch_it != pnode->switches.end();++switch_it) {
 	  if (dest_pnode->switches.find(*switch_it) != dest_pnode->switches.end()) {
-#ifdef FIX_SHARED_INTERFACES
-	      if ((!find_link_to_switch(pv,*switch_it,vlink,first)) || 
-		      (!find_link_to_switch(dest_pv,*switch_it,vlink,second))) {
-		  //cerr << "No acceptable links" << endl;
-		  continue;
+	      bool first_link, second_link;
+	      // Check to see if either, or both, pnodes are actually the
+	      // switch we are looking for
+	      if (pv == *switch_it) {
+		first_link = false;
+	      } else {
+		first_link = true;
 	      }
-#else
-	    find_link_to_switch(pv,*switch_it,vlink,first);
-	    find_link_to_switch(dest_pv,*switch_it,vlink,second);
-#endif
+	      if (dest_pv == *switch_it) {
+		second_link = false;
+	      } else {
+		second_link = true;
+	      }
+
+	      if (first_link) {
+		if (!find_link_to_switch(pv,*switch_it,vlink,first)) {
+		  // No link to this switch
+		  continue;
+		}
+	      }
+
+	      if (second_link) {
+		if (!find_link_to_switch(dest_pv,*switch_it,vlink,second)) {
+		  // No link to this switch
+		  continue;
+		}
+	      }
+
+
 	    resolutions[resolution_index].type = tb_link_info::LINK_INTRASWITCH;
 	    if (flipped) { // Order these need to go in depends on flipped bit
-	      resolutions[resolution_index].plinks.push_back(second);
-	      resolutions[resolution_index].plinks.push_back(first);
+	      if (second_link) {
+		resolutions[resolution_index].plinks.push_back(second);
+	      }
+	      if (first_link) {
+		resolutions[resolution_index].plinks.push_back(first);
+	      }
 	    } else { 
-	      resolutions[resolution_index].plinks.push_back(first);
-	      resolutions[resolution_index].plinks.push_back(second);
+	      if (first_link) {
+		resolutions[resolution_index].plinks.push_back(first);
+	      }
+	      if (second_link) {
+		resolutions[resolution_index].plinks.push_back(second);
+	      }
 	    }
 	    resolutions[resolution_index].switches.push_front(*switch_it);
 	    resolution_index++;
@@ -652,24 +679,50 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	    if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
 				      resolutions[resolution_index].plinks,
 				      resolutions[resolution_index].switches) != 0) {
-#ifdef FIX_SHARED_INTERFACES
-	      if ((!find_link_to_switch(pv,*source_switch_it,vlink,first)) || 
-		      (!find_link_to_switch(dest_pv,*dest_switch_it,vlink,second))) {
-		  //cerr << "No acceptable links" << endl;
-		  continue;
+	      bool first_link, second_link;
+	      // Check to see if either, or both, pnodes are actually the
+	      // switches we are looking for
+	      if ((pv == *source_switch_it) || (pv == *dest_switch_it)) {
+		first_link = false;
+	      } else {
+		first_link = true;
 	      }
-#else
-	      find_link_to_switch(pv,*source_switch_it,vlink,first);
-	      find_link_to_switch(dest_pv,*dest_switch_it,vlink,second);
-#endif
+	      if ((dest_pv == *source_switch_it) ||
+		  (dest_pv == *dest_switch_it)) {
+		second_link = false;
+	      } else {
+		second_link = true;
+	      }
+
+	      if (first_link) {
+		if (!find_link_to_switch(pv,*source_switch_it,vlink,first)) {
+		  // No link to this switch
+		  continue;
+		}
+	      }
+
+	      if (second_link) {
+		if (!find_link_to_switch(dest_pv,*dest_switch_it,vlink,second)) {
+		  // No link to this switch
+		  continue;
+		}
+	      }
 
 	      resolutions[resolution_index].type = tb_link_info::LINK_INTERSWITCH;
 	      if (flipped) { // Order these need to go in depends on flipped bit
-	        resolutions[resolution_index].plinks.push_front(second);
-	        resolutions[resolution_index].plinks.push_back(first);
+		if (second_link) {
+		  resolutions[resolution_index].plinks.push_front(second);
+		}
+		if (first_link) {
+		  resolutions[resolution_index].plinks.push_back(first);
+		}
 	      } else {
-	        resolutions[resolution_index].plinks.push_front(first);
-	        resolutions[resolution_index].plinks.push_back(second);
+		if (first_link) {
+		  resolutions[resolution_index].plinks.push_front(first);
+		}
+		if (second_link) {
+		  resolutions[resolution_index].plinks.push_back(second);
+		}
 	      }
 	      resolution_index++;
 	      total_weight += LINK_RESOLVE_INTERSWITCH;
@@ -918,11 +971,9 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
     }
   }
 
-#ifdef FIX_SHARED_INTERFACES
   if ((!vlink->emulated) && found_best && (best_users > 0)) {
       return false;
   }
-#endif
   if (found_best) {
     out_edge = best_pedge;
     return true;
@@ -1003,14 +1054,11 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
 	vinfo.link_users++;
 	violated++;
       }
-#ifdef FIX_SHARED_INTERFACES
       if ((! vlink->emulated) && (plink->nonemulated > 1)) {
-	  //assert(false);
 	  SADD(SCORE_DIRECT_LINK_PENALTY);
 	  vinfo.link_users++;
 	  violated++;
       }
-#endif
     }
   }
 
@@ -1106,14 +1154,12 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
       SSUB(SCORE_EMULATED_LINK);
     } else {
       plink->nonemulated--;
-#ifdef FIX_SHARED_INTERFACES
       if (plink->nonemulated >= 1) {
 	  //cerr << "Freeing overused link" << endl;
 	  SSUB(SCORE_DIRECT_LINK_PENALTY);
 	  vinfo.link_users--;
 	  violated--;
       }
-#endif
     }
     if (plink->nonemulated+plink->emulated == 0) {
       // link no longer used

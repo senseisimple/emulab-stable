@@ -95,6 +95,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    put(svertex_pmap,sv,s);
 	    s->mate = pv;
 	    p->sgraph_switch = sv;
+	    p->switches.insert(pv);
 	  } else {
 	    p->types[type] = new tb_pnode::type_record(iload,is_static);
 	  }
