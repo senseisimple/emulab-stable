@@ -1,0 +1,17 @@
+Service oriented architectures, such as Planetlab, become much more
+attractive to the user community when a unified and simple, but
+flexible user interface is available.  Aside from masking the
+underlying details and complexities, the infrastructure supporting
+this interface should be fault-tolerant and [resource-efficient];
+attempting to recover and (re)distribute resources in order to meet
+user requests while minimizing system impact.  Emulab provides such an
+interface to Planetlab, exposing its resources in a powerful,
+straightforward fashion.  In the process of creating this interface
+and tracking Planetlab's evolving interface, we have identified
+several facilities we see as key components for a [Resource Platform]
+to provide to external testbed integrators.  We have also exposed API
+semantics and resource management techniques that hinder integration
+with testbed architectures such as Emulab with relatively rapid
+experimental cycles.
+
+* Need better terms for the ones in brackets above.

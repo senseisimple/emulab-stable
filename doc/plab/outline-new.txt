@@ -1,0 +1,132 @@
+\newcommand{\pliface}{Emulab-Planetlab User Interface}
+\newcommand{\emulab}{Emulab}
+\newcommand{\plab}{Planetlab}
+\newcommand{\plapi}{Planetlab API}
+\newcommand{\plciface}{Planetlab Central User Interface}
+\newcommand{\plcapi}{Planetlab Central API}
+\newcommand{\plcnmapi}{PLC / Node Manager Hybrid API}
+\newcommand{\dslice}{Dslice}
+
+\pliface paper outline
+
+I. Introduction
+
+  * Motivation for providing \pliface
+    - bring new set of resources to \emulab
+    - \plab lacks resource discovery, automated setup, admission control
+    - \plciface cumbersome and incomplete
+
+  * \pliface's role in llp service taxonomy and beyond
+    - environment service
+    - ...
+
+  * Challenges assoc. with integration and interface presentation
+    - Instability of \plapi
+    - Tracking the evolving \plapi
+    - Matching interface mechanics to native \plab user expectations
+      + simple
+
+II. Essential integration mechanisms (maybe fold into intro section)
+
+  * stuff we think is needed (and why)
+    - Timely API calls (synchronous)
+    - Strong authentication based on PKI
+    - Meaningful feedback
+    - Push or Pull setup supported by infrastructure
+    - Reliable liveness data
+    - Resource share transferability
+    - Low overhead vserver creation.
+    - Flexible 1st class authentication flexibility
+    - Stable node identification and reliable migration detection
+    - .. \XXX most of the above are what's missing in \plcapi, need
+          to identify other components that are there and work fine.
+
+  * What's missing/wrong in \plab (past, present, future(?))
+    - dslice
+    - \plcapi
+      + WRONG: async and highly unreliable sync instantiation interfaces
+    - \plcnmapi
+    - future (PDN 04-17)
+
+  * What's superfluous in \plab
+    - ...
+
+III. \pliface Features
+
+  * resource discovery
+
+  * resource tracking
+
+  * admission control
+
+  * failover via retry on setup
+
+  * more than one interface
+    - web-based wizard (\plab EZ)
+    - NS file (more powerful)
+
+  * node selection based on various criterion (not all avail via EZ interface)
+    - manual specification a la \plciface
+    - last-mile link type
+    - load metrics (resources used/avail)
+    - pairwise link characteristics
+    - mixtures of the above
+    - all nodes
+    - one node at each site
+
+  * speed up instantiation by performing parallel setup
+    - impact on \plcapi ..
+    - scaling properties
+
+IV. Failure modes, and coping strategies
+
+  * node unreachability
+
+  * half-baked or dirty vservers
+
+  * RPC call hangs
+
+  * disappearing/wiped vservers
+
+  * vserver startup scripts not executed
+
+  * retry/timeout
+
+  * hand-enumerated error conditions
+    - detect fatal failures
+    - proceed when failure really indicates success
+
+  * automatic transitioning in/out of down pool
+    - e2e testing.
+
+V. \plapi Comparison 
+
+  (\dslice vs. \plcapi vs. \plcnmapi)
+
+  * Setup timing
+
+  * Fault ratios/probability    
+
+VI. Future Work
+
+  * Persistent vnode recovery
+    - keep tabs on vservers, and recover them when they die.
+    - we currently do nothing along these lines outside of setup
+
+  * start using newish sensor data instead of home-rolled stat gathering
+
+  * scale up large file/overlay distribution using something like CoDeploy
+
+  * handling shares
+    - who provides the shares and who presents them
+    - us vs. them
+    - transference
+
+VII. Conclusions
+
+  * dslice worked pretty well, \plcapi sucks, \plcnmapi is moving back
+    toward dslice semantics, which were already doing the right thing
+    according to PDN 04-17 before they were dumped.
+
+  * eat your own dogfood / level playing field.
+
