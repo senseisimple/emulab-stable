@@ -197,22 +197,6 @@ foreach $lan (keys(%lans)) {
 }
 # End shark hack
 
-# isdelayed(lan)
-# Returns 1 if the lan is a delayed lan and 0 otherwise.
-sub isdelayed {
-    my $lan = $_[0];
-    my $member;
-    foreach $member (@{$lans{$lan}}) {
-	my ($delay,$bandwidth,$lossrate) = @{$delayinfo{"$lan:$member"}};
-	if (($delay > $delaythresh) ||
-	    (! defined($okbandwidths{$bandwidth })) ||
-	    ($lossrate != 0)) {
-	    return 1;
-	}
-    }
-    return 0;
-};
-
 # min(a,b)
 # Returns the minimum of a and b.
 sub min {
@@ -258,12 +242,16 @@ foreach $lan (keys(%lans)) {
 	$node1 = (split(":",$nodeport1))[0];
 	($delay0,$bw0,$loss0) = @{$delayinfo{"$lan:$nodeport0"}};
 	($delay1,$bw1,$loss1) = @{$delayinfo{"$lan:$nodeport1"}};
+	$delay = $delay0+$delay1;
+	$loss = 1-(1-$loss0)*(1-$loss1);
 	$bandwidth = &getbandwidth(&min($bw0,$bw1));
-	if (&isdelayed($lan)) {
+	if (($delay > $delaythresh) ||
+	    ($bandwidth != 100) ||
+	    ($loss != 0)) {
 	    $delayname = "tbsdelay$delayid";
-	    $delaynodes{"linksdelaysrc/$lan"} = [$delay0+$delay1,
+	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,
 						 &min($bw0,$bw1),
-						 1-(1-$loss0)*(1-$loss1)];
+						 $loss];
 	    printdb "Delay node linksdelaysrc/$lan ($delayname) = " . 
 		join(" ",@{$delaynodes{"linksdelaysrc/$lan"}}) . "\n";
 	    $delayid++;
@@ -282,8 +270,10 @@ foreach $lan (keys(%lans)) {
 	    ($delay,$bw,$loss) = @{$delayinfo{"$lan:$member"}};
 	    $bandwidth = &getbandwidth($bw);
 	    ($node) = (split(":",$member))[0];
+# XXX The expression below should be modified for better bandwidth support.
+# Probably needs to happen post assign somehow.
 	    if (($delay > $delaythresh) ||
-		(! defined($okbandwidths{$bw})) ||
+		($bw != 100) ||
 		($loss != 0)) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
@@ -814,17 +804,11 @@ foreach $vlan (keys(%vlans)) {
 foreach $delay (keys(%delays)) {
     ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
 	@{$delays{$delay}};
-    # XXX - card0/card1 will eventually vanish.  This is just a temporary
-    # hack for things to work at the same time as the previous generation
-    # of software.
-    ($card0) = ($int0 =~ /^eth(\d+)$/);
-    ($card1) = ($int1 =~ /^eth(\d+)$/);
     $dbh->do("insert into delays" .
-	     " (pid,eid,node_id,iface0,iface1,card0,card1" .
+	     " (pid,eid,node_id,iface0,iface1" .
 	     ",delay,bandwidth,lossrate,vname)" .
 	     " values (\"$pid\",\"$eid\",\"$pnode\",\"$int0\",\"$int1\"".
-	     ",$card0,$card1,$delay,$bandwidth" .
-	     ",$lossrate,\"$vname\")") || do {
+	     ",$delay,$bandwidth,$lossrate,\"$vname\")") || do {
 		 print STDERR "Could not update delays table.  Giving up.\n";
 		 exit(1);
 	     };

@@ -117,14 +117,20 @@ if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
 $numnodes = $dbh->do("SELECT * from virt_nodes where pid=\"$pid\"" .
 		     " and eid=\"$eid\"");
 $min = $max = $numnodes;
-$bw_query = "";
-$sth = $dbh->prepare("SELECT max_speed from interface_types");
-$sth->execute();
-($speed) = $sth->fetchrow_array();
-$bw_query .= "bandwidth != $speed";
-while (($speed) = $sth->fetchrow_array()) {
-    $bw_query .= " and bandwidth != $speed";
-}
+# XXX - Need to fix this.
+# XXX - Need to adjust estimations.  Basically -1 delay for every
+# delayed LAN that has only two nodes.  Probably want to add all of
+# this to parser.
+#$bw_query = "";
+#$sth = $dbh->prepare("SELECT max_speed from interface_types");
+#$sth->execute();
+#($speed) = $sth->fetchrow_array();
+#$bw_query .= "bandwidth != $speed";
+#while (($speed) = $sth->fetchrow_array()) {
+#    $bw_query .= " and bandwidth != $speed";
+#}
+$bw_query = "bandwidth != 100";
+
 $numdelays = $dbh->do("SELECT * from virt_lans where (delay != 0" . 
 		      " or lossrate != 0 or ($bw_query))" .
 		      " and pid=\"$pid\" and eid=\"$eid\"");
