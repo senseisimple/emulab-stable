@@ -614,7 +614,7 @@ sub WriteRCFiles()
 	print("$path could not be opened for writing: $!\n");
 	return -1;
     }
-    print CONFIG "$TTL	3600\n\n";
+    print CONFIG "\$TTL	3600\n\n";
     print CONFIG "@	IN	SOA	${myhost}. root.${myhost}.  (\n";
     print CONFIG "				20020927  ; Serial\n";
     print CONFIG "				3600      ; Refresh\n";
