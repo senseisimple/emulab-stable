@@ -121,9 +121,7 @@ earliest time one of the steps needs to occur.
 		ssh users
 		cd /your/object/tree/obj/
 		gmake
-		gmake control-install
-		cd /your/object/tree/obj/event/etc
-		sudo gmake control-install
+		gmake ops-install
 
         * Install the new elvind config file on boss and restart elvind
           Note that this is not done as part of toplevel install.
@@ -162,7 +160,7 @@ earliest time one of the steps needs to occur.
         * Start the elvin server on users.emulab.net:
 
 		ssh users
-		sudo /usr/local/etc/rc.d/2.elvind.sh
+		sudo /usr/local/etc/rc.d/2.elvind.sh start
 
 	* Create the ops certificate (on boss) and copy it to your users node.
 
