@@ -203,8 +203,8 @@ AC_SUBST(LOG_TESTBED)
 # an extra subnet decl for it in dhcpd.conf.template. This is enormously
 # crude and simplistic, but works for the local case!
 # 
-if test "$PRIVATE_NETWORK" != "CONTROL_NETWORK"; then
-	DHCPD_CONTROLNET_DECL="subnet 155.98.32.0 netmask 255.255.255.0 {}"
+if test "$PRIVATE_NETWORK" != "$CONTROL_NETWORK"; then
+    DHCPD_CONTROLNET_DECL="subnet $PRIVATE_NETWORK netmask $PRIVATE_NETMASK {}"
 fi
 
 #
