@@ -101,7 +101,7 @@ log.o:		decls.h log.h
 network.o:	decls.h utils.h
 trace.o:	decls.h trace.h log.h
 
-install:	$(INSTALL_SBINDIR)/frisbeed
+install:	$(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee
 
 client: frisbee
 
