@@ -62,6 +62,7 @@ my %imageid_row = ();
 my $debug       = 0;
 my $imageid;
 my $imagepid    = TB_OPSPID;
+my $ADMINOSID   = TB_OSID_FREEBSD_MFS;
 my $logname;
 my @row;
 my $dbuid;
@@ -305,8 +306,8 @@ my $maxslack = (3 * 60) / $sleepwait; # NFS cache slop factor
 $needcleanup = 1;
 
 while ($tries) {
-    system("$osselect -m PXEFBSD $node") and
-	fatal("*** Failed to change OS on $node!\n");
+    system("$osselect -t $ADMINOSID $node") and
+	fatal("*** Failed to set temp boot to $ADMINOSID for $node!");
 
     if (! DBQueryWarn("update nodes set ".
 		      "startupcmd='$command', startstatus='none' ".
@@ -443,8 +444,8 @@ sub cleanup ()
     # Reset node (DB) state
     #
 
-    if (system("$osselect -m $saved_pxebootpath $node")) {
-	print("*** Failed to reset PXE boot path to $saved_pxebootpath!\n");
+    if (system("$osselect -c -t $node")) {
+	print("*** Failed to clear temp boot for $node!\n");
         $retval = 0;
     }
 

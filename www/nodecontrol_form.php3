@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -52,11 +52,10 @@ $node_id            = $row[node_id];
 $type               = $row[type];
 $vname		    = $row[vname];
 $def_boot_osid      = $row[def_boot_osid];
-$def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
 $next_boot_osid     = $row[next_boot_osid];
-$next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
+$temp_boot_osid     = $row[temp_boot_osid];
 $rpms               = $row[rpms];
 $tarballs           = $row[tarballs];
 $startupcmd         = $row[startupcmd];
@@ -157,14 +156,6 @@ echo "    </td>
       </tr>\n";
 
 echo "<tr>
-          <td>Def Boot Path:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"def_boot_path\" size=\"40\"
-                     value=\"$def_boot_path\"></td>
-      </tr>\n";
-
-
-echo "<tr>
           <td>Def Boot Command Line:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"def_boot_cmd_line\" size=\"40\"
@@ -181,8 +172,17 @@ if ($isadmin) {
     
     while ($row = mysql_fetch_array($osid_result)) {
 	$osname = $row[osname];
-	$osid = $row[osid];
-	$pid  = $row[pid];
+	$oosid = $row[oosid];
+	$posid = $row[posid];
+
+        # Use the osid that came from the partitions table, if there
+	# was one - otherwise, go with the os_info table
+	if ($posid) {
+	    $osid = $posid;
+	}
+	else {
+	    $osid = $oosid;
+	}
 
 	echo "<option ";
 	if ($next_boot_osid == $osid) {
@@ -195,19 +195,42 @@ if ($isadmin) {
            </tr>\n";
 
     echo "<tr>
-             <td>Next Boot Path:</td>
-             <td class=\"left\">
-                 <input type=\"text\" name=\"next_boot_path\" size=\"40\"
-                        value=\"$next_boot_path\"></td>
-          </tr>\n";
-
-
-    echo "<tr>
               <td>Next Boot Command Line:</td>
               <td class=\"left\">
                   <input type=\"text\" name=\"next_boot_cmd_line\" size=\"40\"
                          value=\"$next_boot_cmd_line\"></td>
           </tr>\n";
+
+    mysql_data_seek($osid_result, 0);
+
+    echo "<tr>
+              <td>Temp Boot OS:</td>";
+    echo "    <td><select name=\"temp_boot_osid\">\n";
+    echo "                <option value=\"\">No OS</option>\n";
+    
+    while ($row = mysql_fetch_array($osid_result)) {
+	$osname = $row[osname];
+	$oosid = $row[oosid];
+	$posid = $row[posid];
+
+        # Use the osid that came from the partitions table, if there
+	# was one - otherwise, go with the os_info table
+	if ($posid) {
+	    $osid = $posid;
+	}
+	else {
+	    $osid = $oosid;
+	}
+
+	echo "<option ";
+	if ($temp_boot_osid == $osid) {
+	    echo "selected ";
+	}
+	echo "value=\"$osid\">$pid - $osname</option>\n";
+    }
+    echo "       </select>";
+    echo "    </td>
+           </tr>\n";
 }
 
 echo "<tr>

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,10 +22,11 @@ LOGGEDINORDIE($uid);
 # Check to make sure that this is a valid nodeid
 #
 $query_result =
-    DBQueryFatal("SELECT node_id FROM nodes WHERE node_id='$node_id'");
+    DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("The node $node_id is not a valid nodeid!", 1);
 }
+$row = mysql_fetch_array($query_result);
 
 #
 # Admin users can control any node, but normal users can only control
@@ -38,27 +39,38 @@ if (! $isadmin) {
     }
 }
 
-if (isset($def_boot_osid) && strcmp($def_boot_osid, "None") == 0) {
-    $def_boot_osid = "";
+#
+# Check each parameter. Also note that when setting/clearing values,
+# send the argument to the backend script *only when changed*
+#
+$command_string = "";
+
+if ($def_boot_osid != $row[def_boot_osid]) {
+    $command_string .= "default_boot_osid='$def_boot_osid' ";
+}
+if ($def_boot_cmd_line != $row[def_boot_cmd_line]) {
+    $command_string .= "default_boot_cmdline='$def_boot_cmd_line' ";
+}
+if ($startupcmd != $row[startupcmd]) {
+    $command_string .= "startup_command='$startupcmd' ";
+}
+if ($tarballs != $row[tarballs]) {
+    $command_string .= "tarfiles='$tarballs' ";
+}
+if ($rpms != $row[rpms]) {
+    $command_string .= "rpms='$rpms' ";
 }
 
-#
-# Create a command string, that is slightly different if an admin; we allow
-# admin people to set next_boot parameters. Ordinary folks cannot.
-#
-$command_string =
-	"default_boot_osid='$def_boot_osid'		".
-	"default_boot_path='$def_boot_path'		".
-	"default_boot_cmdline='$def_boot_cmd_line'	".
-	"startup_command='$startupcmd'			".
-	"tarfiles='$tarballs'                           ".
-	"rpms='$rpms'                                   ";
-
 if ($isadmin) {
-    $command_string = "$command_string			".
-	"next_boot_osid='$next_boot_osid'		".
-	"next_boot_path='$next_boot_path'		".
-	"next_boot_cmdline='$next_boot_cmd_line'	";
+    if ($next_boot_osid != $row[next_boot_osid]) {
+	$command_string .= "next_boot_osid='$next_boot_osid' ";
+    }
+    if ($next_boot_cmd_line != $row[next_boot_cmd_line]) {
+	$command_string .= "next_boot_cmdline='$next_boot_cmd_line' ";
+    }
+    if ($temp_boot_osid != $row[temp_boot_osid]) {
+	$command_string .= "temp_boot_osid='$temp_boot_osid' ";
+    }
 }
 
 #

@@ -5,6 +5,6 @@
 -- these is not idempotent, since a site may have changed them for some reason.
 --
 
-INSERT INTO os_info VALUES ('PXEBOOT','emulab-ops','PXEBOOT','root',NULL,'Default pxeboot kernel for contacting bootinfo.','OSKit','','boss:/tftpboot/pxeboot',NULL,'','',0,1,0,'_BOOTWHAT_',NULL,NULL);
-INSERT INTO os_info VALUES ('PXEFBSD','emulab-ops','PXEFBSD','root',NULL,'MFS FreeBSD over PXE','FreeBSD','4.5','boss:/tftpboot/pxeboot.freebsd',NULL,'','ping,ssh,ipod,isup',0,1,0,'NORMAL',NULL,NULL);
-INSERT INTO os_info VALUES ('PXEFRISBEE','emulab-ops','PXEFRISBEE','root',NULL,'Frisbee MFS FreeBSD over PXE','FreeBSD','4.5','boss:/tftpboot/pxeboot.frisbee',NULL,'','ping,ssh,ipod,isup',0,1,0,'RELOAD',NULL,NULL);
+INSERT INTO os_info VALUES ('FREEBSD-MFS','emulab-ops','FREEBSD-MFS','root',NULL,'FreeBSD in an MFS','FreeBSD','4.5','boss:/tftpboot/freebsd',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1);
+INSERT INTO os_info VALUES ('FRISBEE-MFS','emulab-ops','FRISBEE-MFS','root',NULL,'Frisbee (FreeBSD) in an MFS','FreeBSD','4.5','boss:/tftpboot/frisbee',NULL,'','ping,ssh,ipod,isup',0,1,0,'RELOAD',NULL,NULL,1);
+INSERT INTO os_info VALUES ('NEWNODE-MFS','emulab-ops','NEWNODE-MFS','root',NULL,'NewNode (FreeBSD) in an MFS','FreeBSD','4.5','boss:/tftpboot/freebsd.newnode',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1520,10 +1520,9 @@ function SHOWNODE($node_id, $short = 0) {
     $eid		= $row[eid];
     $bios               = $row[bios_version];
     $def_boot_osid      = $row[def_boot_osid];
-    $def_boot_path      = $row[def_boot_path];
     $def_boot_cmd_line  = $row[def_boot_cmd_line];
     $next_boot_osid     = $row[next_boot_osid];
-    $next_boot_path     = $row[next_boot_path];
+    $temp_boot_osid     = $row[temp_boot_osid];
     $next_boot_cmd_line = $row[next_boot_cmd_line];
     $rpms               = $row[rpms];
     $tarballs           = $row[tarballs];
@@ -1554,10 +1553,6 @@ function SHOWNODE($node_id, $short = 0) {
     
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
-    if (!$def_boot_path)
-	$def_boot_path = "&nbsp";
-    if (!$next_boot_path)
-	$next_boot_path = "&nbsp";
     if (!$next_boot_cmd_line)
 	$next_boot_cmd_line = "&nbsp";
     if (!$rpms)
@@ -1703,11 +1698,6 @@ function SHOWNODE($node_id, $short = 0) {
     if (!$short) {
 	if (!$isvirtnode && !$isremotenode) {
 	    echo "<tr>
-                      <td>Def Boot Path:</td>
-                      <td class=left>$def_boot_path</td>
-                  </tr>\n";
-
-	    echo "<tr>
                       <td>Def Boot Command&nbsp;Line:</td>
                       <td class=left>$def_boot_cmd_line</td>
                   </tr>\n";
@@ -1725,13 +1715,20 @@ function SHOWNODE($node_id, $short = 0) {
                   </tr>\n";
 
 	    echo "<tr>
-                     <td>Next Boot Path:</td>
-                     <td class=left>$next_boot_path</td>
+                      <td>Next Boot Command Line:</td>
+                      <td class=left>$next_boot_cmd_line</td>
                   </tr>\n";
 
 	    echo "<tr>
-                      <td>Next Boot Command Line:</td>
-                      <td class=left>$next_boot_cmd_line</td>
+                      <td>Temp Boot OS:</td>
+                      <td class=left>";
+    
+	    if ($temp_boot_osid)
+		SPITOSINFOLINK($temp_boot_osid);
+	    else
+		echo "&nbsp";
+
+	    echo "    </td>
                   </tr>\n";
 	}
 	elseif ($isvirtnode) {

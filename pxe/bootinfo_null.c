@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include "bootwhat.h"
+#include "bootinfo.h"
 
 #ifdef USE_NULL_DB
 
@@ -24,14 +25,16 @@ open_bootinfo_db(void)
 }
 
 int
-query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
+query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 {
 #if 0
-	info->type = BIBOOTWHAT_TYPE_MB;
+	info->type  = BIBOOTWHAT_TYPE_MB;
+	info->flags = 0;
 	info->what.mb.tftp_ip.s_addr = 0;
 	strcpy(info->what.mb.filename, NETBOOT);
 #else
-	info->type = BIBOOTWHAT_TYPE_SYSID;
+	info->type  = BIBOOTWHAT_TYPE_SYSID;
+	info->flags = 0;
 	info->what.sysid = 165; /* BSD */
 #endif
 	return 0;

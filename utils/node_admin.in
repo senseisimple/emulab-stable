@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -51,6 +51,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 my $nodereboot	= "$TB/bin/node_reboot";
 my $osselect    = "$TB/bin/os_select";
+my $ADMINOSID   = TB_OSID_FREEBSD_MFS;
 my $pxebootpath;
 my $dbuid;
 
@@ -106,21 +107,13 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 if ($onoff eq "on") {
-    $pxebootpath = "PXEFBSD";
+    system("$osselect -t $ADMINOSID $node") and
+	die("*** Failed to set temp boot to $ADMINOSID for $node!\n");
 }
 else {
-    my $query_result =
-	DBQueryFatal("select node_types.pxe_boot_path from node_types " .
-		     "left join nodes on nodes.type=node_types.type " .
-		     "where node_id='$node'");
-
-    my @row = $query_result->fetchrow_array();
-    $pxebootpath = $row[0];
+    system("$osselect -c -t $node") and
+	die("*** Failed to clear temp boot for $node!\n");
 }
-
-system("$osselect -m $pxebootpath $node") and
-    die("*** Failed to set PXE boot path for $node!\n");
-
 DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
 	     "where node_id='$node'");
 

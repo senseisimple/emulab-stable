@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,8 +11,9 @@
 #include <string.h>
 #include <netdb.h>
 #include <syslog.h>
-
+#include "log.h"
 #include "bootwhat.h"
+#include "bootinfo.h"
 
 /*
  * Trivial config file format.
@@ -53,7 +54,7 @@ open_bootinfo_db(void)
 }
 
 int
-query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
+query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 {
 	struct config *configp;
 
@@ -84,7 +85,7 @@ parse_host(char *name)
 	if (!isdigit(name[0])) {
 		he = gethostbyname(name);
 		if (he == 0) {
-			syslog(LOG_ERR, "%s: unknown host", name);
+			error("%s: unknown host", name);
 			return 0;
 		}
 		return *(int *)he->h_addr;
@@ -103,7 +104,7 @@ parse_configs(char *filename)
 	int	ipaddr;
 
 	if ((fp = fopen(filename, "r")) == NULL) {
-		syslog(LOG_ERR, "%s: cannot open", filename);
+		error("%s: cannot open", filename);
 		return 1;
 	}
 
@@ -115,7 +116,7 @@ parse_configs(char *filename)
 			continue;
 
 		if (numconfigs >= MAX_CONFIGS) {
-			syslog(LOG_ERR, "%s: too many lines", filename);
+			error("%s: too many lines", filename);
 			fclose(fp);
 			return 1;
 		}
@@ -125,7 +126,7 @@ parse_configs(char *filename)
 		configp = (struct config *) calloc(sizeof *configp, 1);
 		if (!configp) {
 		bad:
-			syslog(LOG_ERR, "%s: parse error", filename);
+			error("%s: parse error", filename);
 			fclose(fp);
 			close_bootinfo_db();
 			return 1;
@@ -136,6 +137,7 @@ parse_configs(char *filename)
 
 		configp->client.s_addr = ipaddr;
 		configp->bootinfolen = sizeof *configp;
+		configp->bootinfo.flags = 0;
 		if (strncmp(action, "sysid=", 6) == 0) {
 			configp->bootinfo.type = BIBOOTWHAT_TYPE_SYSID;
 			configp->bootinfo.what.sysid = atoi(&action[6]);
@@ -192,17 +194,6 @@ find_config(struct in_addr addr)
 
 #ifdef TEST
 #include <stdarg.h>
-
-void
-syslog(int prio, const char *msg, ...)
-{
-	va_list ap;
-
-	va_start(ap, msg);
-	vfprintf(stderr, msg, ap);
-	va_end(ap);
-	fprintf(stderr, "\n");
-}
 
 static void
 print_bootwhat(boot_what_t *bootinfo)

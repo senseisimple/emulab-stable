@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -38,19 +38,16 @@ my %controlset =
  #
  # Symbolic name => Admin, Multi args, nodes field, virt_nodes field, osselect
  #
- default_boot_osid      => [0, 0, "def_boot_osid",      undef,1],
- default_boot_path      => [0, 0, "def_boot_path",      undef,1],
- default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line",0],
- startup_command	=> [0, 0, "startupcmd",		"startupcmd",0],
- tarfiles		=> [0, 1, "tarballs",		"tarfiles",0],
- rpms			=> [0, 1, "rpms",		"rpms",0],
- deltas			=> [0, 1, "deltas",		"deltas",0],
- next_boot_osid         => [1, 0, "next_boot_osid",     undef,1],
- next_boot_path         => [1, 0, "next_boot_path",     undef,1],
- next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef,0],
- pxe_boot_path          => [0, 0, "pxe_boot_path",    undef,1],
- next_pxe_boot_path     => [0, 0, "next_pxe_boot_path",       undef,1],
- bios_version		=> [1, 0, "bios_version",	undef,0],
+ default_boot_osid      => [0, 0, "def_boot_osid",      undef,       1, ""],
+ default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line",  0, ""],
+ startup_command	=> [0, 0, "startupcmd",		"startupcmd",0, ""],
+ tarfiles		=> [0, 1, "tarballs",		"tarfiles",  0, ""],
+ rpms			=> [0, 1, "rpms",		"rpms",      0, ""],
+ deltas			=> [0, 1, "deltas",		"deltas",    0, ""],
+ next_boot_osid         => [1, 0, "next_boot_osid",     undef,       1, "-1"],
+ next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef,       0, ""],
+ temp_boot_osid         => [1, 0, "temp_boot_osid",     undef,       1, "-t"],
+ bios_version		=> [1, 0, "bios_version",	undef,       0, ""],
 );
   
 #
@@ -212,23 +209,27 @@ my $virtnodes_updatestr;
 my @osselect_params=();
 
 foreach my $option (keys(%controls)) {
-    my ($admin, $multi, $physdbkey, $virtdbkey, $needs_osselect) 
-      = @{ $controlset{$option} };
+    my ($admin, $multi, $physdbkey, $virtdbkey,
+	$needs_osselect, $osselect_arg) = @{ $controlset{$option} };
     my $value = $controls{$option};
 
     if ($needs_osselect) {
-	# Don't set osselect fields directly in nodes table
-        if ($value ne "") {
-	  # Make sure we ignore blanks, since osselect needs an OSID
-	  my $str = ( $debug ? "-d " : "").
-	    ( $physdbkey =~ /^next_/ ? "-1 " : "" ).
-	      ( $physdbkey =~ /pxe_boot_/ ? "-m " : "").
-		( $physdbkey =~ /^((def)|(next))_boot_path/ ? "-p " : "").
-		  "$value";
-	  if ($debug) { print "$option=$value ($physdbkey) made osselect str='$str'\n"; }
-	  push(@osselect_params, $str);
+	my $str = ($debug ? "-d " : "");
+	    
+        if ($value eq "") {
+	    # Clearing the field.
+	    $str .= "-c $osselect_arg";
 	}
-    } else {
+	else {
+	    # Setting the field
+	    $str .= "$osselect_arg $value";
+	}
+	if ($debug) {
+	    print "$option=$value ($physdbkey) made osselect str='$str'\n";
+	}
+	push(@osselect_params, $str);
+    }
+    else {
 	if (defined($physnodes_updatestr)) {
 	    $physnodes_updatestr = "$physnodes_updatestr, $physdbkey='$value'";
 	}

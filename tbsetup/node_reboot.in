@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,18 +18,19 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: node_reboot [-d] [-f] [-n] [-w] node [node ...]\n" .
-	         "       node_reboot [-d] [-f] [-n] [-w] -e pid,eid\n".
+    print "Usage: node_reboot [-d] [-f] [-n] [-w] [-k] node [node ...]\n" .
+	  "       node_reboot [-d] [-f] [-n] [-w] [-k] -e pid,eid\n".
 	"Use the -d option to turn on debugging\n" .
 	"Use the -e option to reboot all the nodes in an experiment\n" .
 	"Use the -n option to not wait for nodes to go down\n" .
 	"Use the -w option to to wait for nodes is come back up\n" .
+	"Use the -k option to power cycle nodes in PXEWAIT mode\n" .
 	"Use the -f option to power cycle (and not wait for nodes to die)\n";
     exit(-1);
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.
-my  $optlist = "dfe:nwr";
+my  $optlist = "dfe:nwrk";
 
 #
 # Configure variables
@@ -51,6 +52,7 @@ my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/apod";
 my $vnodesetup	= "$TB/sbin/vnode_setup";
+my $bisend      = "$TB/sbin/bootinfosend";
 my $logfile	= "$TB/log/power.log";
 my $ping	= "/sbin/ping";
 my %pids	= ();
@@ -63,6 +65,7 @@ my $realmode    = 0;
 my $nowait      = 0;
 my $failed      = 0;
 my $eidmode     = 0;
+my $killmode    = 0;
 my $pid;
 my $eid;
 
@@ -93,6 +96,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
@@ -398,7 +404,7 @@ exit $failed;
 #
 sub RebootNode {
     my ($pc) = @_;
-    my ($status, $syspid, $mypid, $didipod);
+    my ($status, $syspid, $mypid, $didipod, $nodestate);
 
     print STDOUT "Rebooting $pc ...\n";
 
@@ -410,6 +416,50 @@ sub RebootNode {
 	return $mypid;
     }
     TBdbfork();
+
+    #
+    # Is the node in PXEWAIT? If so we want to wake it up so that it can
+    # query bootinfo and do what it is supposed to do, without a real reboot.
+    # We send the initial wakeup from here, but let stated deal with it
+    # failing (timeout) and resending it. That means we could be called
+    # with the node in PXEWAKEUP, so send it another wakeup. The point is that
+    # stated is controlling the timeouts. Eventually stated gives up and uses
+    # the -k option to force a power cycle.
+    #
+    if (! TBGetNodeEventState($pc, \$nodestate)) {
+	info("$pc has no event state: power cycle");
+	print STDERR "$pc has no event state Power cycling ...\n" if $debug;
+	# Signal to the parent that the node needs to be power cycled
+	exit(2);
+    }
+    if ($nodestate eq TBDB_NODESTATE_PXEWAIT() ||
+	$nodestate eq TBDB_NODESTATE_PXEWAKEUP()) {
+	#
+	# In killmode, we do not want to bother with sending a wakeup event.
+	# Just do the power cycle. This is used to unstick a machine that
+	# is in waitmode, but not responding to the wakeups. 
+	#
+	if ($killmode) {
+	    info("$pc: in $nodestate: but power cycling in killmode");
+	    print STDERR "$pc: in $nodestate: but power cycling in killmode\n"
+		if $debug;
+	    exit(2);
+	}
+	
+	#
+	# The aux program sends the event to stated ...
+	#
+	my $optarg = ($debug ? "-dd" : "");
+	    
+	print STDERR "$pc: in $nodestate: sending wakeup command.\n" if $debug;
+	system("$bisend $optarg -q $pc");
+	if ($?) {
+	    info("$pc: PXEWAKEUP failed ... power cycle");
+	    print STDERR "$pc: PXEWAKEUP failed ... power cycle.\n" if $debug;
+	    exit(2);
+	}
+	exit(0);
+    }
 
     #
     # See if the machine is pingable. If its not pingable, then we just

@@ -44,7 +44,7 @@ my $INITIAL_OPMODE = TBDB_NODEOPMODE_RELOAD;
 #
 # MFS to boot the nodes into initially
 #
-my $INITIAL_MFS = "PXEFBSD";
+my $INITIAL_MFS = TB_OSID_FREEBSD_MFS();
 
 #
 # Number of vnodes to create for each physical node
@@ -317,7 +317,7 @@ if ($exports_rv) {
 # likes better
 #
 print "Instructing nodes to boot into the FreeBSD MFS\n";
-my $select_rv = system "$os_select -m $INITIAL_MFS " .
+my $select_rv = system "$os_select $INITIAL_MFS " .
     join(" ",@succeeded_nodes);
 if ($select_rv) {
     warn "WARNING - failed to select FreeBSD MFS for nodes";

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -66,6 +66,7 @@ my $usedefault  = 1;
 my $imagename;
 my $imageid;
 my $imagepid    = TB_OPSPID;
+my $FRISBEEOSID = TB_OSID_FRISBEE_MFS();
 my %imageid_row;
 my @nodes       = ();
 my %retries	= ();
@@ -248,7 +249,6 @@ foreach my $node (@nodes) {
 
     print STDOUT "Changing default OS for $node to $defosid\n";
     if (!$TESTMODE) {
-        system("$osselect -m PXEBOOT $node");
         system("$osselect $defosid $node");
     }
 
@@ -424,7 +424,7 @@ sub SetupReload($) {
     DBQueryFatal("replace into current_reloads ".
 		 "(node_id, image_id) values ('$node', '$imageid')");
 
-    system "$osselect -1 -m PXEFRISBEE $node" and
+    system "$osselect -1 $FRISBEEOSID $node" and
       die "*** Unable to select frisbee OS\n";
     system "$FRISBEELAUNCHER ".($dbg? "-d ":"")."$imageid" and
       die "*** Unable to launch frisbee daemon\n";
