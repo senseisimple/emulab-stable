@@ -128,7 +128,7 @@ if (! TBProjLeader($pid, $projleader)) {
 TBUserInfo($projleader, $projleader_name, $projleader_email);
 
 TBMAIL("$expleader_name <$expleader_email>",
-     "$pid/$eid: Please Swap or Terminate Experiment",
+     "$pid/$eid ($c PC".($c!=1?"s":"")."): Please Swap or Terminate Experiment",
      "Hi, this is an automated message from $THISHOMEBASE.\n".
        ( $swap_requests > 0 
          ? ("You have been sent ".$swap_requests." other message".
