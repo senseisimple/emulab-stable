@@ -154,10 +154,16 @@ if ($retval < 0) {
 #
 echo "<br><br><h3>\n";
 if ($retval == 0) {
+    if (strcmp($inout, "in") == 0)
+	$howlong = "five to ten";
+    else
+	$howlong = "less than two";
+    
     echo "Experiment `$exp_eid' in project `$exp_pid' is swapping $inout.
           <br><br>
           You will be notified via email when the experiment has finished
-          swapping. This typically takes 5-10 minutes.
+          swapping. This typically takes $howlong minutes, depending on the
+          number of nodes in the experiment. 
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
 }

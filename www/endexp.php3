@@ -152,7 +152,8 @@ else {
     echo "Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
           You will be notified via email when the experiment has been torn
 	  down, and you can reuse the experiment name.
-          This typically takes less than 5 minutes.
+          This typically takes less than two minutes, depending on the
+          number of nodes in the experiment.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
 }
