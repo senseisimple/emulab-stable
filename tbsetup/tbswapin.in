@@ -203,6 +203,16 @@ if (system("genelists")) {
 }
 TBDebugTimeStamp("genelists finished");
 
+print "Clearing port counters.\n";
+TBDebugTimeStamp("portstats started");
+if (system("portstats -z -a -q $pid $eid")) {
+    print STDERR "*** WARNING: Failed to clear port counters.\n";
+    #
+    # This is a non-fatal error.
+    # 
+}
+TBDebugTimeStamp("porstats finished");
+
 #
 # OK, let's see how that os_setup did
 #
