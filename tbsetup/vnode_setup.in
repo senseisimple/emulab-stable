@@ -31,6 +31,7 @@ my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
+my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 
 my $ssh		= "$TB/bin/sshtb -n";
 my $debug       = 0;
@@ -158,8 +159,9 @@ if (! @nodes) {
 # Just the vnodes mam.
 foreach my $node (@nodes) {
     my $pnode;
+    my $jailed;
     
-    if (! TBIsNodeVirtual($node)) {
+    if (! TBIsNodeVirtual($node, \$jailed)) {
 	next;
     }
 
@@ -170,12 +172,6 @@ foreach my $node (@nodes) {
     TBSetNodeEventState($node, TBDB_NODESTATE_REBOOTING);
     
     print STDOUT "Doing $mode of vnode $node on $pnode ...\n";
-
-    #
-    # We need to know if its a remote or local node, so we know how
-    # to update it. This info needs to be in the DB at some point. 
-    #
-    my $isremote = TBIsNodeRemote($pnode);
 
     #
     # Run an ssh command in a child process, protected by an alarm to
@@ -221,18 +217,14 @@ foreach my $node (@nodes) {
 	}
     }
     else {
-	my $args = ($killmode ? "-k" : "");
-	$args    = "$args $node";
+	my $args = ($killmode ? "-k " : " ");
+	$args   .= ($jailed   ? "-j " : " ");
+	$args   .= "$node ";
 	
 	# Must change our real UID to root so that ssh will work.
 	$UID = 0;
     
-	if ($isremote) {
-	    exec("$ssh -host $pnode /usr/local/etc/testbed/vnodesetup $args");
-	}
-	else {
-	    exec("$ssh -host $pnode /etc/testbed/vnodesetup $args");
-	}
+	exec("$ssh -host $pnode $CLIENT_BIN/vnodesetup $args");
 	die("*** $0:\n".
 	    "    exec failed!\n");
     }
