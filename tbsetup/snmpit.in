@@ -566,7 +566,7 @@ sub doMakeVlan($@) {
     my $vlan_name = shift;
     my @ports = @_;
 
-    my $errors;
+    my $errors = 0;
 
     if (@stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n";
