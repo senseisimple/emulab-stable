@@ -102,6 +102,12 @@ while (1) {
     sleep(10);
 
     #
+    # We use this to figure out when to delete nodes from the retried and
+    # warned hashes
+    #
+    my $time = time();
+
+    #
     # First, look for nodes that have been in the reloading experiment for
     # longer than $retry_time, and try rebooting them
     #
@@ -115,9 +121,20 @@ while (1) {
 		fatal("$node was wedged, but could not be power cycled.");
 	    }
 	    print "\nReload appears wedged. Power cycling and trying once more!\n";
-	    $retried{$node} = 1;
+	}
+	$retried{$node} = $time;
+    }
+
+    #
+    # We can pull out all nodes that were not 'touched' (matched by the select above)
+    # during this pass
+    #
+    foreach $node (keys %retried) {
+	if ($retried{$node} != $time) {
+	    delete $retried{$node};
 	}
     }
+
 
     #
     # Next, we do the same thing for nodes in the reloading experiment for
@@ -131,7 +148,17 @@ while (1) {
 	if (!$warned{$node}) {
 	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
 	    "more than $warn_time minutes");
-	    $warned{$node} = 1;
+	}
+	$warned{$node} = $time;
+    }
+
+    #
+    # We can pull out all nodes that were not 'touched' (matched by the select above)
+    # during this pass
+    #
+    foreach $node (keys %warned) {
+	if ($warned{$node} != $time) {
+	    delete $warned{$node};
 	}
     }
 
