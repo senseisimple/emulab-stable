@@ -219,6 +219,51 @@ Informational stuff should go to us.
 
 Frisbee is sucking up 15% of the CPU. Needs to be profiled.
 
-*** Add virtual name to node control for. - Nov 12 2001 - Needs to be fixed.
+*** Add virtual name to node control for. - Nov 12 2001 -
+    Fixed by Leigh on Nov 28 2001.
 
-Requested by Dave.
+    Requested by Dave.
+
+*** Add quotas on /users. - Nov 12 2001 - Needs to be done.
+
+    Need to build and install a kernel on ops with quotas configured in.
+
+*** Have Linux kernel source available - Nov 12 2001 - Needs to be done.
+
+    Requested by Jay.
+
+*** Use switch port for 10MBs - Nov 28 2001 - Needs to be done.
+
+    LBS - Nov 28th: I worked on this. Turns out the switches do not
+    like it when the nodes force their ports into 10MB full duplex,
+    and the switch disables the port.
+
+*** Add "Must Change Password" state. - Dec 3rd 2001 - Needs to be done.
+
+    Suggested by Mac. When we change the password and email it, we
+    should require that user changes his password next time he logs
+    in.
+
+*** Mysterious TCP drop problem - Nov 21 2001 - Needs to be fixed.
+
+    From: Tian Bu <tbu@cs.umass.edu>
+    To: Mike Hibler <mike@fast.cs.utah.edu>
+    cc: <testbed-ops@fast.cs.utah.edu>
+    Subject: News on packet drop
+    Date: Thu, 29 Nov 2001 14:52:04 -0500 (EST)
+    
+    
+    After spending sometime on investigating why the packet drop occur
+    between a pair of linux nodes, I found that this problem is not
+    related to the OS. Instead, the mysterious packet drop only occurs
+    between a pair of nodes where one end is PC850 and the other end 
+    is PC600.  The settting I first saw the drop was a link between
+    a PC850 and a PC600. I did report that the drop does not appear
+    between a pair of freeBSD nodes. That is misleading because it was 
+    measured on a different setting where the pair of nodes I reserved happen 
+    to be both PC850. :-). Today I start another experiment where there are
+    a pair of PC850 running Linux and observe no mysterious packet drop
+    between them. I guess there may be some incompatible features between 
+    either the interfaces installed on these two different types of machines.
+    
+
