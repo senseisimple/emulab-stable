@@ -34,3 +34,31 @@ presumably as soon as assign is done.  For a batch experiment, it seems to
 take minutes.  I can go out and look at assign.log and see that nodes have
 been assigned almost right away, they just doesn't wind up in the report
 (the DB?) for awhile.
+
+
+*** Shell experiments - Sep 18 2001 - Needs to be fixed
+
+Reported by Rob.
+
+Perhaps a feature instead of a bug. Shell experiments remain in the
+"new" state, and are thus not cleaned up (nodes frees) when the
+experiment is terminating. I view that as intended behaviour, but its
+easy to change, so we should.
+
+
+*** Broken lilo.conf - Sep 17 2001 - Needs to be fixed.
+
+Reported by Matt (and then Rob).
+
+According to Matt, our lilo.conf file is broken. In the next version
+of the disk image, we should fix it. Matt sent a fixed version to
+testbed-ops on Sep. 17 that we could use as a base.
+
+
+*** IPOD support - Sep 17 2001 - Needs to be fixed.
+
+Reported by Rob.
+
+Our Linux kernel needs to be rebuilt with ping of death support.
+
+
