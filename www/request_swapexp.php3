@@ -76,8 +76,9 @@ $c=$r["c"];
 
 if (!$confirmed) {
     echo "<center><h2><br>
-Experiment '$eid' in project '$pid' has $c Emulab nodes reserved,
-and has been sent $swap_requests swap request(s) since it went idle.\n";
+Experiment '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
+      " reserved, \nand has been sent $swap_requests swap request".
+      ($swap_requests!=1?"s":"")." since it went idle.\n";
     if ($swap_requests > 0) {
       echo "The most recent one was sent at $last_swap_req.\n";
     }
@@ -124,12 +125,14 @@ TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid: Please Swap or Terminate Experiment",
      "Hi, this is an automated message from Emulab.Net.\n".
        ( $swap_requests > 0 
-         ? ("You have been sent ".$swap_requests." other messages since this ".
+         ? ("You have been sent ".$swap_requests." other message".
+	    ($swap_requests!=1?"s":"")." since this ".
 	    "experiment became idle.\n")
          : "") .
      "\n".
-     "It appears that the $c nodes in your experiment '$eid' \n".
-     "in project '$pid' are inactive.\n".
+     "It appears that the $c node".($c!=1?"s":"").
+       " in your experiment '$eid' \n".
+     "in project '$pid' ".($c!=1?"are":"is")." inactive.\n".
      "We would appreciate it if you could either terminate or swap this\n".
      "experiment out so that the nodes will be available for use by\n".
      "other experimenters. You can do this by logging into the Emulab Web\n".
