@@ -29,7 +29,7 @@ else
 TBSETDESTDIR=
 endif
 
-SUBDIRS	= $(TBSETDESTDIR) $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
+SUBDIRS	= $(TBSETDESTDIR) $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd tracker
 
 all:		robomonitord all-subdirs 
 client:		client-subdirs

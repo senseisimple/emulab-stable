@@ -2189,6 +2189,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/mezzanine/libfg/GNUmakefile \
 	robots/mezzanine/libmezz/GNUmakefile \
 	robots/mezzanine/mezzanine/GNUmakefile \
+	robots/tracker/GNUmakefile \
 	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord "
 
 #

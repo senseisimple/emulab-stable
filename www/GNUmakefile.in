@@ -54,6 +54,10 @@ AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
 FLOORMAPFILES  = $(wildcard $(SRCDIR)/floormap/*.jpg)
 FLOORMAPFILES += $(wildcard $(SRCDIR)/floormap/*.gif)
 
+ROBOTRACKFILES  = $(wildcard $(SRCDIR)/robotrack/*.php3)
+ROBOTRACKFILES += $(wildcard $(SRCDIR)/robotrack/*.jpg)
+ROBOTRACKFILES += $(wildcard $(SRCDIR)/robotrack/*.jar)
+
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
 
@@ -134,6 +138,7 @@ ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
 ALLUSRP   = $(notdir $(USRPFILES))
+ALLROBO   = $(notdir $(ROBOTRACKFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/floormap/, $(ALLFLOORMAPS)) \
@@ -146,6 +151,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
 	$(addprefix $(INSTALL_WWWDIR)/usrp/, $(ALLUSRP)) \
+	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
