@@ -35,7 +35,7 @@ static int	debug;
 static void	cleanup(void);
 static void	quit(int);
 
-#define MAXAGENTS	100
+#define MAXAGENTS	200
 static struct {
 	char    nodeid[TBDB_FLEN_NODEID];
 	char    vnode[TBDB_FLEN_VNAME];
@@ -362,6 +362,9 @@ get_static_events(event_handle_t handle)
 		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
 			continue;
 		numagents++;
+		if (numagents >= MAXAGENTS) {
+			fatal("Too many agents!");
+		}
 	}
 	mysql_free_result(res);
 	
