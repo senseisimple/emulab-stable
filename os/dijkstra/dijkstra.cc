@@ -97,12 +97,21 @@ void dijkstra(graph *g, int start)           /* WAS prim(g,start) */
 
 void print_route(graph * g, int source, int dest)
 {
-    std::map< int, pair<string, string> >::iterator pos;
+    multimap< int, pair<string, string> >::iterator sourcePos;
+    sourcePos = g->ip[source].find(firstHop[dest]);
+    if (sourcePos == g->ip[source].end())
+    {
+        cerr << "ddijk: internal error: route not found" << endl;
+        exit(1);
+    }
+
+    multimap< int, pair<string, string> >::iterator pos;
     pos = g->ip[dest].begin();
-    std::map< int, pair<string, string> >::iterator limit;
+    multimap< int, pair<string, string> >::iterator limit;
     limit = g->ip[dest].end();
-    string sourceIp = g->ip[source][firstHop[dest]].first;
-    string firstHopIp = g->ip[source][firstHop[dest]].second;
+
+    string sourceIp = sourcePos->second.first;
+    string firstHopIp = sourcePos->second.second;
     for ( ; pos != limit; ++pos)
     {
         if (pos->second.first != firstHopIp)
@@ -152,10 +161,12 @@ int main(int argc, char * argv[])
             }
             insert_edge(&g, firstPos->second, secondPos->second, false,
                         weight);
-            g.ip[firstPos->second][secondPos->second] = make_pair(firstIp,
-                                                                  secondIp);
-            g.ip[secondPos->second][firstPos->second] = make_pair(secondIp,
-                                                                  firstIp);
+            g.ip[firstPos->second].insert(make_pair(firstPos->second,
+                                                    make_pair(firstIp,
+                                                              secondIp)));
+            g.ip[secondPos->second].insert(make_pair(firstPos->second,
+                                                     make_pair(secondIp,
+                                                               firstIp)));
         }
 
         map<string,int>::iterator sourcePos = nameToIndex.find(arg);

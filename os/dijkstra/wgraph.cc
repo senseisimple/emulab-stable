@@ -64,8 +64,6 @@ void read_graph(graph * g, bool directed)
 //                scanf("%d %d %d\n",&x,&y,&w);
             cin >> x >> xIp >> y >> yIp >> w;
             insert_edge(g,x+1,y+1,directed,w);
-            g->ip[x+1][y+1] = make_pair(xIp, yIp);
-            g->ip[y+1][x+1] = make_pair(yIp, xIp);
         }
 }
 

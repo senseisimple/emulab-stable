@@ -39,7 +39,7 @@ typedef struct {
         int nvertices;                  /* number of vertices in the graph */
         int nedges;                     /* number of edges in the graph */
     // map from dest edge to (source ip, dest ip)
-    std::map< int, pair<string, string> > ip[MAXV + 1];
+    std::multimap< int, pair<string, string> > ip[MAXV + 1];
 } graph;
 
 void initialize_graph(graph * g);
