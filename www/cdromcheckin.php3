@@ -95,6 +95,19 @@ if (isset($wahostname) &&
     return;
 }
 
+#
+# Generate a nickname if given hostname.
+#
+unset($nickname);
+if (isset($wahostname)) {
+    if (strpos($wahostname, ".")) {
+	$nickname = str_replace(".", "-", $wahostname);
+    }
+    else {
+	$nickname = $wahostname;
+    }
+}
+
 if (isset($roottag) &&
     !ereg("[0-9a-zA-Z]+", $roottag)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
@@ -130,21 +143,13 @@ if (isset($updated) && $updated == 1) {
 		     "set IP='$IP' ".
 		     "where privkey='$privkey'");
 
-	#
-	# Generate a nickname if given hostname.
-	#
-	$nickname = "";
-	$type     = "pcwa";
-	if (isset($wahostname)) {
-	    $nickname .= "-n ";
-	    
-	    if (strpos($wahostname, ".")) {
-		$nickname .= str_replace(".", "-", $wahostname);
-	    }
-	    else {
-		$nickname .= $wahostname;
-	    }
+	$newargs = "-w -i $IP ";
+	if (isset($nickname)) {
+	    $newargs .= " -n $nickname ";
+	}
 
+	$type = "pcwa";
+	if (isset($wahostname)) {
             #
             # XXX Parse hostname to see if a ron node.
 	    # Silly, but effective since we will never have anything else
@@ -155,8 +160,8 @@ if (isset($updated) && $updated == 1) {
 		$type = "pcron";
 	    }
 	}
-	SUEXEC("nobody", $TBADMINGROUP,
-	       "webnewwanode -w $nickname -t $type -i $IP", 0);
+	$newargs .= " -t $type ";
+	SUEXEC("nobody", $TBADMINGROUP, "webnewwanode $newargs", 0);
     }
     $newroot = "";
     if (isset($roottag)) {
@@ -167,6 +172,17 @@ if (isset($updated) && $updated == 1) {
 		 "set privkey=nextprivkey,updated=now(),nextprivkey=NULL ".
 		 "    $newroot ".
 		 "where privkey='$privkey'");
+
+    #
+    # Update with new nickname. Nice if node changes its real hostname.
+    #
+    if (isset($nickname)) {
+	$nodeid = TBIPtoNodeID($IP);
+	if ($nodeid) {
+	    DBQueryFatal("update reserved set vname='$nickname' ".
+			 "where node_id='$nodeid'");
+	}
+    }
 
     SPITSTATUS(CDROMSTATUS_OKAY);
     return;

@@ -1191,6 +1191,24 @@ function TBGetVerificationKey($name) {
 }
 
 #
+# Map IP to nodeid.
+#
+function TBIPtoNodeID($ip) {
+    $query_result =
+	DBQueryFatal("select n.node_id from interfaces as i ".
+		     "left join nodes as n on n.node_id=i.node_id ".
+		     "left join node_types as t ".
+		     "   on t.type=n.type and i.card=t.control_net ".
+		     "where i.IP='$ip'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[node_id];
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
