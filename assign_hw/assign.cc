@@ -335,6 +335,8 @@ void display_scc(GraphWin& gw)
 {
   edge e;
   node n;
+
+  if (batch_mode) return;
 	
   if (!refreshed) {
     if (on_line)
@@ -546,18 +548,17 @@ int main(int argc, char **argv)
    * the user does anything to the graph, call the
    * proper handler.
    */
-  // XXX: alas, we need this because all the GW stuff is not in
-  // the same spot.
-  GraphWin gw(G, "Flux Testbed:  Simulated Annealing");
+  GraphWin *gw;
   if (! batch_mode) {
-    gw.set_init_graph_handler(del_edge_handler);
-    gw.set_new_edge_handler(new_edge_handler);
-    gw.set_del_edge_handler(del_edge_handler);
-    gw.set_new_node_handler(new_node_handler);
-    gw.set_del_node_handler(del_node_handler);
+    gw = new GraphWin(G, "Flux Testbed:  Simulated Annealing");
+    gw->set_init_graph_handler(del_edge_handler);
+    gw->set_new_edge_handler(new_edge_handler);
+    gw->set_del_edge_handler(del_edge_handler);
+    gw->set_new_node_handler(new_node_handler);
+    gw->set_del_node_handler(del_node_handler);
     
-    gw.set_node_width(24);
-    gw.set_node_height(24);
+    gw->set_node_width(24);
+    gw->set_node_height(24);
   }
   /*
    * Allow the user to specify a topology in ".top" format.
@@ -572,15 +573,17 @@ int main(int argc, char **argv)
     }
     parse_top(G, infile);
     if (! batch_mode) {
-      gw.update_graph();
+      gw->update_graph();
       node n;
       forall_nodes(n, G) {
 	if (G[n].name == NULL) {
 	  G[n].name = "";
 	}
-	gw.set_label(n, G[n].name);
-	gw.set_position(n,
-			point(random() % 200, random() % 200));
+	if (! batch_mode) {
+	  gw->set_label(n, G[n].name);
+	  gw->set_position(n,
+			  point(random() % 200, random() % 200));
+	}
       }
     }
   }
@@ -603,20 +606,20 @@ int main(int argc, char **argv)
   }
 
   if (! batch_mode) {
-    gw.display();
+    gw->display();
 		
-    gw.set_directed(false);
+    gw->set_directed(false);
 		
-    gw.set_node_shape(circle_node);
-    gw.set_node_label_type(user_label);
+    gw->set_node_shape(circle_node);
+    gw->set_node_label_type(user_label);
 		
-    h_menu = gw.get_menu("Layout");
-    gw_add_simple_call(gw, reassign, "Reassign", h_menu);
+    h_menu = gw->get_menu("Layout");
+    gw_add_simple_call(*gw, reassign, "Reassign", h_menu);
 		
     /* Run until the user quits.  Everything is handled by callbacks
      * from LEDA's event loop from here on.                           */
 		
-    gw.edit();
+    gw->edit();
   } else {
     batch();
   }
