@@ -204,31 +204,77 @@ event_unregister(event_handle_t handle)
 
 
 /*
- *
+ * An internal function to handle the two different event_poll calls, without
+ * making the library user mess around with arguments they don't care about.
  */
 
 int
-event_poll(event_handle_t handle)
+internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 {
 	extern int depth;
 	int rv;
+	elvin_timeout_t elvin_timeout = NULL;
 
 	if (!handle->mainloop) {
 		ERROR("multithreaded programs cannot use event_poll\n");
 		return 0;
 	}
 
+	/*
+	 * If the user wants a timeout, set up an elvin timeout now. We just
+	 * use a NULL callback, so that it simply causes a timeout, and doesn't
+	 * actually do anything.
+	 */
+	if (timeout) {
+		elvin_timeout = elvin_sync_add_timeout(NULL, timeout, NULL,
+				NULL, handle->status);
+		if (!elvin_timeout) {
+			ERROR("Elvin elvin_sync_add_timeout failed\n");
+			elvin_error_fprintf(stderr, handle->status);
+			return elvin_error_get_code(handle->status);
+		}
+	}
+
 	depth++;
-	rv = elvin_sync_default_select_and_dispatch(0, handle->status);
+	rv = elvin_sync_default_select_and_dispatch(blocking, handle->status);
 	depth--;
 	if (rv == 0) {
 		ERROR("Elvin select_and_dispatch failed\n");
 		elvin_error_fprintf(stderr, handle->status);
 	}
 
+	/*
+	 * Try to remove the timeout - if it didn't go off, we don't want to
+	 * hit it later. We don't check the return value, since, if it did go
+	 * off (and we don't really have a good way of knowing that), it's not
+	 * there any more, so it looks like an error.
+	 */
+	if (timeout && elvin_timeout) {
+		elvin_error_t error;
+		elvin_sync_remove_timeout(elvin_timeout, error);
+	}
+
 	return elvin_error_get_code(handle->status);
 }
 
+/*
+ * A non-blocking poll of the event system
+ */
+
+int
+event_poll(event_handle_t handle)
+{
+	return internal_event_poll(handle,0,0);
+}
+
+/*
+ * A blocking poll of the event system, with an optional timeout
+ */
+
+int event_poll_blocking(event_handle_t handle, unsigned int timeout)
+{
+	return internal_event_poll(handle,1,timeout);
+}
 
 /*
  * Enter the main loop of the event system, waiting to receive event

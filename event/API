@@ -232,3 +232,26 @@
   the event notification, and DATA is the arbitrary pointer passed to
   event_subscribe.  Returns a pointer to an event
   subscription structure if the operation is successful, 0 otherwise.
+
+* event_poll: Poll for new events
+
+      #include <event.h>
+
+      int event_poll(event_handle_t handle);
+
+  Polls for new events. Calls callbacks for all pending events. Does
+  not block - simply processes events that are currently queued.
+
+* event_poll_blocking: Poll for new events
+
+      #include <event.h>
+
+      int event_poll_blocking(event_handle_t handle, unsigned int timeout);
+
+  Same as event_poll, but blocks waiting for an event. Times out
+  after the given amount of time, or doesn't time out if 0 is given.
+
+  IMPORTANT: elvin uses timeouts internally. So, this function does
+  NOT guarantee that when it returns, either an event has been
+  recieved or your timeout has passed. This should not be much of
+  a problem, but you have been warned!

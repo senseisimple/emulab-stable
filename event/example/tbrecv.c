@@ -132,6 +132,16 @@ main(int argc, char **argv)
 	event_main(handle);
 
 	/*
+	 * Or, we can use a blocking poll like so:
+	 */
+	
+	/*
+	while (1) {
+		event_poll_blocking(handle,0);
+	}
+	*/
+
+	/*
 	 * Unregister with the event system:
 	 */
 	if (event_unregister(handle) == 0) {

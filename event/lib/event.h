@@ -142,6 +142,7 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
 event_handle_t event_register(char *name, int threaded);
 int event_unregister(event_handle_t handle);
 int event_poll(event_handle_t handle);
+int event_poll_blocking(event_handle_t handle, unsigned int timeout);
 int event_main(event_handle_t handle);
 int event_notify(event_handle_t handle, event_notification_t notification);
 int event_schedule(event_handle_t handle, event_notification_t notification,
