@@ -7,45 +7,62 @@
 include("defs.php3");
 
 #
-# No PAGEHEADER since we spit out a Location header later. See below.
-# 
-
-#
-# Only known and logged in users can do this.
-#
-# Note different test though, since we want to allow logged in
-# users with expired passwords to change them.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
 # This page is a generic toggle page, like adminmode.php3, but more
 # generalized. There are a set of things you can toggle, and each of
 # those items has a permission check and a set (pair) of valid values.
 #
-
 # Usage: toggle.php?type=swappable&value=1&pid=foo&eid=bar
 # (type & value are required, others are optional and vary by type)
+#
+# No PAGEHEADER since we spit out a Location header later. See below.
+#
+# Only known and logged in users can do this.
+#
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
 
 # List of valid toggles
-$toggles = array("adminoff", "idle_ignore");
+$toggles = array("adminoff");
 
 # list of valid values for each toggle
-$values  = array("adminoff"    => array(0,1),
-		 "idle_ignore" => array(0,1));
+$values  = array("adminoff"  => array(0,1));
+
+# list of valid extra variables for the each toggle, and mandatory flag.
+$optargs = array("adminoff"  => array("target_uid" => 0));
+
+# Mandatory page arguments.
+$type  = $_GET['type'];
+$value = $_GET['value'];
+
+# Pedantic page argument checking. Good practice!
+if (!isset($type) || !isset($value)) {
+    PAGEARGERROR();
+}
 
 if (! in_array($type, $toggles)) {
-    USERERROR("There is no toggle for $type!", 1);
+    PAGEARGERROR("There is no toggle for $type!");
 }
 if (! in_array($value, $values[$type])) {
-    USERERROR("The value '$value' is illegal for the $type toggle!", 1);
+    PAGEARGERROR("The value '$value' is illegal for the $type toggle!");
+}
+
+# Check optional args and bind locally.
+while (list ($arg, $required) = each ($optargs[$type])) {
+    if (!isset($_GET[$arg])) {
+	if ($required)
+	    PAGEARGERROR("Toggle '$type' requires argument '$arg'");
+	else
+	    unset($$arg);
+    }
+    else {
+	$$arg = addslashes($_GET[$arg]);
+    }
 }
 
 #
 # Permissions checks, and do the toggle...
 #
-if ($type=="adminoff") {
+if ($type == "adminoff") {
     # must be admin
     # Do not check if they are admin mode (ISADMIN), check if they
     # have the power to change to admin mode!
@@ -53,28 +70,14 @@ if ($type=="adminoff") {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
     # Admins can change status for other users.
-    if (!isset($target_uid)) { $target_uid = $uid; }
-
-    DBQueryFatal("update users set adminoff=$value where uid='$target_uid'");
+    if (!isset($target_uid))
+	$target_uid = $uid;
+    elseif (!TBCurrentUser($target_uid)) {
+	    PAGEARGERROR("Target user '$target_uid' is not a valid user!");
+    }
+    DBQueryFatal("update users set adminoff='$value' where uid='$target_uid'");
 }
-elseif ($type=="idle_ignore") {
-    # must be admin 
-    if (! ISADMIN() ) {
-	USERERROR("You do not have permission to toggle $type!", 1);
-    }
-    # require pid/eid
-    if (!isset($pid) || !isset($eid) ||
-	!TBValidExperiment($pid, $eid)) {
-	USERERROR("Experiment '$pid/$eid' is not valid!", 1);
-    }
-    
-    DBQueryFatal("update experiments set idle_ignore=$value ".
-		 "where pid='$pid' and eid='$eid'");
-
-#} elseif ($type=="foo") {
-# Add more here...
-#
-} else {
+else {
     USERERROR("Nobody has permission to toggle $type!", 1);
 }
     
