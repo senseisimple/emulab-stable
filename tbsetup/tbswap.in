@@ -1,0 +1,611 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+
+# tbswap
+
+sub usage()
+{
+    print STDERR "Usage: $0 { in | out } [-force] pid eid\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TBROOT         = "@prefix@";
+my $TESTMODE       = @TESTMODE@;
+my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
+
+# Untaint the path
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
+    ":$TBROOT/sbin:$TBROOT/bin";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+require exitonwarn; # exitonwarn isn't really a module, so just require it
+
+#
+# Actual swap-in and swap-out functions, defined below.
+#
+sub doSwapout();
+sub doSwapin();
+
+#
+# Turn off line buffering on output
+#
+
+$| = 1;
+
+my $force  = 0;
+my $errors = 0;
+my $retry  = 0;
+my $state;
+
+my $os_setup_pid;
+my $cleanvlans;
+
+#
+# First argument is either "in" or "out";
+# this value goes into $swapop.
+#
+
+my $swapop = shift;	
+
+if (($swapop ne "in") && ($swapop ne "out")) {
+    usage();
+}
+
+#
+# Get other arguments.
+#
+
+while ($#ARGV > 1) {
+    $arg = shift;
+    if ($arg eq "-force") {
+	$force = 1;
+    } else {
+	usage();
+    }
+}
+if ($#ARGV < 1) {
+    usage();
+}
+my ($pid,$eid) = @ARGV;
+
+TBDebugTimeStampsOn();
+
+#
+# Print starting message.
+#
+
+print "Beginning swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("tbswap $swapop started");
+
+#
+# Get experiment state; verify that experiment exists.
+#
+
+if (! ($state = ExpState($pid, $eid))) {
+    print STDERR "*** No such experiment $pid/$eid\n";
+    $errors = 1;
+}
+
+#
+# Figure out which state we're looking for 
+# and which state we're going to set according to the operation.
+#
+
+my $desiredState;
+my $nextState;
+my $suggestion;
+my $suggestUseOfForce;
+
+if ($swapop eq "in") {
+    $desiredState = EXPTSTATE_SWAPPED;
+    $nextState    = EXPTSTATE_ACTIVATING;
+    $suggestion   = "Must be swapped out.";
+    $suggestUseOfForce = 0;
+} else {
+    if (! $TESTMODE) {
+	$desiredState = EXPTSTATE_ACTIVE;
+	$suggestion   = "Must be running.";
+    } else {
+	$desiredState = EXPTSTATE_TESTING;
+	$suggestion   = "Must be in testing state.";
+    }
+    $nextState    = EXPTSTATE_SWAPPING;
+    $suggestUseOfForce = 1;
+}
+
+#
+# Check that experiment is in correct state.
+# If it is not, print appropriate error message.
+#
+
+if (! $errors) {
+    if ($state ne $desiredState) {
+	if (! $force) {
+	    if ($state eq EXPTSTATE_SWAPPED) {
+		print STDERR "*** Experiment is already swapped out. $suggestion\n";
+	    } elsif ($state eq EXPTSTATE_ACTIVE) {
+		print STDERR "*** Experiment is already running. $suggestion\n";
+	    } else {
+		print STDERR "*** Experiment is in the wrong state: $state. $suggestion\n";
+	    }
+	    if ($suggestUseOfForce) {
+		print STDERR "    Try using -force to ignore improper state.\n";
+	    }
+	    $errors = 1;
+	} else {
+	    print STDERR "*** WARNING: Ignoring improper state: $state.\n";
+	}
+    }
+}
+
+#
+# Set intermediate experiment state.
+#
+
+if (! $errors) {
+    if (! SetExpState($pid, $eid, $nextState)) {
+	print STDERR "*** Failed to set intermediate experiment state.\n";
+	$errors = 1;
+    }
+}
+
+#
+# Do actual swapping
+#
+
+unset $nextState;
+
+if (! $errors) {
+    if ($swapop eq "in") {
+	#
+	# Swap in
+	#
+
+	# 
+	# $retry flag gets set to 1 by doSwapin() if
+	# another attempt is appropriate.
+	#
+	$retry = 0;
+
+	$errors = doSwapin();
+
+	my $retries = 2;
+
+	#
+	# Attempt a retry if: 
+	#   a) there were errors, 
+	#   b) doswapin() indicated (via $retry) a retry is appropriate,
+	#   c) we haven't tried too many times already.
+	#
+	while ($errors && $retry && $retries) {
+	    $retries--;
+
+	    print STDERR "Cleaning up after errors; will try again.\n";
+	    #
+	    # Leave $retry == 1 for doSwapout(), so it only
+	    # deallocates failed nodes.
+	    #
+	    doSwapout();
+	    # XXX should errors during swapout affect retry mechanism?
+
+	    $retry = 0;
+	    print STDERR "Trying again...\n";
+	    $errors = doSwapin();
+	}
+	
+	if (! $errors) {
+	    #
+	    # Update Accounting Information
+	    #
+	    TBSetExpSwapTime($pid, $eid);
+
+	    #
+	    # Swapin worked; exp is now ACTIVE.
+	    #
+	    $nextState = EXPTSTATE_ACTIVE;
+	} else {	    
+	    print STDERR "Cleaning up after errors.\n";
+	    doSwapout();
+
+	    #
+	    # Regardless of how well cleanup swapout worked, 
+	    # send exp to SWAPPED.
+	    #
+	    $nextState = EXPTSTATE_SWAPPED; 
+	}
+    } else {
+	#
+	# Swap out
+	#
+	$errors = doSwapout();
+
+	#
+	# Update Accounting Information
+	#
+	TBSetExpSwapTime($pid, $eid);
+
+	if (! $errors) {
+	    # 
+	    # Swapout worked; send exp to SWAPPED.
+	    #
+	    $nextState = EXPTSTATE_SWAPPED:
+	} else {
+	    #
+	    # Swapout didn't fully work; leave exp in SWAPPING.
+	    #
+	    undef $nextState;
+	}
+    }
+}
+
+if (defined $nextState) {
+    if (! SetExpState($pid, $eid, $nextState)) {
+	print STDERR "*** Failed to set experiment state.\n";
+	#
+	# Don't obliterate a meaningful error code if this happens.
+	#
+	if (! $errors) { $errors = 1; }
+    }
+}
+
+#
+# Write appropriate message and exit.
+#
+
+if ($errors) {
+    print "Failingly finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
+    TBDebugTimeStamp("tbswap $swapop finished (failed)");
+} else {
+    print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
+    TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
+}
+
+exit($errors);
+
+#################################
+
+##
+# 
+# doSwapout - Swaps experiment out.
+#
+#             If the global $retry flag is 0,
+#             this function will free all nodes for the 
+#             experiment.
+#
+#             If the global $retry flag is 1,
+#             only nodes not in RES_READY will be freed.
+#
+#             Returns 0 on success, >0 on failure.
+#
+##
+
+sub doSwapout {
+    my $swapout_errors = 0;
+
+    #
+    # wait for os_setup;
+    # this only applies if called after a failed doswapin.
+    #
+    if ($os_setup_pid) {
+	print "Waiting for os_setup to finish\n";
+	waitpid($os_setup_pid, 0);
+	undef $os_setup_pid;
+    }
+    
+    if (! $TESTMODE) { 
+	if (! $DISABLE_EVENTS) {
+	    print "Stopping the event system\n";
+	    if (system("eventsys_control stop $pid $eid")) {
+		print STDERR "*** Failed to stop the event system.\n";
+		$swapout_errors = 1;
+	    }
+	}
+	
+	#
+	# If this is an actual swapout, always clean up VLANs
+	# Otherwise, only do it if swapin previously messed them up.
+	#
+	if ($swapop eq "out" || $cleanvlans) {
+	    TBDebugTimeStamp("snmpit started");
+	    print STDERR "Removing VLANs.\n";
+	    if (system("snmpit -r $pid $eid")) {
+		print STDERR "*** Failed to reset VLANs\n";
+		$swapout_errors = 1;
+	    } else {
+		$cleanvlans = 0;
+	    }
+	    TBDebugTimeStamp("snmpit finished");
+	}
+	
+	#
+	# This is a hack. We need a more general os_teardown, but for now
+	# we just kill off the vnode stuff. 
+	#
+	print "Tearing down virtual nodes.\n";
+	TBDebugTimeStamp("vnode_setup -k started");
+	if (system("vnode_setup -d -k $pid $eid")) {
+	    print STDERR "*** Failed to tear down vnodes.\n";
+	    $swapout_errors = 1;
+	}
+	TBDebugTimeStamp("vnode_setup finished");
+    }
+
+    if (! $retry) {
+	#
+	# We're not attempting a retry; 
+	# remove all nodes from the experiment.
+	#
+	print STDERR "Freeing nodes.\n";
+	TBDebugTimeStamp("nfree started");
+	if (system("nfree $pid $eid")) {
+	    print STDERR "*** Could not free nodes.\n";
+	    $swapout_errors = 1;
+	}
+	TBDebugTimeStamp("nfree finished");
+    } else {
+	#
+	# Since $retry == 1, we are preparing for an experiment retry.
+	# Therefore, don't deallocate nodes which have been successfully
+	# incorporated into the experiment (i.e., are RES_READY).
+	# Set these deallocated nodes to RES_FREE_DIRTY.
+	#
+
+	my @failedNodes = ();
+	print STDERR "Freeing failed nodes.\n";
+	$db_result =
+	    DBQueryFatal("select rv.node_id, n.allocstate ".
+                         "from reserved as rv ".
+			 "left join nodes as n on ".
+			 "n.node_id = rv.node_id ".
+			 "where rv.pid='$pid' and rv.eid='$eid'");
+
+	while (($node,$allocstate) = $db_result->fetchrow_array) {
+	    if ($allocstate ne TBDB_ALLOCSTATE_RES_READY()) {
+		push(@failedNodes, $node);
+	    }
+	}
+
+	if (@failedNodes > 0) {
+	    TBDebugTimeStamp("nfree started");
+	    if (system("nfree $pid $eid " . join(" ", @failedNodes))) {
+		print STDERR "*** Could not free nodes.\n";
+		$swapout_errors = 1;
+	    } else {
+		# set nodes as free in ALLOC state machine.
+		foreach my $i (@failedNodes) {
+		    TBSetNodeAllocState( $i, TBDB_ALLOCSTATE_FREE_DIRTY() );
+		}
+	    }
+	    TBDebugTimeStamp("nfree finished");
+	}
+    }
+
+    if (! $TESTMODE) {
+	#
+	# All of these errors are non-fatal on swapout. We find out about them
+	# via email sent from the individual scripts.
+	#
+
+	#
+	# Only reset mountpoints if this is an actual swapout, and
+	# not a failed swapin.
+	#
+	if ($swapop eq "out") {
+	    print "Resetting mountpoints.\n";
+	    TBDebugTimeStamp("exports started");
+	    if (system("exports_setup")) {
+		print STDERR "*** Failed to reset mountpoints.\n";
+	    }
+	    TBDebugTimeStamp("exports finished");
+	}
+	
+	print "Resetting named maps.\n";
+	TBDebugTimeStamp("named started");
+	if (system("named_setup")) {
+	    print "*** WARNING: Failed to reset named map.\n";
+	}
+	TBDebugTimeStamp("named finished");
+	
+	print "Resetting email lists.\n";
+	TBDebugTimeStamp("genelists started");
+	if (system("genelists")) {
+	    print "*** WARNING: Failed to reset email lists.\n";
+	}
+	TBDebugTimeStamp("genelists finished");
+    }
+
+    print STDERR "Resetting DB.\n";
+    DBQueryWarn("DELETE from delays  where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+    DBQueryWarn("DELETE from vlans   where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+    DBQueryWarn("DELETE from tunnels where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+    DBQueryWarn("DELETE from v2pmap  where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+    DBQueryWarn("DELETE from ipport_ranges where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+    DBQueryWarn("DELETE from linkdelays where pid='$pid' and eid='$eid'")
+	or $swapout_errors++;
+
+    return $swapout_errors;
+}
+
+##
+# 
+# doSwapin - Swaps experiment in.
+#
+#            Returns 0 on success, 1 on failure,
+#            assign_wrapper's exitcode if that failed.
+#
+#            Will set $retry = 1 if os_setup failed.
+#
+##
+
+sub doSwapin {
+    #
+    # assign_wrapper does all the virtual to physical mapping 
+    # and updating the DB state.
+    #
+    print "Mapping to physical reality ...\n";
+    TBDebugTimeStamp("assign_wrapper started");
+
+    my $exitcode;
+    if ($exitcode = system("assign_wrapper $pid $eid")) {
+	print STDERR "*** Failed to map to reality.\n";
+	# Pass exit code through
+	return $exitcode >> 8;
+    }
+    TBDebugTimeStamp("assign_wrapper finished");
+
+    print "Mapped to physical reality!\n";
+
+    # Exit here if we are testing.
+    if ($TESTMODE) {
+	print "Testing run - Stopping here.\n";
+	
+	if (! SetExpState($pid, $eid, EXPTSTATE_TESTING)) {
+	    print STDERR "*** Failed to set experiment state.\n";
+	    return 1;
+	}
+	return 0;
+    }
+
+    #
+    # These things need to get started before the nodes come up, so we'll
+    # do them before the os_setup. Everything else can done in parallel with
+    # os_setup. (Actually, these probably can too, since they should finish
+    # long before the nodes reboot, but better safe than sorry)
+    #
+    print "Setting up mountpoints.\n";
+    TBDebugTimeStamp("mountpoints started");
+    if (system("exports_setup")) {
+	print STDERR "*** Failed to setup mountpoints.\n";
+	return 1;
+    }
+    TBDebugTimeStamp("mountpoints finished");
+    
+    TBDebugTimeStamp("named started");
+    print "Setting up named maps.\n";
+    if (system("named_setup")) {
+	print STDERR "*** WARNING: Failed to add node names to named map.\n";
+	#
+	# This is a non-fatal error.
+	# 
+    }
+    TBDebugTimeStamp("named finished");
+    
+    #
+    # Since it'll take a while for the nodes to reboot, we'll start now, and
+    # wait for the os_setup to finish, down below
+    #
+    print "Resetting OS and rebooting.\n";
+    TBDebugTimeStamp("os_setup started");
+    if (!($os_setup_pid = fork())) { 
+	exec("os_setup $pid $eid") or return 1;
+    } elsif ($os_setup_pid == -1) {
+	print STDERR "*** Fork failed.\n";
+	return 1;
+    }
+    
+    #
+    # XXX: Don't add any steps between here and the waitpid() call below without
+    # verifying that 1) It's OK for nodes to come up before the step has
+    # completed and 2) It's OK for the command to run in parallel with os_setup
+    # (no DB dependencies, etc.)
+    #
+
+    print "Setting up VLANs.\n";
+    TBDebugTimeStamp("snmpit started");
+    if (system("snmpit -t $pid $eid")) {
+	print STDERR "*** Failed to set up VLANs.\n";
+	return 1;
+    }
+    TBDebugTimeStamp("snmpit finished");
+    
+    #
+    # An error now means that the VLANS need to be cleaned up.
+    #
+    $cleanvlans = 1;
+    
+    print "Setting up email lists.\n";
+    TBDebugTimeStamp("genelists started");
+    if (system("genelists")) {
+	print STDERR "*** WARNING: Failed to update email lists.\n";
+	#
+	# This is a non-fatal error.
+	# 
+    }
+    TBDebugTimeStamp("genelists finished");
+    
+    print "Clearing port counters.\n";
+    TBDebugTimeStamp("portstats started");
+    if (system("portstats -z -a -q $pid $eid")) {
+	print STDERR "*** WARNING: Failed to clear port counters.\n";
+	#
+	# This is a non-fatal error.
+	# 
+    }
+    TBDebugTimeStamp("portstats finished");
+    
+    #
+    # OK, let's see how that os_setup did
+    #
+    $kid = waitpid($os_setup_pid,0);
+    if ($kid == $os_setup_pid) {
+	undef $os_setup_pid; # Make sure doswapout() doesn't wait for it.
+	if ($CHILD_ERROR) {
+	    print STDERR "*** Failed to reset OS and reboot nodes.\n";
+	    #
+	    # Set global $retry flag to indicate to caller
+	    # that it may be beneficial to attempt
+	    # a doSwapin() again.
+	    #
+	    # Disabled for now, until appropriate changes
+	    # are made in assign_wrapper and os_setup.
+	    #
+
+	    # $retry = 1;
+
+	    return 1;
+	}
+    } else {
+	undef $os_setup_pid;
+	print STDERR "*** Error waiting for os_setup to finish.\n";
+	return 1;
+    }
+    TBDebugTimeStamp("os_setup finished");
+    
+    #
+    # Okay, start the event system now that we know all the nodes have
+    # rebooted (os_setup is done). This only takes a moment (puts itself
+    # in the background), so its not enough of a delay to worry about.
+    # 
+    if (! $DISABLE_EVENTS) {
+	print "Starting the event system.\n";
+	TBDebugTimeStamp("eventsys_control started");
+	if (system("eventsys_control start $pid $eid")) {
+	    print STDERR "*** Failed to start the event system.\n";
+	    return 1;
+	}
+	TBDebugTimeStamp("eventsys_control finished");
+    }
+    
+    return 0;
+}
+
