@@ -5,6 +5,12 @@
 # All rights reserved.
 #
 
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+fi
+
 disk="ad0"
 
 case $# in
@@ -20,12 +26,9 @@ case $# in
 	exit 1
 esac
 
-ptype=`fdisk -$part | grep sysid | sed 's/.*sysid \([0-9][0-9]*\),.*/\1/'`
-ptype=${ptype:-0}
-
 dofreebsd() {
 	# see if there is a root ('a') partition on this BSD slice
-	`disklabel ${disk}s${part} 2>1 | grep -s -E '^[ ]+a:' >/dev/null` || {
+	`disklabel ${disk}s${part} 2>&1 | grep -s -E '^[ ]+a:' >/dev/null` || {
 		return 1
 	}
 
@@ -39,12 +42,12 @@ dofreebsd() {
 		echo "Mount of $rootdev failed"
 		return 1
 	}
-	sed -i .orig -e "s/${disk}s./${disk}s${part}/" /mnt/etc/fstab || {
+	sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	}
-	sed -i .orig -e "s/${disk}s./${disk}s${part}/" /mnt/etc/dumpdates || {
+	sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
 		return 1
@@ -55,18 +58,53 @@ dofreebsd() {
 
 dolinux() {
 	# need to update fstab, lilo.conf
+	echo "do not do linux yet"
+	return 0
 }
 
-case $ptype in
-165)
+fixone() {
+    echo "*** ${disk}s${part}:"
+    ptype=`fdisk -${part} ${disk} | grep sysid | sed 's/.*sysid \([0-9][0-9]*\),.*/\1/'`
+    ptype=${ptype:-0}
+
+    case $ptype in
+    165)
 	dofreebsd
-	exit $?
+	return $?
 	;;
-0)
+    131)
+	dolinux
+	return $?
 	;;
-*)
+    0)
+	echo "unused"
+	;;
+    *)
 	echo "ignoring partition type $ptype"
 	;;
+    esac
+    return 0
+}
+
+case $part in
+0)
+    part=1; fixone
+    part=2; fixone
+    part=3; fixone
+    part=4; fixone
+
+    # for the CD boot, we need to intialize the magic boot block
+    if [ -e /cdrom.inf -a -x $BINDIR/tbbootconfig ]; then
+	$BINDIR/tbbootconfig -f -c 1 -k 0 -m 1 /dev/${disk}
+    fi
+    ;;
+1|2|3|4)
+    fixone
+    ;;
+*)
+    echo "bad partition: $part"
+    false
+    ;;
 esac
 
-exit 0
+exit $?

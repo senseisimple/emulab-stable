@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -160,7 +160,7 @@ main(argc, argv)
 	if (bootfromdisk != -1)
 		tbboot_hdr.bootfromdisk  = bootfromdisk;
 	if (validimage != -1)
-		tbboot_hdr.validimage    = bootfromdisk;
+		tbboot_hdr.validimage    = validimage;
 
 	if (emulabkey) {
 		if (strlen(emulabkey) > TBBOOT_MAXKEYLEN - 1) {
@@ -214,6 +214,7 @@ readhdr(int devfd, tbboot_t *tbhdr)
 		warnx("Bad magic number in header!");
 		if (! force)
 			exit(1);
+		bzero(tbhdr, sizeof(*tbhdr));
 		tbhdr->magic1  = TBBOOT_MAGIC1;
 		tbhdr->magic2  = TBBOOT_MAGIC2;
 		tbhdr->version = TBBOOT_VERSION;

@@ -42,7 +42,7 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
 
-client-install: 
+client-install: link-agent
 	$(INSTALL_PROGRAM) link-agent \
 			$(DESTDIR)$(CLIENT_BINDIR)/link-agent
 

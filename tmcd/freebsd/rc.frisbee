@@ -19,7 +19,7 @@ LOADINFO=`$BINDIR/tmcc loadinfo`
 
 # For testing purposes.
 #BOSSINFO='boss.emulab.net 155.101.128.70'
-#LOADINFO='ADDR=234.5.6.69:4444 PART=0'	# for testing
+#LOADINFO='ADDR=234.5.6.69:4444'
 
 BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
 
@@ -32,11 +32,12 @@ fi
 
 ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
 PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }' | awk -F' ' '{ print $1 }'`
+PARTITION=${PARTITION:-'0'}
 PARTOS=`echo $LOADINFO | awk -F= '{ printf $4 }' | awk -F' ' '{ print $1 }'`
 DISK=`echo $LOADINFO | awk -F= '{ printf $5 }' | awk -F' ' '{ print $1 }'`
 DISK=${DISK:-'ad0'}
 
-if [ x"$PARTITION" != x -a "$PARTITION" != "0" ]; then
+if [ "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION";
 	case $PARTOS in
 	FreeBSD)
@@ -103,16 +104,13 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Frisbee run finished";
 		echo "Resizing final disk partition";
 		$BINDIR/growdisk -vW /dev/$DISK;
-		if [ x"$PTYPE" != x -a -x $BINDIR/slicefix ]; then
+		#
+		# XXX limit the use of slicefix for now to just
+		# those machines with "ad4" as their root disk
+		#
+		if [ -x $BINDIR/slicefix -a "$DISK" = "ad4" ]; then
 			echo "Adjusting slice-related files";
-			if [ x"$SLICE" != x ]; then
-				$BINDIR/slicefix $PARTITION $DISK
-			else
-				$BINDIR/slicefix 1 $DISK
-				$BINDIR/slicefix 2 $DISK
-				$BINDIR/slicefix 3 $DISK
-				$BINDIR/slicefix 4 $DISK
-			fi
+			$BINDIR/slicefix $PARTITION $DISK
 		fi
 		echo "Image load complete, rebooting ...";
 		$BINDIR/tmcc state RELOADDONE;
