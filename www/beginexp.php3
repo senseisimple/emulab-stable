@@ -331,9 +331,7 @@ function SPITFORM($formfields, $errors)
 	}
 
     echo ">\n";
-    echo "Preload Experiment &nbsp;
-          <font size='-1'>(Create experiment but don't swap it in now)
-          </font></td>
+    echo "Do Not Swap In</td>
           </tr>\n";
 
     echo "<tr>
