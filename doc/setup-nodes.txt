@@ -186,8 +186,8 @@ detected correctly, just select them all, and use the 'set type' button.
 ##### Figuring out interfaces
 
 If you found earlier that the FreeBSD and Linux ordering for interfaces was
-different, we'll fix that up now. Use the boxes right about the 'Re-number
-interfaces' to do this. Just leave blank any interface numbers your nodes don't
+different, we'll fix that up now.  Use the boxes right above the 'Re-number
+interfaces' button to do this. Just leave blank any interface numbers your nodes don't
 have. For example, if you have two interfaces, and what FreeBSD detects as eth0
 is eth1 under Linux, and vice versa for eth1, you'd enter '1' and '0' in the
 first two boxes. Select all nodes, and hit the 're-number' button. Once you've
