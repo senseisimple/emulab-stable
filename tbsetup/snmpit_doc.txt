@@ -1,0 +1,38 @@
+Documentation for snmpit 
+------------------------
+
+snmpit uses modules that implement the interface to a given switch
+model. These modules should support these actions:
+
+new(ip,args)	Initializes snmp session to IP, "arg=val" sets
+		module parameters, ignoring unsupported ones
+portControl(cmd,ports)
+		cmd = {enable, disable, 10mbit, 100mbit, full, half, auto}
+		ports = list of "pcX:Y"
+showPorts	print settings of all ports
+getStats	print various stats
+vlanLock	Get a vlan editing lock/token/buffer, and
+vlanUnlock	Release it when done
+setupVlan	(name,ports) - takes a list of ports, and vlans them
+removeVlan	(vlan) - takes vlan number
+listVlans	returns a list of entries, with each entry having an
+		ID, a name, and a list of members (pcX:Y)
+
+Notes:
+showPorts and getStats currently print their results directly. This
+makes sense, since the output could be quite different for different
+switch types. This also prevents snmpit itself from using these
+functions to determine certain things about the state. In the future,
+it would be good to have them return data structures, like listVlans
+does, and have snmpit be able to use this info.
+
+Supported in snmpit:	autovlanconfig from file, db
+			Power control
+			printing list of vlans
+			device type discovery
+
+snmpit library interface
+------------------------
+macport(pcX:Y || MAC)	return MAC || pcX:Y address respectively
+portnum(pcX:Y)		return node:port (or node:mod.port)
+NodeCheck(node)		return true (1) if okay, false (0) if it failed
