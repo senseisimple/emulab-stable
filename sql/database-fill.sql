@@ -57,6 +57,54 @@ REPLACE INTO comments VALUES ('foreign_keys',NULL,'foreign key constraints for u
 REPLACE INTO comments VALUES ('nseconfigs',NULL,'Table for storing NSE configurations');
 REPLACE INTO comments VALUES ('widearea_delays',NULL,'Delay and bandwidth metrics between WAN nodes');
 REPLACE INTO comments VALUES ('virt_nodes',NULL,'Experiment virtual nodes');
+REPLACE INTO comments VALUES ('users',NULL,'testbed user accounts');
+REPLACE INTO comments VALUES ('experiments',NULL,'user experiments');
+REPLACE INTO comments VALUES ('images',NULL,'available disk images');
+REPLACE INTO comments VALUES ('current_reloads',NULL,'currently pending disk reloads');
+REPLACE INTO comments VALUES ('delays',NULL,'delay nodes');
+REPLACE INTO comments VALUES ('loginmessage',NULL,'appears under login button in web interface');
+REPLACE INTO comments VALUES ('nodes',NULL,'hardware, software, and status of testbed machines');
+REPLACE INTO comments VALUES ('projects',NULL,'projects using the testbed');
+REPLACE INTO comments VALUES ('partitions',NULL,'loaded operating systems on node partitions');
+REPLACE INTO comments VALUES ('os_info',NULL,'available operating system features and information');
+REPLACE INTO comments VALUES ('reserved',NULL,'node reservation');
+REPLACE INTO comments VALUES ('wires',NULL,'physical wire types and connections');
+REPLACE INTO comments VALUES ('nologins',NULL,'presence of a row will disallow non-admin web logins');
+REPLACE INTO comments VALUES ('nsfiles',NULL,'NS simulator files used to configure experiments');
+REPLACE INTO comments VALUES ('tiplines',NULL,'serial control \'TIP\' lines');
+REPLACE INTO comments VALUES ('proj_memb',NULL,'project membership');
+REPLACE INTO comments VALUES ('group_membership',NULL,'group membership');
+REPLACE INTO comments VALUES ('node_types',NULL,'specifications regarding types of node hardware available');
+REPLACE INTO comments VALUES ('last_reservation',NULL,'the last project to have reserved listed nodes');
+REPLACE INTO comments VALUES ('groups',NULL,'groups information');
+REPLACE INTO comments VALUES ('vlans',NULL,'configured router VLANs');
+REPLACE INTO comments VALUES ('tipservers',NULL,'machines driving serial control \'TIP\' lines');
+REPLACE INTO comments VALUES ('uidnodelastlogin',NULL,'last node logged into by users');
+REPLACE INTO comments VALUES ('nodeuidlastlogin',NULL,'last user logged in to nodes');
+REPLACE INTO comments VALUES ('scheduled_reloads',NULL,'pending disk reloads');
+REPLACE INTO comments VALUES ('tmcd_redirect',NULL,'used to redirect node configuration client (TMCC) to \'fake\' database for testing purposes');
+REPLACE INTO comments VALUES ('deltas',NULL,'user filesystem deltas');
+REPLACE INTO comments VALUES ('delta_compat',NULL,'delta/OS compatibilities');
+REPLACE INTO comments VALUES ('delta_inst',NULL,'nodes on which listed deltas are installed');
+REPLACE INTO comments VALUES ('delta_proj',NULL,'projects which own listed deltas');
+REPLACE INTO comments VALUES ('next_reserve',NULL,'scheduled reservations (e.g. by sched_reserve)');
+REPLACE INTO comments VALUES ('outlets',NULL,'power controller and outlet connections for nodes');
+REPLACE INTO comments VALUES ('exppid_access',NULL,'allows access to one project\'s experiment by another project');
+REPLACE INTO comments VALUES ('lastlogin',NULL,'list of recently logged in web interface users');
+REPLACE INTO comments VALUES ('switch_stacks',NULL,'switch stack membership');
+REPLACE INTO comments VALUES ('switch_stack_types',NULL,'types of each switch stack');
+REPLACE INTO comments VALUES ('nodelog',NULL,'log entries for nodes');
+REPLACE INTO comments VALUES ('unixgroup_membership',NULL,'Unix group memberships for control (non-experiment) nodes');
+REPLACE INTO comments VALUES ('interface_types',NULL,'network interface types');
+REPLACE INTO comments VALUES ('login',NULL,'currently active web logins');
+REPLACE INTO comments VALUES ('portmap',NULL,'provides consistency of ports across swaps');
+REPLACE INTO comments VALUES ('webdb_table_permissions',NULL,'table access permissions for WebDB interface ');
+REPLACE INTO comments VALUES ('comments',NULL,'database table and row descriptions (such as this)');
+REPLACE INTO comments VALUES ('interfaces',NULL,'node network interfaces');
+REPLACE INTO comments VALUES ('foreign_keys',NULL,'foreign key constraints for use by the dbcheck script');
+REPLACE INTO comments VALUES ('nseconfigs',NULL,'Table for storing NSE configurations');
+REPLACE INTO comments VALUES ('widearea_delays',NULL,'Delay and bandwidth metrics between WAN nodes');
+REPLACE INTO comments VALUES ('virt_nodes',NULL,'Experiment virtual nodes');
 
 #
 # Dumping data for table 'event_eventtypes'
@@ -192,8 +240,12 @@ REPLACE INTO state_transitions VALUES ('NODEALLOC','REBOOT','FREE_DIRTY');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD','FREE_CLEAN');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','REBOOT');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','RELOAD');
+REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','ISUP');
+REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTED');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTING');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','ISUP');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','REBOOTED');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','ISUP');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTED');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING');
 REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','TBSETUP');
@@ -209,15 +261,6 @@ REPLACE INTO state_transitions VALUES ('USERSTATUS','ACTIVE','FROZEN');
 REPLACE INTO state_transitions VALUES ('USERSTATUS','FROZEN','ACTIVE');
 REPLACE INTO state_transitions VALUES ('USERSTATUS','NEWUSER','UNAPPROVED');
 REPLACE INTO state_transitions VALUES ('USERSTATUS','UNAPPROVED','ACTIVE');
-
-#
-# Dumping data for table 'mode_transitions'
-#
-
-REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv1','SHUTDOWN');
 
 #
 # Dumping data for table 'testsuite_preentables'
@@ -248,12 +291,14 @@ REPLACE INTO testsuite_preentables VALUES ('groups','prune');
 
 REPLACE INTO webdb_table_permissions VALUES ('comments',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('foreign_keys',1,1,1);
+REPLACE INTO webdb_table_permissions VALUES ('images',1,0,1);
 REPLACE INTO webdb_table_permissions VALUES ('interfaces',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('interface_types',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('lastlogin',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('nodes',1,1,0);
 REPLACE INTO webdb_table_permissions VALUES ('node_types',1,1,0);
 REPLACE INTO webdb_table_permissions VALUES ('tiplines',1,1,1);
+REPLACE INTO webdb_table_permissions VALUES ('os_info',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('projects',1,1,0);
-
+REPLACE INTO webdb_table_permissions VALUES ('osidtoimageid',1,0,1);
 
