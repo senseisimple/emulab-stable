@@ -16,13 +16,17 @@
   </li>
 </ol>
 <h3><a name="intro"></a>Introduction</h3>
-We have wrapped HyperViewer in a wxGlade Python graphical user
-interface, and connected it to the Emulab database via XML-RPC to read
+This is a client program which runs on your computer, and shows a 3D
+view of the
 network
-topologies.<br>
+topologies for Emulab experiments.&nbsp; In detail, we have wrapped the
+HyperViewer in a wxGlade Python graphical user
+interface, and connected it to the Emulab database via XML-RPC over SSH.<br>
 <br>
 The <a href="http://graphics.stanford.edu/papers/h3cga/">HyperViewer</a>
-software was developed by Tamara Munzner at Stanford.&nbsp; It is
+software was developed by <a
+ href="http://graphics.stanford.edu/%7Emunzner">Tamara Munzner at
+Stanford</a>.&nbsp; It is
 useful for
 visualizing relationships within large graphs such as network
 topologies, and is freely distributed as a <a
@@ -50,44 +54,70 @@ tilings</a>.<br>
  style="border: 2px solid ; width: 106px; height: 106px;" alt=""
  title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
 <h3><a name="install"></a>Installing hypview</h3>
-Getting and unpacking the tarball:<br>
+Getting and unpacking the binary tarball:<br>
 <ul>
-  <li>It's in ~fish/flux/testbed/hyperviewer/hyperviewer.tgz on BAS for
+  <li>Note: There are .so compatibility problems with .so shared
+libraries used by wxPython, which we are working on.&nbsp; Meanwhile,
+as this is Very Alpha Software now, your best bet is to jump to the
+next section on building from sources.<br>
+  </li>
+  <li>The binary tarball is in
+~fish/flux/testbed/hyperviewer/hyperviewer.tgz on BAS for
 now.</li>
   <li>There is a top-level hyperviewer directory in the tarball, so
 just unpack with:<br>
   </li>
 </ul>
 <div style="margin-left: 80px;">
-<pre><big>tar xvzf ~fish/flux/testbed/hyperviewer/hyperviewer.tgz</big><br></pre>
+<pre><big>tar xvzf ~fish/flux/testbed/hyperviewer/hyperviewer.tgz<br><br></big></pre>
 </div>
+Building from sources - This avoids shared library compatibility
+problems, but requires that you have wxPython and its dependencies
+installed on your machine first.<br>
 <ul>
-  <li>There are a couple of example files included:</li>
+  <li>To build the hypviewer C++ library and the _hv.so that is loaded
+into Python:</li>
+</ul>
+<pre style="margin-left: 80px;"><big>cd testbed/hyperviewer<br>gmake -f GNUMakefile</big></pre>
+<ul>
+  <li>See
+the ROADMAP file if you want to know more about internals.</li>
+</ul>
+There are a couple of example files included:
+<ul>
 </ul>
 <div style="margin-left: 80px;">
-<pre><big>cd hyperviewer<br>./hypview.py BigLan.hyp</big>
-<br></pre>
+<pre><big>cd testbed/hyperviewer<br>./hypview.py BigLan.hyp</big><big><br>./hypview.py ts600.hyp</big>
+</pre>
 </div>
 Supported platforms:<br>
 <ul>
-  <li>FreeBSD</li>
+  <li>FreeBSD - The first target.<br>
+  </li>
   <ul>
-    <li>Run it on the old machines and ignore the Radeon text bug for
-now.</li>
-    <li>Building it on the new machines has revealed a bug:
-glPolygonOffsetEXT is missing.</li>
-    <li>If you want to rebuild, checkout testbed/hyperviewer and see
-the ROADMAP.</li>
+    <li>There is a bug in the Radeon DRI driver which "tatters" bitmap
+text.</li>
+    <li>There are different problems in the nVidia drivers.</li>
+    <li>Turning off hardware acceleration of OpenGL rendering is ugly
+but works.</li>
   </ul>
 </ul>
-<pre style="margin-left: 80px;"><big>cvs co testbed/hyperviewer</big><big><br>cd testbed/hyperviewer<br>gmake -f GNUMakefile</big></pre>
 <ul>
-  <li>Linux and Windows as needed later.<br>
+  <li>Linux - Pretty much untested.</li>
+  <ul>
+    <li>Edit the GNUMakefile to select CPU=linux before building,</li>
+    <li>and also select the include of Makefile.linuxglut in
+hypviewer/Makefile.main .<br>
+    </li>
+  </ul>
+  <li>Windows - Coming soon.</li>
+  <li>Please send problem reports to <a href="mailto:fish@cs.utah.edu">Russ
+Fish</a>.<br>
   </li>
 </ul>
 Package dependencies: <br>
 <div style="margin-left: 40px;">It needs wxPython, gtk, glX,
-OpenGL...&nbsp; and wxGlade on top if you want to modify the GUI.<br>
+OpenGL...; and wxGlade on top if you want to modify the GUI.<br>
 </div>
 <h3><a name="run"></a>Running hypview as a script<br>
 </h3>
