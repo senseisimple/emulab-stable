@@ -14,6 +14,9 @@
 #
 ############################################################
 
+# useful values are 0, 1, 2 and 3
+my $verbose = 0;
+
 #
 # Configure variables
 #
@@ -66,20 +69,27 @@ foreach my $n (0..$#ARGV) {
   $machines[$n]= "\L$machines[$n]"; #Lowercase everything...
 }
 #print out args
-#print "do \"$op\" to ",@machines,"\n";
+print "do \"$op\" to ",@machines,"\n" if $verbose > 1;
 
 use Mysql;
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
+print "Looking up node->(powerIP,outlet) mappings...\n" if $verbose;
 $sth = $dbh->query("select o.node_id,i.IP,o.outlet from ".
 		   "outlets as o left join interfaces as i ".
 		   "on o.power_id = i.node_id");
 while ( @_ = $sth->fetchrow_array()) {
-  #print "Got '",join("\t",@_),"\n";
   $IPList{$_[0]}= $_[1];
   $OutletList{$_[0]}= '-'.$_[2];
+}
+
+if ($verbose > 2) {
+  print "Displaying node -> (powerIP, outlet) map...\n";
+  foreach $item (sort keys(%IPList)) {
+    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
+  }
 }
 
 #
@@ -103,70 +113,85 @@ if ($user ne "root") {
       "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
 	join(" or ",@conds).") and uid='$user';";
 
+  print "Checking authorization for '$user': '$cmd'\n" if $verbose;
   $sth = $dbh->query($cmd)
     || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-  #print "$cmd\n";
   while ( @_ = $sth->fetchrow_array()) {
-    #print "Got '",join("'\t'",@_),"'\n";
+    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
     my $node = "\L$_[1]";
+    $node =~ s/(sh\d+)-\d/$1/;
+    push(@OkNodes, "$node");
+  }
+} else {
+  my $cmd = 
+    "select node_id from nodes where ".join(" or ",@conds);
+  print "Root user authorized. Getting node list: '$cmd'\n" if $verbose;
+  $sth = $dbh->query($cmd)
+    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+  while ( @_ = $sth->fetchrow_array()) {
+    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
+    my $node = "\L$_[0]";
     $node =~ s/(sh\d+)-\d/$1/;
     push(@OkNodes, "$node");
   }
 }
 
-@conds = ();
-foreach $node (@OkNodes) {
-  push(@conds,"\Lo.node_id='$node'");
-}
-
-@OkNodes = ();
 my %timelimited = ();
 
-my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
-  "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
-  "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
-  "on n.type=t.type where ".join(" or ",@conds);
+if (@OkNodes > 0) {
+  @conds = ();
+  foreach $node (@OkNodes) {
+    push(@conds,"\Lo.node_id='$node'");
+  }
 
-#print "Checking times: '$cmd'\n";
-$sth = $dbh->query($cmd)
-  || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-while ( @_ = $sth->fetchrow_array()) {
-  #print "Got '",join("'\t'",@_),"'\n";
-  my $node = "\L$_[0]";
-  $node =~ s/(sh\d+)-\d/$1/;
-  if ($_[1] <= 0) {
-    $timelimited{$node} = $_[2];
-  } else {
-    push(@OkNodes, "$node");
+  @OkNodes = ();
+
+  my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
+    "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
+      "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
+	"on n.type=t.type where ".join(" or ",@conds);
+
+  print "Checking times: '$cmd'\n" if $verbose;
+  $sth = $dbh->query($cmd)
+    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+  while ( @_ = $sth->fetchrow_array()) {
+    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
+    my $node = "\L$_[0]";
+    $node =~ s/(sh\d+)-\d/$1/;
+    if ($_[1] <= 0) {
+      $timelimited{$node} = $_[2];
+    } else {
+      push(@OkNodes, "$node");
+    }
+  }
+}
+
+if ($verbose) {
+  foreach $node (sort keys %timelimited) {
+    print "TIME_LIMITED: $node = $timelimited{$node}\n";
   }
 }
 
 if (@OkNodes > 0) {
   @conds = map {"\Lnode_id='$_'"} @OkNodes;
   $cmd = "update outlets set last_power = NULL where ".join(" or ",@conds);
-  #print "Updating times: '$cmd'\n";
+  print "Updating times: '$cmd'\n" if $verbose;
   $sth = $dbh->query($cmd)
     || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
 }
 
 push (@OkNodes,"lights");
 
-#foreach $item (sort keys(%IPList)) {
-#    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
-#}
-
-#foreach $node (keys %timelimited) {
-#  print "TIME_LIMITED: $node = $timelimited{$node}\n";
-#}
-
 foreach $node ( sort @machines) {
   my $Approved = 0;
   foreach $ok (sort @OkNodes) {
+    print "Checking $node == $ok\n" if $verbose > 1;
     if ($node eq $ok) {
+      print "Approved $node.\n" if $verbose > 1;
       $Approved = 1;
     }
   }
-  if (!$Approved && ($user ne "root")) {
+  if (!$Approved) {
     if ($node =~ /(sh\d+)-\d/) {
       print "$node: Sharks are controlled by shelf only. Use '$1'.\n"; 
       $exitval++;
@@ -185,7 +210,7 @@ foreach $node ( sort @machines) {
     } else {
       my $cmd=join(" ",
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
-      #print "calling $cmd\n";
+      print "Calling snmptit: '$cmd'\n" if $verbose > 1;
       open(OUT,$cmd." |");
       while (<OUT>) {
 	if (/was outlet([OnfRebot]+)/) {
