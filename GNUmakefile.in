@@ -12,11 +12,19 @@ include Makeconf
 SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd www tip capture
 
 all:		all-subdirs
-install:	install-subdirs
+
+install:	install-subdirs install-mkdirs
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
+
 post-install:
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C security post-install
+
+install-mkdirs:
+	-mkdir -p $(INSTALL_TOPDIR)/locks
+	-mkdir -p $(INSTALL_TOPDIR)/log
+	-mkdir -p $(INSTALL_TOPDIR)/lists
+
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 	rm -f Makeconf GNUmakefile config.status config.cache config.log
@@ -31,7 +39,7 @@ distclean:	distclean-subdirs
 # By default, make any target by descending into subdirectories.
 %: %-subdirs ;
 
-.PHONY: post-install
+.PHONY: post-install install-mkdirs
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:
