@@ -121,7 +121,7 @@ else {
 #
 my $pc601hack_only = "a.type='pc601' and";
 my $pc601hack_none = "a.type!='pc601' and";
-my $pcvmhack       = "(a.type!='pcvm600' and a.type!='pcvm850') and ";
+my $pcvmhack       = "(t.class!='pcvm') and ";
 
 # the ordinary free condition for a node
 my $free_condition = "(b.node_id is null)";
@@ -129,7 +129,8 @@ my $free_condition = "(b.node_id is null)";
 # if the user has specified an exempt pid/eid, 
 # then view any node which is reserved to that experiment as available.
 if (defined($exempt_eid)) {
-    $free_condition = "($free_condition or (b.pid='$exempt_pid' and b.eid='$exempt_eid'))"; 
+    $free_condition = "($free_condition or ".
+	"(b.pid='$exempt_pid' and b.eid='$exempt_eid'))"; 
 }
 
 $result =
@@ -137,7 +138,7 @@ $result =
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as n on a.phys_nodeid=n.node_id ".
-#		  "where b.node_id is null and $pcvmhack ".
+		 "left join node_types as t on t.type=a.type ".
 		 "where $free_condition and $pcvmhack ".
 		 "      $pc601hack_none ".
 		 "      (a.role='testnode' or ".
@@ -179,6 +180,10 @@ foreach $node (keys(%nodes)) {
 ### then it is a local node and therefore we can support sim nodes
 #################################################################################
             $text .= " sim:100000";
+	    #
+	    # Ditto for jailed nodes
+	    #
+            $text .= " pcvm:10";
 	}
 	print "$text\n";
     }
