@@ -126,12 +126,15 @@ foreach (split("\n",$raw)) {
 	push(@$nodes_tmp,$_);
     }
     $links_tmp = [];
-    foreach (split(" ",$links_raw)) {
+    if (defined $links_raw) {
+      foreach (split(" ",$links_raw)) {
 	push(@$links_tmp,$_);
+      }
     }
     $delay =~ s/[mM][sS]$//;
     $bw =~ s/[mM][bB]$//;
-    printdb "lans{$lan} = [$nodes_raw,$bw,$delay,$loss,$links_raw]\n";
+    printdb "lans{$lan} = [$nodes_raw,$bw,$delay,$loss".
+      (defined $links_raw ? ",$links_raw" : "")."]\n";
     $lans{$lan} = [$nodes_tmp,$bw,$delay,$loss,$links_tmp];
 }
 
