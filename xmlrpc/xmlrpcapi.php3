@@ -140,9 +140,9 @@ Dictionary) of the form:
 </blockquote>
 
 <ul>
-<li><b>/XMLRPC/experiments</b>
+<li><b>/XMLRPC/experiment</b>
 <p>
-The <tt>experiments</tt> module lets you start, control, and terminate
+The <tt>experiment</tt> module lets you start, control, and terminate
 experiments.
 
   <ul>
@@ -415,7 +415,234 @@ experiments.
    </tr>
   </table>
   
+  <br>
+  <li><tt><b>nscheck</b></tt>: Check an NS file for obvious parser errors.
+  The return code is <tt>RESPONSE_SUCCESS</tt> or <tt>RESPONSE_ERROR</tt>.
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>nsfilestr</tt></td>
+    <td>string</td>
+    <td> A string representing the NS file to use, with embedded newlines,
+         <b>or</b>,</td>
+  </tr>
+  <tr>
+    <td><tt>nsfilepath</tt></td>
+    <td>string</td>
+    <td>The pathname of a NS file on the Emulab file
+         server, within the project directory<br>
+	 (example: /proj/mypid/foo.ns)</td>
+  </tr>
+  </table>
+
+  <br>
+  <li><tt><b>delay_config</b></tt>: Change the link characteristics for a
+  delayed link or lan. Note that the link/lan <b>must</b> already be
+  delayed; you cannot convert a non-delayed link into a delayed link. When
+  operating on a delayed lan, all nodes (links to the nodes) in the lan
+  will be changed.
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>pid</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>eid</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>link</tt></td>
+    <td>string</td>
+    <td>The name of the link or lan to change; see your NS file</td>
+  </tr>
+  <tr>
+    <td><tt>params</tt></td>
+    <td>Dictionary</td>
+    <td>A hashed array (Dictionary) of parameters to change; see below</td>
+  </tr>
+  </table>
+  
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <td>name</td><td>type</td><td>default</td><td>description</td>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>persist</tt></td>
+    <td>boolean</td>
+    <td>false</td>
+    <td>If true, the base experiment is changed in the Emulab Database;
+    changes will persist across swapin and swapout. By default, just the
+    physical experiment is changed, and changes are lost at swapout</td>
+   </tr>
+   <tr>
+    <td><tt>src</tt></td>
+    <td>string</td>
+    <td>&nbsp</td>
+    <td>If specified, change a duplex link asymmetrically; just the link from
+    the node specifed will be changed. <em>This option is ignored on lans; the
+    entire lan must be changed</em></td>
+   </tr>
+  </table>
+
+  <br>
+  In addition to the required arguments, you must also supply at least
+  one parameter to change in the <tt>params</tt> argument. The reader is
+  encouraged to read the <tt>ipfw</tt> and <tt>dummynet</tt> man pages on
+  <tt>users.emulab.net</tt>. It is important to note that Emulab supports a
+  smaller set of tunable parameters then NS does; please read the
+  aforementioned manual pages:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <td>name</td><td>type</td><td>range</td><td>description</td>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>bandwidth</tt></td>
+    <td>integer</td>
+    <td>10-100000</td>
+    <td>Bandwidth in <b>Kbits</b>/second</td>
+   </tr>
+   <tr>
+    <td><tt>plr</tt></td>
+    <td>number</td>
+    <td>0 &lt;= plr &lt 1</td>
+    <td>Packet Loss Rate as a number between 0 and 1</td>
+   </tr>
+   <tr>
+    <td><tt>delay</tt></td>
+    <td>integer</td>
+    <td>&gt 0</td>
+    <td>Delay in milliseconds</td>
+   </tr>
+   <tr>
+    <td><tt>limit</tt></td>
+    <td>integer</td>
+    <td>&nbsp</td>
+    <td>Queue size in bytes or packets. Default is 50 ethernet sized packets</td>
+   </tr>
+   <tr>
+    <td><tt>queue-in-bytes</tt></td>
+    <td>integer</td>
+    <td>0,1</td>
+    <td>Limit is expressed in bytes or packets (slots); default is packets</td>
+   </tr>
+   <tr></tr>
+   <td colspan=4 align=center>These are valid for RED/GRED links only</td>
+   <tr></tr>
+   <tr>
+    <td><tt>maxthresh</tt></td>
+    <td>integer</td>
+    <td>&nbsp</td>
+    <td>Maximum threshold for the average queue size</td>
+   </tr>
+   <tr>
+    <td><tt>thresh</tt></td>
+    <td>integer</td>
+    <td>&nbsp</td>
+    <td>Minimum threshold for the average queue size</td>
+   </tr>
+   <tr>
+    <td><tt>linterm</tt></td>
+    <td>integer</td>
+    <td>&gt 0</td>
+    <td>Packet dropping probability expressed as an integer (1/linterm)</td>
+   </tr>
+   <tr>
+    <td><tt>q_weight</tt></td>
+    <td>number</td>
+    <td>0 &lt;= plr &lt 1</td>
+    <td>For calculating average queue size</td>
+   </tr>
+  </table>
+
+  <br>
+  <li><tt><b>reboot</b></tt>: Reboot all nodes in an experiment.
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>pid</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>eid</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  </table>
+  
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <td>name</td><td>type</td><td>default</td><td>description</td>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>wait</tt></td>
+    <td>boolean</td>
+    <td>false</td>
+    <td>If true, wait synchronously for all nodes to complete their reboot</td>
+   </tr>
+  </table>
+  
+  
   </ul>
+
+<br>
+<li><b>/XMLRPC/node</b>
+<p>
+The <tt>node</tt> module lets you control nodes in your experiments.
+  <ul>
+   <li><tt><b>reboot</b></tt>: Reboot nodes. The caller must have
+   permission to reboot all of the nodes in the list, or the entire request
+   fails. The required arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>nodes</tt></td>
+      <td>string</td>
+      <td>A comma separated list of nodes to reboot</td>
+     </tr>
+    </table>
+  
+    <br>
+    The optional arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>default</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>wait</tt></td>
+      <td>boolean</td>
+      <td>false</td>
+      <td>If true, wait synchronously for all nodes to complete their reboot</td>
+     </tr>
+    </table>
+  </ul>
+  
 </ul>
 
 <?php

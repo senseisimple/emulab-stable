@@ -18,19 +18,24 @@ from emulabclient import *
 # Configure variables
 TBDIR = "@prefix@"
 
+# Version
+VERSION = 0.1
+
 #
-# This class implements the server side of the XMLRPC interface to Emulab. 
-#
-# Arguments passed as a Dictionary. This converts to a XML "struct"
-# which in Perl/PHP/Ruby would be a hash. So, a client written in
+# Arguments to methods are passed as a Dictionary. This converts to a XML
+# "struct" which in Perl/PHP/Ruby would be a hash. So, a client written in
 # pretty much any language should be able to talk to this class.
 #
-class emulabserver:
+
+#
+# This class implements the server side of the XMLRPC interface to experiments.
+#
+class experiment:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
     def __init__(self):
-        self.VERSION = 0.1
+        self.VERSION = VERSION
         return
 
     ##
@@ -329,39 +334,7 @@ class emulabserver:
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
-    # create_image.
-    #
-    def create_image(self, version, argdict):
-        if version != self.VERSION:
-            return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
-            pass
-
-        argstr = ""
-        
-        for opt, val in argdict.items():
-            if opt in ("pid"):
-                argstr += " -p "
-                argstr += escapeshellarg(val)
-                pass
-            pass
-
-        if not (argdict.has_key("imageid") and
-                argdict.has_key("nodeid")):
-            return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply imageid and nodeid!");
-
-        argstr += " " + escapeshellarg(argdict["imageid"])
-        argstr += " " + escapeshellarg(argdict["nodeid"])
-
-        (exitval, output) = runcommand(TBDIR + "/bin/create_image " + argstr)
-        if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
-        
-        return EmulabResponse(RESPONSE_SUCCESS, output=output)
-
-    #
-    # create_image.
+    # Delay configuration
     #
     def delay_config(self, version, argdict):
         if version != self.VERSION:
@@ -372,12 +345,12 @@ class emulabserver:
         argstr = ""
         
         for opt, val in argdict.items():
-            if opt in ("modify_exp"):
+            if opt in ("persist"):
                 if val == "true":
                     argstr += " -m "
                     pass
                 pass
-            elif opt in ("srcvnode"):
+            elif opt in ("src"):
                 argstr += " -s "
                 argstr += escapeshellarg(val)
                 pass
@@ -395,10 +368,89 @@ class emulabserver:
         argstr += " " + escapeshellarg(argdict["link"])
 
         for opt, val in argdict["params"].items():
-            argstr += " " + opt + "=" + val
+            argstr += " " + escapeshellarg(opt + "=" + val)
             pass
         
         (exitval, output) = runcommand(TBDIR + "/bin/delay_config " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Reboot all nodes in an experiment.
+    #
+    def reboot(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+
+        if not (argdict.has_key("pid") and
+                argdict.has_key("eid")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply pid and eid!");
+
+        argstr += " -e " + escapeshellarg(argdict["pid"] + "," + argdict["eid"])
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    pass
+
+#
+# This class implements the server side of the XMLRPC interface to nodes.
+#
+class node:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    #
+    # reboot nodes
+    #
+    def reboot(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+
+        if not (argdict.has_key("nodes")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply a list of nodes!");
+
+        tokens = argdict["nodes"].split(",")
+        for token in tokens:
+            argstr += " " + escapeshellarg(token)
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
