@@ -27,6 +27,8 @@ my $killmode = 0;
 my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $BOSSNODE_IP = "@BOSSNODE_IP@";
+my $BASEADDR    = "@FRISEBEEMCASTADDR@";
+my $BASEPORT    = "@FRISEBEEMCASTPORT@";
 
 #
 # Untaint the path
@@ -45,8 +47,6 @@ use libtestbed;
 
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
-my $BASEADDR	= "234.5.6";
-my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
 my $STD_BW	= 72000000; 	# 71.6Mb/sec w/1000HZ kernel

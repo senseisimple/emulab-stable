@@ -897,6 +897,8 @@ fi
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -947,6 +949,8 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
+FRISEBEEMCASTADDR="234.5.6"
+FRISEBEEMCASTPORT=3564
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -1396,7 +1400,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1400: checking for a BSD compatible install" >&5
+echo "configure:1404: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1802,6 +1806,8 @@ s%@SSLCERT_COUNTRY@%$SSLCERT_COUNTRY%g
 s%@SSLCERT_STATE@%$SSLCERT_STATE%g
 s%@SSLCERT_LOCALITY@%$SSLCERT_LOCALITY%g
 s%@SSLCERT_ORGNAME@%$SSLCERT_ORGNAME%g
+s%@FRISEBEEMCASTADDR@%$FRISEBEEMCASTADDR%g
+s%@FRISEBEEMCASTPORT@%$FRISEBEEMCASTPORT%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
