@@ -21,7 +21,8 @@ use strict;
 my $testbed_srcdir = "@top_srcdir@";
 
 # Locals
-my $master_fill   = "$testbed_srcdir/sql/database-fill.sql";
+my $dbfill        = "sql/database-fill.sql";
+my $master_fill   = "$testbed_srcdir/$dbfill";
 my $export_tables = "../utils/export_tables";
 my $tempdifffile  = "/tmp/dbdiff.$$";
 my $tempnewfile   = "/tmp/dbdiff.new.$$";
@@ -62,8 +63,12 @@ if (!$?) {
 }
 
 #
-# Oh well. Cat the diff to stdout and exit with non-zero status.
+# Oh well. Explain to the user what they need to do, and exit with non-zero
+# status
 #
-system("cat $tempdifffile");
+print "*** Your installed database is out of date with $dbfill\n";
+print "    To bring it up to date, run: \n";
+print "    mysqldump tbdb > tbdb.backup\n";
+print "    mysql tbdb < $dbfill\n";
 unlink($tempdifffile);
 exit(1);
