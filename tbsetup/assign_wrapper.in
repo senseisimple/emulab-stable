@@ -85,7 +85,7 @@ use Node;
 my $delaythresh = 2;
 
 # Maximum number of times we run assign.
-my $maxrun = 20;
+my $maxrun = 3;
 
 # Use the switch to delay when possible. Currentlythis only works for 10mbit
 # links (actually, its turned off cause it does not work; auto handshake).
