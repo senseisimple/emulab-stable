@@ -205,9 +205,21 @@ characteristics:
 <p>
 When you receive email containing the experiment setup information (as
 described in <a href="tutorial.php3#Beginning">Beginning an
-Experiment</a>), you will notice an additional section that lists all
-of the events that will be delivered during your experiment:
-	<code><pre>
+Experiment</a>), you will notice an additonal section that gives a
+summary of the events that will be delivered during your experiment:
+<code><pre>
+Event Summary:
+--------------
+Event count: 18
+First event: 60.000 seconds
+Last event: 160.000 seconds </code></pre>
+
+<p>
+You can get a full listing of the events for your experiment by running
+<code>tbreport -v pid eid</code> on <tt>users.emulab.net</tt>. This
+report will include a section like this:
+
+<code><pre>
 Event List:
 Time         Node         Agent      Type       Event      Arguments
 ------------ ------------ ---------- ---------- ---------- ------------ 
@@ -377,7 +389,7 @@ example:
       $cbr0 start
       $cbr0 set packetSize_ 512
       $cbr0 set interval_ 0.01
-      $cbr0 set rate_ 10Mbs
+      $cbr0 set rate_ 10Mb
       $cbr0 set iptos_ 16
       $cbr0 stop
       </pre>
