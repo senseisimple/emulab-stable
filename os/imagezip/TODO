@@ -10,7 +10,9 @@ Things to do for image*:
 
 2. Imagezip could be multithread so that we can be reading ahead on the
    input device and overlapping IO with compression.  Maybe a third thread
-   for doing output.
+   for doing output.  Input is a little tricky since imagezip shortens up
+   its reads as it gets near the end of a chunk, so the buffer mechanism
+   will have to handle having blocks only partially consumed.
 
 3. In imagezip, split out the FS-specific code into subdirectories.
    [DONE]
@@ -20,3 +22,6 @@ Things to do for image*:
 
 5. Imageunzip could be triple-threaded like frisbee, i.e., split the
    file reading and decompression that are currently one in imageunzip.
+
+6. Create a "signature" file for an image using a collision-resistant hash
+   like MD5 or SHA-1.  See TODO.hash for more.

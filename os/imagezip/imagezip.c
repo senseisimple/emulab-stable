@@ -708,7 +708,7 @@ addskip(uint32_t start, uint32_t size)
 {
 	struct range	   *skip;
 
-	if (size < frangesize)
+	if (size == 0 || size < frangesize)
 		return;
 
 	if ((skip = (struct range *) malloc(sizeof(*skip))) == NULL) {
@@ -888,15 +888,15 @@ dumpranges(int verbose)
 	struct range *range;
 	uint32_t total = 0;
 
-	if (verbose) {
+	if (verbose)
 		fprintf(stderr, "\nAllocated ranges (start/size) in sectors:\n");
-		range = ranges;
-		while (range) {
+	range = ranges;
+	while (range) {
+		if (verbose)
 			fprintf(stderr, "  %12d    %9d\n",
 				range->start, range->size);
-			total += range->size;
-			range = range->next;
-		}
+		total += range->size;
+		range = range->next;
 	}
 	fprintf(stderr,
 		"Total Number of Valid Sectors: %d (bytes %qd)\n",
