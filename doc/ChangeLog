@@ -1,3 +1,62 @@
+kwebb       2004/03/03 18:41:33 MST
+
+  Modified files:
+    .                    configure configure.in
+    rc.d                 3.plab.sh.in
+    tbsetup/plab         GNUmakefile.in libplab.py.in
+                         libtestbed.py.in mod_PLC.py.in
+                         mod_dslice.py.in
+  Added files:
+    tbsetup/plab         plabdiscover.in plabrenewd.in
+  Removed files:
+    tbsetup/plab         plabdaemon.in
+  Log:
+  More plab updates/changes
+
+  * implemented PLC slice renewal
+  * restructured daemon code/startup
+    - removed getfree daemon (replaced by plabdiscover; run from cron)
+    - moved generic daemonizing code into libtestbed (class)
+    - created plabrenewd - small script that utilizes daemonizing class
+    - removed plabdaemon file.
+    - updated bossnode startup scripts
+  * changed slice prefix - PLC denies permission w/ anything other than "utah"
+  * Minor semantic changes to module API to be more consistent with other parts.
+  * Some bug fixes.
+
+  Revision  Changes    Path
+  1.202     +3 -3      testbed/configure
+  1.209     +3 -3      testbed/configure.in
+  1.3       +3 -5      testbed/rc.d/3.plab.sh.in
+  1.9       +2 -2      testbed/tbsetup/plab/GNUmakefile.in
+  1.55      +117 -35   testbed/tbsetup/plab/libplab.py.in
+  1.3       +140 -0    testbed/tbsetup/plab/libtestbed.py.in
+  1.3       +34 -12    testbed/tbsetup/plab/mod_PLC.py.in
+  1.3       +8 -4      testbed/tbsetup/plab/mod_dslice.py.in
+
+kwebb       2004/03/02 18:28:45 MST
+
+  Modified files:
+    tbsetup/plab         libplab.py.in mod_PLC.py.in
+                         mod_dslice.py.in
+  Log:
+  Some updates to plab support:
+
+  * removed unused and not generally useful ping checking
+  * reorganized node discovery and added node info updating
+    - e.g., update IP, SITE, or HOSTNAME when they have changed
+    - no longer part of the backend module as this is independent of
+      which backend is used; may modularize it due to plab's new "trumpet"
+      service, which is basically its node DB available via a decentralized
+      transport/API.
+  * introduced new method of getting node info - use plab sites.xml file
+  * various other cleanups.
+
+  Revision  Changes    Path
+  1.54      +220 -110  testbed/tbsetup/plab/libplab.py.in
+  1.2       +0 -22     testbed/tbsetup/plab/mod_PLC.py.in
+  1.2       +0 -6      testbed/tbsetup/plab/mod_dslice.py.in
+
 stoller     2004/03/08 12:44:01 MST
 
   Modified files:
