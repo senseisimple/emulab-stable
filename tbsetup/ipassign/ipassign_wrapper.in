@@ -309,9 +309,12 @@ if (! $impotent) {
 while (my ($vnode, $valhash) = each %vnodetab) {
 
     my @ipinfo = @{$valhash->{'IPS'}};
-    my @routes =  @{$valhash->{'routes'}};
-
     my @ipifaces = map { @{$_}[2] . ":" . @{$_}[0] } @ipinfo;
+
+    my @routes = ();
+    if (defined($valhash->{'routes'})) {
+        @routes = @{$valhash->{'routes'}};
+    }
     
     if (!$impotent) {
         DBQueryFatal("update virt_nodes set ips='@ipifaces' ".
