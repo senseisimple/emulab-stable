@@ -1,7 +1,5 @@
 [This file is not kept entirely up to date.]
 
-CDROM changes (dhcp, signing).
-
 *** Major:
 
 * Dynamic reconfiguration of experiments (add and subtract nodes).
@@ -10,24 +8,13 @@ CDROM changes (dhcp, signing).
    - Reboot or not reboot everything. In flat case, not rebooting would be
      easy, although I contend its essentially the same.
 
-* Break up emulab.
-
-* Swapout and state saving.
+* Break up emulab into smaller components (for example, split of
+  account and group stuff so its independent.
 
 * Fix the entire nalloc/nfree/reloading mechansism and the state
   control stuff for it that is scattered around nfree, tmcd, stated,
   and the reload daemon needs a complete overhaul. Many races, many
   oppotunities to fail. Mac is thinking about this.
-
-* DB optimization, as per Daves email of Sun, 19 May 2002 10:35:54.
-  Good one for Mac, who is good at this DB stuff! Also check cache
-  sizes in the mysql config file.
-
-  Related: Transient lost connections to DB. Requires find the last of
-  the queries that do not go through the common interface, and putting
-  in retry code.
-
-  LBS: Thu May 23 - Added some of Dave's suggestion from his email.
 
 * Event system startup cost. Abhijeet reported that after ISUP, it
   could take a very long time for events to start. This is because it
@@ -42,12 +29,11 @@ CDROM changes (dhcp, signing).
   the simulation (which we would have to convert into something, not
   sure what).
 
-* Move flest to another machine?
-  Related: Change flest to ignore certain tables, like idle stats to
-  reduce DB churning. Could do it as a table of table names.
+  Related; ability to specify swap/terminate times for regular
+  experiments so that users can avoid getting in trouble for idle
+  experiments. 
 
-* Jail setup on wide area nodes. LBS: send email to Dave about using
-  tunnels and our discussion the other day. 
+* Continuing work on jails for both local and remote nodes.
 
 * Need to default the OS id version (4.3, 7.1) if we are going to
   delay reloading, or else people can get old versions of the OS
@@ -60,34 +46,36 @@ CDROM changes (dhcp, signing).
   calls, but provide a way to get all the data at once and save on a
   dozen connections per boot.
 
+  LBS: local nodes using tmcc-nossl since we get security via the
+  switch. Wideare nodes *do* use ssl.
+
 * Complete event system overhaul (per-exp elvind, secure elvind,
   per-node elvind, distribution of event lists to nodes).
   Cannot multicast events to multiple agents at a time.
 
 * Get the program agent working on ron nodes. This is related (and
-  dependent) on securing the event system.
+  dependent) on securing the event system since we do not want anyone
+  to be able to send ab event to the program agent from some random node!
 
 * Deal with two ends of a remote link being allocated to the same ron
   node! Need to catch the situation for now (and error), but
   eventually make sure it does not happen since setting up a tunnel
   from a node to itself sound rather silly.
 
-* Fix Dummynet crashes as reported Parveen.
-
-* Dummynet validation. Error rates from Table 2 in the paper.
-
-* Switch to ipsec AH tunnels for remote nodes. Faster than user mode
-  ip in UDP.
+* Investigate other types of tunnels for wideare nodes. Perhaps ipsec
+  AH tunnels.
 
 * Fix mountd-invalidating-current-mounts problem.
 
-* Fix the DHCP/TFTP bootstrap path: we talked about how to work around
-  the BIOS DHCP failing, but I also had a couple of cases of corrupt
-  MFSes while trying to do disk loads enmasse.
-
-* Swapping support.
+* Automated swapping (with disk saving) support so that we can swap
+  out experiments and save per-node images for people. Requires a lot
+  of disk space.
 
 *** Medium:
+
+* CDROM changes:
+    1) Add DHCP support to waipconfig.pl.
+    3) Add per host certificates.
 
 * Switch rpm/tar file to non-nfs solution. Perhaps a ftpd like daemon
   which does some of the same checks that tmcd does. Or maybe a tmcd
@@ -97,11 +85,8 @@ CDROM changes (dhcp, signing).
 
 * Clean up osid/imageid mess. 
 
-* Add a web page to recreate an image from a node and an existing
-  image descriptor. Need to add a "kill runnin frisbee" function to
-  create_image though (well, need this in general cause I always get
-  bit by it). Might need some locking too (experiment should be locked
-  down).
+* Need to add a "kill runnin frisbee" function so that creating new
+  images does get frisbee messed up.
 
 * Front end support for changing delay/bw/plr asymmetrically in
   events. Currently, we can do queue params, but the basic delay, bw,
@@ -111,20 +96,6 @@ CDROM changes (dhcp, signing).
   example, tb-set-lan-simplex-params. This is actually harder, since
   lans are not directly controllable at the link level anywhere in the
   system. delay_config chokes on lans at the moment for this reason.
-
-* Fix up staticroutes to use lan nodes. Actually, I did most of this,
-  but there was some question that Mike needed to answer about it.
-
-* Change pipe specification on links so that its more clear. We
-  currently use pipe0,pipe1 in some places, and the actual pipe
-  numbers other places (the numbers reported by experiment setup).
-  This makes it confusing to control pipes via the event system.
-  Perhaps have the front end generate the pipe numbers so that
-  everyone agrees on them (frontend, backend, tevc, delayagent,
-  etc.). 
-
-* Web page to control delay nodes (well, links). Would go nicely with
-  Chads new vis tool that shows you the link characteristics.
 
 * Support images with more than once slice (but not the entire disk).
   At present, people can make use of the 4th slice, but cannot save it
@@ -138,25 +109,6 @@ CDROM changes (dhcp, signing).
 * Add MBR initialization to all images, perhaps as a special Frisbee
   operation, like Mike did for slice 4. This is to prevent problems
   with people messing up the MBR.
-
-* Dave requested that we get rid of . from the verification key
-  when it falls at the end so as not to be confused with period.
-
-* Daily experiment stats report sent by email. To include such things
-  as:
-
- 	#expts-created		success/fail	#PCs	Avg#PCs/expt?
- 	#expts-terminated	""		""	""
- 	#swapped-in		""		""	""
- 	#swapped-out		""		""	""
-
-  See Jays message to tbops of Fri, 19 Apr 2002.
-
-* Web interface to "preload" experiment. Sorta like a syntax check
-  that saves the virt state so it can be visualized, and later swapped
-  in. Or perhaps this is an experiment create option.
-
-  LBS: I added this, but its still an admin option.
 
 * Change hardwired degree 4 for vrons->rons to more flexible DB
   management. Related would be dynamic creation of virtual nodes
@@ -172,36 +124,18 @@ CDROM changes (dhcp, signing).
   result of assign_wrapper. Most users have no idea why an experiment
   failed.
 
+  LBS: Rob and Chad have done some of this.
+
 * Add some kind of host table support to RON nodes so that programs
   can figure out IPs. This is going to be a pain.
 
 * Support for protocols other than IP. Mike reported some issues
   related to this in email of Fri, 17 May 2002 10:05:41.
 
-* Look at ganglia (http://ganglia.sourceforge.net) and other cluster
-  management tools to see of we can leverage something from them,
-  especially for widearea nodes.
-
-  LBS: I did this. See message to tbops. 
-
-* Add frontend syntax to control (widearea) solver weights. delay,
-  bandwidth, plr.
-
-  LBS: I did this, but Jay wants normalized numbers 
-
-* Setup the other RON nodes at MIT.
-
-* Find/Fix mysterious capture deaths.
-
-* Web option to become another user (su). Might be possible after I
-  clean up the auth stuff in the web page.
-
 * Bring in a bug tracking system we can use from the web interface.
   Need someone to look around for this. I hate GNATS!
   Rob mentioned RT (http://www.fsck.com/projects/rt). Eric mentioned
   Bugzilla and Jitterbug
-
-* CDROM installation of nodes.
 
 * Retry/reliability to tmcd from ron nodes.
 
@@ -211,6 +145,12 @@ CDROM changes (dhcp, signing).
   have things like SPAN turned on.
 
 *** Minor:
+
+* When I syntax check an ns file, and it fails, it would be handy to have a
+  one-click way to check the same file again.  (My Tcl isn't so good.)
+
+* Change logs for group experiments from /proj/<project>/logs/' to
+  `/groups/<proj>/<group>/logs/'.
 
 * Clean up ISADMIN() and ISADMININISTRATOR() calls in php pages.
 
@@ -223,23 +163,11 @@ CDROM changes (dhcp, signing).
   Can't we check the validity of these paths during the parse phase
   and fail a lot sooner?
 
-* Frisbee work. Mike/Rob reported that Frisbee "rocks" up to about
-  50-60 nodes, and then goes south in a hurry. I reported a couple of
-  optimizations in email that we could apply.
-
 * Add support for ssh protocol 2 rsa/dsa keys. Requires minor changes
   to mkacct, and the three web pages that parse the keys.
 
-* Move log files into experiment directory so that we can retain them
-  for debugging. Right now the go to /tmp and get deleted when done.
-  Could also add a web link to view the most recent log file. Related
-  to current "view in real time" option.
-
 * Link on web pages to pop up an ssh to a node. Perhaps do this by
   usurping the telnet client.
-
-* Macrofy (remove hardwired) Utah Network Testbed string throughout
-  the system (perl and php).
 
 * Macrofy the signature of the email (currently "Testbed Ops").
 
@@ -250,20 +178,9 @@ CDROM changes (dhcp, signing).
   Not a big deal, but requires someone who knows lilo to verify and to
   test it.
 
-* Change perl daemons to clean the environment so that email does not
-  come from the person who ran it with sul!
-
 * Fix "no networks link warning" to deal with remote node links.
 
 * DB consistency checker; to run at night and as part of flest.
-
-* Documentation page reorg. Need some reference material.
-
-* Fix tbcmd test that broke comparing loss rate of 0.000 expected to
-  0.013 obtained.
-
-* node_reboot doesn't check if nodes exist before trying to ssh reboot
-  and IPOD them.
 
 * I'm sitting here looking at the "details" page for an experiment and
   no where obvious on this page does it show the name of the
@@ -271,21 +188,7 @@ CDROM changes (dhcp, signing).
   there it is. How about putting it over the vis image or making it
   part of the vis image? Somewhere right at the top.
 
-* Copyright notices before we give code.
-  Pat has a script.
-
-* Save off ntp.drift problem.
-
 * event system. skew and delay. unix domain socket to local proxy.
-
-* When you're only a part of one project, could that project be the default
-  value for the "choose a project" dropdown in "begin an experiment"?
-
-* Add cleanup error handling (send email) in tb scripts.
-
-* Sort osids in newimage pages.
-
-* For example, boot up complains about no rc.route script.
 
 * allow user to specify OSIDs for their delay nodes. Not entirely sure
   how, since delays are chosen late in the game, but at the moment its
