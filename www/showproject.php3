@@ -60,9 +60,10 @@ $proj_created	= $row[created];
 $proj_expires	= $row[expires];
 $proj_name	= $row[name];
 $proj_URL	= $row[URL];
-$proj_affil	= $row[affil];
-$proj_addr	= $row[addr];
 $proj_head_uid	= $row[head_uid];
+$proj_pcs       = $row[num_pcs];
+$proj_sharks    = $row[num_sharks];
+$proj_why       = $row[why];
 $control_node	= $row[control_node];
 
 #
@@ -90,13 +91,26 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
+          <td>#PCs: </td>
+          <td class=\"left\">$proj_pcs</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>#Sharks: </td>
+          <td class=\"left\">$proj_sharks</td>
+      </tr>\n";
+
+echo "<tr>
           <td>Created: </td>
           <td class=\"left\">$proj_created</td>
       </tr>\n";
 
 echo "<tr>
-          <td>Expires: </td>
-          <td class=\"left\">$proj_expires</td>
+          <td colspan='2'>Why?</td>
+      </tr>\n";
+
+echo "<tr>
+          <td colspan='2' width=600>$proj_why</td>
       </tr>\n";
 
 echo "</table>\n";

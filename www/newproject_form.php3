@@ -268,7 +268,7 @@ echo "<tr>
 
 <tr>
     <td colspan="2" align="center" class="left">
-        <textarea name="why" rows="10" cols="60"></textarea></td>
+        <textarea name="proj_why" rows="10" cols="60"></textarea></td>
 </tr>
 
 <tr>

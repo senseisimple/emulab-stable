@@ -36,6 +36,10 @@ if (!isset($proj_sharks) ||
     strcmp($proj_sharks, "") == 0) {
   $formerror = "Estimated #of Sharks";
 }
+if (!isset($proj_why) ||
+    strcmp($proj_why, "") == 0) {
+  $formerror = "Please describe your project";
+}
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   $formerror = "Full Name";
@@ -210,9 +214,11 @@ $unix_gid = $row[0];
 $unix_gid++;
 
 $newproj_command = "INSERT INTO projects ".
-     "(pid, created, expires, name, URL, head_uid, unix_gid)".
+     "(pid, created, expires, name, URL, head_uid, ".
+     " num_pcs, num_sharks, why, unix_gid)".
      "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
-     "'$proj_head_uid', '$unix_gid')";
+     "'$proj_head_uid', '$proj_pcs', '$proj_sharks', '$proj_why', ".
+     "'$unix_gid')";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
@@ -237,10 +243,10 @@ mail($TBMAIL_APPROVAL,
      "Title:         $usr_title\n".
      "Affiliation:   $usr_affil\n".
      "Address:       $usr_addr\n".
-     "Phone:         $usr_phones\n\n".
+     "Phone:         $usr_phones\n".
      "PCs:           $proj_pcs\n".
      "Sharks:        $proj_sharks\n".
-     "Reasons:\n$why\n\n".
+     "Reasons:\n$proj_why\n\n".
      "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
      "select the 'Project Approval' page.\n\nThey are expecting a result ".
