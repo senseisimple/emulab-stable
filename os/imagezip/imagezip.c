@@ -675,44 +675,46 @@ static int sliceinfosize = 0;
 static void
 getsliceinfo(char *disk, int diskfd)
 {
-	int si;
+	int si, gotit = 0;
 
 #ifdef DIOCGSLICEINFO
 	struct diskslices dsinfo;
 	int i;
 
-	if (ioctl(diskfd, DIOCGSLICEINFO, &dsinfo) < 0) {
-		perror("WARNING: DIOCGSLICEINFO failed");
-		return;
+	if (ioctl(diskfd, DIOCGSLICEINFO, &dsinfo) == 0) {
+		for (si = 0, i = BASE_SLICE; i < dsinfo.dss_nslices; si++,i++) {
+			sliceinfo[si].offset = dsinfo.dss_slices[i].ds_offset;
+			sliceinfo[si].size = dsinfo.dss_slices[i].ds_size;
+			sliceinfo[si].type = dsinfo.dss_slices[i].ds_type;
+			snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
+				 "%ss%d", disk, si+1);
+			sliceinfosize++;
+		}
+		gotit++;
 	}
-
-	for (si = 0, i = BASE_SLICE; i < dsinfo.dss_nslices; si++, i++) {
-		sliceinfo[si].offset = dsinfo.dss_slices[i].ds_offset;
-		sliceinfo[si].size = dsinfo.dss_slices[i].ds_size;
-		sliceinfo[si].type = dsinfo.dss_slices[i].ds_type;
-		snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
-			 "%ss%d", disk, si+1);
-		sliceinfosize++;
-	}
-#else
+#endif
 	/*
-	 * XXX make it up for the primary partitions
+	 * XXX If we didn't get it above, guess the name for primary partitions.
+	 * It is only extended partitions where the naming isn't obvious.
 	 */
-	for (si = 0; si < 4; si++) {
-		sliceinfo[si].offset = 0;
-		sliceinfo[si].size = 0;
-		sliceinfo[si].type = 0;
-		snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
+	if (!gotit) {
+		fprintf(stderr,
+			"WARNING: Could not acquire slice device names "
+			"from kernel, guessing...\n");
+		for (si = 0; si < 4; si++) {
+			sliceinfo[si].offset = 0;
+			sliceinfo[si].size = 0;
+			sliceinfo[si].type = 0;
+			snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
 #ifdef linux
-			 "%s%d",
+				 "%s%d",
 #else
-			 "%ss%d",
+				 "%ss%d",
 #endif
-			 disk, si+1);
-		sliceinfosize++;
-
+				 disk, si+1);
+			sliceinfosize++;
+		}
 	}
-#endif
 
 	if (debug > 1) {
 		fprintf(stderr, "Slice special files:\n");
