@@ -345,10 +345,10 @@ sub vlanUnlock($;$) {
     my $RetVal = $self->{SESS}->set([[$EditOp,1,"apply","INTEGER"]]);
     $self->debug("Apply set: '$RetVal'\n");
 
-    $RetVal = $self->{SESS}->get([[$ApplyStatus,1]]);
+    $RetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
     $self->debug("Apply gave $RetVal\n");
     while ($RetVal eq "inProgress") { 
-	$RetVal = $self->{SESS}->get([[$ApplyStatus,1]]);
+	$RetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
 	$self->debug("Apply gave $RetVal\n");
     }
 
@@ -493,11 +493,13 @@ sub createVlan($$) {
 	# XXX: The maximum VLAN number is hardcoded at 1000
 	#
 	my $vlan_number = 2; # We need to start at 2
-	my $RetVal = $self->{SESS}->get([$VlanRowStatus,$vlan_number]);
+	my $RetVal = snmpitGetFatal($self->{SESS},
+		[$VlanRowStatus,$vlan_number]);
 	$self->debug("Row $vlan_number got '$RetVal'\n",2);
 	while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
 	    $vlan_number += 1;
-	    $RetVal = $self->{SESS}->get([[$VlanRowStatus,$vlan_number]]);
+	    $RetVal = snmpitGetFatal($self->{SESS},
+		[$VlanRowStatus,$vlan_number]);
 	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
 	}
 	if ($vlan_number > 1000) {
@@ -781,7 +783,7 @@ sub UpdateField($$$@) {
 	    $trans = "???";
 	}
 	$self->debug("Checking port $port ($trans) for $val...");
-	$Status = $self->{SESS}->get([[$OID,$port]]);
+	$Status = snmpitGetFatal($self->{SESS},[$OID,$port]);
 	if (!defined $Status) {
 	    warn "Port $port ($trans), change to $val: No answer from device\n";
 	    return -1;		# return error
@@ -796,7 +798,7 @@ sub UpdateField($$$@) {
 		if ($self->{BLOCK}) {
 		    my $n = 0;
 		    while ($Status ne $val) {
-			$Status=$self->{SESS}->get([[$OID,$port]]);
+			$Status = snmpitGetFatal($self->{SESS},[$OID,$port]);
 			$self->debug("Value for $port was $Status\n");
 			select (undef, undef, undef, .25); # wait .25 seconds
 			$n++;
@@ -1014,7 +1016,7 @@ sub setVlansOnTrunk($$$$) {
     # the channel ifIndex the the port is in a channel. Not sure that
     # this is _always_ beneficial, though
     #
-    my $channel = $self->{SESS}->get(["pagpGroupIfIndex",$ifIndex]);
+    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
     if (($channel =~ /^\d+$/) && ($channel != 0)) {
 	$ifIndex = $channel;
     }
@@ -1022,7 +1024,8 @@ sub setVlansOnTrunk($$$$) {
     #
     # Get the exisisting bitfield for allowed VLANs on the trunk
     #
-    my $bitfield = $self->{SESS}->get(["vlanTrunkPortVlansEnabled",$ifIndex]);
+    my $bitfield = snmpitGetFatal($self->{SESS},
+	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
     my $unpacked = unpack("B*",$bitfield);
     
     # Put this into an array of 1s and 0s for easy manipulation

@@ -515,17 +515,17 @@ sub getTrunksFromSwitches($@) {
 # Get a set of SNMP variables from an SNMP session, retrying in case there are
 # transient errors.
 #
-# usage: snmpitGet(session, vars, [retries])
+# usage: snmpitGet(session, var, [retries])
 # args:  session - SNMP::Session object, already connected to the SNMP
 #                  device
-#        vars    - An SNMP::VarList or SNMP::Varbind object containing the
-#                  OID(s) to fetch
+#        var     - An SNMP::Varbind or a reference to a two-element array
+#                  (similar to a single Varbind)
 #        retries - Number of times to retry in case of failure
-# returns: 1 on sucess, 0 on failure
+# returns: the value on sucess, undef on failure
 #
 sub snmpitGet($$;$) {
 
-    my ($sess,$vars,$retries) = @_;
+    my ($sess,$var,$retries) = @_;
 
     if (! defined($retries) ) {
 	$retries = $DEFAULT_RETRIES;
@@ -536,19 +536,20 @@ sub snmpitGet($$;$) {
     #
     if (!$sess) {
 	$snmpitErrorString = "No valid SNMP session given!\n";
-	return 0;
+	return undef;
     }
 
-    if ((ref($vars) ne "SNMP::VarList") && (ref($vars) ne "SNMP::Varbind")) {
-	$snmpitErrorString = "No valid SNMP variables given!\n";
-	return 0;
+    if ((ref($var) ne "SNMP::Varbind") &&
+	    ((ref($var) ne "ARRAY") || (@$var != 2))) {
+	$snmpitErrorString = "Invalid SNMP variable given!\n";
+	return undef;
     }
 
     #
     # Retry several times
     #
     foreach my $retry ( 1 .. $retries) {
-    	my $status = $sess->get($vars);
+    	my $status = $sess->get($var);
 	#
 	# Avoid unitialized variable warnings when printing errors
 	#
@@ -567,7 +568,7 @@ sub snmpitGet($$;$) {
 		$snmpitErrorString .= "Error string is: $sess->{ErrorStr}\n";
 	    }
 	} else {
-	    return 1;
+	    return $var->[2];
 	}
 
 	#
@@ -579,17 +580,17 @@ sub snmpitGet($$;$) {
     #
     # If we made it out, all of the attempts must have failed
     #
-    return 0;
+    return undef;
 }
 
 #
 # Same as snmpitGet, but send mail if any error occur
 #
 sub snmpitGetWarn($$;$) {
-    my ($sess,$vars,$retries) = @_;
+    my ($sess,$var,$retries) = @_;
     my $result;
 
-    $result = snmpitGet($sess,$vars,$retries);
+    $result = snmpitGet($sess,$var,$retries);
 
     if (! $result) {
 	snmpitWarn("SNMP GET failed");
@@ -602,10 +603,10 @@ sub snmpitGetWarn($$;$) {
 # failure.
 #
 sub snmpitGetFatal($$;$) {
-    my ($sess,$vars,$retries) = @_;
+    my ($sess,$var,$retries) = @_;
     my $result;
 
-    $result = snmpitGet($sess,$vars,$retries);
+    $result = snmpitGet($sess,$var,$retries);
 
     if (! $result) {
 	snmpitFatal("SNMP GET failed");
