@@ -8,7 +8,7 @@ SUBDIR		= security
 
 include $(OBJDIR)/Makeconf
 
-BINS		= suexec lastlogin
+BINS		= suexec
 SCRIPTS		= plasticwrap
 SBINS		= paperbag genlastlog lastlog_daemon
 
@@ -28,11 +28,6 @@ suexec:		suexec.c suexec.h
 		-DDOC_ROOT='"$(prefix)/libexec/"' \
 		-DSAFE_PATH='"$(prefix)/libexec:/usr/local/bin:/usr/bin:/bin"'\
 		-o suexec $<
-
-lastlogin:	lastlogin.c
-	$(CC) $(CFLAGS) \
-		-DUSERSVAR='"$(prefix)/usersvar"' \
-		-o lastlogin $<
 
 genlastlog:	genlastlog.c
 	$(CC) $(CFLAGS) -I/usr/local/include \
