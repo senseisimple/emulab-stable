@@ -318,7 +318,7 @@ CREATE TABLE ipsubnets (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   idx smallint(5) unsigned NOT NULL auto_increment,
-  PRIMARY KEY  (pid,eid,idx)
+  PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
 #
