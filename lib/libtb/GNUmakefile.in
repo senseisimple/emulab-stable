@@ -1,0 +1,30 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= lib/libtb
+
+include $(OBJDIR)/Makeconf
+
+all:	libtb.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+SYSTEM	:= $(shell uname -s)
+
+OBJS		= log.o
+ifneq ($(SYSTEM),Linux)
+OBJS	       += tbdb.o
+endif
+CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+
+libtb.a:	$(OBJS)
+	$(AR) crv $@ $(OBJS)
+	$(RANLIB) $@
+
+log.o:		log.h
+tbdb.o:		tbdb.h log.h
+
+install:
+
+clean:
+	/bin/rm -f *.o *.a

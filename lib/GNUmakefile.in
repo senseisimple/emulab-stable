@@ -8,8 +8,26 @@ SUBDIR		= lib
 
 include $(OBJDIR)/Makeconf
 
-all:
+SUBDIRS	= libtb
+
+all:	$(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install:
+libtb:
+	@$(MAKE) -C libtb all
+
+install: 
+	@$(MAKE) -C libtb install
+
+clean:		subdir-clean
+
+subdir-clean:
+	@$(MAKE) -C libtb clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C libtb distclean
+
+.PHONY:	$(SUBDIRS)
