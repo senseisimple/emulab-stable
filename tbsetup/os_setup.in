@@ -699,21 +699,30 @@ elsif (@vnodelist) {
 	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
 	my $maxwait = 90 + (100 * $pnodevcount{$pnode});
+	my $curallocstate;
 
-	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
-	    print "$node is alive and well\n";
-	    # Might have already been set above.
-	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
-	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY;
-	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
-	    next;
+	TBGetNodeAllocState($node, \$curallocstate);
+
+	#
+	# See if vnode_setup alreadt determined the node was dead.
+	#
+	if ($curallocstate ne TBDB_ALLOCSTATE_DOWN() &&
+	    $curallocstate ne TBDB_ALLOCSTATE_DEAD()) {
+
+	    if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP,
+				 $wstart, $maxwait)) {
+		print "$node is alive and well\n";
+		# Might have already been set above.
+		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
+		SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+		next;
+	    }
+
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
 	}
-
-	SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
-	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
-	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN;
 	
-	print "*** WARNING: $node may be down.\n";
+	print "*** WARNING: $node did not boot!\n";
 	
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.

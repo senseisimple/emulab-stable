@@ -181,8 +181,13 @@ foreach my $node (@nodes) {
 		next;
 	    }
 	    elsif ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
-		print "$node never booted; skipping.\n";
-		next;
+		if (!$plab) {
+		    print "$node failed to boot; skipping $mode.\n";
+		    next;
+		}
+		# Plab nodes need to be cleaned up.
+		print "$node failed to boot; changing to cleanup.\n";
+		$mode = "cleanup";
 	    }
 	}
 	elsif ($exptstate eq EXPTSTATE_ACTIVATING) {
@@ -221,9 +226,19 @@ foreach my $node (@nodes) {
 	    }
 	    else {
 		if ($killmode) {
-		    if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
-			print "$node failed to boot; skipping $mode.\n";
+		    if ($allocstate eq TBDB_ALLOCSTATE_DEAD) {
+			# plab only. See below.
+			print "$node failed to initialize; skipping $mode.\n";
 			next;
+		    }
+		    elsif ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
+			if (!$plab) {
+			    print "$node failed to boot; skipping $mode.\n";
+			    next;
+			}
+			# Plab nodes need to be cleaned up.
+			print "$node failed to boot; changing to cleanup.\n";
+			$mode = "cleanup";
 		    }
 		    elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
 			print "$node never booted; skipping $mode.\n";
@@ -235,7 +250,7 @@ foreach my $node (@nodes) {
 		    next;
 		}
 		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) {
-		    print "$node only needs a reboot on remote node $pnode\n";
+		    print "$node needs a reboot on remote node $pnode\n";
 		    $mode = "reboot";
 		}
 	    }
@@ -297,25 +312,31 @@ while (1) {
 		[$vnode, $pnode, $mode, $jailed, $plab, time()];
 	    $children++;
 	} else {
-	    my $args = (($mode eq "teardown") ? "-k " :
-			($mode eq "reboot" ? "-r " : " "));
-	    $args   .= ($jailed   ? "-j " : " ");
-	    $args   .= ($plab     ? "-p " : " ");
-	    $args   .= "$vnode ";
-	
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
 	    if ($plab && $mode eq "setup") {
 		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
-		    die("*** $0:\n".
-			"    Plab node allocation failed");
+		    print STDERR "*** $0:\n" .
+			         "    Plab node allocation failed";
+		    # Should check DB state instead.
+		    exit(99);
 		}
 	    }
 
-	    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup $args");
-	    die("*** $0:\n".
-		"    exec failed!\n");
+	    # Cleanup is used only on plab nodes.
+	    if ($mode ne "cleanup") {
+		my $args = (($mode eq "teardown") ? "-k " :
+			    ($mode eq "reboot" ? "-r " : " "));
+		$args   .= ($jailed   ? "-j " : " ");
+		$args   .= ($plab     ? "-p " : " ");
+		$args   .= "$vnode ";
+	
+		exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup $args");
+		die("*** $0:\n".
+		    "    exec failed!\n");
+	    }
+	    exit(0);
 	}
     } else {
 	#
@@ -352,6 +373,7 @@ while (1) {
 	alarm(($oldest + 120) - time());
 
 	my $childpid = wait();
+	my $exitstatus = $?;
 	alarm 0;
 
 	#
@@ -375,9 +397,7 @@ while (1) {
 	#
 	# Look for setup failure, reported back through ssh.
 	# 
-	if ($?) {
-	    my $exitstatus = $?;
-
+	if ($exitstatus) {
 	    print STDERR "vnode $vnode $mode on $pnode returned $?.\n"
 		if $debug;
 
@@ -387,23 +407,42 @@ while (1) {
 	    elsif ($exitstatus == 15) {
 		print STDERR "$vnode is wedged.\n" if $debug;
 	    }
+	    elsif ($exitstatus >> 8 == 99) {
+		print STDERR "$vnode did not allocate properly.\n" if $debug;
+	    }
 
 	    push @failed_nodes, [$vnode, $pnode, $mode, $exitstatus];
 	    
-	    if (!$killmode) {
-		warn("*** $0:\n".
-		    "    Virtual node $vnode setup failure!\n");
-	    }
-	    else {
-		warn("*** $0:\n".
-		    "    Virtual node $vnode teardown failure!\n");
-	    }
+	    warn("*** $0:\n".
+		 "    Virtual node $vnode $mode failure!\n");
 	}
 
-	if ($plab && $killmode) {
-	    if (system("$TB/sbin/plabnode free $pid $eid $vnode")) {
-		warn("*** $0:\n".
-		     "    Plab node free of $vnode failed");
+	if ($plab) {
+	    #
+	    # I am totally unhappy with this mess.
+	    #
+	    if ((($mode eq "teardown") || ($mode eq "cleanup")) ||
+		($exitstatus && (($exitstatus >> 8) != 99))) {
+		#
+		# Besides teardown/cleanup, we want to do this if the
+		# vnode setup on the node failed, but only if the
+		# plabnode alloc worked (it can fail too, exits with 99).
+		# 
+		if (system("$TB/sbin/plabnode free $pid $eid $vnode")) {
+		    warn("*** $0:\n".
+			 "    Plab node free of $vnode failed");
+		}
+	    }
+	    
+	    #
+	    # If the node was in the setup process, then mark its allocstate
+	    # as down so os_setup knows not to bother waiting for it. DEAD
+	    # is a temp state, different then DOWN. It indicates the node
+	    # was never instantiated (important distinction for plab). 
+	    #
+	    if ($exitstatus &&
+		(($mode eq "setup") || ($mode eq "reboot"))) {
+		TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_DEAD());
 	    }
 	}
     }
