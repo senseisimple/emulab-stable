@@ -27,10 +27,11 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $consetup	= "$TB/libexec/console_setup";
-my $reloadpid	= "emulab-ops";
-my $pendingeid  = "reloadpending";
-my $reloadeid   = "reloading";
+my $consetup	 = "$TB/libexec/console_setup";
+my $sched_reload = "$TB/sbin/sched_reload";
+my $reloadpid	 = "emulab-ops";
+my $pendingeid   = "reloadpending";
+my $reloadeid    = "reloading";
 
 my @nodes;
 my @freed_nodes=();
@@ -355,6 +356,21 @@ foreach my $n (@freed_nodes) {
     # a reload.
     #
     if ($mustclean) {
+	#
+	# Make sure we don't schedule a reload if the node is coming out of
+	# the reloading or reloadpending experimenets.
+	#
+	if (!(($pid eq $reloadpid) && (($eid eq $reloadeid) ||
+		($eid eq $pendingeid)))) {
+	    if (system("$sched_reload $n") != 0) {
+		print STDERR "WARNING: $sched_reload $n failed!\n";
+		$error++;
+	    }
+	    DBQueryWarn("update reserved set ".
+		"pid='$reloadpid',eid='$pendingeid' ".
+		"where node_id='$n'") || $error++;
+	}
+
 	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
     }
     
