@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: exp_accts,v 1.14 2000-09-19 23:16:50 kwright Exp $
+### $Id: exp_accts,v 1.15 2000-09-22 22:06:02 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -221,14 +221,14 @@ foreach $IP (@nodes) {
             ## will report it and move on.
 
 	    print "Creating group $unix_gid on $IP.\n";
-	    open(GROUPADD, "ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
+	    open(GROUPADD, "/usr/local/bin/ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
 	    my $i = 1;
 	    foreach my $user (keys %passwd) {
 
 		print "Creating user $user on $IP.\n";
-		open(USERADD, "ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		open(USERADD, "/usr/local/bin/ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
 	    }
