@@ -67,8 +67,8 @@ $(SUBDIRS): %: %.all
 
 ###############################################################################
 
-mfs: client
+mfs: slothd.client
 
-mfs-install: client-install
+mfs-install: mfs slothd.client-install
 
 .PHONY: mfs mfs-install
