@@ -942,7 +942,7 @@ class Plab:
             failstr = ""
             for n in failed:
                 failstr += "%s %s/%s\n" % n
-            SENDMAIL(TBOPS, "Lease renewal(s) failed" % nodeid,
+            SENDMAIL(TBOPS, "Lease renewal(s) failed",
                      "Failed to renew lease on the following nodes:\n%s" %
                      failstr + "\n\nPlease check the plabrenew log")
 
