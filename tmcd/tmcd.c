@@ -4633,7 +4633,7 @@ COMMAND_PROTOTYPE(dosubconfig)
 		return 1;
 	}
 
-	if (! strcmp(reqp->type, "ixp-bveil")) 
+	if (! strcmp(reqp->type, "ixp-bv")) 
 		return(doixpconfig(sock, reqp, rdata, tcp, vers));
 	
 	error("SUBCONFIG: %s: Invalid subnode class %s\n",
