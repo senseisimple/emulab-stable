@@ -2451,3 +2451,7 @@ last_net_act,last_cpu_act,last_ext_act);
 		unsigned default NULL after panic_date;
         alter table experiment_resources add delay_capacity tinyint(3) \
 		unsigned default NULL after maxlinks;
+
+1.324: Change the default for os_info.OS back to 'Unknown' instead of NULL:
+
+         alter table os_info alter column OS set default 'Unknown';
