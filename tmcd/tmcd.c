@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -279,7 +279,7 @@ struct command {
         { "fullconfig",   FULLCONFIG_NONE, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, doroutelist},
         { "role",	  FULLCONFIG_PHYS, dorole},
-        { "rusage",	  FULLCONFIG_PHYS, dorusage},
+        { "rusage",	  FULLCONFIG_NONE, dorusage},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
