@@ -11,7 +11,7 @@ SUBDIR		= mote
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= tbuisp tbsgmotepower newmote
+BIN_SCRIPTS	= tbuisp tbsgmotepower newmote set-mote-id
 
 #
 # Force dependencies on the scripts so that they will be rerun through
