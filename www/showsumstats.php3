@@ -363,7 +363,7 @@ function showrange ($showby, $sortby, $range) {
 		DBQueryFatal("select action from testbed_stats ".
 			     "where exptidx=$idx and ".
 			     "      UNIX_TIMESTAMP(end_time)<$tstamp ".
-			     "order by tstamp desc");
+			     "order by end_time desc");
 
 	    while ($srow = mysql_fetch_assoc($swapper_result)) {
 		$saction = $srow["action"];
