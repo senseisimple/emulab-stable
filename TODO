@@ -1,5 +1,16 @@
 [This file is not kept entirely up to date.]
 
+* Other items. We better start saving the thumbnails in the experiment
+  archive directory too (expinfo). We should also be re-rendering after a
+  modify. We should also save the XML representation to avoid having to
+  reparse old NS files, although there is some versioning issues with this. 
+
+* Auto discovery of new nodes. 
+
+* Change netbuild to speak XML (in both directions).
+
+  Related: Might require addition of a DTD or Schema to our XML format.
+
 * From: Jay Lepreau <lepreau@cs.utah.edu>
   Subject: Snapping an image - physnode menu item
   Date: Tue, 01 Jul 2003 17:39:36 MDT
@@ -55,12 +66,6 @@
 * Fix event scheduler for experiment modify so that it can add new
   events from the current time index, instead of from time 0. 
 
-* Dynamic reconfiguration of experiments (add and subtract nodes).
-   - Special case for flat topologies. LAN Easy.
-   - Adding to complicated topologies.
-   - Reboot or not reboot everything. In flat case, not rebooting would be
-     easy, although I contend its essentially the same.
-
 * Break up emulab into smaller components (for example, split of
   account and group stuff so its independent.
 
@@ -75,16 +80,6 @@
   using Ian's original binary tree stuff. I hacked in a fix, but need
   to look at that algorithm and perhaps change. Need to decide if
   insertion needs to be optimized, over deletion.
-
-* Specify maximum running time of a batch experiment.
-  Ron Oldfield requested this, for the case when batches fail, they
-  get stuck in the system. An alternative is an NS "at" event to stop
-  the simulation (which we would have to convert into something, not
-  sure what).
-
-  Related; ability to specify swap/terminate times for regular
-  experiments so that users can avoid getting in trouble for idle
-  experiments. 
 
 * Continuing work on jails for both local and remote nodes.
 
@@ -129,14 +124,16 @@
 * Change batch system to handle limited-use disk images like timesys.
 
 * CDROM changes:
-    1) Add DHCP support to waipconfig.pl.
-    3) Add per host certificates.
+    1) Add per host certificates.
 
 * Switch rpm/tar file to non-nfs solution. Perhaps a ftpd like daemon
   which does some of the same checks that tmcd does. Or maybe a tmcd
   variant that does nothing but serve up files according. Maybe it
   does not need to be separate, but seems like putting this directly
-  into tmcd is a bad idea. Maybe not. 
+  into tmcd is a bad idea. Maybe not.
+
+  LBS: This is now done for tar files on widearea nodes, and in jails.
+       Needs to be done with RPMs too.
 
 * Clean up osid/imageid mess. 
 
@@ -175,12 +172,6 @@
   huge amount of space, and /usr/testbed/log has been filling up a
   lot.
 
-* Change exp failed email to report the actual failure mode based on
-  result of assign_wrapper. Most users have no idea why an experiment
-  failed.
-
-  LBS: Rob and Chad have done some of this.
-
 * Add some kind of host table support to RON nodes so that programs
   can figure out IPs. This is going to be a pain.
 
@@ -191,10 +182,6 @@
   Need someone to look around for this. I hate GNATS!
   Rob mentioned RT (http://www.fsck.com/projects/rt). Eric mentioned
   Bugzilla and Jitterbug
-
-* Retry/reliability to tmcd from ron nodes.
-
-  LBS: I have been working on this.
 
 * Noswap bit to prevent users from swapping special experiments that
   have things like SPAN turned on.
@@ -215,12 +202,6 @@
   Can't we check the validity of these paths during the parse phase
   and fail a lot sooner?
 
-* Add support for ssh protocol 2 rsa/dsa keys. Requires minor changes
-  to mkacct, and the three web pages that parse the keys.
-
-* Link on web pages to pop up an ssh to a node. Perhaps do this by
-  usurping the telnet client.
-
 * Macrofy the signature of the email (currently "Testbed Ops").
 
 * FAQ entry for lilo:
@@ -239,8 +220,6 @@
   experiment.  If I scroll all the way down to experiment details,
   there it is. How about putting it over the vis image or making it
   part of the vis image? Somewhere right at the top.
-
-* event system. skew and delay. unix domain socket to local proxy.
 
 * allow user to specify OSIDs for their delay nodes. Not entirely sure
   how, since delays are chosen late in the game, but at the moment its
