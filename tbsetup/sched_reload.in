@@ -81,6 +81,15 @@ if ($pend and $force) {
 }
 my $imageid   = shift;
 
+# This type will be put into the database, to allow programs 
+# such as nfree to figure out what kind of reload is support
+# to occur
+if ($frisbee) {
+	$type = "frisbee";
+} else {
+	$type = "netdisk";
+}
+
 #
 # Untaint args.
 #
@@ -164,7 +173,8 @@ foreach my $node (@nodes) {
     # Put it in the reloads table so TMCD knows to free it.
     print STDERR "Scheduling reload of $imageid for $pc:\n";
     DBQueryFatal("replace into scheduled_reloads ".
-		 "(node_id, image_id) values ('$pc', '$imageid')");
+		 "(node_id, image_id, reload_type) values ".
+		 "('$pc', '$imageid','$type')");
 }
 
 if ($pend) {

@@ -18,8 +18,10 @@ if ($#ARGV < 1) {
 my $error = 0;
 my $consetup="$TB/libexec/console_setup";
 my $exportsetup="$TB/sbin/exports_setup";
+my $os_load = "$TB/bin/os_load -r ";
 my $reloadpid="emulab-ops";
-my $reloadeid="reloadpending";
+my $reload_pendingeid="reloadpending";
+my $reloadeid="reloading";
 my $pid = shift;
 my $eid = shift;
 my @node_names=();
@@ -68,6 +70,8 @@ if ($#node_names == -1) {
 }
 
 my @reloads = ();
+# Frisbee reloads get handled differently than 'normal' reloads
+my @frisbee_reloads = ();
 my %reserves= ();
 foreach my $n (@node_names) { 
   $sth = $dbh->query("select * from reserved where node_id='$n' ".
@@ -85,14 +89,28 @@ foreach my $n (@node_names) {
   $dbh->query($cmd);
 
   # If the node has a reloads entry, change the reservation and start it
-  $cmd = "select node_id,image_id from scheduled_reloads where node_id='$n'";
+  $cmd = "select node_id,image_id,reload_type from scheduled_reloads ".
+	"where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
 
   if ( ($sth->num_rows()) > 0) {
-    print "Adding scheduled reload for $n to the list.\n";
-    push(@reloads,$n);
+	if ($sth->num_rows() != 1) {
+	  print "Warning: multiple reloads scheduled for $n - using the first\n";
+	}
+	my @row = $sth->fetchrow();
+	my $image_id = $row[1];
+	my $reload_type = $row[2];
+	# Check for Frisbee-type reloads
+	if ($reload_type eq "frisbee") {
+	  print "Adding scheduled reload for $n of $image_id to the list using Frisbee.\n";
+	  # We'll need to know both the node and image_id to run os_load
+	  push(@frisbee_reloads,[$n,$image_id]);
+	} else {
+	  print "Adding scheduled reload for $n to the list.\n";
+	  push(@reloads,$n);
+	}
   } else {
     # If the node has a next_reserve entry, change the reservation and start it
     $cmd = "select node_id,pid,eid from next_reserve where node_id='$n'";
@@ -159,7 +177,8 @@ foreach my $n (@node_names) {
   # And clean out various tidbits from the nodes table.
   $cmd = "update nodes set def_boot_osid='$osid', def_boot_cmd_line='',".
       "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs='',".
-	  "pxe_boot_path='$pxe_boot_path' where node_id='$n'";
+	  "pxe_boot_path='$pxe_boot_path', next_pxe_boot_path='' ".
+	  "where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
@@ -177,7 +196,7 @@ $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
-if ( (@reloads > 0) || (keys %reserves > 0) ) {
+if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
   print "Locking tables.\n";
   $cmd = "lock tables nodes read, node_types read, scheduled_reloads read, ".
     "interfaces write, reserved write, next_reserve write";
@@ -186,15 +205,30 @@ if ( (@reloads > 0) || (keys %reserves > 0) ) {
   
   foreach $n ( @reloads ) {
     # Change reservation (don't delete or we'll get races)
-    print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
-    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
+    print "Changing reservation for $n to $reloadpid/$reload_pendingeid...\n";
+    $cmd = "update reserved set pid='$reloadpid',eid='$reload_pendingeid' where ".
       "node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++ && next);
   }
   
-  foreach $n ( keys %reserves ) {
+  foreach $aref ( @frisbee_reloads ) {
+	my $n = $$aref[0];
+	my $image = $$aref[1];
+    # Change reservation (don't delete or we'll get races)
+    print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
+    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
+      "node_id='$n'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++ && next);
+
+	# NOTE: os_load for frisbee nodes gets run later, because the tables
+	# need to be unlocked for os_load to run
+  }
+
+ foreach $n ( keys %reserves ) {
     my ($next_pid,$next_eid) = split (":",$reserves{$n});
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $next_pid/$next_eid...\n";
@@ -213,6 +247,21 @@ if ( (@reloads > 0) || (keys %reserves > 0) ) {
   $cmd = "unlock tables";
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+
+
+  # Continuation of Frisbee code... now that the tables are unlocked, we can
+  # call os_load
+  foreach $aref ( @frisbee_reloads ) {
+	my $n = $$aref[0];
+	my $image = $$aref[1];
+    # Call os_load for the machine, since the reload daemon doesn't handle
+	# frisbee reloads
+	print "Running os_load for $n\n";
+	system "$os_load $image $n"
+	  || (print "Failed to run '$os_load $image $n': $!\n"
+	  && $error++ && next);
+  }
+
 }
 
 if (@freed_nodes) {
