@@ -10,7 +10,6 @@
   <li><a href="#ORDER">Ordering issues</a>
   <li><a href="#HARD">Hardware Commands</a>
   <li><a href="#IP">IP Address Commands</a>
-  <li><a href="#ROUTE">IP Routing Commands</a>
   <li><a href="#OS">OS Commands</a>
   <li><a href="#LOSS">Link Characteristic Commands</a>
   <li><a href="#VTYPE">Virtual Type Commands</a>
@@ -266,35 +265,6 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
       either of those commands instead of tb-set-ip-interface.
 </ul>
 
-
-<hr>
-
-<a name="ROUTE"></a><h3>IP Routing Commands</h3>
-
-We currently provide a simple mechanism for setting up default IP routes
-between nodes in an experiment.
-
-<h4>tb-set-ip-routing</h4>
-
-<pre>
-tb-set-ip-routing <i>protocol</i>.
-
-tb-set-ip-routing none
-tb-set-ip-routing ospf
-</pre>
-
-<dl>
-  <dt><i>protocol</i> - The routing protocol to use.
-</dl>
-
-<p>Notes:
-
-<ul>
-  <li><code>none</code> is the default protocol;
-      i.e., no default routing is setup.
-  <li><code>ospf</code> is implemented by running <tt>gated</tt>
-      on all nodes in the experiment.
-</ul>
 
 <hr>
 

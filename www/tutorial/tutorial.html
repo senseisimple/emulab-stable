@@ -707,17 +707,18 @@ an option to automatically set up routes on nodes which run one of our
 provided FreeBSD or Linux disk images.
 
 <p>
-You can use the <tt>tb-set-ip-routing</tt> command in your NS file to
-enable automatic routing:
+You can use the NS <tt>rtproto</tt> syntax in your NS file to enable
+automatic routing:
 <code><pre>
-tb-set-ip-routing <i>protocol</i>
+$ns rtproto <i>protocol</i>
 </pre></code>
-where <i>protocol</i> is either <code>none</code>, the default for no
-automatic routing, or <code>ospf</code> to enable <code>gated</code>
-running the OSPF protocol on all nodes in the experiment.
-In the future we may add support for automatic pre-computation of static
-routes as well as the ability for users to specify per-node routing
-information in the NS file.
+where <i>protocol</i> is currently limited to <code>Session</code>.
+The implementation of <code>Session</code> routing is to enable
+<code>gated</code> running the OSPF protocol on all nodes in the
+experiment.  The default is no automatic routing (or routing of any
+kind).  In the future we may add support for automatic pre-computation
+of static routes as well as the ability for users to specify per-node
+routing information in the NS file.
 
 <p>
 If you do want to setup and manage routing yourself, you can use the
