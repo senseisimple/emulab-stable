@@ -90,7 +90,7 @@
  * clients' ability to generate requests which is limited by their ability
  * to decompress and write to disk.
  */
-#define SERVER_BURST_SIZE	48
+#define SERVER_BURST_SIZE	16
 #define SERVER_BURST_GAP	1000
 
 /*
