@@ -9,3 +9,95 @@
 # waitForState - a command line tool that uses the StateWait library
 #
 
+use lib '@prefix@/lib';
+use StateWait;
+use Getopt::Std;
+
+my $debug = 0;
+my @states=('ISUP');
+my $u = 10;
+my $t = 300;
+my %opt = ();
+getopts("hds:u:t:",\%opt);
+
+if ($opt{h}) { usage(); }
+if ($opt{d}) { $debug++; }
+if ($opt{u}) { $u = $opt{u}; }
+if ($opt{t}) { $t = $opt{t}; }
+if ($opt{s}) { @states = split(",",$opt{s}); }
+if (!@ARGV) { usage(); }
+
+my @nodes = @ARGV;
+
+sub usage {
+    print <<EOF;
+Usage:
+$0 [-h] [-d]
+	[-u <update freq.>] [-t <timeout>]
+	[-s state1[,s2]] <node> [<node> ...]
+
+Waits for all of the nodes listed to get to the right state.  For a
+list of states, each node must go through those states in the right
+order (non-consecutively).  If no state is supplied, ISUP is
+used. Update frequency is how many seconds apart status updates should
+be (default $u). Timeout is how many seconds we should wait before
+giving up and returning (default $t). The -h option shows this
+message, and -d enables extra debugging output.
+
+EOF
+    exit(1);
+}
+
+if ($debug) { $StateWait::debug = $debug; }
+debug("Calling initStateWait([".join(",",@states)."],".join(",",@nodes).")\n");
+initStateWait(\@states,@nodes);
+
+my $total = scalar(@nodes);
+my $done = 0;
+my $start = time();
+my $now = $start;
+my @finished = ();
+my @failed = ();
+debug("Start waiting at $start, stop at ".($start+$t)." - ".
+        $total." nodes\n");
+debug("COND: now-start=".($now-$start).",t=$t,u=$u,done=$done,total=$total\n");
+while ( ($now - $start) < $t && $done < $total ) {
+    my $wait = min($u,$start + $t - $now);
+    debug("Calling waitForState(\@finished,\@failed,$wait) at $now\n");
+    waitForState(\@finished, \@failed,$wait);
+    $now = time();
+    $done = scalar(@finished) + scalar(@failed);
+    debug("Returned at $now: finished=".join(",",@finished).
+	  "  failed=".join(",",@failed)."\n".
+	  "Still waiting for ".($total-$done)." nodes\n");
+    debug("COND: now-start=".($now-$start).",t=$t, done=$done, total=$total\n");
+}
+
+debug("All done at $now: finished=".join(",",@finished).
+      "  failed=".join(",",@failed)."\n");
+
+debug("Calling endStateWait()\n");
+endStateWait();
+
+my $worked = scalar(@finished);
+my $failed = scalar(@finished);
+my $remain = $total - $worked - $failed;
+if ($worked != $total) {
+    print "*** waitForState: Only $worked nodes of $total succeeded!\n";
+    if ($failed) { print "\tThere were $failed failures.\n"; }
+    if ($remain) { print "\tThere were $remain nodes that timed out.\n"; }
+}
+
+exit(0);
+
+sub max ( $$ ) {
+    return ($_[0] > $_[1] ? $_[0] : $_[1]);
+}
+
+sub min ( $$ ) {
+    return ($_[0] < $_[1] ? $_[0] : $_[1]);
+}
+
+sub debug {
+    if ($debug) { print @_; }
+}
