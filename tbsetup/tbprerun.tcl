@@ -14,6 +14,19 @@ proc outs {args} {
     puts $logFp $s
 }
 
+proc unlock {} {
+    global lockfile
+    outs "Unlocking the world!"
+    if {! [file exists $lockfile]} {
+	outs stderr "Error: World already unlocked - DB may be corrupted."
+    } else {
+	if {[catch "file delete -force $lockfile" err]} {
+	    outs stderr "Error unlocking world ($err)"
+	}
+    }
+}
+
+
 ### Bootstrapping code.  The whole purpose of this is to find the
 # directory containing the script.
 set file [info script]
@@ -26,6 +39,7 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 
 set updir [file dirname $scriptdir]
 
+set lockfile "/usr/testbed/etc/tblock"
 set ns2ir "$updir/ir/ns2ir/parse.tcl"
 set assign "$updir/ir/assign.tcl"
 set handle_ip "$updir/ir/handle_ip.tcl"
@@ -75,15 +89,32 @@ if {! [file exists $irFile]} {
     exit 1
 }
 
+outs "Locking the world!"
+set wait {15 30 60 600 600}
+set waiti 0
+while {[catch "open $lockfile {WRONLY CREAT EXCL}" lockfp]} {
+    if {$wait == [llength $waiti]} {
+	outs stderr "Giving up on locking.  If no other tbprerun is running then remove $lockfile manually."
+	exit 1
+    }
+    set delay [lindex $wait $waiti]
+    incr waiti
+    outs "World is locked.  Waiting $delay seconds"
+    after [expr $delay * 1000]
+}
+close $lockfp
+
 outs "Determining available resources."
 if {[catch "exec $avail type=pc ver extras | $ptopgen > $ptopfile 2>@ $logFp" err]} {
     outs stderr "Error determining available resources. ($err)"
+    unlock
     exit 1
 }
 
 outs "Allocating resources - This may take a while."
 if {[catch "exec $assign $irFile $ptopfile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error allocating resources. ($err)"
+    outs stderr "Error allocating resources.  See $logFile and assign.log for more info."
+    unlock
     exit 1
 }
 
@@ -97,8 +128,11 @@ foreach pair $nodemap {
 outs "Reserving resources."
 if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reserving resources. ($err)"
+    unlock
     exit 1
 }
+
+unlock
 
 outs "Allocating IP addresses."
 if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
