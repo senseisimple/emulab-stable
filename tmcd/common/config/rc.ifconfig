@@ -152,9 +152,11 @@ sub doboot()
 		    
 	    $upcmds   .= "$upline\n    "
 		if (defined($upline));
-	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";
+	    $upcmds   .= TMROUTECONFIG . " $inet up\n    "
+		if ($inet ne "");
 		
-	    $downcmds .= TMROUTECONFIG . " $inet down\n    ";
+	    $downcmds .= TMROUTECONFIG . " $inet down\n    "
+		if ($inet ne "");
 	    $downcmds .= "$downline\n    "
 		if (defined($downline));
 
