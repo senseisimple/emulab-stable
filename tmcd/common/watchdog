@@ -412,23 +412,11 @@ sub setintervals($)
 	}
 
 	#
-	# Policy:
+	# MFS nodes only report isalive
 	#
-	# - vnodes, plab nodes and MFS systems do not send NTP drift or cvsup
-	# - widearea nodes do not record drift
-	# - local nodes do not cvsup
-	# - only a plab node service slice reports rusage
-	#
-	if (JAILED() || PLAB() || MFS()) {
+	if (MFS()) {
 	    $iv{drift} = 0;
 	    $iv{cvsup} = 0;
-	}
-	if (REMOTE()) {
-	    $iv{drift} = 0;
-	} else {
-	    $iv{cvsup} = 0;
-	}
-	if (!PLABSVC()) {
 	    $iv{rusage} = 0;
 	}
 
@@ -606,11 +594,14 @@ sub sendrusage($)
     logmsg("rusage: sending: $rusagestr\n")
 	if ($verbose);
 
-    #
-    # Run tmcc in UDP mode.
-    #
-    if (tmcc(TMCCCMD_RUSAGE, $rusagestr, undef,
-	     ("timeout" => 3, "useudp" => 1)) != 0) {
+    my %tmccargs = ();
+    $tmccargs{timeout} = 3;
+    $tmccargs{useudp} = 1
+	if (!$trytcp || $retry{rusage} != $maxretries);
+
+    my @tmccresults;
+    if (tmcc(TMCCCMD_RUSAGE, $rusagestr, \@tmccresults, %tmccargs) != 0 ||
+	scalar(@tmccresults) == 0) {
 	#
 	# Failed, schedule a retry using a backoff.
 	#
@@ -624,13 +615,21 @@ sub sendrusage($)
 	#
 	# Failed miserably, just whine and reschedule at the normal time.
 	#
-	logmsg("rusage failed ($?) after $maxretries attempts\n");
+	logmsg("rusage: failed ($?) after $maxretries attempts\n");
     } else {
 	#
-	# Success.
+	# Success.  The format of the response is rather simple right now.
+	# Note: if the update failed last time, run it no matter what.
 	#
-	logmsg("rusage succeeded after $retry{rusage} retries\n")
+	logmsg("rusage: succeeded after $retry{rusage} retries\n")
 	    if ($retry{rusage});
+	if ($updatefailed ||
+	    $tmccresults[0] =~ /^UPDATE=1$/) {
+	    logmsg("rusage: running an account update\n");
+	    system("$BINDIR/update -i -l");
+	    $updatefailed = $?;
+	    logmsg("rusage: update done\n");
+	}
     }
 
 resched:
