@@ -5,7 +5,7 @@
  */
 
 #define TBSERVER_PORT		7777
-#define TBSERVER_PORT2		14443
+#define TBSERVER_PORT2		14447
 #define MYBUFSIZE		2048
 #define BOSSNODE_FILENAME	"bossnode"
 
