@@ -329,6 +329,8 @@ setverbose(int sig)
 		verbose = 1;
 	else
 		verbose = 0;
+	info("verbose logging turned %s\n", verbose ? "on" : "off");
+
 	/* Just the parent sends this */
 	if (numchildren)
 		killpg(0, sig);
