@@ -9,6 +9,7 @@ if ($#ARGV < 1) {
       "nfree releases only the listed nodes.\n");
 }
 
+my $error = 0;
 my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
@@ -40,11 +41,14 @@ foreach my $n (@node_names) {
 		       "and eid='$eid'");
     if ($sth->numrows == 0) {
 	print "Node '$n' is not reserved by your experiment.\n";
+	$error++;
 	next;
     } 
     print "Releasing node '$n'...";
     $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
     $sth = $dbh->query($cmd) && print "Succeeded.\n"
-	|| print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"; 
+	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	    && $error++);
 }
 
+exit($error);
