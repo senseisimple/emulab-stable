@@ -88,8 +88,12 @@ function SPITFORM($formfields, $errors)
     #
     echo "<tr>
               <td colspan=2>*Select Project:</td>
-              <td><select name=\"formfields[exp_pid]\">
-                      <option value=''>Please Select &nbsp</option>\n";
+              <td><select name=\"formfields[exp_pid]\">\n";
+
+    # If just one project, make sure just the one option.
+    if (count($projlist) != 1) {
+	echo "<option value=''>Please Select &nbsp</option>\n";
+    }
     
     while (list($project) = each($projlist)) {
 	$selected = "";
