@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -20,9 +20,13 @@ fi
 
 #
 # See if the Testbed configuration software wants to change the hostname.
-# Installed into /etc.
+# Installed into /etc.  Note: frisbee MFS doesn't have perl and hence
+# doesn't have this script.
 # 
-$BINDIR/sethostname $new_domain_name
+if [ -x $BINDIR/sethostname ]
+then
+    $BINDIR/sethostname $new_domain_name
+fi
 
 #
 # Once we have an IP address, we can stop dhclient so that it doesn't get

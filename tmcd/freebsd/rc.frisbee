@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,7 @@ if [ -r /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
 else
 	BINDIR=/etc/testbed
+	BOOTDIR=/etc/testbed
 fi
 
 $BINDIR/tmcc state RELOADSETUP
@@ -86,12 +87,17 @@ fi
 if [ x"$ADDRESS" != x ]; then
         PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`;
 	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
+	if [ -e $BOOTDIR/myip ]; then
+		MCASTIF="-i `cat $BOOTDIR/myip`"
+	else
+		MCASTIF=""
+	fi
 	MCASTADDR="-m $MCAST -p $PORT";
 
-	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTADDR /dev/$DISK at `date`";
+	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`";
 	$BINDIR/tmcc state RELOADING;
 
-	$BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTADDR /dev/$DISK;
+	$BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK;
 	case $? in
 	0)
 		echo "Frisbee run finished";
