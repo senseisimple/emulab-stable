@@ -27,6 +27,6 @@ use libsetup;
 my ($bossname) = split(" ", `tmcc bossinfo`);
 unshift(@ARGV, ("-s", "$bossname"));
 
-exec "tbmevc", @ARGV;
+exec "tevc", @ARGV;
 
 die("Could not exec tbevc: $!");
