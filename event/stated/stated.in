@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -925,6 +925,8 @@ sub handleCtrlEvent($$) {
 		DBQueryFatal("delete from scheduled_reloads ".
 			     "where node_id='$node'");
 		DBQueryFatal("delete from reserved where node_id='$node'");
+		TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
+				 $UID, $pid, $eid);
 		info("Released $node from $pid/$eid\n");
 	    }
 	    next;
