@@ -400,6 +400,39 @@ function DOLOGIN($uid, $password) {
     return -1;
 }
 
+
+#
+# Verify a password
+# 
+function VERIFYPASSWD($uid, $password) {
+    if (! isset($password) ||
+	strcmp($password, "") == 0) {
+	return -1;
+    }
+
+    $query_result =
+	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
+
+    #
+    # Check password in the database against provided. 
+    #
+    if ($row = mysql_fetch_row($query_result)) {
+        $db_encoding = $row[0];
+        $salt = substr($db_encoding, 0, 2);
+	
+        if ($salt[0] == $salt[1]) {
+	    $salt = $salt[0];
+	}
+        $encoding = crypt("$password", $salt);
+	
+        if (strcmp($encoding, $db_encoding)) {
+            return -1;
+	}
+	return 0;
+    }
+    return -1;
+}
+
 #
 # Log out a UID.
 #
