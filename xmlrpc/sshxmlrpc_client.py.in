@@ -32,9 +32,18 @@ module          = "experiment"
 # Debugging output.
 debug           = 0
 
-# For admin people.
-SERVER_PATH     = "/usr/testbed/sbin/"
+#
+# For admin people, and for using their devel trees. These options are
+# meaningless unless you are an Emulab developer; they will be rejected
+# at the server most ungraciously.
+#
+SERVER_PATH     = "/usr/testbed"
+SERVER_DIR      = "sbin"
+DEVEL_DIR       = "devel"
+develuser       = None
 path            = None
+admin           = 0
+devel           = 0
 
 ##
 # Print the usage statement to stdout.
@@ -125,7 +134,7 @@ def do_method(server, method_and_args):
 try:
     # Parse the options,
     opts, req_args =  getopt.getopt(sys.argv[1:],
-                      "dhVs:l:am:",
+                      "dhVs:l:am:zx:",
                       [ "help", "version", "server=", "login=", "module="])
     # ... act on them appropriately, and
     for opt, val in opts:
@@ -150,7 +159,13 @@ try:
 	    debug = 1
             pass
         elif opt in ("-a", "--admin"):
-	    path = SERVER_PATH
+	    admin = 1
+            pass
+        elif opt in ("-z", "--devel"):
+	    devel = 1
+            pass
+        elif opt in ("-x", "--develuser"):
+	    develuser = val
             pass
         pass
     pass
@@ -158,6 +173,20 @@ except getopt.error, e:
     print e.args[0]
     usage()
     sys.exit(2)
+    pass
+
+if admin:
+    path = SERVER_PATH
+    if devel:
+        path += "/" + DEVEL_DIR
+        if develuser:
+            path += "/" + develuser
+            pass
+        else:
+            path += "/" + login_id
+            pass
+        pass
+    path += "/" + SERVER_DIR
     pass
 
 # Get a handle on the server,
