@@ -66,7 +66,7 @@ install:
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_DIR)/opsdir/sbin/event-sched
 
-control-install:
+control-install: event_sched_rpc
 	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_SBINDIR)/event-sched
 
 # not a client thing
