@@ -188,6 +188,18 @@ not_in_node_list(u_char *mac_addr)
 	return 1;
 }
 
+/*  Add link function adds a link to the links_list data structure which is the
+ *  list of all the links in the topology. 
+ *   - It ignores the link if its a duplicate to any of the existing link
+ *   - If one of the interface is common to two links then the links are part
+ *     of a LAN. Since the query is forwarded on the LAN from a single interface
+ *     of a node hence for a LAN there is just one common interface. This
+ *     interface is seperately (pointA of link structure) for making the
+ *     comparisions simple.
+ *     The rest of the interfaces on the LAN is stored as a link list of nodes and
+ *    pointed by the "lan_if_list" in the link structure.
+ */
+
 
 void 
 add_link(struct topd_nbor *p)

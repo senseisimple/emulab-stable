@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.9 2001-07-19 20:02:37 ikumar Exp $
+ * $Id: serv_listen.c,v 1.10 2001-08-02 21:21:05 ikumar Exp $
  */
 
 #include <math.h>
@@ -220,7 +220,7 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 	FD_SET(servSockFd,&readFd);
 	
 	start = tod();
-	state = Q_LISTEN;
+	state = Q_LISTEN;	/* Intially, just wait for query */			
 	while(1)
 	{
 		tempReadFd = readFd;
@@ -314,7 +314,7 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 			} 
 			else
 			{
-				printf("Error: Stray packet... earlier enquiry.\n");
+				printf("Error: Stray packet... earlier enquiry may be.\n");
 			}
 			if(class == NEW)
 				printf("Received a new query packet!\n");
@@ -448,7 +448,7 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 			}
 		}
 				
-		if(state == QR_LISTEN)
+		if(state == QR_LISTEN)	/* Waiting for Querry as well as Replies */
 		{
 			end=tod();
 			/* Since I have come out of the select so lets calculate how much time

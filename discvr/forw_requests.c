@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.9 2001-07-19 20:02:37 ikumar Exp $
+ * $Id: forw_requests.c,v 1.10 2001-08-02 21:21:05 ikumar Exp $
  */
 
 #include <math.h>
@@ -102,7 +102,10 @@ forward_request(struct ifi_info *ifihead, const struct in_pktinfo *pktinfo,
 		// Skip all the interfaces which are not useful
 		if( (ifi->ifi_flags & !IFF_UP) || (ifi->ifi_flags & IFF_LOOPBACK) ||
 		    (strcmp(ifi->ifi_name, if_indextoname(pktinfo->ipi_ifindex, ifname)) == 0) ||
-			(strcmp(ifi->ifi_name,"fxp4")==0) ) 
+			/*(strcmp(ifi->ifi_name,"fxp4")==0)*/
+			(strncmp(inet_ntoa(((struct sockaddr_in *)(ifi->ifi_addr))->sin_addr),"155.101.132",11)==0)
+			)
+
 		{
 			continue;
 		}
