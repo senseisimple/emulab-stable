@@ -1,0 +1,11 @@
+This directory contains scripts/directions included in the "generic image"
+tarball.  It does not currently contain any instructions for Emulab-types
+on how to create the actual images or the tarball.  Talk to Mike about that.
+
+META-README		This file, not included in the tarball
+README			Directions for using the tarball
+
+setup-images.sql	SQL snippets for populating the DB with the images.
+setup-mfsosids.sql
+setup-o2i.sql
+setup-osids.sql
