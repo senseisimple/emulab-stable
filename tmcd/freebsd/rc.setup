@@ -56,7 +56,7 @@ fi
 if [ -x /etc/testbed/slothd ]; then
 	echo "Starting usage detector ..."
         killall slothd
-        rm -f /tmp/.sdpid
+        rm -f /var/run/slothd
 	/etc/testbed/slothd
 fi
 
