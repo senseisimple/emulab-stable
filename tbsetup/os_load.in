@@ -144,7 +144,7 @@ if ($UID && !TBAdmin($UID)) {
 # See if allowed to load this image!
 #
 if (defined($imageid) && $mereuser &&
-    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
+    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
     die("*** You do not have permission to load imageid $imageid!\n");
 }
 
