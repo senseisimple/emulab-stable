@@ -781,7 +781,7 @@ sub init {
 	    }
 
 	} else {
-	    mkdir ($linktest_path,0777) or  die &fatal("Could not create directory $linktest_path");
+	    mkdir (&check_filename($linktest_path),0777) or  die &fatal("Could not create directory $linktest_path");
 	}
 
 	chdir(RUN_PATH);
