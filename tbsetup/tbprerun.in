@@ -39,8 +39,11 @@ use libtestbed;
 $| = 1;
 
 #
-# Check for -force, and ignore experiment state.
+# Parse args
 #
+if (!@ARGV) {
+    usage();
+}
 if ($ARGV[0] eq "-force") {
     $force = 1;
     shift;
