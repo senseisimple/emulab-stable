@@ -10,7 +10,7 @@ my $DBNAME	= "@TBDBNAME@";
 my $BACKUPDIR	= "$TB/backup";
 
 # un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -18,11 +18,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # 
 if ($UID != 0) {
     print STDERR "You must be root to run this script!\n";
-    exit(-1);
-}
-
-if (! chdir($BACKUPDIR)) {
-    print STDERR "Could not chdir to $BACKUPDIR!\n";
     exit(-1);
 }
 
@@ -37,20 +32,56 @@ if ($name =~ /^([-\@\w.]+)$/) {
 }
 
 #
+# Create a temporary name for a log file and untaint it.
+#
+#
+# Form a temp name.
+#
+my $logname = `mktemp /tmp/dbbackup.XXXXXX`;
+
+if ($logname =~ /^([-\@\w.\/]+)$/) {
+    $logname = $1;
+} else {
+    die "Bad data in $logname";
+}
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+# 
+open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+if (! chdir($BACKUPDIR)) {
+    print STDERR "Could not chdir to $BACKUPDIR!\n";
+    fatal();
+}
+
+#
 # Do a mysqldump. This will reset the log files.
 #
 if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $name")) {
     print STDERR "mysqldump failed!\n";
-    exit(1);
+    fatal();
 }
 
-#
-# Compress it.
-#
 if (system("gzip $name")) {
     print STDERR "gzip failed!\n";
-    exit(1);
+    fatal();
 }
 
-print STDOUT "DB backup ($DBNAME) complete!\n";
+#system("cat $logname | /usr/bin/mail -s '\"DB Backup Finished\"' stoller");
+unlink("$logname");
 exit 0;
+
+sub fatal {
+    system("cat $logname | /usr/bin/mail ".
+	   "-s '\"DB Backup Failed\"' testbed@fast");
+    unlink("$logname");
+    exit(1);
+}
