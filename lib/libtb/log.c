@@ -57,7 +57,6 @@ info(const char *fmt, ...)
 
 	if (!usesyslog) {
 		fputs(buf, stderr);
-		fputc('\n', stderr);
 	}
 	else
 		syslog(LOG_INFO, "%s", buf);
@@ -71,7 +70,6 @@ warning(const char *fmt, ...)
 	va_start(args, fmt);
 	if (!usesyslog) {
 		vfprintf(stderr, fmt, args);
-		fputc('\n', stderr);
 		fflush(stderr);
 	}
 	else
@@ -88,7 +86,6 @@ error(const char *fmt, ...)
 	va_start(args, fmt);
 	if (!usesyslog) {
 		vfprintf(stderr, fmt, args);
-		fputc('\n', stderr);
 		fflush(stderr);
 	}
 	else
