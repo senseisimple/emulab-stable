@@ -36,6 +36,9 @@ PAGEHEADER("Documentation");
 <li><b><a href = "docwrapper.php3?docname=security.html">
           Security Issues</a></b>
      <p>
+<li><b><a href = "doc/docwrapper.php3?docname=hw-recommend.html">
+          Hardware recommendations for those building their own Emulab</a></b>
+     <p>
 <li><b><a href = "docwrapper.php3?docname=policies.html">
           Administrative Policies and Disclaimer</a></b>
      <p>

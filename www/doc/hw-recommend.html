@@ -31,6 +31,22 @@ recommendations, and outlines the consequences of each choice.
 <a NAME="NODES"></a><h2>Nodes</h2>
 <dl>
 
+	<dt><b>NICs</b></dt>
+		<dd>At least 2 - one for control net, one for the experimental network.
+		Our attempts to use nodes with only 1 NIC have not met with much
+		success. 3 interfaces lets you have delay nodes, but only linear
+		topolgies (no branching.) 4 lets you have (really simple) routers. We
+		opted to go with 5.  Control net interface should have PXE capability.
+		All experimental interfaces should be the same, unless you are
+		purposely going for a heterogenous environment. Control net interface
+		can be different.  Intel EtherExpress (fxp) and 3Com 3c???  (xl) are
+		known to work. Note that not all these cards have PXE, and different
+		versions of PXE have different sets of bugs, so it's best to get a
+		sample first and try it out before committing to a card. Depedning on
+		usage, it may be OK to get a large number of nodes with 2 interfaces to
+		be edge nodes, and a smaller number with more interfaces to be
+		routers.</dd>
+
 	<dt><b>Case/Chassis</b></dt>
 		<dd>This will depend on your space requirements. The cheapest option is
 		to buy standard desktop machines, but these are not very
@@ -59,22 +75,6 @@ recommendations, and outlines the consequences of each choice.
 		need much, but at least one has wished we had more than 512MB. We chose
 		to go with ECC, since it is not much more expensive than non-ECC, and
 		with our large scale, ECC will help protect against failure.</dd>
-
-	<dt><b>NICs</b></dt>
-		<dd>At least 2 - one for control net, one for the experimental network.
-		Our attempts to use nodes with only 1 NIC have not met with much
-		success. 3 interfaces lets you have delay nodes, but only linear
-		topolgies (no branching.) 4 lets you have (really simple) routers. We
-		opted to go with 5.  Control net interface should have PXE capability.
-		All experimental interfaces should be the same, unless you are
-		purposely going for a heterogenous environment. Control net interface
-		can be different.  Intel EtherExpress (fxp) and 3Com 3c???  (xl) are
-		known to work. Note that not all these cards have PXE, so make sure
-		that your control net card is one of the models that does. Depedning on
-		usage, it may be OK to get a large number of nodes with 2 interfaces to
-		be edge nodes, and a smaller number with more interfaces to be
-		routers.</dd>
-
 
 	<dt><b>Motherboard</b></dt>
 		<dd>Serial console redirection is nice, and the BIOS should have
@@ -108,6 +108,11 @@ recommendations, and outlines the consequences of each choice.
 <dl>
 	<dt><b>Control net</b></dt>
 		<dd><dl>
+
+		<dt><b>Number of ports</b></dt>
+			<dd>You'll need one port for each testbed node, plus ports for
+			control nodes, power controllers, etc.</dd>
+
 		<dt><b>VLANs</b></dt>
 			<dd>Protects control hw (switches, power, etc.) from nodes
 			and world, and private machines. Without them, control
@@ -142,6 +147,22 @@ recommendations, and outlines the consequences of each choice.
 
 	<dt><b>Experimental net</b></dt>
 		 <dd><dl>
+
+		 <dt><b>Vendor</b></dt>
+			 <dd>Our software currently supports Cisco Catalyst 6000 series 
+			 and Intel 510T switches. Other switches by the same vendors will
+			 likely be easy to support. Switches from other vendors can
+			 theoretically be used if they support SNMP for management, but
+			 will likely require significant work.</dd>
+
+		 <dt><b>Number of ports</b></dt>
+			 <dd>You'll need as many ports as you have experimental interfaces
+			 on your nodes. In addition, you need 1 port to connect the
+			 experimental net switch to the control net (for SNMP
+			 configuration.) If you're using multiple switches, you need
+			 sufficient ports to 'stack' them together - If your switches are
+			 100Mbit, Gigabit ports are useful for this.</dd>
+
 		 <dt><b>VLAN support</b></dt>
 			<dd>Optimally, configurable via SNMP (we have no tools to configure
 			it otherwise.) If not available, all experimental isolation is
