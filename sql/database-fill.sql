@@ -448,7 +448,7 @@ REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','defa
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:tinytext',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z][-\\w]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
+REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselinkdelays','int','redirect','default:boolean',0,0,NULL);
@@ -467,7 +467,7 @@ REPLACE INTO table_regex VALUES ('nseconfigs','eid','text','redirect','experimen
 REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\015]*$',0,16777215,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.]+$',2,20,NULL);
-REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[a-zA-Z][-a-zA-Z0-9]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
