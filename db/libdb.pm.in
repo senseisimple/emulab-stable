@@ -2359,7 +2359,8 @@ sub DBQuery($)
 		"  Query: $query\n".
 		"  Error: " . $DB->errstr . " ($err)";
 	}
-	if (defined($result) || $DB->err != 2006) {
+	if (defined($result) ||
+	    ($DB->err != 2006) && ($DB->err != 1053) && ($DB->err != 2013)) {
 	    last;
 	}
 
