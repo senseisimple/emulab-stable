@@ -112,6 +112,9 @@ int assign()
   float cycles = 120.0*(float)(nnodes + G.number_of_edges());
 
   float optimal = OPTIMAL_SCORE(G.number_of_edges(),nnodes);
+#ifdef STATS
+  cout << "STATS_OPTIMAL = " << optimal << endl;
+#endif
   
   int mintrans = (int)cycles;
   int trans;
@@ -153,6 +156,11 @@ int assign()
 
     bool unassigned = true;
     while (trans < mintrans && accepts < naccepts) {
+#ifdef STATS
+      cout << "STATS temp:" << temp << " score:" << get_score() <<
+	" violated:" << violated << " trans:" << trans <<
+	" accepts:" << accepts << endl;
+#endif STATS
       int newpos;
       trans++;
       iters++;
