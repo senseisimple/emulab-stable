@@ -80,6 +80,13 @@ my $port_btn =
 		     -activeforeground=>$btn_afg,
 		     -command=> sub { &msg($status,""); &portSetup("Alpha")}
 		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
+my $stat_btn =
+    $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg=>$btn_bg,
+		     -activebackground=>$btn_abg,-fg=>$btn_fg,
+		     -width=>8, -anchor=>'center',-text=>"Statistics",
+		     -activeforeground=>$btn_afg,
+		     -command=> sub { &msg($status,""); &stats("Alpha")}
+		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 my $opt_btn =
     $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg=>$btn_bg,
 		     -activebackground=>$btn_abg,-fg=>$btn_fg,
@@ -102,7 +109,7 @@ $status =
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'both');
 
 
-&msg($status,"Welcome to SnmpIt!");
+&msg($status,"Welcome to vsnmpit - Visual SnmpIt!");
 
 
 &MainLoop();
@@ -417,7 +424,7 @@ sub portSetup {
     open(DATA,"snmpit -i $switch -s 2>&1 |");
     while (<DATA>) {
 	chop;
-	if (/^Port Configuration, Switch (.*) \((.*)\)/) {
+	if (/^Port Configuration, Testbed Switch (.*) \((.*)\)/) {
 	    $sw_name = $1;
 	    $sw_IP = $2;
 	    next;
@@ -808,6 +815,252 @@ sub updatePorts {
     close (DATA);
     push(@output,"Port Configurations updated.");
     &msg($status,join("\n",@output));
+}
+
+
+#################################################################
+#
+# STATS SECTION
+#
+#################################################################
+
+sub stats {
+    my $switch="";
+    my @args=();
+    ($switch, @args) = @_;
+    $area->pack('forget');
+    $area = 
+	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			 -fg=>$main_fg,-width=>50
+			 )->pack(-side=>'top',-fill=>'both');
+    my $buttons =
+	$area->Frame(-relief=>'groove',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $sw_btn1 = 
+	$buttons->Button
+	    (-text=>'Alpha',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &stats("Alpha"); }
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn2 = 
+	$buttons->Button
+	    (-text=>'Beta',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &stats("Beta"); } 
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn3 = 
+	$buttons->Button
+	    (-text=>'Gamma',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &stats("Gamma"); }
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn4 = 
+	$buttons->Button
+	    (-text=>'Delta',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &stats("Delta"); } 
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    
+    my $sw_name="";
+    my $sw_IP="";
+    my %names=();
+    my %in1=();
+    my %in2=();
+    my %in3=();
+    my %in4=();
+    my %in5=();
+    my %in6=();
+    my %out1=();
+    my %out2=();
+    my %out3=();
+    my %out4=();
+    my %out5=();
+    my %out6=();
+    my @line=();
+    my $port=0;
+    open(DATA,"snmpit -i $switch -g 2>&1 |");
+    while (<DATA>) {
+	chop;
+	if (/^Port Statistics, Testbed Switch (.*) \((.*)\)/) {
+	    $sw_name = $1;
+	    $sw_IP = $2;
+	    next;
+	}
+	if (/InUcast/) {next;}
+	if (/^Port Interface/) {next;}
+	if (/^--/) {next;}
+	s/^ +//;
+	s/ +/\t/g;
+	#s/\t\t\t/\t\t/;
+	#s/Mbit\t\t/Mbit\t/;
+	@line= split("\t",$_);
+	$port = shift(@line);
+	$names{$port}= shift(@line);
+	$in1{$port}=shift(@line);
+	$in2{$port}=shift(@line);
+	$in3{$port}=shift(@line);
+	$in4{$port}=shift(@line);
+	$in5{$port}=shift(@line);
+	$in6{$port}=shift(@line);
+	$out1{$port}=shift(@line);
+	$out2{$port}=shift(@line);
+	$out3{$port}=shift(@line);
+	$out4{$port}=shift(@line);
+	$out5{$port}=shift(@line);
+	$out6{$port}=shift(@line);
+    }
+    close (DATA);
+    
+    my $titlebar =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $titles =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $table =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $switch_title =
+	$titlebar->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+			 -fg=>$main_fg,
+			 -text=>"Port Statistics - Testbed Switch ".
+			 "$sw_name ($sw_IP)"
+			 )->pack(-side=>'left',-expand=>1,-fill=>'x');
+    
+    my $L_portNum = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Port #',-width=>6
+		       )->pack(-side=>'left',-fill=>"both");
+    my $L_interface = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Interface',-width=>10
+		       )->pack(-side=>'left',-expand=>1,-fill=>"both");
+    my $L_in1 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In Octets",-width=>12
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_in2 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In Unicast\nPackets",-width=>10
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_in3 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In Non-\nUnicast\nPackets",
+		       -width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_in4 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In\nDiscards",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_in5 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In\nErrors",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_in6 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"In\nUnknown\nProtocol",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out1 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out Octets",-width=>12
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out2 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out Unicast\nPackets",-width=>10
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out3 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out Non-\nUnicast\nPackets",
+		       -width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out4 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out\nDiscards",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out5 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out\nErrors",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    my $L_out6 = 
+	$titles->Label(-relief=>"sunken",-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>"Out\nQueue\nLength",-width=>8
+		       )->pack(-side=>"left",-fill=>"both");
+    foreach $port ( sort num keys(%names)) {
+	my $row = 
+	    $table->Frame(-relief=>'flat',
+			  -bg=>$main_bg,-fg=>$main_fg
+			  )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$port,-width=>6,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$names{$port},-width=>10,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-expand=>1,-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in1{$port},-width=>12,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in2{$port},-width=>10,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in3{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in4{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in5{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$in6{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out1{$port},-width=>12,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out2{$port},-width=>10,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out3{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out4{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out5{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$out6{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left',-fill=>'x');
+    }
+    my $row = 
+	$table->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $btn_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-expand=>"1",-fill=>'both');
+    my $refresh =
+	$btn_frm->Button(-text=>'Refresh',-bg=>$main_bg,-width=>'14', 
+		     -relief=>'raised',-borderwidth=>3,
+		     -fg=>$main_fg,-activebackground=>$main_abg,
+		     -activeforeground=>$main_afg,
+		     -command=> sub { &stats($switch); }
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'both');
+    
 }
 
 

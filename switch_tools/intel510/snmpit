@@ -452,7 +452,7 @@ sub ShowPorts {
     if ($i =~ /155\.99\.214\.171/) { $switch = "Beta"; }
     if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
     if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
-    print "Port Configuration, Switch $switch ($i)\n";
+    print "Port Configuration, Testbed Switch $switch ($i)\n";
     print "Port Interface\tVLAN\tEnabled\tLink\tAutoNeg\tSpeed\t\tDuplex\n";
     print "----------------------------------------------------------------";
     print "------------\n";
@@ -525,34 +525,46 @@ sub GetStats {
     if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
     if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
     print "Port Statistics, Testbed Switch $switch ($i)\n";
-    print "\t\tIN: Octets\tUcast\tM/Bcast\tDiscard\tErrors\tUnknown Proto.\n";
-    print "Port Interface\tOUT: Octets\tUcast\tM/Bcast\tDiscard\tErrors\tQueue Length\n";
-    print "----------------------------------------------------------------";
-    print "--------------\n";
+    print "\t\t\t     InUcast   InNUcast  In        In      Unknown\t".
+	"\t  OutUcast  OutNUcast Out       Out      Out Queue\n";
+    print "Port Interface\tIn Octets    Packets   Packets   Discards  Errors".
+	"  Proto.    Out Octets   Packets   Packets   Discards  Errors   ".
+	    "Length\n";
+    print "------------------------------------------------------------------";
+    print "------------------------------------------------------------------";
+    print "------\n";
     foreach my $port ( sort num keys (%inOctets) ) {
 	my $vlan;
 	my $switchport = join(":",$i,$port);
 	my $ifname = $Ports{$switchport};
-	if (! defined ($ifname) ) { $ifname = "\t"; }
+	if (! defined ($ifname) ) { $ifname = "         "; }
 	if ($port < 10) { print " "; }
 	print " ",$port,"  ";
 	print $ifname,"\t";
 	my $n=0;
 	my $str="";
-	print $str=$inOctets{$port},"\t";
-	if (length($str) < 8) { print "\t"; }
-	print $str=$inUcast{$port},"\t";
-	print $str=$inNUcast{$port},"\t"; 
-	print $str=$inDiscard{$port},"\t";
-	print $str=$inErr{$port},"\t"; 
-	print $str=$inUnkProt{$port},"\t";
-	print "\n\t\t";
-	print $str=$outOctets{$port},"\t"; 
-	if (length($str) < 8) { print "\t"; }
-	print $str=$outUcast{$port},"\t";
-	print $str=$outNUcast{$port},"\t"; 
-	print $str=$outDiscard{$port},"\t";
-	print $str=$outErr{$port},"\t"; 
+	print $str=$inOctets{$port};
+	foreach $n (length($str)..12) {print " ";}
+	print $str=$inUcast{$port};
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$inNUcast{$port}; 
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$inDiscard{$port};
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$inErr{$port}; 
+	foreach $n (length($str)..7) {print " ";}
+	print $str=$inUnkProt{$port};
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$outOctets{$port}; 
+	foreach $n (length($str)..12) {print " ";}
+	print $str=$outUcast{$port};
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$outNUcast{$port}; 
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$outDiscard{$port};
+	foreach $n (length($str)..9) {print " ";}
+	print $str=$outErr{$port}; 
+	foreach $n (length($str)..9) {print " ";}
 	print $str=$outQLen{$port},"\n";
     }
 }
@@ -699,7 +711,6 @@ sub OneVLAN {
     my $Vlan = $sess->get([[$NextVLANId,0]]);
     my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
     my $RetVal = "Undef.";
-    print "ONE VLAN NAME = $m";
     if ( !$m ) { $m = $Vlan; }
     print "  Creating VLAN $m as VLAN #$Vlan: @vlan ... ";
     $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
@@ -735,16 +746,17 @@ sub AutoVLANConfig {
     my @VLANS= ();
     my @names= ();
     &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
-    &GetToken(*sess,*v);
+    #print "Rcvd: ",join (" ",@names),"\n";
+    &GetToken(\$sess,\$v);
     my $m="";
     my @vlan=();
     while (@VLANS) {
 	@vlan = @{shift(@VLANS)};
 	$m = shift @names;
-	print "VLAN NAME = $m\n";
-	&OneVLAN(*sess,$m,*vlan,*v);
+	#print "Making $m with: ",join(' ',@vlan),"\n";
+	&OneVLAN(\$sess,\$m,\@vlan,\$v);
     }
-    &ReleaseToken(*sess,*v,\$u);
+    &ReleaseToken(\$sess,\$v,\$u);
 }
 
 #
@@ -779,6 +791,7 @@ sub ReadIRFile {
 	my @v= split;
 	$name = shift @v;
 	my $n=0;
+	#print "@v is ",@v,"\n";
 	while(@v != 0 && $n < @v) {
 	    #Lowercase it all, but leave in : for tbpcx:y syntax
 	    $v[$n] = "\L$v[$n]\E";
