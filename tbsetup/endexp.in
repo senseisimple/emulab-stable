@@ -213,7 +213,7 @@ if ($isbatchexpt) {
 		       "Batch experiment $pid/$eid has been canceled.\n".
 		       "You will receive email when the experiment is\n".
 		       "torn down and you can reuse the experiment name.")
-	    if ($ebatchstate ne BATCHSTATE_POSTED &
+	    if ($ebatchstate ne BATCHSTATE_POSTED &&
 		$ebatchstate ne BATCHSTATE_PAUSED);
     }
     #
