@@ -1,3 +1,6 @@
+; This file contains an overview of the design of tiptunnel, which allows users
+; secure access to serial console lines, directly from their desktop machine
+
 ; crb, june 5 2002
 
 Tip-without-ops:

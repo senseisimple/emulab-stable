@@ -1,4 +1,4 @@
-Some notes on how to diagnose problems on the Cisco.
+Some notes on how to diagnose problems on Cisco switches running CatOS
 
 1. Looking at switch stats/status for a node interface.
 

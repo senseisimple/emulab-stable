@@ -1,3 +1,6 @@
+This file gives a basic overview of experiment creation and teardown, though
+it is very out-of-date.
+
 Prerun Outline:
 
 Step 1 - parse.tcl 

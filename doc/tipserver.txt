@@ -1,4 +1,4 @@
-No big deal creating the tip server.
+These are the steps we followed to create a second tip server:
 
 1. Load the new 4.3 image, and then neuter the tmcd/tmcc stuff. Give
    it a fixed IP address (turn off DHCP).
