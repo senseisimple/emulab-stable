@@ -6,32 +6,31 @@
 #
 . /etc/emulab/paths.sh
 
-#
-# A note about Linux. Redhat 9.0 appears to use dhclient instead of pump.
-# We maintain/install both variants though to make life easier. 
-#
-
-date > $LOGDIR/dhclient.log
-echo "$reason" >> $LOGDIR/dhclient.log
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
+then
+    exit 0
+fi
 
 #
 # Remember our server IP, real hostname, router IP, etc.
 #
-if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || \
-   [ x$reason = xRENEW ] || [ x$reason = xREBIND ]; then
-    echo $new_dhcp_server_identifier > $BOOTDIR/bossip
-    echo $new_host_name > $BOOTDIR/realname
-    echo $new_routers > $BOOTDIR/routerip
-    echo $new_ip_address > $BOOTDIR/myip
-    echo $new_subnet_mask > $BOOTDIR/mynetmask
-    if [ -n "$interface" ]; then
-	echo $interface > $BOOTDIR/controlif
-    fi
+echo $new_dhcp_server_identifier > $BOOTDIR/bossip
+echo $new_host_name > $BOOTDIR/realname
+echo $new_routers > $BOOTDIR/routerip
+echo $new_ip_address > $BOOTDIR/myip
+echo $new_subnet_mask > $BOOTDIR/mynetmask
+if [ -n "$interface" ]; then
+    echo $interface > $BOOTDIR/controlif
+fi
 
-    #
-    # See if the Testbed configuration software wants to change the hostname.
-    # 
-    $BINDIR/sethostname.dhclient >>$LOGDIR/dhclient.log 2>&1
-fi  
+#
+# See if the Testbed configuration software wants to change the hostname.
+# 
+$BINDIR/sethostname.dhclient >$LOGDIR/dhclient.log 2>&1
+
+#
+# The killing of dhclient and shutdown of other interfaces is handled
+# by the dhclient caller (sysconfig/network-scripts/ifcfg-eth99)
+#
 
 exit 0
