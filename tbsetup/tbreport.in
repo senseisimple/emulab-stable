@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
@@ -103,6 +103,22 @@ if (@ARGV != 2) {
 
 my ($pid,$eid) = @ARGV;
 my $state;
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\w\.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\w\.]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
 
 #
 # Experiment must exist.
