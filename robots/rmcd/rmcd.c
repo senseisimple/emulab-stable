@@ -1,7 +1,7 @@
 /* Robot Master Control Daemon
  *
  * Dan Flickinger
- *
+ * ***
  *
  * RMCD will immediately try to connect to EMCD, get configuration data,
  * and then open connections to all robots as sent by EMCD. RMCD only heeds
@@ -21,7 +21,7 @@
  *
  *
  * 2004/12/01
- * 2004/12/07
+ * 2004/12/14
  */
 
 #include <stdio.h>
@@ -197,7 +197,12 @@ static void conv_a2r(struct position *rel,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    *rel = *abs_finish; // XXX DAN, fill this out.
+    rel->x = abs_finish->x - abs_start->x;
+    rel->y = abs_finish->y - abs_start->y;
+    rel->theta = abs_finish->theta - abs_start->theta;
+    rel->timestamp = abs_finish->timestamp;
+    
+    //*rel = *abs_finish; // XXX DAN, fill this out.
 }
 
 /**
@@ -216,7 +221,12 @@ static void conv_r2a(struct position *abs_finish,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    *abs_finish = *rel; // XXX DAN, fill this out.
+    abs_finish->x = abs_start->x + rel->x;
+    abs_finish->y = abs_start->y + rel->y;
+    abs_finish->theta = abs_start->theta + rel->theta;
+    abs_finish->timestamp = rel->timestamp;
+    
+    //*abs_finish = *rel; // XXX DAN, fill this out.
 }
 
 /**
