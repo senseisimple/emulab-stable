@@ -103,6 +103,7 @@
 
 <li> <a href="#TR">Troubleshooting</a>
      <ul>
+     <li> <a href="#TR-0">My experiment setup failed, what did I do wrong?</a>
      <li> <a href="#TR-1">My experiment is set up, but I cannot
      			  send packets between some of the nodes. Why?</a>
      <li> <a href="#TR-2">I asked for traffic shaping, but everything
@@ -523,16 +524,6 @@
     deallocated, the run files are cleared, so if you want to save
     them, you must do so before terminating the experiment. 
     </p>
-    <p>
-    The Sharks also have serial console lines, but because of the
-    limited number of serial ports available on <b>users.emulab.net</b>, only
-    one Shark, the last or "eighth", on each shelf has a console line
-    attached. To connect to that shark, you would type <tt>console shXX</tt>
-    at the Unix prompt, where "XX" is the shark shelf number. The
-    shark shelf number is the first digit in the name. Using shark
-    sh16-8 as an example, the shelf number is sixteen, and the number
-    of the node on the shelf is eight.
-    </p>
 
 <li><a NAME="UTT-TUNNEL"></a>
     <font size='+1'><b>How do I connect directly to node consoles, 
@@ -662,13 +653,6 @@
     node hangs, or is otherwise unresponsive, you can use the
     <tt>node_reboot</tt> command, as discussed in the
     <a href="tutorial/tutorial.php3#Wedged">Emulab Tutorial.</a>
-    </p>
-    <p>
-    The Sharks are also power controlled, but because of the limited
-    number of power ports available, the entire shelf of 8 sharks is
-    on a single controller. The <tt>node_reboot</tt> does its best to
-    cleanly reboot individual sharks, but if a single shark is
-    unresponsive, the entire shelf will be power cycled.
     </p>
 
 <li><a NAME="UTT-SCROGGED"></a>
@@ -1430,6 +1414,79 @@
 <a NAME="TR"></a>
 <font size='+1'><b>Troubleshooting</b></font>
 <ul>
+<li> <a NAME="TR-0"></a>
+    <font size='+1'><b>My experiment setup failed,
+        what did I do wrong?</b></font>
+    <p>
+    Experiments can fail in many, many ways, but before you send the above
+    vague question off to us, consider a couple of things.
+    First, look carefully at the "experiment failed"
+    e-mail that you received.  It includes a log of the setup process which,
+    while not a model of clarity, often contains an obvious indication of what
+    happened.
+    <p>
+    One potential point of failure is the mapping phase where Emulab
+    attempts to map your topology to the available resources.  Look
+    in the log for where it runs <code>assign</code>.  Common errors
+    here include:
+    <ul>
+    <li> Your topology that requires more physical nodes than
+    are currently available.  There should be a message of the form:
+    <pre>
+    *** NN nodes of type XX requested, but only MM found
+    </pre>
+    in the log.  You should always check the free node count on the left
+    menu before trying an experiment swapin.  Keep in mind that shaped
+    links might require additional traffic-shaping nodes above and beyond
+    nodes that are explicit in your topology.
+    <p>
+    <li> Your topology requires too many links on one node.
+    Currently you can have no more than four links per node unless
+    you use
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#EMULINKS>
+    multiplexed links</a>.
+    </ul>
+    <p>
+    If the setup log shows <code>assign</code> failing repeatedly and
+    eventually giving up, <a href="#GS-7a">contact us</a>.
+    <p>
+    The next potential failure point is the setup of the physical
+    nodes.  If you are explicitly setting the OS image to use with
+    <code>tb-set-node-os</code>, then make sure you have specified
+    a valid image (e.g., did you spell the OS identifier correctly?)
+    Again, the log output should include an error if the OSID was
+    invalid.  Try:
+    <pre>
+    os_load -l
+    </pre>
+    on users.emulab.net to get a list of OSIDs that you can use.
+    <p>
+    If the OSID is correct, but the log contains messages of the form:
+    <pre>
+    *** Giving up on pcXXX - it's been NN minute(s).
+    *** WARNING: pcXXX may be down.
+    This has been reported to testbed-ops.
+    </pre>
+    then a node failed to reach the point where it would report a successful
+    setup to Emulab.
+    <p>
+    Such failures can be caused by many things.  Sometimes
+    a transient load on an Emulab server can push a node over its
+    timeout, though this is happening less and less as we
+    improve our infrastructure.  Most often, these failures are caused
+    by the use of custom images which either do not boot or do not
+    self-configure properly.  These are harder to dianose because you
+    often need access to the console logs to see what happened,
+    and these logs aren't available after an experiment fails.
+    However, it is possible to interactively monitor
+    the console while the experiment is setting up since console access
+    is granted early in setup process.  You can either use the
+    <code>console</code> command on users, use the
+    <a href="#UTT-TUNNEL">tiptunnel</a> client application,
+    or just run "tail -f" on the <code>/var/log/tiplogs/pcXXX.run</code>
+    file.
+    </p>
+
 <li><a NAME="TR-1"></a>
     <font size='+1'><b>My experiment is set up, but I cannot
 	send packets between some of the nodes. Why?</b></font>
