@@ -436,9 +436,8 @@ function PAGEFOOTER() {
 		<br>
                 <!-- begin copyright -->
                 <font size=-2>
-                    &copy; 2000-2002 The University of Utah.
 <a href="<?php echo "$TBDOCBASE"; ?>/docwrapper.php3?docname=copyright.html">
-                    All rights reserved.</a>
+                    Copyright &copy; 2000-2002 The University of Utah</a>
                   </font>
                   <br />
 		</center>

@@ -11,37 +11,41 @@
 
 <ul>
 <li><b>Wide-area nodes</b>: FreeBSD 4.6 with additions for robustness
-    and for participation in the wide area testbed.
+    and for participation in the wide area Netbed.
 
 <p>
-<li><b>boss.emulab.net</b>: Master node, database, web server, name server, trusted disk-image server
+<li><b>boss.emulab.net</b>: Master server, database, web server, name server, trusted disk-image server
     <p>
     Also known as <b>www.netbed.org</b>.
-    Runs FreeBSD 4.5-RELEASE.  This is the master machine for the testbed
+    Runs FreeBSD.  This is the master machine for the testbed
     software.  Runs all the critical software components and thus is not
-    directly accessible by testbed users.  Moderates (via the database)
+    directly accessible by testbed users.  Mediates (via the database)
     access to node power cycling and disk-image loading as well as providing
     DNS and web services.
 
 <p>
-<li><b>users.emulab.net</b>: Control node, NFS server, test node serial line server and console access point
+<li><b>users.emulab.net</b>:  NFS and SFS file server, login/control/console access point,
+    serial line server.
+
     <p>
-    Also known as <b>ops.emulab.net</b>.
-    Runs FreeBSD 4.5-RELEASE.  This is the main server machine for users
-    of the testbed and is where home directories and all project files
-    live. While most of the testbed configuration process is done via
+    Also known as <b>ops.emulab.net</b> and <b>fs.emulab.net</b>.
+    Currently runs FreeBSD 4.5-RELEASE.  This is the main server machine for users
+    of the testbed and is where shared home directories and all project files
+    live.  While most of the testbed configuration process is done via
     the Web interface, a few things must be done while logged into
     users.emulab.net.  These testbed specific commands and programs are
     contained in <code>/usr/testbed/bin</code>. Your skeleton login
-    files will already have this directory in your path.
+    files already have this directory in your path.
     
     <p>
     This is also one of Emulab's "serial-line console" servers.  Experimenters can access
-    the console of any testbed node (using <code>tip</code>) from here.
+    the console of any testbed node (using the <code>console</code> program) from here.
     Console output of all nodes is also logged here.
+</ul>
 
 <h3>Machines used only for ``Emulab Classic'':</h3>
 
+<ul>
 <p>
 <li><b>tipserv1.emulab.net</b>: additional test node serial line server
     <p>
@@ -53,7 +57,7 @@
 <p>
 <li><b>pc[1-40].emulab.net</b>: <a href="hardware.html#tbpc600">pc600</a> testbed PC nodes
     <p>
-    The testbed nodes can dual boot FreeBSD 4.3 and RedHat Linux 7.1.
+    The testbed nodes can dual boot FreeBSD 4.5 and RedHat Linux 7.1.
     You may also boot your own OSKit kernels on them. Alternatively, you
     can run whatever OS you like by loading your own OS image onto the
     the 4th DOS slice using the Testbed configuration software.
@@ -71,13 +75,13 @@
     All of these nodes have their COM1 serial interface (console
     port) connected to users.emulab.net. The port is configured to run
     at 115K baud, and are accessible from users.emulab.net via
-    <code>tip</code> using the appropriate "pc" names; e.g., "pc6."
+    <code>console</code> using the appropriate "pc" names; e.g., "pc6."
 
 <p>
 <li><b>pc[41-168].emulab.net</b>: <a href="hardware.html#tbpc850">pc850</a> testbed PC nodes
     <p>
     Same as "pc600" nodes from a software perspective:
-    dual booting FreeBSD 4.3 and RedHat Linux 7.1, or capable of running
+    dual booting FreeBSD 4.5 and RedHat Linux 7.1, or capable of running
     custom OSKit kernels.
     However, due to differences in the hardware configuration,
     the "control" interface is <code>fxp0</code> under FreeBSD,
@@ -108,7 +112,7 @@
     limited number of serial ports on the control node, only the last
     Shark on each shelf is connected to the control node.  These
     designated Shark console lines are accessible from
-    users.emulab.net (via the tip command) using the appropriate
+    users.emulab.net (via the <code>console</code> command) using the appropriate
     "tbsh" shelf names; e.g., "sh16."
 
 </ul>
