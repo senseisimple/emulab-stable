@@ -94,7 +94,7 @@ emote named <code>em1</code>, we would use <code>tb-fix-node $inkyhost em1</code
 Uploading your own code to run on the motes is easy. Just build your TinyOS app
 normally (ie. '<code>make mica2</code>').  Then, upload the binary that gets
 placed in <code>build/mica2/main.srec</code> to our
-<a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">mote image
+<a href="/newimageid_ez.php3?nodetype=mote">mote image
     creation page</a>.  This page will ask you for a 'descriptor'.  This
 descriptor can then be used in <code>tb-set-node-os</code> lines in your
 NS files, and your app will be automatically loaded on the appropriate mote(s).
@@ -127,7 +127,7 @@ starting a new experiment, you have two options:
 </ul>
 Both of these are commands in /usr/testbed/bin on ops.emulab.net.   They are
 also available through our
-<a href="<?php echo $TBBASE ?>/xmlrpcapi.php3">XML-RPC interface</a>, so you
+<a href="/xmlrpcapi.php3">XML-RPC interface</a>, so you
 can run them from your desktop machine to save time - the file given as an
 argument to tbuisp is sent with the XML-RPC, so you don't need to copy it onto
 our servers.
