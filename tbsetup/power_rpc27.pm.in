@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,7 +35,7 @@ $| = 1;
 my $debug = 0;
 
 # RPC27 Prompt string
-my $RPC27_PROMPT = "RPC-27>";
+my $RPC27_PROMPT = 'RPC-\d+>';
 my %RPC27_CMD =
   ("cycle"=>"reboot",
    "on"    =>"on",
@@ -127,11 +127,17 @@ sub syncandsend($$) {
 	    return 1;
 	}
 
-	if (sysread($TIP, $line, 1024) == 0) {
-	    print STDERR
-		"*** Power control sync read failed ($controller/$outlet)\n";
-	    close($TIP);
-	    return 1;
+	my $cc = 0;
+	while (1) {
+	    if (sysread($TIP, $line, 1, $cc) == 0) {
+		print STDERR
+		    "*** Power control sync read failed ".
+			"($controller/$outlet)\n";
+		close($TIP);
+		return 1;
+	    }
+	    $cc++;
+	    last if ($line =~ /\n/ || $cc > 1023);
 	}
 	if ($debug) {
 	    print "Read: $line";
