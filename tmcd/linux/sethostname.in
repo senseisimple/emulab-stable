@@ -41,6 +41,8 @@ use libtmcc;
 
 my ($action,$iface,$ip) = @ARGV;
 
+open(STDERR, ">$LOGDIR/pump.log");
+
 if (defined($action)) {
     if ($action ne "up" && $action ne "renewal") {
 	exit 0;
@@ -115,6 +117,12 @@ print STDERR "Resetting hostname to ${nickname}${domain} ... ";
 if (system("hostname", "${nickname}${domain}")) {
     print STDERR "*** FAILED!\n";
     exit 1;
+}
+
+# stash off the interface name to use as our control net
+if (defined($iface) && $iface =~ /^([-\w\.]+)$/) {
+    $iface = $1;
+    system("echo $iface > $BOOTDIR/control_interface");
 }
 
 print STDERR "Done!\n";

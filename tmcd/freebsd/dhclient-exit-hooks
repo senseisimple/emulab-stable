@@ -16,6 +16,9 @@ then
 	echo $new_routers > $BOOTDIR/routerip
 	echo $new_ip_address > $BOOTDIR/myip
 	echo $new_subnet_mask > $BOOTDIR/mynetmask
+	if [ -n "$interface" ]; then
+		echo $interface > $BOOTDIR/control_interface
+	fi
 fi
 
 #
@@ -25,7 +28,7 @@ fi
 # 
 if [ -x $BINDIR/sethostname ]
 then
-    $BINDIR/sethostname $new_domain_name >$LOGDIR/dhclient.log 2>&1
+	$BINDIR/sethostname $new_domain_name >$LOGDIR/dhclient.log 2>&1
 fi
 
 #

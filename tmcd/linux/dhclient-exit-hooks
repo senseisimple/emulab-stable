@@ -11,7 +11,7 @@
 # We maintain/install both variants though to make life easier. 
 #
 
-date >> $LOGDIR/dhclient.log
+date > $LOGDIR/dhclient.log
 echo "$reason" >> $LOGDIR/dhclient.log
 
 #
@@ -24,19 +24,14 @@ if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || \
     echo $new_routers > $BOOTDIR/routerip
     echo $new_ip_address > $BOOTDIR/myip
     echo $new_subnet_mask > $BOOTDIR/mynetmask
+    if [ -n "$interface" ]; then
+	echo $interface > $BOOTDIR/control_interface
+    fi
 
     #
     # See if the Testbed configuration software wants to change the hostname.
     # 
     $BINDIR/sethostname.dhclient >>$LOGDIR/dhclient.log 2>&1
-
-    #
-    # Once we have an IP address, we can stop dhclient so that it doesn't get
-    # in the way 
-    #
-    # I'd love to use the dhclient.pid file, but it helpfully has not been
-    # created at this point
-    #killall dhclient
 fi  
 
 exit 0
