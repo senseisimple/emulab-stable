@@ -95,7 +95,7 @@ if (defined($options{"p"})) {
     $partitions = $options{"p"};
     $ipassign_args .= " -p$partitions";
 } else {
-    $ipassign_args .= " -s";
+    $ipassign_args .= " -ps";
 }
 if (defined($options{"H"})) {
     $routetype = "host2host";
