@@ -32,7 +32,7 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	lthread.2:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
-	snmp.4:${PORTSDIR}/net/net-snmp4 \
+	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
 	vin4.2:${PORTSDIR}/misc/libelvin
 
 RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
@@ -47,8 +47,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	tclsh8.3:${PORTSDIR}/lang/tcl83 \
 	otcl:${PORTSDIR}/lang/otcl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/graphics/p5-GD \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net/p5-SNMP \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP_Session.pm:${PORTSDIR}/net/p5-SNMP_Session \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net-mgmt/p5-SNMP \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP_Session.pm:${PORTSDIR}/net-mgmt/p5-SNMP_Session \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
@@ -57,14 +57,13 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	elvind:${PORTSDIR}/misc/elvind \
-	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
+	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	sudo:${PORTSDIR}/security/sudo \
 	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9 \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser
 
-BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
+BUILD_DEPENDS=	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
