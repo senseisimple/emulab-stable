@@ -14,9 +14,9 @@ proc outs {args} {
     puts $logFp $s
 }
 
-proc readfifo {fp} {
+proc readfifo {fp {prefix {}}} {
     while {[gets $fp line] >= 0} {
-	outs $line
+	outs $prefix$line
     }
 }
 
@@ -90,11 +90,11 @@ foreach pair $nodemap {
 
 outs "Setting up VLANs"
 if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2> $tmpio" err]} {
-    readfifo $tmpioFP
+    readfifo $tmpioFP "SNMPIT: "
     outs stderr "Error running $snmpit. ($err)"
     exit 1
 }
-readfifo $tmpioFP
+readfifo $tmpioFP "SNMPIT: "
 
 #outs "PLACEHOLDER - Verifying virtual network."
 outs "PLACEHOLDER - Copying disk images."
@@ -112,5 +112,5 @@ outs "PLACEHOLDER - Installing secondary pacakages."
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
 
-close $fifoFP
-file delete -force $fifo
+close $tmpioFP
+file delete -force $tmpio
