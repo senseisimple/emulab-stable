@@ -94,6 +94,7 @@ if ($eid =~ /^([-\@\w.]+)$/) {
 else {
     die("Tainted argument $eid!\n");
 }
+my $repfile = "$eid.report";
 
 #
 # Verify user and get his DB uid.
@@ -243,6 +244,13 @@ if (! $batch) {
 }
 
 #
+# Remove old report file since its contents are going to be invalid.
+#
+if (-e $repfile) {
+    unlink("$repfile");
+}
+
+#
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
@@ -266,6 +274,8 @@ else {
     if ($estate ne EXPTSTATE_ACTIVE) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
+
+    system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile");
 }
 
 #
@@ -298,7 +308,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
 	 "Bcc: $TBLOGS",
-	 ($logname));
+	 ($repfile, $logname));
 
 if (defined($logname)) {
     unlink("$logname");
