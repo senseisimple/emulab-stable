@@ -23,9 +23,21 @@ FILES  += $(wildcard $(SRCDIR)/*.gif)
 FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
 
+PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
+PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
+
 #
 # Kill the directory part of the names. The vpath rule will do the rest.
 #
 ALLFILES = $(notdir $(FILES))
+ALLPIXES = $(notdir $(PIXFILES))
 
-install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES))
+install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
+	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES))
+
+$(INSTALL_WWWDIR)/pix/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_WWWDIR)/pix
+	$(INSTALL_DATA) $< $@
+
+
