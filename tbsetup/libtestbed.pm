@@ -7,7 +7,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( SENDMAIL OPENMAIL TBTimeStamp);
+    qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround );
 
 # A library of useful stuff.
 
@@ -89,6 +89,43 @@ sub OPENMAIL($$;$$)
 sub TBTimeStamp()
 {
     return POSIX::strftime("%H:%M:%S", localtime());
+}
+
+#
+# Put ourselves into the background, directing output to the log file.
+# The caller provides the logfile name, which should have been created
+# with mktemp, just to be safe. Returns the usual return of fork. 
+#
+# usage int TBBackGround(char *filename).
+# 
+sub TBBackGround($)
+{
+    my($logname) = @_;
+    
+    my $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller (the web server) will
+    # continue to wait even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die "Bad data in logfile name: $logname";
+    }
+
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    return 0;
 }
 
 1;
