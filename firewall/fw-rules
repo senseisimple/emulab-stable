@@ -105,6 +105,11 @@ allow udp from me to boss 8509	 		# 60060: ELABINELAB
 
 # Special services
 
+# The inner boss also needs to SSLXMLRPC to real boss to start frisbeed
+# for image transfer.  Note that this rule must be before other XMLRPC rule
+# (blocking connections from inside).
+allow tcp from any to boss 3069 recv vlan0 setup keep-state	# 60069: ELABINELAB
+
 # HTTP/HTTPS/SSLXMLRPC into elabinelab boss from outside
 allow tcp from any to any 80,443 in not recv vlan0 setup keep-state # 60070: ELABINELAB
 allow tcp from any to any 3069 in not recv vlan0 setup keep-state   # 60071: ELABINELAB
@@ -116,8 +121,9 @@ allow igmp from any to any				# 60082: BASIC,CLOSED,ELABINELAB
 
 # Ping, IPoD from boss
 # should we allow all ICMP?
-allow icmp from boss to any icmptypes 6,8	# 60090: BASIC,CLOSED,ELABINELAB
-allow icmp from any to boss icmptypes 0		# 60091: BASIC,CLOSED,ELABINELAB
+allow icmp from any to any			# 60090: BASIC,CLOSED,ELABINELAB
+allow icmp from boss to any icmptypes 6,8	# 60090: 
+allow icmp from any to boss icmptypes 0		# 60091: 
 
 # Windows
 # SMB (445) with fs
