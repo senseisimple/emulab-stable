@@ -94,7 +94,7 @@ static event_handle_t	event_handle = NULL;
 #define COMMAND_PROTOTYPE(x) \
 	static int \
 	x(int sock, char *nodeid, char *rdata, int tcp, \
-	  int islocal, char *nodetype, int vers)
+	  int islocal, int isvnode, char *nodetype, int vers)
 
 COMMAND_PROTOTYPE(doreboot);
 COMMAND_PROTOTYPE(dostatus);
@@ -127,7 +127,7 @@ COMMAND_PROTOTYPE(doipodinfo);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int, char *, char *, int, int, char *, int);
+	int    (*func)(int, char *, char *, int, int, int, char *, int);
 } command_array[] = {
 	{ "reboot",	doreboot },
 	{ "status",	dostatus },
@@ -673,7 +673,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			 * Simple "isalive" support for remote nodes.
 			 */
 			doisalive(sock, nodeid, rdata, istcp,
-				  islocal, type, version);
+				  islocal, isvnode, type, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -690,7 +690,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			 * Simple "isup" daemon support!
 			 */
 			doisalive(sock, nodeid, rdata, istcp,
-				  islocal, type, version);
+				  islocal, isvnode, type, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -761,7 +761,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		     istcp ? "TCP" : "UDP", cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, nodeid, rdata, istcp,
-				    islocal, type, version);
+				    islocal, isvnode, type, version);
 
 	if (err)
 		info("%s: %s: returned %d\n",
@@ -1024,7 +1024,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * Now check reserved table
 	 */
-	if (islocal && nodeidtoexp(nodeid, pid, eid, gid)) {
+	if ((islocal || isvnode) && nodeidtoexp(nodeid, pid, eid, gid)) {
 		error("ACCOUNTS: %s: Node is free\n", nodeid);
 		return 1;
 	}
@@ -1032,7 +1032,7 @@ COMMAND_PROTOTYPE(doaccounts)
         /*
 	 * We need the unix GID and unix name for each group in the project.
 	 */
-	if (islocal) {
+	if (islocal || isvnode) {
 		res = mydb_query("select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, pid);
@@ -1098,7 +1098,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * Now onto the users in the project.
 	 */
-	if (islocal) {
+	if (islocal || isvnode) {
 		/*
 		 * This crazy join is going to give us multiple lines for
 		 * each user that is allowed on the node, where each line
@@ -1239,6 +1239,14 @@ COMMAND_PROTOTYPE(doaccounts)
 			row = nextrow;
 		}
 		/*
+		 * Drop root privs if a remote node, but not a vnode.
+		 * This is an interim measure until accounts are
+		 * built just inside the jails.
+		 */
+		if (!islocal && !isvnode)
+			root = tbadmin;
+		 
+		/*
 		 * Okay, process the UID. If there is no primary gid,
 		 * then use one from the list. Then convert the rest of
 		 * the list for the GLIST argument below.
@@ -1274,8 +1282,11 @@ COMMAND_PROTOTYPE(doaccounts)
 				row[10] ? row[10] : "");
 		}
 		else {
-			if (!islocal && vers == 5) {
-				row[1] = "'*'";
+			if (!islocal) {
+				if (vers == 5)
+					row[1] = "'*'";
+				else
+					row[1] = "*";
 			}
 			sprintf(buf,
 				"ADDUSER LOGIN=%s "
@@ -1472,7 +1483,7 @@ COMMAND_PROTOTYPE(dohostsV2)
 	/*
 	 * This will go away. Ignore version and assume latest.
 	 */
-	return(dohosts(sock, nodeid, rdata, tcp, islocal,
+    return(dohosts(sock, nodeid, rdata, tcp, islocal, isvnode,
 		       nodetype, CURRENT_VERSION));
 }
 
