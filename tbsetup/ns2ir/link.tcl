@@ -15,7 +15,11 @@ link instproc print {file} {
     } else {
 	set dstname [$self set dst]
     }
-    
-    puts $file "$prefix-l[$self set id] $srcname [$self set srcport] $dstname [$self set dstport] [$self set bw] [$self set bw] [$self set delay] [$self set delay]"
+    if {[info exists nodeid_map(l[$self set id])]} {
+	set linkname $nodeid_map(l[$self set id])
+    } else {
+	set linkname "l[$self set id]"
+    }
+    puts $file "$prefix-$linkname $srcname [$self set srcport] $dstname [$self set dstport] [$self set bw] [$self set bw] [$self set delay] [$self set delay]"
 }
 

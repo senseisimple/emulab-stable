@@ -32,8 +32,8 @@ proc tb-set-link-loss {src dst rate} {
     puts $TBCMD "tb-set-link-loss $nodeid_map($src) $nodeid_map($dst) $rate"
 }
 proc tb-set-lan-loss {lan rate} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-lan-loss $nodeid_map($lan) $rate"
+    global TBCMD nodeid_map prefix
+    puts $TBCMD "tb-set-lan-loss $prefix-$nodeid_map($lan) $rate"
 }
 proc tb-set-dnard-os {shelf number os} {
     global TBCMD nodeid_map

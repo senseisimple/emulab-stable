@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.5 2001-02-14 16:34:53 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.6 2001-03-14 19:37:37 calfeld Exp $
 
 #
 
@@ -263,7 +263,7 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     #	$self duplex-link $n2 $dnode 0 0 $type $args
     #    }
 
-    set currLink l$linkID
+    real_set currLink l$linkID
     link $currLink
     $currLink set src $n1
     $currLink set srcport -1
@@ -279,6 +279,8 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     incr linkID
 
     lappend linkslist $currLink
+
+    return $currLink
 }
 
 # ROB added

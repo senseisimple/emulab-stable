@@ -38,7 +38,8 @@ proc set {args} {
 		set var $out
 		real_set val [lindex $args 1]
 		if {([regexp {^n[0-9]+$} $val] != -1) ||
-		    ([regexp {^lan[0-9]+$} $val] != -1)} {
+		    ([regexp {^lan[0-9]+$} $val] != -1) ||
+		    ([regexp {^l[0-9]+$} $val] != -1)} {
 		    if {![info exists nodeid_map($val)]} {
 			real_set nodeid_map($val) $var
 		    }
