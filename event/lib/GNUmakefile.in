@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,13 @@ SUBDIR		= event/lib
 
 include $(OBJDIR)/Makeconf
 
-all:	libevent.a libevent_r.a event.so
+SYSTEM	       := $(shell uname -s)
+PROGRAMS	= libevent.a libevent_r.a
+ifneq ($(SYSTEM),Linux)
+PROGRAMS       += event.so
+endif
+
+all:		$(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
