@@ -52,6 +52,7 @@
 #endif
 #ifdef linux
 #include <net/if.h>
+#include <string.h>
 #endif
 
 static int	find_iface(char *mac);
@@ -149,7 +150,7 @@ find_iface(char *macaddr)
 	int		sock, i;
 	struct ifreq    ifrbuf, *ifr = &ifrbuf;
 	FILE	       *fp;
-	char		buf[BUFSIZ], enet[BUFSIZ];
+	char		buf[BUFSIZ], *bp, enet[BUFSIZ];
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		perror("socket()");
@@ -172,9 +173,9 @@ find_iface(char *macaddr)
 
 	while (fgets(buf, sizeof(buf), fp)) {
 		sscanf(buf, "%s:", ifr->ifr_name);
-		if (ifr->ifr_name[strlen(ifr->ifr_name) - 1] == ':')
-			ifr->ifr_name[strlen(ifr->ifr_name) - 1] = 0;
-
+		if (bp = strchr(ifr->ifr_name, ':'))
+			*bp = (char *)0;
+				
 		ifr->ifr_addr.sa_family = AF_INET;
 		if (ioctl(sock, SIOCGIFHWADDR, ifr) < 0)
 			continue;
