@@ -113,19 +113,21 @@ $sth = $dbh->prepare("SELECT type,node_id1,card1,port1,node_id2,card2,port2" .
 $sth->execute;
 while (($type,$node1,$card1,$port1,$node2,$card2,$port2) = 
        $sth->fetchrow_array) {
-    $iface1 = get_iface($node1,$card1,$port1);
-    $iface2 = get_iface($node2,$card2,$port2);
-    $iface1bw = get_ifacebw($node1,$card1,$port1);
-    $iface2bw = get_ifacebw($node2,$card2,$port2);
-    if ($iface1bw < $iface2bw) {
-	$bw = $iface1bw;
-    } else {
-	$bw = $iface2bw;
+    if (defined($nodes{$node1}) && defined($nodes{$node2})) {
+	$iface1 = get_iface($node1,$card1,$port1);
+	$iface2 = get_iface($node2,$card2,$port2);
+	$iface1bw = get_ifacebw($node1,$card1,$port1);
+	$iface2bw = get_ifacebw($node2,$card2,$port2);
+	if ($iface1bw < $iface2bw) {
+	    $bw = $iface1bw;
+	} else {
+	    $bw = $iface2bw;
+	}
+	# !!! - Here we use our knowledge that in the wires table links
+	# to the switch always come as node2.
+	print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
+	    " $node2:$iface2 $bw 1\n";
     }
-    # !!! - Here we use our knowledge that in the wires table links
-    # to the switch always come as node2.
-    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-	" $node2:$iface2 $bw 1\n"
 }
 $sth->finish;
 
