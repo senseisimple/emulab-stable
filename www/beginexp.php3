@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -124,6 +124,37 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
+    # Select a group
+    # 
+    echo "<tr>
+              <td colspan=2>Group[<b>1</b>]:</td>
+              <td><select name=\"formfields[exp_gid]\">
+                    <option value=''>Default Group </option>\n";
+
+    reset($projlist);
+    while (list($project, $grouplist) = each($projlist)) {
+	for ($i = 0; $i < count($grouplist); $i++) {
+	    $group    = $grouplist[$i];
+
+	    if (strcmp($project, $group)) {
+		$selected = "";
+
+		if (isset($formfields[exp_gid]) &&
+		    isset($formfields[exp_pid]) &&
+		    strcmp($formfields[exp_pid], $project) == 0 &&
+		    strcmp($formfields[exp_gid], $group) == 0)
+		    $selected = "selected";
+		
+		echo "<option $selected value=\"$group\">
+                           $project/$group</option>\n";
+	    }
+	}
+    }
+    echo "     </select>
+             </td>
+          </tr>\n";
+
+    #
     # Name:
     #
     echo "<tr>
@@ -183,7 +214,7 @@ function SPITFORM($formfields, $errors)
 	echo "<tr>
                   <td rowspan>*Your NS file: &nbsp</td>
 
-                  <td rowspan><center>Upload (50K max)[<b>1</b>]<br>
+                  <td rowspan><center>Upload (50K max)[<b>2</b>]<br>
                                    <br>
                                    Or<br>
                                    <br>
@@ -210,7 +241,7 @@ function SPITFORM($formfields, $errors)
     # Swappable?
     # 
     echo "<tr>
-  	      <td colspan=2>Swappable?[<b>2</b>]:</td>
+  	      <td colspan=2>Swappable?[<b>3</b>]:</td>
               <td class=left>
                   <input type=checkbox
                          name=\"formfields[exp_swappable]\"
@@ -228,7 +259,7 @@ function SPITFORM($formfields, $errors)
     # Priority
     #
     echo "<tr>
-	      <td colspan=2>Priority[<b>3</b>]:</td>
+	      <td colspan=2>Priority[<b>4</b>]:</td>
               <td class=left>\n";
 
     reset($priorities);
@@ -244,37 +275,6 @@ function SPITFORM($formfields, $errors)
                      $prio &nbsp\n";
     }
     echo "    </td>
-          </tr>\n";
-
-    #
-    # Select a group
-    # 
-    echo "<tr>
-              <td colspan=2>Group[<b>4</b>]:</td>
-              <td><select name=\"formfields[exp_gid]\">
-                    <option value=''>Default Group </option>\n";
-
-    reset($projlist);
-    while (list($project, $grouplist) = each($projlist)) {
-	for ($i = 0; $i < count($grouplist); $i++) {
-	    $group    = $grouplist[$i];
-
-	    if (strcmp($project, $group)) {
-		$selected = "";
-
-		if (isset($formfields[exp_gid]) &&
-		    isset($formfields[exp_pid]) &&
-		    strcmp($formfields[exp_pid], $project) == 0 &&
-		    strcmp($formfields[exp_gid], $group) == 0)
-		    $selected = "selected";
-		
-		echo "<option $selected value=\"$group\">
-                           $project/$group</option>\n";
-	    }
-	}
-    }
-    echo "     </select>
-             </td>
           </tr>\n";
 
     #
@@ -322,6 +322,8 @@ function SPITFORM($formfields, $errors)
 
     echo "<blockquote><blockquote><blockquote>
           <ol>
+             <li>Leave as the default group, or pick a subgroup that
+                 corresponds to the project you selected.
              <li>Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:
                  The file upload mechanism is broken in Opera, so you cannot
                  specify a local file for upload. Instead, please specify a
@@ -334,8 +336,6 @@ function SPITFORM($formfields, $errors)
              <li>You get brownie points for marking your experiments as Low
                  Priority, which indicates that we can swap you out before high
 	         priority experiments.
-             <li>Leave as the default group, or pick a subgroup that
-                 corresponds to the project you selected.
              <li>Check this if you want to create a
                  <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
                  batch mode</a> experiment.
@@ -402,6 +402,23 @@ if (! count($projlist)) {
 if (! isset($submit)) {
     $defaults = array();
 
+    #
+    # For users that are in one project and one subgroup, it is usually
+    # the case that they should use the subgroup, and since they also tend
+    # to be in the clueless portion of our users, give them some help.
+    # 
+    if (count($projlist) == 1) {
+	list($project, $grouplist) = each($projlist);
+	
+	if (count($grouplist) == 2) {
+	    $defaults[exp_pid] = $project;
+	    if (strcmp($project, $grouplist[0])) 
+		$defaults[exp_gid] = $grouplist[0];
+	    else
+		$defaults[exp_gid] = $grouplist[1];
+	}
+	reset($projlist);
+    }
     $defaults[exp_swappable] = "Yep";
     $defaults[exp_priority]  = "low";
     SPITFORM($defaults, 0);
