@@ -39,6 +39,8 @@ Good places to start would include:
   - Diagrams and brief explanations of the state machines used in the 
     system (www/doc/states.html and www/doc/*.gif)
   - The instructions for building a running system from scratch (doc/setup*.txt)
+  - Mail we have exchanged with others about hardware recommendations
+    (doc/hardware-mail.mbox)
 
 QUICK TOUR
  - The Database maintains most testbed state.
