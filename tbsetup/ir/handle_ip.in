@@ -250,7 +250,7 @@ sub get_macs {
 	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
     }
     if (defined($links{$_[0]})) {
-	($src,$dst) = @{$links{$_[0]}};
+	my($src,$dst) = @{$links{$_[0]}};
 	if (&islan($src)) {
 	    push(@$macs,@{$vlanmap{$src}});
 	} elsif (&islan($dst)) {
