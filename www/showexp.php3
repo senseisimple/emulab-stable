@@ -81,6 +81,16 @@ if ($expstate) {
 # Dump the node information.
 #
 SHOWNODES($exp_pid, $exp_eid);
+
+#
+# Admin folks get a swap request link to send email.
+#
+if (ISADMIN($uid)) {
+    echo "<p><center>
+             <A href='request_swapexp.php3?&pid=$exp_pid&eid=$exp_eid'>
+             Send a swap/terminate request</a>
+             </center>\n";    
+}
     
 #
 # Standard Testbed Footer

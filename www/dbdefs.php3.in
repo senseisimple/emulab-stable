@@ -742,6 +742,28 @@ function TBProjLeader($pid, &$projleader)
 }
 
 #
+# Return Experiment Leader.
+#
+# usage TBExpLeader($pid, &$expleader)
+#       returns 1 if valid
+#       returns 0 if not valid
+#
+function TBExpLeader($pid, $eid, &$expleader)
+{
+    $query_result =
+	DBQueryFatal("select expt_head_uid from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $expleader  = $row[expt_head_uid];
+    
+    return 1;
+}
+
+#
 # Return a list of projects for which the uid is allowed to perform the
 # requested operation. Only a couple of access options are supported since
 # to be totally general would require too many DB operations. Not worth
