@@ -150,8 +150,9 @@ foreach my $n (@node_names) {
 	&& $error++);
 
   # And clean out various tidbits from the nodes table.
-  $cmd = "update nodes set def_boot_cmd_line='',def_boot_path='',".
-      "startupcmd='',rpms='',deltas='',tarballs='' where node_id='$n'";
+  $cmd = "update nodes set def_boot_osid='', def_boot_cmd_line='',".
+      "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs=''".
+      " where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
