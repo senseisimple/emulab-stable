@@ -17,8 +17,21 @@ $identity = "-i $ENV{HOME}/.ssh/identity";
 
 # Current working directory:
 $cwd = $ENV{PWD};
+# We only want to actually change to $CWD if it will actually
+# be accesible on the other machine - if it's in /users or /proj
+if (!($cwd =~ qr|/users|) || ($cwd =~ qr|/proj|)) {
+	warn "In order to make sure that this command has access to any\n";
+	warn "files it may need to read, please change directories into\n";
+	warn "your home directory (in /users/) or your project directory\n";
+	warn "(in /proj/).\n";
+	exit (-1);
+}
+
 # Now, do the magic
-$rv = system "$ssh $identity $nopass $nokeycheck $host 'cd $cwd \; $0 @ARGV'";
+$sshcmd = "$ssh $identity $nopass $nokeycheck $host 'cd $cwd \; $0 @ARGV'";
+#print "About to run $sshcmd\n";
+$rv = system $sshcmd;
+
 if ($rv > 256) {
 	print "**********\n";
 	print "SSH failed. You may need to run the following commands:\n\n";
