@@ -194,9 +194,9 @@ $unix_gid++;
 
 $newgroup_command = "INSERT INTO groups ".
      "(gid,grp_created,grp_expires,grp_name,".
-     "grp_URL,grp_affil,grp_addr,grp_head_uid,cntrl_node,unix_gid)".
+     "grp_URL,grp_head_uid,cntrl_node,unix_gid)".
      "VALUES ('$gid',now(), '$grp_expires','$grp_name','$grp_URL',".
-     "'$grp_affil','$grp_addr','$grp_head_uid', '','$unix_gid')";
+     "'$grp_head_uid', '','$unix_gid')";
 $newgroup_result  = mysql_db_query($TBDBNAME, $newgroup_command);
 if (! $newgroup_result) {
     $err = mysql_error();
@@ -216,7 +216,8 @@ mail($TBMAIL_APPROVAL,
      "TESTBED: New Group", "'$usr_name' wants to start group ".
      "'$gid'.\nContact Info:\nName:\t\t$usr_name ($grp_head_uid)\n".
      "Email:\t\t$email\nGroup:\t\t$grp_name\nURL:\t\t$grp_URL\n".
-     "Affiliation:\t$grp_affil\nAddress:\t$grp_addr\n".
+     "Title:\t$usr_title\n".
+     "Affiliation:\t$usr_affil\nAddress:\t$usr_addr\n".
      "Phone:\t\t$usr_phones\n\n".
      "Reasons:\n$why\n\nPlease review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
