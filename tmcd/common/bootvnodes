@@ -128,6 +128,16 @@ if (!REMOTE()) {
     system("mkextrafs.pl $vndir");
 }
 
+#
+# Make sure enough vn devices exist
+#
+for (my $i = 0; $i < scalar(@vnodes); $i++) {
+    my $dev = "vn${i}";
+    if (! -e "/dev/${dev}c") {
+        system("(cd /dev; ./MAKEDEV $dev)");
+    }
+}
+
 foreach my $vnode (keys(%curvnodelist)) {
     my $jailflag = "";
     if ($curvnodelist{$vnode}) {
