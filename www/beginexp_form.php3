@@ -23,13 +23,13 @@ LOGGEDINORDIE($uid);
 # See what projects the uid is a member of. Must be at least one!
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT gid FROM grp_memb WHERE uid=\"$uid\"");
+	"SELECT pid FROM proj_memb WHERE uid=\"$uid\"");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error finding project membership: $uid: $err\n", 1);
 }
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("You do not appear to be a member of an Projects!", 1);
+    USERERROR("You do not appear to be a member of any Projects!", 1);
 }
 
 ?>
@@ -66,7 +66,7 @@ echo "<tr>
           <td>*Select Project:</td>";
 echo "    <td><select name=\"exp_pid\">";
                while ($row = mysql_fetch_array($query_result)) {
-                  $project = $row[gid];
+                  $project = $row[pid];
                   echo "<option value=\"$project\">$project</option>\n";
                }
 echo "       </select>";

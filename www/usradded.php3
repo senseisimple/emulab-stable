@@ -193,7 +193,7 @@ if (! $returning) {
 # Don't try to join twice!
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"select * from grp_memb where uid='$uid' and gid='$pid'");
+	"select * from proj_memb where uid='$uid' and pid='$pid'");
 if (mysql_num_rows($query_result) > 0) {
     die("<h3><br><br>".
         "You have already applied for membership in project: $pid.".
@@ -205,10 +205,12 @@ if (mysql_num_rows($query_result) > 0) {
 # to upgrade the trust level, making the new user real.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"insert into grp_memb (uid,gid,trust) values ('$uid','$pid','none');");
+	"insert into proj_memb (uid,pid,trust) ".
+        "values ('$uid','$pid','none');");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding adding user $uid to group $pid: $err\n", 1);
+    TBERROR("Database Error adding adding user $uid to ".
+            "project $pid: $err\n", 1);
 }
 
 #
@@ -216,23 +218,24 @@ if (! $query_result) {
 # email message out of the database, of course.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT grp_head_uid FROM groups WHERE gid='$pid'");
+	"SELECT head_uid FROM projects WHERE pid='$pid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
     $err = mysql_error();
-    TBERROR("Database Error getting project leader for group $pid: $err\n", 1);
+    TBERROR("Database Error getting project leader for project $pid: $err\n",
+             1);
 }
-$group_leader_uid = $row[0];
+$project_leader_uid = $row[0];
 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_email FROM users WHERE uid='$group_leader_uid'");
+	"SELECT usr_email FROM users WHERE uid='$project_leader_uid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
     $err = mysql_error();
-    TBERROR("Database Error getting email address for group leader ".
-            "$group_leader_uid: $err\n", 1);
+    TBERROR("Database Error getting email address for project leader ".
+            "$project_leader_uid: $err\n", 1);
 }
-$group_leader_email = $row[0];
+$project_leader_email = $row[0];
 
-mail("$group_leader_email",
+mail("$project_leader_email",
      "TESTBED: New Project Member",
      "\n$usr_name ($uid) is trying to join your project ($pid).\n".
      "$usr_name has the\n".

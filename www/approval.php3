@@ -28,24 +28,23 @@ they will be able to log into machines in your Project's experiments.</p>
 more or less access to your nodes:
 <ul>
 	<li>User - Can log into machines in your experiments.
-	<li>Local Root - Granted root access on your project's machines; can create new experiments.
-";
-#echo "<li>Group Root - Can approve users, create projects, and update any project info or personal info for project members.";
-echo "</ul>
-</p></h3>\n";
-$query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
+	<li>Root - Granted root access on your project's machines;
+                   can create new experiments.
+</ul></p></h3>\n";
+
+$query="SELECT pid FROM proj_memb WHERE uid='$auth_usr' and trust='group_root'";
 $result = mysql_db_query("tbdb", $query);
 $select = "SELECT";
 while ($row = mysql_fetch_row($result)) {
-  $gid = $row[0];
+  $pid = $row[0];
   if ($select == "SELECT") {
-    $select .= " DISTINCT uid FROM grp_memb WHERE gid='$gid'";
+    $select .= " DISTINCT uid FROM proj_memb WHERE pid='$pid'";
   } else {
-    $select .= " OR gid='$gid'";
+    $select .= " OR pid='$pid'";
   }
 }
 if ($select=="SELECT") {
-  echo "<h3>You do not have Group Root permissions in any group.</h3>";
+  echo "<h3>You do not have Project Root permissions in any Project</h3>";
   echo "</body></html>\n";
   exit;
 }
@@ -102,8 +101,7 @@ if ( mysql_num_rows($found) == 0 ) {
 <option value='later'>Postpone</option></select></td>
 <td rowspan=2><select name=\"$uid-trust\">
 <option value='user'>User</option>
-<option value='local_root'>Local Root</option>";    
-    #echo "<option value='group_root'>Group Root</option>";
+<option value='local_root'>Root</option>";    
     echo "</select></td>
 <td rowspan=2>&nbsp;$uid&nbsp;</td><td>&nbsp;$name&nbsp;</td><td>&nbsp;$title&nbsp;</td><td>&nbsp;$affil&nbsp;</td><td>&nbsp;$email&nbsp;</td><td>&nbsp;$phone&nbsp;</td></tr>
 <tr><td>&nbsp;$addr&nbsp;</td><td>&nbsp;$addr2&nbsp;</td><td>&nbsp;city&nbsp;</td><td>&nbsp;$state&nbsp;</td><td>&nbsp;$zip&nbsp;</td>

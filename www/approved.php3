@@ -23,19 +23,19 @@ LOGGEDINORDIE($auth_usr);
 echo "
 <h1>Approving new users...</h1>
 ";
-$query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
+$query="SELECT pid FROM proj_memb WHERE uid='$auth_usr' and trust='group_root'";
 $result = mysql_db_query("tbdb", $query);
 $select = "SELECT";
-$group[0]="";
+$project[0]="";
 $n=0;
 while ($row = mysql_fetch_row($result)) {
-  $gid = $row[0];
-  $group[$n]=$gid;
+  $pid = $row[0];
+  $project[$n]=$pid;
   $n = $n + 1;
   if ($select == "SELECT") {
-    $select .= " DISTINCT uid FROM grp_memb WHERE gid='$gid'";
+    $select .= " DISTINCT uid FROM proj_memb WHERE pid='$pid'";
   } else {
-    $select .= " OR gid='$gid'";
+    $select .= " OR pid='$pid'";
   }
 }
 $selected = mysql_db_query("tbdb", $select);
@@ -54,14 +54,14 @@ while ($row = mysql_fetch_row($found)) {
   $uid = $row[0];
   $status=$row[1];
   $email=$row[2];
-  $cmd = "select gid from grp_memb where uid='$uid' and trust='none' and (";
-  $cmd .= "gid='$group[0]'";
+  $cmd = "select pid from proj_memb where uid='$uid' and trust='none' and (";
+  $cmd .= "pid='$project[0]'";
   $n=1;
-  while ( isset($group[$n]) ) { $cmd .= " or gid='$group[$n]'"; $n++; }
+  while ( isset($project[$n]) ) { $cmd .= " or pid='$project[$n]'"; $n++; }
   $cmd .=")";
   $result = mysql_db_query("tbdb",$cmd);
   $row=mysql_fetch_row($result);
-  $gid=$row[0];
+  $pid=$row[0];
   if (isset($$uid)) {
     if ( $$uid == "approve") {
       $trust=${"$uid-trust"};
@@ -73,43 +73,39 @@ while ($row = mysql_fetch_row($found)) {
       $cmd = "update users set status='$newstatus' where uid='$uid'";
       $cmd .= "and status='$status'";
       $result = mysql_db_query("tbdb",$cmd);
-      $cmd = "update grp_memb set trust='$trust' where uid='$uid'";
-      $cmd .= "and trust='none' and gid='$gid'";
-      $result = mysql_db_query("tbdb",$cmd);
-      #
-      # Bogus grp vs proj issue.
-      #
-      $cmd = "insert into proj_memb (uid, pid) values ('$uid', '$gid')";
+      $cmd = "update proj_memb set trust='$trust' where uid='$uid'";
+      $cmd .= "and trust='none' and pid='$pid'";
       $result = mysql_db_query("tbdb",$cmd);
 
-      mail("$email","TESTBED: Group Approval",
+      mail("$email","TESTBED: Project Membership Approval",
 	   "\nThis message is to notify you that you have been approved ".
-	   "as a member of \nthe $gid group with $trust permissions.\n".
+	   "as a member of \nthe $pid project with $trust permissions.\n".
 	   "\nYour status as a Testbed user is now $newstatus.".
 	   "\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
            "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
            "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
            "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
       echo "<h3><p>User $uid was changed to status $newstatus and ";
-      echo "granted $trust permissions for group $gid.</p></h3>\n";
+      echo "granted $trust permissions for project $pid.</p></h3>\n";
     } elseif ( $$uid == "deny") {
-      # Delete all rows from grp memb that are for that person, no privs
-      # and one of the groups that the user is a leader of
-      $cmd = "delete from grp_memb where uid='$uid' and trust='none' and (";
-      $cmd .= "gid='$group[0]'";
+      # Delete all rows from proj_memb that are for that person, no privs
+      # and one of the projects that the user is a leader of
+      $cmd = "delete from proj_memb where uid='$uid' and trust='none' and (";
+      $cmd .= "pid='$project[0]'";
       $n=1;
-      while ( isset($group[$n]) ) { $cmd .= " or gid='$group[$n]'"; $n++; }
+      while ( isset($project[$n]) ) { $cmd .= " or pid='$project[$n]'"; $n++; }
       $cmd .=")";
       $result = mysql_db_query("tbdb",$cmd);
-      mail("$email","TESTBED: Group Membership Denied",
+      mail("$email","TESTBED: Project Membership Denied",
 	   "\nThis message is to notify you that you have been denied ".
-	   "as a member of \nthe $gid group.\n".
+	   "as a member of \nthe $pid project\n".
 	   "\nYour status as a Testbed user is still $status.".
 	   "\n\nThanks,\nTestbed Ops\nUtah Network Testbed\n",
            "From: Testbed Ops <testbed-ops@flux.cs.utah.edu>\n".
            "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
            "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
-      echo "<h3><p>User $uid was denied membership in your group.</p></h3>\n";
+      echo "<h3><p>User $uid was denied membership in your project.</p>
+            </h3>\n";
     } else {
       echo "<h3><p>User $uid was postponed for later decision.</p></h3>\n";
     }

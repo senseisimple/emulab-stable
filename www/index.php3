@@ -83,7 +83,7 @@ if (isset($uid)) {
     $status = $row[0];
 
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT trust FROM grp_memb WHERE uid='$uid'");
+	"SELECT trust FROM proj_memb WHERE uid='$uid'");
     $row = mysql_fetch_row($query_result);
     $trust = $row[0];
     
@@ -127,11 +127,11 @@ if (isset($uid)) {
 # Standard options for anyone.
 # 
 if (isset($uid)) {
-    echo "<p><A href=\"addgrp.php3?$uid\">Start a Project</A>\n";
+    echo "<p><A href=\"newproject_form.php3?$uid\">Start a Project</A>\n";
     echo "<p><A href=\"addusr.php3?$uid\">Join a Project</A>\n";
 }
 else {
-    echo "<p><A href=\"addgrp.php3\">Start a Project</A>\n";
+    echo "<p><A href=\"newproject_form.php3\">Start a Project</A>\n";
     echo "<p><A href=\"addusr.php3\">Join a Project</A>\n";
 }
 echo "<hr>";

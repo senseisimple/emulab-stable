@@ -86,11 +86,8 @@ if ($row = mysql_fetch_row($query_result)) {
 # Next, is this person a member of the project specified, and is the trust
 # equal to group or local root?
 #
-# XXX Split across grp_memb and proj_memb. grp_memb needs to be flushed, but
-# right now that has all the info we need. 
-#
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM grp_memb WHERE gid=\"$exp_pid\" and uid=\"$uid\"");
+	"SELECT * FROM proj_memb WHERE pid=\"$exp_pid\" and uid=\"$uid\"");
 if (($row = mysql_fetch_array($query_result)) == 0) {
     USERERROR("You are not a member of Project $exp_pid, so you cannot begin ".
             "an experiment in that project.", 1);

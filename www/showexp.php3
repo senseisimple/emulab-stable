@@ -162,7 +162,7 @@ if (mysql_num_rows($reserved_result)) {
 # Lets dump the project information too.
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM groups WHERE gid=\"$exp_pid\"");
+	"SELECT * FROM projects WHERE pid=\"$exp_pid\"");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting info for project $exp_pid: $err\n", 1);
@@ -174,42 +174,41 @@ echo "<center>
       </center>
       <table align=center border=1>\n";
 
-$gid		= $row[gid];
-$grp_created	= $row[grp_created];
-$grp_expires	= $row[grp_expires];
-$grp_name	= $row[grp_name];
-$grp_URL	= $row[grp_URL];
-$grp_affil	= $row[grp_affil];
-$grp_addr	= $row[grp_addr];
-$grp_head_uid	= $row[grp_head_uid];
-$cntrl_node	= $row[cntrl_node];
+$proj_created	= $row[created];
+$proj_expires	= $row[expires];
+$proj_name	= $row[name];
+$proj_URL	= $row[URL];
+$proj_affil	= $row[affil];
+$proj_addr	= $row[addr];
+$proj_head_uid	= $row[head_uid];
+$control_node	= $row[control_node];
 
 #
 # Generate the table.
 # 
 echo "<tr>
           <td>Name: </td>
-          <td class=\"left\">$gid</td>
+          <td class=\"left\">$exp_pid</td>
       </tr>\n";
 
 echo "<tr>
           <td>Long Name: </td>
-          <td class=\"left\">$grp_name</td>
+          <td class=\"left\">$proj_name</td>
       </tr>\n";
 
 echo "<tr>
           <td>Project Head: </td>
-          <td class=\"left\">$grp_head_uid</td>
+          <td class=\"left\">$proj_head_uid</td>
       </tr>\n";
 
 echo "<tr>
           <td>Created: </td>
-          <td class=\"left\">$grp_created</td>
+          <td class=\"left\">$proj_created</td>
       </tr>\n";
 
 echo "<tr>
           <td>Expires: </td>
-          <td class=\"left\">$grp_expires</td>
+          <td class=\"left\">$proj_expires</td>
       </tr>\n";
 
 echo "</table>\n";

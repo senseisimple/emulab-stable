@@ -23,12 +23,9 @@ LOGGEDINORDIE($uid);
 # Show a menu of all experiments for all projects that this uid
 # is a member of.
 #
-# XXX Split across grp_memb and proj_memb. grp_memb needs to be flushed, but
-# right now that has all the info we need. 
-#
-$groupmemb_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM grp_memb WHERE uid=\"$uid\"");
-if (mysql_num_rows($groupmemb_result) == 0) {
+$projmemb_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM proj_memb WHERE uid=\"$uid\"");
+if (mysql_num_rows($projmemb_result) == 0) {
   USERERROR("You are not a member of any Projects, so you cannot ".
             "show any experiment information", 1);
 }
@@ -38,8 +35,8 @@ if (mysql_num_rows($groupmemb_result) == 0) {
 # presenting a bogus option list.
 #
 $experiments = "";
-while ($grprow = mysql_fetch_array($groupmemb_result)) {
-    $pid = $grprow[gid];
+while ($projrow = mysql_fetch_array($projmemb_result)) {
+    $pid = $projrow[pid];
     $exp_result = mysql_db_query($TBDBNAME,
 	"SELECT eid FROM experiments WHERE pid=\"$pid\"");
     while ($exprow = mysql_fetch_array($exp_result)) {
