@@ -205,7 +205,7 @@ sub doboot()
 	    #
 	    return 0;
 	}
-	elsif ($mfs eq "frisbee" || $mfs eq "frisbee-new") {
+	elsif ($mfs =~ /^frisbee.*$/) {
 	    #
 	    # Run the frisbee script. If all goes well it will reboot.
 	    # Any problems we land back here, so go into the MFS so we
@@ -214,7 +214,7 @@ sub doboot()
 	    system("$RCDIR/rc.frisbee");
 	    goto mfs;
 	}
-	elsif ($mfs eq "freebsd" || $mfs eq "freebsd-new") {
+	elsif ($mfs =~ /^freebsd.*$/) {
 	    goto mfs;
 	}
 	else {
