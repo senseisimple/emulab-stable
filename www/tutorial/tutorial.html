@@ -35,8 +35,9 @@
             How do I know when all my nodes are ready?</a>
     <li> <a href="#Routing">
             Setting up IP routing between nodes</a>
-    <li> <a href="#Simem">
+    <li> <a href="docwrapper.php3?docname=nse.html">
            Hybrid Experiments with Simulation and Emulation</a>
+	   (<img src="../new.gif" alt="&lt;NEW&gt;"> capabilities)
     <li> <a href="docwrapper.php3?docname=vnodes.html">
     	   Multiplexed Virtual Nodes</a>
 	   <img src="../new.gif" alt="&lt;NEW&gt;">
@@ -564,7 +565,8 @@ Again, please feel free to contact us.
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#SyncServer">How do I know when all my nodes are ready?</a>
 <li> <a href="#Routing">Setting up IP routing between nodes</a>
-<li> <a href="#Simem">Hybrid Experiments with Simulation and Emulation</a> 
+<li> <a href="docwrapper.php3?docname=nse.html">Hybrid Experiments with Simulation and Emulation</a> 
+(<img src="../new.gif" alt="&lt;NEW&gt;"> capabilities)
 <li> <a href="docwrapper.php3?docname=vnodes.html">Multiplexed Virtual Nodes</a>
      <img src="../new.gif" alt="&lt;NEW&gt;">
 <li> <a href="docwrapper.php3?docname=ixp.html">Using IXP network processors</a>
@@ -974,100 +976,6 @@ Two final, cautionary notes on routing:
      and <em>all</em> inter-node traffic will be routed via that interface.
 </ul>
 </p>
-
-<a NAME="Simem"></a>
-<li><h3>Hybrid Experiments with Simulation and Emulation 
-<img src="../new.gif" alt="&lt;NEW&gt;"></h3>
-
-<p>
-Emulab has integrated network simulation using 
-<a href="http://www.isi.edu/nsnam/ns/doc/node487.html">NS Emulation (NSE)</a>
-enabling an experimenter to combine simulation and real
-hardware emulation. This allows scale beyond the limit of
-physical resources as well as interaction of real 
-application traffic with simulated traffic. The latter makes it 
-possible to do validation of simulation models against the real 
-world or use simulation cross traffic when the particular model 
-is still experimental and not available in a real implementation. 
-</p>
-
-<p>
-To create an experiment with simulated resources in it, a user simply has to
-enclose a block of NS Tcl code in <code>$ns make-simulated {
-}</code>. You specify connections between simulated and physical nodes as usual,
-with the current restriction that they must be lexically outside the
-<code>make-simulated</code> block. The following code gives an example:
-</p>
-
-<code><pre>
-
-set ns [new Simulator]
-
-set realnode1 [$ns node]
-set realnode2 [$ns node]
-
-$ns make-simulated {
-
-    # All the code here run in the simulation
-    set simnode1 [$ns node]
-    set simnode2 [$ns node]
-
-    # A duplex link inside the simulation
-    $ns duplex-link $simnode1 $simnode2 1.5Mb 40ms DropTail
-}
-
-# connecting real and simulated nodes. outside make-simulated
-$ns duplex-link $realnode1 $simnode1 5Mb 10ms DropTail
-$ns duplex-link $realnode2 $simnode2 5Mb 10ms DropTail
-
-</pre></code>
-
-<p>
-A hybrid experiment like this causes the simulation to run in
-best effort real time. The number of simulation objects that
-can be supported without falling behind real time depends on
-the amount of external traffic and the number of internal
-simulation events that need to be processed. Please read 
-<a href="docwrapper.php3?docname=nse.html">nse scaling, accuracy and capacity</a> 
- to get a better picture.
-</p>
-
-<p>
-The output from the simulation including errors such as the ones that
-report inability to keep up with real time are logged into a file 
-<code>/proj/&lt;project_name&gt;/exp/&lt;experiment_name&gt;/logs/nse-&lt;nodename&gt;.log
-</code>
-</p>
-
-<p>
-<i>
-nse support is still under development. Please let us know if you face 
-problems in this system. Here are some caveats:
-
-<ul>
-<li>
-Currently, all simulated nodes in an experiment
-are mapped to one physical pc in emulab. This limits the scalability
-of this system. Support to automatically map simulated resources
-on to multiple physical nodes is coming soon. 
-
-<li>
-Enabling NS tracing causes huge file I/O overhead resulting in 
-nse not keeping up with real time. Therefore, do not enable tracing.
-
-<li>
-Remember that each link between the simulated nodes and the physical
-nodes is a real physical link, so there can't be more of them than 
-there are ethernet links on a physical node (currently 4).
-
-</ul>
-
-</i>
-</p>
-
-</ul>
-
-<!-- Batch Mode -->
 
 <hr>
 <a NAME="BatchMode"></a>

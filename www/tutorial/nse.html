@@ -3,26 +3,242 @@
    Copyright (c) 2000-2002 University of Utah and the Flux Group.
    All rights reserved.
   -->
-<center>
-<h1>NSE scaling, accuracy and capacity</h1>
-</center>
-
-<p>
-The data reported here are from our
-<a href="../docwrapper.php3?docname=pubs.html">OSDI publication</a>
-</p>
+  <center>
+      <h1> Hybrid Experiments with Simulation and Emulation </h1>
+  </center>
 
 <h2>Contents</h2>
 <ul>
-<li> <a href="#scaling">Scaling</a>
-<li> <a href="#accuracy">Accuracy and Capacity</a>
+<li> <a href="#overview">Overview</a>
+<li> <a href="#use">Use</a>
+<li> <a href="#advanced">Advanced Topics</a>
+<ul>
+<li> <a href="#scaling">NSE Scaling</a>
+<li> <a href="#accuracy">NSE Accuracy and Capacity</a>
+<li> <a href="#tech">Technical Details</a>
+</ul>
+</ul>
+
+<a NAME="overview"></a>
+<h2>Overview</h2>
+<p>
+Emulab has integrated network simulation using 
+<a href="http://www.isi.edu/nsnam/ns/doc/node541.html">NS Emulation (NSE)</a>
+enabling an experimenter to combine simulation and real
+hardware emulation. The advantages of such an integrated experiment are:
+</p>
+
+<p>
+<ol>
+    <li> Validation of experimental simulation models against real traffic </li>
+    <li> Exposing experimental real traffic to
+    congestion-reactive cross traffic derived from a rich variety of
+    existing, validated simulation models </li>
+    <li> Scaling to larger topologies by multiplexing simulated elements on 
+    physical resources than would be possible with just real elements. </li>
+</ol>
+</p>
+
+<p>
+The primary advantage of using Emulab to perform such experiments is the
+complete automation that we have built when we integrated NSE. Here is
+a list of items that an experimenter using NSE outside Emulab will have to
+worry about:
+
+<ol>
+    <li> Explicit specification of TAP agents to capture and
+    and inject live packets. This includes network
+    interfaces, their hardware addresses and IP addresses </li>
+    <li> Manual setup of routing for live packets both in NSE and on PC hosts </li>
+    <li> Limited scalability with a single instance of NSE </li>
+    <li> In order to scale to larger topologies and simulation workloads 
+    that would otherwise overload a single instance of NSE (causing it to fall behind
+    real-time), a natural solution would be to distribute the load across a distributed
+    set of PCs.  However, it is difficult and tedious to manually setup multiple distributed
+    instances of NSE.  </li>
+    <li> Even if the above were achieved, simulator packets cannot be transported
+    from one simulator to another; Only live packets from real protocol endpoints
+    can be opaquely transported across multiple NSE instances. </li>
+    <li> It is not always possible to ensure correct routing of simulator 
+    injected packets on a PC with multiple network interfaces </li>
+</ol>
+
+In Emulab, we deal with all the above issues and provide an environment for
+integrated experiments with real PC nodes, <a href="docwrapper.php3?docname=vnodes.html">
+    multiplexed virtual nodes</a> and of course simulated resources. Simulated
+resources such as nodes are abstractions that do not have nearly the same level of virtualization as
+real PCs or virtual nodes. There is no equivalent of logging in, running unmodified applications, etc. 
+on a simulated node.
+</p>
+
+<p>
+The number of simulated nodes that are multiplexed on each PC depends mainly on how
+much traffic passes through a node. Since this is difficult to estimate statically,
+we initially use a simple co-location factor to optimistically map the simulated
+nodes. The initial mapping if it causes an overload (i.e. one or more NSE instances
+falls behind real-time), will cause the system to re-map more conservatively. Read the <a href="#tech">
+    technical details</a> section for the gory details.
+</p>
+
+<a NAME="use"></a>
+<h2>Use</h2>
+
+<p>
+To create an experiment with simulated resources in it, a user simply has to
+enclose a block of NS Tcl code in <code>$ns make-simulated {
+}</code>. You specify connections between simulated and physical nodes as usual.
+Multiple <code>make-simulated</code> blocks are allowed in a single experiment
+which results in the concatenation of all such blocks.
+The following code gives an example of an experiment with a dumbell
+topology comprised of both real PC nodes and simulated nodes:
+</p>
+
+<code><pre>
+
+set ns [new Simulator]
+
+# Enable automatic static routing
+$ns rtproto Static
+
+set real1 [$ns node]
+set real2 [$ns node]
+
+# Emulab folks all like FreeBSD more!
+tb-set-node-os $real1 FBSD-STD
+tb-set-node-os $real2 FBSD-STD
+
+$ns make-simulated {
+
+    # All the code here run in the simulation
+    set sim1 [$ns node]
+    set sim2 [$ns node]
+
+    set simrouter1 [$ns node]
+    set simrouter2 [$ns node]
+
+    # Bottleneck link inside simulation. Simulated
+    # and real traffic share this link and interfere
+    # with each other
+    $ns duplex-link $simrouter1 $simrouter2 1.544Mb 40ms DropTail
+
+    # More duplex links inside the simulation
+    $ns duplex-link $sim1 $simrouter1 10Mb 2ms DropTail
+    $ns duplex-link $sim2 $simrouter2 10Mb 2ms DropTail
+
+    # TCP agent in simulation on node sim1
+    set tcp1 [new Agent/TCP]
+    $ns attach-agent $sim1 $tcp1
+
+    # FTP application object in simulation on node sim1
+    set ftp1 [new Application/FTP]
+    $ftp1 attach-agent $tcp1
+
+    # TCPSink object in simulation on node sim2
+    set tcpsink1 [new Agent/TCPSink]
+    $ns attach-agent $sim2 $tcpsink1
+
+    # Do a connect to tell the system that
+    # $tcp1 and $tcpsink1 agents will talk to each other
+    $ns connect $tcp1 $tcpsink1
+
+    # Starting at time 1.0 send 75MB of data
+    $ns at 1.0 "$ftp0 send 75000000"
+
+    # connecting real and simulated nodes. 
+    # It is now okay to specify links between real and simulated
+    # nodes inside the make-simulated block
+    $ns duplex-link $real1 $simrouter1 100Mb 1ms DropTail
+}
+
+# connecting real and simulated nodes. 
+$ns duplex-link $real2 $simrouter2 100Mb 1ms DropTail
+
+# A real TCP traffic agent on PC real1
+set tcpreal1 [new Agent/TCP]
+$ns attach-agent $real1 $tcpreal1
+
+set cbr0 [Application/Traffic/CBR]
+$cbr0 attach-agent $tcpreal1
+
+# A real TCP sink traffic agent on PC real2
+set tcprealsink1 [new Agent/TCPSink]
+$ns attach-agent $real2 $tcprealsink1
+
+# Tell the system that tcpreal1 will talk to
+# tcprealsink1
+$ns connect $tcpreal1 $tcprealsink1
+
+# Start traffic generator at time 10.0
+$ns at 10.0 "$cbr0 start"
+
+# Drastically reduce colocation factor for simulated nodes
+# to demonstrate distributed NSE. With this, the 4 simulated
+# nodes will be mapped to 2 PCs. Simulator packets from sim1
+# to sim2 will be encapsulated and transported over a physical
+# link
+tb-set-colocate-factor 2
+
+$ns run
+
+</pre></code>
+
+The above dumbell topology of 6 nodes will be mapped to 4 PCs
+in emulab. Note that this is a very low multiplexing factor
+chosen to keep the example simple. Two simulation host PCs
+are automatically allocated by the system. The code in the
+<code>make-simulated</code> block will be automatically
+re-parsed into two Tcl sub-specifications, of which each is
+fed into an instance of NSE running on the simulation host.
+Depending on how the mapping happens, there can either be one 
+or two simulated links that cross PCs. Simulator packet flows
+that cross such links are automatically compressed, encapsulated
+in an IP packet and shipped over the physical link.
+
+<p>
+A hybrid experiment like this causes the simulation to run in
+best effort real time. The number of simulation objects that
+can be supported without falling behind real time depends on
+the amount of external traffic and the number of internal
+simulation events that need to be processed. Please read 
+<a href="#scaling">nse scaling</a> and <a href="#accuracy">
+    nse accuracy and capacity</a> to get an idea.
+</p>
+
+<p>
+The output from the simulation including errors such as the ones that
+report inability to keep up with real time are logged into a file 
+<code>/proj/&lt;project_name&gt;/exp/&lt;experiment_name&gt;/logs/nse-simhost-0..n.log
+</code>
+</p>
+
+<p>
+<i>
+nse support is still under further development. Please let us know if you face 
+problems in this system. Here are some caveats:
+
+<ul>
+<li>
+Enabling NS tracing causes huge file I/O overhead resulting in 
+nse not keeping up with real time. Therefore, do not enable tracing.
+
+</ul>
+
+</i>
+</p>
+
 </ul>
 
 <hr>
+<a NAME="advanced"></a>
+<h2>Advanced Topics</h2>
+
 <a NAME="scaling"></a>
-<center>
-<h2>Scaling</h2>
-</center>
+<h3>Scaling</h3>
+
+<p>
+The scaling, accuracy and capacity data reported here are from our
+<a href="../docwrapper.php3?docname=pubs.html">OSDI publication</a>
+</p>
 
 <p>
 An instance of <i>nse</i> simulated 2Mb constant bit rate UDP flows between
@@ -42,9 +258,7 @@ traffic in the return path.
 </p>
 
 <a NAME="accuracy"></a>
-<center>
-<h2>Accuracy and Capacity</h2>
-</center>
+<h3>Accuracy and Capacity</h3>
 
 <p>
 
@@ -70,7 +284,7 @@ as we continue to gain experience with <i>nse</i>, we expect the situation to im
 </p>
 
 <a NAME="table1"></a>
-<TABLE border="1" width="75%">
+<TABLE border="1" width="57%">
 <!-- start of table definition -->
 
 <CAPTION align="bottom"><br>Table 1: Accuracy of <i>nse</i> delay at
@@ -80,7 +294,7 @@ Adjusted RTT is the observed value minus the base overhead.
 </CAPTION>   
 <!-- caption definition -->
 
-<TR>  
+<TR align="center">  
 <!-- start of header row definition -->
 <TH rowspan="2"> delay <br>(ms) </TH>    
 <TH rowspan="2"> packet size <br>(bytes) </TH>    
@@ -89,7 +303,7 @@ Adjusted RTT is the observed value minus the base overhead.
 </TR> 
 <!-- end of header row definition -->
 
-<TR>  
+<TR align="center">  
 <!-- start of 2nd header row definition -->
 <TH> RTT (ms) </TH>    
 <TH> stddev </TH>    
@@ -219,7 +433,7 @@ Adjusted RTT is the observed value minus the base overhead.
 
 <br><br>
 
-<TABLE>
+<TABLE border="0">
 <!-- putting table 2 and 3 side by side -->
 
 <TR><TD>
@@ -415,3 +629,10 @@ as a function of link loss rate and packet size.
 <!-- table in 2st row of the side-by-side alignment -->
 </TR>
 </TABLE>
+
+<a NAME="tech"></a>
+<h3>Technical Details</h3>
+
+<p>
+TODO
+</p>
