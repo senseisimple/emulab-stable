@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -279,23 +279,32 @@ echo "</b></center><br>\n";
 SUBPAGESTART();
 
 echo "<table>
-       <tr><td align=right><b><font color=green>Up</font></b></td>
+       <tr><td align=right>
+           <img src='/autostatus-icons/greenball.gif' alt=up>
+           <b>Up</b></td>
            <td align=left>$num_up</td>
        </tr>
-       <tr><td align=right nowrap><b>Possibly <font color=yellow>Down
-                                             </font></b></td>
+       <tr><td align=right nowrap>
+           <img src='/autostatus-icons/yellowball.gif' alt='possibly down'>
+           <b>Possibly Down</b></td>
            <td align=left>$num_pd</td>
        </tr>
-       <tr><td align=right><b><font color=blue>Unknown</font></b></td>
+       <tr><td align=right>
+           <img src='/autostatus-icons/blueball.gif' alt=unknown>
+           <b>Unknown</b></td>
            <td align=left>$num_unk</td>
        </tr>
-       <tr><td align=right><b><font color=red>Down</font></b></td>
+       <tr><td align=right>
+           <img src='/autostatus-icons/redball.gif' alt=down>
+           <b>Down</b></td>
            <td align=left>$num_down</td>
        </tr>
        <tr><td align=right><b>Total</b></td>
            <td align=left>$num_total</td>
        </tr>
-       <tr><td align=right><b>Free</b></td>
+       <tr><td align=right>
+           <img src='/autostatus-icons/whiteball.gif' alt=free>
+           <b>Free</b></td>
            <td align=left>$num_free</td>
        </tr>
        <tr><td colspan=2 nowrap align=center>
@@ -384,7 +393,10 @@ while ($row = mysql_fetch_array($query_result)) {
     
     echo "   <td>$type ($class)</td>\n";
 
-    if (!$status)
+    if (!$pid)
+	echo "<td align=center>
+                  <img src='/autostatus-icons/whiteball.gif' alt=free></td>\n";
+    elseif (!$status)
 	echo "<td align=center>
                   <img src='/autostatus-icons/blueball.gif' alt=unk></td>\n";
     elseif ($status == "up")
