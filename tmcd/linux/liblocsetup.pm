@@ -195,20 +195,28 @@ sub os_ifconfig_line($$$$$$$;$$)
 	    return undef;
 	}
 	my $accesspoint = $settings->{"accesspoint"};
+	my $accesspointwdots;
+
+	# Allow either dotted or undotted notation!
+	if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $accesspointwdots = "$1:$2:$3:$4:$5:$6";
+	}
+	elsif ($accesspoint =~
+	       /^(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2})$/) {
+	    $accesspointwdots = $accesspoint;
+	    $accesspoint      = "${1}${2}${3}${4}${5}${6}";
+	}
+	else {
+	    warn("*** WARNING: Improper format for MAC ($accesspoint) ".
+		 "provided for $iface!\n");
+	    return undef;
+	}
 	    
 	if (libsetup::findiface($accesspoint) eq $iface) {
 	    $iwcmd .= " mode Master";
 	}
 	else {
-	    if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-		$accesspoint = "$1:$2:$3:$4:$5:$6";
-
-		$iwcmd .= " mode Managed ap $accesspoint";
-	    }
-	    else {
-		warn("*** WARNING: Bad accesspoint provided for $iface!\n");
-		return undef;
-	    }
+	    $iwcmd .= " mode Managed ap $accesspointwdots";
 	}
 
 	$uplines   = sprintf($IFCONFIG, $iface, $inet, $mask) . "\n";
