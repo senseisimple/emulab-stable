@@ -3074,7 +3074,7 @@ sub GatherSwapStats($$$$$;$)
 	#
 	# Increment idleswap indicator, but only valid on swapout.
 	#
-	if ($flags & $TBDB_STATS_FLAGS_IDLESWAP) {
+	if ($flags & TBDB_STATS_FLAGS_IDLESWAP) {
 	    DBQueryWarn("update experiment_stats ".
 			"set idle_swaps=idle_swaps+1 ".
 			"where pid='$pid' and eid='$eid' and idx=$idx");
