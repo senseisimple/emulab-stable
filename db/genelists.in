@@ -189,6 +189,18 @@ foreach my $active ( 0, 1 ) {
 }
 
 #
+# Special list for people approved to use the widearea-nodes.
+#
+$query_result =
+    DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
+		 "left join group_membership as m on m.pid=p.pid ".
+		 "left join users as u on u.uid=m.uid ".
+		 "where p.approved!=0 and p.pcremote_ok is not null ".
+		 "      and m.trust!='none' and u.status='active'");
+    
+genelist($query_result, "$TBOPS", "emulab-widearea-users");
+
+#
 # Regen project lists. Either all the lists, or just the projects
 # that "newuser" is a member of.
 # 
