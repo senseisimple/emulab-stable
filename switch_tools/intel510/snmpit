@@ -35,9 +35,10 @@ my $off=0;
 my $cyc=0;
 my $all=0;
 my @outlets=();
+my %Interfaces=();
 
 &ParseArgs(*ARGV,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*b,*c,*v,
-	   *on,*off,*cyc,*all,*outlets);
+	   *on,*off,*cyc,*all,*outlets,*Interfaces);
 
 use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
 use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/arch/auto/SNMP';
@@ -136,8 +137,7 @@ if ($r) {
 
 #List VLANs is always after $f and @vlan, so that changes made are reflected...
 if ($l) {
-    print "This feature is not fully functional in this version of SnmpIt.\n";
-    &ListVLANs(\$sess,\$v);
+    &ListVLANs(\$sess,\%Interfaces,\$v);
 }
 
 #
@@ -183,9 +183,9 @@ if ($off || $on || $cyc) {
 #
 sub ParseArgs {
     local(*CMDS,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*b,*c,*v,
-	  *on,*off,*cyc,*all,*outlets) = @_;
+	  *on,*off,*cyc,*all,*outlets,*Interfaces) = @_;
     my $help=0; 
-    if (@CMDS < 3) {$help = 2; }
+    if (@CMDS < 2) {$help = 2; }
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
 	$_ = shift(@CMDS);
 	#print "Item=$_*\n";
@@ -217,6 +217,7 @@ sub ParseArgs {
 	elsif (/^-s(.*)/) {$s = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-d(.*)/) {$d = 1;}
 	elsif (/^-e(.*)/) {$e = 1;}
+	elsif (/^-l(.*)/) {$l = 1;}
 	elsif (/^-f(.*)/) {$f = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-m(.*)/) {$m = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ? 
 				  ($1 ? $1 : shift(@CMDS)) : "");}
@@ -277,13 +278,13 @@ sub ParseArgs {
     die("\b\n") if ($help);
     #Now die on any combinations that don't make sense...
     die("What shall I do?\n")
-	if (! ($d||$e||$a||$s||$dup||@vlan||$f||$r||$on||$off||$cyc) );
+	if (! ($d||$e||$a||$s||$dup||@vlan||$f||$r||$l||$on||$off||$cyc) );
     if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
     if ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
     die("$i is not an Intel 510 Switch: Possible completions are\n",
 	"Alpha/155.99.214.170\n Beta/155.99.214.171\n") 
 	if ( (!(($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/))) && 
-	     ($d || $e || $a || $s || $dup || @vlan || $f || $r ));
+	     ($d || $e || $a || $s || $dup || @vlan || $f || $r || $l ));
     die("$i is not a power controller.\n") 
 	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/)) && 
 	     ($on||$off||$cyc) );
@@ -304,8 +305,16 @@ sub ParseArgs {
     die("Invalid speed $s: Must be 10 or 100\n") if (!($s=~/^10$|^100$|^0$/));
     if ($s eq "10" ) { $s="speed10Mbit" ;}
     if ($s eq "100") { $s="speed100Mbit";}
+    if (@vlan || $f || $r || $l) {
+	&ReadTranslationTable(\%Interfaces);
+    }
     $n=0;
     while(@vlan != 0 && $n < @vlan) {
+	#Lowercase it all, but leave in : for testx:y syntax
+	$vlan[$n] = "\L$vlan[$n]\E";
+	if (($vlan[$n]=~/([g-z]|\d)*$/)&&(defined $Interfaces{$vlan[$n]})) {
+	    $vlan[$n] = $Interfaces{$vlan[$n]};
+	}
 	# Allow people to specify addresses with colons or dots
 	$vlan[$n] =~ s/[:\.]//g;
 	die("Invalid MAC Address ",$vlan[$n],". Must be 6 byte Hex value.\n")
@@ -430,7 +439,7 @@ sub OneVLAN {
     my $Vlan = $sess->get([[$NextVLANId,0]]);
     my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
     my $RetVal = "Undef.";
-    if ( ! $m ) { $m = $vlan[0]; }
+    if ( ! $m ) { $m = $Vlan; }
     print "  Creating VLAN $m as VLAN #$Vlan, containing: @vlan ... ";
     $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
     print "",($RetVal? "Succeeded":"Failed"),".\n";
@@ -486,12 +495,85 @@ sub ReadIRFile {
 }
 
 #
+# SUB ReadTranslationTable ----------------------
+#
+
+sub ReadTranslationTable {
+   local(*Table) = @_;
+   my $name="";
+   my $mac="";
+   if ( -e "/usr/testbed/etc/macslist") {
+       open(FILE,"/usr/testbed/etc/macslist") 
+	   || die("Couldn't open /usr/testbed/macslist\n");
+   } elsif ( -e "macslist" ) {
+       open(FILE,"macslist") 
+	   || die("Couldn't open macslist\n");
+   } else {
+       print "Couldn't locate macslist configuration file.\n",
+	   "Translation of MAC addresses will be disabled.\n";
+       return 0;
+   }
+   while ( <FILE> ) {
+       chop;
+       s/  / /g;
+       @_ = split(/ /,$_);
+       $name = $_[0];
+       $mac = $_[2];
+       $Table{$_[0]} = $_[2];
+       $Table{$_[2]} = $_[0];
+   }
+   close(FILE);
+}
+
+#
 # SUB ListVLANs ----------------------
 #
 
 sub ListVLANs {
-    local(*sess,*v) = @_;
-    
+    local(*sess,*Interfaces,*v) = @_;
+    my %Names = ();
+    my %MACs = ();
+    my @data = ();
+    my @bytes = ();
+    my $mac = "";
+    my @vlan = ();
+    my $field = ["vlanPolicyVlanTable",0];
+    #do one to get the first field...
+    $sess->getnext($field);
+    do {
+	@data = @{$field};
+	#print "$data[0]\t$data[1]\t$data[2]\n";
+	if ($data[0] =~ /policyVlanName/) { $Names{$data[1]} = $data[2]; }
+	if ($data[0] =~ /MacRuleVlanId/) 
+	{ 
+	    my @vlan=();
+	    if (defined ( @{$MACs{$data[2]}} ) ) { @vlan =@{$MACs{$data[2]}}; }
+	    $_= sprintf("%d:%02x%02x%02x%02x%02x%02x", split(/\./,$data[1]));
+	    @_= split(/:/,$_);
+	    $mac = $_[1];
+	    push(@vlan, $mac);
+	    $MACs{$data[2]} = \@vlan;
+	}
+	#do the getnext at the end, because if we're on the last, the next
+	#one is junk to all the processing instructions...
+        $sess->getnext($field);
+    } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/) ;
+    print "ID\tName\t\tMembers of VLAN\n";
+    print "------------------------------------------\n";
+    foreach $id ( sort keys ( %Names)) {
+	print $id,"\t",$Names{$id},"\t";
+	if ( length ($Names{$id}) < 8 ) { print "\t"; }
+	if (defined ( @{$MACs{$id}}) ) {
+	    foreach $m ( @{$MACs{$id}} ) {
+		if ( defined ($Interfaces{$m})) {
+		    print $Interfaces{$m},"  \t";
+		} else {
+		    print $m,"\t";
+		}
+	    }
+	}
+	print "\n";
+    }
 }
 
 #
