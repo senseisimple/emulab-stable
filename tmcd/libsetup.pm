@@ -1498,7 +1498,7 @@ sub doaccounts()
 			warn "*** WARNING: Error creating user homedir\n";
 			next;
 		    }
-		    chown($login, $login, $hdir);
+		    chown($uid, $gid, $hdir);
 		}
 		
 		# Add to DB only if successful. 
