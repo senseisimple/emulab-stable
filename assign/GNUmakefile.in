@@ -24,7 +24,7 @@ OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o config.o score.o \
      parser.o solution.o anneal.o featuredesire.o
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
-CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-30
+CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40
 
 # Pick either this
 CXXFLAGS += -O3 
