@@ -57,7 +57,7 @@ function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
 	echo "<option $selected value='$osid'>$pid - $osname</option>\n";
     }
     $selected = "";
-    if (strcmp($previous, "none") == 0)
+    if (!isset($previous) || $previous == "none" || $previous == "")
 	$selected = "selected";
 	
     echo "         <option $selected value=none>No OS</option>\n";
@@ -87,7 +87,7 @@ function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous)
 	echo "<option $selected value='$imageid'>$pid - $imagename</option>\n";
     }
     $selected = "";
-    if (strcmp($previous, "none") == 0)
+    if (!isset($previous) || $previous == "none" || $previous == "")
 	$selected = "selected";
 	
     echo "         <option $selected value=none>No ImageID</option>\n";
