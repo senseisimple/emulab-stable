@@ -4,6 +4,7 @@ import java.util.*;
 import java.text.*;
 
 class Thingee {
+    private boolean nameFixed;
     private String name;
     private int x, y;
 
@@ -114,6 +115,14 @@ class Thingee {
 	currentlySelected = t;
 	}*/
 
+    public void fixName( boolean fix ) {
+	nameFixed = fix;
+    }
+
+    public boolean nameFixed() {
+	return nameFixed;
+    }
+
     public String getName() {
 	return name;
     }
@@ -121,10 +130,12 @@ class Thingee {
     public void setName( String newName ) {
 	//	System.out.println("Thingee.setName(): Renamed from \"" + name + 
 	//		   "\" to \"" + newName + "\"" );
-	names.remove( name );
-	name = new String( newName );
-	names.put( name, new Integer(1) );
-	stringWidthValid = false;
+	if (!nameFixed) {
+	    names.remove( name );
+	    name = new String( newName );
+	    names.put( name, new Integer(1) );
+	    stringWidthValid = false;
+	}
     }
 	
     public Thingee(String newName) {
@@ -137,6 +148,7 @@ class Thingee {
 	moveable = true;
 	propertyEditable = true;
 	trashable = true;
+	nameFixed = false;
     }
 
     public void move( int nx, int ny ) {

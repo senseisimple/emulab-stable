@@ -83,10 +83,17 @@ function GETLOGIN() {
 # 
 function GETUID() {
     global $TBNAMECOOKIE, $HTTP_COOKIE_VARS;
+    global $nocookieuid;
 
-    $curname = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
-    if ($curname == NULL)
-	    return FALSE;
+    $curname = $nocookieuid;
+
+    if ($curname == NULL) {    
+	$curname = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
+    }
+
+    if ($curname == NULL) {
+	return FALSE;
+    }
 
     return $curname;
 }
@@ -101,7 +108,7 @@ function GETUID() {
 function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID;
-
+    global $nocookieauth;
     #
     # If we already figured this out, do not duplicate work!
     #
@@ -110,8 +117,14 @@ function CHECKLOGIN($uid) {
     }
     $CHECKLOGIN_UID = $uid;
 
-    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
-
+    # for java applet, we can send the key in the $auth variable,
+    # rather than passing it is a cookie.
+    if (isset($nocookieauth)) {
+	$curhash = $nocookieauth;
+    } else {
+	$curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+    }
+    
     #
     # Note that we get multiple rows back because of the group_membership
     # join. No big deal.

@@ -14,6 +14,27 @@ $parser   = "$TB/libexec/ns2ir/parse-ns";
 #
 PAGEHEADER("Modify Experiment");
 
+# the following hack is a page for Netbuild to
+# point the user's browser at after a successful modify.
+# this does no error checking.
+if ($justsuccess) {
+    echo "<br /><br />";
+    echo "<font size=+1>
+	  <p>Experiment
+          <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
+          in project <A href='showproject.php3?pid=$pid'>$pid</A>
+          is being modified!</p><br />
+	  <p>You will be notified via email when the operation is complete.
+          This could take one to ten minutes, depending on
+          whether nodes were added to the experiments, and whether
+          disk images had to be loaded.</p>
+          <p>While you are waiting, you can watch the log 
+          in <a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid>
+          realtime</a>.</p></font>\n";
+    PAGEFOOTER();
+    return;
+}
+
 #
 # Only known and logged in users can modify experiments.
 #
@@ -47,6 +68,8 @@ $query_result =
     DBQueryFatal("SELECT * FROM experiments WHERE ".
 		 "eid='$eid' and pid='$pid'");
 if (mysql_num_rows($query_result) == 0) {
+  # Netbuild requires the following line.
+  echo "\n\n<!-- NetBuild! Experiment does not exist -->\n\n";	
   USERERROR("The experiment $eid is not a valid experiment ".
             "in project $pid.", 1);
 }
@@ -54,19 +77,31 @@ if (mysql_num_rows($query_result) == 0) {
 $expstate = TBExptState($pid, $eid);
 
 if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY ) ) {
+  # Netbuild requires the following line.
+  echo "\n\n<!-- NetBuild! No permission to modify -->\n\n";	
   USERERROR("You do not have permission to modify this experiment.", 1);
 }
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
+  # Netbuild requires the following line.
+  echo "\n\n<!-- NetBuild! Experiment cannot be modified while in transition. -->\n\n";	
   USERERROR("You cannot modify an experiment in transition.", 1);
 }
 
 
 if (! isset($go)) {
-	echo "<h3>Experiment Modify ";
-	echo "<a href='faq.php3#UTT-Modify'>Documentation (FAQ)</a></h3>";
+	echo "<h3>Modifying Experiment $pid/$eid:<br>";
+	echo "<a href='faq.php3#UTT-Modify'>Modify Experiment Documentation (FAQ)</a></h3>";
 	echo "<br>";
+
+	if ($isadmin) {
+	    echo "<font size='+1'>".
+		 "You can <a href='buildui/bui.php3?action=modify&pid=$pid&eid=$eid'>".
+		 "modify this experiment with NetBuild</a>, or edit the NS directly:</font>";
+	    echo "<br>";
+        }
+
 	echo "<form action='modifyexp.php3' method='post'>";
 	echo "<textarea cols='100' rows='40' name='nsdata'>";
 
@@ -161,6 +196,8 @@ if (! isset($go)) {
 		echo "$output[$i]\n";
 	    }
 	    echo "</xmp>\n";
+	    # the following line is required for Netbuild interaction.
+	    echo "\n\n<!-- Netbuild! Modify failed -->\n\n";
 
 	    PAGEFOOTER();
 	    die("");
@@ -182,6 +219,8 @@ if (! isset($go)) {
               <p>While you are waiting, you can watch the log 
               in <a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid>
               realtime</a>.</p></font>\n";
+	    # the following line is required for Netbuild.
+	    echo "\n\n<!-- Netbuild! success -->\n\n";
 	}
 	
 #	if ($delnsfile) {

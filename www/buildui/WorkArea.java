@@ -1,27 +1,462 @@
 import java.awt.*;
 import java.util.*;
+import java.lang.*;
+
+// Code for the "workarea" of the applet,
+// which contains the node graph.
+// Contains code to add/remove/select/draw "Thingees".
+//
+// A lot of this code deals with loading and saving the
+// work area as NS, and could probably be in a separate class.
+//
 
 public class WorkArea {
     private Vector thingees;
     private Vector linkThingees;
     private Vector iFaceThingees;
-
-    public WorkArea() {
+    private int width;
+    private int height;
+    
+    public WorkArea(int w, int h) {
 	super();
 	thingees = new Vector();
 	linkThingees = new Vector();
 	iFaceThingees = new Vector();
+	width = w;
+	height = h;
 	//Thingee foo = new Thingee( "Some Node" );
 	//foo.move( 100, 100 );
 	//thingees.addElement( foo  );
     }
 
+    private void rescaleThingees() {
+	int minx = 0, maxx = 0;
+	int miny = 0, maxy = 0;
+	boolean noneYet = true;
+	Enumeration thingeeEnum = thingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    
+	    if (noneYet || t.getX() < minx) { minx = t.getX(); }
+	    if (noneYet || t.getY() < miny) { miny = t.getY(); }
+	    if (noneYet || t.getX() > maxx) { maxx = t.getX(); }
+	    if (noneYet || t.getY() > maxy) { maxy = t.getY(); }
+	    noneYet = false;
+	}
+
+	int xoffs = width / 8;
+	int xspan = width - (2 * xoffs);
+	int yoffs = height / 8;
+	int yspan = height - (2 * yoffs);
+
+	thingeeEnum = thingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    
+	    t.move( (t.getX() - minx) * xspan / (maxx - minx) + xoffs,
+		    (t.getY() - miny) * yspan / (maxy - miny) + yoffs );
+	}
+    }
+
+    private Thingee lookupNodeThingee( String name )
+    {
+      	Enumeration thingeeEnum = thingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    if (t.getName().equals( name ) && (t instanceof NodeThingee)) {
+		return t;
+	    }
+	}
+
+	return null;
+    }
+
+    private Thingee lookupLanThingee( String name )
+    {
+      	Enumeration thingeeEnum = thingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    if (t.getName().equals( name ) && (t instanceof LanThingee)) {
+		return t;
+	    }
+	}
+
+	return null;
+    }
+
+    private Thingee lookupLinkThingee( String name )
+    {
+      	Enumeration thingeeEnum = linkThingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    if (t.getName().equals( name )) {
+		return t;
+	    }
+	}
+
+	return null;
+    }
+
+    private Thingee findInterface( String nodeName, 
+				   Thingee linkOrLan )
+    {
+	Thingee node = lookupNodeThingee( nodeName );
+	if (node == null) { return null; }
+
+      	Enumeration thingeeEnum = iFaceThingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    IFaceThingee t = (IFaceThingee)thingeeEnum.nextElement();
+	    if (t.isConnectedTo( node ) &&
+		t.isConnectedTo( linkOrLan )) {
+		return t;
+	    }
+	}
+
+	return null;
+    }
+
+    private Thingee findLanLink( String nodeName,
+				 String lanName )
+    {
+	Thingee node = lookupNodeThingee( nodeName );
+	Thingee lan  = lookupLanThingee( lanName );
+	if (node == null || lan == null) { return null; }
+
+      	Enumeration thingeeEnum = linkThingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    LinkThingee t = (LinkThingee)thingeeEnum.nextElement();
+	    if (t.isConnectedTo( node ) &&
+		t.isConnectedTo( lan )) {
+		return t;
+	    }
+	}
+
+	return null;
+    }
+
+    private boolean doNSCreateNode( String name ) 
+    {
+	Thingee foo = new NodeThingee( name );
+	foo.move( 100 + thingees.size(), 100 + thingees.size() );
+	foo.fixName(true);
+	add( foo );
+	return true;
+    }
+
+    private boolean doNSCreateLink( String name, String a, String b ) 
+    {
+	Thingee aNode = lookupNodeThingee( a );
+	Thingee bNode = lookupNodeThingee( b );
+	if (aNode == null || bNode == null) { 
+	    System.out.println( "doNSCreateLink("+a+", "+b+") failed." );
+	    return false; 
+	}
+	Thingee foo = new LinkThingee( name, aNode, bNode );
+	foo.fixName(true);
+	add( foo );
+	return true;
+    }
+
+    private boolean doNSCreateLan( String name, Vector nodes, int first, int count ) 
+    {
+	Thingee foo = new LanThingee( name );
+	foo.move( 120 + thingees.size(), 120 + thingees.size());
+	foo.fixName(true);
+	add( foo );
+	// add individual lan members
+	for (int i = 0; i != count; i++) {
+	    Thingee bar = lookupNodeThingee( (String)(nodes.elementAt(first + i)) );
+	    if (bar == null) { 
+		System.out.println( "doNSCreateLan("+name+",...) failed." );
+		return false; }
+	    add( new LanLinkThingee( "", foo, bar ) );
+	}
+	return true;
+    }
+
+    private boolean doNSSetLinkProp( String linkName, String prop, String val )
+    {
+	Thingee foo = lookupLinkThingee( linkName );
+	if (foo == null) { 
+	    System.out.println("doNSSetLinkProp("+linkName+", "+prop+", "+val+") failed.");
+	    return false; 
+	}
+	foo.setProperty( prop, val );
+	return true;
+    }
+
+    private boolean doNSSetLanProp( String lanName, String prop, String val )
+    {
+	Thingee foo = lookupLanThingee( lanName );
+	if (foo == null) { 
+	    System.out.println("doNSSetLanProp("+lanName+", "+prop+", "+val+") failed.");
+	    return false; 
+	}
+	foo.setProperty( prop, val );
+	return true;
+    }
+
+    private boolean doNSSetNodeProp( String nodeName, String prop, String val )
+    {
+	Thingee foo = lookupNodeThingee( nodeName );
+	if (foo == null) { 
+	    System.out.println("doNSSetNodeProp("+nodeName+", "+prop+", "+val+") failed.");
+	    return false; 
+	}
+	foo.setProperty( prop, val );
+	return true;
+    }
+
+    private boolean doNSSetIFaceProp( String nodeName, String linkName, 
+				      String prop, String val )
+    {
+	Thingee link = lookupLinkThingee( linkName );
+	if (link == null) { 
+	    System.out.println("doNSSetIFaceProp("+nodeName+", "+linkName+" ,"+prop+", "+val+") failed.");
+	    return false; 
+	}
+	Thingee iFace = findInterface( nodeName, link );
+	if (iFace == null) { 
+	    System.out.println("doNSSetIFaceProp("+nodeName+", "+linkName+" ,"+prop+", "+val+") failed.");
+	    return false; 
+	}
+	iFace.setProperty( prop, val );
+	return true;
+    }
+
+
+    private boolean doNSSetLanIFaceProp( String nodeName, String lanName, 
+				         String prop, String val )
+    {
+	Thingee lanLink = findLanLink( nodeName, lanName );
+	if (lanLink == null) { 
+	    System.out.println("doNSSetLanIFaceProp("+nodeName+", "+lanName+" ,"+prop+", "+val+") failed.");
+	    return false; }
+	// find iface between node and lanLink
+	Thingee lanIFace = findInterface( nodeName, lanLink );
+	if (lanIFace == null) { 
+	    System.out.println("doNSSetLanIFaceProp("+nodeName+", "+lanName+" ,"+prop+", "+val+") failed.");
+	    return false;
+	}
+	lanIFace.setProperty( prop, val );
+	return true;
+    }
+
+    private boolean doNSSetLanLinkProp( String nodeName, String lanName,
+					String prop, String val )
+    {
+	Thingee lanLink = findLanLink( nodeName, lanName );
+	if (lanLink == null) { 
+	    System.out.println("doNSSetLanLinkProp("+nodeName+", "+lanName+" ,"+prop+", "+val+") failed.");
+	    return false; 
+	}
+	lanLink.setProperty( prop, val );
+	return true;
+    }
+
+    private boolean doNSSetVisPosition( String name, String x, String y )
+    {
+      	Enumeration thingeeEnum = thingees.elements();
+
+	while ( thingeeEnum.hasMoreElements()) {
+	    Thingee t = (Thingee)thingeeEnum.nextElement();
+	    if (t.getName().equals( name )) {
+		t.move( (new Integer(x)).intValue(),
+			(new Integer(y)).intValue() );
+		return true;
+	    }
+	}
+
+	return false;	
+    }
+
+
+    private String getNumPre( String i ) 
+    {
+	int validChars = 0;
+	while (true) {
+	    if (validChars == i.length()) { break; }
+	    char x = i.charAt(validChars);
+	    if (!((x >= '0' && x <= '9') || (x == '.'))) {
+		break;
+	    }
+	    validChars++;
+	}
+	return i.substring( 0, validChars );
+    }
+
+    private boolean doNSCommand( Vector arglist ) {
+	int siz = arglist.size();
+	String command = siz <= 0 ? null : (String)arglist.elementAt(0);
+	String arg1    = siz <= 1 ? null : (String)arglist.elementAt(1);
+	String arg2    = siz <= 2 ? null : (String)arglist.elementAt(2);
+	String arg3    = siz <= 3 ? null : (String)arglist.elementAt(3);
+	String arg4    = siz <= 4 ? null : (String)arglist.elementAt(4);
+	String arg5    = siz <= 5 ? null : (String)arglist.elementAt(5);
+	String arg6    = siz <= 6 ? null : (String)arglist.elementAt(6);
+	String arg7    = siz <= 7 ? null : (String)arglist.elementAt(7);
+
+	Thingee t;
+
+	//System.out.println("doNSCommand(\""+command+"\")");
+
+	if (command.equalsIgnoreCase("ns") ||
+	    command.equalsIgnoreCase("source")) {
+	    // totally ignore "$ns ..." and "source ..." forms.
+	    return true;
+	} 
+
+	if (command.equalsIgnoreCase("set")) {
+	    if (arg1.equalsIgnoreCase("ns") &&
+		arg2.equalsIgnoreCase("new") &&
+		arg3.equalsIgnoreCase("simulator")) {
+		// this is boilerplate and is therefore ignored.
+		return true;
+	    }
+
+	    if (!arg2.equalsIgnoreCase("ns")) { 
+		System.out.println("doNSCommand: invalid 'set'.");
+		return false; 
+	    }
+
+	    if (arg3.equalsIgnoreCase("node")) {
+		// !!! create node named arg1
+		return doNSCreateNode( arg1 );
+	    } else if (arg3.equalsIgnoreCase("duplex-link")) {
+		return doNSCreateLink( arg1, arg4, arg5 ) &&
+		       doNSSetLinkProp( arg1, "bandwidth", getNumPre(arg6) ) &&
+		       doNSSetLinkProp( arg1, "latency", getNumPre(arg7) );
+	    } else if (arg3.equalsIgnoreCase("make-lan")) {
+		// create lan named arg1 from arg4....arglast-2, bw arglast-1, lat arglast 
+		return doNSCreateLan( arg1, arglist, 4, arglist.size() - 2 - 4) &&
+		       doNSSetLanProp( arg1, "bandwidth", getNumPre((String)arglist.elementAt(arglist.size() - 2)) ) &&
+		       doNSSetLanProp( arg1, "latency", getNumPre((String)arglist.elementAt(arglist.size() - 1)) );
+	    }
+	} else if (command.equalsIgnoreCase("tb-set-node-os")) {
+	    return doNSSetNodeProp( arg1, "osid", arg2 );
+	} else if (command.equalsIgnoreCase("tb-set-hardware")) {
+	    return doNSSetNodeProp( arg1, "hardware", arg2 );
+	} else if (command.equalsIgnoreCase("tb-set-link-loss")) {
+	    return doNSSetLinkProp( arg1, "loss", arg2 );
+	} else if (command.equalsIgnoreCase("tb-set-ip-link")) {
+	    return doNSSetIFaceProp( arg1, arg2, "ip", arg3 );
+	} else if (command.equalsIgnoreCase("tb-set-lan-loss")) {
+	    return doNSSetLanProp( arg1, "loss", arg2 ); 
+	} else if (command.equalsIgnoreCase("tb-set-node-lan-params")) {
+	    return doNSSetLanLinkProp( arg1, arg2, "latency",  getNumPre(arg3) ) &&
+		   doNSSetLanLinkProp( arg1, arg2, "bandwidth",   getNumPre(arg4) ) &&
+  		   doNSSetLanLinkProp( arg1, arg2, "loss", arg5 );
+	} else if (command.equalsIgnoreCase("tb-set-ip-lan")) {
+	    return doNSSetLanIFaceProp( arg1, arg2, "ip", arg3 );
+	} else if (command.equalsIgnoreCase("tb-set-vis-position")) {
+	    return doNSSetVisPosition( arg1, arg2, arg3 );
+	}
+
+	System.out.println("doNSCommand(): Unknown command '" + command + "'\n");
+	return false;
+    }
+
+    // loop by line
+    // eat comments
+    // set {N} [$ns node]
+    //   set os, hardware to <auto>
+    // tb-set-node-os ${N} {OS}
+    // tb-set-hardware ${N} {HW}
+    // set {NODELINK} [$ns duplex-link ${A} ${B} {bw}Mb {lat}ms DropTail]
+    //   set link loss 0
+    // tb-set-link-loss ${LINK} {loss}
+    // tb-set-ip-link ${N} ${L} {IP}
+    // set {LAN} [$ns make-lan "${1} ${2} " {BW}Mb {lat}ms]
+    // tb-set-lan-loss ${LAN} {loss}
+    // tb-set-node-lan-params ${N} ${L} {lat}ms {bw}Mb {loss}
+    // tb-set-ip-lan ${N} ${L} {IP}
+    // "$ns rtproto Static"
+    // "$ns run"
+
+    private boolean isTerminatorEOLEOS( String s, int pos ) {
+	if (pos >= s.length()) { return true; }
+	char v = s.charAt(pos);
+	// yup; as far as my parser is concerned, these are all whitespace.
+        if (v == '#'  || v == '\n' || 
+            v == '\t' || v == '\r' ||
+            v == ' '  || v == '['  ||
+            v == '"'  || v == ']'  ||
+	    v == '$' ) {
+	    return true;
+	}
+	return false;
+    }
+
+    private boolean isEOLEOS( String s, int pos ) {
+	return pos >= s.length() || s.charAt(pos) == '\n';
+    }
+
+    private boolean isEOS( String s, int pos ) {
+        return pos >= s.length();
+    }
+
+    public boolean fromNS(String ns) {         
+        Vector   arglist   = new Vector();
+        String  newarg     = new String(); 
+        boolean commentBit = false;
+	int     pos = 0;
+
+        while (true) {
+            if (!isTerminatorEOLEOS( ns, pos )) {
+                // if '#' wasn't already encountered this line,
+		// append char under head to string.
+		if (!commentBit) {
+		    newarg = newarg.concat((new Character(ns.charAt(pos))).toString());
+		}
+	    } else {
+		// At EOS, EOL, or Terminator, current arg ends.
+		if (newarg.length() != 0) { 			  
+		    arglist.addElement( newarg );
+		    newarg = new String();
+		}
+
+		// At EOL or EOS, run command and end comment.
+		if (isEOLEOS(ns, pos)) {
+		    commentBit = false;
+		    if (!arglist.isEmpty()) {
+			// if there is an error, propagate it.
+			if (!doNSCommand(arglist)) {
+			    System.out.println("NS Error, command \""+
+					       (String)arglist.elementAt(0) + "\".");
+			    return false;
+			}
+			// Clear it, but clear isn't in Java 1.1
+			arglist = new Vector();
+		    }
+
+		    // At EOS, we're done.
+		    if (isEOS(ns, pos)) {
+			rescaleThingees();
+			return true;
+		    }
+		} else {
+		    // At '#', begin comment.
+		    if (ns.charAt(pos) == '#') {
+			commentBit = true;
+		    }
+		}
+	    }
+	    pos++;
+	}	
+    }
 
     public String toNS() {
 	Dictionary lanConnections = new Hashtable();
 	String r = "";
 	
-	r += "#generated by Netbuild 1.02\n";
+	r += "#generated by Netbuild 1.03\n";
 	r += "set ns [new Simulator]\n";
 	r += "source tb_compat.tcl\n\n";
 	

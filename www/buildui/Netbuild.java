@@ -37,6 +37,8 @@ public class Netbuild extends java.applet.Applet
     private PropertiesArea iFacePropertiesArea;
     private PropertiesArea lanLinkPropertiesArea;
 
+    private boolean modify; 
+
     private boolean mouseDown;
     private boolean clickedOnSomething;
     private boolean allowMove;
@@ -68,10 +70,57 @@ public class Netbuild extends java.applet.Applet
     private FlatButton copyButton;
     private boolean copyButtonActive;
 
+    private static boolean fatalError;
+    private static String  fatalErrorMessage;
+
     static {
+	fatalError = false;
 	cornflowerBlue  = new Color( 0.95f, 0.95f, 1.0f );
 	lightBlue = new Color( 0.9f, 0.9f, 1.0f );
 	darkBlue  = new Color( 0.3f, 0.3f, 0.5f );
+    }
+
+    private Dialog d;
+
+    private void dialog( String title, String message ) {
+	Frame window = new Frame();
+
+	// Create a modal dialog
+	d = new Dialog(window, title, true);
+
+	// Use a flow layout
+	d.setLayout( new FlowLayout() );
+
+	d.setLocation( new Point( 20, 20 ) );
+
+	// Create an OK button
+	Button ok = new Button ("OK");
+	ok.addActionListener ( new ActionListener() {
+		public void actionPerformed( ActionEvent e )
+		{
+				// Hide dialog
+		    me.d.setVisible(false);
+		}
+	    });
+
+	d.add( new Label (title + ": "));
+	d.add( new Label (message));
+	d.add( ok );
+
+	// Show dialog
+	d.pack();
+	d.setVisible(true);
+    }
+
+    private void fatalError( String message ) {
+	//dialog( "NetBuild Fatal Error", message );
+	//System.exit(0);
+	fatalErrorMessage = message;
+	fatalError = true;
+    }
+
+    private void warningError( String message ) {
+	dialog( "NetBuild Warning", message );
     }
 
     // returns true if anything was added.
@@ -201,6 +250,8 @@ public class Netbuild extends java.applet.Applet
     }
 
     public static void redrawAll() {
+	if (fatalError) { return; }
+
 	me.repaint();
     }
 
@@ -233,6 +284,8 @@ public class Netbuild extends java.applet.Applet
     public void keyTyped( KeyEvent e ) {}
 
     public void keyPressed( KeyEvent e ) {
+	if (fatalError) { return; }
+
 	System.out.println("Woo.");
 	if (e.getKeyCode() == KeyEvent.VK_C) {
 	    prePaintSelChange();
@@ -245,6 +298,8 @@ public class Netbuild extends java.applet.Applet
     public void mouseMoved( MouseEvent e ) {}
 
     public void mouseDragged( MouseEvent e ) {
+	if (fatalError) { return; }
+
 	if (!mouseDown) { return; }
 	Graphics g = getGraphics();
 	g.setXORMode( Color.white );
@@ -338,6 +393,171 @@ public class Netbuild extends java.applet.Applet
 	g.setPaintMode();
     }
 
+    public boolean grabIt() {
+	try {
+	    String action = getParameter("action");
+	    if (action == null ||
+		!action.equals("modify")) { 
+		System.out.println("Not modifying...");
+		return false; 
+	    }
+	    String eid = getParameter("eid");
+	    String pid = getParameter("pid");
+	    String uid = getParameter("uid");
+	    String auth = getParameter("auth");
+
+	    if (eid == null || pid == null || 
+		uid == null || auth == null) {
+		fatalError("Insufficient Parameters.");
+		//System.out.println("Insufficient parameters...");
+		//return false;
+	    }
+
+	    String ns = new String("");
+	    int linesRecd = 0;
+
+       	    System.out.println("Getting NS...");
+	    {	    
+		URL url;
+		URLConnection urlConn;
+		DataOutputStream    printout;
+		DataInputStream     input;
+		// URL of CGI-Bin script.
+		//url = new URL (getCodeBase().toString() + "env.tcgi");
+		url = new URL ( getParameter("importurl") );
+		// URL connection channel.
+		urlConn = url.openConnection();
+		// Let the run-time system (RTS) know that we want input.
+		urlConn.setDoInput (true);
+		// Let the RTS know that we want to do output.
+		urlConn.setDoOutput (true);
+		// No caching, we want the real thing.
+		urlConn.setUseCaches (false);
+		// Specify the content type.
+		urlConn.setRequestProperty("Content-Type", 
+					   "application/x-www-form-urlencoded");
+		// Send POST output.
+		printout = new DataOutputStream (urlConn.getOutputStream ());
+		String content =	    
+		    "eid=" + URLEncoder.encode( eid ) +
+		    "&pid=" + URLEncoder.encode( pid ) +
+		    "&nocookieuid=" + URLEncoder.encode( uid ) +
+		    "&justns=1" +
+		    "&nocookieauth=" + URLEncoder.encode( auth );
+		printout.writeBytes (content);
+		printout.flush ();
+		printout.close ();
+		// Get response data.
+		input = new DataInputStream (urlConn.getInputStream ());
+		String str;
+		System.out.println("BEGIN NS FROM SERVER:");
+		while (null != ((str = input.readLine()))) {
+		    //System.out.println (str);
+		    ns = ns.concat(str);
+		    ns = ns.concat("\n");
+		    linesRecd++;
+		}
+		System.out.println("END NS FROM SERVER.");
+		input.close();
+	    }
+
+	    //System.out.println("Modify = '" + modify + "'");
+	    if (linesRecd == 0) {
+		fatalError("NS file was blank!");
+		//System.out.println("Got blank NS file!");
+		return false;
+	    }
+	    System.out.println("Successfully (?) obtained NS file.");
+	    // System.out.print(ns);
+	    // call fromNS on ns.
+	    if (!workArea.fromNS( ns )) {
+		fatalError("parsefail");
+		//System.out.println("NS failed to parse!");
+		return false;
+	    } else {
+		System.out.println("Successfully parsed NS!");
+	    }
+	    return true;
+	} catch (Exception ex) {
+	    System.out.println("grabIt(): exception '" + ex.getMessage() + "'");
+	    ex.printStackTrace();	       
+	    fatalError("Failed to get and parse NS file!");
+	    return false;
+	}
+    }
+    
+    public String modifyIt( String s ) {
+	String eid = getParameter("eid");
+	String pid = getParameter("pid");
+	String uid = getParameter("uid");
+	String auth = getParameter("auth");
+	
+	if (eid == null || pid == null || 
+	    uid == null || auth == null) {
+	    warningError("Failed to modify experiment.");
+	    //System.out.println("Insufficient parameters...");
+	    return "Bad applet parameters";
+	}
+
+	String response = new String("Could not contact server.");
+
+	try {
+	    URL url;
+	    URLConnection urlConn;
+	    DataOutputStream    printout;
+	    DataInputStream     input;
+	    // URL of CGI-Bin script.
+	    //url = new URL (getCodeBase().toString() + "env.tcgi");
+	    url = new URL ( getParameter("modifyurl") );
+	    // URL connection channel.
+	    urlConn = url.openConnection();
+	    // Let the run-time system (RTS) know that we want input.
+	    urlConn.setDoInput (true);
+	    // Let the RTS know that we want to do output.
+	    urlConn.setDoOutput (true);
+	    // No caching, we want the real thing.
+	    urlConn.setUseCaches (false);
+	    // Specify the content type.
+	    urlConn.setRequestProperty("Content-Type", 
+				       "application/x-www-form-urlencoded");
+	    // Send POST output.
+	    printout = new DataOutputStream (urlConn.getOutputStream ());
+	    String content =	    
+		"nsdata=" + URLEncoder.encode( s ) +
+		"&go=1&reboot=1" +
+		"&eid=" + URLEncoder.encode( eid ) +
+		"&pid=" + URLEncoder.encode( pid ) +
+		"&nocookieuid=" + URLEncoder.encode( uid ) +
+		"&nocookieauth=" + URLEncoder.encode( auth );
+	    printout.writeBytes (content);
+	    printout.flush ();
+	    printout.close ();
+	    // Get response data.
+	    input = new DataInputStream (urlConn.getInputStream ());
+	    String str;
+	    while (null != ((str = input.readLine()))) {
+		//System.out.println (str);
+		if (str.toLowerCase().startsWith("<!-- netbuild!")) { 
+		    //System.out.println( "Registered response!");
+		    response = str;
+		}
+	    }
+	    input.close();
+
+	    System.out.println("Response = " + response);
+	    return response.substring(15,response.length() - 4);
+	} catch (Exception ex) {
+	    //warningError("Failed to modify experiment");
+	    System.out.println("modifyIt() exception: " + ex.getMessage());
+	    ex.printStackTrace();	       
+	    return "Exception";
+	}
+
+	//return "nsref=" + String.valueOf(hash) + 
+        //       "&guid=" + randVal;
+	//return response;
+    }
+
     public String postIt( String s ) {
 	int hash = s.hashCode();
         Random rand = new Random();
@@ -408,22 +628,45 @@ public class Netbuild extends java.applet.Applet
     //}
 
     public void actionPerformed( ActionEvent e ) {
+	if (fatalError) { return; }
 	if (e.getSource() == exportButton) {
 	    startAppropriatePropertiesArea(); // make sure strings are up'd
 	    String ns = workArea.toNS();
 	    System.out.println( ns );	
-	    String ref = postIt( ns );	
-	    //String url = getParameter("exporturl") + "?nsdata=" + 
-	    //URLEncoder.encode( ns );
-	    //toCookie( ns );
-	    //String url = getParameter("exporturl") + "?nsdataincookie=1";
-	    String url = getParameter("expcreateurl") + "?" + ref;
-	    System.out.println( url );
-	    try {
-		getAppletContext().showDocument( new URL( url ), "_blank" );
-	    } catch (Exception ex) {
-		System.out.println("exception: " + ex.getMessage());
-		ex.printStackTrace();	       
+
+	    if (!modify) {
+		String ref = postIt( ns );	
+		//String url = getParameter("exporturl") + "?nsdata=" + 
+		//URLEncoder.encode( ns );
+		//toCookie( ns );
+		//String url = getParameter("exporturl") + "?nsdataincookie=1";
+		String url = getParameter("expcreateurl") + "?" + ref;
+		System.out.println( url );
+		try {
+		    getAppletContext().showDocument( new URL( url ), "_blank" );
+		} catch (Exception ex) {
+		    System.out.println("exception: " + ex.getMessage());
+		    ex.printStackTrace();	       
+		}
+	    } else {
+		String ret = modifyIt( ns );
+		if (ret.equalsIgnoreCase("success")) {
+		    System.out.println("actionPerformed: modify success");
+		    String url = getParameter("modifyurl") + "?" +
+			"&eid=" + URLEncoder.encode( getParameter("eid") ) +
+			"&pid=" + URLEncoder.encode( getParameter("pid") ) +
+			"&justsuccess=1";
+		    System.out.println( url );
+		    try {
+			getAppletContext().showDocument( new URL( url ), "_blank" );
+		    } catch (Exception ex) {
+			System.out.println("exception: " + ex.getMessage());
+			ex.printStackTrace();	       
+		    }		    
+		} else {	
+		    System.out.println("actionPerformed: failed.");
+		    warningError(ret);
+		}
 	    }
 	} else if (e.getSource() == copyButton) {
 	    prePaintSelChange();
@@ -434,6 +677,8 @@ public class Netbuild extends java.applet.Applet
     }
 
     public void mousePressed( MouseEvent e ) {
+	if (fatalError) { return; }
+
 	mouseDown = true;
 	int x = e.getX();
 	int y = e.getY();
@@ -595,6 +840,8 @@ public class Netbuild extends java.applet.Applet
     }
 
     public void mouseReleased( MouseEvent e ) {
+	if (fatalError) { return; }
+
 	if (!mouseDown) { return; }
 	mouseDown = false;
 	if (clickedOnSomething) {
@@ -758,7 +1005,8 @@ public class Netbuild extends java.applet.Applet
     //super();
 
     public void init() {
-	status = "Netbuild v1.02 started.";
+	fatalError = false;
+	status = "Netbuild v1.03 started.";
 	me = this;
 	mouseDown = false;
 
@@ -769,58 +1017,85 @@ public class Netbuild extends java.applet.Applet
 	addMouseMotionListener( this );
 	addKeyListener( this );
 
-	workArea = new WorkArea();
-	palette  = new Palette();
-	propertiesPanel = new Panel();
-
-	nodePropertiesArea  = new NodePropertiesArea();
-	linkPropertiesArea  = new LinkPropertiesArea();
-	iFacePropertiesArea = new IFacePropertiesArea();
-	lanPropertiesArea   = new LanPropertiesArea();
-	lanLinkPropertiesArea = new LanLinkPropertiesArea();
-
-	dragStarted = false;
-	
 	Dimension d = getSize();
 	appWidth    = d.width - 1; //640;
 	appHeight   = d.height - 1; //480;
-
-        propAreaWidth = 160;
+	    
+	propAreaWidth = 160;
 	paletteWidth  = 80;
 	workAreaWidth = appWidth - propAreaWidth - paletteWidth;
 
-	workAreaX = paletteWidth;
-	propAreaX = paletteWidth + workAreaWidth;
+	workArea = new WorkArea(workAreaWidth, appHeight);
+	palette  = new Palette();
+	propertiesPanel = new Panel();
 
-	setBackground( darkBlue );
-	propertiesPanel.setBackground( darkBlue );
-	propertiesPanel.setVisible( true );
+	modify = grabIt();
 
-	exportButton = new FlatButton( "create experiment" );
-	exportButton.addActionListener( this );
+	if (!fatalError) {
+	    nodePropertiesArea  = new NodePropertiesArea();
+	    linkPropertiesArea  = new LinkPropertiesArea();
+	    iFacePropertiesArea = new IFacePropertiesArea();
+	    lanPropertiesArea   = new LanPropertiesArea();
+	    lanLinkPropertiesArea = new LanLinkPropertiesArea();
+	    
+	    dragStarted = false;
+	    
+	    
+	    workAreaX = paletteWidth;
+	    propAreaX = paletteWidth + workAreaWidth;
+	    
+	    setBackground( darkBlue );
+	    propertiesPanel.setBackground( darkBlue );
+	    propertiesPanel.setVisible( true );
 
-	copyButton = new FlatButton( "copy selection" );
-	copyButton.addActionListener( this );
-
-	add( propertiesPanel );
-
-	propertiesPanel.setLocation( propAreaX + 8, 0 + 8 + 24 );
-	propertiesPanel.setSize( propAreaWidth - 16, appHeight - 16 - 32 - 22);
-	
-	exportButton.setVisible( true );
-	exportButton.setEnabled( false );
-	add( exportButton );
-
-	exportButton.setLocation( propAreaX + 8, appHeight - 24 - 2 - 2);
-	exportButton.setSize( propAreaWidth - 16, 20 );
-
-	copyButton.setVisible( false );
-	copyButton.setSize( propAreaWidth - 16, 20);
-
-	precachePropertiesAreas();
+	    if (!modify) {
+		exportButton = new FlatButton( "create experiment" );
+		exportButton.addActionListener( this );
+	    } else {
+		exportButton = new FlatButton( "modify experiment" );
+		exportButton.addActionListener( this );
+	    }	    
+	    
+	    copyButton = new FlatButton( "copy selection" );
+	    copyButton.addActionListener( this );
+	    
+	    add( propertiesPanel );
+	    
+	    propertiesPanel.setLocation( propAreaX + 8, 0 + 8 + 24 );
+	    propertiesPanel.setSize( propAreaWidth - 16, appHeight - 16 - 32 - 22);
+	    
+	    exportButton.setVisible( true );
+	    exportButton.setEnabled( workArea.getThingeeCount() > 0 );
+	    add( exportButton );
+	    
+	    exportButton.setLocation( propAreaX + 8, appHeight - 24 - 2 - 2);
+	    exportButton.setSize( propAreaWidth - 16, 20 );
+	    
+	    copyButton.setVisible( false );
+	    copyButton.setSize( propAreaWidth - 16, 20);
+	    
+	    precachePropertiesAreas();
+	}
     }
 
     public void paint( Graphics g ) {
+	if (fatalError) { 
+	    g.setColor( Color.black );
+	    g.drawString( "Fatal Error!", 10, 30 );
+	    if (fatalErrorMessage.equals("parsefail")) {
+		g.drawString("Failed to parse NS file!", 10, 55 );
+		g.drawString("This may be due to attempting to edit an experiment which", 10, 70);
+		g.drawString("used an NS file that wasn't generated by NetBuild,", 10, 85 );
+	        g.drawString("or was modified by hand to be more complicated than", 10, 100);
+                g.drawString("NetBuild can understand, or if an experiment no longer exists at all.", 10, 115);
+                g.drawString("If this is a problem, please contact Testbed Ops.", 10, 145 );
+	    } else {
+		g.drawString( fatalErrorMessage, 10, 50 );
+                g.drawString("If this is a problem, please contact Testbed Ops.", 10, 80 );
+	    }
+	    super.paint(g);
+	    return;
+	}
 	g.setColor( lightBlue );
 	g.fillRect( 0, 0, paletteWidth, appHeight );
 

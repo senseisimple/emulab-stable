@@ -22,13 +22,32 @@ $isadmin = ISADMIN($uid);
 
 chdir("buildui");
 
+if (isset($action) && $action == "modify") {
+    echo "<h3>Modifying $pid/$eid:</h3>";
+}
+
 ?>
 
 <applet code="Netbuild.class" width=800 height=600 MAYSCRIPT>
-  <param name=exporturl
+  <param name='exporturl'
          value="<?php echo $TBBASE?>/buildui/nssave.php3">
-  <param name=expcreateurl
+  <param name='importurl'
+         value="<?php echo $TBBASE?>/shownsfile.php3">
+  <param name='modifyurl'
+         value="<?php echo $TBBASE?>/modifyexp.php3">
+  <param name='uid'
+	 value="<?php echo $uid?>">
+  <param name='auth'
+	 value="<?php echo $HTTP_COOKIE_VARS[$TBAUTHCOOKIE]?>">
+  <param name='expcreateurl'
          value="<?php echo $TBBASE?>/beginexp.php3">
+<?php
+    if (isset($action) && $action == "modify") {
+	echo "<param name='action' value='modify'>";
+	echo "<param name='pid' value='$pid'>";
+	echo "<param name='eid' value='$eid'>";
+    }
+?>
 <pre>
 NetBuild requires Java.
 
@@ -47,7 +66,7 @@ We'll still be here waiting for you.
 
 <hr>
 <h2>Basic usage:</h2>
-<list>
+<ul>
 <li>
   Drag Nodes and LANs from the <i>Palette</i> on the left into the <i>Workarea</i> in the middle.
 </li>
@@ -57,7 +76,7 @@ We'll still be here waiting for you.
 <li>
   Clicking the "create experiment" button will send you to the Emulab "create experiment" web page, automatically generating and sending an NS file for your designed topology along. From that page, you may create the experiment and/or view the generated NS file.
 </li>
-</list>
+</ul>
 <p>
 <a href="../doc/docwrapper.php3?docname=netbuilddoc.html">Netbuild Full Reference</a>
 </p>

@@ -258,8 +258,14 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	    }
 	} else {
 	    if (nameEdit != null) {
-		nameEdit.tf.setEditable( true );
-		nameEdit.tf.setBackground( Color.white );
+		if (thingsICareAbout == 1 &&
+		    ((Thingee)cThingees.elementAt(0)).nameFixed()) {
+		    nameEdit.tf.setEditable( false );
+		    nameEdit.tf.setBackground( disabledBox );		    
+		} else {
+		    nameEdit.tf.setEditable( true );
+		    nameEdit.tf.setBackground( Color.white );
+		}
 	    }
 	    
 	    if (ipEdit != null) {

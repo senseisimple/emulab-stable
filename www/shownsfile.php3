@@ -10,7 +10,15 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Visualization, NS File, and Details");
+if (!isset($justns)) {
+    $justns = 0;
+}
+
+if (!$justns) {
+    PAGEHEADER("Visualization, NS File, and Details");
+}
+
+
 
 #
 # Only known and logged in users can end experiments.
@@ -61,6 +69,38 @@ if (!$isadmin) {
     if (mysql_num_rows($query_result) == 0) {
         USERERROR("You are not a member of Project $pid!", 1);
     }
+}
+
+#
+# if it is netbuild wanting an NS to modify, send that along
+# (For now, as a disgusting hack, send node positioning along, too.)
+#
+if ($justns) {
+    $query_result =
+	DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
+    if (mysql_num_rows($query_result)) {
+	$row    = mysql_fetch_array($query_result);
+	$nsfile = stripslashes($row[nsfile]);
+	
+	echo "$nsfile\n";
+	# flush();
+
+	$query_result = 
+	    DBQueryFatal("SELECT vname, x, y FROM vis_nodes where pid='$pid' and eid='$eid'");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $name = $row[vname];
+	    $x = $row[x];
+	    $y = $row[y];
+	    echo "tb-set-vis-position \$$name $x $y\n";
+	}
+	flush();
+    }
+    else {
+	echo "No stored NS file for $pid/$eid\n";
+    }    
+
+    return;
 }
 
 echo "<font size=+2><b>".
