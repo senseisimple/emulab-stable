@@ -28,6 +28,11 @@ $referrer  = $_POST['referrer'];
 if (isset($_GET['refer']) && $_GET['refer'] &&
     isset($_SERVER['HTTP_REFERER']) && $_SERVER['HTTP_REFERER'] != "") {
     $referrer = $_SERVER['HTTP_REFERER'];
+
+    # In order to get the auth cookies, pages need to go through https. But,
+    # the user may have visited the last page with http. If they did, send them
+    # back through https
+    $referrer = preg_replace("/^http:/i","https:",$referrer);
 }
 
 #
