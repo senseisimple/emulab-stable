@@ -151,8 +151,17 @@ while (my %row = $db_result->fetchhash()) {
 	$jailnode = 1;
     }
     else {
+	my $nodeAllocState;
+	TBGetNodeAllocState( $node, \$nodeAllocState );
 	$nodes{$node}  = $node;
-	$reboots{$node} = 1;
+	$nodeAllocStates{$node} = $nodeAllocState;
+	# only reboot node if assign_wrapper just pulled it into expt.
+	# (e.g. it isnt ALLOCSTATE_RES_READY)
+	#if (($nodeAllocState eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) ||
+	#    ($nodeAllocState eq TBDB_ALLOCSTATE_RES_INIT_CLEAN())) {
+	if ($nodeAllocState ne TBDB_ALLOCSTATE_RES_READY()) {
+	    $reboots{$node} = 1;
+	}
     }
     $osids{$node} = $osid;
 
@@ -409,12 +418,27 @@ if (!$TESTMODE) {
     my $cmd;
 
     if (keys(%reboots)) {
+	foreach my $node (keys(%reboots)) {
+	    if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN() );
+		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_CLEAN();
+	    } else {
+		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY() );
+		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
+	    }
+	}
+
 	$cmd = "$nodereboot " . join(" ", keys(%reboots));
 	$pids{$cmd} = ForkCmd($cmd);
     }
 
     foreach my $imageid ( keys(%reloads) ) {
 	my @list = @{ $reloads{$imageid} };
+
+	foreach my $node (@list) {
+	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
+	}
 
 	sleep(5);
 	$pids{"$os_load -m $imageid @list"} =
@@ -490,6 +514,8 @@ while ( @nodelist ) {
     if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*7))) {
 	print "$node is alive and well\n";
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();	
 	next;
     }
 
@@ -535,6 +561,8 @@ while ( @nodelist ) {
 
     # Reserve it to down experiment.
     MarkNodeDown($node);
+    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_DOWN() );
+    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();	
 
     # Send mail to testbed-ops about it
     SENDMAIL($TBOPS, "Node $node is down",
@@ -542,7 +570,7 @@ while ( @nodelist ) {
 	     "$node has been taken out of the pool until this matter ".
 	     "is resolved.\n");
 
-    print "*** Experiment will be terminated automatically.\n";
+    # print "*** Experiment will be terminated automatically.\n";
     $failed++;
 }
 TBDebugTimeStamp("Local node waiting finished");

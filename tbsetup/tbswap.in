@@ -357,6 +357,7 @@ sub doSwapout {
 	#
 	# We're not attempting a retry; 
 	# remove all nodes from the experiment.
+	# (nfree will send them to RES_FREE_DIRTY)
 	#
 	print STDERR "Freeing nodes.\n";
 	TBDebugTimeStamp("nfree started");
@@ -370,7 +371,7 @@ sub doSwapout {
 	# Since $retry == 1, we are preparing for an experiment retry.
 	# Therefore, don't deallocate nodes which have been successfully
 	# incorporated into the experiment (i.e., are RES_READY).
-	# Set these deallocated nodes to RES_FREE_DIRTY.
+	# (nfree will send deallocated nodes to RES_FREE_DIRTY)
 	#
 
 	my @failedNodes = ();
@@ -390,14 +391,14 @@ sub doSwapout {
 
 	if (@failedNodes > 0) {
 	    TBDebugTimeStamp("nfree started");
-	    if (system("nfree $pid $eid " . join(" ", @failedNodes))) {
+	    #
+	    # Specify -x switch so when a physical node gets freed,
+	    # any virtual nodes (owned by this experiment)
+	    # sitting on top of it are freed as well.
+	    #
+	    if (system("nfree -x $pid $eid " . join(" ", @failedNodes))) {
 		print STDERR "*** Could not free nodes.\n";
 		$swapout_errors = 1;
-	    } else {
-		# set nodes as free in ALLOC state machine.
-		foreach my $i (@failedNodes) {
-		    TBSetNodeAllocState( $i, TBDB_ALLOCSTATE_FREE_DIRTY() );
-		}
 	    }
 	    TBDebugTimeStamp("nfree finished");
 	}
@@ -473,8 +474,13 @@ sub doSwapin {
     print "Mapping to physical reality ...\n";
     TBDebugTimeStamp("assign_wrapper started");
 
+    #
+    # Pass the -u (update) switch into assign_wrapper,
+    # So any nodes already in the experiment are
+    # fixed.
+    #
     my $exitcode;
-    if ($exitcode = system("assign_wrapper $pid $eid")) {
+    if ($exitcode = system("assign_wrapper -u $pid $eid")) {
 	print STDERR "*** Failed to map to reality.\n";
 	# Pass exit code through
 	return $exitcode >> 8;
@@ -579,11 +585,8 @@ sub doSwapin {
 	    # that it may be beneficial to attempt
 	    # a doSwapin() again.
 	    #
-	    # Disabled for now, until appropriate changes
-	    # are made in assign_wrapper and os_setup.
-	    #
 
-	    # $retry = 1;
+	    $retry = 1;
 
 	    return 1;
 	}

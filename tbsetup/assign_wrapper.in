@@ -70,21 +70,28 @@ $| = 1;
 
 use Getopt::Std;
 
-getopts('v',\%opt);
+getopts('vu',\%opt);
 
 sub usage {
 	print "Usage: $0 [-v] pid eid\n";
 	print "		-v enables verbose output\n";
+	print "         -u enables update functionality\n";
 	exit(-1);
 }
 
 my $verbose = 0;
+my $updating = 0;
+
 if ($opt{v}) {
-	$verbose = 1;
+    $verbose = 1;
+}
+
+if ($opt{u}) {
+    $updating = 1;
 }
 
 if (@ARGV != 2) {
-	usage();
+    usage();
 }
 
 ($pid,$eid) = @ARGV;
@@ -242,18 +249,29 @@ my $remotecount  = 0;
 my $virtcount    = 0;
 my $virtnode_id  = 0;
 
+my %alreadyAllocated = ();
+
 printdb "Loading virt_nodes.\n";
 $result =
-    DBQueryFatal("select distinct vname,ips,vn.type,fixed, ".
-		 " nt.isremotenode,nt.isvirtnode ".
+    DBQueryFatal("select distinct vn.vname,vn.ips,vn.type,vn.fixed, ".
+		 " nt.isremotenode,nt.isvirtnode,rv.node_id ".
 		 " from virt_nodes as vn ".
 		 "left join node_types as nt on ".
 		 " nt.type=vn.type or nt.class=vn.type ".
-		 "where pid='$pid' and eid='$eid'");
+                 "left join reserved as rv on ".
+                 " rv.pid = vn.pid and ".
+                 " rv.eid = vn.eid and ".
+                 " rv.vname = vn.vname ".
+		 "where vn.pid='$pid' and vn.eid='$eid'");
 
-while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = $result->fetchrow_array){
+while (($vname,$ips,$type,$fixed,$isremote,$isvirt,$reserved) = 
+        $result->fetchrow_array){
     if (defined($fixed) && $fixed eq "") {
 	undef($fixed);
+    }
+
+    if (defined($reserved) && $reserved eq "") {
+	undef($reserved);
     }
     
     # REMOTENODE HACK
@@ -299,6 +317,12 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = $result->fetchrow_array){
     $isvirtnode{$vname} = $isvirt;
     $virtcount++
 	if ($isvirt);
+
+    if ($updating && $reserved) {
+	$fixed = $reserved;
+	$alreadyAllocated{$reserved} = 1;
+    }
+
     if (defined($fixed)) {
 	$fixed_nodes{$vname} = $fixed;
     }
@@ -787,7 +811,16 @@ while (1) {
     
     TBDebugTimeStamp("ptopgen started");
     # Snapshot
-    system("ptopgen > $ptopfile");
+    #
+    # if updating (-u), include any resources that may already be
+    # allocated to experiment in the PTOP results.
+    #
+    if ($updating) {
+	system("ptopgen -e $pid/$eid > $ptopfile");
+    } else {
+	system("ptopgen > $ptopfile");
+    }
+
     TBDebugTimeStamp("ptopgen finished");
 
     # Get number of nodes
@@ -852,7 +885,10 @@ while (1) {
 	    if (defined($lannodes{$virtual})) {
 		next;
 	    }
-	    $toreserve{$physical} = 1;	    
+
+	    if (!$alreadyAllocated{$physical}) {
+		$toreserve{$physical} = 1;	    
+	    }
 	    
 	    if ($isvirtnode{$virtual}) {
 		#
@@ -939,6 +975,12 @@ while (1) {
 	    print "Failed to reserve nodes. Trying again.\n";
 	} else {
 	    print "Successfully reserved physical nodes\n";
+
+	    foreach $node (keys(%toreserve)) {
+		# in future, this will be a fully enforced state machine.
+		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+	    }
+
 	    TBDebugTimeStamp("reserving finished");
 	    last;
 	}
