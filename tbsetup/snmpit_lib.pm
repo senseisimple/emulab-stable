@@ -726,8 +726,9 @@ sub snmpitDoIt($$$;$) {
 	    } else {
 		$type = "set";
 	    }
-	    $snmpitErrorString  = "SNMPIT $type failed - variable was " .
-				    printVars($var) . "\n";
+	    $snmpitErrorString  = "SNMPIT $type failed for device " .
+                "$sess->{DestHost} (try $retry of $retries)\n";
+            $snmpitErrorString .= "Variable was " .  printVars($var) . "\n";
 	    $snmpitErrorString .= "Returned $status, ErrorNum was " .
 		   "$sess->{ErrorNum}\n";
 	    if ($sess->{ErrorStr}) {
