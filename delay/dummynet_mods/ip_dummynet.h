@@ -115,6 +115,7 @@ struct dn_flow_queue {
     int hash_slot ;	/* debugging/diagnostic */
 } ;
 
+/* distribution types */
 #define DN_DIST_CONST_TIME	0x01
 #define DN_DIST_CONST_RATE	0x02
 #define DN_DIST_UNIFORM		0x04
@@ -126,6 +127,43 @@ struct dn_flow_queue {
 	(DN_DIST_TABLE_RANDOM|DN_DIST_TABLE_DETERM|DN_DIST_POISSON)
 #define DN_CONST_DIST (DN_DIST_CONST_RATE|DN_DIST_CONST_TIME)
 
+/* delay, bandwidth, loss parameters for dn_pipe */
+
+struct dn_delay {
+	int	delay ;			/* really, ticks	*/
+	int	dist;		/* distribution type */
+	int	mean;
+	int	variance;
+	int    *table;		/* table of possible values */
+	int	entries;	/* entries in table */ 
+	int	tablepos;	/* current pos in table for deterministic */
+};
+
+struct dn_bw {
+	int	bandwidth;		/* bits/sec */
+	int	dist;			/* distribution type */
+	int	mean;
+	int	variance;
+	int	quantum;	/* how frequently to recalculate bw */
+	int	quantum_expire;	/* its expiration date  */
+	int    *table;		/* table of possible values */
+	int	entries;	/* entries in table */
+	int	tablepos;	/* current pos in table for deterministic */
+};
+
+struct dn_loss {
+	int	plr ;		/* pkt loss rate (2^31-1 means 100%) */
+	int	dist;		/* distribution type */
+	int	nextdroptime;	/* time to drop pkt at head of queue */
+	int	mean;
+	int	variance;
+	int	quantum;	/* how frequently to recalc loss rate */
+	int	quantum_expire;	/* its expiration date	*/
+	int    *table;		/* table of possible values */
+	int	entries;	/* entries in table */
+	int	tablepos;	/* current pos in table for deterministic */
+};
+
 /*
  * Pipe descriptor. Contains global parameters, delay-line queue,
  * and the hash array of the per-flow queues.
@@ -136,34 +174,11 @@ struct dn_pipe {			/* a pipe */
 	u_short	pipe_nr ;		/* number	*/
 	u_short	flags ;			/* to speed up things	*/
 #define DN_HAVE_FLOW_MASK	8
-	int	bandwidth;		/* bits/sec */
-	int	bwdist;			/* distribution type */
-	int	bwmean;
-	int	bwvar;
-	int	bwquantum;	/* how frequently to recalculate bw */
-	int	bwquantum_expire;	/* its expiration date  */
-	int    *bwtable;		/* table of possible values */
-	int	bwentries;	/* entries in table */
-	int	bwtablepos;	/* current pos in table for deterministic */
+	struct dn_delay delay;
+	struct dn_bw bw;
+	struct dn_loss loss;
 	int	queue_size ;
 	int	queue_size_bytes ;
-	int	delay ;			/* really, ticks	*/
-	int	delaydist;		/* distribution type */
-	int	delaymean;
-	int	delayvar;		/* variance */
-	int    *delaytable;		/* table of possible values */
-	int	delayentries;	/* entries in table */ 
-	int	delaytablepos;	/* current pos in table for deterministic */
-	int	plr ;		/* pkt loss rate (2^31-1 means 100%) */
-	int	lossdist;		/* distribution type */
-	int	nextdroptime;	/* time to drop pkt at head of queue */
-	int	lossmean;
-	int	lossvar;
-	int	lossquantum;	/* how frequently to recalc loss rate */
-	int	lossquantum_expire;	/* its expiration date	*/
-	int    *losstable;		/* table of possible values */
-	int	lossentries;	/* entries in table */
-	int	losstablepos;	/* current pos in table for deterministic */
         struct	dn_queue p ;
 	struct ipfw_flow_id flow_mask ;
 	int rq_size ;
