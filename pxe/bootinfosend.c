@@ -81,7 +81,9 @@ main(int argc, char **argv)
 		loginit(0, 0);
 	else
 		loginit(1, "bootinfo");
-	info("%s\n", build_info);
+
+	if (debug)
+		info("%s\n", build_info);
 
 	/* Make sure we can map target */
 	if ((he = gethostbyname(argv[0])) == NULL) {
