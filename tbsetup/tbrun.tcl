@@ -97,7 +97,7 @@ if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2> $tmpio" err]} {
 readfifo $tmpioFP "SNMPIT: "
 
 outs "Resetting OS and rebooting."
-if {[catch "exec $os_setup $pid $eid $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $os_setup $pid $eid $irFile >@ stdout 2>@ $logFp" err]} {
     outs stderr "Error running $os_setup. ($err)"
     exit 1
 }
@@ -106,3 +106,4 @@ outs "Testbed ready for use."
 
 close $tmpioFP
 file delete -force $tmpio
+exit 0
