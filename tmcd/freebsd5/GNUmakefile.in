@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,7 +28,6 @@ all:	supfile $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		= 
 SYSETCDIR	= $(DESTDIR)/etc
 JAILDIR		= $(SYSETCDIR)/jail
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
@@ -38,14 +37,18 @@ RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 ISMFS		= $(ETCDIR)/ismfs
 INSTALL		= /usr/bin/install -c
 
-install client-install:	basefbsd-install etc-install \
-			sup-install script-install bin-install # jail-install
-
 destdircheck:
 	@if [ -z "$(DESTDIR)" ]; then \
 	    echo "You must define DESTDIR for this target!"; \
 	    false; \
 	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
+
+install client-install:	basefbsd-install etc-install \
+			sup-install script-install bin-install # jail-install
 
 cdboot-install:	destdircheck basefbsdcdboot-install etc-install \
 			script-install bin-install
