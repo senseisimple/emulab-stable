@@ -970,7 +970,7 @@ sub doSwapin($) {
 	    print STDERR "*** Failed to setup elabinelab!\n";
 	    return 1;
 	}
-	TBDebugTimeStamp("elabinelab setup finished");
+	TBDebugTimeStamp("ElabInElab setup finished");
     }
 
     return 0;
