@@ -1,8 +1,24 @@
+/*
+ * A simple representation of the physical topology.
+ *
+ * Nodes are simply represented by a number of interfaces.
+ *
+ * The assumption is that all of those interfaces are connected
+ * to the same switch.
+ *
+ * Note that nodes MUST be stored in their list in order of increasing
+ * number of interfaces.  A good 10-minute project would be to
+ * create an "addnode" method which does a sorted insert in the
+ * list, or a sort function.
+ *
+ * This sorting is required by the assignment routine.
+ */
+
 class toponode {
 public:
 	toponode();
-	int ints;
-	int used;
+	int ints;		/* Number of ethernet interfaces */
+	int used;		/* Used by assign.  Have we assigned here? */
 };
 
 class tbswitch {
@@ -14,9 +30,9 @@ public:
 
 	inline int numnodes();
 	
-	int nodecount;
-	toponode *nodes;
-	char *name;
+	int nodecount;		/* Total number of nodes in the switch */
+	toponode *nodes;	/* Sorted list of the nodes */
+	char *name;		/* Anything you want */
 };
 
 class topology {
@@ -24,9 +40,16 @@ public:
 	topology(int nswitches);
 	void print_topo();
 	virtual ~topology();
-	int switchcount;
-	tbswitch **switches;
+	int switchcount;	// Number of switches in the topology
+	tbswitch **switches;	// Unordered list of the switches
 };
+
+/*
+ * Parse a simple physical topology description into a topology structure.
+ *
+ * Eventually, this will be replaced by parsing Chris' ptop format
+ * into the topology structure
+ */
 
 topology *parse_phys(char *filename);
 
