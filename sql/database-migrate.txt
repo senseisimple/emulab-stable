@@ -544,3 +544,15 @@ last_net_act,last_cpu_act,last_ext_act);
 	    print "update testbed_stats set rsrcidx=$rsrcidx ".
 		  	"where idx=$idx;\n";
 	}			
+
+1.145: Add vnode to veth_interfaces. This serves to distinguish veths
+       for jailed nodes from veths for plain emulated links between
+       phys nodes, which we might generally allow at some point for
+       supporting emulated links (rather than using IP aliases). My
+       plan is to use this im tmcd to determine what ifconfig returns;
+       no point in returning jailed veth configuration when the node
+       boots, but should wait until the jail is setup (this is further
+       complicated by rtabids, but thats another story).
+
+        alter table veth_interfaces add vnode varchar(32) default NULL
+		after iface;
