@@ -231,6 +231,8 @@ COMMAND_PROTOTYPE(dofwinfo);
 COMMAND_PROTOTYPE(dohostinfo);
 COMMAND_PROTOTYPE(doemulabconfig);
 COMMAND_PROTOTYPE(dolocalize);
+COMMAND_PROTOTYPE(dobooterrno);
+COMMAND_PROTOTYPE(dobootlog);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -308,6 +310,8 @@ struct command {
         { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
 	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
 	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
+	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
+	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -765,7 +769,7 @@ udpserver(int sock, int portnum)
 static void
 tcpserver(int sock, int portnum)
 {
-	char			buf[MYBUFSIZE];
+	char			buf[MAXTMCDPACKET];
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
 	unsigned int		nreq = 0;
@@ -5560,6 +5564,102 @@ COMMAND_PROTOTYPE(dolocalize)
 	}
 	mysql_free_result(res);
 	client_writeback(sock, buf, strlen(buf), tcp);
+	return 0;
+}
+
+/*
+ * Upload boot log to DB for the node. 
+ */
+COMMAND_PROTOTYPE(dobootlog)
+{
+	char		*cp = (char *) NULL;
+	int		len;
+
+	/*
+	 * Dig out the log message text.
+	 */
+	while (*rdata && isspace(*rdata))
+		rdata++;
+
+	/*
+	 * Stash optional text. Must escape it of course. 
+	 */
+	if ((len = strlen(rdata))) {
+		char	buf[MAXTMCDPACKET];
+
+		memcpy(buf, rdata, len);
+		
+		/*
+		 * Ick, Ick, Ick. For non-ssl mode I should have required
+		 * that the client side close its output side so that we
+		 * could read till EOF. Or, included a record len. As it
+		 * stands, fragmentation will cause a large message (like
+		 * console output) to not appear all at once. Getting this in
+		 * a backwards compatable manner is a pain in the ass. So, I
+		 * just bumped the version number. Newer tmcc will close the 
+		 * output side.
+		 *
+		 * Note that tmcc version 22 now closes its write side.
+		 */
+		if (vers >= 22 && tcp && !isssl) {
+			int cc = READ(sock, &buf[len], sizeof(buf) - len);
+
+			if (cc > 0)
+				len += cc;
+		}
+		
+		if ((cp = (char *) malloc((2*len)+1)) == NULL) {
+			error("DOBOOTLOG: %s: Out of Memory\n", reqp->nodeid);
+			return 1;
+		}
+		mysql_escape_string(cp, buf, len);
+
+		if (mydb_update("replace into node_bootlogs "
+				" (node_id, bootlog, bootlog_timestamp) values "
+				" ('%s', '%s', now())", 
+				reqp->nodeid, cp)) {
+			error("DOBOOTLOG: %s: DB Error setting bootlog\n",
+			      reqp->nodeid);
+			free(cp);
+			return 1;
+			
+		}
+		if (verbose)
+		    printf("DOBOOTLOG: %d '%s'\n", len, cp);
+		
+		free(cp);
+	}
+	return 0;
+}
+
+/*
+ * Tell us about boot problems with a specific error code that we can use
+ * in os_setup to figure out what went wrong, and if we should retry.
+ */
+COMMAND_PROTOTYPE(dobooterrno)
+{
+	int		myerrno;
+
+	/*
+	 * Dig out errno that the node is reporting
+	 */
+	if (sscanf(rdata, "%d", &myerrno) != 1) {
+		error("DOBOOTERRNO: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * and update DB.
+	 */
+	if (mydb_update("update nodes set boot_errno='%d' "
+			"where node_id='%s'",
+			myerrno, reqp->nodeid)) {
+		error("DOBOOTERRNO: %s: setting boot errno!\n", reqp->nodeid);
+		return 1;
+	}
+	if (verbose)
+		info("DOBOOTERRNO: errno=%d\n", myerrno);
+		
 	return 0;
 }
 

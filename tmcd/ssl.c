@@ -76,7 +76,7 @@ static char	*clientcertdirs[] = {
 static SSL		*ssl;
 static SSL_CTX		*ctx;
 static int		client = 0;
-static char		nosslbuf[BUFSIZ];
+static char		nosslbuf[MAXTMCDPACKET];
 static int		nosslbuflen, nosslbufidx;
 static void		tmcd_sslerror();
 static void		tmcd_sslprint(const char *fmt, ...);

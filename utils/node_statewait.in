@@ -98,7 +98,7 @@ foreach my $node (sort(@nodes)) {
     #
     # Skip if something failed earlier.
     #
-    if (!TBNodeStateWait($node, $state, $waitstart, $timeout)) {
+    if (!TBNodeStateWait($node, $waitstart, $timeout, undef, ($state))) {
 	print STDOUT "nodewait ($node): Success\n";
 	next;
     }

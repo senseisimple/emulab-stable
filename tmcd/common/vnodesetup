@@ -50,6 +50,7 @@ my $rebooting   = 0;
 my $leavejail   = 0;
 my $timestamps  = 0;
 my $jailpid;
+my $cleanupstate = "SHUTDOWN";
 
 #
 # Turn off line buffering on output
@@ -375,6 +376,7 @@ if ($dojail) {
 	    cleanup();
 	    exit(0);
 	}
+	$cleanupstate = "TBFAILED";
 	fatal("Jail exited unexpectedly!");
     }
     else {
@@ -517,7 +519,7 @@ sub cleanup()
     $cleaning = 1;
 
     # Inform testbed that vnode going down.
-    tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, ("timeout" => 2));
+    tmcc(TMCCCMD_STATE, $cleanupstate, undef, ("timeout" => 2));
 
     #
     # First force the jail to exit. 

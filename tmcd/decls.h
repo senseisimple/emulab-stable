@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,6 +8,7 @@
 #define TBSERVER_PORT2		14447
 #define MYBUFSIZE		2048
 #define BOSSNODE_FILENAME	"bossnode"
+#define MAXTMCDPACKET		0x4000	/* Allow for console logs */
 
 /*
  * As the tmcd changes, incompatable changes with older version of

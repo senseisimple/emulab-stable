@@ -103,7 +103,7 @@ if (isset($pid)) {
 WRITESUBMENUBUTTON("Edit Node Info",
 		   "nodecontrol_form.php3?node_id=$node_id");
 
-if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
+if ($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
     if (isset($pid)) {
 	WRITESUBMENUBUTTON("Update Node",
 			   "updateaccounts.php3?pid=$pid&eid=$eid".
@@ -111,6 +111,9 @@ if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
     }
     WRITESUBMENUBUTTON("Reboot Node",
 		       "boot.php3?node_id=$node_id");
+
+    WRITESUBMENUBUTTON("Show Boot Log",
+		       "bootlog.php3?node_id=$node_id");
 }
 
 if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_LOADIMAGE)) {

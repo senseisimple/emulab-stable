@@ -1808,6 +1808,7 @@ function SHOWNODE($node_id, $flags = 0) {
     $battery_voltage    = $row[battery_voltage];
     $battery_percentage = $row[battery_percentage];
     $battery_timestamp  = $row[battery_timestamp];
+    $boot_errno         = $row[boot_errno];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -2068,6 +2069,11 @@ function SHOWNODE($node_id, $flags = 0) {
 	echo "<tr>
                   <td>RPMs:</td>
                   <td class=left>$rpms</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>Boot Errno:</td>
+                  <td class=left>$boot_errno</td>
               </tr>\n";
 
 	if (!$isvirtnode && !$isremotenode) {

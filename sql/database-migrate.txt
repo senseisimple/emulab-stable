@@ -2249,3 +2249,15 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table nodes add battery_percentage float default NULL;
         alter table nodes add battery_timestamp int(10) unsigned default NULL;
 
+1.295: Add stuff for capturing boot errors.
+
+        alter table nodes add boot_errno int(11) NOT NULL default '0';
+
+        CREATE TABLE node_bootlogs (
+          node_id varchar(32) NOT NULL default '',
+          bootlog text,
+          bootlog_timestamp datetime default NULL,
+          PRIMARY KEY  (node_id)
+        ) TYPE=MyISAM;
+
+	

@@ -426,17 +426,23 @@ sub nodereboot($$)
 	sleep(2);
 
 	foreach my $node (sort(@nodes)) {
+	    my $actual_state;
+	    
 	    #
 	    # Skip if something failed earlier.
 	    #
 	    next
 		if ($result->{node});
 	    
-	    if (!TBNodeStateWait($node,
-				 TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
-		print STDOUT "reboot ($node): alive and well.\n";
-		SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
-		next;
+	    if (!TBNodeStateWait($node, $waitstart, (60*6), \$actual_state,
+				 (TBDB_NODESTATE_TBFAILED,
+				  TBDB_NODESTATE_ISUP))) {
+		if ($actual_state eq TBDB_NODESTATE_ISUP) {
+		    print STDOUT "reboot ($node): alive and well.\n";
+		    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+		    next;
+		}
+		print STDOUT "*** reboot ($node): reported a TBFAILED event.\n";
 	    }
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    $result->{$node} = -1;

@@ -8,8 +8,8 @@ use English;
 use Getopt::Std;
 
 #
-# This script is the plab vserver equiv of ../common/rc.bootsetup. It runs
-# inside the vserver and does a limited set of bootstrapping tasks.
+# This script is the jail equiv of ../common/rc.bootsetup. It runs
+# inside the jail and does a limited set of bootstrapping tasks.
 #
 sub usage()
 {
@@ -45,6 +45,7 @@ sub doshutdown();
 sub doreconfig();
 sub docleanup();
 sub doplabconfig();
+sub BootFatal($);
 
 # Parse command line.
 #if (! getopts($optlist, \%options)) {
@@ -73,9 +74,27 @@ SWITCH: for ($action) {
 	docleanup();
 	last SWITCH;
     };
-    fatal("Invalid action: $action\n");
+    BootFatal("Invalid action: $action\n");
 }
 exit(0);
+
+#
+# This version of fatal sends boot status to tmcd, and then generates
+# a TBFAILED state transition. 
+#
+sub BootFatal($)
+{
+    my ($msg) = @_;
+    
+    if (tmcc(TMCCCMD_BOOTERRNO, "-1") < 0) {
+	print "Error sending boot errno to Emulab Control!\n";
+    }
+    
+    if (tmcc(TMCCCMD_STATE, "TBFAILED") < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    exit(-1);
+}
 
 #
 # Boot Action.
@@ -106,7 +125,7 @@ sub doboot()
         print("Starting testbed watchdog daemon\n");
 	system("$BINDIR/watchdog start");
 	if ($?) {
-	    fatal("Error running $BINDIR/watchdog");
+	    BootFatal("Error running $BINDIR/watchdog");
 	}
     }
 
@@ -118,7 +137,7 @@ sub doboot()
     print("Running config scripts\n");
     system("$RCDIR/rc.config boot");
     if ($?) {
-	fatal("Error running $RCDIR/rc.config");
+	BootFatal("Error running $RCDIR/rc.config");
     }
     TBDebugTimeStamp("rc.injail done running config scripts");
 
@@ -127,13 +146,13 @@ sub doboot()
 	print("Starting linktest daemon\n");
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
-	    fatal("Error running $RCDIR/rc.linktest");
+	    BootFatal("Error running $RCDIR/rc.linktest");
 	}
     }
 
     print("Informing the testbed that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
-	fatal("Error sneding ISUP to Emulab Control!");
+	BootFatal("Error sending ISUP to Emulab Control!");
     }
 }
 

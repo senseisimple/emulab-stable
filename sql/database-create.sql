@@ -874,6 +874,17 @@ CREATE TABLE node_auxtypes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_bootlogs`
+--
+
+CREATE TABLE node_bootlogs (
+  node_id varchar(32) NOT NULL default '',
+  bootlog text,
+  bootlog_timestamp datetime default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_features`
 --
 
@@ -1078,6 +1089,7 @@ CREATE TABLE nodes (
   battery_voltage float default NULL,
   battery_percentage float default NULL,
   battery_timestamp int(10) unsigned default NULL,
+  boot_errno int(11) NOT NULL default '0',
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),

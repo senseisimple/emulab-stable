@@ -104,6 +104,7 @@ char *usagestr =
  " -t timeout	   Timeout waiting for the controller.\n"
  " -x path	   Be a tmcc proxy, using the named unix domain socket\n"
  " -o logfile      Specify log file name for -x option\n"
+ " -f datafile     Extra stuff to send to tmcd (tcp mode only)\n"
  " -i              Do not use SSL protocol\n"
  "\n";
 
@@ -145,7 +146,7 @@ main(int argc, char **argv)
 	int			n, ch;
 	struct hostent		*he;
 	struct in_addr		serverip;
-	char			buf[MYBUFSIZE], *bp;
+	char			buf[MAXTMCDPACKET], *bp;
 	FILE			*fp;
 	volatile int		useudp    = 0;
 	char			* volatile unixpath = NULL;
@@ -155,11 +156,12 @@ main(int argc, char **argv)
 	char			*keyfile  = NULL;
 	char			*privkey  = NULL;
 	char			*proxypath= NULL;
+	char			*datafile = NULL;
 #ifdef _WIN32
         WSADATA wsaData;
 #endif
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:i")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:if:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -195,6 +197,9 @@ main(int argc, char **argv)
 		case 'o':
 			logfile  = optarg;
 			break;
+		case 'f':
+			datafile  = optarg;
+			break;
 		case 'i':
 #ifdef WITHSSL
 			nousessl = 1;
@@ -210,6 +215,9 @@ main(int argc, char **argv)
 		usage();
 	}
 	if (unixpath && proxypath)
+		usage();
+
+	if (useudp && datafile)
 		usage();
 
 	if (unixpath && (keyfile || bossnode)) {
@@ -330,6 +338,21 @@ main(int argc, char **argv)
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
 		exit(-1);
+	}
+	if (!useudp && datafile) {
+		int len;
+		
+		if ((fp = fopen(datafile, "r")) == NULL) {
+			perror("accessing datafile");
+			exit(-1);
+		}
+		len = fread(&buf[n], sizeof(char), sizeof(buf) - (n + 1), fp);
+		if (!len) {
+			perror("reading datafile");
+			exit(-1);
+		}
+		n += len;
+		fclose(fp);
 	}
 	buf[n] = '\0';
 
@@ -510,6 +533,15 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 		bp += cc;
 		n  -= cc;
 	}
+	if (! isssl) {
+		/*
+		 * Send EOF to server so it knows it has all the data.
+		 * SSL mode takes care of this for us by making sure the
+		 * the server gets all the data when it reads. Still, its
+		 * a terrible way to do this. 
+		 */
+		shutdown(sock, SHUT_WR);
+	}
 
 	while (1) {
 		if ((cc = READ(sock, buf, sizeof(buf) - 1)) <= 0) {
@@ -687,7 +719,7 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 #else
 	int			sock, newsock, cc, length;
 	struct sockaddr_un	sunaddr, client;
-	char			command[MYBUFSIZE], buf[MYBUFSIZE];
+	char			command[MAXTMCDPACKET], buf[MAXTMCDPACKET];
 	char			*bp, *cp;
 	
 	/* don't let a client kill us */

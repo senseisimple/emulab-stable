@@ -39,6 +39,7 @@ if ($EUID != 0) {
 
 # Script specific goo.
 my $RCDIR   = "$BINDIR/rc";
+my $LOGFILE = "$LOGDIR/cdbootsetup.debug";
 
 #
 # Disk related parameters
@@ -74,10 +75,36 @@ sub doboot();
 sub doshutdown();
 sub doreconfig();
 sub docleanup();
+sub BootNotify($$);
 
 # Allow default above.
 if (@ARGV) {
     $action = $ARGV[0];
+}
+
+if ($action eq "boot" || $action eq "reconfig") {
+    #
+    # We want to save all of the output off, but also dup it to the console.
+    #
+    open(LOG, "> $LOGFILE") or
+	BootFatal(-1, "Could not open $LOGFILE!");
+
+    #
+    # This open implicitly forks a child, which goes on to execute the rest
+    # of the script. The parent is going to sit in this loop and capture the
+    # output of the child, writing it to the logfile and to the console.
+    # 
+    if (open(FOO, "-|")) {
+	while (<FOO>) {
+	    print LOG $_;
+	    print "$_";
+	}
+	close(FOO);
+	close(LOG);
+	# The CDROM *always* reports back what it can.
+	BootNotify($? >> 8, "CD Boot");
+	exit(0);
+    }
 }
 
 # Execute the action.
@@ -106,6 +133,35 @@ SWITCH: for ($action) {
     fatal("Invalid action: $action\n");
 }
 exit(0);
+
+#
+# Notify boss of what happened. If the code is non-zero, then also
+# generate a booterrno and a TBFAILED state transition. 
+#
+sub BootNotify($$)
+{
+    my ($code, $msg) = @_;
+
+    print "$msg\n";
+    system("sync");
+    
+    #
+    # Send the console log to the server.
+    #
+    if (-e $LOGFILE && -s $LOGFILE &&
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $LOGFILE, "timeout" => 10)) < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+
+    exit(0)
+	if (!$code);
+    
+    if (tmcc(TMCCCMD_STATE, "PXEFAILED") < 0) {
+	print "Error sending PXEFAILED to Emulab Control!\n";
+    }
+    exit($code);
+}
 
 #
 # Boot Action.
@@ -184,6 +240,7 @@ sub doboot()
     if ($bootwhat eq "reboot") {
 	print("Bootinfo says to reboot ... so thats what we gonna do!\n");
 	system("sync");
+	BootNotify(0, "Bootinfo said to reboot");
 	system("reboot");
 	sleep(10000);
     }
@@ -227,6 +284,7 @@ sub doboot()
 	    }
 	}
 	system("sync");
+	BootNotify(0, "Bootinfo said to boot partition $bpart");
 	system("reboot");
 	sleep(10000);
     }

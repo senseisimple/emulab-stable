@@ -648,8 +648,17 @@ TBDebugTimeStamp("Local node waiting started");
 while ( @nodelist ) {
     my $node   = shift(@nodelist);
     my $wstart = $waitstart{$node};
+    my $actual_state;
 
-    if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*7))) {
+    if (!TBNodeStateWait($node, $wstart, (60*7), \$actual_state,
+			 (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
+	print "state is $actual_state\n";
+	
+	if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
+	    print "*** WARNING: $node reported a TBFAILED event; not retrying\n";
+	    $retries{$node} = 0;
+	    goto tbfailed;
+	}
 	print "$node is alive and well\n";
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
@@ -682,10 +691,11 @@ while ( @nodelist ) {
 	# Fall through on failure.
     }
 
-    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
-
     print "*** WARNING: $node may be down.\n".
 	  "    This has been reported to testbed-ops.\n";
+
+  tbfailed:
+    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
@@ -848,6 +858,7 @@ elsif (@vnodelist) {
 	my $wstart = $waitstart{$node};
 	my $maxwait = 90 + (40 * $pnodevcount{$pnode});
 	my $curallocstate;
+	my $actual_state;
 
 	TBGetNodeAllocState($node, \$curallocstate);
 
@@ -857,8 +868,14 @@ elsif (@vnodelist) {
 	if ($curallocstate ne TBDB_ALLOCSTATE_DOWN() &&
 	    $curallocstate ne TBDB_ALLOCSTATE_DEAD()) {
 
-	    if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP,
-				 $wstart, $maxwait)) {
+	    if (!TBNodeStateWait($node, $wstart, $maxwait, \$actual_state,
+				 (TBDB_NODESTATE_TBFAILED,
+				  TBDB_NODESTATE_ISUP))) {
+
+		if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
+		    print "*** WARNING: $node reported a TBFAILED event.\n";
+		    goto vtbfailed;
+		}
 		print "$node is alive and well\n";
 		TBDebugTimeStamp("Virtual node $node setup ISUP");
 		
@@ -868,6 +885,7 @@ elsif (@vnodelist) {
 		next;
 	    }
 
+	  vtbfailed:
 	    TBDebugTimeStamp("Virtual node $node setup FAILED");
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());

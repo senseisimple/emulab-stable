@@ -29,6 +29,7 @@ use Exporter;
 	     TMCCCMD_ROLE TMCCCMD_RUSAGE TMCCCMD_WATCHDOGINFO TMCCCMD_HOSTKEYS
 	     TMCCCMD_FIREWALLINFO TMCCCMD_EMULABCONFIG
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
+	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG
 	     );
 
 # Must come after package declaration!
@@ -71,6 +72,7 @@ my $beproxy     = 0;
       "version"		=> undef,
       "subnode"		=> undef,
       "keyfile"		=> undef,
+      "datafile"	=> undef,
       "timeout"		=> undef,
       "logfile"		=> undef,
       "nocache"         => 0,
@@ -160,6 +162,8 @@ my %commandset =
       "creator"		=> {TAG => "creator"},
       "hostinfo"	=> {TAG => "hostinfo"},
       "localization"	=> {TAG => "localization"},
+      "booterrno"	=> {TAG => "booterrno"},
+      "bootlog"	        => {TAG => "bootlog"},
     );
 
 #
@@ -208,6 +212,8 @@ sub TMCCCMD_EMULABCONFIG(){ $commandset{"emulabconfig"}->{TAG}; }
 sub TMCCCMD_CREATOR     (){ $commandset{"creator"}->{TAG}; }
 sub TMCCCMD_HOSTINFO    (){ $commandset{"hostinfo"}->{TAG}; }
 sub TMCCCMD_LOCALIZATION(){ $commandset{"localization"}->{TAG}; }
+sub TMCCCMD_BOOTERRNO   (){ $commandset{"booterrno"}->{TAG}; }
+sub TMCCCMD_BOOTLOG     (){ $commandset{"bootlog"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
@@ -265,6 +271,9 @@ sub optionstring($%)
     }
     if (defined($opthash{"keyfile"})) {
 	$options .= " -k " . $opthash{"keyfile"};
+    }
+    if (defined($opthash{"datafile"})) {
+	$options .= " -f " . $opthash{"datafile"};
     }
     if (defined($opthash{"timeout"})) {
 	$options .= " -t " . $opthash{"timeout"};

@@ -21,6 +21,7 @@ sub usage()
     print STDERR " -v versnum	Specify a version number for tmcd\n";
     print STDERR " -n subnode	Specify the subnode id\n";
     print STDERR " -k keyfile	Specify the private keyfile\n";
+    print STDERR " -f datafile	Extra stuff to send to tmcd (tcp mode only)\n";
     print STDERR " -u		Use UDP instead of TCP\n";
     print STDERR " -l path	Use named unix domain socket instead of TCP\n";
     print STDERR " -t timeout	Timeout waiting for the controller.\n";
@@ -31,7 +32,7 @@ sub usage()
     print STDERR " -D   	Force command to use a direct, UDP request\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDi:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDi:f:";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -114,6 +115,9 @@ sub ParseOptions()
     }
     if (defined($options{"k"})) {
         libtmcc::configtmcc("keyfile", $options{"k"});
+    }
+    if (defined($options{"f"})) {
+        libtmcc::configtmcc("datafile", $options{"f"});
     }
     if (defined($options{"u"})) {
         libtmcc::configtmcc("useudp", $options{"u"});
