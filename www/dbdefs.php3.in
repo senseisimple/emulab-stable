@@ -1447,7 +1447,7 @@ $lastact_query = "greatest(last_tty_act,last_net_act,last_cpu_act,".
 function TBGetNodeLastAct($pc) {
     global $lastact_query;
     $query_result =
-	DBQueryWarn("select $lastact_query as last_actfrom node_activity ".
+	DBQueryWarn("select $lastact_query as last_act from node_activity ".
 		    "where node_id='$pc'");
 
     if (mysql_num_rows($query_result) == 0) {
