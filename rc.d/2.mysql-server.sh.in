@@ -1,0 +1,23 @@
+#!/bin/sh
+
+case "$1" in
+	start)
+		if [ -x /usr/local/bin/safe_mysqld ]; then
+			/usr/local/bin/safe_mysqld --skip-grant-tables --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-update=@prefix@/log/mysql/update -O max_connections=200 > /dev/null & && echo -n ' mysqld'
+		fi
+		;;
+	stop)
+		/usr/bin/killall mysqld > /dev/null 2>&1 && echo -n ' mysqld'
+		;;
+	*)
+		echo ""
+		echo "Usage: `basename $0` { start | stop }"
+		echo ""
+		exit 64
+		;;
+esac
+
+
+
+
+
