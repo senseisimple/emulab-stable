@@ -198,7 +198,6 @@ static inline void calcError( Solution * t )
 	  printf("%i nodes multiplexed on physical node %s, (err [(vnodes - 1) * plexPenalty] %4.3f)\n",
 		 t->pnode_uses[x],
 		 pnodeNames[x].c_str(),
-		 plexPenalty,
 		 errDelta );
 	}
 	err += errDelta;
@@ -498,7 +497,6 @@ int main( int argc, char ** argv )
 			    " maximum number of virtual nodes allowed on each"
 			    " physical node.\n", pnodes ); }
       for (int i = 0; i < pnodes; i++) {
-	char name[1024];
 	gets( line );
 	sscanf( line, "%i", &(maxplex[i]));
       }
