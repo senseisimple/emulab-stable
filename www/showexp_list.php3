@@ -299,6 +299,9 @@ if ($thumb && !$idle) {
 		     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
 		     "</b>".
 		     "</td>";
+
+		$thumbcount++;
+		if (($thumbcount % 4) == 0) { echo "</tr><tr>\n"; }
 	    }
 	} else {
 
@@ -351,15 +354,10 @@ if ($thumb && !$idle) {
 
 	    echo "</td></tr></table> \n";
 	    echo "</td>";
-	}
 
-	$thumbcount++;
-	if ($thumb == 2) {
-	    if (($thumbcount % 4) == 0) { echo "</tr><tr>\n"; }
-	} else {	
+	    $thumbcount++;
 	    if (($thumbcount % 2) == 0) { echo "</tr><tr>\n"; }
 	}
-	    
     }
 
     echo "</tr></table>";
