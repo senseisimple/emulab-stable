@@ -152,10 +152,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.124: Change address fields in widearea_nodeinfo to tinytext:
 
-       ALTER TABLE widearea_nodeinfo CHANGE city city tinytext
-       ALTER TABLE widearea_nodeinfo CHANGE state state tinytext
-       ALTER TABLE widearea_nodeinfo CHANGE country country tinytext
-       ALTER TABLE widearea_nodeinfo CHANGE zip zip tinytext
+       ALTER TABLE widearea_nodeinfo CHANGE city city tinytext;
+       ALTER TABLE widearea_nodeinfo CHANGE state state tinytext;
+       ALTER TABLE widearea_nodeinfo CHANGE country country tinytext;
+       ALTER TABLE widearea_nodeinfo CHANGE zip zip tinytext;
 
 1.125: Add 'external_node_id' field to widearea_nodeinfo.
        This is pretty much a comment field for now; 
@@ -165,7 +165,7 @@ last_net_act,last_cpu_act,last_ext_act);
        the preferred value. (This may facilitate automatic
        db synchronization later.)
 
-       ALTER TABLE widearea_nodeinfo ADD COLUMN external_node_id tinytext
+       ALTER TABLE widearea_nodeinfo ADD COLUMN external_node_id tinytext;
 
 1.126: Change 'name' column in 'sitevariables' from
        text to varchar(255). Also make it a PRIMARY KEY,
@@ -185,12 +185,13 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table reserved add unique vname (pid,eid,vname); 
 
 1.128: Add usr_country column to users table.
-       No recommended migration commands.
+
+       ALTER TABLE users ADD COLUMN usr_country tinytext AFTER usr_zip;
 
 1.129: Add node_id to state_triggers table, and change its primary key.
 
        alter table state_triggers add 
-		node_id varchar(10) not null default '' first;
+	     node_id varchar(10) not null default '' first;
        update state_triggers set node_id="*";
        alter table state_triggers drop primary key;
        alter table state_triggers add primary key (node_id,op_mode,state);
