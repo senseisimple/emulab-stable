@@ -167,7 +167,16 @@ static void sigpanic(int sig)
 static void usage(char *progname)
 {
   fprintf(stderr,
-	  "Usage: emcd\n");
+	  "Usage: emcd [-hd] [-c config] [-e pid/eid] [-k keyfile] [...]\n"
+	  "Options:\n"
+	  "  -h\t\tPrint this message.\n"
+	  "  -d\t\tTurn on debugging messages and do not daemonize\n"
+	  "  -e pid/eid\tConnect to the experiment event server\n"
+	  "  -k keyfile\tKeyfile for the experiment\n"
+	  "  -p port\tPort to listen on for mtp messages\n"
+	  "  -c config\tThe config file to use\n"
+	  "  -l logfile\tThe log file to use\n"
+	  "  -i pidfile\tThe file to write the PID to\n");
 }
 
 int main(int argc, char *argv[])
@@ -193,6 +202,8 @@ int main(int argc, char *argv[])
   while ((c = getopt(argc, argv, "hde:k:p:c:f:s:P:l:i:")) != -1) {
     switch (c) {
     case 'h':
+      usage(progname);
+      exit(0);
       break;
     case 'd':
       debug += 1;

@@ -11,13 +11,12 @@
 #define GROBOT_H
 
 class grobot;
+class CallbackComplete;
+class CallbackExecute;
 
 #if !defined(GROBOT_SIM)
 #include "acpGarcia.h"
 #include "acpValue.h"
-
-#include "gcallbacks.h"
-#include "gbehaviors.h"
 #endif
 
 #include <math.h>
@@ -28,6 +27,13 @@ class grobot;
 
 // track width, in meters
 #define TRACK_WIDTH 0.1778f
+
+typedef enum {
+  CBT_NONE,
+  
+  CBT_PIVOT,
+  CBT_MOVE
+} cb_type_t;
 
 class grobot {
   public:
@@ -52,7 +58,7 @@ class grobot {
     void sleepy();
     
     void setCBexec(int id);
-    void setCBstatus(int id, int stat);
+    void setCBstatus(int id, int stat, cb_type_t cbt);
 
 #if !defined(GROBOT_SIM)
     acpGarcia garcia;
@@ -60,7 +66,7 @@ class grobot {
     
   private:
     void createNULLbehavior();
-    void createPRIMbehavior();
+    void createPRIMbehavior(cb_type_t cbt);
     
     void set_gotocomplete();
     

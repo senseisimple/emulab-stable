@@ -7,6 +7,7 @@
  */
 
 #include "grobot.h"
+#include "gcallbacks.h"
 
 
 grobot::grobot() {
@@ -131,7 +132,7 @@ void grobot::pbMove(float mdisplacement) {
   pBehavior = garcia.createNamedBehavior("move", "move1");
   pBehavior->setNamedValue("distance", &moveLength);
   
-  createPRIMbehavior();
+  createPRIMbehavior(CBT_MOVE);
   
 }
 
@@ -144,7 +145,7 @@ void grobot::pbPivot(float pangle) {
   pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
   pBehavior->setNamedValue("angle", &pivotAngle);
   
-  createPRIMbehavior();
+  createPRIMbehavior(CBT_PIVOT);
   
 }
 
@@ -205,8 +206,10 @@ void grobot::dgoto(float Dx, float Dy, float Rf) {
       ++gotomexec;
       ++gotomcomplete;
       gotop2 = 0;
-      set_gotocomplete();
     }
+
+    if (0.0f == dt_init && 0.0f == moveL && 0.0f == Rfr)
+      set_gotocomplete();
     
   } else {
     // if a goto is already executing, drop the command
@@ -280,6 +283,7 @@ int grobot::getGOTOstatus() {
   if (0 != gotocomplete) {
     // reset the status
     gotolock = 0;
+    gotocomplete = 0;
   }
   
   return retval_gotocomplete;
@@ -331,7 +335,7 @@ void grobot::setCBexec(int id) {
 
 
 
-void grobot::setCBstatus(int id, int stat) {
+void grobot::setCBstatus(int id, int stat, cb_type_t cbt) {
   // set completion callback status
   
   cout << "Behavior #" << id
@@ -341,6 +345,14 @@ void grobot::setCBstatus(int id, int stat) {
   if (0 != gotolock) {
     // a goto behavior is currently executing
     ++gotomcomplete;
+
+    if (cbt == CBT_MOVE) {
+      // get the Arclength, then estimate and store the displacement
+      // (assume that the first pivot was accurate)
+      float al_temp = getArclen();
+      dx_est = al_temp * cos(dt_init);
+      dy_est = al_temp * sin(dt_init);
+    }
     
     if (1 == gotomcomplete) {
       // first pivot has finished
@@ -348,12 +360,6 @@ void grobot::setCBstatus(int id, int stat) {
     } else if (2 == gotomcomplete) {
       // main move has executed
       gotom1 = stat;
-      
-      // get the Arclength, then estimate and store the displacement
-      // (assume that the first pivot was accurate)
-      float al_temp = getArclen();
-      dx_est = al_temp * cos(dt_init);
-      dy_est = al_temp * sin(dt_init);
       
     } else if (3 == gotomcomplete) {
       // second pivot has executed
@@ -392,7 +398,7 @@ void grobot::createNULLbehavior() {
     acpValue acceleration(2.0f);
     pBehavior = garcia.createNamedBehavior("null", "driver");
     
-    completeCB = new CallbackComplete(pBehavior, this);
+    completeCB = new CallbackComplete(pBehavior, this, CBT_NONE);
     completeCBacpV.set(completeCB);
     pBehavior->setNamedValue("completion-callback", &completeCBacpV);
     
@@ -404,7 +410,7 @@ void grobot::createNULLbehavior() {
 
 
 
-void grobot::createPRIMbehavior() {
+void grobot::createPRIMbehavior(cb_type_t cbt) {
   // create and execute a PRIMitive behavior
   
   // wait until garcia is ready
@@ -421,7 +427,7 @@ void grobot::createPRIMbehavior() {
   }
   
   executeCB = new CallbackExecute(pBehavior, this);
-  completeCB = new CallbackComplete(pBehavior, this);
+  completeCB = new CallbackComplete(pBehavior, this, cbt);
   
 
   executeCBacpV.set(executeCB);

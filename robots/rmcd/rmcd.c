@@ -82,6 +82,7 @@ static struct mtp_config_rmc *rmc_config = NULL;
 enum {
     GCB_PENDING_POSITION,
     GCB_REFINING_POSITION,
+    GCB_VISION_POSITION,
 };
 
 enum {
@@ -94,6 +95,12 @@ enum {
      * Flag used to indicate when we're trying to refine the position.
      */
     GCF_REFINING_POSITION = (1L << GCB_REFINING_POSITION),
+
+    /**
+     * Flag used to indicate that the value in the gc_actual_pos field was
+     * obtained from the vision system.
+     */
+    GCF_VISION_POSITION = (1L << GCB_VISION_POSITION),
 };
 
 struct gorobot_conn {
@@ -179,14 +186,37 @@ static struct gorobot_conn *find_gorobot(int robot_id)
  * Convert an absolute position to a relative position fit for grboto.dgoto().
  *
  * @param rel The object to fill out with the relative position.
- * @param abs The current absolute position of the robot.
+ * @param abs_start The current absolute position of the robot.
+ * @param abs_finish The destination position for the robot.
  */
-static void conv_pos(struct position *rel, struct position *abs)
+static void conv_a2r(struct position *rel,
+		     struct position *abs_start,
+		     struct position *abs_finish)
 {
     assert(rel != NULL);
-    assert(abs != NULL);
+    assert(abs_start != NULL);
+    assert(abs_finish != NULL);
     
-    *rel = *abs; // XXX DAN, fill this out.
+    *rel = *abs_finish; // XXX DAN, fill this out.
+}
+
+/**
+ * Convert an relative movement to an absolute position that we can send back
+ * to emcd.
+ *
+ * @param abs_finish The object to fill out with the final absolute position.
+ * @param abs_start The absolute position of the robot before the move.
+ * @param rel The relative movement of the robot.
+ */
+static void conv_r2a(struct position *abs_finish,
+		     struct position *abs_start,
+		     struct position *rel)
+{
+    assert(rel != NULL);
+    assert(abs_start != NULL);
+    assert(abs_finish != NULL);
+    
+    *abs_finish = *rel; // XXX DAN, fill this out.
 }
 
 /**
@@ -327,9 +357,13 @@ static void handle_emc_packet(int emc_fd)
 		error("uknnown robot %d\n",mp->data.update_position->robot_id);
 	    }
 	    else {
-		/* XXX Always update the position? */
+		/*
+		 * XXX Always update the position?  Should compare against the
+		 * robot-derived position before overwriting it...
+		 */
 		gc->gc_actual_pos =
 		    mp->data.update_position->position;
+		gc->gc_flags |= GCF_VISION_POSITION;
 		
 		info("position update %f\n", gc->gc_actual_pos.x);
 		
@@ -401,11 +435,13 @@ static void handle_emc_packet(int emc_fd)
 			
 			info("moving again\n");
 
-			/* Start the process all over again. */
+			/* Not there yet, contiue refining. */
 			
 			mcg.command_id = 1;
 			mcg.robot_id = gc->gc_robot->id;
-			conv_pos(&mcg.position, &gc->gc_intended_pos);
+			conv_a2r(&mcg.position,
+				 &gc->gc_actual_pos,
+				 &gc->gc_intended_pos);
 			if ((gmp = mtp_make_packet(MTP_COMMAND_GOTO,
 						   MTP_ROLE_RMC,
 						   &mcg)) == NULL) {
@@ -443,6 +479,30 @@ static void handle_gc_packet(struct gorobot_conn *gc, int emc_fd)
 	fatal("bad packet from gorobot!\n");
     }
     else if (mp->opcode == MTP_UPDATE_POSITION) {
+	struct mtp_update_position mup;
+	struct mtp_packet *ump;
+
+	/* Always update emcd and save the new estimated position. */
+	mup.robot_id = gc->gc_robot->id;
+	conv_r2a(&mup.position,
+		 &gc->gc_actual_pos,
+		 &mp->data.update_position->position);
+	gc->gc_actual_pos = mup.position;
+	gc->gc_flags &= ~GCF_VISION_POSITION;
+	mup.status = MTP_POSITION_STATUS_MOVING;
+	
+	if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
+				   MTP_ROLE_RMC,
+				   &mup)) == NULL) {
+	    fatal("cannot allocate packet");
+	}
+	else if (mtp_send_packet(emc_fd, ump) != MTP_PP_SUCCESS) {
+	    fatal("request id failed");
+	}
+	
+	mtp_free_packet(ump);
+	ump = NULL;
+	
 	switch (mp->data.update_position->status) {
 	case MTP_POSITION_STATUS_IDLE:
 	    /* Response to a COMMAND_STOP. */
@@ -476,6 +536,31 @@ static void handle_gc_packet(struct gorobot_conn *gc, int emc_fd)
 	    break;
 	case MTP_POSITION_STATUS_ERROR:
 	    /* XXX */
+	    {
+		struct mtp_update_position mup;
+		struct mtp_packet *ump;
+		
+		mup.robot_id = gc->gc_robot->id;
+		mup.position = gc->gc_actual_pos;
+		mup.status = MTP_POSITION_STATUS_ERROR;
+		
+		info("error for %d\n", mup.robot_id);
+		
+		if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
+					   MTP_ROLE_RMC,
+					   &mup)) == NULL) {
+		    fatal("cannot allocate packet");
+		}
+		else if (mtp_send_packet(emc_fd, ump) != MTP_PP_SUCCESS) {
+		    fatal("request id failed");
+		}
+		
+		mtp_free_packet(ump);
+		ump = NULL;
+
+		gc->gc_flags &= ~GCF_PENDING_POSITION;
+		gc->gc_flags &= ~GCF_REFINING_POSITION;
+	    }
 	    break;
 	case MTP_POSITION_STATUS_COMPLETE:
 	    info("gorobot finished\n");
@@ -662,6 +747,7 @@ int main(int argc, char *argv[])
 		}
 		else {
 		    gc->gc_actual_pos = qrmp->data.update_position->position;
+		    gc->gc_flags |= GCF_VISION_POSITION;
 
 		    info(" robot[%d].x = %f\n", lpc, gc->gc_actual_pos.x);
 		    info(" robot[%d].y = %f\n", lpc, gc->gc_actual_pos.y);

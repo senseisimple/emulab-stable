@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 	}
     }
 
-    printf("Listenting on %d\n", port);
+    printf("Listening on %d\n", port);
 
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
 	    fd_set rreadyfds = readfds;
 	    int rc;
 
+	    /* Poll the file descriptors, don't block */
 	    rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, &tv_zero);
 	    if (rc > 0) {
 		int lpc;

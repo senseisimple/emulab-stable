@@ -91,7 +91,7 @@ void grobot::setCBexec(int id)
 {
 }
 
-void grobot::setCBstatus(int id, int status)
+void grobot::setCBstatus(int id, int status, cb_type_t cbt)
 {
 }
 
@@ -99,7 +99,7 @@ void grobot::createNULLbehavior()
 {
 }
 
-void grobot::createPRIMbehavior()
+void grobot::createPRIMbehavior(cb_type_t cbt)
 {
 }
 

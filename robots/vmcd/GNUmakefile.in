@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 PROGS = vmc-client vmcd
 TESTS = test_vmc-client.sh
-TESTS += test_vmcd.sh test_vmcd2.sh
+TESTS += test_vmcd.sh test_vmcd2.sh test_vmcd3.sh test_vmcd4.sh
 
 all: $(PROGS)
 

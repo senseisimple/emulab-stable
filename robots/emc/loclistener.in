@@ -56,6 +56,18 @@ except getopt.error:
     sys.exit(2)
     pass
 
+res = DBQueryFatal("SELECT pixels_per_meter FROM floorimages "
+                   "WHERE building='MEB-ROBOTS'");
+
+if len(res) == 0:
+    sys.stderr.write("error: MEB-ROBOTS building does not exist?\n");
+    sys.exit(2)
+    pass
+
+pixels_per_meter = float(res[0][0])
+
+sys.stderr.write("Pixels-per-meter: %f\n" % pixels_per_meter)
+
 class LocationInfoUpdater(EventClient):
 
     def handle_event(self, event):
@@ -87,10 +99,13 @@ class LocationInfoUpdater(EventClient):
                     try:
                         key, value = arg.split('=')
                         if key == "X" or key == "x":
-                            update["loc_x"] = str(float(value))
+                            update["loc_x"] = str(
+                                float(value) * pixels_per_meter)
                             pass
                         elif key == "Y" or key == "y":
-                            update["loc_y"] = str(float(value))
+                            # XXX 520 is hardcoded
+                            update["loc_y"] = str(
+                                520 - float(value) * pixels_per_meter)
                             pass
                         else:
                             sys.stderr.write("warning: unknown key: %s\n" %

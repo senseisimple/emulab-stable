@@ -23,7 +23,7 @@ class CallbackExecute;
 // a simple callback completion class
 class CallbackComplete : public acpCallback {
    public:
-     CallbackComplete(acpObject *b, grobot *g);
+     CallbackComplete(acpObject *b, grobot *g, cb_type_t cbt);
      ~CallbackComplete();
   
      aErr call();
@@ -33,7 +33,8 @@ class CallbackComplete : public acpCallback {
    private:
      acpObject *behavior;
      grobot *pgrobot;
-  
+
+     cb_type_t cbt;
      int blast_status; // Behavior Last _STATUS
      int blast_id;     // Behavior Last _ID
 };

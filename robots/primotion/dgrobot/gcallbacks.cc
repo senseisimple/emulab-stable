@@ -9,7 +9,7 @@
  
 #include "gcallbacks.h"
 
-CallbackComplete::CallbackComplete(acpObject *b, grobot *g) {
+CallbackComplete::CallbackComplete(acpObject *b, grobot *g, cb_type_t cbt) {
   behavior = b;
   pgrobot = g;
 
@@ -17,6 +17,8 @@ CallbackComplete::CallbackComplete(acpObject *b, grobot *g) {
   
   // get ID of current behavior
   blast_id = behavior->getNamedValue("unique-id")->getIntVal();
+
+  this->cbt = cbt;
   
   //strcpy(lastMSG, "no messages");
   // cout << "Created Callback" << endl;
@@ -40,7 +42,7 @@ aErr CallbackComplete::call() {
   // call completion callback
   
   blast_status = behavior->getNamedValue("completion-status")->getIntVal();
-  pgrobot->setCBstatus(blast_id, blast_status);
+  pgrobot->setCBstatus(blast_id, blast_status, this->cbt);
 }
 
 
