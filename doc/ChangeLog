@@ -1,3 +1,37 @@
+newbold     2003/04/09 16:07:12 MDT
+
+  Modified files:
+    .                    configure configure.in defs-barb-emulab 
+                         defs-barb-mini defs-calfeld-emulab 
+                         defs-default defs-example 
+                         defs-kwebb-emulab defs-mini 
+                         defs-newbold-emulab defs-newbold-macdb 
+                         defs-newbold-mini defs-rchriste-emulab 
+                         defs-ricci-emulab defs-ricci-mini 
+                         defs-shash-emulab defs-shash-mini 
+                         defs-stoller-emulab defs-stoller-home 
+                         defs-stoller-mini defs-uky defs-wide 
+  Added files:
+    account              quotamail.in 
+  Log:
+  Add new script to notify users when they are over their quota. Runs from
+  cron daily, on the fs node (ops) as root. Uses lots of configure variables
+  so that it does the right thing in any installation, without any
+  customization.
+  
+  One possible caveat regarding quotas: If FS_NODE != USERNODE, they don't
+  have a login on the fs machine. So checking their quota won't work unless
+  the rpc.rquotad(8) daemon is running on FS_NODE, which we currently don't
+  do.
+  
+  In order to do this right, I had to add a new configure var,
+  FS_WITH_QUOTAS, that has a space separated list of file systems that have
+  quotas enabled. (Ie the default is 'FS_WITH_QUOTAS="/q /users"'.) It
+  doesn't have any default, since I couldn't come up with a reasonable one.
+  All the defs files have been updated appropriately to define this new
+  variable.
+
+
 mike        2003/04/09 15:18:00 MDT
 	
   Semi-major frisbee overhaul:
