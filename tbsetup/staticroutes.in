@@ -132,12 +132,18 @@ my $index    = 0;
 # A map of lans, where each is a list of the members, indexed by lan.
 my %lans     = ();
 
-# A reverse map (sorta). Map a pair of links back to the lan.
+# A reverse map (sorta). Map a pair of links back to the lan they belong to.
 my %rlans    = ();
 
-# The costs, indexed by lan This is kinda bogus, but since the cost
+# The costs, indexed by lan. This is kinda bogus, but since the cost
 # is the same for each member of a lan, no big deal.
 my %costs    = ();
+
+# Number of links per node, indexed by node (vname). This is strictly
+# for generating NS style output. When there is more than one link on
+# a node, we *must* generate net routes instead of host routes, or the
+# parser will be unhappy.
+my %linkcount= ();
 
 #
 # Convert list of nodes into a map of $vname:$port to IP. We will need the
@@ -149,6 +155,8 @@ while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
     }
     $dostatic++;
     
+    $linkcount{$vname} = 0;
+    
     foreach my $ipinfo (split(" ", $ips)) {
 	my ($port,$ip) = split(":", $ipinfo);
 	$ips{"$vname:$port"} = $ip;
@@ -157,6 +165,7 @@ while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
 	    $rmap{$index} = $vname;
 	    $index++;
 	}
+	$linkcount{$vname} += 1;
     }
 }
 
@@ -406,7 +415,7 @@ foreach my $route (keys(%routes)) {
 	}
 	if ($format eq "ns") {
 	    print "\$${src} add-route ";
-	    if ($type eq "host") {
+	    if ($type eq "host" && $linkcount{$dst} == 1) {
 		print "\$${dst} \$${hop}\n";
 	    }
 	    else {
