@@ -354,7 +354,7 @@ if test "$enable_events" = "no"; then
 else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
-                    event/tbgen/GNUmakefile event/tbgen/tevd.restart \
+                    event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
                     event/example/tbsend.py event/example/tbrecv.py \
