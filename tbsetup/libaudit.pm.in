@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( AuditStart AuditEnd AuditAbort AuditFork );
+    qw ( AuditStart AuditEnd AuditAbort AuditFork AuditSetARGV );
 
 # After package decl.
 use English;
@@ -155,6 +155,15 @@ sub AuditEnd()
     delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
     unlink($logfile);
     return 0;
+}
+
+#
+# Overwrite our saved argv. Usefull when script contains something that
+# should not go into a mail log.
+#
+sub AuditSetARGV(@)
+{
+    @SAVEARGV = @_;
 }
 
 #
