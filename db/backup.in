@@ -136,7 +136,7 @@ if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
 #
 # Compress the files.
 # 
-if (system("nice gzip -9 $backname")) {
+if (system("nice gzip $backname")) {
     fatal("gzip $backname failed!");
 }
 
@@ -149,15 +149,15 @@ if (! chdir($LOGDIR)) {
     fatal("Could not chdir to $LOGDIR: $!");
 }
 
-if (-e "$basename" && system("nice gzip -9 $basename")) {
+if (-e "$basename" && system("nice gzip $basename")) {
     fatal("gzip $basename failed!");
 }
 
-if (-e "$updname" && system("nice gzip -9 $updname")) {
+if (-e "$updname" && system("nice gzip $updname")) {
     fatal("gzip $updname failed!");
 }
 
-if (-e "$slowname" && system("nice gzip -9 $slowname")) {
+if (-e "$slowname" && system("nice gzip $slowname")) {
     fatal("gzip $slowname failed!");
 }
 
