@@ -53,6 +53,7 @@ function WRITESIDEBAR() {
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
     global $TBBASE, $TBDOCBASE, $TBDBNAME, $BASEPATH, $pswd_expired;
+    global $THISHOMEBASE;
 
     #
     # The document base cannot be a mix of secure and nonsecure.
@@ -70,7 +71,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
-    WRITESIDEBARBUTTON("Projects Using Emulab.Net", $TBDOCBASE,
+    WRITESIDEBARBUTTON("Projects Using $THISHOMEBASE", $TBDOCBASE,
 		       "projectlist.php3");
 
     $freepcs = TBFreePCs();
@@ -128,7 +129,7 @@ function WRITESIDEBAR() {
 			       $TBBASE, "modusr_form.php3");
 	}
 	elseif ($status == "active") {
-	    WRITESIDEBARBUTTON("My Emulab.Net",
+	    WRITESIDEBARBUTTON("My $THISHOMEBASE",
 			       $TBBASE,
 			       "showuser.php3?target_uid=$login_uid");
 	    
@@ -342,7 +343,7 @@ function PAGEHEADER($title) {
     global $TBBASE, $TBDOCBASE, $TBDBNAME;
     global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
-    global $CHECKLOGIN_PSWDEXPIRED;
+    global $CHECKLOGIN_PSWDEXPIRED, $THISHOMEBASE
     global $BASEPATH, $SSL_PROTOCOL, $javacode, $drewheader, $pswd_expired;
 
     $drewheader = 1;
@@ -412,7 +413,7 @@ function PAGEHEADER($title) {
 
     echo "<html>
           <head>
-           <title>Emulab.Net - $title</title>\n";
+           <title>$THISHOMEBASE - $title</title>\n";
 
     $timeo  = ($TBAUTHTIMEOUT + 120) * 1000;
 
@@ -495,13 +496,13 @@ function ENDPAGE() {
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER() {
-    global $TBDOCBASE, $TBMAILADDR;
+    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
 
     ENDPAGE();
 
     echo "<!-- Force full window! -->
 	  <base target=_top>
-          <center>[<a href=\"$TBDOCBASE\">Emulab.Net Home</a>]</center>
+          <center>[<a href=\"$TBDOCBASE\">$THISHOMEBASE Home</a>]</center>
           <center>
            [<a href=\"http://www.cs.utah.edu/flux/\">Flux Research Group</a>]
            [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]
