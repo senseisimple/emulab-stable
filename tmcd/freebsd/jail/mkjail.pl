@@ -79,6 +79,14 @@ my $JAILCNET	   = "172.16.0.0";
 my $JAILCNETMASK   = "255.240.0.0";
 
 #
+# XXX hack: use loopback NFS mounts rather than nullfs loopback mounts
+# which are still buggy.  Can do either for one or both of local
+# filesystems (ROOTMNTDIRS) or remote filesystems (/proj, /users).
+#
+my $NFSMOUNT_LOCAL  = 1;
+my $NFSMOUNT_REMOTE = 0;	# too much load on NFS server
+
+#
 # Locals
 #
 my $JAILPATH	= "/var/emulab/jails";
@@ -104,7 +112,6 @@ my $debug	= 1;
 my $cleaning	= 0;
 my $vndevice;
 my @mntpoints   = ();
-my $nfsmounts = 0;
 my $jailpid;
 my $tmccpid;
 my $interactive = 0;
@@ -391,12 +398,20 @@ sub mkrootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	if (1) {
+	if ($NFSMOUNT_LOCAL) {
 	    mysystem("mount -r localhost:/$dir $path/root/$dir");
 	} else {
 	    mysystem("mount -r -t null /$dir $path/root/$dir");
 	}
 	push(@mntpoints, "$path/root/$dir");
+    }
+
+    #
+    # Pump up the amount of space that can be used per NFS client socket
+    # (up to 64 pending packets @ 8k per packet with default read/write size)
+    #
+    if ($NFSMOUNT_LOCAL) {
+	mysystem("sysctl vfs.nfs.bufpackets=64 >/dev/null 2>&1");
     }
 
     #
@@ -535,7 +550,7 @@ sub mkrootfs($)
     #
     if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
 	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
-	if ($nfsmounts) {
+	if ($NFSMOUNT_REMOTE) {
 	    mysystem("mount localhost:$LOCALFS/$PID ".
 		     "      $path/root/$LOCALMNTPNT/$PID");
 	} else {
@@ -557,7 +572,8 @@ sub mkrootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $path/root $nfsmounts boot");
+	mysystem("$BINDIR/rc/rc.mounts ".
+		 "-j $vnodeid $path/root $NFSMOUNT_REMOTE boot");
     }
 
     cleanmess($path);
@@ -603,13 +619,22 @@ sub restorerootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	if (1) {
+	if ($NFSMOUNT_LOCAL) {
 	    mysystem("mount -r localhost:/$dir $path/root/$dir");
 	} else {
 	    mysystem("mount -r -t null /$dir $path/root/$dir");
 	}
 	push(@mntpoints, "$path/root/$dir");
     }
+
+    #
+    # Pump up the amount of space that can be used per NFS client socket
+    # (up to 64 pending packets @ 8k per packet with default read/write size)
+    #
+    if ($NFSMOUNT_LOCAL) {
+	mysystem("sysctl vfs.nfs.bufpackets=64 >/dev/null 2>&1");
+    }
+
     tmcccopycache($vnodeid, "$path/root");
 
     #
@@ -647,7 +672,7 @@ sub restorerootfs($)
     #
     if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
 	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
-	if ($nfsmounts) {
+	if ($NFSMOUNT_REMOTE) {
 	    mysystem("mount localhost:$LOCALFS/$PID ".
 		     "      $path/root/$LOCALMNTPNT/$PID");
 	} else {
@@ -663,7 +688,8 @@ sub restorerootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $path/root $nfsmounts boot");
+	mysystem("$BINDIR/rc/rc.mounts ".
+		 "-j $vnodeid $path/root $NFSMOUNT_REMOTE boot");
     }
     return 0;
 }
@@ -782,7 +808,7 @@ sub cleanup()
     if (!REMOTE()) {
 	# If this fails, fail, we do want to continue. Dangerous!
 	system("$BINDIR/rc/rc.mounts ".
-	       "-j $vnodeid foo $nfsmounts shutdown");
+	       "-j $vnodeid foo $NFSMOUNT_REMOTE shutdown");
 
 	if ($?) {
 	    # Avoid recursive calls to cleanup; do not use fatal.
