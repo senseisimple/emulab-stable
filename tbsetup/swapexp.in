@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -312,7 +312,7 @@ TBSaveExpLogFiles($pid, $eid);
 # can see the log files. This overwrites existing files of course,
 # but thats okay.
 #
-system("cp -Rfp $workdir/ $userdir/tbdata");
+system("cp -Rfp $workdir/ $userdir/tbdata/");
 
 #
 # Must unlock before exit.

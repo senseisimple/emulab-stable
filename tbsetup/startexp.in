@@ -407,14 +407,10 @@ sub fatal()
 	     ($logname, "assign.log", "wanassign.log", $nsfile));
 
     #
-    # Copy off the workdir to the user directory, Then back up both of
-    # them for post-mortem debugging.
+    # Back up the work dir for post-mortem debugging. 
     #
-    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
     system("/bin/rm -rf  ${workdir}-failed");
     system("/bin/mv -f   $workdir ${workdir}-failed");
-    system("/bin/rm -rf  ${userdir}-failed");
-    system("/bin/mv -f   $userdir ${userdir}-failed");
 
     #
     # Clear the record and cleanup.
