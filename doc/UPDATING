@@ -15,8 +15,8 @@ in YYYYMMDD format.
 	  apache_enable="YES"
 
 20040601:
-	The p5-Time-HiRes port is now required on boss - install it from
-	/usr/ports/devel/p5-Time-HiRes .
+	The p5-Time-HiRes port is now required on both boss and ops -
+	install it from /usr/ports/devel/p5-Time-HiRes .
 
 20040420:
 	Switched web search button backend from webglimpse to swish-e.
