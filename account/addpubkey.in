@@ -27,6 +27,7 @@ my $optlist   = "kna";
 my $iskey     = 0;
 my $verify    = 0;
 my $auditmode = 0;
+my $anonmode  = 0;
 
 #
 # Configure variables
@@ -136,6 +137,8 @@ if (getpwuid($UID) eq "nobody") {
 	fatal("*** $0:\n".
 	      "    Attempt to insert first key for existing user!\n");
     }
+    # Make sure we do not mess with user table.
+    $anonmode = 1;
 }
 elsif (! $verify) {
     if (! UNIX2DBUID($UID, \$db_uid)) {
@@ -244,6 +247,13 @@ sub ParseKey($) {
 
     DBQueryFatal("replace into user_pubkeys ".
 		 "values ('$user', '$comment', '$key', now())");
+
+    #
+    # Mark user record as modified so nodes are updated.
+    #
+    if (!$anonmode) {
+	DBQueryFatal("update users set usr_modified=now() where uid='$user'");
+    }
 
     return 1;
 }
