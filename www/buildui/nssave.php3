@@ -57,6 +57,11 @@ if (! ($fp = fopen($nsfilename, "w"))) {
 	TBERROR("Could not create temporary file $nsfile", 1);
 }
 
+if (strlen( $nsdata ) > 50000) {
+	$nsdata = "#(NS file was >50kb big)\n" .
+                  "!!! ERROR: NS File Truncated !!!\n";
+}
+
 fwrite($fp, $nsdata);
 fclose($fp);
 ?>
