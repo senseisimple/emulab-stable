@@ -896,8 +896,10 @@ CREATE TABLE virt_trafgens (
   role tinytext NOT NULL,
   proto tinytext NOT NULL,
   port int(11) NOT NULL default '0',
+  ip varchar(15) NOT NULL default '',
   target_vnode varchar(32) NOT NULL default '',
   target_port int(11) NOT NULL default '0',
+  target_ip varchar(15) NOT NULL default '',
   generator tinytext NOT NULL,
   PRIMARY KEY  (pid,eid,vnode,vname)
 ) TYPE=MyISAM;
