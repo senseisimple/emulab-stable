@@ -123,7 +123,7 @@ function GETUID() {
 #
 function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
-    global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID;
+    global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
     global $nocookieauth;
     #
     # If we already figured this out, do not duplicate work!
@@ -148,10 +148,11 @@ function CHECKLOGIN($uid) {
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
-		     "       plab_user " .
+		     "       plab_user, n.type " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
+		     "left join nodetypeXpid_permissions as n on g.pid=n.pid " .
 		     "where u.uid='$uid'");
 
     # No such user.
@@ -180,6 +181,10 @@ function CHECKLOGIN($uid) {
 	$adminoff = $row[7];
 	$webonly  = $row[8];
 	$plab     = $row[9];
+
+	$type     = $row[10];
+
+	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
 
     #
@@ -449,6 +454,29 @@ function ISPLABUSER() {
 	return (($CHECKLOGIN_STATUS &
 		 (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER)) ==
 		(CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER));
+    }
+}
+
+#
+# Check to see if a user is allowed, in some project, to use the given node
+# type. Returns 1 if allowed, 0 if not.
+#
+# NOTE: This is NOT intended as a real permissions check. It is intended only
+# for display purposes (ie. deciding whether or not to give the user a link to
+# the plab_ez page.) It does not require the user to be actually logged in, so
+# that it still works for pages fetched through http. Thus, it may be possible
+# for a clever user to fake it out.
+#
+function NODETYPE_ALLOWED($type) {
+    global $CHECKLOGIN_NODETYPES;
+    $uid = GETUID();
+    if (!$uid) {
+	return 0;
+    }
+    if ($CHECKLOGIN_NODETYPES[$type]) {
+	return 1;
+    } else {
+	return 0;
     }
 }
 
