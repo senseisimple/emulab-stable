@@ -5,7 +5,8 @@ A. Information about the node
 -----------------------------
 
 1. MAC address. For each port in the new node you need to find out the
-   MAC address, and which port (eth0/fxp0) it is in software.
+   MAC address, and which port (eth0/fxp0) it is in software.  You need
+   to know both the Linux (eth) and BSD (fxp,xl,dc,etc.) names.
 
 2. Wiring. We need to know which physical port on the back of the
    machine maps to eth0, eth1, etc., and where each port is connected
@@ -37,15 +38,13 @@ B. If the node is of a new type
    values
    ("pc","pc2000","P4",2000,512,20.0,5,1,"RHL-STD",0,"UTAHPC-FBSD45+LINUX71",1,2,"eth0","FBSD-STD","boss.emulab.net:/tftpboot/pxeboot");
 
-2. There are several scripts that limit searches to certain
-   types. You'll need to include this new type as appropriate.
+2. There are several scripts that limit searches to certain classes.
+   If the new type you have added does not have class "pc", you may need
+   to include this new class as appropriate.
    Some of the scripts that might need to be updated are:
-   /db/avail
+   /db/avail.in
    /db/nfree.in
-   /tbsetup/ir/assign_wrapper.in
-   /tbsetup/ir/handle_ip.in
-   /tbsetup/ir/handle_os.in
-   /tbsetup/ns2ir/postparse.in
+   /tbsetup/assign_wrapper.in
    /tbsetup/batchexp.in
    /tbsetup/reload_daemon.in
    /tbsetup/exports_setup.in
@@ -61,8 +60,9 @@ C. What to do on boss:
 ----------------------
 
 1. Insert entries into interfaces table using info from A(1). Try:
-   insert into interfaces (node_id,card,port,MAC,IP,iface) values
-   ("pcN",0,1,"00b0d0f01020",NULL,"eth0")  
+   insert into interfaces (node_id,card,port,MAC,IP,interface_type,iface)
+   values
+   ("pcN",0,1,"00b0d0f01020",NULL,"BSDTYPE","eth0")  
 
 2. Insert entries into wires table using info from A(2). Try:
    insert into wires (node_id1,card1,port1,node_id2,card2,port2) values
@@ -80,8 +80,9 @@ C. What to do on boss:
    ("pcN","powerX",Y)
 
 4. Add entries to the nodes table for each node. Try:
-   insert into nodes (node_id, type, def_boot_osid, priority) values
-   ("pcN","pc1u","FBSD40-STD",N)
+   insert into nodes (node_id,type,phys_nodeid,role,def_boot_osid,priority)
+   values
+   ("pcN","pc1u","pcN","testnode","FBSD45-STD",N)
 
    If the node is a pxebooting node, then you need to set the
    pxe_boot_path in the nodes table. Try:
