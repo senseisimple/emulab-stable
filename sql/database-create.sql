@@ -179,6 +179,9 @@ CREATE TABLE experiments (
   batchstate varchar(12) default NULL,
   event_sched_pid int(11) default '0',
   uselatestwadata tinyint(4) NOT NULL default '0',
+  wa_delay_solverweight tinyint(4) NOT NULL default '0',
+  wa_bw_solverweight tinyint(4) NOT NULL default '0',
+  wa_plr_solverweight tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
