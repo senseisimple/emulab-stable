@@ -104,7 +104,13 @@ foreach my $i (sort (keys %nodename)) {
 # 
 if ($dovirt) {
     foreach my $i (sort (keys %nodename)) {
-	print "4\n";
+	my $vcount = 4;
+	
+	if ($i =~ /^boss.*/) {
+	    $vcount = 1;
+	}
+
+	print "$vcount\n";
     }
 }
 
