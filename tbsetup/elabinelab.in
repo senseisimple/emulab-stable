@@ -143,6 +143,12 @@ system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
 system("scp ~stoller/testbed/testbed/tmcd/common/config/rc.mkelab ".
        "    ${opsnode}:/tmp");
 
+# Still waiting for new images.
+system("scp ~stoller/testbed/testbed/tmcd/common/rc.inelab ".
+       "    ${bossnode}:/usr/local/etc/emulab/rc");
+system("scp ~stoller/testbed/testbed/tmcd/common/rc.inelab ".
+       "    ${opsnode}:/usr/local/etc/emulab/rc");
+
 TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
 system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > /tmp/opsnode.$$ 2>&1");
