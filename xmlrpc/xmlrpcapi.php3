@@ -36,7 +36,7 @@ if (!$printable) {
 This page describes the XMLRPC interface to Emulab. Currently, the
 interface mainly supports experiment creation, modification, swapping,
 and termination. We also provide interfaces to several other common
-operations on nodes end experiments such as reboot, reloading, link
+operations on nodes end experiments such as rebooting, reloading, link
 delay configuration, etc.
 </p>
 
@@ -45,7 +45,8 @@ The Emulab XMLRPC server uses SSH as its transport. Yes, this is a little
 different then other RPC servers, but since all registered Emulab
 users already have accounts on Emulab and are required to use SSH to
 log in (and thus have provided us with their public keys), we decided
-this was easier on users then giving out SSL certificates that would need
+this was any easy way to handle authentication - much
+easier on users then giving out SSL certificates that would need
 to be kept track of. At some future time we may provide SSL or HTTPS
 based servers, but for now rejoice in the fact that you do not need to
 keep yet another certificate around!
