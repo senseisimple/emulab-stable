@@ -410,9 +410,9 @@ if (! isset($submit)) {
     if (count($projlist) == 1) {
 	list($project, $grouplist) = each($projlist);
 	
-	if (count($grouplist) == 2) {
+	if (count($grouplist) <= 2) {
 	    $defaults[exp_pid] = $project;
-	    if (strcmp($project, $grouplist[0])) 
+	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0])) 
 		$defaults[exp_gid] = $grouplist[0];
 	    else
 		$defaults[exp_gid] = $grouplist[1];
