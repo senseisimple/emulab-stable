@@ -560,7 +560,15 @@ foreach my $hostroute (keys(%hostroutes)) {
 	    next;
 	}
     } else {
-	if ($optimize) {
+
+	# We do the following optimization only for
+	# hosts that are _not_ directly connected
+	# neighbors. Otherwise, adding interface 
+	# subnet routes fail. Even with this certain
+	# redundant links might be unused since the
+	# route calculator ended up choosing one of
+	# the routes over the other(s)
+	if ($optimize && ($dst ne $hop)) {
 	    $netroutes{"$src:$dstipsubnet"} = $hop;
 	    $type = "net";
 	    $dstip = $dstipsubnet;
