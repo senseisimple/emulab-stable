@@ -228,11 +228,11 @@ if { $simcode_present == 1 } {
     set i 0    
     
     foreach nodeinst [Node info instances] {
-	if { [$nodeinst info vars nsenode_ipaddr] == {} } {
+	if { [$nodeinst info vars nsenode_ipaddrlist] == {} } {
 	    continue
 	}
-	set nodeinst_ipaddr [$nodeinst set nsenode_ipaddr]
-	if { $nodeinst_ipaddr != {} } {
+	set nodeinst_ipaddrlist [$nodeinst set nsenode_ipaddrlist]
+	foreach nodeinst_ipaddr $nodeinst_ipaddrlist {
 	    set iface [getif $nodeinst_ipaddr]
 	    
 	    # one iptap per node that has real - simulated link

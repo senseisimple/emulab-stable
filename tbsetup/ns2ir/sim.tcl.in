@@ -192,7 +192,9 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
     # goes into NSE
     if { $simnode != {} } {
 	set vport [[$simnode set nsenode] find_port $curlink]
-	$simnode set nsenode_vport $vport
+	set vportlist [$simnode set nsenode_vportlist]
+	lappend vportlist $vport
+	$simnode set nsenode_vportlist $vportlist
     }
 	
     set last_class $curlink

@@ -66,7 +66,7 @@ Node instproc init {s} {
 	$self set simulated 0
 	$self set nsenode ""
     }
-    $self set nsenode_vport ""
+    $self set nsenode_vportlist {}
 }
 
 # The following procs support renaming (see README)

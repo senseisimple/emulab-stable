@@ -73,10 +73,15 @@ NSENode instproc updatedb {DB} {
 	    append nseconfig "\n\n\$$node set simulated 1\n"
 	    append nseconfig "\$$node set nsenode $self\n"
 	    
-	    set nsenode_vport [$node set nsenode_vport]
-	    if { $nsenode_vport != {} } {
-		append nseconfig "\$$node set nsenode_vport $nsenode_vport\n"
-		append nseconfig "\$$node set nsenode_ipaddr [$self ip $nsenode_vport]\n\n"
+	    set nsenode_vportlist [$node set nsenode_vportlist]
+	    if { $nsenode_vportlist != {} } {
+		append nseconfig "\$$node set nsenode_vportlist \[list $nsenode_vportlist]\n"
+
+		set ipaddrlist {}
+		foreach v $nsenode_vportlist {
+		    lappend ipaddrlist [$self ip $v]
+		}
+		append nseconfig "\$$node set nsenode_ipaddrlist \[list $ipaddrlist]\n\n"
 	    }
 	}
     }
