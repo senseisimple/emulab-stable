@@ -199,9 +199,11 @@ proc tb-set-link-loss {srclink args} {
 	perror "\[tb-set-link-loss] $lossrate is not a valid loss rate."
     }
     $srclink instvar loss
+    $srclink instvar rloss
     set adjloss [expr 1-sqrt(1-$lossrate)]
     foreach pair [array names loss] {
 	set loss($pair) $adjloss
+	set rloss(pair) $adjloss
     }
 }
 proc tb-set-lan-loss {lan lossrate} {
@@ -215,9 +217,11 @@ proc tb-set-lan-loss {lan lossrate} {
 	perror "\[tb-set-lan-loss] $lossrate is not a valid loss rate."
     }
     $lan instvar loss
+    $lan instvar rloss
     set adjloss [expr 1-sqrt(1-$lossrate)]
     foreach pair [array names loss] {
 	set loss($pair) $adjloss
+	set rloss($pair) $adjloss
     }
 }
 
@@ -236,6 +240,7 @@ proc tb-set-node-lan-delay {node lan delay} {
 	return
     }
     $lan set delay([list $node $port]) [parse_delay $delay]
+    $lan set rdelay([list $node $port]) [parse_delay $delay]
 }
 proc tb-set-node-lan-bandwidth {node lan bw} {
     if {[$node info class] != "Node"} {
@@ -252,6 +257,7 @@ proc tb-set-node-lan-bandwidth {node lan bw} {
 	return
     }
     $lan set bandwidth([list $node $port]) [parse_bw $bw]
+    $lan set rbandwidth([list $node $port]) [parse_bw $bw]
 }
 proc tb-set-node-lan-loss {node lan loss} {
     var_import ::TBCOMPAT::FLOAT
@@ -273,6 +279,7 @@ proc tb-set-node-lan-loss {node lan loss} {
 	perror "\[tb-set-link-loss] $loss is not a valid loss rate."
     }
     $lan set loss([list $node $port]) $loss
+    $lan set rloss([list $node port]) $loss
 }
 proc tb-set-node-lan-params {node lan delay bw loss} {
     tb-set-node-lan-delay $node $lan $delay
@@ -341,4 +348,76 @@ proc tb-make-weighted-vtype {name weight types} {
 	perror "\[tb-make-weighted-vtype] $weight is not a valid weight. (0 < weight < 1)."
     }
     set vtypes($name) [Vtype $name $weight $types]
+}
+
+proc tb-set-link-simplex-params {link src delay bw loss} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-simplex-params] $link is not a link."
+	return
+    }
+    if {[$src info class] != "Node"} {
+	perror "\[tb-set-link-simplex-params] $src is not a link."
+	return
+    }
+    set port [$link get_port $src]
+    if {$port == {}} {
+	perror "\[tb-set-link-simplex-params] $src is not in $link."
+	return
+    }
+    if {([regexp $FLOAT $loss] == 0) || ($loss > 1.0)} {
+	perror "\[tb-set-link-simplex-params] $loss is not a valid loss rate."
+	return
+    }
+    set adjloss [expr 1-sqrt(1-$loss)]
+    set np [list $src $port]
+    foreach nodeport [$link set nodelist] {
+	if {$nodeport != $np} {
+	    set onp $nodeport
+	}
+    }
+
+    set realdelay [parse_delay $delay]
+    set realbw [parse_bw $bw]
+    $link set delay($np) [expr $realdelay / 2.0]
+    $link set rdelay($onp) [expr $realdelay / 2.0]
+    $link set bandwidth($np) $realbw
+    $link set rbandwidth($onp) $realbw
+    $link set loss($np) [expr $adjloss]
+    $link set rloss($onp) [expr $adjloss]
+}
+
+proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-lan-delay] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	return
+    }
+    if {([regexp $FLOAT $toloss] == 0) || ($toloss > 1.0)} {
+	perror "\[tb-set-link-loss] $toloss is not a valid loss rate."
+    }
+    if {([regexp $FLOAT $fromloss] == 0) || ($fromloss > 1.0)} {
+	perror "\[tb-set-link-loss] $fromloss is not a valid loss rate."
+    }
+
+    set realtodelay [parse_delay $todelay]
+    set realfromdelay [parse_delay $fromdelay]
+    set realtobw [parse_bw $tobw]
+    set realfrombw [parse_bw $frombw]
+
+    $lan set delay([list $node $port]) $realtodelay
+    $lan set rdelay([list $node $port]) $realfromdelay
+    $lan set loss([list $node $port]) $toloss
+    $lan set rloss([list $node $port]) $fromloss
+    $lan set bandwidth([list $node $port]) $realtobw
+    $lan set rbandwidth([list $node $port]) $realfrombw
 }

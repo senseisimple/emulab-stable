@@ -21,14 +21,22 @@ LanLink instproc init {s nodes bw d} {
 
     # Now we need to fill out the nodelist
     $self instvar nodelist
+
+    # r* indicates the switch->node chars, others are node->switch
     $self instvar bandwidth
+    $self instvar rbandwidth
     $self instvar delay
+    $self instvar rdelay
     $self instvar loss
+    $self instvar rloss
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
+	set rbandwidth($nodepair) $bw
 	set delay($nodepair) [expr $d / 2.0]
+	set rdelay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
+	set rloss($nodepair) 0
 	lappend nodelist $nodepair
     }
 }
@@ -137,14 +145,17 @@ LanLink instproc rename_node {old new} {
 LanLink instproc updatedb {DB} {
     $self instvar nodelist
     $self instvar bandwidth
+    $self instvar rbandwidth
     $self instvar delay
+    $self instvar rdelay
     $self instvar loss
+    $self instvar rloss
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,bandwidth,lossrate) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$bandwidth($nodeport),$loss($nodeport))"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport))"
     }
 }
 
