@@ -708,7 +708,12 @@
 	experiment?</h3>
     <p>
     By default, the testbed startup scripts currently start two daemons in 
-    addition to the OS's standard set:
+    addition to the OS's standard set.  Other daemons may be started depending
+    on the network services you ask for in your ns file (see below).
+    </p>
+
+    <p>
+    Unconditionally started daemons:
     </p>
 
     <p>
@@ -724,7 +729,8 @@
     status datagram is sent out once every five minutes.
     <code>Healthd</code>'s overhead is quite low, but it can be safely
     killed and disabled from startup if you're worried about possible
-    side effects.  It is started by <code>/etc/testbed/rc.healthd</code>.
+    side effects.  It is started by
+    <code>/etc/testbed/rc.healthd</code>.
     </p>
 
     <p>
@@ -736,12 +742,22 @@
     <p>
     <code>Slothd</code> is important to efficient testbed utilization
     and should run on every node whenever possible.  Its overhead is
-    almost negligible (essentially like running 'ls -l /dev' once per
-    hour), and should not interfere with your work.  However if your
-    experiment is exceptionally sensitive, then you may arrange with
-    us to disable <code>slothd</code>.  Please note that we will
-    restart this daemon if it is not running unless prior arrangements
-    have been made.
+    almost negligible (essentially less than running <code>'ls -l
+    /dev'</code> once per hour), and should not interfere with your
+    work.  However if your experiment is exceptionally sensitive, then
+    you may arrange with us to disable <code>slothd</code>.  Please
+    note that we will restart this daemon if it is not running unless
+    prior arrangements have been made.
+    </p>
+
+    <p>
+    Conditionally started daemons:
+    </p>
+
+    <p>
+    <blockquote>
+    <li><code>gated</code> - A network routing daemon.
+    </blockquote>
     </p>
 
     <p>
@@ -749,6 +765,7 @@
     <code>tb-set-ip-routing</code> command in your NS file, this will
     start <code>gated</code> on all of your nodes.
     </p>
+
     <p>
     We have left all daemons started by the operating systems' default
     configurations (such as <code>cron</code>) enabled, so you should also
