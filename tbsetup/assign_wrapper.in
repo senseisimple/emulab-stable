@@ -49,7 +49,7 @@ sub usage ()
     exit($WRAPPER_FAILED);
 }
 my $optlist  = "vutnfp";
-my $verbose  = 0;
+my $verbose  = 1;
 my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
@@ -75,6 +75,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 #
 # assign_wrapper Settings
@@ -1215,51 +1216,75 @@ foreach my $pnode (keys(%virtnodes)) {
     #
     if ($numvs) {
 	#
-	# Run avail to get the list of virtnodes on the phys node. We
-	# already know there are enough, since assign knows that.
-	#
-	printdb "Asking avail for $numvs for vnodes: @vlist on $pnode\n";
-    
-	open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs |")
-	    or fatal("avail failed");
-
-	while (<AVAIL>) {
-	    next
-		if (! /^\|/);
-	    next
-		if (/node_id/);
-
-	    if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
-		push(@plist, $1);
+	# All vnodes on pnode are dynamic if the first one is.
+	# We also assume that we do not mix vnode types on a pnode; bad.
+	# 
+	if (virtnodeisdynamic($vlist[0])) {
+	    # Always use the base type ... node type system sucks.
+	    my $vtype = nodetypetype(virtnodetype($vlist[0]));
+	    
+	    #
+	    # Call into library. Be sure to pass impotent mode along.
+	    #
+	    if (Node::CreateVnodes(\@plist,
+				   {"pid" => "$pid", "eid" => "$eid",
+				    "count" => $numvs,
+				    "vtype" => $vtype,
+				    "nodeid" => $pnode,
+				    "verbose"  => $verbose,
+				    "impotent" => $impotent}) < 0) {
+		fatal("Could not allocate vnodes on $pnode");
 	    }
-	    else {
-		fatal("Bad line from avail: $_");
-	    }
-	}
-	close(AVAIL);
-
-	# Sanity check.
-	if (scalar(@vlist) != scalar(@plist)) {
-	    printdb "avail gave " . scalar(@plist) .
-		" vnodes: @plist on $pnode\n";
-	    fatal("Could not map some virtual nodes on $pnode");
-	}
-
-	#
-	# Try to allocate. Note, if this fails we are done for. Okay for now
-	# since it is never the case that it should fail!
-	#
-	if ($impotent) {
-	    print "Selected for $pnode: @plist\n";
-	    print "Skipping physical reservation, as directed.\n";
 	}
 	else {
-	    print "Reserving on $pnode: @plist ...\n";
-	    TBDebugTimeStamp("nalloc vnodes on $pnode started");
-	    if (system("nalloc $pid $eid @plist")) {
-		fatal("Failed to reserve @plist (on $pnode)");
+	    #
+	    # Run avail to get the list of virtnodes on the phys node. We
+	    # already know there are enough, since assign knows that.
+	    #
+	    printdb "Asking avail for $numvs for vnodes: @vlist on $pnode\n";
+    
+	    open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs|")
+		or fatal("avail failed");
+
+	    while (<AVAIL>) {
+		next
+		    if (! /^\|/);
+		next
+		    if (/node_id/);
+
+		if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
+		    push(@plist, $1);
+		}
+		else {
+		    fatal("Bad line from avail: $_");
+		}
 	    }
-	    TBDebugTimeStamp("nalloc vnodes on $pnode finished");
+	    close(AVAIL);
+
+	    # Sanity check.
+	    if (scalar(@vlist) != scalar(@plist)) {
+		printdb "avail gave " . scalar(@plist) .
+		    " vnodes: @plist on $pnode\n";
+		fatal("Could not map some virtual nodes on $pnode");
+	    }
+
+	    #
+	    # Try to allocate. Note, if this fails we are done
+	    # for. Okay for now since it is never the case that it
+	    # should fail!
+	    #
+	    if ($impotent) {
+		print "Selected for $pnode: @plist\n";
+		print "Skipping physical reservation, as directed.\n";
+	    }
+	    else {
+		print "Reserving on $pnode: @plist ...\n";
+		TBDebugTimeStamp("nalloc vnodes on $pnode started");
+		if (system("nalloc $pid $eid @plist")) {
+		    fatal("Failed to reserve @plist (on $pnode)");
+		}
+		TBDebugTimeStamp("nalloc vnodes on $pnode finished");
+	    }
 	}
     }
 
@@ -3070,12 +3095,14 @@ sub interfacespeedmbps($$) {
     return $interface_capabilities{$_[0]}->{$_[1] . "_defspeed"} / 1000.0;
 }
 sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
+sub nodetypetype($)     { return $node_types{$_[0]}->{"type"}; }
 sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
 sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
 sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
 sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
 sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
 sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
+sub nodetypeisdynamic($){ return $node_types{$_[0]}->{"isdynamic"}; }
 sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
 sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
@@ -3164,6 +3191,7 @@ sub LoadVirtNodes()
 	my $issub   = 0;
 	my $isplab  = 0;
 	my $issim   = 0;
+	my $isdyn   = 0;	# Only virtnodes are dynamic.
 
 	# If we have a real type or auxtype ...
 	if (nodetypeistype($type)) {
@@ -3172,6 +3200,7 @@ sub LoadVirtNodes()
 	    $issub    = nodetypeissub($type);
 	    $isplab   = nodetypeisplab($type);
 	    $issim    = nodetypeissim($type);
+	    $isdyn    = nodetypeisdynamic($type);
 	}
 	elsif (virttypeisvtype($type)) {
 	    #
@@ -3185,6 +3214,7 @@ sub LoadVirtNodes()
 	    $issub    = nodetypeissub($vtype);
 	    $isplab   = nodetypeisplab($vtype);
 	    $issim    = nodetypeissim($vtype);
+	    $isdyn    = nodetypeisdynamic($vtype);
 	}
 	else {
 	    fatal("Improper type $type for node $vname!");
@@ -3197,7 +3227,8 @@ sub LoadVirtNodes()
 	$rowref->{"__isvirtnode"}   = $isvirt;
 	$rowref->{"__issubnode"}    = $issub;
 	$rowref->{"__isplabnode"}   = $isplab;
-	$rowref->{"__issimnode"}   = $issim;
+	$rowref->{"__issimnode"}    = $issim;
+	$rowref->{"__isdynamic"}    = $isdyn;
 	$rowref->{"__usewanassign"} = 0;
 	# The mapped osname to actual osid. 
 	$rowref->{"__osid"} = undef;
@@ -3356,6 +3387,9 @@ sub virtnodeissubnode($)   {
 }
 sub virtnodeissim($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issimnode"};
+}
+sub virtnodeisdynamic($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isdynamic"};
 }
 sub virtnodeisplabnode($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isplabnode"};
@@ -4266,9 +4300,12 @@ sub LoadPhysNode($)
 			 "left join node_types as nt on nt.type=n.type ".
 			 "where n.node_id='$pnode'");
 
-	fatal("No such pnode $pnode in nodes table!")
-	    if (!$query_result->num_rows);
-
+	if (!$query_result->num_rows) {
+	    return
+		if ($impotent);
+	    
+	    fatal("No such pnode $pnode in nodes table!")
+	}
 	my $rowref = $query_result->fetchrow_hashref();
 
 	#
@@ -4285,7 +4322,7 @@ sub LoadPhysNode($)
 	# Routing table id for different vnodes on pnode
 	$rowref->{"__rtabid"} = 0;
     }
-    return $phys_nodes{$pnode};
+    return;
 }
 
 #

@@ -6,6 +6,14 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040625:
+	After updating to revision 1.257 of sql/database-create.txt,
+        run sql/devlnodes.pl to clear out all of the non reserved
+        pcvm nodes. Be sure to do a current install of the software, and
+        then:
+
+		update node_types set isdynamic=1 where type='pcvm';
+
 20040615:
 	If you update the ports on your boss node, you'll need to take
 	into accout that FreeBSD is in the process of changing how its

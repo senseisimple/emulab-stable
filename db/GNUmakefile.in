@@ -17,7 +17,7 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
 		  idletimes idlemail setsitevar audit changeuid
 LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
-LIB_SCRIPTS     = libdb.pm
+LIB_SCRIPTS     = libdb.pm Node.pm
 
 # Stuff installed on plastic.
 USERBINS	= node_list readycount

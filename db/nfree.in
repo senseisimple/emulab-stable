@@ -33,6 +33,7 @@ my $TESTMODE = @TESTMODE@;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 my $consetup	= "$TB/libexec/console_setup";
 my $osselect    = "$TB/bin/os_select";
@@ -46,6 +47,7 @@ my $lockedeid   = NFREELOCKED_EID();
 
 my @nodes;
 my @freed_nodes=();
+my @dynanodes=();
 my $error = 0;
 
 $| = 1;  # Turn off line buffering on output
@@ -231,12 +233,14 @@ foreach my $n (@freed_nodes) {
     # Find the default values for its node type.
     my $result =
 	DBQueryFatal("select nt.osid,n.eventstate, " .
-		     "       nt.isvirtnode, nt.imageable, o.mustclean ".
+		     "       nt.isvirtnode, nt.imageable, o.mustclean, ".
+		     "       nt.isdynamic ".
 		     " from nodes as n " .
 		     "left join node_types as nt on n.type=nt.type " .
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "where node_id='$n'");
-    my ($osid, $estate, $isvirt, $imageable, $clean) = $result->fetchrow_array();
+    my ($osid, $estate, $isvirt, $imageable, $clean, $isdynamic) =
+	$result->fetchrow_array();
 
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
@@ -251,12 +255,22 @@ foreach my $n (@freed_nodes) {
 	# If def_boot_osid set, then $clean is defined. Otherwise not set
 	# so default to cleaning node. 
 	$mustclean = $clean;
-    } 
+    }
+
+    #
+    # If the node is a dynamic virtual node, just save it for later.
+    # We will call into the Node library to delete it. 
+    #
+    if ($isdynamic) {
+	push(@dynanodes, $n);
+	next;
+    }
 
     # Clean up interfaces by clearing IPs and/or aliases.
     if (! ($n =~ /sh\d+/)) {
         # Its not a shark, so clean out all IPs except the control net.
-	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,rtabid='0',vnode_id=NULL " .
+	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
+		    "       rtabid='0',vnode_id=NULL " .
 		    "where node_id='$n' and ".
 		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	    || $error++;
@@ -362,6 +376,11 @@ foreach my $n (@freed_nodes) {
 	print "Failed!\n";
 	$error++;
     }
+}
+
+# Release dynamic nodes.
+if (@dynanodes) {
+    Node::DeleteVnodes(@dynanodes);
 }
 
 ######################################################################

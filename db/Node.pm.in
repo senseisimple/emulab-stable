@@ -1,0 +1,444 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# A library for getting the physical (or jailed) node data out of the
+# DB, and caching it.  The intent is to place all of the data about a
+# node in one spot, and use that instead of querying the DB over and
+# over, with specific queries scattered around. I'm hoping this also
+# reduces the load on the DB. It remains to be seen if this approach
+# will work or will be any more convenient.
+#
+# Used like this:
+#
+#	my $pc1 = Node::Lookup("pc1");
+#	my $isvirt = $pc1->IsNodeVirtual();
+#       my $reserved = $pc1->IsNodeReserved();
+#
+# or:
+#	my $isvirt = Node::IsNodeVirtual("pc1");
+#       my $reserved = Node::IsNodeReserved("pc1");
+#
+package Node;
+require Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA = qw( Exporter );
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use English;
+use libdb;
+
+#
+# Cache the node structures to avoid repeated lookups. It is up to the
+# user to request nodes be synched with the DB if they think that is
+# necessary. 
+#
+my %nodes = ();
+
+#
+# Lookup and return a node structure. 
+#
+sub Lookup ($$) {
+    my ($class, $nodeid) = @_;
+
+    if (exists($nodes{$nodeid})) {
+	return $nodes{$nodeid};
+    }
+
+    my $query_result =
+	libdb::DBQueryFatal("select n.*,nt.*,r.vname from nodes as n ".
+			    "left join reserved as r on r.node_id=n.node_id ".
+			    "left join node_types as nt on nt.type=n.type ".
+			    "where n.node_id='$nodeid'");
+
+    if (! $query_result->numrows) {
+	return undef;
+    }
+    my $self          = {};
+    $self->{"DBROW"}  = $query_result->fetchrow_hashref();
+    $self->{"NODEID"} = $nodeid;
+    bless($self);
+    $nodes{$nodeid} = $self;
+    return $self;
+}
+
+#
+# Poor man polysomething. These routines can be called as methods on an
+# instance, or as package functions on a "pcxxx" argument. That is:
+#
+#	$isvirt = Node::IsNodeVirtual("pc1");
+#	$isvirt = $pc1->IsNodeReserved();
+# 
+sub GetNode($)
+{
+    my $arg   = shift;
+
+    return $arg
+	if (ref($arg));
+
+    return Node->Lookup($arg);
+}
+
+#
+# Return the DB data. Maybe this should be a set of tables instead of
+# one big mess. 
+# 
+sub DBData ($)
+{
+    my ($arg) = @_;
+    my $node  = GetNode($arg);
+    my $row   = $node->{"DBROW"};
+
+    return $row;
+}
+
+#
+# Throw away the current info, and reload from the DB.
+# 
+sub Sync ($)
+{
+    my ($arg) = @_;
+    my $node  = GetNode($arg);
+
+    delete($nodes{$node->{"NODEID"}});
+    Node->Lookup($node->{"NODEID"});
+
+    return $row;
+}
+
+sub IsVirtual ($)
+{
+    my ($arg) = @_;
+    my $node  = GetNode($arg);
+
+    return undef
+	if (!defined($node));
+
+    return $node->{"DBROW"}{"isvirtnode"};
+}
+
+sub IsReserved ($)
+{
+    my ($arg) = @_;
+    my $node  = GetNode($arg);
+
+    return undef
+	if (!defined($node));
+
+    return 0
+	if (!defined($node->{"DBROW"}{"vname"}));
+
+    return 1;
+}
+
+sub IsDynamic ($)
+{
+    my ($arg) = @_;
+    my $node  = GetNode($arg);
+
+    return undef
+	if (!defined($node));
+
+    return 0
+	if (!defined($node->{"DBROW"}{"isdynamic"}));
+
+    return 1;
+}
+
+#
+# Create new vnodes. This routine obviously cannot be called on a specific
+# instance since it does not exist! The argument is still a reference; to a
+# a hash of options to be used when creating the new node(s). A list of the
+# node names is returned.
+#
+sub CreateVnodes($$)
+{
+    my ($rptr, $options) = @_;
+    my @created   = ();
+    my @tocreate  = ();
+
+    if (!defined($options->{'pid'})) {
+	print STDERR "*** CreateVnodes: Must supply a pid!\n";
+	return -1;
+    }
+    if (!defined($options->{'eid'})) {
+	print STDERR "*** CreateVnodes: Must supply a eid!\n";
+	return -1;
+    }
+    if (!defined($options->{'count'})) {
+	print STDERR "*** CreateVnodes: Must supply a count!\n";
+	return -1;
+    }
+    if (!defined($options->{'vtype'})) {
+	print STDERR "*** CreateVnodes: Must supply a vtype!\n";
+	return -1;
+    }
+    if (!defined($options->{'nodeid'})) {
+	print STDERR "*** CreateVnodes: Must supply a pnode!\n";
+	return -1;
+    }
+    
+    my $debug   = defined($options->{'debug'}) && $options->{'debug'};
+    my $impotent= defined($options->{'impotent'}) && $options->{'impotent'};
+    my $verbose = defined($options->{'verbose'}) && $options->{'verbose'};
+    my $pid     = $options->{'pid'};
+    my $eid     = $options->{'eid'};
+    my $count   = $options->{'count'};
+    my $vtype   = $options->{'vtype'};
+    my $pnode   = $options->{'nodeid'};
+
+    #
+    # Need the vtype node_type info. 
+    #
+    my $query_result =
+	DBQueryWarn("select * from node_types where type='$vtype'");
+    return -1
+	if (! $query_result);
+
+    if (! $query_result->numrows) {
+	print STDERR "*** CreateVnodes: No such node type '$vtype'\n";
+	return -1;
+    }
+    my $vtype_rowref = $query_result->fetchrow_hashref();
+
+    if (!$vtype_rowref->{"isdynamic"}) {
+	print STDERR "*** CreateVnodes: Not a dynamic node type: '$vtype'\n";
+	return -1;
+    }
+    my $isremote = $vtype_rowref->{"isremotenode"};
+
+    #
+    # Currently, only local pcvm nodes are jailed and get a jailip.
+    # This little tidbit needs to go into the node_types table. 
+    # 
+    my $isjailed = (!$isremote && $vtype eq "pcvm" ? 1 : 0);
+
+    #
+    # Make up a priority (just used for sorting). We need the name prefix
+    # as well for consing up the node name.
+    #
+    my $nodeprefix;
+    my $nodenum;
+    if ($pnode =~ /^(.*\D)(\d+)$/) {
+	$nodeprefix = $1;
+	$nodenum    = $2;
+    }
+    else {
+	print STDERR "*** CreateVnodes: Unexpected nodeid '$pnode'\n";
+	return -1;
+    }
+
+    #
+    # Need the opmode, which comes from the OSID, which is in the node_types
+    # table. 
+    #
+    my $osid = $vtype_rowref->{"osid"};
+    
+    $query_result =
+	DBQueryWarn("select op_mode from os_info where osid='$osid'");
+    return -1
+	if (! $query_result);
+    
+    if (! $query_result->numrows) {
+	print STDERR "*** CreateVnodes: No such OSID '$osid'\n";
+	return -1;
+    }
+    my ($opmode) = $query_result->fetchrow_array();
+
+    #
+    # Need IP for jailed nodes.
+    # 
+    my $IPBASE = TBDB_JAILIPBASE();
+    if ($IPBASE =~ /^(\d+).(\d+).(\d+).(\d+)/) {
+	$IPBASE = "$1.$2";
+    }
+    else {
+	print STDERR "*** CreateVnodes: Bad IPBASE '$IPBASE'\n";
+	return -1;
+    }
+
+    #
+    # Assign however many we are told to (typically by assign). Locally
+    # this is not a problem since nodes are not shared; assign always
+    # does the right thing and we do what it says. In the remote case,
+    # nodes are shared and so it is harder to make sure that nodes are not
+    # over committed. I am not going to worry about this right now though
+    # cause it would be too hard. For RON nodes this is fine; we just
+    # tell people to log in and use them. For plab nodes, this is more
+    # of a problem, but I am going to ignore that for now too since we do
+    # not ever allocate enough to worry; must revisit this at some point.
+    # 
+    # Look to see what nodes are already allocated on the node, and skip
+    # those. Must do this with tables locked, of course.
+    #
+    DBQueryFatal("lock tables nodes write, reserved write, ".
+		 "node_status write, node_hostkeys write");
+
+    if (0 && !$isremote) {
+	for (my $i = 1; $i <= $count; $i++) {
+	    push(@tocreate, $i);
+	}
+    }
+    else {
+	my $n = 1;
+	my $i = 0;
+
+	while ($i < $count) {
+	    my $vnodeid = $nodeprefix . "vm" . $nodenum . "-" . $n;
+	    
+	    $query_result =
+		DBQueryWarn("select node_id from nodes ".
+			     "where node_id='$vnodeid'");
+	    goto bad
+		if (!$query_result);
+
+	    if (!$query_result->numrows) {
+		push(@tocreate, $n);
+		$i++;
+	    }
+	    $n++;
+	}
+    }
+
+    # See below.
+    my $eventstate = TBDB_NODESTATE_SHUTDOWN();
+    my $allocstate = TBDB_ALLOCSTATE_FREE_CLEAN();
+
+    #
+    # Create a bunch.
+    #
+    foreach my $i (@tocreate) {
+	my $vpriority = 10000000 + ($nodenum * 1000) + $i;
+	my $jailip    = "${IPBASE}.${nodenum}.${i}";
+	my $vnodeid   = $nodeprefix . "vm" . $nodenum . "-" . $i;
+
+	if ($verbose) {
+	    if ($impotent) {
+		print "Would allocate $vnodeid on $pnode ($vtype, $osid)\n";
+	    }
+	    else {
+		print "Allocating $vnodeid on $pnode ($vtype, $osid)\n";
+	    }
+	}
+
+	my $statement =
+	         "insert into nodes set ".
+		 "       node_id='$vnodeid', " .
+		 "       type='$vtype', ".
+		 "       phys_nodeid='$pnode', ".
+		 "       role='virtnode', " .
+		 "       priority='$vpriority', ".
+		 "       op_mode='$opmode', " .
+		 "       eventstate='$eventstate', " .
+		 "       allocstate='$allocstate', ".
+		 "       def_boot_osid='$osid', " .
+		 "       update_accounts=1, ".
+		 "       jailflag=$isjailed ".
+		 ($isjailed ? ",jailip='$jailip'" : "");
+
+	print STDERR "$statement\n"
+	    if ($debug);
+
+	if (!$impotent && !DBQueryWarn($statement)) {
+	    print STDERR "*** CreateVnodes: Could not create nodes entry\n";
+	    goto bad;
+	}
+
+	#
+	# Also reserve the node!
+	# 
+	$statement =
+	         "insert into reserved set ".
+		 "       node_id='$vnodeid', " .
+		 "       pid='$pid', ".
+		 "       eid='$eid', ".
+		 "       vname='$vnodeid', " .
+		 "       old_pid='', ".
+		 "       old_eid=''";
+
+	print STDERR "$statement\n"
+	    if ($debug);
+
+	if (!$impotent && !DBQueryWarn($statement)) {
+	    print STDERR "*** CreateVnodes: Could not create reserved entry\n";
+	    goto bad;
+	}
+
+	$statement =
+	         "insert into node_status set ".
+		 "       node_id='$vnodeid', " .
+		 "       status='up', ".
+		 "       status_timestamp=now()";
+
+	print STDERR "$statement\n"
+	    if ($debug);
+
+	if (!$impotent && !DBQueryWarn($statement)) {
+	    print STDERR "*** CreateVnodes: Could not create status entry\n";
+	    goto bad;
+	}
+
+	$statement =
+	         "insert into node_hostkeys set ".
+		 "       node_id='$vnodeid'";
+
+	print STDERR "$statement\n"
+	    if ($debug);
+
+	if (!$impotent && !DBQueryWarn($statement)) {
+	    print STDERR "*** CreateVnodes: Could not create hostkeys entry\n";
+	    goto bad;
+	}
+	
+	push(@created, $vnodeid);
+    }
+    DBQueryFatal("unlock tables");
+    @$rptr = @created;
+    return 0;
+
+  bad:
+    if (!$impotent) {
+	foreach my $vnodeid (@newnodes) {
+	    DBQueryWarn("delete from reserved where node_id='$vnodeid'");
+	    DBQueryWarn("delete from nodes where node_id='$vnodeid'");
+	    DBQueryWarn("delete from node_hostkeys where node_id='$vnodeid'");
+	    DBQueryWarn("delete from node_status where node_id='$vnodeid'");
+	}
+    }
+    DBQueryFatal("unlock tables");
+    return -1;
+}
+
+#
+# Delete vnodes created in above step.
+# 
+sub DeleteVnodes(@)
+{
+    my (@vnodes) = @_;
+
+    DBQueryWarn("lock tables nodes write, reserved write");
+    foreach my $vnodeid (@vnodes) {
+	DBQueryWarn("delete from reserved where node_id='$vnodeid'");
+	DBQueryWarn("delete from nodes where node_id='$vnodeid'");
+    }
+    DBQueryFatal("unlock tables");
+    
+    foreach my $vnodeid (@vnodes) {
+	DBQueryWarn("delete from node_hostkeys where node_id='$vnodeid'");
+	DBQueryWarn("delete from node_status where node_id='$vnodeid'");
+	DBQueryWarn("delete from node_rusage where node_id='$vnodeid'");
+    }
+
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;
