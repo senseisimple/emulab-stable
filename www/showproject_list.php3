@@ -7,10 +7,7 @@ include("defs.php3");
 PAGEHEADER("Project Information List");
 
 #
-# Only known and logged in users can end experiments.
-#
-#
-# Only known and logged in users can end experiments.
+# Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);

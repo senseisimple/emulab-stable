@@ -24,6 +24,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_expires	= $row[expires];
     $proj_name		= $row[name];
     $proj_URL		= $row[URL];
+    $proj_public        = $row[public];
     $proj_funders	= $row[funders];
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
@@ -32,6 +33,13 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_why           = $row[why];
     $control_node	= $row[control_node];
     $approved           = $row[approved];
+
+    if ($proj_public) {
+	$proj_public = "Yes";
+    }
+    else {
+	$proj_public = "No";
+    }
 
     #
     # Generate the table.
@@ -57,6 +65,11 @@ function SHOWPROJECT($pid, $thisuid) {
               <td>URL: </td>
               <td class=\"left\">
                   <A href='$proj_URL'>$proj_URL</A></td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Publicly Visible: </td>
+              <td class=\"left\">$proj_public</td>
           </tr>\n";
     
     echo "<tr>

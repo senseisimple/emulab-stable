@@ -73,6 +73,10 @@ if (!isset($usr_phones) ||
     strcmp($usr_phones, "") == 0) {
   FORMERROR("Phone #");
 }
+if (!isset($proj_public) ||
+    (strcmp($proj_public, "yes") && strcmp($proj_public, "no"))) {
+  FORMERROR("Publicly Visible");
+}
 
 #
 # Check uid and pid for sillyness.
@@ -131,6 +135,16 @@ $proj_funders = addslashes($proj_funders);
 $usr_affil    = addslashes($usr_affil);
 $usr_title    = addslashes($usr_title);
 $usr_addr     = addslashes($usr_addr);
+
+#
+# Convert project visibility to boolean value. Tested above for yes/no.
+#
+if (strcmp($proj_public, "yes") == 0) {
+    $public = 1;
+}
+else {
+    $public = 0;
+}
 
 #
 # This is a new project request. Make sure it does not already exist.
@@ -273,10 +287,10 @@ if (! $returning) {
 #
 $newproj_command = "INSERT INTO projects ".
      "(pid, created, expires, name, URL, head_uid, ".
-     " num_members, num_pcs, num_sharks, why, funders, unix_gid)".
+     " num_members, num_pcs, num_sharks, why, funders, unix_gid, public)".
      "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
      "'$proj_head_uid', '$proj_members', '$proj_pcs', '$proj_sharks', ".
-     "'$proj_why', '$proj_funders', NULL)";
+     "'$proj_why', '$proj_funders', NULL, $public)";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
@@ -311,6 +325,7 @@ mail($TBMAIL_APPROVAL,
      "Project:       $proj_name\n".
      "Expires:	     $proj_expires\n".
      "Project URL:   $proj_URL\n".
+     "Public URL:    $proj_public\n".
      "Funders:       $proj_funders\n".
      "Title:         $usr_title\n".
      "Affiliation:   $usr_affil\n".

@@ -247,6 +247,19 @@ echo "<tr>
       </tr>\n";
 
 #
+# Publiclly visible.
+# 
+echo "<tr>
+         <td>*Can we list your URL publicly as an \"Emulab User?\":
+             <br>
+             (See our <a href=\"projectlist.php3\" target=\"Users\">Users</a> page)
+             </td>
+         <td><input type=radio name=proj_public value=yes checked>Yes &nbsp
+             <input type=radio name=proj_public value=no>No
+             </td>
+      </tr>\n";
+
+#
 #  Funders/Grant numbers
 #
 echo "<tr>
