@@ -76,7 +76,7 @@ elseif (TBEventCount($pid, $eid)) {
 if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
     strcmp($expstate, $TB_EXPTSTATE_PRERUN)) {
     echo "<br>
-          <center>
+          <blockquote><blockquote><blockquote><blockquote>
             <img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center>
 	    <h5>
 	      zoom:
@@ -99,25 +99,28 @@ if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
     	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=0'>Less detail</a>";
     }
     echo "  </h5>
-          </center>\n";
+          </blockquote></blockquote></blockquote></blockquote>\n";
 }
-
-$query_result =
-    DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("There is no stored NS file for $pid/$eid", 1);
-}
-$row    = mysql_fetch_array($query_result);
-$nsfile = $row[nsfile];
 
 echo "<br>
       <h3>NS File:</h3>\n";
-echo "<XMP>$nsfile</XMP>\n";
-flush();
+
+$query_result =
+    DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
+if (mysql_num_rows($query_result)) {
+    $row    = mysql_fetch_array($query_result);
+    $nsfile = $row[nsfile];
+
+    echo "<XMP>$nsfile</XMP>\n";
+    flush();
+}
+else {
+    echo "There is no stored NS file for $pid/$eid\n";
+}
 
 echo "<br>
       <h3>
-       Experiment Details:
+         Experiment Details:
       </h3>\n";
 
 $output = array();
