@@ -1,0 +1,414 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Change delay params for a link.
+#
+# XXX - Does not handle vnodes yet.
+#
+sub usage()
+{
+    print(STDERR
+	  "Usage: link_config [-m] [-d] [-s vnode] <pid> <eid> <link>".
+	  " PARAM=VALUE ...\n".
+	  "Required: pid, eid, link, and at least one parameter to change!\n".
+	  "  pid = Project ID\n".
+	  "  eid = Experiment ID\n".
+	  " link = link name from ns file, ie. 'link1' in\n".
+	  "        'set link1 [\$ns duplex-link \$A \$B 10Kb 0ms DropTail]'\n".
+	  "Options:\n".
+	  "   -d = turn on debugging\n".
+	  "   -s = Select the source of the link to determine which pipe\n".
+	  "   -m = Modify the base experiment in addition to current state.\n"
+	  );
+    # Web interface cares about this return value!
+    exit(2);
+}
+my  $optlist = "dms:";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TEVC        = "$TB/bin/tevc";
+my $debug	= 0;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+if (@ARGV < 4) {
+    usage();
+}
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+my $pid    = shift(@ARGV);
+my $eid    = shift(@ARGV);
+my $link   = shift(@ARGV);
+my $modify = 0;
+my $srcvnode;
+my $member;		# For operating on virt_lans table (vname:port)
+my %physmap;		# For operating on the interface_settings table (pcXXX)
+my %config;
+
+if (defined($options{"m"})) {
+    $modify = 1;
+}
+if (defined($options{"s"})) {
+    $srcvnode = $options{"s"};
+
+    if ($srcvnode =~ /^([-\w]+)$/) {
+	$srcvnode = $1;
+    }
+    else {
+	die("*** Bad srcvnode name: $srcvnode.\n");
+    }
+}
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid.\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid.\n");
+}
+if ($link =~ /^([-\w]+)$/) {
+    $link = $1;
+}
+else {
+    die("*** Bad data in link: $link.\n");
+}
+
+#
+# Permission check.
+#
+if ($UID && !TBAdmin($UID) &&
+    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to modify the delay parameters!\n");
+}
+
+#
+# No transitional experiments.
+#
+my $estate = ExpState($pid, $eid);
+if (! $estate) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
+}
+if ($estate ne EXPTSTATE_ACTIVE &&
+    $estate ne EXPTSTATE_SWAPPED) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid must be ACTIVE or SWAPPED\n".
+	"    to alter its delay configuration.\n");
+}
+
+#
+# To change the interface_settings table, we need to know the physnode names
+# and the interface on that physnode. If a vnode provided, need to find just
+# that one. If changing the entire lan, we need all of the physnodes/ifaces
+# for that lan. This is a complicated operation since we need to go from the
+# the virt_lans table (member) to the reserved table, to the interfaces table
+# to the interface_settings table!
+#
+if ($estate eq EXPTSTATE_ACTIVE) {
+    #
+    # This is absurd. Who came up with this table representation!
+    #  
+    my $query_result =
+	DBQueryFatal("select vl.member,vn.ips,r.node_id from virt_lans as vl ".
+		     "left join virt_nodes as vn on vl.pid=vn.pid and ".
+		     "     vl.eid=vn.eid and ".
+		     "     vn.vname=SUBSTRING(vl.member, 1, ".
+		     "                        POSITION(':' in vl.member)-1) ".
+		     "left join reserved as r on r.pid=vl.pid and ".
+		     "     r.eid=vl.eid and r.vname=vn.vname ".
+		     "where vl.pid='$pid' and vl.eid='$eid' and ".
+		     "      vl.vname='$link'");
+
+    while (my ($member, $ips, $nodeid) = $query_result->fetchrow_array()) {
+	my ($vname, $port) = split(":", $member);
+	my @iplist         = split(" ", $ips);
+
+	foreach my $ipmemb (@iplist) {
+	    my ($ipport,$ipip) = split(":", $ipmemb);
+
+	    if ($port == $ipport) {
+		my $iface_result =
+		    DBQueryFatal("select iface from interfaces ".
+				 "where IP='$ipip' and node_id='$nodeid'");
+		if (!$iface_result->numrows) {
+		    die("*** $0:\n".
+			"    Could not map IP to iface on $nodeid!\n");
+		}
+		my ($iface) = $iface_result->fetchrow_array();
+		$physmap{$member}->{"nodeid"} = $nodeid;
+		$physmap{$member}->{"iface"}  = $iface;
+		last;
+	    }
+	}
+    }
+}
+
+#
+# Parse options, which will modify the existing configuration below.
+#
+while (@ARGV) {
+    my $opt = shift(@ARGV);
+
+    #
+    # The parameters are completely add-hoc. Just make sure they are legal
+    # for the DB. The user can basically say whatever they like, and if the
+    # agent cannot make sense of it, too bad.
+    #
+    if ($opt =~ /^(.*)=(.*)$/) {
+	my $key = $1;
+	my $val = $2;
+
+	if (! TBcheck_dbslot($key, "virt_lan_settings", "capkey",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("*** $0:\n".
+		"    Illegal characters in parameter key: $key\n");
+	}
+	if ($val eq "") {
+	    $val = undef;
+	}
+	elsif (! TBcheck_dbslot($val, "virt_lan_settings", "capval",
+			      TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("*** $0:\n".
+		"    Illegal characters in parameter val: $val\n");
+	}
+	$config{$key} = $val;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Must use PARAM=VALUE arguments\n");
+    }
+}
+    
+#
+# Debug.
+#
+if ($debug) {
+    foreach my $key (keys(%config)) {
+	my $val = $config{$key};
+
+	$val = ""
+	    if (!defined($val));
+
+	print "$key=$val\n";
+    }
+}
+
+#
+# Link or Lan!
+# 
+$query_result =
+    DBQueryFatal("select member from virt_lans ".
+		 "where pid='$pid' and eid='$eid' and vname='$link'");
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    $link is not a link in $pid/$eid!\n");
+}
+my $islink = ($query_result->numrows == 2 ? 1 : 0);
+
+#
+# Find the actual member (vname:port) so we can plug it back in later.
+#
+if (defined($srcvnode)) {
+    while (my ($memb) = $query_result->fetchrow_array()) {
+	my ($vnode, $port) = split(":",$memb);
+
+	if ($vnode eq $srcvnode) {
+	    $member = $memb;
+	    last;
+	}
+    }
+    if (!defined($member)) {
+	die("*** $0:\n".
+	    "    Cannot map $srcvnode to a virt_lan member in $pid/$eid\n");
+    }
+}
+
+#
+# If experiment is not active, all we can do is change virt_lans.
+#
+if ($estate ne EXPTSTATE_ACTIVE) {
+    if ($modify) {
+	ChangeVirtSettings();
+    }
+    else {
+	print "Experiment $pid/$eid is not active. If you want to change\n".
+	    "the base experiment configuration, please use the -m option!\n";
+    }
+    exit(0);
+}
+
+#
+# Deal with changing physical table (interface_settings) if experiment
+# is currently active.
+#
+if (defined($srcvnode)) {
+    #
+    # Changing just one interface.
+    #
+    my $nodeid = $physmap{$member}->{"nodeid"};
+    my $iface  = $physmap{$member}->{"iface"};
+
+    foreach my $key (keys(%config)) {
+	my $val = $config{$key};
+
+	if (defined($val)) {
+	    DBQueryFatal("replace into interface_settings ".
+			 " (node_id, iface, capkey, capval) ".
+			 "values ".
+			 " ('$nodeid', '$iface', '$key', '$val')");
+	}
+	else {
+	    DBQueryFatal("delete from interface_settings ".
+			 "where node_id='$nodeid' and iface='$iface' and ".
+			 "      capkey='$key'");
+	}
+    }
+}
+else {
+    foreach my $key (keys(%config)) {
+	my $val = $config{$key};
+
+	foreach my $member (keys(%physmap)) {
+	    my $nodeid = $physmap{$member}->{"nodeid"};
+	    my $iface  = $physmap{$member}->{"iface"};
+
+	    if (defined($val)) {
+		DBQueryFatal("replace into interface_settings ".
+			     " (node_id, iface, capkey, capval) ".
+			     "values ".
+			     " ('$nodeid', '$iface', '$key', '$val')");
+	    }
+	    else {
+		DBQueryFatal("delete from interface_settings ".
+			     "where node_id='$nodeid' and iface='$iface' and ".
+			     "      capkey='$key'");
+	    }
+	}
+    }
+}
+
+# Change base experiment.
+if ($modify) {
+    ChangeVirtSettings();
+}
+
+#
+# Inject an event. 
+#
+my $inject_string = "$TEVC -e $pid/$eid now $link";
+
+# Direct the event to the whoever is handling this particular delay.
+$inject_string .= "-${srcvnode} "
+    if (defined($srcvnode));
+
+$inject_string .= " modify ";
+
+# Append the parameters.
+foreach my $key (keys(%config)) {
+    my $val = $config{$key};
+
+    $val = ""
+	if (!defined($val));
+    
+    $inject_string .= "${key}=$val ";
+}
+if ($debug) {
+    print "$inject_string\n";
+}
+
+system($inject_string) &&
+    die("*** $0:\n".
+	"    Failed to inject delay update event!\n");
+    
+exit(0);
+
+#
+# Change virt settings in the DB.
+#
+sub ChangeVirtSettings() {
+    foreach my $key (keys(%config)) {
+	my $val = $config{$key};
+
+	#
+	# When making a change to the lan, must remove any per-node
+	# setting of the same name. 
+	#
+	if (!defined($srcvnode)) {
+	    DBQueryFatal("delete from virt_lan_member_settings ".
+			 "where pid='$pid' and eid='$eid' and ".
+			 "      vname='$link' and capkey='$key'");
+
+	    if (defined($val)) {
+		DBQueryFatal("replace into virt_lan_settings ".
+			     " (pid, eid, vname, capkey, capval) ".
+			     "values ".
+			     " ('$pid', '$eid', '$link', '$key', '$val')");
+	    }
+	    else {
+		DBQueryFatal("delete from virt_lan_settings ".
+			     "where pid='$pid' and eid='$eid' and ".
+			     "      vname='$link' and capkey='$key'");
+	    }
+	}
+	else {
+	    if (defined($val)) {
+		DBQueryFatal("replace into virt_lan_member_settings ".
+			     " (pid, eid, vname, member, capkey, capval) ".
+			     "values ".
+			     " ('$pid', '$eid', '$link', '$member', ".
+			     "  '$key', '$val')");
+	    }
+	    else {
+		DBQueryFatal("delete from virt_lan_member_settings ".
+			     "where pid='$pid' and eid='$eid' and ".
+			     "      vname='$link' and capkey='$key' and ".
+			     "      member='$member'");
+	    }
+	}
+    }
+}

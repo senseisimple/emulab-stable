@@ -1,0 +1,50 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/link-agent
+
+SYSTEM	       := $(shell uname -s)
+PROGRAMS	= link-agent
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -static -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += `elvin-config --cflags vin4c`
+
+LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LIBS     += -levent -ltb -lcrypto
+LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+ifeq ($(NEEDKERB),0)
+ CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+ LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+endif
+LIBS     += -ldl
+endif
+
+link-agent:		link-agent.o
+	$(CC) $(LDFLAGS) -o $@ link-agent.o $(LIBS)
+
+$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+install:
+
+client-install: 
+	$(INSTALL_PROGRAM) link-agent \
+			$(DESTDIR)$(CLIENT_BINDIR)/link-agent
+
+clean:
+	/bin/rm -f *.o $(PROGRAMS)

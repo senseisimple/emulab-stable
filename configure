@@ -2,7 +2,7 @@
 
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 2.13 
-# Copyright (C) 1992, 93, 94, 95, 96 Free Software Foundation, Inc.
+# Copyright (C) 1992, 93, 94, 95, 96, 04 Free Software Foundation, Inc.
 #
 # This configure script is free software; the Free Software Foundation
 # gives unlimited permission to copy, distribute and modify it.
@@ -1245,6 +1245,7 @@ else
 		    event/nsetrafgen/nse-makepatch \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
+		    event/link-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated \
 		    event/linktest/GNUmakefile \
@@ -1381,7 +1382,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
-	db/setsitevar db/newwanode db/audit \
+	db/setsitevar db/newwanode db/audit db/changeuid \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
@@ -1466,6 +1467,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
+	utils/link_config utils/import_commitlog \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
@@ -1483,6 +1485,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/webxmlrpc \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid \
+	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 
