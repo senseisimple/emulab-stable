@@ -73,7 +73,21 @@ my $out_height = 492;
 
 # Unless we suppress titles, there will be a header/trailer around each floor image.
 my $head_height = 50;
+my $head_pointsize = 32;
 my $tail_height = 15;
+
+# Thumbnail images are 40% as big.  Use smaller header/trailer as well.
+my $thumb_head_height = 25;
+my $thumb_head_pointsize = 16;
+my $thumb_width = 316;
+my $thumb_height = 196;
+my $thumb_tail_height = 5;
+
+# Assume non-thumbnail images last time, unless told otherwise by $last_scale == 0.
+my $last_head_height = $head_height;
+my $last_head_pointsize = $head_pointsize;
+my $last_height = $out_height;
+my $last_tail_height = $tail_height;
 
 my $pid;
 my $eid;
@@ -165,6 +179,11 @@ if (defined($options{"s"})) {
     else {
 	# Scale_arg 0 means to use the 40% size thumbnail images.
 	$scale = 0.4;
+
+	# Skinny down the head/tail heights as well.
+	$head_height = $thumb_head_height;
+	$head_pointsize = $thumb_head_pointsize;
+	$tail_height = $thumb_tail_height;
     }
     dprint "scale arg $scale_arg, scaling factor $scale\n";
 }
@@ -177,6 +196,12 @@ if (defined($options{"S"})) {
     else {
 	# Scale_arg 0 means to use the 40% size thumbnail images.
 	$last_scale = 0.4;
+
+	# Skinny down the head/tail heights as well.
+	$last_head_height = $thumb_head_height;
+	$last_head_pointsize = $thumb_head_pointsize;
+	$last_height = $thumb_height;
+	$last_tail_height = $thumb_tail_height;
     }
     dprint "last_scale arg $last_scale_arg, last scaling factor $last_scale\n";
 
@@ -185,6 +210,12 @@ if (defined($options{"S"})) {
 	# If we didn't specify a new scale, keep it the same as the last time.
 	$scale_arg = $last_scale_arg;
 	$scale = $last_scale;
+
+	# Skinny down the head/tail heights as well.
+	$head_height = $last_head_height;
+	$head_pointsize = $last_head_pointsize;
+	$tail_height = $last_tail_height;
+
 	dprint "scale from last_scale_arg $last_scale_arg, last_scale $scale\n";
     }
 }
@@ -489,7 +520,9 @@ sub dofloor($$)
     dprint "new offsets $x_offset, $y_offset\n";
 
     # Crop the correct rectangle out of the input image.
-    $err = $baseimage->Crop(width=>$out_width, height=>$out_height, 
+    my $this_width = min($in_width, $out_width);
+    my $this_height = min($in_height, $out_height);
+    $err = $baseimage->Crop(width=>$out_width, height=>$this_height, 
 			    x=>$x_offset, y=>$y_offset);
     warn "$err" if "$err";
 
@@ -591,24 +624,24 @@ sub dofloor($$)
 	dprint "head label $floor_label\n";
         $err = $baseimage->Border(fill=>'white', width=>0, height=>$head_height);
         warn "$err" if "$err";
-        $err = $baseimage->Annotate(fill=>'black', x=>10, y=>40, 
+        $err = $baseimage->Annotate(fill=>'black', x=>10, y=>$head_height*0.8, 
                                     font=>"/usr/testbed/lib/arial.ttf", 
-				    pointsize=>($scale_arg == 0 ? 16 : 32),
+				    pointsize=>$head_pointsize,
                                     text=>"$floor_label");
 	warn "$err" if "$err";            
 
         # Border adds to both the top and the bottom.  Crop some of it away.
-        my $y1 = $head_height + $out_height;
+        my $y1 = $head_height + $this_height;
         my $y2 = $y1 + $tail_height;
-        $err = $baseimage->Crop(width=>$out_width, height=>$y2);
+        $err = $baseimage->Crop(width=>$this_width, height=>$y2);
         warn "$err" if "$err";
         # Fill in a black rectangle at the bottom for a separator.
         $err = $baseimage->Draw(fill=>'black', primitive=>'rectangle',
-                                points=>"0,$y1, $out_width,$y2");
+                                points=>"0,$y1, $this_width,$y2");
         warn "$err" if "$err";
 
 	# Have to adjust the maps cause we just moved everything.
-	adjustmap($areamap, 0, 50);
+	adjustmap($areamap, 0, $head_height);
     }
     
     return ($baseimage, $areamap);
@@ -621,10 +654,11 @@ sub dofloor($$)
 sub adjust_map_y($$) {
     my ($_y, $_notitles) = @_;
     
-    my $map_height = $out_height + ($_notitles ? 0 : $head_height + $tail_height);
-    my $raw_map_y = ($_y % $map_height) - ($_notitles ? 0 : $head_height);
+    my $map_height = $last_height + 
+	($_notitles ? 0 : $last_head_height + $last_tail_height);
+    my $raw_map_y = ($_y % $map_height) - ($_notitles ? 0 : $last_head_height);
     # Avoid out-of-bound coords if the header or trailer is clicked.
-    my $map_y = max(0, min($raw_map_y, $out_height));
+    my $map_y = max(0, min($raw_map_y, $last_height));
     dprint "adjust_map_y map_height $map_height, " .
 	"_y $_y, raw_map_y $raw_map_y, map_y $map_y\n";
 
