@@ -35,7 +35,8 @@
     <li> <a href="#Routing">
             Setting up IP routing between nodes</a>
     <li> <a href="#Simem">
-           Hybrid Experiments with Simulation and Emulation</a><img src="../new.gif">
+           Hybrid Experiments with Simulation and Emulation</a>
+	   <img src="../new.gif" alt="&lt;NEW&gt;">
     </ul>
 <li> <a href="#BatchMode">Batch Mode Experiments</a>
 <li> <a href="#CustomOS">Creating your own disk image</a>
@@ -472,7 +473,8 @@ or not work as you expect. Again, please feel free to contact us.
 <li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
 <li> <a href="#Delta">Customizing an OS (How to create a <i>delta</i>)</a>
 <li> <a href="#Routing">Setting up IP routing between nodes</a>
-<li> <a href="#Simem">Hybrid Experiments with Simulation and Emulation</a><img src="../new.gif">
+<li> <a href="#Simem">Hybrid Experiments with Simulation and Emulation</a> 
+     <img src="../new.gif" alt="&lt;NEW&gt;">
 </ul>
 <p>
 
@@ -854,7 +856,8 @@ Two final, cautionary notes on routing:
 </p>
 
 <a NAME="Simem"></a>
-<li><h3>Hybrid Experiments with Simulation and Emulation <img src="../new.gif"></h3>
+<li><h3>Hybrid Experiments with Simulation and Emulation 
+<img src="../new.gif" alt="&lt;NEW&gt;"></h3>
 
 <p>
 Emulab has integrated network simulation using 
@@ -902,7 +905,7 @@ $ns duplex-link $realnode2 $simnode2 5Mb 10ms DropTail
 <p>
 A hybrid experiment like this causes the simulation to run in
 best effort real time. The number of simulation objects that
-can be supported without falling back in real time depends on
+can be supported without falling behind real time depends on
 the amount of external traffic and the number of internal
 simulation events that need to be processed. Please read 
 <a href="docwrapper.php3?docname=nse.html">nse scaling, accuracy and capacity</a> 
