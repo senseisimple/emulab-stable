@@ -1,23 +1,27 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
 
 #
-# Setup/Update the system with new delays. Use -u for update mode, which
-# means to run the scripts so that the delays are installed.
+# Setup/Update the system with new delays. Use -i for install mode, which
+# means to run the scripts so that the delays are installed. Use -u for
+# uninstall mode, which really only makes sense when used in conjunction
+# with -j. On a real delay node, no real need to do an uninstall; an install
+# flushes the current rules for the entire node. 
 #
 sub usage()
 {
-    print "Usage: delaysetup [-u]\n";
+    print "Usage: delaysetup [-i | -u]\n";
     exit(1);
 }
-my $optlist = "u";
-my $update  = 0;
+my $optlist   = "iu";
+my $install   = 0;
+my $uninstall = 0;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -34,6 +38,9 @@ $| = 1;
 use libsetup;
 use libtmcc;
 
+# Protos
+sub LinkDelaySetup();
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -42,8 +49,11 @@ use libtmcc;
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"i"})) {
+    $install = 1;
+}
 if (defined($options{"u"})) {
-    $update = 1;
+    $uninstall = 1;
 }
 if (@ARGV) {
     usage();
@@ -65,21 +75,19 @@ if (REMOTE() || MFS()) {
     return 0;
 }
 
+# Uninstall just looks for the files, runs them, and exits.
+if ($uninstall) {
+    system(TMLINKDELAY . " disable")
+	if (-e TMLINKDELAY);
+    exit(0);
+}
+
 #
 # Update the delays configuration. Also run the the commands to make
 # the changes.
 #
-
-&LinkDelaySetup();
-
-if ($update) {
-    #
-    # Only one of these files will actually exist, since a node cannot
-    # be a delay node *and* have linkdelays. 
-    #
-    system(TMDELAY)
-	if (-e TMDELAY);
-	
+LinkDelaySetup();
+if ($install) {
     system(TMLINKDELAY)
 	if (-e TMLINKDELAY);
 }
@@ -320,6 +328,10 @@ sub LinkDelaySetup()
 	chmod(0755, TMLINKDELAY);
 	close(MAP);
     
+	# Touch this file so that we globally know that the node is a delay
+	# node.
+	system("touch " . ISDELAYNODE());
+
 	#
 	# Now do kernel configuration. All of the above work is wasted,
 	# but such is life.

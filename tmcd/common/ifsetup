@@ -1,0 +1,193 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initialize (or tear down) interfaces (normal, veth, tunnels). Also
+# sets up (or tears down) the corresponding ipfw rules by invoking
+# delaysetup.
+#
+# This script is just a wrapper for several rc scripts so that it can
+# be called easily from mkjail, or even from the command line.
+#
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid [-j rtabid]] ".
+	               "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:r:";
+my $action  = "boot";
+my $vnodeid;
+my $rtabid;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $IFCONFIG      = "$BINDIR/rc/rc.ifconfig";
+my $ROUTECONFIG   = "$BINDIR/rc/rc.route";
+my $TUNCONFIG     = "$BINDIR/rc/rc.tunnels";
+my $DELAYCONFIG   = "$BINDIR/rc/rc.delays";
+my $KEYCONFIG     = "$BINDIR/rc/rc.keys";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+#exit(0)
+#    if (MFS());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+if (defined($options{'r'})) {
+    $rtabid = $options{'r'};
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    #
+    # Run the various scripts.
+    #
+    my $optarg = (defined($vnodeid) ? "-j $vnodeid " : "");
+    $optarg   .= (defined($rtabid)  ? "-r $rtabid  " : "");
+
+    # Yuck! We need the eventkey in the outer environment so that agents
+    # can get it.
+    if (defined($vnodeid)) {
+	system("$KEYCONFIG -j $vnodeid boot");
+    }
+
+    # Routes will be done when the interfaces go up, but must set
+    # things up and do generic boot.
+    system("$ROUTECONFIG $optarg boot");
+    if ($?) {
+	fatal("Could not boot routing!");
+    }
+
+    system("$TUNCONFIG $optarg boot");
+    if ($?) {
+	fatal("Could not boot tunnels!");
+    }
+
+    system("$IFCONFIG $optarg boot");
+    if ($?) {
+	fatal("Could not boot interfaces!");
+    }
+
+    system("$DELAYCONFIG $optarg boot");
+    if ($?) {
+	fatal("Could not boot delays!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    #
+    # Run the various scripts.
+    #
+    my $optarg = (defined($vnodeid) ? "-j $vnodeid" : "");
+    $optarg   .= (defined($rtabid)  ? "-r $rtabid  " : "");
+
+    system("$DELAYCONFIG $optarg shutdown");
+    if ($?) {
+	fatal("Could not shutdown delays!");
+    }
+
+    system("$TUNCONFIG $optarg shutdown");
+    if ($?) {
+	fatal("Could not shutdown tunnels!");
+    }
+
+    system("$IFCONFIG $optarg shutdown");
+    if ($?) {
+	fatal("Could not shutdown interfaces!");
+    }
+
+    # Routes are already done when the interfaces go down, but 
+    # also do generic shutdown.
+    system("$ROUTECONFIG $optarg shutdown");
+    if ($?) {
+	fatal("Could not shutdown routing!");
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+
+}

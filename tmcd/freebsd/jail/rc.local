@@ -4,8 +4,8 @@
 #
 . /etc/emulab/paths.sh
 
-if [ -x $BINDIR/rc.injail -a ! -e $ETCDIR/nojail ]; then
-    $BINDIR/rc.injail
+if [ -x $BINDIR/rc/rc.injail -a ! -e $ETCDIR/nojail ]; then
+    $BINDIR/rc/rc.injail
 fi
 
 exit 0

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -101,6 +101,7 @@ if (!$debug && TBBackGround($logname)) {
     #
     # Parent exits normally
     #
+    select(undef, undef, undef, 0.25);
     exit(0);
 }
 
@@ -168,7 +169,7 @@ while (1) {
     # if the lock is taken (another update already running).
     #
     print "Looking for new Emulab accounts ...\n";
-    system("update -i");
+    system("update -i -l");
 
     # Skip all this stuff in jail. 
     next
@@ -229,7 +230,7 @@ sub startisalive()
 		if ($failed ||
 		    $tmccresults[0] =~ /^UPDATE=1$/) {
 		    print "Running an update at $date ...\n";
-		    system("update -i -a");
+		    system("update -i -l");
 		    $failed = $?;
 		}
 		last;

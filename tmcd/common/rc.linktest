@@ -15,6 +15,9 @@ sub usage()
 my $optlist	= "";
 my $action      = "start";
 
+# Turn off line buffering on output
+$| = 1;
+
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 

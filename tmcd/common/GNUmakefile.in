@@ -27,7 +27,7 @@ DESTDIR		=
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
 VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
-RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+RCDIR		= $(BINDIR)/rc
 TBBINDIR	= $(DESTDIR)/usr/testbed/bin
 TBLIBDIR	= $(DESTDIR)/usr/testbed/lib
 INSTALL		= /usr/bin/install -c
@@ -73,10 +73,12 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
+	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
 	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/bootsubnodes $(BINDIR)/bootsubnodes
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
 	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
+	(cd config; $(MAKE) script-install)
 
 symlinks:	dir-install
 	rm -f $(TBBINDIR)/tevc
@@ -87,14 +89,11 @@ symlinks:	dir-install
 	ln -s $(BINDIR) $(TBLIBDIR)
 
 local-script-install:	common-script-install
-	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup
 	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
-	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(BINDIR)/rc.testbed
-	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(BINDIR)/rc.agents
-	$(INSTALL) -m 755 $(SRCDIR)/rc.progagent $(BINDIR)/rc.progagent
-	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(BINDIR)/rc.linktest
-	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(BINDIR)/rc.setup
-	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(BINDIR)/rc.slothd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(RCDIR)/rc.testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.bootsetup $(RCDIR)/rc.bootsetup
+	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(RCDIR)/rc.slothd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linktest $(RCDIR)/rc.linktest
 	# Symlink this cause we invoke it from boss, and its too much
 	# of a hassle to worry about right now.
 	rm -f $(ETCDIR)/update

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -31,7 +31,7 @@ STDERR->autoflush(1);
 # Untaint the environment.
 # 
 $ENV{'PATH'} = "/tmp:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
-    "/usr/local/bin:/usr/site/bin:/usr/site/sbin:/usr/local/etc/testbed";
+    "/usr/local/bin:/usr/site/bin:/usr/site/sbin:/usr/local/etc/emulab";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -93,7 +93,7 @@ if (!close(ED)) {
     die("*** $0:\n".
 	"    Oops, error editing label on ${rawdevice}s${slice}!\n");
 }
-mysystem("newfs -U ${rawdevice}s${slice}${partition}");
+mysystem("newfs -U -i 25000 ${rawdevice}s${slice}${partition}");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
 mysystem("mount $mountpoint");

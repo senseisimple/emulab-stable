@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,4 +24,4 @@ if [ -x $BINDIR/runcvsup.sh ]; then
 	$BINDIR/runcvsup.sh
 fi
 
-$BINDIR/rc.setup
+$BINDIR/rc/rc.bootsetup boot

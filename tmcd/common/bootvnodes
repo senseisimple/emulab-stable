@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -18,10 +18,10 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: bootvnodes [-d] [-f] [-k | -h]\n";
+    print "Usage: bootvnodes [-d] [-f] [-k | -h | -r | -b | -c]\n";
     exit(1);
 }
-my $optlist = "kdfh";
+my $optlist = "kdfhrcb";
 
 #
 # Turn off line buffering on output
@@ -40,16 +40,11 @@ use libtmcc;
 
 # Locals
 my $logname = "$LOGDIR/bootvnodes.debug";
-my $vndir   = "/var/emulab/jails";
+my $vndir   = "$VARDIR/jails";
 my $debug   = 0;
 my $daemon  = 1;
-my $killit  = 0;
-my $haltit  = 0;
-
-#
-# Forward declarations for prototype checking
-#
-sub bootvnodes();
+my $reconfig= 0;
+my $action;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -65,11 +60,20 @@ if (defined($options{"d"})) {
 if (defined($options{"f"})) {
     $daemon = 0;
 }
+if (defined($options{"r"})) {
+    $action = "reboot";
+}
 if (defined($options{"k"})) {
-    $killit = 1;
+    $action = "kill";
 }
 if (defined($options{"h"})) {
-    $haltit = 1;
+    $action = "halt";
+}
+if (defined($options{"b"})) {
+    $action = "boot";
+}
+if (defined($options{"c"})) {
+    $reconfig = 1;
 }
 if (@ARGV) {
     usage();
@@ -104,14 +108,45 @@ if ($daemon && TBBackGround($logname)) {
     exit(0);
 }
 
-if ($killit | $haltit) {
-    my $opt = ($haltit ? "-h" : "-k");
-    my $act = ($haltit ? "Halting" : "Killing");
-    
-    print "$act vnodes ... please be patient ...\n";
+#
+# Helper function to boot/kill/halt/reboot a specific vnode.
+#
+sub bootvnode($$$)
+{
+    my ($vnode, $action, $jailed) = @_;
+    my $opt;
+    my $act;
 
-    opendir(DIR, "/var/emulab/jails") or
-	die("Cannot opendir /var/emulab/jails: $!\n");
+    if ($action eq "halt") {
+	$opt = "-h";
+	$act = "Halting";
+    }
+    elsif ($action eq "reboot") {
+	$opt = "-r";
+	$act = "Rebooting";
+    }
+    elsif ($action eq "kill") {
+	$opt = "-k";
+	$act = "Killing";
+    }
+    else {
+	$opt = "-b";
+	$act = "Booting";
+    }
+    $opt .= " -jV"
+	if ($jailed);
+    
+    print "$act vnode $vnode ...\n";
+    system("vnodesetup $opt $vnode");
+    return($?);
+}
+
+#
+# This applies to whatever vnodes are running. Do it and exit.
+# 
+if (defined($action) && !$reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
     my @files = readdir(DIR);
     closedir(DIR);
 
@@ -119,15 +154,15 @@ if ($killit | $haltit) {
 	if ($file ne "." && $file ne ".." && $file ne "local" &&
 	    $file =~ /^([-\w]*)$/) {
 
-	    print "$act vnode $1 ...\n";
-	    system("vnodesetup $opt $1");
+	    # Assume jailed for now.
+	    bootvnode($1, $action, 1);
 	}
     }
     exit(0);
 }
 
-my %curvnodelist;
-my @vnodes;
+my %newvnodelist = ();
+my %curvnodelist = ();
 
 #
 # Get the current set of vnodes that are supposed to be running on
@@ -138,21 +173,55 @@ my @tmccresults;
 if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
     die("*** WARNING: Could not get vnode list from server!\n");
 }
-if (! @tmccresults) {
-    print "No vnodes. Exiting gracefully ...\n";
-    exit(0);
-}
-
 foreach my $str (@tmccresults) {
     if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
-	$curvnodelist{$1} = $2;
+	$newvnodelist{$1} = $2;
     }
     else {
 	warn("*** WARNING: Skipping bad subnodeid: '$str'\n");
     }
 }
-@vnodes = keys(%curvnodelist);
-print "Vnodelist is @vnodes.\n";
+
+#
+# If doing a reconfig, get the current set of vnodes that are running.
+# We want to compare that list against the list we just got from tmcd.
+#
+if ($reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file ne "." && $file ne ".." && $file ne "local" &&
+	    $file =~ /^([-\w]*)$/) {
+	    $curvnodelist{$1} = 1;	# XXX Assume jailed.
+	}
+    }
+
+    #
+    # Reboot nodes that are running and in the current list from tmcd.
+    # Kill nodes that are running but not in the current list from tmcd.
+    #
+    foreach my $vnode (keys(%curvnodelist)) {
+	if (exists($newvnodelist{$vnode})) {
+	    bootvnode($vnode,
+		      (defined($action) ? $action : "reboot"),
+		      $newvnodelist{$vnode});
+	    delete($newvnodelist{$vnode});
+	}
+	else {
+	    bootvnode($vnode, "kill", $curvnodelist{$vnode});
+	}
+    }
+}
+# XXX Exit if specific action requested, and it was not "boot"
+exit(0)
+    if (defined($action) && $action ne "boot");
+
+# Exit if nothing left to do (no new vnodes). 
+exit(0)
+    if (! scalar(keys(%newvnodelist)));
 
 #
 # If booting with vnodes, then see about creating the extra FS.
@@ -165,21 +234,16 @@ if (!REMOTE()) {
 #
 # Make sure enough vn devices exist
 #
-for (my $i = 0; $i < scalar(@vnodes); $i++) {
+for (my $i = 0;
+     $i < scalar(keys(%newvnodelist)) + scalar(keys(%curvnodelist)); $i++) {
     my $dev = "vn${i}";
     if (! -e "/dev/${dev}c") {
         system("(cd /dev; ./MAKEDEV $dev)");
     }
 }
 
-foreach my $vnode (keys(%curvnodelist)) {
-    my $jailflag = "";
-    if ($curvnodelist{$vnode}) {
-	$jailflag = "-jV";
-    }
-    print "Setting up vnode $vnode ...\n";
-    # This will not return until the vnode is fully running.
-    system("vnodesetup -b $jailflag $vnode");
-    sleep(1);
+foreach my $vnode (keys(%newvnodelist)) {
+    # Blocks until mostly setup. 
+    bootvnode($vnode, "boot", $newvnodelist{$vnode});
 }
 exit(0);

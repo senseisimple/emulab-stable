@@ -1,0 +1,318 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-r rtabid] ".
+	               "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:r:";
+my $action  = "boot";
+my $vnodeid;
+my $rtabid;		# Currently ignored.
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $VTUND       = "/usr/local/sbin/vtund";
+my @vtundpids   = ();
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || PLAB() || JAILED());
+
+# Now safe to do this since MFS does not have full perl install.
+require Socket;
+import Socket;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# After libsetup include; tunnels run outside in fake vnode setup.
+my $PIDFILE        = CONFDIR() . "/tunnel.pid";
+my $VTUNDCONFIG    = CONFDIR() . "/vtund.conf";
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# Signal handler to initiate cleanup in parent and the children.
+sub Pcleanup($)
+{
+    my ($signame) = @_;
+
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+    $SIG{HUP}  = 'IGNORE';
+
+    foreach my $pid (@vtundpids) {
+	system("kill $pid");
+	waitpid($pid, 0);
+    }
+
+    unlink $PIDFILE;
+    exit(0);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @tunnels;
+
+    print STDOUT "Checking Testbed tunnel configuration ... \n";
+
+    if (gettunnelconfig(\@tunnels)) {
+	fatal("Could not get tunnel configuration from libsetup!");
+    }
+
+    unlink $VTUNDCONFIG;
+    return
+	if (!@tunnels);
+
+    # XXX
+    system("kldload if_tap");
+
+    #
+    # Write our pid to a file so we can be killed later.
+    # 
+    system("echo '$PID' > $PIDFILE") == 0
+	or fatal("Could not create $PIDFILE!");
+    
+    $SIG{TERM} = \&Pcleanup;
+    $SIG{INT}  = \&Pcleanup;
+    $SIG{HUP}  = \&Pcleanup;
+
+    my ($pid, $eid, $vname) = check_nickname();
+
+    if (! open(CONF, ">$VTUNDCONFIG")) {
+	fatal("Could not open $VTUNDCONFIG: $!");
+    }
+
+    print(CONF
+	  "options {\n".
+	  "  ifconfig    /sbin/ifconfig;\n".
+	  "  route       /sbin/route;\n".
+	  "}\n".
+	  "\n".
+	  "default {\n".
+	  "  persist     yes;\n".
+	  "  stat        yes;\n".
+	  "  keepalive   yes;\n".
+	  "  type        ether;\n".
+	  "}\n".
+	  "\n");
+    
+    #
+    # First construct the config file.
+    # 
+    foreach my $tunnel (@tunnels) {
+	my $name     = $tunnel->{"NAME"};
+	my $isserver = $tunnel->{"ISSERVER"};
+	my $peeraddr = $tunnel->{"PEERIPADDR"};
+	my $peerport = $tunnel->{"PEERPORT"};
+	my $password = $tunnel->{"PASSWORD"};
+	my $encrypt  = ($tunnel->{"ENCRYPT"}  ? "yes" : "no");
+	my $compress = ($tunnel->{"COMPRESS"} ? "yes" : "no");
+	my $inetip   = $tunnel->{"IPADDR"};
+	my $mask     = $tunnel->{"IPMASK"};
+	my $proto    = $tunnel->{"PROTO"};
+
+	#
+	# Sheesh, vtund fails if it sees "//" in a path. 
+	#
+	my $config = TMROUTECONFIG;
+	$config =~ s/\/\//\//g;
+	my $rtabopt= "";
+	if (defined($rtabid)) {
+	    $rtabopt = "    ifconfig \"%% rtabid $rtabid\";\n";
+	}
+	    
+	print(CONF
+	      "$name {\n".
+	      "  password      $password;\n".
+	      "  compress      $compress;\n".
+	      "  encrypt       $encrypt;\n".
+	      "  proto         $proto;\n".
+	      "\n".
+	      "  up {\n".
+	      "    # Connection is Up\n".
+	      $rtabopt .
+	      "    ifconfig \"%% $inetip netmask $mask\";\n".
+	      "    program " . $config . " \"$inetip up\" wait;\n".
+	      "  };\n".
+	      "  down {\n".
+	      "    # Connection is Down\n".
+	      "    ifconfig \"%% down\";\n".
+	      "    program " . $config . " \"$inetip down\" wait;\n".
+	      "  };\n".
+	      "}\n\n");
+    }
+    close(CONF);
+
+    #
+    # Now fire off the vtund processes
+    # 
+    foreach my $tunnel (@tunnels) {
+	my $name     = $tunnel->{"NAME"};
+	my $isserver = $tunnel->{"ISSERVER"};
+	my $peeraddr = $tunnel->{"PEERIPADDR"};
+	my $peerport = $tunnel->{"PEERPORT"};
+	my $password = $tunnel->{"PASSWORD"};
+	my $encrypt  = ($tunnel->{"ENCRYPT"}  ? "yes" : "no");
+	my $compress = ($tunnel->{"COMPRESS"} ? "yes" : "no");
+	my $inetip   = $tunnel->{"IPADDR"};
+	my $mask     = $tunnel->{"IPMASK"};
+	my $proto    = $tunnel->{"PROTO"};
+
+	my $log;
+	my $cmd = "$VTUND -n -P $peerport -f $VTUNDCONFIG ";
+
+	if ($isserver) {
+	    if (!$didserver) {
+		$cmd .= "-s";
+		$log  = "$LOGDIR/vtund-${pid}-${eid}.debug";
+		$didserver = 1;
+	    }
+	}
+	else {
+	    $cmd .= "$name $peeraddr";
+	    $log  = "$LOGDIR/vtun-${pid}-${eid}-${name}.debug";
+	}
+
+	#
+	# Fork a child to run vtund. The parent saves up all the
+	# pids so that we can react to a shutdown later. We do this cause
+	# vtund is 3rd party and we do not have very good control
+	# over its output, and we want to avoid a shell wrapper around it
+	# by using a redirect. 
+	#
+	my $childpid = fork();
+	if ($childpid) {
+	    #
+	    # Parent. Save pid and keep going.
+	    #
+	    push(@vtundpids, $childpid);
+	    sleep(1);
+	}
+	else {
+	    $SIG{TERM} = 'DEFAULT';
+	    $SIG{INT}  = 'IGNORE';
+	    $SIG{HUP}  = 'DEFAULT';
+
+	    # Redirect stdout/stderr to log file.
+	    open(STDOUT, ">>$log")
+		or fatal("Could not redirect STDOUT");
+	    open(STDERR, ">&STDOUT")
+		or fatal("Could not redirect STDERR");
+
+	    exec("$cmd");
+	    die("*** $0:\n".
+		"    Could not exec $cmd\n");
+	}
+    }
+    #
+    # Just wait. We will die via the signal handler above.
+    #
+    while (1) {
+	sleep(10000);
+    }
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    if (-e $PIDFILE) {
+	system("kill `cat $PIDFILE`");
+	sleep(1);
+	# Wait for it to die.
+	while (-e $PIDFILE) {
+	    print "Waiting for $PIDFILE to die ...\n";
+	    sleep(10);
+	}
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Shutdown tunnels before doing reconfig.
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink $VTUNDCONFIG, $PIDFILE;
+}

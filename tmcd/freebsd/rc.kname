@@ -7,6 +7,9 @@
 use English;
 use Getopt::Std;
 
+# Turn off line buffering on output
+$| = 1;
+
 #
 # Check to see what the kernel says was booted, and copy to /kernel.
 #
@@ -28,6 +31,9 @@ if (-e $kernel) {
 	if (system("cp -f /kernel /kernel.save")) {
 	    print "Could not backup /kernel! Aborting kernel change\n";
 	}
+	elsif (! unlink("/kernel")) {
+	    print "Could not unlink /kernel! Aborting kernel change\n";
+	}
 	elsif (system("cp -f $kernel /kernel")) {
 	    print "Could not cp $kernel to /kernel!\n";
 	}
@@ -41,3 +47,4 @@ else {
 	"    Kernel $kernel does not exist!\n");
 }
 
+exit(0);

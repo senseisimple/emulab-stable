@@ -14,12 +14,13 @@ COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
                     libtmcc.pm libsetup.pm)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
-                    plabsetup rc.inplab rusaged)
+                    rc.inplab rusaged)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EESCRIPTS	= $(TESTBED_SRCDIR)/tmcd/plab/rc.vinit
 ULEESCRIPTS	= $(COMSCRIPTS) $(LINSCRIPTS) $(PLABSCRIPTS)
 ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
+THISDIR         = $(PWD)
 
 #
 # Linux binaries the tarball needs
@@ -57,6 +58,7 @@ $(ROOTBALLNAME): copyfiles
 	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
 copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
+	(cd ../common/config; $(MAKE) script-install DESTDIR=$(THISDIR)/plabroot)
 	$(INSTALL_PROGRAM) $(ULEESCRIPTS) plabroot/usr/local/etc/emulab
 	chmod u+s plabroot/usr/local/etc/emulab/vnodesetup
 	chmod u+s plabroot/usr/local/etc/emulab/update
@@ -78,7 +80,7 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	cp /dev/null plabroot/usr/local/etc/emulab/isrem
 
 mkdirtree:
-	mkdir -p plabroot/usr/local/etc/emulab
+	mkdir -p plabroot/usr/local/etc/emulab/rc
 	mkdir -p plabroot/usr/local/bin
 	mkdir -p plabroot/usr/bin
 	mkdir -p plabroot/etc

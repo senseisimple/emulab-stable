@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -108,12 +108,12 @@ sysetc-remove:
 
 script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
-	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc.ixp
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
-	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup

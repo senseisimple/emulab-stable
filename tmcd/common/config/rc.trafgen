@@ -1,0 +1,273 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX ":sys_wait_h";
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+my $vnodeid;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my %trafgenpids = ();
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || REMOTE());
+
+# Now safe to do this since MFS does not have full perl install.
+require Socket;
+import Socket;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Local goo
+# After libsetup include; trafgens run outside in fake vnode setup.
+my $PIDFILE  = (defined($vnodeid) ? CONFDIR() : "/var/run") . "/trafgen.pid";
+my $LOGFILE  = (defined($vnodeid) ? CONFDIR() : $LOGDIR)    . "/trafgen.debug";
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# Signal handler to initiate cleanup in parent and the children.
+sub Pcleanup($)
+{
+    my ($signame) = @_;
+
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+    $SIG{HUP}  = 'IGNORE';
+
+    foreach my $pid (values(%trafgenpids)) {
+	system("kill $pid");
+	waitpid($pid, 0);
+    }
+
+    unlink $PIDFILE;
+    exit(0);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @trafgens;
+    my $errors = 0;
+
+    print STDOUT "Checking Testbed trafgen configuration ... \n";
+
+    if (gettrafgenconfig(\@trafgens)) {
+	fatal("Could not get trafgen configuration from libsetup!");
+    }
+
+    return
+	if (!@trafgens);
+
+    my ($pid, $eid, $vname) = check_nickname();
+
+    # We connect to the local elvind and talk to the master via the proxy.
+    my $cmdline = "$BINDIR/trafgen -s localhost ";
+    if ($pid) {
+	$cmdline .= " -E $pid/$eid -k " . TMEVENTKEY();
+    }
+
+    foreach my $trafgen (@trafgens) {
+	my $name      = $trafgen->{"NAME"};
+	my $ownaddr   = $trafgen->{"SRCHOST"};
+	my $ownport   = $trafgen->{"SRCPORT"};
+	my $peeraddr  = $trafgen->{"PEERHOST"};
+	my $peerport  = $trafgen->{"PEERPORT"};
+	my $proto     = $trafgen->{"PROTO"};
+	my $role      = $trafgen->{"ROLE"};
+	my $generator = $trafgen->{"GENERATOR"};
+	my $target;
+	my $source;
+
+	# Skip if not specified as a TG generator. NSE handled elsewhere.
+	next
+	    if ($generator eq "NSE");
+
+	if ($role eq "sink") {
+	    $target = "$ownaddr.$ownport";
+	    $source = "$peeraddr.$peerport";
+	}
+	else {
+	    $target = "$peeraddr.$peerport";
+	    $source = "$ownaddr.$ownport";
+	}
+
+	#
+	# Fork a child to run the trafgen. The parent saves up all the
+	# pids so that we can react to a shutdown later. We do this cause
+	# the trafgen is 3rd party and we do not have very good control
+	# over its output, and we want to avoid a shell wrapper around it
+	# by using a redirect. 
+	#
+	my $childpid = fork();
+	if ($childpid) {
+	    #
+	    # Parent. Save pid and keep going.
+	    #
+	    $trafgenpids{"$name"} = $childpid;
+	    sleep(1);
+	}
+	else {
+	    $SIG{TERM} = 'DEFAULT';
+	    $SIG{INT}  = 'IGNORE';
+	    $SIG{HUP}  = 'DEFAULT';
+
+	    # Redirect stdout/stderr to log file.
+	    open(STDOUT, ">>$LOGDIR/${name}-${pid}-${eid}.debug")
+		or fatal("Could not redirect STDOUT");
+	    open(STDERR, ">&STDOUT")
+		or fatal("Could not redirect STDERR");
+
+	    exec("$cmdline -N $name -S $source -T $target -P $proto -R $role");
+	    die("*** $0:\n".
+		"    Could not exec $cmdline -N $name ...\n");
+	}
+    }
+
+    #
+    # Quick check to see if any trafgens exited. 
+    #
+    while ((my $childpid = waitpid(-1, &WNOHANG)) != 0) {
+	foreach my $name (keys(%trafgenpids)) {
+	    if ($trafgenpids{$name} == $childpid) {
+		warning("Trafgen $name failed to run properly!");
+		delete($trafgenpids{$name});
+		last;
+	    }
+	}
+	$errors++;
+	sleep(1);
+    }
+
+    #
+    # Now daemonize and let the boot continue. 
+    #
+    if (TBBackGround($LOGFILE)) {
+	exit($errors);
+    }
+
+    #
+    # Write our pid to a file so we can be killed later.
+    # 
+    system("echo '$PID' > $PIDFILE") == 0
+	or fatal("Could not create $PIDFILE!");
+    
+    $SIG{TERM} = \&Pcleanup;
+    $SIG{INT}  = \&Pcleanup;
+    $SIG{HUP}  = \&Pcleanup;
+    
+    #
+    # Just wait. We will die via the signal handler above.
+    #
+    while (1) {
+	sleep(10000);
+    }
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Shutdown trafgen before doing reconfig.
+    if (-e $PIDFILE) {
+	system("kill `cat $PIDFILE`");
+	sleep(1);
+	# Wait for it to die.
+	while (-e $PIDFILE) {
+	    print "Waiting for $PIDFILE to die ...\n";
+	    sleep(5);
+	}
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink $PIDFILE, $LOGFILE;
+}

@@ -1,0 +1,217 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# XXX hack: workaround for tmcc cmd failure inside TCL storing the output
+#     of a few tmcc commands in $BOOTDIR files for use by NSE. Yuck!
+#     Because of tmcc caching, it is not really a problem to rerun these
+#     commands, and it keeps all this sim stuff here in one place so its
+#     obvious what is going on and who all this stuff is for.
+#
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $BOSSFILE    = "$BOOTDIR/tmcc.bossinfo";
+my $NSECONFIGS  = "$BOOTDIR/tmcc.nseconfigs";
+my $ROUTELIST   = "$BOOTDIR/tmcc.routelist";
+my $TRAFGENS    = "$BOOTDIR/tmcc.trafgens";
+my $IFCONFIGS   = "$BOOTDIR/tmcc.ifconfig";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || !(SIMHOST() || SIMTRAFGEN()));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# libsetup specific goo here. 
+my $SIMRC	= TMSIMRC();
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    docleanup();
+    
+    my $boss = tmccbossname();
+
+    system("echo '$boss' >$BOSSFILE");
+    if ($?) {
+	fatal("Could not write $BOSSFILE");
+    }
+
+    my @nseconfigs = ();
+
+    if (tmcc(TMCCCMD_NSECONFIGS, undef, \@nseconfigs) < 0) {
+	fatal("Could not get nseconfigs from server!");
+    }
+    if (open(NSECFG, ">$NSECONFIGS")) {
+	foreach my $nseconfig (@nseconfigs) {
+	    print NSECFG $nseconfig;
+	}
+	close(NSECFG);
+    }
+    else {
+	fatal("Cannot open file $NSECONFIGS: $!");
+    }
+    
+    my @routelist = ();
+
+    if (tmcc(TMCCCMD_ROUTELIST, undef, \@routelist) < 0) {
+	fatal("Could not get routelist from server!");
+    }
+    if (open(RLIST, ">$ROUTELIST")) {
+	foreach my $route (@routelist) {
+	    print RLIST $route;
+	}
+	close(RLIST);
+    }
+    else {
+	fatal("Cannot open file $ROUTELIST: $!");
+    }
+
+    my @trafgens = ();
+
+    if (tmcc(TMCCCMD_TRAFFIC, undef, \@trafgens) < 0) {
+	fatal("Could not get trafgens from server!");
+    }
+    if (open(TLIST, ">$TRAFGENS")) {
+	foreach my $trafgen (@trafgens) {
+	    print TLIST $trafgen;
+	}
+	close(TLIST);
+    }
+    else {
+	fatal("Cannot open file $TRAFGENS: $!");
+    }
+
+    my @ifconfigs = ();
+
+    if (tmcc(TMCCCMD_IFC, undef, \@ifconfigs) < 0) {
+	fatal("Could not get interface config from server!");
+    }
+    if (open(ILIST, ">$IFCONFIGS")) {
+	foreach my $ifc (@ifconfigs) {
+	    print ILIST $ifc;
+	}
+	close(ILIST);
+    }
+    else {
+	fatal("Cannot open file $IFCONFIGS: $!");
+    }
+
+    #
+    # Generate a start file for rc.setup since we need to delay the actual
+    # start of the simulator till later ...
+    #
+    if (open(RC, ">$SIMRC")) {
+	print RC "#!/bin/sh\n"; 
+	print RC "$BINDIR/startnse &\n";
+	print RC "exit 0\n";
+	close RC;
+	chmod(0755, $SIMRC);
+    }
+    else {
+	fatal("Could not open $SIMRC: $!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do.
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    docleanup();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink $ROUTELIST, $BOSSFILE, $NSECONFIGS, $TRAFGENS, $IFCONFIGS, $SIMRC;
+}

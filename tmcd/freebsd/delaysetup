@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -11,8 +11,8 @@ use Getopt::Std;
 # Setup/Update the system with new delays. Use -i for install mode, which
 # means to run the scripts so that the delays are installed. Use -u for
 # uninstall mode, which really only makes sense when used in conjunction
-# with -j. BTW, none of the options make sense on a delaynode; they are
-# intended for use with linkdelays on end nodes.
+# with -j. On a real delay node, no real need to do an uninstall; an install
+# flushes the current rules for the entire node. 
 #
 sub usage()
 {
@@ -95,11 +95,6 @@ if ($uninstall) {
 
     system(TMLINKDELAY . " disable")
 	if (-e TMLINKDELAY);
-
-    # Kill delay agent.
-    if (defined($vnodeid)) {
-	system("$BINDIR/rc.delayagent -j $vnodeid stop");
-    }
     exit(0);
 }
 
@@ -117,14 +112,8 @@ if (-e TMDELAY) {
 
 LinkDelaySetup();
 if (-e TMLINKDELAY) {
-    if ($install) {
-	system(TMLINKDELAY . " enable");
-
-	# Fire up a delay agent.
-	if (defined($vnodeid)) {
-	    system("$BINDIR/rc.delayagent -j $vnodeid start");
-	}
-    }
+    system(TMLINKDELAY . " enable")
+	if ($install);
     exit(0);
 }
 exit(0);
@@ -354,7 +343,6 @@ sub DelaySetup
 	# If a delay node, then lets report status and ready in so that batch
 	# experiments do not become stuck.
 	#
-	printf DEL "%s %s\n", TMCC(), TMCCCMD_READY();
 	printf DEL "%s %s 0\n", TMCC(), TMCCCMD_STARTSTAT();
 
 	print DEL "echo \"Delay Configuration Complete\"\n";
@@ -585,6 +573,11 @@ sub LinkDelaySetup
 	close(DEL);
 	chmod(0755, TMLINKDELAY);
 
+	# Touch this file so that we globally know that the node is a delay
+	# node. See routing setup. Need to avoid fastforwarding whenever we
+	# have link delays.
+	system("touch " . ISDELAYNODE());
+
 	#
 	# Now do kernel configuration. All of the above work is wasted,
 	# but such is life.
@@ -614,21 +607,23 @@ sub checkkernel($)
 	    if (system("cp -f /kernel /kernel.save")) {
 		print "Could not backup /kernel! Aborting kernel change\n";
 	    }
+	    elsif (! unlink("/kernel")) {
+		print "Could not unlink /kernel! Aborting kernel change\n";
+	    }
+	    elsif (system("cp -f $kernel /kernel")) {
+		print "Could not cp $kernel to /kernel!\n";
+	    }
 	    else {
-		if (system("cp -f $kernel /kernel")) {
-		    print "Could not cp $kernel to /kernel! ".
-			"Aborting kernel change\n";
-		}
-		else {
-		    system("sync");
-		    system("reboot");
-		    #
-		    # Make sure that, even if the reboot command returns
-		    # before the node is totally down, this process doesn't
-		    # exit (otherwise, we would proceed with testbed setup)
-		    #
-		    sleep(10000);
-		}
+		print "Copied $kernel to /kernel.\n";
+		
+		system("sync");
+		system("reboot");
+		#
+		# Make sure that, even if the reboot command returns
+		# before the node is totally down, this process doesn't
+		# exit (otherwise, we would proceed with testbed setup)
+		#
+		sleep(10000);
 	    }
 	}
     }

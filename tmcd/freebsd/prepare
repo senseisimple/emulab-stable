@@ -15,7 +15,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # each of the FreeBSD and Linux partitions.
 #
 my $DUMPDATES   = "/etc/dumpdates";
-my @DBFILES     = ("/var/db/testbed.tarfiles");
+my @DBFILES     = ();
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
@@ -44,6 +44,9 @@ use libsetup;
 # First clean up the node as it would be if free.
 #
 cleanup_node(1);
+
+print "Running $BINDIR/rc/rc.config to clean up ...\n";
+system("$BINDIR/rc/rc.config reset");
 
 print "Removing old DB files ...\n";
 foreach my $dbfile (@DBFILES) {

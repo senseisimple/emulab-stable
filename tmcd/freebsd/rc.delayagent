@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,6 +15,9 @@ sub usage()
 my $optlist	= "j:";
 my $vnodeid;
 my $action      = "start";
+
+# Turn off line buffering on output
+$| = 1;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -51,9 +54,8 @@ my $logfile;
 my $pidfile;
 
 if (defined($vnodeid)) {
-    # Maybe move these files to the jaildir?
-    $logfile = "$LOGDIR/delayagent-${vnodeid}.debug";
-    $pidfile = "/var/run/delayagent-${vnodeid}.pid";
+    $logfile = CONFDIR() . "/delayagent.debug";
+    $pidfile = CONFDIR() . "/delayagent.pid";
 }
 else {
     $logfile = "$LOGDIR/delayagent.debug";
@@ -68,7 +70,7 @@ if ($action eq "stop") {
 	print "$pidno\n";
 	# The delay agent will not die properly for some reason. 
 	system("kill -9 $pidno");
-	#unlink($pidfile);
+	unlink($pidfile);
     }
     exit(0);
 }

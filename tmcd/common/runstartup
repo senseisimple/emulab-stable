@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
-use POSIX qw(setsid);
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -26,6 +25,12 @@ $| = 1;
 # library and initialize itself. 
 #
 use libsetup;
+
+# Sigh, no POSIX module on the MFS. 
+if (!MFS()) {
+    require POSIX;
+    import POSIX qw(setsid);
+}
 
 # Locals;
 my $logname;
@@ -56,7 +61,8 @@ if (background()) {
     #
     exit 0;
 }
-sleep(10);
+# Delay to allow the boot to complete. 
+sleep(30);
 
 #
 # Open up the command file, which tells us what to do.
@@ -146,7 +152,8 @@ sub background()
     if ($mypid) {
 	return $mypid;
     }
-    POSIX::setsid();
+    setsid()
+	if (!MFS());
 
     #
     # We have to disconnect from the caller by redirecting both STDIN and

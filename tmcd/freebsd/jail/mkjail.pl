@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(JailedMounts REMOTE LOCALROOTFS TMPASSDB TMGROUPDB);
+use libsetup qw(REMOTE LOCALROOTFS);
 use libtmcc;
 
 #
@@ -98,6 +98,7 @@ my $IP;
 my $IPALIAS;
 my $IPMASK;
 my $PID;
+my $idnumber;
 my $jailhostname;
 my $debug	= 1;
 my $cleaning	= 0;
@@ -108,6 +109,7 @@ my $jailpid;
 my $tmccpid;
 my $interactive = 0;
 my $USEVCNETROUTES = 0;
+my @controlroutes = ();
 
 # This stuff is passed from tmcd, which we parse into a config string
 # and an option set.
@@ -150,6 +152,15 @@ if (defined($options{'s'})) {
 
 if (defined($options{'V'})) {
     $USEVCNETROUTES = 1;
+}
+
+#
+# If the vnodeid looks like what we expect (pcvmXXX-YYY) then pull out
+# the YYY part and use that for the rtabid and the vn device number.
+# Saves on searching and allocation. Need a better solution at some point.
+#
+if ($vnodeid =~ /^[\w]*-(\d+)$/) {
+    $idnumber = $1;
 }
 
 #
@@ -263,11 +274,19 @@ if (defined($IPALIAS)) {
 }
 
 #
+# Add control routes if jail gets its own route table.
+#
+if ($jailflags & $JAIL_ROUTING) {
+    addcontrolroutes();
+}
+
+#
 # Set up jail interfaces. We pass it the rtabid as well, and the script
 # does all the right stuff. 
 #
-mysystem("ifsetup -i -j $vnodeid ".
-	 (($jailflags & $JAIL_ROUTING) ? "-r $routetabid" : ""));
+mysystem("ifsetup -j $vnodeid ".
+	 (($jailflags & $JAIL_ROUTING) ? "-r $routetabid " : "") .
+	 "boot");
 
 #
 # Start the tmcc proxy. This path will be valid in both the outer
@@ -327,18 +346,18 @@ sub mkrootfs($)
     mysystem("dd if=/dev/zero of=root.vnode bs=512 oseek=$vnsize count=1");
 
     #
-    # Find a free vndevice.
+    # Find a free vndevice. We start with the obvious choice, and if that
+    # fails, fall back to searching.
     #
-    for (my $i = 0; $i < $MAXVNDEVS; $i++) {
-	# Make sure the dev entries exist!
-	if (! -e "/dev/vn${i}") {
-	    mysystem("(cd /dev; ./MAKEDEV vn${i})");
-	}
-	
-	system("vnconfig -c vn${i} root.vnode");
-	if (! $?) {
-	    $vndevice = $i;
-	    last;
+    if (defined($idnumber) && CheckFreeVN($idnumber, "root.vnode")) {
+	$vndevice = $idnumber;
+    }
+    else {
+	for (my $i = 0; $i < $MAXVNDEVS; $i++) {
+	    if (CheckFreeVN($i, "root.vnode")) {
+		$vndevice = $i;
+		last;
+	    }
 	}
     }
     fatal("Could not find a free vn device!") 
@@ -348,8 +367,8 @@ sub mkrootfs($)
 
     mysystem("vnconfig -s labels vn${vndevice} root.vnode");
     mysystem("disklabel -r -w vn${vndevice} auto");
-    mysystem("newfs -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
-    mysystem("tunefs -m 2 -o space /dev/vn${vndevice}c");
+    mysystem("newfs -U -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
+    mysystem("tunefs -m 2 -o time /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
     push(@mntpoints, "$path/root");
 
@@ -372,7 +391,7 @@ sub mkrootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	if ($nfsmounts) {
+	if (1) {
 	    mysystem("mount -r localhost:/$dir $path/root/$dir");
 	} else {
 	    mysystem("mount -r -t null /$dir $path/root/$dir");
@@ -505,18 +524,11 @@ sub mkrootfs($)
 	mysystem("cp -p /etc/group $path/root/etc");
 	mysystem("cp -p /etc/master.passwd $path/root/etc");
 	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
-	mysystem("cp -p " . TMPASSDB() . ".db $path/root/$DBDIR");
-	mysystem("cp -p " . TMGROUPDB() . ".db $path/root/$DBDIR");
+	# XXX
+	mysystem("cp -p $DBDIR/passdb.db $path/root/$DBDIR");
+	mysystem("cp -p $DBDIR/groupdb.db $path/root/$DBDIR");
     }
     
-    #
-    # If the jail gets its own routing table, must arrange for it to
-    # be populated with some extras when it boots up.
-    # 
-    if ($jailflags & $JAIL_ROUTING) {
-	addroutestorc("$path/root/etc/rc.conf.routes");
-    }
-
     #
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
@@ -545,9 +557,7 @@ sub mkrootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedMounts($vnodeid, "$path/root", $nfsmounts) ) {
-	    push(@mntpoints, "$path/root/$dir");
-	}
+	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $path/root $nfsmounts boot");
     }
 
     cleanmess($path);
@@ -565,16 +575,18 @@ sub restorerootfs($)
 	fatal("Could not chdir to $path: $!");
 
     #
-    # Find a free vndevice.
+    # Find a free vndevice. We start with the obvious choice, and if that
+    # fails, fall back to searching.
     #
-    for (my $i = 0; $i < $MAXVNDEVS; $i++) {
-	# Make sure the dev entries exist!
-	mysystem("(cd /dev; ./MAKEDEV vn${i})");
-	
-	system("vnconfig -c vn${i} root.vnode");
-	if (! $?) {
-	    $vndevice = $i;
-	    last;
+    if (defined($idnumber) && CheckFreeVN($idnumber, "root.vnode")) {
+	$vndevice = $idnumber;
+    }
+    else {
+	for (my $i = 0; $i < $MAXVNDEVS; $i++) {
+	    if (CheckFreeVN($i, "root.vnode")) {
+		$vndevice = $i;
+		last;
+	    }
 	}
     }
     fatal("Could not find a free vn device!") 
@@ -591,7 +603,7 @@ sub restorerootfs($)
     # Okay, mount some other directories to save space.
     #
     foreach my $dir (@ROOTMNTDIRS) {
-	if ($nfsmounts) {
+	if (1) {
 	    mysystem("mount -r localhost:/$dir $path/root/$dir");
 	} else {
 	    mysystem("mount -r -t null /$dir $path/root/$dir");
@@ -607,10 +619,26 @@ sub restorerootfs($)
     push(@mntpoints, "$path/root/proc");
 
     #
-    # Must rebuild the routes list cause of swapmodify.
+    # Stash the control net IP if not the same as the host IP
     #
-    if ($jailflags & $JAIL_ROUTING) {
-	addroutestorc("$path/root/etc/rc.conf.routes");
+    if ($IP ne $hostip) {
+	mysystem("echo $IP >> $path/root/var/emulab/boot/myip");
+    }
+
+    # No X11 forwarding. 
+    mysystem("cat $path/root/etc/ssh/sshd_config | ".
+	     "sed -e 's/^X11Forwarding.*yes/X11Forwarding no/' > ".
+	     "$path/root/tmp/sshd_foo");
+    mysystem("cp -f $path/root/tmp/sshd_foo $path/root/etc/ssh/sshd_config");
+    
+    # Port/Address for sshd.
+    if ($IP ne $hostip) {
+	mysystem("echo 'ListenAddress $IP' >> ".
+		 "$path/root/etc/ssh/sshd_config");
+    }
+    else {
+	mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
+		 "$path/root/etc/rc.conf");
     }
 
     #
@@ -635,9 +663,7 @@ sub restorerootfs($)
     # but not sure what to do about that. 
     #
     if (! REMOTE()) {
-	foreach my $dir ( JailedMounts($vnodeid, "$path/root", $nfsmounts) ) {
-	    push(@mntpoints, "$path/root/$dir");
-	}
+	mysystem("$BINDIR/rc/rc.mounts -j $vnodeid $path/root $nfsmounts boot");
     }
     return 0;
 }
@@ -739,11 +765,30 @@ sub cleanup()
     }
 
     # Clean up interfaces we might have setup
-    system("ifsetup -u -j $vnodeid");
+    system("ifsetup -j $vnodeid shutdown");
 
     # If the jail has its own IP, clean the alias.
     if (defined($IPALIAS)) {
 	clearcnethostalias($IPALIAS);
+    }
+
+    # Clean control routes
+    foreach my $route (reverse(@controlroutes)) {
+	print("deleting route: '$route'\n");
+	system("route delete -rtabid $routetabid $route");
+    }
+
+    # Unmounts.
+    if (!REMOTE()) {
+	# If this fails, fail, we do want to continue. Dangerous!
+	system("$BINDIR/rc/rc.mounts ".
+	       "-j $vnodeid foo $nfsmounts shutdown");
+
+	if ($?) {
+	    # Avoid recursive calls to cleanup; do not use fatal.
+	    die("*** $0:\n".
+		"    rc.mounts failed!\n");
+	}
     }
 
     while (@mntpoints) {
@@ -965,39 +1010,33 @@ sub setjailoptions() {
 # Append a list of static routes to the rc.conf file. This basically
 # augments the list of static routes that tmcd tells us to install. 
 #
-sub addroutestorc($rc)
+sub addcontrolroutes()
 {
     my ($rc)   = @_;
     my $count  = 0;
-
-    open(RC, ">$rc") or
-	fatal("Could not open $rc to append static routes");
 
     #
     # XXX use address for localhost.  For some reason the route command is
     # going to the DNS before using the hosts file, despite the host.conf
     # file.
     # 
-    my $localhost = "127.0.0.1";
-
     my $routerip  = getcnetrouter($USEVCNETROUTES);
+    my $localhost = "127.0.0.1";
     my $hostip    = `cat $BOOTDIR/myip`;
     chomp($hostip);
 
-    #
-    # First the set of routes that all jails get. 
-    #
-    print RC "static_routes=\"default lo0 host\"\n";
-    print RC "route_default=\"default $routerip\"\n";
-    print RC "route_lo0=\"$localhost -interface lo0\"\n";
-    print RC "route_host=\"$hostip $localhost\"\n";
+    push(@controlroutes, "default $routerip");
+    push(@controlroutes, "$localhost -interface lo0");
+    push(@controlroutes, "$hostip $localhost");
 
     if ($IP ne $hostip) {
+	my $net;
+
 	#
 	# Setup a route for all jails on this node, to the loopback.
 	#
-	print RC "static_routes=\"\$static_routes jailnet\"\n";
-	print RC "route_jailnet=\"-net $IP -interface lo0 255.255.255.0\"\n";
+	$net = inet_ntoa(inet_aton($IP) & inet_aton("255.255.255.0"));
+	push(@controlroutes, "-net $net -interface lo0 255.255.255.0");
 
 	#
 	# All other jails are reachable via the control net interface.
@@ -1010,16 +1049,19 @@ sub addroutestorc($rc)
 	# default route until the privnet route is up (ARP complains
 	# about "host is not on local network").
 	#
-	print RC "static_routes=\"privnet \$static_routes\"\n";
-	print RC "route_privnet=\"-net $IP -interface $phys_cnet_if $IPMASK\"\n";
+	$net = inet_ntoa(inet_aton($IP) & inet_aton($IPMASK));
+	push(@controlroutes, "-net $net -interface $phys_cnet_if $IPMASK");
+	
 	#
 	# If using the virtual control net for routes, also make sure that
 	# nodes are reachable with their real control net addresses directly.
 	#
 	if ($USEVCNETROUTES) {
-	    print RC "static_routes=\"\$static_routes rcnet\"\n";
-	    print RC "route_rcnet=\"-net $hostip -netmask " . getcnetmask(0) .
-		" -interface $phys_cnet_if\"\n";
+	    my $mask = getcnetmask(0);
+	    
+	    $net = inet_ntoa(inet_aton($hostip) & inet_aton($mask));
+	    push(@controlroutes,
+		 "-net $net -netmask $mask -interface $phys_cnet_if");
 	}
     }
 
@@ -1031,11 +1073,16 @@ sub addroutestorc($rc)
     # interface!
     # 
     foreach my $ip (@jailips) {
-	print RC "static_routes=\"\$static_routes ip${count}\"\n";
-	print RC "route_ip${count}=\"$ip -interface lo0\"\n";
-	$count++;
+	push(@controlroutes, "$ip -interface lo0");
     }
-    close(RC);
+
+    #
+    # Now add them:
+    #
+    foreach my $route (@controlroutes) {
+	print("Adding route: '$route'\n");
+	mysystem("route add -rtabid $routetabid $route");
+    }
     return 0;
 }
 
@@ -1062,6 +1109,15 @@ sub getnextrtabid()
     my $nextrtabid = 1;
 
     #
+    # If the vnodeid is what we think (pcvmXXX-YYY) then just use the YYY
+    # part. At some point we need better control of this from Emulab Central.
+    #
+    if (defined($idnumber)) {
+	$nextrtabid = $idnumber;
+	goto gotit;
+    }
+
+    #
     # The chances of a race are low, but need to deal with it anyway.
     #
     my $lockfile  = "/var/emulab/lock/rtabid";
@@ -1086,6 +1142,8 @@ sub getnextrtabid()
     }
     system("echo $nextrtabid > $rtabidfile");
     close(LOCK);
+
+  gotit:
     #
     # Flush that routing table so its pristine. Again, this should be
     # handled in the kernel.
@@ -1159,7 +1217,7 @@ sub clearcnethostalias($)
     if ((inet_ntoa($cnalias & inet_aton($JAILCNETMASK)) eq $JAILCNET) &&
 	jailcnetaliases() == 0) {
 	my $palias = inet_ntoa($cnalias & inet_aton("255.255.255.0"));
-	mysystem("ifconfig $phys_cnet_if -alias $palias");
+	system("ifconfig $phys_cnet_if -alias $palias");
     }
 }
 
@@ -1196,4 +1254,20 @@ sub getcnetmask($)
     }
 
     return $cnetmask;
+}
+
+#
+# Check for free vn device.
+#
+sub CheckFreeVN($$)
+{
+    my ($vn, $file) = @_;
+    
+    # Make sure the dev entries exist!
+    if (! -e "/dev/vn${vn}") {
+	mysystem("(cd /dev; ./MAKEDEV vn${vn})");
+    }
+	
+    system("vnconfig -c vn${vn} $file");
+    return ($? ? 0 : 1);
 }

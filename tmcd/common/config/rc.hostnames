@@ -1,0 +1,197 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This takes a special argument so it can be called by ixpsetup to create
+# a specific hosts file other than /etc/hosts.
+# 
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-f file] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:f:";
+my $action  = "boot";
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Script specific goo
+my $HOSTSFILE  = "/etc/hosts";
+my $DEFAULT    = "$ETCDIR/hosts";
+my $pathname   = $HOSTSFILE;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || (REMOTE() && !(PLAB() || JAILED())));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'f'})) {
+    $pathname = $options{'f'};
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my $HTEMP = "${pathname}.new";
+    my @tmccresults;
+
+    print STDOUT "Checking Testbed hostnames configuration ... \n";
+
+    if (tmcc(TMCCCMD_HOSTS, undef, \@tmccresults) < 0) {
+	fatal("Could not get hosts file from server!");
+    }
+    # Important; if no results then do nothing. Do not want to kill
+    # the existing hosts file.
+    return 0
+	if (! @tmccresults);
+
+    #
+    # Note, we no longer start with the 'prototype' file here because we have
+    # to make up a localhost line that's properly qualified.
+    #
+    if (!open(HOSTS, ">$HTEMP")) {
+	fatal("Could not open $HTEMP: $!");
+    }
+
+    my $localaliases = "loghost";
+
+    #
+    # Find out our domain name, so that we can qualify the localhost entry
+    #
+    my $hostname = `hostname`;
+    if ($hostname =~ /[^.]+\.(.+)/) {
+	$localaliases .= " localhost.$1";
+    }
+    
+    #
+    # First, write a localhost line into the hosts file - we have to know the
+    # domain to use here
+    #
+    print HOSTS os_etchosts_line("localhost", "127.0.0.1",
+				 $localaliases), "\n";
+
+    #
+    # Now convert each hostname into hosts file representation and write
+    # it to the hosts file. Note that ALIASES is for backwards compat.
+    # Should go away at some point.
+    #
+    my $pat  = q(NAME=([-\w\.]+) IP=([0-9\.]*) ALIASES=\'([-\w\. ]*)\');
+
+    foreach my $str (@tmccresults) {
+	if ($str =~ /$pat/) {
+	    my $name    = $1;
+	    my $ip      = $2;
+	    my $aliases = $3;
+	    
+	    my $hostline = os_etchosts_line($name, $ip, $aliases);
+	    
+	    print HOSTS "$hostline\n";
+	}
+	else {
+	    warning("Bad hosts line: $str");
+	}
+    }
+    close(HOSTS);
+    system("mv -f $HTEMP $pathname");
+    if ($?) {
+	fatal("Could not move $HTEMP to $pathname!");
+    }
+    return 0;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    system("$CP -f $DEFAULT $HOSTSFILE");
+    if ($?) {
+	fatal("Could not copy default $HOSTSFILE into place!");
+    }
+}

@@ -1,4 +1,4 @@
 #
 # Bump as needed
 #
-RHL73-STD  base=@CLIENT_VARDIR@ prefix=/ preserve release=20031110
+RHL73-STD  base=@CLIENT_VARDIR@ prefix=/ preserve release=20040201

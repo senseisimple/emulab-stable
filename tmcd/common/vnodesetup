@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -142,6 +142,10 @@ if ($dojail && $doplab) {
     die("Can't do both jail and Plab");
 }
 
+if (!$dojail && !$doplab) {
+    die("Must be a real jail or a real Plab vserver.");
+}
+
 # Tell the library what vnode we are messing with.
 libsetup_setvnodeid($vnodeid);
 # Tell tmcc library too, although thats already been done with previous call.
@@ -221,21 +225,7 @@ if (!$debug && !$interactive && TBBackGround($logname)) {
     # setup first. This whole approach is wildly hacky.
     #
     if ($dojail) {
-	my $now   = time();
-	my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
-	my $count = 60;
-	
-	while ($count--) {
-	    sleep(1);
-	    if (-e $goofy) {
-		my (undef,undef,undef,undef,undef,undef,undef,undef,
-                      undef,$mtime,$ctime,undef,undef)
-                          = stat($goofy);
-		exit(0)
-		    if ($mtime >= $now || $ctime >= $now);
-	    }
-	}
-	exit(1);
+	hackwaitandexit();
     }
     exit(0);
 }
@@ -338,36 +328,6 @@ if (!defined($pid)) {
 # Become real root so that route command works!
 #
 $UID = 0;
-
-#
-# This stuff is done only when the node is not in a jail or on Plab. The
-# jail/Plab setup code does all this, so we avoid duplication of effort.
-#
-if (!$dojail && !$doplab) {
-    print STDOUT "Checking Testbed tunnel configuration ... \n";
-    dotunnels();
-
-    print STDOUT "Checking Testbed routing configuration ... \n";
-    dorouterconfig();
-
-    print STDOUT "Checking Testbed traffic generation configuration ...\n";
-    dotrafficconfig();
-
-    #
-    # Okay, now run startup the scripts
-    #
-    if (-e TMTUNNELCONFIG) {
-	print "Starting Tunnels ...\n";
-	TBForkCmd(TMTUNNELCONFIG);
-	sleep(5);
-    }
-
-    if (-e TMTRAFFICCONFIG) {
-	print "Starting Traffic Generators ...\n";
-	TBForkCmd(TMTRAFFICCONFIG);
-	sleep(1);
-    }
-}
 
 #
 # Create the jail.
@@ -522,7 +482,7 @@ sub rebootvnode() {
 	print"*** Could not kill(USR2) process $mpid: $!\n";
 	return -1;
     }
-    return 0;
+    hackwaitandexit();
 }
 
 #
@@ -557,8 +517,8 @@ sub cleanup()
 	#
 	$SIG{TERM} = 'IGNORE';
 	kill('TERM', -$pgrp);
-	print "Waiting 5 seconds for process group to die off ...\n";
-	sleep(5);
+	print "Waiting 2 seconds for process group to die off ...\n";
+	sleep(2);
     }
 
     #
@@ -723,4 +683,27 @@ sub removeconfdir($)
 	    "    $dir/root is not empty! This is very bad!\n");
     }
     system("rm -rf $dir");
+}
+
+#
+# Totally gross; wait for the watchdog to startup before exiting. This
+# indicates the vnode is running. If nothing after minute, assume the
+# vnode had a problem and exit accordingly. 
+# 
+sub hackwaitandexit()
+{
+    my $now   = time();
+    my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
+    my $count = 60;
+	
+    while ($count--) {
+	sleep(1);
+	if (-e $goofy) {
+	    my (undef,undef,undef,undef,undef,undef,undef,undef,
+		undef,$mtime,$ctime,undef,undef) = stat($goofy);
+	    exit(0)
+		if ($mtime >= $now || $ctime >= $now);
+	}
+    }
+    exit(1);
 }

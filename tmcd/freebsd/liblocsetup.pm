@@ -15,12 +15,12 @@ use Exporter;
 @EXPORT =
     qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
 	 $LOOPBACKMOUNT 
-	 os_cleanup_node os_ifconfig_line os_etchosts_line
+	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel
+	 os_groupdel os_getnfsmounts
        );
 
 # Must come after package declaration!
@@ -84,32 +84,26 @@ my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
 
 #
-# OS dependent part of cleanup node state. On a remote node, this will
+# OS dependent part of account cleanup. On a remote node, this will
 # only be called from inside a JAIL, or from the prepare script. 
 # 
-sub os_cleanup_node ($) {
-    my ($scrub) = @_;
-
-    if (! $scrub) {
-	return 0;
-    }
-    
+sub os_account_cleanup()
+{
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
-	exit(1);
+	return -1;
     }
     
     if (system("$CP -f $TMPASSWD /etc/master.passwd_testbed") != 0) {
 	print STDERR "Could not copy default passwd file into place: $!\n";
-	exit(1);
+	return -1;
     }
     
     if (system("$MKDB /etc/master.passwd_testbed") != 0) {
 	print STDERR "Failure running $MKDB on default password file: $!\n";
-	exit(1);
+	return -1;
     }
-
     return 0;
 }
 
@@ -390,6 +384,7 @@ sub os_setup()
 sub os_routing_enable_forward()
 {
     my $cmd;
+    my $fname = libsetup::ISDELAYNODE();
 
     if (REMOTE()) {
 	$cmd = "echo 'IP forwarding not turned on!'";
@@ -399,7 +394,7 @@ sub os_routing_enable_forward()
     } else {
 	# No Fast Forwarding when operating with linkdelays. 
 	$cmd  = "sysctl -w net.inet.ip.forwarding=1\n" .
-	        "    if [ ! -e $BOOTDIR/rc.linkdelay ]; then\n" .
+	        "    if [ ! -e $fname ]; then\n" .
 	        "        sysctl -w net.inet.ip.fastforwarding=1\n" .
 		"    fi\n";
     }
@@ -479,6 +474,36 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+#
+# Find out what NFS mounts exist already! 
+# 
+sub os_getnfsmounts($)
+{
+    my ($rptr) = @_;
+    my %mounted = ();
+
+    #
+    # Grab the output of the mount command and parse. 
+    #
+    if (! open(MOUNT, "/sbin/mount|")) {
+	print "os_getnfsmounts: Cannot run mount command\n";
+	return -1;
+    }
+    while (<MOUNT>) {
+	if ($_ =~ /^([-\w\.\/:\(\)]+) on ([-\w\.\/]+) \((.*)\)$/) {
+	    # Search for nfs string in the option list.
+	    foreach my $opt (split(',', $3)) {
+		if ($opt eq "nfs") {
+		    $mounted{$1} = $2;
+		}
+	    }
+	}
+    }
+    close(MOUNT);
+    %$rptr = %mounted;
+    return 0;
 }
 
 1;

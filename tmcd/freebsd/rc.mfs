@@ -1,44 +1,158 @@
-#!/bin/sh
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-. /etc/emulab/paths.sh
+use English;
+use Getopt::Std;
 
 #
-# The MFS does a very restricted set of operations.
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
 #
-echo "Doing Testbed Setup on an MFS ... "
+sub usage()
+{
+    print "Usage: " . scriptname() . "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "";
+my $action     = "boot";
 
-#
-# Inform TMCD that we've rebooted, and are starting testbed setup
-#
-echo "Informing the testbed that we've rebooted ..."
-$BINDIR/tmcc state TBSETUP
+# Turn off line buffering on output
+$| = 1;
 
-if [ -x $BINDIR/rc.ipod ]; then
-	echo "Setting up IPOD ... "
-        $BINDIR/rc.ipod
-fi
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-echo "Doing Testbed setup configuration ..."
-$BINDIR/bootsetup
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
 
-if [ -x $BINDIR/slothd ]; then
-        echo "Starting usage detector ..."
-        rm -f /var/run/slothd
-        $BINDIR/slothd
-fi
-
-/bin/rm -f /var/at/jobs/S*
-if [ -s $BOOTDIR/startupcmd  ]; then
-        echo "Scheduling startup command to run in a little bit ..."
-	echo "$BINDIR/runstartup" | at -q S 'now + 2 minutes'
-fi
+# Script specific goo.
+my $RCDIR   = "$BINDIR/rc";
 
 #
-# Inform TMCD that we're up and running
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
 #
-echo "Informing the testbed that we're up and running ..."
-$BINDIR/tmcc state ISUP
+# Boot Action.
+#
+sub doboot()
+{
+    #
+    # The MFS does a very restricted set of operations.
+    #
+    print("Doing Testbed Setup on an MFS\n");
+
+    print("Informing Emulab Control that we have rebooted\n");
+    if (tmcc(TMCCCMD_STATE, "TBSETUP") < 0) {
+	fatal("Error sending TBSETUP to Emulab Control!");
+    }
+
+    if (-x "$RCDIR/rc.ipod") {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.ipod");
+	}
+    }
+
+    # Now we get into the real work.
+    print("Checking Testbed reservation status\n");
+    my ($pid, $eid, $vname) = bootsetup();
+
+    #
+    # This stuff is run regardless of reservation status.
+    #
+    if (-x "$RCDIR/rc.slothd") {
+	print("Starting slothd usage detector\n");
+	system("$RCDIR/rc.slothd start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.slothd");
+	}
+    }
+
+    #
+    # This is where we run all of the config scripts. These talk to the
+    # DB and setup the node the way it is supposed to be. 
+    # 
+    if (!defined($pid)) {
+	print("Resetting node to a clean state\n");
+	system("$RCDIR/rc.config reset");
+    }
+    else {
+	print("Running config scripts\n");
+	system("$RCDIR/rc.config boot");
+    }
+    if ($?) {
+	fatal("Error running $RCDIR/rc.config");
+    }
+    
+    print("Informing Emulab Control that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sending ISUP to Emulab Control!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

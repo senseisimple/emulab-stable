@@ -107,18 +107,18 @@ sysetc-install:	dir-install
 script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(BINDIR)/rc.delayagent
-	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc.healthd
-	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc.mfs
-	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
-	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc.kname
+	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(BINDIR)/rc/rc.delayagent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
+	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
-	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
+	$(INSTALL) -m 755 $(SRCDIR)/mkextrafs.pl $(BINDIR)/mkextrafs.pl
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
 
@@ -141,9 +141,8 @@ jail-install:	dir-install
 	$(INSTALL) -m 640 $(SRCDIR)/jail/master.passwd $(JAILDIR)/master.passwd
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
-	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.injail $(BINDIR)/rc.injail
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.injail $(BINDIR)/rc/rc.injail
 	$(INSTALL) -m 755 $(SRCDIR)/jail/crontab $(JAILDIR)/crontab
-	$(INSTALL) -m 755 $(SRCDIR)/jail/jailsetup $(BINDIR)/jailsetup
 	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
 	$(INSTALL) -m 755 ./injail $(JAILDIR)/injail
 

@@ -15,7 +15,7 @@ package libtmcc;
 use Exporter;
 @ISA    = "Exporter";
 @EXPORT = qw(configtmcc tmcc tmccbossname tmccgetconfig tmccclrconfig
-	     tmcccopycache
+	     tmcccopycache tmccbossinfo
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
 	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_HOSTS TMCCCMD_RPM
 	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_STARTSTAT
@@ -400,6 +400,40 @@ sub tmccbossname()
 	return undef;
     }
     return $bossname;
+}
+
+#
+# Ditto, but return both parts of the info.
+#
+sub tmccbossinfo()
+{
+    my @tmccresults;
+
+    if (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
+	!scalar(@tmccresults)) {
+	warn("*** WARNING: Could not get bossinfo from tmcc!\n");
+	return undef;
+    }
+    my ($bossname, $bossip) = split(" ", $tmccresults[0]);
+
+    #
+    # Taint check. Nice to do for the caller. Also strips any newline.
+    #
+    if ($bossname =~ /^([-\w\.]*)$/) {
+	$bossname = $1;
+    }
+    else {
+	warn("*** WARNING: Tainted bossname from tmcc: $bossname\n");
+	return undef;
+    }
+    if ($bossip =~ /^([\d\.]*)$/) {
+	$bossip = $1;
+    }
+    else {
+	warn("*** WARNING: Tainted boss IP from tmcc: $bossip\n");
+	return undef;
+    }
+    return ($bossname, $bossip);
 }
 
 #

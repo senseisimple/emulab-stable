@@ -1,0 +1,267 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-r rtabid] " .
+	               "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:r:";
+my $action  = "boot";
+my $vnodeid;
+my $rtabid;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || JAILED() || REMOTE() || PLAB());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+if (defined($options{'r'})) {
+    $rtabid = $options{'r'};
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Local goo
+# After libsetup include; ifconfig is run outside vnode setup.
+my $TMIFC  = CONFDIR() . "/rc.ifc";
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action. We create a script to enable/disable interfaces, and then
+# execute it. We use a shell script so that it is easy to see exactly what
+# we did and so users can piddle around themselves. 
+#
+sub doboot()
+{
+    my $upcmds       = "";
+    my $downcmds     = "";
+    my @ifacelist    = ();
+
+    print STDOUT "Checking Testbed interface configuration ... \n";
+
+    #
+    # Get the iface list from libsetup, which handles parsing the stuff
+    # we get back from tmcd.
+    #
+    if (getifconfig(\@ifacelist) != 0) {
+	fatal("Could not get ifconfig from libsetup!");
+    }
+    return 0
+	if (! @ifacelist);
+
+    foreach my $ifconfig (@ifacelist) {
+	if (! $ifconfig->{ISVETH}) {
+	    my $inet     = $ifconfig->{IPADDR};
+	    my $mask     = $ifconfig->{IPMASK};
+	    my $mac      = $ifconfig->{MAC};
+	    my $speed    = $ifconfig->{SPEED};
+	    my $duplex   = $ifconfig->{DUPLEX};
+	    my $aliases  = $ifconfig->{ALIASES};
+	    my $iface    = $ifconfig->{IFACE};
+	    my $ifrtabid = undef;
+
+	    #
+	    # Slightly confused. We use the rtabid from tmcd only when
+	    # it is a SIMHOST. We use the rtabid from the command line
+	    # only when its a vnode. Otherwise ignore, at least until we
+	    # get all this straightened out.
+	    #
+	    if (SIMHOST()) {
+		$ifrtabid = $ifconfig->{RTABID};
+	    }
+	    elsif (defined($vnodeid) && defined($rtabid)) {
+		$ifrtabid = $rtabid;
+	    }
+
+	    my ($upline, $downline) =
+		os_ifconfig_line($iface, $inet, $mask,
+				 $speed, $duplex, $aliases, $ifrtabid);
+		    
+	    $upcmds   .= "$upline\n    "
+		if (defined($upline));
+	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";
+		
+	    $downcmds .= TMROUTECONFIG . " $inet down\n    ";
+	    $downcmds .= "$downline\n    "
+		if (defined($downline));
+
+	    # There could be routes for each alias.
+	    foreach my $alias (split(',', $aliases)) {
+		$upcmds   .= TMROUTECONFIG . " $alias up\n    ";
+		$downcmds .= TMROUTECONFIG . " $alias down\n    ";
+	    }
+	}
+	else {
+	    my $inet     = $ifconfig->{IPADDR};
+	    my $mask     = $ifconfig->{IPMASK};
+	    my $id       = $ifconfig->{ID};
+	    my $vmac     = $ifconfig->{VMAC};
+	    my $pmac     = $ifconfig->{PMAC};
+	    my $iface    = $ifconfig->{IFACE};
+	    my $ifrtabid = undef;
+	    my $encap    = $ifconfig->{ENCAP};
+
+	    #
+	    # A bit of history.
+	    #
+	    # Route table IDs were originally computed locally for
+	    # vnodes and passed into this function.  When simnodes
+	    # came along, we changed it so that rtabids were generated
+	    # on boss and stored in the DB.  Til we have a chance to
+	    # reconcile this, we ignore the rtabid returned for vnodes
+	    # and only use it for simnodes.
+	    #
+	    # Also ensure that encapsulation is always used for simnodes
+	    # til we get a chance to revisit that!
+	    #
+	    if (SIMHOST()) {
+		$ifrtabid = $ifconfig->{RTABID};
+		$encap = 1;
+	    }
+	    elsif (defined($vnodeid) && defined($rtabid)) {
+		$ifrtabid = $rtabid;
+	    }
+
+	    my ($upline, $downline) =
+		os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,
+				 $ifrtabid, $encap);
+		    
+	    $upcmds   .= "$upline\n    ";
+	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";
+		
+	    $downcmds .= TMROUTECONFIG . " $inet down\n    ";
+	    $downcmds .= "$downline\n    "
+		if (defined($downline));
+	}
+    }
+    
+    #
+    # Local file into which we write ifconfig commands (as a shell script).
+    #
+    unlink $TMIFC;
+    if (open(IFC, ">$TMIFC")) {
+	print IFC "#!/bin/sh\n";
+	print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+	print IFC "if [ x\$1 = x ]; ".
+	    "then action=enable; else action=\$1; fi\n";
+	print IFC "case \"\$action\" in\n";
+	print IFC "  enable)\n";
+	print IFC "    $upcmds\n";
+	print IFC "    ;;\n";
+	print IFC "  disable)\n";
+	print IFC "    $downcmds\n";
+	print IFC "    ;;\n";
+	print IFC "esac\n";
+	close(IFC);
+	chmod(0755, $TMIFC);
+    }
+    else {
+	fatal("Could not open $TMIFC: $!\n");
+    }
+    system("$TMIFC enable");
+    if ($?) {
+	fatal("Error running $TMIFC");
+    }
+    return 0;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Bring all interfaces down.
+    if (-e $TMIFC) {
+	system("$TMIFC disable");
+	if ($?) {
+	    fatal("Error running $TMIFC");
+	}
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink $TMIFC;
+}

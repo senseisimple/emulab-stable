@@ -13,12 +13,12 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
-	 os_cleanup_node os_ifconfig_line os_etchosts_line
+	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel
+	 os_groupdel os_getnfsmounts
        );
 
 # Must come after package declaration!
@@ -79,26 +79,20 @@ my $DEFSHELL	= "/bin/tcsh";
 #
 # OS dependent part of cleanup node state.
 # 
-sub os_cleanup_node ($) {
-    my ($scrub) = @_;
-
+sub os_account_cleanup()
+{
     unlink @LOCKFILES;
 
-    if (! $scrub) {
-	return 0;
-    }
-    
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
-	exit(1);
+	return -1;
     }
     
     if (system("$CP -f $TMSHADOW $TMGSHADOW /etc") != 0) {
 	print STDERR "Could not copy default passwd file into place: $!\n";
-	exit(1);
+	return -1;
     }
-
     return 0;
 }
 
@@ -389,6 +383,31 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+sub os_getnfsmounts($)
+{
+    my ($rptr) = @_;
+    my %mounted = ();
+
+    #
+    # Grab the output of the mount command and parse. 
+    #
+    if (! open(MOUNT, "/bin/mount|")) {
+	print "os_getnfsmounts: Cannot run mount command\n";
+	return -1;
+    }
+    while (<MOUNT>) {
+	if ($_ =~ /^([-\w\.\/:\(\)]+) on ([-\w\.\/]+) type (\w+) .*$/) {
+	    # Check type for nfs string.
+	    if ($3 eq "nfs") {
+		$mounted{$1} = $2;
+	    }
+	}
+    }
+    close(MOUNT);
+    %$rptr = %mounted;
+    return 0;
 }
 
 1;

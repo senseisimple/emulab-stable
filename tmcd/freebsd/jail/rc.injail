@@ -1,53 +1,146 @@
-#!/bin/sh
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-. /etc/emulab/paths.sh
+use English;
+use Getopt::Std;
 
-echo "Doing Testbed jailsetup configuration ..."
-$BINDIR/jailsetup
+#
+# This script is the plab vserver equiv of ../common/rc.bootsetup. It runs
+# inside the vserver and does a limited set of bootstrapping tasks.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . " boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "";
+my $action  = "boot";
 
-if [ -x $BOOTDIR/rc.route ]; then
-        echo "Setting up Testbed interface routing ..."
-	$BOOTDIR/rc.route enable
-fi
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-if [ -x $BOOTDIR/rc.syncserver  ]; then
-        echo "Starting Sync Server ..."
-	$BOOTDIR/rc.syncserver
-fi
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
 
-if [ -x $BOOTDIR/rc.rpm  ]; then
-        echo "Installing RPMs ..."
-	$BOOTDIR/rc.rpm
-fi
+# Script specific goo.
+my $RCDIR	 = "$BINDIR/rc";
 
-if [ -x $BOOTDIR/rc.tarballs  ]; then
-        echo "Installing Tarballs ..."
-	$BOOTDIR/rc.tarballs
-fi
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself.
+#
+use libsetup;
+use libtmcc;
+use librc;
 
-if [ -s $BOOTDIR/startupcmd  ]; then
-        echo "Scheduling startup command to run in a little bit ..."
-	$BINDIR/runstartup
-fi
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub doplabconfig();
 
-if [ -x $BINDIR/rc.agents  ]; then
-	$BINDIR/rc.agents
-fi
+# Parse command line.
+#if (! getopts($optlist, \%options)) {
+#    usage();
+#}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
 
-if [ -x $BOOTDIR/rc.traffic  ]; then
-        echo "Starting traffic generators ..."
-	$BOOTDIR/rc.traffic
-fi
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
 
-if [ -x $BINDIR/watchdog  ]; then
-        echo "Starting update watchdog ..."
-	$BINDIR/watchdog start
-fi
+#
+# Boot Action.
+#
+sub doboot()
+{
+    print("Checking Testbed reservation status\n");
+    my ($pid, $eid, $vname) = jailsetup();
 
+    #
+    # At this point, if we are a free node just return. Something went wacky.
+    #
+    if (!defined($pid)) {
+	return;
+    }
 
-echo "Informing the testbed that we're up and running ..."
-$BINDIR/tmcc state ISUP
+    #
+    # Do this after *before* config scripts. At the moment we use a hacky test
+    # in vnodesetup to see if the watchdog is running, which tells vnodesetup
+    # that the vnode has finished setting up. By doing it now, we allow vnode
+    # setup to proceed in parallel (okay, at most two are going to partially
+    # overlap, but that is better then nothing at all!
+    # 
+    if (-x "$BINDIR/watchdog") {
+        print("Starting testbed watchdog daemon\n");
+	system("$BINDIR/watchdog start");
+	if ($?) {
+	    fatal("Error running $BINDIR/watchdog");
+	}
+    }
+
+    #
+    # This is where we run all of the config scripts. These talk to the
+    # DB and setup the node the way it is supposed to be. 
+    # 
+    print("Running config scripts\n");
+    system("$RCDIR/rc.config boot");
+    if ($?) {
+	fatal("Error running $RCDIR/rc.config");
+    }
+
+    print("Informing the testbed that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
+	fatal("Error sneding ISUP to Emulab Control!");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}
+

@@ -43,6 +43,7 @@ case "$1" in
 	killproc healthd
 	killproc watchdog
 	killproc evproxy
+	killproc linktest
 	echo "Informing the testbed we're rebooting ..."
 	$BINDIR/tmcc state SHUTDOWN
 	RETVAL=$?
