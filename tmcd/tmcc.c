@@ -89,7 +89,7 @@ main(int argc, char **argv)
 		}
 
 	argc -= optind;
-	if (argc < 1 || argc > 3) {
+	if (argc < 1 || argc > 5) {
 		usage();
 	}
 	argv += optind;
