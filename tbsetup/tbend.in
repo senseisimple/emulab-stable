@@ -9,7 +9,7 @@ $TBDB = "@TBDBNAME@";
 $TBSETUPLIB = "$TBROOT/lib";
 
 $ENV{'PATH'} = "$TBROOT/libexec:$TBROOT/libexec/ir" .
-    ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin";
+    ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin:/usr/bin";
 push(@INC,$TBSETUPLIB);
 
 require libtbsetup;
