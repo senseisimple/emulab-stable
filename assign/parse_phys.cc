@@ -73,15 +73,15 @@ topology *parse_phys(char *filename)
 				perror("Could not allocate a tbswitch");
 				exit(-1);
 			}
-			for (int i = 0; i < nodecount; i++) {
-				infile >> newsw->nodes[i].ints;
-				infile >> newsw->nodes[i].count;
-				newsw->nodes[i].used = 0;
-#ifdef VERBOSE
-				printf("Adding node %d with %d %d\n",
-				       i, newsw->nodes[i].ints,
-				       newsw->nodes[i].count);
-#endif
+			for (int i = 0; i < nodecount;) {
+				int ints, count;
+				infile >> ints;
+				infile >> count;
+				for (int j = 0; j < count; j++) {
+					newsw->nodes[i].ints = ints;
+					newsw->nodes[i].used = 0;
+					i++;
+				}
 			}
 		}
 	}

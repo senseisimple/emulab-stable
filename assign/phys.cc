@@ -1,9 +1,10 @@
+#include <iostream.h>
 #include <stdlib.h>
 #include <string.h>
 #include "phys.h"
 
 toponode::toponode() {
-	ints = count = used = 0;
+	ints = used = 0;
 }
 
 tbswitch::tbswitch() {
@@ -29,10 +30,7 @@ tbswitch::~tbswitch() {
 }
 
 inline int tbswitch::numnodes() {
-	int nc = 0;
-	for (int i = 0; i < nodecount; i++)
-		nc += nodes[i].count;
-	return nc;
+	return nodecount;
 }
 
 topology::topology(int nswitches) {
@@ -42,4 +40,18 @@ topology::topology(int nswitches) {
 
 topology::~topology() {
 	if (switches) delete(switches);
+}
+
+void topology::print_topo() {
+	cout << "Topology has " << switchcount << " switches" << endl;
+	cout << "--------" << endl;
+	for (int i = 0; i < switchcount; i++) {
+		cout <<  " sw " << i << " has " << switches[i]->numnodes() << " nodes"
+		     << endl;
+		for (int j = 0; j < switches[i]->nodecount; j++) {
+			cout << switches[i]->nodes[j].ints << " ";
+		}
+		cout << endl;
+	}
+
 }

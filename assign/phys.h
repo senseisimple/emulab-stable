@@ -2,7 +2,6 @@ class toponode {
 public:
 	toponode();
 	int ints;
-	int count;
 	int used;
 };
 
@@ -23,9 +22,11 @@ public:
 class topology {
 public:
 	topology(int nswitches);
+	void print_topo();
 	virtual ~topology();
 	int switchcount;
 	tbswitch **switches;
 };
 
 topology *parse_phys(char *filename);
+

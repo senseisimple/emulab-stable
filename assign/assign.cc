@@ -40,7 +40,7 @@ node_array<int> bestnodes, absnodes;
 float                       bestscore, absbest;
 
 float *interlinks;
-float *numnodes;
+int *numnodes;
 
 /*
  * Basic simulated annealing parameters:
@@ -78,10 +78,69 @@ float score()
 		if (interlinks[i] > intercap) {
 			sc += (interlinks[i]-intercap);
 		}
+		/* XXX:  THIS MUST BE OPTIMIZED */
+		
+		/* Experimental:  Collapse delay nodes together
+		 * and handle node fanout restrictions */
+
+		/* Mark all nodes unused */
+		for (int j = 0; j < topo->switches[i]->numnodes(); j++) {
+			topo->switches[i]->nodes[j].used = 0;
+		}
+		
+		int numdelays = 0;
+		int assigned = 0;
+		node n;
+		forall_nodes(n, G) {
+		    if (G[n].partition() == i) {
+		        if (G[n].type() == testnode::TYPE_DELAY) {
+				numdelays++;
+			} else {
+			    assigned = 0;
+			    /* Assign to an available node */
+			    for (int j = 0;
+				 j < topo->switches[i]->numnodes();
+				 j++) {
+				    if (topo->switches[i]->nodes[j].used == 0 && (topo->switches[i]->nodes[j].ints >= G.degree(n))) {
+					    topo->switches[i]->nodes[j].used = 1;
+					    assigned = 1;
+					    break;
+				    }
+			    }
+			    if (!assigned) {
+				    sc += 1;
+			    }
+			}
+		    }
+		}
+		int numn = numnodes[i];
+
+		numn -= numdelays;
+		/* Now turn normal nodes into delay nodes as needed */
+		/* XXX:  THIS IS NOT OPTIMAL.  We should improve on this
+		 * so it uses the right size nodes a bit... but oh well */
+		int maxnodes = topo->switches[i]->numnodes();
+		int j = 0;
+		while (numdelays > 0 && j < maxnodes) {
+			if (topo->switches[i]->nodes[j].used) { continue; }
+			numdelays -= topo->switches[i]->nodes[j].ints/2;
+			topo->switches[i]->nodes[j].used = 1;
+			j++;
+		}
+
+		/* Add in the unsatisfied delay nodes */
+		if (numdelays > 0) {
+			sc += numdelays;
+		}
+
+		/* XXX:  This should now be obsolete and handled by the
+		 * assigned part above */
+#if 0
 		/* Do we have too many nodes per switch? */
 		if (numnodes[i] > nodecap[i]) {
 			sc += (numnodes[i] - nodecap[i]);
 		}
+#endif
 		/* Try to minimize the number of switches used */
 		/* This is likely NOT an effective way to do it! */
 		if (numnodes[i] > 0) {
@@ -289,6 +348,12 @@ void loopassign()
 	totaltime = used_time(timestart);
 	cout << "Total time to find solution "
 	     << totaltime << " seconds" << endl;
+	node n;
+#if 0
+	forall_nodes(n, G) {
+		cout << "Node degree: " << G.degree(n) << endl;
+	}
+#endif
 }
 
 void chopgraph(GraphWin& gw) {
@@ -434,7 +499,7 @@ int main(int argc, char **argv)
 	argv += optind;
     
 	interlinks = new float[nparts];
-	numnodes = new float[nparts];
+	numnodes = new int[nparts];
 	for (int i = 0; i < nparts; i++) {
 		interlinks[i] = 0;
 		numnodes[i] = 0;
@@ -487,6 +552,7 @@ int main(int argc, char **argv)
 		for (int i = 0; i < nparts; i++) {
 			nodecap[i] = topo->switches[i]->numnodes();
 		}
+		topo->print_topo();
 	}
     
 	gw.display();
