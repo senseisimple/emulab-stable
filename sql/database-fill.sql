@@ -530,6 +530,7 @@ REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_node
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
+REPLACE INTO table_regex VALUES ('users','wikiname','text','regex','^[A-Z]+[a-z]+[A-Z]+[A-Za-z0-9]*$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
