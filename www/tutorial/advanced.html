@@ -336,37 +336,41 @@ example:
 </blockquote>
  
 <ul>
-<li> Links:
-     <ul>
-     <li> $link0 up
-     <li> $link0 down
-     <li> $link0 bandwidth 10Mb duplex
-     <li> $link0 delay 10ms
-     <li> $link0 plr 0.1
-     </ul>
+<li> Links: <pre>
+   In "ns" script:
+     $link0 bandwidth 10Mb duplex
+     $link0 delay 10ms
+     $link0 plr 0.05
+
+   With "tevc":
+     tevc ... link0 modify bandwidth=20000	# In kbits/second; 20000 = 20Mbps
+     tevc ... link0 modify delay=10ms		# In msecs (the "ms" is ignoredd)
+     tevc ... link0 modify plr=0.1
+
+   Both:
+     $link0 up
+     $link0 down
+     </pre>
 
 <li> Queues: Queues are special. In your NS file you modify the actual
-     queue, while on the command line you use the link that queue is
-     part of.
-     <ul>
-     <li> $queue0 set queue-in-bytes_ 0
-     <li> $queue0 set limit_ 75
-     <li> $queue0 set maxthresh_ 20
-     <li> $queue0 set thresh_ 7
-     <li> $queue0 set linterm_ 11
-     <li> $queue0 set q_weight_ 0.004
-     </ul>
+     queue, while on the command line you use the link to which the queue belongs.<pre>
+      $queue0 set queue-in-bytes_ 0
+      $queue0 set limit_ 75
+      $queue0 set maxthresh_ 20
+      $queue0 set thresh_ 7
+      $queue0 set linterm_ 11
+      $queue0 set q_weight_ 0.004
+      </pre>
 
-<li> CBR
-     <ul>
-     <li> $cbr0 start
-     <li> $cbr0 set packetSize_ 512
-     <li> $cbr0 set interval_ 0.01
-     <li> $cbr0 set rate_ 10Mbs
-     <li> $cbr0 stop
-     </ul>
+<li> CBR <pre>
+      $cbr0 start
+      $cbr0 set packetSize_ 512
+      $cbr0 set interval_ 0.01
+      $cbr0 set rate_ 10Mbs
+      $cbr0 stop
+      </pre>
 
-<li> FullTcp, FTP and Telnet: Refer NS documentation <a
+<li> FullTcp, FTP and Telnet: Refer to the NS documentation <a
      href="http://www.isi.edu/nsnam/ns/doc/ns_doc.pdf">here</a>.
 
 </ul>
