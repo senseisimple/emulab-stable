@@ -1,5 +1,5 @@
 OBJS=delay.o
-CFLAGS += -Wall  -DDEBUG=1 -g -O2
+CFLAGS += -Wall -O2 #-DDEBUG=1 -g
 CC=gcc
 LIBS=-L. -ldivert
 

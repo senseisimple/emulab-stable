@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/signal.h>
 #include <assert.h>
 #include <sys/time.h>
@@ -25,7 +26,11 @@
 
 struct msockinfo *msock, *outsock;
 
-#define DPRINTF(fmt, args...) /* Shut up */
+#ifdef DEBUG
+#define DPRINTF(fmt, args...) printf(fmt , ##args )
+#else
+#define DPRINTF(args...)
+#endif
 
 /*
  * I'm lazy, but want to see if an allocation fails...
@@ -93,7 +98,7 @@ int packet_enq(char *data, int datalen, int usecs, struct sockaddr_in from,
 void packet_forw(struct packet *packet)
 {
 	int wlen;
-#if 0
+#ifdef DEBUG
 	printf("Sock: %d, len: %d, fromlen: %d\n",
 	       msock->sock, packet->datalen, packet->fromlen);
 	IPDUMP((struct ip *)(packet->data));
@@ -186,40 +191,105 @@ long timediff(struct timeval *time_now, struct timeval *time_prev)
 	return usecs_now - time_prev->tv_usec;
 }
 
+void usage() {
+	fprintf(stderr, "usage:  delay [-h] [-ui] [-p port/type] [-d delay]\n");
+}
+
+void help() {
+	usage();
+	fprintf(stderr,
+		"        -h               help (this message)\n"
+		"        -u               delay UDP packets (default)\n"
+		"        -i               delay ICMP packets\n"
+		"        -p <port/type>   UDP: delay packets to this port\n"
+		"                         ICMP:  Delay this ICMP type\n"
+		"        -d <delay>       Delay for this many microseconds\n"
+		"\n"
+		);
+}
+
+
 /*
  * Set up our sockets, and start the receive / enqueue / run queue
  * loop
  */
 
 int main(int argc, char **argv) {
-	int port = 69;
+	int port = 0;
 	char *packetbuf = NULL;
-	int granularity; /* Kind of */
-	int delay = 1000000;
+	unsigned long granularity; /* Kind of */
+	unsigned long delay = 1000000;
 	struct timeval mytv, time_prev, time_now;
 	int rc;
+	int proto = IPPROTO_UDP;
+
+	/* getopt stuff */
+	extern char *optarg;
+	extern int optind;
+	int ch;
+
+	while ((ch = getopt(argc, argv, "uip:d:")) != -1)
+		switch (ch) {
+		case 'u':
+			proto = IPPROTO_UDP;
+			break;
+		case 'i':
+			proto = IPPROTO_ICMP;
+			break;
+		case 'p':
+			port = atoi(optarg);
+			break;
+		case 'd':
+			delay = atoi(optarg);
+			break;
+		case 'h':
+			help();
+			exit(-1);
+		default:
+			usage();
+			exit(-1);
+		}
+
+	argc -= optind;
+	argv += optind;
+
+	if (!port) {
+		fprintf(stderr, "must supply a port to divert\n");
+		usage();
+		exit(-1);
+	}
 
 	time_prev.tv_sec = time_prev.tv_usec = 0;
-
-	if (argc > 1) {
-		port = atoi(argv[1]);
-	}
-
-	if (argc > 2) {
-		delay = atoi(argv[2]);
-	}
 
 	signal(SIGTERM, cleanup);
 	signal(SIGQUIT, cleanup);
 	signal(SIGINT, cleanup);
 
 	msock = get_socket();
-	
-	add_mask_port(msock, port);
+
+	if (proto == IPPROTO_UDP) {
+		add_mask_port(msock, port);
+	} else if (proto == IPPROTO_ICMP) {
+		add_mask_icmp(msock, port);
+	} else {
+		fprintf(stderr, "unknown proto type %d\n", proto);
+		cleanup(0);
+		exit(-1);
+	}
 
 	granularity = delay / 100;
+
+	/* Gotta love those 10ms timers... */
+#define MIN_USEC 10000
+	if (granularity < MIN_USEC)
+		granularity = MIN_USEC;
+
 	mytv.tv_sec = granularity / 1000000;
 	mytv.tv_usec = granularity % 1000000;
+
+	if (mytv.tv_sec == 0 && mytv.tv_usec < MIN_USEC) {
+		mytv.tv_usec = MIN_USEC;
+	}
 
 	/* Do our delays by simply breaking out of the recvfrom every
 	 * now and then.  Note that this is potentially INACCURATE if
@@ -242,6 +312,7 @@ int main(int argc, char **argv) {
 		perror("Setsockopt for timeout failed");
 		exit(errno);
 	}
+	DPRINTF("Timeout set for receive divert socket\n");
 
 	/*
 	 * The meat:
@@ -262,10 +333,15 @@ int main(int argc, char **argv) {
 			packetbuf = (char *)malloc(MAXPACKET);
 		}
 
+		bzero(&from, sizeof(from));
 		fromlen = sizeof(struct sockaddr_in);
 		len = recvfrom(msock->sock, packetbuf, MAXPACKET, 0,
 			       (struct sockaddr *)&from, &fromlen);
 
+		if (len > 0) {
+			DPRINTF("Received packet of length %d\n", len);
+		}
+		
 		gettimeofday(&time_now, NULL);
 		
 		pq_run(timediff(&time_now, &time_prev));
