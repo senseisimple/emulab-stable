@@ -924,6 +924,57 @@ sub getStats ($) {
 }
 
 #
+# Enable, or disable,  port on a trunk
+#
+# usage: removeVlan(self, vlan_number, modport, value)
+#	 vlan_number: The cisco-native VLAN top operate on
+#        modport: module.port of the trunk to operate on
+#        value: 0 to disallow the VLAN on the trunk, 1 to allow it
+#        Returns 1 on success, 0 otherwise
+#
+sub setVlanOnTrunk($$$$) {
+    my $self = shift;
+    my ($vlan_number, $modport, $value) = @_;
+
+    #
+    # Some error checking
+    #
+    if (($value != 1) && ($value != 0)) {
+	die "Invalid value $value passed to setVlanOnTrunk\n";
+    }
+    if ($vlan_number == 1) {
+	die "VLAN 1 passed to setVlanOnTrunk\n"
+    }
+
+    my $ifIndex = $self->{IFINDEX}{$modport};
+
+    #
+    # Get the exisisting bitfield for allowed VLANs on the trunk
+    #
+    my $bitfield = $self->{SESS}->get(["vlanTrunkPortVlansEnabled",$ifIndex]);
+    my $unpacked = unpack("B*",$bitfield);
+    
+    # Put this into an array of 1s and 0s for easy manipulation
+    my @bits = split //,$unpacked;
+
+    # Just set the bit of the one we want to change
+    $bits[$vlan_number] = $value;
+
+    # Pack it back up...
+    $unpacked = join('',@bits);
+    $bitfield = pack("B*",$unpacked);
+
+    # And save it back...
+    if (!$self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
+	    "OCTETSTR"])) {
+	return 1;
+    } else {
+	return 0;
+    }
+
+}
+
+#
 # Reads the IfIndex table from the switch, for SNMP functions that use 
 # IfIndex rather than the module.port style. Fills out the objects IFINDEX
 # members,
@@ -942,20 +993,8 @@ sub readifIndex($) {
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$ifindex) = @$rowref;
 
-    	my $node = portnum("$self->{NAME}:$modport");
-
-    	if (defined $node) { # Make sure this is a port we care about
-	    $self->debug("Got $name $modport $ifindex\n",3);
-	    $self->debug("('$modport' == $node)\n",3);
-	    $self->debug("($modport == $ifindex == $node)\n",2);
-
-	    #
-	    # IFINDEX is a two-way hash, so that we lookup based on either
-	    # the ifindex or the modport representation
-	    #
-	    $self->{IFINDEX}{$modport} = $ifindex;
-	    $self->{IFINDEX}{$ifindex} = $modport;
-	}
+	$self->{IFINDEX}{$modport} = $ifindex;
+	$self->{IFINDEX}{$ifindex} = $modport;
     }
 }
 

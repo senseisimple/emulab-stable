@@ -397,5 +397,98 @@ sub getStats($) {
     return map $stats{$_}, sort {tbsort($a,$b)} keys %stats;
 }
 
+#
+# Not a 'public' function - only needs to get called by other functions in
+# this file, not external functions.
+#
+# Enables or disables (depending on $value) a VLAN on all appropriate
+# switches in a stack
+#
+# ONLY pass in @ports if you're SURE that they are the only ports in the
+# VLAN - basically, only if you just created it. This is a shortcut, so
+# that we don't have to ask all switches if they have any ports in the VLAN.
+#
+sub setVlanOnTrunks($$$;@) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my $value = shift;
+    my @ports = @_;
+
+    #
+    # First, get a list of all trunks
+    #
+    my %trunks = getTrunks();
+
+    #
+    # Next, figure out which switches this VLAN exists on
+    #
+    my @switches;
+    if (@ports) {
+	#
+	# I'd rather not have to go out to the switches to ask which ones
+	# have ports in the VLAN. So, if they gave me ports, I'll just 
+	# trust that those are the only ones in the VLAN
+	#
+	@switches = getDeviceNames(@ports);
+    } else {
+	#
+	# Since this may be a hand-created (not from the database) VLAN, the
+	# only way we can figure out which swtiches this VLAN spans is to
+	# ask them all.
+	#
+	foreach my $devicename (keys %{$self->{DEVICES}}) {
+	    my $device = $self->{DEVICES}{$devicename};
+	    foreach my $line ($device->listVlans()) {
+		my ($vlan_id, $vlan, $memberRef) = @$line;
+		if (($vlan == $vlan_number) && $memberRef && @$memberRef){
+		    push @switches, $devicename;
+		}
+	    }
+	}
+    }
+
+    #
+    # Next, get a list of the trunks that are used to move between these
+    # switches
+    #
+    my @trunks = getTrunksFromSwitches(\%trunks,@switches);
+
+    #
+    # Now, we go through the list of trunks that need to be modifed, and
+    # do it! We have to modify both ends of the trunk, or we'll end up wasting
+    # the trunk bandwidth.
+    #
+    my $errors = 0;
+    foreach my $trunk (@trunks) {
+	my ($src,$dst) = @$trunk;
+	if (!$self->{DEVICES}{$src}) {
+	    warn "ERROR - Bad device $src found in setVlanOnTrunks!\n";
+	    $errors++;
+	} else {
+	    #
+	    # On ciscos, we can use any port in the trunk, so we'll use the
+	    # first
+	    #
+	    my $modport = $trunks{$src}{$dst}[0];
+	    $errors += !($self->{DEVICES}{$src}->setVlanOnTrunk($vlan_number,
+		$modport,$value));
+	}
+	if (!$self->{DEVICES}{$dst}) {
+	    warn "ERROR - Bad device $dst found in setVlanOnTrunks!\n";
+	    $errors++;
+	} else {
+	    #
+	    # On ciscos, we can use any port in the trunk, so we'll use the
+	    # first
+	    #
+	    my $modport = $trunks{$dst}{$src}[0];
+	    $errors += !($self->{DEVICES}{$dst}->setVlanOnTrunk($vlan_number,
+		$modport,$value));
+	}
+    }
+
+    return $errors;
+}
+
 # End with true
 1;

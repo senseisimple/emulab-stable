@@ -10,7 +10,8 @@ use Exporter;
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
 		getTestSwitches getVlanPorts getExperimentVlans getDeviceNames
 	    	getDeviceType getInterfaceSettings mapPortsToDevices
-		getSwitchStack getStackType tbsort );
+		getSwitchStack getStackType getTrunks getTrunksFromSwitches
+		tbsort );
 
 use English;
 use libdb;
@@ -328,7 +329,9 @@ sub getStackType($) {
 # Returns a structure representing all trunk links. It's a hash, keyed by
 # switch, that contains hash references. Each of the second level hashes
 # is keyed by destination, with the value being an array reference that
-# contains the card.port pairs to which the trunk is conencted.
+# contains the card.port pairs to which the trunk is conencted. For exammple,
+# ('cisco1' => { 'cisco3' => ['1.1','1.2'] },
+#  'cisco3' => { 'cisco1' => ['2.1','2.2'] } )
 #
 sub getTrunks() {
 
@@ -353,6 +356,7 @@ sub getTrunks() {
 # A reference to a hash, as returned by the getTrunks() function
 # A reference to an array of unvisited switches: Use [keys %trunks]
 # Two siwtch names, the source and the destination 
+#
 sub getTrunkPath($$$$) {
     my ($trunks, $unvisited, $src,$dst) = @_;
     if ($src eq $dst) {
@@ -407,6 +411,93 @@ sub getTrunkPath($$$$) {
 	    return ();
 	}
     }
+}
+
+#
+# Returns a list of trunks, in the form [src, dest], from a path (as returned
+# by getTrunkPath() ). For example, if the input is:
+# (cisco1, cisco3, cisco4), the return value is:
+# ([cisco1, cisco3], [cisco3, cisco4])
+#
+sub getTrunksFromPath(@) {
+    my @path = @_;
+    my @trunks = ();
+    my $lastswitch = "";
+    foreach my $switch (@path) {
+	if ($lastswitch) {
+	    push @trunks, [$lastswitch, $switch];
+	}
+	$lastswitch = $switch;
+    }
+
+    return @trunks;
+}
+
+#
+# Given a list of lists of trunks (returned by multiple getTrunksFromPath() 
+# calls), return a list of the unique trunks found in this list
+#
+sub getUniqueTrunks(@) {
+    my @trunkLists = @_;
+    my @unique = ();
+    foreach my $trunkref (@trunkLists) {
+	my @trunks = @$trunkref;
+	TRUNK: foreach my $trunk (@trunks) {
+	    # Since source and destination are interchangable, we have to
+	    # check both possible orderings
+	    foreach my $unique (@unique) {
+		if ((($unique->[0] eq $trunk->[0]) &&
+		     ($unique->[1] eq $trunk->[1])) ||
+		    (($unique->[0] eq $trunk->[1]) &&
+		     ($unique->[1] eq $trunk->[0]))) {
+			 # Yep, it's already in the list - go to the next one
+			 next TRUNK;
+		}
+	    }
+
+	    # Made it through, we must not have seen this one before
+	    push @unique, $trunk;
+	}
+    }
+
+    return @unique;
+}
+
+#
+# Given a trunk structure (as returned by getTrunks() ), and a list of switches,
+# return a list of all trunks (in the [src, dest] form) that are needed to span
+# all the switches (ie. which trunks the VLAN must be allowed on)
+#
+sub getTrunksFromSwitches($@) {
+    my $trunks = shift;
+    my @switches = @_;
+
+    #
+    # First, find the paths between each set of switches
+    #
+    my @paths = ();
+    foreach my $switch1 (@switches) {
+	foreach my $switch2 (@switches) {
+	    push @paths, [ getTrunkPath($trunks, [ keys %$trunks ],
+					$switch1, $switch2) ];
+	}
+    }
+
+    #
+    # Now, make a list of all the the trunks used by these paths
+    #
+    my @trunkList = ();
+    foreach my $path (@paths) {
+	push @trunkList, [ getTrunksFromPath(@$path) ];
+    }
+
+    #
+    # Last, remove any duplicates from the list of trunks
+    #
+    my @trunks = getUniqueTrunks(@trunkList);
+
+    return @trunks;
+
 }
 
 #

@@ -262,11 +262,11 @@ foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/) && do {
+	(/listvlans/ || /getstats/ || /make/ || /remove/) && do {
 	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
 	    last;
 	};
-	(/listports/ || /make/ || /remove/) && do {
+	(/listports/) && do {
 	    @devicenames = $opt{i}? @{$opt{i}} :
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
@@ -274,7 +274,7 @@ foreach my $command (@commands) {
 	(/tables/) && do {
 	    @vlans = getExperimentVlans($pid,$eid);
 	    @ports = getVlanPorts(@vlans);
-	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
+	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
 	    last;
 	};
 	(/reset/) && do {
