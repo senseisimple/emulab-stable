@@ -74,6 +74,10 @@ if (isset($needscript)) {
 	echo "MD5=5ed48bdf6def666d5a5d643cbc2ce4d0\n";
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v3.pl\n";
     }
+    elseif ($cdvers == 69) {
+	echo "URL=https://${WWWHOST}/images/netbed-setup-v69.pl\n";
+	echo "SIG=https://${WWWHOST}/images/netbed-setup-v69.pl.sig\n";
+    }
     else {
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v4.pl\n";
 	echo "SIG=https://${WWWHOST}/images/netbed-setup-v4.pl.sig\n";
@@ -236,7 +240,7 @@ if (strcmp($privIP, "1.1.1.1")) {
 #	return;
 #    }
 
-    $upgrade_instructions = "";
+    $upgrade_instructions = 0;
     #
     # Check for image upgrade. Rather simplistic right now.
     #
@@ -283,7 +287,8 @@ if (strcmp($privIP, "1.1.1.1")) {
 
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
-    echo "$upgrade_instructions\n";
+    if ($upgrade_instructions) 
+	echo "$upgrade_instructions\n";
     echo "emulab_status=0\n";
     
     return;
@@ -368,6 +373,24 @@ elseif ($cdvers == 3) {
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
+    }
+}
+elseif ($cdvers == 69) {
+    if (!strcmp($REMOTE_ADDR, "155.101.132.191")) {
+	echo "fdisk=image.fdisk\n";
+	echo "fdisk_sig=image.fdisk.sig\n";
+	echo "slice1_image=slice1.ndz\n";
+	echo "slice1_sig=slice1.ndz.sig\n";
+	# Still return this for the root tag. Might change later.
+	echo "slice1_md5=20d04a3ba96043788e2d31d52e7e7165\n";
+    }
+    else {
+	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
+	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
+	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
+	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
+	# Still return this for the root tag. Might change later.
+	echo "slice1_md5=20d04a3ba96043788e2d31d52e7e7165\n";
     }
 }
 else {
