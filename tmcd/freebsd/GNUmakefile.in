@@ -66,6 +66,7 @@ cdboot-install:	destdircheck common-install etc-install \
 	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
 	cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
 	cp $(SRCDIR)/cdboot/fstab.lbs $(SYSETCDIR)/fstab.lbs
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/boot
 	cp $(SRCDIR)/cdboot/loader.conf $(DESTDIR)/boot/loader.conf
 	cp $(SRCDIR)/cdboot/loader.rc.lbs $(DESTDIR)/boot/loader.rc.lbs
 	cp $(SRCDIR)/cdboot/.profile $(DESTDIR)/.profile
