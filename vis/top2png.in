@@ -1,0 +1,66 @@
+#!/usr/bin/perl -w
+use English;
+use Getopt::Std;
+
+#
+# Convert a top file into a PNG image.
+# 
+
+sub usage()
+{
+    print STDOUT "Usage: top2png [-o <outputfile>] <inputfile>\n".
+	"Use -o to specify output file. Default to stdout.\n";
+    exit(-1);
+}
+my  $optlist = "o:";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+my $TOPPER = "$TB/libexec/vis/topper";
+my $RENDER = "$TB/libexec/vis/render";
+my $NEATO  = "neato";
+my $output;
+
+#
+# Turn off line buffering on output.
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"o"})) {
+    $output = $options{"o"};
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $input = $ARGV[0];
+
+if (! -e $input) {
+    die("*** $0:\n".
+	"    $input does not exist!\n");
+}
+
+my $cmd = "cat $input | $TOPPER | $NEATO | $RENDER";
+
+if (defined($output)) {
+    $cmd .= " > $output";
+}
+
+if (system($cmd)) {
+    exit(1);
+}
+exit(0);

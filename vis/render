@@ -1,0 +1,277 @@
+#!/usr/bin/perl -w
+
+#
+# Convert an outputed neato file into a png image
+# (does intelligent mashing/expanding)
+#
+# takes neato output file on stdin, spits png image out on stdout.
+#
+
+use GD;
+
+# "ideal" width and height
+
+$idealw = 500;
+$idealh = 500;
+
+%props = ();
+%nodes = ();
+@links = ();
+
+#parse input file
+
+while (<>) {
+  if (/^\s*(\w+)\s\[([^\]]*)\]/) {
+    # this line is a property set
+    ($cmd, $props) = ($1, $2);
+    $props =~ s/[\=\,]/ /g;
+
+    while (($props =~ s/^\s*(\w+)\s+((\"[^\"]*\")|(\w+))\s*//)) {
+	# add each property to %props
+        ($k, $v) = ($1, $2);
+	$v =~ s/\"//g;
+	$props{$k} = $v;
+#	print "property $k gets value $v\n";
+    } 
+
+    if ($cmd =~ /^node$/) {
+#	print "node property $props\n";
+    } elsif ($cmd =~ /^graph$/) {
+#	print "graph thingee (ignored)\n";
+    } else {
+	# there is a name here, not "node" or "graph"
+        # so it terminates the node.. store props away.
+	$nodes{$cmd} = {%props}; 
+	%props = ();
+    }
+  } elsif (/^\s*(\w+)\s\-\-\s(\w+)\s/) {
+    # a link.
+    ($a, $b) = ($1, $2);
+    push( @links, $a . " " . $b );    
+  }
+}
+
+
+%nodepos = ();
+
+($fontw, $fonth) = (gdSmallFont->width, gdSmallFont->height);
+
+# load position hash for nodes
+
+foreach $i (keys %nodes) {
+    if (exists $nodes{$i}{"pos"}) {
+	$s = $nodes{$i}{"pos"};
+	$s =~ /^\s*(\d+)\s+(\d+)/;    
+	$nodepos{ $i } = [$1, $2]; 	
+    }
+}
+
+$maxX = 1000;
+$minX = 0;
+$maxY = 1000;
+$minY = 0;
+
+$xSquishable = 1;
+$ySquishable = 1;
+
+# while we are above the ideal width or height,
+# and there exist empty rows or columns,
+# take out rows or columns of whitespace.
+
+while ((($maxX - $minX) > $idealw && $xSquishable) || 
+       (($maxY - $minY) > $idealh && $ySquishable)) {
+
+    if ($maxX - $minX > $idealw) {   
+	$totalsub = 0;
+	$lastvert = 0;
+	foreach $j (sort {$nodepos{ $a }[0] <=> $nodepos{ $b }[0]} keys %nodepos) 
+	{
+	    $vert = $nodepos{ $j }[0];
+	    if ($vert - $lastvert > 36) {
+#		$totalsub += ($vert - $lastvert - 36);
+		$totalsub += 1;
+#		warn " now eating $totalsub vert\n";
+	    }
+	    $nodepos{ $j }[0] -= $totalsub;
+	    $lastvert = $vert;
+	}
+    
+	if ($totalsub > 0) { $xSquishable = 1; } else { $xSquishable = 0; }
+    }
+
+    if ($maxY - $minY > $idealh) {
+	$totalsub = 0;
+	$lastvert = 0;
+	foreach $j (sort {$nodepos{ $a }[1] <=> $nodepos{ $b }[1]} keys %nodepos) 
+	{
+	    $vert = $nodepos{ $j }[1];
+	    if ($vert - $lastvert > 36) {
+#		$totalsub += ($vert - $lastvert - 36);
+		$totalsub += 1;
+#		warn "now eating $totalsub horiz\n";
+	    }
+	    $nodepos{ $j }[1] -= $totalsub;
+	    $lastvert = $vert;
+	}
+	
+	if ($totalsub > 0) { $ySquishable = 1; } else { $ySquishable = 0; }
+    }
+
+    $maxX = 0;
+    $maxY = 0;
+    $minX = 1000000;
+    $minY = 1000000;
+    
+    # get min and max X and Y
+    foreach $i (keys %nodepos) {
+	($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+	$halflabel = ((length( $i ) - 0.5) * $fontw) / 2;
+	if ($x + $halflabel > $maxX) { $maxX = $x + $halflabel; }
+	if ($y + $fonth> $maxY) { $maxY = $y + $fonth; }
+	if ($x - $halflabel < $minX) { $minX = $x - $halflabel; }
+	if ($y < $minY) { $minY = $y; }
+    }     
+}
+
+$xbig = $maxX - $minX;
+$ybig = $maxY - $minY;
+
+$xscale = 1.0;
+$yscale = 1.0;
+
+# if it is too small, scale everything up so it takes the
+# "ideal" amount of space
+
+if ($xbig < $idealw) {
+    $xscale = ($idealw / $xbig);
+    $xbig = $idealw;
+}
+
+if ($ybig < $idealh) {
+    $yscale = ($idealh / $ybig);
+    $ybig = $idealh;
+}
+
+foreach $i (keys %nodepos) {
+  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+  $x -= $minX;
+  $y -= $minY;
+
+  $x *= $xscale;
+  $y *= $yscale;
+
+  $x += 20;
+  $y += 20;
+  $nodepos{ $i } = [$x,$y];	
+}
+
+# start constructing the image
+
+$im = new GD::Image($xbig + 40, $ybig + 50);
+
+$nodeicon = GD::Image->newFromPng("nodeicon.png") || warn "nodeicon.png not found";
+$lanicon  = GD::Image->newFromPng("lanicon.png") || warn "lanicon.png not found";
+
+%colors = ();
+
+$colors{"black"} =  $im->colorAllocate(0,0,0);
+$colors{"blue"} =  $im->colorAllocate(0,0,192);
+$colors{"paleblue"} =  $im->colorAllocate(127,127,192);
+$colors{"green"} =  $im->colorAllocate(0,96,0);
+$colors{"orange"} =  $im->colorAllocate(255, 128, 0);
+$colors{"white"} =  $im->colorAllocate(255,255,255);
+$colors{"gray80"} = $im->colorAllocate(210,210,210);
+$colors{"gray75"} = $im->colorAllocate(191,191,191);
+$colors{"gray50"} = $im->colorAllocate(127,127,127);
+$colors{"gray25"} = $im->colorAllocate(63,63,63);
+
+# set clear background
+$bgcolor = $colors{"white"}; # $im->colorAllocate(254, 254, 254);
+
+$im->transparent($bgcolor);
+#$im->interlaced('true');
+$im->fill( 1, 1, $bgcolor );
+
+#$im->rectangle( 0,0,99,99, $gray50 );
+
+# render shadows
+
+foreach $i (keys %nodes) {
+  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+  $im->filledRectangle( $x - 12, $y - 12, 
+ 	                $x + 20, $y + 20, $colors{"gray80"});
+} 
+
+# render links
+
+foreach $i (@links) {
+  ($a, $b) = ($i =~ /(\w+)\s(\w+)/);
+
+  ($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
+  ($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
+
+  $im->line( $x1, $y1, $x2, $y2, $colors{"paleblue"} );
+#  print "Link: $i\n";
+}
+
+# render nodes.
+# if colors match certain colors, use icons instead
+# (hack)
+
+foreach $i (keys %nodes) {
+  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+
+  $cname = $nodes{$i}{"color"};
+  $c = $colors{ $cname } || $colors{"blue"};
+
+  $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
+  $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
+  $im->filledRectangle( $x - 14, $y - 14, 
+			$x + 14, $y + 14, $colors{"white"} );
+
+  if ($nodeicon && ($cname eq "skyblue" || $cname eq "steelblue")) {
+    $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
+  } elsif ($lanicon && $cname eq "green") {
+    $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
+  } else {
+  $im->filledRectangle( $x - 6, $y - 6, 
+			$x + 6, $y + 6, $c );
+  }
+} 
+
+# render text.
+# this is done in a second pass so no text is obscured by
+# boxes.
+
+foreach $i (keys %nodes) {
+  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+
+  $xpos = $x - (((length($i) - 0.5) * $fontw) / 2); 
+
+  $im->string(gdSmallFont, $xpos + 1, $y + 20, 
+	$i, $colors{"white"});
+  $im->string(gdSmallFont, $xpos - 1, $y + 20, 
+	$i, $colors{"white"});
+  $im->string(gdSmallFont, $xpos, $y + 19, 
+	$i, $colors{"white"});
+  $im->string(gdSmallFont, $xpos, $y + 21, 
+	$i, $colors{"white"});
+  $im->string(gdSmallFont, $xpos, $y + 20, 
+	$i, $colors{"black"});
+} 
+
+#write it to stdout
+
+binmode STDOUT;
+print $im->png;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 
+# I can visualize topologies again, topper!
+
 %color = (
   "pc850", "skyblue",
   "pc600", "steelblue",
