@@ -43,7 +43,7 @@ use English;
 my $vnodeid;
 
 #
-# True is running inside a jail. Set just below. 
+# True if running inside a jail. Set just below. 
 # 
 my $injail;
 
@@ -227,6 +227,7 @@ my $vname	= "";
 # Control tmcc error condition and timeout. Dynamic, not lexical!
 $tmccdie        = 1; 
 $tmcctimeout    = 0;
+my $TMCCTIMEO   = 30;	# Default timeout on remote nodes. 
 
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
@@ -352,6 +353,7 @@ sub cleanup_node ($) {
     unlink TMDELAY, TMLINKDELAY;
     unlink TMMOUNTDB . ".db";
     unlink TMSFSMOUNTDB . ".db";
+    unlink "$VARDIR/db/rtabid";
 
     #
     # If scrubbing, remove the password/group file DBs so that we revert
@@ -2027,7 +2029,7 @@ sub bootsetup()
 sub nodeupdate()
 {
     if (REMOTE()) {
-	local $tmcctimeout = 10;
+	local $tmcctimeout = $TMCCTIMEO;
 	nodeupdateaux();
     }
     else {

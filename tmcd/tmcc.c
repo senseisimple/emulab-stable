@@ -91,6 +91,30 @@ usage()
 	exit(1);
 }
 
+/*
+ * We cannot let remote nodes hang, but they can be slow. If we get connected
+ * we give it an extra timeout, and if we make any progress at all, keep
+ * giving it extra timeouts.
+ */
+static int connected = 0;
+static int progress  = 0;
+static int waitfor   = 0;
+
+static void
+tooktoolong()
+{
+	static int	lastprogress = 0;
+
+	/* If we made progress, keep going (reset timer too) */
+	if (connected && progress > lastprogress) {
+		lastprogress = progress;
+		alarm(waitfor);
+		return;
+	}
+
+	fprintf(stderr, "Timed out cause there was no progress!\n");
+	exit(-1);
+}
 
 int
 main(int argc, char **argv)
@@ -108,7 +132,6 @@ main(int argc, char **argv)
 	char			*keyfile  = NULL;
 	char			*privkey  = NULL;
 	char			*proxypath= NULL;
-	int			waitfor   = 0;
 
 	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:")) != -1)
 		switch(ch) {
@@ -276,6 +299,7 @@ main(int argc, char **argv)
 	 * When a timeout is requested, just let the signal kill us.
 	 */
 	if (waitfor) {
+		signal(SIGALRM, tooktoolong);
 		alarm(waitfor);
 	}
 
@@ -393,6 +417,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 		sleep(10);
 	}
  foundit:
+	connected = 1;
 
 	n = 1;
 	if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &n, sizeof(n)) < 0) {
@@ -426,6 +451,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 			}
 			break;
 		}
+		progress += cc;
 		if (dooutput(outfd, buf, cc) < 0)
 			goto bad;
 	}
@@ -471,9 +497,11 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 		fprintf(stderr, "short write (%d != %d)\n", cc, n);
 		return -1;
 	}
+	connected = 1;
 
 	cc = recvfrom(sock, buf, sizeof(buf) - 1, 0,
 		      (struct sockaddr *)&client, &length);
+	progress += cc;
 
 	if (cc < 0) {
 		perror("Reading from socket:");
@@ -515,6 +543,7 @@ dounix(char *data, int outfd, char *unixpath)
 		close(sock);
 		return -1;
 	}
+	connected = 1;
 
 	/*
 	 * Write the command to the socket and wait for the response.
@@ -542,6 +571,7 @@ dounix(char *data, int outfd, char *unixpath)
 			}
 			break;
 		}
+		progress += cc;
 		if (dooutput(outfd, buf, cc) < 0)
 			goto bad;
 	}
