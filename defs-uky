@@ -78,6 +78,7 @@ FSDIR_GROUPS=/groups
 FSDIR_PROJ=/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+FS_WITH_QUOTAS="/proj /groups /users"
 
 #
 # You shouldn't have to change anything below this point

@@ -25,3 +25,4 @@ WWWHOST=www.mini.emulab.net
 WWW=www.mini.emulab.net/~barb/www
 TBCOOKIESUFFIX=-mini
 THISHOMEBASE=Mini.Emulab.Net
+FS_WITH_QUOTAS="/z"

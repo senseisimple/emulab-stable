@@ -31,6 +31,7 @@ AC_SUBST(OURDOMAIN)
 AC_SUBST(FSDIR_PROJ)
 AC_SUBST(FSDIR_GROUPS)
 AC_SUBST(FSDIR_USERS)
+AC_SUBST(FS_WITH_QUOTAS)
 AC_SUBST(TRACK_INTERSWITCH_BANDWIDTH)
 AC_SUBST(TIMESTAMPS)
 AC_SUBST(UNIFIED_BOSS_AND_OPS)
@@ -396,6 +397,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/GNUmakefile account/tbacct account/webtbacct \
 	account/addpubkey account/webaddpubkey \
 	account/addsfskey account/webaddsfskey \
+	account/quotamail \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \

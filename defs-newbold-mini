@@ -23,3 +23,4 @@ WWW=www.mini.emulab.net/~newbold/www
 TBCOOKIESUFFIX=-mini
 THISHOMEBASE=Mini.Emulab.Net
 TBAUTHTIMEOUT=216000
+FS_WITH_QUOTAS="/z"

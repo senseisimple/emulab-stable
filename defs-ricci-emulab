@@ -24,3 +24,4 @@ FSDIR_USERS=/users
 
 WWWHOST=www.emulab.net
 WWW=www.emulab.net/~ricci/www
+FS_WITH_QUOTAS="/q /users"

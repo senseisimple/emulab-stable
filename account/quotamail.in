@@ -1,0 +1,53 @@
+#!/bin/sh
+
+# Found on the internet, and customized for Emulab
+
+#
+# This script must run as root on ops, and should be run from cron daily, 
+# with an entry in /etc/crontab (on ops) something like this:
+# 
+# 0   6   *   *   *   root   /usr/testbed/sbin/quotamail
+#
+# Some sites may wish to change the CC to a different list, or 
+# possibly even remove it all together.
+#
+# One possible caveat regarding quotas: If FS_NODE != USERNODE, they don't  
+# have a login on the fs machine. So checking their quota won't work unless
+# the rpc.rquotad(8) daemon is running on FS_NODE, which we currently don't
+# do.
+#
+
+for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /+/ {print $1}'`
+do
+(
+# feel free to change this message!!!
+cat << MESSAGE
+From: Testbed Operations <@TBOPSEMAIL_NOSLASH@>
+To: $i@@OURDOMAIN@
+Cc: Testbed Operations <@TBOPSEMAIL_NOSLASH@>
+Subject: over disk quota at @THISHOMEBASE@
+
+Hello,
+
+It looks like your disk usage has exceeded your disk quota. Please move or
+remove some files to get below your quota. Disk space is limited, so if
+you could clean up your directory it would be appreciated.
+
+You can check your usage with the 'quota' command on @USERNODE@:
+
+> quota -v -l
+`quota -v -l $i`
+
+The directory trees where you most likely have files are:
+Project directory:    @FSDIR_PROJ@
+Group directory:      @FSDIR_GROUPS@
+User/Home directory:  @FSDIR_USERS@   
+
+Thanks,
+@THISHOMEBASE@ Testbed Operations
+@TBOPSEMAIL_NOSLASH@
+
+MESSAGE
+) | /usr/sbin/sendmail -t
+done
+

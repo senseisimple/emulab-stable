@@ -22,3 +22,4 @@ WWWHOST=www.emulab.net
 WWW=www.emulab.net/~newbold/www
 THISHOMEBASE=Mac.Emulab.Net
 TBAUTHTIMEOUT=216000
+FS_WITH_QUOTAS="/q /users"

@@ -16,6 +16,7 @@ OURDOMAIN=ballmoss.com
 FSDIR_GROUPS=/groups
 FSDIR_PROJ=/proj
 FSDIR_USERS=/users
+FS_WITH_QUOTAS="/proj /groups /users"
 TBSTATEDEMAIL=stoller@stoller.casco.net
 TBTESTSUITEEMAIL=stoller@stoller.casco.net
 WWWHOST=golden-gw.ballmoss.com:9876

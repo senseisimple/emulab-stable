@@ -23,3 +23,4 @@ TBTESTSUITEEMAIL=shash+testsuite@cs.utah.edu
 WWWHOST=www.emulab.net
 WWW=www.emulab.net/~shash/www
 THISHOMEBASE=Shash@Emulab.Net
+FS_WITH_QUOTAS="/q /users"
