@@ -77,6 +77,7 @@ else {
 #
 # max_x and max_y are the bounds of the image from the state file.
 #
+if (0) {
 if (isset($max_x) && $max_x != "") {
     # Sanitize for the shell.
     if (!preg_match("/^[0-9]+$/", $max_x)) {
@@ -95,6 +96,7 @@ if (isset($max_y) && $max_y != "") {
 else {
     PAGEARGERROR("Must supply max_y for image");
 }
+} 
 
 #
 # Assume a single image for the robot map. When user clicks, pixel
