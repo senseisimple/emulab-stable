@@ -1,3 +1,10 @@
+#/bin/sh -
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #
 # HACK: run dhclient on all interfaces, and do nothing else
 #

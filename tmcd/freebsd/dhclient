@@ -1,5 +1,11 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Ignore interfaces passed in and just dhcp on all of them.
 # Since we are invoked by telling rc.conf to DHCP on lo0, we must
 # also correctly reset lo0's state.

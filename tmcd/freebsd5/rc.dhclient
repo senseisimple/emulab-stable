@@ -1,4 +1,8 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # In rc.conf, we have told it to just to configure lo0.  Then when the
 # rc.d/dhclient script is executed, it sources this (/etc/rc.conf.d/dhclient)
 # file where we identify all the actual interfaces and mark them as
