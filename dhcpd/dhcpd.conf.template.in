@@ -8,18 +8,15 @@
 # servers' IP addresses, the router's IP, and see the comment about nodetypes
 # below.
 #
-server-identifier               155.101.128.70;
-server-name                     "155.101.128.70";
-next-server			155.101.128.70;
+server-identifier               @BOSSNODE_IP@;
+server-name                     "@BOSSNODE_IP@";
 
-option  domain-name-servers     155.101.128.70;
-option  domain-name             "emulab.net";
-
+# Config these too?
 option  root-path		"/tftpboot";
+filename 			"/tftpboot/pxeboot.emu";
 
 default-lease-time              36000;                  # 10 hours
 max-lease-time                  36000;                  # 10 hours
-
 ddns-update-style               none;                   # req'd vers 3 directive
 
 # Define the PXE option space
@@ -58,27 +55,27 @@ class "PXE" {
 	option PXE.discovery-control 8;
 }
 
-subnet 155.101.128.0 netmask 255.255.255.0 {
-
-}
+@DHCPD_CONTROLNET_DECL@
  
 shared-network emulab {
  
-subnet 155.101.132.0 netmask 255.255.252.0 {
-
-	option subnet-mask		255.255.252.0;
-	option routers                  155.101.132.1;
-        filename 			"/tftpboot/pxeboot.emu";
+ subnet @CONTROL_NETWORK@ netmask @CONTROL_NETMASK@ {
+	option subnet-mask		@CONTROL_NETMASK@;
 
 	# Example of a dynamic range. If you uncomment the following line 
 	# (after changing the IP addresses to suitable ones, of course)
 	# unknown nodes will get assigned a random IP in it
-	range 155.101.132.200 155.101.132.249;
+	range @DHCPD_DYNRANGE@;
 
 	# testbed PCs
 	group {
+		next-server			@BOSSNODE_IP@;
+		option routers                  @CONTROL_ROUTER_IP@;
+		option  domain-name-servers     @BOSSNODE_IP@;
+		option  domain-name             "@OURDOMAIN@";
+
 		#
-		# For every PC nodetype, include a line like the the one below.
+		# For every PC nodetype, include a line like the one below.
 		# These lines will be replaced with auto-generated entries for
 		# nodes of that type. You can also use the class field from the
 		# node_types table
@@ -88,11 +85,18 @@ subnet 155.101.132.0 netmask 255.255.252.0 {
 
 	# stargates
 	group {
+		next-server			@BOSSNODE_IP@;
+		option routers                  @CONTROL_ROUTER_IP@;
+		option  domain-name-servers     @BOSSNODE_IP@;
+		option  domain-name             "@OURDOMAIN@";
+
 		%%nodetype=sg
 	}
-}
+ }
 
-subnet 172.16.0.0 netmask 255.240.0.0 {
-}
-
+ #
+ # Private network; for virtual (jailed) nodes.
+ #
+ subnet 172.16.0.0 netmask 255.240.0.0 {
+ }
 }

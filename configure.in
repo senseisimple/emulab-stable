@@ -65,6 +65,19 @@ AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
 AC_SUBST(PLAB_SLICEPREFIX)
 AC_SUBST(LINKTEST_NSPATH)
+AC_SUBST(BOSSNODE_IP)
+AC_SUBST(OPSNODE_IP)
+AC_SUBST(CONTROL_ROUTER_IP)
+AC_SUBST(CONTROL_NETWORK)
+AC_SUBST(CONTROL_NETMASK)
+AC_SUBST(PRIVATE_NETWORK)
+AC_SUBST(PRIVATE_ROUTER)
+AC_SUBST(PRIVATE_NETMASK)
+AC_SUBST(PUBLIC_NETWORK)
+AC_SUBST(PUBLIC_ROUTER)
+AC_SUBST(PUBLIC_NETMASK)
+AC_SUBST(DHCPD_DYNRANGE)
+AC_SUBST(DHCPD_CONTROLNET_DECL)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -112,6 +125,23 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
+#
+# Network config stuff. Obviously, this needs to be localized, but there are
+# too many defs files too worry about right now.
+#
+BOSSNODE_IP=155.98.32.70
+OPSNODE_IP=155.98.33.74
+CONTROL_ROUTER_IP=155.98.36.1
+CONTROL_NETWORK=155.98.36.0
+CONTROL_NETMASK=255.255.252.0
+PRIVATE_NETWORK=155.98.32.0
+PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETMASK=255.255.255.0
+PUBLIC_NETWORK=155.98.33.0
+PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETMASK=255.255.255.0
+DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+DHCPD_CONTROLNET_DECL=""
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -167,6 +197,15 @@ fi
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
 AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
 AC_SUBST(LOG_TESTBED)
+
+#
+# If the private network is different then the control network, we need
+# an extra subnet decl for it in dhcpd.conf.template. This is enormously
+# crude and simplistic, but works for the local case!
+# 
+if test "$PRIVATE_NETWORK" != "CONTROL_NETWORK"; then
+	DHCPD_CONTROLNET_DECL="subnet 155.98.32.0 netmask 255.255.255.0 {}"
+fi
 
 #
 # The email addresses need to be be munged for perl scripts. But,
@@ -551,6 +590,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
+	dhcpd/dhcpd.conf.template \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 

@@ -874,6 +874,19 @@ fi
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -920,6 +933,23 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
+#
+# Network config stuff. Obviously, this needs to be localized, but there are
+# too many defs files too worry about right now.
+#
+BOSSNODE_IP=155.98.32.70
+OPSNODE_IP=155.98.33.74
+CONTROL_ROUTER_IP=155.98.36.1
+CONTROL_NETWORK=155.98.36.0
+CONTROL_NETMASK=255.255.252.0
+PRIVATE_NETWORK=155.98.32.0
+PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETMASK=255.255.255.0
+PUBLIC_NETWORK=155.98.33.0
+PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETMASK=255.255.255.0
+DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+DHCPD_CONTROLNET_DECL=""
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -1022,6 +1052,15 @@ cat >> confdefs.h <<EOF
 EOF
 
 
+
+#
+# If the private network is different then the control network, we need
+# an extra subnet decl for it in dhcpd.conf.template. This is enormously
+# crude and simplistic, but works for the local case!
+# 
+if test "$PRIVATE_NETWORK" != "CONTROL_NETWORK"; then
+	DHCPD_CONTROLNET_DECL="subnet 155.98.32.0 netmask 255.255.255.0 {}"
+fi
 
 #
 # The email addresses need to be be munged for perl scripts. But,
@@ -1337,7 +1376,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1338: checking for a BSD compatible install" >&5
+echo "configure:1380: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1512,6 +1551,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
+	dhcpd/dhcpd.conf.template \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 
@@ -1716,6 +1756,19 @@ s%@TBLOGFACIL@%$TBLOGFACIL%g
 s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g
 s%@PLAB_SLICEPREFIX@%$PLAB_SLICEPREFIX%g
 s%@LINKTEST_NSPATH@%$LINKTEST_NSPATH%g
+s%@BOSSNODE_IP@%$BOSSNODE_IP%g
+s%@OPSNODE_IP@%$OPSNODE_IP%g
+s%@CONTROL_ROUTER_IP@%$CONTROL_ROUTER_IP%g
+s%@CONTROL_NETWORK@%$CONTROL_NETWORK%g
+s%@CONTROL_NETMASK@%$CONTROL_NETMASK%g
+s%@PRIVATE_NETWORK@%$PRIVATE_NETWORK%g
+s%@PRIVATE_ROUTER@%$PRIVATE_ROUTER%g
+s%@PRIVATE_NETMASK@%$PRIVATE_NETMASK%g
+s%@PUBLIC_NETWORK@%$PUBLIC_NETWORK%g
+s%@PUBLIC_ROUTER@%$PUBLIC_ROUTER%g
+s%@PUBLIC_NETMASK@%$PUBLIC_NETMASK%g
+s%@DHCPD_DYNRANGE@%$DHCPD_DYNRANGE%g
+s%@DHCPD_CONTROLNET_DECL@%$DHCPD_CONTROLNET_DECL%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
