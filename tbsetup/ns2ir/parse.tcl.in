@@ -139,6 +139,9 @@ namespace eval GLOBALS {
 
     # This will hold the handle for the database connection
     variable DB {}
+
+    # These are going to be default values within the NS file.
+    variable default_ip_routing_type "none"
 }
 
 # Connect to the DB

@@ -40,7 +40,6 @@ Node instproc init {s} {
     $self set deltas ""
     $self set tarfiles ""
     $self set failureaction "fatal"
-    $self set routertype "none"
 }
 
 # The following procs support renaming (see README)
@@ -81,6 +80,7 @@ Node instproc updatedb {DB} {
     $self instvar routertype
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::default_ip_routing_type
 
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
@@ -99,7 +99,7 @@ Node instproc updatedb {DB} {
     }
 
     # Update the DB
-    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$routertype\")";
+    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\")";
 }
 
 # add_lanlink lanlink

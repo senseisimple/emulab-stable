@@ -151,17 +151,19 @@ proc tb-set-node-deltas {node args} {
     }
     $node set deltas [join $args :]
 }
-proc tb-set-node-routertype {node type} {
+proc tb-set-ip-routing {type} {
+    var_import ::GLOBALS::default_ip_routing_type
+
     if {$type == {}} {
-	perror "\[tb-set-node-routertype] No type given."
+	perror "\[tb-set-ip-routing] No type given."
 	return
     }
     if {($type != "none") &&
-	($type != "gated")} {
-	perror "\[tb-set-node-routertype] Type is not one of none|gated"
+	($type != "ospf")} {
+	perror "\[tb-set-ip-routing] Type is not one of none|ospf"
 	return
     }
-    $node set routertype $type
+    set default_ip_routing_type $type
 }
 
 # Lan/Link state routines.
