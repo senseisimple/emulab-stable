@@ -763,7 +763,7 @@ CREATE TABLE location_info (
   building varchar(32) default NULL,
   loc_x int(10) unsigned NOT NULL default '0',
   loc_y int(10) unsigned NOT NULL default '0',
-  orientation float default NULL;
+  orientation float default NULL,
   contact tinytext,
   phone tinytext,
   room varchar(32) default NULL,
