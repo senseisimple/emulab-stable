@@ -52,3 +52,5 @@ mkdir -p /var/emulab/jails
 mkdir -p /var/emulab/lock
 mkdir -p /var/emulab/logs
 
+# Remove dhcpcd temp files (XXX: shouldn't have to do this..)
+rm -f /etc/dhcpc/dhcpcd-*
