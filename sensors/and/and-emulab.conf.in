@@ -29,9 +29,9 @@ interval 120
 #
 lv1time 90
 lv2time 1800
-lv2cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (30 min.)" @TBOPSEMAIL@
+lv2cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (30 min.)" @TBAUTOMAILEMAIL@ -f @TBOPSEMAIL@
 lv3time 7200
-lv3cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (2 hrs.)" @TBOPSEMAIL@
+lv3cmd mail -s "@THISHOMEBASE@: CPU Hog - $AND_COMMAND (2 hrs.)" @TBAUTOMAILEMAIL@ -f @TBOPSEMAIL@
 
 #
 # Strategy for picking the right priority entry for a user/group/job
