@@ -493,6 +493,17 @@ void remove_node(vvertex vv)
     SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
     pnode->remove_current_type();
+    // ptypes
+    tb_pnode::types_list::iterator lit = pnode->type_list.begin();
+    while (lit != pnode->type_list.end()) {
+	int removed_violations = (*lit)->ptype->remove_users((*lit)->max_load);
+	if (removed_violations) {
+	    SSUB(SCORE_MAX_TYPES * removed_violations);
+	    violated -= removed_violations;
+	    vinfo.max_types -= removed_violations;
+	}
+	lit++;
+    }
   } else if (old_load > tr->max_load) {
     // If the pnode was over its load, remove the penalties for the nodes we
     // just removed, down to the max_load.
@@ -1125,6 +1136,17 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
   if (old_total_load == 0) {
     SDEBUG(cerr << "  new pnode" << endl);
     SADD(SCORE_PNODE);
+    // ptypes
+    tb_pnode::types_list::iterator lit = pnode->type_list.begin();
+    while (lit != pnode->type_list.end()) {
+	int new_violations = (*lit)->ptype->add_users((*lit)->max_load);
+	if (new_violations) {
+	    SADD(SCORE_MAX_TYPES * new_violations);
+	    violated += new_violations;
+	    vinfo.max_types += new_violations;
+	}
+	lit++;
+    }
   }
 #ifdef LOAD_BALANCE
   SSUB(SCORE_PNODE * (powf(1 + ((pnode->current_load-1) * 1.0)/pnode->max_load,2)));

@@ -17,7 +17,6 @@ using namespace boost;
 #include "parser.h"
 
 extern name_pvertex_map pname2vertex;
-extern name_count_map ptypes;
 
 #define ptop_error(s) errors++;cout << "PTOP:" << line << ": " << s << endl; exit(EXIT_FATAL)
 #define ptop_error_noline(s) errors++;cout << "PTOP: " << s << endl
@@ -98,15 +97,21 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    ptop_error("Bad node line, bad load: " << load << ".");
 	    iload = 1;
 	  }
+
+	  /*
+	   * Make a tb_ptype structure for this guy - or just add this node to
+	   * it if it already exists
+	   */
 	  if (ptypes.find(type) == ptypes.end()) {
-	      ptypes[type] = iload;
-	  } else {
-	      ptypes[type] += iload;
+	      ptypes[type] = new tb_ptype(type);
 	  }
+	  ptypes[type]->add_slots(iload);
+	  tb_ptype *ptype = ptypes[type];
+
 	  if (type.compare("switch") == 0) {
 	    isswitch = true;
 	    p->is_switch = true;
-	    p->types["switch"] = new tb_pnode::type_record(1,false);
+	    p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
 	    svertex sv = add_vertex(SG);
 	    tb_switch *s = new tb_switch();
 	    put(svertex_pmap,sv,s);
@@ -114,8 +119,9 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    p->sgraph_switch = sv;
 	    p->switches.insert(pv);
 	  } else {
-	    p->types[type] = new tb_pnode::type_record(iload,is_static);
+	    p->types[type] = new tb_pnode::type_record(iload,is_static,ptype);
 	  }
+	  p->type_list.push_back(p->types[type]);
 	}
 	for (i=i+1;(i<parsed_line.size()) && (parsed_line[i].compare("-")) ;++i) {
 	  crope feature,cost;
@@ -294,6 +300,23 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 #endif
 	}
       }
+    } else if (command.compare("set-type-limit") == 0) {
+      if (parsed_line.size() != 3) {
+	ptop_error("Bad set-type-limit line, requires two arguments.");
+      }
+      crope type = parsed_line[1];
+      int max;
+      if (sscanf(parsed_line[2].c_str(),"%u",&max) != 1) {
+	  ptop_error("Bad number argument: " << parsed_line[2] << ".");
+      }
+
+      // Look for a record for this ptype - create it if it doesn't exist
+      if (ptypes.find(type) == ptypes.end()) {
+	  ptypes[type] = new tb_ptype(type);
+      }
+
+      ptypes[type]->set_max_users(max);
+
     } else {
       ptop_error("Unknown directive: " << command << ".");
     }

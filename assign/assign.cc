@@ -54,9 +54,6 @@ tb_vgraph VG;
 tb_vgraph_vertex_pmap vvertex_pmap = get(vertex_data, VG);
 tb_vgraph_edge_pmap vedge_pmap = get(edge_data, VG);
 
-// A simple list of physical types.
-name_count_map ptypes;
-
 // List of virtual types by name.
 name_count_map vtypes;
 name_list_map vclasses;
@@ -126,6 +123,9 @@ double use_connected_pnode_find = 0.0f;
 // XXX - shouldn't be in this file
 double absbest;
 int absbestviolated, iters, iters_to_best;
+
+// Map of all physical types in use in the system
+tb_ptype_map ptypes;
 
 /*
  * Internal functions
@@ -353,17 +353,25 @@ int type_precheck() {
 	    vtype_it != vtypes.end();++vtype_it) {
     
 	// Check to see if there were any pnodes of the type at all
-	name_count_map::iterator ptype_it = ptypes.find(vtype_it->first);
+	tb_ptype_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
 	    cout << "  *** No physical nodes of type " << vtype_it->first
 		<< " found" << endl;
 	    ok = false;
 	} else {
 	    // Okay, there are some - are there enough?
-	    if (ptype_it->second < vtype_it->second) {
+	    if (ptype_it->second->pnode_slots() < vtype_it->second) {
 		cout << "  *** " << vtype_it->second << " nodes of type " <<
 		    vtype_it->first << " requested, but only "
-		    << ptype_it->second << " found" << endl;
+		    << ptype_it->second->pnode_slots() << " found" << endl;
+		ok = false;
+	    }
+	    // Okay, there are enough - but are we allowed to use them?
+	    if (ptype_it->second->maxusers() &&
+		    (ptype_it->second->maxusers() < vtype_it->second)) {
+		cout << "  *** " << vtype_it->second << " nodes of type " <<
+		    vtype_it->first << " requested, but you are only " <<
+		    "allowed to use " << ptype_it->second->maxusers() << endl;
 		ok = false;
 	    }
 	}

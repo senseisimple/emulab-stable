@@ -127,6 +127,9 @@ static float SCORE_TRIVIAL_MIX = 0.5; /* Cost of mixing trivial and non-trivial
 					 links */
 
 static float SCORE_SUBNODE = 0.5; /* Cost of not properly assigning subnodes */
+static float SCORE_MAX_TYPES = 0.15; /* Cost of going over type limits - low 
+                                      * enough that assign ususally picks this
+				      * over leaving a node unassigned */
 
 // The following are used to weight possible link resolutions.  Higher
 // numbers mean a more likely resolution.  Trivial resolutions are always

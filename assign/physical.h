@@ -95,6 +95,52 @@ extern tb_pgraph_edge_pmap pedge_pmap;
 extern tb_sgraph_vertex_pmap svertex_pmap;
 extern tb_sgraph_edge_pmap sedge_pmap;
 
+/*
+ * Represents a physical type
+ */
+class tb_ptype {
+    public:
+	tb_ptype(crope _name) : users(0), max_users(0), my_name(_name), slots(0)
+	    { ; }
+	inline crope name() const { return my_name; };
+	inline int pnode_slots() const { return slots; };
+	inline int maxusers() const { return max_users; };
+	inline int add_users(int count = 1) {
+	    int oldusers = users;
+	    users = users + count;
+	    if (max_users && (oldusers <= max_users) && (users > max_users)) {
+		return 1;
+	    } else {
+		return 0;
+	    }
+	}
+	inline int remove_users(int count = 1) {
+	    int oldusers = users;
+	    users = users - count;
+	    assert(users >= 0);
+	    if (max_users && (oldusers > max_users) && (users <= max_users)) {
+		return 1;
+	    } else {
+		return 0;
+	    }
+	}
+	inline void set_max_users(int users) {
+	    max_users = users;
+	}
+	inline void add_slots(int additional_slots) {
+	    slots += additional_slots;
+	}
+    private:
+	crope my_name;
+	/* How many users are using this type right now */
+	int users;
+	/* The maximum number of nodes of this type we're allowed to use */
+	int max_users;
+	/* How many slots of this type are available in the physical topology */
+	int slots;
+};
+
+
 class tb_pnode {
 public:
   tb_pnode() { tb_pnode("(unnamed)"); }
@@ -110,12 +156,15 @@ public:
 
   class type_record {
       public:
-	  type_record(int _max_load, bool _is_static) :
+	  type_record(int _max_load, bool _is_static, tb_ptype *_ptype) :
 	      max_load(_max_load), current_load(0),
-	      is_static(_is_static) { ; }
+	      is_static(_is_static), ptype(_ptype) { ; }
 	  int max_load;		// maximum load for this type
 	  int current_load;	// how many vnodes are assigned of this type
 	  bool is_static;	// whether this type is static or dynamic
+
+	  tb_ptype *ptype;	// Pointer to the global ptype strucutre for
+	  			// type
 
 	  bool operator==(const type_record &b) {
 	      return ((max_load == b.max_load) && (is_static == b.is_static));
@@ -129,9 +178,15 @@ public:
 	  }
   };
 
-  // contains max nodes for each type
+  // Contains max nodes for each type
+  // NOTE: Parallel data strucure, see below!
   typedef hash_map<crope,type_record*> types_map;
   types_map types;
+  
+  // Same as above, but a list for fast iteration
+  // If you touch the above list, you must touch this one too
+  typedef list<type_record*> types_list;
+  types_list type_list;
 
   // contains cost of each feature
   node_feature_set features;
@@ -347,5 +402,9 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 
 /* The physical graph, defined in assign.cc */
 extern tb_pgraph PG;
+
+/* A map of all tb_ptypes currently in existance */
+typedef map<crope,tb_ptype*> tb_ptype_map;
+extern tb_ptype_map ptypes;
 
 #endif
