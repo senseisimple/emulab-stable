@@ -5,19 +5,6 @@
 # Server version	3.23.47-log
 
 #
-# Table structure for table 'virt_agents'
-#
-
-CREATE TABLE virt_agents (
-  pid varchar(12) NOT NULL default '',
-  eid varchar(32) NOT NULL default '',
-  vname varchar(32) NOT NULL default '',
-  vnode varchar(32) NOT NULL default '',
-  objecttype smallint(5) unsigned NOT NULL default '0',
-  PRIMARY KEY (pid,eid,vname,vnode)
-) TYPE=MyISAM;
-
-#
 # Table structure for table 'comments'
 #
 
@@ -389,7 +376,7 @@ CREATE TABLE next_reserve (
 #
 
 CREATE TABLE node_types (
-  class enum('pc','shark','switch','power') NOT NULL default 'pc',
+  class varchar(10) default NULL,
   type varchar(30) NOT NULL default '',
   proc varchar(30) default NULL,
   speed smallint(5) unsigned default NULL,
@@ -737,6 +724,19 @@ CREATE TABLE users (
   cvsweb tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'virt_agents'
+#
+
+CREATE TABLE virt_agents (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  objecttype smallint(5) unsigned NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,vname,vnode)
 ) TYPE=MyISAM;
 
 #
