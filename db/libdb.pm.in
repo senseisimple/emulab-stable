@@ -2831,7 +2831,7 @@ sub TBIPtoNodeID($$)
 	DBQueryFatal("select n.node_id from interfaces as i ".
 		     "left join nodes as n on n.node_id=i.node_id ".
 		     "left join node_types as t ".
-		     "   on t.type=n.type and i.card=t.control_net ".
+		     "   on t.type=n.type and i.iface=t.control_iface ".
 		     "where i.IP='$ip'");
 
     if ($query_result->numrows == 0) {
