@@ -231,7 +231,7 @@ int assign()
     }
     node pn = pname2node.access(fixed_nodes.inf(fixed_it));
     int ppos = pnode2posistion.access(&PG[pn]);
-    if (G[n].vclass != NULL) {
+    if (G[vn].vclass != NULL) {
       cerr << "Can not have fixed nodes be in a vclass!\n";
       exit(1);
     }
