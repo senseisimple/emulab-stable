@@ -83,15 +83,14 @@ function GENPLIST ($query_result)
               <td>(Approved?) Description</td>
               <td>Leader</td>
               <td align=center>Days<br>Idle</td>
-              <td align=center>Expts<br>Created</td>
-              <td align=center>Expts<br>Running</td>
+              <td align=center colspan=2>Expts<br>Cr, Run</td>
               <td align=center>Nodes</td>\n";
 
     #
-    # Admin users get a "delete" option.
+    # Admin users get other fields.
     # 
     if ($isadmin) {
-	echo "<td align=center>Delete</td>\n";
+	echo "<td align=center>Pub?</td>\n";
     }
     echo "</tr>\n";
 
@@ -103,6 +102,7 @@ function GENPLIST ($query_result)
 	$created    = $projectrow[created];
 	$expt_count = $projectrow[expt_count];
 	$expt_last  = $projectrow[expt_last];
+	$public     = $projectrow[public];
 
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -135,24 +135,27 @@ function GENPLIST ($query_result)
 	    echo "<td>$idle_row[0]</td>\n";
 	}
 
-	echo "<td>$expt_count</td>\n";
-
 	# Number of Current Experiments.
-	$count1 =
+	$query_cur_expts =
 	    DBQueryFatal("SELECT count(*) FROM experiments where pid='$pid'");
-	$row1   = mysql_fetch_array($count1);
+	$cur_expts_row = mysql_fetch_array($query_cur_expts);
 
 	# Number of nodes reserved.
-	$count2 =
+	$query_nodes_reserved =
 	    DBQueryFatal("SELECT count(*) FROM reserved where pid='$pid'");
-	$row2   = mysql_fetch_array($count2);
-	
-	echo "<td>$row1[0]</td><td>$row2[0]</td>\n";
+	$nodes_reserved_row = mysql_fetch_array($query_nodes_reserved);
+
+	echo "<td>$expt_count</td>\n";
+	echo "<td>$cur_expts_row[0]</td>\n";
+	echo "<td>$nodes_reserved_row[0]</td>\n";
 
 	if ($isadmin) {
-	    echo "<td align=center><A href='deleteproject.php3?pid=$pid'>
-                      <img alt='o' src='redball.gif'></A>
-                  </td>\n";
+	    if ($public) {
+		echo "<td align=center><img alt='Y' src='greenball.gif'></td>";
+	    }
+	    else {
+		echo "<td align=center><img alt='N' src='redball.gif'></td>\n";
+	    }
 	}
 	echo "</tr>\n";
     }

@@ -173,7 +173,11 @@ echo "<p><center>
        <A href='newgroup_form.php3?pid=$pid'>Yes</a>
       </center>\n";
 
-echo "</center>\n";
+if ($isadmin) {
+    echo "<p>
+          <A href='deleteproject.php3?pid=$pid'>
+             <font color=Red>Delete this project?</font></a>\n";
+}
 
 #
 # Standard Testbed Footer
