@@ -6,7 +6,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event-sched.h,v 1.4 2002-03-05 16:21:24 stoller Exp $
+ * $Id: event-sched.h,v 1.5 2002-05-05 14:11:49 stoller Exp $
  */
 
 #ifndef __SCHED_H__
@@ -36,6 +36,7 @@ typedef struct sched_event {
 #else
 #define TRACE(fmt,...)
 #endif /* DEBUG */
+extern int debug;
 
 /*
  * Function prototypes:
