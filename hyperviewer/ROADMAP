@@ -66,9 +66,9 @@ Files, by area in the diagram above:
 Package dependencies:
 
  . wxGlade-0.3.1_1     GUI builder for wxPython/wxWindows written in Python
+   py23-wxPython-2.4.2.4_2 Python bindings for the wxWidgets/GTK GUI toolkit
    wxgtk-common-2.4.2_1 The wxWidgets GUI toolkit (common files)
    wxgtk2-2.4.2_3      The wxWidgets GUI toolkit (GTK2 version)
-   py23-wxPython-2.4.2.4_2 Python bindings for the wxWidgets/GTK GUI toolkit
 
    - Documentation:
 	wxGlade tutorial - file:///usr/local/share/doc/wxGlade/tutorial.html
