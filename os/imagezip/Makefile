@@ -1,4 +1,6 @@
-CC = gcc
+include ../../Makeconf
+include ../../GNUmakerules
+
 CFLAGS = -O2 -g
 LIBS = -lz
 
@@ -10,9 +12,7 @@ imagezip: imagezip.c
 imageunzip: imageunzip.c
 	$(CC) $(CFLAGS) imageunzip.c $(LIBS) -o imageunzip
 
-install: imagezip imageunzip
-	install -c imagezip /usr/testbed/bin
-	install -c imageunzip /usr/testbed/bin
+install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 
 clean:
 	/bin/rm -f *.o imagezip imageunzip
