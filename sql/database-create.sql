@@ -189,6 +189,15 @@ CREATE TABLE experiments (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'exported_tables'
+#
+
+CREATE TABLE exported_tables (
+  table_name varchar(64) NOT NULL default '',
+  PRIMARY KEY  (table_name)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'exppid_access'
 #
 

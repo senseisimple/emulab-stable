@@ -1,0 +1,44 @@
+#!/usr/bin/perl -w
+#
+# export_tables - Create an SQL file with the contents of selected tables 
+# that should more or less be the same across all sites.
+#
+
+use English;
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
+my $DBNAME = '@TBDBNAME@';
+
+my $mysqldump = "mysqldump";
+
+if (!TBAdmin($UID)) {
+    die("Only admins get to use this program\n");
+}
+
+#
+# Build a list of tables to export
+#
+my $result = DBQueryFatal("select table_name from exported_tables");
+my $table_names;
+while (my ($table_name) = $result->fetchrow()) {
+    $table_names .= "$table_name ";
+}
+
+#
+# Run mysqldump, and read its stdout
+#
+open(FH,"$mysqldump -t $DBNAME $table_names |") or
+    die "Unable to run $mysqldump: $!\n";
+
+#
+# Change INSERT to REPLACE, so that the resulting SQL can be used to update
+# existing databases.
+#
+while (<FH>) {
+    s/^INSERT/REPLACE/g;
+    print;
+}
