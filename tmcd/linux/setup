@@ -11,6 +11,7 @@ my $TMPASSWD    = "/etc/rc.d/testbed/passwd";
 my $TMSHADOW    = "/etc/rc.d/testbed/shadow";
 my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
 my @CONFIGS	= ($TMIFC);
+my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
@@ -186,6 +187,7 @@ close(TM);
 sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink @CONFIGS;
+    unlink @LOCKFILES;
 
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
