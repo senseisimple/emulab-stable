@@ -51,6 +51,22 @@ if (!$isadmin &&
 }
 
 #
+# Tell the user how many PCs he is using.
+#
+$yourpcs = TBUserPCs($target_uid);
+
+if ($yourpcs) {
+    echo "<center><h2><font color=Red>\n";
+    
+    if (strcmp($uid, $target_uid))
+	echo "$uid is using $yourpcs PCs!\n";
+    else
+	echo "You are using $yourpcs PCs!\n";
+    
+    echo "</font></h2></center>\n";
+}
+
+#
 # Lets show projects.
 #
 $query_result =
@@ -133,7 +149,7 @@ if ($isadmin ||
 
     echo "<br><br><center>
            <A href='modusr_form.php3?target_uid=$target_uid'>
-              Edit User Info?</a>
+              Edit Profile?</a>
          </center>\n";
 }
     
