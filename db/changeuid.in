@@ -1,0 +1,176 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Change the uid of an UNAPPROVED user. 
+#
+sub usage()
+{
+    print(STDERR "Usage: changeuid <olduid> <newuid>\n");
+    exit(-1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# We don't want to run this script unless its the real version.
+#
+#if ($EUID != 0) {
+#    die("*** $0:\n".
+#	"    Must be setuid! Maybe its a development version?\n");
+#}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# Only admin types!
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Only TB administrators can run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $olduid = shift(@ARGV);
+my $newuid = shift(@ARGV);
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Get the user status. Only users in the new or unapproved state can
+# have their uid changed. Once the account is created, it is much more
+# difficult to deal with.
+#
+$query_result =
+    DBQueryFatal("select status from users where uid='$olduid'");
+
+if ($query_result->numrows == 0) {
+    die("*** $0:\n".
+	"    No such user '$olduid' in the DB!\n");
+}
+my ($status) = $query_result->fetchrow_array();
+
+#
+# Only operate on unapproved users (must be verified). Any other state
+# is hard to deal with cause of exported homedirs, existing experiments,
+# files that need to be changed on disk, etc. Maybe add this support later.
+# 
+if ($status ne USERSTATUS_UNAPPROVED()) {
+    die("*** $0:\n".
+	"    User '$olduid' must be an unapproved (verified) user!\n");
+}
+
+#
+# Obviously the new user must not exist in the users table. This is the
+# last table we change below ...
+#
+$query_result =
+    DBQueryFatal("select status from users where uid='$newuid'");
+
+if ($query_result->numrows) {
+    die("*** $0:\n".
+	"    User '$newuid' is already in the DB!\n");
+}
+
+#
+# Change a bunch of tables!
+#
+print "Updating group_membership table ...\n";
+DBQueryFatal("update group_membership set uid='$newuid' ".
+	     "where uid='$olduid'");
+
+print "Updating projects table ...\n";
+DBQueryFatal("update projects set head_uid='$newuid' ".
+	     "where head_uid='$olduid'");
+
+print "Updating user_pubkeys table ...\n";
+DBQueryFatal("update user_pubkeys set uid='$newuid' ".
+	     "where uid='$olduid'");
+
+print "Updating user_sfskeys table ...\n";
+DBQueryFatal("update user_sfskeys set uid='$newuid' ".
+	     "where uid='$olduid'");
+
+print "Updating user_stats table ...\n";
+DBQueryFatal("update user_stats set uid='$newuid' ".
+	     "where uid='$olduid'");
+
+print "Updating widearea_accounts table ...\n";
+DBQueryFatal("update widearea_accounts set uid='$newuid' ".
+	     "where uid='$olduid'");
+
+# Auto logout old user. 
+print "Clearing logins table ...\n";
+DBQueryFatal("delete from login where uid='$olduid'");
+
+#
+# Lastly change users table; if anything breaks above we can still run
+# this script to finish the job. Technically, we should lock these tables
+# so that no one can sneak in and create a new user with the same uid
+# as new one, but that is not likely to happen!
+#
+print "Updating users table ...\n";
+DBQueryFatal("update users set uid='$newuid' where uid='$olduid'");
