@@ -722,6 +722,8 @@ CREATE TABLE users (
   stud tinyint(4) default '0',
   pswd_expires date default NULL,
   cvsweb tinyint(4) NOT NULL default '0',
+  emulab_pubkey text,
+  home_pubkey text,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
