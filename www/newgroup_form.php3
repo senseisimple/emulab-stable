@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Edit your Group");
+PAGEHEADER("Create a Project Group");
 
 #
 # Only known and logged in users.
@@ -15,18 +15,29 @@ LOGGEDINORDIE($uid);
 #
 # Verify page arguments.
 # 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a project ID.", 1);
+if (!isset($pid) || strcmp($pid, "") == 0) {
+    unset($pid);
+
+    #
+    # See what projects the uid can do this in.
+    #
+    $projlist = TBProjList($uid, $TB_PROJECT_MAKEGROUP);
+
+    if (! count($projlist)) {
+	USERERROR("You do not appear to be a member of any Projects in which ".
+		  "you have permission to create new groups.", 1);
+    }
+}
+else {
+    #
+    # Verify permission for specific group.
+    #
+    if (! TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEGROUP)) {
+	USERERROR("You do not have permission to create groups in ".
+		  "project $pid!", 1);
+    }
 }
 
-#
-# Verify permission.
-#
-if (! TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_MAKEGROUP)) {
-    USERERROR("You do not have permission to create groups in project $pid!",
-	      1);
-}
 
 echo "<form action=newgroup.php3 method=post>
       <table align=center border=1> 
@@ -36,12 +47,28 @@ echo "<form action=newgroup.php3 method=post>
         </td>
       </tr>\n";
 
-echo "<tr>
-          <td>Project:</td>
-          <td class=left>
-              <input name=group_pid type=readonly value='$pid'>
-          </td>
-      </tr>\n";
+if (isset($pid)) {
+    echo "<tr>
+              <td>Project:</td>
+              <td class=left>
+                  <input name=group_pid type=readonly value='$pid'>
+              </td>
+          </tr>\n";
+}
+else {
+    echo "<tr>
+              <td>*Select Project:</td>";
+    echo "    <td><select name=pid>";
+
+    for ($i = 0; $i < count($projlist); $i++) {
+	$pid = $projlist[$i];
+
+	echo "    <option value='$pid'>$pid</option>\n";
+    }
+    echo "       </select>";
+    echo "    </td>
+          </tr>\n";
+}
 
 echo "<tr>
           <td>*Group Name (no blanks, lowercase):</td>

@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Create a Testbed Group");
+PAGEHEADER("Create a Project Group");
 
 $mydebug = 0;
 
