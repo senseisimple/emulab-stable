@@ -73,8 +73,8 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON_ABS("Kentucky Emulab", $TBDOCBASE,
 			   "http://www.uky.emulab.net");
     
-    WRITESIDEBARBUTTON_NEW("Tutorial at SIGCOMM",
-		       $TBDOCBASE, "sc2002tut.php3");
+    WRITESIDEBARBUTTON_NEW("Join Netbed (CD)",
+			   $TBDOCBASE, "cdrom.php");
 
     WRITESIDEBARBUTTON_NEW("News (August&nbsp;15)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
