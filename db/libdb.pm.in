@@ -78,7 +78,7 @@ use Exporter;
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
-	 TBUnixGroupList TBOSID TBImageID TBdbfork
+	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid
 	 );
 
 # Must come after package declaration!
@@ -1067,6 +1067,31 @@ sub NodeidToExp ($$$;$) {
     }
     return 1;
 }
+
+#
+# Map a pid/eid/vname to its real nodename
+#
+# usage: VnameToNodeid(char *pid, char * eid, char *vname, \$nodeid)
+#        returns 1 if the specified pid/eid/vname exists
+#        returns 0 if it does not
+#
+sub VnameToNodeid ($$$$) {
+    my($pid, $eid, $vname, $nodeid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select node_id from reserved ".
+		    "where pid='$pid' and eid='$eid' and vname='$vname'");
+
+    if (! $query_result ||
+	! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    $$nodeid = $row[0];
+    return 1;
+}
+
 
 #
 # Get the default ImageID for a particular node, from the node_types table.
