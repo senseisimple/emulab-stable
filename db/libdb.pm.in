@@ -2942,7 +2942,7 @@ sub TBActivityReport($)
 #			 char *mode, int code, int flags)
 #        Mode is one of preload, start, in, out, modify, end.
 #
-sub GatherSwapStats($$$$$;$)
+sub GatherSwapStats($$$$;$$)
 {
     my ($pid, $eid, $uid, $mode, $ecode, $flags) = @_;
     my ($pnodes,$vnodes,$duration);
@@ -2950,6 +2950,8 @@ sub GatherSwapStats($$$$$;$)
     # Optional argument to modify the stats gathering. 
     $flags = 0
 	if (!defined($flags));
+    $ecode = 0
+	if (!defined($ecode));
     
     local $DBQUERY_MAXTRIES = 5;
 
