@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -64,6 +64,9 @@
 #define TBDB_NODESTATE_RELOADING  "RELOADING"
 #define TBDB_NODESTATE_RELOADDONE "RELOADDONE"
 #define TBDB_NODESTATE_UNKNOWN    "UNKNOWN"
+#define TBDB_NODESTATE_PXEWAIT    "PXEWAIT"
+#define TBDB_NODESTATE_PXEWAKEUP  "PXEWAKEUP"
+#define TBDB_NODESTATE_PXEBOOTING "PXEBOOTING"
 
 #define TBDB_NODEOPMODE_NORMAL      "NORMAL"
 #define TBDB_NODEOPMODE_DELAYING    "DELAYING"
