@@ -61,15 +61,19 @@ foreach my $n (0..$#ARGV) {
   #
   # Untaint the arguments.
   #
-  if ($machines[$n] =~ /^([-\@\w.]+)$/) {
+  $machines[$n] =~ s/^([-\@\w.]+)$/$1/;
+  if ($machines[$n] =~ /^(sh\d+)-[1-8]$/) {
+    print "WARNING: Rebooting $machines[$n] will reboot all of shelf $1!\n";
     $machines[$n] = $1;
   }
 }
-foreach my $n (0..$#ARGV) {
-  $machines[$n]= "\L$machines[$n]"; #Lowercase everything...
+my %all_nodes = ();
+foreach my $n (0..$#machines) {
+  $all_nodes{"\L$machines[$n]"} = 1; # Lowercase it and use as hash key
 }
-#print out args
-print "do \"$op\" to ",@machines,"\n" if $verbose > 1;
+@machines= sort keys %all_nodes;
+# then dump the args
+print "do \"$op\" to @machines\n" if $verbose > 1;
 
 use Mysql;
 
@@ -192,20 +196,19 @@ foreach $node ( sort @machines) {
     }
   }
   if (!$Approved) {
-    if ($node =~ /(sh\d+)-\d/) {
-      print "$node: Sharks are controlled by shelf only. Use '$1'.\n"; 
-      $exitval++;
-    } elsif (defined ($timelimited{$node})) {
+    if (defined ($timelimited{$node})) {
       print "Node '$node' was power controlled within the last ".
 	$timelimited{$node}." seconds. Skipping...\n";
+    } elsif ( ! defined ($IPList{$node}) ) {
+      print "Machine $node not found. Skipping...\n";
+      $exitval++;
     } else {
       print "You are not authorized to control $node. Skipping...\n";
       $exitval++;
     }
   } else {
-    $node =~ /(sh\d+)-(\d)/;
     if ( ! defined ($IPList{$node}) ) {
-      print "Machine $node not found. Skipping...\n";
+      print "Power controller for $node not found. Skipping...\n";
       $exitval++;
     } else {
       my $cmd=join(" ",
