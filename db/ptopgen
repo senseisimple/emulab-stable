@@ -1,0 +1,54 @@
+#!/usr/local/bin/perl -w
+#
+# Generates a ptop file from the output of an avail command.
+# Takes input on STDIN and output goes to STDOUT
+# Also requires file testbed.ptop, in /usr/testbed/etc/ or ./
+#
+#
+my $d = 0; #debug
+my %nodes = ();
+
+while (<>) {
+  if (!/^\|/ ) {next;}
+  if ( /^\|node_id/) {next;}
+  /^\|(\S*) *\|/;
+  $nodes{$1} = 1;
+  print STDERR "Got '$1'   \t" if $d;
+}
+
+print STDERR "\n" if $d;
+
+if ( -e "/usr/testbed/etc/testbed.ptop") {
+  open(PTOP,"/usr/testbed/etc/testbed.ptop")
+    || die("Couldn't open /usr/testbed/etc/testbed.ptop\n");
+} elsif ( -e "testbed.ptop" ) {
+  open(PTOP,"testbed.ptop")
+    || die("Couldn't open testbed.ptop\n");
+} elsif ( -e "/home/newbold/db/testbed.ptop" ) {
+  open(PTOP,"/home/newbold/db/testbed.ptop")
+    || die("Couldn't open /home/newbold/db/testbed.ptop\n");
+} else { die("Couldn't locate testbed.ptop.\n"); }
+
+while (<PTOP>) {
+  chop;
+  if (/^\#/) {next;}
+  print STDERR "Read '$_' \t" if $d;
+  if (/^node (\S*) (\S*)/) {
+    my ($node,$type) = ($1,$2);
+    print STDERR "Node $node ($type)\n" if $d;
+    if ($type eq 'switch' ) {
+      $nodes{$node} = 1;
+    }
+    if (defined $nodes{$node}) {
+      print $_,"\n";
+    }
+  } elsif (/^link (\S*) (\S*) (\S*)/) {
+    print STDERR "\nGrabbed link $2 $3\t" if $d;
+    my ($node) = split(/:/,$2);
+    my $switch = $3;
+    print STDERR "Link $node<==>$switch\n" if $d;
+    if (defined $nodes{$node} && defined $nodes{$switch}) {
+      print $_,"\n";
+    }
+  }
+}
