@@ -47,6 +47,11 @@ if { ${::TBCOMPAT::elabinelab_maxpcs} != 0 } {
     set maxpcs 0
 }
 
+if { ${::TBCOMPAT::elabinelab_source_tarfile} != "" } {
+    tb-set-node-tarfiles $myboss /usr/src ${::TBCOMPAT::elabinelab_source_tarfile}
+    tb-set-node-tarfiles $myops /usr/src ${::TBCOMPAT::elabinelab_source_tarfile}
+}
+
 set lanstr "myboss myops "
 for {set i 1} {$i <= $maxpcs} {incr i} {
 	set name "mypc${i}"

@@ -141,6 +141,7 @@ sub SetupOpsNode();
 sub SetupBossNode();
 sub CreateDefsFile($);
 sub SetupSendMail($$);
+sub GetEmulabSource($);
 
 #
 # Boot Action.
@@ -239,9 +240,7 @@ sub SetupOpsNode()
     mysystem("mkdir ${TBDIR}/testbed/src");
     mysystem("mkdir ${TBDIR}/testbed/obj");
 
-    print "Copying over current testbed software from /proj\n";
-    mysystem("mkdir ${TBDIR}/testbed/src/testbed");
-    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src", 3);
+    GetEmulabSource("${TBDIR}/testbed/src");
 
     #
     # The mirror tree is copied to temp storage, and then copied into
@@ -467,6 +466,10 @@ sub SetupOpsNode()
     mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
 	     "   >> /etc/rc.local");
 
+    # Ack, still waiting for new images.
+    mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
+	     "   /usr/local/etc/emulab/rc/rc.inelab");
+
     #
     # Copy the mirror tree into place. Do not use rsync.
     #
@@ -490,17 +493,15 @@ sub SetupBossNode()
     mysystem("mkdir ${TBDIR}/testbed/src");
     mysystem("mkdir ${TBDIR}/testbed/obj");
 
-    print "Copying over current testbed software from /proj\n";
-    mysystem("mkdir ${TBDIR}/testbed/src/testbed");
-    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src", 3);
+    GetEmulabSource("${TBDIR}/testbed/src");
 
     print "Copying over initial dbstate from /proj\n";
     mysystem("mkdir ${TBDIR}/testbed/stuff");
-    mysystem("cp -fp /proj/$pid/exp/$eid/dbstate.tar.gz ${TBDIR}/testbed/stuff",
-	     3);
+    mysystem("cp -fp /proj/$pid/exp/$eid/dbstate.tar.gz ".
+	     "       ${TBDIR}/testbed/stuff");
 
     # Copy over creators ssl certificate for XMLRPC. See below.
-    mysystem("cp -fp ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff", 3);
+    mysystem("cp -fp ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff");
 
     #
     # Stash the IP of the outer emulab for tmcc (and script above).
@@ -749,6 +750,10 @@ sub SetupBossNode()
     #
     mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
 	     "   >> /etc/rc.local");
+
+    # Ack, still waiting for new images.
+    mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
+	     "   /usr/local/etc/emulab/rc/rc.inelab");
 }
 
 #
@@ -992,4 +997,41 @@ sub mysystem($;$)
 	SetupFatal("Command failed: $? - $command");
     }
     print "Finished at: " . libsetup::TBTimeStamp() . "\n";
+}
+
+#
+# Deal with the source code!
+#
+sub GetEmulabSource($)
+{
+    my ($destdir) = @_;
+
+    mysystem("mkdir $destdir/testbed");
+    
+    #
+    # Look to see if the source code is already here (say, cause the user
+    # specified a tarfile). If so, copy it into place.
+    #
+    if (-d "/usr/src") {
+	print "Copying over current testbed software from /usr/src\n";
+	mysystem("rsync -a --delete /usr/src/ $destdir/testbed");
+    }
+    else {
+	#
+	# Get the tarball from the server.
+	#
+	my $file   = TMNODEID();
+	my $nodeid = `cat $file`;
+	chomp($nodeid);
+
+	my $keyfile = TMKEYHASH();
+	my $keyhash = `cat $keyfile`;
+	chomp($keyhash);
+
+	mysystem("fetch -q -o /tmp/foo.tar.gz ".
+		 "'https://${bossname}/spewrpmtar.php3?nodeid=${nodeid}&".
+		 "key=${keyhash}&elabinelab_source=1'");
+
+	mysystem("tar xzf /tmp/foo.tar.gz -C $destdir/testbed");
+    }
 }
