@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -143,6 +143,10 @@ foreach my $node (@nodes) {
     if (! TBIsNodeVirtual($node, \$jailed)) {
 	next;
     }
+    if (! TBPhysNodeID($node, \$pnode)) {
+	die("*** $0:\n".
+	    "    No physical node for $node!\n");
+    }
     if (!TBIsNodeRemote($node) && !$force) {
 	#
 	# A local vnode. If the experiment is activating, then the
@@ -155,10 +159,6 @@ foreach my $node (@nodes) {
 	    print STDOUT "Skipping $mode of vnode $node on local $pnode ...\n";
 	    next;
 	}
-    }
-    if (! TBPhysNodeID($node, \$pnode)) {
-	die("*** $0:\n".
-	    "    No physical node for $node!\n");
     }
 
     #
