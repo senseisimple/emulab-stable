@@ -1,0 +1,527 @@
+#!/usr/bin/perl -w
+#
+# Linktest test script.
+#
+# set $ENV{TEST_NS_SCRIPT} to override default NS file location (for testing)
+#
+# @author: davidand
+# @created: 10/13/03
+use strict;
+use Class::Struct;
+use constant ERROR_LOG => "/tmp/linktest.log";
+use constant RUDE_LOG  => "/tmp/rude.log";
+use constant CRUDE_DAT => "/tmp/crude.dat"; # crude binary 
+use constant CRUDE_DEC => "/tmp/crude.dec"; # decoded crude data
+use constant RUDE_CFG  => "/tmp/rude.cfg";
+use constant PATHRATE_DAT => "/tmp/pathrate.dat";
+use constant SEND_RATE => 400; # rude sends 1 more than specified here.
+use constant PACK_COUNT => 401;
+use constant HI_BW => 90000000; # pathrate test only accurate 1-90 Mbps
+use constant LO_BW =>  1000000;
+
+##############################################################################
+# Globals
+##############################################################################
+
+# see init() for initialization of globals
+my $ns_file;    # operative ns file
+my $synserv;    # node having synch server (from tb-set-synch)
+my $rtproto;    # routing protocol
+my $hostname; # this host
+my $eid; # experiment id
+my $pid; # project id
+my $gid; # group id
+
+my @verts; # verts: list of text strings containing host names.
+           # sorted alphabetically
+my @edges; # edges: list of edge structs.
+           # sorted alphabetically by src . dst
+
+# struct for representing an edge
+struct ( edge => {
+    src => '$',
+    dst => '$',
+    bw  => '$',
+    delay => '$',
+    loss => '$'
+});
+
+
+# experiment path (ie, tbdata) set by init.
+my $expt_path;
+
+# log path (ie tbdata/linktest) set by init.
+my $log_path;
+
+# full path to custom NS build. # TODO: this should get a configure variable.
+my $ns_cmd = "/users/davidand/bin/ns"; 
+
+# full path to custom tb_compat.tcl. # TODO: this should be a configure variable.L
+my $lt_path = "/users/davidand/testbed/event/linktest";
+
+##############################################################################
+# Main control
+##############################################################################
+
+# init global scalars
+&init;
+
+# init topology
+&get_topo;
+&debug_top;
+
+
+## NB: call by reference by value
+#my @edge_copy = @edges;
+#while(@edge_copy) {
+#    my $assignment = &get_assign(\@edge_copy);
+#    print "assignment: " . $assignment->src . "\n";
+#}
+
+&stat_rt_test if defined($rtproto) && $rtproto eq "Static";
+
+&onehop_test;
+&stream_test;
+&bw_test;
+
+
+##############################################################################
+# Test procedures
+##############################################################################
+
+
+# Static routing test
+# 
+# Attempt to reach all nodes with default TTL
+sub stat_rt_test {
+    # fork processes to run the pings in parallel.
+    foreach my $dst (@verts) {
+	if(!($dst eq $hostname) ) {
+	    my $pid = fork();
+	    if(!$pid) {
+		if(!&ping_node($dst,0)) {
+		    &error("could not reach $dst");
+		}
+		exit;
+	    }
+	}
+    }
+    wait;
+}
+
+
+# direct link test
+#
+# Attempt to reach linked nodes with TTL=1
+sub onehop_test {
+    # fork processes to run the pings in parallel.
+    foreach my $edge (@edges) {
+	if($edge->src eq $hostname ) {
+	    my $pid = fork();
+	    if(!$pid) {
+		if(!&ping_node($edge->dst,1)) {
+		    &error("could not reach " . $edge->dst . " directly");
+		}
+		exit;
+	    }
+	}
+    }
+    wait;
+}
+ 
+# stream test
+#
+# check latency and loss.
+sub stream_test {
+    # repeatedly:
+    #   get test assignments.
+    #   start crude
+    #   run the stream
+    #   stop crude
+    #   analyze results for latency and loss
+
+    my @edge_copy = @edges;
+
+    # all nodes will execute the same reductions on the edge list
+    # on their own so that the number of barriers is the same.
+    while(@edge_copy) {
+	my $edge = &get_assign(\@edge_copy);
+	if(defined($edge)) {
+	    
+	    # unique barrier for this test.
+	    my $barrier_name = $edge->src . $edge->dst;
+
+	    # determine if this machine is the source or the dest.
+	    if($hostname eq $edge->src
+	       
+) {
+		# wait for crude startup
+		&barrier($barrier_name);
+		# generate config file
+		open FCFG,">" . RUDE_CFG || die ("couldn't open " . RUDE_CFG);
+		print FCFG "START NOW\n";
+		print FCFG "0000 1 ON 3001 " . $edge->dst . ":10001 CONSTANT " . SEND_RATE . " 20\n";
+		print FCFG "1000 1 OFF\n";
+		close FCFG;
+		# run rude
+		system "rude -s" . RUDE_CFG . " 1>" . RUDE_LOG . " 2>/dev/null";
+		&barrier($barrier_name);
+
+	    } elsif ($hostname eq $edge->dst) {
+		# start up crude
+		my $crude_pid = fork();
+		if(!$crude_pid) {
+		    unlink CRUDE_DAT if -e CRUDE_DAT;
+		    open(STDOUT, ">/dev/null"); # redirct output to null
+		    exec "crude -l " . CRUDE_DAT;
+		}
+		&barrier($barrier_name);
+		# test occurs
+		&barrier($barrier_name);
+		system "kill -9 $crude_pid";
+		# analyze log for latency and loss.
+		&analyze_stream($edge);
+	    }
+	    &barrier();
+	}
+    }
+}
+
+sub bw_test {
+    
+    # start pathrate_snd in interactive mode
+    # repeatedly:
+    #   get test assignments
+    #   run pathrate_rcv
+    #   analyze log results 
+
+    my $snd_pid = fork();
+    if(!$snd_pid) {
+	open(STDOUT, ">/dev/null"); # redirct output to null
+	exec "pathrate_snd -i";
+    }
+    # wait for sender ready.
+    sleep(1);
+    &barrier();
+
+    my @edge_copy = @edges;
+
+    # all nodes will execute the same reductions on the edge list
+    # on their own so that the number of barriers is the same.
+    while(@edge_copy) {
+	my $edge = &get_assign(\@edge_copy);
+	if(defined($edge)) {
+
+	    # determine if this machine is the source or the dest.
+	    if($hostname eq $edge->src
+	       && $edge->bw <= HI_BW
+	       && $edge->bw >= LO_BW) {
+		my $cmd = "pathrate_rcv -Q -s " . $edge->dst . " -q -O "
+		    . PATHRATE_DAT . " >/dev/null";
+		system "$cmd";
+		&analyze_bw($edge);
+		
+	    }
+	}
+	&barrier();
+    }
+
+    system "kill -9 $snd_pid";
+
+
+}
+
+
+##############################################################################
+# Utility methods
+##############################################################################
+
+# invoke ns and parse the representation into @verts and @edges
+sub get_topo {
+    # make sure we execute in the linktest directory (to access tb_compat.tcl)
+
+    # in the experiment directory, execute the ns script with my hacked tb_compat.tcl
+    chdir($lt_path);
+    
+    # get the nsfile path # TODO: adjust for groups
+    if(defined($ENV{TEST_NS_SCRIPT})) {
+	$ns_file = $ENV{TEST_NS_SCRIPT};
+    } else {
+	$ns_file = "/proj/$pid/exp/$eid/tbdata/$eid.ns";
+    }
+
+    die "could not find NS script: $ns_file\n" unless -e $ns_file;
+
+    my @ns_output = `$ns_cmd $ns_file`;
+    foreach my $line (@ns_output) {
+	chomp ($line);
+
+	# load the output from ns.
+	# the file format is simple:
+	# expr := h <node name>
+	#      || l <src node> <dst node> <bw (Mb/s)> <latency (s)> <loss (%)>
+	if( $line =~ /^h (\S+)/ ) {
+	    push @verts, $1
+	} elsif ( $line =~ /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d\.\d+)\s+(\d\.\d+)/) {
+	    my $newEdge = new edge;
+	    $newEdge->src($1);
+	    $newEdge->dst($2);
+	    $newEdge->bw($3);
+	    $newEdge->delay($4);
+	    $newEdge->loss($5);
+	    push @edges, $newEdge;
+	} elsif ($line =~ /^y (\S+)/) {
+	    $synserv = $1;
+
+	# currently recognize only Static routing
+	} elsif ($line =~ /^r Static/i) {
+	    $rtproto = "Static";
+	}
+    }
+
+    # maintain sort order.
+    @verts = sort { $a cmp $b } @verts;
+    @edges = sort { $a->src . $a->dst cmp $b->src . $b->dst } @edges;
+
+    # is there a synch server? if not that's a problem (unless have a default)
+    die "no synch server defined in: $ns_file\n" unless defined($synserv);
+}
+
+
+# prints out the topology read in from the NS file
+sub debug_top {
+    &debug("ns script: $ns_file\n");
+    &debug("nodes:\n");
+    foreach my $vert (@verts) {
+	&debug( " " . $vert . "\n");
+    }
+    &debug("links:\n");
+    foreach my $edge (@edges) {
+	&debug( " " . $edge->src . " " . $edge->dst . " " . $edge->bw
+		. " " . $edge->delay . " " . $edge->loss . "\n"
+		);
+    }
+    &debug("synch server: $synserv\n");
+    &debug("routing protocol: $rtproto\n") if defined($rtproto);
+}
+
+# TODO: update to log to expt problem directory.
+sub error {
+    print STDERR "ERROR: $_[0]\n";
+    print STDERR "  Details: ";
+    system "cat " . ERROR_LOG;
+    print STDERR "\n";
+}
+
+# synch all nodes
+sub barrier {
+    &barrier_name("allnodes");
+}
+
+sub barrier_name {
+    my ($name) = @_;
+    my $cmd;
+    my $count = @verts - 1;
+    if($synserv eq $hostname) {
+	$cmd = "emulab-sync -s $synserv -n $name -i $count";
+    } else {
+	$cmd = "emulab-sync -s $synserv -n $name";
+    }
+    system $cmd;
+}
+
+sub debug {
+    print "@_"; 
+}
+
+# initialize globals
+sub init {
+
+    # get the experiment info
+    my $nick = `cat @CLIENT_VARDIR@/boot/nickname`;
+    ($hostname, $eid, $pid) = split /\./, $nick;
+    chomp $hostname;
+    chomp $eid;
+    chomp $pid;
+    $gid = $pid; # temporarily ignoring groups
+
+    # get the experiment path and log path
+    $expt_path = "/proj/$pid/exp/$eid/tbdata";
+    $log_path = "/proj/$pid/exp/$eid/tbdata/linktest";
+
+}    
+
+# pings a node. 
+# @param[0] := host to ping
+# @param[1] := ttl, 0 for default
+# @return: # of replies
+sub ping_node {
+    my ($host,$ttl) = @_;
+
+    # set deadline to prevent long waits
+    my $cmd;
+    if($ttl) {
+	$cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 -t $ttl 2> " . ERROR_LOG;
+    } else {
+	$cmd = "sudo ping -c 10 -q $host -i 0.1 -w 1 2> " . ERROR_LOG;
+    }
+
+    my @results = `$cmd`;
+    foreach my $result (@results) {
+	# find the results line we care about
+	if($result =~ /(\d+) received/) {
+	    return $1;
+	}
+    }
+    return 0;
+}
+
+
+# returns an edge for this node to work on. ensures that no other
+# machine gets the same assignment at the same time.
+sub get_assign {
+    my ($todo_ref) = @_; # must maintain sorted order invariant
+    my $task = undef;
+
+    # build a fresh hash to see which nodes are in use.
+    my %inuse;
+    foreach (@verts) {
+	$inuse{$_}=0;
+    }
+
+    for(my $i=0;$i<@{$todo_ref};$i++) {
+	my $edge = @{$todo_ref}[$i];
+	if(!(
+	     $inuse{$edge->src} || $inuse {$edge->dst})) {
+	    $inuse{$edge->src} = 1;
+	    $inuse{$edge->dst} = 1;
+	    $task = @{$todo_ref}[$i];
+	    splice(@{$todo_ref},$i,1); 
+	}
+    }
+
+    # each machine should reduce the todo list the same way due to
+    # alphabetic sorting of info from the ns file.
+    # only thing left to do is return this machines' assignment for processing.
+    return $task; # or undef if no jobs left for this machine.
+}
+
+# PRE: stream test has been run and results are in CRUDE_DAT
+# POST: reports errors if any to the log location.
+# @param: the edge being analyzed
+#
+# note, runs on the dest.
+sub analyze_stream {
+    my ($edge) = @_;
+    # decode the log.
+    system "crude -d " . CRUDE_DAT . " > " . CRUDE_DEC;
+
+     # get clock offsets
+    my $Os = &get_offset($edge->src);
+    $Os /= 1000; # convert to microseconds
+    my $Or = &get_offset($edge->dst);
+    $Or /= 1000;
+   
+    # scan the log. since it's just the mean, don't bother with a statistics
+    # library, use an accumulator instead.
+    my $count = 0;
+    my $sum = 0;
+    open FLOG,"" . CRUDE_DEC || die("could not open " . CRUDE_DEC);
+    while(<FLOG>) {
+	if(/Tx=(\d+\.\d+).*Rx=(\d+\.\d+)/) {
+	    my $Ts = $1;
+	    my $Tr = $2;
+	    
+	    my $owd = $Tr + $Or - ( $Ts + $Os);
+	    # convert to ms
+	    $owd *= 1000;
+
+	    # subtract transmit delay (queue and prop are 0)
+	    # L2 bit size of packets: 20 (UDP) 8 (IP) 18 (ETH) 20 (PAY) = 68B = 528b
+	    # need to think some more about this...
+#	    my $Dt = (1 / ( $edge->bw * 1024/512 )) * 1000;
+#	    $owd -=  $Dt;
+	    $sum += $owd;
+	    $count++;
+	}
+    }
+    close FLOG;
+    if(!$count) {
+	&error("no packets sent!");
+	return;
+    }
+    my $mean = ($sum / $count);
+    &debug("mean latency: $mean\n");
+    
+
+    # TODO: redo the analysis using hypothesis testing with the null
+    # hypothesis being that the test passed.
+
+    # also, the loss stuff is fishy since we're estimating the
+    # population without using the standard error
+
+    # now the part using magic numbers.
+    my $bestfit = -0.10888 - 0.00236 * $edge->delay;
+    my $diff = abs($bestfit - $mean);
+    if($diff>0.71) {
+	&error("Latency test outside of best fit line by: $diff\n");
+    }
+    
+    my $expected = &round(PACK_COUNT * $edge->loss);
+    my $sd = sqrt( $expected * (1 - $edge->loss));
+    my $actual = PACK_COUNT - $count;
+    my $tol = &round((3 * $sd));
+    &debug("loss: actual: $actual expected: $expected tolerance: $tol\n");
+    if($actual > ($expected + $tol)
+       || 
+       $actual < ($expected - $tol)
+       ) {
+	&error("Loss test outside of acceptible loss ($count)\n");
+    }
+
+}
+
+sub analyze_bw {
+    my ($edge) = @_;
+    my $lo = -1;
+    my $hi = -1;
+
+    open LOGF,"<" . PATHRATE_DAT || die "could not open: $!";
+    while(<LOGF>) {
+#	print $_;
+	if (/^Final capacity estimate :\D+(\d+\.\d+|\d+)\D+(\d+\.\d+|\d+) Mbps/) {
+	    $lo = $1;
+	    $hi = $2;
+	} elsif (/^Final capacity estimate :\D+(\d+\.\d+|\d+)\D+(\d+\.\d+|\d+) kbps/) {
+	    $hi = $2 / 1000;
+	    $lo = $1 / 1000;
+	}
+    }
+    close LOGF;
+
+    # note crappy margin of error. more work needed, or maybe another tool.
+#    &debug($edge->bw . " lo $lo hi $hi\n");
+    $lo -= 3; # units of mb
+    $hi += 3;
+    &debug("bandwidth: $lo Mb to $hi Mb\n");
+    if($edge->bw > ($hi * 1000000)
+       || 
+       $edge->bw < ($lo * 1000000)) {
+	&error("Bandwidth test outside of acceptible range ($lo Mb  $hi Mb)");
+    }
+
+}
+
+# get ntpq offset of the specified host
+sub get_offset {
+    my ($host) = @_;
+    my @result = `/usr/sbin/ntpq -c rl $host | grep ^offset`;
+    if( $result[0] =~ /^offset=(-*\d+\.\d+)/) {
+	return $1;
+    }
+    return 0;
+}
+sub round {
+    my($number) = shift;
+    return int($number + .5);
+}
