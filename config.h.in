@@ -5,6 +5,7 @@
 #undef VERSION
 
 #undef TBDBNAME
+#undef TBADMINGROUP
 #undef IPBASE
 #undef BOSSNODE
 #undef USERNODE

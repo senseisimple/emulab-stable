@@ -15,6 +15,7 @@ sub usage()
 #
 my $TB		= "@prefix@";
 my $TESTMODE	= @TESTMODE@;
+my $TBPID	= "@TBADMINGROUP@";
 
 #
 # Testbed Support libraries
@@ -28,7 +29,6 @@ $| = 1;
 
 my $SSH		= "$TB/bin/sshtb -n -l root ";
 my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
-my $TBPID	= "flux";
 my %cmdargs     = ();
 my @row;
 

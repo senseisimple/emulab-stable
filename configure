@@ -825,6 +825,12 @@ fi
 
 
 
+
+#
+# Defaults for for above variables.
+# 
+TBADMINGROUP="flux"
+
 #
 # Okay, I know this is improper usage of --with. Too bad.
 #
@@ -861,6 +867,10 @@ fi
 #
 cat >> confdefs.h <<EOF
 #define TBDBNAME "$TBDBNAME"
+EOF
+
+cat >> confdefs.h <<EOF
+#define TBADMINGROUP "$TBADMINGROUP"
 EOF
 
 cat >> confdefs.h <<EOF
@@ -1042,7 +1052,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1046: checking for a BSD compatible install" >&5
+echo "configure:1056: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1308,6 +1318,7 @@ s%@STRIP@%$STRIP%g
 s%@SSH@%$SSH%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
+s%@TBADMINGROUP@%$TBADMINGROUP%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
 s%@TBACTIVEARCHIVE@%$TBACTIVEARCHIVE%g
