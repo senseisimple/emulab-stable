@@ -10,27 +10,18 @@
 <h3>Table of Contents:</h3>
 <ol>
   <li><a href="#intro">Introduction</a></li>
-  <li><a
- href="file:///.a/nfast/users/fish/flux/testbed/www/hyperviewer/index.html#platforms">Supported
-platforms, release notes<br>
+  <li><a href="#platforms">Supported platforms, release notes<br>
     </a></li>
-  <li><a
- href="file:///.a/nfast/users/fish/flux/testbed/www/hyperviewer/index.html#dependencies">Package
-dependencies</a></li>
+  <li><a href="#dependencies">Package dependencies</a></li>
   <li><a href="#install">Installing hypview</a></li>
   <ol style="list-style-type: lower-alpha;">
-    <li><a href="#getting_unix">Getting and unpacking the Emulab
-HyperViewer
-client program (Unix/Linux)</a></li>
-    <li><a href="#getting_windows">Getting and unpacking the Emulab
-HyperViewer
-client program (Windows)</a><br>
+    <li><a href="#getting_unix">Getting and unpacking hypview on
+Unix/Linux</a></li>
+    <li><a href="#getting_windows">Getting and unpacking hypview on
+Windows</a><br>
     </li>
-    <li><a href="#building_unix">Building the Emulab HyperViewer client
-program from sources (Unix/Linux)</a></li>
-    <li><a href="#building_windows">Building the Emulab HyperViewer
-client
-program from sources (Windows)</a></li>
+    <li><a href="#building_unix">Building hypview on Unix/Linux</a></li>
+    <li><a href="#building_windows">Building hypview on Windows</a></li>
   </ol>
   <li><a href="#run">Running hypview as a script</a></li>
   <li><a href="#gui">The hypview Graphical User Interface</a></li>
@@ -55,7 +46,7 @@ snapshot
 from hypview of the same topology, where more detail is apparent.&nbsp;
 Interactively, it is easy to reach out from the high-detail area in the
 center of the sphere to look more closely into the compressed areas
-near the center of the sphere.<br>
+near the outside surface of the sphere.<br>
 <br>
 <div style="margin-left: 40px;"><a href="graphviz_biglan.jpg"><img
  style="border: 2px solid ; width: 320px; height: 348px;" alt=""
@@ -64,6 +55,12 @@ near the center of the sphere.<br>
  align="top" style="border: 2px solid ; width: 380px; height: 326px;"
  alt="" src="gui_top_small2.jpg" title="Click for full-size image."></a></div>
 <br>
+&nbsp;<a
+ href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig"><img
+ hspace="10" align="left"
+ style="border: 2px solid ; width: 149px; height: 150px;"
+ alt="Hyperbolic Motion - Figure 3" title="Hyperbolic Motion - Figure 3"
+ src="image1.jpg"></a><br>
 The <a href="http://graphics.stanford.edu/papers/h3cga/">HyperViewer</a>
 software was developed by <a
  href="http://graphics.stanford.edu/%7Emunzner">Tamara Munzner at
@@ -80,12 +77,13 @@ further description, particularly <a
 Unix file system.&nbsp; The drawing and picking algorithms are designed
 to produce a constant frame-rate by doing the most visible features
 first, and hence scales to 100,000-node graphs.<br>
-&nbsp;<a
- href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig"><img
- style="border: 2px solid ; width: 149px; height: 150px;"
- alt="Hyperbolic Motion - Figure 3" title="Hyperbolic Motion - Figure 3"
- src="image1.jpg"></a><br>
+&nbsp;
 <br>
+<br>
+&nbsp;<a href="http://www.mcescher.com/Gallery/recogn-bmp/LW436.jpg"><img
+ hspace="10" align="left"
+ style="border: 2px solid ; width: 106px; height: 106px;" alt=""
+ title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
 The basic idea is that a graph is presented within a sphere that
 resembles a fish-eye lens: objects in the center of the sphere appear
 full-size, but objects get smaller as they approach the surface of the
@@ -93,9 +91,7 @@ sphere.&nbsp; A hyperbolic projection is used, which actually maps an
 infinite 3D space onto the finite sphere.&nbsp; M.C. Esher did likewise
 in 2D with <a href="http://mathworld.wolfram.com/HyperbolicTiling.html">hyperbolic
 tilings</a>.<br>
-<a href="http://www.mcescher.com/Gallery/recogn-bmp/LW436.jpg"><img
- style="border: 2px solid ; width: 106px; height: 106px;" alt=""
- title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
+<br>
 <br>
 <hr style="width: 100%; height: 2px;"><br>
 <h3><a name="platforms"></a>Supported platforms, release notes:</h3>
@@ -219,9 +215,8 @@ Plus wxGlade on top of wxPython if you want to modify the GUI design.<br>
 <div style="margin-left: 40px;"></div>
 <br>
 <h3><a name="install"></a>Installing hypview</h3>
-<h4><a name="getting_unix"></a>Getting and unpacking the Emulab
-HyperViewer
-client program (Unix/Linux):</h4>
+<h4><a name="getting_unix"></a>Getting and unpacking hypview on
+Unix/Linux:</h4>
 <ul>
   <li>There are binary tarballs for <a
  href="http://www.emulab.net/downloads/hyperviewer-FreeBSD.tgz">FreeBSD</a>
@@ -283,26 +278,34 @@ to the
 next section on rebuilding hypview from sources.<br>
 </div>
 <br>
-<h4><a name="getting_windows"></a>Getting and unpacking the Emulab
-HyperViewer
-client program (Windows):<br>
+<h4><a name="getting_windows"></a>Getting and unpacking hypview on
+Windows:<br>
 </h4>
 <ul>
   <li>You first need Python, wxWindows, and PyOpenGL.&nbsp; The easy
 way is to get it all packaged together in <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-PyOpenGL.exe">one
-exe file</a>, and unpack to the location of your choice.&nbsp; The
-download size is 25 meg and installed it becomes 56 meg.&nbsp; The
-default unpack location is C:\, in which case you can also unpack <a
+exe file</a>, and unpack to the location of your choice.&nbsp; <br>
+  </li>
+  <ul>
+    <li>The download size is 25 meg and when installed it becomes 56
+meg.&nbsp; <br>
+    </li>
+    <li>The default unpack location is C:\, in which case you can also
+unpack <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-shortcuts.exe">these
 shortcuts</a> into your Start Menu/Programs folder for the effect of a
-normal installation.<br>
-  </li>
+normal installation.</li>
+    <li>Add the Python22 install directory to your PATH environment
+variable in Control Panel/System/Advanced/Environment Variables so
+shell scripts will find python.exe .<br>
+    </li>
+  </ul>
 </ul>
 <ul>
   <li>Another approach is to download and install the official Windows
 versions of
-the following :</li>
+the following components:</li>
   <ul>
     <li><a
  href="http://www.python.org/ftp/python/2.2.3/Python-2.2.3.exe">Python
@@ -351,10 +354,11 @@ use the File/Open menu command, or do this in a command shell:<br>
  style="font-weight: bold;">only</span> in the hyperviewer directory
 for now.<br>
 </div>
-<h4><a name="building_unix"></a>Building the Emulab HyperViewer client
-program from sources (Unix/Linux)</h4>
+<h4><a name="building_unix"></a>Building hypview on Unix/Linux</h4>
 Full sources for hypview and a version of the hyperviewer library are
-included in the tarball.<br>
+included in the release tarballs.&nbsp; There is also a <a
+ href="http://www.emulab.net/downloads/hyperviewer-src.tgz">sources-only
+tarball</a> you can start with.<br>
 <br>
 Building from sources avoids shared library compatibility
 problems, but requires that you have wxPython and its dependencies
@@ -382,20 +386,33 @@ There are a couple of example files included:
 <pre><big>cd hyperviewer<br>./hypview BigLan.hyp</big><big><br>./hypview ts600.hyp<br></big></pre>
 </div>
 &nbsp;<br>
-<h4><a name="building_windows"></a>Building the Emulab HyperViewer
-client
-program from sources (Windows)<br>
+<h4><a name="building_windows"></a>Building hypview on Windows<br>
 </h4>
 Full sources for hypview and a version of the hyperviewer library are
-included in the WinZip self-extracting exe file.&nbsp; You will need to
+included in the WinZip self-extracting <a
+ href="http://www.emulab.net/downloads/hyperviewer-Win32.exe">exe file</a>.&nbsp;
+There is also a <a
+ href="http://www.emulab.net/downloads/hyperviewer-src.tgz">sources-only
+tarball</a> you can start with.<br>
+<br>
+&nbsp;You will need to
 install Developer Studio 6 with Visual C++ and the Platform SDK (which
 includes OpenGL.)&nbsp; VC++ and OpenGL documentation is on the MSDN
-library disks.
+library disks.<br>
+<ul>
+  <li>Define the PYTHON_INCLUDE and PYTHON_LIB environment variables in
+Control Panel/System/Advanced/Environment Variables:</li>
+  <ul>
+    <li>PYTHON_INCLUDE = C:\Python22\include</li>
+    <li>PYTHON_LIB = C:\Python22\libs\python22.lib<br>
+    </li>
+  </ul>
+</ul>
 <ul>
   <li>Move the source files that are in the <span
  style="font-weight: bold;">win32</span> subdirectory up into the main
 directory, if that has not already been done.&nbsp; These are the
--DWIN32 versions of the files generated by SWIG, and Python library
+-DWIN32 versions of the files generated by SWIG, and any Python library
 files that are missing from the Windows version of Python.<br>
   </li>
 </ul>
@@ -412,7 +429,8 @@ up-to-date so you don't need SWIG unless you want to change
 things.&nbsp; You can get it from <a
  href="http://prdownloads.sourceforge.net/swig/swigwin-1.3.21.zip">swigwin-1.3.21</a>,
     <a href="http://www.swig.org/">(SWIG home page)</a>, and will need <a
- href="http://www.winzip.com/">WinZip</a> to unpack it.<br>
+ href="http://www.winzip.com/">WinZip</a> to unpack it.&nbsp; Add the
+SWIG install directory onto your PATH environment variable.<br>
   </li>
 </ul>
 <ul>
@@ -585,7 +603,11 @@ matching nodes under it.<br>
 <ul>
   <li>Since HyperViewer is set up to load a file, the experiment option
 actually writes a temp .hyp file.&nbsp; You will see the file name on
-the window title if you want to save the file.<br>
+the window title if you want to save the file.&nbsp; <br>
+  </li>
+  <li>On Unix/Linux, the file goes in /tmp.&nbsp; On Windows, it goes
+in C:\temp if there is one, otherwise they will accumulate in the
+hyperviewer directory.<br>
   </li>
 </ul>
 <div style="margin-left: 40px;"><img
