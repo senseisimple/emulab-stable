@@ -210,7 +210,7 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	# Get some more information about this interface type
 	#
-	my $iface_query = DBQueryFatal("SELECT max_speed, full_duplex, " .
+	my $iface_query = DBQueryFatal("SELECT full_duplex, " .
 	    "connector FROM interface_types WHERE type='$iface_type'");
 	if (!$iface_query->num_rows()) {
 	    warn "Node $node_id failed: Interface $card is of unknown type " .
@@ -218,7 +218,7 @@ NODE: foreach my $node_id (@node_ids) {
 	    next NODE;
 	}
 
-	my ($max_speed, $full_duplex, $connector) = $iface_query->fetchrow();
+	my ($full_duplex, $connector) = $iface_query->fetchrow();
 
 	#
 	# Do a sanity check - make sure that we have a switch recorded for all
@@ -237,7 +237,7 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	# Stash it away...
 	#
-	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
+	$interfaces{$card} = [$MAC, $iface_type, $full_duplex,
 		$switch_id, $switch_card, $switch_port, $cable, $len];
 
     }
@@ -318,7 +318,7 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     while (my ($card, $aref) = each %interfaces) {
-	my ($MAC, $iface_type, $speed, $duplex, $switch_id, $switch_card,
+	my ($MAC, $iface_type, $duplex, $switch_id, $switch_card,
 	    $switch_port, $cable, $len) = @$aref;
 	my $iface = "eth$card";
 	my $iface_IP = "";
@@ -332,7 +332,7 @@ NODE: foreach my $node_id (@node_ids) {
 	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
 	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
 	    "interface_type='$iface_type', iface='$iface', " .
-	    "current_speed='$speed', duplex=$duplex, role='$iface_role'");
+	    "current_speed='0', duplex=$duplex, role='$iface_role'");
 
 	if (!$switch_id) {
 	    print "No switch found for ${node_id}:$iface - skipping\n";
