@@ -785,7 +785,7 @@ function SHOWEXPLIST($type,$id) {
 		$state .= "&nbsp;(idle)";
 	    }
 	    if ($nodes==0) {
-		$nodes = "<font color=blue>$minnodes</font>";
+		$nodes = "<font color=green>$minnodes</font>";
 	    }
 
 	    if ($nopid) {
@@ -805,7 +805,7 @@ function SHOWEXPLIST($type,$id) {
 	}
 	echo "</table>\n";
 	echo "<center><font size=-1><b>*</b> Node counts in \n".
-	    "<font color=blue><b>blue</b></font>\n".
+	    "<font color=green><b>green</b></font>\n".
 	    "show a rough estimate of the minimum number of \n".
 	    "nodes required to swap in.\n".
 	    "<br>They account for delay nodes, but not for node \n".
