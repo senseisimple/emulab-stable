@@ -1,6 +1,6 @@
 # planetlab.ns - NS script to allocate PlanetLab nodes on Emulab/Netbed
 #
-# September 12, 2003
+# September 17, 2003
 #
 # Questions and comments to testbed-ops@emulab.net
 
@@ -27,13 +27,13 @@ tb-set-mem-usage 3
 set num_nodes 80
 
 #
-# Type of PlanetLab nodes to request.  Currently supported choices are:
-#    pcplab      Any PlanetLab node
+# Type of PlanetLab nodes to request.  Current choices, with counts:
+#    pcplab      Any PlanetLab node (127)
 # The following are mutually exclusive sets:
-#    pcplabdsl   PlanetLab nodes on DSL lines
-#    pcplabinet  PlanetLab nodes on the commodity Internet, in North America
-#    pcplabintl  PlanetLab nodes outside North America
-#    pcplabinet2 PlanetLab end-hosts (not colo sites) on Internet2
+#    pcplabdsl   Plab nodes on DSL lines (3)
+#    pcplabinet  Plab nodes on the commodity Internet, in North America (12)
+#    pcplabintl  Plab nodes outside North America (24)
+#    pcplabinet2 Plab end-hosts (not colo sites) on Internet2 (88)
 #
 # Can mix and match these types all you want with, say, multiple loops below.
 #
