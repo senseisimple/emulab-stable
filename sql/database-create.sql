@@ -1,8 +1,8 @@
-# MySQL dump 8.13
+# MySQL dump 8.16
 #
 # Host: localhost    Database: tbdb
 #--------------------------------------------------------
-# Server version	3.23.47-log
+# Server version	3.23.49-log
 
 #
 # Table structure for table 'comments'
@@ -731,6 +731,29 @@ CREATE TABLE scheduled_reloads (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'state_timeouts'
+#
+
+CREATE TABLE state_timeouts (
+  op_mode varchar(20) NOT NULL default '',
+  state varchar(20) NOT NULL default '',
+  timeout int(11) default NULL,
+  action mediumtext,
+  PRIMARY KEY  (op_mode,state)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'state_transitions'
+#
+
+CREATE TABLE state_transitions (
+  op_mode varchar(20) NOT NULL default '',
+  state1 varchar(20) NOT NULL default '',
+  state2 varchar(20) NOT NULL default '',
+  PRIMARY KEY  (op_mode,state1,state2)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'switch_paths'
 #
 
@@ -740,27 +763,6 @@ CREATE TABLE switch_paths (
   vname varchar(32) default NULL,
   node_id1 varchar(10) default NULL,
   node_id2 varchar(10) default NULL
-) TYPE=MyISAM;
-
-#
-# Table structure for table 'state_timeouts'
-#
-
-CREATE TABLE state_timeouts (
-  op_mode varchar(20) default NULL,
-  state varchar(20) default NULL,
-  timeout int(11) default NULL,
-  action mediumtext
-) TYPE=MyISAM;
-
-#
-# Table structure for table 'state_transitions'
-#
-
-CREATE TABLE state_transitions (
-  op_mode varchar(20) default NULL,
-  state1 varchar(20) default NULL,
-  state2 varchar(20) default NULL
 ) TYPE=MyISAM;
 
 #
@@ -792,30 +794,6 @@ CREATE TABLE testsuite_preentables (
   action enum('drop','clean','prune') default 'drop',
   PRIMARY KEY  (table_name)
 ) TYPE=MyISAM;
-
-#
-# Dumping data for table 'testsuite_preentables'
-#
-
-INSERT INTO testsuite_preentables VALUES ('comments','drop');
-INSERT INTO testsuite_preentables VALUES ('iface_counters','drop');
-INSERT INTO testsuite_preentables VALUES ('lastlogin','drop');
-INSERT INTO testsuite_preentables VALUES ('login','drop');
-INSERT INTO testsuite_preentables VALUES ('loginmessage','drop');
-INSERT INTO testsuite_preentables VALUES ('node_idlestats','drop');
-INSERT INTO testsuite_preentables VALUES ('nodelog','drop');
-INSERT INTO testsuite_preentables VALUES ('nodeuidlastlogin','drop');
-INSERT INTO testsuite_preentables VALUES ('nologins','drop');
-INSERT INTO testsuite_preentables VALUES ('userslastlogin','drop');
-INSERT INTO testsuite_preentables VALUES ('uidnodelastlogin','drop');
-INSERT INTO testsuite_preentables VALUES ('next_reserve','clean');
-INSERT INTO testsuite_preentables VALUES ('last_reservation','clean');
-INSERT INTO testsuite_preentables VALUES ('current_reloads','clean');
-INSERT INTO testsuite_preentables VALUES ('scheduled_reloads','clean');
-INSERT INTO testsuite_preentables VALUES ('users','prune');
-INSERT INTO testsuite_preentables VALUES ('projects','prune');
-INSERT INTO testsuite_preentables VALUES ('group_membership','prune');
-INSERT INTO testsuite_preentables VALUES ('groups','prune');
 
 #
 # Table structure for table 'tiplines'
