@@ -1853,12 +1853,6 @@ doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 
 	/*
-	 * Now check reserved table
-	 */
-	if (nodeidtoexp(nodeid, pid, eid, gid))
-		return 0;
-
-	/*
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query("select load_address,loadpart from images as i "
