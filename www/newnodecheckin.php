@@ -17,6 +17,12 @@ require("newnode-defs.php3");
 #
 
 #
+# Grab the IP address that this node has right now, so that we can contact it
+# later if we need to, say, reboot it.
+#
+$tmpIP = getenv("REMOTE_ADDR");
+
+#
 # Find all interfaces
 #
 $interfaces = array();
@@ -38,6 +44,56 @@ foreach ($HTTP_GET_VARS as $key => $value) {
     }
 }
 
+#
+# Use one of the interfaces to see if this node seems to have already checked
+# in once
+#
+if (count($interfaces)) {
+    $testmac = $interfaces[0]["mac"];
+
+    #
+    # First, make sure it isn't a 'real boy' - we should let the operators know
+    # about this, because there may be some problem.
+    #
+    $query_result = DBQueryFatal("select n.node_id from " .
+	"nodes as n left join interfaces as i " .
+	"on n.node_id=i.node_id " .
+	"where i.mac='$testmac'");
+    if  (mysql_num_rows($query_result)) {
+        $row = mysql_fetch_array($query_result);
+	$node_id = $row["node_id"];
+        echo "Node is already a real node, named $node_id\n";
+	TBMAIL($TBMAIL_OPS,"Node Checkin Error","A node attempted to check " .
+	    "in as a new node, but it is already\n in the database as " .
+	    "$node_id!");
+	exit;
+    }
+
+
+    #
+    # Next, try the new nodes
+    #
+    $query_result = DBQueryFatal("select n.new_node_id, n.node_id from " .
+	"new_nodes as n left join new_interfaces as i " .
+	"on n.new_node_id=i.new_node_id " .
+	"where i.mac='$testmac'");
+
+    if  (mysql_num_rows($query_result)) {
+        $row = mysql_fetch_array($query_result);
+	$id = $row["new_node_id"];
+	$node_id = $row["node_id"];
+        echo "Node has already checked in as ID $id, name $node_id\n";
+
+	#
+	# Keep the temp. IP address around in case it's gotten a new one
+	#
+	DBQueryFatal("update new_nodes set temporary_IP='$tmpIP' " .
+	    "where new_node_id=$id");
+
+	exit;
+    }
+}
+
 
 #
 # Attempt to come up with a node_id and an IP address for it
@@ -52,19 +108,10 @@ $IP = guess_IP("pc",$node_num);
 $type = guess_node_type($cpuspeed,$disksize);
 
 #
-# Try to figure out which switch ports it's plugged into
-#
-$mac_list = array();
-foreach ($interfaces as $interface) {
-	$mac_list[$interface["type"]] = "";
-}
-find_switch_macs($mac_list);
-
-#
 # Stash this information in the database
 #
 DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
-	"IP='$IP', dmesg='$messages', created=now()");
+	"IP='$IP', temporary_IP='$tmpIP', dmesg='$messages', created=now()");
 
 $query_result = DBQueryFatal("select last_insert_id()");
 $row = mysql_fetch_array($query_result);
@@ -74,18 +121,9 @@ foreach ($interfaces as $interface) {
 	$card = $interface["card"];
 	$mac = $interface["mac"];
 	$type = $interface["type"];
-	if ($mac_list[$mac]["switch"]) {
-	    DBQueryFatal("insert into new_interfaces set " .
-		"new_node_id=$new_node_id, card=$card, mac='$mac', " .
-		"interface_type='$type', ".
-		"switch_id='$mac_list[$mac][switch]', " .
-		"switch_card='$mac_list[$mac][card]', " .
-		"switch_port='$mac_list[$mac][port]'");
-	} else {
-	    DBQueryFatal("insert into new_interfaces set " .
-		"new_node_id=$new_node_id, card=$card, mac='$mac', " .
-		"interface_type='$type'");
-	}
+	DBQueryFatal("insert into new_interfaces set " .
+	    "new_node_id=$new_node_id, card=$card, mac='$mac', " .
+	    "interface_type='$type'");
 }
 
 #
