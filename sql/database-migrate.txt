@@ -1652,3 +1652,10 @@ last_net_act,last_cpu_act,last_ext_act);
 	    contact tinytext,
 	    phone tinytext,
 	    room varchar(32) default NULL);
+
+1.254: Add a "force" field in widearea_updates to specify that the
+       disk should be reloaded even though it's already registered as
+       being the current version.  Good for cleaning up messes...
+
+       ALTER TABLE widearea_updates ADD
+           force enum('yes','no') NOT NULL default 'no' after update_started;

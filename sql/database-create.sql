@@ -1971,6 +1971,7 @@ CREATE TABLE widearea_updates (
   roottag tinytext NOT NULL,
   update_requested datetime NOT NULL default '0000-00-00 00:00:00',
   update_started datetime default NULL,
+  force enum('yes', 'no') NOT NULL default 'no',
   PRIMARY KEY  (IP)
 ) TYPE=MyISAM;
 
