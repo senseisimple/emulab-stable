@@ -25,26 +25,37 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 my $DBErrorString = "";
 
 #
-# Test admin status. Optional argument is the UID to test. If not provided,
-# then test the current UID.
+# Test admin status. Optional argument is the UID or Name to test. If not
+# provided, then test the current UID.
 #
-# usage: TBAdmin([int uid]);
+# XXX Argument is *either* a numeric UID, or a string name.
+#
+# usage: TBAdmin([int or char* uid]);
 #        returns 1 if an admin type.
 #        returns 0 if a mere user.
 # 
 sub TBAdmin(;$)
 {
     my($uid) = @_;
+    my($name);
 
     if (!defined($uid)) {
 	$uid = $UID;
     }
 
-    my ($name) = getpwuid($uid)
-	or die "$uid not in passwd file\n";
+    #
+    # Test if numeric. Map to name if it is.
+    # 
+    if ($uid =~ /^[0-9]+$/) {
+	($name) = getpwuid($uid)
+	    or die "$uid not in passwd file\n";
+    }
+    else {
+	$name = $uid;
+    }
 
     my $query_result =
-	DBquery("select admin from users where uid='$name'");
+	DBQueryFatal("select admin from users where uid='$name'");
 
     my @row = $query_result->fetchrow_array();
     if ($row[0] == 1) {
@@ -100,13 +111,13 @@ sub NodeAccessCheck($;$)
     #
     foreach my $node (@$nodelist) {
 	my $query_result =
-	    DBquery("select reserved.node_id from reserved ".
-		    "left join proj_memb on ".
-		    "reserved.pid=proj_memb.pid and reserved.node_id='$node' ".
-		    "where proj_memb.uid='$name'");
+	    DBQueryFatal("select reserved.node_id from reserved ".
+			 "left join proj_memb on ".
+			 "reserved.pid=proj_memb.pid and ".
+			 "reserved.node_id='$node' ".
+			 "where proj_memb.uid='$name'");
 
-	if ($query_result == 0 ||
-	    $query_result->numrows == 0) {
+	if ($query_result->numrows == 0) {
 	    return 0;
 	}
     }
@@ -133,10 +144,10 @@ sub ProjMember($;$)
 	or die "$uid not in passwd file\n";
 
     my $query_result =
-	DBquery("select * from proj_memb where uid='$name' and pid='$pid'");
+	DBQueryFatal("select * from proj_memb where ".
+		     "uid='$name' and pid='$pid'");
 
-    if ($query_result == 0 ||
-	$query_result->numrows == 0) {
+    if ($query_result->numrows == 0) {
 	return 0;
     }
     return 1;
@@ -187,18 +198,18 @@ sub DBQueryFatal($)
 }
 
 #
-# Die and send email after a failed DB query. First argument is the error
+# Warn and send email after a failed DB query. First argument is the error
 # message to display. The contents of $DBErrorString is also printed.
 # 
-# usage: DBFatal(char *message)
+# usage: DBWarn(char *message)
 #
-sub DBFatal($)
+sub DBWarn($)
 {
     my($message) = $_[0];
     my($text, $progname);
 
     #
-    # Must taint check $PROGRAM_NAME cause it comes from outside.
+    # Must taint check $PROGRAM_NAME cause it comes from outside. Silly!
     #
     if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
 	$progname = $1;
@@ -213,8 +224,20 @@ sub DBFatal($)
 
     system("echo \"$text\" | /usr/bin/mail ".
 	   "-s 'TESTBED: DBFatal - $message' \"$TBOPS\"");
+}
 
-    exit(-1);
+#
+# Same as above, but die after the warning.
+# 
+# usage: DBFatal(char *message)
+#
+sub DBFatal($)
+{
+    my($message) = $_[0];
+
+    DBWarn($message);
+
+    exit(1);
 }
 
 1;
