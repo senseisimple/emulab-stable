@@ -1,0 +1,471 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(setsid);
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Setup a single virtual experiment.
+#
+sub usage()
+{
+    print "Usage: vnodesetup [-j [-s]] [-b | -k | -r] [-d] <vnodeid>\n".
+	"Use the -k option to kill the virtual node.\n";
+    exit(1);
+}
+my $optlist	= "kbdjsr";
+
+# Locals
+my $killit	= 0;
+my $rebootit	= 0;
+my $debug	= 0;
+my $fromboot	= 0;
+my $dojail	= 0;
+my $interactive = 0;
+my $cleaning	= 0;
+my $rebooting   = 0;
+my $leavejail   = 0;
+my $jailpid;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# Forward declarations for prototype checking
+#
+sub killvnode();
+sub rebootvnode();
+sub cleanup();
+
+#
+# Must be root.
+# 
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe not installed properly?\n");
+}
+
+#
+# If not invoked as real root, then must be invoked as emulabman.
+#
+if ($UID) {
+    my ($pwname) = getpwuid($UID) or
+	die("*** $0:\n".
+	    "    $UID is not in the password file!\n");
+
+    if ($pwname ne "emulabman") {
+	die("*** $0:\n".
+	    "    You do not have permission to run this script!\n");
+    }
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"k"})) {
+    $killit = 1;
+}
+if (defined($options{"r"})) {
+    $rebootit = 1;
+}
+if (defined($options{"b"})) {
+    $fromboot = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"j"})) {
+    $dojail = 1;
+    if (defined($options{"s"})) {
+	$interactive = 1;
+    }
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $vnodeid = $ARGV[0];
+
+if ($vnodeid =~ /^([-\w]+)$/) {
+    $vnodeid = $1;
+}
+else {
+    die("Bad data in vnodeid: $vnodeid.");
+}
+
+#
+# Hacky. All this path stuff is hacky.
+# 
+my $pidfile  = "/var/run/tbvnode-${vnodeid}.pid";
+my $vnodedir = "/var/emulab/jails/$vnodeid";
+my $logname  = "$LOGDIR/tbvnode-${vnodeid}.log";
+
+#
+# If killing the virtual node, then kill the manager process. We use
+# the negative signal number to send to the process group so that all
+# stuff gets killed in one fell swoop.
+#
+if ($killit) {
+    if (! -e $pidfile) {
+	die("*** $0:\n".
+	    "    No pid for $vnodeid manager!\n");
+    }
+    exit(killvnode());
+}
+if ($rebootit) {
+    if (! -e $pidfile) {
+	die("*** $0:\n".
+	    "    No pid for $vnodeid manager!\n");
+    }
+    exit(rebootvnode());
+}
+
+#
+# If the pidfile still exists, then something went wrong with a
+# previous experiment (or teardown).
+#
+if (-e $pidfile) {
+    print "Killing an already running vnode manager!\n";
+
+    if (killvnode() == 0) {
+	if (-e $pidfile) {
+	    die("*** $0:\n".
+		"    Not able to kill running vnode manager!\n");
+	}
+    }
+    elsif ($!{ESRCH}) {
+	#
+	# If there was no such process, kill the pid file and go on.
+	# 
+	system("rm -f $pidfile");
+    }
+    else {
+	die("*** $0:\n".
+	    "    Not able to kill running vnode manager!\n");
+    }
+}
+
+#
+# Okay, lets continue on so that ssh from Emulab exits right away.
+# It will figure out we are okay via the ISUP. 
+#
+if (!$debug && !$interactive && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Change our process group since we are a daemon. Not usually important,
+# but we get called from the watchdog, and we do not want to be in
+# its process group, or it will die when we get killed.
+#
+POSIX::setsid();
+
+#
+# Write our pid into the pid file so we can be killed later (when the
+# experiment is torn down). We must do this first so that we can be
+# killed before we change the sig handlers
+#
+open(PFILE, "> $pidfile")
+    or die("Could not open $pidfile: $!");
+print PFILE "$PID\n";
+close(PFILE);
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{USR1} = 'IGNORE';
+    $SIG{USR2} = 'IGNORE';
+
+    if ($signame eq 'USR2') {
+	reboot();
+	$SIG{USR1} = \&handler;
+	$SIG{USR2} = \&handler;
+	return;
+    }
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+    
+    #
+    # If we catch a TERM, we want to leave the jail around since TERM
+    # means the node is rebooting. We want to restart it later when the
+    # node reboots.
+    #
+    if ($signame eq 'TERM') {
+	$leavejail = 1;
+    }
+
+    fatal("Caught a SIG${signame}! Killing the vnode ...");
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+$SIG{USR1} = \&handler;
+$SIG{USR2} = \&handler;
+
+#
+# Kill existing directory in case its still there.
+#
+if (!$fromboot && -e $vnodedir) {
+    system("rm -rf $vnodedir");
+}
+if (! -e $vnodedir) {
+    mkdir($vnodedir, 0755) or
+	die("*** $0:\n".
+	    "    Could not mkdir $vnodedir: $!\n");
+}
+
+#
+# Inform the TMCD we are setting up. 
+#
+system("tmcc -n $vnodeid state TBSETUP");
+
+#
+# Invoke remotevnodesetup routine in the setup library. This will talk
+# to tmcd and create the rc files.
+#
+my ($pid) = vnodesetup($vnodeid);
+if (!defined($pid)) {
+    #
+    # Hmm, suddenly got free. 
+    # 
+    system("rm -f $pidfile");
+    system("rm -rf $vnodedir");
+    exit(0);
+}
+
+#
+# Become real root so that route command works!
+#
+$UID = 0;
+
+REBOOT:
+#
+# Okay, now startup the scripts.
+#
+if (-e TMTUNNELCONFIG) {
+    print "Starting Tunnels ...\n";
+    TBForkCmd(TMTUNNELCONFIG);
+    sleep(5);
+}
+
+if (!$dojail) {
+    if (-e TMTRAFFICCONFIG) {
+	print "Starting Traffic Generators ...\n";
+	TBForkCmd(TMTRAFFICCONFIG);
+	sleep(1);
+    }
+}
+
+#
+# Create the jail.
+#
+if ($dojail) {
+    $jailpid = fork();
+    if ($jailpid) {
+	#
+	# Parent waits for jail to fold on its own. If the jail is
+	# killed off though, will never return.
+	#
+	if (waitpid($jailpid, 0) < 0) {
+	    #
+	    # Means that already waited. Must be forcing a reboot.
+	    # 
+	    if (!defined($jailpid) && $rebooting) {
+		$rebooting = 0;
+		system("tmcc -n $vnodeid state TBSETUP");
+		goto REBOOT;
+	    }
+	}
+	undef($jailpid);
+	
+	if ($debug || $interactive) {
+	    if ($?) {
+		fatal("Jail startup exited with $?");
+	    }
+	    cleanup();
+	    exit(0);
+	}
+	fatal("Jail exited unexpectedly!");
+    }
+    else {
+	my $option = ($interactive ? "-s" : "");
+	
+	exec("mkjail.pl $option -p $pid $vnodeid");
+	die("*** $0:\n".
+	    "    Could not start the jail!\n");
+    }
+}
+else {
+    #
+    # Inform the TMCD we are ready.
+    #
+    system("tmcc -n $vnodeid state ISUP");
+
+    #
+    # Now we just sit and wait to be killed off by a signal sent to the
+    # process group. Everything should get killed. 
+    #
+    while (1) {
+	sleep 5;
+    }
+}
+exit 0;
+
+#
+# Routine to kill a vnode manager by sending it a signal.
+#
+sub killvnode() {
+    my $mpid = `cat $pidfile`;
+    $mpid =~ s/\n//;
+    # untaint
+    if ($mpid =~ /^([-\@\w.]+)$/) {
+	$mpid = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in pid: $mpid!\n");
+    }
+    if (kill('USR1', $mpid) == 0) {
+	print"*** Could not kill(USR1) process $mpid: $!\n";
+	return -1;
+    }
+    
+    #
+    # Wait for the pidfile to be removed. Do not wait too long though. 
+    # 
+    for (my $i = 0; $i < 30;) {
+	sleep(5);
+	if (! -e $pidfile) {
+	    return 0;
+	}
+	$i += 5;
+    }
+    print "*** Not able to kill running vnode manager process $mpid!\n";
+    return 0;
+}
+
+#
+# Routine to "reboot" a vnode by sending a signal to the manager process.
+#
+sub rebootvnode() {
+    my $mpid = `cat $pidfile`;
+    $mpid =~ s/\n//;
+    # untaint
+    if ($mpid =~ /^([-\@\w.]+)$/) {
+	$mpid = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in pid: $mpid!\n");
+    }
+    if (kill('USR2', $mpid) == 0) {
+	print"*** Could not kill(USR2) process $mpid: $!\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Cleanup at exit.
+#
+sub cleanup()
+{
+    if ($cleaning) {
+	die("*** $0:\n".
+	    "    Oops, already cleaning!\n");
+    }
+    $cleaning = 1;
+
+    # Inform testbed that vnode going down.
+    system("tmcc -t 2 -n $vnodeid state SHUTDOWN");
+
+    #
+    # First force the jail to exit. 
+    #
+    if (defined($jailpid)) {
+	if ($leavejail) {
+	    kill('USR1', $jailpid);
+	}
+	else {
+	    kill('HUP', $jailpid);
+	}
+	waitpid($jailpid, 0);
+	undef($jailpid);
+    }
+
+    $SIG{TERM} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    print "Waiting 10 seconds for process group to die off ...\n";
+    sleep(10);
+    if (! $leavejail) {
+	system("rm -rf $vnodedir");
+    }
+    system("rm -f $pidfile");
+}
+
+#
+# Reboot a vnode. Sort of odd, I know.
+#
+sub reboot()
+{
+    $rebooting = 1;
+    
+    # Inform testbed that vnode going down.
+    system("tmcc -t 2 -n $vnodeid state SHUTDOWN");
+
+    #
+    # First force the jail to exit, but leaving it intact.
+    #
+    if (defined($jailpid)) {
+	kill('USR1', $jailpid);
+	waitpid($jailpid, 0);
+	undef($jailpid);
+    }
+
+    $SIG{TERM} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    print "Waiting 10 seconds for process group to die off ...\n";
+    sleep(10);
+    $SIG{TERM} = '\&handler';
+}
+
+#
+# Print error and exit.
+#
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    cleanup();
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
