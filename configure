@@ -925,7 +925,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
-	db/webcontrol discvr/GNUmakefile \
+	db/webcontrol db/node_status discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
