@@ -104,7 +104,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbprerun tbsetup/tbrun tbsetup/tbend tbsetup/tbreport \
 	tbsetup/checkpass/GNUmakefile \
 	tip/GNUmakefile \
-	tmcd/GNUmakefile tmcd/tmcd.restart \
+	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
+	tmcd/tmcd.restart \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
 
 #

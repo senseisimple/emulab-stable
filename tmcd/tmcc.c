@@ -10,12 +10,16 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include "decls.h"
 
 #ifdef LBS
 #define	MASTERNODE	"206.163.153.25"
 #else
-#define	MASTERNODE	"155.99.212.70"
+#define	MASTERNODE	"boss.emulab.net"
 #endif
 
 void		sigcatcher(int foo);
@@ -26,12 +30,26 @@ main(int argc, char **argv)
 	struct sockaddr_in	name, client;
 	struct timeval		tv;
 	struct itimerval	timo;
+	struct hostent		*he;
+	struct in_addr		serverip;
 	char			buf[BUFSIZ], *bp, *response = "";
 
 	if (argc < 2 || argc > 3) {
 		fprintf(stderr, "usage: %s <command>\n", argv[0]);
 		exit(1);
 	}
+
+#ifdef	LBS
+	inet_aton(MASTERNODE, &serverip);
+#else
+	he = gethostbyname(MASTERNODE);
+	if (he)
+		memcpy((char *)&serverip, he->h_addr, he->h_length);
+	else {
+		fprintf(stderr, "gethostbyname(%s) failed\n", MASTERNODE); 
+		exit(1);
+	}
+#endif
 
 	while (1) {
 		/* Create socket from which to read. */
@@ -43,7 +61,7 @@ main(int argc, char **argv)
 
 		/* Create name. */
 		name.sin_family = AF_INET;
-		inet_aton(MASTERNODE, &name.sin_addr);
+		name.sin_addr   = serverip;
 		name.sin_port = htons(TBSERVER_PORT);
 
 		if (connect(sock,

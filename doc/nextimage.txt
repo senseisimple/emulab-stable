@@ -1,1 +1,0 @@
-* Mike's dhcp fix: plastic:/sbin/dhclient-script

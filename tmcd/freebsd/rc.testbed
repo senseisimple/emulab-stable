@@ -1,0 +1,21 @@
+#!/bin/sh
+
+echo "Checking for file updates ..."
+export HOME=/root
+/usr/local/bin/cvsup -1 -g -L 1 /etc/testbed/supfile
+
+if [ -x /etc/testbed/setup ]; then
+        echo "Setting up Testbed configuration..."
+        /etc/testbed/setup
+fi
+
+if [ -x /etc/testbed/rc.ifc ]; then
+        echo "Setting up Testbed interfaces..."
+        /etc/testbed/rc.ifc
+fi
+
+if [ -x /etc/testbed/rc.delay ]; then
+        echo "Setting up Testbed delay configuration..."
+        /etc/testbed/rc.delay
+fi
+
