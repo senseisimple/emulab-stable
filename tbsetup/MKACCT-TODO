@@ -1,4 +1,4 @@
-$Id: MKACCT-TODO,v 1.2 2000-12-04 19:59:09 kwright Exp $
+$Id: MKACCT-TODO,v 1.3 2000-12-05 01:05:20 kwright Exp $
 
 (We can move this to attic when all the account/user setup stuff is
 finished.)
@@ -10,7 +10,13 @@ STUFF TO SET UP USER ACCOUNTS, DIRECTORIES ON CONTROL AND TESTBED NODES
 x add installation stuff to makefiles (similar to mkprojdir)
   for mkacct stuff. all must be setuid root.
 
-- fix UID EUID problem in mkacct
+x fix UID EUID problem in mkacct
+
+x fix UID EUID problem in mkacct-ctrl
+
+- test rmacct (tested as tu1 and i couldn't ssh uname to testbed nodes;
+  i do have to be root for testbed ssh's since there will be
+  no ssh keys for other than root - think i just have to change this) 
 
 - add hooks for mkacct/rmacct into tbrun/end
 
