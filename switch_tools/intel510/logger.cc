@@ -14,6 +14,8 @@ void WriteLogs(float T[NUMPORTS][NUMTESTS][REPEAT]);
 
 void StatLogs();
 
+float Error(float var, float chance);
+
 int main(int argc, char* argv[])
 {
   // number of lines in a log file
@@ -105,7 +107,7 @@ int main(int argc, char* argv[])
       return 0;
     }
   
-  cout << "Port| Operation            | Avg.  |4*StdDev| Max. | Min. |\n";
+  cout << "Port| Operation            | Avg.  |+/-Error| Max. | Min. |\n";
   cout << "----+----------------------+-------+--------+------+------+\n";
 
   float max, min, avg, var;
@@ -146,7 +148,7 @@ int main(int argc, char* argv[])
 	cout << setprecision(3);
 	cout << " | " << avg;
 	cout << setprecision(4);
-	cout << " | " << 4*sqrt(var);
+	cout << " | " << Error(var,.05);
 	cout << setprecision(2);
 	cout << " | " << max;
 	cout << " | " << min;
@@ -365,13 +367,16 @@ void StatLogs()
   dlog.close();
   alog.close();
   elog.close();
-  
+
+  float error=0.05;
+  cout << setprecision(2);
+  cout << "(Chance for error set at "<<error*100<<"%)\n";
   cout << "Disable:"<<setw(4)<<Num[0][0]<<" Times/port  ";
   cout << "Auto-Config:"<<setw(4)<<Num[0][1]<<" Times/port  ";
   cout << "Explicit:"<<setw(4)<<Num[0][2]<<" Times/port\n";
-  cout << "Port    Mean 4*StdDev    ";
-  cout << "Port    Mean 4*StdDev        ";
-  cout << "Port    Mean 4*StdDev\n";
+  cout << "Port    Mean    Error    ";
+  cout << "Port    Mean    Error        ";
+  cout << "Port    Mean    Error\n";
 
   cout << setiosflags(ios::right | ios::fixed | ios::showpoint);
   cout << setprecision(3);
@@ -380,20 +385,23 @@ void StatLogs()
     {
       cout << setw(3)<<x+1;
       cout << setw(9)<<Mean[x][0];
-      cout << setw(9)<<4.0*sqrt(Var[x][0]);
+      cout << setw(9)<<Error(Var[x][0],error);
       cout << setw(7)<<x+1;
       cout << setw(9)<<Mean[x][1];
-      cout << setw(9)<<4.0*sqrt(Var[x][1]);
+      cout << setw(9)<<Error(Var[x][1],error);
       cout << setw(11)<<x+1;
       cout << setw(9)<<Mean[x][2];
-      cout << setw(9)<<4.0*sqrt(Var[x][2]);
+      cout << setw(9)<<Error(Var[x][2],error);
       cout << "\n";
     }
  
 }
 
 
-
+float Error(float var, float chance)
+{
+  return sqrt(var * (1.0/chance - 1) );
+}
 
 
 
