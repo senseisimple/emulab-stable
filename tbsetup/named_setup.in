@@ -8,6 +8,7 @@
 
 use English;
 use Fcntl ':flock';
+use Socket;
 
 #
 # Suck out virtual names and create CNAME map entries.
@@ -26,7 +27,7 @@ my $USERS	= "@USERNODE@";
 my $DISABLED    = "@DISABLE_NAMED_SETUP@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 
-my $mapdir			= "/etc/namedb";
+my $mapdir			= "/tmp/namedb";
 my $mapfile			= "$mapdir/${OURDOMAIN}.db";
 my $mapfiletail			= "$mapfile.tail";
 my $mapfile_internal		= "$mapdir/${OURDOMAIN}.internal.db";
@@ -150,11 +151,12 @@ my $db_result =
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id and ".
 		 "     nt.control_iface=i.iface ".
-		 "where nt.isvirtnode=0 and nt.issubnode=0 and ".
+		 "where nt.isvirtnode=0 and ".
 		 "      n.role='testnode' and i.IP is not null ".
 		 "order by nt.type,n.node_id");
 
 my %reverse;
+my %routable;
 if ($db_result->numrows > 0) {
     #
     # Create an IN record for each node. 
@@ -174,6 +176,10 @@ if ($db_result->numrows > 0) {
 	    
 	    $oldtype = $type;
 	}
+
+	next
+	    if (! isroutable($IP));
+	$routable{$node_id} = $IP;
 
 	print MAP "$node_id\tIN\tA\t$IP\n";
 	print MAP "\tIN\tMX 10\t$USERS.\n";
@@ -199,11 +205,12 @@ print MAP "\$TTL\t1\n\n";
 # nodes that have a vname in the reserved table. 
 #
 $db_result =
-    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid,n.jailip ".
+    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid,n.jailip,i.IP ".
 		 " from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join node_types as nt on nt.type=n.type ".
-		 "where nt.issubnode=0");
+		 "left join interfaces as i on n.node_id=i.node_id and ".
+		 "     nt.control_iface=i.iface ");
 
 if ($db_result->numrows > 0) {
     #
@@ -222,6 +229,10 @@ if ($db_result->numrows > 0) {
 	    $vname = $row{"vname"};
 	}
 
+	# If the node has its own unroutable IP skip; done later. 
+	next
+	    if (defined($row{"IP"}) and !isroutable($row{"IP"}));
+
         #
         # VIRTNODE HACK: Map cname to underlying physnode, but first
 	# spit out a vname for the virtnode name (no point in polluting
@@ -231,16 +242,26 @@ if ($db_result->numrows > 0) {
 	if (defined($physid) && $physid ne $node_id) {
 	    if (defined($jailip)) {
 		#
-		# If the vnode has its own jailip, then skip this completely
+		# If the jailip is unroutable, then skip this completely
 		# since both the name and the cname will be entered into
 		# the "private" vnodes map below. 
-		# 
-		next;
+		#
+		next
+		    if (!isroutable($jailip));
 	    }
-	    $cname   = sprintf("%-40s", "$node_id");
-	    printf MAP "$cname IN\tCNAME\t$physid\n";
+
+	    #
+	    # If the vnode has its own routable IP, we can create the CNAME
+	    # to it directly below. But if the vnode does not have its own
+	    # routable IP, then we need create an CNAME entry for it that
+	    # points to the physnode first/.
+	    #
+	    if (!exists($routable{$node_id})) {
+		$cname   = sprintf("%-40s", "$node_id");
+		printf MAP "$cname IN\tCNAME\t$physid\n";
 	    
-	    $node_id = $physid;
+		$node_id = $physid;
+	    }
 	}
 	    
 	$cname = sprintf("%-40s", "$vname.$eid.$pid");
@@ -307,6 +328,9 @@ if ($db_result->numrows > 0) {
 	    $vname = $row{"vname"};
 	}
 
+	next
+	    if (isroutable($IP));
+
 	# Spit an A record for the node.
 	print MAP "$node_id\tIN\tA\t$IP\n";
 
@@ -321,7 +345,7 @@ if ($db_result->numrows > 0) {
 # 
 print MAP
     ";\n".
-    "; Other unroutable IPs (allocated subnodes only).\n" .
+    "; Other unroutable IPs.\n" .
     ";\n";
     
 $db_result =
@@ -331,8 +355,7 @@ $db_result =
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id and ".
 		 "     nt.control_iface=i.iface ".
-		 "where nt.issubnode=1 and ".
-		 "      n.role='testnode' and i.IP is not null ".
+		 "where n.role='testnode' and i.IP is not null ".
 		 "order by nt.type,n.node_id");
 
 if ($db_result->numrows > 0) {
@@ -345,6 +368,9 @@ if ($db_result->numrows > 0) {
 	my $eid     = $row{"eid"};
 	my $IP      = $row{"IP"};
 	my $vname   = $node_id;
+
+	next
+	    if (isroutable($IP));
 
 	if (defined($row{"vname"})) {
 	    $vname = $row{"vname"};
@@ -386,6 +412,8 @@ while (my $dirent = readdir(DIR)) {
 }
 closedir DIR;
 
+exit(0);
+
 #
 # This is better than HUPing the nameserver directly. Notet that we look
 # for a local port of named first.
@@ -398,8 +426,6 @@ else {
     system("named.reload > /dev/null") == 0 or
 	fatal("named.reload failed!\n");
 }
-
-exit(0);
 
 sub fatal {
     my $msg = $_[0];
@@ -467,4 +493,32 @@ sub make_zonefile($;$$) {
     # 
     system("cat $mapfiletail >> $mapfile") == 0 or
     fatal("Failed to concat $mapfiletail to $mapfile\n");
+}
+
+#
+# Is an IP routable?
+#
+sub isroutable($)
+{
+    my ($IP)  = @_;
+    my ($a,$b,$c,$d) = ($IP =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+
+    #
+    # These are unroutable:
+    # 10.0.0.0        -   10.255.255.255  (10/8 prefix)
+    # 172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+    # 192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+    #
+
+    # Easy tests.
+    return 0
+	if (($a eq "10") ||
+	    ($a eq "192" && $b eq "168"));
+
+    # Lastly
+    return 0
+	if (inet_ntoa((inet_aton($IP) & inet_aton("255.240.0.0"))) eq
+	    "172.16.0.0");
+
+    return 1;
 }
