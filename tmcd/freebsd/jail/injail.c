@@ -6,13 +6,21 @@
 
 /*
  * The C version of injail.pl
- *
  * A much smaller memory footprint.
+ *
+ * The point of this is to fire up the init code inside the jail,
+ * and then wait for a signal from outside the jail. When that happens
+ * kill off everything inside the jail and exit. So, like a mini version
+ * of /sbin/init, since killing the jail cleanly from outside the jail
+ * turns out to be rather difficult, and doing it from inside is very easy!
  */
 
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
+
+/*
+ */
 
 char *vnode;
 char *prog;
