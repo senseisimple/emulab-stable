@@ -36,6 +36,8 @@ SCRIPTNAME = "Unknown" # should see if we can get the toplevel script name
 
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "plabnodes"
+MONITOR_PID  = "emulab-ops"
+MONITOR_EID  = "plab-monitor"
 
 MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
 MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
@@ -43,7 +45,7 @@ LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 #ALLOWED_NODES = ("155.98.35.3", "12.46.129.22")
 ALLOWED_NODES = ()
-NUMVNODES = 10
+NUMVNODES = 20
 
 DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 SSH = "@prefix@/bin/sshtb"
@@ -510,7 +512,8 @@ class Plab:
                      " values (%s, %s, now())",
                      (nodeid, 'up'))
 
-        vnodetype = "pcplab"  # %s" % linktype
+        vnodetype = "pcplab"
+        vnodeid = ""
         for n in range(NUMVNODES):
             vprio = (priority * 100) + (n+1)
             sshdport = 38000+(n+1)
@@ -534,6 +537,12 @@ class Plab:
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
                          (vnodeid, 'up'))
+
+        # Now, put the last vnode created into the special monitoring expt.
+        DBQueryFatal("insert into reserved"
+                     " (node_id, pid, eid, rsrv_time, vname)"
+                     " values (%s, %s, %s, now(), %s)",
+                     (vnodeid, MONITOR_PID, MONITOR_EID, vnodeid))
 
     def __getNodetypeInfo(self):
         """
