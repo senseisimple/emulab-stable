@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -238,10 +238,14 @@ else {
     print "Creating widearea node $nodename ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".
-		 " status, op_mode, def_boot_osid) ".
+		 " op_mode, def_boot_osid) ".
 		 "values ('$nodename', '$nodetype', '$nodename', ".
-		 "        'testnode', $nextpri, 'down', 'NORMAL', ".
+		 "        'testnode', $nextpri, 'NORMAL', ".
 		 "        '$defosid') ");
+
+    DBQueryFatal("replace into node_status ".
+		 "(node_id, status, status_timestamp) ".
+		 "values ('$nodename', 'down', now()) ");
 
     DBQueryFatal("insert into interfaces ".
 		 "(node_id, card, port, IP, interface_type, iface) ".
@@ -267,9 +271,9 @@ for ($i = 1; $i < 9; $i++) {
     print "Creating widearea virtual node $nodevname ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".
-		 " status, op_mode, def_boot_osid, update_accounts) ".
+		 " op_mode, def_boot_osid, update_accounts) ".
 		 "values ('$nodevname', '$nodevtype', '$nodename', ".
-		 "        'virtnode', $priority, 'down', 'NORMAL', ".
+		 "        'virtnode', $priority, 'NORMAL', ".
 		 "        '$defosid', 1) ");
 }
 
