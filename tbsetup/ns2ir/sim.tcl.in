@@ -231,6 +231,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::irfile
     var_import ::GLOBALS::ran
     var_import ::GLOBALS::impotent
+    var_import ::GLOBALS::passmode
     var_import ::GLOBALS::vtypes
     var_import ::GLOBALS::uselatestwadata
     var_import ::GLOBALS::usewatunnels
@@ -274,7 +275,7 @@ Simulator instproc run {} {
     if {$errors == 1} {return}
 
     # If we are running in impotent mode we stop here
-    if {$impotent == 1} {return}
+    if {$impotent == 1 && $passmode == 0} {return}
 
     $self spitxml_init
 

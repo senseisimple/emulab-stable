@@ -152,26 +152,26 @@ if (!defined($pid)) {
 #
 if (! $pid) {
     # Set the CPU limit for us.
-    setrlimit(RLIMIT_CPU, 60, 60);
+    setrlimit(RLIMIT_CPU, 180, 180);
     
     # Give parent a chance to react.
     sleep(1);
 
-    system("nice $parser @ARGV $nsfile");
-    exit($? >> 8);
+    exec("nice -15 $parser @ARGV $nsfile");
+    die("Could not exec the parser!\n");
 }
 
 #
 # Parent waits.
 #
 waitpid($pid, 0);
-my $exit_status = $? >> 8;
+my $exit_status = $?;
 
 #
 # If the child was KILLed, then it overran its time limit.
 # Send email. Otherwise, exit with result of child.
 #
-if ($exit_status == SIGKILL) {
+if (($exit_status & 0xff) == SIGKILL) {
     my $msg = "Parser Exceeded CPU Limit";
 
     SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg,
@@ -186,5 +186,5 @@ if ($exit_status == SIGKILL) {
 if (-d $tempdir) {
     system("/bin/rm -r $tempdir");
 }
-exit($exit_status);
+exit($exit_status >> 8);
 
