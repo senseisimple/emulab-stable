@@ -1390,6 +1390,8 @@ foreach my $pnode (keys(%virtnodes)) {
     # know there are enough, since assign knows that.
     #
     my $num  = @vlist;
+
+    print "Asking avail for $num vnodes on $pnode\n";
     
     open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$num |")
 	or fatal(1, "*** $0:\n".
@@ -1400,9 +1402,14 @@ foreach my $pnode (keys(%virtnodes)) {
 	    if (! /^\|/);
 	next
 	    if (/node_id/);
-	
-	my ($nodeid) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;
-	push(@plist, $nodeid);
+
+	if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
+	    push(@plist, $1);
+	}
+	else {
+	    fatal(1, "*** $0:\n".
+		     "    Bad line from avail: $_\n");
+	}
     }
     close(AVAIL);
 
@@ -1415,7 +1422,7 @@ foreach my $pnode (keys(%virtnodes)) {
     # Try to allocate. Note, if this fails we are done for. Okay for now
     # since it is never the case that it should fail!
     #
-    print "Reserving @plist ...\n";
+    print "Reserving ($pnode) @plist ...\n";
     if (system("nalloc $pid $eid @plist")) {
 	fatal(1, "*** $0:\n".
 	         "Failed to reserve @plist (on $pnode)\n");
