@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -99,16 +99,18 @@ if (mysql_num_rows($query_result) == 0) {
 # DB guy. Sorry. Well, obtuse to me.
 # 
 $query_result =
-    DBQueryFatal("SELECT g.* FROM group_membership as g ".
-		 "LEFT JOIN group_membership as authed ".
-		 "ON g.pid=authed.pid and g.gid=authed.gid and ".
-		 "   g.uid!='$auth_usr' and g.trust='none' ".
+    DBQueryFatal("select g.* from group_membership as authed ".
+		 "left join group_membership as g on ".
+		 " g.pid=authed.pid and g.gid=authed.gid ".
 		 "left join users as u on u.uid=g.uid ".
-		 "WHERE u.status!='" . TBDB_USERSTATUS_UNVERIFIED . "' and ".
-		 "u.status!='" . TBDB_USERSTATUS_NEWUSER . "' and ".
-		 "      authed.uid='$auth_usr' and ".
-		 "      (authed.trust='group_root' or ".
-		 "       authed.trust='project_root') ".
+		 "where u.status!='".
+		 TBDB_USERSTATUS_UNVERIFIED . "' and ".
+		 " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
+		 "' and g.uid!='$auth_usr' and ".
+		 "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
+		 "  and authed.uid='$auth_usr' and ".
+		 "  (authed.trust='group_root' or ".
+		 "   authed.trust='project_root') ".
 		 "ORDER BY g.uid,g.pid,g.gid");
 
 if (mysql_num_rows($query_result) == 0) {
