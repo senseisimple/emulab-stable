@@ -4,19 +4,15 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # Jail startup. To be run inside of a jail!
 #
 case "$1" in
 start)
-	if [ -f /usr/local/etc/emulab/jaildog.pl ]; then
-	    /usr/local/etc/emulab/jaildog.pl > /dev/null 2>&1
-	    echo -n ' Emulab'
-	elif [ -f /etc/testbed/jaildog.pl ]; then
-	    /etc/testbed/jaildog.pl > /dev/null 2>&1
-	    echo -n ' Emulab'
-	fi
+        $BINDIR/jaildog.pl > /dev/null 2>&1
+	echo -n ' Emulab'
 	;;
 stop)
 	#

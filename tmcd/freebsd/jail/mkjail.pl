@@ -10,6 +10,9 @@ use Fcntl;
 use IO::Handle;
 use Socket;
 
+# Drag in path stuff so we can find emulab stuff. Also untaints path.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
 #
 # Questions:
 #
@@ -34,7 +37,7 @@ my  $optlist = "i:p:e:s";
 if ($UID) {
     die("Must be root to run this script!\n");
 }
-system("sysctl jail.set_hostname_allowed=0");
+system("sysctl jail.set_hostname_allowed=0 >/dev/null 2>&1");
 
 #
 # Catch ^C and exit with error. 
@@ -65,37 +68,17 @@ STDOUT->autoflush(1);
 STDERR->autoflush(1);
 
 #
-# Untaint the environment.
-# 
-$ENV{'PATH'} = "/tmp:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
-    "/usr/local/bin:/usr/site/bin:/usr/site/sbin";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-#
-# Deal with the screwy path mess that I created!
-#
-my $EMULABPATH;
-if (-e "/usr/local/etc/emulab/tmcc") {
-    $EMULABPATH = "/usr/local/etc/emulab";
-}
-elsif (-e "/etc/testbed/tmcc") {
-    $EMULABPATH = "/etc/testbed";
-}
-else {
-    die("*** $0:\n".
-	"    Could not locate the testbed directory!\n");
-}
-
-#
 # Locals
 #
 my $JAILPATH	= "/var/emulab/jails";
-my $JAILCONFIG  = "/etc/jail";
-my $LOCALROOTFS = "/local";
-my $TMCC	= "$EMULABPATH/tmcc";
+my $ETCJAIL     = "/etc/jail";
+my $LOCALFS	= "/users/local";
+my $LOCALMNTPNT = "/local";
+my $TMCC	= "$BINDIR/tmcc";
+my $JAILCONFIG  = "jailconfig";
 my @ROOTCPDIRS	= ("etc", "root");
 my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
-		   "bin", "sbin", "home", $LOCALROOTFS);
+		   "bin", "sbin", "home", $LOCALMNTPNT);
 my @ROOTMNTDIRS = ("bin", "sbin", "usr");
 my $VNFILEMBS   = 64;
 my $MAXVNDEVS	= 10;
@@ -108,6 +91,9 @@ my @mntpoints   = ();
 my $jailpid;
 my $tmccpid;
 my $interactive = 0;
+my %jailconfig  = ();
+my $jailoptions;
+my $sshdport	= 50000;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -137,6 +123,20 @@ if (defined($options{'s'})) {
 }
 
 #
+# Get the parent IP.
+# 
+my $hostname = `hostname`;
+my $hostip;
+
+# Untaint and strip newline.
+if ($hostname =~ /^([-\w\.]+)$/) {
+    $hostname = $1;
+
+    my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
+    $hostip = inet_ntoa($ipaddrs[0]);
+}
+
+#
 # If no IP, then it defaults to our hostname's IP.
 # 
 if (defined($options{'i'})) {
@@ -150,15 +150,7 @@ if (defined($options{'i'})) {
     }
 }
 else {
-    my $hostname = `hostname`;
-
-    # Untaint and strip newline.
-    if ($hostname =~ /^([-\w\.]+)$/) {
-	$hostname = $1;
-
-	my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
-	$IP = inet_ntoa($ipaddrs[0]);
-    }
+    $IP = $hostip;
 }
 if (!defined($IP)) {
     usage();
@@ -179,7 +171,9 @@ print("Setting up jail for HOST:$HOST using IP:$IP\n")
     if ($debug);
 
 #
-# First create the directory tree and such.
+# In most cases, the $HOST directory will have been created by the caller,
+# and a config file possibly dropped in.
+# When debugging, we have to create it here. 
 # 
 chdir($JAILPATH) or
     die("Could not chdir to $JAILPATH: $!\n");
@@ -188,7 +182,18 @@ if (! -e $HOST) {
     mkdir($HOST, 0770) or
 	fatal("Could not mkdir $HOST in $JAILPATH: $!");
 }
+else {
+    getjailconfig("$JAILPATH/$HOST");
+}
 
+#
+# See if special options supported, and if so setup args as directed.
+#
+setjailoptions();
+
+#
+# Create the "disk";
+#
 if (-e "$HOST/root") {
     #
     # Try to pick up where we left off.
@@ -223,7 +228,8 @@ else {
     $SIG{TERM} = 'DEFAULT';
     $ENV{'TMCCVNODEID'} = $HOST;
 
-    my $cmd = "jail $JAILPATH/$HOST/root $HOST $IP $JAILCONFIG/injail.pl";
+    my $cmd = "jail $jailoptions ".
+	"$JAILPATH/$HOST/root $HOST $IP /etc/jail/injail.pl";
     if ($interactive) {
 	$cmd .= " /bin/csh";
     }
@@ -340,23 +346,37 @@ sub mkrootfs($)
     #
     # Now a bunch of stuff to set up a nice environment in the jail.
     #
-    mysystem("cp -p $JAILCONFIG/rc.conf $path/root/etc");
-    mysystem("cp -p $JAILCONFIG/rc.local $path/root/etc");
-    mysystem("cp -p $JAILCONFIG/group $path/root/etc");
-    mysystem("cp -p $JAILCONFIG/master.passwd $path/root/etc");
+    mysystem("cp -p $ETCJAIL/rc.conf $path/root/etc");
+    mysystem("rm -f $path/root/etc/rc.conf.local");
+    mysystem("cp -p $ETCJAIL/rc.local $path/root/etc");
+    mysystem("cp -p $ETCJAIL/group $path/root/etc");
+    mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
     mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
     mysystem("echo '$IP		$HOST' >> $path/root/etc/hosts");
+    mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
+	     " $path/root/etc/rc.conf");
 
+    # No X11 forwarding. 
+    mysystem("cat $path/root/etc/ssh/sshd_config | ".
+	     "sed -e 's/^X11Forwarding.*yes/X11Forwarding no/' > ".
+	     "$path/root/tmp/sshd_foo");
+    mysystem("cp -f $path/root/tmp/sshd_foo $path/root/etc/ssh/sshd_config");
+
+    # In the jail, 127.0.0.1 refers to the jail, but we want to use the
+    # nameserver running *outside* the jail.
+    mysystem("cat /etc/resolv.conf | ".
+	     "sed -e 's/127\.0\.0\.1/$hostip/' > ".
+	     "$path/root/etc/resolv.conf");
+    
     #
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
     #
-    if (defined($PID) && -e $LOCALROOTFS && -e "$LOCALROOTFS/$PID") {
-	mysystem("mkdir -p $path/root/$LOCALROOTFS/$PID");
-	mysystem("mount localhost:$LOCALROOTFS/$PID ".
-		 "$path/root/$LOCALROOTFS/$PID");
-	push(@mntpoints, "$path/root/$LOCALROOTFS/$PID");
+    if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
+	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
+	mysystem("mount localhost:$LOCALFS/$PID $path/root/$LOCALMNTPNT/$PID");
+	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
 
     cleanmess($path);
@@ -408,22 +428,17 @@ sub restorerootfs($)
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
     #
-    if (defined($PID) && -e $LOCALROOTFS && -e "$LOCALROOTFS/$PID") {
-	mysystem("mount localhost:$LOCALROOTFS/$PID ".
-		 "$path/root/$LOCALROOTFS/$PID");
-	push(@mntpoints, "$path/root/$LOCALROOTFS/$PID");
+    if (defined($PID) && -e $LOCALFS && -e "$LOCALFS/$PID") {
+	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
+	mysystem("mount localhost:$LOCALFS/$PID $path/root/$LOCALMNTPNT/$PID");
+	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
-
-    cleanmess($path);
     return 0;
 }
 
 #
-# Deal with the path mess I created! I should have split the emulab
-# directory into a /etc/emulab part with keys and such, and a
-# /usr/local/bin part that had the scripts. I do not want to mess with that
-# now, so mount a tiny MFS over /usr/local/etc/emulab, and then remove the
-# bits that we do not want the jail to see.
+# Okay, we clean up some of what is in /etc and /etc/emulab so that the
+# jail cannot see that stuff. 
 #
 sub cleanmess($) {
     my ($path) = @_;
@@ -435,28 +450,10 @@ sub cleanmess($) {
     mysystem("rm -f $path/root/etc/emulab.cdkey");
     mysystem("rm -f $path/root/etc/emulab.pkey");
 
-    if (-e "/usr/local/etc/emulab/tmcc") {
-	mysystem("mount_mfs -s 4096 -b 4096 -f 1024 -i 12000 -c 11 ".
-		 "-T minimum dummy $path/root/usr/local/etc/emulab");
-	push(@mntpoints, "$path/root/usr/local/etc/emulab");
-	mysystem("hier cp /usr/local/etc/emulab ".
-		 "        $path/root/usr/local/etc/emulab");
-
-	#
-	# And symlink /etc/testbed in. Ug, these paths are all a mess!
-	# 
-	mysystem("rm -rf $path/root/etc/testbed");
-	mysystem("ln -s /usr/local/etc/emulab $path/root/etc/testbed");
-
-	mysystem("rm -f  $path/root/usr/local/etc/emulab/*.pem");
-	mysystem("rm -f  $path/root/usr/local/etc/emulab/cvsup.auth");
-	mysystem("rm -rf $path/root/usr/local/etc/emulab/.cvsup");
-    }
-    else {
-	mysystem("rm -f  $path/root/etc/testbed/*.pem");
-	mysystem("rm -f  $path/root/etc/testbed/cvsup.auth");
-	mysystem("rm -rf $path/root/etc/testbed/.cvsup");
-    }
+    mysystem("rm -f  $path/root/$ETCDIR/*.pem");
+    mysystem("rm -f  $path/root/$ETCDIR/cvsup.auth");
+    mysystem("rm -rf $path/root/$ETCDIR/.cvsup");
+    mysystem("rm -f  $path/root/$ETCDIR/master.passwd");
 
     #
     # Copy in emulabman if it exists.
@@ -569,4 +566,95 @@ sub mysystem($)
     if ($?) {
 	fatal("Command failed: $? - $command");
     }
+}
+
+#
+# Read in the jail config file. 
+#
+sub getjailconfig($)
+{
+    my ($path) = @_;
+
+    $path .= "/$JAILCONFIG";
+
+    if (! -e $path) {
+	return 0;
+    }
+    
+    if (! open(CONFIG, $path)) {
+	print("$path could not be opened for reading: $!\n");
+	return -1;
+    }
+    while (<CONFIG>) {
+	if ($_ =~ /^(.*)="(.+)"$/ ||
+	    $_ =~ /^(.*)=(.+)$/) {
+	    $jailconfig{$1} = $2;
+	}
+    }
+    close(CONFIG);
+    return 0;
+}
+
+#
+# See if special jail opts supported.
+#
+sub setjailoptions() {
+    $jailoptions = "";
+
+    #
+    # Do this all the time, so that we can figure out the sshd port.
+    # 
+    foreach my $key (keys(%jailconfig)) {
+	my $val = $jailconfig{$key};
+
+        SWITCH: for ($key) {
+	    /^PORTRANGE$/ && do {
+		if ($val =~ /(\d+),(\d+)/) {
+		    $jailoptions .= " -p $1:$2";
+		    $sshdport     = $1;
+		}
+		last SWITCH;
+	    };
+	    /^SYSVIPC$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o sysvipc";
+		}
+		else {
+		    $jailoptions .= " -o nosysvipc";
+		}
+		last SWITCH;
+	    };
+	    /^INETRAW$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o inetraw";
+		}
+		else {
+		    $jailoptions .= " -o noinetraw";
+		}
+		last SWITCH;
+	    };
+	    /^BPFRO$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o bpfro";
+		}
+		else {
+		    $jailoptions .= " -o nobpfro";
+		}
+		last SWITCH;
+	    };
+	}
+    }
+    print("SSHD port is $sshdport\n");
+
+    system("sysctl jail.inetraw_allowed=1 >/dev/null 2>&1");
+    system("sysctl jail.bpf_allowed=1 >/dev/null 2>&1");
+    
+    if ($?) {
+	print("Special jail options are NOT supported!\n");
+	$jailoptions = "";
+	return 0;
+    }
+    print("Special jail options are supported: '$jailoptions'\n");
+    
+    return 0;
 }

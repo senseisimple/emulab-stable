@@ -11,7 +11,9 @@ xten:*:67:67::0:0:X-10 daemon:/usr/local/xten:/sbin/nologin
 pop:*:68:6::0:0:Post Office Owner:/nonexistent:/sbin/nologin
 nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/sbin/nologin
 ftp:*:99:52::0:0:Anonymous Ftp:/var/spool/ftp:/bin/echo
+sshd:*:22:22::0:0:Secure Shell Daemon:/var/empty:/sbin/nologin
 smmsp:*:25:25::0:0:Sendmail Submission User:/var/spool/clientmqueue:/sbin/nologin
+mailnull:*:26:26::0:0:Sendmail Default User:/var/spool/mqueue:/sbin/nologin
 mysql:*:88:88::0:0:MySQL Daemon:/var/db/mysql:/sbin/nologin
 sfs:*:77:77::0:0:SFS pseudo-user:/:/bin/nologin
 emulabman:*:65520:10::0:0:Emulab Man:/home/emulabman:/bin/tcsh

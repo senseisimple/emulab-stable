@@ -11,7 +11,7 @@ use Getopt::Std;
 # The point of this is to fire up the init code inside the jail,
 # and then wait for a signal from outside the jail. When that happens
 # kill off everything inside the jail and exit. So, like a mini version
-# of /sbin/init cause killing the jail cleanly from outside the jail
+# of /sbin/init, since killing the jail cleanly from outside the jail
 # turns out to be rather difficult, and doing it from inside is very easy!
 #
 my $DEFCONSIX = "/bin/sh /etc/rc";

@@ -25,11 +25,8 @@ my $optlist = "t:";
 #
 $| = 1;
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Must be root to run this.
@@ -43,19 +40,11 @@ if ($UID != 0) {
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 #
-if (-d "/usr/local/etc/emulab") {
-    use lib "/usr/local/etc/emulab";
-    $ENV{'PATH'} .= ":/usr/local/etc/emulab";
-}
-elsif (-d "/etc/testbed") {
-    use lib "/etc/testbed";
-    $ENV{'PATH'} .= ":/etc/testbed";
-}
 use libsetup;
 
 # Locals
 my $timeout = (60 * 60 * 12);	# In seconds of course. 
-my $logname = "/var/tmp/emulab-jaildog.debug";
+my $logname = "$LOGDIR/emulab-jaildog.debug";
 my $pidfile = "/var/run/emulab-jaildog.pid";
 my $vnodeid;
 
@@ -119,12 +108,37 @@ if (! ($vnodeid = jailedsetup())) {
 if (-x TMTARBALLS()) {
     print "Installing Tarballs ...\n";
     system(TMTARBALLS());
+    if ($? < 0) {
+	die("*** $0:\n".
+	    "    Failed to install tarballs!\n");
+    }
 }
 
 if (-x TMSTARTUPCMD()) {
     print "Running startup command ...\n";
     system("runstartup");
+    # Command does not actually run till a little later ...
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to setup startup command!\n");
+    }
 }
+
+if (-x TMTRAFFICCONFIG()) {
+    print "Starting Traffic Generators ...\n";
+    # Exits immediately.
+    system(TMTRAFFICCONFIG());
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to setup traffic generators!\n");
+    }
+    sleep(1);
+}
+
+#
+# Start isalive daemon.
+#
+startisalive();
 
 #
 # Inform TMCD that we are up and running.
@@ -133,18 +147,40 @@ print "Informing Emulab Operations that we're up and running ...\n";
 system("tmcc state ISUP");
 
 #
+# Loop!
+# 
+while (1) {
+    sleep($timeout);
+    
+    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+
+    print "Dogging it at $date\n";
+    
+    #
+    # Run account update. Use immediate mode so that it exits right away
+    # if the lock is taken (another update already running).
+    #
+    print "Looking for new Emulab accounts ...\n";
+    system("update -i");
+}
+
+exit(0);
+
+#
 # Fire off a child that does nothing but tell the boss we are alive.
 #
-my $mypid = fork();
-if (! $mypid) {
+sub startisalive()
+{
+    if (fork()) {
+	return;
+    }
     my $failed  = 0;
     
     print "Keep alive starting up ... \n";
 
     while (1) {
 	#
-	# Run tmcc in UDP mode. The command is ignored at the other end.
-	# Its just the connection that tells tmcd we are alive.
+	# Run tmcc in UDP mode. 
 	# Since its UDP, we try it a couple of times if it fails. 
 	#
 	my $retries = 3;
@@ -180,23 +216,3 @@ if (! $mypid) {
     }
     exit(0);
 }
-
-#
-# Loop!
-# 
-while (1) {
-    sleep($timeout);
-    
-    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
-
-    print "Dogging it at $date\n";
-    
-    #
-    # Run account update. Use immediate mode so that it exits right away
-    # if the lock is taken (another update already running).
-    #
-    print "Looking for new Emulab accounts ...\n";
-    system("update -i");
-}
-
-exit(0);

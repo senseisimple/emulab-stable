@@ -2,10 +2,10 @@
 #
 # The point of this is to startup testbed stuff inside the jail.
 #
-if [ -f /usr/local/etc/emulab/jailctl ]; then
-    /usr/local/etc/emulab/jailctl start
-elif [ -f /etc/testbed/jailctl ]; then
-    /etc/testbed/jailctl start
+. /etc/emulab/paths.sh
+
+if [ -x $BINDIR/jailctl ]; then
+    $BINDIR/jailctl start
 fi
 
 exit 0
