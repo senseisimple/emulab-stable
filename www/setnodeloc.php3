@@ -92,7 +92,7 @@ function SPITFORM($errors, $node_id, $building, $floor,
     $uniqueid = $matches[1];
 
     $retval = SUEXEC("nobody", "nobody",
-		     "webfloormap -o $prefix -f $floor $building",
+		     "webfloormap -t -o $prefix -f $floor $building",
 		     SUEXEC_ACTION_IGNORE);
 
     if ($retval) {
@@ -234,12 +234,23 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
 
     echo "<font size=+2>Pick a floor, any floor</font><br><br>\n";
 
-    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
-             <img src=meb3fl-thumb.png></a>";
-
-    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
-             <img src=meb4fl-thumb.png></a>";
-
+    echo "<table>
+          <tr>
+            <td>
+               <a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
+                  <img src=meb3fl-thumb.png></a>
+            </td>
+            <td>
+               <a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
+                 <img src=meb4fl-thumb.png></a>
+            </td>
+          </tr>
+          <tr>
+          <td align=center>MEB 3rd Floor</td>
+          <td align=center>MEB 4th Floor</td>
+          </tr>
+          </table>\n";
+    
     echo "</center>\n";
 
     PAGEFOOTER();

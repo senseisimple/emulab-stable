@@ -11,15 +11,17 @@ use Getopt::Std;
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
 # 
 sub usage {
-    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] [<building>] or \n";
-    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] ";
+    print STDERR "Usage: floormap [-t] [-o <prefix>] [-f <floor>] [<building>]";
+    print STDERR "\nor\n";
+    print STDERR "Usage: floormap [-t] [-o <prefix>] [-f <floor>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
     exit(-1);
 }
-my $optlist  = "df:o:e:";
+my $optlist  = "df:o:e:t";
+my $debug    = 0;
+my $notitles = 0;
 my $building = "MEB";
 my $floor;
-my $debug;
 my $image;
 my $pid;
 my $eid;
@@ -39,13 +41,26 @@ use libdb;
 use GD;
 
 #
-# Hardwire the imagemaps for now.
+# Hardwire the imagemaps for now. This needs to go into the DB in some format.
 #
-my %baseimages = ();
-$baseimages{"MEB"}{"4"} = "$TB/www/meb4fl.png";
-$baseimages{"MEB"}{"3"} = "$TB/www/meb3fl.png";
-#$baseimages{"MEB"}{"2"} = "$TB/www/meb2fl.png";
-#$baseimages{"MEB"}{"1"} = "$TB/www/meb1fl.png";
+my %baseimages =
+    ("MEB"	=> { "title"	=> "Merril Engineering Building",
+		     "floors"	=> { 3 => "$TB/www/meb3fl.png",
+				     4 => "$TB/www/meb4fl.png"}
+		   }
+     );
+
+# Ha.
+my @floortags = ();
+$floortags[1] = "1st floor";
+$floortags[2] = "2nd floor";   
+$floortags[3] = "3rd floor";
+$floortags[4] = "4th floor";
+$floortags[5] = "5th floor";
+$floortags[6] = "6th floor";
+$floortags[7] = "7th floor";
+$floortags[8] = "8th floor";
+$floortags[9] = "9th floor";
 
 #
 # Turn off line buffering on output
@@ -73,6 +88,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"t"})) {
+    $notitles = 1;
 }
 if (defined($options{"f"})) {
     $floor = $options{"f"};
@@ -127,7 +145,7 @@ if (!exists($baseimages{$building})) {
 # If a floor specified, then do just that floor and spit it out.
 #
 if (defined($floor)) {
-    if (!exists($baseimages{$building}{$floor})) {
+    if (!exists($baseimages{$building}->{"floors"}->{$floor})) {
 	die("No such floor '$floor' in building: $building\n");
     }
     
@@ -141,7 +159,7 @@ else {
     #
     my @floors = ();
 
-    foreach my $floor (sort(keys(%{ $baseimages{$building} }))) {
+    foreach my $floor (sort(keys(%{ $baseimages{$building}->{"floors"} }))) {
 	my ($floorimage, $areamap) = dofloor($building, $floor);
 
 	push(@floors, [ $floorimage, $areamap ]);
@@ -158,7 +176,7 @@ else {
 	
 	($x, $y) = $floorimage->getBounds();
 
-	$total_y = $total_y + $y + 10;
+	$total_y = $total_y + $y + 15;
 	$max_x = $x
 	    if ($x > $max_x);
     }
@@ -182,7 +200,7 @@ else {
 	adjustmap($areamap, 0, $running_y);
 	push(@areamaps, $areamap);
 	
-	$running_y += $y + 10;
+	$running_y += $y + 15;
     }
 }
 writefiles($image, @areamaps);
@@ -211,14 +229,15 @@ sub dofloor($$)
     #
     # Grab the base image for the floor.
     #
-    if (! exists($baseimages{$building}{$floor})) {
+    if (! exists($baseimages{$building}->{"floors"}->{$floor})) {
 	die("*** $0:\n".
 	    "    No base image for $building:$floor!\n");
     }
     my $baseimage =
-	GD::Image->newFromPng($baseimages{$building}{$floor}, 1) ||
-	die("*** $0:\n".
-	    "    Could not get base ". $baseimages{"$building:$floor"} ."!\n");
+      GD::Image->newFromPng($baseimages{$building}->{"floors"}->{$floor}, 1) ||
+	  die("*** $0:\n".
+	      "    Could not get base ".
+	      $baseimages{$building}->{"floors"}->{$floor}  ."!\n");
 
     #
     # Green dot means node is free or owned by pid/eid.
@@ -229,6 +248,7 @@ sub dofloor($$)
     my $green = $baseimage->colorAllocate(0,250,0);
     my $red   = $baseimage->colorAllocate(250,0,0);
     my $blue  = $baseimage->colorAllocate(0,0,250);
+    my $white = $baseimage->colorAllocate(255,255,255);
     my $CY    = 10;
     my $CX    = 10;
 
@@ -272,6 +292,28 @@ sub dofloor($$)
 	$tmp->{"Y2"} = $y + ($CY / 2);
 	$areamap->{$nodeid} = $tmp;
     }
+
+    if (!$notitles) {
+	#
+	# We wat to stick in a label for the floor. To do that we need to make
+	# some white space at the top by expanding the image, and moving it down.
+	# Okay, so it takes some steps to do that. 
+	# 
+	my ($x, $y) = $baseimage->getBounds();
+	my $fullimage = new GD::Image($x, $y + 50, 1);
+	$fullimage->copy($baseimage, 0, 50, 0, 0, $x, $y);
+	$fullimage->filledRectangle(0, 0, $x, 50, $white);
+
+	$fullimage->stringFT($black, "/usr/testbed/lib/arial.ttf",
+			     25, 0, 10, 40,
+			     $baseimages{$building}->{"title"} . " - " .
+			     $floortags[$floor]);
+
+	# Have to adjust the maps cause we just moved everything.
+	adjustmap($areamap, 0, 50);
+	$baseimage = $fullimage;
+    }
+    
     return ($baseimage, $areamap);
 }
 
