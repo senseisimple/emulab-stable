@@ -648,6 +648,7 @@ int main(int argc,char **argv)
   sigemptyset(&action.sa_mask);
   action.sa_flags = 0;
   sigaction(SIGUSR1,&action,NULL);
+  sigaction(SIGINT,&action,NULL);
 
   // Convert options to the common.h parameters.
   parse_options(argv, options, noptions);
