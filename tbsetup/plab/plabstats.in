@@ -39,10 +39,11 @@ my $showdisk = 0;
 my $showhost = 1;
 my $showip = 0;
 my $showstate = 0;
+my $ganglianames = 0;
 my $now = time();
 my $header;
 
-my $optlist = "CDLMSdfhin";
+my $optlist = "CDLMSdfhino";
 
 sub usage()
 {
@@ -53,6 +54,7 @@ sub usage()
 	"  -h	this help message\n".
 	"  -i	print IP address along with metrics\n".
 	"  -n	do not print hostname with metrics\n".
+	"  -o   print hostnames from Ganglia, rather than the database\n".
 	"\n".
 	"  -C	print Ganglia CPU metrics, sorted by %CPU usage\n".
 	"  -D	print Ganglia disk metrics, sorted by %disk usage\n".
@@ -85,6 +87,7 @@ use libtestbed;
 
 # Locals
 my %nodemap     = ();
+my %dbhostnames = ();
 my $LOADMETRIC;
 my $MAXLOAD;
 my $MINDISK;
@@ -121,6 +124,9 @@ if (defined($options{"i"})) {
 }
 if (defined($options{"n"})) {
     $showhost = 0;
+}
+if (defined($options{"o"})) {
+    $ganglianames = 1;
 }
 if (defined($options{"C"})) {
     $showcpu = 1;
@@ -211,14 +217,16 @@ else {
 # map from the IP we get from the XML output, to our node_id. 
 #
 my $query_result =
-    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+    DBQueryFatal("select i.node_id,i.IP,w.hostname from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "left join widearea_nodeinfo as w on n.node_id=w.node_id ".
 		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
     		 "and nt.class='pcplabphys'");
 
-while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
+while (my ($nodeid,$IP,$hostname) = $query_result->fetchrow_array()) {
     $nodemap{$IP} = $nodeid;
+    $dbhostnames{$nodeid} = $hostname;
 }
 
 #
@@ -249,7 +257,7 @@ $debug = 0;
 foreach my $arg (keys(%nodemap)) {
     $IP = $arg;
     if (defined($nodemap{$IP})) {
-	$host = "(" . $nodemap{$IP} . ")";
+	$host = "(" . $dbhostnames{$nodemap{$IP}} . ")";
 	ShowMetrics();
 	undef($host);
 	undef($metricsage);
