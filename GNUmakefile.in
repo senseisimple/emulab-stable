@@ -134,7 +134,7 @@ mfs: mfsoscheck
 	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
 
-mfs-install: destdircheck mfs
+mfs-install: destdircheck mfs client-mkdirs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
