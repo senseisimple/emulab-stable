@@ -96,12 +96,14 @@ if (! $debug) {
     daemonize();
 }
 
+print "Reload Daemon starting... pid $$\n";
+
 #
 # Loop, looking for nodes to reload.
 # 
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
-    my($pid, $eid, $reload_type);
+    my($pid, $eid);
 
     #
     # Partial delay between loops in case of an error.
@@ -125,7 +127,7 @@ while (1) {
     while (($node) = $query_result->fetchrow){ 
 	if (!$retried{$node}) {
 	    if (system("$reboot -f $node")) {
-		fatal("$node was wedged, but could not be power cycled.");
+		fatal("$node was wedged, but could not be power cycled.\n");
 	    }
 	    print "\nReload appears wedged at ".`date`.
 		"Power cycling and trying once more!\n";
@@ -217,7 +219,7 @@ while (1) {
 	# Query for the imageid from the reloads table.
 	#
 	$query_result =
-	    DBQueryWarn("select image_id, reload_type from scheduled_reloads " .
+	    DBQueryWarn("select image_id from scheduled_reloads " .
 			"where node_id='$node'");
     
 	if ((! $query_result) || (!$query_result->numrows())) {
@@ -227,12 +229,10 @@ while (1) {
 	    # type
 	    #
 	    $imageid = "";
-	    $reload_type = TB_DEFAULT_RELOADTYPE;
 
 	} else {
 	    @row     = $query_result->fetchrow_array();
 	    $imageid = $row[0];
-	    $reload_type= $row[1];
 	}
 	
 	#
@@ -247,18 +247,7 @@ while (1) {
 	    next;
 	}
 	
-	#
-	# We add flags to our os_load call depending on the type of reload
-	# the user asked for. We basically need a case for each type.
-	#
 	my $os_load_flags = "";
-	if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
-	    $os_load_flags .= " -r";
-	} elsif ($reload_type eq TB_RELOADTYPE_NETDISK) {
-	    $os_load_flags .= " -n";
-	} else {
-	    fatal("Found a reload type I don't know how to handle: $reload_type");
-	}
 
 	#
 	# We only add the -m flag to os_load if we found a specific image
@@ -274,7 +263,7 @@ while (1) {
 	    # This should not fail! 
 	    #
 	    fatal("$os_load failed on $node. Thats not supposed to happen.\n".
-		  "Please check the reload daemon log before restarting!");
+		  "Please check the reload daemon log before restarting!\n");
 	}
     }
     else {
@@ -296,7 +285,6 @@ while (1) {
 	    next;
 	}
 
-	$reload_type = TB_DEFAULT_RELOADTYPE;
     }
     $stamp = DBDateTime();
 	
@@ -306,10 +294,10 @@ while (1) {
     # For Frisbee reloads, we don't wait for the node to finish reloading,
     # since the whole point is to let many nodes load at once.
     #
-    if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
+    #if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
 	print "Not waiting for frisbee reload of $node.\n";
 	next;
-    }
+    #}
 
     #
     # Reload was started. We want to wait until its finished.
@@ -350,10 +338,10 @@ while (1) {
     }
     if ($count == 130) {
 	if ($retry) {
-	    fatal("$node appears to have wedged. Stopping reload daemon.");
+	    fatal("$node appears to have wedged. Stopping reload daemon.\n");
 	}
 	if (system("$reboot -f $node")) {
-	    fatal("$node was wedged, but could not be power cycled.");
+	    fatal("$node was wedged, but could not be power cycled.\n");
 	}
 	print "\nReload appears wedged. Power cycling and trying once more!\n";
 	$retry = 1;
