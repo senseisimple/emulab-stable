@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -4258,7 +4258,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 	char		gid[TBDB_FLEN_GID];
 	char		physnode[TBDB_FLEN_NODEID];
 	char		buf[MYBUFSIZE];
-	int		nrows, control_net, ipcount = 0;
+	int		nrows, control_net, ipcount = 0, low, high, sport;
 
 	/*
 	 * Only vnodes get a jailconfig of course, and only allocated ones.
@@ -4273,12 +4273,12 @@ COMMAND_PROTOTYPE(dojailconfig)
 	}
 
 	/*
-	 * Get the portrange for the node. Cons up the other params I
+	 * Get the portrange for the experiment. Cons up the other params I
 	 * can think of right now. 
 	 */
-	res = mydb_query("select ipport_low,ipport_high from nodes "
-			 "where node_id='%s'",
-			 2, nodeid);
+	res = mydb_query("select low,high from ipport_ranges "
+			 "where pid='%s' and eid='%s'",
+			 2, pid, eid);
 	
 	if (!res) {
 		error("JAILCONFIG: %s: DB Error getting config!\n", nodeid);
@@ -4289,16 +4289,38 @@ COMMAND_PROTOTYPE(dojailconfig)
 		mysql_free_result(res);
 		return 0;
 	}
-	row = mysql_fetch_row(res);
+	row  = mysql_fetch_row(res);
+	low  = atoi(row[0]);
+	high = atoi(row[1]);
+	mysql_free_result(res);
+
+	/*
+	 * Now need the sshdport for this node.
+	 */
+	res = mydb_query("select sshdport from nodes where node_id='%s'",
+			 1, nodeid);
+	
+	if (!res) {
+		error("JAILCONFIG: %s: DB Error getting config!\n", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row   = mysql_fetch_row(res);
+	sport = atoi(row[0]);
+	mysql_free_result(res);
 	
 	sprintf(buf,
-		"PORTRANGE=\"%s,%s\"\n"
+		"PORTRANGE=\"%d,%d\"\n"
+		"SSHDPORT=%d\n"
 		"SYSVIPC=1\n"
 		"INETRAW=1\n"
-		"BPFRO=1\n", row[0], row[1]);
+		"BPFRO=1\n", low, high, sport);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	mysql_free_result(res);
 
 	/*
 	 * Now return the IP interface list that this jail has access to.
