@@ -258,13 +258,14 @@ process.  boot process. You can ensure this by changing directories to
 'mysql-server.sh' to '2.mysql-server.sh'. Furthermore, dhcpd needs to start
 before proxydhcp, so rename 'dhcpd.sh' to '2.dhcpd.sh'. You will also need to
 install the '3.testbed.sh' and 'cvsupd.sh'  scripts (in the rc.d directory of
-the testbed tree)
+the testbed tree.) Make sure that these scripts are executable (chmod +x),
+so that they'll get executed at system startup time.
 
 Apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
 3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
 newer versions are likely to work as well.) We have an auto-generated config
 file that you can install by changing to the apache subdir of your build tree
-and running 'gmake install'. Some apache installtions may expect to find their
+and running 'gmake install'. Some apache installations may expect to find their
 config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
 ours gets installed.) Just symlink apache.conf to httpd.conf if you have
 trouble with this. Also our config file expects to find SSL certificates in:
