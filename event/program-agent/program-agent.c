@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,13 +19,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <pwd.h>
 #include <time.h>
 #include "tbdefs.h"
 #include "log.h"
 #include "event.h"
+#define MAXAGENTS	100
 
-static char 		*logfile;
 static char		debug;
+static char		*agentnames[MAXAGENTS];
+static int		numagents;
 
 struct proginfo {
 	char		name[TBDB_FLEN_EVOBJNAME];
@@ -46,25 +49,32 @@ void
 usage(char *progname)
 {
 	fprintf(stderr,
-		"Usage: %s [-s server] [-p port] [-l logfile]\n", progname);
+		"Usage: %s [-s server] [-p port] [-l logfile] "
+		"[-u login] [-i pidfile] -e pid/eid -a agent [-a agent ...]\n",
+		progname);
 	exit(-1);
 }
 
 int
 main(int argc, char **argv)
 {
+	FILE *fp;
 	event_handle_t handle;
 	address_tuple_t	tuple;
 	char *progname;
 	char *server = NULL;
 	char *port = NULL;
-	char *ipaddr = NULL;
-	char buf[BUFSIZ], ipbuf[BUFSIZ];
+	char *logfile = NULL;
+	char *user = NULL;
+	char *pidfile = NULL;
+	char *pideid = NULL;
+	char buf[BUFSIZ], agentlist[BUFSIZ];
 	int c;
 
 	progname = argv[0];
+	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "s:p:l:d")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:l:du:i:e:a:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -78,6 +88,24 @@ main(int argc, char **argv)
 		case 'd':
 			debug++;
 			break;
+		case 'u':
+			user = optarg;
+			break;
+		case 'i':
+			pidfile = optarg;
+			break;
+		case 'e':
+			pideid = optarg;
+			break;
+		case 'a':
+			if (numagents >= MAXAGENTS)
+				fatal("Too many agents listed");
+			agentnames[numagents] = optarg;
+			numagents++;
+			if (!strlen(agentlist))
+				strcat(agentlist, ",");
+			strcpy(agentlist, optarg);
+			break;
 		default:
 			usage(progname);
 		}
@@ -85,8 +113,13 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if (!pideid || !numagents)
+		usage(progname);
+	if (!getuid() && !user)
+		usage(progname);
+
 	if (debug) 
-		loginit(0, 0);
+		loginit(0, logfile);
 	else {
 		/* Become a daemon */
 		daemon(0, 0);
@@ -98,25 +131,42 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Get our IP address. Thats how we name ourselves to the
-	 * Testbed Event System. 
+	 * Write out a pidfile if root.
 	 */
-	if (ipaddr == NULL) {
-	    struct hostent	*he;
-	    struct in_addr	myip;
-	    
-	    if (gethostname(buf, sizeof(buf)) < 0) {
-		fatal("could not get hostname");
-	    }
-
-	    if (! (he = gethostbyname(buf))) {
-		fatal("could not get IP address from hostname: %s", buf);
-	    }
-	    memcpy((char *)&myip, he->h_addr, he->h_length);
-	    strcpy(ipbuf, inet_ntoa(myip));
-	    ipaddr = ipbuf;
+	if (!getuid()) {
+		if (pidfile)
+			strcpy(buf, pidfile);
+		else
+			sprintf(buf, "%s/progagent.pid", _PATH_VARRUN);
+		fp = fopen(buf, "w");
+		if (fp != NULL) {
+			fprintf(fp, "%d\n", getpid());
+			(void) fclose(fp);
+		}
 	}
 
+	/*
+	 * Flip to the user, but only if we are currently root.
+	 */
+	if (! getuid()) {
+		struct passwd *pw;
+
+		/*
+		 * Must be a valid user of course.
+		 */
+		if ((pw = getpwnam(user)) == NULL)
+			fatal("invalid user: %s", user);
+
+		/*
+		 * Initialize the group list, and then flip to uid.
+		 */
+		if (setgid(pw->pw_gid) ||
+		    initgroups(user, pw->pw_gid) ||
+		    setuid(pw->pw_uid)) {
+			fatal("Could not become user: %s", user);
+		}
+	}
+	
 	/*
 	 * Convert server/port to elvin thing.
 	 *
@@ -139,13 +189,11 @@ main(int argc, char **argv)
 		fatal("could not allocate an address tuple");
 	}
 	/*
-	 * We want to get all program events for this node. We will
-	 * suck out the objname from the notification, and use that
-	 * as the handle while it is running.
+	 * Ask for just the program agents we care about. 
 	 */
-	tuple->host	 = ipaddr;
+	tuple->expt      = pideid;
 	tuple->objtype   = TBDB_OBJECTTYPE_PROGRAM;
-	tuple->objname   = ADDRESSTUPLE_ANY;
+	tuple->objname   = agentlist;
 	tuple->eventtype = ADDRESSTUPLE_ANY;
 
 	/*
