@@ -1,3 +1,0 @@
-LABEL::configure -startx 1.165 -starty .82 \
-	-deltax 2.06 -deltay .5 \
-	-columns 4 -rows 20
