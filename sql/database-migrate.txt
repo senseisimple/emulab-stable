@@ -1511,3 +1511,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table virt_agents change vname \
 		vname varchar(64) NOT NULL default '';
 
+1.242: Add est_bandwidth and rest_bandwidth to virt_lans, to hold the estimated
+       bandwidth that will be used on the link/LAN. This can then be passed to
+       assign, to do less conservative bandwidth allocation.
+
+       alter table virt_lans add est_bandwidth int(10) unsigned \
+	   default NULL after bandwidth;
+       alter table virt_lans add rest_bandwidth int(10) unsigned \
+	   default NULL after rbandwidth;

@@ -438,21 +438,6 @@ CREATE TABLE images (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table `interface_types`
---
-
-CREATE TABLE interface_types (
-  type varchar(30) NOT NULL default '',
-  max_speed int(11) default NULL,
-  full_duplex tinyint(1) default NULL,
-  manufacturuer varchar(30) default NULL,
-  model varchar(30) default NULL,
-  ports tinyint(4) default NULL,
-  connector varchar(30) default NULL,
-  PRIMARY KEY  (type)
-) TYPE=MyISAM;
-
---
 -- Table structure for table `interface_capabilities`
 --
 
@@ -460,7 +445,7 @@ CREATE TABLE interface_capabilities (
   type varchar(30) NOT NULL default '',
   capkey varchar(64) NOT NULL default '',
   capval varchar(64) NOT NULL default '',
-  PRIMARY KEY  (type, capkey)
+  PRIMARY KEY  (type,capkey)
 ) TYPE=MyISAM;
 
 --
@@ -474,6 +459,21 @@ CREATE TABLE interface_settings (
   capval varchar(64) NOT NULL default '',
   PRIMARY KEY  (node_id,iface,capkey),
   KEY node_id (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `interface_types`
+--
+
+CREATE TABLE interface_types (
+  type varchar(30) NOT NULL default '',
+  max_speed int(11) default NULL,
+  full_duplex tinyint(1) default NULL,
+  manufacturuer varchar(30) default NULL,
+  model varchar(30) default NULL,
+  ports tinyint(4) default NULL,
+  connector varchar(30) default NULL,
+  PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
 --
@@ -1632,6 +1632,7 @@ CREATE TABLE virt_lans (
   vname varchar(32) NOT NULL default '',
   delay float(10,2) default '0.00',
   bandwidth int(10) unsigned default NULL,
+  est_bandwidth int(10) unsigned default NULL,
   lossrate float(10,3) default NULL,
   q_limit int(11) default '0',
   q_maxthresh int(11) default '0',
@@ -1650,6 +1651,7 @@ CREATE TABLE virt_lans (
   mask varchar(15) default '255.255.255.0',
   rdelay float(10,2) default NULL,
   rbandwidth int(10) unsigned default NULL,
+  rest_bandwidth int(10) unsigned default NULL,
   rlossrate float(10,3) default NULL,
   cost float NOT NULL default '1',
   widearea tinyint(4) default '0',
