@@ -34,7 +34,6 @@ int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
-int		insubnet(int subnets[], char *address);
 
 /*
  * Commands we support.
@@ -75,6 +74,16 @@ struct command {
 	{ "log",	dolog },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
+
+/* 
+ * Simple struct used to make a linked list of ifaces
+ */
+struct node_interface {
+	char *iface;
+	struct node_interface *next;
+};
+
+int		directly_connected(struct node_interface *interfaces, char *iface);
 
 char *usagestr = 
  "usage: tmcd [-d] [-p #]\n"
@@ -768,22 +777,17 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	int nnodes; /* Number of other nodes in this experiment */
 
 
-	/* XXX: This is hacky. But, the sharks and their IPaliases make this
-	 * a royal PITA! This array contains a bunch of ints that describe
-	 * each subnet - the first 24 bits correspond to an interface's IP address,
-	 * and the last 8 bits are 0. The list is 0-terminated. This
-	 * really should be dynamically allocated, or fixed some other way!
-	 */
-	int subnets[16];
-	int nsubnets;
-
 	char *last_id; /* Used to determine link# */
 	int link;
 	int seen_direct;
 
 	MYSQL_RES	*interface_result;
 	MYSQL_RES	*nodes_result;
+	MYSQL_RES	*vlan_result;
 	MYSQL_ROW	row;
+
+	struct node_interface *connected_interfaces, *temp_interface;
+	int nvlans;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "HOSTNAMES: %s: No such node",
@@ -824,61 +828,66 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	mysql_free_result(interface_result);
 
 	/*
-	 * Now, we need to loop through all of the interfaces to build the list of 
-	 * of our subnets
+	 * Now, we need to look through the vlans table to find a list of everything
+	 * that's directly connected
 	 */
-	interface_result = mydb_query("SELECT IP, IPalias, card "
-			"FROM interfaces "
-			"WHERE node_id = '%s' AND IP IS NOT NULL",
-			3, nodeid);
+	vlan_result = mydb_query("SELECT members "
+			"FROM vlans "
+			"WHERE members LIKE '%%%s:%%' AND pid='%s' AND eid='%s'",
+			1, nodeid,pid,eid);
 
-	if (!interface_result) {
+	if (!vlan_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting interfaces!", nodeid);
 		return 1;
 	}
 
-	if ((ninterfaces = (int)mysql_num_rows(interface_result)) == 0) {
-		mysql_free_result(interface_result);
-		return 0;
-	}
+	nvlans = (int)mysql_num_rows(interface_result);
+	connected_interfaces = NULL;
 
-	nsubnets = 0;
-	bzero(subnets,sizeof(subnets));
-	while (ninterfaces--) {
-		row = mysql_fetch_row(interface_result);
+	while (nvlans--) {
+		char *member_list, *member_list_start, *member, *endptr;
 
-		/* Skip Control network interface */
-		if (atoi(row[2]) != control_net) {
-			int aA, aB, aC, aD; /* Hold the 4 parts of the IP address: A.B.C.D */
-			if (sscanf(row[0],"%i.%i.%i.%i",&aA,&aB,&aC,&aD) == 4){
-				subnets[nsubnets++] = (aA << 24) | (aB << 16) | (aC << 8);
-			}
+		row = mysql_fetch_row(vlan_result);
+		/*
+		 * NOTE: The following is not portable outside BSD, you'll likely
+		 * have to use the evil strtok(3) on on other platforms.
+		 * Making a copy of this string, and keeping track of it original
+		 * base, to make sure I don't introdce any memory leaks.
+		 */
+		member_list = member_list_start = (char*)malloc(strlen(row[0]) +1);
+		strcpy(member_list,row[0]);
+		while (member = strsep(&member_list," ")) {
+			struct node_interface *interface;
+			/*
+			 * Add the interface to the list
+			 */
+
+			interface =
+				(struct node_interface *)malloc(sizeof(struct node_interface *));
+			interface->iface = (char*)malloc(strlen(member +1));
+			strcpy(interface->iface,member);
+			interface->next = connected_interfaces;
+			connected_interfaces = interface;
 		}
 
-		/* Get IPalias as well (mostly important for Sharks) */
-		if (row[1] && (strcmp(row[1],""))) {
-			int aA, aB, aC, aD; /* Hold the 4 parts of the IP address: A.B.C.D */
-			if (sscanf(row[1],"%i.%i.%i.%i",&aA,&aB,&aC,&aD) == 4){
-				subnets[nsubnets++] = (aA << 24) | (aB << 16) | (aC << 8);
-			}
-		}
+		free(member_list_start);
 
 	}
-	mysql_free_result(interface_result);
+
+	mysql_free_result(vlan_result);
 
 	/*
 	 * Grab a list of all other hosts in this experiment - we'll sort out the
 	 * directly connected ones while looping through them.
 	 */
 	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, i.card = t.control_net "
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(i.node_id,':',i.iface), i.card = t.control_net "
 				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
 				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
 				"LEFT JOIN node_types AS t ON n.type = t.type "
 				"WHERE IP IS NOT NULL AND IP != '' AND pid='%s' AND eid='%s'"
-		/*		"i.node_id != '%s'" */
 				"ORDER BY node_id DESC, IP",
-				5,pid,eid,nodeid);
+				6,pid,eid,nodeid);
 
 	if (!nodes_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
@@ -922,8 +931,11 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		 */
 
 		/* Skip the control network interface */
-		if (!(node_row[4] && atoi(node_row[4]))) {
+		if (!(node_row[5] && atoi(node_row[5]))) {
 
+			/*
+			 * Keep track of node_ids, so we can get the LINK number rigth
+			 */
 			if (!strcmp(node_row[0],last_id)) {
 				link++;
 			} else {
@@ -932,10 +944,10 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			}
 
 
-			if (insubnet(subnets,node_row[1])) {
-				sprintf(buf,"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-					vname, link, node_row[1],
-					(!seen_direct) ? vname : " ");
+			if (directly_connected(connected_interfaces,node_row[4])) {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+						vname, link, node_row[1],
+						(!seen_direct) ? vname : " ");
 				seen_direct = 1;
 			} else {
 				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
@@ -958,10 +970,10 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 				last_id = node_row[0];
 			}
 
-			if (insubnet(subnets,node_row[2])) {
-				sprintf(buf,"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-					vname, link, node_row[2],
-					(!seen_direct) ? vname : " ");
+			if (directly_connected(connected_interfaces,node_row[4])) {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+						vname, link, node_row[2],
+						(!seen_direct) ? vname : " ");
 				seen_direct = 1;
 			} else {
 				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
@@ -974,6 +986,17 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		}
 	}
 	mysql_free_result(nodes_result);
+
+	/*
+	 * Clean up our linked list of interfaces
+	 */
+	while (connected_interfaces != NULL) {
+		temp_interface = connected_interfaces;
+		connected_interfaces = connected_interfaces->next;
+		free(temp_interface->iface);
+		free(temp_interface);
+	}
+	
 	return 0;
 
 }
@@ -1802,29 +1825,26 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 }
 
 /*
- * Return 1 if address is in subnets, 0 otherwize
+ * Return 1 if iface is in connected_interfaces, 0 otherwise
  */
 
 int
-insubnet(int subnets[], char *address) {
-	int aA, aB, aC, i, binaryAddress;
+directly_connected(struct node_interface *interfaces, char *iface) {
 
-	if (address == 0) {
+	struct node_interface *traverse;
+	traverse = interfaces;
+	if (iface == NULL) {
 		/* Don't die if address is null */
 		return 0;
 	}
-	if (sscanf(address,"%i.%i.%i",&aA,&aB,&aC) != 3) {
-		/* Address was in the wrong format */
-		return 0;
-	}
 
-	i = 0;
-	binaryAddress = (aA << 24) | (aB << 16) | (aC << 8);
-	while (subnets[i] != 0) {
-		if (subnets[i++] == binaryAddress) {
+	while (traverse != NULL) {
+		if (!strcmp(traverse->iface,iface)) {
 			return 1;
 		}
+		traverse = traverse->next;
 	}
+
 	return 0;
 
 }
