@@ -49,8 +49,8 @@ static float delta = 2;
 static float FD_VIOLATION_WEIGHT = 1.0;
 
 // Number of runs to spend melting
-static int melt_trans = 500;
-static int min_neighborhood_size = 500;
+static int melt_trans = 1000;
+static int min_neighborhood_size = 1000;
 
 
 static float temp_rate = 0.9;

@@ -8,6 +8,7 @@
 #define __PHYSICAL_H
 
 #include "common.h"
+#include <set>
 
 // Icky, but I can't include virtual.h here
 class tb_vnode;
@@ -50,7 +51,7 @@ typedef graph_traits<tb_sgraph>::vertex_iterator svertex_iterator;
 typedef graph_traits<tb_sgraph>::edge_iterator sedge_iterator;
 typedef graph_traits<tb_sgraph>::out_edge_iterator soedge_iterator;
 
-typedef hash_set<pvertex,hashptr<void*> > pvertex_set;
+typedef set<pvertex> pvertex_set;
 typedef hash_map<tb_pnode*,pvertex,hashptr<tb_pnode*> > pnode_pvertex_map;
 typedef hash_map<crope,pvertex> name_pvertex_map;
 typedef vector<svertex> switch_pred_map;

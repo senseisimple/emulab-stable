@@ -7,6 +7,8 @@
 #ifndef __PCLASS_H
 #define __PCLASS_H
 
+#include<map>
+
 // Declared in assign.cc - indicated whether or not we should use pclasses
 extern bool use_pclasses;
 
@@ -64,7 +66,7 @@ class tb_pclass {
 public:
   tb_pclass() : name(), size(0), used(0), refcount(0) {;}
 
-  typedef hash_map<crope,tb_pnodelist*> pclass_members_map;
+  typedef map<crope,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
   typedef hash_map<crope,tb_pnodeset*> pclass_members_set;
 

@@ -1242,36 +1242,44 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
   double value;
   tb_vnode::desires_map::iterator desire_it;
   tb_pnode::features_map::iterator feature_it;
-  for (desire_it = vnode->desires.begin();
-       desire_it != vnode->desires.end();
-       desire_it++) {
-    feature_it = pnode->features.find((*desire_it).first);
-    SDEBUG(cerr << "  desire = " << (*desire_it).first << " " <<
-	   (*desire_it).second << endl);
 
-    if (feature_it == pnode->features.end()) {
-      // Unmatched desire.  Add cost.
-      SDEBUG(cerr << "    unmatched" << endl);
-      value = (*desire_it).second;
-      fd_score += SCORE_DESIRE*value;
-      if (value >= FD_VIOLATION_WEIGHT) {
-	fd_violated++;
+  // Optimize the case where the vnode has no desires
+  if (!vnode->desires.empty()) {
+    for (desire_it = vnode->desires.begin();
+	desire_it != vnode->desires.end();
+	desire_it++) {
+      feature_it = pnode->features.find((*desire_it).first);
+      SDEBUG(cerr << "  desire = " << (*desire_it).first << " " <<
+	  (*desire_it).second << endl);
+
+      if (feature_it == pnode->features.end()) {
+	// Unmatched desire.  Add cost.
+	SDEBUG(cerr << "    unmatched" << endl);
+	value = (*desire_it).second;
+	fd_score += SCORE_DESIRE*value;
+	if (value >= FD_VIOLATION_WEIGHT) {
+	  fd_violated++;
+	}
       }
     }
   }
-  for (feature_it = pnode->features.begin();
-       feature_it != pnode->features.end();++feature_it) {
-    desire_it = vnode->desires.find((*feature_it).first);
-    SDEBUG(cerr << "  feature = " << (*feature_it).first
-	   << " " << (*feature_it).second << endl);
 
-    if (desire_it == vnode->desires.end()) {
-      // Unused feature.  Add weight
-      SDEBUG(cerr << "    unused" << endl);
-      value = (*feature_it).second;
-      fd_score+=SCORE_FEATURE*value;
-      if (value >= FD_VIOLATION_WEIGHT) {
-	fd_violated++;
+  // Optimize the case where the pnode has no features
+  if (!pnode->features.empty()) {
+    for (feature_it = pnode->features.begin();
+	feature_it != pnode->features.end();++feature_it) {
+      desire_it = vnode->desires.find((*feature_it).first);
+      SDEBUG(cerr << "  feature = " << (*feature_it).first
+	  << " " << (*feature_it).second << endl);
+
+      if (desire_it == vnode->desires.end()) {
+	// Unused feature.  Add weight
+	SDEBUG(cerr << "    unused" << endl);
+	value = (*feature_it).second;
+	fd_score+=SCORE_FEATURE*value;
+	if (value >= FD_VIOLATION_WEIGHT) {
+	  fd_violated++;
+	}
       }
     }
   }
