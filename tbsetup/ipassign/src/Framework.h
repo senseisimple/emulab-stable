@@ -68,6 +68,7 @@ private:
     std::auto_ptr<Router> m_route;
     // The selector for which partitioning strategy to use
     std::auto_ptr<Partition> m_partition;
+    bool m_doRouting;
 };
 
 #endif

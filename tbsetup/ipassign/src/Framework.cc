@@ -24,6 +24,7 @@
 using namespace std;
 
 Framework::Framework(int argCount, char ** argArray)
+    : m_doRouting(true)
 {
     if (argCount <= 0 || argArray == NULL)
     {
@@ -70,6 +71,7 @@ Framework & Framework::operator=(Framework const & right)
     swap(m_assign, temp.m_assign);
     swap(m_route, temp.m_route);
     swap(m_partition, temp.m_partition);
+    swap(m_doRouting, temp.m_doRouting);
     return *this;
 }
 
@@ -140,9 +142,12 @@ void Framework::ipAssign(void)
 
 void Framework::route(void)
 {
-    m_assign->getGraph(m_route->getTree(), m_route->getLans());
-    m_route->setHosts(m_assign->getHosts());
-    m_route->calculateRoutes();
+    if (m_doRouting)
+    {
+        m_assign->getGraph(m_route->getTree(), m_route->getLans());
+        m_route->setHosts(m_assign->getHosts());
+        m_route->calculateRoutes();
+    }
 }
 
 void Framework::printIP(ostream & output) const
@@ -152,7 +157,10 @@ void Framework::printIP(ostream & output) const
 
 void Framework::printRoute(ostream & output) const
 {
-    m_route->print(output);
+    if (m_doRouting)
+    {
+        m_route->print(output);
+    }
 }
 
 void Framework::parseCommandLine(int argCount, char ** argArray)
@@ -284,6 +292,9 @@ void Framework::parseArgument(string const & arg,
             routeChoice = HostNet;
             break;
             // time ip assignment and routing
+        case '!':
+            m_doRouting = false;
+            break;
         default:
             throw InvalidArgumentException(arg);
             break;
