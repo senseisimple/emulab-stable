@@ -1,14 +1,2 @@
-BODY {background: #C0C0C0; font-weight: bold; }
-A:link {color: #001080; font-weight: bold; text-decoration: none;}
-A:visited {color: #001080;}
-P {color: #000000; text-align: left; font-weight: bold;}
-TD {color: #802020; text-align: center; font-weight: bold;}
-TD.left {color: #802020; text-align: left; font-weight: bold;}
-H1 {color: #802020; text-align: center; font-weight: bold;font-size: x-large; }
-H2 {color: #802020; text-align: center; font-weight: bold;font-size: large; }
-H3 {color: #802020; text-align: center; font-weight: bold;font-size: medium; }
-H4 {color: #000000; text-align: center; font-weight: bold;font-size: medium; }
-H3 P {color: #001080; text-align: left; font-weight: bold;font-size: medium; }
-OL,UL,DL { color: #001080; text-align: left; font-weight: bold;}
-OL H3 {color: #001080; text-align: left;}
-OL LI { color: #001080;  text-align: left; font-weight: bold; font-size: 150%;}
+BODY {background: #C0C0C0}
+
