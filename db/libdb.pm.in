@@ -2207,7 +2207,7 @@ sub TBNodeUpdateAccountsByUID($)
 		     "left join group_membership as g on ".
 		     "  u.uid=g.uid and g.pid=g.gid ".
 		     "left join projects as p on p.pid=g.pid ".
-		     "where u.uid='$uid'");
+		     "where u.uid='$uid' and p.pid is not null");
 
     while (my %row = $query_result->fetchhash()) {
 	my $pid      = $row{'pid'};
