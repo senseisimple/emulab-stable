@@ -19,22 +19,39 @@ use strict;
 my $TB = "@prefix@";
 
 my $switchmac = "$TB/sbin/switchmac";
-my $sched_reload = "$TB/sbin/sched_reload";
+my $os_load = "$TB/bin/os_load";
+my $os_select = "$TB/bin/os_select";
+my $newnode_reboot = "$TB/sbin/newnode_reboot";
+my $named_setup = "$TB/sbin/named_setup";
 my $nalloc = "$TB/bin/nalloc";
 my $nfree = "$TB/bin/nfree";
 my $dhcpd_makeconf = "$TB/sbin/dhcpd_makeconf";
+my $exports_setup = "$TB/sbin/exports_setup";
 
-my $dhcpd_conf = "/usr/local/etc/dhpcd.conf";
+my $dhcpd_conf = "/usr/local/etc/dhcpd.conf";
 my $dhcpd_template = "/usr/local/etc/dhcpd.conf.template";
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
-my $sudo = "/usr/local/bin/sudo";
+my $sudo = "/usr/local/bin/sudo -S";
 
 #
 # Initial event system state to put the nodes into
 #
-my $INITIAL_STATE = "SHUTDOWN";
-my $INITIAL_OPMODE = "MINIMAL";
+my $INITIAL_STATE = TBDB_NODESTATE_SHUTDOWN;
+my $INITIAL_OPMODE = TBDB_NODEOPMODE_RELOAD;
+
+#
+# MFS to boot the nodes into initially
+#
+my $INITIAL_MFS = "PXEFBSD";
+
+#
+# Number of vnodes to create for each physical node
+#
+my $NUM_VNODES = 50;
+
+# Turn off line buffering on output
+$| = 1;
 
 if (!TBAdmin()) {
     die "Sorry, only testbed administrators can run this script!\n";
@@ -47,8 +64,29 @@ if (@ARGV < 1) {
 #
 # The user has to be able to run sudo, so they can restart dhcpd.
 #
-if (system "$sudo -s /bin/pwd < /dev/null") {
+if (system "$sudo /bin/pwd < /dev/null") {
     die "You must be able to sudo to root to use this script\n";
+}
+
+#
+# Make sure that the dhcpd template file exists, and that the real version
+# is writable
+#
+if (!-e $dhcpd_template) {
+    die "In order to use this script, $dhcpd_template must exist!\n";
+}
+if (!-w $dhcpd_conf) {
+    die "In order to use this script, you must be able to write $dhcpd_conf\n";
+}
+
+#
+# For vnodes - figure out the jail IP base
+#
+my $IPBASE;
+if (TBDB_JAILIPBASE =~ /^(\d+).(\d+).(\d+).(\d+)/) {
+    $IPBASE = "$1.$2";
+} else {
+    die "Problem with JAILIPBASE\n"
 }
 
 my @node_ids = @ARGV;
@@ -56,7 +94,7 @@ my @node_ids = @ARGV;
 #
 # Now, loop through the nodes given, and add each one
 #
-my @succeeded_nodes;
+my (@succeeded_nodes, @succeeded_IPs);
 NODE: foreach my $node_id (@node_ids) {
     my $query_result;
 
@@ -73,13 +111,13 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Grab information about the node from the new_nodes table
     #
-    $query_result = DBQueryFatal("SELECT new_node_id, type, IP " .
+    $query_result = DBQueryFatal("SELECT new_node_id, type, IP, temporary_IP " .
 	"FROM new_nodes WHERE node_id='$node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: No pending node with that name exists!\n";
 	next NODE;
     }
-    my ($new_node_id, $type, $IP) = $query_result->fetchrow();
+    my ($new_node_id, $type, $IP, $tempIP) = $query_result->fetchrow();
 
     #
     # Make sure that the new node is of a valid type, and grab a few other
@@ -131,10 +169,11 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Make up a priority (just used for sorting)
     #
-    $node_id =~ /(\d+)$/;
+    $node_id =~ /^(.*\D)(\d+)$/;
+    my ($prefix,$nodenum) = ($1, $2);
     my $priority;
-    if ($1) {
-	$priority = $1;
+    if (defined $nodenum) {
+	$priority = $nodenum;
     } else {
 	$priority = 1;
     }
@@ -144,8 +183,34 @@ NODE: foreach my $node_id (@node_ids) {
     #
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
-	"phys_nodeid='$node_id', role='testnode', priority=$priority" .
+	"phys_nodeid='$node_id', role='testnode', priority=$priority, " .
     	"eventstate='$INITIAL_STATE', op_mode='$INITIAL_OPMODE'");
+
+    #
+    # Add some vnodes
+    #
+    if (defined $nodenum) {
+	my $vtype = $type;
+	if (!($vtype =~ s/pc/pcvm/)) {
+	    $vtype = "$vtype-vm";
+	}
+	for (my $i = 1; $i <= $NUM_VNODES; $i++) {
+	    my $vpriority = 10000000 + ($nodenum * 1000) + $i;
+	    my $nodename = $node_id;
+	    if (!($nodename =~ s/pc/pcvm/)) {
+		$nodename = "$nodename-vm";
+	    }
+	    $nodename .= "-$i";
+	    my $jailip = "${IPBASE}.${nodenum}.${i}";
+
+	    DBQueryFatal("INSERT INTO nodes SET node_id='$nodename', " .
+		"type='$vtype', phys_nodeid='$node_id', role='virtnode', " .
+		"priority='$vpriority', op_mode='PCVM', " .
+		"eventstate='SHUTDOWN', " .
+		"def_boot_osid='emulab-ops-FBSD-JAIL', " .
+		"update_accounts=1, jailflag=1, jailip='$jailip'");
+	}
+    }
 
     while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $speed, $duplex, $switch_id, $switch_card,
@@ -162,6 +227,10 @@ NODE: foreach my $node_id (@node_ids) {
 	    "interface_type='$iface_type', iface='$iface', " .
 	    "current_speed='$speed', duplex=$duplex");
 
+	if (!$switch_id) {
+	    print "No switch found for ${node_id}:$iface - skipping\n";
+	    next;
+	}
 	DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
 	    "node_id1='$node_id', card1=$card, port1=1, " .
 	    "node_id2='$switch_id', card2='$switch_card', " .
@@ -169,14 +238,10 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     #
-    # TODO - Do we need to get the nodes into a good state for the event system?
-    #
-
-    #
-    # Schedule a reload for it
+    # Put it into hwdown for now - I would put them in reloading, but I'm
+    # afriad the reload_daemon might do the wrong thing to them
     #
     system "$nalloc emulab-ops hwdown $node_id";
-    system "$sched_reload $node_id";
 
     #
     # Remove the node from the new_ tables
@@ -184,9 +249,10 @@ NODE: foreach my $node_id (@node_ids) {
     DBQueryFatal("DELETE FROM new_nodes WHERE new_node_id=$new_node_id");
     DBQueryFatal("DELETE FROM new_interfaces WHERE new_node_id=$new_node_id");
 
-    print "$node_id succesfully added!";
+    print "$node_id succesfully added!\n";
 
     push @succeeded_nodes, $node_id;
+    push @succeeded_IPs, $tempIP;
 }
 
 #
@@ -199,40 +265,71 @@ if (!@succeeded_nodes) {
 #
 # Re-generate dhcpd.conf
 #
-if (! -f $dhcpd_template) {
-    warn "Warning: $dhcpd_template does not exist\n";
-    warn "You'll need to re-run dhcpd_makeconf manually, free the new\n";
-    warn "nodes from emulab-ops/hwdown, then reboot them.\n";
-} else {
-    print "Re-generating dhcpd.conf\n";
-    open(CONF,"$dhcpd_makeconf $dhcpd_template|") or die "Unable to fork: $!\n";
-    my @conf = <CONF>;
-    close CONF or die "Error reading from dhcpd_makeconf: $!\n";
+print "Re-generating dhcpd.conf\n";
+open(CONF,"$dhcpd_makeconf $dhcpd_template|") or die "Unable to fork: $!\n";
+my @conf = <CONF>;
+close CONF or die "Error reading from dhcpd_makeconf: $!\n";
 
-    open(CONF,">$dhcpd_conf") or die "Unable to open $dhcpd_conf for writing\n";
-    print CONF @conf;
-    close CONF;
+open(CONF,">$dhcpd_conf") or die "Unable to open $dhcpd_conf for writing\n";
+print CONF @conf;
+close CONF;
 
-    if ($> == 0) {
-	print "Restarting dhcpd\n";
-	system "$sudo $dhcpd_rc stop";
-	sleep 2;
-	system "$sudo $dhcpd_rc start";
+print "Restarting dhcpd: $sudo $dhcpd_rc stop\n";
+my $sudo_rv = system "$sudo $dhcpd_rc stop";
+if ($sudo_rv) {
+    die "Error stopping dhcpd - return value was $sudo_rv\n";
+}
+sleep 2;
+print "Restarting dhcpd: $sudo $dhcpd_rc start\n";
+$sudo_rv = system "$sudo $dhcpd_rc start";
+if ($sudo_rv) {
+    die "Error starting dhcpd - return value was $sudo_rv\n";
+}
 
-	#
-	# Now, free all the nodes we just made from hwdown, so that they can reload
-	#
-	system "$nfree emulab-ops hwdown " . join(" ",@succeeded_nodes);
-    } else {
-	warn "Warning: You will need to restart dhcpd, free the nodes\n";
-	warn "from emulab-ops/hwdown, then reboot them.\n";
-    }
-
+print "Setting up nameserver\n";
+my $named_rv = system "$named_setup";
+if ($named_rv) {
+    die "Error running named_setup - return value was $named_rv\n";
 }
 
 #
+# Before we boot nodes into the MFS, we have to make sure they can mount
+# NFS filesystems
+#
+print "Running exports_setup\n";
+my $exports_rv = system "$exports_setup";
+if ($exports_rv) {
+    warn "WARNING - exports_setup returned $exports_rv";
+}
+
+#
+# Tell the nodes to boot into the FreeBSD MFS, so that we have them in a state
+# which we can control - this also puts them into a state that the event system
+# likes better
+#
+print "Instructing nodes to boot into the FreeBSD MFS\n";
+my $select_rv = system "$os_select -m $INITIAL_MFS " .
+    join(" ",@succeeded_nodes);
+if ($select_rv) {
+    warn "WARNING - failed to select FreeBSD MFS for nodes";
+}
+
+#
+# Start rebooting nodes
+#
+print "Rebooting nodes...\n";
+foreach my $IP (@succeeded_IPs) {
+    print "Rebooting $IP\n";
+    system "$newnode_reboot $IP\n";
+}
+
+print "\n\n";
+print "Finished - when you are satisifed that the nodes are working\n";
+print "correctly, use nfree on boss to free them from the emulab-ops/hwdown\n";
+print "experiment.\n";
+
+#
 # TODO -
-#    add nodes to named?
 #    disable interfaces
 #    console setup
 #
