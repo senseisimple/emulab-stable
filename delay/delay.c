@@ -223,6 +223,8 @@ int main(int argc, char **argv) {
 	int rc;
 	int proto = IPPROTO_UDP;
 
+	fd_set readfds;
+
 	/* getopt stuff */
 	extern char *optarg;
 	extern int optind;
@@ -324,24 +326,47 @@ int main(int argc, char **argv) {
 	 * after running the queue, or they don't rest long enough.
 	 */
 
+	FD_ZERO(&readfds);
+
+	granularity = delay / 100;
+
 	while (1) {
 		struct sockaddr_in from;
 		int fromlen;
 		int len;
+		int rc;
 
 		if (!packetbuf) {
 			packetbuf = (char *)malloc(MAXPACKET);
 		}
 
-		bzero(&from, sizeof(from));
-		fromlen = sizeof(struct sockaddr_in);
-		len = recvfrom(msock->sock, packetbuf, MAXPACKET, 0,
-			       (struct sockaddr *)&from, &fromlen);
-
-		if (len > 0) {
-			DPRINTF("Received packet of length %d\n", len);
+		if (granularity < MIN_USEC) {
+#ifdef SPIN_OK
+			granularity = 0;
+#else
+			granularity = MIN_USEC;
+#endif
 		}
+
+		mytv.tv_sec = granularity / 1000000;
+		mytv.tv_usec = granularity % 1000000;
 		
+
+		FD_SET(msock->sock, &readfds);
+		rc = select(msock->sock+1, &readfds, NULL, NULL, &mytv);
+
+		len = 0;
+		
+		if (FD_ISSET(msock->sock, &readfds)) {
+			bzero(&from, sizeof(from));
+			fromlen = sizeof(struct sockaddr_in);
+			len = recvfrom(msock->sock, packetbuf, MAXPACKET, 0,
+				       (struct sockaddr *)&from, &fromlen);
+			
+			if (len > 0) {
+				DPRINTF("Received packet of length %d\n", len);
+			}
+		}
 		gettimeofday(&time_now, NULL);
 		
 		pq_run(timediff(&time_now, &time_prev));
