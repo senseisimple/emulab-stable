@@ -194,8 +194,8 @@ if ($submit) {
 	       "\nThe swap settings for $pid/$eid have changed.\n".
 	       "\nThe reasons and/or timeouts have changed.\n".
 	       "\nThe new settings are:\n".
-	       "Swappable:\t$s\t('$sr')\n".
-	       "Idleswap:\t$i\t(after $it hrs)\t('$ir')\n".
+	       "Swappable:\t$s\t($sr)\n".
+	       "Idleswap:\t$i\t(after $it hrs)\t($ir)\n".
 	       "Autoswap:\t$a\t(after $at hrs)\n".
 	       "\nCreator:\t$cuid ($cname <$cemail>)\n".
 	       "Swapper:\t$suid ($sname <$semail>)\n".
