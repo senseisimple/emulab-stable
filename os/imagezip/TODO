@@ -13,6 +13,7 @@ Things to do for image*:
    for doing output.
 
 3. In imagezip, split out the FS-specific code into subdirectories.
+   [DONE]
 
 4. Write an imageconvert so that we can convert old version images into
    new ones and maybe change the compression level used in an image.

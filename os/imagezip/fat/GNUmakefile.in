@@ -1,0 +1,32 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= os/imagezip/fat
+MAINDIR		= $(SRCDIR)/..
+
+include $(OBJDIR)/Makeconf
+
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(SRCDIR)
+
+all:	libfat.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS = fat_glue.o fat_boot.o fat_fat.o
+
+fat_glue.o: fat_glue.h $(MAINDIR)/sliceinfo.h $(MAINDIR)/global.h
+
+libfat.a:	$(OBJS)
+	$(AR) $(ARFLAGS) $@ $?
+	$(RANLIB) $@
+
+install: 
+
+clean:
+	rm -f libfat.a $(OBJS)

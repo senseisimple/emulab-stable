@@ -1,6 +1,9 @@
 /*
- * Hacked from...
+ * Hacked from BSD fsck_msdosfs.
  */
+#ifndef __RCSID
+#define __RCSID(s)
+#endif
 
 /*
  * Copyright (C) 1995, 1997 Wolfgang Solfrank

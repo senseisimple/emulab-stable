@@ -9,6 +9,7 @@
  */
 
 #include <err.h>
+#include <sys/types.h>
 #include "dosfs.h"
 
 #define	FSOK		0		/* Check was OK */
@@ -30,3 +31,7 @@ ssize_t devread(int fd, void *buf, size_t nbytes);
 #define read(f,b,s)	devread((f), (b), (s))
 #define pfatal		warnx
 #define pwarn		warnx
+
+#ifndef __RCSID
+#define __RCSID(s)
+#endif

@@ -1,0 +1,33 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= os/imagezip/ffs
+MAINDIR		= $(SRCDIR)/..
+
+include $(OBJDIR)/Makeconf
+
+CFLAGS		+= $(SUBDIRCFLAGS)
+
+all:	libffs.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS = ffs.o
+
+ffs.o: ffs.h fs.h disklabel.h
+ffs.o: $(MAINDIR)/global.h $(MAINDIR)/sliceinfo.h $(MAINDIR)/imagehdr.h
+
+libffs.a:	$(OBJS)
+	$(AR) $(ARFLAGS) $@ $?
+	$(RANLIB) $@
+
+install: 
+
+clean:
+	rm -f libffs.a $(OBJS)

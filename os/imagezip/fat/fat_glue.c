@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <sys/param.h>
 
+#include "sliceinfo.h"
+#include "global.h"
 #include "fat_glue.h"
 
 /* XXX */
@@ -27,7 +29,8 @@ static u_int32_t fat_offset, fat_limit;
 static int fatsecpersec;
 
 int
-read_fatslice(int slice, u_int32_t start, u_int32_t size, int infd)
+read_fatslice(int slice, int stype, u_int32_t start, u_int32_t size,
+	      char *sfilename, int infd)
 {
 	struct bootblock boot;
 	struct fatEntry *fat = NULL;

@@ -14,50 +14,73 @@ DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
 		  imageunzip.c crc.c imageunzip.8
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
+WITH_FFS	= 1
+WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
+SUBDIRCFLAGS	= -Wall -O2 -g -I$(SRCDIR)
+ifdef LINUX
+SUBDIRCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread
+else
 PTHREADCFLAGS	= -D_THREAD_SAFE \
 		  -I/usr/local/include/pthread/linuxthreads
+SUBDIRCFLAGS	+= 
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+endif
 
 # Define this if you implementation of cond_vars works well
 # They don't with linuxthreads under FreeBSD: wakeups take longer than
 # Necessary sometimes.
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
-CFLAGS		= -Wall -O2 -g -static
+CFLAGS		= $(SUBDIRCFLAGS) -static
 LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 
+# UFS/UFS2
+ifeq ($(WITH_FFS),1)
+CFLAGS		+= -DWITH_FFS
+SUBDIRS		+= ffs
+FSLIBS		+= ffs/libffs.a
+endif
+
+# EXT2/EXT3
+ifeq ($(WITH_EXTFS),1)
+CFLAGS		+= -DWITH_EXTFS
+SUBDIRS		+= extfs
+FSLIBS		+= extfs/libextfs.a
+endif
+
 # with NTFS
 ifeq ($(WITH_NTFS),1)
+ifndef HAVE_GCC3
 CC		= gcc30
-INCS		= -I$(SRCDIR)/ntfs/extra_bsd_includes \
-		  -I$(SRCDIR)/liblocale/include \
-		  -Intfs/libntfs/ntfsprogs/include \
-		  -I$(SRCDIR)
-CFLAGS		+= -DWITH_NTFS $(INCS)
-LIBS		+= -Lntfs -lntfs -llocale
-NTFSDIR		= ntfs
+endif
+CFLAGS		+= -DWITH_NTFS
+SUBDIRS		+= ntfs
+FSLIBS		+= ntfs/libntfs.a
+ifndef HAVE_LOCALE
+FSLIBS		+= ntfs/liblocale.a
+endif
 endif
 
 # with FAT
 ifeq ($(WITH_FAT),1)
 CFLAGS		+= -DWITH_FAT
-FSOBJS		+= fat_boot.o fat_fat.o fat_glue.o
-MOSTLY_SRCDIRS	+= $(SRCDIR)/fat
+SUBDIRS		+= fat
+FSLIBS		+= fat/libfat.a
 endif
 
-all:	imagezip imageunzip imagedump
+all:	$(SUBDIRS) imagezip imageunzip imagedump
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: $(NTFSDIR) imagezip.o version.o $(FSOBJS)
-	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(LIBS) -o imagezip
+imagezip: imagezip.o version.o $(FSLIBS)
+	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) $(FSLIBS) -o imagezip
 
 imageunzip: imageunzip.o crc.o version.o 
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
@@ -68,10 +91,11 @@ imageunzip.o:	imageunzip.c
 imagedump: imagedump.o version.o
 	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
 
-fat_boot.o fat_fat.o fat_glue.o: $(SRCDIR)/fat/fat_glue.h
+ffs extfs ntfs fat:
+	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
-ntfs:
-	@$(MAKE) -C ntfs all
+imagezip.o: sliceinfo.h imagehdr.h global.h
+imageunzip.o: imagehdr.h
 
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
@@ -84,12 +108,15 @@ client-install:
 	$(INSTALL_PROGRAM) imageunzip $(DESTDIR)/usr/local/bin/imageunzip
 	$(INSTALL_PROGRAM) imagedump $(DESTDIR)/usr/local/bin/imagedump
 
-clean:
-	@if [ -d ntfs ]; then \
-		$(MAKE) -C ntfs clean; \
-	fi;
+clean: subdir-clean
 	/bin/rm -f *.o imagezip imageunzip imagedump version.c
 	/bin/rm -f imagezip.tar imagezip.tar.gz
+
+subdir-clean:
+	@$(MAKE) -C ffs clean
+	@$(MAKE) -C extfs clean
+	@$(MAKE) -C ntfs clean
+	@$(MAKE) -C fat clean
 
 imagezip.tar.gz: imagezip.tar
 	gzip -c imagezip.tar > imagezip.tar.gz
@@ -105,4 +132,4 @@ imagezip.tar: Makefile.sa Makefile-linux.sa $(DISTFILES)
 	tar cf imagezip.tar imagezip-dist
 	rm -rf imagezip-dist
 
-.PHONY:	$(NTFSDIR)
+.PHONY:	$(SUBDIRS)

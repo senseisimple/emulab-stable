@@ -15,23 +15,32 @@ PKGHOST		= www.emulab.net
 
 include $(OBJDIR)/Makeconf
 
+ifndef HAVE_GCC3
+CC		= gcc30
+endif
+ifdef LINUX
+INCLUDES        = -I${NTFSDIR}/include -I${OBJDIR}
+FETCH		= wget -q -N
+PATCH		= patch -sN -d $(NTFSVER) -p1
+else
+INCLUDES        = -nostdinc -I${NTFSDIR}/include -I${OBJDIR} \
+                  -I${SRCDIR}/../extra_bsd_includes \
+                  -I/usr/include \
+                  -I/usr/local/include
 FETCH		= fetch -m
-UNPACK		= tar zxf
 PATCH		= patch -sN
+endif
+UNPACK		= tar zxf
 MV		= mv -f
+ifndef HAVE_LOCALE
+INCLUDES        += -I${SRCDIR}/../liblocale/include
+endif
 
 all:	libntfs.a
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CC		= gcc30
-INCLUDES        = -I${NTFSDIR}/include -I${OBJDIR} \
-                  -I${SRCDIR}/../liblocale/include \
-                  -I${SRCDIR}/../extra_bsd_includes \
-                  -I/usr/include \
-                  -I/usr/local/include
-
-CFLAGS	        = -O2 -g -nostdinc -static -Wall $(INCLUDES)
+CFLAGS	        = -O2 -g -static -Wall $(INCLUDES)
 
 OBJS=	attrib.o \
 	bitmap.o \
@@ -62,12 +71,14 @@ $(SRCS): $(LIBSRCDIR)/patched
 $(LIBSRCDIR)/patched:
 	$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz
 	$(UNPACK) $(NTFSVER).tar.gz
+ifndef LINUX
 	$(PATCH) < $(SRCDIR)/ntfs.patch
+endif
 	$(MV) $(NTFSVER) $(NTFSDIR)
 	$(NTFSDIR)/configure
 	$(MV) config.h $(NTFSDIR)/include
 	touch $(LIBSRCDIR)/patched
 
 clean:
-	-rm -f *.o *~ *.a
-	-rm -rf $(NTFSDIR)
+	-rm -f *.o *~ *.a config.* Makefile
+	-rm -rf $(NTFSDIR) 

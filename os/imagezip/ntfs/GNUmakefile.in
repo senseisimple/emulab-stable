@@ -8,15 +8,34 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
 SUBDIR		= os/imagezip/ntfs
+MAINDIR		= $(SRCDIR)/..
 
 include $(OBJDIR)/Makeconf
 
-all:	libntfs.a liblocale.a
+LIBS		= libntfs.a
+ifndef HAVE_LOCALE
+LIBS		+= liblocale.a
+endif
+
+ifndef HAVE_GCC3
+CC		= gcc30
+endif
+CFLAGS		+= $(SUBDIRCFLAGS) -Ilibntfs/ntfsprogs/include
+ifndef LINUX
+CFLAGS		+= -I$(SRCDIR)/extra_bsd_includes \
+		   -I$(SRCDIR)/liblocale/include
+endif
+
+all:	$(LIBS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-libntfs.a: libntfs/libntfs.a
-	cp -p libntfs/libntfs.a libntfs.a
+ntfs_glue.o: $(MAINDIR)/global.h $(MAINDIR)/sliceinfo.h
+
+libntfs.a: libntfs/libntfs.a ntfs_glue.o
+	cp libntfs/libntfs.a libntfs.a
+	$(AR) $(ARFLAGS) $@ ntfs_glue.o
+	$(RANLIB) $@
 
 liblocale.a: liblocale/liblocale.a
 	cp -p liblocale/liblocale.a liblocale.a
@@ -30,4 +49,4 @@ liblocale/liblocale.a:
 clean:
 	-$(MAKE) -C libntfs clean
 	-$(MAKE) -C liblocale clean
-	/bin/rm -f libntfs.a liblocale.a
+	/bin/rm -f libntfs.a liblocale.a ntfs_glue.o

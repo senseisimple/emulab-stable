@@ -1,7 +1,7 @@
 #ifndef _LINUX_TYPES_H
 #define _LINUX_TYPES_H
 
-#include<sys/types.h>
+#include <sys/types.h>
 
 typedef u_int8_t  __u8;
 typedef u_int16_t __u16;

@@ -1,0 +1,32 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= os/imagezip/extfs
+MAINDIR		= $(SRCDIR)/..
+
+include $(OBJDIR)/Makeconf
+
+CFLAGS		+= $(SUBDIRCFLAGS) -I$(SRCDIR)
+
+all:	libextfs.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS = extfs.o
+
+extfs.o: $(MAINDIR)/sliceinfo.h $(MAINDIR)/global.h
+
+libextfs.a:	$(OBJS)
+	$(AR) $(ARFLAGS) $@ $?
+	$(RANLIB) $@
+
+install: 
+
+clean:
+	rm -f libextfs.a $(OBJS)

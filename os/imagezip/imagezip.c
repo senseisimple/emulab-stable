@@ -11,8 +11,6 @@
  *	Multithread so that we can be reading ahead on the input device
  *	and overlapping IO with compression.  Maybe a third thread for
  *	doing output.
- *
- *	Split out the FS-specific code into subdirectories.  Clean it up.
  */
 #include <ctype.h>
 #include <err.h>
@@ -28,82 +26,12 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <zlib.h>
-#ifndef linux
-#include <sys/diskslice.h>
-#define DKTYPENAMES
-#include <sys/disklabel.h>
-#include <ufs/ffs/fs.h>
-#endif
-#include "ext2_fs.h"
+
 #include "imagehdr.h"
-#ifdef WITH_NTFS
-#include <linux/fs.h>
-#include "volume.h"
-#include "inode.h"
-#include "support.h" 
-#include "attrib.h"
-#include "runlist.h"
-#include "dir.h"
-#endif
+#include "sliceinfo.h"
+#include "global.h"
 
 #define min(a,b) ((a) <= (b) ? (a) : (b))
-
-/* Why is this not defined in a public header file? */
-#define ACTIVE		0x80
-#define BOOT_MAGIC	0xAA55
-#define DOSPTYP_UNUSED		0	/* Unused */
-#ifndef DOSPTYP_FAT12
-#define	DOSPTYP_FAT12		1	/* FAT12 */
-#endif
-#ifndef DOSPTYP_FAT16
-#define	DOSPTYP_FAT16		4	/* FAT16 */
-#endif
-#ifndef DOSPTYP_FAT16L
-#define	DOSPTYP_FAT16L		6	/* FAT16, part >= 32MB */
-#endif
-#ifndef DOSPTYP_EXT
-#define	DOSPTYP_EXT		5	/* DOS extended partition */
-#endif
-#ifndef DOSPTYPE_NTFS
-#define DOSPTYP_NTFS    	7       /* Windows NTFS partition */
-#endif
-#ifndef DOSPTYP_FAT32
-#define	DOSPTYP_FAT32		11	/* FAT32 */
-#endif
-#ifndef DOSPTYP_FAT32_LBA
-#define	DOSPTYP_FAT32_LBA	12	/* FAT32, LBA */
-#endif
-#ifndef DOSPTYP_FAT16L_LBA
-#define	DOSPTYP_FAT16L_LBA	14	/* FAT16, part >= 32MB, LBA */
-#endif
-#ifndef DOSPTYPE_EXT_LBA
-#define	DOSPTYP_EXT_LBA		15	/* DOS extended, LBA partition */
-#endif
-#ifndef DOSPTYP_LINSWP
-#define	DOSPTYP_LINSWP		0x82	/* Linux swap partition */
-#endif
-#ifndef DOSPTYP_LINUX
-#define	DOSPTYP_LINUX		0x83	/* Linux partition */
-#endif
-#ifndef DOSPTYP_OPENBSD
-#define DOSPTYP_OPENBSD 	0xa6	/* OpenBSD */
-#endif
-
-
-#define ISBSD(t)	((t) == DOSPTYP_386BSD || (t) == DOSPTYP_OPENBSD)
-#define ISEXT(t)	((t) == DOSPTYP_EXT || (t) == DOSPTYP_EXT_LBA)
-#define ISFAT(t)	\
-	((t) == DOSPTYP_FAT12 || (t) == DOSPTYP_FAT16 || \
-	 (t) == DOSPTYP_FAT16L || (t) == DOSPTYP_FAT32 || \
-	 (t) == DOSPTYP_FAT32_LBA || (t) == DOSPTYP_FAT16L_LBA)
-
-#ifndef NDOSPART
-#define NDOSPART	4
-#endif
-#define MAXSLICES	32 /* > 4 to allow for extended partition naming */
-
-/* 0 == false for all, ~0 == true for all, else true for those set */
-typedef uint32_t partmap_t[MAXSLICES];
 
 char	*infilename;
 int	infd, outfd, outcanseek;
@@ -123,9 +51,6 @@ int	forcereads= 0;
 int	retrywrites= 1;
 off_t	datawritten;
 partmap_t ignore, forceraw;
-
-#define sectobytes(s)	((off_t)(s) * secsize)
-#define bytestosec(b)	(uint32_t)((b) / secsize)
 
 #define HDRUSED(reg, rel) \
     (sizeof(blockhdr_t) + \
@@ -165,37 +90,59 @@ void	addfixup(off_t offset, off_t poffset, off_t size, void *data,
 void	addreloc(off_t offset, off_t size, int reloctype);
 
 /* Forward decls */
-#ifndef linux
 int	read_image(u_int32_t start, int pstart, u_int32_t extstart);
-int	read_bsdslice(int slice, u_int32_t start, u_int32_t size, int type);
-int	read_bsdpartition(struct disklabel *dlabel, int part);
-int	read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dboff);
-#ifdef WITH_NTFS
-int     read_ntfsslice(int slice, u_int32_t start, u_int32_t size,
-		       char *openname);
-#endif
-#ifdef WITH_FAT
-int	read_fatslice(int slice, u_int32_t start, u_int32_t size, int infd);
-#endif
-#endif
-int	read_linuxslice(int slice, u_int32_t start, u_int32_t size);
-int	read_linuxswap(int slice, u_int32_t start, u_int32_t size);
-int	read_linuxgroup(struct ext2_super_block *super,
-			struct ext2_group_desc	*group,
-			int index, u_int32_t diskoffset);
 int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
 
 static void getsliceinfo(char *disk, int diskfd);
-static char *slicename(u_int32_t offset, u_int32_t size, int type);
+
+static SLICEMAP_PROCESS_PROTO(read_slice);
+
+struct slicemap fsmap[] = {
+	{ DOSPTYP_UNUSED,	"UNUSED",	0 },
+#ifdef WITH_FFS
+	{ DOSPTYP_386BSD,	"FBSD FFS",	read_bsdslice },
+	{ DOSPTYP_OPENBSD,	"OBSD FFS",	read_bsdslice },
+#endif
+#ifdef WITH_EXTFS
+	{ DOSPTYP_LINUX,	"Linux EXT",	read_linuxslice },
+	{ DOSPTYP_LINSWP,	"Linux SWP",	read_linuxswap },
+#endif
+#ifdef WITH_NTFS
+	{ DOSPTYP_NTFS,		"NTFS",		read_ntfsslice },
+#endif
+#ifdef WITH_FAT
+	{ DOSPTYP_FAT12,	"FAT12",	read_fatslice },
+	{ DOSPTYP_FAT16,	"FAT16",	read_fatslice },
+	{ DOSPTYP_FAT16L,	"FAT16L",	read_fatslice },
+	{ DOSPTYP_FAT16L_LBA,	"FAT16 LBA",	read_fatslice },
+	{ DOSPTYP_FAT32,	"FAT32",	read_fatslice },
+	{ DOSPTYP_FAT32_LBA,	"FAT32 LBA",	read_fatslice },
+#endif
+	{ DOSPTYP_EXT,		"DOSEXT",	0 },
+	{ DOSPTYP_EXT_LBA,	"DOSEXT LBA",	0 },
+	{ -1,			"",		0 },
+};
+
+static inline struct slicemap *
+getslicemap(int stype)
+{
+	struct slicemap *smap;
+
+	for (smap = fsmap; smap->type != -1; smap++)
+		if (smap->type == stype)
+			return smap;
+	return 0;
+}
 
 #define IORETRIES	10
 
-#ifdef linux
-#define devlseek	lseek
-#else
-static inline off_t devlseek(int fd, off_t off, int whence)
+/*
+ * Assert the hell out of it...
+ */
+off_t
+devlseek(int fd, off_t off, int whence)
 {
 	off_t noff;
 	assert((off & (DEV_BSIZE-1)) == 0);
@@ -203,7 +150,6 @@ static inline off_t devlseek(int fd, off_t off, int whence)
 	assert(noff == (off_t)-1 || (noff & (DEV_BSIZE-1)) == 0);
 	return noff;
 }
-#endif
 
 /*
  * Wrap up read in a retry mechanism to persist in the face of IO errors,
@@ -326,9 +272,6 @@ devwrite(int fd, const void *buf, size_t nbytes)
 	exit(1);
 }
 
-/* Map partition number to letter */
-#define BSDPARTNAME(i)       ("abcdefghijklmnop"[(i)])
-
 static int
 setpartition(partmap_t map, char *str)
 {
@@ -366,14 +309,11 @@ main(argc, argv)
 {
 	int	ch, rval;
 	char	*outfilename = 0;
-	int	linuxfs	  = 0;
-	int	bsdfs     = 0;
-	int	ntfs	  = 0;
-	int	fatfs	  = 0;
 	int	rawmode	  = 0;
+	int	slicetype = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbnfdihrs:c:z:oI:1F:DR:X")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnfdihrs:c:z:oI:1F:DR:S:X")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -388,22 +328,22 @@ main(argc, argv)
 			debug++;
 			break;
 		case 'l':
-			linuxfs++;
+			slicetype = DOSPTYP_LINUX;
 			break;
 		case 'b':
-			bsdfs++;
+			slicetype = DOSPTYP_386BSD;
 			break;
 		case 'n':
-			ntfs++;
-			break;
-		case 'f':
-			fatfs++;
+			slicetype = DOSPTYP_NTFS;
 			break;
 		case 'o':
 			dots++;
 			break;
 		case 'r':
 			rawmode++;
+			break;
+		case 'S':
+			slicetype = atoi(optarg);
 			break;
 		case 's':
 			slicemode = 1;
@@ -464,11 +404,6 @@ main(argc, argv)
 			"the slice (-s) option\n\n");
 		usage();
 	}
-	if (linuxfs + bsdfs + ntfs + fatfs > 1) {
-		fprintf(stderr,
-			"-b, -l, -n, and -f are mutually exclusive!\n\n");
-		usage();
-	}
 	if (!info && argc != 2) {
 		fprintf(stderr, "Must specify an output filename!\n\n");
 		usage();
@@ -486,24 +421,14 @@ main(argc, argv)
 	}
 	getsliceinfo(infilename, infd);
 
-	if (linuxfs)
-		rval = read_linuxslice(0, 0, 0);
-#ifndef linux
-	else if (bsdfs)
-		rval = read_bsdslice(0, 0, 0, DOSPTYP_386BSD);
-#ifdef WITH_NTFS
-	else if (ntfs)
-		rval = read_ntfsslice(-1, 0, 0, infilename);
-#endif
-#ifdef WITH_FAT
-	else if (fatfs)
-		rval = read_fatslice(-1, 0, 0, infd);
-#endif
-	else if (rawmode)
+	if (slicetype != 0) {
+		rval = read_slice(-1, slicetype, 0, 0, infilename, infd);
+		if (rval == -1)
+			fprintf(stderr, ", cannot process\n");
+	} else if (rawmode)
 		rval = read_raw();
 	else
 		rval = read_image(DOSBBSECTOR, 0, 0);
-#endif
 	if (rval) {
 		fprintf(stderr, "* * * Aborting * * *\n");
 		exit(1);
@@ -545,7 +470,20 @@ main(argc, argv)
 	exit(0);
 }
 
-#ifndef linux
+static int
+read_slice(int snum, int stype, u_int32_t start, u_int32_t size,
+	   char *sname, int sfd)
+{
+	struct slicemap *smap = getslicemap(stype);
+
+	if (smap && smap->process)
+		return (*smap->process)(snum, stype, start, size, sname, sfd);
+	
+	fprintf(stderr, "Slice %d is an unknown type %#x (%s)",
+		snum+1, stype, smap ? smap->desc : "??");
+	return -1;
+}
+
 /*
  * Parse the DOS partition table and dispatch to the individual readers.
  */
@@ -553,14 +491,8 @@ int
 read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 {
 	int		i, cc, rval = 0;
-	struct doslabel {
-		char		align[sizeof(short)];	/* Force alignment */
-		char		pad2[DOSPARTOFF];
-		struct dos_partition parts[NDOSPART];
-		unsigned short  magic;
-	} doslabel;
-#define DOSPARTSIZE \
-	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+	struct slicemap	*smap;
+	struct doslabel doslabel;
 
 	if (devlseek(infd, sectobytes(bbstart), SEEK_SET) < 0) {
 		warn("Could not seek to DOS label at sector %u", bbstart);
@@ -593,50 +525,15 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			int bsdix = pstart + i;
 
 			fprintf(stderr, "  P%d: ", bsdix + 1);
-			switch (doslabel.parts[i].dp_typ) {
-			case DOSPTYP_UNUSED:
-				fprintf(stderr, "  UNUSED");
-				break;
-			case DOSPTYP_386BSD:
-				fprintf(stderr, "  FBSD  ");
-				break;
-			case DOSPTYP_OPENBSD:
-				fprintf(stderr, "  OBSD  ");
-				break;
-			case DOSPTYP_LINSWP:
-				fprintf(stderr, "  LSWAP ");
-				break;
-			case DOSPTYP_LINUX:
-				fprintf(stderr, "  LINUX ");
-				break;
-			case DOSPTYP_EXT:
-			case DOSPTYP_EXT_LBA:
-				fprintf(stderr, "  EXTDOS");
-				break;
-#ifdef WITH_FAT
-			case DOSPTYP_FAT12:
-				fprintf(stderr, "  FAT12 ");
-				break;
-			case DOSPTYP_FAT16:
-			case DOSPTYP_FAT16L:
-			case DOSPTYP_FAT16L_LBA:
-				fprintf(stderr, "  FAT16 ");
-				break;
-			case DOSPTYP_FAT32:
-			case DOSPTYP_FAT32_LBA:
-				fprintf(stderr, "  FAT32 ");
-				break;
-#endif
-#ifdef WITH_NTFS
-			case DOSPTYP_NTFS:
-				fprintf(stderr, "  NTFS  ");
-				break;
-#endif
-			default:
-				fprintf(stderr, "  UNKNO ");
-			}
+			smap = getslicemap(doslabel.parts[i].dp_typ);
+			if (smap == 0)
+				fprintf(stderr, "%-10s", "UNKNOWN");
+			else
+				fprintf(stderr, "%-10s", smap->desc);
+
 			start = doslabel.parts[i].dp_start;
 #if 0
+			/* Make start sector absolute */
 			if (ISEXT(doslabel.parts[i].dp_typ))
 				start += extstart;
 			else
@@ -645,7 +542,8 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			fprintf(stderr, "  start %9d, size %9d",
 				start, doslabel.parts[i].dp_size);
 			fprintf(stderr, ", slicedev %s\n",
-				slicename(bbstart + doslabel.parts[i].dp_start,
+				slicename(bsdix,
+					  bbstart + doslabel.parts[i].dp_start,
 					  doslabel.parts[i].dp_size,
 					  doslabel.parts[i].dp_typ)?:"<none>");
 		}
@@ -676,32 +574,8 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			}
 		}
 
+		smap = getslicemap(type);
 		switch (type) {
-		case DOSPTYP_386BSD:
-		case DOSPTYP_OPENBSD:
-			rval = read_bsdslice(bsdix, start, size, type);
-			break;
-		case DOSPTYP_LINSWP:
-			rval = read_linuxswap(bsdix, start, size);
-			break;
-		case DOSPTYP_LINUX:
-			rval = read_linuxslice(bsdix, start, size);
-			break;
-#ifdef WITH_FAT
-		case DOSPTYP_FAT12:
-		case DOSPTYP_FAT16:
-		case DOSPTYP_FAT16L:
-		case DOSPTYP_FAT16L_LBA:
-		case DOSPTYP_FAT32:
-		case DOSPTYP_FAT32_LBA:
-			rval = read_fatslice(bsdix, start, size, infd);
-			break;
-#endif
-#ifdef WITH_NTFS
-		case DOSPTYP_NTFS:
-			rval = read_ntfsslice(bsdix, start, size, infilename);
-			break;
-#endif
 		case DOSPTYP_EXT:
 		case DOSPTYP_EXT_LBA:
 			/*
@@ -722,11 +596,14 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			if (size > 0)
 				addskip(start, size);
 			break;
+
 		default:
-			fprintf(stderr,
-				"  Slice %d is an unknown type (%x), "
-				"forcing raw compression.\n",
-				bsdix + 1, type);
+			rval = read_slice(bsdix, type, start, size,
+					  infilename, infd);
+			if (rval == -1) {
+				fprintf(stderr, ", forcing raw compression\n");
+				rval = 0;
+			}
 			break;
 		}
 		if (rval) {
@@ -774,12 +651,18 @@ static struct dsinfo {
 } sliceinfo[MAXSLICES];
 static int sliceinfosize = 0;
 
+#if defined(__FreeBSD__) && __FreeBSD__ < 5
+#include <sys/diskslice.h>
+#endif
+
 static void
 getsliceinfo(char *disk, int diskfd)
 {
-#ifndef linux
+	int si;
+
+#ifdef DIOCGSLICEINFO
 	struct diskslices dsinfo;
-	int i, si;
+	int i;
 
 	if (ioctl(diskfd, DIOCGSLICEINFO, &dsinfo) < 0) {
 		perror("WARNING: DIOCGSLICEINFO failed");
@@ -794,6 +677,25 @@ getsliceinfo(char *disk, int diskfd)
 			 "%ss%d", disk, si+1);
 		sliceinfosize++;
 	}
+#else
+	/*
+	 * XXX make it up for the primary partitions
+	 */
+	for (si = 0; si < 4; si++) {
+		sliceinfo[si].offset = 0;
+		sliceinfo[si].size = 0;
+		sliceinfo[si].type = 0;
+		snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
+#ifdef linux
+			 "%s%d",
+#else
+			 "%ss%d",
+#endif
+			 disk, si+1);
+		sliceinfosize++;
+
+	}
+#endif
 
 	if (debug > 1) {
 		fprintf(stderr, "Slice special files:\n");
@@ -805,15 +707,13 @@ getsliceinfo(char *disk, int diskfd)
 				sliceinfo[si].type);
 		fprintf(stderr, "\n");
 	}
-
-#endif
 }
 
 /*
  * Find a disk special with the indicated parameters
  */
-static char *
-slicename(u_int32_t offset, u_int32_t size, int type)
+char *
+slicename(int slice, u_int32_t offset, u_int32_t size, int type)
 {
 	int si;
 
@@ -822,977 +722,18 @@ slicename(u_int32_t offset, u_int32_t size, int type)
 		    sliceinfo[si].size == size &&
 		    sliceinfo[si].type == type)
 			return sliceinfo[si].name;
-	return 0;
-}
-
-
-/*
- * Operate on a BSD slice
- */
-int
-read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
-{
-	int		cc, i, rval = 0, npart;
-	union {
-		struct disklabel	label;
-		char			pad[BBSIZE];
-	} dlabel;
-
-	if (debug)
-		fprintf(stderr, "  P%d (%sBSD Slice)\n", slice + 1,
-			bsdtype == DOSPTYP_386BSD ? "Free" : "Open");
-	
-	if (devlseek(infd, sectobytes(start), SEEK_SET) < 0) {
-		warn("Could not seek to beginning of BSD slice");
-		return 1;
-	}
 
 	/*
-	 * Then seek ahead to the disklabel.
+	 * XXX use the slice number to pick
 	 */
-	if (devlseek(infd, sectobytes(LABELSECTOR), SEEK_CUR) < 0) {
-		warn("Could not seek to beginning of BSD disklabel");
-		return 1;
-	}
-
-	if ((cc = devread(infd, &dlabel, sizeof(dlabel))) < 0) {
-		warn("Could not read BSD disklabel");
-		return 1;
-	}
-	if (cc != sizeof(dlabel)) {
-		warnx("Could not get the entire BSD disklabel");
- 		return 1;
-	}
-
-	/*
-	 * Check the magic numbers.
-	 */
-	if (dlabel.label.d_magic  != DISKMAGIC ||
-	    dlabel.label.d_magic2 != DISKMAGIC) {
-#if 0 /* not needed, a fake disklabel is created by the kernel */
-		/*
-		 * If we were forced with the bsdfs option,
-		 * assume this is a single partition disk like a
-		 * memory or vnode disk.  We cons up a disklabel
-		 * and let it rip.
-		 */
-		if (size == 0) {
-			fprintf(stderr,
-				"No disklabel, assuming single partition\n");
-			dlabel.label.d_partitions[0].p_offset = 0;
-			dlabel.label.d_partitions[0].p_size = 0;
-			dlabel.label.d_partitions[0].p_fstype = FS_BSDFFS;
-			return read_bsdpartition(&dlabel.label, 0);
-		}
-#endif
-		warnx("Wrong magic number is BSD disklabel");
- 		return 1;
-	}
-
-	/*
-	 * Now scan partitions.
-	 *
-	 * XXX space not covered by a partition winds up being compressed,
-	 * we could detect this.
-	 */
-	npart = dlabel.label.d_npartitions;
-	assert(npart >= 0 && npart <= 16);
-	if (debug)
-		fprintf(stderr, "  P%d: %d partitions\n", slice+1, npart);
-	for (i = 0; i < npart; i++) {
-		if (! dlabel.label.d_partitions[i].p_size)
-			continue;
-
-		if (dlabel.label.d_partitions[i].p_fstype == FS_UNUSED)
-			continue;
-
-		/*
-		 * OpenBSD maps the extended DOS partitions as slices 8-15,
-		 * skip them.
-		 */
-		if (bsdtype == DOSPTYP_OPENBSD && i >= 8 && i < 16) {
-			if (debug)
-				fprintf(stderr, "    '%c'   skipping, "
-					"OpenBSD mapping of DOS partition %d\n",
-					BSDPARTNAME(i), i - 6);
-			continue;
-		}
-
-		if (debug) {
-			/* XXX silence gcc about dktypenames */
-			rval = DKMAXTYPES;
-
-			fprintf(stderr, "    '%c' ", BSDPARTNAME(i));
-
-			fprintf(stderr, "  start %9d, size %9d\t(%s)\n",
-			   dlabel.label.d_partitions[i].p_offset,
-			   dlabel.label.d_partitions[i].p_size,
-			   fstypenames[dlabel.label.d_partitions[i].p_fstype]);
-		}
-
-		if (ignore[slice] & (1 << i)) {
-			fprintf(stderr, "  Slice %d BSD partition '%c' ignored,"
-				" NOT SAVING.\n",
-				slice + 1, BSDPARTNAME(i));
-			addskip(dlabel.label.d_partitions[i].p_offset,
-				dlabel.label.d_partitions[i].p_size);
-		} else if (forceraw[slice] & (1 << i)) {
-			fprintf(stderr, "  Slice %d BSD partition '%c',"
-				" forcing raw compression.\n",
-				slice + 1, BSDPARTNAME(i));
-		} else {
-			rval = read_bsdpartition(&dlabel.label, i);
-			if (rval)
-				return rval;
-		}
-	}
-	
-	/*
-	 * Record a fixup for the partition table, adjusting the
-	 * partition offsets to make them slice relative.
-	 */
-	if (slicemode &&
-	    start != 0 && dlabel.label.d_partitions[0].p_offset == start) {
-		for (i = 0; i < npart; i++) {
-			if (dlabel.label.d_partitions[i].p_size == 0)
-				continue;
-
-			/*
-			 * Don't mess with OpenBSD partitions 8-15 which map
-			 * extended DOS partitions.  Also leave raw partition
-			 * alone as it maps the entire disk (not just slice)
-			 */
-			if (bsdtype == DOSPTYP_OPENBSD &&
-			    (i == 2 || (i >= 8 && i < 16)))
-				continue;
-
-			assert(dlabel.label.d_partitions[i].p_offset >= start);
-			dlabel.label.d_partitions[i].p_offset -= start;
-		}
-		dlabel.label.d_checksum = 0;
-		dlabel.label.d_checksum = dkcksum(&dlabel.label);
-		addfixup(sectobytes(start+LABELSECTOR), sectobytes(start),
-			 (off_t)sizeof(dlabel.label), &dlabel,
-			 bsdtype == DOSPTYP_OPENBSD ?
-			 RELOC_OBSDDISKLABEL : RELOC_FBSDDISKLABEL);
-	}
+	if (slice < 4 && sliceinfo[slice].type == 0 &&
+	    sliceinfo[slice].offset == 0 && sliceinfo[slice].size == 0 &&
+	    sliceinfo[slice].name != 0)
+		return sliceinfo[slice].name;
 
 	return 0;
 }
 
-/*
- * BSD partition table offsets are relative to the start of the raw disk.
- * Very convenient.
- */
-int
-read_bsdpartition(struct disklabel *dlabel, int part)
-{
-	int		i, cc, rval = 0;
-	union {
-		struct fs fs;
-		char pad[MAXBSIZE];
-	} fs;
-	union {
-		struct cg cg;
-		char pad[MAXBSIZE];
-	} cg;
-	u_int32_t	size, offset;
-
-	offset = dlabel->d_partitions[part].p_offset;
-	size   = dlabel->d_partitions[part].p_size;
-	
-	if (dlabel->d_partitions[part].p_fstype == FS_SWAP) {
-		addskip(offset, size);
-		return 0;
-	}
-
-	if (dlabel->d_partitions[part].p_fstype != FS_BSDFFS) {
-		warnx("BSD Partition '%c': Not a BSD Filesystem",
-		      BSDPARTNAME(part));
-		return 1;
-	}
-
-	if (devlseek(infd, sectobytes(offset) + SBOFF, SEEK_SET) < 0) {
-		warnx("BSD Partition '%c': Could not seek to superblock",
-		      BSDPARTNAME(part));
-		return 1;
-	}
-
-	if ((cc = devread(infd, &fs, SBSIZE)) < 0) {
-		warn("BSD Partition '%c': Could not read superblock",
-		     BSDPARTNAME(part));
-		return 1;
-	}
-	if (cc != SBSIZE) {
-		warnx("BSD Partition '%c': Truncated superblock",
-		      BSDPARTNAME(part));
-		return 1;
-	}
- 	if (fs.fs.fs_magic != FS_MAGIC) {
-		warnx("BSD Partition '%c': Bad magic number in superblock",
-		      BSDPARTNAME(part));
- 		return 1;
- 	}
-
-	if (debug) {
-		fprintf(stderr, "        bfree %9d, size %9d\n",
-		       fs.fs.fs_cstotal.cs_nbfree, fs.fs.fs_bsize);
-	}
-
-	for (i = 0; i < fs.fs.fs_ncg; i++) {
-		unsigned long	cgoff, dboff;
-
-		cgoff = fsbtodb(&fs.fs, cgtod(&fs.fs, i)) + offset;
-		dboff = fsbtodb(&fs.fs, cgbase(&fs.fs, i)) + offset;
-
-		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
-			warn("BSD Partition '%c': Could not seek to cg %d",
-			     BSDPARTNAME(part), i);
-			return 1;
-		}
-		if ((cc = devread(infd, &cg, fs.fs.fs_bsize)) < 0) {
-			warn("BSD Partition '%c': Could not read cg %d",
-			     BSDPARTNAME(part), i);
-			return 1;
-		}
-		if (cc != fs.fs.fs_bsize) {
-			warn("BSD Partition '%c': Truncated cg %d",
-			     BSDPARTNAME(part), i);
-			return 1;
-		}
-		if (debug > 1) {
-			fprintf(stderr,
-				"        CG%d\t offset %9ld, bfree %6d\n",
-				i, cgoff, cg.cg.cg_cs.cs_nbfree);
-		}
-		
-		rval = read_bsdcg(&fs.fs, &cg.cg, dboff);
-		if (rval)
-			return rval;
-	}
-
-	return rval;
-}
-
-int
-read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
-{
-	int  i, max;
-	char *p;
-	int count, j;
-
-	max = fsp->fs_fpg;
-	p   = cg_blksfree(cgp);
-
-	/*
-	 * XXX The bitmap is fragments, not FS blocks.
-	 *
-	 * The block bitmap lists blocks relative to the base (cgbase()) of
-	 * the cylinder group. cgdmin() is the first actual datablock, but
-	 * the bitmap includes all the blocks used for all the blocks
-	 * comprising the cg. These include the superblock, cg, inodes,
-	 * datablocks and the variable-sized padding before all of these
-	 * (used to skew the offset of consecutive cgs).
-	 * The "dbstart" parameter is thus the beginning of the cg, to which
-	 * we add the bitmap offset. All blocks before cgdmin() will always
-	 * be allocated, but we scan them anyway. 
-	 */
-
-	if (debug > 2)
-		fprintf(stderr, "                 ");
-	for (count = i = 0; i < max; i++)
-		if (isset(p, i)) {
-			unsigned long dboff, dbcount;
-
-			j = i;
-			while ((i+1)<max && isset(p, i+1))
-				i++;
-
-			dboff = dbstart + fsbtodb(fsp, j);
-			dbcount = fsbtodb(fsp, (i-j) + 1);
-					
-			if (debug > 2) {
-				if (count)
-					fprintf(stderr, ",%s",
-						count % 4 ?
-						" " : "\n                 ");
-				fprintf(stderr, "%lu:%ld", dboff, dbcount);
-			}
-			addskip(dboff, dbcount);
-			count++;
-		}
-	if (debug > 2)
-		fprintf(stderr, "\n");
-	return 0;
-}
-#endif
-
-/*
- * Operate on a linux slice. I actually don't have a clue what a linux
- * slice looks like. I just know that in our images, the linux slice
- * has the boot block in the first sector, part of the boot in the
- * second sector, and then the superblock for the one big filesystem
- * in the 3rd sector. Just start there and move on.
- *
- * Unlike BSD partitions, linux block offsets are from the start of the
- * slice, so we have to add the starting sector to everything. 
- */
-int
-read_linuxslice(int slice, u_int32_t start, u_int32_t size)
-{
-#define LINUX_SUPERBLOCK_OFFSET	1024
-#define LINUX_SUPERBLOCK_SIZE 	1024
-#define LINUX_MAXGRPSPERBLK	\
-	(EXT2_MAX_BLOCK_SIZE/sizeof(struct ext2_group_desc))
-
-	int			cc, i, numgroups, rval = 0;
-	struct ext2_super_block	fs;
-	struct ext2_group_desc	groups[LINUX_MAXGRPSPERBLK];
-	int			dosslice = slice + 1; /* DOS Numbering */
-	off_t			soff;
-
-	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
-	assert((sizeof(groups) & ~EXT2_MAX_BLOCK_SIZE) == 0);
-
-	if (debug)
-		fprintf(stderr, "  P%d (Linux Slice)\n", dosslice);
-	
-	/*
-	 * Skip ahead to the superblock.
-	 */
-	if (devlseek(infd, sectobytes(start) + LINUX_SUPERBLOCK_OFFSET,
-		     SEEK_SET) < 0) {
-		warnx("Linux Slice %d: Could not seek to superblock",
-		      dosslice);
-		return 1;
-	}
-
-	if ((cc = devread(infd, &fs, LINUX_SUPERBLOCK_SIZE)) < 0) {
-		warn("Linux Slice %d: Could not read superblock", dosslice);
-		return 1;
-	}
-	if (cc != LINUX_SUPERBLOCK_SIZE) {
-		warnx("Linux Slice %d: Truncated superblock", dosslice);
-		return 1;
-	}
- 	if (fs.s_magic != EXT2_SUPER_MAGIC) {
-		warnx("Linux Slice %d: Bad magic number in superblock",
-		      dosslice);
- 		return (1);
- 	}
-	if (EXT2_BLOCK_SIZE(&fs) < EXT2_MIN_BLOCK_SIZE ||
-	    EXT2_BLOCK_SIZE(&fs) > EXT2_MAX_BLOCK_SIZE) {
-	    warnx("Linux Slice %d: Block size not what I expect it to be: %d!",
-		  dosslice, EXT2_BLOCK_SIZE(&fs));
-	    return 1;
-	}
-
-	numgroups = ((fs.s_blocks_count - fs.s_first_data_block)
-		     + (fs.s_blocks_per_group - 1))
-		/ fs.s_blocks_per_group;
-	if (debug) {
-		fprintf(stderr, "        %s\n",
-			(fs.s_feature_compat & 4) ? "EXT3" : "EXT2");
-		fprintf(stderr, "        count %9u, size %9d, pergroup %9d\n",
-			fs.s_blocks_count, EXT2_BLOCK_SIZE(&fs),
-			fs.s_blocks_per_group);
-		fprintf(stderr, "        bfree %9u, first %9u, groups %9d\n",
-			fs.s_free_blocks_count, fs.s_first_data_block,
-			numgroups);
-	}
-
-	/*
-	 * Read each group descriptor. It says where the free block bitmap
-	 * lives. The absolute block numbers a group descriptor refers to
-	 * is determined by its index * s_blocks_per_group. Once we know where
-	 * the bitmap lives, we can go out to the bitmap and see what blocks
-	 * are free.
-	 *
-	 * Group descriptors are in the blocks right after the superblock.
-	 */
-	assert(LINUX_SUPERBLOCK_SIZE <= EXT2_BLOCK_SIZE(&fs));
-	assert(EXT2_DESC_PER_BLOCK(&fs) * sizeof(struct ext2_group_desc)
-	       == EXT2_BLOCK_SIZE(&fs)); 
-	soff = sectobytes(start) +
-		(fs.s_first_data_block + 1) * EXT2_BLOCK_SIZE(&fs);
-	for (i = 0; i < numgroups; i++) {
-		int gix;
-
-		/*
-		 * Read the group descriptors in groups since they are
-		 * smaller than a sector size, packed into EXT2_BLOCK_SIZE
-		 * blocks right after the superblock. 
-		 */
-		gix = (i % EXT2_DESC_PER_BLOCK(&fs));
-		if (gix == 0) {
-			if (devlseek(infd, soff, SEEK_SET) < 0) {
-				warnx("Linux Slice %d: "
-				      "Could not seek to Group %d",
-				      dosslice, i);
-				return 1;
-			}
-
-			if ((cc = devread(infd, groups, sizeof(groups))) < 0) {
-				warn("Linux Slice %d: "
-				     "Could not read Group %d",
-				     dosslice, i);
-				return 1;
-			}
-			if (cc != sizeof(groups)) {
-				warnx("Linux Slice %d: "
-				      "Truncated Group %d", dosslice, i);
-				return 1;
-			}
-			soff += EXT2_BLOCK_SIZE(&fs);
-		}
-
-		if (debug) {
-			fprintf(stderr,
-				"        Group:%-2d\tBitmap %9u, bfree %9d\n",
-				i, groups[gix].bg_block_bitmap,
-				groups[gix].bg_free_blocks_count);
-		}
-
-		if ((rval = read_linuxgroup(&fs, &groups[gix], i, start)))
-			return rval;
-	}
-	
-	return 0;
-}
-
-/*
- * A group descriptor says where on the disk the block bitmap is. Its
- * a 1bit per block map, where each bit is a FS block (instead of a
- * fragment like in BSD). Since linux offsets are relative to the start
- * of the slice, need to adjust the numbers using the slice offset.
- */
-int
-read_linuxgroup(struct ext2_super_block *super,
-		struct ext2_group_desc	*group,
-		int index,
-		u_int32_t sliceoffset /* Sector offset of slice */)
-{
-	char	*p, bitmap[EXT2_MAX_BLOCK_SIZE];
-	int	i, cc, max;
-	int	count, j, freecount;
-	off_t	offset;
-	unsigned long block;
-
-	block = super->s_first_data_block +
-		(index * super->s_blocks_per_group);
-
-	/*
-	 * Sanity check the bitmap block numbers
-	 */
-	if (group->bg_block_bitmap < block ||
-	    group->bg_block_bitmap >= block + super->s_blocks_per_group) {
-		warnx("Linux Group %d: "
-		      "Group bitmap block (%d) out of range [%lu-%lu]",
-		      index, group->bg_block_bitmap,
-		      block, block + super->s_blocks_per_group - 1);
-		return 1;
-	}
-
-	offset  = sectobytes(sliceoffset);
-	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
-	if (devlseek(infd, offset, SEEK_SET) < 0) {
-		warn("Linux Group %d: "
-		     "Could not seek to Group bitmap block %d",
-		     index, group->bg_block_bitmap);
-		return 1;
-	}
-
-	/*
-	 * Sanity check this number since it the number of blocks in
-	 * the group (bitmap size) is dependent on the block size. 
-	 */
-	if (super->s_blocks_per_group > (EXT2_BLOCK_SIZE(super) * 8)) {
-	    warnx("Linux Group %d: "
-		  "Block count not what I expect it to be: %d!",
-		  index, super->s_blocks_per_group);
-	    return 1;
-	}
-
-	if ((cc = devread(infd, bitmap, EXT2_BLOCK_SIZE(super))) < 0) {
-		warn("Linux Group %d: "
-		     "Could not read Group bitmap", index);
-		return 1;
-	}
-	if (cc != EXT2_BLOCK_SIZE(super)) {
-		warnx("Linux Group %d: Truncated Group bitmap", index);
-		return 1;
-	}
-
-	/*
-	 * The final group may have fewer than s_blocks_per_group
-	 */
-	max = super->s_blocks_count - block;
-	if (max > super->s_blocks_per_group)
-		max = super->s_blocks_per_group;
-	else if (debug && max != super->s_blocks_per_group)
-		fprintf(stderr,
-			"        Linux Group %d: only %d blocks\n", index, max);
-
-	p = bitmap;
-	freecount = 0;
-
-	/*
-	 * XXX The bitmap is FS blocks.
-	 *     The bitmap is an "inuse" map, not a free map.
-	 */
-#define LINUX_FSBTODB(count) \
-	((EXT2_BLOCK_SIZE(super) / secsize) * (count))
-
-	if (debug > 2)
-		fprintf(stderr, "                 ");
-	for (freecount = count = i = 0; i < max; i++)
-		if (!isset(p, i)) {
-			unsigned long dboff;
-			int dbcount;
-
-			j = i;
-			while ((i+1)<max && !isset(p, i+1))
-				i++;
-
-			/*
-			 * The offset of this free range, relative
-			 * to the start of the disk, is: the slice
-			 * offset, plus the offset of the group itself,
-			 * plus the index of the first free block in
-			 * the current range, plus the offset of the
-			 * first data block in the filesystem.
-			 */
-			dboff = sliceoffset +
-				LINUX_FSBTODB(index*super->s_blocks_per_group) +
-				LINUX_FSBTODB(j) +
-				LINUX_FSBTODB(super->s_first_data_block);
-
-			dbcount = LINUX_FSBTODB((i-j) + 1);
-					
-			if (debug > 2) {
-				if (count)
-					fprintf(stderr, ",%s",
-						count % 4 ?
-						" " : "\n                 ");
-				fprintf(stderr, "%lu:%d %d:%d",
-					dboff, dbcount, j, i);
-				count++;
-			}
-			addskip(dboff, dbcount);
-			freecount += dbcount;
-		}
-	if (debug > 2)
-		fprintf(stderr, "\n");
-
-	if (freecount != LINUX_FSBTODB(group->bg_free_blocks_count)) {
-		warnx("Linux Group %d: "
-		      "Computed free count (%d) != expected free count (%d)",
-		      index, freecount, group->bg_free_blocks_count);
-		return 1;
-	}
-
-	return 0;
-}
-
-/*
- * For a linux swap partition, all that matters is the first little
- * bit of it. The rest of it does not need to be written to disk.
- */
-int
-read_linuxswap(int slice, u_int32_t start, u_int32_t size)
-{
-	if (debug) {
-		fprintf(stderr,
-			"  P%d (Linux Swap)\n", slice + 1 /* DOS Numbering */);
-		fprintf(stderr,
-			"        start %12d, size %9d\n",
-			start, size);
-	}
-
-	start += bytestosec(0x8000);
-	size  -= bytestosec(0x8000);
-	
-	addskip(start, size);
-	return 0;
-}
-
-#ifdef WITH_NTFS
-
-/********Code to deal with NTFS file system*************/
-/* Written by: Russ Christensen <rchriste@cs.utah.edu> */
-
-/**@bug If the Windows partition is only created in a part of a
- * primary partition created with FreeBSD's fdisk then the sectors
- * after the end of the NTFS partition and before the end of the raw
- * primary partition will not be marked as free space. */
-
-
-struct ntfs_cluster;
-struct ntfs_cluster {
-	unsigned long start;
-	unsigned long length;
-	struct ntfs_cluster *next;
-};
-
-static __inline__ int
-ntfs_isAllocated(char *map, __s64 pos)
-{
-	int result;
-	char unmasked;
-	char byte;
-	short shift;
-	byte = *(map+(pos/8));
-	shift = pos % 8;
-	unmasked = byte >> shift;
-	result = unmasked & 1;
-	assert((result == 0 || result == 1) &&
-	       "Programming error in statement above");
-	return result;
-}
-
-static void
-ntfs_addskips(ntfs_volume *vol,struct ntfs_cluster *free,u_int32_t offset)
-{
-	u_int8_t sectors_per_cluster;
-	struct ntfs_cluster *cur;
-	int count = 0;
-	sectors_per_cluster = vol->cluster_size / vol->sector_size;
-	if(debug) {
-		fprintf(stderr,"sectors per cluster: %d\n",
-			sectors_per_cluster);
-		fprintf(stderr,"offset: %d\n", offset);
-	}
-	for(count = 0, cur = free; cur != NULL; cur = cur->next, count++) {
-		if(debug > 1) {
-			fprintf(stderr, "\tGroup:%-10dCluster%8li, size%8li\n",
-				count, cur->start,cur->length);
-		}
-		addskip(cur->start*sectors_per_cluster + offset,
-			cur->length*sectors_per_cluster);
-	}
-}
-
-static int
-ntfs_freeclusters(struct ntfs_cluster *free)
-{
-	int total;
-	struct ntfs_cluster *cur;
-	for(total = 0, cur = free; cur != NULL; cur = cur->next)
-		total += cur->length;
-	return total;
-}
-
-/* The calling function owns the pointer returned.*/
-static void *
-ntfs_read_data_attr(ntfs_attr *na)
-{
-	void  *result;
-	int64_t pos;
-	int64_t tmp;
-	int64_t amount_needed;
-	int   count;
-
-	/**ntfs_attr_pread might actually read in more data than we
-	 * ask for.  It will round up to the nearest DEV_BSIZE boundry
-	 * so make sure we allocate enough memory.*/
-	amount_needed = na->data_size - (na->data_size % DEV_BSIZE) + DEV_BSIZE;
-	assert(amount_needed > na->data_size && amount_needed % DEV_BSIZE == 0
-	       && "amount_needed is rounded up to DEV_BSIZE multiple");
-	if(!(result = malloc(amount_needed))) {
-		perror("Out of memory!\n");
-		exit(1);
-	}
-	pos = 0;
-	count = 0;
-	while(pos < na->data_size) {
-		tmp = ntfs_attr_pread(na,pos,na->data_size - pos,result+pos);
-		if(tmp < 0) {
-			perror("ntfs_attr_pread failed");
-			exit(1);
-		}
-		assert(tmp != 0 && "Not supposed to happen error!  "
-		       "Either na->data_size is wrong or there is another "
-		       "problem");
-		assert(tmp % DEV_BSIZE == 0 && "Not supposed to happen");
-		pos += tmp;
-	}
-#if 0 /*Turn on if you want to look at the free list directly*/
-	{
-		int fd;
-
-		fprintf(stderr, "Writing ntfs_free_bitmap.bin\n");
-		if((fd = open("ntfs_free_bitmap.bin",
-			      O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
-			perror("open ntfs_free_bitmap.bin failed\n");
-			exit(1);
-		}
-		if(write(fd, result, na->data_size) != na->data_size) {
-			perror("writing free space bitmap.bin failed\n");
-			exit(1);
-		}
-		close(fd);
-		fprintf(stderr, "Done\n");
-	}
-#endif
-	return result;
-}
-
-static struct ntfs_cluster *
-ntfs_compute_freeblocks(ntfs_attr *na, void *cluster_map, __s64 num_clusters)
-{
-	struct ntfs_cluster *result;
-	struct ntfs_cluster *curr;
-	struct ntfs_cluster *tmp;
-	__s64 pos = 1;
-	int total_free = 0;
-	result = curr = NULL;
-	assert(num_clusters <= na->data_size * 8 && "If there are more "
-	       "clusters than bits in the free space file then we have a "
-	       "problem.  Fewer clusters than bits is okay.");
-	if(debug)
-		fprintf(stderr,"num_clusters==%qd\n",num_clusters);
-	while(pos < num_clusters) {
-		if(!ntfs_isAllocated(cluster_map,pos++)) {
-			curr->length++;
-			total_free++;
-		}
-		else {
-			while(ntfs_isAllocated(cluster_map,pos)
-			      && pos < num_clusters) {
-				++pos;
-			}
-			if(pos >= num_clusters) break;
-			if(!(tmp = malloc(sizeof(struct ntfs_cluster)))) {
-				perror("clusters_free: Out of memory");
-				exit(1);
-			}
-			if(curr) {
-				curr->next = tmp;
-				curr = curr->next;
-			} else
-				result = curr = tmp;
-			curr->start = pos;
-			curr->length = 0;
-			curr->next = NULL;
-		}
-	}
-	if(debug)
-		fprintf(stderr, "total_free==%d\n",total_free);
-	return result;
-}
-
-/*Add the blocks used by filename to the free list*/
-void
-ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
-{
-	u_int8_t sectors_per_cluster;
-	ntfs_inode *ni, *ni_root;
-	ntfs_attr *na;
-	MFT_REF File;
-	runlist_element *rl;
-	int ulen;
-	uchar_t *ufilename;
-	int i;
-	int amount_skipped;
-
-	/*Goal: Get MFT_REF for filename before we can call ntfs_inode_open
-	        on the file.*/
-	if(!(ni_root = ntfs_inode_open(vol, FILE_root))) {
-		perror("Opening file $ROOT failed\n");
-		ntfs_umount(vol,TRUE);
-		exit(1);
-	}
-	/* Subgoal: get the uchar_t name for filename */
-	ufilename = malloc(sizeof(uchar_t)*(strlen(filename)+1));
-	if(!ufilename) {
-		fprintf(stderr, "Out of memory\n");
-		exit(1);
-	}
-	bzero(ufilename,sizeof(uchar_t)*strlen(filename)+1);
-	ulen = ntfs_mbstoucs(filename, &ufilename, strlen(filename)+1);
-	if(ulen == -1) {
-		perror("ntfs_mbstoucs failed");
-		exit(1);
-	}
-	File = ntfs_inode_lookup_by_name(ni_root, ufilename, ulen);
-	if(IS_ERR_MREF(File)) {
-		if (debug > 1) {
-			fprintf(stderr, "%s does not exist so there is no need "
-				"to skip the file.\n", filename);
-		}
-		return;
-	}
-  	free(ufilename);
-	ufilename = NULL;
-	if(debug > 1 ) fprintf(stderr,"vol->nr_mft_records==%lld\n",
-			       vol->nr_mft_records);
-	/*Goal: Skip the file*/
-	if(!(ni = ntfs_inode_open(vol, File))) {
-	  perror("calling ntfs_inode_open (0)");
-	  ntfs_umount(vol,TRUE);
-	  exit(1);
-	}
-	if(!(na = ntfs_attr_open(ni, AT_DATA, NULL, 0))) {
-		perror("Opening attribute $DATA failed\n");
-		ntfs_umount(vol,TRUE);
-		exit(1);
-	}
-	assert(NAttrNonResident(na) && "You are trying to skip a file that is "
-	       "small enough to be resident inside the Master File Table. "
-	       "This is a bit silly.");
-	/*Goal: Find out what clusters on the disk are being used by filename*/
-	sectors_per_cluster = vol->cluster_size / vol->sector_size;
-	if(!(rl = ntfs_attr_find_vcn(na, 0))) {
-	    perror("Error calling ntfs_attr_find_vcn");
-	    exit(1);
-	}
-	amount_skipped = 0;
-	for(i=0; rl[i].length != 0; i++) {
-		if (rl[i].lcn == LCN_HOLE) {
-		    if (debug > 1) {
-			fprintf(stderr, "LCN_HOLE\n");
-		    }
-		    continue;
-		}
-		if (rl[i].lcn == LCN_RL_NOT_MAPPED) {
-		    /* Pull in more of the runlist because the NTFS library
-		       might not pull in the entire runlist when you ask
-		       for it.  When I asked the NTFS library folks why they
-		       do this they said it was for performance reasons. */
-		    if (debug > 1) {
-			fprintf(stderr, "LCN_RL_NOT_MAPPED\n");
-		    }
-		    if (ntfs_attr_map_runlist(na, rl[i].vcn) == -1) {
-			perror("ntfs_attr_map_runlist failed\n");
-			exit(1);
-		    } else {
-			rl = ntfs_attr_find_vcn(na, 0);
-			/* There *might* be a memory leak here.  I don't
-			   know if rl needs to be freed by us or not. */
-			if(!rl) {
-			    perror("Error calling ntfs_attr_find_vcn");
-			    exit(1);
-			}
-			/*retry*/
-			--i;
-			continue;
-		    }
-		}
-		if (debug > 1) {
-		    fprintf(stderr, "For file %s skipping:%lld length:%lld\n",
-			    filename,
-			    (long long int)rl[i].lcn*sectors_per_cluster +
-			    offset,
-			    (long long int)rl[i].length*sectors_per_cluster);
-		}
-		assert(rl[i].length > 0 && "Programming error");
-		assert(rl[i].lcn > 0 &&
-		       "Programming error: Not catching NTFS Lib error value");
-		amount_skipped += rl[i].length*sectors_per_cluster;
-		addskip(rl[i].lcn*sectors_per_cluster + offset,
-			rl[i].length*sectors_per_cluster);
-	}
-	if (debug) {
-	    fprintf(stderr, "For NTFS file %s skipped %d bytes\n", filename,
-		    amount_skipped*512);
-	}
-}
-
-/*
- * Primary function to call to operate on an NTFS slice.
- */
-int
-read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
-{
-	ntfs_inode     *ni_bitmap;
-	ntfs_attr      *na_bitmap;
-	void           *buf;
-	struct ntfs_cluster *cfree;
-  	struct ntfs_cluster *tmp;
-	char           *name;
-	ntfs_volume    *vol;
-
-	/* Check to make sure the types the NTFS lib defines are what they
-	   claim*/
-	assert(sizeof(s64) == 8);
-	assert(sizeof(s32) == 4);
-	assert(sizeof(u64) == 8);
-	assert(sizeof(u32) == 4);
-	/*Our NTFS Library code needs the /dev name of the partition to
-	 * examine.  The following line is FreeBSD specific code.*/
-	if (slice < 0)
-		name = openname;
-	else
-		name = slicename(start, size, DOSPTYP_NTFS);
-	if (name == NULL) {
-		fprintf(stderr,
-			"Could not locate special file for NTFS slice %d\n",
-			slice+1);
-		return 1;
-	}
-	if (debug)
-		fprintf(stderr, "Using %s for NTFS slice %d\n", name, slice+1);
-	/*The volume must be mounted to find out what clusters are free*/
-	if(!(vol = ntfs_mount(name, MS_RDONLY))) {
-		perror(name);
-		fprintf(stderr, "Failed to read superblock information.  "
-			"Not a valid NTFS partition\n");
-		return 1;
-	}
-	/*A bitmap of free clusters is in the $DATA attribute of the
-	 *  $BITMAP file*/
-	if(!(ni_bitmap = ntfs_inode_open(vol, FILE_Bitmap))) {
-		perror("Opening file $BITMAP failed\n");
-		ntfs_umount(vol, TRUE);
-		return 1;
-	}
-	if(!(na_bitmap = ntfs_attr_open(ni_bitmap, AT_DATA, NULL, 0))) {
-		perror("Opening attribute $DATA failed\n");
-		return 1;
-	}
-	buf = ntfs_read_data_attr(na_bitmap);
-	cfree = ntfs_compute_freeblocks(na_bitmap,buf,vol->nr_clusters);
-	ntfs_addskips(vol,cfree,start);
-	if(debug > 1) {
-		fprintf(stderr, "  P%d (NTFS v%u.%u)\n",
-			slice + 1 /* DOS Numbering */,
-			vol->major_ver,vol->minor_ver);
-		fprintf(stderr, "        %s",name);
-		fprintf(stderr, "      start %10d, size %10d\n", start, size);
-		fprintf(stderr, "        Sector size: %u, Cluster size: %u\n",
-			vol->sector_size, vol->cluster_size);
-		fprintf(stderr, "        Volume size in clusters: %qd\n",
-			vol->nr_clusters);
-		fprintf(stderr, "        Free clusters:\t\t %u\n",
-			ntfs_freeclusters(cfree));
-	}
-
-      	ntfs_skipfile(vol, "pagefile.sys", start);
-      	ntfs_skipfile(vol, "hiberfil.sys", start);
-
-	/*We have the information we need so unmount everything*/
-	ntfs_attr_close(na_bitmap);
-	if(ntfs_inode_close(ni_bitmap)) {
-		perror("ntfs_close_inode ni_bitmap failed");
-		return 1;
-	}
-	if(ntfs_umount(vol,FALSE)) {
-		perror("ntfs_umount failed");
-		return 1;
-	}
-	/*Free NTFS malloc'd memory*/
-	assert(buf && "Programming Error, buf should be freed here");
-	free(buf);
-	assert(cfree && "Programming Error, "
-	       "'struct cfree' should be freed here");
-	while(cfree) {
-		tmp = cfree->next;
-		free(cfree);
-		cfree = tmp;
-	}
-	return 0; /*Success*/
-}
-#endif
 
 /*
  * For a raw image (something we know nothing about), we report the size
@@ -1838,8 +779,8 @@ char *usagestr =
  " -d             Turn on debugging.  Multiple -d options increase output\n"
  " -b             FreeBSD slice only.  Input must be a FreeBSD FFS slice\n"
  " -l             Linux slice only.  Input must be a Linux EXT2FS slice\n"
- " -n             NTFS slice only.  Input must be an NTFS slice\n";
-
+ " -n             NTFS slice only.  Input must be an NTFS slice\n"
+ " -S DOS-ptype   Treat the input device as containing a slice of the given type\n";
 
 void
 usage()
@@ -1885,13 +826,13 @@ dumpskips(int verbose)
 			inputminsec, inputmaxsec);
 		fprintf(stderr, "Skip ranges (start/size) in sectors:\n");
 	}
-	
+
 	pskip = skips;
 	while (pskip) {
-		assert(pskip->start >= offset);
 		if (verbose)
 			fprintf(stderr,
 				"  %12d    %9d\n", pskip->start, pskip->size);
+		assert(pskip->start >= offset);
 		offset = pskip->start + pskip->size;
 		total += pskip->size;
 		pskip  = pskip->next;

@@ -14,6 +14,7 @@
 .Op Fl dhiorv
 .Op Fl I Ar slice
 .Op Fl R Ar slice
+.Op Fl S Ar DOS-ptype
 .Op Fl s Ar slice
 .Op Fl z Ar level
 .Ar device
@@ -87,10 +88,11 @@ The slice is skipped.
 will attempt to locate a BSD partition table and process each BSD
 partition in turn.  If no partition table is found,
 .Nm
-fails.  Within a BSD slice, filesystem partitions are smartly compressed,
-unused and swap partitions are skipped, and all others are
-compressed conventionally.
-.Em This has only been tested with FreeBSD .
+fails.  Within a BSD slice, UFS1 and UFS2 filesystem partitions are smartly
+compressed, unused and swap partitions are skipped, and all others are
+compressed conventionally.  UFS2 is currently only used in FreeBSD 5.x
+systems, all others use UFS1.
+.Em Support for this BSD slice type has only been tested with FreeBSD .
 .It Sy Linux filesystem
 (131).
 If the slice contains a Linux EXT2FS, it is smartly compressed.
@@ -296,6 +298,19 @@ Incompatible with
 .Fl f
 and
 .Fl l .
+.It Fl S Ar DOS-ptype
+Tells
+.Nm
+that
+.Ar device
+is a slice of the indicated type.  This is the generalized form of the
+deprecated
+.Fl b ,
+.Fl l ,
+and
+.Fl n
+options.  Should be used when the device does not contain a DOS partition
+table and really does contain data of the appropriate type.
 .It Fl X
 Try e(X)tremely hard to read data from the input device,
 returning success even if a read fails.

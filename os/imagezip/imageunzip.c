@@ -403,7 +403,8 @@ usage(void)
 		"                 NOTE: Use -z/-p to avoid seeking.\n"
 		" -o              Output 'dots' indicating progress\n"
 		" -n              Single threaded (slow) mode\n"
-		" -d              Turn on progressive levels of debugging\n");
+		" -d              Turn on progressive levels of debugging\n"
+		" -W size         MB of memory to use for write buffering\n");
 	exit(1);
 }	
 
@@ -1244,17 +1245,7 @@ writedata(off_t offset, size_t size, void *buf)
 }
 
 #ifndef linux
-/*
- * DOS partition table handling
- */
-struct doslabel {
-	char		align[sizeof(short)];	/* Force alignment */
-	char		pad2[DOSPARTOFF];
-	struct dos_partition parts[NDOSPART];
-	unsigned short  magic;
-};
-#define DOSPARTSIZE \
-	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+#include "sliceinfo.h"
 
 static long long outputmaxsize = 0;
 
