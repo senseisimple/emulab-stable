@@ -135,6 +135,12 @@ define("TBDB_IFACEROLE_FAKE",		"fake");
 define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
 
+# User Interface types
+define("TBDB_USER_INTERFACE_EMULAB",	"emulab");
+define("TBDB_USER_INTERFACE_PLAB",	"plab");
+$TBDB_USER_INTERFACE_LIST = array(TBDB_USER_INTERFACE_EMULAB,
+				  TBDB_USER_INTERFACE_PLAB);
+
 # Some regex functions to check various arguments
 function TBvalid_uid($uid) {
     global $TBDB_UIDLEN, $TBDB_MINLEN;
@@ -1724,6 +1730,20 @@ function TBGetExptIdleIgnore($pid,$eid) {
     return $row[idle_ignore];
 }
 
+#
+# Get the default user interface that has been selected for the project.
+#
+function TBGetDefaultProjectUserInterface($pid) {
+    $query_result =
+	DBQueryWarn("select default_user_interface from projects ".
+		    "where pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[0];
+}
 
 #
 # Check if a site-specific variable exists. 

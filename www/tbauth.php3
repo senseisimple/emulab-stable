@@ -148,7 +148,7 @@ function CHECKLOGIN($uid) {
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
-		     "       plab_user, n.type " .
+		     "       user_interface, n.type " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -180,7 +180,7 @@ function CHECKLOGIN($uid) {
 	}
 	$adminoff = $row[7];
 	$webonly  = $row[8];
-	$plab     = $row[9];
+	$interface= $row[9];
 
 	$type     = $row[10];
 
@@ -294,7 +294,7 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
     if ($cvsweb)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_CVSWEB;
-    if ($plab)
+    if ($interface == TBDB_USER_INTERFACE_PLAB)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_PLABUSER;
     if (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_NEWUSER;
@@ -436,14 +436,14 @@ function ISPLABUSER() {
 	    return 0;
 	}
 	$query_result =
-	    DBQueryFatal("SELECT plab_user FROM users WHERE uid='$uid'");
+	    DBQueryFatal("SELECT user_interface FROM users WHERE uid='$uid'");
 	if (!mysql_num_rows($query_result)) {
 	    return 0;
 	}
 
 	$row = mysql_fetch_row($query_result);
 	if ($row[0]) {
-	    return 1;
+	    return ($row[0] == TBDB_USER_INTERFACE_PLAB);
 	} else {
 	    return 0;
 	}

@@ -202,7 +202,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	# 1. For our benefit
 	$$foo = $approval;
 	
-	# 2. For the strcmp below's benefit
+	# 2. For the strcmp below.
 	$default_approval = $approval;
 
 	# 3. For the sanity check
@@ -443,7 +443,12 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
 	        TBERROR("Invalid $user status $curstatus in approveuser.php3",
                          1);
 	    }
-	    DBQueryFatal("UPDATE users set status='$newstatus' ".
+	    if (!($user_interface = TBGetDefaultProjectUserInterface($project)))
+		$user_interface = TBDB_USER_INTERFACE_EMULAB;
+	    
+	    DBQueryFatal("UPDATE users set ".
+			 "       status='$newstatus', ".
+			 "       user_interface='$user_interface' ".
 			 "WHERE uid='$user'");
 
             #

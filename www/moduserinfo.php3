@@ -255,9 +255,9 @@ function SPITFORM($formfields, $errors)
              </tr>\n";
 
         #
-	# Planetlab bit
+	# Planetlab bit. This should really be a drop down menu of the choices.
 	#
-	if ($formfields['plab_user']) {
+	if ($formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
 	    $checked = "checked";
 	} else {
 	    $checked = "";
@@ -266,8 +266,10 @@ function SPITFORM($formfields, $errors)
 	echo "<tr>
 		  <td colspan=2>Use simplified PlanetLab view:</td>
 		  <td class=left>
-		     <input type='checkbox' name=\"formfields[plab_user]\" value='1'
-			 $checked>
+		     <input type='checkbox'
+                            name=\"formfields[user_interface]\"
+                            value=\"" . TBDB_USER_INTERFACE_PLAB . "\"
+			    $checked>
 		  </td>
 	      </tr>\n";
 
@@ -388,7 +390,7 @@ $defaults[usr_title]   = $row[usr_title];
 $defaults[usr_affil]   = $row[usr_affil];
 $defaults[usr_shell]   = $row[usr_shell];
 $defaults[notes]       = $row[notes];
-$defaults[plab_user]   = $row[plab_user];
+$defaults[user_interface] = $row[user_interface];
 
 #
 # On first load, display a form consisting of current user values, and exit.
@@ -605,10 +607,12 @@ if ($isadmin &&
 #
 # Change the plab bit to a simple 1 or 0
 #
-if ($formfields[plab_user]) {
-    $plab_bit = 1;
-} else {
-    $plab_bit = 0;
+if (isset($formfields[user_interface]) &&
+    $formfields[user_interface] == TBDB_USER_INTERFACE_PLAB) {
+    $user_interface = TBDB_USER_INTERFACE_PLAB;
+}
+else {
+    $user_interface = TBDB_USER_INTERFACE_EMULAB;
 }
 
 #
@@ -628,7 +632,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     strcmp($defaults[usr_title], $formfields[usr_title]) ||
     strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
     strcmp($defaults[usr_shell], $formfields[usr_shell]) ||
-    strcmp($defaults[plab_user], $formfields[plab_user]) ||
+    strcmp($defaults[user_interface], $formfields[user_interface]) ||
     # Check this too, since we want to call out if the email addr changed.
     strcmp($defaults[usr_email], $formfields[usr_email])) {
 
@@ -645,7 +649,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 		 "usr_title=\"$usr_title\",     ".
 		 "usr_affil=\"$usr_affil\",     ".
 		 "usr_shell=\"$usr_shell\",     ".
-		 "plab_user=\"$plab_bit\",	".
+		 "user_interface=\"$user_interface\",	".
 		 "usr_modified=now()            ".
 		 "WHERE uid=\"$target_uid\"");
 

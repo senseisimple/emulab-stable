@@ -50,6 +50,11 @@ if (isset($head_uid) && strcmp($head_uid,"")) {
 	    "gid='$pid'");
 }
 
+if (!isset($user_interface) ||
+    !in_array($user_interface, $TBDB_USER_INTERFACE_LIST)) {
+    $user_interface = TBDB_USER_INTERFACE_EMULAB;
+}
+
 #
 # Get the current status for the headuid, which we might need to change
 # anyway, and to verify that the user is a valid user. We also need
@@ -178,10 +183,10 @@ elseif (strcmp($approval, "approve") == 0) {
 	    TBERROR("Invalid $headuid status $curstatus in ".
                     "approveproject.php3", 1);
         }
-	DBQueryFatal("UPDATE users set status='$newstatus' ".
+	DBQueryFatal("UPDATE users set status='$newstatus', ".
+		     "       user_interface='$user_interface' ".
 		     "WHERE uid='$headuid'");
     }
-
 
     #
     # Change the trust value in group_membership to group_root, and set the
@@ -191,7 +196,9 @@ elseif (strcmp($approval, "approve") == 0) {
 		 "set trust='project_root',date_approved=now() ".
 		 "WHERE uid='$headuid' and pid='$pid' and gid='$pid'");
 
-    DBQueryFatal("UPDATE projects set approved='1' WHERE pid='$pid'");
+    DBQueryFatal("update projects set approved='1', ".
+		 "       default_user_interface='$user_interface' ".
+		 "where pid='$pid'");
 
     #
     # XXX

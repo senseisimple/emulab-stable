@@ -156,6 +156,20 @@ echo "        </select>
           </td>
        </tr>\n";
 
+#
+# Set the user interface.
+#
+echo "<tr>
+          <td align=center>
+              Default User Interface:
+              <select name=user_interface>\n";
+
+foreach ($TBDB_USER_INTERFACE_LIST as $interface) {
+    echo "            <option value='$interface'>$interface</option>\n";
+}
+echo "        </select>
+          </td>
+       </tr>\n";
 
 #
 # XXX
