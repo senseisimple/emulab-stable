@@ -23,9 +23,20 @@ CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 CFLAGS	       += -I${SRCDIR}/../mtp
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
-LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
+ifeq ($(SYSTEM),Linux)
+CFLAGS	       += -I${SRCDIR}/../mezzanine/libmezz -I${SRCDIR}/../mezzanine/mezzanine
+CFLAGS         += -DHAVE_MEZZANINE
+endif
 
-LIBS	 += -lmtp -ltb -lm
+LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib 
+ifeq ($(SYSTEM),Linux)
+LDFLAGS		= -L../mezzanine/libmezz
+endif
+
+LIBS	 += -lmtp -ltb -lm 
+ifeq ($(SYSTEM),Linux)
+LIBS     += -lmezz
+endif
 
 test_vmc-client.sh: vmc-client
 
