@@ -17,15 +17,19 @@
 #define TESTMODE
 #define VERSION		2
 #define NETMASK		"255.255.255.0"
-#ifndef TBDBNAME
-#define TBDBNAME	"tbdb"	/* Defined in configure */
-#endif
-#define DBNAME		TBDBNAME
 
+/* Defined in configure and passed in via the makefile */
+#define DBNAME_SIZE	64
+#define DEFAULT_DBNAME	TBDBNAME
+
+static int	debug = 0;
+static int	portnum = TBSERVER_PORT;
+static char     dbname[DBNAME_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid);
 static int	iptonodeid(struct in_addr ipaddr, char *bufp);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
+static int	checkdbredirect(struct in_addr ipaddr);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
@@ -72,12 +76,44 @@ struct command {
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
+char *usagestr = 
+ "usage: tmcd [-d] [-p #]\n"
+ " -d              Turn on debugging. Multiple -d options increase output\n"
+ " -p portnum	   Specify a port number to listen on\n"
+ "\n";
+
+void
+usage()
+{
+	fprintf(stderr, usagestr);
+	exit(1);
+}
+
 int
 main(int argc, char **argv)
 {
-	int			tcpsock, udpsock;
+	int			tcpsock, udpsock, ch;
 	int			length, i, err = 0;
 	struct sockaddr_in	name;
+
+	while ((ch = getopt(argc, argv, "dp:")) != -1)
+		switch(ch) {
+		case 'p':
+			portnum = atoi(optarg);
+			break;
+		case 'd':
+			debug++;
+
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
+
+	if (argc)
+		usage();
 
 	openlog("tmcd", LOG_PID, LOG_USER);
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
@@ -105,7 +141,7 @@ main(int argc, char **argv)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = htons(TBSERVER_PORT);
+	name.sin_port = htons((u_short) portnum);
 	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
 		syslog(LOG_ERR, "binding stream socket: %m");
 		exit(1);
@@ -141,7 +177,7 @@ main(int argc, char **argv)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = htons(TBSERVER_PORT);
+	name.sin_port = htons((u_short) portnum);
 	if (bind(udpsock, (struct sockaddr *) &name, sizeof(name))) {
 		syslog(LOG_ERR, "binding stream socket: %m");
 		exit(1);
@@ -157,9 +193,8 @@ main(int argc, char **argv)
 
 	while (1) {
 		struct sockaddr_in client;
-#ifdef TESTMODE
-		struct sockaddr_in oclient;
-#endif
+		struct sockaddr_in redirect_client;
+		int		   redirect = 0;
 		int		   clientsock, length = sizeof(client);
 		char		   buf[MYBUFSIZE], *bp, *cp;
 		int		   cc, nfds, istcp;
@@ -211,26 +246,61 @@ main(int argc, char **argv)
 
 		buf[cc] = '\0';
 		bp = buf;
-#ifdef TESTMODE
+
 		/*
-		 * Allow remote end to be specified for testing.
+		 * Look for REDIRECT, which is a proxy request for a
+		 * client other than the one making the request. Good
+		 * for testing. Might become a general tmcd redirect at
+		 * some point, so that we can test new tmcds.
 		 */
-		oclient = client;
-		if (strncmp("MYIP=", buf, strlen("MYIP=")) == 0) {
+		if (strncmp("REDIRECT=", buf, strlen("REDIRECT=")) == 0) {
 			char *tp;
 			
-			bp += strlen("MYIP=");
+			bp += strlen("REDIRECT=");
 			tp = bp;
 			while (! isspace(*tp))
 				tp++;
 			*tp++ = '\0';
+			redirect_client = client;
+			redirect        = 1;
 			inet_aton(bp, &client.sin_addr);
 			bp = tp;
 		}
-#endif
 		cp = (char *) malloc(cc + 1);
 		assert(cp);
 		strcpy(cp, bp);
+		
+#ifndef	TESTMODE
+		/*
+		 * IN TESTMODE, we allow redirect.
+		 * Otherwise not since that would be a (minor) privacy
+		 * risk, by allowing testbed nodes to get info for other
+		 * nodes.
+		 */
+		if (redirect) {
+			char	buf1[32], buf2[32];
+
+			strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
+			strcpy(buf2, inet_ntoa(client.sin_addr));
+			
+			syslog(LOG_INFO,
+			       "%s INVALID REDIRECT: %s", buf1, buf2);
+			goto skipit;
+		}
+#endif
+		/*
+		 * Check for a redirect using the default DB. This allows
+		 * for a simple redirect to a secondary DB for testing.
+		 * Not very general. Might change to full blown tmcd
+		 * redirection at some point, but this is a very quick and
+		 * easy hack. Upon return, the dbname has been changed if
+		 * redirection is in force. 
+		 */
+		strcpy(dbname, DEFAULT_DBNAME);
+		if (checkdbredirect(client.sin_addr)) {
+			/* Something went wrong */
+			goto skipit;
+		}
 		
 		/*
 		 * Figure out what command was given.
@@ -243,9 +313,11 @@ main(int argc, char **argv)
 		/*
 		 * And execute it.
 		 */
-		if (i == numcommands)
+		if (i == numcommands) {
 			syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
 			       inet_ntoa(client.sin_addr), cp);
+			goto skipit;
+		}
 		else {
 			bp = cp + strlen(command_array[i].cmdname);
 
@@ -270,10 +342,11 @@ main(int argc, char **argv)
 			       command_array[i].cmdname, err);
 		}
 
+	skipit:
 		free(cp);
-#ifdef TESTMODE
-		client = oclient;
-#endif
+		if (redirect) 
+			client = redirect_client;
+
 		if (istcp)
 			close(clientsock);
 		else
@@ -1408,15 +1481,15 @@ mydb_query(char *query, int ncols, ...)
 	}
 
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, DBNAME, 0, 0, 0) == 0) {
+	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
 		syslog(LOG_ERR, "%s: connect failed: %s",
-			DBNAME, mysql_error(&db));
+			dbname, mysql_error(&db));
 		return (MYSQL_RES *) 0;
 	}
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		syslog(LOG_ERR, "%s: query failed: %s",
-			DBNAME, mysql_error(&db));
+			dbname, mysql_error(&db));
 		mysql_close(&db);
 		return (MYSQL_RES *) 0;
 	}
@@ -1424,7 +1497,7 @@ mydb_query(char *query, int ncols, ...)
 	res = mysql_store_result(&db);
 	if (res == 0) {
 		syslog(LOG_ERR, "%s: store_result failed: %s",
-			DBNAME, mysql_error(&db));
+			dbname, mysql_error(&db));
 		mysql_close(&db);
 		return (MYSQL_RES *) 0;
 	}
@@ -1433,7 +1506,7 @@ mydb_query(char *query, int ncols, ...)
 	if (ncols && ncols != (int)mysql_num_fields(res)) {
 		syslog(LOG_ERR, "%s: Wrong number of fields returned "
 		       "Wanted %d, Got %d",
-			DBNAME, ncols, (int)mysql_num_fields(res));
+			dbname, ncols, (int)mysql_num_fields(res));
 		mysql_free_result(res);
 		return (MYSQL_RES *) 0;
 	}
@@ -1456,15 +1529,15 @@ mydb_update(char *query, ...)
 	}
 
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, DBNAME, 0, 0, 0) == 0) {
+	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
 		syslog(LOG_ERR, "%s: connect failed: %s",
-			DBNAME, mysql_error(&db));
+			dbname, mysql_error(&db));
 		return 1;
 	}
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		syslog(LOG_ERR, "%s: query failed: %s",
-			DBNAME, mysql_error(&db));
+			dbname, mysql_error(&db));
 		mysql_close(&db);
 		return 1;
 	}
@@ -1592,6 +1665,56 @@ nodeidtocontrolnet(char *nodeid, int *net)
 	mysql_free_result(res);
 	*net = atoi(row[0]);
 
+	return 0;
+}
+
+/*
+ * Check for DBname redirection.
+ */
+static int
+checkdbredirect(struct in_addr ipaddr)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		newdb[128];
+	
+	/*
+	 * Find the nodeid.
+	 */
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Look for an alternate DB name.
+	 */
+	res = mydb_query("select dbname from tmcd_redirect where node_id='%s'",
+			 1, nodeid);
+			 
+	if (!res) {
+		syslog(LOG_ERR, "CHECKDBREDIRECT: "
+		       "%s: DB Error getting redirect table!", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res)) {
+		row = mysql_fetch_row(res);
+		strcpy(dbname, row[0]);
+	}
+
+	/*
+	 * Okay, lets test to make sure that DB exists. If not, fall back
+	 * on the main DB. 
+	 */
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: %s DB does not exist",
+		       inet_ntoa(ipaddr), dbname);
+		strcpy(dbname, DEFAULT_DBNAME);
+	}
+	mysql_free_result(res);
 	return 0;
 }
  
