@@ -3,7 +3,7 @@ use English;
 use Getopt::Std;
    
 #
-# XXX Paper and plastic IP addresses wired into the kernel choice.
+# XXX boss.emulab.net and users.emulab.net wired in. 
 #     Path to netdisk is wired in (should come from os_info table).
 #     wd0 wired in. Should come from node_types table in DB
 # 
@@ -34,9 +34,9 @@ my $TB		= "@prefix@";
 push(@INC, "$TB/lib");
 require libdb;
 
-my $NETDISK     = "/tftpboot/netdisk";
-my $PAPERADDR	= "boss.emulab.net";
-my $PLASTICADDR	= "users.emulab.net";
+my $BOSSADDR	= "boss.emulab.net";
+my $USERADDR	= "users.emulab.net";
+my $NETDISK     = "$BOSSADDR:/tftpboot/netdisk";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $dbg		= 0;
 my @row;
@@ -156,10 +156,10 @@ if ($imagepid) {
     if (! ($imagepath =~ /^\/proj\//)) {
 	die("Your image must reside in /proj\n");
     }
-    $cmdline = "${PLASTICADDR}:$imagepath $diskpart";    
+    $cmdline = "${USERADDR}:$imagepath $diskpart";    
 }
 else {
-    $cmdline = "${PAPERADDR}:$imagepath $diskpart";
+    $cmdline = "${BOSSADDR}:$imagepath $diskpart";
 }
 
 #
