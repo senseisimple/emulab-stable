@@ -172,7 +172,7 @@ if ($num_ron || $num_pcplab) {
 	if ($num_ron) {
 		echo "<input type=checkbox value=Yep checked
                                  name=ron_okay>
-                                 Allow RON &nbsp\n";
+                                 Allow RON (PCWA) &nbsp\n";
 	}
 	echo "   </td>
               </tr>\n";

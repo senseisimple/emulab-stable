@@ -206,9 +206,11 @@ elseif (strcmp($approval, "approve") == 0) {
 	!strcmp($pcplab_okay, "Yep")) {
 	    $pcremote_ok[] = "pcplab";
     }
+    # RON implies pcwa too.
     if (isset($ron_okay) &&
 	!strcmp($ron_okay, "Yep")) {
 	    $pcremote_ok[] = "pcron";
+	    $pcremote_ok[] = "pcwa";
     }
     if (count($pcremote_ok)) {
 	    $foo = implode(",", $pcremote_ok);
