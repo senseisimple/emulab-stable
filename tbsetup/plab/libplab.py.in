@@ -182,6 +182,13 @@ def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
     return 1
 
 #
+# Print out a timestamp with optional message
+#
+def TIMESTAMP(msgstr = ""):
+    mytime = time.strftime("%H:%M:%S")
+    print "TIMESTAMP: %s %s" % (mytime, msgstr)
+    
+#
 # Termination signals, and global var to track if we got one when
 # they are disabled with disable_sigs
 #
@@ -1196,6 +1203,8 @@ class Node:
         
         tries = DEF_TRIES
         while 1:
+            TIMESTAMP("createnode %s try %d started." % (self.nodeid,
+                                                        DEF_TRIES-tries+1))
             try:
                 self.leasedata = tryXmlrpcCmd(nodemgr.newleasevm,
                                               (self.ticketdata,
@@ -1243,6 +1252,7 @@ class Node:
                       self.slice.slicename, self.nodeid,
                       self.ticketdata, self.leasedata,
                       self.lease.end_time))
+        TIMESTAMP("createnode %s finished." % self.nodeid)
 
 
     def _load(self):
@@ -1303,6 +1313,8 @@ class Node:
 
         tries = DEF_TRIES
         while 1:
+            TIMESTAMP("freenode %s try %d started." % (self.nodeid,
+                                                       DEF_TRIES-tries+1))
             try:
                 tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
                              inittries = tries, raisefault = 1)
@@ -1327,6 +1339,7 @@ class Node:
                 deleted = 1
                 break
 
+        TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
 
     def addKey(self, identityfile):
@@ -1370,6 +1383,8 @@ class Node:
 
         tries = DEF_TRIES
         while 1:
+            TIMESTAMP("renewnode %s try %d started." % (self.nodeid,
+                                                        DEF_TRIES-tries+1))
             try:
                 self.leasedata = tryXmlrpcCmd(nodemgr.renewlease,
                                               self.slice.slicename,
@@ -1395,6 +1410,7 @@ class Node:
                      " set leasedata = %s, leaseend = %s"
                      " where node_id = %s",
                      (self.leasedata, self.lease.end_time, self.nodeid))
+        TIMESTAMP("renewnode %s finished." % self.nodeid)
         return 0
 
     def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
@@ -1404,11 +1420,13 @@ class Node:
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
+        TIMESTAMP("emulabify %s started." % self.nodeid)
         print "Overlaying Emulab files on %s ..." % self.nodeid
         self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
         self.__perform("-tt sh /tmp/fixsudo.sh")
         self.addToGroup(self.slice.slicename, "root")
         self.unpackTgz(rootballpath, rootballname)
+        TIMESTAMP("emulabify %s finished." % self.nodeid)
 
     def addToGroup(self, user, group):
         if verbose:
