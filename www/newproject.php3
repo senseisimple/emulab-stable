@@ -280,7 +280,7 @@ if (! $returning) {
 #
 # Now give the user some warm fuzzies
 #
-echo "<center><h1>Project '$pid' successfully added.</h1></center>
+echo "<center><h1>Project '$pid' successfully queued.</h1></center>
       Testbed Operations has been notified of your application.
       Most applications are reviewed within one week. We will notify
       you by e-mail at '$usr_name&nbsp;&lt;$usr_email>' of their decision
