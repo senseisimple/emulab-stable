@@ -166,7 +166,7 @@ void print_solution_summary()
 	  feature_it != pnode->features.end();++feature_it) {
 	if ((feature_it->first[0] == '?') && (feature_it->first[1] == '+')) {
 	  double remaining = feature_it->second; 
-	  cerr << "    " << feature_it->first << ":" << remaining << endl;
+	  cout << "    " << feature_it->first << ":" << remaining << endl;
 	}
       }
     }
