@@ -2342,9 +2342,9 @@ class experiment:
             return permerror
 
         #
-        # We return the result as a string. Yucky.
+        # We return the result as a list of lists.
         #
-        result = "";
+        result = []
 
 	res = DBQuery("select vi.vname,vi.vnode,r.node_id,o.type "
                       " from virt_agents as vi "
@@ -2377,16 +2377,10 @@ class experiment:
                 nodeid = agent[2]
                 pass 
             
-            if not result == "":
-                result = result + "\n"
-                pass
-            
-            result = result + agent[0] + "," + agent[1] + "," 
-            result = result + nodeid + "," + ipaddr + "," + agent[3]
+            result.append((agent[0], agent[1], nodeid, ipaddr, agent[3]))
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=result,
-                              output=str(result))
+        return EmulabResponse(RESPONSE_SUCCESS, value=result)
     
     #
     # Get event group list for event scheduler.
@@ -2413,24 +2407,19 @@ class experiment:
             return permerror
 
         #
-        # We return the result as a string. Yucky.
+        # We return the result as a list of lists.
         #
-        result = "";
+        result = []
 
 	res = DBQuery("select group_name,agent_name from event_groups "
                       "where pid=%s and eid=%s",
                       (argdict["proj"], argdict["exp"]))
 
         for group in res:
-            if not result == "":
-                result = result + "\n"
-                pass
-            
-            result = result + group[0] + "," + group[1]
+            result.append((group[0], group[1]))
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=result,
-                              output=str(result))
+        return EmulabResponse(RESPONSE_SUCCESS, value=result)
     
     #
     # Get event list for event scheduler.
@@ -2457,9 +2446,9 @@ class experiment:
             return permerror
 
         #
-        # We return the result as a string. Yucky.
+        # We return the result as a list of lists.
         #
-        result = "";
+        result = []
 
 	res = DBQuery("select ex.idx,ex.time,ex.vname,"
                       " ot.type,et.type,ex.arguments from eventlist as ex "
@@ -2472,17 +2461,11 @@ class experiment:
                       (argdict["proj"], argdict["exp"]))
 
         for event in res:
-            if not result == "":
-                result = result + "\n"
-                pass
-            
-            result = result + str(event[0]) + "," + str(event[1]) + ","
-            result = result + event[2] + "," + event[3] + ","
-            result = result + event[4] + "," + event[5]
+            result.append((str(event[0]), str(event[1]), event[2],
+                           event[3], event[4], event[5]));
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=result,
-                              output=str(result))
+        return EmulabResponse(RESPONSE_SUCCESS, value=result)
     
     pass
 
