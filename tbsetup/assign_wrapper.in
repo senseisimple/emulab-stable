@@ -906,11 +906,12 @@ foreach $vnodeport (keys(%portmap)) {
     }
     # End Shark Hack
 }
-# Load delay_osids for types
-$sth = $dbh->prepare("SELECT type,delay_osid from node_types");
+# Load delay_osids and default osids for types
+$sth = $dbh->prepare("SELECT type,delay_osid,osid from node_types");
 $sth->execute;
-while (($type,$delayosid) = $sth->fetchrow_array) {
+while (($type,$delayosid,$defosid) = $sth->fetchrow_array) {
     $delayosids{$type} = $delayosid;
+    $defosids{$type} = $defosid;
 }
 $sth->finish;
 @nodepairs = ();
@@ -935,8 +936,17 @@ foreach $pair (@nodepairs) {
     $sth->execute;
     # The if statement will cause us to skip nodes that belong to
     # the experiment but aren't virtual.  I.e. delay nodes.
+    # Figure out type of pnode
+    $sth2 = $dbh->prepare("SELECT type from nodes" .
+			  " where node_id=\"$pnode\"");
+    $sth2->execute;
+    my ($type) = $sth2->fetchrow_array;
+    $sth2->finish;
     if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,$failureaction) = 
 	$sth->fetchrow_array) {
+	if (!defined($osid) || $osid eq "") {
+	    $osid = $defosids{$type};
+	}
 	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"$osid\"," .
 		       " def_boot_cmd_line=\"$cmdline\"," .
 		       " startstatus=\"none\"," .
@@ -954,12 +964,6 @@ foreach $pair (@nodepairs) {
 	} 
     } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
 	# Delay node
-	# Figure out delay osid
-	$sth2 = $dbh->prepare("SELECT type from nodes" .
-			      " where node_id=\"$pnode\"");
-	$sth2->execute;
-	($type) = $sth2->fetchrow_array;
-	$sth2->finish;
 	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"" .
 		       $delayosids{$type} . "\"," .
 		       " startstatus=\"none\"," .
