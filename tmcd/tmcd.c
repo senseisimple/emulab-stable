@@ -3632,10 +3632,16 @@ COMMAND_PROTOTYPE(doisalive)
 	int		doaccounts = 0;
 	char		buf[MYBUFSIZE];
 
-	mydb_update("update nodes "
-		    "set status='up',status_timestamp=now() "
-		    "where node_id='%s' or phys_nodeid='%s'",
-		    nodeid, nodeid);
+	/*
+	 * Only for remote nodes now; local node status determined with
+	 * with fping via db/node_status script. Need to replace that.
+	 */
+	if (! islocal) {
+	    mydb_update("update nodes "
+			"set status='up',status_timestamp=now() "
+			"where node_id='%s' or phys_nodeid='%s'",
+			nodeid, nodeid);
+	}
 
 	/*
 	 * Return info about what needs to be updated. 
@@ -3815,7 +3821,8 @@ COMMAND_PROTOTYPE(dontpdrift)
 	}
 	mydb_update("update nodes set ntpdrift='%f' where node_id='%s'",
 		    drift, nodeid);
-
+	
+	info("NTPDRIFT: %f", drift);
 	return 0;
 }
 
