@@ -20,7 +20,7 @@
 #include <fcntl.h>
 
 #include "log.h"
-#include "mtp.h"
+//#include "mtp.h"
 #include <math.h>
 
 #include "mezz.h"
@@ -50,45 +50,45 @@ static void sigusr1(int signal)
     mezz_frame_count += 1;
 }
 
-#define ROBOT_HEIGHT 0.12f
+/* #define ROBOT_HEIGHT 0.12f */
 
-void radial_trans(struct robot_position *p_inout)
-{
-    float distance_from_center, theta, vtheta, offset;
-    struct robot_position dp;
-    struct robot_position rp;
+/* void radial_trans(struct robot_position *p_inout) */
+/* { */
+/*     float distance_from_center, theta, vtheta, offset; */
+/*     struct robot_position dp; */
+/*     struct robot_position rp; */
 
-    dp.x = 0.0;
-    dp.y = 0.0;
-    dp.theta = 0.0;
+/*     dp.x = 0.0; */
+/*     dp.y = 0.0; */
+/*     dp.theta = 0.0; */
     
-    rp = *p_inout;
+/*     rp = *p_inout; */
 
-    mtp_polar(&dp, &rp, &distance_from_center, &theta);
-    vtheta = atan2f(z_offset, distance_from_center);
-    offset = ROBOT_HEIGHT / tanf(vtheta);
-    mtp_cartesian(&dp, distance_from_center - offset, theta, p_inout);
-}
+/*     mtp_polar(&dp, &rp, &distance_from_center, &theta); */
+/*     vtheta = atan2f(z_offset, distance_from_center); */
+/*     offset = ROBOT_HEIGHT / tanf(vtheta); */
+/*     mtp_cartesian(&dp, distance_from_center - offset, theta, p_inout); */
+/* } */
 
 /**
  * Transform a local camera coordinate to a real world coordinate.
  *
  * @param p The position to transform.
  */
-void local2global_posit_trans(struct robot_position *p_inout)
-{
-    float old_x = p_inout->x;
+/* void local2global_posit_trans(struct robot_position *p_inout) */
+/* { */
+/*     float old_x = p_inout->x; */
     
-    assert(p_inout != NULL);
+/*     assert(p_inout != NULL); */
     
-    p_inout->x = p_inout->y + x_offset;
-    p_inout->y = old_x + y_offset;
-    p_inout->theta -= M_PI_2;
-}
+/*     p_inout->x = p_inout->y + x_offset; */
+/*     p_inout->y = old_x + y_offset; */
+/*     p_inout->theta -= M_PI_2; */
+/* } */
 
 void print_packets(mezz_mmap_t *mm)
 {
-    struct robot_position rp;
+/*     struct robot_position rp; */
     mezz_objectlist_t *mol;
     int lpc;
     int i,j;
@@ -108,74 +108,69 @@ void print_packets(mezz_mmap_t *mm)
 
     int found_first_blob = 0;
 
-    for (i = 0; i < mm->bloblist.count; ++i) {
-	if (found_first_blob) {
-	    break;
-	}
-	for (j = 0; j < mm->bloblist.count; ++j) {
-	    if (found_first_blob) {
-		break;
-	    }
-	    if (j != i) {
-		if (!done_blobs[i] && !done_blobs[j] &&
-		    mm->bloblist.blobs[i].object == 
-		      mm->bloblist.blobs[j].object ) {
-
-		    found_first_blob = 1;
-
-		    done_blobs[i] = done_blobs[j] = 1;
-
-		    // print out the blob centroids
-		    fprintf(output_FILE,
-			    "a(%f,%f) b(%f,%f)",
-			    mm->bloblist.blobs[i].ox,
-			    mm->bloblist.blobs[i].oy,
-			    mm->bloblist.blobs[j].ox,
-			    mm->bloblist.blobs[j].oy
-			    );
-
-		    fprintf(output_FILE,
-			    " -- wc(%f,%f,%f)\n",
-			    mol->objects[0].px,
-			    mol->objects[0].py,
-			    mol->objects[0].pa
-			    );
-		    fflush(stdout);
-		}
-	    }
+    for (i = 0; i < mm->objectlist.count; ++i) {
+	mezz_object_t *obj = &(mm->objectlist.objects[i]);
+	if (obj->valid) {
+	    fprintf(output_FILE,
+		    "[%d] a(%f,%f) b(%f,%f)",
+		    i,
+		    obj->ablob.ox,
+		    obj->ablob.oy,
+		    obj->bblob.ox,
+		    obj->bblob.oy
+		    );
+	    fprintf(output_FILE,
+		    " -- wc(%f,%f,%f)\n",
+		    obj->px,
+		    obj->py,
+		    obj->pa
+		    );
 	}
     }
 
-#if 0
-    for (lpc = 0; lpc < mol->count; ++lpc) {
-        if (mol->objects[lpc].valid) { /* Don't send meaningless data. */
+    // old "algorithm" for finding which blobs belong to which objects...
+    // faulty cause blobs aren't declared as valid/invalid like objects are.
 
-	    /* Copy the camera-coordinates, then */
-            rp.x = mol->objects[lpc].px;
-            rp.y = mol->objects[lpc].py;
-            rp.theta = mol->objects[lpc].pa;
+/*     for (i = 0; i < mm->bloblist.count; ++i) { */
+/* 	if (found_first_blob) { */
+/* 	    break; */
+/* 	} */
+/* 	for (j = 0; j < mm->bloblist.count; ++j) { */
+/* 	    if (found_first_blob) { */
+/* 		break; */
+/* 	    } */
+/* 	    if (j != i) { */
+/* 		if (!done_blobs[i] && !done_blobs[j] && */
+/* 		    mm->bloblist.blobs[i].object == */
+/* 		    mm->bloblist.blobs[j].object ) { */
 
-	    fprintf(output_FILE,"  - local[%d]:  x = %f, y = %f, theta = %f\n",
-		    lpc,rp.x,rp.y,rp.theta
-		    );
+/* 		    found_first_blob = 1; */
 
-	    radial_trans(&rp);
+/* 		    done_blobs[i] = done_blobs[j] = 1; */
 
-	    fprintf(output_FILE,
-		    "  - radial[%d]: x = %f, y = %f, theta = %f\n",
-		    lpc,rp.x,rp.y,rp.theta
-		    );
+/* 		    // print out the blob centroids */
+/* 		    fprintf(output_FILE, */
+/* 			    "a(%f,%f) b(%f,%f)", */
+/* 			    mm->bloblist.blobs[i].ox, */
+/* 			    mm->bloblist.blobs[i].oy, */
+/* 			    mm->bloblist.blobs[j].ox, */
+/* 			    mm->bloblist.blobs[j].oy */
+/* 			    ); */
 
-	    /* ... transform them into global coordinates. */
-            local2global_posit_trans(&rp);
+/* 		    fprintf(output_FILE, */
+/* 			    " -- wc(%f,%f,%f)\n", */
+/* 			    mol->objects[0].px, */
+/* 			    mol->objects[0].py, */
+/* 			    mol->objects[0].pa */
+/* 			    ); */
 
-	    fprintf(output_FILE,
-		    "  - global[%d]: x = %f, y = %f, theta = %f\n",
-		    lpc,rp.x,rp.y,rp.theta
-		    );
-         }
-    }
-#endif
+
+/* 		    fflush(output_FILE); */
+/* 		} */
+/* 	    } */
+/* 	} */
+/*     } */
+
 }
 
 void usage() {
@@ -263,7 +258,8 @@ int main(int argc, char *argv[])
     signal(SIGPIPE, SIG_IGN);
     
     if (mezz_init(0, mezz_file) == -1) {
-	errorc("unable to initialize mezzanine\n");
+	error("unable to initialize mezzanine\n");
+	//errorc("unable to initialize mezzanine\n");
 	exit(2);
     }
     mezzmap = mezz_mmap();
@@ -366,9 +362,9 @@ int main(int argc, char *argv[])
     default_section_title_len = section_counter;
     
     if (output_file != NULL) {
-	output_FILE = fopen(output_file,"a");
+	output_FILE = fopen(output_file,"w");
 	if (output_FILE == NULL) {
-	    error("error: could not open output file for appending\n");
+	    error("error: could not open output file for writing\n");
 	    exit(1);
 	}
     }
