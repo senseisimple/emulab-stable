@@ -1602,7 +1602,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table virt_lans add index vnode (pid,eid,vnode);
 
-
 1.251: Add floorimages and buildings tables for wireless floormap
        support. This is rather primitive still; We just need a place to
        define buildings and floors in buildings, so that we do not hardwire
@@ -1659,3 +1658,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
        ALTER TABLE widearea_updates ADD
            force enum('yes','no') NOT NULL default 'no' after update_started;
+
+1.255: Add a linktest_pid slot to the experiments table so that we can
+       kill off linktest async via the web interface.
+       
+	alter table experiments add linktest_pid int(11) default '0' \
+		after linktest_level;

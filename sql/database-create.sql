@@ -302,6 +302,7 @@ CREATE TABLE experiments (
   use_ipassign tinyint(4) NOT NULL default '0',
   ipassign_args varchar(255) default NULL,
   linktest_level tinyint(4) NOT NULL default '0',
+  linktest_pid int(11) default '0',
   useprepass tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
