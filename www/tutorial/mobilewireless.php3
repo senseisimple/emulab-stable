@@ -150,10 +150,10 @@ board computers for each robot.
 <li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">Mica2 
 motes</a> attached to each stargate.
 <li>Four cameras for visual tracking of the robots.
-<li>A <a href="https://www.emulab.net/webcam.php3">webcam</a> for viewing the
+<li>A <a href="<?php echo $TBBASE ?>/webcam.php3">webcam</a> for viewing the
 robots in their habitat.
-<li>An <a href="/robotmap.php3">abstract map</a> of the current locations of
-the robots.
+<li>An <a href="<?php echo $TBBASE ?>/robotmap.php3">abstract map</a> of the
+current locations of the robots.
 </ul>
 
 <?php NLCBODYEND() ?>
@@ -263,11 +263,11 @@ area:
 </blockquote>
 
 The values specified above are measured in meters and based on the map located
-<a href="/robotmap.php3">here</a>, where the origin is in the upper left hand
-corner, with positive X going right and positive Y going down.  You can also
-click on the map to get a specific set of coordinates.  Note that any
-coordinates you specify must not be in an obstacle, or they will be rejected by
-the system.
+<a href="<?php echo $TBBASE ?>/robotmap.php3">here</a>, where the origin is in
+the upper left hand corner, with positive X going right and positive Y going
+down.  You can also click on the map to get a specific set of coordinates.
+Note that any coordinates you specify must not be in an obstacle, or they will
+be rejected by the system.
 
 <p>
 With this NS file you can now create your first mobile experiment.  Actually
@@ -295,8 +295,8 @@ sending START and STOP events to <a
 href="docwrapper.php3?docname=advanced.html">traffic generators</a> and <a
 href="docwrapper.php3?docname=advanced.html">program objects</a>.  However,
 before moving it for the first time, you might want to check its current
-position in the <a href="/robotmap.php3">map</a> and/or <a
-href="https://www.emulab.net/webcam.php3">webcam</a>.
+position in the <a href="<?php echo $TBBASE ?>/robotmap.php3">map</a> and/or <a
+href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
 
 <p>
 <table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
