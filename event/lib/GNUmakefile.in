@@ -79,6 +79,7 @@ LIB_STUFF       = event.pm event.so
 
 install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
+control-install:	install
 
 clean:
 	/bin/rm -f *.o libevent.a libevent_r.a *.so *.pm

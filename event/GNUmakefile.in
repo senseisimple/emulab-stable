@@ -70,6 +70,7 @@ endif
 	@$(MAKE) -C proxy client-install
 
 control-install: 
+	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 
 clean:		subdir-clean
