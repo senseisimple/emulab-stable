@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -17,7 +17,19 @@ PAGEHEADER("Emulab Software Distributions");
 
 <ul>
 <li> <img src="/new.gif" alt="&lt;NEW&gt;">
-     <a href="/downloads/frisbee-snapshot-20031021.tar.gz">
+     <a href="/downloads/frisbee-snapshot-20040312.tar.gz">
+     Updated Frisbee Server and Client Source Snapshot</a>.
+     This is a ``snapshot'' of the current development tree.  This version
+     includes improved Linux support.  The frisbee client will now build
+     under Linux and the Linux image zipper can make partition images
+     and supports filesystems other than ext2fs.
+     Please take a look at the
+     <a href="/downloads/frisbee-README-20040312.txt">README</a>
+     file for more information on the changes.
+     This
+     <a href="/downloads/frisbee-fs-20040312.iso">updated ISO image</a>
+     includes binaries built from the current sources.
+<li> <a href="/downloads/frisbee-snapshot-20031021.tar.gz">
      Updated Frisbee Server and Client Source Snapshot</a>.
      This is a ``snapshot'' of the current development tree.  It includes the
      NTFS framework that was not in the previous release as well as some
