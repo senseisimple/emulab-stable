@@ -376,7 +376,7 @@ getbossnode(char **bossnode, int *portp)
 				 * Look for port spec
 				 */
 				if ((bp = strchr(buf, ':'))) {
-					*bp++  = NULL;
+					*bp++  = (char) NULL;
 					*portp = atoi(bp);
 				}
 				*bossnode = strdup(buf);
@@ -531,7 +531,7 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	}
 	connected = 1;
 
-	fromlen = sizeof(client);
+	length = sizeof(client);
 	cc = recvfrom(sock, buf, sizeof(buf) - 1, 0,
 		      (struct sockaddr *)&client, &length);
 	progress += cc;
