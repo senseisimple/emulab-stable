@@ -1,106 +1,118 @@
-<?php
-if (!isset($PHP_AUTH_USER) || !empty($HTTP_GET_VARS)) {
-  Header("WWW-Authenticate: Basic realm=\"Testbed\"");
-  Header("HTTP/1.0 401 Unauthorized");
-  echo "User authentication is required to view these pages\n";
-  exit;
-} else {
-  $USER = addslashes($PHP_AUTH_USER);
-  $PSWD = crypt("$PHP_AUTH_PW", strlen($USER));
-  $query = "SELECT * FROM users WHERE uid=\"$USER\" AND usr_pswd=\"$PSWD\" AND trust_level > 1";
-  $result = mysql_db_query("tbdb", $query);
-  $numusers = mysql_num_rows($result);
-  $query2 = "SELECT timeout FROM login WHERE uid=\"$USER\"";
-  $result2 = mysql_db_query("tbdb", $query2);
-  $n = mysql_num_rows($result2);
-  $row = mysql_fetch_row($result2);
-  if (($n == 0) && ($numusers != 0)) {
-        $cmnd = "INSERT INTO login VALUES ('$USER', '0')";
-        mysql_db_query("tbdb", $cmnd);
-  } elseif (($numusers  == 0) || ($row[0] < time())) {
-        $cmnd = "DELETE FROM login WHERE uid=\"$USER\"";
-        mysql_db_query("tbdb", $cmnd);
-        Header("WWW-Authenticate: Basic realm=\"Testbed\"");
-        Header("HTTP/1.0 401 Unauthorized");
-        die ("Authorization Failed\n");
-  }
-  $timeout = time() + 1800;
-  $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$USER\"";
-  mysql_db_query("tbdb", $cmnd);
-}
-echo "
 <html>
 <head>
-<title>Approve users</title>";
-#<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-echo "</head>
-<body>\n";
-if (isset($OK)) {
-	while ($elem = each($HTTP_POST_VARS)) {
-		$uid = $elem[0];
-		$act = $elem[1];
-		if ($act == "reject") {
-			$cmnd1 = "DELETE FROM users WHERE uid='$uid'";
-			$cmnd2 = "DELETE FROM grp_memb WHERE uid='$uid'";
-			$cmnd3 = "DELETE FROM proj_memb WHERE uid='$uid'";
-			mysql_db_query("tbdb", $cmnd1);
-			mysql_db_query("tbdb", $cmnd2);
-			mysql_db_query("tbdb", $cmnd3);
-			echo "<h3 color='red'>$uid DELETED</h3>\n";
-		} elseif ($act == "accept") {
-			$cmnd = "UPDATE users SET trust_level=1 where uid='$uid'";
-			mysql_db_query("tbdb", $cmnd);
-			echo "<h3 color='blue'>$uid APPROVED</h3>\n";
-		} elseif ($act == "postpone") {
-			echo "<h3>$uid is waiting</h3>\n";
-		} else {
-			echo "<h1>Something is Wrong: $uid, $act</h1>\n";
-		}
-	}
-	die("</body></html>");
+<title>New User Approval</title>
+<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+</head>
+<body>
+<?php
+$auth_usr = "";
+if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
+  $auth_usr=$Vals[1];
+  addslashes($auth_usr);
+  $query = "SELECT timeout FROM login WHERE uid=\"$auth_usr\"";
+  $result = mysql_db_query("tbdb", $query);
+  $n = mysql_num_rows($result);
+  if ($n == 0) {
+    echo "<h3>You are not logged in. Please go back to the ";
+    echo "<a href=\"tbdb.html\" target=\"_top\"> Home Page </a> ";
+    echo "and log in first.</h3></body></html>";
+    exit;
+  } else {
+    $row = mysql_fetch_row($result);
+    if ($row[0] < time()) { # if their login expired
+      echo "<h3>You have been logged out due to inactivity.
+Please log in again.</h3>\n</body></html>";
+      $cmnd = "DELETE FROM login WHERE uid=\"$auth_usr\"";
+      mysql_db_query("tbdb", $cmnd);
+      exit;
+    } else {
+      $timeout = time() + 600;
+      $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
+      mysql_db_query("tbdb", $cmnd);
+    }
+  }
+} else {
+  unset($auth_usr);
 }
 echo "
 <h1>Approve new users in your group</h1>
-<table border=1 cellpadding=3 cellspacing=0>
-<tr><th cellvalign>Reject</th>
-<th cellvalign>Postpone Judgement</th>
-<th cellvalign>Accept</th>
-<th cellvalign>User</th></tr>
-<form action='approval.php3' method='post'>\n";
-
-$query = "SELECT gid FROM grp_memb WHERE uid='$USER'";
+<h3><p>
+This page will let you approve new members of your group. Once approved,
+they will be able to log into machines in your group's experiments.</p>
+<p> If you desire, you may set their trust/privilege levels to give them
+more or less access to your nodes:
+<ol>
+<li>User - Can log into machines in your experiments.
+<li>Local Root - Can have root access on machines, can create new experiments.
+<li>Group Root - Can approve users, create projects, and update any group info or personal info for group members.
+</ol>
+</p></h3>\n";
+$query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
 $result = mysql_db_query("tbdb", $query);
 $select = "SELECT";
 while ($row = mysql_fetch_row($result)) {
-	$gid = $row[0];
-	if ($select == "SELECT") {
-		$select .= " DISTINCT uid FROM grp_memb WHERE gid='$gid'";
-	} else {
-		$select .= " OR gid='$gid'";
-	}
+  $gid = $row[0];
+  if ($select == "SELECT") {
+    $select .= " DISTINCT uid FROM grp_memb WHERE gid='$gid'";
+  } else {
+    $select .= " OR gid='$gid'";
+  }
+}
+if ($select=="SELECT") {
+  echo "<h3>You do not have Group Root permissions in any group.</h3>";
+  echo "</body></html>\n";
+  exit;
 }
 $selected = mysql_db_query("tbdb", $select);
 $find = "SELECT";
 while ($row = mysql_fetch_row($selected)) {
-	$uid = $row[0];
-	if ($find = "SELECT") {
-		$find .= " DISTINCT uid FROM users WHERE trust_level=0 AND uid='$uid'";
-	} else {
-		$find .= " OR uid='$uid'";
-	}
+  $uid = $row[0];
+  if ($find == "SELECT") {
+    $find .= " DISTINCT uid,usr_name,usr_email,usr_addr,usr_phone FROM users WHERE (status='newuser' OR status='unapproved') AND (uid='$uid'";
+  } else {
+    $find .= " OR uid='$uid'";
+  }
 }
+$find .= ")";
 $found = mysql_db_query("tbdb", $find);
-while ($row = mysql_fetch_row($found)) {
-	$uid = $row[0];
-	echo "<tr><th><input type='radio' name='$uid' value='reject'></th>
-	      	 <th><input type='radio' name='$uid' value='postpone'></th>
-	         <th><input type='radio' name='$uid' value='accept'></th>
-		 <th>$uid</th></tr>\n";
+if ( mysql_num_rows($found) == 0 ) {
+  echo "<h3>You have no new group members who need approval</h3>\n";
+} else {
+  echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2 align='center'>
+<tr>
+<td>Action</td>
+<td>Trust Level</td>
+<td>User</td>
+<td>Name</td>
+<td>E-mail</td>
+<td>Addr</td>
+<td>Ph&nbsp;#</td>
+</tr>
+<form action='approved.php3?$auth_usr' method='post'>\n";
+  while ($row = mysql_fetch_row($found)) {
+    $uid = $row[0];
+    $name= $row[1];
+    $email=$row[2];
+    $addr= $row[3];
+    $phone=$row[4];
+    echo "<tr><td><select name=\"$uid\">
+<option value='approve'>Approve</option>
+<option value='deny'>Deny</option>
+<option value='later'>Postpone</option></select></td>
+<td><select name=\"$uid-trust\">
+<option value='user'>User</option>
+<option value='local_root'>Local Root</option>
+<option value='group_root'>Group Root</option></select></td>
+<td>&nbsp;$uid&nbsp;</td><td>&nbsp;$name&nbsp;</td><td>&nbsp;$email&nbsp;</td>
+<td>&nbsp;$addr&nbsp;</td><td>&nbsp;$phone&nbsp;</td>
+</tr>\n";
+  }
+  echo "
+<tr><td colspan=7><b><input type='submit' value='Submit' name='OK'></td></tr>
+</form>
+</table>\n";
 }
 echo "
-<tr><th colspan=4><input type='submit' value='Okay' name='OK'></th></tr>
-</form>
-</table>
 </body>
 </html>";
 ?>
