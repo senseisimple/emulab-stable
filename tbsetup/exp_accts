@@ -1,0 +1,156 @@
+#!/usr/local/bin/perl -w
+#
+# exp_accts - Makes accounts for all users in this experiment's project.
+#
+# Adds accounts to currently booted OS only.
+#
+# 
+#
+
+#debug flag
+my $d = 1;
+
+if ($#ARGV < 0) { 
+  die("Usage: exp_accts <eid>\n".
+      "Makes accounts for all users in an experiment's project.\n");
+}
+my $eid = $ARGV[0];
+
+if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
+  die("Invalid eid '$eid' contains illegal characters.\n"); 
+}
+
+open(WHO,"/usr/bin/whoami 2>&1 |");
+$_ = <WHO>;
+chop;
+close(WHO);
+#if ($_ ne "root") { die("This won't work unless you're root.\n"); }
+
+use Mysql;
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+my $sth;
+
+my $cmd = "select eid from experiments where eid='$eid'";
+
+$sth = $dbh->query($cmd);
+
+my $rows =0;
+
+while ($sth->fetchrow_array) {
+  $rows += 1;
+}
+if ( $rows != 1 ) { die("Invalid eid '$eid'.\n"); }
+
+$cmd = 
+  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
+  "from experiments as e ".
+  "left join projects as p on e.pid = p.pid ".
+  "left join proj_memb as pm on p.pid = pm.pid ".
+  "left join users as u on u.uid = pm.uid ".
+  "where e.eid = '$eid'";
+
+$sth = $dbh->query($cmd);
+
+my %passwd = ();
+my %unix_uid = ();
+my %name = ();
+
+while (@row = $sth->fetchrow_array) {
+  $passwd{$row[0]} = $row[1];
+  $unix_uid{$row[0]} = $row[2];
+  $name{$row[0]} = $row[4];
+}
+
+if ($d) {
+  foreach my $name (sort keys %passwd) {
+    print "Name: $name\tPassword: $passwd{$name}\t".
+      "Unix UID: $unix_uid{$name}\n";
+  }
+}
+
+$cmd = 
+  "select unix_gid from groups as g ".
+  "left join proj_grps as pg on g.gid = pg.gid ".
+  "left join projects as p on pg.pid = p.pid ".
+  "left join experiments as e on e.pid = p.pid ".
+  "where e.eid = '$eid'";
+
+$sth = $dbh->query($cmd);
+
+my $unix_gid = 65533; # "nogroup"...
+
+if (@row = $sth->fetchrow_array) {
+  $unix_gid = $row[0];
+}
+
+print "Unix GID: $unix_gid\n" if $d;
+
+$cmd = 
+  "select IP from IP_list as ip ".
+  "left join reserved as r on r.node_id=ip.node_id ".
+  "left join experiments as e on r.eid = e.eid ".
+  "where e.eid = '$eid'";
+
+$sth = $dbh->query($cmd);
+
+my @nodes = ();
+
+while (@row = $sth->fetchrow_array) {
+  push(@nodes,$row[0]);
+}
+
+if ($d) {
+  print "Nodes: ";
+  foreach (@nodes) {
+    print "$_\t";
+  }
+  print "\n";
+}
+
+my $last = "";
+my $OS = "";
+my $IP = "";
+foreach $IP (@nodes) {
+    #if its not the same as the last one, get the OS
+    if ( $IP ne $last ) {
+        $last = $IP;
+        if (-e "/bin/ping") {
+            open(PING,"/bin/ping -c 1 $IP 2>&1 |");
+        } else {
+            open(PING,"/sbin/ping -c 1 $IP 2>&1 |");
+        }
+        do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
+        print "Got $1 ping packet(s) back from $IP.\n" if $d;
+        if ( $1 > 0 ) {
+            open(UNAME,"su1 rsh $IP uname -a 2>&1 |");
+            $_ = <UNAME>;
+            #print $_;
+            if ( !($_=/^Sorry/) ) { 
+	      @temp = split(" ",$_); 
+	      $OS = $temp[$0]; 
+	    } else { die("Authorization Failed.\n"); }
+        } else {
+            #$ifstr="";
+        }
+        print "OS for $IP is $OS\n" if $d;
+        if ($OS eq "Linux") {  }
+        elsif ($OS eq "FreeBSD") { }
+        else {  }
+        #if ( ) { print "Using \"\"\n"; }
+    }
+
+    #Set up the interface
+#    if (  eq "" ) {
+#        print "Unknown OS $OS on $IP. Skipping.\n";
+#        next;
+#    }
+
+    print "Creating    on $IP...\n";
+    open(IFC,
+         "su1 rsh $IP ls 2>&1 |"
+         );
+    while ( <IFC> ) {
+        print ">> $_";
+    }
+}
