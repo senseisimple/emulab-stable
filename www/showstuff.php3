@@ -686,7 +686,6 @@ function SHOWIMAGEID($imageid, $edit) {
     $part4_osid	 = $row[part4_osid];
     $default_osid= $row[default_osid];
     $path 	 = $row[path];
-    $magic	 = $row[magic];
     $pid	 = $row[pid];
     $loadaddr	 = $row[load_address];
 
@@ -695,8 +694,6 @@ function SHOWIMAGEID($imageid, $edit) {
     if ($edit) {
 	if (!$description)
 	    $description = "";
-	if (!$magic)
-	    $magic = "";
 	if (!$path)
 	    $path = "";
 	if (!$loadaddr)
@@ -705,8 +702,6 @@ function SHOWIMAGEID($imageid, $edit) {
     else {
 	if (!$description)
 	    $description = "&nbsp";
-	if (!$magic)
-	    $magic = "&nbsp";
 	if (!$path)
 	    $path = "&nbsp";
 	if (!$loadaddr)
@@ -810,20 +805,6 @@ function SHOWIMAGEID($imageid, $edit) {
     }
     else {
 	echo "$path";
-    }
-    echo "  </td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Magic: </td>
-            <td class=left>\n";
-
-    if ($edit) {
-	echo "<input type=text name=magic size=60
-                     maxlength=256 value='$magic'>";
-    }
-    else {
-	echo "$magic";
     }
     echo "  </td>
           </tr>\n";

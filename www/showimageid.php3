@@ -40,13 +40,18 @@ SHOWIMAGEID($imageid, 0);
 #
 # Edit option.
 #
-if (TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
-    $fooid = rawurlencode($imageid);
-    echo "<p><center>
-               Do you want to edit this ImageID?
-              <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
-            </center>\n";
-}
+$fooid = rawurlencode($imageid);
+echo "<p><center>
+           Do you want to edit this ImageID?
+           <A href='editimageid_form.php3?imageid=$fooid'>Yes</a>
+         </center>\n";
+
+echo "<br><br>\n";
+
+echo "<p><center>
+           Do you want to delete this ImageID?
+           <A href='deleteimageid.php3?imageid=$fooid'>Yes</a>
+         </center>\n";
 
 #
 # Standard Testbed Footer

@@ -70,6 +70,14 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 echo "</table>\n";
 
+# Create option.
+echo "<p><center>
+       Do you want to create a new ImageID?
+       <A href='newimageid_form.php3'>Yes</a>
+      </center>\n";
+
+echo "<br><br>\n";
+
 #
 # Standard Testbed Footer
 # 
