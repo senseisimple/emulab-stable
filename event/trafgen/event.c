@@ -193,10 +193,20 @@ tgevent_init(int argc, char *argv[])
 	if (tuple == NULL) {
 		fatal("could not allocate an address tuple");
 	}
-	tuple->host	 = ipaddr;
+	/*
+	 * Do not use the ipaddr if we have a pid/eid. This allows
+	 * trafgens to work inside jails that have their own IP.
+	 */
+	if (myexp) {
+		tuple->expt = myexp;
+		tuple->host = ADDRESSTUPLE_ANY;
+	}
+	else {
+		tuple->host = ipaddr;
+		tuple->expt = ADDRESSTUPLE_ANY;
+	}
 	tuple->site      = ADDRESSTUPLE_ANY;
 	tuple->group     = ADDRESSTUPLE_ANY;
-	tuple->expt      = myexp ? myexp : ADDRESSTUPLE_ANY;
 	tuple->objtype   = TBDB_OBJECTTYPE_TRAFGEN;
 	tuple->objname   = myname ? myname : ADDRESSTUPLE_ANY;
 	tuple->eventtype = ADDRESSTUPLE_ANY;
