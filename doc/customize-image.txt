@@ -41,44 +41,63 @@ A. Load the image on a testbed machine.
 We will assume the machine is called "pc1" in the following directions.
 
 * Put the Utah-provided generic image in /usr/testbed/images on your
-  boss machine.  The generic image will be loaded, and the custom
+  file server machine.  The generic image will be loaded, and the custom
   image saved, using this directory.
 
 * Boot pc1 into the admin MFS as described above
 
+* Figure out what your root disk is.  You can look through the boot
+  time output of FreeBSD on pc1 to find it.  If you missed that output,
+  you can ssh into pc1 and run "dmesg":
+
+      sudo ssh pc1 dmesg
+
+  If you have IDE disks, the disk you want will probably be "ad0".
+  If you have SCSI disks, it will be "da0".  For SATA disks, it will
+  probably be "ad4".  RAID controllers are variously things like: "ar",
+  "aacd", "twed", depending on the controller you have.  If you cannot
+  find anything in the output that looks like a disk, you may have an
+  unsupported disk controller.  Contact testbed-ops@emulab.net if this
+  happens (and be sure to have your "dmesg" output handy!)
+
+  If your disk is anything other than "ad0", there are several files
+  under both FreeBSD and Linux that will need to be "fixed".  The good
+  news is that the post-disk-load customization pass should do this
+  for you.  Just make sure that the Emulab database node_types table
+  has the correct value of disktype for each node type.  But, you still
+  need to know the disk type for the following steps, so lets set a
+  shell variable:
+
+      set DSK=<your-disk-here> # e.g. "ad0", "da0", "ad4"
+	or
+      DSK=<your-disk-here>; export DSK
+
 * Use 'imageunzip' to load the disk.
-  If all went well, the node should be up and accessible via ssh.
+  If all has gone well, the node should be up and accessible via ssh.
   To copy the generic image onto the test machine disk, do the following
   from boss:
 
-      sudo ssh pc1 imageunzip - /dev/ad0 < /usr/testbed/images/FBSD47+RHL73-GENERIC.ndz
+      sudo ssh pc1 imageunzip - /dev/$DSK \
+	< /usr/testbed/images/FBSD410+RHL90-GENERIC.ndz
 
-  (or use "/dev/da0" for SCSI).  Image loading should take anywhere from
-  45 seconds, to several minutes.
-
-  If the ssh returns with "Killed" then imageunzip ran out of memory.
-  By default, imageunzip will consume memory without bound for buffering
-  of pending disk writes.  In this case, retry the imageunzip with
-  "-W <num-MB>" where <num-MB> is a number of MB maximum to use for
-  disk buffering.  If the node you are loading has 512MB of memory, try
-  a number like 300.
+  Image loading should take anywhere from 45 seconds, to several minutes.
 
 Now you can begin customizing the FreeBSD and Linux partitions.
 
 
 B. Customize FreeBSD:
 
-First, login as root from boss:
+First, login as root from boss and set that magic disk variable:
 
-       sudo slogin pc1
+      sudo slogin pc1
+      set DSK=<your-disk-here>  # you *will* be in csh here
 
-and mount the FreeBSD filesystems on the node:
+and mount the FreeBSD filesystems on the disk:
 
-      mount /dev/ad0s1a /mnt
-      mount /dev/ad0s1e /mnt/var
-      mount /dev/ad0s1f /mnt/usr
+      mount /dev/${DSK}s1a /mnt
+      mount /dev/${DSK}s1e /mnt/var
+      mount /dev/${DSK}s1f /mnt/usr
 
-(replacing "ad0" with "da0" if you have a SCSI root disk).
 Now you can update the necessary files as follows.
 	
 The MFS has a much scaled-down set of binaries.  To get access to a more
@@ -109,22 +128,25 @@ Now update the following files:
 
 * /mnt/etc/ssh/ssh_host*
 
-  We use the same host key for all images and all OSes.  If you have
-  already generate a set of site-specific host keys, copy them to the
-  disk with:
+  We use the same host key for all images and all OSes.  If you correctly
+  customized your MFSes, you have already generated a set of site-specific
+  host keys, and you can copy them to the disk with:
 
       cp -p /etc/ssh/ssh_host* /mnt/etc/ssh/
 
-  and skip to the next bullet item.  If you have NOT generated appropriate
-  host keys, you can generate them with:
+  and then skip to the next bullet item.
+
+  If you did NOT generate host keys for your MFSes, you can generate
+  keys now with:
 
       ssh-keygen -t rsa1 -N "" -f /mnt/etc/ssh/ssh_host_key
       ssh-keygen -t rsa -N "" -f /mnt/etc/ssh/ssh_host_rsa_key
       ssh-keygen -t dsa -N "" -f /mnt/etc/ssh/ssh_host_dsa_key
 
-  Note that you will have to go back and install these keys in the sources
-  for your frisbee/freebsd MFSes later using the updating instructions in
-  the README file in the MFS tarball.
+  This installs them in the disk image, you will still have to go back and
+  install these same keys in the sources for your frisbee/freebsd MFSes later
+  using the updating instructions in the README file in the MFS tarball.
+  So save the keys from /mnt/etc/ssh off somewhere.
 
 * /mnt/etc/emulab/{client,emulab}.pem
 
@@ -150,9 +172,8 @@ Mount the Linux filesystems (recall that the FreeBSD filesystems are
 still mounted on /mnt, so we use another directory):
 
       mkdir /mnt2
-      mount -t ext2fs /dev/ad0s2 /mnt2
+      mount -t ext2fs /dev/${DSK}s2 /mnt2
 
-(replacing "ad0" with "da0" if you have a SCSI root disk).
 Now you can update the necessary files as follows.
 	
 * /mnt2/root/.ssh/authorized_keys
@@ -192,9 +213,7 @@ Now unmount the Linux filesystem:
 and fsck it for good luck.  Actually, not only good luck but also to reset
 the time stamp that forces a periodic fsck:
 
-      e2fsck /dev/ad0s2
-
-again, replace "ad" with "da" for SCSI.
+      e2fsck /dev/${DSK}s2
 
 
 D. Saving the customized image
@@ -204,11 +223,9 @@ D. Saving the customized image
    From boss do:
 
        cd /usr/testbed/images
-       sudo ssh pc1 imagezip /dev/ad0 - > FBSD47+RHL73-STD.ndz
-       sudo ssh pc1 imagezip -s 1 /dev/ad0 - > FBSD47-STD.ndz
-       sudo ssh pc1 imagezip -s 2 /dev/ad0 - > RHL73-STD.ndz
-
-   replacing "ad0" with "da0" for SCSI of course.
+       sudo ssh pc1 imagezip /dev/$DSK - > FBSD410+RHL90-STD.ndz
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
+       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > RHL90-STD.ndz
 
 
 E. Testing the image
@@ -279,43 +296,41 @@ G. Installing the images
 
 
 
-[ XXX THIS ENDS THE INSTRUCTIONS.  THE REST OF THIS FILE IS SUPPLEMENTAL
-  MATERIAL AND NEEDS SOME WORK. ]
-
 Dealing with SCSI disks (or RAID).
 
+* For completeness here are the files that need to be changed if you have
+  other than IDE disks:
 
-* Since we have IDE disks, it takes a little more work to create an
-  image on IDE disks for a site with SCSI disks.
+      FreeBSD /etc/fstab: needs "ad0" changed to appropriate type
+      Linux /etc/fstab: needs "hda" changed to appropriate type
+      Linux /etc/lilo.conf: ditto, plus lilo must be rerun
 
-* For FreeBSD, you need to make sure that the kernel includes support
-  for the host adaptor in question.  You can look at output from the
-  "newnode" (aka GENERIC) kernel if necessary.  If the HA is not already
-  supported in our various TESTBED configs, add it and rebuild and install
-  the kernels in the image.  Then, in the image, you need to change /etc/fstab
-  to refer to "da" disks rather than "ad" disks.
+  Again, you should not need to mess with these files, the post-disk-loader
+  script will do it for you.
 
-* For Linux, it is even more of a PITA.  As with BSD, you need to configure
-  our kernel with generic SCSI support and support for the HA.  Note that
-  by default, Linux includes SCSI as a module, but to load a module into the
-  Linux kernel at boot time, you need to have a little MFS (initrd) that
-  contains the appropriate modules.  We just build a kernel with the SCSI
-  stuff hardwired instead.  Anyway, once you have a kernel, modify /etc/fstab
-  to talk about "sda" rather than "hda".  Now you also have to modify
-  /etc/lilo.conf, again, to reference "sda" rather than "hda".  But, once
-  you have done that, you cannot rerun lilo as it will complain about not
-  having an sda disk; i.e., lilo looks at the config file to figure out
-  what disk to write the new stuff to, and that file now says "sda" instead
-  of the "hda" that you are constructing the image on!  Go ahead and create
-  the image without re-running lilo.  When you boot Linux from the image for
-  the first time, interrupt lilo (type anything once lilo starts loading the
-  image) and then type:
+* For FreeBSD, we have four different kernels that are used for various
+  purposes.  Only one of them is generic.  So you will need to build
+  customized kernels in order to do "link delays", delay nodes and virtual
+  nodes.  The image does include our versions of all these kernels, so
+  try those first and maybe save yourself some work.  These kernels support:
 
-	 linux root=/dev/sda2
+      disks: ad, ar, da (with ahc, ahd controllers)
+      network: xl, dc, fxp, em, nge
 
-  (assuming Linux is in partition 2 on the disk).  This will boot it up
-  using SCSI as the root disk.  Now, assuming your kernel has the appropriate
-  SCSI support, the machine will come up ok.  Then login as root and run
-  "lilo" to fix things up for good (remember to create a new image afterward).
+  Copy /kernel.100HZ over to /kernel on a node and try booting it.  If
+  that works and all your network interfaces were found, just create a
+  new image after copying /kernel.100HZ to /kernel (copy, don't move,
+  /kernel.100HZ needs to exist).
 
+  Otherwise, you need to build your own kernels.  You can look at output from
+  the admin MFS (aka GENERIC) kernel if necessary.  Add the necessary driver
+  to the various TESTBED configs in the kernel source, and rebuild and install
+  the kernels in the image.  Mail testbed-ops@emulab.net for more info.
 
+* For Linux, it is even more of a PITA.  We currently don't even have a
+  generic Linux kernel in the image.  So if Linux doesn't boot in the image,
+  you will have to configure/build a new kernel on some external machine.
+  If you don't have a Linux machine to do this with, contact us.
+
+[ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
+[ Last updated 11/11/04 ]
