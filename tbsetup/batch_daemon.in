@@ -104,7 +104,7 @@ if (! $debug) {
 while (1) {
     my($count, $i, $query_result, $pending_result, $running_result);
     my(%row, %pending_row);
-    
+
     #
     # Need to lock the table here because of cancelation in endexp.
     # See the comments in there. We need to atomically grab the next
@@ -124,8 +124,7 @@ while (1) {
 	DBQuery("lock tables experiments write");
     if (! $query_result) {
 	print "DB Error locking tables. Waiting a bit ...\n";
-	sleep(10);
-	next;
+	goto pause;
     }
     
     $pending_result =
@@ -145,15 +144,12 @@ while (1) {
     if (!$pending_result || !$running_result) {
 	print "DB Error getting batch info. Waiting a bit ...\n";
 	DBQuery("unlock tables");
-	sleep(10);
-	next;
-
+	goto pause;
     }
 
     if (!$pending_result->numrows && !$running_result->numrows) {
 	DBQuery("unlock tables");
-	sleep(10);
-	next;
+	goto pause;
     }
 
     #
@@ -176,8 +172,7 @@ while (1) {
 	if (! $query_result) {
 	    print "DB error setting batch $pid/$eid to configuring.\n";
 	    DBQuery("unlock tables");
-	    sleep(10);
-	    next;
+	    goto pause;
 	}
     }
     DBQueryWarn("unlock tables");
@@ -211,7 +206,8 @@ while (1) {
     if ($pending_result->numrows) {
 	dosomething("start", %pending_row);
     }
-    sleep(15);
+  pause:
+    sleep(30);
 }
 
 #
@@ -369,7 +365,7 @@ sub startexp($)
 			"where eid='$eid' and pid='$pid'");
 
 	if ($exit_status == $TOOFEWNODES) {
-	    if ($attempts && (($attempts % 10) == 0)) {
+	    if ($attempts && (($attempts % 30) == 0)) {
 		$attempts++;
 		
 		my $msg =
@@ -618,4 +614,3 @@ sub donotify($$$)
     SENDMAIL($to, $subject, $mesg, $from, $hdrs,
 	     ($logname, "assign.log", $nsfile));
 }
-
