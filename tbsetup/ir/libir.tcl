@@ -142,6 +142,8 @@ proc ir_write {file} {
     set fp [open $file w]
     
     _ir_write $fp /
+
+    close $fp
 }
 
 proc _ir_write {fp path} {
