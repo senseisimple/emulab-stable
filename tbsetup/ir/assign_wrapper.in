@@ -434,7 +434,9 @@ while (<PTOP>) {
 $num_sshelves = $#t+1;
 @t = keys(%nodes);
 # Counting delay nodes as 1 when rwe really only need them as 1/2.  So..
-$num_pcs = $#t+1 - int($delayindex/2);
+# Also need to remove LANs from count.
+@lant = keys(%lans);
+$num_pcs = $#t+1 - int($delayindex/2) - ($#lant + 1);
 if ($num_pcs > $avail_pcs) {
     print STDERR "Insufficient PCs to do mapping.  Have $avail_pcs; need $num_pcs.\n";
     exit(77);
