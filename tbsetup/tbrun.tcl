@@ -45,6 +45,7 @@ set ir2ifc "$scriptdir/ir2ifc"
 set ifcboot "$scriptdir/ifc_setup"
 set delay_setup "$scriptdir/delay_setup"
 set os_setup "$scriptdir/os_setup"
+set mkacct "$scriptdir/mkacct"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -133,6 +134,13 @@ outs "PLACEHOLDER - Verifying OS functionality."
 #}
 
 outs "PLACEHOLDER - Installing secondary packages."
+
+outs "Creating user accounts."
+if {[catch "exec $mkacct $eid >@ $logFP 2>@ $logFP" err]} {
+    outs stderr "Error running $mkacct. ($err)"
+    exit 1
+}
+
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
 

@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl,v 1.4 2000-12-03 14:16:26 kwright Exp $
+### $Id: mkacct-ctrl,v 1.5 2000-12-05 01:00:25 kwright Exp $
 
 use English;
 use Mysql;
@@ -131,13 +131,15 @@ sub dowork() {
     # XXX: I assume FreeBSD for now. Its 
     # fairly firmly entrenched as our control node OS. -lkw
 
+
+    # The following user/group creation commands must be done as root. 
+    $UID = $EUID;
+
     #
     # Make group
-    # Note: If I don't do an su1 below, the command will be executed
-    #       as the user $UID.
     #
     print "Adding group $project to $control_node.\n";
-    open(ADDGROUP, "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node /usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
+    open(ADDGROUP, "/usr/local/bin/sshtb $control_node /usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
     while (<ADDGROUP>) { print "$_"; }
     close(ADDGROUP);
     
@@ -148,18 +150,16 @@ sub dowork() {
     # password.
     #
     print "Adding user $user to $control_node.\n";
-    my $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
+    my $cmd = "/usr/local/bin/sshtb $control_node " .
 	      "/usr/sbin/pw useradd $user -u $user_number -c $fullname " .
 	      "-d /users/$user -g $project -s /bin/tcsh"; 	  
     open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd.";
     while (<PWADD>) { print "$_"; }
-    $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
+    $cmd = "/usr/local/bin/sshtb $control_node " .
            "/usr/sbin/pw usermod $user -h 0"; 
     close(PWADD);
     
-    # Note: tried to take the su1 out below, but pipe was then executed
-    #       as $UID rather than 0.
-    open(CHPASS, "/usr/site/bin/su1 /usr/local/bin/sshtb $control_node " .
+    open(CHPASS, "/usr/local/bin/sshtb $control_node " .
 	         "/usr/bin/chpass -p $pswd $user 2>&1 |"); 
     while (<CHPASS>) { print "$_"; }
     close(CHPASS);
