@@ -9,7 +9,9 @@
 
 Class Agent -superclass NSObject
 Class Agent/UDP -superclass Agent
+Class Agent/TCP -superclass Agent
 Class Agent/Null -superclass Agent
+Class Agent/TCPSINK -superclass Agent
 
 Class Application -superclass NSObject
 Class Application/Traffic/CBR -superclass Application
@@ -17,6 +19,8 @@ Class Application/Traffic/CBR -superclass Application
 namespace eval GLOBALS {
     set new_classes(Agent/UDP) {}
     set new_classes(Agent/Null) {}
+    set new_classes(Agent/TCP) {}
+    set new_classes(Agent/TCPSINK) {}
     set new_classes(Application/Traffic/CBR) {}
 }
 
@@ -125,6 +129,37 @@ Agent/UDP instproc connect {dst} {
     $node set osid "FBSD-STD"
 }
 
+# Agent/TCP
+Agent/TCP instproc connect {dst} {
+    $self next $dst
+    $self instvar node
+    $self instvar application
+    $self instvar destination
+
+    set error 0
+    if {$node == {}} {
+	perror "\[connect] $self is not attached to a node."
+	set error 1
+    }
+    if {$application == {}} {
+	perror "\[connect] $self does not have an attached application."
+	set error 1
+    }
+    set dest [$destination set node]
+    if {$dest == {}} {
+	perror "\[connect] $destination is not attached to a node."
+	set error 1
+    }
+    if {[llength [$node set portlist]] != 1} {
+	perror "\[connect] $node must have exactly one link to be a traffic generator."
+	set error 1
+    }
+    if {$error} {return}
+
+    $self set proto "tcp"
+    $node set osid "FBSD-STD"
+}
+
 # Agent/Null
 Agent/Null instproc connect {dst} {
     $self next $dst
@@ -148,6 +183,33 @@ Agent/Null instproc connect {dst} {
     if {$error} {return}
 
     $self set role "sink"
+    $node set osid "FBSD-STD"
+}
+
+# Agent/Null
+Agent/TCPSINK instproc connect {dst} {
+    $self next $dst
+    $self instvar node
+    $self instvar application
+    $self instvar destination
+    set error 0
+    if {$node == {}} {
+	perror "\[connect] $self is not attached to a node."
+	set error 1
+    }
+    set dest [$destination set node]
+    if {$dest == {}} {
+	perror "\[connect] $destination is not attached to a node."
+	set error 1
+    }
+    if {[llength [$node set portlist]] != 1} {
+	perror "\[connect] $node must have exactly one link to be a traffic consumer."
+	set error 1
+    }
+    if {$error} {return}
+
+    $self set role "sink"
+    $self set proto "tcp"
     $node set osid "FBSD-STD"
 }
 
