@@ -10,7 +10,6 @@ use English;
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 # un-taint path
@@ -36,18 +35,9 @@ if ($UID != 0) {
 }
 
 #
-# Create a temporary name for a log file and untaint it.
-#
-#
 # Form a temp name.
 #
-my $logname = `mktemp /tmp/dbboot.XXXXXX`;
-
-if ($logname =~ /^([-\@\w.\/]+)$/) {
-    $logname = $1;
-} else {
-    die "Bad data in $logname";
-}
+my $logname = TBMakeLogname("dbboot");
 
 #
 # Reopen both stdout and stderr so that we can record all the output for
@@ -73,7 +63,31 @@ DBQueryFatal("update experiments set event_sched_pid=0");
 #
 DBQueryFatal("delete from login");
 
-#SENDMAIL("stoller", "DB Boot Finished", "", undef, undef, ($logname));
+#
+# Check for experiments stuck in transition.
+#
+$query_result =
+    DBQueryFatal("select pid,eid,expt_locked from experiments ".
+		 "where expt_locked is not NULL");
+if ($query_result->numrows) {
+    print "The following experiments are stuck in transition.\n\n";
+
+    print "Pid          Eid                  When\n";
+    print "------------ -------------------- ------------------------\n";
+    while (($pid,$eid,$locked) = $query_result->fetchrow_array) {
+	printf("%-12s %-20s %s\n", $pid, $eid, $locked);
+    }
+    print "\n";
+}
+
+#
+# Send email if anything was reported.
+#
+if (-s $logname) {
+    SENDMAIL($TBOPS, "DB Boot Finished", "DB Boot results:",
+	     $TBOPS, undef, ($logname));
+}
+
 unlink("$logname");
 exit 0;
 
