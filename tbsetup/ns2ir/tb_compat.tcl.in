@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # This is the tb_compact.tcl that deals with all the TB specific commands.
 # It should be loaded at the beginning of any ns script using the TB commands.
 

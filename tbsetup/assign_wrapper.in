@@ -1,5 +1,12 @@
 #!/usr/bin/perl -w
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 # This function as the main assign loop.  It converts the virtual
 # topology into a top input including LAN and delay translation.  It
 # then snapshots the current testbed physical state and runs assign,

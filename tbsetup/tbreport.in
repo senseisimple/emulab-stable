@@ -1,6 +1,13 @@
 #!/usr/bin/perl -w
 
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
+#
 # tbreport - given a pid and eid, print out useful information, including
 # a list of nodes and links, about the experiment. Only useful when the
 # experiment is in the active, swapped, or testing states
