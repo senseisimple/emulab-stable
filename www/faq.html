@@ -1229,7 +1229,11 @@
     Each node has a partition at the end of the disk that you can use if
     you wish. In Linux, the partition is <code>/dev/hda4</code> ; in FreeBSD,
     it's </code>/dev/ad0s4</code> . There is no filesystem on this partition,
-    so you'll need to create it yourself. 
+    so you'll need to create it yourself.  Before going any further, there
+    is one very important point: <b>anything you put in this disk space will
+    be lost when your experiment swaps out!</b>  That is, unless you create
+    a <a href="tutorial/tutorial.php3#CustomOS">Custom disk image</a>
+    before it gets swapped.
     </p><p>
     Recent versions of our standard FreeBSD and Linux images include a
     script, <code>/usr/testbed/bin/mkextrafs</code> for this purpose.
