@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -122,6 +122,8 @@ foreach my $tipname ( keys %tipgroup ) {
     # any attached tip, and reopen the run file.
     #
     $procid = `cat ${tipname}.pid`;
+    die("Error obtaining pid for $tipname\n")
+	if ($?);
     $procid =~ s/\n//;
     # untaint
     if ($procid =~ /^([-\@\w.]+)$/) {
