@@ -352,9 +352,7 @@ REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','StartBoot');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP','BootDone');
-REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','TBFAILED','BootError');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
-REPLACE INTO state_transitions VALUES ('PCVM','TBFAILED','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
@@ -436,8 +434,6 @@ REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','RECONFIG','DoReConfig');
 REPLACE INTO state_transitions VALUES ('NORMALv2','RECONFIG','TBSETUP','ReConfig');
 REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','ISUP','BootDone');
-REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','TBFAILED','BootFail');
-REPLACE INTO state_transitions VALUES ('NORMALv2','TBFAILED','SHUTDOWN','RebootAfterFail');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('NETBOOT','PXEBOOTING','BOOTING','BootInfo');
@@ -458,6 +454,10 @@ REPLACE INTO state_transitions VALUES ('OPSNODEBSD','TBSETUP','ISUP','BootDone')
 REPLACE INTO state_transitions VALUES ('OPSNODEBSD','ISUP','TBSETUP','Crash');
 REPLACE INTO state_transitions VALUES ('RELOAD-MOTE','RELOADING','RELOADDONE','ReloadDone');
 REPLACE INTO state_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','RELOADING','Booting');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','TBFAILED','BootFail');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBFAILED','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','TBFAILED','BootError');
+REPLACE INTO state_transitions VALUES ('PCVM','TBFAILED','SHUTDOWN','Reboot');
 
 --
 -- Dumping data for table `state_triggers`
@@ -678,6 +678,14 @@ REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9]
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','building','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','floor','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','loc_x','float','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','loc_y','float','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_startloc','orientation','float','redirect','default:float',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
