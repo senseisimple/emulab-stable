@@ -385,14 +385,6 @@ else {
 	    if ($canceled);
 
 	#
-	# Must be unlocked if called by the user.
-	#
-	ExitWithStatus(1,
-		  "Experiment $pid/$eid went into transition at $expt_locked!\n".
-		  "You must wait until it is no longer in transition.\n")
-	    if (defined($expt_locked));
-
-	#
 	# Check the state for the various operations.
 	#
 	if (!$force) {
