@@ -20,7 +20,7 @@ use Fcntl ':flock';
 #
 # Configure variables
 #
-my $TBOPS       = "testbed-ops\@fast.cs.utah.edu";
+my $TBOPS       = "@TBOPSEMAIL@";
 
 my $etcdir      = "/etc";
 my $exports	= "$etcdir/exports";
