@@ -107,7 +107,8 @@ function SPITFORM($formfields, $errors)
 
     echo "<br><hr size=4>\n";
     echo "<center>
-          Enter new ssh public keys for user ${target_uid}[<b>1,2</b>].
+          Enter ssh (protocol 1 or 2) public keys for user
+                    ${target_uid}[<b>1,2</b>].
           </center><br>\n";
 
     if ($errors) {
@@ -223,7 +224,7 @@ if (isset($formfields[usr_key]) &&
     #
     $formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
 
-    if (! ereg("^[0-9a-zA-Z\@\. ]*$", $formfields[usr_key])) {
+    if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
 	$errors["PubKey"] = "Invalid characters";
 
 	SPITFORM($formfields, $errors);
@@ -252,7 +253,7 @@ if (isset($usr_keyfile) &&
 	if (ereg("^[\n\#]", $buffer))
 	    continue;
 
-	if (! ereg("^[0-9a-zA-Z\@\.[:space:]\r\n]*$", $buffer)) {
+	if (! preg_match("/^[-\w\s\.\@\+\/\=\r\n]*$/", $buffer)) {
 	    $errors["PubKey File Contents"] = "Invalid characters";
 
 	    fclose($fp);
@@ -294,16 +295,20 @@ if (isset($usr_key)) {
 	#
 	$pieces = explode(" ", $stuff);
 
-	if (count($pieces) != 4) {
-	    if (count($pieces) != 1) {
-		TBERROR("Bad Key for $target_uid: $stuff", 0);
-	    }
+	if (count($pieces) == 4) {
+	    $key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
+	    $comment = $pieces[3];
+	}
+	elseif (count($pieces) == 3) {
+	    $key     = "$pieces[0] $pieces[1] $pieces[2]";
+	    $comment = $pieces[0] . "-" . $pieces[2];
+	}
+	elseif (count($pieces) == 1) {
 	    continue;
 	}
-	# These have already been tested for bad chars above (ereg).
-	$key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
-	$comment = $pieces[3];
-	
+	else {
+	    TBERROR("Improper key: $stuff", 0);
+	}
 	DBQueryFatal("replace into user_pubkeys ".
 		     "values ('$target_uid', '$comment', '$key', now())");
 

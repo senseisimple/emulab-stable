@@ -88,10 +88,10 @@ if ($canceled) {
 if (!$confirmed) {
     PAGEHEADER("SSH Public Key Maintenance");
 
-    echo "<center><h2><br>
+    echo "<center><h3><br>
           Are you <b>REALLY</b>
-          sure you want to delete SSH Public Key '$key' for user '$target_uid'?
-          </h2>\n";
+          sure you want to delete this SSH Public Key for user '$target_uid'?
+          </h3>\n";
     
     echo "<form action='deletepubkey.php3?target_uid=$target_uid&key=$key'
                 method=post>";

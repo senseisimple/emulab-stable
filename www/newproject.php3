@@ -693,7 +693,21 @@ if (!$returning) {
     # 
     if (isset($formfields[usr_key]) &&
 	strcmp($formfields[usr_key], "")) {
-	$usr_key[] = $formfields[usr_key];
+        #
+        # Replace any embedded newlines first.
+        #
+	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
+
+	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
+	    $errors["PubKey"] = "Invalid characters";
+
+	    SPITFORM($formfields, $errors);
+	    PAGEFOOTER();
+	    return;
+	}
+	else {
+	    $usr_key[] = $formfields[usr_key];
+	}
     }
     
     #
@@ -710,7 +724,10 @@ if (!$returning) {
 	while (!feof($fp)) {
 	    $buffer = fgets($fp, 4096);
 
-	    if (! ereg("^[0-9a-zA-Z\@\. \n]*$", $buffer)) {
+	    if (ereg("^[\n\#]", $buffer))
+		continue;
+
+	    if (! preg_match("/^[-\w\s\.\@\+\/\=\r\n]*$/", $buffer)) {
 		$errors["PubKey File Contents"] = "Invalid characters";
 
 		fclose($fp);
@@ -804,16 +821,20 @@ if (! $returning) {
             #
 	    $pieces = explode(" ", $stuff);
 
-	    if (count($pieces) != 4) {
-		if (count($pieces) != 1) {
-		    TBERROR("Bad Key for $proj_head_uid: $stuff", 0);
-		}
+	    if (count($pieces) == 4) {
+		$key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
+		$comment = $pieces[3];
+	    }
+	    elseif (count($pieces) == 3) {
+		$key     = "$pieces[0] $pieces[1] $pieces[2]";
+		$comment = $pieces[0] . "-" . $pieces[2];
+	    }
+	    elseif (count($pieces) == 1) {
 		continue;
 	    }
-            # These have already been tested for bad chars above (ereg).
-	    $key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
-	    $comment = $pieces[3];
-	
+	    else {
+		TBERROR("Improper key: $stuff", 0);
+	    }
 	    DBQueryFatal("replace into user_pubkeys ".
 			 "values ('$proj_head_uid', ".
 			 "         '$comment', '$key', now())");
