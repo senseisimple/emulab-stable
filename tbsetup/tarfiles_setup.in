@@ -25,7 +25,7 @@ use Socket;
 
 sub usage()
 {
-    print "Usage: $0 eid pid\n";
+    print "Usage: $0 pid eid\n";
  
     exit(-1);
 }
@@ -121,7 +121,19 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     # Find out the pnode where the this vnode is mapped, if any
     #
     my $physnode;
-    VnameToNodeid($pid,$eid,$vname,\$physnode);
+    VnameToNodeid($pid,$eid,$vname,\$physnode); 
+    
+    # The if block below is needed for simulated nodes which do not
+    # have a reserved table entry. A tarfile specified for a simulated
+    # node ends up on its host PC
+    if ( ! $physnode ) {
+	my $query_result = 
+	DBQueryFatal("select node_id from v2pmap where pid='$pid' and eid='$eid'".  
+	     	     " and vname='$vname'");
+	if ( $query_result->numrows ) {
+	    ($physnode) = $query_result->fetchrow_array();
+	}
+    }
 
     #
     # Go through the list of RPMs looking for files to fetch
