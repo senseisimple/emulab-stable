@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2003, 2004 University of Utah and the Flux Group.
@@ -10,196 +9,157 @@
 # Client-side script to report a new node into a testbed
 #
 #
-my $prefix;
-my $tmcc;
+
+use strict;
+
+#
+# Constants and the like
+#
+my $PREFIX;
+my $TMCC;
 
 if (-e "/usr/local/etc/emulab") {
-    $prefix = "/usr/local/etc/emulab";
-    $tmcc = "$prefix/tmcc.bin";
+    $PREFIX = "/usr/local/etc/emulab";
+    $TMCC = "$PREFIX/tmcc.bin";
 }
 else {
-    $prefix = "/etc/emulab";
-    $tmcc = "$prefix/tmcc";
+    $PREFIX = "/etc/emulab";
+    $TMCC = "$PREFIX/tmcc";
 }
 
-my $cpuspeed = "$prefix/cpuspeed.awk";
-my $fetch = "/usr/bin/fetch";
+my $FETCH = "/usr/bin/fetch";
 
-my $formURL = "newnodecheckin.php";
+my $FORMURL = "newnodecheckin.php";
 
-my $ifconfig = "/sbin/ifconfig";
-my $dmesg = "/var/run/dmesg.boot";
-my $teachswitch = "$prefix/teachswitch";
+my $IFCONFIG = "/sbin/ifconfig";
+my $DMESG = "/var/run/dmesg.boot";
+my $TEACHSWITCH = "$PREFIX/teachswitch";
+
+
+my $FLOPPYDEV  = "/dev/fd0";
+my $FORMAT     = "/sbin/newfs_msdos";
+my $MOUNTPOINT = "/mnt";
+my $MOUNT      = "/sbin/mount";
+my $UNMOUNT    = "/sbin/umount";
 
 #
-# Accept an identifier, an opaque string to report to the web interface
+# Error codes, and how many times we beep to indicate each one.
 #
-my $identifier;
-if (@ARGV) {
-    if (@ARGV == 1) {
-	$identifier = shift @ARGV;
+my $ERROR_USAGE       = 0;
+my $ERROR_NOBOSS      = 1;
+my $ERROR_HWPROB      = 2;
+my $ERROR_NODHCP      = 3;
+my $ERROR_FLOPPYWRITE = 4;
+my $ERROR_CHECKIN     = 5;
+
+my %BEEP_CODES = (
+    # 1 beep means okay, 2 means stick in a floppy
+    $ERROR_NODHCP      => 3,
+    $ERROR_NOBOSS      => 3,
+    $ERROR_CHECKIN     => 3,
+    $ERROR_FLOPPYWRITE => 4,
+    $ERROR_HWPROB      => 4,
+    $ERROR_USAGE       => 4
+);
+my $UNKNOWN_ERROR_BEEPS = 6;
+
+#
+# Constants for use in determining if the floppy is in or not
+#
+my $FLOPPY_REMOVED  = 0;
+my $FLOPPY_INSERTED = 1;
+
+#
+# Handle command-line arguments - we do them ourselves unstead of using getopt,
+# because we want to be able to run this on minimalist environments where that
+# may not exist.
+#
+my $headless	= 0;
+my $writefloppy	= 0;
+my $testing	= 0;
+my $bossnode	= "";
+
+my $uniquifier;
+foreach my $arg (@ARGV) {
+    if ($arg =~ s/^-//) {
+	foreach my $letter (split('',$arg)) {
+	    SWITCH: for ($letter) {
+		/h/ && do { $headless = 1; last; };
+		/w/ && do { $writefloppy = 1; last; };
+		/t/ && do { $testing = 1; last; };
+	    };
+	}
     } else {
-	die "Usage: $0 [identifier]";
+	if ($uniquifier) {
+	    exit usage();
+	} else {
+	    $uniquifier = $arg;
+	}
     }
 }
 
+sub usage {
+    print "Usage: $0 [-h] [-w] [-t] [identifer]\n";
+    print " -h         - Run headless (beep codes for errors)\n";
+    print " -w         - Write an the node's unique identifier to a floppy\n";
+    print " -t         - Test mode\n";
+    print " identifier - supply the given identifier to boss\n";
+    1;
+}
+
 #
-# Find out what our boss node was, so we don't have to hardcode it here
+# Find out what our boss node was, so we don't have to hardcode it here - allow
+# the user to provide one on the command line, though, so that we can run tests
+# on nodes that aren't in the testbed
 #
-my $bossinfo = `$tmcc bossinfo`;
-$bossinfo =~ /^([\w-.]+)/;
-my $bossnode = $1;
 if (!$bossnode) {
-    die "Unable to parse boss name from '$bossinfo'\n";
-}
-
-#
-# Grab this node's MAC addresses - we'll just parse them from the output of
-# ifconfig for now.
-#
-my @ifconfig_lines = `$ifconfig`;
-my @ifaces;
-my $iface = "";
-my $mac;
-my $status;
-foreach my $line (@ifconfig_lines) {
-    chomp $line;
-    SWITCH: for ($line) {
-	#
-	# A line beginning a new interface
-	#
-	(/^(\w+):/) && do {
-	    if ($iface) {
-		#
-		# We have an old interface to save away, but only if it's
-		# Ethernet
-		#
-		if ($mac) {
-		    push @ifaces, [$iface, $mac, $status];
-		}
-	    }
-
-	    $iface = $1;
-	    $mac = $status = "";
-	    last SWITCH;
-	};
-
-	#
-	# A line containing a MAC address
-	#
-	(/\s+ether ([0-9a-f:]+)/) && do {
-	    $mac = $1;
-	    $mac =~ s/://g;
-	    if (length($mac) != 12) {
-		die "Malformed MAC $mac\n";
-	    }
-	    last SWITCH;
-	};
-	
-	#
-	# A line containing the interface status
-	#
-	(/^\s+status: (.*)/) && do {
-	    $status = $1;
-	    last SWITCH;
-	};
-    }
-
-}
-
-#
-# Get the last one
-#
-if ($iface && $mac) {
-    push @ifaces, [$iface, $mac, $status];
-}
-
-#
-# Warn about any that don't have carrier
-#
-foreach my $aref (@ifaces) {
-    my ($iface, $mac, $status) = @$aref;
-    if ($status ne "active") {
-	message("WARNING: $iface has no carrier!\n");
+    my $bossinfo = `$TMCC bossinfo`;
+    $bossinfo =~ /^([\w\-.]+)/;
+    my $bossnode = $1;
+    if (!$bossnode) {
+	error_fatal($ERROR_NOBOSS,"Unable to parse boss name from '$bossinfo'\n");
     }
 }
 
 #
-# Figure out the disk drive size
+# Get physical information about this node
 #
-open(DMESG,"<$dmesg") or die "Unable to open $dmesg\n";
-my ($diskdev, $disksize);
-while (<DMESG>) {
-    chomp;
-    #
-    # Take the first of ad or da, whichever we find first
-    #
-    if (/^((ad|da|ar|aacd)\d): (\d+)MB/) {
-	$diskdev = $1;
-	$disksize = $3;
-	last;
-    }
-}
-
-if (!$diskdev) {
-    message("WARNING: Unable to find disk drive\n");
-    $diskdev = "unknown";
-    $disksize = 0;
-}
-
-#
-# Find this node's CPU speed
-#
-my $speed = `$cpuspeed < $dmesg`;
-chomp $speed;
+my @ifaces = find_interfaces();
+my ($diskdev, $disksize) = get_disksize();
+my $speed = get_cpuspeed();
 
 #
 # Start the program that will annouce us to the switch, so that it learns
 # MAC addresses, etc.
 #
-system "$teachswitch &" and message("Unable to start teachswitch: $!\n");
-
-#
-# Sleep for a few seconds to give teachswitch the chance to do its thing
-#
-sleep(10);
+if (!$testing) {
+    teachswitch();
+}
 
 #
 # Report this stuff back to the web script on boss - build up a URL to do so
 #
-my $URL = "http://$bossnode/$formURL?";
-$URL .= "cpuspeed=" . urlencode($speed);
-$URL .= "&diskdev=" . urlencode($diskdev);
-$URL .= "&disksize=" . urlencode($disksize);
-if ($identifier) {
-    $URL .= "&identifier=". urlencode($identifier);
-}
-
-my $ifaceindex = 0;
-foreach my $aref (@ifaces) {
-    my ($iface, $mac, $status) = @$aref;
-    $URL .= "&ifacename$ifaceindex=" . urlencode($iface);
-    $URL .= "&ifacemac$ifaceindex=" . urlencode($mac);
-    $ifaceindex++;
-}
-
-$URL .= "&messages=" . urlencode(join "", @::messages);
+my $URL = buildURL();
 
 print "URL is $URL\n";
-print "URL size is " . length($URL) . "\n";
-system "$fetch -o - '$URL'";
+my $identifier;
+if (!$testing) {
+    $identifier = checkin($URL);
+} else {
+    # Just make one up for testing purposes
+    $identifier = 314;
+}
 
+print "This node's identifier is: $identifier\n";
 
-sub message($) {
-    my ($message) = @_;
-    print $message;
-    push @::messages, $message;
+if ($writefloppy) {
+    writefloppy($identifier);
 }
 
 #
 # Little subroutine to URL encode data we're sending through the web interface
 #
-sub urlencode($) {
+sub urlencode {
     my ($string) = @_;
     my @chars = split //, $string;
     my $encoded = "";
@@ -212,4 +172,335 @@ sub urlencode($) {
     }
 
     return $encoded;
+}
+
+#
+# Return a URL containing the data we've collected, to be fetched from boss to
+# check in
+#
+sub buildURL {
+    my $URL = "http://$bossnode/$FORMURL?";
+    $URL .= "cpuspeed=" . urlencode($speed);
+    $URL .= "&diskdev=" . urlencode($diskdev);
+    $URL .= "&disksize=" . urlencode($disksize);
+    if ($uniquifier) {
+	$URL .= "&identifier=". urlencode($uniquifier);
+    }
+
+    my $ifaceindex = 0;
+    foreach my $aref (@ifaces) {
+	my ($iface, $mac, $status) = @$aref;
+	$URL .= "&ifacename$ifaceindex=" . urlencode($iface);
+	$URL .= "&ifacemac$ifaceindex=" . urlencode($mac);
+	$ifaceindex++;
+    }
+
+    $URL .= "&messages=" . urlencode(join "", @::messages);
+
+    return $URL;
+}
+
+#
+# Actually check in - return this node's ID if we get one
+#
+sub checkin {
+    my ($URL) = @_;
+    open(CHECKIN,"$FETCH -o '-' $URL|")
+	or error_fatal($ERROR_CHECKIN,"Unable to check in with boss!\n");
+    my $id = undef;
+    while (<CHECKIN>) {
+	print;
+	if (/Node ID is (\d+)/) {
+	    $id = $1;
+	}
+    }
+    return $id;
+}
+
+######################################################################
+# Node hardware functions
+######################################################################
+
+#
+# Grab a list of all interfaces on this node - returns a list of [$iface, $mac,
+# $status] for each one
+#
+sub find_interfaces {
+    #
+    # Grab this node's MAC addresses - we'll just parse them from the output of
+    # ifconfig for now.
+    #
+    my @ifconfig_lines = `$IFCONFIG`;
+    my @ifaces;
+    my $iface = "";
+    my $mac;
+    my $status;
+    foreach my $line (@ifconfig_lines) {
+	chomp $line;
+	SWITCH: for ($line) {
+	    #
+	    # A line beginning a new interface
+	    #
+	    (/^(\w+):/) && do {
+		if ($iface) {
+		    #
+		    # We have an old interface to save away, but only if it's
+		    # Ethernet
+		    #
+		    if ($mac) {
+			push @ifaces, [$iface, $mac, $status];
+		    }
+		}
+
+		$iface = $1;
+		$mac = $status = "";
+		last SWITCH;
+	    };
+
+	    #
+	    # A line containing a MAC address
+	    #
+	    (/\s+ether ([0-9a-f:]+)/) && do {
+		$mac = $1;
+		$mac =~ s/://g;
+		if (length($mac) != 12) {
+		    error($ERROR_HWPROB,"Malformed MAC $mac\n");
+		    $mac = undef;
+		}
+		last SWITCH;
+	    };
+	
+	    #
+	    # A line containing the interface status
+	    #
+	    (/^\s+status: (.*)/) && do {
+		$status = $1;
+		last SWITCH;
+	    };
+	}
+
+    }
+
+    #
+    # Get the last one
+    #
+    if ($iface && $mac) {
+	push @ifaces, [$iface, $mac, $status];
+    }
+
+    #
+    # Warn about any that don't have carrier
+    #
+    foreach my $aref (@ifaces) {
+	my ($iface, $mac, $status) = @$aref;
+	if ($status ne "active") {
+	    message("WARNING: $iface has no carrier!\n");
+	}
+    }
+
+    return @ifaces;
+}
+
+#
+# Figure out the disk drive size - returns a pair containing the disk device
+# (ie. ad0 or da1) and the size in megabytes
+#
+sub get_disksize {
+    if (!open(DMESG,"<$DMESG")) {
+	error($ERROR_HWPROB,"Unable to open $DMESG\n");
+	return ("",0);
+    }
+    my ($diskdev, $disksize);
+    while (<DMESG>) {
+	chomp;
+	#
+	# Take the first of ad or da, whichever we find first
+	#
+	if (/^((ad|da|ar|aacd)\d): (\d+)MB/) {
+	    $diskdev = $1;
+	    $disksize = $3;
+	    last;
+	}
+    }
+
+    if (!$diskdev) {
+	message("WARNING: Unable to find disk drive\n");
+	$diskdev = "unknown";
+	$disksize = 0;
+    }
+
+    return ($diskdev, $disksize);
+}
+
+#
+# Find this node's CPU speed - returns the speed in MHz
+#
+sub get_cpuspeed {
+    if (!open(DMESG,"<$DMESG")) {
+	error($ERROR_HWPROB,"Unable to open $DMESG\n");
+	return (0);
+    }
+    my $speed = 0;
+    while (<DMESG>) {
+	if (/^CPU:.*\((\d+(\.\d+)?)+\-MHz/) {
+	    $speed = $1;
+	    last;
+	}
+    }
+    return $speed;
+}
+
+#
+# Teach the switch where we are
+#
+sub teachswitch {
+    system "$TEACHSWITCH &" and message("Unable to start teachswitch: $!\n");
+
+    #
+    # Sleep for a few seconds to give teachswitch the chance to do its thing
+    # before anyone comes looking
+    #
+    sleep(10);
+}
+
+######################################################################
+# Error functions
+######################################################################
+
+# 
+# Print a message, and send it on to the script we're checking in with
+# 
+sub message {
+    my ($message) = @_;
+    print $message;
+    push @::messages, $message;
+}
+
+
+#
+# Report an error, which is non-fatal
+#
+sub error {
+    my ($errno, $string) = @_;
+
+    print STDERR "*** Error $errno: $string\n";
+
+    #
+    # Maybe we ought to beep when headless - right now, we do this only for
+    # fatal errors, but maybe we should do it for all of them.
+    #
+}
+
+#
+# Same as above, but a fatal error
+#
+sub fatal_error {
+    my ($errno, $string) = @_;
+    print STDERR "*** Fatal Error $errno: $string\n";
+
+    #
+    # If headless, beep to let the user know what went wrong
+    #
+    if ($headless) {
+	my $beeps = $BEEP_CODES{$errno} || $UNKNOWN_ERROR_BEEPS;
+	beep($beeps);
+    } else {
+	exit 1;
+    }
+}
+
+######################################################################
+# Functions for dealing with the floppy drive
+######################################################################
+
+#
+# Beep to let the user know that they are expected to insert or remove the
+# floppy.
+#
+sub wait_for_floppy {
+    my ($state) = @_;
+    if ($state == $FLOPPY_INSERTED) {
+	print "Waiting for user to insert a floppy\n";
+	beep(2,$state);
+    } else {
+	print "Waiting for user to remove the floppy\n";
+	beep(1,$state);
+    }
+}
+
+#
+# Write out the node's identifier to a floppy
+#
+sub writefloppy {
+    my ($id) = @_;
+
+    #
+    # Make sure the floppy is readable
+    #
+    if (!checkfloppy()) {
+	wait_for_floppy($FLOPPY_INSERTED);
+    }
+
+    #
+    # Format that sucker
+    #
+    if (system "$FORMAT $FLOPPYDEV") {
+	error_fatal($ERROR_FLOPPYWRITE,"Floppy format failed: $!\n");
+    }
+
+    #
+    # Drop a file down with the unique identifier we were provided
+    #
+    if (system "$MOUNT -t msdos $FLOPPYDEV $MOUNTPOINT") {
+	error_fatal($ERROR_FLOPPYWRITE,"Failed to mount floppy: $!\n");
+    }
+
+    if (!open(IDFILE,">$MOUNTPOINT/node.id")) {
+	error_fatal($ERROR_FLOPPYWRITE,"Failed to write floppy: $!\n");
+    }
+
+    print IDFILE "$id\n";
+    close(IDFILE);
+    system "$UNMOUNT $MOUNTPOINT";
+
+    #
+    # Let the user know we're done
+    #
+    wait_for_floppy($FLOPPY_REMOVED);
+
+    print "Floppy written!\n";
+}
+
+#
+# Beep for a while - first argument is the number of beeps in each group.  If
+# the second argument is non-zero, will stop beeping and return when the floppy
+# is inserted or removed
+#
+sub beep {
+    my ($count, $exitOnChange) = @_;
+
+    $count = 1 unless $count;
+
+    my $floppystate;
+    while (1) {
+	foreach my $i (1 .. $count) {
+	    syswrite STDOUT, "\a";
+	    select(undef, undef, undef,.2);
+	}
+
+	if (defined($exitOnChange) && (checkfloppy() == $exitOnChange)) {
+	    return;
+	}
+
+	sleep(3);
+    }
+}
+
+#
+# Check to see if the floppy is readable - 1 if it is, 0 if not
+#
+sub checkfloppy {
+    open(FLOPPY,"<$FLOPPYDEV") or return $FLOPPY_REMOVED;
+    close(FLOPPY);
+    return $FLOPPY_INSERTED;
 }
