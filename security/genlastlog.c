@@ -248,23 +248,38 @@ doit(gzFile *infp)
 		 *	FreeBSD:	"Accepted rsa for USER" 
 		 *	Linux 6.2:	"log: RSA authentication for USER"
 		 *	Linux 7.1:	"session opened for user USER"
+		 *      (several):      "Accepted publickey for USER"
+		 *      (several):      "Accepted password for USER"
 		 */
 #define L1	"Accepted rsa for "
 #define L2	"session opened for user "
 #define L3	"log: RSA authentication for "
-
+#define L4	"Accepted publickey for "
+#define L5	"Accepted password for "
+		
 		/* Skip to end of program[pid]: and trailing space */
 		bp = strchr(bp, ':');
 		bp += 2;
 
 		if (strncmp(bp, L1, strlen(L1)) == 0) {
+		  /*fprintf(stdout,"Hit L1: ");*/
 			bp += strlen(L1);
 		}
 		else if (strncmp(bp, L2, strlen(L2)) == 0) {
+		  /*fprintf(stdout,"Hit L2: ");*/
 			bp += strlen(L2);
 		}
 		else if (strncmp(bp, L3, strlen(L3)) == 0) {
+		  /*fprintf(stdout,"Hit L3: ");*/
 			bp += strlen(L3);
+		}
+		else if (strncmp(bp, L4, strlen(L4)) == 0) {
+		  /*fprintf(stdout,"Hit L4: ");*/
+			bp += strlen(L4);
+		}
+		else if (strncmp(bp, L5, strlen(L5)) == 0) {
+		  /*fprintf(stdout,"Hit L5: ");*/
+			bp += strlen(L5);
 		}
 		else {
 			continue;
@@ -275,6 +290,7 @@ doit(gzFile *infp)
 		 */
 		if (! (user = strsep(&bp, " ")))
 			continue;
+		/*fprintf(stdout,"%s on %s\n",user,node);*/
 
 		/* We do not care about ROOT logins. */
 		if (strcasecmp(user, "ROOT") == 0)
