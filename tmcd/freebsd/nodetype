@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -35,10 +35,20 @@ elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
     *)
 	echo unknown
    	;;
-esac
-# For Aerospace Corp nodes
-elif [ $cpuspeed = "2400" ]; then
+    esac
+# For Aerospace Corp and Rutgers nodes
+elif [ $cpuspeed = "2400" -a -x $BINDIR/chipset.awk ]; then
+    case `$BINDIR/chipset.awk /var/run/dmesg.boot` in
+    HI_C)
 	echo pc${cpuspeed}-aero;
+	;;
+    HI_B)
+	echo pc${cpuspeed}-orbit;
+	;;
+    *)
+	echo unknown
+   	;;
+    esac
 # For Wiconsin nodes - they have a different node typing scheme
 elif [ $cpuspeed = "2500" ]; then
 	echo i2;

@@ -1,14 +1,15 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+
 . /etc/emulab/paths.sh
 
-NODETYPE=`nodetype`
+NODETYPE=`$BINDIR/nodetype`
 case $NODETYPE in
-pc300|pc1500|pc2000|pc2400-aero)
+pc300|pc1500|pc2000|pc2400-aero|pc2400-orbit)
     echo 'eth0'
     ;;
 i2)
