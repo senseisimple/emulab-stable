@@ -283,6 +283,8 @@ for $line (sort SortMe @nodelist) {
     print "$line\n";
 }
 
+unlink($tempfile)
+    if (defined($tempfile) && -e $tempfile);
 exit(0);
 
 sub CheckMetrics()
