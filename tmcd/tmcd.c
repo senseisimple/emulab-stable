@@ -119,7 +119,7 @@ static volatile int killme;
 ({ \
 	int __count__ = snprintf((buf), (size), ##format); \
         \
-        if (__count__ >= ((size) - 1)) { \
+        if (__count__ >= (size)) { \
 		error("Not enough room in output buffer! line %d.\n", __LINE__);\
 		return 1; \
 	} \
@@ -236,7 +236,8 @@ COMMAND_PROTOTYPE(dodoginfo);
  * Flags encode a few other random properties of commands
  */
 #define F_REMUDP	0x1	/* remote nodes can request using UDP */
-#define F_MINLOG	0x2	/* record minimal logging info */
+#define F_MINLOG	0x2	/* record minimal logging info normally */
+#define F_MAXLOG	0x4	/* record maximal logging info normally */
 
 struct command {
 	char	*cmdname;
@@ -729,7 +730,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	int		   redirect = 0, havekey = 0;
 	char		   buf[BUFSIZ], *bp, *cp;
 	char		   privkey[TBDB_FLEN_PRIVKEY];
-	int		   i, err = 0;
+	int		   i, overbose = 0, err = 0;
 	int		   version = DEFAULT_VERSION;
 	tmcdreq_t	   tmcdreq, *reqp = &tmcdreq;
 
@@ -960,6 +961,10 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
+	if ((command_array[i].flags & F_MAXLOG) != 0) {
+		overbose = verbose;
+		verbose = 1;
+	}
 	if (verbose || (command_array[i].flags & F_MINLOG) == 0)
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
@@ -969,6 +974,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (err)
 		info("%s: %s: returned %d\n",
 		     reqp->nodeid, command_array[i].cmdname, err);
+	if ((command_array[i].flags & F_MAXLOG) != 0)
+		verbose = overbose;
 
  skipit:
 	if (!istcp) 
@@ -1624,15 +1631,41 @@ COMMAND_PROTOTYPE(doaccounts)
 		if ((pubkeys_nrows = (int)mysql_num_rows(pubkeys_res))) {
 			while (pubkeys_nrows) {
 				MYSQL_ROW	pubkey_row;
+				int		klen;
+				char		*kbuf;
 
 				pubkey_row = mysql_fetch_row(pubkeys_res);
 
-				OUTPUT(buf, sizeof(buf),
-				       "PUBKEY LOGIN=%s KEY=\"%s\"\n",
+#define _KHDR	"PUBKEY LOGIN=%s KEY=\"%s\"\n"
+				/*
+				 * Pubkeys can be large, so we may have to
+				 * malloc a special buffer.
+				 */
+				klen = strlen(_KHDR)
+					+ strlen(row[0])
+					+ strlen(pubkey_row[1])
+					- 4 /* 2 x %s */
+					+ 1;
+				if (klen > sizeof(buf) - 1) {
+					kbuf = malloc(klen);
+					if (kbuf == 0) {
+						info("ACCOUNT: WARNING "
+						     "pubkey for %s too large, "
+						     "skipped\n", row[0]);
+						pubkeys_nrows--;
+						continue;
+					}
+				} else {
+					kbuf = buf;
+					klen = sizeof(buf);
+				}
+				OUTPUT(kbuf, klen, _KHDR,
 				       row[0], pubkey_row[1]);
-			
-				client_writeback(sock, buf, strlen(buf), tcp);
+				client_writeback(sock, kbuf, strlen(kbuf), tcp);
+				if (kbuf != buf)
+					free(kbuf);
 				pubkeys_nrows--;
+#undef _KHDR
 
 				if (verbose)
 					info("ACCOUNTS: PUBKEY LOGIN=%s "
