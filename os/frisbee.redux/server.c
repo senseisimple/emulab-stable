@@ -554,16 +554,14 @@ ServerRecvThread(void *arg)
 		if (! PacketValid(p, FileInfo.chunks)) {
 			struct in_addr ipaddr = { p->hdr.srcip };
 			DOSTAT(badpackets++);
-			log("received bad packet %d/%d from %s, ignored",
+			log("bad packet %d/%d from %s, ignored",
 			    p->hdr.type, p->hdr.subtype, inet_ntoa(ipaddr));
-#if 0
 			if (p->hdr.type == PKTTYPE_REQUEST &&
-			    p->hdr.subtype == PKTSUBTYPE_REQUEST)
-				log("  len=%d, chunk=%d(%d), block=%d@%d\n",
+			    (p->hdr.subtype == PKTSUBTYPE_REQUEST ||
+			     p->hdr.subtype == PKTSUBTYPE_PREQUEST))
+				log("  len=%d, chunk=%d(%d), word2=%d",
 				    p->hdr.datalen, p->msg.request.chunk,
-				    FileInfo.chunks, p->msg.request.count,
-				    p->msg.request.block);
-#endif
+				    FileInfo.chunks, p->msg.request.block);
 			continue;
 		}
 		gettimeofday(&LastReq, 0);
