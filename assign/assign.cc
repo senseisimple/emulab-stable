@@ -720,7 +720,7 @@ int main(int argc,char **argv)
   fclose(deltaout);
 #endif
 
-  if ((get_score() > absbest) || (violated > absbestviolated)) {
+  if ((!compare_scores(get_score(),absbest)) || (violated > absbestviolated)) {
     cerr << "Internal error: Invalid migration assumptions." << endl;
     cerr << "score:" << get_score() << " absbest:" << absbest <<
       " violated:" << violated << " absbestviolated:" <<

@@ -978,7 +978,7 @@ NOTQUITEDONE:
 
       // Check to make sure that our 'clean' solution scores the same as
       // the initial score - if not, that indicates a bug
-      if (get_score() != initial_score) {
+      if (!compare_scores(get_score(),initial_score)) {
 	  cerr << "*** WARNING: 'Clean' score does not match initial score" <<
 	      endl << "     This indicates a bug - contact the operators" <<
 	      endl << "     (initial score: " << initial_score <<

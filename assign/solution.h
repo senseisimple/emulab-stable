@@ -38,6 +38,14 @@ extern assigned_map absassigned;
 /* Print a solution */
 void print_solution();
 
+/* Check to see if two scores are, for all intents and purposes, the same */
+bool compare_scores(double score1, double score2);
+
+/* The amount by twhich two scores can differ and still look the same - should
+ * be << than the smallest possible weight
+ */
+const double ITTY_BITTY = 0.00001;
+
 /*
  * These structs are used for traversing edges, etc. to produce graphviz
  * outputs. They are used as functors.

@@ -6,6 +6,14 @@
 
 #include "solution.h"
 
+bool compare_scores(double score1, double score2) {
+    if ((score1 < (score2 + ITTY_BITTY)) && (score1 > (score2 - ITTY_BITTY))) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
 /*
  * Print out the current solution
  */
