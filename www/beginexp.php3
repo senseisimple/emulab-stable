@@ -69,10 +69,23 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
     else {
-	echo "<b>
-              Looking for a <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
-	      to help you create your topology?
-              <a href='buildui/bui.php3'>Check it out!</a></b>\n<br><br>";
+	if (!isset($nsdata) && !isset($nsref)) {
+	echo "<p>Either <b><a href='buildui/bui.php3'>go to the " .
+             "NetBuild GUI</a></b> and create your experiment graphically " .
+	     "(<a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>Additional " .
+             "information</a>), or, if you already have an NS file, " .
+             "fill out the following information:</p>";
+	
+	#echo "<b>
+        #      Looking for a <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
+	#      to help you create your topology?
+        #      <a href='buildui/bui.php3'>Check it out!</a></b>\n<br><br>";
+	} else {
+	echo "<p><b>Your NetBuild-generated NS file has been uploaded.</b> " .
+             "To finish creating your experiment, " . 
+             "please fill out the following information:</p>";
+        }
+        echo "<br />";
     }
 
     echo "<table align=center border=1> 
