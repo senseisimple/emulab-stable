@@ -161,7 +161,7 @@ int main(int argc, char * argv[])
             }
             insert_edge(&g, firstPos->second, secondPos->second, false,
                         weight);
-            g.ip[firstPos->second].insert(make_pair(firstPos->second,
+            g.ip[firstPos->second].insert(make_pair(secondPos->second,
                                                     make_pair(firstIp,
                                                               secondIp)));
             g.ip[secondPos->second].insert(make_pair(firstPos->second,
