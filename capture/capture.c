@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -26,12 +26,10 @@
 #include <ctype.h>
 #include <strings.h>
 #include <syslog.h>
-#ifdef HPBSD
-#include <sgtty.h>
-#else
 #include <termios.h>
-#endif
 #include <errno.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -63,16 +61,16 @@ void reinit(int);
 void newrun(int);
 void terminate(int);
 void cleanup(void);
-void capture();
-void usage();
+void capture(void);
+
+void usage(void);
+void warn(char *format, ...);
+void die(char *format, ...);
+void dolog(int level, char *format, ...);
 
 #ifdef __linux__
 #define _POSIX_VDISABLE '\0'
 #define revoke(tty)	(0)
-#endif
-
-#ifdef HPBSD
-#define TWOPROCESS	/* historic? */
 #endif
 
 /*
@@ -100,6 +98,7 @@ char	*Devname;
 char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0, standalone = 0;
+int	stampinterval = -1;
 sigset_t actionsigmask;
 sigset_t allsigmask;
 #ifdef  USESOCKETS
@@ -128,9 +127,7 @@ const char * certfile = NULL;
 #endif /* USESOCKETS */
 
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
 	char strbuf[MAXPATHLEN], *newstr();
 	int flags, op, i;
@@ -143,7 +140,7 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:ip:c:")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
@@ -180,6 +177,11 @@ main(argc, argv)
 			    (speed = val2speed(i)) == 0)
 				usage();
 			break;
+		case 'T':
+			stampinterval = atoi(optarg);
+			if (stampinterval < 0)
+				usage();
+			break;
 		}
 
 	argc -= optind;
@@ -188,10 +190,8 @@ main(argc, argv)
 	if (argc != 2)
 		usage();
 
-#ifndef HPBSD
 	if (!debug)
 		(void)daemon(0, 0);
-#endif
 
 	Machine = argv[0];
 
@@ -315,7 +315,7 @@ main(argc, argv)
 int	pid;
 
 void
-capture()
+capture(void)
 {
 	flags = FNDELAY;
 	(void) fcntl(ptyfd, F_SETFL, &flags);
@@ -330,7 +330,7 @@ capture()
  * Loop reading from the console device, writing data to log file and
  * to the pty for tip to pick up.
  */
-in()
+in(void)
 {
 	char buf[BUFSIZE];
 	int cc;
@@ -364,7 +364,7 @@ in()
 /*
  * Loop reading input from pty (tip), and send off to the console device.
  */
-out()
+out(void)
 {
 	char buf[BUFSIZE];
 	int cc;
@@ -397,7 +397,7 @@ out()
 static fd_set	sfds;
 static int	fdcount;
 void
-capture()
+capture(void)
 {
 	fd_set fds;
 	int i, cc, lcc;
@@ -553,6 +553,25 @@ capture()
 				}
 			}
 dropped:
+			if (stampinterval >= 0) {
+				static time_t laststamp;
+				struct timeval tv;
+				char stampbuf[40], *cts;
+				time_t now;
+
+				gettimeofday(&tv, 0);
+				now = tv.tv_sec;
+				if (stampinterval == 0 ||
+				    now > laststamp + stampinterval) {
+					cts = ctime(&now);
+					cts[24] = 0;
+					snprintf(stampbuf, sizeof stampbuf,
+						 "\nSTAMP{%s}\n", cts);
+					write(logfd, stampbuf,
+					      strlen(stampbuf));
+				}
+				laststamp = now;
+			}
 			i = write(logfd, buf, cc);
 			if (i < 0)
 				die("%s: write: %s", Logname, geterr(errno));
@@ -746,12 +765,7 @@ terminate(int sig)
 	 * We know that the any pending access to the pty completed
 	 * because we blocked SIGUSR2 during the operation.
 	 */
-#ifdef HPBSD
-	int zero = 0;
-	ioctl(ptyfd, TIOCFLUSH, &zero);
-#else
 	tcflush(ptyfd, TCIOFLUSH);
-#endif
 	if (revoke(Ttyname) < 0)
 		dolog(LOG_WARNING, "could not revoke access to tty");
 	close(ptyfd);
@@ -784,39 +798,55 @@ terminate(int sig)
 /*
  *  Display proper usage / error message and exit.
  */
+char *optstr =
+#ifdef USESOCKETS
+#ifdef WITHSSL
+"[-c certfile] "
+#endif
+"[-b bossnode] [-p bossport] [-i] "
+#endif
+"-Hdr [-s speed] [-T stampinterval]";
 void
-usage()
+usage(void)
 {
-	fprintf(stderr, "usage: %s machine tty\n", Progname);
+	fprintf(stderr, "usage: %s %s machine tty\n", Progname, optstr);
 	exit(1);
 }
 
-warn(format, arg0, arg1, arg2, arg3)
-	char *format, *arg0, *arg1, *arg2, *arg3;
+void
+warn(char *format, ...)
 {
 	char msgbuf[BUFSIZE];
+	va_list ap;
 
-	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
+	va_start(ap, format);
+	vsnprintf(msgbuf, BUFSIZE, format, ap);
+	va_end(ap);
 	dolog(LOG_WARNING, msgbuf);
 }
 
-die(format, arg0, arg1, arg2, arg3)
-	char *format, *arg0, *arg1, *arg2, *arg3;
+void
+die(char *format, ...)
 {
 	char msgbuf[BUFSIZE];
+	va_list ap;
 
-	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
+	va_start(ap, format);
+	vsnprintf(msgbuf, BUFSIZE, format, ap);
+	va_end(ap);
 	dolog(LOG_ERR, msgbuf);
 	quit(0);
 }
 
-dolog(level, format, arg0, arg1, arg2, arg3)
-	int level;
-	char *format, *arg0, *arg1, *arg2, *arg3;
+void
+dolog(int level, char *format, ...)
 {
 	char msgbuf[BUFSIZE];
+	va_list ap;
 
-	snprintf(msgbuf, BUFSIZE, format, arg0, arg1, arg2, arg3);
+	va_start(ap, format);
+	vsnprintf(msgbuf, BUFSIZE, format, ap);
+	va_end(ap);
 	if (debug) {
 		fprintf(stderr, "%s - %s\n", Machine, msgbuf);
 		fflush(stderr);
@@ -832,7 +862,7 @@ quit(int sig)
 }
 
 void
-cleanup()
+cleanup(void)
 {
 	dolog(LOG_NOTICE, "exiting");
 #ifdef TWOPROCESS
@@ -843,38 +873,20 @@ cleanup()
 }
 
 char *
-newstr(str)
-	char *str;
+newstr(char *str)
 {
-	register char *np;
+	char *np;
 
-	if ((np = (char*)malloc((unsigned) strlen(str) + 1)) == NULL)
+	if ((np = malloc((unsigned) strlen(str) + 1)) == NULL)
 		die("malloc: out of memory");
 
 	return(strcpy(np, str));
 }
 
-#if 0
-char *
-geterr(errindx)
-int errindx;
-{
-	extern int sys_nerr;
-	extern char *sys_errlist[];
-	char syserr[25];
-
-	if (errindx < sys_nerr)
-		return(sys_errlist[errindx]);
-
-	(void) sprintf(syserr, "unknown error (%d)", errindx);
-	return(syserr);
-}
-#endif
-
 /*
  * Open up PID file and write our pid into it.
  */
-writepid()
+writepid(void)
 {
 	int fd;
 	char buf[8];
@@ -896,23 +908,8 @@ writepid()
 /*
  * Put the console line into raw mode.
  */
-rawmode(speed)
-int speed;
+rawmode(int speed)
 {
-#ifdef HPBSD
-	struct sgttyb sgbuf;
-	int bits;
-	
-	if (ioctl(devfd, TIOCGETP, (char *)&sgbuf) < 0)
-		die("%s: ioctl(TIOCGETP): %s", Device, geterr(errno));
-	sgbuf.sg_ispeed = sgbuf.sg_ospeed = speed;
-	sgbuf.sg_flags = RAW|TANDEM;
-	bits = LDECCTQ;
-	if (ioctl(devfd, TIOCSETP, (char *)&sgbuf) < 0)
-		die("%s: ioctl(TIOCSETP): %s", Device, geterr(errno));
-	if (ioctl(devfd, TIOCLBIS, (char *)&bits) < 0)
-		die("%s: ioctl(TIOCLBIS): %s", Device, geterr(errno));
-#else
 	struct termios t;
 
 	if (tcgetattr(devfd, &t) < 0)
@@ -930,7 +927,6 @@ int speed;
 	t.c_cc[VSTART] = t.c_cc[VSTOP] = _POSIX_VDISABLE;
 	if (tcsetattr(devfd, TCSAFLUSH, &t) < 0)
 		die("%s: tcsetattr: %s", Devname, geterr(errno));
-#endif
 }
 
 /*
@@ -1010,11 +1006,10 @@ static struct speeds {
 #define NSPEEDS (sizeof(speeds) / sizeof(speeds[0]))
 
 int
-val2speed(val)
-	register int val;
+val2speed(int val)
 {
-	register int n;
-	register struct speeds *sp;
+	int n;
+	struct speeds *sp;
 
 	for (sp = speeds, n = NSPEEDS; n > 0; ++sp, --n)
 		if (val == sp->val)
@@ -1025,7 +1020,7 @@ val2speed(val)
 
 #ifdef USESOCKETS
 int
-clientconnect()
+clientconnect(void)
 {
 	int		cc, length = sizeof(tipclient);
 	int             ret;
@@ -1245,7 +1240,7 @@ clientconnect()
  * to do a secure connect.
  */
 int
-createkey()
+createkey(void)
 {
 	int			cc, i, fd;
 	unsigned char		buf[BUFSIZ];
@@ -1336,7 +1331,7 @@ static	jmp_buf deadline;
 static	int	deadbossflag;
 
 void
-deadboss()
+deadboss(int sig)
 {
 	deadbossflag = 1;
 	longjmp(deadline, 1);
@@ -1349,7 +1344,7 @@ deadboss()
  * the files properly.
  */
 int
-handshake()
+handshake(void)
 {
 	int			sock, cc, err = 0;
 	struct sockaddr_in	name;
