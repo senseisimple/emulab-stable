@@ -29,7 +29,8 @@ SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp
 SCRIPTFILES = hypview pangorc.local pango.modules.local
-DISTFILES = ${SCRIPTFILES} ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${HVROOT}
+DOCFILES = www
+DISTFILES = ${SCRIPTFILES} ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${DOCFILES} ${HVROOT}
 
 # Finally, make something.
 default: _hv.so
@@ -65,7 +66,8 @@ dist:
 	# Wrap a top-level hyperviewer directory around the dist files in the tarball.
 	mkdir -p temp/hyperviewer
 	cp -rp ${DISTFILES} temp/hyperviewer
-	tar cvfz hyperviewer.tgz -C temp hyperviewer
+	ln -s www/index.html temp/hyperviewer
+	tar cfz hyperviewer.tgz -C temp hyperviewer
 	rm -rf temp
 
 clean:
