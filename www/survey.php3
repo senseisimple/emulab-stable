@@ -70,23 +70,57 @@ PAGEHEADER("Emulab Survey");
 # echo "<h1>I think you are $effuid</h1>";
 
 if ($submit) {
+    global $TB_PROJECT_READINFO;
 
+    if ($uid && ! $anonymous) {
+	TBUserInfo($uid,$name,$mail);
+	if ($name != "" && $mail != "") {
+	    $from = "\"$name\" <$mail>";
+	    $q = DBQueryWarn("select usr_affil from users where uid='$uid'");
+	    $r = mysql_fetch_array($q);
+	    $affil = $r['usr_affil'];
+	    $plist = TBProjList($uid,$TB_PROJECT_READINFO);
+	    $projects = "";
+	    foreach ($plist as $proj => $grplist) {
+		if ($projects != "") { $projects .= ", "; }
+		$projects .= $proj;
+		if (count($grplist)>1) {
+		    $grps = "";
+		    foreach ($grplist as $grp) {
+			if ($grp==$proj) { continue; }
+			if ($grps != "") { $grps .= ", "; }
+			$grps .= "$grp";
+		    }
+		    $projects .= " (sub-group(s) $grps)";
+		}
+	    }
+	} else {
+	    $from = "$uid@emulab.net";
+	}
+    } else {
+	$from = "$TBMAIL_OPS";
+    }
+    
     $mesg = "";
     if ($anonymous) {
-	$mesg .= "\nSurvey Responder: *Anonymous* (uid hash ='" . md5($effuid) . "' )\n";
-	$mesg .= "Auth notes: $uidnotes\n";
+	$mesg .= "\nSurvey Responder:    *Anonymous* (uid hash ='" . md5($effuid) . "' )\n";
+	$mesg .= "Auth notes:          $uidnotes\n";
     } else {
-        $mesg .= "\nSurvey Responder: $effuid\n";
-	$mesg .= "Auth notes: $uidnotes\n";
-	$mesg .= "Remote IP: $REMOTE_ADDR\n";
+        $mesg .= "\nSurvey Responder:    $effuid\n";
+	$mesg .= "Auth notes:          $uidnotes\n";
+	$mesg .= "Institution:         $affil\n";
+	$mesg .= "Emulab Projects:     $projects\n";
+	$mesg .= "Remote IP:           $REMOTE_ADDR\n";
     }
     if (strcmp($name,"")) {
-    	$mesg .= "User-supplied name: $name\n";
+    	$mesg .= "User-supplied name:  $name\n";
     }
     if (strcmp($email,"")) {
     	$mesg .= "User-supplied email: $email\n";
     }
-    $mesg .= "> Multiple Choice:\n";
+    # Debugging...
+    #print "\n<pre>\n$mesg\n</pre>\n"; return;
+    $mesg .= "\n\n> Multiple Choice:\n";
     $foo = 0;
     for( $n = 0; $n < count($questions) - 1; $n += 2) {
 	$foo++;
@@ -121,6 +155,9 @@ if ($submit) {
 	TBUserInfo($uid,$name,$mail);
 	if ($name != "" && $mail != "") {
 	    $from = "\"$name\" <$mail>";
+	    $q = DBQueryWarn("select usr_affil from users where uid='$uid'");
+	    $r = mysql_fetch_array($q);
+	    $affil = $r['usr_affil'];
 	} else {
 	    $from = "$uid@emulab.net";
 	}
@@ -129,7 +166,7 @@ if ($submit) {
     }
     
 #   testbed-survey@emulab.net
-#    TBMAIL("barb@flux.utah.edu",
+#    TBMAIL("newbold@flux.utah.edu",
     TBMAIL("testbed-survey@emulab.net",
 	   "Survey Answers",
 	   $mesg,
