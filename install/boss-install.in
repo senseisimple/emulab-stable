@@ -887,6 +887,8 @@ Phase "named", "Setting up initial named configuration", sub {
 Phase "firstuser", "Setting up initial user (elabman)", sub {
     PhaseSkip("elabman already created")
 	if (-d "/users/elabman");
+    PhaseSkip("Not needed unless in batch mode")
+	if (!$batchmode);
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser ".
 		   ($batchmode ? " -b" : "") .
 		   (defined($password) ? " -p $password" : ""));
