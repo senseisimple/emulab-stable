@@ -67,6 +67,11 @@ A. Things to understand up front:
    - Perl.  On FreeBSD 5, perl is not installed by default.  Make sure you
      have a version of perl5 installed.
 
+   - Perl HiRes timer module.  If debugging timestamps are enabled in the
+     client scripts, you will need to install the HiRes module.  Currently
+     this only happens in the mkjail script which is FreeBSD specific.
+     To install on FreeBSD, install the devel/p5-Time-HiRes port.
+
    - Ethtool.  On Linux, with certain NICs, you will need ethtool (instead
      of mii-tool) so that the Emulab software can change link speed/duplex.
      Just install an RPM.
