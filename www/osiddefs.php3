@@ -26,8 +26,8 @@ $osid_featurelist["mlinks"]	= 0;
 
 # Default op modes. The value is a user-okay flag.
 $osid_opmodes			= array();
-$osid_opmodes["NORMALv2"]	= 0;
-$osid_opmodes["NORMALv1"]	= 1;
+$osid_opmodes["NORMALv2"]	= 1;
+$osid_opmodes["NORMALv1"]	= 0;
 $osid_opmodes["MINIMAL"]	= 1;
 $osid_opmodes["NORMAL"]		= 1;
 
