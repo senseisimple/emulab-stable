@@ -548,7 +548,8 @@ sub doVlansFromTables(@) {
     my $errors = 0;
 
     if (@stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n";
+	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	    "Stacks are " . join(",",@stacks) . "\n";
     }
     my ($stack) = @stacks;
 
@@ -609,7 +610,8 @@ sub doMakeVlan($@) {
     my $errors = 0;
 
     if (@stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n";
+	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	    "Stacks are " . join(",",@stacks) . "\n";
     }
     my ($stack) = @stacks;
 
@@ -682,7 +684,8 @@ sub doPortControl($@) {
     my @ports = @_;
 
     if (@stacks > 1) {
-	die "Port control accross multiple stacks is not yet supported\n";
+	die "Port control accross multiple stacks is not yet supported\n" .
+	    "Stacks are " . join(",",@stacks) . "\n";
     }
     my ($stack) = @stacks;
 
