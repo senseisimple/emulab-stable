@@ -95,9 +95,6 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (! version)
-		
-
 	/*
 	 * Handle built-in "bossinfo" command
 	 */
