@@ -11,9 +11,31 @@ SUBDIR		= robots/emc
 
 include $(OBJDIR)/Makeconf
 
-all:
+PROGS = emcd
+TESTS = test_emcd.sh
+
+all: $(PROGS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS		= emcd.o
+CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include 
+CFLAGS	       += -I${SRCDIR}/../mtp -I${SRCDIR}/../../event/lib
+CFLAGS	       += -I${SRCDIR}/../../lib/libtb
+CFLAGS	       += `elvin-config --cflags vin4c`
+LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
+
+LIBS	 += -levent -lcrypto -lmtp -ltb
+LIBS     += `elvin-config --libs vin4c`
+
+test_emcd.sh: emcd
+
+emcd: emcd.o robot_list.o ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ emcd.o robot_list.o $(LIBS)
+
+install: all
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/opsdir/sbin/emcd
 
 clean:
 	rm -f *.o

@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
   static struct mtp_config_rmc mcr = {
     3,
     rcr,
-    { 10.0, 20.0 }
+    { 10.1, 20.2 }
   };
   
   static struct robot_config rcv[3] = {
@@ -49,13 +49,13 @@ int main(int argc, char *argv[])
   
   static struct mtp_update_position mup = {
     3,
-    { 5, 25, 76 },
+    { 5, 25, 0.44 },
     MTP_POSITION_STATUS_IDLE,
     56
   };
   
   static struct mtp_request_id mri = {
-    { 3, 20, 69 },
+    { 3.1, 20.2, 69.5 },
     169
   };
   
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
   static struct mtp_command_goto mcg = {
     5,
     3,
-    { 2, 13, 73 },
+    { 2.2, 13.3, 73.4 },
   };
   
   static struct mtp_command_goto mcs = {

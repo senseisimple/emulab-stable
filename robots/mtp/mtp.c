@@ -83,6 +83,28 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
 
 }
 
+#define encode_float32(buf, idx, val) { \
+  union { \
+    float f; \
+    unsigned int i; \
+  } __z; \
+\
+  __z.f = val; \
+  *((int *)((buf)+(idx))) = htonl(__z.i); \
+  idx += 4; \
+}
+
+#define decode_float32(buf, idx, val) { \
+  union { \
+    float f; \
+    unsigned int i; \
+  } __z; \
+\
+  __z.i = ntohl(*((int *)((buf)+(idx)))); \
+  val = __z.f; \
+  idx += 4; \
+}
+
 int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   char *buf;
   int i,j;
@@ -156,10 +178,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
       i += strlen(&buf[i]) + 1;
     }
     // now write the global_bound data
-    *((int *)(buf+i)) = htonl(data->box.horizontal);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->box.vertical);
-
+    encode_float32(buf, i, data->box.horizontal);
+    encode_float32(buf, i, data->box.vertical);
   }
   else if (packet->opcode == MTP_CONFIG_VMC) {
     struct mtp_config_rmc *data = packet->data.config_rmc;
@@ -229,12 +249,9 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
 
     // now write the specific data:
     i = MTP_PACKET_HEADER_LEN;
-    *((int *)(buf+i)) = htonl(data->position.x);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.y);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.theta);
-    i += 4;
+    encode_float32(buf, i, data->position.x);
+    encode_float32(buf, i, data->position.y);
+    encode_float32(buf, i, data->position.theta);
     *((int *)(buf+i)) = htonl(data->timestamp);
     i += 4;
 
@@ -258,12 +275,9 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i = MTP_PACKET_HEADER_LEN;
     *((int *)(buf+i)) = htonl(data->robot_id);
     i += 4;
-    *((int *)(buf+i)) = htonl(data->position.x);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.y);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.theta);
-    i += 4;
+    encode_float32(buf, i, data->position.x);
+    encode_float32(buf, i, data->position.y);
+    encode_float32(buf, i, data->position.theta);
     *((int *)(buf+i)) = htonl(data->status);
     i += 4;
     *((int *)(buf+i)) = htonl(data->timestamp);
@@ -312,12 +326,9 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i += 4;
     *((int *)(buf+i)) = htonl(data->robot_id);
     i += 4;
-    *((int *)(buf+i)) = htonl(data->position.x);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.y);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->position.theta);
-    i += 4;
+    encode_float32(buf, i, data->position.x);
+    encode_float32(buf, i, data->position.y);
+    encode_float32(buf, i, data->position.theta);
 
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
@@ -417,11 +428,8 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       i += len;
     }
     // write the global_coord box
-    data->box.horizontal = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->box.vertical = ntohl(*((int *)(buf+i)));
-    i += 4;
-
+    decode_float32(buf, i, data->box.horizontal);
+    decode_float32(buf, i, data->box.vertical);
   }
   else if (packet->opcode == MTP_CONFIG_VMC) {
     struct mtp_config_vmc *data = (struct mtp_config_vmc *)malloc(sizeof(struct mtp_config_vmc));
@@ -463,12 +471,9 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       return MTP_PP_ERROR_MALLOC;
     }
     packet->data.request_id = data;
-    data->position.x = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.y = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.theta = ntohl(*((int *)(buf+i)));
-    i += 4;
+    decode_float32(buf, i, data->position.x);
+    decode_float32(buf, i, data->position.y);
+    decode_float32(buf, i, data->position.theta);
     data->timestamp = ntohl(*((int *)(buf+i)));
     i += 4;
 
@@ -481,12 +486,9 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     packet->data.update_position = data;
     data->robot_id = ntohl(*((int *)(buf+i)));
     i += 4;
-    data->position.x = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.y = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.theta = ntohl(*((int *)(buf+i)));
-    i += 4;
+    decode_float32(buf, i, data->position.x);
+    decode_float32(buf, i, data->position.y);
+    decode_float32(buf, i, data->position.theta);
     data->status = ntohl(*((int *)(buf+i)));
     i += 4;
     data->timestamp = ntohl(*((int *)(buf+i)));
@@ -513,12 +515,9 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     i += 4;
     data->robot_id = ntohl(*((int *)(buf+i)));
     i += 4;
-    data->position.x = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.y = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->position.theta = ntohl(*((int *)(buf+i)));
-    i += 4;
+    decode_float32(buf, i, data->position.x);
+    decode_float32(buf, i, data->position.y);
+    decode_float32(buf, i, data->position.theta);
 
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
@@ -680,6 +679,7 @@ int mtp_calc_size(int opcode,void *data) {
       opcode == MTP_CONTROL_INIT ||
       opcode == MTP_CONTROL_CLOSE) {
     struct mtp_control *c = (struct mtp_control *)data;
+    assert(c->msg);
     retval += 8;
     retval += strlen(c->msg) + 1;
   }
@@ -687,6 +687,8 @@ int mtp_calc_size(int opcode,void *data) {
     struct mtp_config_rmc *c = (struct mtp_config_rmc *)data;
     retval += 4;
     for (i = 0; i < c->num_robots; ++i) {
+      assert(c->robots[i].hostname);
+      
       retval += 4;
       retval += strlen(c->robots[i].hostname) + 1;
     }
@@ -696,6 +698,8 @@ int mtp_calc_size(int opcode,void *data) {
     struct mtp_config_vmc *c = (struct mtp_config_vmc *)data;
     retval += 4;
     for (i = 0; i < c->num_robots; ++i) {
+      assert(c->robots[i].hostname);
+      
       retval += 4;
       retval += strlen(c->robots[i].hostname) + 1;
     }
@@ -730,4 +734,152 @@ int mtp_calc_size(int opcode,void *data) {
   
   return retval;
 
+}
+
+void mtp_print_packet(FILE *file, struct mtp_packet *mp)
+{
+  int lpc;
+  
+  fprintf(file,
+	  "Packet: length %d; version %d; role %d\n",
+	  mp->length,
+	  mp->version,
+	  mp->role);
+  
+  switch (mp->opcode) {
+  case MTP_CONTROL_ERROR:
+  case MTP_CONTROL_NOTIFY:
+  case MTP_CONTROL_INIT:
+  case MTP_CONTROL_CLOSE:
+    switch (mp->opcode) {
+    case MTP_CONTROL_ERROR:
+      fprintf(file, " opcode:\terror\n");
+      break;
+    case MTP_CONTROL_NOTIFY:
+      fprintf(file, " opcode:\tnotify\n");
+      break;
+    case MTP_CONTROL_INIT:
+      fprintf(file, " opcode:\tinit\n");
+      break;
+    case MTP_CONTROL_CLOSE:
+      fprintf(file, " opcode:\tclose\n");
+      break;
+    }
+    fprintf(file,
+	    "  id:\t\t%d\n"
+	    "  code:\t\t%d\n"
+	    "  msg:\t\t%s\n",
+	    mp->data.control->id,
+	    mp->data.control->code,
+	    mp->data.control->msg);
+    break;
+
+  case MTP_CONFIG_VMC:
+    fprintf(file,
+	    " opcode:\tconfig-vmc\n"
+	    "  num:\t\t%d\n",
+	    mp->data.config_vmc->num_robots);
+    for (lpc = 0;
+	 lpc < mp->data.config_vmc->num_robots;
+	 lpc++) {
+      fprintf(file,
+	      "  robot[%d]:\t%d, %s\n",
+	      lpc,
+	      mp->data.config_vmc->robots[lpc].id,
+	      mp->data.config_vmc->robots[lpc].hostname);
+    }
+    break;
+    
+  case MTP_CONFIG_RMC:
+    fprintf(file,
+	    " opcode:\tconfig-rmc\n"
+	    "  num:\t\t%d\n"
+	    "  horiz:\t%f\n"
+	    "  vert:\t\t%f\n",
+	    mp->data.config_rmc->num_robots,
+	    mp->data.config_rmc->box.horizontal,
+	    mp->data.config_rmc->box.vertical);
+    for (lpc = 0;
+	 lpc < mp->data.config_rmc->num_robots;
+	 lpc++) {
+      fprintf(file,
+	      "  robot[%d]:\t%d, %s\n",
+	      lpc,
+	      mp->data.config_rmc->robots[lpc].id,
+	      mp->data.config_rmc->robots[lpc].hostname);
+    }
+    break;
+    
+  case MTP_REQUEST_POSITION:
+    fprintf(file,
+	    " opcode:\trequest-position\n"
+	    "  id:\t\t%d\n",
+	    mp->data.request_position->robot_id);
+    break;
+    
+  case MTP_REQUEST_ID:
+    fprintf(file,
+	    " opcode:\trequest-id\n"
+	    "  x:\t\t%f\n"
+	    "  y:\t\t%f\n"
+	    "  theta:\t%f\n"
+	    "  timestamp:\t%d\n",
+	    mp->data.request_id->position.x,
+	    mp->data.request_id->position.y,
+	    mp->data.request_id->position.theta,
+	    mp->data.request_id->timestamp);
+    break;
+    
+  case MTP_UPDATE_POSITION:
+    fprintf(file,
+	    " opcode:\tupdate-position\n"
+	    "  id:\t\t%d\n"
+	    "  x:\t\t%f\n"
+	    "  y:\t\t%f\n"
+	    "  theta:\t%f\n"
+	    "  status:\t%d\n"
+	    "  timestamp:\t%d\n",
+	    mp->data.update_position->robot_id,
+	    mp->data.update_position->position.x,
+	    mp->data.update_position->position.y,
+	    mp->data.update_position->position.theta,
+	    mp->data.update_position->status,
+	    mp->data.update_position->timestamp);
+    break;
+    
+  case MTP_UPDATE_ID:
+    fprintf(file,
+	    " opcode:\tupdate-id\n"
+	    "  id:\t%d\n",
+	    mp->data.update_position->robot_id);
+    break;
+    
+  case MTP_COMMAND_GOTO:
+    fprintf(file,
+	    " opcode:\tcommand-goto\n"
+	    "  commid:\t%d\n"
+	    "  id:\t\t%d\n"
+	    "  x:\t\t%f\n"
+	    "  y:\t\t%f\n"
+	    "  theta:\t%f\n",
+	    mp->data.command_goto->command_id,
+	    mp->data.command_goto->robot_id,
+	    mp->data.command_goto->position.x,
+	    mp->data.command_goto->position.y,
+	    mp->data.command_goto->position.theta);
+    break;
+    
+  case MTP_COMMAND_STOP:
+    fprintf(file,
+	    " opcode:\tupdate-id\n"
+	    "  commid:\t%d\n"
+	    "  id:\t%d\n",
+	    mp->data.command_stop->command_id,
+	    mp->data.command_stop->robot_id);
+    break;
+
+  default:
+    assert(0);
+    break;
+  }
 }

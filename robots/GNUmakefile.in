@@ -15,6 +15,7 @@ SUBDIRS	= mtp emc rmcd vmcd
 
 all:	all-subdirs
 check:	check-subdirs
+install:	install-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

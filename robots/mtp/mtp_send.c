@@ -52,6 +52,7 @@ static void usage(void)
 	    "Options:\n"
 	    "  -h\t\tPrint this message\n"
 	    "  -d\t\tTurn on debugging messages\n"
+	    "  -w\t\tWait for, and print, any replies\n"
 	    "  -i #\t\tThe robot identifier\n"
 	    "  -c #\t\tThe code number for control packets\n"
 	    "  -C #\t\tThe command_id for goto/stop\n"
@@ -65,7 +66,7 @@ static void usage(void)
 	    "  -s idle|moving|error|complete\n"
 	    "      \t\tThe robot status\n"
 	    "  -m msg\tThe msg for control packets\n"
-	    "  -r vmc|emc|rmc\n"
+	    "  -r vmc|emc|rmc|emulab\n"
 	    "      \t\tThe role (Default: rmc)\n"
 	    "  -P #\t\tThe port the peer listening on\n"
 	    "\n"
@@ -84,9 +85,11 @@ static void required_option(char *name)
     exit(1);
 }
 
-int main(int argc, char *argv[])
+static int interpret_options(int *argcp, char ***argvp)
 {
-    struct {
+    static int fd = -1;
+    
+    static struct {
 	int id;
 	int code;
 	char *hostname;
@@ -119,6 +122,9 @@ int main(int argc, char *argv[])
 	-1,		/* port */
     };
 
+    int argc = *argcp;
+    char **argv = *argvp;
+
     union {
 	struct mtp_control control;
 	struct mtp_config_rmc config_rmc;
@@ -131,13 +137,13 @@ int main(int argc, char *argv[])
 	struct mtp_command_stop command_stop;
     } payload;
     
-    int c, fd, retval = EXIT_SUCCESS;
+    int c, waitmode = 0, retval = EXIT_SUCCESS;
     mtp_payload_t m_payload;
     struct sockaddr_in sin;
     mtp_packet_t *mp;
     char opcode;
     
-    while ((c = getopt(argc, argv, "hdi:c:C:n:x:y:o:H:V:t:s:m:r:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hdwi:c:C:n:x:y:o:H:V:t:s:m:r:P:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -145,6 +151,9 @@ int main(int argc, char *argv[])
 	    break;
 	case 'd':
 	    debug += 1;
+	    break;
+	case 'w':
+	    waitmode = 1;
 	    break;
 	case 'i':
 	    if (sscanf(optarg, "%d", &args.id) != 1) {
@@ -269,6 +278,9 @@ int main(int argc, char *argv[])
 	    else if (strcasecmp(optarg, "rmc") == 0) {
 		args.role = MTP_ROLE_RMC;
 	    }
+	    else if (strcasecmp(optarg, "emulab") == 0) {
+		args.role = MTP_ROLE_EMULAB;
+	    }
 	    else {
 		fprintf(stderr,
 			"error: r option must be one of: vmc, emc, or rmc\n");
@@ -300,6 +312,9 @@ int main(int argc, char *argv[])
 	usage();
 	exit(1);
     }
+
+    *argcp = argc - 1;
+    *argvp = argv + 1;
 
     if (args.hostname == NULL) {
 	required_option("n");
@@ -491,20 +506,28 @@ int main(int argc, char *argv[])
 	break;
     }
 
-    memset(&sin, 0, sizeof(sin));
-    sin.sin_len = sizeof(sin);
-    sin.sin_family = AF_INET;
-    sin.sin_port = htons(args.port);
-    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	perror("socket");
+    if (fd == -1) {
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_len = sizeof(sin);
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(args.port);
+	
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	    perror("socket");
+	}
+	else if (mygethostbyname(&sin, args.hostname) == 0) {
+	    perror("gethostbyname");
+	}
+	else if (connect(fd,
+			 (struct sockaddr *)&sin,
+			 sizeof(struct sockaddr_in)) == -1) {
+	    perror("connect");
+	}
     }
-    else if (mygethostbyname(&sin, args.hostname) == 0) {
-	perror("gethostbyname");
-    }
-    else if (connect(fd,
-		     (struct sockaddr *)&sin,
-		     sizeof(struct sockaddr_in)) == -1) {
-	perror("connect");
+
+    if (fd == -1) {
+	fprintf(stderr, "could not connect to server\n");
+	exit(1);
     }
     else if ((mp = mtp_make_packet(opcode,
 				   args.role,
@@ -515,9 +538,35 @@ int main(int argc, char *argv[])
 	perror("mtp_send_packet"); // XXX not right
     }
     else {
-	close(fd);
-	fd = -1;
+	if (debug) {
+	    mtp_print_packet(stdout, mp);
+	}
+	if (waitmode) {
+	    if (mtp_receive_packet(fd, &mp) != MTP_PP_SUCCESS) {
+		perror("mtp_receive_packet");
+	    }
+	    else {
+		mtp_print_packet(stdout, mp);
+
+		mtp_free_packet(mp);
+		mp = NULL;
+	    }
+	}
     }
+
+    optreset = 1;
+    optind = 1;
+    
+    return retval;
+}
+
+int main(int argc, char *argv[])
+{
+    int retval;
+
+    do {
+	retval = interpret_options(&argc, &argv);
+    } while ((argc > 0) && strcmp(argv[0], "--") == 0);
 
     return retval;
 }

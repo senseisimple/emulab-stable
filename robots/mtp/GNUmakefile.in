@@ -41,7 +41,10 @@ mtp_send: mtp_send.o $(MTPLIBS)
 mtp_recv: mtp_recv.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_recv.o -L. -lmtp
 
-install: $(addprefix $(INSTALL_LIBDIR), $(MTPLIBS))
+install: all
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL_PROGRAM) mtp_send $(INSTALL_DIR)/opsdir/bin/mtp_send
+	$(INSTALL_PROGRAM) mtp_recv $(INSTALL_DIR)/opsdir/bin/mtp_recv
 
 clean:
 	/bin/rm -f *.o *.a $(MTPPROGS)

@@ -185,6 +185,8 @@ struct mtp_packet *mtp_make_packet( unsigned char opcode,
 				    /* data's type is only known by opcode */
 				    void *data
 				    );
+void mtp_free_packet(struct mtp_packet *mp);
+void mtp_print_packet(FILE *file, struct mtp_packet *mp);
 /* data's type is known by opcode! */
 int mtp_calc_size(int opcode,void *data);
 

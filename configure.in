@@ -613,7 +613,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
 	mote/GNUmakefile mote/tbuisp \
-	robots/GNUmakefile robots/mtp/GNUmakefile "
+	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
+	robots/emc/test_emcd.sh "
 
 #
 # Do this for easy distclean.

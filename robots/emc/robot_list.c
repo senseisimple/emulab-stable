@@ -1,5 +1,9 @@
-#include "robot_list.h"
 
+#include "config.h"
+
+#include <stdlib.h>
+
+#include "robot_list.h"
 
 struct robot_list *robot_list_create() {
   struct robot_list *tmp = (struct robot_list *)malloc(sizeof(struct robot_list));
@@ -202,6 +206,9 @@ struct robot_list_enum *robot_list_enum(struct robot_list *l) {
       return NULL;
     }
     else {
+      struct robot_list_item *a;
+      int i;
+      
       tmp = (void *)malloc(sizeof(void *)*(l->item_count));
       if (tmp == NULL) {
 		free(e);
@@ -213,9 +220,9 @@ struct robot_list_enum *robot_list_enum(struct robot_list *l) {
       e->size = l->item_count;
 	  
       /* scroll through list forwards and copy data into e->data */
-      struct robot_list_item *a = l->head;
-      int i = 0;
-	  
+      a = l->head;
+      i = 0;
+      
       while (a != NULL) {
 		e->data[i] = a->data;
 		a = a->next;
