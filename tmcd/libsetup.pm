@@ -2223,6 +2223,7 @@ sub doplabconfig()
 	      "}\n\n");
 
 	# Make it look like it's in Emulab domain
+	# XXX This shouldn't be hardcoded
 	print RC "setconfigopt /etc/resolv.conf domain emulab.net\n";
 	print RC "setconfigopt /etc/resolv.conf search emulab.net\n\n";
 
