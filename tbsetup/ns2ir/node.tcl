@@ -174,6 +174,10 @@ Node instproc updatedb {DB} {
     set ipraw {}
     set i 0
     foreach ip $iplist {
+	if { $ip == {} } {
+	    # Give a dummy IP address if none has been set
+	    set ip "0.0.0.0"
+	}
 	lappend ipraw $i:$ip
 	incr i
     }
