@@ -1,0 +1,19 @@
+*** /q/ports/security/py-m2crypto/work/m2crypto-0.11/M2Crypto/httpslib.py       Tue Jan  7 09:44:35 2003
+--- /usr/local/lib/python2.3/site-packages/M2Crypto/httpslib.py Thu Sep  2 11:27:56 2004
+***************
+*** 22,28 ****
+
+          default_port = HTTPS_PORT
+
+!         if sys.version[:5] == '2.2.2':
+              def __init__(self, host, port=None, strict=None, **ssl):
+                  keys = ssl.keys()
+                  try:
+--- 22,28 ----
+
+          default_port = HTTPS_PORT
+
+!         if sys.version[:3] == '2.3':
+              def __init__(self, host, port=None, strict=None, **ssl):
+                  keys = ssl.keys()
+                  try:
