@@ -196,10 +196,10 @@ namespace eval GLOBALS {
     variable default_ip_routing_type "none"
 
     # For remote nodes. Use latest widearea data.
-    variable uselatestwadata 0
+    variable uselatestwadata 1
 
     # For remote nodes. Use tunnels
-    variable usewatunnels 1
+    variable usewatunnels 0
 
     # Use link delays instead of delay nodes.
     variable uselinkdelays 0
