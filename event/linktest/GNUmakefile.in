@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -67,7 +67,12 @@ $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
 
 $(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 
+# We install just enough to fire off the test from boss and wait. 
 install:
+	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(INSTALL_LIBEXECDIR)
+	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(INSTALL_BINDIR)
+
+control-install:	install
 
 client-install:
 	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(DAEMON) \

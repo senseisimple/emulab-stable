@@ -1,22 +1,41 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
-# wrapper for running linktest that includes
-# an extra event for reporting completion.
-
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
 use strict;
 use Getopt::Std;
 use English;
 
-# security
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
-
-sub usage {
-    my $msg = "Usage: run_linktest.pl [-s server] [-p port] [-k keyfile] -e pid/eid [-q]\n";
-    $msg .= "\t-q\tquick termination mode\n";
-    $msg .= "\t-d n\tdebug level n (development only)\n";
-    warn $msg;
-    return 1;
+#
+# Wrapper for running the linktest daemon. This script is currently
+# setup so it can run on either boss (or ops via plasticwrap), or from
+# an experimental node. Hence the odd paths and ltevent aux program,
+# which is not really on boss. Also not use of tmcc to find the server. 
+#
+sub usage()
+{
+    print "Usage: run_linktest.pl ".
+	  "[-q] [-d] [-s server] [-p port] [-k keyfile] -e pid/eid\n".
+	  "Use -q for quick termination mode\n";
+    exit(1);
 }
+my $optlist = "qd:s:p:k:e:";
+my $debug   = 0;
+my $quick   = 0;
+my $server;
+my $keyfile;
+my $port;
+my $pid;
+my $eid;
+
+# Local goo
+my $TB          = "@prefix@";
+my $TMCC	= "@CLIENT_BINDIR@/tmcc";
+my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
+my $LTEVENTBOSS = "$TB/libexec/ltevent";
+my $BOSSNODE    = "@BOSSNODE@";
 
 #
 # This script should be run as a real person!
@@ -26,92 +45,197 @@ if (! $EUID) {
 	"    This script should not be run as root!\n");
 }
 
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+    if ($debug =~ /^([\w]+)$/) {
+	$debug = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in debug: $debug\n");
+    }
+}
+if (defined($options{"q"})) {
+    $quick = 1;
+}
+if (defined($options{"s"})) {
+    $server = $options{"s"};
+    if ($server =~ /^([-\w\.]+)$/) {
+	$server = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in server: $server\n");
+    }
+}
+if (defined($options{"k"})) {
+    $keyfile = $options{"k"};
+    if ($keyfile =~ /^([-\w\.\/]+)$/) {
+	$keyfile = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in keyfile: $keyfile\n");
+    }
+}
+if (defined($options{"p"})) {
+    $port = $options{"p"};
+    if ($port =~ /^(\d+)$/) {
+	$port = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in port: $port\n");
+    }
+}
+if (defined($options{"e"})) {
+    ($pid,$eid) = split(/\//, $options{"e"});
+}
+else {
+    usage();
+}
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Bad data in pid: $pid\n");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Bad data in eid: $eid\n");
+}
+
 # signal handler in case the process is killed.
 $SIG{INT} = sub {
     print "Aborted. Linktest continues on nodes.\nErrors so far:\n";
     exit &analyze;
 };
 
-my $server;
-my $port;
-my %opt = ();
-getopts("s:e:d:qp:k:",\%opt);
-if ($opt{s}) { $server = $opt{s}; } else { 
-    my $results = `@CLIENT_BINDIR@/tmcc bossinfo`;
-    if($results =~ /^([\w\.]*)\s/) {
-	$server = $1; 
-    } else {
-	die "Could not determine event server name\n";
+#
+# Need to figure out the elvind server. Since this script runs on boss
+# and on experimental nodes, do something gross!
+#
+if (!defined($server)) {
+    if (-x $TMCC) {
+	my $results = `$TMCC bossinfo`;
+	if ($results =~ /^([\w\.]*)\s/) {
+	    $server = $1; 
+	}
+	else {
+	    die("*** $0:\n".
+		"    Bad data in server: $results\n");
+	}
+    }
+    else {
+	# We can do this on boss/ops, but not on experimental node.
+	$server = $BOSSNODE;
     }
 }
-if ($opt{p}) { $port = $opt{p}; }
-exit &usage unless ($opt{e});
-my ($pid,$eid) = split(/\//,$opt{e});
+
+#
+# These days, must use a keyfile! Hmm, linktest.c is not using a keyfile.
+#
+#if (!defined($keyfile)) {
+#    $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
+#}
 
 my $linktest_path; # path to linktest data.
 $linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
 
 # send the startup event.
-my $args = &starter;
+my $args = starter();
 # event arguments
 $args .=  " -x START";
-if(defined($opt{q})) {
-    $args .= " STARTAT=1 STOPAT=3";
+$args .= " STARTAT=1 STOPAT=3"
+    if ($quick);
+$args .= " DEBUG=$debug"
+    if (defined($debug));
+
+system($args);
+if ($?) {
+    die("*** $0:\n".
+	"    Error running '$args'\n");
 }
-if(defined($opt{d})) {
-    $args .= " DEBUG=" . $opt{d};
-}
-&my_system($args);
 
 print "Linktest in progress...\n";
-print "Quick termination requested.\n" if defined($opt{q});
-print "Debug mode requested.\n" if defined($opt{d});
+print "Quick termination requested.\n"
+    if ($quick);
+print "Debug mode requested.\n"
+    if (defined($debug));
 
 # wait for the shutdown event.
-$args = &starter;
+$args = starter();
 $args .= " -w STOP";
-&my_system($args);
 
-
-# analyze results of the run
-exit &analyze;
-
-sub analyze {
-    my @dir_contents;
-    opendir (DIR,$linktest_path) || die "cannot open Linktest directory.";
-    @dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
-    closedir(DIR);
-
-    foreach my $file (@dir_contents)
-    {
-	&my_system("/bin/cat","$linktest_path/$file");
-	
-    }
-    if(@dir_contents) {
-	return 1;
-    } else {
-	print "No errors\n";
-	return 0;
-    }
+system($args);
+if ($?) {
+    die("*** $0:\n".
+	"    Error running '$args'\n");
 }
 
-sub my_system {
-    if(my $pid = fork) {
-	waitpid($pid,0);
-    } else {
-	my @arg_array = split(/\s+/,"@_");
-	exec(@arg_array);
+#
+# Spit out the results?
+# 
+my @dir_contents;
+opendir(DIR, $linktest_path) ||
+    die("*** $0:\n".
+	"    Cannot open $linktest_path\n");
+@dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
+closedir(DIR);
+
+foreach my $file (@dir_contents) {
+    # Hmm, need to taint check the filenames. Ick.
+    if ($file =~ /^([-\w\.\/]+)$/) {
+	$file = $1;
     }
-
+    else {
+	die("*** $0:\n".
+	    "    Bad data in filename: $file\n");
+    }
+    system("/bin/cat $linktest_path/$file");
 }
+exit(scalar(@dir_contents));
 
+# Initial part of command string to ltevent.
 sub starter {
-    my $cmd = "@CLIENT_BINDIR@/ltevent -s $server -e $pid/$eid";
-    if(defined ($opt{p})){
-	$cmd .= " -p " . $opt{p};
+    my $cmd;
+
+    if (-x $LTEVENTBOSS) {
+	$cmd = $LTEVENTBOSS;
     }
-    if(defined($opt{k})) {
-	$cmd .= " -k " . $opt{k};
+    else {
+	$cmd = $LTEVENT;
     }
+    $cmd .= " -s $server -e $pid/$eid";
+    $cmd .= " -p $port"
+	if (defined($port));
+    $cmd .= " -k $keyfile"
+	if (defined($keyfile));
+    
     return $cmd
 }
