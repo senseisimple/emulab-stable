@@ -266,6 +266,14 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
     num_fixed++;
   }
 
+  // Subtract the number of fixed nodes from nnodes, since they don't really
+  // count
+  if (num_fixed) {
+      nnodes -= num_fixed;
+      cout << "Adjusting dificulty estimate for fixed nodes, " <<
+	  nnodes << " remain.\n";
+  }
+
   /* We'll check against this later to make sure that whe we've unmapped
    * everything, the score is the same */
   double initial_score = get_score();
