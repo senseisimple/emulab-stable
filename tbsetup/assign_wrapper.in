@@ -3801,6 +3801,14 @@ sub CreateTopFile()
 		#    $desirestr .= " $oldmapping:.2";
 		#}
 	    }
+
+	    # Require that this vnode be places onto a pnode that supports
+	    # the OS it is going to run
+	    my $os = virtnodeosid($vname);
+	    if ($os) {
+		$desirestr .= " OS-${os}:1";
+	    }
+
 	    my $typestr = $type;
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;

@@ -213,6 +213,58 @@ if (defined($pid)) {
     }
 }
 
+#
+# Read the table of which image types are supported on which hardware - we
+# limit this to global images and ones that match the PID (if given) We do this
+# limiting for two reasons:
+# 1) To avoid an explosion in the number of features for nodes
+# 2) To avoid information leaks, allowing projects to see each other's images
+# 
+my $osidquery = "select distinct o.osid, oi.type from os_info as o " .
+	"left join osidtoimageid as oi on o.osid = oi.osid " .
+	"left join images as i on oi.imageid = i.imageid ".
+	"where i.global = 1";
+if ($pid) {
+    $osidquery .= " or i.pid='$pid'";
+}
+
+my %node_type_osids;
+my %osid_node_types;
+$result = DBQueryFatal($osidquery);
+while (my ($osid,$type) = $result->fetchrow()) {
+    if ($node_type_osids{$type}) {
+	push @{$node_type_osids{$type}}, $osid;
+    } else {
+	$node_type_osids{$type} = [$osid];
+    }
+    #
+    # We have to maintain a data structure telling us which types an OSID could
+    # be on for use below with generic OSIDs
+    #
+    if ($osid_node_types{$osid}) {
+	push @{$osid_node_types{$osid}}, $type;
+    } else {
+	$osid_node_types{$osid} = [$type];
+    }
+}
+
+#
+# We also have to resolve the 'generic' OSIDs, which use the nextosid field to
+# redirect to another OSID
+#
+$result = DBQueryFatal("select osid, nextosid from os_info where " .
+    "nextosid is not null");
+while (my ($osid, $nextosid) = $result->fetchrow()) {
+    #
+    # Check to see if they were allowed to use the real OSID
+    #
+    if ($osid_node_types{$nextosid}) {
+	foreach my $type (@{$osid_node_types{$nextosid}}) {
+	    push @{$node_type_osids{$type}}, $osid;
+	}
+    }
+}
+
 # Print switches
 if (defined($switchtouse)) {
     print "node $switchtouse switch:1 *lan:*\n";
@@ -396,6 +448,14 @@ foreach $node (keys(%nodes)) {
     push(@features, @{$typemap{$type}->{'FEATURES'}});
     if (defined($features{$node})) {
 	push @features, @{$features{$node}};
+    }
+
+    #
+    # Add in features for all of the OSes that this node (as evidenced by its
+    # type) can support
+    #
+    if ($node_type_osids{$type}) {
+	push @features, map "OS-$_:0", @{$node_type_osids{$type}};
     }
 
     # This is for the case that we are modifying an existing experiment - tell
