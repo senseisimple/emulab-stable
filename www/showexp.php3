@@ -49,11 +49,11 @@ SUBMENUSTART("Experiment Options");
 
 if ($expstate) {
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
-	WRITESUBMENUBUTTON("Visualizaton, NS File, Mapping",
+	WRITESUBMENUBUTTON("Visualization, NS File, Mapping",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
     elseif (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
-	WRITESUBMENUBUTTON("Visualizaton and NS File",
+	WRITESUBMENUBUTTON("Visualization and NS File",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
     else {

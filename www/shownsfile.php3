@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Visualizaton, NS File, and Details");
+PAGEHEADER("Visualization, NS File, and Details");
 
 #
 # Only known and logged in users can end experiments.
