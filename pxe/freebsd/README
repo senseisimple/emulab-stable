@@ -1,0 +1,59 @@
+This directory contains diffs for a clean FreeBSD 4.10 RELEASE tree.
+These diffs, for the lib/libstand and sys/boot source directories,
+are necessary to build the "pxeboot" first-stage boot loader used on
+Emulab nodes.
+
+libstand.diffs:
+
+  These are primarily robustness changes for the standalone TFTP code.
+  There is also a bug fix or two, and a patch to have bootp/dhcp recognize
+  and respect the TFTP server name option (66).  To apply this patch:
+
+	(cd <yoursrcdir>; patch -p2) < libstand.diffs
+
+  Install the new version of the library with:
+
+	cd <yoursrcdir>/lib/libstand
+	make
+	make install
+
+  These changes are compatible with, and should not effect, any other
+  boot programs.
+
+
+sysboot.diffs:
+
+  Primarily this patch adds a subdirectory (sys/boot/i386/emuboot) for
+  the PXE-loaded first-stage boot loader we use.
+
+  Most of the other diffs are in support of this loader (typically
+  conditionally compiled/assembled via the 'TESTBED' symbol).  There
+  are new options in sys/boot/i386/Makefile.inc for forcing the serial
+  console, or changing its speed or port number, make sure these are
+  correct for your site.  The ETHERBOOT_* conditionals are a hack to
+  get our pxeboot to load and run when booted via an older, modified
+  version of etherboot.  These changes no longer for newer versions
+  of etherboot.
+
+  There is also a directory (sys/boot/i386/emuboot0) which is a slightly
+  modified version of boot0 (the MBR-resident boot loader) that just
+  reboots the machine unless explicitly told what to do after a short time.
+  This is a fall-back in case PXE booting fails (due to a transient load
+  on the network) and the BIOS falls back to booting from disk.  This will
+  force the machine to keep rebooting and retrying PXE until it works.
+  Apply this patch with:
+
+	(cd <yoursrcdir>; patch -p2) < sysboot.diffs
+
+  Then modify the i386/Makefile.inc file as appropriate and build with:
+
+	cd <yoursrcdir>/sys/boot
+	make
+
+  DON'T DO AN INSTALL HERE.  I am less certain that these changes are
+  compatible with all existing boot code.  Instead:
+
+	cp -p /tftpboot/pxeboot.emu /tftpboot/pxeboot.emu.bak
+	cp <yoursrcdir>/sys/boot/i386/emuboot/pxeboot /tftpboot/pxeboot.emu
+
+
