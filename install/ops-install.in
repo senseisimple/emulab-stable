@@ -150,7 +150,7 @@ Phase "ports", "Installing ports", sub {
 	chomp $pwd;
 	chdir "$PORTSDIR/emulab-ops" or
 		PhaseFail "Unable to change to $PORTSDIR/emulab-ops: $!";
-	ExecQuietFatal("make install");
+	ExecQuietFatal("make -DBATCH install");
 	chdir $pwd;
     };
 };
