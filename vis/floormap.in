@@ -35,7 +35,7 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTakgzvnx";
+my $optlist  = "df:o:s:c:S:C:O:e:tTakgzvnxy";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
@@ -47,6 +47,7 @@ my $ghost    = 0;	#  Overlay ghost nodes from all floors onto each map.
 my $show_vnames    = 0;
 my $show_cameras   = 0;
 my $show_exclusion = 0;
+my $show_nodes     = 1;
 
 my $building;
 my $floor;
@@ -277,9 +278,12 @@ if (defined($options{"O"})) {
 if (defined($options{"o"})) {
     $prefix = $options{"o"};
     if ($cleanup) {
-	unlink "${prefix}.jpg", "${prefix}.map", "${prefix}.state";
+	unlink $prefix, "${prefix}.jpg", "${prefix}.map", "${prefix}.state";
 	exit(0);
     }
+}
+if (defined($options{"y"})) {
+    $show_nodes = 0;
 }
 if (defined($options{"v"})) {
     $show_cameras = 1;
@@ -638,6 +642,9 @@ sub dofloor($$)
 	    warn "$err" if "$err";
 	}
     }
+
+    return ($baseimage, $areamap)
+	if (!$show_nodes);
 
     # Draw the selected node locations and labels. 
     # Green dot means node is free or owned by pid/eid.
