@@ -213,7 +213,8 @@ main(argc, argv)
 	if (runfile)
 		signal(SIGUSR1, newrun);
 	signal(SIGUSR2, terminate);
-
+	srandomdev();
+	
 	/*
 	 * Open up run/log file, console tty, and controlling pty.
 	 */
@@ -452,12 +453,12 @@ capture()
 #endif
 		fds = sfds;
 		timeout.tv_usec = 0;
+		timeout.tv_sec  = 30;
 #ifdef	USESOCKETS
-		if (needshake)
-			timeout.tv_sec  = 15;
-		else
+		if (needshake) {
+			timeout.tv_sec += (random() % 60);
+		}
 #endif
-			timeout.tv_sec  = 30;
 		i = select(fdcount, &fds, NULL, NULL, &timeout);
 		if (i < 0) {
 			if (errno == EINTR) {
