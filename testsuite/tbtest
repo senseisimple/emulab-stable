@@ -189,6 +189,7 @@ if (($type eq "full") && (($mode eq "init") || ($mode eq "run"))) {
 }
 
 $testdb = "tbdb_$user";
+$bossnode = `hostname`;
 
 # Test counts
 $pass = 0;
@@ -311,7 +312,7 @@ sub step_init {
 	    $have{$type} = [];
 	}
 	
-	open(AVAIL,"/usr/testbed/sbin/avail includevirt |");
+	open(AVAIL,"/usr/testbed/sbin/avail includevirt rand |");
 	while (<AVAIL>) {
 	    if (! /^\|/) {next};
 	    if (/node_id/) {next;}
@@ -341,6 +342,9 @@ sub step_init {
 	}
 	prints "  Reserving ";
 	tbexec("/usr/testbed/bin/nalloc $pid $eid $raw","$path/reserve.log");
+	# Have to run exports_setup, or the nodes won't come up properly
+	prints "  Setting up exports ";
+	tbexec("/usr/testbed/sbin/exports_setup","$path/exports_setup.log");
 
 	prints "  Setting up tmcc redirect ";
 	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
@@ -373,6 +377,7 @@ sub step_init {
     print DEFS "TBDBNAME=$testdb\n";
     print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
     print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
+    print DEFS "BOSSNODE=$bossnode\n";
     close(DEFS);
     
     prints "  Configuring ";
@@ -380,10 +385,10 @@ sub step_init {
     if ($type eq "full") {
 	$testmode = "";
     } else {
-	$testmode = "--enable-testmode";
+	$testmode = "--enable-testmode --disable-events";
     }
     tbexec("$basedir/../configure --prefix=$path/install $testmode ".
-	   "--disable-events --with-TBDEFS=$path/defs",
+	   "--with-TBDEFS=$path/defs",
 	   "$path/configure.log");
     
     prints "  Building ";
@@ -495,7 +500,7 @@ sub step_init {
 	# Free nodes we allocated for the experiment and allocate all
 	# others.
 	prints "  Creating testbed/unavailable in test DB ";
-	open(AVAIL,"avail |");
+	open(AVAIL,"avail includevirt |");
 	$raw = "";
 	while (<AVAIL>) {
 	    if (! /^\|/) {next};
@@ -524,8 +529,8 @@ sub step_init {
     
     prints "  Setting up test experiment ";
     $dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
-    $dbh->do("INSERT into experiments (pid,eid) "
-	     . "values (\"testbed\",\"test\")") || do {
+    $dbh->do("INSERT into experiments (pid,gid,eid,testdb) "
+	     . "values (\"testbed\",\"testbed\",\"test\",\"$testdb\")") || do {
 		 prints "FAIL\n";
 		 $fail++;
 		 doexit(1);
@@ -615,6 +620,17 @@ sub step_test {
 		next;
 	    }
 	}
+
+	# Start stated
+	my $statedpid;
+	if ($type eq "full") {
+	    # Do the fork ourselves, so that we can remember the pid
+	    $statedpid = fork();
+	    if (!$statedpid) {
+		exec("$path/install/sbin/stated -f") or
+		    die "Error exec()ing $path/sbin/stated: $!\n";
+	    }
+	}
 	
 	# We're now ready to run the test.
 	
@@ -654,6 +670,10 @@ sub step_test {
 		$msg = join(" ",@t[1..$#t]);
 		print FLESTLOG "$result: $test $msg\n";
 	    }
+	}
+
+	if (! kill(15, $statedpid) ) {
+	    prints "WARNING: Unable to kill stated process ($statedpid)\n";
 	}
 	
 	close(TESTLOG);
