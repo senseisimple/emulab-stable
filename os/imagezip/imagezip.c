@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -52,6 +52,7 @@ int	retrywrites= 1;
 int	dorelocs  = 1;
 off_t	datawritten;
 partmap_t ignore, forceraw;
+char	*chkpointdev;
 
 #define HDRUSED(reg, rel) \
     (sizeof(blockhdr_t) + \
@@ -81,22 +82,25 @@ int		numranges, numskips;
 struct blockreloc	*relocs;
 int			numregions, numrelocs;
 
-void	addskip(uint32_t start, uint32_t size);
 void	dumpskips(int verbose);
 void	sortrange(struct range *head, int domerge,
 		  int (*rangecmp)(struct range *, struct range *));
 void    makeranges(void);
 void	dumpranges(int verbose);
-void	addfixup(off_t offset, off_t poffset, off_t size, void *data,
-		 int reloctype);
 void	addreloc(off_t offset, off_t size, int reloctype);
 static int cmpfixups(struct range *r1, struct range *r2);
+static int read_doslabel(int infd, int lsect, int pstart,
+			 struct doslabel *label);
 
 /* Forward decls */
 int	read_image(u_int32_t start, int pstart, u_int32_t extstart);
 int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
+
+#ifdef WITH_SHD
+int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect);
+#endif
 
 static SLICEMAP_PROCESS_PROTO(read_slice);
 
@@ -312,7 +316,7 @@ main(int argc, char *argv[])
 	int	slicetype = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:X")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -379,6 +383,9 @@ main(int argc, char *argv[])
 		case 'X':
 			forcereads++;
 			break;
+		case 'C':
+			chkpointdev = optarg;
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -396,6 +403,9 @@ main(int argc, char *argv[])
 					fprintf(stderr, "%c %s",
 						ch > 1 ? ',' : ':',
 						fsmap[ch].desc);
+#ifdef WITH_SHD
+			fprintf(stderr, ", SHD device");
+#endif
 			fprintf(stderr, "\n");
 			exit(0);
 		}
@@ -433,23 +443,70 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (slicetype != 0) {
-		rval = read_slice(-1, slicetype, 0, 0, infilename, infd);
-		if (rval == -1)
-			fprintf(stderr, ", cannot process\n");
-	} else if (rawmode)
-		rval = read_raw();
-	else
-		rval = read_image(DOSBBSECTOR, 0, 0);
-	if (rval) {
-		fprintf(stderr, "* * * Aborting * * *\n");
-		exit(1);
-	}
+	if (chkpointdev) {
+#ifdef WITH_SHD
+		u_int32_t ssect = 0;
 
-	sortrange(skips, 1, 0);
-	if (debug)
-		dumpskips(info || debug > 2);
-	makeranges();
+		rval = 0;
+		if (dorelocs) {
+			fprintf(stderr, "WARNING: no relocation info "
+				"generated for checkpoint images\n");
+			dorelocs = 0;
+		}
+
+		/*
+		 * Slice indicates the slice shadowed for checkpointing.
+		 * XXX we need this right now to determine the offset of
+		 * the block numbers returned by the shd device.
+		 */
+		if (slicemode) {
+			struct doslabel doslabel;
+
+			rval = read_doslabel(infd, DOSBBSECTOR, 0, &doslabel);
+			if (rval == 0)
+				ssect = doslabel.parts[slice-1].dp_start;
+		}
+
+		if (rval == 0) {
+			rval = read_shd(chkpointdev, infilename, infd, ssect);
+			if (rval == 0)
+				sortrange(ranges, 1, 0);
+		}
+		if (rval) {
+			fprintf(stderr, "* * * Aborting * * *\n");
+			exit(1);
+		}
+#else
+		fprintf(stderr, "Checkpoint device not supported\n\n");
+		usage();
+#endif
+	} else {
+		/*
+		 * Create the skip list by scanning the filesystems on
+		 * the disk or indicated partition.
+		 */
+		if (slicetype != 0) {
+			rval = read_slice(-1, slicetype, 0, 0,
+					  infilename, infd);
+			if (rval == -1)
+				fprintf(stderr, ", cannot process\n");
+		} else if (rawmode)
+			rval = read_raw();
+		else
+			rval = read_image(DOSBBSECTOR, 0, 0);
+		if (rval) {
+			fprintf(stderr, "* * * Aborting * * *\n");
+			exit(1);
+		}
+
+		/*
+		 * Create a valid range list from the skip list
+		 */
+		sortrange(skips, 1, 0);
+		if (debug)
+			dumpskips(info || debug > 2);
+		makeranges();
+	}
 	if (debug)
 		dumpranges(info || debug > 2);
 	sortrange(fixups, 0, cmpfixups);
@@ -497,65 +554,82 @@ read_slice(int snum, int stype, u_int32_t start, u_int32_t size,
 }
 
 /*
- * Parse the DOS partition table and dispatch to the individual readers.
+ * Read a DOS partition table at the indicated offset.
+ * If successful return 0 with *label filled in.  Otherwise return an error.
  */
-int
-read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
+static int
+read_doslabel(int infd, int lsect, int pstart, struct doslabel *label)
 {
-	int		i, cc, rval = 0;
-	struct slicemap	*smap;
-	struct doslabel doslabel;
+	int cc;
 
-	if (devlseek(infd, sectobytes(bbstart), SEEK_SET) < 0) {
-		warn("Could not seek to DOS label at sector %u", bbstart);
+	if (devlseek(infd, sectobytes(lsect), SEEK_SET) < 0) {
+		warn("Could not seek to DOS label at sector %u", lsect);
 		return 1;
 	}
-	if ((cc = devread(infd, doslabel.pad2, DOSPARTSIZE)) < 0) {
-		warn("Could not read DOS label at sector %u", bbstart);
+	if ((cc = devread(infd, label->pad2, DOSPARTSIZE)) < 0) {
+		warn("Could not read DOS label at sector %u", lsect);
 		return 1;
 	}
 	if (cc != DOSPARTSIZE) {
-		warnx("Could not get the entire DOS label at sector %u",
-		      bbstart);
+		warnx("Incomplete read of DOS label at sector %u", lsect);
  		return 1;
 	}
-	if (doslabel.magic != BOOT_MAGIC) {
+	if (label->magic != BOOT_MAGIC) {
 		warnx("Wrong magic number in DOS partition table at sector %u",
-		      bbstart);
+		      lsect);
  		return 1;
 	}
 
 	if (debug) {
-		if (bbstart == 0)
+		int i;
+
+		if (lsect == DOSBBSECTOR)
 			fprintf(stderr, "DOS Partitions:\n");
 		else
 			fprintf(stderr,
 				"DOS Partitions in Extended table at %u\n",
-				bbstart);
+				lsect);
 		for (i = 0; i < NDOSPART; i++) {
+			struct slicemap *smap;
 			u_int32_t start;
 			int bsdix = pstart + i;
 
 			fprintf(stderr, "  P%d: ", bsdix + 1);
-			smap = getslicemap(doslabel.parts[i].dp_typ);
+			smap = getslicemap(label->parts[i].dp_typ);
 			if (smap == 0)
 				fprintf(stderr, "%-10s", "UNKNOWN");
 			else
 				fprintf(stderr, "%-10s", smap->desc);
 
-			start = doslabel.parts[i].dp_start;
+			start = label->parts[i].dp_start;
 #if 0
 			/* Make start sector absolute */
-			if (ISEXT(doslabel.parts[i].dp_typ))
+			if (ISEXT(label->parts[i].dp_typ))
 				start += extstart;
 			else
 				start += bbstart;
 #endif
 			fprintf(stderr, "  start %9d, size %9d\n",
-				start, doslabel.parts[i].dp_size);
+				start, label->parts[i].dp_size);
 		}
 		fprintf(stderr, "\n");
 	}
+
+	return 0;
+}
+
+/*
+ * Parse the DOS partition table and dispatch to the individual readers.
+ */
+int
+read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
+{
+	int		i, rval = 0;
+	struct slicemap	*smap;
+	struct doslabel doslabel;
+
+	if (read_doslabel(infd, bbstart, pstart, &doslabel) != 0)
+		return 1;
 
 	/*
 	 * Now operate on individual slices. 
@@ -701,6 +775,9 @@ usage()
 	exit(1);
 }
 
+/*
+ * Add a range of free space to skip
+ */
 void
 addskip(uint32_t start, uint32_t size)
 {
@@ -722,6 +799,30 @@ addskip(uint32_t start, uint32_t size)
 	skip->next  = skips;
 	skips       = skip;
 	numskips++;
+}
+
+/*
+ * Add an explicit valid block range.
+ * We always add entries to the end of the list since we are commonly
+ * called with alredy sorted entries.
+ */
+void
+addvalid(uint32_t start, uint32_t size)
+{
+	static struct range **lastvalid = &ranges;
+	struct range *valid;
+
+	if ((valid = (struct range *) malloc(sizeof(*valid))) == NULL) {
+		fprintf(stderr, "No memory for valid range\n");
+		exit(1);
+	}
+	
+	valid->start = start;
+	valid->size  = size;
+	valid->next  = 0;
+	*lastvalid   = valid;
+	lastvalid    = &valid->next;
+	numranges++;
 }
 
 void
@@ -822,28 +923,16 @@ sortrange(struct range *head, int domerge,
 void
 makeranges(void)
 {
-	struct range	*pskip, *ptmp, *range, **lastrange;
+	struct range	*pskip, *ptmp;
 	uint32_t	offset;
 	
 	offset = inputminsec;
-	lastrange = &ranges;
 
 	pskip = skips;
 	while (pskip) {
-		if ((range = (struct range *)
-		             malloc(sizeof(*range))) == NULL) {
-			fprintf(stderr, "Out of memory!\n");
-			exit(1);
-		}
-		range->start = offset;
-		range->size  = pskip->start - offset;
-		range->next  = 0;
-		offset       = pskip->start + pskip->size;
+		addvalid(offset, pskip->start - offset);
+		offset = pskip->start + pskip->size;
 		
-		*lastrange = range;
-		lastrange = &range->next;
-		numranges++;
-
 		ptmp  = pskip;
 		pskip = pskip->next;
 		free(ptmp);
@@ -853,30 +942,18 @@ makeranges(void)
 	 */
 	if (inputmaxsec == 0 || (inputmaxsec - offset) != 0) {
 		assert(inputmaxsec == 0 || inputmaxsec > offset);
-		if ((range = (struct range *)malloc(sizeof(*range))) == NULL) {
-			fprintf(stderr, "Out of memory!\n");
-			exit(1);
-		}
-		range->start = offset;
-	
+
 		/*
 		 * A bug in FreeBSD causes lseek on a device special file to
 		 * return 0 all the time! Well we want to be able to read
-		 * directly out of a raw disk (/dev/rad0), so we need to
+		 * directly out of a raw disk (/dev/ad0), so we need to
 		 * use the compressor to figure out the actual size when it
 		 * isn't known beforehand.
 		 *
 		 * Mark the last range with 0 so compression goes to end
 		 * if we don't know where it is.
 		 */
-		if (inputmaxsec)
-			range->size = inputmaxsec - offset;
-		else
-			range->size = 0;
-		range->next = 0;
-
-		*lastrange = range;
-		numranges++;
+		addvalid(offset, inputmaxsec ? (inputmaxsec - offset) : 0);
 	}
 }
 

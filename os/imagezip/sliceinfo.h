@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -91,7 +91,7 @@ struct doslabel {
 	unsigned short  magic;
 };
 #define DOSPARTSIZE \
-	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+	(DOSPARTOFF + NDOSPART*sizeof(struct dospart) + sizeof(unsigned short))
 
 struct slicemap {
 	int	type;

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= os/imagezip
 DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
 		  imageunzip.c crc.c imageunzip.8 \
-		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc]
+		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc]
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
@@ -30,6 +30,9 @@ WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
+
+# XXX special checkpoint/shadow device support
+WITH_SHD	= 0
 
 include $(OBJDIR)/Makeconf
 
@@ -93,6 +96,13 @@ SUBDIRS		+= fat
 FSLIBS		+= fat/libfat.a
 endif
 
+# with SHD
+ifeq ($(WITH_SHD),1)
+CFLAGS		+= -DWITH_SHD
+SUBDIRS		+= shd
+FSLIBS		+= shd/libshd.a
+endif
+
 all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -115,7 +125,7 @@ imagehash: imagehash.o version.o
 imagehash.o:	imagehash.c
 	$(CC) -c $(HASHCFLAGS) -o imagehash.o $<
 
-ffs extfs ntfs fat:
+ffs extfs ntfs fat shd:
 	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
 imagezip.o: sliceinfo.h imagehdr.h global.h
