@@ -147,9 +147,9 @@ if (!$opt{p}) {
 # Make sure they have access to it
 #
 if ($opt{p}) {
-    my @nodes = map { /^([^:]+):/; $1; } @passedPorts;
+    my @nodes = map { /^([^:]+)(:(\d+))?$/; $1; } @passedPorts;
     if (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,@nodes)) {
-	die "You do not have permission to view one or more of the nodes\n";
+	die "You do not have permission to view one or more of @nodes\n";
     }
 } else {
     if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
