@@ -40,6 +40,7 @@ public:
   int bw_used;			// how much is used
   int users;			// number of users in direct links
   char *srcmac,*dstmac;		// source and destination MAC addresses.
+  char *name;			// The name
 };
 
 class tb_route {

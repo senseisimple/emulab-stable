@@ -7,7 +7,7 @@
  *   <type> = <t>[:<max>]
  *   <t>    = pc | switch | dnard
  *   <max>  = how many virtual entities of that type per physical entity.
- * link <src>[:<mac>] <dst>[:<mac>] <size> <number>
+ * link <name> <src>[:<mac>] <dst>[:<mac>] <size> <number>
  */
 
 #include <LEDA/graph_alg.h>
@@ -40,6 +40,7 @@ int parse_ptop(tb_pgraph &PG, istream& i)
   char *snext;
   char *snode;
   char *scur;
+  char lname[32];
   int isswitch;
 
   switch_index.init(PG,MAX_PNODES,0);
@@ -110,8 +111,8 @@ int parse_ptop(tb_pgraph &PG, istream& i)
       }
     }
     else if (!strncmp(inbuf, "link", 4)) {
-      if (sscanf(inbuf, "link %s %s %d %d", n1, n2, &size, &num)
-	  != 4) {
+      if (sscanf(inbuf, "link %s %s %s %d %d", lname, n1, n2, &size, &num)
+	  != 5) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
 	char *snode,*smac;
@@ -137,6 +138,7 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  PG[ed1].bandwidth=size;
 	  PG[ed1].bw_used=0;
 	  PG[ed1].users=0;
+	  PG[ed1].name=strdup(lname);
 	  if (smac)
 	    PG[ed1].srcmac = strdup(smac);
 	  else

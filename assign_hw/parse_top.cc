@@ -26,6 +26,7 @@ int parse_top(tb_vgraph &G, istream& i)
   string s1, s2;
   char inbuf[255];
   char n1[32], n2[32], type[32];
+  char lname[32];
   int num_nodes = 0;
   int bw;
   int r;
@@ -69,7 +70,7 @@ int parse_top(tb_vgraph &G, istream& i)
       }
     }
     else if (!strncmp(inbuf, "link", 4)) {
-      r=sscanf(inbuf, "link %s %s %d", n1, n2,&bw);
+      r=sscanf(inbuf, "link %s %s %s %d", lname, n1, n2,&bw);
       if (r < 2) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
@@ -84,6 +85,7 @@ int parse_top(tb_vgraph &G, istream& i)
 	G[e].type = tb_vlink::LINK_UNKNOWN;
 	G[e].plink = NULL;
 	G[e].plink_two = NULL;
+	G[e].name = strdup(lname);
       }
     }
     else {

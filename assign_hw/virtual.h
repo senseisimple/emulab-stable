@@ -46,6 +46,7 @@ public:
   edge plink_two;		// second plink for INTRA and INTER links
   edge plink_local_one;		// only used in inter - link to local switch
   edge plink_local_two;		// only used in inter - link to local switch
+  char *name;			// name
 };
 
 typedef GRAPH<tb_vnode,tb_vlink> tb_vgraph;

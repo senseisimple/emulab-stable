@@ -475,32 +475,31 @@ void print_solution()
   forall_edges(e,G) {
     tb_vlink &v = G[e];
     tb_plink *p,*p2,*p3,*p4;
-#define PMKNAME(p) PG[PG.source(p)].name << "-" << PG[PG.target(p)].name
-    cout << G[G.source(e)].name << "-" << G[G.target(e)].name;
+    cout << G[e].name;
     if (v.type == tb_vlink::LINK_DIRECT) {
       p = &PG[v.plink];
-      cout << " direct " << PMKNAME(v.plink) << " (" <<
+      cout << " direct " << PG[v.plink].name << " (" <<
 	p->srcmac << "," << p->dstmac << ")" << endl;
     } else if (v.type == tb_vlink::LINK_INTRASWITCH) {
       p = &PG[v.plink];
       p2 = &PG[v.plink_two];
-      cout << " intraswitch " << PMKNAME(v.plink) << " (" <<
+      cout << " intraswitch " << PG[v.plink].name << " (" <<
 	p->srcmac << "," << p->dstmac << ") " <<
-	PMKNAME(v.plink_two) << " (" << p2->srcmac << "," << p2->dstmac <<
+	PG[v.plink_two].name << " (" << p2->srcmac << "," << p2->dstmac <<
 	")" << endl;
     } else if (v.type == tb_vlink::LINK_INTERSWITCH) {
       p = &PG[v.plink];
       p3 = &PG[v.plink_local_one];
       p4 = &PG[v.plink_local_two];
-      cout << " interswitch " << PMKNAME(v.plink) << " (" <<
+      cout << " interswitch " << PG[v.plink].name << " (" <<
 	p->srcmac << "," << p->dstmac << ")";
       if (v.plink_two) {
 	p2 = &PG[v.plink_two];
-	cout << " " << PMKNAME(v.plink_two) << " (" << p2->srcmac << "," <<
+	cout << " " << PG[v.plink_two].name << " (" << p2->srcmac << "," <<
 	  p2->dstmac <<	")";
       }
-      cout << " " << PMKNAME(v.plink_local_one) << " (" << p3->srcmac << "," <<
-	p3->dstmac << ") " << PMKNAME(v.plink_local_two) << " (" <<
+      cout << " " << PG[v.plink_local_one].name << " (" << p3->srcmac << "," <<
+	p3->dstmac << ") " << PG[v.plink_local_two].name << " (" <<
 	p4->srcmac << "," << p4->dstmac << ")" << endl;
     } else {
       cout << "Unknown link type" << endl;
