@@ -554,18 +554,18 @@ sub getifconfig($)
 		    warn("*** WARNING: Could not map $vmac to a veth!\n");
 		    next;
 		}
-	    }
-
-	    #
-	    # A veth might not have any underlying physical interface if the
-	    # link or lan is completely contained on the node. tmcd tells us
-	    # that by setting the pmac to "none". Note that this obviously is
-	    # relevant on the physnode, not when called from inside a vnode.
-	    #
-	    if ($pmac ne "none") {
-		if (! ($iface = findiface($pmac))) {
-		    warn("*** WARNING: Could not map $pmac to an iface!\n");
-		    next;
+	    } else {
+		#
+		# A veth might not have any underlying physical interface if the
+		# link or lan is completely contained on the node. tmcd tells us
+	        # that by setting the pmac to "none". Note that this obviously is
+	        # relevant on the physnode, not when called from inside a vnode.
+	        #
+		if ($pmac ne "none") {
+		    if (! ($iface = findiface($pmac))) {
+			warn("*** WARNING: Could not map $pmac to an iface!\n");
+			next;
+		    }
 		}
 	    }
 
