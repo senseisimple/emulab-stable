@@ -355,6 +355,20 @@ getbossnode(char **bossnode, int *portp)
 	FILE		*fp;
 	char		buf[BUFSIZ], **cp = bossnodedirs, *bp;
 
+	if ((bp = getenv("BOSSNAME")) != NULL) {
+		strcpy(buf, bp);
+		
+		/*
+		 * Look for port spec
+		 */
+		if ((bp = strchr(buf, ':'))) {
+			*bp++  = (char) NULL;
+			*portp = atoi(bp);
+		}
+		*bossnode = strdup(buf);
+		return 0;
+	}
+
 	/*
 	 * Search for the file.
 	 */
