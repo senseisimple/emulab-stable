@@ -99,8 +99,9 @@ while (my $arg = shift @ARGV) {
 sub debug { warn @_,"\n" if $opt{d}; }
 
 sub usage {
-	print "Usage: $0 [-v] [-d] <node | node:if> ... \n";
+	print "Usage: $0 [-vdm] <node | node:if> ... \n";
 	print "-v: Verbose, prose, output\n";
 	print "-d: Enable debugging output\n";
+	print "-m: Show MAC addresses\n";
 	return -1;
 }
