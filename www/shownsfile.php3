@@ -74,7 +74,7 @@ $result = exec("$TBSUEXEC_PATH nobody flux webreport $pid $eid",
  	       $output, $retval);
 
 echo "<XMP>\n";
-for ($i = 1; $i < count($output); $i++) {
+for ($i = 0; $i < count($output); $i++) {
     echo "$output[$i]\n";
 }
 echo "</XMP>\n";

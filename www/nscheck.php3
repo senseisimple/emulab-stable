@@ -86,7 +86,8 @@ else {
 $output = array();
 $retval = 0;
 
-$result = exec("$TBSUEXEC_PATH $uid flux webnscheck $nsfile", $output, $retval);
+$result =
+    exec("$TBSUEXEC_PATH $uid flux webnscheck $nsfile", $output, $retval);
 
 echo "<center>";
 echo "<h1>Syntax Check Results</h1>";
