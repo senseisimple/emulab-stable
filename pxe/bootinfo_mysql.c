@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <syslog.h>
 
@@ -10,6 +11,7 @@
 
 static char dbname[] = TBDBNAME;
 static MYSQL db;
+static int parse_multiboot_path(char *path, boot_what_t *info);
 
 int
 open_bootinfo_db(void)
@@ -110,9 +112,8 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 */
 	if (row[NEXT_BOOT_PATH] != 0 && row[NEXT_BOOT_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[NEXT_BOOT_PATH],
-			MAX_BOOT_PATH-1);
+		parse_multiboot_path(row[NEXT_BOOT_PATH], info);
+
 		if (row[NEXT_BOOT_CMD_LINE] != 0 &&
 		    row[NEXT_BOOT_CMD_LINE][0] != '\0')
 			strncpy(info->cmdline, row[NEXT_BOOT_CMD_LINE],
@@ -129,15 +130,11 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 */
 	if (row[DEF_BOOT_PATH] != 0 && row[DEF_BOOT_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[DEF_BOOT_PATH],
-			MAX_BOOT_PATH-1);
+		parse_multiboot_path(row[DEF_BOOT_PATH], info);
 	}
 	else if (row[OSID_PATH] != 0 && row[OSID_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[OSID_PATH],
-			MAX_BOOT_PATH-1);
+		parse_multiboot_path(row[DEF_BOOT_PATH], info);
 	}
 	else if (row[PARTITION] != 0 && row[PARTITION][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_PART;
@@ -266,6 +263,36 @@ ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 int
 close_bootinfo_db(void)
 {
+	return 0;
+}
+
+/*
+ * Split a multiboot path into the IP and Path.
+ */
+static int
+parse_multiboot_path(char *path, boot_what_t *info)
+{
+	char		*p  = path;
+	struct hostent	*he;
+
+	info->type = BIBOOTWHAT_TYPE_MB;
+	info->what.mb.tftp_ip.s_addr = 0;
+
+	strsep(&p, ":");
+	if (p) {
+		he = gethostbyname(path);
+		path = p;
+	}
+	else {
+		he = gethostbyname("users.emulab.net");
+	}
+	if (he) {
+		memcpy((char *)&info->what.mb.tftp_ip,
+		       he->h_addr, sizeof(info->what.mb.tftp_ip));
+	}
+
+	strncpy(info->what.mb.filename, path, MAX_BOOT_PATH-1);
+
 	return 0;
 }
 
