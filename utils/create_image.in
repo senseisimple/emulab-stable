@@ -416,8 +416,8 @@ if ($cursize > $maximagesize) {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 
-print "Image creation succeeded. ".
-      "Final size: " . (stat($filename))[7] . " bytes.\n";
+print "Image creation succeeded.\n";
+#      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
 SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
