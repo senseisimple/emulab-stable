@@ -7,4 +7,7 @@ TBOPSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
 TBLOGSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
 IPBASE=192.168
 DELAYCAPACITY=2
+BOSSNODE=stoller.casco.net
+USERNODE=stoller.casco.net
+MYDOMAIN=casco.net
 

@@ -7,5 +7,6 @@ TBOPSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 TBLOGSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 IPBASE=192.168
 DELAYCAPACITY=2
-
-
+BOSSNODE=boss.emulab.net
+USERNODE=users.emulab.net
+OURDOMAIN=emulab.net

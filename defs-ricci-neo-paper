@@ -5,4 +5,6 @@ TBDBNAME=tbdb
 WWWDEFS=ricci-neo-paper
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
-
+BOSSNODE=boss.emulab.net
+USERNODE=users.emulab.net
+OURDOMAIN=emulab.net

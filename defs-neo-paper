@@ -5,3 +5,6 @@ TBDBNAME=tbdb
 WWWDEFS=neo-paper
 TBOPSEMAIL='Testbed Operations <testbed-ops@flux.cs.utah.edu>'
 TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
+BOSSNODE=boss.emulab.net
+USERNODE=users.emulab.net
+OURDOMAIN=emulab.net
