@@ -8,7 +8,7 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
-	 TBMakeLogname TB_BOSSNODE );
+	 TBMakeLogname TB_BOSSNODE TBGenSecretKey);
 
 my $MAILTAG  = "@OURDOMAIN@";
 my $BOSSNODE = "@BOSSNODE@";
@@ -181,6 +181,15 @@ sub TBMakeLogname($)
     }
 
     return $logname;
+}
+
+#
+# Get me a secret key!
+#
+sub TBGenSecretKey()
+{
+    my $key = `/bin/dd if=/dev/urandom count=128 bs=1 2> /dev/null | /sbin/md5`;
+    return $key;
 }
 
 1;
