@@ -143,7 +143,7 @@ my @OPS_NAMES = ($FSNODE, $USERNODE);
 # The meta-port (name and version) that drags in all the dependancies for
 # a boss node
 #
-my $BOSS_PORT = "emulab-boss-1.6";
+my $BOSS_PORT = "emulab-boss-1.7";
 
 #
 # Figure out which directory we live in, so that some stages can do thing
