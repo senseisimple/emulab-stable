@@ -94,6 +94,11 @@ while (<NTP>) {
 	/^peer.*$/ && do {
 	    last SWITCH1;
 	};
+	# Leave refclock lines alone
+	/^server.*127\.127.*$/ && do {
+	    print NEW "$_\n";
+	    last SWITCH1;
+	};
 	/^server.*$/ && do {
 	    last SWITCH1;
 	};
