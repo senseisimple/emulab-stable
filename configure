@@ -983,10 +983,6 @@ cat >> confdefs.h <<EOF
 EOF
 
 cat >> confdefs.h <<EOF
-#define OURDOMAIN "$OURDOMAIN"
-EOF
-
-cat >> confdefs.h <<EOF
 #define FSDIR_PROJ "$FSDIR_PROJ"
 EOF
 
@@ -1067,6 +1063,10 @@ fi
 if test -z "$OURDOMAIN"; then
     OURDOMAIN="`echo $BOSSNODE | sed -E -e 's/^[a-zA-Z0-9\-]+\.//'`"
 fi
+cat >> confdefs.h <<EOF
+#define OURDOMAIN "$OURDOMAIN"
+EOF
+
 
 if test -z "$TBAUTHDOMAIN"; then
     TBAUTHDOMAIN=".$OURDOMAIN"
