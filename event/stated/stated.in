@@ -111,6 +111,7 @@ my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
 
 # This only gets used here, so it isn't in a lib constant.
 my $TBFREENODE = "FREENODE";
+my $TBISUP = TBDB_NODESTATE_ISUP;
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -527,6 +528,14 @@ sub stateTransition($$) {
 	    };
 	    /^$TBFREENODE$/ && do {
 		handleCtrlEvent($node,$trig);
+		next;
+	    };
+	    /^$TBISUP$/ && do {
+		info("$node: Triggered $TBISUP\n");
+		EventSendWarn(host      => $BOSSNODE ,
+			      objtype   => TBDB_TBEVENT_NODESTATE ,
+			      eventtype => TBDB_NODESTATE_ISUP ,
+			      objname   => $node);
 		next;
 	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");

@@ -291,6 +291,8 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,NULL);
 --
 
 
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','ACTIVE');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','SWAPPED');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','TESTING');
@@ -387,6 +389,7 @@ REPLACE INTO state_triggers VALUES ('*','NORMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','NORMALv1','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONE','RESET, RELOADDONE');
+REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 
 --
 -- Dumping data for table 'testsuite_preentables'
@@ -420,6 +423,7 @@ REPLACE INTO testsuite_preentables VALUES ('node_activity','clean');
 REPLACE INTO testsuite_preentables VALUES ('portmap','clean');
 REPLACE INTO testsuite_preentables VALUES ('webnews','clean');
 REPLACE INTO testsuite_preentables VALUES ('vis_nodes','clean');
+REPLACE INTO testsuite_preentables VALUES ('vis_experiments','clean');
 REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
