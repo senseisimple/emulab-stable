@@ -44,6 +44,9 @@ B. Change /etc/inittab.  Change the line:
    to:
 	S1:2345:respawn:/sbin/agetty -L 115200 ttyS1 vt100
 
+C. Change /etc/securetty.  Add ttyS1 at the end.
+   Otherwise you cannot login as root on the console.
+
 3. FreeBSD:
 
    Oh man, was this a pain in the ass!  Who wrote that BSD console support

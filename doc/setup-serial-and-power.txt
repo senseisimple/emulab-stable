@@ -106,7 +106,7 @@ Open the above file, and add a line like this:
 /usr/testbed/sbin/capture -T 15 -r -s 115200 pc<XXX> <ttyport> >/dev/null 2>&1 &
 
 Where <XXX> is as above, and <ttyport> is the tty device file associated
-with this power controller.
+with this pc.
 
 * Test the console line
 
@@ -114,8 +114,13 @@ Run "console pc<XXX>" on serial 2.  Hit enter a couple of times, or reboot
 (using "power"!) the machine and wait to see if the PXE and MFS kernel 
 console messages appear.
 
+4) Enter all tipserver machines into the database.
 
-4) Collect interface mapping from nodes
+For each independent tipserver machine you have, do the following in mysql:
+
+insert info tipservers values ("<serial_server>");
+
+5) Collect interface mapping from nodes
 
 Emulab requires a mapping from FreeBSD interface number to Linux interface 
 number.
