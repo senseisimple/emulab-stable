@@ -679,7 +679,7 @@ sub doSwapin($) {
 	    if (@virtnodes) {
 		TBDebugTimeStamp("vnode_setup started");
 		
-		if (system("vnode_setup -f -k $pid $eid @virtnodes")) {
+		if (system("vnode_setup -k $pid $eid @virtnodes")) {
 		    print "Failed to tear down unused virtnodes!\n";
 		    return 1;
 		}

@@ -162,30 +162,54 @@ foreach my $node (@nodes) {
 	    "    No physical node for $node!\n");
     }
 
+    TBGetNodeAllocState($node, \$allocstate);
+
     #
     # On remote nodes, or when forcemode is on, always do the deed.
     # Otherwise, look at experiment state.
-    # 
-    if (!TBIsNodeRemote($node) && !$force) {
+    #
+    if (!$force) {
 	if ($exptstate eq EXPTSTATE_SWAPPING) {
 	    #
 	    # When swapping, local vnodes go down with the physnode.
 	    #
-	    print "$node will $mode with local node $pnode\n";
-	    next;
+	    if (! TBIsNodeRemote($node)) {
+		print "$node will $mode with local node $pnode.\n";
+		next;
+	    }
+	    elsif ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
+		print "$node never booted; skipping.\n";
+		next;
+	    }
 	}
 	elsif ($exptstate eq EXPTSTATE_ACTIVATING) {
 	    #
-	    # The allocstate determines if the vnode actually needs to be
-	    # setup.  See os_setup and assign_wrapper; the idea is to
-	    # avoid setting up vnodes on machines that are rebooting
-	    # anyway. Complicated by modify which could add a vnode to an
-	    # existing machine, but not reboot the machine. 
+	    # The allocstate determines if the vnode actually needs to
+	    # be setup or torndown. Note that a failed experiment will
+	    # cause a bunch of vnodes to be torndown, while in the
+	    # ACTIVATING state. See os_setup and assign_wrapper; the
+	    # idea is to avoid doing setup/teardown up vnodes on
+	    # machines that are rebooting anyway, or that failed.
+	    # Complicated by modify which could add/subtract a vnode on
+	    # an existing machine, but not reboot the machine. Note that
+	    # free (now unused) vnodes will land in RES_TEARDOWN. It is
+	    # assumed that these booted okay, and need to be torndown,
+	    # even though they are not RES_READY.
 	    #
-	    TBGetNodeAllocState($node, \$allocstate);
-
-	    if ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
-		print "$node will $mode with local node $pnode\n";
+	    if (! TBIsNodeRemote($node)) {
+		if ($killmode) {
+		    if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
+			print "$node never booted; skipping $mode.\n";
+			next;
+		    }
+		}
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
+		    print "$node will $mode with local node $pnode\n";
+		    next;
+		}
+	    }
+	    elsif ($killmode && $allocstate eq TBDB_ALLOCSTATE_DOWN) {
+		print "$node never booted; skipping $mode.\n";
 		next;
 	    }
 	}
