@@ -73,6 +73,7 @@ WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php)
 # we end up sucking over "CVS"
 DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
 DOWNLOADFILES += $(wildcard $(SRCDIR)/downloads/*.zip)
+DOWNLOADFILES += $(wildcard $(SRCDIR)/downloads/*.exe)
 
 #
 # This stuff only gets installed on the main site
