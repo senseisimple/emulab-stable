@@ -838,8 +838,6 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		strcpy(nickname,nodeid);
 	}
 
-	syslog(LOG_NOTICE, "dohosts: nickname is %s", nickname);
-
 	/*
 	 * Now, we need to look through the virt_lans table to find a list of all the
 	 * VLANs we're in
@@ -1892,8 +1890,6 @@ directly_connected(struct node_interface *interfaces, char *iface) {
 
 	struct node_interface *traverse;
 
-	syslog(LOG_NOTICE, "directly_connected: checking %s", iface);
-
 	traverse = interfaces;
 	if (iface == NULL) {
 		/* Don't die if address is null */
@@ -1901,7 +1897,6 @@ directly_connected(struct node_interface *interfaces, char *iface) {
 	}
 
 	while (traverse != NULL) {
-		syslog(LOG_NOTICE, "directly_connected: checking against %s", traverse->iface);
 		if (!strcmp(traverse->iface,iface)) {
 			return 1;
 		}
