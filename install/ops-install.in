@@ -203,7 +203,7 @@ Phase "exports", "Setting up exports", sub {
 	# Figure out which of these directories are on the same
 	# filesystems
 	#
-	my @dirs = ('/users','/groups','/proj','/share','/var');
+	my @dirs = ('/users','/groups','/proj','/share','/var','/usr/testbed');
 	@dirs = map {`realpath $_`} @dirs;
 	chomp @dirs;
 	my %filesystems;
