@@ -1,3 +1,9 @@
+Frisbee README version 0.2 of Wed Jun 18 10:35:17 MDT 2003.
+(This is a possibly out of date copy of:
+http://www.emulab.net/downloads/frisbee-README.txt
+Check there for the latest.)
+
+
 This is a preliminary release of the Frisbee[1] disk imaging tool used in
 the University of Utah's Emulab testbed cluster and described in the
 USENIX '03 paper (a copy of which should be in the doc subdirectory).
