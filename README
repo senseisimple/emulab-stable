@@ -6,15 +6,68 @@ NOTE: See the file RESTRICTED-RIGHTS for restrictions on this interim
 snapshot.  In summary, for now you can't redistribute it or use it for
 commercial purposes.
 
-
 HOW TO
 Copy and localize the 'defs-default' file for your environment
 and run ./configure.
 
+DOCUMENTATION
 This is a snapshot, not a formal distribution, so don't expect
-great documentation.  See the files in the 'doc' directory.
-To get started, see doc/setup*.
+great documentation.
 
+doc/* contains documentation for developers.
+www/*.html and www/doc/*.html contain end-user documentation.
+(www/faq.html will be especially valuable to those unfamiliar with the system.)
+
+QUICK TOUR
+ - The Database maintains most testbed state.
+   - LibDB (db/libdb.pm.in) is the main DB interface for testbed software.
+   - sql/database-create.sql contains the DB schema.
+   
+ - The Web Interface (www/*) is the primary means of managing the system.   
+
+ - startexp (tbsetup/startexp.in) is the backend for experiment creation;
+   Important scripts it calls include tbprerun (tbsetup/tbprerun.in) 
+   and tbswap (tbsetup/tbswap.in).
+
+ - ns2ir (tbsetup/ns2ir/*) converts NS files to DB state (via TCL). 
+ - assign (assign/*) maps experiments to available hardware.
+ - snmpit (tbsetup/snmpit.in) configures VLANs on switch hardware.
+ - frisbee (os/frisbee.redux/*) uses multicast to rapidly deploy disk images.
+ - tmcd (tmcd/*) is contacted by nodes as they boot up, to get configuration.
+ - capture and console (capture/*, tip/*) provide serial line access to nodes.
+
+SOURCE TREE ORGANIZATION
+account   -  Account creation and management
+apache    -  Apache HTTPD configuration
+assign    -  Resource allocation software
+capture   -  Node serial line server software
+cdrom     -  Configuration files for remote nodes
+db        -  Variety of interfaces to testbed state 
+dhcpd     -  DHCPD configuration
+discvr    -  Topology discovery software
+doc       -  Documentation (mainly internal)
+event     -  Event System
+hw_config -  Configuration for network hardware
+install   -  Site installation scripts
+ipod      -  "Ping of Death" software
+ir        -  NS-to-database interpreter (in TCL)
+lib       -  C++ database interface library
+os        -  Software for saving/distributing images (incl. Frisbee)
+patches   -  Patches needed to compile software
+pxe       -  Intel PXE support
+security  -  Tools for secure boss node access
+sensors   -  Node monitoring daemons
+sql       -  Database schema and initialization
+ssl       -  SSL Certificate configurations
+sysadmin  -  Apache Log Roller
+tbsetup   -  Experiment creation and manipulation
+testsuite -  Automated testing suite
+tip       -  Node serial line client software
+tmcd      -  Testbed master control daemon (for node configuration)
+tools     -  pcapper tool
+utils     -  Testbed configuration and maintenence tools
+vis       -  Experiment visualization
+www       -  Web Interface / User Documentation
 
 HELP
 For help and to report bugs and problems, mail
@@ -27,3 +80,4 @@ for "big picture" issues and problems.
 
 Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285
 December 2, 2002
+
