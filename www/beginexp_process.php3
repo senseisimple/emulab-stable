@@ -49,6 +49,11 @@ if (strlen($exp_id) > $TBDB_EIDLEN) {
 }
 
 #
+# Certain of these values must be escaped or otherwise sanitized.
+# 
+$exp_name = addslashes($exp_name);
+
+#
 # I'm going to allow shell experiments to be created (No NS file).
 # 
 $nonsfile = 0;
