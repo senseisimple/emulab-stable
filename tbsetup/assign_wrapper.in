@@ -208,6 +208,14 @@ my %node_types = ();
 my %interface_types = ();
 
 #
+# XXX Hack table for determining if a delay node is required. We store
+# the native link speeds for each type,class. Indexed by type and class,
+# the value is a list of link hardware speeds for which no delay node is
+# required. This is an awful way to do this, and quite wrong.
+#
+my %node_type_linkbw = ();
+
+#
 # phys_nodes: The equiv of virt_nodes above, except that these are pulled
 # from the DB once the physical resources have been allocated. Indexed
 # by physname, but there is a pointer from the virt_nodes table entry
@@ -236,6 +244,10 @@ my %v2vmap = ();
 # 
 my %reserved_v2pmap  = ();
 my %reserved_v2vmap  = ();
+my %oldreservednodes = ();
+# reserved_p2vmap is indexed by physical and contains one or more virtual
+# nodes
+my %reserved_p2vmap  = ();
 
 #
 # Experiment wide options. See below. They come from the experiments table.
@@ -258,6 +270,12 @@ my $mem_usage;
 # Allow override of jail/delay osids.
 my $jail_osid;
 my $delay_osid;
+
+# Flag that tells us whether to fix-node current
+# resources or not during a swap modify. This is
+# useful when vnode weights are tweaked by the experimenter
+# before doing a swapmod
+my $fix_current_resources;
 
 ######################################################################
 
@@ -545,7 +563,21 @@ sub RunAssign ($)
     my $cmdargs = "$ptopfile $topfile";
     $cmdargs = "-uPod -c .75 $cmdargs"
 	if ($virtcount);
-    print "assign $cmdargs\n";
+
+    my $cmd;
+
+    # If doing an experiment with virtnodes, use the prepass wrapper for assign
+    # Turned off for now, because it needs some work.
+    #if ($virtcount) {
+    #	$cmd = "assign_prepass";
+    #	$cmdargs = "-m $multiplex_factor $cmdargs"
+    #	    if ($multiplex_factor);
+    #} else {
+    #	$cmd = "assign";
+    #}
+
+    $cmd = "assign";
+    print "$cmd $cmdargs\n";
 
     #
     # Fork a child to run assign. Parent spins watching the cancel flag
@@ -580,7 +612,7 @@ sub RunAssign ($)
 	# the parent. 
 	#
         POSIX::setsid();
-	exec("nice assign $cmdargs > assign.log");
+	exec("nice $cmd $cmdargs > assign.log");
 	die("*** $0:\n".
 	    "    Could not start assign!\n");
     }
@@ -855,6 +887,52 @@ sub RunAssign ($)
 	return 0;
     }
 
+    # From here, we can't recover anymore, coz we move
+    # previously reserved pnodes/vnodes to the holding reservation
+    # and back. By doing this, we will avoid any UNIQUE key issues
+    # when a virt_node in the topology moves from one pnode to another
+    # from previous to new mapping.
+    # Another reason to do this just before nalloc of a new toreserve
+    # nodes is that, we can get into name clashes
+    # For example, lets say the user called his node pc2 and it was
+    # actually mapped to pc99 in the initial swapin. If this was a
+    # swapmod where the user asked for another node node0 which got 
+    # mapped to pc2. nalloc of pc2 will result in UNIQUE key problems
+    # since there exists a reserved vname pc2 (virtual name). By 
+    # having this operation of moving the nodes into 
+    # OLDRESERVED_PID/OLDRESERVED_EID and back before a new nalloc,
+    # avoid this UNIQUE key problem. Also note that simply updating
+    # the vname to be the same as the node_id field also won't
+    # work all the time i.e. in the example discussed above
+    my $oldreserved_pid = OLDRESERVED_PID;	
+    my $oldreserved_eid = OLDRESERVED_EID;
+    if (scalar(keys %oldreservednodes)) {
+	# We can't recover after this coz we are making changes to
+	# the DB
+	$NoRecover = 1;
+	TBDebugTimeStamp("Moving Old Reserved nodes to ".
+	    		 "$oldreserved_pid/$oldreserved_eid ".
+			 "and back started");
+	system("nfree -o $pid $eid " . join(" ", keys(%oldreservednodes)) );
+	system("nalloc $pid $eid " . join(" ", keys(%oldreservednodes)) );
+	my $exitval  = $? >> 8;
+	TBDebugTimeStamp("Moving Old Reserved nodes to ".
+	    		 "$oldreserved_pid/$oldreserved_eid ".
+			 "and back finished");
+	#
+	# If nalloc failed with a fatal error, lets give it up. No retry.
+	# 
+	if ($exitval != 0) {
+	    fatal($WRAPPER_FAILED,
+	    	  "Failed to move back Old Reserved nodes back to reserved\n");
+	}
+	# We need to move this back and forth the holding reservation only
+	# once i.e. in the first call to RunAssign(). If it gets repeatedly
+	# called coz only some pnode resources got nalloc'ed, we don't have
+	# to do the above again.
+	undef %oldreservednodes;
+    }
+
     TBDebugTimeStamp("reserving started");
     system("nalloc -p $pid $eid " . join(" ", keys(%toreserve)));
     TBDebugTimeStamp("reserving finished");
@@ -1048,6 +1126,8 @@ foreach my $pnode (keys(%virtnodes)) {
     my @oplist = ();
     my @ovlist = ();
 
+    printdb "On pnode $pnode: vnodes @vlist\n";
+
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
     fatal($WRAPPER_FAILED,
@@ -1060,28 +1140,48 @@ foreach my $pnode (keys(%virtnodes)) {
     # avail, of just the nodes we need in this run. 
     #
     if ($updating) {
-	my @newvlist = ();
-	my @delvlist = ();
-	
-	foreach my $vnode (@vlist) {
-	    if (!defined($reserved_v2vmap{$vnode})) {
-		# A new vnode on pnode to allocate.
-		push(@newvlist, $vnode);
-		next;
-	    }
-	    if ($reserved_v2pmap{$vnode} ne $pnode) {
-		# A vnode moved. Its new to this pnode.
-		print "$vnode has moved from $reserved_v2pmap{$vnode} ".
-		    "to $pnode!\n";
-		
-		push(@newvlist, $vnode);
-		next;
-	    }
+	my @oldvlist = ();
+	if ( defined($reserved_p2vmap{$pnode}) ) {
+	    @oldvlist = @{$reserved_p2vmap{$pnode}};
+	} 
+        printdb "On pnode $pnode: oldvlist: @oldvlist\n";
 
-	    # Push already allocated p/v onto lists for later.
-	    push(@oplist, $reserved_v2vmap{$vnode});
-	    push(@ovlist, $vnode);
+	# newvlist = elements in vlist but not in oldvlist
+	#            i.e. newly mapped to this pnode
+	my @newvlist = array_diff( \@vlist, \@oldvlist );
+        printdb "On pnode $pnode: newvlist: @newvlist\n";
+
+	# curvlist = elements in both vlist and oldvlist
+	#            i.e. vnodes mapped the same way from previous
+	#            to current
+	# This is the same as @vlist intersection @oldvlist
+	# since the lists have no duplicates
+	my @curvlist = array_diff( \@vlist, \@newvlist );
+        printdb "On pnode $pnode: curvlist: @curvlist\n";
+
+	foreach my $vnode (@curvlist) {
+	    if( defined($reserved_v2vmap{$vnode}) ) {
+		push( @oplist, $reserved_v2vmap{$vnode} );
+		push( @ovlist, $vnode );
+	    }
 	}
+
+	# delvlist = elements in oldvlist not in vlist
+	#            i.e. vnodes that moved to another pnode or
+	#            went away
+	my @delvlist = array_diff( \@oldvlist, \@vlist );
+        printdb "On pnode $pnode: delvlist: @delvlist\n";
+
+	while( scalar(@newvlist) && scalar(@delvlist) ) {
+	    my $del_vnode = pop(@delvlist);
+	    if ( defined($reserved_v2vmap{$del_vnode}) ) {
+		my $reserved_node = $reserved_v2vmap{$del_vnode};
+		push( @oplist, $reserved_node );
+		my $new_vnode = pop(@newvlist);
+		push( @ovlist, $new_vnode );
+	    }
+	}
+	
 	# These are the new nodes we need to allocate
 	@vlist = @newvlist;
 	$numvs = scalar(@vlist);
@@ -1099,7 +1199,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	# Run avail to get the list of virtnodes on the phys node. We
 	# already know there are enough, since assign knows that.
 	#
-	print "Asking avail for $numvs vnodes on $pnode\n";
+	printdb "Asking avail for $numvs for vnodes: @vlist on $pnode\n";
     
 	open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs |")
 	    or fatal($WRAPPER_FAILED, "avail failed");
@@ -1122,6 +1222,7 @@ foreach my $pnode (keys(%virtnodes)) {
 
 	# Sanity check.
 	if (scalar(@vlist) != scalar(@plist)) {
+	    printdb "avail gave " . scalar(@plist) . " vnodes: @plist on $pnode\n";
 	    fatal($WRAPPER_FAILED,
 		  "Could not map some virtual nodes on $pnode");
 	}
@@ -1175,6 +1276,17 @@ foreach my $pnode (keys(%virtnodes)) {
 				    TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 	    }
 	}
+    }
+
+    # Since we have some extra physical vnode reserved on this pnode,
+    # we will let tbswap tear them down
+    while (@delvlist) {
+	my $del_vnode = pop(@delvlist);
+	if ( defined($reserved_v2vmap{$del_vnode}) ) {
+	    my $reserved_node = $reserved_v2vmap{$del_vnode};
+	    TBSetNodeAllocState($reserved_node,
+				TBDB_ALLOCSTATE_RES_TEARDOWN());
+	}		
     }
 }
 
@@ -2082,35 +2194,6 @@ sub getbandwidth {
     return $best;
 }
 
-# requires_delay(bw)
-# Returns 1 if the given bandwidth requires that a delay node be inserted, 0
-# if it can be handled by some interface in the testbed
-#
-# XXX - This is not totally correct. Just because such an interface exists does
-# not necessarily mean we can use it, for a variety of reasons. Eventually,
-# assign needs to handle delay nodes, because, really, only it knows what
-# interfaces it can use.
-sub requires_delay {
-    my $targetbandwidth = $_[0];
-    my $bestbandwidth = getbandwidth($targetbandwidth);
-    printdb "Checking $bestbandwidth against $targetbandwidth\n";
-    # XXX temporary hack: && $bestbandwidth >= $S100Kbs
-    # A delay node is not being added for the 10Mb 0ms link
-    # Permanent fix required
-    if ($bestbandwidth == $targetbandwidth && $bestbandwidth >= $S100Kbs) {
-	return 0;
-    }
-
-    # XXX - This assumes that all interfaces/switch ports can be slowed down,
-    # which is not true
-    if ($delaywithswitch && (($targetbandwidth == $S100Kbs) ||
-	    ($targetbandwidth == $S10Kbs))) {
-	return 0;
-    }
-
-    return 1;
-}
-
 # getnodeport(s)
 # Takes a ports result from assign (mac0,mac1) and returns the
 # first non-null one.
@@ -2132,8 +2215,7 @@ sub InitPnode($pnode, $vnode)
     my $role;
     my $simhost_violation;
 
-    # XXX NSE hack: if the vnode is simulated, we just
-    # choose FBSD-NSE and static routing
+    # XXX NSE hack: 
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
 	#
 	# We can use the Jail hosting OSID for NSE now, but allow override.
@@ -2145,7 +2227,7 @@ sub InitPnode($pnode, $vnode)
 	    $osid = nodejailosid(physnodetype($pnode));
 	}
 	
-	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
+	DBQueryFatal("UPDATE nodes set def_boot_cmd_line='/kernel.jail'," .
 		     " startstatus='none'," .
 		     " bootstatus='unknown'," .
 		     " ready=0," .
@@ -2173,6 +2255,7 @@ sub InitPnode($pnode, $vnode)
 	# almost the same no matter what type.
 	#
 	my $routertype;
+	my $cmdline = "";	# XXX Gross hack. 
 
 	if (exists($delaynodes{$vnode})) {
 	    #
@@ -2188,6 +2271,7 @@ sub InitPnode($pnode, $vnode)
 	    $vname = $vnode;
 	    $role  = TBDB_RSRVROLE_DELAYNODE;
 	    $routertype = TBDB_ROUTERTYPE_NONE;
+	    $cmdline = "/kernel.delay";
 	}
 	elsif (exists($virtnodes{$pnode})) {
 	    #
@@ -2206,12 +2290,14 @@ sub InitPnode($pnode, $vnode)
 	    $vname = newvname($pnode, "vhost");
 	    $role  = TBDB_RSRVROLE_VIRTHOST;
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
+	    $cmdline = "/kernel.jail";
 	}
 	fatal($WRAPPER_FAILED,
 	      "No OSID is defined for internal node $vname!")
 	    if (!defined($osid));
 	
 	DBQueryFatal("UPDATE nodes set ".
+		     " def_boot_cmd_line='$cmdline'," .
 		     " startstatus=0, ".
 		     " bootstatus='unknown', ".
 		     " routertype='$routertype', ".
@@ -2777,12 +2863,79 @@ sub LoadPhysInfo()
 
 	$node_types{$auxtype}  = $node_types{$type};
     }
+
+    #
+    # Now get interface speeds for each type/class. We use this for determining
+    # if a delay node is required. Very hacky, quite wrong.
+    #
+    $query_result =
+	DBQueryFatal("select distinct i.interface_type,n.type ".
+		     " from interfaces as i ".
+		     "left join nodes as n on n.node_id=i.node_id ".
+		     "where i.role='" . TBDB_IFACEROLE_EXPERIMENT . "'");
+
+    # XXX Special hack for sim nodes.
+    $node_type_linkbw{"sim"} = {};
+
+    while (my ($iface_type, $node_type) = $query_result->fetchrow()) {
+	my $node_class = nodetypeclass($node_type);
+
+	$node_type_linkbw{$node_type} = {}
+	    if (!defined($node_type_linkbw{$node_type}));
+	$node_type_linkbw{$node_class} = {}
+	    if (!defined($node_type_linkbw{$node_class}));
+
+	$node_type_linkbw{$node_type}->{interfacespeed($iface_type)} = 1;
+	$node_type_linkbw{$node_class}->{interfacespeed($iface_type)} = 1;
+
+	#
+	# If the type/class has a non-zero simnode capacity, then add
+	# entries for the interface speed so that requires_delay can
+	# figure out interface speeds the underlying node type supports.
+	#
+	if (nodetypesimcap($node_type) || nodetypesimcap($node_class)) {
+	    $node_type_linkbw{"sim"}->{interfacespeed($iface_type)} = 1;
+	}
+    }
+
+    #
+    # Ug, it just gets worse and worse. We also need to map between the
+    # auxtypes that a node (its physical type) can take on. For example,
+    # a link between two pcvm nodes is really a link between a pc600 and
+    # pc850.
+    #
+    $query_result =
+	DBQueryFatal("select distinct n.type,at.type from node_auxtypes as at ".
+		     "left join nodes as n on n.node_id=at.node_id");
+
+    while (my ($phystype, $auxtype) = $query_result->fetchrow()) {
+	next
+	    if (!exists($node_type_linkbw{$phystype}));
+	
+	$node_type_linkbw{$auxtype} = {}
+	    if (!defined($node_type_linkbw{$auxtype}));
+
+	my @list = keys(%{ $node_type_linkbw{$phystype} });
+	foreach my $speed (@list) {
+	    $node_type_linkbw{"$auxtype"}->{$speed} = 1;
+	}
+    }
+
+    if ($verbose) {
+	printdb("Interface Speeds:\n");
+	foreach my $type (keys(%node_type_linkbw)) {
+	    my @list = keys(%{ $node_type_linkbw{$type} });
+
+	    printdb(" $type: @list\n");
+	}
+    }
 }
 sub interfacespeed($)	{ return $interface_types{$_[0]}->{"max_speed"}; }
 sub interfacespeedmbps($) {
     return $interface_types{$_[0]}->{"max_speed"} / 1000.0;
 }
 sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
+sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
 sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
 sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
 sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
@@ -2791,6 +2944,45 @@ sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
 sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
 sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
+sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
+
+# requires_delay(bw)
+# Returns 1 if the given bandwidth requires that a delay node be inserted, 0
+# if it can be handled by some interface in the testbed
+#
+# Way bogus! We have to guess if we need to insert a delay node (assign should
+# really be doing this). We need a delay node if the desired bw does not
+# match the native hardware link speed. Of course, we do not know what assign
+# will map the node too, but we do know generally what interface speeds are
+# supported on each type/class of hardware that the user might request. If
+# a 50Mb link on a "pc" is requested, we know we need a delay node cause
+# pcs support just 100Mb and 1000Mb links. assign might pick either one, but
+# we know we need a delay node no matter what. The problem is what happens if
+# the user asks for 100Mb (no delay node), but assign maps it to a 1000Mb link?
+# Well, we are screwed since we needed a delay node. We are ignoring that
+# problem for now since no one has access to 1gig interfaces at the moment.
+# 
+sub requires_delay($$)
+{
+    my ($node, $targetbw) = @_;
+    my $node_type  = virtnodetype($node);
+    my $node_class = nodetypeclass($node_type);
+
+    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	  "requires_delay(): $node - invalid type/class $node_type/$node_class!")
+	if (!exists($node_type_linkbw{$node_type}) &&
+	    !exists($node_type_linkbw{$node_class}));
+
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_type} })) {
+	return 0
+	    if ($targetbw == $bw);
+    }
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_class} })) {
+	return 0
+	    if ($targetbw == $bw);
+    }
+    return 1;
+}
 
 #
 # Load up the virt_nodes info, which includes the type info for each
@@ -3277,12 +3469,12 @@ sub LoadExperiment()
     my $query_result =
 	DBQueryFatal("select uselinkdelays,forcelinkdelays,".
 		     "       multiplex_factor,usewatunnels, ".
-		     "       cpu_usage,mem_usage, ".
+		     "       cpu_usage,mem_usage,allowfixnode, ".
 		     "       jail_osname,delay_osname ".
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$jail_osname,$delay_osname) =
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname) =
 	$query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
@@ -3298,6 +3490,8 @@ sub LoadExperiment()
 	if (!defined($cpu_usage));
     $mem_usage = $o6
 	if (!defined($mem_usage));
+    $fix_current_resources = $o7
+	if (!defined($fix_current_resources));
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {
@@ -3313,6 +3507,8 @@ sub LoadExperiment()
 	}
     }
 
+    printdb "Not fixing current resources during this swapin\n"
+	if (! $fix_current_resources);
     LoadVirtTypes();
     LoadVirtNodes();
     LoadVirtLans();
@@ -3331,7 +3527,9 @@ sub CreateTopFile()
 {
     my $physnode_count = 0;
     my $virtnode_count = 0;
-    my $simnode_count = 0;
+    my $simnode_count  = 0;
+    my %osdoesveth     = ();
+    my %osdoesmlink    = ();
     
     # Open the TOP file
     open(TOPFILE,"> $topfile") or
@@ -3362,6 +3560,16 @@ sub CreateTopFile()
 	    if (virtnodeisplabnode($vname) && $cpu_usage) {
 		# Yuck
 		$desirestr .= " +load:" . (($cpu_usage - 1) / 5.0);
+	    }
+	    if ($updating) {
+		$desirestr .= " already_reserved:.2";
+
+		# Try to keep this on the same physical node where it was
+		# before
+		#my $oldmapping = $reserved_v2pmap{$node};
+		#if ($oldmapping) {
+		#    $desirestr .= " $oldmapping:.2";
+		#}
 	    }
 	    my $typestr = $type;
 	    if (virtnodeisvirt($vname)) {
@@ -3426,14 +3634,23 @@ sub CreateTopFile()
 		    $virtnodes++;
 		} else {
 		    $nonvirtnodes++;
-		    # We check against the standard FBSD and declare the node
-		    # to be a nonbsd one even if it is actually running FBSD
-		    # via a user-specific FBSD image. Thats coz there is no
-		    # way of determining if the FBSD image is actually running
-		    # our kernel that can do veths
-		    if (defined(virtnodeosid($node)) &&
-			virtnodeosid($node) ne TBOSID(TB_OPSPID, "FBSD-STD")) {
-			$nonbsdnodes++;
+		    #
+		    # Check os feature list emulated/veth support.
+		    #
+		    if (defined(virtnodeosid($node))) {
+			my $osid = virtnodeosid($node);
+			
+			if (!exists($osdoesmlink{$osid})) {
+			    $osdoesmlink{$osid} =
+				OSFeatureSupported($osid, 'mlinks');
+			    $osdoesveth{$osid} =
+				OSFeatureSupported($osid, 'veths');
+			}
+			# For simplicity, lets just say that a node needs
+			# both set.
+			if (! ($osdoesmlink{$osid} && $osdoesveth{$osid})) {
+			    $nonbsdnodes++;
+			}
 		    }
 		}
 		$realnodes++;
@@ -3513,10 +3730,12 @@ sub CreateTopFile()
 	    $bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	    $rbandwidth = &getbandwidth(&min($rbw0,$bw1));
 	    if (((($delay >= $delaythresh) ||
-		  (!$nobwshaping && &requires_delay($bw)) ||
+		  (!$nobwshaping && (requires_delay($node0, $bw) ||
+				     requires_delay($node1, $bw))) ||
 		  ($loss != 0)) ||
 		 (($rdelay >= $delaythresh) ||
-		  (!$nobwshaping && &requires_delay($rbw)) ||
+		  (!$nobwshaping && (requires_delay($node0, $rbw) ||
+				     requires_delay($node1, $rbw))) ||
 		  ($rloss != 0)) ||
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
@@ -3615,10 +3834,10 @@ sub CreateTopFile()
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
 		if (((($delay >= $delaythresh) ||
-		      &requires_delay($bw) ||
+		      &requires_delay($node, $bw) ||
 		      ($loss != 0)) || 
 		     (($rdelay >= $delaythresh) ||
-		      &requires_delay($rbw) ||
+		      &requires_delay($node, $rbw) ||
 		      ($rloss != 0)) ||
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||
@@ -3896,6 +4115,22 @@ sub getrtabid($$) {
     return $rtabid;
 }
 
+sub array_diff($$) {
+    my ($a, $b) = @_;
+
+    my %seen; # lookup table
+    my @aonly;# answer
+    
+    # build lookup table
+    @seen{@$b} = ();
+
+    foreach my $item (@$a) {
+	push(@aonly, $item) unless exists $seen{$item};
+    }
+
+    return @aonly;
+}
+
 #
 # Load current resources. We pull in the phys node entries now.
 # 
@@ -3922,6 +4157,10 @@ sub LoadCurrent()
 	    if ($isremote && !$isplab);
 	
 	LoadPhysNode($reserved);
+
+	if( ! defined($reserved_p2vmap{$physnode}) ) {
+	    $reserved_p2vmap{$physnode} = [];
+	}
 	
 	#
 	# If a virtnode, we need the underlying physnode, since thats
@@ -3934,13 +4173,16 @@ sub LoadCurrent()
 	    physnodesetreuse($physnode, "unused");
 	    $reserved_v2vmap{$vname} = $reserved;
 	    $reserved_v2pmap{$vname} = $physnode;
+	    push(@{$reserved_p2vmap{$physnode}}, $vname);
 
 	    # Allow for the user to "move" a node. Yuck!
 	    $fixed_nodes{$vname} = $physnode
-		if (!defined($fixed_nodes{$vname}));
+		if (!defined($fixed_nodes{$vname}) && $fix_current_resources);
 	    $reserved_vcount++;
+	    $oldreservednodes{$reserved} = 1;
 	} 
 	else {
+	    $oldreservednodes{$physnode} = 1;
 	    if ($erole eq TBDB_RSRVROLE_SIMHOST) {
 		printdb "simhost:$reserved has vname:$vname with ".
 		         "simhost_violation:$simhost_violation\n";
@@ -3960,8 +4202,10 @@ sub LoadCurrent()
 		    printdb " simnodes\n";
 		    while (my ($simnode) = $query_result2->fetchrow_array()) {
 			$fixed_nodes{$simnode} = $reserved 
-				if (!defined($fixed_nodes{$simnode})); 
+				if (!defined($fixed_nodes{$simnode}) &&
+				    $fix_current_resources); 
 			$reserved_v2pmap{$simnode} = $reserved;
+			push(@{$reserved_p2vmap{$reserved}}, $simnode);
 			printdb "Fixing simnode:$simnode -> $reserved\n";
 			$reserved_simcount++;
 		    }
@@ -3969,12 +4213,13 @@ sub LoadCurrent()
 	    }
 	    else {
 		$reserved_v2pmap{$vname} = $reserved;
+		push(@{$reserved_p2vmap{$reserved}}, $vname);
 		physnodesetreuse($reserved, "unused");
 		printdb "non simhost:$reserved has vname:$vname\n";
 
 		# Allow for the user to "move" a node. Yuck!
 		$fixed_nodes{$vname} = $reserved
-		    if (!defined($fixed_nodes{$vname}));
+		    if (!defined($fixed_nodes{$vname}) && $fix_current_resources);
 		$reserved_pcount++;
 	    }
 	}
@@ -3985,4 +4230,5 @@ sub LoadCurrent()
 	if ($reserved_vcount);
     print "Reserved simnodes = $reserved_simcount\n"
 	if ($reserved_simcount);
+    printdb "Old Reserved Nodes: " . join(" ", keys %oldreservednodes) . "\n";
 }

@@ -22,6 +22,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT =
     qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
+	 OLDRESERVED_PID OLDRESERVED_EID
 	 NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
@@ -142,10 +143,10 @@ use vars qw(@ISA @EXPORT);
 
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
-	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
+	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
-	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
+	 ExpNodes ExpNodesOldReserved DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
@@ -294,6 +295,8 @@ sub PLABMOND_PID()		{ $TBOPSPID; }
 sub PLABMOND_EID()		{ "plab-monitor"; }
 sub PLABHOLDING_PID()		{ $TBOPSPID; }
 sub PLABHOLDING_EID()		{ "plabnodes"; }
+sub OLDRESERVED_PID()		{ $TBOPSPID; }
+sub OLDRESERVED_EID()		{ "oldreserved"; }
 sub PROJROOT()			{ $PROJROOT; }
 sub GROUPROOT()			{ $GROUPROOT; }
 sub USERROOT()			{ $USERROOT; }
@@ -1445,6 +1448,53 @@ sub TBGetCancelFlag($$$)
 }
 
 #
+# Return a list of all the nodes in an experiment
+# that were moved to OLDRESERVED_PID/OLDRESERVED_EID
+# holding reservation
+#
+# usage: ExpNodesOldReserved(char *pid, char *eid)
+#        returns the list if a valid pid/eid.
+#        returns 0 if an invalid pid/eid or if an error.
+#
+sub ExpNodesOldReserved($$)
+{
+    my($pid, $eid) = @_;
+    my(@row);
+    my(@nodes);
+
+    my $oldreserved_pid = OLDRESERVED_PID;
+    my $oldreserved_eid = OLDRESERVED_EID;
+    my $query_result =
+	DBQueryWarn("select r.node_id from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where (r.pid='$oldreserved_pid' and r.old_pid='$pid') ".
+		    "and (r.pid='$oldreserved_eid' and r.old_eid='$eid') ");
+
+    if (! $query_result or
+	$query_result->numrows == 0) {
+	return ();
+    }
+    while (@row = $query_result->fetchrow_array()) {
+	my $node = $row[0];
+
+	#
+	# Taint check. I do not understand this sillyness, but if I
+	# taint check these node names, I avoid warnings throughout.
+	#
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+
+	    push(@nodes, $node);
+	}
+	else {
+	    print "*** $0: WARNING: Bad node name: $node.\n";
+	}
+    }
+    return @nodes;
+}
+
+#
 # Return a list of all the nodes in an experiment.
 #
 # usage: ExpNodes(char *pid, char *eid)
@@ -1625,6 +1675,34 @@ sub IsShelved ($;$$) {
 	return 1;
     }
     return 0;
+}
+
+#
+# Map nodeid to its pid/eid in the oldreserved holding reservation
+#
+# usage: NodeidToExpOldReserved(char *nodeid, \$pid, \$eid, \$vname)
+#        returns 1 if the node is reserved.
+#        returns 0 if the node is not reserved.
+#
+sub NodeidToExpOldReserved ($$$) {
+    my($nodeid, $pid, $eid) = @_;
+
+    my $oldreserved_pid = OLDRESERVED_PID;
+    my $oldreserved_eid = OLDRESERVED_EID;
+    my $query_result =
+	DBQueryWarn("select old_pid,old_eid from reserved ".
+		    "where node_id='$nodeid' and pid='$oldreserved_pid' ".
+		    "and eid='$oldreserved_eid'");
+
+    if (! $query_result ||
+	! $query_result->num_rows) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $$pid = $row[0];
+    $$eid = $row[1];
+    return 1;
 }
 
 #

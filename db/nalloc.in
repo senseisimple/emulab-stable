@@ -52,6 +52,8 @@ my $eid = shift;
 my @node_names=@ARGV;
 my @vals = ();
 my @nodes= ();
+my $oldreserved_pid = OLDRESERVED_PID;
+my $oldreserved_eid = OLDRESERVED_EID;
 
 if ($debug) { print "Expt '$eid', proj '$pid'\n"; }
 
@@ -102,11 +104,16 @@ foreach my $n (@node_names) {
 	if (($r_pid eq $pid) && ($r_eid eq $eid)) {
 	    print "You have already reserved node '$n'.\n";
 	    # Do not increment error code since that throws off tbprerun.
+	    next;
+	} elsif(NodeidToExpOldReserved($n, \$r_pid, \$r_eid) &&
+		(($r_pid eq $pid) && ($r_eid eq $eid)) ) {
+	    print "You have already reserved node '$n' which was moved to ".
+	    	   "a holding reservation: $oldreserved_pid/$oldreserved_eid.\n";
 	} else {
 	    print "Someone else has already reserved node '$n'.\n";
 	    $noalloc++;
+	    next;
 	}
-	next; # Go on to the next node if this one is reserved
     }
 
     my $result = DBQueryFatal("select * from nodes where node_id='$n'");
@@ -130,7 +137,7 @@ foreach my $n (@node_names) {
 	    # End shark hack
 	} else {
 	    # its not a shark - just add it in...
-	    push(@vals,"('$n','$pid','$eid','$n')");
+	    push(@vals,"('$n','$pid','$eid','$n','','')");
 	    push(@nodes,"$n");
 	}
     }
@@ -156,7 +163,7 @@ if (!$error && (!$noalloc || $partial) && @vals) {
     if ($debug) {
 	print "Reserving nodes...\n";
     }
-    $cmd = "insert into reserved (node_id,pid,eid,vname) values ".
+    $cmd = "replace into reserved (node_id,pid,eid,vname,old_pid,old_eid) values ".
       join(",",@vals);
     if (!DBQueryWarn($cmd)) {
 	$error++;

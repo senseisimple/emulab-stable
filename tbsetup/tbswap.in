@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -65,7 +65,8 @@ sub UPDATE_RECOVER()  { return 0; }
 
 $| = 1;
 
-my $updateReboot = 0;
+my $updateReboot   = 0;
+my $updateReconfig = 1;
 my $updateEventsys_restart = 0;
 my $force  = 0;
 my $errors = 0;
@@ -101,6 +102,7 @@ while ($#ARGV > 1) {
 	$force = 1;
     } elsif ($arg eq "-reboot") {
 	$updateReboot = 1;
+	$updateReconfig = 0;
     } elsif ($arg eq "-eventsys_restart" && $swapop eq "update") {
 	$update_Eventsys_restart = 1;
     } else {
@@ -734,8 +736,9 @@ sub doSwapin($) {
     # and we are successfully performing the update,
     # then mark all nodes in experiment so os_setup will reboot them.
     #
-    if (($type == UPDATE) && $updateReboot) {
-	print STDERR "Marking nodes for reboot.\n";
+    if (($type == UPDATE) &&
+	($updateReboot || $updateReconfig)) {
+	print STDERR "Marking nodes for reboot/reconfig.\n";
 	$db_result =
 	    DBQueryFatal("select r.node_id,n.allocstate from reserved as r ".
 			 "left join nodes as n on n.node_id=r.node_id ".
@@ -749,7 +752,10 @@ sub doSwapin($) {
 	    # does not even exist yet (plab nodes).
 	    #
 	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
-		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+		TBSetNodeAllocState($node,
+				    ($updateReboot ?
+				     TBDB_ALLOCSTATE_RES_INIT_DIRTY() :
+				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
 	}
     }

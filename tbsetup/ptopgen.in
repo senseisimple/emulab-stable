@@ -229,7 +229,8 @@ if (defined($exempt_eid)) {
 
 $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
-		 "a.def_boot_osid from nodes as a ".
+		 "a.def_boot_osid, (b.pid is not null and b.eid is not null) " .
+		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
@@ -243,7 +244,7 @@ $result =
 # to use all nodes), or if there is no entry in the perms table for
 # the type/class of node.
 #
-while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid) 
+while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved) 
     = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
@@ -252,6 +253,12 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid)
 	$subnode_of{$node} = $physnode;
     }
     $node_def_boot_osid{$node} = $def_boot_osid;
+
+    if ($reserved) {
+	$is_reserved{$node} = 1;
+    } else {
+	$is_reserved{$node} = 0;
+    }
 }
 
 foreach $node (keys(%nodes)) {
@@ -328,6 +335,9 @@ foreach $node (keys(%nodes)) {
 	push @features, "?+ram:$ram";
 	# This number can be use for fine-tuning packing
 	push @features, "?+virtpercent:100";
+	# Put this silly feature in so that we can try to keep vnodes
+	# on the same pnode they were before
+	push @features, "${node}:0.0";
     }
 
     if ($simstuff && $simnode_capacity > 0) {
@@ -349,6 +359,12 @@ foreach $node (keys(%nodes)) {
     push(@features, @{$typemap{$type}->{'FEATURES'}});
     if (defined($features{$node})) {
 	push @features, @{$features{$node}};
+    }
+
+    # This is for the case that we are modifying an existing experiment - tell
+    # assign to prefer nodes the user has already allocated
+    if ($exempt_eid && $is_reserved{$node}) {
+	push(@features,"already_reserved:0");
     }
 
     #

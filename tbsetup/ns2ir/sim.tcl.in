@@ -245,8 +245,11 @@ Simulator instproc run {} {
     var_import ::GLOBALS::forcelinkdelays
     var_import ::GLOBALS::multiplex_factor
     var_import ::GLOBALS::sync_server
+    var_import ::GLOBALS::use_ipassign
+    var_import ::GLOBALS::ipassign_args
     var_import ::GLOBALS::cpu_usage
     var_import ::GLOBALS::mem_usage
+    var_import ::GLOBALS::fix_current_resources
     var_import ::GLOBALS::veth_encapsulate
     var_import ::GLOBALS::jail_osname
     var_import ::GLOBALS::delay_osname
@@ -254,8 +257,10 @@ Simulator instproc run {} {
     var_import ::TBCOMPAT::eventtypes
     
     # Fill out IPs
-    foreach obj [concat [array names lanlink_list]] {
-	$obj fill_ips
+    if {! $use_ipassign } {
+	foreach obj [concat [array names lanlink_list]] {
+	    $obj fill_ips
+	}
     }
 
     # Go through the list of nodes, and find subnode hosts - we have to add a
@@ -336,8 +341,8 @@ Simulator instproc run {} {
 	$prog updatedb "sql"
     }
 
-    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate"]
-    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate]
+    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
+    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate $fix_current_resources]
 
     if { $multiplex_factor != {} } {
 	lappend fields "multiplex_factor"
@@ -350,6 +355,14 @@ Simulator instproc run {} {
     } elseif { $default_sync_server != {} } {
 	lappend fields "sync_server"
 	lappend values $default_sync_server
+    }
+
+    lappend fields "use_ipassign"
+    lappend values $use_ipassign
+
+    if { $ipassign_args != {} } {
+	lappend fields "ipassign_args"
+	lappend values $ipassign_args
     }
 
     if { $jail_osname != {} } {

@@ -150,11 +150,35 @@ system("prerender -t $pid $eid");
 
 TBDebugTimeStamp("routes started");
 print "Setting up static routes (if requested) ... \n";
-if (system("staticroutes $pid $eid")) {
-    cleanup();
-    die("*** $0:\n".
-	"    Static route calculation failed!\n");
+
+#
+# Find out which route calculator we're supposed to use
+#
+my $result = DBQueryWarn("select use_ipassign, ipassign_args " .
+    "from experiments where pid='$pid' and eid='$eid'");
+if (!$result || ($result->num_rows() != 1)) {
+	cleanup();
+	die("*** $0:\n".
+	    "    Error determining route calculator!\n");
 }
+my ($use_ipassign, $ipassign_args) = $result->fetchrow();
+if ($use_ipassign) {
+    if (!defined $ipassign_args) {
+	$ipassign_args = "";
+    }
+    if (system("ipassign_wrapper $ipassign_args $pid $eid")) {
+	cleanup();
+	die("*** $0:\n".
+	    "    Static route calculation failed!\n");
+    }
+} else {
+    if (system("staticroutes $pid $eid")) {
+	cleanup();
+	die("*** $0:\n".
+	    "    Static route calculation failed!\n");
+    }
+}
+
 TBDebugTimeStamp("routes finished");
 print "Static routing done! " . TBTimeStamp() . "\n";
 

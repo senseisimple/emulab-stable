@@ -653,6 +653,25 @@ proc tb-set-sync-server {node} {
 }
 
 #
+# Turn on or of the ipassign program for IP address assignment and route
+# calculation
+#
+proc tb-use-ipassign {onoff} {
+    var_import ::GLOBALS::use_ipassign
+
+    set use_ipassign $onoff
+}
+
+#
+# Give arguments for ipassign
+#
+proc tb-set-ipassign-args {stuff} {
+    var_import ::GLOBALS::ipassign_args
+
+    set ipassign_args $stuff
+}
+
+#
 # Set the startup command for a node. Replaces the tb-set-node-startup
 # command above, but we have to keep that one around for a while. This
 # new version dispatched to the node object, which uses a program object.
@@ -697,6 +716,17 @@ proc tb-set-cpu-usage {usage} {
 #
 proc tb-bind-parent {sub phys} {
     tb-fix-node $sub $phys
+}
+
+proc tb-fix-current-resources {onoff} {
+    var_import ::GLOBALS::fix_current_resources
+
+    if {$onoff != 0 && $onoff != 1} {
+	perror "\[tb-fix-current-resources] $onoff must be 0/1"
+	return
+    }
+
+    set fix_current_resources $onoff
 }
 
 #

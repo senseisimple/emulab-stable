@@ -77,10 +77,13 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 			 "wa_plr_solverweight"		=> 1,
 			 "cpu_usage"			=> 1,
 			 "mem_usage"			=> 1,
+			 "allowfixnode"			=> 1,
 			 "veth_encapsulate"		=> 1,
 			 "jail_osname"			=> 1,
 			 "delay_osname"			=> 1,
-			 "sync_server"			=> 1);
+			 "sync_server"			=> 1,
+		         "use_ipassign"			=> 1,
+		         "ipassign_args"		=> 1);
 
 #
 # Turn off line buffering on output
@@ -227,7 +230,7 @@ sub readXML($$$) {
 	$count += scalar(@{$virtual_tables{$table}})
 	    if (defined($virtual_tables{$table}));
     }
-    if ($count > 10000) {
+    if ($count > 100000) {
 	fatal("Too many rows of data!");
     }
 

@@ -17,10 +17,11 @@ use Getopt::Std;
 #
 sub usage ()
 {
-    die("Usage: nfree [-x] <pid> <eid> [<node> <node> <...>]\n".
+    die("Usage: nfree [-x] [-o] <pid> <eid> [<node> <node> <...>]\n".
 	"Releases all nodes in the specified experiment.\n".
 	"If nodes are listed, nfree releases only those nodes.\n".
-	" '-x' frees all virtual nodes on any physical node that gets freed.\n"
+	" '-x' frees all virtual nodes on any physical node that gets freed.\n".
+	" '-o' Moves nodes into a oldreserved holding experiment.\n"
 	);
 }
 
@@ -38,6 +39,8 @@ my $osselect    = "$TB/bin/os_select";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
 my $reloadeid   = "reloading";
+my $oldreserved_pid = OLDRESERVED_PID;
+my $oldreserved_eid = OLDRESERVED_EID;
 
 my @nodes;
 my @freed_nodes=();
@@ -53,7 +56,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-my  $optlist = "x";
+my  $optlist = "xo";
 
 %options = ();
 
@@ -62,9 +65,13 @@ if (! getopts($optlist, \%options)) {
 }
 
 my $freeDependantVirtuals = 0;
+my $moveToOldReserved = 0;
 
 if (defined($options{"x"})) {
     $freeDependantVirtuals = 1;
+}
+if (defined($options{"o"})) {
+    $moveToOldReserved = 1;
 }
 
 if (@ARGV < 2) {
@@ -133,6 +140,9 @@ if (@ARGV) {
 } else {
     print "Releasing all nodes from experiment '$eid' in project '$pid'.\n";
     @nodes = ExpNodes($pid, $eid);
+    if (! $moveToOldReserved ) {
+	push( @nodes, ExpNodesOldReserved($pid, $eid) );
+    }
 }
 
 ######################################################################
@@ -172,19 +182,38 @@ foreach my $n (@nodes) {
 	next;
     }
 
-    # Move to locked reservation. Node is not free, but is no longer
-    # owned by the pid/eid, so cannot be mucked with.
-    if (! DBQueryWarn("update reserved " .
-		      "set vname='$n', pid='$reloadpid', eid='$lockedeid' ".
-		      "where node_id='$n'")) {
-	print "*** WARNING: Error locking down node $n!\n";
-	next;
+    if ( $moveToOldReserved ) {
+	# Move to holding reservation. Node is not free, but is no longer
+	# owned by the pid/eid, so cannot be mucked with.
+	if (! DBQueryWarn("update reserved " .
+			  "set vname='$n', pid='$oldreserved_pid', ".
+			  "eid='$oldreserved_eid', old_pid='$pid', ".
+			  "old_eid='$eid' where node_id='$n'")) {
+	    print "*** WARNING: Error moving node $n to holding pid/eid: ".
+	          "$oldreserved_pid/$oldreserved_eid\n";
+	    next;
+	}
+    } else {
+	# Move to locked reservation. Node is not free, but is no longer
+	# owned by the pid/eid, so cannot be mucked with.
+	if (! DBQueryWarn("update reserved " .
+			  "set vname='$n', pid='$reloadpid', eid='$lockedeid', ".
+			  "old_pid='', old_eid='' ".
+			  "where node_id='$n'")) {
+	    print "*** WARNING: Error locking down node $n!\n";
+	    next;
+	}
+	push(@freed_nodes, $n);
     }
 
-    push(@freed_nodes, $n);
 }
 
 DBQueryFatal("unlock tables");
+
+# We are done if called with a -o
+if( $moveToOldReserved ) {
+    exit($error);
+}
 
 ######################################################################
 # Step 2

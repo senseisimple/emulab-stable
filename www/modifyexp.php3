@@ -136,9 +136,14 @@ if (! isset($go)) {
               topology (adding or removing nodes, links, and LANs).
 	      If adding/removing a delay to/from an existing link, or
               replacing a lost node <i>without modifying the experiment
-              topology</i>, this won't be necessary.</p>";
+              topology</i>, this won't be necessary. Restarting the
+	      event system is also highly recommended since the same nodes
+	      in your virtual topology may get mapped to different physical
+	      nodes.</p>";
 	echo "<input type='checkbox' name='reboot' value='1' checked='1'>
 	      Reboot nodes in experiment (Highly Recommended)</input>";
+	echo "<br><input type='checkbox' name='eventrestart' value='1' checked='1'>
+	      Restart Event System in experiment (Highly Recommended)</input>";
     }
     echo "<br>";
     echo "<input type='hidden' name='pid' value='$pid'>";
@@ -209,6 +214,7 @@ set_time_limit(0);
 # Run the script.
 $retval = SUEXEC($uid, $unix_gid,
 		 "webswapexp $rebootswitch " . ($reboot ? "-r " : "") .
+		 ($eventrestart ? "-e " : "") .
 		 "-s modify $pid $eid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 		 

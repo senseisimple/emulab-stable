@@ -67,6 +67,7 @@ my $dbg		= 0;
 my $failed      = 0;
 my $failedvnodes= 0;
 my $failedplab  = 0;
+my $canceled    = 0;
 my %nodes       = ();
 my %vnodes      = ();
 my %vnodephosts = ();
@@ -207,9 +208,13 @@ while (my %row = $db_result->fetchhash()) {
 	TBGetNodeAllocState( $node, \$nodeAllocState );
 	$nodes{$node}  = $node;
 	$nodeAllocStates{$node} = $nodeAllocState;
-	# only reboot node if assign_wrapper just pulled it into expt.
-	# (e.g. it isnt ALLOCSTATE_RES_READY)
-	if ($nodeAllocState ne TBDB_ALLOCSTATE_RES_READY()) {
+	if ($nodeAllocState eq TBDB_ALLOCSTATE_RES_RECONFIG()) {
+	    # Terrible use of state machine.
+	    $reconfigs{$node} = 1;
+	}
+	elsif ($nodeAllocState ne TBDB_ALLOCSTATE_RES_READY()) {
+	    # only reboot node if assign_wrapper just pulled it into expt.
+	    # (e.g. it isnt ALLOCSTATE_RES_READY)
 	    $reboots{$node} = 1;
 	}
     }
@@ -469,8 +474,9 @@ if (!$TESTMODE) {
 	foreach my $node (@list) {
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
-	    # No point in rebooting, obviously, but it does reboot!
+	    # No point in reboot/reconfig obviously, since node will reboot!
 	    delete $reboots{$node};
+	    delete $reconfigs{$node};
 	    $rebooted{$node} = 1;
 	}
 
@@ -479,6 +485,9 @@ if (!$TESTMODE) {
 	    ForkCmd("$os_load -m $imageid @list");
     }
 
+    #
+    # Fire off the reboots.
+    # 
     if (keys(%reboots)) {
 	foreach my $node (keys(%reboots)) {
 	    if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
@@ -497,30 +506,10 @@ if (!$TESTMODE) {
     }
 
     #
-    # Any nodes that were not reloaded or rebooted, get a reconfig. They
-    # must have been in the experiment before, but we check the allocstate
-    # anyway.
+    # Fire off the reconfigs.
     #
-    foreach my $node (keys(%nodes)) {
-	next
-	    if (exists($rebooted{$node}) ||
-		$nodeAllocStates{$node} ne TBDB_ALLOCSTATE_RES_READY());
-
-	# Currently, only do this for NORMALv2 images. Need a way to
-	# know this is allowed!
-	my $mode;
-
-	if (!TBGetNodeOpMode($node, \$mode)) {
-	    print "*** Error getting operational mode for $node!\n";
-	    next;
-	}
-	next
-	    if ($mode ne "NORMALv2");
-	
-	$reconfigs{$node} = $node;
-    }
     if (keys(%reconfigs)) {
-	$cmd = "$nodereboot -r -d " . join(" ", keys(%reconfigs));
+	$cmd = "$nodereboot -r " . join(" ", keys(%reconfigs));
 	$pids{$cmd} = ForkCmd($cmd);
     }
 
@@ -598,7 +587,19 @@ while ( @nodelist ) {
 	next;
     }
 
-    if ($retries{$node}) {
+    #
+    # Check for cancelation. Do not want to retry the reboots if the
+    # swap was canceled.
+    #
+    if (!$canceled) {
+	TBGetCancelFlag($pid, $eid, \$canceled);
+
+	if ($canceled) {
+	    print "*** Swap canceled; will terminate os_setup early!\n";
+	}
+    }
+
+    if ($retries{$node} && !$canceled) {
 	$retries{$node} -= 1;
 
 	print "*** Rebooting $node and waiting again ...\n";
@@ -694,7 +695,10 @@ foreach my $vnode (@vnodelist) {
 # XXX - Don't bother if something above failed. A waste of time and
 # usually leads to cascading errors.
 #
-if ($failed && @vnodelist) {
+if ($canceled && @vnodelist) {
+    print "*** Skipping virtual node setup since swapin was canceled!\n";
+}
+elsif ($failed && @vnodelist) {
     print "*** Skipping virtual node setup since there were previous ".
 	"failures!\n";
 }
@@ -799,7 +803,7 @@ TBDebugTimeStamp("os_setup finished");
 
 # No retry if vnodes failed. Indicates a fatal problem.
 exit(-1)
-    if ($failedvnodes);
+    if ($failedvnodes || $canceled);
 exit(1)
     if ($failed || $failedplab);
 exit 0;

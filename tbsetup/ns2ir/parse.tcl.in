@@ -213,6 +213,12 @@ namespace eval GLOBALS {
     # The name of the sync_server
     variable sync_server {}
 
+    # Whether or not use use ipassign
+    variable use_ipassign 0
+
+    # Arguments to pass to ipassign
+    variable ipassign_args {}
+
     # For remote nodes. The solver weights.
     variable wa_delay_solverweight 1
     variable wa_bw_solverweight	   7
@@ -229,6 +235,9 @@ namespace eval GLOBALS {
     # it an integer, 1 <= x <= 5.
     variable cpu_usage 3
     variable mem_usage 0
+
+    # Flag to disable doing a fix-node
+    variable fix_current_resources 1
 
     # Control veth encapsulation
     variable veth_encapsulate 1
