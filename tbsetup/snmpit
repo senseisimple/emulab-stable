@@ -633,65 +633,76 @@ sub OneVLAN {
       $n++;
     }
   } elsif ($device eq "Cisco") {
+    my $okay = 0;
+    my $attempts = 0;
     my $VlanType = '.1.3.6.1.4.1.9.9.46.1.4.2.1.3.1'; # vlan # is index
     my $VlanName = '.1.3.6.1.4.1.9.9.46.1.4.2.1.4.1'; # vlan # is index
     my $VlanSAID = '.1.3.6.1.4.1.9.9.46.1.4.2.1.6.1'; # vlan # is index
     my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
-    my $N = 2;
-    my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
-    print "Row $N got '$RetVal'\n" if $debug;
-    while ($RetVal ne '') {
-      $N += 1;
-      $RetVal = $sess->get([[$VlanRowStatus,$N]]);
+    while (($okay == 0) && ($attempts <3)) {
+      my $N = 2;
+      my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
       print "Row $N got '$RetVal'\n" if $debug;
-    }
-    my $SAID = pack("H*",sprintf("%08x",$N+100000));
-    if ( !$m 
-	 #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
-	 || ($m =~ /l(\d)+-(\d)+/)
-	 #End of Temp fix
-       ) { $m = $N; }
-    print "  Creating VLAN $m as VLAN #$N: @vlan ... ";
-    # Yes, this next line MUST happen all in one set command....
-    $RetVal = $sess->set([[$VlanRowStatus,$N,"createAndGo","INTEGER"],
-			  [$VlanType,$N,"ethernet","INTEGER"],
-			  [$VlanName,$N,$m,"OCTETSTR"],
-			  [$VlanSAID,$N,$SAID,"OCTETSTR"]]);
-    print "",($RetVal? "Succeeded":"Failed"), ".\n";
-    if (!$RetVal) { 
-      print STDERR "VLAN Create '$m' as VLAN $N failed.\n"; 
-    } else {
-      $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
-      # If RetVal isn't succeeded, then I can try and fix it
-      my $tries = 0;
-      while ($RetVal ne "succeeded") {
-	$tries += 1;
-	if ($RetVal eq "someOtherError" && $tries <= 2) {
-	  #Duplicate name... correct and try again..
-	  my $name = $sess->get([[$VlanName,$N]]);
-	  print STDERR "VLAN name '$name' is already in use. ".
-	    "Renaming to '_$name'.\n";
-	  $name = $sess->set([[$VlanName,$N,"_$name","OCTETSTR"]]);
-	  $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
-	} else {
-	  &ReleaseToken(*sess,$v,0);
-	  die("VLAN Reconfiguration Failed. Unrecoverable Error. Notify".
-	      " Testbed Administrator immediately.\n");
-	}
+      while ($RetVal ne '') {
+	$N += 1;
+	$RetVal = $sess->get([[$VlanRowStatus,$N]]);
+	print "Row $N got '$RetVal'\n" if $debug;
       }
-      # VLAN exists now - Add the ports:
-      # @vlan is a list of MACs, so I need to find out what they are...
-      my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
-      %ifIndex = &mac2ifIndex(*sess,*vlan);
-      foreach $mac (@vlan) {
-	my $IF = $ifIndex{$mac};
-	if (!defined $IF) {
-	  print "    Addding MAC address $mac - port not found ... Failed\n";
-	  next;
+      my $SAID = pack("H*",sprintf("%08x",$N+100000));
+      if ( !$m 
+	   #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
+	   || ($m =~ /l(\d)+-(\d)+/)
+	   #End of Temp fix
+	 ) { $m = $N; }
+      print "  Creating VLAN $m as VLAN #$N: @vlan ... ";
+      # Yes, this next line MUST happen all in one set command....
+      $RetVal = $sess->set([[$VlanRowStatus,$N,"createAndGo","INTEGER"],
+			    [$VlanType,$N,"ethernet","INTEGER"],
+			    [$VlanName,$N,$m,"OCTETSTR"],
+			    [$VlanSAID,$N,$SAID,"OCTETSTR"]]);
+      print "",($RetVal? "Succeeded":"Failed"), ".\n";
+      if (!$RetVal) { 
+	print STDERR "VLAN Create '$m' as VLAN $N failed.\n"; 
+      } else {
+	$RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
+	# If RetVal isn't succeeded, then I can try and fix it
+	my $tries = 0;
+	if ($RetVal eq "succeeded") { $okay = 1; }
+	while ($RetVal ne "succeeded") {
+	  $tries += 1;
+	  if ($RetVal eq "someOtherError" && $tries <= 2) {
+	    #Duplicate name... correct and try again..
+	    my $name = $sess->get([[$VlanName,$N]]);
+	    print STDERR "VLAN name '$name' might already be in use. ".
+	      "Renaming to '_$name'.\n";
+	    $name = $sess->set([[$VlanName,$N,"_$name","OCTETSTR"]]);
+	    $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
+	  } else {
+	    # Try again from the beginning... maybe we're using a bad VLAN #
+	    print STDERR "VLAN creation failed.".
+	      ($attempts<2 ?" Trying again...\n":
+	       " Third failure, giving up.\n");
+	    $okay=0;
+	    $attempts++;
+	  }
 	}
-	print "    Adding MAC Address $mac (ifIndex $IF) ... ";
-	$RetVal = $sess->set([[$PortVlanMemb,$IF,$N,"INTEGER"]]);
-	print "",($RetVal? "Succeeded":"Failed"), ".\n";
+	if ($okay == 0) { next; }
+	# VLAN exists now - Add the ports:
+	# @vlan is a list of MACs, so I need to find out what they are...
+	my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
+	%ifIndex = &mac2ifIndex(*sess,*vlan);
+	foreach $mac (@vlan) {
+	  my $IF = $ifIndex{$mac};
+	  if (!defined $IF) {
+	    print "    Addding MAC address $mac - port not found ... Failed\n";
+	    next;
+	  }
+	  print "    Adding MAC Address $mac (ifIndex $IF) ... ";
+	  $RetVal = $sess->set([[$PortVlanMemb,$IF,$N,"INTEGER"]]);
+	  print "",($RetVal? "Succeeded":"Failed"), ".\n";
+	}
+	#If everything went okay, break out of the loop
+	$okay = 1;
       }
     }
   } else { 
