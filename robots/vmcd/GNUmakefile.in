@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,11 +26,12 @@ TESTS += test_vmcd.sh test_vmcd2.sh test_vmcd3.sh test_vmcd4.sh
 endif
 
 all: $(PROGS)
+client:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CFLAGS	       += -I${SRCDIR}/../mtp
+CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib 

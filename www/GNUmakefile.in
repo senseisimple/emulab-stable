@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -16,11 +16,13 @@ OURDOMAIN       = @OURDOMAIN@
 
 include $(OBJDIR)/Makeconf
 
+SUBDIRS = garcia-telemetry
+
 #
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: defs.php3 dbdefs.php3 swish.conf websearch xmlrpc.php3
+all: defs.php3 dbdefs.php3 swish.conf websearch xmlrpc.php3 all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -38,6 +40,7 @@ FILES  += $(wildcard $(SRCDIR)/*.php3)
 FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(wildcard $(SRCDIR)/*.ico)
 FILES  += $(wildcard $(SRCDIR)/*.class)
+FILES  += $(wildcard $(SRCDIR)/*.jar)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime.pl $(SRCDIR)/rdp-mime.pl \
 	  $(SRCDIR)/ssh-mime-winxp.pl $(SRCDIR)/rdp-mime-winxp.pl \
@@ -162,3 +165,11 @@ $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)

@@ -39,7 +39,7 @@ check_output() {
     -s ops \
     -c `realpath ${SRCDIR}/test_emcd2.config`
 
-vmc-client -l `pwd`/test_vmc-client1.log \
+./vmc-client -l `pwd`/test_vmc-client1.log \
     -i `pwd`/test_vmc-client1.pid \
     -p ${VMC1_PORT} \
     -f ${SRCDIR}/test_vmcd2.pos \
@@ -47,7 +47,7 @@ vmc-client -l `pwd`/test_vmc-client1.log \
 
 # Start vmcd:
 
-vmcd -l `pwd`/test_vmcd.log \
+./vmcd -l `pwd`/test_vmcd2.log \
     -i `pwd`/test_vmcd.pid \
     -e localhost \
     -p ${EMC_PORT} \
@@ -80,7 +80,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -i 1 request-position
 
 check_output "no update?" <<EOF
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		1
   x:		6.000000
@@ -95,7 +95,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -i 2 request-position
 
 check_output "no update?" <<EOF
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		2
   x:		20.000000

@@ -1,3 +1,15 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/**
+ * @file mtp_dump.c
+ *
+ * Utility that will connect to a server and dump out any MTP packets it
+ * receives.
+ */
 
 #include "config.h"
 
@@ -40,7 +52,7 @@ static int mygethostbyname(struct sockaddr_in *host_addr, char *host)
 
 static void usage(void)
 {
-    fprintf(stderr, "Usage: mtp_dump <host> <port>\n");
+    fprintf(stderr, "Usage: mtp_dump <host> <port> [<max-packets>]\n");
 }
 
 int main(int argc, char *argv[])
@@ -56,14 +68,17 @@ int main(int argc, char *argv[])
     }
     else if (sscanf(argv[2], "%d", &port) != 1) {
 	fprintf(stderr, "error: port is not a number\n");
+	usage();
     }
     else if ((argc > 3) && sscanf(argv[3], "%d", &max_packets) != 1) {
 	fprintf(stderr, "error: max packets argument is not a number\n");
+	usage();
     }
     else if (mygethostbyname(&sin, argv[1]) == 0) {
 	fprintf(stderr, "error: unknown host %s\n", argv[1]);
     }
     else {
+	mtp_handle_t mh;
 	int fd;
 	
 #ifndef linux
@@ -78,22 +93,27 @@ int main(int argc, char *argv[])
 	else if (connect(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
 	    perror("connect");
 	}
+	else if ((mh = mtp_create_handle(fd)) == NULL) {
+	    fprintf(stderr, "error: mtp_init_handle\n");
+	}
 	else {
-	    struct mtp_packet *mp;
+	    struct mtp_packet mp;
 	    int lpc = 0;
 	    
 	    while (((max_packets == 0) || (lpc < max_packets)) &&
-		   (mtp_receive_packet(fd, &mp) == MTP_PP_SUCCESS)) {
-		mtp_print_packet(stdout, mp);
+		   (mtp_receive_packet(mh, &mp) == MTP_PP_SUCCESS)) {
+		mtp_print_packet(stdout, &mp);
 		
-		mtp_free_packet(mp);
-		mp = NULL;
+		mtp_free_packet(&mp);
 
 		lpc += 1;
 	    }
 	    
 	    close(fd);
 	    fd = -1;
+
+	    mtp_delete_handle(mh);
+	    mh = NULL;
 	}
 
 	retval = EXIT_SUCCESS;

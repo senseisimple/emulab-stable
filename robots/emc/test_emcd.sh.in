@@ -45,34 +45,34 @@ run_test ../mtp/mtp_send -n localhost -P ${PORT} \
     -w -r rmc -i 1 request-position
 
 check_output "init -> request-position failed?" <<EOF
-Packet: length 76; version 1; role 0
+Packet: version 2; role emc
  opcode:	config-rmc
   num:		2
-  horiz:	3.657600
-  vert:		2.438400
+  horiz:	0.000000
+  vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
-Packet: length 44; version 1; role 0
+Packet: version 2; role emc
  opcode:	error
-  id:		-1
-  code:		-1
+  id:		0
+  code:		0
   msg:		position not updated yet
 EOF
 
 run_test ../mtp/mtp_send -n localhost -P ${PORT} \
     -w -r rmc -i 0 -c 0 -m "empty" init -- \
-    -r rmc -i 1 -x 6 -y 7 -o 0.44 -s idle -t 1 update-position -- \
+    -r rmc -i 1 -x 6 -y 7 -o 0.44 -s complete -t 1.0 update-position -- \
     -w -r rmc -i 1 request-position
 
 check_output "init -> update-position -> request-position failed?" <<EOF
-Packet: length 76; version 1; role 0
+Packet: version 2; role emc
  opcode:	config-rmc
   num:		2
-  horiz:	3.657600
-  vert:		2.438400
+  horiz:	0.000000
+  vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		1
   x:		6.000000

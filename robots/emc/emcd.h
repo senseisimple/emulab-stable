@@ -2,6 +2,8 @@
 #ifndef __EMCD_H__
 #define __EMCD_H__
 
+#include "mtp.h"
+
 struct emc_robot_config {
   int id;
   char *hostname;
@@ -11,12 +13,12 @@ struct emc_robot_config {
 };
 
 struct rmc_client {
-  int sock_fd;
+  mtp_handle_t handle;
   struct robot_list *position_list;
 };
 
 struct vmc_client {
-  int sock_fd;
+  mtp_handle_t handle;
   struct robot_list *position_list;
 };
 

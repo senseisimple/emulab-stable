@@ -4,12 +4,19 @@
 # this fragment
 #
 
+# Need the PATH because the older autoconf does not support
+# AC_PATH_TOOL which is needed for cross-compilation to work.
+export PATH	= @PATH@
+
 export CC       = @CC@
 export CXX	= @CXX@
 export LD	= @CC@ ${CFLAGS}
 export STRIP    = @STRIP@
 export RANLIB	= @RANLIB@
 export AR	= @AR@
+
+export JAVAC	= @JAVAC@
+export JAR	= @JAR@
 
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@
@@ -63,3 +70,6 @@ LOG_TESTBED	= @LOG_TESTBED@
 EVENTSYS	= @EVENTSYS@
 HAVE_MEZZANINE	= @HAVE_MEZZANINE@
 GTK_CONFIG	= @GTK_CONFIG@
+BRAINSTEM_DIR	= @BRAINSTEM_DIR@
+
+host_cpu	= @host_cpu@

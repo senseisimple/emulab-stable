@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,12 +15,13 @@ PROGS = emcd loclistener
 TESTS = test_emcd.sh
 
 all: $(PROGS)
+client:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS		= emcd.o robot_list.o
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CFLAGS	       += -I${SRCDIR}/../mtp -I${SRCDIR}/../../event/lib
+CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp -I${SRCDIR}/../../event/lib
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 CFLAGS	       += `elvin-config --cflags vin4c`
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib

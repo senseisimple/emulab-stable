@@ -89,6 +89,10 @@ static double x_offset = 0.0;
  */
 static double y_offset = 0.0;
 
+static XDR xdr;
+static char packet_buffer[2048];
+static char *cursor;
+
 /**
  * Print the usage statement to standard error.
  */
@@ -110,6 +114,19 @@ static void usage(void)
 #endif
 	    ,
             VMCCLIENT_DEFAULT_PORT);
+}
+
+static int mem_write(char *handle, char *data, int len)
+{
+    int retval = len;
+
+    assert(handle == NULL);
+    assert(data != NULL);
+
+    memcpy(cursor, data, len);
+    cursor += len;
+    
+    return retval;
 }
 
 /**
@@ -143,7 +160,7 @@ static void sigusr1(int signal)
  *
  * @param p The position to transform.
  */
-void local2global_posit_trans(struct position *p_inout)
+void local2global_posit_trans(struct robot_position *p_inout)
 {
     float old_x = p_inout->x;
     
@@ -158,23 +175,22 @@ void local2global_posit_trans(struct position *p_inout)
  * Encode any object identified by mezzanine as mtp packets in the given
  * buffer.
  *
- * @param buffer The buffer where any packets should be written.
  * @param mm The mezzanine memory-mapped file.
  * @return The length, in bytes, of the packets encoded in the buffer.
  */
-static int encode_packets(char *buffer, mezz_mmap_t *mm)
+static int encode_packets(mezz_mmap_t *mm)
 {
-    struct mtp_update_position mup;
+    struct mtp_update_position *mup;
     mezz_objectlist_t *mol;
     struct mtp_packet mp;
-    int lpc, retval;
-    char *cursor;
+    int lpc, retval = 0;
     int last_idx_set;
     
-    assert(buffer != NULL);
     assert(mm != NULL);
 
     mol = &mm->objectlist;
+
+    cursor = packet_buffer;
     
 #if !defined(HAVE_MEZZANINE)
     if (posfile) {
@@ -199,13 +215,10 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
      * Initialize one packet and then overwrite whatever is different between
      * any located objects.
      */
-    mp.length = mtp_calc_size(MTP_UPDATE_POSITION, &mup);
-    mp.opcode = MTP_UPDATE_POSITION;
-    mp.version = MTP_VERSION;
+    mp.data.opcode = MTP_UPDATE_POSITION;
+    mp.vers = MTP_VERSION;
     mp.role = MTP_ROLE_VMC;
-    mp.data.update_position = &mup;
-    
-    cursor = buffer;
+    mup = &mp.data.mtp_payload_u.update_position;
 
     /*
      * XXX Find the index of the last valid objct so we know when to put
@@ -228,25 +241,25 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
 		     mol->objects[lpc].pa);
 	    }
 	    
-            mup.robot_id = -1;
+            mup->robot_id = -1;
 
 	    /* Copy the camera-coordinates, then */
-            mup.position.x = mol->objects[lpc].px;
-            mup.position.y = mol->objects[lpc].py;
-            mup.position.theta = mol->objects[lpc].pa;
+            mup->position.x = mol->objects[lpc].px;
+            mup->position.y = mol->objects[lpc].py;
+            mup->position.theta = mol->objects[lpc].pa;
 
 	    /* ... transform them into global coordinates. */
-            local2global_posit_trans(&(mup.position));
+            local2global_posit_trans(&(mup->position));
 
             if (lpc == last_idx_set) {
                 /*
 		 * Mark the end of updates for this frame so that vmcd can
 		 * delete stale tracks.
 		 */
-                mup.status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
+                mup->status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
             }
             else {
-                mup.status = MTP_POSITION_STATUS_UNKNOWN;
+                mup->status = MTP_POSITION_STATUS_UNKNOWN;
             }
 
 	    /*
@@ -254,18 +267,29 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
 	     * when an update is for a different frame, instead of setting the
 	     * MTP_POSITION_STATUS_CYCLE_COMPLETE flag.
 	     */
-            mup.position.timestamp = mm->time;
+            mup->position.timestamp = mm->time;
+
+	    if (debug > 1) {
+		mtp_print_packet(stdout, &mp);
+	    }
 
 	    /* Finally, encode the packet. */
-            cursor += mtp_encode_packet(&cursor, &mp);
+            if (!xdr_mtp_packet(&xdr, &mp))
+		assert(0);
+
+	    xdrrec_endofrecord(&xdr, 1);
         }
     }
-    
-    retval = cursor - buffer;
 
+    if (debug > 0) {
+	info("vmc-client: packet length %d\n", retval);
+    }
+    
 #if !defined(HAVE_MEZZANINE)
     mm->time += 1.0;
 #endif
+
+    retval = cursor - packet_buffer;
 
     return retval;
 }
@@ -278,6 +302,8 @@ int main(int argc, char *argv[])
     int retval = EXIT_FAILURE;
     struct sockaddr_in sin;
     struct sigaction sa;
+
+    xdrrec_create(&xdr, 0, 0, NULL, NULL, mem_write);
     
     while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:")) != -1) {
         switch (c) {
@@ -508,13 +534,11 @@ int main(int argc, char *argv[])
 		     * can tell if there really is a new frame ready.
                      */
                     if (mezz_frame_count != last_mezz_frame) {
-                        char buffer[8192];
-
 			if (debug > 1) {
 			    info("vmc-client: new frame\n");
 			}
                         
-                        if ((rc = encode_packets(buffer, mezzmap)) == -1) {
+                        if ((rc = encode_packets(mezzmap)) == -1) {
                             errorc("error: unable to encode packets");
                         }
                         else if (rc == 0) {
@@ -528,7 +552,7 @@ int main(int argc, char *argv[])
                             
                             for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
                                 if (FD_ISSET(lpc, &clientfds)) {
-                                    write(lpc, buffer, rc);
+                                    write(lpc, packet_buffer, rc);
                                 }
                             }
                         }
@@ -547,6 +571,8 @@ int main(int argc, char *argv[])
 #if defined(HAVE_MEZZANINE)
     mezz_term(0);
 #endif
+
+    xdr_destroy(&xdr);
     
     return retval;
 }

@@ -83,7 +83,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -i 1 request-position
 
 check_output "no update?" <<EOF
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		1
   x:		6.000000

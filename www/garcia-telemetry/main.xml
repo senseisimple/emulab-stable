@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<panel columns="1" background="#ffffff" gap="4">
+  <panel weightx="1">
+    <label text="Battery: " />
+    <progressbar name="battery-bar" minimum="0" maximum="100" weightx="1" />
+    <label text=" " />
+    <label name="battery-text" text="0.0" font="bold" />
+  </panel>
+
+  <panel text="Wheels" border="true" columns="5" weightx="1">
+    <label text="Left Odometer: " />
+    <label name="left-odom" width="10" font="bold" text="?.?" />
+
+    <label weightx="1" />
+
+    <label text="Right Odometer: " />
+    <label name="right-odom" width="10" font="bold" text="?.?" />
+
+    <label text="Left Velocity: " />
+    <label name="left-vel" width="10" font="bold" text="?.?" />
+
+    <label weightx="1" />
+
+    <label text="Right Velocity: " />
+    <label name="right-vel" width="10" font="bold" text="?.?" />
+  </panel>
+
+  <panel text="Sensors" border="true" columns="5" weightx="1">
+    <label text="Front Left: " />
+    <label name="fl-sensor" width="10" font="bold" text="?.?" />
+
+    <label weightx="1" />
+
+    <label text="Front Right: " />
+    <label name="fr-sensor" width="10" font="bold" text="?.?" />
+
+    <label text="Side Left: " />
+    <label name="sl-sensor" width="10" font="bold" text="?.?" />
+
+    <label weightx="1" />
+
+    <label text="Side Right: " />
+    <label name="sr-sensor" width="10" font="bold" text="?.?" />
+
+    <label text="Rear Left: " />
+    <label name="rl-sensor" width="10" font="bold" text="?.?" />
+
+    <label weightx="1" />
+
+    <label text="Rear Right: " />
+    <label name="rr-sensor" width="10" font="bold" text="?.?" />
+  </panel>
+
+  <separator />
+  
+  <panel weightx="1">
+    <label name="connected" font="italic" />
+    <label weightx="2" />
+    <label text="Update Interval: " font="9" valign="center" />
+    <label name="last-update" font="9" valign="center" />
+    <label weightx="2" />
+    <button name="reconnect-button"
+            text="Reconnect"
+	    action="reconnect()"
+	    enabled="false"
+	    />
+  </panel>
+</panel>

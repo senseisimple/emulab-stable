@@ -1,7 +1,21 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/**
+ * @file mtp_recv.c
+ *
+ * Utility that listens on a given port, accepts a connection, prints out any
+ * MTP packets received on that connection until it closes, and then waits for
+ * another connection.
+ */
 
 #include "config.h"
 
 #include <stdio.h>
+#include <signal.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -17,9 +31,25 @@
 
 #include "mtp.h"
 
+/**
+ * Signal handler for SIGINT, SIGQUIT, and SIGTERM that just calls exit.
+ *
+ * @param signal The actual signal received.
+ */
+static void sigquit(int signal)
+{
+    assert((signal == SIGINT) || (signal == SIGQUIT) || (signal == SIGTERM));
+
+    exit(0);
+}
+
 int main(int argc, char *argv[])
 {
     int fd, port = 0, retval = EXIT_SUCCESS;
+
+    signal(SIGQUIT, sigquit);
+    signal(SIGTERM, sigquit);
+    signal(SIGINT, sigquit);
 
     if ((argc == 2) && sscanf(argv[1], "%d", &port) != 1) {
 	fprintf(stderr, "error: port argument is not a number: %s\n", argv[1]);
@@ -65,17 +95,27 @@ int main(int argc, char *argv[])
 	    while ((fd_peer = accept(fd,
 				     (struct sockaddr *)&sin_peer,
 				     &slen)) != -1) {
-		struct mtp_packet *mp;
-		
-		while (mtp_receive_packet(fd_peer, &mp) == MTP_PP_SUCCESS) {
-		    mtp_print_packet(stdout, mp);
-		    
-		    mtp_free_packet(mp);
-		    mp = NULL;
-		}
+		struct mtp_packet mp;
+		mtp_handle_t mh;
 
-		close(fd_peer);
-		fd_peer = -1;
+		if ((mh = mtp_create_handle(fd_peer)) == NULL) {
+		    fprintf(stderr, "error: mtp_init_handle\n");
+		    retval = EXIT_FAILURE;
+		    break;
+		}
+		else {
+		    while (mtp_receive_packet(mh, &mp) == MTP_PP_SUCCESS) {
+			mtp_print_packet(stdout, &mp);
+			
+			mtp_free_packet(&mp);
+		    }
+
+		    mtp_delete_handle(mh);
+		    mh = NULL;
+		    
+		    close(fd_peer);
+		    fd_peer = -1;
+		}
 		
 		slen = sizeof(sin_peer);
 	    }

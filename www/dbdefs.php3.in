@@ -1570,6 +1570,38 @@ function TBNodeIDtoExpt($nodeid, &$pid, &$eid, &$gid) {
 }
 
 #
+# Get the class of a node.
+#
+function TBNodeClass($nodeid) {
+    $query_result =
+	DBQueryFatal("select nt.class from nodes as n ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "  where n.node_id='$nodeid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return "";
+    }
+
+    $row = mysql_fetch_array($query_result);
+    return $row["class"];
+}
+
+#
+# Get the status of a node.
+#
+function TBNodeStatus($nodeid) {
+    $query_result =
+	DBQueryFatal("select status from nodes as n where node_id='$nodeid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return "";
+    }
+
+    $row = mysql_fetch_array($query_result);
+    return $row["status"];
+}
+
+#
 # Functions related to idle times
 #
 

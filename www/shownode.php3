@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -119,6 +119,13 @@ if ($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
 if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_LOADIMAGE)) {
     WRITESUBMENUBUTTON("Create a Disk Image",
 		       "newimageid_ez.php3?formfields[node]=$node_id");
+}
+
+if (($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) &&
+    (TBNodeClass($node_id) == "robot")) {
+    WRITESUBMENUBUTTON("Show Telemetry",
+		       "telemetry.php3?node=$node_id",
+		       "telemetry");
 }
 
 if ($isadmin) {

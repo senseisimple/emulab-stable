@@ -33,7 +33,7 @@ check_output() {
 
 # Start the daemons vmcd depends on:
 
-../emc/emcd -l `pwd`/test_emcd.log \
+../emc/emcd -l `pwd`/test_emcd4.log \
     -i `pwd`/test_emcd.pid \
     -p ${EMC_PORT} \
     -s ops \
@@ -47,7 +47,7 @@ vmc-client -l `pwd`/test_vmc-client1.log \
 
 # Start vmcd:
 
-vmcd -l `pwd`/test_vmcd.log \
+vmcd -l `pwd`/test_vmcd4.log \
     -i `pwd`/test_vmcd.pid \
     -e localhost \
     -p ${EMC_PORT} \
@@ -83,7 +83,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -i 1 request-position
 
 check_output "no update?" <<EOF
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		1
   x:		6.000000
@@ -98,7 +98,7 @@ run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -i 2 request-position
 
 check_output "no update?" <<EOF
-Packet: length 36; version 1; role 0
+Packet: version 2; role emc
  opcode:	update-position
   id:		2
   x:		20.000000

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,26 +12,35 @@ SUBDIR		= robots/mtp
 include $(OBJDIR)/Makeconf
 
 MTPLIBS = libmtp.a
-MTPPROGS = mtp_test mtp_send mtp_recv mtp_dump
+MTPPROGS = mtp_send mtp_recv mtp_dump
+TESTS = test_mtp.sh
 
-TESTS = mtp_test
+ifeq ($(JAVAC),)
+JARS =
+else
+JARS = $(TESTBED_SRCDIR)/www/mtp.jar
+endif
 
-all: $(MTPLIBS) $(MTPPROGS)
+all client: $(MTPLIBS) $(MTPPROGS) $(JARS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= mtp.o
-CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+OBJS		= mtp.o mtp_xdr.o
+CFLAGS	       += -O -g -Wall -I. -I${SRCDIR} -I${OBJDIR} -I/usr/local/include
 
 libmtp.a: $(OBJS)
-	$(AR) crv $@ $<
+	$(AR) crv $@ $^
 	$(RANLIB) $@
 
-mtp.o:		mtp.h
+mtp.h: mtp_xdr.h
+
+mtp.o:		mtp.h mtp_xdr.o
 mtp_test.o:	mtp.h
 mtp_send.o:	mtp.h
 mtp_recv.o:	mtp.h
 mtp_dump.o:	mtp.h
+
+test_mtp.sh: mtp_send mtp_recv
 
 mtp_test: mtp_test.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_test.o -L. -lmtp
@@ -45,6 +54,16 @@ mtp_recv: mtp_recv.o $(MTPLIBS)
 mtp_dump: mtp_dump.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp
 
+CLASSES_SRC = $(wildcard $(SRCDIR)/*.java)
+
+CLASSES = $(patsubst $(SRCDIR)/%.java,net/emulab/%.class,$(CLASSES_SRC))
+
+$(CLASSES): $(CLASSES_SRC)
+	env CLASSPATH=$(TESTBED_SRCDIR)/www/oncrpc.jar:. $(JAVAC) -d . $^
+
+$(TESTBED_SRCDIR)/www/mtp.jar: $(CLASSES)
+	$(JAR) cvf $@ $^
+
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) mtp_send $(INSTALL_DIR)/opsdir/bin/mtp_send
@@ -52,4 +71,4 @@ install: all
 	$(INSTALL_PROGRAM) mtp_dump $(INSTALL_DIR)/opsdir/bin/mtp_dump
 
 clean:
-	/bin/rm -f *.o *.a $(MTPPROGS)
+	/bin/rm -f *.o *.a $(MTPPROGS) mtp_xdr.h mtp_xdr.c $(CLASSES)

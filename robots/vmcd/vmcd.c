@@ -28,6 +28,8 @@ static char *logfile = NULL;
 
 static char *pidfile = NULL;
 
+static mtp_handle_t emc_handle;
+
 #define MAX_VMC_CLIENTS 10
 #define MAX_TRACKED_OBJECTS 10
 
@@ -35,11 +37,12 @@ struct robot_track {
     int updated;
     int valid;
     int robot_id;
-    struct position position;
+    struct robot_position position;
     int request_id;
 };
 
 struct vmc_client {
+    mtp_handle_t vc_handle;
     char *vc_hostname;
     int vc_port;
     int vc_fd;
@@ -50,7 +53,7 @@ struct vmc_client {
 static unsigned int vmc_client_count = 0;
 static struct vmc_client vmc_clients[MAX_VMC_CLIENTS];
 
-static struct mtp_config_vmc *vmc_config = NULL;
+static struct mtp_config_vmc vmc_config;
 
 /* for tracking */
 static int next_request_id = 0;
@@ -65,7 +68,7 @@ static struct robot_track real_robots[MAX_TRACKED_OBJECTS];
 
 void vmc_handle_update_id(struct mtp_packet *p);
 void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p);
-int find_real_robot_id(struct position *p);
+int find_real_robot_id(struct robot_position *p);
 
 
 /**
@@ -244,16 +247,11 @@ static int parse_client_options(int *argcp, char **argvp[])
     return retval;
 }
 
-/* promoted to global so that handlers can access it */
-int emc_fd;
-
 int main(int argc, char *argv[])
 {
     int lpc, i , retval = EXIT_SUCCESS;
     struct sockaddr_in sin;
     fd_set readfds;
-
-    emc_fd = 0;
     
     FD_ZERO(&readfds);
     
@@ -295,12 +293,14 @@ int main(int argc, char *argv[])
      * as necessary; vmc will not connect to emc.
      */
     if (emc_hostname != NULL) {
-        struct mtp_packet *mp = NULL, *rmp = NULL;
-        struct mtp_control mc;
-        
-        mc.id = -1;
-        mc.code = -1;
-        mc.msg = "vmcd init";
+        struct mtp_packet mp, rmp;
+	int emc_fd;
+
+	mtp_init_packet(&mp,
+			MA_Opcode, MTP_CONTROL_INIT,
+			MA_Role, MTP_ROLE_VMC,
+			MA_Message, "vmcd init",
+			MA_TAG_DONE);
         if (mygethostbyname(&sin, emc_hostname, emc_port) == 0) {
             pfatal("bad emc hostname: %s\n", emc_hostname);
         }
@@ -310,31 +310,28 @@ int main(int argc, char *argv[])
         else if (connect(emc_fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
             pfatal("connect");
         }
-        else if ((mp = mtp_make_packet(MTP_CONTROL_INIT,
-                                       MTP_ROLE_VMC,
-                                       &mc)) == NULL) {
-            pfatal("mtp_make_packet");
-        }
-        else if (mtp_send_packet(emc_fd, mp) != MTP_PP_SUCCESS) {
+	else if ((emc_handle = mtp_create_handle(emc_fd)) == NULL) {
+	    pfatal("mtp_create_handle");
+	}
+        else if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
             pfatal("could not configure with emc");
         }
-        else if (mtp_receive_packet(emc_fd, &rmp) != MTP_PP_SUCCESS) {
+        else if (mtp_receive_packet(emc_handle, &rmp) != MTP_PP_SUCCESS) {
             pfatal("could not get vmc config packet");
         }
         else {
             FD_SET(emc_fd, &readfds);
-            vmc_config = rmp->data.config_vmc;
+            vmc_config = rmp.data.mtp_payload_u.config_vmc;
             
-            for (lpc = 0; lpc < vmc_config->num_robots; lpc++) {
+            for (lpc = 0; lpc < vmc_config.robots.robots_len; lpc++) {
                 info(" robot[%d] = %d %s\n",
                      lpc,
-                     vmc_config->robots[lpc].id,
-                     vmc_config->robots[lpc].hostname);
+                     vmc_config.robots.robots_val[lpc].id,
+                     vmc_config.robots.robots_val[lpc].hostname);
             }
+
+	    mtp_free_packet(&rmp);
         }
-        
-        free(mp);
-        mp = NULL;
     }
 
     /* setup real_robots */
@@ -358,7 +355,10 @@ int main(int argc, char *argv[])
                          sizeof(sin)) == -1) {
             pfatal("connect");
         }
-        else {
+        else if ((vc->vc_handle = mtp_create_handle(vc->vc_fd)) == NULL) {
+	    pfatal("mtp_create_handle");
+	}
+	else {
             int i;
 	    
             FD_SET(vc->vc_fd, &readfds);
@@ -381,43 +381,50 @@ int main(int argc, char *argv[])
         rreadyfds = readfds;
         rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
         if (rc > 0) {
-            if ((emc_fd != 0) && FD_ISSET(emc_fd, &rreadyfds)) {
-                struct mtp_packet *mp = NULL;
-                
-                if ((rc = mtp_receive_packet(emc_fd, &mp)) != MTP_PP_SUCCESS) {
-                    fatal("bad packet from emc %d\n", rc);
-                }
-                else {
-                    /* XXX Need to handle update_id msgs here. */
-                    mtp_print_packet(stdout, mp);
-
-                    vmc_handle_update_id(mp);
-                }
-                
-                mtp_free_packet(mp);
-                mp = NULL;
-            }
+            if ((emc_handle != NULL) &&
+		FD_ISSET(emc_handle->mh_fd, &rreadyfds)) {
+		do {
+		    struct mtp_packet mp;
+		    
+		    if ((rc = mtp_receive_packet(emc_handle,
+						 &mp)) != MTP_PP_SUCCESS) {
+			fatal("bad packet from emc %d\n", rc);
+		    }
+		    else {
+			/* XXX Need to handle update_id msgs here. */
+			mtp_print_packet(stdout, &mp);
+			
+			vmc_handle_update_id(&mp);
+		    }
+		    
+		    mtp_free_packet(&mp);
+		} while (emc_handle->mh_remaining > 0);
+	    }
             
             for (lpc = 0; lpc < vmc_client_count; lpc++) {
                 struct vmc_client *vc = &vmc_clients[lpc];
                 
                 if (FD_ISSET(vc->vc_fd, &rreadyfds)) {
-                    struct mtp_packet *mp = NULL;
-                    
-                    if (mtp_receive_packet(vc->vc_fd, &mp) != MTP_PP_SUCCESS) {
-                        fatal("bad packet from vmc-client\n");
-                    }
-                    else {
-                        mtp_print_packet(stdout, mp);
-                        fflush(stdout);
+		    do {
+			struct mtp_packet mp;
 			
-                        vmc_handle_update_position(vc,mp);
-
-                    }
-                    
-                    mtp_free_packet(mp);
-                    mp = NULL;
-                }
+			if (mtp_receive_packet(vc->vc_handle,
+					       &mp) != MTP_PP_SUCCESS) {
+			    fatal("bad packet from vmc-client\n");
+			}
+			else {
+			    if (debug > 1) {
+				mtp_print_packet(stdout, &mp);
+				fflush(stdout);
+			    }
+			    
+			    vmc_handle_update_position(vc, &mp);
+			}
+			
+			mtp_free_packet(&mp);
+		    } while (vc->vc_handle->mh_remaining > 0);
+		    info("done reading\n");
+		}
             }
         }
         else if (rc == -1 && errno != EINTR) {
@@ -435,12 +442,12 @@ void vmc_handle_update_id(struct mtp_packet *p) {
     }
     // we have to search all of the vmc_clients' tracks arrays for this
     // request_id, IF the returned robot_id isn't -1
-    if (p->data.update_id->robot_id == -1) {
-      error("no robot id?\n");
+    if (p->data.mtp_payload_u.update_id.robot_id == -1) {
+	error("no robot id?\n");
         return;
     }
 
-    info("update id %d\n", p->data.update_id->request_id);
+    info("update id %d\n", p->data.mtp_payload_u.update_id.request_id);
 
     // now check through all the possible tracks:
     for (i = 0; i < MAX_VMC_CLIENTS; ++i) {
@@ -448,10 +455,12 @@ void vmc_handle_update_id(struct mtp_packet *p) {
             struct vmc_client *vc = &(vmc_clients[i]);
             for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
                 if (vc->tracks[j].valid &&
-                    vc->tracks[j].request_id == p->data.update_id->request_id) {
+                    vc->tracks[j].request_id ==
+		    p->data.mtp_payload_u.update_id.request_id) {
                     int first_invalid_idx = -1;
 		    
-                    vc->tracks[j].robot_id = p->data.update_id->robot_id;
+                    vc->tracks[j].robot_id =
+			p->data.mtp_payload_u.update_id.robot_id;
 
                     // before we return, we should also try to update
                     // real_robots, and make a new track if one isn't there
@@ -510,11 +519,10 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         if (vc->tracks[i].valid) {
             float dx,dy;
             float my_dist_delta;
-            float my_pose_delta;
             
-            dx = fabsf(p->data.update_position->position.x -
+            dx = fabsf(p->data.mtp_payload_u.update_position.position.x -
                        vc->tracks[i].position.x);
-            dy = fabsf(p->data.update_position->position.y -
+            dy = fabsf(p->data.mtp_payload_u.update_position.position.y -
                        vc->tracks[i].position.y);
             my_dist_delta = sqrt(dx*dx + dy*dy);
             //my_pose_delta = p->data.update_position->position.theta - 
@@ -545,7 +553,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         info("got a match\n");
         
         vc->tracks[best_track_idx].position =
-            p->data.update_position->position;
+            p->data.mtp_payload_u.update_position.position;
         // now we try to update real_robots
         if (vc->tracks[best_track_idx].robot_id != -1) {
             // we want to update the real_robots list!
@@ -572,7 +580,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             
             vc->tracks[first_invalid_track].valid = 1;
             vc->tracks[first_invalid_track].position =
-                p->data.update_position->position;
+                p->data.mtp_payload_u.update_position.position;
             vc->tracks[first_invalid_track].robot_id = -1;
             vc->tracks[first_invalid_track].request_id = -1;
             
@@ -582,17 +590,21 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             retval = find_real_robot_id(&(vc->tracks[first_invalid_track].position));
             if (retval == -1) {
                 // we have to send our request_id packet, now:
-                struct mtp_request_id rid;
-                struct mtp_packet *mp;
-                
-                rid.position = vc->tracks[first_invalid_track].position;
-                rid.request_id = get_next_request_id();
-                mp = mtp_make_packet(MTP_REQUEST_ID, MTP_ROLE_VMC, &rid);
-                retval = mtp_send_packet(emc_fd,mp);
+                struct mtp_packet mp;
+		int request_id;
+
+		request_id = get_next_request_id();
+		mtp_init_packet(&mp,
+				MA_Opcode, MTP_REQUEST_ID,
+				MA_Role, MTP_ROLE_VMC,
+				MA_Position, &vc->tracks[first_invalid_track].
+				position,
+				MA_RequestID, request_id,
+				MA_TAG_DONE);
+                retval = mtp_send_packet(emc_handle, &mp);
                 if (retval == MTP_PP_SUCCESS) {
-                    info("sent request %d\n", rid.request_id);
-                    vc->tracks[first_invalid_track].request_id =
-                        rid.request_id;
+                    info("sent request %d\n", request_id);
+                    vc->tracks[first_invalid_track].request_id = request_id;
                 }
                 else {
                     vc->tracks[first_invalid_track].valid = 0;
@@ -601,7 +613,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             else {
                 // we can update the real_robots list!
                 real_robots[retval].position =
-                    p->data.update_position->position;
+                    p->data.mtp_payload_u.update_position.position;
                 real_robots[retval].updated = 1;
                 vc->tracks[first_invalid_track].robot_id =
                     real_robots[retval].robot_id;
@@ -615,30 +627,31 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     // now, if the update_position.status field is MTP_POSITION_STATUS_CYCLE_
     // COMPLETE, we want to go though and weed out any valid tracks that
     // were not updated:
-    if (p->data.update_position->status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
-        struct mtp_update_position mup;
-        struct mtp_packet *mp;
-        
-        mp = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_VMC, &mup);
+    if (p->data.mtp_payload_u.update_position.status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
         for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
             if (vc->tracks[i].valid && !(vc->tracks[i].updated)) {
                 vc->tracks[i].valid = -1;
             }
             else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
+		struct mtp_packet mp;
+		
                 info("sending update for %d (idx %d)-> %f %f\n",
                      vc->tracks[i].robot_id,
                      i,
                      vc->tracks[i].position.x,
                      vc->tracks[i].position.y);
                 
-                mup.robot_id = vc->tracks[i].robot_id;
-                mup.position = vc->tracks[i].position;
-                mup.status = MTP_POSITION_STATUS_UNKNOWN;
-                mtp_send_packet(emc_fd, mp);
+		mtp_init_packet(&mp,
+				MA_Opcode, MTP_UPDATE_POSITION,
+				MA_Role, MTP_ROLE_VMC,
+				MA_RobotID, vc->tracks[i].robot_id,
+				MA_Position, &vc->tracks[i].position,
+				MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+				MA_TAG_DONE);
+		
+                mtp_send_packet(emc_handle, &mp);
             }
         }
-        mtp_free_packet(mp);
-        mp = NULL;
 
         // now we null out all teh updated bits and let the next cycle remove
         // dups
@@ -653,7 +666,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             
 }
 
-int find_real_robot_id(struct position *p) {
+int find_real_robot_id(struct robot_position *p) {
     int i;
 
     // we look through real_robots:

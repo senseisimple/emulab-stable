@@ -1,3 +1,15 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/**
+ * @file mtp_send.c
+ *
+ * Utility that connects to a server, sends one or more MTP packets, and
+ * optionally waits for any reply packets.
+ */
 
 #include <errno.h>
 #include <float.h>
@@ -39,6 +51,9 @@ static int mygethostbyname(struct sockaddr_in *host_addr, char *host)
     return( retval );
 }
 
+/**
+ * Print the usage message for this utility.
+ */
 static void usage(void)
 {
     fprintf(stderr,
@@ -72,6 +87,11 @@ static void usage(void)
 	    "  $ mtp_send -n garcia1 -P 3000 -i 1 -c 2 -m \"FooBar\" error\n");
 }
 
+/**
+ * Print an error message about a missing required command-line flag and exits.
+ *
+ * @param name The name of the missing command-line flag.
+ */
 static void required_option(char *name)
 {
     assert(name != NULL);
@@ -83,9 +103,19 @@ static void required_option(char *name)
     exit(1);
 }
 
+/**
+ * Interpret a single set of command-line flags using getopt, then construct an
+ * MTP packet, send it to the server, and optionally wait for a reply.  This
+ * function must be called multiple times to handle subsequent packets whose
+ * flags are seperated by a double-dash "--".
+ *
+ * @param argcp Pointer to main's argc argument.
+ * @param argvp Pointer to main's argv argument.
+ * @return Zero on success, an error code otherwise.
+ */
 static int interpret_options(int *argcp, char ***argvp)
 {
-    static int fd = -1;
+    static mtp_handle_t mh = NULL;
     
     static struct {
 	int id;
@@ -97,7 +127,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	float orientation;
 	float horizontal;
 	float vertical;
-	int timestamp;
+	double timestamp;
 	int status;
 	char *message;
 	int role;
@@ -113,7 +143,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	DBL_MIN,	/* orientation */
 	DBL_MIN,	/* horizontal */
 	DBL_MIN,	/* vertical */
-	-1,		/* timestamp */
+	-1.0,		/* timestamp */
 	-1,		/* status */
 	NULL,		/* message */
 	MTP_ROLE_RMC,	/* role */
@@ -123,24 +153,12 @@ static int interpret_options(int *argcp, char ***argvp)
     int argc = *argcp;
     char **argv = *argvp;
 
-    union {
-	struct mtp_control control;
-	struct mtp_config_rmc config_rmc;
-	struct mtp_config_vmc config_vmc;
-	struct mtp_request_position request_position;
-	struct mtp_request_id request_id;
-	struct mtp_update_position update_position;
-	struct mtp_update_id update_id;
-	struct mtp_command_goto command_goto;
-	struct mtp_command_stop command_stop;
-    } payload;
-    
     int c, waitmode = 0, retval = EXIT_SUCCESS;
-    mtp_payload_t m_payload;
     struct sockaddr_in sin;
-    mtp_packet_t *mp;
+    mtp_packet_t mp;
     char opcode;
-    
+
+    /* Loop through the current set of command-line flags. */
     while ((c = getopt(argc, argv, "hdwi:c:C:n:x:y:o:H:V:t:s:m:r:P:")) != -1) {
 	switch (c) {
 	case 'h':
@@ -234,7 +252,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	    }
 	    break;
 	case 't':
-	    if (sscanf(optarg, "%d", &args.timestamp) != 1) {
+	    if (sscanf(optarg, "%lf", &args.timestamp) != 1) {
 		fprintf(stderr,
 			"error: t option is not a number: %s\n",
 			optarg);
@@ -362,7 +380,7 @@ static int interpret_options(int *argcp, char ***argvp)
 		"  orientation:\t%f\n"
 		"  horizontal:\t%f\n"
 		"  vertical:\t%f\n"
-		"  timestamp:\t%d\n"
+		"  timestamp:\t%f\n"
 		"  status:\t%d\n"
 		"  message:\t%s\n"
 		"  port:\t\t%d\n",
@@ -393,12 +411,14 @@ static int interpret_options(int *argcp, char ***argvp)
 	    required_option("c");
 	if (args.message == NULL)
 	    required_option("m");
-	
-	payload.control.id = args.id;
-	payload.control.code = args.code;
-	payload.control.msg = args.message;
 
-	m_payload.control = &payload.control;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_ID, args.id,
+			MA_Code, args.code,
+			MA_Message, args.message,
+			MA_TAG_DONE);
 	break;
 
     case MTP_CONFIG_VMC:
@@ -411,9 +431,11 @@ static int interpret_options(int *argcp, char ***argvp)
 	if (args.id == -1)
 	    required_option("i");
 
-	payload.request_position.robot_id = args.id;
-
-	m_payload.request_position = &payload.request_position;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_TAG_DONE);
 	break;
 
     case MTP_REQUEST_ID:
@@ -423,15 +445,17 @@ static int interpret_options(int *argcp, char ***argvp)
 	    required_option("y");
 	if (args.orientation == DBL_MIN)
 	    required_option("o");
-	if (args.timestamp == -1)
+	if (args.timestamp == -1.0)
 	    required_option("t");
 
-	payload.request_id.position.x = args.x;
-	payload.request_id.position.y = args.y;
-	payload.request_id.position.theta = args.orientation;
-	payload.request_id.position.timestamp = args.timestamp;
-
-	m_payload.request_id = &payload.request_id;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_X, args.x,
+			MA_Y, args.y,
+			MA_Theta, args.orientation,
+			MA_Timestamp, args.timestamp,
+			MA_TAG_DONE);
 	break;
 
     case MTP_UPDATE_POSITION:
@@ -445,26 +469,30 @@ static int interpret_options(int *argcp, char ***argvp)
 	    required_option("o");
 	if (args.status == -1)
 	    required_option("s");
-	if (args.timestamp == -1)
+	if (args.timestamp == -1.0)
 	    required_option("t");
 
-	payload.update_position.robot_id = args.id;
-	payload.update_position.position.x = args.x;
-	payload.update_position.position.y = args.y;
-	payload.update_position.position.theta = args.orientation;
-	payload.update_position.position.timestamp = args.timestamp;
-	payload.update_position.status = args.status;
-
-	m_payload.update_position = &payload.update_position;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_X, args.x,
+			MA_Y, args.y,
+			MA_Theta, args.orientation,
+			MA_Timestamp, args.timestamp,
+			MA_Status, args.status,
+			MA_TAG_DONE);
 	break;
 
     case MTP_UPDATE_ID:
 	if (args.id == -1)
 	    required_option("i");
 
-	payload.update_id.robot_id = args.id;
-
-	m_payload.update_id = &payload.update_id;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_TAG_DONE);
 	break;
 
     case MTP_COMMAND_GOTO:
@@ -477,23 +505,28 @@ static int interpret_options(int *argcp, char ***argvp)
 	if (args.orientation == DBL_MIN)
 	    required_option("o");
 
-	payload.command_goto.command_id = args.command_id;
-	payload.command_goto.robot_id = args.id;
-	payload.command_goto.position.x = args.x;
-	payload.command_goto.position.y = args.y;
-	payload.command_goto.position.theta = args.orientation;
-
-	m_payload.command_goto = &payload.command_goto;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_CommandID, args.command_id,
+			MA_RobotID, args.id,
+			MA_X, args.x,
+			MA_Y, args.y,
+			MA_Theta, args.orientation,
+			MA_Timestamp, args.timestamp,
+			MA_TAG_DONE);
 	break;
 
     case MTP_COMMAND_STOP:
 	if (args.id == -1)
 	    required_option("i");
 
-	payload.command_stop.command_id = args.command_id;
-	payload.command_stop.robot_id = args.id;
-
-	m_payload.command_stop = &payload.command_stop;
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_CommandID, args.command_id,
+			MA_RobotID, args.id,
+			MA_TAG_DONE);
 	break;
 
     default:
@@ -504,7 +537,13 @@ static int interpret_options(int *argcp, char ***argvp)
 	break;
     }
 
-    if (fd == -1) {
+    if (debug) {
+	mtp_print_packet(stdout, &mp);
+    }
+
+    if (mh == NULL) {
+	int fd;
+	
 	memset(&sin, 0, sizeof(sin));
 #if !defined(linux)
 	sin.sin_len = sizeof(sin);
@@ -523,38 +562,41 @@ static int interpret_options(int *argcp, char ***argvp)
 			 sizeof(struct sockaddr_in)) == -1) {
 	    perror("connect");
 	}
+	else if ((mh = mtp_create_handle(fd)) == NULL) {
+	    perror("mtp_init_handle");
+	}
     }
 
-    if (fd == -1) {
-	fprintf(stderr, "could not connect to server\n");
+    if (mh == NULL) {
+	fprintf(stderr, "error: could not connect to server\n");
 	exit(1);
     }
-    else if ((mp = mtp_make_packet(opcode,
-				   args.role,
-				   m_payload.control)) == NULL) {
-	perror("mtp_make_packet");
-    }
-    else if (mtp_send_packet(fd, mp) != MTP_PP_SUCCESS) {
+    else if (mtp_send_packet(mh, &mp) != MTP_PP_SUCCESS) {
 	perror("mtp_send_packet"); // XXX not right
     }
     else {
 	if (debug) {
-	    mtp_print_packet(stdout, mp);
+	    mtp_print_packet(stdout, &mp);
 	}
 	if (waitmode) {
-	    if (mtp_receive_packet(fd, &mp) != MTP_PP_SUCCESS) {
+	    struct mtp_packet mp_reply;
+	    
+	    if (mtp_receive_packet(mh, &mp_reply) != MTP_PP_SUCCESS) {
 		perror("mtp_receive_packet");
 	    }
 	    else {
-		mtp_print_packet(stdout, mp);
+		mtp_print_packet(stdout, &mp_reply);
 
-		mtp_free_packet(mp);
-		mp = NULL;
+		mtp_free_packet(&mp_reply);
 	    }
 	}
     }
 
 #if !defined(linux)
+    /*
+     * Important, must inform getopt that it needs to reset its internal
+     * state.
+     */
     optreset = 1;
 #endif
     optind = 1;

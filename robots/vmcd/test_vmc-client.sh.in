@@ -46,7 +46,7 @@ sleep 1; kill -s USR1 `cat test_vmc-client.pid`;) &
 run_test ../mtp/mtp_dump localhost ${PORT} 4
 
 check_output "bad update?" <<EOF
-Packet: length 36; version 1; role 2
+Packet: version 2; role vmc
  opcode:	update-position
   id:		-1
   x:		5.500000
@@ -54,7 +54,7 @@ Packet: length 36; version 1; role 2
   theta:	-2.661593
   status:	-1
   timestamp:	0.000000
-Packet: length 36; version 1; role 2
+Packet: version 2; role vmc
  opcode:	update-position
   id:		-1
   x:		6.500000
@@ -62,7 +62,7 @@ Packet: length 36; version 1; role 2
   theta:	-2.601593
   status:	32
   timestamp:	0.000000
-Packet: length 36; version 1; role 2
+Packet: version 2; role vmc
  opcode:	update-position
   id:		-1
   x:		5.500000
@@ -70,7 +70,7 @@ Packet: length 36; version 1; role 2
   theta:	-2.661593
   status:	-1
   timestamp:	1.000000
-Packet: length 36; version 1; role 2
+Packet: version 2; role vmc
  opcode:	update-position
   id:		-1
   x:		7.500000

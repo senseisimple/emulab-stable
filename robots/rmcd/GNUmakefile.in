@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,14 +12,15 @@ SUBDIR		= robots/rmcd
 include $(OBJDIR)/Makeconf
 
 PROGS = rmcd
-TESTS = test_rmcd.sh
+TESTS = test_rmcd.sh test_rmcd2.sh
 
 all: $(PROGS)
+client:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CFLAGS	       += -I${SRCDIR}/../mtp
+CFLAGS	       += -I${SRCDIR}/../mtp -I../mtp
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb

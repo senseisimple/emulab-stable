@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,6 +26,7 @@ endif
 SUBDIRS	= $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
 
 all:		all-subdirs
+client:		client-subdirs
 check:		check-subdirs
 install:	install-subdirs
 
@@ -40,4 +41,3 @@ clean:		clean-subdirs
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
 .PHONY:	$(SUBDIRS)
-
