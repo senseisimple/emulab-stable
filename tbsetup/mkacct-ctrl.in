@@ -168,7 +168,7 @@ sub dowork() {
       # 
       # Create groups on paper if they don't exist.
       #
-      if (`grep $group /etc/group` eq "") { 
+      if (`egrep '^${group}:' /etc/group` eq "") { 
 	print "Adding group $group to paper\n";
 	system("/usr/sbin/pw groupadd $group -g $group_number") == 0 or
 	  print STDERR "Could not add group $group with gid $group_number to paper\n";
@@ -177,7 +177,7 @@ sub dowork() {
       #
       # Make groups on control node if they don't exist.
       #
-      if (`$ssh $control_node grep $groupnames[0] /etc/group` eq "") { 
+      if (`$ssh $control_node egrep '^${group}:' /etc/group` eq "") { 
 	print "Adding group $group to $control_node.\n";
 	system("$ssh $control_node /usr/sbin/pw groupadd $group -g ".
 	       "$group_number") == 0 or
@@ -198,7 +198,7 @@ sub dowork() {
     #
     # Make user on paper. We don't give them a password.
     #
-    if (`grep $user /etc/passwd` eq "") { 
+    if (`egrep '^${user}:' /etc/passwd` eq "") {
       print "Adding user $user to paper.\n";
       system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
 	     "-k /usr/share/skel -m -d /users/$user ".
@@ -223,7 +223,7 @@ sub dowork() {
     # Quote special chars for ssh and the shell on the other side
     $fullname =~ s/\"/\'/g;
     $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
-    if (`$ssh $control_node grep $user /etc/passwd` eq "") { 
+    if (`$ssh $control_node egrep '^${user}:' /etc/passwd` eq "") { 
       print "Adding user $user to $control_node.\n";
       $str = "$ssh $control_node " .
 	     "'/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
