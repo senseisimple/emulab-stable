@@ -420,6 +420,31 @@ foreach $link (keys(%links)) {
 }
 close(TOPFILE);
 
+# Check for available resources
+# This is very heuristic and won't work at all if our topology changes much.
+open(PTOP,"$ptopfile");
+$avail_sshelves = 0;
+$avail_pcs = 0;
+while (<PTOP>) {
+    if (! /^node/) {next;}
+    if (/shark-shelf/) {$avail_sshelves++;}
+    if (/pc/) {$avail_pcs++;}
+}
+@t = keys(%sharkshelves);
+$num_sshelves = $#t+1;
+@t = keys(%nodes);
+# Counting delay nodes as 1 when rwe really only need them as 1/2.  So..
+$num_pcs = $#t+1 - int($delayindex/2);
+if ($num_pcs > $avail_pcs) {
+    print STDERR "Insufficient PCs to do mapping.  Have $avail_pcs; need $num_pcs.\n";
+    exit(777);
+}
+if ($num_sshelves > $avail_sshelves) {
+    print STDERR "Insufficient Shark Shelves to do mapping.  Have $avail_sshelves; need $num_sshelves.\n";
+    exit(777);
+}
+
+
 # Run assign
 
 # After assign finishes correctly several data structures will be
