@@ -133,7 +133,7 @@ if ($nodemode) {
 else {
     $message = "Nodes in $pid/$eid were rebooted via the web interface ".
 	       "by $uid\n";
-    $subject = "Nodes Rebooted: $pid/eid";
+    $subject = "Nodes Rebooted: $pid/$eid";
 }
 
 TBMAIL($TBMAIL_AUDIT,
