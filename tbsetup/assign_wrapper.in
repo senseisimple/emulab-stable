@@ -384,7 +384,7 @@ foreach $lan (keys(%lans)) {
 		 (($delaywithswitch == 0) && 
 		  (($rbw != $S100Kbs) && (($sharks == 0) ||
 					 ($nonsharks > 1)))) ||
-		 ($loss != 0))) {
+		 ($rloss != 0))) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss,
 							    $rdelay,$rbw,$rloss];
