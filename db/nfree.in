@@ -175,7 +175,7 @@ foreach my $n (@nodes) {
     # Move to locked reservation. Node is not free, but is no longer
     # owned by the pid/eid, so cannot be mucked with.
     if (! DBQueryWarn("update reserved " .
-		      "set vname=NULL, pid='$reloadpid', eid='$lockedeid' ".
+		      "set vname='$n', pid='$reloadpid', eid='$lockedeid' ".
 		      "where node_id='$n'")) {
 	print "*** WARNING: Error locking down node $n!\n";
 	next;
@@ -303,7 +303,7 @@ foreach my $n (@freed_nodes) {
 	print "Moving $n to $next_pid/$next_eid.\n";
 
 	DBQueryWarn("update reserved set pid='$next_pid',eid='$next_eid'," .
-		    "vname=NULL where node_id='$n'")
+		    "vname='$n' where node_id='$n'")
 	    || $error++;
 	
 	DBQueryWarn("delete from next_reserve where node_id='$n'")
@@ -327,9 +327,8 @@ foreach my $n (@freed_nodes) {
     if ( !$TESTMODE && ((!$isvirt && $imageable) || $result->numrows()) ) {
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
-	DBQueryWarn("update reserved set ".
-		    "pid='$reloadpid',eid='$pendingeid' ".
-		    "where node_id='$n'") || $error++;
+	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".
+		    "vname='$n' where node_id='$n'") || $error++;
 
 	# This little sillyness is for disk reloading.
 	# Kill the last reservation since this path is special.

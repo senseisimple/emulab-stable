@@ -100,8 +100,8 @@ foreach my $node (@nodes) {
 		       "pid='$pid' and eid='$eid'");
     if ( ($sth->num_rows()) < 1) {
       print "Reserved  - Scheduling next reservation...\n";
-      $sth = DBQueryFatal("replace into next_reserve (node_id,pid,eid) ".
-			  "values ('$pc','$pid','$eid')");
+      $sth = DBQueryFatal("replace into next_reserve (node_id,pid,eid,vname) ".
+			  "values ('$pc','$pid','$eid','$pc')");
     } else {
       print "Reserved  - Already reserved to $pid/$eid\n";
     }

@@ -110,7 +110,7 @@ foreach my $n (@node_names) {
 	    # End shark hack
 	} else {
 	    # its not a shark - just add it in...
-	    push(@vals,"('$n','$pid','$eid')");
+	    push(@vals,"('$n','$pid','$eid','$n')");
 	    push(@nodes,"$n");
 	}
     }
@@ -128,7 +128,8 @@ if (!$error && @vals) {
     if ($debug) {
 	print "Reserving nodes...\n";
     }
-    my $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
+    my $cmd = "insert into reserved (node_id,pid,eid,vname) values ".
+      join(",",@vals);
     if (!DBQueryWarn($cmd)) {
 	$error++;
     }
