@@ -1,0 +1,64 @@
+ROADMAP FOR LINKTEST
+
+Description of files...
+
+Name:
+	linktest.c.in, linktest.h.in
+Description:
+	A daemon that waits for LINKTEST events.
+Where it runs:
+	On nodes only. It should be invoked by rc.setup
+	so that it is running before any events arrive.
+What it does:
+	After receiving the START event, forks linktest.pl
+	to conduct tests. Waits for linktest.pl to exit.
+Who it should run as:
+	experiment swapper
+	
+
+Name:
+	linktest.pl.in
+Description:
+	A test suite for Emulab experiments.
+Where it runs:
+	On nodes only.
+	The synch node does some extra processing, so it will
+	cd to a directory where it finds tb_compat.tcl. Otherwise
+	the directory is default.
+What it does:
+	Parses the experiment ns script, then conducts
+	various tests for connectivity and link attributes.
+	If errors are found, it saves them to a directory
+	under tbdata for the experiment. It also sends
+	a STOP event when all tests are completed.
+Who it should run as:
+	Invoked by linktest; therefore experiment swapper.
+
+Name:
+	ns-patchfile
+Description:
+	A patchfile for NS that adds extra data structures
+	useful for parsing experiment datafiles.
+Where it runs:
+	The patched version of NS is run by the synch node in linktest.pl
+	inside a directory where it can find tb_compat.tcl
+What it does:
+	N/A
+Who it should run as:
+	N/A
+
+Name:
+	tb_compat.tcl
+Description:
+	A modified version of testbed tb_compat.tcl that
+	has support for parsing NS scripts using
+	a patched version of ns (using ns-patchfile).
+Where it runs:
+	N/A
+What it does:
+	N/A
+Who it should run as:
+	N/A
+
+
+

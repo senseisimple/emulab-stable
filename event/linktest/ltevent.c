@@ -25,7 +25,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage:\t%s -s server [-p port] -e pid/eid [-w event | -x event] [ARGS...]\n",
+		"Usage:\t%s -s server [-p port] [-k keyfile] -e pid/eid [-w event | -x event] [ARGS...]\n",
 		progname);
 	fprintf(stderr, " -w event\twait for Linktest event\n");
 	fprintf(stderr, " -x event\ttransmit Linktest event\n");
@@ -59,7 +59,7 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "s:p:w:x:e:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:w:x:e:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -76,6 +76,9 @@ main(int argc, char **argv)
 		case 'e':
 			pideid = optarg;
 			break;
+		case 'k':
+			keyfile = optarg;
+			break;
 		default:
 			usage();
 		}
@@ -91,8 +94,8 @@ main(int argc, char **argv)
 
 	event_args[0] = NULL;
 	while(argc) {
-	  strlcat(event_args,argv[0],sizeof(event_args));
-	  strlcat(event_args," ",sizeof(event_args));
+	  strncat(event_args,argv[0],sizeof(event_args));
+	  strncat(event_args," ",sizeof(event_args));
 	  argv++;
 	  argc--;
 	}

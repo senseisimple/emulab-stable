@@ -1,40 +1,61 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w -T
 #
 # wrapper for running linktest that includes
 # an extra event for reporting completion.
-#
-# TODO: consider timeout overall
 
 use strict;
 use Getopt::Std;
 
+# security
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+
 sub usage {
-    warn "Usage: $0 [-s server] [-q] -e pid/eid\n";
+    my $msg = "Usage: run_linktest.pl [-s server] [-p port] [-k keyfile] -e pid/eid [-q]\n";
+    $msg .= "\t-q\tquick termination mode\n";
+    $msg .= "\t-d n\tdebug level n (development only)\n";
+    warn $msg;
     return 1;
 }
 
-my $server;
-my %opt = ();
-getopts("s:e:q",\%opt);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
-exit &usage unless ($opt{e});
+# signal handler in case the process is killed.
+$SIG{INT} = sub {
+    print "Aborted. Linktest continues on nodes.\n";
+    exit(1);
+};
 
+my $server;
+my $port;
+my %opt = ();
+getopts("s:e:d:qp:k:",\%opt);
+if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+if ($opt{p}) { $port = $opt{p}; }
+exit &usage unless ($opt{e});
 my ($pid,$eid) = split(/\//,$opt{e});
 
 my $linktest_path; # path to linktest data.
 $linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
 
 # send the startup event.
-# note, want to redo this not to be so wasteful. just want 
-# to make sure the forked proc dies if the script gets sigint.
-my $cmd = "ltevent -s $server -e $pid/$eid -x START";
+my $args = &starter;
+# event arguments
+$args .=  " -x START";
 if(defined($opt{q})) {
-    $cmd .= " STARTAT=1 STOPAT=3";
+    $args .= " STARTAT=1 STOPAT=3";
 }
-`$cmd`;
+if(defined($opt{d})) {
+    $args .= " DEBUG=" . $opt{d};
+}
+&my_system($args);
+
+print "Linktest in progress...\n";
+print "Quick termination requested.\n" if defined($opt{q});
+print "Debug mode requested.\n" if defined($opt{d});
 
 # wait for the shutdown event.
-`ltevent -s $server -e $pid/$eid -w STOP`;
+$args = &starter;
+$args .= " -w STOP";
+&my_system($args);
+
 
 # analyze results of the run
 exit &analyze;
@@ -47,7 +68,7 @@ sub analyze {
 
     foreach my $file (@dir_contents)
     {
-	system "cat $linktest_path/$file";
+	&my_system("/bin/cat","$linktest_path/$file");
 	
     }
     if(@dir_contents) {
@@ -58,7 +79,23 @@ sub analyze {
     }
 }
 
+sub my_system {
+    if(my $pid = fork) {
+	waitpid($pid,0);
+    } else {
+	my @arg_array = split(/\s+/,"@_");
+	exec(@arg_array);
+    }
 
+}
 
-
-
+sub starter {
+    my $cmd = "@CLIENT_BINDIR@/ltevent -s $server -e $pid/$eid";
+    if(defined ($opt{p})){
+	$cmd .= " -p " . $opt{p};
+    }
+    if(defined($opt{k})) {
+	$cmd .= " -k " . $opt{k};
+    }
+    return $cmd
+}

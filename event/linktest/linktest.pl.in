@@ -1,30 +1,27 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w -T
 #
 # Linktest test script.
 #
 # @author: davidand
 #
-#
-# Features:
-# -> Hypothesis tests for latency and loss only reject if 99% chance
-#    of misconfig
-# -> pretty tight bounds on Pathrate, only allowing 0.5Mb variance
-#    from the estimate.
-#
-#
-# See bas:/users/davidand/writeup2/finalpaper.pdf for doc on some of
-# pathrate's limitations. Also in this version, bandwidths under 1Mb
-# are skipped except for the static routing test due to need for more
-# testing of how many packets can safely be put out.
 use strict;
 use Class::Struct;
+use POSIX qw(uname);
+use IO::Handle;
 
-# path to linktest special ns
+# path to applications and files
 use constant LINKTEST_NSPATH => "@LINKTEST_NSPATH@";
+use constant PATH_NICKNAME => "@CLIENT_VARDIR@/boot/nickname";
+use constant PATH_KEYFILE => "@CLIENT_VARDIR@/boot/eventkey";
+use constant PATH_RUDE => "/usr/local/bin/rude";
+use constant PATH_CRUDE => "/usr/local/bin/crude";
+use constant PATH_PATHRATE_SND => "/usr/local/bin/pathrate_snd";
+use constant PATH_PATHRATE_RCV => "/usr/local/bin/pathrate_rcv";
+use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
+use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
 
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
-use constant CRUDE_DEC => "/tmp/crude.dec"; # decoded binary data
 use constant RUDE_CFG  => "/tmp/rude.cfg";
 use constant PATHRATE_DAT => "/tmp/pathrate.dat";
 
@@ -71,10 +68,12 @@ use constant NAME_BW => "Bandwidth";
 use constant SUFFIX_ERROR => ".error";
 use constant SUFFIX_FATAL => ".fatal";
 use constant SUFFIX_TOPO =>  ".topology";
+use constant DEBUG_ALL => 2; # debug level for all debug info, not just msgs.
+use constant LOG_CHANCE => 0.10; # chance of logging.
 
 # more paths
 use constant TBCOMPAT_PATH => "/proj/utahstud/users/davidand/public/ltpath";
-use constant LOG_PATH => "/proj/utahstud/users/davidand/public/logpath";
+use constant LOG_PATH => "/proj/utahstud/users/davidand/public/logpath/biglog";
 
 # struct for representing a link.
 struct ( edge => {
@@ -103,7 +102,9 @@ my $startat=1;  # which test to start at
 my $stopat=99;  # which test to stop at
 my @kill_list;  # PIDs maintained through the life of linktest
                     # which get killed as part of cleanup.
-my $debug_mode = 0; # enable debug statements
+my $debug_level = 0; # enable debug statements
+                    # 1 = print debug statements.
+                    # 2 = show STDOUT and STDERR
 my $barr_count;   # used by synserv host, nubmer of hosts -1
 my $server = "boss";       # event server. default to boss.
 
@@ -125,6 +126,8 @@ $SIG{INT} = sub {
     exit(1);
 };
 
+# security
+$ENV{'PATH'} = '/bin:/usr/bin';
 
 ##############################################################################
 # Main control
@@ -132,6 +135,8 @@ $SIG{INT} = sub {
 &proc_cmd;
 
 &init;
+
+&debug_top;
 
 if(&dotest(TEST_LATENCY)) {
     &debug("\nTesting Single Hop Connectivity and Latency...\n\n");
@@ -208,7 +213,7 @@ sub loss_test {
 	    if($hostname eq $edge->src) {
 		if(valid_loss($edge)) {
 		    &write_rude_cfg($stream_id,$edge);
-		    &my_system("rude","-s", RUDE_CFG);
+		    &my_system(PATH_RUDE,"-s", RUDE_CFG);
 		    $analyze{$stream_id} = $other_edge;
 		} else {
 		    &debug("Skipping loss test for " . &print_link($edge) . "\n");
@@ -216,7 +221,7 @@ sub loss_test {
 	    } elsif ($hostname eq $other_edge->src) {
 		if(valid_loss($other_edge)) {
 		    &write_rude_cfg($stream_id,$other_edge);
-		    &my_system("rude","-s", RUDE_CFG);
+		    &my_system(PATH_RUDE,"-s", RUDE_CFG);
 		    $analyze{$stream_id} = $edge;
 		} else {
 		    &debug("Skipping loss test for " . &print_link($other_edge) . "\n");
@@ -233,14 +238,14 @@ sub loss_test {
     sleep(1);
 
     # count packets received for each stream.
-    system "crude -d " . CRUDE_DAT . " > " . CRUDE_DEC;
-    open CLOG, "" . CRUDE_DEC ||  die &fatal ("Could not open " . CRUDE_DEC);
-    while(<CLOG>) {
+    my @results = &my_tick(PATH_CRUDE,"-d",CRUDE_DAT);
+    my $result_count = @results;
+    &debug("result_count from crude: $result_count\n");
+    foreach (@results) {
 	if(/ID=(\d+) /) {
 	    $recv_cnt{$1}++;
 	}
     }
-    close CLOG;
 
     # analyze only links for which a stream was received here.
     foreach my $key (keys %analyze) {
@@ -271,7 +276,7 @@ sub loss_test {
 		    
 		    my $errmsg = "Unexpected loss occurred (n=$n, received=$received)\n";
 		    &error(NAME_LOSS, $edge, $errmsg);
-		}
+		} # note, no logging of succesful 0-loss. (too common).
 	    } elsif($denominator == 0) {
 		my $errmsg = "No packets were lost (n=$n, plr=" . $edge->loss .")";
 		&error(NAME_LOSS, $edge, $errmsg);
@@ -520,7 +525,7 @@ sub bw_test {
 		if (&valid_bw($edge)) {
 		    push @analyze_list, $edge;
 		    
-		    &my_system("pathrate_rcv", "-Q","-s",$edge->src,"-q","-N", PATHRATE_DAT);
+		    &my_system(PATH_PATHRATE_RCV, "-Q","-s",$edge->src,"-q","-N", PATHRATE_DAT);
 		} else {
 		    &debug("Skipping bandwidth test for " . &print_link($edge) . "\n");
 
@@ -533,8 +538,8 @@ sub bw_test {
 
     # read the log file.
     if(@analyze_list) {
-	open PLOG, "".PATHRATE_DAT ||  die &fatal ("Could not open " . PATHRATE_DAT);
-	while(<PLOG>) {
+	my @results = &read_file(PATHRATE_DAT);
+	foreach (@results) {
 	    my $edge = shift(@analyze_list);
 	    my $sender = $edge->src;
 	    if(/SNDR=$sender.*CAPL=(\d+\.\d+)Mbps.*CAPH=(\d+\.\d+)Mbps/) {
@@ -618,9 +623,8 @@ sub valid_latency {
 sub get_topo {
     my $ns_outfile = shift(@_);
 
-    open NSOUT,$ns_outfile ||  die &fatal("Could not open $ns_outfile");
-    while(<NSOUT>) {
-	chomp;
+    my @results = &read_file($ns_outfile);
+    foreach (@results) {
 
 	# load the output from ns.
 	# the file format is simple:
@@ -642,7 +646,6 @@ sub get_topo {
 	    $rtproto = RTPROTO_STATIC;
 	}
     }
-    close NSOUT;
 
     # sorted order.
     @hosts = sort { $a cmp $b } @hosts;
@@ -675,30 +678,26 @@ sub error {
     $output .= "  Link:  " . &print_link($edge) . "\n";
     $output .=     "  Error: $msg\n\n";
 
-    my $fname = $linktest_path . "/" . $hostname . SUFFIX_ERROR;
-    open ERRF,">>$fname" || die &fatal("Could not open $fname");
-    print ERRF $output;
-    close ERRF;
-    &debug($output);
+    &debug($output);    
+    &append_file($linktest_path . "/" . $hostname . SUFFIX_ERROR,
+		 $output);
 }
 
 # log to fatal file and exit.
 sub fatal {
     my ($msg) = @_;
-
-    my $output = "Fatal Error: $msg";
+    my @output;
+    push @output,"Fatal Error: $msg";
 
     if(defined($linktest_path) && defined($hostname)) {
 	my $fname = $linktest_path . "/" . $hostname . SUFFIX_FATAL;
-	open ERRF,">$fname" || die "Could not open $fname for fatal error logging! $output";
-	print ERRF $output;
-	close ERRF;
+	&write_file($fname,@output);
     }
     
     # clean up any child proceses
     &cleanup;
 
-    return $output;
+    return $output[0];
 }
 
 
@@ -708,24 +707,24 @@ sub barrier {
 	# note, the synserver should know what the node count is
 	# since it parsed the NS file.
 	die &fatal("barrcount not defined!") unless defined($barr_count);
-	&my_system("emulab-sync","-i",$barr_count);
+	if($barr_count) {
+	    &my_system(PATH_EMULAB_SYNC,"-i",$barr_count);
+	}
     } else {
-	&my_system("emulab-sync");
+	&my_system(PATH_EMULAB_SYNC);
     }
 
 }
 
 sub debug {
-    return unless $debug_mode;
+    return unless $debug_level;
     print "@_";
 }
 
 
 # initialize globals and set up linktest directory if needed.
 sub init {
-    my @results = `uname`;
-    $platform = $results[0];
-    chomp($platform);
+    ($platform) = POSIX::uname();
 
     if($platform eq BSD) {
 	$ns_cmd = LINKTEST_NSPATH ."/fbsd/ns";
@@ -736,10 +735,10 @@ sub init {
     }
 
     # get the experiment info
-    my $fname = "@CLIENT_VARDIR@/boot/nickname";
-     die &fatal("Could not locate $fname") unless -e $fname;
-    my $tmp = `cat $fname`;
-    ($hostname, $exp_id, $proj_id) = split /\./, $tmp;
+    my $fname = PATH_NICKNAME;
+    die &fatal("Could not locate $fname") unless -e $fname;
+    my @results = &read_file($fname);
+    ($hostname, $exp_id, $proj_id) = split /\./, $results[0];
     chomp $hostname;
     chomp $exp_id;
     chomp $proj_id;
@@ -748,15 +747,21 @@ sub init {
     # get the experiment path and log path
     $expt_path = "/proj/$proj_id/exp/$exp_id/tbdata";
     $linktest_path = "$expt_path/linktest";
-    $ns_file = "$expt_path/$exp_id-modify.ns" unless defined($ns_file);
-    $ns_file = "$expt_path/$exp_id.ns" unless -e $ns_file;    
-     die &fatal("Could not locate $ns_file") unless -e $ns_file;
+    if(!defined($ns_file)) {
+	if(-e "$expt_path/$exp_id-modify.ns") {
+	    $ns_file = "$expt_path/$exp_id-modify.ns";
+	} elsif (-e "$expt_path/$exp_id.ns") {
+	    $ns_file = "$expt_path/$exp_id.ns";
+	} else {
+	    die &fatal("Could not locate an ns file.");
+	}
+    }
 
     my $ssname = "@CLIENT_VARDIR@/boot/syncserver";
      die &fatal("Could not locate an emulab-sync server") unless -e $ssname;
 
-    $tmp = `cat $ssname`;
-    ($synserv) = split/\./, $tmp;
+    @results = &read_file($ssname);
+    ($synserv) = split/\./, $results[0];
     chomp $synserv;
 
     # synserv machine makes the linktest directory and invokes ns.
@@ -777,21 +782,22 @@ sub init {
 	}
 
 	chdir(TBCOMPAT_PATH);
-	system "$ns_cmd $ns_file > $outname";
+	@results = &my_tick($ns_cmd,
+			    &check_filename($ns_file));
+	&write_file($outname,@results);
     }
     
     # blitz local files from last run.
     &do_unlink(CRUDE_DAT);
     &do_unlink(PATHRATE_DAT);
-    &do_unlink(CRUDE_DEC);
     &do_unlink(RUDE_CFG);
 
     # start up collector streams if necessary.
     if(&dotest(TEST_LOSS)){
-	&my_system_initonly("crude","-l",CRUDE_DAT);
+	&my_system_initonly(PATH_CRUDE,"-l",CRUDE_DAT);
     }
     if(&dotest(TEST_BW)){
-	&my_system_initonly("pathrate_snd","-i","-q");
+	&my_system_initonly(PATH_PATHRATE_SND,"-i","-q");
     }
 
     # synserver host reads the ns file early to get the node count.
@@ -830,23 +836,26 @@ sub ping_node {
     my $send_rate = $timeout / $send_count;
 
     # set deadline to prevent long waits
+    # TODO: note that some kind of problem occurs with the path.hmm.
     my $cmd;
     if($ttl) {
 	if($platform eq BSD) {
-	    $cmd = "sudo ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
+	    $cmd = "/usr/local/bin/sudo /sbin/ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
 	} elsif($platform eq LINUX) {
-	    $cmd = "sudo ping -c $send_count -q -i $send_rate -w $timeout -t $ttl $host";
+	    $cmd = "/usr/bin/sudo /bin/ping -c $send_count -q -i $send_rate -w $timeout -t $ttl $host";
 	}
     } else {
 	if($platform eq BSD) {
-	    $cmd = "sudo ping -c $send_count -q -i $send_rate -t $timeout $host";
+	    $cmd = "/usr/local/bin/sudo /sbin/ping -c $send_count -q -i $send_rate -t $timeout $host";
 	} elsif($platform eq LINUX) {
-	    $cmd = "sudo ping -c $send_count -q -i $send_rate -w $timeout $host";
+	    $cmd = "/usr/bin/sudo /bin/ping -c $send_count -q -i $send_rate -w $timeout $host";
 	}
     }
 
     # note backticks passes SIGINT to child procs
-    my @results = `$cmd`;
+    my @args = split(/\s+/,$cmd);
+    my @results = &my_tick(@args);
+
     my $reslt_cnt = @results;
     my $result = $results[$reslt_cnt-2];
     if($platform eq BSD && $result =~ /(\d+) packets received/) {
@@ -1005,7 +1014,7 @@ sub proc_cmd {
 	    $ns_file = $1;
 	}
 	if($arg =~ /DEBUG=(\d)/) {
-	    $debug_mode=$1;
+	    $debug_level=$1;
 	}
 
     }
@@ -1015,7 +1024,7 @@ sub proc_cmd {
 # send the event indicating that the test has completed.
 sub send_done {
     if($hostname eq $synserv) {
-	&my_system("ltevent","-s",EVENT_SERVER,"-e","$proj_id/$exp_id","-x",EVENT_STOP);
+	&my_system(PATH_LTEVENT,"-s",EVENT_SERVER,"-e","$proj_id/$exp_id","-x",EVENT_STOP, "-k", PATH_KEYFILE);
     }
 }
 
@@ -1034,6 +1043,35 @@ sub dotest {
     }
 }
 
+# an alternative to backticks to pass taint mode.
+sub my_tick {
+    # first arg has to be a file, so at least check that here.
+    my $fname = &check_filename(shift @_);
+
+    my @results;
+    open(FROM, "-|") or exec $fname, @_;
+    while( <FROM>) {
+	push @results,$_;
+    };
+    close FROM;
+    return @results;
+}
+
+# reads/returns contents of file.
+sub read_file {
+    my @results;
+    my $fname = &check_filename($_[0]);
+    open FILE, $fname || die &fatal ("Could not open $fname");
+    while(<FILE>) {
+	chomp;
+	push @results, $_;
+    };
+    close FILE;
+    return @results;
+	
+}
+
+
 # purpose: because built-in system does not send SIGINT to child processes,
 # interrupting link test (in development) causes background proceses.
 # using a lower-level implementation enables sending
@@ -1042,6 +1080,8 @@ sub dotest {
 #
 # @param: accepts a list of arguments for exec.
 sub my_system {
+    &check_filename($_[0]);
+
     foreach my $param (@_) {
 	&debug($param . " ");
     }
@@ -1051,37 +1091,73 @@ sub my_system {
 	waitpid($pid,0);
 	pop(@kill_list);
     } else {
-	open(STDOUT, "/dev/null") ;
-	open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
+	if($debug_level < DEBUG_ALL) {
+	    open(STDOUT, "/dev/null") ;
+	    open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
+	}
 	exec(@_);
     }
 }
 # permutation of my_system to start but not wait for child procs.
 sub my_system_initonly {
+    &check_filename($_[0]);
+
     if(my $pid =fork) {
 	push @kill_list, $pid;
     } else {
-	open(STDOUT, "/dev/null") ;
-	open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
+	if($debug_level < DEBUG_ALL) {
+	    open(STDOUT, "/dev/null") ;
+	    open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
+	}
 	exec(@_);
     }
 }
 
+sub check_filename {
+    my $fname = shift @_;
+    
+    # taint check: /something/something.out
+    if($fname =~ /^(\/?(?:[\/\w-]*(?:\.\w+)?)*)$/) {
+	return "$1";
+    } else {
+	die &fatal("Possible taint detected: $fname");
+    }
+
+}
+
+sub write_file{
+    my ($fname,@list) = @_;
+    my $ut_fname = &check_filename($fname);
+    open FILE,">$ut_fname"  || die &fatal("could not open $ut_fname for writing");
+    foreach (@list) {
+	print FILE $_;
+    }
+    close FILE;
+
+}
+
 
 sub do_unlink {
-    my $fname = shift @_;
-    if( -e $fname) {
-	&debug("unlink $fname\n");
-	unlink $fname ||  die &fatal ("Could not delete $fname");
+    my $ut_fname = &check_filename(shift @_);
+
+    if( -e $ut_fname) {
+	&debug("unlink $ut_fname\n");
+	unlink $ut_fname ||  die &fatal ("Could not delete $ut_fname");
     }
 }
 
 # purpose: log to a proprietary location for future improvement.
+# save only randomly so that it doesn't hit the fs too bad.
 sub log {
+    return unless (rand(1) < LOG_CHANCE);
     my $msg = shift @_;
     &debug($msg);
-    open LOGF,">>".LOG_PATH."/lt.log" || die &fatal ("Could not open logfile");
-    print LOGF $msg;
-    close LOGF;
+    &append_file(LOG_PATH,$msg);
 }
 
+sub append_file {
+    my $fname = &check_filename(shift @_);
+    open FILE,">>$fname" || die &fatal ("Could not append to $fname");
+    print FILE "@_";
+    close FILE;
+}
