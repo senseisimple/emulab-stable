@@ -20,6 +20,7 @@ my $TB		= "@prefix@";
 # to the actual binary to run
 %allowed = (	"avail"		=> "$TB/bin/avail",
 		"inuse"		=> "$TB/bin/inuse",
+		"if2port"	=> "$TB/sbin/if2port",
 		"mac2if"	=> "$TB/bin/mac2if",
 		"nalloc"	=> "$TB/bin/nalloc",
 		"nfree"		=> "$TB/bin/nfree",
