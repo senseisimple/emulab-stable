@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.8 2001-08-16 23:49:40 stoller Exp $";
+	"$Id: hunt.c,v 1.9 2001-08-20 15:26:06 stoller Exp $";
 #endif /* not lint */
 
 #ifdef USESOCKETS
@@ -218,6 +218,8 @@ socket_open(char *tipname)
 	/* Caller picks up and displays error */
 	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
 		close(sock);
+		fprintf(stderr,
+			"Socket connect failed. Falling back to tty line.\n");
 		return -1;
 	}
 
