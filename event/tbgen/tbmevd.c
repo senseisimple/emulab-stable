@@ -8,9 +8,16 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "event.h"
+#include "log.h"
+#include "tbdb.h"
 
 static char	*progname;
+static int	debug = 0;
 
 void
 usage()
@@ -36,8 +43,11 @@ main(int argc, char **argv)
 	
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "s:p:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:d:")) != -1) {
 		switch (c) {
+		case 'd':
+			debug = 1;
+			break;
 		case 's':
 			server = optarg;
 			break;
@@ -50,6 +60,14 @@ main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
+
+	loginit("tbmevd", !debug);
+
+	/*
+	 * Set up DB state.
+	 */
+	if (!dbinit())
+		return 1;
 
 	/*
 	 * Convert server/port to elvin thing.
@@ -69,22 +87,19 @@ main(int argc, char **argv)
 	 */
 	tuple = address_tuple_alloc();
 	if (tuple == NULL) {
-		ERROR("could not allocate an address tuple\n");
-		return 1;
+		fatal("could not allocate an address tuple");
 	}
 	tuple->objtype  = OBJECTTYPE_TESTBED;
 
 	/* Register with the event system: */
 	handle = event_register(server, 0);
 	if (handle == NULL) {
-		ERROR("could not register with event system\n");
-		return 1;
+		fatal("could not register with event system");
 	}
 
 	/* Subscribe to the test event: */
 	if (! event_subscribe(handle, callback, tuple, "event received")) {
-		ERROR("could not subscribe to event\n");
-		return 1;
+		fatal("could not subscribe to event");
 	}
 	
 	/* Begin the event loop, waiting to receive event notifications: */
@@ -92,8 +107,7 @@ main(int argc, char **argv)
 
 	/* Unregister with the event system: */
 	if (event_unregister(handle) == 0) {
-		ERROR("could not unregister with event system\n");
-		return 1;
+		fatal("could not unregister with event system");
 	}
 
 	return 0;
@@ -105,21 +119,31 @@ main(int argc, char **argv)
 static void
 callback(event_handle_t handle, event_notification_t notification, void *data)
 {
-	char		buf[7][64];
-	int		len = 64;
-	struct timeval	now;
+	char		nodeid[TBDB_FLEN_NODEID];
+	char		eventtype[TBDB_FLEN_EVEVENTTYPE];
+	char		ipaddr[32];
 
-	gettimeofday(&now, NULL);
+	event_notification_get_host(handle, notification,
+				    ipaddr, sizeof(ipaddr));
+	
+	event_notification_get_eventtype(handle, notification,
+					 eventtype, sizeof(eventtype));
 
-	event_notification_get_site(handle, notification, buf[0], len);
-	event_notification_get_expt(handle, notification, buf[1], len);
-	event_notification_get_group(handle, notification, buf[2], len);
-	event_notification_get_host(handle, notification, buf[3], len);
-	event_notification_get_objtype(handle, notification, buf[4], len);
-	event_notification_get_objname(handle, notification, buf[5], len);
-	event_notification_get_eventtype(handle, notification, buf[6], len);
+	/*
+	 * Convert to nodeid.
+	 */
+	if (! mydb_iptonodeid(ipaddr, nodeid)) {
+		error("Could not map ipaddr %s to nodeid!", ipaddr);
+		return;
+	}
 
-	printf("Event: %lu %s %s %s %s %s %s %s\n", now.tv_sec,
-	       buf[0], buf[1], buf[2], 
-	       buf[3], buf[4], buf[5], buf[6]);
+	/*
+	 * Set the event status for this node.
+	 */
+	if (! mydb_setnodeeventstate(nodeid, eventtype)) {
+		error("Error setting node event state: %s/%s!",
+		      nodeid, eventtype);
+		return;
+	}
+	info("%s(%s) -> %s", ipaddr, nodeid, eventtype);
 }
