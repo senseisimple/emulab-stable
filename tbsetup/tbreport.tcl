@@ -99,10 +99,10 @@ foreach link [array names ipmap] {
     if {$verbose == 1} {
 	set smac $macmap([lindex $ipmap($link) 0])
 	set dmac $macmap([lindex $ipmap($link) 1])
-	sql query $DB "select IFC from interfaces where mac = \"$smac\""
+	sql query $DB "select card from interfaces where mac = \"$smac\""
 	set sifc [sql fetchrow $DB]
 	sql endquery $DB
-	sql query $DB "select IFC from interfaces where mac = \"$dmac\""
+	sql query $DB "select card from interfaces where mac = \"$dmac\""
 	set difc [sql fetchrow $DB]
 	sql endquery $DB
 	puts [format "%20s %-15s %20s %-15s" /dev/eth$sifc $smac /dev/eth$difc $dmac]
