@@ -12,10 +12,13 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include "decls.h"
@@ -32,6 +35,11 @@
 #define CLIENT_CERTFILE		"client.pem"
 
 /*
+ * This is used by tmcd to determine if the connection is ssl or not.
+ */
+int	isssl;
+
+/*
  * On the client, we search a couple of dirs for the pem file.
  */
 static char	*clientcertdirs[] = {
@@ -46,6 +54,8 @@ static char	*clientcertdirs[] = {
 static SSL		*ssl;
 static SSL_CTX		*ctx;
 static int		client = 0;
+static char		nosslbuf[MYBUFSIZE];
+static int		nosslbuflen, nosslbufidx;
 static void		tmcd_sslerror();
 static void		tmcd_sslprint(const char *fmt, ...);
 
@@ -180,24 +190,49 @@ tmcd_client_sslinit(void)
 int
 tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 {
-	int	newsock;
+	int	newsock, cc;
 
 	if ((newsock = accept(sock, addr, addrlen)) < 0)
 		return -1;
 
+	/*
+	 * Read the first bit. It indicates whether we need to SSL
+	 * handshake or not. 
+	 */
+	if ((cc = read(newsock, nosslbuf, sizeof(nosslbuf) - 1)) <= 0) {
+		error("sslaccept: reading request");
+		if (cc == 0)
+			errno = EIO;
+		return -1;
+	}
+	if (strncmp(nosslbuf, SPEAKSSL, strlen(SPEAKSSL))) {
+		/*
+		 * No ssl. Need to return this data on the next read.
+		 * See below.
+		 */
+		isssl = 0;
+		nosslbuflen = cc;
+		nosslbufidx = 0;
+		return newsock;
+	}
+	isssl = 1;
+	nosslbuflen = 0;
+
 	if (! (ssl = SSL_new(ctx))) {
 		tmcd_sslerror();
+		errno = EIO;
 		return -1;
 	}
 	if (! SSL_set_fd(ssl, newsock)) {
 		tmcd_sslerror();
+		errno = EIO;
 		return -1;
 	}
 	if (SSL_accept(ssl) <= 0) {
 		tmcd_sslerror();
+		errno = EAUTH;
 		return -1;
 	}
-	tmcd_sslverify(newsock, 0);
 	
 	return newsock;
 }
@@ -209,53 +244,136 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 int
 tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 {
+	char		*cp = SPEAKSSL;
+	int		cc;
+	X509		*peer;
+	char		cname[256];
+	struct hostent	*he;
+	struct in_addr  ipaddr;
+	
 	if (connect(sock, name, namelen) < 0)
 		return -1;
+
+	/*
+	 * Send our special tag which says we speak SSL.
+	 */
+	if ((cc = write(sock, cp, strlen(cp))) != strlen(cp)) {
+		if (cc >= 0) {
+			error("sslconnect: short write\n");
+			errno = EIO;
+		}
+		return -1;
+	}
 	
 	if (! (ssl = SSL_new(ctx))) {
 		tmcd_sslerror();
+		errno = EIO;
 		return -1;
 	}
 	if (! SSL_set_fd(ssl, sock)) {
 		tmcd_sslerror();
+		errno = EIO;
 		return -1;
 	}
 	if (SSL_connect(ssl) <= 0) {
 		tmcd_sslerror();
-		return -1;
+		goto badauth;
 	}
-	tmcd_sslverify(sock, 0);
-	
-	return 0;
-}
 
-/*
- * Verify the certificate of the peer.
- */
-int
-tmcd_sslverify(int sock, char *host)
-{
-	X509	*peer;
-	char	*cp, buf[256];
-
+	/*
+	 * Do the verification dance.
+	 */
 	if (SSL_get_verify_result(ssl) != X509_V_OK) {
 		tmcd_sslprint("Certificate did not verify!\n");
-		return 1;
+		goto badauth;
 	}
 	
 	if (! (peer = SSL_get_peer_certificate(ssl))) {
 		tmcd_sslprint("No certificate was presented by the peer!\n");
-		return 1;
+		goto badauth;
 	}
 
-	if ((cp = X509_NAME_oneline(X509_get_subject_name(peer), 0, 0))) {
-		printf("Peer subject: %s\n", cp);
-		free(cp);
+	/*
+	 * Grab the common name from the cert.
+	 */
+	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+				  NID_commonName, cname, sizeof(cname));
+
+	/*
+	 * On the client, the common name must map to the same
+	 * host we just connected to. This should be enough of
+	 * a check?
+	 */
+	ipaddr = ((struct sockaddr_in *)name)->sin_addr;
+	
+	if (!(he = gethostbyaddr((char *) &ipaddr, sizeof(ipaddr), AF_INET))) {
+		error("Could not reverse map %s: %s\n",
+		      inet_ntoa(ipaddr), hstrerror(h_errno));
+		goto badauth;
+	}
+	if (strcmp(he->h_name, cname)) {
+		error("Certificate commonname mismatch: %s!=%s\n",
+		      he->h_name, cname);
+		goto badauth;
+	}
+	
+	return 0;
+
+ badauth:
+	errno = EAUTH;
+	return -1;
+}
+
+/*
+ * Verify the certificate of the client.
+ */
+int
+tmcd_sslverify_client(char *nodeid, char *class, char *type, int islocal)
+{
+	X509		*peer;
+	char		cname[256], unitname[256];
+
+	if (SSL_get_verify_result(ssl) != X509_V_OK) {
+		error("sslverify: Certificate did not verify!\n");
+		return -1;
+	}
+	
+	if (! (peer = SSL_get_peer_certificate(ssl))) {
+		error("sslverify: No certificate presented!\n");
+		return -1;
 	}
 
-	if ((cp = X509_NAME_oneline(X509_get_issuer_name(peer), 0, 0))) {
-		printf("Peer issuer: %s\n", cp);
-		free(cp);
+	/*
+	 * Grab stuff from the cert.
+	 */
+	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+				  NID_organizationalUnitName,
+				  unitname, sizeof(unitname));
+
+	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+				  NID_commonName,
+				  cname, sizeof(cname));
+
+	/*
+	 * On the server, things are a bit more difficult since
+	 * we share a common cert locally and a per group cert remotely.
+	 *
+	 * Make sure common name matches.
+	 */
+	if (strcmp(cname, BOSSNODE)) {
+		error("sslverify: commonname mismatch: %s!=%s\n",
+		      cname, BOSSNODE);
+		return -1;
+	}
+
+	/*
+	 * If the node is remote, then the unitname must match the type.
+	 * Simply a convention. 
+	 */
+	if (!islocal && strcmp(unitname, type)) {
+		error("sslverify: unitname mismatch: %s!=%s\n",
+		      unitname, type);
+		return -1;
 	}
 
 	return 0;
@@ -272,8 +390,13 @@ tmcd_sslwrite(int sock, const void *buf, size_t nbytes)
 	int	cc;
 
 	errno = 0;
-	if ((cc = SSL_write(ssl, buf, nbytes)) <= 0) {
-		if (cc < 0) {
+	if (isssl || client)
+		cc = SSL_write(ssl, buf, nbytes);
+	else
+		cc = write(sock, buf, nbytes);
+
+	if (cc <= 0) {
+		if (cc < 0 && isssl) {
 			tmcd_sslerror();
 		}
 		return cc;
@@ -287,11 +410,27 @@ tmcd_sslwrite(int sock, const void *buf, size_t nbytes)
 int
 tmcd_sslread(int sock, void *buf, size_t nbytes)
 {
-	int	cc;
+	int	cc = 0;
+
+	if (nosslbuflen) {
+		char *bp = (char *) buf, *cp = &nosslbuf[nosslbufidx];
+		
+		while (cc < nbytes && nosslbuflen) {
+			*bp = *cp;
+			bp++; cp++; cc++;
+			nosslbuflen--; nosslbufidx++;
+		}
+		return cc;
+	}
 
 	errno = 0;
-	if ((cc = SSL_read(ssl, buf, nbytes)) <= 0) {
-		if (cc < 0) {
+	if (isssl || client)
+		cc = SSL_read(ssl, buf, nbytes);
+	else
+		cc = read(sock, buf, nbytes);
+	
+	if (cc <= 0) {
+		if (cc < 0 && isssl) {
 			tmcd_sslerror();
 		}
 		return cc;
@@ -310,6 +449,7 @@ tmcd_sslclose(int sock)
 		SSL_free(ssl);
 		ssl = NULL;
 	}
+	nosslbuflen = 0;
 	close(sock);
 	return 0;
 }
@@ -345,8 +485,7 @@ tmcd_sslprint(const char *fmt, ...)
 
 	if (client) {
 		fputs(buf, stderr);
-		fputs("\n", stderr);
 	}
 	else
-		error("%s\n", buf);
+		error("%s", buf);
 }

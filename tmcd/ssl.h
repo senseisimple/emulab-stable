@@ -9,7 +9,14 @@ int		tmcd_sslconnect(int sock, const struct sockaddr *, socklen_t);
 int		tmcd_sslwrite(int sock, const void *buf, size_t nbytes);
 int		tmcd_sslread(int sock, void *buf, size_t nbytes);
 int		tmcd_sslclose(int sock);
-int		tmcd_sslverify(int sock, char *host);
+int		tmcd_sslverify_client(char *, char *, char *, int);
+int		isssl;
+
+/*
+ * The client sends this tag to indicate that it is SSL capable.
+ * Only local nodes can skip SSL. Remote nodes must use SSL!
+ */
+#define SPEAKSSL	"ISPEAKSSL_TMCDV10"
 
 /*
  * When compiled to use SSL, redefine the routines appropriately

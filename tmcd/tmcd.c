@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,7 @@
 #include "config.h"
 #include "ssl.h"
 #include "log.h"
+#include "tbdefs.h"
 
 #ifdef EVENTSYS
 #include "event.h"
@@ -42,14 +44,15 @@
 #define DBNAME_SIZE	64
 #define DEFAULT_DBNAME	TBDBNAME
 
-static int	debug = 0;
+int		debug = 0;
 static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
+static struct in_addr myipaddr;
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-static int	iptonodeid(struct in_addr ipaddr, char *bufp);
+static int	iptonodeid(struct in_addr, char *, char *, char *, int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
-static int	checkdbredirect(struct in_addr ipaddr);
+static int	checkdbredirect(char *nodeid);
 static void	tcpserver(int sock);
 static void	udpserver(int sock);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
@@ -76,7 +79,7 @@ static event_handle_t	event_handle = NULL;
  */
 #define COMMAND_PROTOTYPE(x) \
 	static int \
-	x(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
+	x(int sock, char *nodeid, char *rdata, int tcp, int vers)
 
 COMMAND_PROTOTYPE(doreboot);
 COMMAND_PROTOTYPE(dostatus);
@@ -104,7 +107,7 @@ COMMAND_PROTOTYPE(docreator);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int, struct in_addr, char *, int, int);
+	int    (*func)(int, char *, char *, int, int);
 } command_array[] = {
 	{ "reboot",	doreboot },
 	{ "status",	dostatus },
@@ -161,8 +164,8 @@ static void
 cleanup()
 {
 	signal(SIGHUP, SIG_IGN);
-	killpg(0, SIGHUP);
 	killme = 1;
+	killpg(0, SIGHUP);
 }
 
 int
@@ -173,6 +176,7 @@ main(int argc, char **argv)
 	struct sockaddr_in	name;
 	FILE			*fp;
 	char			buf[BUFSIZ];
+	struct hostent		*he;
 	extern char		build_info[];
 
 	while ((ch = getopt(argc, argv, "dp:c:")) != -1)
@@ -214,6 +218,21 @@ main(int argc, char **argv)
 	}
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
 	info("%s\n", build_info);
+
+	/*
+	 * Grab our IP for security check below.
+	 */
+#ifdef	LBS
+	strcpy(buf, BOSSNODE);
+#else
+	if (gethostname(buf, sizeof(buf)) < 0)
+		pfatal("getting hostname");
+#endif
+	if ((he = gethostbyname(buf)) == NULL) {
+		error("Could not get IP (%s) - %s\n", buf, hstrerror(h_errno));
+		exit(1);
+	}
+	memcpy((char *)&myipaddr, he->h_addr, he->h_length);
 
 	/*
 	 * Setup TCP socket for incoming connections.
@@ -343,7 +362,7 @@ main(int argc, char **argv)
 }
 
 /*
- * Listen for UDP requests. This not a secure channel, and so this should
+ * Listen for UDP requests. This is not a secure channel, and so this should
  * eventually be killed off.
  */
 static void
@@ -375,8 +394,7 @@ udpserver(int sock)
 }
 
 /*
- * Listen for TCP requests. This not a secure channel, and so this should
- * eventually be killed off.
+ * Listen for TCP requests.
  */
 static void
 tcpserver(int sock)
@@ -421,7 +439,10 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	struct sockaddr_in redirect_client;
 	int		   redirect = 0;
 	char		   buf[BUFSIZ], *bp;
-	int		   i, cc, err = 0;
+	char		   nodeid[TBDB_FLEN_NODEID];
+	char		   class[TBDB_FLEN_NODECLASS];
+	char		   type[TBDB_FLEN_NODETYPE];
+	int		   i, cc, islocal, err = 0;
 	int		   version = DEFAULT_VERSION;
 
 	cc = strlen(rdata);
@@ -459,14 +480,24 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			bp++;
 	}		
 
-#ifndef	TESTMODE
+	/* Start with default DB */
+	strcpy(dbname, DEFAULT_DBNAME);
+
 	/*
-	 * IN TESTMODE, we allow redirect.
-	 * Otherwise not since that would be a (minor) privacy
-	 * risk, by allowing testbed nodes to get info for other
-	 * nodes.
+	 * Map the ip to a nodeid.
 	 */
-	if (redirect) {
+	if (iptonodeid(client->sin_addr, nodeid, class, type, &islocal)) {
+		error("No such node: %s\n", inet_ntoa(client->sin_addr));
+		goto skipit;
+	}
+
+	/*
+	 * Redirect is allowed from the local host only!
+	 * I use this for testing. See below where I test redirect
+	 * if the verification fails. 
+	 */
+	if (redirect &&
+	    redirect_client.sin_addr.s_addr != myipaddr.s_addr) {
 		char	buf1[32], buf2[32];
 		
 		strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
@@ -475,21 +506,49 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		info("%s INVALID REDIRECT: %s\n", buf1, buf2);
 		goto skipit;
 	}
+
+#ifdef  WITHSSL
+	/*
+	 * If the connection is not SSL, then it must be a local node.
+	 */
+	if (isssl) {
+		if (tmcd_sslverify_client(nodeid, class, type, islocal)) {
+			error("%s: SSL verification failure\n", nodeid);
+			if (! redirect)
+				goto skipit;
+		}
+	}
+	else if (!islocal) {
+		error("%s: Remote node connected without SSL!\n", nodeid);
+		/*
+		 * Allow for now, until ron nodes updated.
+		 * if (! redirect)
+		 *	goto skipit;
+		 */
+	}
+#else
+	/*
+	 * When not compiled for ssl, do not allow remote connections.
+	 */
+	if (!islocal) {
+		error("%s: Remote node without SSL!\n", nodeid);
+		/*
+		 * Allow for now, until ron nodes updated.
+		 * if (! redirect)
+		 *	goto skipit;
+		 */
+	}
 #endif
 	/*
 	 * Check for a redirect using the default DB. This allows
 	 * for a simple redirect to a secondary DB for testing.
-	 * Not very general. Might change to full blown tmcd
-	 * redirection at some point, but this is a very quick and
-	 * easy hack. Upon return, the dbname has been changed if
-	 * redirection is in force. 
+	 * Upon return, the dbname has been changed if redirected.
 	 */
-	strcpy(dbname, DEFAULT_DBNAME);
-	if (checkdbredirect(client->sin_addr)) {
+	if (checkdbredirect(nodeid)) {
 		/* Something went wrong */
 		goto skipit;
 	}
-		
+
 	/*
 	 * Figure out what command was given.
 	 */
@@ -498,36 +557,31 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			    strlen(command_array[i].cmdname)) == 0)
 			break;
 
-	/*
-	 * And execute it.
-	 */
 	if (i == numcommands) {
-		info("%s INVALID REQUEST: %.8s\n",
-		     inet_ntoa(client->sin_addr), bp);
+		info("%s: INVALID REQUEST: %.8s\n", nodeid, bp);
 		goto skipit;
 	}
-	else {
-		bp += strlen(command_array[i].cmdname);
 
-		/*
-		 * XXX hack, don't log "log" contents,
-		 * both for privacy and to keep our syslog smaller.
-		 */
-		if (command_array[i].func == dolog)
-			info("%s log %d chars\n",
-			     inet_ntoa(client->sin_addr), strlen(bp));
-		else
-			info("%s vers:%d %s\n",
-			     inet_ntoa(client->sin_addr),
-			     version, command_array[i].cmdname);
+	/*
+	 * Execute it.
+	 */
+	bp += strlen(command_array[i].cmdname);
 
-		err = command_array[i].func(sock, client->sin_addr,
-					    bp, istcp, version);
+	/*
+	 * XXX hack, don't log "log" contents,
+	 * both for privacy and to keep our syslog smaller.
+	 */
+	if (command_array[i].func == dolog)
+		info("%s: log %d chars\n", nodeid, strlen(bp));
+	else
+		info("%s: vers:%d %s\n", nodeid,
+		     version, command_array[i].cmdname);
 
-		info("%s %s: returned %d\n",
-		     inet_ntoa(client->sin_addr),
-		     command_array[i].cmdname, err);
-	}
+	err = command_array[i].func(sock, nodeid, bp, istcp, version);
+
+	if (err)
+		info("%s: %s: returned %d\n",
+		     nodeid, command_array[i].cmdname, err);
 
  skipit:
 	if (!istcp) 
@@ -542,17 +596,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 COMMAND_PROTOTYPE(doreboot)
 {
 	MYSQL_RES	*res;	
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("REBOOT: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
-
-	info("REBOOT: %s is reporting a reboot\n", nodeid);
 
 	/*
 	 * Clear the current_reloads for this node, in case it just finished
@@ -596,7 +642,8 @@ COMMAND_PROTOTYPE(doreboot)
 	 * See if the node was in the reload state. If so we need to clear it
 	 * and its reserved status.
 	 */
-	res = mydb_query("select node_id from scheduled_reloads where node_id='%s'",
+	res = mydb_query("select node_id from scheduled_reloads "
+			 "where node_id='%s'",
 			 1, nodeid);
 	if (!res) {
 		error("REBOOT: %s: DB Error getting reload!\n", nodeid);
@@ -608,7 +655,8 @@ COMMAND_PROTOTYPE(doreboot)
 	}
 	mysql_free_result(res);
 
-	if (mydb_update("delete from scheduled_reloads where node_id='%s'", nodeid)) {
+	if (mydb_update("delete from scheduled_reloads where node_id='%s'",
+			nodeid)) {
 		error("REBOOT: %s: DB Error clearing reload!\n", nodeid);
 		return 1;
 	}
@@ -628,17 +676,11 @@ COMMAND_PROTOTYPE(doreboot)
  */
 COMMAND_PROTOTYPE(dostatus)
 {
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		nickname[128];
 	char		buf[MYBUFSIZE];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("STATUS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -670,17 +712,11 @@ COMMAND_PROTOTYPE(doifconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		control_net, nrows;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("IFCONFIG: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -788,7 +824,6 @@ COMMAND_PROTOTYPE(doaccounts)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
@@ -796,8 +831,9 @@ COMMAND_PROTOTYPE(doaccounts)
 	int		nrows, gidint;
 	int		shared = 0, tbadmin;
 
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("ACCOUNTS: %s: No such node\n", inet_ntoa(ipaddr));
+	if (! tcp) {
+		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
+		      nodeid);
 		return 1;
 	}
 
@@ -1061,17 +1097,11 @@ COMMAND_PROTOTYPE(dodelay)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[2*MYBUFSIZE];
 	int		nrows;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("DELAY: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1167,7 +1197,7 @@ COMMAND_PROTOTYPE(dohostsV2)
 	/*
 	 * This will go away. Ignore version and assume latest.
 	 */
-	return(dohosts(sock, ipaddr, rdata, tcp, CURRENT_VERSION));
+	return(dohosts(sock, nodeid, rdata, tcp, CURRENT_VERSION));
 }
 
 COMMAND_PROTOTYPE(dohosts)
@@ -1176,7 +1206,6 @@ COMMAND_PROTOTYPE(dohosts)
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	char		pid[64], eid[64], gid[64];
-	char		nodeid[32];
 	int		nrows;
 	int		rv = 0;
 
@@ -1192,11 +1221,6 @@ COMMAND_PROTOTYPE(dohosts)
 		struct in_addr	 ipaddr;
 		struct hostentry *next;
 	} *hosts = 0, *host;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("HOSTNAMES: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1404,16 +1428,10 @@ COMMAND_PROTOTYPE(dorpms)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("TARBALLS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1468,16 +1486,10 @@ COMMAND_PROTOTYPE(dotarballs)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp, *tp;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("TARBALLS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1535,16 +1547,10 @@ COMMAND_PROTOTYPE(dodeltas)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE], *bp, *sp;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("DELTAS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1600,16 +1606,10 @@ COMMAND_PROTOTYPE(dostartcmd)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("STARTUPCMD: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -1678,23 +1678,16 @@ COMMAND_PROTOTYPE(dostartcmd)
  */
 COMMAND_PROTOTYPE(dostartstat)
 {
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	int		exitstatus;
 
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("STARTSTAT: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
-
 	/*
 	 * Dig out the exit status
 	 */
 	if (! sscanf(rdata, "%d", &exitstatus)) {
-		error("STARTSTAT: %s: Invalid exit status: %s\n",
-		       inet_ntoa(ipaddr), rdata);
+		error("STARTSTAT: %s: Invalid status: %s\n", nodeid, rdata);
 		return 1;
 	}
 	
@@ -1729,15 +1722,9 @@ COMMAND_PROTOTYPE(dostartstat)
  */
 COMMAND_PROTOTYPE(doready)
 {
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("READY: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Make sure currently allocated to an experiment!
@@ -1771,17 +1758,11 @@ COMMAND_PROTOTYPE(doreadycount)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		total, ready, i;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("READYCOUNT: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Make sure currently allocated to an experiment!
@@ -1835,7 +1816,6 @@ static char logfmt[] = "/proj/%s/logs/%s.log";
  */
 COMMAND_PROTOTYPE(dolog)
 {
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
@@ -1847,10 +1827,6 @@ COMMAND_PROTOTYPE(dolog)
 	/*
 	 * Find the pid/eid of the requesting node
 	 */
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("LOG: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		info("LOG: %s: Node is free\n", nodeid);
 		return 1;
@@ -1859,8 +1835,7 @@ COMMAND_PROTOTYPE(dolog)
 	snprintf(logfile, sizeof(logfile)-1, logfmt, pid, eid);
 	fd = fopen(logfile, "a");
 	if (fd == NULL) {
-		error("LOG: %s: Could not open %s\n",
-		      inet_ntoa(ipaddr), logfile);
+		error("LOG: %s: Could not open %s\n", nodeid, logfile);
 		return 1;
 	}
 
@@ -1872,7 +1847,7 @@ COMMAND_PROTOTYPE(dolog)
 	while (isspace(*rdata))
 		rdata++;
 
-	fprintf(fd, "%s: %s\n\n%s\n=======\n", tstr, inet_ntoa(ipaddr), rdata);
+	fprintf(fd, "%s: %s\n\n%s\n=======\n", tstr, nodeid, rdata);
 	fclose(fd);
 
 	return 0;
@@ -1885,17 +1860,11 @@ COMMAND_PROTOTYPE(domounts)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("MOUNTS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -2000,16 +1969,10 @@ COMMAND_PROTOTYPE(dorouting)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("ROUTES: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -2062,13 +2025,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		buf[MYBUFSIZE];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("doloadinfo: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -2114,12 +2071,6 @@ COMMAND_PROTOTYPE(doloadinfo)
 COMMAND_PROTOTYPE(doreset)
 {
 	MYSQL_RES	*res;	
-	char		nodeid[32];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("doreset: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Check to see if next_pxe_boot_path is set
@@ -2196,17 +2147,11 @@ COMMAND_PROTOTYPE(dotrafgens)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows;
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("TRAFGENS: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -2259,20 +2204,13 @@ COMMAND_PROTOTYPE(donseconfigs)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	int		nrows;
 
 	if (!tcp) {
-		error("NSECONFIGS: %s: Cannot do UDP mode!\n",
-		      inet_ntoa(ipaddr));
-		return 1;
-	}
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("NSECONFIGS: %s: No such node\n", inet_ntoa(ipaddr));
+		error("NSECONFIGS: %s: Cannot do UDP mode!\n", nodeid);
 		return 1;
 	}
 
@@ -2316,16 +2254,10 @@ COMMAND_PROTOTYPE(donseconfigs)
  */
 COMMAND_PROTOTYPE(dostate)
 {
-	char		nodeid[32];
 	char 		*newstate;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("STATE: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Dig out state that the node is reporting
@@ -2380,16 +2312,10 @@ COMMAND_PROTOTYPE(docreator)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
-
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("CREATOR: %s: No such node\n", inet_ntoa(ipaddr));
-		return 1;
-	}
 
 	/*
 	 * Now check reserved table
@@ -2532,16 +2458,22 @@ mydb_update(char *query, ...)
 }
 
 /*
- * Map IP to node ID. 
+ * Map IP to node ID (plus other info).
  */
 static int
-iptonodeid(struct in_addr ipaddr, char *bufp)
+iptonodeid(struct in_addr ipaddr,
+	   char *nodeid, char *class, char *type, int *islocal)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select node_id from interfaces where IP='%s'", 1,
-			 inet_ntoa(ipaddr));
+	res = mydb_query("select t.class,t.type,n.node_id "
+			 " from node_types as t "
+			 "left join nodes as n on t.type=n.type "
+			 "left join interfaces as i on n.node_id=i.node_id "
+			 "where i.IP='%s'",
+			 3, inet_ntoa(ipaddr));
+			 
 	if (!res) {
 		error("iptonodeid: %s: DB Error getting interfaces!\n",
 		      inet_ntoa(ipaddr));
@@ -2549,13 +2481,21 @@ iptonodeid(struct in_addr ipaddr, char *bufp)
 	}
 
 	if (! (int)mysql_num_rows(res)) {
-		error("Cannot map IP %s to nodeid\n", inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
 	}
 	row = mysql_fetch_row(res);
 	mysql_free_result(res);
-	strcpy(bufp, row[0]);
+
+	if (!row[0] || !row[1] || !row[2]) {
+		error("iptonodeid: %s: Malformed DB response!\n",
+		      inet_ntoa(ipaddr)); 
+		return 1;
+	}
+	strcpy(nodeid, row[2]);
+	strcpy(class,  row[0]);
+	strcpy(type,   row[1]);
+	*islocal = (! strcasecmp(class, "pcremote") ? 0 : 1);
 
 	return 0;
 }
@@ -2670,23 +2610,14 @@ nodeidtocontrolnet(char *nodeid, int *net)
  * Check for DBname redirection.
  */
 static int
-checkdbredirect(struct in_addr ipaddr)
+checkdbredirect(char *nodeid)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
-	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
 	
-	/*
-	 * Find the nodeid.
-	 */
-	if (iptonodeid(ipaddr, nodeid)) {
-		error("CHECKDBREDIRECT: %s: No such node\n",
-		      inet_ntoa(ipaddr));
-		return 1;
-	}
 	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		info("CHECKDBREDIRECT: %s: Node is free\n", nodeid);
 		return 0;
@@ -2724,9 +2655,9 @@ checkdbredirect(struct in_addr ipaddr)
 	 * Okay, lets test to make sure that DB exists. If not, fall back
 	 * on the main DB. 
 	 */
-	if (iptonodeid(ipaddr, nodeid)) {
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
 		error("CHECKDBREDIRECT: %s: %s DB does not exist\n",
-		      inet_ntoa(ipaddr), dbname);
+		      nodeid, dbname);
 		strcpy(dbname, DEFAULT_DBNAME);
 	}
 	mysql_free_result(res);

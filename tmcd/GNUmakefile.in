@@ -20,9 +20,9 @@ TMLIBS	 = ${OBJDIR}/lib/libtb/libtb.a
 #
 # For SSL enabled tmcd/tmcc
 #
-#CFLAGS += -DWITHSSL -DETCDIR='"$(INSTALL_ETCDIR)"'
+#CFLAGS	+= -DWITHSSL -DETCDIR='"$(INSTALL_ETCDIR)"'
 #TMLIBS	+= -lssl -lcrypto
-#SSLOBJ  = ssl.o
+#SSLOBJ   = ssl.o
 
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS = `elvin-config --cflags vin4c` \
