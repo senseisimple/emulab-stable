@@ -1,0 +1,26 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
+
+print "Starting Program Agent ...\n";
+
+#
+# We use the tmcc to figure out where the Testbed Event Daemon is running.
+# Don't worry about the port for now.
+#
+my ($bossname) = split(" ", `tmcc bossinfo`);
+
+system("program-agent -s $bossname -l /tmp/progagent.debug &");
+exit($? >> 0);

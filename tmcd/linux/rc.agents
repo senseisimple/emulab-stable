@@ -1,0 +1,17 @@
+#!/bin/sh
+
+#
+# Start the agents. The scripts decide themselves whether to do anything.
+# 
+if [ -x /etc/rc.d/testbed/rc.delayagent ]; then
+        /etc/rc.d/testbed/rc.delayagent
+fi
+
+if [ -x /etc/rc.d/testbed/rc.progagent ]; then
+        /etc/rc.d/testbed/rc.progagent
+fi
+
+if [ -x /etc/rc.d/testbed/rc.traffic  ]; then
+        echo "Starting traffic generators ..."
+	/etc/rc.d/testbed/rc.traffic
+fi

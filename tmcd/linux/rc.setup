@@ -31,6 +31,10 @@ if [ -s /etc/rc.d/testbed/startupcmd  ]; then
 	echo "/etc/rc.d/testbed/runstartup" | at -q S 'now + 2 minutes'
 fi
 
+if [ -x /etc/rc.d/testbed/rc.agents  ]; then
+	/etc/rc.d/testbed/rc.agents
+fi
+
 #
 # Generate an event that says we are up and running
 #
