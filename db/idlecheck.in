@@ -56,9 +56,12 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 # Configurable parameters
 my $idlehours = 24;
 my $minpph = 4; # Min packets per hour that an idle interface sends/rcvs
+my $stalemin = 120; # Max minutes of staleness for latest report
 
+# Derived params
 my $minpkts = $idlehours * $minpph;
 my $idlesec = $idlehours * 3600;
+my $stalesec = $stalemin * 60;
 my $node1="";
 my $node2="";
 my $node3="";
@@ -67,14 +70,20 @@ if ($n) {
     $node2="and a.node_id=\"$n\"";
     $node3=",node_id";
 }
+my %active=();
 
 # This query finds how many packets the non-control net interfaces
 # have sent in the last $idlesec seconds, and saves it in a temporary
 # table. It then aggregates that and shows a list of pid/eid (and
-# maybe nodes) whose interfaces have each sent less than $minpkts
+# maybe nodes) that have an interface that sent/rcvd at least $minpkts
 # packets in the time period. It also makes sure to only count entries
 # since they've been swapped in, and makes sure they were swapped in
 # at least $idlesec seconds ago.
+
+# The last query below finds the last reported tty use for each
+# expt. It only counts reports that have been received in the last
+# $stalemin minutes and that have been since the expt was swapped in,
+# and only shows expts that have been used in the last $idlesec seconds.
 
 for my $cmd ("drop table if exists idletemp;",
 	     "create temporary table idletemp 
@@ -91,24 +100,48 @@ and IP not like \"155.101.%\" $node2
 group by r.pid,r.eid,a.mac;",
 	     "select pid,eid, max(idiff), max(odiff) from idletemp 
 group by pid,eid $node3
-having (max(idiff) <= $minpkts) and (max(odiff) <= $minpkts);",
+having (max(idiff) >= $minpkts) or (max(odiff) >= $minpkts);",
 	     "select r.pid,r.eid,max(last_tty) as lastuse ,max(tstamp) as t
 from node_idlestats as n 
 left join reserved as r on n.node_id=r.node_id
 left join experiments as e on e.pid=r.pid and e.eid=r.eid
 where tstamp >= expt_swapped and r.pid is not null and r.eid is not null
 group by pid,eid 
-having (unix_timestamp(now())-unix_timestamp(t) <= 7200)
-and (unix_timestamp(now())-unix_timestamp(lastuse) >= 86400)
+having (unix_timestamp(now())-unix_timestamp(t) <= $stalesec)
+and (unix_timestamp(now())-unix_timestamp(lastuse) <= $idlesec)
 order by pid,eid,last_tty,tstamp;") {
 
     print "Sending cmd:\n$cmd\n" if $d;
     my $result = DBQueryFatal($cmd);
-    print $result->as_string();
-    if ($cmd =~ /^select /i && $result->numrows() == 0) {
-	# nothing that has been reporting regularly is idle...
-	exit(0);
+    if ($cmd =~ /^select /i && $result->numrows() > 0) {
+	# Add the pid/eid to our list of active expts
+	while(@r=$result->fetchrow()) {
+	    $pid=$r[0];
+	    $eid=$r[1];
+	    print "Adding $pid/$eid to active list\n" if $d;
+	    $active{"$pid/$eid"} = 1;
+	}
     }
+    #print $result->as_string();
 }
+
+$cmd = "select r.pid,r.eid,swappable from reserved as r
+left join experiments as e on e.pid=r.pid and e.eid=r.eid
+group by r.pid,r.eid order by r.pid,r.eid";
+print "Sending cmd:\n$cmd\n" if $d;
+my $result = DBQueryFatal($cmd);
+while(@r=$result->fetchrow()) {
+    $pid=$r[0];
+    $eid=$r[1];
+    $swap=$r[2];
+    $idle=!defined($active{"$pid/$eid"});
+    print "Checking for $pid/$eid in active list\n" if $d;
+    my $str= "$pid/$eid";
+    $str = $str . " " x (40-length($str));
+    $str .= ($idle? "inactive\t" : "\t\t" );
+    $str .= (!$swap? "unswappable\n" : "\n" );
+    if ($idle) { print $str; }
+}
+#print $result->as_string();
 
 exit(0);
