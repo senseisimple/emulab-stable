@@ -5,6 +5,16 @@
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: rc.delayagent [-j <vnodeid>] start | stop\n";
+    exit(1);
+}
+my $optlist	= "j:";
+my $vnodeid;
+my $action      = "start";
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -16,10 +26,52 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 use libsetup;
 
 #
-# Really comes from libloc.
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
 #
-my $MAPFILE = $libsetup::TMDELMAP;
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"j"})) {
+    $vnodeid = $options{"j"};
+    libsetup_setvnodeid($vnodeid);
+}
+if (@ARGV) {
+    $action = $ARGV[0];
 
+    usage()
+	if ($action ne "start" and $action ne "stop");
+}
+# Must do this *after* setting vnode id.
+my $MAPFILE = TMDELMAP();
+my $logfile;
+my $pidfile;
+
+if (defined($vnodeid)) {
+    # Maybe move these files to the jaildir?
+    $logfile = "$LOGDIR/delayagent-${vnodeid}.debug";
+    $pidfile = "/var/run/delayagent-${vnodeid}.pid";
+}
+else {
+    $logfile = "$LOGDIR/delayagent.debug";
+    $pidfile = "/var/run/delayagent.pid";
+}
+
+# Stop.
+if ($action eq "stop") {
+    if (-e $pidfile) {
+	my $pidno = `cat $pidfile`;
+	chomp($pidno);
+	print "$pidno\n";
+	# The delay agent will not die properly for some reason. 
+	system("kill -9 $pidno");
+	#unlink($pidfile);
+    }
+    exit(0);
+}
+
+# Start.
 if (! -s $MAPFILE) {
     exit(0);
 }
@@ -33,9 +85,15 @@ my ($pid, $eid, $vname) = check_nickname();
 
 #
 # We use the tmcc to figure out where the Testbed Event Daemon is running.
-# Don't worry about the port for now.
+# Don't worry about the port for now. When for a jail, we use localhost
+# to talk to the local elvind and the evproxy. Maybe just do this all the
+# time and not worry about the extra 1ms of transit delay?
 #
-my ($bossname) = split(" ", `tmcc bossinfo`);
+my $bossname = "localhost";
+if (! defined($vnodeid)) {
+    ($bossname) = split(" ", `tmcc bossinfo`);
+}
 
-system("delay-agent -s $bossname -d -E $pid/$eid -f $MAPFILE &");
+system("delay-agent -s $bossname -E $pid/$eid ".
+       "-f $MAPFILE -l $logfile -i $pidfile &");
 exit($? >> 0);
