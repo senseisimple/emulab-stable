@@ -93,15 +93,15 @@ else {
 
 $query_result =
     DBQueryFatal("SELECT u.*, ".
-		 " IF(ll.time, ".
-		 "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
+		 " IF(ll.weblogin_last, ".
+		 "    TO_DAYS(CURDATE()) - TO_DAYS(ll.weblogin_last), ".
 		 "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
 		 "   as webidle, ".
 		 " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
 		 "FROM users as u ".
 		 "$clause ".
 		 "left join userslastlogin as ull on u.uid=ull.uid ".
-		 "left join lastlogin as ll on u.uid=ll.uid ".
+		 "left join user_stats as ll on u.uid=ll.uid ".
 		 "$where ".
 		 "order by $order");
 

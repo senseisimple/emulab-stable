@@ -464,16 +464,6 @@ CREATE TABLE last_reservation (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'lastlogin'
---
-
-CREATE TABLE lastlogin (
-  uid varchar(10) NOT NULL default '',
-  time datetime default NULL,
-  PRIMARY KEY  (uid)
-) TYPE=MyISAM;
-
---
 -- Table structure for table 'linkdelays'
 --
 

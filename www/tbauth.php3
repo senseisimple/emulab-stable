@@ -375,12 +375,6 @@ function DOLOGIN($uid, $password, $adminmode) {
 	}
 
 	#
-	# Create a last login record. This is now obsolete. 
-	#
-	DBQueryFatal("REPLACE into lastlogin (uid, time) ".	
-		     " VALUES ('$uid', NOW())");
-
-	#
 	# Usage stats. 
 	#
 	DBQueryFatal("update user_stats set ".
