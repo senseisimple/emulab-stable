@@ -100,10 +100,13 @@ mail("$expleader_name <$expleader_email>",
      "It appears that your experiment '$eid' in project '$pid' is inactive.\n".
      "We would appreciate it if you could either terminate or swap this\n".
      "this experiment out so that the nodes will be available for use by\n".
-     "other experimentors. You can do this by logging into the Emulab Web\n".
+     "other experimenters. You can do this by logging into the Emulab Web\n".
      "Interface, and using the swap or terminate links on this page:\n".
      "\n".
      "        $TBBASE/showexp.php3?pid=$pid&eid=$eid\n".
+     "\n".
+     "More information on experiment swapping is available in the Emulab\n".
+     "FAQ at http://www.emulab.net/faq.php3#UTT-Swapping\n".
      "\n".
      "If you feel this message is in error then please contact\n".
      "$TBMAILADDR_OPS.\n".
