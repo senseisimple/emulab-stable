@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -89,13 +89,13 @@ my $eid   = shift(@ARGV);
 #
 # Untaint the arguments.
 #
-if ($pid =~ /^([-\@\w]+)$/) {
+if ($pid =~ /^([-\w]+)$/) {
     $pid = $1;
 }
 else {
     die("*** Bad data in pid: $pid\n");
 }	
-if ($eid =~ /^([-\@\w]+)$/) {
+if ($eid =~ /^([-\w]+)$/) {
     $eid = $1;
 }
 else {
