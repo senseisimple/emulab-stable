@@ -15,6 +15,10 @@ function FLUXPERSON($person, $name) {
     echo "<li> <a href=\"http://www.cs.utah.edu/~$person\">$name</a>\n";
 }
 
+function PARTFLUXPERSON($person, $name, $other) {
+    echo "<li> <a href=\"http://www.cs.utah.edu/~$person\">$name</a> ($other)\n";
+}
+
 echo "<h3>Faculty:</h3>\n";
 echo "<ul>\n";
 FLUXPERSON("lepreau", "Jay Lepreau");
@@ -22,8 +26,8 @@ echo "</ul>\n";
 
 echo "<h3>Students and Staff:</h3>\n";
 echo "<ul>\n";
-FLUXPERSON("calfeld", "Chris Alfeld");
-FLUXPERSON("danderse", "Dave Andersen");
+PARTFLUXPERSON("calfeld", "Chris Alfeld", "Univ. Utah, Univ. Wisconsin");
+PARTFLUXPERSON("danderse", "Dave Andersen", "MIT");
 FLUXPERSON("barb", "Chad Barb");
 FLUXPERSON("rchriste", "Russ Christensen");
 FLUXPERSON("aclement", "Austin Clements");
