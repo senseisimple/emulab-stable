@@ -11,7 +11,8 @@
 static char dbname[] = "tbdb";
 static char dbquery[] =
    "select n.next_boot_path, n.next_boot_cmd_line, n.def_boot_image_id, "
-   "d.img_desc, p.partition, n.def_boot_cmd_line, d.img_path from nodes "
+   "d.img_desc, p.partition, n.def_boot_cmd_line, "
+   "n.def_boot_path from nodes "
    "as n left join partitions as p on n.node_id=p.node_id and "
    "n.def_boot_image_id=p.image_id left join disk_images as d on "
    "p.image_id=d.image_id left join interfaces as i on "
@@ -96,7 +97,6 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	row = mysql_fetch_row(res);
 
-#if 1
 	/*
 	 * First element is next_boot_path.  If set, assume it is a
 	 * multiboot kernel.
@@ -112,30 +112,128 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		mysql_free_result(res);
 		return 0;
 	}
-#endif
 
-	/* Fifth element (row[4]) should have the partition number */
-	if (row[4] == 0 || row[4][0] == '\0') {
+	/*
+	 * There is either a partition number or default boot path.
+	 * The default boot path overrides the partition.
+	 */
+	if (row[6] != 0 && row[6][0] != '\0') {
+		info->type = BIBOOTWHAT_TYPE_MB;
+		info->what.mb.tftp_ip.s_addr = 0;
+		strncpy(info->what.mb.filename, row[6], MAX_BOOT_PATH-1);
+	}
+	else if (row[4] != 0 && row[4][0] != '\0') {
+		info->type = BIBOOTWHAT_TYPE_PART;
+		info->what.partition = atoi(row[4]);
+	}
+	else {
 		syslog(LOG_ERR, "%s: null query result for IP %s!",
 			dbname, inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
 	}
-
-	/*
-	 * Just 45000 lines of code later, we have the 32 bits of info
-	 * we wanted!
-	 */
-	part = atoi(row[4]);
-	mysql_free_result(res);
-
-	info->type = BIBOOTWHAT_TYPE_PART;
-	info->what.partition = part;
 	if (row[5] != 0 && row[5][0] != '\0')
 		strncpy(info->cmdline, row[5], MAX_BOOT_CMDLINE-1);
 	else
 		info->cmdline[0] = 0;	/* Must zero first byte! */
 	
+	/*
+	 * Just 45040 lines of code later, we are done. 
+	 */
+	mysql_free_result(res);
+	return 0;
+}
+
+int
+ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
+{
+	char querybuf[1024];
+	int n, nrows, ncols, part;
+	MYSQL db;
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+
+	n = snprintf(querybuf, sizeof querybuf,
+		     "select i.node_id,n.next_boot_path,n.next_boot_cmd_line "
+		     "from nodes as n left join interfaces as i on "
+		     "i.node_id=n.node_id where i.IP = '%s'",
+		     inet_ntoa(ipaddr));
+	if (n > sizeof querybuf) {
+		syslog(LOG_ERR, "query too long for buffer");
+		return 1;
+	}
+	
+	mysql_init(&db);
+	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
+		syslog(LOG_ERR, "%s: connect failed: %s",
+			dbname, mysql_error(&db));
+		return 1;
+	}
+
+	if (mysql_real_query(&db, querybuf, n) != 0) {
+		syslog(LOG_ERR, "%s: query failed: %s",
+			dbname, mysql_error(&db));
+		mysql_close(&db);
+		return 1;
+	}
+
+	res = mysql_store_result(&db);
+	if (res == 0) {
+		syslog(LOG_ERR, "%s: store_result failed: %s",
+			dbname, mysql_error(&db));
+		mysql_close(&db);
+		return 1;
+
+	}
+
+	nrows = (int)mysql_num_rows(res);
+	switch (nrows) {
+	case 0:
+		syslog(LOG_ERR, "%s: no entry for host %s",
+			dbname, inet_ntoa(ipaddr));
+		mysql_free_result(res);
+		return 1;
+	case 1:
+		break;
+	default:
+		syslog(LOG_ERR, "%s: %d entries for IP %s, using first",
+			dbname, nrows, inet_ntoa(ipaddr));
+		break;
+	}
+
+	row = mysql_fetch_row(res);
+
+	if (row[1] == 0 || row[1][0] == '\0') {
+		/* Nothing to do */
+		mysql_free_result(res);
+		mysql_close(&db);
+		return 1;
+	}
+	
+	/*
+	 * Update the database to reflect that the boot has been done.
+	 */
+	n = snprintf(querybuf, sizeof querybuf,
+		     "update nodes set next_boot_path='',"
+		     "next_boot_cmd_line='' where node_id='%s'",
+		     row[0]);
+	mysql_free_result(res);
+	
+	if (n > sizeof querybuf) {
+		syslog(LOG_ERR, "query too long for buffer");
+		mysql_close(&db);
+		return 1;
+	}
+	
+	if (mysql_real_query(&db, querybuf, n) != 0) {
+		syslog(LOG_ERR, "%s: query failed: %s",
+			dbname, mysql_error(&db));
+		mysql_close(&db);
+		return 1;
+	}
+	syslog(LOG_INFO, "%s: next_boot_path cleared", inet_ntoa(ipaddr));
+
+	mysql_close(&db);
 	return 0;
 }
 

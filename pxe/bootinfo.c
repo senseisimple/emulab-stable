@@ -55,6 +55,8 @@ main()
 
 	signal(SIGHUP, onhup);
 	while (1) {
+		int ack = 0;
+		
 		if ((mlen = recvfrom(sock, &boot_info, sizeof(boot_info),
 				     0, (struct sockaddr *)&client, &length))
 		    < 0) {
@@ -62,23 +64,33 @@ main()
 			exit(1);
 		}
 
-		if (boot_info.opcode != BIOPCODE_BOOTWHAT_REQUEST) {
+		switch (boot_info.opcode) {
+		case BIOPCODE_BOOTWHAT_REQUEST:
+			syslog(LOG_INFO, "%s: REQUEST",
+			       inet_ntoa(client.sin_addr));
+			err = query_bootinfo_db(client.sin_addr, boot_whatp);
+			break;
+
+		case BIOPCODE_BOOTWHAT_ACK:
+			syslog(LOG_INFO, "%s: ACK",
+			       inet_ntoa(client.sin_addr));
+			ack_bootinfo_db(client.sin_addr, boot_whatp);
+			continue;
+
+		default:
 			syslog(LOG_INFO, "%s: invalid packet",
 			       inet_ntoa(client.sin_addr));
 			continue;
 		}
-		syslog(LOG_INFO, "%s: REQUEST", inet_ntoa(client.sin_addr));
-
-		boot_info.opcode = BIOPCODE_BOOTWHAT_REPLY;
-		err = query_bootinfo_db(client.sin_addr, boot_whatp);
+		
 		if (err) {
-			syslog(LOG_INFO, "%s: FAIL: no valid entry",
-			       inet_ntoa(client.sin_addr));
 			boot_info.status = BISTAT_FAIL;
 		} else {
 			log_bootwhat(client.sin_addr, boot_whatp);
 			boot_info.status = BISTAT_SUCCESS;
 		}
+		boot_info.opcode = BIOPCODE_BOOTWHAT_REPLY;
+		
 		client.sin_family = AF_INET;
 		client.sin_port = htons(BOOTWHAT_SRCPORT);
 		if (sendto(sock, (char *)&boot_info, sizeof(boot_info), 0,
