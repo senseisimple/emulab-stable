@@ -3,6 +3,14 @@ use English;
 
 #
 # This gets invoked from the Web interface. Terminate an experiment.
+# Most of the STDOUT prints are never seen since the web interface
+# repeats only errors. My plan is make this script the front end to
+# experiment termination and make tbend a backend program that no one
+# uses.
+#
+# TODO: Perhaps setup a watchdog timer to guard against hangs. Not sure
+#       why this would happen, but it would be bad for a termination to
+#       hang up. 
 #
 # usage: tbstopit <pid> <eid>
 #
@@ -64,10 +72,15 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # We have to protect against trying to end an experiment that is currently
 # in the process of being terminated. We use a timestamp for this purpose.
 # If the timestamp is ever non-null, then something is wrong and we should
-# never proceed.
+# not proceed.
 #
-$query_result = $DB->query("SELECT expt_terminating FROM experiments ".
-			   "WHERE eid='$eid' and pid='$pid'");
+# We also have to guard against trying to terminate an experiment that
+# is still in the process of configuring. Its easiest to force the user
+# to wait!
+#
+$query_result =
+    $DB->query("SELECT expt_terminating,expt_ready FROM experiments ".
+	       "WHERE eid='$eid' and pid='$pid'");
 
 if (! $query_result) {
     fatal("DB Error getting experiment termination date for $pid/$eid\n");
@@ -85,6 +98,13 @@ if (defined($row[0])) {
 	"torn down\n";
     exit(1);
 }
+if (! $row[1]) {
+    print STDOUT
+	"It appears that experiment $pid/$eid is still configuring.\n".
+	"The user that created the experiment will be notified via email\n".
+	"when it has been fully configured and is ready for use\n";
+    exit(1);
+}
 
 #
 # Figure out who is going to get the email!
@@ -93,7 +113,7 @@ $query_result = $DB->query("SELECT usr_name,usr_email from users ".
 			   "WHERE unix_uid='$EUID'");
 
 if (! $query_result) {
-    fatal("DB Error getting user informarion for uid $EUID\n");
+    fatal("DB Error getting user information for uid $EUID\n");
 }
 if ($query_result->numrows < 1) {
     print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
@@ -145,6 +165,7 @@ open(STDIN, "< /dev/null") or
 #
 $logname = `mktemp /tmp/tbend-$pid-$eid.XXXXXX`;
 
+# Note different taint check (allow /).
 if ($logname =~ /^([-\@\w.\/]+)$/) {
     $logname = $1;
 } else {
@@ -180,9 +201,9 @@ if (! $query_result) {
 
 print STDOUT "Termination Success\n";
 
-open(MAIL, "| /usr/bin/mail -s \"Experiment $pid/$eid Terminated\" ".
-     "-c $TBOPS ".
-     "\"$user_name <$user_email>\" >/dev/null 2>&1")
+open(MAIL, "| /usr/bin/mail ".
+     "-s \"TESTBED: Experiment $pid/$eid Terminated\" ".
+     "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
     or die "Cannot start mail program: $!";
 
 print MAIL "Your experiment `$eid' in project `$pid' has been terminated.\n";
@@ -200,7 +221,7 @@ if (open(IN, "$logname")) {
 }
 close(MAIL);
 
-system("rm -f $logname");
+unlink("$logname");
 exit 0;
 
 sub fatal()
@@ -209,7 +230,8 @@ sub fatal()
 
     if (chdir($expdir)) {
 	$save = "$eid-$PID";
-	system("mv $eid $save");
+	# Fucking taint checks. Whats wrong with rename("$eid", "$save");
+	system("/bin/mv", "-f", "$eid", "$save");
     }
     print STDOUT $mesg;
 
@@ -218,7 +240,7 @@ sub fatal()
     # that far.
     # 
     open(MAIL, "| /usr/bin/mail ".
-	 "-s \"Experiment Termination Failure $pid/$eid\" ".
+	 "-s \"TESTBED: Termination Failure $pid/$eid\" ".
 	 "$TBOPS >/dev/null 2>&1")
 	or die "Cannot start mail program: $!";
 
@@ -234,7 +256,7 @@ sub fatal()
     }
     close(MAIL);
 
-    system("rm -f $logname");
+    unlink("$logname");
     exit(-1);
 }
 

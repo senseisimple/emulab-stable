@@ -122,6 +122,16 @@ $user_name = $row[0];
 $user_email = $row[1];
 
 #
+# Set the experiment ready bit to 1 if its a shell experiment.
+#
+if ($nonsfile) {
+    $expt_ready = 1;
+}
+else {
+    $expt_ready = 0;
+}
+
+#
 # At this point enter the exp_id into the database so that it shows up as
 # valid when the tb scripts run. We need to remove the entry if any of
 # this fails!
@@ -129,9 +139,9 @@ $user_email = $row[1];
 $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end) ".
+        "expt_head_uid, expt_start, expt_end, expt_ready) ".
         "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
+        "'$exp_name', '$uid', '$exp_start', '$exp_end', '$expt_ready')");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
@@ -154,7 +164,8 @@ if ($nonsfile) {
     echo "<center><br>
           <h2>Experiment Configured!
           </center><br><br>
-          The ID for your experiment in project $exp_pid is $exp_id.<br><br>
+          The ID for your experiment in project `$exp_pid' is `$exp_id.'
+          <br><br>
           Since you did not provide an NS script, no nodes have been
           allocated. You must log in and run the tbsetup scripts
           yourself. For your convenience, we have created a directory
@@ -181,25 +192,9 @@ if ($nonsfile) {
     die("");
 }
 
-#
-# We run a wrapper script that does all the work of creating the directory
-# and running the tb scripts. If it fails, we get back all the output and
-# give that to the user. If it succeeds, we go and find the report file
-# and give that to the user.
-#
-#   tbdoit <pid> <eid> <temp_nsfile>
-#
-# Later, when the experiment is ended, the directory will be deleted.
-#
-# There is similar path stuff in endexp.php3.  Be sure to sync that up
-# if you change things here.
-#
 echo "<center><br>";
-echo "<h3>Setting up experiment. This may take a few minutes ...
+echo "<h3>Starting experiment configuration. Please wait a moment ...
           </center><br><br>
-	  Please do <em>not</em> click the 'Stop' button. This will cause
-	  the experiment creation to terminate prematurely, which can cause
-  	  problems for future (other) experiments.
       </h3>";
 
 flush();
@@ -215,42 +210,30 @@ chmod($exp_nsfile, 0666);
 
 #
 # Run the scripts. We use a script wrapper to deal with changing
-# to the proper directory and to keep some of these details out
-# of this. We just want to know if the experiment setup worked.
-# The wrapper is going to go the extra step of running tbreport
-# so that we can give the user warm fuzzies.
+# to the proper directory and to keep most of these details out
+# of this. The user will be notified later. Its possible that the
+# script will return non-zero status, but there are just a couple
+# of conditions. Generally, the script exits and the user is told
+# of errors later. 
 #
 $output = array();
 $retval = 0;
 $last   = time();
 
-if (($pipe = popen("$TBSUEXEC_PATH $uid $gid ".
-                   "tbdoit $exp_pid $exp_id $exp_nsfile", "r")) == 0) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
-
-    TBERROR("Opening pipe to tbdoit", 1);
-}
-
-$count = 0;
-echo "<XMP>\n";
-while (!feof($pipe)) {
-    $line = fgets($pipe, 1024);
-    $output[$count] = $line;
-    $count++;
-
-    echo "$line";
-    flush();
-}
-echo "</XMP>\n";
-
-$retval = pclose($pipe);
+$result = exec("$TBSUEXEC_PATH $uid $gid tbdoit $exp_pid $exp_id $exp_nsfile",
+ 	       $output, $retval);
 
 if ($retval) {
-    echo "<center><br><br><h2>
-          Setup Failure($retval)
-          </h2><br></center>\n";
-
+    echo "<br><br><h2>
+          Setup Failure($retval): Output as follows:
+          </h2>
+          <br>
+          <XMP>\n";
+          for ($i = 0; $i < count($output); $i++) {
+              echo "$output[$i]\n";
+          }
+    echo "</XMP>\n";
+    
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 
@@ -258,46 +241,11 @@ if ($retval) {
 }
 
 echo "<center><br>";
-echo "<h2>Experiment Configured!<br>";
-echo "The ID for your experiment in project $exp_pid is $exp_id<br>";
-echo "For your convenience, we have created a directory hierarchy on the<br>";
-echo "control node: $dirname\n";
-
-#
-# The tbdoit script dumps report output to stdout. Look for it in the
-# output and send that out to the user. We cannot open the actual file
-# because the project directory is not readable by world.
-#
-for ($i = 0; $i < count($output); $i++) {
-    if (strcmp($output[$i], "Dumping $exp_id.report\n") == 0)
-        break;
-}
-$summary = "";
-for ($i = $i + 1; $i < count($output); $i++) {
-    $summary = "$summary $output[$i]";
-}
-
-#
-# Lets generate a mail message for now so that we can see whats happening.
-#
-if (1) {
-mail("$user_name '$uid' <$user_email>", 
-     "TESTBED: '$exp_pid' '$exp_id' New Experiment Created",
-     "User:        $uid\n".
-     "EID:         $exp_id\n".
-     "PID:         $exp_pid\n".
-     "Name:        $exp_name\n".
-     "Created:     $exp_created\n". 
-     "Expires:     $exp_expires\n".
-     "Start:       $exp_start\n".
-     "End:         $exp_end\n".
-     "Directory:   $dirname\n".
-     "Summary:\n\n".
-     "$summary\n",
-     "From: $TBMAIL_WWW\n".
-     "Cc: $TBMAIL_WWW\n".
-     "Errors-To: $TBMAIL_WWW");
-}
+echo "<h2>Experiment `$exp_id' in project `$exp_pid' is configuring!<br><br>
+          You will be notified via email when the experiment has been fully<br>
+	  configured and you are able to proceed.<br>";
+echo "</h2>";
+echo "</center>\n";
 
 #
 # Standard Testbed Footer

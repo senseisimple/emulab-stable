@@ -38,6 +38,35 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The experiment $exp_eid is not a valid experiment ".
             "in project $exp_pid.", 1);
 }
+$row = mysql_fetch_array($query_result);
+
+#
+# If the experiment is still being configured, then do not allow it to
+# be stopped. The user has to wait!
+#
+$ready = $row[expt_ready];
+if (! $ready) {
+    USERERROR("The experiment `$exp_eid' is still configuring!<br>".
+	      "The user that created the experiment will be notified via ".
+	      "email<br>".
+	      "when it has been fully configured and is ready for use.<br>".
+	      "At that time you may terminate the experiment.<br>");
+}
+
+#
+# If the experiment is already in the process of ending, then abort.
+# The wrapper script checks this too, but might as well head it off early.
+#
+$terminating = $row[expt_terminating];
+if ($terminating) {
+    USERERROR("A termination request for experiment $exp_eid was issued at ".
+	      "$terminating.<br>".
+	      "You may not issue multiple termination requests for an ".
+	      "experiment!<br><br>".
+	      "A notification will be sent via email ".
+	      "to the user that initiated the termination request when the ".
+	      "experiment has been torn down.", 1);
+}
 
 #
 # Verify that this uid is a member of the project for the experiment
