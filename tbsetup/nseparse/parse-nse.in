@@ -218,7 +218,7 @@ exit(0)
 # to indicate that these are the results of parsing
 # the nse specifications
 #
-system("$TB/libexec/xmlconvert -s -x $outfile $pid $eid");
+system("$TB/libexec/xmlconvert -p -s -x $outfile $pid $eid");
 
 if ($?) {
     my $exit_status = $? >> 8;
@@ -265,11 +265,11 @@ sub GenDefsFile($)
     # nseconfigs table based on pid,eid,vname where vname matches the vname
     # in the reserved table
     $query_result =
-	DBQueryFatal("select distinct v.vname,vn.type,vn.ips,r.vname from v2pmap as v " .
-		     "left join virt_nodes as vn on v.vname=vn.vname " .
+	DBQueryFatal("select v.vname,vn.type,vn.ips,r.vname from v2pmap as v " .
+		     "left join virt_nodes as vn on vn.pid=v.pid " .
+		     "and vn.eid=v.eid and vn.vname=v.vname " .
 		     "left join reserved as r on r.node_id=v.node_id " .
-		     "where v.pid='$pid' and v.eid='$eid' " .
-		     "and vn.pid='$pid' and vn.eid='$eid'");
+		     "where v.pid='$pid' and v.eid='$eid'");
     while (my ($vnode,$vtype,$ipports,$pnode) = $query_result->fetchrow_array()) {
 	print TCL "set v2pmapinfo($vnode) [list $vtype [list $ipports] $pnode]\n";
     }
