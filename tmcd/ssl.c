@@ -117,6 +117,11 @@ tmcd_server_sslinit(void)
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
 			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
 
+	/*
+	 * No session caching! Useless and eats up memory.
+	 */
+	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+
 	return 0;
 }
 
@@ -183,6 +188,11 @@ tmcd_client_sslinit(void)
 	 */
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
 			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+
+	/*
+	 * No session caching! Useless and eats up memory.
+	 */
+	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
 
 	return 0;
 }
@@ -471,6 +481,7 @@ tmcd_sslclose(int sock)
 		}
 		SSL_free(ssl);
 		ssl = NULL;
+		ERR_clear_error();
 	}
 	nosslbuflen = 0;
 	close(sock);
