@@ -95,6 +95,13 @@ my $nsfile= $ARGV[2];
 if (defined($options{"b"})) {
     $batch   = 1;
     $logname = $options{"b"};
+    
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	die("Bad data in logfile name: $logname");
+    }
 }
 if (defined($options{"f"})) {
     $frontend = 1;
@@ -140,13 +147,7 @@ else {
 }
 
 if (!defined($logname)) {
-    $logname = `mktemp /tmp/start-$pid-$eid.XXXXXX`;
-}
-if ($logname =~ /^([-\@\w.\/]+)$/) {
-    $logname = $1;
-}
-else {
-    die("Bad data in logfile name: $logname");
+    $logname = TBExptCreateLogFile($pid, $eid, "start");
 }
 
 my $repfile = "$eid.report";
@@ -222,6 +223,7 @@ TBLockExp($pid, $eid);
 #
 if (! $batch) {
     TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
     
     if (TBBackGround($logname)) {
 	#
@@ -361,7 +363,15 @@ SENDMAIL("$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 ($repfile, $logname, $nsfile));
 
-TBExptClearLogFile($pid, $eid);
+#
+# Move the temporary log file into the experiment directory and change the
+# name in the DB. This makes it available to the web interface later on
+# if desired.
+#
+system("cp -pf $logname $expt_path/tbdata/startexp.log");
+TBExptCloseLogFile($pid, $eid);
+TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/startexp.log");
+
 unlink($logname);
 exit 0;
 
@@ -383,8 +393,6 @@ sub fatal()
     # In batch mode, exit.
     #
     if ($batch) {
-	TBExptClearLogFile($pid, $eid);
-	TBUnLockExp($pid, $eid);
 	exit($errorstat);
     }
 
@@ -410,6 +418,12 @@ sub fatal()
 
     DBQueryWarn("DELETE from experiments ".
 		"WHERE eid='$eid' and pid='$pid'");
+
+    #
+    # Move the temporary log file into the experiment directory so its kept.
+    #
+    system("cp -pf $logname $expt_path/tbdata/startexp.log");
+    TBExptClearLogFile($pid, $eid);
     
     #
     # Save a copy of the failed experiment directory for debugging.
@@ -421,7 +435,6 @@ sub fatal()
 	system("/bin/mv", "-f", "${expt_path}", "${expt_path}-TBfailed");
     }
 
-    TBExptClearLogFile($pid, $eid);
     unlink($logname);
     exit($errorstat);
 }

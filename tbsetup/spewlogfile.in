@@ -35,6 +35,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $logname;
+my $isopen;
 
 #
 # Load the Testbed support stuff. 
@@ -78,7 +79,16 @@ if ($eid =~ /^([-\@\w]+)$/) {
 }
 else {
     die("*** Bad data in eid: $eid\n");
-}	
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
 
 #
 # Verify that this person is allowed to do this. 
@@ -91,7 +101,7 @@ if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
 #
 # Get the logfile name.
 #
-if (! TBExptGetLogFile($pid, $eid, \$logname)) {
+if (! TBExptGetLogFile($pid, $eid, \$logname, \$isopen)) {
     die("*** $0:\n".
 	"    There is no logfile to view for $pid/$eid!\n");
 }
@@ -100,14 +110,28 @@ use Fcntl;
 use IO::Handle;
 STDOUT->autoflush(1);
 
+#
+# If not an admin type, flip back to the UID now to enforce normal
+# permissions. 
+#
+if (! TBAdmin($UID)) {
+    $EUID = $UID;
+}
+
 sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
     die("*** $0:\n".
-	"    Could not open $logname. Must no longer be in transition!");
+	"    Could not open $logname: $!\n");
+
+#
+# If an admin type, flip back to the UID now that the file is open.
+#
+if (TBAdmin($UID)) {
+    $EUID = $UID;
+}
 
 #
 # Loop reading the file in nonblocking mode. Sleep between loops, and
-# check for a change in status. For now, this is simply accomplished
-# by checking to make sure the name of the logfile has not changed!
+# check for a change in status.
 #
 while (1) {
     my $tmp;
@@ -115,7 +139,8 @@ while (1) {
     while (sysread(LOG, $buf, 2048)) {
 	print STDOUT "$buf";
     }
-    if (! TBExptGetLogFile($pid, $eid, \$tmp) || $tmp ne $logname) {
+    if (! TBExptGetLogFile($pid, $eid, \$tmp, \$isopen) || !$isopen ||
+	$tmp ne $logname) {
 	last;
     }
     sleep(2);

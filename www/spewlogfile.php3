@@ -55,6 +55,7 @@ if (! TBExptLogFile($pid, $eid)) {
 }
 
 header("Content-Type: text/plain");
+ignore_user_abort(0);
 
 $retval = 0;
 $result = system("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", $retval);
