@@ -17,7 +17,7 @@ if (! $query_result) {
 }
 
 # I want the summary at the top of the page, so I build an array that
-# gets printed later, while couting the nober of nodes with each status
+# gets printed later, while couting the number of nodes with each status
 $num_up = 0;
 $num_pd = 0;
 $num_down = 0;
