@@ -53,18 +53,33 @@ foreach my $node (@nodes) {
     if ($node =~ /^([-\@\w.]+)$/) {
 	$node = $1;
     }
+    else {
+	die("Tainted node name: $node");
+    }
 
     #
     # Need the project for the node since that is the group.
     # 
-    $db_result = $DB->query("select pid from reserved where node_id='$node'");
-    if ($db_result->numrows == 1) {
+    #
+    # HACK! If its a shark shelf, then need a wildcard query so we can
+    # the nodes.
+    #
+    if ($node =~ /sh\d+/) {
+	$db_result =
+	    $DB->query("select pid from reserved where node_id like '$node%'");
+    }
+    else {
+	$db_result =
+	    $DB->query("select pid from reserved where node_id='$node'");
+    }
+    if ($db_result->numrows > 0) {
 	@row = $db_result->fetchrow_array();
 	$pid = $row[0];
     }
     else {
 	$pid = $TBPID;
     }
+	
     $cmdargs = "$cmdargs $node $pid";
 }
 
