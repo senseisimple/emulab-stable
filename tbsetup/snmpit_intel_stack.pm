@@ -125,7 +125,7 @@ sub vlanExists($$) {
     my $self = shift;
     my $vlan_id = shift;
 
-    if ($self->{LEADER}->findVlan($vlan_id)) {
+    if ($self->{LEADER}->findVlan($vlan_id,1)) {
 	return 1;
     } else {
 	return 0;
@@ -147,6 +147,7 @@ sub removeVlan($$) {
 	return 0;
     }
 
+    $errors += $self->{LEADER}->removePortsFromVlan($vlan_id);
     my $ok = $self->{LEADER}->removeVlan($vlan_id);
 
     return ($ok && ($errors == 0));
