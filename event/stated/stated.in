@@ -33,6 +33,7 @@ use libtestbed;
 use Getopt::Std;
 use strict;
 use English;
+use POSIX qw(strftime);
 
 #
 # Number of iterations (roughly, seconds) after which we'll reload 
@@ -127,9 +128,9 @@ my $do_reload = 0;
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
 #
-$SIG{HUP} = sub { print "Recieved a SIGHUP\n"; $do_reload = 1; };
+$SIG{HUP} = sub { info("Recieved a SIGHUP\n"); $do_reload = 1; };
 
-print "stated starting up\n";
+info("stated starting up\n");
 
 #
 # Now, we just poll for events, and watch for 
@@ -252,13 +253,13 @@ sub handleEvent($$$) {
 	my $objname = event_notification_get_objname($handle,$notification);
 	my $eventtype = event_notification_get_eventtype($handle,$notification);
 
-	print "Got an event: ($objtype,$objname,$eventtype)\n";
+	info("Got an event: ($objtype,$objname,$eventtype)\n");
 
 	#
 	# Check to see if another instance is supposed to be handling this node
 	#
 	if (!checkDBRedirect($objname)) {
-	    print "Got an event for node $objname, which isn't mine\n";
+	    info("Got an event for node $objname, which isn't mine\n");
 	    return;
 	}
 
@@ -323,7 +324,7 @@ sub opModeTransition($$) {
 
 	my ($node,$newmode) = @_;
 
-	print "opModeTransition: $node, $newmode\n";
+	info("opModeTransition: $node, $newmode\n");
 
 	my $now = time();
 	$nodes{$node}{mode}           = $newmode;
@@ -376,7 +377,7 @@ sub checkDBRedirect($) {
 # Reload state from the database
 #
 sub reload() {
-    	print "Reloading state from database\n";
+    	info("Reloading state from database\n");
 	%nodes    = readStates(%nodes);
 	%timeouts = getTimeouts();
 	%valid     = getValid();
@@ -391,7 +392,14 @@ sub notify($) {
 	if (!$debug) {
 	    	SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
 	}
-	print $message;
+	info($message);
+}
+
+sub info($) {
+    my $message = shift;
+    # Print out log entries like this:
+    # Sep 20 09:36:00 stated[238]: Reloading state from database
+    print strftime("%b %e %H:%M:%S",gmtime)." stated[$$]: $message";
 }
 
 #
@@ -399,7 +407,7 @@ sub notify($) {
 #
 END {
     	if ($handle) {
-		print "Exiting, cleaning up\n";
+		info("Exiting, cleaning up\n");
 		if (event_unregister($handle) == 0) {
 			die "Unable to unregister with event system\n";
 		}
