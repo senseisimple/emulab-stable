@@ -147,7 +147,7 @@ void read_physical_topology(char *filename)
   ptopfile.open(filename);
   if (!ptopfile.is_open()) {
       cout << "Unable to open ptop file " << filename << endl;
-      exit(EXIT_UNRETRYABLE);
+      exit(EXIT_FATAL);
   }
   cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
 
@@ -256,7 +256,7 @@ void read_virtual_topology(char *filename)
   topfile.open(filename);
   if (!topfile.is_open()) {
       cout << "Unable to open top file " << filename << endl;
-      exit(EXIT_UNRETRYABLE);
+      exit(EXIT_FATAL);
   }
   cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
 
@@ -334,7 +334,7 @@ void print_help()
   cout << "  -u          - Print a summary of the solution." << endl;
   cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
       "<float>% of the time." << endl;
-  exit(EXIT_UNRETRYABLE);
+  exit(EXIT_FATAL);
 }
  
 // Perfrom a pre-cehck to make sure that there are enough free nodes of the

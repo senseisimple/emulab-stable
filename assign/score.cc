@@ -630,7 +630,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 #endif
   case tb_link_info::LINK_UNKNOWN:
     cout << "Internal error: Should not be here either." << endl;
-    exit(EXIT_RETRYABLE);
+    exit(EXIT_FATAL);
     break;
   }
 
@@ -1061,7 +1061,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	      case tb_link_info::LINK_UNKNOWN:
 	      case tb_link_info::LINK_TRIVIAL:
 		cerr << "Internal error: Should not be here." << endl;
-		exit(EXIT_RETRYABLE);
+		exit(EXIT_FATAL);
 		break;
 	      }
 	      if (choice < 0) break;
@@ -1639,7 +1639,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	    default:
 	      // Global features are required to have some kind of type
 	      cout << "Bad global feature " << (*feature_it).first << endl;
-	      exit(EXIT_UNRETRYABLE);
+	      exit(EXIT_FATAL);
 	  }
       } else {
 	desire_it = vnode->desires.find(feature_name);
@@ -1702,7 +1702,7 @@ double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 	    default:
 	      // Local features are required to have some kind of type
 	      cout << "Bad local desire " << (*desire_it).first << endl;
-	      exit(EXIT_UNRETRYABLE);
+	      exit(EXIT_FATAL);
 	    }
 	}
       }
@@ -1753,7 +1753,7 @@ double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
 	    default:
 	      // Local features are required to have some kind of type
 	      cout << "Bad local desire " << (*desire_it).first << endl;
-	      exit(EXIT_UNRETRYABLE);
+	      exit(EXIT_FATAL);
 	    }
 	}
       }

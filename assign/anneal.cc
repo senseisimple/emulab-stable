@@ -363,7 +363,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     tb_pnode *pn = get(pvertex_pmap,pv);
     if (vn->vclass != NULL) {
       cout << "Can not have fixed nodes be in a vclass!.\n";
-      exit(EXIT_UNRETRYABLE);
+      exit(EXIT_FATAL);
     }
     if (add_node(vv,pv,false,true) == 1) {
       cout << "Fixed node: Could not map " << vn->name <<

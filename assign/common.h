@@ -17,14 +17,16 @@
 #define EXIT_SUCCESS 0
 
 // No valid solution was found, but one may exist
-// No violation-free solution was found after annealing, or there was an
-// internal error
+// No violation-free solution was found after annealing.
 #define EXIT_RETRYABLE 1
 
 // It is not possible to map the given top file into the given ptop file,
 // so there's no point in re-running assign.
-// Can also occur if the top or ptop file does not exist or cannot be parsed
 #define EXIT_UNRETRYABLE 2
+
+// An internal error occured, or there was a problem with the input - for
+// example, the top or ptop file does not exist or cannot be parsed
+#define EXIT_FATAL -1
 
 /*
   To use these on the command line, each entry gets a

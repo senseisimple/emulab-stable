@@ -302,7 +302,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 
   errors += bind_ptop_subnodes();
 
-  if (errors > 0) {exit(EXIT_UNRETRYABLE);}
+  if (errors > 0) {exit(EXIT_FATAL);}
   
   return num_nodes;
 }
