@@ -1,6 +1,7 @@
 <html>
 <head>
   <title>Utah Network Testbed - Testbed Specific ns Commands</title>
+  <!-- Changed by: Mac G Newbold, 14-Mar-2001 -->
   <link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
 </head>
 <body>
@@ -47,9 +48,9 @@ used to communicate with the PC without interfering with any
 experimental traffic or topology.
 
 <p>In addition to the PCs a number of shark shelves are connected to the
-switch.  Each shark shelf is 8 sharks connected via a single 10 MBs
-wire to a hub.  The hub in turn is connected to the central CISCO
-switch.  Each hub is also connected to the outside world for control
+switch.  Each shark shelf is 8 sharks connected via a single 10 Mbps
+wire to a switch.  The switch in turn is connected to the central CISCO
+switch.  Each switch is also connected to the outside world for control
 traffic.
 
 <hr>
@@ -58,15 +59,16 @@ traffic.
 
 <p>The key to emulating virtual links is VLANs.  Basically, VLANs are
 a collection of ports on the switch.  Broadcast traffic is contained
-within the VLAN.  A basic link is emulated by creating a VLAN on the
-switch with two ports in it.  For example, say node A port 1 and node
-B port 1 are connected in the virtual topology.  These node/ports
-correspond to ports on the switch, say 1-1 and 1-5.  To emulate this
-link a VLAN with ports 1-1 and 1-5 are created.  Thus traffic from
-node A port 1 will travel to the switch and then to node B port 1.  No
-traffic, even broadcast traffic, will go anywhere else.
+within the VLAN, and all other traffic is likewise only permitted to
+other ports in the VLAN.  A basic link is emulated by creating a VLAN
+on the switch with two ports in it.  For example, say node A port 1
+and node B port 1 are connected in the virtual topology.  These
+node/ports correspond to ports on the switch, say 1-1 and 1-5.  To
+emulate this link a VLAN with ports 1-1 and 1-5 are created.  Thus
+traffic from node A port 1 will travel to the switch and then to node
+B port 1.  No traffic, even broadcast traffic, will go anywhere else.
 
-<p>This method works great for 100Mbs links with negligible latency
+<p>This method works great for 100Mbps links with negligible latency
 (currently defined as less than 3ms) and loss (no greater than 40' of ethernet
 cable).  However, often the virtual topology will contain a link with
 different characteristics.  To emulate these links another PC is
@@ -113,10 +115,10 @@ out to be 1-sqrt(1-L).
 In this way it is possible to have nodes in a LAN with different delay
 characteristics.  The model behind this case is that the link
 characteristics of a LAN come from the transmission medium (wires,
-etc.) and not from the hub.  Thus when traffic travels across the LAN
-it hits the link characteristics of two hops (one to the hub and one
+etc.) and not from the switch.  Thus when traffic travels across the LAN
+it hits the link characteristics of two hops (one to the switch and one
 from).  So in the current case traffic from the node should hit the
-link to the LAN and then a single link in the LAN (hub to node).  This
+link to the LAN and then a single link in the LAN (switch to node).  This
 is emulated by creating a delay node between the node and the LAN.
 Thus traffic between the linked in node and another node in the LAN
 will go through the link delay characteristics and "half" of the LAN
@@ -135,11 +137,11 @@ port in the VLAN of the first lan and the other port in the VLAN of
 the second LAN.  This delay node has the delay characteristics of the
 LAN to LAN link.  This is consistent with the above model in that
 traffic between a node in the first LAN and a node in the second LAN
-will travel to the hub, through the link to the other hub, and then to
+will travel to the switch, through the link to the other switch, and then to
 the destination.  Thus the total delay will be "half" of the first
 LAN, the link, and "half" of the second LAN.  This is not always what
 is wanted.  For example, say you wanted to emulate the same setup
-except that the link between the LAN was not at the hubs but rather at
+except that the link between the LAN was not at the switches but rather at
 some gateway.  In this case traffic should see the full delay of both
 LANs rather than only "half".  To account for this the link between
 lans should have half the latency of each LAN added to it and a loss
@@ -153,21 +155,24 @@ the second LAN, and loss the loss rate of the lan to lan link.
 <a name=#SHARKS></a><h3>Sharks</h3>
 
 <p>Sharks are greatly limited in their connectivity.  They must be
-leaf nodes; and they must be part of an undelayed 10MBs LAN with at most 8
-sharks in it.
+leaf nodes; and they must be part of an undelayed 10Mbps (switched)
+LAN with at most 8 sharks in it. Note that each node can use up to
+10Mbps (combined experimental and control traffic), but it is not
+shared between all nodes. The uplinks are 100Mbps, so all 8 sharks can
+take up to 10Mbps to the CISCO switches witout saturating the uplinks.
 
 <hr>
 
 <a name=#MAP></a><h3>Virtual to physical translation</h3>
 
-<p>The conversion between the physical and virtual topology is NP
-complete in the general case.  A simulated annealing process is used
-to do the translation.  This algorithm works quite well but it is
-nondeterministic.  As a result between runs of the same NS file the
-actual physical machines and ports used may change.  This is made as
-transparent as possible.  However, it is impossible to hide the port
-changing.  Be aware that the actual interfaces used on each node for a
-given link may change between runs.
+<p>The conversion between the physical and virtual topology is an
+NP-complete problem in the general case.  A simulated annealing
+process is used to do the translation.  This algorithm works quite
+well but it is nondeterministic.  As a result between runs of the same
+NS file the actual physical machines and ports used may change.  This
+is made as transparent as possible.  However, it is impossible to hide
+the port changing.  Be aware that the actual interfaces used on each
+node for a given link may change between runs.
 
 <hr>
 
@@ -181,12 +186,18 @@ be in the same subnet.  Likewise, all IP addresses on a LAN should be
 in the same subnet.  Automatically generated IP addresses will conform
 to this requirement.  If part of a link or lan is explicitly specified
 with the commands below then the remainder will be automatically
-generated under the same subnet.
+generated under the same subnet, assuming a netmask of <code>255.255.255.0</code> (class C).
 
 <p>IP address assignment is deterministic and tries to fill lower IP's
 first, starting at 2.  Except in the partial specification case (see
 above), all automatic IP addresses are in the network
-<code>192.168</code>.
+<code>192.168.*.*</code>.
+
+<p>If you choose to specify addresses, and don't conform to the same
+subnet requirements, you will need to set up the proper routing tables
+on all of your nodes to make the traffic go to the right places. You
+will always need to set up routing between any nodes that are not
+directly connected, even for automatically generated IP addresses.
 
 <hr size=2 noshade>
 <center>
