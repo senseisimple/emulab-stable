@@ -740,7 +740,7 @@ sub snmpitGetWarn($$;$) {
 
     $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
 
-    if (! $result) {
+    if (! defined $result) {
 	snmpitWarn("SNMP GET failed");
     }
     return $result;
@@ -756,7 +756,7 @@ sub snmpitGetFatal($$;$) {
 
     $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
 
-    if (! $result) {
+    if (! defined $result) {
 	snmpitFatal("SNMP GET failed");
     }
     return $result;
@@ -789,7 +789,7 @@ sub snmpitSetWarn($$;$) {
 
     $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
 
-    if (! $result) {
+    if (! defined $result) {
 	snmpitWarn("SNMP SET failed");
     }
     return $result;
@@ -805,7 +805,7 @@ sub snmpitSetFatal($$;$) {
 
     $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
 
-    if (! $result) {
+    if (! defined $result) {
 	snmpitFatal("SNMP SET failed");
     }
     return $result;
