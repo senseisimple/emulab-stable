@@ -887,7 +887,7 @@ dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
 	 * Text string is a colon separated list.
 	 */
 	row = mysql_fetch_row(res);
-	if (! row[0]) {
+	if (! row[0] || !row[0][0]) {
 		mysql_free_result(res);
 		return 0;
 	}
@@ -955,7 +955,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 	 * Simple text string.
 	 */
 	row = mysql_fetch_row(res);
-	if (! row[0]) {
+	if (! row[0] || !row[0][0]) {
 		mysql_free_result(res);
 		return 0;
 	}
@@ -1216,7 +1216,7 @@ nodeidtonickname(char *nodeid, char *nickname)
 	}
 	row = mysql_fetch_row(res);
 	mysql_free_result(res);
-	if (! row[0])
+	if (! row[0] || !row[0][0])
 		return 1;
 		
 	strcpy(nickname, row[0]);
