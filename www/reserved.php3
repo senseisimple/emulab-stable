@@ -6,20 +6,17 @@ include("defs.php3");
 #
 PAGEHEADER("Utah Testbed Machine Status");
 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT n.node_id, n.type, nt.class, j.pid, j.eid, j.vname ".
-        "FROM nodes AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
-        "LEFT JOIN node_types AS nt ON n.type=nt.type ".
-	"WHERE role='testnode' ORDER BY priority,type");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting node reservation status: $err\n", 1);
-}
-
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-
 $isadmin = ISADMIN($uid);
+
+$query_result =
+    DBQueryFatal("SELECT n.node_id, n.phys_nodeid, n.type, nt.class, ".
+		 " nt.isvirtnode, j.pid, j.eid, j.vname from nodes AS n ".
+		 "LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
+		 "LEFT JOIN node_types AS nt ON n.type=nt.type ".
+		 "WHERE role='testnode' or role='virtnode' ".
+		 "ORDER BY priority,type");
 
 #
 # Count the types up.
@@ -74,6 +71,8 @@ while ($r = mysql_fetch_array($query_result)) {
     $res1 = $r["pid"];
     $res2 = $r["eid"];
     $res3 = $r["vname"];
+    $isvirt = $r["isvirtnode"];
+    $phys = $r["phys_nodeid"];
     if (!$res1 || $res1 == "NULL") {
       $res1 = "--";
     }
@@ -83,7 +82,11 @@ while ($r = mysql_fetch_array($query_result)) {
     if (!$res3 || $res3 == "NULL") {
       $res3 = "--";
     }
-    echo "<tr><td>$id</td> <td>$type ($class)</td> ";
+    if ($isvirt)
+	echo "<tr><td>$id ($phys)</td> ";
+    else
+	echo "<tr><td>$id</td> ";
+    echo "<td>$type ($class)</td> ";
     # If I'm an admin, I can see pid/eid/vname, but if not, I only see eid
     if ($isadmin) { echo "<td>$res1</td> "; }
     echo "<td>$res2</td> ";
