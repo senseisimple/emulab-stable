@@ -41,6 +41,7 @@ Usage: $0 [-h] [-v] [-i device]
 	  [-t pid eid]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100> ports] [-u <half|full> ports]
+	  [-c]
 General:
   -h          Display this help message
   -v          Verbose mode
@@ -54,6 +55,8 @@ VLAN Control:
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
   -o <name>         Delete the VLAN with name <name>
+  -c                Delete ALL VLANs, and recreate from the database. ** USE
+                        WITH EXTREME CAUTION **
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -75,7 +78,7 @@ END
 
 my %opt = ();
 GetOptions(\%opt,'h','l','v','s','t','r','i=s@','m=s@','o=s@','p=s','u=s','d',
-    'e','a','g');
+    'e','a','g','c');
 
 if ($opt{h}) {
     exit &usage;
@@ -137,6 +140,7 @@ if ($opt{s}) { push @commands, ["listports"]; }
 if ($opt{g}) { push @commands, ["getstats"]; }
 if ($opt{t}) { push @commands, ["tables"]; }
 if ($opt{r}) { push @commands, ["reset"]; }
+if ($opt{c}) { push @commands, ["recreate"]; }
 
 #
 # Commands that can appear once, and take an agurment
@@ -285,6 +289,17 @@ foreach my $command (@commands) {
 	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
 	    last;
 	};
+	(/recreate/) && do {
+	    #
+	    # Safety check - cannot be used with -i . We have to operate on
+	    # all experimental switches
+	    #
+	    if ($opt{i}) {
+		die "-c and -i cannot be used together\n";
+	    }
+	    @devicenames = getTestSwitches();
+	    last;
+	};
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
@@ -378,6 +393,11 @@ foreach my $command (@commands) {
 	/portcontrol/ && do {
 	    my $portcommand = @args;
 	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
+	    last;
+	};
+	/recreate/ && do {
+	    $exitval += doRecreateVlans(\@stacks);
+	    last;
 	};
     }
 }
@@ -448,7 +468,7 @@ $vlan_id,$pideid,           $vname,   $members
 	($pid,$eid,$vname) = $result->fetchrow();
 
 	#
-	# Permissions check - people only get to see
+	# Permissions check - people only get to see their own VLANs
 	#
 	if ((!$eid) || (!$pid)) {
 	    if (!TBAdmin()) {
@@ -750,3 +770,67 @@ sub doPortControl($$@) {
 
 }
 
+#
+# Remove all VLANs from the switch, and re-create them from the database
+# tables.
+#
+sub doRecreateVlans($) {
+    my $stacks = shift;
+
+    #
+    # Make sure the user REALLY wants to do this
+    #
+
+    if (!TBAdmin()) {
+	warn "Sorry, only admins get to use this functions\n";
+	return 0;
+    }
+
+    warn "WARNING: Using this function will cause all VLANS to be\n";
+    warn "deleted and re-created. This will cause temporary disruption,\n";
+    warn "and you will lose all hand-created VLANs. This function operates\n";
+    warn "on ALL experimental switches.\n";
+    warn "\nAre you SURE you want to do this? (yes/no)\n";
+
+    my $doit = <>;
+
+    if (!($doit =~ /^y/i)) {
+	warn "Not recreating VLANs\n";
+	return 0;
+    } else {
+	warn "Okay, recreating VLANs\n";
+    }
+
+    #
+    # Get a list of all VLANs on all of the given switches, so that we can
+    # nuke them.
+    #
+    my @vlansToNuke = ();
+    foreach my $stack (@$stacks) {
+	my @stackVlans = $stack->listVlans();
+	foreach my $vlan (@stackVlans) {
+	    my $id = $$vlan[0];
+	    push (@vlansToNuke,$id);
+	}
+    }
+
+    debug("Going to nuke " . join(',',@vlansToNuke) . "\n");
+
+    foreach my $vlan (@vlansToNuke) {
+	doDeleteVlan($stacks,$vlan);
+    }
+
+    #
+    # Get a list of all experiments, so that we can re-create their VLANs
+    #
+    my @expts = ();
+    my $result = DBQueryFatal("select pid,eid from experiments ".
+    	"where state = '". EXPTSTATE_ACTIVE. "'");
+    while (my ($pid,$eid) = $result->fetchrow()) {
+	my @vlans = getExperimentVlans($pid,$eid);
+	doVlansFromTables($stacks,@vlans);
+    }
+
+    return 1;
+
+}
