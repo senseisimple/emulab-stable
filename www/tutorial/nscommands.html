@@ -4,124 +4,379 @@
   <link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
 </head>
 <body>
-  <h1>Utah Network Testbed - Testbed Specific ns Commands</h1>
-  <p>This document describes embeddable commands, used 
-     to specify testbed-specific parameters inside ns files.</p> 
-  <h2>Format</h2>
-  <p>All testbed 'TB' commands are in the following form:</p>
-  <p><code>#TB <i>command</i> <i>arg1 arg2 .. argn</i></code</p>
-  <p>The <code>#TB</code> prefix is ignored as a comment
-     by traditional ns interpreters, so one ns file can be used for
-     both simulators and the testbed. </p> 
-  <h2>Commands:</h2>
-  <hr>
-  <a name="set-ip"></a>
-  <h3>set-ip</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-ip <i>node</i> <i>ip</i></code></p>
-  <p>Indicates that <i>node</i> should have the IP address <i>ip</i>.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-ip node1 198.168.0.5</code></p>
-  <hr>
-  <a name="set-ip-interface"></a>
-  <h3>set-ip-interface</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-ip-interface <i>node</i> <i>dest</i> <i>ip</i></code></p>
-  <p>This command is used to set the IP address of an interface
-     on a node with multiple links. The interface on <i>node</i> which 
-     connects to <i>dest</i> is given the ip address <i>ip</i>. </p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-ip-interface node2 node3 198.168.0.5</code></p>
-  <p><b>Note:</b></p>
-  <p>This command will not work for two nodes with multiple connections
-     between them.</p>
-  <hr>
-  <a name="set-hardware"></a>
-  <h3>set-hardware</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-hardware <i>node</i> <i>type</i> [<i>args</i>]</code></p>
-  <p>This command sets hardware specifications. Currently, the only <i>type</i> 
-     supported is <code>shark-shelf</code>, which indicates that <i>node</i> should
-     be a shelf (switched LAN) of 8 sharks (aka dnards).
-     <i>Node</i> may include wildcards '*' or '?'.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-hardware node8 shark-shelf</code></p>
-  <hr>
-  <a name="set-node-os"></a>
-  <h3>set-node-os</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-node-os <i>node</i> <i>os</i></code></p>
-  <p>Sets the operating system of one or more nodes; may be a standard OS 
-  (<code>FBSD40-STD</code> or <code>RHL62-STD</code>) or an OS created using 
-  <a href="#create-os"><code>create-os</code></a>. <i>Node</i> may include wildcards '*' or '?'.</p>
-  <p><b>Examples:</b></p>
-  <p><code>#TB set-node-os node6 FBSD40-STD</code></p>
-  <p><code>#TB set-node-os node3? MY-CUSTOM-OS</code></p>
-  <p><b>Note:</b></p>
-  <p>Nodes which are in use as delay nodes should only use <code>FBSD40-STD</code>.</p>
 
-  <hr>
-  <a name="set-node-deltas"></a>
-  <h3>set-node-deltas</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-node-deltas <i>node</i> <i>deltas</i></code></p>
-  <p>Used to apply user "deltas" to a node's installation. These deltas may install
-     packages or otherwise modify an existing, standard <code>FBSD40-STD</code> or <code>RHL62-STD</code>
-     installation. <i>Node</i> may include wildcards '*' or '?'.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-node-deltas node1 XXX</code></p>
+<center>
+<h1>Emulab - NS Testbed Commands</h1>
+</center>
 
-  <hr>
-  <a name="create-os"></a>
-  <h3>create-os</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB create-os <i>label</i> <i>imagepath</i> <i>partition</i></code></p>
-  <p>Creates a custom OS called <i>label</i>, for use in <a href="#set-node-os"><code>set-node-os</code></a>
-     commands.  XXX <i>imagepath</i> is a path to the image on <code>ops.emulab.net</code> in your user
-     subdirectory. XXX something about <i>partition</i></p>
-XXX Talk to Leigh
-  <p><b>Example:</b></p>
-  <p><code>#TB create-os MY-CUSTOM-OS XXX/XXX XXX</code></p>
 
-  <hr>
-  <a name="set-dnard-ip"></a>
-  <h3>set-dnard-ip</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-dnard-ip <i>shelf</i> <i>number</i> <i>ip</i></code></p>
-  <p>XXX Four score and twenty years ago, our fathers brought forth upon this
-     continent a new nation, conceived in <i>liberty</i>, and dedicated to
-     the proposition that all men are created equal.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-dnard-ip XXX 3 198.168.0.1</code></p>
-  <hr>
-  <a name="set-dnard-os"></a>
-  <h3>set-dnard-os</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-dnard-os <i>shelf</i> <i>number</i> <i>os</i></code></p>
-  <p>XXX Four score and twenty years ago, our fathers brought forth upon this
-     continent a new nation, conceived in <i>liberty</i>, and dedicated to
-     the proposition that all men are created equal.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-dnard-os XXX 2 XXX</code></p>
+<h2>Contents</h2>
+<ul>
+  <li><a href=#INTRO>Introduction</a>
+  <li><a href=#TCL>TCL, NS, and node names</a>
+  <li><a href=#HARD>Hardware Commands</a>
+  <li><a href=#IP>IP Commands</a>
+  <li><a href=#OS>OS Commands</a>
+  <li><a href=#LOSS>Link Loss Commands</a>
+  <li><a href=#UNSUP>Unsupported/Not yet implemented Commands</a>
+</ul>
 
-  <hr>
-  <a name="set-link-loss"></a>
-  <h3>set-link-loss</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-link-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
-  <p>Sets the loss rate of a link. <i>Rate</i> is between 0.0 and 1.0.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-link-loss node1 node12 0.1</code></p>
+<hr>
 
-  <hr>
-  <a name="set-lan-loss"></a>
-  <h3>set-lan-loss</h3>
-  <p><b>Format:</b></p>
-  <p><code>#TB set-lan-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
-  <p>Sets the loss rate of a lan (as specified using the NS command
-make-lan). <i>Rate</i> is between 0.0 and 1.0.</p>
-  <p><b>Example:</b></p>
-  <p><code>#TB set-lan-loss lan1 node1 0.7</code></p>
+<a name=INTRO></a><h3>Introduction</h3>
+
+<p>In order to use the testbed specific commands you must include the
+following line near the top of your NS file (before any testbed
+commands are used):
+
+<pre>
+source tb_compat.tcl
+</pre>
+
+<p>If you wish to use your file under NS you can use download this <a
+href=tb_compat.tcl>tb_compat.tcl</a>.  Place it in the same directory
+as your NS file.  When run in this way under NS the testbed commands
+will have no effect, but NS will be able to parse your file.
+
+<hr>
+
+<a name=TCL></a><h3>TCL, NS, and node names</h3>
+
+In your file you will be creating nodes with something like:
+
+<pre>
+set node1 [$ns node]
+</pre>
+
+What is really going on is that the simulator, represented by
+<code>$ns</code> is creating a new node, involving a bunch of internal
+data changes, and returning a reference to it which is stored in the
+variable <code>node1</code>.  In almost all cases, when you need to
+refer to a node you will do it as <code>$node1</code>, the
+<code>$</code> indicating that you want the value the variable
+<code>node1</code>, i.e. the reference to the node.  Thus you will be
+issuing commands like:
+
+<pre>
+$ns duplex-link $node1 $node2 100Mb 150ms DropTail
+$tb-set-ip $node1 192.0.0.2
+</pre>
+
+<p>(Note the <code>$</code>'s)
+
+<p>You will notice that when your experiment is setup the node names
+and such will be <code>node1</code>.  This happens because the parser
+detects what variable you are using to store the node reference and
+uses that as the node name.  In the case that you do something like:
+
+<pre>
+set node1 [$ns node2]
+set A $node1
+</pre>
+
+<p>The node will still be called <code>node1</code> as that was the first
+variable to contain the reference.
+
+<p>If you are dealing with many nodes you may store them in array,
+perhaps like this:
+
+<pre>
+for {set i 0} {$i < 4} {incr i} {
+   set nodes($i) [$ns node]
+}
+</pre>
+
+<p>In this case the names of the node will be <code>nodes_0_</code>,
+<code>nodes_1_</code>, <code>nodes_2_</code>, <code>nodes_3_</code>.
+This slightly ugly syntax comes is to avoid any problems that
+<code>()</code> may cause in later scripts.
+
+<p>As a final note, everything said above for nodes applies equally to
+lans.  I.e.:
+
+<pre>
+set lan0 [$ns make-lan "$node0 $node1" 100Mb .1ms]
+tb-set-lan-loss $lan0 .02
+$ns duplex-link $lan0 $node3 100Mb 100ms DropTail
+</pre>
+
+<p>(Again, note the <code>$</code>'s)
+
+<hr>
+
+<a name=HARD></a><h3>Hardware Commands</h3>
+
+<h4>tb-set-hardware</h4>
+
+<pre>
+tb-set-hardware <i>node</i> <i>type</i> [<i>args</i>].
+
+tb-set-hardware $node3 pc
+tb-set-hardware $node4 shark-shelf
+</pre>
+
+<dl>
+  <dt><i>node</i> - The name of the node.
+  <dt><i>type</i> - The type of the node.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>Currently only <code>pc</code> and <code>shark-shelf</code> are
+supported types.  <code>pc</code> is the default type.
+<code>shark-shelf</code> refers to a shelf of 8 sharks.  In the near
+future <code>shark-shelf</code> will be replaced with
+<code>shark</code> which specifies that the node is a single shark.
+  <li>No current types have any additional arguments.
+</dl>
+
+<hr>
+
+<a name=IP></a><h3>IP Commands</h3>
+
+<p>Each node will be assigned an IP address.  The following commands
+will allow you to explicitly set those IP addresses.  IP addresses
+will be automatically generated for all nodes that you do not
+explicitly set IP addresses.
+
+<p>In the common case the IP addresses on either side of a link must
+be in the same subnet.  Likewise, all IP addresses on a LAN should be
+in the same subnet.  Automatically generated IP addresses will conform
+to this requirement.  If part of a link or lan is explicitly specified
+with the commands below then the remainder will be automatically
+generated under the same subnet.
+
+<p>IP address assignment is deterministic and tries to fill lower IP's
+first, starting at 2.  Except in the partial specification case (see
+above), all automatic IP addresses are in the network
+<code>192.168</code>.
+
+<h4>tb-set-ip</h4>
+
+<pre>
+tb-set-ip <i>node</i> <i>ip</i>
+
+tb-set-ip $node1 142.3.4.5
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node to assign the IP address to.
+  <dt><i>ip</i> - The IP address.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>This command should only be used for nodes that have a single
+      link.  For nodes with multiple links the next command,
+      <code>tb-set-ip-interface</code> should be used.  Mixing
+      <code>tb-set-ip</code>. and <code>tb-set-ip-interface</code> on
+      the same node will result in an error.
+</ul>
+
+<h4>tb-set-ip-interface</h4>
+
+<pre>
+tb-set-ip-interface <i>node</i> <i>dst</i> <i>ip</i>
+
+tb-set-ip-interface $node2 $node1 142.3.4.6
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node to set the IP for.
+  <dt><i>dst</i> - The destination of the link to set the IP for.
+  <dt><i>IP</i> - The IP address.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This commands can not be mixed on the same node with
+      <code>tb-set-ip</code>.  (See above)
+  <li>In the case of multiple links between the same pair of nodes
+      there is no way to distinguish which link to the set the IP
+      for.  This should be fixed soon.
+</ul>
+
+<hr>
+
+<a name=OS></a><h3>OS Commands</h3>
+
+<h4>tb-set-node-os</h4>
+
+<pre>
+tb-set-node-os <i>node</i> <i>os</i>
+
+tb-set-node-os $node1 FBSD40-STD
+tb-set-node-os $node1 MY_OS
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node to set the OS for.
+  <dt><i>os</i> - The id of the OS for that node.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>The OS ID can either by one of the standard OS's we provide or
+      a custom OS ID described by <code>tb-create-os</code> (see
+      below).  In the latter case the <code>tb-create-os</code> command
+      must come before the <code>tb-set-node-os</code> command.
+  <li>If no OS is specified for a node a default OS is chosen based on
+      the nodes type.  This is currently RHL62-STD for PCs.
+  <li>The currently available standard OS types are: FBSD40-STD,
+      RHL62-STD, NBSD14-STD (should not be used on PC nodes), and
+      NETBOOT.  NETBOOT is the oskit netboot kernel for loading other
+      operating systems over the network.
+</ul>
+
+<h4>tb-set-dnard-os</h4>
+
+<pre>
+tb-set-dnard-os <i>shelf</i> <i>number</i> <i>os</i>
+
+tb-set-dnard-os $shelf1 1 MY-SHARK-OS
+</pre>
+
+<dl>
+  <dt><i>shelf</i> - The shelf containing the shark.
+  <dt><i>number</i> - A number between 1 and 8 describing which shark.
+  <dt><i>os</i> - The id of the OS to set.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>This command applies to nodes of type <code>shark-shelf</code>
+      (see <code>tb-set-hardware</code> above).  It will create an
+      error on a node of any other type.
+  <li>In the near future this command will vanish along with
+      shark-shelf's when we make ns node to shark a one to one rather
+      than one to eight mapping.
+  <li>The OS ID can either be one of the standard OS's or a custom OS
+      ID described by <code>tb-create-os</code>(see
+      below).  In the latter case the <code>tb-create-os</code> command
+      must come before the <code>tb-set-node-os</code> command.
+  <li>The default OS for sharks is NBSD14-STD.
+</ul>
+
+<h4>tb-create-os</h4>
+
+<pre>
+tb-create-os <i>id</i> <i>path</i> <i>partition</i>
+
+XXX Need examples
+</pre>
+
+<dl>
+  <dt><i>id</i> - The ID for the OS.
+  <dt><i>path</i> - XXX
+  <dt><i>partition</i> - XXX
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>XXX - Need responce from Leigh to finish this section.
+  <li>This command allows <i>id</i> to be used in other OS commands to
+      setup nodes with custom OSs.
+</ul>
+
+<hr>
+
+<a name=LOSS></a><h3>Link Loss Commands</h3>
+
+<p>The NS syntax for creating a link:
+
+<pre>
+$ns duplex-link $node1 $node2 100Mb 150ms DropTail
+</pre>
+
+<p>Does not allow for specifying link loss rates.  Emulab does,
+however, support link loss.  The following commands can be used to
+specify link loss rates.
+
+<h4>tb-set-link-loss</h4>
+
+<pre>
+tb-set-link-loss <i>src</i> <i>dst</i> <i>loss</i>
+
+tb-set-link-loss $node1 $node2 0.05
+</pre>
+
+<dl>
+  <dt><i>src</i>, <i>dst</i> - Two nodes to describe the link.
+  <dt><i>loss</i> - The loss rate (between 0 and 1).
+</dl>
+
+<p>Notes:
+<ul>
+  <li>In the case of multiple links between two nodes there is no way
+      to specify which link to configure the loss for.  In fact, the
+      behavior of a tb-set-link-loss command in the case of multiple
+      links is undefined.  This will be fixed soon.
+</ul>
+
+<h4>tb-set-lan-loss</h4>
+
+<pre>
+tb-set-lan-loss <i>lan</i> <i>loss</i>
+
+tb-set-lan-loss $lan1 0.3
+</pre>
+
+<dl>
+  <dt><i>lan</i> - The lan to set the loss rate for.
+  <dt><i>loss</i> - The loss rate (between 0 and 1).
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command sets the loss rate for the entire LAN.  If you want
+      to have a different loss rate for a node in the LAN you'll need
+      to link the node to the lan (rather than include in the
+      <code>make-lan</code> command) and set the loss rate of the link
+      appropriately (contact testbed-ops).
+</ul>
+
+<hr>
+
+<a name=UNSUP></a><h3>Unsupported/Not yet implemented Commands</h3>
+
+<p>The following commands will parse but do not do anything as yet.
+
+<h4>tb-set-dnard-ip</h4>
+
+<pre>
+tb-set-dnard-ip <i>shelf</i> <i>number</i> <i>ip</i>
+</pre>
+
+<p>This command will probably vanish soon without ever having been
+implemented.
+
+<h4>tb-set-*-deltas</h4>
+
+<pre>
+tb-set-node-deltas <i>node</i> <i>deltas</i>
+tb-set-dnard-deltas <i>shelf</i> <i>number</i> <i>deltas</i>
+</pre>
+
+<p>The second command will probably vanish like all the other dnard
+commands in the near future.  The first command will likely go through
+some change and accompany a few other commands once we get delta
+support going.
+
+<hr>
+<address>
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+<!-- hhmts start -->
+Last modified: Tue Mar 13 12:12:09 MST 2001
+<!-- hhmts end -->
+</address>
 
 </body>
 </html>
+      
