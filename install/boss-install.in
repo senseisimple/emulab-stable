@@ -86,14 +86,15 @@ my $RNDC_KEY        = "/usr/local/etc/rndc.key";
 #
 # Some directories we care about
 #
-my $LOGDIR       = "$PREFIX/log";
-my $MYSQL_LOGDIR = "$LOGDIR/mysql";
-my $RCDIR        = "/usr/local/etc/rc.d";
-my $USERSVAR_DIR = "$PREFIX/usersvar";
-my $OPSDIR_DIR   = "$PREFIX/opsdir";
-my $PORTSDIR     = "/usr/ports/misc";
-my $MIBPATH      = "/usr/local/share/snmp/mibs";
-my $TFTP_DIR     = "$PREFIX/tftpboot";
+my $LOGDIR        = "$PREFIX/log";
+my $MYSQL_LOGDIR  = "$LOGDIR/mysql";
+my $RCDIR         = "/usr/local/etc/rc.d";
+my $USERSVAR_DIR  = "$PREFIX/usersvar";
+my $OPSDIR_DIR    = "$PREFIX/opsdir";
+my $PORTSDIR      = "/usr/ports/misc";
+my $MIBPATH       = "/usr/local/share/snmp/mibs";
+my $TFTP_DIR      = "$PREFIX/tftpboot";
+my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
 
 #
 # URLs
@@ -188,6 +189,12 @@ Phase "tftp", "Setting up directories for tftp", sub {
 	mkdir $TFTP_DIR,0775 or
 	    PhaseFail("Unable to create $TFTP_DIR : $!");
 	ExecQuietFatal("$CHGRP tbadmin $TFTP_DIR");
+    };
+    Phase "tftpproj", "Creating $TFTP_PROJ_DIR", sub {
+	DoneIfExists($TFTP_PROJ_DIR);
+	mkdir $TFTP_PROJ_DIR,0775 or
+	    PhaseFail("Unable to create $TFTP_PROJ_DIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $TFTP_PROJ_DIR");
     };
     Phase "tftplink", "Linking /tftpboot", sub {
 	DoneIfExists("/tftpboot");
