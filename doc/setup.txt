@@ -51,8 +51,14 @@ http://www.algorithmic-solutions.com/as_html/products/products.html
 
 ##### Step 3 - Testbed tree configuration/installation
 
-Configure the testbed tree. For example, I have the testbed source in ~/testbed,
-and use the ~/tbobj directory to do my builds in.
+It is best to add the following group before creating the following
+directories. Basically, testbed software should be in the tbadmin
+group. Run this command as root.
+
+	pw groupadd tbadmin -g 99
+	
+Configure the testbed tree. For example, I have the testbed source in
+~/testbed, and use the ~/tbobj directory to do my builds in.
 
 cd ~/tbobj
 ~/testbed/configure
@@ -193,7 +199,7 @@ in /etc/rc.conf. Check out the ntpd man page for configuration information.
 You may want a program to allow administrator-types to run stuff easily as root.
 Here at Utah, we have two: su1 (developed locally) and sudo (installed from
 FreeBSD ports) - don't forget to get it set up! Our strategy on boss was to
-give everyone in the weel group unrestricted sudo access with:
+give everyone in the wheel group unrestricted sudo access with:
 %wheel  ALL=(ALL) NOPASSWD: ALL
 
 checkpass - in the testbed software:

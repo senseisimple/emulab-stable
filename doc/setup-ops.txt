@@ -8,6 +8,13 @@
 First of all, the machine should be configured correctly for the network it is
 on, have the root password set, etc.
 
+It is best to add the following group before creating the following
+directories. Basically, testbed software should be in the tbadmin
+group. Run this command as root.
+
+	pw groupadd tbadmin -g 99
+	
+
 The following directories will need to exist on partitions that have enough
 space to hold them:
 
