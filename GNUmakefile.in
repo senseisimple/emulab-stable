@@ -9,7 +9,7 @@ DISTCLEAN_FILES = @DISTCLEAN_FILES@
 
 include Makeconf
 
-SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd www tip capture
+SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www tip capture
 
 all:		all-subdirs
 
@@ -36,6 +36,7 @@ control-install:
 	@$(MAKE) -C os control-install
 	@$(MAKE) -C db control-install
 	@$(MAKE) -C tbsetup control-install
+	@$(MAKE) -C utils control-install
 
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/locks
