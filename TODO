@@ -13,6 +13,8 @@
   the queries that do not go through the common interface, and putting
   in retry code.
 
+  LBS: Thu May 23 - Added some of Dave's suggestion from his email.
+
 * Event system startup cost. Abhijeet reported that after ISUP, it
   could take a very long time for events to start. This is because it
   takes a really long time to process the event stream in event-sched
@@ -111,19 +113,8 @@
   operation, like Mike did for slice 4. This is to prevent problems
   with people messing up the MBR.
 
-* Web Interface Problem with unverified users who forgot their passwords.
-  The verification stuff needs some work, as does the password stuff,
-  which retains some of its structure from when we had to deal with
-  frames. This is mostly a cleanup operation that I can do in a day or
-  two.
-
-  Dave also requested that we get rid of . from the verification key
+* Dave requested that we get rid of . from the verification key
   when it falls at the end so as not to be confused with period.
-
-  Also includes suggestion from Dave to make verification a web link
-  instead of form. So, send them a URL that when clicked verifies
-  them. This would be a good user interface addition, and not too hard
-  after the above cleanup.
 
 * Daily experiment stats report sent by email. To include such things
   as:
@@ -201,10 +192,6 @@
 * Add permission check to eventsys_control and install on ops so that
   users can start/stop/replay the event stream.
 
-* Change approve/verify stuff so that project leader does not see
-  email or new users on approval page until they verify themselves.
-  Would need to change email too.
-
 * Link on web pages to pop up an ssh to a node. Perhaps do this by
   usurping the telnet client.
 
@@ -257,3 +244,5 @@
   2) Without logging out, went to https://www.mini.emulab.net
   This got me the message "The document contained no data" from Netscape.
 
+* When you're only a part of one project, could that project be the default
+  value for the "choose a project" dropdown in "begin an experiment"?
