@@ -14,10 +14,11 @@ include $(OBJDIR)/Makeconf
 ifeq ($(JAVAC),)
 JARS =
 else
-JARS = $(TESTBED_SRCDIR)/www/robotrack/tracker.jar
+JARS = $(TESTBED_SRCDIR)/www/robotrack/tracker.jar \
+	$(TESTBED_SRCDIR)/www/robotrack/selector.jar
 endif
 
-all:
+all:	robopipe
 jar: $(JARS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -25,14 +26,18 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 RoboTrack.class: $(SRCDIR)/RoboTrack.java
 	$(JAVAC) -deprecation -d . $^
 
+NodeSelect.class: $(SRCDIR)/NodeSelect.java
+	$(JAVAC) -deprecation -d . $^
+
 $(TESTBED_SRCDIR)/www/robotrack/tracker.jar: RoboTrack.class
-	echo '$(filter-out RoboTrack.class, $(shell echo *.class))'
+	echo '$(filter-out RoboTrack.class, $(shell echo Robo*.class))'
 	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out RoboTrack.class, $(shell echo *.class)))
 
-foo:
-	echo '$(filter-out RoboTrack.class, $(wildcard *.class))'
+$(TESTBED_SRCDIR)/www/robotrack/selector.jar: NodeSelect.class
+	echo '$(filter-out NodeSelect.class, $(shell echo Node*.class))'
+	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo Node*.class)))
 
-install:
+install:	$(INSTALL_LIBEXECDIR)/robopipe
 
 clean:
 	/bin/rm -f *.class *.jar
