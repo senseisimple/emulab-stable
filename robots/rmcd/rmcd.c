@@ -197,12 +197,17 @@ static void conv_a2r(struct position *rel,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    rel->x = abs_finish->x - abs_start->x;
-    rel->y = abs_finish->y - abs_start->y;
+    float ct = cos(abs_start->theta);
+    float st = sin(abs_start->theta);
+    
+    rel->x = ct*(abs_finish->x - abs_start->x) +
+             st*(abs_finish->y - abs_start->y);
+    rel->y = ct*(abs_finish->y - abs_start->y) +
+             st*(abs_start->x - abs_finish->x);
+    
     rel->theta = abs_finish->theta - abs_start->theta;
     rel->timestamp = abs_finish->timestamp;
     
-    //*rel = *abs_finish; // XXX DAN, fill this out.
 }
 
 /**
@@ -221,12 +226,15 @@ static void conv_r2a(struct position *abs_finish,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    abs_finish->x = abs_start->x + rel->x;
-    abs_finish->y = abs_start->y + rel->y;
+    float ct = cos(abs_start->theta);
+    float st = sin(abs_start->theta);
+    
+    abs_finish->x = ct*rel->x - st*rel->y + abs_start->x;
+    abs_finish->y = ct*rel->y + st*rel->x + abs_start->y;
+    
     abs_finish->theta = abs_start->theta + rel->theta;
     abs_finish->timestamp = rel->timestamp;
-    
-    //*abs_finish = *rel; // XXX DAN, fill this out.
+
 }
 
 /**
