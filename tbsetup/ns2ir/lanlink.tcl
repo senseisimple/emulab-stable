@@ -83,6 +83,21 @@ Queue instproc get_link {} {
     return $mylink
 }
 
+# Hacky. Need to create an association bewteen the queue direction
+# and a dummynet pipe. This should happen later on, but I do not
+# have time right now to make all the changes. Instead, convert
+# "to" to "pipe0" and "from" to "pipe1".
+Queue instproc get_pipe {} {
+    $self instvar direction
+
+    if {$direction == "to"} {
+	set pipe "pipe0"
+    } else {
+	set pipe "pipe1"
+    }
+    return $pipe
+}
+
 Link instproc init {s nodes bw d type} {
     $self next $s $nodes $bw $d $type
 

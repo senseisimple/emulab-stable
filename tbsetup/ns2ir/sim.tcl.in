@@ -396,6 +396,7 @@ Simulator instproc at {time eventstring} {
 	}
 	"Queue" {
 	    set otype LINK
+	    set pipe [$obj get_pipe]
 	    set obj [$obj get_link]
 	    switch -- $cmd {
                 "set" {
@@ -439,6 +440,7 @@ Simulator instproc at {time eventstring} {
 		    return
 		}
 	    }
+	    set args "PIPE=$pipe $args"
 	    set vnode {}
 	    set vname $obj
 	}
