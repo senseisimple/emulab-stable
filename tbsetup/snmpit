@@ -361,7 +361,7 @@ sub ParseArgs {
       "  +c/-c Confirm Changes (now ",($c?"on":"off"),")\n",
       "  -g    Get Statistics\n",
       "  -s    Show Port Configurations\n",
-      "  -p    List of port numbers and ranges\n",
+      "  -p    List of port numbers and ranges (For Ciscos, use ifIndex)\n",
       "  -d    Disable port(s)\n",
       "  -e    Enable port(s)\n",
       "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
@@ -411,7 +411,7 @@ sub ParseArgs {
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
   my $n=0;
-  while(@p != 0 && $n < @p) {
+  while( $device eq "Intel" && (@p != 0 && $n < @p) ) {
     die("Invalid port ",$p[$n],": Must be 1-24\n") 
       if ($p[$n] =~ /\D/ || $p[$n]>24 || $p[$n]<1);
     $n++;
@@ -710,6 +710,11 @@ sub OneVLAN {
 	  print "    Adding MAC Address $mac (ifIndex $IF) ... ";
 	  $RetVal = $sess->set([[$PortVlanMemb,$IF,$N,'INTEGER']]);
 	  print "",($RetVal? "Succeeded":"Failed"), ".\n";
+	  my $Admin = ".1.3.6.1.2.1.2.2.1.7";
+	  my $Status = "up";
+	  if (! &UpdateField(\$sess,\$Admin,[$IF],\$Status,\$b,\$c,\$v)) {
+	    print STDERR "Port enable failed.\n";
+	  }          
 	}
 	#If everything went okay, break out of the loop
 	$okay = 1;
@@ -841,6 +846,11 @@ sub RemoveVLAN {
 	    print "Setting VLAN to 1..." if $debug;
 	    $RetVal = $sess->set([[$PortVlanMemb,$index,1,'INTEGER']]);
 	    print "",($RetVal? "Succeeded":"Failed=$RetVal") if $debug;
+	    my $Admin = ".1.3.6.1.2.1.2.2.1.7";
+	    my $Status = "down";
+	    if (! &UpdateField(\$sess,\$Admin,[$index],\$Status,\$b,\$c,\$v)) {
+	      print STDERR "Port disable failed.\n";
+	    }          
 	  }
 	  print "\n" if $debug;
 	}
@@ -1082,8 +1092,13 @@ sub UpdateField {
       print "Value for $port was $Status\n" if ($v);
       if ($Status ne $val) {
 	print "Setting value for $port to $val\n" if ($v);
-	#The empty sub {} is there to force it into async mode
-	$session->set([[$OID,$port,$val,"INTEGER"]],sub {});
+	if ($device eq "Intel") {
+	  # The empty sub {} is there to force it into async mode
+	  $session->set([[$OID,$port,$val,"INTEGER"]],sub {});
+	} else {
+	  # Don't use async
+	  $session->set([[$OID,$port,$val,"INTEGER"]]);
+	}
 	if ($b) {
 	  while ($Status ne $val) { 
 	    $Status=$session->get([[$OID,$port]]);
@@ -1095,7 +1110,7 @@ sub UpdateField {
   }
   if ( (!$b) && $c ) {
     my $loops=0;
-    my $max_loops=20;
+    my $max_loops=10;
     my %notdone=();
     my @done=();
     foreach my $port (@ports) {
