@@ -30,6 +30,7 @@ my $debug   = 0;
 my $impotent= 0;
 my $xmlfile;
 my $now     = time();
+my $nowminutes = (localtime($now))[1];
 
 #
 # Only real root can call this.
@@ -172,7 +173,7 @@ else {
 	waitpid($syspid, 0);
 	alarm 0;
 
-	fatal("Timed out downloading XML data from web site!")
+	fatal("Timed out downloading XML data from web site!",1)
 	    if ($? == 15);
 	    
 	fatal("Could not download XML data from web site!")
@@ -419,11 +420,13 @@ sub EndElement ($$)
 }
 
 
-
 sub fatal {
     my $msg = $_[0];
+    my $quiet = (defined($_[1]) ? $_[1] : 0);
 
-    SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+    if (!$quiet || ($quiet && ($nowminutes < 6))) {
+        SENDMAIL($TBOPS, "plabmetrics Failed", $msg);
+    }
     print "$msg\n"
 	if $debug;
 
