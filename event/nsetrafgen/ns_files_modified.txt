@@ -13,6 +13,7 @@ ns-2.26/apps/telnet.cc
 ns-2.26/classifier/classifier-hash.h
 ns-2.26/classifier/classifier.cc
 ns-2.26/classifier/classifier.h
+ns-2.26/classifier/classifier-port.cc
 ns-2.26/common/ip.h
 ns-2.26/common/packet.h
 ns-2.26/common/scheduler.cc
