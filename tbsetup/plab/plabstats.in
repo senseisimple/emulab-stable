@@ -184,7 +184,8 @@ if ($showstate) {
 my $query_result =
     DBQueryFatal("select n.node_id as plabnode, ni.hostname, i.IP, ".
 		 "    nr.load_1min,nr.load_5min,nr.load_15min,nr.disk_used, ".
-		 "    now() - nr.status_timestamp as metricsage ".
+		 "    unix_timestamp()-unix_timestamp(nr.status_timestamp) ".
+		 "    as metricsage ".
 		 " from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join widearea_nodeinfo as ni on n.node_id=ni.node_id ".

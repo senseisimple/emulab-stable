@@ -150,7 +150,8 @@ print "\n=== plabmetrics ".
 #
 my $query_result =
     DBQueryFatal("select n.node_id as plabnode, nr.*, ".
-		 "       now() - nr.status_timestamp as metricsage ".
+		 "       unix_timestamp()-unix_timestamp(nr.status_timestamp) ".
+		 "       as metricsage ".
 		 " from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join node_rusage as nr on nr.node_id=n.node_id ".
