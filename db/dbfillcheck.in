@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -41,7 +41,7 @@ if (system("perl $export_tables | sort > $tempoldfile")) {
     die("*** $0:\n".
 	"    $export_tables failed!\n");
 }
-if (system("sort $master_fill > $tempnewfile")) {
+if (system("grep -E -v '^(LOCK|UNLOCK|DELETE) ' $master_fill | sort > $tempnewfile")) {
     unlink($tempoldfile);
     die("*** $0:\n".
 	"    sort $master_fill failed!\n");
