@@ -2,7 +2,7 @@ INSTALL_DIR	= /usr/testbed
 INSTALL_BINDIR	= $(INSTALL_DIR)/bin
 INSTALL		= /usr/bin/install -c
 
-DBFLAG	= -DUSE_CFILE_DB #-DUSE_MYSQL_DB #-DUSE_NULL_DB
+DBFLAG	= -DUSE_MYSQL_DB #-DUSE_CFILE_DB #-DUSE_NULL_DB
 DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
 
 CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG

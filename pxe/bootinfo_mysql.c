@@ -10,8 +10,12 @@
 
 static char dbname[] = "tbdb";
 static char dbquery[] =
-	"select n.boot_default from nodes as n, interfaces as i "
-	"where i.IP = \"%s\" and n.node_id = i.node_id";
+   "select n.next_boot_path, n.next_boot_cmd_line, n.def_boot_image_id, "
+   "d.img_desc, p.partition, n.def_boot_cmd_line, d.img_path from nodes "
+   "as n left join partitions as p on n.node_id=p.node_id and "
+   "n.def_boot_image_id=p.image_id left join disk_images as d on "
+   "p.image_id=d.image_id left join interfaces as i on "
+   "i.node_id=n.node_id where i.IP = '%s'";
 
 static MYSQL db;
 
@@ -35,7 +39,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		syslog(LOG_ERR, "query too long for buffer");
 		return 1;
 	}
-
+	
 	mysql_init(&db);
 	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
 		syslog(LOG_ERR, "%s: connect failed: %s",
@@ -43,6 +47,10 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		return 1;
 	}
 
+	/* Debug message into log:
+	syslog(LOG_ERR, "USING QUERY: %s", querybuf);
+	*/
+	
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		syslog(LOG_ERR, "%s: query failed: %s",
 			dbname, mysql_error(&db));
@@ -77,7 +85,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	ncols = (int)mysql_num_fields(res);
 	switch (ncols) {
-	case 1:
+	case 7: /* Should have 7 fields */
 		break;
 	default:
 		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
@@ -87,7 +95,24 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	}
 
 	row = mysql_fetch_row(res);
-	if (row[0] == 0 || row[0] == '\0') {
+
+#if 1
+	/*
+	 * First element is next_boot_path.  If set, assume it is a
+	 * multiboot kernel.
+	 */
+	if (row[0] != 0 && row[0][0] != '\0') {
+		info->type = BIBOOTWHAT_TYPE_MB;
+		info->what.mb.tftp_ip.s_addr = 0;
+		strncpy(info->what.mb.filename, row[0],
+			MAX_BOOT_DATA-sizeof(boot_what_t)-1);
+		mysql_free_result(res);
+		return 0;
+	}
+#endif
+
+	/* Fifth element (row[4]) should have the partition number */
+	if (row[4] == 0 || row[4][0] == '\0') {
 		syslog(LOG_ERR, "%s: null query result for IP %s!",
 			dbname, inet_ntoa(ipaddr));
 		mysql_free_result(res);
@@ -98,7 +123,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 * Just 45000 lines of code later, we have the 32 bits of info
 	 * we wanted!
 	 */
-	part = atoi(row[0]);
+	part = atoi(row[4]);
 	mysql_free_result(res);
 
 	info->type = BIBOOTWHAT_TYPE_PART;
@@ -126,6 +151,26 @@ syslog(int prio, const char *msg, ...)
 	fprintf(stderr, "\n");
 }
 
+static void
+print_bootwhat(boot_what_t *bootinfo)
+{
+	switch (bootinfo->type) {
+	case BIBOOTWHAT_TYPE_PART:
+		printf("boot from partition %d\n",
+		       bootinfo->what.partition);
+		break;
+	case BIBOOTWHAT_TYPE_SYSID:
+		printf("boot from partition with sysid %d\n",
+		       bootinfo->what.sysid);
+		break;
+	case BIBOOTWHAT_TYPE_MB:
+		printf("boot multiboot image %s:%s\n",
+		       inet_ntoa(bootinfo->what.mb.tftp_ip),
+		       bootinfo->what.mb.filename);
+		break;
+	}
+}
+
 main(int argc, char **argv)
 {
 	struct in_addr ipaddr;
@@ -135,10 +180,10 @@ main(int argc, char **argv)
 	open_bootinfo_db();
 	while (--argc > 0) {
 		if (inet_aton(*++argv, &ipaddr))
-			if (query_bootinfo_db(ipaddr, boot_whatp) == 0)
-				printf("%s: returned partition %d\n",
-				       *argv, boot_whatp->what.partition);
-			else
+			if (query_bootinfo_db(ipaddr, boot_whatp) == 0) {
+				printf("%s: ", *argv);
+				print_bootwhat(boot_whatp);
+			} else
 				printf("%s: failed\n", *argv);
 		else
 			printf("bogus IP address `%s'\n", *argv);
