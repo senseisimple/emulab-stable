@@ -45,6 +45,8 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/backup
 	-mkdir -p $(INSTALL_TOPDIR)/batch
 	-chmod 777 $(INSTALL_TOPDIR)/batch
+	-mkdir -p $(INSTALL_TOPDIR)/expinfo
+	-chmod 777 $(INSTALL_TOPDIR)/expinfo
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs
