@@ -544,10 +544,12 @@ if ($thumb && !$idle) {
 	    if ($str=="") { $str="&nbsp;"; }
 	    # sanity check
 	    $slothderr=0;
-	    if ($daysidle==0 && $inactive[$expt]==1 && $stale[$expt]==0) {
-	      $str .= " (recently logged into)\n";
-	      $slothderr=1;
-	    }
+	    # This check won't work anymore now that a login today
+	    # doesn't mean it is active.
+	    #if ($daysidle==0 && $inactive[$expt]==1 && $stale[$expt]==0) {
+	    #  $str .= " (recently logged into)\n";
+	    #  $slothderr=1;
+	    #}
 	    $foo .= "$str</td>\n";
 	    if (isset($perexp_usage["$pid:$eid"]) &&
 		isset($perexp_usage["$pid:$eid"]["pc"])) {
