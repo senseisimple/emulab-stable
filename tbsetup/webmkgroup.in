@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# This gets invoked from the Web interface. Simply a wrapper ...
+#
+# usage: webmkgroup arguments ...
+#
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Run the real thing, and never return.
+# 
+exec "$TB/sbin/mkgroup", @ARGV;
+
+die("webmkgroup: Could not exec mkgroup: $!");

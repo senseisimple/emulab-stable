@@ -102,6 +102,8 @@ if (! chdir($olddir)) {
 }
 
 if (-e $gid) {
+    print "Renaming $gid to $newname in $olddir.\n";
+    
     if (! rename($gid, $newname)) {
 	die("*** Could not rename group directory $olddir/$gid to ".
 	    "$newname: $!\n");
@@ -122,6 +124,8 @@ if (-e $gid) {
 #
 # Now remove the group from the group file on both plastic and paper.
 #
+print "Removing group $unix_name ($unix_gid) on local node.\n";
+
 if (system("$GROUPDEL $unix_name")) {
     warn("*** WARNING: ".
 	 "Could not remove group $unix_name from operations node\n");
@@ -132,6 +136,8 @@ if (system("$GROUPDEL $unix_name")) {
 # Be real root for ssh.
 # 
 $UID = 0;
+
+print "Removing group $unix_name ($unix_gid) on $CONTROL.\n";
 
 if (system("$SSH $CONTROL $GROUPDEL $unix_name")) {
     warn("*** WARNING: Could not remove group $unix_name from $CONTROL\n");
@@ -151,6 +157,8 @@ while (@db_row = $query_result->fetchrow_array() ) {
 }
 
 foreach my $tipserver ( @tipservers ) {
+    print "Removing group $unix_name ($unix_gid) on $tipserver.\n";
+
     if (system("$SSH $tipserver $GROUPDEL $unix_name")) {
 	warn("*** WARNING: ".
 	     "Could not remove group $unix_name from $tipserver!\n");

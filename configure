@@ -1031,9 +1031,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
-	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
+	tbsetup/GNUmakefile tbsetup/console_setup \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
-	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
+	tbsetup/os_load tbsetup/os_setup tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
@@ -1048,17 +1048,20 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
-	tbsetup/savelogs tbsetup/group-update tbsetup/webgroupupdate \
+	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
+        tbsetup/webmkgroup tbsetup/mkgroup \
+	tbsetup/webmkacct tbsetup/mkacct \
+	tbsetup/webmkproj tbsetup/mkproj \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin \
-	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
+	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/cvsupd.sh"
 

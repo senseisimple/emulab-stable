@@ -7,7 +7,8 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT =
-    qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe );
+    qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
+	 TBMakeLogname );
 
 # A library of useful stuff.
 
@@ -153,6 +154,26 @@ sub TBBackGround($)
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
     return 0;
+}
+
+#
+# Create a logname and untaint it!
+#
+sub TBMakeLogname($)
+{
+    my($prefix) = @_;
+    my $logname;
+    
+    $logname = `mktemp /tmp/${prefix}.XXXXXX`;
+
+    if ($logname =~ /^([-\@\w\.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	die("Bad data in logfile name: $logname");
+    }
+
+    return $logname;
 }
 
 1;

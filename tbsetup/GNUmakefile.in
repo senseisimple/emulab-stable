@@ -19,14 +19,15 @@ USERBINS        = os_load node_reboot nscheck node_update savelogs node_control
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
-		  console_reset db2ns bwconfig frisbeelauncher group-update \
-		  rmgroup
+		  console_reset db2ns bwconfig frisbeelauncher \
+		  rmgroup mkgroup mkacct setgroups mkproj
 
-LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
+LIBEXEC_STUFF	= rmproj rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
-		  assign_wrapper ptopgen webnodeupdate webgroupupdate \
-		  webrmgroup webswapexp webnodecontrol
+		  assign_wrapper ptopgen webnodeupdate \
+		  webrmgroup webswapexp webnodecontrol \
+		  webmkgroup webmkacct websetgroups webmkproj
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
@@ -67,14 +68,16 @@ post-install:
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
 	chmod 775 $(INSTALL_LIBEXECDIR)
-	chown root $(INSTALL_LIBEXECDIR)/mkprojdir
-	chmod u+s $(INSTALL_LIBEXECDIR)/mkprojdir
+	chown root $(INSTALL_SBINDIR)/mkproj
+	chmod u+s $(INSTALL_SBINDIR)/mkproj
 	chown root $(INSTALL_LIBEXECDIR)/rmproj
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmproj
 	chown root $(INSTALL_SBINDIR)/rmgroup
 	chmod u+s $(INSTALL_SBINDIR)/rmgroup
-	chown root $(INSTALL_LIBEXECDIR)/mkacct-ctrl
-	chmod u+s $(INSTALL_LIBEXECDIR)/mkacct-ctrl
+	chown root $(INSTALL_SBINDIR)/mkacct
+	chmod u+s $(INSTALL_SBINDIR)/mkacct
+	chown root $(INSTALL_SBINDIR)/mkgroup
+	chmod u+s $(INSTALL_SBINDIR)/mkgroup
 	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chown root $(INSTALL_SBINDIR)/named_setup
@@ -83,8 +86,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/exports_setup
 	chown root $(INSTALL_BINDIR)/savevlans
 	chmod u+s $(INSTALL_BINDIR)/savevlans
-	chown root $(INSTALL_SBINDIR)/group-update
-	chmod u+s $(INSTALL_SBINDIR)/group-update
+	chown root $(INSTALL_SBINDIR)/setgroups
+	chmod u+s $(INSTALL_SBINDIR)/setgroups
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
 	chown root $(INSTALL_BINDIR)/node_reboot

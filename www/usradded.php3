@@ -282,14 +282,24 @@ $leader_name = $row[0];
 $leader_email = $row[1];
 $leader_uid = $row[2];
 
+#
+# The mail message to the approval list.
+#
 mail("$leader_name '$leader_uid' <$leader_email>",
      "TESTBED: $joining_uid $pid Project Join Request",
-     "\n$usr_name ($joining_uid) is trying to join your group $gid\n".
-     "in project $pid\n".
-     "$usr_name has the\n".
-     "Testbed username $joining_uid and email address $usr_email.\n".
-     "$usr_name's phone number is $usr_phone and address $usr_addr.\n\n".
-     "Please return to $TBWWW\n".
+     "$usr_name is trying to join your group $gid in project $pid.\n".
+     "\n".
+     "Contact Info:\n".
+     "Name:            $usr_name\n".
+     "Emulab ID:       $joining_uid\n".
+     "Email:           $usr_email\n".
+     "User URL:        $usr_url\n".
+     "Title:           $usr_title\n".
+     "Affiliation:     $usr_affil\n".
+     "Address:         $usr_addr\n".
+     "Phone:           $usr_phone\n".
+     "\n".
+     "Please return to $TBWWW,\n".
      "log in, and select the 'New User Approval' page to enter your\n".
      "decision regarding $usr_name's membership in your project\n\n".
      "Thanks,\n".

@@ -4,7 +4,7 @@ use English;
 #
 # This gets invoked from the Web interface. Simply a wrapper ...
 #
-# usage: webgroupupdate arguments ...
+# usage: webmkproj arguments ...
 #
 
 #
@@ -15,6 +15,6 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/sbin/group-update", @ARGV;
+exec "$TB/sbin/mkproj", @ARGV;
 
-die("webgroupupdate: Could not exec group-update: $!");
+die("webmkproj: Could not exec mkproj: $!");

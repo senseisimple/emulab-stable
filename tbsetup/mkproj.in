@@ -1,0 +1,186 @@
+#!/usr/local/bin/perl -wT
+use English;
+
+#
+# Make a project directory hierarchy. Must be called as tbroot.
+# Creates a directory rooted /proj/pid. The directory is setuid
+# to the project leader, and setgid to the project gid. We get
+# this info from the database.
+#
+# usage: mkproj <pid>
+#
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $MKGROUP  = "$TB/sbin/mkgroup";
+my $MKACCT   = "$TB/sbin/mkacct";
+
+my $PROJROOT = "/proj";
+my $TFTPROOT = "/tftpboot";
+my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
+		"groups", "tiplogs");
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: mkprojdir <pid>\n");
+}
+my $pid = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Invalid pid '$pid' contains illegal characters.\n");
+}
+
+#
+# Figure out who called us. Only with admin status in the DB can run
+# this script.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be a TB administrator to run this script!\n");
+}
+
+my $projhead;
+
+#
+# We need the project leader name.
+#
+if (! ($projhead = ProjLeader($pid))) {
+    die("*** $0:\n".
+	"    Could not get project leader for project $pid!\n");
+}
+
+#
+# Before we can proceed, we need to create the project (unix) group
+# and then create an account for the project leader. We pass this off
+# to sub scripts, but because they are also setuid, we need to flip
+# our UID (perl sillyness). Do that in a child process cause we need
+# root UID to finish off.
+#
+if (my $childpid = fork()) {
+    #
+    # Parent waits for child.
+    # 
+    waitpid($childpid, 0);
+    if ($?) {
+	exit($? >> 8);
+    }
+}
+else {
+    $EUID = $UID;
+
+    system("$MKGROUP $pid $pid") == 0 or
+	fatal("$MKGROUP $pid failed!");
+
+    system("$MKACCT $projhead") == 0 or
+	fatal("$MKACCT $projhead failed!");
+    
+    exit(0);
+}
+
+#
+# This acts as check (and we need the numeric uid) in case mkacct failed!
+# 
+my (undef,undef,$uid) = getpwnam($projhead)
+    or fatal("$projhead not in passwd file");
+
+my (undef,undef,$gid) = getgrnam($pid)
+    or fatal("$pid not in group file");
+
+#
+# Okay, do it.
+#
+if (! mkdir("$PROJROOT/$pid", 0770)) {
+    fatal("Could not make directory $PROJROOT/$pid: $!");
+}
+
+if (! chmod(0770, "$PROJROOT/$pid")) {
+    fatal("Could not chmod directory $PROJROOT/$pid: $!");
+}
+
+if (! chown($uid, $gid, "$PROJROOT/$pid")) {
+    fatal("Could not chown $PROJROOT/$pid to $uid/$gid: $!");
+}
+
+#
+# Make project subdirs.
+#
+foreach my $dir (@DIRLIST) {
+
+    if (! mkdir("$PROJROOT/$pid/$dir", 0770)) {
+	fatal("Could not make directory $PROJROOT/$pid/$dir: $!");
+    }
+    if (! chmod(0770, "$PROJROOT/$pid/$dir")) {
+	fatal("Could not chmod directory $PROJROOT/$pid/$dir: $!");
+    }
+    if (! chown($uid, $gid, "$PROJROOT/$pid/$dir")) {
+	fatal("Could not chown $PROJROOT/$pid/$dir to $uid/$gid: $!");
+    }
+}
+
+#
+# Create a tftp directory for oskit kernels.
+# 
+if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
+    fatal("Could not make directory $TFTPROOT/proj/$pid: $!");
+}
+if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
+    fatal("Could not chmod directory $TFTPROOT/proj/$pid: $!");
+}
+if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
+    fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "TESTBED: mkproj $pid Failed", $msg);
+    die("$0: $msg\n");
+}

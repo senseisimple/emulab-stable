@@ -1,0 +1,360 @@
+#!/usr/local/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Set groups for users. With just a pid all the users in the group
+# are modified. Of course, since we might be removing groups, we actuall
+# have to go through the entire set of users in the project. Hence, you
+# can provide an optional list of users to operate on; the web interface
+# uses this option since it know what users have been changed via the web
+# form.
+#
+# Note that this script does not create accounts or groups. That should 
+# already have been done with other scripts.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: setgroups [-b | -a] -p <pid> [user ...]\n".
+        "       setgroups [-b | -a] [user ...]\n";
+	
+    exit(-1);
+}
+my  $optlist = "bap:";
+
+#
+# Configure variables
+#
+my $TB      = "@prefix@";
+my $TBOPS   = "@TBOPSEMAIL@";
+my $TBLOGS  = "@TBLOGSEMAIL@";
+my $CONTROL = "@USERNODE@";
+
+my $SSH     = "$TB/bin/sshtb";
+my $USERMOD = "/usr/sbin/pw usermod";
+
+my $batchmode   = 0;
+my $auditmode   = 0;
+my $dbuid;
+my @userlist;
+my $pid;
+my $user_name;
+my $user_email;
+my $logname;
+my @db_row;
+my $query_result;
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"b"})) {
+    $batchmode = 1;
+}
+if (defined($options{"a"})) {
+    $auditmode = 1;
+}
+if (defined($options{"p"})) {
+    $pid = $options{"p"};
+
+    #
+    # Untaint,
+    #
+    if ($pid =~ /^([-\@\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in pid: $pid.");
+    }
+}
+
+#
+# See if a userlist was provided. This is an optimization. The web interface
+# knows which users actually changed, so its quicker to modify that set
+# instead of the entire project set.
+#
+if (@ARGV) {
+    # Untaint the users.
+    foreach my $user ( @ARGV ) {
+	if ($user =~ /^([\w]+)$/) {
+	    $user = $1;
+	}
+	else {
+	    die("Bad user name: $user.");
+	}
+    
+	push(@userlist, $user);
+    }
+}
+
+if (!defined($pid) && !defined(@userlist)) {
+    usage();
+}
+
+#
+# Get user DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+        "    You do not exist in the Emulab Database!\n");
+}
+
+#
+# Get email info.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+        "    Cannot determine email info for you!\n");
+}
+
+#
+# This script always does the right thing, so it does not matter who
+# calls it. But we guard it anyway in the case where ops/boss are the
+# same.
+# 
+if (!TBAdmin($UID)) {
+    #
+    # Check if group_root/project_root anyplace, which indicates caller
+    # has some level of responsibility.
+    #
+    $query_result =
+	DBQueryFatal("select trust from group_membership ".
+		     "where uid='$dbuid' and ".
+		     "trust='project_root' or trust='group_root'");
+
+    if ($query_result->numrows == 0) {
+	die("*** $0:\n".
+	    "    $dbuid does not have permission to update groups!\n");
+    }
+}
+
+#
+# In batch mode, go to background and send email later.
+# 
+if ($batchmode || $auditmode) {
+    my $childpid;
+
+    #
+    # Create a temporary name for a log file.
+    #
+    $logname = TBMakeLogname("setgroups");
+    
+    if ($childpid = TBBackGround($logname)) {
+	if ($auditmode) {
+	    waitpid($childpid, 0);
+	    exit($? >> 8);
+	}
+	    
+	#
+	# Parent exits normally
+	#
+	print STDOUT
+	    "Updating groups.\n".
+	    "You will be notified via email when the update is complete.\n";
+	exit(0);
+    }
+}
+
+# 
+# All this stuff must be done as root (ssh).
+#
+$UID = $EUID;
+
+#
+# If no user list provided, we have to do this for the entire project
+# member list since we have no idea who got changed.
+#
+if (! defined(@userlist)) {
+    $query_result =
+	DBQueryFatal("select uid from group_membership ".
+		     "where pid='$pid' and pid=gid");
+
+    $query_result->numrows ||
+	fatal("No project members for $pid!\n");
+
+    while (@db_row = $query_result->fetchrow_array() ) {
+	push(@userlist, $db_row[0]);
+    }
+}
+
+#
+# Loop through user set, building up the group set and issuing commands.
+#
+foreach my $uid (@userlist) {
+    my @groupnames;
+    my @grouplist;
+    my $groupargument;
+    my $project;
+
+    #
+    # Form a list of project (group) membership names. We do this in two
+    # steps to ensure that we get the default group membership since we
+    # want that to be the user's primary group. Not sure this really matters
+    # all that much, but might as well. 
+    # 
+    $query_result =
+	DBQueryFatal("select g.unix_name from group_membership as m ".
+		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
+		     "where m.uid='$uid' and m.pid=m.gid and m.trust!='none'");
+
+    $query_result->numrows ||
+	fatal("$uid is not in any groups!\n");
+    
+    while (@db_row = $query_result->fetchrow_array() ) {
+	push(@groupnames, $db_row[0]);
+    }
+
+    $query_result =
+	DBQueryFatal("select g.unix_name from group_membership as m ".
+		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
+		     "where m.uid='$uid' and m.pid!=m.gid ".
+		     " and m.trust!='none'");
+
+    while (@db_row = $query_result->fetchrow_array() ) {
+	push(@groupnames, $db_row[0]);
+    }
+
+    print "Processing user $uid: @groupnames\n";
+
+    #
+    # Construct an appropriate group list for the pw commands. Main project
+    # is the first on the list, and that becomes the primary group. The rest
+    # (if any) of the groups become a comma separated list for the -G option.
+    #
+    $groupargument = " ";
+    $project       = shift @groupnames;
+    $grouplist     = join(",",@groupnames);
+
+    #
+    # Add special groups. These are listed in the DB so that special local
+    # users can have more unix groups than just the projects/groups they are
+    # in. These groups must already exist. 
+    #
+    if ((my @extragrouplist = TBUnixGroupList($uid))) {
+	print "Adding extra groups to list: @extragrouplist\n";
+    
+	if ($grouplist) {
+	    $grouplist = "$grouplist," . join(",", @extragrouplist);
+	}
+	else {
+	    $grouplist = join(",", @extragrouplist);
+	}
+    }
+
+    if ($grouplist) {
+	$groupargument = "-G $grouplist";
+    }
+    else {
+	$groupargument = "-G \"\"";
+    }
+
+    print "Updating user $uid record on local node.\n";
+
+    #
+    # MAKE SURE not to update anything else!
+    #
+    if (system("$USERMOD $uid -g $project $groupargument")) {
+	fatal("Could not modify user $uid on local node.");
+    }
+
+    print "Updating user $uid record on $control_node.\n";
+
+    if (system("$SSH $control_node ".
+	       "'$USERMOD $uid -g $project $groupargument'")) {
+	fatal("Could not modify user $uid record on $control_node.");
+    }
+}
+
+print "Group Update Completed!\n";
+if ($batchmode || $auditmode) {
+    donotify("Group Update Completed!\n", 0);
+    unlink($logname);
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print STDOUT "$mesg\n";
+
+    if ($batchmode || $auditmode) {
+	donotify($mesg, 1);
+	unlink($logname);
+    }
+    exit(-1);
+}
+
+sub donotify($$)
+{
+    my($mesg, $iserr) = @_;
+    my($subject, $from, $to, $hdrs);
+    my $MAIL;
+
+    $from    = $TBOPS;
+    $hdrs    = "Reply-To: $TBOPS";
+    
+    #
+    # An error goes just to Testbed Operations. Normal status messages go
+    # to the user and to the Testbed Logs address.
+    # 
+    if ($iserr) {
+	$subtext = "Failure";
+	$to      = "$TBOPS";
+    }
+    else {
+	$subtext = "Success";
+	$to      = "$user_name <$user_email>";
+	$hdrs    = "Bcc: $TBLOGS\n" . "$hdrs";
+    }
+
+    SENDMAIL($to,
+	     "TESTBED: Group Update $subtext",
+	     $mesg, $from, $hdrs,
+	     ($logname));
+}

@@ -458,6 +458,9 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	    elseif (strcmp($curstatus, "unapproved") == 0) {
 		$newstatus = "active";
 	    }
+	    elseif (strcmp($curstatus, "unverified") == 0) {
+		$newstatus = "unverified";
+	    }
 	    else {
 	        TBERROR("Invalid $user status $curstatus in approveuser.php3",
                          1);
@@ -489,7 +492,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	#
         # Create user account on control node.
         #
-	SUEXEC($uid, "flux", "mkacct-ctrl $user", 0);
+	SUEXEC($uid, "flux", "webmkacct $user", 0);
+	SUEXEC($uid, "flux", "websetgroups $user", 0);
 		
 	continue;
     }

@@ -1,0 +1,286 @@
+#!/usr/local/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create a user account. All this script does is create the account
+# if it does not exist, or update the password and gecos fields.
+# No groups processing is done here. The initial account is created in
+# the "guest" group; use the setgroups command to set a users groups.
+#
+# usage: mkacct <userid>
+#
+# XXX - /users wired in. 
+# 
+sub usage()
+{
+    print STDOUT "Usage: mkacct <uid>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB      = "@prefix@";
+my $TBOPS   = "@TBOPSEMAIL@";
+my $CONTROL = "@USERNODE@";
+
+my $HOMEDIR = "/users";
+my $PBAG    = "$TB/sbin/paperbag";
+my $SSH     = "$TB/bin/sshtb";
+my $USERADD = "/usr/sbin/pw useradd";
+my $USERMOD = "/usr/sbin/pw usermod";
+my $CHPASS  = "/usr/bin/chpass";
+my $KEYGEN  = "/usr/bin/ssh-keygen";
+my $SETGROUPS = "$TB/sbin/setgroups";
+my $GENELISTS = "$TB/sbin/genelists";
+
+my $user;
+my @db_row;
+my $query_result;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+$user = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Invalid uid '$user' contains illegal characters.\n");
+}
+
+#
+# This script always does the right thing, but we prefer that mere users
+# do not run it, except when its for themselves. Otherwise, make sure that
+# user has group/project root in at least one project, which indicates they
+# have some level of responsibility.
+#
+if (!TBAdmin($UID)) {
+    my $dbuid;
+
+    if (! UNIX2DBUID($UID, \$dbuid)) {
+	die("You are not a valid emulab user!\n");
+    }
+    if ($dbuid ne $user) {
+	#
+	# Check if group_root/project_root anyplace.
+	#
+	$query_result =
+	    DBQueryFatal("select trust from group_membership ".
+			 "where uid='$dbuid' and ".
+			 "trust='project_root' or trust='group_root'");
+
+	if ($query_result->numrows == 0) {
+	    die("$0: You do not have permission to run this script!\n");
+	}
+    }
+}
+
+#
+# Get the user info (the user being created). This join picks out the
+# user's earliest project membership to use for the default group.
+#
+$query_result =
+    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name,u.usr_email,m.pid ".
+		 " from users as u ".
+		 "left join group_membership as m ".
+		 " on u.uid=m.uid and m.pid=m.gid ".
+		 "where u.uid='$user' order by date_approved asc limit 1");
+
+if ($query_result->numrows == 0) {
+    fatal("$user is not in the DB. This is bad.\n");
+}
+@db_row         = $query_result->fetchrow_array();
+my $pswd        = $db_row[0];
+my $user_number = $db_row[1]; 
+my $fullname    = $db_row[2];
+my $user_email  = $db_row[3];
+my $defpid      = $db_row[4];
+
+#
+# Unix info for users default group.
+#
+my $default_groupname;
+my $default_groupgid;
+
+if (! TBGroupUnixInfo($defpid, $defpid,
+		      \$default_groupgid, \$default_groupname)) {
+    fatal("No info for default project $defpid!");
+}
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
+
+#
+# All this stuff must be done as root (ssh).
+#
+$UID = $EUID;
+
+#
+# Run genelists to update the email lists. This is a convenient
+# spot to do this. Errors are non-fatal; the testbed list will
+# will find out about problems via email from genelists. Note that
+# this command must be run when EUID==UID==0 because its a setuid
+# PERL script.
+#
+system("$GENELISTS");
+
+#
+# Make user on local. We don't give them a password since they are not
+# allowed to log in, except via paperbag. 
+#
+if (system("egrep -q -s '^${user}:' /etc/passwd")) {
+    print "Adding user $user ($user_number) to local node.\n";
+
+    if (system("$USERADD $user -u $user_number -c \"$fullname\" ".
+	       "-k /usr/share/skel -m -d $HOMEDIR/$user ".
+	       "-g $default_groupname -s $PBAG")) {
+	fatal("Could not add user $user to local node.");
+    }
+}
+else {
+    print "Updating user $user ($user_number) on local node.\n";
+
+    #
+    # MAKE SURE not to update anything else!
+    #
+    if (system("$USERMOD $user -c \"$fullname\" ")) {
+	fatal("Could not modify user $user on local node.");
+    }
+}
+
+#
+# Make user account on control node. We do the password setup as separate
+# step since thats easier than trying to do both via ssh.
+#
+# Quote special chars for ssh and the shell on the other side
+#
+$fullname =~ s/\"/\'/g;
+$fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+if (system("$SSH $control_node egrep -q -s '^${user}:' /etc/passwd")) {
+    print "Adding user $user ($user_number) to $control_node.\n";
+
+    if (system("$SSH $control_node ".
+	       "'$USERADD $user -u $user_number -c \"$fullname\" ".
+	       "-k /usr/share/skel -m -d $HOMEDIR/$user ".
+	       "-g $default_groupname -s /bin/tcsh'")) {
+	fatal("Could not add user $user ($user_number) to $control_node.\n");
+    }
+}
+else {
+    print "Updating user $user ($user_number) on $control_node.\n";
+
+    #
+    # MAKE SURE not to update anything else!
+    #
+    if (system("$SSH $control_node ".
+	       "'$USERMOD $user -c \"$fullname\"'")) {
+	fatal("Could not modify user $user record on $control_node.");
+    }
+}
+
+print "Updating user $user password on $control_node.\n";
+
+if (system("$SSH $control_node $CHPASS -p $pswd $user")) {
+    fatal("Could not change password for user $user on $control_node.\n");
+}
+
+#
+# Set up the ssh key, but only if not done so already.
+#
+if (! -e "$HOMEDIR/$user/.ssh/" ) {
+    print "Setting up ssh configuration for $user.\n";
+    
+    mkdir("$HOMEDIR/$user/.ssh", 0700) or
+	fatal("Could not mkdir $HOMEDIR/$user/.ssh: $!");
+    chown($user_number, $default_groupgid, "$HOMEDIR/$user/.ssh") or
+	fatal("Could not chown $HOMEDIR/$user/.ssh: $!");
+    
+    # Run commands below as the user
+    $EUID = $user_number;
+    $UID  = $EUID;
+
+    if (system("$KEYGEN -P '' -f $HOMEDIR/$user/.ssh/identity")) {
+	fatal("Failure in ssh-keygen");
+    }
+    if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
+	       "$HOMEDIR/$user/.ssh/authorized_keys")) {
+	fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub to auth keys");
+    }
+    chmod(0600, "$HOMEDIR/$user/.ssh/authorized_keys") or
+	fatal("Could not chmod $HOMEDIR/$user/.ssh/authorized_keys: $!");
+}
+
+#
+# Set up a .forward file so that any email to them gets forwarded off.
+#
+if (! -e "$HOMEDIR/$user/.forward" ) {
+    print "Setting up .forward file for $user.\n";
+
+    if (system("echo \"$user_email\" > $HOMEDIR/$user/.forward")) {
+	fatal("Could not create $HOMEDIR/$user/.forward");
+    }
+    chmod(0644, "$HOMEDIR/$user/.forward") or
+	fatal("Could not chmod $HOMEDIR/$user/.forward");
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "TESTBED: mkacct-ctrl Failed", $msg);
+    die("$0: $msg\n");
+}

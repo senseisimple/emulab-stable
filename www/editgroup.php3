@@ -191,8 +191,10 @@ if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
 }
 
 #
-# Now do the second pass, which makes the changes.
+# Now do the second pass, which makes the changes. Record the user IDs
+# that are changed so that we can pass that to setgroups below.
 #
+$modusers = "";
 
 #
 # Go through the list of current members. For each one, check to see if
@@ -206,11 +208,12 @@ if (mysql_num_rows($curmembers_result)) {
     while ($row = mysql_fetch_array($curmembers_result)) {
 	$user = $row[0];
 	$foo  = "change_$user";
-	
+
 	if (!$defaultgroup && !isset($$foo)) {
 	    DBQueryFatal("delete from group_membership ".
 			 "where pid='$pid' and gid='$gid' and uid='$user'");
 
+	    $modusers = "$modusers $user";
 	    continue;
 	}
         #
@@ -250,6 +253,8 @@ if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
 			 " date_applied,date_approved) ".
 			 "values ('$user','$pid','$gid', '$newtrust', ".
 			 "        now(), now())");
+	    
+	    $modusers = "$modusers $user";
 	}
     }
 }
@@ -259,12 +264,23 @@ if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
 #
 TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
+echo "<br>
+      Group '$gid' in project '$pid' is being updated!<br><br>
+      This will take a minute or two. <b>Please</b> do not click the Stop
+      button during this time. If you do not receive notification within
+      a reasonable amount of time, please contact $TBMAILADDR.\n";
+flush();
+
 #
 # Run the script. This will do the account stuff for all the people
 # in the group. This is the same script that gets run when the group
 # is first created.
 #
-SUEXEC($uid, $unix_gid, "webgroupupdate $pid $gid", 1);
+SUEXEC($uid, $unix_gid, "websetgroups -a -p $pid $modusers", 1);
+
+echo "<br><br>
+      <b>Done!</b>
+      <br>\n";
 
 #
 # Show it again!

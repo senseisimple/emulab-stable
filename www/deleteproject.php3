@@ -52,6 +52,16 @@ if (mysql_num_rows($query_result)) {
 }
 
 #
+# Check to see if there are any groups. Force them to be deleted.
+#
+$query_result =
+    DBQueryFatal("SELECT * FROM groups where pid='$pid' and pid!=gid");
+if (mysql_num_rows($query_result)) {
+    USERERROR("Project '$pid' has active groups. You must delete ".
+	      "those groups before you can remove the project!", 1);
+}
+
+#
 # We run this twice. The first time we are checking for a confirmation
 # by putting up a form. The next time through the confirmation will be
 # set. Or, the user can hit the cancel button, in which case we should

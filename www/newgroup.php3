@@ -1,5 +1,6 @@
 <?php
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -7,6 +8,8 @@ include("defs.php3");
 PAGEHEADER("Create a Project Group");
 
 $mydebug = 0;
+
+ignore_user_abort(1);
 
 #
 # First off, sanity check the form to make sure all the required fields
@@ -146,21 +149,29 @@ if (strcmp($head_uid, $group_leader)) {
 #
 TBGroupUnixInfo($group_pid, $group_pid, $unix_gid, $unix_name);
 
+echo "<br>
+      Group '$group_id' in project '$group_pid' is being created!<br><br>
+      This will take a minute or two. <b>Please</b> do not click the Stop
+      button during this time. If you do not receive notification within
+      a reasonable amount of time, please contact $TBMAILADDR.\n";
+flush();
+
 #
 # Run the script. This will make the group directory, set the perms,
 # and do the account stuff for all of the people in the group. This
 # is the same script that gets run when the group membership changes.
 #
-SUEXEC($uid, $unix_gid, "webgroupupdate -b $group_pid $group_id", 1);
+SUEXEC($uid, $unix_gid, "webmkgroup -a $group_pid $group_id", 1);
+SUEXEC($uid, $unix_gid, "websetgroups -a $head_uid $group_leader", 1);
 
-echo "<br><br>";
-echo "<h3>
-        Group `$group_id' in project `$group_pid' is being created!<br><br>
-        You will be notified via email when the process has completed.
-	This typically takes less than 1-2 minutes.
-        If you do not receive email notification within a reasonable amount
-        of time, please contact $TBMAILADDR.
-      </h3>\n";
+echo "<br><br>
+      <b>Done!</b>
+      <br>\n";
+
+#
+# Show it!
+#
+SHOWGROUP($group_pid, $group_id);
 
 #
 # Standard Testbed Footer

@@ -213,7 +213,7 @@ mail("$usr_name <$usr_email>",
 # Create the user accounts. Must be done *before* we create the
 # project directory!
 # 
-SUEXEC($uid, "flux", "mkacct-ctrl $target_uid", 0);	 	
+SUEXEC($uid, "flux", "webmkacct $target_uid", 0);
 
 echo "<center>
       <br>
