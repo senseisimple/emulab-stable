@@ -48,12 +48,15 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <regex.h>
-#include <values.h>
 #include <errno.h>
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef MAXINT
+#define MAXINT INT_MAX
+#endif
 
 #define DEBUG 0
 
