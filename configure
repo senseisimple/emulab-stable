@@ -1442,7 +1442,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tip/GNUmakefile \
-	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
+	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/freebsd5/GNUmakefile \
+	tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
 	tmcd/tmcd.restart tmcd/plab/GNUmakefile tmcd/common/config/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
