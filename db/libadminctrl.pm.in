@@ -1052,6 +1052,12 @@ sub TBAdmissionControlCheck($$$$)
 	if (defined($ptypearray));
 
     $uid = MapNumericUID($uid);
+
+    #
+    # Check to see if admin control is even on.
+    #
+    return 1
+	if (! TBGetSiteVar("swap/use_admission_control"));
     
     #
     # Admin people do not get checks (when in admin mode of course).
