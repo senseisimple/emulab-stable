@@ -26,6 +26,7 @@ my $f = "";  #AutoVLAN filename
 my $l = 0;   #List all VLANs on switch
 my $m = "";  #Create VLAN - name
 my @vlan = ();  #VLAN Members - list of MAC Addresses
+my @r = ();  #VLAN(s) to be removed
 my $b = 0;   #Block (bool) (two-way switch)
 my $c = 1;   #Confirm Changes (bool) (two-way switch)
 my $v = 0;   #Verbose (bool) !Must default quiet; switch only turns on!
@@ -38,7 +39,7 @@ my $all=0;
 my @outlets=();
 my %Interfaces=();
 
-&ParseArgs(*ARGV,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*b,*c,*v,
+&ParseArgs(*ARGV,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*r,*b,*c,*v,
 	   *on,*off,*cyc,*all,*outlets,*Interfaces);
 
 use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
@@ -47,7 +48,7 @@ use SNMP;
 #$SNMP::debugging = 1;
 
 &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
-if (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/)) {
+if (($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/)) {
     &SNMP::addMibFiles(
 #		       '/usr/local/share/snmp/mibs/RFC1155-SMI.txt',
 #		       '/usr/local/share/snmp/mibs/RFC1213-MIB.txt',
@@ -129,9 +130,12 @@ if ($f) {
     &AutoVLANConfig(\$sess,\$f,\$v);
 }
 
-if ($r) {
+if (@r) {
     &GetToken(\$sess,\$v);
-    &RemoveVLAN(\$sess,\$r,\$v);
+    foreach $x (sort @r)
+    {
+	&RemoveVLAN(\$sess,\$x,\$v);
+    }
     &ReleaseToken(\$sess,\$v);
 }
 
@@ -182,10 +186,10 @@ if ($off || $on || $cyc) {
 # SUB PARSEARGS----------------------
 #
 sub ParseArgs {
-    local(*CMDS,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*b,*c,*v,
+    local(*CMDS,*i,*p,*d,*e,*a,*dup,*s,*f,*l,*m,*vlan,*r,*b,*c,*v,
 	  *on,*off,*cyc,*all,*outlets,*Interfaces) = @_;
     my $help=0; 
-    if (@CMDS < 2) {$help = 2; }
+    if (@CMDS < 1) {$help = 2; }
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
 	$_ = shift(@CMDS);
 	#print "Item=$_*\n";
@@ -227,7 +231,12 @@ sub ParseArgs {
 		push(@vlan, shift(@CMDS));
 	    }
 	}
-	elsif (/^-r(.*)/) {$r = ($1 ? $1 : shift(@CMDS));}
+	elsif (/^-r(.*)/) {
+	    push(@r, ($1 ? $1 : shift(@CMDS)));
+	    while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) { 
+		push(@r, shift(@CMDS));
+	    }
+	}
 	elsif (/^-v(.*)/) {$v = 1;}
 	elsif (/^-b(.*)/) {$b = 0;}
 	elsif (/^\+b(.*)/) {$b = 1;}
@@ -245,7 +254,7 @@ sub ParseArgs {
 	    "\t[-p<port> <port> <x>..<y> ... ]\n",
 	    "\t[-d[isable]|-e[nable]] [+a|-a] [-s<speed>] [-dup<duplex>]\n", 
 	    "\t[-m<vlan name>] [[-vlan<MAC Addr.>] | [-f<filename>]]\n",
-	    "\t[-r<vlan #>] [-l]\n",
+	    "\t[-r<vlan #> <vlan #> ... ] [-l]\n",
 	    "\t[ [-on|-off|-cyc] [-all] | [-<n>] ]\n";
 	
     }
@@ -267,7 +276,7 @@ sub ParseArgs {
 	    "  -l    List all VLANs on switch (ell, not #1)\n",
 	    "  -m    Make a VLAN\n",
 	    "  -vlan Add MAC Address to VLAN\n",
-	    "  -r    Remove VLAN",
+	    "  -r    Remove VLAN(s)",
 	    "  -on   Turn on outlets\n",
 	    "  -off  Turn off outlets\n",
 	    "  -cyc  Power Cycle outlets\n",
@@ -278,20 +287,20 @@ sub ParseArgs {
     die("\b\n") if ($help);
     #Now die on any combinations that don't make sense...
     die("What shall I do?\n")
-	if (! ($d||$e||$a||$s||$dup||@vlan||$f||$r||$l||$on||$off||$cyc) );
+	if (! ($d||$e||$a||$s||$dup||@vlan||$f||@r||$l||$on||$off||$cyc) );
+    if (@vlan||$f||@r||$l) { $i = "Gamma"; }
     if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
     if ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
+    if ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
+    if ($i =~ /Delta/i)  { $i = "155.99.214.173"; }
     die("$i is not an Intel 510 Switch: Possible completions are\n",
-	"Alpha/155.99.214.170\n Beta/155.99.214.171\n") 
-	if ( (!(($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/))) && 
-	     ($d || $e || $a || $s || $dup || @vlan || $f || $r || $l ));
+	"Alpha/155.99.214.170\n Beta/155.99.214.171\n",
+	"Gamma/155.99.214.172\n Delta/155.99.214.173\n") 
+	if ( (!(($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/))) && 
+	     ($d || $e || $a || $s || $dup || @vlan || $f || @r || $l ));
     die("$i is not a power controller.\n") 
-	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/)) && 
+	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/)) && 
 	     ($on||$off||$cyc) );
-    die("Can't remove a Control VLAN.\n") 
-	if ( (($i=~/155\.99\.214\.170/) && ($r) && ($r==38)) || 
-	     (($i=~/155\.99\.214\.171/) && ($r) && ($r==42)));
-    #(Control VLAN is 41 on 170, 42 on 171)
     die("Can't enable and disable at the same time.\n") if ($d && $e);
     die("Can't use auto with duplex or speed.\n") if (($a=~/en/)&&($dup||$s));
     my $n=0;
@@ -397,6 +406,10 @@ sub ReleaseToken {
     $sess->set([[$TokenRelease,0,"save","INTEGER"]]);
     $RetVal = $sess->get([[$TokenReleaseResult,0]]);
     print "VLAN Configuration Save Result is $RetVal\n" if ($v);
+    while ($RetVal eq "notReady") {
+	$RetVal = $sess->get([[$TokenReleaseResult,0]]);
+	print "VLAN Configuration Save Result is $RetVal\n" if ($v);
+    }
     if ($RetVal ne 'success') {
 	die("VLAN Reconfiguration Failed. No changes saved.\n");
     }
@@ -425,6 +438,7 @@ sub GetToken {
     print "VLAN Token Claim Result is $RetVal\n" if ($v);
     if ($RetVal ne 'success') {
 	my $Owner = $sess->get([[$TokenOwner,0]]);
+	print "VLAN Token Claim Result is $RetVal\n";
 	die("Can't edit VLANs: Token taken by $Owner\n");
     }
 }
@@ -489,10 +503,10 @@ sub AutoVLANConfig {
 
 sub ReadIRFile {
    local(*f,*VLANS) = @_;
+   my %exists = ();
    my $skip = 1;
    my $switch = $i;
    my $section = "";
-   my $go = 0;
    if ( !open(IR,$f) ) { die("Couldn't open $f for VLAN Setup.\n"); }
    while (<IR>) {
        chop;
@@ -500,17 +514,8 @@ sub ReadIRFile {
        if ( /^start vlan/i ) { $skip = 0 ; next; }
        if ($skip) { next; }
        if ( /^end vlan/i ) { $skip = 1 ; next; }
-       if ( /^end/ ) { $go = 0; next; }
-       if ( /^switch (.*)$/i) {
-	   $section = $1;
-	   if ($section=~/[a-z]/) {
-	       if ($section =~ /Alpha/i) { $section = "155.99.214.170"; }
-	       if ($section =~ /Beta/i)  { $section = "155.99.214.171"; }
-	   }
-	   $go =  ( $section eq $switch ? 1 : 0 );
-	   next;
-       }
-       if (! $go) { next; }
+       if ( /^switch/i ) { next; }
+       if ( /^end/i ) { next; }
        # If I'm in the right section, turn the line into a VLAN
        my @v= split;
        my $n=0;
@@ -526,7 +531,11 @@ sub ReadIRFile {
 	       if (!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)));
 	   $n++;
        }
-       push(@VLANS, \@v);
+       @v = sort @v;
+       if (!defined $exists{ join(' ',@v) }) {
+	   push(@VLANS, \@v);
+	   $exists{join(' ',@v)} = 1;
+       }
    }   
    close (IR);
 }
@@ -623,11 +632,14 @@ sub RemoveVLAN(*sess,*r,*v) {
     my $DeleteOID = ".1.3.6.1.4.1.343.6.11.1.9.1.4";
     my $RetVal = "Undef.";
     print "  Removing VLAN #$r ... ";
-    $RetVal = $sess->set([[$DeleteOID,$r,"delete","INTEGER"]]);
-    print "",($RetVal? "Succeeded":"Failed"),".\n";
-    if (! defined ($RetVal) ) {
-	&ReleaseToken(*sess,*v);
-	die("VLAN #$r does not exist on this switch.\n");
+    if ($r == 25) {
+	print "VLAN #$r is the Control VLAN, and cannot be removed.\n";
+    } else {
+	$RetVal = $sess->set([[$DeleteOID,$r,"delete","INTEGER"]]);
+	print "",($RetVal? "Succeeded":"Failed"),".\n";
+	if (! defined ($RetVal) ) {
+	    print "VLAN #$r does not exist on this switch.\n";
+	}
     }
 }
 
