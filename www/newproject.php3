@@ -652,7 +652,7 @@ if (!$returning) {
     $usr_phone         = $formfields[usr_phone];
     $password1         = $formfields[password1];
     $password2         = $formfields[password2];
-    $usr_returning     = "Yes";
+    $usr_returning     = "No";
 
     if (! isset($formfields[usr_URL]) ||
 	strcmp($formfields[usr_URL], "") == 0 ||
