@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,14 +50,17 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 
 #
 # Grab the current user list for the group. The group leader cannot be
-# removed! Neither can the project leader.
+# removed! Neither can the project leader. Do not include members that
+# have not been approved to main group either! This will force them to
+# go through the approval page first.
 #
 $curmembers_result =
     DBQueryFatal("select distinct m.uid from group_membership as m ".
 		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
 		 "left join projects as p on p.pid=m.pid ".
 		 "where m.pid='$pid' and m.gid='$gid' and ".
-		 "      m.uid!=g.leader and m.uid!=p.head_uid");
+		 "      m.uid!=g.leader and m.uid!=p.head_uid ".
+		 "      and m.trust!='none'");
 
 #
 # Grab the user list from the project. These are the people who can be
