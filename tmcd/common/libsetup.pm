@@ -225,7 +225,7 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 11; };
+sub TMCD_VERSION()	{ 12; };
 
 #
 # These are the TMCC commands. 
@@ -888,7 +888,6 @@ sub doifconfig (;$)
 	    my $duplex   = $6;
 	    my $aliases  = $7;
 	    my $iface    = $8;
-	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
 	    if (($iface ne "") ||
 		($iface = findiface($mac))) {
@@ -924,19 +923,16 @@ sub doifconfig (;$)
 		    
 		$upcmds   .= "$upline\n    "
 		    if (defined($upline));
-		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n";
 		
-		$downcmds .= TMROUTECONFIG . " $routearg down\n    ";
+		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
 		$downcmds .= "$downline\n    "
 		    if (defined($downline));
 
 		# There could be routes for each alias.
 		foreach my $alias (split(',', $aliases)) {
-		    $routearg = inet_ntoa(inet_aton($alias) &
-					  inet_aton($mask));
-			
-		    $upcmds   .= TMROUTECONFIG . " $routearg up\n";
-		    $downcmds .= TMROUTECONFIG . " $routearg down\n";
+		    $upcmds   .= TMROUTECONFIG . " $alias up\n";
+		    $downcmds .= TMROUTECONFIG . " $alias down\n";
 		}
 	    }
 	    else {
@@ -950,7 +946,6 @@ sub doifconfig (;$)
 	    my $id       = $4;
 	    my $vmac     = $5;
 	    my $pmac     = $6; 
-	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
 	    if (JAILED()) {
 		if ($iface = findiface($vmac)) {
@@ -968,9 +963,9 @@ sub doifconfig (;$)
 		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,$rtabid);
 		    
 		$upcmds   .= "$upline\n    ";
-		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n";
 		
-		$downcmds .= TMROUTECONFIG . " $routearg down\n    ";
+		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
 		$downcmds .= "$downline\n    "
 		    if (defined($downline));
 	    }
@@ -1089,10 +1084,13 @@ sub dorouterconfig (;$)
     #
     # ROUTERTYPE=manual
     # ROUTE DEST=192.168.2.3 DESTTYPE=host DESTMASK=255.255.255.0 \
-    #	NEXTHOP=192.168.1.3 COST=0
+    #	NEXTHOP=192.168.1.3 COST=0 SRC=192.168.4.5
+    #
+    # The SRC ip is used to determine which interface the routes are
+    # associated with, since nexthop alone is not enough cause of the 
     #
     $pat = q(ROUTE DEST=([0-9\.]*) DESTTYPE=(\w*) DESTMASK=([0-9\.]*) );
-    $pat .= q(NEXTHOP=([0-9\.]*) COST=([0-9]*));
+    $pat .= q(NEXTHOP=([0-9\.]*) COST=([0-9]*) SRC=([0-9\.]*));
 
     my $usemanual = 0;
     foreach my $line (@stuff) {
@@ -1106,8 +1104,8 @@ sub dorouterconfig (;$)
 	    my $dmask = $3;
 	    my $gate  = $4;
 	    my $cost  = $5;
+	    my $sip   = $6;
 	    my $rcline;
-	    my $routearg = inet_ntoa(inet_aton($gate) & inet_aton($dmask));
 
 	    #
 	    # For IXP.
@@ -1119,18 +1117,19 @@ sub dorouterconfig (;$)
 	    $rconfig->{"IPMASK"}   = $dmask;
 	    $rconfig->{"GATEWAY"}  = $gate;
 	    $rconfig->{"COST"}     = $cost;
+	    $rconfig->{"SRCIPADDR"}= $sip;
 	    push(@routes, $rconfig);
 
-	    if (! defined($upmap{$routearg})) {
-		$upmap{$routearg} = [];
-		$downmap{$routearg} = [];
+	    if (! defined($upmap{$sip})) {
+		$upmap{$sip} = [];
+		$downmap{$sip} = [];
 	    }
 	    $rcline = os_routing_add_manual($rtype, $dip,
 					    $dmask, $gate, $cost, $rtabid);
-	    push(@{$upmap{$routearg}}, $rcline);
+	    push(@{$upmap{$sip}}, $rcline);
 	    $rcline = os_routing_del_manual($rtype, $dip,
 					    $dmask, $gate, $cost, $rtabid);
-	    push(@{$downmap{$routearg}}, $rcline);
+	    push(@{$downmap{$sip}}, $rcline);
 	} else {
 	    warn "*** WARNING: Bad routing line: $line\n";
 	}
@@ -2120,7 +2119,6 @@ sub dotunnels(;$)
 	    my $inetip   = $8;
 	    my $mask     = $9;
 	    my $proto    = $10;
-	    my $routearg = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
 
 	    my $cmd = "$VTUND -n -P $peerport -f ". TMVTUNDCONFIG;
 
@@ -2156,12 +2154,12 @@ sub dotunnels(;$)
 		  "    # Connection is Up\n".
 		  $rtabopt .
 		  "    ifconfig \"%% $inetip netmask $mask\";\n".
-		  "    program " . $config . " \"$routearg up\" wait;\n".
+		  "    program " . $config . " \"$inetip up\" wait;\n".
 		  "  };\n".
 		  "  down {\n".
 		  "    # Connection is Down\n".
 		  "    ifconfig \"%% down\";\n".
-		  "    program " . $config . " \"$routearg down\" wait;\n".
+		  "    program " . $config . " \"$inetip down\" wait;\n".
 		  "  };\n".
 		  "}\n\n");
 	}
