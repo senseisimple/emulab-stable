@@ -160,9 +160,6 @@ TBDebugTimeStamp("assign_wrapper started");
 #  nodes is indexed by virtual node and contains the node type.
 #  isremotenode is indexed by virtual node and says whether the node is
 #    is remote. We let wanassign deal with those nodes.
-#  nodelans is indexed by virtual node and contains a list of
-#    <port>:<lan> that it is connected to.
-#  ips is indexed by nodeport and contains the IP addresses.
 #  lannodes is indexed by physical name is the set of lan nodes.
 #  portbw is indexed by virtual nodeport and contains the bandwidth
 #    of that port. Note that port bandwidth in the interfaces table is
@@ -194,12 +191,19 @@ TBDebugTimeStamp("top started");
 # sharkshelfid is used to generate ids for shark shelves.
 $sharkshelfid = 0;
 
-# lans is indexed by virtual lan and is a list of nodeport members.
+# ips is indexed by node:port and contains the IP address for the port.
+my %ips	      = ();
+
+# lans is indexed by virtual lan and is a list of node:port members.
+# memberof is indexed by node:port and holds the lan it is a member of.
 # emulated is 1 if the link/lan is emulated (virtual). This is
 # controlled by the a variable in the virt_lans table. It also gets
 # set when one of the nodes in the lan is a virtnode (jail).
+# useveth is 1 if the link/lan should us a veth device (virtual only). 
 my %lans     = ();
+my %memberof = ();
 my %emulated = ();
+my %useveth  = ();
 
 # delayinfo stores the virt_lans info, and is indexed by virtual
 # lan:node:port and is a list of delay, bandwidth, lossrate, rdelay,
@@ -366,7 +370,6 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) =
 	$delayid = $num + 1;
     }
     $nodes{$vname} = $type;
-    $nodelans{$vname} = [];
 
     if( $type eq "sim" ) {
       push( @simnodelist, $vname );
@@ -414,7 +417,7 @@ printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
 		 "rdelay,rbandwidth,rlossrate,widearea, ".
-		 "emulated,uselinkdelay,nobwshaping " .
+		 "emulated,uselinkdelay,nobwshaping,usevethiface " .
 		 "from virt_lans where pid='$pid' and eid='$eid' ".
                  "order by vname,member");
 
@@ -432,7 +435,8 @@ my %tunnels   = ();
 # 
 while (my ($vname,$member,$delay,$bandwidth,$lossrate,
 	   $rdelay,$rbandwidth,$rlossrate,$widearea,
-	   $isemulated,$uselinkdelay,$nobwshaping) = $result->fetchrow_array) {
+	   $isemulated,$uselinkdelay,$nobwshaping,$useveth)
+       = $result->fetchrow_array) {
     my ($node,$port) = split(":",$member);
 
     #
@@ -458,6 +462,7 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
 	$lans{$vname} = [];
     }
     push(@{$lans{$vname}},$member);
+    $memberof{$member} = $vname;
     $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate,
 				    $rdelay,$rbandwidth,$rlossrate];
 
@@ -492,6 +497,7 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
     $emulated{$vname} = $isemulated;
     $uselinkdelay{$vname} = $uselinkdelay;
     $nobwshaping{$vname} = $nobwshaping;
+    $useveth{$vname} = $useveth;
     
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
@@ -508,10 +514,9 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
     } else {
 	$portbw{$member} = $S100Mbs;
     }
-    push(@{$nodelans{$node}},"$port:$vname");
     printdb "  portbw of $member = $portbw{$member}\n";
     printdb "  $vname $member - $delay $bandwidth $lossrate $rdelay $rbandwidth $rlossrate\n";
-    printdb "    Added $port:$vname to nodelans of $node\n";
+    printdb "   $port:$vname is a lan of $node\n";
 }
 $result->finish;
 
@@ -594,7 +599,6 @@ foreach $node (keys(%nodes)) {
     # End Shark hack
 }
 
-#
 # lans that have simulated nodes
 my %simnodelans = ();
 
@@ -1823,8 +1827,10 @@ my %simnode_extips = ();
 my %IPaliases = ();
 
 foreach $vnodeport (keys(%portmap)) {
-    ($vnode,$vport) = split(":",$vnodeport);
-    $pport = $portmap{$vnodeport};
+    my ($vnode,$vport) = split(":",$vnodeport);
+    my $pport = $portmap{$vnodeport};
+    my $lan   = $memberof{$vnodeport};
+    
     if ($nodes{$vnode} eq "shark-shelf") {
 	# Shark Hack
 	$shelf = $v2pmap{$vnode};
@@ -1835,6 +1841,26 @@ foreach $vnodeport (keys(%portmap)) {
 	    $i++;
 	}
 	# End Shark Hack
+    }
+    if ($emulated{$lan} && ($isvirtnode{$vnode} || $useveth{$lan})) {
+	#
+	# Emulated links on local virtual nodes use the new veth device.
+	# This is still fuzzy. What about connections to non-bsd nodes?
+	#
+	my $pnode = $v2pmap{$vnode};
+	my $ip    = $ips{$vnodeport};
+
+	#
+	# Not sure about the MAC yet. We need to create something, and
+	# for now it will be helpful for debugging if I use the IP.
+	# 
+	my $mac   = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
+
+	printdb("IP: $pnode:$pport $ip (veth)\n");
+
+	DBQueryFatal("insert into veth_interfaces ".
+		     "(node_id, veth_id, mac, IP, iface) ".
+		     "values ('$pnode', 0, '$mac', '$ip', '$pport')");
     }
     else {
 	#
@@ -2017,7 +2043,7 @@ foreach $vnode (keys(%v2vmap)) {
 }
 
 foreach $vnodeport (keys(%portbw)) {
-    ($vnode,$vport) = split(":",$vnodeport);
+    my ($vnode) = split(":",$vnodeport);
     # SHARK HACK
     # NSE hack: additional checks coz portbw is defined
     #
