@@ -9,6 +9,7 @@
 use English;
 use Fcntl ':flock';
 use Socket;
+use strict;
 
 #
 # Suck out virtual names and create CNAME map entries.
@@ -32,6 +33,7 @@ my $mapfile			= "$mapdir/${OURDOMAIN}.db";
 my $mapfiletail			= "$mapfile.tail";
 my $mapfile_internal		= "$mapdir/${OURDOMAIN}.internal.db";
 my $mapfile_internal_head	= "$mapfile_internal.head";
+my $mapfile_internal_tail	= "$mapfile_internal.tail";
 my $vnodesfile			= "$mapdir/vnodes.${OURDOMAIN}.db";
 my $vnodesback 			= "$mapdir/vnodes.${OURDOMAIN}.db.backup";
 my $reversedir			= "$mapdir/reverse";
@@ -132,265 +134,120 @@ my $now = time;
 utime $now, $now, $lockfile;
 
 #
-# We stick the new map entries into the tail file. First zero it out.
-#
-open(MAP, ">$mapfiletail") || fatal("Couldn't open $mapfiletail\n");
-print MAP "\n";
-print MAP ";\n";
-print MAP "; DO NOT EDIT below this point. Auto generated map entries!\n";
-print MAP ";\n";
-print MAP "\n";
-
-#
-# First create the IA records for those nodes that have a named_root
-# defined. We glean the IP for the node from the interfaces table.
+# Grab the list of all nodes, including virtual and widearea nodes
 #
 my $db_result =
-    DBQueryFatal("select nt.type,nt.isremotenode,n.node_id,i.IP,i.role ".
-		 "  from nodes as n ".
+    DBQueryFatal("select n.node_id, n.role, n.jailip, i.IP, i.role ".
+		 "    from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id ". 
-		 "where nt.isvirtnode=0 and ".
-		 "      n.role='testnode' and i.IP is not null and ".
-		 "      (i.card=nt.control_net or i.role='gw') ".
-		 "order by nt.type,n.node_id");
-
-my %reverse;
-my %routable;
-if ($db_result->numrows > 0) {
-    #
-    # Create an IN record for each node. 
-    #
-    my $oldtype = "";
-    
-    while (@row = $db_result->fetchrow_array) {
-	my $type    = $row[0];
-	my $isremote= $row[1];
-	my $node_id = $row[2];
-	my $IP      = $row[3];
-	my $role    = $row[4];
-
-	if ($oldtype ne $type) {
-	    print MAP ";\n";
-	    print MAP "; $type nodes.\n";
-	    print MAP ";\n";
-	    
-	    $oldtype = $type;
-	}
-
-	next
-	    if (! isroutable($IP));
-	$routable{$node_id} = $IP;
-
-	if ($role eq "gw") {
-	    $node_id = "$node_id-gw";
-	}
-
-	print MAP "$node_id\tIN\tA\t$IP\n";
-	print MAP "\tIN\tMX 10\t$USERS.\n";
-
-	#
-	# Put it into a map so we can generate the reverse zone file later
-	#
-	$IP =~ /(\d+\.\d+\.\d+)\.(\d+)/;
-	if ($1 && $2) {
-	    my $subnet = $1;
-	    my $host = $2;
-	    push @{$reverse{$subnet}}, [$host, $node_id];
-	} else {
-	    warn "Poorly formed IP address $IP\n";
-	}
-    }
-}
-print MAP "\n";
-print MAP "\$TTL\t1\n\n";
+		 "where (n.role='testnode' or n.role='virtnode') ".
+		 "    and (i.IP is not null or n.jailip is not null) ".
+		 "    and (i.card is null or i.card=nt.control_net " .
+		 "        or i.role='gw') ");
 
 #
-# Figure out the set of experiment nodes we are working on. These are the 
-# nodes that have a vname in the reserved table. 
+# Sort out the routable and unroutable addresses, and make a map for reversing
+# them
+#
+my %routable;
+my %unroutable;
+my %reverse;
+while (my @row = $db_result->fetchrow_array()) {
+    my $node_id = $row[0];
+    my $nrole   = $row[1];
+    my $jailIP  = $row[2];
+    my $IP      = $row[3];
+    my $irole   = $row[4];
+
+    #
+    # For most nodes, we get the IP address from the interfaces table; but, for
+    # virtual nodes, we get it from the jailip column
+    #
+    if (!$IP) {
+	$IP = $jailIP;
+    }
+    if (!$IP) {
+	warn "named_setup: No IP for node $node_id!\n";
+	next;
+    }
+
+    #
+    # Special treatment for gateway interfaces - we give act as if they are a
+    # separate node
+    #
+    if ($irole && $irole eq "gw") {
+	$node_id = "$node_id-gw";
+    }
+
+    #
+    # Make a little structure so that we can make decisions later about this
+    # node (ie. handling virt nodes differently)
+    #
+    my $node_rec = {
+	IP   => $IP,
+	role => $nrole
+    };
+
+    #
+    # Sort it into the right pile based on whether or not it's routable
+    #
+    if (isroutable($IP)) {
+	$routable{$node_id} = $node_rec;
+    } else {
+	$unroutable{$node_id} = $node_rec;
+    }
+
+    #
+    # Put it into a map so we can generate the reverse zone file later
+    #
+    $IP =~ /(\d+\.\d+\.\d+)\.(\d+)/;
+    if ($1 && $2) {
+	my $subnet = $1;
+	my $host = $2;
+	push @{$reverse{$subnet}}, [$host, $node_id];
+    } else {
+	warn "Poorly formed IP address $IP\n";
+    }
+}
+
+#
+# Get the list of currently-reserved nodes so that we can make CNAMEs for them
 #
 $db_result =
-    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid,n.jailip,i.IP ".
-		 " from reserved as r ".
-		 "left join nodes as n on n.node_id=r.node_id ".
-		 "left join node_types as nt on nt.type=n.type ".
-		 "left join interfaces as i on n.node_id=i.node_id and ".
-		 "     nt.control_iface=i.iface ");
+    DBQueryFatal("select node_id,pid,eid,vname from reserved");
 
-if ($db_result->numrows > 0) {
+my %cnames;
+while (my ($node_id,$pid,$eid,$vname) = $db_result->fetchrow_array()) {
+
     #
-    # Create a CNAME for each reserved node.
+    # Handle some rare cases where a node can get reserved without a vname -
+    # such as calling nalloc directly
     #
-    while (my %row = $db_result->fetchhash) {
-	my $node_id = $row{"node_id"};
-	my $pid     = $row{"pid"};
-	my $eid     = $row{"eid"};
-	my $physid  = $row{"phys_nodeid"};
-	my $jailip  = $row{"jailip"};
-	my $vname   = $node_id;
-	my $cname;
-
-	if (defined($row{"vname"})) {
-	    $vname = $row{"vname"};
-	}
-
-	# If the node has its own unroutable IP skip; done later. 
-	next
-	    if (defined($row{"IP"}) and !isroutable($row{"IP"}));
-
-        #
-        # VIRTNODE HACK: Map cname to underlying physnode, but first
-	# spit out a vname for the virtnode name (no point in polluting
-	# the map with a zillion cnames for nodes that do not actually
-	# exist until they are allocated).
-        #
-	if (defined($physid) && $physid ne $node_id) {
-	    if (defined($jailip)) {
-		#
-		# If the jailip is unroutable, then skip this completely
-		# since both the name and the cname will be entered into
-		# the "private" vnodes map below. 
-		#
-		next
-		    if (!isroutable($jailip));
-	    }
-
-	    #
-	    # If the vnode has its own routable IP, we can create the CNAME
-	    # to it directly below. But if the vnode does not have its own
-	    # routable IP, then we need create an CNAME entry for it that
-	    # points to the physnode first/.
-	    #
-	    if (!exists($routable{$node_id})) {
-		$cname   = sprintf("%-40s", "$node_id");
-		printf MAP "$cname IN\tCNAME\t$physid\n";
-	    
-		$node_id = $physid;
-	    }
-	}
-	    
-	$cname = sprintf("%-40s", "$vname.$eid.$pid");
-	printf MAP "$cname IN\tCNAME\t$node_id\n";
+    if (!defined($vname)) {
+	$vname = $node_id;
     }
+
+    push @{$cnames{$node_id}}, "$vname.$eid.$pid";
 }
 
-print MAP "\n";
-close(MAP);
 
 #
-# Make this map!
+# Make the zone file for routable IP addresses
 #
-make_zonefile($mapfile);
+make_forward_zonefile($mapfiletail,\%routable,\%cnames);
+assemble_zonefile($mapfile);
 
 #
-# If they have an 'internal' zone file (ie. with some internal IPs for boss and
-# ops), make that too
+# Make the zone file that includes both routable and unroutable IP addresses,
+# if the site has a .head file for it
 #
 if (-e $mapfile_internal_head) {
-    make_zonefile($mapfile_internal,$mapfile_internal_head,$mapfiletail);
+    make_forward_zonefile($mapfile_internal_tail,
+	{%routable, %unroutable},\%cnames);
+    assemble_zonefile($mapfile_internal);
 }
 
-#
-# Now we tack on the virtual node, but that has to go onto the end
-# of a *copy* of the file we just created.
-#
-if (-e $vnodesfile) {
-    system("mv -f $vnodesfile $vnodesback") == 0 or
-	fatal("Could not back up $vnodesfile to $vnodesback\n");
-}
-
-system("cp $mapfile $vnodesfile") == 0 or
-    fatal("Could not copy $mapfile to $vnodesfile\n");
-
-#
-# Open up the file and append the jail ips.
-# 
-open(MAP, ">>$vnodesfile") || fatal("Couldn't open $vnodesfile\n");
-print MAP
-    ";\n".
-    "; Jail IPs (allocated nodes only).\n" .
-    ";\n\n".
-    "\$TTL\t60\n\n";
-    
-$db_result =
-    DBQueryFatal("select r.*,n.jailip from reserved as r ".
-		 "left join nodes as n on n.node_id=r.node_id ".
-		 "left join node_types as nt on nt.type=n.type ".
-		 "where nt.isvirtnode=1 and nt.isremotenode=0 and ".
-		 "      nt.issubnode=0 and n.jailip is not null");
-
-if ($db_result->numrows > 0) {
-    #
-    # Create a CNAME for each reserved node.
-    #
-    while (my %row = $db_result->fetchhash) {
-	my $node_id = $row{"node_id"};
-	my $pid     = $row{"pid"};
-	my $eid     = $row{"eid"};
-	my $IP      = $row{"jailip"};
-	my $vname   = $node_id;
-
-	if (defined($row{"vname"})) {
-	    $vname = $row{"vname"};
-	}
-
-	next
-	    if (isroutable($IP));
-
-	# Spit an A record for the node.
-	print MAP "$node_id\tIN\tA\t$IP\n";
-
-	# Then a CNAME.
-	my $cname = sprintf("%-40s", "$vname.$eid.$pid");
-	printf MAP "$cname IN\tCNAME\t$node_id\n";
-    }
-}
-
-#
-# Other unroutable addresses.
-# 
-print MAP
-    ";\n".
-    "; Other unroutable IPs.\n" .
-    ";\n";
-    
-$db_result =
-    DBQueryFatal("select r.node_id,r.pid,r.eid,r.vname,i.IP ".
-		 "  from reserved as r ".
-		 "left join nodes as n on r.node_id=n.node_id ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on n.node_id=i.node_id and ".
-		 "     nt.control_iface=i.iface ".
-		 "where n.role='testnode' and i.IP is not null ".
-		 "order by nt.type,n.node_id");
-
-if ($db_result->numrows > 0) {
-    #
-    # Create a CNAME for each reserved node.
-    #
-    while (my %row = $db_result->fetchhash) {
-	my $node_id = $row{"node_id"};
-	my $pid     = $row{"pid"};
-	my $eid     = $row{"eid"};
-	my $IP      = $row{"IP"};
-	my $vname   = $node_id;
-
-	next
-	    if (isroutable($IP));
-
-	if (defined($row{"vname"})) {
-	    $vname = $row{"vname"};
-	}
-
-	# Spit an A record for the node.
-	print MAP "$node_id\tIN\tA\t$IP\n";
-
-	# Then a CNAME.
-	my $cname = sprintf("%-40s", "$vname.$eid.$pid");
-	printf MAP "$cname IN\tCNAME\t$node_id\n";
-    }
-}
-close(MAP);
 
 #
 # Look for reverse zone files that we may need to make
@@ -413,24 +270,27 @@ while (my $dirent = readdir(DIR)) {
     }
     close MAP;
 
-    make_zonefile("$reversedir/$basename");
+    assemble_zonefile("$reversedir/$basename");
     
 }
 closedir DIR;
 
 #
+# Get the nameserver to reload the zone files.
 # This is better than HUPing the nameserver directly. Notet that we look
 # for a local port of named first.
 #
 if (-x "/usr/local/sbin/rndc") {
     system("/usr/local/sbin/rndc reload > /dev/null") == 0 or
 	fatal("/usr/local/sbin/rndc reload failed!\n");
-}
-else {
+} else {
     system("named.reload > /dev/null") == 0 or
 	fatal("named.reload failed!\n");
 }
 
+#
+# Die and tell someone about it
+#
 sub fatal {
     my $msg = $_[0];
 
@@ -439,18 +299,14 @@ sub fatal {
 }
 
 #
-# Make a zone file from the 
+# Put together a zone file from its consituent head and tail pieces
 #
-sub make_zonefile($;$$) {
-    my ($mapfile,$mapfilehead,$mapfiletail) = @_;
+sub assemble_zonefile($) {
+    my ($mapfile) = @_;
 
     my $mapfileback = "$mapfile.backup";
-    if (!defined $mapfilehead) {
-	$mapfilehead = "$mapfile.head";
-    }
-    if (!defined $mapfiletail) {
-	$mapfiletail = "$mapfile.tail";
-    }
+    my $mapfilehead = "$mapfile.head";
+    my $mapfiletail = "$mapfile.tail";
 
     #
     # Concat the head and tail files to create the new map.
@@ -497,6 +353,72 @@ sub make_zonefile($;$$) {
     # 
     system("cat $mapfiletail >> $mapfile") == 0 or
     fatal("Failed to concat $mapfiletail to $mapfile\n");
+}
+
+#
+# Make a forward zone file, from the given map of addresses and CNAMEs
+#
+sub make_forward_zonefile($$$) {
+    my ($filename, $addresses, $cnames) = @_;
+    open(MAP, ">$filename") || fatal("Couldn't open $filename\n");
+    print MAP "\n";
+    print MAP ";\n";
+    print MAP "; DO NOT EDIT below this point. Auto generated map entries!\n";
+    print MAP ";\n";
+    print MAP "\n";
+
+    #
+    # Start out with the A records for the nodes
+    #
+    print MAP "\n";
+    print MAP ";\n";
+    print MAP "; Nodes\n";
+    print MAP ";\n";
+    print MAP "\n";
+    while (my ($node_id, $node_rec) = each %$addresses) {
+
+	#
+	# Special treatment for virtual nodes - we only bother to print them
+	# out if some has reserved them (ie. if they have a CNAME)
+	#
+	if (($node_rec->{role} eq "virtnode") && (!$cnames->{$node_id})) {
+	    next;
+	}
+
+	print MAP "$node_id\tIN\tA\t$node_rec->{IP}\n";
+	print MAP "\tIN\tMX 10\t$USERS.\n";
+    }
+
+    #
+    # Switch the TTL to 1 second for CNAMEs so that people will changes quickly
+    # as experiments swap in and out
+    #
+    print MAP "\n";
+    print MAP "\$TTL\t1\n\n";
+
+    print MAP "\n";
+    print MAP ";\n";
+    print MAP "; CNAMEs for reserved nodes\n";
+    print MAP ";\n";
+    print MAP "\n";
+
+    while (my ($pname, $vnames) = each %$cnames) {
+	#
+	# Only print out CNAMEs for nodes that are actually going into this map
+	#
+	next unless ($addresses->{$pname});
+
+	#
+	# Write out every CNAME for this pnode
+	#
+	foreach my $vname (@$vnames) {
+	    my $formatted_vname = sprintf "%-50s", $vname;
+	    print MAP "$formatted_vname\tIN\tCNAME\t$pname\n";
+	}
+    }
+
+    print MAP "\n";
+    close(MAP);
 }
 
 #
