@@ -200,8 +200,8 @@ foreach $node (keys(%rvnodemap)) {
 	$lindex = 0;
 	foreach $dest (@sortdests) {
 	    ($dest,$ip) = @$dest;
-	    $lindex++;
 	    $sth = $dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$node\",\"$dest\",$lindex,\"$ip\")");
+	    $lindex++;
 	    $sth->execute;
 	    $sth->finish;
 	}
