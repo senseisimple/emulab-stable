@@ -171,7 +171,7 @@ if ($state eq EXPTSTATE_ACTIVE) {
 # this.
 #
 my $virtnodes_result =
-    DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
+    DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms," .
 		 "startupcmd,tarfiles,type,fixed from virt_nodes ".
 		 "where pid='$pid' and eid='$eid' order by vname");
 
@@ -181,7 +181,7 @@ if ($shownodes) {
     print "--------------- ------------ --------------- ".
 	  "--------------------\n";
 
-    while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
+    while (($vname,$ips,$osname,$cmd_line,$rpms,$startupcmd,
 	    $tarfiles,$type,$fixed) = $virtnodes_result->fetchrow_array()) {
 	my $qualname = "$vname.$eid.$pid.$DOMAIN";
 
