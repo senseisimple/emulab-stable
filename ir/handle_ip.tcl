@@ -2,10 +2,11 @@
 # This program combines a ns input file and a post-assign IR file
 # to add the ip and ip-mac sections to the ir file.
 
-set mactable "../switch_tools/intel510/macslist"
 
 set scriptdir [file dirname [info script]]
-source libir.tcl
+set updir [file dirname $scriptdir]
+set mactable "$updir/switch_tools/intel510/macslist"
+source "$scriptdir/libir.tcl"
 namespace import TB_LIBIR::ir
 
 if {[llength $argv] != 2} {
@@ -207,13 +208,12 @@ proc get_subnet {ip} {
     return [join [lrange [split $ip .] 0 2] .]
 }
 proc find_free_subnet {node} {
-    global ips_node ip_base
+    global ips_assigned ip_base
 
-    if {! [info exists ips_node($node)]} {return "$ip_base.1"}
-    foreach ip $ips_node($node) {
+    foreach ip [array names ips_assigned] {
 	set used([get_subnet $ip]) 1
     }
-    for {set i 1} {$i < 100} {incr i} {
+    for {set i 1} {$i < 250} {incr i} {
 	if {! [info exists used($ip_base.$i)]} {return "$ip_base.$i"}
     }
     return {}
@@ -225,7 +225,7 @@ foreach left [array names to_assign] {
     set both [lindex $to_assign($left) 2]
 
     if {$both == 1} {
-	set subnet [find_free_common_subnet $node $dst]
+	set subnet [find_free_subnet $node $dst]
 	set ipA [find_free_ip $subnet]
 	set ipB [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ipA]
