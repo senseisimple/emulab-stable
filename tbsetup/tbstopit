@@ -31,11 +31,11 @@ if (system("$tbdir/tbend $project $eid $irfile") != 0) {
     exit(-1);
 }
 
-print STDOUT "Running rmacct with argument: $eid\n";
-if (system("$tbdir/rmacct $eid") != 0) {
-    print STDOUT "rmacct failed!\n";
-    exit(-1); 
-}
+#print STDOUT "Running rmacct with argument: $eid\n";
+#if (system("$tbdir/rmacct $eid") != 0) {
+#    print STDOUT "rmacct failed!\n";
+#    exit(-1); 
+#}
 
 print STDOUT "Termination Success\n";
 exit 0;
