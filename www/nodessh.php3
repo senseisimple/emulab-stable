@@ -63,11 +63,6 @@ header("Content-Description: SSH description file for a testbed node");
 echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";
 echo "login:    $uid\n";
 
-# Hack for multiple logins/sshd's on Windows.
-if ($iswindowsnode) {
-    echo "port: 2222\n";
-}
-
 if ($isvirt) {
     if ($isremote) {
 	#
