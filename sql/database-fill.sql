@@ -263,6 +263,17 @@ REPLACE INTO state_transitions VALUES ('USERSTATUS','NEWUSER','UNAPPROVED');
 REPLACE INTO state_transitions VALUES ('USERSTATUS','UNAPPROVED','ACTIVE');
 
 #
+# Dumping data for table 'mode_transitions'
+#
+
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMALv1','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','RELOAD','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','MINIMAL','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','RELOAD','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','MINIMAL','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv1','SHUTDOWN');
+
+#
 # Dumping data for table 'testsuite_preentables'
 #
 
