@@ -17,11 +17,11 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 if (!isset($nsdata)) {
-	ERROR( "Need to send NSFILE!" );
+	USERERROR( "Need to send NSFILE!" );
 } 
 
 if (!isset($nsref) || !ereg("^[0-9]+$", $nsref)) {
-	ERROR( "Need to send valid NSREF!" );
+	USERERROR( "Need to send valid NSREF!" );
 }
 
 #if (isset($nsdata)) {
