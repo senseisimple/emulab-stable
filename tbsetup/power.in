@@ -16,10 +16,16 @@
 #
 # Configure variables
 #
-my $TBOPS = "@TBOPSEMAIL@";
+my $TB         = "@prefix@";
+my $TBOPS      = "@TBOPSEMAIL@";
+my $ELABINELAB = @ELABINELAB@;
+my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
+my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 
 use lib "@prefix@/lib";
 use libdb;
+use libxmlrpc;
 use power_rpc27;
 use snmpit_apc;
 use libtestbed;
@@ -119,7 +125,39 @@ foreach my $n (0..$#machines) {
 #
 print "do \"$op\" to @machines\n" if $verbose > 1;
 
+#
+# ElabinElab is special; Do local permission checks, build up a node list
+# and then contact the proxy to do the actual work. No perl bindings yet,
+# so have to use the python client program. 
+#
+if ($ELABINELAB) {
+    my @nodelist = ();
+    
+    foreach my $node (@machines) {
+	if (!(($UID == 0) ||
+	      TBNodeAccessCheck($UID, TB_NODEACCESS_POWERCYCLE, $node))) {
+	    warn "You are not authorized to control $node. Skipping...\n";
+	    next;
+	}
+	push(@nodelist, $node);
+    }
 
+    exit(0)
+	if (! @nodelist);
+
+    libxmlrpc::Config({"server"  => $RPCSERVER,
+		       "verbose" => 1,
+		       "cert"    => $RPCCERT,
+		       "portnum" => $RPCPORT});
+
+    my $rval = libxmlrpc::CallMethod("elabinelab", "power",
+				     {"op"    => "$op",
+				      "nodes" => join(",", @nodelist)});
+    if (!defined($rval)) {
+	exit(-1);
+    }
+    exit($rval);
+}
 
 #
 # Get table of users <--> machines for those nodes, to make sure
