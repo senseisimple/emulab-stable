@@ -673,13 +673,13 @@ while (1) {
 	# spit out up to nodes
 	print "ASSIGN FAILED:\n";       
 	while (<ASSIGNFP>) {
-	    if (/link_users: (\d+)$/) {
+	    if (/link_users:\s*(\d+)$/) {
 		$linkusers = $1;
-	    } elsif (/bandwidth: (\d+)$/) {
+	    } elsif (/bandwidth:\s*(\d+)$/) {
 		$bandwidth = $1;
-	    } elsif (/unassigned: (\d+)$/) {
+	    } elsif (/unassigned:\s*(\d+)$/) {
 		$unassigned = $1;
-	    } elsif (/desires: (\d+)$/) {
+	    } elsif (/desires:\s*(\d+)$/) {
 		$desires = $1;
 	    }
 	    if (/^Nodes:/) {last;}
@@ -726,7 +726,8 @@ while (1) {
 	if ($unassigned > 0) {
 	    $exitcode += 32;
 	}
-	print "$0: *** Reached run limit.  Giving up.\n";
+	print "*** $0:\n".
+	      "    Reached run limit. Giving up. Exitcode: $exitcode.\n";
 	exit($exitcode);
     }
     $currentrun++;
