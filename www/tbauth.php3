@@ -43,6 +43,14 @@ define("CHECKLOGIN_ADMINOFF",		0x20000);
 define("CHECKLOGIN_WEBONLY",		0x40000);
 
 #
+# Constants for tracking possible login attacks.
+#
+define("DOLOGIN_MAXUSERATTEMPTS",	4);
+define("DOLOGIN_MAXUSERWAITTIME",	60);	# Seconds
+define("DOLOGIN_MAXIPATTEMPTS",		8);
+define("DOLOGIN_MAXIPWAITTIME",		120);	# Seconds
+
+#
 # Generate a hash value suitable for authorization. We use the results of
 # microtime, combined with a random number.
 # 
@@ -366,31 +374,107 @@ function ISADMINISTRATOR() {
 function DOLOGIN($uid, $password, $adminmode = 0) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBSECURECOOKIES;
+    global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid) || !isset($password) || $password == "") {
 	return -1;
     }
+    $now = time();
 
-    $query_result =
-	DBQueryFatal("SELECT usr_pswd,admin FROM users WHERE uid='$uid'");
+    #
+    # Check for a frozen IP address; too many failures.
+    #
+    unset($iprow);
+    unset($IP);
+    if (isset($_SERVER['REMOTE_ADDR'])) {
+	$IP = $_SERVER['REMOTE_ADDR'];
+	
+	$ip_result =
+	    DBQueryFatal("select * from login_failures ".
+			 "where IP='$IP'");
+
+	if ($iprow = mysql_fetch_array($ip_result)) {
+	    $ipfrozen = $iprow['frozen'];
+
+	    if ($ipfrozen) {
+		DBQueryFatal("update login_failures set ".
+			     "       failcount=failcount+1, ".
+			     "       failstamp='$now' ".
+			     "where IP='$IP'");
+		return -1;
+	    }
+	}
+    }
+
+    $user_result =
+	DBQueryFatal("select usr_pswd,admin,weblogin_frozen,".
+		     "       weblogin_failcount,weblogin_failstamp, ".
+		     "       usr_email,usr_name ".
+		     "from users where uid='$uid'");
 
     #
     # Check password in the database against provided. 
     #
-    if ($row = mysql_fetch_row($query_result)) {
-        $db_encoding = $row[0];
-	$isadmin     = $row[1];
+    do {
+      if ($row = mysql_fetch_array($user_result)) {
+        $db_encoding = $row['usr_pswd'];
+	$isadmin     = $row['admin'];
+	$frozen      = $row['weblogin_frozen'];
+	$failcount   = $row['weblogin_failcount'];
+	$failstamp   = $row['weblogin_failstamp'];
+	$usr_email   = $row['usr_email'];
+	$usr_name    = $row['usr_name'];
+
+	# Check for frozen accounts, and for too many failures within
+	# the last N minutes.
+	if ($frozen) {
+	    DBQueryFatal("update users set , ".
+			 "       weblogin_failcount=weblogin_failcount+1, ".
+			 "       weblogin_failstamp='$now' ".
+			 "where uid='$uid'");
+	    return -1;
+	}
+	
         $encoding = crypt("$password", $db_encoding);
         if (strcmp($encoding, $db_encoding)) {
-            return -1;
+	    #
+	    # Bump count and check for too many failures within the
+	    # last minute.
+	    #
+	    $failcount++;
+	    if (($failstamp && $now - $failstamp > DOLOGIN_MAXUSERWAITTIME) ||
+		!$failstamp) {
+		$failstamp = $now;
+		$failcount = 1;
+	    }
+
+	    if ($failcount > DOLOGIN_MAXUSERATTEMPTS) {
+		$frozen = 1;
+	    
+		TBMAIL("$usr_name '$uid' <$usr_email>",
+		   "Web Login Freeze: '$uid'",
+		   "Your login has been frozen because there were too many\n".
+		   "login failures from " . $_SERVER['REMOTE_ADDR'] . ".\n\n".
+		   "Testbed Operations has been notified.\n",
+		   "From: $TBMAIL_OPS\n".
+		   "Cc: $TBMAIL_OPS\n".
+		   "Bcc: $TBMAIL_AUDIT\n".
+		   "Errors-To: $TBMAIL_WWW");
+	    }
+
+	    DBQueryFatal("update users set weblogin_frozen='$frozen', ".
+			 "       weblogin_failcount='$failcount', ".
+			 "       weblogin_failstamp='$failstamp' ".
+			 "where uid='$uid'");
+            break;
         }
         #
         # Pass! Insert a record in the login table for this uid with
         # the new hash value. If the user is already logged in, thats
         # okay; just update it in place with a new hash and timeout. 
         #
-	$timeout = time() + $TBAUTHTIMEOUT;
+	$timeout = $now + $TBAUTHTIMEOUT;
 	$hashkey = GENHASH();
         $query_result =
 	    DBQueryFatal("SELECT timeout FROM login WHERE uid='$uid'");
@@ -418,14 +502,13 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
 	# with the hash value and auth usr embedded.
 
 	#
-	# For the hashkey, we give it a longish timeout since we are going
-	# to control the actual timeout via the database. This just avoids
-	# having to update the hash as we update the timeout in the database
-	# each time the user does something. Eventually the cookie will
-	# expire and the user will be forced to log in again anyway. 
+	# For the hashkey, we use a zero timeout so that the cookie is
+	# a session cookie; killed when the browser is exited. Hopefully this
+	# keeps the key from going to disk on the client machine. The cookie
+	# lives as long as the browser is active, but we age the cookie here
+	# at the server so it will become invalid at some point.
 	#
-	$timeout = time() + (60 * 60 * 24) + $TBAUTHTIMEOUT;
-	setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/",
+	setcookie($TBAUTHCOOKIE, $hashkey, 0, "/",
                   $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 	#
@@ -436,7 +519,7 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
 	# we do not pass around the UID anymore, but look for it in the
 	# cookie.
 	# 
-	$timeout = time() + (60 * 60 * 24 * 32);
+	$timeout = $now + (60 * 60 * 24 * 32);
 	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
 
 	#
@@ -450,13 +533,57 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
 	if ($adminmode && $isadmin) {
 	    $adminoff = 0;
 	}
-	DBQueryFatal("update users set adminoff=$adminoff where uid='$uid'");
+	DBQueryFatal("update users set adminoff=$adminoff, ".
+		     "       weblogin_failcount=0,weblogin_failstamp=0 ".
+		     "where uid='$uid'");
 
 	return 0;
-    }
+      }
+    } while (0);
     #
     # No such user
     #
+    if (!isset($IP))
+	return -1;
+    
+    if (isset($iprow)) {
+	$ipfailcount = $iprow['failcount'];
+	$ipfailstamp = $iprow['failstamp'];
+
+        #
+        # Bump count and check for too many (8) failures within the
+        # last 2 minutes. Note that aging is passive; we do not have
+        # a daemon cleaning out old records, so we have to age on the fly. 
+        #
+	$ipfailcount++;
+	if (($ipfailstamp && $now - $ipfailstamp > DOLOGIN_MAXIPWAITTIME) ||
+	    !$ipfailstamp) {
+	    $ipfailstamp = $now;
+	    $ipfailcount = 1;
+	}
+    }
+    else {
+	$ipfailcount = 1;
+	$ipfailstamp = $now;
+	$ipfrozen    = 0;
+    }
+    
+    if ($ipfailcount > DOLOGIN_MAXIPATTEMPTS) {
+	$ipfrozen = 1;
+	    
+	TBMAIL($TBMAIL_OPS,
+	       "Web Login Freeze: '$IP'",
+	       "Logins has been frozen because there were too many login\n".
+	       "failures from $IP. Last attempted uid was '$uid'.\n\n",
+	       "From: $TBMAIL_OPS\n".
+	       "Bcc: $TBMAIL_AUDIT\n".
+	       "Errors-To: $TBMAIL_WWW");
+    }
+    DBQueryFatal("replace into login_failures set ".
+		 "       IP='$IP', ".
+		 "       frozen='$ipfrozen', ".
+		 "       failcount='$ipfailcount', ".
+		 "       failstamp='$ipfailstamp'");
     return -1;
 }
 

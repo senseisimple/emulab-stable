@@ -22,13 +22,15 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 # List of valid toggles
-$toggles = array("adminoff");
+$toggles = array("adminoff", "webfreeze");
 
 # list of valid values for each toggle
-$values  = array("adminoff"  => array(0,1));
+$values  = array("adminoff"  => array(0,1),
+		 "webfreeze" => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
-$optargs = array("adminoff"  => array("target_uid" => 0));
+$optargs = array("adminoff"  => array("target_uid" => 0),
+		 "webfreeze" => array("target_uid" => 1));
 
 # Mandatory page arguments.
 $type  = $_GET['type'];
@@ -76,6 +78,19 @@ if ($type == "adminoff") {
 	    PAGEARGERROR("Target user '$target_uid' is not a valid user!");
     }
     DBQueryFatal("update users set adminoff='$value' where uid='$target_uid'");
+}
+elseif ($type == "webfreeze") {
+    # must be admin
+    # Do not check if they are admin mode (ISADMIN), check if they
+    # have the power to change to admin mode!
+    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (!TBCurrentUser($target_uid)) {
+	PAGEARGERROR("Target user '$target_uid' is not a valid user!");
+    }
+    DBQueryFatal("update users set weblogin_frozen='$value' ".
+		 "where uid='$target_uid'");
 }
 else {
     USERERROR("Nobody has permission to toggle $type!", 1);
