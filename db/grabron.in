@@ -31,17 +31,22 @@ my $MAGICNODE = "ron2";
 
 my $logfile = "$TB/log/grabron";
 
-if (@ARGV != 2) {
-    die "Usage: $0 <host> <port>\n";
+if (@ARGV != 1) {
+    die "Usage: $0 <url>\n";
 }
-my ($host, $port) = @ARGV;
+my ($url) = @ARGV;
+if (! ($url =~ /^http:\/\/([\w-.]+)\/(.*)$/) ) {
+    die "URL must be in the form http://host/path\n";
+}
+my ($host,$path) = ($1,$2);
+print "Host is $host, path is $path\n";
 
 $| = 1;
 
 #
 # Time in beteen polls
 #
-my $interval = 8 * 60 *60; # 8 hours
+my $interval = 24 * 60 *60; # 24 hours
 
 #
 # Find out the interface to use for the TBDB_WIDEAREA_LOCALNODE, since I don't
@@ -166,58 +171,26 @@ sub upload_times($$$) {
 
 sub get_times($) {
     my ($last_time) = (@_);
-    print "Connecting to $host:$port\n";
+    my $end_time = time();
+    
+    print "Connecting to $host\n";
 
     my $remote = IO::Socket::INET->new ( Proto => "tcp",
     					 PeerAddr => $host,
-					 PeerPort => $port );
+					 PeerPort => 80 );
     if (!$remote) {
-	warn "Unable to connect to to $host:$port\n";
+	warn "Unable to connect to to $host\n";
 	return ();
     }
 
     $remote->autoflush(1); # Equivalent of $| = 1
+	
+    print "Giving times $last_time $end_time\n";
 
-    my ($version, $start, $end, $ent);
-    $version = <$remote>;
-    $start = <$remote>;
-    $end = <$remote>;
-    $ent = <$remote>;
-
-    if (!$version || !$start || !$end || !$ent) {
-    	warn "Unable to read data from network\n";
-    	undef $remote;
-    	return ();
-    }
-
-    $version =~ /DBSYNC (\d+\.\d+)/;
-    if (!$1 || ($1 != "1.0")) {
-	warn "Wrong version reported\n";
-	undef $remote;
-	return ();
-    }
-
-    #
-    # We don't currently care about these
-    #
-    $start =~ /DBSTART (\d+)/;
-    $ent =~ /DBENT (\d+)/;
-
-    $end =~ /DBEND (\d+\.?\d+)/;
-    if (!$1) {
-	warn "No end time reported\n";
-	undef $remote;
-	return ();
-    }
-
-    my $end_time = sprintf("%i",$1);
-    if ($last_time > $end_time) {
-	warn "No new data available\n";
-	undef $remote;
-	return ();
-    }
-
-    print "Giving: $last_time $end_time\n";
+    my $args = "start=$last_time&end=$end_time&format=avgTxt";
+    print $remote "GET http://$host/$path?$args HTTP/1.0\n";
+    print $remote "User-Agent: grabron\n";
+    print $remote "\n";
 
     #
     # Set some gloabls, so that other functions see these times
@@ -225,23 +198,41 @@ sub get_times($) {
     $::last_time = $last_time;
     $::end_time = $end_time;
 
-    print $remote "$last_time $end_time\n";
-
-    #
-    # XXX: Timeout waiting for data
-    #
+    $/ = "\r\n"; # Use CRLF instead of just LF to delimit lines
     my @data = <$remote>;
+    chomp @data;
     if (!@data) {
 	warn "No data returned\n";
 	undef $remote;
 	return ();
     }
 
-    if ($data[0] !~ /^\d/) {
-    	warn "An error was reported: \n", @data, "\n";
-    	undef $remote;
-    	return ();
+    #
+    # Check HTTP header, make sure we got back a 200
+    #
+    my $firstline = shift @data;
+    if (! ($firstline =~ /^HTTP\/\d\.\d (\d+) (.*)$/)) {
+	warn "Unexpected header: $firstline\n";
+	undef $remote;
+	return ();
     }
+    my ($status,$stext) = ($1,$2);
+    if ($status != 200) {
+	warn "Unexpected status: $status $stext\n";
+	undef $remote;
+	return ();
+    }
+
+    #
+    # Eat the rest of the headers
+    #
+    while (shift @data) { }
+
+    #
+    # XXX: Temporary, until Dave fixes the "Plain Text" output, which isn't
+    # really
+    #
+    @data = split /<p>|<\/p><p>|<\/p>/, $data[0];
 
     my @return;
     foreach my $line (@data) {
