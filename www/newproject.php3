@@ -82,6 +82,21 @@ if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
 }
 
 #
+# Check that email address looks reasonable. We need the domain for
+# below anyway.
+#
+$email_domain = strstr($usr_email, "@");
+if (! $email_domain ||
+    strcmp($usr_email, $email_domain) == 0 ||
+    strlen($email_domain) <= 1 ||
+    ! strstr($email_domain, ".")) {
+    USERERROR("The email address `$usr_email' looks invalid!. Please ".
+	      "go back and fix it up", 1);
+}
+$email_domain = substr($email_domain, 1);
+$email_user   = substr($usr_email, 0, strpos($usr_email, "@", 0));
+
+#
 # Certain of these values must be escaped or otherwise sanitized.
 # 
 $proj_why  = addslashes($proj_why);
@@ -132,6 +147,23 @@ if ($returning) {
     }
 }
 else {
+    #
+    # Check new username against CS logins so that external people do
+    # not pick names that overlap with CS names.
+    #
+    if (! strstr($email_domain, "cs.utah.edu")) {
+	$dbm = dbmopen($TBCSLOGINS, "r");
+	if (! $dbm) {
+	    TBERROR("Could not dbmopen $TBCSLOGINS from newproject.php3\n", 1);
+	}
+	if (dbmexists($dbm, $proj_head_uid)) {
+	    dbmclose($dbm);
+	    USERERROR("The username '$proj_head_uid' is already in use. ".
+		      "Please go back and choose another.", 1);
+	}
+	dbmclose($dbm);
+    }
+    
     if (strcmp($password1, $password2)) {
         USERERROR("You typed different passwords in each of the two password ".
                   "entry fields. <br> Please go back and correct them.",
