@@ -103,6 +103,7 @@ if (isset($deletekey)) {
 	DBQueryFatal("delete from node_status where node_id='$nodeid'");
 	DBQueryFatal("delete from reserved where node_id='$nodeid'");
 	DBQueryFatal("delete from node_auxtypes where node_id='$nodeid'");
+	DBQueryFatal("delete from node_activity where node_id='$nodeid'");
     }
     header("Location: wideareakeys.php3");
 }
