@@ -429,7 +429,7 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * See if the node was in the reload state. If so we need to clear it
 	 * and its reserved status.
 	 */
-	res = mydb_query("select node_id from reloads where node_id='%s'",
+	res = mydb_query("select node_id from scheduled_reloads where node_id='%s'",
 			 1, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "REBOOT: %s: DB Error getting reload!",
@@ -442,7 +442,7 @@ doreboot(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 	mysql_free_result(res);
 
-	if (mydb_update("delete from reloads where node_id='%s'", nodeid)) {
+	if (mydb_update("delete from scheduled_reloads where node_id='%s'", nodeid)) {
 		syslog(LOG_ERR, "REBOOT: %s: DB Error clearing reload!",
 		       nodeid);
 		return 1;

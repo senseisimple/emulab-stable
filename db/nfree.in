@@ -51,7 +51,7 @@ if ($sth->numrows < 1) {
   die("There is no experiment '$eid' in project '$pid'.\n");
 }
  
-$cmd = "lock tables nodes write, node_types read, reloads read, ".
+$cmd = "lock tables nodes write, node_types read, scheduled_reloads read, ".
   "interfaces write, delays write, reserved write, last_reservation write,".
   "next_reserve read";
 $sth = $dbh->query($cmd) 
@@ -85,7 +85,7 @@ foreach my $n (@node_names) {
   $dbh->query($cmd);
 
   # If the node has a reloads entry, change the reservation and start it
-  $cmd = "select node_id,image_id from reloads where node_id='$n'";
+  $cmd = "select node_id,image_id from scheduled_reloads where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
@@ -179,7 +179,7 @@ $sth = $dbh->query($cmd)
 
 if ( (@reloads > 0) || (keys %reserves > 0) ) {
   print "Locking tables.\n";
-  $cmd = "lock tables nodes read, node_types read, reloads read, ".
+  $cmd = "lock tables nodes read, node_types read, scheduled_reloads read, ".
     "interfaces write, reserved write, next_reserve write";
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");

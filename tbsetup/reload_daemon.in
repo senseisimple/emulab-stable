@@ -143,10 +143,10 @@ while (1) {
 	# EID was when nfree noticed an entry in the table.
 	#
 	$query_result =
-	    DBQueryWarn("select image_id from reloads where node_id='$node'");
+	    DBQueryWarn("select image_id from scheduled_reloads where node_id='$node'");
     
 	if (! $query_result) {
-	    print "DB Error getting imageid from reloads. Waiting a bit.\n";
+	    print "DB Error getting imageid from scheduled_reloads. Waiting a bit.\n";
 	    next;
 	}
 	@row     = $query_result->fetchrow_array();

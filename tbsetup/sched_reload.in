@@ -163,7 +163,7 @@ foreach my $node (@nodes) {
 
     # Put it in the reloads table so TMCD knows to free it.
     print STDERR "Scheduling reload of $imageid for $pc:\n";
-    DBQueryFatal("replace into reloads ".
+    DBQueryFatal("replace into scheduled_reloads ".
 		 "(node_id, image_id) values ('$pc', '$imageid')");
 }
 
