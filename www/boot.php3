@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -72,7 +72,7 @@ if (!$confirmed) {
                 sure you want to reboot node '$node_id?'
               </h2>\n";
 	
-	SHOWNODE($node_id, 1);
+	SHOWNODE($node_id, SHOWNODE_SHORT);
     }
     else {
         echo "<font size=+2>Experiment <b>".

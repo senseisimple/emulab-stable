@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -71,7 +71,7 @@ if (!$confirmed) {
           sure you want to free node '$node_id?'
           </h2>\n";
 
-    SHOWNODE($node_id);
+    SHOWNODE($node_id, SHOWNODE_NOFLAGS);
     
     echo "<form action='freenode.php3?node_id=$node_id' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";

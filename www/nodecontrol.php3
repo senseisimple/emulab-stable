@@ -84,7 +84,7 @@ echo "<center>
       <h3>Node parameters successfully modified!</h3><p>
       </center>\n";
 
-SHOWNODE($node_id);
+SHOWNODE($node_id, SHOWNODE_NOFLAGS);
 
 #
 # Edit option.

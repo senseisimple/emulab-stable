@@ -198,7 +198,7 @@ function SHOWGROUP($pid, $gid) {
 
     #
     # Generate the table.
-    # 
+    #
     echo "<tr>
               <td>GID: </td>
               <td class=\"left\">
@@ -627,6 +627,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
     $mem_usage   = $exprow["mem_usage"];
     $cpu_usage   = $exprow["cpu_usage"];
     $exp_slice   = $exprow[slicename];
+    $linktest    = $exprow["linktest_level"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -849,6 +850,12 @@ function SHOWEXP($pid, $eid, $short = 0) {
                       <td class=\"left\">$syncserver</td>
                   </tr>\n";
 	}
+	if ($linktest) {
+	    echo "<tr>
+                      <td>Linktest Level: </td>
+                      <td class=\"left\">$linktest</td>
+                  </tr>\n";
+	}
     }
 
     echo "</table>\n";
@@ -955,13 +962,13 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	    "at least one node in the experiment has not <br>reported ".
 	    "on its proper schedule.\n"; 
 	if ($parens) {
-            # don't show this unless we did it... most users shouldn't ever
+            # do not show this unless we did it... most users should not ever
 	    # need to know that some expts have their idleness ignored
 	    echo "Values are in parenthesis for idle-ignore experiments.\n";
 	}
 	echo "</ol></font></td></tr></table>\n";
 
-    }   
+    }
 }
 
 #
@@ -1564,7 +1571,7 @@ function SHOWOSIDEXPTS($pid, $osname, $uid) {
 
 	    #
 	    # Gotta make sure that the user actually has the right to see this
-	    # experiment - summarize all the experiments that he/she can't see
+	    # experiment - summarize all the experiments that he/she cannot see
 	    # at the bottom
 	    #
 	    if (!TBExptAccessCheck($uid,$pid,$eid,$TB_EXPT_READINFO)) {
@@ -1589,7 +1596,14 @@ function SHOWOSIDEXPTS($pid, $osname, $uid) {
 #
 # Show node record.
 #
-function SHOWNODE($node_id, $short = 0) {
+define("SHOWNODE_NOFLAGS",	0);
+define("SHOWNODE_SHORT",	1);
+define("SHOWNODE_NOPERM",	2);
+
+function SHOWNODE($node_id, $flags = 0) {
+    $short  = ($flags & SHOWNODE_SHORT  ? 1 : 0);
+    $noperm = ($flags & SHOWNODE_NOPERM ? 1 : 0);
+    
     $query_result =
 	DBQueryFatal("select n.*,na.*,r.vname,r.pid,r.eid,i.IP, ".
 		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
@@ -1649,7 +1663,7 @@ function SHOWNODE($node_id, $short = 0) {
     $last_report        = $row[last_report];
     $rsrvrole           = $row[rsrvrole];
     $phys_IP		= $row[phys_IP];
-    
+
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
     if (!$next_boot_cmd_line)
@@ -1680,7 +1694,7 @@ function SHOWNODE($node_id, $short = 0) {
 	}
     }
 
-    if (!$short) {
+    if (!$short && !$noperm) {
 	if ($vname) {
 	    echo "<tr>
                       <td>Virtual Name:</td>
@@ -1705,10 +1719,11 @@ function SHOWNODE($node_id, $short = 0) {
 
     echo "<tr>
               <td>Node Type:</td>
-              <td class=left>$type</td>
+              <td class=left>
+  	          <A href='shownodetype.php3?node_type=$type'>$type</td>
           </tr>\n";
 
-    if (!$short) {
+    if (!$short && !$noperm) {
 	echo "<tr>
                   <td>Def Boot OS:</td>
                   <td class=left>";
@@ -1794,7 +1809,7 @@ function SHOWNODE($node_id, $short = 0) {
 	}
     }
 
-    if (!$short) {
+    if (!$short && !$noperm) {
 	if (!$isvirtnode && !$isremotenode) {
 	    echo "<tr>
                       <td>Def Boot Command&nbsp;Line:</td>
@@ -1852,24 +1867,22 @@ function SHOWNODE($node_id, $short = 0) {
                      <td class=left>$sshdport</td>
                   </tr>\n";
 	}
-    }
 
-    echo "<tr>
-              <td>Startup Command:</td>
-              <td class=left>$startupcmd</td>
-          </tr>\n";
+	echo "<tr>
+                  <td>Startup Command:</td>
+                  <td class=left>$startupcmd</td>
+              </tr>\n";
 
-    echo "<tr>
-              <td>Tarballs:</td>
-              <td class=left>$tarballs</td>
-          </tr>\n";
+        echo "<tr>
+                  <td>Tarballs:</td>
+                  <td class=left>$tarballs</td>
+              </tr>\n";
 
-    echo "<tr>
-              <td>RPMs:</td>
-              <td class=left>$rpms</td>
-          </tr>\n";
+	echo "<tr>
+                  <td>RPMs:</td>
+                  <td class=left>$rpms</td>
+              </tr>\n";
 
-    if (!$short) {
 	if (!$isvirtnode && !$isremotenode) {
 	    echo "<tr>
                       <td>Router Type:</td>
@@ -1954,8 +1967,41 @@ function SHOWNODE($node_id, $short = 0) {
 	    }
 	}
     }
-    echo "</table>\n";
 
+    if (!$short) {
+        #
+        # Get interface info.
+        #
+	echo "<tr>
+                  <td align=center colspan=2>Interface Info</td>
+              </tr>\n";
+	echo "<tr><th>Interface</th><th>Model; protocols</th>\n";
+    
+	$query_result =
+	    DBQueryFatal("select i.*,it.*,c.* from interfaces as i ".
+			 "left join interface_types as it on ".
+			 "     i.interface_type=it.type ".
+			 "left join interface_capabilities as c on ".
+			 "     i.interface_type=c.type and ".
+			 "     c.capkey='protocols' ".
+			 "where i.node_id='$node_id' and ".
+			 "      i.role='" . TBDB_IFACEROLE_EXPERIMENT . "'".
+			 "order by iface");
+    
+	while ($row = mysql_fetch_array($query_result)) {
+	    $iface     = $row["iface"];
+	    $type      = $row["type"];
+	    $man       = $row["manufacturuer"];
+	    $model     = $row["model"];
+	    $protocols = $row["capval"];
+
+	    echo "<tr>
+                      <td>$iface:&nbsp </td>
+                      <td class=left>$type ($man $model; $protocols)</td>
+                  </tr>\n";
+	}
+    }
+    echo "</table>\n";
 }
 
 #

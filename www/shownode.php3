@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -26,6 +26,9 @@ if (!isset($node_id) ||
     strcmp($node_id, "") == 0) {
     USERERROR("You must provide a node ID.", 1);
 }
+if (!TBvalid_node_id($node_id)) {
+    PAGEARGERROR("Illegal characters in arguments");
+}
 
 #
 # Check to make sure that this is a valid nodeid
@@ -34,18 +37,19 @@ if (! TBValidNodeName($node_id)) {
     USERERROR("$node_id is not a valid node name!", 1);
 }
 
+echo "<font size=+2>".
+     "Node <b>$node_id</b></font>";
+
 #
 # Admin users can look at any node, but normal users can only control
 # nodes in their own experiments.
 #
-if (! $isadmin) {
-    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
-        USERERROR("You do not have permission to access node $node_id!", 1);
-    }
+if (! $isadmin &&
+    ! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
+    SHOWNODE($node_id, SHOWNODE_NOPERM);
+    PAGEFOOTER();
+    return;
 }
-
-echo "<font size=+2>".
-     "Node <b>$node_id</b>";
 
 $query_result =
     DBQueryFatal("select r.vname,r.pid,r.eid from nodes as n ".
