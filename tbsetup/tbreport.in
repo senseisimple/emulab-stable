@@ -286,7 +286,7 @@ if ($showlinks) {
 	    while (my ($node_id1, $node_id2, $time, $bandwidth,
 		    $lossrate) = $result->fetchrow) {
 		$delaymap{"$node_id1 $node_id2"} = 
-		    [$time * 1000 / 2, $bandwidth * 8, $lossrate];
+		    [$time * 1000 / 2, $bandwidth, $lossrate];
 	    }
 
 	    print  "Wide-Area Lan/Link Info: Recent Data\n";
