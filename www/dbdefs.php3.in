@@ -8,6 +8,7 @@ $TBDB_UIDLEN    = 8;
 $TBDB_PIDLEN    = 12;
 $TBDB_GIDLEN	= 12;
 $TBDB_UNIXGLEN	= 16;
+$TBDB_NODEIDLEN = 10;
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not
