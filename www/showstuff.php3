@@ -569,10 +569,22 @@ function SHOWEXP($pid, $eid) {
 #
 function SHOWNODES($pid, $eid) {
     global $TBDBNAME;
+    global $TBOPSPID;
 		
     $reserved_result = mysql_db_query($TBDBNAME,
 		"SELECT * FROM reserved WHERE ".
 		"eid=\"$eid\" and pid=\"$pid\"");
+    
+    # If this is an expt in emulab-ops, we don't care about vname,
+    # since it won't be defined. But we do want to know when the node
+    # entered the experiment, since it won't match the experiment's
+    # swapin date.
+    $nodename="Node Name";
+    $vnamefield="vname";
+    if (!strcmp($pid, $TBOPSPID)) {
+      $nodename="Reserve Time";
+      $vnamefield="rsrvtime";
+    }
     
     if (mysql_num_rows($reserved_result)) {
 	echo "<center>
@@ -581,7 +593,7 @@ function SHOWNODES($pid, $eid) {
               <table align=center border=1>
               <tr>
                 <td align=center>Node ID</td>
-                <td align=center>Node Name</td>
+                <td align=center>$nodename</td>
                 <td align=center>Type</td>
                 <td align=center>Default<br>OSID</td>
                 <td align=center>Default<br>Path</td>
@@ -593,7 +605,8 @@ function SHOWNODES($pid, $eid) {
               </tr>\n";
 	
 	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT nodes.*,reserved.vname ".
+		"SELECT nodes.*,reserved.vname, ".
+	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 	        "FROM nodes LEFT JOIN reserved ".
 	        "ON nodes.node_id=reserved.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
@@ -601,7 +614,7 @@ function SHOWNODES($pid, $eid) {
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
-	    $vname   = $row[vname];
+	    $vname   = $row[$vnamefield];
 	    $type    = $row[type];
 	    $def_boot_osid      = $row[def_boot_osid];
 	    $def_boot_path      = $row[def_boot_path];
