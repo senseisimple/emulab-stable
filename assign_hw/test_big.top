@@ -1,0 +1,44 @@
+node 1 pc
+node 2 pc
+node 3 pc
+node 4 pc
+node 5 pc
+node 6 pc
+node 7 pc
+node 8 pc
+node 9 pc
+node 10 pc
+node 11 pc
+node 12 pc
+node 13 pc
+node 14 pc
+node 15 pc
+node 16 pc
+node 17 pc
+node 18 pc
+node 19 pc
+node 20 pc
+link 1 2 100
+link 2 3 100
+link 3 4 100
+link 3 7 100
+link 4 11 100
+link 4 12 100
+link 5 7 100
+link 5 9 100
+link 6 7 100
+link 7 8 100
+link 8 9 100
+link 9 10 100
+link 10 11 100
+link 12 13 100
+link 13 14 100
+link 14 15 100
+link 15 16 100
+link 16 17 100
+link 17 20 100
+link 18 15 100
+link 18 19 100
+link 19 20 100
+link 20 1 100
+link 2 12 100
