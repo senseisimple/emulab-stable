@@ -726,12 +726,12 @@ function PAGEHEADER($title, $view = NULL) {
 
     if ($login_uid && ISADMINISTRATOR()) {
 	if (ISADMIN($login_uid)) {
-	    echo "<a href=toggle.php?target_uid=$login_uid&type=adminoff&value=1>
+	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=1>
 	             <img src='/redball.gif'
                           border=0 alt='Admin On'></a>\n";
 	}
 	else {
-	    echo "<a href=toggle.php?target_uid=$login_uid&type=adminoff&value=0>
+	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=0>
 	             <img src='/greenball.gif'
                           border=0 alt='Admin Off'></a>\n";
 	}
