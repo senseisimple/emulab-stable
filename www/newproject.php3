@@ -977,50 +977,68 @@ DBQueryFatal("insert into group_membership ".
 	     "values ('$proj_head_uid','$pid','$pid','none', now())");
 
 #
-# Grab the unix GID that was assigned.
+# If a new user, do not send the full blown message until verified.
 #
-TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+if ($returning) {
+    #
+    # Grab the unix GID that was assigned.
+    #
+    TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
-#
-# The mail message to the approval list.
-# 
-TBMAIL($TBMAIL_APPROVAL,
-     "New Project '$pid' ($proj_head_uid)",
-     "'$usr_name' wants to start project '$pid'.\n".
-     "\n".
-     "Name:            $usr_name ($proj_head_uid)\n".
-     "Returning User?: $usr_returning\n".
-     "Email:           $usr_email\n".
-     "User URL:        $usr_URL\n".
-     "Project:         $proj_name\n".
-     "Expires:         $proj_expires\n".
-     "Project URL:     $proj_URL\n".
-     "Public URL:      $proj_public\n".
-     "Why Not Public:  $proj_whynotpublic\n".
-     "Link to Us?:     $proj_linked\n".
-     "Funders:         $proj_funders\n".
-     "Title:           $usr_title\n".
-     "Affiliation:     $usr_affil\n".
-     "Address 1:       $usr_addr\n".
-     "Address 2:       $usr_addr2\n".
-     "City:            $usr_city\n".
-     "State:           $usr_state\n".
-     "ZIP/Postal Code: $usr_zip\n".
-     "Country:         $usr_country\n".
-     "Phone:           $usr_phone\n".
-     "Members:         $proj_members\n".
-     "PCs:             $proj_pcs\n".
-     "Planetlab PCs:   $proj_plabpcs\n".
-     "RON PCs:         $proj_ronpcs\n".
-     "Unix GID:        $unix_name ($unix_gid)\n".
-     "Reasons:\n$proj_why\n\n".
-     "Please review the application and when you have made a decision,\n".
-     "go to $TBWWW and\n".
-     "select the 'Project Approval' page.\n\nThey are expecting a result ".
-     "within 72 hours.\n", 
-     "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-     "Reply-To: $TBMAIL_APPROVAL\n".
-     "Errors-To: $TBMAIL_WWW");
+    #
+    # The mail message to the approval list.
+    # 
+    TBMAIL($TBMAIL_APPROVAL,
+	   "New Project '$pid' ($proj_head_uid)",
+	   "'$usr_name' wants to start project '$pid'.\n".
+	   "\n".
+	   "Name:            $usr_name ($proj_head_uid)\n".
+	   "Returning User?: $usr_returning\n".
+	   "Email:           $usr_email\n".
+	   "User URL:        $usr_URL\n".
+	   "Project:         $proj_name\n".
+	   "Expires:         $proj_expires\n".
+	   "Project URL:     $proj_URL\n".
+	   "Public URL:      $proj_public\n".
+	   "Why Not Public:  $proj_whynotpublic\n".
+	   "Link to Us?:     $proj_linked\n".
+	   "Funders:         $proj_funders\n".
+	   "Title:           $usr_title\n".
+	   "Affiliation:     $usr_affil\n".
+	   "Address 1:       $usr_addr\n".
+	   "Address 2:       $usr_addr2\n".
+	   "City:            $usr_city\n".
+	   "State:           $usr_state\n".
+	   "ZIP/Postal Code: $usr_zip\n".
+	   "Country:         $usr_country\n".
+	   "Phone:           $usr_phone\n".
+	   "Members:         $proj_members\n".
+	   "PCs:             $proj_pcs\n".
+	   "Planetlab PCs:   $proj_plabpcs\n".
+	   "RON PCs:         $proj_ronpcs\n".
+	   "Unix GID:        $unix_name ($unix_gid)\n".
+	   "Reasons:\n$proj_why\n\n".
+	   "Please review the application and when you have made a \n".
+	   "decision, go to $TBWWW and\n".
+	   "select the 'Project Approval' page.\n\n".
+	   "They are expecting a result within 72 hours.\n", 
+	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
+	   "Reply-To: $TBMAIL_APPROVAL\n".
+	   "Errors-To: $TBMAIL_WWW");
+}
+else {
+    TBMAIL($TBMAIL_APPROVAL,
+	   "New Project '$pid' ($proj_head_uid)",
+	   "'$usr_name' wants to start project '$pid'.\n".
+	   "\n".
+	   "Name:            $usr_name ($proj_head_uid)\n".
+	   "Returning User?: No\n".
+	   "\n".
+	   "No action is necessary until the user has verified the account.\n",
+	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
+	   "Reply-To: $TBMAIL_APPROVAL\n".
+	   "Errors-To: $TBMAIL_WWW");
+}
 
 #
 # Spit out a redirect so that the history does not include a post

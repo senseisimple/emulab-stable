@@ -119,7 +119,7 @@ if (! isset($go)) {
 	
 	echo "</textarea>";
 
-	echo "<br />";
+	echo "<br>";
 	if (0 == strcmp($expstate, $TB_EXPTSTATE_ACTIVE)) {
 	    echo "<p><b>Note!</b> It is recommended that you 
 	      reboot all nodes in your experiment by checking the box below.
@@ -131,10 +131,10 @@ if (! isset($go)) {
 	    echo "<input type='checkbox' name='reboot' value='1' checked='1'>
 	      Reboot nodes in experiment (Highly Recommended)</input>";
 	}
-	echo "<br />";
-	echo "<input type='hidden' name='pid' value='$pid' />";
-	echo "<input type='hidden' name='eid' value='$eid' />";
-	echo "<input type='submit' name='go' value='Modify' />";
+	echo "<br>";
+	echo "<input type='hidden' name='pid' value='$pid'>";
+	echo "<input type='hidden' name='eid' value='$eid'>";
+	echo "<input type='submit' name='go' value='Modify'>";
 	echo "</form>\n";
     } else {
 	if (! isset($nsdata)) {
