@@ -9,8 +9,8 @@ SUBDIR		= tbsetup/ns2ir
 include $(OBJDIR)/Makeconf
 
 LIB_STUFF	= lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
-		  nsobject.tcl traffic.tcl vtype.tcl
-LIBEXEC_STUFF	= parse.tcl 
+		  nsobject.tcl traffic.tcl vtype.tcl parse.tcl 
+LIBEXEC_STUFF	= parse-ns
 
 #
 # Force dependencies on the scripts so that they will be rerun through

@@ -80,7 +80,7 @@ if (system("/bin/cp", "$tempfile", "$nsfile")) {
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 
-if (system("parse.tcl -n -a $nsfile") != 0) {
+if (system("parse-ns -n -a $nsfile") != 0) {
     fatal("NS Parse failed!");
 }
 

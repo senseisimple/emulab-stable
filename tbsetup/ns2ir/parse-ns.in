@@ -1,0 +1,83 @@
+#!/usr/bin/perl -w
+use English;
+use Getopt::Std;
+use BSD::Resource;
+use POSIX qw(:signal_h);
+    
+#
+# Simply a wrapper for the parser. Passes on its arguments to parse.tcl.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: parse-ns [args ...]\n".
+        "Where options and arguments are those required by parse.tcl\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
+    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# Fork a child process to run the parser in.
+#
+my $pid = fork();
+
+if (!defined($pid)) {
+    die("*** $0:\n".
+	"    Could not fork a new process!");
+}
+
+#
+# Child runs the parser, niced down, and then exits.
+#
+if (! $pid) {
+    # Set the CPU limit for us.
+    setrlimit(RLIMIT_CPU, 60, 60);
+    
+    # Give parent a chance to react.
+    sleep(1);
+
+    system("nice parse.tcl @ARGV");
+    exit($? >> 0);
+}
+
+#
+# Parent waits.
+#
+waitpid($pid, 0);
+
+#
+# If the child was KILLed, then it overran its time limit.
+# Send email. Otherwise, exit with result of child.
+#
+if (($? >> 8) == SIGKILL) {
+    my $msg = "Overran its CPU limit on 'parse.tcl @ARGV'";
+
+    SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg);
+    print STDERR "Parser Exceeded CPU Limit: 'parse.tcl @ARGV'\n";
+    exit(15);
+}
+exit($? >> 8);

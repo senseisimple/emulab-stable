@@ -71,7 +71,7 @@ sub cleanup {
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
-if (system("parse.tcl $pid $eid $nsfile")) {
+if (system("parse-ns $pid $eid $nsfile")) {
     print STDERR "*** Parsing failed.\n";
     cleanup();
     exit(1);
