@@ -6,7 +6,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: sched.c,v 1.1 2001-11-02 05:40:54 imurdock Exp $";
+static char rcsid[] = "$Id: sched.c,v 1.2 2001-11-06 17:31:07 imurdock Exp $";
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -45,9 +45,22 @@ main(int argc, char **argv)
     struct timeval next_event_wait, now;
     event_handle_t handle;
     event_notification_t notification;
+    char *server = NULL;
+    int c;
+
+    while ((c = getopt(argc, argv, "s:")) != -1) {
+        switch (c) {
+          case 's':
+              server = optarg;
+              break;
+          default:
+              fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
+              return 1;
+        }
+    }
 
     /* Register with the event system: */
-    handle = event_register();
+    handle = event_register(server);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;
