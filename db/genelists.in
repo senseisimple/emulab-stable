@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Fcntl ':flock';
@@ -10,14 +10,27 @@ use English;
 use Getopt::Std;
 
 sub usage() {
-    print STDOUT "Usage: genelists [-d] [-a] [-n uid]\n".
-	"Generate the email list files after things change.\n".
-	"Use the -d option to see debugging output.\n".
-	"Use the -a option to generate lists for all projects.\n".
-	"Use the -n option to generate lists for a new user.\n";
+    print("Usage: genelists [-d] [-n] -a\n".
+	  "Usage: genelists [-d] [-n] [-m] -u user\n".
+	  "Usage: genelists [-d] [-n] -p project\n".
+	  "Usage: genelists [-d] [-n] -t\n".
+	  "where:\n".
+	  "  -d    - Turn on debugging\n".
+	  "  -n    - Impotent mode\n".
+	  "  -u    - Generate lists for a user; add -m for new email address\n".
+	  "  -p    - Generate lists for a project (includes subgroups)\n".
+	  "  -t    - Generate activity lists\n".
+	  "  -a    - Generate all email lists; careful ...\n");
     exit(-1);
 }
-my  $optlist = "an:d";
+my $optlist = "anu:p:tdm";
+my $debug   = 0;
+my $all     = 0;
+my $update  = 0;
+my $activity= 0;
+my $impotent= 0;
+my $pid;
+my $user;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -27,15 +40,13 @@ my $TBACTIVE    = "@TBACTIVEARCHIVE@";
 my $TBALL       = "@TBUSERSARCHIVE@";
 my $PROJROOT	= "/proj";
 my $GRPROOT	= "/groups";
+my $ELISTS      = "$TB/lists";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $USERS";
 my $PROG	= "/usr/testbed/sbin/genelists.proxy";
 my $lockfile    = "/var/tmp/testbed_genelists_lockfile";
 my $tempfile    = "/var/tmp/testbed_genelists_tempfile";
-my $newuser;
-my $allprojects;
-my $d = 0;
 
 #
 # Turn off line buffering on output
@@ -78,24 +89,52 @@ if (@ARGV) {
     usage();
 }
 if (defined($options{"d"})) {
-    $d++;
+    $debug++;
 }
 if (defined($options{"a"})) {
-    $allprojects = 1;
+    $all = 1;
+}
+if (defined($options{"m"})) {
+    $update = 1;
+}
+if (defined($options{"t"})) {
+    $activity = 1;
 }
 if (defined($options{"n"})) {
-    $newuser = $options{"n"};
+    $impotent = 1;
+}
+if (defined($options{"u"})) {
+    $user = $options{"u"};
+    
     #
     # Untaint.
     #
-    if ($newuser =~ /^([-\w]+)$/) {
-	$newuser = $1;
+    if ($user =~ /^([-\w]+)$/) {
+	$user = $1;
     }
     else {
-	die("Tainted argument $newuser!\n");
+	die("Tainted argument $user!\n");
     }
 }
-if (defined($newuser) && defined($allprojects)) {
+
+if (defined($options{"p"})) {
+    $pid = $options{"p"};
+    
+    #
+    # Untaint.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Tainted argument $pid!\n");
+    }
+}
+
+if (defined($user) && defined($pid)) {
+    usage();
+}
+if ($update && !defined($user)) {
     usage();
 }
 
@@ -145,7 +184,7 @@ if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
 		close(LOCK);
 		exit(0);
 	    }
-	    if ($count++ > 20)  {
+	    if ($count++ > 30)  {
 		fatal("Process with the lock didn't finish after a long time!\n");
 	    }
 	    sleep(1);
@@ -159,162 +198,233 @@ if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
 my $now = time;
 utime $now, $now, $lockfile;
 
-foreach my $active ( "active", "recent_users", "recent_projects", "all" ) {
-    my $progarg;
-    my $userlist;
+ActiveUsers()
+    if ($all || $activity || $update);
 
-    print "Starting $active at: \t".time()."\n" if $d;
-    if ($active eq "active") {
-	print "Getting Active Users\n" if $d;
-	# All active users on the testbed
-	if (! ($query_result =
-	       DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
-		       "left join group_membership as p ".
-		       "     on e.pid=p.pid and p.pid=p.gid ".
-		       "left join users as u on u.uid=p.uid ".
-		       "where u.status='active' and ".
-		       "      e.state='active' ".
-		       "order by u.usr_email"))) {
-	    DBFatal("Getting Active Users!");
-	}
-	$userlist = "$TBOPS\n".
-	            "$TBACTIVE";
-	$progarg  = "emulab-active-users";
+RecentUsers()
+    if ($all || $activity || $update);
+
+RecentProjects()
+    if ($all || $activity || $update);
+
+Users()
+    if ($all || defined($user));
+
+WideAreaPeople()
+    if ($all || defined($user));
+
+ProjectLeaders()
+    if ($all || defined($user) || defined($pid));
+
+if ($all || defined($user) || defined($pid)) {
+    my $query;
+    my $phash = {};
+    my $query_result;
+    
+    if ($all) {
+	$query = "select pid,gid from groups";
     }
-    elsif ($active eq "recent_users") {
-	my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
-	print "Getting Recently Active Users\n" if $d;
-	# Recently active users on the testbed
-	if (! DBQuery("create temporary table tstat1 ".
-		      "select distinct exptidx,uid from testbed_stats as t ".
-		      "where ((UNIX_TIMESTAMP(now()) - ".
-		      "UNIX_TIMESTAMP(t.end_time)) <= $limit)")) {
-	    DBFatal("Making Recently Active Temp Table!");
-	}
-	if (! ($query_result =
-	       DBQuery("select distinct u.usr_email from tstat1 as t ".
-		       "left join users as u on u.uid=t.uid ".
-		       "order by u.usr_email"))) {
-	    DBFatal("Getting Recently Active Users!");
-	}
-	$userlist = "$TBOPS\n".
-	            "$TBACTIVE";
-	$progarg  = "emulab-recently-active-users";
+    elsif ($user) {
+	$query = "select pid,gid from group_membership where uid='$user'";
     }
-    elsif ($active eq "recent_projects") {
-	my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
-	print "Getting Recently Active Projects (members)\n" if $d;
-	# Recently active projects (members) on the testbed
-	if (! ($query_result =
-	       DBQuery("select distinct u.usr_email from tstat1 as t ".
-		       "left join experiment_stats as s on ".
-		       "     s.exptidx=t.exptidx ".
-		       "left join group_membership as p ".
-		       "     on s.pid=p.pid and p.pid=p.gid ".
-		       "left join users as u on u.uid=p.uid ".
-		       "where u.status='active' ".
-		       "order by u.usr_email"))) {
-	    DBFatal("Getting Recently Active Projects!");
-	}
-	$userlist = "$TBOPS\n".
-	            "$TBACTIVE";
-	$progarg  = "emulab-recently-active-projects";
+    else {
+	$query = "select pid,gid from groups where pid='$pid'";
     }
-    elsif ($active eq "all") {
-	print "Getting All Users\n" if $d;
-	# All approved users on the testbed
-	if (! ($query_result =
-	       DBQuery("SELECT DISTINCT usr_email FROM users ".
-		       "where status='active' order by usr_email"))) {
-	    DBFatal("Getting Users!");
-	}
-	$userlist = "$TBOPS\n".
-	            "$TBALL";
-	$progarg  = "emulab-users";
+    $query .= " order by pid,gid";
+
+    if (! ($query_result = DBQuery($query))) {
+	DBFatal("Getting Project List!");
     }
-    print "Processing $active at: \t".time()." \t(".
-      $query_result->numrows()." entries)\n" if $d;
-    genelist($query_result, $userlist, $progarg);
+    while (my ($pid,$gid) = $query_result->fetchrow_array()) {
+	ProjectLists($pid, $gid);
+    }
+}
+
+#
+# Close the lock file. Exiting releases it, but might as well.
+#
+close(LOCK);
+exit 0;
+
+#
+# All active users on the testbed
+#
+sub ActiveUsers()
+{
+    my $userlist;
+    my $query_result;
+
+    print "Getting Active Users\n" if $debug;
+    
+    if (! ($query_result =
+	   DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
+		   "left join group_membership as p ".
+		   "     on e.pid=p.pid and p.pid=p.gid ".
+		   "left join users as u on u.uid=p.uid ".
+		   "where u.status='active' and ".
+		   "      e.state='active' ".
+		   "order by u.usr_email"))) {
+	DBFatal("Getting Active Users!");
+    }
+    $userlist = "$TBOPS\n".
+	        "$TBACTIVE";
+
+    genelist($query_result, $userlist, "emulab-active-users");
+}
+
+#
+# Recently active users.
+# 
+sub RecentUsers()
+{
+    my $userlist;
+    my $query_result;
+
+    my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
+    print "Getting Recently Active Users\n" if $debug;
+
+    if (! DBQuery("create temporary table tstat1 ".
+		  "select distinct exptidx,uid from testbed_stats as t ".
+		  "where ((UNIX_TIMESTAMP(now()) - ".
+		  "UNIX_TIMESTAMP(t.end_time)) <= $limit)")) {
+	DBFatal("Making Recently Active Temp Table!");
+    }
+    if (! ($query_result =
+	   DBQuery("select distinct u.usr_email from tstat1 as t ".
+		   "left join users as u on u.uid=t.uid ".
+		   "order by u.usr_email"))) {
+	DBFatal("Getting Recently Active Users!");
+    }
+    $userlist = "$TBOPS\n".
+	        "$TBACTIVE";
+
+    genelist($query_result, $userlist, "emulab-recently-active-users");
+}
+
+#
+# Recently active projects (members).
+#
+sub RecentProjects()
+{
+    my $userlist;
+    my $query_result;
+
+    my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
+    print "Getting Recently Active Projects (members)\n" if $debug;
+
+    if (! ($query_result =
+	   DBQuery("select distinct u.usr_email from tstat1 as t ".
+		   "left join experiment_stats as s on ".
+		   "     s.exptidx=t.exptidx ".
+		   "left join group_membership as p ".
+		   "     on s.pid=p.pid and p.pid=p.gid ".
+		   "left join users as u on u.uid=p.uid ".
+		   "where u.status='active' ".
+		   "order by u.usr_email"))) {
+	DBFatal("Getting Recently Active Projects!");
+    }
+    $userlist = "$TBOPS\n".
+	        "$TBACTIVE";
+
+    genelist($query_result, $userlist, "emulab-recently-active-projects");
+}
+
+#
+# All active users of the testbed.
+# 
+sub Users()
+{
+    my $userlist;
+    my $query_result;
+
+    print "Getting All Users\n" if $debug;
+
+    if (! ($query_result =
+	   DBQuery("SELECT DISTINCT usr_email FROM users ".
+		   "where status='active' order by usr_email"))) {
+	DBFatal("Getting Users!");
+    }
+    $userlist = "$TBOPS\n".
+	        "$TBALL";
+    
+    genelist($query_result, $userlist, "emulab-users");
 }
 
 #
 # Special list for people approved to use the widearea-nodes.
 #
-$query_result =
-    DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
-		 "left join group_membership as m on m.pid=p.pid ".
-		 "left join users as u on u.uid=m.uid ".
-		 "where p.approved!=0 and p.pcremote_ok is not null ".
-		 "      and m.trust!='none' and u.status='active'");
+sub WideAreaPeople()
+{
+    my $query_result =
+	DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
+		     "left join group_membership as m on m.pid=p.pid ".
+		     "left join users as u on u.uid=m.uid ".
+		     "where p.approved!=0 and p.pcremote_ok is not null ".
+		     "      and m.trust!='none' and u.status='active' ".
+		     "order by usr_email");
 
-genelist($query_result, "$TBOPS", "emulab-widearea-users");
+    genelist($query_result, "$TBOPS", "emulab-widearea-users");
+}
 
 #
 # Another list of project leaders.
 #
-$query_result =
-    DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
-		 "left join users as u on u.uid=p.head_uid ".
-		 "where p.approved!=0");
+sub ProjectLeaders()
+{
+    my $query_result =
+	DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
+		     "left join users as u on u.uid=p.head_uid ".
+		     "where p.approved!=0 ".
+		     "order by usr_email");
 
-genelist($query_result, "$TBOPS", "emulab-project-leaders");
+    genelist($query_result, "$TBOPS", "emulab-project-leaders");
+}
 
 #
-# Regen project lists. Either all the lists, or just the projects
-# that "newuser" is a member of.
+# Regen project lists. 
 #
-if (defined($newuser) || defined($allprojects)) {
+sub ProjectLists($$)
+{
+    my ($pid, $gid) = @_;
     my $proj_result;
 
-    if (defined($newuser)) {
-	$proj_result =
-	    DBQueryFatal("select pid,gid from group_membership ".
-			 "where uid='$newuser'");
-    }
-    else {
-	$proj_result =
-	    DBQueryFatal("select pid,gid from groups");
-    }
+    print "Getting project members for $pid/$gid\n" if $debug;
 
-    while (my ($pid,$gid) = $proj_result->fetchrow_array) {
-	print "Getting project members for $pid/$gid\n" if $d;
+    my $query_result =
+	DBQueryFatal("SELECT distinct u.usr_email from ".
+		     " group_membership as p ".
+		     "left join users as u on u.uid=p.uid ".
+		     "where p.pid='$pid' and p.gid='$gid' and ".
+		     " p.trust!='none' ".
+		     "order by u.usr_email");
 
-	my $query_result =
-	    DBQueryFatal("SELECT distinct u.usr_email from ".
-			 " group_membership as p ".
-			 "left join users as u on u.uid=p.uid ".
-			 "where p.pid='$pid' and p.gid='$gid' and ".
-			 " p.trust!='none' ".
-			 "order by u.usr_email");
+    if ($query_result->numrows) {
+	my $archive;
 
-	if ($query_result->numrows) {
-	    my $archive;
+	if ($pid eq $gid) {
+	    $archive = "$PROJROOT/$pid/$pid-users.mail";
+	}
+	else {
+	    $archive = "$GRPROOT/$pid/$gid/$pid-$gid.mail";
+	}
 
-	    if ($pid eq $gid) {
-		$archive = "$PROJROOT/$pid/$pid-users.mail";
-	    }
-	    else {
-		$archive = "$GRPROOT/$pid/$gid/$pid-$gid.mail";
-	    }
-
-	    #
-	    # This would be nice, but will not work since the mailer daemon
-	    # cannot access files in /proj/$pid or /groups/$pid
-	    #
-	    if (0 && ! -e $archive) {
-		open(ARCHIVE, ">>$archive") or
-		    fatal("Could not create $archive: $!");
-		close(ARCHIVE);
-
-		chmod(0666, "$archive") or
-		    fatal("Could not chmod(666) $archive: $!");
-	    }
-	    if ($pid eq $gid) {
-		genelist($query_result, undef, "$pid-users");
-	    }
-	    else {
-		genelist($query_result, undef, "$pid-$gid-users");
-	    }
+	#
+	# This would be nice, but will not work since the mailer daemon
+	# cannot access files in /proj/$pid or /groups/$pid
+	#
+	if (0 && ! -e $archive) {
+	    open(ARCHIVE, ">>$archive") or
+		fatal("Could not create $archive: $!");
+	    close(ARCHIVE);
+	    
+	    chmod(0666, "$archive") or
+		fatal("Could not chmod(666) $archive: $!");
+	}
+	if ($pid eq $gid) {
+	    genelist($query_result, undef, "$pid-users");
+	}
+	else {
+	    genelist($query_result, undef, "$pid-$gid-users");
 	}
     }
 }
@@ -324,7 +434,10 @@ if (defined($newuser) || defined($allprojects)) {
 #
 sub genelist($$$)
 {
-    my($query_result, $inituserlist, $progarg) = @_;
+    my($query_result, $inituserlist, $listname) = @_;
+
+    print "Processing $listname at: \t".time()." \t(".
+      $query_result->numrows()." entries)\n" if $debug;
 
     open(LIST,"> $tempfile") ||
 	fatal("Couldn't open $tempfile: $!\n");
@@ -342,24 +455,40 @@ sub genelist($$$)
 	    next;
 	}
 	print LIST "$user_email\n";
-	print "$user_email\n" if $d>1;
+	print "$user_email\n" if $debug>1;
     }
     close(LIST);
+    chmod(0664, $tempfile);
 
+    if (! -d $ELISTS) {
+	if (! mkdir($ELISTS, 0770)) {
+	    fatal("Could not make directory $ELISTS: $!");
+	}
+
+	if (! chmod(0775, $ELISTS)) {
+	    fatal("Could not chmod directory $ELISTS: $!");
+	}
+    }
+
+    if (-e "$ELISTS/$listname" &&
+	system("cmp -s $tempfile $ELISTS/$listname") == 0) {
+	print "$listname has not changed. Skipping.\n";
+	return;
+    }
+
+    system("/bin/mv -f $tempfile $ELISTS/$listname") == 0 ||
+	fatal("Could not move $tempfile to $ELISTS/$listname: $!");
+    
     #
     # Fire the new file over to the fileserver to finish up.
     #
-    $UID = 0;
-    system("$SSH $PROG $progarg < $tempfile") == 0 or
-    	fatal("Failed: $SSH $PROG $progarg < $tempfile: $?");
+    if (!$impotent) {
+	$UID = 0;
+	system("$SSH $PROG $listname < $tempfile") == 0 or
+	    fatal("Failed: $SSH $PROG $listname < $tempfile: $?");
+    }
     unlink("$tempfile");
 }
-
-#
-# Close the lock file. Exiting releases it, but might as well.
-#
-close(LOCK);
-exit 0;
 
 sub fatal {
   local($msg) = $_[0];

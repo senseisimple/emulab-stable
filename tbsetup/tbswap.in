@@ -507,7 +507,7 @@ sub doSwapout($) {
 
 	print "Resetting email lists.\n";
 	TBDebugTimeStamp("genelists started");
-	if (system("genelists")) {
+	if (system("genelists -t")) {
 	    print "*** WARNING: Failed to reset email lists.\n";
 	}
 	TBDebugTimeStamp("genelists finished");
@@ -801,7 +801,7 @@ sub doSwapin($) {
 
     print "Setting up email lists.\n";
     TBDebugTimeStamp("genelists started");
-    if (system("genelists")) {
+    if (system("genelists -t")) {
 	print STDERR "*** WARNING: Failed to update email lists.\n";
 	#
 	# This is a non-fatal error.

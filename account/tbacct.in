@@ -303,7 +303,7 @@ sub AddUser()
 	fatal("Could not generate initial ssh key for $user");
     }
     # Add to elists.
-    system("$GENELISTS -n $user");
+    system("$GENELISTS -u $user");
 
     #
     # Must update the exports file or else nodes will complain.  There
@@ -374,7 +374,7 @@ sub DelUser()
     system("$EXPORTSSETUP");
 
     # Remove from elists.
-    system("$GENELISTS -n $user");
+    system("$GENELISTS -u $user");
     $EUID = 0;
 
     $sfsupdate = 1;
@@ -472,7 +472,7 @@ sub UpdateUser(;$)
 
     $EUID = $UID;
     # Update elists in case email changed.
-    system("$GENELISTS -n $user");
+    system("$GENELISTS -m -u $user");
     $EUID = 0;
 
     return 0;

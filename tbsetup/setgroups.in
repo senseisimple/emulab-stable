@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -46,7 +46,8 @@ my $USERMOD = "/usr/sbin/pw usermod";
 
 my $dbuid;
 my @userlist;
-my $pid="";
+my $pid;
+my $
 my $user_name;
 my $user_email;
 my $logname;
@@ -353,9 +354,17 @@ foreach my $uid (@userlist) {
     TBNodeUpdateAccountsByUID($uid);
 }
 
-print "Updating email lists for: ".join(" ",@userlist)."\n";
-foreach $u (@userlist) { system("$GENELISTS -n $u"); }
+if (defined($pid)) {
+    print "Updating email lists for project $pid\n";
+    system("$GENELISTS -p $pid");
+}
+else {
+    print "Updating email lists for: ".join(" ",@userlist)."\n";
 
+    foreach $u (@userlist) {
+	system("$GENELISTS -n $u");
+    }
+}
 
 print "Group Update Completed!\n";
 exit(0);
