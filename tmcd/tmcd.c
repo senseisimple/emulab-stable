@@ -1164,16 +1164,14 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 	 */
 	nodes_result = 
 		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, "
-			   "  r.vname, CONCAT(r.vname,':',p.vport), "
+			   "  r.vname, CONCAT(r.vname,':',i.card), "
 			   "  i.card = t.control_net, v.vname "
 			   "FROM interfaces AS i "
 			   "LEFT JOIN reserved AS r ON i.node_id = r.node_id "
 			   "LEFT JOIN nodes AS n ON i.node_id = n.node_id "
 			   "LEFT JOIN node_types AS t ON n.type = t.type "
-			   "LEFT JOIN portmap AS p ON i.iface = p.pport AND "
-			   "  p.vnode=r.vname AND p.pid=r.pid AND p.eid=r.eid "
 			   "LEFT JOIN virt_lans as v on "
-			   " member=CONCAT(r.vname,':',p.vport) AND "
+			   " member=CONCAT(r.vname,':',i.card) AND "
 			   " v.pid=r.pid AND v.eid=r.eid "
 			   "WHERE IP IS NOT NULL AND IP != '' AND "
 			   " r.pid='%s' AND r.eid='%s'"
