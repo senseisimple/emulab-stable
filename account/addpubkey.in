@@ -17,18 +17,20 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: addpubkeys [-n] [-k] <user> [<keyfile> | <key>]\n";
-    print "       addpubkeys [-i | -w] <user>\n";
+    print "       addpubkeys [-i [-f] | -w] <user>\n";
     print "Options:\n";
     print " -k      Indicates that key was passed in on the command line\n";
     print " -n      Verify key format only; do not enter into into DB\n";
     print " -w      Generate new authkeys (protocol 1 and 2) file for user\n";
     print " -i      Initialize mode; generate initial key for user\n";
+    print " -f      Force a generate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "kniw";
+my $optlist   = "kniwf";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
+my $force     = 0;
 my $genmode   = 0;
 my $nobody    = 0;
 my $noemail   = 0;
@@ -39,6 +41,7 @@ my $noemail   = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
 my $HOMEDIR	= "/users";
 my $KEYGEN	= "/usr/bin/ssh-keygen";
 my $USERUID;
@@ -103,6 +106,9 @@ if (defined($options{"n"})) {
 }
 if (defined($options{"i"})) {
     $initmode = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 if (defined($options{"w"})) {
     $genmode = 1;
@@ -347,10 +353,14 @@ sub InitUser()
 	mkdir("$sshdir", 0700) or
 	    fatal("Could not mkdir $sshdir: $!");
     }
-    if (! -f "$sshdir/identity") {
+    if (! -f "$sshdir/identity" || $force) {
 	print "Setting up ssh configuration for $user.\n";
+
+	# Hmm, need to use -C option so comment field makes sense.
     
-	if (system("$KEYGEN -t rsa1 -P '' -f $sshdir/identity")) {
+	if (system("$KEYGEN -t rsa1 -P '' ".
+		   "-C '${user}" . "\@" . ${OURDOMAIN} . "' ".
+		   "-f $sshdir/identity")) {
 	    fatal("Failure in ssh-keygen!");
 	}
 
