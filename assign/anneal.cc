@@ -111,6 +111,62 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
   return matched;
 }
 
+/*
+ * Finds a pnode which:
+ * 1) One of the vnode's neighbors is mapped to
+ * 2) Satisifies the usual pnode mapping constraints
+ * 3) The vnode is not already mapped to
+ */
+tb_pnode *find_pnode_connected(vvertex vv, tb_vnode *vn) {
+
+  //cerr << "find_pnode_connected(" << vn->name << ") called" << endl;
+
+  // We make a list of all neighboring vnodes so that we can go through
+  // them in random order
+  vector<vedge> visit_order(out_degree(vv,VG));
+  voedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
+  for (int i = 0; vedge_it != end_vedge_it; vedge_it++, i++) {
+    visit_order[i] = *vedge_it;
+  }
+  for (int i = 0; i < visit_order.size(); i++) {
+	int i1 = std::random() % visit_order.size();
+	int i2 = std::random() % visit_order.size();
+	vedge tmp = visit_order[i1];
+	visit_order[i1] = visit_order[i2];
+	visit_order[i2] = tmp;
+  }
+  for (int i = 0; i < visit_order.size(); i++) {
+    vvertex neighbor_vv = target(visit_order[i],VG);
+    tb_vnode *neighbor_vn = get(vvertex_pmap,neighbor_vv);
+    //cerr << "    trying " << neighbor_vn->name << endl;
+    // Skip any that aren't assigned
+    if (!neighbor_vn->assigned) {
+      //cerr << "        not assigned" << endl;
+      continue;
+    }
+
+    // Skip any that are assigned to the same pnode we are
+    if (neighbor_vn->assignment == vn->assignment) {
+      //cerr << "        same assignment" << endl;
+      continue;
+    }
+
+    // Check to make sure that our vn can map to the neibor's assigment
+    tb_pnode *neighbor_pnode = get(pvertex_pmap,neighbor_vn->assignment);
+    //cerr << "        neighbor on " << neighbor_pnode->name << endl;
+    if (pnode_is_match(vn,neighbor_pnode)) {
+      //cerr << "        good" << endl;
+      //cerr << "    worked" << endl;
+      return neighbor_pnode;
+    }
+    //cerr << "        doesn't match" << endl;
+  }
+
+  //cerr << "    failed" << endl;
+  return NULL;
+}
+
 tb_pnode *find_pnode(tb_vnode *vn)
 {
 #ifdef PER_VNODE_TT
@@ -133,8 +189,8 @@ tb_pnode *find_pnode(tb_vnode *vn)
 	traversal_order[i] = i;
   }
   for (int i = 0; i < num_types; i++) {
-	int i1 = std::rand() % num_types;
-	int i2 = std::rand() % num_types;
+	int i1 = std::random() % num_types;
+	int i2 = std::random() % num_types;
 	int tmp = traversal_order[i1];
 	traversal_order[i1] = traversal_order[i2];
 	traversal_order[i2] = tmp;
@@ -193,10 +249,13 @@ tb_pnode *find_pnode(tb_vnode *vn)
   return NULL;
 }
 
+// We put the temperature outside the function so that external stuff, like
+// status_report in assign.cc, can see it.
+double temp;
 
 /* When this is finished the state will reflect the best solution found. */
 void anneal(bool scoring_selftest, double scale_neighborhood,
-	double *initial_temperature)
+	double *initial_temperature, double use_connected_pnode_find)
 {
   cout << "Annealing." << endl;
 
@@ -229,7 +288,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   int bestviolated;
   int num_fixed=0;
   double meltedtemp;
-  double temp = init_temp;
+  temp = init_temp;
   double deltatemp, deltaavg;
 
   // Priority queue of unassigned virtual nodes.  Basically a fancy way
@@ -443,8 +502,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 
     // Adjust the number of transitions we're going to do based on the number
     // of pclasses that are actually 'in play'
-    int transitions = neighborsize *
-      (count_enabled_pclasses() *1.0 / pclasses.size());
+    int transitions = (int)(neighborsize *
+      (count_enabled_pclasses() *1.0 / pclasses.size()));
     assert(transitions <= neighborsize);
 
     if (melting) {
@@ -511,7 +570,16 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	    vn->vclass->dominant << endl;
 #endif
       }
-      tb_pnode *newpnode = find_pnode(vn);
+
+      // Actually find a pnode
+      tb_pnode *newpnode = NULL;
+      if ((use_connected_pnode_find != 0)
+	  && ((std::random() % 1000) < (use_connected_pnode_find * 1000))) {
+	newpnode = find_pnode_connected(vv,vn);
+      }
+      if (newpnode == NULL) {
+	newpnode = find_pnode(vn);
+      }
 #ifndef FREE_IMMEDIATELY
       if (oldassigned) {
 	RDEBUG(cout << "removing: !lan, oldassigned" << endl;)
@@ -536,7 +604,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	pclass_vector *acceptable_types = tt.second;
 	// Find a node to kick out
 	bool foundnode = false;
-	int offi = std::rand();
+	int offi = std::random();
 	int index;
 	for (int i = 0; i < size; i++) {
 	  index = (i + offi) % size;
@@ -553,14 +621,16 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 
 	if (foundnode) {
 	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
-	  tb_pclass::tb_pnodeset::iterator it = (*acceptable_types)[index]->used_members[vn->type]->begin();
-	  int j = std::rand() % (*acceptable_types)[index]->used_members[vn->type]->size();
+	  tb_pclass::tb_pnodeset::iterator it =
+	    (*acceptable_types)[index]->used_members[vn->type]->begin();
+	  int j = std::random() %
+	    (*acceptable_types)[index]->used_members[vn->type]->size();
 	  while (j > 0) {
 	    it++;
 	    j--;
 	  }
 	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
-	  int k = std::rand() % (*it)->assigned_nodes.size();
+	  int k = std::random() % (*it)->assigned_nodes.size();
 	  while (k > 0) {
 	    it2++;
 	    k--;

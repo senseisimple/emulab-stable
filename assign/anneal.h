@@ -74,6 +74,6 @@ tb_pnode *find_pnode(tb_vnode *vn);
 
 /* The big guy! */
 void anneal(bool scoring_selftest, double scale_neighborhood,
-    double *initial_temperature);
+    double *initial_temperature, double use_connected_pnode_find);
 
 #endif

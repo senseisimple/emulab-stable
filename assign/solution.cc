@@ -97,6 +97,74 @@ void print_solution()
     cout << "End solution" << endl;
 }
 
+/*
+ * Print out a summary of the solution - mainly, we print out information from
+ * the physical perspective. For example, now many vnodes are assigned to each
+ * pnode, and how much total bandwidth each pnode is handling.
+ */
+void print_solution_summary()
+{
+  // First, print the number of vnodes on each pnode, and the total number of
+  // pnodes used
+  cout << "Summary:" << endl;
+
+  // Go through all physical nodes
+  int pnodes_used = 0;
+  pvertex_iterator pit, pendit;
+  tie(pit, pendit) = vertices(PG);
+  for (;pit != pendit; pit++) {
+    tb_pnode *pnode = get(pvertex_pmap,*pit);
+
+    // We're going to treat switches specially
+    bool isswitch = false;
+    if (pnode->is_switch) {
+      isswitch = true;
+    }
+
+    // Only print pnodes we are using, or switches we are going through
+    if ((pnode->total_load > 0) ||
+	(isswitch && (pnode->switch_used_links > 0))) {
+
+      // What we really want to know is how many PCs, etc. were used, so don't
+      // count switches
+      if (!pnode->is_switch) {
+	pnodes_used++;
+      }
+
+      // Print name, number of vnodes, and some bandwidth numbers
+      cout << pnode->name << " " << pnode->total_load << " vnodes, " <<
+	pnode->nontrivial_bw_used << " nontrivial BW, " <<
+	pnode->trivial_bw_used << " trivial BW" << endl;
+
+      // Go through all links on this pnode
+      poedge_iterator pedge_it,end_pedge_it;
+      tie(pedge_it,end_pedge_it) = out_edges(*pit,PG);
+      for (;pedge_it!=end_pedge_it;++pedge_it) {
+	tb_plink *plink = get(pedge_pmap,*pedge_it);
+
+	tb_pnode *link_dst = get(pvertex_pmap,source(*pedge_it,PG));
+	if (link_dst == pnode) {
+	  link_dst = get(pvertex_pmap,target(*pedge_it,PG));
+	}
+
+	// Ignore links we aren't using
+	if (plink->bw_used == 0) {
+	  continue;
+	}
+
+	// For switches, only print inter-switch links
+	if (isswitch && (!link_dst->is_switch)) {
+	  continue;
+	}
+	cout << "    " << plink->bw_used << " " << plink->name << endl;
+      }
+    }
+  }
+  cout << "Total physical nodes used: " << pnodes_used << endl;
+
+  cout << "End summary" << endl;
+}
+
 void pvertex_writer::operator()(ostream &out,const pvertex &p) const {
     tb_pnode *pnode = get(pvertex_pmap,p);
     out << "[label=\"" << pnode->name << "\"";

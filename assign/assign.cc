@@ -116,6 +116,12 @@ bool greedy_link_assignment = false;
 // the initial temperature
 bool no_melting = false;
 double initial_temperature = 0.0f;
+
+// Print out a summary of the solution in addition to the solution itself
+bool print_summary = false;
+
+// Use the 'connected' find algorithm
+double use_connected_pnode_find = 0.0f;
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -325,6 +331,9 @@ void print_help()
   cout << "  -o          - Allow overloaded pnodes to be considered." << endl;
   cout << "  -t <float>  - Start the temperature at <float> instead of melting."
       << endl;
+  cout << "  -u          - Print a summary of the solution." << endl;
+  cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
+      "<float>% of the time." << endl;
   exit(EXIT_UNRETRYABLE);
 }
  
@@ -582,8 +591,16 @@ int mapping_precheck() {
 // Signal handler - add a convneint way to kill assign and make it return an
 // unretryable error
 void exit_unretryable(int signal) {
-    cout << "Killed with signal " << signal << " - exiting!" << endl;
-    _exit(EXIT_UNRETRYABLE);
+  cout << "Killed with signal " << signal << " - exiting!" << endl;
+  _exit(EXIT_UNRETRYABLE);
+}
+
+// Singal handler - add a way for a user to get some status information
+extern double temp;
+void status_report(int signal) {
+  cout << "I: " << iters << " T: " << temp << " S: " << get_score() << " V: "
+    << violated << " (Best S: " << absbest << " V:" << absbestviolated << ")"
+    << endl;
 }
 
 int main(int argc,char **argv)
@@ -596,7 +613,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:og")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -646,6 +663,13 @@ int main(int argc,char **argv)
 	print_help();
       }
       no_melting = true; break;
+    case 'u':
+      print_summary = true; break;
+    case 'c':
+      if (sscanf(optarg,"%lf",&use_connected_pnode_find) != 1) {
+	print_help();
+      }
+      break;
     default:
       print_help();
     }
@@ -679,6 +703,13 @@ int main(int argc,char **argv)
   action.sa_flags = 0;
   sigaction(SIGUSR1,&action,NULL);
   sigaction(SIGINT,&action,NULL);
+
+  // Set up a signal handler for control+T
+  struct sigaction action2;
+  action2.sa_handler = status_report;
+  sigemptyset(&action2.sa_mask);
+  action2.sa_flags = 0;
+  sigaction(SIGINFO,&action2,NULL);
 
   // Convert options to the common.h parameters.
   parse_options(argv, options, noptions);
@@ -751,7 +782,8 @@ int main(int argc,char **argv)
   }
  
   timestart = used_time();
-  anneal(scoring_selftest, scale_neighborhood, initial_temperature_pointer);
+  anneal(scoring_selftest, scale_neighborhood, initial_temperature_pointer,
+      use_connected_pnode_find);
   timeend = used_time();
 
 #ifdef GNUPLOT_OUTPUT
@@ -776,6 +808,10 @@ int main(int argc,char **argv)
   cout << vinfo;
 
   print_solution();
+
+  if (print_summary) {
+    print_solution_summary();
+  }
 
   if (viz_prefix.size() != 0) {
     crope aviz = viz_prefix + "_solution.viz";

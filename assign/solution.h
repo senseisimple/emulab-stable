@@ -34,9 +34,13 @@ using namespace boost;
 /* From assign.cc */
 extern node_map absassignment;
 extern assigned_map absassigned;
+extern tb_pgraph PG;
 
 /* Print a solution */
 void print_solution();
+
+/* Print a summary of the solution */
+void print_solution_summary();
 
 /* Check to see if two scores are, for all intents and purposes, the same */
 bool compare_scores(double score1, double score2);

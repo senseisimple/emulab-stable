@@ -75,8 +75,8 @@ public:
   			  current_type_record(NULL), total_load(0),
 			  switches(), sgraph_switch(), switch_used_links(0),
 			  total_interfaces(0), used_interfaces(0),
-			  total_bandwidth(0), my_class(NULL),
-			  my_own_class(NULL), assigned_nodes(),
+			  total_bandwidth(0), nontrivial_bw_used(0),
+			  my_class(NULL), my_own_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0), subnode_of(NULL),
 			  subnode_of_name(""), has_subnode(false),
 			  unique(false), is_switch(false) {;}
@@ -128,6 +128,8 @@ public:
   int total_interfaces;		// total number of links leaving the node
   int used_interfaces;		// number of links that are currently in use
   int total_bandwidth;		// total bandwidth of all this nodes' links
+  int nontrivial_bw_used;	// amount of non-trivial bandwidth in use on
+  				// this node - for debugging only
 
   tb_pclass *my_class;		// the pclass this node belongs to
 
