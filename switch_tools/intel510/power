@@ -74,6 +74,17 @@ foreach $item ( sort @machines) {
     if ( ! defined ($IPList{$item}) ) {
 	print "Machine $item not found. Skipping...\n";
     } else {
-	system($snmpit,'-v','-i',$IPList{$item},$op,$OutletList{$item});
+	my $cmd=join(" ",
+		  ($snmpit,'-v','-i',$IPList{$item},$op,$OutletList{$item}));
+	open(OUT,$cmd." |");
+	while (<OUT>) {
+	    if (/was outlet(.*)/) {
+		print "$item was $1";
+	    }
+	    if (/to outlet(.*)/) {
+		print " ... $item now $1";
+	    }
+	}
+	print "\n";
     }
 }
