@@ -264,12 +264,7 @@ foreach my $node (@nodes) {
     # Assign partition table entries for each partition in the image.
     # This is complicated by the fact that an image that covers only
     # part of the slices, should only change the partition table entries
-    # for the subset of slices that are written to disk. In reality, this
-    # is silly since there is no telling what the disk is going to end
-    # up looking like after a partial image is written, especially if its
-    # a user generated image. Not sure how to handle this yet. For now
-    # lets just say that a user defined images essentially wipe the disk
-    # except for the stuff they write. 
+    # for the subset of slices that are written to disk.
     #
     for ($i = 1; $i <= 4; $i++) {
 	my $partname = "part${i}_osid";
@@ -388,9 +383,9 @@ sub WaitTillReloadDone {
     my @failed  = ();
 
     #
-    # Seven minutes seems like a long time to wait, but it ain't!
+    # Seems like a long time to wait, but it ain't!
     # 
-    my $maxwait = (60 * 7);
+    my $maxwait = (60 * 10);
 
     foreach my $node ( @nodes ) {
 	$done{$node}  = 0;
