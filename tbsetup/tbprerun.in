@@ -31,7 +31,7 @@ my $TBROOT   = "@prefix@";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
-    ":$TBROOT/sbin:$TBROOT/bin";
+    ":$TBROOT/libexec/vis:$TBROOT/sbin:$TBROOT/bin";
 
 #
 # Testbed Support libraries
@@ -95,6 +95,7 @@ sub cleanup {
     DBQueryWarn("DELETE from eventlist     where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from ipsubnets     where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_NEW);
+    system("prerender -r $pid $eid");
 }
 
 # This setups virt_nodes, virt_names including all IP address calculation
@@ -108,6 +109,10 @@ if (system("parse-ns $pid $eid $nsfile")) {
 }
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
+
+TBDebugTimeStamp("prerender started in background");
+print "Precomputing visualization (in background)...\n";
+system("prerender $pid $eid &");
 
 TBDebugTimeStamp("routes started");
 print "Setting up static routes (if requested) ... \n";

@@ -6,13 +6,18 @@
 # All rights reserved.
 #
 
+use English;
+use Getopt::Std;
+use lib '@prefix@/lib';
+use libdb;
 
 #
-# Convert an outputed neato file into a png image
-# (does intelligent mashing/expanding)
+# Render experiment from the database.
+# Spits PNG image out to stdout.
 #
-# takes neato output file on stdin, spits png image out on stdout.
-#
+
+# TODO: delay nodes
+# TODO: display text in image if there are no nodes.
 
 use GD;
 use Getopt::Std;
@@ -22,16 +27,19 @@ use Getopt::Std;
 my $TB		= "@prefix@";
 my $ICONDIR     = "$TB/www";
 
-my  $optlist = "z:";
-if (! getopts($optlist, \%options)) {
-    die("Usage:\nrender [-z zoomfactor]\n");
-    
+sub dprint($);
+
+sub usage {
+    die "Usage:\nrender [-v] [-z zoomfactor] [-d detaillevel] <pid> <eid>\n";
 }
 
-# if $embiggen == 1, node fonts will be rendered bigger.
-# if $embiggen == 2, node and link fonts will be rendered bigger.
+my  $optlist = "z:d:v";
+if (! getopts($optlist, \%options)) { usage; }
 
-my $embiggen = 0; 
+if (@ARGV != 2) { usage; }
+
+my $debug = 0;
+if ( defined($options{"v"}) ) { $debug++; }
 
 my $zoom = 1;
 if ( defined($options{"z"} ) ) {
@@ -39,230 +47,206 @@ if ( defined($options{"z"} ) ) {
     if ($zf =~ /^([\.0-9]+)/) {
 	$zoom = $1;
     } else {
-	die("Bad argument to -z.. must be float.");
+	die("Bad argument to -z; must be float.");
     }
 }
+
+my $detail = 0;
+if (defined($options{"d"})) {
+    my $df = $options{"d"};
+    if ($df =~ /^([0-9]+)/) {
+	$detail = $1;
+    } else {
+	die("Bad argument to -d; must be non-negative integer.");
+    }
+}
+
+my %nodes = ();
+my %links = ();
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+# Get node list.
+# (left join info from vis_nodes; could also left join virt_lans,
+#  but there's no reason to since lan info shows up on the link, not the LAN node.)
+
+my $result = DBQueryFatal("SELECT vis.vname, vis.vis_type, vis.x, vis.y, ".
+			  "virt.ips, virt.type " .
+			  "FROM vis_nodes as vis " .
+			  "LEFT JOIN virt_nodes as virt on ".
+			  "vis.vname=virt.vname and vis.pid=virt.pid and vis.eid=virt.eid ".
+#			  "LEFT JOIN virt_lans as lans on vis.vname=lans.vname ".
+			  "WHERE vis.pid='$pid' AND vis.eid='$eid'");
+
+while (my ($name, $vis_type, $vis_x, $vis_y, $ips, $virt_type) = $result->fetchrow) {
+    dprint "NODE $name $vis_type $vis_x $vis_y\n";
+
+    if (defined $ips) {
+	$ips =~ s/^\d\://g;
+	$ips =~ s/\s\d\:/ /g;
+	$ips =~ s/^192\.168//g;
+	$ips =~ s/\s192\.168/ /g;
+
+	$nodes{$name}{"ips"} = $ips;
+    }
+
+    $nodes{$name}{"type"} = $vis_type; # vis type, not hwtype.
+    $nodes{$name}{"x"} = $vis_x;
+    $nodes{$name}{"y"} = $vis_y;
+
+    # what appears in label depends on the detail level.
+    my $label = $name;
+    if ($detail > 0) {
+	if (defined $virt_type) {
+	    $label .= "(" . $virt_type . ")";
+	}
+	if (defined $ips) {
+	    $label .= " " . $ips;
+	}
+    }
+    
+    $nodes{$name}{"label"} = $label;
+
+    if (!(defined $min_x) || $vis_x < $min_x) { $min_x = $vis_x; }
+    if (!(defined $min_y) || $vis_y < $min_y) { $min_y = $vis_y; }
+    if (!(defined $max_x) || $vis_x > $max_x) { $max_x = $vis_x; }
+    if (!(defined $max_y) || $vis_y > $max_y) { $max_y = $vis_y; }
+}
+
+if (!(defined $min_x)) {
+    # no nodes.
+    die "No visible nodes in '$pid/$eid', or experiment does not exist.\n";
+}
+
+dprint "min x,y = $min_x, $min_y\n" .
+       "max x,y = $max_x, $max_y\n";
+
+# adjust each node's position so topleftmost node is at (60,60) * $zoom.
+foreach $i (keys %nodes) {
+    $nodes{$i}{"x"} = ($nodes{$i}{"x"} - $min_x + 60) * $zoom;
+    $nodes{$i}{"y"} = ($nodes{$i}{"y"} - $min_y + 60) * $zoom;
+}
+
+# adjust max x,y appropriately.
+$max_x = ($max_x - $min_x + 120) * $zoom;
+$max_y = ($max_y - $min_y + 120) * $zoom;
+
+# get vlan list.
+
+$result = DBQueryFatal("SELECT vname, delay, bandwidth, lossrate, " .
+			  "rdelay, rbandwidth, rlossrate, " . 
+			  "member FROM virt_lans " .
+			  "WHERE pid='$pid' AND eid='$eid'");
+
+while (my ($vname, $delay, $bandwidth, 
+           $lossrate, $rdelay, $rbandwidth, 
+           $rlossrate, $member) = $result->fetchrow) {
+    $member =~ s/\:.*//;
+    $lans{$vname}{$member}{"delay"}  = $delay;
+    $lans{$vname}{$member}{"bw"}     = $bandwidth;
+    $lans{$vname}{$member}{"loss"}   = $lossrate;
+    $lans{$vname}{$member}{"rdelay"} = $rdelay;
+    $lans{$vname}{$member}{"rbw"}    = $rbandwidth;
+    $lans{$vname}{$member}{"rloss"}  = $rlossrate;
+}
+
+foreach my $lan (keys %lans) {
+    if ((keys %{$lans{$lan}}) == 2) {
+	# amalgamate into 2 member link.
+	my $a = (keys %{$lans{$lan}})[0];
+	my $b = (keys %{$lans{$lan}})[1];
+	my $delaya2b = $lans{$lan}{$a}{"delay"} + $lans{$lan}{$b}{"rdelay"};
+	my $delayb2a = $lans{$lan}{$b}{"delay"} + $lans{$lan}{$a}{"rdelay"};
+	my $bwa2b = min( $lans{$lan}{$a}{"bw"}, $lans{$lan}{$b}{"rbw"} );
+	my $bwb2a = min( $lans{$lan}{$b}{"bw"}, $lans{$lan}{$a}{"rbw"} );
+	my $lossa2b = combineloss( $lans{$lan}{$a}{"loss"}, $lans{$lan}{$b}{"rloss"} );
+	my $lossb2a = combineloss( $lans{$lan}{$b}{"loss"}, $lans{$lan}{$a}{"rloss"} );
+	my $desc = "";
+	if ($detail > 0) {
+	    $desc = gendesc( $delaya2b, $delayb2a, $bwa2b, $bwb2a, $lossa2b, $lossb2a );
+	}
+	# create the link
+	dprint "LINK $a $b '$desc'\n";
+	$links{"$a $b"}{"label"} = $desc; 
+    } else {
+	# add links from node to LAN.
+	unless (exists $nodes{$lan} && ($nodes{$lan}{"type"} eq "lan")) {
+	    warn "No LAN $lan!";
+	}
+	foreach my $node (keys %{$lans{$lan}}) {
+	    my $delayin  = $lans{$lan}{$node}{"delay"};
+	    my $delayout = $lans{$lan}{$node}{"rdelay"};
+	    my $bwin     = $lans{$lan}{$node}{"bw"};
+	    my $bwout    = $lans{$lan}{$node}{"rbw"};
+	    my $lossin   = $lans{$lan}{$node}{"loss"};
+	    my $lossout  = $lans{$lan}{$node}{"rloss"};
+	    my $desc = "";
+	    if ($detail > 0) {
+		$desc = gendesc( $delayin, $delayout, $bwin, $bwout, $lossin, $lossout );
+	    }
+	    # create a link from node to lan.
+	    $links{"$node $lan"}{"label"} = $desc;
+	    dprint "LINK $node $lan '$desc'\n";
+	}
+    }
+}    
+
+
+# if $embiggen == 1, node fonts will be rendered bigger.
+# if $embiggen == 2, node and link fonts will be rendered bigger.
+
+my $embiggen = 0; 
 
 if ($zoom >= 1.5) { $embiggen = 1; }
 if ($zoom >= 1.75) { $embiggen = 2; }
 
-%props = ();
-%nodes = ();
-%linklabels = ();
-@links = ();
-
-#parse input file
-
-while (<>) {
-  if (/^\s*(\w+)\s\[([^\]]*)\]/) {
-    # this line is a property set
-    ($cmd, $props) = ($1, $2);
-    $props =~ s/[\=\,]/ /g;
-
-    while (($props =~ s/^\s*(\w+)\s+((\"[^\"]*\")|(\w+))\s*//)) {
-	# add each property to %props
-        ($k, $v) = ($1, $2);
-	$v =~ s/\"//g;
-	$props{$k} = $v;
-#	print "property $k gets value $v\n";
-    } 
-
-    if ($cmd =~ /^node$/) {
-#	print "node property $props\n";
-    } elsif ($cmd =~ /^graph$/) {
-#	print "graph thingee (ignored)\n";
-    } else {
-	# there is a name here, not "node" or "graph"
-        # so it terminates the node.. store props away.
-	$nodes{$cmd} = {%props}; 
-	%props = ();
-    }
-  } elsif (/^\s*(\w+)\s\-\-\s(\w+)\s/) {
-    # a link.
-    ($a, $b) = ($1, $2);
-    push( @links, $a . " " . $b );
-    if (/label\s*\=\s*\"([^\"]*)\"/) {
-	$linklabels{ "$a $b" } = $1;
-    } elsif (/label\s*\=\s*(\w+)/) {
-	$linklabels{ "$a $b" } = $1;
-    }
-  }
-}
-
-
-%nodepos = ();
-
-($fontw, $fonth) = (gdSmallFont->width, gdSmallFont->height);
-
-# load position hash for nodes
-
-foreach $i (keys %nodes) {
-    if (exists $nodes{$i}{"pos"}) {
-	$s = $nodes{$i}{"pos"};
-	$s =~ /^\s*(\d+)\s+(\d+)/;    
-	$nodepos{ $i } = [$1, $2]; 	
-    }
-}
-
-# "ideal" width and height
-
-$idealw = 500;
-$idealh = 500;
-
-
-$maxX = 1000;
-$minX = 0;
-$maxY = 1000;
-$minY = 0;
-
-$xSquishable = 1;
-$ySquishable = 1;
-
-# while we are above the ideal width or height,
-# and there exist empty rows or columns,
-# take out rows or columns of whitespace.
-
-while ((($maxX - $minX) > $idealw && $xSquishable) || 
-       (($maxY - $minY) > $idealh && $ySquishable)) {
-
-    if ($maxX - $minX > $idealw) {   
-	$totalsub = 0;
-	$lastvert = 0;
-	foreach $j (sort {$nodepos{ $a }[0] <=> $nodepos{ $b }[0]} keys %nodepos) 
-	{
-	    $vert = $nodepos{ $j }[0];
-	    if ($vert - $lastvert > 36) {
-#		$totalsub += ($vert - $lastvert - 36);
-		$totalsub += 1;
-#		warn " now eating $totalsub vert\n";
-	    }
-	    $nodepos{ $j }[0] -= $totalsub;
-	    $lastvert = $vert;
-	}
-    
-	if ($totalsub > 0) { $xSquishable = 1; } else { $xSquishable = 0; }
-    }
-
-    if ($maxY - $minY > $idealh) {
-	$totalsub = 0;
-	$lastvert = 0;
-	foreach $j (sort {$nodepos{ $a }[1] <=> $nodepos{ $b }[1]} keys %nodepos) 
-	{
-	    $vert = $nodepos{ $j }[1];
-	    if ($vert - $lastvert > 36) {
-#		$totalsub += ($vert - $lastvert - 36);
-		$totalsub += 1;
-#		warn "now eating $totalsub horiz\n";
-	    }
-	    $nodepos{ $j }[1] -= $totalsub;
-	    $lastvert = $vert;
-	}
-	
-	if ($totalsub > 0) { $ySquishable = 1; } else { $ySquishable = 0; }
-    }
-
-    $maxX = 0;
-    $maxY = 0;
-    $minX = 1000000;
-    $minY = 1000000;
-    
-    # get min and max X and Y
-    foreach $i (keys %nodepos) {
-	($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
-	$halflabel = ((length( $i ) - 0.5) * $fontw) / 2;
-	if ($x + $halflabel > $maxX) { $maxX = $x + $halflabel; }
-	if ($y + $fonth> $maxY) { $maxY = $y + $fonth; }
-	if ($x - $halflabel < $minX) { $minX = $x - $halflabel; }
-	if ($y < $minY) { $minY = $y; }
-    }     
-}
-
-$xbig = $maxX - $minX;
-$ybig = $maxY - $minY;
-
-$xscale = 1.0;
-$yscale = 1.0;
-
-
-# recompute new ideal.. minimum size.
-$nodecount = (keys %nodepos);
-$idealarea = 4200 * $nodecount;
-$idealw = sqrt( $idealarea );
-if ($idealw > 500) { $idealw = 500; }
-$idealh = $idealw;
-
-# if it is too small, scale everything up so it takes the
-# "ideal" amount of space
-
-if ($xbig < $idealw) {
-    $xscale = ($idealw / $xbig);
-    $xbig = $idealw;
-}
-
-if ($ybig < $idealh) {
-    $yscale = ($idealh / $ybig);
-    $ybig = $idealh;
-}
-
-foreach $i (keys %nodepos) {
-  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
-  $x -= $minX;
-  $y -= $minY;
-
-  $x *= $xscale;
-  $y *= $yscale;
-
-  $x += 20;
-  $y += 20;
-  $nodepos{ $i } = [$x,$y];	
-}
-
-# Uhh, Zoom Zip..
-foreach $i (keys %nodepos) {
-  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
-  $x *= $zoom;
-  $y *= $zoom;
-  $nodepos{ $i } = [$x,$y];	
-}
-
 # start constructing the image
 
-$im = new GD::Image(($xbig + 60) * $zoom, ($ybig + 70) * $zoom);
+dprint "Image size = $max_x x $max_y\n";
+$im = new GD::Image($max_x, $max_y);
 
 $nodeicon = GD::Image->newFromPng("$ICONDIR/nodeicon.png") || warn "nodeicon.png not found";
 $lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png not found";
 
 %colors = ();
 
-$colors{"black"} =  $im->colorAllocate(0,0,0);
-$colors{"darkblue"} =  $im->colorAllocate(0,0,96);
-$colors{"darkred"} =  $im->colorAllocate(128,0,0);
-$colors{"red"} =  $im->colorAllocate(192,0,0);
-$colors{"blue"} =  $im->colorAllocate(0,0,192);
-$colors{"paleblue"} =  $im->colorAllocate(127,127,192);
-$colors{"green"} =  $im->colorAllocate(0,96,0);
-$colors{"orange"} =  $im->colorAllocate(255, 128, 0);
-$colors{"white"} =  $im->colorAllocate(255,255,255);
-$colors{"gray80"} = $im->colorAllocate(210,210,210);
-$colors{"gray75"} = $im->colorAllocate(191,191,191);
-$colors{"gray50"} = $im->colorAllocate(127,127,127);
-$colors{"gray25"} = $im->colorAllocate(63,63,63);
+$colors{"black"}     =  $im->colorAllocate(0,0,0);
+$colors{"darkblue"}  =  $im->colorAllocate(0,0,96);
+$colors{"darkred"}   =  $im->colorAllocate(128,0,0);
+$colors{"red"}       =  $im->colorAllocate(192,0,0);
+$colors{"blue"}      =  $im->colorAllocate(0,0,192);
+$colors{"paleyellow"}      =  $im->colorAllocate(192,192,127);
+$colors{"paleblue"}  =  $im->colorAllocate(127,127,192);
+$colors{"green"}     =  $im->colorAllocate(0,96,0);
+$colors{"lightgreen"} =  $im->colorAllocate(0, 160, 0);
+$colors{"orange"}    =  $im->colorAllocate(255, 128, 0);
+$colors{"yellow"}    =  $im->colorAllocate(255, 255, 0);
+$colors{"cyan"}    =  $im->colorAllocate(0, 191, 191);
+$colors{"white"}     =  $im->colorAllocate(255,255,255);
+$colors{"gray80"}    =  $im->colorAllocate(210,210,210);
+$colors{"gray75"}    =  $im->colorAllocate(191,191,191);
+$colors{"gray50"}    =  $im->colorAllocate(127,127,127);
+$colors{"gray25"}    =  $im->colorAllocate(63,63,63);
 
 # set clear background
 $bgcolor = $im->colorAllocate(254, 254, 254);
 
-$im->transparent($bgcolor);
-#$im->interlaced('true');
+# $im->transparent($bgcolor);
 $im->fill( 1, 1, $bgcolor );
 
+#$im->interlaced('true');
 #$im->rectangle( 0,0,99,99, $gray50 );
 
 # render shadows
 
 foreach $i (keys %nodes) {
-  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
-  $cname = $nodes{$i}{"color"};
-  if ($cname eq "green") {
+  # get node location
+  ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+  if ($nodes{$i}{"type"} eq "lan") {
+      # render filled circle for LAN shadow.
+      # there doesn't seem to be a filledArc (!),
+      # so we render 18 concentric circles.
       for ($i = 1; $i < 18; $i++) {
 	  $im->arc( $x + 4, $y + 4, 
 		    $i * 2, $i * 2, 
@@ -270,6 +254,7 @@ foreach $i (keys %nodes) {
 		    $colors{"gray80"} );
       }
   } else {
+      # not a LAN, so render solid square for shadow.
       $im->filledRectangle( $x - 12, $y - 12, 
 			    $x + 20, $y + 20, $colors{"gray80"});
   }
@@ -277,157 +262,186 @@ foreach $i (keys %nodes) {
 
 # render links
 
-foreach $i (@links) {
-  ($a, $b) = ($i =~ /(\w+)\s(\w+)/);
+foreach $i (keys %links) {
+  # get endpoint names from link name
+  ($a, $b) = ($i =~ /(\S+)\s(\S+)/);
 
-  ($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
-  ($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
+  # get endpoint node location
+  ($x1, $y1) = ($nodes{ $a }{"x"}, $nodes{ $a }{"y"});
+  ($x2, $y2) = ($nodes{ $b }{"x"}, $nodes{ $b }{"y"});  
 
-  if (exists $linklabels{ $i }) {
-      my $foo   = $linklabels{ $i };
-      my $red   = $colors{"red"};
-      my $green = $colors{"green"};      
-      my $blue  = $colors{"blue"};
-      my $black = $colors{"black"};
+  # get near-endpoints
+  ($xv, $yv) = ($x2 - $x1, $y2 - $y1);
+  $vmag = sqrt( $xv * $xv + $yv * $yv );
 
-      if ($foo =~ /^\!rs/) {
-	  $im->setStyle($red); 
-      } elsif ($foo =~ /^\!bs/) {
-	  $im->setStyle($blue); 
-      } elsif ($foo =~ /^\!ks/) {
-	  $im->setStyle($black); 
-      } elsif ($foo =~ /^\!ro/) {
-	  $im->setStyle($red, gdTransparent);
-      } elsif ($foo =~ /^\!bo/) {
-	  $im->setStyle($blue, gdTransparent);
-      } elsif ($foo =~ /^\!ko/) {
-	  $im->setStyle($black, gdTransparent);
-      } elsif ($foo =~ /^\!ra/) {
-	  $im->setStyle($red, $red, gdTransparent);
-      } elsif ($foo =~ /^\!ba/) {
-	  $im->setStyle($blue, $blue, gdTransparent);
-      } elsif ($foo =~ /^\!ka/) {
-	  $im->setStyle($black, $black, gdTransparent);
-      } else {
-	  $im->setStyle($colors{"paleblue"}); 
-      }
+  if ($vmag > (26 * 2)) {
+      $xv = ($xv / $vmag) * 26;
+      $yv = ($yv / $vmag) * 26;
+      
+      ($x1n, $y1n) = ($x1 + $xv, $y1 + $yv);
+      ($x2n, $y2n) = ($x2 - $xv, $y2 - $yv);
+      
+      # set link color
+      # $im->setStyle($colors{"paleblue"}); 
+      # $im->setStyle($red, $red, gdTransparent);   
+      
+      # actual rendering
+      # $im->line( $x1, $y1, $x2, $y2, gdStyled );
+      
+      $im->setStyle( $colors{"yellow"} );
+      $im->line( $x1 + 1, $y1, $x1n + 1, $y1n, gdStyled );
+      $im->line( $x2n + 1, $y2n, $x2 + 1, $y2, gdStyled );
+
+      $im->line( $x1, $y1 + 1, $x1n, $y1n + 1, gdStyled );
+      $im->line( $x2n, $y2n + 1, $x2, $y2 + 1, gdStyled );
+
+      $im->line( $x1 - 1, $y1, $x1n - 1, $y1n, gdStyled );
+      $im->line( $x2n - 1, $y2n, $x2 - 1, $y2, gdStyled );
+
+      $im->line( $x1, $y1 - 1, $x1n, $y1n - 1, gdStyled );
+      $im->line( $x2n, $y2n - 1, $x2, $y2 - 1, gdStyled );
+
+      $im->setStyle( $colors{"paleyellow"} );
+
+      $im->line( $x1, $y1, $x1n, $y1n, gdStyled );
+      $im->line( $x2n, $y2n, $x2, $y2, gdStyled );
+
+      $im->setStyle( $colors{"paleblue"} );
+      $im->line( $x1n, $y1n, $x2n, $y2n, gdStyled );
+
   } else {
-      $im->setStyle($colors{"paleblue"}); 
+      $im->setStyle( $colors{"black"}, gdTransparent );
+      $im->line( $x1, $y1, $x2, $y2, gdStyled );
   }
-  
-  #$im->line( $x1, $y1, $x2, $y2, $colors{"paleblue"} );
-  
-  $im->line( $x1, $y1, $x2, $y2, gdStyled );
 }
 
 # render nodes.
-# if colors match certain colors, use icons instead
-# (hack)
 
 foreach $i (keys %nodes) {
-  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+  # get node position and type.
+  my ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+  my $type = $nodes{$i}{"type"};
 
-  $cname = $nodes{$i}{"color"};
-  $c = $colors{ $cname } || $colors{"blue"};
-
-  if ($cname eq "red") {
+  if ($type eq "special") {
+      # 'special' is not used for anything right now.
       $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"darkred"} );
       $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"darkred"} );
-  } elsif ($cname eq "green") { 
+      $im->filledRectangle( $x - 14, $y - 14, 
+			    $x + 14, $y + 14, $colors{"white"} );
+      # render icon
+      $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
+  } elsif ($type eq "lan") {
+      # render multiple concentric circles (again, no filledArc) for LAN.
+      # render outermost circle at 50% grey to provide
+      # fake antialiasing.
       $im->arc( $x, $y, 36, 36, 0, 360, $colors{"gray50"} );
       $im->arc( $x, $y, 34, 34, 0, 360, $colors{"gray25"} );
       $im->arc( $x, $y, 32, 32, 0, 360, $colors{"gray75"} );
-  } else {
-      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
-      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
-  }
-
-  if ($cname eq "green") {
       for ($i = 1; $i < 16; $i++) {
 	  $im->arc( $x, $y, $i * 2, $i * 2, 0, 360, $colors{"white"} );
       }
+      # render icon
+      $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
   } else {
+      # anything that isn't a LAN (in other words, a node.)
+      $im->rectangle( $x - 16, $y - 16, $x + 16, $y + 16, $colors{"gray25"} );
+      $im->rectangle( $x - 15, $y - 15, $x + 15, $y + 15, $colors{"gray25"} );
       $im->filledRectangle( $x - 14, $y - 14, 
 			    $x + 14, $y + 14, $colors{"white"} );
-  }
-
-  if ($nodeicon && ($cname eq "skyblue" || 
-		    $cname eq "steelblue" ||
-		    $cname eq "blue" ||
-		    $cname eq "red")) {
-    $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
-  } elsif ($lanicon && $cname eq "green") {
-    $im->copy($lanicon, $x-16, $y-16, 0, 0, 32, 32);
-  } else {
-    $im->filledRectangle( $x - 6, $y - 6, 
-	     		  $x + 6, $y + 6, $c );
+      # render icon
+      $im->copy($nodeicon, $x-16, $y-16, 0, 0, 32, 32);
   }
 } 
 
-# render text.
-# this is done in a second pass so no text is obscured by
-# boxes.
+# render link text.
+# (this is done in a second pass so no text is obscured by boxes)
 
-foreach $i (@links) {
-    if (exists $linklabels{ $i }) {
-	($a, $b) = ($i =~ /(\w+)\s(\w+)/);
-	($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
-	($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
-	($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
+foreach $i (keys %links) {
+    # only render label if there _is_ a label.
+    if (!exists $links{$i}{"label"}) { next; }
 
-	$linklabels{ $i } =~ s/^\!..//;
-	# axe prefix added to avoid reserved-word collide:
-	$linklabels{ $i } =~ s/_x1823Y_//; 
-
-	my @lines = split " ", $linklabels{ $i };
-
-	$y -= (0.5 * (@lines * gdTinyFont->height)); 
-
-	my $linenum = 0;
-	foreach $j (@lines) {
-	    $xpos = $x - ((length($j) - 0.5) * (($embiggen == 2) ? gdSmallFont->width : gdTinyFont->width) / 2); 
-	    
-	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos + 1, $y, 
-			$j, $bgcolor);
-	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos - 1, $y, 
-			$j, $bgcolor);
-	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y - 1, 
-			$j, $bgcolor);
-	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y + 1, 
-			$j, $bgcolor);
-	    $im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y, 
-			$j, $colors{"darkblue"}); 
-	    $y += ($embiggen == 2) ? gdSmallFont->height : gdTinyFont->height; 
-	}
+    # get endpoint names and positions
+    ($a, $b) = ($i =~ /(\S+)\s(\S+)/);
+    ($x1, $y1) = ($nodes{$a}{"x"}, $nodes{$a}{"y"});
+    ($x2, $y2) = ($nodes{$b}{"x"}, $nodes{$b}{"y"});  
+    # calculate midpoint of link line
+    ($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
+    
+    # $links{$i}{"label"} =~ s/^\!..//;
+    
+    # split lines by space
+    my @lines = split " ", $links{$i}{"label"};
+    
+    # center vertically
+    $y -= (0.5 * (@lines * gdTinyFont->height)); 
+    
+    my $linenum = 0;
+    foreach $j (@lines) {
+	$xpos = $x - ((length($j) - 0.5) * (($embiggen == 2) ? gdSmallFont->width : gdTinyFont->width) / 2); 
+	
+	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos + 1, $y, 
+		    $j, $bgcolor);
+	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos - 1, $y, 
+		    $j, $bgcolor);
+	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y - 1, 
+		    $j, $bgcolor);
+	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y + 1, 
+		    $j, $bgcolor);
+	$im->string(($embiggen == 2) ? gdSmallFont : gdTinyFont, $xpos, $y, 
+		    $j, $colors{"darkblue"}); 
+	$y += ($embiggen == 2) ? gdSmallFont->height : gdTinyFont->height; 
     }
 }
+
+# render node text.
+# (this is done in a second pass so no text is obscured by boxes)
     
 foreach $i (keys %nodes) {
-  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+  # only render label if there _is_ a label.  
+  if (!exists $nodes{$i}{"label"}) { next; }
 
-# my $nm = $i;
+  # get node position
+  ($x, $y) = ($nodes{$i}{"x"}, $nodes{$i}{"y"});
+
+  # my $nm = $i;
   my $nm = $nodes{$i}{"label"};
 
   @lines = ();
 
+  # append space, so same patterns work on the last word.
   $nm .= " ";
 
-  $nm =~ s/^(\S+)//;
-  $nm =~ s/_x1823Y_//; 
+  # first word (i.e., node name) 
+  # always gets its own line.
+  $nm =~ s/^(\S+)\s+//;
   push @lines, $1;
 
-  while ( $nm =~ s/^(.{1,12})\s// ) {
-    push @lines, $1;
+  # greedy line breaking (split works for links, but isn't quite sexy enough for nodes.):
+  while ($nm ne "") {
+      if ($nm =~ s/^(.{1,12})\s+//) {
+	  # if the next n words (plus the space between them) 
+	  # total less than 13 characters, use that as a line. 
+	  push @lines, $1;
+      } elsif ($nm =~ s/^(\S+)\s+//) {
+	  # if the next word is longer than 12, we fall through to this,
+	  # which uses that word as a line.
+	  push @lines, $1;
+      } else {
+	  # if neither of the above applies,
+	  # we abort the loop, and add a complaint to the string list.
+	  push @lines, "ERROR";
+	  last;
+      }
   }
 
-  push @lines, $nm;
-
-  # my @lines = split " ", $nm;
+  # now that @lines contains each line of the node caption,
+  # render it.
 
   my $linenum = 0;
   foreach $j (@lines) {
 #     warn "$j $x $y!";
       if ($linenum++ == 0) {
+	  # The first line, so we render it bigger.
 	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdMediumBoldFont->width : gdSmallFont->width) / 2);
 
 	  $im->string($embiggen ? gdMediumBoldFont : gdSmallFont, 
@@ -445,6 +459,7 @@ foreach $i (keys %nodes) {
 		      $j, $colors{"black"}); 
 	  $y += $embiggen ? gdMediumBoldFont->height : gdSmallFont->height; 
       } else {
+	  # Not the first line, so we render it smaller.
 	  $xpos = $x - ((length($j) - 0.5) * ($embiggen ? gdSmallFont->width : gdTinyFont->width) / 2); 
 
 	  $im->string(($embiggen) ? gdSmallFont : gdTinyFont, 
@@ -472,13 +487,96 @@ foreach $i (keys %nodes) {
 binmode STDOUT;
 print $im->png;
 
+# functions to generate labels for links on $detail > 0
 
+sub reportbw {
+    my $bandwidth = shift;
+    if ($bandwidth >= 5000000) {
+	return sprintf( "%.0f", ($bandwidth / 1000000) ) . "Gb";
+    } elsif ($bandwidth >= 1000000) {
+	return sprintf( "%.1f", ($bandwidth / 1000000) ) . "Gb";
+    } elsif ($bandwidth >= 5000) {
+	return sprintf( "%.0f", ($bandwidth / 1000) ) . "Mb";
+    } elsif ($bandwidth >= 1000) {
+	return sprintf( "%.1f", ($bandwidth / 1000) ) . "Mb";
+    } elsif ($bandwidth >= 5) {
+	return sprintf( "%.0f", $bandwidth ) . "kb";
+    } else {
+	return sprintf( "%.1f", $bandwidth ) . "kb";
+    }
+}
 
+sub reportdelay {
+    my $delay = shift;
+    if ($delay == 0) { return "0msec"; }
 
+    if ($delay >= 10) {
+	return sprintf( "%.0f", $delay ) . "msec";
+    } else {
+	return sprintf( "%.1f", $delay ) . "msec";
+    }
+}
 
+sub reportloss {
+    my $losspct = shift;
+    $losspct *= 100;
+    if ($losspct < 0.0001) { return "0\%loss"; }
 
+    if ($losspct > 5) {
+	return sprintf( "%.0f", $losspct ) . "\%loss";
+    } elsif ($losspct > 1) {
+	return sprintf( "%.1f", $losspct ) . "\%loss";
+    } elsif ($losspct > 0.1) {
+	return sprintf( "%.2f", $losspct ) . "\%loss";
+    } else {
+	return sprintf( "%.3f", $losspct ) . "\%loss";
+    }
+}
 
+sub gendesc {
+    my ($delay0, $delay1, $bw0, $bw1, $loss0, $loss1) = @_;
+    my $desc = "";
+    
+    if ($bw0 == $bw1) {
+	$desc .= reportbw( $bw0 ) . " ";
+    } else {
+	$desc .= reportbw( $bw0 ) . "/" . reportbw( $bw1 ) . " ";
+    }
 
+    if ($delay0 == $delay1) {
+	if ($delay0 != 0) {
+	    $desc .= reportdelay( $delay0 ) . " ";
+	}
+    } else {
+	$desc .= reportdelay( $delay0 ) . "/" . reportdelay( $delay1 ) . " ";
+    }
 
+    if ($loss0 == $loss1) {
+	if ($loss0 != 0.0) {
+	    $desc .= reportloss( $loss0 ) . " ";
+	}
+    } else {
+	$desc .= reportloss( $loss0 ) . "/" . reportloss( $loss1 ) . " ";
+    }
 
+    $desc =~ s/\s$//g;
+
+    return $desc;
+}
+
+sub combineloss {
+    my ($a, $b) = @_;
+    return (1.0 - ((1.0 - $a) * (1.0 - $b)));
+}
+
+sub min {
+    my ($a, $b) = @_;
+    if ($a < $b) { return $a; }
+    return $b;
+}
+
+sub dprint($) {
+    my $n = shift;
+    if ($debug > 0) { print STDERR $n; }
+}
 

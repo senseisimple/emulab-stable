@@ -1,0 +1,419 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+# Need this module to use mktemp (commented out below)
+# use File::MkTemp;
+
+# Configure variables
+my $TB       = "@prefix@";
+
+use lib '@prefix@/lib';
+use libdb;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Untaint the path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#my $NEATO_CMD = "neato -Gstart=5 -Gepsilon=0.0001 -Goverlap=scale -Gsep=1";
+#my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.001 -Goverlap=scale -Gpack=true -Gsep=1 -Gmclimit=30";
+#my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.001 -Goverlap=scale -Gpack=true -Gsep=4 -Gmclimit=30";
+#my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Goverlap=scale -Gmaxiter=20000 -Gpack=true";
+my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Gmaxiter=20000 -Gpack=true";
+
+sub dprint($);
+
+sub usage {
+    die "Usage:\nprerender [-v] [-r] <pid> <eid>\n" .
+        "    -r  Just remove vis info from DB\n";
+}
+
+my $optlist = "rv";
+
+%options = ();
+
+if (!getopts($optlist, \%options)) { usage; }
+if (@ARGV != 2) { usage; }
+
+my $debug = 0;
+if ( defined($options{"v"}) ) { $debug++; }
+
+# for the mungeName function, below.
+$mungeUID = 0;
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+### First, wipe out the old layout.
+
+DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
+
+### If they specified -r, meaning they just wanted to remove vis info 
+### from the DB, we quit now.
+
+if (defined($options{"r"})) { exit; }
+
+### Now, read experiment virtual info from the DB.
+
+# read nodes
+
+my $result = DBQueryFatal("SELECT vname FROM virt_nodes " .
+			  "WHERE pid='$pid' AND eid='$eid'");
+
+my $nodes = ();
+my $lans  = ();
+my $links = ();
+
+# all virt_nodes are visualizer nodes of type "node"
+while (my ($vname) = $result->fetchrow) {
+    $nodes{$vname}{"type"} = "node";
+}
+
+# read lans
+
+$result = DBQueryFatal("SELECT vname, member FROM virt_lans " .
+		       "WHERE pid='$pid' AND eid='$eid'");
+
+while (my ($vname, $member) = $result->fetchrow) {
+    $member =~ s/\:.*//;
+    $lans{$vname}{$member} = 1;
+}
+
+# construct links from lans
+
+foreach my $lan (keys %lans) {
+    if ((keys %{$lans{$lan}}) == 2) {
+	# make a link
+	my $a = (keys %{$lans{$lan}})[0];
+	my $b = (keys %{$lans{$lan}})[1];
+	$links{"$a $b"} = "pair";
+    } else {
+	# it's a lan; we need a visualizer node for it (of type "lan").
+	if (exists $nodes{$lan}) { die "LAN $lan name collided."; }
+	$nodes{$lan}{"type"} = "lan";
+
+	# make the appropriate links (from each member to the LAN)
+	foreach my $node (keys %{$lans{$lan}}) {
+	    $links{"$node $lan"} = "lan";
+	}
+    }
+}
+
+### Write topology to temporary file
+
+# Ideally, we could use mktemp, but module isn't installed.
+# my $tempfile = mktemp("prerenderXXXXXX.topfile");
+
+# Could use ($ENV{'TMP'} || "/tmp")  but not sure if that is safe.
+my $tempfile =  "/tmp/prerender.$$-" . sprintf("%i",rand(65536));
+
+open (TOPO, ">$tempfile" ) or die( "Couldn't open temporary file '$tempfile'\n" );
+
+# write topology to neato
+
+print TOPO "graph G {\n";
+
+foreach my $node (keys %nodes) {
+    print TOPO "{node [shape = box] " . mungeName($node) . "}\n";
+}
+
+#foreach my $a (keys %nodes) {
+#    foreach my $b (keys %nodes) {
+#	if (!exists $links{"$a $b"}) {
+#	    print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 4];\n";
+#	    print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
+#	}
+#    }
+#}
+
+foreach my $link (keys %links) {
+    my ($a, $b) = $link =~ /(\S+)\s(\S+)/;
+    if ($links{$link} eq "pair") {
+# 	print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 3];\n";
+	print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
+    } else {
+#	print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 5];\n";
+	print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
+    }
+}
+
+print TOPO "}\n";
+
+close(TOPO);
+
+my $bestOverlap;
+
+# loop
+for ($attempt = 0; $attempt < 16; $attempt++) {
+
+### Send topology to neato.
+
+    open (NEATO, "$NEATO_CMD $tempfile |" );
+
+### Parse results from neato.
+
+    %props = ();
+    %nodeProps = ();
+
+# General neato output parser.
+# stashes away all properties returned for each graph node.
+# (All we care about for now is "pos")
+# Links are ignored.
+    
+    while (<NEATO>) {
+	if (/^\s*(\w+)\s\[([^\]]*)\]/) {
+	    # this line is a property set
+	    ($cmd, $props) = ($1, $2);
+	    $props =~ s/[\=\,]/ /g;
+	    
+	    while (($props =~ s/^\s*(\w+)\s+((\"[^\"]*\")|(\w+))\s*//)) {
+		# add each property to %props
+		($k, $v) = ($1, $2);
+		$v =~ s/\"//g;
+		$props{$k} = $v;
+#	        print "property $k gets value $v\n";
+	    } 
+	    
+	    if ($cmd =~ /^node$/) {
+#	print "node property $props\n";
+	    } elsif ($cmd =~ /^graph$/) {
+#	print "graph thingee (ignored)\n";
+	    } else {
+		# there is a name here, not "node" or "graph"
+		# so it terminates the node.. store props away.
+		$nodeProps{$cmd} = {%props}; 
+		%props = ();
+	    }
+	} 
+    }
+
+# done with neato process.
+    
+    close(NEATO);
+    
+# obtain X,Y for each node from stashed Properties.
+    
+    foreach $node (keys %nodes) {
+	my $mungedName = mungeName( $node );
+	if (exists $nodeProps{$mungedName}{"pos"}) {
+	    $s = $nodeProps{$mungedName}{"pos"};
+	    $s =~ /^\s*(\d+)\s+(\d+)/;    
+	    $nodes{ $node }{"x"} = $1;
+	    $nodes{ $node }{"y"} = $2; 	
+	} else {
+	    warn "No position information returned for $node (mungedName=$mungedName)";
+	}
+    }
+    
+### Fixup positions (eat free columns and rows)
+    
+    my $subX = 0;
+    my $lastX = 0;
+    foreach $i (sort {$nodes{$a}{"x"} <=> $nodes{$b}{"x"}} keys %nodes) {
+	my $xDiff = $nodes{$i}{"x"} - $lastX;
+	if ($xDiff > 60) {
+	    $subX += $xDiff - 60;
+	}
+	# last should be the position _before_ transform
+	$lastX = $nodes{$i}{"x"};
+	$nodes{$i}{"x"} -= $subX;
+    }
+    
+    my $subY = 0;
+    my $lastY = 0;
+    foreach $i (sort {$nodes{$a}{"y"} <=> $nodes{$b}{"y"}} keys %nodes) {
+	my $yDiff = $nodes{$i}{"y"} - $lastY;
+	if ($yDiff > 60) {
+	    $subY += $yDiff - 60;
+	}
+	# last should be the position _before_ transform
+	$lastY = $nodes{$i}{"y"};
+	$nodes{$i}{"y"} -= $subY;
+    }
+
+    # check for overlaps 
+    # false positive: each pair is checked twice. should fix this
+    # false positive: two edges which end at the same node "collide".
+    #                 but, this shouldn't give any attempt an unfair advantage.
+
+    my $overlaps = 0;
+
+    foreach my $linka (keys %links) {
+	my ($a1, $a2) = ($linka =~ /(\S+)\s(\S+)/);
+
+	defined $a1 or die;
+	defined $a2 or die;
+	exists $nodes{ $a1 } or die $a1;
+	exists $nodes{ $a2 } or die $a2;
+
+	my ($a1x,$a1y) = ($nodes{ $a1 }{"x"}, $nodes{ $a1 }{"y"});
+	my ($a2x,$a2y) = ($nodes{ $a2 }{"x"}, $nodes{ $a2 }{"y"});
+
+	defined $a1x or die "$linka $a1";
+	defined $a1y or die $a1;
+	defined $a2x or die $a2;
+	defined $a2y or die $a2;
+
+	foreach my $linkb (keys %links) {
+	    # never check a link against itself
+	    if ($linka eq $linkb) { next; }
+    
+	    my ($b1, $b2) = ($linkb =~ /(\S+)\s(\S+)/);
+
+	    defined $b1 or die;
+	    defined $b2 or die;
+
+	    my ($b1x,$b1y) = ($nodes{ $b1 }{"x"}, $nodes{ $b1 }{"y"});
+	    my ($b2x,$b2y) = ($nodes{ $b2 }{"x"}, $nodes{ $b2 }{"y"});
+
+	    defined $b1x or die $b1;
+	    defined $b1y or die $b1;
+	    defined $b2x or die $b2;
+	    defined $b2y or die $b2;
+
+	    my $shared = "";
+
+	    # see if line segments share at least one common endpoint
+	    if ($b1 eq $a1) { $shared = $b1; $unshared0 = $b2; $unshared1 = $a2; }
+	    elsif ($b1 eq $a2) { $shared = $b1; $unshared0 = $b2; $unshared1 = $a1; }
+	    elsif ($b2 eq $a1) { $shared = $b2; $unshared0 = $b1; $unshared1 = $a2; }
+	    elsif ($b2 eq $a2) { $shared = $b2; $unshared0 = $b1; $unshared1 = $a1; }
+
+	    if ($shared ne "") {
+		if ($unshared0 eq $unshared1) {
+		    # They share 2 endpoints,
+		    # so they're the same segment;
+		    # there's nothing to be done.
+		    next;
+		}
+		
+		# if segments share a common endpoint,
+		# then see if they are at a greater than 5 degree angle.
+
+		my ($adx, $ady) = ($nodes{$unshared0}{"x"} - $nodes{$shared}{"x"}, 
+				   $nodes{$unshared0}{"y"} - $nodes{$shared}{"y"} );
+		my ($bdx, $bdy) = ($nodes{$unshared1}{"x"} - $nodes{$shared}{"x"}, 
+				   $nodes{$unshared1}{"y"} - $nodes{$shared}{"y"} );
+
+		my $alen = sqrt( $adx * $adx + $ady * $ady );
+		my $blen = sqrt( $bdx * $bdx + $bdy * $bdy );
+
+		# A dot product is |A|*|B|*cos(Theta).
+		# We calculate A dot B, then divide by |A|*|B| to get
+		# cos(Theta), which we compare with cos(5 degrees).
+		my $dotProduct = ($adx * $bdx + $ady * $bdy) / ($alen * $blen);
+
+		# cosine of 10 deg is ~0.9848	       
+		# cosine of 5 deg is ~0.9962	       
+		if ($dotProduct > 0.9962) { 
+		    # dprint "overlap '$linka'-'$linkb' $dotProduct\n";
+		    # bad overlap.
+		    $overlaps += 0.9; 
+		} elsif ($dotProduct > 0.9848) { 
+		    # dprint "overlap '$linka'-'$linkb' $dotProduct\n";
+		    $overlaps += 0.5; 
+		}
+		
+		next;
+	    }
+
+	    
+	    # formula derived from solving simultaneous parametric line equations
+	    # u is parameter for line A, v is for line B.
+	    # for line segments to collide, u and v of collision must both be 
+	    # between 0 and 1 (inclusive).
+
+	    my ($k0, $k1, $k2) = ($a2x - $a1x, $b1x - $b2x, $a1x - $b1x);
+	    my ($k3, $k4, $k5) = ($a2y - $a1y, $b1y - $b2y, $a1y - $b1y);
+	    
+	    my $v_n = ($k2 * $k3 - $k0 * $k5);
+	    my $v_d = ($k0 * $k4 - $k3 * $k1);
+	    
+	    if ($v_d < 0.001 && $v_d > -0.001) { next; } # no solution (i.e., lines are parallel)
+	    my $v = $v_n / $v_d;
+	    
+	    my $u_n = -($k4 * $v + $k5);
+	    my $u_d = $k3;
+	    if ($u_d < 0.001 && $u_d > -0.001) { next; } # no solution (i.e., lines are parallel)
+	    
+	    my $u = $u_n / $u_d;
+	    
+	    if ($u >= 0.0 && $u <= 1.0 && 
+		$v >= 0.0 && $v <= 1.0) {
+		#dprint "overlap '$linka'-'$linkb' u=$u v=$v\n";
+		$overlaps++;
+	    }
+	} # foreach $linkb
+    } # foreach $linka
+
+    dprint "Attempt = $attempt, overlaps = $overlaps.\n";
+
+    # if this is the best so far, stash it away.
+    if (!defined $bestOverlaps || $overlaps < $bestOverlaps) {
+	$bestOverlaps = $overlaps;
+	foreach $node (keys %nodes) {
+	    $nodes{ $node }{"x_best"} = $nodes{ $node }{"x"}; 
+	    $nodes{ $node }{"y_best"} = $nodes{ $node }{"y"}; 
+	}	
+    }    
+
+    # if there were no overlaps, we're done.
+    if ($overlaps == 0) { last; }
+} # for $attempt
+
+### Delete tempfile
+
+unlink $tempfile;
+
+### Put new data into db.
+
+foreach $node (keys %nodes) {
+    if (exists $nodes{ $node }{"type"} &&
+        exists $nodes{ $node }{"x_best"} &&
+	exists $nodes{ $node }{"y_best"}) {
+
+	DBQueryFatal("INSERT INTO vis_nodes (vname, pid, eid, vis_type, x, y) VALUES".
+		     " ('$node', '$pid', '$eid', " .
+		     "'" . $nodes{ $node }{"type"} . "', " .
+		     "'" . $nodes{ $node }{"x_best"}    . "', " .
+		     "'" . $nodes{ $node }{"y_best"}    . "') ");
+    }
+}
+
+### Success!!
+
+exit;
+
+
+# function to munge node/lan names as they are fed to neato so
+# so neato doesn't choke.
+# First, looks to see if this name has already been used.
+# If not, changes substrings of non-word characters to underscores, and
+# appends a unique identifier.
+
+sub mungeName($) {
+    my $n = shift;
+    if (exists $mungeMap{$n}) {
+	return $mungeMap{$n};
+    }
+    my $nm = $n;
+    $nm =~ s/\W+/_/g; 
+    $nm .= "__" . $mungeUID++;
+    $mungeMap{$n} = $nm;
+    return $nm;
+}
+
+sub dprint($) {
+    my $n = shift;
+    if ($debug > 0) { print STDERR $n; }
+}

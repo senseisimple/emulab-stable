@@ -1,0 +1,51 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+# Configure variables
+my $TB       = "@prefix@";
+
+use lib '@prefix@/lib';
+use libdb;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Untaint the path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $PRERENDER_CMD = "@prefix@/libexec/vis/prerender";
+
+sub usage {
+    die "Usage:\prerender_all [-v]";
+}
+
+my $optlist = "v";
+
+%options = ();
+
+if (!getopts($optlist, \%options)) { usage; }
+if (@ARGV != 0) { usage; }
+
+if ( defined($options{"v"}) ) { 
+    $PRERENDER_CMD .= " -v";
+}
+
+my $result = DBQueryFatal("SELECT pid,eid FROM experiments");
+
+while (my ($pid,$eid) = $result->fetchrow) {
+    print "Prerendering $pid/$eid\n";
+    if (system("$PRERENDER_CMD $pid $eid") != 0) {
+	print STDERR "Prerender of $pid/$eid FAILED!\n";
+    }
+}
+
+exit(0);

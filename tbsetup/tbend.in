@@ -27,7 +27,7 @@ my $TBROOT   = "@prefix@";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
-    ":$TBROOT/sbin:$TBROOT/bin";
+    ":$TBROOT/libexec/vis:$TBROOT/sbin:$TBROOT/bin";
 
 #
 # Testbed Support libraries
@@ -104,6 +104,9 @@ DBQueryWarn("DELETE from ipsubnets  where pid='$pid' and eid='$eid'") or
     $errors++;
 DBQueryWarn("DELETE from ipport_ranges  where pid='$pid' and eid='$eid'") or
     $errors++;
+
+print "Removing visualization data...\n";
+system("prerender -r $pid $eid");
 
 if ($errors == 0) {
     SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or

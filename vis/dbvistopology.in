@@ -32,10 +32,8 @@ use lib "/usr/testbed/lib";
 use libdb;
 use libtestbed;
 
-my $neato    = "neato"; 
-my $dbtopper = "$TB/libexec/vis/dbtopper";
 my $render   = "$TB/libexec/vis/render";
-my $tbdata   = "tbdata";
+# my $tbdata   = "tbdata";
 my $output;
 my $zoom;
 my $detail;
@@ -129,25 +127,26 @@ if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
 	"    You do not have permission to view experiment $pid/$eid\n");
 }
 
-my $args;
+my $args = "";
 
-if (defined($output)) {
-    $args = "> $output";
-} else {
-    $args = "2> /dev/null";
-}
 
 if (defined($zoom)) {
-    $args = "-z $zoom $args";
+    $args .= "-z $zoom ";
 } 
 
 if (defined($detail)) {
-    $topperargs = "-d $detail";
-} else {
-    $topperargs = "";
+    $args .= "-d $detail ";
 }
 
-if (system("$dbtopper $topperargs $pid $eid | $neato | $render $args") != 0) {
+$args .= "$pid $eid ";
+
+if (defined($output)) {
+    $args .= "> $output";
+} else {
+    $args .= "2> /dev/null";
+}
+
+if (system("$render $args") != 0) { 
     exit(1);
 }
 
