@@ -6,6 +6,14 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040615:
+	If you update the ports on your boss node, you'll need to take
+	into accout that FreeBSD is in the process of changing how its
+	rc.d scripts work - add the following two lines to the bottom
+	of your /etc/rc.conf on boss:
+	  dhcpd_enable="YES"
+	  apache_enable="YES"
+
 20040601:
 	The p5-Time-HiRes port is now required on boss - install it from
 	/usr/ports/devel/p5-Time-HiRes .
