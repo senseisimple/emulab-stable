@@ -422,7 +422,9 @@ sub stateTransition($$) {
 	if ($os_op_mode ne $mode) {
 	    my $str = "Node $node is running OS '$osid' but in mode '$mode' ".
 	      "instead of mode '$os_op_mode'!\n";
-	    if ($os_op_mode ne "") {
+	    # For now, only force if we're going into reload mode, so we
+	    # don't get stuck looping in reloading.
+	    if ($os_op_mode eq "RELOAD") {
 		DBQueryFatal("UPDATE nodes SET op_mode='$os_op_mode', ".
 			     "op_mode_timestamp=unix_timestamp(now()) ".
 			     "WHERE node_id='$node'");
