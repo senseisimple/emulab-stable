@@ -35,6 +35,7 @@ static char		*myexp;
 extern int		gotevent;
 extern protocol		prot;
 extern tg_action	*tg_first;
+extern int		FlushOutput;
 
 extern double dist_const_gen(distribution *);
 extern char *dist_const_init(distribution *, double);
@@ -336,7 +337,7 @@ parse_args(char *buf, tg_action *tg)
 	 * the interval to ensure a proper value.
 	 */
 	if (rate >= 0)
-		interval = 1.0 / ((rate * 1000) / (8.0 * psize));		
+		interval = 1.0 / ((rate * 1000) / (8.0 * psize));
 
 	/*
 	 * Validate the computed interval.
@@ -370,7 +371,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 {
 	char		buf[8][64];
 	int		len = 64;
-	static int	startdone;
 	static int	setupdone;
 	struct timeval	now;
 
@@ -397,6 +397,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	}
 #endif
 
+	if (tg_first != &actions[0])
+		fatal("global action list corrupted!");
+
 	/*
 	 * Perform a setup when we get the "start of time" event.
 	 */
@@ -418,7 +421,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			}
 
 			if (logfile) {
-				extern int FlushOutput;
 				FlushOutput = 1;
 				gettimeofday(&now, NULL);
 				start_log(now, NULL);
@@ -435,16 +437,14 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			}
 #ifdef EVENTDEBUG
 			gettimeofday(&now, NULL);
-			fprintf(stderr, "%lu.%03lu: SETUP exp=%s\n",
+			fprintf(stderr, "%lu.%03lu: SETUP/WAIT exp=%s\n",
 				now.tv_sec, now.tv_usec / 1000,
 				myexp ? myexp : buf[1]);
 #endif
-			if (tg_first != &actions[0])
-				fatal("global action list corrupted!");
 			actions[0].tg_flags = TG_SETUP;
 			actions[0].next = &actions[1];
 			actions[1].tg_flags = TG_WAIT;
-			setupdone = 1;
+			actions[1].next = NULL;
 
 			/*
 			 * XXX if they didn't specify an experiment,
@@ -452,6 +452,8 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			 */
 			if (myexp == 0)
 				myexp = strdup(buf[1]);
+
+			setupdone = 1;
 		}
 	}
 
@@ -465,30 +467,58 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		fprintf(stderr, "%lu.%03lu: WAIT\n",
 			now.tv_sec, now.tv_usec / 1000);
 #endif
-		tg_first->tg_flags &= ~TG_SETUP;
-		tg_first->tg_flags |= TG_WAIT;
+		tg_first->tg_flags = TG_WAIT;
+		tg_first->next = NULL;
 	}
 
 	/*
-	 * If eventtype is START, load params (first call only) and 
-	 * let it rip.  If there are errors in the initial params,
-	 * go back to the STOPed state.
+	 * If eventtype is START, parse any explicitly provided parameters
+	 * and load the tg_action structure.  If there are errors, go back
+	 * to the STOPed state.
 	 */
 	else if (strcmp(buf[6], STARTEVENT) == 0) {
-		if (!startdone) {
-			memset(tg_first, 0, sizeof(tg_action));
-			if (parse_args(buf[7], tg_first) != 0) {
-				fprintf(stderr, "START invalid params\n");
-				goto dowait;
-			}
-			startdone = 1;
+		memset(tg_first, 0, sizeof(tg_action));
+		if (parse_args(buf[7], tg_first) != 0) {
+			fprintf(stderr, "START invalid params\n");
+			goto dowait;
 		}
+
+		/*
+		 * XXX if no time start event was seen, do an implied setup.
+		 * This will happen if the node reboots after the scheduler
+		 * has already sent the time start.
+		 */
+		if (!setupdone) {
 #ifdef EVENTDEBUG
-		gettimeofday(&now, NULL);
-		fprintf(stderr, "%lu.%03lu: START\n",
-			now.tv_sec, now.tv_usec / 1000);
+			gettimeofday(&now, NULL);
+			fprintf(stderr, "%lu.%03lu: SETUP/START exp=%s\n",
+				now.tv_sec, now.tv_usec / 1000,
+				myexp ? myexp : buf[1]);
 #endif
-		tg_first->tg_flags &= ~(TG_SETUP|TG_WAIT);
+			if (logfile) {
+				FlushOutput = 1;
+				gettimeofday(&now, NULL);
+				start_log(now, NULL);
+			}
+			actions[1] = actions[0];
+			actions[0].tg_flags = TG_SETUP;
+			actions[0].next = &actions[1];
+			actions[1].next = NULL;
+			if (actions[1].tg_flags != (TG_ARRIVAL|TG_LENGTH))
+				fatal("START1: list corrupted!");
+			if (myexp == 0)
+				myexp = strdup(buf[1]);
+			setupdone = 1;
+		} else {
+#ifdef EVENTDEBUG
+			gettimeofday(&now, NULL);
+			fprintf(stderr, "%lu.%03lu: START\n",
+				now.tv_sec, now.tv_usec / 1000);
+#endif
+			if (tg_first->tg_flags != (TG_ARRIVAL|TG_LENGTH) ||
+			    tg_first->next != NULL)
+				fatal("START2: list corrupted!");
+		}
 	}
 
 	/*
@@ -496,11 +526,8 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 * current state.  Invalid params are ignored.
 	 */
 	else if (strcmp(buf[6], MODIFYEVENT) == 0) {
-		if (!startdone)
-			fprintf(stderr, "WARNING: "
-				"MODIFY without initial START event\n");
 		if (parse_args(buf[7], tg_first) != 0)
-			fprintf(stderr, "MODIFY invalid params\n");
+			fprintf(stderr, "MODIFY invalid params, ignored\n");
 #ifdef EVENTDEBUG
 		else {
 			int plen;
@@ -520,12 +547,21 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		/*
 		 * XXX Normally we return and reprocess the current event
 		 * list after a MODIFY event, but if the head of the event
-		 * list is a SETUP event (part of a SETUP/WAIT combo) we
-		 * can't do that.  So in that case, we change the head of
-		 * the list to a WAIT.
+		 * list is a SETUP event (part of a SETUP/WAIT or SETUP/START
+		 * combo) we can't do that.  So in that case, we change the
+		 * head of the list to reflect the WAIT or START and continue
+		 * with that action.
 		 */
-		if (tg_first->tg_flags & TG_SETUP)
-			goto dowait;
+		if (tg_first->tg_flags & TG_SETUP) {
+			if (tg_first->next == NULL)
+				fatal("MODIFY: list corrupted!");
+			if (tg_first->next->tg_flags & TG_WAIT)
+				goto dowait;
+			tg_first->tg_flags &= ~TG_SETUP;
+			tg_first->next = NULL;
+			if (tg_first->tg_flags != (TG_ARRIVAL|TG_LENGTH))
+				fatal("MODIFY2: list corrupted!");
+		}
 	}
 	/*
 	 * If eventtype is RESET, zero out the event list so that TG
@@ -599,7 +635,6 @@ tgevent_loop(void)
 		 * Restart the log
 		 */
 		if (logfile) {
-			extern int FlushOutput;
 			FlushOutput = 1;
 			log_close();
 			start_log(now, "%s");
