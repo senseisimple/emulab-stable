@@ -924,3 +924,29 @@ tb-set-wasolver-weights 1 10 500
   in an essentially random selection.
 </ul>
 
+<h4>tb-set-node-failure-action</h4>
+
+<pre>
+tb-set-node-failure-action <i>node action</i>
+
+tb-set-node-failure-action $nodeA "fatal"
+tb-set-node-failure-action $nodeB "nonfatal"
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node name.
+  <dt><i>action</i> - One of "fatal" or "nonfatal"
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command sets the failure mode for a node. When an
+  experiment is swapped in, the default action is to abort the swapin if
+  any nodes fail to come up normally. This is the "fatal" mode. You
+  may also set a node to "nonfatal" which will cause node bootup failures to
+  be reported, but otherwise ignored during swapin. Note that this can
+  result in your experiment not working properly if a dependent node
+  fails, but typically you can arrange your software to deal with
+  this. 
+</ul>
+
