@@ -20,6 +20,7 @@ gmake-3.79.1        GNU version of 'make' utility
 graphviz-1.7c       Graph Visualization Software from AT&T and Bell Labs
 isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server c
 linuxthreads-2.1.3_2 POSIX pthreads implementation using rfork to generate kern
+mhash-0.8.9         Library provides an easy way to access strong hashes such a
 mod_auth_mysql-2.20 Allows users to use MySQL databases for user authentication
 mod_php3-3.0.18     PHP3 module for Apache
 mysql-client-3.23.36 Multithreaded SQL database (client)
@@ -45,6 +46,10 @@ http://www.php.net/do_download.php?download_file=mime.c.diff-3.0.gz
 'work' directory to apply the patch, then return to the normal make procedure)
 The latest version of the ports collection (but not the one that came with
 FreeBSD 4.3) may have this patch applied already.
+
+IMPORTANT: The mhash package should be installed _before_ the mod_php3 port is
+built. When building mod_php3, you will be given a menu to choose the various
+features you want support for. Make sure to select support for mhash .
 
 Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
 scripts, requires tcl82. When you install the tcl-sql package, it will be put
