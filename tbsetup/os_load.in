@@ -192,11 +192,12 @@ foreach my $node (@nodes) {
     }
     %imageid_row = $db_result->fetchhash();
 
-    my $loadpart  = $imageid_row{'loadpart'};
-    my $loadlen   = $imageid_row{'loadlength'};
-    my $imagepath = $imageid_row{'path'};
-    my $defosid   = $imageid_row{'default_osid'};
-    my $shared    = $imageid_row{'shared'};
+    my $loadpart       = $imageid_row{'loadpart'};
+    my $loadlen        = $imageid_row{'loadlength'};
+    my $imagepath      = $imageid_row{'path'};
+    my $defosid        = $imageid_row{'default_osid'};
+    my $shared         = $imageid_row{'shared'};
+    my $max_concurrent = $imageid_row{'max_concurrent'};
 
     # Check for a few errors early!
     if (!defined($imagepath)) {
@@ -206,6 +207,32 @@ foreach my $node (@nodes) {
     if (! -R $imagepath) {
 	die("*** $0:\n".
 	    "    $imagepath does not exists or cannot be read!\n");
+    }
+
+    #
+    # If there's a maxiumum number of concurrent loads listed, check to
+    # see if we'll go over the limit, by checking to see how many other
+    # nodes are currently booting thie image's default_osid. This is NOT
+    # intended to be strong enforcement of license restrictions, just a way
+    # to catch mistakes.
+    # XXX This could go outside the @nodes loop, but so could most of this
+    # stuff
+    #
+    if ($max_concurrent && !TBAdmin($UID)) {
+	# Exclude nodes in this load from the count
+	my $nodelist = join(" or ",map("node_id='$_'",@nodes));
+	if (!@nodes) {
+	    $nodelist = "1";
+	}
+	my $count_result = DBQueryFatal("select count(*) from nodes where " .
+	    "def_boot_osid='$defosid' and !($nodelist)");
+	my ($current_count) = $count_result->fetchrow();
+	if ($current_count + @nodes > $max_concurrent) {
+	    die("*** $0:\n".
+		"    This image is limited to $max_concurrent concurrent " .
+		" loads, and $current_count\nnodes are already running ".
+		" $defosid\n");
+	}
     }
 
     #

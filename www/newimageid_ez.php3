@@ -345,6 +345,20 @@ function SPITFORM($formfields, $errors)
     echo "                       > Yes
               </td>
           </tr>\n";
+
+    #
+    # Maxiumum concurrent loads
+    #
+    echo "<tr>
+              <td>Maximum concurrent loads[<b>7</b>]:</td>
+              <td class=left>
+                  <input type=text
+                         name=\"formfields[max_concurrent]\"
+                         value=\"" . $formfields[max_concurrent] . "\"
+	                 size=4 maxlength=4>
+              </td>
+          </tr>\n";
+
     
     if ($isadmin) {
         #
@@ -420,6 +434,9 @@ function SPITFORM($formfields, $errors)
              <li> If you need to snapshot the entire disk (including the MBR),
                   check this option. <b>Most users will not need to check this
                   option. Please ask us first to make sure</b>.
+             <li> If your image contains software that is only licensed to run
+	  	  on a limited number of nodes at a time, you can put this
+		  number here. Most users will want to leave this option blank.
           </ol>
           </blockquote></h4>\n";
 }
@@ -620,6 +637,17 @@ if (isset($formfields[wholedisk]) &&
     $shared = 1;
 }
 
+if (isset($formfields[max_concurrent]) &&
+    strcmp($formfields[max_concurrent],"")) {
+    
+    if (!preg_match ("/^\d+$/",$formfields[max_concurrent])) {
+    	$errors["Maximum Concurrent Loads"] = "Invalid number";
+    }
+
+    $max_concurrent = "'" . $formfields[max_concurrent] . "'";
+} else {
+    $max_concurrent = "NULL";
+}
 
 #
 # If any errors, respit the form with the current values and the
@@ -693,11 +721,12 @@ if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
 DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
-	     " default_osid, path, pid, shared, creator, created) ".
+	     " default_osid, path, pid, shared, creator, created, ".
+	     " max_concurrent) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
 	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $shared, ".
-             "   '$uid', now())");
+             "   '$uid', now(), $max_concurrent)");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".

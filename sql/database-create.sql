@@ -321,6 +321,7 @@ CREATE TABLE images (
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
   updated datetime default NULL,
+  max_concurrent int(11) default NULL,
   PRIMARY KEY  (imagename,pid),
   KEY imageid (imageid)
 ) TYPE=MyISAM;
