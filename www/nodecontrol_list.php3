@@ -69,6 +69,11 @@ else {
     $clause = "and (nt.class='pc')";
     $view   = "PCs";
 }
+# If admin or widearea, show the vname too. 
+$showvnames = 0;
+if ($isadmin || !strcmp($showtype, "widearea")) {
+    $showvnames = 1;
+}
 
 #
 # Suck out info for all the nodes.
@@ -115,14 +120,18 @@ echo "<table border=2 cellpadding=2 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <th align=center>ID</th>
-          <th align=center>Type (Class)</th>
+          <th align=center>ID</th>\n";
+
+if ($showvnames) {
+    echo "<th align=center>Name</th>\n";
+}
+
+echo "    <th align=center>Type (Class)</th>
           <th align=center>Up?</th>\n";
 
 if ($isadmin) {
     echo "<th align=center>PID</th>
           <th align=center>EID</th>
-          <th align=center>Name</th>
           <th align=center>Default<br>OSID</th>\n";
 }
 else {
@@ -155,6 +164,13 @@ while ($row = mysql_fetch_array($query_result)) {
   	      (!strcmp($node_id, $phys_nodeid) ? "" : "($phys_nodeid)") .
 	      "</td>\n";
     }
+
+    if ($showvnames) {
+	if ($vname)
+	    echo "<td>$vname</td>\n";
+	else
+	    echo "<td>--</td>\n";
+    }
     
     echo "   <td>$type ($class)</td>\n";
 
@@ -170,14 +186,9 @@ while ($row = mysql_fetch_array($query_result)) {
 	if ($pid) {
 	    echo "<td>$pid</td>
                   <td>$eid</td>\n";
-	    if ($vname)
-	        echo "<td>$vname</td>\n";
-	    else
-		echo "<td>--</td>\n";
 	}
 	else {
 	    echo "<td>--</td>
-	          <td>--</td>
    	          <td>--</td>\n";
 	}
 	if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid))
