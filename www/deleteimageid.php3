@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -119,28 +119,38 @@ DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 # If this is an EZ imageid, then delete the corresponding OSID too.
 #
 $query_result =
-    DBQueryFatal("select ezid from images ".
-		 "where imageid='$imageid' and ezid=1");
+    DBQueryFatal("select ezid,path from images where imageid='$imageid'");
+$row = mysql_fetch_row($query_result);
+$ezid = $row[0];
+$path = $row[1];
 
 #
 # Delete the record(s).
 #
 DBQueryFatal("DELETE FROM images WHERE imageid='$imageid'");
 DBQueryFatal("DELETE FROM osidtoimageid where imageid='$imageid'");
-
-if (mysql_num_rows($query_result)) {
+if ($ezid) {
     DBQueryFatal("DELETE FROM os_info WHERE osid='$imageid'");
 }
 
 DBQueryFatal("unlock tables");
 
-echo "<p>
-      <center><h3>
-      Image '$imageid' in project $pid has been deleted!
-      </h3></center>\n";
+echo "<br>
+      <h3>
+      Image '$imageid' in project $pid has been deleted!\n";
+
+if ($path) {
+    echo "<br>
+          <br>
+          <font color=red>Please remember to delete $path!</font>\n";
+}
+echo "</h3>\n";
 
 echo "<br>
-      <a href='showimageid_list.php3'>Back to Image Descriptor list</a>\n";
+      <center>
+      <a href='showimageid_list.php3'>Back to Image Descriptor list</a>
+      </center>
+      <br><br>\n";
 
 #
 # Standard Testbed Footer
