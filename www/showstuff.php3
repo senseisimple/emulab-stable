@@ -767,7 +767,7 @@ function SHOWEXPLIST($type,$id) {
 	echo "<tr>$pidrow
               <th>EID</th>
               <th>State</th>
-              <th align=center>Nodes</th>
+              <th align=center>Nodes*</th>
               <th align=center>Hours Idle</th>
               <th>Description</th>
           </tr>\n";
@@ -804,9 +804,12 @@ function SHOWEXPLIST($type,$id) {
              </tr>\n";
 	}
 	echo "</table>\n";
-	echo "<font size=-1 color=blue>Node counts in blue show a rough \n".
-	    "estimate of the minimum number of nodes required to swap in.\n".
-	    "It does not account for node types, etc.</font>\n";
+	echo "<center><font size=-1><b>*</b> Node counts in \n".
+	    "<font color=blue><b>blue</b></font>\n".
+	    "show a rough estimate of the minimum number of \n".
+	    "nodes required to swap in.\n".
+	    "<br>They account for delay nodes, but not for node \n".
+	    "types, etc.</font></center>\n";
     }   
 }
 
