@@ -365,11 +365,14 @@ sub GenDefsFile($)
     
     print TCL "# Node Classes\n";
     $query_result =
-	DBQueryFatal("select class,isremotenode,isvirtnode from node_types");
-    while (my ($class,$isrem,$isvirt) = $query_result->fetchrow_array()) {
+	DBQueryFatal("select class,isremotenode,isvirtnode,issubnode ".
+		     "from node_types");
+    while (my ($class,$isrem,$isvirt,$issubnode) =
+	   $query_result->fetchrow_array()) {
 	print TCL "set hwtypes($class) 1\n";
 	print TCL "set isremote($class) $isrem\n";
 	print TCL "set isvirt($class) $isvirt\n";
+	print TCL "set issubnode($class) $issubnode\n";
     }
     print TCL "\n";
 
