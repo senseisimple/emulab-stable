@@ -222,6 +222,7 @@ foreach my $node (@nodes) {
 
     print STDOUT "Changing default OS for $node to $defosid\n";
     if (!$TESTMODE) {
+        system("$osselect -m PXEBOOT $node");
         system("$osselect $defosid $node");
     }
 
