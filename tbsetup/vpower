@@ -1,0 +1,198 @@
+#!/usr/local/bin/perl -w
+use strict;
+use Tk;
+
+#Color values
+
+my $main_bg = 'grey80';
+my $act_bg = 'grey90';
+
+#other Variables
+
+my $op="";
+my @machines=();
+
+#Build the Widgets now
+
+#set up main
+my $main = MainWindow->new();
+$main->title("vpower - Visual Power");
+#$main->minsize( qw(200 100) );
+$main->configure(-background => $main_bg );
+
+#add some frames
+my $msg_frm = 
+    $main->Frame( -relief=>'sunken', -borderwidth=>2, -background=>$main_bg
+		   )->pack(-side=>'bottom',-expand=>'1', -fill=>'x');
+my $msg_area = 
+    $msg_frm->Label(-background=>$main_bg, -anchor=>'nw') 
+    ->pack(-side=>'left',-expand=>'1',-fill=>'x',-anchor=>'nw');
+
+my $frm = 
+    $main->Frame( -relief=>'flat', -background=>$main_bg
+		  ) ->pack (-side=>'left', -fill=>'x');
+my $frm1 = 
+    $frm->Frame( -relief=>'flat', -background=>$main_bg
+		  ) ->pack (-side=>'left', -fill=>'x');
+my $frm2 = 
+    $frm->Frame( -relief=>'flat', -background=>$main_bg
+		  ) ->pack (-side=>'left', -fill=>'x');
+my $frm3 = 
+    $frm->Frame( -relief=>'flat', -background=>$main_bg
+		  ) ->pack (-side=>'left', -fill=>'x');
+
+#set up the machines
+
+my @mach;
+my @machvals;
+
+$mach[1] = 
+    $frm1->Checkbutton(-variable=>\$machvals[1], -text=>"tbpc01",
+		       -background=>$main_bg, -width=>'6',-anchor=>'nw'
+		       )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[2] = 
+    $frm1->Checkbutton(-variable=>\$machvals[2], -text=>"tbpc02",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[3] = 
+    $frm1->Checkbutton(-variable=>\$machvals[3], -text=>"tbpc03",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[4] = 
+    $frm1->Checkbutton(-variable=>\$machvals[4], -text=>"tbpc04",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[5] = 
+    $frm1->Checkbutton(-variable=>\$machvals[5], -text=>"tbpc05",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[6] = 
+    $frm2->Checkbutton(-variable=>\$machvals[6], -text=>"tbpc06",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[7] = 
+    $frm2->Checkbutton(-variable=>\$machvals[7], -text=>"tbpc07",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[8] = 
+    $frm2->Checkbutton(-variable=>\$machvals[8], -text=>"tbpc08",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[9] = 
+    $frm2->Checkbutton(-variable=>\$machvals[9], -text=>"tbpc09",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[10] = 
+    $frm2->Checkbutton(-variable=>\$machvals[10], -text=>"tbpc10",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+$mach[11] = 
+    $frm3->Checkbutton(-variable=>\$machvals[11], -text=>"alpha",
+			   -background=>$main_bg, -width=>'6',-anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x');
+$mach[12] = 
+    $frm3->Checkbutton(-variable=>\$machvals[12], -text=>"beta",
+			   -background=>$main_bg, -width=>'6', -anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x');
+$mach[13] = 
+    $frm3->Checkbutton(-variable=>\$machvals[13], -text=>"gamma",
+			   -background=>$main_bg, -width=>'6', -anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x');
+$mach[14] = 
+    $frm3->Checkbutton(-variable=>\$machvals[14], -text=>"delta",
+			   -background=>$main_bg, -width=>'6', -anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x');
+$mach[15] = 
+    $frm3->Checkbutton(-variable=>\$machvals[15], -text=>"",
+			   -background=>$main_bg, -width=>'6', -anchor=>'nw'
+			   )->pack(-side=>'top',-fill=>'x');
+
+#set up the operations
+
+my $op_on = 
+    $frm1->
+    Radiobutton( -variable=> \$op, -text => 'On', -background=>$main_bg,
+		 -value=>'on', -width=>'6', -anchor=>'nw'
+		 )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+
+my $op_off = 
+    $frm2->
+    Radiobutton( -variable=> \$op, -text => 'Off',-background=>$main_bg,
+		 -value=>'off', -width=>'6', -anchor=>'nw'
+		 )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+
+my $op_cyc = 
+    $frm3->
+    Radiobutton( -variable=> \$op, -text => 'Cycle',-background=>$main_bg,
+		 -value=>'cycle', -width=>'6', -anchor=>'nw'
+		 )->pack(-side=>'top',-fill=>'x', -anchor=>'w');
+
+#set up the buttons
+
+my $go = 
+    $frm1->Button(-text=>'Go!',-background=>$main_bg,-width=>'6', 
+		  -anchor=>'center', -relief=>'raised',-command=>
+		  sub {
+		      my $n=0;
+		      @machines=();
+		      while ($n <= $#machvals ) {
+			  if (defined($machvals[$n])&&$machvals[$n]==1) {
+			      push(@machines,"tbpc0$n") if ($n < 10);
+			      push(@machines,"tbpc$n") if ($n == 10);
+			      push(@machines,"alpha") if ($n==11);
+			      push(@machines,"beta") if ($n==12);
+			      push(@machines,"gamma") if ($n==13);
+			      push(@machines,"delta") if ($n==14);
+			  }
+			  $n++;
+		      }
+		      if ($#machines<0) {
+			  &message
+			      ($msg_area,
+			       "Please select at least one machine.");
+		      } elsif (!$op) {
+			  &message ($msg_area, 
+				    "Please select an operation.");
+		      } else {
+			  my @output=();
+			  open(PWR,"power $op @machines |");
+			  while (<PWR>) {
+			      chop;
+			      push (@output,$_);
+			  }
+			  &message ($msg_area,
+				    join ("\n",@output));
+			  my $n=0;
+			  while ($n <= $#machvals ) {
+			      $machvals[$n]=0;
+			      $n++;
+			  }
+		      }
+		  })
+    ->pack(-side=>'left',-anchor=>'s',-fill=>'x',
+    -padx=>'2',-pady=>'2');
+
+my $help_btn=
+    $frm2->Button(-text=>'Help',-background => $main_bg,-width=>'6', 
+    -anchor=>'center', -relief=>'raised',-command=>sub {
+	&message( $msg_area, 
+		  "Select machine(s) to update\n", 
+		  "Select on, off, or cycle\n",
+		  "Press the Go! button"); } )
+    ->pack(-side=>'left',-anchor=>'s',-fill=>'x',
+    -padx=>'2',-pady=>'2');
+
+my $exit_btn= 
+    $frm3->Button(-text=>'Exit', -background => $main_bg,-width=>'6', 
+    -anchor=>'center', -relief=>'raised',-command=>sub{$main->destroy})
+    ->pack(-side=>'left',-anchor=>'s',-fill=>'x',
+    -padx=>'2',-pady=>'2');
+
+MainLoop();
+
+sub message {
+    (my $area,my @msg) = @_;
+    my $text= join("",@msg);
+    $area->configure(-text=> $text, -anchor=>'nw' );
+}
+

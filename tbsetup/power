@@ -1,0 +1,82 @@
+#!/usr/local/bin/perl -w
+#
+# Testbed Power Control script
+#
+# Mac Newbold, Flux Research Group, Univ. of Utah Computer Science Dept.
+# Created: April 18, 2000
+# Last Changed: April 18, 2000
+# 
+# Syntax:
+#
+# power on <machine> <machine> ...
+# power off <machine> <machine> ...
+# power cycle <machine> <machine> ...
+#
+# Requires a configuration file named power.conf, located in this dir or in
+# /usr/testbed/etc/power.conf
+# Config file has # at beginning of a line for comments, 
+# and takes on each line:
+# machine<tab>powerControllerIP<tab>Outlet#
+#
+############################################################
+
+my $op = ""; #stores operation (on/off/cyc)
+my @machines = (); #stores machines to operate on
+my $ip = ""; #stores IP of a power controller
+my $outlet = 0; #stores number of an outlet
+my %IPList = (); #holds machine/ip pairs
+my %OutletList = (); #holds machine/outlet pairs
+
+#Must have at least an op and a machine, so at least 2 ARGV
+die("Syntax:\npower on <machine> <machine> ...\n",
+    "power off <machine> <machine> ...\n",
+    "power cycle <machine> <machine> ...\n\nIncorrect Syntax.\n") 
+    if ( @ARGV < 2 );
+
+#Read in ARGV
+$op = shift (@ARGV);
+if ($op eq "cycle") { $op = "cyc"; }
+$op = '-'.$op;
+@machines = @ARGV;
+#print out args
+#print "do \"$op\" to ",@machines,"\n";
+
+use Mysql;
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $sth ="";
+
+$sth = $dbh->query("select o.node_id,i.IP,o.outlet from ".
+		   "outlets as o left join interfaces as i ".
+		   "on o.power_id = i.node_id");
+while ( @_ = $sth->fetchrow_array()) {
+  #print "Got '",join("\t",@_),"\n";
+  $IPList{$_[0]}= $_[1];
+  $OutletList{$_[0]}= '-'.$_[2];
+}
+
+#foreach $item (sort keys(%IPList)) {
+#    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
+#}
+
+my $snmpit=(-e '/usr/testbed/bin/snmpit'?'/usr/testbed/bin/snmpit':'snmpit');
+
+foreach $item ( sort @machines) {
+    #print $snmpit, '-i',$IPList{$item},$op,$OutletList{$item},"\n";
+    if ( ! defined ($IPList{$item}) ) {
+	print "Machine $item not found. Skipping...\n";
+    } else {
+	my $cmd=join(" ",
+		  ($snmpit,'-v','-i',$IPList{$item},$op,$OutletList{$item}));
+	open(OUT,$cmd." |");
+	while (<OUT>) {
+	    if (/was outlet(.*)/) {
+		print "$item was $1";
+	    }
+	    if (/to outlet(.*)/) {
+		print " ... $item now $1";
+	    }
+	}
+	print "\n";
+    }
+}
