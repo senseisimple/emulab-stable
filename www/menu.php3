@@ -131,8 +131,6 @@ function WRITESIDEBAR() {
 		if ($login_status & CHECKLOGIN_ISADMIN) {
 		    WRITESIDEBARBUTTON("User List",
 				       $TBBASE, "showuser_list.php3");
-		    WRITESIDEBARBUTTON("Node Control",
-				       $TBBASE, "nodecontrol_list.php3");
 		}
 	    
 		WRITESIDEBARBUTTON("Begin an Experiment",
@@ -142,7 +140,7 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Update user information",
 				   $TBBASE, "moduserinfo.php3");
 		WRITESIDEBARBUTTON("Node Reservation Status",
-				   $TBBASE, "reserved.php3");
+				   $TBBASE, "nodecontrol_list.php3");
 		WRITESIDEBARBUTTON("Node Up/Down Status",
 				   $TBDOCBASE, "updown.php3");
 		
