@@ -20,6 +20,7 @@ my $HOMEDIR = "/users";
 my $SSH     = "$TB/bin/sshtb";
 my $CONTROL = "users.emulab.net";
 my $USERDEL = "/usr/sbin/pw userdel";
+my $GENELISTS = "$TB/sbin/genelists";
 
 my $user;
 my $query_result;
@@ -98,6 +99,13 @@ if ($UID && !TBAdmin($UID)) {
 	die("$0: $me does not have enough permission in ${user}'s project");
     }
 }
+
+#
+# Run genelists to update the email lists. This is a convenient
+# spot to do this. Errors are non-fatal; the testbed list will
+# will find out about problems via email from genelists.
+#
+system("$GENELISTS");
 
 #
 # Note hardwired control node. 

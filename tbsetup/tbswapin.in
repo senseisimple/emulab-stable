@@ -184,6 +184,14 @@ if (&tbs_exec("named_setup")) {
     # 
 }
 
+&tbs_out("Setting up email lists.\n");
+if (&tbs_exec("genelists")) {
+    &tbs_out("WARNING: Failed to update email lists.\n");
+    #
+    # This is a non-fatal error.
+    # 
+}
+
 &tbs_out("Marking as running.\n");
 if (! $dbh->do("UPDATE experiments set state=\"active\"" .
 	       " where pid=\"$pid\" and eid=\"$eid\"")) {

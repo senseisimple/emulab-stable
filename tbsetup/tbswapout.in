@@ -117,13 +117,21 @@ if (&tbs_exec("nfree $pid $eid")) {
 if (! $TESTMODE) {
     &tbs_out("Resetting mountpoints\n");
     if (&tbs_exec("exports_setup")) {
-	&tbs_out("Failed to setup mountpoints.\n");
+	&tbs_out("Failed to reset mountpoints.\n");
 	$errors=1;
     }
     
     &tbs_out("Resetting named maps.\n");
     if (&tbs_exec("named_setup")) {
-	&tbs_out("Failed to add node names to named map.\n");
+	&tbs_out("Failed to reset named map.\n");
+	#
+	# This is a non-fatal error.
+	# 
+    }
+
+    &tbs_out("Resetting email lists.\n");
+    if (&tbs_exec("genelists")) {
+	&tbs_out("Failed to reset email lists.\n");
 	#
 	# This is a non-fatal error.
 	# 

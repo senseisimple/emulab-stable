@@ -23,6 +23,7 @@ my $GROUPADD= "/usr/sbin/pw groupadd";
 my $USERADD = "/usr/sbin/pw useradd";
 my $USERMOD = "/usr/sbin/pw usermod";
 my $CHPASS  = "/usr/bin/chpass";
+my $GENELISTS = "$TB/sbin/genelists";
 
 my $user;
 my @db_row;
@@ -104,7 +105,14 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# Get the user info (the the user being created).
+# Run genelists to update the email lists. This is a convenient
+# spot to do this. Errors are non-fatal; the testbed list will
+# will find out about problems via email from genelists.
+#
+system("$GENELISTS");
+
+#
+# Get the user info (the user being created).
 #
 $query_result =
     DBQueryFatal("select usr_pswd,unix_uid,usr_name,usr_email ".
