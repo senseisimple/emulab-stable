@@ -168,6 +168,7 @@ Node instproc updatedb {DB} {
     # 
     if {$issubnode && $fixed == ""} {
 	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" $self ]
+	set fixed "host-$self"
     }
 
     # We need to generate the IP column from our iplist.
