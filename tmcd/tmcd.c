@@ -112,7 +112,6 @@ COMMAND_PROTOTYPE(doreadycount);
 COMMAND_PROTOTYPE(dolog);
 COMMAND_PROTOTYPE(domounts);
 COMMAND_PROTOTYPE(dosfshostid);
-//COMMAND_PROTOTYPE(dosfsmounts);
 COMMAND_PROTOTYPE(doloadinfo);
 COMMAND_PROTOTYPE(doreset);
 COMMAND_PROTOTYPE(dorouting);
@@ -147,7 +146,6 @@ struct command {
 	{ "log",	dolog },
 	{ "mounts",	domounts },
 	{ "sfshostid",	dosfshostid },
-//	{ "sfsmounts",	dosfsmounts },
 	{ "loadinfo",	doloadinfo},
 	{ "reset",	doreset},
 	{ "routing",	dorouting},
@@ -2278,8 +2276,6 @@ COMMAND_PROTOTYPE(dosfshostid)
 	if (nodeidtonickname(nodeid, nickname))
 		strcpy(nickname, nodeid);
 
-	/* XXX Make sure that the dirsearch dir exists (more NFS goop) */
-	
 	/*
 	 * Create symlink names
 	 */
@@ -2309,48 +2305,6 @@ COMMAND_PROTOTYPE(dosfshostid)
 	if (sfshostiddeadfl) {
 		errorc("symlinking %s to %s", dspath, sfspath);
 		return 1;
-	}
-
-	return 0;
-}
-
-/*
- * Return SFS-based mounts.
- * XXX This is _completely_ unused, and will be removed.
- */
-COMMAND_PROTOTYPE(dosfsmounts)
-{
-	char		pid[64];
-	char		eid[64];
-	char		gid[64];
-	char		buf[MYBUFSIZE];
-
-	/*
-	 * Now check reserved table
-	 */
-	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		error("MOUNTS: %s: Node is free\n", nodeid);
-		return 1;
-	}
-
-	if (strlen(fshostid)) {
-		/*
-		 * Return project mount first.
-		 */
-		sprintf(buf, "REMOTE=%s%s/%s LOCAL=%s/%s\n",
-			fshostid, FSDIR_PROJ, pid, PROJDIR, pid);
-		client_writeback(sock, buf, strlen(buf), tcp);
-
-		/*
-		 * If pid!= gid, then this is group experiment, and we return
-		 * a mount for the group directory too.
-		 */
-		if (strcmp(pid, gid)) {
-			sprintf(buf, "REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
-				fshostid, FSDIR_GROUPS, pid, gid,
-				GROUPDIR, pid, gid);
-			client_writeback(sock, buf, strlen(buf), tcp);
-		}
 	}
 
 	return 0;

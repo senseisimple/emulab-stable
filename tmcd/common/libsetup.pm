@@ -540,49 +540,13 @@ sub dosfshostid ()
     my $myhostid;
 
     # Do I already have a host key?
-#      if (-e "/etc/sfs/sfs_host_key") {
-#  	print STDOUT "  This node already has a host key\n";
-#      }
-#      else {
-#          # Create my host key
-#  	if (! -e "/etc/sfs") {
-#  	    if (! os_mkdir("/etc/sfs", 0755)) {
-#  		warn "*** WARNING: Could not make directory /etc/sfs: $!\n";
-#  	    }
-#  	}
-	
-#  	if (! -e "/etc/sfs/sfs_host_key") {
-#  	    print STDOUT "  Creating SFS host key\n";
-#  	    if (system("sfskey gen -KPn $vname.$eid.$pid ".
-#  		       "/etc/sfs/sfs_host_key")) {
-#  		warn "*** WARNING: Could not generate SFS host key: $!\n";
-#  		$USESFS = 0;
-#  		return 1;
-#  	    }
-#  	}
-#      }
     if (! -e "/etc/sfs/sfs_host_key") {
 	warn "*** This node does not have a host key, skipping SFS stuff\n";
 	$USESFS = 0;
 	return 1;
     }
 
-    # Start SFS server and client (this has to be done now, as opposed
-    # to in an rc script, because the hostkey has to exist)
-#      if (system($SFSSD)) {
-#  	warn "*** Failed to start sfssd\n";
-#  	$USESFS = 0;
-#  	return 1;
-#      }
-#      if (system($SFSCD)) {
-#  	warn "*** Failed to start sfscd\n";
-#  	$USESFS = 0;
-#  	return 1;
-#      }
-
     # Give hostid to TMCD
-    # IAMHERE: sfssd needs to be running for this call to succeed
-    #   Directory needs to exist on fs/proj
     open(SFSKEY, "sfskey hostid - |")
 	or die "Cannot start sfskey";
     $myhostid = <SFSKEY>;
@@ -601,106 +565,6 @@ sub dosfshostid ()
 	warn "*** WARNING: Could not retrieve this node's hostid (is sfssd running?)\n";
 	$USESFS = 0;
     }
-
-    return 0;
-}
-
-#
-# Create SFS "mounts" (which are really just symlinks).  The remote side
-# of the mount is relative to /sfs and includes the server hostname, the
-# server's hostid, and the path on the server.  The local side is simply
-# the path relative to / to symlink to the remote sfs directory.  This
-# closely follows domounts()
-#
-sub dosfsmounts()
-{
-    my $TM;
-    my %MBD;
-    my %mounts;
-    my %deletes;
-
-    die("*** Don't call dosfsmounts!");
-    
-    $TM = OPENTMCC(TMCCCMD_SFSMOUNTS);
-
-    while (<$TM>) {
-	if ($_ =~ /REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
-	    $mounts{$1} = $2;
-	}
-    }
-    CLOSETMCC($TM);
-
-    dbmopen(%MDB, TMSFSMOUNTDB, 0660);
-    
-    #
-    # First symlink all the mounts we are told to. For each one that is
-    # not currently symlinked, and can be, add it to the DB.
-    #
-    while (($remote, $local) = each %mounts) {
-	if (-l $local && readlink($local) eq ("/sfs/" . $remote)) {
-	    $MDB{$remote} = $local;
-	    next;
-	}
-	if ( ! -l $local ) {
-	    print STDOUT "  Unlinking incorrect symlink $local\n";
-	    if ( ! unlink($local)) {
-		warn "*** WARNING: Could not unlink $local: $!\n";
-		next;
-	    }
-	}
-
-	$dir = $local;
-	$dir =~ s/(.*)\/[^\/]*$/$1/;
-	if (! -e $dir) {
-	    print STDOUT "  Making directory $dir\n";
-	    if (! os_mkdir($dir, 755)) {
-		warn "*** WARNING: Could not make directory $local: $!\n";
-		next;
-	    }
-	}
-	print STDOUT "  Symlinking $remote on $local\n";
-	if (! symlink("/sfs/" . $remote, $local)) {
-	    warn "*** WARNING: Could not make symlink $local: $!\n";
-	    next;
-	}
-
-	$MDB{$remote} = $local;
-    }
-
-    #
-    # Now delete the ones that we symlinked previously, but are now no
-    # longer in the mount set (as told to us by the TMCD). Note, we
-    # cannot delete them directly from MDB since that would mess up the
-    # foreach loop, so just stick them in temp and postpass it.
-    #
-    while (($remote, $local) = each %MDB) {
-	if (defined($mounts{$remote})) {
-	    next;
-	}
-
-	if (! -e $local) {
-	    $deletes{$remote} = $local;
-	    next;
-	}
-
-	print STDOUT "  Deleting symlink $local\n";
-	if (! unlink($local)) {
-	    warn "*** WARNING: Could not delete $local: $!\n";
-	    next;
-	}
-
-	#
-	# Only delete from set if we can actually unlink it.  This way
-	# we can retry it later (or next time).
-	#
-	$deletes{$remote} = $local;
-    }
-    while (($remote, $local) = each %deletes) {
-	delete($MDB{$remote});
-    }
-
-    # Write the DB back out!
-    dbmclose(%MDB);
 
     return 0;
 }
