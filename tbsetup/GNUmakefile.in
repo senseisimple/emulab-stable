@@ -34,7 +34,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
-		  assign_wrapper ptopgen webnodeupdate \
+		  assign_wrapper assign_wrapper-new ptopgen webnodeupdate \
 		  webdelay_config \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup websetgroups webmkproj \

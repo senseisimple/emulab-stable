@@ -509,7 +509,6 @@ sub doSwapout($) {
 	#
 
 	my @failedNodes = ();
-	print STDERR "Freeing failed nodes.\n";
 	$db_result =
 	    DBQueryFatal("select rv.node_id, n.allocstate ".
                          "from reserved as rv ".
@@ -527,6 +526,8 @@ sub doSwapout($) {
 	# if doing an update -restart.
 
 	if (@failedNodes > 0) {
+	    print STDERR "Freeing failed nodes.\n";
+	    
 	    TBDebugTimeStamp("nfree started");
 	    #
 	    # Specify -x switch so when a physical node gets freed,
@@ -621,7 +622,10 @@ sub doSwapin($) {
 	# fixed.
 	#
 	my $exitcode;
-	if ($exitcode = system("assign_wrapper -u $pid $eid")) {
+	my $wrapper = (($pid eq "testbed") ?
+		       "assign_wrapper-new" : "assign_wrapper");
+	
+	if ($exitcode = system("$wrapper -u $pid $eid")) {
 	    print STDERR "*** Failed to map to reality.\n";
 
 	    #
