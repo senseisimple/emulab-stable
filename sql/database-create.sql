@@ -194,6 +194,8 @@ CREATE TABLE images (
   magic tinytext,
   pid varchar(12) default NULL,
   load_address text,
+  load_busy tinyint(4) NOT NULL default '0',
+  ezid tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (imageid)
 ) TYPE=MyISAM;
 
@@ -312,7 +314,7 @@ CREATE TABLE next_reserve (
 
 CREATE TABLE node_types (
   class enum('pc','shark','switch','power') NOT NULL default 'pc',
-  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','PC27','pc1500') NOT NULL default 'pc600',
+  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500','laptop') NOT NULL default 'pc600',
   proc enum('PIII','StrongARM','Intel510','Cisco6509','P4') default NULL,
   speed smallint(5) unsigned default NULL,
   RAM smallint(5) unsigned default NULL,
@@ -350,7 +352,7 @@ CREATE TABLE nodelog (
 
 CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
-  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500') default NULL,
+  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500','laptop') NOT NULL default 'pc600',
   role enum('testnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
   def_boot_osid varchar(30) NOT NULL default '',
   def_boot_path text,
@@ -420,6 +422,7 @@ CREATE TABLE os_info (
   magic tinytext,
   machinetype enum('pc600','pc850','dnard','pc1500') default NULL,
   osfeatures set('ping','ssh','ipod') default NULL,
+  ezid tinyint(4) NOT NULL default '0',
   pid varchar(12) default '',
   PRIMARY KEY  (osid)
 ) TYPE=MyISAM;
@@ -547,12 +550,13 @@ CREATE TABLE switch_stacks (
 #
 
 CREATE TABLE tiplines (
+  tipname varchar(32) NOT NULL default '',
   node_id varchar(10) NOT NULL default '',
-  server tinytext NOT NULL,
+  server varchar(64) NOT NULL default '',
   portnum int(11) NOT NULL default '0',
   keylen smallint(6) NOT NULL default '0',
   keydata text,
-  PRIMARY KEY  (node_id)
+  PRIMARY KEY  (tipname)
 ) TYPE=MyISAM;
 
 #
@@ -619,6 +623,7 @@ CREATE TABLE users (
   unix_uid smallint(5) unsigned NOT NULL auto_increment,
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
   admin tinyint(4) default '0',
+  dbedit tinyint(4) default '0',
   stud tinyint(4) default '0',
   pswd_expires date default NULL,
   PRIMARY KEY  (uid),
@@ -636,7 +641,10 @@ CREATE TABLE virt_lans (
   delay float(10,2) default '0.00',
   bandwidth int(10) unsigned default NULL,
   lossrate float(10,3) default NULL,
-  member text
+  member text,
+  rdelay float(10,2) default NULL,
+  rbandwidth int(10) unsigned default NULL,
+  rlossrate float(10,3) default NULL
 ) TYPE=MyISAM;
 
 #
@@ -654,9 +662,22 @@ CREATE TABLE virt_nodes (
   startupcmd tinytext,
   tarfiles text,
   vname varchar(32) NOT NULL default '',
-  type enum('pc','shark','pc600','pc850','dnard','pc1500') default NULL,
+  type varchar(12) default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
-  routertype enum('none','ospf','static') NOT NULL default 'none'
+  routertype enum('none','ospf','static') NOT NULL default 'none',
+  fixed text NOT NULL
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'virt_vtypes'
+#
+
+CREATE TABLE virt_vtypes (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(12) NOT NULL default '',
+  name varchar(12) NOT NULL default '',
+  weight float(7,5) NOT NULL default '0.00000',
+  members text
 ) TYPE=MyISAM;
 
 #
