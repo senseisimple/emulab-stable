@@ -3029,7 +3029,7 @@ sub GatherSwapStats($$$$$;$)
 	DBQueryWarn("update experiment_stats set ".
 		    "  swap_errors=swap_errors+1, ".
 		    "  swap_exitcode=$ecode ".
-		    "where pid='$pid' and eid='$eid' and idx=idx");
+		    "where pid='$pid' and eid='$eid' and idx=$idx");
 
 	if ($mode eq TBDB_STATS_SWAPIN ||
 	    $mode eq TBDB_STATS_START ||
@@ -3045,7 +3045,7 @@ sub GatherSwapStats($$$$$;$)
     if ($mode eq TBDB_STATS_TERMINATE) {
 	DBQueryWarn("update experiment_stats ".
 		    "set destroyed=now() ".
-		    "where pid='$pid' and eid='$eid' and idx=idx");
+		    "where pid='$pid' and eid='$eid' and idx=$idx");
     }
 
     #
@@ -3062,7 +3062,7 @@ sub GatherSwapStats($$$$$;$)
 			"       UNIX_TIMESTAMP(now()) - ".
 			"       UNIX_TIMESTAMP(swapin_last) ".
 			" from experiment_stats ".
-			"where pid='$pid' and eid='$eid' and idx=idx");
+			"where pid='$pid' and eid='$eid' and idx=$idx");
 
 	if ($query_result && $query_result->numrows) {
 	    ($pnodes,$vnodes,$duration) = $query_result->fetchrow_array;
@@ -3077,7 +3077,7 @@ sub GatherSwapStats($$$$$;$)
 	if ($flags & $TBDB_STATS_FLAGS_IDLESWAP) {
 	    DBQueryWarn("update experiment_stats ".
 			"set idle_swaps=idle_swaps+1 ".
-			"where pid='$pid' and eid='$eid' and idx=idx");
+			"where pid='$pid' and eid='$eid' and idx=$idx");
 	}
     }
 
@@ -3140,7 +3140,7 @@ sub GatherSwapStats($$$$$;$)
 			"set ${tmp}_count=${tmp}_count+1, ".
 			"    ${tmp}_last=now(), ".
 			"    swapin_duration=swapin_duration+${duration} ".
-			"where pid='$pid' and eid='$eid' and idx=idx");
+			"where pid='$pid' and eid='$eid' and idx=$idx");
 	}
     }
 
@@ -3164,7 +3164,7 @@ sub GatherSwapStats($$$$$;$)
 	    my $pnodes = $query_result->numrows;
 
 	    DBQueryWarn("update experiment_stats set pnodes=$pnodes ".
-			"where pid='$pid' and eid='$eid' and idx=idx");
+			"where pid='$pid' and eid='$eid' and idx=$idx");
 	}
     }
 
