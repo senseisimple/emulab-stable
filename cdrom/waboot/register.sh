@@ -17,7 +17,7 @@
 case "$1" in
 start)
 	if [ -f /usr/site/sbin/register.pl ]; then
-		/usr/site/sbin/register.pl $netbed_disk
+		/usr/site/sbin/register.pl $netbed_disk $netbed_IP
 		exit $?
 	fi
 	;;

@@ -19,7 +19,7 @@
 #
 case "$1" in
 start)
-	if [ -f /usr/site/sbin/tbbootconfig ]; then
+	if [ -x /usr/site/sbin/tbbootconfig ]; then
 		/usr/site/sbin/tbbootconfig -c 1 $netbed_disk
 
 		case $? in

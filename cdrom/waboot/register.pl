@@ -19,7 +19,7 @@ use Socket;
 #
 sub usage()
 {
-    print("Usage: register.pl <bootdisk>\n");
+    print("Usage: register.pl <bootdisk> <ipaddr>\n");
     exit(-1);
 }
 my  $optlist = "";
@@ -108,10 +108,11 @@ my %weberrors =
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 1) {
+if (@ARGV != 2) {
     usage();
 }
 my $rawbootdisk = $ARGV[0];
+my $IP = $ARGV[1];
 
 #
 # Untaint the arguments.
@@ -121,6 +122,12 @@ if ($rawbootdisk =~ /^([\w\/]+)$/) {
 }
 else {
     fatal("Tainted argument $rawbootdisk!");
+}
+if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
+    $IP = $1;
+}
+else {
+    fatal("Tainted argument $IP!");
 }
 
 #
@@ -143,27 +150,6 @@ my $blockdevice = $rawdevice;
 # See if this is the first time. Look for the magic boot header.
 #
 $fromscratch = mysystem("$tbboot -v $rawbootdisk");
-
-#
-# We need our IP.
-# 
-my $hostname = `hostname`;
-if (!defined($hostname)) {
-    fatal("No hostname!");
-}
-# Untaint and strip newline.
-if ($hostname =~ /^([-\w\.]+)$/) {
-    $hostname = $1;
-}
-else {
-    fatal("Tainted argument $hostname!\n");
-}
-
-my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
-if (!defined(@ipaddrs)) {
-    fatal("Could not map $hostname to IP address!");
-}
-my $IP = inet_ntoa($ipaddrs[0]);
 
 GetInstructions();
 
@@ -313,6 +299,23 @@ for ($i = 1; $i <= 4; $i++) {
     # If told to load a local image from the CDROM, its really easy!
     # 
     if (! ($image =~ /^http:.*$/ || $image =~ /^ftp:.*$/)) {
+	#
+	# First, check the hash if provided.
+	#
+	if (defined($hash)) {
+	    print "Checking MD5 hash of the CDROM image.\n";
+	    print $PATIENCEMSG;
+
+	    my $hval = `md5 -q /$image`;
+	    chomp($hval);
+
+	    fatal("CDROM image has invalid hash!")
+		if ($hash ne $hval);
+	}
+
+	#
+	# Then load up the disk straight from the CDROM.
+	#
 	print "Loading image for slice $i from $image.\n";
 	print $PATIENCEMSG;
 
@@ -509,8 +512,8 @@ sub GetInstructions()
 	}
 	else {
 	    while (!defined($privkey)) {
-		$privkey = Prompt("Please enter your 16 character CD password",
-				  undef);
+		$privkey = Prompt("Please enter your 16 character CD password".
+				  " (no spaces)", undef);
 	    }
 	}
 
@@ -899,15 +902,7 @@ sub WriteConfigBlock()
 {
     my $cmd;
 
-    # XXX for now hack, tbbootconfig doesn't know about 'bootdisk'
-    if (1) {
-	mysystem("grep -v bootdisk $softconfig > /tmp/softcfg");
-	fatal("Could not prepare $softconfig for writing!")
-	    if ($?);
-	$cmd = "$tbboot -f -d -w /tmp/softcfg -k 1 -c 0 ";
-    } else {
-	$cmd = "$tbboot -f -d -w $softconfig -k 1 -c 0 ";
-    }
+    $cmd = "$tbboot -f -d -w $softconfig -k 1 -c 0 ";
 
     if (defined($config{privkey})) {
 	$cmd .= "-e $config{privkey} ";

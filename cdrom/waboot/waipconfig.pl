@@ -14,6 +14,24 @@ use Fcntl;
 use IO::Handle;
 
 #
+# Disk related parameters
+#
+
+# where to find kernel config output
+my $dmesgcmd = "/sbin/dmesg";
+my $dmesgfile = "/var/run/dmesg.boot";
+
+# preferred ordering of disks to use
+my @preferred = ("ar", "aacd", "amrd", "mlxd", "twed", "ad", "da");
+
+# ordered list of disks found and hash of sizes
+my @disklist;
+my %disksize;
+
+# min disk size we can use (in MB)
+my $MINDISKSIZE = 8000;
+
+#
 # Boot configuration for the CDROM. Determine the IP configuration, either
 # from the floopy or from the user interactively.
 #
@@ -196,7 +214,7 @@ sub GetNewConfig()
     print "\n";
 
     if (Prompt("Continue with installation?", "No") =~ /no/i) {
-	exit(-277);
+	exit(13);
     }
 
     #
@@ -231,8 +249,8 @@ sub GetUserConfig()
     $config{'domain'}    = Prompt("Domain", $config{'domain'});
     $config{'IP'}        = Prompt("IP Address", $config{'IP'});
     $config{'netmask'}   = Prompt("Netmask", WhichNetMask());
+    $config{'gateway'}   = Prompt("Gateway IP", WhichGateway());
     $config{'nameserver'}= Prompt("Nameserver IP", $config{'nameserver'});
-    $config{'gateway'}   = Prompt("Gateway IP", $config{'gateway'});
 
     # XXX
     $rawbootdisk = $config{'bootdisk'};
@@ -326,12 +344,11 @@ sub WhichInterface()
 	}
     }
 
-    return "fxp0";
+    return undef;
 }
 
 #
-# Which network mask. Make the standard class C guess and let the caller
-# spit that out in a prompt for verification.
+# Which network mask.  Default based on the network number.
 #
 sub WhichNetMask()
 {
@@ -340,7 +357,45 @@ sub WhichNetMask()
 	return $config{'netmask'};
     }
 
+    #
+    # XXX this is a nice idea, but will likely be wrong for large
+    # institutions that subdivide class B's (e.g., us!)
+    #
+    if (0 && defined($config{'IP'})) {
+	my ($net) = split(/\./, $config{'IP'});
+	return "255.0.0.0" if $net < 128;
+	return "255.255.0.0" if $net < 192;
+    }
+
     return "255.255.255.0";
+}
+
+#
+# Which gateway IP.  Use the more or less traditional .1 for the network
+# indicated by (IP & netmask).
+#
+sub WhichGateway()
+{
+    # XXX
+    if (defined($config{'gateway'})) {
+	return $config{'gateway'};
+    }
+
+    #
+    # Grab IP and netmask, combine em, stick 1 in the low quad,
+    # make sure the result isn't the IP, and return that.
+    # Parsing tricks from the IPv4Addr package.
+    #
+    if (defined($config{'IP'}) && defined($config{'netmask'})) {
+	my $addr = unpack("N", pack("CCCC", split(/\./, $config{'IP'})));
+	my $mask = unpack("N", pack("CCCC", split(/\./, $config{'netmask'})));
+	my $gw = ($addr & $mask) | 1;
+	if ($gw != $addr) {
+	    return join(".", unpack("CCCC", pack("N", $gw)));
+	}
+    }
+
+    return undef;
 }
 
 #
@@ -350,41 +405,40 @@ sub WhichNetMask()
 sub WhichRawDisk()
 {
     #
-    # Search the drives until we find a valid header.
-    # Order is: IDE, SCSI, IDE RAID, SCSI RAID
+    # Find the list of configured disks
+    #
+    my @list = DiskList();
+
+    #
+    # Search the drives looking for one with a valid header.
     # 
-    foreach my $disk ("ad", "da", "ar", "aacd") {
-	foreach my $drive (0) {
-	    my $guess = "/dev/${disk}${drive}";
-
-	    system("$tbboot -v $guess");
-	    if (! $?) {
-		#
-		# Allow for overiding the guess, with short timeout.
-		#
-		$rawbootdisk =
-		    Prompt("Which Disk Device is the boot device?",
-			   "$guess", 10);
-		goto gotone;
-	    }
-	}
-    }
-
-    #
-    # Okay, no candidates. Lets find the first real disk. Use dd
-    # to see if the drive is configured.
-    #
-    foreach my $disk ("ad0", "da0", "ar0", "aacd0") {
+    foreach my $disk (@list) {
 	my $guess = "/dev/${disk}";
 
-	system("dd if=$guess of=/dev/null bs=512 count=32 >/dev/null 2>&1");
+	system("$tbboot -v $guess");
 	if (! $?) {
 	    #
 	    # Allow for overiding the guess, with short timeout.
 	    #
-	    $rawbootdisk =
-		Prompt("Which Disk Device is the boot device?",
-		       "$guess", 10);
+	    $rawbootdisk = Prompt("Which Disk Device is the boot device?",
+				  "$guess", 10);
+	    goto gotone;
+	}
+    }
+
+    #
+    # None with configuration info, just use the first existing disk
+    # which is large enough and is actually accessible.
+    #
+    foreach my $disk (@list) {
+	my $guess = "/dev/${disk}";
+
+	if (DiskSize($disk) >= $MINDISKSIZE && DiskReadable($disk)) {
+	    #
+	    # Allow for overiding the guess, with short timeout.
+	    #
+	    $rawbootdisk = Prompt("Which Disk Device is the boot device?",
+				  "$guess", 10);
 	    goto gotone;
 	}
     }
@@ -394,11 +448,77 @@ sub WhichRawDisk()
     # If still not defined, then loop forever.
     # 
     while (!defined($rawbootdisk) || ! -e $rawbootdisk) {
-	$rawbootdisk = 
-	    Prompt("Which Disk Device is the boot device?", $defrawdisk);
+	$rawbootdisk = Prompt("Which Disk Device is the boot device?",
+			      $defrawdisk);
     }
     return $rawbootdisk;
 }
+
+#
+# Create a list of all disks and their sizes.
+#
+sub DiskList()
+{
+    if (-x $dmesgcmd) {
+	GetDisks($dmesgcmd);
+    }
+
+    # if we didn't grab anything there, try the /var/run file
+    if (@disklist == 0 && -r $dmesgfile) {
+	GetDisks("cat $dmesgfile");
+    }
+
+    return @disklist;
+}
+
+sub DiskSize($)
+{
+    my ($name) = @_;
+
+    if (defined($disksize{$name})) {
+	return $disksize{$name};
+    }
+    return 0;
+}
+
+sub DiskReadable($)
+{
+    my ($disk) = @_;
+    my $dev = "/dev/$disk";
+
+    if (!system("dd if=$dev of=/dev/null bs=512 count=32 >/dev/null 2>&1")) {
+	return(1);
+    }
+    return(0);
+}
+
+sub GetDisks($)
+{
+    my ($cmd) = @_;
+    my @units = (0, 1, 2, 3);
+    my @cmdout = `$cmd`;
+
+    #
+    # Arbitrary: we prefer disk type over unit number;
+    # e.g. ad1 is better than da0.
+    #
+    foreach my $disk (@preferred) {
+	foreach my $unit (@units) {
+	    my $dmesgpat = "^($disk$unit):.* (\\d+)MB.*\$";
+	    foreach my $line (@cmdout) {
+		if ($line =~ /$dmesgpat/) {
+		    my $name = $1;
+		    my $size = $2;
+		    if (!defined($disksize{$name})) {
+			push(@disklist, $name);
+		    }
+		    $disksize{$name} = $size;
+		}
+	    }
+	}
+    }
+}
+
 
 #
 # Write a config file suitable for input to the testbed boot header program.

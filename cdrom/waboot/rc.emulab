@@ -28,8 +28,9 @@ EmulabCheckIPConfig()
 		case $? in
 	        0)
 		       ;;
-		-277)
+		13)
 			echo 'Installation aborted'
+			echo 'Remove the CD and reboot'
 			exit 1
 			;;
 		*)
