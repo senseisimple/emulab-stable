@@ -21,6 +21,10 @@ HOW TO
 Copy and localize the 'defs-example' file for your environment
 and run ./configure - see doc/setup.txt for details.
 
+This source currently only builds on FreeBSD, and requires several packages;
+the dependencies can be found in the Makefile for our 'meta-port' in
+install/ports/emulab-boss .
+
 DOCUMENTATION
 This is a snapshot, not a formal distribution, so don't expect
 great documentation.
