@@ -2338,3 +2338,17 @@ last_net_act,last_cpu_act,last_ext_act);
 
          alter table experiments add lockdown tinyint(1) NOT NULL \
               default '0' after security_level;
+
+1.304: Add a table for the starting location of the robots.
+
+	CREATE TABLE virt_node_startloc (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  vname varchar(32) NOT NULL default '',
+	  building varchar(32) NOT NULL default '',
+	  floor varchar(32) NOT NULL default '',
+	  loc_x float NOT NULL default '0',
+	  loc_y float NOT NULL default '0',
+	  orientation float NOT NULL default '0',
+	  PRIMARY KEY  (pid,eid,vname)
+	) TYPE=MyISAM;

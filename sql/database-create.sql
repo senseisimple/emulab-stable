@@ -376,9 +376,9 @@ CREATE TABLE experiments (
   elab_in_elab tinyint(1) NOT NULL default '0',
   elabinelab_eid varchar(32) default NULL,
   security_level tinyint(1) NOT NULL default '0',
+  lockdown tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',
   panic_date datetime default NULL,
-  lockdown tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
@@ -1946,6 +1946,22 @@ CREATE TABLE virt_node_desires (
   desire varchar(30) NOT NULL default '',
   weight float default NULL,
   PRIMARY KEY  (pid,eid,vname,desire)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_node_startloc`
+--
+
+CREATE TABLE virt_node_startloc (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  building varchar(32) NOT NULL default '',
+  floor varchar(32) NOT NULL default '',
+  loc_x float NOT NULL default '0',
+  loc_y float NOT NULL default '0',
+  orientation float NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
