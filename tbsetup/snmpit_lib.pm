@@ -172,6 +172,15 @@ sub getExperimentVlans ($$) {
 }
 
 #
+# Returns an array of all ports used by a given experiment
+#
+sub getExperimentPorts ($$) {
+    my ($pid, $eid) = @_;
+
+    return getVlanPorts(getExperimentVlans($pid,$eid));
+}
+
+#
 # Usage: getDeviceNames(@ports)
 #
 # Returns an array of the names of all devices used in the given ports

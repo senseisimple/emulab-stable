@@ -107,9 +107,9 @@ sub new($$#@) {
     #
     if (!$self->{LEADER}) {
 	# XXX: For simplicity, we assume for now that the leader is a Cisco
-	 use snmpit_cisco;
-	 $self->{LEADER} = new snmpit_cisco($self->{STACKID});
-     }
+	use snmpit_cisco;
+	$self->{LEADER} = new snmpit_cisco($self->{STACKID});
+    }
 
     bless($self,$class);
 

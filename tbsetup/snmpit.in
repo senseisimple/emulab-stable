@@ -249,6 +249,12 @@ debug("Ports: " . join(",",@ports) . "\n");
 # to modify that experiment
 #
 if ($pid && $eid) {
+    #
+    # First, make sure the experiment exists
+    #
+    if (!ExpState($pid,$eid)) {
+	die "There is no experiment $eid in project $pid\n";
+    }
     if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
@@ -547,15 +553,20 @@ sub doVlansFromTables(@) {
     my ($stack) = @stacks;
 
     foreach my $vlan (@vlans) {
-	if (!$stack->createVlan($vlan)) {
-    	    warn "ERROR: Failed to create VLAN with id $vlan\n";
-	    #
-	    # Don't try to put ports in a VLAN if it couldn't be created
-	    #
-	    $errors++;
-    	} else {
-	    my @ports = getVlanPorts($vlan);
+	my @ports = getVlanPorts($vlan);
+	if ($stack->vlanExists($vlan)) {
+	    print "  VLAN $vlan already exists\n";
 	    $errors += $stack->setPortVlan($vlan,@ports);
+	} else {
+	    if (!$stack->createVlan($vlan)) {
+		warn "ERROR: Failed to create VLAN with id $vlan\n";
+		#
+		# Don't try to put ports in a VLAN if it couldn't be created
+		#
+		$errors++;
+	    } else {
+		$errors += $stack->setPortVlan($vlan,@ports);
+	    }
 	}
     }
 
