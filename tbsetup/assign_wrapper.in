@@ -1334,6 +1334,9 @@ if (scalar(keys(%isremotenode))) {
 	    push(@{$p2vmap{$phys_nodeid}}, $virtual);
 
 	    $jailed{$virtual}  = $jailflag;
+
+	    # Virtual nodes are always clean. Also prevents errors elsewhere.
+	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 	}
 	TBDebugTimeStamp("wanassign finished");
     }
@@ -1436,6 +1439,9 @@ foreach my $pnode (keys(%virtnodes)) {
 	TBIsNodeVirtual($physical, \$jailflag);
 	
 	$jailed{$virtual}  = $jailflag;
+	
+	# Virtual nodes are always clean. Also prevents errors elsewhere.
+	TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
     }
 }
 
