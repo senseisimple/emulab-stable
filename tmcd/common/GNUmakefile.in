@@ -36,8 +36,9 @@ install:
 	@echo "directory afterwards."
 
 
-local-install:	path-install local-script-install
-remote-install:	path-install remote-script-install
+local-install:		path-install local-script-install
+remote-install:		path-install remote-script-install
+control-install:	path-install control-script-install
 
 other-install:
 	(cd ../../os; $(MAKE) client-install)
@@ -86,3 +87,8 @@ local-script-install:	common-script-install
 remote-script-install:	common-script-install
 	-chown root $(BINDIR)/vnodesetup
 	-chmod u+s $(BINDIR)/vnodesetup
+
+control-script-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
+	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
