@@ -30,7 +30,7 @@
 # delaythresh is the maximum delay in ms above which a delay node is needed
 # maxrun is the number of times to rerun assign if no match is found.
 # assign is the path to assign
-$delaythresh = .25;
+$delaythresh = 10;
 $maxrun = 5;
 
 #
