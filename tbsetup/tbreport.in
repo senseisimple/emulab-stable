@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+
+# tbreport
+# This just provides the necessary information from the IR file.
+
+$TBROOT = "@prefix@";
+
+push(@INC,"$TBROOT/lib/ir");
+require libir;
+
+if ($#ARGV == 3) {
+    ($v,$pid,$eid,$irfile) = @ARGV;
+    if ($v ne "-v") {
+	print STDERR "Syntax: $0 [-v] pid eid irfile\n";
+	exit(1);
+    }
+} elsif ($#ARGV == 2) {
+    ($pid,$eid,$irfile) = @ARGV;
+} else {
+    print STDERR "Syntax: $0 [-v] pid eid irfile\n";
+    exit(1);
+}
+
+eval {&ir_read($irfile)};
+if ($@) {
+    print STDERR "Could not read $irfile: $@\n";
+    exit(1);
+}
+
+# Display node map
+$raw = eval {&ir_get("/virtual/nodes")};
+if ($@) {
+    print STDERR "Could not read /virtual/nodes from IR file!\n";
+    exit(1);
+}
+print "Node Mapping:\n";
+printf "%-20s %-20s\n", "Virtual", "Physical";
+print "-------------------- --------------------\n";
+foreach (split("\n",$raw)) {
+    ($v,$p) = split;
+    printf "%-20s %-20s\n", $v, $p;
+}
+
+# Display IP addresses
+#  $raw = eval {&ir_get("/topology/lans")};
+#  if ($@) {
+#      print STDERR "Could not read /topology/lans from IR file!\n";
+#      exit(1);
+#  }
+#  foreach (split("\n",$raw)) {
+#      @info = split;
+#      $lan = @info[0];
+#      $lans{$lan} = 1;
+#  }
+$raw = eval {&ir_get("/ip/map")};
+if ($@) {
+    print STDERR "Could not read /ip/map from IR file!\n";
+    exit(1);
+}
+print "\n";
+print "IP Addresses:\n";
+printf "%-20s %-20s %-20s\n", "Node", "Destination", "IP";
+print "-------------------- -------------------- --------------------\n";
+foreach (split("\n",$raw)) {
+    ($src,$dst,$ip) = split;
+    printf "%-20s %-20s %-20s\n", $src, $dst, $ip;
+}
+
+0;
+
