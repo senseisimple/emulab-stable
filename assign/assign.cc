@@ -1,5 +1,6 @@
 #include <LEDA/graph_alg.h>
 #include <LEDA/graphwin.h>
+#include <LEDA/ugraph.h>
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
@@ -35,8 +36,14 @@ void dump_options(const char *str, struct config_param cparams[], int nparams);
 #define OPTIMAL_SCORE(edges,nodes) 0
 #endif
 
-tb_pgraph PG(1,1);
-tb_vgraph G(1,1);
+tb_sgraph SG;
+edge_array<int> edge_costs;
+typedef node_array<int> switch_distance_array;
+typedef node_array<edge> switch_pred_array;
+node_array<switch_distance_array> switch_distances;
+node_array<switch_pred_array> switch_preds;
+tb_pgraph PG;
+tb_vgraph G;
 
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
@@ -63,7 +70,7 @@ extern node_array<int> switch_index;
 node_pq<int> unassigned_nodes(G);
 
 int parse_top(tb_vgraph &G, istream& i);
-int parse_ptop(tb_pgraph &G, istream& i);
+int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 
 /*
  * Basic simulated annealing parameters:
@@ -364,6 +371,17 @@ void usage() {
 	  );
 }
 
+int mst_comp(const edge &A,const edge &B)
+{
+  edge pA,pB;
+  pA = SG[A].mate;
+  pB = SG[B].mate;
+  // Highbandwidth = low score
+  if (PG[pA].bandwidth > PG[pB].bandwidth) return -1;
+  if (PG[pA].bandwidth < PG[pB].bandwidth) return 1;
+  return 0;
+}
+
 void print_solution()
 {
   node n;
@@ -375,11 +393,13 @@ void print_solution()
     } else {
       node pnode = pnodes[G[n].posistion];
       tb_pnode &pnoder = PG[pnode];
-      cout << G[n].name << " " << (pnoder.the_switch ?
-				   PG[pnoder.the_switch].name :
-				   "NO_SWITCH") <<
-	" " << pnoder.name << endl;
-
+      cout << G[n].name << " ";
+      if (pnoder.the_switch) {
+	cout << PG[pnoder.the_switch].name;
+      } else {
+	cout << "NO_SWITCH";
+      }
+      cout << " " << pnoder.name << endl;
     }
   }
   cout << "End Nodes" << endl;
@@ -387,33 +407,30 @@ void print_solution()
   edge e;
   forall_edges(e,G) {
     tb_vlink &v = G[e];
-    tb_plink *p,*p2,*p3,*p4;
     cout << G[e].name;
     if (v.type == tb_vlink::LINK_DIRECT) {
-      p = &PG[v.plink];
-      cout << " direct " << PG[v.plink].name << " (" <<
-	p->srcmac << "," << p->dstmac << ")" << endl;
+      tb_plink &p = PG[v.plink];
+      cout << " direct " << p.name << " (" <<
+	p.srcmac << "," << p.dstmac << ")" << endl;
     } else if (v.type == tb_vlink::LINK_INTRASWITCH) {
-      p = &PG[v.plink];
-      p2 = &PG[v.plink_two];
-      cout << " intraswitch " << PG[v.plink].name << " (" <<
-	p->srcmac << "," << p->dstmac << ") " <<
-	PG[v.plink_two].name << " (" << p2->srcmac << "," << p2->dstmac <<
+      tb_plink &p = PG[v.plink];
+      tb_plink &p2 = PG[v.plink_two];
+      cout << " intraswitch " << p.name << " (" <<
+	p.srcmac << "," << p.dstmac << ") " <<
+	p2.name << " (" << p2.srcmac << "," << p2.dstmac <<
 	")" << endl;
     } else if (v.type == tb_vlink::LINK_INTERSWITCH) {
-      p = &PG[v.plink];
-      p3 = &PG[v.plink_local_one];
-      p4 = &PG[v.plink_local_two];
-      cout << " interswitch " << PG[v.plink].name << " (" <<
-	p->srcmac << "," << p->dstmac << ")";
-      if (v.plink_two) {
-	p2 = &PG[v.plink_two];
-	cout << " " << PG[v.plink_two].name << " (" << p2->srcmac << "," <<
-	  p2->dstmac <<	")";
+      cout << " interswitch ";
+      edge e;
+      tb_plink &lp = PG[v.plink_local_one];
+      tb_plink &lp2 = PG[v.plink_local_two];
+      cout << lp.name << " (" << lp.srcmac << "," << lp.dstmac << ")";
+      forall(e,v.path) {
+	tb_plink &p = PG[e];
+	cout << " " << p.name << " (" << p.srcmac << "," << p.dstmac << ")";
       }
-      cout << " " << PG[v.plink_local_one].name << " (" << p3->srcmac << "," <<
-	p3->dstmac << ") " << PG[v.plink_local_two].name << " (" <<
-	p4->srcmac << "," << p4->dstmac << ")" << endl;
+      cout << " " << lp2.name << " (" << lp2.srcmac << "," <<
+	lp2.dstmac << ")" << endl;
     } else {
       cout << "Unknown link type" << endl;
     }
@@ -491,10 +508,46 @@ int main(int argc, char **argv)
       cerr << "Error opening file: " << topofile << endl;
       exit(-1);
     }
-    nparts = parse_ptop(PG,ptopfile);
+    nparts = parse_ptop(PG,SG,ptopfile);
     cout << "Nparts: " << nparts << endl;
-  }
+    cout << "Initializing data structures." << endl;
+    edge_costs.init(SG);
+    switch_distances.init(SG);
+    switch_preds.init(SG);
+    cout << "Calculating shortest paths on switch fabric." << endl;
+    edge ed;
+    forall_edges(ed,SG) {
+      edge_costs[ed] = 10000-PG[SG[ed].mate].bandwidth;
+#ifdef SCORE_DEBUG
+      cerr << "  " << PG[SG[ed].mate].name << " " << edge_costs[ed] << endl;
+#endif
 
+    }
+    node sw;
+    forall_nodes(sw,SG) {
+      switch_distances[sw].init(SG);
+      switch_preds[sw].init(SG);
+      DIJKSTRA_T(SG,sw,edge_costs,
+		 switch_distances[sw],switch_preds[sw]);
+#ifdef SCORE_DEBUG
+      cerr << "Source " << PG[SG[sw].mate].name << endl;
+      node dsw;
+      forall_nodes(dsw,SG) {
+	cerr << "  " << PG[SG[dsw].mate].name;
+	int dist = switch_distances[sw][dsw];
+	cerr << "  dist " << dist;
+	edge de = switch_preds[sw][dsw];
+	if (de == nil) {
+	  cerr << "  pred nil" << endl;
+	} else {
+	  cerr << "  pred " << PG[SG[de].mate].name << endl;
+	}
+      }
+#endif
+    }
+  }
+  
+  cout << "Annealing!" << endl;
   batch();
 
   print_solution();

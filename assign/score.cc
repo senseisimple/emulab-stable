@@ -10,6 +10,7 @@
 
 // Not sure we need all these LEDA includes.
 #include <LEDA/graph_alg.h>
+#include <LEDA/ugraph.h>
 #include <LEDA/graphwin.h>
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
@@ -30,6 +31,9 @@
 
 #include "assert.h"
 
+typedef node_array<edge> switch_pred_array;
+extern node_array<switch_pred_array> switch_preds;
+
 float score;			// The score of the current mapping
 int violated;			// How many times the restrictions
 				// have been violated.
@@ -40,13 +44,14 @@ violated_info vinfo;		// specific info on violations
 
 extern tb_vgraph G;		// virtual graph
 extern tb_pgraph PG;		// physical grpaph
+extern tb_sgraph SG;		// switch fabric
 
-int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s);
 edge direct_link(node a,node b);
 void score_link(edge e,edge v,bool interswitch);
 void unscore_link(edge e,edge v,bool interswitch);
 edge find_link_to_switch(node n);
 int find_intraswitch_path(node src,node dst,edge *first,edge *second);
+int find_interswitch_path(node src,node dst,int bandwidth,list<edge> &L);
 
 #ifdef SCORE_DEBUG_MORE
 #define SADD(amount) fprintf(stderr,"SADD: %s = %.2f\n",#amount,amount);score+=amount
@@ -124,7 +129,7 @@ void remove_node(node n)
   tb_pnode &pnoder = PG[pnode];
 
 #ifdef SCORE_DEBUG
-  fprintf(stderr,"SCORE: remove_node(%s)\n",vnoder.name);
+  cerr <<  "SCORE: remove_node(" << vnoder.name << ")\n";
   fprintf(stderr,"       no_connections = %d\n",vnoder.no_connections);
 #endif
 
@@ -146,7 +151,7 @@ void remove_node(node n)
       vdst = G.source(e);
     vdstr=&G[vdst];
 #ifdef SCORE_DEBUG
-    fprintf(stderr,"  edge to %s\n",vdstr->name);
+    cerr << "  edge to " << vdstr->name << endl;
 #endif
     if (vdstr->posistion == 0) continue;
     if (vlink->type == tb_vlink::LINK_DIRECT) {
@@ -159,28 +164,19 @@ void remove_node(node n)
       // INTERSWITCH LINK
       pdst=pnodes[vdstr->posistion];
       pdstr=&PG[pdst];
-      edge first,second;
-      first = vlink->plink;
-      second = vlink->plink_two;
 #ifdef SCORE_DEBUG
-      node through;
-      if (PG.source(first) == pnode)
-	through = PG.target(first);
-      else
-	through = PG.source(first);
-      fprintf(stderr,"   interswitch link (through %s)\n",
-	      PG[through].name);
+      cerr << "  interswitch link\n";
 #endif
 
-      unscore_link(first,e,true);
-      if (second) unscore_link(second,e,true);
+      edge cur;      
+      forall(cur,G[e].path) {
+	SSUB(SCORE_INTERSWITCH_LINK);
+	unscore_link(cur,e,true);
+      }
+      G[e].path.clear();
+      
       unscore_link(vlink->plink_local_one,e,false);
       unscore_link(vlink->plink_local_two,e,false);
-
-      // adjust score apropriately.
-      SSUB(SCORE_INTERSWITCH_LINK);
-      if (second)
-	SSUB(SCORE_INTERSWITCH_LINK);
     } else if (vlink->type == tb_vlink::LINK_INTRASWITCH) {
       // INTRASWITCH LINK
 #ifdef SCORE_DEBUG
@@ -215,7 +211,7 @@ void remove_node(node n)
     if (the_switch) {
       if ((--PG[the_switch].pnodes_used) == 0) {
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"  releasing switch %s\n",PG[the_switch].name);
+	cerr << "  releasing switch " << PG[the_switch].name << endl;
 #endif
 	// release switch
 	SSUB(SCORE_SWITCH);
@@ -296,11 +292,14 @@ int add_node(node n,int ploc)
   tb_pnode &pnoder=PG[pnode];
 
 #ifdef SCORE_DEBUG
-  fprintf(stderr,"SCORE: add_node(%s,%s[%d])\n",
-	  vnoder.name,pnoder.name,ploc);
+  cerr << "SCORE: add_node(" << vnoder.name << "," << pnoder.name << "[" << ploc << "])\n";
   fprintf(stderr,"  vnode type = ");
   cerr << vnoder.type << " pnode switch = ";
-  cerr << (pnoder.the_switch ? PG[pnoder.the_switch].name : "No switch");
+  if (pnoder.the_switch) {
+    cerr << PG[pnoder.the_switch].name;
+  } else {
+    cerr << "No switch";
+  }
   cerr << endl;
 #endif
   
@@ -374,7 +373,7 @@ int add_node(node n,int ploc)
     assert(dst != n);
     assert(&dstr != &vnoder);
 #ifdef SCORE_DEBUG
-    fprintf(stderr,"  edge to %s\n",dstr.name);
+    cerr << "  edge to " << dstr.name << endl;
 #endif
 
     if (dstr.posistion != 0) {
@@ -383,7 +382,7 @@ int add_node(node n,int ploc)
       tb_pnode &dpnoder=PG[dpnode];
 
 #ifdef SCORE_DEBUG
-      fprintf(stderr,"   goes to %s\n",dpnoder.name);
+      cerr << "   goes to " << dpnoder.name << endl;
 #endif
 
       if ((pedge=direct_link(dpnode,pnode)) != NULL) {
@@ -423,16 +422,13 @@ int add_node(node n,int ploc)
 	score_link(second,e,false);
       } else {
 	// try to find interswitch
-	// XXX - need to do user and bandwidth checking for links to
-	// and from node as well!
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"   looking for interswitch link\n");
+	cerr << "   looking for interswitch link " <<
+	  PG[pnoder.the_switch].name << " " <<
+	  PG[dpnoder.the_switch].name << endl;
 #endif
-	edge first,second;
-	first=second=NULL;
 	if (find_interswitch_path(pnoder.the_switch,dpnoder.the_switch,
-				  er->bandwidth,
-				  &first,&second) == 0) {
+				  er->bandwidth,er->path) == 0) {
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
@@ -447,18 +443,18 @@ int add_node(node n,int ploc)
 	  violated++;
  	} else {
 #ifdef SCORE_DEBUG
-	  fprintf(stderr,"   found interswitch link (%p, %p)\n",first,second);
+	  fprintf(stderr,"   found interswitch link\n");
 #endif
 	  er->type=tb_vlink::LINK_INTERSWITCH;
-	  SADD(SCORE_INTERSWITCH_LINK);
-	  if (second)
+
+	  edge cur;
+	  forall(cur,er->path) {
 	    SADD(SCORE_INTERSWITCH_LINK);
-
-	  score_link(first,e,true);
-	  if (second) score_link(second,e,true);
-
-	  er->plink = first;
-	  er->plink_two = second;
+#ifdef SCORE_DEBUG
+	    cerr << "     " << PG[cur].name << endl;
+#endif
+	    score_link(cur,e,true);
+	  }
 
 	  er->plink_local_one = find_link_to_switch(pnode);
 	  assert(er->plink_local_one != NULL);
@@ -630,82 +626,39 @@ int find_intraswitch_path(node src,node dst,edge *first,edge *second)
   return 1;
 }
 
-// this needs to find a path between switches src and dst (in PG).
-// needs to return the best of all possible
-// best =
-//   shorter is better
-//   lowest % of bw used after link added is better.
-int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
+// this uses the shortest paths calculated over the switch graph to
+// find a path between src and dst.  It passes out list<edge>, a list
+// of the edges used. (assumed to be empty to begin with).
+// Returns 0 if no path exists and 1 otherwise.
+int find_interswitch_path(node src,node dst,int bandwidth,list<edge> &L)
 {
-  edge best_first,best_second;
-  float best_bw;
-  float bw;
-  int best_length = 1000;
+  // We know the shortest path from src to node already.  It's stored
+  // in switch_preds[src] and is a node_array<edge>.  Let P be this
+  // array.  We can trace our shortest path by starting at the end and
+  // following the pred edges back until we reach src.  We need to be
+  // careful though because the switch_preds deals with elements of SG
+  // and we have elements of PG.
+  if ((src == nil) || (dst == nil)) {return 0;}
   
-  best_bw=100.0;
-  best_first = best_second = NULL;
-
-
-  if (!src || ! dst) return 0;
-  
-  // try to find a path to the destination
-  node ldst,ldstb;
-  edge first,second;
-#ifdef SCORE_DEBUG
-  tb_pnode *ldstr,*ldstbr;
-  tb_plink *firstr,*secondr;
-#endif
-  forall_inout_edges(first,src) {
-    ldst = PG.target(first);
-    if (ldst == src)
-      ldst = PG.source(first);
-#ifdef SCORE_DEBUG
-    ldstr = &PG[ldst];
-    firstr = &PG[first];
-#endif
-    if (ldst == dst) {
-      // we've found a path, it's just firstedge
-      if (first)
-	bw = (PG[first].bw_used+bandwidth)/PG[first].bandwidth;
-      if (! best_first || bw < best_bw) {
-	best_first = first;
-	best_bw = bw;
-	best_second = NULL;
-	best_length = 1;
-      }
-    }
-    forall_inout_edges(second,ldst) {
-      ldstb = PG.target(second);
-      if (ldstb == ldst)
-	ldstb = PG.source(second);
-#ifdef SCORE_DEBUG
-      ldstbr = &PG[ldstb];
-      secondr = &PG[second];
-#endif
-      if (ldstb == dst) {
-	if (best_length == 1) continue;
-	bw = (PG[first].bw_used+bandwidth)/PG[first].bandwidth;
-	if (second)
-	  // NOTE: One thing to try differently.
-	  bw *= (PG[second].bw_used+bandwidth)/PG[second].bandwidth;
-	if (bw < best_bw) {
-	  best_first = first;
-	  best_second = second;
-	  best_bw = bw;
-	  best_length = 2;
-	}
-      }
-    }
-  }
-  // if we get here we didn't find a path
-  if (best_first) {
-    *f = best_first;
-    if (best_second)
-      *s = best_second;
-    return 1;
-  } else {
+  node sg_src = PG[src].sgraph_switch;
+  node sg_dst = PG[dst].sgraph_switch;
+  edge sg_ed;
+  node sg_cur=sg_dst;
+  switch_pred_array &preds = switch_preds[sg_src];
+  if (preds[sg_dst] == nil) {
+    // unreachable
     return 0;
   }
+  while (sg_cur != sg_src) {
+    sg_ed = preds[sg_cur];
+    L.push(SG[sg_ed].mate);
+    if (SG.source(sg_ed) == sg_cur) {
+      sg_cur = SG.target(sg_ed);
+    } else {
+      sg_cur = SG.source(sg_ed);
+    }
+  }
+  return 1;
 }
 
 // this does scoring for over users and over bandwidth on edges.

@@ -16,15 +16,16 @@ LEDA=@LEDA@
 
 OBJS=score.o parse_top.o parse_ptop.o config.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
-LDFLAGS+= -O3 -fomit-frame-pointer -m486
-CXXFLAGS = -I${LEDA}/incl -fomit-frame-pointer -m486
+LDFLAGS+= -O3
+CXXFLAGS = -I${LEDA}/incl
 
 # Pick one of the following:
 CXXFLAGS += -Wall -O3 
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE #-DSTATS
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DGRAPH_DEBUG #=DSTATS
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG #-DSTATS
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DSCORE_DEBUG_MORE #-DSTATS
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DSCORE_DEBUG_MORE 
+
+#CXXFLAGS += -DSTATS
 
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
@@ -33,12 +34,6 @@ DEPLIBS=$(OBJS)
 
 assign: ${DEPLIBS} ${OBJS} assign.o
 	${CXX} assign.o -o assign ${LIBS} $(OBJS) ${LDFLAGS}
-
-assign_p: assign.po $(DEPLIBS) $(POBJS) 
-	${CXX} assign.po -pg -g -o assign_p ${LIBS} $(POBJS)
-
-assign.po: assign.cc
-	${CXX} -c -pg -g -o assign.po assign.cc ${CXXFLAGS}
 
 install: $(INSTALL_LIBEXECDIR)/assign 
 

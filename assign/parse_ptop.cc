@@ -12,6 +12,7 @@
 
 #include <LEDA/graph_alg.h>
 #include <LEDA/graphwin.h>
+#include <LEDA/ugraph.h>
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
@@ -26,7 +27,7 @@
 extern node pnodes[MAX_PNODES];	// int -> node map
 node_array<int> switch_index;
 
-int parse_ptop(tb_pgraph &PG, istream& i)
+int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
   int switchi=0;
   dictionary<string, node> nmap;
@@ -66,7 +67,7 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 #ifdef GRAPH_DEBUG
 	cout << "Found phys. node '"<<snode<<"'\n";
 #endif
-	PG[no1].name=strdup(snode);
+	PG[no1].name=string(snode);
 	PG[no1].typed = false;
 	PG[no1].max_load = 0;
 	PG[no1].current_load = 0;
@@ -89,6 +90,9 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	    isswitch = 1;
 	    PG[no1].types.insert(stype,1);
 	    PG[no1].the_switch = no1;
+	    node sw = SG.new_node();
+	    SG[sw].mate = no1;
+	    PG[no1].sgraph_switch = sw;
 	    switch_index[no1] = switchi++;
 	  } else {
 	    PG[no1].types.insert(stype,iload);
@@ -118,40 +122,49 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  != 5) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
+	string linkname(lname);
 	char *snode,*smac;
 	char *dnode,*dmac;
 	smac = n1;
 	dmac = n2;
 	snode = strsep(&smac,":");
 	dnode = strsep(&dmac,":");
-	string s1(snode);
-	string s2(dnode);
-	if (nmap.lookup(s1) == nil) {
+	if (nmap.lookup(snode) == nil) {
 	  fprintf(stderr,"PTOP error: Unknown source node %s\n",snode);
 	  exit(1);
 	}
-	if (nmap.lookup(s2) == nil) {
+	if (nmap.lookup(dnode) == nil) {
 	  fprintf(stderr,"PTOP error: Unknown destination node %s\n",dnode);
 	  exit(1);
 	}
-	node node1 = nmap.access(s1);
-	node node2 = nmap.access(s2);
+	node node1 = nmap.access(snode);
+	node node2 = nmap.access(dnode);
+#define ISSWITCH(n) (PG[n].types.lookup("switch") != nil)
 	for (int i = 0; i < num; ++i) {
 	  ed1=PG.new_edge(node1, node2);
 	  PG[ed1].bandwidth=size;
 	  PG[ed1].bw_used=0;
 	  PG[ed1].users=0;
-	  PG[ed1].name=strdup(lname);
+	  PG[ed1].name=linkname;
 	  if (smac)
-	    PG[ed1].srcmac = strdup(smac);
+	    PG[ed1].srcmac = string(smac);
 	  else
-	    PG[ed1].srcmac = NULL;
+	    PG[ed1].srcmac = string("(null)");
 	  if (dmac)
-	    PG[ed1].dstmac = strdup(dmac);
+	    PG[ed1].dstmac = string(dmac);
 	  else
-	    PG[ed1].dstmac = NULL;
+	    PG[ed1].dstmac = string("(null)");
+	  if (ISSWITCH(node1) && ISSWITCH(node2)) {
+	    if (i != 0) {
+	      cout <<
+		"Warning: Extra links between switches will be ignored." <<
+		endl;
+	    }
+	    edge swedge = SG.new_edge(PG[node1].sgraph_switch,
+				      PG[node2].sgraph_switch);
+	    SG[swedge].mate = ed1;
+	  }
 	}
-#define ISSWITCH(n) (PG[n].types.lookup("switch") != nil)
 	if (ISSWITCH(node1) &&
 	    ! ISSWITCH(node2))
 	  PG[node2].the_switch = node1;
