@@ -715,25 +715,29 @@ class Plab:
 #
 
 class Slice:
-    # XXX: maybe add slicename arg
-    def __init__(self, plab, pid, eid):
+
+    def __init__(self, plab, pid, eid, slicename = None):
         self.plab = plab
         self.pid, self.eid = pid, eid
         self.slicemeta = None
+        self.slicename = slicename
+        return
     
     def _create(self):
         """
         Creates a new slice that initially contains no nodes.  Don't call
         this directly, use Plab.createSlice instead.
         """
-        res = DBQueryFatal("select idx from experiments "
-                              "where pid=%s "
-                              "and eid=%s",
-                              (self.pid, self.eid))
-        if not len(res):
-            raise RuntimeError, "Didn't get any results while looking for idx"
-        eindex = res[0][0]
-        self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+        if not self.slicename:
+            res = DBQueryFatal("select idx from experiments "
+                               "where pid=%s "
+                               "and eid=%s",
+                               (self.pid, self.eid))
+            if not len(res):
+                raise RuntimeError, "Didn't get any results while looking for idx"
+            eindex = res[0][0]
+            self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+            pass
         
         print "Creating Plab slice %s." % self.slicename
         

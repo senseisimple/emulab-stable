@@ -88,6 +88,7 @@ my $logfile = "$TB/log/plabmonitord";
 my @oldnodes = ();
 my $LOOPSLEEP = 1800;  # 1/2 hour between successive loops.
 my $PAUSETIME = 120;   # 2 minute pause after running vnode_setup
+my $SETUPWAIT = 960;   # 16 minutes to wait for vnode to setup.
 my $BATCHNUM = 20;     # degree of parallelization
 
 #
@@ -167,7 +168,8 @@ while (1) {
         #
         # Try to setup this batch of vnodes.
         #
-        system("vnode_setup -f -d -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @vnodes");
+        system("vnode_setup -f -d -w $SETUPWAIT -n $BATCHNUM ".
+               "$PLABMOND_PID $PLABMOND_EID @vnodes");
 
         print "sleeping for a bit.\n"
             if ($debug);
