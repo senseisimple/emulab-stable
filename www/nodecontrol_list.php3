@@ -37,16 +37,16 @@ echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td>Change</td>
-          <td>ID</td>
-          <td>Type</td>
-          <td>PID</td>
-          <td>EID</td>
-          <td>Def Image</td>
-          <td>Def Path</td>
-          <td>Def Cmdline</td>
-          <td>Next Path</td>
-          <td>Next Cmdline</td>
+          <td align=center>Change</td>
+          <td align=center>ID</td>
+          <td align=center>Type</td>
+          <td align=center>PID</td>
+          <td align=center>EID</td>
+          <td align=center>Default<br>Image</td>
+          <td align=center>Default<br>Path</td>
+          <td align=center>Default<br>Cmdline</td>
+          <td align=center>Next<br>Path</td>
+          <td align=center>Next<br>Cmdline</td>
       </tr>\n";
     
 while ($row = mysql_fetch_array($query_result)) {
