@@ -667,6 +667,15 @@ foreach ($inserts as $name => $value) {
 if ($new_type) {
     DBQueryFatal("insert into node_types set type='$node_type', ".
 		 implode(",", $insert_data));
+    if ($formfields["class"] == "pc") {
+	$vnode_type = $node_type;
+	$vnode_type = preg_replace("/pc/","pcvm",$vnode_type);
+	if ($vnode_type == $node_type) {
+	    $vnode_type = "$vnode_type-vm";
+	}
+	DBQueryFatal("insert into node_types_auxtypes set " .
+	    "auxtype='$vnode_type' type='pcvm'");
+    }
 } else {
     DBQueryFatal("update node_types set ".
 		 implode(",", $insert_data) . " ".
