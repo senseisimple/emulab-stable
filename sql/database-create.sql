@@ -562,6 +562,7 @@ CREATE TABLE nodes (
   update_accounts smallint(6) default '0',
   next_op_mode varchar(20) default NULL,
   ipodhash varchar(64) default NULL,
+  osid varchar(35) NOT NULL default '',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
