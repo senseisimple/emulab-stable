@@ -33,12 +33,18 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_why           = $row[why];
     $control_node	= $row[control_node];
     $approved           = $row[approved];
+    $expt_count         = $row[expt_count];
+    $expt_last          = $row[expt_last];
 
     if ($proj_public) {
 	$proj_public = "Yes";
     }
     else {
 	$proj_public = "No";
+    }
+
+    if (!$expt_last) {
+	$expt_last = "&nbsp";
     }
 
     #
@@ -100,6 +106,16 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<tr>
               <td>Expires: </td>
               <td class=\"left\">$proj_expires</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Experiments Created:</td>
+              <td class=\"left\">$expt_count</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Date of last experiment:</td>
+              <td class=\"left\">$expt_last</td>
           </tr>\n";
     
     echo "<tr>
