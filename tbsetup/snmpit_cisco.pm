@@ -637,7 +637,7 @@ sub removePortsFromVlan($$) {
 #
 # Remove the given VLAN from this switch. This presupposes that all of its
 # ports have already been removed with removePortsFromVlan(). The VLAN is
-# given as a VLAN identified from the database.
+# given as a VLAN identifier from the database.
 #
 # usage: removeVlan(self,int vlan)
 #	 returns 1 on success
