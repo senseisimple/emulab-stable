@@ -35,10 +35,13 @@ chdir "/etc/testbed";
 $id = `id`;
 ($vnode,$eid,$pid) = split (/\./, `hostname`);
 $logpath = "/proj/$pid/exp/$eid/logs/nse-$vnode.log";
+umask(002);
+open( STDOUT, ">>$logpath");
+open( STDERR, ">>&STDOUT" );
 if( $id =~ /uid=(\d+)/ ) {
     if( $1 ne "0" ) {
-        system("sudo nse nseinput.tcl >> $logpath 2>&1");
+        system("sudo nse nseinput.tcl");
     } else {
-        system("nse nseinput.tcl > $logpath 2>&1");
+        system("nse nseinput.tcl");
     }
 }
