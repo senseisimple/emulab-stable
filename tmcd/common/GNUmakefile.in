@@ -19,7 +19,7 @@ SUBDIR		= tmcd/common
 
 include $(OBJDIR)/Makeconf
 
-all:	vnodesetup
+all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -62,14 +62,14 @@ path-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/paths.pm $(ETCDIR)/paths.pm
 	$(INSTALL) -m 755 $(SRCDIR)/paths.sh $(ETCDIR)/paths.sh
 
-common-script-install:	dir-install vnodesetup
+common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
-	$(INSTALL) -m 755 vnodesetup $(BINDIR)/vnodesetup
+	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
 	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
 
