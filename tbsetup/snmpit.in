@@ -391,7 +391,7 @@ foreach my $command (@commands) {
 	    last;
 	};
 	/portcontrol/ && do {
-	    my $portcommand = @args;
+	    my ($portcommand) = @args;
 	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
 	    last;
 	};
