@@ -18,7 +18,7 @@ use Getopt::Std;
 $| = 1;
 
 # Defaults
-my $defidlehours = 2;
+my $defidlehours = TBGetSiteVar("idle/threshold");
 
 # Don't put 'my' on these, or they won't be settable with ${$var}
 $h = 0; # help mode

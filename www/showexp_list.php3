@@ -76,8 +76,8 @@ $showlastlogin = $isadmin;
 # show properly... it just shows the header in the table, over the
 # wrong column. 
 
-# how many hours is considered idle...
-$idlehours = 2;
+# How many hours is considered idle...
+$idlehours = TBGetSiteVar("idle/threshold");
 
 #
 # Handle showtype
