@@ -867,8 +867,12 @@ sub static_rt_test {
 # Convenience to print information about a link.
 sub print_link {
     my $edge = shift @_;
-    return $edge->src . " to " . $edge->dst . " (" . ($edge->bw / 1000000)  . 
-	" Mbps, " . $edge->delay . "ms, " . (100 * $edge->loss) . "% loss)";
+    my $str = $edge->src . " to " . $edge->dst;
+    if ($edge->bw && $edge->delay && $edge->loss) {
+	$str .= " (" . ($edge->bw / 1000000)  . " Mbps, " .
+	    $edge->delay . "ms, " . (100 * $edge->loss) . "% loss)";
+    }
+    return $str;
 }
 
 # returns whether the current node has a link.
@@ -1120,9 +1124,11 @@ sub dotest {
 sub my_tick {
     # first arg has to be a file, so at least check that here.
     my $fname = &check_filename(shift @_);
+    my @args = map { $1 if (/(.*)/) } @_;
 
     my @results;
-    open(FROM, "-|") or exec $fname, @_;
+
+    open(FROM, "-|") or exec $fname, @args;
     while( <FROM>) {
 	push @results,$_;
     };
@@ -1175,7 +1181,8 @@ sub my_system {
 	    open(STDOUT, "/dev/null") ;
 	    open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
 	}
-	exec(@_);
+	my @args = map { $1 if (/(.*)/) } @_;
+	exec(@args);
     }
 }
 # permutation of my_system to start but not wait for child procs.
