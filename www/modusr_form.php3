@@ -64,6 +64,8 @@ $usr_addr    = $row[usr_addr];
 $usr_name    = $row[usr_name];
 $usr_phone   = $row[usr_phone];
 $usr_passwd  = $row[usr_pswd];
+$usr_title   = $row[usr_title];
+$usr_affil   = $row[usr_affil];
 
 #
 # Generate the form.
@@ -109,6 +111,10 @@ echo "<tr>
           <td class=\"left\">
               <input type=\"password\" name=\"old_password\"></td>
 
+          <td>*Title/Position:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"usr_title\"
+                     value=\"$usr_title\"></td>
      </tr>\n";
 
 echo "<tr>
@@ -116,6 +122,10 @@ echo "<tr>
           <td class=\"left\">
               <input type=\"password\" name=\"new_password1\"></td>
 
+          <td>*Institutional<br>Affiliation:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"usr_affil\"
+                     value=\"$usr_affil\"></td>
      </tr>\n";
 
 echo "<tr>

@@ -36,6 +36,14 @@ if (!isset($usr_phone) ||
     strcmp($usr_phone, "") == 0) {
   $formerror = "Phone #";
 }
+if (!isset($usr_title) ||
+    strcmp($usr_title, "") == 0) {
+  $formerror = "Title/Position";
+}
+if (!isset($usr_affil) ||
+    strcmp($usr_affil, "") == 0) {
+  $formerror = "Institutional Affiliation";
+}
 if (!isset($old_password) || strcmp($old_password, "") == 0) {
   $formerror = "Old Password";
 }
@@ -115,7 +123,9 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"usr_email=\"$usr_email\",     ".
 	"usr_addr=\"$usr_addr\",       ".
 	"usr_phone=\"$usr_phone\",     ".
-	"usr_expires=\"$usr_expires\"  ".
+	"usr_expires=\"$usr_expires\", ".
+	"usr_title=\"$usr_title\",     ".
+	"usr_affil=\"$usr_affil\"      ".
 	"WHERE uid=\"$uid\"");
 
 if (! $insert_result) {

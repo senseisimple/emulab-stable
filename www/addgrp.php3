@@ -92,14 +92,15 @@ echo "<tr>
          <td><input type=\"text\" name=\"grp_URL\"
                     value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
 
-         <td>*Email<br>Address:</td>
+         <td>*Title/Position:</td>
          <td class=\"left\">
-             <input name=\"email\"";
+             <input name=\"usr_title\"";
 if ($row) {
-    echo "          type=\"readonly\" value=\"$row[usr_email]\">";
+    echo "          type=\"readonly\" value=\"$row[usr_title]\">";
 } else {
-    echo "          type=\"text\">";
+    echo "          type=\"text\" value=\"Professor\">";
 }
+
 echo "     </td>
       </tr>\n";
 
@@ -110,48 +111,74 @@ echo "<tr>
           <td><input type=\"text\" name=\"grp_expires\"
                      value=\"$expiretime\"></td>
 
-          <td>*Postal<br>Address:</td>
-          <td class=\"left\">
+         <td>*Institutional<br>Affiliation:</td>
+         <td class=\"left\">
+             <input name=\"usr_affil\"";
+if ($row) {
+    echo "          type=\"readonly\" value=\"$row[usr_affil]\">";
+} else {
+    echo "          type=\"text\" value=\"UCB Networks Group\">";
+}
+
+echo "     </td>
+      </tr>\n";
+
+echo "<tr>
+         <td></td>
+         <td></td>
+         <td>*Email<br>Address:</td>
+         <td class=\"left\">
+             <input name=\"email\"";
+if ($row) {
+    echo "          type=\"readonly\" value=\"$row[usr_email]\">";
+} else {
+    echo "          type=\"text\">";
+}
+
+echo "    </td>
+      </tr>\n";
+
+#
+# If a new usr, then provide a second password confirmation field.
+# Otherwise, a blank spot.
+#
+echo "<tr>
+         <td>*Password:</td>
+         <td><input type=\"password\" name=\"password1\"></td>
+
+         <td>*Postal<br>Address:</td>
+         <td class=\"left\">
               <input name=\"usr_addr\"";
 if ($row) {
     echo "           type=\"readonly\" value=\"$row[usr_addr]\">";
 } else {
     echo "           type=\"text\">";
 }
-echo "     </td>
+echo "    </td>
       </tr>\n";
 
-echo "<tr>
-         <td>*Your institutional<br>affiliation:</td>
-         <td><input type=\"text\" name=\"grp_affil\"
-                    value=\"UCB Networks Group\"></td>
 
-	 <td>*Phone #:</td>
-         <td class=\"left\">
-             <input name=\"usr_phones\"";
+echo "<tr>";
+if (! $row) {
+    echo "<td>*Retype<br>New Password:</td>
+          <td class=\"left\">
+              <input type=\"password\" name=\"password2\"></td>";
+}
+else {
+    echo "<td></td>
+          <td></td>";
+}
+echo "    <td>*Phone #:</td>
+          <td class=\"left\">
+              <input name=\"usr_phones\"";
 if ($row) {
-    echo "          type=\"readonly\" value=\"$row[usr_phone]\">";
+    echo "           type=\"readonly\" value=\"$row[usr_phone]\">";
 } else {
-    echo "          type=\"text\">";
+    echo "           type=\"text\">";
 }
 echo "    </td>
       </tr>\n";
 
-echo "<tr>
-         <td>*Password:</td>
-         <td><input type=\"password\" name=\"password1\"></td>
-     </tr>\n";
-
-#
-# If a new usr, then provide a second password confirmation field.
-# 
-if (! $row) {
-    echo "<tr>
-              <td>Retype<br>New Password:</td>
-              <td class=\"left\">
-                  <input type=\"password\" name=\"password2\"></td>
-          </tr>\n";
-}
 ?>
 
 <tr>

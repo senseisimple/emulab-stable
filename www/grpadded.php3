@@ -44,9 +44,13 @@ if (!isset($usr_addr) ||
     strcmp($usr_addr, "") == 0) {
   $formerror = "Postal Address";
 }
-if (!isset($grp_affil) ||
-    strcmp($grp_affil, "UCB Networks Group") == 0) {
-  $formerror = "Research Afilliation";
+if (!isset($usr_affil) ||
+    strcmp($usr_affil, "UCB Networks Group") == 0) {
+  $formerror = "Institutional Afilliation";
+}
+if (!isset($usr_title) ||
+    strcmp($usr_title, "Professor") == 0) {
+  $formerror = "Title/Position";
 }
 if (!isset($usr_phones) ||
     strcmp($usr_phones, "") == 0) {
@@ -140,9 +144,10 @@ if (! $returning) {
     $encoding = crypt("$password1");
     $newuser_command = "INSERT INTO users ".
         "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-        "usr_phone,usr_pswd,unix_uid,status) ".
+        "usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
         "VALUES ('$grp_head_uid', now(), '$grp_expires', '$usr_name', ".
-        "'$email', '$usr_addr', '$usr_phones', '$encoding', ".
+        "'$email', '$usr_addr', '$usr_title', '$usr_affil', ".
+        "'$usr_phones', '$encoding', ".
         "'$unix_uid', 'newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
