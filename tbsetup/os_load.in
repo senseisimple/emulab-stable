@@ -14,16 +14,16 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT
-	"Usage: os_load [-s] [[-p <pid>] -i <imagename>] <node> [node ...]\n".
-	"       os_load [-s] [[-p <pid>] -i <imagename>] -e pid,eid\n".
-	"       os_load -l\n".
-	"Use -i to specify an image name. Use node default otherwise.\n".
-	"Use -m to specify an image ID (internal name).\n".
-	"Use -s to start reload, but do not wait for it to complete.\n".
-	"Use -r to supress rebooting nodes - you'll need to to it yourself\n".
-	"Use -e to reload all the nodes in an experiment.\n" .
-        "Use -l to get a list of images you are permitted to load.\n";
+    print("Usage: os_load [-s] [[-p <pid>] -i <imageid>] <node> [node ...]\n".
+	  "       os_load [-s] [[-p <pid>] -i <imageid>] -e pid,eid\n".
+	  "       os_load -l\n".
+	  "Use -i to specify an image ID. Use node default otherwise.\n".
+	  "Use -p to specify the project ID in which to find the imageid.\n".
+	  "Use -m to specify the internal name if an image ID.\n".
+	  "Use -s to start reload, but do not wait for it to complete.\n".
+	  "Use -r to supress rebooting nodes - you'll need to to it yourself\n".
+	  "Use -e to reload all the nodes in an experiment.\n" .
+	  "Use -l to get a list of images you are permitted to load.\n");
     exit(-1);
 }
 my $optlist   = "sldi:e:p:m:r";
@@ -35,6 +35,8 @@ my @nodes     = ();
 my $imagepid;
 my $imagename;
 my $imageid;
+my $pid;
+my $eid;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -47,9 +49,6 @@ use libtestbed;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
-
-# Default to looking for ID in emulab-ops proj.
-$imagepid = TB_OPSPID;	
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -79,6 +78,46 @@ $waitmode = 0
     if (defined($options{"s"}));
 $noreboot = 1
     if (defined($options{"r"}));
+
+#
+# Figure out which nodes. Choice of nodes on command line, or all nodes in an
+# experiment. To get all free nodes, must use sched_reload. 
+# 
+if (defined($options{"e"})) {
+    usage()
+	if (@ARGV);
+    
+    my $pideid = $options{"e"};
+
+    if ($pideid =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+	if (! (@nodes = ExpNodes($pid, $eid))) {
+	    die("*** $0:\n".
+		"    There are no nodes in $pid/$eid!\n");
+	}
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -e option: $pideid\n");
+	usage();
+    }
+}
+else {
+    usage()
+	if (! @ARGV);
+    
+    # Untaint nodes.
+    foreach my $node (@ARGV) {
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Bad node name: $node.\n");
+	}
+	push(@nodes, $node);
+    }
+}
 
 #
 # Image name (user visible name, not the internal ID). User is allowed
@@ -111,10 +150,29 @@ if (defined($options{"i"})) {
 	}
     }
 
-    # Convert external name to internal.
-    if (! ($imageid = TBImageID($imagepid, $imagename))) {
-	die("*** $0:\n".
-	    "    No such image $imagename in project $imagepid!\n");
+    #
+    # If -p option given, use that.
+    # If in experiment mode, then use the pid of the experiment, unless
+    # a -p option was given.
+    # Otherwise look in the system project.
+    #
+    if (defined($imagepid)) {
+	if (! ($imageid = TBImageID($imagepid, $imagename))) {
+	    die("*** $0:\n".
+		"    No such image $imagename in project $imagepid!\n");
+	}
+    }
+    else {
+	if (defined($pid)) {
+	    $imageid = TBImageID($pid, $imagename);
+	}
+	if (! $imageid) {
+	    $imageid = TBImageID(TB_OPSPID(), $imagename);
+	}
+	if (! $imageid) {
+	    die("*** $0:\n".
+		"    No such image $imagename!\n");
+	}
     }
 }
 
@@ -135,45 +193,6 @@ if (defined($options{"m"})) {
     }
 }
 
-#
-# Figure out which nodes. Choice of nodes on command line, or all nodes in an
-# experiment. To get all free nodes, must use sched_reload. 
-# 
-if (defined($options{"e"})) {
-    usage()
-	if (@ARGV);
-    
-    my $pideid = $options{"e"};
-
-    if ($pideid =~ /([-\w]*),([-\w]*)/) {
-	if (! (@nodes = ExpNodes($1, $2))) {
-	    die("*** $0:\n".
-		"    There are no nodes in $1/$2!\n");
-	}
-	$imagepid = $1;
-    }
-    else {
-	die("*** $0:\n".
-	    "    Invalid argument to -e option: $pideid\n");
-	usage();
-    }
-}
-else {
-    usage()
-	if (! @ARGV);
-    
-    # Untaint nodes.
-    foreach my $node (@ARGV) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-	}
-	else {
-	    die("*** Bad node name: $node.\n");
-	}
-	push(@nodes, $node);
-    }
-}
-
 # VIRTNODE HACK: Virtual nodes are special. Do not reload! 
 my @temp = ();
 foreach my $node ( @nodes ) {
@@ -188,6 +207,11 @@ if (! @nodes) {
     print "*** reload: No nodes to load. Exiting.\n";
     exit(0);
 }
+
+print "@nodes\n";
+print "$imageid\n"
+    if (defined($imageid));
+exit(0);
 
 #
 # Okay, call into the library using a hash of arguments. Pass a reference
