@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.7 2001-08-16 16:33:27 stoller Exp $";
+	"$Id: hunt.c,v 1.8 2001-08-16 23:49:40 stoller Exp $";
 #endif /* not lint */
 
 #ifdef USESOCKETS
@@ -46,7 +46,6 @@ static const char rcsid[] =
 #include <netdb.h>
 #include "capdecls.h"
 
-int	socket_hunt(char *devname);
 int	socket_open(char *devname);
 #endif
 
@@ -79,12 +78,6 @@ hunt(name)
 	sig_t f;
 	int res;
 
-#ifdef  USESOCKETS
-	if ((res = socket_hunt(name)) >= 0) {
-		return 1;
-	}
-#endif
-	
 	f = signal(SIGALRM, dead);
 	while ((cp = getremote(name))) {
 		deadfl = 0;
@@ -107,6 +100,14 @@ hunt(name)
 			break;
 		if (setjmp(deadline) == 0) {
 			alarm(10);
+#ifdef USESOCKETS
+			if ((FD = socket_open(name)) >= 0) {
+				alarm(0);
+				HW = 0;
+				goto done;
+			}
+			else
+#endif
 			if ((FD = open(cp, O_RDWR)) >= 0)
 				ioctl(FD, TIOCEXCL, 0);
 		}
@@ -135,51 +136,12 @@ hunt(name)
 		(void)uu_unlock(uucplock);
 #endif
 	}
+ done:
 	signal(SIGALRM, f);
 	return (deadfl ? -1 : (int)cp);
 }
 
 #ifdef USESOCKETS
-int
-socket_hunt(name)
-	char *name;
-{
-	register char *cp;
-	sig_t f;
-	int res;
-	
-	/*
-	 * There needs to be a "generic" entry in the remote file
-	 * to keep the rest of tip happy. This could go away if
-	 * we drop/rewrite tip.
-	 */
-	if (! (cp = getremote("generic"))) {
-		fprintf(stderr, "No generic entry in remote file!\n");
-		return -1;
-	}
-
-	/*
-	 * Force HW to zero since that makes no sense in socket based tip.
-	 */
-	HW = 0;
-
-	f = signal(SIGALRM, dead);
-	deadfl = 0;
-	
-	if (setjmp(deadline) == 0) {
-		alarm(10);
-		FD = socket_open(name);
-	}
-	alarm(0);
-	if (FD < 0) {
-		deadfl = 1;
-	}
-	if (deadfl)
-		getremote_reset();
-	signal(SIGALRM, f);
-	return (deadfl ? -1 : 0);
-}
-
 /*
  *
  */

@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)remote.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: remote.c,v 1.3 2001-08-16 16:33:27 stoller Exp $";
+	"$Id: remote.c,v 1.4 2001-08-16 23:49:40 stoller Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -289,13 +289,4 @@ getremote(host)
 		next = cp;
 	}
 	return (DV);
-}
-
-void
-getremote_reset()
-{
-	lookedup = 0;
-	DV = 0;
-	BR = 0;
-	HW = 0;
 }
