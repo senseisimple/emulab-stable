@@ -379,28 +379,48 @@ while ($row = mysql_fetch_array($query_result)) {
 
 <table>
 <tr>
-    <th>0 -&gt;</th>
+    <th>FreeBSD interface number</th>
+    <th>Linux interface number</th>
+</tr>
+<tr>
+    <td>0</td>
     <td><input type="text" size=2 name="remap[0]"></td>
 </tr>
 <tr>
-    <th>1 -&gt;</th>
+    <td>1</td>
     <td><input type="text" size=2 name="remap[1]"></td>
 </tr>
 <tr>
-    <th>2 -&gt;</th>
+    <td>2</td>
     <td><input type="text" size=2 name="remap[2]"></td>
 </tr>
 <tr>
-    <th>3 -&gt;</th>
+    <td>3</td>
     <td><input type="text" size=2 name="remap[3]"></td>
 </tr>
 <tr>
-    <th>4 -&gt;</th>
+    <td>4</td>
     <td><input type="text" size=2 name="remap[4]"></td>
 </tr>
-</table>
+<tr>
+    <td>5</td>
+    <td><input type="text" size=2 name="remap[5]"></td>
+</tr>
+<tr>
+    <td>6</td>
+    <td><input type="text" size=2 name="remap[6]"></td>
+</tr>
+<tr>
+    <td>7</td>
+    <td><input type="text" size=2 name="remap[6]"></td>
+</tr>
+<tr>
+    <td colspan=2 align="center">
     <input type="submit" value="Re-number interfaces of selected nodes"
 	name="renumber">
+    </td>
+</tr>
+</table>
 
 <br><br>
 
