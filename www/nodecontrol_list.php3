@@ -94,21 +94,42 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 #
-# First count up free nodes.
+# First count up free nodes as well as status counts.
 #
-$free = 0;
+$num_free = 0;
+$num_up   = 0;
+$num_pd   = 0;
+$num_down = 0;
+$num_unk  = 0;
+
 while ($row = mysql_fetch_array($query_result)) {
     $pid                = $row[pid];
     $status             = $row[status];
 
-    if (!$pid && $status == "up") {
-	$free++;
+    switch ($status) {
+    case "up":
+	$num_up++;
+	if (!$pid) {
+	    $num_free++;
+	}
+	break;
+    case "possibly down":
+    case "unpingable":
+	$num_pd++;
+	break;
+    case "down":
+	$num_down++;
+	break;
+    default:
+	$num_unk++;
+	break;
     }
 }
+$num_total = ($num_up + $num_down + $num_pd + $num_unk);
 mysql_data_seek($query_result, 0);
 
 echo "<center><b>
-       View: $view<br>($free Free)\n";
+       View: $view\n";
 
 if (! strcmp($showtype, "widearea")) {
     echo "<br>
@@ -117,8 +138,32 @@ if (! strcmp($showtype, "widearea")) {
 
 echo "</b></center><br>\n";
 
-echo "<table border=2 cellpadding=2 cellspacing=2
-       align='center'>\n";
+SUBPAGESTART();
+
+echo "<table>
+       <tr><td align=right><b><font color=green>Up</font></b></td>
+           <td align=left>$num_up</td>
+       </tr>
+       <tr><td align=right nowrap><b>Possibly <font color=yellow>Down
+                                             </font></b></td>
+           <td align=left>$num_pd</td>
+       </tr>
+       <tr><td align=right><b><font color=blue>Unknown</font></b></td>
+           <td align=left>$num_unk</td>
+       </tr>
+       <tr><td align=right><b><font color=red>Down</font></b></td>
+           <td align=left>$num_down</td>
+       </tr>
+       <tr><td align=right><b>Total</b></td>
+           <td align=left>$num_total</td>
+       </tr>
+       <tr><td align=right><b>Free</b></td>
+           <td align=left>$num_free</td>
+       </tr>
+      </table>\n";
+SUBMENUEND_2B();
+
+echo "<table border=2 cellpadding=2 cellspacing=2>\n";
 
 echo "<tr>
           <th align=center>ID</th>\n";
@@ -214,6 +259,7 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 echo "</table>\n";
+SUBPAGEEND();
 
 #
 # Standard Testbed Footer
