@@ -86,6 +86,11 @@ my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
 my $TBCONTROL    = TBDB_TBEVENT_TBCONTROL;
 my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
 
+# Set up some notification throttling
+my $mailgap = 15; # in seconds
+my $lastmail = time() - $mailgap + 2; # Send a digest of startup msgs after 2s.
+my %msgs = ();
+
 my $pidfile;
 $pidfile = "$TB/locks/stated.pid";
 debug("Using pidfile $pidfile\n");
@@ -165,11 +170,6 @@ $SIG{QUIT} = \&cleanup;
 $SIG{ABRT} = \&cleanup;
 $SIG{TERM} = \&cleanup;
 $SIG{KILL} = \&cleanup;
-
-# Set up some notification throttling
-my $mailgap = 15; # in seconds
-my $lastmail = time - $mailgap + 2; # Send a digest of startup msgs after 2s.
-my %msgs = ();
 
 # Track if I handled an event or not
 my $event_count = 0;
