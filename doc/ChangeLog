@@ -32,4 +32,60 @@ stoller     2003/03/29 10:23:30 MST
   joinproject, whereby we send along the target pid/gid, but the user
   has not yet logged in and remembers to do so via the link at the top
   of the page.
+
+	
+newbold     2003/04/02 15:24:48 MST
+
+  Modified files:
+    .                    configure configure.in defs-barb-emulab 
+                         defs-barb-mini defs-calfeld-emulab 
+                         defs-default defs-example 
+                         defs-kwebb-emulab defs-mini 
+                         defs-newbold-emulab defs-newbold-macdb 
+                         defs-newbold-mini defs-rchriste-emulab 
+                         defs-ricci-emulab defs-ricci-mini 
+                         defs-shash-emulab defs-shash-mini 
+                         defs-stoller-emulab defs-stoller-home 
+                         defs-stoller-mini defs-wide 
+    www                  defs.php3.in 
+  Removed files:
+    www                  barb-emulab-defs.php3 barb-mini-defs.php3 
+                         default-defs.php3 example-defs.php3 
+                         kwebb-emulab-defs.php3 mini-defs.php3 
+                         newbold-emulab-defs.php3 
+                         newbold-mini-defs.php3 
+                         ricci-emulab-defs.php3 
+                         ricci-mini-defs.php3 
+                         shash-emulab-defs.php3 
+                         shash-mini-defs.php3 
+                         stoller-emulab-defs.php3 
+                         stoller-home-defs.php3 
+                         stoller-mini-defs.php3 wide-defs.php3 
+  Log:
+  Massive reworking of our structure for defs files.
   
+  Before:
+  The main defs file (ie for configure) had an entry for WWWDEFS that
+  pointed to a <@WWWDEFS@>-defs.php3 file in the www/ directory. The www
+  defs file loaded some values about web pages, URLs, and some web
+  configuration parameters.
+  
+  Problem:
+  Anything that was only in the www defs file was not accessible in the rest
+  of the universe (ie perl, C, and any other non-web-page scripts). For
+  instance, you couldn't have a perl script send an email to a user with a
+  link to the web site.
+  
+  Solution:
+  Nuke all the www-defs files, move any important values into the main
+  configure, and change the web defs infrastructure to respect that. This
+  also meant adding about 3 lines each to all of the configure defs files.
+  (There really are about 10 new values you can change in your defs file,
+  but in almost all cases, the default values are the right thing.)
+  
+  Upgrading:
+  External sites will need to move a few variables from their www-defs file
+  into their configure defs file. The example file should make it pretty
+  obvious. They may also want to customize some of the other vars that are
+  mentioned in configure.in and www/defs.php3.in .
+
