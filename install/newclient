@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,9 +10,18 @@
 # Client-side script to report a new node into a testbed
 #
 #
-my $prefix = "/etc/testbed";
+my $prefix;
+my $tmcc;
 
-my $tmcc = "$prefix/tmcc";
+if (-e "/usr/local/etc/emulab") {
+    $prefix = "/usr/local/etc/emulab";
+    $tmcc = "$prefix/tmcc.bin";
+}
+else {
+    $prefix = "/etc/emulab";
+    $tmcc = "$prefix/tmcc";
+}
+
 my $cpuspeed = "$prefix/cpuspeed.awk";
 my $fetch = "/usr/bin/fetch";
 
@@ -20,7 +29,7 @@ my $formURL = "newnodecheckin.php";
 
 my $ifconfig = "/sbin/ifconfig";
 my $dmesg = "/var/run/dmesg.boot";
-my $teachswitch = "/etc/testbed/teachswitch";
+my $teachswitch = "$prefix/teachswitch";
 
 #
 # Find out what our boss node was, so we don't have to hardcode it here
