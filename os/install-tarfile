@@ -12,6 +12,9 @@ use POSIX 'setsid';
 
 #
 # Install a tarfile. This script is run from the setup code on client nodes.
+# By default the tarfile is accessed directly via NFS, if '-c' is specified
+# the tar file is copied over first either via NFS (the default) or tmcc
+# (-t option).
 #
 # Exit Value Matters!: 0 if installed okay
 #                      1 if already installed
@@ -22,10 +25,10 @@ use POSIX 'setsid';
 #
 sub usage()
 {
-    print STDOUT "Usage: install-tarfile [-j] <installdir> <filename>\n";
+    print STDOUT "Usage: install-tarfile [-ct] <installdir> <filename>\n";
     exit(-1);
 }
-my $optlist  = "j";
+my $optlist  = "ct";
 
 #
 # Turn off line buffering on output
@@ -45,11 +48,12 @@ my $IDENTFILE      = "/var/db/testbed.tarfiles";
 my $tarfile        = "";
 my $decompressflag = "";
 my $installdir     = "/";
-my $jailmode	   = 0;
-my $jailfile       = "";
+my $usetmcc	   = 0;
+my $copymode	   = 0;
+my $copyfile       = "";
 
 # Protos
-sub GetTarFile($$);
+sub GetTarFile($$$);
 
 #
 # Must be running as root to work. 
@@ -66,8 +70,17 @@ if ($EUID != 0) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"c"})) {
+    $copymode = 1;
+}
+if (defined($options{"t"})) {
+    $usetmcc = 1;
+    $copymode = 1;
+}
+# XXX compat
 if (defined($options{"j"})) {
-    $jailmode = 1;
+    $usetmcc = 1;
+    $copymode = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -111,10 +124,10 @@ if (-e $IDENTFILE) {
 }
 
 #
-# Must be able to see the tarfile if not in jail mode. The front end
+# Must be able to see the tarfile if not copying. The front end
 # ensures that its in a reasonable place, but have to make sure here.
 #
-if (! $jailmode) {
+if (! $copymode) {
     #
     # Make sure its really there.
     #
@@ -123,15 +136,15 @@ if (! $jailmode) {
     }
 }
 else {
-    $jailfile = `mktemp /var/tmp/tarball.XXXXXX`;
+    $copyfile = `mktemp /var/tmp/tarball.XXXXXX`;
 
-    if ($jailfile =~ /^([-\@\w\.\/]+)$/) {
-	$jailfile = $1;
+    if ($copyfile =~ /^([-\@\w\.\/]+)$/) {
+	$copyfile = $1;
     }
     else {
-	die("Bad data in jailfile name: $jailfile");
+	die("Bad data in copyfile name: $copyfile");
     }
-    GetTarFile($tarfile, $jailfile);
+    GetTarFile($tarfile, $copyfile, $usetmcc);
     #
     # Dies on any failure!
     #
@@ -140,8 +153,12 @@ else {
 #
 # Add to index first; if fails too bad.
 # 
-system("echo \"$tarfile\" >> $IDENTFILE") == 0 or
+if (system("echo \"$tarfile\" >> $IDENTFILE")) {
+    if ($copymode) {
+	unlink($copyfile);
+    }
     fatal("Could not update $IDENTFILE");
+}
 
 #
 # Figure what decompression flag is required, based on file extension.
@@ -157,17 +174,23 @@ SWITCH: for ($tarfile) {
 # Install tar file from root?
 # 
 if (! chdir($installdir)) {
+    if ($copymode) {
+	unlink($copyfile);
+    }
     fatal("Could not chdir to $installdir: $!\n");
 }
 
 #
 # Run the tarfile. 
 #
-if ($jailmode) {
-    $tarfile = $jailfile;
+if ($copymode) {
+    $tarfile = $copyfile;
 }
 system("tar $decompressflag -xf $tarfile");
 $exit_status = $? >> 8;
+if ($copymode) {
+    unlink($copyfile);
+}
 
 exit($exit_status);
 
@@ -181,28 +204,38 @@ sub fatal {
 #
 # Get a tarfile from the server via tmcc and stash.
 #
-sub GetTarFile($$)
+sub GetTarFile($$$)
 {
-    my ($tarfile, $jailfile) = @_;
+    my ($tarfile, $copyfile, $usetmcc) = @_;
     my $buf;
+    my $bytelen;
 
     #
-    # Protocol is a little odd. First word is the number of bytes
-    # (yes, limited to 31 bits of length!), then the data. If we do
-    # not get that much data, we fail. What about timeout option?
-    # Could take a while to get the entire file, but instead of a
-    # timeout let Emulab decide when its too long.
+    # If copying via NFS, open the file.  Otherwise pipe from tmcc.
     #
-    open(TMCC, "tmcc -t 300 tarball $tarfile |")
-	or fatal("Could not download tarfile from server!");
+    if (! $usetmcc) {
+	open(TMCC, "< $tarfile")
+	    or fatal("Could not open tarfile on server!");
+	$bytelen = (stat($tarfile))[7];
+    } else {
+	#
+	# Protocol is a little odd. First word is the number of bytes
+	# (yes, limited to 31 bits of length!), then the data. If we do
+	# not get that much data, we fail. What about timeout option?
+	# Could take a while to get the entire file, but instead of a
+	# timeout let Emulab decide when its too long.
+	#
+	open(TMCC, "tmcc -t 300 tarball $tarfile |")
+	    or fatal("Could not download tarfile from server!");
 
-    # Hokey C struct stuff
-    my $firstword = pack("i", 0);
+	# Hokey C struct stuff
+	my $firstword = pack("i", 0);
     
-    if (! sysread(TMCC, $firstword, length($firstword))) {
-	fatal("Could not read length of tarfile from server!");
+	if (! sysread(TMCC, $firstword, length($firstword))) {
+	    fatal("Could not read length of tarfile from server!");
+	}
+	$bytelen = unpack("i", $firstword);
     }
-    my $bytelen = unpack("i", $firstword);
     if ($bytelen == 0) {
 	fatal("Zero length of tarfile from server!");
     }
@@ -210,24 +243,48 @@ sub GetTarFile($$)
     #
     # Open the target file and start dumping the data in.
     #
-    open(JFILE, "> $jailfile")
-	or fatal("Could not open local file $jailfile: $!");
+    open(JFILE, "> $copyfile")
+	or fatal("Could not open local file $copyfile: $!");
+
+    #
+    # Deal with NFS read failures
+    #
+    my $foffset = 0;
+    my $retries = 5;
 
     while ($bytelen) {
 	my $rlen = sysread(TMCC, $buf, 8192);
 
 	if (! defined($rlen)) {
+	    #
+	    # If we are copying the file via NFS, retry a few times
+	    # on error to avoid the changing-exports-file server problem.
+	    #
+	    if (! $usetmcc) {
+		if ($retries > 0 && sysseek(TMCC, $foffset, 0)) {
+		    warn("*** WARNING retrying read of $tarfile ".
+			 "at offset $foffset\n");
+		    $retries--;
+		    sleep(2);
+		    next;
+		}
+	    }
+	    unlink($copyfile);
 	    fatal("Error reading tarball $tarfile: $!");
 	}
         if ($rlen == 0) {
 	    last;
 	}
 	if (! syswrite(JFILE, $buf)) {
-	    fatal("Error writing tarfile $jailfile: $!");
+	    unlink($copyfile);
+	    fatal("Error writing tarfile $copyfile: $!");
 	}
+	$foffset += $rlen;
 	$bytelen -= $rlen;
+	$retries = 5;
     }
     if ($bytelen) {
+	unlink($copyfile);
 	fatal("Did not get the entire tarball! $bytelen bytes left.");
     }
     close(JFILE);
