@@ -716,12 +716,23 @@ if (isset($syntax)) {
     echo "<h2>Syntax Check Results</h2>\n";
     echo "</center>\n";
 
-    if ($retval) {
+    if ($retval < 0) {
 	SUEXECERROR(SUEXEC_ACTION_DIE);
         #
         # Never returns ...
         #
         die("");
+    }
+
+    # Parse Error.	 
+    if ($retval) {
+	echo "<br><br><h2>
+              Parse Failure($retval): Output as follows:
+              </h2>
+              <br>
+              <XMP>$suexec_output</XMP>\n";
+	PAGEFOOTER();
+	die("");
     }
 
     echo "<center><br>";
