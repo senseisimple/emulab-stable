@@ -760,7 +760,6 @@ TBDebugTimeStamp("top finished");
 #
 # v2pmap is indexed by virtual and contains the physical node.
 # p2vmap is indexed by physical and contains one or more virtual nodes
-# p2pmap is indexed by physical and contains the physical node.
 # plinks is indexed by virtual name and contains 
 #  (pnodeportA,pnodeportB) .  If one is a delay node it is always
 #  the second.
@@ -982,7 +981,6 @@ TBDebugTimeStamp("assign_loop finished");
 # be a virtual node :-) Must record the underlying phys_nodeid and an
 # indicator for jail.
 #
-my %p2pmap = ();
 my %jailed = ();
 
 # Now allocate the remote nodes. 
@@ -1026,19 +1024,9 @@ if (scalar(keys(%isremotenode))) {
 	foreach my $virtual (keys(%v2vmap)) {
 	    my $physical = $v2vmap{$virtual};
 	    my $jailflag;
-	    my $phys_nodeid;
 
 	    TBIsNodeVirtual($physical, \$jailflag);
-	    TBPhysNodeID($physical, \$phys_nodeid);
-	    
-	    $v2pmap{$virtual} = $phys_nodeid;
-	    if ( !defined($p2vmap{$phys_nodeid})) {
-		$p2vmap{$phys_nodeid} = [];
-	    }
-	    push(@{$p2vmap{$phys_nodeid}}, $virtual);
-
 	    $jailed{$virtual}  = $jailflag;
-	    $p2pmap{$physical} = $phys_nodeid;	    
 	}
 	TBDebugTimeStamp("wanassign finished");
     }
@@ -1103,7 +1091,6 @@ foreach my $pnode (keys(%virtnodes)) {
 	TBIsNodeVirtual($physical, \$jailflag);
 	
 	$jailed{$virtual}  = $jailflag;
-	$p2pmap{$physical} = $pnode;
     }
 }
 
@@ -1924,11 +1911,30 @@ foreach $lan (keys(%rnodelans)) {
     
     foreach $member (@members) {
 	my ($vnode,$vport) = split(":",$member);
-	my $vvnode    = $v2vmap{$vnode};
 	my $isserver  = ($server eq $vnode ? 1 : 0);
 	my $peervnode = ($vnode eq $node0 ? $node1 : $node0);
-	my $peervvnode= $v2vmap{$peervnode};
+	my $vvnode;
+	my $peervvnode;
 	my $ip;
+
+	#
+	# Note, if either side of the tunnel is on the local side, it
+	# is connected to the physical node (pcxxx), even if its talking
+	# to a local virtual node (say, a jail). Obviously, both sides
+	# cannot be local. 
+	#
+	if ($isremotenode{$vnode}) {
+	    $vvnode= $v2vmap{$vnode};
+	}
+	else {
+	    $vvnode= $v2pmap{$vnode};
+	}
+	if ($isremotenode{$peervnode}) {
+	    $peervvnode= $v2vmap{$peervnode};
+	}
+	else {
+	    $peervvnode= $v2pmap{$peervnode};
+	}
 
 	#
 	# Need to map the server to the control net interface of the
