@@ -69,7 +69,7 @@ if ($UID) {
 # do expansion of shark shelves
 ######################################################################
 
-DBQueryFatal("lock tables nodes read, reserved write");
+DBQueryFatal("lock tables nodes read, reserved write, node_activity write");
 
 foreach my $n (@node_names) {
     # Shark hack
@@ -126,9 +126,17 @@ if ($debug) { print "List Ready: @vals\nError=$error\n"; }
 
 if (!$error && @vals) {
     if ($debug) {
+	print "Resetting node activity...\n";
+    }
+    my $cmd = "update node_activity set last_ext_act = now() where ".
+      join(" or ",map("node_id='$_'",@nodes));
+    DBQueryWarn($cmd);
+    # It isn't an error if this fails...
+
+    if ($debug) {
 	print "Reserving nodes...\n";
     }
-    my $cmd = "insert into reserved (node_id,pid,eid,vname) values ".
+    $cmd = "insert into reserved (node_id,pid,eid,vname) values ".
       join(",",@vals);
     if (!DBQueryWarn($cmd)) {
 	$error++;
