@@ -82,6 +82,8 @@
      <li> <a href="#SWS-6">How does my software determine when other
                            nodes in my experiment are ready?</a>
      <li> <a href="#SWS-7">Can I run my own Operating System?</a>
+     <li> <a href="#MovingImage">Can I share a disk image between two
+                           projects?</a>
      <li> <a href="#SWS-8">What if I need more disk space on my nodes?</a>
      <li> <a href="#SWS-9">Are there testbed-specific daemons that could
                            interfere with my experiment?</a>
@@ -1072,6 +1074,26 @@
     autoloaded when the experiment is swapped in. We strongly
     encourage people to use this approach whenever possible! There is
     more information available in the <a
+    href="tutorial/tutorial.php3#CustomOS">Custom OS</a> section of
+    the <a href = "tutorial/tutorial.php3">Emulab Tutorial.</a>
+    </p>
+
+<li><a NAME="MovingImage"></a>
+    <font size='+1'><b>
+    Can I share a disk image between two projects?
+    </b></font>
+    <p>
+    No. At this time you cannot share OS images between projects. We
+    are thinking of adding project collaboration support, but that is
+    a future project.
+    </p>
+    <p>
+    In the meantime, you will need to create an
+    <a href="https://www.emulab.net/newimageid_ez.php3">image
+    descriptor</a> in the project that wants to use your image. Fill out
+    the form, but leave out the "Node to Obtain Snapshot from". Then
+    just copy the image over to the default path it picked for you in
+    the form. There is more information available in the <a
     href="tutorial/tutorial.php3#CustomOS">Custom OS</a> section of
     the <a href = "tutorial/tutorial.php3">Emulab Tutorial.</a>
     </p>
