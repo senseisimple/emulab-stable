@@ -256,12 +256,15 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 	    error("Could not map object to an agent: %s\n", objname);
 	    goto bad;
     }
+    
     event_notification_clear_host(handle, event.notification);
     event_notification_set_host(handle,
 				event.notification, agents[x].ipaddr);
     event_notification_clear_objtype(handle, event.notification);
     event_notification_set_objtype(handle,
 				   event.notification, agents[x].objtype);
+
+    event.simevent = !strcmp(agents[x].objtype, TBDB_OBJECTTYPE_SIMULATOR);
 
     if (debug > 1) {
 	    struct timeval now;
@@ -598,7 +601,7 @@ handle_simevent(event_handle_t handle, sched_event_t *eventp)
 		return 0;
 	}
 	/*
-	 * Run the command. Redirect the output so we can see it.
+	 * Run the command. Output goes ...
 	 */
 	if (!strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT)) {
 	    sprintf(cmd, "swapexp -s out %s %s", pid, eid);
