@@ -71,16 +71,38 @@ if (($state ne EXPTSTATE_SWAPPED) && ($state ne EXPTSTATE_ACTIVE) &&
     exit(0);
 }
 
+# Read nodemap if applicable
+if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
+    my $result = DBQueryFatal("SELECT vname,node_id from reserved" .
+			      " where pid=\"$pid\" and eid=\"$eid\"");
+    while (($v,$p) = $result->fetchrow_array()) {
+	if (!$v) {
+	    $v = "";
+	}
+	$v2pmap{$v} = $p;
+    }
+    $result->finish;
+}
+
 # Virtual
 # Display node info
 my $result = DBQueryFatal("SELECT vname,ips,osid,cmd_line,rpms,deltas," .
-	"startupcmd,tarfiles,type from virt_nodes where pid=\"$pid\"" .
-		   " and eid=\"$eid\"");
+			  "startupcmd,tarfiles,type from virt_nodes where pid=\"$pid\"" .
+			  " and eid=\"$eid\"");
 print "Node Info:\n";
 printf "%-15s %-10s %-15s\n", "ID", "Type", "OSID";
 print "--------------- ---------- ---------------\n";
 while (($vname,$ips,$osid,$cmd_line,$rpms,$deltas,$startupcmd,$tarfiles,$type) 
        = $result->fetchrow_array()) {
+    if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
+	$p = $v2pmap{$vname};
+	if ($p ne "") {
+	    $subresult = DBQueryFatal("SELECT def_boot_osid,type from nodes" .
+				      " where node_id = \"$p\"");
+	    ($osid,$type) = $subresult->fetchrow_array();
+	    $subresult->finish();
+	}
+    }
     printf "%-15s %-10s %-15s\n", $vname, $type, $osid;
     if ($verbose) {
 	if ($cmd_line ne "") {
@@ -130,16 +152,11 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     print "Node Mapping:\n";
     printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
     print "--------------- --------------- --------------------\n";
-    my $result = DBQueryFatal("SELECT vname,node_id from reserved" .
-			 " where pid=\"$pid\" and eid=\"$eid\"");
-    while (($v,$p) = $result->fetchrow_array()) {
-	# If they have no virtual name, we use the physical one
-	if (!$v) {
-	    $v = $p;
-	}
+    foreach $v (keys(%v2pmap)) {
+	$p = $v2pmap{$v};
+	if ($p eq "") {$p = $v;}
 	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.emulab.net";
     }
-    $result->finish();
     print "\n";
 
     $result = DBQueryFatal("SELECT vnode,vport,pport from portmap" .
