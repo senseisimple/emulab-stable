@@ -27,11 +27,19 @@ my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 
-my $TYPE     = "pc600"; # XXX: Temporary hack! needs to change for ISPs
-my $reloader = "$TB/sbin/sched_reload";
-my $reboot   = "$TB/bin/node_reboot";
-my $logfile  = "$TB/log/reloadlog";
-my $debug    = 0;
+#
+# This stuff should not be hardwired in.
+# 
+my $CLASS	= "pc";	 # XXX: Needs a better approach.
+my $RELOADPID	= "emulab-ops";
+my $RELOADEID	= "reloading";
+my $PENDINGEID	= "reloadpending";
+
+my $os_load	= "$TB/bin/os_load";
+my $sched_reload= "$TB/sbin/sched_reload";
+my $reboot	= "$TB/bin/node_reboot";
+my $logfile	= "$TB/log/reloadlog";
+my $debug	= 0;
 
 #
 # Turn off line buffering on output (dots ...).
@@ -46,6 +54,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Testbed Support library
 use lib "@prefix@/lib";
+use libdb;
 use libtestbed;
 
 #
@@ -69,16 +78,16 @@ if (! $debug) {
 }
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
 # Loop, looking for nodes to reload.
 # 
 while (1) {
-    my($count, $which, @row, $imageid, $node, $retry, $stamp);
+    my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
+    my($pid, $eid, $type);
+
+    #
+    # Partial delay between loops in case of an error.
+    # 
+    sleep(10);
     
     #
     # Find all of the free node that have not been reloaded (no pid entry
@@ -86,20 +95,21 @@ while (1) {
     # the system).
     #
     $query_result =
-	DBquery("select a.node_id from nodes as a ".
-		"left join reserved as b on a.node_id=b.node_id ".
-		"left join last_reservation as l on l.node_id=a.node_id ".
-		"where b.node_id is null and a.type='$TYPE' and l.pid!='' ".
-		"order by a.node_id");
+	DBQueryWarn("select a.node_id,b.pid,b.eid,n.type from nodes as a ".
+		    "left join reserved as b on a.node_id=b.node_id ".
+		    "left join last_reservation as l on l.node_id=a.node_id ".
+		    "left join node_types as n on n.type=a.type where ".
+		    "(b.node_id is null and n.class='$CLASS' and l.pid!='') ".
+		    "or (b.pid='$RELOADPID' and b.eid='$PENDINGEID') ".
+		    "order by a.node_id");
+
     if (! $query_result) {
 	print "DB Error getting free nodes. Waiting a bit.\n";
-	sleep(10);
 	next;
     }
     $count = $query_result->numrows;
 
     if (! $count) {
-	sleep(10);
 	next;
     }
 
@@ -109,40 +119,82 @@ while (1) {
     #
     $which = int(rand($count));
     $query_result->dataseek($which);
-    @row  = $query_result->fetchrow_array();
-    $node = $row[0];
+    %hrow  = $query_result->fetchhash();
+    $node  = $hrow{'node_id'};
+    $pid   = $hrow{'pid'};
+    $eid   = $hrow{'eid'};
+    $type  = $hrow{'type'};
 
-    #
-    # Query for the default imageid. I do this each time through the loop
-    # in case it gets changed in the DB.
-    #
-    $query_result =
-	DBquery("select imageid from node_types where type='$TYPE'");
-    
-    if (! $query_result) {
-	print "DB Error getting node type. Waiting a bit.\n";
-	sleep(10);
-	next;
-    }
-    @row     = $query_result->fetchrow_array();
-    $imageid = $row[0];
-
-    
     print "Trying to reload $node ... \n";
+
+    #
+    # What we do depends on whether its a free node or a node reserved
+    # into the reload pending experiment.
+    #
+    if ((defined($pid) && $pid eq $RELOADPID) &&
+	(defined($eid) && $eid eq $PENDINGEID)) {
+	#
+	# Query for the imageid from the reloads table. Note that there
+	# has to be one since the only way this node got into the pending
+	# EID was when nfree noticed an entry in the table.
+	#
+	$query_result =
+	    DBQueryWarn("select image_id from reloads where node_id='$node'");
     
-    #
-    # Call sched_reload with the "force" option, which says that if
-    # sched_reload cannot reserve the node (cause someone just got it)
-    # then don't schedule a reload for later. Just fail outright.
-    # We will try again in a bit.
-    #
-    if (system("$reloader -f $imageid $node")) {
+	if (! $query_result) {
+	    print "DB Error getting imageid from reloads. Waiting a bit.\n";
+	    next;
+	}
+	@row     = $query_result->fetchrow_array();
+	$imageid = $row[0];
+	
 	#
-	# Could not get it. Wait and go around again.
+	# The node is reserved into the special pid/eid, as the result
+	# of a sched_reload while it was still allocated to an experiment.
+	# We change the reservation EID over and fire up an os_load
+	# directly.
 	#
-	print "Could not start a reload on $node. Waiting a bit.\n";
-	sleep(10);
-	next;
+	if (! DBQueryWarn("update reserved set eid='$RELOADEID' where ".
+			  "node_id='$node'")) {
+	    print "Could not update EID for $node. Waiting a bit.\n";
+	    next;
+	}
+	if (system("$os_load $imageid $node")) {
+	    #
+	    # Could not get it. Wait and go around again.
+	    #
+	    print "$os_load failed on $node. Waiting a bit.\n";
+	    next;
+	}
+    }
+    else {
+	#
+	# Query for the default imageid. I do this each time through the loop
+	# in case it gets changed in the DB.
+	#
+	$query_result =
+	    DBQueryWarn("select imageid from node_types where type='$type'");
+    
+	if (! $query_result) {
+	    print "DB Error getting default image for $type. Waiting a bit.\n";
+	    next;
+	}
+	@row     = $query_result->fetchrow_array();
+	$imageid = $row[0];
+	
+	#
+	# Call sched_reload with the "force" option, which says that if
+	# sched_reload cannot reserve the node (cause someone just got it)
+	# then don't schedule a reload for later. Just fail outright.
+	# We will try again in a bit.
+	#
+	if (system("$sched_reload -f $imageid $node")) {
+	    #
+	    # Could not get it. Wait and go around again.
+	    #
+	    print "$sched_reload failed on $node. Waiting a bit.\n";
+	    next;
+	}
     }
     $stamp = `date '+20%y-%m-%d %H:%M:%S'`;
     chop($stamp);
@@ -155,12 +207,11 @@ while (1) {
     $retry = 0;
   again:
     $count = 0;
-    while ($count < 200) {
+    while ($count < 130) {
 	$query_result =
-	    DBquery("select pid,eid from reserved where node_id='$node'");
+	    DBQueryWarn("select pid,eid from reserved where node_id='$node'");
 	if (! $query_result) {
 	    print "DB Error getting reservation for $node. Waiting a bit\n";
-	    sleep(10);
 	    next;
 	}
 	$stamp = `date '+20%y-%m-%d %H:%M:%S'`;
@@ -176,18 +227,19 @@ while (1) {
 	# when it reboots, and then reallocated to another experiment,
 	# before we get back here to check.
 	#
-	# XXX "testbed/reloading" wired in. 
-	#
 	@row  = $query_result->fetchrow_array();
-	if ($row[0] ne "testbed" || $row[1] ne "reloading") {
+	if ($row[0] ne "$RELOADPID" || $row[1] ne "$RELOADEID") {
 	    print "\nReload of $node has finished at $stamp.\n";
 	    last;
 	}
 	print ".";
+	if (($count % 70) == 0) {
+	    print "\n";
+	}
 	$count++;
 	sleep(5);
     }
-    if ($count == 200) {
+    if ($count == 130) {
 	if ($retry) {
 	    fatal("$node appears to have wedged. Stopping reload daemon.");
 	}
@@ -198,21 +250,7 @@ while (1) {
 	$retry = 1;
 	goto again;
     }
-    sleep(30);
-}
-
-sub DBquery($)
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB->query($query);
-
-    if (! $result) {
-	print "DB Query failed: $query\n";
-    }
-
-    return $result;
+    sleep(20);
 }
 
 sub fatal {

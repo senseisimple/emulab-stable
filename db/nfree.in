@@ -18,9 +18,8 @@ if ($#ARGV < 1) {
 my $error = 0;
 my $consetup="$TB/libexec/console_setup";
 my $exportsetup="$TB/sbin/exports_setup";
-my $osload="$TB/bin/os_load";
-my $reloadpid="testbed";
-my $reloadeid="reloading";
+my $reloadpid="emulab-ops";
+my $reloadeid="reloadpending";
 my $pid = shift;
 my $eid = shift;
 my @node_names=();
@@ -68,7 +67,7 @@ if ($#node_names == -1) {
   }
 }
 
-my %reloads = ();
+my @reloads = ();
 my %reserves= ();
 foreach my $n (@node_names) { 
   $sth = $dbh->query("select * from reserved where node_id='$n' ".
@@ -92,24 +91,8 @@ foreach my $n (@node_names) {
 	&& $error++);
 
   if ( ($sth->num_rows()) > 0) {
-    my @reload;
-    print "Adding reload for $n to the list.\n";
-    my $i = 0;
-    my $max = $sth->num_rows();
-    while ( $i < $max  ) {
-      $i++;
-      @reload = $sth->fetchrow_array();
-      my ($node, $image) = @reload;
-
-      if (! defined($reloads{"$image"})) {
-	my @list = ($node);
-	$reloads{"$image"} = \@list;
-      } else {
-	my @list = @{$reloads{"$image"}};
-	push(@list,$node);
-	$reloads{"$image"} = \@list;
-      }
-    }
+    print "Adding scheduled reload for $n to the list.\n";
+    push(@reloads,$n);
   } else {
     # If the node has a next_reserve entry, change the reservation and start it
     $cmd = "select node_id,pid,eid from next_reserve where node_id='$n'";
@@ -144,7 +127,8 @@ foreach my $n (@node_names) {
   # Find the control net interface for this node type
   $sth = 
     $dbh->query("select control_net,osid,node_types.pxe_boot_path " .
-		"from node_types left join nodes on nodes.type=node_types.type " .
+		"from node_types " .
+		"left join nodes on nodes.type=node_types.type " .
 		"where node_id='$n'");
   my @row= $sth->fetchrow_array();
   my $control= $row[0];
@@ -185,29 +169,14 @@ $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
-my @reloaded = ();
-foreach $reload ( keys %reloads ) {
-  @list = @{$reloads{$reload}};
-  # Call os_load to start the reload
-  print STDERR "Starting reload for @list:\n";
-  $cmd = "$osload $reload @list";
-  print STDERR "Calling '$cmd'\n";
-  if ( system($cmd) != 0 ) {
-    print STDERR "WARNING: OS_LOAD FAILED ON @list!\n";
-  } else {
-    push (@reloaded, @list);
-  }
-  print STDERR "Reload for @list complete.\n";
-}
-
-if ( (@reloaded > 0) || (keys %reserves > 0) ) {
+if ( (@reloads > 0) || (keys %reserves > 0) ) {
   print "Locking tables.\n";
   $cmd = "lock tables nodes read, node_types read, reloads read, ".
     "interfaces write, reserved write, next_reserve write";
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
   
-  foreach $n ( @reloaded ) {
+  foreach $n ( @reloads ) {
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
     $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
