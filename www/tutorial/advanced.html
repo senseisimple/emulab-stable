@@ -239,7 +239,7 @@ Last event: 160.000 seconds </code></pre>
 
 <p>
 You can get a full listing of the events for your experiment by running
-<code>tbreport -v pid eid</code> on <tt>users.emulab.net</tt>. This
+<code>tbreport -v proj expt</code> on <tt>users.emulab.net</tt>. This
 report will include a section like this:
 
 <code><pre>
@@ -301,7 +301,7 @@ event injection is accomplished via the <em>Testbed Event Client</em>
 <tt>users.emulab.net</tt>. The command line syntax for <tt>tevc</tt>
 is:
 	<code><pre>
-	tevc -e pid/eid time objname event [args ...]</code></pre>
+	tevc -e proj/expt time objname event [args ...]</code></pre>
 
 where the <tt>time</tt> parameter is one of:
 
@@ -372,7 +372,7 @@ example:
 </tr>
 <tr>
  <td> tevc:</td>
- <td><code></pre>tevc -e pid/eid +3.0 link0 down</pre></code>
+ <td><code></pre>tevc -e proj/expt +3.0 link0 down</pre></code>
  </td>
 </tr>
 </table>

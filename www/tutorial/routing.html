@@ -23,7 +23,7 @@ to <i>router</i>.  In order to get router to correctly forward packets
 between client and server, you would add this line to your NS file:
 
 <code><pre>
-tb-set-node-startcmd $router /proj/pid/router-startup
+tb-set-node-startcmd $router /proj/myproj/router-startup
 </pre></code>
 
 This will make router run the <code>router-startup</code> script
@@ -49,8 +49,8 @@ Now to get client and server to talk to each other through this router,
 you would add these lines to your NS file:
 
 <code><pre>
-tb-set-node-startcmd $client /proj/pid/clientroutecmd
-tb-set-node-startcmd $server /proj/pid/serverroutecmd
+tb-set-node-startcmd $client /proj/myproj/clientroutecmd
+tb-set-node-startcmd $server /proj/myproj/serverroutecmd
 </pre></code>
 
 This will have the client and the server each call a small script
@@ -119,8 +119,8 @@ You can make a single script that will handle all end nodes, by replacing
 and specifying the router in your NS file:
 
 <code><pre>
-tb-set-node-startcmd $clientA {/proj/pid/router-startup router0}
-tb-set-node-startcmd $clientB {/proj/pid/router-startup router1}
+tb-set-node-startcmd $clientA {/proj/myproj/router-startup router0}
+tb-set-node-startcmd $clientB {/proj/myproj/router-startup router1}
 </pre></code>
 
 For multiple routers, the startup script for each router will need to
@@ -143,7 +143,7 @@ then
 else
     sudo sysctl -w net.ipv4.conf.all.forwarding=1
 fi
-sudo gated -f /proj/pid/gated.conf
+sudo gated -f /proj/myproj/gated.conf
 exit 0
 </pre></code>
 

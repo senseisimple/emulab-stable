@@ -801,8 +801,8 @@
     <p>
     We have a command called <code>portstats</code> that allows you access
     to some of the port counters on our switches. To use it, you'll need
-    to ssh to <b>users.emulab.net</b>. '<code>portstats &lt;pid&gt; 
-    &lt;eid&gt;</code>' will get you stats for all experimental interfaces in
+    to ssh to <b>users.emulab.net</b>. '<code>portstats &lt;proj&gt; 
+    &lt;exp&gt;</code>' will get you stats for all experimental interfaces in
     your experiment. Run '<code>portstats -h</code>' to get a list of other
     options, such as different sets of stats.
     </p>
@@ -914,7 +914,7 @@
 	 <tt>users.emulab.net</tt>, you may do the following:
 	     <blockquote>
 	     	<code>
-	        eventsys_control [-f] replay pid eid
+	        eventsys_control [-f] replay proj expt
 		</code>
 	     </blockquote>
 	 </li>

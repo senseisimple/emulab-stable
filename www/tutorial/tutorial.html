@@ -713,8 +713,8 @@ specify a (space separated) list of RPMs to install on each of your
 nodes when it boots:
 
 <code><pre>
-tb-set-node-rpms $nodeA /proj/pid/rpms/silly-freebsd.rpm
-tb-set-node-rpms $nodeB /proj/pid/rpms/silly-linux.rpm	</code></pre>
+tb-set-node-rpms $nodeA /proj/myproj/rpms/silly-freebsd.rpm
+tb-set-node-rpms $nodeB /proj/myproj/rpms/silly-linux.rpm	</code></pre>
 
 The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
 on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
@@ -740,7 +740,7 @@ specify absolute pathnames in your tarfile, which many modern tar
 programs balk at. 
 
 <code><pre>
-tb-set-node-tarfiles $nodeA /usr/site /proj/pid/tarfiles/silly.tar.gz </code></pre>
+tb-set-node-tarfiles $nodeA /usr/site /proj/myproj/tarfiles/silly.tar.gz </code></pre>
 
 The above NS code says to install the <tt>silly.tar.gz</tt> tar file
 on <tt>nodeA</tt> from the working directory <tt>/usr/site</tt> when
@@ -768,11 +768,11 @@ should cd to the directory you need). You can specify the same program
 for each node, or a different program.  For example:
 
 <code><pre>
-tb-set-node-startcmd $nodeA "/proj/pid/runme.nodeA"
-tb-set-node-startcmd $nodeB "/proj/pid/runme.nodeB"	</code></pre>
+tb-set-node-startcmd $nodeA "/proj/myproj/runme.nodeA"
+tb-set-node-startcmd $nodeB "/proj/myproj/runme.nodeB"	</code></pre>
 
-will run <tt>/proj/pid/runme.nodeA</tt> on nodeA and
-<tt>/proj/pid/runme.nodeB</tt> on nodeB. The programs must reside on
+will run <tt>/proj/myproj/runme.nodeA</tt> on nodeA and
+<tt>/proj/myproj/runme.nodeB</tt> on nodeB. The programs must reside on
 the node's local filesystem, or in a directory that can be reached via
 NFS. This is either the project's <tt>/proj</tt> directory, in the
 <tt>/group</tt> directory if the experiment has been created in a
@@ -782,7 +782,7 @@ output into a file. You can place the file on the local node, or in
 one of the NFS mounted directories mentioned above. For example:
 
 <code><pre>
-tb-set-node-startcmd $nodeB "/proj/pid/runme >& /tmp/foo.log" </code></pre>
+tb-set-node-startcmd $nodeB "/proj/myproj/runme >& /tmp/foo.log" </code></pre>
 
 The exit value of the start command is reported back to the Web
 Interface, and is made available to you via the "Experiment
@@ -805,7 +805,7 @@ object(s) yourself by restarting the
 on <tt>users.emulab.net</tt>:
 
 	<code><pre>
-	eventsys_control replay &lt;pid&gt &lt;eid&gt </code></pre>
+	eventsys_control replay &lt;proj&gt &lt;expt&gt </code></pre>
 
 You can also control each program object by sending it events, either
 with the NS "at" command:
@@ -817,8 +817,8 @@ with the NS "at" command:
 or you can use the event program on <tt>users.emulab.net</tt>
 
 	<code><pre>
-	tevc -e mypid/myeid now nodeA_startcmd stop
-	tevc -e mypid/myeid now nodeA_startcmd start	</code></pre>
+	tevc -e myproj/myexpt now nodeA_startcmd stop
+	tevc -e myproj/myexpt now nodeA_startcmd start	</code></pre>
 
 The start command is especially useful when
 combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
@@ -1238,7 +1238,7 @@ default images as a base, goes like this:
      above). Recreate the image as needed:
 
      <code><pre>
-     create_image -p &lt;pid&gt &lt;imageid&gt &lt;node&gt  </pre></code>
+     create_image -p &lt;proj&gt &lt;imageid&gt &lt;node&gt  </pre></code>
 
 <li> Once your image is working properly, you can use it in any NS
      file by using the <tt>tb-set-node-os</tt>. 
@@ -1251,7 +1251,7 @@ of your images or with one of the default images, you can use the
 <tt>os_load</tt> command. Log into <tt>users</tt> and run:
 
 	<code><pre>
-	os_load -p &lt;pid&gt -i &lt;imageid&gt &lt;node&gt </pre></code>
+	os_load -p &lt;proj&gt -i &lt;imageid&gt &lt;node&gt </pre></code>
 	
 This program will run in the foreground, waiting until the image has
 been loaded. At that point you should log in and make sure everything
