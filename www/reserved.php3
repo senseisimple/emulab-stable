@@ -15,6 +15,9 @@ if (! $query_result) {
     TBERROR("Database Error getting node reservation status: $err\n", 1);
 }
 
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+
 $isadmin = ISADMIN($uid);
 
 #
@@ -46,7 +49,7 @@ while ($r = mysql_fetch_array($query_result)) {
     }
 }
 
-echo "<center><h3>
+echo "<center><h3>      
       $freepcs of $numpcs PCs Free <br>
       $freesharks of $numsharks Sharks Free.
       </h3></center>\n";
@@ -80,6 +83,7 @@ while ($r = mysql_fetch_array($query_result)) {
       $res3 = "--";
     }
     echo "<tr><td>$id</td> <td>$type</td> ";
+    # If I'm an admin, I can see pid/eid/vname, but if not, I only see eid
     if ($isadmin) { echo "<td>$res1</td> "; }
     echo "<td>$res2</td> ";
     if ($isadmin) { echo "<td>$res3</td>"; }
