@@ -2651,6 +2651,7 @@ iptonodeid(struct in_addr ipaddr, char *vnodeid,
 			 " from node_types as t "
 			 "left join nodes as n on t.type=n.type "
 			 "left join interfaces as i on n.node_id=i.node_id "
+			 "and i.card=t.control_net "
 			 "where i.IP='%s'",
 			 3, inet_ntoa(ipaddr));
 			 
