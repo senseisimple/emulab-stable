@@ -62,6 +62,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/mkacct-ctrl
 	chown root $(INSTALL_BINDIR)/mkacct
 	chmod u+s $(INSTALL_BINDIR)/mkacct
+	chown root $(INSTALL_LIBTBDIR)/mkacct
+	chmod u+s $(INSTALL_LIBTBDIR)/mkacct
 	chown root $(INSTALL_BINDIR)/rmacct
 	chmod u+s $(INSTALL_BINDIR)/rmacct
 	chown root $(INSTALL_BINDIR)/os_setup
