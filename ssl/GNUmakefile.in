@@ -26,7 +26,7 @@ emulab.pem:	dirsmade emulab.cnf
 	# Create the Certificate Authority.
 	# The certificate (no key!) is installed on both boss and remote nodes.
 	#
-	openssl req -new -x509 -config emulab.cnf \
+	openssl req -new -x509 -days 1000 -config emulab.cnf \
 		    -keyout cakey.pem -out cacert.pem
 	cp cacert.pem emulab.pem
 
