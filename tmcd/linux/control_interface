@@ -9,10 +9,10 @@
 
 NODETYPE=`$BINDIR/nodetype`
 case $NODETYPE in
-pc300|pc1500|pc2000|pc2400-aero|pc2400-orbit|pc733)
+pc300|pc1500|pc2000|pc2400-orbit|pc733)
     echo 'eth0'
     ;;
-i2)
+i2|pc2400-aero)
     echo 'eth1'
     ;;
 pc850|pcL440GX)
