@@ -440,3 +440,16 @@ void pclass_debug()
   }
 }
 
+/* Count how many enabled, non-empty, pclasses there currently are. */
+int count_enabled_pclasses()
+{
+  pclass_list::iterator it;
+  int count = 0;
+  for (it=pclasses.begin();it != pclasses.end();++it) {
+      if ((*it)->disabled) { continue; }
+      // XXX - skip empty pclasses
+      count++;
+  }
+
+  return count;
+}

@@ -529,7 +529,7 @@ sub RunAssign ($)
     TBDebugTimeStamp("assign started");
     # Run assign
     my $cmdargs = "$ptopfile $topfile";
-    $cmdargs = "-Pop $cmdargs"
+    $cmdargs = "-Pod $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
 

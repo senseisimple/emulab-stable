@@ -134,4 +134,6 @@ int pclass_unset(tb_pnode *p);
 
 void pclass_debug();
 
+int count_enabled_pclasses();
+
 #endif

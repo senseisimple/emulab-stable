@@ -847,7 +847,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	typedef vector<tb_link_info> resolution_vector;
 	typedef vector<pvertex_list> switchlist_vector;
 
-	resolution_vector resolutions(10);
+	resolution_vector resolutions(3);
 	int resolution_index = 0;
 	float total_weight = 0;
 

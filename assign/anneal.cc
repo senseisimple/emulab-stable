@@ -122,127 +122,65 @@ tb_pnode *find_pnode(tb_vnode *vn)
   pclass_vector *acceptable_types = tt.second;
   
   tb_pnode *newpnode = NULL;
-
-  /*
-  int enabled_pclasses = 0;
-  for (int i = 0; i < num_types; i++) {
-    if ((*acceptable_types)[i]->disabled) {
-	continue;
-    }
-    enabled_pclasses++;
-  }
-  cout << "Looking for a pnode for " << vn->name << " - there are " <<
-      enabled_pclasses << " to choose from (" << num_types << " total)" << endl;
-  assert(num_types == enabled_pclasses);
-  */
   
-  int i = std::random()%num_types;
-  int first = i;
-  bool first_time_through = true;
-  for (;;) {
+  //cerr << "Node is " << vn->name << " First = " << first << endl;
 
-    // Stopping condition - stop if we're back to the first one, and this isn't
-    // our first time through the loop
-    if (i == first) {
-      if (first_time_through) {
-	first_time_through = false;
-      } else {
-	// Couldn't find a sutable node
-	return NULL;
-      }
-    }
+  // Randomize the order in which we go through the list of acceptable pclasses
+  // We do this by making a randomly-ordered list of indicies into the
+  // acceptable_types vector
+  vector<int> traversal_order(num_types);
+  for (int i = 0; i < num_types; i++) {
+	traversal_order[i] = i;
+  }
+  for (int i = 0; i < num_types; i++) {
+	int i1 = std::rand() % num_types;
+	int i2 = std::rand() % num_types;
+	int tmp = traversal_order[i1];
+	traversal_order[i1] = traversal_order[i2];
+	traversal_order[i2] = tmp;
+  }
 
-    i = (i+1)%num_types;
+  for (int i = 0; i < num_types; i++) {
+
+    int index = traversal_order[i];
+    tb_pclass *pclass = (*acceptable_types)[index];
 
     // Skip pclasses that have been disabled
-    if ((*acceptable_types)[i]->disabled) {
-	i = std::rand()%num_types;
-	continue;
+    if (pclass->disabled) {
+	  continue;
     }
-
-#ifdef PCLASS_SIZE_BALANCE
-    int acceptchance = 1000 * (*acceptable_types)[i]->size * 1.0 /
-	npnodes;
-    if ((std::rand() % 1000) < acceptchance) {
-	continue;
-    }
-#endif
-
-    // For load balancing only
-REDO_SEARCH:
-    tb_pnode* firstmatch = NULL;
 
 #ifndef FIND_PNODE_SEARCH
     // If not searching for the pnode, just grab the front one
-    newpnode = (*acceptable_types)[i]->members[vn->type]->front();
+    newpnode = pclass->members[vn->type]->front();
 #else
 #ifdef PER_VNODE_TT
     // If using PER_VNODE_TT and vclasses, it's possible that there are
     // some pclasses in this node's type table that can't be used right now,
     // becuase they contain entires that don't contain the vnodes _current_
     // type
-    if ((*acceptable_types)[i]->members.find(vn->type) ==
-	    (*acceptable_types)[i]->members.end()) {
+    if (pclass->members.find(vn->type) == pclass->members.end()) {
 	continue;
     }
 #endif
 
-    list<tb_pnode*>::iterator it = (*acceptable_types)[i]->members[vn->type]->L.begin();
-#ifdef LOAD_BALANCE
-    int skip = std::rand() % (*acceptable_types)[i]->members[vn->type]->L.size();
-    // Skip the begging of the list
-    for (int j = 0; j < skip; j++) {
-	it++;
-    }
-#endif // LOAD_BALANCE
-    while (it != (*acceptable_types)[i]->members[vn->type]->L.end()) {
-#ifdef LOAD_BALANCE
-	if ((*it)->typed) {
-	    if ((*it)->current_type.compare(vn->type)) {
-		it++;
-	    } else {
-		if (firstmatch == NULL) {
-		    firstmatch = *it;
-		}
-		double acceptchance = 1 - (*it)->current_load * 1.0
-		    / (*it)->max_load;
-
-	        int p = 1000 * acceptchance;
-		if ((std::random() % 1000) < (1000 * acceptchance)) {
-		    break;
-		} else {
-		    it++;
-		}
-	    }
-	} else {
-	    break;
-	}
-#else // LOAD_BALANCE
+    list<tb_pnode*>::iterator it = pclass->members[vn->type]->L.begin();
+    while (it != pclass->members[vn->type]->L.end()) {
 	if (pnode_is_match(vn,*it)) {
 	    break; 
 	} else {
 	    it++;
 	}
-#endif // LOAD_BALANCE
     }
-    if (it == (*acceptable_types)[i]->members[vn->type]->L.end()) {
-#ifdef LOAD_BALANCE
-	if (firstmatch) {
-	    //newpnode = firstmatch;
-	    goto REDO_SEARCH;
-	} else {
-	    newpnode = NULL;
-	}
-#else // LOAD_BALANCE
+    if (it == pclass->members[vn->type]->L.end()) {
 	newpnode = NULL;
-#endif // LOAD_BALANCE
     } else {
 	newpnode = *it;
     }
 #endif // FIND_PNODE_SEARCH
 #ifdef PCLASS_DEBUG
     cerr << "Found pclass: " <<
-      (*acceptable_types)[i]->name << " and node " <<
+      pclass->name << " and node " <<
       (newpnode == NULL ? "NULL" : newpnode->name) << "\n";
 #endif
     if (newpnode != NULL) {
@@ -250,6 +188,9 @@ REDO_SEARCH:
       return newpnode;
     }
   }
+
+  // Nope, didn't find one
+  return NULL;
 }
 
 
@@ -500,13 +441,19 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     scores[0] = bestscore;
 #endif
 
+    // Adjust the number of transitions we're going to do based on the number
+    // of pclasses that are actually 'in play'
+    int transitions = neighborsize *
+      (count_enabled_pclasses() *1.0 / pclasses.size());
+    assert(transitions <= neighborsize);
+
     if (melting) {
       cout << "Doing melting run" << endl;
     }
 
     while ((melting && (trans < melt_trans))
 #ifdef NEIGHBOR_LENGTH
-	    || (trans < neighborsize)) {
+	    || (trans < transitions)) {
 #else
 	    || (!melting && (trans < mintrans && accepts < naccepts))) {
 #endif
