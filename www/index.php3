@@ -72,7 +72,7 @@ if (mysql_num_rows($query_result) != 1) {
 
 echo "<center><font color=Red size=+1>\n";
 echo "Please see this important <a href=news.php3>news item</a> about
-      upcoming <a href=news.php3#43>Emulab Downtime</a>.\n";
+      <a href=news.php3#47>the current state</a> of Emulab.\n";
 echo "</font></center><br>\n";
 
 ?>
