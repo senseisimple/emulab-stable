@@ -23,14 +23,15 @@ use English;
 my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
 my $CONTROL = "@USERNODE@";
+my $BOSSNODE= "@BOSSNODE@";
 
 my $HOMEDIR = "/users";
 my $SSH     = "$TB/bin/sshtb";
 my $USERDEL = "/usr/sbin/pw userdel";
-my $GENELISTS = "$TB/sbin/genelists";
 
 my $user;
 my $query_result;
+my $errors = 0;
 
 #
 # We don't want to run this script unless its the real version.
@@ -96,32 +97,26 @@ $UID = $EUID;
 
 print "Removing user $user from local node.\n";
 if (system("$USERDEL $user")) {
-    fatal("Could not remove user $user from local node.");
+    if (($? >> 8) != 67) {
+	print("Could not remove user $user from local node.\n");
+	$errors++;
+    }
 }
 
-print "Removing user $user from $control_node.\n";
-if (system("$SSH -host $control_node '$USERDEL $user'")) {
-    fatal("Could not remove user $user from $control_node.\n");
+if ($control_node ne $BOSSNODE) {
+    print "Removing user $user from $control_node.\n";
+    if (system("$SSH -host $control_node '$USERDEL $user'")) {
+	if (($? >> 8) != 67) {
+	    print("Could not remove user $user from $control_node.\n");
+	    $errors++;
+	}
+    }
 }
 
 #
-# Rename the user directory instead of deleting it.
-# 
-my $newname = "$HOMEDIR/$user-" . TBDateTimeFSSafe();
+# Now schedule account updates on all the nodes that this person has
+# an account on.
+#
+TBNodeUpdateAccountsByUID($user);
 
-if (! -e "$HOMEDIR/$user") {
-    fatal("User directory '$HOMEDIR/$user' does not exist!");
-}
-
-if (! rename("$HOMEDIR/$user", $newname)) {
-    fatal("Could not rename user directory $user to $newname: $!");
-}
-
-exit(0);
-
-sub fatal {
-    local($msg) = $_[0];
-
-    SENDMAIL($TBOPS, "rmacct-ctrl Failed", $msg);
-    die("$0: $msg");
-}
+exit(1);

@@ -94,15 +94,23 @@ if (!$confirmed_twice) {
 }
 
 #
-# The group membership table needs to be cleaned.
+# Set the status to frozen. This prevents possible race conditions.
+#
+DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
+	     "where uid='$target_uid'");
+
+#
+# Remove the user account before killing the user entry. The side
+# effect is to also set the update_accounts flag for of the nodes the
+# user had access to.
+#
+SUEXEC($uid, $TBADMINGROUP, "rmacct-ctrl $target_uid", 0);
+
+#
+# Now it is okay to clean the group membership table.
 #
 $query_result =
     DBQueryFatal("delete FROM group_membership where uid='$target_uid'");
-
-#
-# Remove the user account before killing the user entry.
-#
-SUEXEC($uid, $TBADMINGROUP, "rmacct-ctrl $target_uid", 0);
 
 #
 # Then the users table,
@@ -111,10 +119,18 @@ $query_result =
     DBQueryFatal("delete FROM users where uid='$target_uid'");
 
 #
-# Then the pubkey table,
+# Then the pubkey tables.
 # 
 $query_result =
     DBQueryFatal("delete FROM user_pubkeys where uid='$target_uid'");
+$query_result =
+    DBQueryFatal("delete FROM user_sfskeys where uid='$target_uid'");
+
+#
+# Must do widearea_accounts too!
+#
+$query_result =
+    DBQueryFatal("delete FROM widearea_accounts where uid='$target_uid'");
 
 #
 # Warm fuzzies.
@@ -131,7 +147,7 @@ TBUserInfo($uid, $uid_name, $uid_email);
 TBMAIL($TBMAIL_OPS,
      "User $target_uid removed",
      "User '$target_uid' has been removed by $uid ($uid_name).\n\n".
-     "Please remember to remove the backup directory in /users\n\n",
+     "Please remember to remove the directory in /users if appropriate\n\n",
      "From: $uid_name <$uid_email>\n".
      "Errors-To: $TBMAIL_WWW");
 
