@@ -13,25 +13,47 @@ PAGEHEADER("Documentation");
 ?>
 
 <h3>Getting Started on the Testbed</h3>
+
+<p>These documents are highly recommended reading for all Emulab users.</p>
+
 <ul>
-<li><b><a href = "docwrapper.php3?docname=auth.html">
-	      How to get an account on the Testbed</a></b>
-<li><b><a href="tutorial/docwrapper.php3?docname=tutorial.html">
-              Emulab "Getting Started" Tutorial</a></b>
-<li><b><a href="docwrapper.php3?docname=faq.html">
-              Frequently Asked Questions (FAQ)</a></b>
+<li><dl>
+<dt><b><a href="docwrapper.php3?docname=auth.html">
+	      How to get an account on the Testbed</a></b></dt>
+    <dd>Starting or joining projects, authorization, and policies.</dd>
+</dl><br>
+
+<li><dl>
+<dt><b><a href="tutorial/docwrapper.php3?docname=tutorial.html">
+              Emulab "Getting Started" Tutorial</a></b></dt>
+    <dd>The basics of creating experiments, and a quick intro to frequently
+        used features, avoiding common pitfalls, and quick solutions to the
+        most common problems people encounter.</dd>
+</dl><br>
+
+<li><dl>
+<dt><b><a href="docwrapper.php3?docname=faq.html">
+              Frequently Asked Questions (FAQ)</a></b></dt>
+    <dd>Probably our most important reference document. Check here before
+        asking for help. Includes sections on "Getting Started" on Emulab,
+        using the testbed, hardware setup, software setup, security issues,
+        and troubleshooting. Over 50 questions and answers.</dd>
+</dl>
+
 </ul>
 
 <h3>Reference Material</h3>
 <ul>
 <li><b><a href="tutorial/docwrapper.php3?docname=tutorial.html#Advanced">
               Emulab Advanced Tutorial</a></b>
+<li><b><a href="tutorial/docwrapper.php3?docname=advanced.html">
+              Emulab Advanced Example</a></b>
 <li><b><a href="tutorial/docwrapper.php3?docname=nscommands.html">
               Emulab-specific NS Extensions Reference Manual</a></b>
 <li><b><a href="doc/docwrapper.php3?docname=tmcd.html">
               Testbed Master Control Daemon (TMCD) Reference Manual</a></b>
 <li><b><a href = "docwrapper.php3?docname=swapping.html">
-          Node Usage Policies</a></b>
+          Node Usage Policies and "Swapping" Experiments</a></b>
 <li><b><a href = "doc/docwrapper.php3?docname=netbuilddoc.html">
           NetBuild Reference Manual</a></b>
 <li><b><a href = "docwrapper.php3?docname=security.html">
@@ -39,7 +61,7 @@ PAGEHEADER("Documentation");
 <li><b><a href = "docwrapper.php3?docname=groups.html">
           About Project Groups</a></b>
 <li><b><a href = "doc/docwrapper.php3?docname=internals.html">
-          Emulab Internals</a></b><img src="new.gif">
+          Emulab Internals</a></b>
 <li><b><a href = "doc/docwrapper.php3?docname=hw-recommend.html">
           Want to build your own Testbed?</a></b>
 <li><b><a href = "docwrapper.php3?docname=hardware.html">
