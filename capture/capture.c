@@ -1058,8 +1058,10 @@ clientconnect(void)
 	capret_t	capret;
 
 	newfd = accept(sockfd, (struct sockaddr *)&tipclient, &length);
-	if (newfd < 0)
-		die("accept(): accepting new client: %s", geterr(errno));
+	if (newfd < 0) {
+		dolog(LOG_NOTICE, "accept()ing new client: %s", geterr(errno));
+		return 1;
+	}
 
 	/*
 	 * Is there a better way to do this? I suppose we
