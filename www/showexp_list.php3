@@ -22,7 +22,7 @@ if (! isset($showtype))
 if (! isset($sortby))
     $sortby = "normal";
 if (! isset($minidledays))
-    $minidledays = "3";
+    $minidledays = "2";
 
 echo "<b>Show:
          <a href='showexp_list.php3?showtype=active&sortby=$sortby'>active</a>,
@@ -91,7 +91,7 @@ if ($isadmin) {
         $clause = "";
     
     $experiments_result =
-	DBQueryFatal("select pid,eid,expt_head_uid,expt_name,state, ".
+	DBQueryFatal("select pid,eid,expt_head_uid,expt_name,state,swappable,".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap ".
 		     "from experiments as e $clause ".
@@ -169,6 +169,7 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	$daysidle=0;
 	
 	if ($isadmin) {
+	    $swappable= $row[swappable];
 	    $foo = "&nbsp;";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
@@ -182,10 +183,16 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	    }
 	}
 
-	if ($idle) $foo .= "</td><td align=center>$daysidle</td>
-<td align=center valign=center>
+	if ($idle) {
+	  $foo .= "</td><td align=center>$daysidle</td>\n";
+	  if ($swappable) {
+	    $foo .="<td align=center valign=center>
 <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
-<img src=\"redball.gif\"></a>";
+<img src=\"redball.gif\"></a>\n";
+	  } else {
+	    $foo .="<td>&nbsp;</td>\n";
+	  }
+	}
 	
 	$usage_query =
 	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
