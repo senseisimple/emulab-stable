@@ -37,21 +37,25 @@ $expiretime = date("Y:m:d", time() + (86400 * 120));
 ?>
 <table align="center" border="1"> 
 <tr>
-    <td colspan="2">
-        <h1 align="center">Apply to Use the Utah Network Testbed</h1>
+    <td colspan="2" align="center">
+        <h1>Apply to Use the Utah Network Testbed</h1>
+        <font size="+1">
+               If you are a student
+               <font color="red">(undergrad or graduate)</font>, please
+               <a href="auth.html">read this first</a>!
+        </font>
     </td>
 </tr>
+<tr></tr>
+<tr></tr>
 
 <tr>
     <td align="center" colspan="2">
         Fields marked with * are required;
-        those marked + are highly recommended.
-    </td>
+        those marked + are highly recommended.</td>
 </tr>
 
 <form action=newproject.php3 method="post">
-<tr></tr>
-<tr></tr>
 <?php
 
 #
