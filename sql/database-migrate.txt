@@ -1173,3 +1173,25 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table interfaces add vnode_id varchar(32) default NULL;
 
+1.211: Add a new table virt_simnode_attributes that contains the number
+       of slots that a virt_node will occupy on a pnode. This is useful
+       during mapping. The default value is 1. The column eventrate will
+       also be used during mapping. The initial value is 0 since it is not
+       determined during the first swapin. Updates to these columns during
+       an experimental run will persist till the next swapin. Currently,
+       the updates will be done when a simulator (nse) running on a pnode
+       cannot keep up with real-time. In future, it could be done
+       periodically. The reserved table has a new column simhost_violation
+       whose value can be '0' or '1' to indicate that a pnode running nse 
+       cannot keep up with real-time.
+
+       create table virt_simnode_attributes ( \
+       pid varchar(12) NOT NULL default '', \
+       eid varchar(32) NOT NULL default '', \
+       vname varchar(32) NOT NULL default '', \
+       nodeweight smallint(5) unsigned not null default '1', \
+       eventrate int(11) unsigned not null default '0', \
+       KEY pid (pid,eid,vname));
+
+       alter table reserved add simhost_violation tinyint(3) \
+               unsigned not null default '0';

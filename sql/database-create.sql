@@ -1131,6 +1131,7 @@ CREATE TABLE reserved (
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
   erole enum('node','virthost','delaynode','simhost') NOT NULL default 'node',
+  simhost_violation tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname)
 ) TYPE=MyISAM;
@@ -1610,6 +1611,19 @@ CREATE TABLE virt_routes (
   nexthop varchar(32) NOT NULL default '',
   cost int(11) NOT NULL default '0',
   PRIMARY KEY  (pid,eid,vname,src,dst),
+  KEY pid (pid,eid,vname)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_simnode_attributes`
+--
+
+CREATE TABLE virt_simnode_attributes (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  nodeweight smallint(5) unsigned NOT NULL default '1',
+  eventrate int(11) unsigned NOT NULL default '0',
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 

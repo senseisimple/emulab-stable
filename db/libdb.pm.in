@@ -2642,6 +2642,7 @@ sub TBGetSiteVar($)
 		   "virt_vtypes",
 		   "virt_programs",
 		   "virt_node_desires",
+		   "virt_simnode_attributes",
 		   "nseconfigs",
 		   "eventlist",
 		   "ipsubnets",
