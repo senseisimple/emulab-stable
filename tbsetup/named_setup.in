@@ -26,14 +26,16 @@ my $USERS	= "@USERNODE@";
 my $DISABLED    = "@DISABLE_NAMED_SETUP@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 
-my $mapdir      = "/etc/namedb";
-my $mapfile	= "$mapdir/${OURDOMAIN}.db";
-my $mapfiletail = "$mapfile.tail";
-my $vnodesfile  = "$mapdir/vnodes.${OURDOMAIN}.db";
-my $vnodesback  = "$mapdir/vnodes.${OURDOMAIN}.db.backup";
-my $reversedir  = "$mapdir/reverse";
-my $lockfile    = "/var/tmp/testbed_named_lockfile";
-my $dbg		= 0;
+my $mapdir			= "/etc/namedb";
+my $mapfile			= "$mapdir/${OURDOMAIN}.db";
+my $mapfiletail			= "$mapfile.tail";
+my $mapfile_internal		= "$mapdir/${OURDOMAIN}.internal.db";
+my $mapfile_internal_head	= "$mapfile_internal.head";
+my $vnodesfile			= "$mapdir/vnodes.${OURDOMAIN}.db";
+my $vnodesback 			= "$mapdir/vnodes.${OURDOMAIN}.db.backup";
+my $reversedir			= "$mapdir/reverse";
+my $lockfile			= "/var/tmp/testbed_named_lockfile";
+my $dbg	= 0;
 my @row;
 
 use strict;
@@ -253,6 +255,14 @@ close(MAP);
 make_zonefile($mapfile);
 
 #
+# If they have an 'internal' zone file (ie. with some internal IPs for boss and
+# ops), make that too
+#
+if (-e $mapfile_internal_head) {
+    make_zonefile($mapfile_internal,$mapfile_internal_head,$mapfiletail);
+}
+
+#
 # Now we tack on the virtual node, but that has to go onto the end
 # of a *copy* of the file we just created.
 #
@@ -356,12 +366,16 @@ sub fatal {
 #
 # Make a zone file from the 
 #
-sub make_zonefile($) {
-    my ($mapfile) = @_;
+sub make_zonefile($;$$) {
+    my ($mapfile,$mapfilehead,$mapfiletail) = @_;
 
     my $mapfileback = "$mapfile.backup";
-    my $mapfilehead = "$mapfile.head";
-    my $mapfiletail = "$mapfile.tail";
+    if (!defined $mapfilehead) {
+	$mapfilehead = "$mapfile.head";
+    }
+    if (!defined $mapfiletail) {
+	$mapfiletail = "$mapfile.tail";
+    }
 
     #
     # Concat the head and tail files to create the new map.
