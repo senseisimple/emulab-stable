@@ -273,6 +273,13 @@ foreach my $n (@freed_nodes) {
 		    "where node_id='$n' and ".
 		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	    || $error++;
+	# And log phys nodes freed from hwdown
+	my $dbuid;
+	if ($pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID()
+	    && UNIX2DBUID($UID, \$dbuid)) {
+	    TBSetNodeLogEntry($n, $dbuid, "misc",
+			      "'Moved from hwdown; nfree'");
+	}
     }
 
     my $allocFreeState = TBDB_ALLOCSTATE_FREE_DIRTY();
