@@ -456,7 +456,7 @@ CREATE TABLE interfaces (
   mask varchar(15) default NULL,
   interface_type varchar(30) default NULL,
   iface text NOT NULL,
-  role enum('ctrl','expt','jail','fake','other') NOT NULL default 'other',
+  role enum('ctrl','expt','jail','fake','other','gw') default NULL,
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
   PRIMARY KEY  (node_id,card,port),

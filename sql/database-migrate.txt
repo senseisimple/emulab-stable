@@ -1002,3 +1002,8 @@ last_net_act,last_cpu_act,last_ext_act);
 1.190: Add an index...
 
        alter table testbed_stats add key (exptidx);
+
+1.191: Add a new role 'gw' for 'gateway' interfaces:
+
+       alter table interfaces modify role enum('ctrl','expt','jail','fake', \
+           'other','gw');
