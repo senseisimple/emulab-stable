@@ -15,6 +15,7 @@ ISP110s:
 	Responsible: Rob
 	RMAs: 1 returned, replacement recieved
 	To be RMA'ed: pc83 (NMI errors) pc48 (simply dead, though it worked at first)
+		pc51 (often hangs)
 
 Network cables:
 	Status: Received
