@@ -451,6 +451,7 @@ CREATE TABLE interfaces (
   IPaliases text,
   interface_type varchar(30) default NULL,
   iface text NOT NULL,
+  role enum('ctrl', 'expt', 'jail', 'virt') NOT NULL default 'expt',
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
   PRIMARY KEY  (node_id,card,port),

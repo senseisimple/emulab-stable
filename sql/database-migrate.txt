@@ -872,3 +872,27 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (pid,eid)
 	) TYPE=MyISAM;
 
+1.173: Add "role" to interfaces table, to replace the control_net and
+       control_iface join with node_types, since new nodes have more
+       than just expt and ctrl interfaces (ixps). The control_net slot
+       is bogus anyway. Note that 'jail' is a placeholder for later.
+       A 'fake' interface is not to be confused with veth interfaces; it
+       is a psuedo interface like that found between an ixp and the host.
+
+       alter table interfaces add \
+		role enum('ctrl', 'expt', 'jail', 'fake', 'other') \
+		NOT NULL default 'other' after iface;
+
+
+       Now we have to set them.
+
+       update interfaces set role='ctrl' where \
+        ip like '155.101.%' or ip like '172.17.%' or \
+        node_id like 'wa%' or node_id like 'ron%';
+
+       update interfaces set role='expt' where \
+	(ip like '192.168.%' or IP='') and \
+	(node_id like 'pc%' or node_id like 'ixp%');
+
+       update interfaces set role='fake' where \
+	(interface_type='ixp_fake' and node_id like 'pc%');
