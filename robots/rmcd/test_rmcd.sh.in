@@ -30,6 +30,7 @@ check_output() {
 
 ##
 
+# Need an emcd for rmcd to connect to.
 ../emc/emcd -l `pwd`/test_emcd.log \
     -i `pwd`/test_emcd.pid \
     -p ${EMC_PORT} \
@@ -38,11 +39,11 @@ check_output() {
 
 sleep 1
 
-# XXX should be a vmc update...
 ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -r vmc -i 0 -c 0 -m "empty" init -- \
     -r vmc -i 1 -x 6 -y 7 -o 0.44 -s idle -t 1 update-position
 
+# Start a fake gorobot to simulate robot processing.
 ../primotion/gorobot -l `pwd`/test_gorobot.log \
     -i `pwd`/test_gorobot.pid
 
@@ -61,7 +62,7 @@ trap 'cleanup' EXIT
 
 sleep 2
 
-# Noop first
+# Goto the current position and expect an immediate success.
 
 run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
@@ -78,7 +79,7 @@ Packet: length 36; version 1; role 1
   timestamp:	1.000000
 EOF
 
-# then try a real move:
+# Then try a real move that will fail because of no vmc updates:
 
 run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
@@ -95,10 +96,12 @@ Packet: length 36; version 1; role 1
   timestamp:	1.000000
 EOF
 
+# Now, send the update and
 ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -w -r vmc -i 0 -c 0 -m "empty" init -- \
     -r vmc -i 1 -x 7 -y 8 -o 0.44 -s idle -t 1 update-position
 
+# ... retry to goto.
 run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 0 -c 0 -m "empty" init -- \
     -w -i 1 -x 7 -y 8 -o 0.44 -C 1 command-goto

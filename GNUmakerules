@@ -79,6 +79,9 @@ check: $(TESTS)
 		fi; \
 		if $$tst; then \
 			echo "PASS: $$tst"; \
+		else \
+			echo "FAIL: $$tst"; \
+			exit 1; \
 		fi \
 	done
 endif
