@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.7 2001-08-02 21:21:05 ikumar Exp $
+ * $Id: cli.c,v 1.8 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -86,9 +86,9 @@ find_nodeID(void)
 }                            
 
 void
-make_inquiry(topd_inqid_t *tip, u_int16_t ttl, u_int16_t factor) 
+make_inquiry(topd_inqid_t *tip, u_int16_t ttl, u_int16_t factor, int lans_exist) 
 {
-        struct timeval tv;
+    struct timeval tv;
 	u_char         *nid;
 
 	/* First goes the the time of day... */
@@ -108,17 +108,18 @@ make_inquiry(topd_inqid_t *tip, u_int16_t ttl, u_int16_t factor)
 	nid = find_nodeID();
 	memcpy((void *)tip->tdi_nodeID, nid, ETHADDRSIZ);
 	bzero(tip->tdi_p_nodeIF,ETHADDRSIZ);
+	tip->lans_exist = htons(lans_exist);
 }
 
 void
 cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen, 
-    u_int16_t ttl, u_int16_t factor)
+    u_int16_t ttl, u_int16_t factor, int lans_exist)
 {
         u_int32_t         n;
 	char              recvline[MAXLINE + 1];
 	topd_inqid_t      ti;
 	
-	make_inquiry(&ti, ttl, factor);
+	make_inquiry(&ti, ttl, factor, lans_exist);
 
 	printf("sending query to server:\n");
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
@@ -142,8 +143,9 @@ main(int argc, char **argv)
 	int sockfd;
 	struct sockaddr_in servaddr;
 
-	if (argc != 4) {
-		fprintf(stderr, "usage: cli <Server IPaddress> <TTL> <factor>\n");
+	if (argc != 5) {
+		fprintf(stderr, "usage: cli <Server IPaddress> <TTL> <factor> <lan
+				present?1/0>\n");
 		exit(1);
 	}
 
@@ -155,7 +157,8 @@ main(int argc, char **argv)
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	//printf("calling client\n");
-	cli(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr), atoi(argv[2]), atoi(argv[3]));
+	cli(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr), atoi(argv[2]),
+		atoi(argv[3]), atoi(argv[4]));
 
 	exit(0);
 }

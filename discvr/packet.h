@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: packet.h,v 1.6 2001-08-02 21:21:05 ikumar Exp $
+ * $Id: packet.h,v 1.7 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #ifndef _TOPD_PACKET_H_
@@ -47,6 +47,7 @@ typedef struct topd_inqid {
 	u_int16_t          tdi_factor;
 	u_char             tdi_nodeID[ETHADDRSIZ];
 	u_char			   tdi_p_nodeIF[ETHADDRSIZ];
+	int				   lans_exist;                
 } topd_inqid_t;
 
 #define TOPD_INQ_SIZ ALIGN(sizeof(struct topd_inqid))

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.7 2001-08-02 21:21:05 ikumar Exp $
+ * $Id: util.c,v 1.8 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -191,11 +191,12 @@ print_tdinq(const char *mesg)
 {
         topd_inqid_t *tip = (topd_inqid_t *)mesg;
 
-	printf("\nINQ:%u.%u TTL:%d FACTOR:%d NODE:",
+	printf("\nINQ:%u.%u TTL:%d FACTOR:%d HAS_LAN:%d NODE:",
 		ntohl(tip->tdi_tv.tv_sec), 
 		ntohl(tip->tdi_tv.tv_usec),
 		ntohs(tip->tdi_ttl), 
-		ntohs(tip->tdi_factor)); 
+		ntohs(tip->tdi_factor),
+		ntohs(tip->lans_exist)); 
 	print_nodeID(tip->tdi_nodeID);
 	printf(" PARENT i/f:");
 	print_nodeID(tip->tdi_p_nodeIF);

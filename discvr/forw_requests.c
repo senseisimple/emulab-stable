@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.10 2001-08-02 21:21:05 ikumar Exp $
+ * $Id: forw_requests.c,v 1.11 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #include <math.h>
@@ -110,8 +110,8 @@ forward_request(struct ifi_info *ifihead, const struct in_pktinfo *pktinfo,
 			continue;
 		}
 
-		memcpy(&(temp_mesg->tdi_p_nodeIF),&(ifi->ifi_haddr),IFHADDRSIZ);
-		//memcpy(&(temp_mesg->tdi_p_nodeIF),&myNodeID,IFHADDRSIZ);
+		memcpy(temp_mesg->tdi_p_nodeIF,ifi->ifi_haddr,ETHADDRSIZ);
+		//memcpy(&(temp_mesg->tdi_p_nodeIF),&myNodeID,ETHADDRSIZ);
 
 		printf("Forwarding the query to interface: \"%s\"\n",ifi->ifi_name);
 		temp_sock_list = sock_list;

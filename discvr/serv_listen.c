@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.10 2001-08-02 21:21:05 ikumar Exp $
+ * $Id: serv_listen.c,v 1.11 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #include <math.h>
@@ -44,6 +44,7 @@ extern topd_inqid_t inqid_current;
 u_char myNodeID[ETHADDRSIZ];
 u_char sendingIF[ETHADDRSIZ];
 u_char receivingIF[ETHADDRSIZ];
+int lans_exist=1;
 
 /*
  * Return 0 if the inquiry is not from us, 1 if it is.
@@ -269,6 +270,7 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 			}
 			sock_num=0;
 			free(sock_list);
+			lans_exist = 1;
 
 			state = Q_LISTEN;
 			free(inqhead);
@@ -333,6 +335,7 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 			memcpy(&senderIF, &(temp_inqid->tdi_p_nodeIF), ETHADDRSIZ);
 			ttl = ntohs(temp_inqid->tdi_ttl);
 			factor = ntohs(temp_inqid->tdi_factor);
+			lans_exist = ntohs(temp_inqid->lans_exist);
 			
 			if(ttl==0)
                 printf("The TTL is zero so i will not forward!!\n");
@@ -401,7 +404,6 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 				default:
 					break;
 			}
-			
 		}
 
 		for(i=0;i<sock_num;i++)
@@ -445,6 +447,13 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 				// interface, has
 				ifi->ifi_nbors->tdnbl_n = (n-sizeof(topd_inqid_t)) / sizeof(struct topd_nbor);
 				ifi->ifi_nbors->tdnbl_next = saveNbr;
+
+				if(lans_exist==0)
+				{
+					FD_CLR(sock_list[i],&readFd);
+					close(sock_list[i]);
+					remove_socket(i,sock_list,&sock_num);
+				}
 			}
 		}
 				
@@ -478,6 +487,16 @@ serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 				printf("Deadline still not met. Set timer to %ld\n", timeLimit.tv_sec);
 			}
 		}
-			
 	}
+}
+
+void
+remove_socket(int sock_index, int* sock_list, int *psock_num)
+{
+	int i=0;
+	for(i=sock_index;i<(*psock_num-1);i++)
+	{
+		sock_list[i]=sock_list[i+1];
+	}
+	(*psock_num)--;
 }

@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.8 2001-08-02 21:21:05 ikumar Exp $*/
+/*$Id: discvr.h,v 1.9 2001-08-04 22:58:30 ikumar Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -124,5 +124,7 @@ tod(void);
 
 void
 gen_nam_file(const char *mesg, size_t nbytes, char *);
+
+void remove_socket(int sock_index,int* sock_list,int* sock_num);
 
 #endif /* _TOPD_DISCVR_H_ */
