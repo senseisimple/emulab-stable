@@ -182,12 +182,22 @@ DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
 #
 if ($reboot) {
     if ($waitmode) {
+	$StateWait::debug = 0;
+	
 	#
 	# Initialize the statewait library.
 	#
-	my @states   = (TBDB_NODESTATE_MFSSETUP(), TBDB_NODESTATE_ISUP());
+	my @states   = ();
 	my @finished = ();
 	my @failed   = ();
+
+	#
+	# Only wait for MFSSETUP when going into the MFS. When coming out
+	# of MFS, just wait for generic ISUP.
+	# 
+	push(@states, TBDB_NODESTATE_MFSSETUP())
+	    if ($onoff eq "on");
+	push(@states, TBDB_NODESTATE_ISUP());
     
 	if (initStateWait(\@states, @nodes)) {
 	    die("*** $0:\n".
