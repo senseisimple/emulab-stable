@@ -73,6 +73,7 @@ static int	iptonodeid(struct in_addr, char *, char *,
 			   char *, char *, int *, int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
+static int	vnodetophysnode(char *nodeid, char *physnode);
 static int	checkdbredirect(char *nodeid);
 static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock);
@@ -3408,6 +3409,34 @@ nodeidtocontrolnet(char *nodeid, int *net)
 }
 
 /*
+ * Map vnode to its phys node.
+ */
+static int
+vnodetophysnode(char *nodeid, char *physnode)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+	res = mydb_query("select phys_nodeid from nodes where node_id='%s'",
+			 1, nodeid);
+
+	if (!res) {
+		error("vnodetophysnode: %s: DB Error!\n", nodeid);
+		return 1;
+	}
+
+	if (! (int)mysql_num_rows(res)) {
+		mysql_free_result(res);
+		return 1;
+	}
+	row = mysql_fetch_row(res);
+	strcpy(physnode, row[0]);
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
  * Check for DBname redirection.
  */
 static int
@@ -4224,10 +4253,12 @@ COMMAND_PROTOTYPE(dojailconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		pid[64];
-	char		eid[64];
-	char		gid[64];
+	char		pid[TBDB_FLEN_PID];
+	char		eid[TBDB_FLEN_EID];
+	char		gid[TBDB_FLEN_GID];
+	char		physnode[TBDB_FLEN_NODEID];
 	char		buf[MYBUFSIZE];
+	int		nrows, control_net, ipcount = 0;
 
 	/*
 	 * Only vnodes get a jailconfig of course, and only allocated ones.
@@ -4268,5 +4299,90 @@ COMMAND_PROTOTYPE(dojailconfig)
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
+
+	/*
+	 * Now return the IP interface list that this jail has access to.
+	 * Two kinds: Tunnels on the physnode for that experiment, and if
+	 * its a local node then the normal interfaces. Eventually local
+	 * nodes will be shared too, and then I'm not sure how it will be
+	 * done. Perhaps tunnels on local nodes too.
+	 *
+	 * So, first grab the physnodeid.
+	 */
+	strcpy(buf, "IPADDRS=\"");
+	
+	if (vnodetophysnode(nodeid, physnode)) {
+		error("JAILCONFIG: %s: Error getting physnodeid!\n", nodeid);
+		return 1;
+	}
+	
+	res = mydb_query("select assigned_ip from tunnels "
+			 "where node_id='%s' and pid='%s' and eid='%s'",
+			 1, physnode, pid, eid);
+
+	if (!res) {
+		error("JAILCONFIG: %s: DB Error getting tunnels\n", physnode);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res))) {
+		while (nrows) {
+			row = mysql_fetch_row(res);
+			
+			strcat(buf, row[0]);
+			nrows--;
+			ipcount++;
+			
+			if (nrows)
+				strcat(buf, ",");
+		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Okay, now do equiv an doifconfig and find real interfaces.
+	 * As mentioned, since local nodes are not currently shared, just
+	 * return the entire set. 
+	 *
+	 * Need to know the control network for the machine since
+	 * we don't want to mess with that.
+	 */
+	if (nodeidtocontrolnet(physnode, &control_net)) {
+		error("JAILCONFIG: %s: No Control Network\n", physnode);
+		return 1;
+	}
+
+	/*
+	 * Find all the interfaces.
+	 */
+	res = mydb_query("select IP from interfaces "
+			 "where node_id='%s' and card!=%d "
+			 " and IP is not null and IP!=''",
+			 1, physnode, control_net);
+	if (!res) {
+		error("JAILCONFIG: %s: DB Error getting local IPs!\n",
+		      physnode);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res))) {
+		if (ipcount)
+			strcat(buf, ",");
+		
+		while (nrows) {
+			row = mysql_fetch_row(res);
+
+			strcat(buf, row[0]);
+			nrows--;
+			ipcount++;
+			
+			if (nrows)
+				strcat(buf, ",");
+		}
+	}
+	mysql_free_result(res);
+
+	if (ipcount) {
+		strcat(buf, "\"\n");
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
 	return 0;
 }
