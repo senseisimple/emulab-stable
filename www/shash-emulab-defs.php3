@@ -1,6 +1,6 @@
 <?php
 #
-# Shashi's definitions. Selected via configure.
+# Mac's definitions. Selected via configure.
 #
 $WWWHOST        = "www.emulab.net";
 $WWW            = "$WWWHOST/~shash/www";
@@ -15,18 +15,18 @@ $TBCOOKIESUFFIX = "";
 # Title Page stuff.
 #
 $TITLECOLOR     = "#E04050";
-$BANNERCOLOR    = "#ABABE0";
-$THISHOMEBASE   = "Emulab.Net";
-$THISPROJECT    = "The Utah Network Testbed";
+$BANNERCOLOR    = "#4080FF";
+$THISHOMEBASE   = "Shash@Emulab.Net";
+$THISPROJECT    = "The Shash Network Testbed";
 
-$TBMAILADDR_OPS		= "shash@cs.utah.edu";
-$TBMAIL_OPS		= "Shashi Testbed Ops <$TBMAILADDR_OPS>";
-$TBMAILADDR_WWW		= "shash@cs.utah.edu";
-$TBMAIL_WWW		= "Shashi Testbed WWW <$TBMAILADDR_WWW>";
-$TBMAILADDR_APPROVAL	= "shash@cs.utah.edu";
-$TBMAIL_APPROVAL	= "Shashi Testbed Approval <$TBMAILADDR_APPROVAL>";
-$TBMAILADDR_LOGS	= "shash@cs.utah.edu";
-$TBMAIL_LOGS		= "Shashi Testbed Logs <$TBMAILADDR_LOGS>";
-$TBMAILADDR_AUDIT	= "shash@cs.utah.edu";
-$TBMAIL_AUDIT		= "Shashi Testbed Audit <$TBMAILADDR_AUDIT>";
+$TBMAILADDR_OPS		= "shash+ops@cs.utah.edu";
+$TBMAIL_OPS		= "Shash Testbed Ops <$TBMAILADDR_OPS>";
+$TBMAILADDR_WWW		= "shash+www@cs.utah.edu";
+$TBMAIL_WWW		= "Shash Testbed WWW <$TBMAILADDR_WWW>";
+$TBMAILADDR_APPROVAL	= "shash+approve@cs.utah.edu";
+$TBMAIL_APPROVAL	= "Shash Testbed Approval <$TBMAILADDR_APPROVAL>";
+$TBMAILADDR_LOGS	= "shash+log@cs.utah.edu";
+$TBMAIL_LOGS		= "Shash Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAILADDR_AUDIT	= "shash+audit@cs.utah.edu";
+$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>
