@@ -108,3 +108,34 @@ like this too, since splitting stuff between the web interface and the
 perl scripts is messy, and the PHP DB interface is not as nice or
 robust as the perl interface.
 
+
+*** LastLogin info in web page - Sep 27 2001 - Needs to be done.
+
+    From: Jay Lepreau <lepreau@cs.utah.edu>
+    To: "Leigh B. Stoller" <stoller@moab.cs.utah.edu>
+    Cc: testbed@fast.cs.utah.edu
+    Subject: Re: cvs commit: testbed/www showproject_list.php3 
+    Date: Wed, 26 Sep 2001 19:11:11 MDT
+    
+    If it were pretty easy to get wtmp info from plastic
+    into the database, and displayed in a separate column
+    on this page, that would be great.
+    
+    It's the info we need to know who's really active and who's inactive,
+    which is not only interesting but affects who we ask to free up nodes.
+
+    LBS Comment: Probably want last web login info too. This would be
+    easy to add with a last_login DB table that would be updated in
+    DOLOGIN in the web server.
+
+
+*** Need to install ssh on Linux - Sep 27 2001 - Needs to be done.
+
+Suggested by Jay.
+
+I think we should install xinetd and rsh by default.  (But not turn on
+rsh.) For one thing, many computational cluster users will want MPI.
+
+RPMS: /proj/parmc/rpms/xinetd-2.1.8.9pre14-6.i386.rpm
+      /proj/parmc/rpms/rsh-server-0.17-2.5.i386.rpm
+
