@@ -177,8 +177,7 @@ foreach my $n (@nodes) {
     # owned by the pid/eid, so cannot be mucked with.
     # 
     if (! DBQueryWarn("update reserved " .
-		      "set vname=NULL, pid='$reloadpid', gid='$reloadpid', " .
-		      " eid='$lockedeid' ".
+		      "set vname=NULL, pid='$reloadpid', eid='$lockedeid' ".
 		      "where node_id='$n'")) {
 	print "*** WARNING: Error locking down node $n!\n";
 	next;
