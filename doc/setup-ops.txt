@@ -89,10 +89,10 @@ start nfsd by hand:
 nfs_server_enable="YES"
 nfs_server_flags="-u -t -n 16"
 
-Create /etc/exports.head . This should contain exports of /users/, /proj/, and
-/groups/ to all other control nodes BUT NOT testbed nodes. When this is done,
-run exports_setup on the boss node, which will create an /etc/exports file
-by concatenating this with dynamically-generated exports of directories to
+Create /etc/exports.head . This should contain exports of /users/, /proj/,
+/groups/, and /var/ to all other control nodes BUT NOT testbed nodes. When this
+is done, run exports_setup on the boss node, which will create an /etc/exports
+file by concatenating this with dynamically-generated exports of directories to
 nodes that need them.
 
 ##### Step 6 - Capture setup
