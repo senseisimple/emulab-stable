@@ -385,10 +385,9 @@ doaccounts(int sock, struct in_addr ipaddr, char *request)
 	 * Now onto the users in the project.
 	 */
 	res = mydb_query("select u.uid,u.usr_pswd,u.unix_uid,u.usr_name,"
-			 "p.trust "
-			 "from users as u "
+			 "p.trust from users as u "
 			 "left join proj_memb as p on p.uid=u.uid "
-			 "where p.pid='%s'",
+			 "where p.pid='%s' and u.status='active'",
 			 5, pid);
 	if (!res) {
 		syslog(LOG_ERR, "ACCOUNTS: %s: DB Error getting users!", pid);
