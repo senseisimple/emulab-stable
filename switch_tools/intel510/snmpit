@@ -6,10 +6,12 @@
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
-# Last Change: August 16, 2000                                          #
+# Last Change: August 17, 2000                                          #
 #     Version: 2.00                                                     #
 #                                                                       #
 #########################################################################
+
+$| = 1; # Turn off line buffering on output
 
 my $debug = 0;
 
@@ -23,21 +25,24 @@ my $device;
 #
 # Source Code Map
 # 
-# Line Subroutine
-# ---- ---------------------
-#  ~40 myMain 
-# ~250 ParseArgs
-# ~450 GetToken
-#      ReleaseToken
-#      OneVLAN
-#      AutoVLANConfig
-#      RemoveVLAN
-#      ListVLANs
-#      ReadIRFile
-#      ReadTranslationTable
-#      UpdateField
-#      ShowPorts
-#      GetStats
+#  Line Subroutine
+# ----- ---------------------
+#   ~50 myMain 
+#  ~250 ParseArgs
+#  ~450 GetToken
+#  ~510 ReleaseToken
+#  ~600 OneVLAN
+#  ~700 mac2ifIndex
+#  ~750 AutoVLANConfig
+#  ~780 RemoveVLAN
+#  ~820 ListVLANs
+#  ~930 ReadIRFile
+# ~1000 ReadTranslationTable
+# ~1030 UpdateField
+# ~1100 ShowPorts
+# ~1230 GetStats
+#
+# Total lines of code: ~1340
 #
 
 sub myMain {
@@ -77,9 +82,11 @@ sub myMain {
   &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
 	     \@r,\$u,\$b,\$c,\$v,\$g,
 	     \$on,\$off,\$cyc,\$all,\@outlets,\%Interfaces,\%Ports);
+
+  print "\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup spd=$spd s=$s f=$f l=$l",
+  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
+  "off=$off cyc=$cyc all=$all device=$device\n" if $debug;
   
-#  use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
-#  use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/arch/auto/SNMP';
   use SNMP;
   
   #$SNMP::debugging = 1;
@@ -92,9 +99,9 @@ sub myMain {
   } elsif ($device eq "APC") {
     &SNMP::addMibFiles('/n/moab/x/newbold/mibs/PowerNet-MIB.txt');
   } elsif ($device eq "Cisco") {
-    #&SNMP::addMibFiles('/usr/local/share/snmp/mibs/CISCO-MIB.txt', 
-	#	       '/usr/local/share/snmp/mibs/CISCO-MIB.txt',
-		#       '/usr/local/share/snmp/mibs/CISCO-MIB.txt');
+    &SNMP::addMibFiles('/usr/local/share/snmp/mibs/CISCO-STACK-MIB.txt', 
+	       '/usr/local/share/snmp/mibs/CISCO-VTP-MIB.txt',
+	       '/usr/local/share/snmp/mibs/CISCO-VLAN-MEMBERSHIP-MIB.txt');
   }
   
   $SNMP::save_descriptions = 1; # must be set prior to mib initialization
@@ -181,12 +188,12 @@ sub myMain {
     if ($device eq "Intel" || $device eq "Cisco") {
       &GetToken(\$sess,\$v);
       &OneVLAN(\$sess,\$m,\@vlan,\$v);
-      &ReleaseToken(\$sess,\$v,\$u);
+      &ReleaseToken(\$sess,$v,$u);
     } else { 
       die("Invalid option 'make VLAN' for device of type $device.\n");
     }
   }
-  
+
   if ($f) {
     &AutoVLANConfig(\$sess,\$f,\$v,\$u,\%Interfaces);
   }
@@ -198,15 +205,15 @@ sub myMain {
 	{
 	  &RemoveVLAN(\$sess,\$x,\$v);
 	}
-      &ReleaseToken(\$sess,\$v,\$u);
+      &ReleaseToken(\$sess,$v,$u);
     } else { 
       die("Invalid option 'remove VLAN(s)' for device of type $device.\n");
     }
   }
-  
+
   #List VLANs is always after $f and @vlan, so that changes made are reflected
   if ($l) {
-    &ListVLANs(\$sess,\%Interfaces,\$v);
+    &ListVLANs(\$sess,\%Interfaces,\%Ports,\$v);
   }
   
   #
@@ -379,7 +386,7 @@ sub ParseArgs {
   die("What shall I do?\n")
     if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
 	  ||$on||$off||$cyc));
-  if (@vlan||$f||@r||$l && (!defined($i)||!$i)) { $i = "Gamma"; }
+  if ((@vlan||$f||@r||$l) && (!defined($i) || !$i)) { $i = "Gamma"; }
   if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
   elsif ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
   elsif ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
@@ -448,40 +455,54 @@ sub ParseArgs {
 
 sub GetToken {
   local(*sess,*v) = @_;
-  my $TokenOwner = '.1.3.6.1.4.1.343.6.11.4.5';
-  my $TokenReq = '.1.3.6.1.4.1.343.6.11.4.6';
-  my $TokenReqResult = '.1.3.6.1.4.1.343.6.11.4.7';
-  my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
-  my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
-  #The zeros and ones are a magic number it needs...
-  my $Num = pack("C*",0,0,0,0,1,1);
-  my $RetVal = 0;
-  my $tries = 0;
-  while ($RetVal ne "success" && $tries < 10) {
-    $tries += 1;
-    $sess->set([[$TokenReq,0,$Num,"OCTETSTR"]]);
-    $RetVal = $sess->get([[$TokenReqResult,0]]);
-    while ($RetVal eq "notReady") {
+  if ($device eq "Intel") {
+    my $TokenOwner = '.1.3.6.1.4.1.343.6.11.4.5';
+    my $TokenReq = '.1.3.6.1.4.1.343.6.11.4.6';
+    my $TokenReqResult = '.1.3.6.1.4.1.343.6.11.4.7';
+    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
+    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
+    #The zeros and ones are a magic number it needs...
+    my $Num = pack("C*",0,0,0,0,1,1);
+    my $RetVal = 0;
+    my $tries = 0;
+    while ($RetVal ne "success" && $tries < 10) {
+      $tries += 1;
+      $sess->set([[$TokenReq,0,$Num,"OCTETSTR"]]);
       $RetVal = $sess->get([[$TokenReqResult,0]]);
-      print "*VLAN Token Claim Result is $RetVal\n" if ($v);
-      select (undef, undef, undef, .25); #wait 1/4 second
-    }
-    print "VLAN Token Claim Result is $RetVal\n" if ($v);
-    if ($RetVal ne 'success') {
-      my $Owner = $sess->get([[$TokenOwner,0]]);
-      if ($Owner ne "0.0.0.0") { 
-	$tries = 10;
-      } else {
-	print STDERR time,
-	"Try #$tries - Result is $RetVal - Waiting 2 seconds\n";
-	select (undef, undef, undef, 2); #wait 2 seconds
+      while ($RetVal eq "notReady") {
+	$RetVal = $sess->get([[$TokenReqResult,0]]);
+	print "*VLAN Token Claim Result is $RetVal\n" if ($v);
+	select (undef, undef, undef, .25); #wait 1/4 second
+      }
+      print "VLAN Token Claim Result is $RetVal\n" if ($v);
+      if ($RetVal ne 'success') {
+	my $Owner = $sess->get([[$TokenOwner,0]]);
+	if ($Owner ne "0.0.0.0") { 
+	  $tries = 10;
+	} else {
+	  print STDERR time,
+	  "Try #$tries - Result is $RetVal - Waiting 2 seconds\n";
+	  select (undef, undef, undef, 2); #wait 2 seconds
+	}
       }
     }
-  }
-  if ($RetVal ne 'success') {
-    my $Owner = $sess->get([[$TokenOwner,0]]);
-    print STDERR "VLAN Token Claim Result is $RetVal\n";
-    die("Can't edit VLANs: Token taken by $Owner\n");
+    if ($RetVal ne 'success') {
+      my $Owner = $sess->get([[$TokenOwner,0]]);
+      print STDERR "VLAN Token Claim Result is $RetVal\n";
+      die("Can't edit VLANs: Token taken by $Owner\n");
+    }
+  } elsif ($device eq "Cisco") {
+    my $EditOp = '.1.3.6.1.4.1.9.9.46.1.4.1.1.1'; # use index 1
+    my $BufferOwner = '.1.3.6.1.4.1.9.9.46.1.4.1.1.3'; # use index 1
+    $RetVal = $sess->set([[$EditOp,1,"copy","INTEGER"]]);
+    print "Set gave: '$RetVal'\n" if $v;
+    $RetVal = 
+      $sess->set([[$BufferOwner,1,substr(`uname -n`,0,-1),"OCTETSTR"]]);
+    print "Owner: '$RetVal'\n" if $v;
+    $RetVal = $sess->get([[$BufferOwner,1]]);
+    print "Owner is: '$RetVal'\n" if $v;
+  } else {
+    die("Invalid option 'get edit token' for device of type $device.\n");
   }
 }
 
@@ -490,46 +511,82 @@ sub GetToken {
 #
 
 sub ReleaseToken {
-  local(*sess,*v,*u) = @_;
-  my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
-  my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
-  my $TokenConfirmState = '.1.3.6.1.4.1.343.6.11.1.18';
-  my $save = ($u ? "saveWithConfirmOption" : "save");
-  print "Releasing Token with $save command\n" if ($v);
-  $sess->set([[$TokenRelease,0,$save,"INTEGER"]]);
-  my $RetVal = $sess->get([[$TokenReleaseResult,0]]);
-  print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-  while ($RetVal eq "notReady") {
-    $RetVal = $sess->get([[$TokenReleaseResult,0]]);
+  local(*sess,$v,$u) = @_;
+  if ($device eq "Intel") {
+    my $TokenRelease = '.1.3.6.1.4.1.343.6.11.4.8';
+    my $TokenReleaseResult = '.1.3.6.1.4.1.343.6.11.4.9';
+    my $TokenConfirmState = '.1.3.6.1.4.1.343.6.11.1.18';
+    my $save = ($u ? "saveWithConfirmOption" : "save");
+    print "Releasing Token with $save command\n" if ($v);
+    $sess->set([[$TokenRelease,0,$save,"INTEGER"]]);
+    my $RetVal = $sess->get([[$TokenReleaseResult,0]]);
     print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-    select (undef, undef, undef, .25); #wait 1/4 second
-  }
-  if ($u) {
-    $RetVal = $sess->get([[$TokenConfirmState,0]]);
-    print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
     while ($RetVal eq "notReady") {
-      sleep(2);
+      $RetVal = $sess->get([[$TokenReleaseResult,0]]);
+      print "VLAN Configuration Save Result is $RetVal\n" if ($v);
+      select (undef, undef, undef, .25); #wait 1/4 second
+    }
+    if ($u) {
       $RetVal = $sess->get([[$TokenConfirmState,0]]);
       print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-    }
-    if ($RetVal eq "ready")
-      {
-	$RetVal = $sess->set([[$TokenConfirmState,0,"confirm","INTEGER"]]);
+      while ($RetVal eq "notReady") {
+	sleep(2);
+	$RetVal = $sess->get([[$TokenConfirmState,0]]);
 	print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
       }
-    while (!($RetVal =~ /Conf/i)) {
-      $RetVal = $sess->get([[$TokenConfirmState,0]]);
-      print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
-    }	
-    if ($RetVal ne "confirmedNewConf") {
-      die("VLAN Reconfiguration Failed. No changes saved.\n");
+      if ($RetVal eq "ready")
+	{
+	  $RetVal = $sess->set([[$TokenConfirmState,0,"confirm","INTEGER"]]);
+	  print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
+	}
+      while (!($RetVal =~ /Conf/i)) {
+	$RetVal = $sess->get([[$TokenConfirmState,0]]);
+	print "VLAN Configuration Confirm Result is $RetVal\n" if ($v);
+      }	
+      if ($RetVal ne "confirmedNewConf") {
+	die("VLAN Reconfiguration Failed. No changes saved.\n");
+      }
+    } else {
+      if ($RetVal ne 'success') {
+	print "VLAN Configuration Save Result is $RetVal\n" if ($v);
+	die("$RetVal VLAN Reconfiguration Failed. No changes saved.\n");
+      }
+    }   
+  } elsif ($device eq "Cisco") {
+    my $EditOp = '.1.3.6.1.4.1.9.9.46.1.4.1.1.1'; # use index 1
+    my $ApplyStatus = '.1.3.6.1.4.1.9.9.46.1.4.1.1.2'; # use index 1
+    $RetVal = $sess->set([[$EditOp,1,"apply","INTEGER"]]);
+    print "Apply set: '$RetVal'\n" if $v;
+    my $RetVal = $sess->get([[$ApplyStatus,1]]);
+    print "Apply gave $RetVal\n" if $v;
+    while ($RetVal eq "inProgress") { 
+      $RetVal = $sess->get([[$ApplyStatus,1]]);
+      print "Apply gave $RetVal\n" if $v;
     }
+    my $ApplyRetVal = $RetVal;
+    if ($RetVal ne "succeeded") {
+      print "Apply failed: Gave $RetVal\n" if $v;
+    } else { 
+      print "Apply Succeeded.\n" if $v; 
+      $RetVal = $sess->set([[$EditOp,1,"release","INTEGER"]]);
+      if (! $RetVal ) {
+	die("VLAN Reconfiguration Failed. No changes saved.\n");
+      }
+      print "Release: '$RetVal'\n" if $v; 
+    }
+    # If I succeed or if $u is false, release buffer, otherwise I'll 
+    # try and correct the problem and apply the buffer again...
+    if (!$u) {
+      $RetVal = $sess->set([[$EditOp,1,"release","INTEGER"]]);
+      print "Release: '$RetVal'\n" if $v; 
+      if (! $RetVal ) {
+	die("VLAN Reconfiguration Failed. No changes saved.\n");
+      }
+    }
+    return $ApplyRetVal;
   } else {
-    if ($RetVal ne 'success') {
-      print "VLAN Configuration Save Result is $RetVal\n" if ($v);
-      die("$RetVal VLAN Reconfiguration Failed. No changes saved.\n");
-    }
-  }   
+    die("Invalid option 'release edit token' for device of type $device.\n");
+  }
 }
 
 #
@@ -553,7 +610,7 @@ sub OneVLAN {
     $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
     print "",($RetVal? "Succeeded":"Failed"),".\n";
     if (! defined ($RetVal) ) {
-      &ReleaseToken(*sess,*v,1);
+      &ReleaseToken(*sess,$v,1);
       die("VLAN name \"$m\" not unique.\n");
     }
     my @x;
@@ -573,10 +630,124 @@ sub OneVLAN {
       $n++;
     }
   } elsif ($device eq "Cisco") {
-    
+    my $VlanType = '.1.3.6.1.4.1.9.9.46.1.4.2.1.3.1'; # vlan # is index
+    my $VlanName = '.1.3.6.1.4.1.9.9.46.1.4.2.1.4.1'; # vlan # is index
+    my $VlanSAID = '.1.3.6.1.4.1.9.9.46.1.4.2.1.6.1'; # vlan # is index
+    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
+    my $N = 2;
+    my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
+    print "Row $N got '$RetVal'\n" if $debug;
+    while ($RetVal ne '') {
+      $N += 1;
+      $RetVal = $sess->get([[$VlanRowStatus,$N]]);
+      print "Row $N got '$RetVal'\n" if $debug;
+    }
+    my $SAID = pack("H*",sprintf("%08x",$N+100000));
+    if ( !$m 
+	 #Temporary fix: if its a lX-Y name from assign.tcl, ignore it
+	 || ($m =~ /l(\d)+-(\d)+/)
+	 #End of Temp fix
+       ) { $m = $N; }
+    print "  Creating VLAN $m as VLAN #$N: @vlan ... ";
+    # Yes, this next line MUST happen all in one set command....
+    $RetVal = $sess->set([[$VlanRowStatus,$N,"createAndGo","INTEGER"],
+			  [$VlanType,$N,"ethernet","INTEGER"],
+			  [$VlanName,$N,$m,"OCTETSTR"],
+			  [$VlanSAID,$N,$SAID,"OCTETSTR"]]);
+    print "",($RetVal? "Succeeded":"Failed"), ".\n";
+    if (!$RetVal) { 
+      print STDERR "VLAN Create '$m' as VLAN $N failed.\n"; 
+    } else {
+      $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
+      # If RetVal isn't succeeded, then I can try and fix it
+      my $tries = 0;
+      while ($RetVal ne "succeeded") {
+	$tries += 1;
+	if ($RetVal eq "someOtherError" && $tries <= 2) {
+	  #Duplicate name... correct and try again..
+	  my $name = $sess->get([[$VlanName,$N]]);
+	  print STDERR "VLAN name '$name' is already in use. ".
+	    "Renaming to '_$name'.\n";
+	  $name = $sess->set([[$VlanName,$N,"_$name","OCTETSTR"]]);
+	  $RetVal = &ReleaseToken(*sess,$v,1); #send last as 1 to get result
+	} else {
+	  &ReleaseToken(*sess,$v,0);
+	  die("VLAN Reconfiguration Failed. Unrecoverable Error. Notify".
+	      " Testbed Administrator immediately.\n");
+	}
+      }
+      # VLAN exists now - Add the ports:
+      # @vlan is a list of MACs, so I need to find out what they are...
+      my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
+      %ifIndex = &mac2ifIndex(*sess,*vlan);
+      foreach $mac (@vlan) {
+	my $IF = $ifIndex{$mac};
+	if (!defined $IF) {
+	  print "    Addding MAC address $mac - port not found ... Failed\n";
+	  next;
+	}
+	print "    Adding MAC Address $mac (ifIndex $IF) ... ";
+	$RetVal = $sess->set([[$PortVlanMemb,$IF,$N,"INTEGER"]]);
+	print "",($RetVal? "Succeeded":"Failed"), ".\n";
+      }
+    }
   } else { 
     die("Invalid option 'create VLAN' for device of type $device.\n");
   }
+}
+
+#
+# SUB mac2ifIndex ----------------------
+#
+
+sub mac2ifIndex {
+  # Takes a list of MAC addresses and finds their module/port numbers,
+  # then asks the switch what ifIndex that port has, and returns
+  # a hash of the ifIndices from the MAC address
+  local(*sess,*MACs) = @_;
+  use Mysql;
+  my $dbh = Mysql->connect("localhost","tbdb","script","none");
+  my $sth ="";
+
+  my @list=();
+  my $mac;
+  my $mod;
+  my $port;
+  my $index;
+  foreach $mac ( @MACs ) { push(@list,"MAC='\L$mac'"); }
+  my $cond = join(" or ",@list);
+  
+  my $cmd = "select i.MAC, w.node_id1, w.card1, w.port1, ".
+    "w.node_id2,w.card2,w.port2 from interfaces as i ".
+    "left join wires as w on w.node_id1=i.node_id and i.card=w.card1 ".
+    "and i.port=w.port1 where $cond";
+
+  my %Mod_Port = ();
+  $sth = $dbh->query($cmd);
+  print "\n" if $debug;
+  while ( @_ = $sth->fetchrow_array()) {
+    # Get module/port numbers for each MAC
+    $mac = $_[0];
+    $mod = $_[5];
+    $port = $_[6];
+    print "$mac ($_[1].$_[2].$_[3]) <==> ($_[4]) $mod.$port\n" if $debug;
+    $Mod_Port{$mac} = "$mod.$port";
+  }
+
+  # For now, just look on the switch I'm interested in...
+  # Later, we might have to see which switch the port is on and check that one
+  
+  my %ifIndex = ();
+  my $portIfIndex = ".1.3.6.1.4.1.9.5.1.4.1.1.11.";
+  foreach $mac ( keys %Mod_Port) {
+    print "getting $portIfIndex$Mod_Port{$mac}..." if $debug;
+    $index = $sess->get([["$portIfIndex$Mod_Port{$mac}"]]);
+    print "got $index\n" if $debug;
+    if (defined $index) { $ifIndex{$mac} = $index; }
+  }
+  
+  return %ifIndex;
+
 }
 
 #
@@ -599,7 +770,7 @@ sub AutoVLANConfig {
       print "Making $m with: ",join(' ',@vlan),"\n" if $debug;
       &OneVLAN(\$sess,\$m,\@vlan,\$v);
     }
-    &ReleaseToken(\$sess,\$v,\$u);
+    &ReleaseToken(\$sess,$v,$u);
   } else { 
     die("Invalid option 'VLANs from file' for device of type $device.\n");
   }
@@ -625,7 +796,17 @@ sub RemoveVLAN {
       }
     }
   } elsif ($device eq "Cisco") {
-    
+    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
+    if ($r == 1) {
+      print STDERR "VLAN #$r is the Control VLAN, and cannot be removed.\n";
+    } else {
+      print "  Removing VLAN #$r ... ";
+      my $RetVal = $sess->set([[$VlanRowStatus,$r,"destroy","INTEGER"]]);
+      print "",($RetVal? "Succeeded":"Failed"),".\n";
+      if (! defined $RetVal) { 
+	print STDERR "VLAN #$r does not exist on this switch.\n"; 
+      }
+    }
   } else { 
     die("Invalid option 'remove VLAN' for device of type $device.\n");
   }
@@ -639,14 +820,13 @@ sub RemoveVLAN {
 sub num { $a <=> $b; }
 
 sub ListVLANs {
-  local(*sess,*Interfaces,*v) = @_;
+  local(*sess,*Interfaces,*Ports,*v) = @_;
   my %Names = ();
   my %MACs = ();
+  my @data = ();
+  my $mac = "";
+  my @vlan = ();
   if ($device eq "Intel") {
-    my @data = ();
-    my @bytes = ();
-    my $mac = "";
-    my @vlan = ();
     my $field = ["vlanPolicyVlanTable",0];
     #do one to get the first field...
     $sess->getnext($field);
@@ -669,6 +849,60 @@ sub ListVLANs {
       $sess->getnext($field);
     } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/) ;
   } elsif ($device eq "Cisco") {
+    print "Getting VLAN info...\n" if $debug;
+    my $VlanIndex = ["vlanIndex",0]; # index by vlan #
+    my $VlanName = ["vtpVlanName",0]; # index by 1.vlan #
+    my $VlanPortVlan = ["vlanPortVlan",0]; # index by module.port, gives vlan #
+    #do one to get the first field...
+    my $RetVal = $sess->getnext($VlanIndex);
+    @data = @{$VlanIndex};
+    do {
+      print "Got $RetVal   \t" if $debug;
+      print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
+      if ($RetVal == 1 ) { $Names{1}="Control"; }
+      else { $Names{$RetVal} = ""; }
+      #do the getnext at the end, because if we're on the last, the next
+      #one is junk to all the processing instructions...
+      $RetVal = $sess->getnext($VlanIndex);
+      @data = @{$VlanIndex};
+    } while ( $data[0] =~ /^vlanIndex/ && $RetVal < 1000 ) ;
+    $RetVal = $sess->getnext($VlanName);
+    @data = @{$VlanName};
+    my $num = 0;
+    $data[1] =~ /\.(.*)/;
+    $num = $1;
+    do {
+      print "Got $RetVal   \t" if $debug;
+      print "$data[0]\t$data[1] ($num)\t$data[2]\n" if $debug;
+      if ( !$Names{$num} ) { $Names{$num} = $RetVal; }
+      #do the getnext at the end, because if we're on the last, the next
+      #one is junk to all the processing instructions...
+      $RetVal = $sess->getnext($VlanName);
+      @data = @{$VlanName};
+      $data[1] =~ /\.(.*)/;
+      $num = $1;
+    } while ( $data[0] =~ /^vtpVlanName/ && $num < 1000 ) ;
+    $RetVal = $sess->getnext($VlanPortVlan);
+    @data = @{$VlanPortVlan};
+    do {
+      if ($RetVal != 1) {
+	print "Got $RetVal   \t" if $debug;
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
+	my @vlan=();
+	if (defined ( @{$MACs{$data[2]}} ) ) { @vlan =@{$MACs{$data[2]}}; }
+	$_= join(":",split(/\./,$data[1]));
+	my $i = $sess->{DestHost};
+	print "(IP '$i' ith card/port '$_' " if $debug;
+	$mac = $Interfaces{$Ports{"$i:$_"}};
+	print "is MAC $mac)\n" if $debug;
+	push(@vlan, $mac);
+	$MACs{$data[2]} = \@vlan;
+	#do the getnext at the end, because if we're on the last, the next
+	#one is junk to all the processing instructions...
+      }
+      $RetVal = $sess->getnext($VlanPortVlan);
+      @data = @{$VlanPortVlan};
+    } while ( $data[0] =~ /^vlanPortVlan/ && $RetVal < 1000 ) ;
     
   } else { 
     die("Invalid option 'list VLANs' for device of type $device.\n");
@@ -770,23 +1004,24 @@ sub ReadTranslationTable {
   @_ = $sth->fetchrow_array(); #get column names first, ignore them
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
-    $mac = "$_[2]";
+    if ($_[2] != 1) {$name .=$_[2]; }
+    $mac = "$_[3]";
     $Table{$name} = $mac;
     $Table{$mac} = $name;
   }
-  $sth = $dbh->query("select * from wires;");
-  @_ = $sth->fetchrow_array(); #get column names first, ignore them
+  $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
+		     "from wires;");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
-    if ($_[2] =~ /Alpha/i) { $_[2] = "155.99.214.170"; }
-    elsif ($_[2] =~ /Beta/i)  { $_[2] = "155.99.214.171"; }
-    elsif ($_[2] =~ /Gamma/i)  { $_[2] = "155.99.214.172"; }
-    elsif ($_[2] =~ /Delta/i)  { $_[2] = "155.99.214.173"; }
-    elsif ($_[2] =~ /Eta/i)  { $_[2] = "155.99.214.174"; }
-    elsif ($_[2] =~ /Cisco/i)  { $_[2] = "155.99.214.175"; }
-    elsif ($_[2] =~ /Control/i)  { $_[2] = "155.99.214.175"; }
-    else { $_[2] = "155.99.214.175"; }
-    $switchport = join(":",($_[2],$_[3]));
+    if ($_[3] =~ /Alpha/i) { $_[3] = "155.99.214.170"; }
+    elsif ($_[3] =~ /Beta/i)  { $_[3] = "155.99.214.171"; }
+    elsif ($_[3] =~ /Gamma/i)  { $_[3] = "155.99.214.172"; }
+    elsif ($_[3] =~ /Delta/i)  { $_[3] = "155.99.214.173"; }
+    elsif ($_[3] =~ /Eta/i)  { $_[3] = "155.99.214.174"; }
+    elsif ($_[3] =~ /Cisco/i)  { $_[3] = "155.99.214.175"; }
+    else { $_[3] = "155.99.214.175"; }
+    $switchport = join(":",($_[3],$_[4]));
+    if ($_[3] eq "155.99.214.175") { $switchport .=":$_[5]"; }
     $Ports{$name} = $switchport;
     $Ports{$switchport} = $name;
   }
