@@ -30,6 +30,9 @@ while (<SNMPIT>) {
     $id = $line[0];
     if (! ($id =~ /[0-9]+/)) {next;}
     if ($id == 1) {next;}
+    # Skip VLANs with no members, which tries to delete VLAN 1,
+    # as well as private VLANs
+    if (@line < 2) {next;}
     $remove = 1;
     foreach $member (@line[2..$#line]) {
 	@elements = split(":",$member);
