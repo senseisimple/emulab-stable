@@ -566,6 +566,7 @@ CREATE TABLE nodes (
   ntpdrift float default NULL,
   ipport_low int(11) NOT NULL default '11000',
   ipport_high int(11) NOT NULL default '20000',
+  jailflag tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
