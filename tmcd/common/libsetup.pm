@@ -1327,7 +1327,7 @@ sub TBTimeStamp()
     
     if (! $imported_POSIX) {
 	require POSIX;
-	import POSIX::strftime;
+	import POSIX qw(strftime);
 	$imported_POSIX = 1;
     }
     return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
