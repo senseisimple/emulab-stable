@@ -22,7 +22,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  console_reset db2ns bwconfig
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
-		  os_setup mkexpdir console_setup webnscheck \
+		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp webkillbatchexp \
 		  assign_wrapper ptopgen
 

@@ -66,6 +66,23 @@ $nsfile = $row[nsfile];
 
 echo "<XMP>$nsfile</XMP>\n";
 
+echo "<br>
+      <center><h3>
+      Here is the physical mapping for this experiment
+      </h3></center>\n";
+
+$output = array();
+$retval = 0;
+
+$result = exec("$TBSUEXEC_PATH nobody flux webreport $exp_pid $exp_eid",
+ 	       $output, $retval);
+
+echo "<XMP>\n";
+for ($i = 1; $i < count($output); $i++) {
+    echo "$output[$i]\n";
+}
+echo "</XMP>\n";
+
 #
 # Standard Testbed Footer
 # 
