@@ -389,6 +389,9 @@ sub write_solution($$$) {
     my %links;
     while (my ($name, $node) = each %$nodegraph) {
 	foreach my $link (@{$node->{slinks}}) {
+	    if ($link->{'reversed'}) {
+		print "Found a reversed link - $link $link->{name}\n";
+	    }
 	    $links{$link->{'name'}} = $link;
 	}
     }
@@ -399,10 +402,10 @@ sub write_solution($$$) {
 	my @pairs = @$pairs;
 	my @real_virtlinks = list_links($links{$name});
 	foreach my $real_virtlink (@real_virtlinks) {
-	    print "$real_virtlink $type ";
+	    print "$real_virtlink->{name} $type ";
 
 	    my @ordered_pairs;
-	    if (!$links{$name}->{'reversed'}) {
+	    if (!$real_virtlink->{'reversed'}) {
 		@ordered_pairs = @pairs;
 	    } else {
 		# The direction of this link is reversed wrt the conglomerated
@@ -798,7 +801,8 @@ sub node_fits_in_conglomerate($$) {
 	'delay' => 2,
 	'pc850' => 1,
 	'pc600' => 1,
-	'lan'   => 100
+	'lan'   => 100,
+	'sim'	=> 1000
     );
 
     my %additive_features = (
@@ -1041,15 +1045,16 @@ sub make_link_conglomerates(@) {
 	    # Add it to the existing conglomerate
 	    $conglomerate->{'bw'} += $link->{'bw'};
 
-	    # XXX - Handle flags
-	    # Add to the nodes list
-	    push @{$conglomerate->{'links'}}, $link;
-
 	    # Figure out if it points in the same direction as the rest of the
 	    # links in the conglomerate
 	    if ($link->{'src'} ne $conglomerate->{'src'}) {
 		$link->{'reversed'} = 1;
 	    }
+
+	    # XXX - Handle flags
+	    # Add to the nodes list
+	    push @{$conglomerate->{'links'}}, $link;
+
 	}
     }
 
@@ -1099,7 +1104,7 @@ sub list_links($) {
     my ($virtual) = @_;
     my @linklist = ();
     if (!@{$virtual->{'links'}}) {
-	return ($virtual->{name});
+	return ($virtual);
     } else {
 	foreach my $link (@{$virtual->{'links'}}) {
 	    push @linklist, list_links($link);
