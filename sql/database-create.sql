@@ -1035,6 +1035,7 @@ CREATE TABLE plab_slices (
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
   slicemeta text,
+  leaseend datetime default NULL,
   PRIMARY KEY  (pid,eid)
 ) TYPE=MyISAM;
 

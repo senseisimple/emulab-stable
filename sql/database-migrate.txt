@@ -1385,3 +1385,7 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table widearea_recent modify node_id2 varchar(32) NOT NULL default '';
        alter table wires modify node_id1 char(32) NOT NULL default '';
        alter table wires modify node_id2 char(32) NOT NULL default '';
+
+1.231 add leaseend column to plab_slices table
+
+       alter table plab_slices add column leaseend datetime default NULL;
