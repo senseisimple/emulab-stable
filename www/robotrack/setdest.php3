@@ -119,7 +119,7 @@ while (list ($node_id, $value) = each ($nodeidlist)) {
 		     "websetdest -d -x $x -y $y -o $o $node_id",
 		     SUEXEC_ACTION_IGNORE);
 
-    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+#    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 
     #
     # Report fatal errors.
