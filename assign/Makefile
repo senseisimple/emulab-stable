@@ -4,8 +4,8 @@
 include ../Makeconf
 include ../GNUmakerules
 
-CXX=/usr/gnu/bin/g++
-CC=/usr/gnu/bin/gcc 
+CXX=/usr/bin/g++
+CC=/usr/bin/gcc 
 LEDA=/n/paria/z/dga/LEDA-4.0
 OBJS=score.o parse_top.o parse_ptop.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
