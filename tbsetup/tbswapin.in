@@ -48,6 +48,11 @@ my $state;
 sub cleanup {
     print STDERR "Cleaning up after errors.\n";
 
+    if ($os_setup_pid) {
+	print "Waiting for os_setup to finish\n";
+	waitpid($os_setup_pid,0);
+    }
+
     print "Stopping event system\n";
     if (system("eventsys_control stop $pid $eid")) {
 	print STDERR "*** Failed to stop the event system.\n";
@@ -128,6 +133,14 @@ if (system("exports_setup")) {
     exit(1);
 }
 
+print "Setting up named maps.\n";
+if (system("named_setup")) {
+    print STDERR "*** WARNING: Failed to add node names to named map.\n";
+    #
+    # This is a non-fatal error.
+    # 
+}
+
 print "Starting the event system.\n";
 if (system("eventsys_control start $pid $eid")) {
     print STDERR "*** Failed to start the event system.\n";
@@ -148,6 +161,13 @@ if (!($os_setup_pid = fork())) {
     exit(1);
 }
 
+#
+# XXX: Don't add any steps between here and the waitpid() call below without
+# verifying that 1) It's OK for nodes to come up before the step has
+# completed and 2) It's OK for the command to run in parallel with os_setup
+# (no DB dependencies, etc.)
+#
+
 print "Setting up VLANs.\n";
 if (system("snmpit -t $pid $eid")) {
     print STDERR "*** Failed to set up VLANs.\n";
@@ -159,14 +179,6 @@ if (system("snmpit -t $pid $eid")) {
 # An error now means that the VLANS need to be cleaned up.
 #
 $cleanvlans = 1;
-
-print "Setting up named maps.\n";
-if (system("named_setup")) {
-    print STDERR "*** WARNING: Failed to add node names to named map.\n";
-    #
-    # This is a non-fatal error.
-    # 
-}
 
 print "Setting up email lists.\n";
 if (system("genelists")) {
@@ -181,12 +193,14 @@ if (system("genelists")) {
 #
 $kid = waitpid($os_setup_pid,0);
 if ($kid == $os_setup_pid) {
+    undef $os_setup_pid; # Make sure cleanup() doesn't wait for it
     if ($CHILD_ERROR) {
 	print STDERR "*** Failed to reset OS and reboot nodes.\n";
 	cleanup;
 	exit(1);
     }
 } else {
+    undef $os_setup_pid;
     print STDERR "*** Error waiting for os_setup to finish.\n";
     cleanup;
     exit(1);
