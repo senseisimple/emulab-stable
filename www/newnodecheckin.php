@@ -82,7 +82,8 @@ if (count($interfaces)) {
         $row = mysql_fetch_array($query_result);
 	$id = $row["new_node_id"];
 	$node_id = $row["node_id"];
-        echo "Node has already checked in as ID $id, name $node_id\n";
+        echo "Node has already checked in\n";
+	echo "Node ID is $id\n";
 
 	#
 	# Keep the temp. IP address around in case it's gotten a new one
@@ -124,6 +125,8 @@ DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
 $query_result = DBQueryFatal("select last_insert_id()");
 $row = mysql_fetch_array($query_result);
 $new_node_id = $row[0];
+
+echo "Node ID is $new_node_id\n";
 
 foreach ($interfaces as $interface) {
 	$card = $interface["card"];
