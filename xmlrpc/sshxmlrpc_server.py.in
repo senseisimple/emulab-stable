@@ -1,0 +1,54 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+import time
+import socket
+import sshxmlrpc
+
+#
+# This class implements the server side of the XMLRPC interface to Emulab. 
+#
+class MyEchoObject:
+
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self):
+        self.VERSION = "MyEchoObject v0.1"
+        return
+
+    ##
+    # Echo a message, basically, prepend the host name to the parameter.
+    #
+    # @param msg The message to echo.
+    # @return The 'msg' value with this machine's name prepended.
+    #
+    def echo(self, msg):
+        return socket.gethostname() + ": " + msg
+
+    ##
+    # Similar to echo, except it also prepends the current time.
+    #
+    # @param msg The message to echo.
+    # @return The 'msg' value with this machine's name and current time
+    # prepended.
+    #
+    # @sa echo
+    #
+    def echoWithTime(self, msg):
+        return (socket.gethostname()
+                + " - "
+                + time.asctime(time.localtime())
+                + ": "
+                + msg)
+
+    pass
+
+
+# Construct and wrap our object.
+wrapper = sshxmlrpc.SSHServerWrapper(MyEchoObject())
+# Handle the request on stdin and send the response to stdout.
+wrapper.handle_request((sys.stdin, sys.stdout))

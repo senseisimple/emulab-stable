@@ -1,0 +1,82 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+import getopt
+
+from sshxmlrpc import *
+
+##
+# The package version number
+#
+PACKAGE_VERSION = "0.1"
+
+##
+# Print the usage statement to stdout.
+#
+def usage():
+    print "Send an XML-RPC request to a SSH-based server."
+    print "Usage: " + sys.argv[0] + " [-hV] <URI> <method> [<args>]"
+    print
+    print "Options:"
+    print "  -h, --help\t\t  Display this help message"
+    print "  -V, --version\t\t  Show the vesion number"
+    print
+    print "Required arguments:"
+    print "  URI\t\t\t  The URI of the server (e.g. ssh://localhost/echo.py)"
+    print "  method\t\t  The method to execute on the server"
+    print "  args\t\t\t  The method arguments, given as a python list"
+    print "      \t\t\t  (Note: This value gets eval'd)"
+    print
+    print "Example:"
+    print ("  "
+           + sys.argv[0]
+           + " ssh://ops.emulab.net/~stack/sshxmlrpc/echo.py"
+           + " echo '\"Hello, World!\"'")
+    return
+
+try:
+    # Parse the options,
+    opts, req_args = getopt.getopt(sys.argv[1:],
+                                   "hV",
+                                   [ "help", "version", ])
+    # ... act on them appropriately, and
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit()
+            pass
+        elif opt in ("-V", "--version"):
+            print PACKAGE_VERSION
+            sys.exit()
+            pass
+        pass
+    # ... make sure the required arguments are there.
+    if len(req_args) < 2:
+        raise getopt.error("Required arguments not given", "")
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+# Get a handle on the server,
+server = SSHServerProxy(req_args[0])
+
+# ... get the requested method,
+meth = getattr(server, req_args[1])
+
+# ... cons up the arguments, and
+if len(req_args) > 2:
+    meth_args = eval("[" + req_args[2] + "]")
+    pass
+else:
+    meth_args = []
+    pass
+
+# ... make the call.
+print str(apply(meth, meth_args))
