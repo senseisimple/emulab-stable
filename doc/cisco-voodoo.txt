@@ -108,6 +108,19 @@ ID  Name                            Members of VLAN
    through, then try generating your traffic while you are connected to
    the router and see if you get errors.
 
+   To see the whole lists in all their ugliness, type:
+	show ip access-lists
+   The rules are pretty straightforward. First match wins. Netmasks are bass-ackwards
+   (intead of 255.255.255.0, you would use 0.0.0.255). Each list is applied both
+   on entrance and exit to the like-named control network VLAN.
+
 3. Changing the firewall rules
 
-   No freakin' clue.
+   ROB: Working on this part
+
+4. Finding MAC address information
+	To find which port a given MAC address is on type (on the switch console):
+		show cam <MAC> (where MAC is colon-separated, like 08:00:2b:81:62:d3
+	To show all MAC addresses in a given VLAN, type:
+		show cam dynamic <VLAN> (where VLAN is the number, not the name)
+	
