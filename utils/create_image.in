@@ -10,7 +10,7 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: create-image <node> <imageid> <filename>\n";
+    print STDOUT "Usage: create-image <imageid> <node>\n";
     exit(-1);
 }
 my  $optlist = "";
@@ -20,6 +20,7 @@ my  $optlist = "";
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
 my $PROJROOT	= "/proj";
 my $TFTPDIR     = "/tftpboot";
 
@@ -51,8 +52,8 @@ my $createimage = "/usr/local/bin/create-image";
 my $device      = "/dev/rad0";
 my $mereuser    = 0;
 my %imageid_row = ();
-my $logname     = 0;
 my $debug       = 0;
+my $logname;
 my @row;
 my $dbuid;
 
@@ -64,13 +65,12 @@ my $dbuid;
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 3) {
+if (@ARGV != 2) {
     usage();
 }
 
-my $node     = $ARGV[0];
-my $imageid  = $ARGV[1];
-my $filename = $ARGV[2];
+my $imageid  = $ARGV[0];
+my $node     = $ARGV[1];
 
 #
 # Untaint the arguments.
@@ -80,13 +80,6 @@ if ($node =~ /^([-\w]+)$/) {
 }
 else {
     die("*** Tainted node name: $node\n");
-}
-# Note different taint check (allow /).
-if ($filename =~ /^([-\w.\/]+)$/) {
-    $filename = $1;
-}
-else {
-    die("*** Tainted output filename: $filename\n");
 }
 
 #
@@ -155,6 +148,16 @@ if ($mereuser && $imagepid &&
 # exists and is writeable for the user. We test this by creating the file.
 # Its going to get wiped anyway.
 #
+my $filename = $imageid_row{'path'};
+
+# Untaint. Very silly.
+if ($filename =~ /^([-\w\.\/]+)$/) {
+    $filename = $1;
+}
+else {
+    die("Bad filename: $filename");
+}
+
 if (! ($filename =~ /^$PROJROOT\/$pid\/.*/)) {
     die("File $filename for must reside someplace in $PROJROOT/$pid\n");
 }
@@ -183,15 +186,25 @@ else {
 #
 # Go to the background since this is going to take a while.
 # 
-if (!$debug && background()) {
-    #
-    # Parent exits normally
-    #
-    print STDOUT
-	"Your image from $node is being created\n".
-	"You will be notified via email when the image has been\n".
-	"completed, and you can load the image on another node.\n";
+if (!$debug) {
+    $logname = `mktemp /tmp/create-image-$pid-$eid.XXXXXX`;
+
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    }
+    else {
+	die("Bad data in logfile name: $logname");
+    }
+    if (TBBackGround($logname)) {
+	#
+	# Parent exits normally
+	#
+	print STDOUT
+	    "Your image from $node is being created\n".
+	    "You will be notified via email when the image has been\n".
+	    "completed, and you can load the image on another node.\n";
 	exit(0);
+    }
 }
 
 #
@@ -283,9 +296,13 @@ SENDMAIL("$user_name <$user_email>",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
 	 "You may now os_load this image on other nodes in your experiment.\n",
-	 "$TBOPS");
+	 "$user_name <$user_email>",
+	 "Bcc: $TBLOGS",
+	 ($logname));
 
-unlink("$logname");
+if (defined($logname)) {
+    unlink("$logname");
+}
 exit 0;
 
 sub cleanup ()
@@ -294,72 +311,26 @@ sub cleanup ()
 		"startupcmd='$saved_startupcmd' where node_id='$node'");
 }
 
-#
-# Put ourselves into the background so that caller sees immediate response.
-# Mail notification will happen later.
-# 
-sub background()
-{
-    $mypid = fork();
-    if ($mypid) {
-	return $mypid;
-    }
-
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller (the web server) will
-    # continue to wait even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Create a temporary name for a log file and untaint it.
-    #
-    $logname = `mktemp /tmp/create-image-$pid-$eid.XXXXXX`;
-
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in $logname";
-    }
-
-    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-
-    return 0;
-}
-
 sub fatal($)
 {
     my($mesg) = $_[0];
-    local $MAIL;
+
+    print "$mesg\n";
     
     #
-    # Send a message to the testbed list. Append the logfile if it got
-    # that far.
+    # Send a message to the testbed list. 
     #
-    if (! ($MAIL =
-	   OPENMAIL("$user_name <$user_email>",
-		    "TESTBED: Image Creation Failure on $node: $pid/$eid",
-		    undef, "Cc: $TBOPS"))) {
-	die("Cannot start mail program!");
-    }
-
-    print $MAIL $mesg;
-
-    if (open(IN, "$logname")) {
-	print $MAIL "\n\n---------\n\n";
-	
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-    }
-    close($MAIL);
+    SENDMAIL("$user_name <$user_email>",
+	     "TESTBED: Image Creation Failure on $node: $pid/$eid",
+	     $mesg,
+	     "$user_name <$user_email>",
+	     "Cc: $TBOPS",
+	     ($logname));
     
-    unlink("$logname");
+    
+    if (defined($logname)) {
+	unlink("$logname");
+    }
     exit(-1);
 }
 
