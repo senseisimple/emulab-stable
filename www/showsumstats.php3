@@ -238,7 +238,7 @@ function edaycmp ($a, $b) {
 
 function showrange ($showby, $sortby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
-    $debug = 1;
+    $debug = 0;
     
     switch ($range) {
         case "day":
