@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -256,7 +256,7 @@ sub DoneIfEdited($) {
 # Check to see if the phase is already done, as evidenced by the fact that two
 # files are identical
 #
-sub DoneIfIdentical($) {
+sub DoneIfIdentical($$) {
     my ($filename1,$filename2) = @_;
     if (!$filename1 || !$filename2) {
 	PhaseFail("Bad filename passed to DoneIfIdentical");
