@@ -20,7 +20,7 @@ use Exporter;
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
-	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
+	 tmcctimeout libsetup_getvnodeid dotrafficconfig
 	 ixpsetup dokeyhash donodeid
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS IXP
@@ -73,6 +73,11 @@ my $inplab;
 #
 my $inixp;
 
+#
+# Inside, there might be a tmcc proxy socket. 
+#
+my $tmccproxy;
+
 # Load up the paths. Its conditionalized to be compatabile with older images.
 # Note this file has probably already been loaded by the caller.
 BEGIN
@@ -98,6 +103,22 @@ BEGIN
 	    die("Bad data in vnodeid: $vnodeid");
 	}
 	$injail = 1;
+
+	#
+	# Temporary. Will move to tmcc library. 
+	#
+	if (-e "$BOOTDIR/proxypath") {
+	    open(PP, "$BOOTDIR/proxypath");
+	    $tmccproxy = <PP>;
+	    close(PP);
+
+	    if ($tmccproxy =~ /^([-\w\.\/]+)$/) {
+		$tmccproxy = $1;
+	    }
+	    else {
+		die("Bad data in tmccproxy path: $tmccproxy");
+	    }
+	}
     }
 
     # Determine if running inside a Plab vserver.
@@ -293,9 +314,8 @@ my $eid		= "";
 my $vname	= "";
 
 # Control tmcc error condition and timeout. Dynamic, not lexical!
-$tmccdie        = 1; 
 $tmcctimeout    = 0;
-my $TMCCTIMEO   = 30;	# Default timeout on remote nodes. 
+my $TMCCTIMEO   = 30;	# Default timeout on remote nodes.
 
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
@@ -359,13 +379,15 @@ sub OPENTMCC($;$$)
     if ($tmcctimeout) {
 	$options .= " -t $tmcctimeout";
     }
+    if (defined($tmccproxy)) {
+	$options .= " -l $tmccproxy";
+    }
 
     my $foo = sprintf("%s -v %d $options $NODE $vn $cmd $args |",
 		      TMCC, TMCD_VERSION);
 
     if (!open(TM, $foo)) {
 	print STDERR "Cannot start TMCC: $!\n";
-	die("\n") if $tmccdie;
 	return undef;
     }
     return (*TM);
@@ -384,7 +406,6 @@ sub CLOSETMCC($) {
 	else {
 	    print STDERR "Error closing TMCC pipe: $!\n";
 	}
-	die("\n") if $tmccdie;
 	return 0;
     }
     return 1;

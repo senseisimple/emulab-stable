@@ -30,6 +30,7 @@ typedef int socklen_t;
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <assert.h>
 #include <sys/types.h>
@@ -650,6 +651,7 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 		perror("binding unix domain socket");
 		exit(-1);
 	}
+	chmod(localpath, S_IRWXU|S_IRWXG|S_IRWXO);
 	if (listen(sock, 5) < 0) {
 		perror("listen on unix domain socket");
 		exit(-1);

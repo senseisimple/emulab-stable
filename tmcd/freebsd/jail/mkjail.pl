@@ -685,6 +685,13 @@ sub startproxy($)
 	# -l option specified all over.
 	#
 	$ENV{'TMCCUNIXPATH'} = $insidepath;
+
+	#
+	# The above is good only for direct decendents of the init process.
+	# So, the above will be phased out in favor of a file in the usual
+        # place to clue the client in. 
+	#
+	mysystem("echo $insidepath > $dir/root/${BOOTDIR}/proxypath");
 	
 	select(undef, undef, undef, 0.2);
 	return 0;
