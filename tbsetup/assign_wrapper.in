@@ -2067,7 +2067,10 @@ sub requires_delay {
     my $targetbandwidth = $_[0];
     my $bestbandwidth = getbandwidth($targetbandwidth);
     printdb "Checking $bestbandwidth against $targetbandwidth\n";
-    if ($bestbandwidth == $targetbandwidth) {
+    # XXX temporary hack: && $bestbandwidth < $S100Kbs
+    # A delay node is not being added for the 10Mb 0ms link
+    # Permanent fix required
+    if ($bestbandwidth == $targetbandwidth && $bestbandwidth < $S100Kbs) {
 	return 0;
     }
 
