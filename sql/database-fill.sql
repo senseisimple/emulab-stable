@@ -339,6 +339,7 @@ REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','SHUTDOWN','Retry')
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('PCVM','ISUP','BOOTING','Crash');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
