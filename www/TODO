@@ -8,6 +8,8 @@ importance should be obvious. Whoever does this work *will* program in the
 dominate style of the existing, newly written, 4500 lines of code! Now, if
 I could just figure out how to add a php mode to emacs ...
 
+* Add password hint for the clueless users who forget their passwords.
+
 * tbend should work from the database, not the .ir file.
 
 * Put a limit on the number of new users/projects that can be
