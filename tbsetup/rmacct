@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: rmacct,v 1.3 2000-11-21 10:38:16 kwright Exp $
+### $Id: rmacct,v 1.4 2000-11-21 10:49:47 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -214,7 +214,7 @@ foreach $IP (@nodes) {
 	    }
 
 	    print "Removing group $eid on $IP.\n";
-	    open(GROUPDEL, "/usr/local/bin/sshtb $IP /usr/sbin/groupdel $eid 2>&1 |");
+	    open(GROUPDEL, "/usr/local/bin/sshtb $IP /usr/sbin/groupdel $group 2>&1 |");
 	    while (<GROUPDEL>) { print "$_"; }
 	    close(GROUPDEL); 
 

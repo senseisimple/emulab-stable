@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: mkacct,v 1.21 2000-11-21 10:37:53 kwright Exp $
+### $Id: mkacct,v 1.22 2000-11-21 10:49:47 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -249,7 +249,7 @@ foreach $IP (@nodes) {
             ## will report it and move on.
 
 	    print "Creating group $unix_gid on $IP.\n";
-	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
+	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $unix_gid $group 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
 	    my $i = 1;
