@@ -4,7 +4,7 @@ source [file dirname [info script]]/oslib.tcl
 namespace import TB_OS::os
 
 if {[llength $argv] == 0 || [llength $argv] > 2} {
-    puts stderr "Syntax: $arg0 \[-v\[v\]\] <node>"
+    puts stderr "Syntax: $argv0 \[-v\[v\]\] <node>"
     exit 1
 }
 

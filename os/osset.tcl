@@ -4,7 +4,7 @@ source [file dirname [info script]]/oslib.tcl
 namespace import TB_OS::os
 
 if {[llength $argv] < 2} {
-    puts stderr "Syntax: $arg0 <node> <base> <deltas...>"
+    puts stderr "Syntax: $argv0 <node> <base> <deltas...>"
     exit 1
 }
 
