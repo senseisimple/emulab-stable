@@ -503,10 +503,21 @@ while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
     }
 }
 
-# Read interface types
-$result = DBQueryFatal("SELECT type,max_speed from interface_types");
-while (($type,$speed) = $result->fetchrow_array) {
-    $interfacespeeds{$type} = $speed;
+# Read interface types. First need to find the protocols an interface supports
+# and then then the speed for each of those protocols.
+# Note that we are going to assume anything attached to a switch is ethernet.
+$result = DBQueryFatal("SELECT type,capkey,capval from interface_capabilities ".
+		       "where capkey='protocols' or capkey like '%_defspeed'"); 
+while (($type,$capkey,$capval) = $result->fetchrow_array) {
+    if ($capkey eq "protocols") {
+	$interfaceprotocols{$type} = [ split(",", $capval) ];
+    }
+    elsif ($capkey =~ /^([-\w]+)_defspeed$/) {
+	$interfacespeeds{$type}{$1} = $capval;
+    }
+    else {
+	die("Improper defspeed $capval for $type!\n");
+    }
 }
 
 # Read interface switches
@@ -532,8 +543,8 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	(defined($nodes{$node2}) || defined($switches{$node2}))) {
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
-	$iface1bw = get_ifacebw($node1,$card1,$port1);
-	$iface2bw = get_ifacebw($node2,$card2,$port2);
+	$iface1bw = get_ifacebw($node1,$card1,$port1,"ethernet");
+	$iface2bw = get_ifacebw($node2,$card2,$port2,"ethernet");
 	# XXX - This is a bad, bad hack - we  use our knowledge that in the
 	# wires table links to the switch always come as node2. We also assume
 	# that node interfaces are plugged into switch ports of the same speed.
@@ -589,7 +600,7 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
 	    my ($node,$iface) = split /:/, $member;
 	    my $switch = get_ifaceswitch($node,$iface);
 	    my ($card, $port) = get_ifacecardport($node,$iface);
-	    my $bw = get_ifacebw($node,$card,$port);
+	    my $bw = get_ifacebw($node,$card,$port,"ethernet");
 	    $switches{$switch} += $bw;
 	}
 
@@ -624,6 +635,38 @@ foreach $interconnect (keys(%interconnects)) {
     print "link link-$interconnect $src $dst $interconnects{$interconnect} 0 0 1\n";
 }
 
+#
+# Fake switches. Hardwired for now. 
+#
+foreach my $switchtype (("80211a", "80211b", "80211g")) {
+    my $switchname = $switchtype;
+    print "node $switchname *${switchtype}:*\n";
+
+    foreach my $interface (keys(%interfacetypes)) {
+	my ($node,$card,$port) = split(":", $interface);
+
+	next
+	    if (!defined($nodes{$node}));
+	
+	my $type    = $interfacetypes{$interface};
+	my @protos  = @{ $interfaceprotocols{$type} };
+	my $iface   = get_iface($node,$card,$port);
+
+	foreach my $proto (@protos) {
+	    if ($proto eq $switchtype) {
+		my $ifacebw = get_ifacebw($node,$card,$port,$proto);
+
+		#print "$node $card $port $type $proto\n";
+		
+		print "link link-$node:$iface-$switchname:(null) ".
+		    "$node:$node/$iface $switchname:(null) $ifacebw 0 0 1\n";
+	    }
+	}
+    }
+}
+
+exit(0);
+
 # Print out links
 sub get_iface {
     ($node,$card,$port) = @_;
@@ -640,11 +683,12 @@ sub get_iface {
     }
 };
 
-# Find the bandwidth for an interface
+# Find the bandwidth for an interface, when using the given protocol (which
+# most of the time is ethernet).
 sub get_ifacebw {
-    ($node,$card,$port) = @_;
+    ($node,$card,$port,$protocol) = @_;
     if (defined($interfacetypes{"$node:$card:$port"})) {
-	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}};
+	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}}{$protocol};
     }
     else {
 	return $default_switchport_speed;

@@ -773,9 +773,9 @@ proc tb-set-delay-os {os} {
 #
 # Allow type of lans (but not links) to be changed.
 #
-proc tb-set-protocol {lanlink protocol} {
+proc tb-set-lan-protocol {lanlink protocol} {
     if {[$lanlink info class] != "Lan"} {
-	perror "\[tb-set-protocol] $lanlink is not a lan."
+	perror "\[tb-set-lan-protocol] $lanlink is not a lan."
 	return
     }
     $lanlink set protocol $protocol
@@ -797,3 +797,24 @@ proc tb-set-lan-accesspoint {lanlink node} {
     $lanlink set_accesspoint $node
 }
 
+#
+# Set capabilities for lans and members of lans.
+#
+proc tb-set-lan-setting {lanlink capkey capval} {
+    if {[$lanlink info class] != "Lan"} {
+	perror "\[tb-set-lan-setting] $lanlink is not a lan."
+	return
+    }
+    $lanlink set_setting $capkey $capval
+}
+proc tb-set-node-lan-setting {lanlink node capkey capval} {
+    if {[$lanlink info class] != "Lan"} {
+	perror "\[tb-set-node-lan-setting] $lanlink is not a lan."
+	return
+    }
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-lan-setting] $node is not a node."
+	return
+    }
+    $lanlink set_member_setting $node $capkey $capval
+}

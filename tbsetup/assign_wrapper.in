@@ -207,10 +207,10 @@ my %virt_vtypes = ();
 my %node_types = ();
 
 # 
-# interface_types: We need this to find out the bandwidths of the devices
+# interface_capabilities: We need this to find out the bandwidths of the devices
 # we actually have on the testbed. Index by interface type name.
 #
-my %interface_types = ();
+my %interface_capabilities = ();
 
 #
 # XXX Hack table for determining if a delay node is required. We store
@@ -267,6 +267,7 @@ my $uselinkdelays;
 my $forcelinkdelays;
 my $usewatunnels;
 my $multiplex_factor;
+my $experiment_idx;
 
 # For admission control. Not well defined yet.
 my $cpu_usage;
@@ -1340,6 +1341,9 @@ if ($updating && !$impotent) {
 
 	# Clean the veth_interfaces table for this node too.
 	DBQueryFatal("delete from veth_interfaces where node_id='$pnode'");
+	
+	# And interface settings.
+	DBQueryFatal("delete from interface_settings where node_id='$pnode'");
     }
 }
 
@@ -1544,7 +1548,7 @@ foreach $plink (keys(%plinks)) {
 	}
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linklan/([^/]+)/(.+)$|)) {
-	# node may be the LAN multiple times.
+	# node may be in the LAN multiple times.
 	# nodeportA is the node.
 	# nodeportB is the LAN
 	# No delays
@@ -1609,6 +1613,20 @@ foreach $plink (keys(%plinks)) {
 		    "$rbandwidth,$rloss,$trivonly\]\n";
 	    }
 	}
+    }
+    elsif (($lan,$virtA) = ($plink =~ m|^fakelan/([^/]+)/(.+)$|)) {
+	# node is attached to a fake switch (LAN).
+	# nodeportA is the node.
+	# nodeportB is the fake LAN.
+	printdb " FAKELAN:";
+
+	#
+	# No trivial links, emulated links, delays, vlans. We do however need
+	# to come up with an ssid?
+	# 
+	$portmap{$virtA} = $portA;
+	printdb "  Portmap:\n";
+	printdb "    $virtA = $portA\n";
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	   $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
@@ -1782,13 +1800,13 @@ foreach $delayid (keys(%nodedelays)) {
     #       is set.
     #
 
-    my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0));
+    my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0), "ethernet");
     DBQueryFatal("update interfaces set " .
 		 "current_speed='$speed0' " .
 		 "where node_id='$pnode' and ".
 		 "iface='$int0'");
 
-    my $speed1 = interfacespeedmbps(physinterfacetype($pnode,$int1));
+    my $speed1 = interfacespeedmbps(physinterfacetype($pnode,$int1), "ethernet");
     DBQueryFatal("update interfaces set " .
 		 "current_speed='$speed1' " .
 		 "where node_id='$pnode' and ".
@@ -2153,6 +2171,104 @@ if ($query_result->numrows) {
 }
 
 #
+# Deal with interface settings.
+#
+foreach my $lan (keys(%virt_lans)) {
+    my $protocol = virtlanprotocol($lan);
+    
+    next
+	if (virtlanwidearea($lan) || $protocol eq "ethernet");
+	
+    my @members = virtlanmembers($lan);
+    my $ssid    = "${lan}_${experiment_idx}";
+    my $ap;
+
+    #
+    # Grab the settings for the entire lan. We will put them into the
+    # interface_settings table for each member of the lan.
+    #
+    my %lan_settings = ();
+    my $query_result =
+	DBQueryFatal("select capkey,capval from virt_lan_settings ".
+		     "where pid='$pid' and eid='$eid' and vname='$lan'");
+
+    while (my ($capkey,$capval) = $query_result->fetchrow_array()) {
+	$lan_settings{$capkey} = $capval;
+    }
+
+    #
+    # See who the access point is. This is icky. 
+    # 
+    if (virtlanAP($lan)) {
+	my ($vnode, $port) = split(":", virtlanAP($lan));
+	my $pnode = $v2pmap{$vnode};
+ 	my $pport = $portmap{virtlanAP($lan)}; 
+	
+ 	my $query_result =
+	    DBQueryFatal("select MAC from interfaces ".
+			 "       where node_id='$pnode' and iface='$pport'");
+	($ap) = $query_result->fetchrow_array();
+    }
+
+    foreach my $member (@members) {
+	my ($vnode, $port) = split(":", $member);
+	my $pnode = $v2pmap{$vnode};
+ 	my $pport = $portmap{$member}; 
+
+	#
+	# First copy over the lan settings.
+	#
+	foreach my $capkey (keys(%lan_settings)) {
+	    my $capval = $lan_settings{$capkey};
+	    
+	    DBQueryFatal("insert into interface_settings ".
+			 "       (node_id, iface, capkey, capval) ".
+			 "values ('$pnode', '$pport', '$capkey', '$capval')");
+
+	    printdb("interface_setting: $pnode $pport $capkey $capval\n");
+	}
+
+	#
+	# Next do the per-member settings, which override lan settings.
+	#
+	my $query_result =
+	    DBQueryFatal("select capkey,capval from virt_lan_member_settings ".
+			 "where pid='$pid' and eid='$eid' and vname='$lan' and ".
+			 "      member='$member'");
+
+	while (my ($capkey,$capval) = $query_result->fetchrow_array()) {
+	    DBQueryFatal("insert into interface_settings ".
+			 "       (node_id, iface, capkey, capval) ".
+			 "values ('$pnode', '$pport', '$capkey', '$capval')");
+
+	    printdb("interface_setting: $pnode $pport $capkey $capval\n");
+	}
+
+	#
+	# And lastly, these override anything the user says to do.
+	# 
+	DBQueryFatal("insert into interface_settings ".
+		     "       (node_id, iface, capkey, capval) ".
+		     "values ('$pnode', '$pport', 'protocol', '$protocol')");
+	
+	printdb("interface_setting: $pnode $pport protocol $protocol\n");
+
+	DBQueryFatal("insert into interface_settings ".
+		     "       (node_id, iface, capkey, capval) ".
+		     "values ('$pnode', '$pport', 'ssid', '$ssid')");
+	
+	printdb("interface_setting: $pnode $pport ssid $ssid\n");
+
+	if (defined($ap)) {
+	    DBQueryFatal("insert into interface_settings ".
+			 "       (node_id, iface, capkey, capval) ".
+			 "values ('$pnode', '$pport', 'accesspoint', '$ap')");
+	    printdb("interface_setting: $pnode $pport accesspoint $ap\n");
+	}
+    }
+}
+
+#
 # Adding to the v2pmap table
 #
 foreach my $vnode (keys(%v2pmap)) {
@@ -2203,33 +2319,33 @@ exit 0;
 # Returns the lowest ok bandwidth that is greater than or equal to
 # the one passed. Takes a virtual node, from which it grabs a type - only
 # consideres bandwidths on the node types the virtual node can be mapped to.
-# Very similar to requires_delay above
-sub getbandwidth($$) {
-    my ($node, $targetbw) = @_;
+# Very similar to requires_delay().
+sub getbandwidth($$$) {
+    my ($node, $lan, $targetbw) = @_;
     my $best = 10000000000;
 
     my $node_type  = virtnodetype($node);
     my $node_class = nodetypeclass($node_type);
-    
+    my $protocol   = virtlanprotocol($lan);
+
     fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	  "getbandwidth(): $node - invalid type/class $node_type/$node_class!")
-	if (!exists($node_type_linkbw{$node_type}) &&
-	    ($node_class && !exists($node_type_linkbw{$node_class})));
+	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
+	    ($node_class && !exists($node_type_linkbw{$node_class}{$protocol})));
 
-    foreach my $bw (keys(%{ $node_type_linkbw{$node_type} })) {
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_type}{$protocol} })) {
 	if (($bw >= $targetbw) && ($bw < $best)) {
 	    $best = $bw;
 	}
     }
 
     if ($node_class) {
-	foreach my $bw (keys(%{ $node_type_linkbw{$node_class} })) {
+	foreach my $bw (keys(%{ $node_type_linkbw{$node_class}{$protocol} })) {
 	    if (($bw >= $targetbw) && ($bw < $best)) {
 		$best = $bw;
 	    }
 	}
     }
-
     return $best;
 
 }
@@ -2857,19 +2973,16 @@ sub newvname_simhost($)
 #
 sub LoadPhysInfo()
 {
-    # Interface types. We could get by without this, using the phys_nodes
-    # table info we load later, but for the naming conflicts between some
-    # of the fields in the nodes table and node_types.
+    #
+    # Interface capabilities, for getting speeds.
+    #
     my $query_result =
-	DBQueryFatal("select * from interface_types");
+	DBQueryFatal("select * from interface_capabilities");
 
-    while (my $rowref = $query_result->fetchrow_hashref()) {
-	my $type = $rowref->{"type"};
-
-	#
-	# Stash the entire DB row reference.
-	#
-	$interface_types{$type} = $rowref;
+    while (my ($type, $capkey, $capval) = $query_result->fetchrow()) {
+	$interface_capabilities{$type} = {}
+  	    if (!defined($interface_capabilities{$type}));
+	$interface_capabilities{$type}->{$capkey} = $capval;
     }
 
     # Node types table.
@@ -2926,16 +3039,28 @@ sub LoadPhysInfo()
 	$node_type_linkbw{$node_class} = {}
 	    if (!defined($node_type_linkbw{$node_class}));
 
-	$node_type_linkbw{$node_type}->{interfacespeed($iface_type)} = 1;
-	$node_type_linkbw{$node_class}->{interfacespeed($iface_type)} = 1;
+	if (!defined($interface_capabilities{$iface_type}->{"protocols"})) {
+	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		  "No protocols listed in capabilities for $iface_type!");
+	}
+	my @protolist =
+	    split(",", $interface_capabilities{$iface_type}->{"protocols"});
 
-	#
-	# If the type/class has a non-zero simnode capacity, then add
-	# entries for the interface speed so that requires_delay can
-	# figure out interface speeds the underlying node type supports.
-	#
-	if (nodetypesimcap($node_type) || nodetypesimcap($node_class)) {
-	    $node_type_linkbw{"sim"}->{interfacespeed($iface_type)} = 1;
+	foreach my $proto (@protolist) {
+	    my $speed =
+		$interface_capabilities{$iface_type}->{"${proto}_defspeed"};
+
+	    $node_type_linkbw{$node_type}{$proto}->{$speed} = 1;
+	    $node_type_linkbw{$node_class}{$proto}->{$speed} = 1;
+
+	    #
+	    # If the type/class has a non-zero simnode capacity, then add
+	    # entries for the interface speed so that requires_delay can
+	    # figure out interface speeds the underlying node type supports.
+	    #
+	    if (nodetypesimcap($node_type) || nodetypesimcap($node_class)) {
+		$node_type_linkbw{"sim"}{$proto}->{$speed} = 1;
+	    }
 	}
     }
 
@@ -2953,13 +3078,7 @@ sub LoadPhysInfo()
 	next
 	    if (!exists($node_type_linkbw{$phystype}));
 	
-	$node_type_linkbw{$auxtype} = {}
-	    if (!defined($node_type_linkbw{$auxtype}));
-
-	my @list = keys(%{ $node_type_linkbw{$phystype} });
-	foreach my $speed (@list) {
-	    $node_type_linkbw{"$auxtype"}->{$speed} = 1;
-	}
+	$node_type_linkbw{$auxtype} = $node_type_linkbw{$phystype};
     }
 
     #
@@ -2969,30 +3088,35 @@ sub LoadPhysInfo()
     foreach my $vtype (keys %virt_vtypes) {
 	my @members = virttypemembers($vtype);
 
-	$node_type_linkbw{$vtype} = {}
-	    if (!defined($node_type_linkbw{$vtype}));
 	foreach my $phystype (@members) {
-	    next if (!exists($node_type_linkbw{$phystype}));
-	    my @list = keys(%{ $node_type_linkbw{$phystype} });
-	    foreach my $speed (@list) {
-		$node_type_linkbw{$vtype}->{$speed} = 1;
+	    next
+		if (!exists($node_type_linkbw{$phystype}));
+
+	    $node_type_linkbw{$vtype} = {}
+	        if (!defined($node_type_linkbw{$vtype}));
+
+	    foreach my $protocol (keys(%{ $node_type_linkbw{$phystype} })) {
+		my @list = keys(%{ $node_type_linkbw{$phystype}{$protocol} });
+		foreach my $speed (@list) {
+		    $node_type_linkbw{$vtype}{$protocol}->{$speed} = 1;
+		}
 	    }
 	}
-	
     }
 
     if ($verbose) {
 	printdb("Interface Speeds:\n");
 	foreach my $type (keys(%node_type_linkbw)) {
-	    my @list = keys(%{ $node_type_linkbw{$type} });
+	    foreach my $protocol (keys(%{ $node_type_linkbw{$type} })) {
+		my @list = keys(%{ $node_type_linkbw{$type}{$protocol} });
 
-	    printdb(" $type: @list\n");
+		printdb(" $type:$protocol - @list\n");
+	    }
 	}
     }
 }
-sub interfacespeed($)	{ return $interface_types{$_[0]}->{"max_speed"}; }
-sub interfacespeedmbps($) {
-    return $interface_types{$_[0]}->{"max_speed"} / 1000.0;
+sub interfacespeedmbps($$) {
+    return $interface_capabilities{$_[0]}->{$_[1] . "_defspeed"} / 1000.0;
 }
 sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
 sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
@@ -3006,7 +3130,7 @@ sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
 sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
 
-# requires_delay(bw)
+# requires_delay()
 # Returns 1 if the given bandwidth requires that a delay node be inserted, 0
 # if it can be handled by some interface in the testbed
 #
@@ -3022,22 +3146,23 @@ sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
 # Well, we are screwed since we needed a delay node. We are ignoring that
 # problem for now since no one has access to 1gig interfaces at the moment.
 # 
-sub requires_delay($$)
+sub requires_delay($$$)
 {
-    my ($node, $targetbw) = @_;
+    my ($node, $lan, $targetbw) = @_;
     my $node_type  = virtnodetype($node);
     my $node_class = nodetypeclass($node_type);
+    my $protocol   = virtlanprotocol($lan);
 
     fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	  "requires_delay(): $node - invalid type/class $node_type/$node_class!")
-	if (!exists($node_type_linkbw{$node_type}) &&
-	    !exists($node_type_linkbw{$node_class}));
+	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
+	    !exists($node_type_linkbw{$node_class}{$protocol}));
 
-    foreach my $bw (keys(%{ $node_type_linkbw{$node_type} })) {
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_type}{$protocol} })) {
 	return 0
 	    if ($targetbw == $bw);
     }
-    foreach my $bw (keys(%{ $node_type_linkbw{$node_class} })) {
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_class}{$protocol} })) {
 	return 0
 	    if ($targetbw == $bw);
     }
@@ -3346,6 +3471,7 @@ sub LoadVirtLans()
 	my $nobwshaping  = $rowref->{"nobwshaping"};
 	my $useveth      = $rowref->{"usevethiface"};
 	my $trivial_ok   = $rowref->{"trivial_ok"};
+	my $protocol     = $rowref->{"protocol"};
 
 	# Extend the DB info with this stuff:
 	#
@@ -3372,6 +3498,9 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"WIDEAREA"}     = $widearea;
 	# Whether all member nodes are simulated
 	$virt_lans{$vname}->{"ALLSIM"}       = 0;
+	$virt_lans{$vname}->{"PROTOCOL"}     = $protocol;
+	$virt_lans{$vname}->{"ACCESSPOINT"}  = $member
+	    if ($rowref->{"is_accesspoint"});
 
 	#
 	# REMOTE VIRTNODE HACK: 
@@ -3456,7 +3585,7 @@ sub LoadVirtLans()
 	    }
 	} else {
 	    my $node = (split(":",$member))[0];
-	    $portbw{$member} = &getbandwidth($node,$bandwidth);
+	    $portbw{$member} = &getbandwidth($node, $vname, $bandwidth);
 	}
 	
 	printdb "  portbw of $member = $portbw{$member}\n";
@@ -3494,6 +3623,12 @@ sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
 sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
 sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
 sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
+sub virtlanprotocol($)  { return $virt_lans{$_[0]}->{"PROTOCOL"}; }
+sub virtlanAP($)        {
+    return $virt_lans{$_[0]}->{"ACCESSPOINT"}
+        if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
+    return undef;
+};
 
 #
 # Ditto for virt_vtypes.
@@ -3531,11 +3666,11 @@ sub LoadExperiment()
 	DBQueryFatal("select uselinkdelays,forcelinkdelays,".
 		     "       multiplex_factor,usewatunnels, ".
 		     "       cpu_usage,mem_usage,allowfixnode, ".
-		     "       jail_osname,delay_osname ".
+		     "       jail_osname,delay_osname,idx ".
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname) =
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx) =
 	$query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
@@ -3567,6 +3702,7 @@ sub LoadExperiment()
 		  "Invalid OS $delay_osname in project $pid!");
 	}
     }
+    $experiment_idx = $idx;
 
     #
     # Command line option from tbswap overrides user.
@@ -3691,6 +3827,7 @@ sub CreateTopFile()
 	my $uselinkdelay = virtlanlinkdelay($lan);
 	my $mustdelay = virtlanmustdelay($lan);
 	my $nobwshaping = virtlannobwshape($lan);
+	my $protocol = virtlanprotocol($lan);
 	foreach $member (@members) {
 	    ($node) = (split(":",$member))[0];
 	    if (virtnodeissim($node)) {
@@ -3777,7 +3914,27 @@ sub CreateTopFile()
 	    $virt_lans{$lan}->{"USEVETH"} = 1;
 	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
-	if ($#members == 1) {
+	if ($protocol ne "ethernet") {
+	    #
+	    # This arrangement is temporary. For now, if its not a regular
+	    # ethernet, then create a lan attached to a fake switch. See ptopgen.
+	    # We label them differently though, since these do not get vlans.
+	    # Some other special treatment applies as well.
+	    #
+	    print TOPFILE "node fakelan/$lan $protocol\n";
+	    $expt_stats{"lans"} += 1;
+	    $lannodes{"fakelan/$lan"} = 1;
+	    foreach $member (@members) {
+		my $plink = "fakelan/$lan/$member";
+		my ($delay,$bw,$loss,
+		    $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
+		my ($node) = (split(":",$member))[0];
+		my $bandwidth = &getbandwidth($node, $lan, $bw);
+		    
+		print TOPFILE "link $plink $node fakelan/$lan $bandwidth 0 0\n";
+	    }
+	}
+	elsif ($#members == 1) {
 	    $expt_stats{"links"} += 1;
 	    ($nodeport0,$nodeport1) = @members;
 	    $node0 = (split(":",$nodeport0))[0];
@@ -3793,15 +3950,15 @@ sub CreateTopFile()
 	    $rdelay = $rdelay0+$delay1;
 	    $rloss = 1-(1-$rloss0)*(1-$loss1);
 	    $rbw = &min($rbw0,$bw1);
-	    $bandwidth = &getbandwidth($node0,&min($bw0,$rbw1));
-	    $rbandwidth = &getbandwidth($node1,&min($rbw0,$bw1));
+	    $bandwidth = &getbandwidth($node0,$lan,&min($bw0,$rbw1));
+	    $rbandwidth = &getbandwidth($node1,$lan,&min($rbw0,$bw1));
 	    if (((($delay >= $delaythresh) ||
-		  (!$nobwshaping && (requires_delay($node0, $bw) ||
-				     requires_delay($node1, $bw))) ||
+		  (!$nobwshaping && (requires_delay($node0, $lan, $bw) ||
+				     requires_delay($node1, $lan, $bw))) ||
 		  ($loss != 0)) ||
 		 (($rdelay >= $delaythresh) ||
-		  (!$nobwshaping && (requires_delay($node0, $rbw) ||
-				     requires_delay($node1, $rbw))) ||
+		  (!$nobwshaping && (requires_delay($node0, $lan, $rbw) ||
+				     requires_delay($node1, $lan, $rbw))) ||
 		  ($rloss != 0)) ||
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
@@ -3870,8 +4027,8 @@ sub CreateTopFile()
 		# could not tell earlier if the link was going to get a real
 		# delay node or just a delaywithswitch.
 		#
-		$portbw{$nodeport0} = getbandwidth($node0,$bandwidth);
-		$portbw{$nodeport1} = getbandwidth($node0,$rbandwidth);
+		$portbw{$nodeport0} = getbandwidth($node0,$lan,$bandwidth);
+		$portbw{$nodeport1} = getbandwidth($node0,$lan,$rbandwidth);
 	    }
 	    else {
 		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
@@ -3910,16 +4067,16 @@ sub CreateTopFile()
 		($delay,$bw,$loss,
 		 $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
 		($node) = (split(":",$member))[0];
-		$bandwidth = &getbandwidth($node,$bw);
-		$rbandwidth = &getbandwidth($node,$rbw);
+		$bandwidth = &getbandwidth($node,$lan,$bw);
+		$rbandwidth = &getbandwidth($node,$lan,$rbw);
                 # XXX The expression below should be modified for
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
 		if (((($delay >= $delaythresh) ||
-		      &requires_delay($node, $bw) ||
+		      &requires_delay($node, $lan, $bw) ||
 		      ($loss != 0)) || 
 		     (($rdelay >= $delaythresh) ||
-		      &requires_delay($node, $rbw) ||
+		      &requires_delay($node, $lan, $rbw) ||
 		      ($rloss != 0)) ||
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||

@@ -205,6 +205,13 @@ LanLink instproc init {s nodes bw d type} {
 	return
     }
 
+    # Virt lan settings, for the entire lan
+    $self instvar settings
+
+    # And a two-dimenional arrary for per-member settings.
+    # TCL does not actually have multi-dimensional arrays though, so its faked.
+    $self instvar member_settings
+
     # Now we need to fill out the nodelist
     $self instvar nodelist
 
@@ -359,6 +366,33 @@ LanLink instproc set_accesspoint {node} {
 	}
     }
     perror "set_accesspoint: No such node $node in lan $self."
+}
+
+#
+# Set a setting for the entire lan.
+#
+LanLink instproc set_setting {capkey capval} {
+    $self instvar settings
+
+    set settings($capkey) $capval
+}
+
+#
+# Set a setting for just one member of a lan
+#
+LanLink instproc set_member_setting {node capkey capval} {
+    $self instvar member_settings
+    $self instvar nodelist
+
+    foreach pair $nodelist {
+	set n [lindex $pair 0]
+	set p [lindex $pair 1]
+	if {$n == $node} {
+	    set member_settings($node,$capkey) $capval
+	    return {}
+	}
+    }
+    perror "set_member_setting: No such node $node in lan $self."
 }
 
 #
@@ -545,6 +579,18 @@ Lan instproc updatedb {DB} {
     $self instvar netmask
     $self instvar protocol
     $self instvar accesspoint
+    $self instvar settings
+    $self instvar member_settings
+
+    #
+    # Upload lan settings and them per-member settings
+    #
+    foreach setting [array names settings] {
+	set fields [list "vname" "capkey" "capval"]
+	set values [list $self $setting $settings($setting)]
+	
+	$sim spitxml_data "virt_lan_settings" $fields $values
+    }
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -596,6 +642,20 @@ Lan instproc updatedb {DB} {
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint]
 
 	$sim spitxml_data "virt_lans" $fields $values
+
+	foreach setting_key [array names member_settings] {
+	    set foo      [split $setting_key ","]
+	    set thisnode [lindex $foo 0]
+	    set capkey   [lindex $foo 1]
+
+	    if {$thisnode == $node} {
+		set fields [list "vname" "member" "capkey" "capval"]
+		set values [list $self $nodeportraw $capkey \
+		                 $member_settings($setting_key)]
+	
+		$sim spitxml_data "virt_lan_member_settings" $fields $values
+	    }
+	}
     }
 }
 
