@@ -97,6 +97,16 @@ nfs_server_enable="YES"
 nfs_server_flags="-u -t -n 16"
 nfs_client_enable="YES"
 
+You also need some cross mounts between bossnode and fs. On bossnode:
+
+	fs.mini.emulab.net:/z/users     /users  nfs     rw      0       0
+	fs.mini.emulab.net:/z/proj      /proj   nfs     rw      0       0
+	fs.mini.emulab.net:/z/groups    /groups nfs     rw      0       0
+	fs.mini.emulab.net:/var         /usr/testbed/usersvar nfs ro,soft,-b    0
+
+Note that you will need exports on fs (see setup-ops.txt).
+	
+
 tftp - Should have the following line in /etc/inetd.conf
 tftp    dgram   udp wait    nobody  /usr/libexec/tftpd  tftpd /tftpboot /proj
 (make sure to HUP inetd)
