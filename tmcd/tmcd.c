@@ -2682,8 +2682,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS from images as i "
-			 "left join current_reloads as r on i.imageid = r.image_id "
+	res = mydb_query("select load_address,loadpart,OS from current_reloads as r "
+			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
 			 3, reqp->nodeid);

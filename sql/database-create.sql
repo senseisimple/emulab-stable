@@ -315,7 +315,8 @@ CREATE TABLE images (
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
   updated datetime default NULL,
-  PRIMARY KEY  (imagename,pid)
+  PRIMARY KEY  (imagename,pid),
+  KEY imageid (imageid)
 ) TYPE=MyISAM;
 
 --
@@ -492,7 +493,7 @@ CREATE TABLE node_idlestats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_types'
+-- Table structure for table 'node_status'
 --
 
 CREATE TABLE node_status (
