@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -221,7 +221,8 @@ function WRITEPLABBOTTOMBAR() {
 #
 function WRITESIDEBAR() {
     global $login_status, $login_uid;
-    global $TBBASE, $TBDOCBASE, $BASEPATH;
+    global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $WIKIURL;
+    global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
 
     #
@@ -377,6 +378,14 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
+
+		if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
+		    $wikiname = $CHECKLOGIN_WIKINAME;
+		
+		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
+					       "${WIKIURL}/Main/$wikiname",
+					       "${WIKIURL}/Main/$wikiname");
+		}
 	    
                 # Since a user can be a member of more than one project,
                 # display this option, and let the form decide if the 

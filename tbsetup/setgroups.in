@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,10 +39,13 @@ my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
 my $ADMINGRP= "@TBADMINGROUP@";
+my $WIKISUPPORT   = @WIKISUPPORT@;
+my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
 
 my $SSH     = "$TB/bin/sshtb";
 my $GENELISTS="$TB/sbin/genelists";
 my $USERMOD = "/usr/sbin/pw usermod";
+my $SAVEUID = $UID;
 
 my $dbuid;
 my @userlist;
@@ -202,7 +205,7 @@ foreach my $uid (@userlist) {
     #
     # Form a list of project (group) membership names. We do this in two
     # steps to ensure that we get the default group membership since we
-    # want that to be the user's primary group. Not sure this really matters
+    # want that to be the users primary group. Not sure this really matters
     # all that much, but might as well.
     #
     $query_result =
@@ -360,6 +363,17 @@ else {
 
     foreach $u (@userlist) {
 	system("$GENELISTS -u $u");
+    }
+}
+
+# and the twiki.
+if ($WIKISUPPORT) {
+    $UID  = $SAVEUID;
+    $EUID = $UID;
+
+    foreach $user (@userlist) {
+	system("$SETWIKIGROUPS $user") == 0 or
+	    fatal("$SETWIKIGROUPS $user failed!");
     }
 }
 

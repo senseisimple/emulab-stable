@@ -25,6 +25,8 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
 my $MKACCT   = "$TB/sbin/tbacct add";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
+my $WIKISUPPORT = @WIKISUPPORT@;
+my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
@@ -124,6 +126,11 @@ $EUID = $UID;
 
 system("$MKGROUP $pid $pid") == 0 or
     fatal("$MKGROUP $pid failed!");
+
+if ($WIKISUPPORT) {
+    system("$ADDWIKIPROJ $pid") == 0 or
+	fatal("$ADDWIKIPROJ $pid failed!");
+}
 
 system("$MKACCT $projhead") == 0 or
     fatal("$MKACCT $projhead failed!");

@@ -14,10 +14,12 @@
 # A project
 #
 function SHOWPROJECT($pid, $thisuid) {
-    global $TBDBNAME;
+    global $WIKISUPPORT, $WIKIURL;
 
     $query_result =
-	DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
+	DBQueryFatal("select p.*,g.wikiname from projects as p ".
+		     "left join groups as g on g.pid=p.pid and g.gid=g.pid ".
+		     "where p.pid='$pid'");
     $row = mysql_fetch_array($query_result);
 
     echo "<center>
@@ -42,6 +44,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $approved           = $row[approved];
     $expt_count         = $row[expt_count];
     $expt_last          = $row[expt_last];
+    $wikiname           = $row[wikiname];
 
     if ($proj_public) {
 	$proj_public = "Yes";
@@ -87,6 +90,16 @@ function SHOWPROJECT($pid, $thisuid) {
               <td class=\"left\">
                   <A href='$proj_URL'>$proj_URL</A></td>
           </tr>\n";
+
+    if ($WIKISUPPORT && isset($wikiname)) {
+	$wikiurl = "${WIKIURL}/$wikiname/WebHome";
+	
+	echo "<tr>
+                  <td>Project Wiki:</td>
+                  <td class=\"left\">
+                      <A href='$wikiurl'>$wikiname</A></td>
+              </tr>\n";
+    }
     
     echo "<tr>
               <td>Publicly Visible: </td>
@@ -370,7 +383,7 @@ function SHOWGROUPMEMBERSHIP($uid) {
 # A User
 #
 function SHOWUSER($uid) {
-    global $TBDBNAME;
+    global $WIKISUPPORT, $WIKIURL;
 
     $userinfo_result =
 	DBQueryFatal("SELECT * from users where uid='$uid'");
@@ -397,6 +410,7 @@ function SHOWUSER($uid) {
     $frozen      = $row['weblogin_frozen'];
     $failcount   = $row['weblogin_failcount'];
     $failstamp   = $row['weblogin_failstamp'];
+    $wikiname    = $row['wikiname'];
 
     if (!strcmp($usr_addr2, ""))
 	$usr_addr2 = "&nbsp";
@@ -452,6 +466,16 @@ function SHOWUSER($uid) {
               <td>Home Page URL:</td>
               <td><A href='$usr_URL'>$usr_URL</A></td>
           </tr>\n";
+
+    if ($WIKISUPPORT && isset($wikiname)) {
+	$wikiurl = "${WIKIURL}/Main/$wikiname";
+	
+	echo "<tr>
+                  <td>Emulab Wiki Page:</td>
+                  <td class=\"left\">
+                      <A href='$wikiurl'>$wikiname</A></td>
+              </tr>\n";
+    }
     
     #echo "<tr>
     #          <td>Expiration date:</td>

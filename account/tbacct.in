@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,6 +40,7 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
+my $WIKISUPPORT = @WIKISUPPORT@;
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
 my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
@@ -58,6 +59,8 @@ my $MKUSERCERT	= "$TB/sbin/mkusercert";
 my $SFSUPDATE	= "$TB/sbin/sfskey_update";
 my $PBAG	= "$TB/sbin/paperbag";
 my $EXPORTSSETUP= "$TB/sbin/exports_setup";
+my $ADDWIKIUSER = "$TB/sbin/addwikiuser";
+my $DELWIKIUSER = "$TB/sbin/delwikiuser";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -319,6 +322,10 @@ sub AddUser()
     system("$GENELISTS -u $user")
 	if (! $batch);
 
+    # And to the wiki if enabled.
+    system("$ADDWIKIUSER $user")
+	if ($WIKISUPPORT && !$batch);
+
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
 
@@ -394,6 +401,11 @@ sub DelUser()
 
     # Remove from elists.
     system("$GENELISTS -u $user");
+
+    # And to the wiki if enabled.
+    system("$DELWIKIUSER $user")
+	if ($WIKISUPPORT);
+    
     $EUID = 0;
 
     $sfsupdate = 1;
@@ -426,6 +438,13 @@ sub UpdatePassword()
 	}
     }
     $UID = $SAVEUID;
+
+    $EUID = $UID;
+    # And to the wiki if enabled.
+    system("$ADDWIKIUSER -u $user")
+	if ($WIKISUPPORT);
+    $EUID = 0;
+    
     return 0;
 }
 

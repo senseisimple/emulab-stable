@@ -34,6 +34,7 @@ TBMAINSITE=1
 THISHOMEBASE=Emulab.Net
 PLABSUPPORT=1
 PLAB_ROOTBALL="plabroot-10.tar.bz2"
+WIKISUPPORT=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.

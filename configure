@@ -1307,6 +1307,7 @@ fi
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1353,6 +1354,7 @@ OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
 PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
+WIKISUPPORT=0
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
@@ -1852,17 +1854,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1856: checking for $ac_hdr" >&5
+echo "configure:1858: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1861 "configure"
+#line 1863 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1866: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1868: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1901,17 +1903,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1905: checking for $ac_hdr" >&5
+echo "configure:1907: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1910 "configure"
+#line 1912 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1915: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1917: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1944,7 +1946,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1948: checking for $ac_word" >&5
+echo "configure:1950: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2023,7 +2025,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2027: checking for a BSD compatible install" >&5
+echo "configure:2029: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2084,7 +2086,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2088: checking for $ac_word" >&5
+echo "configure:2090: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2265,7 +2267,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/mezzanine/libmezz/GNUmakefile \
 	robots/mezzanine/mezzanine/GNUmakefile \
 	robots/tracker/GNUmakefile \
-	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord "
+	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord \
+        wiki/GNUmakefile wiki/addwikiuser wiki/wikiproxy \
+	wiki/usertemplate wiki/webhometemplate \
+        wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj "
 
 #
 # Do this for easy distclean.
@@ -2476,6 +2481,7 @@ s%@OUTERBOSS_NODENAME@%$OUTERBOSS_NODENAME%g
 s%@OUTERBOSS_XMLRPCPORT@%$OUTERBOSS_XMLRPCPORT%g
 s%@OUTERBOSS_SSLCERTNAME@%$OUTERBOSS_SSLCERTNAME%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
+s%@WIKISUPPORT@%$WIKISUPPORT%g
 s%@TBLOGFACIL@%$TBLOGFACIL%g
 s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g
 s%@PLAB_SLICEPREFIX@%$PLAB_SLICEPREFIX%g

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -13,6 +13,7 @@
 $CHECKLOGIN_STATUS		= -1;
 $CHECKLOGIN_UID			= 0;
 $CHECKLOGIN_NOLOGINS		= -1;
+$CHECKLOGIN_WIKINAME            = "";
 
 #
 # New Mapping. 
@@ -125,6 +126,7 @@ function GETUID() {
 function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
+    global $CHECKLOGIN_WIKINAME;
     global $nocookieauth;
     #
     # If we already figured this out, do not duplicate work!
@@ -149,7 +151,7 @@ function CHECKLOGIN($uid) {
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
-		     "       user_interface,n.type,u.stud " .
+		     "       user_interface,n.type,u.stud,u.wikiname " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -186,6 +188,7 @@ function CHECKLOGIN($uid) {
 
 	$type     = $row[10];
 	$stud     = $row[11];
+	$wikiname = $row[12];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -309,6 +312,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_UNVERIFIED;
     if (strcmp($status, TBDB_USERSTATUS_ACTIVE) == 0)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ACTIVE;
+    if (isset($wikiname) && $wikiname != "")
+	$CHECKLOGIN_WIKINAME = $wikiname;
 
     #
     # Set the magic enviroment variable, if appropriate, for the sake of

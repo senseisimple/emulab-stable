@@ -109,6 +109,7 @@ AC_SUBST(OUTERBOSS_NODENAME)
 AC_SUBST(OUTERBOSS_XMLRPCPORT)
 AC_SUBST(OUTERBOSS_SSLCERTNAME)
 AC_SUBST(PLABSUPPORT)
+AC_SUBST(WIKISUPPORT)
 AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
 AC_SUBST(PLAB_SLICEPREFIX)
@@ -188,6 +189,7 @@ OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
 PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
+WIKISUPPORT=0
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
@@ -760,7 +762,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/mezzanine/libmezz/GNUmakefile \
 	robots/mezzanine/mezzanine/GNUmakefile \
 	robots/tracker/GNUmakefile \
-	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord "
+	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord \
+        wiki/GNUmakefile wiki/addwikiuser wiki/wikiproxy \
+	wiki/usertemplate wiki/webhometemplate \
+        wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj "
 
 #
 # Do this for easy distclean.
