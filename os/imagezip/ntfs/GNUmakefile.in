@@ -1,0 +1,43 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= os/imagezip/ntfs
+LIBDIR		= $(SRCDIR)/linux-ntfs
+
+include $(OBJDIR)/Makeconf
+
+CC		= gcc30
+INCS		= -I$(SRCDIR)/extra_bsd_includes -I$(LIBDIR)/include \
+		  -I$(LIBDIR) -I$(SRCDIR)/..
+CFLAGS		= -O2 -g -static $(INCS)
+
+all:	$(LIBDIR) libntfs.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+libntfs.a: missingClibrary.o linux-ntfs/libntfs/.libs/libntfs.a
+	cp -p linux-ntfs/libntfs/.libs/libntfs.a libntfs.a
+	ar r libntfs.a missingClibrary.o
+
+linux-ntfs/libntfs/.libs/libntfs.a: linux-ntfs/config.status
+	@$(MAKE) -C linux-ntfs/libntfs CC="$(CC)" CFLAGS="$(CFLAGS)" all
+
+linux-ntfs/config.status:
+	-mkdir linux-ntfs
+	(cd linux-ntfs; $(LIBDIR)/configure --srcdir=$(LIBDIR))
+
+$(LIBDIR):
+	@echo ""
+	@echo "* * * must install linux-ntfs source first * * *"
+	@echo ""
+	@false
+
+clean:
+	$(MAKE) -C linux-ntfs/libntfs clean
+	/bin/rm -f missingClibrary.o libntfs.a
