@@ -342,6 +342,7 @@ sub ParseArgs {
 	$n++;
     }
     die("Which ports do I reconfigure?\n") if (!@p &&($d||$e||$dup||$spd||$a));
+    $dup = "\L$dup\E"; #lowercase it all...
     die("Invalid duplex $dup: Must be full or half\n") 
 	if(!($dup=~/^full$|^half$|^$/));
     die("Invalid speed $spd: Must be 10 or 100\n") 

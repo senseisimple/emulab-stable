@@ -20,10 +20,12 @@ my $main_bg = 'slateblue';
 my $main_abg = 'mediumslateblue';
 my $main_fg = 'white';
 my $main_afg = 'white';
+my $dis_fg = 'gray';
 my $btn_bg = 'darkslateblue';
 my $btn_fg = 'white';
 my $btn_abg = 'slateblue';
 my $btn_afg = 'white';
+my $btn_dfg = 'gray';
 my $stat_bg = 'mediumslateblue';
 my $stat_fg = 'white';
 
@@ -66,7 +68,7 @@ my $port_btn =
 		     -activebackground=>$btn_abg,-fg=>$btn_fg,
 		     -width=>8, -anchor=>'center',-text=>"Port Setup",
 		     -activeforeground=>$btn_afg,
-		     -command=> sub { &msg($status,""); &portSetup}
+		     -command=> sub { &msg($status,""); &portSetup("Alpha")}
 		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 my $opt_btn =
     $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg=>$btn_bg,
@@ -208,7 +210,7 @@ sub vlanSetup {
 		     -activeforeground=>$main_afg,
 		     -command=> sub { 
 			 my @removeMe = ();
-			 foreach $ID (sort keys %vlans) {
+			 foreach $ID (sort num keys %vlans) {
 			     if ($vlans{$ID}) {
 				 push (@removeMe, $ID);
 			     }
@@ -345,16 +347,355 @@ sub fileVLAN {
 #################################################################
 
 sub portSetup {
+    my $switch="";
+    my @args=();
+    ($switch, @args) = @_;
     $area->packForget();
     $area = 
 	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
 			 -fg=>$main_fg,-width=>50
 			 )->pack(-side=>'top',-fill=>'both');
+    $area->pack('forget');
+    $area = 
+	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			 -fg=>$main_fg,-width=>50
+			 )->pack(-side=>'top',-fill=>'both');
+    my $buttons =
+	$area->Frame(-relief=>'groove',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $sw_btn1 = 
+	$buttons->Button
+	    (-text=>'Alpha',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &portSetup("Alpha"); }
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn2 = 
+	$buttons->Button
+	    (-text=>'Beta',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &portSetup("Beta"); } 
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn3 = 
+	$buttons->Button
+	    (-text=>'Gamma',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &portSetup("Gamma"); }
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my $sw_btn4 = 
+	$buttons->Button
+	    (-text=>'Delta',-bg=>$main_bg,-width=>'5', 
+	     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+	     -fg=>$main_fg,-activebackground=>$main_abg,
+	     -activeforeground=>$main_afg,
+	     -command=> sub { &portSetup("Delta"); } 
+	     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    
+    my $sw_name="";
+    my $sw_IP="";
+    my %names=();
+    my %enabled=();
+    my %link=();
+    my %auto=();
+    my %spd=();
+    my %dup=();
+    my @line=();
+    my $port=0;
+    open(DATA,"snmpit -i $switch -s 2>&1 |");
+    while (<DATA>) {
+	chop;
+	if (/^Port Configuration, Switch (.*) \((.*)\)/) {
+	    $sw_name = $1;
+	    $sw_IP = $2;
+	    next;
+	}
+	if (/^Port\tInterface/) {next;}
+	if (/^--/) {next;}
+	s/\t\t/\t/g;
+	@line= split("\t",$_);
+	$port = shift(@line);
+	$names{$port}= shift(@line);
+	$enabled{$port}= shift(@line);
+	$link{$port}= shift(@line);
+	$auto{$port}= shift(@line);
+	$spd{$port}= shift(@line);
+	$dup{$port}= shift(@line);
+    }
+    close (DATA);
+    
+    my $titlebar =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $titles =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $table =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-bg=>$main_bg,
+		     -fg=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $switch_title =
+	$titlebar->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+			 -fg=>$main_fg,
+			 -text=>"Port Configuration - Testbed Switch ".
+			 "$sw_name ($sw_IP)"
+			 )->pack(-side=>'left',-expand=>1,-fill=>'x');
+    
+    my $marks = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Select',-width=>6
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_portNum = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Port #',-width=>6
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_interface = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Interface',-width=>12
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_enabled = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Enabled',-width=>8
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_link = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Link',-width=>6
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_autoConf = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Auto Config.',-width=>12
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_speed = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Speed',-width=>16
+		       )->pack(-side=>'left',-fill=>'x');
+    my $L_duplex = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'Duplex',-width=>12
+		       )->pack(-side=>'left',-fill=>'x');
+    my %marked=();
+    foreach $port ( sort num keys(%names)) {
+	my $row = 
+	    $table->Frame(-relief=>'flat',
+			  -bg=>$main_bg,-fg=>$main_fg
+			  )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+	$row->Checkbutton(-variable=>\$marked{$port},-relief=>'sunken',
+			  -width=>3,-anchor=>'center',
+			  -bg=>$main_bg,-fg=>$main_fg,
+			  -activebackground=>$main_abg,
+			  -activeforeground=>$main_afg,
+			  -selectcolor=>$btn_bg,-borderwidth=>3
+			  )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$port,-width=>6,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$names{$port},-width=>12,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$enabled{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$link{$port},-width=>6,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$auto{$port},-width=>12,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$spd{$port},-width=>16,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$dup{$port},-width=>12,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-side=>'left');
+    }
+    my $row = 
+	$table->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $btn_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-expand=>"1",-fill=>'both');
+    my $sel_frm = 
+	$btn_frm->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $sel_all_btn = 
+	$sel_frm->Button(-text=>'Select All',-bg=>$main_bg,-width=>'8', 
+			 -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+			 -fg=>$main_fg,-activebackground=>$main_abg,
+			 -activeforeground=>$main_afg,
+			 -command=> sub { 
+			     foreach $port ( sort num keys(%names)) {
+				 $marked{$port}=1;
+			     }
+			 }
+			 )->pack(-side=>'left',-expand=>1,-fill=>'both');
+    my $desel_all_btn = 
+	$sel_frm->Button(-text=>'Deselect All',-bg=>$main_bg,-width=>'8', 
+			 -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+			 -fg=>$main_fg,-activebackground=>$main_abg,
+			 -activeforeground=>$main_afg,
+			 -command=> sub { 
+			     foreach $port ( sort num keys(%names)) {
+				 $marked{$port}=0;
+			     }
+			 }
+			 )->pack(-side=>'left',-expand=>1,-fill=>'both');
 
+    my $p_enable = "";
+    my $p_auto = "";
+    my $p_spd = "";
+    my $p_dup = "";
 
+    my $update_btn = 
+	$btn_frm->Button(-text=>'Update',-bg=>$main_bg,-width=>'16', 
+			 -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+			 -fg=>$main_fg,-activebackground=>$main_abg,
+			 -activeforeground=>$main_afg,
+			 -command=> sub { 
+			     my @updateMe = ();
+			     foreach $port (sort num keys %names) {
+				 if ($marked{$port}) {
+				     push (@updateMe, $port);
+				 }
+			     }
+			     if (@updateMe) {
+				 &msg($status,"Updating Port(s) ",
+				      join(" ",@updateMe),
+				      "\nThis should take about ",
+				      ($#updateMe<12 ? 10:25)," seconds...");
+				 &updatePorts($sw_IP,$p_enable,$p_auto,
+					      $p_spd,$p_dup,@updateMe);
+				 sleep(2);
+				 &portSetup($switch);
+			     }
+			 }
+			 )->pack(-side=>'top',-expand=>1,-fill=>'both');
+    my $en_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,-bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-fill=>'y');
+    my $auto_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,-bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-fill=>'y');
+    my $spd_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,-bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-fill=>'y');
+    my $dup_frm = 
+	$row->Frame(-relief=>'flat',-borderwidth=>2,-bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'left',-fill=>'y');
+    my $en_opt = 
+	$en_frm->Radiobutton(-variable=>\$p_enable,-value=>"-e",
+			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			     -fg=>$main_fg,-activebackground=>$main_abg,
+			     -activeforeground=>$main_afg,-anchor=>'nw',
+			     -selectcolor=>$btn_bg,-width=>'6',
+			     -text=>"Enable"
+			     )->pack(-side=>'top',-fill=>'x',
+				     -padx=>'3',-pady=>'3');
+    my $dis_opt = 
+	$en_frm->Radiobutton(-variable=>\$p_enable,-value=>"-d",
+			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			     -fg=>$main_fg,-activebackground=>$main_abg,
+			     -activeforeground=>$main_afg,-anchor=>'nw',
+			     -selectcolor=>$btn_bg,-width=>'6',
+			     -text=>"Disable"
+			     )->pack(-side=>'top',-fill=>'x',
+				     -padx=>'3',-pady=>'3');
+    my $spd100_opt = "";
+    my $spd10_opt = "";
+    my $dupFull_opt = "";
+    my $dupHalf_opt = "";
 
+    my $auto_opt = 
+	$auto_frm->
+	    Checkbutton(-variable=>\$p_auto,
+			-onvalue=>"+a",-offvalue=>"-a",
+			-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			-fg=>$main_fg,-activebackground=>$main_abg,
+			-activeforeground=>$main_afg,-anchor=>'center',
+			-selectcolor=>$btn_bg,-width=>'10',
+			-text=>"Auto Config.", -command => sub {
+			    if ($p_auto eq "+a") {
+				$spd100_opt->configure(-state=>'disabled');
+				$spd10_opt->configure(-state=>'disabled');
+				$dupFull_opt->configure(-state=>'disabled');
+				$dupHalf_opt->configure(-state=>'disabled');
+				$p_spd = "";
+				$p_dup = "";
+			    } else {
+				$spd100_opt->configure(-state=>'normal');
+				$spd10_opt->configure(-state=>'normal');
+				$dupFull_opt->configure(-state=>'normal');
+				$dupHalf_opt->configure(-state=>'normal');
+			    }
+			}
+			)->pack(-side=>'top',-expand=>1,-fill=>'y',
+				-padx=>'3',-pady=>'3');
+    $spd100_opt = 
+	$spd_frm->Radiobutton(-variable=>\$p_spd,-value=>"-spd 100",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'8',
+			      -text=>"100 Mbps"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
+    $spd10_opt = 
+	$spd_frm->Radiobutton(-variable=>\$p_spd,-value=>"-spd 10",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'8',
+			      -text=>"10 Mbps"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
+    $dupFull_opt = 
+	$dup_frm->Radiobutton(-variable=>\$p_dup,-value=>"-dup Full",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'10',
+			      -text=>"Full Duplex"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
+    $dupHalf_opt = 
+	$dup_frm->Radiobutton(-variable=>\$p_dup,-value=>"-dup Half",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'10',
+			      -text=>"Half Duplex"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
     $area->pack();
 }
+
+sub updatePorts {
+    (my $switch, my $en, my $auto, my $spd, my $dup, my @ports) = @_;
+    open(DATA,"snmpit -i $switch $snmp_v $snmp_b $snmp_c -p ".
+	 join(" ",@ports)." $en $auto $spd $dup 2>&1  |");
+    my @output =();
+    while (<DATA>) {
+	chop;
+	push(@output, $_);
+    }
+    close (DATA);
+    push(@output,"Port Configurations updated.");
+    &msg($status,join("\n",@output));
+}
+
 
 #################################################################
 #
