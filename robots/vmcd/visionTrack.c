@@ -25,11 +25,13 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
     struct vision_track *retval = NULL;
 
     assert(vt != NULL);
-    assert(curr != NULL);
     assert(distance_out != NULL);
 
     *distance_out = FLT_MAX;
 
+    if (curr == NULL)
+	return retval;
+    
     while (curr->vt_link.ln_Succ != NULL) {
 	float distance;
 
@@ -51,6 +53,23 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 	curr = (struct vision_track *)curr->vt_link.ln_Succ;
     }
     
+    return retval;
+}
+
+static struct vision_track *vtNextCamera(struct vision_track *vt)
+{
+    struct vision_track *retval = NULL;
+    struct vmc_client *vc;
+
+    vc = vt->vt_client;
+    while (vt->vt_link.ln_Succ != NULL && vt->vt_client == vc) {
+	vt = (struct vision_track *)vt->vt_link.ln_Succ;
+    }
+
+    if (vt->vt_link.ln_Succ != NULL) {
+	retval = vt;
+    }
+
     return retval;
 }
 
@@ -161,23 +180,24 @@ void vtCoalesce(struct lnMinList *extra,
 	if (in_camera_count > 1) {
 	    struct vision_track *vt_extra;
 	    float distance;
-	    
+
 	    while ((in_camera_count > 1) &&
 		   ((vt_extra = vtFindMin(vt,
 					  (struct vision_track *)
-					  vt->vt_link.ln_Succ,
+					  vtNextCamera(vt),
 					  &distance)) != NULL) &&
-		   (vt->vt_client != vt_extra->vt_client) &&
 		   (distance < 0.35)) {
-#if 0
-		printf("coalesce %f %f  --  %f %f\n",
+#if 1
+		printf("coalesce %.2f %.2f %.2f %d --  %.2f %.2f %.2f %d\n",
 		       vt->vt_position.x, vt->vt_position.y,
-		       vt_extra->vt_position.x, vt_extra->vt_position.y);
+		       vt->vt_position.theta, vt->vt_client->vc_port,
+		       vt_extra->vt_position.x, vt_extra->vt_position.y,
+		       vt->vt_position.theta, vt_extra->vt_client->vc_port);
 #endif
 		
 		lnRemove(&vt_extra->vt_link);
 		lnAddHead(extra, &vt_extra->vt_link);
-
+		
 		in_camera_count -= 1;
 	    }
 	}
@@ -284,7 +304,8 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 				  (struct vision_track *)start->lh_Head,
 				  &distance)) == NULL) {
 	}
-	else if (distance < 0.05) {
+	else if (((vt->vt_client == vt_start->vt_client) && (distance < 0.05)) ||
+		 ((vt->vt_client != vt_start->vt_client) && (distance < 0.22))) {
 	    float diff;
 
 	    diff = mtp_theta(mtp_theta(vt_start->vt_position.theta) -
