@@ -24,10 +24,15 @@ vvertex_vector virtual_nodes;
 // Map of physical node name to its vertex descriptor.
 name_pvertex_map pname2vertex;
   
-// Map of virtual node name to the physical node name it's fixed too.
+// Map of virtual node name to the physical node name it's fixed to.
 // The domain is the set of all fixed virtual nodes and the range is
 // the set of all fixed physical nodes.
 name_name_map fixed_nodes;
+
+// Map of virtual node name to the physical node name that we should
+// start the virtual node on. However, unlike fixed nodes, assign is
+// allowed to move these.
+name_name_map node_hints;
 
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
@@ -249,7 +254,8 @@ REDO_SEARCH:
 
 
 /* When this is finished the state will reflect the best solution found. */
-void anneal(bool scoring_selftest, double scale_neighborhood)
+void anneal(bool scoring_selftest, double scale_neighborhood,
+	double *initial_temperature)
 {
   cout << "Annealing." << endl;
 
@@ -339,6 +345,40 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
    * everything, the score is the same */
   double initial_score = get_score();
 
+  /*
+   * Handle node hints - we do this _after_ we've figured out the initial
+   * score, since, unlike fixed nodes, hints get unmapped before we do the
+   * final mapping. Also, we ignore any hints for vnodes which have already
+   * been assigned - they must have been fixed, and that over-rides the hint.
+   */
+  for (name_name_map::iterator hint_it=node_hints.begin();
+       hint_it!=node_hints.end();++hint_it) {
+    if (vname2vertex.find((*hint_it).first) == vname2vertex.end()) {
+      cout << "Warning: Hinted node: " << (*hint_it).first <<
+	"does not exist." << endl;
+      continue;
+    }
+    vvertex vv = vname2vertex[(*hint_it).first];
+    if (pname2vertex.find((*hint_it).second) == pname2vertex.end()) {
+      cout << "Warning: Hinted node: " << (*hint_it).second <<
+	" not available." << endl;
+      continue;
+    }
+    pvertex pv = pname2vertex[(*hint_it).second];
+    tb_vnode *vn = get(vvertex_pmap,vv);
+    tb_pnode *pn = get(pvertex_pmap,pv);
+    if (vn->assigned) {
+      cout << "Warning: Skipping hint for node " << vn->name << ", which is "
+	<< "fixed in place" << endl;
+      continue;
+    }
+    if (add_node(vv,pv,false,true) == 1) {
+      cout << "Warning: Hinted node: Could not map " << vn->name <<
+	" to " << pn->name << endl;
+      continue;
+    }
+  }
+
   bestscore = get_score();
   bestviolated = violated;
 
@@ -356,7 +396,6 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
     tb_vnode *vn = get(vvertex_pmap,*vit);
     absassigned[*vit] = vn->assigned;
     if (vn->assigned) {
-      assert(vn->fixed);
       absassignment[*vit] = vn->assignment;
       abstypes[*vit] = vn->type;
     } else {
@@ -428,7 +467,13 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   stddev = 0;
 
 #ifdef MELT
-  melting = true;
+  if (initial_temperature == NULL) {
+      melting = true;
+  } else {
+      melting = false;
+      temp = *initial_temperature;
+      cout << "Starting with initial temperature " << temp << endl;
+  }
 #ifdef TIME_TARGET
   meltstart = used_time();
 #endif

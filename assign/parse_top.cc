@@ -30,6 +30,7 @@ using namespace boost;
 
 extern name_vvertex_map vname2vertex;
 extern name_name_map fixed_nodes;
+extern name_name_map node_hints;
 extern name_count_map vtypes;
 extern name_list_map vclasses;
 extern vvertex_vector virtual_nodes;
@@ -316,6 +317,14 @@ int parse_top(tb_vgraph &VG, istream& i)
 	crope virtualnode = parsed_line[1];
 	crope physicalnode = parsed_line[2];
 	fixed_nodes[virtualnode] = physicalnode;
+      }
+    } else if (command.compare("node-hint") == 0) {
+      if (parsed_line.size() != 3) {
+	top_error("Bad node-hint line, wrong number of arguments.");
+      } else {
+	crope virtualnode = parsed_line[1];
+	crope physicalnode = parsed_line[2];
+	node_hints[virtualnode] = physicalnode;
       }
     } else {
       top_error("Unknown directive: " << command << ".");

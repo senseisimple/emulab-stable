@@ -111,6 +111,11 @@ bool allow_overload = false;
 // Forces assign to do greedy link assignment, by chosing the first link in its
 // list, which is usually the lowest-cost
 bool greedy_link_assignment = false;
+
+// Forces assign to skip melting, and, instead, use the temperature given as
+// the initial temperature
+bool no_melting = false;
+double initial_temperature = 0.0f;
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -318,6 +323,8 @@ void print_help()
   cout << "  -T          - Doing some scoring self-testing." << endl;
   cout << "  -H <float>  - Try <float> times harder." << endl;
   cout << "  -o          - Allow overloaded pnodes to be considered." << endl;
+  cout << "  -t <float>  - Start the temperature at <float> instead of melting."
+      << endl;
   exit(EXIT_UNRETRYABLE);
 }
  
@@ -634,6 +641,11 @@ int main(int argc,char **argv)
       allow_overload = true; break;
     case 'g':
       greedy_link_assignment = true; break;
+    case 't':
+      if (sscanf(optarg,"%lf",&initial_temperature) != 1) {
+	print_help();
+      }
+      no_melting = true; break;
     default:
       print_help();
     }
@@ -728,9 +740,18 @@ int main(int argc,char **argv)
     write_graphviz(sfile,SG,svertex_writer(),sedge_writer(),graph_writer());
     sfile.close();
   }
+
+  // Handle the initial temperature, if one was given - a NULL initial temp.
+  // means that we should start with the normal melting procedure
+  double *initial_temperature_pointer;
+  if (no_melting) {
+    initial_temperature_pointer = &initial_temperature;
+  } else {
+    initial_temperature_pointer = NULL;
+  }
  
   timestart = used_time();
-  anneal(scoring_selftest, scale_neighborhood);
+  anneal(scoring_selftest, scale_neighborhood, initial_temperature_pointer);
   timeend = used_time();
 
 #ifdef GNUPLOT_OUTPUT
