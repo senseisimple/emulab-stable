@@ -193,14 +193,7 @@ static void err_output(const char *fmt, va_list ap)
 	    lt->tm_hour, lt->tm_min, lt->tm_sec);
 
     vfprintf(log, fmt, ap);
-
     fflush(log);
-
-    /*
-     * Write to stderr so the web server can pick it up.
-     */
-    vfprintf(stderr, fmt, ap);
-    fflush(stderr);
 #endif /* LOG_EXEC */
     return;
 }
