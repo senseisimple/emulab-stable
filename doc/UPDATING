@@ -13,7 +13,7 @@ in YYYYMMDD format.
 		sudo sql/gentopmaps.pl
 
 20040625:
-	After updating to revision 1.257 of sql/database-create.txt,
+	After updating to revision 1.257 of sql/database-migrate.txt,
         run sql/devlnodes.pl to clear out all of the non reserved
         pcvm nodes. Be sure to do a current install of the software, and
         then:
