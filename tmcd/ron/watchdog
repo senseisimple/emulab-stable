@@ -43,7 +43,7 @@ use lib "/usr/local/etc/emulab";
 use libsetup;
 
 # Locals
-my $timeout = (60 * 30);	# In seconds of course. 
+my $timeout = (60 * 60);	# In seconds of course. 
 my $logname = "/tmp/emulab-watchdog.debug";
 my $vndir   = "/var/emulab";
 my $pidfile = "/var/run/emulab-watchdog.pid";
@@ -131,6 +131,14 @@ close(PFILE);
 #
 print "Informing Emulab Operations that we've rebooted ...\n";
 system("tmcc state REBOOTED");
+
+#
+# Do Apod.
+#
+if (-x "/usr/local/etc/emulab/setipod") {
+    print "Setting up APOD ... \n";
+    system("/usr/local/etc/emulab/setipod");
+}
 
 # At bootup, look for new accounts.
 print "Looking for new Emulab accounts ...\n";
@@ -222,6 +230,15 @@ sub bootvnodes() {
     my @vnodes;
 
     #
+    # Don't want tmcc errors to really kill us.
+    #
+    my $newpid = fork();
+    if ($newpid) {
+	waitpid($newpid, 0);
+	return ($? >> 8);
+    }
+    
+    #
     # Get the current set of vnodes that are supposed to be running on
     # this node.
     #
@@ -256,6 +273,7 @@ sub bootvnodes() {
 	system("vnodesetup $vnode");
 	sleep(5);
     }
+    exit(0);
 }
 
 exit(0);

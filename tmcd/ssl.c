@@ -61,6 +61,7 @@ static char	*clientcertdirs[] = {
 	"/etc/testbed",
 	"/etc/rc.d/testbed",
 	"/usr/local/etc/testbed",
+	"/usr/local/etc/emulab",
 	ETCDIR,
 	0
 };

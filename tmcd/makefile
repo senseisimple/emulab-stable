@@ -1,7 +1,9 @@
 #
 # Testbed TMCD client program
 #
-CFLAGS	       += -O -g -Wall -DUDP -DSTANDALONE -DBOSSNODE='"boss.emulab.net"'
+BOSSNODE        = boss.emulab.net
+#BOSSNODE        = golden-gw.ballmoss.com
+CFLAGS	       += -O -g -Wall -DUDP -DSTANDALONE -DBOSSNODE='"$(BOSSNODE)"'
 SRCDIR          = .
 DESTDIR		=
 INSTALL_DIR	= $(DESTDIR)/usr/local/etc/emulab
@@ -11,6 +13,7 @@ DISTFILES	= makefile decls.h libsetup.pm ssl.c ssl.h tmcc.c
 WAFILES		= liblocsetup-linux.pm liblocsetup-freebsd.pm install.sh \
 			emulabctl rc.testbed update vnodesetup watchdog \
 			reinstall.sh emulabkey
+BSDFILES	= setipod
 DISTDIR		= /tmp/emulab
 
 #
@@ -28,7 +31,7 @@ ssl.o:	ssl.c ssl.h decls.h
 clean: 
 	rm -f *.o core tmcc
 
-install:	misc-install script-install bin-install
+force-install:	misc-install script-install bin-install
 
 dir-install:
 	-mkdir -p $(INSTALL_DIR)
@@ -43,6 +46,9 @@ bin-install:	dir-install tmcc
 
 script-install:	dir-install
 	for file in $(WAFILES); do \
+		$(INSTALL_PROG) $(SRCDIR)/$$file $(INSTALL_DIR)/$$file; \
+	done
+	for file in $(BSDFILES); do \
 		$(INSTALL_PROG) $(SRCDIR)/$$file $(INSTALL_DIR)/$$file; \
 	done
 	$(INSTALL_PROG) $(SRCDIR)/libsetup.pm $(INSTALL_DIR)/libsetup.pm
@@ -65,13 +71,28 @@ post-install:
 	chown emulabman $(INSTALL_DIR)/client.pem $(INSTALL_DIR)/emulab.pem
 	chmod 640 $(INSTALL_DIR)/client.pem $(INSTALL_DIR)/emulab.pem
 
-dist:
+dist:	trafgen pemfile
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
 	cp -p $(DISTFILES) $(DISTDIR)
+	cp -p $(BSDFILES) $(DISTDIR)
 	for file in $(WAFILES); do cp ron/$$file $(DISTDIR); done
 	cp /usr/testbed/etc/emulab.pem $(DISTDIR)
-	cp /usr/testbed/etc/pcplab.pem $(DISTDIR)/client.pem
+	cp /usr/testbed/etc/$(PEMFILE) $(DISTDIR)/client.pem
+	cp /usr/local/sbin/vtund $(DISTDIR)
+	cp $(TRAFGEN) $(DISTDIR)
 	rm -f $(DISTDIR).tar
 	tar cf $(DISTDIR).tar -C $(DISTDIR) .
+
+trafgen:
+ifndef	TRAFGEN
+	@echo "You must define TRAFGEN (path to trafgen binary)."
+	@false
+endif
+
+pemfile:
+ifndef	PEMFILE
+	@echo "You must define PEMFILE (name of the pem file)."
+	@false
+endif
 

@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
@@ -21,7 +21,8 @@ use Socket;
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+$ENV{'PATH'}  = "/bin:/sbin:/usr/bin:/usr/local/bin";
+$ENV{'PATH'} .= ":/usr/local/etc/emulab:/etc/testbed";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #

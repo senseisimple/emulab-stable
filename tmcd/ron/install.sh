@@ -31,6 +31,7 @@ else
 	rm -f /etc/rc5.d/S99emulab
 	ln -s ../init.d/emulab /etc/rc5.d/S99emulab
 endif
+cp /dev/null isrem
 chown emulabman . *
 chgrp bin . *
 chown root update vnodesetup
