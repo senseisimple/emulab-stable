@@ -12,7 +12,7 @@ SUBDIR		= vis
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= dbvistopology
-LIBEXEC_SCRIPTS = webvistopology
+LIBEXEC_SCRIPTS = webvistopology webfloormap
 LIBEXEC_VIS	= prerender render prerender_all floormap
 
 #
