@@ -8,6 +8,7 @@ use English;
 use Getopt::Std;
 use File::Basename;
 use Fcntl;
+use IO::Handle;
 
 sub WhichRawDisk();
 
@@ -88,6 +89,7 @@ if ($action eq "boot" || $action eq "reconfig") {
     #
     open(LOG, "> $LOGFILE") or
 	BootFatal(-1, "Could not open $LOGFILE!");
+    LOG->autoflush(1);
 
     #
     # This open implicitly forks a child, which goes on to execute the rest
