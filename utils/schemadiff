@@ -158,7 +158,7 @@ sub read_schema($) {
 	    # what this line is trying to do...
 	    #
 
-	    if (/^\) TYPE=(\w+);/) {
+	    if (/^\) TYPE\s*=\s*(\w+);/) {
 
 		# The end of the table definition
 		my $type = $1;
@@ -194,6 +194,8 @@ sub read_schema($) {
 
 		# A primary key
 		my $key = $1;
+		# Strip whitespace
+		$key =~ s/\s+//g;
 		debug("Putting primary key $key in table $table_name\n");
 		$tables{$table_name}{PRIMARY}{$key} = 1;
 
@@ -201,6 +203,8 @@ sub read_schema($) {
 
 		# A key/index (synonmyms)
 		my ($name, $key) = ($2, $3);
+		# Strip whitespace
+		$key =~ s/\s+//g;
 		debug("Putting key $key in table $table_name\n");
 
 		if ($name) {
