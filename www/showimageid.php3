@@ -43,7 +43,7 @@ SUBMENUSTART("More Options");
 $fooid = rawurlencode($imageid);
 WRITESUBMENUBUTTON("Edit this Image Descriptor",
 		   "editimageid_form.php3?imageid=$fooid");
-WRITESUBMENUBUTTON("Dump Node Disk Contents into Image",
+WRITESUBMENUBUTTON("Snapshot Node Disk into Image",
 		   "loadimage.php3?imageid=$fooid");
 WRITESUBMENUBUTTON("Delete this Image Descriptor",
 		   "deleteimageid.php3?imageid=$fooid");

@@ -10,7 +10,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Dump Node Disk Contents into Existing Image Descriptor");
+PAGEHEADER("Snapshot Node Disk into Existing Image Descriptor");
 
 #
 # Only known and logged in users.
@@ -61,7 +61,7 @@ if (! isset($node) || isset($cancelled)) {
     echo "<br />";
 
     echo "<form action='loadimage.php3' method='post'>\n".
-	 "<font size=+1>Node to dump into image '$imageid':</font> ".
+	 "<font size=+1>Node to snapshot into image '$imageid':</font> ".
 	 "<input type='text'   name='node' value='$node'></input>\n".
 	 "<input type='hidden' name='imageid' value='$imageid'></input>\n".
 	 "<input type='submit' name='submit'  value='Go!'></input>\n".
@@ -76,7 +76,7 @@ if (! isset($node) || isset($cancelled)) {
 
 if (! TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_LOADIMAGE)) {
     USERERROR("You do not have permission to ".
-	      "dump an image from node '$node'.", 1);
+	      "snapshot an image from node '$node'.", 1);
 }
 
 # Should check for file file_exists($image_path),
@@ -86,8 +86,8 @@ if (! isset($confirmed) ) {
     echo "<center><form action='loadimage.php3' method='post'>\n".
 #         "<h2>Image already exists at '<code>$image_path</code>'.".
          "<h2><b>Warning!</b><br />".
-	 "Dumping disk contents from node '$node' into image '$imageid' ".
-	 "will overwrite any previously dumped image. ".
+	 "Doing a snapshot of node '$node' into image '$imageid' ".
+	 "will overwrite any previous snapshot for that image. ".
 	 "Are you sure you want to continue?</h2>".
          "<input type='hidden' name='node'      value='$node'></input>".
          "<input type='hidden' name='imageid'   value='$imageid'></input>".
@@ -103,14 +103,14 @@ if (! isset($confirmed) ) {
 TBGroupUnixInfo($image_pid, $image_gid, $unix_gid, $unix_name);
 
 echo "<br>
-      Creating image for '$imageid' using node '$node' ...
+      Taking a snapshot of node '$node' into image '$imageid' ...
       <br><br>\n";
 flush();
 
 SUEXEC($uid, $unix_gid, "webcreateimage -p $image_pid $image_name $node", 1);
 
 echo "This will take 10 minutes or more; you will receive email
-      notification when the image is complete. In the meantime,
+      notification when the snapshot is complete. In the meantime,
       <b>PLEASE DO NOT</b> delete the imageid or the experiment
       $node is in. In fact, it is best if you do not mess with 
       the node at all!<br>\n";

@@ -327,10 +327,10 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
-    # Node to Obtain image from.
+    # Node to Snapshot image from.
     #
     echo "<tr>
-              <td>Node to Obtain Image from[<b>2</b>]:</td>
+              <td>Node to Obtain Snapshot from[<b>2</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[node]\"
@@ -506,8 +506,8 @@ function SPITFORM($formfields, $errors)
                  </ul>
              </li>
              <li> If you already have a node customized, enter that node
-                  name (pcXXX) and its disk contents 
-		  will be dumped automatically into the specified Image File.
+                  name (pcXXX) and a snapshot will automatically be made of
+		  its disk contents into the specified Image File. 
                   Notification of completion will be sent to you via email. 
 	     </li>
              <li> Guidelines for setting OS features for your OS:
@@ -867,11 +867,13 @@ $confirmationWarning = "";
 #
 if (! isset($node)) {
     $confirmationWarning .=
-          "<h2>You have not defined a node from which to obtain the image!
-           If you do not specify such a node now,
-	   you will later have to go to the Image Descriptor information
-	   page for the new image and then choose 
-	   'Dump Node Disk Contents into Image' from the menu.
+          "<h2>You have not defined a node to obtain a snapshot from!
+	   If you continue, the image descriptor will be created,
+	   but not associated with any actual disk data.
+	   You will be able to remedy this later by
+	   going to the Image Descriptor information
+	   page for the new image and choosing 
+	   'Snapshot Node Disk into Image' from the menu.<br />
   	   Continue only if this is what you want.</h2>";
 }
 
@@ -1017,7 +1019,7 @@ if (isset($node)) {
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
     echo "<br>
-          Creating image using node '$node' ...
+	  Taking a snapshot of node '$node' for image ...
           <br><br>\n";
     flush();
 
