@@ -237,7 +237,6 @@ Node instproc add_routes_to_DB {DB} {
 		return
 	    }
 	}
-	puts stderr "'$pid','$eid','$self','$dstip','$hopip','$type'"
 	
 	sql exec $DB "insert into virt_routes (pid,eid,vname,dst,nexthop,dst_type) values ('$pid','$eid','$self','$dstip','$hopip','$type')";
     }
