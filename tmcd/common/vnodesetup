@@ -33,7 +33,7 @@ sub usage()
 	"Use -k when killing the virtual node (removes filesystems).\n";
     exit(1);
 }
-my $optlist	= "kbdjsVrhp";
+my $optlist	= "kbdjsVrhpt";
 
 # Locals
 my $killit	= 0;
@@ -48,6 +48,7 @@ my $doplab	= 0;
 my $cleaning	= 0;
 my $rebooting   = 0;
 my $leavejail   = 0;
+my $timestamps  = 0;
 my $jailpid;
 
 #
@@ -118,6 +119,9 @@ if (defined($options{"b"})) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"t"})) {
+    $timestamps = 1;
 }
 if (defined($options{"j"})) {
     $dojail = 1;
@@ -234,6 +238,10 @@ if (!$debug && !$interactive && TBBackGround($logname)) {
     }
     exit(0);
 }
+if ($timestamps) {
+    TBDebugTimeStampsOn();
+}
+TBDebugTimeStamp("vnodesetup starting the real work");
 
 #
 # Change our process group since we are a daemon; we get called from
@@ -314,12 +322,17 @@ tmcc(TMCCCMD_STATE, "BOOTING");
 #
 my ($pid, $eid, $vname);
 
+TBDebugTimeStamp("vnodesetup calling into libsetup");
+
 if ($doplab) {
     ($pid, $eid, $vname) = vnodeplabsetup($vnodeid);
 }
 else {
     ($pid, $eid, $vname) = vnodejailsetup($vnodeid);
 }
+
+TBDebugTimeStamp("vnodesetup back from libsetup");
+
 if (!defined($pid)) {
     #
     # Hmm, suddenly got free. 
@@ -374,6 +387,8 @@ if ($dojail) {
 	if ($usevcnetroutes) {
 	    $options .= "-V ";
 	}
+	TBDebugTimeStamp("vnodesetup calling mkjail.pl");
+	
 	exec("mkjail.pl $options -p $pid -h $jailhostname $vnodeid");
 	die("*** $0:\n".
 	    "    Could not start the jail!\n");
