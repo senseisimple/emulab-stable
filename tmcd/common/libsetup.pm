@@ -1306,6 +1306,10 @@ sub doaccounts()
 	    # Group info goes in the hash table.
 	    #
 	    my $gname = "$1";
+
+	    # New plab images are stupid.
+	    $gname = lc($gname)
+		if (PLAB());
 	    
 	    if (REMOTE() && !JAILED() && !PLAB()) {
 		$gname = "emu-${gname}";
