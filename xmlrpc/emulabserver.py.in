@@ -1194,7 +1194,9 @@ class experiment:
                 if res[5]:
                     tmp["eventstatus"] = res[5]
                     pass
-                tmp["idle"] = res[6]
+                if res[6]:
+                    tmp["idle"] = res[6]
+                    pass
                 if res[7]:
                     tmp["load_1min"] = res[7]
                     pass
