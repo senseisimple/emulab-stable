@@ -1352,8 +1352,9 @@ class Node:
             print self.leasedata
         self.lease = lease.lease(self.leasedata)
         DBQueryFatal("update plab_slice_nodes"
-                     " set leasedata = %s, leaseend = %s",
-                     (self.leasedata, self.lease.end_time))
+                     " set leasedata = %s, leaseend = %s"
+                     " where node_id = %s",
+                     (self.leasedata, self.lease.end_time, self.nodeid))
         return 0
 
     def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
