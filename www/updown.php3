@@ -67,10 +67,10 @@ printf("%.2f",(($num_up + $num_unpingable)/$num_total) *100);
 
 <h3>Key:</h3>
 <p>
-<img src="/autostatus-icons/up.png" alt="up"> - Up<br>
-<img src="/autostatus-icons/maybe.png" alt="possibly down"> - Possibly down<br>
-<img src="/autostatus-icons/down.png" alt="down"> - Down<br>
-<img src="/autostatus-icons/dep.png" alt="unpingable"> - Unpingable: Running an operating system that does not respond to pings<br>
+<img src="/autostatus-icons/greenball.gif" alt="up"> - Up<br>
+<img src="/autostatus-icons/yellowball.gif" alt="possibly down"> - Possibly down<br>
+<img src="/autostatus-icons/redball.gif" alt="down"> - Down<br>
+<img src="/autostatus-icons/blueball.gif" alt="unpingable"> - Unpingable: Running an operating system that does not respond to pings<br>
 </p>
 
 <?php
@@ -102,7 +102,7 @@ while ($r = mysql_fetch_array($query_result)) {
 		}
 
 		print("<h3>$type</h3>\n");
-		print("<table cellspacing=0 cellpadding=5>\n");
+		print("<table cellspacing=0 border=0 cellpadding=5>\n");
 
 		$lasttype = $type;
 		$column = 0;
@@ -130,16 +130,16 @@ while ($r = mysql_fetch_array($query_result)) {
 	print("<td $tdbg><nobr>");
 	switch ($status) {
 		case "up":
-			print("<img src=\"/autostatus-icons/up.png\" alt=\"up\">");
+			print("<img src=\"/autostatus-icons/greenball.gif\" alt=\"up\">");
 			break;
 		case "possibly down":
-			print("<img src=\"/autostatus-icons/maybe.png\" alt=\"possibly down\">");
+			print("<img src=\"/autostatus-icons/yellowball.gif\" alt=\"possibly down\">");
 			break;
 		case "down":
-			print("<img src=\"/autostatus-icons/down.png\" alt=\"down\">");
+			print("<img src=\"/autostatus-icons/redball.gif\" alt=\"down\">");
 			break;
 		case "unpingable":
-			print("<img src=\"/autostatus-icons/dep.png\" alt=\"unpingable\">");
+			print("<img src=\"/autostatus-icons/blueball.gif\" alt=\"unpingable\">");
 			break;
 		default:
 			print("<b>Unknown</b>");
