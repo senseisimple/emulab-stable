@@ -17,6 +17,9 @@ use Getopt::Std;
 # XXX There is an inherent race condition with using this script. What if
 # nodes are released while it is running?
 #
+# Eventually, this script should be tossed. The widearea nodes poll
+# for updates, and thats how local nodes should do it too. 
+#
 # The output is all jumbled together since the updates are issued in parallel.
 # Might be a pain when debugging. 
 # 
@@ -95,7 +98,7 @@ my $logname;
 my %pids	= ();
 my $failed	= 0;
 my $dbuid;
-my @remotenodes = ();
+my @autonodes   = ();
 
 #
 # We don't want to run this script unless its the real version.
@@ -204,20 +207,14 @@ if (! @nodes) {
 }
 
 #
-# For widearea nodes, just flag them in the DB. The nodes will
-# notice this and suck the data over when they can.
+# Mark the nodes for auto update. Nodes may not respect this field
+# (old local images), but its harmless. 
 #
 foreach my $node ( @nodes ) {
-    if (TBIsNodeRemote($node) && !TBIsNodeVirtual($node)) {
-	print STDOUT "Marking widearea node $node for update.\n";
-
-	#
-	# No point in incrementing the flag past 2!
-	#
-	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
-		     "where node_id='$node' and update_accounts<2");
-
-	push(@remotenodes, $node);
+    if (! DBQueryWarn("update nodes set ".
+		      "update_accounts=GREATEST(update_accounts,1) ".
+		      "where node_id='$node'")) {
+	fatal("DB Error!");
     }
 }
 
@@ -229,10 +226,20 @@ foreach my $node ( @nodes ) {
 #
 my $maxpids = 0;
 foreach my $node ( @nodes ) {
+    my $jailed;
+    
     #
-    # Remote nodes handled just above.
+    # widearea and jailed nodes auto update. Skip them.
     # 
-    if (TBIsNodeRemote($node) || TBIsNodeVirtual($node)) {
+    if (TBIsNodeRemote($node)) {
+	push(@autonodes, $node);
+	next;
+    }
+    # eventually all virtual nodes will be jailed ...
+    if (TBIsNodeVirtual($node, \$jailed)) {
+	if ($jailed) {
+	    push(@autonodes, $node);
+	}
 	next;
     }
     
@@ -278,28 +285,39 @@ foreach my $thispid ( keys(%pids) ) {
 # this cause tmcd decrements the update_accounts flag whenever a node
 # picks up new accounts.
 #
-if (@remotenodes) {
-    print STDOUT "Waiting a while for widearea nodes to update ...\n";
-    sleep(90);
-    my $foo = pop(@remotenodes);
-    my $str = "node_id='$foo' ";
+if (@autonodes) {
+    print STDOUT "Waiting a while for nodes to auto update ...\n";
+    for (my $i = 0; $i < 6; $i++) {
+	sleep(30);
 
-    foreach my $node ( @remotenodes ) {
-	$str .= "or node_id='$node' ";
-    }
-    my $query_result =
-	DBQueryFatal("select node_id,update_accounts from nodes ".
-		     "where ($str)");
+	my $firstnode = pop(@autonodes);
+	my $querystr  = "node_id='$firstnode' ";
 
-    while (my ($node,$notdone) = $query_result->fetchrow_array) {
-	if ($notdone) {
-	    $failed++;
-	    print STDERR "Update of node $node has not completed!\n";
+	while (@autonodes) {
+	    my $node = pop(@autonodes);
+
+	    $querystr .= "or node_id='$node' ";
 	}
-	else {
-	    print STDOUT "$node updated.\n";
+	
+	my $query_result =
+	    DBQueryFatal("select node_id,update_accounts from nodes ".
+			 "where ($querystr)");
+
+	while (my ($node,$notdone) = $query_result->fetchrow_array) {
+	    if ($notdone) {
+		push(@autonodes, $node);
+	    }
+	    else {
+		print STDOUT "$node updated.\n";
+	    }
 	}
+	last if (! @autonodes);
+	print STDOUT "Still waiting for nodes to auto update ...\n";
     }
+}
+foreach my $node ( @autonodes ) {
+    print STDOUT "Node update failed on $node.\n";
+    $failed++;
 }
 
 TBUnLockExp($pid, $eid);
@@ -319,16 +337,11 @@ sub UpdateNode {
 
     print STDOUT "Updating $node.\n";
 
-    #
-    # We need to know if its a remote or local node, so we know how
-    # to update it. This info needs to be in the DB at some point. 
-    #
-    my($isremote) = TBIsNodeRemote($node);
-
     $mypid = fork();
     if ($mypid) {
 	return $mypid;
     }
+    TBdbfork();
 
     #
     # Run an ssh command in a child process, protected by an alarm to
@@ -363,12 +376,7 @@ sub UpdateNode {
 	exit(0);
     }
     else {
-	if ($isremote) {
-	    exec("$ssh -host $node /usr/local/etc/testbed/update");
-	}
-	else {
-	    exec("$ssh -host $node /etc/testbed/update");
-	}
+	exec("$ssh -host $node /etc/testbed/update");
 	exit(0);
     }
     exit(0);
