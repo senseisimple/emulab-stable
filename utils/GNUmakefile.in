@@ -24,7 +24,7 @@ LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS) firstuser
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
