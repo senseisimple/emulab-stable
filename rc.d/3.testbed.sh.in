@@ -27,3 +27,8 @@ if [ -x @prefix@/sbin/reload_daemon  ]; then
         @prefix@/sbin/reload_daemon
 fi
 
+if [ -x @prefix@/sbin/batch_daemon  ]; then
+        echo -n " batchd"
+        @prefix@/sbin/batch_daemon
+fi
+
