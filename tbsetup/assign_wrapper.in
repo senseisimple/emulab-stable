@@ -309,18 +309,12 @@ my %jailosids    = ();
 my %defaultosids = ();
 
 $query_result =
-    DBQueryFatal("SELECT type,delay_osid,osid from node_types");
+    DBQueryFatal("SELECT type,delay_osid,osid,jail_osid from node_types");
 
-my $OURDOMAIN   = "@OURDOMAIN@";
-
-while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
+while (($type,$delayosid,$defosid,$jailosid) =
+       $query_result->fetchrow_array()) {
     $delayosids{$type}   = $delayosid;
-    if ($OURDOMAIN eq "mini.emulab.net") {
-	$jailosids{$type}    = "FBSD-STD";
-    }
-    else {
-	$jailosids{$type}    = "emulab-ops-FBSD47-UPDATE";
-    }
+    $jailosids{$type}    = $jailosid;
     $defaultosids{$type} = $defosid;
 }
 
