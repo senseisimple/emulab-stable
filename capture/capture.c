@@ -846,10 +846,9 @@ char *
 newstr(str)
 	char *str;
 {
-	char *malloc();
 	register char *np;
 
-	if ((np = malloc((unsigned) strlen(str) + 1)) == NULL)
+	if ((np = (char*)malloc((unsigned) strlen(str) + 1)) == NULL)
 		die("malloc: out of memory");
 
 	return(strcpy(np, str));
