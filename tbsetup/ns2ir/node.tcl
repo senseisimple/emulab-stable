@@ -97,6 +97,9 @@ Node instproc init {s} {
 	$self set simulated 0
     }
     $self set nsenode_vportlist {}
+
+    # This is a mote thing.
+    $self set numeric_id {}
 }
 
 # The following procs support renaming (see README)
@@ -155,6 +158,7 @@ Node instproc updatedb {DB} {
     $self instvar X_
     $self instvar Y_
     $self instvar orientation_
+    $self instvar numeric_id
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::use_physnaming
     var_import ::TBCOMPAT::physnodes
@@ -252,6 +256,11 @@ Node instproc updatedb {DB} {
     if { $inner_elab_role != "" } {
 	lappend fields "inner_elab_role"
 	lappend values $inner_elab_role
+    }
+
+    if { $numeric_id != {} } {
+	lappend fields "numeric_id"
+	lappend values $numeric_id
     }
 
     $sim spitxml_data "virt_nodes" $fields $values
@@ -558,4 +567,13 @@ Node instproc console {} {
     $self instvar console_
     
     return $console_
+}
+
+#
+# Set numeric ID (a mote thing)
+#
+Node instproc set_numeric_id {myid} {
+    $self instvar numeric_id
+
+    set numeric_id $myid
 }

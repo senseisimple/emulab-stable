@@ -1489,3 +1489,15 @@ proc tb-set-security-level {level} {
     }
     set security_level $level
 }
+
+#
+# Set numeric ID (this is a mote thing)
+#
+proc tb-set-node-id {vnode myid} {
+    if {[$vnode info class] != "Node"} {
+	perror "\[tb-set-node-id] $vnode is not a node."
+	return
+    }
+    $vnode set_numeric_id $myid
+}
+
