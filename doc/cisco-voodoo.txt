@@ -1,0 +1,29 @@
+Some notes on how to diagnose problems on the Cisco.
+
+1. Looking at switch stats/status for a node interface.
+
+   Mac may have a wrapper for this, but here is the guts of what you have
+   to do.  To look at the switch port for a particular enet card, first
+   figure out what switch port it is connected to!
+
+      mysql tbdb
+      select * from wires where node_id1='tbpcXX';
+
+   What you care about are node_id2/card2/port2.  Node_id2 tells you which
+   cisco: "cisco" is the testbed cisco (``tip test'') and "cisco2" is the
+   control net cisco (``tip control'').  card2/port2 give you the info you
+   need for the cisco-style card/port name (e.g., 3/39).
+
+   Armed with this info, tip to the correct cisco, login and enable.
+   Then you can do:
+
+      show port status card/port
+
+   or
+
+      show port card/port
+
+   for everything.  If, say, the port is disabled, you can do:
+
+      set port enable card/port
+
