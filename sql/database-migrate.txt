@@ -896,3 +896,20 @@ last_net_act,last_cpu_act,last_ext_act);
 
        update interfaces set role='fake' where \
 	(interface_type='ixp_fake' and node_id like 'pc%');
+
+1.176: Add netmask to various tables. Currently in text format, but
+       might have to change to an int format to save space.
+
+       alter table interfaces add mask varchar(15) \
+		default NULL after IPaliases;
+       alter table virt_lans add mask varchar(15) \
+		default '255.255.255.0' after member;
+       alter table tunnels add mask varchar(15) \
+       		default NULL after peer_ip;
+       alter table veth_interfaces add mask varchar(15) \
+		default NULL after IP;
+
+       update interfaces set mask='255.255.255.0' \
+		where role='ctrl' or role='ctrl' or role='fake';
+       update veth_interfaces set mask='255.255.255.0';
+       update tunnels set mask='255.255.255.0';
