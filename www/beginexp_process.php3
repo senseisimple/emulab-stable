@@ -8,26 +8,6 @@
 include("defs.php3");
 
 #
-# Only known and logged in users can begin experiments.
-#
-if (!isset($uid)) {
-    USERERROR("You must be logged in to change your user information!", 1);
-}
-
-#
-# Verify that the uid is known in the database.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid='$uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error confirming user $uid: $err\n", 1);
-}
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    USERERROR("You do not appear to have an account!", 1);
-}
-
-#
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
@@ -39,10 +19,6 @@ $formerror="No Error";
 if (!isset($uid) ||
     strcmp($uid, "") == 0) {
   $formerror = "Username";
-}
-if (!isset($password) ||
-    strcmp($password, "") == 0) {
-  $formerror = "Password";
 }
 if (!isset($exp_pid) ||
     strcmp($exp_pid, "") == 0) {
@@ -71,23 +47,9 @@ if ($formerror != "No Error") {
 }
 
 #
-# Verify the password.
+# Only known and logged in users can begin experiments.
 #
-$pswd_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
-if (!$pswd_result) {
-    TBERROR("Database Error retrieving password for $uid: $err\n", 1);
-}
-if ($row = mysql_fetch_row($pswd_result)) {
-    $db_encoding = $row[0];
-    $salt = substr($db_encoding,0,2);
-    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
-    $encoding = crypt("$password", $salt);
-    if (strcmp($encoding, $db_encoding)) {
-	USERERROR("The password provided was incorrect. ".
-                  "Please go back and retype the password.", 1);
-    }
-}
+LOGGEDINORDIE($uid);
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not

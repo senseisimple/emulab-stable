@@ -7,20 +7,17 @@
 <?php
 include("defs.php3");
 
+#
+# Only known and logged in users can end experiments.
+#
 $uid = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-  $uid=$Vals[1];
-  addslashes($uid);
+    $uid=$Vals[1];
+    addslashes($uid);
 } else {
-  unset($uid);
+    unset($uid);
 }
-
-#
-# Only known and logged in users can do this.
-#
-if (!isset($uid)) {
-    USERERROR("You must be logged in to sho experiment information!", 1);
-}
+LOGGEDINORDIE($uid);
 
 #
 # Must provide the EID!
@@ -28,19 +25,6 @@ if (!isset($uid)) {
 if (!isset($exp_eid) ||
     strcmp($exp_eid, "") == 0) {
   USERERROR("The experiment ID was not provided!", 1);
-}
-
-#
-# Verify that the uid is known in the database.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid='$uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error confirming user $uid: $err\n", 1);
-}
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    USERERROR("You do not appear to have an account!", 1);
 }
 
 #

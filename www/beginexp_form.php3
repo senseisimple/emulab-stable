@@ -7,33 +7,17 @@
 <?php
 include("defs.php3");
 
+#
+# Only known and logged in users can begin experiments.
+#
 $uid = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-  $uid=$Vals[1];
-  addslashes($uid);
+    $uid=$Vals[1];
+    addslashes($uid);
 } else {
-  unset($uid);
+    unset($uid);
 }
-
-#
-# Only known and logged in users can modify info.
-#
-if (!isset($uid)) {
-    USERERROR("You must be logged in begin an experiment!", 1);
-}
-
-#
-# Verify that the uid is known in the database.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid='$uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error confirming user $uid: $err\n", 1);
-}
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    USERERROR("You do not appear to have an account!", 1);
-}
+LOGGEDINORDIE($uid);
 
 #
 # See what projects the uid is a member of. Must be at least one!
@@ -75,14 +59,6 @@ echo "<tr>
           <td>*Username:</td>
           <td class=\"left\"> 
               <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
-      </tr>\n";
-
-#
-# Password until we do authentication.
-#
-echo "<tr>
-          <td>*Password:</td>
-          <td><input type=\"password\" name=\"password\"></td>
       </tr>\n";
 
 #
