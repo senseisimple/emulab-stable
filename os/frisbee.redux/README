@@ -136,3 +136,47 @@ a bunch of requests it is working on.
 
 Lbs
 
+From: "David G. Andersen" <danderse@cs.utah.edu>
+To: Leigh Stoller <stoller@flux.utah.edu>
+Subject: Re: Refs on Reliable bulk data distrib (relevant to Frisbee)
+Date: Thu, 19 Sep 2002 16:32:57 -0600
+
+Leigh Stoller just mooed:
+> 
+> 1. The "I need these blocks" request format is stupid. I naively thought
+>    that packet loss would be rare, so nodes would not be requesting missing
+>    blocks very often. Its a dumb start,length request which means that if I
+>    am missing a bunch of scattered blocks in a 1MB chunk, I have to send a
+>    request for each non contiguous range. Should be a simple bitmap
+>    instead. Should be an easy change to client and server, and this would
+>    reduce the amount of client to server traffic.
+>
+> 2. Slightly related is my point in the message below. The clients should be
+>    listening for requests from the other clients so as not to flood the
+>    server with dup requests. Note though that the server *does* coallesce
+>    all the requests; if 10 clients request the same block it is sent just
+>    once. Basically, if one client did not get a block, odds are none of the
+>    clients got it! This change is a little more work cause it requires
+>    some bookkeeping, but its not too big a deal. 
+
+   yeah.  you're now encountering the standard multicast reliability
+problem.  too bad kristin isn't still there. :-)  throw in a bit
+of random backoff and snooping on requests and it should be OK.
+
+> 3. Lastly, I have no decent rate controlling mechanism to prevent the
+>    server from flooding the network. Its not so much that I am worried
+>    about flooding the clients with blocks too fast, but that I can easily
+>    flood the link to the cisco by blasting out udp packets. That causes
+>    more packet drops and more requests and again I have a feedback loop. My
+>    hacky solution was just to throttle back the sender with a constant
+>    usleep until I came up with something. I'm not really sure what the
+>    effect of this hack is though, but I am guessing that the strictly
+>    constant (and conservative) output rate is not helping me any!
+
+  hmm.  also researchby, but since the clients are mostly homogenous,
+this shouldn't be too bad to solve.  could you keep a rate estimate of
+the number of drops, and scale back the transmission rate by .9 or so
+if it exceeds some thresshold, and then ramp it back up a bit over time?
+(super aggressive tcp)
+
+  -dave
