@@ -102,7 +102,7 @@ function SPITFORM($errors, $node_id, $isnewid, $building, $floor,
     }
     $uniqueid = $matches[1];
 
-    $retval = SUEXEC("nobody", "nobody",
+    $retval = SUEXEC($uid, "nobody",
 		     "webfloormap -t -o $prefix -f $floor $building",
 		     SUEXEC_ACTION_IGNORE);
 

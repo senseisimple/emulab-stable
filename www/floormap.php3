@@ -247,7 +247,7 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$retval = SUEXEC("nobody", "nobody", "webfloormap -o $prefix " .
+$retval = SUEXEC($uid, "nobody", "webfloormap -o $prefix " .
 		 (isset($pid) ? "-e $pid,$eid " : "") .
 		 (isset($floor) ? "-f $floor " : "") .
 		 (isset($building) ? "$building" : "") .

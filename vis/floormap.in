@@ -33,10 +33,11 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTa";
+my $optlist  = "df:o:s:c:S:C:O:e:tTak";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
+my $cleanup  = 0;
 
 my $building;
 my $floor;
@@ -96,7 +97,7 @@ my $img_n  = -1;
 
 # Admin people get extra info
 $mereuser = 0
-    if (!TBAdmin($UID));
+    if (TBAdmin($UID));
 
 # Ha.
 my @floortags = ();
@@ -135,6 +136,9 @@ if (defined($options{"a"})) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"k"})) {
+    $cleanup = 1;
 }
 if (defined($options{"t"})) {
     $notitles = 1;
@@ -200,6 +204,10 @@ if (defined($options{"O"})) {
 }
 if (defined($options{"o"})) {
     $prefix = $options{"o"};
+    if ($cleanup) {
+	unlink "${prefix}.jpg", "${prefix}.map", "${prefix}.state";
+	exit(0);
+    }
 }
 
 if (defined($options{"e"})) {
@@ -665,7 +673,7 @@ sub writefiles($@)
             "$err\n".
             "    Could not open ${prefix}.jpg for writing!\n");
     }
-
+	
     # Areamap.
     if (!open(MAP, "> ${prefix}.map")) {
 	unlink("${prefix}.jpg");
@@ -693,7 +701,7 @@ sub writefiles($@)
     }
     print MAP "</MAP>\n";
     close(MAP);
-
+	
     # HTML items save state.  They are included into the form by PHP and returned to
     # us by HTML-get as page arguments when the map or zoom buttons are clicked on.
     if (!open(STATE, "> ${prefix}.state")) {

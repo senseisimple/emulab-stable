@@ -35,12 +35,16 @@ $prefix = "/tmp/$prefix";
 #
 function CLEANUP()
 {
-    global $prefix;
-    
+    global $prefix, $uid;
+
+    #
+    # The backend script (vis/floormap.in) removes all the temp files
+    # with the -c option. Yucky, but file perms and owners make this
+    # the easiest way to do it.
+    # 
     if (isset($prefix)) {
-	unlink("${prefix}.jpg");
-	unlink("${prefix}.map");
-	unlink("${prefix}.state");
+	SUEXEC($uid, "nobody", "webfloormap -o $prefix -k ");
+	# This file does belong to the web server.
 	unlink($prefix);
     }
     exit();
