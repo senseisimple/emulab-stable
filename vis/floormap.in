@@ -68,9 +68,17 @@ my $last_x  = 0;  # The UNZOOMED, and hence un-offset, previous click point.
 my $last_y  = 0;
 my $last_notitles = 0;  # This says there were no titles around the previous images.
 
-# The image produced for each floor will be this size, except when using thumbnails.
+# The image produced for each floor will be this size, except when
+# using thumbnails.
+#
+# XXX What is this! 
 my $out_width  = 792;
 my $out_height = 492;
+
+if ($nozoom) {
+    my $out_width  = 1280;
+    my $out_height = 1024;
+}
 
 # Max x,y of image to go into state file.
 my $max_x = 0;
