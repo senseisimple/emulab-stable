@@ -44,23 +44,22 @@ function SPITFORM($formfields, $returning, $errors)
     PAGEHEADER("Apply for Project Membership");
 
     if ($errors) {
-	echo "<table class=stealth
-                     align=center border=0 cellpadding=0 cellspacing=2>
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
               <tr>
-                 <td class=stealth nowrap align=center colspan=3>
+                 <th align=center colspan=2>
                    <font size=+1 color=red>
-                      Oops, please fix the following errors!
+                      &nbsp;Oops, please fix the following errors!&nbsp;
                    </font>
                  </td>
               </tr>\n";
 
 	while (list ($name, $message) = each ($errors)) {
 	    echo "<tr>
-                     <td class=stealth align=right>
-                         <font color=red>$name:</font></td>
-                     <td class=stealth>&nbsp &nbsp</td>
-                     <td class=stealth align=left>
-                         <font color=red>$message</font></td>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
                   </tr>\n";
 	}
 	echo "</table><br>\n";

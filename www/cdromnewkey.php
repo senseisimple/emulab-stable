@@ -27,20 +27,22 @@ function SPITFORM($formfields, $errors)
           </blockquote><br>\n";
 
     if ($errors) {
-	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
               <tr>
-                 <td nowrap align=center colspan=3>
+                 <th align=center colspan=2>
                    <font size=+1 color=red>
-                      Oops, please fix the following errors!
+                      &nbsp;Oops, please fix the following errors!&nbsp;
                    </font>
                  </td>
               </tr>\n";
 
 	while (list ($name, $message) = each ($errors)) {
 	    echo "<tr>
-                     <td align=right><font color=red>$name:</font></td>
-                     <td>&nbsp &nbsp</td>
-                     <td align=left><font color=red>$message</font></td>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
                   </tr>\n";
 	}
 	echo "</table><br>\n";

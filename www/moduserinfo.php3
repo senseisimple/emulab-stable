@@ -38,20 +38,22 @@ function SPITFORM($formfields, $errors)
     PAGEHEADER("Modify User Information");
 
     if ($errors) {
-	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
               <tr>
-                 <td align=center colspan=3>
+                 <th align=center colspan=2>
                    <font size=+1 color=red>
-                      Oops, please fix the following errors!
+                      &nbsp;Oops, please fix the following errors!&nbsp;
                    </font>
                  </td>
               </tr>\n";
 
 	while (list ($name, $message) = each ($errors)) {
 	    echo "<tr>
-                     <td align=right><font color=red>$name:</font></td>
-                     <td>&nbsp &nbsp</td>
-                     <td align=left><font color=red>$message</font></td>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
                   </tr>\n";
 	}
 	echo "</table><br>\n";
@@ -353,10 +355,10 @@ if (isset($formfields[password1]) &&
     strcmp($formfields[password1], "")) {
     if (!isset($formfields[password2]) ||
 	strcmp($formfields[password2], "") == 0) {
-	$errors["Confirm Password"] = "Missing Field";
+	$errors["Retype Password"] = "Missing Field";
     }
     elseif (strcmp($formfields[password1], $formfields[password2])) {
-	$errors["Confirm Password"] = "Does not match Password";
+	$errors["Retype Password"] = "Two Passwords Do Not Match";
     }
     elseif (! CHECKPASSWORD($formfields[target_uid],
 			    $formfields[password1],
