@@ -338,7 +338,7 @@ proc tb-set-node-lan-loss {node lan loss} {
 	perror "\[tb-set-link-loss] $loss is not a valid loss rate."
     }
     $lan set loss([list $node $port]) $loss
-    $lan set rloss([list $node port]) $loss
+    $lan set rloss([list $node $port]) $loss
 }
 proc tb-set-node-lan-params {node lan delay bw loss} {
     tb-set-node-lan-delay $node $lan $delay
