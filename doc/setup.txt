@@ -76,7 +76,7 @@ if you're running the nameserver for this domain on boss, those names won't be
 resolvable yet. Since we don't yet have a way to auto-generate DNS
 configuration files, the suggested work-around is to add addresses for the
 FSNODE and USERNODE that you specified in your defs file (which may be the same
-thing), to /etc/hosts on boss. Remebember to remove them once you really have
+thing), to /etc/hosts on boss. Remember to remove them once you really have
 DNS set up.
 
 ##### Step 4 - Installing from source.
@@ -105,13 +105,13 @@ though we hope to soon.
 DNS configuration - boss-install enables bind on your boss node, but does not
 set it up as a server for your domain. We don't have documentation for creating
 the zone files, etc yet. Best bet right now is to ask Utah for a copy of
-theirs.  Hopefully, there will be a script to auto-generate large portions of
-them from the database. Once done, add 127.0.0.1 as the first nameserver in
-/etc/resolv.conf . Also, add boss as the first nameserver on ops, too. If
-you're running under the .emulab.net domain, too, make sure to get Utah to
-delegate the subdomain to you. If you have any hardware (eg. switches or power
-controllers) on a private subnet, add them to /etc/hosts, with the same name
-they've been give in the database.
+theirs. You need to include boss and ops in your domain, but NOT the nodes -
+these will be added for you automatically.  Once done, add 127.0.0.1 as the
+first nameserver in /etc/resolv.conf . Also, add boss as the first nameserver
+on ops, too. If you're running under the .emulab.net domain, too, make sure to
+get Utah to delegate the subdomain to you. If you have any hardware (eg.
+switches or power controllers) on a private subnet, add them to /etc/hosts,
+with the same name they've been give in the database.
 
 hosts file - It's a good idea to put ops' name/IP address in /etc/hosts - this
 helps out NFS mounts, which are typically done before the nameserver is started,
@@ -119,29 +119,17 @@ and is generally helpful if things go wrong with the nameserver.
 
 SSL certificates - Our apache config file expects to find SSL certificates in:
 /usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
-/usr/local/etc/apache/ssl.key/www.<sitename>.net.key
+/usr/local/etc/apache/ssl.key/www.<sitename>.key
 (where <sitename> is OURDOMAIN from the configure defs file.) 
 Generate a passwordless certificate (up to you if you want to get a 'real' one
 from Verisign, etc., or sign your own), and place the files from it in the
 above locations.
-
-cvsupd - Minor changes to images can be distributed at boot time with cvsup.
-See doc/newimage.txt for an overview of setting up a sup tree. Make sure to
-copy over the old one (if it exists).
-
-dhcpd - Once you've filled out the nodes and interfaces tables (instructions in
-setup-db.txt), you need to generate a config file for dhcpd. For this, you use
-the dhcpd_makeconf script (installed into /usr/testbed/sbin), which uses the
-template file in the dhcpd directory of the source distribution. Make sure to
-edit the template file to reflect your local IP addresses, and include all node
-types. Place the resulting config file (which dhcpd_makeconf spits to the
-standard output), in /usr/local/etc/dhcpd.conf .
 
 tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
 to boot, reload, etc. testbed machines, which live in /tftpboot . For the time
 being, these are not distributed with our source, and require some site
 customizations, so ask Utah for the boot loaders, etc.
 
-disk images - You'll also, of course, need disk iamges to go on your nodes.
+disk images - You'll also, of course, need disk images to go on your nodes.
 Right now, we have no automatic way of generating these, so you'll have to ask
 Utah for some.
