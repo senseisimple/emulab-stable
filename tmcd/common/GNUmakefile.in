@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,6 +29,7 @@ BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
 VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
 RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 TBBINDIR	= $(DESTDIR)/usr/testbed/bin
+TBLIBDIR	= $(DESTDIR)/usr/testbed/lib
 INSTALL		= /usr/bin/install -c
 
 install:
@@ -65,6 +66,7 @@ path-install:	dir-install
 common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/libtmcc.pm $(BINDIR)/libtmcc.pm
+	$(INSTALL) -m 755 $(SRCDIR)/libtestbed.pm $(BINDIR)/libtestbed.pm
 	$(INSTALL) -m 755 $(SRCDIR)/tmcc.pl $(BINDIR)/tmcc
 	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
@@ -81,6 +83,8 @@ symlinks:	dir-install
 	ln -s $(BINDIR)/tevc $(TBBINDIR)/tevc
 	rm -f $(TBBINDIR)/emulab-sync
 	ln -s $(BINDIR)/emulab-sync $(TBBINDIR)/emulab-sync
+	rm -f $(TBLIBDIR)
+	ln -s $(BINDIR) $(TBLIBDIR)
 
 local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup
