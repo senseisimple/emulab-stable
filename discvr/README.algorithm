@@ -1,0 +1,165 @@
+From: Jay Lepreau <lepreau@cs.utah.edu>
+To: Indrajeet <ikumar@cs.utah.edu>
+Cc: Leigh Stoller <stoller@fast.cs.utah.edu>
+Subject: Re: topology discovery algorithm 
+In-reply-to: Indrajeet's message of Wed, 20 Jun 2001 00:30:10 MDT
+Date: Wed, 20 Jun 2001 01:30:53 MDT
+
+Indra, thanks for turning the pseudocode into English.  It's more
+understandable now and a good start.  It can still profitably be made
+substantially more high level in exposition.
+
+For example, including something like these bits would be helpful.
+Your level of detail is also helpful, and helps relate to the
+identifiers in the source code, and is good to have written down, but
+does not replace the following kind of thing.
+
+I have some bits here; it's hard to put them all together concisely
+and completely and will take more time.  That's why writing is hard...
+It does skip over the problems of multiple sockets, etc.
+
+----------------
+The algorithm does a recursive, parallel graph search from a
+distinguished start node, which eventually merges all the link info
+which is returned back up to it.  Searches stop when they reach an
+already visited node, recognized by each node recording searches
+that pass thru it.
+
+The start (so-called "client") node floods its links in parallel on
+their broadcast addresses, asking for its neighbors to identify their
+ethernet interfaces via their MAC addresses.  This continues recursively.
+The returned data is a list of links, identified by pairs of nodes;
+nodes are uniquely identified by their greatest MAC address.
+
+Each new startnode-initiated search is identified by a unique id,
+allowing 1) multiple start nodes and 2) re-running the search.  (This
+does not appear to be of great value compared to the potential cost of
+keeping the list of searches, which apparently never shrinks.  #2
+could be attained by aging.)
+
+However, by using multiple start nodes chosen luckily or judiciously,
+the overall algorithm could deal with network partitions.
+
+Although the program sets timeouts so it will not hang in the face of
+link or node failures during the run, the algorithm is not robust
+(correct) in the face of such failures.  A normal run, with the state
+of all links and nodes unchanged during the run, and servers running
+correctly on all nodes, will never elicit a timeout.  Timeouts are
+proportional to the current hops-to-live, decremented at each hop,
+and initially set to a liberal estimate of the network diameter.
+
+Currently, the control network is excluded by excluding interfaces
+named 'fxp4'  [Ugh.  As we discussed, it needs to be based on IP
+address and there needs to be a command line option to include it,
+but still distinguish it by color in 'nam'.]
+
+---------------
+One small comment:
+	1) Unique ID: Basically its the value returned by "gettimeofday()"
+   			which serves two purpose:
+			a) Query initiated by different clients running simulatenously
+
+The unique id includes more than the timestamp; it also
+include the nodeID.  Otherwise one couldn't discriminate between
+two clients that really started "simulatenously".
+
+----------------
+p.s. Something else for your todo list: port the program to Linux.
+It needs to run on both of our "supported" OS's.  I would think
+it should be easy.
+
+~~~~
+Date: Thu, 21 Jun 2001 03:32:51 -0600 (MDT)
+From: Jay Lepreau <lepreau@fast.cs.utah.edu>
+To: ikumar@cs.utah.edu, stoller@fast.cs.utah.edu
+Subject: td - look what I stumbled on
+
+This was something
+that Kristin wrote last August when we were about to submit a new proposal
+(but didn't have to).  It actually went in to the MRI proposal of February.
+
+The whole TTL thing is bogus in terms of limiting propogation,
+since she has to check for loops a different way.
+The TTL thing is only useful for setting the timeout.
+
+But this is another example of a narrativr description of the algorithm.
+
+--------------
+% $Id: README.algorithm,v 1.1 2002-05-03 18:31:23 lepreau Exp $
+
+\subsection{Topology Discovery}
+
+To allow arbitrary topologies within the testbed and provide some 
+measure of security to testbed users, we employ Virtual LANs (VLANs).
+VLANs are made possible by switch technology which, when configured
+to do so, restricts traffic generated within a VLAN to
+the subset of machines in that VLAN. This technology can be used
+to define subnets within an experiment as well as create barriers
+to protect users from other's accidental stray traffic.
+Though they enable security and arbitrary topologies, VLANs also
+present a administrative challenge: describing accurately at any 
+one time the entire testbed topology. Similarly, it would be useful
+to somehow verify that the testbed tools have correctly configured
+requested topologies. In general, a \emph{topology discovery} tool is
+needed. The challenge is to discover topology in a scalable manner
+within an acceptable convergence time.  
+
+To fill the need for topology discovery, we've architected and 
+implemented a prototype of a tool which recursively queries machines
+and concatenates and forwards responses until the inquiring node,
+once all responses are received, has the information necessary
+to construct a graph of the entire network.
+
+One might employ an algorithm whereby each machine discovers its
+neighbors and sends the information back to a central point where
+the information is merged to produce a result. However, that 
+requires a trigger at each machine. One solution is to trigger
+inquiries at startup, but that restricts the time when discovery
+can be done to boot time. Furthermore, it requires naming 
+a known central destination. 
+
+Our solution is to trigger inquiries at a single machine. The 
+inquiry is sent out to neighbors which respond with their set
+of neighbors. Before responding, however, the first tier 
+of neighbors forward the inquiry to a second tier. In this way,
+all reachable machines are contacted. 
+
+In a network with a large diameter, response packets may be
+delayed simply because the inquiry was forwarded across many
+tiers. To avoid sending response packets before machines in
+the lowest tiers receive the inquiry and have an opportunity
+to respond, we employ a TTL scheme. When an inquiry is created,
+the packet is assigned a user-specified TTL. At each subsequent
+hop, the TTL is decremented. As with more general uses of TTLs,
+the inquiry is only forwarded as long as its TTL is greater
+than zero. To ensure that we hear from distant neighbors, 
+we listen for responses for a time that is a function of
+the TTL. That is, higher-tier machines wait relatively longer
+time for responses; lower-tiered machines wait for
+less time.
+
+The TTL is the key to convergence. Because the TTL will
+eventually decrease to zero, we are assured that inquiries will
+at some point cease to be forwarded. Likewise, because time time
+we wait for responses is finite, we are assured that eventually 
+all responses will be received, the information will be merged
+into a graph reflecting the current topology.
+
+As we allow arbitrary topologies, it is possible that loops
+may exist in the network. We attempt to lessen duplicate
+information stemming from loops by forwarding only inquiries
+that not yet seen. Though we don't forward duplicate inquiries, 
+we do respond with a special-case,
+abbreviated response to avoid \emph{not} detecting 
+the redundant link in a loop, 
+
+Though we have a prototype of our algorithm, we have not yet
+measured its time to convergence or analysed the relationships
+between the user-specified TTL, true network diameter and 
+convergence. Our tool is currently not portable but limited
+to FreeBSD. We expect this tool to be useful not only in
+large cluster environments such as ours but in any 
+environment requiring topology discovery. We are
+especially interested in our tool's usefulness in
+sensor networks. 
+------------
