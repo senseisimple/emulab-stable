@@ -101,6 +101,7 @@ echo "   <td valign=top align=left width='85%'>\n";
 SHOWEXP($exp_pid, $exp_eid);
 
 echo "   </td>\n";
+echo " </tr>\n";
 echo "</table>\n";
 
 #

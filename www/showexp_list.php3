@@ -85,7 +85,7 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
-                <td>".$usage["pc"]." &nbsp;</td>\n";
+                <td>".$usage["pc"]." &nbsp</td>\n";
 
 	if ($isadmin) {
 	    $foo = "&nbsp";
