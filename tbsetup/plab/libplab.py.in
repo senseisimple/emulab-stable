@@ -42,7 +42,7 @@ FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
-SCRIPTNAME = "Unknown" # should see if we can get the toplevel script name
+SCRIPTNAME = sys.argv[0][sys.argv[0].rfind("/")+1:]
 
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "hwdown"       # start life in hwdown
@@ -1273,6 +1273,7 @@ class Slice:
                 tryXmlrpcCmd(self.agent.deleteSlice)
             except:
                 print "Failed to delete PLC slice!"
+                traceback.print_exc()
 
         try:
             print "\tRemoving slice DB entry."
