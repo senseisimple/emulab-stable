@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <sys/wait.h>
 #include <sys/fcntl.h>
+#include <sys/syscall.h>
+#include <sys/stat.h>
 #include <paths.h>
 #include <setjmp.h>
 #include <mysql/mysql.h>
@@ -124,6 +126,9 @@ COMMAND_PROTOTYPE(dotunnels);
 COMMAND_PROTOTYPE(dovnodelist);
 COMMAND_PROTOTYPE(doisalive);
 COMMAND_PROTOTYPE(doipodinfo);
+COMMAND_PROTOTYPE(doatarball);
+COMMAND_PROTOTYPE(dontpinfo);
+COMMAND_PROTOTYPE(dontpdrift);
 
 struct command {
 	char	*cmdname;
@@ -158,6 +163,9 @@ struct command {
 	{ "vnodelist",	dovnodelist},
 	{ "isalive",	doisalive},
 	{ "ipodinfo",	doipodinfo},
+	{ "ntpinfo",	dontpinfo},
+	{ "ntpdrift",	dontpdrift},
+	{ "tarball",	doatarball},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3690,3 +3698,117 @@ COMMAND_PROTOTYPE(doipodinfo)
 	return 0;
 }
   
+/*
+ * Return ntp config for a node. 
+ */
+COMMAND_PROTOTYPE(dontpinfo)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	if (!tcp) {
+		error("NTPINFO: %s: Cannot do this in UDP mode!\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Node is allowed to be free?
+	 */
+
+	/*
+	 * First get the servers and peers.
+	 */
+	res = mydb_query("select type,IP from ntpinfo where node_id='%s'",
+			 2, nodeid);
+
+	if (!res) {
+		error("NTPINFO: %s: DB Error getting ntpinfo!\n", nodeid);
+		return 1;
+	}
+	
+	if ((nrows = (int)mysql_num_rows(res))) {
+		while (nrows) {
+			row = mysql_fetch_row(res);
+			if (row[0] && row[0][0] &&
+			    row[1] && row[1][0]) {
+				if (!strcmp(row[0], "peer")) {
+					sprintf(buf, "PEER=%s\n", row[1]);
+				}
+				else {
+					sprintf(buf, "SERVER=%s\n", row[1]);
+				}
+				client_writeback(sock, buf, strlen(buf), tcp);
+				info("NTPINFO: %s", buf);
+			}
+			nrows--;
+		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Now get the drift.
+	 */
+	res = mydb_query("select ntpdrift from nodes "
+			 "where node_id='%s' and ntpdrift is not null",
+			 1, nodeid);
+
+	if (!res) {
+		error("NTPINFO: %s: DB Error getting ntpdrift!\n", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res)) {
+		row = mysql_fetch_row(res);
+		if (row[0] && row[0][0]) {
+			sprintf(buf, "DRIFT=%s\n", row[0]);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("NTPINFO: %s", buf);
+		}
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Upload the current ntp drift for a node.
+ */
+COMMAND_PROTOTYPE(dontpdrift)
+{
+	float		drift;
+
+	if (!tcp) {
+		error("NTPDRIFT: %s: Cannot do this in UDP mode!\n", nodeid);
+		return 1;
+	}
+	if (!islocal) {
+		error("NTPDRIFT: %s: remote nodes not allowed!\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Node can be free?
+	 */
+
+	if (sscanf(rdata, "%f", &drift) != 1) {
+		error("NTPDRIFT: %s: Bad argument\n", nodeid);
+		return 1;
+	}
+	mydb_update("update nodes set ntpdrift='%f' where node_id='%s'",
+		    drift, nodeid);
+
+	return 0;
+}
+
+/*
+ * Return a tarball. Would work for rpms too. Anyway, it has to be a
+ * The tarball being requested has to be in the tarballs list for the
+ * node of course. Has to be a tcp connection of course, and all remote
+ * tcp connections are required to be ssl'ized.
+ */
+COMMAND_PROTOTYPE(doatarball)
+{
+	return 0;
+}
