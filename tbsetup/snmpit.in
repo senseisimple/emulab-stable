@@ -653,16 +653,19 @@ sub doReset($@) {
     my @vlans = @_;
 
     my $errors = 0;
-    foreach my $vlan (@vlans) {
-	#
-	# Just remove the VLAN from evey satck on which it exists
-	#
-	foreach my $stack (@$stacks) {
+    #
+    # Just remove the VLAN from evey satck on which it exists. We keep a
+    # list and do them all at once for efficiency.
+    #
+    foreach my $stack (@$stacks) {
+	my @existant_vlans = ();
+	foreach my $vlan (@vlans) {
 	    if ($stack->vlanExists($vlan)) {
-		if (!$stack->removeVlan($vlan)) {
-		    $errors++;
-		}
+		push @existant_vlans, $vlan;
 	    }
+	}
+	if (!$stack->removeVlan(@existant_vlans)) {
+	    $errors++;
 	}
     }
     return $errors;

@@ -144,22 +144,27 @@ sub vlanExists($$) {
 }
 
 
-sub removeVlan($$) {
+sub removeVlan($@) {
     my $self = shift; 
-    my $vlan_id = shift;
+    my @vlan_ids = @_;
 		    
-    #
-    # First, make sure that the VLAN really does exist
-    #
-    my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
-    if (!$vlan_number) {
-	warn "ERROR: VLAN $vlan_id not found on switch!";
-	return 0;
+    my $errors = 0;
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# First, make sure that the VLAN really does exist
+	#
+	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
+	if (!$vlan_number) {
+	    warn "ERROR: VLAN $vlan_id not found on switch!";
+	    $errors++;
+	}
+	my $ok = $self->{LEADER}->removeVlan($vlan_id);
+	if (!$ok) {
+	    $errors++;
+	}
     }
 
-    my $ok = $self->{LEADER}->removeVlan($vlan_id);
-
-    return $ok;
+    return ($errors == 0);
 }       
 
 sub portControl ($$@) { 

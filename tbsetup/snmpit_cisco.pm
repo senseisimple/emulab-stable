@@ -640,39 +640,42 @@ sub setPortVlan($$@) {
 # Remove all ports from the given VLAN. The VLAN is given as a VLAN
 # identifier from the database.
 #
-# usage: removePortsFromVlan(self,int vlan)
+# usage: removePortsFromVlan(self,int vlans)
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
 #
-sub removePortsFromVlan($$) {
+sub removePortsFromVlan($@) {
     my $self = shift;
-    my $vlan_id = shift;
+    my @vlan_ids = @_;
 
     #
-    # Find the real VLAN number from the passed VLAN ID
+    # Find the real VLAN numbers from the passed VLAN IDs
     #
-    my $vlan_number = $self->findVlan($vlan_id);
-    if (!defined($vlan_number)) {
-	print STDERR "ERROR: VLAN with identifier $vlan_id does not exist\n";
-	return 1;
+    my %vlan_numbers = ();
+    foreach my $vlan_id (@vlan_ids) {
+	my $vlan_number = $self->findVlan($vlan_id);
+	if (!defined($vlan_number)) {
+	    print STDERR "ERROR: VLAN with identifier $vlan_id does not exist\n";
+	    return 1;
+	}
+	$self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
+	$vlan_numbers{$vlan_number} = 1;
     }
-    $self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
 
     #
     # Get a list of the ports in the VLAN
     #
-    #
-    my $VlanPortVlan = ["vlanPortVlan"]; # index by module.port, gives vlan #
+    my $VlanPortVlan = ["vlanPortVlan"]; # index by module.port, gives vlan
+    my @ports;
 
     #
     # Walk the tree to find VLAN membership
     #
     my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
-    my @ports;
     foreach my $rowref (@$rows) {
-    	my ($name,$modport,$port_vlan_number) = @$rowref;
-    	$self->debug("Got $name $modport $port_vlan_number\n");
-	if ($port_vlan_number == $vlan_number) {
+	my ($name,$modport,$port_vlan_number) = @$rowref;
+	$self->debug("Got $name $modport $port_vlan_number\n");
+	if ($vlan_numbers{$port_vlan_number}) {
 	    push @ports, $modport;
 	}
     }
@@ -695,19 +698,9 @@ sub removePortsFromVlan($$) {
 #	 returns 0 on failure
 #
 #
-sub removeVlan($$) {
+sub removeVlan($@) {
     my $self = shift;
-    my $vlan_id = shift;
-
-    #
-    # Find the real VLAN number from the passed VLAN ID
-    #
-    my $vlan_number = $self->findVlan($vlan_id);
-    if (!defined($vlan_number)) {
-	print STDERR "ERROR: VLAN with identifier $vlan_id does not exist\n";
-	return 0;
-    }
-    $self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
+    my @vlan_ids = @_;
 
     #
     # Need to lock the VLAN edit buffer
@@ -716,24 +709,44 @@ sub removeVlan($$) {
     	return 0;
     }
 
-    #
-    # Perform the actual removal
-    #
-    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
-    print "  Removing VLAN #$vlan_number ... ";
-    my $RetVal = $self->{SESS}->set([$VlanRowStatus,$vlan_number,"destroy","INTEGER"]);
-    print ($RetVal ? "Succeeded.\n" : "Failed.\n");
+    my $errors = 0;
+
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# Find the real VLAN number from the passed VLAN ID
+	#
+	my $vlan_number = $self->findVlan($vlan_id);
+	if (!defined($vlan_number)) {
+	    print STDERR "ERROR: VLAN with identifier $vlan_id does ".
+		    "not exist\n";
+	    return 0;
+	}
+	$self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
+
+	#
+	# Perform the actual removal
+	#
+	my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan is index
+
+	print "  Removing VLAN #$vlan_number ... ";
+	my $RetVal = $self->{SESS}->set([$VlanRowStatus,$vlan_number,
+					 "destroy","INTEGER"]);
+	if ($RetVal) {
+	    print "Succeeded.\n";
+	} else {
+	    print "Failed.\n";
+	    $errors++;
+	}
+    }
 
     #
     # Unlock whether successful or not
     #
     $self->vlanUnlock();
 
-    if (! defined $RetVal) { 
-	print STDERR "VLAN #$vlan_number does not exist on this switch.\n";
+    if ($errors) {
 	return 0;
     } else {
-	$self->vlanUnlock();
 	return 1;
     }
 

@@ -321,33 +321,36 @@ sub vlanExists($$) {
 # Removes a VLAN from the stack. This implicitly removes all ports from the
 # VLAN. It is an error to remove a VLAN that does not exist.
 #
-# usage: removeVlan(self, vlan identifier)
+# usage: removeVlan(self, vlan identifiers)
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub removeVlan($$) {
+sub removeVlan($@) {
     my $self = shift;
-    my $vlan_id = shift;
+    my (@vlan_ids) = @_;
     my $errors = 0;
 
-    #
-    # First, make sure that the VLAN really does exist
-    #
-    my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
-    if (!$vlan_number) {
-	warn "ERROR: VLAN $vlan_id not found on switch!";
-	return 0;
-    }
+    foreach my $vlan_id (@vlan_ids) {
+	#
+	# First, make sure that the VLAN really does exist
+	#
+	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
+	if (!$vlan_number) {
+	    warn "ERROR: VLAN $vlan_id not found on switch!";
+	    return 0;
+	}
 
-    #
-    # Prevent the VLAN from being sent across trunks.
-    #
-    if (!$self->setVlanOnTrunks($vlan_number,0)) {
-	warn "ERROR: Unable to set up VLANs on trunks!\n";
 	#
-	# We can keep going, 'cause we can still remove the VLAN
+	# Prevent the VLAN from being sent across trunks.
 	#
+	if (!$self->setVlanOnTrunks($vlan_number,0)) {
+	    warn "ERROR: Unable to set up VLANs on trunks!\n";
+	    #
+	    # We can keep going, 'cause we can still remove the VLAN
+	    #
+	}
+	
     }
 
     #
@@ -356,17 +359,26 @@ sub removeVlan($$) {
     #
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
+	my @existant_vlans = ();
+	foreach my $vlan_id (@vlan_ids) {
 
-	#
-	# Only remove ports from the VLAN if it exists on this
-	# device
-	#
-	if (defined(my $number = $device->findVlan($vlan_id))) {
-		$errors += $device->removePortsFromVlan($vlan_id);
+	    #
+	    # Only remove ports from the VLAN if it exists on this
+	    # device. Do it in one pass for efficiency
+	    #
+	    if (defined(my $number = $device->findVlan($vlan_id))) {
+		push @existant_vlans, $vlan_id;
+	    }
 	}
+
+	$errors += $device->removePortsFromVlan(@existant_vlans);
     }
 
-    my $ok = $self->{LEADER}->removeVlan($vlan_id);
+    #
+    # For efficiency, we remove all VLANs from the leader in one function
+    # call. This can save a _lot_ of locking and unlocking.
+    #
+    my $ok = $self->{LEADER}->removeVlan(@vlan_ids);
 
     return ($ok && ($errors == 0));
 }
