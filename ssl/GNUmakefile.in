@@ -9,14 +9,9 @@ SUBDIR		= ssl
 
 include $(OBJDIR)/Makeconf
 
-all:
+all:	emulab.pem server.pem localnode.pem ronnode.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
-
-#
-# The openssl config file.
-#
-SSLCONF		= $(SRCDIR)/openssl.cnf
 
 #
 # You do not want to run these targets unless you are sure you
@@ -26,58 +21,44 @@ SSLCONF		= $(SRCDIR)/openssl.cnf
 #
 pems:	emulab.pem server.pem client.pem
 
-emulab.pem:	dirsmade $(SSLCONF)
+emulab.pem:	dirsmade emulab.cnf
 	#
 	# Create the Certificate Authority.
 	# The certificate (no key!) is installed on both boss and remote nodes.
 	#
-	openssl req -new -x509 -config $(SSLCONF) \
+	openssl req -new -x509 -config emulab.cnf \
 		    -keyout cakey.pem -out cacert.pem
 	cp cacert.pem emulab.pem
 
-server.pem:	dirsmade $(SSLCONF)
+server.pem:	dirsmade server.cnf ca.cnf
 	#
 	# Create the server side private key and certificate request.
 	#
-	openssl req -new -config $(SSLCONF) \
-		-keyout servkey.pem -out servreq.pem
+	openssl req -new -config server.cnf \
+		-keyout server_key.pem -out server_req.pem
 	#
 	# Combine key and cert request.
 	#
-	cat servkey.pem servreq.pem > newreq.pem
+	cat server_key.pem server_req.pem > newreq.pem
 	#
 	# Sign the server cert request, creating a server certificate.
 	#
-	openssl ca -policy policy_anything -config $(SSLCONF) \
-		-out servcert.pem \
+	openssl ca -batch -policy policy_match -config ca.cnf \
+		-out server_cert.pem \
 		-cert cacert.pem -keyfile cakey.pem \
 		-infiles newreq.pem
 	#
 	# Combine the key and the certificate into one file which is installed
 	# on boss and used by tmcd.
 	#
-	cat servkey.pem servcert.pem > server.pem
+	cat server_key.pem server_cert.pem > server.pem
 	rm -f newreq.pem
 
-client.pem:	dirsmade $(SSLCONF)
-	#
-	# Create a client side private key and certificate request.
-	#
-	openssl req -new -config $(SSLCONF) \
-		-keyout clientkey.pem -out clientreq.pem 
-	#
-	# Sign the client cert request, creating a client certificate.
-	#
-	openssl ca -policy policy_anything -config $(SSLCONF) \
-		-out clientcert.pem \
-	        -cert cacert.pem -keyfile cakey.pem \
-		-infiles clientreq.pem
-	#
-	# Combine the key and the certificate into one file which is installed
-	# on each remote node and used by tmcc. Installed on boss too so
-	# we can test tmcc there.
-	#
-	cat clientkey.pem clientcert.pem > client.pem
+localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
+	$(SRCDIR)/mkclient.sh localnode
+
+ronnode.pem:	dirsmade ronnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
+	$(SRCDIR)/mkclient.sh ronnode
 
 dirsmade:
 	-mkdir -p certs
@@ -90,15 +71,17 @@ dirsmade:
 #
 # You do not want to run these targets unless you are sure you
 # know what you are doing!
-# 
-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
-		$(INSTALL_ETCDIR)/server.pem \
-		$(INSTALL_ETCDIR)/client.pem
+#
+install:
+	@echo "BE VERY CAREFUL! INSTALLING NEW CERTS CAN CAUSE DISASTER!"
 
-client-install:	$(INSTALL_ETCDIR)/client.pem
+boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/server.pem
+	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
+
+client-install:	
+	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 
 clean:
-	rm -f *.pem serial index.txt *.old dirsmade
-	rm -rf certs crl
-
-
+	rm -f *.pem serial index.txt *.old dirsmade *.cnf
+	rm -rf newcerts certs

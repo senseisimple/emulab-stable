@@ -1,0 +1,25 @@
+[ req ]
+prompt                  = no
+default_bits		= 1024
+default_keyfile 	= privkey.pem
+distinguished_name	= req_distinguished_name
+attributes		= req_attributes
+x509_extensions	        = v3_ca	# The extentions to add to the self signed cert
+encrypt_key		= no
+string_mask             = nombstr
+
+[ req_distinguished_name ]
+C                      = US
+ST                     = Utah
+L                      = Salt Lake City
+O                      = Utah Network Testbed
+OU                     = Certificate Authority
+CN                     = @BOSSNODE@
+emailAddress           = @TBOPSEMAIL@
+
+[ req_attributes ]
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints = CA:true
