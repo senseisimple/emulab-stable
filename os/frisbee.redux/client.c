@@ -47,9 +47,6 @@ int		maxinprogress = MAXINPROGRESS;
 int		redodelay = CLIENT_REQUEST_REDO_DELAY;
 int		idledelay = CLIENT_WRITER_IDLE_DELAY;
 int		startdelay = 0, startat = 0;
-#ifdef DOLOSSRATE
-int		lossrate = 0;
-#endif
 
 int		debug = 0;
 int		tracing = 0;
@@ -356,26 +353,14 @@ main(int argc, char **argv)
 			strncpy(traceprefix, event.data.start.traceprefix, 64);
 		else
 			traceprefix[0] = 0;
-#ifdef DOLOSSRATE
-		if (event.data.start.plr >= 0.0 && event.data.start.plr <= 1.0)
-			lossrate = (int)(event.data.start.plr * 0x7fffffff);
-		else
-			lossrate = 0;
-#endif
 
 		log("Starting: slice=%d, startat=%d, startdelay=%d, zero=%d, "
 		    "randomize=%d, nothreads=%d, debug=%d, tracing=%d, "
 		    "pkttimeout=%d, idletimer=%d, idledelay=%d, redodelay=%d, "
-#ifdef DOLOSSRATE
-		    "plr=%.2f, "
-#endif
 		    "maxmem=%d, chunkbufs=%d, maxwritebumfem=%d, "
 		    "maxreadahead=%d, maxinprogress=%d",
 		    slice, startat, startdelay, zero, randomize, nothreads,
 		    debug, tracing, pkttimeout, idletimer, idledelay, redodelay,
-#ifdef DOLOSSRATE
-		    lossrate ? event.data.start.plr : 0,
-#endif
 		    maxmem, maxchunkbufs, maxwritebufmem,
 		    maxreadahead, maxinprogress);
 	}
@@ -1266,35 +1251,10 @@ PlayFrisbee(void)
 	Stats.u.v1.redodelay     = redodelay;
 	Stats.u.v1.randomize     = randomize;
 	p->msg.leave2.stats      = Stats;
-
-#if 1
-	/* XXX hack, make sure stats get through */
-	delay = 0;
-	while (delay < 10) {
-		Packet_t rep;
-		int readretry;
-
-		PacketSend(p, 0);
-		for (readretry = 0; readretry < 10; readretry++) {
-			fsleep(100000);
-			while (PacketReceive(&rep) == 0) {
-				if (rep.hdr.subtype == PKTSUBTYPE_LEAVE2 &&
-				    rep.hdr.type == PKTTYPE_REPLY)
-					goto gotit;
-			}
-		}
-		delay++;
-	}
- gotit:
-#else
 	PacketSend(p, 0);
-#endif
 
 	log("");
 	ClientStatsDump(myid, &Stats);
-#ifdef DOLOSSRATE
-	dump_network();
-#endif
 #else
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;

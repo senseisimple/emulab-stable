@@ -50,9 +50,6 @@ struct in_addr	mcastif;
 char	       *filename;
 struct timeval  IdleTimeStamp, FirstReq, LastReq;
 volatile int	activeclients;
-#ifdef DOLOSSRATE
-int		lossrate = 0;
-#endif
 
 /* Forward decls */
 void		quit(int);
@@ -439,12 +436,6 @@ ClientLeave2(Packet_t *p)
 				break;
 			}
 	}
-#if 1
-	/* XXX let the client know we got the goods */
-	p->hdr.type = PKTTYPE_REPLY;
-	p->hdr.datalen = sizeof(p->msg.leave2);
-	PacketReply(p);
-#endif
 #else
 	activeclients--;
 
@@ -804,17 +795,6 @@ main(int argc, char **argv)
 		case 'W':
 			bandwidth = atol(optarg);
 			break;
-#ifdef DOLOSSRATE
-		/* XXX this is not the emulab way! */
-		case 'L':
-		{
-			double plr = atof(optarg);
-			if (plr < 0 || plr > 1)
-				fatal("bad loss rate: %f", plr);
-			lossrate = (int)(plr * 0x7fffffff);
-			break;
-		}
-#endif
 		case 'h':
 		case '?':
 		default:
@@ -925,9 +905,6 @@ main(int argc, char **argv)
 		    Stats.intervals, Stats.missed);
 		log("  spurious wakeups:  %d", Stats.wakeups);
 		log("  max workq size:    %d", WorkQMax);
-#ifdef DOLOSSRATE
-		dump_network();
-#endif
 	}
 #endif
 

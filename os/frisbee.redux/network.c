@@ -22,20 +22,7 @@
 #include "decls.h"
 #include "utils.h"
 
-#ifdef DOLOSSRATE
-#define LOSSONSENDER
-#define LOSSONRECVER
-#endif
-
-#ifdef DOLOSSRATE
-extern int lossrate;
-#endif
-
 #ifdef STATS
-#ifdef DOLOSSRATE
-unsigned long rpackets, rpacketslost;
-unsigned long spackets, spacketslost;
-#endif
 unsigned long nonetbufs;
 #define DOSTAT(x)	(x)
 #else
@@ -52,24 +39,6 @@ static int		sock;
 struct in_addr		myipaddr;
 static int		nobufdelay = -1;
 int			broadcast = 0;
-
-void
-dump_network(void)
-{
-#ifdef DOLOSSRATE
-	if (lossrate == 0)
-		return;
-
-	if (spacketslost)
-		fprintf(stderr, "Lost %lu of %lu send packets (%.2f%%)\n",
-			spacketslost, spackets,
-			(double)spacketslost * 100 / spackets);
-	if (rpacketslost)
-		fprintf(stderr, "Lost %lu of %lu recv packets (%.2f%%)\n",
-			rpacketslost, rpackets,
-			(double)rpacketslost * 100 / rpackets);
-#endif
-}
 
 static void
 CommonInit(void)
@@ -222,31 +191,7 @@ PacketReceive(Packet_t *p)
 {
 	struct sockaddr_in from;
 	int		   mlen, alen;
-#ifdef DOLOSSRATE
-#ifdef LOSSONRECVER
-	struct timeval	   now, then;
 
-	if (lossrate) {
-		/*
-		 * XXX cannot rely on socket timeout value since we need to
-		 * treat received and dropped packets as though they never
-		 * arrived.  This is still not correct as a receive timeout
-		 * could still be up to twice as long as it should be, but
-		 * I don't want to mess with the socket timeout on every
-		 * recv call.
-		 */
-		gettimeofday(&then, 0);
-		if ((then.tv_usec += PKTRCV_TIMEOUT) >= 1000000) {
-			then.tv_sec++;
-			then.tv_usec -= 1000000;
-		}
-	again:
-		gettimeofday(&now, 0);
-		if (timercmp(&now, &then, >=))
-			return -1;
-	}
-#endif
-#endif
 	alen = sizeof(from);
 	bzero(&from, alen);
 	if ((mlen = recvfrom(sock, p, sizeof(*p), 0,
@@ -270,21 +215,6 @@ PacketReceive(Packet_t *p)
 		return 1;
 	}
 
-#ifdef DOLOSSRATE
-#ifdef LOSSONRECVER
-	DOSTAT(rpackets++);
-	if (lossrate && random() < lossrate) {
-		/* XXX hack: don't loose join/leave messages, screws stats */
-		if (p->hdr.subtype != PKTSUBTYPE_JOIN &&
-		    p->hdr.subtype != PKTSUBTYPE_LEAVE &&
-		    p->hdr.subtype != PKTSUBTYPE_LEAVE2) {
-			DOSTAT(rpacketslost++);
-			goto again;
-		}
-	}
-#endif
-#endif
-
 	return 0;
 }
 
@@ -300,21 +230,6 @@ PacketSend(Packet_t *p, int *resends)
 {
 	struct sockaddr_in to;
 	int		   len, delays;
-
-#ifdef DOLOSSRATE
-#ifdef LOSSONSENDER
-	DOSTAT(spackets++);
-	if (lossrate && random() < lossrate) {
-		/* XXX hack: don't loose join/leave messages, screws stats */
-		if (p->hdr.subtype != PKTSUBTYPE_JOIN &&
-		    p->hdr.subtype != PKTSUBTYPE_LEAVE &&
-		    p->hdr.subtype != PKTSUBTYPE_LEAVE2) {
-			DOSTAT(spacketslost++);
-			return;
-		}
-	}
-#endif
-#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 	p->hdr.srcip = myipaddr.s_addr;

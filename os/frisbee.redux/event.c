@@ -211,16 +211,6 @@ parse_event(Event_t *event, char *etype, char *buf)
 				gotevent = 1;
 				continue; 
 			}
-#ifdef DOLOSSRATE
-			{
-				double plr;
-				if (sscanf(cp, "PLR=%lf", &plr) == 1) {
-					event->data.start.plr = plr;
-					gotevent = 1;
-					continue; 
-				}
-			}
-#endif
 		}
 	}
 	return 0;
@@ -289,7 +279,6 @@ EventInit(char *server)
 	strcpy(ipbuf, inet_ntoa(myip));
 	ipaddr = ipbuf;
 
-#if 1
 	/*
 	 * Hideous Hack Alert!
 	 *
@@ -304,7 +293,6 @@ EventInit(char *server)
 		return 1;
 	} else if (debug)
 		log("client number %d for event handling", clientnum);
-#endif
 
 	/*
 	 * Convert server/port to elvin thing.

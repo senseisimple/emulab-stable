@@ -33,9 +33,6 @@ typedef struct {
 			int trace;	/* tracing level */
 			char traceprefix[STRSIZE];
 					/* prefix for trace output file */
-#ifdef DOLOSSRATE
-			double plr;
-#endif
 		} start;
 		struct {
 			int exitstatus;

@@ -33,9 +33,6 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
-# Hacky loss rate flag
-#CFLAGS		+= -DDOLOSSRATE
-
 # Define this if you implementation of cond_vars works well
 #CFLAGS		+= -DCONDVARS_WORK
 
