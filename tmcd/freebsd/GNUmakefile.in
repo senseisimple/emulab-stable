@@ -21,13 +21,14 @@ INSTALL_FILES	= group master.passwd setup
 INSTALL		= /usr/bin/install -c 
 
 install:
-	-mkdir -p 
+	-mkdir -p $(INSTALL_DIR)
 	-rm -rf $(INSTALL_DIR)/sup/sup
 	-mkdir -p $(INSTALL_DIR)/sup
 	$(INSTALL) -m 644 $(SRCDIR)/group $(INSTALL_DIR)/group
 	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(INSTALL_DIR)/master.passwd
 	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
+	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
 	$(INSTALL) -m 755 $(SRCDIR)/supfile $(INSTALL_DIR)/supfile
 	-mkdir -p /root/.cvsup

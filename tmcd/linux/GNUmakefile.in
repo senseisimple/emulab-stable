@@ -30,6 +30,7 @@ install:
 	$(INSTALL) -m 600 $(SRCDIR)/gshadow $(INSTALL_DIR)/gshadow
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
+	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
 	$(INSTALL) -m 755 $(SRCDIR)/supfile $(INSTALL_DIR)/supfile
 	-mkdir -p /root/.cvsup
