@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+
+# Save the tiplogs from an experiment
+
+sub usage {
+	print "Usage: $0 pid eid\n";
+	exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB          = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if (@ARGV != 2) {
+	&usage;
+}
+
+my ($pid,$eid) = @ARGV;
+
+# XXX: This may need to be changed for use outside Utah
+my $logdir =	"/n/plastic/var/log/tiplogs";
+my $tiplogdir =	"/proj/$pid/tiplogs";
+my $savedir = 	"$tiplogdir/$eid";
+
+# Make sure the user is in the correct project
+if (! ProjMember($pid)) {
+	die "You must be a member of project $pid to use this script\n";
+}
+
+# Now, we get a list of all nodes...
+my $sth = DBQueryFatal("SELECT node_id, vname FROM reserved " .
+	"WHERE pid='$pid' AND eid='$eid'");
+if ($sth->numrows == 0) {
+	die "No nodes found for experiment $eid in project $pid!\n";
+}
+
+print "Saving tiplogs for $pid/$eid to $savedir\n";
+
+# We don't want directory creation to be modified by the user's umask, 
+# because the tiplogs directory needs to be kept group-writable.
+my $savemask = umask 000;
+
+# Create the directory (and its parent) if they don't exist
+foreach $dir ($tiplogdir, $savedir) {
+	if (! -d $dir) {
+		print "Making directory $dir ...\n";
+		if (!mkdir($dir,0770)) {
+			die "Unable to make directory $dir: $!\n";
+		}
+	}
+}
+
+# Restore the saved umask
+umask $savemask;
+
+# Make sure the user can write to it
+if (! -w $savedir) {
+	die "Unable to write to directory $savedir\n";
+}
+
+while (@row = $sth->fetchrow) {
+	my ($node, $vname) = @row;
+	if (!$vname) { # In case they don't have a vname...
+		$vname = $node;
+	}
+	my $runfile = "$logdir/$node.run";
+	my $savefile = "$savedir/$vname.log";
+	print "Copying $runfile to $savefile ...\n";
+	# Test to make sure the .run file exists
+	if (! (-e $runfile && -r $runfile) ) {
+		warn "Warning: $savefile does not exist or is not " .
+			"readable, skipping.\n";
+		next;
+	}
+	system "cp $runfile $savefile";
+}

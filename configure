@@ -1047,6 +1047,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
+	tbsetup/savelogs \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \

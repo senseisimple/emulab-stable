@@ -41,6 +41,7 @@ my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $startexp = "$TB/bin/startexp";
 my $endexp   = "$TB/bin/endexp";
+my $savelogs = "$TB/bin/savelogs";
 my $avail    = "$TB/sbin/avail";
 my $batchlog = "$TB/log/batchlog";
 my $projroot = "/proj";
@@ -410,7 +411,12 @@ sub startexp($)
 sub endexp($)
 {
     my(%exphash)  = @_;
-    
+
+	#
+	# Save tiplogs
+	#
+    system("$savelogs $pid $eid");
+
     system("$endexp -b $pid $eid");
     my $exit_status = $? >> 8;
 
