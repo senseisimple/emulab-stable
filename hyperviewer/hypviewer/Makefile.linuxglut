@@ -1,0 +1,30 @@
+# FreeBSD
+# Glut windows
+# totally untested, just a guide...
+
+CPU = linux
+WINSYS = glut
+ARCH = $(CPU)$(WINSYS)
+CFLAGS = -DPyHack -DFONTHACK -DHYPGLUT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=''
+LDLIBS  =  -L../../src/$(ARCH) -L/usr/X11R6/lib  -l$(LIBRARY)$(ARCH) -lglut -lGLU -lGL -lXmu -lXext -lX11 -lm
+INCDIRS = -I../include -I../../include -I/usr/X11R6/include 
+
+SUBDIRS = src examples/glut
+
+CC = /usr/bin/g++
+LD = /usr/bin/cc
+AR = /usr/bin/ar rv
+MKDIR = /bin/mkdir 
+RM = /bin/rm -rf
+MAKE = /usr/local/bin/gmake
+INSTALL = /usr/bin/install
+INSTLIBDIR = /usr/local/lib
+INSTBINDIR = /usr/local/bin
+
+OBJSUFFIX = .o
+LIBSUFFIX = .a
+LIBPREFIX = lib
+
+_library:
+	$(AR) $(LIBNAME) $(OBJS)
+

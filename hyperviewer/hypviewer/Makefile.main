@@ -20,6 +20,7 @@ ROOTDIR = /home/fish/h3/hypviewer
 #include $(ROOTDIR)/Makefile.irixvk
 #include $(ROOTDIR)/Makefile.freext
 include $(ROOTDIR)/Makefile.freeglut
+#include $(ROOTDIR)/Makefile.linuxglut
 #include $(ROOTDIR)/Makefile.linuxxt
 
 ########################################################################
