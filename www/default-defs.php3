@@ -9,6 +9,7 @@ $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
 $TBAUTHDOMAIN   = ".emulab.net";
 $TBSECURECOOKIES= 1;
+$TBCOOKIESUFFIX = "";
 
 #
 # Title Page stuff.

@@ -9,6 +9,7 @@ $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
 $TBAUTHDOMAIN   = ".ballmoss.com";
 $TBSECURECOOKIES= 0;
+$TBCOOKIESUFFIX = "";
 
 #
 # Title Page stuff.

@@ -7,8 +7,9 @@ $WWW            = "$WWWHOST";
 $TBBASE         = "https://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBAUTHDOMAIN   = ".mini.emulab.net";
+$TBAUTHDOMAIN   = ".emulab.net";
 $TBSECURECOOKIES= 1;
+$TBCOOKIESUFFIX = "-mini";
 
 #
 # Title Page stuff.

@@ -22,8 +22,8 @@ $TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users";
 $TBNSSUBDIR     = "nsdir";
 
-$TBAUTHCOOKIE   = "HashCookie";
-$TBNAMECOOKIE   = "MyUidCookie";
+$TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
+$TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
 $TBAUTHTIMEOUT  = 21600;
 
 $HTTPTAG        = "http://";
