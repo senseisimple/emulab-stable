@@ -1,12 +1,32 @@
 #!/bin/sh
 
-{
-cat >/tmp/edscript <<EOF
-/^emulab_/s/ALL[ \t]*$/NOPASSWD: ALL/
-w
-q
+TMPSUDOERS=/tmp/sudoers
+ME=`whoami`
+
+rm -f $TMPSUDOERS
+
+cat > $TMPSUDOERS <<EOF
+# sudoers file.
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# See the sudoers man page for the details on how to write a sudoers file.
+#
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# Defaults specification
+
+# User privilege specification
+root    ALL=(ALL) ALL
+$ME     ALL=(ALL) NOPASSWD: ALL
+%root   ALL=(ALL) NOPASSWD: ALL
 EOF
-su -c "ed /etc/sudoers < /tmp/edscript"
-} > /dev/null 2>&1
+
+su -c "install -c -m 440 $TMPSUDOERS /etc/sudoers"
 
 exit $?
