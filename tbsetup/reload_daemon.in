@@ -143,10 +143,12 @@ while (1) {
 	# EID was when nfree noticed an entry in the table.
 	#
 	$query_result =
-	    DBQueryWarn("select image_id from scheduled_reloads where node_id='$node'");
+	    DBQueryWarn("select image_id from scheduled_reloads where ".
+			"node_id='$node'");
     
 	if (! $query_result) {
-	    print "DB Error getting imageid from scheduled_reloads. Waiting a bit.\n";
+	    print "DB Error getting imageid from scheduled_reloads. ".
+		"Waiting a bit.\n";
 	    next;
 	}
 	@row     = $query_result->fetchrow_array();
@@ -165,10 +167,10 @@ while (1) {
 	}
 	if (system("$os_load $imageid $node")) {
 	    #
-	    # Could not get it. Wait and go around again.
+	    # This should not fail! 
 	    #
-	    print "$os_load failed on $node. Waiting a bit.\n";
-	    next;
+	    fatal("$os_load failed on $node. Thats not supposed to happen.\n".
+		  "Please check the reload daemon log before restarting!");
 	}
     }
     else {
@@ -255,11 +257,20 @@ while (1) {
     sleep(20);
 }
 
-sub fatal {
+sub fatal($)
+{
     local($msg) = $_[0];
 
     SENDMAIL($TBOPS, "TESTBED: Reload Daemon Died", $msg);
     die($msg);
+}
+
+sub notify($)
+{
+    my($mesg) = $_[0];
+    
+    print "$mesg\n";
+    SENDMAIL($TBOPS, "TESTBED: Reload Daemon Message", $msg);
 }
 
 #
