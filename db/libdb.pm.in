@@ -2707,28 +2707,59 @@ sub TBSiteVarExists($)
 # Get the value of the variable, or the default value if
 # the value is undefined (NULL).
 #
-# usage: TBGetSiteVar($name)
-#        returns value if variable is defined;
-#        dies otherwise.
+# usage: TBGetSiteVar($name, char \*rptr )
+#        Without rptr: returns value if variable is defined; dies otherwise.
+#        With rptr:    returns value in $rptr if variable is defined; returns
+#                      zero otherwise, or any failure.
 #
-sub TBGetSiteVar($)
+sub TBGetSiteVar($;$)
 {
-    my($name) = @_;
+    my ($name, $rptr) = @_;
+    my $value;
 
-    $name  = DBQuoteSpecial( $name );
+    $name = DBQuoteSpecial( $name );
+    
+    my $query_string =
+	"select value,defaultvalue from sitevariables where name=$name";
 
-    my $query_result =
-	DBQueryFatal("select value, defaultvalue from sitevariables ".
-		     "where name=$name");
+    my $query_result;
+    if (defined($rptr)) {
+	#
+	# I added the result parameter as an option to avoid changing every
+	# call to TBGetSiteVar(). Sorry. When called in this manner, it is
+	# up to the caller to decide what to do when it fails. 
+	#
+	$query_result = DBQueryWarn($query_string);
 
-    if ($query_result->numrows > 0) {
-	my($value, $defaultvalue) = $query_result->fetchrow_array;
-
-	if (defined $value) { return $value; }
-	if (defined $defaultvalue) { return $defaultvalue; }
+	return 0
+	    if (! $query_result)
+    }
+    else {
+	$query_result = DBQueryFatal($query_string);
     }
 
-    die("*** attempted to fetch unknown site variable $name!");
+    if ($query_result->numrows > 0) {
+	my ($curvalue, $defaultvalue) = $query_result->fetchrow_array();
+
+	if (defined($curvalue)) {
+	    $value = $curvalue;
+	}
+	elsif (defined($defaultvalue)) {
+	    $value = $defaultvalue;
+	}
+    }
+    if (defined($rptr)) {
+	if (defined($value)) {
+	    $$rptr = $value;
+	    return 1;
+	}
+	return 0;
+    }
+    elsif (defined($value)) {
+	return $value;
+    }
+    die("*** $0:\n".
+	"    Attempted to fetch unknown site variable $name\n");
 }
 
 #
