@@ -1,0 +1,41 @@
+Rough steps for upgrading your existing Emulab.
+
+0. "Shutdown" the testbed.  Disable the web interface and prevent user
+   logins to "users".  [ We really need a way to stop all Emulab daemons,
+   etc. that might be confused by DB changes. ]
+
+1. Look at doc/UPDATING to find out what you have to update in the
+   boss/ops FreeBSD environment before updating Emulab software.
+   Entries are timestamped, so look for things that have changed since
+   the last you installed.
+
+2. Unpack and build the Emulab software.  You should do this in a directory
+   accessible to your tipserv, ops and boss nodes (e.g., /users) to make
+   the various installs easier.
+
+3. Update the DB.  Look at sql/database-migrate.txt which is a list of
+   SQL commands to perform.  Diff the version of this file from the last
+   release, with the version from this release to find which ones to apply.
+
+4. Login to your tipservers (if you have them), cd to your build directory
+   and do:
+       sudo gmake tipserv-install
+
+5. Login to your ops/users node, cd to your build directory and do:
+       sudo gmake ops-install
+
+6. Back on your boss node, cd to your build directory and do:
+       sudo gmake boss-install
+       sudo gmake post-install
+
+7. Reboot tipservers, ops and boss and make sure things boot up ok.
+   Try creating/swapping/modifying/destroying an experiment, look
+   for errors.
+
+8. Bring up the web interface and inform users that they should reboot
+   their existing experiment nodes if they notice odd behaviors.
+
+Things should be backward compatible so you don't have to update the
+standard disk images immediately.  But you will want to do it.  See
+update-node.txt for more info about that.
+
