@@ -19,7 +19,7 @@ USERBINS        = os_load node_reboot nscheck
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
-		  console_reset db2ns bwconfig
+		  console_reset db2ns bwconfig frisbeelauncer
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck webreport \

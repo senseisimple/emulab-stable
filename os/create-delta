@@ -105,9 +105,9 @@ open(TAB, "$FSTAB") or
     fatal("Could not open $FSTAB: $!");
 
 while (<TAB>) {
-    if ($_ =~ /^([\w\/]+)[\s]+([\w\/]+).*(\d).*\d$/) {
-	if ($3 != 0) {
-	    push(@fslist, $2);
+    if ($_ =~ /^(LABEL=)?([\w\/]+)[\s]+([\w\/]+).*(\d).*\d$/) {
+	if ($4 != 0) {
+	    push(@fslist, $3);
 	}
     }
 }

@@ -1,0 +1,219 @@
+#!/usr/bin/perl -w
+use Getopt::Std;
+use POSIX 'setsid'; # For &daemonize
+use Sys::Syslog;
+
+# Configure variables
+my $TB		= "@prefix@";
+
+use lib "@prefix@/lib";
+use libdb;
+
+# Defines
+my $FRISBEED	= "$TB/sbin/frisbeed";
+my $BASEADDR	= "234.5.6";
+my $LOGFILE	= "$TB/log/frisbeelauncher";
+
+# Process command line options
+getopts('nd',\%opt);
+if (@ARGV != 1) {
+	exit &usage();
+}
+$imageid = shift @ARGV;
+
+# Try to discover if some other process is handling this address
+$address = &get_address($imageid);
+
+if ($address) {
+	&debug("A server (address $address) is already running for image $imageid\n");
+	exit (0);
+}
+
+# We're going to pick an address from these tables, so we need to lock
+# the tables to avoid race condidtions
+&lock_tables;
+
+# Pick an address: Die if unsucessful, set address and unlock if sucessful
+$address = &pick_address;
+&debug("Picked address $address\n");
+
+if (!$address) {
+	&unlock_tables;
+	die "Unable to find a free address to send on\n";
+}
+
+&set_address($imageid,$address);
+&unlock_tables;
+
+# Grab the filename to give to frisbee
+my $filename = &get_filename($imageid);
+
+# Run in the background
+&daemonize;
+
+# Set up a signal handler that will clean up in case we get killed
+$SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
+# XXX: Any others we should catch?
+
+# Now, we actually launch Frisbee
+while (1) {
+	if ($child_pid = fork()) {
+		# Wait for child to exit
+		wait();
+		if (!$?) {
+			# Proccess exited normally, so we can exit
+			&debug("Frisbee exited normally\n");
+			last;
+		} else {
+			print STDERR "$$: Frisbee died abnormally, with return " .
+				"value $? - restarting\n";
+		}
+	} else {
+		# Child branch
+		if (!exec($FRISBEED,$filename,$address)) {
+			# Hmmm. We'll exit(0), so that the parent doesn't try to
+			# restart us
+			print STDERR "$$: Unable to exec $FRISBEED\n";
+			exit(0);
+		}
+	}
+}
+
+&clear_address;
+exit(0);
+
+######################################################################
+# Subroutines
+######################################################################
+
+# Print out a usage mesage
+sub usage {
+	print "Usage: $0 [-n] [-d] IMAGEID\n";
+	print "-n:	Don't kill server when idle\n";
+	print "-d:	Print debugging output\n";
+}
+
+# Only print if -d option was given. Also add $$ on the beginning of the
+# string, to ease debugging
+sub debug {
+	if ($opt{d}) { print "$$: ", @_ };
+}
+
+# Grab the address for the passed-in imageid
+sub get_address {
+	my ($imageid) = @_;
+	my $image_query = "SELECT imageid,load_address FROM images WHERE " .
+		"imageid='$imageid'";
+
+	my $sth = DBQueryFatal($image_query);
+
+	my @row = $sth->fetchrow;
+	if (!@row) {
+		die "No such imageid: $imageid\n";
+	}
+
+	return $row[1];
+}
+
+# Grab the filename for the passed-in imageid
+sub get_filename {
+	my ($imageid) = @_;
+	my $image_query = "SELECT path FROM images WHERE " .
+		"imageid='$imageid'";
+
+	my $sth = DBQueryFatal($image_query);
+
+	my @row = $sth->fetchrow;
+	if (!@row) {
+		die "No such imageid: $imageid\n";
+	}
+
+	return $row[0];
+}
+
+
+# Lock the tables used in this script - waits indefinitely until it
+# succeeds
+sub lock_tables {
+	while (1) {
+		&debug("Locking tables\n");
+		my $sth = DBQuery("LOCK TABLES images WRITE"); 
+		if (!$sth) {
+			print "DB Error locking tables. Waiting a bit ...\n";
+			sleep(10);
+		} else {
+			last;
+		}
+	}
+}
+
+# Unlock the tables used in this script
+sub unlock_tables {
+	&debug("Unlocking tables\n");
+	DBQueryFatal("UNLOCK TABLES"); 
+}
+
+# Pick out an address to use
+sub pick_address {
+	my $address_query = "SELECT load_address FROM images WHERE " .
+		"load_address IS NOT NULL and load_address != ''";
+	my $sth = DBQueryFatal($address_query);
+
+	my %used_addrs = (); # Loading addresses already taken
+	while (@row = $sth->fetchrow) {
+		$row[0] =~ /^$BASEADDR\.(\d+)$/;
+		if ($1) {
+			$used_addrs{$1} = 1;
+		}
+	}
+
+	my $address;
+	for (my $i = 1; $i < 255; $i++) {
+		if (!$used_addrs{$i}) {
+			$address = $BASEADDR . "." . $i;
+			last;
+		}
+	}
+
+	return $address;
+}
+
+# Pass in an imageid, and an address
+sub set_address {
+	my ($imageid,$address) = @_;
+	my $address_update = "UPDATE images SET load_address='$address' " .
+		"WHERE imageid='$imageid'";
+	DBQueryFatal($address_update);
+}
+
+# Kill off our child process, if started, and clear out registered address
+# Also, die off
+sub cleanup {
+	print STDERR "$$: Killed, cleaning up\n";
+	if ($child_pid) {
+		kill 15, $child_pid;
+	}
+	&clear_address;
+	exit(1);
+}
+
+# Clear out the address registered to this process
+sub clear_address {
+	&debug("Clearing out registered load_address\n");
+	# Now, clear out the load_address we had set up
+	my $address_clear = "UPDATE images SET load_address='' " .
+		"WHERE imageid='$imageid'";
+	DBQueryFatal($address_clear);
+}
+
+# Stolen shamlessly from the perlipc manpage
+sub daemonize {
+	chdir '/' or die "Can't chdir to /: $!";
+	open STDIN, '/dev/null' or die "Can't read /dev/null: $!";
+
+	open STDOUT, ">>$LOGFILE" or die "Can't write to $LOGFILE: $!";
+	defined(my $pid = fork) or die "Can't fork: $!";
+	exit if $pid;
+	setsid or die "Can't start a new session: $!";
+	open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
+}
