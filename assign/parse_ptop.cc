@@ -131,7 +131,12 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 #endif
 
 #ifdef FIX_PLINK_ENDPOINTS
-      bool fixends = false;
+      bool fixends;
+#ifdef FIX_PLINKS_DEFAULT
+      fixends = true;
+#else
+      fixends = false;
+#endif
       if (parsed_line.size() == 9) {
 	  if (parsed_line[8].compare("fixends") == 0) {
 	      fixends = true;

@@ -897,12 +897,19 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       double distance = vlink->delay_info.distance(physical_delay);
       int users;
 
-      // For sticking emulated links in emulated links we only care
-      // about the distance.
+      // For sticking emulated links in emulated links we care about the
+      // distance, and whether or not we've gone over bandwidth
       users = plink->nonemulated;
       if (! vlink->emulated) {
 	users += plink->emulated;
+      } else {
+	  if (vlink->delay_info.bandwidth >
+		  (plink->delay_info.bandwidth - plink->bw_used)) {
+	      // Silly hack to make sure that this link doesn't get chosen
+	      users = best_users + 1;
+	  }
       }
+
       if (distance == -1) {
 	// -1 == infinity
 	distance = DBL_MAX;

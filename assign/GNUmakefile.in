@@ -44,6 +44,9 @@ CXXFLAGS += -DFIND_PNODE_SEARCH -DNO_REVERT
 # This should be enabled, for better mapping, but has to be disabled
 # for now because it breaks vclasses
 #CXXFLAGS += -DPER_VNODE_TT -DSMART_UNMAP
+# Make sure that all emulated links that are assigned to a plink have the same
+# endpoints
+CXXFLAGS += -DFIX_PLINK_ENDPOINTS -DFIX_PLINKS_DEFAULT
 
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
