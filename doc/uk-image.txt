@@ -17,51 +17,20 @@ A. FreeBSD (while running single user):
   Remove known_hosts if it exists.  Put in local boss root pub key.
   Leave in our pub key if acceptible.
 
-* /etc/hosts
-  Fix the fully qualified name for localhost.
-
 * /etc/localtime
   Copy the correct file over from /usr/share/zoneinfo
 
-* /etc/motd
-  Reflect new site
-
-* /etc/rc.conf
-  set ntpdate_flags to boss.uky.emulab.net
-
-* /etc/ntp.conf
-  Put in IP of time server
-
-* /etc/testbed/master.passwd
+* /usr/local/etc/emulab/master.passwd
   Change the root password, this file will get installed by prepare.
 
 * /etc/ssh/ssh_host*
   Generate new host keys.  Actually, copy from an existing image.
 
-* /etc/testbed/{client,emulab}.pem
+* /etc/emulab/{client,emulab}.pem
   Generate a new one.  From Leigh:
       Just need to cd into the ssl directory and do a gmake
       (on their boss of course!) then a gmake boss-installX.
       The images need emulab.pem and client.pem from that directory.
-
-* /etc/testbed/supfile
-  Fix release tag (FBSD*) if necessary
-  [ DON'T FORGET TO FIX UP cvsup TREE on boss ]
-
-* /var/emulab/sup/sup/*/checkouts
-  Remove these files.
-
-* /usr/local/etc/testbed/tmcc
-  Install a binary customized for the site.  Created as part of the
-  general testbed software build.  You may not need to do this, run:
-  "tmcc bossinfo" and see what it says.
-
-* /usr/site
-  Remove it.
-
-* Run /usr/local/etc/testbed/prepare
-  This will install clean passwd and group files, clean out log files
-  and take care of various other lint.
 
 * Unmount filesystems, and remount root read-only to be safe:
   cd /
@@ -79,14 +48,8 @@ B. While running Linux (single user):
   Remove known_hosts if it exists.  Put in local boss root pub key.
   Leave in our pub key if acceptible.
 
-* /etc/hosts
-  Fix the fully qualified name for localhost.
-
 * /etc/localtime
   Copy the correct file over from /usr/share/zoneinfo
-
-* /etc/ntp/step-tickers /etc/ntp.conf
-  Put in IP of time server.
 
 * /etc/ssh/ssh_host*
   Generate new host keys.  Actually, copy from an existing image.
@@ -99,24 +62,6 @@ B. While running Linux (single user):
       Just need to cd into the ssl directory and do a gmake
       (on their boss of course!) then a gmake boss-installX.
       The images need emulab.pem and client.pem from that directory.
-
-* /etc/testbed/supfile
-  Fix release tag (RHL*) if necessary.
-
-* /var/emulab/sup/sup/*/checkouts
-  Remove these files.
-
-* /etc/testbed/tmcc
-  Install a binary customized for the site.  Must be built from testbed
-  source under Linux (duh!)  Again, you may not need this, run:
-  "tmcc bossinfo" to verify.
-
-* /usr/site
-  Remove it.
-
-* Run /usr/local/etc/testbed/prepare
-  This will install clean passwd and group files, clean out log files
-  and take care of various other lint.
 
 * Remount root filesystem read-only (IMPORTANT!)
   cd /
