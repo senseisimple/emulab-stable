@@ -552,9 +552,9 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
 # Return the Unix GID Name and Number for a group. This is distinct from
 # the name we use within the Testbed system.
 #
-# usage: TBGroupUnixInfo($pid, $gid, &$unix_name, &$unix_gid)
+# usage: TBGroupUnixInfo($pid, $gid, &$unix_gid, &$unix_name)
 #
-function TBGroupUnixInfo($pid, $gid, &$unix_name, &$unix_gid)
+function TBGroupUnixInfo($pid, $gid, &$unix_gid, &$unix_name)
 {
     $query_result =
 	DBQueryFatal("select unix_name,unix_gid from groups ".

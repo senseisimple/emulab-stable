@@ -79,7 +79,7 @@ if (! ($head = ProjLeader($pid))) {
 my (undef,undef,$uid) = getpwnam($head)
     or die "$head not in passwd file";
 
-my (undef,undef,$gid) = getgrnam($pid);
+my (undef,undef,$gid) = getgrnam($pid)
     or die "$pid not in group file";
 
 #

@@ -121,7 +121,7 @@ if ($user ne "root") {
 	"     e.pid=n.pid and e.eid=n.eid ".
 	"left join group_membership as g on ".
 	"     g.pid=e.pid and g.gid=e.gid ".
-	"where (" . join(" or ",@conds) . ") g.uid='$user';";
+	"where (" . join(" or ",@conds) . ") and g.uid='$user';";
 			 
   print "Checking authorization for '$user': '$cmd'\n" if $verbose;
   $sth = $dbh->query($cmd)

@@ -337,7 +337,7 @@ mail($TBMAIL_APPROVAL,
      "Members:         $proj_members\n".
      "PCs:             $proj_pcs\n".
      "Sharks:          $proj_sharks\n".
-     "Unix GID:        $unix_gid\n".
+     "Unix GID:        $unix_name ($unix_gid)\n".
      "Reasons:\n$proj_why\n\n".
      "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
