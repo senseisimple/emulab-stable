@@ -69,7 +69,7 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
 
 clean:	subdir-clean
-	rm -f *.o core tbprerun tbrun tbend tbreport
+	rm -f *.o core tbreport
 
 subdir-clean:
 	@$(MAKE) -C checkpass clean

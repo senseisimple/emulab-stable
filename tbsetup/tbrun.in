@@ -1,0 +1,57 @@
+#!/usr/bin/perl -w
+
+# tbrun
+
+# This is the second program in the tbprerun/tbrun/tbend sequence.
+# Unlike tbprerun this will actually manipulate the nodes and switch
+# changing into the experimental state.
+# Setting up the paths
+$TBROOT = "@prefix@";
+
+$TBSETUPLIB = "$TBROOT/lib";
+
+$ENV{'PATH'} = "$TBROOT/libexec:$TBROOT/libexec/ir" 
+    . ":$TBROOT/libexec/ns2ir:$TBROOT/sbin:$TBROOT/bin:/usr/bin";
+push(@INC,$TBSETUPLIB);
+
+require libtbsetup;
+require 'ctime.pl';
+
+if ($#ARGV != 2) {
+    print STDERR "Syntax: $0 pid eid ir_file\n";
+    exit(1);
+}
+($pid,$eid,$irfile) = @ARGV;
+
+$prefix = &tbs_prefix($irfile);
+$logfile = "$prefix.log";
+
+&tbs_initlog($logfile);
+
+&tbs_out("Input: $irfile\n");
+&tbs_out("Log:   $logfile\n");
+&tbs_out("\n");
+
+if (! -r $irfile) {
+    &tbs_out("$irfile does not exist or is not readable.\n");
+    exit(1);
+}
+
+&tbs_out("Beginning Testbed run for $pid-$eid ($irfile). " 
+	 . &ctime(time) . "\n");
+
+&tbs_out("Setting up VLANs\n");
+if (&tbs_exec("snmpit -u -f $irfile")) {
+    &tbs_out("Failed to set up VLANs\n");
+    exit(1);
+}
+
+&tbs_out("Resetting OS and rebooting.\n");
+if (&tbs_exec("os_setup $pid $eid $irfile")) {
+    &tbs_out("Failed to reset OS and reboot nodes.\n");
+    exit(1);
+}
+
+&tbs_out("Run finished - " . &ctime(time) . "\n");
+
+0;
