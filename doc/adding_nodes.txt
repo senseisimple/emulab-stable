@@ -83,6 +83,24 @@ C. What to do on boss:
 	update nodes set pxe_boot_path='boss.emulab.net:/tftpboot/pxeboot'
 		where node_id='pcN';
 
+   N (priority) is the where it gets printed out. These need to be
+   ascending numbers, and in the right region. See the table.
+
+4a. Add entries into the tiplines table. The "server" field is where
+    the actual capture process runs:
+
+    INSERT INTO tiplines VALUES ('pc1', 'users.emulab.net',0,0,'');
+    INSERT INTO tiplines VALUES ('pc111','tipserv1.emulab.net',0,0,'');
+
+    You need to add the usual lines in /etc/remote on the machine
+    where the capture process runs. In addition, add a line on users
+    to that users can use tip to connect to a console on a remote tip
+    server. So, on users:
+
+	pc111|tbpc111:dv=/dev/tip/pc111:br#115200:nt:pa=none:
+
+    The device field is ignored, but something must be there. 
+
 5. Until you are ready to put it in service, reserve it to an expt,
    either with nalloc or by adding an entry to the reserved table
    directly. You'll probably also want to put its ports in a vlan to
@@ -115,10 +133,6 @@ C. What to do on boss:
                 }
 	   sudo /usr/local/etc/rc.d/dhcpd.sh restart 
 	   (old /usr/site/bin/dhcp/restart)
-   - ProxyDHCP: on boss, edit /usr/testbed/etc/proxydhcp.conf
-                add a line like this:
-		155.101.132.N  155.101.128.70   /tftpboot/pxeboot
-		sudo /usr/testbed/sbin/proxydhcp.restart
    - tip: on ops, edit /etc/remote
 	  add a line like this:
 	  pcN:dv=/dev/tip/pcN:br#115200:nt:pa=none:
