@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -131,10 +131,10 @@ $result =
     DBQueryFatal("select a.node_id,a.phys_nodeid,count(*) from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
-		 "left join nodes as n on a.phys_nodeid=n.node_id ".
+		 "left join node_status as ns on a.phys_nodeid=ns.node_id ".
 		 "left join node_types as nt on a.type=nt.type ".
 		 "where b.node_id is null and ".
-		 "      (nt.isremotenode=1 and n.status='up' and ".
+		 "      (nt.isremotenode=1 and ns.status='up' and ".
 		 "       (m.node_id is null or ".
 		 "        m.pid!='$DEADPID' or m.eid!='$DEADEID')) ".
 		 "group by a.phys_nodeid");

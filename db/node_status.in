@@ -1,135 +1,48 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-#
-# node_status - Updates the 'status' column in the nodes table to indicate
-# whether nodes are pingable, etc.
-# Intended to be run as a cronjob
-# Requires 'fping' to be installed
-#
-
-############################## Defines and includes
-my $fping = "/usr/local/sbin/fping"; # Path to fping
-
-use strict;
 use English;
-use IPC::Open2;
 
+#
+# node_status - Updates the 'status' column in the node_status table.
+# Currently run as a cron job, but is probably better as a testbed
+# daemon. 
+#
+#
 # Configure variables
-use lib '@prefix@/lib';
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
 use libdb;
 
 #
 # Only root and admins are allowed to use this script
 #
 if (($UID != 0) && (!TBAdmin())) {
-	die "Only root and admins are allowed to use this script\n";
+    die("*** $0:\n".
+	"    You do not have permission to run this script!\n");
 }
 
 #
-# Node list. We only care about local, non virtual nodes.
-# Remote nodes handled below.
+# The idea is simple; any nodes that have not reported in (isalive in
+# tmcd) within the last XX seconds are moved to the down category.
 #
-my $query =
-    "select n.node_id, n.status, os_info.osfeatures FROM nodes as n ".
-    "left join node_types as nt on n.type=nt.type ".
-    "left join os_info ON n.def_boot_osid = os_info.osid ".
-    "where nt.isvirtnode=0 and nt.isremotenode=0 and nt.class!='shark'";
-
-my $result = DBQueryFatal($query);
-
-############################## Determine pingable/unpingable nodes
-my (@newlyUp, @newlyDown, @newlyPD, @newlyUnpingable) = ();
-
-my $fpingPID = &open2("FOUT","FIN","$fping 2>&1"); # Throws an exception on failure
-
-my %oldStatus = (); # Status of node from the DB, so we can tell if it changed
-
-while (my %row = $result->fetchhash) {
-	my $node = $row{node_id};
-	$oldStatus{$node} = $row{status};
-	if ($row{osfeatures} && ($row{osfeatures} =~ /ping/)) {
-		# We have a node that should be capable of returning pings
-		print FIN $node,"\n"; # Give fping another node to ping
-	} else {
-		# This node can't return pings
-		if ((!$row{status}) || ($row{status} ne 'unpingable')) {
-			push @newlyUnpingable, $node;
-		}
-	}
-}
-close(FIN); # Tell fping we're done giving it nodes
-
-############################## Determine status changes
-while (<FOUT>) { # Read fping results
-	chomp;
-	my ($node,$status) = split /\s+/,$_,2;
-	# Skip ICMP messages
-	next if ($node eq "ICMP");
-	
-	if ($status eq "is alive") {
-		if ($oldStatus{$node} ne "up") {
-			push @newlyUp,$node;
-		}
-	} else { # Node must not have returned a ping
-		if ($oldStatus{$node} eq "possibly down") {
-			push @newlyDown, $node;
-		} elsif ($oldStatus{$node} ne "down") {
-			push @newlyPD, $node;
-		}
-	}
-}
-close(FOUT);
-
-############################## Write back changes
-# When I started this section, it seemed a clever way to avoid code
-# duplication. Now, I'm not so sure :)
-foreach (['down', @newlyDown], ['up', @newlyUp],
-		['possibly down', @newlyPD], ['unpingable', @newlyUnpingable]) {
-	my $status = shift @$_;
-	my @nodes = @$_;
-	if (@nodes) {
-		my $query = "UPDATE nodes SET status='$status' WHERE " .
-			join " OR ", map("node_id='$_'",@nodes);
-		DBQueryFatal($query);
-	}
-}
-
-#
-# Now look at widearea nodes. 
-#
-$result =
-    DBQueryFatal("SELECT n.node_id,n.status, ".
-		 "  UNIX_TIMESTAMP(n.status_timestamp) ".
-		 "from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "left join reserved as r on n.node_id=r.node_id ".
-		 "where nt.isvirtnode=0 and nt.isremotenode=1 and ".
-		 "(UNIX_TIMESTAMP(now()) - ".
-		 " UNIX_TIMESTAMP(n.status_timestamp)) > 90");
-
-while (my ($node, $status, $stamp) = $result->fetchrow_array) {
-    #
-    # Repeat the time check to avoid dropping a node that just came up.
-    # 
-    DBQueryFatal("update nodes set status='down' ".
-		 "where node_id='$node' and ".
-		 "(UNIX_TIMESTAMP(now()) - ".
-		 " UNIX_TIMESTAMP(status_timestamp)) > 90");
-}
-
-########################################################################
-#
-# New Stuff. The idea is simple; any nodes that have not reported in
-# (isalive in tmcd) within the last XX seconds are moved to the down
-# category. 
-#
-
 my $query_result =
     DBQueryFatal("SELECT n.node_id,ns.status,r.pid,nt.isremotenode, ".
 		 "  UNIX_TIMESTAMP(now()) - ".
@@ -154,7 +67,9 @@ while (my ($node,$status,$pid,$remote,$timediff) = $result->fetchrow_array) {
 	#
 	# If its reserved and not reporting isalive, then its a user
 	# image not doing what it is supposed to. Mark as possibly
-	# down since we do not really know whats up.
+	# down since we do not really know whats up. This includes old
+	# images as well, but that would only happen when the node is
+	# reserved since free nodes run the default image and report in.
 	#
 	if (defined($pid)) {
 	    $newstatus = "possibly down";

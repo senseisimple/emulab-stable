@@ -3587,18 +3587,8 @@ COMMAND_PROTOTYPE(doisalive)
 	char		buf[MYBUFSIZE];
 
 	/*
-	 * Only for remote nodes now; local node status determined with
-	 * with fping via db/node_status script. Need to replace that.
-	 */
-	if (! reqp->islocal) {
-	    mydb_update("update nodes "
-			"set status='up',status_timestamp=now() "
-			"where node_id='%s' or phys_nodeid='%s'",
-			reqp->nodeid, reqp->nodeid);
-	}
-	/*
-	 * New stuff. Old stuff above will come out when node_status
-	 * table completely implemented.
+	 * See db/node_status script, which uses this info (timestamps)
+	 * to determine when nodes are down.
 	 */
 	mydb_update("replace delayed into node_status "
 		    " (node_id, status, status_timestamp) "
