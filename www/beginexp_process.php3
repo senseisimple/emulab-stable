@@ -6,7 +6,8 @@ include("defs.php3");
 #
 PAGEHEADER("Beginning a Testbed Experiment");
 
-$mydebug = 0;
+$mydebug   = 0;
+$delnsfile = 0;
 
 #
 # First off, sanity check the form to make sure all the required fields
@@ -123,6 +124,23 @@ elseif ($specupload) {
     chmod($exp_nsfile, 0666);
     $nsfile = $exp_nsfile;
     $nonsfile = 0;
+}
+elseif (isset($nsdata) && strcmp($nsdata, "")) {
+    #
+    # The NS file is encoded in the URL. Must create a temp file
+    # to hold it, and pass through to the backend.
+    #
+    # XXX Hard to believe, but there is no equiv of mkstemp in php3.
+    #
+    $nsfile    = tempnam("/tmp", "$exp_pid-$exp_id.nsfile.");
+    $delnsfile = 1;
+    $nonsfile  = 0;
+
+    if (! ($fp = fopen($nsfile, "w"))) {
+	TBERROR("Could not create temporary file $nsfile", 1);
+    }
+    fwrite($fp, urldecode($nsdata));
+    fclose($fp);
 }
 else {
     #
@@ -298,6 +316,10 @@ $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       "$exp_priority $exp_swappable ".
 	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
+
+if ($delnsfile) {
+    unlink($nsfile);
+}
 
 if ($retval) {
     echo "<br><br><h2>

@@ -13,6 +13,17 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
+# See if nsdata was provided. Clear it if an empty string, otherwise
+# reencode it.
+#
+if (isset($nsdata)) {
+    if (strcmp($nsdata, "") == 0) 
+	unset($nsdata);
+    else
+	$nsdata = rawurlencode($nsdata);
+}
+
+#
 # See what projects the uid can create experiments in. Must be at least one.
 #
 $projlist = TBProjList($uid, $TB_PROJECT_CREATEEXPT);
@@ -64,9 +75,18 @@ echo "<tr>
       </tr>\n";
 
 #
-# NS file upload.
-# 
-echo "<tr>
+# NS file.
+#
+if (isset($nsdata)) {
+    echo "<tr>
+            <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+            <input type=hidden name=nsdata value=$nsdata>
+            <td><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
+                   View NS File</a></td>
+          </tr>\n";
+}
+else {
+    echo "<tr>
           <td rowspan>*Your NS file: &nbsp</td>
 
           <td rowspan><center>Upload (20K max)<br>
@@ -83,7 +103,8 @@ echo "<tr>
               <br>
               <input type=\"text\" name=\"exp_localnsfile\" size=\"50\">
               </td>
-      </tr>\n";
+          </tr>\n";
+}
 
 #
 # Expires.
@@ -180,8 +201,7 @@ echo "<p><blockquote>
               <a href='newosid_form.php3'>create the OSID first!</a>
          <li> You can view a <a href='showosid_list.php3'> list of OSIDs</a>
               that are available for you to use in your NS file.
-         <li>
-              You can also view a <a href='showimageid_list.php3'> list of
+         <li> You can also view a <a href='showimageid_list.php3'> list of
               ImageIDs.</a> 
       </ul>
       </blockquote>\n";
