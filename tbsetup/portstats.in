@@ -107,7 +107,7 @@ if (!$opt{p}) {
 # 
 my @passedPorts = ();
 foreach my $arg (@ARGV) {
-    if ($arg =~ /^([-\w\.]+)$/) {
+    if ($arg =~ /^([-\w\.:]+)$/) {
         $arg = $1;
     }
     else {
