@@ -252,7 +252,7 @@ if (strcmp($privIP, "1.1.1.1")) {
 	$force   = $row["force"];
 
 	# Do not upgrade if the root tag already matches. ???
-	if ($force eq "yes"|| !isset($roottag) || strcmp($roottag, $newroot)) {
+	if (!strcmp($force, "yes")|| !isset($roottag) || strcmp($roottag, $newroot)) {
 	    $update  = 1;
 
 	    DBQueryFatal("update widearea_updates set update_started=now() ".
