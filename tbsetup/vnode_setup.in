@@ -153,9 +153,10 @@ my $exptstate = ExpState($pid, $eid);
 foreach my $node (@nodes) {
     my $pnode;
     my $jailed;
+    my $plab;
     my $allocstate;
 
-    if (! TBIsNodeVirtual($node, \$jailed)) {
+    if (! TBIsNodeVirtual($node, \$jailed, \$plab)) {
 	next;
     }
     if (! TBPhysNodeID($node, \$pnode)) {
@@ -280,14 +281,29 @@ foreach my $node (@nodes) {
     else {
 	my $args = ($killmode ? "-k " : " ");
 	$args   .= ($jailed   ? "-j " : " ");
+	$args   .= ($plab     ? "-p " : " ");
 	$args   .= "$node ";
 	
 	# Must change our real UID to root so that ssh will work.
 	$UID = 0;
-    
-	exec("$ssh -host $pnode $CLIENT_BIN/vnodesetup $args");
+
+	if ($plab && !$killmode) {
+	    if (system("$TB/sbin/plabnode -v -d alloc $pid $eid $node")) {
+		die("*** $0:\n".
+		    "    Plab node allocation failed");
+	    }
+	}
+
+	exec("$ssh -host $node $CLIENT_BIN/vnodesetup $args");
 	die("*** $0:\n".
 	    "    exec failed!\n");
+
+	if ($plab && $killmode) {
+	    if (system("$TB/sbin/plabnode -v -d free $pid $eid $node")) {
+		warn("*** $0:\n".
+		     "    Plab node free failed");
+	    }
+	}
     }
 }
 

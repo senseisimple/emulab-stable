@@ -544,6 +544,39 @@ sub doSwapout($) {
 
     if (! $TESTMODE) {
 	#
+	# If the experiment has no Plab dslice nodes left, but still has
+	# a Plab slice, destroy the slice
+	#
+
+	# Does the slice exist?
+	$db_result =
+	    DBQueryFatal("select slicename from plab_slices ".
+			 "where pid='$pid' and eid='$eid'");
+
+	if ($db_result->numrows) {
+	    # Are there any dslice nodes left?
+	    $db_result =
+		DBQueryFatal("select n.node_id from nodes as n ".
+			     "left join node_types as nt on n.type = nt.type ".
+			     "left join reserved as r ".
+			     " on r.node_id = n.node_id ".
+			     "where r.pid='$pid' and r.eid='$eid' ".
+			     " and nt.isplabdslice = 1");
+
+	    if (!$db_result->numrows) {
+		print "Destroying Planetlab slice.\n";
+		TBDebugTimeStamp("plabslice destroy started");
+		if (system("plabslice -v destroy $pid $eid")) {
+		    print STDERR "*** Failed to destroy Plab dslice\n";
+		    $swapout_errors = 1;
+		}
+		TBDebugTimeStamp("plabslice destroy finished");
+	    }
+	}
+    }
+
+    if (! $TESTMODE) {
+	#
 	# All of these errors are non-fatal on swapout. We find out about them
 	# via email sent from the individual scripts.
 	#
@@ -713,6 +746,43 @@ sub doSwapin($) {
     if ($TESTMODE) {
 	print "Testing run - Stopping here.\n";
 	return 0;
+    }
+
+    #
+    # If there are any Plab dslice nodes in the experiment, create the
+    # dslice now
+    #
+    if ($type > UPDATE_RECOVER) {
+	# Are there any Plab nodes?
+	$db_result =
+	    DBQueryFatal("select n.node_id from nodes as n ".
+			 "left join node_types as nt on n.type = nt.type ".
+			 "left join reserved as r on r.node_id = n.node_id ".
+			 "where r.pid='$pid' and r.eid='$eid' ".
+			 " and nt.isplabdslice = 1");
+
+	if ($db_result->numrows) {
+	    # Does slice already exist?
+	    $db_result =
+		DBQueryFatal("select slicename from plab_slices ".
+			     "where pid='$pid' and eid='$eid'");
+
+	    if (! $db_result->numrows) {
+		my @plabnodes = ();
+		
+		while (my ($node) = $db_result->fetchrow_array()) {
+		    push(@plabnodes, $node);
+		}
+		
+		print "Creating Planetlab slice.\n";
+		TBDebugTimeStamp("plabslice create started");
+		if (system("plabslice -v create $pid $eid")) {
+		    print STDERR "*** Failed to create Plab dslice\n";
+		    return 3;
+		}
+		TBDebugTimeStamp("plabslice alloc finished");
+	    }
+	}
     }
 
     #
