@@ -1,11 +1,14 @@
 #!/bin/sh
 
 # We only handle gated right now
-if [ "$1"x != "ROUTERTYPE=gated"x ]
-then
+case $1 in
+    ROUTERTYPE=gated | ROUTERTYPE=ospf)
+	;;
+    *)
 	echo "WARNING bad TMCD routing info, gated not started"
 	exit 0
-fi
+	;;
+esac
 
 # Must know the control net
 if [ -x /etc/testbed/control_interface ]
