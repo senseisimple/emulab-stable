@@ -159,8 +159,11 @@ LanLink instproc init {s nodes bw d type} {
     # Allow user to control if link is emulated. Only links, not lans.
     $self set emulated 0
 
-    # Allow user to turn of actual bw shaping on emulated links. Not lans.
+    # Allow user to turn off actual bw shaping on emulated links. Not lans.
     $self set nobwshaping 0
+
+    # Allow user to turn on veth devices on emulated links. Not lans.
+    $self set useveth 0
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -494,11 +497,12 @@ LanLink instproc updatedb {DB} {
     $self instvar uselinkdelay
     $self instvar emulated
     $self instvar nobwshaping
+    $self instvar useveth
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea,emulated,uselinkdelay,nobwshaping) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea,$emulated,$uselinkdelay,$nobwshaping)"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea,emulated,uselinkdelay,nobwshaping,usevethiface) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea,$emulated,$uselinkdelay,$nobwshaping,$useveth)"
     }
 }

@@ -601,6 +601,17 @@ proc tb-set-noshaping {link onoff} {
 }
 
 #
+# For emulated links, allow veth device to be used. Not a user option.
+# 
+proc tb-set-useveth {link onoff} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-useveth] $link is not a link."
+	return
+    }
+    $link set useveth $onoff
+}
+
+#
 # Control linkdelays for lans and links
 # 
 proc tb-set-endnodeshaping {lanlink onoff} {

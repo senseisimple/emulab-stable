@@ -41,6 +41,7 @@ proc tb-force-endnodeshaping {onoff} {}
 proc tb-set-multiplexed {link onoff} {}
 proc tb-set-endnodeshaping {link onoff} {}
 proc tb-set-noshaping {link onoff} {}
+proc tb-set-useveth {link onoff} {}
 
 Class Program
 
