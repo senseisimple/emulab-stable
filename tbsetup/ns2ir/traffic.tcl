@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -507,6 +507,7 @@ Application/Traffic/CBR instproc init {} {
     $self set packetSize_ 210
     $self set rate_ "100Mbps"
     $self set interval_ {}
+    $self set iptos_ {}
     $self next
     
     $self set role "source"
@@ -516,6 +517,7 @@ Application/Traffic/CBR instproc get_params {} {
     $self instvar packetSize_
     $self instvar rate_
     $self instvar interval_
+    $self instvar iptos_
 
     if {$rate_ != {} && $rate_ != 0} {
 	set rate [parse_bw $rate_]
@@ -529,6 +531,13 @@ Application/Traffic/CBR instproc get_params {} {
     } else {
 	set param "$param INTERVAL=-1"
     }
+
+    if {$iptos_ != {} && $iptos_ != 0} {
+	set param "$param QOS=$iptos_"
+    } else {
+	set param "$param QOS=-1"
+    }
+
     return $param
 }
 

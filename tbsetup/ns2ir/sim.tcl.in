@@ -439,6 +439,9 @@ Simulator instproc at {time eventstring} {
                         "interval_" {
 	                    set args  "INTERVAL=$arg"
                         }
+                        "iptos_" {
+	                    set args  "QOS=$arg"
+                        }
 			unknown {
 		            punsup "at $time $event"
 		            return
