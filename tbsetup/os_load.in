@@ -118,6 +118,7 @@ if (defined($options{"e"})) {
 	    die("*** $0:\n".
 		"    There are no nodes in $1/$2!\n");
 	}
+	$imagepid = $1;
     }
     else {
 	die("Invalid argument to -e option: $pideid\n");
