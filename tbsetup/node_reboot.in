@@ -348,7 +348,7 @@ sub RebootNode {
 	    # OK, ssh worked, so the node should have reported the state
 	    # transition itself.
 	    #
-	    $setstate = 0;
+	    #$setstate = 0;
 	}
 
     }
