@@ -108,6 +108,7 @@ $nodes_result =
 		 " and i.card=node_types.control_net ".
 		 " where i.IP!='NULL' and r.node_id not like 'sh%' ".
 		 "       and node_types.isvirtnode=0 ".
+		 "       and node_types.isremotenode=0 ".
 		 "order by r.eid,e.gid,r.pid,nodes.priority");
 
 my %ipgroups	= ();
