@@ -43,7 +43,7 @@ ALLCERTS	= $(CERTS)
 #
 # Name and rootball revision
 #
-ROOTBALLREV	= 7
+ROOTBALLREV	= 8
 ROOTBALLNAME	= plabroot-$(ROOTBALLREV).tgz
 
 include $(OBJDIR)/Makeconf
