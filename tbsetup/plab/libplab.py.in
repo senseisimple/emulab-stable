@@ -947,12 +947,16 @@ class Plab:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
+
+            if tstamp <= now:
+                print "WARNING: Lease for %s %s/%s has expired!" % entry[:3]
+                continue
             
             if node.renew():
                 print "Failed to renew lease for %s %s/%s" % entry[:3]
                 if entry not in failedrenew:
                     newfail.append(entry)
-                if entry[3] < (now + (2*3600)):
+                if (tstamp - now) < (2*3600):
                     failsoon.append(entry)
             else:
                 if entry in failedrenew:
