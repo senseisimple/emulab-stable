@@ -84,7 +84,8 @@ full_duplex: 1 if the card can operate in full duplex, 0 otherwise
 ##### Bringing up the first node
 
 We'll start by bringing up the first node in the testbed, to make sure things
-are working, and so that you can set some initial values.
+are working, and so that you can set some initial values. If we haven't already
+given it to you, ask Utah for the 'newnode' MFS.
 
 Setting up dhcpd -
 We use dhcpd to assign addresses to nodes when they boot. We don't normally do

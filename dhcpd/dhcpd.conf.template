@@ -22,6 +22,7 @@ max-lease-time                  36000;                  # 10 hours
 
 ddns-update-style               none;                   # req'd vers 3 directive
 
+# NOTE: You should not need to change any of the PXE options below
 # Define the PXE option space
 # Code 1: Multicast IP address of bootfile
 # Code 2: UDP port that client should monitor for MTFTP responses
