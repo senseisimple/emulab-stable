@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+
 #include "port.h"
 
 #include <iostream.h>
@@ -1341,6 +1342,10 @@ pvertex make_lan_node(vvertex vv)
     pl->bw_used = 0;
     pl->emulated = pl->nonemulated = 0;
     p->switches.insert(largest_switch);
+
+#ifdef FIX_PLINK_ENDPOINTS
+    pl->fixends = false;
+#endif
   } else {
     p->name += "orphin";
   }
