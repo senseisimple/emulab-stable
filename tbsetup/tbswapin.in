@@ -70,7 +70,7 @@ sub cleanup {
     # we just kill off the vnode stuff. 
     #
     TBDebugTimeStamp("vnode_setup -k started");
-    if (system("vnode_setup -d -k $pid $eid")) {
+    if (system("vnode_setup -f -d -k $pid $eid")) {
 	print STDERR "*** Failed tear down vnodes.\n";
     }
 
