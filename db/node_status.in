@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -22,7 +22,10 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $debug = 1;
+my $verbose = 1;
+my $debug = 0;
+$verbose = 1
+    if ($debug);
 
 #
 # Turn off line buffering on output
@@ -50,12 +53,56 @@ if (($UID != 0) && (!TBAdmin())) {
 #
 # Grab the reporting intervals for the various types of nodes - we convert
 # them into seconds, and make the timeout twice as big as the reporting
-# interval
+# interval.
 #
 my $plab_timeout  = TBGetSiteVar("watchdog/isalive/plab")  * 60 * 2;
 my $vnode_timeout = TBGetSiteVar("watchdog/isalive/vnode") * 60 * 2;
 my $local_timeout = TBGetSiteVar("watchdog/isalive/local") * 60 * 2;
 my $wa_timeout    = TBGetSiteVar("watchdog/isalive/wa")    * 60 * 2;
+
+print "\n=== node_status ".
+    "(local=$local_timeout, vnode=$vnode_timeout, ".
+    "plab=$plab_timeout, wa=$wa_timeout) ".
+    "running at " . `date`
+    if ($verbose);
+
+#
+# A zero timeout value means no timeout
+#
+if ($plab_timeout == 0) {
+    print " WARNING: no timeout on plab nodes\n"
+	if ($verbose);
+    $plab_timeout = 999999999;
+}
+if ($vnode_timeout == 0) {
+    print " WARNING: no timeout on local vnodes\n"
+	if ($verbose);
+    $vnode_timeout = 999999999;
+}
+if ($local_timeout == 0) {
+    print " WARNING: no timeout on local nodes\n"
+	if ($verbose);
+    $local_timeout = 999999999;
+}
+if ($wa_timeout == 0) {
+    print " WARNING: no timeout on widearea nodes\n"
+	if ($verbose);
+    $wa_timeout = 999999999;
+}
+
+#
+# Fun facts:
+#	isremotenode   -> widearea, plabvirt, plabphys
+#	isvirtnode     -> vnode, plabvirt
+#	isplabdslice   -> plabvirt
+#	isplabphysnode -> plabphys
+# so:
+#	local phys node == !isremotenode && !isvirtnode
+#	local virt node == !isremotenode && isvirtnode
+#	widearea node   == isremotenode && !isplabdslice && !isplabphysnode
+#	plab phys node  == isplabphysnode
+#	plab virt node  == isplabdslice
+#
 my $query_result =
     DBQueryFatal("SELECT n.node_id,ns.status,r.pid,nt.isremotenode, ".
 		 "       nt.isvirtnode, nt.isplabdslice, ".
@@ -66,25 +113,26 @@ my $query_result =
 		 "left join reserved as r on r.node_id=n.node_id ".
 		 "where ".
 		 " ns.status != 'down' && " .
-		 # Jailed and PLAB virtnodes report every 600 seconds.
-		 # Must be allocated to an experiment to be considerd.
-		 " ((nt.isvirtnode=1 && r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > $vnode_timeout)) || ".
-		 # plab virtual nodes
-		 # Must be allocated to an experiment to be considerd.
-		 "  (nt.isplabdslice=1 && r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
-		 # plab physical nodes
-		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
-		 "     nt.isplabphysnode=1 && ".
-		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
-		 # Local phys nodes 
-		 "  (nt.isvirtnode=0 && nt.isremotenode=0 && ".
+		 # Local phys nodes:
+		 " ((nt.isremotenode=0 && nt.isvirtnode=0 && ".
 		 "   ((now() - ns.status_timestamp) > $local_timeout)) || ".
-		 # Remote phys nodes (but NOT plab nodes, which we got above)
-		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
-		 "     nt.isplabphysnode=0 && ".
-		 "   ((now() - ns.status_timestamp) > $wa_timeout)))");
+		 # Local virtual node:
+		 # must be allocated to an experiment to be considered.
+		 "  (nt.isremotenode=0 && nt.isvirtnode=1 && ".
+		 "   r.pid is not null && ".
+		 "   ((now() - ns.status_timestamp) > $vnode_timeout)) || ".
+		 # Widearea nodes:
+		 "  (nt.isremotenode=1 && nt.isplabdslice=0 && ".
+		 "   nt.isplabphysnode=0 && ".
+		 "   ((now() - ns.status_timestamp) > $wa_timeout)) || ".
+		 # Plab physical nodes:
+		 "  (nt.isplabphysnode=1 && ".
+		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
+		 # Plab virtual nodes:
+		 # must be allocated to an experiment to be considered.
+		 "  (nt.isplabdslice=1 && ".
+		 "   r.pid is not null && ".
+		 "   ((now() - ns.status_timestamp) > $plab_timeout)))");
 		 
 
 while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
@@ -104,15 +152,18 @@ while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
 	}
     }
 
+    next
+	if ($status eq $newstatus);
+
+    print "  $node: $status to $newstatus after $timediff\n"
+	if ($verbose);
+
     #
-    # Repeat the time check to avoid dropping a node that just came up.
+    # Repeat the time check to avoid dropping a node that just came up?
     #
-    if ($debug) {
-        print "$node ($timediff) goes from $status to $newstatus\n";
-    }
-    else {
-        DBQueryFatal("update node_status set status='$newstatus' ".
-	  	     "where node_id='$node'");
+    if (!$debug) {
+	DBQueryFatal("update node_status set status='$newstatus' ".
+		     "where node_id='$node'");
     }
 }
 
@@ -132,8 +183,12 @@ $query_result =
 		      NODEDEAD_EID . "')");
 
 while (my ($node) = $query_result->fetchrow_array) {
-    MarkPhysNodeDown($node);
-    TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
-	"'Moved to hwdown by node_status; ".
-	"$node has not reported in for a long time.'");
+    print " $node: moved to hwdown\n"
+	if ($verbose);
+    if (!$debug) {
+	MarkPhysNodeDown($node);
+	TBSetNodeLogEntry($node, $UID, TB_DEFAULT_NODELOGTYPE(),
+		"'Moved to hwdown by node_status; ".
+		"$node has not reported in for more than $timeout seconds.'");
+    }
 }
