@@ -116,7 +116,17 @@ foreach my $node ( @ARGV ) {
 # Mere users cannot schedule reloads.
 #
 if ($UID && !TBAdmin($UID)) {
-    die("Only root or TB administrators can schedule disk reloads.\n");
+    die("*** Only root or TB administrators can schedule disk reloads.\n");
+}
+
+#
+# Confirm a valid imageid!
+#
+my $query_result =
+    DBQueryFatal("select * from images where imageid='$imageid'");
+    
+if ($query_result->numrows < 1) {
+    die("*** No such imageid $imageid is registered in the DB!");
 }
 
 #
