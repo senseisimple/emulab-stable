@@ -137,7 +137,12 @@ proc tb-set-node-tarfiles {node args} {
 	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
 	return
     }
-    $node set tarfiles [join $args :]
+    set tarfiles {}
+    while {$args != {}} {
+	lappend tarfiles [join [lrange $args 0 1]]
+	set args [lrange $args 2 end]
+    }
+    $node set tarfiles [join $tarfiles :]
 }
 proc tb-set-node-deltas {node args} {
     if {$args == {}} {
