@@ -27,6 +27,7 @@ my $TBOPS   = "@TBOPSEMAIL@";
 my $CONTROL = "@USERNODE@";
 
 my $HOMEDIR = "/users";
+my $USERPATH= "$TB/bin";
 my $PBAG    = "$TB/sbin/paperbag";
 my $SSH     = "$TB/bin/sshtb";
 my $USERADD = "/usr/sbin/pw useradd";
@@ -188,6 +189,10 @@ if (system("egrep -q -s '^${user}:' /etc/passwd")) {
 	       "-g $default_groupname -s $PBAG")) {
 	fatal("Could not add user $user to local node.");
     }
+    #
+    # First time account is made, do some extra work. 
+    #
+    FirstTime();
 }
 else {
     print "Updating user $user ($user_number) on local node.\n";
@@ -237,45 +242,6 @@ if (system("$SSH $control_node $CHPASS -p $pswd $user")) {
     fatal("Could not change password for user $user on $control_node.\n");
 }
 
-#
-# Set up the ssh key, but only if not done so already.
-#
-if (! -e "$HOMEDIR/$user/.ssh/" ) {
-    print "Setting up ssh configuration for $user.\n";
-    
-    mkdir("$HOMEDIR/$user/.ssh", 0700) or
-	fatal("Could not mkdir $HOMEDIR/$user/.ssh: $!");
-    chown($user_number, $default_groupgid, "$HOMEDIR/$user/.ssh") or
-	fatal("Could not chown $HOMEDIR/$user/.ssh: $!");
-    
-    # Run commands below as the user
-    $EUID = $user_number;
-    $UID  = $EUID;
-
-    if (system("$KEYGEN -P '' -f $HOMEDIR/$user/.ssh/identity")) {
-	fatal("Failure in ssh-keygen");
-    }
-    if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
-	       "$HOMEDIR/$user/.ssh/authorized_keys")) {
-	fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub to auth keys");
-    }
-    chmod(0600, "$HOMEDIR/$user/.ssh/authorized_keys") or
-	fatal("Could not chmod $HOMEDIR/$user/.ssh/authorized_keys: $!");
-}
-
-#
-# Set up a .forward file so that any email to them gets forwarded off.
-#
-if (! -e "$HOMEDIR/$user/.forward" ) {
-    print "Setting up .forward file for $user.\n";
-
-    if (system("echo \"$user_email\" > $HOMEDIR/$user/.forward")) {
-	fatal("Could not create $HOMEDIR/$user/.forward");
-    }
-    chmod(0644, "$HOMEDIR/$user/.forward") or
-	fatal("Could not chmod $HOMEDIR/$user/.forward");
-}
-
 exit(0);
 
 sub fatal {
@@ -283,4 +249,84 @@ sub fatal {
 
     SENDMAIL($TBOPS, "mkacct Failed", $msg);
     die("$0: $msg\n");
+}
+
+#
+# Do some new account stuff.
+#
+sub FirstTime()
+{
+    my $dossh = 0;
+    
+    #
+    # Set up the ssh key, but only if not done so already.
+    #
+    if (! -e "$HOMEDIR/$user/.ssh/" ) {
+	print "Setting up ssh configuration for $user.\n";
+    
+	mkdir("$HOMEDIR/$user/.ssh", 0700) or
+	    fatal("Could not mkdir $HOMEDIR/$user/.ssh: $!");
+	chown($user_number, $default_groupgid, "$HOMEDIR/$user/.ssh") or
+	    fatal("Could not chown $HOMEDIR/$user/.ssh: $!");
+	
+	$dossh = 1;
+    }
+    
+    #
+    # The rest of this needs to be done as the user, so fork a child.
+    #
+    $mypid = fork();
+    if ($mypid) {
+	waitpid($mypid, 0);
+	if ($?) {
+	    exit($? >> 0);
+	}
+	return;
+    }
+
+    $EUID = $user_number;
+    $UID  = $EUID;
+
+    if ($dossh) {
+	if (system("$KEYGEN -P '' -f $HOMEDIR/$user/.ssh/identity")) {
+	    fatal("Failure in ssh-keygen");
+	}
+	if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
+		   "$HOMEDIR/$user/.ssh/authorized_keys")) {
+	    fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub ".
+		  "to authorized_keys");
+	}
+	chmod(0600, "$HOMEDIR/$user/.ssh/authorized_keys") or
+	    fatal("Could not chmod $HOMEDIR/$user/.ssh/authorized_keys: $!");
+    }
+
+    #
+    # Set up a .forward file so that any email to them gets forwarded off.
+    #
+    if (! -e "$HOMEDIR/$user/.forward" ) {
+	print "Setting up .forward file for $user.\n";
+
+	if (system("echo \"$user_email\" > $HOMEDIR/$user/.forward")) {
+	    fatal("Could not create $HOMEDIR/$user/.forward");
+	}
+	chmod(0644, "$HOMEDIR/$user/.forward") or
+	    fatal("Could not chmod $HOMEDIR/$user/.forward");
+    }
+
+    #
+    # Add testbed path to .cshrc and .profile.
+    #
+    my $cpathstr = "set path = ($USERPATH \$path)";
+    if (-e "$HOMEDIR/$user/.cshrc" &&
+	system("egrep -q -s '$USERPATH' $HOMEDIR/$user/.cshrc")) {
+	system("echo '$cpathstr' >> $HOMEDIR/$user/.cshrc");
+    }
+
+    my $spathstr = "PATH=$USERPATH:\$PATH";
+    if (-e "$HOMEDIR/$user/.profile" &&
+	system("egrep -q -s '$USERPATH' $HOMEDIR/$user/.profile")) {
+	system("echo '$spathstr' >> $HOMEDIR/$user/.profile");
+    }
+
+    exit(0);
 }
