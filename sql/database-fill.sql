@@ -85,6 +85,7 @@ REPLACE INTO event_eventtypes VALUES (17,'COMPLETE');
 REPLACE INTO event_eventtypes VALUES (18,'MESSAGE');
 REPLACE INTO event_eventtypes VALUES (19,'LOG');
 REPLACE INTO event_eventtypes VALUES (20,'RUN');
+REPLACE INTO event_eventtypes VALUES (21,'SNAPSHOT');
 
 --
 -- Dumping data for table `event_objecttypes`
@@ -706,6 +707,13 @@ REPLACE INTO table_regex VALUES ('virt_node_startloc','loc_y','float','redirect'
 REPLACE INTO table_regex VALUES ('virt_node_startloc','orientation','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','parent','text','regex','^[-\\w\\(\\)]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('experiments','delay_capacity','int','redirect','default:tinyint',1,10,NULL);
+REPLACE INTO table_regex VALUES ('virt_user_environment','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_user_environment','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_user_environment','name','text','redirect','^[a-zA-Z][-\\w]+$',0,255,NULL);
+REPLACE INTO table_regex VALUES ('virt_user_environment','value','text','redirect','default:text',1,512,NULL);
+REPLACE INTO table_regex VALUES ('virt_programs','dir','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_programs','timeout','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_programs','expected_exit_code','int','redirect','default:tinyint',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
