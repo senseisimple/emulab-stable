@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 use Getopt::Std;
 use POSIX 'setsid'; # For &daemonize
 use Sys::Syslog;
@@ -6,6 +6,12 @@ use Sys::Syslog;
 # Configure variables
 my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Turn off line buffering on output
@@ -28,6 +34,16 @@ if (@ARGV != 1) {
 	exit &usage();
 }
 $imageid = shift @ARGV;
+
+#
+# Untaint the argument.
+#
+if ($imageid =~ /^([-\@\w\+]+)$/) {
+	$imageid = $1;
+} else {
+	die("Invalid image '$imageid' contains illegal characters.\n");
+}
+
 
 # Grab the filename to give to frisbee
 my $filename = &get_filename($imageid);
@@ -68,6 +84,13 @@ if (!$address) {
 # Run in the background
 if (TBBackGround($LOGFILE)) {
     exit(0);
+}
+
+#
+# Drop root permissions, if we have them
+#
+if ($EUID == 0) {
+	$EUID = $UID;
 }
 
 # Set up a signal handler that will clean up in case we get killed

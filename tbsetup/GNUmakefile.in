@@ -78,6 +78,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/mkacct
 	chown root $(INSTALL_SBINDIR)/mkgroup
 	chmod u+s $(INSTALL_SBINDIR)/mkgroup
+	chown root $(INSTALL_SBINDIR)/frisbeelauncher
+	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
 	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chown root $(INSTALL_SBINDIR)/named_setup
