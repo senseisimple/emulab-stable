@@ -10,7 +10,7 @@
 #  ir exists <path> => 1 | 0
 #  ir type <path> => file | dir
 #
-# <path> is a / seperated path (ex. /topology/nodes). will get you
+# <path> is a / seperated path (ex. /topology/nodes). / will get you
 # toplevel.
 #
 # XXX: This removes all comments.
