@@ -1,0 +1,184 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# usage: gentopofile <pid> <eid>
+#
+# This little program generates a topology file that is given to the physical
+# nodes in an experiment, so that they may generates the /etc/hosts files and
+# their routes. We used to do this centrally, but that solution does not scale
+# at all to 1000s of nodes. 
+#
+sub usage()
+{
+    print("Usage: gentopofile [-d] [-n] <pid> <eid>\n".
+	  "       Use -n to print to stdout, but leave the file alone.\n".
+	  "       Use -d to turn on debugging output.\n");
+    exit(-1);
+}
+my $optlist  = "dn";
+my $debug    = 0;
+my $impotent = 0;
+my $toponame = "topomap";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+# The output stream.
+my $OUT;
+
+if ($impotent) {
+    $OUT = *STDOUT;
+}
+else {
+    open(MAP, "> $toponame") or
+	die("Could not create $toponame: $!\n");
+
+    $OUT = *MAP;
+}
+
+my %nodes = ();
+my %ips   = ();
+my %lans  = ();
+
+#
+# Grab the node table and save the ips for each node:port. We are going to use
+# this info to convert the DB representation of:
+#
+# nodeA, 0:1.1.1.1 1:2.2.2.2 2:3.3.3.3
+# to
+# nodeA, lan0:1.1.1.1 lan1:2.2.2.2 lan2:3.3.3.3
+#
+# Since the port numbers are totally pointless outside of assign_wrapper.
+#
+my $query_result =
+    DBQueryFatal("select v.vname,v.ips from virt_nodes as v " .
+		 "where v.pid='$pid' and v.eid='$eid' " .
+		 "      order by v.vname");
+
+while (my ($vname,$ips) = $query_result->fetchrow_array()) {
+    $nodes{$vname} = {};
+    
+    foreach my $ipinfo (split(" ", $ips)) {
+	my ($port,$ip) = split(":", $ipinfo);
+	
+	$ips{"$vname:$port"} = $ip;
+    }
+}
+
+#
+# Grab the lans table. We are going to spit out one entry per lan, but
+# we need to convert port:ip above to lan:ip.
+# 
+$query_result =
+    DBQueryFatal("select vname,member,mask,cost from virt_lans as v ".
+		 "where v.pid='$pid' and v.eid='$eid' ");
+
+while (my ($vname,$member,$mask,$cost) = $query_result->fetchrow_array) {
+    # One entry per lan.
+    if (! defined($lans{$vname})) {
+	$lans{$vname} = {};
+	$lans{$vname}->{"mask"} = $mask;
+	$lans{$vname}->{"cost"} = $cost;
+    }
+    # Store lan:ip into the portlist for the node.
+    my ($node,$port) = split(":", $member);
+    my $ip = $ips{$member};
+    $nodes{$node}->{$port} = "$vname:$ip";
+}
+
+#
+# First spit out the nodes.
+#
+# ALWAYS print this header; rather then a version number, it serves
+# to describe the format of the data that follows. 
+#
+print $OUT "# nodes: vname,links\n";
+
+foreach my $node (keys(%nodes)) {
+    print $OUT "$node,";
+    print $OUT join(" ", values(%{ $nodes{$node} }));
+    print $OUT "\n";
+}
+
+#
+# Then spit out the lans. As above, ALWAYS print the header.
+#
+print $OUT "# lans: vname,mask,cost\n";
+
+foreach my $lan (keys(%lans)) {
+    my $cost = $lans{$lan}->{"cost"};
+    my $mask = $lans{$lan}->{"mask"};
+    print $OUT "$lan,$mask,$cost\n";
+}
+
+if (! $impotent) {
+    close(MAP);
+
+    #
+    # Create a compressed copy of the file. The experiment nodes will look
+    # for this first, so as to reduce the amount of data served up via NFS.
+    #
+    system("cat $toponame | gzip > ${toponame}.gz");
+}
+exit(0);
