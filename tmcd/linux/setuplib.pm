@@ -92,7 +92,7 @@ sub check_status ()
     else {
 	die("Error getting reservation status\n");
     }
-    return 1;
+    return ($project, $eid, $vname);
 }
 
 #

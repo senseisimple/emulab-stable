@@ -446,15 +446,18 @@ NFS. This is either the project's <tt>/proj</tt> directory, or a
 project member's home directory in <tt>/users</tt>.
 
 <p>
-
 The exit value of the startup command is reported back to the Web
 Interface, and is made available to you via the "Experiment
 Information" link. There is a listing for all of the nodes in the
 experiment, and the exit value is recorded in this listing. The
 special symbol <tt>none</tt> indicates that the node is still running
-the startup command. The startup command is especially useful when
-combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
+the startup command. A log file containing the output of the startup
+command is created in the project's <tt>logs</tt> directory
+(<tt>/proj/pid/logs</tt>).
 
+<p>
+The startup command is especially useful when
+combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
 
 <p>
 <li> <a NAME="ReadyBits"></a>
@@ -572,7 +575,9 @@ sudo /usr/local/bin/create-delta /proj/testbed/foo.delta	</code></pre>
 The argument to the <tt>create-delta</tt> command is a complete
 pathname, which <b>must</b> reside someplace in your /proj directory
 (a subdirectory is fine).  You cannot write the delta file to any
-other filesystem. It should be noted that a delta created on one OS
+other filesystem. This restriction is enforced so that diskspace (and
+resources in general) can be accounted for on a per-project basis.
+It should be noted that a delta created on one OS
 cannot be installed on another. In other words, a delta created on a
 FreeBSD machine can only be installed on a FreeBSD machine. If you
 need the same software installed on a Linux machine as well, you will

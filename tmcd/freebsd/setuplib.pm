@@ -45,7 +45,11 @@ my $USERDIR     = "/users";
 my $PROJMOUNTCMD= "/sbin/mount fs.emulab.net:/q/$PROJDIR/%s $PROJDIR/%s";
 my $USERMOUNTCMD= "/sbin/mount fs.emulab.net:$USERDIR/%s $USERDIR/%s";
 my $HOSTNAME    = "%s\t%s-%s %s\n";
-my $kernel      = "/kernel.100HZ";
+my $KERNEL100   = "/kernel.100HZ";
+my $KERNEL1000  = "/kernel.1000HZ";
+my $KERNEL10000 = "/kernel.10000HZ";
+my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000); 
+my $kernel      = $KERNEL100;
 
 #
 # This is a debugging thing for my home network.
@@ -94,7 +98,7 @@ sub check_status ()
     else {
 	die("Error getting reservation status\n");
     }
-    return 1;
+    return ($project, $eid, $vname);
 }
 
 #
@@ -196,6 +200,7 @@ sub dohostnames ()
 sub dodelays ()
 {
     my @delays;
+    my $checkreplace;
     
     print STDOUT "Checking Testbed delay configuration ... \n";
 
@@ -281,41 +286,50 @@ sub dodelays ()
 	# we needed to know the minimum delay. Eventually we will boot the
 	# correct kernel to start with via PXE. 
 	#
-	if ($mindelay >= 50) {
-	    $kernel = "/kernel.100HZ";
-	}
-	elsif ($mindelay >= 3) {
-	    $kernel = "/kernel.1000HZ";
-	}
-	else {
-	    $kernel = "/kernel.10000HZ";
+	$kernel = $KERNEL1000;
+	$checkreplace = 1;
+    }
+    else {
+	#
+	# Make sure we are running the correct non delay kernel. This
+	# is really only necessary in the absence of disk reloading.
+	# Further, we don't want to replace a user supplied kernel.
+	#
+	$kernel = $KERNEL100;
+	$checkreplace = 0;
+	foreach $kern (@KERNELS) {
+	    if (system("cmp -s /kernel $kern") == 0) {
+		$checkreplace = 1;
+	    }
 	}
     }
 
-    #
-    # Make sure we are running the correct kernel
-    #
     print STDOUT "Checking kernel configuration ... \n";
-    if (-e $kernel) {
-	if (system("cmp -s /kernel $kernel") != 0) {
-	    if (system("cp -f /kernel /kernel.save")) {
-		print STDOUT
-		    "Could not backup /kernel! Aborting kernel change\n";
-	    }
-	    else {
-		if (system("cp -f $kernel /kernel")) {
-		    print STDOUT "Could not cp $kernel to /kernel! ".
-			"Aborting kernel change\n";
+    if ($checkreplace) {
+	#
+	# Make sure we are running the correct kernel. 
+	#
+	if (-e $kernel) {
+	    if (system("cmp -s /kernel $kernel") != 0) {
+		if (system("cp -f /kernel /kernel.save")) {
+		    print STDOUT
+			"Could not backup /kernel! Aborting kernel change\n";
 		}
 		else {
-		    system("sync");
-		    system("reboot");
+		    if (system("cp -f $kernel /kernel")) {
+			print STDOUT "Could not cp $kernel to /kernel! ".
+			    "Aborting kernel change\n";
+		    }
+		    else {
+			system("sync");
+			system("reboot");
+		    }
 		}
 	    }
 	}
-    }
-    else {
-	print STDOUT "Kernel $kernel does not exist!\n";
+	else {
+	    print STDOUT "Kernel $kernel does not exist!\n";
+	}
     }
 
     return 0;

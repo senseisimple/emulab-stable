@@ -118,6 +118,16 @@ if (! chown($uid, $gid, "$PROJROOT/$pid/images")) {
     die("Could not chown $PROJROOT/$pid/images to $uid/$gid: $!\n");
 }
 
+if (! mkdir("$PROJROOT/$pid/logs", 0770)) {
+    die("Could not make directory $PROJROOT/$pid/logs: $!\n");
+}
+if (! chmod(0770, "$PROJROOT/$pid/logs")) {
+    die("Could not chmod directory $PROJROOT/$pid/logs: $!\n");
+}
+if (! chown($uid, $gid, "$PROJROOT/$pid/logs")) {
+    die("Could not chown $PROJROOT/$pid/logs to $uid/$gid: $!\n");
+}
+
 #
 # Create a tftp directory for oskit kernels.
 # 

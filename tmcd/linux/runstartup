@@ -5,15 +5,29 @@ use English;
 # We are run out of the at daemon as root.
 #
 my $TMCC	 = "/etc/rc.d/testbed/tmcc";
-my $TMNICKNAME   = "/etc/rc.d/testbed/nickname";
 my $TMSTARTUPCMD = "/etc/rc.d/testbed/startupcmd";
-#$TMRUNCMD = "/tmp/startupcmd";
+my $logname;
+
+#
+# Load the testbed library.
+#
+push(@INC, "/etc/rc.d/testbed");
+require setuplib;
 
 #
 # Untaint path
 #
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Get the config parameters so we can open up a log file in the proper
+# location. See below.
+#
+my ($pid, $eid, $vname) = check_status();
+if (! defined($pid)) {
+    fatal("Could not determine pid/eid");
+}
 
 #
 # Disconnect from the caller (at daemon).
@@ -44,8 +58,11 @@ while (<CMD>) {
 if (!defined($runcmd) || !defined($login)) {
     fatal("$TMSTARTUPCMD not in proper format!");
 }
-(undef,undef,$uid,$gid,undef,undef,undef,$homedir) = getpwnam($login) or
+(undef,undef,$uid,$gid,undef,undef,undef,undef) = getpwnam($login) or
     fatal("Could not determine UID for $login");
+
+chown($uid, $gid, $logname) or
+    fatal("Could not chown $logname to $uid/$gid: $!\n");
 
 #
 # Fork a child so that we can run the command as the user and wait for it.
@@ -57,7 +74,7 @@ if ($mypid) {
     #
     waitpid($mypid, 0);
 
-    $stat = $?;
+    $stat = $? >> 8;
 }
 else {
     #
@@ -76,11 +93,6 @@ print STDOUT "$runcmd returned $stat\n";
 # Use the TMCC to tell the TMCD what the exit status was.
 #
 system("$TMCC startstatus $stat");
-
-#
-# Put the log file in the callers home dir! Hmm, what about name clashes?
-#
-system("/bin/cp", "$logname", "$homedir");
 
 exit(0);
 
@@ -113,21 +125,6 @@ sub background()
     }
 
     #
-    # Open up the nickname file so we can generate a meaningfull filename.
-    #
-    $nickname = `hostname -s`;
-    if (open(NICK, "$TMNICKNAME")) {
-	$nickname = <NICK>;
-	close(NICK);
-    }
-    # Taint check (strips newline too)
-    if ($nickname =~ /^([-\@\w.]+)$/) {
-	$nickname = $1;
-    } else {
-	die "Bad data in $nickname";
-    }
-
-    #
     # We have to disconnect from the caller by redirecting both STDIN and
     # STDOUT away from the pipe. Otherwise the caller (the web server) will
     # continue to wait even though the parent has exited. 
@@ -138,7 +135,10 @@ sub background()
     #
     # Create a temporary name for a log file and untaint it.
     #
-    $logname = `mktemp /var/tmp/runlog-$nickname.XXXXXX`;
+    $logname = `mktemp /proj/$pid/logs/runlog-$eid.$vname.XXXXXX`;
+    if ($?) {
+	die("mktemp failed!");
+    }
 
     # Note different taint check (allow /).
     if ($logname =~ /^([-\@\w.\/]+)$/) {
@@ -147,8 +147,10 @@ sub background()
 	die "Bad data in $logname";
     }
 
+    chmod(0644, $logname);
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
 
     return 0;
 }
