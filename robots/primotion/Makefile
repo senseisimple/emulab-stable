@@ -3,7 +3,7 @@
 # Dan Flickinger
 #
 # 2004/10/04
-# 2004/12/08
+# 2004/12/15
 
 
 HOSTPATH=/z/garcia/brainstem
@@ -101,7 +101,7 @@ install: gorobot mtp_send
 		echo -n "Checking $$host: "; \
 		if ping -W 1 -c 1 $$host > /dev/null 2>&1; then \
 			echo "up"; \
-			scp -o "Protocol 1" $^ root@$$host:apps/; \
+			scp -o "Protocol 2" $^ root@$$host:apps/; \
 		else \
 			echo "down"; \
 		fi \
