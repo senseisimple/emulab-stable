@@ -250,6 +250,10 @@ PlayFrisbee(void)
 		 * spin.
 		 */
 		if (! WorkQueueDequeue(&chunk, &startblock, &blockcount)) {
+			/* If zero, never exit */
+			if (! SERVER_INACTIVE_SECONDS)
+				continue;
+			
 			if (idlelastloop) {
 				struct timeval  estamp;
 
