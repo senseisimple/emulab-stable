@@ -1,3 +1,10 @@
+# -*- tcl -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # This is a nop tb_compact.tcl file that should be used when running scripts
 # under ns.
 
@@ -27,4 +34,33 @@ proc tb-make-hard-vtype {name types} {}
 proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {}
 proc tb-set-link-simplex-params {link src delay bw loss} {}
 proc tb-set-uselatestwadata {onoff} {}
+proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
+proc tb-set-uselinkdelays {onoff} {}
+proc tb-set-forcelinkdelays {onoff} {}
+
+Class Program
+
+Program instproc init {args} {
+}
+
+Program instproc unknown {m args} {
+}
+
+Class NSENode -superclass Node
+
+NSENode instproc make-simulated {args} {
+    uplevel 1 eval $args
+}
+
+# We are just syntax checking the NS file
+Simulator instproc run {args} {
+}
+
+Simulator instproc nsenode {args} {
+    return [new NSENode]
+}
+
+Simulator instproc make-simulated {args} {
+    uplevel 1 eval $args
+}
