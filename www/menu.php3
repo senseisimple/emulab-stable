@@ -62,7 +62,7 @@ function WRITESIDEBAR() {
     echo "<table cellspacing=2 cellpadding=2 border=0 width=150>\n";
 
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
-    WRITESIDEBARBUTTON("News (<img src=new.gif> Apr 19)", $TBDOCBASE,
+    WRITESIDEBARBUTTON("News (<img src=/new.gif> Apr 19)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
