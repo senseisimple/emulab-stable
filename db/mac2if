@@ -9,12 +9,15 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 my @list = "";
 my $n=0;
 foreach my $mac ( @ARGV ) { 
-  if ( $mac =~ /^tb(\w+\d+):(\d+)$/ ) {
-    my $node="tb".$1;
+  if ( $mac =~ /^(sh\d+)(-\d)?(:\d)?$/ ) {
+    my $node = $1. (defined $2 ? $2 : "-" );
+    $list[$n] .= "(node_id like '$node%')";
+  } elsif ( $mac =~ /^(\w+\d+):(\d+)$/ ) {
+    my $node=$1;
     my $if=$2;
     $list[$n] .= "(node_id='$node' and card='$if')";
-  } elsif ( $mac =~ /^tb(\w+\d+)$/ ) {
-    my $node="tb".$1;
+  } elsif ( $mac =~ /^(\w+\d+)$/ ) {
+    my $node=$1;
     $list[$n] .= "(node_id='$node')";
   } else {
     $mac =~ s/^(\d):/0$1:/;
@@ -26,6 +29,8 @@ foreach my $mac ( @ARGV ) {
 }
 
 my $cond = join(" or ",@list);
+
+#print "Using conditions '$cond'\n";
 
 my $sth = $dbh->
     query("select * from interfaces where $cond");
