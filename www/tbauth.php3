@@ -41,6 +41,7 @@ define("CHECKLOGIN_TRUSTED",		0x08000);
 define("CHECKLOGIN_CVSWEB",		0x10000);
 define("CHECKLOGIN_ADMINOFF",		0x20000);
 define("CHECKLOGIN_WEBONLY",		0x40000);
+define("CHECKLOGIN_PLABUSER",		0x80000);
 
 #
 # Constants for tracking possible login attacks.
@@ -148,7 +149,8 @@ function CHECKLOGIN($uid) {
     # 
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
-		     "       status,admin,cvsweb,g.trust,adminoff,webonly " .
+		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
+		     "       plab_user " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -179,6 +181,7 @@ function CHECKLOGIN($uid) {
 	}
 	$adminoff = $row[7];
 	$webonly  = $row[8];
+	$plab     = $row[9];
     }
 
     #
@@ -288,6 +291,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
     if ($cvsweb)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_CVSWEB;
+    if ($plab)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_PLABUSER;
     if (strcmp($status, TBDB_USERSTATUS_NEWUSER) == 0)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_NEWUSER;
     if (strcmp($status, TBDB_USERSTATUS_UNAPPROVED) == 0)
@@ -415,28 +420,37 @@ function ISADMINISTRATOR() {
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
 }
 
-# Is this user a planetlab user?
-# TODO: I'd like to make this much faster since it will happen often. But,
-# can't roll it into $CHECKLOGIN_STATUS, because we need to be able to tell
-# even when they are logged out (ie. we only have their uid cookie)
+# Is this user a planetlab user? Returns 1 if they are, 0 if not.
 function ISPLABUSER() {
     global $CHECKLOGIN_STATUS;
 
-    $uid = GETUID();
-    if (!$uid) {
-	return 0;
-    }
-    $query_result =
-	DBQueryFatal("SELECT plab_user FROM users WHERE uid='$uid'");
-    if (!mysql_num_rows($query_result)) {
-	return 0;
-    }
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	#
+	# For users who are not logged in, we need to check the database
+	#
+	$uid = GETUID();
+	if (!$uid) {
+	    return 0;
+	}
+	$query_result =
+	    DBQueryFatal("SELECT plab_user FROM users WHERE uid='$uid'");
+	if (!mysql_num_rows($query_result)) {
+	    return 0;
+	}
 
-    $row = mysql_fetch_row($query_result);
-    if ($row[0]) {
-	return 1;
+	$row = mysql_fetch_row($query_result);
+	if ($row[0]) {
+	    return 1;
+	} else {
+	    return 0;
+	}
     } else {
-	return 0;
+	#
+	# For logged-in users, we've recorded it in the the login status
+	#
+	return (($CHECKLOGIN_STATUS &
+		 (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER)) ==
+		(CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER));
     }
 }
 
