@@ -90,7 +90,7 @@ while (my ($uid,$admin) = $query_result->fetchrow_array()) {
     if ($admin) {
 	# Add admin users to group wheel for convenience.
 	DBQueryFatal("insert into unixgroup_membership ".
-		     "values ('$uid','wheel'");
+		     "values ('$uid','wheel')");
     }
     mysystem("$TB/sbin/setgroups $uid");
     if ($admin) {
