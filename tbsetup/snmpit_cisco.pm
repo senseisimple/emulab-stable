@@ -983,7 +983,7 @@ sub removeVlan($@) {
 	#
 	my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan is index
 
-	print "  Removing VLAN #$vlan_number ... ";
+	print "  Removing VLAN #$vlan_number on $self->{NAME} ... ";
 	my $RetVal = $self->{SESS}->set([$VlanRowStatus,"1.$vlan_number",
 					 "destroy","INTEGER"]);
 	if ($RetVal) {
