@@ -17,7 +17,7 @@ PAGEHEADER("Emulab Software Distributions");
 
 <ul>
 <li> <img src="/new.gif" alt="&lt;NEW&gt;">
-     <a href="/downloads/frisbee-20030614.tar.gz">Frisbee Server and
+     <a href="/downloads/frisbee-20030618.tar.gz">Frisbee Server and
      Client</a>,
      as described in our paper <cite><a href="pubs.php3">Fast, Scalable Disk
      Imaging with Frisbee</a></cite>, to appear at
@@ -25,7 +25,10 @@ PAGEHEADER("Emulab Software Distributions");
      Please take a look at the
      <a href="/downloads/frisbee-README.txt">README</a> file for a better
      idea of how we use Frisbee in the Testbed, and how to setup a
-     simple Frisbee demonstration on your network. 
+     simple Frisbee demonstration on your network.   Use this
+     <a href="/downloads/frisbee-fs-20030618.iso">ISO image</a>
+     to create a bootable FreeBSD 4.6 system from which to run the
+     image creation and installation tools.
 <ul>
 
 <?php
