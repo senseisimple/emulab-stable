@@ -257,21 +257,19 @@ function SPITFORM($formfields, $errors)
         #
 	# Planetlab bit
 	#
-	if ($isadmin) {
-	    if ($formfields['plab_user']) {
-		$checked = "checked";
-	    } else {
-		$checked = "";
-	    }
-
-	    echo "<tr>
-                      <td colspan=2>PlanetLab User:</td>
-                      <td class=left>
-                         <input type='checkbox' name=\"formfields[plab_user]\" value='1'
-			     $checked>
-                      </td>
-                  </tr>\n";
+	if ($formfields['plab_user']) {
+	    $checked = "checked";
+	} else {
+	    $checked = "";
 	}
+
+	echo "<tr>
+		  <td colspan=2>Use simplified PlanetLab view:</td>
+		  <td class=left>
+		     <input type='checkbox' name=\"formfields[plab_user]\" value='1'
+			 $checked>
+		  </td>
+	      </tr>\n";
 
         #
 	# Notes
@@ -605,17 +603,12 @@ if ($isadmin &&
 }
 
 #
-# Only admins can change the plab_user bit.
+# Change the plab bit to a simple 1 or 0
 #
-if ($isadmin && ($defaults[plab_user] != $formfields[plab_user])) {
-    if ($formfields[plab_user]) {
-	$new_bit = 1;
-    } else {
-	$new_bit = 0;
-    }
-
-    DBQueryFatal("UPDATE users SET plab_user=$new_bit ".
-		 "WHERE uid='$target_uid'");
+if ($formfields[plab_user]) {
+    $plab_bit = 1;
+} else {
+    $plab_bit = 0;
 }
 
 #
@@ -635,6 +628,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     strcmp($defaults[usr_title], $formfields[usr_title]) ||
     strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
     strcmp($defaults[usr_shell], $formfields[usr_shell]) ||
+    strcmp($defaults[plab_user], $formfields[plab_user]) ||
     # Check this too, since we want to call out if the email addr changed.
     strcmp($defaults[usr_email], $formfields[usr_email])) {
 
@@ -651,6 +645,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 		 "usr_title=\"$usr_title\",     ".
 		 "usr_affil=\"$usr_affil\",     ".
 		 "usr_shell=\"$usr_shell\",     ".
+		 "plab_user=\"$plab_bit\",	".
 		 "usr_modified=now()            ".
 		 "WHERE uid=\"$target_uid\"");
 
