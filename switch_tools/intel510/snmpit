@@ -27,6 +27,7 @@ sub myMain {
     my $dup = "";#Duplex (half/full)
     my $spd = 0; #Speed (10/100)
     my $s = 0;   #Show port configs
+    my $g = 0;   #Get Statistics
     my $f = "";  #AutoVLAN filename
     my $l = 0;   #List all VLANs on switch
     my $m = "";  #Create VLAN - name
@@ -47,7 +48,7 @@ sub myMain {
     my %Ports=();
 
     &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
-	       \@r,\$u,\$b,\$c,\$v,
+	       \@r,\$u,\$b,\$c,\$v,\$g,
 	       \$on,\$off,\$cyc,\$all,\@outlets,\%Interfaces,\%Ports);
     
     use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
@@ -113,6 +114,10 @@ sub myMain {
     #Show always goes after changes, so that they are reflected.
     if ($s) {
 	&ShowPorts(\$sess,\%Ports,\%Interfaces,\$i,\$v);
+    }
+    
+    if ($g) {
+	&GetStats(\$sess,\%Ports,\$i,\$v);
     }
     
 #
@@ -185,7 +190,7 @@ sub myMain {
 # SUB PARSEARGS----------------------
 #
 sub ParseArgs {
-    local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,
+    local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,*g,
 	  *on,*off,*cyc,*all,*outlets,*Interfaces,*Ports) = @_;
     my $help=0; 
     if (@main::CMDS < 1) {$help = 1; }
@@ -222,6 +227,7 @@ sub ParseArgs {
 	elsif (/^-d(.*)/) {$d = 1;}
 	elsif (/^-e(.*)/) {$e = 1;}
 	elsif (/^-s(.*)/) {$s = 1;}
+	elsif (/^-g(.*)/) {$g = 1;}
 	elsif (/^-l(.*)/) {$l = 1;}
 	elsif (/^-u(.*)/) {$u = 1;}
 	elsif (/^-f(.*)/) {$f = ($1 ? $1 : shift(@CMDS));}
@@ -255,7 +261,7 @@ sub ParseArgs {
 	    " snmpit [-h] [-v] -i<ip>\n",
 	    "\t[-u] [-l] [-m<vlan name>] [-vlan<MAC Addr.>]\n",
 	    "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
-	    "\t[+b|-b] [+c|-c] [-s] [-p<port> <port> <x>..<y> ... ]\n",
+	    "\t[+b|-b] [+c|-c] [-g] [-s] [-p<port> <port> <x>..<y> ... ]\n",
 	    "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>]\n";
 
 # Hidden Power control functionality
@@ -279,6 +285,7 @@ sub ParseArgs {
 	    "\nPort Control:\n",
 	    "  +b/-b Blocking mode (now ",($b?"on":"off"),")\n",
 	    "  +c/-c Confirm Changes (now ",($c?"on":"off"),")\n",
+	    "  -g    Get Statistics\n",
 	    "  -s    Show Port Configurations\n",
 	    "  -p    List of port numbers and ranges\n",
 	    "  -d    Disable port(s)\n",
@@ -298,13 +305,14 @@ sub ParseArgs {
     
     #Unused letters of the alphabet:
     #
-    # g, j, k, n, q, t, w, x, y, z
+    # j, k, n, q, t, w, x, y, z
     #
     #If help only, end here...
     die("\b\n") if ($help);
     #Now die on any combinations that don't make sense...
     die("What shall I do?\n")
-	if (!($d||$e||$a||$spd||$dup||$s||@vlan||$f||@r||$l||$on||$off||$cyc));
+	if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
+	      ||$on||$off||$cyc));
     if (@vlan||$f||@r||$l) { $i = "Gamma"; }
     if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
     if ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
@@ -314,7 +322,7 @@ sub ParseArgs {
 	"Alpha/155.99.214.170\n Beta/155.99.214.171\n",
 	"Gamma/155.99.214.172\n Delta/155.99.214.173\n") 
 	if ( (!(($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/))) && 
-	     ($d||$e||$a||$spd||$dup||$s||@vlan||$f||@r||$l));
+	     ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
     die("$i is not a power controller.\n") 
 	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/)) && 
 	     ($on||$off||$cyc) );
@@ -334,7 +342,7 @@ sub ParseArgs {
 	if (!($spd=~/^10$|^100$|^0$/));
     if ($spd eq "10" ) { $spd="speed10Mbit" ;}
     if ($spd eq "100") { $spd="speed100Mbit";}
-    if ($s || @vlan || $f || @r || $l) {
+    if ($s || $g || @vlan || $f || @r || $l) {
 	&ReadTranslationTable(\%Interfaces,\%Ports);
     }
     $n=0;
@@ -467,6 +475,85 @@ sub ShowPorts {
 	print $auto{$id},"\t",$speed{$id},"\t";
 	if (length ($speed{$id}) < 8 ) { print "\t"; }
 	print $duplex{$id},"\n";
+    }
+}
+
+#
+# SUB GetStats ----------------------
+#
+
+sub GetStats {
+    local(*sess,*Ports,*i,*v) = @_;
+    my $ifTable = ["ifInOctets",0];
+    my %inOctets=();
+    my %inUcast=();
+    my %inNUcast=();
+    my %inDiscard=();
+    my %inErr=();
+    my %inUnkProt=();
+    my %outOctets=();
+    my %outUcast=();
+    my %outNUcast=();
+    my %outDiscard=();
+    my %outErr=();
+    my %outQLen=();
+    my @data=();
+    #do one to get the first field...
+    $sess->getnext($ifTable);
+    do {
+	@data = @{$ifTable};
+	#print "$data[0]\t$data[1]\t$data[2]\n";
+	if ($data[1] < 25) {
+	    if    ($data[0]=~/InOctets/)  {$inOctets{$data[1]}  = $data[2];} 
+	    elsif ($data[0]=~/InUcast/)   {$inUcast{$data[1]}   = $data[2];}
+	    elsif ($data[0]=~/InNUcast/)  {$inNUcast{$data[1]}  = $data[2];}
+	    elsif ($data[0]=~/InDiscard/) {$inDiscard{$data[1]} = $data[2];}
+	    elsif ($data[0]=~/InErrors/)  {$inErr{$data[1]}     = $data[2];}
+	    elsif ($data[0]=~/InUnknownP/){$inUnkProt{$data[1]} = $data[2];}
+	    elsif ($data[0]=~/OutOctets/) {$outOctets{$data[1]} = $data[2];}
+	    elsif ($data[0]=~/OutUcast/)  {$outUcast{$data[1]}  = $data[2];}
+	    elsif ($data[0]=~/OutNUcast/) {$outNUcast{$data[1]} = $data[2];}
+	    elsif ($data[0]=~/OutDiscard/){$outDiscard{$data[1]}= $data[2];}
+	    elsif ($data[0]=~/OutErrors/) {$outErr{$data[1]}    = $data[2];}
+	    elsif ($data[0]=~/OutQLen/)   {$outQLen{$data[1]}   = $data[2];}
+	}
+	$sess->getnext($ifTable);
+    } while ( $data[0] =~ /^i[f](In|Out)/) ;
+    my $switch = "";
+    if ($i =~ /155\.99\.214\.170/) { $switch = "Alpha"; }
+    if ($i =~ /155\.99\.214\.171/) { $switch = "Beta"; }
+    if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
+    if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
+    print "Port Statistics, Testbed Switch $switch ($i)\n";
+    print "\t\tIN: Octets\tUcast\tM/Bcast\tDiscard\tErrors\tUnknown Proto.\n";
+    print "Port Interface\tOUT: Octets\tUcast\tM/Bcast\tDiscard\tErrors\tQueue Length\n";
+    print "----------------------------------------------------------------";
+    print "--------------\n";
+    foreach my $port ( sort num keys (%inOctets) ) {
+	my $vlan;
+	my $switchport = join(":",$i,$port);
+	my $ifname = $Ports{$switchport};
+	if (! defined ($ifname) ) { $ifname = "\t"; }
+	if ($port < 10) { print " "; }
+	print " ",$port,"  ";
+	print $ifname,"\t";
+	my $n=0;
+	my $str="";
+	print $str=$inOctets{$port},"\t";
+	if (length($str) < 8) { print "\t"; }
+	print $str=$inUcast{$port},"\t";
+	print $str=$inNUcast{$port},"\t"; 
+	print $str=$inDiscard{$port},"\t";
+	print $str=$inErr{$port},"\t"; 
+	print $str=$inUnkProt{$port},"\t";
+	print "\n\t\t";
+	print $str=$outOctets{$port},"\t"; 
+	if (length($str) < 8) { print "\t"; }
+	print $str=$outUcast{$port},"\t";
+	print $str=$outNUcast{$port},"\t"; 
+	print $str=$outDiscard{$port},"\t";
+	print $str=$outErr{$port},"\t"; 
+	print $str=$outQLen{$port},"\n";
     }
 }
 
