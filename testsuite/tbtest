@@ -31,8 +31,8 @@
 use DBI;
 use POSIX;
 
-die("*** $0:\n".
-    "    Testsuite Disabled. Come edit me if need be.\n");
+#die("*** $0:\n".
+#    "    Testsuite Disabled. Come edit me if need be.\n");
 
 $| = 1;
 
@@ -385,7 +385,7 @@ sub step_init {
     # Setup test database
     prints "Setting up test database.\n";
     prints "  Dumping Current ";
-    tbexec("mysqldump $TBDB","$path/dbdump.txt");
+    tbexec("mysqldump -e -a $TBDB","$path/dbdump.txt");
     # Now add a line to the dumped database that sets flest as an admin
     prints "  Setting up flest admin account ";
     tbexec("echo \"update users set admin=1 where uid='flest';\"".
@@ -396,14 +396,41 @@ sub step_init {
     tbexec("echo \"create database $testdb\" | mysql","createdb.log");
     
     prints "  Filling DB ";
-    tbexec("cat $path/dbdump.txt | mysql $testdb","fill.log");
+    tbexec("cat $path/dbdump.txt | mysql -q -s $testdb","fill.log");
 
 
     $dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
 	prints "ERROR: Could not connect to new DB.\n";
 	doexit(1);
     };
-    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";    
+    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";
+
+    #
+    # Clear our extraneous stuff.
+    # 
+    $sth = $dbh->prepare("SELECT * from testsuite_preentables");
+    $sth->execute;
+    while (($table,$action) = $sth->fetchrow_array) {
+	$_ = $action;
+        SWITCH: {
+	    /^drop$/ && do {
+		prints "    Dropping table $table\n";
+		$dbh->do("drop table $table");
+		last SWITCH;
+	    };
+	    /^clean$/ && do {
+		prints "    Cleaning table $table\n";
+		$dbh->do("delete from $table");
+		last SWITCH;
+	    };
+	    /^prune$/ && do {
+		prints "    Pruning table $table\n";
+		$dbh->do("delete from $table ".
+			 "where pid!='emulab-ops' and pid!='testbed'");
+		last SWITCH;
+	    };
+	}
+    }
 
     if ($type eq "frontend") {
 	# Clear out experiments and set up test experiment.     
@@ -492,7 +519,7 @@ sub step_init {
     $pass++;
     
     prints "  Snapshotting clean state ";
-    tbexec("mysqldump $testdb","clean.txt");
+    tbexec("mysqldump -e -a $testdb","clean.txt");
     prints "END INIT\n";
 }
 
@@ -556,7 +583,7 @@ sub step_test {
 	    $fail++;
 	    doexit(1);
 	}
-	if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
+	if (tbexect("cat $path/clean.txt | mysql -q -s $testdb",TESTLOG)) {
 	    prints "FAIL - Could not populate test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
 	    fail2("$test - Populate test DB");
@@ -595,7 +622,7 @@ sub step_test {
 	    } elsif ($status =~ /^FAIL/) {
 		$fail++;
 		# grab copy of testbed
-		system("mysqldump $testdb > db.txt");
+		system("mysqldump -e -a $testdb > db.txt");
 		if (($? >> 8) != 0) {
 		    prints "ERROR: Could not grab copy of database.\n";
 		    doexit(1);
