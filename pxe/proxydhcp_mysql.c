@@ -10,6 +10,7 @@
 static char dbname[] = TBDBNAME;
 static MYSQL db;
 static int parse_pathspec(char *path, struct in_addr *sip, char **filename);
+static int clear_next_pxeboot(char *node);
 
 #include <stdarg.h>
 void
@@ -39,12 +40,13 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 	MYSQL_RES *res;
 	MYSQL_ROW row;
 	char dbquery[] =
-		"select pxe_boot_path from nodes as n "
+		"select pxe_boot_path, next_pxe_boot_path from nodes as n "
 		"left join interfaces as i on "
 		"i.node_id=n.node_id "
 	        "where i.IP = '%s'";
 
 #define PXEBOOT_PATH		0
+#define NEXT_PXEBOOT_PATH	1
 
 	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
 	if (n > sizeof querybuf) {
@@ -97,7 +99,7 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 
 	ncols = (int)mysql_num_fields(res);
 	switch (ncols) {
-	case 1: /* Should have 1 fields */
+	case 2: /* Should have 2 fields */
 		break;
 	default:
 		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
@@ -111,6 +113,19 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 	/*
 	 * Check next_boot_path.  If set, assume it is a multiboot kernel.
 	 */
+	if (row[NEXT_PXEBOOT_PATH] != 0 && row[NEXT_PXEBOOT_PATH][0] != '\0') {
+		char	*filename;
+
+		if (parse_pathspec(row[NEXT_PXEBOOT_PATH], sip, &filename))
+			goto bad;
+
+		if (strlen(filename) >= bootlen)
+			goto bad;
+		strcpy(bootprog, filename);
+
+		mysql_free_result(res);
+		return 0;
+	}
 	if (row[PXEBOOT_PATH] != 0 && row[PXEBOOT_PATH][0] != '\0') {
 		char	*filename;
 
@@ -124,11 +139,13 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 		mysql_free_result(res);
 		return 0;
 	}
+
  bad:
 	mysql_free_result(res);
 	return 1;
 }
 #undef PXEBOOT_PATH
+#undef NEXT_PXEBOOT_PATH
 
 int
 close_db(void)
