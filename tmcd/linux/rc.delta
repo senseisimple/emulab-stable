@@ -1,0 +1,55 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Load Deltas. 
+# 
+my $reboot      = 0;
+
+#
+# Load the testbed library.
+#
+push(@INC, "/etc/rc.d/testbed");
+require setuplib;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Inform the master that we have rebooted.
+#
+#
+# Inform the master that we have rebooted.
+#
+inform_reboot();
+
+#
+# Check allocation. Exit now if not allocated.
+#
+if (! check_status()) {
+    exit(0);
+}
+
+#
+# Mount the project directory.
+#
+mount_projdir();
+
+#
+# Delta configuration.
+#
+$reboot = install_deltas();
+
+if ($reboot) {
+    system("sync");
+    system("reboot");
+}
+exit 0;
