@@ -3,17 +3,17 @@ set ns [new Simulator]
 source tb_compat.tcl
 
 set maxnodes 3
+set lanstr ""
 
 for {set i 1} {$i <= $maxnodes} {incr i} {
     set node($i) [$ns node]
+    set name node-${i}
+    append lanstr "$name "
     tb-set-node-os $node($i) FBSD-STD
 }
 
-for {set i 1} {$i < $maxnodes} {incr i} {
-	set next $i;
-	incr next;
-	$ns duplex-link $node($i) $node($next) 100Mb 0ms DropTail
-}
+# Put all the nodes in a lan
+set big-lan [$ns make-lan "$lanstr" 100Mb 0ms]
 
 # Go!
 $ns run                                 

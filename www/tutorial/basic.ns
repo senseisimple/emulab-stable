@@ -2,23 +2,21 @@
 set ns [new Simulator]                  
 source tb_compat.tcl
 
-# define the 4 nodes in the topology. 
-set NodeA [$ns node]
-set NodeB [$ns node]
-set NodeC [$ns node]
-set NodeD [$ns node]                    
+set nodeA [$ns node]
+set nodeB [$ns node]
+set nodeC [$ns node]
+set nodeD [$ns node]
 
-# Next define the 3 links between the nodes.
-$ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
-$ns duplex-link $NodeB $NodeC 100Mb  0ms DropTail
-$ns duplex-link $NodeB $NodeD 100Mb  0ms DropTail
+set link0 [$ns duplex-link $nodeB $nodeA 30Mb 50ms DropTail]
+tb-set-link-loss $link0 0.01
+
+set lan0 [$ns make-lan "$nodeD $nodeC $nodeB " 100Mb 0ms]
 
 # Set the OS on a couple.
 tb-set-node-os $NodeA FBSD-STD
 tb-set-node-os $NodeC RHL-STD         
 
-# Set IP address of node B on the port going to node C
-tb-set-ip-interface $NodeB $NodeC 192.168.42.42 
+$ns rtproto Static
 
 # Go!
 $ns run                                 

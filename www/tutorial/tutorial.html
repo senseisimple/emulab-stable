@@ -49,13 +49,15 @@
 </center>
 
 <p>
-This section of the tutorial describes how to run your first Testbed
+This section of the tutorial describes how to run your first Emulab
 experiment. We cover basic NS syntax and various operational issues
 that you will need to know in order conduct experiments to completion.
 Later sections of the tutorial will cover more advanced topics such as
 loading your own RPMs automatically, running programs automatically,
 running batch jobs, creating your own disk images and loading those
-images on your nodes. 
+images on your nodes. For your convenience, there is also a 
+<a href="../buildui/bui.php3">Java GUI</a>
+interface you can use to create NS files for your experiments.
 </p>
 
 <ul>
@@ -75,7 +77,7 @@ images on your nodes.
 <li> <h3>Logging Into the Web Interface</h3>
 
 <p>
-If you already have an account on the Testbed, all you need to do is
+If you already have an account on Emulab or Netbed, all you need to do is
 go to <a href="https://www.emulab.net"> Emulab Home
 Page</a>, enter your login name and your password, and then click on
 the "Login" button. If you don't have an account, click on the "Join
@@ -87,16 +89,18 @@ getting an Emulab account, go to the <b><a href =
 <li> <a NAME="Designing"></a>
      <h3>Designing a Network Topology</h3>
 <p>
-Part of the Testbed's power lies in its ability to assume many different
+Part of Emulab's power lies in its ability to assume many different
 topologies; the description of a such a topology is a necessary part
-of an experiment.
+of an experiment. (Note: You may want to take a look at our 
+<a href="../buildui/bui.php3">Java GUI</a> to build experiments 
+without directly editing NS files.)
 
 <p>
 Emulab uses the "NS" ("Network Simulator") format to describe network
 topologies.  This is substantially the same <a
 href="http://www.scriptics.com/software/tcltk/">Tcl</a>-based format
-used by <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.  Since the
-Testbed offers emulation, rather than simulation, these files are
+used by <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.  Since 
+Emulab offers emulation, rather than simulation, these files are
 interpreted in a somewhat different manner than ns-2.  Therefore, some
 ns-2 functionality may work differently than you expect, or may not be
 implemented at all. Please look for warnings of the form:
@@ -109,7 +113,7 @@ Also, some <a href="docwrapper.php3?docname=nscommands.html">
 testbed-specific syntax</a> has been added, which with the inclusion
 of compatibility module (<a href="tb_compat.tcl">tb_compat.tcl</a>),
 will be ignored by the NS simulator. This
-allows the same NS file to work on both the Testbed and ns-2, most of
+allows the same NS file to work on both Emulab and ns-2, most of
 the time.
 
 <p>
@@ -121,7 +125,7 @@ create a test network which looks like the following:
   <br>
   <center>
     <img src="abcd.png"><br><br>
-    (A is connected to B, B to C, and B to D.)
+    (A is connected to B, and B to C and D with a LAN.)
   </center>
   <br>
 
@@ -147,12 +151,12 @@ Then define the 4 nodes in the topology.
 <p>
 Next define the 3 links between the nodes. NS syntax permits you to
 specify the bandwidth, latency, and queue type. For our example, we
-will define full speed links between B and C,D and a delayed link
+will define a full speed LAN between B, C, and D, and a shaped link
 from node A to B.
 	<code><pre>
-	$ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
-	$ns duplex-link $NodeB $NodeC 100Mb  0ms DropTail
-	$ns duplex-link $NodeB $NodeD 100Mb  0ms DropTail</code></pre>
+	set link0 [$ns duplex-link $nodeB $nodeA 30Mb 50ms DropTail]
+	tb-set-link-loss $link0 0.01
+	set lan0 [$ns make-lan "$nodeD $nodeC $nodeB " 100Mb 0ms]</code></pre>
 
 <p>
 In addition to the standard NS syntax above, a number of
@@ -160,24 +164,26 @@ In addition to the standard NS syntax above, a number of
 extensions</a> have been added that allow you
 to better control your experiment. For example, you may specify what
 Operating System is booted on your nodes. We currently support FreeBSD
-4.5 and Linux RedHat 7.1, as well as
+4.7 and Linux RedHat 7.3, as well as
 <a href="http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
-testbed PCs. By default, Linux RedHat 7.1 is selected.
+Emulab PCs. By default, our most recent Linux image is selected.
 
 	<code><pre>
 	tb-set-node-os $NodeA FBSD-STD
-	tb-set-node-os $NodeC RHL-STD		</code></pre>
+	tb-set-node-os $NodeC RHL-STD</code></pre>
 
 <p>
-You may also control what IP addresses are assigned to the
-experimental interfaces on your nodes. The experiment configuration
-software will select IP addresses for you, but if your experiment
-depends on particular IP addresses, you may specify them at each
-link. The following example sets the IP address of node B on the port
-going to node C:
+In a topology like this, you will likely want to communicate between
+all the nodes, including nodes that aren't directly connected,
+like A and C. In order for that to happen, we must enable
+routing in our experiment, so B can route packets for the other
+nodes. The typical way to do this is with Static routing. (Other
+options are detailed below, in the 
+<a href="http://www.emulab.net/~newbold/www/tutorial/docwrapper.php3?docname=tutorial.html#Routing"
+>Routing section</a>.)
 
 	<code><pre>
-	tb-set-ip-interface $NodeB $NodeC 192.168.42.42	</code></pre>
+	$ns rtproto Static</code></pre>
 
 <p>
 Lastly, all NS files end with an epilogue that instructs the simulator
@@ -190,15 +196,42 @@ to start.
 <p>
 If you would like to try the above example, the completed <a
 href="basic.ns" target=stuff>NS file</a> can be run as an experiment in your
-project. Another example ns script that shows off using the power of
-Tcl to generate topologies is <a href="loop.ns" target=stuff>here</a>.
+project. 
 
+<p>
+Because NS is based on TCL, the full power of the TCL language is
+available for you to use in your NS files, including loops,
+control structures, and even procedures/functions. Here's an
+example of a simple loop: 
+(Download this example: <a href="loop.ns" target=stuff>loop.ns</a>)
+
+	<code><pre>
+	# This is a simple ns script that demonstrates loops.
+	set ns [new Simulator]                  
+	source tb_compat.tcl
+
+	set maxnodes 3
+	set lanstr ""
+
+	for {set i 1} {$i <= $maxnodes} {incr i} {
+	    set node($i) [$ns node]
+	    set name node-${i}
+	    append lanstr "$name "
+	    tb-set-node-os $node($i) FBSD-STD
+	}
+
+	# Put all the nodes in a lan
+	set big-lan [$ns make-lan "$lanstr" 100Mb 0ms]
+
+	# Go!
+	$ns run</pre></code>                            
+     
 <p>
 <li> <a NAME="Beginning"></a>
      <h3>Beginning the Experiment</h3>
 
 <p>
-After logging on to the Testbed Web Interface, choose the "Begin
+After logging on to the Emulab Web Interface, choose the "Begin
 Experiment" option from the menu. First select which project you want
 the experiment to be configured in. Most people will be a member of just
 one project, and will not have a choice. If you are a member of
@@ -214,7 +247,7 @@ describe your network topology. This file will be uploaded through
 your browser when you choose "Submit."
 
 <p>
-After submission, the Testbed interface will begin processing your
+After submission, Emulab will begin processing your
 request. This will likely take several minutes, depending on how large
 your topology is, and what other features (such as delay nodes and
 bandwidth limits) you are using. Assuming all goes well, you will
@@ -227,37 +260,51 @@ For the NS file described above, you would receive a listing that looks
 similar to this:
 
 	<code><pre>
-        Node Info:
-        ID              Type       OSID           
-        --------------- ---------- ---------------
-        NodeA           pc         FBSD-STD       
-        NodeB           pc                        
-        NodeC           pc         RHL-STD        
-        NodeD           pc                        
-
-        Node Mapping:
-        Virtual         Physical        Qualified Name
-        --------------- --------------- --------------------
-        NodeA           pc18            NodeA.myexp.myproj.emulab.net
-        NodeB           pc29            NodeB.myexp.myproj.emulab.net
-        NodeC           pc28            NodeC.myexp.myproj.emulab.net
-        NodeD           pc35            NodeD.myexp.myproj.emulab.net
-        tbsdelay0       pc15            tbsdelay0.myexp.myproj.emulab.net
-
-        Lan/Link Info:
-        ID              Member          IP              Delay     BW (Kbs)  Loss Rate
-        --------------- --------------- --------------- --------- --------- ---------
-        l6              NodeB:eth0      192.168.42.42   0.00      100000    0.000    
-        l5              NodeB:eth2      192.168.1.3     25.00     100000    0.000    
-        l5              NodeA:eth0      192.168.1.2     25.00     100000    0.000    
-        l6              NodeC:eth0      192.168.42.2    0.00      100000    0.000    
-        l7              NodeB:eth1      192.168.2.2     0.00      100000    0.000    
-        l7              NodeD:eth0      192.168.2.3     0.00      100000    0.000    
-
-        Delay Node Info:
-        LinkID          Virtual         Physical        Pipe Numbers   
-        --------------- --------------- --------------- --------------- 
-        l5              tbsdelay0       pc15            100,110		</code></pre>
+	Virtual Node Info:
+	ID              Type         OS              Qualified Name
+	--------------- ------------ --------------- --------------------
+	nodeA           pc			     nodeA.myexp.myproj.emulab.net
+	nodeB           pc                           nodeB.myexp.myproj.emulab.net
+	nodeC           pc                           nodeC.myexp.myproj.emulab.net
+	nodeD           pc                           nodeD.myexp.myproj.emulab.net
+	
+	Physical Node Mapping:
+	ID              Type         OS              Physical    
+	--------------- ------------ --------------- ------------
+	tbsdelay0       pc850        FBSD47-STD      pc61
+	nodeB           pc850        RHL73-STD       pc63
+	nodeC           pc600        RHL73-STD       pc31
+	nodeD           pc600        RHL73-STD       pc34
+	nodeA           pc600        RHL73-STD       pc13
+	
+	Virtual Lan/Link Info:
+	ID              Member          IP              Delay     BW (Kbs)  Loss Rate
+	--------------- --------------- --------------- --------- --------- ---------
+	lan0            nodeC:0         192.168.2.3     0.00      100000    0.000    
+	                                                0.00      100000    0.000    
+	lan0            nodeB:1         192.168.2.4     0.00      100000    0.000    
+	                                                0.00      100000    0.000    
+	lan0            nodeD:0         192.168.2.2     0.00      100000    0.000    
+	                                                0.00      100000    0.000    
+	link0           nodeB:0         192.168.1.2     25.00     30000     0.005    
+	                                                25.00     30000     0.005    
+	link0           nodeA:0         192.168.1.3     25.00     30000     0.005    
+	                                                25.00     30000     0.005    
+	
+	Physical Lan/Link Info:
+	ID              Member          Delay Node   Delay    BW (Kbs) PLR    Pipe     
+	--------------- --------------- ------------ -------- -------- ------ ---------
+	link0           nodeA           tbsdelay0    50.00    30000    0.010  100      
+	link0           nodeB           tbsdelay0    50.00    30000    0.010  110      
+	
+	Route List:
+	Node            Interface       Dest            Nexthop         Type  Cost 
+	--------------- --------------- --------------- --------------- ----- ----
+	nodeA           192.168.1.3     192.168.2.4     192.168.1.2     host  0    
+	nodeA           192.168.1.3     192.168.2.0     192.168.1.2     net   0    
+	nodeC           192.168.2.3     192.168.1.0     192.168.2.4     net   0    
+	nodeD           192.168.2.2     192.168.1.0     192.168.2.4     net   0    
+</code></pre>
 
 <p>
 A few points should be noted:
@@ -269,19 +316,20 @@ A few points should be noted:
      are included so that you can
      <a href="../faq.php3?#HDS-6">modify the delay parameters</a>
      after the experiment has been created. 
-<p>
+
 <li> Delays of less than 2ms (per trip) are too small to be
      accurately modeled at this time, and will be silently ignored.
      A delay of 0ms can be used to indicate that you do not want
      added delay; the two interfaces will be "directly" connected to
      each other. 
-     Also, please see the
-     <a href="docwrapper.php3?docname=nscommands.html#LOSS">
-     <i>Link Loss Commands</i></a> section in the
-     <a href="docwrapper.php3?docname=nscommands.html">
-     Extensions</a> reference.
-     
-<p>
+
+<li> Each link in the "Virtual Lan/Link" section has its delay, etc.,
+     split between two entries. One is for traffic coming into the
+     link from the node, and the other is for traffic leaving the
+     link to the node. In the case of links, the four entries often
+     get optimized to two entries in the "Physical Lan/Link"
+     section.
+
 <li> The names in the "Qualified Name" column refer to the control
      network interfaces for each of your allocated nodes. These names
      are added to the Emulab nameserver map on the fly, and are
@@ -290,11 +338,16 @@ A few points should be noted:
      the names listed above, `myproj' is the name of the project that
      you chose to work in, and `myexp' is the name of the experiment
      that you provided in the "Begin Experiment" page.
-<p>
-<li> Since the IP address for the link from NodeB to NodeC was set in
-     the NS file, the system selected an appropriate IP address for
-     the other end of the link. All of the other links were configured
-     by the system to use 192.168.XXX.XXX subnets.
+
+<li> Please don't use the "Qualified Name" from within nodes in your
+     experiment, since it will contact them over the control network,
+     bypassing the link shaping we configured.
+     (See also these two FAQ entries: 
+<a href="http://www.emulab.net/docwrapper.php3?docname=faq.html#TR-2">
+here</a> and
+<a href="http://www.emulab.net/docwrapper.php3?docname=faq.html#Naming">
+here</a>.)
+
 </ul>
 
 
@@ -304,9 +357,9 @@ A few points should be noted:
 
 <p>
 By the time you receive the email message listing your nodes, the
-Testbed configuration system will have ensured that your nodes are
+Emulab configuration system will have ensured that your nodes are
 fully configured and ready to use. If you have selected one of the
-Testbed-supported operating system images (FreeBSD, Linux, NetBSD),
+Emulab-supported operating system images (FreeBSD or Linux),
 this configuration process includes:
 
 <p>
@@ -338,10 +391,14 @@ password will be the same as your Web Interface login and password.
 The /etc/hosts file on each node will provide a local name mapping for
 the other nodes in your experiments. You should take care to use these
 names (or IP numbers) and <b>not</b> the .emulab.net names listed in
-the node mapping, since the emulab names refer to the control network
+the node mapping, since the Emulab names refer to the control network
 LAN that is shared amongst all nodes in all experiments. It is only
 the experimental interfaces that are entirely private to your
-experiment.
+experiment. (See also these two FAQ entries: 
+<a href="http://www.emulab.net/docwrapper.php3?docname=faq.html#TR-2">
+here</a> and
+<a href="http://www.emulab.net/docwrapper.php3?docname=faq.html#Naming">
+here</a>.)
 
 <p>
 <b> NOTE:</b> The configuration process just described occurs only on
@@ -349,8 +406,8 @@ Emulab constructed operating system images. If you are using an OSKit
 kernel, or your own disk image with your own operating system, you
 will be responsible for all of the configuration. At some point we
 hope to provide tools to assist in the configuration, but for now you
-are on your own.
-
+are on your own. Ask <a href="mailto:testbed-ops@flux.cs.utah.edu">
+Testbed Ops</a> for help or more information.
 
 <p>
 <li> <a NAME="RootAccess"></a>
@@ -377,7 +434,7 @@ running FreeBSD:
 <p>
 This is bound to happen when running experimental software and/or
 experimental operating systems. Fortunately we have an easy way for
-you to power cycle nodes without requiring Testbed Operations to get
+you to power cycle nodes without requiring Tested Operations to get
 involved. If you must power cycle a node, log on to users.emulab.net
 and use the "node_reboot" command:
 
@@ -439,7 +496,7 @@ experiments in all of the projects for which you have the
 authorization to terminate experiments. Select the experiment you want
 to terminate by clicking on the button in the "Terminate" column on
 the right hand side. You will be asked to <b>confirm</b> your choice.
-The Testbed configuration system will then tear down your experiment,
+The Emulab configuration system will then tear down your experiment,
 and send you an email message when the process is complete. At this
 point you are allowed to reuse the experiment name (say, if you wanted
 to create a similar experiment with different parameters).
@@ -475,9 +532,12 @@ experiments, you can use the <em>terminate</em> option, but not the
 If you have any questions or problems, or just want to comment on
 Emulab's operation (maybe you want to suggest an improvement to one of
 the Web pages), feel free to contact us by sending email to
-<a href="../sendemail.php3">Testbed Operations</a>. Also note that much
-of the software is in development, and occasionally things might break
-or not work as you expect. Again, please feel free to contact us.
+<a href="../sendemail.php3">Testbed Operations</a>. Please send all
+correspondence to this address, not to individual members of our
+team. Messages that aren't on this list may not get responses.
+Also note that much of the software is in development, and 
+occasionally things might break or not work as you expect. 
+Again, please feel free to contact us. 
 
 <!-- This ends the Basic Tutorial Section -->
 </ul>
@@ -508,8 +568,8 @@ or not work as you expect. Again, please feel free to contact us.
 
 We have a more <a href="docwrapper.php3?docname=advanced.html">
 advanced example</a> demonstrating the use of RED queues, traffic
-generators, the event system and the integration of network
-simulation (NS)
+generators, the event system, program objects,  and the 
+integration of network simulation (NS/NSE).
 
 </p>
 
@@ -517,7 +577,7 @@ simulation (NS)
      <h3>Installing RPMS automatically</h3>
 <p>
 
-The Testbed NS extension <tt>tb-set-node-rpms</tt> allows you to
+The Emulab NS extension <tt>tb-set-node-rpms</tt> allows you to
 specify a (space separated) list of RPMs to install on each of your
 nodes when it boots:
 
@@ -538,7 +598,7 @@ rpms in your home directory.
      <h3>Installing TAR files automatically</h3>
 <p>
 
-The Testbed NS extension <tt>tb-set-node-tarfiles</tt> allows you to
+The Emulab NS extension <tt>tb-set-node-tarfiles</tt> allows you to
 specify a set of tarfiles to install on each of your nodes when it
 boots. This command is similar to the <a href="#RPMS">tb-set-node-rpms</a>
 above, and is provided for those people who do not want to spend a month
@@ -888,7 +948,7 @@ there are ethernet links on a physical node (currently 4).
      <h3>Batch Mode Introduction</h3>
 
 <p>
-Batch Mode experiments can be created on the Testbed via the "Create
+Batch Mode experiments can be created on Emulab via the "Create
 an Experiment" link in the operations menu to your left. There is a
 checkbox near the bottom of the form that indicates you want to use
 the batch system. There are several important differences between a
@@ -1022,7 +1082,7 @@ descriptor name in your NS file with the
 <a href="docwrapper.php3?docname=nscommands.html#OS">
 <tt>tb-set-node-os</tt></a> directive. When the experiment is
 configured, the proper image will be loaded on each node automatically by
-the Testbed system.
+the Emulab system.
 
 <p>
 A typical approach to creating your own disk image using one of the
