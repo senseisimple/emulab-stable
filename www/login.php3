@@ -12,6 +12,10 @@ $vuid      = $_GET['vuid'];
 # Allow adminmode to be passed along to new login. Handy for letting admins
 # log in when NOLOGINS() is on. 
 $adminmode = $_GET['adminmode'];
+# Display a simpler version of this page
+if (isset($_REQUEST['simple'])) {
+    $simple = $_REQUEST['simple'];
+}
 # Form arguments.
 $login     = $_POST['login'];
 $uid       = $_POST['uid'];
@@ -27,6 +31,17 @@ if (isset($_GET['refer']) && $_GET['refer'] &&
 }
 
 #
+# Turn off some of the decorations and menus for the simple view
+#
+if ($simple) {
+    $view = array('hide_banner' => 1, 'hide_copyright' => 1,
+	'hide_sidebar' => 1);
+} else {
+    $view = array();
+}
+
+
+#
 # Must not be logged in already!
 # 
 if (($known_uid = GETUID()) != FALSE) {
@@ -40,14 +55,14 @@ if (($known_uid = GETUID()) != FALSE) {
 	    return;
 	}
 
-	PAGEHEADER("Login");
+	PAGEHEADER("Login",$view);
 
 	echo "<h3>
               You are still logged in. Please log out first if you want
               to log in as another user!
               </h3>\n";
-	    
-	PAGEFOOTER();
+
+	PAGEFOOTER($view);
 	die("");
     }
 }
@@ -55,11 +70,11 @@ if (($known_uid = GETUID()) != FALSE) {
 #
 # Spit out the form.
 # 
-function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
+function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
-    PAGEHEADER("Login");
+    PAGEHEADER("Login",$view);
 
     if ($failed) {
 	echo "<center>
@@ -103,6 +118,10 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
 	echo "<input type=hidden name=referrer value=$referrer>\n";
     }
 
+    if ($simple) {
+	echo "<input type=hidden name=simple value=$simple>\n";
+    }
+
     echo "</form>
           </table>\n";
 
@@ -117,8 +136,8 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
 if (! isset($login)) {
     # Allow page arg to override what we think is the UID to log in as. 
     SPITFORM((isset($vuid) ? $vuid : $known_uid),
-	     $key, $referrer, 0, $adminmode);
-    PAGEFOOTER();
+	     $key, $referrer, 0, $adminmode, $simple, $view);
+    PAGEFOOTER($view);
     return;
 }
 
@@ -146,8 +165,8 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, $key, $referrer, 1, $adminmode);
-    PAGEFOOTER();
+    SPITFORM($uid, $key, $referrer, 1, $adminmode, $simple, $view);
+    PAGEFOOTER($view);
     return;
 }
 
