@@ -415,7 +415,9 @@ sub SetupOpsNode()
     #
     # Create the ops node.
     #
-    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; perl ops-install -b");
+    my $pkg = "-P $emulabconfig{OPS_PKG_DIR}/$emulabconfig{OPS_PKG}";
+    mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
+	     "   perl ops-install $pkg -b");
 
     #
     # And install the ops side.
@@ -668,8 +670,9 @@ sub SetupBossNode()
     #
     # Create the boss node. This will also install the software.
     #
+    my $pkg = "-P $emulabconfig{BOSS_PKG_DIR}/$emulabconfig{BOSS_PKG}";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
-	     "   perl boss-install -b -w ElabInElab");
+	     "   perl boss-install $pkg -b -w ElabInElab");
 
     #
     # The above script wiped out the outer emulab root ssh pub keys from ops.
