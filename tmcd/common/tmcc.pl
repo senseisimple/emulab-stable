@@ -26,11 +26,12 @@ sub usage()
     print STDERR " -t timeout	Timeout waiting for the controller.\n";
     print STDERR " -x path	Be a proxy using the unix domain socket\n";
     print STDERR " -o path	Specify log file name for -x option\n";
+    print STDERR " -i   	Do not use SSL protocol\n";
     print STDERR " -c   	Clear tmcc cache first (must be root)\n";
     print STDERR " -D   	Force command to use a direct, UDP request\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcD";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDi:";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -85,6 +86,9 @@ sub ParseOptions()
     }
     if (defined($options{"b"})) {
         libtmcc::configtmcc("nocache", 1);
+    }
+    if (defined($options{"i"})) {
+        libtmcc::configtmcc("nossl", 1);
     }
     if (defined($options{"c"})) {
 	if ($UID) {

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -17,6 +17,7 @@ int		tmcd_sslread(int sock, void *buf, size_t nbytes);
 int		tmcd_sslclose(int sock);
 int		tmcd_sslverify_client(char *, char *, char *, int);
 int		isssl;
+int		nousessl;
 
 /*
  * The client sends this tag to indicate that it is SSL capable.

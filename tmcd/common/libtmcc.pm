@@ -75,6 +75,7 @@ my $beproxy     = 0;
       "nocache"         => 0,
       "clrcache"        => 0,
       "noproxy"         => 0,
+      "nossl"           => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -230,6 +231,9 @@ sub optionstring($%)
     }
     if ($opthash{"useudp"}) {
 	$options .= " -u";
+    }
+    if ($opthash{"nossl"}) {
+	$options .= " -i";
     }
     if ($opthash{"beproxy"}) {
 	$options .= " -x " . $opthash{"beproxy"};

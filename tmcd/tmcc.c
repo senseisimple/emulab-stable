@@ -101,6 +101,7 @@ char *usagestr =
  " -t timeout	   Timeout waiting for the controller.\n"
  " -x path	   Be a tmcc proxy, using the named unix domain socket\n"
  " -o logfile      Specify log file name for -x option\n"
+ " -i              Do not use SSL protocol\n"
  "\n";
 
 void
@@ -155,7 +156,7 @@ main(int argc, char **argv)
         WSADATA wsaData;
 #endif
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:x:l:do:i")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -191,6 +192,11 @@ main(int argc, char **argv)
 		case 'o':
 			logfile  = optarg;
 			break;
+		case 'i':
+#ifdef WITHSSL
+			nousessl = 1;
+#endif
+			break;
 		default:
 			usage();
 		}
@@ -215,6 +221,13 @@ main(int argc, char **argv)
 	        fprintf(stderr,"WSAStartup failed\n");
 		exit(1);
 	}
+#endif
+#ifdef WITHSSL
+	/*
+	 * Brutal hack for inner elab; see rc.inelab.
+	 */
+	if (getenv("TMCCNOSSL") != NULL)
+		nousessl = 1;
 #endif
 
 	if (!bossnode) {
@@ -355,6 +368,9 @@ getbossnode(char **bossnode, int *portp)
 	FILE		*fp;
 	char		buf[BUFSIZ], **cp = bossnodedirs, *bp;
 
+	/*
+	 * Brutal hack for inner elab; see rc.inelab.
+	 */
 	if ((bp = getenv("BOSSNAME")) != NULL) {
 		strcpy(buf, bp);
 		
@@ -426,7 +442,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 	char			*bp, buf[MYBUFSIZE];
 	
 #ifdef  WITHSSL
-	if (tmcd_client_sslinit()) {
+	if (!nousessl && tmcd_client_sslinit()) {
 		printf("SSL initialization failed!\n");
 		return -1;
 	}

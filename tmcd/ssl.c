@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -55,6 +55,11 @@
 int	isssl;
 
 /*
+ * Client side; optional use of SSL.
+ */
+int	nousessl;
+
+/*
  * On the client, we search a couple of dirs for the pem file.
  */
 static char	*clientcertdirs[] = {
@@ -83,7 +88,7 @@ int
 tmcd_server_sslinit(void)
 {
 	char	buf[BUFSIZ];
-	
+
 	client = 0;
 	SSL_library_init();
 	SSL_load_error_strings();
@@ -223,6 +228,12 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 		return -1;
 
 	/*
+	 * Client side; optional use of SSL.
+	 */
+	if (nousessl)
+		return newsock;
+
+	/*
 	 * Read the first bit. It indicates whether we need to SSL
 	 * handshake or not. Clear the buffer to avoid confusing
 	 * the last connection with this new connection. 
@@ -289,6 +300,12 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 	
 	if (connect(sock, name, namelen) < 0)
 		return -1;
+
+	/*
+	 * Client side; optional use of SSL.
+	 */
+	if (nousessl)
+		return 0;
 
 	/*
 	 * Send our special tag which says we speak SSL.
@@ -358,6 +375,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 		      cname, buf, inet_ntoa(cnameip));
 		goto badauth;
 	}
+	isssl = 1;
 	return 0;
 
  badauth:
@@ -441,7 +459,7 @@ tmcd_sslwrite(int sock, const void *buf, size_t nbytes)
 	int	cc;
 
 	errno = 0;
-	if (isssl || client)
+	if (isssl)
 		cc = SSL_write(ssl, buf, nbytes);
 	else
 		cc = write(sock, buf, nbytes);
@@ -493,7 +511,7 @@ tmcd_sslread(int sock, void *buf, size_t nbytes)
 	}
 
 	errno = 0;
-	if (isssl || client)
+	if (isssl)
 		cc = SSL_read(ssl, buf, nbytes);
 	else
 		cc = read(sock, buf, nbytes);
