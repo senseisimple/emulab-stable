@@ -210,11 +210,11 @@ foreach my $n (@freed_nodes) {
     # of the default values for its node type.
     #
     my $result =
-	DBQueryFatal("select control_net,osid,node_types.pxe_boot_path, " .
+	DBQueryFatal("select control_net,nt.osid,nt.pxe_boot_path, " .
 		     " nodes.def_boot_osid,nodes.def_boot_path, ".
 		     " node_types.isvirtnode ".
-		     " from node_types " .
-		     "left join nodes on nodes.type=node_types.type " .
+		     " from node_types as nt " .
+		     "left join nodes as n on n.type=nt.type " .
 		     "where node_id='$n'");
     my ($control,$osid,$pxe_boot_path,$def_boot_osid,$def_boot_path,$isvirt) =
 	$result->fetchrow_array();
