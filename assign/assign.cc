@@ -330,111 +330,6 @@ void chopgraph() {
   }
 }
 
-/*
- * Something in the graph has changed!  Better redisplay.
- *
- * Performs the color assignment for whichever switch the
- * node belongs to and shows the inter-switch links as
- * dashed lines.
- */
-
-void display_scc(GraphWin& gw)
-{
-  edge e;
-  node n;
-
-  if (batch_mode) return;
-	
-  if (!refreshed) {
-    if (on_line)
-      chopgraph();
-  }
-	
-  refreshed = 0;
-	
-  /* Now color them according to their partition */
-  // XXX - Need to color them according to switch now!
-  // XXX - Need to add labels based on physical node matching
-  forall_nodes(n, G) {
-    int switchi;
-    if (G[n].posistion) {
-      gw.set_label(n,PG[pnodes[G[n].posistion]].name);
-      if (PG[pnodes[G[n].posistion]].the_switch != NULL) {
-	switchi = switch_index[PG[pnodes[G[n].posistion]].the_switch];
-	switch (switchi) {
-	case 0:
-	  gw.set_color(n, black);
-	  break;
-	case 1:
-	  gw.set_color(n, blue);
-	  break;
-	case 2:
-	  gw.set_color(n, green);
-	  break;
-	case 3:
-	  gw.set_color(n, red);
-	  break;
-	case 4:
-	  gw.set_color(n, yellow);
-	  break;
-	case 5:
-	  gw.set_color(n, violet);
-	  break;
-	case 6:
-	  gw.set_color(n, cyan);
-	  break;
-	case 7:
-	  gw.set_color(n, brown);
-	  break;
-	case 8:
-	  gw.set_color(n, pink);
-	  break;
-	case 9:
-	  gw.set_color(n, orange);
-	  break;
-	case 10:
-	  gw.set_color(n, grey1);
-	  break;
-	case 11:
-	  gw.set_color(n, grey3);
-	  break;
-	}
-      }
-    }
-  }
-  
-  forall_edges(e, G) {
-    node v = G.source(e);
-    node w = G.target(e);
-    node sa,sb;
-    if (G[v].posistion && G[w].posistion) {
-      sa = PG[pnodes[G[v].posistion]].the_switch;
-      sb = PG[pnodes[G[w].posistion]].the_switch;
-      if (sa == sb) {
-	gw.set_style(e, solid_edge);
-      } else {
-	gw.set_style(e, dashed_edge);
-      }
-    }
-  }
-  gw.redraw();
-}
-
-/*
- * Someone clicked on the "reassign" button.
- * Reset and redisplay.
- */
-
-void reassign(GraphWin& gw)
-{
-  bestnodes.init(G, 0);
-  absnodes.init(G, 0);
-  chopgraph();
-  refreshed = 1;
-  display_scc(gw);
-}
-
-// XXX : another code by copy
 void batch()
 {
   bestnodes.init(G, 0);
@@ -442,10 +337,6 @@ void batch()
   chopgraph();
 }
 
-void new_edge_handler(GraphWin& gw, edge)  { display_scc(gw); }
-void del_edge_handler(GraphWin& gw)        { display_scc(gw); }
-void new_node_handler(GraphWin& gw, node)  { display_scc(gw); }
-void del_node_handler(GraphWin& gw)        { display_scc(gw); }
 
 void usage() {
   fprintf(stderr,
@@ -520,7 +411,6 @@ void print_solution()
 
 int main(int argc, char **argv)
 {
-  int h_menu;
   extern char *optarg;
   extern int optind;
   char *topofile = NULL;
@@ -528,7 +418,7 @@ int main(int argc, char **argv)
   int ch;
 
   partition_mechanism = PARTITION_BY_ANNEALING;
-    
+
   while ((ch = getopt(argc, argv, "boas:n:t:h")) != -1)
     switch(ch) {
     case 'h': usage(); exit(0);
@@ -551,23 +441,6 @@ int main(int argc, char **argv)
   srandom(seed);
 
   /*
-   * Set up the LEDA graph window environment.  Whenever
-   * the user does anything to the graph, call the
-   * proper handler.
-   */
-  GraphWin *gw;
-  if (! batch_mode) {
-    gw = new GraphWin(G, "Flux Testbed:  Simulated Annealing");
-    gw->set_init_graph_handler(del_edge_handler);
-    gw->set_new_edge_handler(new_edge_handler);
-    gw->set_del_edge_handler(del_edge_handler);
-    gw->set_new_node_handler(new_node_handler);
-    gw->set_del_node_handler(del_node_handler);
-    
-    gw->set_node_width(24);
-    gw->set_node_height(24);
-  }
-  /*
    * Allow the user to specify a topology in ".top" format.
    */
 
@@ -579,20 +452,6 @@ int main(int argc, char **argv)
       exit(-11);
     }
     parse_top(G, infile);
-    if (! batch_mode) {
-      gw->update_graph();
-      node n;
-      forall_nodes(n, G) {
-	if (G[n].name == NULL) {
-	  G[n].name = "";
-	}
-	if (! batch_mode) {
-	  gw->set_label(n, G[n].name);
-	  gw->set_position(n,
-			  point(random() % 200, random() % 200));
-	}
-      }
-    }
   }
 
   /*
@@ -612,24 +471,7 @@ int main(int argc, char **argv)
     cout << "Nparts: " << nparts << endl;
   }
 
-  if (! batch_mode) {
-    gw->display();
-		
-    gw->set_directed(false);
-		
-    gw->set_node_shape(circle_node);
-    gw->set_node_label_type(user_label);
-		
-    h_menu = gw->get_menu("Layout");
-    gw_add_simple_call(*gw, reassign, "Reassign", h_menu);
-		
-    /* Run until the user quits.  Everything is handled by callbacks
-     * from LEDA's event loop from here on.                           */
-		
-    gw->edit();
-  } else {
-    batch();
-  }
+  batch();
 
   print_solution();
     
