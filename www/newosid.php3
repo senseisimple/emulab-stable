@@ -58,7 +58,7 @@ if (isset($os_path)) {
 	unset($os_path);
     }
     else {
-	if (! ereg("^[-_a-zA-Z0-9\/\.]+$", $os_path)) {
+	if (! ereg("^[-_a-zA-Z0-9\/\.:]+$", $os_path)) {
 	    USERERROR("The path contains invalid characters!", 1);
 	}
     }
