@@ -6,6 +6,14 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040120:
+	Bumped up the sizes on some buffers to help network performance.
+	Add the following two lines to /etc/sysctl.conf:
+
+	net.local.dgram.maxdgram=65536
+	net.local.dgram.recvspace=65536
+
+
 20040112:
        Big change to bootinfo sequence.
 

@@ -85,6 +85,8 @@ my $RNDC_KEY        = "/usr/local/etc/rndc.key";
 
 my $LOADER_CONF	    = "/boot/loader.conf";
 
+my $SYSCTL_CONF	    = "/etc/sysctl.conf";
+
 #
 # Some directories we care about
 #
@@ -543,6 +545,14 @@ Phase "loader.conf", "Setting up $LOADER_CONF", sub {
     DoneIfEdited($LOADER_CONF);
     AppendToFileFatal($LOADER_CONF,
 	"kern.hz=1000"
+    );
+};
+
+Phase "sysctl.conf", "Setting up $SYSCTL_CONF", sub {
+    DoneIfEdited($SYSCTL_CONF);
+    AppendToFileFatal($SYSCTL_CONF,
+	"net.local.dgram.maxdgram=65536",
+	"net.local.dgram.recvspace=65536"
     );
 };
 
