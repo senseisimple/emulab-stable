@@ -1161,6 +1161,8 @@ CREATE TABLE nodes (
   battery_percentage float default NULL,
   battery_timestamp int(10) unsigned default NULL,
   boot_errno int(11) NOT NULL default '0',
+  destination_x float NOT NULL default '0',
+  destination_y float NOT NULL default '0',
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),

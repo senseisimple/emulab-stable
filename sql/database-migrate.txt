@@ -2420,3 +2420,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	  config tinytext,
 	  PRIMARY KEY  (name,building,floor)
 	) TYPE=MyISAM;
+
+1.309: Add destination coords to the nodes table for robots.
+
+	alter table nodes add destination_x float NOT NULL default '0';
+	alter table nodes add destination_y float NOT NULL default '0';
+
+       Unlike other coords, these are meters and translated to pixels
+       later when displayed (trying to head in the right direction ...)
