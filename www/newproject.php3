@@ -353,7 +353,9 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2>*Estimated #of PCs:</td>
+              <td colspan=2>*Estimated #of
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbpcs\">
+                             PCs</a>:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_pcs]\"
@@ -363,7 +365,9 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2>*Estimated #of Sharks:</td>
+              <td colspan=2>*Estimated #of
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbshark\">
+                             Sharks</a>:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_sharks]\"
