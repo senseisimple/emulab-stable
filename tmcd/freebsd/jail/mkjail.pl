@@ -803,7 +803,6 @@ sub startproxy($)
 {
     my ($dir) = @_;
     my $log   = "$dir/tmcc.log";
-    my $klog  = "$dir/tmcc.ktrace";
 
     #
     # The point of these paths is so that there is a comman path to
@@ -834,7 +833,7 @@ sub startproxy($)
 
     # The -o option will cause the proxy to detach but not fork!
     # Eventually change this to standard pid file kill.
-    exec("ktrace -i -a -f $klog $TMCC -d -x $outsidepath -n $vnodeid -o $log");
+    exec("$TMCC -d -x $outsidepath -n $vnodeid -o $log");
     die("Exec of $TMCC failed! $!\n");
 }
 
