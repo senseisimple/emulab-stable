@@ -46,6 +46,8 @@ my $PATCH      = "/usr/bin/patch";
 my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $TOUCH      = "/usr/bin/touch";
+my $SSH        = "/usr/bin/ssh";
+my $CP         = "/bin/cp";
 
 my $SUIDPERL   = "/usr/bin/suidperl";
 
@@ -120,7 +122,7 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/proxydhcpd.log",
     "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
-    "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log"
+    "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log",
     "$LOGDIR/plabrenew.log");
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
@@ -135,6 +137,9 @@ my @OPS_NAMES = ($FSNODE, $USERNODE);
 my $OBJDIR = `/usr/bin/dirname $0`;
 chomp $OBJDIR;
 my $TOP_OBJDIR = "$OBJDIR/..";
+
+my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
+my $BOSS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-boss.conf";
 
 #
 # Allow this to work if the library is left in the source directory
@@ -537,6 +542,16 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	    "   StrictHostKeyChecking no",
 	    "   Protocol 1,2");
     };
+    Phase "keycopy", "Copy root ssh keys to ops", sub {
+	if (ExecQuiet("$SSH root@$USERNODE pwd")) {
+	    PhaseSkip("Key already copied");
+	} else {
+	    PhaseFail("You'll need to manually copy boss's public SSH key\n".
+		      "over to ops print so boss can get into ops without a\n" .
+		      "password. Run the following print as root:\n" .
+		      "scp $ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
+	}
+    };
 };
 
 Phase "rndc", "Setting up rndc for control of nameserver", sub {
@@ -570,15 +585,15 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
     };
 };
 
+Phase "event", "Setting up event system", sub {
+    Phase "elvinconf", "Installing elvind config file", sub {
+	DoneIfExists("$ELVIND_CONF");
+	ExecQuietFatal("$CP $BOSS_ELVIND_CONF $ELVIND_CONF");
+    };
+};
+
 print "----------------------------------------------------------------------\n";
 print "Installation completed succesfully!\n";
 print "Please reboot this machine before proceeding with boss setup\n";
-
-if (!PhaseWasSkipped("ssh")) {
-    print "You'll need to manually copy boss's public SSH key over to ops,\n";
-    print "so boss can get into ops without a password. Run the following\n";
-    print "as root:\n";
-    print "scp $ROOT_PUBKEY ops:$ROOT_AUTHKEY\n";
-}
 
 exit 0;
