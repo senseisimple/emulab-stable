@@ -136,7 +136,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_URL]\">";
 } else {
-    echo "          type=\"text\" size=\"45\">";
+    echo "          value=\"http://\" type=\"text\" size=\"45\">";
 }
 
 echo "     </td>
@@ -238,7 +238,8 @@ echo "<tr>
 #
 echo "<tr>
          <td>*URL:</td>
-         <td><input type=\"text\" name=\"proj_URL\" size=\"45\"></td>
+         <td><input type=\"text\" name=\"proj_URL\"
+                    value=\"http://\" size=\"45\"></td>
       </tr>\n";
 
 #

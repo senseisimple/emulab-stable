@@ -30,6 +30,8 @@ $TBAUTHCOOKIE   = "HashCookie";
 $TBNAMECOOKIE   = "MyUidCookie";
 $TBAUTHTIMEOUT  = 21600;
 
+$HTTPTAG        = "http://";
+
 #
 # Database constants and the like.
 #
@@ -185,6 +187,33 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
     }
     return $retval;
 }
+
+#
+# Verify a URL.
+#
+function VERIFYURL($url) {
+    global $HTTPTAG;
+
+    if (strlen($url)) {
+	if (strstr($url, " ")) {
+	    USERERROR("URL ($url) is malformed; spaces are not allowed. ".
+		      "Please go back and fix it up.", 1);
+	}
+	
+	if (strcmp($HTTPTAG, substr($url, 0, strlen($HTTPTAG)))) {
+	    USERERROR("URL ($url) must begin with $HTTPTAG. ".
+		      "Please go back and fix it up.", 1);
+	}
+	$fp = @fopen($url, "r");
+	if (! $fp) {
+	    USERERROR("URL ($url) is not valid (cannot be accessed). ".
+		      "Please go back and fix it up.", 1);
+	}
+	fclose($fp);
+    }
+    return 0;
+}
+
 
 #
 # Beware empty spaces (cookies)!

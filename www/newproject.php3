@@ -45,7 +45,8 @@ if (!isset($usr_name) ||
   FORMERROR("Full Name");
 }
 if (!isset($proj_URL) ||
-    strcmp($proj_URL, "") == 0) {
+    strcmp($proj_URL, "") == 0 ||
+    strcmp($proj_URL, $HTTPTAG) == 0) {
   FORMERROR("Project URL");
 }
 if (!isset($usr_email) ||
@@ -95,6 +96,15 @@ if (! $email_domain ||
 }
 $email_domain = substr($email_domain, 1);
 $email_user   = substr($usr_email, 0, strpos($usr_email, "@", 0));
+
+#
+# Check URLs. 
+#
+if (strcmp($usr_url, $HTTPTAG) == 0) {
+    $usr_url = "";
+}
+VERIFYURL($usr_url);
+VERIFYURL($proj_URL);
 
 #
 # Certain of these values must be escaped or otherwise sanitized.

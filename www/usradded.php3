@@ -61,6 +61,14 @@ $email_domain = substr($email_domain, 1);
 $email_user   = substr($usr_email, 0, strpos($usr_email, "@", 0));
 
 #
+# Check URLs. 
+#
+if (strcmp($usr_url, $HTTPTAG) == 0) {
+    $usr_url = "";
+}
+VERIFYURL($usr_url);
+
+#
 # Certain of these values must be escaped or otherwise sanitized.
 #
 $usr_name  = addslashes($usr_name);

@@ -154,7 +154,8 @@ else {
     echo "<tr>
               <td>Home Page URL:</td>
               <td class=\"left\">
-                  <input type=\"text\" name=\"usr_url\" size=45></td>
+                  <input type=\"text\" name=\"usr_url\"
+                         value=\"http://\" size=45></td>
           </tr>\n";
 
     echo "<tr>

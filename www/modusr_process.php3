@@ -63,6 +63,29 @@ if (!isset($usr_affil) ||
 }
 
 #
+# Check that email address looks reasonable. We need the domain for
+# below anyway.
+#
+$email_domain = strstr($usr_email, "@");
+if (! $email_domain ||
+    strcmp($usr_email, $email_domain) == 0 ||
+    strlen($email_domain) <= 1 ||
+    ! strstr($email_domain, ".")) {
+    USERERROR("The email address `$usr_email' looks invalid!. Please ".
+	      "go back and fix it up", 1);
+}
+$email_domain = substr($email_domain, 1);
+$email_user   = substr($usr_email, 0, strpos($usr_email, "@", 0));
+
+#
+# Check URLs. 
+#
+if (strcmp($usr_url, $HTTPTAG) == 0) {
+    $usr_url = "";
+}
+VERIFYURL($usr_url);
+
+#
 # Now see if the user is requesting to change the password. We do the usual
 # checks to make sure the two fields agree and that it passes our tests for
 # safe passwords.
