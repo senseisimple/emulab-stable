@@ -23,29 +23,47 @@ my $testbed_srcdir = "@top_srcdir@";
 # Locals
 my $master_fill   = "$testbed_srcdir/sql/database-fill.sql";
 my $export_tables = "../utils/export_tables";
-my $tempfile      = "/tmp/dbdiff.$$";
+my $tempdifffile  = "/tmp/dbdiff.$$";
+my $tempnewfile   = "/tmp/dbdiff.new.$$";
+my $tempoldfile   = "/tmp/dbdiff.old.$$";
 my $exitcode      = 0;
 
 #
 # Diff exits with 2 if a problem. We tell diff to ignore whitespace
 # changes and comment lines (line starting with '--').
 #
-if (system("perl $export_tables | ".
-	   "diff -b -B -I '^--.*\$' $master_fill - > $tempfile") == 2) {
-    unlink($tempfile);
+# We sort(1) the text files so that we don't pick up differences in ordering,
+# which could be pretty random.
+#
+if (system("perl $export_tables | sort > $tempoldfile")) {
+    unlink($tempoldfile);
     die("*** $0:\n".
-	"    diff $export_tables failed!\n");
+	"    $export_tables failed!\n");
 }
+if (system("sort $master_fill > $tempnewfile")) {
+    unlink($tempoldfile);
+    die("*** $0:\n".
+	"    sort $master_fill failed!\n");
+}
+if (system("diff -b -B -I '^--.*\$' $tempoldfile $tempnewfile > $tempdifffile")
+	== 2) {
+    unlink($tempdifffile);
+    die("*** $0:\n".
+	"    diff $tempoldfile $tempnewfile failed!\n");
+}
+
+unlink($tempoldfile);
+unlink($tempnewfile);
 
 # No differences ...
 if (!$?) {
-    unlink($tempfile);
+    unlink($tempdifffile);
     exit(0);
 }
 
 #
 # Oh well. Cat the diff to stdout and exit with non-zero status.
 #
-system("cat $tempfile");
-unlink($tempfile);
+system("cat $tempdifffile");
+unlink($tempdifffile);
 exit(1);
