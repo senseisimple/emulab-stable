@@ -110,15 +110,10 @@ else {
 # Figure out who called us. Only root, people with admin status
 # in the DB, or the owner of the experiment can run this script.
 #
-if ($UID && !TBAdmin($UID)) {
-    my ($me) = getpwuid($UID)
-	or die "$UID not in passwd file";
-
-    my $leader = ExpLeader($pid, $eid);
-
-    if ($me ne $leader) {
-	die("os_setup: You must be root or a TB administrator\n");
-    }
+if ($UID && !TBAdmin($UID) &&
+    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to swap this experiment!\n");
 }
 
 TBDebugTimeStamp("os_setup started");
