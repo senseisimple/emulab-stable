@@ -1,0 +1,122 @@
+#!/usr/bin/perl -w
+
+# TODO: Add support for varying number of available nodes.
+# TODO: Add support for Full tests.
+
+# mktest
+
+# This is a tool to facilitate test construction.  It interactively prompts
+# the user for test information and constructs the necessary test files.
+# The pass/fail of the test is based solely on the exit codes of the
+# various tb* programs.  This tool will not suffice for more intricate
+# checking.
+
+# This script must be run in the testsuite directory.
+
+if (! -d "templates") {
+    print STDERR "Must be run in testbed/testsuite.\n";
+    exit(1);
+}
+
+if (! defined($ENV{"EDITOR"})) {
+    $editor = "vi";
+} else {
+    $editor = $ENV{"EDITOR"};
+}
+
+
+$name = "";
+$mode = "";
+$description = "";
+$nsfile = "";
+
+# Optional syntax:
+#  mktest <mode> <name> <nsfile> [<description>]
+if ($#ARGV != -1) {
+    ($mode,$name,$nsfile) = @ARGV[0..2];
+    if ($#ARGV == 3) {
+	$description = $ARGV[3];
+    } 
+}
+
+while ($name eq "") {
+    print "Test Name:\n";
+    print "\n";
+    print "> ";
+    $in = <STDIN>;
+    chop $in;
+    if ($in =~ /\s/) {
+	print "Please, no whitespace.\n";
+    } else {
+	$name = $in;
+    }
+}
+
+
+while ($mode eq "") {
+    print "\nMode:\n";
+    print "\n";
+    print "Frontend - This is a frontend test only.  It does not require actual\n";
+    print "hardware and will not test beyond assign wrapper.\n";
+    print "\n";
+    print "Full - This is a full test.  This is not yet supported.\n";
+    print "\n";
+    print "1) Frontend\n";
+    print "2) Full\n";
+    print "> ";
+    $in = <STDIN>;
+    chop $in;
+    if ($in =~ /1/) {
+	$mode = "frontend";
+    } elsif ($in =~ /2/) {
+	$mode = "full";
+    }
+}
+
+
+if ($description eq "") {
+    $tmpfile = "/tmp/$$";
+    open(TMPFILE,"> $tmpfile") || die "Could not open $tmpfile for writing.\n";
+    print TMPFILE "# Enter a description of your test here.";
+    close TMPFILE;
+    system("$editor $tmpfile");
+    open(TMPFILE,"$tmpfile") || die "Could not open $tmpfile for reading.\n";
+    while (<TMPFILE>) {
+	if (! /^\#/) {
+	    $description .= $_;
+	}
+    }
+    close(TMPFILE);
+    unlink $tmpfile;
+}
+
+while ($nsfile eq "") {
+    print "\nNS File.\n";
+    print "\n";
+    print "> ";
+    $in = <STDIN>;
+    chop $in;
+    if (! -f $in) {
+	print "$in does not exist.\n";
+    } else {
+	$nsfile = $in;
+    }
+}
+
+$dir = "tests/$mode/$name";
+mkdir $dir,0755;
+system "cp templates/$mode $dir/test";
+open(INFO,"> $dir/info");
+print INFO $description;
+close(INFO);
+system "cp $nsfile $dir/nsfile.ns";
+
+print "Test generated.\n";
+
+0;
+
+
+
+
+
+
