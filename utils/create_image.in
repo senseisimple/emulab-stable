@@ -184,6 +184,13 @@ close(FILE) or
     die("Could not truncate $filename: $!");
 
 #
+# Record when this image was updated, so that we can figure out which
+# revision of the testbed image it was based off.
+#
+DBQueryFatal("update images set updated=now() where ".
+		 "pid='$imagepid' and imagename='$imagename'");
+
+#
 # Okay, we want to build up a command line that will run the script on
 # on the client node. We use the imageid description to determine what
 # slice (or perhaps the entire disk) is going to be zipped up. We do not

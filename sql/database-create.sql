@@ -282,6 +282,7 @@ CREATE TABLE images (
   load_busy tinyint(4) NOT NULL default '0',
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
+  updated datetime default NULL,
   PRIMARY KEY  (imagename,pid)
 ) TYPE=MyISAM;
 
