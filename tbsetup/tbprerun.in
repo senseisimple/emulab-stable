@@ -79,6 +79,11 @@ if (! ($state = ExpState($pid, $eid))) {
 	"    No such experiment $pid/$eid\n");
 }
 
+if (! ($gid = ExpGroup($pid,$eid))) {
+    die("*** $0:\n".
+	"    Unable to get group for $pid/$eid\n");
+}
+
 if (! $modify) {
     if (!$force && $state ne EXPTSTATE_NEW) {
 	die("*** $0:\n".
@@ -119,7 +124,7 @@ sub cleanup {
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("parser started");
-if (system("parse-ns $pid $eid $nsfile")) {
+if (system("parse-ns $pid $gid $eid $nsfile")) {
     cleanup();
     die("*** $0:\n".
 	"    Parsing failed!\n");

@@ -141,8 +141,8 @@ if {${GLOBALS::anonymous} && ! ${GLOBALS::impotent}} {
 if {${GLOBALS::anonymous} && ([llength $argv] != 1)} {
     puts stderr "Syntax: $argv0 \[-q\] -n -a ns_file"
     exit 1
-} elseif {(! ${GLOBALS::anonymous}) && ([llength $argv] != 3)} {
-    puts stderr "Syntax: $argv0 \[-q\] \[-n \[-a\]\] pid eid ns_file"
+} elseif {(! ${GLOBALS::anonymous}) && ([llength $argv] != 4)} {
+    puts stderr "Syntax: $argv0 \[-q\] \[-n \[-a\]\] pid gid eid ns_file"
     exit 1
 }
 
@@ -151,12 +151,14 @@ namespace eval GLOBALS {
     # Remaining arguments
     if {$anonymous} {
 	variable pid "PID"
+	variable gid "GID"
 	variable eid "EID"
 	variable nsfile [lindex $argv 0]
     } else {
 	variable pid [lindex $argv 0]
-	variable eid [lindex $argv 1]
-	variable nsfile [lindex $argv 2]
+	variable gid [lindex $argv 1]
+	variable eid [lindex $argv 2]
+	variable nsfile [lindex $argv 3]
     }
     
     # This is used to name class instances by the variables they
