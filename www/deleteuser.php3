@@ -46,7 +46,7 @@ if (isset($request) && $request) {
     TBMAIL($TBMAIL_OPS,
 	   "Delete User Request: '$target_uid'",
 	   "$uid is requesting that user account '$target_uid' be deleted\n".
-	   "from the testbed since $uid is no longer a member of any ".
+	   "from the testbed since $target_uid is no longer a member of any ".
 	   "projects.\n",
 	   "From: $uid_name '$uid' <$uid_email>\n".
 	   "Errors-To: $TBMAIL_WWW");
