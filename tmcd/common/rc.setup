@@ -124,10 +124,13 @@ fi
 if [ -x $BOOTDIR/rc.simulator  ]; then
         echo "Starting Network Simulation ..."
 	$BOOTDIR/rc.simulator
+	# The simulator will send the ISUP once it is
+	# up and running
+	echo "Will Inform the testbed that we're up and running after simulator initialization ..."
+else
+	echo "Informing the testbed that we're up and running ..."
+	$BINDIR/tmcc state ISUP
 fi
-
-echo "Informing the testbed that we're up and running ..."
-$BINDIR/tmcc state ISUP
 
 # Now boot vnodes. Doing it after ISUP is better; os_setup will consider
 # the node ready, and move onto waiting for vnodes to boot. 

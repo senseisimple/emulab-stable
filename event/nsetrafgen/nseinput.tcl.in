@@ -7,7 +7,9 @@
 #
 
 global CLIENTVARDIR
+global CLIENTBINDIR
 set CLIENTVARDIR @CLIENT_VARDIR@
+set CLIENTBINDIR @CLIENT_BINDIR@
 
 # consults tmcc hostnames database to translate hostname to IP
 # returns ip address of name
@@ -480,5 +482,14 @@ if { $cpuspeed != -1 } {
 if { [info exists tbroutes] } {
     unset tbroutes
 }
+
+# Adding an event to send an ISUP event to the testbed
+# Note that the actual events specified by the user will
+# come from the event system after a little while. So, this
+# first event at 0.0 will ensure that the simulator scheduler
+# has subscribed to the event system and is processing the
+# first event
+$ns at 0.0 {exec echo "Informing the testbed that we're up and running ..." > /dev/console}
+$ns at 0.0 "exec $CLIENTBINDIR/tmcc state ISUP"
 
 $ns run
