@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <paths.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,6 +56,8 @@ main(int argc, char **argv)
 	boot_info_t		boot_info;
 	boot_what_t	       *boot_whatp = (boot_what_t *) &boot_info.data;
 	int		        port = BOOTWHAT_DSTPORT;
+	char			buf[BUFSIZ];
+	FILE			*fp;
 	extern char		build_info[];
 
 	progname = argv[0];
@@ -91,6 +94,16 @@ main(int argc, char **argv)
 		loginit(1, "bootinfo");
 	}
 	info("%s\n", build_info);
+
+	/*
+	 * Write out a pidfile.
+	 */
+	sprintf(buf, "%s/bootinfo.pid", _PATH_VARRUN);
+	fp = fopen(buf, "w");
+	if (fp != NULL) {
+		fprintf(fp, "%d\n", getpid());
+		(void) fclose(fp);
+	}
 
 	/* Initialize data base */
 	err = open_bootinfo_db();
