@@ -399,7 +399,7 @@ DocumentRoot "@prefix@/www"
 #
 # This should be changed to whatever you set DocumentRoot to.
 #
-<Directory "@TBOPSEMAIL@/www">
+<Directory "@prefix@/www">
 
 #
 # This may also be "None", "All", or any combination of "Indexes",
