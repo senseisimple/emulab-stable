@@ -13,6 +13,23 @@
 my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
 
+# snmpit uses modules that implement the interface to a given switch
+# model. These modules should support these actions:
+#
+# new		Needs to take IP, and initialize snmp session
+# portControl	(cmd,ports)
+# 		cmd = {enable, disable, 10mbit, 100mbit, full, half,
+#                      auto, manual}
+# 		ports = list of "pcX:Y"
+# showPorts	print settings of all ports
+# getStats	print various stats
+# vlanLock	Get a vlan editing lock/token/buffer, and
+# vlanUnlock	Release it when done
+# setupVlan	(ports) - takes a list of ports, and vlans them
+# removeVlan	(vlans) - takes a list of vlan numbers
+# listVlans	returns a list of entries, with each entry having an
+# 		ID, a name, and a list of members (pcX:Y)
+
 #
 # Source Code Map
 # ===============
@@ -770,10 +787,10 @@ sub num { $a <=> $b; }
 sub alphanum { 
   $a =~ /^([a-z]*)([0-9]*)/;
   $a_let = $1;
-  $a_num = $2;
+  $a_num = ($2 || 0);
   $b =~ /^([a-z]*)([0-9]*)/;
   $b_let = $1;
-  $b_num = $2;
+  $b_num = ($2 || 0);
   if ($a_let eq $b_let) {
     return $a_num <=> $b_num;
   } else {
@@ -851,9 +868,9 @@ sub ListVLANs {
 	my @vlan=();
 	if (defined (@{$Members{$data[2]}})) { @vlan =@{$Members{$data[2]}}; }
 	print "('$data[1]' " if $debug;
-	$node = $Ports{"$i:$data[1]"};
+	($node = $Ports{"$i:$data[1]"}) || ($node = "???");
 	print "== $node)\n" if $debug;
-	push(@vlan, $node);
+	push(@vlan, $node) unless ($node =~ /^empty:/);
 	$Members{$data[2]} = \@vlan;
 	#do the getnext at the end, because if we're on the last, the next
 	#one is junk to all the processing instructions...
@@ -861,7 +878,7 @@ sub ListVLANs {
       $RetVal = $sess->getnext($VlanPortVlan);
       @data = @{$VlanPortVlan};
     } while ( $data[0] =~ /^vlanPortVlan/ ) ;
-    
+
   } else { 
     die("Invalid option 'list VLANs' for device of type $device.\n");
   }
@@ -870,7 +887,7 @@ sub ListVLANs {
   my $id;
   # I'm trying out using formats. See perldoc perlform for details.
   format = 
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ($id),($Names{$id}),(defined(@{$Members{$id}})?join("  ",sort alphanum (@{$Members{$id}})):"")
 .
   foreach $id ( sort num keys (%Names) ) {
