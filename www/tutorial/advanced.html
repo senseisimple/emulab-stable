@@ -431,8 +431,8 @@ Then in your NS file a set of static events to run these commands:
 If you want to schedule starts and stops using dynamic events:
 
 	<code><pre>
-	tevc -e testbed/myexp now prog0 start "command=/bin/ls /tmp"
-	tevc -e testbed/myexp now prog1 start "command=sleep 60"
+	tevc -e testbed/myexp now prog0 start
+	tevc -e testbed/myexp now prog1 start
 	tevc -e testbed/myexp +20 prog1 stop</code></pre>
 	
 Some points worth mentioning:
@@ -450,9 +450,5 @@ Some points worth mentioning:
 <li> The "stop" command is implemented by sending a SIGTERM to the
      process group leader (the csh process). If the SIGTERM fails, a
      SIGKILL is sent.
-
-<li> When issuing dynamic events using <tt>tevc</tt>, you must specify
-     the command line to invoke. This is intended to make program
-     objects more flexible.
 </ul>
 
