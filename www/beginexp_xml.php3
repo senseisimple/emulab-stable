@@ -340,16 +340,21 @@ else {
 #
 $exp_swappable = "";
 
-if ($formfields[exp_swappable] == "1") {
-    $exp_swappable .= " -s";
+# Experiments are swappable by default; supply reason if noswap requested.
+if ($formfields[exp_swappable] == "0") {
+    $exp_swappable .= " -S " . escapeshellarg($formfields[exp_noswap_reason]);
 }
 
 if ($formfields[exp_autoswap] == "1") {
     $exp_swappable .= " -a " . (60 * $formfields[exp_autoswap_timeout]);
 }
 
+# Experiments are idle swapped by default; supply reason if noidleswap requested.
 if ($formfields[exp_idleswap] == "1") {
     $exp_swappable .= " -l " . (60 * $formfields[exp_idleswap_timeout]);
+}
+else {
+    $exp_swappable .= " -L " .escapeshellarg($formfields[exp_noidleswap_reason]);
 }
 
 $exp_batched   = 0;
@@ -410,24 +415,6 @@ if ($retval < 0) {
 if ($retval) {
     XMLSTATUS("weberror", $suexec_output);
     exit(1);
-}
-
-# add reasons to db, since we don't want to pass these on the command line.
-
-if ($formfields[exp_noswap_reason]) {
-    DBQueryFatal("UPDATE experiments " .
-		 "SET noswap_reason='" .
-                 addslashes($formfields[exp_noswap_reason]).
-                 "' ".
-		 "WHERE eid='$exp_id' and pid='$exp_pid'");
-}
-
-if ($formfields[exp_noidleswap_reason]) {
-    DBQueryFatal("UPDATE experiments " .
-		 "SET noidleswap_reason='" .
-                 addslashes($formfields[exp_noidleswap_reason]).
-                 "' ".
-		 "WHERE eid='$exp_id' and pid='$exp_pid'");
 }
 
 # Send back a useful message. This needs more thought.

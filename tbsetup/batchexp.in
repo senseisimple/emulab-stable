@@ -16,6 +16,7 @@ use POSIX qw(strftime);
 # only option).
 #
 # TODO: Remove expt_expires and priority.
+#       Add calls to check_slot() to verify inputs.
 # 
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
@@ -29,14 +30,15 @@ use POSIX qw(strftime);
 sub usage()
 {
     print(STDERR
-	  "Usage: batchexp [-i [-w]] [-f] [-E description] [-g gid] [-s]\n".
-	  "                [-a <autotime>] [-l <idletime>]\n".
+	  "Usage: batchexp [-i [-w]] [-f] [-E description] [-g gid]\n".
+	  "                [-S reason] [-L reason] [-a <time>] [-l <time>]\n".
 	  "                -p <pid> -e <eid> <nsfile>\n".
 	  "switches:\n".
 	  "-i       - swapin immediately; by default experiment is batched\n".
 	  "-w       - wait for non-batchmode experiment to preload or swapin\n".
 	  "-f       - preload experiment (do not swapin or queue yet)\n".
-	  "-s       - Experiment can be swapped at any time\n".
+	  "-S <str> - Experiment cannot be swapped; must provide reason\n".
+	  "-L <str> - Experiment cannot be IDLE swapped; must provide reason\n".
 	  "-a <nnn> - Auto swapout nnn minutes after experiment is swapped in\n".
 	  "-l <nnn> - Auto swapout nnn minutes after experiment goes idle\n".
 	  "-E <str> - A pithy sentence describing your experiment\n".
@@ -47,7 +49,7 @@ sub usage()
     exit(-1);
 }
 
-my $optlist = "iE:g:e:p:sa:l:fw";
+my $optlist = "iE:g:e:p:S:L:a:l:fw";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -103,9 +105,11 @@ my $pid;
 my $gid;
 my $description;
 my $tempnsfile;
-my $swappable    = 0;
-my $idleswap     = 0;
+my $swappable    = 1;
+my $noswap_reason;
+my $idleswap     = 1;
 my $idleswaptime = 60 * TBGetSiteVar("idle/threshold");
+my $noidleswap_reason;
 my $autoswap     = 0;
 my $autoswaptime = 10 * 60;
 my $idleignore   = 0;
@@ -144,11 +148,14 @@ if (!defined($pid) || !defined($eid)) {
 if (!defined($gid)) {
     $gid = $pid;
 }
-if (defined($description)) {
-    $description = DBQuoteSpecial($description);
-}
-else {
+if (!defined($description)) {
     $description = "'Created by $dbuid'";
+}
+if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
+    die("Must provide a reason with -S option (not swappable reason)!\n");
+}
+if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")) {
+    die("Must provide a reason with -L option (no idleswap reason)!\n");
 }
 if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
     die("*** $0:\n".
@@ -156,6 +163,12 @@ if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
 }
 my $nsfile  = "$eid.ns";
 my $repfile = "$eid.report";
+
+# Defaults for the DB and for the email message. 
+$noswap_reason = "'None Given'"
+    if (!defined($noswap_reason));
+$noidleswap_reason = "'None Given'"
+    if (!defined($noidleswap_reason));
 
 #
 # Make sure UID is allowed to create experiments in this project.
@@ -239,8 +252,8 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
-		  "now(), '$eventkey', 'None Given', 'None Given', ".
-		  "$batchmode)")) {
+		  "now(), '$eventkey', $noswap_reason, ".
+		  "$noidleswap_reason, $batchmode)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -507,21 +520,12 @@ TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR());
 #
 # Dump the report file and the log file to the user via email. 
 #
-# Yuck. We need some stuff from the DB that the web page inserted. This stuff
-# should come in on the command line, since we allow people to invoke this
-# script from ops, and if that happens, we will not have any strings!
+# Yuck, we want the created time that mysql assigned at the insertion.
 #
 $query_result =
-    DBQueryFatal("select noswap_reason,noidleswap_reason,expt_created ".
-		 "  from experiments ".
+    DBQueryFatal("select expt_created from experiments ".
 		 "where pid='$pid' and eid='$eid'");
-my ($noswap_reason,$noidleswap_reason,$expt_created) =
-    $query_result->fetchrow_array();
-$noswap_reason = "None Given"
-    if (!defined($noswap_reason));
-$noidleswap_reason = "None Given"
-    if (!defined($noidleswap_reason));
-
+my ($expt_created) = $query_result->fetchrow_array();
 my $message;
 
 if ($frontend) {
@@ -732,6 +736,10 @@ sub ParseArgs()
     if (defined($options{"f"})) {
 	$frontend = 1;
     }
+
+    #
+    # pid,eid,gid get passed along as shell commands args; must taint check.
+    # 
     if (defined($options{"p"})) {
 	$pid = $options{"p"};
 
@@ -751,6 +759,10 @@ sub ParseArgs()
 	else {
 	    die("Bad data in argument: $eid.");
 	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper experiment name (id)!\n");
+	}
     }
     if (defined($options{"g"})) {
 	$gid = $options{"g"};
@@ -763,22 +775,43 @@ sub ParseArgs()
 	}
     }
     if (defined($options{"E"})) {
-	$description = $options{"E"};
+	if (! TBcheck_dbslot($options{"E"}, "experiments", "expt_name",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper experiment description!\n");
+	}
+	$description = DBQuoteSpecial($options{"E"});
     }
-    if (defined($options{"s"})) {
-	$swappable = 1;
+    if (defined($options{"S"})) {
+	if (! TBcheck_dbslot($options{"S"}, "experiments", "noswap_reason",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper noswap reason!\n");
+	}
+	$swappable     = 0;
+	$noswap_reason = DBQuoteSpecial($options{"S"});
+    }
+    if (defined($options{"L"})) {
+	if (! TBcheck_dbslot($options{"L"}, "experiments", "noidleswap_reason",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper noidleswap reason!\n");
+	}
+	$idleswap          = 0;
+	$noidleswap_reason = DBQuoteSpecial($options{"L"});
     }
     if (defined($options{"l"})) {
-        $idleswap = 1;
+	if (! TBcheck_dbslot($options{"l"}, "experiments", "idleswap_timeout",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper idleswap timeout!\n");
+	}
+        $idleswap     = 1;
 	$idleswaptime = $options{"l"};
-	(($idleswaptime =~ /^\d+$/) &&
-         ($idleswaptime > 0)) or die("Bad idleswap time: '$idleswaptime'");
     }
     if (defined($options{"a"})) {
-        $autoswap = 1;
+	if (! TBcheck_dbslot($options{"a"}, "experiments", "autoswap_timeout",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    die("Improper autoswap timeout!\n");
+	}
+        $autoswap     = 1;
 	$autoswaptime = $options{"a"};
-	(($autoswaptime =~ /^\d+$/) &&
-         ($autoswaptime > 0)) or die("Bad autoswap time: '$autoswaptime'");
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
