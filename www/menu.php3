@@ -316,15 +316,15 @@ function WRITESIDEBAR() {
     # 
     switch ($login_status & CHECKLOGIN_STATUSMASK) {
     case CHECKLOGIN_LOGGEDIN:
-	$login_message = "&quot;$login_uid&quot; Logged In.";
+	$login_message = "'$login_uid' logged in.";
 	    
 	if ($login_status & CHECKLOGIN_PSWDEXPIRED)
-	    $login_message = "$login_message<br>(Password Expired!)";
+	    $login_message = "$login_message<br>(password expired!)";
 	elseif ($login_status & CHECKLOGIN_UNAPPROVED)
-	    $login_message = "$login_message<br>(Unapproved!)";
+	    $login_message = "$login_message<br>(unapproved!)";
 	break;
     case CHECKLOGIN_TIMEDOUT:
-	$login_message = "Login Timed Out";
+	$login_message = "login timed out";
 	break;
     default:
 	$login_message = 0;
@@ -333,7 +333,7 @@ function WRITESIDEBAR() {
 
     if ($login_message) {
       echo "<tr>";
-      echo "<td class=\"menufooter\"><center><b>";
+      echo "<td class=\"menufooter\" style='padding-top: 6px;' ><center><b>";
       echo "$login_message</b></center></td>";
       echo "</tr>";
     }
