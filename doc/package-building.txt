@@ -73,6 +73,17 @@ Now, you have to install all of these ports. Just run a 'make install' in the
 /usr/port/misc/emulab-boss and /usr/ports/misc/emulab-ops directories. Now, we
 play the waiting game. This will take a while.
 
+At this point, is a good idea to check for ports with bad packing lists - this
+happens every once in a while. Run 'pkg_info -g -a', and look for "doesn't
+exist" - if you find any of these, you'll have to determine whether the port
+is broken, whether you should touch the file, or what else needs to be fixed.
+Generally, files that fail their MD5 checksums are okay - this just means that
+two ports installed the same file. So far, I haven't seen this happen with any
+files that actually mattered.
+
+After building the ports, you'll want to do a 'make clean' and remove everything
+in /usr/ports/distfiles to make sure you have enough room for all the packages.
+
 Now, to build the packages. Pretty easy, actually. Just run:
 mkdir /usr/ports/packages
 Then:
