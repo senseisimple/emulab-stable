@@ -25,5 +25,7 @@ install: \
 	$(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS))
 
 post-install:
+	chown root $(INSTALL_BINDIR)/tbuisp
+	chmod u+s $(INSTALL_BINDIR)/tbuisp
 
 clean:

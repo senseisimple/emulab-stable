@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2004 University of Utah and the Flux Group.
@@ -11,18 +11,32 @@
 
 use lib '@prefix@/lib';
 my $TB = '@prefix@';
-
+ 
 use libdb;
 use English;
 use Getopt::Std;
 
+#
+# We have to be setuid root so that we can ssh into stargates as root
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+ 
 use strict;
 
 #
 # Constants
 #
-my $UISP = "$TB/bin/uisp";
-my $DEBUG = 1;
+my $UISP   = "$TB/bin/uisp";
+my $SGUISP = "/usr/local/bin/uisp";
+my $SSHTB  = "$TB/bin/sshtb";
+my $DEBUG  = 1;
 
 #
 # Handle command-line arguments
@@ -64,6 +78,26 @@ if (!@motes) {
 }
 
 #
+# Taint check the filename
+#
+if ($filename =~ /^([-\w\/.]+)$/) {
+    $filename = $1;
+} else {
+    die("*** Tainted filename: $filename\n");
+}
+
+#
+# Tait check the node names
+#
+@motes = map {
+    if (/^([-\w]+)$/) {
+	$1;
+    } else {
+	die("*** Tainted node name: $_\n");
+    }
+} @motes;
+
+#
 # Permission check
 #
 if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
@@ -71,10 +105,11 @@ if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
 }
 
 #
-# Check the file to make sure it's readable
+# Check the file to make sure it's readable - note, we want to make sure it's
+# readable by the real uid, since w'ere setuid root
 #
 if ($filename) {
-    if (!-r $filename) {
+    if (!-R $filename) {
 	die "$filename not readable\n";
     }
 }
@@ -115,6 +150,8 @@ MOTE: foreach my $mote (@motes) {
     }
     my ($hosttype, $hostclass) = TBNodeType($host);
 
+    my $upload_method;
+
     #
     # Figure out how we talk to the programming board, and what chipset it has
     #
@@ -126,6 +163,24 @@ MOTE: foreach my $mote (@motes) {
 	    push @uisp_args, "-dhost=$host";
 	    # The type of programming board on a emote
 	    push @uisp_args, "-dprog=stk500";
+
+	    # We do the upload by running uisp directly on boss
+	    $upload_method = "direct";
+
+	    last TSWITCH;
+	};
+	/^sg/ && do {
+	    # Stargate
+
+	    # We have to ssh in to the stargate to do the programming
+
+	    # The type of programming board on a stargate
+	    push @uisp_args, "-dprog=stargate";
+
+	    # We do the upload by sshing to the toe stargate and running
+	    # uisp
+	    $upload_method = "ssh";
+
 	    last TSWITCH;
 	};
 	# Default
@@ -156,7 +211,12 @@ MOTE: foreach my $mote (@motes) {
     my $opstring;
     OSWITCH: for ($operation) {
 	/^upload$/ && do {
-	    $opstring = "--wr_fuse_e=ff --erase --upload if=$filename";
+	    $opstring = "--wr_fuse_e=ff --erase --upload ";
+	    if ($upload_method eq "direct") {
+		$opstring .= "if=$filename";
+	    } elsif ($upload_method eq "ssh") {
+		$opstring .= "if=-";
+	    }
 	    last OSWITCH;
 	};
 
@@ -169,9 +229,30 @@ MOTE: foreach my $mote (@motes) {
     # TODO - Allow for some parallelism
     #
     print "Uploading code to $mote\n";
-    my $commandstr = "$UISP " . join(" ",@uisp_args,$opstring);
+    my $commandstr;
+    if ($upload_method eq "direct") {
+	#
+	# We're running uisp directly on this node
+	#
+	$commandstr = "$UISP " . join(" ",@uisp_args,$opstring);
+
+	# Drop root permission, no need ro it
+	$EUID = $UID;
+    } elsif ($upload_method eq "ssh") {
+	#
+	# We have to ssh into the mote host
+	#
+	$commandstr = "$SSHTB -host $host $SGUISP " .
+	    join(" ",@uisp_args,$opstring) . " < $filename";
+    } else {
+	warn "Unsupported upload method for $mote - skipping";
+	$errors++;
+	next MOTE;
+    }
     dprint("$commandstr\n");
     if (system($commandstr)) {
+	$errors++;
+	warn "Failed to upload code to $mote";
     }
 }
 
