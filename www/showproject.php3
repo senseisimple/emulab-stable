@@ -80,6 +80,30 @@ if (mysql_num_rows($query_result)) {
     echo "</table>\n";
 }
 
+#
+# A list of project experiments.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT eid,expt_name FROM experiments WHERE pid=\"$pid\"");
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Project Experiments</h3>
+          </center>
+          <table align=center border=1>\n";
+
+    while ($row = mysql_fetch_row($query_result)) {
+        $eid  = $row[0];
+        $name = $row[1];
+        echo "<tr>
+                  <td>
+                      <A href='showexp.php3?exp_pideid=$pid\$\$$eid'>$name</a>
+                      </td>
+              </tr>\n";
+    }
+
+    echo "</table>\n";
+}
+
 echo "</center>\n";
 
 #
