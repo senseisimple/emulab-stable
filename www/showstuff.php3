@@ -592,61 +592,81 @@ function SHOWEXP($pid, $eid, $edit=0) {
     if ($edit) {
 	# make this a form too
 	echo "<form action=\"showexp.php3?pid=$pid&eid=$eid\" method=POST>\n";
-	$noswap = "Why: <input type=text ".
+
+	$noswap_form = "Why: <input type=text ".
 	    "name=noswap value=\"$noswap_reason\" size=30>";
-	$noidleswap = "Why: <input type=text ".
+	$noidleswap_form = "Why: <input type=text ".
 	    "name=noidleswap value=\"$noidleswap_reason\" size=30>";
-	$autoswap_str= "<input type=text size=3 name=autoswap ".
+	$autoswap_form= "<input type=text size=3 name=autoswap ".
 	    "value=\"$autoswap_hrs\"> hour".($autoswap_hrs==1 ? "" : "s");
+	$toggle = "<font size=-2 face=\"Verdana,Arial,sans-serif\">Toggle</font>";
+	$expttag = "pid=$pid&eid=$eid&edit=1";
+
+	if ($swappable)
+	    $swappable = "Yes
+<a href=\"toggle.php?type=swappable&value=0&$expttag\">$toggle</a>
+$noswap_form";
+	else
+	    $swappable = "<b>No</b>
+<a href=\"toggle.php?type=swappable&value=1&$expttag\">$toggle</a>
+$noswap_form";
+	
+	$idleswap_form= "<input type=text size=3 name=idleswap ".
+	    "value=\"$idleswap_hrs\"> hour".($idleswap_hrs==1 ? "" : "s");
+	
+	if ($idleswap)
+	    $idleswap = "Yes
+<a href=\"toggle.php?type=idleswap&value=0&$expttag\">$toggle</a>
+(after $idleswap_form) <br> $noidleswap_form";
+	else
+	    $idleswap = "<b>No</b>
+<a href=\"toggle.php?type=idleswap&value=1&$expttag\">$toggle</a>
+(after $idleswap_form) <br> $noidleswap_form";
+	
+	if ($autoswap)
+	    $autoswap = "<b>Yes</b>
+<a href=\"toggle.php?type=autoswap&value=0&$expttag\">$toggle</a>
+(after $autoswap_form)";
+	else
+	    $autoswap = "No
+<a href=\"toggle.php?type=autoswap&value=1&$expttag\">$toggle</a>
+(after $autoswap_form)";
+
+        if ($idle_ignore)
+	    $idle_ignore = "<b>Yes</b>
+<a href=\"toggle.php?type=idle_ignore&value=0&$expttag\">$toggle</a>";
+        else
+	    $idle_ignore = "No
+<a href=\"toggle.php?type=idle_ignore&value=1&$expttag\">$toggle</a>";
+
     } else {
 	$noswap = "($noswap_reason)";
 	$noidleswap = "($noidleswap_reason)";
 	$autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
-    }
-    if ($edit && ISADMIN() ) {
-	# Admins can edit the idleswap time.
-	$idleswap_str= "<input type=text size=3 name=idleswap ".
-	    "value=\"$idleswap_hrs\"> hour".($idleswap_hrs==1 ? "" : "s");
-    } else {
-	$idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
+        $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "":"s");
+
+	if ($swappable)
+	    $swappable = "Yes";
+	else
+	    $swappable = "<b>No</b> $noswap";
+
+	if ($idleswap)
+	    $idleswap = "Yes (after $idleswap_str)";
+	else
+	    $idleswap = "<b>No</b> $noidleswap";
+
+	if ($autoswap)
+	    $autoswap = "<b>Yes</b> (after $autoswap_str)";
+	else
+	    $autoswap = "No";
+
+        if ($idle_ignore)
+	    $idle_ignore = "<b>Yes</b>";
+        else
+	    $idle_ignore = "No";
+
     }
     
-    if ($swappable)
-	$swappable = "Yes
-<a href=\"toggle.php?type=swappable&value=0&pid=$pid&eid=$eid\">
-<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a>";
-    else
-	$swappable = "No
-<a href=\"toggle.php?type=swappable&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> $noswap";
-
-    if ($idleswap)
-	$idleswap = "Yes
-<a href=\"toggle.php?type=idleswap&value=0&pid=$pid&eid=$eid\">
-<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a> (after $idleswap_str)";
-    else
-	$idleswap = "No
-<a href=\"toggle.php?type=idleswap&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> $noidleswap";
-
-    if ($autoswap)
-	$autoswap = "Yes
-<a href=\"toggle.php?type=autoswap&value=0&pid=$pid&eid=$eid\">
-<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a> (after $autoswap_str)";
-    else
-	$autoswap = "No
-<a href=\"toggle.php?type=autoswap&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
-
-    if ($idle_ignore)
-	$idle_ignore = "Yes
-<a href=\"toggle.php?type=idle_ignore&value=0&pid=$pid&eid=$eid\">
-<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a>";
-    else
-	$idle_ignore = "No
-<a href=\"toggle.php?type=idle_ignore&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
-
     #
     # Generate the table.
     #
@@ -698,13 +718,15 @@ function SHOWEXP($pid, $eid, $edit=0) {
               </tr>\n";
     }
 
-    echo "<tr>
+    if (ISADMIN()) {
+	echo "<tr>
             <td><a
             href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
             Swappable:</a></td>
             <td class=\"left\">$swappable</td>
           </tr>\n";
-
+    }
+    
     echo "<tr>
             <td><a
             href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
@@ -715,7 +737,7 @@ function SHOWEXP($pid, $eid, $edit=0) {
     echo "<tr>
             <td><a 
             href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
-            Auto-Swap:</a></td>
+            Max. Duration:</a></td>
             <td class=\"left\">$autoswap</td>
           </tr>\n";
 
