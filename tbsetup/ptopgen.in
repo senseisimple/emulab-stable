@@ -183,6 +183,9 @@ foreach $node (keys(%nodes)) {
             #################################################################
             $text .= " sim:100000";
 	}
+
+	$features = get_features($node,$nodes{$node});
+
 	if ($virtstuff && $virtnode_capacity > 0) {
 	    #
 	    # Ditto for jailed nodes
@@ -194,8 +197,16 @@ foreach $node (keys(%nodes)) {
 		$text .= " pcvm:$virtnode_capacity";
 	    }
 	    $text .= " *lan:*";
+	    # Add features
+	    if ($features) {
+		$text .= " - $features";
+	    } else {
+		$text .= " -";
+	    }
 	    # Add trivial bw spec.
-	    $text .= " - - trivial_bw:400000";
+	    $text .= " - trivial_bw:400000";
+	} else {
+	    $text .= " - $features";
 	}
 	print "$text\n";
     }
@@ -375,4 +386,22 @@ sub get_ifacecardport {
     } else {
 	return ();
     }
+}
+
+sub get_features {
+    my ($node, $type) = (@_);
+    #
+    # We don't actually have a per-node feature table yet, so the node is
+    # ignored.
+    #
+
+    my @features;
+    my $result = DBQueryFatal("select feature, weight from " .
+	"node_type_features where type='$type'");
+    while (my ($feature, $weight) = $result->fetchrow()) {
+	push @features, "$feature:$weight";
+    }
+
+    return join(" ",@features);
+
 }

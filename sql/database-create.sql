@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.54-log
+-- Server version	3.23.52-log
 
 --
 -- Table structure for table 'cdroms'
@@ -671,6 +671,17 @@ CREATE TABLE node_status (
   status enum('up','possibly down','down','unpingable') default NULL,
   status_timestamp datetime default NULL,
   PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'node_type_features'
+--
+
+CREATE TABLE node_type_features (
+  type varchar(30) NOT NULL default '',
+  feature varchar(30) NOT NULL default '',
+  weight float NOT NULL default '0',
+  PRIMARY KEY  (type,feature)
 ) TYPE=MyISAM;
 
 --

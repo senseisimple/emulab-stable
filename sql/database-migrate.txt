@@ -757,3 +757,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
         drop table vis_experiments;
 
+1.161: Add a node_type_features table that lists the assign 'features' for each
+       node type:
+
+       create table node_type_features (type varchar(30) not null,
+	   feature varchar(30) not null, weight float not null default 0.0,
+	   primary key (type,feature));
