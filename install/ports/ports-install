@@ -12,8 +12,10 @@ PORTS="elvind emulab-boss emulab-ops libelvin tftp-hpa"
 for PORT in $PORTS
 do
     cp -r $SRCDIR/$PORT $PORTSDIR/$PORTSUBDIR
-    if [ "$?" ]
+    if [ "$?" != "0" ]
     then
 	exit 1
     fi
 done
+
+exit 0
