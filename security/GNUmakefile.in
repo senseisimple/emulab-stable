@@ -28,7 +28,7 @@ suexec:	suexec.c suexec.h
 	$(CC) $(CFLAGS) -o suexec suexec.c
 
 install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
-	$(addprefix $(INSTALL_BINDIR)/, paperbag)
+	$(addprefix $(INSTALL_SBINDIR)/, paperbag)
 	@echo "Don't forget to do a post-install as root"
 
 post-install:

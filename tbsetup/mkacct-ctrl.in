@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl.in,v 1.1 2001-01-04 01:17:07 stoller Exp $
+### $Id: mkacct-ctrl.in,v 1.2 2001-01-04 23:18:12 stoller Exp $
 
 use English;
 use Mysql;
@@ -10,6 +10,8 @@ use Mysql;
 #
 my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
+
+my $PBAG   = "$TB/sbin/paperbag";
 
 my $me;                # alphanumeric username of $UID 
 
@@ -157,7 +159,7 @@ sub dowork() {
     my $cmd = "/usr/sbin/pw useradd $user -u $user_number " .
 		  "-k /usr/share/skel -m " .
 		      "-d /users/$user -g $project " .
-			  "-s $TB/security/paperbag";
+			  "-s $PBAG";
     open(PWADDP, "$cmd 2>&1 |") or die "$0: Could not open pw useradd on paper.";
     while (<PWADDP>) { print "$_"; }
     close(PWADDP);
