@@ -383,7 +383,7 @@ function PAGEBEGINNING( $title ) {
     global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $WWW;
     global $MAINPAGE;
 
-    $MAINPAGE = !strcmp($TBDIR, "/usr/testbed"); 
+    $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/"); 
   
     echo "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 
           'http://www.w3.org/TR/html4/loose.dtd'>
