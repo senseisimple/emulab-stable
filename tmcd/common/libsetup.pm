@@ -298,8 +298,21 @@ sub check_status ()
     my @tmccresults;
 
     if (tmcc(TMCCCMD_STATUS, undef, \@tmccresults) < 0) {
-	warn("*** WARNING: Could not get status from server!\n");
-	return -1;
+	#
+	# Local jails have some load issues that may cause the tmcc
+	# proxy to come up late.  So wait awhile and try again.
+	#
+	if (JAILED()) {
+	    warn("*** WARNING: Could not get status from server, retrying\n");
+	    sleep(5);
+	    if (tmcc(TMCCCMD_STATUS, undef, \@tmccresults) < 0) {
+		warn("*** WARNING: Could not get status from server!\n");
+		return -1;
+	    }
+	} else {
+	    warn("*** WARNING: Could not get status from server!\n");
+	    return -1;
+	}
     }
     #
     # This is possible if the boss node does not now about us yet.
