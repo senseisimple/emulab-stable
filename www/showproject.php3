@@ -77,6 +77,9 @@ if (mysql_num_rows($query_result)) {
 	$state= $projrow[state];
 	$nodes= $projrow["count(r.node_id)"];
 	$name = stripslashes($projrow[expt_name]);
+	if ($projrow[swap_requests] > 0) {
+	  $state .= "&nbsp;(idle)";
+	}
 
         echo "<tr>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
