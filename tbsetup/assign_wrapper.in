@@ -357,6 +357,7 @@ my %expt_stats = (# pnodes include jailnodes and delaynodes.
 		  links       => 0,
 		  walinks     => 0,
 		  lans        => 0,
+		  wirelesslans => 0,
 		  shapedlinks => 0,
 		  shapedlans  => 0,
 		  minlinks    => 100000,
@@ -3923,7 +3924,8 @@ sub CreateTopFile()
 	    # Some other special treatment applies as well.
 	    #
 	    print TOPFILE "node fakelan/$lan $protocol\n";
-	    $expt_stats{"lans"} += 1;
+	    # XXX If not ethernet, assume wireless. Need more info someplace!
+	    $expt_stats{"wirelesslans"} += 1;
 	    $lannodes{"fakelan/$lan"} = 1;
 	    foreach $member (@members) {
 		my $plink = "fakelan/$lan/$member";
