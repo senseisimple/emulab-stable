@@ -20,7 +20,6 @@ my  $optlist = "dn";
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
 my $wansolve    = "$TB/libexec/wanlinksolve";
 my $wansolveargs= "-m 4 -2 7 -v";
 my $waninfo     = "$TB/libexec/wanlinkinfo";
@@ -102,11 +101,6 @@ my %virtlans		= ();
 my %rlanmap		= ();
 
 #
-# How many remote (widearea) nodes total.
-#
-my $remotecount		= 0;
-
-#
 # A list of nodes to allocate with nalloc when we finally get that far.
 #
 my @toreserve;
@@ -136,9 +130,6 @@ sub newnode ($$$$$$) {
 	SOLUTION => undef,      # the solver solution. Might be same as FIXED.
 	MAPPING  => undef,      # Final mapping. 
     };
-    if ($isremote) {
-	$remotecount += 1;
-    }
 }
 sub isremotenode($)	{ return $virtnodes{$_[0]}->{ISREMOTE}; }
 sub isfixednode($)	{ return $virtnodes{$_[0]}->{FIXED}; }
@@ -162,12 +153,15 @@ sub newvlan ($) {
 }
 
 #
-# Get the flag
+# Get the flag uselatest data flag.
 #
 $query_result =
     DBQueryFatal("select uselatestwadata from experiments ".
 		 "where pid='$pid' and eid='$eid'");
 ($uselatestwadata) = $query_result->fetchrow_array();
+if ($uselatestwadata) {
+    printdb("Using latest widearea data.\n");
+}
 
 #
 # Get type map.
@@ -238,10 +232,12 @@ while (my ($vname,$type,$fixed,$isremote,$isvirt) =
 #
 my $typecount  = 0;
 my $classcount = 0;
+my $fixedcount = 0;
 foreach my $vnode (keys(%virtnodes)) {
     if (isremotenode($vnode)) {
 	my $virtnode = $virtnodes{$vnode};
 	my $type     = $virtnode->{TYPE};
+	my $fixed    = $virtnode->{FIXED};
 
 	if ($typemap{$type} eq $type) {
 	    $classcount++;
@@ -249,20 +245,22 @@ foreach my $vnode (keys(%virtnodes)) {
 	else {
 	    $typecount++;
 	}
+	if ($fixed) {
+	    $fixedcount++;
+	}
     }
+}
+#
+# If no remote nodes, we are done.
+#
+if (!$typecount && !$classcount) {
+    print "There are no remote nodes. This is okay!\n";
+    exit(0);
 }
 if ($typecount && $classcount) {
     die("*** $0:\n".
 	"    Bad mix of generic classes and specific types of remote nodes.\n".
 	"    We cannot do that yet!\n");
-}
-
-#
-# If no remote nodes, we are done.
-#
-if (! $remotecount) {
-    print "There are no remote nodes. This is okay!\n";
-    exit(0);
 }
 
 #
@@ -331,7 +329,8 @@ foreach my $vname (keys(%virtlans)) {
     #
     # Create a reverse mapping from the link members to the lans they
     # are part of. Indexed by names (without ports) since the wansolver
-    # only cares about nodes.
+    # only cares about nodes. This is how we map back a pair of vnodes
+    # to the lans the nodes are members of.
     #
     foreach my $member1 (@members) {
 	my ($node1) = split(":",$member1);
@@ -357,29 +356,31 @@ foreach my $vname (keys(%virtlans)) {
 #
 # Assign nodes
 # 
-if ($typecount) {
+if ($typecount || $classcount == $fixedcount) {
     #
     # If the user provided types instead of classes, we have to do the
-    # assignment instead of using the solver. 
+    # assignment instead of using the solver.
+    #
+    # Or, if the user provided classes, but fixed all the nodes, we need to
+    # try to allocate them.
     # 
     foreach my $vnode (keys(%virtnodes)) {
-	if (isremotenode($vnode) && isfixednode($vnode)) {
-	    my $virtnode = $virtnodes{$vnode};
-
-	    #
-	    # A fixed node is easy. Just want to reserve it (or try to).
-	    # 
-	    $virtnode->{MAPPING} = $virtnode->{FIXED};
-	    push(@toreserve, $virtnode->{FIXED});
-	}
-    }
-    foreach my $vnode (keys(%virtnodes)) {
-	if (isremotenode($vnode) && !isfixednode($vnode)) {
+	if (isremotenode($vnode)) {
 	    my $virtnode = $virtnodes{$vnode};
 	    my $type     = $virtnode->{TYPE};
 
+	    if (isfixednode($vnode)) {
+		#
+		# A fixed node is easy. Just want to reserve it (or try to).
+		# 
+		$virtnode->{MAPPING} = $virtnode->{FIXED};
+		push(@toreserve, $virtnode->{FIXED});
+		next;
+	    }
+
 	    #
 	    # Otherwise, create a list of vnodes for each type we need.
+	    # This works as a count as well.
 	    #
 	    if (!defined($mappings{$type})) {
 		$mappings{$type} = [];
@@ -400,7 +401,7 @@ if ($typecount) {
 	printdb("Trying to find $count nodes of type $type\n");
 
 	#
-	# Must exclude anything we decided to reserve.
+	# Must exclude anything we decided to reserve so far.
 	#
 	if (@toreserve) {
 	    foreach my $n (@toreserve) {
@@ -484,40 +485,27 @@ sub printdb {
 # This big ball of goo runs the wan solver.
 #
 sub runwansolver() {
+    open(INPUT, ">wanlinkinfo.input") or
+	die("*** $0:\n".
+	    "    Could not open wanlinkinfo.input: $!\n");
+    
     #
-    # Need to start the wansolver. 
-    # We use perl IPC goo to create a child we can both write to and read from
-    # (normal perl I/O provides just unidirectional I/O to a process).
-    # 
-    if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
-	die("*** $0:\n".
-	    "    socketpair failed: $!\n");
+    # Need the count of remotenodes, plus the boss node if there are
+    # connections to the local testbed. We fix the mapping for the boss node.
+    # Even worse, it requires knowing the name of the boss.
+    #
+    my $seenboss    = 0;
+    my $remotecount = 0;
+	
+    foreach my $vnode (sort(keys(%virtnodes))) {
+	if (isremotenode($vnode)) {
+	    $remotecount++;
+	}
+	elsif (!$seenboss) {
+	    $seenboss = $vnode;
+	    $remotecount++;
+	}
     }
-    CHILD->autoflush(1);
-    PARENT->autoflush(1);
-
-    my $childpid = fork();
-    if (! $childpid) {
-	close CHILD;
-
-	#
-	# Dup our descriptors to the parent, and exec the program.
-	# The parent then talks to it read/write.
-	#
-	open(STDIN,  "<&PARENT") || die "Can't redirect stdin";
-	open(STDOUT, ">&PARENT") || die "Can't redirect stdout";
-	open(STDERR, ">&PARENT") || die "Can't redirect stderr";
-
-	#
-	# Start the solver. We will pipe in the stuff later.
-	# 
-        exec("nice $wansolve $wansolveargs");
-        #exec("cat > /tmp/wansolve");
-	#exec("cat /tmp/wansolved");
-	die("*** $0:\n".
-	    "    exec of $wansolve failed: $!\n");
-    }
-    close PARENT;
 
     #
     # Start the info program, and pipe in the results. The sad fact is that
@@ -528,12 +516,15 @@ sub runwansolver() {
     if ($uselatestwadata) {
 	$waninfoargs .= " -l";
     }
-    open(INFO, "$waninfo $waninfoargs | tee wanlinkinfo.output |") or
+    if (! $seenboss) {
+	$waninfoargs .= " -r";
+    }
+    open(INFO, "$waninfo $waninfoargs |") or
 	die("*** $0:\n".
 	    "    Could not start $waninfo: $!\n");
 
     while (<INFO>) {
-	print CHILD $_;
+	print INPUT $_;
     }
 
     close(INFO) or
@@ -546,30 +537,25 @@ sub runwansolver() {
     #
     # Number of v nodes first.
     #
-    print CHILD $remotecount + 1 . "\n";
+    print INPUT "$remotecount\n";
 
     #
-    # Then a list of v nodes. The first is special (and bogus). We fix the
-    # mapping for the boss node. Even worse, it requires knowing the name
-    # of the boss.
+    # Then a list of v nodes. 
     #
-    my $seenboss = 0;
-
     foreach my $vnode (sort(keys(%virtnodes))) {
 	if (isremotenode($vnode)) {
-	    print CHILD "$vnode";
+	    my $tag = $vnode;
 
 	    #
 	    # Check for fixed mappings. 
 	    #
 	    if (isfixednode($vnode)) {
-		print CHILD " " . physnode($vnode) . ":eth0";
+		$tag = "$tag " . physnode($vnode) . ":eth0";
 	    }
-	    print CHILD "\n";
+	    print INPUT "$tag\n";
 	}
-	elsif (!$seenboss) {
-	    print CHILD "boss boss:ti0\n";
-	    $seenboss = $vnode;
+	elsif ($vnode eq $seenboss) {
+	    print INPUT "boss boss:ti0\n";
 	}
     }
 
@@ -616,20 +602,58 @@ sub runwansolver() {
     foreach my $vnode1 (sort(keys(%latmatrix))) {
 	foreach my $vnode2 (sort(keys(%{ $latmatrix{$vnode1}}))) {
 	    printdb("$vnode1:$vnode2($latmatrix{$vnode1}{$vnode2})  ");
-	    print CHILD "$latmatrix{$vnode1}{$vnode2}  ";
+	    print INPUT "$latmatrix{$vnode1}{$vnode2}  ";
 	}
-	print CHILD "\n";
+	print INPUT "\n";
 	printdb("\n");
     }
 
     foreach my $vnode1 (sort(keys(%bwmatrix))) {
 	foreach my $vnode2 (sort(keys(%{ $bwmatrix{$vnode1}}))) {
 	    printdb("$vnode1:$vnode2($bwmatrix{$vnode1}{$vnode2})  ");
-	    print CHILD "$bwmatrix{$vnode1}{$vnode2}  ";
+	    print INPUT "$bwmatrix{$vnode1}{$vnode2}  ";
 	}
-	print CHILD "\n";
+	print INPUT "\n";
 	printdb("\n");
     }
+    close(INPUT) or
+	die("*** $0:\n".
+	    "    Error closing input file: $!\n");
+
+    #
+    # Need to start the wansolver. 
+    # We use perl IPC goo to create a child we can both write to and read from
+    # (normal perl I/O provides just unidirectional I/O to a process).
+    # 
+    if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
+	die("*** $0:\n".
+	    "    socketpair failed: $!\n");
+    }
+    CHILD->autoflush(1);
+    PARENT->autoflush(1);
+
+    my $childpid = fork();
+    if (! $childpid) {
+	close CHILD;
+
+	#
+	# Dup our descriptors to the parent, and exec the program.
+	# The parent then talks to it read/write.
+	#
+	open(STDIN,  "<&PARENT") || die "Can't redirect stdin";
+	open(STDOUT, ">&PARENT") || die "Can't redirect stdout";
+	open(STDERR, ">&PARENT") || die "Can't redirect stderr";
+
+	#
+	# Start the solver. We will pipe in the stuff later.
+	# Tee does not work here. 
+	# 
+        exec("cat wanlinkinfo.input | nice $wansolve $wansolveargs");
+	#exec("cat /tmp/wansolved");
+	die("*** $0:\n".
+	    "    exec of $wansolve failed: $!\n");
+    }
+    close PARENT;
 
     #
     # Wait for the child to give us some output. We want to be careful not to
