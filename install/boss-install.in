@@ -12,8 +12,6 @@
 # The main things it does not do yet:
 # * Figure out where to put directories such as /usr/testbed - they must
 #   already exist
-# * Do any dhcpd setup - need to figure out if we can use version 3, or how
-#   we're going to get version 2 installed.
 # * Set up named - we probably have to do that later, when the interfaces table
 #   is filled in
 # * Set up a sup tree. Not sure what the right thing to do here is!
@@ -396,7 +394,8 @@ Phase "syslog", "Setting up syslog", sub {
 
     Phase "logdir", "Creating mysql log directory", sub {
 	DoneIfExists($MYSQL_LOGDIR);
-	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
+	mkdir $MYSQL_LOGDIR, 0775 or
+	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
 	ExecQuietFatal("$CHGRP mysql:mysql $LOGDIR");
     };
 
