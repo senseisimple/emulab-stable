@@ -9,7 +9,8 @@ all:	libevent.a
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS += -O -g -static -I. -Wall -DDEBUG
+#CFLAGS += -DDEBUG
+CFLAGS += -O -g -static -I. -Wall -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS += `elvin-config --cflags vin4mt`
 
 OBJS	= event.o util.o

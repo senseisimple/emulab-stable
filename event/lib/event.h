@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.9 2002-02-28 00:16:18 mike Exp $
+ * $Id: event.h,v 1.10 2002-03-05 16:33:41 stoller Exp $
  */
 
 #ifndef __EVENT_H__
@@ -107,19 +107,6 @@ typedef enum {
 typedef void (*event_notify_callback_t)(event_handle_t handle,
                                         event_notification_t notification,
                                         void *data);
-
-/*
- * Debugging and tracing definitions:
- */
-
-#define ERROR(fmt,...) fprintf(stderr, __FUNCTION__ ": " fmt, ## __VA_ARGS__)
-#ifdef DEBUG
-#define TRACE(fmt,...) printf(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
-#define DBG(fmt,...) printf(fmt, ## __VA_ARGS__)
-#else
-#define TRACE(fmt,...)
-#define DBG(fmt,...)
-#endif /* DEBUG */
 
 /*
  * Function prototypes:

@@ -13,8 +13,14 @@
 #include <string.h>
 #include <unistd.h>
 #include "event.h"
-#undef  TRACE
+#include "log.h"
+
+#define ERROR(fmt,...) error(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#ifdef  DEBUG
+#define TRACE(fmt,...) info(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#else
 #define TRACE(fmt,...)
+#endif
 
 static char hostname[MAXHOSTNAMELEN];
 
