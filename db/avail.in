@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 use Mysql;
 
-my $d = 1; #debug mode
+my $d = 0; #debug mode
 
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
@@ -39,15 +39,17 @@ if ( $d ) {
   }
 }
 
-my $join= "nodes as a left join reserved as b on a.node_id=b.node_id";
-my $cols= "a.node_id,a.type";
+my $join= "nodes as a left join reserved as b on a.node_id=b.node_id".
+  " left join node_types as nt on a.type=nt.type";
+my $cols= "a.node_id,a.type,nt.class";
 my $cond= "b.node_id is null and a.role='testnode'";
 my $os = 0;
 my $delta = 0;
 
 if (defined($args{"type"})) {
   # Make it a like, so if they type 'pc' they get pc850 and pc600...
-  $cond .= " and a.type like '%".$args{"type"}."%'" if $args{"type"} ne '='; 
+  $cond .= " and (a.type='".$args{"type"}."' or nt.class='".$args{"type"}."')" 
+    if $args{"type"} ne '=';
 }
 if (defined($args{"os"})) { 
   $os = 1;
