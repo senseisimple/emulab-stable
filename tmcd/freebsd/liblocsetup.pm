@@ -277,7 +277,7 @@ sub dodelays ()
     while (<$TM>) {
 	push(@delays, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (@delays) {
 	$count    = 69;

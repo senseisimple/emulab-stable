@@ -13,7 +13,7 @@ use Exporter;
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd remotenodeupdate remotenodevnodesetup
 
-	 OPENTMCC RUNTMCC MFS
+	 OPENTMCC CLOSETMCC RUNTMCC MFS
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
@@ -167,6 +167,17 @@ sub OPENTMCC($;$)
 }
 
 #
+# Close connection. Die on error.
+# 
+sub CLOSETMCC($) {
+    my($TM) = @_;
+    
+    close($TM)
+	or die $? ? "$TMCC exited with status $?.\n" :
+	            "Error closing pipe: $!\n";
+}
+
+#
 # Run a TMCC command with the provided arguments.
 #
 # usage: RUNTMCC(char *command, char *args)
@@ -239,7 +250,7 @@ sub check_status ()
     
     $TM = OPENTMCC(TMCCCMD_STATUS);
     $_  = <$TM>;
-    close($TM);
+    CLOSETMCC($TM);
 
     if ($_ =~ /^FREE/) {
 	return 0;
@@ -290,7 +301,8 @@ sub domounts()
 	    $mounts{$1} = $2;
 	}
     }
-
+    CLOSETMCC($TM);
+    
     #
     # The MFS version does not support (or need) this DB stuff. Just mount
     # them up.
@@ -442,7 +454,7 @@ sub doifconfig ()
 	    warn "*** WARNING: Bad ifconfig line: $_";
 	}
     }
-    close($TM);
+    CLOSETMCC($TM);
     close(IFC);
     chmod(0755, TMIFC);
 
@@ -486,7 +498,7 @@ sub dorouterconfig ()
     while (<$TM>) {
 	push(@stuff, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (! @stuff) {
 	return 0;
@@ -642,7 +654,7 @@ sub dohostnames ()
 	    warn "*** WARNING: Bad hosts line: $_";
 	}
     }
-    close($TM);
+    CLOSETMCC($TM);
     close(HOSTS);
 
     return 0;
@@ -671,10 +683,12 @@ sub doaccounts ()
 	    #
 	    # Group info goes in the hash table.
 	    #
+	    my $gname = "$1";
+	    
 	    if (REMOTE()) {
-		$1 = "emu-$1";
+		$gname = "emu-${gname}";
 	    }
-	    $newgroups{"$1"} = $2
+	    $newgroups{"$gname"} = $2
 	}
 	elsif ($_ =~ /^ADDUSER LOGIN=([0-9a-z]+)/) {
 	    #
@@ -687,7 +701,7 @@ sub doaccounts ()
 	    warn "*** WARNING: Bad accounts line: $_\n";
 	}
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     dbmopen(%PWDDB, TMPASSDB, 0660) or
 	die("Cannot open " . TMPASSDB . ": $!\n");
@@ -914,7 +928,7 @@ sub dorpms ()
     while (<$TM>) {
 	push(@rpms, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (! @rpms) {
 	return 0;
@@ -953,7 +967,7 @@ sub dotarballs ()
     while (<$TM>) {
 	push(@tarballs, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (! @tarballs) {
 	return 0;
@@ -993,7 +1007,7 @@ sub dostartupcmd ()
     if (defined($_)) {
 	$startupcmd = $_;
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (! $startupcmd) {
 	return 0;
@@ -1036,7 +1050,7 @@ sub dotrafficconfig()
     
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
     ($boss) = split(" ", <$TM>);
-    close($TM);
+    CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_status();
 
     my $cmdline = "$SETUPDIR/trafgen -s $boss";
@@ -1110,9 +1124,10 @@ sub dotrafficconfig()
     if( $startnse ) {
 	print RC "$SETUPDIR/startnse &\n";
     }
-    close($TM);
+    CLOSETMCC($TM);
 
-    # XXX hack: need a separate section for starting up NSE when we support simulated nodes
+    # XXX hack: need a separate section for starting up NSE when we
+    #           support simulated nodes
     if( ! $startnse ) {
 
 	# start NSE if 'tmcc nseconfigs' is not empty
@@ -1126,7 +1141,7 @@ sub dotrafficconfig()
 	    }
 	    print RC "$SETUPDIR/startnse &\n";
 	}
-	close($TM)
+	CLOSETMCC($TM)
     }
     
     if ($didopen) {
@@ -1158,7 +1173,7 @@ sub dotunnels()
     while (<$TM>) {
 	push(@tunnels, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     if (! @tunnels) {
 	return 0;
@@ -1505,7 +1520,7 @@ sub install_deltas ()
     while (<$TM>) {
 	push(@deltas, $_);
     }
-    close($TM);
+    CLOSETMCC($TM);
 
     #
     # No deltas. Just exit and let the boot continue.
