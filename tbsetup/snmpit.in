@@ -308,7 +308,15 @@ foreach my $stack_id (keys %stacks) {
 	# 'default' case
 	die "Unknown stack type $stack_type for stack $stack_id\n";
     }
-    push @stacks, $stack;
+
+    #
+    # Check for error in object creation and bail
+    #
+    if (!$stack) {
+	die "Unable to connect to one or more switches, exiting\n";
+    } else {
+	push @stacks, $stack;
+    }
 }
 
 ######################################################################

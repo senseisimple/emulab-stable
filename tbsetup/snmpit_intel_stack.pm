@@ -68,6 +68,17 @@ sub new($$#@) {
     use snmpit_intel;
     $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG});
 
+	#
+	# Check for failed object creation
+	#
+	if (!$self->{LEADER}) {
+		#
+		# The snmpit_intel object has already printed an error message,
+		# so we'll just return an error
+		#
+		return undef;
+	}
+
     bless($self,$class);
     return $self;
 }
@@ -150,7 +161,7 @@ sub removeVlan($$) {
     $errors += $self->{LEADER}->removePortsFromVlan($vlan_id);
     my $ok = $self->{LEADER}->removeVlan($vlan_id);
 
-    return ($ok && ($errors == 0));
+    return $ok;
 }       
 
 sub portControl ($$@) { 
