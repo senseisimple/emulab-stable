@@ -3997,7 +3997,7 @@ sub CreateTopFile()
 
 		    #
 		    # We allow users to oversubscribe by letting them turn
-		    # off the bandwidth shaping. If however, the link was
+		    # off the bandwidth shaping. If however, if the link was
 		    # shaped for some other reason (like a delay), then
 		    # turn off just the bw shaping part by setting them to 0.
 		    # This is special; means no limits in ipfw.
@@ -4065,7 +4065,7 @@ sub CreateTopFile()
 		    # delay should be inserted only if assign makes it a
 		    # trivial link.		    
 		    #
-		    if (! virtlanallsim($lan)) {
+		    if (!$nobwshaping && !virtlanallsim($lan)) {
 			$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
 					       $nodeport1,$rdelay,$rbw,$rloss,1];
 		    }
@@ -4091,10 +4091,10 @@ sub CreateTopFile()
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
 		if (((($delay >= $delaythresh) ||
-		      &requires_delay($node, $lan, $bw) ||
+		      (!$nobwshaping && &requires_delay($node, $lan, $bw)) ||
 		      ($loss != 0)) || 
 		     (($rdelay >= $delaythresh) ||
-		      &requires_delay($node, $lan, $rbw) ||
+		      (!$nobwshaping && &requires_delay($node, $lan, $rbw)) ||
 		      ($rloss != 0)) ||
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||
@@ -4115,6 +4115,16 @@ sub CreateTopFile()
 			$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
 			my $plink = "linklan/$lan/$member";
 			
+			#
+			# We allow users to oversubscribe by letting them turn
+			# off the bandwidth shaping. If however, if the link was
+			# shaped for some other reason (like a delay), then
+			# turn off just the bw shaping part by setting them to 0.
+			# This is special; means no limits in ipfw.
+			#
+			if ($nobwshaping) {
+			    $bw = $rbw = 0;
+			}
 			$delaylinks{$plink} =
 			    [$member,$delay,$bw,$loss,
 			     $member,$rdelay,$rbw,$rloss,0];
@@ -4176,8 +4186,10 @@ sub CreateTopFile()
 			# delay should be inserted only if assign makes it
 			# a trivial link.
 			#
-			$delaylinks{$plink} = [$member,$delay,$bw,$loss,
-					       $member,$rdelay,$rbw,$rloss,1];
+			if (!$nobwshaping) {
+			    $delaylinks{$plink} = [$member,$delay,$bw,$loss,
+					   $member,$rdelay,$rbw,$rloss,1];
+			}
 		    }
 		    print TOPFILE "\n";
 		}
