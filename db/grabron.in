@@ -51,7 +51,7 @@ while (1) {
 }
 
 sub get_ipmap() {
-    my $result = DBQueryFatal("select node_id,iface,IP from interfaces");
+    my $result = DBQueryFatal("select node_id,iface, IP from interfaces");
     my %map = ();
     while (my ($node_id,$iface,$IP) = $result->fetchrow()) {
 	$map{$IP} = [$node_id, $iface];
@@ -60,10 +60,11 @@ sub get_ipmap() {
 }
 
 sub get_bandwidths() {
-    my $result = DBQueryFatal("select IP1,IP2,bandwidth from widearea_delays");
+    my $result = DBQueryFatal("select node_id1,iface1,node_id2,iface2, ".
+	    "bandwidth from widearea_delays");
     my %map = ();
-    while (my ($IP1,$IP2,$bandwidth) = $result->fetchrow()) {
-	$map{"$IP1:$IP2"} = $bandwidth;
+    while (my ($node1,$if1,$node2,$if2,$bandwidth) = $result->fetchrow()) {
+	$map{"$node1:$if1 $node2:$if2"} = $bandwidth;
     }
     return %map;
 }
@@ -89,12 +90,13 @@ sub upload_times($$$) {
 	    next;
 	}
 	my ($node_id2, $iface2) = @{$ipmap{$dst}};
-	if (!$bandwidths{"$src:$dst"}) {
-	    warn "Got a pair ($src:$dst) that has no bandwidth\n";
+	if (!$bandwidths{"$node_id1:$iface1 $node_id2:$iface2"}) {
+	    warn "Got a pair ($node_id1:$iface1 $node_id2:$iface2) that has ".
+		    "no bandwidth\n";
 	    $failed++;
 	    next;
 	}
-	my $bandwidth = $bandwidths{"$src:$dst"};
+	my $bandwidth = $bandwidths{"$node_id1:$iface1 $node_id2:$iface2"};
 	if (!defined($latency)) {
 	    #
 	    # If no latency, that means we can't get there from here, so
@@ -108,7 +110,8 @@ sub upload_times($$$) {
 		" IP2='$dst', time=$latency, node_id1='$node_id1', " .
 		" iface1='$iface1', node_id2='$node_id2', iface2='$iface2', " .
 		" bandwidth=$bandwidth, time_stddev='$stddev', " .
-		" lossrate='$lossrate'");
+		" lossrate='$lossrate', start_time=$::last_time, " .
+		" end_time=$::end_time");
 
     }
 
@@ -169,6 +172,13 @@ sub get_times($) {
     }
 
     print "Giving: $last_time $end_time\n";
+
+    #
+    # Set some gloabls, so that other functions see these times
+    #
+    $::last_time = $last_time;
+    $::end_time = $end_time;
+
     print $remote "$last_time $end_time\n";
 
     #
