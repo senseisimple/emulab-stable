@@ -24,8 +24,8 @@
 The mobile wireless testbed integrates robots and motes into the standard
 Emulab testbed.  If you want to know how to create experiments utilizing these
 resources, check out the <a href="/tutorial/mobilewireless.php3">tutorial</a>.
-This document is intended to provide an in-depth description of what makes up
-this part of Emulab.
+This document is intended to provide a more in-depth description of what makes
+up this part of Emulab.
 
 <p>
 <li> <a NAME="HARDWARE"></a>
@@ -58,11 +58,21 @@ href="/robotmap.php3">robot map</a> by selecting the "Show Tracking Camera
 Bounds" display option.
 
 <p>
+Currently the accuracy of the vision system with respect to the real world
+coordinates is around 10cm, but is usually closer to 5cm.  We are working to
+improve this wherever possible, but it may take some time.
+
+<p>
 <li> <a NAME="NAVIGATION"></a>
      <h3>Robot Navigation</h3>
 
-Due to physical obstacles in the robot area and the size and maneuverability of
-the robots, there are limitations on where the robots can go and how they can
-get there.
+Due to obstacles in the area and the size and maneuverability of the robots,
+there are limitations on where the robots can go and how they can get there.
+For example, the "tail" of the robot sticks out further from the center axis of
+the wheels than its "head", so there needs to be a fair amount of clearance for
+the robot to be able to pivot correctly.  Therefore, we enforce a 0.25 meter
+exclusion zone around obstacles to ensure the robots can maneuver freely.
+These exclusion zones can be seen on the <a href="/robotmap.php3">robot map</a>
+by selecting the "Show Exclusion Zones" display option.
 
 </ul>

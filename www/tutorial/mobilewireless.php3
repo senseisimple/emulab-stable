@@ -122,7 +122,11 @@ that hosts a mote with a wireless network interface.  The goal of this "mobile
 wireless testbed" is to give users an opportunity to conduct experiments with
 wireless nodes in configurable physical locations and while in motion.  For
 example, mobile nodes could be used to realistically test and evaluate an
-ad-hoc routing algorithm in a fairly repeatable manner.
+ad-hoc routing algorithm in a fairly repeatable manner.  This document is
+intended as a tutorial for those interested in making use of this testbed,
+there is also a short <a href="<?php echo
+$TBBASE?>/doc/docwrapper.php3?docname=mobilewireless.html">reference manual</a>
+available that gives details about the workings of the system.
 
 <br>
 <br>
