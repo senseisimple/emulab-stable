@@ -40,7 +40,7 @@ function GENPLIST ($which, $query_result)
 	}
 
 	echo "<td align=center>";
-	echo "<img border=1 width=128 height=128 class='stealth' ".
+	echo "<img border=1 class='stealth' ".
 	    " src='showthumb.php3?idx=$rsrcidx'>".
 	    " $swapdate" .
 	    "</td>";

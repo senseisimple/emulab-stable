@@ -335,7 +335,7 @@ if ($thumb && !$idle) {
 	    if ($pid != "emulab-ops") {
 		echo "<td align=center>".
 		     "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
-		     "<img border=1 width=128 height=128 class='stealth' ".
+		     "<img border=1 class='stealth' ".
 		     " src='showthumb.php3?idx=$rsrcidx'>".
 		     "<br>\n".
 		     "<b>".
@@ -352,9 +352,9 @@ if ($thumb && !$idle) {
 	    echo "<td>".
 		 "<table border=0 cellpadding=4 cellspacing=0>".
 		 "<tr>".
-		 "<td width=128 align=center>".
+		 "<td width=160 align=center>".
 	         "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
-		 "<img border=1 width=128 height=128 class='stealth' ".
+		 "<img border=1 class='stealth' ".
 		 " src='showthumb.php3?idx=$rsrcidx'>".
 	         "</a>".
                  "</td>".
