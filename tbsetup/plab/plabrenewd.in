@@ -1,0 +1,36 @@
+#!/usr/local/bin/python
+
+import sys
+sys.path.append("@prefix@/lib")
+import libtestbed
+import libplab
+
+RENEW_PERIOD = 60*60
+
+def usage(me):
+    print "Usage: %s [ -vd ]" % me
+    sys.exit(1)
+    return # NOTREACHED
+
+def main(args):
+    me = args[0]
+    try:
+        args = libtestbed.handleArgs(args[1:])
+    except getopt.GetoptError:
+        usage(me)
+        pass
+
+    plab = libplab.Plab()
+    daemon = libtestbed.pydaemon(libtestbed.pydaemon.SYSLOG)
+
+    if not libtestbed.debug:
+        daemon.daemonize()
+        pass
+    
+    daemon.daemonLoop(plab.renew, RENEW_PERIOD)
+
+    return # NOTREACHED
+
+if __name__ == "__main__":
+    main(sys.argv)
+

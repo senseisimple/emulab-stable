@@ -910,7 +910,7 @@ IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
 PLAB_ROOTBALL="plabroot-9.tar.bz2"
-PLAB_SLICEPREFIX="emulab"
+PLAB_SLICEPREFIX="utah"
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 
@@ -1433,12 +1433,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
         tbsetup/plab/libtestbed.py tbsetup/plab/libdb.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
-	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
+	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
 	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
-	tbsetup/plab/etc/netbed_files/GNUmakefile \
+	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tip/GNUmakefile \

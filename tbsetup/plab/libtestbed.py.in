@@ -4,8 +4,11 @@ import sys
 import os
 import time
 import signal
+import syslog
 import traceback
 import xmlrpclib
+
+from warnings import warn
 
 #
 # Constants
@@ -22,6 +25,8 @@ DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 DEF_SLEEPINT = 5
 DEF_TRIES    = 3
 DEF_TIMEOUT  = 1*60     # default timeout interval
+
+MAXCONSECEXC = 3
 
 #
 # informational output control variables
@@ -389,3 +394,138 @@ def tryXmlrpcCmd(cmd, args = (),
             # exception.
             print "Giving up after %s tries" % inittries
             raise
+
+
+class logger:
+    def __init__(self, logname):
+        syslog.openlog(logname, syslog.LOG_PID, syslog.LOG_USER)
+        self.buf = ""
+        return
+
+    def close(self):
+        syslog.closelog()
+        return
+
+    def flush(self): pass
+    
+    def write(self, str):
+        # Ugh
+        self.buf += str
+        while self.buf.find("\n") >= 0:
+            pos = self.buf.find("\n")
+            line = self.buf[:pos]
+            self.buf = self.buf[pos+1:]
+            syslog.syslog(line)
+            pass
+        return # XXX: need to return # bytes written?
+    pass
+
+
+class pydaemon:
+
+    SYSLOG = "__SysLog__"
+    
+    def __init__(self, logname = ""):
+        self.logname = logname
+        return
+
+    def daemonize(self):
+        """
+        Fork off into a daemon process, redirecting stdout and stderr to
+        logfile.
+
+        Based on code from the ASPN Python Cookbook.
+        """
+        # First fork
+        if os.fork():
+            sys.exit(0)
+            pass
+            
+        # Decouple from parent environment.
+        os.chdir("/") 
+        os.umask(0) 
+        os.setsid() 
+        
+        # Second fork
+        if os.fork():
+            sys.exit(0)
+            pass
+
+        # Redirect standard fd's
+        si = open("/dev/null", 'r')
+        so = open("/dev/null", 'a+', 0)
+        os.dup2(si.fileno(), sys.stdin.fileno())
+        os.dup2(so.fileno(), sys.stdout.fileno())
+        os.dup2(so.fileno(), sys.stderr.fileno())
+
+        # Redirect output
+        outfile = None
+        if self.logname == self.SYSLOG:
+            outfile = logger(SCRIPTNAME)
+            pass
+        elif self.logname:
+            outfile = open(logname, "a+")
+            pass
+        else:
+            return
+
+        if outfile:
+            sys.stdout = sys.stderr = outfile
+            pass
+        else:
+            print "Couldn't open output log"
+            pass
+
+        return
+
+    
+    def daemonLoop(self, func, period, maxconsecexc = MAXCONSECEXC):
+        """
+        Forks off into a daemon process with output directed to logfile, and
+        calls the given func every period seconds.
+        """
+        import time
+        import traceback
+
+        consecexc = maxconsecexc
+        while True:
+            start = time.clock()
+            try:
+                func()
+                pass
+            except SignalInterrupt, e:
+                print "Received signal %s in daemon loop, exiting." % e.signum
+                sys.exit(0)
+                pass
+            except KeyboardInterrupt:
+                print "Received keyboard interrupt in daemon loop, exiting."
+                sys.exit(1)
+                pass
+            except:
+                print "Exception caught in plab daemon loop:"
+                print "".join(traceback.format_exception(*sys.exc_info()))
+                consecexc -= 1
+                if consecexc > 0:
+                    print "Going back to sleep until next scheduled run"
+                else:
+                    print "Too many consecutive exceptions seen, bailing out!"
+                    SENDMAIL(TBOPS, "%s Exiting",
+                             "The plab %s daemon has seen too many "
+                             "consecutive exceptions and is bailing out."
+                             "Someone needs to check the log!" %
+                             (SCRIPTNAME, func.func_name), TBOPS)
+                    raise
+                pass
+            else:
+                consecexc = maxconsecexc
+                pass
+            
+            end = time.clock()
+            if end - start < period:
+                wait = period - (end - start)
+                print "Sleeping %g seconds" % wait
+                time.sleep(wait)
+                pass
+            pass
+        
+        return # NOTREACHED

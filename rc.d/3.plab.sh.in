@@ -4,11 +4,9 @@
 #
 case "$1" in
 	start)
-		if [ -x @prefix@/sbin/plabdaemon  ]; then
-			echo -n " plabrenew"
-			@prefix@/sbin/plabdaemon -v renew
-			echo -n " plabgetfree"
-			@prefix@/sbin/plabdaemon -v getfree
+		if [ -x @prefix@/sbin/plabrenewd  ]; then
+			echo -n " plabrenewd"
+			@prefix@/sbin/plabrenewd -v
 		fi
 
 		if [ -x @prefix@/sbin/plabmonitord  ]; then

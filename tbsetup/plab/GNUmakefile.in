@@ -14,8 +14,8 @@ include $(OBJDIR)/Makeconf
 
 SUBDIRS		= libdslice etc
 
-SBIN_STUFF	= plabslice plabnode plabdaemon plabmetrics plabstats \
-		  plabmonitord plablinkdata plabdist plabhttpd
+SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
+		  plabmonitord plablinkdata plabdist plabhttpd plabdiscover
 
 LIB_STUFF       = libplab.py libtestbed.py libdb.py mod_dslice.py mod_PLC.py
 

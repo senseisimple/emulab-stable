@@ -16,6 +16,7 @@ from libtestbed import *
 #
 # Constants
 #
+LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 AGENTIP = "dslice.planet-lab.org"
 ELABPUBKEYFILE = "/root/.ssh/identity.pub"
 
@@ -35,12 +36,15 @@ class mod_dslice:
         self.modname = "mod_dslice"
         pass
     
-    def createSlice(self, slicename):
+    def createSlice(self, slice):
         privkey, pubkey = self.__genKeypair()
-        return (1, cPickle.dumps((privkey, pubkey)))
+        return (1, cPickle.dumps((privkey, pubkey)), None)
 
-    def deleteSlice(self, slicename):
-        pass
+    def deleteSlice(self, slice):
+        return
+
+    def renewSlice(self, slice):
+        return (0, slice.slicemeta, None)
 
     def createNode(self, node):
         # Get a ticket, and redeem it for a vm lease

@@ -86,6 +86,7 @@ class PLCagent:
     def listSlice(self):
         return self.__server.listSlice(self.__auth)
 
+    pass # end of PLCagent class
 
 
 class mod_PLC:
@@ -93,9 +94,10 @@ class mod_PLC:
         self.modname = "mod_PLC"
         pass
 
-    def createSlice(self, slicename):
+    def createSlice(self, slice):
 
-        agent = PLCagent(slicename)
+        agent = PLCagent(slice.slicename)
+        res = None
 
         try:
             res = tryXmlrpcCmd(agent.createSlice)
@@ -104,7 +106,7 @@ class mod_PLC:
                 pass
             pass
         except:
-            print "Failed to create slice %s" % slicename
+            print "Failed to create slice %s" % slice.slicename
             raise
         
         try:
@@ -115,7 +117,7 @@ class mod_PLC:
                 pass
             pass
         except:
-            print "Failed to assign emulabman to slice %s" % slicename
+            print "Failed to assign emulabman to slice %s" % slice.slicename
             raise
         
         try:
@@ -127,15 +129,35 @@ class mod_PLC:
                 pass
             pass
         except:
-            print "Failed to assign shares to slice %s" % slicename
+            print "Failed to assign shares to slice %s" % slice.slicename
             raise
         
-        return (res, None)
+        leaseend = time.time() + DEF_PLC_LEASELEN
+        return (res, None, leaseend)
 
-    def deleteSlice(self, slicename):
-        agent = PLCagent(slicename)
+    def deleteSlice(self, slice):
+        agent = PLCagent(slice.slicename)
         tryXmlrpcCmd(agent.deleteSlice)
         pass
+
+    def renewSlice(self, slice):
+        agent = PLCagent(slice.slicename)
+        res = None
+        
+        try:
+            res = tryXmlrpcCmd(agent.AssignShares,
+                               (DEF_PLC_LEASELEN,
+                                DEF_PLC_SHARES))
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to assign shares to slice %s" % slice.slicename
+            raise
+        
+        leaseend = time.time() + DEF_PLC_LEASELEN
+        return (res, None, leaseend)
 
     def createNode(self, node):
         # add the node to the PLC slice.
@@ -184,10 +206,10 @@ class mod_PLC:
         except:
             print "Failed to instantiate sliver %s on slice %s" % \
                   (node.nodeid, node.slice.slicename)
+            self.freeNode(node)
             raise
         
-        leaselen = time.time() + DEF_PLC_LEASELEN
-        return (res, None, leaselen)
+        return (res, None, None)
 
     def freeNode(self, node):
         agent = PLCagent(node.slice.slicename)
@@ -203,8 +225,8 @@ class mod_PLC:
             raise
         return res
 
-    # XXX: implement
     def renewNode(self, node, length = 0):
         return(0,None,None)
 
-    
+    pass # end of mod_PLC class
+

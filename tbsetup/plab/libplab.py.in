@@ -43,7 +43,6 @@ agents = {'PLC'    : mod_PLC,
 #
 DEF_AGENT = "PLC";
 
-LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
 RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
@@ -58,7 +57,8 @@ MONITOR_PID  = "emulab-ops"
 MONITOR_EID  = "plab-monitor"
 
 MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
-MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
+MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113",
+                       "205.124.249.121", "205.124.249.115")
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 # right now these are the only 2.0 machines running the new slice interface:
@@ -408,7 +408,7 @@ class Plab:
         osigs = disable_sigs(TERMSIGS)
         defosid, controliface = self.__getNodetypeInfo()
         nodeid = NODEPREFIX + nodeent['NODEID']
-        priority = PLABBASEPRIO + int(nodeid)
+        priority = PLABBASEPRIO + int(nodeent['NODEID'])
         hostonly = nodeent['HNAME'].replace(".", "-")
         site = BADSITECHARS.sub("-", nodeent['SITE'])
         
@@ -559,65 +559,124 @@ class Plab:
         
         return nodeid, priority
 
-    # XXX: Review..
+    # XXX: might want to just call into slice.renew and let module specific
+    # code deal with individual node renew if it tracks at that level.
     def renew(self):
         """
         Renews all of the Plab leases that are going to expire soon.
         """
+        
         print "Renewing Plab leases ..."
         # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
         # returns the local time
-        import time
         now = int(time.mktime(time.gmtime()))
         endtime = now + RENEW_TIME
-        res = DBQueryFatal("select node_id, pid, eid,"
-                           " unix_timestamp(leaseend) from plab_slice_nodes"
-                           " where %s > unix_timestamp(leaseend)",
-                           (endtime, ))
+        res = DBQueryFatal("select NULL, pid, eid,"
+                            " unix_timestamp(leaseend) from plab_slices"
+                            " where leaseend != NULL and"
+                            "  %s > unix_timestamp(leaseend)",
+                            (endtime, ))
+        res += DBQueryFatal("select node_id, pid, eid,"
+                            " unix_timestamp(leaseend) from plab_slice_nodes"
+                            " where leaseend != NULL and"
+                            "  %s > unix_timestamp(leaseend)",
+                            (endtime, ))
+        
         loadedSlices = {}
-        global failedrenew
+        global failedrenew # XXX
         newfail = []
         failsoon = []
+        ret = 0
+
         for entry in res:
             nodeid, pid, eid, tstamp = entry
+
+            if tstamp <= now:
+                if nodeid:
+                    print "WARNING: Node lease for %s (%s/%s) has expired!" % \
+                          (nodeid, pid, eid)
+                    pass
+                else:
+                    print "WARNING: Slice lease for %s/%s has expired!" % \
+                          (pid, eid)
+                    pass
+                continue
+
             try:
                 slice = loadedSlices[(pid, eid)]
+                pass
             except KeyError:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
-            node = slice.loadNode(nodeid)
-
-            if tstamp <= now:
-                print "WARNING: Lease for %s %s/%s has expired!" % entry[:3]
-                continue
+                pass
             
-            if node.renew():
-                print "Failed to renew lease for %s %s/%s" % entry[:3]
+            if nodeid:
+                node = slice.loadNode(nodeid)
+                ret = node.renew()
+                pass
+            else:
+                try:
+                    res, slicemeta, leaselen = \
+                         self.agent.renewSlice(slice.slicename)
+                    ret = 1
+                    pass
+                except:
+                    ret = 0
+
+            if not ret:
+                if nodeid:
+                    print "Failed to renew lease for %s (%s/%s)" % \
+                          (nodeid, pid, eid)
+                    pass
+                else:
+                    print "Failed to renew lease for %s/%s" % \
+                          (pid, eid)
+                    pass
                 if entry not in failedrenew:
                     newfail.append(entry)
+                    pass
                 if (tstamp - now) < (2*3600):
                     failsoon.append(entry)
+                    pass
+                pass
             else:
                 if entry in failedrenew:
                     failedrenew.remove(entry)
-                
+                    
         if newfail:
             failedrenew += newfail
             failstr = ""
             for n in newfail:
-                failstr += "%s %s/%s\n" % n[:3]
+                if n[0]:
+                    failstr += "%s (%s/%s)\n" % n[:3]
+                    pass
+                else:
+                    failstr += "%s/%s\n" % n[1:3]
+                    pass
+                pass
             SENDMAIL(TBOPS, "Lease renewal(s) failed",
                      "Failed to renew lease on the following nodes:\n%s" %
                      failstr + "\n\nPlease check the plabrenew log", TBOPS)
+            pass
 
         if failsoon:
             failstr = ""
             for n in failsoon:
-                failstr += "%s %s/%s: expires: %s\n" % \
-                           (n[:3] + (time.ctime(n[3]),))
+                if n[0]:
+                    failstr += "%s (%s/%s): expires: %s\n" % \
+                               (n[:3] + (time.ctime(n[3]),))
+                    pass
+                else:
+                    failstr += "%s/%s: expires: %s\n" % \
+                               (n[1:3] + (time.ctime(n[3]),))
+                    pass
             SENDMAIL(TBOPS, "WARNING: PLAB leases are about to expire",
                      "The following plab leases are about to expire:\n%s" %
                      failstr + "\n\nPlease look into it!", TBOPS)
+            pass
+        return
+    
+    pass # end class Plab
 
 
 #
@@ -646,20 +705,18 @@ class Slice:
         self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
         
         print "Creating Plab slice %s." % self.slicename
-
+        
         try:
-            res, self.slicemeta = \
-                 self.plab.agent.createSlice(self.slicename)
-            if res:
-                DBQueryFatal("insert into plab_slices"
-                             " (pid, eid, slicename, slicemeta) "
-                             " values (%s, %s, %s, %s)",
-                             (self.pid, self.eid, self.slicename,
-                              self.slicemeta))
-                pass
+            res, self.slicemeta, self.leaseend = \
+                 self.plab.agent.createSlice(self)
+
+            DBQueryFatal("insert into plab_slices"
+                         " values (%s, %s, %s, %s, FROM_UNIXTIME(%s))",
+                         (self.pid, self.eid, self.slicename,
+                          self.slicemeta, self.leaseend))
             pass
         except:
-            self.plab.agent.deleteSlice(self.slicename)
+            self.plab.agent.deleteSlice(self)
             DBQueryFatal("delete from plab_slices where slicename=%s",
                          (self.slicename,))
             raise
@@ -686,6 +743,31 @@ class Slice:
         ((self.slicename, self.slicemeta), ) = res
         pass
 
+    def renew(self):
+        """
+        Renews slice lease, if applicable to selected backend agent.
+        """
+        print "Renewing lease for slice %s" % self.slicename
+
+        ret = 0
+        try:
+            res, self.slicemeta, self.leaseend = \
+                 self.plab.agent.renewSlice(self)
+            
+            DBQueryFatal("replace into plab_slices"
+                         " values (%s, %s, %s, %s, FROM_UNIXTIME(%s))",
+                         (self.pid, self.eid, self.slicename,
+                          self.slicemeta, self.leaseend))
+            ret = 1
+            pass
+        except:
+            print "Slice renewal failed!"
+            traceback.print_exc()
+            ret = 0
+            pass
+        
+        return ret        
+
     def destroy(self):
         """
         Frees all nodes in this slice and destroys the slice.  Note
@@ -706,7 +788,7 @@ class Slice:
         osigs = disable_sigs(TERMSIGS)
 
         try:
-            self.plab.agent.deleteSlice(self.slicename)
+            self.plab.agent.deleteSlice(self)
             pass
         except:
             print "Failed to delete slice!"
@@ -786,7 +868,7 @@ class Node:
 
         print "Creating Plab node %s on %s." % (self.nodeid, self.IP)
         res, self.nodemeta, self.leaselen = \
-                    self.slice.plab.agent.createNode(self)
+             self.slice.plab.agent.createNode(self)
         
         DBQueryFatal("replace into plab_slice_nodes"
                      " (pid, eid, slicename, node_id,"
@@ -865,7 +947,7 @@ class Node:
         """
         res = ForkCmd(self._renew, timeout = RENEW_TIMEOUT,
                       disable_sigs_parent = TERMSIGS)
-        return res[0] | res[1]
+        return not (res[0] | res[1])
 
     def _renew(self):
         res, self.nodemeta, self.leaseend = \
