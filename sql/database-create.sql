@@ -157,8 +157,8 @@ CREATE TABLE deltas (
 CREATE TABLE elabinelab_vlans (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  inner_id int(11) unsigned NOT NULL default 0,
-  outer_id int(11) unsigned NOT NULL default 0,
+  inner_id int(11) unsigned NOT NULL default '0',
+  outer_id int(11) unsigned NOT NULL default '0',
   PRIMARY KEY  (pid,eid,inner_id)
 ) TYPE=MyISAM;
 
@@ -2027,7 +2027,7 @@ CREATE TABLE webnews (
   date datetime default NULL,
   author varchar(32) default NULL,
   body text,
-  archived tinyint(1) default '0',
+  archived tinyint(1) NOT NULL default '0',
   archived_date datetime default NULL,
   PRIMARY KEY  (msgid),
   KEY date (date)

@@ -2124,3 +2124,4 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table webnews add archived_date datetime default NULL \
 	        after archived;
 
+1.273: Fix errors in last revision; skip to next entry.
