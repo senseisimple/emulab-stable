@@ -14,7 +14,7 @@
 # A project
 #
 function SHOWPROJECT($pid, $thisuid) {
-    global $WIKISUPPORT, $WIKIURL;
+    global $WIKISUPPORT;
 
     $query_result =
 	DBQueryFatal("select p.*,g.wikiname from projects as p ".
@@ -92,7 +92,7 @@ function SHOWPROJECT($pid, $thisuid) {
           </tr>\n";
 
     if ($WIKISUPPORT && isset($wikiname)) {
-	$wikiurl = "${WIKIURL}/$wikiname/WebHome";
+	$wikiurl = "gotowiki.php3?redurl=$wikiname/WebHome";
 	
 	echo "<tr>
                   <td>Project Wiki:</td>
@@ -383,7 +383,7 @@ function SHOWGROUPMEMBERSHIP($uid) {
 # A User
 #
 function SHOWUSER($uid) {
-    global $WIKISUPPORT, $WIKIURL;
+    global $WIKISUPPORT;
 
     $userinfo_result =
 	DBQueryFatal("SELECT * from users where uid='$uid'");
@@ -468,7 +468,7 @@ function SHOWUSER($uid) {
           </tr>\n";
 
     if ($WIKISUPPORT && isset($wikiname)) {
-	$wikiurl = "${WIKIURL}/Main/$wikiname";
+	$wikiurl = "gotowiki.php3?redurl=Main/$wikiname";
 	
 	echo "<tr>
                   <td>Emulab Wiki Page:</td>

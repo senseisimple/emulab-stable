@@ -366,8 +366,8 @@ function WRITESIDEBAR() {
 		    $wikiname = $CHECKLOGIN_WIKINAME;
 		
 		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
-					       "${WIKIURL}/Main/$wikiname",
-					       "${WIKIURL}/Main/$wikiname");
+			       "gotowiki.php3?redurl=Main/$wikiname",
+			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
 	    
 		WRITESIDEBARBUTTON("Update User Information",
@@ -391,8 +391,8 @@ function WRITESIDEBAR() {
 		    $wikiname = $CHECKLOGIN_WIKINAME;
 		
 		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
-					       "${WIKIURL}/Main/$wikiname",
-					       "${WIKIURL}/Main/$wikiname");
+			       "gotowiki.php3?redurl=Main/$wikiname",
+			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
 	    
                 # Since a user can be a member of more than one project,

@@ -13,6 +13,7 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addwikiuser addwikiproj wikisetup delwikiuser \
 			  setwikigroups
+LIBEXEC_SCRIPTS		= wikixlogin
 
 CTRL_SBIN_SCRIPTS	= wikiproxy
 CTRL_LIB_FILES		= usertemplate webhometemplate
@@ -21,11 +22,13 @@ CTRL_LIB_FILES		= usertemplate webhometemplate
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIB_FILES)
+all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIB_FILES) \
+	$(LIBEXEC_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/wiki/, $(CTRL_LIB_FILES))
 
@@ -42,6 +45,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/addwikiproj
 	chown root $(INSTALL_SBINDIR)/setwikigroups
 	chmod u+s $(INSTALL_SBINDIR)/setwikigroups
+	chown root $(INSTALL_LIBEXECDIR)/wikixlogin
+	chmod u+s $(INSTALL_LIBEXECDIR)/wikixlogin
 
 #
 # Control node installation (okay, plastic)

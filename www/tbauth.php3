@@ -530,6 +530,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
+    global $WIKISUPPORT, $WIKICOOKIENAME;
     
     # Caller makes these checks too.
     if ((!TBvalid_uid($token) && !TBvalid_email($token)) ||
@@ -785,6 +786,7 @@ function VERIFYPASSWD($uid, $password) {
 #
 function DOLOGOUT($uid) {
     global $CHECKLOGIN_STATUS, $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
+    global $WIKISUPPORT, $WIKICOOKIENAME;
 
     # Pedantic check.
     if (!TBvalid_uid($uid)) {
@@ -811,6 +813,9 @@ function DOLOGOUT($uid) {
     #
     setcookie($TBAUTHCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    if ($WIKISUPPORT) {
+	setcookie($WIKICOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    }
 
     return 0;
 }

@@ -40,6 +40,7 @@ my $WIKIGROUPDIR = "$WIKIDATADIR/Main";
 my $WIKIARCHIVE  = "$WIKIDATADIR/_archive";
 my $WIKIPASSWD   = "$WIKIDIR/data/.htpasswd";
 my $USERMAPDB    = "$WIKIDIR/data/.usermap";
+my $COOKIEDIR    = "/var/db/cgisess";
 my $WIKIUSER     = "nobody";
 my $WIKIGROUP    = "nobody";
 my $CI		 = "ci";
@@ -98,6 +99,9 @@ elsif ($action eq "addproject") {
 }
 elsif ($action eq "setgroups") {
     exit(SetWikiGroups(@ARGV));
+}
+elsif ($action eq "xlogin") {
+    exit(WikixLogin(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -723,6 +727,31 @@ sub CI($$) {
         return system($cmd);	
     }
     return $? >> 8;
+}
+
+#
+# Backdoor Login
+#
+sub WikixLogin(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $secretkey) = @_;
+
+    #
+    # Create a little file that holds the secret key, named by the user.
+    # The TWiki login script will check for the existence of this file,
+    # and use the key inside it to match against the key provided by the
+    # client browser.
+    #
+    open(KEY, ">${COOKIEDIR}/$user") or
+	fatal("Could not open ${COOKIEDIR}/$user for writing!");
+
+    print KEY "$secretkey\n";
+    print KEY time() . "\n";
+    close(KEY);
+    return 0;
 }
      
 sub fatal($)

@@ -24,8 +24,17 @@ use TWiki;
 use TWiki::Plugins::SessionPlugin;
 
 my $oopsurl = "oopsloginfail";
+my $CREDDIR = "/var/db/cgisess";
 
 $query= new CGI;
+
+sub myerror($)
+{
+    my ($msg) = @_;
+
+    my $url = &TWiki::getOopsUrl(undef, "", $oopsurl, $msg);
+    TWiki::redirect($query, $url);
+}
 
 &main();
 
@@ -34,17 +43,61 @@ sub main
     my $username = $query->param('username');
     my $password = $query->param('password');
     my $redurl   = $query->param('redurl');
+    my $bosscred = $query->param('bosscred');
 
-    chomp($username);
-    chomp($password);
+    #
+    # If bosscred provided, boss is trying to autologin the user using
+    # a key that it sent across via a backend script and stashed in the
+    # cookie dir. Find that file, compare the keys and if the key is not
+    # too terribly old, give the user the nod.
+    #
+    if (defined($bosscred)) {
+	if (!defined($username) || $username eq "") {
+	    myerror("Missing username argument");
+	    return;
+	}
 
-    if (! ($username && $password)) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
-			     "Missing arguments (username or password)");
+	my $file = "${CREDDIR}/$username";
 
-        TWiki::redirect( $query, $url );
+	if (! -e $file) {
+	    myerror("Cred file does not exist!");
+	    return;
+	}
+	if (!open(COK, $file)) {
+	    myerror("Cannot open cred file!");
+	    return;
+	}
+	my $cred  = <COK>;
+	my $stamp = <COK>;
+	close(COK);
+
+	# Compare credentials.
+	if (defined($cred)) {
+	    chomp($cred);
+	    if ($cred eq $bosscred) {
+		goto accepted;
+	    }
+	}
+	# Does not match. Redirect to login page.
+      dologon:
+	my $url = &TWiki::getViewUrl("TWiki", "DoLogin");
+	$url .= "?username=${username}";
+	$url .= "&redurl=${redurl}"
+	    if (defined($redurl) && $redurl ne "");
+	
+	TWiki::redirect($query, $url);
 	return;
     }
+
+    #
+    # Normal login.
+    # 
+    if (! ($username && $password)) {
+	myerror("Missing arguments (username or password)");
+	return;
+    }
+    chomp($username);
+    chomp($password);
 
     #
     # Suck out the password entry.
@@ -63,9 +116,7 @@ sub main
     close(HTP);
 
     if (!defined($pwentry)) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
-				     "No such user: '$username'");
-        TWiki::redirect( $query, $url );
+	myerror("No such user: '$username'");
 	return;
     }
 
@@ -78,15 +129,14 @@ sub main
     my $str = crypt($password, $encryptedpasswd);
 
     if ($str ne $encryptedpasswd) {
-        my $url = &TWiki::getOopsUrl(undef, "", $oopsurl,
-				     "Incorrect Password");
-        TWiki::redirect( $query, $url );
+	myerror("Incorrect Password");
 	return;
     }
-
+ 
     # This causes the query object to suddenly have a remote_user() value.
     # SessionPlugin uses that ...
-    $ENV{REMOTE_USER} = $username;
+ accepted:
+   $ENV{REMOTE_USER} = $username;
 
     #
     # Stuff we need to pass down. Note that I am not bothering with the
