@@ -428,7 +428,7 @@ foreach my $command (@commands) {
 	my $stack;
 	debug("Stack $stack_id has type $stack_type\n");
 	SWITCH: for ($stack_type) {
-	    /cisco/ && do {
+	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
 		$stack = new snmpit_cisco_stack($stack_id,$debug,$community,
 		    $supports_private, $single_domain, @{$stacks{$stack_id}});
