@@ -87,13 +87,16 @@ if (!$handle) { die "Unable to register with event system\n"; }
 my $tuple = address_tuple_alloc();
 if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-%$tuple = ( host      => $BOSSNODE,
-	    objtype   => 'TBNODESTATE' );
+#
+# Unfortunately, we can't subscribe to multiple objtypes - so, we subscribe
+# to all events to $BOSSNODE, and throw away notificattions whose objtypes
+# do not match the ones we care about.
+#
+%$tuple = ( host => $BOSSNODE );
 
 if (!event_subscribe($handle,\&handleEvent,$tuple)) {
-	die "Could not subscribe to event\n";
+	die "Could not subscribe to events\n";
 }
-
 
 #
 # Read in the pre-existing node states, and timeout and valid transition
@@ -129,18 +132,21 @@ while (1) {
 	#
 	while (my ($node, $value) = each %nodes) {
 		my $state    = $value->{state};
-		my $time     = $value->{time};
+		my $mode     = $value->{mode};
+		my $time     = $value->{timestamp};
 		my $notified = $value->{notified};
 		my ($timeout,$action);
-		if ($state && $timeouts{$state}) {
-			($timeout, $action) = @{$timeouts{$state}};
+		if ($mode && $state && $timeouts{$mode} &&
+				$timeouts{$mode}{$state}) {
+			($timeout, $action) = @{$timeouts{$mode}{$state}};
 		}
 		if ((!$notified) && $time && $timeout &&
 				(($time + $timeout) < $now)) {
 			   #
 			   # TODO: Need to actually do something!
 			   #
-			   notify("Node $node has timed out in state $state\n");
+			   notify("Node $node has timed out in state $state" .
+			   	  ", mode $mode\n");
 			   $value->{notified} = 1;
 		}
 	}
@@ -163,23 +169,27 @@ sub readStates(;@) {
 
 	debug("readStates called\n");
 	my $result = DBQueryFatal("SELECT node_id, eventstate, " .
-				  "state_timestamp FROM nodes");
+				  "state_timestamp, op_mode, " .
+				  "op_mode_timestamp FROM nodes");
 
 	my %nodes;
-	while (my ($node_id, $state, $time) = $result->fetchrow()) {
+	while (my ($node_id, $state, $timestamp, $mode, $mode_timestamp)
+			= $result->fetchrow()) {
 	    	#
 		# If there's an entry in oldnodes for this node, and it
 		# hasn't changed state or time, use the old entry (so that
 		# we don't lose information about which nodes we've already
 		# notified the ops about, etc.)
 		#
-		if ($oldnodes{$node_id} &&
-		   ($oldnodes{$node_id}{$state} eq $state) &&
-		   ($oldnodes{$node_id}{$time} == $time)) {
+		if ($oldnodes{$node_id} && $state && $timestamp &&
+		   ($oldnodes{$node_id}{state} eq $state) &&
+		   ($oldnodes{$node_id}{timestamp} == $timestamp)) {
 		       $nodes{$node_id} = $oldnodes{$node_id};
 		} else { 
-		    $nodes{$node_id}{state} = $state;
-		    $nodes{$node_id}{time}  = $time;
+		    $nodes{$node_id}{state}          = $state;
+		    $nodes{$node_id}{timestamp}      = $timestamp;
+		    $nodes{$node_id}{mode}           = $mode;
+		    $nodes{$node_id}{mode_timestamp} = $mode_timestamp;
 		}
 	}
 	return %nodes;
@@ -190,12 +200,12 @@ sub readStates(;@) {
 #
 sub getTimeouts() {
 	debug("getTimeouts called\n");
-	my $result = DBQueryFatal("SELECT state, timeout, action " .
+	my $result = DBQueryFatal("SELECT op_mode, state, timeout, action " .
 				  "FROM state_timeouts");
 
 	my %timeouts;
-	while (my ($state, $timeout, $action) = $result->fetchrow()) {
-		$timeouts{$state} = [ $timeout, $action ];
+	while (my ($op_mode, $state, $timeout, $action) = $result->fetchrow()) {
+		$timeouts{$op_mode}{$state} = [ $timeout, $action ];
 	}
 	return %timeouts;
 }
@@ -205,12 +215,12 @@ sub getTimeouts() {
 #
 sub getValid() {
 	debug("getValid called\n");
-	my $result = DBQueryFatal("SELECT state1, state2 " .
+	my $result = DBQueryFatal("SELECT op_mode, state1, state2 " .
 				  "FROM state_transitions");
 
 	my %valid;
-	while (my ($state1, $state2) = $result->fetchrow()) {
-		$valid{$state1}{$state2} = 1;
+	while (my ($mode,$state1, $state2) = $result->fetchrow()) {
+		$valid{$mode}{$state1}{$state2} = 1;
 	}
 	return %valid;
 }
@@ -220,31 +230,69 @@ sub getValid() {
 #
 sub handleEvent($$$) {
 	my ($handle,$notification,$data) = @_;
+	my $objtype = event_notification_get_objtype($handle,$notification);
 	my $objname = event_notification_get_objname($handle,$notification);
 	my $eventtype = event_notification_get_eventtype($handle,$notification);
 
-	print "Got an event: ($objname,$eventtype)\n";
+	print "Got an event: ($objtype,$objname,$eventtype)\n";
+
+	SWITCH: for ($objtype) {
+
+	    (/TBNODESTATE/) && do {
+		stateTransition($objname,$eventtype);
+		last;
+	    };
+	    (/TBNODEOPMODE/) && do {
+		opModeTransition($objname,$eventtype);
+		last;
+	    };
+
+	}
+
+}
+
+sub stateTransition($$) {
+
+	my ($node,$newstate) = @_;
 
 	# Check for invalid transitions
-	my $oldstate;
-	if ($nodes{$objname}) {
-		$oldstate = $nodes{$objname}{state};
+	my ($oldstate, $mode);
+	if ($nodes{$node}) {
+		$oldstate = $nodes{$node}{state};
+		$mode = $nodes{$node}{mode};
 	} else {
-		notify("Got an event for a node ($objname) I don't know ".
+		notify("Got an event for a node ($node) I don't know ".
 		      "about\n");
 	}
-	if ($oldstate && !$valid{$oldstate}{$eventtype}) {
-		notify("Invalid transition for node $objname from $oldstate " .
-		       " to $eventtype\n");
+	if ($oldstate && $valid{$mode} && $valid{$mode}{$oldstate} &&
+			!$valid{$mode}{$oldstate}{$newstate}) {
+		notify("Invalid transition for node $node from $oldstate " .
+		       " to $newstate\n");
 	}
 
 	my $now = time();
-	$nodes{$objname}{state}     = $eventtype;
-	$nodes{$objname}{time}      = $now;
-	$nodes{$objname}{notified}  = 0;
+	$nodes{$node}{state}     = $newstate;
+	$nodes{$node}{timestamp} = $now;
+	$nodes{$node}{notified}  = 0;
 
-	DBQueryFatal("UPDATE nodes SET eventstate='$eventtype', " .
-		     "state_timestamp='$now' WHERE node_id='$objname'");
+	DBQueryFatal("UPDATE nodes SET eventstate='$newstate', " .
+		     "state_timestamp='$now' WHERE node_id='$node'");
+
+}
+
+sub opModeTransition($$) {
+
+	my ($node,$newmode) = @_;
+
+	print "opModeTransition: $node, $newmode\n";
+
+	my $now = time();
+	$nodes{$node}{mode}           = $newmode;
+	$nodes{$node}{mode_timestamp} = $now;
+	$nodes{$node}{notified}       = 0;
+
+	DBQueryFatal("UPDATE nodes SET op_mode='$newmode', " .
+		     "op_mode_timestamp='$now' WHERE node_id='$node'");
 
 }
 

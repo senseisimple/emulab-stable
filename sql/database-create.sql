@@ -441,6 +441,8 @@ CREATE TABLE nodes (
   eventstatus tinytext,
   eventstate varchar(10) default NULL,
   state_timestamp int(10) unsigned default NULL,
+  op_mode varchar(10) default NULL,
+  op_mode_timestamp int(10) unsigned default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -626,6 +628,7 @@ CREATE TABLE scheduled_reloads (
 #
 
 CREATE TABLE state_timeouts (
+  op_mode varchar(20) default NULL,
   state varchar(20) default NULL,
   timeout int(11) default NULL,
   action mediumtext
@@ -636,6 +639,7 @@ CREATE TABLE state_timeouts (
 #
 
 CREATE TABLE state_transitions (
+  op_mode varchar(20) default NULL,
   state1 varchar(20) default NULL,
   state2 varchar(20) default NULL
 ) TYPE=MyISAM;
