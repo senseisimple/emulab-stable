@@ -119,19 +119,20 @@ function SPITFORM($formfields, $errors)
     echo "<SCRIPT LANGUAGE=JavaScript>
               function SetPrefix(theform) 
               {
-                  if (theform['formfields[pid]'].value == '') {
+                  var idx = theform['formfields[pid]'].selectedIndex;
+                  var pid = theform['formfields[pid]'].options[idx].value;
+
+                  if (pid == '') {
                       theform['formfields[path]'].value = '/proj/';
                   }
                   else if (theform['formfields[imagename]'].value == '') {
 		      theform['formfields[imagename]'].defaultValue = '';
   	              theform['formfields[path]'].value =
-                              '/proj/' +
-                              theform['formfields[pid]'].value + '/images/';
+                              '/proj/' + pid + '/images/';
                   }
                   else if (theform['formfields[imagename]'].value != '') {
   	              theform['formfields[path]'].value =
-                              '/proj/' +
-                              theform['formfields[pid]'].value + '/images/' +
+                              '/proj/' + pid + '/images/' +
                               theform['formfields[imagename]'].value + '.ndz';
                   }
               }
@@ -785,7 +786,7 @@ if (isset($node)) {
     echo "This will take 10 minutes or more; you will receive email
           notification when the image is complete. In the meantime,
           <b>PLEASE DO NOT</b> delete the imageid or the experiment
-          $node is in. In fact, it is best if you do not mess the with 
+          $node is in. In fact, it is best if you do not mess with 
           the node at all!<br>\n";
 }
 
