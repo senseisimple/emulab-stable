@@ -54,3 +54,14 @@ a few stumbling blocks, and notes to be aware of:
 
 * Grab a precompiled CVSup binary, either from the old RHL image, or
   from the CVSup website.  _Much_ less hassle.
+
+* Newer (circa 11/2003) Emulab images require that elvind be installed.
+  Building libelvin and elvind for Linux is not really a problem, the
+  problem is getting the correct sources to build from.  We use Elvin
+  4.0.3 which may no longer be available.  Once libelvin and elvind
+  are installed, the tmcd/linux make will take care of hooking it in
+  to the startup.
+
+* Elvin libraries are installed in /usr/local/lib.  Make sure the default
+  shared library path (/etc/ld.so.conf) includes this.  If necessary, add
+  it and run ldconfig.
