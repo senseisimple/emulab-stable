@@ -25,8 +25,8 @@ use Exporter;
 	 TBAdmin NodeAccessCheck ProjMember ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
-	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState
-
+	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
+	 ExpNodes
 	 );
 
 # Must come after package declaration!
@@ -232,6 +232,28 @@ sub ProjMember($;$)
 }
 
 #
+# Return Project leader. First argument pid.
+#
+# usage: ProjLeader(char *pid)
+#        returns char *leader if a valid pid.
+#        returns 0 if an invalid pid.
+# 
+sub ProjLeader($)
+{
+    my($pid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select head_uid from projects where pid='$pid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
 # Return Experiment leader. First argument pid. Second argument is eid.
 #
 # usage: ExpLeader(char *pid, char *eid)
@@ -298,6 +320,33 @@ sub SetExpState($$$)
 	return 0;
     }
     return 1;
+}
+
+#
+# Return a list of all the nodes in an experiment.
+#
+# usage: ExpNodes(char *pid, char *eid)
+#        returns the list if a valid pid/eid.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub ExpNodes($$)
+{
+    my($pid, $eid) = @_;
+    my(@row);
+    my(@nodes);
+
+    my $query_result =
+	DBQueryWarn("select node_id from reserved where ".
+		    "pid='$pid' and eid='$eid'");
+
+    if (! $query_result or
+	$query_result->numrows == 0) {
+	return ();
+    }
+    while (@row = $query_result->fetchrow_array()) {
+	push(@nodes, $row[0]);
+    }
+    return @nodes;
 }
 
 #
