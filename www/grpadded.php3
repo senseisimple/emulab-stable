@@ -17,7 +17,7 @@ include("defs.php3");
 #
 $formerror="No Error";
 if (!isset($gid) ||
-    strcmp($gid, "TestNet-One") == 0) {
+    strcmp($gid, "ucb-omcast") == 0) {
   $formerror = "Name";
 }
 if (!isset($grp_head_uid) ||
@@ -25,7 +25,7 @@ if (!isset($grp_head_uid) ||
   $formerror = "Username";
 }
 if (!isset($grp_name) ||
-    strcmp($grp_name, "Test Networks One") == 0) {
+    strcmp($grp_name, "UCB Overlay Multicast") == 0) {
   $formerror = "Long Name";
 }
 if (!isset($usr_name) ||
@@ -33,7 +33,7 @@ if (!isset($usr_name) ||
   $formerror = "Full Name";
 }
 if (!isset($grp_URL) ||
-    strcmp($grp_URL, "http://www.testnetworks.org") == 0) {
+    strcmp($grp_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
   $formerror = "URL";
 }
 if (!isset($email) ||
@@ -42,10 +42,10 @@ if (!isset($email) ||
 }
 if (!isset($usr_addr) ||
     strcmp($usr_addr, "") == 0) {
-  $formerror = "Mailing Address";
+  $formerror = "Postal Address";
 }
 if (!isset($grp_affil) ||
-    strcmp($grp_affil, "UofX Networks Group") == 0) {
+    strcmp($grp_affil, "UCB Networks Group") == 0) {
   $formerror = "Research Afilliation";
 }
 if (!isset($usr_phones) ||
