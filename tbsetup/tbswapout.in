@@ -12,7 +12,7 @@
 use DBI;
 
 # Set up paths
-$TESTMODE = @TESTMODE@;
+$TESTMODE = "@TESTMODE@";
 $TBDB = "@TBDBNAME@";
 $TBROOT = "@prefix@";
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 

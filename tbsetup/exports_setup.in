@@ -17,7 +17,7 @@ use Fcntl ':flock';
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $TESTMODE    = @TESTMODE@;
+my $TESTMODE    = "@TESTMODE@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root fs.emulab.net";

@@ -26,7 +26,7 @@ my  $optlist = "";
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $TESTMODE    = @TESTMODE@;
+my $TESTMODE    = "@TESTMODE@";
 my $TFTP	= "/tftpboot";
 
 #

@@ -30,7 +30,7 @@ my  $optlist = "sldw";
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $TESTMODE    = @TESTMODE@;
+my $TESTMODE    = "@TESTMODE@";
 my $TBOPS       = "@TBOPSEMAIL@";
 
 #
