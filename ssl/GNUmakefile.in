@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,7 +16,7 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
-	localnode.pem
+	localnode.pem capture.sha1fingerprint
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -95,6 +95,10 @@ capture.fingerprint:	capture.pem
 	openssl x509 -sha -noout -fingerprint -in capture.pem \
 	    > capture.fingerprint
 
+capture.sha1fingerprint:	capture.pem
+	openssl x509 -sha1 -noout -fingerprint -in capture.pem \
+	    > capture.sha1fingerprint
+
 localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh localnode
 
@@ -160,11 +164,13 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/capture.fingerprint \
+		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/server.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 	chmod 644 $(INSTALL_ETCDIR)/capture.fingerprint
+	chmod 644 $(INSTALL_ETCDIR)/capture.sha1fingerprint
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 
