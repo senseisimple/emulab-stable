@@ -102,9 +102,9 @@ main(int argc, char **argv)
 				fatal("Too many agents listed");
 			agentnames[numagents] = optarg;
 			numagents++;
-			if (!strlen(agentlist))
+			if (strlen(agentlist))
 				strcat(agentlist, ",");
-			strcpy(agentlist, optarg);
+			strcat(agentlist, optarg);
 			break;
 		default:
 			usage(progname);
