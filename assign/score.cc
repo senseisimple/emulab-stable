@@ -1254,8 +1254,9 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	}
       } else {
 	// For non-emulated links, we're just looking for links with few (0,
-	// actually) users
-	if (users < best_users) {
+	// actually) users, and enough bandwidth
+	if ((users < best_users) &&
+		(plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)) {
 	  best_pedge = *pedge_it;
 	  best_distance = distance;
 	  found_best = true;
