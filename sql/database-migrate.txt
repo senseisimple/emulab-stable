@@ -388,3 +388,16 @@ last_net_act,last_cpu_act,last_ext_act);
        user_stats.
 
        drop table lastlogin;
+
+1.139: Add veth_interfaces table, which are virtual ethernet devices
+       in FreeBSD.
+
+	CREATE TABLE veth_interfaces (
+	  node_id varchar(10) NOT NULL default '',
+	  veth_id int(10) unsigned NOT NULL auto_increment,
+	  mac varchar(12) NOT NULL default '000000000000',
+	  IP varchar(15) default NULL,
+	  iface varchar(10) NOT NULL default '',
+	  PRIMARY KEY  (node_id,veth_id),
+	  KEY IP (IP)
+	) TYPE=MyISAM;
