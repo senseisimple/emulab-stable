@@ -83,7 +83,7 @@ my $osid = shift;
 my @nodes = @ARGV;
 
 # Untaint args.
-if ($osid =~ /^([-\@\w\/\.]+)$/) { $osid = $1; }
+if ($osid =~ /^([-\@\w\/\+\.]+)$/) { $osid = $1; }
 elsif (!$mfs) { fatal("Bad data in osid: '$osid'\n"); }
 
 if ($mfs) {
