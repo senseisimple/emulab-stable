@@ -15,12 +15,12 @@
 . /etc/rc.conf.local
 
 #
-# rawbootdisk is set in rc.conf.local by the CDROM boot image.
+# netbed_disk is set in rc.conf.local by the CDROM boot image.
 #
 case "$1" in
 start)
 	if [ -f /usr/site/sbin/tbbootconfig ]; then
-		/usr/site/sbin/tbbootconfig -c 1 $rawbootdisk
+		/usr/site/sbin/tbbootconfig -c 1 $netbed_disk
 
 		case $? in
 		0)

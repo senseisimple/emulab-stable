@@ -8,7 +8,7 @@
 #
 # This file goes in /usr/local/etc/rc.d on the CDROM.
 #
-# Get the rawdisk and pass that to the registration program. It does
+# Get the disk and pass that to the registration program. It does
 # all the actual work.
 # 
 
@@ -17,7 +17,7 @@
 case "$1" in
 start)
 	if [ -f /usr/site/sbin/register.pl ]; then
-		/usr/site/sbin/register.pl $rawbootdisk
+		/usr/site/sbin/register.pl $netbed_disk
 		exit $?
 	fi
 	;;

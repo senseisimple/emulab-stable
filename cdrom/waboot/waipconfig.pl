@@ -45,7 +45,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # The raw disk device. 
 #
-my $defrawdisk	= "/dev/rad0";
+my $defrawdisk	= "/dev/ad0";
 my $rawbootdisk;
 my $etcdir	= "/etc";
 my $rcconflocal	= "$etcdir/rc.conf.local";
@@ -59,11 +59,12 @@ my $tbboot	= "tbbootconfig";
 #
 my %config = ( interface  => undef,
 	       hostname   => undef,
+	       domain     => undef,
 	       IP         => undef,
 	       netmask    => undef,
-	       domain     => undef,
 	       nameserver => undef,
 	       gateway    => undef,
+	       bootdisk   => undef,
 	     );
 
 # Must be root
@@ -84,29 +85,6 @@ if (@ARGV != 0) {
     usage();
 }
 
-print "\n";
-print "**************************************************************\n";
-print "*                                                            *\n";
-print "* Netbed installation CD.  This program will wipe your       *\n";
-print "* hard disk, and install a fresh Netbed image.               *\n";
-print "*                                                            *\n";
-print "* If this is not what you intended, please remove the CD and *\n";
-print "* reboot.                                                    *\n";
-print "*                                                            *\n";
-print "* Before you can install this CD, you must first go to       *\n";
-print "* www.emulab.net/cdromnewkey.php for a password.             *\n";
-print "*                                                            *\n";
-print "* Then, figure out what boot disk you want to use.           *\n";
-print "* Common disks are ad0 (1st IDE disk) and da0 (1st SCSI).    *\n";
-print "*                                                            *\n";
-print "**************************************************************\n";
-print "\n";
-
-#
-# Need a raw disk device.
-#
-$rawbootdisk = WhichRawDisk();
-
 BootFromCD();
 
 # Done!
@@ -115,18 +93,32 @@ exit(0);
 sub BootFromCD()
 {
     #
-    # On the CDROM, the order is to check for a hardwired config,
-    # and then a config stashed in the boot block. If neither is there,
-    # then prompt the user. Always give the user a chance to override the
-    # the current config. 
-    # 
-    if (CheckConfigFile() != 0 && CheckConfigBlock() != 0) {
+    # First check for a config file on the CD.
+    # If found, use that info.  bootdisk must be set.
+    #
+    if (CheckConfigFile() != 0 || !defined($config{'bootdisk'})) {
 	#
-	# Else no config found. Must wait until we get one.
-	# 
-	print "\nNo existing configuration was found!\n";
-	GetUserConfig();
+	# Give them multiple tries to find a disk with an existing
+	# configuration block.
+	#
+	while (1) {
+	    $rawbootdisk = WhichRawDisk();
+	    if (CheckConfigBlock() == 0) {
+		last;
+	    }
+	    print "No existing configuration was found on $rawbootdisk\n";
+	    if (Prompt("Try another disk for existing configuration?",
+		       "No", 10) =~ /no/i) {
+		#
+		# Don't want to try another disk,
+		# consider this a first time install.
+		#
+		GetNewConfig();
+		last;
+	    }
+	}
     }
+    $rawbootdisk = $config{'bootdisk'};
 
     #
     # Give the user a chance to override the normal operation, and specify
@@ -175,6 +167,56 @@ sub BootFromCD()
     return 0;
 }
 
+sub GetNewConfig()
+{
+    #
+    # First, an intimidating disclaimer
+    #
+    print "\n";
+    print "****************************************************************\n";
+    print "*                                                              *\n";
+    print "* Netbed installation CD (version 0.1).                        *\n";
+    print "*                                                              *\n";
+    print "* THIS PROGRAM WILL WIPE YOUR YOUR HARD DISK!                  *\n";
+    print "* It will then install a fresh Netbed image.                   *\n";
+    print "*                                                              *\n";
+    print "* If this is NOT what you intended, please type 'no' to the    *\n";
+    print "* prompt below and the machine will reboot (don't forget to    *\n";
+    print "* remove the CD).                                              *\n";
+    print "*                                                              *\n";
+    print "* Before you can install this CD, you must first go to         *\n";
+    print "* www.emulab.net/cdromnewkey.php for a password.               *\n";
+    print "*                                                              *\n";
+    print "* You must also know some basic characteristics of the machine *\n";
+    print "* you are installing on (disk device and network interface) as *\n";
+    print "* well as configuration of the local network (host and domain  *\n";
+    print "* name, IP address for machine, nameserver and gateway).       *\n";
+    print "*                                                              *\n";
+    print "****************************************************************\n";
+    print "\n";
+
+    if (Prompt("Continue with installation?", "No") =~ /no/i) {
+	exit(-277);
+    }
+
+    #
+    # All right, we gave them a chance.
+    # Here we should explain what the possible disk/network options are,
+    # preferably by going out and discovering what exists.
+    #
+
+    print "****************************************************************\n";
+    print "*                                                              *\n";
+    print "* The installation script attempts to intuit default values    *\n";
+    print "* for much of installation information.  In the process it may *\n";
+    print "* generate error messages from the kernel which may be safely  *\n";
+    print "* ignored.                                                     *\n";
+    print "*                                                              *\n";
+    print "****************************************************************\n";
+
+    GetUserConfig();
+}
+
 #
 # Prompt for the configuration from the user. Return -1 if something goes
 # wrong.
@@ -183,13 +225,17 @@ sub GetUserConfig()
 {
     print "Please enter the system configuration by hand\n";
     
+    $config{'bootdisk'}  = Prompt("System boot disk", $rawbootdisk);
     $config{'interface'} = Prompt("Network Interface", WhichInterface());
     $config{'hostname'}  = Prompt("Hostname (no domain)", $config{'hostname'});
     $config{'domain'}    = Prompt("Domain", $config{'domain'});
     $config{'IP'}        = Prompt("IP Address", $config{'IP'});
-    $config{'netmask'}   = Prompt("Netmask", $config{'netmask'});
-    $config{'nameserver'}= Prompt("Nameserver", $config{'nameserver'});
+    $config{'netmask'}   = Prompt("Netmask", WhichNetMask());
+    $config{'nameserver'}= Prompt("Nameserver IP", $config{'nameserver'});
     $config{'gateway'}   = Prompt("Gateway IP", $config{'gateway'});
+
+    # XXX
+    $rawbootdisk = $config{'bootdisk'};
 
     return 0;
 }
@@ -242,7 +288,12 @@ sub CheckConfigBlock()
     if ($?) {
 	return -1;
     }
-    return CheckConfigFile("/tmp/config.$$");
+    if (CheckConfigFile("/tmp/config.$$") == 0) {
+	# XXX bootdisk is not part of the on disk info
+	$config{'bootdisk'} = $rawbootdisk;
+	return 0;
+    }
+    return -1;
 }
 
 #
@@ -252,31 +303,57 @@ sub CheckConfigBlock()
 sub WhichInterface()
 {
     # XXX
-    if (defined($config{interface})) {
-	return $config{interface};
+    if (defined($config{'interface'})) {
+	return $config{'interface'};
     }
     my @allifaces = split(" ", `ifconfig -l`);
 		       
-    foreach my $guess ("fxp", "de", "tx", "vx", "wx", "em", "bge", "xl") {
-	foreach my $iface (@allifaces) {
-	    $iface =~ /([a-zA-z]*)(\d*)/;
-	    if ($1 eq $guess && $2 == 0) {
-		return $iface;
+    #
+    # Prefer the first interface found that is not "lo".
+    #
+    foreach my $iface (@allifaces) {
+	if ($iface =~ /([a-zA-z]+)(\d+)/) {
+	    if ($1 eq "lo") {
+		next;
 	    }
+
+	    # XXX check to make sure it has carrier
+	    if (`ifconfig $iface` =~ /.*no carrier/) {
+		next;
+	    }
+
+	    return $iface;
 	}
     }
+
     return "fxp0";
 }
 
 #
+# Which network mask. Make the standard class C guess and let the caller
+# spit that out in a prompt for verification.
+#
+sub WhichNetMask()
+{
+    # XXX
+    if (defined($config{'netmask'})) {
+	return $config{'netmask'};
+    }
+
+    return "255.255.255.0";
+}
+
+#
 # Which raw disk. Prompt if we cannot come up with a good guess.
+# Note: raw and block devices are one in the same now.
 #
 sub WhichRawDisk()
 {
     #
     # Search the drives until we find a valid header.
+    # Order is: IDE, SCSI, IDE RAID, SCSI RAID
     # 
-    foreach my $disk ("rad", "rda", "raacd") {
+    foreach my $disk ("ad", "da", "ar", "aacd") {
 	foreach my $drive (0) {
 	    my $guess = "/dev/${disk}${drive}";
 
@@ -286,7 +363,7 @@ sub WhichRawDisk()
 		# Allow for overiding the guess, with short timeout.
 		#
 		$rawbootdisk =
-		    Prompt("Which Raw Disk Device is the boot device?",
+		    Prompt("Which Disk Device is the boot device?",
 			   "$guess", 10);
 		goto gotone;
 	    }
@@ -297,7 +374,7 @@ sub WhichRawDisk()
     # Okay, no candidates. Lets find the first real disk. Use dd
     # to see if the drive is configured.
     #
-    foreach my $disk ("rad0", "rda0", "raacd0") {
+    foreach my $disk ("ad0", "da0", "ar0", "aacd0") {
 	my $guess = "/dev/${disk}";
 
 	system("dd if=$guess of=/dev/null bs=512 count=32 >/dev/null 2>&1");
@@ -306,7 +383,7 @@ sub WhichRawDisk()
 	    # Allow for overiding the guess, with short timeout.
 	    #
 	    $rawbootdisk =
-		Prompt("Which Raw Disk Device is the boot device?",
+		Prompt("Which Disk Device is the boot device?",
 		       "$guess", 10);
 	    goto gotone;
 	}
@@ -318,7 +395,7 @@ sub WhichRawDisk()
     # 
     while (!defined($rawbootdisk) || ! -e $rawbootdisk) {
 	$rawbootdisk = 
-	    Prompt("Which Raw Disk Device is the boot device?", $defrawdisk);
+	    Prompt("Which Disk Device is the boot device?", $defrawdisk);
     }
     return $rawbootdisk;
 }
@@ -381,7 +458,9 @@ sub WriteRCFiles()
     print CONFIG "ifconfig_$config{interface}=\"".
 	         "inet $config{IP} netmask $config{netmask}\"\n";
     print CONFIG "defaultrouter=\"$config{gateway}\"\n";
-    print CONFIG "rawbootdisk=\"$rawbootdisk\"\n";
+    print CONFIG "# Netbed info\n";
+    print CONFIG "netbed_disk=\"$rawbootdisk\"\n";
+    print CONFIG "netbed_IP=\"$config{IP}\"\n";
     print CONFIG "# EOF\n";
     close(CONFIG);
 

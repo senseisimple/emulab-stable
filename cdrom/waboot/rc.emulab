@@ -28,6 +28,10 @@ EmulabCheckIPConfig()
 		case $? in
 	        0)
 		       ;;
+		-277)
+			echo 'Installation aborted'
+			exit 1
+			;;
 		*)
 			echo 'Error in testbed configuration program'
 			#reboot

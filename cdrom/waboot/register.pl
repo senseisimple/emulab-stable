@@ -40,9 +40,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Locals
 #
-#my $WWW        = "https://www.emulab.net";
+my $WWW        = "https://www.emulab.net";
 #my $WWW        = "http://golden-gw.ballmoss.com:8080/~stoller/testbed";
-my $WWW         = "https://www.emulab.net/~stoller/www";
+#my $WWW         = "https://www.emulab.net/~stoller/www";
 my $etcdir	= "/etc";
 my $cdkeyfile	= "$etcdir/emulab.cdkey";
 my $setupconfig	= "$etcdir/emulab-setup.txt";
@@ -58,10 +58,13 @@ my $logfile     = "/tmp/register.log";
 my $needstore   = 0;
 my $fromscratch = 0;
 my $needumount  = 0;
+my $showprogress= 1;
 my $cdkey;
 my $privkey;
 my %slicesizes;
 	
+my $PATIENCEMSG  = "This could take several minutes, please be patient!\n";
+
 my %config = ( privkey        => undef,
 	       fdisk          => undef,
 	       slice1_image   => undef,
@@ -123,6 +126,7 @@ else {
 #
 # See if we want to continue. Useful for debugging.
 # 
+print "\n";
 if (! (Prompt("Dance with Netbed?", "Yes", 10) =~ /yes/i)) {
     exit(0);
 }
@@ -131,7 +135,9 @@ if (! (Prompt("Dance with Netbed?", "Yes", 10) =~ /yes/i)) {
 # Get the plain device names (ad0, rad0).
 #
 my $rawdevice   = substr($rawbootdisk, rindex($rawbootdisk, '/') + 1);
-my $blockdevice = substr($rawdevice, 1);
+# XXX no difference in block/raw anymore
+#my $blockdevice = substr($rawdevice, 1);
+my $blockdevice = $rawdevice;
 
 #
 # See if this is the first time. Look for the magic boot header.
@@ -178,6 +184,7 @@ if ($needstore) {
 	    if (!defined($fdisk));
 
 	print "Creating a temporary filesystem on slice 2 to hold images.\n";
+	print "    (ignore kernel generated \"no disk label\" messages.)\n";
 	
 	#
 	# First time through we need to lay down a DOS partition table.
@@ -306,9 +313,15 @@ for ($i = 1; $i <= 4; $i++) {
     # If told to load a local image from the CDROM, its really easy!
     # 
     if (! ($image =~ /^http:.*$/ || $image =~ /^ftp:.*$/)) {
-	print "Loading image for slice $i from $image. Be patient!\n";
-	
-	mysystem("imageunzip -s $i -d /$image $rawbootdisk");
+	print "Loading image for slice $i from $image.\n";
+	print $PATIENCEMSG;
+
+	if ($showprogress) {
+	    print "(Output indicates uncompressed bytes written to disk.)\n";
+	    system("imageunzip -o -s $i -d /$image $rawbootdisk");
+	} else {
+	    mysystem("imageunzip -s $i -d /$image $rawbootdisk");
+	}
 	fatal("Failed to lay down image /$image!")
 	    if ($?);
 	goto finished;
@@ -320,10 +333,14 @@ for ($i = 1; $i <= 4; $i++) {
     if ($image =~ /^http:.*$/ || $image =~ /^ftp:.*$/) {
       again:
 	print "Transferring image to temp storage for slice $i from:\n".
-	      "    $image \n".
-	      "    Please be patient! \n";
+	      "    $image \n";
+	print $PATIENCEMSG;
 	
-	mysystem("$wget -nv -O /mnt/image.ndz $image");
+	if ($showprogress) {
+	    system("$wget -O /mnt/image.ndz $image");
+	} else {
+	    mysystem("$wget -nv -O /mnt/image.ndz $image");
+	}
 	fatal("Failed to transfer image!")
 	    if ($?);
 
@@ -331,7 +348,9 @@ for ($i = 1; $i <= 4; $i++) {
 	# If an md5 hash was provided, compare it.
 	#
 	if (defined($hash)) {
-	    print "Checking MD5 hash of the image. Please be patient!\n";
+	    print "Checking MD5 hash of the image.\n";
+	    print $PATIENCEMSG;
+
 	    my $hval = `md5 -q /mnt/image.ndz`;
 	    chomp($hval);
 
@@ -343,9 +362,14 @@ for ($i = 1; $i <= 4; $i++) {
 	}
 
 	print "Writing image from temp storage to slice $i.\n";
-	print "This could take several minutes. Please be *very* patient!\n";
-	
-	mysystem("imageunzip -s $i -o /mnt/image.ndz $rawbootdisk");
+	print $PATIENCEMSG;
+
+	if ($showprogress) {
+	    print "(Output indicates uncompressed bytes written to disk.)\n";
+	    system("imageunzip -o -s $i /mnt/image.ndz $rawbootdisk");
+	} else {
+	    mysystem("imageunzip -s $i /mnt/image.ndz $rawbootdisk");
+	}
 	fatal("Failed to lay down image!")
 	    if ($?);
 
@@ -485,7 +509,8 @@ sub GetInstructions()
 	}
 	else {
 	    while (!defined($privkey)) {
-		$privkey = Prompt("Please enter you CD password?", undef);
+		$privkey = Prompt("Please enter your 16 character CD password",
+				  undef);
 	    }
 	}
 
@@ -708,8 +733,8 @@ sub MakeFS($$)
 	# If told to use a local image from the CDROM, its really easy!
 	# 
 	if (! ($tarball =~ /^http:.*$/ || $tarball =~ /^ftp:.*$/)) {
-	    print "Unpacking $tarball to $mntpoint.\n".
-		"    Please be patient!\n";
+	    print "Unpacking $tarball to $mntpoint.\n";
+	    print $PATIENCEMSG;
 	
 	    mysystem("tar -zxf /$tarball");
 	    fatal("Failed to untar /$tarball!")
@@ -720,14 +745,16 @@ sub MakeFS($$)
 	    # Transfer the image to the temp store and then unzip to the slice.
 	    #
 	    print "Transferring tarball for $mntpoint from:\n".
-	      "    $tarball\n".
-	      "    Please be patient! \n";
+		  "    $tarball\n";
+	    print $PATIENCEMSG;
 	
 	    mysystem("$wget -nv -O /mnt/slicex.tar.gz $tarball");
 	    fatal("Failed to transfer tarball!")
 		if ($?);
 
-	    print "Unpacking tarball. Please be patient!\n";
+	    print "Unpacking tarball.\n";
+	    print $PATIENCEMSG;
+
 	    mysystem("tar -zxf /mnt/slicex.tar.gz");
 	    fatal("Failed to untar /mnt/slicex.tar.gz!")
 		if ($?);
@@ -867,7 +894,18 @@ sub MountRoot()
 # 
 sub WriteConfigBlock()
 {
-    my $cmd = "$tbboot -f -d -w $softconfig -k 1 -c 0 ";
+    my $cmd;
+
+    # XXX for now hack, tbbootconfig doesn't know about 'bootdisk'
+    if (1) {
+	mysystem("grep -v bootdisk $softconfig > /tmp/softcfg");
+	fatal("Could not prepare $softconfig for writing!")
+	    if ($?);
+	$cmd = "$tbboot -f -d -w /tmp/softcfg -k 1 -c 0 ";
+    } else {
+	$cmd = "$tbboot -f -d -w $softconfig -k 1 -c 0 ";
+    }
+
     if (defined($config{privkey})) {
 	$cmd .= "-e $config{privkey} ";
     }
