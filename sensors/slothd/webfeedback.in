@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,7 +16,7 @@ use Socket;
 sub usage()
 {
     print STDOUT
-	"Usage: webfeedback [-hc] [-d duration] pid gid eid\n".
+	"Usage: webfeedback [-hcb] [-d duration] pid gid eid\n".
 	"Web wrapper for dealing with feedback information.\n".
 	"\n".
 	"Required arguments:\n".
@@ -163,6 +163,7 @@ $expdir = "/proj/$pid/exp/$eid";
 if ($mode eq "clear") {
     if (defined($options{"c"})) {
 	unlink("$expdir/tbdata/feedback_data.tcl");
+	unlink("$expdir/tbdata/feedback_estimate.tcl");
     }
     if (defined($options{"b"})) {
 	unlink("$expdir/tbdata/bootstrap_data.tcl");
@@ -255,6 +256,7 @@ if ($mode eq "record") {
     my %ipmap;
     my %macmap;
     my %memmap;
+    my %pipemap;
     
     # Get the virtual node names and IP addresses and
     my $virtnodes_result =
@@ -327,6 +329,20 @@ if ($mode eq "record") {
 	$memmap{$member}->{"LAN"} = $vname;
     }
     
+    $result =
+	DBQueryFatal("select * from linkdelays ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vlan,vnode,node_id");
+
+    if ($result->numrows) {
+	while (my %row = $result->fetchhash()) {
+	    $pipemap{$row{pipe}} = $row{vname};
+	    if ($row{type} eq "duplex") {
+		$pipemap{$row{rpipe}} = $row{vname};
+	    }
+	}
+    }
+
     # Start digest-slothd with all of the slothd logs, tee its output to the
     # feedback file, and
     open(DIGESTER,
@@ -343,6 +359,13 @@ if ($mode eq "record") {
 		$memmap{$m}->{"NODE"},
 		$memmap{$m}->{"LAN"};
 	}
+    }
+
+    foreach my $p (sort keys(%pipemap)) {
+	printf DIGESTER
+	    "pipe %s %s\n",
+	    $p,
+	    $pipemap{$p};
     }
     
     # All done, cleanup.
