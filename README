@@ -13,13 +13,9 @@ Netbeds that are not included in this snapshot. Contact us (contact info at the
 bottom of this file) if you are interested in receiving an updated version of
 this source.
 
-NOTE: See the file RESTRICTED-RIGHTS for restrictions on this interim
-snapshot.  In summary, for now you can't redistribute it or use it for
-commercial purposes.
-
 HOW TO
 Copy and localize the 'defs-example' file for your environment
-and run ./configure - see doc/setup.txt for details.
+and run "./configure".  See doc/setup.txt for details.
 
 This source currently only builds on FreeBSD, and requires several packages;
 the dependencies can be found in the Makefile for our 'meta-port' in
@@ -36,11 +32,12 @@ Good places to start would include:
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
-  - The software architecture notes (doc/arch.txt and doc/arch-diagram.ps)
-  - The overview of some major systems (doc/overview.txt)
+  - Software architecture preliminary diagram (doc/arch-diagram.ps)
+  - Notes on the source tree and architecture (doc/arch.txt)
+  - Overview of some major systems (doc/overview.txt)
   - Diagrams and brief explanations of the state machines used in the 
     system (www/doc/states.html and www/doc/*.gif)
-  - The instructions for making a running system (doc/setup*.txt)
+  - The instructions for building a running system from scratch (doc/setup*.txt)
 
 QUICK TOUR
  - The Database maintains most testbed state.
@@ -93,13 +90,12 @@ www       -  Web Interface / User Documentation
 
 HELP/CONTACT INFORMATION
 For help and to report bugs and problems, mail
-    testbed-ops@flux.cs.utah.edu
+    testbed-ops@flux.utah.edu
 
 Don't be shy!  
 We are happy to get on the phone with you, too,
 for "big picture" issues and problems.
 
 
-Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285
-April 29, 2003
-
+Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285, and the Utah testbed crew.
+April 30, 2003
