@@ -1,0 +1,41 @@
+<?php
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+include("defs.php3");
+
+#
+# This script generates the contents of an image. No headers or footers,
+# just spit back an image. The thumbs are public, so no checking is done.
+# To obfuscate, do not use pid/eid, but rather use the resource index. 
+#
+
+#
+# Verify page arguments.
+# 
+if (!isset($idx) ||
+    strcmp($idx, "") == 0) {
+    USERERROR("You must provide an ID.", 1);
+}
+
+#
+# Get the thumb from the DB. 
+#
+$query_result =
+    DBQueryFatal("select thumbnail from experiment_resources ".
+		 "where idx='$idx'");
+if (!$query_result || (mysql_num_rows($query_result) == 0)) {
+    USERERROR("No such thumbnail on file!", 1);
+}
+$row  = mysql_fetch_array($query_result);
+$data = $row[thumbnail];
+ 
+header("Content-type: image/png");
+echo "$data";
+
+#
+# No Footer!
+# 
+?>

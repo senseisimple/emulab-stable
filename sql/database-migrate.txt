@@ -743,4 +743,17 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiment_stats drop shapedlans;
 	alter table experiment_stats drop minlinks;
 	alter table experiment_stats drop maxlinks;
-       
+
+1.160: Put the thumbnail into the resources table. 
+
+	alter table experiment_resources add thumbnail mediumblob
+			 after maxlinks;
+
+       Then create the thumbs in the DB
+
+	        prerender_all -t
+
+       Also remove the vis_experiments table, since no longer needed.
+
+        drop table vis_experiments;
+

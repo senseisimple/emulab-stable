@@ -2072,6 +2072,9 @@ function SHOWEXPTSTATS($pid, $eid) {
     echo "<table align=center border=1>\n";
     
     foreach($row as $key => $value) {
+	if ($key == "thumbnail")
+	    continue;
+	
 	echo "<tr>
                   <td>$key:</td>
                   <td>$value</td>

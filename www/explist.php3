@@ -30,12 +30,11 @@ function GENPLIST ($which, $query_result)
 	$pid        = $row["pid"];
 	$eid        = $row["eid"];
 	$pnodes     = $row["pnodes"];
-	$thumb_hash = $row["thumb_hash"];
 	$swapdate   = $row["swapdate"];
 	$state      = $row["state"];
+	$rsrcidx    = $row["rsrcidx"];
 
-	if ($pid == $TBOPSPID || $pnodes == 0 ||
-	    !isset($thumb_hash)) {
+	if ($pid == $TBOPSPID || $pnodes == 0) {
 	    continue;
 	}
 	if ($state == $TB_EXPTSTATE_ACTIVE) {
@@ -47,7 +46,7 @@ function GENPLIST ($which, $query_result)
 
 	echo "<td align=center>";
 	echo "<img border=1 width=128 height=128 class='stealth' ".
-	    " src='thumbs/tn$thumb_hash.png'>".
+	    " src='showthumb.php3?idx=$rsrcidx'>".
 	    " $swapdate" .
 	    "</td>";
 
@@ -63,14 +62,12 @@ function GENPLIST ($which, $query_result)
 # Active Experiments.
 # 
 $query_result =
-    DBQueryFatal("select e.pid,e.eid,e.state,rs.pnodes,ve.thumb_hash, ".
+    DBQueryFatal("select e.pid,e.eid,e.state,s.rsrcidx,rs.pnodes, ".
 		 "       s.swapin_last as swapdate ".
 		 " from experiments as e ".
-		 "left join vis_experiments as ve on ".
-		 "     ve.pid=e.pid and ve.eid=e.eid ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as rs on rs.idx=s.rsrcidx ".
-		 "where rs.pnodes>0 and ".
+		 "where rs.pnodes>0 and rs.thumbnail is not null and ".
 		 "      e.state='" . $TB_EXPTSTATE_ACTIVE . "' and " .
 		 "      e.pid!='emulab-ops' and ".
 		 "      not (e.pid='ron' and e.eid='all') ".
@@ -82,14 +79,13 @@ if (mysql_num_rows($query_result)) {
 }
 
 $query_result =
-    DBQueryFatal("select e.pid,e.eid,e.state,rs.pnodes,ve.thumb_hash, ".
+    DBQueryFatal("select e.pid,e.eid,e.state,s.rsrcidx,rs.pnodes, ".
 		 "       s.swapout_last as swapdate ".
 		 " from experiments as e ".
-		 "left join vis_experiments as ve on ".
-		 "     ve.pid=e.pid and ve.eid=e.eid ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as rs on rs.idx=s.rsrcidx ".
 		 "where rs.pnodes-rs.delaynodes>2 and ".
+		 "      rs.thumbnail is not null and ".
 		 "      e.state='" . $TB_EXPTSTATE_SWAPPED . "' " .
 		 "order by s.swapout_last desc ".
 		 "limit 200");

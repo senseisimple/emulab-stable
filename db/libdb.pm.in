@@ -139,7 +139,7 @@ use Exporter;
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
-	 TBLeaderMailList ExpGroup TBExptSetSwapUID
+	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -2509,7 +2509,8 @@ sub TBExptBackupVirtualState($$$)
 
     if (! $errors) {
 	foreach $table (@virtualTables) {
-	    DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
+	    DBQueryWarn("SELECT * FROM $table ".
+			"WHERE pid='$pid' AND eid='$eid' ".
 			"INTO OUTFILE '$backupDir/$table' ")
 		or $errors++;
 	}
@@ -2596,6 +2597,29 @@ sub TBExptSetSwapUID($$$)
 
     return DBQueryWarn("update experiments set expt_swap_uid='$uid' ".
 		       "where pid='$pid' and eid='$eid'");
+}
+
+#
+# Set the thumbnail for an experiment. Comes in as a binary string, which
+# must be quoted before DB insertion.
+#
+sub TBExptSetThumbNail($$$)
+{
+    my ($pid, $eid, $bindata) = @_;
+
+    $bindata = DBQuoteSpecial($bindata);
+
+    # Need the resource ID first.
+    my $query_result = 
+	DBQueryFatal("select rsrcidx from experiments as e ".
+		     "left join experiment_stats as s on e.idx=s.exptidx ".
+		     "where e.pid='$pid' and e.eid='$eid'");
+    my ($rsrcidx) = $query_result->fetchrow_array();
+
+    # Now do the insert. 
+    return
+	DBQueryFatal("update experiment_resources set thumbnail=$bindata ".
+		     "where idx=$rsrcidx");
 }
 
 #

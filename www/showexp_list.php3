@@ -62,16 +62,6 @@ if ($showtype != "all") {
 
 echo "</b><br />\n";
 
-#echo "<b>Show:
-#         <a class='static' href='showexp_list.php3?showtype=active&sortby=$sortby&thumb=$thumb'>active</a>,
-#         <a class='static' href='showexp_list.php3?showtype=batch&sortby=$sortby&thumb=$thumb'>batch</a>,";
-#if ($isadmin) 
-#     echo "\n<a class='static' href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb'".
-#       ">idle</a>,";
-#
-#echo "\n       <a class='static' href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>all</a>.
-#      </b><br />\n";
-
 # Default value for showlastlogin is 1 for admins
 $showlastlogin = $isadmin;
 # Note: setting this to 1 for non-admins still doesn't make the column
@@ -190,18 +180,8 @@ if ($thumb && !$idle) {
 
     echo "</b><br />\n";
 }
- 
-#    if (!$thumb) {
-#	echo "<b><a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=1'>".
-#             "Switch to Thumbnail view".
-#	     "</a></b><br />";
-#    } else {
-#	echo "<b><a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=0'>".
-#             "Switch to List view".
-#	     "</a></b><br />";
-#    }
 }
-
+ 
 echo "<br />\n";
 
 #
@@ -247,11 +227,10 @@ count(r.node_id) as ncount, swap_requests,
 round((unix_timestamp(now())-unix_timestamp(last_swap_req))/3600,1) as lastreq,
 (unix_timestamp(now()) - unix_timestamp(max(greatest(
 last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
-(max(last_report) is not null) as canbeidle,
-ve.thumb_hash as thumb_hash 
+(max(last_report) is not null) as canbeidle, s.rsrcidx
 from experiments as e 
-left join vis_experiments as ve on ve.pid=e.pid and ve.eid=e.eid 
-left join reserved as r on e.pid=r.pid and e.eid=r.eid 
+left join reserved as r on e.pid=r.pid and e.eid=r.eid
+left join experiment_stats as s on e.idx=s.exptidx
 left join nodes as n on r.node_id=n.node_id
 left join node_activity as na on r.node_id=na.node_id
 where (n.type!='dnard' or n.type is null) $clause 
@@ -264,11 +243,10 @@ select distinct e.*, date_format(expt_swapped,'%Y-%m-%d') as d,
 date_format(expt_swapped,'%c/%e') as dshort, count(r.node_id) as ncount, 
 (unix_timestamp(now()) - unix_timestamp(max(greatest(
 last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
-(max(last_report) is not null) as canbeidle,
-ve.thumb_hash as thumb_hash 
+(max(last_report) is not null) as canbeidle, s.rsrcidx
 from group_membership as g 
 left join experiments as e on g.pid=e.pid and g.pid=g.gid 
-left join vis_experiments as ve on ve.pid=e.pid and ve.eid=e.eid 
+left join experiment_stats as s on e.idx=s.exptidx
 left join reserved as r on e.pid=r.pid and e.eid=r.eid 
 left join nodes as n on r.node_id=n.node_id 
 left join node_activity as na on r.node_id=na.node_id
@@ -349,35 +327,17 @@ if ($thumb && !$idle) {
 	$huid = $row["expt_head_uid"];
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["dshort"];
-	$thumb_hash = $row["thumb_hash"];
+        $rsrcidx = $row["rsrcidx"];
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
-
-	if ($TBMAINSITE) {
-	    # if image is not in thumbs dir, render it!
-	    if ($thumb_hash && !file_exists ($TBDIR . "www/thumbs/tn$thumb_hash.png")) {
-		# we'll be paranoid, and escape pid and eid.
-		$prerender_cmd = $TBDIR . "libexec/vis/prerender -t " . 
-		                 escapeshellcmd($pid) . " " . escapeshellcmd($eid) .
-				 " > /dev/null";
-		#echo "<!-- rerendered $pid $eid -->";
-		system( $prerender_cmd );
-	    }
-	}
-
-#	echo "<table style=\"float: none;\" width=256 height=192><tr><td>".
-#	echo "And<table align=left width=256 height=192><tr width=256><td height=192>".
-#	echo "<table width=256 height=192><tr><td>".
-#	echo "<td width=50%>".
-#	echo "<tr
 
 	if ($thumb == 2) {
 	    if ($pid != "emulab-ops") {
 		echo "<td align=center>".
 		     "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
 		     "<img border=1 width=128 height=128 class='stealth' ".
-		     " src='thumbs/tn$thumb_hash.png' />".
-		     "<br />\n".
+		     " src='showthumb.php3?idx=$rsrcidx'>".
+		     "<br>\n".
 		     "<b>".
 		     "<a href='showproject.php3?pid=$pid'>$pid</a>/<br />".
 		     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
@@ -395,9 +355,7 @@ if ($thumb && !$idle) {
 		 "<td width=128 align=center>".
 	         "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
 		 "<img border=1 width=128 height=128 class='stealth' ".
-#	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
-#	     " src='thumbs/$pid.$eid.png' />".
-		 " src='thumbs/tn$thumb_hash.png' />".
+		 " src='showthumb.php3?idx=$rsrcidx'>".
 	         "</a>".
                  "</td>".
 	         "<td align=left class='paddedcell'>".

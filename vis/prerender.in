@@ -49,6 +49,7 @@ if (!getopts($optlist, \%options)) { usage; }
 if (@ARGV != 2) { usage; }
 
 my $debug = 0;
+my $thumb = 0;
 
 if ( defined($options{"v"}) ) { 
     $debug++; 
@@ -56,34 +57,14 @@ if ( defined($options{"v"}) ) {
     $THUMB_CMD .= " -v"; 
 }
 
+if ( defined($options{"t"}) ) { 
+    $thumb++; 
+}
+
 #my ($pid) = $ARGV[0];
 #my ($eid) = $ARGV[1];
 my ($pid) = $ARGV[0] =~ /([0-9a-zA-Z_\-]+)/;
 my ($eid) = $ARGV[1] =~ /([0-9a-zA-Z_\-]+)/;
-
-if ( defined($options{"t"}) ) { 
-    my $result = DBQueryFatal("SELECT thumb_hash FROM vis_experiments " .
-			      "WHERE pid='$pid' AND eid='$eid'");
-    ($thumb) = $result->fetchrow;
-
-    if (!$thumb) {
-	if (defined($options{"r"})) {
-	    print STDERR "Warning! No thumbnail found to remove.\n";
-	} else {
-	    # If we're not removing the experiment, we need to generate a thumbhash.
-	    # Hash a lot of random junk.
-	    $thumb = md5_hex( rand(99999) . "-$$-$pid-$eid-XYzzY" );
-	    DBQueryFatal("INSERT INTO vis_experiments (pid,eid,thumb_hash) VALUES ".
-			 "('$pid','$eid','$thumb')");
-	}
-    }
-
-    if ($thumb) { 
-	dprint "Thumb hash is '$thumb'.\n"; 
-    } else {
-	dprint "No thumb hash.\n";
-    }
-}
 
 # for the mungeName function, below.
 $mungeUID = 0;
@@ -91,11 +72,7 @@ $mungeUID = 0;
 ### If they specified -r, meaning they just wanted to remove vis info 
 ### from the DB, we do it and quit.
 if (defined($options{"r"})) {
-    if ($thumb) {
-	system("/bin/rm @prefix@/www/thumbs/tn$thumb.png");
-    }
     DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
-    DBQueryFatal("DELETE FROM vis_experiments WHERE pid='$pid' AND eid='$eid'");
     exit 0; 
 }
 
@@ -430,16 +407,18 @@ foreach $node (keys %nodes) {
 }
 
 # Generate thumbnail, if called for. The .png file is put into the work
-# directory, so it is copied off to the users and the archive directory. 
+# directory, so it is copied off to the users directory. We take that
+# file and stash it in the DB, since that is where the system will read
+# it from.
 
 if ($thumb) {
     my $workdir = TBExptWorkDir($pid, $eid);
     my $fname   = "$workdir/$eid.png";
 	
-    if (system("$THUMB_CMD $pid $eid > $fname")) {
+    if (system("nice $THUMB_CMD $pid $eid > $fname")) {
 	print STDERR "Error generating thumbnail.\n";
     }
-    system("cp -pf $fname @prefix@/www/thumbs/tn$thumb.png");
+    TBExptSetThumbNail($pid, $eid, `cat $fname`);
 }
 
 ### Success!!

@@ -188,6 +188,7 @@ CREATE TABLE experiment_resources (
   shapedlans smallint(5) unsigned default '0',
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
+  thumbnail mediumblob,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
   KEY lastidx (lastidx)
@@ -1475,17 +1476,6 @@ CREATE TABLE virt_vtypes (
   name varchar(12) NOT NULL default '',
   weight float(7,5) NOT NULL default '0.00000',
   members text
-) TYPE=MyISAM;
-
---
--- Table structure for table 'vis_experiments'
---
-
-CREATE TABLE vis_experiments (
-  eid varchar(32) NOT NULL default '',
-  pid varchar(12) NOT NULL default '',
-  thumb_hash varchar(64) NOT NULL default '',
-  PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
 --
