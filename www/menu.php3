@@ -271,8 +271,11 @@ function WRITESIDEBAR() {
         # Standard options for anyone else not logged in.
         #
         if (! NOLOGINS()) {
-	    WRITESIDEBARLASTBUTTON("Request Account",
-				   $TBBASE, "reqaccount.php3");
+	    echo "<tr><td class='menuopt'>".
+	         "<center><a href='$TBBASE/reqaccount.php3'>".
+	         "<img border=0 src='requestaccount.gif' ".
+		 " alt='Request Account' />".
+	         "</a></center></td></tr>";
 	}
     }
 
