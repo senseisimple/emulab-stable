@@ -1,0 +1,20 @@
+/*
+ * Various constants that are reflected in the DB!
+ */
+#define	TBDB_FLEN_NODEID	64
+#define TBDB_FLEN_EVOBJTYPE	128
+#define TBDB_FLEN_EVOBJNAME	128
+#define TBDB_FLEN_EVEVENTTYPE	128
+
+/*
+ * Event system stuff
+ */
+#define TBDB_OBJECTTYPE_TESTBED	"TBCONTROL"
+#define TBDB_OBJECTTYPE_LINK	"LINK"
+#define TBDB_OBJECTTYPE_TRAFGEN	"TRAFGEN"
+
+#define TBDB_EVENTTYPE_ISUP	"ISUP"
+#define TBDB_EVENTTYPE_REBOOT	"REBOOT"
+#define TBDB_EVENTTYPE_UP	"UP"
+#define TBDB_EVENTTYPE_DOWN	"DOWN"
+#define TBDB_EVENTTYPE_MODIFY	"MODIFY"

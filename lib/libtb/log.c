@@ -23,6 +23,8 @@ loginit(int slog, char *name)
 {
 	if (slog) {
 		usesyslog = 1;
+		if (! name)
+			name = "Testbed";
 		openlog(name, LOG_PID, LOG_USER);
 		return 0;
 	}
@@ -32,7 +34,7 @@ loginit(int slog, char *name)
 	if (name) {
 		int	fd;
 
-		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0)) != -1) {
+		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0640)) != -1) {
 			(void)dup2(fd, STDOUT_FILENO);
 			(void)dup2(fd, STDERR_FILENO);
 			if (fd > 2)
