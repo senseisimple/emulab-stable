@@ -447,7 +447,7 @@ sub WaitTillReloadDone {
     #
     # Seems like a long time to wait, but it ain't!
     # 
-    my $maxwait = (60 * 10);
+    my $maxwait = (60 * 15);
 
     foreach my $node ( @nodes ) {
 	$done{$node}  = 0;
