@@ -47,9 +47,10 @@ install: all
 	install -c tbsetup/ir/extract_tb.tcl /usr/testbed/bin
 	install -c tbsetup/ir/handle_ip.tcl /usr/testbed/bin
 	install -c tbsetup/ns2ir/parse.tcl /usr/testbed/bin
+	@$(MAKE) -C tbsetup/checkpass install
 
 
-all: lib/sql.so assign/assign discvr/cli discvr/serv os/key7 os/key8 os/imagezip/imagezip
+all: lib/sql.so assign/assign discvr/cli discvr/serv os/key7 os/key8 os/imagezip/imagezip tbsetup/checkpass/checkpass
 
 lib/sql.so:
 	@$(MAKE) -C lib sql.so
@@ -72,11 +73,15 @@ os/key8:
 os/imagezip/imagezip:
 	@$(MAKE) -C os/imagezip imagezip
 
+tbsetup/checkpass/checkpass:
+	@$(MAKE) -C tbsetup/checkpass checkpass
+
 clean:
 	@$(MAKE) -C assign clean
 	@$(MAKE) -C discvr clean
 	@$(MAKE) -C os  clean
 	@$(MAKE) -C os/imagezip clean
-
+	@$(MAKE) -C tbsetup/checkpass clean
+	
 
 

@@ -24,15 +24,12 @@ default:
 	@echo "you evidently don't know what you're doing. go read the README"
 
 all:
-	( cd cracklib && make && exit $$? )
-	( cd util && make DICTPATH=$(DICTPATH) && exit $$? )
-###	( cd passwd && make DICTPATH=$(DICTPATH) passwd && exit $$? )
-###	touch all
+	gmake -C cracklib
+	gmake -C util DICTPATH=$(DICTPATH) 
 
 clean:
-	-( cd cracklib && make clean && exit $$? )
-	-( cd util && make clean && exit $$? )
-###	-( cd passwd && make clean && exit $$? )
+	gmake -C cracklib clean 
+	gmake -C util clean 
 	-rm -f all installed Part* *.BAK *.bak *~
 
 install: all
