@@ -20,7 +20,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # Like the INSTALL_ETCDIR target
 $(INSTALL_APACHE_CONFIG)/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_ETCDIR)
+	-mkdir -p $(INSTALL_APACHE_CONFIG)
 	$(INSTALL_DATA) $< $@
 
 
