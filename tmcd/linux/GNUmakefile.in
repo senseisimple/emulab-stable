@@ -29,13 +29,14 @@ all:	supfile $(SCRIPTS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR		=
-SYSETCDIR	= $(DESTDIR)/etc
-ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
-BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
-VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
-RCDIR		= $(SYSETCDIR)/rc.d
-INSTALL		= /usr/bin/install -c 
-COMMON		= $(SRCDIR)/../common
+SYSETCDIR	?= $(DESTDIR)/etc
+ETCDIR		?= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		?= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		?= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		?= $(SYSETCDIR)/rc.d
+INSTALL		?= /usr/bin/install -c 
+COMMON		?= $(SRCDIR)/../common
+DEFRUNLVLDIR	?= $(RCDIR)/rc3.d
 
 install client-install:	common-install etc-install \
 			sup-install script-install bin-install
@@ -50,7 +51,7 @@ dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/init.d
 	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc1.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc3.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(DEFRUNLVLDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc6.d
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
@@ -94,7 +95,7 @@ sysetc-install:	dir-install ifcfgs
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
-	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc3.d/S96testbed
+	-ln -sf $(RCDIR)/init.d/testbed $(DEFRUNLVLDIR)/S96testbed
 	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
 	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
@@ -107,7 +108,7 @@ sysetc-install:	dir-install ifcfgs
 				$(SYSETCDIR)/cron.pend; \
 	fi
 	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
-	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc3.d/S96elvin
+	-ln -sf $(RCDIR)/init.d/elvin $(DEFRUNLVLDIR)/S96elvin
 	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
 	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
@@ -136,7 +137,7 @@ script-install:	dir-install $(SCRIPTS)
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
-	-ln -sf $(RCDIR)/init.d/nfs $(RCDIR)/rc3.d/S20nfs
+	-ln -sf $(RCDIR)/init.d/nfs $(DEFRUNLVLDIR)/S20nfs
 	-ln -sf $(RCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
 	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
 	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config

@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+#
+# testbed       Do some testbed stuff,
+#
+# description:	On shutdown, it informs the testbed we are rebooting
+#		and terminates any lingering daemons.
+
+RETVAL=0
+
+# See how we were called.
+case "$1" in
+  start)
+        # Fire off testbed startup.
+        $BINDIR/rc/rc.testbed
+        touch /var/lock/subsys/testbed
+	;;
+  stop) 
+        rm /var/lock/subsys/testbed
+	echo "Shutting down testbed daemons ..."
+	killall trafgen
+	killall program-agent
+	killall slothd
+	killall healthd
+	killall watchdog
+	killall evproxy
+	killall linktest
+	killall emulab-syncd
+	echo "Informing the testbed we're rebooting ..."
+	$BINDIR/tmcc state SHUTDOWN
+	RETVAL=$?
+	;;
+  status)
+	echo "Peachy"
+	;;
+  restart)
+	echo "Done"
+	;;
+  reload)
+	echo "Done"
+	;;
+  *)
+	echo "Usage: testbed {start|stop|restart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL

@@ -60,6 +60,10 @@ MDSUBDIR  = cygwinxp
 TMSLIBS   += -lminires
 endif
 
+ifeq ($(host_cpu),arm)
+MDSUBDIR  = linux-sg
+endif
+
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS = `elvin-config --cflags vin4c` \
 		     -I$(TESTBED_SRCDIR)/event/lib -DEVENTSYS

@@ -1994,6 +1994,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile \
 	tmcd/linux/sethostname.dhclient \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
+        tmcd/linux-sg/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/cygwinxp/GNUmakefile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \

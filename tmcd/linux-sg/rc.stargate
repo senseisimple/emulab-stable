@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+. /etc/emulab/paths.sh
+
+case "$1" in
+  start)
+        echo "Executing Stargate-specific startup.."
+
+        # Replace new regmon with old since our code doesn't
+        # work with the new one yet..
+        if [ -r $ETCDIR/regmon.o ]; then
+                /sbin/rmmod regmon
+                /sbin/insmod -f $ETCDIR/regmon.o
+        fi
+
+        # Start the mote -> sg LEDS mirror
+        # Probably ought to move this to $BINDIR, but I'm not
+        #  sure it's even installed from client-install yet!
+        if [ -x /usr/local/bin/moteleds ]; then
+                /usr/local/bin/moteleds -d -s -m
+        fi
+
+        # Start the robot control process
+        #cd /usr/local/etc/emulab
+        #/usr/local/bin/gorobot -d >> /tmp/gorobot.log
+        ;;
+  stop)
+        # nothing yet..
+        ;;
+
+  *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+        ;;
+esac
+
+exit 0

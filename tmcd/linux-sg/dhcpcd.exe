@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+# source interface parameters.
+. $1
+
+if [ x$2 = xdown ]
+then
+    exit 0
+fi
+
+#
+# Remember our server IP, real hostname, router IP, etc.
+#
+echo $DHCPSIADDR > $BOOTDIR/bossip
+echo $HOSTNAME > $BOOTDIR/realname
+echo $GATEWAY > $BOOTDIR/routerip
+echo $IPADDR > $BOOTDIR/myip
+echo $NETMASK > $BOOTDIR/mynetmask
+if [ -n "$INTERFACE" ]; then
+    echo $INTERFACE > $BOOTDIR/controlif
+fi
+
+#
+# See if the Testbed configuration software wants to change the hostname.
+# 
+$BINDIR/sethostname.dhclient >$LOGDIR/dhclient.log 2>&1
+
+#
+# Killing off dhcpcd appears to unconfig the interface, so lets keep it
+# around..
+#
+
+exit 0
