@@ -13,6 +13,8 @@ if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
 elif [ $cpuspeed = "850" -a -x '/etc/rc.d/testbed/chipset.awk' ]; then
 	if [ `/etc/rc.d/testbed/chipset.awk /proc/pci` = "GX" ]; then
 		echo pcL440GX;
+	else
+		echo pc$cpuspeed;
 	fi
 
 else

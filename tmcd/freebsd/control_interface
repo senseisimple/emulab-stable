@@ -2,12 +2,12 @@
 
 NODETYPE=`/etc/testbed/nodetype`
 
-if [ $NODETYPE = 'pc600' ]; then
+if [ "$NODETYPE" = 'pc600' ]; then
     echo 'fxp4'
-elif [ $NODETYPE = 'pc850' ]; then
+elif [ "$NODETYPE" = 'pc850' ]; then
     echo 'fxp0'
-elif [ $NODETYPE = 'pcL440GX' ]; then
+elif [ "$NODETYPE" = 'pcL440GX' ]; then
     echo 'fxp2'
-elif [ $NODETYPE = 'pc1500' ]; then
+elif [ "$NODETYPE" = 'pc1500' ]; then
     echo 'xl0'
 fi

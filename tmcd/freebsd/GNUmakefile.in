@@ -53,10 +53,10 @@ script-install:	dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 		/etc/dhclient-exit-hooks
-	$(INSTALL) -m 755 $(SRCDIR)/nodetype /etc/testbed/nodetype
-	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk /etc/testbed/chipset.awk
-	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk /etc/testbed/cpuspeed.awk
-	$(INSTALL) -m 755 $(SRCDIR)/control_interface /etc/testbed/control_interface
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(INSTALL_DIR)/chipset.awk
+	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(INSTALL_DIR)/control_interface
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 /etc/start_if.fxp0
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp2 /etc/start_if.fxp2
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 /etc/start_if.fxp4
