@@ -420,7 +420,11 @@ REPLACE INTO testsuite_preentables VALUES ('node_activity','clean');
 REPLACE INTO testsuite_preentables VALUES ('portmap','clean');
 REPLACE INTO testsuite_preentables VALUES ('webnews','clean');
 REPLACE INTO testsuite_preentables VALUES ('vis_nodes','clean');
-REPLACE INTO testsuite_preentables VALUES ('vis_experiments','clean');
+REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --
 -- Dumping data for table 'webdb_table_permissions'
