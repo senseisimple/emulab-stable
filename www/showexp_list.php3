@@ -145,33 +145,6 @@ Note that it is not reliable in the case where they're using a special
 kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
     }
     
-    echo "<table border=2 cols=0
-                 cellpadding=0 cellspacing=2 align=center>
-            <tr>
-              <td width=8%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
-                  PID</td>
-              <td width=8%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
-                  EID</td>
-              <td width=3%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
-                  PCs</td>\n";
-
-    if ($isadmin)
-	echo "<td width=17% align=center>Last Login</td>\n";
-    if ($idle)
-	echo "<td width=4% align=center>Days Idle</td>
-              <td width=4% align=center>Swap Req.</td>\n";
-
-    echo "    <td width=60%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
-                  Name</td>
-              <td width=4%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
-                  Head UID</td>
-            </tr>\n";
-
     #
     # Okay, I decided to do this as one big query instead of a zillion
     # per-exp queries in the loop below. No real reason, except my personal
@@ -205,7 +178,38 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	$total_usage[$class] += $count;
 	$perexp_usage["$pid:$eid"][$class] = $count;
     }
+    ksort($total_usage);
+
+    #
+    # Now shove out the column headers.
+    #
+    echo "<table border=2 cols=0
+                 cellpadding=0 cellspacing=2 align=center>
+            <tr>
+              <td width=8%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
+                  PID</td>
+              <td width=8%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
+                  EID</td>
+              <td align=center width=3%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
+                  PCs</a><br>[<b>1</b>]</td>\n";
     
+    if ($isadmin)
+	echo "<td width=17% align=center>Last Login</td>\n";
+    if ($idle)
+	echo "<td width=4% align=center>Days Idle</td>
+              <td width=4% align=center>Swap Req.</td>\n";
+
+    echo "    <td width=60%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
+                  Name</td>
+              <td width=4%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
+                  Head UID</td>
+            </tr>\n";
+
     while ($row = mysql_fetch_array($experiments_result)) {
 	$pid  = $row[pid];
 	$eid  = $row[eid];
@@ -242,11 +246,14 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	    }
 	}
 
-	$nodes = 0;
+	$nodes   = 0;
+	$special = 0;
 	reset($perexp_usage);
 	if (isset($perexp_usage["$pid:$eid"])) {
 	    while (list ($class, $count) = each($perexp_usage["$pid:$eid"])) {
 		$nodes += $count;
+		if (strcmp($class, "pc"))
+		    $special = 1;
 	    }
 	}
 
@@ -258,8 +265,13 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
-                       $eid</A></td>
-                <td> $nodes</td>\n";
+                       $eid</A></td>\n";
+
+	# If multiple classes, then hightlight the number.
+	if ($special)
+            echo "<td><font color=red>$nodes</font></td>\n";
+	else
+            echo "<td>$nodes</td>\n";
 
 	if ($isadmin) echo "<td>$foo</td>\n";
 
@@ -269,11 +281,15 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
                </tr>\n";
     }
     echo "</table>\n";
-    echo "<br><center><b>Node Totals</b></center>\n";
+
+    echo "<ol>
+             <li><font color=red>Red</font> indicates nodes other than PCs.
+          </ol>\n";
+    
+    echo "<center><b>Node Totals</b></center>\n";
     echo "<table border=0
                  cellpadding=1 cellspacing=1 align=center>\n";
     $total = 0;
-    ksort($total_usage);
     while (list($type, $count) = each($total_usage)) {
 	    $total += $count;
 	    echo "<tr>
