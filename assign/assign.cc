@@ -186,7 +186,7 @@ int assign()
   
   while (temp >= temp_stop) {
 #ifdef VERBOSE
-    cout << "Temperature:  " << temp << endl;
+    cout << "Temperature:  " << temp << " AbsBest: " << absbest << " (" << absbestv << ")" << endl;
 #endif
     trans = 0;
     accepts = 0;

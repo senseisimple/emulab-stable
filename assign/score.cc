@@ -427,8 +427,8 @@ int add_node(node n,int ploc)
 	// try to find interswitch
 #ifdef SCORE_DEBUG
 	cerr << "   looking for interswitch link " <<
-	  PG[pnoder.the_switch].name << " " <<
-	  PG[dpnoder.the_switch].name << endl;
+	  (pnoder.the_switch != nil?PG[pnoder.the_switch].name:string("No Switch")) << " " <<
+	  (dpnoder.the_switch != nil?PG[dpnoder.the_switch].name:string("No Switch")) << endl;
 #endif
 	if (find_interswitch_path(pnoder.the_switch,dpnoder.the_switch,
 				  er->bandwidth,er->path) == 0) {
@@ -671,7 +671,7 @@ void score_link(edge e,edge v,bool interswitch)
   tb_vlink &er = G[v];
 
 #ifdef SCORE_DEBUG
-  fprintf(stderr,"  score_link(%p)\n",e);
+  cerr << "  score_link(" << e << ") - " << pl.name << " / " << er.name << endl;
 #endif
 
   if (! interswitch) {
