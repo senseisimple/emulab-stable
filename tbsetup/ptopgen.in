@@ -1,9 +1,18 @@
 #!/usr/bin/perl -w
+use English;
+use Getopt::Std;
 
 # Settings - Change these to your particular network.
 
 # Switch interface speed - In Mbps
 $switch_speed = 100;
+
+sub usage()
+{
+    print STDOUT "Usage: ptopgen [-s switch]\n";
+    exit(-1);
+}
+my  $optlist = "s:";
 
 ######################################################################
 
@@ -14,6 +23,22 @@ use libdb;
 
 %switches=();
 %used_switches=();
+my $switchtouse;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"s"})) {
+    $switchtouse = $options{"s"};
+}
 
 # Read class/type maps
 my $result = DBQueryFatal("select class,type,delay_capacity from node_types");
@@ -27,12 +52,20 @@ $result->finish;
 $nodetypes{"switch"} = 0;
 
 # Print switches
-$result = DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
-while (($switch) = $result->fetchrow_array) {
-    print "node $switch switch:1\n";
-    $switches{$switch} = 1;
+if (defined($switchtouse)) {
+    print "node $switchtouse switch:1\n";
+    $switches{$switchtouse} = 1;
 }
-$result->finish;
+else {
+    $result =
+	DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
+
+    while (($switch) = $result->fetchrow_array) {
+	print "node $switch switch:1\n";
+	$switches{$switch} = 1;
+    }
+    $result->finish;
+}
 
 # Find available nodes
 $result = DBQueryFatal("select a.node_id,a.type from" .

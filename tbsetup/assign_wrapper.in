@@ -20,10 +20,11 @@
 $delaythresh = 3;
 $maxrun = 20;
 $delaywithswitch=0;
+$assignlog = "assign.log";
 
 $DELAYCAPACITY = @DELAYCAPACITY@;
 $TBROOT = "@prefix@";
-$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
+$ENV{'PATH'} = "/bin:/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
 use lib '@prefix@/lib';
 use libdb;
@@ -324,6 +325,9 @@ DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 print "Minumum nodes = $minimum_nodes\n";
 print "Maximum nodes = $maximum_nodes\n";
 
+# Init assign.log with the topfile.
+system("cat $topfile > $assignlog");
+
 ######################################################################
 # Step 2 - Assign Loop
 # 
@@ -354,7 +358,18 @@ while (1) {
     undef %plinks;
 
     # Snapshot
-    system("ptopgen > $ptopfile");
+    # XXX HACK!!! Alternate switches for now.
+    my $switchtouse;
+    if ($currentrun & 1) {
+	$switchtouse = "-s cisco3";
+    }
+    else {
+	$switchtouse = "-s cisco1";
+    }
+    system("ptopgen $switchtouse > $ptopfile");
+
+    # Add latest ptop to log.
+    system("cat $ptopfile >> $assignlog");
 
     # Get number of nodes
     my $numnodes_result = 
@@ -373,7 +388,7 @@ while (1) {
     # Run assign
     $fail = 0;
     print "assign -b -t $ptopfile $topfile\n";
-    open(ASSIGNFP,"assign -b -t $ptopfile $topfile | tee assign.log |");
+    open(ASSIGNFP,"assign -b -t $ptopfile $topfile | tee -a $assignlog |");
     $violations = 0;
     $score = -1;
 
