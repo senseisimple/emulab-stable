@@ -193,20 +193,22 @@ foreach my $node (@nodes) {
 	print STDERR "vnode $mode on $pnode returned $?.\n" if $debug;
     
 	#
-	# If either ssh is not running or it timed out,
-	# send it a ping of death.
+	# Look for setup failure, reported back through ssh.
 	# 
-	if ($? == 256 || $? == 15) {
-	    if ($? == 256) {
+	if ($?) {
+	    my $exitstatus = $?;
+
+	    if ($exitstatus == 256) {
 		print STDERR "$node is not running sshd.\n" if $debug;
-	    } else {
+	    }
+	    elsif ($exitstatus == 15) {
 		print STDERR "$node is wedged.\n" if $debug;
 	    }
 	    
 	    # Send mail to testbed-ops about it
 	    SENDMAIL($TBOPS, "Virtual Node $node $mode failure",
 	     "Virtual node $node $mode (on physical node $pnode) in pid/eid\n".
-	     "$pid/$eid has failed!\n");
+	     "$pid/$eid has failed! Exit status was $exitstatus.\n");
 
 	    if (!$killmode) {
 		die("*** $0:\n".
