@@ -33,7 +33,7 @@
 void		sigcatcher(int foo);
 char		*getbossnode(void);
 #ifdef UDP
-void		doudp(int, char **, int, struct in_addr, int, char *);
+void		doudp(int, char **, int, struct in_addr, int, char *, int);
 #endif
 
 char *usagestr = 
@@ -43,6 +43,7 @@ char *usagestr =
  " -v versnum	   Specify a version number for tmcd\n"
  " -n vnodeid	   Specify the vnodeid\n"
  " -u		   Use UDP instead of TCP\n"
+ " -t timeout	   Timeout waiting for a reply from master (UDP ONLY).\n"
  "\n";
 
 void
@@ -65,12 +66,13 @@ main(int argc, char **argv)
 	int			version = CURRENT_VERSION;
 	char			*vnodeid = NULL;
 #ifdef UDP
-	int			useudp = 0;
+	int			waitfor = 0;
+	int			useudp  = 0;
 #endif
 
 	portnum = TBSERVER_PORT;
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
@@ -85,6 +87,9 @@ main(int argc, char **argv)
 			version = atoi(optarg);
 			break;
 #ifdef UDP
+		case 't':
+			waitfor = atoi(optarg);
+			break;
 		case 'u':
 			useudp = 1;
 			break;
@@ -139,7 +144,8 @@ main(int argc, char **argv)
 
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv, version, serverip, portnum, vnodeid);
+		doudp(argc, argv,
+		      version, serverip, portnum, vnodeid, waitfor);
 		/*
 		 * Never returns.
 		 */
@@ -285,7 +291,8 @@ getbossnode(void)
  */
 void
 doudp(int argc, char **argv,
-      int vers, struct in_addr serverip, int portnum, char *vnodeid)
+      int vers, struct in_addr serverip, int portnum, char *vnodeid,
+      int waitfor)
 {
 	int			sock, length, n, cc;
 	struct sockaddr_in	name, client;
@@ -339,8 +346,12 @@ doudp(int argc, char **argv,
 		exit(1);
 	}
 
+	if (waitfor) {
+		alarm(waitfor);
+	}
 	cc = recvfrom(sock, buf, sizeof(buf), 0,
 		      (struct sockaddr *)&client, &length);
+
 	if (cc < 0) {
 		perror("Reading from socket:");
 		exit(1);
