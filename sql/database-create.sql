@@ -890,7 +890,7 @@ CREATE TABLE reserved (
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
   PRIMARY KEY  (node_id),
-  KEY pid (pid,eid)
+  UNIQUE KEY vname (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
