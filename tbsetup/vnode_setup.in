@@ -287,8 +287,10 @@ foreach my $node (@nodes) {
     }
 }
 
-#
-# Only if all nodes setup okay.
-# 
-print STDOUT "Vnode $mode done!\n";
+if ($killmode) {
+    print STDOUT "Vnode teardown finished.\n";
+}
+else {
+    print STDOUT "Vnode setup initiated on all nodes ...\n";
+}
 exit 0;
