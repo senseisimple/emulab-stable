@@ -206,8 +206,9 @@ if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
   foreach $n ( @reloads ) {
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $reloadpid/$reload_pendingeid...\n";
-    $cmd = "update reserved set pid='$reloadpid',eid='$reload_pendingeid' where ".
-      "node_id='$n'";
+    $cmd = "update reserved set ".
+	"pid='$reloadpid',eid='$reload_pendingeid',vname=NULL ".
+	"where node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++ && next);
@@ -218,8 +219,8 @@ if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
 	my $image = $$aref[1];
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
-    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
-      "node_id='$n'";
+    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid',vname=NULL ".
+	where node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++ && next);
@@ -232,8 +233,8 @@ if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
     my ($next_pid,$next_eid) = split (":",$reserves{$n});
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $next_pid/$next_eid...\n";
-    $cmd = "update reserved set pid='$next_pid',eid='$next_eid' where ".
-      "node_id='$n'";
+    $cmd = "update reserved set pid='$next_pid',eid='$next_eid',vname=NULL ".
+      "where node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++ && next);
