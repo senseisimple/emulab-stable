@@ -15,6 +15,14 @@ use libtestbed;
 
 my $TB = '@prefix@';
 
+#
+# This is the magic node which is equivalent to the TBDB_WIDEAREA_LOCALNODE .
+# This could be moved to a configure variable, but I'm not going to do so
+# until there's a need to go to that trouble. It's hacky, no matter where
+# you put it.
+#
+my $MAGICNODE = "ron2";
+
 my $logfile = "$TB/log/grabron";
 
 if (@ARGV != 2) {
@@ -29,9 +37,21 @@ $| = 1;
 #
 my $interval = 8 * 60 *60; # 8 hours
 
-if (TBBackGround($logfile)) {
-    exit(0);
+#
+# Find out the interface to use for the TBDB_WIDEAREA_LOCALNODE, since I don't
+# want to hardcode it anywhere.
+# XXX: What if it has more than one interface?
+#
+my $result = DBQueryFatal("select iface from interfaces where node_id='" .
+	TBDB_WIDEAREA_LOCALNODE . "'");
+if ($result->num_rows() != 1){
+    die "Unable to determine iface for " . TBDB_WIDEAREA_LOCALNODE . "\n";
 }
+my ($localIface) = ($result->fetchrow());
+
+#if (TBBackGround($logfile)) {
+#   exit(0);
+#
 
 #
 # Start out with the the last $interval seconds
@@ -106,12 +126,32 @@ sub upload_times($$$) {
 	    $bandwidth = -1;
 	}
 	$suceeded++;
-	DBQueryFatal("replace into widearea_recent set IP1='$src'," .
-		" IP2='$dst', time=$latency, node_id1='$node_id1', " .
-		" iface1='$iface1', node_id2='$node_id2', iface2='$iface2', " .
+	DBQueryFatal("replace into widearea_recent set time=$latency, " .
+		"node_id1='$node_id1', iface1='$iface1', ".
+		"node_id2='$node_id2', iface2='$iface2', " .
 		" bandwidth=$bandwidth, time_stddev='$stddev', " .
 		" lossrate='$lossrate', start_time=$::last_time, " .
 		" end_time=$::end_time");
+	#
+	# If either (or both) endpoints are the magic node, we update
+	# the database again, with the WIDEAREA_LOCALNODE instead.
+	#
+	if (($node_id1 eq $MAGICNODE) || ($node_id2 eq $MAGICNODE)) {
+	    if ($node_id1 eq $MAGICNODE) {
+		$node_id1 = TBDB_WIDEAREA_LOCALNODE;
+		$iface1 = $localIface;
+	    }
+	    if ($node_id2 eq $MAGICNODE) {
+		$node_id2 = TBDB_WIDEAREA_LOCALNODE;
+		$iface2 = $localIface;
+	    }
+	    DBQueryFatal("replace into widearea_recent set time=$latency, ".
+		" node_id1='$node_id1', iface1='$iface1', ".
+		" node_id2='$node_id2', iface2='$iface2', " .
+		" bandwidth=$bandwidth, time_stddev='$stddev', " .
+		" lossrate='$lossrate', start_time=$::last_time, " .
+		" end_time=$::end_time");
+	}
 
     }
 
