@@ -3,10 +3,10 @@ running
 -------
 
 Typically assign is run in the following method:
-	assign -b -t <ptop> <top>
+	assign -t <ptop> <top>
 
--h provides a brief help listing.  -a does nothing.  -b prevents the
-GUI.  -t specifies a ptop file.  -o does very little of use.
+-h provides a brief help listing.  -a does nothing.  -b does nothing.
+-t specifies a ptop file and is mandatory.  -o does very little of use.
 
 
 ptop format
