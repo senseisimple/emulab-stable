@@ -1,12 +1,13 @@
 #!/usr/local/bin/perl -w
 #########################################################################
-# SnmpIt! - An SNMP Tool for the Intel 510T Switch                      #
+# SnmpIt! - An SNMP Tool                                                #
+# (specialized for the Intel 510T Switch and APC power controllers)     #
 #                                                                       #
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
-# Last Change: April 1999                                               #
-#     Version: 0.9b                                                     #
+# Last Change: April 29, 2000                                           #
+#     Version: 1.0                                                      #
 #                                                                       #
 #########################################################################
 
@@ -125,7 +126,6 @@ if (@vlan) {
 }
 
 if ($f) {
-    print "This feature is not fully functional in this version of SnmpIt.\n";
     &AutoVLANConfig(\$sess,\$f,\$v);
 }
 
@@ -313,7 +313,7 @@ sub ParseArgs {
     while(@vlan != 0 && $n < @vlan) {
 	#Lowercase it all, but leave in : for testx:y syntax
 	$vlan[$n] = "\L$vlan[$n]\E";
-	if (($vlan[$n]=~/([g-z]|\d)*$/)&&(defined $Interfaces{$vlan[$n]})) {
+	if (($vlan[$n]=~/([g-z])/ )&&(defined $Interfaces{$vlan[$n]})) {
 	    $vlan[$n] = $Interfaces{$vlan[$n]};
 	}
 	# Allow people to specify addresses with colons or dots
@@ -440,8 +440,8 @@ sub OneVLAN {
     my $Vlan = $sess->get([[$NextVLANId,0]]);
     my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
     my $RetVal = "Undef.";
-    if ( ! $m ) { $m = $Vlan; }
-    print "  Creating VLAN $m as VLAN #$Vlan, containing: @vlan ... ";
+    if ( !$m || $f ) { $m = $Vlan; }
+    print "  Creating VLAN $m as VLAN #$Vlan: @vlan ... ";
     $RetVal = $sess->set([[$CreateOID,$Vlan,$m,"OCTETSTR"]]);
     print "",($RetVal? "Succeeded":"Failed"),".\n";
     if (! defined ($RetVal) ) {
@@ -473,11 +473,11 @@ sub OneVLAN {
 sub AutoVLANConfig {
     local(*sess,*f,*v) = @_;
     my @VLANS= ();
-    &ReadIRFile(*f,*VLANS);
+    &ReadIRFile(*f,\@VLANS);
     &GetToken(*sess,*v);
     my $m="";
     while (@VLANS) {
-	@vlan = shift(@VLANS);
+	@vlan = @{shift(@VLANS)};
 	&OneVLAN(*sess,*m,*vlan,*v);
     }
     &ReleaseToken(*sess,*v);
@@ -489,11 +489,48 @@ sub AutoVLANConfig {
 
 sub ReadIRFile {
    local(*f,*VLANS) = @_;
-   if ( !open(IR,$f) ) { die("Could not open $f for VLAN Setup.\n"); }
-   <IR>
-   
-
+   my $skip = 1;
+   my $switch = $i;
+   my $section = "";
+   my $go = 0;
+   if ( !open(IR,$f) ) { die("Couldn't open $f for VLAN Setup.\n"); }
+   while (<IR>) {
+       chop;
+       if ( /^\#/ ) {  next; } #skip comments
+       if ( /^start vlan/i ) { $skip = 0 ; next; }
+       if ($skip) { next; }
+       if ( /^end vlan/i ) { $skip = 1 ; next; }
+       if ( /^end/ ) { $go = 0; next; }
+       if ( /^switch (.*)$/i) {
+	   $section = $1;
+	   if ($section=~/[a-z]/) {
+	       if ($section =~ /Alpha/i) { $section = "155.99.214.170"; }
+	       if ($section =~ /Beta/i)  { $section = "155.99.214.171"; }
+	   }
+	   $go =  ( $section eq $switch ? 1 : 0 );
+	   next;
+       }
+       if (! $go) { next; }
+       # If I'm in the right section, turn the line into a VLAN
+       my @v= split;
+       my $n=0;
+       while(@v != 0 && $n < @v) {
+	   #Lowercase it all, but leave in : for testx:y syntax
+	   $v[$n] = "\L$v[$n]\E";
+	   if (($v[$n]=~/([g-z])/ )&&(defined $Interfaces{$v[$n]})) {
+	       $v[$n] = $Interfaces{$v[$n]};
+	   }
+	   # Allow people to specify addresses with colons or dots
+	   $v[$n] =~ s/[:\.]//g;
+	   die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
+	       if (!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)));
+	   $n++;
+       }
+       push(@VLANS, \@v);
+   }   
+   close (IR);
 }
+
 
 #
 # SUB ReadTranslationTable ----------------------
