@@ -486,7 +486,7 @@ function PAGEHEADER($title) {
     echo "$title</h2></td>\n";
     echo "<td class=\"contentheader\" align=right>Generated ";
     if ($login_uid) {
-	echo "for <b>$login_uid</b>, ";
+	echo "for <b>$login_uid</b>,<br>";
     }
     echo "$now.";
     echo "</td>";
