@@ -92,7 +92,7 @@ main(int argc, char **argv)
 	if(!server)
 	        usage();
 
-	event_args[0] = NULL;
+	event_args[0] = '\0';
 	while(argc) {
 	  strncat(event_args,argv[0],sizeof(event_args));
 	  strncat(event_args," ",sizeof(event_args));
