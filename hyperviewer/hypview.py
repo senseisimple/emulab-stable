@@ -131,7 +131,8 @@ class hvFrame(hvFrameUI):
 	# Set up the wxGlade part.
 	hvFrameUI.__init__(self, *args, **kwds)
 	
-	self.vwr = None		# Load data under the File menu now.
+	self.vwr = None		# Load data under the File menu and create the viewer there.
+	self.currNode = None	# Nothing selected at first.
 
 	# Control events.  (HyperViewer events are connected after loading data.)
 	# EVT_ handler-setting functions are defined in site-packages/wxPython/wx.py .
@@ -145,8 +146,10 @@ class hvFrame(hvFrameUI):
 	EVT_BUTTON(self.GoToTop, -1, self.OnGoToTop)
 	EVT_BUTTON(self.ShowLinksIn, -1, self.OnShowLinksIn)
 	EVT_BUTTON(self.HideLinksIn, -1, self.OnHideLinksIn)
+	EVT_CHECKBOX(self.DescendLinksIn, -1, self.OnDescendLinksIn)
 	EVT_BUTTON(self.ShowLinksOut, -1, self.OnShowLinksOut)
 	EVT_BUTTON(self.HideLinksOut, -1, self.OnHideLinksOut)
+	EVT_CHECKBOX(self.DescendLinksOut, -1, self.OnDescendLinksOut)
 	EVT_BUTTON(self.HelpButton, -1, self.OnUsage)
 	EVT_CHOICE(self.LabelsMode, -1, self.OnLabelsMode)
 	EVT_MENU(self, 1, self.OnOpen)
@@ -208,25 +211,23 @@ class hvFrame(hvFrameUI):
 
 	    # This is *really* evil... It still fails every other time, so do it twice.  :-(
 	    self.vwr = hv.hvMain([str(name), str(file)], # Must be non-unicode strings.
-				 window, width, height)  # Win32 needs the window info.
+	                         window, width, height)  # Win32 needs the window info.
 	    ##hv.hvKill(self.vwr)
 	    self.vwr = None
 
 	self.vwr = hv.hvMain([str(name), str(file)], # Must be non-unicode strings.
 			     window, width, height)  # Win32 needs the window info.
-	if self.vwr is None:			# Must have been a problem....
+	if self.vwr is None:			     # Must have been a problem....
 	    return False
 
-	# Initial drawing.
-	self.hypView.SwapBuffers()		# Make the sphere visible.
-	self.DrawGL()				# Show the graph.
-	
 	# Don't connect up the mouse events before the HyperView data is loaded!
 	EVT_LEFT_DOWN(self.hypView, self.OnClick)
 	EVT_LEFT_UP(self.hypView, self.OnClick)
 	EVT_MIDDLE_DOWN(self.hypView, self.OnClick)
 	EVT_MIDDLE_UP(self.hypView, self.OnClick)
 	EVT_MOTION(self.hypView, self.OnMove)
+
+	self.OnGoToTop(None)			     # Show info for the top node.
 	
 	return True
     
@@ -235,7 +236,6 @@ class hvFrame(hvFrameUI):
     def DrawGL(self):
 	##print "in DrawGL"
 	self.vwr.drawFrame()
-	self.hypView.SwapBuffers()
 	pass	
     
     ##
@@ -243,6 +243,7 @@ class hvFrame(hvFrameUI):
     def SelectedNode(self, node):
 	##print node
 	if string.find(node, "|") == -1:	# Links are "node1|node2".
+	    self.currNode = node
 	    self.NodeName.Clear()
 	    self.NodeName.WriteText(node)
 	    self.ChildCount.SetLabel(str(self.vwr.getChildCount(node)))
@@ -250,16 +251,12 @@ class hvFrame(hvFrameUI):
 	    linksIn = self.vwr.getIncomingCount(node)
 	    self.LabelLinksIn.SetLabel(
 		"Non-tree Links in: " + str(linksIn))
-	    self.ShowLinksIn.Enable(linksIn > 0)
-	    self.HideLinksIn.Enable(linksIn > 0)
-	    self.DescendLinksIn.Enable(linksIn > 0)
+	    self.OnDescendLinksIn(None)
 
 	    linksOut = self.vwr.getOutgoingCount(node)
 	    self.LabelLinksOut.SetLabel(
 		"Non-tree Links out: " + str(linksOut))
-	    self.ShowLinksOut.Enable(linksOut > 0)
-	    self.HideLinksOut.Enable(linksOut > 0)
-	    self.DescendLinksOut.Enable(linksOut > 0)
+	    self.OnDescendLinksOut(None)
 	pass
     
     ##
@@ -345,7 +342,27 @@ class hvFrame(hvFrameUI):
 	self.vwr.setDrawBackFrom(hv.getSelected(), 0, self.DescendLinksOut.IsChecked())
 	self.DrawGL()
 	pass
-
+    def OnDescendLinksIn(self, cmdEvent):
+	node = self.currNode
+	if node is None:
+	    node = hv.getGraphCenter()
+	linksIn = self.vwr.getIncomingCount(node)
+	descend = self.DescendLinksIn.IsChecked()
+	self.ShowLinksIn.Enable(descend or linksIn > 0)
+	self.HideLinksIn.Enable(descend or linksIn > 0)
+	self.DescendLinksIn.Enable(True)
+	pass
+    def OnDescendLinksOut(self, cmdEvent):
+	node = self.currNode
+	if node is None:
+	    node = hv.getGraphCenter()
+        linksOut = self.vwr.getOutgoingCount(node)
+	descend = self.DescendLinksOut.IsChecked()
+	self.ShowLinksOut.Enable(descend or linksOut > 0)
+	self.HideLinksOut.Enable(descend or linksOut > 0)
+	self.DescendLinksIn.Enable(True)
+	pass
+    
     ##
     # Combo boxes select between alternatives.
     def OnLabelsMode(self, cmdEvent):
@@ -455,7 +472,6 @@ class hvFrame(hvFrameUI):
 	    ##print "click", btnNum, btnState, mouseEvent.GetX(), mouseEvent.GetY()
 	    self.vwr.mouse(btnNum, btnState, mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    self.vwr.redraw()
-	    self.hypView.SwapBuffers()
 	    
 	    # If a pick occurred, the current node name has changed.
 	    self.SelectedNode(hv.getSelected())
@@ -474,7 +490,6 @@ class hvFrame(hvFrameUI):
 	    self.vwr.passive(mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    pass
 	self.vwr.redraw()
-	self.hypView.SwapBuffers()
 	pass
     
     ##
@@ -483,7 +498,6 @@ class hvFrame(hvFrameUI):
 	if self.vwr:
 	    self.vwr.idle()
 	    pass
-	self.hypView.SwapBuffers()
 	###idleEvent.RequestMore()
 	pass
     
@@ -491,7 +505,6 @@ class hvFrame(hvFrameUI):
 	if self.vwr:
 	    self.vwr.redraw()
 	    pass
-	self.hypView.SwapBuffers()
 	pass
     pass
 
