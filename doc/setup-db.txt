@@ -1,0 +1,254 @@
+##### Setting up tbdb for a new boss node
+##### Last updated January i18, 2002
+
+##### Step 0 - Create the database
+
+Before beginning this process, you should have mysql installed and running on
+your boss node.
+
+Create the database. You can do this with the database-create.sql file in the
+sql subdirectory of the testbed tree, like so:
+
+mysqladmin create tbdb
+mysql tbdb < sql/database-create.sql
+
+It's a good idea to contact Utah to make sure that the database-create.sql file
+is up-to-date.
+
+##### Step 1 - Setup users
+
+You'll need to start by creating an admin user. Currently, there is no
+automated way to do this - the easiest thing to do is conact Utah and ask for
+an example entry. We hope to remedy this problem before too long.
+
+At this point, it's a good idea to get the nfs mounts between boss and ops
+setup, as well at the ssh root keys. See the boss and ops setup documents for
+details.
+
+Run 'mkacct <username>' for the user you just created. This will set up a Unix
+account for them on the boss and ops nodes.
+
+If you want to make sure that this account is a member of any Unix groups (such
+as wheel,) run 'unixgroups -a <uid> <gid> ...'
+
+##### Step 2 - Setup projects and experiments
+
+At this point, you should get the webserver up and running on your boss node.
+Again, instructions are in the boss setup documentation.
+
+Go to the web interface, and log in as the admin account you created. Create
+two projects: One for the administrators at your site (we call ours 'testbed'),
+and another meta-project called 'emulab-ops'. As soon as you've sent the
+request to sart each project, you can just use the 'New Project Approval' link
+to make them active.
+
+Others at your site can now apply to join your project.
+
+There are three experiments that must be created in the emulab-ops project.
+Just start them through the normal 'begin experiment' page, and don't give an
+NS file. These experiments are:
+
+hwdown - Nodes that are down due to hardware failure
+reloading - Nodes that are having their disks automatically reloaded
+readpending - Nodes that are awaiting disk reloading
+
+Any other 'holding' experiments that you want for operations should be put
+into the emulab-ops project.
+
+##### Step 3 - Setup web sql editor
+
+Several of the steps below require you to add data to the database by hand. If
+you're comfortable with SQL, you can do this directly with SQL queries, or you
+can use the generic web-based SQL table editor provided with the testbed
+software. If you plan to use the former method, you can skip this step.
+
+********************************** WARNING **********************************
+* Many tables depend on data in other tables, or depend on programs running *
+* to effect a change. Thus, you should not edit tables other than the ones  *
+* described in this document.                                               *
+* You have been warned......                                                *
+********************************** WARNING **********************************
+
+First, you'll want to protect the webdb script from outside browsers. Because
+of its flexibilty, it would be quite dangerous if it were broken into. So, we
+add an additional layer of protection by limiting the IP addresses it may be
+used from. Open your apache.conf file (created as part of the boss
+installation), and find the 'Directory' directives. Add a section such as
+this:
+<Directory /usr/testbed/www/webdb>
+	AllowOverride None
+	order deny,allow
+	deny from all
+	allow from 155.99.212.
+</Directory>
+If you installed the testbed tree somewhere other than /usr/testbed, fix the
+directory. Chage the 'allow from' line to match your IP subnet (note the '.'
+on the end of the address, to match the entire subnet). You can have as
+many 'allow' lines as you want. Restart apache.
+
+Next, you'll need to specify which users have the ability to edit the database.
+This is done with the 'dbedit' column in the users table. When we automate
+user creation, we'll add a way to set this when the user is created.
+
+Now, you'll need to specify which tables are editable from the web interface.
+This is to protect against accidental database damage, as mentioned in the
+warning above. We'll soon provide contents for this table
+(webdb_table_permissions) with the testbed software.
+
+##### Step 4 - Setup switches
+
+1) Create node types for switches
+
+Add entries to the node_types table for each type of switch you'll be using.
+The class column should be 'switch', and choose a type that reasonably
+describes the switch. Most of the other columns aren't important for switches
+(so you can leave them blank), but putting in max_cards (if the switch is
+expandable) and max_ports is a good idea.
+
+2) Create interface type for the switch IP interfaces
+
+Now, go into the interface_types table and add interface types for your
+switches' IP interfaces. Since these are logical interfaces, not real ones,
+most of the information here is unimportant.
+
+3) Create interface types for switch interconnects (if any)
+
+If you'll be connecting switches together, also add interface types for the
+ports you'll be using to link them together. Unlike the logical IP interfaces,
+make sure that you get physical information like speed (in Kbps) and duplex are
+correct.
+	
+4) Create switches in nodes table
+
+Next, add the switches to the nodes table. The only necessary fields here are
+node_id (choose one appropriate to the switch), type (use one of the ones you
+created earlier,) and role. Role, for switches, should be either 'testswitch'
+or 'controlswitch', depending on whether you're using it for the
+experimental or control network.
+
+5) Create interfaces for switch IP interfaces
+
+In the interfaces table, add an interface for the IP address of each switch.
+The important columns are node_id, IP, and interface_type. card and port should
+be set to values that will not be used by actual ports on the switch (they
+could both, for example, be 0)
+
+6) Add state for switch interconnects
+
+If you'll be connecting switches together, add interfaces to each of them.
+Unlike the previous interfaces, make sure that you get the correct card and
+port numbers. For switches that do not have expansion modules, the card number
+is assumed to be 1. Make sure to get the current_speed (this time, in Mbps) and
+duplex correct.
+
+Now, go into the wires table and add wires connecting the switch interfaces you
+just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
+matter which switch you use as node 1 (the node_id1, card1, port1 columns), and
+which you use as node 2.
+
+7) Create switch stacks
+
+Into the switch_stack_types table, create entries for each stack in your
+network. A stack is set of switches that share common VLANs. Usually, your
+experimental switches will be one stack, and the control network another. You
+should create a stack even if there is only one switch in it. The stack should
+be named (the stack_id column) after the master switch in the stack.  In our
+case, for example, our experimental network stack is called 'cisco1'. The
+stack_type column is used by snmpit to determine which module to use to talk to
+the stack. The currently supported values are 'cisco' and 'intel'. Making a
+control network stack is optional.
+
+Finally, add switches to these stacks by putting entries in the switch_stacks
+table, listing the node_id of each switch and the stack_id of the stack it
+belongs to.
+
+##### Step 5 - Setup control hardware
+
+1) Boss/ops nodes
+
+Optional step: You can put your control (boss and ops) nodes in the database if
+you wish. You'll need to add entries to the nodes, interfaces, and wires
+tables, and possibly the node_types and interface_types tables as well. See the
+instructions for adding nodes below for descriptions of the contents of these
+tables.
+
+2) Power controllers
+
+The only two supported power controllers at this time are the APC AP9210 and
+the BayTech RPC27. Theoretically, other SNMP and serial-controlled power
+controllers should not be hard to support.
+
+If your power controllers are controlled via IP and SNMP, add a node type ander
+interface type for them. Then, give them an entries in the nodes, interfaces,
+and wires tables. Make sure to get the IP address correct in the interfaces
+table. The role listed in the nodes table should be 'powerctrl'.
+
+If you have serial power controllers, just create entries node_types and nodes
+- no interfaces or wires. Again, the role in the nodes table should be
+'powerctrl'.
+
+##### Step 6 - Images and OSids
+
+These will depend on the image(s) and any OSKit kernels you've recieved, or
+built yourself. Since you're probably using disk images from Utah, the best
+thing to do is ask us for the appropriate lines for the os_info and images
+tables.
+
+##### Step 7 - Setup nodes
+
+1) Create node type for the nodes
+
+Add an entry to the node_types table for each type of experimental node you
+have. Most of the columns should be self-explanatory, but here are some notes:
+
+class: Should be 'pc'
+type: Shoud be 'pcXXX', where XXX is a short (a few characters) string
+	describing the nodes (such as processor speed, chipset, etc.)
+proc: Class of processor (ie. 'PIII')
+speed: CPU speed in MHz
+RAM: Amount of RAM in MB
+HD: Hard disk size in GB
+max_cards: Number of PCI (or ISA) slots
+max_ports: Maximum number of NIC ports (eg. dual port cards count as 2)
+osid: Default operating system to use. Should be one of the ones created in
+	Step 6
+control_net: Interface number (described below) of the control network
+	interface
+power_time: Number of second between power cycles (to help save wear and tear
+	on the hardware). We recommend 60.
+imageid: Default image to load (created in Step 6)
+delay_capacity: How many delay nodes this node can be. For example, nodes with
+	2 experimental interfaces can be 1 delay node, nodes with 4 experimental
+	interfaces can be 2 delay nodes, etc.
+control_iface: Linux-style interface name for the control network (ie. 'eth0')
+delay_osid: Which OS should be run when this node is being a delay node. 
+	Should usually be 'FBSD-STD'
+pxe_boot_path: Path (including hostname) to the mini-kernel that should be
+	loaded by PXE. Ask Utah for this kernel. For example,
+	'boss.emulab.net/tftboot/pxeboot'
+
+2) Create interface types for the nodes
+
+Add entries to the interface_types table for each type of network card you are
+using. Notes on the columns:
+
+type: So far, we have been using FreeBSD driver names for types, but this
+	string is arbitrary
+max_speed: The maximum speed of the interface, in Kbps
+full_duplex: 1 if the card can operate in full duplex, 0 otherwise
+
+3) Create the nodes
+
+Will be somewhat automated (no script yet) - documentation coming soon!
+
+4) Setup outlets
+
+Will be somewhat automated (no script yet)  - documentation coming soon!
+
+5) Create their interfaces
+
+Use the macgrabber.pl script - documentation coming soon!
+
+6) Create their wires
+
+Use the fillwires.pl script - documentation coming soon!
