@@ -123,7 +123,7 @@ echo "    <td><select name=\"def_boot_osid\">\n";
                   echo "value=\"$osid\">$pid - $osid</option>\n";
                }
 if ($isadmin) {
-    echo "<option value=\"None\">No OSID</option>\n";
+    echo "<option value=\"\">No OSID</option>\n";
 }
 echo "       </select>";
 echo "    </td>
@@ -150,7 +150,7 @@ mysql_data_seek($osid_result, 0);
 echo "<tr>
           <td>Next Boot OSID:</td>";
 echo "    <td><select name=\"next_boot_osid\">\n";
-echo "                <option value=\"None\">No OSID</option>\n";
+echo "                <option value=\"\">No OSID</option>\n";
                while ($row = mysql_fetch_array($osid_result)) {
                   $osid = $row[osid];
 		  $pid  = $row[pid];
