@@ -186,6 +186,11 @@ sub doboot()
 	#
 	if ($mfs eq "newnode") {
 	    system("$BINDIR/newclient");
+	    #
+	    # Not supposed to do anything else after this, so just
+	    # exit to avoid booting into the MFS.
+	    #
+	    return 0;
 	}
 	elsif ($mfs eq "frisbee") {
 	    #
