@@ -43,3 +43,8 @@ install:
 	-mkdir -p /root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth /root/.cvsup/auth
 	$(INSTALL) -m 644 $(SRCDIR)/pump.conf /etc/pump.conf
+	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth2 /etc/sysconfig/network-scripts/ifcfg-eth2
+	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth4 /etc/sysconfig/network-scripts/ifcfg-eth4
+

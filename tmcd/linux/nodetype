@@ -1,0 +1,13 @@
+#!/bin/sh
+
+if [ -x '/etc/rc.d/testbed/cpuspeed.awk' ]; then
+	cpuspeed=`/etc/rc.d/testbed/cpuspeed.awk /proc/cpuinfo`;
+else
+	cpuspeed='';
+fi
+
+if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
+	echo "unknown";
+else
+	echo pc$cpuspeed;
+fi
