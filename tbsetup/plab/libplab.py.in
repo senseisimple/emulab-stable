@@ -366,7 +366,7 @@ class Plab:
         adds some additional fields that newwanode doesn't, and takes
         advantage of the fact that the Plab nodes may be added in bulk.
         """
-        defosid, controlnet, numvnodes = self.__getNodetypeInfo()
+        defosid, controliface, numvnodes = self.__getNodetypeInfo()
         id, priority = self.__nextFreeNodeid()
         nodeid = "pcplab%d" % id
         print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
@@ -386,7 +386,7 @@ class Plab:
         DBQueryFatal("insert into interfaces"
                      " (node_id, card, port, IP, interface_type, iface, role)"
                      " values (%s, %s, %s, %s, %s, %s, %s)",
-                     (nodeid, controlnet, 1, ip, 'fxp', 'eth0', 'ctrl'))
+                     (nodeid, 0, 1, ip, 'fxp', controliface, 'ctrl'))
 
         DBQueryFatal("insert into reserved"
                      " (node_id, pid, eid, rsrv_time, vname)"
@@ -425,14 +425,14 @@ class Plab:
 
     def __getNodetypeInfo(self):
         """
-        addNode helper function.  Returns a (defosid, controlnet,
+        addNode helper function.  Returns a (defosid, controliface,
         numvnodes) tuple for the Plab pnode type.  Caches the result since
         it doesn't change.
         """
         if not hasattr(self, "__getNodetypeInfoCache"):
             if debug:
                 print "Getting node type info"
-            res = DBQueryFatal("select osid, control_net, virtnode_capacity"
+            res = DBQueryFatal("select osid, control_iface, virtnode_capacity"
                                " from node_types"
                                " where type = 'pcplabphys'")
             assert (len(res) == 1), "Failed to get node type info"
