@@ -149,7 +149,8 @@ else {
 }
 
 $query_result =
-    DBQueryFatal("select s.*,t.*,r.*,t.idx as statno,t.tstamp as ttstamp ".
+    DBQueryFatal("select t.exptidx,s.pid,s.eid,t.action,t.exitcode,t.uid, ".
+                 "       r.pnodes,t.idx as statno,t.tstamp as ttstamp ".
 		 "  from testbed_stats as t ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
 		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
@@ -163,6 +164,7 @@ if (mysql_num_rows($query_result) == 0) {
 echo "<table align=center border=1>
       <tr>
         <th>#</th>
+        <th>Uid</th>
         <th>Pid</th>
         <th>Eid</th>
         <th>ExptIdx</th>
@@ -176,6 +178,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $exptidx = $row[exptidx];
     $pid     = $row[pid];
     $eid     = $row[eid];
+    $uid     = $row[uid];
     $when    = $row[ttstamp];
     $action  = $row[action];
     $ecode   = $row[exitcode];
@@ -183,6 +186,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	
     echo "<tr>
             <td>$idx</td>
+            <td>$uid</td>
             <td>$pid</td>
             <td>$eid</td>
             <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>
