@@ -128,8 +128,14 @@ void grobot::setvPath(float Wv, float Wr) {
 void grobot::pbMove(float mdisplacement) {
   // execute a move primitive
   
-  if (mdisplacement != 0.0f) {
+  // TRUNCATE THE CRAP
+  mdisplacement = 100.0*mdisplacement;
+  mdisplacement = floor(mdisplacement);
+  mdisplacement = mdisplacement/100.0;
+  
+  if (mdisplacement > 0.05f) {
     // send the move to the robot
+    // if you want to move less than 5 cm, FUCK OFF.
     std::cout << "Move length: " << mdisplacement << std::endl;
     
     acpValue moveLength((float)(mdisplacement));
@@ -160,6 +166,11 @@ void grobot::pbPivot(float pangle) {
   
   int numturns;
   
+  // TRUNCATE THE CRAP
+  pangle = 100.0*pangle;
+  pangle = floor(pangle);
+  pangle = pangle/100.0;
+  
   // make the pivot smarter
   if (fabs(pangle) == 2*M_PI) {
     // this is zero! Who sends this shit??
@@ -183,8 +194,9 @@ void grobot::pbPivot(float pangle) {
     }
   }
   
-  if (pangle != 0.0f) {
+  if (pangle > 0.05f) {
     // send the pivot to the robot
+    // If it wants to turn less than 0.05 radians, it gets the hose again
     std::cout << "Pivot angle: " << pangle << std::endl;
     
     acpValue pivotAngle((float)(pangle));
