@@ -65,10 +65,6 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
     else {
-	# Temporary - July 17 was new form install - remove in
-	# mid august or september
-	echo "<h3>For more info about the new form, see the
-		<a href='news.php3'>July 17 News item</a>.</h3>\n";
 	    
 	if (!isset($nsdata) && !isset($nsref)) {
 	echo "<p><ul>

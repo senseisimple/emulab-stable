@@ -151,13 +151,13 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON_NEW("Papers (Aug 1)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON_NEW("Software <font size=-1> ".
+	WRITESIDEBARBUTTON("Papers (Aug 1)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Software <font size=-1> ".
 			       "(June 14)</font>",
 			       $TBDOCBASE, "software.php3");
 	WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
 	WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
-	WRITESIDEBARBUTTON_NEW("Emulab Users", $TBDOCBASE,
+	WRITESIDEBARBUTTON("Emulab Users", $TBDOCBASE,
 			   "doc/docwrapper.php3?docname=users.html");
 	WRITESIDEBARLASTBUTTON("Sponsors", $TBDOCBASE,
 			       "docwrapper.php3?docname=sponsors.html");
