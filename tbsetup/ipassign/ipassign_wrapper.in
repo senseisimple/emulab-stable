@@ -47,6 +47,11 @@ my $routetype     = "host2net";
 my $partitions    = 0;
 
 #
+# Perform route computation?
+#
+my $doroutes = 1;
+
+#
 # Testbed Support libraries
 #
 use lib "@prefix@/lib";
@@ -143,11 +148,14 @@ if (!$query_result->numrows) {
     warn("*** $0:\n".
 	 "    No nodes in experiment $pid/$eid!\n");
     exit(0);
-} else {
+} 
+else {
     my $routertype = $query_result->fetchrow_array;
     if (!$force && $routertype ne "static") {
         warn("Static routing not requested in $pid/$eid. This is okay!\n");
-        exit(0);
+        warn("     Still calculating IP addresses with ipassign..\n");        
+        $doroutes = 0;
+        $ipassign_args .= " -!";
     }
 }
 
@@ -311,11 +319,6 @@ while (my ($vnode, $valhash) = each %vnodetab) {
     my @ipinfo = @{$valhash->{'IPS'}};
     my @ipifaces = map { @{$_}[2] . ":" . @{$_}[0] } @ipinfo;
 
-    my @routes = ();
-    if (defined($valhash->{'routes'})) {
-        @routes = @{$valhash->{'routes'}};
-    }
-    
     if (!$impotent) {
         DBQueryFatal("update virt_nodes set ips='@ipifaces' ".
                      "where vname='$vnode' and pid='$pid' and eid='$eid'");
@@ -326,6 +329,16 @@ while (my ($vnode, $valhash) = each %vnodetab) {
             "IPS: @ipifaces\n";
     }
 
+    # If we're not calculating routes, then just go on to next entry.
+    if (! $doroutes) {
+        next;
+    }
+
+    my @routes = ();
+    if (defined($valhash->{'routes'})) {
+        @routes = @{$valhash->{'routes'}};
+    }
+    
     foreach $routeptr (@routes) {
         my ($type, $dstip, $mask, $hopip) = @{$routeptr};
         my $srcip;
