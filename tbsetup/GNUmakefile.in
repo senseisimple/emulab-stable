@@ -12,7 +12,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir
+SUBDIRS		= checkpass ns2ir plab
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  tbresize os_load startexp endexp batchexp swapexp \
@@ -63,12 +63,15 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir
+.PHONY:	checkpass ns2ir plab
 checkpass:
 	@$(MAKE) -C checkpass all
 
 ns2ir:
 	@$(MAKE) -C ns2ir all
+
+plab:
+	@$(MAKE) -C plab all
 
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
@@ -79,6 +82,7 @@ install: all script-install subdir-install
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
+	@$(MAKE) -C plab install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -88,6 +92,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
+	@$(MAKE) -C plab post-install
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
@@ -157,12 +162,14 @@ clean:	subdir-clean
 subdir-clean:
 	@$(MAKE) -C checkpass clean
 	@$(MAKE) -C ns2ir clean
+	@$(MAKE) -C plab clean
 
 distclean:	subdir-distclean
 
 subdir-distclean:
 	@$(MAKE) -C checkpass distclean
 	@$(MAKE) -C ns2ir distclean
+	@$(MAKE) -C plab distclean
 
 #
 # XXX Create non .tcl files.

@@ -437,6 +437,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot \
+	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
+	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
+	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
