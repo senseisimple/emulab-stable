@@ -217,7 +217,9 @@ function SPITFORM($formfields, $errors)
                  regarding passwords and email addresses.
             <li> You can also
                  <a href='showpubkeys.php3?target_uid=$target_uid'>
-                 edit your ssh public keys.</a>
+                 edit your ssh public keys</a> and your
+                 <a href='showsfskeys.php3?target_uid=$target_uid'>
+		 sfs public keys</a>.
           </ol>
           </blockquote></blockquote>
           </h4>\n";

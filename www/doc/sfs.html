@@ -1,0 +1,68 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h2>SFS</h2>
+</center>
+
+We use <a href=http://www.fs.net>SFS</a> to provide a secure
+distributed filesystem. Both emulab classic nodes and widearea netbed
+nodes in your experiments can be accessed via the SFS filesystem,
+either from <tt>users.emulab.net</tt> or from any machine you have
+access to that is running the SFS client software. Further, you can
+access any node in your experiment from any other node in your
+experiment, all via the <tt>/sfs/netbed</tt> directory.
+
+<p>
+When your Emulab account is created, we create an SFS public/private
+key pair for you and store the public part in our database. Your
+private key is stored in your ~/.sfs directory, and just like your
+Emulab generated <a href=docwrapper.php3?docname=security.html>SSH</a>
+key, there is no passphrase protecting your SFS key; you should not
+reuse this key anywhere else. It is fine to copy this private key back
+to your home machine, but only if your home machine is 
+secure and your home directory is not NFS mounted on a public network!
+This will allow you to access your experimental nodes without having
+to first log into <tt>users.emulab.net</tt>. Either way, accessing
+your experimental nodes is easy. When you are logged into
+<tt>users.emulab.net</tt>:
+	<code><pre>
+	sfsagent
+	cd /sfs/netbed/nodeA.myexp.mypid		</code></pre>
+
+<p>
+If instead you have copied your emulab private key to your home
+machine, and have added it to your agent, then you can add the
+following <em>certprog</em> to your agent:
+	<code><pre>
+	sfskey certprog -p netbed dirsearch \
+	  /sfs/ops.emulab.net:eu7f8hmfpxk54t4uqdhpkhy7qtwqx7fn/q/proj/.sfs
+	cd /sfs/netbed/nodeA.myexp.mypid		</code></pre>
+
+<p>
+As with SSH public keys, we distribute SFS public keys to all of the
+nodes in your experiment (for all of the users in your project or
+group). This allows anyone in your project to access the fileystems on
+all of the experimental nodes. Further, when your experimental nodes
+boot for the first time, a new SFS host key is generated and passed
+back to <tt>ops.emulab.net</tt>. These host keys are used to generate
+the /sfs/netbed directory so that you see the same view of your nodes,
+no matter where you are logged in.
+
+<p>
+You can also use the SFS <em>rex</em> program to log into your nodes
+(or to <tt>users.emulab.net</tt>). Rex is the SFS equivalent of SSH;
+once you have started your SFS agent, rex will forward your private
+keys, much like SSH forwards your private keys when you use it to log
+in to another node. To log into one of your experimental nodes with
+rex: 
+	<code><pre>
+	sfsagent
+	rex -x /sfs/netbed/nodeA.myexp.mypid		</code></pre>
+
+To rex into <tt>users.emulab.net</tt>:
+	<code><pre>
+	sfsagent
+	rex -x /sfs/netbed/users.emulab.net		</code></pre>
