@@ -1,7 +1,7 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl -wT
 
 ### 
-### $Id: rmacct,v 1.2 2000-09-22 22:06:40 kwright Exp $
+### $Id: rmacct,v 1.3 2000-11-21 10:38:16 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -18,7 +18,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 sub untaint_user {
     my @row = @_;
 
-    if ( @row != 1 ) {                           # expecting only 1 field 
+    if ( @row != 2 ) {                           # expecting only 1 field 
 	return 0;    
     }
 
@@ -91,7 +91,7 @@ if ( $rows != 1 ) {
 ##
 print "Selecting users...\n";
 $cmd = 
-  "select u.uid ".
+  "select u.uid, p.pid ".
   "from experiments as e ".
   "left join projects as p on e.pid = p.pid ".
   "left join proj_memb as pm on p.pid = pm.pid ".
@@ -100,13 +100,25 @@ $cmd =
 $sth = $dbh->query($cmd);
 my @users = ();
 while (@row = $sth->fetchrow_array) {
-    if ( untaint_user(@row) != 1 ) {
-	print "Invalid user data. Row skipped.\n";
-    } else {
-	push(@users, $row[0]); 
-	print "\t$row[0]\n";
+    if ( @row != 2 ) {
+	die "User data query did not return correct number of elements.\n";
+    } 
+
+    if ( $row[0] =~ /^(([a-z]|\d)+)$/ ) {       # user
+	push(@users, $1);
+	print "\t$1\n";
+    } else { 
+	print "Username from database invalid. Row skipped\n";
     }
+    
+    if ( $row[1] =~ /^([a-z0-9]+)$/ ) {          # project/group name
+	$group = $1;
+    } else {
+	die "Group name from database not valid.\n";
+    } 
 }
+
+print "Group: $group\n";
 
 ##
 ## Select machines.
@@ -133,7 +145,7 @@ if ( $savedir ) {
 	if ( -e "/users/$user" ) {
 	    print "Creating $user.tar in /tmp\n";
 	    open(TAR, "/usr/bin/tar cvf /tmp/$user.tar /users/$user 2>&1 |");
-	    while (<TAR>) { print "$_"; }
+    while (<TAR>) { print "$_"; }
 	    close(TAR);	    
 	}
     }
@@ -171,7 +183,7 @@ foreach $IP (@nodes) {
 	} else {  
 
 	    print "Checking OS on $IP...";
-            open(UNAME,"/usr/local/bin/ssh $IP uname 2>&1 |");
+            open(UNAME,"/usr/local/bin/sshtb $IP uname 2>&1 |");
             $_ = <UNAME>;
 	    print $_;
 	    close(UNAME);
@@ -196,13 +208,13 @@ foreach $IP (@nodes) {
 	    my $i = 1;
 	    foreach my $user (@users) {
 		print "Removing user $user from $IP.\n";
-		open(USERDEL, "/usr/local/bin/ssh $IP /usr/sbin/userdel -r $user 2>&1 |");
+		open(USERDEL, "/usr/local/bin/sshtb $IP /usr/sbin/userdel -r $user 2>&1 |");
 		while (<USERDEL>) { print "$_"; }
 		close(USERDEL);
 	    }
 
 	    print "Removing group $eid on $IP.\n";
-	    open(GROUPDEL, "/usr/local/bin/ssh $IP /usr/sbin/groupdel $eid 2>&1 |");
+	    open(GROUPDEL, "/usr/local/bin/sshtb $IP /usr/sbin/groupdel $eid 2>&1 |");
 	    while (<GROUPDEL>) { print "$_"; }
 	    close(GROUPDEL); 
 
@@ -213,10 +225,18 @@ foreach $IP (@nodes) {
 	    foreach my $user (@users) {
 
 		print "Removing $user from $IP\n";
-		open (RMUSER, "/usr/local/bin/ssh $IP /usr/sbin/rmuser -y $user 2>&1 |");
+		open (RMUSER, "/usr/local/bin/sshtb $IP /usr/sbin/rmuser -y $user 2>&1 |");
 		while ( <RMUSER> ) {print "$_"; }
 		close(RMUSER);
 	    }
+	    
+	    print "Removing group $group from $IP\n";
+	    open (SED, "/usr/local/bin/sshtb $IP \"/usr/bin/sed '/^$group/d' /etc/group >! /tmp/newgroup\" 2>&1 |");
+	    while ( <SED> ) {print "$_";}   
+	    close(SED);
+	    open (CP, "/usr/local/bin/sshtb $IP /bin/cp /tmp/newgroup /etc/group 2>&1 |");
+	    while (<CP>) {print "$_";}
+	    close CP;
 	} else {
 	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
