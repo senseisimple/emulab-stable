@@ -169,7 +169,8 @@ if ($action eq "stop" ||
 	}
 	exit(0);
     }
-    # replay continues below 
+    # replay continues below, but give exiting scheduler a chance to react!
+    sleep(1);
 }
 
 #
