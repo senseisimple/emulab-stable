@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -33,6 +33,13 @@ else {
     $returning = 0;
 }
 
+$ACCOUNTWARNING = "Your username should reflect your normal login name.<br>".
+    "Emulab accounts are not to be shared amongst users!<br>";
+
+$EMAILWARNING = "We require all Emulab users to provide current, ".
+    "non-pseudonymic email addresses. Redirections and anonymous ".
+    "email addresses are not allowed.";
+
 #
 # Spit the form out using the array of data. 
 # 
@@ -40,6 +47,7 @@ function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
     global $usr_keyfile;
+    global $ACCOUNTWARNING, $EMAILWARNING;
     
     PAGEHEADER("Apply for Project Membership");
 
@@ -87,6 +95,7 @@ function SPITFORM($formfields, $returning, $errors)
                              name=\"formfields[joining_uid]\"
                              value=\"" . $formfields[joining_uid] . "\"
 	                     size=$TBDB_UIDLEN
+                             onchange=\"alert('$ACCOUNTWARNING')\"
 	                     maxlength=$TBDB_UIDLEN>
                   </td>
               </tr>\n";
@@ -152,6 +161,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <input type=text
                              name=\"formfields[usr_email]\"
                              value=\"" . $formfields[usr_email] . "\"
+                             onchange=\"alert('$EMAILWARNING')\"
 	                     size=30>
                   </td>
               </tr>\n";
