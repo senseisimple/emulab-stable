@@ -413,6 +413,12 @@ printdb "Generating TOP file.\n";
 TBDebugTimeStamp("TOP started");
 
 #
+# vtypes are a funny mix beteween physical and virtual state, so we have to
+# load them before getting the PhysInfo.
+#
+LoadVirtTypes();
+
+#
 # Load phys info. Interface types, node types, etc. Its any physical stuff
 # we need.
 #
@@ -2921,6 +2927,25 @@ sub LoadPhysInfo()
 	}
     }
 
+    #
+    # Here it goes getting even worse - we have to do a similar thing for
+    # vtypes.
+    #
+    foreach my $vtype (keys %virt_vtypes) {
+	my @members = virttypemembers($vtype);
+
+	$node_type_linkbw{$vtype} = {}
+	    if (!defined($node_type_linkbw{$vtype}));
+	foreach my $phystype (@members) {
+	    next if (!exists($node_type_linkbw{$phystype}));
+	    my @list = keys(%{ $node_type_linkbw{$phystype} });
+	    foreach my $speed (@list) {
+		$node_type_linkbw{$vtype}->{$speed} = 1;
+	    }
+	}
+	
+    }
+
     if ($verbose) {
 	printdb("Interface Speeds:\n");
 	foreach my $type (keys(%node_type_linkbw)) {
@@ -3509,7 +3534,6 @@ sub LoadExperiment()
 
     printdb "Not fixing current resources during this swapin\n"
 	if (! $fix_current_resources);
-    LoadVirtTypes();
     LoadVirtNodes();
     LoadVirtLans();
 
