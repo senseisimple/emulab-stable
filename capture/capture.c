@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -64,7 +64,7 @@ void cleanup(void);
 void capture(void);
 
 void usage(void);
-void warn(char *format, ...);
+void warning(char *format, ...);
 void die(char *format, ...);
 void dolog(int level, char *format, ...);
 
@@ -321,7 +321,7 @@ main(int argc, char **argv)
 		die("%s: open: %s", Devname, geterr(errno));
 
 	if (ioctl(devfd, TIOCEXCL, 0) < 0)
-		warn("TIOCEXCL %s: %s", Devname, geterr(errno));
+		warning("TIOCEXCL %s: %s", Devname, geterr(errno));
 
 	writepid();
 	rawmode(speed);
@@ -486,11 +486,13 @@ capture(void)
 	for (;;) {
 #ifdef LOG_DROPS
 		if (drop_topty_chars >= DROP_THRESH) {
-			warn("%d dev -> pty chars dropped", drop_topty_chars);
+			warning("%d dev -> pty chars dropped",
+				drop_topty_chars);
 			drop_topty_chars = 0;
 		}
 		if (drop_todev_chars >= DROP_THRESH) {
-			warn("%d pty -> dev chars dropped", drop_todev_chars);
+			warning("%d pty -> dev chars dropped",
+				drop_todev_chars);
 			drop_todev_chars = 0;
 		}
 #endif
@@ -505,7 +507,7 @@ capture(void)
 		i = select(fdcount, &fds, NULL, NULL, &timeout);
 		if (i < 0) {
 			if (errno == EINTR) {
-				warn("input select interrupted, continuing");
+				warning("input select interrupted, continuing");
 				continue;
 			}
 			die("%s: select: %s", Devname, geterr(errno));
@@ -610,6 +612,8 @@ dropped:
 
 		}
 		if (FD_ISSET(ptyfd, &fds)) {
+			int lerrno;
+
 			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 			errno = 0;
 #ifdef WITHSSL
@@ -621,16 +625,20 @@ dropped:
 			{
 			        cc = read(ptyfd, buf, sizeof(buf), 0);
 			}
+			lerrno = errno;
 			sigprocmask(SIG_SETMASK, &omask, NULL);
 			if (cc < 0) {
 				/* XXX commonly observed */
-				if (errno == EIO || errno == EAGAIN)
+				if (lerrno == EIO || lerrno == EAGAIN)
 					continue;
 #ifdef	USESOCKETS
-				if (errno == ECONNRESET)
+				if (lerrno == ECONNRESET || lerrno == ETIMEDOUT)
 					goto disconnected;
+				die("%s: socket read: %s",
+				    Machine, geterr(lerrno));
+#else
+				die("%s: read: %s", Ptyname, geterr(lerrno));
 #endif
-				die("%s: read: %s", Ptyname, geterr(errno));
 			}
 			if (cc == 0) {
 #ifdef	USESOCKETS
@@ -835,7 +843,7 @@ usage(void)
 }
 
 void
-warn(char *format, ...)
+warning(char *format, ...)
 {
 	char msgbuf[BUFSIZE];
 	va_list ap;
@@ -1421,14 +1429,14 @@ handshake(void)
 	if (setjmp(deadline)) {
 		alarm(0);
 		signal(SIGALRM, SIG_DFL);
-		warn("Timed out connecting to %s\n", Bossnode);
+		warning("Timed out connecting to %s\n", Bossnode);
 		close(sock);
 		return -1;
 	}
 	alarm(5);
 
 	if (connect(sock, (struct sockaddr *)&Bossaddr, sizeof(Bossaddr)) < 0){
-		warn("connect(%s): %s", Bossnode, geterr(errno));
+		warning("connect(%s): %s", Bossnode, geterr(errno));
 		err = -1;
 		close(sock);
 		goto done;
@@ -1436,9 +1444,9 @@ handshake(void)
 
 	if ((cc = write(sock, &whoami, sizeof(whoami))) != sizeof(whoami)) {
 		if (cc < 0)
-			warn("write(%s): %s", Bossnode, geterr(errno));
+			warning("write(%s): %s", Bossnode, geterr(errno));
 		else
-			warn("write(%s): Failed", Bossnode);
+			warning("write(%s): Failed", Bossnode);
 		err = -1;
 		close(sock);
 		goto done;
@@ -1446,9 +1454,9 @@ handshake(void)
 	
 	if ((cc = read(sock, &tipown, sizeof(tipown))) != sizeof(tipown)) {
 		if (cc < 0)
-			warn("read(%s): %s", Bossnode, geterr(errno));
+			warning("read(%s): %s", Bossnode, geterr(errno));
 		else
-			warn("read(%s): Failed", Bossnode);
+			warning("read(%s): Failed", Bossnode);
 		err = -1;
 		close(sock);
 		goto done;
