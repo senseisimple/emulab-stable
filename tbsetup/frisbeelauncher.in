@@ -48,6 +48,8 @@ my $BASEADDR	= "234.5.6";
 my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
+my $BW		= 70000000; 	# 70Mb/sec
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -267,7 +269,7 @@ while (1) {
 			my $addr = $1;
 			my $port = $2;
 
-			if (!exec("$FRISBEED -m $addr -p $port $filename")) {
+			if (!exec("$FRISBEED -W $BW -m $addr -p $port $filename")) {
 				die("$$: Unable to exec $FRISBEED\n");
 			}
 		}
