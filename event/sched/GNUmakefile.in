@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -74,8 +74,11 @@ rpc.o:			rpc.cc rpc.h
 rrpc.o:			rpc.cc rpc.h
 	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
-install: event-sched_rrpc
+install-dirs:
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
+
+install: install-dirs mevent-sched_rrpc
 	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
 		$(DESTDIR)$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
