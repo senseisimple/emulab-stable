@@ -19,7 +19,7 @@ LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-30
 
 # Pick either this
-CXXFLAGS += -Wall -O3 
+CXXFLAGS += -O3 
 # or this
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
 # and then zero or more of these
