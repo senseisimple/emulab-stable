@@ -596,11 +596,11 @@ DBQueryFatal("INSERT INTO images ".
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid, creator, created) ".
+	     " osfeatures, pid, creator, shared, created) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', now())");
+             "   '$uid', $shared, now())");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".
