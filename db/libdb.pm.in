@@ -3542,6 +3542,7 @@ sub TBNodeStateWait ($$$$) {
 # Determine if there is a firewall for a particular experiment.
 # Optionally returns the pname of the firewall node and the VLAN info.
 #
+# XXX only returns true for experiments with VLAN-based firewalls.
 # XXX this will need to change if we support multiple firewalls per experiment.
 #
 sub TBExptFirewall ($$;$$$) {
@@ -3556,7 +3557,8 @@ sub TBExptFirewall ($$;$$$) {
     if (!defined($fwnodep)) {
 	$query_result =
 	    DBQueryWarn("SELECT eid FROM firewalls ".
-			"WHERE pid='$pid' and eid='$eid'");
+			"WHERE pid='$pid' and eid='$eid' ".
+			"AND type LIKE '%-vlan'");
 	if (!$query_result || $query_result->num_rows == 0) {
 	    return 0;
 	}
