@@ -237,13 +237,19 @@ int frisbeeLoop()
   
   /* traceprintf("Checking if alarm went off..\n"); */
   if (t_getWentOff()) {
+/*
     traceprintf("Got that alarm went off...\n");
+*/
     t_setTimer( ALIVE_HINT_MIN + (random() % ALIVE_HINT_RANGE) );
     if (skipNextAlive == 0) {
+/*
       traceprintf("Sending alive hint...\n");
+*/
       sendAliveHint();
     } else {
+/*
       traceprintf("Skipping send of alive hint...\n");
+*/
     }
     skipNextAlive = 0;
   }
