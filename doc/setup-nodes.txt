@@ -1,0 +1,19 @@
+#####
+##### Configuration suggestions for testbed nodes
+#####
+
+This file contains tips we've found useful in setting up our nodes.
+
+##### Disable PXE on non-control interfaces
+
+Nodes will boot much quicker if you disable PXE booting (through whatever means
+provided by your card) on experimental net interfaces.
+
+##### Set power-loss behavior
+
+Many BIOSes have an option about what to do after a power failure (which is
+what it looks like to the node when it gets power cycled by a power
+controller.)  They're usally 'always off', 'always on', and 'last state'.
+Always on is the best - last state is OK, but if someone does a 'shutdown -h'
+on the node, you can't bring it back up with power cycling - you have to go
+punch the power button.  Just make sure they're not set to always off.          
