@@ -1626,13 +1626,15 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "w.trust,'guest','guest',31,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
-				 "UNIX_TIMESTAMP(u.usr_modified) "
+				 "UNIX_TIMESTAMP(u.usr_modified), "
+				 "u.usr_email,u.usr_shell, "
+				 "u.widearearoot,u.wideareajailroot "
 				 "from widearea_accounts as w "
 				 "left join users as u on u.uid=w.uid "
 				 "where w.trust!='none' and "
 				 "      u.status='active' and node_id='%s' "
 				 "order by u.uid",
-				 12, reqp->nodeid);
+				 16, reqp->nodeid);
 
 		if (res) {
 			if ((nrows = mysql_num_rows(res)))
