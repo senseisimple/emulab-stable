@@ -747,12 +747,6 @@ sub dorouterconfig ()
 	    my $cost  = $5;
 	    my $routearg = inet_ntoa(inet_aton($gate) & inet_aton($dmask));
 
-	    # NSE hack: staticroutes added routes for the case when dst == hop
-	    # Filtering it on the client side
-	    if ( $dip eq $routearg ) {
-		next;
-	    }
-
 	    if (! defined($upmap{$routearg})) {
 		$upmap{$routearg} = [];
 		$downmap{$routearg} = [];
