@@ -141,7 +141,7 @@ else {
           </tr>\n";
 
     echo "<tr>
-              <td>*Email Address:</td>
+              <td>*Email Address[1]:</td>
               <td class=\"left\">
                   <input type=\"text\" name=\"usr_email\" size=30></td>
           </tr>\n";
@@ -174,7 +174,7 @@ else {
           </tr>\n";
 
     echo "<tr>
-              <td>*Password:</td>
+              <td>*Password[1]:</td>
               <td><input type=\"password\" name=\"password1\" size=12></td>
           </tr>
           
@@ -213,8 +213,18 @@ echo "<tr>
 <b><input type="submit" value="Submit"></b></td></tr>
 </form>
 </table>
-
 <?php
+
+echo "<h4><blockquote><blockquote>
+      <dl COMPACT>
+        <dt>[1]                
+            <dd>Please consult our
+                <a href = 'docwrapper.php3?docname=security.html'>
+                security policies</a> for information
+                regarding passwords and email address.
+     </dl>
+     </blockquote></blockquote></h4>\n";
+
 #
 # Standard Testbed Footer
 # 
