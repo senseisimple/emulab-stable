@@ -184,7 +184,8 @@ sub doboot()
 	#
 	# We know about a couple of different MFSs, but thats it!
 	#
-	if ($mfs eq "newnode") {
+
+	if ($mfs eq "freebsd.newnode") {
 	    system("$BINDIR/newclient");
 	    #
 	    # Not supposed to do anything else after this, so just
@@ -336,7 +337,7 @@ sub DiskReadable($)
 sub GetDisks($)
 {
     my ($cmd) = @_;
-    my @units = (0, 1, 2, 3);
+    my @units = (0, 1, 2, 3, 4, 5, 6, 7);
     my @cmdout = `$cmd`;
 
     #
