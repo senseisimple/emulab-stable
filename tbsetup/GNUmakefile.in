@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,9 +28,9 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup mkacct setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
-		  sfskey_update sfskey_update.proxy
+		  sfskey_update sfskey_update.proxy rmuser
 
-LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
+LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
 		  assign_wrapper ptopgen webnodeupdate \
@@ -38,11 +38,12 @@ LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup webmkacct websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
-		  webidlecheck webnodereboot
+		  webidlecheck webnodereboot webrmuser
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
-		  snmpit_cisco_stack.pm snmpit_intel_stack.pm
+		  snmpit_cisco_stack.pm snmpit_intel_stack.pm \
+		  libaudit.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -99,8 +100,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/mkgroup
 	chown root $(INSTALL_SBINDIR)/frisbeelauncher
 	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
-	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
-	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
+	chown root $(INSTALL_SBINDIR)/rmuser
+	chmod u+s $(INSTALL_SBINDIR)/rmuser
 	chown root $(INSTALL_SBINDIR)/named_setup
 	chmod u+s $(INSTALL_SBINDIR)/named_setup
 	chown root $(INSTALL_SBINDIR)/exports_setup
