@@ -479,6 +479,13 @@ function PAGEFOOTER() {
            [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]
            [<a href=\"http://www.utah.edu/\">University of Utah</a>]
           </center>
+          <center>
+           <font size=-1>
+             &copy; 2000-2002 University of Utah and the Flux Group.
+               <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                  All rights reserved.</a>
+           </font>
+          </center>
          <p align=right>
          <font size=-2>
           Problems? Contact $TBMAILADDR\n";
