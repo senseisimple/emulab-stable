@@ -1,3 +1,74 @@
+mike        2004/04/12 16:06:52 MDT
+
+  Modified files:
+    capture              capture.c 
+  Log:
+  Getting back ETIMEDOUT from a socket read should not be fatal to capture.
+  Now it is treaded just like ECONNRESET.
+  
+  Also, don't clobber the read errno with the intermediate sigsetmask call
+  (though it should never fail and errno should never be affected)
+  
+  Change warn() to warning() to avoid conflict with standard BSD library
+  routine.  This showed up when statically linking capture.
+  
+  Revision  Changes    Path
+  1.31      +24 -16    testbed/capture/capture.c
+
+mike        2004/04/07 11:22:32 MDT
+
+  Modified files:
+    os/imagezip          global.h imagezip.c 
+    os/imagezip/ntfs     ntfs_glue.c 
+    os/imagezip/ntfs/libntfs ntfs.patch 
+  Log:
+  Get rid of the hacky code to figure out what special file was associated
+  with every DOS partition.  It was only used by NTFS and has been replaced
+  by equally hacky changes to the NTFS library.
+  
+  The benefit of the latter is that it at least works all the time on
+  Linux and all FreeBSD versions.
+  
+  Revision  Changes    Path
+  1.3       +0 -1      testbed/os/imagezip/global.h
+  1.46      +1 -106    testbed/os/imagezip/imagezip.c
+  1.2       +9 -14     testbed/os/imagezip/ntfs/ntfs_glue.c
+
+mike        2004/03/30 17:27:04 MST
+
+  Modified files:
+    www/tutorial         tutorial.html 
+  Added files:
+    www/tutorial         ixp.html 
+  Log:
+  Add IXP documentation from Abhijeet
+  
+  Revision  Changes    Path
+  1.73      +3 -0      testbed/www/tutorial/tutorial.html
+
+mike        2004/03/30 14:44:33 MST
+
+  Modified files:
+    www/tutorial         vnodes.html 
+  Log:
+  Alright, I am now officially sick of writing vnode documentation.
+  I have said all that I want to say.
+  
+  Revision  Changes    Path
+  1.4       +268 -47   testbed/www/tutorial/vnodes.html
+
+mike        2004/03/29 16:31:10 MST
+
+  Modified files:
+    www/tutorial         tutorial.html 
+  Added files:
+    www/tutorial         control-net.png 
+  Log:
+  Add a section on the control net
+  
+  Revision  Changes    Path
+  1.72      +124 -0    testbed/www/tutorial/tutorial.html
+
 ricci       2004/03/23 15:56:53 MST
 
   Added files:
