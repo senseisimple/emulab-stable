@@ -74,7 +74,33 @@ $logname = "$dirname" . "/" . "$exp_eid" . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 #
-# Make sure the experiment directory exists before continuing. 
+# Check to see if the experiment directory exists before continuing.
+# We will allow experiments to be deleted even without the files
+# describing it, since in some cases the user is handling that part on
+# his/her own.
+# 
+if (! file_exists($dirname)) {
+    $query_result = mysql_db_query($TBDBNAME,
+	"DELETE FROM experiments WHERE eid='$exp_eid' and pid=\"$exp_pid\"");
+    if (! $query_result) {
+        $err = mysql_error();
+        TBERROR("Database Error deleting experiment $exp_eid ".
+                "in project $exp_pid: $err\n", 1);
+    }
+
+    echo "<center><br><h2>
+          Experiment $exp_pid Terminated!<br>
+          Since there was no IR file to work from, the EID has been removed,
+          <br>but you will need to make sure the nodes are released yourself.
+          </h2></center><br>";
+
+    echo "</body>
+          </html>\n";
+    die("");
+}
+
+#
+# By this point, the IR file must exist to go on.
 # 
 if (! file_exists($irname)) {
     TBERROR("IR file $irname for experiment $exp_eid does not exist!\n", 1);
@@ -135,7 +161,7 @@ if (! $query_result) {
 }
 
 echo "<center><br>";
-echo "<h2>Experiment Terminated! Thanks!<br>";
+echo "<h2>Experiment $exp_pid Terminated!<br>";
 echo "</h2></center><br>";
 
 ?>

@@ -33,8 +33,6 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 ?>
-<br><br><center><h3>Still under Construction!</h3></center>
-
 <table align="center" border="1"> 
 <tr>
     <td align="center" colspan="2">
@@ -81,7 +79,7 @@ echo "    </td>
 # XXX Note CONSTANT in expression!
 #
 echo "<tr>
-          <td>*Name<br>(will be prefixed by project name):</td>
+          <td>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"exp_id\"
                      size=\"19\" maxlength=\"19\">
               </td>

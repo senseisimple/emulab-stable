@@ -99,9 +99,8 @@ if (isset($uid)) {
                     Begin an Experiment</A>\n";
         echo "<p><A href='endexp_form.php3?$uid'>
                     End an Experiment</A>\n";
-        # Every active user can do these options.
         echo "<p><A href='showexp_form.php3?$uid'>
-                    Show experiment information</A>\n";
+                    Experiment Information</A>\n";
         echo "<p><A href='modusr_form.php3?$uid'>
                     Update user information</A>\n";
         echo "<p><A href='reserved.php3'>

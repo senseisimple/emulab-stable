@@ -38,11 +38,6 @@ if (!isset($exp_created) ||
     strcmp($exp_created, "") == 0) {
   $formerror = "Experiment Created";
 }
-if (!isset($exp_nsfile) ||
-    strcmp($exp_nsfile, "") == 0 ||
-    strcmp($exp_nsfile, "none") == 0) {
-  $formerror = "Your NS file";
-}
 if ($formerror != "No Error") {
   USERERROR("Missing field; Please go back and fill out ".
             "the \"$formerror\" field!", 1);
@@ -64,6 +59,16 @@ LOGGEDINORDIE($uid);
 if (strlen($exp_id) > 19) {
     USERERROR("The experiment name \"$exp_id\" is too long! ".
               "Please select another.", 1);
+}
+
+#
+# I'm going to allow shell experiments to be created (No NS file).
+# 
+$nonsfile = 0;
+if (!isset($exp_nsfile) ||
+    strcmp($exp_nsfile, "") == 0 ||
+    strcmp($exp_nsfile, "none") == 0) {
+    $nonsfile = 1;
 }
 
 #
@@ -97,6 +102,42 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 }
 
 #
+# At this point enter the exp_id into the database so that it shows up as
+# valid when the tb scripts run. We need to remove the entry if any of
+# this fails!
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"INSERT INTO experiments ".
+        "(eid, pid, expt_created, expt_expires, expt_name, ".
+        "expt_head_uid, expt_start, expt_end) ".
+        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
+        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
+if (! $query_result) {
+    $err = mysql_error();
+    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
+}
+
+#
+# If an experiment "shell" give some warm fuzzies and be done with it.
+# The user us responsible for running the tb scripts on his/her own!
+# The user will need to come back and terminate the experiment though
+# to clear it out of the database.
+#
+if ($nonsfile) {
+    echo "<center><br>
+          <h2>Experiment Configured!<br>
+          The ID for your experiment in project $exp_pid is $exp_id<br>
+          Since you did not provide an NS script, no nodes have been
+          allocated.<br> You must log in and run the tbsetup scripts
+          yourself.
+          </h2></center><br>\n";
+
+    echo "</body>
+          </html>\n";
+    die("");
+}
+
+#
 # We are going to write out the NS file to a subdir of the testbed
 # directory. The name of this directory is <pid>-<eid>, and we stash
 # the <eid>.ns file in there. We then run a wrapper script as:
@@ -123,27 +164,6 @@ if (! mkdir($dirname, 0777)) {
 if (! copy($exp_nsfile, "$nsname")) {
     rmdir($dirname);
     TBERROR("Copying NS file for experiment into $dirname.", 1);
-}
-
-#
-# So, that went okay. At this point enter the exp_id into the database
-# so that it shows up as valid when the tb scripts run. We need to remove
-# the entry if any of this fails!
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"INSERT INTO experiments ".
-        "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end) ".
-        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
-if (! $query_result) {
-    if (! $mydebug) {
-        unlink("$nsname");
-        rmdir("$dirname");
-    }
-
-    $err = mysql_error();
-    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
 }
 
 echo "<center><br>";
