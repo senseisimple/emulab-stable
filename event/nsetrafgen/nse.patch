@@ -1520,6 +1520,144 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 -	return -1;
 +	// we reach here only if halted
  }
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Wed Apr 10 16:43:49 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Sun Oct  6 23:48:29 2002
+@@ -31,7 +31,7 @@
+  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  * SUCH DAMAGE.
+  *
+- * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.h,v 1.22 2002/04/10 20:37:46 haldar Exp $ (LBL)
++ * @(#) $Header: /nfs/jade/vint/CVSROOT/ns-2/common/scheduler.h,v 1.25 2002/07/23 21:35:21 yuri Exp $ (LBL)
+  */
+ 
+ #ifndef ns_scheduler_h
+@@ -56,6 +56,7 @@
+ class Event {
+ public:
+ 	Event* next_;		/* event list */
++	Event* prev_;
+ 	Handler* handler_;	/* handler to call when event ready */
+ 	double time_;		/* time at which event is ready */
+ 	scheduler_uid_t uid_;	/* unique ID */
+@@ -73,7 +74,6 @@
+ };
+ 
+ #define	SCHED_START	0.0	/* start time (secs) */
+-#define CALENDAR_ALPHA  2.0    /* used for resizing bucket width incase of overflow */
+ 
+ class Scheduler : public TclObject {
+ public:
+@@ -86,7 +86,8 @@
+ 	virtual void insert(Event*) = 0;	// schedule event
+ 	virtual Event* lookup(scheduler_uid_t uid) = 0;	// look for event
+ 	virtual Event* deque() = 0;		// next event (removes from q)
+-	inline double clock() const {		// simulator virtual time
++	virtual const Event* head() = 0;	// next event (not removed from q)
++	double clock() const {			// simulator virtual time
+ 		return (clock_);
+ 	}
+ 	virtual void sync() {};
+@@ -109,11 +110,13 @@
+ 
+ class ListScheduler : public Scheduler {
+ public:
+-	inline ListScheduler() : queue_(0) {}
+-	virtual void cancel(Event*);
+-	virtual void insert(Event*);
+-	virtual Event* deque();
+-	virtual Event* lookup(scheduler_uid_t uid);
++	ListScheduler() : queue_(0) {}
++	void cancel(Event*);
++	void insert(Event*);
++	Event* deque();
++	const Event* head() { return queue_; }
++	Event* lookup(scheduler_uid_t uid);
++
+ protected:
+ 	Event* queue_;
+ };
+@@ -122,18 +125,19 @@
+ 
+ class HeapScheduler : public Scheduler {
+ public:
+-	inline HeapScheduler() { hp_ = new Heap; } 
+-	virtual void cancel(Event* e) {
++	HeapScheduler() { hp_ = new Heap; } 
++	void cancel(Event* e) {
+ 		if (e->uid_ <= 0)
+ 			return;
+ 		e->uid_ = - e->uid_;
+ 		hp_->heap_delete((void*) e);
+ 	}
+-	virtual void insert(Event* e) {
++	void insert(Event* e) {
+ 		hp_->heap_insert(e->time_, (void*) e);
+ 	}
+-	virtual Event* lookup(scheduler_uid_t uid);
+-	virtual Event* deque();
++	Event* lookup(scheduler_uid_t uid);
++	Event* deque();
++	const Event* head() { return (const Event *)hp_->heap_min(); }
+ protected:
+ 	Heap* hp_;
+ };
+@@ -141,38 +145,37 @@
+ class CalendarScheduler : public Scheduler {
+ public:
+ 	CalendarScheduler();
+-	virtual ~CalendarScheduler();
+-	virtual void cancel(Event*);
+-	virtual void insert(Event*);
+-	virtual Event* lookup(scheduler_uid_t uid);
+-	virtual Event* deque();
++	~CalendarScheduler();
++	void cancel(Event*);
++	void insert(Event*);
++	Event* lookup(scheduler_uid_t uid);
++	Event* deque();
++	const Event* head();
+ 
+ protected:
+-	int resizeenabled_;
+ 	double width_;
+-	double oneonwidth_; /* this variable is always equal 1/width_
+-			     * we use it for a speedup (mul is cheaper than div),
+-			     * but we may also lose precision with it.
+-			     */
+-	double buckettop_;
+-	double last_clock_;
+-	double prevtop_;
++	double diff0_, diff1_, diff2_; /* wrap-around checks */
++
++	int stat_qsize_;		/* # of distinct priorities in queue*/
+ 	int nbuckets_;
+-	int buckbits_;
+ 	int lastbucket_;
+ 	int top_threshold_;
+ 	int bot_threshold_;
+ 
+-	Event** buckets_;
++	struct Bucket {
++		Event *list_;
++		int    count_;
++	} *buckets_;
++		
+ 	int qsize_;
+-	double max_;
+ 
+ 	virtual void reinit(int nbuck, double bwidth, double start);
+-	virtual void resize(int newsize);
+-	virtual double newwidth();
++	virtual void resize(int newsize, double start);
++	virtual double newwidth(int newsize);
+ 
+ private:
+ 	virtual void insert2(Event*);
++	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
+ 
+ };
+ 
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
 +++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Sun Oct  6 21:54:17 2002
