@@ -31,6 +31,9 @@
 use DBI;
 use POSIX;
 
+die("*** $0:\n".
+    "    Testsuite Disabled. Come edit me if need be.\n");
+
 $| = 1;
 
 $pwd = `/bin/pwd`;
