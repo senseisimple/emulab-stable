@@ -42,6 +42,11 @@ namespace eval TBCOMPAT {
 	set hwtypes($row) 1
     }
     sql endquery $DB
+    sql query $DB "select class from node_types"
+    while {[set row [sql fetchrow $DB]] != ""} {
+	set hwtypes($row) 1
+    }
+    sql endquery $DB
 
     # And a os table with valid OSIDs
     # We omit this check in anonymous mode.
