@@ -40,7 +40,7 @@ function GENPLIST ($which, $query_result)
 	    $swapdate = "";
 	}
 	else {
-	    $swapdate = "<br>$swapdate";
+	    $swapdate = "<font size=-1><br>$swapdate</font>";
 	}
 
 	echo "<td align=center>";

@@ -99,7 +99,12 @@ to remotely configure and control machines and links down to
 the hardware level.  Packet loss, latency, bandwidth, queue sizes--
 all can be user-defined.  Even the OS disk
 contents can be fully and securely replaced with custom images by any experimenter;
-Netbed can load ten or a hundred disks in 2.5 minutes total.
+Netbed can load ten or a hundred disks in 2.5 minutes total. 
+<?php
+echo "There are currently <a href=explist.php3>$active_expts active
+     experiments</a> running on Emulab, and <a
+     href=explist.php3>$swapped_expts swapped out experiments</a>.\n";
+?>
 </p>
 
 <p> Utah's local installation currently features high-speed Cisco
