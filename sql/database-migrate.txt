@@ -2463,3 +2463,23 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table location_info add stamp int(10) unsigned default NULL;
 
+1.316: Add bios_waittime to node_types table and reboot_waittime to
+       os_info table. Both in seconds. 
+
+        alter table node_types add bios_waittime int(10) unsigned \
+                default NULL after isrebootable;
+
+        alter table os_info add reboot_waittime int(10) unsigned \
+                default NULL after mfs;
+
+       Insert bios wait times for your specific hardware types, or:
+
+        update node_types set bios_waittime=60 where class='pc';
+
+       Optionally update your os_info table with reboot times,
+       although os_setup will continue to use a default if not
+       specified.
+
+        update os_info set reboot_waittime=150 where OS='Linux' or
+	  OS='FreeBSD' or OS='NetBSD';
+        update os_info set reboot_waittime=180 where OS=Windows';

@@ -1261,6 +1261,7 @@ function SHOWOSINFO($osid) {
     $mustclean      = $osrow[mustclean];
     $nextosid       = $osrow[nextosid];
     $max_concurrent = $osrow[max_concurrent];
+    $reboot_waittime= $osrow[reboot_waittime];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -1276,6 +1277,8 @@ function SHOWOSINFO($osid) {
 	$os_op_mode = "&nbsp";
     if (!$created)
 	$created = "N/A";
+    if (!$reboot_waittime)
+	$reboot_waittime = "&nbsp";
 
     #
     # Generate the table.
@@ -1345,6 +1348,11 @@ function SHOWOSINFO($osid) {
                 <td class=\"left\">$max_concurrent</td>
               </tr>\n";
     }
+
+    echo "<tr>
+            <td>Reboot Waittime: </td>
+            <td class=\"left\">$reboot_waittime</td>
+          </tr>\n";
 
     echo "<tr>
             <td>Shared?: </td>

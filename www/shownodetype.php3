@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -65,6 +65,7 @@ $delay_osid	= $noderow["delay_osid"];
 $jail_osid	= $noderow["jail_osid"];
 $isvirtnode	= $noderow["isvirtnode"];
 $isremotenode	= $noderow["isremotenode"];
+$bios_waittime	= $noderow["bios_waittime"];
 
 TBOSInfo($osid, $osname, $pid);
 TBOSInfo($jail_osid, $jail_osname, $pid);
@@ -119,6 +120,13 @@ echo "<tr>
       <td>Interfaces:</td>
       <td class=left>$max_interfaces</td>
           </tr>\n";
+
+if (isset($bios_waittime)) {
+    echo "<tr>
+              <td>Bios Waittime:</td>
+              <td class=left>$bios_waittime</td>
+          </tr>\n";
+}
 
 echo "<tr>
       <td>Delay Capacity:</td>

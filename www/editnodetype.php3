@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -256,6 +256,17 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
+             <td>Bios reboot wait time:<br>
+                 (in seconds)</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[bios_waittime]\"
+                        value=\"" . $formfields[bios_waittime] . "\"
+	                size=6>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
              <td>isvirtnode:</td>
              <td class=left>
                  <input type=text
@@ -363,6 +374,7 @@ if ($new_type) {
 	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
 	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
         "ismodelnet" => 0, "isjailed" => 0, "isdynamic" => 0,
+        "bios_waittime" => 0,
 	"issimnode" => 0, "simnode_capacity" => 20, "bootdisk_unit" => 0);
 } else {
     #
@@ -614,6 +626,16 @@ if (isset($formfields[bootdisk_unit]) && $formfields[bootdisk_unit] != "") {
     }
     else {
 	$inserts["bootdisk_unit"] = $formfields[bootdisk_unit];
+    }
+}
+
+# bios_waittime
+if (isset($formfields[bios_waittime]) && $formfields[bios_waittime] != "") {
+    if (! TBvalid_integer($formfields[bios_waittime])) {
+	$errors["bios_waittime"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["bios_waittime"] = $formfields[bios_waittime];
     }
 }
 

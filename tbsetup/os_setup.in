@@ -80,6 +80,9 @@ my %pnodevcount = ();
 my %plabvnodes  = ();
 my %osids       = ();
 my %canfail     = ();
+my %bios_waittime   = ();	# Indexed by node_type.
+my %reboot_waittime = ();	# Indexed by osid.
+my %node_types  = ();		# Indexed by node_id.
 
 #
 # Ah, Frisbee works so lets do auto reloading for nodes that do not have
@@ -207,6 +210,7 @@ while (my %row = $db_result->fetchhash()) {
     my $jailnode  = $row{'jailflag'};
     my $plabnode  = $row{'isplabdslice'};
     my $failmode  = $row{'failureaction'};
+    my $bios_wait = $row{'bios_waittime'};
     my $bootpath  = 0;
 
     #
@@ -238,7 +242,9 @@ while (my %row = $db_result->fetchhash()) {
 	    $reboots{$node} = 1;
 	}
     }
-    $osids{$node} = $osid;
+    $osids{$node}         = $osid;
+    $bios_waittime{$type} = $bios_wait;
+    $node_types{$node}    = $type;
 
     #
     # Make sure the files specified in the paths exist. We mount the
@@ -443,6 +449,15 @@ while (my %row = $db_result->fetchhash()) {
     # Set the canfail bit.
     #
     $canfail{$node} = (($failmode eq NODEFAILMODE_FATAL()) ? 0 : 1);
+
+    #
+    # Set the reboot waittime from the osid now that we have it
+    # finalized.
+    #
+    $osid = $osids{$node};
+    if (!exists($reboot_waittime{$osid})) {
+	$reboot_waittime{$osid} = TBOSIDRebootWaittime($osid);
+    }
 
     print STDERR "$node - $osids{$node} - $canfail{$node}\n"
 	if $dbg;
@@ -687,8 +702,16 @@ while ( @nodelist ) {
     my $node   = shift(@nodelist);
     my $wstart = $waitstart{$node};
     my $actual_state;
+    my $waittime = (60 * 7);	# The default.
 
-    if (!TBNodeStateWait($node, $wstart, (60*7), \$actual_state,
+    # Compute actual waittime.
+    if (defined($bios_waittime{$node_types{$node}}) &&
+	defined($reboot_waittime{$osids{$node}})) {
+	$waittime = ($bios_waittime{$node_types{$node}} +
+		     $reboot_waittime{$osids{$node}}) * 2;
+    }
+
+    if (!TBNodeStateWait($node, $wstart, $waittime, \$actual_state,
 			 (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
 	if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
 	    print "*** WARNING: $node reported a TBFAILED event; ".

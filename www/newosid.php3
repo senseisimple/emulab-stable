@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -203,6 +203,27 @@ if (isset($nextosid)) {
 }
 
 #
+# Check the reboot_waittime. Only admin users can set this. Grab default
+# if not set.
+#
+if (isset($reboot_waittime) && $reboot_waittime != "") {
+    if (!$isadmin) {
+	USERERROR("Setting reboot waittime requires admin mode!", 1);
+    }
+    elseif (!TBvalid_integer($reboot_waittime)) {
+	USERERROR("Reboot Waittime: ". TBFieldErrorString(), 1);
+    }
+}
+else {
+    if (! array_key_exists($OS, $osid_reboot_waitlist)) {
+	USERERROR("Operating System (OS) - No default reboot waittime", 1);
+    }
+    else {
+	$reboot_waittime = $osid_reboot_waitlist[$OS];
+    }
+}
+
+#
 # And insert the record!
 #
 if (isset($os_path)) {
@@ -235,11 +256,12 @@ if (TBValidOSID($osid)) {
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description,OS,version,path,magic,op_mode, ".
-		 " osfeatures, pid, shared, creator, mustclean, created) ".
+		 " osfeatures, pid, shared, creator, mustclean, created, ".
+		 " reboot_waittime) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', '$op_mode', ".
 		 "        '$os_features', '$pid', $os_shared, ".
-	         "        '$uid', $os_mustclean, now())");
+	         "        '$uid', $os_mustclean, now(), $reboot_waittime)");
 
 DBQueryFatal("unlock tables");
 

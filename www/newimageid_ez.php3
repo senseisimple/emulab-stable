@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -576,6 +576,18 @@ function SPITFORM($formfields, $errors)
                   </td>
               </tr>\n";
 
+	#
+	# Reboot waittime. 
+	# 
+	echo "<tr>
+		  <td>Reboot Waittime (seconds):</td>
+		  <td class=left>
+		      <input type=text
+			     name=\"formfields[reboot_waittime]\"
+			     value=\"" . $formfields[reboot_waittime] . "\"
+			     size=4 maxlength=4>
+		  </td>
+	      </tr>\n";
     }
 
     echo "<tr>
@@ -975,6 +987,9 @@ if (isset($formfields[node]) &&
     $node = $formfields[node];
 }
 
+#
+# Max concurrent
+# 
 if (isset($formfields[max_concurrent]) &&
     strcmp($formfields[max_concurrent],"")) {
     
@@ -985,6 +1000,29 @@ if (isset($formfields[max_concurrent]) &&
     $max_concurrent = "'" . $formfields[max_concurrent] . "'";
 } else {
     $max_concurrent = "NULL";
+}
+
+#
+# Reboot waittime. Only admin users can set this. Grab default
+# if not set.
+#
+if (isset($formfields[reboot_waittime]) &&
+    strcmp($formfields[reboot_waittime],"")) {
+    if (!$isadmin) {
+	$errors["Reboot Waittime"] = "Not enough permission";
+    }
+    elseif (!TBvalid_integer($formfields[reboot_waittime])) {
+	$errors["Reboot Waittime"] = TBFieldErrorString();
+    }
+    $reboot_waittime = $formfields[reboot_waittime];
+}
+else {
+    if (! array_key_exists($formfields[os_name], $osid_reboot_waitlist)) {
+	$errors["Reboot Waittime"] = "No default reboot waittime for OS";
+    }
+    else {
+	$reboot_waittime = $osid_reboot_waitlist[$formfields[os_name]];
+    }
 }
 
 #
@@ -1137,11 +1175,12 @@ DBQueryFatal("INSERT INTO images ".
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
 	     " osfeatures, pid, creator, shared, created, op_mode, ".
-	     " max_concurrent) ".
+	     " max_concurrent, reboot_waittime) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', $global, now(), '$op_mode', $max_concurrent)");
+             "   '$uid', $global, now(), '$op_mode', $max_concurrent, ".
+             "   $reboot_waittime)");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

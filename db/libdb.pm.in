@@ -155,7 +155,7 @@ use vars qw(@ISA @EXPORT);
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
-	 TBResolveNextOSID TBOsidToPid
+	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
 	 TBdbfork TBDBDisconnect VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
@@ -169,7 +169,7 @@ use vars qw(@ISA @EXPORT);
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
 	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
 
-	 TBNodeType TBNodeTypeProcInfo
+	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState
 	 TBExptRestoreVirtualState
@@ -2010,6 +2010,29 @@ sub TBOSMaxConcurrent ($)
 }
 
 #
+# Returns the reboot waittime.
+#
+# usage: TBOSIDRebootWaittime(char *osid)
+#        returns >= 1 if there is a waittime
+#        returns undef if there is no waittime
+#        returns 0 if not valid.
+#
+sub TBOSIDRebootWaittime ($)
+{
+    my($osid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select reboot_waittime from os_info where osid='$osid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
 # Returns the number of nodes that are supposedly booting an OS. A list of
 # nodes that should be excluded from this count can be given.
 #
@@ -3187,6 +3210,25 @@ sub TBNodeTypeProcInfo($)
     
     my ($proc, $speed) = $result->fetchrow();
     return ($proc, $speed);
+}
+
+#
+# Return a node's type bios waittime.
+#        returns >= 1 if there is a waittime
+#        returns undef if there is no waittime
+#        returns 0 if not valid.
+#
+sub TBNodeTypeBiosWaittime($)
+{
+    my ($type) = @_;
+    my $query_result = DBQueryFatal("SELECT bios_waittime FROM node_types " .
+				    "WHERE type='$type'");
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
 }
 
 #

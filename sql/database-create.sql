@@ -1072,6 +1072,7 @@ CREATE TABLE node_types (
   simnode_capacity smallint(5) unsigned NOT NULL default '0',
   trivlink_maxspeed int(11) unsigned NOT NULL default '0',
   isrebootable tinyint(1) default '1',
+  bios_waittime int(10) unsigned default NULL,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -1282,6 +1283,7 @@ CREATE TABLE os_info (
   nextosid varchar(35) default NULL,
   max_concurrent int(11) default NULL,
   mfs tinyint(4) NOT NULL default '0',
+  reboot_waittime int(10) unsigned default NULL,
   PRIMARY KEY  (osname,pid),
   KEY osid (osid),
   KEY OS (OS),
