@@ -162,7 +162,7 @@ print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
 close(DEFS);
 
 prints "  Configuring ";
-tbexec("$basedir/../configure --prefix=$path/install ".
+tbexec("$basedir/../configure --prefix=$path/install --enable-testmode ".
        "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
        "$path/configure.log");
 
@@ -203,8 +203,8 @@ $sth = $dbh->prepare("SELECT pid,eid from experiments");
 $sth->execute;
 while (($pid,$eid) = $sth->fetchrow_array) {
     print CLEARLOG "$pid $eid\n";
-    print CLEARLOG "tbswapout -nologfile -force -test $pid $eid\n";
-    open(EXEC,"tbswapout -nologfile -force -test $pid $eid 2>&1 |");
+    print CLEARLOG "tbswapout -nologfile -force $pid $eid\n";
+    open(EXEC,"tbswapout -nologfile -force $pid $eid 2>&1 |");
     while (<EXEC>) {
 	print CLEARLOG $_;
     }
