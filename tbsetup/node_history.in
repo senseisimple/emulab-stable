@@ -34,18 +34,21 @@ my $epoch = 1105563540;
 
 sub usage {
     print("Usage: $0 [-ARalrsvw] [node ...]\n".
-	  "  -A print history of all nodes (you do NOT want to do this)\n".
-	  "  -R print raw records (default is to combine some records)\n".
-	  "  -a show only when allocated to experiment\n".
-	  "  -l list records\n".
-	  "  -r reverse order (most recent first)\n".
-	  "  -s show a summary of node's past usage\n".
-	  "  -v verbose output\n".
-	  "  -w print warnings about anomolous records\n");
+    "  -A       print history of all nodes (you do NOT want to do this)\n".
+    "  -R       print raw records (default is to combine some records)\n".
+    "  -S field sort list by field (date, node, pideid, uid, elapsed)\n".
+    "  -a       show only when allocated to experiment\n".
+    "  -l       list records\n".
+    "  -n num   report on only the first num records (after sorting)\n".
+    "             use negative value for last num records\n".
+    "  -r       reverse order (most recent first)\n".
+    "  -s       show a summary of node's past usage\n".
+    "  -v       verbose output\n".
+    "  -w       print warnings about anomolous records\n");
     exit(1);
 }
 
-my $optlist = "ARalrswv";
+my $optlist = "ARS:aln:rswv";
 my $warnme = 0;
 my $verbose = 0;
 my $showall = 0;
@@ -53,7 +56,45 @@ my $showalloconly = 0;
 my $list = 0;
 my $summary = 0;
 my $raw = 0;
+my $numrecs = 0;
+
+#
+# Sort stuff.  sortby value should correspond to record field format:
+#
+# sortby 0: node
+# sortby 1: pideid
+# sortby 2: uid
+# sortby 3: date
+# sortby 4: elapsed
+#
+my %sortmap = (
+    "node" => 0,
+    "pideid" => 1,
+    "uid" => 2,
+    "date" => 3,
+    "elapsed" => 4
+);
+my $sortbydate = $sortmap{date};
+my $sortby = $sortbydate;
 my $revorder = 0;
+
+# Sort function: first by indicated field, secondarily by date
+sub byfield()
+{
+    # already sorted by date
+    return 0 if ($sortby == $sortbydate);
+
+    # int compare for elapsed
+    if ($sortby == $sortmap{elapsed}) {
+	return @$a[$sortby] <=> @$b[$sortby] ||
+	    @$a[$sortbydate] <=> @$b[$sortbydate];
+    }
+
+    # string compare for everything else
+    return @$a[$sortby] cmp @$b[$sortby] ||
+	@$a[$sortbydate] <=> @$b[$sortbydate];
+}
+
 
 #
 # Parse command arguments.
@@ -68,11 +109,21 @@ if (defined($options{"A"})) {
 if (defined($options{"R"})) {
     $raw = 1;
 }
+if (defined($options{"S"})) {
+    if (!defined($sortmap{$options{"S"}})) {
+	print STDERR "invalid sort field '$options{S}'\n";
+	usage();
+    }
+    $sortby = $sortmap{$options{"S"}};
+}
 if (defined($options{"a"})) {
     $showalloconly = 1;
 }
 if (defined($options{"l"})) {
     $list = 1;
+}
+if (defined($options{"n"})) {
+    $numrecs = $options{"n"};
 }
 if (defined($options{"r"})) {
     $revorder = 1;
@@ -119,8 +170,7 @@ my $query_result =
 		 "$querymod $orderby");
 
 my %nodeinfo;	# [ expt, starttime, uid ]
-my %nodestats;	# [ free, allocated, reloading, down ]
-my @lines;
+my @records;
 
 while (my %row = $query_result->fetchhash()) {
     my $pideid = "$row{pid}/$row{eid}";
@@ -133,26 +183,19 @@ while (my %row = $query_result->fetchhash()) {
     # from the epoch til now.
     #
     if (!defined($nodeinfo{$node})) {
-	$nodeinfo{$node} = [ "FREE", $epoch, "root" ];
-    }
-    if (!defined($nodestats{$node})) {
-	$nodestats{$node} = [ 0, 0, 0, 0 ];
+	$nodeinfo{$node} = [ "", $epoch, "root" ];
     }
 
     my ($opideid, $ostamp, $ouid) = @{$nodeinfo{$node}};
     my $elapsed = $stamp - $ostamp;
-    my $start = ctime($ostamp);
-    my $end = ctime($stamp);
-    chomp($start);
-    chomp($end);
 
     #
     # Allocating node to experiment.
     # Should currently be free.
     #
     if ($row{op} eq "alloc") {
-	if ($opideid ne "FREE") {
-	    print STDERR "$node: dup alloc: already in $opideid at $start\n"
+	if ($opideid ne "") {
+	    print STDERR "$node: dup alloc: already allocated to $opideid\n"
 		if ($warnme);
 	    # XXX possibly missing state in the DB, treat as move
 	}
@@ -167,7 +210,7 @@ while (my %row = $query_result->fetchhash()) {
 	    print STDERR "$node: mismatched alloc,free records: $opideid,$pideid\n"
 		if ($warnme);
 	}
-	$nodeinfo{$node} = [ "FREE", $stamp, $uid ];
+	$nodeinfo{$node} = [ "", $stamp, $uid ];
     }
     elsif ($row{op} eq "move") {
 	if (!$raw) {
@@ -181,53 +224,55 @@ while (my %row = $query_result->fetchhash()) {
 	$nodeinfo{$node} = [ $pideid, $stamp, $uid ];
     }
 
-    my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
-    my $isalloced = 0;
-    if ($opideid eq "FREE") {
-	$ftime += $elapsed;
-    } elsif ($opideid eq "emulab-ops/reloadpending" ||
-	     $opideid eq "emulab-ops/reloading") {
-	$rtime += $elapsed;
-    } elsif ($opideid eq "emulab-ops/hwdown") {
-	$dtime += $elapsed;
-    } else {
-	$atime += $elapsed;
-	$isalloced = 1;
-    }
-    $nodestats{$node} = [ $ftime, $atime, $rtime, $dtime ];
-
-    if ($list) {
-	if ($verbose) {
-	    my $str="$node: $opideid from $start til $end ($elapsed sec)\n";
-	    push(@lines, $str)
-		if (!$showalloconly || $isalloced);
-	} else {
-	    my ($pid, $eid) = split("/", $opideid);
-	    $eid = "FREE"
-		if ($pid eq "FREE");
-	    my $str="$node REC $ostamp $elapsed $uid $pid $eid\n";
-	    push(@lines, $str)
-		if (!$showalloconly || $isalloced);
-	}
-    }
+    # save off the record
+    push(@records, [ $node, $opideid, $ouid, $ostamp, $elapsed ]);
 }
 
-# Include the current state of nodes
+# Include the current state of nodes in a final record
 my $stamp = time();
 for $node (keys(%nodeinfo)) {
     my ($opideid, $ostamp, $ouid) = @{$nodeinfo{$node}};
     my $elapsed = $stamp - $ostamp;
-    my $start = ctime($ostamp);
-    chomp($start);
+    push(@records, [ $node, $opideid, $ouid, $ostamp, $elapsed ]);
+}
 
+# Prune the list based on date range (someday)
+
+# Sort the list as desired
+if ($sortby ne "date") {
+    @records = sort byfield @records;
+}
+if ($revorder) {
+    @records = reverse(@records);
+}
+
+# Prune to the proper number of entries (first/last $numrecs entries)
+if ($numrecs && $numrecs < $#records) {
+    if ($numrecs > 0) {
+	@records = @records[0 .. $numrecs-1];
+    } else {
+	@records = @records[$numrecs .. -1 ];
+    }
+}
+
+#
+# Loop over the remaining records, computing summary stats
+# and printing (if desired).
+#
+for my $rec (@records) {
+    my ($node, $pideid, $uid, $stamp, $elapsed) = @{$rec};
+
+    if (!defined($nodestats{$node})) {
+	$nodestats{$node} = [ 0, 0, 0, 0 ];
+    }
     my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
     my $isalloced = 0;
-    if ($opideid eq "FREE") {
+    if ($pideid eq "") {
 	$ftime += $elapsed;
-    } elsif ($opideid eq "emulab-ops/reloadpending" ||
-	     $opideid eq "emulab-ops/reloading") {
+    } elsif ($pideid eq "emulab-ops/reloadpending" ||
+	     $pideid eq "emulab-ops/reloading") {
 	$rtime += $elapsed;
-    } elsif ($opideid eq "emulab-ops/hwdown") {
+    } elsif ($pideid eq "emulab-ops/hwdown") {
 	$dtime += $elapsed;
     } else {
 	$atime += $elapsed;
@@ -237,27 +282,30 @@ for $node (keys(%nodeinfo)) {
 
     if ($list) {
 	if ($verbose) {
-	    my $str = "$node: $opideid from $start til NOW ($elapsed sec)\n";
-	    push(@lines, $str)
+	    my $start = ctime($stamp);
+	    chomp($start);
+	    my $end = ctime($stamp + $elapsed);
+	    chomp($end);
+
+	    print "$node: $pideid from $start til $end ($elapsed sec)\n"
 		if (!$showalloconly || $isalloced);
 	} else {
-	    my ($pid, $eid) = split("/", $opideid);
-	    $eid = "FREE"
-		if ($pid eq "FREE");
-	    my $str="$node REC $ostamp $elapsed $ouid $pid $eid\n";
-	    push(@lines, $str)
+	    my ($pid, $eid);
+	    if ($pideid eq "") {
+		$pid = $eid = "<FREE>";
+	    } else {
+		($pid, $eid) = split("/", $pideid);
+	    }
+	    print "$node REC $stamp $elapsed $uid $pid $eid\n"
 		if (!$showalloconly || $isalloced);
 	}
     }
 }
 
-# Print out list
-if ($revorder) {
-    @lines = reverse(@lines);
-}
-print @lines;
-
+#
 # Print out summary information
+# We can do this for all nodes, but how do we present it?
+#
 my $node = $nodes[0]; # XXX
 if ($summary && defined($nodestats{$node})) {
     my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
