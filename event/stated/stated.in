@@ -245,7 +245,11 @@ sub handleEvent($$$) {
 
 	SWITCH: for ($objtype) {
 
-	    (/TBNODESTATE/) && do {
+	    #
+	    # Handle both the new TBNODEOPMODE and the old TBCONTROL events, 
+	    # for backward compatibility.
+	    #
+	    (/TBNODESTATE/ || /TBCONTROL/) && do {
 		stateTransition($objname,$eventtype);
 		last;
 	    };
