@@ -182,32 +182,11 @@ proc find_free_ip {subnet} {
     }
     return {}
 }
-proc find_free_common_subnet {nodeA nodeB} {
-    global ips_node ip_base
 
-    if {![info exists ips_node($nodeA)] &&
-	![info exists ips_node($nodeB)]} {
-	return "$ip_base.1"
-    }
-    if {[info exists ips_node($nodeA)]} {
-	foreach ip $ips_node($nodeA) {
-	    set used([get_subnet $ip]) 1
-	}
-    }
-    if {[info exists ips_node($nodeB)]} {
-	foreach ip $ips_node($nodeB) {
-	    set used([get_subnet $ip]) 1
-	}
-    } 
-    for {set i 1} {$i < 100} {incr i} {
-	if {! [info exists used($ip_base.$i)]} {return "$ip_base.$i"}
-    }
-    return {}
-}
 proc get_subnet {ip} {
     return [join [lrange [split $ip .] 0 2] .]
 }
-proc find_free_subnet {node} {
+proc find_free_subnet {} {
     global ips_assigned ip_base
 
     foreach ip [array names ips_assigned] {
@@ -225,7 +204,7 @@ foreach left [array names to_assign] {
     set both [lindex $to_assign($left) 2]
 
     if {$both == 1} {
-	set subnet [find_free_common_subnet $node $dst]
+	set subnet [find_free_subnet]
 	set ipA [find_free_ip $subnet]
 	set ipB [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ipA]
@@ -240,7 +219,7 @@ foreach left [array names to_assign] {
 	} elseif {[info exists IP($dst)]} {
 	    set subnet [get_subnet $IP($dst)]
 	} else {
-	    set subnet [find_free_subnet $node]
+	    set subnet [find_free_subnet]
 	}
 	set ip [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ip]
