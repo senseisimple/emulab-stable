@@ -71,7 +71,8 @@ if ($isadmin) {
     $osid_result =
 	DBQueryFatal("select o.*,p.osid from os_info as o ".
 		     "left join partitions as p on o.osid=p.osid ".
-		     "where p.node_id='$node_id' or o.path!='' ".
+		     "where p.node_id='$node_id' or ".
+		     "(o.path!='' and o.path is not NULL) ".
 		     "order by o.osid");
 }
 else {
@@ -79,8 +80,8 @@ else {
 	DBQueryFatal("select distinct o.*,p.osid from os_info as o ".
 		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
-		     "where m.uid='$uid' and p.node_id='$node_id' ".
-		     " or o.path!='' or o.shared=1 ".
+		     "where m.uid='$uid' and (p.node_id='$node_id' or ".
+		     " (o.path!='' and o.path is not NULL) and o.shared=1) ".
 		     "order by o.pid,o.osid");
 }
 
