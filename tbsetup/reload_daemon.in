@@ -165,7 +165,7 @@ while (1) {
 	    print "Could not update EID for $node. Waiting a bit.\n";
 	    next;
 	}
-	if (system("$os_load $imageid $node")) {
+	if (system("$os_load -i $imageid $node")) {
 	    #
 	    # This should not fail! 
 	    #
@@ -175,26 +175,16 @@ while (1) {
     }
     else {
 	#
-	# Query for the default imageid. I do this each time through the loop
-	# in case it gets changed in the DB.
-	#
-	$query_result =
-	    DBQueryWarn("select imageid from node_types where type='$type'");
-    
-	if (! $query_result) {
-	    print "DB Error getting default image for $type. Waiting a bit.\n";
-	    next;
-	}
-	@row     = $query_result->fetchrow_array();
-	$imageid = $row[0];
-	
-	#
 	# Call sched_reload with the "force" option, which says that if
 	# sched_reload cannot reserve the node (cause someone just got it)
 	# then don't schedule a reload for later. Just fail outright.
 	# We will try again in a bit.
 	#
-	if (system("$sched_reload -f $imageid $node")) {
+	# We do not need to specify an imageid, since we want the node
+	# default, and sched_reload will pick that up from the database
+	# in the absence of a -i option. 
+	#
+	if (system("$sched_reload -f $node")) {
 	    #
 	    # Could not get it. Wait and go around again.
 	    #
