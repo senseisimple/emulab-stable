@@ -1,0 +1,30 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= os/dijkstra
+
+include $(OBJDIR)/Makeconf
+
+CFLAGS	= -Wall -O2 -g -static
+
+all:	dijkstra
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+dijkstra:	dijkstra.o wgraph.o wgraph.h
+	$(CXX) $(CFLAGS) dijkstra.o wgraph.o $(LIBS) -o dijkstra
+
+wgraph.o:	wgraph.cc wgraph.h
+
+client-install: dijkstra
+	$(INSTALL_PROGRAM) dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra
+
+clean:
+	rm -f *.o dijkstra
+

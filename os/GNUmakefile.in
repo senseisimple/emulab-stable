@@ -14,7 +14,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip frisbee.redux growdisk syncd
+SUBDIRS	= imagezip frisbee.redux growdisk syncd dijkstra
 
 all:	$(SUBDIRS) split-image.sh
 
@@ -28,6 +28,9 @@ frisbee.redux:
 
 syncd:
 	@$(MAKE) -C syncd all
+
+dijkstra:
+	@$(MAKE) -C dijkstra all
 
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
@@ -46,6 +49,7 @@ ifneq ($(SYSTEM),Linux)
 endif
 	$(MAKE) -C syncd client-install
 	$(MAKE) -C growdisk client-install
+	$(MAKE) -C dijkstra client-install
 
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
