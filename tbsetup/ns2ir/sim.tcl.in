@@ -499,6 +499,24 @@ Simulator instproc at {time eventstring} {
   }
 }
 
+#
+# Routing control. Right now, we do not support much at all.
+#
+Simulator instproc rtproto {type args} {
+    var_import ::GLOBALS::default_ip_routing_type
+
+    if {$args != {}} {
+	punsup "rtproto: arguments ignored: $args"
+    }
+
+    if {($type == "Session") ||	($type == "ospf")} {
+	set default_ip_routing_type "ospf"
+    } else {
+	punsup "rtproto: unsupported routing protocol ignored: $type"
+	return
+    }
+}
+
 # unknown 
 # This is invoked whenever any method is called on the simulator
 # object that is not defined.  We interpret such a call to be a
