@@ -91,9 +91,11 @@ tipserv-install:
 	@$(MAKE) -C capture tipserv-install
 	@$(MAKE) -C tbsetup tipserv-install
 
-client-install: 
+client-install:
+	@$(MAKE) -C lib/libtb client
 	@$(MAKE) -C event client-install
 	@$(MAKE) -C os client-install
+	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
 #

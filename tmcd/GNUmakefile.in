@@ -70,7 +70,7 @@ install:	$(INSTALL_SBINDIR)/tmcd \
 		$(INSTALL_SBINDIR)/tmcd.restart
 
 
-client-install:
+client-install: tmcc-nossl findif
 ifeq ($(SYSTEM),FreeBSD)
 	@$(MAKE) -C freebsd install
 else

@@ -78,14 +78,14 @@ dir-install:
 common-install:	dir-install
 	(cd ../common; $(MAKE) local-install)
 
-sup-install:	dir-install
+sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
 	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc.bin
-	$(INSTALL) -m 755 ../findif $(BINDIR)/findif
+	$(INSTALL) -m 755 -s ../tmcc-nossl $(BINDIR)/tmcc.bin
+	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 
 etc-install:	dir-install sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
@@ -110,6 +110,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(BINDIR)/rc/rc.delayagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/healthd.conf $(BINDIR)/healthd.conf
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
@@ -136,7 +137,7 @@ sfs-install:
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/var
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/usr
 
-jail-install:	dir-install
+jail-install:	dir-install injail
 	$(INSTALL) -m 755 -o root -g wheel -d $(JAILDIR)
 	$(INSTALL) -m 644 $(SRCDIR)/jail/group $(JAILDIR)/group
 	$(INSTALL) -m 640 $(SRCDIR)/jail/master.passwd $(JAILDIR)/master.passwd

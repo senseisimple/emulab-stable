@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,8 +37,8 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
 
-client-install: 
-	$(INSTALL_PROGRAM) program-agent \
+client-install: program-agent
+	$(INSTALL_PROGRAM) -s program-agent \
 			$(DESTDIR)$(CLIENT_BINDIR)/program-agent
 
 clean:

@@ -20,6 +20,9 @@ slothd:
 install: 
 	@$(MAKE) -C slothd install
 
+client-install:
+	@$(MAKE) -C slothd client-install
+
 clean:		subdir-clean
 
 subdir-clean:

@@ -63,7 +63,7 @@ install:
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 
-client-install:
+client-install: lib
 ifeq ($(SYSTEM),FreeBSD)
 	@$(MAKE) -C delay-agent client-install
 endif

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -69,8 +69,8 @@ proxytest:	proxytest.o $(LIBTBDIR)/log.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-client-install: 
-	$(INSTALL_PROGRAM) evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
+client-install: evproxy
+	$(INSTALL_PROGRAM) -s evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

@@ -58,11 +58,11 @@ $(LIBEVENTDIR)/%.a:
 binaries: $(LOCAL_BINDIR)/$(DAEMON) $(LOCAL_BINDIR)/$(LTEVENT) 
 
 $(LOCAL_BINDIR)/$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
-	-mkdir $(LOCAL_BINDIR)
+	-mkdir -p $(LOCAL_BINDIR)
 	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
 $(LOCAL_BINDIR)/$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
-	-mkdir $(LOCAL_BINDIR)
+	-mkdir -p $(LOCAL_BINDIR)
 	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
 $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
@@ -76,10 +76,10 @@ install:
 
 control-install:	install
 
-client-install:
-	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(DAEMON) \
+client-install: all
+	$(INSTALL_PROGRAM) -s $(LOCAL_BINDIR)/$(DAEMON) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
-	$(INSTALL_PROGRAM)  $(LOCAL_BINDIR)/$(LTEVENT) \
+	$(INSTALL_PROGRAM) -s $(LOCAL_BINDIR)/$(LTEVENT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
 	$(INSTALL_PROGRAM) $(SCRIPT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)

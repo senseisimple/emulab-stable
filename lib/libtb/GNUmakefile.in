@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,17 +13,21 @@ include $(OBJDIR)/Makeconf
 
 all:	libtb.a
 
+client:	libtb-nodb.a
+	mv libtb-nodb.a libtb.a
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 SYSTEM	:= $(shell uname -s)
 
 OBJS		= log.o tbdefs.o
-ifneq ($(SYSTEM),Linux)
-OBJS	       += tbdb.o
-endif
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 
-libtb.a:	$(OBJS)
+libtb.a:	$(OBJS) tbdb.o
+	$(AR) crv $@ $(OBJS) tbdb.o
+	$(RANLIB) $@
+
+libtb-nodb.a:	$(OBJS)
 	$(AR) crv $@ $(OBJS)
 	$(RANLIB) $@
 

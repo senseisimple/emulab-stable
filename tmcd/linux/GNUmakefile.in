@@ -61,8 +61,8 @@ sup-install:	dir-install
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc.bin
-	$(INSTALL) -m 755 ../findif $(BINDIR)/findif
+	$(INSTALL) -m 755 -s ../tmcc-nossl $(BINDIR)/tmcc.bin
+	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 
 etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
@@ -88,9 +88,9 @@ sysetc-install:	dir-install
 			$(SYSETCDIR)/sysconfig/network-scripts/ifcfg-eth4
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
-	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc3.d/S96testbed
-	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
-	-ln -s $(RCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
+	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc3.d/S96testbed
+	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
+	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
 	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
 		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
@@ -101,9 +101,11 @@ sysetc-install:	dir-install
 				$(SYSETCDIR)/cron.pend; \
 	fi
 	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
-	-ln -s $(RCDIR)/init.d/elvin $(RCDIR)/rc3.d/S96elvin
-	-ln -s $(RCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
-	-ln -s $(RCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
+	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc3.d/S96elvin
+	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
+	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
+	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
+	-ln -sf $(RCDIR)/rc.local $(SYSETCDIR)/rc.local
 
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
@@ -119,6 +121,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname.dhclient \
 				$(BINDIR)/sethostname.dhclient
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/healthd.conf $(BINDIR)/healthd.conf
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
@@ -130,8 +133,8 @@ script-install:	dir-install
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
-	-ln -s $(RCDIR)/init.d/nfs $(RCDIR)/rc3.d/S20nfs
-	-ln -s $(RCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
+	-ln -sf $(RCDIR)/init.d/nfs $(RCDIR)/rc3.d/S20nfs
+	-ln -sf $(RCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
 	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
 	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
 	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -57,8 +57,8 @@ client: slothd
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd)
 
-client-install:
-	$(INSTALL_PROGRAM) $(SLOTHD_DIR)/slothd $(DESTDIR)$(CLIENT_BINDIR)
+client-install: client
+	$(INSTALL_PROGRAM) -s $(SLOTHD_DIR)/slothd $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
 	rm -f *.o $(SDPROGS) $(SBIN_SCRIPTS) *~ core *.core version.c
