@@ -40,7 +40,7 @@ my $ping	= "/sbin/ping";
 my %pids	= ();
 my @row;
 my @nodes       = ();
-my $debug       = 1;
+my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
 my $eidmode     = 0;
@@ -214,12 +214,16 @@ sub RebootNode {
     #
     print STDERR "Trying ssh reboot of $pc ...\n" if $debug;
 
+    # Must change our real UID to root so that ssh will work.
+    $UID = 0;
+    
     #
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
     # some funky state.
     # 
     $syspid = fork();
+
     if ($syspid) {
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
 	alarm 20;
@@ -230,7 +234,7 @@ sub RebootNode {
 	# The ssh can return non-zero exit status, but still have worked.
 	# FreeBSD for example.
 	#
-	print STDERR "reboot returned $?.\n" if $debug;
+	print STDERR "reboot of $pc returned $?.\n";
     
 	#
 	# If either ssh is not running or it timed out,
@@ -248,8 +252,6 @@ sub RebootNode {
 	}
     }
     else {
-	# Must change our real UID to root so that ssh will work.
-	$UID = 0;
 	exec("$ssh $pc /sbin/reboot");
 	exit(0);
     }
