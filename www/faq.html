@@ -14,6 +14,7 @@
 <ul>
 <li> <a href="#GS">Getting Started</a>
      <ul>
+     <li> <a href="#GS-Eligible">Who is Eligible to use Emulab.Net?</a>
      <li> <a href="#GS-1">How do I start a project?</a>
      <li> <a href="#GS-2">How do I join a project?</a>
      <li> <a href="#GS-3">I have an Emulab account. Now what?</a>
@@ -43,7 +44,10 @@
      <li> <a href="#HDS-1">How many nodes are there?</a>
      <li> <a href="#HDS-2">How many nodes are currently available?</a>
      <li> <a href="#HDS-3">How many ethernet cards are on each node?</a>
-     <li> <a href="#HDS-4">Can I do traffic shaping on my links?</a>
+     <li> <a href="#HDS-4">How many nodes are currently available (free)?</a>
+     <li> <a href="#HDS-5">Can I do traffic shaping on my links?</a>
+     <li> <a href="#HDS-6">Can I modify the traffic shapping
+                           parameters on my links?</a>
      </ul>
 
 <li> <a href="#SWS">Software setup</a>
@@ -71,6 +75,19 @@
 <a NAME="GS"></a>
 <h3>Getting Started</h3>
 <ul>
+<li><a NAME="GS-Eligible"></a>
+    <h3>Who is Eligible to use Emulab.Net?</h3>
+    <p>
+    Emulab.Net is an NSF/DARPA sponsored project, with additional
+    support from these <a href =
+    "docwrapper.php3?docname=sponsors.html"> sponsors</a>. As such,
+    eligibility to use Emulab is primarily granted to other NSF/DARPA
+    sponsored projects, as well as current university research
+    projects. There are exceptions of course. If you are unsure about
+    your eligibility to use Emulab, please feel free to send us an email
+    inquiry.
+    </p>
+
 <li><a NAME="GS-1"></a>
     <h3>How do I start a project?</h3>
     <p>
@@ -320,9 +337,26 @@
     in the web interface, but no nodes are allocated. Once an
     experiment is swapped out, you can swap it back in via the web
     interface by going to the Experiment Information page for your
-    experiment, and clicking on the swapin option.
+    experiment, and clicking on the swapin option. 
     </p>
 
+    <p>
+    The <tt>swappable</tt> checkbox in the Begin Experiment web page
+    is used to determine what experiments can be <em>automatically</em>
+    swapped by the testbed scheduling system. Note that all experiments are
+    capable of being swapped; even if you do not check the swappable box,
+    you are free to swap your own experiments as you like. The only
+    difference is that the testbed scheduling system will not consider your
+    experiment when looking for experiments to swap out. You will sometimes
+    notice that the Experiment Information page does not contain the swap
+    link. That is because experiments cannot be swapped when they are in
+    transition. For example, when the experiment is being swapped in (say,
+    after first being created) the link will disappear until the experiment
+    is fully swapped in, and it is capable of being swapped out. You will
+    need to occasionally reload the page so that the updated state is
+    recognized and the swap link appears. 
+    </p>
+    
     <p>
     Be aware that we do not currently save any files that you may have
     placed on your nodes. When your experiment is swapped back in, you
@@ -376,6 +410,21 @@
     page for a summary of all Emulab NS extensions, and the
     <a href = "tutorial/tutorial.php3">Emulab Tutorial</a> for an
     example. 
+    </p>
+
+<li><a NAME="HDS-6"></a>
+    <h3>Can I modify the traffic shapping parameters on my links?</h3>
+    <p>
+    Yes! If your NS file specified traffic shaping on a link, then you
+    can subsequently modify those parameters after the experiment has
+    been swapped in. Note that you cannot <em>convert</em> a non shaped
+    link into a shaped link; you can only modify the traffic shaping
+    parameters of a link that is already being shaped.  To modify the
+    parameters, log into <b>users.emulab.net</b> and use the
+    <tt>delay_config</tt> program. This program requires that you know
+    the symbolic names of the individual links. This information is
+    available via the web interface on the Experiment Information
+    page.     
     </p>
 </ul>
 

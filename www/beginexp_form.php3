@@ -133,47 +133,46 @@ echo "<tr>
           <td><input type=checkbox name=exp_shared value=Yep>&nbsp Yes</td>
      </tr>\n";
          
-?>
+echo "<tr>
+          <td align=center colspan=3>
+             <b><input type=submit value=Submit></b></td>
+     </tr>
+   </form>
+ </table>\n";
 
-<tr>
-    <td align="center" colspan="3">
-        <b><input type="submit" value="Submit"></b></td>
-</tr>
-</form>
-</table>
+echo "<h4><blockquote><blockquote><blockquote>
+      <dl COMPACT>
+        <dt>[1]
+            <dd>Check if your experiment can be swapped out and swapped back 
+	        in without harm to your experiment. Useful for scheduling when
+	        resources are tight. More information on swapping
+	        is contained in the 
+	        <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Emulab FAQ</a>.
+        <dt>[2]
+            <dd>You get brownie points for marking your experiments as Low
+                Priority, which indicates that we can swap you out before high
+	        priority experiments.
+        <dt>[3]
+            <dd>Leave blank to use the default group for the project.
+        <dt>[4]
+            <dd>Leave unchecked unless you know what this means!
+     </dl>
+     </blockquote></blockquote></blockquote></h4>\n";
 
-<h4><blockquote><blockquote><blockquote>
-   <dl COMPACT>
-      <dt>[1]
-          <dd>Check if your experiment can be swapped out and swapped back in
-	      without harm to your experiment. Useful for scheduling when
-	      resources are tight.
-      <dt>[2]
-          <dd>You get brownie points for marking your experiments as Low
-              Priority, which indicates that we can swap you out before high
-	      priority experiments.
-      <dt>[3]
-          <dd>Leave blank to use the default group for the project.
-      <dt>[4]
-          <dd>Leave unchecked unless you know what this means!
-  </dl>
-</blockquote></blockquote></blockquote></h4>
+echo "<p><blockquote>
+      <ul>
+         <li> Please <a href='nscheck_form.php3'>syntax check</a> your NS
+              file first!
+         <li> If your NS file is using a custom OSID, you must
+              <a href='newosid_form.php3'>create the OSID first!</a>
+         <li> You can view a <a href='showosid_list.php3'> list of OSIDs</a>
+              that are available for you to use in your NS file.
+         <li>
+              You can also view a <a href='showimageid_list.php3'> list of
+              ImageIDs.</a> 
+      </ul>
+      </blockquote>\n";
 
-<p>
-<blockquote>
-<ul>
-<li> Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
-<li> If your NS file is using a custom OSID, you must
-     <a href="newosid_form.php3">create the OSID first!</a>
-<li>
-     You can view a <a href="showosid_list.php3"> list of OSIDs</a>
-     that are available for you to use in your NS file.
-<li>
-     You can also view a <a href="showimageid_list.php3"> list of ImageIDs.</a>
-</ul>
-     </blockquote>
-
-<?php
 #
 # Standard Testbed Footer
 # 

@@ -383,7 +383,7 @@ function SHOWUSER($uid) {
 # Show an experiment.
 #
 function SHOWEXP($pid, $eid) {
-    global $TBDBNAME;
+    global $TBDBNAME, $TBDOCBASE;
 		
     $query_result =
 	DBQueryFatal("SELECT * FROM experiments WHERE ".
@@ -422,9 +422,7 @@ function SHOWEXP($pid, $eid) {
 
     echo "<tr>
             <td>Name: </td>
-            <td class=\"left\">
-                <A href='shownsfile.php3?pid=$pid&eid=$eid'>
-                   $eid</a></td>
+            <td class=left>$eid</td>
           </tr>\n";
 
     echo "<tr>
@@ -472,7 +470,7 @@ function SHOWEXP($pid, $eid) {
           </tr>\n";
 
     echo "<tr>
-            <td>Swappable: </td>
+            <td><a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Swappable:</a></td>
             <td class=\"left\">$swappable</td>
           </tr>\n";
 
