@@ -8,6 +8,7 @@
 
 use English;
 use POSIX qw(strftime);
+use POSIX qw(setsid);
 use Fcntl;
 use IO::Handle;
 
@@ -202,6 +203,12 @@ sub TBBackGround($)
     #
     STDOUT->autoflush(1);
     STDERR->autoflush(1);
+
+    #
+    # Create a new session to ensure we are clear of any process group
+    #
+    POSIX::setsid() or
+	die("setsid failed: $!");
 
     return 0;
 }
