@@ -42,6 +42,7 @@ my $USERNODE    = "@USERNODE@";
 		"swapexp"	=> "$TB/bin/swapexp",
 		"endexp"	=> "$TB/bin/endexp",
 		"tbreport"	=> "$TB/bin/tbreport",
+		"xmlrpc/experiment" => "$TB/sbin/sshxmlrpc_server.py",
 	   );
 
 #
@@ -137,8 +138,16 @@ do {{
 		}
 	}
 
-	# Strip off all path information from the command
-	$command =~ /([^\/]+)$/; $command = $1;
+	# xmlrpc is special for now, while we use paperbag for it.
+	# Pass the second token as the first arg to the server.
+	if ($command =~ /^xmlrpc\/(\w*)$/) {
+	        unshift(@args, $1);
+		$command = "xmlrpc/$1";
+	}
+	else {
+	    # Strip off all path information from the command
+	    $command =~ /([^\/]+)$/; $command = $1;
+	}
 	next unless $command; # Don't complain if they leave a blank command
 	&debug("Command = $command, @args = " . join ",",@args . "\n");
 
@@ -152,7 +161,6 @@ do {{
 		}
 		next;
 	}
-
 	if (!$allowed{$command}) {
 		print "$command is not in the allowed list, sorry\n";
 	} else {
