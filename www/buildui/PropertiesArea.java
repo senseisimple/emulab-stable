@@ -205,7 +205,7 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
     public abstract String getName();
 
     private synchronized void download() {
-	System.out.println( "PropertiesArea.download(): Beginning");
+	//	System.out.println( "PropertiesArea.download(): Beginning");
 	Enumeration et = Thingee.selectedElements();
 	
 	//currentThingees = new Vector();
@@ -269,18 +269,18 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	}
 
 	currentThingees = cThingees;
-	System.out.println( "PropertiesArea.download(): Ending");
+	//	System.out.println( "PropertiesArea.download(): Ending");
     }
 
     private synchronized void upload() {
-	System.out.println("Upload begins..");
+	//	System.out.println("Upload begins..");
 	if (currentThingees == null) { return; }
 
 	Enumeration et = currentThingees.elements();
 	
 	boolean needRedraw = false;
 	while (et.hasMoreElements()) {
-	    System.out.println( "PropertiesArea.upload(): Regarding a thingee.");
+	    //	    System.out.println( "PropertiesArea.upload(): Regarding a thingee.");
 	    Thingee t = (Thingee)et.nextElement();
 
 	    //if (iCare(t)) {
@@ -295,10 +295,11 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 				t.getName().compareTo( s ) != 0) {
 				needRedraw = true;				
 			    }
-			    System.out.println( 
-			      "PA.upload(): Setting prop \"" + 
-			      p.name + 
-			      "\" to \"" + s + "\"." );
+
+			    // System.out.println( 
+			    //  "PA.upload(): Setting prop \"" + 
+			    //  p.name + 
+			    //  "\" to \"" + s + "\"." );
 			    t.setProperty(p.name, s);
 			}
 		    }
@@ -308,7 +309,7 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	if (needRedraw) {
 	    Netbuild.redrawAll();
 	}
-	System.out.println("Upload ends..");
+	//	System.out.println("Upload ends..");
     }
 
     public void refresh() {

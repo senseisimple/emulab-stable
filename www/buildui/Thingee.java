@@ -119,8 +119,8 @@ class Thingee {
     }
     
     public void setName( String newName ) {
-	System.out.println("Thingee.setName(): Renamed from \"" + name + 
-			   "\" to \"" + newName + "\"" );
+	//	System.out.println("Thingee.setName(): Renamed from \"" + name + 
+	//		   "\" to \"" + newName + "\"" );
 	names.remove( name );
 	name = new String( newName );
 	names.put( name, new Integer(1) );
@@ -163,6 +163,10 @@ class Thingee {
 	    if ((stringWidth/2) > wid) { wid = (stringWidth/2) + 4; }
 	    return new Rectangle( x + -wid - 2, y + -21 - 2, 
 				  wid * 2 + 6, 57 + 6 );
+    }
+
+    public void drawRect( Graphics g ) {
+	g.fillRect( x-16, y-16, 32, 32 );
     }
 
     public void drawIcon( Graphics g ) {

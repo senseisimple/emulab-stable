@@ -39,6 +39,10 @@ public class Palette {
 	copier.propertyEditable = false;
     }
 
+    public boolean has( Thingee t ) {
+	return (newNode == t || newLAN == t || trash == t);
+    }
+
     public void paint( Graphics g ) {
 	newNode.draw( g );
 	newLAN.draw( g );
@@ -48,6 +52,10 @@ public class Palette {
 
     public boolean hitTrash( int x, int y ) {
 	return trash.clicked(x, y);
+    }
+
+    public void funktasticizeTrash( Graphics g ) {
+	trash.drawRect( g );
     }
 
     public boolean hitCopier( int x, int y ) {

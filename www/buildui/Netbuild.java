@@ -113,6 +113,7 @@ public class Netbuild extends java.applet.Applet
 	// this hack makes it so 
 	// the widget creating goes on at app startup,
 	// not when the user places the first node (that is very annoying)
+
 	doittoit( true, nodePropertiesArea, false );
 	doittoit( true, linkPropertiesArea, false );
 	doittoit( true, lanPropertiesArea, false );
@@ -249,6 +250,9 @@ public class Netbuild extends java.applet.Applet
 	if (clickedOnSomething) {
 	    if (allowMove) {
 		if (dragStarted) {
+		    if (palette.hitTrash( lastDragX + downX, lastDragY + downY )) {
+			palette.funktasticizeTrash( g );
+		    }
 		    Enumeration en = Thingee.selectedElements();
 		    
 		    while(en.hasMoreElements()) {
@@ -266,9 +270,13 @@ public class Netbuild extends java.applet.Applet
 		}
 		
 		dragStarted = true;
-		
+
 		lastDragX = e.getX() - downX;
 		lastDragY = e.getY() - downY;	
+
+		if (palette.hitTrash( e.getX(), e.getY() )) {
+		    palette.funktasticizeTrash( g );
+		}		
 		
 		Enumeration en = Thingee.selectedElements();
 		
@@ -471,7 +479,12 @@ public class Netbuild extends java.applet.Applet
     private void paintThingee( Thingee t ) {
 	Rectangle r = t.getRectangle();
 	
-	repaint( r.x + workAreaX, r.y, r.width, r.height );
+	// HACK!
+	if (palette.has( t )) {
+	    repaint( r.x, r.y, r.width, r.height );
+	} else {
+	    repaint( r.x + workAreaX, r.y, r.width, r.height );
+	}
     } 
 
     private Dictionary wasSelected;
@@ -513,6 +526,10 @@ public class Netbuild extends java.applet.Applet
 	    if (dragStarted) {
 		Graphics g = getGraphics();
 		g.setXORMode( Color.white );
+
+		if (palette.hitTrash( lastDragX + downX, lastDragY + downY )) {
+		    palette.funktasticizeTrash( g );
+		}
 		
 		{
 		    Enumeration en = Thingee.selectedElements();
