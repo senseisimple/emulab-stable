@@ -35,8 +35,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-#my $ipod	= "$TB/sbin/ipod";
-my $ipod	= "./ipod";
+my $ipod	= "$TB/sbin/ipod";
+#my $ipod	= "./ipod";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
