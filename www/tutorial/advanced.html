@@ -385,15 +385,15 @@ to be started and stopped with NS <tt>at</tt> statements. To define a
 program object:
 
 	<code><pre>
-	set prog0 [$ns program]
+	set prog0 [new Program $ns]
 	$prog0 set node $nodeA
 	$prog0 set command "/bin/ls -lt >& /users/joe/logs/prog0"
 
-	set prog1 [$ns program]
+	set prog1 [new Program $ns]
 	$prog1 set node $nodeB
 	$prog1 set command "/bin/sleep 60 >& /tmp/sleep.debug"</pre></code>
 
-Then in your NS files a set of static events to run these commands:
+Then in your NS file a set of static events to run these commands:
 
 	<code><pre>
 	$ns at 10 "$prog0 start"
@@ -410,9 +410,6 @@ If you want to schedule starts and stops using dynamic events:
 Some points worth mentioning:
 
 <ul>
-<li> The term "program" generally refers to the object by which you
-     control the command line you have specifed. 
-
 <li> A program must be "stopped" before it is started; if the program
      is currently running on the node, the start event will be
      silently ignored.
@@ -426,7 +423,7 @@ Some points worth mentioning:
      process group leader (the csh process). If the SIGTERM fails, a
      SIGKILL is sent.
 
-<li> When issuing dynamic events using <tt>tevc</tt?, you must specify
+<li> When issuing dynamic events using <tt>tevc</tt>, you must specify
      the command line to invoke. This is intended to make program
      objects more flexible.
 </ul>

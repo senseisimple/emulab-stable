@@ -582,49 +582,10 @@ Simulator instproc use_subnet {subnet} {
     set subnets($subnet) {}
 }
 
-# program
-Simulator instproc program {} {
-    var_import ::GLOBALS::last_class
-    $self instvar id_counter
+# add_program
+# Link to a new program object.
+Simulator instproc add_program {prog} {
     $self instvar prog_list
-
-    set id n[incr id_counter]
-    Program $id $self
-    set prog_list($id) {}
-    set last_class $id
-
-    return $id
-}
-
-Program instproc init {s} {
-    $self set sim $s
-
-    $self set node {}
-    $self set command {}
-}
-
-Program instproc rename {old new} {
-    [$self set sim] rename_program $old $new
-}
-
-# updatedb DB
-# This adds rows to the virt_trafgens table corresponding to this agent.
-Program instproc updatedb {DB} {
-    var_import ::GLOBALS::pid
-    var_import ::GLOBALS::eid
-    var_import ::GLOBALS::objtypes
-    $self instvar node
-    $self instvar command
-
-    if {$node == {}} {
-	perror "\[updatedb] $self has no node."
-	return
-    }
-    if {$command == {}} {
-	perror "\[updatedb] $self has no command."
-	return
-    }
-
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$self','$objtypes(PROGRAM)')";
+    set prog_list($prog) {}
 }
 

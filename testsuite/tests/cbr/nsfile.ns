@@ -46,11 +46,11 @@ $ns connect $udp0 $null0
 $ns connect $tcp0 $null1
 
 # Create a program object and attach it to nodeA
-set prog0 [$ns program]
+set prog0 [new Program $ns]
 $prog0 set node $n3
 $prog0 set command "/bin/ls -lt >& /tmp/foo"
 
-set prog1 [$ns program]
+set prog1 [new Program $ns]
 $prog1 set node $n3
 $prog1 set command "/bin/sleep 60 >& /tmp/bar"
 

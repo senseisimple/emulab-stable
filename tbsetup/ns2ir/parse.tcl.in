@@ -183,6 +183,7 @@ source ${GLOBALS::libdir}/node.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
 source ${GLOBALS::libdir}/vtype.tcl
+source ${GLOBALS::libdir}/program.tcl
 
 ##################################################
 # Redifing Assignment
@@ -267,11 +268,17 @@ proc new {class args} {
 	NullClass $id
 	return $id
     }
-    if {$args != {}} {
-	punsup "args for $class"
-    }
+
     set id $class[incr new_counter]
-    eval $class $id 
+
+    # XXX Hack!
+    if {[llength $args] > 1} {
+	punsup "arguments for $class"
+    } elseif {[llength $args] == 1} {
+	eval $class $id [lindex $args 0]
+    } else {
+	eval $class $id 
+    }
     return $id
 }
 
