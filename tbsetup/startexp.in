@@ -365,19 +365,14 @@ sub fatal()
 	print STDOUT "DB Error deleting experiment record for $pid/$eid\n";
     }
 
-    #
-    # For debugging failures?
-    # 
-    if (chdir($expdir)) {
-	$save = "$eid-$PID";
-	# Fucking taint checks. Whats wrong with rename("$eid", "$save");
-	system("/bin/mv", "-f", "$eid", "$save");
-    }
 
     #
     # In batch mode, exit. Make sure to delete tempns file. 
     #
     if ($batch) {
+	if (chdir($expdir)) {
+	    system("/bin/mv", "-f", "$eid", "$eid-$PID");
+	}
 	unlink("$tempns");
 	exit(-1);
     }
@@ -411,10 +406,22 @@ sub fatal()
 	}
 	close(IN);
     }
+
+    if (open(IN, "$eiddir/assign.log")) {
+	print MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
     close(MAIL);
 
     unlink("$tempns");
     unlink("$logname");
+    if (chdir($expdir)) {
+	system("/bin/mv", "-f", "$eid", "$eid-$PID");
+    }
     exit(-1);
 }
 

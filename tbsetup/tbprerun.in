@@ -125,7 +125,6 @@ while ($done == 0) {
     &tbs_out("Allocating resources - This may take a while.\n");
     if (&tbs_exec("assign_wrapper $irfile $ptopfile")) {
 	&tbs_out("Failed to allocate resources.\n");
-	&tbs_out("  See $logfile and assign.log for more info.\n");
     } else {
 	# now we need to read what resources are needed from the IR file
 	eval {&ir_read($irfile)};
