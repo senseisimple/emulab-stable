@@ -13,7 +13,7 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( $CP $LN $RM $CHOWN $EGREP 
-	 $NFSMOUNT $UMOUNT $SFCMOUNT $SFCUMOUNT $NTS $NET
+	 $NFSMOUNT $UMOUNT $SFCMOUNT $SFCUMOUNT $NTS $NET $HOSTSFILE
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
 	 os_account_cleanup os_accounts_start os_accounts_end
 	 os_ifconfig_line os_etchosts_line
@@ -71,14 +71,18 @@ $SFCUMOUNT	= "$SFC/umount";
 
 $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
+$NETSH		= "$NTS/netsh";
+$NTE		= "$NTS/drivers/etc";
+$HOSTSFILE	= "$NTE/hosts";
+
 $BASH		= "/bin/bash";
 
 #
 # These are not exported
 #
 my $ADDUSERS     = "$BINDIR/addusers.exe";
-my $IFCONFIGBIN = "/sbin/ifconfig";
-my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s";
+my $IFCONFIGBIN = "$NETSH interface ip set address";
+my $IFCONFIG    = "$IFCONFIGBIN name=\"%s\" source=static addr=%s mask=%s";
 my $IFC_1000MBS  = "1000baseTx";
 my $IFC_100MBS  = "100baseTx";
 my $IFC_10MBS   = "10baseT";
@@ -132,191 +136,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 {
     my ($iface, $inet, $mask, $speed, $duplex, $aliases,
 	$iface_type, $settings, $rtabid) = @_;
-    my ($miirest, $miisleep, $miisetspd, $media);
     my ($uplines, $downlines);
-
-    #
-    # Special handling for new style interfaces (which have settings).
-    # This should all move into per-type modules at some point. 
-    #
-    if (defined($settings) && exists($settings->{"protocol"}) &&
-	$settings->{"protocol"} ne "ethernet") {
-
-	#
-	# Setting the protocol is special and appears to be card specific.
-	# How stupid is that!
-	#
-	my $protocol = $settings->{"protocol"};
-	my $privcmd  = "";
-	
-	if ($iface_type eq "ath") {
-	    $privcmd = "/sbin/iwpriv $iface mode ";
-
-	    SWITCH1: for ($protocol) {
-		/^80211a$/ && do {
-		    $privcmd .= "1";
-		    last SWITCH1;
-		};
-		/^80211b$/ && do {
-		    $privcmd .= "2";
-		    last SWITCH1;
-		};
-		/^80211g$/ && do {
-		    $privcmd .= "3";
-		    last SWITCH1;
-		};
-	    }
-	}
-	else {
-	    warn("*** WARNING: Unsupported interface type $iface_type!\n");
-	    return undef;
-	}
-	 
-	#
-	# At the moment, we expect just the various flavors of 80211, and
-	# we treat them all the same, configuring with iwconfig and iwpriv.
-	#
-	my $iwcmd = "/sbin/iwconfig $iface ";
-
-	#
-	# We demand to be given an ssid.
-	#
-	if (!exists($settings->{"ssid"})) {
-	    warn("*** WARNING: No SSID provided for $iface!\n");
-	    return undef;
-	}
-	$iwcmd .= "essid ". $settings->{"ssid"};
-
-	# If we do not get a channel, pick one.
-	if (exists($settings->{"channel"})) {
-	    $iwcmd .= " channel " . $settings->{"channel"};
-	}
-	else {
-	    $iwcmd .= " channel 3";
-	}
-
-	# txpower and rate default to auto if not specified.
-	if (exists($settings->{"rate"})) {
-	    $iwcmd .= " rate " . $settings->{"rate"};
-	}
-	else {
-	    $iwcmd .= " rate auto";
-	}
-	if (exists($settings->{"txpower"})) {
-	    $iwcmd .= " txpower " . $settings->{"txpower"};
-	}
-	else {
-	    $iwcmd .= " txpower auto";
-	}
-	# Allow this too. 
-	if (exists($settings->{"sensitivity"})) {
-	    $iwcmd .= " sens " . $settings->{"sensitivity"};
-	}
-
-	#
-	# We demand to be told if we are the master or a peon.
-	# This needs to be last for some reason.
-	#
-	if (!exists($settings->{"accesspoint"})) {
-	    warn("*** WARNING: No accesspoint provided for $iface!\n");
-	    return undef;
-	}
-	my $accesspoint = $settings->{"accesspoint"};
-	my $accesspointwdots;
-
-	# Allow either dotted or undotted notation!
-	if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-	    $accesspointwdots = "$1:$2:$3:$4:$5:$6";
-	}
-	elsif ($accesspoint =~
-	       /^(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2}):(\w{2})$/) {
-	    $accesspointwdots = $accesspoint;
-	    $accesspoint      = "${1}${2}${3}${4}${5}${6}";
-	}
-	else {
-	    warn("*** WARNING: Improper format for MAC ($accesspoint) ".
-		 "provided for $iface!\n");
-	    return undef;
-	}
-	    
-	if (libsetup::findiface($accesspoint) eq $iface) {
-	    $iwcmd .= " mode Master";
-	}
-	else {
-	    $iwcmd .= " mode Managed ap $accesspointwdots";
-	}
-
-	$uplines   = sprintf($IFCONFIG, $iface, $inet, $mask) . "\n";
-	$uplines  .= $privcmd . "\n";
-	$uplines  .= $iwcmd;
-	$downlines = "$IFCONFIGBIN $iface down";
-	return ($uplines, $downlines);
-    }
-
-    #
-    # Need to check units on the speed. Just in case.
-    #
-    if ($speed =~ /(\d*)([A-Za-z]*)/) {
-	if ($2 eq "Mbps") {
-	    $speed = $1;
-	}
-	elsif ($2 eq "Kbps") {
-	    $speed = $1 / 1000;
-	}
-	else {
-	    warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
-	}
-	if ($speed == 1000) {
-	    $media = $IFC_1000MBS;
-	}
-	elsif ($speed == 100) {
-	    $media = $IFC_100MBS;
-	}
-	elsif ($speed == 10) {
-	    $media = $IFC_10MBS;
-	}
-	else {
-	    warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
-	    $speed = 100;
-	    $media = $IFC_100MBS;
-	}
-    }
-    if ($duplex eq "full") {
-	$media = "$media-$IFC_FDUPLEX";
-    }
-    elsif ($duplex eq "half") {
-	$media = "$media-$IFC_HDUPLEX";
-    }
-    else {
-	warn("*** Bad duplex $duplex in ifconfig, default to full\n");
-	$duplex = "full";
-	$media = "$media-$IFC_FDUPLEX";
-    }
-
-    #
-    # Linux is apparently changing from mii-tool to ethtool but some drivers
-    # don't support the new interface (3c59x), some don't support the old
-    # interface (e1000), and some (eepro100) support the new interface just
-    # enough that they can report success but not actually do anything. Sweet!
-    #
-    my $ethtool;
-    if (-e "/sbin/ethtool") {
-	$ethtool = "/sbin/ethtool";
-    } elsif (-e "/usr/sbin/ethtool") {
-	$ethtool = "/usr/sbin/ethtool";
-    }
-    if (defined($ethtool)) {
-	# this seems to work for returning an error on eepro100
-	$uplines = 
-	    "if $ethtool $iface >/dev/null 2>&1; then\n    " .
-	    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
-	    "else\n    " .
-	    "  /sbin/mii-tool --force=$media $iface\n    " .
-	    "fi\n    ";
-    } else {
-	$uplines = "/sbin/mii-tool --force=$media $iface\n    ";
-    }
 
     if ($inet ne "") {
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
@@ -342,7 +162,8 @@ sub os_etchosts_line($$$)
 {
     my ($name, $ip, $aliases) = @_;
     
-    return sprintf("%s\t%s %s", $ip, $name, $aliases);
+    # Note: space rather than tab after the host name on Windows.
+    return sprintf("%s %s %s", $ip, $name, $aliases);
 }
 
 #

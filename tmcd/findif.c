@@ -223,7 +223,10 @@ find_iface(char *macaddr)
 static int
 find_iface(char *macaddr)
 {
-	FILE *fp = popen("getmac /nh /v /fo csv", "r");
+	/* We copy the Windows getmac.exe and library framedyn.dll into $BINDIR
+	 * because our path gets "untainted" into a pure Unix form in rc scripts.
+	 */
+	FILE *fp = popen("bash -c 'cd $BINDIR; getmac /nh /v /fo csv'", "r");
 	char buf[BUFSIZ];
 	
 	while (fgets(buf, BUFSIZ, fp) != NULL) {

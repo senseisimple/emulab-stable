@@ -20,7 +20,8 @@ fi
 # Shares are local to the Win32 login session context.
 # We must process a user name and password for the first one to be opened, and it
 # has to go onto a drive letter.  After that, we can use UNC //host paths freely.
-host=fs
+###host=fs
+host=fs.bsd-fs.testbed.emulab.net
 pswd=`tmcc accounts | awk '/LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
 echo "Connecting to //$host as $user."
 while ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no

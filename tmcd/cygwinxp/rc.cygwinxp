@@ -18,7 +18,8 @@ uname -r > $iscygwin
 chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
-# Set up for autologin as the swapin user.
+# Set up for autologin as the swapin user after reboot.
+# Also run rc.cygwinxp-user as part of all logins.
 tmcc=/usr/local/etc/emulab/tmcc.bin
 swapper=`$tmcc creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
 echo "`date`: Set to autologin as $swapper." >> $logfile
@@ -26,18 +27,22 @@ alogdir=/var/emulab/boot
 autologin=$alogdir/autologin.reg
 chmod -f g+w $alogdir
 rm -f $autologin
+# Note the double-doubled backslashes below.  Bash and regedit each eat a level.
 cat <<EOF > $autologin
 Windows Registry Editor Version 5.00
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
 "AutoAdminLogon"="1"
 "DefaultUserName"="$swapper"
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
+"EmulabLogin"="C:\\\\cygwin\\\\bin\\\\bash /usr/local/etc/emulab/rc/rc.cygwinxp-user"
 EOF
 chmod g+rw $autologin
 chmod -f g-w $alogdir
 winautologin=`cygpath -w $autologin`
-if ! regedit -s $winautologin ; then
-    echo "`date`: regedit -s $winautologin failed with code $?." >> $logfile
+regedit=/cygdrive/c/WINDOWS/regedit
+if ! $regedit -s "$winautologin" ; then
+    echo "`date`: $regedit -s $winautologin failed with code $?." >> $logfile
 fi
 
 # Make sure the computer name is right, reboots to change it if necessary.

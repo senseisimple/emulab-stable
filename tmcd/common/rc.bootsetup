@@ -118,8 +118,8 @@ sub doboot()
     # Check for an os dependent initialization script.
     #
     my $os_script = "rc." . lc($OSNAME);
-    
     if (-x "$RCDIR/$os_script") {
+        print("Running os dependent initialization script $os_script\n");    
 	system("$RCDIR/$os_script");
 	if ($?) {
 	    fatal("Error running $RCDIR/$os_script");
@@ -186,7 +186,7 @@ sub doboot()
 	}
     }
 
-    if (-x "$BINDIR/watchdog" && ! WINDOWS()) {
+    if (-x "$BINDIR/watchdog") {
         print("Starting testbed update watchdog\n");
 	system("$BINDIR/watchdog start");
 	if ($?) {

@@ -51,6 +51,7 @@ chmod o-r /etc/ssh*key.user
 echo "Starting new sshd daemon as $user."
 (CYGWIN="ntsec tty" /usr/sbin/sshd -p 2222 -o "UsePrivilegeSeparation no" \
 	-h /etc/ssh_host_key.user -h /etc/ssh_host_dsa_key.user  &)
+sleep 2
 
 # Remember this one separately from the SYSTEM sshd.
 chmod -f g+w $upidfile
