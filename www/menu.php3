@@ -567,12 +567,12 @@ function PAGEFOOTER() {
               <td colspan=2 class=contentbody>
 	        <center>
                 <font size=-1>
-		[<a href=http://www.cs.utah.edu/flux/>
-                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a>]
-		[<a href=http://www.cs.utah.edu/>
-                    School&nbsp;of&nbsp;Computing</a>]
-		[<a href=http://www.utah.edu/>
-                    The&nbsp;University&nbsp;of&nbsp;Utah</a>]
+		[ <a href=http://www.cs.utah.edu/flux/>
+                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a> ]
+		[ <a href=http://www.cs.utah.edu/>
+                    School&nbsp;of&nbsp;Computing</a> ]
+		[ <a href=http://www.utah.edu/>
+                    The&nbsp;University&nbsp;of&nbsp;Utah</a> ]
 		</font>
 		<br>
                 <!-- begin copyright -->
