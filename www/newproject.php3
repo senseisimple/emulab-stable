@@ -546,8 +546,7 @@ if (! isset($_POST['submit'])) {
 else {
     # Form submitted. Make sure we have a formfields array and a target_uid.
     if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['proj_head_uid'])) {
+	!is_array($_POST['formfields'])) {
 	PAGEARGERROR("Invalid form arguments.");
     }
     $formfields = $_POST['formfields'];

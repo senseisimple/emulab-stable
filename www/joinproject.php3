@@ -391,8 +391,7 @@ if (! isset($_POST['submit'])) {
 else {
     # Form submitted. Make sure we have a formfields array and a target_uid.
     if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['joining_uid'])) {
+	!is_array($_POST['formfields'])) {
 	PAGEARGERROR("Invalid form arguments.");
     }
     $formfields = $_POST['formfields'];
@@ -733,7 +732,8 @@ $leader_name = $row[0];
 $leader_email = $row[1];
 $leader_uid = $row[2];
 
-$allleaders = TBLeaderMailList($pid,$gid);
+if (($allleaders = TBLeaderMailList($pid,$gid)) == 0)
+    $allleaders = "";
 
 #
 # The mail message to the leader. We send this for returning users
