@@ -19,10 +19,11 @@
      <li> <a href="#UTT-1">Is there a tutorial?</a>
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
-     <li> <a href="#UTT-4">Where do I store files needed by my experiment?</a>
-     <li> <a href="#UTT-5">Are my files on <b>users.emulab.net</b>
+     <li> <a href="#UTT-4">Can I reboot (power cycle) my nodes?</a>
+     <li> <a href="#UTT-5">Where do I store files needed by my experiment?</a>
+     <li> <a href="#UTT-6">Are my files on <b>users.emulab.net</b>
                            backed up (filesaved)?</a>
-     <li> <a href="#UTT-6">Are the nodes in my experiment backed up
+     <li> <a href="#UTT-7">Are the nodes in my experiment backed up
                            (filesaved)?</a> 
      </ul>
 
@@ -188,6 +189,22 @@
     </p>
 
 <li><a NAME="UTT-4"></a>
+    <h3>Can I reboot (power cycle) my nodes?</h3>
+    <p>
+    Yes. Each of the PCs is independently power controlled. If your
+    node becomes wedged, or otherwise unresponsive, you can use the
+    <tt>node_reboot</tt> command, as discussed in the
+    <a href="tutorial/tutorial.php3#Wedged">Emulab Tutorial.</a>
+    </p>
+    <p>
+    The Sharks are also power controlled, but because of the limited
+    number of power ports available, the entire shelf of 8 sharks is
+    on a single controller. The <tt>node_reboot</tt> does its best to
+    cleanly reboot individual sharks, but if a single shark is
+    unresponsive, the entire shelf will be power cycled.
+    </p>
+
+<li><a NAME="UTT-5"></a>
     <h3>Where do I store files needed by my experiment?</h3>
     <p>
     Each project has its own directory, rooted at <tt>/proj</tt>,
@@ -205,7 +222,7 @@
     experiments in the corresponding /proj project directory. 
     </p>
 
-<li><a NAME="UTT-5"></a>
+<li><a NAME="UTT-6"></a>
     <h3>Are my files on <b>users.emulab.net</b> backed up (filesaved)?</h3>
     <p>
     Yes. All of the files in your home directory on /users, and all of
@@ -215,7 +232,7 @@
     in conducting your experiments.
     </p>
     
-<li><a NAME="UTT-6"></a>
+<li><a NAME="UTT-7"></a>
     <h3>Are the nodes in my experiment backed up (filesaved)?</h3>
     <p>
     No! The nodes in your experiment are not filesaved. Any changes
