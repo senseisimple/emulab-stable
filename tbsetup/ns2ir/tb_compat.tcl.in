@@ -160,13 +160,13 @@ proc tb-set-link-loss {srclink args} {
 	}
     } else {
 	set reallink $srclink
-	set loss [lindex $args 0]
+	set lossrate [lindex $args 0]
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
 	($lossrate > 1.0)} {
 	perror "ERROR: tb-set-link-loss - $lossrate is not a valid loss rate."
     }
-    $lan instvar loss
+    $srclink instvar loss
     set adjloss [expr 1-sqrt(1-$lossrate)]
     foreach pair [array names loss] {
 	set loss($pair) $adjloss
