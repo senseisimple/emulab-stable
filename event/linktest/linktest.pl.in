@@ -3,8 +3,6 @@
 # Linktest test script.
 #
 # @author: davidand
-# @created: 10/13/03
-# @modified: 12/11/03 - use readycount to get node count, run ns on 1 node.
 use strict;
 use Class::Struct;
 use Getopt::Std;
@@ -17,7 +15,7 @@ use constant RUDE_CFG  => "/tmp/rude.cfg";
 use constant PATHRATE_DAT => "/tmp/pathrate.dat";
 
 # rude sample size for loss
-# future improvement: modulate this based on link speed..
+# TODO: modulate this based on link speed..
 # in practice, 56kb maxes out around 100 pps.
 # above 256Kb 400 is OK.
 use constant SEND_RATE => 400; # rude sends 1 more than specified here.
@@ -26,6 +24,7 @@ use constant SEND_COUNT => 401;
 # pathrate test limits -- see &valid_bw comment.
 use constant HI_BW => 85000000;
 use constant LO_BW =>  1000000;
+use constant HI_LOSS => 0.02;
 
 # supported OS's as returned by uname.
 use constant BSD => "FreeBSD";
@@ -60,10 +59,11 @@ my $proj_id;    # project id
 my $gid;        # group id
 my $platform;   # name of platform
 my $testlevel=99; # which tests to run (default, all)
-my $nodecount;  # number of nodes (used for barrier sync)
 my $crude_pid;  # pid of a crude process to harvest rude streams
 my $pathrate_snd_pid; # pid of a pathrate_snd process to harvest rcv streams
 my $verbosity = 0; # enable debug statements
+my $cumulative = 1; # cumulative tests (default,all)
+my $barr_count;   # used by synserv host, nubmer of hosts -1
 
 my @hosts; # hosts: list of text strings containing host names.
            # sorted alphabetically
@@ -99,25 +99,31 @@ my $run_in_path = "/users/davidand/testbed/event/linktest";
 
 &init;
 
-&debug_top;
+if($testlevel == PARSE_ONLY) {
+    &debug_top;
+}
 
-if($testlevel >= ONEHOP_LEVEL) {
+if(($cumulative && $testlevel >= ONEHOP_LEVEL)
+   || (!$cumulative && $testlevel == ONEHOP_LEVEL)) {
     &debug("\nTesting Single Hop Connectivity and Latency...\n\n");
     &ping_latency_test;
 }
 
-if($testlevel >= NHOP_LEVEL
-   && $rtproto eq STATIC) {
+if((($cumulative && $testlevel >= NHOP_LEVEL)
+    || (!$cumulative && $testlevel == NHOP_LEVEL))
+   && defined($rtproto) && $rtproto eq STATIC) {
     &debug("\nTesting Static Routing...\n\n");
     &static_rt_test; # nodes not covered by 1hop test
 }
 
-if ($testlevel >=LOSS_LEVEL) {
+if (($cumulative && $testlevel >=LOSS_LEVEL)
+    || (!$cumulative && $testlevel ==LOSS_LEVEL)) {
     &debug("\nTesting Loss...\n\n");
     &stream_test; 
 }
 
-if( $testlevel >=BW_LEVEL) {
+if(($cumulative && $testlevel >=BW_LEVEL)
+   || (!$cumulative && $testlevel == BW_LEVEL)) {
     &debug("\nTesting Bandwidth...\n\n");
     &bw_test;
 }
@@ -187,12 +193,12 @@ sub static_rt_test {
     &wait_all(\@waitlist);
 }
 
-# Ping directly connected nodes.
+# Ping directly connected nodes and get RTT.
 #
 # note: since there were intermittent problems with the OWD
 # measurement on BSD, hold off on using NTP/Crude/rude for
 # latency measurement and the best fit. However, keep the
-# variance from the OWD test. See /users/davidand/magic/rude.
+# variance from the OWD test. See /users/davidand/magic/rude
 sub ping_latency_test {
     my @waitlist;
     my @edge_copy = @links;
@@ -239,6 +245,9 @@ sub ping_latency_test {
 #
 # See /users/davidand/magic/parallelism/README for some comments about
 # why it's OK to run crude/rude in both directions simultaneously.
+#
+# Due to problems found while testing, the stream test doesn't check latency,
+# only loss. See bas:/users/davidand/writeup2/finalpaper.pdf for test details.
 sub stream_test {
     my %analyze;
     my %recv_cnt;
@@ -256,7 +265,6 @@ sub stream_test {
 		close FCFG;
 		# run the test
 		system "rude -s" . RUDE_CFG . " 1>/dev/null 2>/dev/null";
-#		&debug("Stream to " . $edge->dst . "...OK\n");
 		$analyze{$stream_id} = $other_edge;
 	    } elsif ($hostname eq $other_edge->src) {
 		open FCFG,">" . RUDE_CFG || die ("couldn't open " . RUDE_CFG);
@@ -266,7 +274,6 @@ sub stream_test {
 		close FCFG;
 		# run the test
 		system "rude -s" . RUDE_CFG . " 1>/dev/null 2>/dev/null";
-#		&debug("Stream to " . $other_edge->dst . "...OK\n");
 		$analyze{$stream_id} = $edge;
 	    }
 	}
@@ -293,24 +300,25 @@ sub stream_test {
 	my $recved = $recv_cnt{$key};
 	if(!defined($recved)) {
 	    $recved=0;
-	    &debug("warning, mismatch...\n");
-	}
-	my $expected = &round($edge->loss * SEND_COUNT);
-	my $actual = (SEND_COUNT - $recved);
-	my $msg = "Stream from " . $edge->src . ": " 
-	       . $actual
-	       . "/" . $expected
-	       . "\n";
-	&debug($msg);
-	# for now, check sqrt(np(1-p)), even though that doesn't account for sample size.
-	my $dev = sqrt(SEND_COUNT * $edge->loss * (1 - $edge->loss));
-	$dev = &round($dev);
-	my $tol = LOSS_TOL * $dev;
-	if( $actual < ($expected - $tol)
-	    || 
-	    $actual > ($expected + $tol)) {
-	    &error("Loss outside of tolerance $tol\n");
-	    &error($msg);
+	    &error("No packets received from " . $edge->src . "...\n");
+	} else {
+	    my $expected = &round($edge->loss * SEND_COUNT);
+	    my $actual = (SEND_COUNT - $recved);
+	    my $msg = "Stream from " . $edge->src . ": " 
+		. $actual
+		. "/" . $expected
+		. "\n";
+	    &debug($msg);
+	    # for now, check sqrt(np(1-p)), even though that doesn't account for sample size.
+	    my $dev = sqrt(SEND_COUNT * $edge->loss * (1 - $edge->loss));
+	    $dev = &round($dev);
+	    my $tol = LOSS_TOL * $dev;
+	    if( $actual < ($expected - $tol)
+		|| 
+		$actual > ($expected + $tol)) {
+		&error("Loss outside of tolerance $tol\n");
+		&error($msg);
+	    }
 	}
 
     }
@@ -378,7 +386,7 @@ sub bw_test {
 		
 		
 		my $output = sprintf "Receive from " . $edge->src
-		    . ": $1/$2/%.1f/$diff\n", $expected;
+		    . ": $1/$2/%.1f/%.1f\n", $expected, $diff;
 		&debug($output);
 
 		if($diff > BW_TOL) {
@@ -401,12 +409,18 @@ sub bw_test {
 
 # When delay nodes are present, Pathrate has problems getting above
 # approx 90Mb measurements on 100Mb links. See
-# /users/davidand/magic/pathrate for details.  Also, Pathrate usually
-# fails under 1Mbps. Hence the limits.
+# /users/davidand/magic/pathrate for details.  Pathrate usually
+# fails under 1Mbps.
+# Further, loss causes pathrate to fail. So skip pathrate if loss is
+# over 2%.
+# Basically we only want to run Pathrate if there's a good chance of
+# successful measurement, since it's rather lengthy to run (16s average).
 sub valid_bw {
     my $edge = shift @_;
     if($edge->bw >= LO_BW
-       && $edge->bw <= HI_BW) {
+       && $edge->bw <= HI_BW
+       && $edge->loss <= HI_LOSS
+       ) {
 	return 1;
     } else {
 	return 0;
@@ -416,8 +430,7 @@ sub valid_bw {
 }
 
 
-# Handles invoking NS if the current node is the sync serv, then
-# reads in the resulting output file.
+# Handles reading NS output.
 sub get_topo {
     my $ns_outfile = shift(@_);
 
@@ -474,18 +487,25 @@ sub debug_top {
 sub error {
     my $fname = $linktest_path . "/" . $hostname . ERR_SUFFIX;
     open ERRF,">>$fname" || die "could not open error file: $!";
-    print ERRF "ERROR: $_[0]\n";
+    print ERRF "ERROR: $_[0]";
     close ERRF;
+    if($verbosity) {
+	print STDERR "ERROR: $_[0]";
+    }
 }
 
 # synch all nodes
 sub barrier {
     my $cmd;
     if($hostname eq $synserv) {
-	$cmd = "emulab-sync -i " . ($nodecount - 1);
+	# note, the synserver should know what the node count is
+	# since it parsed the NS file.
+	die "barrcount not defined!" unless defined($barr_count);
+	$cmd = "emulab-sync -i $barr_count";
     } else {
 	$cmd = "emulab-sync";
     }
+#    &debug($cmd . "\n");
     system $cmd;
 
 }
@@ -535,7 +555,7 @@ sub init {
     $linktest_path = "$expt_path/linktest";
     $ns_file = "$expt_path/$exp_id-modify.ns" unless defined($ns_file);
     $ns_file = "$expt_path/$exp_id.ns" unless -e $ns_file;    
-    die "no expt file found!" unless -e $ns_file;
+    die "no NS script found!" unless -e $ns_file;
 
     my $ssname = "@CLIENT_VARDIR@/boot/syncserver";
     die "synch server required!" unless -e $ssname;
@@ -544,20 +564,19 @@ sub init {
     ($synserv) = split/\./, $tmp;
     chomp $synserv;
 
-    # must get node count in order for barrier to work.
-    @results = `tmcc readycount`;
-    if($results[0] =~ /READY=(\d+) TOTAL=(\d+)/) {
-	$nodecount = $2 - $1;
-    } else {
-	die "could not get number of nodes from $results[0]";
-    }
-    die "no links" if $nodecount <=1;
-
     # synserv machine makes the linktest directory and invokes ns.
     my $outname = "$linktest_path/$exp_id.out";
     if($hostname eq $synserv) {
 	if( -e $linktest_path ) {
 	    die "file exists but is not a directory" unless -d $linktest_path;
+
+	    # blitz files from the last time.
+	    opendir (DIR,$linktest_path) || die "can't open $linktest_path: $!";
+	    my @dirfiles = grep (!/^\.\.?$/,readdir(DIR));
+	    foreach (@dirfiles) {
+		unlink "$linktest_path/$_" || die "can't unlink $_: $!";
+	    }
+
 	} else {
 	    mkdir ($linktest_path,0777) or die "cannot make directory: $!";
 	}
@@ -582,11 +601,20 @@ sub init {
 	}
     }
 
+    # synserver host reads the ns file early to get the node count.
+    # not using ready count, in practice sometimes didn't get a ready
+    # in some cases (expt modify).
+    if($hostname eq $synserv) {
+	&get_topo($outname) ;
+	$barr_count = @hosts;
+	$barr_count--;
+    }
+
     # big first synch waiting for collector startup and ns execution.
     &barrier;
 
     # now all nodes read in the topology file output by ns.
-    &get_topo($outname);
+    &get_topo($outname) unless $hostname eq $synserv;
 }    
 
 # pings a node. 
@@ -641,19 +669,11 @@ sub ping_node {
 
 
 
-# returns an edge for this node to work on. ensures that no other
-# machine gets the same assignment at the same time.
+# returns one edge at a time, reserving two nodes.
 sub get_assign {
     my ($todo_ref) = @_; # must maintain sorted order invariant
     my $task = undef;
     my @thisrun;
-
-#    &debug("oneway assign:\n");
-#    foreach my $edge (@{$todo_ref}) {
-#	if(defined($edge)){
-#	    &debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
-#	}
-#    }
 
     # build a fresh hash to see which nodes are in use.
     my %inuse;
@@ -671,12 +691,6 @@ sub get_assign {
 	}
     }
 
-#    &debug("thisrun:\n");
-#    foreach my $edge (@thisrun) {
-#	&debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
-#    }
-
-
     # figure out the tasks for this particular host.
     foreach my $edge (@thisrun) {
 	if($hostname eq $edge->src || $hostname eq $edge->dst ) {
@@ -684,32 +698,19 @@ sub get_assign {
 	}
     }
 
- #   &debug("$hostname:\n");
- #   if(defined($task)) {
-#	&debug("\t" . $task->src . "\t" . $task->dst . "\n\n");
-#    }
-
-    # each machine should reduce the todo list the same way due to
+    # each machine should reduce the todo list the same order due to
     # alphabetic sorting of info from the ns file.
     # only thing left to do is return this machines' assignment for processing.
     return $task; # or undef if no jobs left for this host.
 }
 
 
-
+# returns two edges at a time, reserving two nodes.
 sub get_twoway_assign {
-
-    my ($todo_ref) = @_; # must maintain sorted order invariant
+    my ($todo_ref) = @_;
     my $task = undef;
     my $other_task = undef;
     my @thisrun;
-
-#    &debug("twoway assign:\n");
-#    foreach my $edge (@{$todo_ref}) {
-#	if(defined($edge)){
-#	    &debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
-#	}
-#    }
 
     # build a fresh hash to see which nodes are in use.
     my %inuse;
@@ -739,11 +740,6 @@ sub get_twoway_assign {
 	}
     }
 
-#    &debug("thisrun:\n");
-#    foreach my $edge (@thisrun) {
-#	&debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
-#    }
-
 
     # figure out the tasks for this particular host.
     foreach my $edge (@thisrun) {
@@ -759,16 +755,6 @@ sub get_twoway_assign {
 	}
     }
 
-#    &debug("$hostname:\n");
-#    if(defined($task) && defined($other_task)) {
-#	&debug("\t" . $task->src . "\t" . $task->dst . "\n" .
-#	       "\t" . $other_task->src . "\t" . $other_task->dst . "\n\n");
-#    }
-
-
-    # each machine should reduce the todo list the same way due to
-    # alphabetic sorting of info from the ns file.
-    # only thing left to do is return this machines' assignment for processing.
     return ($task,$other_task); # or undef if no jobs left for this machine.
 
 
@@ -801,24 +787,35 @@ sub wait_all {
 # process cmd line
 sub proc_cmd {
     my %options=();
-    getopts("hvl:f:",\%options);
+    getopts("hvl:f:L:d",\%options);
     if(defined $options{h}){
-	print "Options:\n";
-	print " -h\tPrint this message and exit\n";
-	print " -v\tVerbose output\n";
-	print " -l <number> Test selection (cumulative):\n";
-	print "    0\tparse NS script only\n";
+	print "Test Codes:\n";
 	print "    1\tsingle hop connectivity and latency\n";
 	print "    2\tstatic routing\n";
 	print "    3\tloss\n";
 	print "    4\tbandwidth\n";
+	print "Options:\n";
+	print " -h\tPrint this message and exit\n";
+	print " -v\tVerbose output\n";
+	print " -l <test code> Run all tests through the specified test\n";
+	print " -L <test code> Run only the specified test\n";
 	print " -f <filename> Specify NS script\n";
+#	print " -d parse NS file and exit (debug)\n"; # secret
 	exit;
     }
 
-    if(defined $options{l}) {
-	if($options{l}=~/(\d)/){
+    if(defined($options{l}) && $options{l}=~/(\d)/){
+	if($1 >= 1 && $1 <= 4) {
 	    $testlevel=$1;
+	} else {
+	    die "Invalid test code $1\n";
+	}
+    } elsif(defined($options{L}) && $options{L}=~/(\d)/){
+	$cumulative = 0;
+	if($1 >= 1 && $1 <= 4) {
+	    $testlevel=$1;
+	} else {
+	    die "Invalid test code $1\n";
 	}
     }
 
@@ -831,4 +828,11 @@ sub proc_cmd {
 	die "Could not find $ns_file\n" unless -e $ns_file;
     }
 
+
+    if(defined($options{d}) ) {
+	$testlevel = PARSE_ONLY;
+	$verbosity = 1;
+	die "you must supply a filename for parse only.\n" 
+	    unless defined($options{f});
+    }
 }

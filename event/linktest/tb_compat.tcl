@@ -21,10 +21,10 @@ proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
 proc tb-set-node-deltas {node args} {}
 proc tb-set-node-tarfiles {node args} {}
-proc tb-set-node-lan-delay {node lan delay} {}
-proc tb-set-node-lan-bandwidth {node lan bw} {}
-proc tb-set-node-lan-loss {node lan loss} {}
-proc tb-set-node-lan-params {node lan delay bw loss} {}
+#proc tb-set-node-lan-delay {node lan delay} {}
+#proc tb-set-node-lan-bandwidth {node lan bw} {}
+#proc tb-set-node-lan-loss {node lan loss} {}
+#proc tb-set-node-lan-params {node lan delay bw loss} {}
 proc tb-set-node-failure-action {node type} {}
 proc tb-set-ip-routing {type} {}
 proc tb-fix-node {v p} {}
@@ -52,6 +52,9 @@ Class NSENode -superclass Node
 
 NSENode instproc make-simulated {args} {
     uplevel 1 eval $args
+}
+
+Node instproc add-desire {arg1 arg2} {
 }
 
 # We are just syntax checking the NS file
@@ -394,8 +397,88 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
 	}
 
     }
+}
+proc tb-set-node-lan-delay {node lan delay} {
+    global lt_links
+    foreach lt $lt_links {
+	if { 
+	    $lan == [$lt src] 
+	    &&
+	    $node == [$lt dst]
+	} {
+	    $lt set_delay $delay
+	}
+	if { 
+	    $lan == [$lt dst] 
+	    &&
+	    $node == [$lt src]
+	} {
+	    $lt set_delay $delay
+	}
+    }
+}
+proc tb-set-node-lan-bandwidth {node lan bandwidth} {
+    global lt_links
+    foreach lt $lt_links {
+	if { 
+	    $lan == [$lt src] 
+	    &&
+	    $node == [$lt dst]
+	} {
+	    $lt set_bw $bandwidth
+	}
+	if { 
+	    $lan == [$lt dst] 
+	    &&
+	    $node == [$lt src]
+	} {
+	    $lt set_bw $bandwidth
+	}
+    }
+}
 
+proc tb-set-node-lan-params {node lan delay bw loss} {
+    global lt_links
+    foreach lt $lt_links {
+	if { 
+	    $lan == [$lt src] 
+	    &&
+	    $node == [$lt dst]
+	} {
+	    $lt set_loss $loss
+	    $lt set_delay $delay
+	    $lt set_bw $bw
+	}
+	if { 
+	    $lan == [$lt dst] 
+	    &&
+	    $node == [$lt src]
+	} {
+	    $lt set_loss $loss
+	    $lt set_delay $delay
+	    $lt set_bw $bw
+	}
+    }
 
 }
 
+proc tb-set-node-lan-loss {node lan loss} {
+    global lt_links
+    foreach lt $lt_links {
+	if { 
+	    $lan == [$lt src] 
+	    &&
+	    $node == [$lt dst]
+	} {
+	    $lt set_loss $loss
+	}
+	if { 
+	    $lan == [$lt dst] 
+	    &&
+	    $node == [$lt src]
+	} {
+	    $lt set_loss $loss
+	}
+    }
+}
 

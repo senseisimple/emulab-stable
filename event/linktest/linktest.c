@@ -191,8 +191,18 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 }
 
+/*
+  what does this do? take arguments from the tevc command and pass them
+  through to the linktest script.
+*/
+
+
 static void
 start_linktest(char *args) {
   info("starting linktest.\n");
   info(LINKTEST_SCRIPT);
+
+   
+
+
 }
