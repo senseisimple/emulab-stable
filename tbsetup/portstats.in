@@ -15,7 +15,6 @@ use lib '@prefix@/lib';
 
 use libdb;
 use snmpit_lib;
-use snmpit_cisco;
 
 use English;
 use Getopt::Long;
@@ -156,7 +155,23 @@ foreach my $name (keys %portMap) {
     #
     # Connect to the switch and get the data we want off of it
     #
-    my $device = new snmpit_cisco($name);
+    my $type = getDeviceType($name);
+    my $device;
+    SWITCH: for ($type) {
+	/cisco/ && do {
+	    require snmpit_cisco;
+	    $device = new snmpit_cisco($name);
+	    last;
+	};
+	/intel/ && do {
+	    require snmpit_intel;
+	    $device = new snmpit_intel($name);
+	    last;
+	};
+
+	# 'default' case
+	die "Unknown switch type ($type) for $name\n";
+    }
     my @results = $device->getFields(\@ports,\@oids);
 
     foreach my $result (@results) {
