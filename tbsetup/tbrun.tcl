@@ -141,11 +141,11 @@ if {[catch "exec $ifcboot $pid $eid $ifcfile >@ $logFp 2>@ $logFp" err]} {
 
 outs "PLACEHOLDER - Installing secondary packages."
 
-#outs "Creating user accounts."
-#if {[catch "exec $mkacct $eid >@ $logFP 2>@ $logFP" err]} {
-#    outs stderr "Error running $mkacct. ($err)"
-#    exit 1
-#}
+outs "Creating user accounts."
+if {[catch "exec $mkacct $eid >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error running $mkacct. ($err)"
+    exit 1
+}
 
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
