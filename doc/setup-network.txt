@@ -1,5 +1,5 @@
 #####
-##### Configuration suggestions for Cisco switches
+##### Laying Out Your Network
 ##### 
 
 The purpose of this document is to aid in designing and setting up the control
