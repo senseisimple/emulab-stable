@@ -1,3 +1,50 @@
+ricci       2004/03/23 15:56:53 MST
+
+  Added files:
+    www                  widearea_nodeinfo.php3
+  Log:
+  New web page: widearea_nodeinfo.php3
+
+  Intended as a replacement for the old widearea_info page, which
+  was just not scaling with the number of nodes we now have in the
+  database.
+
+  Allows the user to give a set of criteria (such as node, bandwidth,
+  latency, and packet loss), and grabs links that match those criteria.
+
+ricci       2004/03/16 15:38:16 MST
+
+  Modified files:
+    db                   node_status.in
+  Log:
+  Use Mike's new sitevars to get timeouts for keepalives.
+
+  Also, split out the checks for local vnodes and plab vnodes, since
+  they can actually have different reporting intervals.
+
+ricci       2004/03/16 14:48:45 MST
+
+  Modified files:
+    db                   node_status.in
+  Log:
+  Add another part to node_status - move plab phys nodes that have not
+  checked in for a while into hwdown.
+
+  Adding another query to do this was much simpler than trying to make the one
+  monster query already in this script get what we wanted.
+
+ricci       2004/03/11 17:44:45 MST
+
+  Modified files:
+    www/cvsweb           cvsweb.cgi cvsweb.conf
+  Log:
+  Update to the latest version of cvsweb in the 2.0 branch. (There is
+  now a 3.0 branch, but it seems substantially different.)
+
+  This doesn't solve the problem I was hoping it would (being unable to
+  grab a tarball of the top-level directory), but I've already done the
+  work to update...
+
 stoller     2004/03/09 10:43:54 MST
 
   Modified files:
