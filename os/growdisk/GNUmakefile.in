@@ -15,7 +15,7 @@ all:	growdisk
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS = -O -g -static
+CFLAGS = -O -g -static -I$(SRCDIR)/../imagezip
 
 growdisk: growdisk.o
 	$(CC) $(CFLAGS) growdisk.o -o growdisk

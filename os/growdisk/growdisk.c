@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -40,13 +40,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <err.h>
+#if __FreeBSD__ >= 5
+#include <sys/disk.h>
+#else
 #include <sys/disklabel.h>
+#endif
+#include "sliceinfo.h"
 
 struct diskinfo {
 	char bootblock[512];
 	int cpu, tpc, spt;
 	unsigned long disksize;
-	struct dos_partition *parts;
+	struct dospart *parts;
 } diskinfo;
 
 char optionstr[] =
@@ -115,7 +120,6 @@ void
 getdiskinfo(char *disk)
 {
 	int fd;
-	struct disklabel label;
 	unsigned long chs = 1;
 	struct sector0 {
 		char stuff[DOSPARTOFF];
@@ -128,30 +132,48 @@ getdiskinfo(char *disk)
 	fd = open(disk, O_RDONLY);
 	if (fd < 0)
 		err(1, "%s: opening for read", disk);
-	if (ioctl(fd, DIOCGDINFO, &label) < 0)
-		err(1, "%s: DIOCGDINFO", disk);
-	diskinfo.cpu = label.d_ncylinders;
-	chs *= diskinfo.cpu;
-	diskinfo.tpc = label.d_ntracks;
-	chs *= diskinfo.tpc;
-	diskinfo.spt = label.d_nsectors;
-	chs *= diskinfo.spt;
-	diskinfo.disksize = label.d_secperunit;
-	if (diskinfo.disksize < chs)
-		errx(1, "%s: secperunit (%lu) < CxHxS (%lu)",
-		     disk, diskinfo.disksize, chs);
-	else if (diskinfo.disksize > chs) {
-		if (verbose)
-			warnx("%s: only using %lu of %lu reported sectors",
-			      disk, chs, diskinfo.disksize);
-		diskinfo.disksize = chs;
+#ifdef DIOCGMEDIASIZE
+	{
+		unsigned ssize;
+		off_t dsize;
+
+		if (ioctl(fd, DIOCGSECTORSIZE, &ssize) < 0)
+			err(1, "%s: DIOCGSECTORSIZE", disk);
+		if (ioctl(fd, DIOCGMEDIASIZE, &dsize) < 0)
+			err(1, "%s: DIOCGMEDIASIZE", disk);
+		diskinfo.disksize = (unsigned long)(dsize / ssize);
+		diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
 	}
+#else
+	{
+		struct disklabel label;
+
+		if (ioctl(fd, DIOCGDINFO, &label) < 0)
+			err(1, "%s: DIOCGDINFO", disk);
+		diskinfo.cpu = label.d_ncylinders;
+		chs *= diskinfo.cpu;
+		diskinfo.tpc = label.d_ntracks;
+		chs *= diskinfo.tpc;
+		diskinfo.spt = label.d_nsectors;
+		chs *= diskinfo.spt;
+		diskinfo.disksize = label.d_secperunit;
+		if (diskinfo.disksize < chs)
+			errx(1, "%s: secperunit (%lu) < CxHxS (%lu)",
+			     disk, diskinfo.disksize, chs);
+		else if (diskinfo.disksize > chs) {
+			if (verbose)
+				warnx("%s: only using %lu of %lu reported sectors",
+				      disk, chs, diskinfo.disksize);
+			diskinfo.disksize = chs;
+		}
+	}
+#endif
 	if (read(fd, diskinfo.bootblock, sizeof(diskinfo.bootblock)) < 0)
 		err(1, "%s: error reading bootblock", disk);
 	s0 = (struct sector0 *)diskinfo.bootblock;
 	if (s0->magic != 0xAA55)
 		errx(1, "%s: invalid bootblock", disk);
-	diskinfo.parts = (struct dos_partition *)s0->parts;
+	diskinfo.parts = (struct dospart *)s0->parts;
 	close(fd);
 }
 
@@ -162,7 +184,7 @@ int
 tweakdiskinfo(char *disk)
 {
 	int i, lastspace = NDOSPART, lastunused = NDOSPART;
-	struct dos_partition *dp;
+	struct dospart *dp;
 	long firstfree = -1;
 
 	for (i = 0; i < NDOSPART; i++) {
@@ -278,12 +300,14 @@ int
 showdiskinfo(char *disk)
 {
 	int i;
-	struct dos_partition *dp;
+	struct dospart *dp;
 
 	if (!fdisk) {
-		printf("%s: %lu sectors (%dx%dx%d CHS)\n", disk,
-		       diskinfo.disksize,
-		       diskinfo.cpu, diskinfo.tpc, diskinfo.spt);
+		printf("%s: %lu sectors", disk, diskinfo.disksize);
+		if (diskinfo.cpu)
+			printf(" (%dx%dx%d CHS)",
+			       diskinfo.cpu, diskinfo.tpc, diskinfo.spt);
+		printf("\n");
 		for (i = 0; i < NDOSPART; i++) {
 			dp = &diskinfo.parts[i];
 			printf("  %d: start=%9lu, size=%9lu, type=0x%02x\n",
