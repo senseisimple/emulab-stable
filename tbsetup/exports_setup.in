@@ -155,8 +155,10 @@ print MAP "#\n";
 #
 # This takes the iphash array and spits out the mount lists using the
 # function provided.
-# 
-spitmounts(sub { my $pid = shift; print MAP "$projdir/$pid " });
+#
+if (@iplist) {
+    spitmounts(sub { my $pid = shift; print MAP "$projdir/$pid " });
+}
 
 #
 # Next determine what group directories need to be exported. This is done
@@ -269,7 +271,9 @@ print MAP "#\n";
 # This takes the iphash array and spits out the mount lists using the
 # function provided.
 #
-spitmounts(sub { my $uid = shift; print MAP "$usersdir/$uid " });
+if (@iplist) {
+    spitmounts(sub { my $uid = shift; print MAP "$usersdir/$uid " });
+}
 
 print MAP "\n";
 close(MAP);
