@@ -180,16 +180,17 @@ if ($db_result->numrows < 1) {
 }
 
 while (my %row = $db_result->fetchhash()) {
-    my $node     = $row{'node_id'};
-    my $osid     = $row{'def_boot_osid'};
-    my $type     = $row{'type'};
-    my $class    = $row{'class'};
-    my $subnode  = $row{'issubnode'};
-    my $virtnode = $row{'isvirtnode'};
-    my $jailnode = $row{'jailflag'};
-    my $plabnode = $row{'isplabdslice'};
-    my $failmode = $row{'failureaction'};
-    my $bootpath = 0;
+    my $node      = $row{'node_id'};
+    my $osid      = $row{'def_boot_osid'};
+    my $type      = $row{'type'};
+    my $class     = $row{'class'};
+    my $subnode   = $row{'issubnode'};
+    my $virtnode  = $row{'isvirtnode'};
+    my $imageable = $row{'iimageable'};
+    my $jailnode  = $row{'jailflag'};
+    my $plabnode  = $row{'isplabdslice'};
+    my $failmode  = $row{'failureaction'};
+    my $bootpath  = 0;
 
     #
     # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
@@ -306,7 +307,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it.
     #
-    if (!$bootpath && !$jailnode && !$plabnode && !$subnode) {
+    if (!$bootpath && !$jailnode && !$plabnode && !$imageable) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
