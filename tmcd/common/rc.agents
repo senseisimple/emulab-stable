@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+. /etc/emulab/paths.sh
+
+#
+# Start the agents. The scripts decide themselves whether to do anything.
+# 
+if [ -x $BINDIR/rc.delayagent ]; then
+        $BINDIR/rc.delayagent
+fi
+
+if [ -x $BINDIR/rc.progagent ]; then
+        $BINDIR/rc.progagent
+fi
+

@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Don't put anything else in here. Put it in the rc.setup file cause
+# if you sup this file, it won't take effect till the next reboot.
+#
+
+. /etc/emulab/paths.sh
+
+#
+# If on the MFS, skip this stuff and just do the MFS setup stuff.
+#
+if [ -e $ETCDIR/ismfs ]; then
+        $BINDIR/rc.mfs
+	exit 0
+fi
+
+if [ -x $BINDIR/runcvsup.sh ]; then
+	$BINDIR/runcvsup.sh
+fi
+
+$BINDIR/rc.setup

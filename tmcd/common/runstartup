@@ -4,21 +4,17 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use POSIX qw(setsid);
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/testbed";
-use libsetup;
-
+# Prototypes.
 #
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+sub fatal($);
+sub background();
 
 #
 # Turn off line buffering on output
@@ -26,12 +22,29 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1;
 
 #
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+#
+use libsetup;
+
+# Locals;
+my $logname;
+my $logtemplate;
+
+#
 # Get the config parameters so we can open up a log file in the proper
 # location. See below.
 #
-my ($pid, $eid, $vname);
-if (! (($pid, $eid, $vname) = check_status())) {
-    fatal("Could not determine pid/eid");
+if (JAILED()) {
+    $logtemplate = "$VARDIR/logs/runlog.XXXXXX";
+}
+else {
+    my ($pid, $eid, $vname) = check_status();
+
+    if (!defined($eid)) {
+	fatal("Could not determine pid/eid");
+    }
+    $logtemplate = "/proj/$pid/logs/runlog-$eid.$vname.XXXXXX";
 }
 
 #
@@ -43,6 +56,7 @@ if (background()) {
     #
     exit 0;
 }
+sleep(10);
 
 #
 # Open up the command file, which tells us what to do.
@@ -88,8 +102,8 @@ else {
     $EGID = $GID = $gid;
     $EUID = $UID = $uid;
 
-    exec($runcmd) or
-	fatal("Could not exec $runcmd: $!");
+    exec($runcmd);
+    exit($!);
 }
 
 print STDOUT "$runcmd returned $stat\n";
@@ -126,6 +140,7 @@ sub background()
     if ($mypid) {
 	return $mypid;
     }
+    POSIX::setsid();
 
     #
     # We have to disconnect from the caller by redirecting both STDIN and
@@ -138,9 +153,9 @@ sub background()
     #
     # Create a temporary name for a log file and untaint it.
     #
-    $logname = `mktemp /proj/$pid/logs/runlog-$eid.$vname.XXXXXX`;
+    $logname = `mktemp $logtemplate`;
     if ($?) {
-	die("mktemp failed!");
+    	die("mktemp failed!");
     }
 
     # Note different taint check (allow /).
@@ -153,7 +168,6 @@ sub background()
     chmod(0644, $logname);
     open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
     open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
-
 
     return 0;
 }

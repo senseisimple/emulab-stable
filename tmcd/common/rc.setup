@@ -1,0 +1,94 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+echo "Informing the testbed that we've rebooted ..."
+$BINDIR/tmcc state TBSETUP
+
+if [ -x $BINDIR/tbshutdown ]; then
+        echo "Starting up shutdown notification daemon ..."
+        $BINDIR/tbshutdown
+fi
+
+echo "Doing Testbed bootsetup configuration ..."
+$BINDIR/bootsetup
+
+if [ -x $BINDIR/rc.ipod ]; then
+	echo "Setting up IPOD ... "
+        $BINDIR/rc.ipod
+fi
+
+if [ -x $BOOTDIR/rc.tunnel ]; then
+        echo "Setting up Testbed tunnels ..."
+        $BOOTDIR/rc.tunnel
+fi
+
+if [ -x $BOOTDIR/rc.ifc ]; then
+        echo "Setting up Testbed interfaces ..."
+        $BOOTDIR/rc.ifc
+fi
+
+# Note: no routing on delay nodes
+if [ -x $BOOTDIR/rc.delay ]; then
+        echo "Setting up Testbed delay configuration ..."
+        $BOOTDIR/rc.delay
+elif [ -x $BOOTDIR/rc.route ]; then
+        echo "Setting up Testbed interface routing ..."
+	$BOOTDIR/rc.route enable
+fi
+
+if [ -x $BOOTDIR/rc.rpm  ]; then
+        echo "Installing RPMs ..."
+	$BOOTDIR/rc.rpm
+fi
+
+if [ -x $BOOTDIR/rc.tarballs  ]; then
+        echo "Installing Tarballs ..."
+	$BOOTDIR/rc.tarballs
+fi
+
+if [ -x $BINDIR/rc.healthd ]; then
+	echo "Starting node health monitoring ..."
+	$BINDIR/rc.healthd start
+fi
+
+if [ -x $BINDIR/slothd ]; then
+	echo "Starting usage detector ..."
+        killall slothd
+        rm -f /var/run/slothd.pid
+	$BINDIR/slothd
+fi
+
+if [ -x $BINDIR/watchdog  ]; then
+        echo "Starting update watchdog ..."
+	$BINDIR/watchdog
+fi
+
+if [ -x $BINDIR/bootvnodes  ]; then
+        echo "Booting up vnodes ..."
+	# Foreground mode.
+	$BINDIR/bootvnodes -f
+fi
+
+/bin/rm -f /var/at/jobs/S*
+/bin/rm -f /var/spool/at/S*
+if [ -s $BOOTDIR/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	echo "$BINDIR/runstartup" | at -q S 'now + 2 minutes'
+fi
+
+if [ -x $BINDIR/rc.agents  ]; then
+	$BINDIR/rc.agents
+fi
+
+if [ -x $BOOTDIR/rc.traffic  ]; then
+        echo "Starting traffic generators ..."
+	$BOOTDIR/rc.traffic
+fi
+
+echo "Informing the testbed that we're up and running ..."
+$BINDIR/tmcc state ISUP

@@ -4,7 +4,6 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 #
@@ -13,18 +12,8 @@ use English;
 # usage: sendevent <event>
 # 
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-#
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/rc.d/testbed";
-use libsetup;
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # We use the tmcc to figure out where the Testbed Event Daemon is running.
