@@ -190,7 +190,7 @@ ID  Name                            Members of VLAN
       Console> (enable) set span <port> <monitor>
    To forward the traffic from an entire VLAN:
       Console> (enable) set span <vlan #> <monitor>
-   NOTE: You want want to append 'rx' or 'tx' to the VLAN command line, or
+   NOTE: You might want to append 'rx' or 'tx' to the VLAN command line, or
       you'll get doubles of everything (incoming and outgoing both)
    To stop cloning:
       Console> (enable) set span disable <monitor>

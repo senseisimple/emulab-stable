@@ -107,6 +107,10 @@ B. While running Linux (single user):
 * Remount root filesystem read-only (IMPORTANT!)
   mount -o remount,ro /
 
+* Fsck it for good luck.  Actually, not only good luck but also resets
+  some time stamp that forces an fsck periodically
+  fsck -f <root device>
+
 D. Frisbee MFS (boss:/tftpboot/frisbee/boot/mfsroot):
 
 E. FreeBSD MFS (boss:/tftpboot/boot/mfsroot):
