@@ -89,16 +89,13 @@ if ($isadmin) {
     else
         $clause = "";
 
-    # Note: round((now()-last_swap_req)/10000) takes a number like
-    # HHMMSS and takes it to hours, rounding up when MMSS >=5000
-    # It does _not_ round up where MMSS >= 3000 as you might think.
-    
     $experiments_result =
 	DBQueryFatal("select e.*,".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
                      "count(r.node_id) as ncount, swap_requests, ".
-		     "round((now()-last_swap_req)/10000) as lastreq ".
+		     "round((unix_timestamp(now()) - ".
+		     "unix_timestamp(last_swap_req))/3600,1) as lastreq ".
 		     "from experiments as e ".
                      "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
                      "left join nodes as n on r.node_id=n.node_id ".
