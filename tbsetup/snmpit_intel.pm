@@ -66,8 +66,8 @@ sub new {
     } else {
 	$self->{DEBUG} = 0;
     }
-    $self->{BLOCK} = 1;
-    $self->{CONFIRM} = 1;
+    $self->{BLOCK} = 0;
+    $self->{CONFIRM} = 0;
     $self->{NAME} = $name;
 
     if ($self->{DEBUG}) {
@@ -795,44 +795,8 @@ sub UpdateField($$$@) {
 	}
 
     }
-    if ( (!$self->{BLOCK}) && !$self->{CONFIRM} ) {
-	my $loops = 0;
-	my $max_loops = 10;
-	my %notdone = ();
-	my @done = ();
-	foreach my $port (@ports) {
-	    $Status = $self->{SESS}->get([[$OID,$port]]);
-	    $self->debug("Value for $port was $Status\n");
-	    if ($Status ne $val) {
-		$notdone{$port} =1;
-	    }
-	}
-	while ( %notdone && $loops < $max_loops ) {
-	    if ($loops > 5) {
-		sleep($loops -5);
-	    }
-	    foreach my $port (sort num keys(%notdone)) {
-		$Status = $self->{SESS}->get([[$OID,$port]]);
-		$self->debug("Value for $port was ",$Status,"\n");
-		if ($Status eq $val) {
-		    push(@done,$port);
-		}
-	    }
-	    foreach my $i (@done) {
-		delete $notdone{$i};
-	    }
-	    $loops++;
-	}
-	if ($loops == $max_loops) {
-	    my $err = 0;
-	    foreach my $port (sort num keys(%notdone)) {
-		$err++;
-		print STDERR "Port $port Change not verified!\n";
-	    }
-	    return $err;
-	}
-    }
-    # returns 0 on success, # of failed ports on failure
+
+
     return 0;
 }
 
