@@ -410,6 +410,14 @@ REPLACE INTO testsuite_preentables VALUES ('scheduled_reloads','clean');
 REPLACE INTO testsuite_preentables VALUES ('projects','prune');
 REPLACE INTO testsuite_preentables VALUES ('group_membership','prune');
 REPLACE INTO testsuite_preentables VALUES ('groups','prune');
+REPLACE INTO testsuite_preentables VALUES ('user_sfskeys','clean');
+REPLACE INTO testsuite_preentables VALUES ('user_pubkeys','clean');
+REPLACE INTO testsuite_preentables VALUES ('port_counters','drop');
+REPLACE INTO testsuite_preentables VALUES ('images','prune');
+REPLACE INTO testsuite_preentables VALUES ('os_info','prune');
+REPLACE INTO testsuite_preentables VALUES ('node_activity','clean');
+REPLACE INTO testsuite_preentables VALUES ('portmap','clean');
+REPLACE INTO testsuite_preentables VALUES ('webnews','clean');
 
 --
 -- Dumping data for table 'webdb_table_permissions'
