@@ -300,7 +300,7 @@ proc parse_delay {dspec} {
 # We now have all our infrastructure in place.  We are ready to load
 # the NS file.
 
-file copy -force ${GLOBALS::tbcompat} [file dirname ${GLOBALS::nsfile}]
+file copy -force ${GLOBALS::tbcompat} .
 source ${GLOBALS::nsfile}
 
 # Clean up
