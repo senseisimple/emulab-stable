@@ -21,7 +21,7 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
-	 ixpsetup
+	 ixpsetup dokeyhash donodeid
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS IXP
 
@@ -29,12 +29,14 @@ use Exporter;
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
 	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
 	 TMPROGAGENTS TMPASSDB TMGROUPDB TMGATEDCONFIG
+	 TMSYNCSERVER TMRCSYNCSERVER TMKEYHASH TMNODEID
+	 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
 	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE TMCCCMD_LINKDELAYS
 	 TMCCCMD_PROGRAMS TMCCCMD_SUBNODELIST TMCCCMD_SUBCONFIG
-	 TMCCCMD_STATE
+	 TMCCCMD_STATE TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
        );
 
 # Must come after package declaration!
@@ -210,6 +212,8 @@ sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
 sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
 sub TMSYNCSERVER()	{ CONFDIR() . "/syncserver";}
 sub TMRCSYNCSERVER()	{ CONFDIR() . "/rc.syncserver";}
+sub TMKEYHASH()		{ CONFDIR() . "/keyhash";}
+sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -260,6 +264,8 @@ sub TMCCCMD_SUBCONFIG() { "subconfig"; }
 sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 sub TMCCCMD_PROGRAMS()  { "programs"; }
 sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
+sub TMCCCMD_KEYHASH()   { "keyhash"; }
+sub TMCCCMD_NODEID()    { "nodeid"; }
 
 #
 # Some things never change.
@@ -1759,12 +1765,6 @@ sub dorpms ()
     # (install-tarfile knows how to deal with said race when copying).
     #
     my $installoption = "-c";
-    if (JAILED() || PLAB()) {
-	$installoption .= " -t";
-	if (my $id = PLAB()) {
-	    $installoption .= " -n $id";
-	}
-    }
 
     open(RPM, ">" . TMRPM)
 	or die("Could not open " . TMRPM . ": $!");
@@ -1814,12 +1814,6 @@ sub dotarballs ()
     # (install-tarfile knows how to deal with said race when copying).
     #
     my $installoption = "-c";
-    if (JAILED() || PLAB()) {
-	$installoption .= " -t";
-	if (my $id = PLAB()) {
-	    $installoption .= " -n $id";
-	}
-    }
 
     open(TARBALL, ">" . TMTARBALLS)
 	or die("Could not open " . TMTARBALLS . ": $!");
@@ -2304,6 +2298,80 @@ sub dosyncserver()
 }
 
 #
+# Get the hashkey
+# 
+sub dokeyhash()
+{
+    my @configstrings;
+    my $keyhash;
+
+    $TM = OPENTMCC(TMCCCMD_KEYHASH);
+    while (<$TM>) {
+	push(@configstrings, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (! @configstrings) {
+	return 0;
+    }
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($configstrings[0] =~ /KEYHASH HASH=\'([\w]*)\'/) {
+	$keyhash = $1;
+    }
+    else {
+	warn "*** WARNING: Bad keyhash line: $_";
+	return 1;
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0227);
+    
+    if (system("echo '$keyhash' > ". TMKEYHASH)) {
+	warn "*** WARNING: Could not write " . TMKEYHASH . "\n";
+    }
+    umask($oldumask);
+    return 0;
+}
+
+#
+# Get the nodeid
+# 
+sub donodeid()
+{
+    my @configstrings;
+    my $nodeid;
+
+    $TM = OPENTMCC(TMCCCMD_NODEID);
+    while (<$TM>) {
+	push(@configstrings, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (! @configstrings) {
+	return 0;
+    }
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($configstrings[0] =~ /([-\w]*)/) {
+	$nodeid = $1;
+    }
+    else {
+	warn "*** WARNING: Bad nodeid line: $_";
+	return 1;
+    }
+    
+    system("echo '$nodeid' > ". TMNODEID);
+    return 0;
+}
+
+#
 # Plab configuration.  Currently sets up sshd and the DNS resolver
 # 
 sub doplabconfig()
@@ -2428,6 +2496,8 @@ sub bootsetup()
     doaccounts();
 
     if (! MFS()) {
+	donodeid();
+	
 	#
 	# Okay, lets find out about interfaces.
 	#
@@ -2451,6 +2521,12 @@ sub bootsetup()
 	# 
 	print STDOUT "Checking Testbed sync server setup ...\n";
 	dosyncserver();
+	
+	#
+	# Get the key
+	# 
+	print STDOUT "Checking Testbed key ...\n";
+	dokeyhash();
 	
 	#
 	# Router Configuration.
@@ -2526,6 +2602,8 @@ sub jailsetup()
     # inside a jail and what its ID is. 
     #
     system("echo '$vnodeid' > " . TMJAILNAME());
+    # Need to unify this with jailname.
+    system("echo '$vnodeid' > " . TMNODEID());
     
     #
     # Do account stuff.
@@ -2570,6 +2648,9 @@ sub jailsetup()
 
 	print STDOUT "Checking Testbed sync server setup ...\n";
 	dosyncserver();
+	
+	print STDOUT "Checking Testbed key ...\n";
+	dokeyhash();
 	
 	print STDOUT "Checking Testbed RPM configuration ... \n";
 	dorpms();
@@ -2698,6 +2779,9 @@ sub plabsetup()
 	print STDOUT "Checking Testbed hostnames configuration ... \n";
 	dohostnames();
 
+	print STDOUT "Checking Testbed key ...\n";
+	dokeyhash();
+	
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
 
@@ -2748,6 +2832,8 @@ sub vnodeplabsetup($)
     # its ID is. 
     #
     system("echo '$vnodeid' > $BOOTDIR/plabname");
+    # Need to unify this with plabname.
+    system("echo '$vnodeid' > $BOOTDIR/nodeid");
     
     # XXX Anything else to do?
     

@@ -1519,6 +1519,25 @@ function TBIPtoNodeID($ip) {
 }
 
 #
+# Map nodeid to pid,eid,gid. Return 0 if not reserved. 
+#
+function TBNodeIDtoExpt($nodeid, &$pid, &$eid, &$gid) {
+    $query_result =
+	DBQueryFatal("select r.pid,r.eid,e.gid from reserved as r ".
+		     "left join experiments as e on r.pid=e.pid and ".
+		     "     r.eid=e.eid where node_id='$nodeid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $pid   = $row["pid"];
+    $eid   = $row["eid"];
+    $gid   = $row["gid"];
+    return 1;
+}
+
+#
 # Functions related to idle times
 #
 

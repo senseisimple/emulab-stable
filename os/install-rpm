@@ -10,6 +10,10 @@ use English;
 use Getopt::Std;
 use POSIX 'setsid';
 
+# Drag in path stuff so we can find emulab stuff.
+# XXX Temporary until I have the new tmcc library finished!
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
 #
 # Install an RPM. This script is run from the setup code on client nodes.
 # By default the RPM is accessed directly via NFS, if '-c' is specified
@@ -25,10 +29,10 @@ use POSIX 'setsid';
 #
 sub usage()
 {
-    print STDOUT "Usage: install-rpm [-ct] [-n nodeid] <filename>\n";
+    print STDOUT "Usage: install-rpm [-d] [-ct] [-n nodeid] <filename>\n";
     exit(-1);
 }
-my $optlist  = "ctn:";
+my $optlist  = "dctn:";
 
 #
 # Turn off line buffering on output
@@ -36,20 +40,26 @@ my $optlist  = "ctn:";
 $| = 1;
 
 #
-# Untaint the path
+# Untaint env.
 # 
-$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/etc/emulab";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # No configure vars.
 #
 my $IDENTFILE      = "/var/db/testbed.rpms";
-my $rpm        = "";
-my $usetmcc	   = 0;
+my $rpm            = "";
+my $usewget	   = 0;
 my $copymode	   = 0;
-my $copyfile       = "";
-my $vnodeid;
+my $debug	   = 0;
+my $copyfile;
+my $nodeid;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+#
+use libsetup;
 
 # Protos
 sub GetRPMFile($$$);
@@ -72,14 +82,17 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"c"})) {
     $copymode = 1;
 }
+if (defined($options{"d"})) {
+    $debug = 1;
+}
 if (defined($options{"t"})) {
-    $usetmcc = 1;
+    $usewget = 1;
     $copymode = 1;
 }
 if (defined($options{"n"})) {
-    $vnodeid = $options{"n"};
-    if ($vnodeid =~ /^([-\w]+)$/) {
-	$vnodeid = $1;
+    $nodeid = $options{"n"};
+    if ($nodeid =~ /^([-\w]+)$/) {
+	$nodeid = $1;
     }
 }
 if (@ARGV != 1) {
@@ -130,7 +143,7 @@ else {
     else {
 	die("Bad data in copyfile name: $copyfile");
     }
-    GetRPMFile($rpm, $copyfile, $usetmcc);
+    GetRPMFile($rpm, $copyfile, $usewget);
     #
     # Dies on any failure!
     #
@@ -140,9 +153,6 @@ else {
 # Add to index first; if fails too bad.
 # 
 if (system("echo \"$rpm\" >> $IDENTFILE")) {
-    if ($copymode) {
-	unlink($copyfile);
-    }
     fatal("Could not update $IDENTFILE");
 }
 
@@ -163,8 +173,11 @@ exit($exit_status);
 sub fatal {
     local($msg) = $_[0];
 
-    print STDERR "$msg\n";
-    exit(-1);
+    if ($copymode && -e $copyfile) {
+	unlink($copyfile);
+    }
+    die("*** $0:\n".
+	"    $msg\n");
 }
 
 #
@@ -172,66 +185,37 @@ sub fatal {
 #
 sub GetRPMFile($$$)
 {
-    my ($rpm, $copyfile, $usetmcc) = @_;
+    my ($rpm, $copyfile, $usewget) = @_;
     my $buf;
     my $bytelen;
 
     #
-    # If copying via NFS, open the file.  Otherwise pipe from tmcc.
+    # If copying via NFS, must watch for read errors and retry.
     #
-    if (! $usetmcc) {
+    if (! $usewget) {
 	open(TMCC, "< $rpm")
-	    or fatal("Could not open RPM on server!");
+	    or fatal("Could not open rpm on server!");
 	$bytelen = (stat($rpm))[7];
-    } else {
-	my $tmccopt = "-t 300";
-	if (defined($vnodeid)) {
-	    $tmccopt .= " -n $vnodeid";
-	}
 
 	#
-	# Protocol is a little odd. First word is the number of bytes
-	# (yes, limited to 31 bits of length!), then the data. If we do
-	# not get that much data, we fail. What about timeout option?
-	# Could take a while to get the entire file, but instead of a
-	# timeout let Emulab decide when its too long.
+	# Open the target file and start dumping the data in.
 	#
-	open(TMCC, "tmcc $tmccopt rpm $rpm |")
-	    or fatal("Could not download RPM from server!");
+	open(JFILE, "> $copyfile")
+	    or fatal("Could not open local file $copyfile: $!");
 
-	# Hokey C struct stuff
-	my $firstword = pack("i", 0);
-    
-	if (! sysread(TMCC, $firstword, length($firstword))) {
-	    fatal("Could not read length of RPM from server!");
-	}
-	$bytelen = unpack("i", $firstword);
-    }
-    if ($bytelen == 0) {
-	fatal("Zero length of RPM from server!");
-    }
+	#
+	# Deal with NFS read failures
+	#
+	my $foffset = 0;
+	my $retries = 5;
 
-    #
-    # Open the target file and start dumping the data in.
-    #
-    open(JFILE, "> $copyfile")
-	or fatal("Could not open local file $copyfile: $!");
+	while ($bytelen) {
+	    my $rlen = sysread(TMCC, $buf, 8192);
 
-    #
-    # Deal with NFS read failures
-    #
-    my $foffset = 0;
-    my $retries = 5;
-
-    while ($bytelen) {
-	my $rlen = sysread(TMCC, $buf, 8192);
-
-	if (! defined($rlen)) {
-	    #
-	    # If we are copying the file via NFS, retry a few times
-	    # on error to avoid the changing-exports-file server problem.
-	    #
-	    if (! $usetmcc) {
+	    if (! defined($rlen)) {
+		#
+		# If we are copying the file via NFS, retry a few times
+		# on error to avoid the changing-exports-file server problem.
 		if ($retries > 0 && sysseek(TMCC, $foffset, 0)) {
 		    warn("*** WARNING retrying read of $rpm ".
 			 "at offset $foffset\n");
@@ -239,26 +223,83 @@ sub GetRPMFile($$$)
 		    sleep(2);
 		    next;
 		}
+		fatal("Error reading tarball $rpm: $!");
 	    }
-	    unlink($copyfile);
-	    fatal("Error reading RPM $rpm: $!");
+	    if ($rlen == 0) {
+		last;
+	    }
+	    if (! syswrite(JFILE, $buf)) {
+		fatal("Error writing rpm $copyfile: $!");
+	    }
+	    $foffset += $rlen;
+	    $bytelen -= $rlen;
+	    $retries = 5;
 	}
-        if ($rlen == 0) {
-	    last;
-	}
-	if (! syswrite(JFILE, $buf)) {
-	    unlink($copyfile);
-	    fatal("Error writing RPM $copyfile: $!");
-	}
-	$foffset += $rlen;
-	$bytelen -= $rlen;
-	$retries = 5;
+	close(JFILE);
+	close(TMCC);
     }
-    if ($bytelen) {
-	unlink($copyfile);
-	fatal("Did not get the entire RPM! $bytelen bytes left.");
+    else {
+	#
+	# Need the nodeid and the keyhash. We allow the nodeid to be
+	# overridden on the command line, but thats just a debugging
+	# feature.
+	#
+	if (!defined($nodeid)) {
+	    #
+	    # Eventually, use tmcc which will cache the result. 
+	    # 
+	    open(FD, "< " . TMNODEID()) or
+		fatal("Could not open ". TMNODEID() . ": $!");
+	    $nodeid = <FD>;
+	    close(FD);
+	    fatal("Could not get our nodeid!")
+		if (!defined($nodeid));
+
+	    if ($nodeid =~ /^([-\w]+)$/) {
+		$nodeid = $1;
+	    }
+	}
+	#
+	# Eventually, use tmcc which will cache the result. 
+	# 
+	open(FD, "< " . TMKEYHASH()) or
+	    fatal("Could not open ". TMKEYHASH() . ": $!");
+	$keyhash = <FD>;
+	close(FD);
+	fatal("Could not get our keyhash!")
+		if (!defined($keyhash));
+	if ($keyhash =~ /^([\w]+)$/) {
+	    $keyhash = $1;
+	}
+
+	#
+	# Lastly, need our boss node.
+	# 
+	my ($www) = split(" ", `tmcc bossinfo`);
+	die("Could not get bossinfo!")
+	    if ($?);
+
+	if ($www =~ /^[-\w]+\.(.*)$/) {
+	    $www = "www.${1}";
+	}
+	else {
+	    fatal("Tainted bossinfo $www!");
+	}
+
+	#
+	# Okay, run wget with the proper arguments. 
+	#
+	my $cmd = "wget -q -O $copyfile ".
+	          "'https://${www}/spewrpmtar.php3".
+	          "?nodeid=${nodeid}&file=${rpm}&key=${keyhash}'";
+    
+	if ($debug) {
+	    print STDERR "$cmd\n";
+	}
+	system($cmd);
+
+	fatal("Could not retrieve $rpm from $www")
+	    if ($?);
     }
-    close(JFILE);
-    close(TMCC);
     return 0;
 }
