@@ -272,7 +272,7 @@ if ($showlinks) {
     }
 
     my $result =
-	DBQueryFatal("select vname,member,delay,bandwidth,lossrate, ".
+	DBQueryFatal("select vname,member,mask,delay,bandwidth,lossrate, ".
 		     "rdelay,rbandwidth,rlossrate ".
 		     "from virt_lans where pid='$pid' and eid='$eid'".
 		     "order by vname,member");
@@ -280,16 +280,16 @@ if ($showlinks) {
     if ($result->numrows) {
 	print  "Virtual Lan/Link Info:\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-	       "ID", "Member", "IP", "Delay", "BW (Kbs)", "Loss Rate";
+	       "ID", "Member", "IP/Mask", "Delay", "BW (Kbs)", "Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
 
-	while (($vname,$member,$delay,$bandwidth,$lossrate,
+	while (($vname,$member,$mask,$delay,$bandwidth,$lossrate,
 		$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array()) {
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
 	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
-	           "", "", $rdelay, $rbandwidth, $rlossrate;
+	           "", $mask, $rdelay, $rbandwidth, $rlossrate;
 	}
 	print "\n";
     }
