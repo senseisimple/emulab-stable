@@ -635,7 +635,7 @@ foreach $node (keys(%nodes)) {
     if (($nodes{$node} ne "shark") &&
 	($nodes{$node} ne "dnard") && !$isremotenode{$node}) {
 	print TOPFILE "node $node $nodes{$node}\n";
-	if ($nodes{$node} ne "shark-shelf") {
+	if ($nodes{$node} ne "shark-shelf" && !$isvirtnode{$node}) {
 	    $nodes++;
 	}
     }
