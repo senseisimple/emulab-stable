@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Wrapper for DHCPD which has a habit of dying. 
+#
+case "$1" in
+	start)
+		if [ -x @prefix@/sbin/dhcpd_wrapper ]; then
+			echo -n " dhcpd_wrapper"
+			@prefix@/sbin/dhcpd_wrapper
+		fi
+		;;
+	stop)
+		if [ -r /var/run/dhcpd_wrapper.pid ]; then
+			kill `cat /var/run/dhcpd_wrapper.pid`
+		fi
+		;;
+	*)
+		echo ""
+		echo "Usage: `basename $0` { start | stop }"
+		echo ""
+		exit 64
+		;;
+esac
