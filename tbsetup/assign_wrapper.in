@@ -1628,20 +1628,42 @@ exit(0)
 PatchVeths();
 
 #
-# Clean the virt_agents table.
-# Yuck. There should be an agents table instead of munging virt_agents.
+# Seed the virt_agents table. This should probably be done elsewhere.
+# Anyway, each lan/link needs an agent to handle changes to delays or
+# other link parameters, and that agent (might be several) will be
+# running on more than one node. Delay node agent, wireless agent,
+# etc. They might be running on a node different then where the link
+# is really (delay node). So, just send all link event to all nodes,
+# and let them figure out what they should do (what to ignore, what to
+# act on). So, specify a wildcard; a "*" for the vnode will be treated
+# specially by the event scheduler, and no ipaddr will be inserted
+# into the event. Second, add pseudo agents, one for each member of
+# the link (or just one if a lan). The objname is lan-vnode, and
+# allows us to send an event to just the agent controlling that link
+# (or lan node delay). The agents will subscribe to these additional
+# names when they start up.
 #
-my $virt_agents =
-    DBQueryFatal("select vname,vnode from virt_agents as v ".
-		 "left join event_objecttypes as e on e.idx=v.objecttype ".
-		 "where e.type='LINK' and pid='$pid' and eid='$eid'");
+foreach my $lan (keys(%virt_lans)) {
+    DBQueryFatal("replace into virt_agents ".
+		 " (pid, eid, vname, vnode, objecttype) ".
+		 " select '$pid', '$eid', '$lan', '*', ".
+		 "   idx from event_objecttypes where ".
+		 "   event_objecttypes.type='LINK'");
 
-while (my ($vname,$vnode) = $virt_agents->fetchrow_array()) {
-    DBQueryFatal("delete from virt_agents ".
-		 "where pid='$pid' and eid='$eid' and ".
-		 " vname='$vname' and vnode='$vnode'");
+    foreach my $member (virtlanmembers($lan)) {
+	my ($vnode) = split(":", $member);
+	
+	DBQueryFatal("replace into virt_agents ".
+		     " (pid, eid, vname, vnode, objecttype) ".
+		     " select '$pid', '$eid', '${lan}-${vnode}', '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINK'");
+    }
 }
 
+#
+# Enter delays.
+# 
 foreach $delayid (keys(%nodedelays)) {
     # So r* indicates int1->int0 and others are int0->int1
     my ($pnode,$int0,$int1,$vname,
@@ -1721,46 +1743,6 @@ foreach $delayid (keys(%nodedelays)) {
     }
 
     #
-    # Delay nodes require that we augment the virt_agents list. We used to
-    # specify the node where the agent was running, but that will not work
-    # for lans, where we need to direct the event to the agent running on
-    # behalf of that node. So, we will do two things.  First, specify a
-    # "wildcard" for the vnode; a "*" for the vnode will be treated
-    # specially by the event scheduler, and no ipaddr will be inserted into
-    # the event. Second, add pseudo agents, one for each member of the link
-    # (or just one if a lan). The objname is lan-vnode, and allows us to
-    # send an event to just the agent controlling that link (or lan node
-    # delay). The delay-agent will subscribe to these additional names when
-    # it starts up.
-    #
-    DBQueryFatal("replace into virt_agents ".
-		 " (pid, eid, vname, vnode, objecttype) ".
-		 " select '$pid', '$eid', '$vname', '*', ".
-		 "   idx from event_objecttypes where ".
-		 "   event_objecttypes.type='LINK'");
-
-    DBQueryFatal("replace into virt_agents ".
-		 " (pid, eid, vname, vnode, objecttype) ".
-		 " select '$pid', '$eid', '${vname}-${vnode0}', '*', ".
-		 "   idx from event_objecttypes where ".
-		 "   event_objecttypes.type='LINK'");
-
-    if (@members == 2) {
-	DBQueryFatal("replace into virt_agents ".
-		     " (pid, eid, vname, vnode, objecttype) ".
-		     " select '$pid', '$eid', '${vname}-${vnode1}', '*', ".
-		     "   idx from event_objecttypes where ".
-		     "   event_objecttypes.type='LINK'");
-    }
-
-    #
-    # We used to post-pass the eventlist to set the vnode where the agent
-    # would be running, but this is no longer needed since the virt_agents
-    # entry above will be used by the event scheduler to direct the event
-    # to the proper place.
-    # 
-
-    #
     # XXX - Whenever a delay node is inserted, port speeds are set to
     #       their maximum speed on the delay node ports. This is to ensure that
     #       they get a valid number instead of something left over, but
@@ -1771,7 +1753,6 @@ foreach $delayid (keys(%nodedelays)) {
     #       to do in this mess. See companion XXX above where portbw hash
     #       is set.
     #
-
     my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0),
 				    "ethernet");
     DBQueryFatal("update interfaces set " .
@@ -1847,36 +1828,7 @@ foreach $delayid (keys(%linkdelays)) {
 		     "      vlan='$lan' and vnode='$vnode'");
     }
 
-    #
-    # Link delays also require that we augment the virt_agents list, and
-    # like delay nodes above we need to specify a "wildcard" for the vnode;
-    # a "*" for the vnode will be treated specially by the event scheduler,
-    # and no ipaddr will be inserted into the event. Second, add a pseudo
-    # agent for the member of the link (or lan node). The objname is
-    # lan-vnode, and allows us to send an event to just the agent
-    # controlling that link (or lan node delay). The delay-agent will
-    # subscribe to these additional names when it starts up.
-    #
-    DBQueryFatal("replace into virt_agents ".
-		 " (pid, eid, vname, vnode, objecttype) ".
-		 " select '$pid', '$eid', '$lan', '*', ".
-		 "   idx from event_objecttypes where ".
-		 "   event_objecttypes.type='LINK'");
-
-    DBQueryFatal("replace into virt_agents ".
-		 " (pid, eid, vname, vnode, objecttype) ".
-		 " select '$pid', '$eid', '${lan}-${vnode}', '*', ".
-		 "   idx from event_objecttypes where ".
-		 "   event_objecttypes.type='LINK'");
-
     $expt_stats{"linkdelays"} += 1;
-
-    #
-    # We used to post-pass the eventlist to set the vnode where the agent
-    # would be running, but this is no longer needed since the virt_agents
-    # entry above will be used by the event scheduler to direct the event
-    # to the proper place.
-    # 
 }
 
 # For recording IP aliases. see below.
@@ -1923,8 +1875,9 @@ foreach $vnodeport (keys(%portmap)) {
 	    printdb("IP: $pnode:$pport $ip\n");
 
 	    DBQueryFatal("update interfaces set ".
-			 " IP='$ip',IPaliases=NULL,mask='$mask',vnode_id=$vvnode," .
-			 "rtabid='$rtabid' where node_id='$pnode' and iface='$pport'");
+			 "   IP='$ip',IPaliases=NULL,mask='$mask',".
+			 "   vnode_id=$vvnode,rtabid='$rtabid' ".
+			 "where node_id='$pnode' and iface='$pport'");
 	    $IPaliases{"$pnode:$pport"} = 1;
 	}
 	else {
@@ -2816,7 +2769,8 @@ sub NewVethIface($$$;$)
 	#
 	my $query_result = 
 	    DBQueryFatal("insert into veth_interfaces ".
-			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask, rtabid) ".
+			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask, ".
+			 " rtabid) ".
 			 "values ('$pnode', 0, '$mac', '$ip', " .
 			          (defined($pport) ? "'$pport'" : "NULL") .
 			 "        , $vvnode, '$mask', '$rtabid')");
