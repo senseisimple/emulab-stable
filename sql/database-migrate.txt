@@ -1664,3 +1664,41 @@ last_net_act,last_cpu_act,last_ext_act);
        
 	alter table experiments add linktest_pid int(11) default '0' \
 		after linktest_level;
+
+1.256: Add a usemodelnet slot to the experiments table to indicate
+       that an experiment prefers to use modelnet for traffic shaping.
+       At some future time maybe we can mix modelnet with delay nodes,
+       but please do not hold your breath waiting.
+
+	alter table experiments add usemodelnet tinyint(1) NOT NULL \
+		default '0' after useprepass;
+
+       Add modelnet_cores and modelnet_edges variables to hold user
+       tunable number of physical core nodes and edge nodes to throw
+       at a virtual topology. 
+
+	alter table experiments add modelnet_cores tinyint(4) unsigned \
+		NOT NULL default '0' after usemodelnet;
+        alter table experiments add modelnet_edges tinyint(4) unsigned \
+		NOT NULL default '0' after modelnet_cores;
+
+       Add ismodelnet and isphantom slots to node_types table. ismodelnet
+       is set for modelnet nodes (which are also going to be isvirt).  Add
+       isphantom to mark nodes that do no get underlying physical nodes;
+       there will be an entry in the reserved table but no entries in the
+       nodes table. Initially, modelnet virtual nodes will all be phantoms.
+       Will possibly change later.
+
+	alter table node_types add ismodelnet tinyint(1) NOT NULL \
+		default '0' after isvirtnode;
+	alter table node_types add isphantom tinyint(1) NOT NULL \
+		default '0' after ismodelnet;
+		
+       Not sure that isphantom is going to work cause of the number of
+       queries that join reserved with the nodes table. I might end up
+       making nodes dynamic instead, creating and detroying them on the
+       fly. I would prefer that isphantom works, but I am willing to live
+       with isdynamic since we can use that for all of our virtual nodes.
+
+	alter table node_types add isdynamic tinyint(1) NOT NULL \
+		default '0' after isphantom;
