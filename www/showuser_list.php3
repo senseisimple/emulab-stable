@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -63,7 +63,7 @@ echo "<br><br>\n";
 if (isset($searchfor) && strcmp($searchfor, "")) {
     $clause  = "";
     $where   = "where (u.usr_name like '%${searchfor}%' or ".
-	"u.usr_email like '%${searchfor}%') ";
+	"u.usr_email like '%${searchfor}%' or u.uid like '%${searchfor}%') ";
     $showtag = "matching";
 }
 elseif (! strcmp($showtype, "all")) {
