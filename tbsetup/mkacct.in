@@ -48,9 +48,12 @@ my $SFSKEYREG = "/usr/local/bin/sfskey register";
 my $SETGROUPS = "$TB/sbin/setgroups";
 my $GENELISTS = "$TB/sbin/genelists";
 my $SFSUPDATE = "$TB/sbin/sfskey_update";
+my $NOLOGIN   = "/sbin/nologin";
 
 my $auditmode = 0;
 my $sfschange = 0;
+my $errors    = 0;
+my $wasfrozen = 0;
 my $logname;
 my $user;
 my @db_row;
@@ -197,23 +200,44 @@ my $defpid      = $db_row[5];
 if ($status eq USERSTATUS_FROZEN ||
     $status eq USERSTATUS_NEWUSER ||
     $status eq USERSTATUS_UNAPPROVED) {
+    
     #
     # All this stuff must be done as root (ssh).
     #
     $UID = $EUID;
 
-    if ($control_node ne $BOSSNODE) {
-	print "Removing user $user from $control_node.\n";
-	if (system("$SSH -host $control_node '$USERDEL $user'") &&
-	    (($? >> 8) != 67)) {
-	    fatal("Could not remove user $user from $control_node.\n");
-	}
+    if ($status eq USERSTATUS_FROZEN) {
+	print "Freezing user $user on local node.\n";
+	system("$USERMOD $user -s $NOLOGIN");
+    }
+    else {
+	print "Removing user $user from local node.\n";
+	system("$USERDEL $user");
+    }
+    if ($? && (($? >> 8) != 67)) {
+	$errors++;
+	print("Error operating on user $user on local node!\n");
     }
 
-    print "Removing user $user from local node.\n";
-    if (system("$USERDEL $user") && (($? >> 8) != 67)) {
-	fatal("Could not remove user $user from local node.");
+    if ($control_node ne $BOSSNODE) {
+	if ($status eq USERSTATUS_FROZEN) {
+	    print "Freezing user $user on $control_node.\n";
+	    system("$SSH -host $control_node ".
+		   "'$USERMOD $user -s $NOLOGIN'");
+	}
+	else {
+	    print "Removing user $user from $control_node.\n";
+	    system("$SSH -host $control_node '$USERDEL $user'");
+	}
+	if ($? && (($? >> 8) != 67)) {
+	    $errors++;
+	    print("Error operating on user $user on $control_node!\n");
+	}
     }
+    if ($errors) {
+	fatal("Error clearing account for $user!");
+    }
+
     exit(0);
 }
 
@@ -261,12 +285,28 @@ if (system("egrep -q -s '^${user}:' /etc/passwd")) {
     }
 }
 else {
-    print "Updating user $user ($user_number) on local node.\n";
+    #
+    # Get the current login shell. This is how we determine if the user
+    # was frozen, which tells us what shell argument to provide. Otherwise
+    # we leave the shell alone since the user may have changed it. Maybe
+    # we should put the shell in the DB instead?
+    #
+    my $oldshell;
+    my $shellarg = "";
+    
+    (undef,undef,undef,undef,undef,undef,undef,undef,$oldshell) =
+	getpwnam($user) or
+	    fatal("Could not determine oldshell for $user");
+    if ($oldshell eq $NOLOGIN) {
+	$wasfrozen = 1;
+	$shellarg  = "-s $PBAG";
+    }
 
     #
     # MAKE SURE not to update anything else!
     #
-    if (system("$USERMOD $user -c \"$fullname\" ")) {
+    print "Updating user $user ($user_number) on local node.\n";
+    if (system("$USERMOD $user $shellarg -c \"$fullname\" ")) {
 	fatal("Could not modify user $user on local node.");
     }
 }
@@ -294,13 +334,14 @@ if ($control_node ne $BOSSNODE) {
 	}
     }
     else {
-	print "Updating user $user ($user_number) on $control_node.\n";
-
+	my $shellarg = ($wasfrozen ? "-s /bin/tcsh" : "");
+	
 	#
 	# MAKE SURE not to update anything else!
 	#
+	print "Updating user $user ($user_number) on $control_node.\n";
 	if (system("$SSH -host $control_node ".
-		   "'$USERMOD $user -c \\\"$fullname\\\"'")) {
+		   "'$USERMOD $user $shellarg -c \\\"$fullname\\\"'")) {
 	    fatal("Could not modify user $user record on $control_node.");
 	}
     }
