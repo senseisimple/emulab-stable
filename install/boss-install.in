@@ -128,6 +128,7 @@ my $MIBPATH       = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR      = "$PREFIX/tftpboot";
 my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
 my $VARRUN        = "/var/run";
+my $ETCSSH	  = "/etc/ssh";
 
 #
 # URLs
@@ -723,6 +724,10 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	} else {
 	    ExecQuietFatal("$SCP -i $INIT_PRIVKEY ".
 			   "$ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
+
+	    # Copy hosts keys to ops.
+	    ExecQuietFatal("cat ${ETCSSH}/*.pub | $SSH ${USERNODE} ".
+			   "  '(cat > ${ETCSSH}/ssh_known_hosts)'");
 
 	    if (ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
 		PhaseFail("You'll need to manually copy boss's public SSH key\n".
