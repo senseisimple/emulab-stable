@@ -28,7 +28,7 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 # Control node installation (okay, plastic)
 #
 control-install:
-	cd /tmp/gg && \
+	cd $(INSTALL_BINDIR) && \
 		list='$(BIN_SCRIPTS)'; for file in $$list; do \
 			ln -s plasticwrap $$file; \
 		done;
