@@ -700,6 +700,10 @@ if ((isset($w_password1) && strcmp($w_password1, "")) &&
     $insert_result =
 	DBQueryFatal("UPDATE users SET usr_w_pswd='$w_password1' ".
 		     "WHERE uid='$target_uid'");
+
+    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
+	SUEXEC($uid, "nobody", "webtbacct wpasswd $target_uid", 1);
+    }
 }
 
 #

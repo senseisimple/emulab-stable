@@ -24,7 +24,7 @@ use Getopt::Std;
 sub usage()
 {
     print("Usage: tbacct [-f] [-b] ".
-	  "<add|del|mod|passwd|freeze|thaw> <user>\n");
+	  "<add|del|mod|passwd|wpasswd|freeze|thaw> <user>\n");
     exit(-1);
 }
 my $optlist = "fb";
@@ -40,6 +40,9 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
+
+my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
+my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
 
 my $HOMEDIR	= "/users";
 my $USERPATH	= "$TB/bin";
@@ -134,7 +137,7 @@ if ($user =~ /^([-\w]+)$/i) {
 else {
     die("Tainted argument: $user\n");
 }
-if ($cmd =~ /^(add|del|mod|freeze|passwd|thaw)$/) {
+if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw)$/) {
     $cmd = $1;
 }
 else {
@@ -161,7 +164,7 @@ if (AuditStart(0)) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin ".
+		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin,u.usr_w_pswd ".
 		 "from users as u ".
 		 "where u.uid='$user'");
 
@@ -177,6 +180,7 @@ my $status      = $row[4];
 my $webonly     = $row[5];
 my $usr_shell   = $row[6];
 my $usr_admin   = $row[7];
+my $wpswd       = $row[8];
 
 #
 # Get the users earliest project membership to use as the default group
@@ -217,6 +221,10 @@ SWITCH: for ($cmd) {
     };
     /^passwd$/ && do {
 	UpdatePassword();
+	last SWITCH;
+    };
+    /^wpasswd$/ && do {
+	UpdateWindowsPassword();
 	last SWITCH;
     };
     /^mod$/ && do {
@@ -417,6 +425,37 @@ sub UpdatePassword()
 	    fatal("Could not change password for user $user on $CONTROL!");
 	}
     }
+    $UID = $SAVEUID;
+    return 0;
+}
+
+#
+# Change a Windows password for the user on the Samba server node.
+# The local password is not touched!
+#
+sub UpdateWindowsPassword()
+{
+    # shell escape.
+    $wpswd     =~ s/\$/\\\$/g;
+
+    #
+    # Check status. Ignore if user is not active.
+    #
+    if ($status ne USERSTATUS_ACTIVE) {
+	print("$user is not active! Not updating the password!\n");
+	return 0;
+    }
+
+    $UID = 0;
+    print "Updating user $user Samba password on $SAMBANODE.\n";
+    # -s = silent, -a = add user if necessary.
+    open( SPCMD, "| $SSH -host $SAMBANODE $SMBPASSWD -s -a $user")
+        || fatal("Opening $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+    local $SIG{PIPE} = sub { die "smbpasswd spooler pipe broke" };
+    print SPCMD "$wpswd\n$wpswd\n";
+    close SPCMD 
+	|| fatal("Closing $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+
     $UID = $SAVEUID;
     return 0;
 }
