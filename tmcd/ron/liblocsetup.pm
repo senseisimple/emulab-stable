@@ -105,8 +105,9 @@ sub os_homedirdel($$)
 {
     my ($login, $homedir) = @_;
     
-    print "Removing home directory: $homedir\n";
-    return(system("rm -rf $homedir"));
+    #print "Removing home directory: $homedir\n";
+    #return(system("rm -rf $homedir"));
+    return 0;
 }
 
 #
