@@ -507,6 +507,9 @@ REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experime
 REPLACE INTO table_regex VALUES ('virt_agents','vname','text','redirect','eventlist:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vnode','text','regex','(^[-\\w]+$)|(^\\*{1}$)',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','default:tinyint',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lan_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);

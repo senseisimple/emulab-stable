@@ -2765,6 +2765,7 @@ sub TBGetSiteVar($;$)
 #
 @virtualTables  = ("virt_nodes",
 		   "virt_lans",
+		   "virt_lan_lans",
 		   "virt_lan_settings",
 		   "virt_lan_member_settings",
 		   "virt_trafgens",

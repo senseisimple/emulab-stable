@@ -1817,3 +1817,28 @@ last_net_act,last_cpu_act,last_ext_act);
       Then run:
 	
 		./mustdelay.pl
+
+1.269: Add new table to generate a per virt_lan index for use with
+       veth vlan tags. This would be so much easier if the virt_lans
+       table had been split into virt_lans and virt_lan_members.
+       Anyway, this table might someday become the per-lan table, with a
+       table of member settings. This would reduce the incredible amount of
+       duplicate info in virt_lans!
+
+	CREATE TABLE virt_lan_lans (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  idx int(11) NOT NULL auto_increment,  
+	  vname varchar(32) NOT NULL default '',
+	  PRIMARY KEY  (pid,eid,idx),
+	  UNIQUE KEY vname (pid,eid,vname)
+	) TYPE=MyISAM;
+
+       This arrangement will provide a unique index per virt_lan, within
+       each pid,eid. That is, it starts from 1 for each pid,eid. That is
+       necessary since the limit is 16 bits, so a global index would
+       quickly overflow. The above table is populated with:
+
+	insert into virt_lan_lans (pid, eid, vname) 
+            select distinct pid,eid,vname from virt_lans;
+

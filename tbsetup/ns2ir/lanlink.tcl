@@ -565,6 +565,8 @@ Link instproc updatedb {DB} {
 	return
     }
 
+    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
+
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
 	if {$node == $src_node} {
@@ -679,6 +681,8 @@ Lan instproc updatedb {DB} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
 	return
     }
+
+    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
     #
     # Upload lan settings and them per-member settings
