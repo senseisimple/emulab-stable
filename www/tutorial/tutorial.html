@@ -792,10 +792,6 @@ special symbol <tt>none</tt> indicates that the node is still running
 the start command. 
 
 <p>
-The start command is especially useful when
-combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
-
-<p>
 The start command is implemented using
 <a href="docwrapper.php3?docname=advanced.html#ProgramObjects">
 Program Objects</a>, which are described in more detail in the
@@ -804,12 +800,28 @@ Advanced Tutorial.</a> Note that the start command is run only when
 the experiment is swapped in. If you want to rerun the experiment, you
 can swap the experiment out and back in, or you can reboot all of the
 nodes in your experiment. If rebooting, you must fire off the program
-object yourself by restarting the 
+object(s) yourself by restarting the 
 <a href="docwrapper.php3?docname=advanced.html">Event System</a> 
 on <tt>users.emulab.net</tt>:
 
-<code><pre>
-eventsys_control replay &lt;pid&gt &lt;eid&gt </code></pre>
+	<code><pre>
+	eventsys_control replay &lt;pid&gt &lt;eid&gt </code></pre>
+
+You can also control each program object by sending it events, either
+with the NS "at" command:
+
+	<code><pre>
+	$ns at 2000.0 "$nodeA_startcmd stop"
+	$ns at 2010.0 "$nodeA_startcmd start"		</code></pre>
+
+or you can use the event program on <tt>users.emulab.net</tt>
+
+	<code><pre>
+	tevc -e mypid/myeid now nodeA_startcmd stop
+	tevc -e mypid/myeid now nodeA_startcmd start	</code></pre>
+
+The start command is especially useful when
+combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
 
 <p>
 <li> <a NAME="SyncServer"></a>
