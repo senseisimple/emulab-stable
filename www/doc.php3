@@ -16,6 +16,10 @@ PAGEHEADER("Documentation");
               Emulab Frequently Asked Questions (FAQ)</a></b>
      <p>
 
+<li><b><a href="docwrapper.php3?docname=tutorial/nscommands.html">
+              Emulab-specific NS Extensions Reference Manual</a></b>
+     <p>
+
 <li><b><a href="docwrapper.php3?docname=doc/tmcd.html">
               Testbed Master Control Daemon (TMCD) Reference Manual</a></b>
      <p>
