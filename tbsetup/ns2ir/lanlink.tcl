@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,8 @@ Class Queue -superclass NSObject
 # This class is a hack.  It's sole purpose is to associate to a Link
 # and a direction for accessing the Queue class.
 Class SimplexLink -superclass NSObject
+# Ditto, another hack class.
+Class LLink -superclass NSObject
 
 SimplexLink instproc init {link dir} {
     $self set mylink $link
@@ -31,6 +33,18 @@ SimplexLink instproc queue {} {
     $self instvar mylink
     $self instvar mydir
     return [$mylink set ${mydir}queue]
+}
+LLink instproc init {lan node} {
+    $self set mylan  $lan
+    $self set mynode $node
+}
+LLink instproc queue {} {
+    $self instvar mylan
+    $self instvar mynode
+
+    set port [$mylan get_port $mynode]
+    
+    return [$mylan set linkq([list $mynode $port])]
 }
 # Don't need any rename procs since these never use their own name and
 # can not be generated during Link creation.
@@ -125,6 +139,8 @@ Link instproc init {s nodes bw d type} {
 }
 
 LanLink instproc init {s nodes bw d type} {
+    var_import GLOBALS::new_counter
+
     # This is a list of {node port} pairs.
     $self set nodelist {}
 
@@ -170,6 +186,7 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar loss
     $self instvar rloss
     $self instvar cost
+    $self instvar linkq
 
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
@@ -181,6 +198,10 @@ LanLink instproc init {s nodes bw d type} {
 	set rloss($nodepair) 0
 	set cost($nodepair) 1
 	lappend nodelist $nodepair
+
+	set lq q[incr new_counter]
+	Queue lq$lq $self $type to
+	set linkq($nodepair) lq$lq
     }
 }
 
@@ -359,6 +380,54 @@ Link instproc updatedb {DB} {
 	} else {
 	    set linkqueue $fromqueue
 	}
+	set limit_ [$linkqueue set limit_]
+	set maxthresh_ [$linkqueue set maxthresh_]
+	set thresh_ [$linkqueue set thresh_]
+	set q_weight_ [$linkqueue set q_weight_]
+	set linterm_ [$linkqueue set linterm_]
+	set queue-in-bytes_ [$linkqueue set queue-in-bytes_]
+	if {${queue-in-bytes_} == "true"} {
+	    set queue-in-bytes_ 1
+	} elseif {${queue-in-bytes_} == "false"} {
+	    set queue-in-bytes_ 0
+	}
+	set bytes_ [$linkqueue set bytes_]
+	if {$bytes_ == "true"} {
+	    set bytes_ 1
+	} elseif {$bytes_ == "false"} {
+	    set bytes_ 0
+	}
+	set mean_pktsize_ [$linkqueue set mean_pktsize_]
+	set red_ [$linkqueue set red_]
+	if {$red_ == "true"} {
+	    set red_ 1
+	} elseif {$red_ == "false"} {
+	    set red_ 0
+	}
+	set gentle_ [$linkqueue set gentle_]
+	if {$gentle_ == "true"} {
+	    set gentle_ 1
+	} elseif {$gentle_ == "false"} {
+	    set gentle_ 0
+	}
+	set wait_ [$linkqueue set wait_]
+	set setbit_ [$linkqueue set setbit_]
+	set droptail_ [$linkqueue set drop-tail_]
+	
+	set nodeportraw [join $nodeport ":"]
+	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_ where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+    }
+}
+
+Lan instproc updatedb {DB} {
+    $self next $DB
+    $self instvar nodelist
+    $self instvar linkq
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
 	set limit_ [$linkqueue set limit_]
 	set maxthresh_ [$linkqueue set maxthresh_]
 	set thresh_ [$linkqueue set thresh_]

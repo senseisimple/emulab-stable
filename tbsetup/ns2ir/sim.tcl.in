@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -121,6 +121,10 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
 	perror "\[duplex-link] $n2 is not a node."
 	set error 1
     }
+#    if { [$n1 set isvirt] != [$n2 set isvirt] } {
+#	perror "\[duplex-link] Bad link between real and virtual node!"
+#	set error 1
+#    }
 
     if { $simulated == 1 && ( [$n1 set simulated] == 0 || [$n2 set simulated] == 0 ) } {
 	set simulated 0
@@ -159,6 +163,24 @@ Simulator instproc make-lan {nodelist bw delay args} {
     if {($args != {})} {
 	punsup "Arguments for make-lan: $args"
     }
+
+    #
+    # The number of virtual nodes has to be zero, or equal to the number
+    # of nodes (In other word, no mixing of real and virtual nodes).
+    #
+#    set acount 0
+#    set vcount 0
+#    foreach node $nodelist {
+#	if { [$node set isvirt] } {
+#	    incr vcount
+#	}
+#	incr acount
+#    }
+#    if { ($vcount != 0) && ($vcount != $acount) } {
+#	perror "\[duplex-link] Bad lan between real and virtual nodes!"
+#	set error 1
+#	return ""
+#    }
 
     # At this point we have one of the nodes of
     # the lan to be real. We need to make sure
@@ -215,6 +237,8 @@ Simulator instproc run {} {
     var_import ::GLOBALS::wa_delay_solverweight
     var_import ::GLOBALS::wa_bw_solverweight
     var_import ::GLOBALS::wa_plr_solverweight
+    var_import ::GLOBALS::uselinkdelays
+    var_import ::GLOBALS::forcelinkdelays
 
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {
@@ -295,7 +319,7 @@ Simulator instproc run {} {
 	$prog updatedb $DB
     }
 
-    sql exec $DB "update experiments set usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
+    sql exec $DB "update experiments set forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
     sql endquery $DB
     
     foreach event $event_list {
@@ -699,6 +723,26 @@ Simulator instproc link {src dst} {
     set name sl[incr new_counter]
     
     return [SimplexLink $name $reallink $dir]
+}
+
+Simulator instproc lanlink {lan node} {
+    if {[$node info class] != "Node"} {
+	perror "\[lanlink] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[lanlink] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[lanlink] $node is not in $lan."
+	return
+    }
+    var_import GLOBALS::new_counter
+    set name ll[incr new_counter]
+    
+    return [LLink $name $lan $node]
 }
 
 # get_subnet
