@@ -2612,9 +2612,14 @@ sub TBExptDestroy($$)
     # okay since admin types should rarely end experiments in other projects.
     #
     print "Removing experiment directories ... \n";
-    if (system("/bin/rm -rf $userdir")) {
+    if (defined($userdir) && system("/bin/rm -rf $userdir")) {
 	print "*** WARNING: Not able to remove $userdir\n";
 	print "             Someone will need to do this by hand.\n";
+	# NFS errors usually the result. Sometimes its cause there is
+	# someone in the directory, so its being held open.
+        libtestbed::SENDMAIL($TBOPS, "TBExptDestroy: Could not remove directory",
+			     "Could not remove $userdir.\n".
+			     "Someone will need to do this by hand.\n");
     }
     if (system("/bin/rm -rf $workdir")) {
 	print "*** WARNING: Not able to remove $workdir\n";
