@@ -2687,7 +2687,7 @@ sub LoadVirtLans()
 	# User has requested veth devices. Not typical.
 	$virt_lans{$vname}->{"USEVETH"}      = $useveth;
 	# User has said that colocating is okay. Not typical.
-	$virt_lans{$vname}->{"TRIVOK"}       = $trivial_ok;
+	$virt_lans{$vname}->{"TRIVIAL_OK"}   = $trivial_ok;
 	# Link is connected to a remote node, and gets a tunnel.
 	$virt_lans{$vname}->{"TUNNEL"}       = 0;
 
