@@ -139,6 +139,26 @@ if ($UID && !TBAdmin($UID) &&
 		"    You do not have permission to swap this experiment!");
 }
 
+#
+# Verify user and get his DB uid.
+# XXX - copied from elsewhere: is this translation needed anymore?
+#
+my $dbuid;
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Get email info for user, in case we have to alert them about failures
+#
+my ($user_name,$user_email);
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
+}
+my $user_email_to = "$user_name <$user_email>";
+
 TBDebugTimeStamp("os_setup started");
 
 #
@@ -582,7 +602,7 @@ while ( @nodelist ) {
 	# Send mail to testbed-ops and to the user about it.
 	my ($user) = getpwuid($UID);
 	
-	SENDMAIL($user, "Node $node is down",
+	SENDMAIL($user_email_to, "Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
 		 "is nonfatal, although you might encounter other problems\n".
@@ -699,7 +719,7 @@ elsif (@vnodelist) {
 	    # Send mail to testbed-ops and to the user about it.
 	    my ($user) = getpwuid($UID);
 	
-	    SENDMAIL($user, "Virtual Node $node is down",
+	    SENDMAIL($user_email_to, "Virtual Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
 		 "is nonfatal, although you might encounter other problems\n".
