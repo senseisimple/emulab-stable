@@ -28,10 +28,11 @@ my  $optlist = "dfe:";
 my $TB		= "@prefix@";
 
 #
-# Load the Testbed support stuff. 
+# Testbed Support libraries
 #
-push(@INC, "$TB/lib");
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
@@ -141,27 +142,85 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# In force mode, just call the power program for the whole bunch and
-# be done with it.
+# Another shark hack. Well, perhaps not. We really don't want 50 nodes
+# all rebooting at the same time, PCs *or* sharks. Lets order them
+# so that the shelves are grouped together at least, and issue the reboots
+# in batches. 
 #
-if ($force) {
-    system("$power cycle @nodes");
-    exit $? >> 8;
+my @sortednodes = sort(@nodes);
+
+while (@sortednodes) {
+    my @batch = ();
+    my $i     = 0;
+    my $lastshelf = 0;
+    
+    while ($i < 8 && @sortednodes > 0) {
+	my $node = shift(@sortednodes);
+	my $shelf;
+	my $unit;
+
+	#
+	# The point of this sillyness is stop at each shelf transition.
+	#
+	if (IsShelved($node, \$shelf, \$unit)) {
+	    if ($lastshelf && $lastshelf ne $shelf) {
+		unshift(@sortednodes, $node);
+		last;
+	    }
+	    $lastshelf = $shelf;
+	}
+	    
+	push(@batch, $node);
+	$i++;
+    }
+
+    if ($force) {
+        #
+        # In force mode, call the power program for the whole batch, and
+	# continue on. We don't wait for them to go down or reboot.
+        #
+	system("$power cycle @batch");
+	if ($?) {
+	    exit ($? >> 8);
+	}
+    }
+    else {
+        #
+        # Fire off a reboot process so that we can overlap them all.
+        # We need the pid so we can wait for them all before preceeding.
+        #
+	foreach my $node ( @batch ) {
+	    $mypid = RebootNode($node);
+	    $pids{$node} = $mypid;
+	}
+    }
+
+    # 
+    # If there are more nodes to go, then lets pause a bit so that we
+    # do not get a flood of machines coming up all at the same exact
+    # moment.
+    #
+    if (@sortednodes) {
+	print STDOUT "Pausing to give some nodes time to reboot ...\n";
+	if ($lastshelf) {
+	    sleep(15);
+	}
+	    sleep(10);
+	else
+    }
 }
 
 #
-# Fire off a reboot process so that we can overlap them all.
-# We need the pid so we can wait for them all before preceeding.
+# In force mode, we are done.
 #
-foreach my $node ( @nodes ) {
-    $mypid = RebootNode($node);
-    $pids{$node} = $mypid;
+if ($force) {
+    exit 0;
 }
 
 #
 # Wait for all the reboot children to exit before continuing.
 #
-foreach my $node ( @nodes ) {
+foreach my $node ( sort(@nodes) ) {
     my $mypid     = $pids{$node};
 
     waitpid($mypid, 0);
@@ -234,7 +293,7 @@ sub RebootNode {
 	# The ssh can return non-zero exit status, but still have worked.
 	# FreeBSD for example.
 	#
-	print STDERR "reboot of $pc returned $?.\n";
+	print STDERR "reboot of $pc returned $?.\n" if $debug;
     
 	#
 	# If either ssh is not running or it timed out,
