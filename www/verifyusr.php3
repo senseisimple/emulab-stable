@@ -111,6 +111,7 @@ function INFORMLEADERS($uid) {
 	     $proj_URL          = $row[URL];
 	     $proj_funders      = stripslashes($row[funders]);
 	     $proj_public       = ($row[public] ? "Yes" : "No");
+	     $proj_linked       = ($row[linked_to_us] ? "Yes" : "No");
 	     $proj_whynotpublic = stripslashes($row[public_whynot]);
 	     $proj_members      = $row[num_members];
 	     $proj_pcs          = $row[num_pcs];
@@ -132,6 +133,7 @@ function INFORMLEADERS($uid) {
 		"Project URL:     $proj_URL\n".
 		"Public URL:      $proj_public\n".
 		"Why Not Public:  $proj_whynotpublic\n".
+		"Linked to Us?:   $proj_linked\n".
 		"Funders:         $proj_funders\n".
 		"Title:           $usr_title\n".
 		"Affiliation:     $usr_affil\n".

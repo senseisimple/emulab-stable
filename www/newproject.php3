@@ -875,9 +875,11 @@ else {
 if (!isset($formfields[proj_linked]) ||
     strcmp($formfields[proj_linked], "checked")) {
     $proj_linked = "No";
+    $linked = 0;
 }
 else {
     $proj_linked = "Yes";
+    $linked = 1;
 }
 
 #
@@ -953,12 +955,12 @@ if (! $returning) {
 DBQueryFatal("INSERT INTO projects ".
 	     "(pid, created, expires, name, URL, head_uid, ".
 	     " num_members, num_pcs, why, funders, unix_gid, ".
-	     " num_pcplab, num_ron, public, public_whynot)".
+	     " num_pcplab, num_ron, public, public_whynot, linked_to_us)".
 	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
 	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
 	     "        '$proj_pcs', '$proj_why', ".
 	     "        '$proj_funders', NULL, $proj_plabpcs, $proj_ronpcs, ".
-	     "         $public, '$proj_whynotpublic')");
+	     "         $public, '$proj_whynotpublic', $linked)");
 
 DBQueryFatal("INSERT INTO project_stats (pid) VALUES ('$pid')");
 

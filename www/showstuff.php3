@@ -36,6 +36,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_pcs           = $row[num_pcs];
     $proj_ronpcs        = $row[num_ron];
     $proj_plabpcs       = $row[num_pcplab];
+    $proj_linked        = $row[linked_to_us];
     $proj_why           = nl2br($row[why]);
     $control_node	= $row[control_node];
     $approved           = $row[approved];
@@ -47,6 +48,13 @@ function SHOWPROJECT($pid, $thisuid) {
     }
     else {
 	$proj_public = "No";
+    }
+
+    if ($proj_linked) {
+	$proj_linked = "Yes";
+    }
+    else {
+	$proj_linked = "No";
     }
 
     if (!$expt_last) {
@@ -83,6 +91,11 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<tr>
               <td>Publicly Visible: </td>
               <td class=\"left\">$proj_public</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Link to Us?: </td>
+              <td class=\"left\">$proj_linked</td>
           </tr>\n";
     
     echo "<tr>
