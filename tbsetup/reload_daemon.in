@@ -46,7 +46,7 @@ my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
-my $warn_time   = 30 * 60; # 30 minutes
+my $warn_time   = 30; # in minutes
 
 #
 # Turn off line buffering on output (dots ...).
@@ -98,11 +98,11 @@ while (1) {
     $query_result =
 	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
 		    "and eid='$RELOADEID' and " .
-		    "(rsrv_time + $warn_time) < NOW() ");
+		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time MINUTE) > rsrv_time");
     while (($node) = $query_result->fetchrow){ 
 	if (!$warned{$node}) {
 	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
-	    "more than $warn_time seconds");
+	    "more than $warn_time minutes");
 	    $warned{$node} = 1;
 	}
     }
