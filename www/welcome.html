@@ -1,97 +1,94 @@
 <html>
-  <head>
-    <title>Utah Network Testbed - Operations Home</title>
-    <link rel='stylesheet' href='tbstyle.css' type='text/css'>
-    <base href='https://www.emulab.net/' target='dynamic'>
-  </head>
-  <body>
-    <h1>Testbed Operations</h1>
+<head>
+	<title>Utah Network Testbed - Operations Home</title>
+	<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+<!--	<base href='https://www.emulab.net/' target='dynamic'>
+-->
+</head>
+<body>
+
+<h1>Testbed/Emulab Operations</h1>
 
 This is the Web-based operational interface to the testbed.
-For information on the testbed itself, see the
+For details on the testbed itself and why it's special, see the
 <a href = "http://www.cs.utah.edu/flux/testbed/">base</a> and
 <a href = "http://www.cs.utah.edu/flux/testbed/doc/">documentation</a> pages.
 <p>
 
-OUTLINE
+To protect data you submit, SSL is used to encrypt data as it
+is transferred accross the Internet. Therefore, you will need to
+access these pages with a browser that supports SSL.  We recommend
+Netscape 4.0 or later, or presumably a recent IE, and also recommend a
+screen resolution of at least 800x600 to avoid excessive scrolling.
 
-Policy
+<h3>What is it?</h3>
 
-Authorization Scheme
+<!-- XXX find hardware page -->
+<a href = "http://www.cs.utah.edu/flux/testbed/doc/">Raw hardware</a>--
+lots of it-- with configuration and management tools.
+<!-- lots of them.  [not yet so many] -->
+During an experiment's time slots, the experiment (and associated researchers)
+get exclusive use of the
+assigned machines, including root access if desired.  Until we finish designing
+and building smarter scheduling and state-saving software, and obtain the
+disk space, scheduling is manual and done at course granularity
+(days).
 
-What is it?
-	Raw hardware and management and configuration tools.
-	In practice, provide some default software that many users
-	may want.  But fundamentally, the software you run on it,
-	including all bits on the disks, is up to you.
+<p> We provide some default software (e.g. Linux and
+FreeBSD on the PCs, NetBSD on the Sharks) that many users may want.
+But fundamentally, the software you run on it, including all bits on
+the disks, is replaceable and up to you.  The same applies to the network's
+characteristics, including its topology: configurable by users.
 
-What do users get?
-	Home dir on login node.
+<h3>A few hardware and usage details, please</h3>
 
-
-
-<h2>Overview of the authorization scheme and policy</h2>
-
-<h2>Policy</h2>
-
-<ul><b>Appropriate Use:</b>
-In principle, almost any research or experimental use of the testbed
-by experimenters that have a need for it is appropriate.
+Right now: a FreeBSD operations node with 90 GB of disk space,
+on which all users get full Unix accounts, ssh-accessible from the world.
+40 PCs each with 5 100 Mbit cards and a 13 GB disk, plus 160
+StrongARM-based "Sharks," all connected by 2 miles of cable thru high
+end Cisco switches.  Full details available on the
+<!-- XXX check this URL -->
+<a href = "http://www.cs.utah.edu/flux/testbed/doc/">hardware page</a>.
 <p>
 
-When our resources become oversubscribed we will be allocating
-resources based on some currently vague function of perceived research
-value, resources required (typically number of nodes and weirdness
- of software), the testbed's uniqueness as a suitable platform for the
-research,
+When an experiment's machines are active, appropriate Unix accounts
+are also provided on those nodes.
 
-sponsorship by our primary sponsors (currently NSF and Cisco),
-affiliation with an academic institution, funded project,
-and for commercial users, ability to pay.
+<h3><a href = "policies.html">Administrative Policies and Disclaimer</a></h3>
 
+Most any legitimate research/experimental use is allowed, including
+use by companies.  Of course, when demand exceeds supply we will have
+to assign priorities to projects, but the hardware base will be expanding.
 
 
-Many commercial users would also be allowed
+<h3><a href = "auth.html">Authorization Scheme, Policy, and "How To Get Started"</a></h3>
+
+It's hierarchical: we authorize a project under a principal
+investigator (e.g. a faculty member) and delegate authority
+to that person to authorize the project's members--  and
+accountability for their behavior. 
 
 
+<h3>Notes on security</a></h3>
+<!-- <a href = "security.html"> -->
+
+Each project gets a unique Unix group and its own protected subtree on
+the ops node.  That subtree is NFS-exported only to that group's
+assigned test machines.  We don't currently protect against spoofing
+on the control network, so there are vulnerabilities.  The test networks
+are fully separated between experiments by way of VLANs.
 
 
-Use this set of pages
-<ul>
-<li> to gain authorization to use the testbed, either as
-	<ul>
-	<li> a project leader ("principal investigator" in academic
-		parlance) starting a new project ("start project"), or
-	<li> as a worker bee in a particular project ("join project");
-	</ul>
-<li> as a project leader, to approve or deny pending project members;
-<li> to authenticate ("login") to the Web-based testbed services.
-</ul>
+<h3>How to contact Testbed Ops</h3>
+
+For questions or problems, send email to
+<a href="mailto:testbed-ops@flux.cs.utah.edu">
+Testbed Ops (testbed-ops@flux.cs.utah.edu)</a>.    
 <p>
 
-When your project or membership request is approved or denied you will
-receive email.
 
-
-    <h2>How do I get started</h2>
-
-    Briefly, you use the links at your left to create and join
-    <em>projects</em>. Typically, a project leader will request
-    permission from Testbed Ops, via the web interface, to
-    <em>create</em> a project.  Then, people working on project
-    (students, staff, etc.) will request permission from the Project
-    Leader, also via the web interface, to <em>join</em> the project.
-    Once project members have been authorized, they can log onto the
-    Testbed interface to start an experiment, reserving and
-    configuring nodes as necessary. More detailed information on this
-    process can be found in the <a href="faq.html">FAQ</a>.
-
-    <h2>How to contact Testbed Ops</h2>
-
-    For questions or problems, send email to
-    <a href="mailto:testbed-ops@flux.cs.utah.edu">
-    Testbed Ops (testbed-ops@flux.cs.utah.edu)</a>.    
-    <p>
-
-  </body>
+<hr>
+<address>testbed-www@flux.cs.utah.edu<br>
+Last modified on Oct 27, 2000</address>
+</body>
 </html>

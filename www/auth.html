@@ -1,0 +1,162 @@
+<html>
+<head>
+	<title>Utah Network Testbed -  Policy</title>
+	<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+<!--	<base href='https://www.emulab.net/' target='dynamic'>
+-->
+</head>
+<body>
+
+
+<h1>Overview of the authorization scheme, policy, and how to</h1>
+
+
+<h3>How do I get started?</h3>
+
+Briefly, you use the links at your left to create and join
+<em>projects</em>.  Typically, someone who will be the <em>project
+leader</em> requests permission from Testbed Ops/Admin, via the web
+interface, to <em>create</em> a project.  In academic parlance, a
+project leader is a "principal investigator."  That person is expected
+to be someone who is responsible, whose position is more or less
+verifiable by us, and is therefore accountable.  Specifically, the
+project leader is held responsible for the actions of members of
+his/her project.
+<p>
+
+For example, if you are a grad student who "owns" a project and no
+faculty member is really involved, normally you should still get your
+advisor or other professor to be the project leader.  Exceptions could
+include your being a senior student well-known in the research
+community.  If you are not a student, but a senior/core member of an
+open source project, either you or someone more official in
+the project should be leader, as appropriate.
+If you are in a research lab and are not brand new there, you would
+probably be the project leader.
+<p>
+
+Within a week, say, you will receive email from the testbed admin
+folks, either approving or denying your project.
+<!-- XXX login to web interface and ops node, or has web interface
+	login enablement already happened? Clarify below. -->
+You will then be able to login to the testbed.
+
+<p>
+People working on the project
+(students, staff, etc.) will request permission from the project
+leader, also via the web interface, to <em>join</em> the project.
+These requests can precede project approval; they will be queued.
+Once project members have been authorized by the leader, they can log onto the
+testbed ops node to start an experiment, reserving and
+configuring nodes as necessary. 
+
+<!--
+More detailed information on this
+process can be found in the <a href="faq.html">FAQ</a>. -->
+
+<p>
+In the future we will enable the leader to provide a list of
+project members.
+
+
+<h3>Another way of saying the same thing</h3>
+
+If you didn't understand that, try this.
+<p>
+
+Use this set of Web pages
+<ul>
+<li> to gain authorization to use the testbed, either as
+	<ul>
+	<li> a project leader ("principal investigator" in academic
+		parlance) who is starting a new project
+		("start project"), or
+	<li> as a worker bee in a particular project ("join project");
+	</ul>
+<li> as a project leader, to approve or deny pending project members;
+<li> to authenticate ("login") to the Web-based testbed services.
+</ul>
+<p>
+
+When your project or membership request is approved or denied you will
+receive email.
+
+<h3>Seems awfully complicated</h3>
+
+It should be a lot easier in practice than it sounds.
+<p>
+
+We need accountability.  However, we want to avoid slowing things
+down by checking every user-- thus we delegate that authority
+to the PI's.  Since the PI (project leader) has so much authority,
+we need more info from them, such as their postal address.
+<p>
+
+If you think this soounds bad, try getting access to a telescope
+or supercomputer.
+<p>
+
+We are certainly open to suggestions, however, and already plan
+to improve the interface in a number of ways.
+
+<h2>A mini-FAQ</h2>
+
+<ul>
+
+<li><h3>Someone told me to join their project. How do I do  that?</h3>
+<p>
+Go to the 'Join a Project' page, fill out the
+form, and wait for the project leader to approve you.  When
+approved you will receive an email message saying so,
+and you can then log into the Testbed.
+<!--  Not implemented:
+	Your project leader will
+	control how much access you have to Testbed resources, within
+	the limits given to the project as a whole.
+-->
+</p>
+
+<li><h3>I'm already a testbed user, but I'm collaborating with
+  another project.  Can I join that project too?</h3>
+<p>
+Yes, if that project leader approves you.  
+Do the appropriate stuff on the 'Join a Project' page.
+</p>
+
+<li><h3>I've been approved.  How do I use my account?</h3>
+<p>
+The first step would be to come back here and log in to the Web
+interface.  That will update the list of options in the side bar.
+	You might be authorized to start projects or experiments, or
+	maybe just to use the nodes in an experiment. Either way, your
+	options will show up in the side bar.
+Those will normally include starting a new "experiment" which leads to
+reserving a set of nodes, which leads to automatic creation of Unix
+accounts on those nodes for all members in your project. You will be
+able to use ssh to log into those machines.
+<p>
+You will also receive an account on the operations machine
+"ops.emulab.net", and from there will be able to access the test
+nodes' serial line consoles via 'tip' as well as access console log
+files.
+</p>
+
+<li><h3>You still haven't answered my question. Who can I ask?</h3>
+<p>
+You can try the other web pages for the testbed, located on the
+<a href="http://www.cs.utah.edu/flux/testbed/">testbed
+homepage</a>, or in the
+<a href="http://www.cs.utah.edu/flux/testbed/doc/">testbed 
+documentation</a>.  After checking those, you may
+<a href="mailto:testbed-ops@flux.cs.utah.edu">
+send e-mail to Testbed Ops</a>(testbed-ops@flux.cs.utah.edu).
+</p>
+
+</ul>
+
+<hr>
+<address>testbed-www@flux.cs.utah.edu<br>
+Last modified on Oct 27, 2000</address>
+</body>
+
+</html>
