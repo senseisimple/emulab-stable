@@ -1,0 +1,216 @@
+This file describes the implementation of (and a little bit of the rationale
+for) out FreeBSD-based "virtual node" support.
+
+The summary is that we use a highly customized FreeBSD kernel supporting
+beefed-up jails, virtual disks, virtual ethernet interfaces, and multiple
+routing tables to implement reasonably isolated virtual nodes for network-
+centric activity.  We do not yet provide complete resource isolation, in
+particular to limit CPU or memory consumption.
+
+A. Rationale
+
+Why jails?
+
+One way to achieve multiplexing of activity on physical nodes is simply to
+start up multiple copies of an experimenter's desired applications.  For
+example, if they want 10 "nodes" running a background traffic generator,
+we just start up 10 copies on a single physical node.  There are a number
+of problems with this approach.  One is that it will likely require
+customization of the application, possibly even changing the code itself,
+to allow it to co-exist with other instances of itself.  For example,
+the application might have a hardwired path in the filesystem for
+configuration or logging information or require a specific port number.
+The first step in virtualizing an application's environment is thus to
+give it its own name space.
+
+BSD jails (jail(2)) serve to restrict a process and all its descendents to
+a unique slice of the filesystem namespace using chroot.  This not only gives
+each jail a custom, virtual root filesystem (/, /var, etc.) but also insulates
+them from the filesystem activities of others (and visa-versa).  Jails also
+provide a mechanism for virtualizing and restricting access to the network.
+When a jail is created, it is given a virtual hostname and a set of IP
+addresses that it can bind to.  These IP addresses are associated with
+network interfaces outside of the jail context and cannot be changed from
+within a jail.  Hence, jails are implicitly limited to a set of interfaces
+they may use.  Further, jails allow processes within them to run as root,
+albeit a watered-down variant.  With root inside a jail, applications can
+add/change/remove whatever files they want (except for device special files),
+bind to privileged ports, and kill any other jailed processes.
+
+Why virtual disks?
+
+One potential problem with the filesystem virtualization provided by jails,
+is constraining disk usage.  Even though each jail has its own subset of
+the filesystem name space, that space is likely to be part of a larger
+filesystem.  Jails themselves do nothing to limit now much disk space can
+be used within the hosting filesystem.  Disk quotas aren't useful since,
+within the jail's name space, files are not restricted to a single uid
+or even subset of uids, they can be owned by anyone.
+
+The BSD vnode disk driver (vn(4)) allows us to create a regular file with
+a fixed size and expose it via a disk interface.  These fixed-size virtual
+disks are used to contain a root filesystem for each jail which is mounted
+at the root of each jail's name space.  Since the virtual disks are contained
+in regular files, they are also easy and efficient to move or clone.
+
+Why virtual ethernet interfaces?
+
+An important part of BSD jails is the ability to restrict them to specific
+IP addresses.  But the jail mechanism does not ...
+
+   - allows attaching of ipfw/dummynet
+   - ensures jail sees only traffic it should without overly limiting
+     to specific target IPs
+   - encapsulation
+
+The BSD virtual ethernet driver, which we wrote, is a goofy hybrid of a
+virtual device, an encapsulating device and a bridging device.  It allows
+us to create lots and lots of ethernet interfaces (virtualization), multiplex
+them on physical interfaces or tie them together in a loopback fashion
+(bridging) and have them communicate transparently through our switch
+fabric (encapsulation).
+
+
+Why virtual routing tables?
+
+
+B. Implementation
+
+All virtual nodes on a physical node will belong to the same experiment.
+This eases the immediate burden of providing isolation somewhat and also
+allows us to evade tricky issues of who has what access to the hosting
+physical node.  So a physical node, mapped to an experiment, boots up and
+eventually runs the bootvnodes script.  That script contacts Testbed Central
+and discovers that it has vnodes to setup.  It performs a couple of global
+"one time" actions: it creates a filesystem on the 4th DOS partition for
+jail disk space and ensures that sufficient virtual disk (vn) devices exist
+for all vnodes.  It then runs vnodesetup for every vnode.
+
+The vnodesetup script is used to start ("boot"), stop ("halt") and restart
+("reboot") vnodes.  It is also used to setup vnodes on widearea nodes, but
+we consider only local cluster nodes here.  Vnodesetup forks and runs another
+script, mkjail.pl, in the child.  The parent hangs around and cleans up if the
+jail dies.  It also serves as a focal point for killing the jail, catching
+signals and forcibly terminating the jail.  It is the parent vnodesetup
+process that handles informing stated of state transitions in the jail.
+
+In mkjail.pl we finally get down to it.  This script builds up the filesystem
+hierarchy used by the jail, sets up its interfaces (including the virtual
+control net interface, routes and dummynet delay pipes), and then starts
+the jail.  Note that the filesystem and interfaces are setup outside the
+jail and passed as parameters into the jail.
+
+The filesystem consists of a per-jail vnode-disk and loopback (null) mounts
+of various physical node filesystems.  The whole shebang is located in
+/var/emulab/jails/<vnodename>.  root.vnode is the regular file which serves
+as the root disk.  It is attached to a vn device that is then mounted at
+/var/emulab/jails/<vnodename>/root.  The mkjail.pl script populates the disk
+by copying in some directories from the physical node and customizing the
+content.  This loading of the disk only happens on the first boot up of the
+virtual node.  Subsequent boots simply mount the vn disk.  To save space in
+the per-jail disk, the binary directories /sbin and /bin are remounted
+read-only with a loopback mount as is /usr.  The shared /share, /proj,
+/users and /local directories are also loopback mounted read-write from
+the physical node.  From the perspective of the physical node, there will
+be at least 8 mounts for every jail: /dev/vn?c (the root), /bin, /sbin,
+/usr, /proc, /share, /proj/<pid>, and /local/<pid>, plus one in /users
+for every user in the project (and maybe a /group/<gid> too!).
+
+The network setup starts with configuration of the virtual control net
+interface.  This consists of a 172.16/12 address alias assigned to the
+real control net interface.  There will be one such alias per virtual
+node.  These aliases allow us to further isolate jails from each other
+as each jail now has a unique address on which to run services.  We no
+longer have to assign port ranges within the primary control net address
+and run daemons on weird port numbers.  We can also use DNS to map
+symbolic names to the virtual nodes.  Note that these address are
+"unroutable" and thus are not exposed outside emulab.net.  Accessing
+services on the nodes from outside requires a proxy on ops.emulab.net,
+such as an ssh tunnel.
+
+For experimental interfaces, mkjail.pl creates an rc file to setup the virtual
+interfaces and routes, and runs them.  A virtual interface's parameters are
+assigned as follows.  We assign veth virtual MACs based on the interfaces IP
+address, in the form: 00:00:IP#0:IP#1:IP#2:IP#3, ensuring uniqueness.
+We assign veth tags using the subnet part of the interface's IP address.
+Since we use the 192.168 space, we need only the third octet of the IP to
+identify the subnet, but for future expansion, we use the second and third
+octets.  A veth's physical interface is determined by assign.  We may use
+multiple physical interfaces between nodes or we may use no physical
+interfaces at all.  The routing table ID is unique per virtual node on a
+physical node, so we simply use a per-physical node counter to assign these
+when the vnodes are booted.  All veths for a virtual node get the same
+counter value.  There is nothing magical in route setup, just an extra
+argument to the route command to ensure the routes get added to the correct
+table.  Likewise for delay setup, ipfw rules are simply applied to veths
+rather than physical interfaces.  Setting up routes and dummynet outside
+the jail is largely historical.
+
+Finally, the jail startup is done.  Our augmented jail implementation
+takes some new parameters in addition to a "primary" IP address, the root
+directory of the jail, and the program to run.  The important additional
+parameter is a list of IP addresses.  These addresses, along with the primary,
+implicitly define which interfaces are accessible to the jail: those to which
+the IP addresses are assigned.  This is analogous to the root directory
+specification which determines which mounted filesystems are accessible:
+those at or below the level of the root directory.  The program run by the
+jail is yet another perl script, /etc/injail.pl, that is effectively the
+/sbin/init of the virtual node.  Its primary jobs are to fire off /etc/rc
+to bring up the virtual node and then sit around and wait for a signal to
+shutdown the jail.  The startup scripts run by /etc/rc in the jail are
+scaled back versions of what would run on a real node.  This scaling back
+reflects the fact that the node has already been partially initialized and
+also that it usually will not run as many services as a real node.  A
+typical jail syslogd, cron and sshd, as well as the Emulab watchdog and
+optional agents like trafgen or delay_agent.  From the perspective of the
+physical node, each jail has at least 8 processes running:
+vnodesetup, mkjail.pl and proxy-tmcc outside the jail as well as
+injail.pl, syslogd, cron, sshd, and the Emulab watchdog inside the jail.
+Empirically, it appears that each jail requires 12-16MB of physical memory
+for its base processes.
+
+C. Details
+
+FreeBSD jails.  Jails provide filesystem and network namespace isolation
+and some degree of superuser privilege restriction.  To the basic jail
+mechanism we have added:
+
+1. Raw socket access.
+2. Read-only BPF access.
+3. Multiple-IP and INADDR_ANY support
+4. Associate jail with a routing table
+5. Bug fixes: cannot umount fs not mounted from within jail
+
+[ move this detail somewhere else, a man page maybe? ]
+First a few words on veth devices.  They are configured with a few parameters:
+a virtual MAC (VMAC) address, a broadcast domain tag, an associated physical
+(parent) ethernet interface, and a routing table ID.  The VMAC obviously
+identifies the interface and needs to be unique within a broadcast domain,
+*not* unique per physical node.  Thus, you could have the same VMAC on
+multiple veths on the same physical node (though we don't do that) and you
+may have to have distinct VMACs within a set of physical nodes, it depends
+on the topology.  The broadcast domain tag is basically a VLAN tag, it allows
+us to use the same physical wire for multiple LANs.  Unlike VLANs where you
+can have up to 4096, we currently use a 16-bit value allowing up to 64k LANs.
+Again, a tag's uniqueness has nothing to do with physical node boundaries,
+veths on different physical nodes may need to have the same tag while veths
+on the same node may have different values.  The parent interface parameter
+determines which interface the veths send and receive encapsulated packets
+to and from.  All veths with the same parent interface and broadcast domain
+tag, can talk to each other.  If such veths are on the same physical node,
+they talk via a loopback with no encapsulation and without packets going
+out on the physical interface.  Specifying a null parent can be used for a
+strictly loopback connection.  The routing table ID is used with incoming
+packets to determine which table to use for lookups when forwarding.
+The route table ID effectively identifies a virtual node: all interfaces
+associated with a virtual node have the same ID, every virtual node has
+its own unique ID.  The route table ID is a local-node only value, different
+physical nodes can use the same ID for different purposes.
+
+
+D. Examples
+
+Consider a topology of two nodes connected via a link.  Assume that both
+nodes have been mapped to virtual nodes on two different physical nodes.
+Each virtual node.
+
