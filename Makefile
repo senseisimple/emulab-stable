@@ -49,6 +49,8 @@ install: all
 	install -c tbsetup/tbrun.tcl /usr/testbed/bin/tbrun
 	install -c tbsetup/vpower /usr/testbed/bin
 	install -c tbsetup/vsnmpit /usr/testbed/bin
+	install -c tbsetup/tbdoit /usr/testbed/bin
+	install -c tbsetup/tbstopit /usr/testbed/bin
 	#XXX - hackish
 	rm -rf /usr/testbed/lib/tbsetup
 	rm -rf /usr/testbed/lib/db
