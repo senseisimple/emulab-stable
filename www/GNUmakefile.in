@@ -80,6 +80,11 @@ NLFILES += $(wildcard $(SRCDIR)/netlab/*.txt)
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 WEBDBFILES += $(wildcard $(SRCDIR)/webdb/*.php)
 
+HYFILES  = $(wildcard $(SRCDIR)/hyperviewer/*.php3)
+HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.html)
+HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.jpg)
+HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
+
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
 DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
@@ -112,6 +117,7 @@ ALLDOWNLOADS = $(notdir $(DOWNLOADFILES))
 ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
+ALLHY     = $(notdir $(HYFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
@@ -121,6 +127,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/, $(ALLDOWNLOADS)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
+	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
