@@ -852,7 +852,14 @@ public class Netbuild extends java.applet.Applet
 	g.translate( workAreaX, 0 );
 	g.setClip( 1, 1, workAreaWidth - 1, appHeight - 1 );
 	workArea.paint( g );
+	g.translate( -workAreaX, 0 );
+	g.setClip( 0, 0, appWidth, appHeight );
 	super.paint(g);
     }
 }
+
+
+
+
+
 
