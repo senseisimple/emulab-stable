@@ -248,14 +248,16 @@ doit(gzFile *infp)
 		 *	FreeBSD:	"Accepted rsa for USER" 
 		 *	Linux 6.2:	"log: RSA authentication for USER"
 		 *	Linux 7.1:	"session opened for user USER"
-		 *      (several):      "Accepted publickey for USER"
-		 *      (several):      "Accepted password for USER"
+		 *      (several ssh2): "Accepted publickey for USER"
+		 *      (several ssh2): "Accepted password for USER"
+		 *      (several ssh2): "Accepted keyboard-interactive for USER"
 		 */
 #define L1	"Accepted rsa for "
 #define L2	"session opened for user "
 #define L3	"log: RSA authentication for "
 #define L4	"Accepted publickey for "
 #define L5	"Accepted password for "
+#define L6	"Accepted keyboard-interactive for "
 		
 		/* Skip to end of program[pid]: and trailing space */
 		bp = strchr(bp, ':');
@@ -280,6 +282,10 @@ doit(gzFile *infp)
 		else if (strncmp(bp, L5, strlen(L5)) == 0) {
 		  /*fprintf(stdout,"Hit L5: ");*/
 			bp += strlen(L5);
+		}
+		else if (strncmp(bp, L6, strlen(L6)) == 0) {
+		  /*fprintf(stdout,"Hit L6: ");*/
+			bp += strlen(L6);
 		}
 		else {
 			continue;
