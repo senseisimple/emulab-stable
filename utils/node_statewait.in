@@ -1,0 +1,100 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Simple utility script that waits for nodes to reach a given state.
+# Presently used by elabinelab stuff to determine when nodes have been
+# rebooted and are part of inner elab.
+#
+sub usage()
+{
+    print STDOUT "Usage: node_statewait [-t timeout] [-a] | [node ...]\n";
+    exit(-1);
+}
+my $optlist = "at:";
+my $timeout = 60 * 6;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+# Locals
+my @nodes       = ();
+my $failed      = 0;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+}
+
+#
+# All testnodes, or just some nodes.
+#
+if (defined($options{"a"})) {
+    usage()
+	if (@ARGV);
+
+    my $query_result =
+	DBQueryFatal("select node_id from nodes ".
+		     "where role='testnode'");
+
+    while (my ($node) = $query_result->fetchrow_array()) {
+	push(@nodes, $node);
+    }
+    exit(0)
+	if (!@nodes);
+}
+else {
+    usage()
+	if (!@ARGV);
+
+    # Untaint the nodes.
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Bad node name: $node.");
+	}
+	push(@nodes, $node);
+    }
+}
+
+my $waitstart = time;
+
+foreach my $node (sort(@nodes)) {
+    #
+    # Skip if something failed earlier.
+    #
+    if (!TBNodeStateWait($node, TBDB_NODESTATE_PXEWAIT, $waitstart, $timeout)) {
+	print STDOUT "nodewait ($node): Success\n";
+	next;
+    }
+    $failed++;
+}
+print "nodewait: Done. There were $failed failures.\n";
+exit($failed);
