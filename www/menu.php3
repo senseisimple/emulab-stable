@@ -298,13 +298,13 @@ function WRITEBANNER($title) {
     if ($login_uid && ISADMININSTRATOR()) {
 	if (ISADMIN($login_uid)) {
 	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=1>
-	             <img src='/autostatus-icons/greenball.gif'
-                          alt='Admin On'></a>\n";
+	             <img src='/autostatus-icons/redball.gif'
+                          border=0 alt='Admin On'></a>\n";
 	}
 	else {
 	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=0>
-	             <img src='/autostatus-icons/redball.gif'
-                          alt='Admin Off'></a>\n";
+	             <img src='/autostatus-icons/greenball.gif'
+                          border=0 alt='Admin Off'></a>\n";
 	}
     }
     else {
