@@ -40,7 +40,7 @@ if (mysql_num_rows($query_result) == 0) {
 
 $filename = $node_id . ".acl"; 
 
-header("Content-Type: text/testbed-acl");
+header("Content-Type: text/x-testbed-acl");
 header("Content-Disposition: attachment; filename=$filename;");
 header("Content-Description: ACL key file for a testbed node serial port");
 
@@ -54,7 +54,8 @@ $keylen  = $row[keylen];
 $keydata = $row[keydata];
 
 # XXX fix me!!!
-$certhash = "7161bb44818e7be5a5bcd58506163e1583e6aa1c";
+# $certhash = "7161bb44818e7be5a5bcd58506163e1583e6aa1c";
+$certhash = "0bc864551de711a3d46ac173dbd67cde75c36734";
 
 echo "host:   $server\n";	
 echo "port:   $portnum\n";
@@ -62,3 +63,4 @@ echo "keylen: $keylen\n";
 echo "key:    $keydata\n";
 echo "ssl-server-cert: $certhash\n";
 ?>
+

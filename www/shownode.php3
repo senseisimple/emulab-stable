@@ -43,9 +43,19 @@ SUBPAGESTART();
 SUBMENUSTART("Node Options");
 
 #
+# Tip to node option
+#
+if ($isadmin || 
+    TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
+    WRITESUBMENUBUTTON("Connect to Serial Line</a> " . 
+	"<a href=\"faq.php3#UTT-TUNNEL\">(howto)",
+	"nodetipacl.php3?node_id=$node_id");
+}
+
+#
 # Edit option
 #
-WRITESUBMENUBUTTON("Edit node info",
+WRITESUBMENUBUTTON("Edit Node Info",
 		   "nodecontrol_form.php3?node_id=$node_id");
 
 if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
@@ -61,6 +71,8 @@ if ($isadmin) {
 }
 SUBMENUEND();
 
+# echo "<h4>(<a href=\"faq.php3#UTT-TUNNEL\">Help on 'connect to serial line'</a>)</h4>";
+
 #
 # Dump record.
 # 
@@ -73,3 +85,7 @@ SUBPAGEEND();
 # 
 PAGEFOOTER();
 ?>
+
+
+
+

@@ -27,6 +27,8 @@
      <li> <a href="#UTT-TOOFEW">What if I need more nodes than are free?</a>
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
+     <li> <a href="#UTT-TUNNEL">How do I connect directly to node consoles, 
+                                without going through <b>users</b>?</a>
      <li> <a href="#UTT-4">Can I reboot (power cycle) my nodes?</a>
      <li> <a href="#UTT-SCROGGED">I've scrogged my disk! Now what?</a>
      <li> <a href="#UTT-5">Where do I store files needed by my experiment?</a>
@@ -339,6 +341,32 @@
     of the node on the shelf is eight.
     </p>
 
+<li><a NAME="UTT-TUNNEL"></a>
+    <h3>How do I connect directly to node consoles, 
+        without going through <b>users</b>?</h3>
+    <p>
+    Clicking "Connect to Serial Line"
+    in the Node Options page will send your browser a "text/x-testbed-acl"
+    file. If you have downloaded <code>tiptunnel</code> and set it as the 
+    handler for that MIME type, <code>tiptunnel</code> will launch a new 
+    telnet running in a new xterm (this may take a few seconds.) 
+    That telnet will be connected to a local port, 
+    which is tunneled through SSL to your node's console. 
+    Closing the xterm, exiting telnet, or killing <code>tiptunnel</code>
+    itself will end the connection.
+    </p>
+    <p>
+    You can download the gzipped <code>tiptunnel</code> 
+    statically-linked x86 binary for FreeBSD 
+    <a href="downloads/tiptunnel.gz">here</a>.
+    Simply <code>gunzip</code> it to somewhere accessible,
+    set it as executable with <code>chmod u+x tiptunnel</code>,  
+    and when you click on the "Connect to Serial Line" link,
+    tell your browser to always use the <code>tiptunnel</code> 
+    binary to open files of type "text/x-testbed-acl".
+    The source tarball, as well as a version for Windows, 
+    will be available soon.
+    </p>
 <li><a NAME="UTT-4"></a>
     <h3>Can I reboot (power cycle) my nodes?</h3>
     <p>

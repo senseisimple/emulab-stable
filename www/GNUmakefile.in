@@ -64,6 +64,10 @@ BUIFILES += $(wildcard $(SRCDIR)/buildui/*.class)
 
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 
+# need to make it *.gz; with simply "*", 
+# we end up sucking over "CVS"
+DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
+
 #
 # This stuff only gets installed on the main site
 #
@@ -85,6 +89,7 @@ ALLDOCS   = $(notdir $(DOCFILES))
 ALLTUTS   = $(notdir $(TUTFILES))
 ALLICONS  = $(notdir $(AUTOICONS))
 ALLWEBDB  = $(notdir $(WEBDBFILES))
+ALLDOWNLOADS = $(notdir $(DOWNLOADFILES))
 ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
 
@@ -93,6 +98,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
 	$(addprefix $(INSTALL_WWWDIR)/webdb/, $(ALLWEBDB)) \
+	$(addprefix $(INSTALL_WWWDIR)/downloads/, $(ALLDOWNLOADS)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
