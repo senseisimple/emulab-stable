@@ -220,17 +220,34 @@ proc set {args} {
     # There are a bunch of cases where we just pass through to real set.
     if {[llength $args] == 1} {
 	return [uplevel real_set \{[lindex $args 0]\}]
-    } elseif {([info level] != 1) || ($last_class == {})} {
+    } elseif {($last_class == {})} {
 	return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
     }
 
-    # At this point this is an assignment immediately after class creation.
     real_set var [lindex $args 0]
     real_set val [lindex $args 1]
+
+    # Run the set to make sure variables declared as global get registered
+    # as global (does not happen until first set).
+    real_set ret [uplevel real_set \{$var\} \{$val\}]
+
+    # Rename happens only when assigning to a global variable. Because of
+    # array syntax, must strip parens and indices to get the base variable
+    # name (has no effect if not an array access).
+    real_set l [split $var \(]
+    real_set base_var [lindex $l 0]
+
+    # Now check to see if its a global. No renaming if not a global.
+    if {[uplevel info globals $base_var] == {}} {
+        return $ret
+    }
+    
+    # At this point this is an assignment immediately after class creation.
     if {$val == $last_class} {
 	# Here we change ARRAY(INDEX) to ARRAY-INDEX
 	regsub -all {[\(]} $var {-} out
 	regsub -all {[\)]} $out {} val
+
 	# Sanity check
 	if {! [catch "uplevel info args $val"]} {
 	    error "Already have an object named $val."
