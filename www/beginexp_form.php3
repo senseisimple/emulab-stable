@@ -151,8 +151,10 @@ echo "<tr>
 <li> If your NS file is using a custom OSID, you must
      <a href="newosid_form.php3">create the OSID first!</a>
 <li>
-     You can also view a <a href="showosid_list.php3"> list of OSIDs</a>
+     You can view a <a href="showosid_list.php3"> list of OSIDs</a>
      that are available for you to use in your NS file.
+<li>
+     You can also view a <a href="showimageid_list.php3"> list of ImageIDs.</a>
 </ul>    
 
 <?php

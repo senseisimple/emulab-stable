@@ -498,6 +498,194 @@ function SHOWOSINFO($osid) {
 }
 
 #
+# Show ImageID record.
+#
+function SHOWIMAGEID($imageid, $edit) {
+    global $TBDBNAME;
+		
+    $query_result = mysql_db_query($TBDBNAME,
+		"SELECT * FROM images WHERE imageid='$imageid'");
+
+    $row = mysql_fetch_array($query_result);
+
+    $description = $row[description];
+    $loadpart	 = $row[loadpart];
+    $loadlength	 = $row[loadlength];
+    $part1_osid	 = $row[part1_osid];
+    $part2_osid	 = $row[part2_osid];
+    $part3_osid	 = $row[part3_osid];
+    $part4_osid	 = $row[part4_osid];
+    $default_osid= $row[default_osid];
+    $path 	 = $row[path];
+    $magic	 = $row[magic];
+    $pid	 = $row[pid];
+    $loadaddr	 = $row[load_address];
+
+    if (!$pid)
+	$pid = "&nbsp";
+    if ($edit) {
+	if (!$description)
+	    $description = "";
+	if (!$magic)
+	    $magic = "";
+	if (!$path)
+	    $path = "";
+	if (!$loadaddr)
+	    $loadaddr = "";
+    }
+    else {
+	if (!$description)
+	    $description = "&nbsp";
+	if (!$magic)
+	    $magic = "&nbsp";
+	if (!$path)
+	    $path = "&nbsp";
+	if (!$loadaddr)
+	    $loadaddr = "&nbsp";
+    }
+    
+    #
+    # Generate the table.
+    #
+    echo "<table align=center border=2 cellpadding=2 cellspacing=2>\n";
+
+    if ($edit) {
+	$imageid_encoded = rawurlencode($imageid);
+	
+	echo "<form action='editimageid.php3?imageid=$imageid_encoded'
+                    method=post>\n";
+    }
+
+    echo "<tr>
+            <td>ImageID: </td>
+            <td class=\"left\">$imageid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Description: </td>
+            <td class=left>\n";
+
+    if ($edit) {
+	echo "<input type=text name=description size=60
+                     maxlength=256 value='$description'>";
+    }
+    else {
+	echo "$description";
+    }
+    echo "   </td>
+ 	  </tr>\n";
+
+    echo "<tr>
+            <td>Project: </td>
+            <td class=\"left\">$pid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Load Partition: </td>
+            <td class=\"left\">$loadpart</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Load Length: </td>
+            <td class=\"left\">$loadlength</td>
+          </tr>\n";
+
+    if ($part1_osid) {
+	echo "<tr>
+                 <td>Slice 1 OSID: </td>
+                 <td class=\"left\">
+                    <A href='showosinfo.php3?osid=$part1_osid'>$part1_osid</A>
+              </tr>\n";
+    }
+
+    if ($part2_osid) {
+	echo "<tr>
+                 <td>Slice 2 OSID: </td>
+                 <td class=\"left\">
+                    <A href='showosinfo.php3?osid=$part2_osid'>$part2_osid</A>
+              </tr>\n";
+    }
+
+    if ($part3_osid) {
+	echo "<tr>
+                 <td>Slice 3 OSID: </td>
+                 <td class=\"left\">
+                    <A href='showosinfo.php3?osid=$part3_osid'>$part3_osid</A>
+              </tr>\n";
+    }
+
+    if ($part4_osid) {
+	echo "<tr>
+                 <td>Slice 4 OSID: </td>
+                 <td class=\"left\">
+                    <A href='showosinfo.php3?osid=$part4_osid'>$part4_osid</A>
+              </tr>\n";
+    }
+
+    if ($default_osid) {
+	echo "<tr>
+                 <td>Default OSID: </td>
+                 <td class=\"left\">
+                    <A href='showosinfo.php3?osid=$default_osid'>
+                       $default_osid</A>
+              </tr>\n";
+    }
+
+    echo "<tr>
+            <td>Path: </td>
+            <td class=left>\n";
+
+    if ($edit) {
+	echo "<input type=text name=path size=60
+                     maxlength=256 value='$path'>";
+    }
+    else {
+	echo "$path";
+    }
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Magic: </td>
+            <td class=left>\n";
+
+    if ($edit) {
+	echo "<input type=text name=magic size=60
+                     maxlength=256 value='$magic'>";
+    }
+    else {
+	echo "$magic";
+    }
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Load Address: </td>
+            <td class=left>\n";
+
+    if ($edit) {
+	echo "<input type=text name=loadaddr size=20
+                     maxlength=256 value='$loadaddr'>";
+    }
+    else {
+	echo "$loadaddr";
+    }
+    echo "  </td>
+          </tr>\n";
+
+    if ($edit) {
+	echo "<tr>
+                 <td colspan=2 align=center>
+                     <b><input type=submit value=Submit></b>
+                 </td>
+              </tr>
+              </form>\n";
+    }
+
+    echo "</table>\n";
+}
+
+#
 # This is an included file.
 # 
 ?>
