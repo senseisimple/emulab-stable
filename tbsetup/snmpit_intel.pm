@@ -444,7 +444,7 @@ sub createVlan($$) {
 
     $self->vlanUnlock();
 
-    return 0;
+    return $okay;
 
 }
 
@@ -723,7 +723,14 @@ sub removeVlan($$) {
     print "  Removing VLAN #$vlan_number ... ";
     $RetVal = $self->{SESS}->set([[$DeleteOID,$vlan_number,"delete",
 	"INTEGER"]]);
-    print "",($RetVal? "Succeeded":"Failed"),".\n";
+    my $ok;
+    if ($RetVal) {
+	print "Succeeded.\n";
+	$ok = 1;
+    } else {
+	print "Failed.\n";
+	$ok = 0;
+    }
 
     #
     # Unlock whether successful or not
@@ -732,12 +739,9 @@ sub removeVlan($$) {
 
     if (! defined $RetVal) {
 	print STDERR "VLAN #$vlan_number does not exist on this switch.\n";
-	return 0;
-    } else {
-	$self->vlanUnlock();
-	return 1;
     }
 
+    return $ok;
 }
 
 #
@@ -845,10 +849,9 @@ sub listVlans($) {
     my %Members = ();
 
     #
-    # We go through the vlanPolicy table to get the names and members of
-    # all VLANs
+    # First, we grab the names of all VLANs
     #
-    my $field = ["vlanPolicy",0];
+    my $field = ["policyVlanName",0];
     my ($varname,$index,$vlan_number);
     $self->{SESS}->getnext($field);
     do {
@@ -856,7 +859,19 @@ sub listVlans($) {
 	$self->debug("listVlans: Got $varname $index $vlan_number\n");
 	if ($varname =~ /policyVlanName/) {
 	    $Names{$index} = $vlan_number
-	} elsif ($varname =~ /policyPortRuleVlanId/) {
+	}
+	$self->{SESS}->getnext($field);
+    } while ( $varname eq "policyVlanName");
+
+    #
+    # Next, we find membership, by port
+    #
+    $field = ["policyPortRuleVlanId",0];
+    $self->{SESS}->getnext($field);
+    do {
+	($varname,$index,$vlan_number) = @{$field};
+	$self->debug("listVlans: Got $varname $index $vlan_number\n");
+	if ($varname =~ /policyPortRuleVlanId/) {
 	    #
 	    # This table is indexed by vlan.port
 	    #
@@ -871,12 +886,12 @@ sub listVlans($) {
 	    ($node = portnum($self->{NAME} . ":1." . $port)) ||
 			($node = "port$port");
 
-		push @{$Members{$vlan_number}}, $node;
-	    }
+	    push @{$Members{$vlan_number}}, $node;
+	}
 
-	    $self->{SESS}->getnext($field);
+	$self->{SESS}->getnext($field);
 
-    } while ( $varname =~ /policy/i );
+    } while ( $varname eq "policyPortRuleVlanId" );
 
     #
     # Build a list from the name and membership lists
