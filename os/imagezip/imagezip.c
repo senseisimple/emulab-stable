@@ -1490,8 +1490,8 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		 * data won't be compressable (maybe its already compressed),
 		 * and the output size will be *bigger* than the input size.
 		 */
-		if (count > subblockleft) {
-			count = subblockleft - (2 * secsize);
+		if (count > (subblockleft - 1024)) {
+			count = subblockleft - 1024;
 
 			/*
 			 * But of course, we always want to be sector aligned.
