@@ -3,7 +3,7 @@ node B pc
 node C pc
 node D pc
 node E pc
-link A C 100
-link B C 100
-link C D 100
-link A E 100
+link l1 A C 100 0 0
+link l2 B C 100 0 0
+link l3 C D 100 0 0
+link l4 A E 100 0 0

@@ -1,6 +1,6 @@
 node A pc
 node B pc
 node C pc
-link A B 100
-link A C 100
-link B C 100
+link vl1 A B 100 0 0
+link vl2 A C 100 0 0
+link vl3 B C 100 0 0

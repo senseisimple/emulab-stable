@@ -1,38 +1,37 @@
-node switch switch
+node switch switch:1
 
-node tri1 pc
-node tri2 pc
-node tri3 pc
-link tri1 switch 100 1
-link tri2 tri1 100 1
-link tri2 tri3 100 1
-link tri3 tri1 100 1
+node tri1 pc:1
+node tri2 pc:1
+node tri3 pc:1
+link tri1-0 tri1 switch 100 0 0
+link tri1-1 tri2 tri1 100 0 0
+link tri1-2 tri2 tri3 100 0 0
+link tri1-3 tri3 tri1 100 0 0
 
-node two pc
-link two switch 100 2
+node two pc:1
+link two-0 two switch 100 0 0
+link two-1 two switch 100 0 0
 
-node three pc
-link three switch 100 3
+node three pc:1
+link three-0 three switch 100 0 0
+link three-1 three switch 100 0 0
+link three-1 three switch 100 0 0
 
-node a pc
-link a three 100 1
-node b pc
-link b three 100 1
-node center pc
-link center b 100 1
-link center two 100 1
-node d pc
-link d center 100 1
+node a pc:1
+link a-0 a three 100 0 0
+node b pc:1
+link b-0 b three 100 0 0
+node center pc:1
+link center-0 center b 100 0 0
+link center-1 center two 100 0 0
+node d pc:1
+link d-0 d center 100 0 0
 
-node fanbase pc
-link fanbase center 100 1
-node fan1 pc
-node fan2 pc
-node fan3 pc
-link fan1 fanbase 100 1 
-link fan2 fanbase 100 1
-link fan3 fanbase 100 1
-
-
-
-
+node fanbase pc:1
+link fanbase-0 fanbase center 100 0 0
+node fan1 pc:1
+node fan2 pc:1
+node fan3 pc:1
+link fan1-0 fan1 fanbase 100 0 0
+link fan2-0 fan2 fanbase 100 0 0
+link fan3-0 fan3 fanbase 100 0 0

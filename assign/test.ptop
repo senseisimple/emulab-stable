@@ -1,10 +1,11 @@
-node pa pc
-node pb pc
-node pc pc
-node pd pc
-link pa pb 100 1
-link pa pc 100 1
-link pa pd 100 1
-link pb pc 100 1
-link pb pd 100 1
-link pc pd 100 1
+node S switch:1
+node pa pc:1
+node pb pc:1
+node pc pc:1
+node pd pc:1
+link l1 pa S 100 0 0
+link l2 pa S 100 0 0
+link l3 pb S 100 0 0
+link l4 pb S 100 0 0
+link l5 pc S 100 0 0
+link l6 pc S 100 0 0

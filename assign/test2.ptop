@@ -1,14 +1,22 @@
-node switch_a switch
-node switch_b switch
-node a_1 pc
-node a_2 pc
-node a_3 pc
-node b_1 pc
-node b_2 pc
-link a_1 switch_a 100 3
-link a_2 switch_a 100 3
-link a_3 switch_a 100 3
-link b_1 switch_b 100 2
-link b_2 switch_b 100 2
-link switch_a switch_b 400 1
+node switch_a switch:1
+node switch_b switch:1
+node a_1 pc:1
+node a_2 pc:1
+node a_3 pc:1
+node b_1 pc:1
+node b_2 pc:1
+link a_1-0 a_1:a_1-eth0 switch_a 100 0 0
+link a_1-1 a_1:a_1-eth1 switch_a 100 0 0
+link a_1-2 a_1:a_1-eth2 switch_a 100 0 0
+link a_2-0 a_2:a_2-eth0 switch_a 100 0 0
+link a_2-1 a_2:a_2-eth1 switch_a 100 0 0
+link a_2-2 a_2:a_2-eth2 switch_a 100 0 0
+link a_3-0 a_3:a_3-eth0 switch_a 100 0 0
+link a_3-1 a_3:a_3-eth1 switch_a 100 0 0
+link a_3-2 a_3:a_3-eth2 switch_a 100 0 0
+link b_1-0 b_1:b_1-eth0 switch_b 100 0 0
+link b_1-1 b_1:b_1-eth1 switch_b 100 0 0
+link b_2-0 b_2:b_2-eth0 switch_b 100 0 0
+link b_2-1 b_2:b_2-eth1 switch_b 100 0 0
+link switch_a-switch_b switch_a switch_b 400 0 0 1
 

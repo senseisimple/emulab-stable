@@ -1,4 +1,4 @@
-node S switch
+node S switch:1
 node n1 pc:1 - abone:0.05
 node n2 pc:1 - abone:0.05
 node n3 pc:1 - abone:0.05
@@ -9,14 +9,23 @@ node m2 pc:1
 node m3 pc:1
 node m4 pc:1
 node m5 pc:1
-link l1 n1 S 100 4
-link l2 n2 S 100 4
-link l3 n3 S 100 4
-link l4 n4 S 100 4
-link l5 n5 S 100 4
-link k1 m1 S 100 4
-link k2 m2 S 100 4
-link k3 m3 S 100 4
-link k4 m4 S 100 4
-link k5 m5 S 100 4
-
+link l1-0 n1:n1-eth0 S 100 0 0
+link l1-1 n1:n1-eth1 S 100 0 0
+link l2-0 n2:n2-eth0 S 100 0 0
+link l2-1 n2:n2-eth1 S 100 0 0
+link l3-0 n3:n3-eth0 S 100 0 0
+link l3-1 n3:n3-eth1 S 100 0 0
+link l4-0 n4:n4-eth0 S 100 0 0
+link l4-1 n4:n4-eth1 S 100 0 0
+link l5-0 n5:n5-eth0 S 100 0 0
+link l5-1 n5:n5-eth1 S 100 0 0
+link k1-0 m1:m1-eth0 S 100 0 0
+link k1-1 m1:m1-eth1 S 100 0 0
+link k2-0 m2:m2-eth0 S 100 0 0
+link k2-1 m2:m2-eth1 S 100 0 0
+link k3-0 m3:m3-eth0 S 100 0 0
+link k3-1 m3:m3-eth1 S 100 0 0
+link k4-0 m4:m4-eth0 S 100 0 0
+link k4-1 m4:m4-eth1 S 100 0 0
+link k5-0 m5:m5-eth0 S 100 0 0
+link k5-1 m5:m5-eth1 S 100 0 0
