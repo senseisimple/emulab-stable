@@ -19,13 +19,15 @@ sub usage {
     print "-h	Show this message\n";
     print "-v	Use virtual names, when possible, for hostnames\n";
     print "-i 	Install new config file to standard location.\n";
+    print "-r 	Restart DHCPD after config file regeneration (with -i only)\n";
     print "Without -i, spits out a dhcpd config file on stdout, as in:\n";
     print "  $0 > dhcpd.conf\n";
     exit(1);
 }
-my $optlist = "ihvt:";
+my $optlist = "ihvt:r";
 my $install = 0;
 my $vnames  = 0;
+my $restart = 0;
 
 #
 # Configure variables
@@ -67,6 +69,9 @@ if (defined($options{"i"})) {
     if ($EUID != 0) {
 	die("*** $0:\n".
 	    "    Must be root! Maybe its a development version?\n");
+    }
+    if (defined($options{"r"})) {
+	$restart = 1;
     }
 }
 if (defined($options{"h"})) {
@@ -255,6 +260,21 @@ if ($install) {
     }
     system("mv -f $outfile $DHCPD_CONF") == 0 or
 	    fatal("Could not install new ${DHCPD_CONF}");
+
+    if ($restart) {
+	$dpid = `cat /var/run/dhcpd.pid`;
+	chomp($dpid);
+        # untaint
+	if ($dpid =~ /^([\d]+)$/) {
+	    $dpid = $1;
+	}
+	else {
+	    fatal("Bad pid for DHCPD: $dpid");
+	}
+	if (kill('TERM', $dpid) == 0) {
+	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
+	}
+    }
 }
 exit(0);
 
