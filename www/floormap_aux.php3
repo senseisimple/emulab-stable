@@ -17,9 +17,6 @@ include("defs.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    USERERROR("You do not have permission to view this page!", 1);
-}
 
 #
 # Verify arguments.

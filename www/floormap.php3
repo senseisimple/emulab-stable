@@ -17,19 +17,17 @@ PAGEHEADER("Wireless Node Map");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    USERERROR("You do not have permission to view this page!", 1);
-}
 
 # Careful with this local variable
 unset($prefix);
 
 #
-# Verify page arguments.
+# Verify page arguments. For now, just default to MEB since thats the only
+# place we have wireless nodes!
 # 
 if (!isset($building) ||
     strcmp($building, "") == 0) {
-    PAGEARGERROR("Must provide a building and an optional floor!");
+    $building = "MEB";
 }
 # Sanitize for the shell.
 if (!preg_match("/^[-\w]+$/", $building)) {
@@ -93,9 +91,14 @@ if (! readfile("${prefix}.map")) {
     TBERROR("Could not read ${prefix}.map", 1);
 }
 
+echo "<font size=+1>For more info on using wireless nodes, see the
+     <a href='tutorial/docwrapper.php3?docname=wireless.html'>
+     wireless tutorial.</a></font><br><br>\n";
+
 # And the img ...
 echo "<center>
-      <table class=nogrid align=center border=0 cellpadding=6 cellspacing=0>
+      <table class=nogrid align=center border=0 vpsace=5
+             cellpadding=6 cellspacing=0>
       <tr>
          <td align=right>Free</td>
          <td align=left><img src='/autostatus-icons/greenball.gif' alt=Free>
@@ -112,9 +115,10 @@ echo "<center>
           </td>
       </tr>
       </table>
-      <br><br>
+      Click on the dots below to see information about the node
       <img src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">
       </center>\n";
+
 
 #
 # Standard Testbed Footer
