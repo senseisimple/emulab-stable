@@ -36,15 +36,21 @@ my  $optlist = "de:l";
 my %controlset =
 (
  #
- #  Symbolic name   =>  Admin, Multi args, nodes DB field, virt_nodes DB field
+ # Symbolic name => Admin, Multi args, nodes field, virt_nodes field, osselect
  #
- default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line"],
- startup_command	=> [0, 0, "startupcmd",		"startupcmd"],
- tarfiles		=> [0, 1, "tarballs",		"tarfiles"],
- rpms			=> [0, 1, "rpms",		"rpms"],
- deltas			=> [0, 1, "deltas",		"deltas"],
- next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef],
- bios_version		=> [1, 0, "bios_version",	undef],
+ default_boot_osid      => [0, 0, "def_boot_osid",      undef,1],
+ default_boot_path      => [0, 0, "def_boot_path",      undef,1],
+ default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line",0],
+ startup_command	=> [0, 0, "startupcmd",		"startupcmd",0],
+ tarfiles		=> [0, 1, "tarballs",		"tarfiles",0],
+ rpms			=> [0, 1, "rpms",		"rpms",0],
+ deltas			=> [0, 1, "deltas",		"deltas",0],
+ next_boot_osid         => [1, 0, "next_boot_osid",     undef,1],
+ next_boot_path         => [1, 0, "next_boot_path",     undef,1],
+ next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef,0],
+ pxe_boot_path          => [0, 0, "pxe_boot_path",    undef,1],
+ next_pxe_boot_path     => [0, 0, "next_pxe_boot_path",       undef,1],
+ bios_version		=> [1, 0, "bios_version",	undef,0],
 );
   
 #
@@ -54,6 +60,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 
+my $osselect    = "$TB/bin/os_select";
 my @nodes       = ();
 my %controls    = ();
 my $eidmode	= 0;
@@ -202,16 +209,29 @@ else {
 #
 my $physnodes_updatestr;
 my $virtnodes_updatestr;
+my @osselect_params=();
 
 foreach my $option (keys(%controls)) {
-    my ($admin, $multi, $physdbkey, $virtdbkey) = @{ $controlset{$option} };
+    my ($admin, $multi, $physdbkey, $virtdbkey, $needs_osselect) 
+      = @{ $controlset{$option} };
     my $value = $controls{$option};
 
-    if (defined($physnodes_updatestr)) {
-	$physnodes_updatestr = "$physnodes_updatestr, $physdbkey='$value'";
-    }
-    else {
-	$physnodes_updatestr = "$physdbkey='$value'";
+    if ($needs_osselect) {
+	# Don't set osselect fields directly in nodes table
+	my $str = ( $debug ? "-d " : "").
+	  ( $physdbkey =~ /^next_/ ? "-1 " : "" ).
+	    ( $physdbkey =~ /pxe_boot_/ ? "-m " : "").
+	      ( $physdbkey =~ /^(def)|(next)_boot_path/ ? "-p " : "").
+		"$value";
+	if ($debug) { print "$option=$value made osselect str='$str'\n"; }
+	push(@osselect_params, $str);
+    } else {
+	if (defined($physnodes_updatestr)) {
+	    $physnodes_updatestr = "$physnodes_updatestr, $physdbkey='$value'";
+	}
+	else {
+	    $physnodes_updatestr = "$physdbkey='$value'";
+	}
     }
 
     if (defined($virtdbkey)) {
@@ -223,13 +243,18 @@ foreach my $option (keys(%controls)) {
 	}
     }
 }
-if (! defined($physnodes_updatestr) && ! defined($virtnodes_updatestr)) {
+if (! defined($physnodes_updatestr) && 
+    @osselect_params==0 && 
+    ! defined($virtnodes_updatestr)) {
     exit(0);
 }
 
 if ($debug) {
     if (defined($physnodes_updatestr)) {
 	print "Phys update will be '$physnodes_updatestr'\n";
+    }
+    if (@osselect_params>0) {
+	print "osselect calls:\n  ".join("\n  ",@osselect_params)."\n";
     }
     if (defined($virtnodes_updatestr)) {
 	print "Virt update will be '$virtnodes_updatestr'\n";
@@ -245,6 +270,8 @@ foreach my $node (@nodes) {
     my $node_eid;
     my $node_vname;
 
+    if ($debug) { print "Processing $node...\n"; }
+
     if (defined($physnodes_updatestr)) {
 	if ($UID && !$IsAdmin &&
 	    ! TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, $node)) {
@@ -257,6 +284,25 @@ foreach my $node (@nodes) {
 	}
 	DBQueryFatal("update nodes set $physnodes_updatestr ".
 		     "where node_id='$node'");
+    }
+
+    if (@osselect_params>0) {
+	if ($UID && !$IsAdmin &&
+	    ! TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, $node)) {
+	    print("*** $0:\n".
+		  "    You do not have permission to modify physical ".
+		  "parameters for $node!\n");
+	    
+	    $errors++;
+	    next;
+	}
+	foreach $str (@osselect_params) {
+	    if ($debug) { print "Running '$osselect $str $node'\n"; }
+	    if (system("$osselect $str $node")) {
+		print "*** $0:\n    os_select failed!\n";
+		$errors++;
+	    }
+	}
     }
 
     #
