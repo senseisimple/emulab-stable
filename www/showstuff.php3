@@ -100,7 +100,7 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "</tr>\n";
 
     echo "<tr>
-              <td colspan='2'>Why?</td>
+              <td colspan='2'>Why?:</td>
           </tr>\n";
     
     echo "<tr>

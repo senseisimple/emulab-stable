@@ -1,0 +1,111 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Syntax check an NS file.
+#
+# usage: nscheck <nsfile>
+#
+sub usage()
+{
+    print STDOUT "Usage: nscheck <nsfile>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+my $tbbindir = "$TB/bin/";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
+    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$TBIRLIB = "$TB/lib/ir";
+push(@INC,$TBIRLIB);
+require libir;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $tempfile = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($tempfile =~ /^([-\@\w.\/]+)$/) {
+    $tempfile = $1;
+}
+else {
+    fatal("Tainted argument $tempfile");
+}
+
+$tbcmdfile = "tbcmds";
+$id        = "foo-bar";
+$nsfile    = "foo.ns";
+$irfile    = "foo.ir";
+
+#
+# Make a temp dir and copy the NS file into it. We run the scripts
+# from that directory cause it writes temp files.
+# 
+$dirname = "/tmp/parse-$$";
+
+mkdir($dirname, 0775) or
+    fatal("Could not mkdir $dirname");
+
+chdir($dirname) or
+    fatal("Could not chdir to $dirname");
+
+if (system("/bin/cp", "$tempfile", "$nsfile")) {
+    fatal("Could not copy $tempfile to $dirname");
+}
+
+#
+# Do a firstcut parse on the NS file, converting it to IR format. This
+# operates as a syntax check on the NS file, so we can kick back bad NS
+# files now instead of later.
+#
+if (system("parse.tcl $id $nsfile $irfile") != 0) {
+    fatal("NS Parse failed!");
+}
+if (system("extract_tb $nsfile $tbcmdfile") != 0) {
+    fatal("NS extract_tb pass failed!");
+}
+if (system("postparse $tbcmdfile $irfile") != 0) {
+    fatal("NS postparse pass failed!");
+}
+
+system("/bin/rm", "-rf", "$dirname");
+exit 0;
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print STDOUT "$mesg\n";
+
+    system("/bin/rm", "-rf", "$dirname");
+    exit(-1);
+}

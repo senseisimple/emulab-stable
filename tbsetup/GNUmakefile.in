@@ -12,16 +12,16 @@ SUBDIRS		= checkpass ir ns2ir
 
 BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
 		  os_load savevlans startexp endexp batchexp killbatchexp \
-		  node_reboot
+		  node_reboot nscheck
 
 # Stuff that mere users get on plastic.
-USERBINS        = snmpit os_load node_reboot
+USERBINS        = snmpit os_load node_reboot nscheck
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
-		  os_setup mkexpdir console_setup \
+		  os_setup mkexpdir console_setup webnscheck \
 		  webstartexp webendexp webbatchexp webkillbatchexp
 
 LIB_STUFF       = libtbsetup.pm

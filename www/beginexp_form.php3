@@ -141,6 +141,11 @@ echo "<tr>
 </form>
 </table>
 
+<p>
+<center>
+Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
+</center>
+
 <?php
 #
 # Standard Testbed Footer

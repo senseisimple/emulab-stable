@@ -115,6 +115,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/GNUmakefile security/paperbag \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
+	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/killbatchexp tbsetup/batch_daemon \
