@@ -66,7 +66,7 @@ int		mydb_update(char *query, ...);
 #define MINCHILDREN	5
 static int	udpchild;
 static int	numchildren;
-static int	maxchildren = MINCHILDREN;
+static int	maxchildren = 10;
 static volatile int killme;
 
 #ifdef EVENTSYS
@@ -450,7 +450,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 
 	while (isspace(*bp))
 		bp++;
-	
+
 	/*
 	 * Look for VERSION. 
 	 */

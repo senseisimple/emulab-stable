@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/ioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,7 +59,7 @@ static char	*clientcertdirs[] = {
 static SSL		*ssl;
 static SSL_CTX		*ctx;
 static int		client = 0;
-static char		nosslbuf[MYBUFSIZE];
+static char		nosslbuf[BUFSIZ];
 static int		nosslbuflen, nosslbufidx;
 static void		tmcd_sslerror();
 static void		tmcd_sslprint(const char *fmt, ...);
@@ -211,18 +212,22 @@ tmcd_sslaccept(int sock, struct sockaddr *addr, socklen_t *addrlen)
 
 	/*
 	 * Read the first bit. It indicates whether we need to SSL
-	 * handshake or not. 
+	 * handshake or not. Clear the buffer to avoid confusing
+	 * the last connection with this new connection. 
 	 */
-	if ((cc = read(newsock, nosslbuf, sizeof(nosslbuf) - 1)) <= 0) {
+	bzero(nosslbuf, strlen(SPEAKSSL));
+	      
+	if ((cc = read(newsock, nosslbuf, strlen(SPEAKSSL))) <= 0) {
 		error("sslaccept: reading request");
 		if (cc == 0)
 			errno = EIO;
 		goto badauth;
 	}
-	if (strncmp(nosslbuf, SPEAKSSL, strlen(SPEAKSSL))) {
+	
+	if (strncmp(nosslbuf, SPEAKSSL, cc)) {
 		/*
 		 * No ssl. Need to return this data on the next read.
-		 * See below.
+		 * See below. 
 		 */
 		isssl = 0;
 		nosslbuflen = cc;
@@ -429,22 +434,40 @@ tmcd_sslwrite(int sock, const void *buf, size_t nbytes)
 }
 
 /*
- * Read stuff in.
+ * Read stuff in. The nosslbuf stuff is overly general; the caller behaves
+ * in a much more constrained manner.
  */
 int
 tmcd_sslread(int sock, void *buf, size_t nbytes)
 {
-	int	cc = 0;
+	int	cc = 0, nosslcount = 0;
 
+	/*
+	 * This cruft only happens on the server.
+	 */
 	if (nosslbuflen) {
-		char *bp = (char *) buf, *cp = &nosslbuf[nosslbufidx];
-		
-		while (cc < nbytes && nosslbuflen) {
-			*bp = *cp;
-			bp++; cp++; cc++;
-			nosslbuflen--; nosslbufidx++;
-		}
-		return cc;
+		nosslcount = (nosslbuflen > nbytes ? nbytes : nosslbuflen);
+
+		memcpy(buf, &nosslbuf[nosslbufidx], nosslcount);
+		nosslbuflen -= nosslcount;
+		nosslbufidx += nosslcount;
+
+		if (nosslcount == nbytes)
+			return nosslcount;
+
+		/*
+		 * The request has to be presented to the caller as a single
+		 * message. Since we read just enough to look for the
+		 * SPEAKSSL tag above, see if there is more, and get it.
+		 */
+		if (ioctl(sock, FIONREAD, &cc) < 0)
+			return -1;
+
+		if (cc == 0)
+			return nosslcount;
+
+		nbytes -= nosslcount;
+		buf     = (void *) (((char *) buf) + nosslcount);
 	}
 
 	errno = 0;
@@ -459,7 +482,7 @@ tmcd_sslread(int sock, void *buf, size_t nbytes)
 		}
 		return cc;
 	}
-	return cc;
+	return cc + nosslcount;
 }
 
 /*
