@@ -80,17 +80,34 @@ if (!defined($hostname)) {
 #
 my $cmd;
 
-if (! TBValidNodeName($hostname) || !TBIsNodeRemote($hostname)) {
-    if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
-		     $hostname eq $FSNODE)) {
-	$cmd = "@ARGV";
-    } else {
-	$cmd = "$SSH $SSH_ARGS @args $hostname @ARGV";
-    }
+if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
+		 $hostname eq $FSNODE)) {
+    $cmd = "@ARGV";
 }
 else {
-    $cmd = "$SSH $SSH_ARGS @args -l emulabman $hostname @ARGV";
+    my $user;
+
+    if (TBValidNodeName($hostname)) {
+	my ($jailed, $plab, $physhost);
+	if (TBIsNodeVirtual($hostname, \$jailed, \$plab)) {
+	    if ($plab) {
+		TBPlabNodeUsername($hostname, \$user);
+	    }
+	    TBPhysNodeID($hostname, \$physhost);
+	    $hostname = $physhost;
+	}
+	elsif (TBIsNodeRemote($hostname)) {
+	    $user = "emulabman";
+	}
+    }
+
+    $cmd = "$SSH $SSH_ARGS @args ";
+    if (defined($user)) {
+	$cmd .= "-l $user ";
+    }
+    $cmd .= "$hostname @ARGV";
 }
+
 if ($debug) {
     print "$cmd\n";
 }

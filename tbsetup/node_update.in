@@ -226,7 +226,7 @@ foreach my $node ( @nodes ) {
 #
 my $maxpids = 0;
 foreach my $node ( @nodes ) {
-    my $jailed;
+    my ($jailed, $plab);
     
     #
     # widearea and jailed nodes auto update. Skip them.
@@ -236,8 +236,8 @@ foreach my $node ( @nodes ) {
 	next;
     }
     # eventually all virtual nodes will be jailed ...
-    if (TBIsNodeVirtual($node, \$jailed)) {
-	if ($jailed) {
+    if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
+	if ($jailed || $plab) {
 	    push(@autonodes, $node);
 	}
 	next;

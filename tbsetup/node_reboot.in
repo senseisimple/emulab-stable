@@ -189,10 +189,10 @@ my %realnodes = ();
 my %virtnodes = ();
 
 foreach my $node ( @nodes ) {
-    my $jailed;
+    my ($jailed, $plab);
 
-    if (TBIsNodeVirtual($node, \$jailed)) {
-	if (! $jailed) {
+    if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
+	if (! $jailed && ! $plab) {
 	    print "*** Skipping old style (non-jail) virtual node $node ...\n";
 	    next;
 	}
@@ -568,7 +568,7 @@ sub RebootVNode($$) {
     #
     $UID = 0;
 
-    exec("$ssh -host $pnode $CLIENT_BIN/vnodesetup -r -j $vnode");
+    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup -r -j $vnode");
     exit(0);
 }
 

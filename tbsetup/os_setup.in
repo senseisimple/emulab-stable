@@ -159,17 +159,17 @@ while (my %row = $db_result->fetchhash()) {
     my $type     = $row{'type'};
     my $bootpath = 0;
     my $jailnode = 0;
+    my $plabnode = 0;
 
     #
     # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
     # a bit, and so run them through the checks below.
     #
-    if (TBIsNodeVirtual($node, \$jailed)) {
-	$vnodes{$node} = $jailed;
-	if (! $jailed) {
+    if (TBIsNodeVirtual($node, \$jailnode, \$plabnode)) {
+	$vnodes{$node} = ($jailnode || $plabnode);
+	if (! $jailnode && ! $plabnode) {
 	    next;
 	}
-	$jailnode = 1;
     }
     else {
 	my $nodeAllocState;
@@ -274,7 +274,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it. 
     #
-    if (!$bootpath && !$jailnode) {
+    if (!$bootpath && !$jailnode && !$plabnode) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.

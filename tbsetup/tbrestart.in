@@ -127,10 +127,10 @@ foreach my $node ( @nodes ) {
     # Must duplicate a check that would be done in node_reboot if we
     # gave it the entire list. No point in rebooting local jails.
     #
-    my $jailed;
+    my ($jailed, $plab);
     
-    if (TBIsNodeVirtual($node, \$jailed)) {
-	if (! $jailed) {
+    if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
+	if (! $jailed && ! $plab) {
 	    next;
 	}
 	if (! TBIsNodeRemote($node)) {

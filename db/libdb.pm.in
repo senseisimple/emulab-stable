@@ -145,7 +145,7 @@ use Exporter;
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck
+	 TBNodeAllocCheck TBPlabNodeUsername
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -2254,18 +2254,20 @@ sub TBIsNodeRemote($)
 }
 
 #
-# Is a node virtual (or "multiplexed"). Optionally return jailflag.
+# Is a node virtual (or "multiplexed"). Optionally return jailflag and a
+# Plab flag.
 #
-# usage TBIsNodeVirtual(char *node, int *jailed)
+# usage TBIsNodeVirtual(char *node, int *jailed, int *plabbed)
 #        Returns 1 if yes.
 #        Returns 0 if no.
 #
-sub TBIsNodeVirtual($;$)
+sub TBIsNodeVirtual($;$$)
 {
-    my ($nodeid, $jailed) = @_;
+    my ($nodeid, $jailed, $plabbed) = @_;
 
     my $query_result =
-	DBQueryFatal("select isvirtnode,n.jailflag from nodes as n ".
+	DBQueryFatal("select isvirtnode,n.jailflag,t.isplabdslice ".
+		     "from nodes as n ".
 		     "left join node_types as t on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
@@ -2277,7 +2279,37 @@ sub TBIsNodeVirtual($;$)
     if (defined($jailed)) {
 	$$jailed = $row[1];
     }
+    if (defined($plabbed)) {
+	$$plabbed = $row[2];
+    }
     return($row[0]);
+}
+
+#
+# Get the username used to log in to a particular vnode allocated on Plab
+#
+# usage TBPlabNodeUsername(char *node, char \*username)
+#        Returns 1 if successful
+#        Returns 0 if node is not allocated with Plab
+#
+sub TBPlabNodeUsername($$)
+{
+    my ($nodeid, $username) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select slicename from plab_slice_nodes ".
+		     "where node_id='$nodeid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$username = $row[0];
+	return 1;
+    }
+    return 0;
 }
 
 #

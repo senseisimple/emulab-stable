@@ -50,7 +50,7 @@ if (@ARGV > 0) {
 select pid,eid,r.node_id,max(tstamp) as t from reserved as r 
 left join node_idlestats as n on r.node_id=n.node_id 
 where r.node_id not like \"sh%\" and r.node_id not like \"wireless%\" 
-and r.node_id not like \"%ron%\" 
+and r.node_id not like \"%ron%\" and r.node_id not like \"%plab%\" 
 group by pid,eid,node_id 
 having t is null or (unix_timestamp(now())-unix_timestamp(t) >= $t*60) 
 order by pid,eid,node_id");
