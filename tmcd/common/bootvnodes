@@ -133,7 +133,7 @@ sub bootvnode($$$)
 	$opt = "-b";
 	$act = "Booting";
     }
-    $opt .= " -jV"
+    $opt .= " -jVt"
 	if ($jailed);
     
     print "$act vnode $vnode ...\n";
