@@ -1,5 +1,21 @@
 [This file is not kept entirely up to date.]
 
+*  Fix tmcd/fork problem (events out of order).
+
+*  Supply form args to beginexp page, and allow inline NS files.
+
+*  From: Jay Lepreau <lepreau@flux.utah.edu>
+   Subject: expt phase transition durations
+   Date: Fri, 18 Jul 2003 14:03:48 MDT
+
+   Some sub-times would be really useful too,
+   like how long assign took to run.
+
+*  Feed back jail changes to FreeBSD.org.
+
+*  I think these swap/modify errors should include the ns file.
+   Well, certainly if it's a parsing error.
+
 *  From: Jay Lepreau <lepreau@cs.utah.edu>
    Date: Thu, 10 Jul 2003 10:56:37 MDT
 
@@ -94,7 +110,11 @@
   modify. We should also save the XML representation to avoid having to
   reparse old NS files, although there is some versioning issues with this. 
 
-* Auto discovery of new nodes. 
+* Auto discovery of new nodes.
+
+  * Rob is working on this.
+
+* Viz can't handle multiple links between nodes.
 
 * Change netbuild to speak XML (in both directions).
 

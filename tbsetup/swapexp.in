@@ -402,6 +402,22 @@ if (! $batch) {
 }
 
 #
+# Gather stats; start clock ticking
+#
+if ($inout eq "in") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+elsif ($inout eq "out") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+elsif ($inout eq "modify") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+
+#
 # Remove old report file since its contents are going to be invalid.
 #
 if ($inout ne "restart" && -e $repfile) {

@@ -108,6 +108,7 @@ use Exporter;
 	 TBDB_STATS_PRELOAD TBDB_STATS_START TBDB_STATS_TERMINATE
 	 TBDB_STATS_SWAPIN TBDB_STATS_SWAPOUT TBDB_STATS_SWAPMODIFY
 	 TBDB_STATS_FLAGS_IDLESWAP TBDB_STATS_FLAGS_PREMODIFY
+	 TBDB_STATS_FLAGS_START
 
 	 TBDB_JAILIPBASE TBDB_JAILIPMASK
 
@@ -148,6 +149,8 @@ use Exporter;
 
 	 TBExptRemovePhysicalState TBExptBackupPhysicalState 
 	 TBExptRestorePhysicalState
+
+	 TBExptPortRange
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID TBTipServers
@@ -486,6 +489,9 @@ sub TBDB_STATS_SWAPOUT()	{ "swapout"; }
 sub TBDB_STATS_SWAPMODIFY()	{ "swapmod"; }
 sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
+sub TBDB_STATS_FLAGS_START()    { 0x04; }
+# Do not export this variable!
+my $TBDB_STATS_STARTCLOCK;
 
 # Jail.
 sub TBDB_JAILIPBASE()		{ "@JAILIPBASE@"; }
@@ -2499,14 +2505,13 @@ sub TBGetSiteVar($)
 		   "virt_vtypes",
 		   "nseconfigs",
 		   "eventlist",
-		   #"ipport_ranges",
 		   "ipsubnets");
 
 @physicalTables = ("delays",
 		   "vlans",
 		   "tunnels",
-		   "v2pmap",
 		   "ipport_ranges",
+		   "v2pmap",
 		   "linkdelays",
 		   "portmap");
 
@@ -2676,6 +2681,30 @@ sub TBExptSetThumbNail($$$)
     return
 	DBQueryFatal("update experiment_resources set thumbnail=$bindata ".
 		     "where idx=$rsrcidx");
+}
+
+#
+# Get the port range for an experiment.
+#
+# usage TBControlNetIP(char *pid, char *eid, int \*low, int \*high)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBExptPortRange($$$$)
+{
+    my ($pid, $eid, $high, $low) = @_;
+
+    my $query_result =
+	DBQueryFatal("select low,high from ipport_ranges ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$low  = $row[0];
+    $$high = $row[1];
+    return 1;
 }
 
 #
@@ -3271,6 +3300,16 @@ sub GatherSwapStats($$$$$;$)
     # Optional argument to modify the stats gathering. 
     $flags = 0
 	if (!defined($flags));
+
+    #
+    # If this is a start time marker, then just record the time in a global
+    # variable and return. This is cheezy, but the interface I'm providing
+    # allows for fancier stuff later if desired.
+    #
+    if ($flags & TBDB_STATS_FLAGS_START) {
+	$TBDB_STATS_STARTCLOCK = time();
+	return;
+    }
     
     local $DBQUERY_MAXTRIES = 5;
 
@@ -3521,11 +3560,22 @@ sub GatherSwapStats($$$$$;$)
     # worth worrying about.
     #
   logit:
-    DBQueryWarn("insert into testbed_stats ".
+    my $starttime = (!defined($TBDB_STATS_STARTCLOCK) ? "NULL" :
+		     "FROM_UNIXTIME($TBDB_STATS_STARTCLOCK)");
+    if ("@OURDOMAIN@" eq "ballmoss.com") {
+      DBQueryWarn("insert into testbed_stats ".
+		"(idx, uid, start_time, end_time, exptidx, rsrcidx, ".
+		" action, exitcode) ".
+		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
+		"        '$mode', $ecode)");
+    }
+    else {
+      DBQueryWarn("insert into testbed_stats ".
 		"(idx, uid, tstamp, exptidx, rsrcidx, ".
 		" action, exitcode) ".
 		"values (0, '$uid', now(), $exptidx, $rsrcidx, ".
 		"        '$mode', $ecode)");
+    }
 }
 
 #

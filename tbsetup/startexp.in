@@ -238,6 +238,17 @@ if (! $batch) {
 	exit(0);
     }
 }
+#
+# Gather statistics; start the clock ticking.
+#
+if ($frontend) {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+else {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0,
+		    TBDB_STATS_FLAGS_START);
+}
 
 #
 # Run the various scripts. We want to propogate the error from tbprerun

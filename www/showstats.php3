@@ -150,12 +150,12 @@ else {
 
 $query_result =
     DBQueryFatal("select t.exptidx,s.pid,s.eid,t.action,t.exitcode,t.uid, ".
-                 "       r.pnodes,t.idx as statno,t.tstamp as ttstamp ".
+                 "       r.pnodes,t.idx as statno,t.start_time,t.end_time ".
 		 "  from testbed_stats as t ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
 		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
 		 "$wclause ".
-		 "order by t.tstamp desc,t.idx desc limit $records");
+		 "order by t.end_time desc,t.idx desc limit $records");
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No testbed stats records in the system!", 1);
@@ -168,7 +168,8 @@ echo "<table align=center border=1>
         <th>Pid</th>
         <th>Eid</th>
         <th>ExptIdx</th>
-        <th>Time</th>
+        <th>Start</th>
+        <th>End</th>
         <th>Action (Nodes)</th>
         <th>ECode</th>
       </tr>\n";
@@ -179,10 +180,14 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $pid     = $row[pid];
     $eid     = $row[eid];
     $uid     = $row[uid];
-    $when    = $row[ttstamp];
+    $start   = $row[start_time];
+    $end     = $row[end_time];
     $action  = $row[action];
     $ecode   = $row[exitcode];
     $pnodes  = $row[pnodes];
+
+    if (!isset($end))
+	$end = "&nbsp";
 	
     echo "<tr>
             <td>$idx</td>
@@ -190,7 +195,8 @@ while ($row = mysql_fetch_assoc($query_result)) {
             <td>$pid</td>
             <td>$eid</td>
             <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>
-            <td>$when</td>\n";
+            <td>$start</td>
+            <td>$end</td>\n";
     if (!$ecode && (strcmp($action, "preload") &&
 		    strcmp($action, "destroy"))) {
 	echo "<td>$action ($pnodes)</td>\n";

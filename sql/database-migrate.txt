@@ -757,21 +757,21 @@ last_net_act,last_cpu_act,last_ext_act);
 
         drop table vis_experiments;
 
-1.161: Add a node_type_features table that lists the assign 'features' for each
+1.162: Add a node_type_features table that lists the assign 'features' for each
        node type:
 
        create table node_type_features (type varchar(30) not null,
 	   feature varchar(30) not null, weight float not null default 0.0,
 	   primary key (type,feature));
 
-1.162: Add columns to the new_interfaces table indicating where the interface
+1.163: Add columns to the new_interfaces table indicating where the interface
        is plugged into a switch:
 
        alter table new_interfaces add column switch_id char(10);
        alter table new_interfaces add column switch_card tinyint(3);
        alter table new_interfaces add column switch_port tinyint(3);
 
-1.163: Chage the new_interfaces table to contain card numbers, rather than
+1.164: Chage the new_interfaces table to contain card numbers, rather than
        iface names:
 
        alter table new_interfaces drop primary key;
@@ -780,12 +780,12 @@ last_net_act,last_cpu_act,last_ext_act);
 	   new_node_id;
        alter table new_interfaces add primary key (new_node_id,card);
 
-1.164: Added a new column to new_nodes, so we can tell the IP address that
+1.165: Added a new column to new_nodes, so we can tell the IP address that
        the node was temporarily given while it's configuring:
 
        alter table new_nodes add column temporary_IP varchar(15) after IP;
 
-1.165: Kill max_ports and max_cards, replace with max_interfaces.
+1.166: Kill max_ports and max_cards, replace with max_interfaces.
 
        alter table node_types drop max_ports;
        alter table node_types drop max_cards;
@@ -795,4 +795,15 @@ last_net_act,last_cpu_act,last_ext_act);
        update node_types set max_interfaces=5 where type='pc600';
        update node_types set max_interfaces=5 where type='pc850';
        update node_types set max_interfaces=3 where type='pcL440GX';
-       
+
+
+1.168: As per Jay's request, start recording the start time as well as
+       the end time, in the testbed_stats table. So we know how long
+       things like swapin take, etc. Below, we convert the current
+       timestamp into the "end" time, and add a new "start" time,
+       which is null for all existing records. 
+
+        alter table testbed_stats change tstamp \
+			end_time datetime default NULL;
+	alter table testbed_stats add start_time datetime \
+			default NULL after idx;

@@ -321,7 +321,7 @@ function showrange ($showby, $sortby, $range) {
     $query_result =
 	DBQueryFatal("select s.pid,s.eid,t.uid,t.action,t.exptidx, ".
 		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
-		     "  UNIX_TIMESTAMP(t.tstamp) as ttstamp ".
+		     "  UNIX_TIMESTAMP(t.end_time) as ttstamp ".
 		     " from testbed_stats as t ".
 		     "left join experiment_stats as s on ".
 		     "  s.exptidx=t.exptidx ".
@@ -330,9 +330,9 @@ function showrange ($showby, $sortby, $range) {
 		     "left join experiment_resources as r2 on ".
 		     "  r2.idx=r1.lastidx and r1.lastidx is not null ".
 		     "where t.exitcode = 0 && ".
-		     "    ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.tstamp)) ".
+		     "    ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.end_time))".
 		     "     < $wclause) ".
-		     "order by t.tstamp");
+		     "order by t.end_time");
 
     # Experiment start time, indexed by pid:eid.
     $expt_start = array();
@@ -362,7 +362,7 @@ function showrange ($showby, $sortby, $range) {
 	    $swapper_result =
 		DBQueryFatal("select action from testbed_stats ".
 			     "where exptidx=$idx and ".
-			     "      UNIX_TIMESTAMP(tstamp)<$tstamp ".
+			     "      UNIX_TIMESTAMP(end_time)<$tstamp ".
 			     "order by tstamp desc");
 
 	    while ($srow = mysql_fetch_assoc($swapper_result)) {

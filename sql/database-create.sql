@@ -1140,7 +1140,8 @@ CREATE TABLE switch_stacks (
 
 CREATE TABLE testbed_stats (
   idx int(10) unsigned NOT NULL auto_increment,
-  tstamp datetime default NULL,
+  start_time datetime default NULL,
+  end_time datetime default NULL,
   exptidx int(10) unsigned NOT NULL default '0',
   rsrcidx int(10) unsigned NOT NULL default '0',
   action varchar(16) NOT NULL default '',

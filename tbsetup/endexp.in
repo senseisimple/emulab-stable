@@ -284,6 +284,9 @@ if (! $batch) {
 # Sanity check states in case someone changes something.
 #
 if ($estate eq EXPTSTATE_ACTIVE) { 
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
+		    TBDB_STATS_FLAGS_START);
+
     print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
     if (system("$tbdir/tbswap out $pid $eid") != 0) {
 	fatal("tbswap out failed!\n");
@@ -301,6 +304,9 @@ if ($estate eq EXPTSTATE_ACTIVE) {
 }
 
 if ($estate eq EXPTSTATE_SWAPPED) {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0,
+		    TBDB_STATS_FLAGS_START);
+    
     print STDOUT "Running tbend with arguments: $pid $eid\n";
     if (system("$tbdir/tbend $pid $eid") != 0) {
 	fatal("tbend failed!\n");
