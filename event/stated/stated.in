@@ -42,6 +42,9 @@ use Sys::Syslog;
 # run syslogd without -s, or use setlogsock('unix') before openlog.
 # (To get setlocksock: 'use Sys::Syslog qw(:DEFAULT setlogsock);' )
 
+# Do lots of db retries before we fail and die
+$libdb::DBQUERY_MAXTRIES = 5;
+
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
