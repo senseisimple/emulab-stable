@@ -67,6 +67,9 @@ my $dbg		= 0;
 my $failed      = 0;
 my %nodes       = ();
 my %vnodes      = ();
+my %vnodephosts = ();
+my %vnode2pnode = ();
+my %pnodevcount = ();
 my %osids       = ();
 my %canfail     = ();
 my $db_result;
@@ -421,6 +424,16 @@ foreach my $vnode (keys(%vnodes)) {
 	    "    Cannot determine phys_nodeid for $vnode!");
     }
     my $n_osid;
+
+    #
+    # Count up the number of jailed nodes on this pnode, and add the
+    # mapping. We use this below for determining how long to wait for
+    # a particular vnode.
+    #
+    $pnodevcount{$pnode} = 0
+	if (!defined($pnodevcount{$pnode}));
+    $pnodevcount{$pnode}++;
+    $vnode2pnode{$vnode} = $pnode;
     
     if (!defined($nodes{$pnode})) {
 	#
@@ -429,10 +442,8 @@ foreach my $vnode (keys(%vnodes)) {
 	#
 	next;
     }
-    else {
-	$n_osid = $osids{$pnode};
-    }
-    
+    $n_osid = $osids{$pnode};
+
     system("$osselect $n_osid $vnode") and
 	die_noretry("*** Could not set boot OS to $n_osid for $vnode");
 
@@ -632,14 +643,14 @@ elsif (@vnodelist) {
     foreach my $node (@vnodelist) {
 	$waitstart{$node} = time;
     }
-    my $maxwait = 120 + (30 * scalar(@vnodelist));
-
     print "Waiting for virtual testbed nodes to finish setting up ...\n";
 
     TBDebugTimeStamp("Virtual node waiting started");
     while ( @vnodelist ) {
 	my $node   = shift(@vnodelist);
+	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
+	my $maxwait = 90 + (30 * $pnodevcount{$pnode});
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
