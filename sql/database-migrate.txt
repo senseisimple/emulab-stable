@@ -770,3 +770,12 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table new_interfaces add column switch_id char(10);
        alter table new_interfaces add column switch_card tinyint(3);
        alter table new_interfaces add column switch_port tinyint(3);
+
+1.163: Chage the new_interfaces table to contain card numbers, rather than
+       iface names:
+
+       alter table new_interfaces drop primary key;
+       alter table new_interfaces drop column iface;
+       alter table new_interfaces add column card int not null after
+	   new_node_id;
+       alter table new_interfaces add primary key (new_node_id,card);

@@ -568,13 +568,13 @@ CREATE TABLE mode_transitions (
 
 CREATE TABLE new_interfaces (
   new_node_id int(11) NOT NULL default '0',
-  iface varchar(10) NOT NULL default '',
+  card int(11) NOT NULL default '0',
   mac varchar(12) NOT NULL default '',
   interface_type varchar(15) default NULL,
   switch_id varchar(10) default NULL,
   switch_card tinyint(3) default NULL,
   switch_port tinyint(3) default NULL,
-  PRIMARY KEY  (new_node_id,iface)
+  PRIMARY KEY  (new_node_id,card)
 ) TYPE=MyISAM;
 
 --
