@@ -75,15 +75,44 @@ else {
 
 
 if (!$idle) {
-    if (!$thumb) {
-	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=1'>".
-             "Switch to Thumbnail view".
-	     "</a></b><br />";
+    echo "<b>View: ";
+
+    if ($thumb != 0) {
+	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=0'>";
+	echo "List";
+        echo "</a>";
     } else {
-	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=0'>".
-             "Switch to List view".
-	     "</a></b><br />";
+        echo "List";
     }
+    echo ", ";
+
+    if ($thumb != 1) {
+	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=1'>";
+	echo "Detailed Thumbnails";
+        echo "</a>";
+    } else {
+        echo "Detailed Thumbnails";
+    }
+    echo ", ";
+
+    if ($thumb != 2) {
+	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=2'>";
+	echo "Brief Thumbnails";
+        echo "</a>";
+    } else {
+        echo "Brief Thumbnails";
+    }
+    echo "</b><br />\n";
+ 
+#    if (!$thumb) {
+#	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=1'>".
+#             "Switch to Thumbnail view".
+#	     "</a></b><br />";
+#    } else {
+#	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=0'>".
+#             "Switch to List view".
+#	     "</a></b><br />";
+#    }
 }
 
 echo "<br />\n";
@@ -233,9 +262,12 @@ if (mysql_num_rows($experiments_result)) {
     # Now shove out the column headers.
     #
 if ($thumb && !$idle) {
-    echo "<table border=2 cols=2
-                 cellpadding=2 cellspacing=2 align=center><tr>";
 
+    if ($thumb == 2) {
+	echo "<table border=2 cols=4 cellpadding=2 cellspacing=2 align=center><tr>";
+    } else {
+	echo "<table border=2 cols=2 cellpadding=2 cellspacing=2 align=center><tr>";
+    }
     $thumbCount = 0;
  
     while ($row = mysql_fetch_array($experiments_result)) {	
@@ -255,58 +287,79 @@ if ($thumb && !$idle) {
 
 #	Should create on demand.
 
-	echo "<td>".
-             "<table border=0 cellpadding=4 cellspacing=0>".
-	     "<tr>".
-	     "<td width=128 align=center>".
-	     "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
-	     "<img border=1 width=128 height=128 class='stealth' ".
+	if ($thumb == 2) {
+	    if ($pid != "emulab-ops") {
+		echo "<td align=center>".
+		     "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
+		     "<img border=1 width=128 height=128 class='stealth' ".
+		     " src='thumbs/tn$thumb_hash.png' />".
+		     "<br />\n".
+		     "<b>".
+		     "<a href='showproject.php3?pid=$pid'>$pid</a>/<br />".
+		     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
+		     "</b>".
+		     "</td>";
+	    }
+	} else {
+
+	    echo "<td>".
+		 "<table border=0 cellpadding=4 cellspacing=0>".
+		 "<tr>".
+		 "<td width=128 align=center>".
+	         "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
+		 "<img border=1 width=128 height=128 class='stealth' ".
 #	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
 #	     " src='thumbs/$pid.$eid.png' />".
-	     " src='thumbs/tn$thumb_hash.png' />".
-	     "</a>".
-             "</td>".
-	     "<td align=left class='paddedcell'>".
-	     "<b>".
- 	     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-             "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
-	     "</b>".
-	     "<br />\n".
-	     "<b><font size=-1>$name</font></b>".
-             "<br />\n";
+		 " src='thumbs/tn$thumb_hash.png' />".
+	         "</a>".
+                 "</td>".
+	         "<td align=left class='paddedcell'>".
+	         "<b>".
+ 	         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+                 "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
+	         "</b>".
+	         "<br />\n".
+	         "<b><font size=-1>$name</font></b>".
+                 "<br />\n";
 
 	# echo "<font size=-2>Using 69 PCs</font>\n";
 
-	if ($isadmin) {
-	    $swappable= $row["swappable"];
-	    $swapreq=$row["swap_requests"];
-	    $lastswapreq=$row["lastreq"];
-	    $lastlogin = "";
-	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
-	        $daysidle=$lastexpnodelogins["daysidle"];
-	        #if ($idle && $daysidle < 1)
-		#  continue;
-		$lastlogin .= $lastexpnodelogins["date"] . " " .
-		 "(" . $lastexpnodelogins["uid"] . ")";
-	    } elseif ($state=="active") {
-	        $daysidle=$row["lastswap"];
-	        $lastlogin .= "$date Swapped In";
-	    }
-	    # if ($lastlogin=="") { $lastlogin="<td>&nbsp;</td>\n"; }
-	    if ($lastlogin != "") {
-		echo "<font size=-2><b>Last Login:</b> $lastlogin</font><br />\n";
-	    }
-	}	
+	    if ($isadmin) {
+		$swappable= $row["swappable"];
+		$swapreq=$row["swap_requests"];
+		$lastswapreq=$row["lastreq"];
+		$lastlogin = "";
+		if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
+		    $daysidle=$lastexpnodelogins["daysidle"];
+		    #if ($idle && $daysidle < 1)
+		    #  continue;
+		    $lastlogin .= $lastexpnodelogins["date"] . " " .
+			"(" . $lastexpnodelogins["uid"] . ")";
+		} elseif ($state=="active") {
+		    $daysidle=$row["lastswap"];
+		    $lastlogin .= "$date Swapped In";
+		}
+		# if ($lastlogin=="") { $lastlogin="<td>&nbsp;</td>\n"; }
+		if ($lastlogin != "") {
+		    echo "<font size=-2><b>Last Login:</b> $lastlogin</font><br />\n";
+		}
+	    }	
 
-	echo "<font size=-2><b>Created by:</b> ".
-             "<a href='showuser.php3?target_uid=$huid'>$huid</a>".
-	     "</font><br />\n";
+	    echo "<font size=-2><b>Created by:</b> ".
+		 "<a href='showuser.php3?target_uid=$huid'>$huid</a>".
+		 "</font><br />\n";
 
-	echo "</td></tr></table> \n";
-	echo "</td>";
+	    echo "</td></tr></table> \n";
+	    echo "</td>";
+	}
 
 	$thumbcount++;
-	if (($thumbcount % 2) == 0) { echo "</tr><tr>\n"; }
+	if ($thumb == 2) {
+	    if (($thumbcount % 4) == 0) { echo "</tr><tr>\n"; }
+	} else {	
+	    if (($thumbcount % 2) == 0) { echo "</tr><tr>\n"; }
+	}
+	    
     }
 
     echo "</tr></table>";
