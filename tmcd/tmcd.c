@@ -2514,9 +2514,9 @@ COMMAND_PROTOTYPE(dotunnels)
 		row = mysql_fetch_row(res);
 
 		sprintf(buf, "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
-			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s INET=%s\n",
+			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s INET=%s MASK=%s\n",
 			row[0], row[1], row[2], row[3], row[4],
-			row[5], row[6], row[7]);
+			row[5], row[6], row[7], NETMASK);
 		       
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
