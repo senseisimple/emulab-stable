@@ -547,7 +547,6 @@ list(ac, av)
 		rulenum = 0 ;
 	    for ( ; nbytes > 0 ; p = (struct dn_pipe *)next_pipe ) {
 		char qs[30] ;
-		char plr[30] ;
 		int l ;
 		struct dn_flow_queue *q ;
 
@@ -562,66 +561,66 @@ list(ac, av)
 		printf("%05d: ",p->pipe_nr);
 
 		printf("\tbandwidth dist:\t");
-		if (!p->bwdist)
+		if (!p->bw.dist)
 		    printf("none (unlimited bw)");
 		else
-		if (p->bwdist & DN_DIST_CONST_RATE)
-		    printf("constant, %4d ",p->bandwidth);
+		if (p->bw.dist & DN_DIST_CONST_RATE)
+		    printf("constant, %4d ",p->bw.bandwidth);
 		else
-		if (p->bwdist & DN_DIST_UNIFORM)
+		if (p->bw.dist & DN_DIST_UNIFORM)
 		    printf("uniform, var %4d mean %4d ",
-			p->bwvar,p->bwmean);
+			p->bw.variance,p->bw.mean);
 		else
-		if (p->bwdist & DN_DIST_POISSON)
-		    printf("Poisson, mean %4d ",p->bwmean);
+		if (p->bw.dist & DN_DIST_POISSON)
+		    printf("Poisson, mean %4d ",p->bw.mean);
 		else
-		if (p->bwdist & DN_DIST_TABLE_RANDOM)
+		if (p->bw.dist & DN_DIST_TABLE_RANDOM)
 		    printf("random (PRINT ENTRIES)");
 		else
-		if (p->bwdist & DN_DIST_TABLE_DETERM)
+		if (p->bw.dist & DN_DIST_TABLE_DETERM)
 		     printf("deterministic (PRINT ENTRIES)");
 
 		printf("\n\tdelay dist:\t");
-		if (!p->delaydist)
+		if (!p->delay.dist)
 		    printf("none");
 		else
-		if (p->delaydist & DN_DIST_CONST_TIME)
-		    printf("constant, %4d ms",p->delay);
+		if (p->delay.dist & DN_DIST_CONST_TIME)
+		    printf("constant, %4d ms",p->delay.delay);
 		else
-		if (p->delaydist & DN_DIST_UNIFORM)
+		if (p->delay.dist & DN_DIST_UNIFORM)
 		    printf("uniform, var %4d mean %4d ",
-			p->delayvar,p->delaymean);
+			p->delay.variance,p->delay.mean);
 		else
-		if (p->delaydist & DN_DIST_POISSON)
-		    printf("Poisson, mean %4d ",p->delaymean);
+		if (p->delay.dist & DN_DIST_POISSON)
+		    printf("Poisson, mean %4d ",p->delay.mean);
 		else
-		if (p->delaydist & DN_DIST_TABLE_RANDOM)
+		if (p->delay.dist & DN_DIST_TABLE_RANDOM)
 		    printf("random (PRINT ENTRIES)");
 		else
-		if (p->delaydist & DN_DIST_TABLE_DETERM)
+		if (p->delay.dist & DN_DIST_TABLE_DETERM)
 		     printf("deterministic (PRINT ENTRIES)");
 
 		printf("\n\tloss dist:\t");
-		if (!p->lossdist)
+		if (!p->loss.dist)
 		    printf("none");
 		else
-		if (p->lossdist & DN_DIST_CONST_TIME)
-		    printf("constant time, %4d ",p->lossmean);
+		if (p->loss.dist & DN_DIST_CONST_TIME)
+		    printf("constant time, %4d ",p->loss.mean);
 		else
-		if (p->lossdist & DN_DIST_CONST_RATE)
-		    printf("constant rate, %4d ",p->plr);
+		if (p->loss.dist & DN_DIST_CONST_RATE)
+		    printf("constant rate, %4d ",p->loss.plr);
 		else
-		if (p->lossdist & DN_DIST_UNIFORM)
+		if (p->loss.dist & DN_DIST_UNIFORM)
 		    printf("uniform, var %4d mean %4d ",
-			p->lossvar,p->lossmean);
+			p->loss.variance,p->loss.mean);
 		else
-		if (p->lossdist & DN_DIST_POISSON)
-		    printf("Poisson, mean %4d ",p->lossmean);
+		if (p->loss.dist & DN_DIST_POISSON)
+		    printf("Poisson, mean %4d ",p->loss.mean);
 		else
-		if (p->lossdist & DN_DIST_TABLE_RANDOM)
+		if (p->loss.dist & DN_DIST_TABLE_RANDOM)
 		    printf("random (PRINT ENTRIES)");
 		else
-		if (p->lossdist & DN_DIST_TABLE_DETERM)
+		if (p->loss.dist & DN_DIST_TABLE_DETERM)
 		    printf("deterministic (PRINT ENTRIES)");
 		putchar('\n');
 
@@ -632,14 +631,9 @@ list(ac, av)
 			sprintf(qs,"%d B", l);
 		} else
 		    sprintf(qs,"%3d sl.", p->queue_size);
-		if (p->plr)
-		    sprintf(plr,"plr %f", 1.0*p->plr/(double)(0x7fffffff));
-		else
-		    plr[0]='\0';
 
-		printf(" %s%s %d queues (%d buckets)\n",
-		    qs, plr,
-		    p->rq_elements, p->rq_size);
+		printf(" %s %d queues (%d buckets)\n",
+		    qs, p->rq_elements, p->rq_size);
 		printf("    mask: 0x%02x 0x%08x/0x%04x -> 0x%08x/0x%04x\n",
 		    p->flow_mask.proto,
 		    p->flow_mask.src_ip, p->flow_mask.src_port,
@@ -822,12 +816,23 @@ show_usage(const char *fmt, ...)
 "    ipoptions [!]{ssrr|lsrr|rr|ts},...\n"
 "    icmptypes {type[,type]}...\n"
 "  pipeconfig:\n"
-"    {bw|bandwidth} <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
 "    [delaydist constant] delay <milliseconds>\n"
 "    delaydist uniform delaymean <ms> delayvar <ms>\n"
-"    delaydist custom delayentries <entry_count> <entry> <entry> <entry> ...\n"
+"    delaydist random delayentries <entry_count> <entry> <entry> <entry> ...\n"
+"    delaydist determ delayentries <entry_count> <entry> <entry> <entry> ...\n"
+"    delaydist poisson delaymean <ms>\n"
+"    [lossdist constrate] plr <decimal>\n"
+"    lossdist consttime lossmean <ms>\n"
+"    lossdist uniform lossmean <decimal> lossvar <decimal>\n"
+"    lossdist poisson lossmean <decimal>\n"
+"    lossdist random lossentries <entry_count> <entry> <entry> <entry> ...\n"
+"    lossdist determ lossentries <entry_count> <entry> <entry> <entry> ...\n"
+"    [bwdist constant] {bw|bandwidth} <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
+"    bwdist uniform bwmean <value> bwvar <value>\n"
+"    bwdist poisson bwmean <value>\n"
+"    bwdist random bwentries <entry_count> <entry> <entry> <entry> ...\n"
+"    bwdist determ bwentries <entry_count> <entry> <entry> <entry> ...\n"
 "    queue <size>{packets|Bytes|KBytes}\n"
-"    plr <fraction>\n"
 "    mask {all| [dst-ip|src-ip|dst-port|src-port|proto] <number>}\n"
 "    buckets <number>}\n"
 );
@@ -1279,6 +1284,148 @@ build_poisson(int mean, int *entries)
     return table;
 }
 
+/*
+ * read a parameter and its value from cmdline
+ */
+static int
+readint(char *label, char **argv)
+{
+    if (strcmp(argv[0],label))
+	show_usage("%s found where %s expected",argv[0],label);
+    return atoi(argv[1]);
+}
+
+/*
+ * read a parameter and its value from cmdline
+ * luckily, we get to parse units on bw specifications. fun.
+ */
+static int
+readbw_rate(char *label, char **argv)
+{
+    int i;
+    char *end;
+    if (strcmp(argv[0],label))
+	show_usage("%s found where %s expected",argv[0],label);
+    i = strtoul(argv[1], &end, 0);
+    if (*end == 'K' || *end == 'k' )
+	end++, i *= 1000 ;
+    else if (*end == 'M')
+	end++, i *= 1000000 ;
+    if ( *end == 'B' || !strncmp(end, "by", 2) )
+	i *= 8 ;
+    return i;
+}
+
+/*
+ * read a parameter and its value from cmdline
+ * the string is a real number 0..1, which we convert to an
+ * int 0..7fffffff
+ */
+static int
+readlossrate(char *label, char **argv)
+{
+    double d;
+    if (strcmp(argv[0],label))
+	show_usage("%s found where %s expected",argv[0],label);
+    d = strtod(argv[1], NULL);
+    if (d>1 || d<0)
+	show_usage("loss rate %s makes no sense",argv[1]);
+    return ((int)(d*0x7fffffff));
+}
+
+/*
+ * read table from cmdline
+ * argv == {"entries","<num_of_ents>","<ent0>","<ent1>"...}
+ */
+static int
+readtable(char **argv, int *ac, int **tabptr)
+{
+    int entries, i;
+    int *table; /* just for syntactic convenience */
+    if (strcmp(argv[0],"entries"))
+	show_usage("%s found where 'entries' expected",argv[0]);
+    entries = strtoul(argv[1], NULL, 0);
+    if (entries <= 0)
+	show_usage("%d entries in your table?", argv[1]);
+    if ((*ac -= entries) < 0)
+	show_usage("fewer entries than claimed ");
+
+    table = *tabptr = malloc(entries*sizeof(int));
+    for (i=0; i<entries; i++)
+	table[i] = strtol(argv[i+2], NULL, 0);
+    return entries;
+}
+
+/*
+ * read bw rate table
+ * ugh, parsing those dumb unit things every time
+ */
+static int
+readbwratetable(char **argv, int *ac, int **tabptr)
+{
+    int entries, i;
+    int *table;
+    char *end;
+    if (strcmp(argv[0],"entries"))
+	show_usage("%s found where 'entries' expected",argv[0]);
+    entries = strtoul(argv[1], NULL, 0);
+    if (entries <= 0)
+	show_usage("%d entries in your table?", argv[1]);
+    if ((*ac -= entries) < 0)
+	show_usage("fewer entries than claimed ");
+
+    table = *tabptr = malloc(entries*sizeof(int));
+    for (i=0; i<entries; i++) {
+	table[i] = strtol(argv[i+2], &end, 0);
+	if (*end == 'K' || *end == 'k' )
+	    end++, table[i] *= 1000 ;
+	else if (*end == 'M')
+	    end++, table[i] *= 1000000 ;
+	if ( *end == 'B' || !strncmp(end, "by", 2) )
+	    table[i] *= 8 ;
+    }
+    return entries;
+}
+
+/*
+ * read loss rate table.
+ * obviously, there are alternative ways to structure these little functions.
+ * ...but does it matter for these things?
+ */
+static int
+readlossratetable(char **argv, int *ac, int **tabptr)
+{
+    int entries, i;
+    int *table;
+    if (strcmp(argv[0],"entries"))
+	show_usage("%s found where 'entries' expected",argv[0]);
+    entries = strtoul(argv[1], NULL, 0);
+    if (entries <= 0)
+	show_usage("%d entries in your table?", argv[1]);
+    if ((*ac -= entries) < 0)
+	show_usage("fewer entries than claimed ");
+
+    table = *tabptr = malloc(entries*sizeof(int));
+    for (i=0; i<entries; i++) {
+	double d = strtod(argv[i+2], NULL);
+	if (d>1 || d<0)
+	    show_usage("loss rate %s makes no sense",argv[i+2]);
+	table[i] = (int)(d*0x7fffffff);
+    }
+    return entries;
+}
+
+/*
+ * adjust_ac()
+ * a _cheesy_ little fn because we have to make this check all of the time.
+ */
+static void
+adjust_ac(int *ac, int i)
+{
+    if ((*ac+=i) < 0)
+	show_usage("more args required\n");
+}
+
 static void
 config_pipe(int ac, char **av)
 {
@@ -1289,169 +1436,163 @@ config_pipe(int ac, char **av)
  
         memset(&pipe, 0, sizeof pipe);
  
-        av++; ac--;
+        av++; ac-=2;
+
         /* Pipe number */
         if (ac && isdigit(**av)) {
                 pipe.pipe_nr = atoi(*av); av++; ac--;
         }
-        while (ac > 1) {
+        while (ac >= 1) {
 	    arglen = strlen(*av);
+
+	    /* bandwidth */
             if (!strncmp(*av,"bw",arglen) ||
                 ! strncmp(*av,"bandwidth",arglen)) {
-		pipe.bwdist = DN_DIST_CONST_RATE;
-                pipe.bandwidth = strtoul(av[1], &end, 0);
+		adjust_ac(&ac,-2);
+		pipe.bw.dist = DN_DIST_CONST_RATE;
+                pipe.bw.bandwidth = strtoul(av[1], &end, 0);
                 if (*end == 'K' || *end == 'k' )
-                        end++, pipe.bandwidth *= 1000 ;
+                        end++, pipe.bw.bandwidth *= 1000 ;
                 else if (*end == 'M')
-                        end++, pipe.bandwidth *= 1000000 ;
+                        end++, pipe.bw.bandwidth *= 1000000 ;
                 if ( *end == 'B' || !strncmp(end, "by", 2) )
-                        pipe.bandwidth *= 8 ;
-                av+=2; ac-=2;
+                        pipe.bw.bandwidth *= 8 ;
+                av+=2;
 	    } else if (!strncmp(*av,"bwdist",arglen) ) {
-		av++; ac--;
+		av++;
+		adjust_ac(&ac,-1);
 		arglen = strlen(*av);
 		if (!strncmp(*av,"constant",arglen) ) {
-		    pipe.bwdist=DN_DIST_CONST_RATE;
+		    adjust_ac(&ac,-2);
+		    pipe.bw.dist=DN_DIST_CONST_RATE;
+		    pipe.bw.bandwidth = readbw_rate("constant",av);
+		    av+=2;
 		} else if (!strncmp(*av,"uniform",arglen) ) {
-		    pipe.bwdist=DN_DIST_UNIFORM;
+		    adjust_ac(&ac,-7);
+		    pipe.bw.dist=DN_DIST_UNIFORM;
+		    pipe.bw.mean = readbw_rate("mean",av+1);
+		    pipe.bw.variance = readbw_rate("var",av+3);
+		    pipe.bw.quantum = readint("quantum",av+5);
+		    av+=7;
 		} else if (!strncmp(*av,"poisson",arglen) ) {
-		    pipe.bwdist=DN_DIST_POISSON;
+		    adjust_ac(&ac,-5);
+		    pipe.bw.dist=DN_DIST_POISSON;
+		    pipe.bw.mean = readbw_rate("mean",av+1);
+		    pipe.bw.quantum = readint("quantum",av+3);
+		    pipe.bw.table =
+			build_poisson(pipe.bw.mean,&(pipe.bw.entries));
+		    av+=5;
                 } else if (!strncmp(*av,"random",arglen) ) {
-                    pipe.bwdist=DN_DIST_TABLE_RANDOM;
+		    adjust_ac(&ac,-4);
+                    pipe.bw.dist=DN_DIST_TABLE_RANDOM;
+		    pipe.bw.quantum = readint("quantum",av+1);
+		    pipe.bw.entries =
+			readbwratetable(av+3,&ac,&pipe.bw.table);
+		    av+=4+pipe.bw.entries;
 		} else if (!strncmp(*av,"determ",arglen) ) {
-		    pipe.bwdist=DN_DIST_TABLE_DETERM;
+		    adjust_ac(&ac,-4);
+		    pipe.bw.dist=DN_DIST_TABLE_DETERM;
+		    pipe.bw.quantum = readint("quantum",av+1);
+		    pipe.bw.entries =
+			readbwratetable(av+3,&ac,&pipe.bw.table);
+		    av+=4+pipe.bw.entries;
 		} else show_usage("invalid bw distribution ``%s''", *av);
-		av++; ac--;
-	    } else if (!strncmp(*av,"bwmean",arglen) ) {
-		/* used for all bw types except custom */
-		pipe.bwmean = strtoul(av[1], &end, 0);
-		if (*end == 'K' || *end == 'k' )
-		    end++, pipe.bwmean *= 1000 ;
-		else if (*end == 'M')
-		    end++, pipe.bwmean *= 1000000 ;
-		if ( *end == 'B' || !strncmp(end, "by", 2) )
-		    pipe.bwmean *= 8 ;
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"bwvar",arglen) ) {
-		/* used for uniform dist */
-		pipe.bwvar = strtoul(av[1], &end, 0);
-		if (*end == 'K' || *end == 'k' )
-		    end++, pipe.bwvar *= 1000 ;
-		else if (*end == 'M')
-		    end++, pipe.bwvar *= 1000000 ;
-		if ( *end == 'B' || !strncmp(end, "by", 2) )
-		    pipe.bwvar *= 8 ;
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"bwquantum",arglen) ) {
-		pipe.bwquantum = strtol(av[1], NULL, 0);
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"bwentries",arglen) ) {
-		/* bw table. first, the number of entries.
-		 * next, the entries themselves */
-		pipe.bwentries = strtol(av[1], NULL, 0);
-		if (pipe.bwentries <= 0)
-		    show_usage("%d entries in your custom bw table?", av[1]);
-		av+=2; ac-=2;
-		pipe.bwtable = malloc(pipe.bwentries*sizeof(int));
-		for(i=0;i<pipe.bwentries;i++) {
-		    pipe.bwtable[i] = strtoul(av[i], &end, 0);
-		    if (*end == 'K' || *end == 'k' )
-			end++, pipe.bwtable[i] *= 1000;
-		    else if (*end == 'M')
-			end++, pipe.bwtable[i] *= 1000000;
-		    if ( *end == 'B' || !strncmp(end, "by", 2) )
-			pipe.bwtable[i] *= 8;
-		}
-		av+=pipe.bwentries;
-		ac-=pipe.bwentries;
+
+	    /* delay */
             } else if (!strcmp(*av,"delay") ) {
-		pipe.delaydist = DN_DIST_CONST_TIME;
-                pipe.delay = strtoul(av[1], NULL, 0);
-                av+=2; ac-=2;
+		adjust_ac(&ac,-2);
+		pipe.delay.dist = DN_DIST_CONST_TIME;
+                pipe.delay.delay = strtoul(av[1], NULL, 0);
+                av+=2;
             } else if (!strncmp(*av,"delaydist",arglen) ) {
-                av++; ac--;
+		adjust_ac(&ac,-1);
+                av++;
 		arglen = strlen(*av);
                 if (!strncmp(*av,"constant",arglen) ) {
-                    pipe.delaydist=DN_DIST_CONST_TIME;
+		    adjust_ac(&ac,-2);
+                    pipe.delay.dist=DN_DIST_CONST_TIME;
+		    pipe.delay.delay = strtoul(av[1], NULL, 0);
+		    av+=2;
                 } else if (!strncmp(*av,"uniform",arglen) ) {
-                    pipe.delaydist=DN_DIST_UNIFORM;
+		    adjust_ac(&ac,-5);
+                    pipe.delay.dist=DN_DIST_UNIFORM;
+		    pipe.delay.mean = readint("mean",av+1);
+		    pipe.delay.variance = readint("var",av+3);
+		    av+=5;
                 } else if (!strncmp(*av,"poisson",arglen) ) {
-                    pipe.delaydist=DN_DIST_POISSON;
+		    adjust_ac(&ac,-3);
+                    pipe.delay.dist=DN_DIST_POISSON;
+		    pipe.delay.mean = readint("mean",av+1);
+		    pipe.delay.table = 
+			build_poisson(pipe.delay.mean,&(pipe.delay.entries));
+		    av+=3;
                 } else if (!strncmp(*av,"random",arglen) ) {
-                    pipe.delaydist=DN_DIST_TABLE_RANDOM;
+		    adjust_ac(&ac,-2);
+                    pipe.delay.dist=DN_DIST_TABLE_RANDOM;
+		    pipe.delay.entries = 
+			readtable(av+1,&ac,&pipe.delay.table);
+		    av+=2+pipe.delay.entries;
 		} else if (!strncmp(*av,"determ",arglen) ) {
-		    pipe.delaydist=DN_DIST_TABLE_DETERM;
+		    adjust_ac(&ac,-2);
+		    pipe.delay.dist=DN_DIST_TABLE_DETERM;
+		    pipe.delay.entries =
+			readtable(av+1,&ac,&pipe.delay.table);
+		    av+=2+pipe.delay.entries;
                 } else show_usage("invalid delay distribution ``%s''", *av);
-                av++; ac--;
-            } else if (!strncmp(*av,"delaymean",arglen) ) {
-                /* used for all delay types except custom */
-                pipe.delaymean = strtoul(av[1], NULL, 0);
-                av+=2; ac-=2;
-            } else if (!strncmp(*av,"delayvar",arglen) ) {
-                /* used for uniform delay */
-                pipe.delayvar = strtoul(av[1], NULL, 0);
-                av+=2; ac-=2;
-	    } else if (!strncmp(*av,"delayentries",arglen) ) {
-		/* delay table. first, the number of entries. next, the entries themselves */
-		pipe.delayentries = strtoul(av[1], NULL, 0);
-		if (pipe.delayentries <= 0)
-		    show_usage("%d entries in your custom delay table?", av[1]);
-		av+=2; ac-=2;
-		pipe.delaytable = malloc(pipe.delayentries*sizeof(int));
-		for(i=0;i<pipe.delayentries;i++)
-		    pipe.delaytable[i] = strtol(av[i], NULL, 0);
-		av+=pipe.delayentries;
-		ac-=pipe.delayentries;
+
+	    /* loss */
             } else if (!strncmp(*av,"plr",arglen) ) {
-                
-                double d = strtod(av[1], NULL);
-		if (d > 1)
-		    d = 1 ;
-		else if (d < 0)
-		    d = 0 ;
-                pipe.plr = (int)(d*0x7fffffff) ;
-		pipe.lossdist = DN_DIST_CONST_RATE;
-                av+=2; ac-=2;
+		adjust_ac(&ac,-2);
+		pipe.loss.dist = DN_DIST_CONST_RATE;
+		pipe.loss.plr = readlossrate("plr",av);
+                av+=2;
             } else if (!strncmp(*av,"lossdist",arglen) ) {
-		av++; ac--;
+		adjust_ac(&ac,-1);
+		av++;
 		arglen = strlen(*av);
 		if (!strncmp(*av,"consttime",arglen) ) {
-		    pipe.lossdist=DN_DIST_CONST_TIME;
+		    adjust_ac(&ac,-2);
+		    pipe.loss.dist=DN_DIST_CONST_TIME;
+		    pipe.loss.mean = atoi(av[1]);
+		    av+=2;
 		} else if (!strncmp(*av,"constrate",arglen) ) { 
-                    pipe.lossdist=DN_DIST_CONST_RATE;
+		    adjust_ac(&ac,-2);
+                    pipe.loss.dist=DN_DIST_CONST_RATE;
+		    pipe.loss.plr = readlossrate("constrate",av);
+		    av+=2;
 		} else if (!strncmp(*av,"determ",arglen) ) {
-		    pipe.lossdist=DN_DIST_TABLE_DETERM;
+		    adjust_ac(&ac,-4);
+		    pipe.loss.dist=DN_DIST_TABLE_DETERM;
+		    pipe.loss.quantum = readint("quantum",av+1);
+		    pipe.loss.entries = 
+			readtable(av+3,&ac,&pipe.loss.table);
+		    av+=4+pipe.loss.entries;
+		} else if (!strncmp(*av,"random",arglen) ) {
+		    adjust_ac(&ac,-4);
+		    pipe.loss.dist=DN_DIST_TABLE_RANDOM;
+		    pipe.loss.quantum = readint("quantum",av+1);
+		    pipe.loss.entries = 
+			readlossratetable(av+3,&ac,&pipe.loss.table);
+		    av+=4+pipe.loss.entries;
 		} else if (!strncmp(*av,"uniform",arglen) ) {
-		    pipe.lossdist=DN_DIST_UNIFORM;
+		    adjust_ac(&ac,-6);
+		    pipe.loss.dist=DN_DIST_UNIFORM;
+		    pipe.loss.mean = readlossrate("mean",av+1);
+		    pipe.loss.variance = readlossrate("var",av+3);
+		    pipe.loss.quantum = readint("quantum",av+5);
+		    av+=6;
 		} else if (!strncmp(*av,"poisson",arglen) ) {
-		    pipe.lossdist=DN_DIST_POISSON;
+		    int i;
+		    adjust_ac(&ac,-4);
+		    pipe.loss.dist=DN_DIST_POISSON;
+		    pipe.loss.mean = readlossrate("mean",av+1);
+		    pipe.loss.quantum = readint("quantum",av+3);
+		    pipe.loss.table =
+			build_poisson(pipe.loss.mean>>0x10,&(pipe.loss.entries));
+		    for (i = 0; i < pipe.loss.entries; i++)
+			pipe.loss.table[i]<<=0x10;
+		    av+=4;
 		} else show_usage("invalid loss distribution ``%s''", *av);
-                av++; ac--;
-	    } else if (!strcmp(*av,"loss") ) {
-		pipe.lossdist = DN_DIST_CONST_TIME;
-		pipe.lossmean = strtoul(av[1], NULL, 0);
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"lossmean",arglen) ) {
-		/* if mean is rate-based, convert it */
-		if (pipe.lossdist &
-		    (DN_DIST_UNIFORM|DN_DIST_POISSON|DN_DIST_TABLE_RANDOM)) {
-		    double d = strtod(av[1], NULL);
-		    if ((d > 1) | (d < 0))
-			show_usage("invalid lossmean %s\n",av[1]);
-		    pipe.lossmean = (int)(d*0x7fffffff) ;
-		}
-		else
-		    pipe.lossmean = strtoul(av[1], NULL, 0);
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"lossvar",arglen) ) {
-		double d = strtod(av[1], NULL);
-		if ((d > 1) | (d < 0))
-		    show_usage("invalid lossvar %s\n",av[1]);
-		pipe.lossvar = (int)(d*0x7fffffff) ;
-		av+=2; ac-=2;
-	    } else if (!strncmp(*av,"lossquantum",arglen) ) {
-		pipe.lossquantum = strtol(av[1], NULL, 0);
-		av+=2; ac-=2;
 	    } else if (!strncmp(*av,"queue",arglen) ) {
                 end = NULL ;
                 pipe.queue_size = strtoul(av[1], &end, 0);
@@ -1463,18 +1604,6 @@ config_pipe(int ac, char **av)
                     pipe.queue_size = 0 ;
                 }
                 av+=2; ac-=2;
-            } else if (!strncmp(*av,"lossentries",arglen) ) {
-                /* loss table. first, the number of entries. next, the entries themselves */
-                pipe.lossentries = strtol(av[1], NULL, 0);
-                if (pipe.lossentries <= 0)
-                    show_usage("%d entries in your custom loss table?", av[1]);
-                av+=2; ac-=2;
-                pipe.losstable = malloc(pipe.lossentries*sizeof(int));
-                for(i=0;i<pipe.lossentries;i++)
-                    pipe.losstable[i] = strtol(av[i], NULL, 0);
-                av+=pipe.lossentries;
-                ac-=pipe.lossentries;
-
             } else if (!strncmp(*av,"buckets",arglen) ) {
                 pipe.rq_size = strtoul(av[1], NULL, 0);
                 av+=2; ac-=2;
@@ -1551,30 +1680,10 @@ config_pipe(int ac, char **av)
                 show_usage("unrecognised option ``%s''", *av);
         }
 
-	/* handle poisson distribution */
-	if (pipe.delaydist == DN_DIST_POISSON)
-	    pipe.delaytable = 
-		build_poisson(pipe.delaymean,&(pipe.delayentries));
-	if (pipe.lossdist == DN_DIST_POISSON) {
-	    /* the mean is a 31-bit number and the cheesy method that i use
-	     * is just not going to work. of course, my 'adjustment' below
-	     * is even worse.
-	     */
-	    pipe.losstable =
-		build_poisson(pipe.lossmean>>0x10,&(pipe.lossentries));
-	    for (i = 0; i < pipe.lossentries; i++)
-		    pipe.losstable[i]<<=0x10;
-	}
-	if (pipe.bwdist == DN_DIST_POISSON)
-	    pipe.bwtable =
-		build_poisson(pipe.bwmean,&(pipe.bwentries));
-
         if (pipe.pipe_nr == 0 )
             show_usage("pipe_nr %d be > 0", pipe.pipe_nr);
         if (pipe.queue_size > 100 )
             show_usage("queue size %d must be 2 <= x <= 100", pipe.queue_size);
-        if (pipe.delay > 10000 )
-            show_usage("delay %d must be < 10000", pipe.delay);
 #if 0
         printf("configuring pipe %d bw %d delay %d size %d\n",
                 pipe.pipe_nr, pipe.bandwidth, pipe.delay, pipe.queue_size);
@@ -1582,8 +1691,12 @@ config_pipe(int ac, char **av)
         i = setsockopt(s,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe);
         if (i)
                 err(1, "setsockopt(%s)", "IP_DUMMYNET_CONFIGURE");
-	if (pipe.delaytable)
-	    free(pipe.delaytable);
+	if (pipe.delay.table)
+	    free(pipe.delay.table);
+	if (pipe.loss.table)
+	    free(pipe.loss.table);
+	if (pipe.bw.table)
+	    free(pipe.bw.table);
                 
 }
 
