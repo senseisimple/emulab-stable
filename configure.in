@@ -408,7 +408,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	apache/GNUmakefile apache/httpd.conf \
-	install/ops-install "
+	install/ops-install install/boss-install "
 
 #
 # Do this for easy distclean.

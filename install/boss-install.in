@@ -1,0 +1,424 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# install-boss.sh - Script to do the initial install of a boss node
+#
+# The main things it does not do yet:
+# * Figure out where to put directories such as /usr/testbed - they must
+#   already exist
+# * Do any dhcpd setup - need to figure out if we can use version 3, or how
+#   we're going to get version 2 installed.
+# * Set up named - we probably have to do that later, when the interfaces table
+#   is filled in
+# * Set up a sup tree. Not sure what the right thing to do here is!
+# * Doesn't do anything about SSL certificates for the web
+
+#
+# Configure variables
+#
+my $PREFIX     = '@prefix@';
+my $SRCDIR     = '@srcdir@';
+my $TOP_SRCDIR = '@top_srcdir@';
+my $DBNAME     = "@TBDBNAME@";
+
+my $OURDOMAIN  = '@OURDOMAIN@';
+
+my $USERNODE   = '@USERNODE@';
+my $FSNODE     = '@FSNODE@';
+my $BOSSNODE   = '@BOSSNODE@';
+
+#
+# Some programs we use
+#
+my $SH         = "/bin/sh";
+my $CHMOD      = "/bin/chmod";
+my $CHGRP      = "/usr/bin/chgrp";
+my $PWD        = "/bin/pwd";
+my $PW         = "/usr/sbin/pw";
+my $PATCH      = "/usr/bin/patch";
+my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
+my $PKG_INFO   = "/usr/sbin/pkg_info";
+my $TOUCH      = "/usr/bin/touch";
+
+my $SUIDPERL   = "/usr/bin/suidperl";
+
+my $MYSQL      = "/usr/local/bin/mysql";
+my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
+my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
+my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
+
+my $GMAKE      = "/usr/local/bin/gmake";
+
+#
+# Some files we edit/create
+#
+my $CRONTAB         = "/etc/crontab";
+my $FSTAB           = "/etc/fstab";
+my $RCCONF          = "/etc/rc.conf";
+my $SYSLOG_CONF     = "/etc/syslog.conf";
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+
+my $ROOT_PRIVKEY    = "/root/.ssh/identity";
+my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
+my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
+
+my $SUDOERS         = "/usr/local/etc/sudoers";
+my $HTTPD_CONF      = "/usr/local/etc/apache/httpd.conf";
+
+my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
+
+my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
+my $BOOST_PATCH     = "$TOP_SRCDIR/patches/boost.patch";
+
+#
+# Some directories we care about
+#
+my $LOGDIR       = "$PREFIX/log";
+my $RCDIR        = "/usr/local/etc/rc.d";
+my $USERSVAR_DIR = "$PREFIX/usersvar";
+my $PORTSDIR     = "/usr/ports/misc";
+my $MIBPATH      = "/usr/local/share/snmp/mibs";
+
+#
+# URLs
+#
+my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
+
+#
+# And some lists that we use
+#
+my @TESTBED_DIRS = ($PREFIX);
+
+my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
+    "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
+    "$LOGDIR/frisbeed.log", "$LOGDIR/frisbee.log", "$LOGDIR/tevd.log",
+    "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log");
+
+my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
+    "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB");
+
+#
+# Figure out which directory we live in, so that some stages can do thing
+# relative to it.
+#
+my $OBJDIR = `/usr/bin/dirname $0`;
+chomp $OBJDIR;
+my $TOP_OBJDIR = "$OBJDIR/..";
+
+#
+# Allow this to work if the library is left in the source directory
+#
+use lib '@srcdir@';
+   
+use English;
+use libinstall;
+
+#
+# Make sure they know what they're getting into...
+#
+warn "***** Please run install-ops on ops, and reboot it, before running\n";
+warn "this script!\n\n";
+print STDERR "WARNING: This script is ONLY intended to be run on a machine\n";
+print STDERR "that is being set up as a dedicated boss node. Continue? [y/N] ";
+my $response = <>;
+die "Installation aborted!\n" unless ($response =~ /^y/i);
+
+if ($UID != 0) {
+    die "This script must be run as root.\n";
+}
+
+Phase "groups", "Creating groups", sub {
+    Phase "tbadmin", "Creating tbadmin group", sub {
+	if (getgrnam("tbadmin")) {
+	    PhaseSkip("tbadmin group already exists");
+	}
+	ExecQuietFatal("$PW groupadd tbadmin -g 101");
+    };
+    Phase "tbvis", "Creating tbvis group", sub {
+	if (getgrnam("tbvis")) {
+	    PhaseSkip("tbvis group already exists");
+	}
+	ExecQuietFatal("$PW groupadd tbvis -g 102");
+    };
+    Phase "root", "Creating root group", sub {
+	if (getgrnam("root")) {
+	    PhaseSkip("root group already exists");
+	}
+	ExecQuietFatal("$PW groupadd root -g 103");
+    };
+};
+
+Phase "dirs", "Setting directory permissions", sub {
+    foreach my $dir (@TESTBED_DIRS) {
+	Phase $dir, $dir, sub {
+	    if (!-d $dir) {
+		PhaseFail("Directory $dir does not exist");
+	    }
+	    my ($mode,$group) = (stat($dir))[2,5];
+	    # Fix up the mode (strip file type)
+	    $mode = $mode & 0777;
+	    if ($mode == 0775 && $group eq getgrnam("tbadmin")) {
+		PhaseSkip("Already done");
+	    }
+	    ExecQuietFatal("$CHGRP tbadmin $dir");
+	    ExecQuietFatal("$CHMOD 0775 $dir");
+	};
+    }
+};
+
+Phase "usersvar", "Creating $USERSVAR_DIR", sub {
+    DoneIfExists($USERSVAR_DIR);
+    mkdir $USERSVAR_DIR,0777 or
+	PhaseFail("Unable to create $USERSVAR_DIR : $!");
+};
+
+Phase "ports", "Installing ports", sub {
+    Phase "pcopy", "Copying ports into place", sub {
+	DoneIfExists("$PORTSDIR/emulab-boss");
+	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
+    };
+    Phase "pinstall", "Checking for port installation", sub {
+	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.0")) {
+	    PhaseSkip("Ports already installed");
+	}
+	PhaseFail("Please install ports manually, since some\n of them are " .
+	    "interactive. Run: \n" .
+	    "cd $PORTSDIR/emulab-boss && make install\n" .
+	    "then re-run this script.");
+    };
+};
+
+Phase "patches", "Applying patches", sub {
+    Phase "g++patch", "Patching g++'s STL", sub {
+	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $STL_PATCH")) {
+	    PhaseSkip("$STL_PATCH already applied");
+	}
+	ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
+    };
+    Phase "boostpatch", "Patching boost headers", sub {
+	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $BOOST_PATCH")) {
+	    PhaseSkip("$BOOST_PATCH already applied");
+	}
+	ExecQuietFatal("$PATCH -f -p0 -i $BOOST_PATCH");
+    };
+};
+
+Phase "cracklib", "Installing cracklib", sub {
+    DoneIfExists("$CRACKLIB_DICT");
+    my $pwd = `$PWD`;
+    chomp $pwd;
+    chdir "$TOP_SRCDIR/tbsetup/checkpass/cracklib,2.7" or
+	PhaseFail "Unable to change to " .
+	    "$TOP_SRCDIR/tbsetup/checkpass/cracklib,2.7: $!";
+    ExecQuietFatal("make install clean");
+    chdir $pwd;
+};
+
+Phase "apache", "Installing apache config file", sub {
+    DoneIfEdited("$HTTPD_CONF");
+    # ICK!!! If we installed apache AFTER we unpacked the source tarball,
+    # make will not properly install the new apache config file! So, we use
+    # this shameful hack to force it to do so!
+    ExecQuietFatal("$TOUCH -t 01010000 $HTTPD_CONF");
+    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache install");
+};
+
+Phase "rc.d", "Setting up rc.d scripts", sub {
+    DoneIfExists("$RCDIR/3.testbed.sh");
+    Phase "my-client", "Moving $RCDIR/mysql-client.sh", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-client.sh");
+	ExecQuietFatal("mv $RCDIR/mysql-client.sh $RCDIR/1.mysql-client.sh");
+    };
+    Phase "my-server", "Removing $RCDIR/mysql-server.sh", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server.sh");
+	if (!unlink "$RCDIR/mysql-server.sh") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
+	}
+    };
+    # XXX - Commented until we get the dhcp port thing figured out
+#    Phase "dhcpd", "Moving $RCDIR/dhcpd.sh", sub {
+#	DoneIfExists("$RCDIR/2.dhcpd.sh");
+#	ExecQuietFatal("mv $RCDIR/dchpd.sh $RCDIR/2.dhcpd.sh");
+#    };
+    Phase "snmpd", "Removing snmpd starup script",  sub {
+	DoneIfDoesntExist("$RCDIR/snmpd.sh");
+	if (!unlink "$RCDIR/snmpd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/snmpd.sh: $!");
+	}
+    };
+    Phase "rc.testbed", "Installing testbed RC scripts", sub {
+	DoneIfExists("$RCDIR/3.testbed.sh");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+    };
+};
+
+Phase "database", "Setting up database", sub {
+    Phase "mysql", "Starting mysql", sub {
+	if (!ExecQuiet("$MYSQLADMIN ping")) {
+	    PhaseSkip("mysqld already running");
+	}
+	ExecQuietFatal("$RCDIR/2.mysql-server.sh start");
+	# Give mysqld some time to start, then make sure it did
+	sleep 5;
+	ExecQuietFatal("$MYSQLADMIN ping");
+    };
+    Phase "$DBNAME", "Creating $DBNAME", sub {
+	if (!ExecQuiet("$MYSQLSHOW $DBNAME")) {
+	    PhaseSkip("tbdb already exists");
+	}
+	ExecQuietFatal("$MYSQLADMIN create $DBNAME");
+    };
+    Phase "tables", "Creating tables in $DBNAME", sub {
+	if (!ExecQuiet("$MYSQLDUMP -d $DBNAME users")) {
+	    PhaseSkip("Tables have already been created");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-create.sql");
+    };
+    Phase "dbdata", "Filling tables with initial data", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "exported_tables' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-fill.sql");
+    };
+};
+
+Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
+    DoneIfEdited($RCCONF);
+    AppendToFileFatal($RCCONF,
+	qq|nfs_server_enable = "YES"|,
+	qq|nfs_server_flags  = "-u -t -n 16"|,
+	qq|nfs_client_enable = "YES"|,
+	qq|inetd_enable      = "YES"|,
+	qq|inetd_flags       = "-wW -R 0"|,
+	qq|named_enable      = "YES"|,
+	qq|xntpd_enable      = "YES"|,
+	qq|syslogd_flags     = ""|,
+	qq|tftpd_flags       = "-lvvvv -C 40 -s /tftpboot"|);
+};
+
+Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
+    PhaseSkip("Already done") if (-u $SUIDPERL);
+    ExecQuietFatal("$CHMOD u+s $SUIDPERL");
+};
+
+Phase "mounts", "Setting up mounts of fs and ops", sub {
+    DoneIfEdited($FSTAB);
+    AppendToFileFatal($FSTAB,
+	"$FSNODE:/users\t\t/users\tnfs\trw\t0\t0",
+	"$FSNODE:/proj\t\t/proj\tnfs\trw\t0\t0",
+	"$FSNODE:/groups\t\t/groups\tnfs\trw\t0\t0",
+	"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b\t0\t0");
+    # XXX - Do we want to do a 'mount -a' at this point?
+};
+
+Phase "mibs", "Fetching Cisco MIBs", sub {
+    foreach my $mib (@CISCO_MIBS) {
+	my $localfile = "$MIBPATH/$mib.txt";
+	my $mibURL = "$CISCO_MIB_FTP/$mib.my";
+	Phase "$mib", "Fetching $mib", sub {
+	    DoneIfExists($localfile);
+	    FetchFileFatal($mibURL,$localfile);
+	};
+    }
+};
+
+Phase "syslog", "Setting up syslog", sub {
+    Phase "sysconf", "Editing $SYSLOG_CONF", sub {
+	DoneIfEdited($SYSLOG_CONF);
+	AppendToFileFatal($SYSLOG_CONF,
+	    "!bootinfo",  "*.*\t\t\t\t\t\t$LOGDIR/bootinfo.log",
+	    "!tmcd",      "*.*\t\t\t\t\t\t$LOGDIR/tmcd.log",
+	    "!capture",   "*.*\t\t\t\t\t\t$LOGDIR/capture.log",
+	    "!dhcpd",     "*.*\t\t\t\t\t\t$LOGDIR/dhcpd.log",
+	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
+	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
+	    "!frisbee",   "*.*\t\t\t\t\t\t$LOGDIR/frisbee.log",
+	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
+	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
+	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
+	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
+    };
+
+    Phase "logdir", "Creating log directory", sub {
+	DoneIfExists($LOGDIR);
+	mkdir $LOGDIR, 0770 or PhaseFail("Unable to create $LOGDIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+    };
+
+    Phase "logfiles", "Creating log files", sub {
+	foreach my $logfile (@LOGFILES) {
+	    Phase $logfile, $logfile, sub {
+		DoneIfExists($logfile);
+		CreateFileFatal($logfile);
+		ExecQuietFatal("$CHGRP tbadmin $logfile");
+		ExecQuietFatal("$CHMOD 640 $logfile");
+	    };
+	}
+    };
+
+    Phase "newsyslog", "Setting up $NEWSYSLOG_CONF", sub {
+	DoneIfEdited($NEWSYSLOG_CONF);
+	AppendToFileFatal($NEWSYSLOG_CONF,
+	    "$LOGDIR/tmcd.log               640  9     1000 *     Z",
+	    "$LOGDIR/stated.log             640  9     300  *     Z",
+	    "$LOGDIR/osselect.log           640  9     300  *     Z",
+	    "$LOGDIR/power.log              640  7     300  *     Z",
+	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
+	    "$LOGDIR/tftpd.log              640  7     200  *     Z",
+	    "$LOGDIR/dhcpd.log              640  7     200  *     Z",
+	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",
+	    "$LOGDIR/capserver.log          640  5     200  *     Z",
+	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
+	    "$LOGDIR/tevd.log               640  3     200  *     Z",
+	    "$LOGDIR/suexec.log             640  3     200  *     Z",
+	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
+	        "/var/run/lastlog_daemon.pid");
+    };
+};
+
+Phase "cron", "Adding cron jobs", sub {
+    Phase "crontab", "Editing $CRONTAB", sub {
+	DoneIfEdited($CRONTAB);
+	AppendToFileFatal($CRONTAB,
+	    "45 \t1\t*\t*\t*\troot\t/usr/testbed/sbin/backup",
+	    "*/5\t*\t*\t*\t*\troot\t/usr/testbed/sbin/node_status");
+    };
+    Phase "cronhup", "HUPing cron", sub {
+	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
+	HUPDaemon("cron");
+    };
+};
+
+Phase "sudoers", "Editing $SUDOERS", sub {
+    DoneIfEdited($SUDOERS);
+    AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
+};
+
+Phase "ssh", "Setting up root ssh from boss to ops", sub {
+    DoneIfExists($ROOT_PRIVKEY);
+    ExecQuietFatal("$SSH_KEYGEN -t rsa1 -P '' -f $ROOT_PRIVKEY");
+};
+
+print "----------------------------------------------------------------------\n";
+print "Installation completed succesfully!\n";
+print "Please reboot this machine before proceeding with boss setup\n";
+
+if (!PhaseWasSkipped("ssh")) {
+    print "You'll need to manually copy boss's public SSH key over to ops,\n";
+    print "so boss can get into ops without a password. Run the following\n";
+    print "as root:\n";
+    print "scp $ROOT_PUBKEY ops:$ROOT_AUTHKEY\n";
+}
+
+exit 0;
