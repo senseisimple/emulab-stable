@@ -46,12 +46,12 @@ static void	deadsyncd(int sig);
 char *usagestr = 
  "usage: emulab-sync [options]\n"
  " -n <name>       Optional barrier name; must be less than 64 bytes long\n"
- " -d		   Turn on debugging\n"
- " -s server	   Specify a sync server to connect to\n"
- " -p portnum	   Specify a port number to connect to\n"
- " -i count	   Initialize named barrier to count waiters\n"
+ " -d              Turn on debugging\n"
+ " -s server       Specify a sync server to connect to\n"
+ " -p portnum      Specify a port number to connect to\n"
+ " -i count        Initialize named barrier to count waiters\n"
  " -a              Master returns immediately when initializing barrier\n"
- " -u		   Use UDP instead of TCP\n"
+ " -u              Use UDP instead of TCP\n"
  "\n";
 
 void
@@ -135,8 +135,10 @@ main(int argc, char **argv)
 		}
 		fclose(fp);
 	}
-	if (!server)
+	if (!server) {
+		fprintf(stderr, "Must provide name of the syncserver!\n\n");
 		usage();
+	}
 	
 	/*
 	 * Map server to IP.
