@@ -76,25 +76,33 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
 
+sub debug {
+    if ($d) { print @_; }
+}
+
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 my %options = ();
 if (!@ARGV) { usage(); }
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"h"})) { usage(); }
-if (defined($options{"d"})) { $d++; }
-if (defined($options{"q"})) { $noreboot++; }
+if (defined($options{"d"})) { $d++; debug("Debugging output enabled.\n"); }
+if (defined($options{"q"})) { $noreboot++; debug("Not rebooting nodes.\n"); }
 if (defined($options{"a"})) {
     if (defined($options{"r"})) {
         warn("Only one of -a or -r should be given\n");
 	usage();
     }
     $op = ADD;
+    debug("ADDING nodes.\n");
 }
-if (defined($options{"r"})) { $op = REMOVE; }
-if (defined($options{"n"})) { $num = untaint($options{"n"}); }
-if (defined($options{"t"})) { $type = untaint($options{"t"}); }
-if (defined($options{"p"})) { $prefix = untaint($options{"p"}); }
+if (defined($options{"r"})) { $op = REMOVE; debug("REMOVING nodes.\n"); }
+if (defined($options{"n"})) { $num=untaint($options{"n"});
+			      debug("n=$num\n"); }
+if (defined($options{"t"})) { $type=untaint($options{"t"});
+			      debug("type $type\n"); }
+if (defined($options{"p"})) { $prefix=untaint($options{"p"});
+			      debug("prefix=$prefix\n"); }
 if (defined($options{"e"})) {
     my $pideid = $options{"e"};
     if ($pideid =~ /([-\w]*),([-\w]*)/) {
@@ -104,26 +112,36 @@ if (defined($options{"e"})) {
         warn("Invalid argument to -e option: $pideid\n");
         usage();
     }
+    debug("Experiment = $pid/$eid\n");
 }
 if (defined($options{"v"})) {
     my $vstr = $options{"v"};
     my @vlist = split(",",$vstr);
+    debug("vlist = ",join(" ",@vlist),"\n");
     if (@vlist+0 != $num) {
       warn("Invalid list for -v: Must have $num vnames\n");
       usage();
     }
     my @usednames = ();
+    debug("usednames = ",join(" ",@usednames),"\n");
     my $q = DBQueryFatal("select vname from reserved ".
 			 "where pid='$pid' and eid='$eid'");
-    while (my @r=$q->fetchrow_array()) {
-      push(@usednames, $r[0]);
+    debug("usednames = ",join(" ",@usednames),"\n");
+    while (@r=$q->fetchrow_array()) {
+	if ($r[0]) {
+	    debug("used name is '$r[0]'\n");
+	    push(@usednames, $r[0]);
+	}
+	debug("bigger usednames = ",join(" ",@usednames),"\n");
     }
+    debug("usednames = ",join(" ",@usednames),"\n");
     foreach $vname (@vlist) {
       if ( grep(/^$vname$/,@vnames,@usednames) > 0 ) {
 	die("Vname $vname cannot be used twice.\n");
       }
       push(@vnames,untaint($vname));
     }
+    debug("vnames = ",join(" ",@vnames),"\n");
 }
 
 # Untaint nodes.
