@@ -51,15 +51,14 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 #
-# Verify that this uid is a member of the project being displayed. 
+# Verify permission to look at the group. This is a little different,
+# since the standard test would look for permission in just the group,
+# but we also want to allow user from the project with appropriate
+# privs to look at the group.
 #
-if (!$isadmin) {
-    $query_result = 
-        DBQueryFatal("SELECT trust FROM group_membership ".
-		     "WHERE uid='$uid' and pid='$pid' and gid='$gid'");
-    if (mysql_num_rows($query_result) == 0) {
-        USERERROR("You are not a member of Project $pid.", 1);
-    }
+if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO) &&
+    ! TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+    USERERROR("You are not a member of group $gid in project $pid!", 1);
 }
 
 #
@@ -70,23 +69,38 @@ if ($isadmin || TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELUSER)) {
     $prived = 1;
 }
 
-SUBPAGESTART();
-SUBMENUSTART("Group Options");
-WRITESUBMENUBUTTON("Edit this Group",
-		   "editgroup_form.php3?pid=$pid&gid=$gid");
+#
+# This menu only makes sense for people with privs to use them.
+#
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
+    TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP)) {
 
-#
-# A delete option, but not for the default group!
-#
-if (strcmp($gid, $pid)) {
-    WRITESUBMENUBUTTON("Delete this Group",
-		       "deletegroup.php3?pid=$pid&gid=$gid");
+    SUBPAGESTART();
+    SUBMENUSTART("Group Options");
+
+    if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
+	WRITESUBMENUBUTTON("Edit this Group",
+			   "editgroup_form.php3?pid=$pid&gid=$gid");
+    }
+
+    #
+    # A delete option, but not for the default group!
+    #
+    if (strcmp($gid, $pid) &&
+	TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP)) {
+	WRITESUBMENUBUTTON("Delete this Group",
+			   "deletegroup.php3?pid=$pid&gid=$gid");
+    }
+    SUBMENUEND();
 }
-SUBMENUEND();
 
 SHOWGROUP($pid, $gid);
 SHOWGROUPMEMBERS($pid, $gid, $prived);
-SUBPAGEEND();
+
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
+    TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP)) {
+    SUBPAGEEND();
+}
 
 #
 # A list of Group experiments.

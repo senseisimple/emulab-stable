@@ -280,13 +280,13 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
     }
     elseif ($access_type == $TB_PROJECT_MAKEGROUP ||
 	    $access_type == $TB_PROJECT_DELGROUP) {
-	$mintrust = $TBDB_TRUST_PROJROOT;
+	$mintrust = $TBDB_TRUST_GROUPROOT;
     }
     elseif ($access_type == $TB_PROJECT_LEADGROUP) {
 	#
-	# Must be at least local root to lead a group.
+	# Allow mere user (in default group) to lead a subgroup.
 	# 
-	$mintrust = $TBDB_TRUST_LOCALROOT;
+	$mintrust = $TBDB_TRUST_USER;
     }
     elseif ($access_type == $TB_PROJECT_MAKEOSID ||
 	    $access_type == $TB_PROJECT_MAKEIMAGEID ||
@@ -304,6 +304,8 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $mintrust = $TBDB_TRUST_PROJROOT;
 	}
 	else {
+	    # Editing a group requires privs in the project, not group!
+	    $gid = $pid;
 	    $mintrust = $TBDB_TRUST_GROUPROOT;
 	}
     }

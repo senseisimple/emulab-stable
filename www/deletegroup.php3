@@ -39,7 +39,7 @@ if (strcmp($gid, $pid) == 0) {
 #
 # Verify permission.
 #
-if (! TBProjAccessCheck($uid, $pid, 0, $TB_PROJECT_DELGROUP)) {
+if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP)) {
     USERERROR("You do not have permission to delete groups in project $pid!",
 	      1);
 }

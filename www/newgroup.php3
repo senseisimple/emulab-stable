@@ -8,12 +8,8 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# Standard Testbed Header
+# No header since we issue a redirect later.
 #
-PAGEHEADER("Create a Project Group");
-
-$mydebug = 0;
-
 ignore_user_abort(1);
 
 #
@@ -73,14 +69,11 @@ if (! TBProjAccessCheck($uid, $group_pid, 0, $TB_PROJECT_MAKEGROUP)) {
 }
 
 #
-# Verify project and leader. That is, the leader choosen has to be a member
-# of the default group for the project and must already possess a
-# minimum level of trust since it would make no sense to make "user" a
-# group leader.
+# Verify project and leader. Any user can lead a group.
 #
 if (! TBProjAccessCheck($group_leader, $group_pid, 0, $TB_PROJECT_LEADGROUP)) {
-    USERERROR("$group_leader is not a trusted (local root or better) member ".
-	      "of the project $group_pid!", 1);
+    USERERROR("$group_leader does not have enough permission to lead a group ".
+	      "in project $group_pid!", 1);
 }
 	       
 #
@@ -132,22 +125,9 @@ DBQueryFatal("insert into group_membership ".
 	     "        'group_root', now(), now())");
 
 #
-# Grab the project head uid for the project. If its different than the
-# the leader for the group, insert the project head also. This is polite.
+# Note, if the project leader wants to be in the subgroup, he/she has to
+# add themself via the edit page. 
 #
-$query_result =
-    DBQueryFatal("select head_uid from projects where pid='$group_pid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    DBFatal("Getting head_uid for project $group_pid.");
-}
-$head_uid = $row[0];
-
-if (strcmp($head_uid, $group_leader)) {
-    DBQueryFatal("insert into group_membership ".
-		 "(uid, pid, gid, trust, date_applied, date_approved) ".
-		 "values ('$head_uid','$group_pid','$group_id', ".
-		 "        'group_root', now(), now())");
-}
 
 #
 # Grab the unix GID for running scripts.
@@ -167,25 +147,13 @@ flush();
 # is the same script that gets run when the group membership changes.
 #
 SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
-SUEXEC($uid, $unix_gid, "websetgroups $head_uid $group_leader", 1);
-
-echo "<br><br>
-      <b>Done!</b>
-      <br>\n";
+SUEXEC($uid, $unix_gid, "websetgroups $group_leader", 1);
 
 #
-# Show it!
-#
-SHOWGROUP($group_pid, $group_id);
-
-#
-# Back to ...
+# Spit out a redirect so that the history does not include a post
+# in it. The back button skips over the post and to the form.
 # 
-echo "<br>
-       <A href='showproject.php3?pid=$group_pid'>Back to Project page</a>\n";
+header("Location: showgroup.php3?pid=$group_pid&gid=$group_id");
 
-#
-# Standard Testbed Footer
-# 
-PAGEFOOTER();
+# No Testbed footer.
 ?>

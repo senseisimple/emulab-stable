@@ -8,17 +8,15 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# Standard Testbed Header
+# No testbed header since we spit out a redirect.
 #
-PAGEHEADER("Edit Group Membership");
+ignore_user_abort(1);
 
 #
 # Only known and logged in users.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-
-ignore_user_abort(1);
 
 #
 # First off, sanity check page args.
@@ -50,17 +48,14 @@ if (! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP)) {
 
 #
 # Grab the current user list for the group. The group leader cannot be
-# removed! Neither can the project leader. Do not include members that
-# have not been approved to main group either! This will force them to
-# go through the approval page first.
+# removed! Do not include members that have not been approved to main
+# group either! This will force them to go through the approval page first.
 #
 $curmembers_result =
     DBQueryFatal("select distinct m.uid from group_membership as m ".
 		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
-		 "left join projects as p on p.pid=m.pid ".
 		 "where m.pid='$pid' and m.gid='$gid' and ".
-		 "      m.uid!=g.leader and m.uid!=p.head_uid ".
-		 "      and m.trust!='none'");
+		 "      m.uid!=g.leader and m.trust!='none'");
 
 #
 # Grab the user list from the project. These are the people who can be
@@ -77,14 +72,18 @@ $nonmembers_result =
 
 function TBCheckTrustConsistency($user, $pid, $gid, $newtrust)
 {
+    global $TBDB_TRUST_USER;
+    
     #
     # If changing default group trust level, then compare levels.
-    # A user may not have greater permission in the default group than
-    # in a subgroup.
+    # A user may not have root privs in the project and user privs
+    # in the group; make no sense to do that and can violate trust.
     #
     if (strcmp($pid, $gid)) {
 	$projtrust = TBProjTrust($user, $pid);
-	if ($projtrust > TBTrustConvert($newtrust)) {
+
+	if (TBTrustConvert($newtrust) == $TBDB_TRUST_USER &&
+	    $projtrust > $TBDB_TRUST_USER) {
 	    USERERROR("User $user may not have a higher trust level in ".
 		      "the default group of $pid, than in subgroup $gid!", 1);
 	}
@@ -275,13 +274,6 @@ if (!$defaultgroup && mysql_num_rows($nonmembers_result)) {
 #
 TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
-echo "<br>
-      Group '$gid' in project '$pid' is being updated!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.\n";
-flush();
-
 #
 # Run the script. This will do the account stuff for all the people
 # in the group. This is the same script that gets run when the group
@@ -289,25 +281,11 @@ flush();
 #
 SUEXEC($uid, $unix_gid, "websetgroups -p $pid $modusers", 1);
 
-echo "<br><br>
-      <b>Done!</b>
-      <br>\n";
-
 #
-# Show it again!
-#
-SHOWGROUP($pid, $gid);
-
-SHOWGROUPMEMBERS($pid, $gid);
-
-#
-# Back to ...
+# Spit out a redirect so that the history does not include a post
+# in it. The back button skips over the post and to the form.
 # 
-echo "<br>
-       <A href='showgroup.php3?pid=$pid&gid=$gid'>Back to Group page</a>\n";
+header("Location: showgroup.php3?pid=$pid&gid=$gid");
 
-#
-# Standard Testbed Footer
-# 
-PAGEFOOTER();
+# No Testbed footer.
 ?>
