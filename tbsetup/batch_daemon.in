@@ -369,7 +369,7 @@ sub startexp($)
 			"where eid='$eid' and pid='$pid'");
 
 	if ($exit_status == $TOOFEWNODES) {
-	    if (($attempts % 5) == 0) {
+	    if ($attempts && (($attempts % 10) == 0)) {
 		$attempts++;
 		
 		my $msg =
