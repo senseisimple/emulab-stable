@@ -449,7 +449,7 @@ CREATE TABLE interfaces (
   IP varchar(15) default NULL,
   IPalias varchar(15) default NULL,
   IPaliases text,
-  mask varchar(15) default '255.255.255.0',
+  mask varchar(15) default NULL,
   interface_type varchar(30) default NULL,
   iface text NOT NULL,
   role enum('ctrl','expt','jail','fake','other') NOT NULL default 'other',
