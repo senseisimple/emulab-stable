@@ -176,8 +176,9 @@ $nodes_result =
 		 "left join nodes on r.node_id=nodes.node_id ".
 		 "left join node_types on node_types.type=nodes.type ".
 		 "left join interfaces as i on r.node_id=i.node_id ".
-		 " and i.iface=node_types.control_iface ".
-		 " where i.IP!='NULL' and r.node_id not like 'sh%' ".
+		 " where i.IP!='NULL' and ".
+		 "       i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
+		 "       and r.node_id not like 'sh%' ".
 		 "       and node_types.isvirtnode=0 ".
 		 "       and node_types.isremotenode=0 ".
 		 "order by r.pid,e.gid,r.eid,nodes.priority");
