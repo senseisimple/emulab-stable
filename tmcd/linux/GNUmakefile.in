@@ -123,6 +123,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/mkextrafs.pl $(BINDIR)/mkextrafs.pl
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 				$(BINDIR)/control_interface
 
