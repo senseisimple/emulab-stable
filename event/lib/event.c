@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.2 2001-11-02 17:33:34 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.3 2001-11-06 17:01:19 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -27,7 +27,7 @@ static char hostname[MAXHOSTNAMELEN];
    a handle that may be passed to other event system routines if
    the operation is successful, NULL otherwise. */
 event_handle_t
-event_register(void)
+event_register(char *url)
 {
     event_handle_t handle;
     elvin_handle_t server;
@@ -60,6 +60,15 @@ event_register(void)
         ERROR("elvin_handle_set_discovery_scope failed: ");
         elvin_error_fprintf(stderr, status);
         return 0;
+    }
+
+    /* Set the server URL, if we were passed one by the user. */
+    if (url) {
+        if (elvin_handle_append_url(server, url, status) == 0) {
+            ERROR("elvin_handle_append_url failed: ");
+            elvin_error_fprintf(stderr, status);
+            return 0;
+        }
     }
 
     /* Connect to the elvin server: */
