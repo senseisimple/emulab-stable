@@ -325,7 +325,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       cout << "Can not have fixed nodes be in a vclass!.\n";
       exit(EXIT_UNRETRYABLE);
     }
-    if (add_node(vv,pv,false,false) == 1) {
+    if (add_node(vv,pv,false,true) == 1) {
       cout << "Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       exit(EXIT_UNRETRYABLE);
@@ -372,7 +372,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	<< "fixed in place" << endl;
       continue;
     }
-    if (add_node(vv,pv,false,true) == 1) {
+    if (add_node(vv,pv,false,false) == 1) {
       cout << "Warning: Hinted node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       continue;
@@ -713,7 +713,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	      // gotten otherwise
 	      double oldscore = get_score();
 	      double tempscore;
-	      if (!add_node(vv,newpos,false,true)) {
+	      if (!add_node(vv,newpos,false,false)) {
 		tempscore = get_score();
 		remove_node(vv);
 	      }
@@ -726,7 +726,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 		abort();
 	      }
 	    }
-	    if (add_node(vv,newpos,false,true) != 0) {
+	    if (add_node(vv,newpos,false,false) != 0) {
 	      unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
 	      continue;
 	    }
@@ -848,7 +848,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	RDEBUG(cout << "removing: rejected change" << endl;)
 	remove_node(vv);
 	if (oldassigned) {
-	  add_node(vv,oldpos,false,true);
+	  add_node(vv,oldpos,false,false);
 	}
       }
 
@@ -1072,7 +1072,7 @@ NOTQUITEDONE:
 	  if (vnode->vclass != NULL) {
 	    vnode->type = abstypes[*vvertex_it];
 	  }
-	  assert(!add_node(*vvertex_it,absassignment[*vvertex_it],true,true));
+	  assert(!add_node(*vvertex_it,absassignment[*vvertex_it],true,false));
 	}
       }
     }

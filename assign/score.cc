@@ -496,7 +496,6 @@ void remove_node(vvertex vv)
   SSUB(SCORE_PNODE * (powf(1+ ((pnode->current_load+1) * 1.0)/pnode->max_load,2)));
   SADD(SCORE_PNODE * (powf(1+ pnode->current_load * 1.0/pnode->max_load,2)));
 #endif
-  pnode->remove_current_type();
   if (pnode->total_load == 0) {
     // If the pnode is now free, we need to do some cleanup
     SDEBUG(cerr << "  releasing pnode" << endl);
@@ -1542,7 +1541,7 @@ UNSCORE_TRIVIAL:
 }
 
 double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
-	bool include_violations)
+	bool ignore_violations)
 {
   double fd_score=0;
   fd_violated=0;
@@ -1570,7 +1569,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	SDEBUG(cerr << "    unmatched" << endl);
 	value = (*desire_it).second;
 	fd_score += SCORE_DESIRE*value;
-	if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
+	if ((value >= FD_VIOLATION_WEIGHT) && (!ignore_violations)) {
 	  fd_violated++;
 	}
       } else {
@@ -1581,7 +1580,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	  value = (*desire_it).second + (*feature_it).second;
 	  SDEBUG(cerr << "    additive - total " << value << endl);
 	  fd_score += SCORE_DESIRE*value;
-	  if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
+	  if ((value >= FD_VIOLATION_WEIGHT) && (!ignore_violations)) {
 	    fd_violated++;
 	  }
 	}
@@ -1615,7 +1614,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	      if (global_fd_set[feature_name] > 1) {
 		SDEBUG(cerr << "      but more than one" << endl);
 		fd_score+=SCORE_FEATURE*value;
-		if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
+		if ((value >= FD_VIOLATION_WEIGHT) && (!ignore_violations)) {
 		  fd_violated++;
 		}
 	      }
@@ -1626,7 +1625,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	      if (global_fd_set[feature_name] == 1) {
 		SDEBUG(cerr << "      but only one" << endl);
 		fd_score+=SCORE_FEATURE*value;
-		if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
+		if ((value >= FD_VIOLATION_WEIGHT) && (!ignore_violations)) {
 		  fd_violated++;
 		}
 	      }
@@ -1642,7 +1641,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	  // Unused feature.  Add weight
 	  SDEBUG(cerr << "    unused" << endl);
 	  fd_score+=SCORE_FEATURE*value;
-	  if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
+	  if ((value >= FD_VIOLATION_WEIGHT) && (!ignore_violations)) {
 	    fd_violated++;
 	  }
 	}
