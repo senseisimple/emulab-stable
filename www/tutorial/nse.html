@@ -1,0 +1,412 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>NSE scaling, accuracy and capacity</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#scaling">Scaling</a>
+<li> <a href="#accuracy">Accuracy and Capacity</a>
+</ul>
+
+<hr>
+<a NAME="scaling"></a>
+<center>
+<h2>Scaling</h2>
+</center>
+
+<p>
+An instance of <i>nse</i> simulated 2Mb constant bit rate UDP flows between
+pairs of nodes on 2Mb links with 50ms latencies.
+To measure
+<i>nse</i>'s ability to keep pace with real time, and thus with live traffic,
+a similar link was instantiated inside the same <i>nse</i> simulation,
+to forward live TCP traffic between two physical Emulab nodes, again at a
+rate of 2Mb.  On an 850MHz PC, we were able to scale the number of 
+simulated
+flows up to 150 simulated links and 300 simulated nodes, while maintaining
+the full throughput of the live TCP connection. With additional simulated links,
+the throughput dropped precipitously. We also measured <i>nse</i>'s TCP
+model on the simulated links: the performance dropped after 80
+simulated links due to a higher event rate from the acknowledgment
+traffic in the return path.
+</p>
+
+<a NAME="accuracy"></a>
+<center>
+<h2>Accuracy and Capacity</h2>
+</center>
+
+<p>
+
+As a capacity test, we generated streams of UDP round-trip traffic between
+two nodes, with an interposed 850 Mhz PC running <i>nse</i> on a FreeBSD 4.5
+1000HZ kernel.
+A maximum stable packet rate of <b>4000</b> packets per second was determined over 
+a range of packet rates and link delays using 64-byte and 1518-byte packets.
+Since these are round trip measurements, the packet rates are actually twice the
+numbers reported. With this capacity, we performed experiments to
+measure the <a href="#table1">delay</a>, <a href="#table2">bandwidth</a>
+and <a href="#table3">loss rates</a> for representative
+values. The results are summarized in Tables <a href="#table1">1</a>,
+<a href="#table2">2</a> and <a href="#table3">3</a>
+</p>
+
+<p>
+Emulab's integration of <i>nse</i> is much less mature than its support for
+dummynet based emulation. This is reflected in the large percentage
+error values in <a href="#table2">bandwidth</a> and <a href="#table3">loss rates</a>.
+Integrating <i>nse</i> has already uncovered a number of problems that have since been solved;
+as we continue to gain experience with <i>nse</i>, we expect the situation to improve.
+</p>
+
+<a NAME="table1"></a>
+<TABLE border="1" width="75%">
+<!-- start of table definition -->
+
+<CAPTION align="bottom"><br>Table 1: Accuracy of <i>nse</i> delay at
+maximum packet rate (4000 PPS) as a function of packet size and link 
+delay. The 0ms measurement represents the base overhead of the link. 
+Adjusted RTT is the observed value minus the base overhead.
+</CAPTION>   
+<!-- caption definition -->
+
+<TR>  
+<!-- start of header row definition -->
+<TH rowspan="2"> delay <br>(ms) </TH>    
+<TH rowspan="2"> packet size <br>(bytes) </TH>    
+<TH colspan="3"> observed </TH>    
+<TH colspan="2"> adjusted </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR>  
+<!-- start of 2nd header row definition -->
+<TH> RTT (ms) </TH>    
+<TH> stddev </TH>    
+<TH> %err </TH>    
+<TH> RTT (ms) </TH>    
+<TH> %err </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD rowspan="2"> 0 </TD>
+<TD> 64 </TD>    
+<TD> 0.238 </TD>    
+<TD> 0.004 </TD>    
+<TD> N/A </TD>    
+<TD> N/A </TD>    
+<TD> N/A </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD> 1518 </TD>    
+<TD> 1.544 </TD>    
+<TD> 0.025 </TD>    
+<TD> N/A </TD>    
+<TD> N/A </TD>    
+<TD> N/A </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD rowspan="2"> 5 </TD>
+<TD> 64 </TD>    
+<TD> 10.251 </TD>    
+<TD> 0.295 </TD>    
+<TD> 2.51 </TD>    
+<TD> 10.013 </TD>    
+<TD> 0.13 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD> 1518 </TD>    
+<TD> 11.586 </TD>    
+<TD> 0.067 </TD>    
+<TD> 15.86 </TD>    
+<TD> 10.032 </TD>    
+<TD> 0.32 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD rowspan="2"> 10 </TD>
+<TD> 64 </TD>    
+<TD> 20.255 </TD>    
+<TD> 0.014 </TD>    
+<TD> 1.28 </TD>    
+<TD> 20.017 </TD>    
+<TD> 0.09 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD> 1518 </TD>    
+<TD> 21.675 </TD>    
+<TD> 0.093 </TD>    
+<TD> 8.38 </TD>    
+<TD> 20.121 </TD>    
+<TD> 0.61 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+<TR align="center">  
+<!-- start of fourth row definition -->
+<TD rowspan="2"> 50 </TD>
+<TD> 64 </TD>    
+<TD> 100.474 </TD>    
+<TD> 0.029 </TD>    
+<TD> 0.47 </TD>    
+<TD> 100.236 </TD>    
+<TD> 0.24 </TD>    
+</TR> 
+<!-- end of fourth row definition -->
+
+<TR align="center">  
+<!-- start of fourth row definition -->
+<TD> 1518 </TD>    
+<TD> 102.394 </TD>    
+<TD> 3.440 </TD>    
+<TD> 2.39 </TD>    
+<TD> 100.840 </TD>    
+<TD> 0.84 </TD>    
+</TR> 
+<!-- end of fourth row definition -->
+
+<TR align="center">  
+<!-- start of fifth row definition -->
+<TD rowspan="2"> 300 </TD>
+<TD> 64 </TD>    
+<TD> 601.690 </TD>    
+<TD> 0.546 </TD>    
+<TD> 0.28 </TD>    
+<TD> 601.452 </TD>    
+<TD> 0.24 </TD>    
+</TR> 
+<!-- end of fifth row definition -->
+
+<TR align="center">  
+<!-- start of fifth row definition -->
+<TD> 1518 </TD>    
+<TD> 602.999 </TD>    
+<TD> 0.093 </TD>    
+<TD> 0.49 </TD>    
+<TD> 601.445 </TD>    
+<TD> 0.24 </TD>    
+</TR> 
+<!-- end of fifth row definition -->
+
+</TABLE>
+<!-- end of table definition -->
+
+<br><br>
+
+<TABLE>
+<!-- putting table 2 and 3 side by side -->
+
+<TR><TD>
+
+<a name="table2"></a>
+<TABLE border="1">
+<!-- start of table definition -->
+
+<CAPTION align="bottom"><br>Table 2: Accuracy of <i>nse</i> bandwidth as a
+function of link bandwidth and packet size.
+</CAPTION>   
+<!-- caption definition -->
+
+<TR>  
+<!-- start of header row definition -->
+<TH rowspan="2"> bandwidth <br>(Kbps) </TH>    
+<TH rowspan="2"> packet size <br>(bytes) </TH>    
+<TH colspan="2"> observed </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR>  
+<!-- start of 2nd header row definition -->
+<TH> bw (Kbps) </TH>    
+<TH> %err </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD rowspan="2"> 56 </TD>
+<TD> 64 </TD>    
+<TD> 55.60 </TD>    
+<TD> 0.71 </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD> 1518 </TD>    
+<TD> 56.63 </TD>    
+<TD> 1.12 </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD rowspan="2"> 384 </TD>
+<TD> 64 </TD>    
+<TD> 376.3 </TD>    
+<TD> 2.00 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD> 1518 </TD>    
+<TD> 382.1 </TD>    
+<TD> 0.49 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD rowspan="2"> 1544 </TD>
+<TD> 64 </TD>    
+<TD> 1444.5 </TD>    
+<TD> 6.44 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD> 1518 </TD>    
+<TD> 1531.0 </TD>    
+<TD> 0.84 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+<TR align="center">  
+<!-- start of fourth row definition -->
+<TD rowspan="2"> 10000 </TD>
+<TD> 64 </TD>    
+<TD> N/A </TD>    
+<TD> N/A </TD>    
+</TR> 
+<!-- end of fourth row definition -->
+
+<TR align="center">  
+<!-- start of fourth row definition -->
+<TD> 1518 </TD>    
+<TD> 9659.6 </TD>    
+<TD> 3.40 </TD>    
+</TR> 
+<!-- end of fourth row definition -->
+
+<TR align="center">  
+<!-- start of fifth row definition -->
+<TD> 45000 </TD>
+<TD> 1518 </TD>    
+<TD> 39857 </TD>    
+<TD> 11.43 </TD>    
+</TR> 
+<!-- end of fifth row definition -->
+
+</TABLE>
+<!-- end of table definition -->
+
+</TD>
+<!-- table in 1st row of the side-by-side alignment -->
+
+<TD>
+
+<a name="table3"></a>
+<TABLE border="1">
+<!-- start of table definition -->
+
+<CAPTION align="bottom"><br>Table 3: Accuracy of <i>nse</i> packet loss rate
+as a function of link loss rate and packet size.
+</CAPTION>   
+<!-- caption definition -->
+
+<TR>  
+<!-- start of header row definition -->
+<TH rowspan="2"> packet loss <br> rate (%) </TH>    
+<TH rowspan="2"> packet size <br>(bytes) </TH>    
+<TH colspan="2"> observed </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR>  
+<!-- start of 2nd header row definition -->
+<TH> loss rate (%) </TH>    
+<TH> %err </TH>    
+</TR> 
+<!-- end of header row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD rowspan="2"> 0.8 </TD>
+<TD> 64 </TD>    
+<TD> 0.819 </TD>    
+<TD> 2.37 </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of first row definition -->
+<TD> 1518 </TD>    
+<TD> 0.820 </TD>    
+<TD> 2.50 </TD>    
+</TR> 
+<!-- end of first row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD rowspan="2"> 2.5 </TD>
+<TD> 64 </TD>    
+<TD> 2.477 </TD>    
+<TD> 0.92 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of second row definition -->
+<TD> 1518 </TD>    
+<TD> 2.477 </TD>    
+<TD> 0.92 </TD>    
+</TR> 
+<!-- end of second row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD rowspan="2"> 12 </TD>
+<TD> 64 </TD>    
+<TD> 11.88 </TD>    
+<TD> 1.00 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+<TR align="center">  
+<!-- start of third row definition -->
+<TD> 1518 </TD>    
+<TD> 11.89 </TD>    
+<TD> 0.91 </TD>    
+</TR> 
+<!-- end of third row definition -->
+
+</TABLE>
+<!-- end of table definition -->
+
+</TD>
+<!-- table in 2st row of the side-by-side alignment -->
+</TR>
+</TABLE>

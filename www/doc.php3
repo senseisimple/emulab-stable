@@ -24,7 +24,7 @@ PAGEHEADER("Documentation");
 
 <h3>Reference Material</h3>
 <ul>
-<li><b><a href="tutorial/docwrapper.php3?docname=advanced.html">
+<li><b><a href="tutorial/docwrapper.php3?docname=tutorial.html#Advanced">
               Emulab Advanced Tutorial</a></b>
 <li><b><a href="tutorial/docwrapper.php3?docname=nscommands.html">
               Emulab-specific NS Extensions Reference Manual</a></b>
