@@ -138,7 +138,9 @@ static int mygethostbyname(struct sockaddr_in *host_addr,
     assert(strlen(host) > 0);
   
     memset(host_addr, 0, sizeof(struct sockaddr_in));
+#ifndef linux
     host_addr->sin_len = sizeof(struct sockaddr_in);
+#endif
     host_addr->sin_family = AF_INET;
     host_addr->sin_port = htons(port);
     if( (host_ent = gethostbyname(host)) != NULL ) {
@@ -170,7 +172,6 @@ static struct gorobot_conn *find_gorobot(int robot_id)
 {
     struct gorobot_conn *retval = NULL;
     int lpc;
-
     assert(robot_id >= 0);
 
     for (lpc = 0; (lpc < rmc_config->num_robots) && !retval; lpc++) {

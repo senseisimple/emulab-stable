@@ -253,7 +253,9 @@ int main(int argc, char *argv[])
     }
     
     memset(&sin, 0, sizeof(sin));
+#ifndef linux
     sin.sin_len = sizeof(sin);
+#endif
     sin.sin_family = AF_INET;
     sin.sin_port = htons(port);
     sin.sin_addr.s_addr = INADDR_ANY;

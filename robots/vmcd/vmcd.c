@@ -137,7 +137,9 @@ static int mygethostbyname(struct sockaddr_in *host_addr,
     assert(strlen(host) > 0);
     
     memset(host_addr, 0, sizeof(struct sockaddr_in));
+#ifndef linux
     host_addr->sin_len = sizeof(struct sockaddr_in);
+#endif
     host_addr->sin_family = AF_INET;
     host_addr->sin_port = htons(port);
     if( (host_ent = gethostbyname(host)) != NULL ) {
@@ -234,7 +236,9 @@ static int parse_client_options(int *argcp, char **argvp[])
     *argcp = argc + 1;
     *argvp = argv - 1;
     
+#ifndef linux
     optreset = 1;
+#endif
     optind = 1;
     
     return retval;

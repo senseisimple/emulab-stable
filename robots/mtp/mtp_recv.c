@@ -12,6 +12,7 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <string.h>
 
 #include "mtp.h"
 
@@ -32,7 +33,9 @@ int main(int argc, char *argv[])
 	int on_off = 1;
 	
 	memset(&sin, 0, sizeof(sin));
+#ifndef linux
 	sin.sin_len = sizeof(sin);
+#endif
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 	sin.sin_addr.s_addr = INADDR_ANY;

@@ -12,6 +12,7 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <string.h>
 
 #include "mtp.h"
 
@@ -64,7 +65,9 @@ int main(int argc, char *argv[])
     else {
 	int fd;
 	
+#ifndef linux
 	sin.sin_len = sizeof(sin);
+#endif
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
