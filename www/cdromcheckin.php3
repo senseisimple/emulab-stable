@@ -149,7 +149,7 @@ echo "privkey=$newkey\n";
 if (0) {
     echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
     echo "slice1_image=http://${WWWHOST}/images/slice1.ndz\n";
-    echo "slice1_md5=cb810b43f49d15b3ac4122ff42f8925d\n";
+    echo "slice1_md5=2970e2cf045f5872c6728eeea3b51dae\n";
     echo "slicex_mount=/users\n";
     echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
     echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
