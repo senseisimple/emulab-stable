@@ -198,8 +198,8 @@ while (1) {
     my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
     
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid from nodes as a ".
-		    "left join reserved as b on a.node_id=b.node_id ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid from reserved as b ".
+		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
 		    "left join node_types as n on n.type=a.type where ".
 		    "(b.node_id is null and $CLASSCLAUSE and l.pid!='') ".
