@@ -13,9 +13,10 @@ C                      = @SSLCERT_COUNTRY@
 ST                     = @SSLCERT_STATE@
 L                      = @SSLCERT_LOCALITY@
 O                      = @SSLCERT_ORGNAME@
-# tmcd uses OU and CN for verification.
-OU                     = pclocal
-CN                     = @BOSSNODE@
+OU                     = Server
+# The apache server wants the CommonName (CN) to match what we set "ServerName"
+# to in apache/http.conf.in (in the SSL section).
+CN                     = www.@OURDOMAIN@
 emailAddress           = @TBOPSEMAIL@
 
 [ req_attributes ]

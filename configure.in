@@ -78,6 +78,10 @@ AC_SUBST(PUBLIC_ROUTER)
 AC_SUBST(PUBLIC_NETMASK)
 AC_SUBST(DHCPD_DYNRANGE)
 AC_SUBST(DHCPD_CONTROLNET_DECL)
+AC_SUBST(SSLCERT_COUNTRY)
+AC_SUBST(SSLCERT_STATE)
+AC_SUBST(SSLCERT_LOCALITY)
+AC_SUBST(SSLCERT_ORGNAME)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -125,6 +129,15 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
+#
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
 #
 # Network config stuff. Obviously, this needs to be localized, but there are
 # too many defs files too worry about right now.
@@ -477,7 +490,6 @@ esac]
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig \
-        ssl/ca.cnf ssl/ctrlnode.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \

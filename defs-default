@@ -35,6 +35,15 @@ THISHOMEBASE=Emulab.Net
 PLABSUPPORT=1
 PLAB_ROOTBALL="plabroot-10.tar.bz2"
 #
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
+#
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
 BOSSNODE_IP=155.98.32.70

@@ -16,7 +16,7 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
-	localnode.pem capture.sha1fingerprint
+	localnode.pem capture.sha1fingerprint apache.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -60,6 +60,32 @@ server.pem:	dirsmade server.cnf ca.cnf
 	# on boss and used by tmcd.
 	#
 	cat server_key.pem server_cert.pem > server.pem
+	rm -f newreq.pem
+
+apache.pem:	dirsmade apache.cnf ca.cnf
+	#
+	# Create the server side private key and certificate request.
+	#
+	openssl req -new -config apache.cnf \
+		-keyout apache_key.pem -out apache_req.pem
+	#
+	# Combine key and cert request.
+	#
+	cat apache_key.pem apache_req.pem > newreq.pem
+	#
+	# Sign the apache cert request, creating a apache certificate.
+	#
+	openssl ca -batch -policy policy_sslxmlrpc -config ca.cnf \
+		-out apache_cert.pem \
+		-cert cacert.pem -keyfile cakey.pem \
+		-infiles newreq.pem
+	#
+	# Combine the key and the certificate into one file. This file is
+	# is not actually installed though; the separate files will be
+	# installed into the apache cert/key directories by install/boss-install
+	# when the boss node is created.
+	#
+	cat apache_key.pem apache_cert.pem > apache.pem
 	rm -f newreq.pem
 
 capture.pem:	dirsmade capture.cnf ca.cnf
@@ -167,7 +193,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem
-	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
 	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
@@ -188,7 +214,7 @@ remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem
-	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
 	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
@@ -219,7 +245,7 @@ tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 usercert-install:	install-dirs
 	-mkdir -p $(INSTALL_LIBDIR)/ssl
 	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
-	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
 
 clean:
 	@echo "BE VERY CAREFUL! CLEANING THE SSL DIR CAN CAUSE DISASTER!"

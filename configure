@@ -887,6 +887,10 @@ fi
 
 
 
+
+
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -933,6 +937,15 @@ TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
+#
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
 #
 # Network config stuff. Obviously, this needs to be localized, but there are
 # too many defs files too worry about right now.
@@ -1376,7 +1389,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1380: checking for a BSD compatible install" >&5
+echo "configure:1393: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1438,7 +1451,6 @@ esac
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig \
-        ssl/ca.cnf ssl/ctrlnode.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
@@ -1769,6 +1781,10 @@ s%@PUBLIC_ROUTER@%$PUBLIC_ROUTER%g
 s%@PUBLIC_NETMASK@%$PUBLIC_NETMASK%g
 s%@DHCPD_DYNRANGE@%$DHCPD_DYNRANGE%g
 s%@DHCPD_CONTROLNET_DECL@%$DHCPD_CONTROLNET_DECL%g
+s%@SSLCERT_COUNTRY@%$SSLCERT_COUNTRY%g
+s%@SSLCERT_STATE@%$SSLCERT_STATE%g
+s%@SSLCERT_LOCALITY@%$SSLCERT_LOCALITY%g
+s%@SSLCERT_ORGNAME@%$SSLCERT_ORGNAME%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g

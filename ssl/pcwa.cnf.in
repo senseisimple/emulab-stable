@@ -9,10 +9,10 @@ encrypt_key		= no
 string_mask             = nombstr
 
 [ req_distinguished_name ]
-C                      = US
-ST                     = Utah
-L                      = Salt Lake City
-O                      = Utah Network Testbed
+C                      = @SSLCERT_COUNTRY@
+ST                     = @SSLCERT_STATE@
+L                      = @SSLCERT_LOCALITY@
+O                      = @SSLCERT_ORGNAME@
 # tmcd uses OU and CN for verification.
 OU                     = pcwa
 CN                     = @BOSSNODE@
