@@ -489,8 +489,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 */
 	else if (strcmp(buf[6], MODIFYEVENT) == 0) {
 		if (!startdone)
-			fprintf(stderr, "MODIFY without START event\n");
-		else if (parse_args(buf[7], tg_first) != 0)
+			fprintf(stderr, "WARNING: "
+				"MODIFY without initial START event\n");
+		if (parse_args(buf[7], tg_first) != 0)
 			fprintf(stderr, "MODIFY invalid params\n");
 #ifdef EVENTDEBUG
 		else {
@@ -585,6 +586,16 @@ tgevent_loop(void)
 		actions[0].tg_flags = TG_SETUP;
 		actions[0].next = &actions[1];
 		actions[1].tg_flags = TG_WAIT;
+
+		/*
+		 * Restart the log
+		 */
+		if (logfile) {
+			extern int FlushOutput;
+			FlushOutput = 1;
+			log_close();
+			start_log(now, "%s");
+		}
 	}
 
 	log_close();
