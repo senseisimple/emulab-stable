@@ -109,7 +109,7 @@ perl scripts is messy, and the PHP DB interface is not as nice or
 robust as the perl interface.
 
 
-*** LastLogin info in web page - Sep 27 2001 - Needs to be done.
+*** LastLogin info in web page - Sep 27 2001 - Done by LBS on Oct 1 2001.
 
     From: Jay Lepreau <lepreau@cs.utah.edu>
     To: "Leigh B. Stoller" <stoller@moab.cs.utah.edu>
@@ -139,3 +139,79 @@ rsh.) For one thing, many computational cluster users will want MPI.
 RPMS: /proj/parmc/rpms/xinetd-2.1.8.9pre14-6.i386.rpm
       /proj/parmc/rpms/rsh-server-0.17-2.5.i386.rpm
 
+
+*** Needs web page to change proj trust - Oct 3 2001 - Needs to be fixed.
+
+Reported by James Griffioen.
+
+No way to change the trust level for a user in a project. Need to
+provide a web page for it.
+
+*** Paperbag/plasticwrap bug - Oct 5 2001 -- Fixed by Rob.
+
+Reported by magnus.
+
+    magnus@ops ~> os_load -i UTAHPC-FBSD+LINUX -w pc121 pc122 pc123 pc124 
+    pc125 pc126 pc127
+    Sorry, you used a forbidden character
+    **********
+    SSH failed. You may need to run the following commands:
+    
+    mkdir -m 0755 /users/magnus/.ssh
+    ssh-keygen -P '' -f /users/magnus/.ssh/identity
+    cp /users/magnus/.ssh/identity.pub /users/magnus/.ssh/authorized_keys
+    chmod 600 /users/magnus/.ssh/authorized_keys
+    **********
+
+
+*** Inconsistent exit in scripts. Oct 3 2001 - Needs to be fixed
+
+When going to background we should a __DIE__ hook to make sure that
+the log file gets emailed off. Generally, the fatal error amd email
+stuff is very inconsistent. Normal users should get warm fuzzies.
+Informational stuff should go to us.
+
+
+*** Per User info change - Oct 8 2001 - Needs to be fixed
+
+    From: Jay Lepreau <lepreau@cs.utah.edu>
+    To: Leigh Stoller <stoller@fast.cs.utah.edu>
+    Subject: Re: Feature Request 
+    Date: Mon, 08 Oct 2001 06:14:43 MDT
+    
+    After I sent that, I just checked it out.  Realized that you
+    (logically) display the info on the general user info page.  What I
+    was originally wanting was more accurate and precise data for the
+    general project info page.  That would take a bunch of processing: for
+    each proj, go thru its users, find the minimum time for each type of
+    login and display that.
+    
+    Don't need it right now, but eventually we're going to need the kind
+    of info to move projects to 'inactive'.
+    
+    The same info is what we'll need to deschedule experiments, or arm twist
+    their users.  But for expts we have the creator, who will usually
+    be the one using the machines.
+
+
+*** Node control changes lost on swapin/out - Oct 30 2001 - Needs to be fixed
+
+    > From: Mac Newbold <newbold@cs.utah.edu>
+    > Subject: Re: swapin/out anomoly
+    > Date: Tue, 30 Oct 2001 15:53:45 -0700 (MST)
+    > 
+    > Sometimes when we update settings, we update only the physical, and not
+    > the virtual, and the virtual is all that persists between swaps. IMHO, I
+    > think what we need to do is evaluate which things make sense to keep
+    > between swaps, which things don't, and which things should offer a
+    > choice. This affects OSs, delay params, and potentially other things
+    > too. Perhaps there's even a unified solution we can implement as part of
+    > the swapout process.
+    
+    Its probably a good idea to take the nodecontrol web page and remove the
+    stuff that changes the DB. Instead, lets use a backend perl script that
+    will update the DB appropriately (and can be used from the command line
+    too). Basically, I'm not happy about doing that much DB munging in the web
+    interface, especially virt_nodes and virt_lans (since it would be nice to
+    present a web interface to change the delay params at some point).
+    
