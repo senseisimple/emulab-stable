@@ -963,7 +963,7 @@ last_net_act,last_cpu_act,last_ext_act);
 1.184: Put an index on the path in the os_info table, since stated needs
        to select on it
 
-       alter table os_info add key path;
+       alter table os_info add key (path(255));
 
 1.185: Add two new columns to widearea_nodeinfo to record the node's hostname
        and a match-able site name
