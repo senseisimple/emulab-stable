@@ -1,0 +1,96 @@
+#!/usr/local/bin/perl -w
+#
+# vlandiff - Show differences between switch state and vlan table, if any
+#
+
+my $TBROOT = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+
+$ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
+
+my $debug = 0;
+
+use Mysql;
+
+my $dbh;
+my $sth;
+
+my %table = ();
+my %switch= ();
+
+# Get all the vlans from the table
+
+$dbh = Mysql->connect("localhost",$DBNAME,"script","none");
+$sth = $dbh->
+  query("select id,members from vlans");
+while (@row = $sth->fetchrow_array()) {
+  my @list = split(" ",$row[1]);
+  foreach $port (@list) {
+    my ($node,$card) = split(":",$port);
+    #if ($node =~ /^(sh\d+)/) { $node = "$1-1"; }
+    if ($card =~ /[a-zA-Z]/) {
+      # specified ala ethX
+      my $sth2 = $dbh->
+	query("select card from interfaces where node_id='$node' ".
+	      "and iface='$card'");
+      $card = ($sth2->fetchrow_array())[0];
+      print "Had '$port', changed to '$node:$card'\n" if $debug;
+      $port = "$node:$card";
+    }
+  }
+  $table{$row[0]} = join(" ",sort @list);
+  print "In table: vlan $row[0]: $table{$row[0]}\n" if $debug;
+}
+
+# Get all the vlans from the switch
+
+my $list;
+open(LIST,"snmpit -l |") || die ("vlandiff: couldn't run snmpit: $!\n");
+while(<LIST>) {
+  chop;
+  if (/(^ID)|(^--)|(^1 )/) { next; }
+  s/[\t ]+/ /g;
+  /(\d+)\s+(\S+)(?:\s+(.*)?)?/;
+  if (!defined $3) { $list = ""; } else { $list = $3; }
+  if ($2 ne "default") {
+    $switch{$2} = join(" ", sort split(" ",$list));
+    print "On switch: vlan $2: $switch{$2}\n" if $debug;
+  }
+}
+close(LIST);
+
+# Compare all of them...
+
+foreach $key (sort keys %table) {
+  if ( defined $switch{$key} && ($switch{$key} eq $table{$key}) ) {
+    # If its in both lists, delete it from both
+    print "vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n"
+      if $debug;
+    delete $switch{$key};
+    delete $table{$key};
+  }
+}
+
+# Print out the difference
+
+my $rv = 0;
+
+if (keys %table) {
+  print "In vlans table only:\n";
+  foreach $key(sort keys %table) {
+    print "$key\t$table{$key}\n";
+  }
+  $rv++;
+}
+
+if (keys %switch) {
+  print "On switch only:\n";
+  foreach $key(sort keys %switch) {
+    print "$key\t$switch{$key}\n";
+  }
+  $rv++;
+}
+
+# Return 0 if same, 1 for a one-sided diff, 2 for a two-sided diff
+# (Could be changed to return total # of different vlans)
+exit($rv);

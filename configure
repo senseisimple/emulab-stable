@@ -951,7 +951,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
-	utils/GNUmakefile \
+	utils/GNUmakefile utils/vlandiff utils/vlansync \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
 
 #
