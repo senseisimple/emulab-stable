@@ -91,6 +91,15 @@ proc punsup {msg} {
     }
 }	
 
+#
+# We ignore unsupported tcl commands if it is inside
+# make-simulated else error is flagged i.e. we call 
+# perror which does the right thing
+#
+proc unknown {args} {
+    perror "$args"
+}
+
 # Parse Arguments
 
 # We setup a few globals that we need for argument parsing.

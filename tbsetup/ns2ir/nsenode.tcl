@@ -90,7 +90,13 @@ NSENode instproc updatedb {DB} {
 	append nseconfig "set simcode_present $simcode_present\n\n"
     }
 
-    # NSE code runs only FreeBSD as of now
+    # We prefer to get a pc850 if available to take advantage of more CPU horsepower
+    tb-make-soft-vtype pcnsenode {pc850}
+    tb-set-hardware $self pcnsenode
+
+    # NSE code runs only FreeBSD as of now. 
     $self set osid "FBSD-STD"    
+
+    # The Node class's updatedb method updates the DB
     $self next $DB
 }
