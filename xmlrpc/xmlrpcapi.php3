@@ -44,16 +44,24 @@ need, please send us email.
 </p>
 
 <p>
-The Emulab XMLRPC server uses SSH as its transport. Yes, this is a little
-different then other RPC servers, but since all registered Emulab
-users already have accounts on Emulab and are required to use SSH to
-log in (and thus have provided us with their public keys), we decided
-this was any easy way to handle authentication - much
-easier on users then giving out SSL certificates that would need
-to be kept track of. At some future time we may provide SSL or HTTPS
-based servers, but for now rejoice in the fact that you do not need to
-keep yet another certificate around!
-</p>
+The Emulab XMLRPC server can be accessed via two different transport layers.
+
+<ul>
+<li> SSH: Yes, this is a little different then other RPC servers, but
+     since all registered Emulab users already have accounts on Emulab
+     and are required to use SSH to
+     log in (and thus have provided us with their public keys), we decided
+     this was any easy way to handle authentication.
+
+<li> SSL: A more traditional SSL based server is also available. You
+     need to request a certificate from the Emulab website in order to
+     the SSL based server. Go to the "My Emulab" portion of the Emulab
+     website, and click on the "Create SSL Certificate" link. You will
+     be prompted for a passphrase to use to encrypt the private key.
+     Once the key has been created, you will be given a link to
+     download a text version (PEM format). Simply provide this
+     certificate as an input to your SSL client.
+</ul>
 
 <p>
 The API is described in detail below. A demonstration client written in
@@ -92,16 +100,19 @@ command lines into RPCs to the server, and prints out the results that the
 server sends back (exiting with whatever status code the server
 returned). You can use this client program as is, or you can write your own
 client program in whatever language you like, as long as you speak to the
-server over an SSH connection. The API for the server is broken into
-several different modules that export a number of methods, each of which is
-described below. The python library we use to speak XMLRPC over an SSH
-connection takes paths of the form:
+server over an SSH connection.
 
-    <code><pre>
-    ssh://user@hostname/XMLRPC/module</code></pre>
+<p> You may also use the SSL version of the client program, <a
+href="downloads/xmlrpc/"><tt>sslxmlrpc_client</tt></a> as long as you
+request an SSL certificate as described above. Once you have a
+certificate, use the <tt>--cert=</tt> option to tell the demonstration
+client where to find your certificate. You will be prompted for the
+private key passphrase when it attempts to contact the server. 
 
-where each <em>module</em> exports some methods. Each method is of the
-form (in Python speak):
+<p>
+The API for the server is broken into several different modules that
+export a number of methods, each of which is described below. Each
+method is of the form (in Python speak):
 
     <code><pre>
     def startexp(version, arguments):

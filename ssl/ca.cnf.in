@@ -52,6 +52,38 @@ organizationalUnitName	= optional
 commonName		= match
 emailAddress		= optional
 
+[ CA_usercerts ]
+dir		= .			# Where everything is kept
+certs		= $dir/certs		# Where the issued certs are kept
+crl_dir		= $dir/crl		# Where the issued crl are kept
+database	= $dir/index.txt	# database index file.
+new_certs_dir	= $dir/newcerts		# default place for new certs.
+
+certificate	= $dir/cacert.pem 	# The CA certificate
+serial		= $dir/serial 		# The current serial number
+crl		= $dir/crl.pem 		# The current CRL
+private_key	= $dir/cakey.pem        # The private key
+RANDFILE	= $dir/.rand		# private random number file
+
+default_days	= 1000			# how long to certify for
+default_crl_days= 1000			# how long before next CRL
+default_md	= md5			# which md to use.
+preserve	= no			# keep passed DN ordering
+
+# A few difference way of specifying how similar the request should look
+# For type CA, the listed attributes must be the same, and the optional
+# and supplied fields are just that :-)
+policy		= policy_sslxmlrpc
+
+# For the sslxmlrpc policy
+[ policy_sslxmlrpc ]
+countryName		= match
+stateOrProvinceName	= match
+organizationName	= match
+organizationalUnitName	= optional
+commonName		= optional
+emailAddress		= optional
+
 [ usr_cert ]
 # These extensions are added when 'ca' signs a request.
 

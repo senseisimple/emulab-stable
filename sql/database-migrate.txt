@@ -1913,3 +1913,34 @@ last_net_act,last_cpu_act,last_ext_act);
 	    'emulab-ops-FBSD47-STD',NULL,0);
 
        Poplulate the default_firewall_rules table using sql/fwrules-create.sql.
+
+1.272: Table to manage to SSL certs we create for people to access the
+       SSL version of the RPC server. In addition to storing text
+       versions of the cert and private keys, we also store the serial
+       number of the cert so we can "revoke" certificates at the
+       server simply by removing them from the table. The SSL server
+       checks the serial number to make sure its still valid.
+
+       CREATE TABLE user_sslcerts (
+        uid varchar(8) NOT NULL default '',
+        idx int(10) unsigned NOT NULL default 0,
+	cert text,
+	privkey text,
+	created datetime default NULL,
+	encrypted tinyint(1) NOT NULL default '0',
+        PRIMARY KEY  (idx)
+       ) TYPE=MyISAM;
+
+       This next table is to deal with the need for a unique index
+       that will not start from zero (filling in deleted rows) when
+       the DB is dropped. We have several tables like that, and we
+       should use this table for those too. 
+
+       CREATE TABLE emulab_indicies (
+        name varchar(64) NOT NULL default '',
+        idx int(10) unsigned NOT NULL default 0,
+        PRIMARY KEY  (name)
+       ) TYPE=MyISAM;
+
+       The certs for all users are created from the doc/UPDATING file.
+       Please read that. 

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,8 +12,8 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= tbacct addsfskey addpubkey quotamail
-LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey
+SBIN_STUFF	= tbacct addsfskey addpubkey quotamail mkusercert
+LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -38,6 +38,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/tbacct
 	chown root $(INSTALL_SBINDIR)/addpubkey
 	chmod u+s $(INSTALL_SBINDIR)/addpubkey
+	chown root $(INSTALL_SBINDIR)/mkusercert
+	chmod u+s $(INSTALL_SBINDIR)/mkusercert
 
 control-install:
 

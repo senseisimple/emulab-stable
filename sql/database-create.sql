@@ -151,6 +151,16 @@ CREATE TABLE deltas (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `emulab_indicies`
+--
+
+CREATE TABLE emulab_indicies (
+  name varchar(64) NOT NULL default '',
+  idx int(10) unsigned NOT NULL default 0,
+  PRIMARY KEY  (name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `event_eventtypes`
 --
 
@@ -1570,6 +1580,20 @@ CREATE TABLE user_sfskeys (
   pubkey text,
   stamp datetime default NULL,
   PRIMARY KEY  (uid,comment)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `user_sslcerts`
+--
+
+CREATE TABLE user_sslcerts (
+  uid varchar(8) NOT NULL default '',
+  idx int(10) unsigned NOT NULL default 0,
+  cert text,
+  privkey text,
+  created datetime default NULL,
+  encrypted tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
 --

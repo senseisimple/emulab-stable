@@ -89,21 +89,35 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         except AttributeError:
             raise Exception('method "%s" is not supported' % method)
         else:
+            self.logit("Calling method '" + method + "'");
             return apply(meth, params);
         pass
 
     #
-    # Get the unix_uid for the user.
+    # Get the unix_uid for the user. User must be active. 
     #
     def getuserid(self, uid):
-        userQuery = DBQueryFatal("SELECT unix_uid FROM users AS u "
-                                 "WHERE u.uid=%s",
+        userQuery = DBQueryFatal("select unix_uid,status from users "
+                                 "where uid=%s",
                                  (uid,))
-    
+        
         if len(userQuery) == 0:
             return 0
-    
+        
+        if (userQuery[0][1] != "active"):
+            return -1
+        
         return int(userQuery[0][0])
+    
+    #
+    # Check the certificate serial number. 
+    #
+    def checkcert(self, uid, serial):
+        res = DBQueryFatal("select idx from user_sslcerts "
+                           "where uid=%s and idx=%s",
+                           (uid, serial))
+
+        return len(res)
     
     #
     # Get the group list for the user.
@@ -118,7 +132,6 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
                            "where m.uid=%s "
                            "order by date_approved asc ",
                            (user,))
-
         
         for group in res:
             result.append(int(group[1]));
@@ -144,12 +157,27 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         if self.uid == 0:
             self.logit('No such user: "%s"' % self.user)
             raise Exception('No such user: "%s"' % self.user)
-
+        
+        if self.uid == -1:
+            self.logit('User "%s" is not active' % self.user)
+            raise Exception('User "%s" is not active' % self.user)
+        
+        #
+        # Check the certificate serial number. At the moment, the serial
+        # must match a certificate that is in the DB for that user. This
+        # is my crude method of certificate revocation. 
+        #
+        serial = request.get_peer_cert().get_serial_number()
+        
+        if self.checkcert(self.user, serial) == 0:
+            self.logit('No such cert with serial "%s"' % serial)
+            raise Exception('No such cert with serial "%s"' % serial)
+        
         self.glist = self.getusergroups(self.user);
         if len(self.glist) == 0:
             self.logit('No groups for user: "%s"' % self.user)
             raise Exception('No groups for user: "%s"' % self.user)
-       
+        
         self.logit("Connect from %s: %s %s" %
                    (client[0], self.user, str(self.glist)))
         
@@ -209,6 +237,16 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
 
     pass
 
+#
+# Check for debug flag.
+# 
+if len(sys.argv) > 1 and sys.argv[1] == "-d":
+    debug = 1
+    pass
+
+#
+# Daemonize when not running in debug mode.
+#
 if not debug:
     #
     # Connect to syslog. 

@@ -6,6 +6,50 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040901:
+	New SSL version of the XMLRPC server.
+
+	* Install this port on both boss and ops:
+
+		/usr/ports/security/py-m2crypto	
+
+	* Reconfig, rebuild, and reinstall the testbed software on your
+	  boss node. Be sure to pick up changes in sql/database-migrate.
+
+	* Install some ssl files on boss:
+
+		cd /usr/object/tree/ssl
+		gmake usercert-install
+
+        * Install new version of testbed startup script on boss
+	  
+		cd /usr/object/tree/rc.d
+		sudo gmake install
+
+        * Generate SSL certificates for existing emulab users
+
+		cd /usr/src/tree/sql
+		./initcerts.pl
+
+	* Add the following lines to /etc/syslog.conf on boss
+
+	  !sslxmlrpc
+	  *.*                            /usr/testbed/log/sslxmlrpc.log
+
+	* Add the following line to /etc/newsyslog.conf on boss
+
+	  /usr/testbed/log/sslxmlrpc.log          640  7     1000 *     Z
+
+        * Create the log file and restart syslog on boss
+	
+		sudo touch /usr/testbed/log/sslxmlrpc.log
+		sudo kill -HUP `cat /var/run/syslog.pid`
+
+        * Fire up the SSL XMLRPC server
+
+		sudo /usr/testbed/sbin/sslxmlrpc_server.py
+
+
 20040816:
 	The event system has moved to users.emulab.net.
 

@@ -64,6 +64,11 @@ case "$1" in
 			inetd -a @BOSSNODE@ -p /var/run/testbed-inetd.pid @prefix@/etc/inetd.conf
 		fi
 
+		if [ -x @prefix@/sbin/sslxmlrpc_server.py ]; then
+			echo -n " sslxmlrpc"
+			@prefix@/sbin/sslxmlrpc_server.py
+		fi
+
 		#
 		# Could trigger experiment creation, so make sure everything
 		# else is setup first; i.e., run this last!

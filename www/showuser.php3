@@ -180,6 +180,9 @@ if ($isadmin || !strcmp($uid, $target_uid)) {
     WRITESUBMENUBUTTON("Edit SFS Keys",
 		       "showsfskeys.php3?target_uid=$target_uid");
 
+    WRITESUBMENUBUTTON("Generate SSL Cert",
+		       "gensslcert.php3?target_uid=$target_uid");
+
     WRITESUBMENUBUTTON("Show History",
 		       "showstats.php3?showby=user&which=$target_uid");
 }

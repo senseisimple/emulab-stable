@@ -36,6 +36,7 @@ emulab.pem:	dirsmade emulab.cnf
 	openssl req -new -x509 -days 1000 -config emulab.cnf \
 		    -keyout cakey.pem -out cacert.pem
 	cp cacert.pem emulab.pem
+	cp cakey.pem emulab.key
 
 server.pem:	dirsmade server.cnf ca.cnf
 	#
@@ -137,14 +138,26 @@ dirsmade:
 	touch index.txt
 	touch dirsmade
 
+install-dirs:
+	-mkdir -p $(INSTALL_DIR)/ssl
+	-chmod 770 $(INSTALL_DIR)/ssl
+	-mkdir -p $(INSTALL_DIR)/ssl/certs
+	-mkdir -p $(INSTALL_DIR)/ssl/newcerts
+	-chmod 775 $(INSTALL_DIR)/ssl/newcerts
+	-mkdir -p $(INSTALL_DIR)/ssl/crl
+	echo "01" > $(INSTALL_DIR)/ssl/serial
+	touch $(INSTALL_DIR)/ssl/index.txt
+	touch install-dirs
+
 #
 # You do not want to run these targets unless you are sure you
 # know what you are doing!
 #
-install:	$(INSTALL_SBINDIR)/mksig
+install:	install-dirs $(INSTALL_SBINDIR)/mksig
 	@echo "BE VERY CAREFUL! INSTALLING NEW CERTS CAN CAUSE DISASTER!"
 
 boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/emulab.key \
 		$(INSTALL_ETCDIR)/server.pem \
 		$(INSTALL_ETCDIR)/pcplab.pem \
 		$(INSTALL_ETCDIR)/pcwa.pem \
@@ -153,8 +166,11 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem
+	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 600 $(INSTALL_ETCDIR)/emulab.key
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
@@ -163,14 +179,19 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab_privkey.pem
 
-remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
+remote-site-boss-install:	install-dirs \
+		$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/emulab.key \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/capture.fingerprint \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem
+	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 600 $(INSTALL_ETCDIR)/emulab.key
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 	chmod 644 $(INSTALL_ETCDIR)/capture.fingerprint
 	chmod 644 $(INSTALL_ETCDIR)/capture.sha1fingerprint
@@ -193,6 +214,11 @@ control-install:	$(INSTALL_SBINDIR)/capture.pem \
 
 tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem
+
+usercert-install:	install-dirs
+	-mkdir -p $(INSTALL_LIBDIR)/ssl
+	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+	$(INSTALL_DATA) $(SRCDIR)/usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
 
 clean:
 	@echo "BE VERY CAREFUL! CLEANING THE SSL DIR CAN CAUSE DISASTER!"

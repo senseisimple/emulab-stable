@@ -13,12 +13,12 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= sshxmlrpc_client.py
-SBIN_SCRIPTS	= sshxmlrpc_server.py xmlrpcbag
+SBIN_SCRIPTS	= sshxmlrpc_server.py xmlrpcbag sslxmlrpc_server.py 
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
 DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README \
-                  script_wrapper.py
+                  script_wrapper.py sslxmlrpc_client.py
 DEBUG_STUFF     = experiment node imageid osid fs user emulab server
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
@@ -26,7 +26,7 @@ EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 #
 # These are the ones installed on plastic (users, control, etc). 
 # 
-CLIENTBIN       = sshxmlrpc_client.py script_wrapper.py
+CLIENTBINS      = sshxmlrpc_client.py script_wrapper.py sslxmlrpc_client.py
 USERLIBS	= sshxmlrpc.py emulabclient.py
 SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 		  delay_config link_config savelogs portstats eventsys_control \
@@ -38,7 +38,7 @@ SYMLINKS        = node_admin node_reboot os_load create_image node_list \
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF) \
-	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBIN)
+	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBINS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -48,7 +48,9 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(WWW_STUFF)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/xmlrpc/, $(DOWNLOAD_STUFF)) \
-	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/bin/, $(CLIENTBINS))
 	-rm -f $(INSTALL_SBINDIR)/paperbag
 	ln -s xmlrpcbag $(INSTALL_SBINDIR)/paperbag
 
@@ -67,6 +69,16 @@ $(INSTALL_SBINDIR)/xmlrpc/%: %
 	-mkdir -p $(INSTALL_SBINDIR)/xmlrpc
 	$(INSTALL_PROGRAM) $< $@
 
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+
 #
 # Control node installation (okay, plastic)
 #
@@ -78,7 +90,7 @@ LINKS=	cd $(INSTALL_BINDIR) && \
 		done;
 endif
 control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
-			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBIN))
+			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBINS))
 	$(LINKS)
 
 clean:

@@ -50,6 +50,7 @@ my $CHPASS	= "/usr/bin/chpass";
 my $SFSKEYGEN	= "/usr/local/bin/sfskey gen";
 my $SETGROUPS	= "$TB/sbin/setgroups";
 my $GENELISTS	= "$TB/sbin/genelists";
+my $MKUSERCERT	= "$TB/sbin/mkusercert";
 my $SFSUPDATE	= "$TB/sbin/sfskey_update";
 my $PBAG	= "$TB/sbin/paperbag";
 my $EXPORTSSETUP= "$TB/sbin/exports_setup";
@@ -304,6 +305,9 @@ sub AddUser()
     }
     # Add to elists.
     system("$GENELISTS -u $user");
+
+    # Generate the SSL cert for the user.
+    system("$MKUSERCERT $user");
 
     #
     # Must update the exports file or else nodes will complain.  There

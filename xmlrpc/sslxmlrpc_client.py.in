@@ -52,7 +52,7 @@ debug           = 0
 def usage():
     print "Make a request to the Emulab XML-RPC (SSL-based) server."
     print ("Usage: " + sys.argv[0] 
-                     + " [-hV] [-l login] [-s server] [-m module] "
+                     + " [-hV] [-s server] [-m module] "
                      + "<method> [param=value ...]")
     print
     print "Options:"
@@ -157,8 +157,8 @@ def do_method(server, method_and_args):
 try:
     # Parse the options,
     opts, req_args =  getopt.getopt(sys.argv[1:],
-                      "dhVs:l:am:zx:p:",
-                      [ "help", "version", "server=", "login=", "module=",
+                      "dhVs:m:p:",
+                      [ "help", "version", "server=", "module=",
                         "cert=", "port="])
     # ... act on them appropriately, and
     for opt, val in opts:
@@ -179,23 +179,11 @@ try:
         elif opt in ("-c", "--cert"):
 	    certificate = val
             pass
-        elif opt in ("-l", "--login"):
-	    login_id = val
-            pass
         elif opt in ("-m", "--module"):
 	    module = val
             pass
         elif opt in ("-d", "--debug"):
 	    debug = 1
-            pass
-        elif opt in ("-a", "--admin"):
-	    admin = 1
-            pass
-        elif opt in ("-z", "--devel"):
-	    devel = 1
-            pass
-        elif opt in ("-x", "--develuser"):
-	    develuser = val
             pass
         pass
     pass
@@ -217,7 +205,6 @@ ctx = SSL.Context('sslv23')
 ctx.load_cert(certificate, certificate)
 ctx.set_verify(SSL.verify_none, 16)
 ctx.set_allow_unknown_ca(0)
-#ctx.set_info_callback()
 
 # This is parsed by the Proxy object.
 URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port)

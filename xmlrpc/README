@@ -7,12 +7,18 @@ information can be found at http://www.emulab.net/xmlrpcapi.php3
   or perhaps even use it in production from the command line if you do
   not want to write your own client.
 
+* sslxmlrpc_client.py: An pure SSL based version of the above mentioned
+  demonstration program. You can request an SSL certificate from the
+  My Emulab portion of the Emulab website.
+
 * sshxmlrpc.py: A library written at the University of Utah that you
-  need to include in your Python client program. Be sure to move this
-  file to your python library directory.
+  need to include in your SSH based Python client program. Be sure to
+  move this file to your python library directory.
 
 * emulabclient.py: Another small library that you need to put in your
-  python library directory.
+  python library directory. This library is loaded by both the SSH and
+  SSL versions of the demonstration client programs, and defines a few
+  small classes and constants. 
 
 * script_wrapper.py: A slightly more advanced client that implements a
   "shell" script style interface to emulab. To get a list of "shell"

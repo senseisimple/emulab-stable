@@ -1397,6 +1397,7 @@ esac
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig \
+        ssl/ca.cnf ssl/ctrlnode.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
@@ -1423,7 +1424,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/GNUmakefile account/tbacct account/webtbacct \
 	account/addpubkey account/webaddpubkey \
 	account/addsfskey account/webaddsfskey \
-	account/quotamail \
+	account/quotamail account/mkusercert account/webmkusercert  \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/spewrpmtar tbsetup/gentopofile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \

@@ -1,0 +1,408 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Fcntl ':flock';
+
+#
+# Create user SSL certificates.
+# 
+sub usage()
+{
+    print("Usage: mkusercert [-d] [-o] [-p password] <user>\n");
+    exit(-1);
+}
+my $optlist = "dp:o";
+my $debug   = 0;
+my $output  = 0;
+my $password;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+
+# Locals
+my $USERDIR	= USERROOT();
+my $SSLDIR      = "$TB/lib/ssl";
+my $TEMPLATE    = "$SSLDIR/usercert.cnf";
+my $CACONFIG    = "$SSLDIR/ca.cnf";
+my $EMULAB_CERT = "$TB/etc/emulab.pem";
+my $EMULAB_KEY  = "$TB/etc/emulab.key";
+my $OPENSSL     = "/usr/bin/openssl";
+my $lockfile    = "/var/tmp/testbed_mkusercert_lockfile";
+my $WORKDIR     = "$TB/ssl";
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# Rewrite audit version of ARGV to prevent password in mail logs.
+#
+my @NEWARGV = @ARGV;
+for ($i = 0; $i < scalar(@NEWARGV); $i++) {
+    if ($NEWARGV[$i] eq "-p") {
+	$NEWARGV[$i + 1] = "**********";
+    }
+}
+AuditSetARGV(@NEWARGV);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"p"})) {
+    $password = $options{"p"};
+
+    #
+    # Make sure its all escaped since any printable char is allowed.
+    #
+    if ($password =~ /^([\040-\176]*)$/) {
+	$password = $1;
+    }
+    else {
+	die("Tainted argument: $password\n");
+    }
+    $password =~ s/\'/\'\\\'\'/g;
+    $password = "'$password'";
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $user = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+if ($user =~ /^([-\w]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Tainted argument: $user\n");
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# CD to the workdir, and then serialize on the lock file since there is
+# some shared goop that the ssl tools muck with (serial number, index, etc.).
+# 
+chdir("$WORKDIR") or
+    fatal("Could not chdir to $WORKDIR: $!");
+
+open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+$count = 0;
+if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+    #
+    # If we don't get it the first time, we wait for:
+    # 1) The lock to become free, in which case we do our thing
+    # 2) The time on the lock to change, in which case we wait for that process
+    #    to finish
+    #
+    my $oldlocktime = (stat(LOCK))[9];
+    my $gotlock = 0;
+    while (1) {
+	print "Another exports update in progress, waiting for it to finish\n";
+	if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+	    # OK, got the lock, we can do what we're supposed to
+	    $gotlock = 1;
+	    last;
+	}
+	$locktime = (stat(LOCK))[9];
+	if ($locktime != $oldlocktime) {
+	    $oldlocktime = $locktime;
+	    last;
+	}
+	if ($count++ > 60)  {
+	    fatal("Could not get the lock after a long time!\n");
+	}
+	sleep(1);
+    }
+
+    $count = 0;
+    #
+    # If we didn't get the lock, wait for the processes that did to finish
+    #
+    if (!$gotlock) {
+	while (1) {
+	    if ((stat(LOCK))[9] != $oldlocktime) {
+		exit(0);
+	    }
+	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		close(LOCK);
+		exit(0);
+	    }
+	    if ($count++ > 20)  {
+		fatal("Process with the lock did not finish after ".
+		      "a long time!\n");
+	    }
+	    sleep(1); 
+	}
+    }
+}
+
+#
+# Perl-style touch(1)
+#
+my $now = time;
+utime $now, $now, $lockfile;
+
+#
+# Get the user info (the user being operated on).
+#
+my $query_result =
+    DBQueryFatal("select u.usr_name,u.usr_email,u.admin,u.unix_uid ".
+		 "from users as u ".
+		 "where u.uid='$user'");
+
+if ($query_result->numrows == 0) {
+    fatal("$user is not in the DB. This is bad.\n");
+}
+my @row         = $query_result->fetchrow_array();
+my $fullname    = $row[0];
+my $user_email  = $row[1];
+my $usr_admin   = $row[2];
+my $user_number = $row[3];
+
+#
+# Get the users earliest project membership to use as the default group
+# for the case that the account is being (re)created. We convert that to
+# the unix info.
+#
+my $default_groupname;
+my $default_groupgid;
+
+$query_result =
+    DBQueryFatal("select m.pid from group_membership as m ".
+		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none' ".
+		 "order by date_approved asc limit 1");
+
+if (my ($defpid) = $query_result->fetchrow_array) {
+    if (! TBGroupUnixInfo($defpid, $defpid,
+			  \$default_groupgid, \$default_groupname)) {
+	fatal("No info for default project $defpid!");
+    }
+}
+else {
+    print "No group membership for $user; using the guest group!\n";
+
+    ($default_groupname,undef,$default_groupgid,undef) = getgrnam("guest");
+}
+
+#
+# Create a template conf file. We tack on the DN record based on the
+# user particulars.
+#
+system("cp -f $TEMPLATE usercert.cnf") == 0
+    or fatal("Could not copy $TEMPLATE to current dir");
+
+open(TEMP, ">>usercert.cnf")
+    or fatal("Could not open $TEMPLATE for append: $!");
+
+print TEMP "OU\t\t= sslxmlrpc\n";
+print TEMP "CN\t\t= $user\n";
+print TEMP "emailAddress\t= $user" . "\@" . "$OURDOMAIN\n";
+close(TEMP)
+    or fatal("Could not close usercert.cnf: $!");
+
+#
+# Create a client side private key and certificate request.
+#
+system("$OPENSSL req -new -config usercert.cnf ".
+       (defined($password) ? " -passout pass:${password} " : " -nodes ") .
+       " -keyout usercert_key.pem -out usercert_req.pem") == 0
+    or fatal("Could not create certificate request");
+
+#
+# Remove the index file. We keep track of things ourselves. We also have to
+# figure out what the next serial number will be and write that into the
+# file. We could let "ca' keep track, but with devel trees, we might end
+# up with duplicate serial numbers.
+#
+open(IND, ">index.txt")
+    or fatal("Could not clear index.txt");
+close(IND);
+
+#
+# Lock the table to avoid conflict with devel trees.
+#
+DBQueryFatal("lock tables emulab_indicies write");
+
+$query_result =
+    DBQueryFatal("select idx from emulab_indicies ".
+		 "where name='user_sslcerts'");
+my ($curidx) = $query_result->fetchrow_array();
+$curidx = 1
+    if (!defined($curidx));
+my $nextidx = $curidx + 1;
+
+DBQueryFatal("replace into emulab_indicies (name, idx) ".
+	     "values ('user_sslcerts', $nextidx)");
+DBQueryFatal("unlock tables");
+
+open(SER, ">serial")
+    or fatal("Could not create new serial file");
+printf SER "%08x\n", $curidx;
+close(SER);
+
+#
+# Sign the client cert request, creating a client certificate.
+#
+system("$OPENSSL ca -batch -policy policy_sslxmlrpc -config $CACONFIG ".
+       " -name CA_usercerts ".
+       " -out usercert_cert.pem -cert $EMULAB_CERT -keyfile $EMULAB_KEY ".
+       " -infiles usercert_req.pem") == 0
+    or fatal("Could not sign certificate request");
+
+#
+# For now, there can be just one cert of each kind (encrypted, and
+# unencrypted). Might change that at some point. 
+#
+DBQueryFatal("delete from user_sslcerts ".
+	     "where uid='$user' and ".
+	     "       encrypted=" . (defined($password) ? 1 : 0));
+
+#
+# Create a new entry in the table.
+#
+DBQueryFatal("insert into user_sslcerts (uid, idx, created, encrypted) ".
+	     " values ('$user', $curidx, now(), ".
+	               (defined($password) ? 1 : 0) . ")");
+
+#
+# Grab the cert path and strip off the header goo, then insert into
+# the DB.
+#
+my $certstring = "";
+
+open(CERT, "$OPENSSL x509 -in usercert_cert.pem |")
+    or fatal("Could not start x509 on usercert_cert.pem");
+
+while (<CERT>) {
+    next
+	if ($_ =~ /^--.*--$/);
+    $certstring .= $_;
+}
+close(CERT);
+
+#
+# Now suck in the priv key.
+# 
+my $pkeystring = "";
+open(PKEY, "usercert_key.pem")
+    or fatal("Could open usercert_key.pem");
+
+while (<PKEY>) {
+    next
+	if ($_ =~ /^--.*--$/);
+    $pkeystring .= $_;
+}
+close(PKEY);
+
+$pkeystring = DBQuoteSpecial($pkeystring);
+$certstring = DBQuoteSpecial($certstring);
+DBQueryFatal("update user_sslcerts set cert=$certstring,privkey=$pkeystring ".
+	     "where uid='$user' and idx=$curidx");
+
+#
+# Combine the key and the certificate into one file which is installed
+# on each remote node and used by tmcc. Installed on boss too so
+# we can test tmcc there.
+#
+system("cat usercert_key.pem usercert_cert.pem > usercert.pem") == 0
+    or fatal("Could not combine cert and key into one file");
+
+#
+# Copy the certificate to the users .ssl directory.
+#
+my $ssldir = "$USERDIR/$user/.ssl";
+if (! -d $ssldir) {
+    mkdir($ssldir, 0700) or
+	fatal("Could not mkdir $ssldir: $!");
+
+    chown($user_number, $default_groupgid, $ssldir)
+	or fatal("Could not chown $ssldir: $!");
+}
+
+my $target;
+
+if (defined($password)) {
+    $target = "$ssldir/encrypted.pem";
+}
+else {
+    $target = "$ssldir/emulab.pem";
+}
+
+system("cp -f usercert.pem $target") == 0
+    or fatal("Could not copy usercert.pem to $target");
+
+chown($user_number, $default_groupgid, "$target")
+    or fatal("Could not chown $target: $!");
+
+close(LOCK);
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
