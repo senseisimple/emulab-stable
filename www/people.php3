@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -11,16 +11,20 @@ require("defs.php3");
 #
 PAGEHEADER("People Power");
 
-function FLUXPERSON($person, $name) {
-    echo "<li> <a href=\"http://www.cs.utah.edu/~$person\">$name</a>\n";
+function FLUXPERSON($login, $name) {
+    echo "<li> <a href=\"http://www.cs.utah.edu/~$login\">$name</a>\n";
 }
 
-function PARTFLUXPERSON($person, $name, $other) {
-    echo "<li> <a href=\"http://www.cs.utah.edu/~$person\">$name</a> ($other)\n";
+function PARTFLUXPERSON($login, $name, $where) {
+    echo "<li> <a href=\"http://www.cs.utah.edu/~$login\">$name</a> ($where)\n";
 }
 
-function MAILPERSON($person, $name) {
-    echo "<li> <a href=\"mailto:$person\">$name</a>\n";
+function EXFLUXPERSON($url, $name, $where) {
+    echo "<li> <a href=\"$url\">$name</a> ($where)\n";
+}
+
+function MAILPERSON($login, $name) {
+    echo "<li> <a href=\"mailto:$login\">$name</a>\n";
 }
 
 echo "<h3>Faculty:</h3>\n";
@@ -31,10 +35,11 @@ echo "</ul>\n";
 echo "<h3>Students and Staff:</h3>\n";
 echo "<ul>\n";
 PARTFLUXPERSON("calfeld", "Chris Alfeld", "Univ. Wisconsin");
-PARTFLUXPERSON("danderse", "Dave Andersen", "MIT");
-FLUXPERSON("davidand", "David Anderson");
+PARTFLUXPERSON("danderse", "David G. Andersen", "MIT");
+FLUXPERSON("davidand", "David S. Anderson");
 FLUXPERSON("rchriste", "Russ Christensen");
 FLUXPERSON("aclement", "Austin Clements");
+FLUXPERSON("duerig", "Jonathon Duerig");
 FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("mike", "Mike Hibler");
 FLUXPERSON("abhijeet", "Abhijeet Joglekar");
@@ -51,8 +56,8 @@ PARTFLUXPERSON("barb", "Chad Barb", "Sensory Sweep");
 PARTFLUXPERSON("sclawson", "Steve Clawson", "Alcatel");
 PARTFLUXPERSON("ikumar", "Indrajeet Kumar", "Qualcomm");
 PARTFLUXPERSON("vanmaren", "Kevin Van Maren", "Unisys");
-PARTFLUXPERSON("imurdock", "Ian Murdock", "Progeny");
-PARTFLUXPERSON("bwhite", "Brian White", "Cornell");
+EXFLUXPERSON("http://ianmurdock.com/", "Ian Murdock", "Progeny");
+EXFLUXPERSON("http://www.csl.cornell.edu/~bwhite/", "Brian White", "Cornell");
 # Some consulting for UCB; don't know how much.
 FLUXPERSON("kwright", "Kristin Wright");
 echo "</ul>\n";
