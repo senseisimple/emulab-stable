@@ -14,24 +14,26 @@ package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( libsetup_init cleanup_node check_status
-	 doifconfig dohostnames domounts check_nickname
+    qw ( libsetup_init libsetup_setvnodeid cleanup_node check_status
+	 doifconfig dohostnames domounts dotunnels check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
-	 TBBackGround TBForkCmd vnodesetup
-	 jailedsetup dojailconfig JailedNFSMounts findiface
-	 tmccdie tmcctimeout
+	 TBBackGround TBForkCmd vnodesetup dorouterconfig
+	 jailsetup dojailconfig JailedNFSMounts findiface
+	 tmccdie tmcctimeout libsetup_getvnodeid
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
 
-	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
+	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
-	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY
+	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
+	 TMPROGAGENTS
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
 	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE TMCCCMD_LINKDELAYS
+	 TMCCCMD_PROGRAMS
        );
 
 # Must come after package declaration!
@@ -42,6 +44,14 @@ use English;
 # and use in pathnames. Used in conjunction with jailed virtual nodes.
 #
 my $vnodeid;
+sub libsetup_setvnodeid($)
+{
+    ($vnodeid) = @_;
+}
+sub libsetup_getvnodeid()
+{
+    return $vnodeid;
+}
 
 #
 # True if running inside a jail. Set just below. 
@@ -152,6 +162,7 @@ sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
 sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
 sub TMJAILCONFIG()	{ CONFDIR() . "/jailconfig";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
+sub TMPROGAGENTS()	{ CONFDIR() . "/progagents";}
 sub TMIFC()		{ CONFDIR() . "/rc.ifc"; }
 sub TMRPM()		{ CONFDIR() . "/rc.rpm";}
 sub TMTARBALLS()	{ CONFDIR() . "/rc.tarballs";}
@@ -161,6 +172,7 @@ sub TMTUNNELCONFIG()	{ CONFDIR() . "/rc.tunnel";}
 sub TMVTUNDCONFIG()	{ CONFDIR() . "/vtund.conf";}
 sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
 sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
+sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -176,7 +188,7 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 9; };
+sub TMCD_VERSION()	{ 10; };
 
 #
 # These are the TMCC commands. 
@@ -205,6 +217,7 @@ sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
 sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
+sub TMCCCMD_PROGRAMS()  { "programs"; }
 
 #
 # Some things never change.
@@ -346,7 +359,7 @@ sub cleanup_node ($) {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
     unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
-    unlink TMDELAY, TMLINKDELAY;
+    unlink TMDELAY, TMLINKDELAY, TMPROGAGENTS;
     unlink TMMOUNTDB . ".db";
     unlink TMSFSMOUNTDB . ".db";
     unlink "$VARDIR/db/rtabid";
@@ -660,19 +673,12 @@ sub domounts()
 # Aux function called from the mkjail code to do the NFS mounts outside
 # of a jail, and return the list of mounts that were created. This
 # will hopefully go away some point with better SFS support inside of
-# jails. Local only.
+# jails. Local only, of course.
 # 
 sub JailedNFSMounts($$)
 {
     my ($vid, $rootpath) = @_;
-    my $TM;
-    my %mounts;
     my @mountlist = ();
-
-    #
-    # Set global vnodeid for tmcc commands.
-    #
-    $vnodeid  = $vid;
 
     #
     # No NFS mounts on remote nodes.
@@ -681,16 +687,13 @@ sub JailedNFSMounts($$)
 	return ();
     }
 
-    $TM = OPENTMCC(TMCCCMD_MOUNTS, "USESFS=0");
-
-    while (<$TM>) {
-	if ($_ =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
-	    $mounts{$1} = $2;
-	}
-    }
-    CLOSETMCC($TM);
+    #
+    # Mount same set of existing mounts. A hack, but this whole NFS thing
+    # is a serious hack inside jails.
+    #
+    dbmopen(%MDB, TMMOUNTDB, 0444);
     
-    while (my ($remote, $path) = each %mounts) {
+    while (my ($remote, $path) = each %MDB) {
 	$local = "$rootpath/$path";
 	    
 	if (! -e $local) {
@@ -707,9 +710,9 @@ sub JailedNFSMounts($$)
 	}
 	push(@mountlist, $path);
     }
+    dbmclose(%MDB);	   
     return @mountlist;
 }
-
 #
 # Do SFS hostid setup.
 # Creates an SFS host key for this node, if it doesn't already exist,
@@ -761,10 +764,13 @@ sub dosfshostid ()
 # Do interface configuration.    
 # Write a file of ifconfig lines, which will get executed.
 #
-sub doifconfig ()
+sub doifconfig (;$)
 {
-    my $TM;
-    
+    my ($rtabid) = @_;
+    my @ifaces = ();
+    my $upcmds   = "";
+    my $downcmds = "";
+
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
     # on the MFS. 
@@ -772,29 +778,25 @@ sub doifconfig ()
     if (MFS()) {
 	return 1;
     }
-    
-    $TM = OPENTMCC(TMCCCMD_IFC);
 
-    #
-    # Open a connection to the TMCD, and then open a local file into which
-    # we write ifconfig commands (as a shell script).
-    # 
-    open(IFC, ">" . TMIFC)
-	or die("Could not open " . TMIFC . ": $!");
-    print IFC "#!/bin/sh\n";
-    
+    my $TM = OPENTMCC(TMCCCMD_IFC);
     while (<$TM>) {
-	my $pat;
+	push(@ifaces, $_);
+    }
+    CLOSETMCC($TM);
 
-	#
-	# Note that speed has a units spec: (K|M)bps
-	# 
-	$pat  = q(INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
-	$pat .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)");
-	
-	if ($_ =~ /$pat/) {
-	    my $iface;
+    if (! @ifaces) {
+	return 0;
+    }
 
+    my $ethpat  = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
+    $ethpat    .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)");
+
+    my $vethpat = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) ID=(\d*) );
+    $vethpat   .= q(VMAC=(\w*) PMAC=(\w*));
+
+    foreach my $iface (@ifaces) {
+	if ($iface =~ /$ethpat/) {
 	    my $inet     = $2;
 	    my $mask     = $3;
 	    my $mac      = $4;
@@ -803,32 +805,76 @@ sub doifconfig ()
 	    my $aliases  = $7;
 	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
-	    if ($iface = findiface($mac)) {
-		my $ifline =
+	    if (my $iface = findiface($mac)) {
+		my ($upline, $downline) =
 		    os_ifconfig_line($iface, $inet,
-				     $mask, $speed, $duplex, $aliases);
+				     $mask, $speed, $duplex, $aliases,$rtabid);
 		    
-		print STDOUT "  $iface $inet $aliases\n";
-		print IFC "$ifline\n";
-		print IFC TMROUTECONFIG . " $routearg up\n";
+		$upcmds   .= "$upline\n";
+		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
+		
+		$downcmds .= TMROUTECONFIG . " $routearg down\n";
+		$downcmds .= "$downline\n"
+		    if (defined($downline));
 
 		# There could be routes for each alias.
 		foreach my $alias (split(',', $aliases)) {
 		    $routearg = inet_ntoa(inet_aton($alias) &
 					  inet_aton($mask));
 			
-		    print IFC TMROUTECONFIG . " $routearg up\n";
+		    $upcmds   .= TMROUTECONFIG . " $routearg up\n";
+		    $downcmds .= TMROUTECONFIG . " $routearg down\n";
 		}
 	    }
 	    else {
 		warn "*** WARNING: Bad MAC: $mac\n";
 	    }
 	}
+	elsif ($iface =~ /$vethpat/) {
+	    my $iface    = undef;
+	    my $inet     = $2;
+	    my $mask     = $3;
+	    my $id       = $4;
+	    my $vmac     = $5;
+	    my $pmac     = $6; 
+	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
+
+	    if ($pmac eq "none" ||
+		($iface = findiface($pmac))) {
+		my ($upline, $downline) =
+		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,$rtabid);
+		    
+		$upcmds   .= "$upline\n";
+		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
+		
+		$downcmds .= TMROUTECONFIG . " $routearg down\n";
+		$downcmds .= "$downline\n"
+		    if (defined($downline));
+	    }
+	    else {
+		warn "*** WARNING: Bad PMAC: $pmac\n";
+	    }
+	}
 	else {
 	    warn "*** WARNING: Bad ifconfig line: $_";
 	}
     }
-    CLOSETMCC($TM);
+    #
+    # Local file into which we write ifconfig commands (as a shell script).
+    # 
+    open(IFC, ">" . TMIFC)
+	or die("Could not open " . TMIFC . ": $!");
+    print IFC "#!/bin/sh\n";
+    print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+    print IFC "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
+    print IFC "case \"\$action\" in\n";
+    print IFC "  enable)\n";
+    print IFC "     $upcmds\n";
+    print IFC "     ;;\n";
+    print IFC "  disable)\n";
+    print IFC "     $downcmds\n";
+    print IFC "     ;;\n";
+    print IFC "esac\n";
     close(IFC);
     chmod(0755, TMIFC);
 
@@ -860,12 +906,13 @@ sub findiface($)
 # Do router configuration stuff. This just writes a file for someone else
 # to deal with.
 #
-sub dorouterconfig ()
+sub dorouterconfig (;$)
 {
-    my @stuff   = ();
-    my $routing = 0;
-    my %upmap   = ();
-    my %downmap = ();
+    my ($rtabid) = @_;
+    my @stuff    = ();
+    my $routing  = 0;
+    my %upmap    = ();
+    my %downmap  = ();
     my $TM;
 
     $TM = OPENTMCC(TMCCCMD_ROUTING);
@@ -935,9 +982,11 @@ sub dorouterconfig ()
 		$upmap{$routearg} = [];
 		$downmap{$routearg} = [];
 	    }
-	    $rcline = os_routing_add_manual($rtype, $dip, $dmask, $gate,$cost);
+	    $rcline = os_routing_add_manual($rtype, $dip,
+					    $dmask, $gate, $cost, $rtabid);
 	    push(@{$upmap{$routearg}}, $rcline);
-	    $rcline = os_routing_del_manual($rtype, $dip, $dmask, $gate,$cost);
+	    $rcline = os_routing_del_manual($rtype, $dip,
+					    $dmask, $gate, $cost, $rtabid);
 	    push(@{$downmap{$routearg}}, $rcline);
 	} else {
 	    warn "*** WARNING: Bad routing line: $line\n";
@@ -1047,7 +1096,8 @@ sub dohostnames ()
 	}
     }
     CLOSETMCC($TM);
-    (close(HOSTS) and system("mv -f $HTEMP " . HOSTSFILE)) or
+    close(HOSTS);
+    system("mv -f $HTEMP " . HOSTSFILE) == 0 or
 	warn("*** Could not mv $HTEMP to ". HOSTSFILE . "!\n");
 
     return 0;
@@ -1270,7 +1320,7 @@ sub doaccounts()
 
     my $pat = q(ADDUSER LOGIN=([0-9A-Za-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
-    $pat   .= q(SERIAL=(\d+) EMAIL="([-\w\@\.\+]+)");
+    $pat   .= q(SERIAL=(\d+) EMAIL="([-\w\@\.\+]+)" SHELL=([-\w]*));
 
     while (($login, $info) = each %newaccounts) {
 	if ($info =~ /$pat/) {
@@ -1283,6 +1333,7 @@ sub doaccounts()
 	    $glist = $8;
 	    $serial= $9;
 	    $email = $10;
+	    $shell = $11;
 	    if ( $name =~ /^(([^:]+$|^))$/ ) {
 		$name = $1;
 	    }
@@ -1313,7 +1364,7 @@ sub doaccounts()
 		    print "Updating: ".
 			"$login/$uid/$gid/$root/$name/$hdir/$glist\n";
 		    
-		    os_usermod($login, $gid, "$glist", $pswd, $root);
+		    os_usermod($login, $gid, "$glist", $pswd, $root, $shell);
 
 		    #
 		    # Note that we changed the info for next time.
@@ -1325,7 +1376,7 @@ sub doaccounts()
 		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 
 		if (os_useradd($login, $uid, $gid, $pswd, 
-			       "$glist", $hdir, $name, $root)) {
+			       "$glist", $hdir, $name, $root, $shell)) {
 		    warn "*** WARNING: Error adding new user $login\n";
 		    next;
 		}
@@ -1567,6 +1618,40 @@ sub dostartupcmd ()
     return 0;
 }
 
+#
+# Program agents. I would like to implement startup command using
+# a program agent at some point ...
+#
+sub doprogagent ()
+{
+    my @agents = ();
+    
+    my $TM = OPENTMCC(TMCCCMD_PROGRAMS);
+    while (<$TM>) {
+	push(@agents, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (! @agents) {
+	return 0;
+    }
+
+    #
+    # Write the data to the file. The rc script will interpret it.
+    # Note that one of the lines (the first) indicates what user to
+    # run the agent as. 
+    # 
+    open(RUN, ">" . TMPROGAGENTS)
+	or die("Could not open " . TMPROGAGENTS . ": $!");
+
+    foreach my $line (@agents) {
+	print RUN "$line";
+    }
+    close(RUN);
+
+    return 0;
+}
+
 sub dotrafficconfig()
 {
     my $didopen = 0;
@@ -1603,7 +1688,15 @@ sub dotrafficconfig()
     CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_nickname();
 
-    my $cmdline = "$BINDIR/trafgen -s $boss";
+    my $cmdline = "$BINDIR/trafgen -s ";
+    # Inside a jail, we connect to the local elvind and talk to the
+    # master via the proxy.
+    if (JAILED()) {
+	$cmdline .= "localhost"
+    }
+    else {
+	$cmdline .= "$boss"
+    }
     if ($pid) {
 	$cmdline .= " -E $pid/$eid";
     }
@@ -1752,8 +1845,9 @@ sub dotrafficconfig()
     return 0;
 }
 
-sub dotunnels()
+sub dotunnels(;$)
 {
+    my ($rtabid) = @_;
     my @tunnels;
     my $pat;
     my $TM;
@@ -1840,6 +1934,10 @@ sub dotunnels()
 	    #
 	    my $config = TMROUTECONFIG;
 	    $config =~ s/\/\//\//g;
+	    my $rtabopt= "";
+	    if (defined($rtabopt)) {
+		$rtabopt = "    ifconfig \"%% rtabid $rtabid\";\n";
+	    }
 	    
 	    print(CONF
 		  "$name {\n".
@@ -1850,6 +1948,7 @@ sub dotunnels()
 		  "\n".
 		  "  up {\n".
 		  "    # Connection is Up\n".
+		  $rtabopt .
 		  "    ifconfig \"%% $inetip netmask $mask\";\n".
 		  "    program " . $config . " \"$routearg up\" wait;\n".
 		  "  };\n".
@@ -1896,47 +1995,6 @@ sub dojailconfig()
     }
     close(RC);
     chmod(0755, TMJAILCONFIG);
-    return 0;
-}
-
-#
-# Setup interface configuration inside of a jail. Okay, all we really
-# do is set up a bunch of routing calls, like doifconfig does above.
-# We get the list of "interfaces" from the jailconfig file, but maybe
-# it should be rolled into doifconfig instead?
-#
-sub dojailifconfig()
-{
-    if (! -e TMJAILCONFIG) {
-	dojailconfig();
-	if (! -e TMJAILCONFIG) {
-	    return 0;
-	}
-    }
-
-    my $fname    = TMJAILCONFIG();
-    my $ipstring = `grep IPADDRS $fname`;
-
-    if (defined($ipstring) && $ipstring =~ /^(.*)="(.+)"$/) {
-	my @iplist = split(",", $2);
-
-	if (@iplist) {
-	    open(IFC, ">" . TMIFC)
-		or die("Could not open " . TMIFC . ": $!");
-	    print IFC "#!/bin/sh\n";
-
-	    foreach my $ip (@iplist) {
-		if ($ip =~ /^([0-9\.]+)$/) {
-		    my $routearg = inet_ntoa(inet_aton($1) &
-					     inet_aton("255.255.255.0"));
-
-		    print IFC TMROUTECONFIG . " $routearg up\n";
-		}
-	    }
-	    close(IFC);
-	    chmod(0755, TMIFC);
-	}
-    }
     return 0;
 }
 
@@ -2017,6 +2075,12 @@ sub bootsetup()
 	# 
 	print STDOUT "Checking Testbed Tarball configuration ... \n";
 	dotarballs();
+
+	#
+	# Program agents
+	# 
+	print STDOUT "Checking Testbed program agent configuration ... \n";
+	doprogagent();
     }
 
     #
@@ -2036,7 +2100,7 @@ sub bootsetup()
 #
 # This happens inside a jail. 
 #
-sub jailedsetup()
+sub jailsetup()
 {
     #
     # Currently, we rely on the outer environment to set our vnodeid
@@ -2088,14 +2152,14 @@ sub jailedsetup()
 	print STDOUT "Checking Testbed jail configuration ...\n";
 	dojailconfig();
 	
-	print STDOUT "Checking Testbed ifconfig configuration ...\n";
-	dojailifconfig();
-
 	print STDOUT "Checking Testbed hostnames configuration ... \n";
 	dohostnames();
 
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
+
+	print STDOUT "Checking Testbed RPM configuration ... \n";
+	dorpms();
 
 	print STDOUT "Checking Testbed Tarball configuration ... \n";
 	dotarballs();
@@ -2105,6 +2169,9 @@ sub jailedsetup()
 
 	print STDOUT "Checking Testbed traffic generation configuration ...\n";
 	dotrafficconfig();
+
+	print STDOUT "Checking Testbed program agent configuration ... \n";
+	doprogagent();
 
 	print STDOUT "Checking Testbed Experiment Startup Command ... \n";
 	dostartupcmd();
@@ -2162,31 +2229,13 @@ sub vnodesetup($)
     }
 
     #
-    # Do tunnels
-    # 
-    print STDOUT "Checking Testbed tunnel configuration ... \n";
-    dotunnels();
-
-    #
-    # Router Configuration.
-    #
-    print STDOUT "Checking Testbed routing configuration ... \n";
-    dorouterconfig();
-
-    #
-    # Traffic generator Configuration.
-    #
-    print STDOUT "Checking Testbed traffic generation configuration ...\n";
-    dotrafficconfig();
-
-    #
-    # Getting jail config.
+    # Get jail config.
     #
     print STDOUT "Checking Testbed jail configuration ...\n";
     dojailconfig();
 
     return ($pid, $eid, $vname);
-}
+}    
 
 #
 # Report startupcmd status back to the TMCC. Called by the runstartup
