@@ -6,7 +6,7 @@
 # set-hardware
 # set-link-loss
 
-push(@INC,"./ir");
+push(@INC,"/usr/testbed/lib/tbsetup/ir");
 require libir;
 
 if ($#ARGV != 1) {
