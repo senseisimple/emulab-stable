@@ -44,6 +44,7 @@ if ($WWWHOST != "www.emulab.net") {
 
 $TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users";
+$TBGROUP_DIR	= "/groups";
 $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
