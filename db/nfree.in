@@ -10,7 +10,7 @@ use Getopt::Std;
 
 #
 # nfree - Takes pysical node names, and frees them from the experiment they
-# are allocated to. If nodes are ommited, frees up all nodes in the given
+# are allocated to. If nodes are omitted, frees up all nodes in the given
 # experiment. Looks in the scheduled_reloads and next_reserve tables to see
 # if this node should be re-reserved into another experiment and/or reloaded,
 # rather than being put back into the pool of free nodes
