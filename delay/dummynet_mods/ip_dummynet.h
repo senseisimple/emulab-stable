@@ -122,6 +122,10 @@ struct dn_flow_queue {
 #define DN_DIST_TABLE_RANDOM	0x10
 #define DN_DIST_TABLE_DETERM	0x20
 
+#define DN_TABLE_DIST \
+	(DN_DIST_TABLE_RANDOM|DN_DIST_TABLE_DETERM|DN_DIST_POISSON)
+#define DN_CONST_DIST (DN_DIST_CONST_RATE|DN_DIST_CONST_TIME)
+
 /*
  * Pipe descriptor. Contains global parameters, delay-line queue,
  * and the hash array of the per-flow queues.
@@ -132,7 +136,15 @@ struct dn_pipe {			/* a pipe */
 	u_short	pipe_nr ;		/* number	*/
 	u_short	flags ;			/* to speed up things	*/
 #define DN_HAVE_FLOW_MASK	8
-	int	bandwidth;		/* really, bytes/tick.	*/
+	int	bandwidth;		/* bits/sec */
+	int	bwdist;			/* distribution type */
+	int	bwmean;
+	int	bwvar;
+	int	bwquantum;	/* how frequently to recalculate bw */
+	int	bwquantum_expire;	/* its expiration date  */
+	int    *bwtable;		/* table of possible values */
+	int	bwentries;	/* entries in table */
+	int	bwtablepos;	/* current pos in table for deterministic */
 	int	queue_size ;
 	int	queue_size_bytes ;
 	int	delay ;			/* really, ticks	*/
