@@ -50,6 +50,7 @@ use constant LINUX => "Linux";
 use constant RTPROTO_STATIC => "Static";
 use constant EVENT_STOP => "STOP";
 use constant PING_SEND_COUNT => 10;
+use constant SYNC_NAMESPACE => "linktest";
 
 # test levels
 use constant TEST_LATENCY => 1; # direct link connectivity & latency
@@ -710,10 +711,10 @@ sub barrier {
 	# since it parsed the NS file.
 	die &fatal("barrcount not defined!") unless defined($barr_count);
 	if($barr_count) {
-	    &my_system(PATH_EMULAB_SYNC,"-i",$barr_count);
+	    &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,"-n",SYNC_NAMESPACE);
 	}
     } else {
-	&my_system(PATH_EMULAB_SYNC);
+	&my_system(PATH_EMULAB_SYNC,"-n",SYNC_NAMESPACE);
     }
 
 }
