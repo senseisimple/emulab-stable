@@ -1,6 +1,9 @@
 ##### Setting up tbdb for a new boss node
 ##### Last updated January 24, 2002
 
+Note: steps labeled "Local Only" are only required when setting up a testbed
+with local nodes - they can be skipped in a widearea-only testbed.
+
 ##### Step 0 - Create the database
 
 Before beginning this process, you should have mysql installed and running on
@@ -93,6 +96,7 @@ warning above. We'll soon provide contents for this table
 (webdb_table_permissions) with the testbed software.
 
 ##### Step 4 - Setup switches
+##### Local Only
 
 1) Create node types for switches
 
@@ -160,6 +164,7 @@ table, listing the node_id of each switch and the stack_id of the stack it
 belongs to.
 
 ##### Step 5 - Setup control hardware
+##### Local Only
 
 1) Boss/ops nodes
 
@@ -189,7 +194,9 @@ If you have serial power controllers, just create entries node_types and nodes
 These will depend on the image(s) and any OSKit kernels you've recieved, or
 built yourself. Since you're probably using disk images from Utah, the best
 thing to do is ask us for the appropriate lines for the os_info and images
-tables.
+tables.  For a widearea-only testbed, no images entries in the images table a
+required, but OSIDs are still useful, to determine what a node's capabilities
+are. 
 
 ##### Step 7 - Setup nodes
 
@@ -242,7 +249,7 @@ Will be somewhat automated (no script yet) - documentation coming soon!
 
 Will be somewhat automated (no script yet)  - documentation coming soon!
 
-5) Create their interfaces
+5a) Create their interfaces - Local Only
 
 The macgrabber script is used when you have serial consoles on all nodes. Thus,
 you should get the capture processes running on your ops node before beginnig
@@ -284,7 +291,19 @@ its output seems to make sense, pipe it into 'mysql tbdb'.
 You can now hop back over to the boss setup documentation, and set up the
 dcpd.conf file for real.
 
-6) Create their wires
+5b) Create their Interfaces - Wide-area only
+
+In the wide-area case, MAC addresses for interfaces are not necessary. Instead,
+the only necessary columns in the interfaces table are:
+
+node_id: Node's ID
+card: Number of the card (0 if the node only has one card)
+port: Set to 0
+IP: The node's IP
+interface_type: Useful, but not necessary
+iface: eth0, as long as the node has only one interface
+
+6) Create their wires - Local Only
 
 Now, we need to enter information into the wires table, so that we know what
 NIC on which machine connects to which port on the switch. This can be done 
