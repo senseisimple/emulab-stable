@@ -144,7 +144,7 @@ if (! @tmccresults) {
 }
 
 foreach my $str (@tmccresults) {
-    if ($_ =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+    if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
 	$curvnodelist{$1} = $2;
     }
     else {
