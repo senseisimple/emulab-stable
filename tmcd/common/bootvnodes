@@ -239,6 +239,13 @@ for (my $i = 0;
     }
 }
 
+#
+# XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb trivial links
+# XXX turn on local hack to retry on NFS EACCES errors (thanks mountd!)
+#
+system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
+system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+
 foreach my $vnode (keys(%newvnodelist)) {
     # Blocks until mostly setup. 
     bootvnode($vnode, "boot", $newvnodelist{$vnode});
