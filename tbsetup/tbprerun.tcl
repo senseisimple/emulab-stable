@@ -69,7 +69,7 @@ if {! [file exists $irFile]} {
 }
 
 outs "Determining available resources."
-if {[catch "exec $avail type=pc OS=FreeBSD ver extras | $ptopgen > $ptopfile 2>@ $logFp" err]} {
+if {[catch "exec $avail type=pc ver extras | $ptopgen > $ptopfile 2>@ $logFp" err]} {
     outs stderr "Error determining available resources. ($err)"
     exit 1
 }
