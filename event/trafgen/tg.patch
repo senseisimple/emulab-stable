@@ -1,7 +1,6 @@
-Only in tg2.0/src/tg: #prot_tcp.c#
-diff -ru dist-tg2.0/src/tg/config.h tg2.0/src/tg/config.h
---- dist-tg2.0/src/tg/config.h	Thu Jan 24 16:30:09 2002
-+++ tg2.0/src/tg/config.h	Mon Jul  8 14:46:06 2002
+diff -ru dist/tg2.0/src/tg/config.h tg2.0/src/tg/config.h
+--- dist/tg2.0/src/tg/config.h	Thu Jan 24 16:30:09 2002
++++ tg2.0/src/tg/config.h	Wed Aug 25 14:37:32 2004
 @@ -14,7 +14,7 @@
  
  /* Maximum packet buffer size.						*/
@@ -11,9 +10,9 @@ diff -ru dist-tg2.0/src/tg/config.h tg2.0/src/tg/config.h
  
  /* Maximum value from random-number generator.				*/
  
-diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
---- dist-tg2.0/src/tg/log.c	Thu Jan 24 16:30:09 2002
-+++ tg2.0/src/tg/log.c	Mon Jul  8 14:46:06 2002
+diff -ru dist/tg2.0/src/tg/log.c tg2.0/src/tg/log.c
+--- dist/tg2.0/src/tg/log.c	Thu Jan 24 16:30:09 2002
++++ tg2.0/src/tg/log.c	Wed Aug 25 14:37:32 2004
 @@ -268,6 +268,11 @@
  	char		*cp = buf;
  	char		ctl;
@@ -97,9 +96,9 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  	if (log_fp != stdout &&  log_fp != stderr) 
  	  (void) fclose (log_fp);
  
-diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
---- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_dgram.c	Mon Jul  8 14:56:37 2002
+diff -ru dist/tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
+--- dist/tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_dgram.c	Wed Aug 25 14:37:32 2004
 @@ -198,6 +198,22 @@
  	for (;;)
  		{
@@ -167,9 +166,9 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  	return (sta);
  	}
  
-diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
---- dist-tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_stream.c	Mon Jul  8 14:59:52 2002
+diff -ru dist/tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
+--- dist/tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_stream.c	Wed Aug 25 14:37:32 2004
 @@ -147,6 +147,22 @@
  	for (;;)
  		{
@@ -241,9 +240,9 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 +#endif
  	return (result);
  	}
-diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
---- dist-tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_tcp.c	Fri Apr 18 13:36:45 2003
+diff -ru dist/tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
+--- dist/tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_tcp.c	Wed Aug 25 14:37:32 2004
 @@ -93,6 +93,12 @@
  
  #endif /* QOSDEBUG */
@@ -312,9 +311,9 @@ diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
  		if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
  			{
  			(void)close(sfd);
-diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
---- dist-tg2.0/src/tg/prot_test.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_test.c	Mon Jul  8 14:46:06 2002
+diff -ru dist/tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
+--- dist/tg2.0/src/tg/prot_test.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_test.c	Wed Aug 25 14:37:32 2004
 @@ -447,6 +447,7 @@
  
  	if (!test_get_packets(prtab, fd, endtout))
@@ -323,9 +322,9 @@ diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
  		return (-1);
  		}
  	else
-diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
---- dist-tg2.0/src/tg/prot_udp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_udp.c	Fri Apr 18 13:53:15 2003
+diff -ru dist/tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
+--- dist/tg2.0/src/tg/prot_udp.c	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/prot_udp.c	Wed Aug 25 14:37:32 2004
 @@ -47,7 +47,7 @@
  
  /* Apply QOS parameters to an existing fd.                              */
@@ -380,9 +379,9 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  		        if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
  			{
  			    (void)close(sfd);
-diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
---- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Fri Apr 18 15:32:50 2003
+diff -ru dist/tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
+--- dist/tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
++++ tg2.0/src/tg/tg.y	Tue Oct  5 16:53:50 2004
 @@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
@@ -396,7 +395,18 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  
  
  /* Variables local to this file.					*/
-@@ -265,7 +269,6 @@
+@@ -183,6 +187,10 @@
+ 
+ int	sym_tbl_index = 0;
+ 
++/* Include here to compile on Bison as well as Yacc. */
++YYSTYPE yylval;
++#include "lex.yy.c"
++
+ %}
+ 
+ /* Lex token definitions.						*/
+@@ -265,7 +273,6 @@
  macro
  	: IDENTIFIER EQUAL integer
  		{
@@ -404,7 +414,22 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		char		*cp;
  
  		if (!(cp = malloc (strlen($1.n) + 1))) {
-@@ -856,6 +859,14 @@
+@@ -842,7 +849,13 @@
+ 	;
+ 
+ %%
+-#include "lex.yy.c"
++
++/* Forward definitions, necessary to compile on Yacc as well as Bison. */
++#if defined(__cplusplus) || defined(__STDC__)
++  int yylex(void);
++#else
++  int yylex();
++#endif
+ 
+ /* MAINprogram for extractdoc.						*/
+ 
+@@ -856,6 +869,14 @@
  	void		sigint();
  	FILE		*fp;
  
@@ -419,7 +444,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  	/* Set debugging if it is desired.				*/
  
  #	if YYDEBUG
-@@ -917,6 +928,7 @@
+@@ -917,6 +938,7 @@
  	/* Generate traffic.						*/
  
  	do_actions();
@@ -427,7 +452,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  	return (0);
  	}
  
-@@ -1005,7 +1017,7 @@
+@@ -1005,7 +1027,7 @@
  	/* If there is no explicit setup clause, do an immediate setup.	*/
  
  	if (got_setup_implicit &&
@@ -436,7 +461,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		{
  
  		/* log the setup error. */
-@@ -1017,6 +1029,10 @@
+@@ -1017,6 +1039,10 @@
  	/* Each pass through the following loop processes one tg_action	*/
  	/* element from the list.					*/
  
@@ -447,7 +472,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  	for (cur_tg = tg_first; cur_tg != NULL; cur_tg = cur_tg->next)
  		{
  
-@@ -1070,7 +1086,7 @@
+@@ -1070,7 +1096,7 @@
  
  			/* Perform setup phase.				*/
  
@@ -456,7 +481,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  				{
  
  				/* log the setup error. */
-@@ -1116,7 +1132,7 @@
+@@ -1116,7 +1142,7 @@
  
  			(*(prot.prot->sleep_till))(&(cur_tg->stop_before));
  			}
@@ -465,7 +490,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			{
  			/* (Re-)Start logging to a new file */
  			time_t now;
-@@ -1144,6 +1160,22 @@
+@@ -1144,6 +1170,22 @@
  
  			generate(tx_asn, cur_tg, lasttime);
  			}
@@ -488,7 +513,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		}
  
  	/* Finished, tear down connection.				*/
-@@ -1154,8 +1186,11 @@
+@@ -1154,8 +1196,11 @@
  		/* log the teardown error. */
  
  		perror("do_actions: protocol teardown");
@@ -500,7 +525,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  
  	return;
  	}
-@@ -1341,6 +1376,12 @@
+@@ -1341,6 +1386,12 @@
  
  		if (arrival != 0)
  			(*(prot.prot->sleep_till))(&nextpkt_tv);
@@ -513,7 +538,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		lasttime = nextpkt_tv;
  
  		/* Did we exceed the limit on the number of packets to send? */
-@@ -1382,6 +1423,10 @@
+@@ -1382,6 +1433,10 @@
  						   pktlen,
  						   &(cur_tg->stop_before),
  						   &pktid);
@@ -524,7 +549,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			}
  		}
  	}
-@@ -2096,5 +2141,16 @@
+@@ -2096,5 +2151,16 @@
  	char		*addr;
  {
  
