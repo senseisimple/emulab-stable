@@ -205,7 +205,7 @@ echo "  Click on the dots below to see information about the robot\n";
 echo "  <br>\n";
 echo "  Click elsewhere to get its x,y location.\n";
 echo "  <br>\n";
-if ($isadmin || TBWebdbAllowed($uid)) {
+if ($isadmin || TBWebCamAllowed($uid)) {
     echo "  There is a nifty <a href=webcam.php3>webcam image</a> of the";
     echo "   robots too\n";
     echo "  <br>\n";
