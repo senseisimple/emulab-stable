@@ -32,7 +32,7 @@ ac_help="$ac_help
 ac_help="$ac_help
   --disable-events      Disable events (requires Elvin libraries)"
 ac_help="$ac_help
-  --enable-windows      Enable Windows XP support (requires third-party software)"
+  --enable-windows      Enable Windows XP support (default)"
 ac_help="$ac_help
   --enable-windowsclient      Enable Windows XP client support (requires third-party software)"
 ac_help="$ac_help
@@ -1737,16 +1737,16 @@ if test "${enable_windows+set}" = set; then
 fi
 
 
-if test "$enable_windows" = "yes"; then
+if test "$enable_windows" = "no"; then
+	winfiles="";
+	WINSUPPORT=0;
+else
 	winfiles="os/imagezip/ntfs/GNUmakefile \
 		  os/imagezip/ntfs/liblocale/GNUmakefile \
 		  os/imagezip/ntfs/libntfs/GNUmakefile \
 		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
 	WINSUPPORT=1;
-else
-	winfiles="";
-	WINSUPPORT=0;
 fi
 
 

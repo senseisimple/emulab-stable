@@ -417,7 +417,7 @@ sub SetupOpsNode()
     mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
 	     "   ../../src/testbed/configure ".
 	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
-	     ($WINSUPPORT ? "--enable-windows" : ""));
+	     ($WINSUPPORT ? "" : "--disable-windows"));
 
     #
     # Create the ops node.
