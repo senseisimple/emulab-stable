@@ -40,3 +40,4 @@ INSERT INTO sitevariables VALUES ('watchdog/hostkeys',NULL,'999999','Interval in
 INSERT INTO sitevariables VALUES ('plab/message',NULL,'','Message to display at the top of the plab_ez page');
 INSERT INTO sitevariables VALUES ('node/ssh_pubkey',NULL,'','Boss SSH public key to install on nodes');
 INSERT INTO sitevariables VALUES ('general/autoswap_threshold',NULL,'16','Number of hours before an experiment is forcibly swapped');
+INSERT INTO sitevariables VALUES ('general/autoswap_mode',NULL,'0','Control whether autoswap defaults to on or off in the Begin Experiment page');
