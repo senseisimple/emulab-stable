@@ -22,5 +22,29 @@ print "Starting Program Agent ...\n";
 #
 my ($bossname) = split(" ", `tmcc bossinfo`);
 
+#
+# We have to run the program agent as the user that created the experiment.
+# Might change at some point with multiuser nodes.
+#
+my (undef,$creator) = split("=", `tmcc creator`);
+chop($creator);
+
+if (!defined($creator)) {
+    print STDERR "Could not determine experiment creator!\n";
+    exit(1);
+}
+(undef,undef,$uid,$gid,undef,undef,undef,undef) = getpwnam($creator);
+
+if (!defined($uid)) {
+    print STDERR "Could not determine experiment creator UID!\n";
+    exit(1);
+}
+
+#
+# Become the creator and run the agent.
+#
+$EGID = $GID = $gid;
+$EUID = $UID = $uid;
+
 system("program-agent -s $bossname -l /tmp/progagent.debug &");
 exit($? >> 0);
