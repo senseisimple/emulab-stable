@@ -520,6 +520,10 @@ dropped:
 				/* XXX commonly observed */
 				if (errno == EIO || errno == EAGAIN)
 					continue;
+#ifdef	USESOCKETS
+				if (errno == ECONNRESET)
+					goto disconnected;
+#endif
 				die("%s: read: %s", Ptyname, geterr(errno));
 			}
 			if (cc == 0) {
