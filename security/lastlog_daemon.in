@@ -92,10 +92,13 @@ while (1) {
     print "Running at " . `date`;
     
     if (system("$genlastlog")) {
-	print "Exited with status $? at " . `date`;
+	# Save status across the date call in print statement.
+	my $exitval = $?;
+	
+	print "Exited with status $exitval at " . `date`;
 
 	SENDMAIL($TBOPS, "Genlastlog Failed!",
-		 "Failed with exit value $?\n".
+		 "Failed with exit value $exitval\n".
 		 "Please look at the syslog entries for genlastlog!");
     }
     sleep(60 * 5);
