@@ -373,7 +373,7 @@ sub step_init {
 	print STDERR "ERROR: Could not copy defs file.\n";
 	doexit(1);
     }
-    open(DEFS,">$path/defs");
+    open(DEFS,">>$path/defs");
     print DEFS "TBDBNAME=$testdb\n";
     print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
     print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
