@@ -990,6 +990,7 @@ CREATE TABLE users (
   emulab_pubkey text,
   home_pubkey text,
   adminoff tinyint(4) default '0',
+  verify_key varchar(32) default NULL,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;

@@ -49,7 +49,7 @@ if (! strcmp($status, TBDB_USERSTATUS_ACTIVE) ||
 # The user is logged in, so all we need to do is confirm the key.
 # Make sure it matches.
 #
-$keymatch = GENKEY($uid);
+$keymatch = TBGetVerificationKey($uid);
 
 if (strcmp($key, $keymatch)) {
     USERERROR("The given key \"$key\" is incorrect. ".

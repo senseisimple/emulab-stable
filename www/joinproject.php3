@@ -583,7 +583,7 @@ if (! $returning) {
         "'$encoding', NULL, 'newuser', ".
 	"date_add(now(), interval 1 year), now())");
 
-    $key = GENKEY($joining_uid);
+    $key = TBGenVerificationKey($joining_uid);
 
     TBMAIL("$usr_name '$joining_uid' <$usr_email>",
       "Your New User Key",

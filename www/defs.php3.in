@@ -55,13 +55,6 @@ $TBMAILADDR     = "<a href=\"mailto:$TBMAILADDR_OPS\">
 include("dbdefs.php3");
 
 #
-# Generate the KEY from a name
-#
-function GENKEY ($name) {
-    return crypt("TB_"."$name"."_USR", strlen($name) + 13);
-}
-
-#
 # Wrap up the mail function so we can prepend a tag to the subject
 # line that indicates what testbed. Useful when multiple testbed
 # email to the same list.

@@ -836,7 +836,7 @@ if (! $returning) {
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now())");
 
-    $key = GENKEY($proj_head_uid);
+    $key = TBGenVerificationKey($proj_head_uid);
 
     TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
       "Your New User Key",

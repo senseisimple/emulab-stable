@@ -1162,6 +1162,30 @@ function TBHasSerialConsole($node_id) {
 }
 
 #
+# Generate a verification key, and stash it in the database
+#
+function TBGenVerificationKey($name) {
+    $key = md5(uniqid(rand(),1));
+    DBQueryFatal("update users set verify_key='$key' where uid='$name'");
+    return $key;
+}
+
+#
+# Get a verification key from the database
+#
+function TBGetVerificationKey($name) {
+    $query_result =
+	DBQueryFatal("select verify_key from users where uid='$name'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	# Can we signal error somehow?
+	return "";
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row[verify_key];
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
