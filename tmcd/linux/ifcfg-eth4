@@ -1,5 +1,5 @@
 DEVICE="eth4"
-if ["`/etc/rc.d/testbed/nodetype`" = 'pc600']; then
+if [ "`/etc/rc.d/testbed/nodetype`" = 'pc600' ]; then
 	ONBOOT="yes"
 	BOOTPROTO="dhcp"
 else
