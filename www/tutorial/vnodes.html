@@ -189,23 +189,93 @@ anyway so that all virtual links have the same MTU.
 <a NAME="AdvancedIssues"></a><h2>Advanced Issues</h2>
 
 <h3>Taking advantage of a virtual node host.</h3>
-A physical node hosting one or more virtual nodes is ''invisible'' to the
-topology, it exists only to host virtual nodes.  You can however use the
-physical node in a variety of ways: monitoring, proxying, efficient
-distribution of files.
-How to find the vnode filesystems,
-what is shared from the host,
-monitoring veth and phys eth devices,
-routing tables.
+A physical node hosting one or more virtual nodes is not itself part of
+the topology, it exists only to host virtual nodes.  However, the physical
+node is still setup with user accounts and shared filesystems just as a
+regular node is.  Thus you can login to, and use the physical node in a
+variety of ways:
+<ul>
+<li> Since the /usr file system for each node is mounted via a read-only
+     loopback mount from the physical host, any files installed on a
+     physical host's /usr will automatically be part of every virtual node
+     as well.  This allows for a potentially more efficient file distribution
+     mechanism:
+     install packages in the host's /usr and they are visible in the virtual
+     nodes as well.  Unfortunately, there is currently no "handle" for a
+     virtual node host in the NS file, so you cannot install tarballs or
+     RPMs on it as part of the experiment creation process.  You must install
+     them by hand after the experiment has been created, and reboot the
+     virtual nodes.  Thereafter, the packages will be available.
+<li> The private root filesystem for each virtual node is also accessible
+     to the host node in
+     <code>/var/emulab/jails/</code><i>vnodename</i><code>/root</code>
+     where <i>vnodename</i> is the "pcvmNN-NN" Emulab name.  Thus the host
+     can monitor log files and even change files on the fly.
+<li> Other forms of monitoring can be done as well since all processes,
+     filesystems, network interfaces and routing tables are visible in the
+     host.  For instance, you can run tcpdump on a virtual interface outside
+     the node rather than inside it.  You can also tcpdump on a physical
+     interface on which many virtual nodes' traffic is multiplexed.  The
+     installed version of tcpdump understands the veth encapsulation.
+</ul>
+We should emphasize however, that virtual nodes are not "performance
+isolated" from each other or from the host; i.e., a big CPU hogging
+monitor application in the host might affect the performance and behavior
+of the hosted virtual nodes.
 
 <h3>Controlling virtual node layout.</h3>
-Using tb-set-colocate-factor,
-using tb-fix-node,
+<p>
+Normally, the Emulab resource mapper, <code>assign</code>
+will map virtual nodes onto physical
+nodes in such a way as to achieve the best overall use of physical resources
+without violating any of the constraints of the virtual nodes or links.
+In a nutshell, it packs as many virtual nodes onto a physical node as it
+can without exceeding a node's internal or external network bandwidth
+capabilities and without exceeding a node-type specific static packing
+factor.  Internal network bandwidth is an empirically derived value for
+how much network data can be moved through internally connected virtual
+ethernet interfaces.  External network bandwidth is based on the number
+of physical interfaces available on the node.  The static packing factor is
+intended as a coarse metric of CPU and memory load that a physical node
+can support, currently it is based strictly on the amount of physical memory.
+The current values for these constraints are:
+<ul>
+<li>Internal network bandwidth: 400Mb/sec for all node types
+<li>External network bandwidth: 400Mb/sec for all node types
+<li>Packing factor: 10 for pc600s and pc1500s, 20 for pc850s and pc2000s
+</ul>
+</p><p>
+The mapper generally produces an "unsurprising" mapping of virtual nodes
+to physical nodes (e.g., mapping small LANs all on the same physical host)
+and where it doesn't, it is usually because doing so would violate one
+of the constraints.  However, there are circumstances in which you might
+want to modify or even override the way in which mapping is done.
+Currently there are only limited ways in which to do this, and none of
+these will allow you to violate the constrains above.
+</p><p>
+Using the NS-extension <code>tb-set-colocate-factor</code> command, you
+can globally reduce (not increase!) the maximum number of virtual nodes
+per physical node.  This command is useful if you know the application
+load you are running in the vnodes is going to require more resources
+per instance (e.g., a java DHT).
+Note that currently, this is not really a "factor,"
+it is an absolute value.  Setting it to 5 will reduce the capacity of
+all node types to 5, whether they were 10 or 20 by default.
+</p><p>
+Since <code>assign</code> uses a heuristic algorithm at its core,
+sometime it just doesn't find the best solution that you might think
+is obvious.  If assign just won't colocate virtual nodes that you want
+colocated, you can resort to trying to do the mapping by hand using
+<code>tb-fix-node</code>.
+<i>TODO:
 using tb-set-jail-os,
+using tb-set-noshaping,
 understanding how bandwidth affects layout.
 How do I know what the right colocate factor is?
+ENDTODO</i>
 <h3>Mixing virtual and physical nodes.</h3>
 <a NAME="Limitations"></a><h2>Limitations</h2>
+<i>TODO:
 Must run FreeBSD and a particular version at that.
 No resource guarantees for CPU and memory.
 veth encapsulation reduces MTU.
@@ -216,8 +286,11 @@ Only scale to low 1000s of nodes due to various bottlenecks
 No consoles.
 Always use linkdelays (more overhead, requires 1000Hz kernel).
 Not a complete virtualization, many commands "see through".
+ENDTODO</i>
 <a NAME="KnownBugs"></a><h2>Known Bugs</h2>
+<i>TODO:
 Deadlocks in loopback mounts.
+ENDTODO</i>
 <a NAME="TechDetails"></a><h2>Technical Details</h2>
 There is an
 <a href="../doc/docwrapper.php3?docname=jail.html">online document</a>
