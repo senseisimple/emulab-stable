@@ -16,6 +16,9 @@
 #
 # */5     *       *       *       *       root    /usr/testbed/sbin/idlemail
 #
+# If you use a frequency other than 5 minutes, make sure to change the
+# autowarn sections below, especially the query for who should be warned.
+#
 
 # Configure variables
 use lib '@prefix@/lib';
@@ -219,6 +222,26 @@ EOT
 	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
     }
 
+    # Now send warning messages to those who will get autoswapped soon
+    my $warnmin = 60; # minutes before autoswap that we warn them
+    my $window = 8; # idlemail frequency <= window < 2*frequency
+    $sql  = <<EOT;
+select pid,eid,autoswap_timeout,
+(unix_timestamp(now()) - unix_timestamp(expt_swapped))/60 as activemin
+from experiments where swappable>0 and state="active" and autoswap>0
+having activemin+$warnmin>=autoswap_timeout and
+activemin+$warnmin<=autoswap_timeout+$window order by pid,eid
+EOT
+    $q = DBQueryFatal($sql);
+    if ($d) { print $q->as_string; $q->dataseek(0); }
+    while (%r = $q->fetchhash()) {
+	# These get an autowarn message
+	$pid = $r{'pid'};
+	$eid = $r{'eid'};
+	# all options ignored but autoswap and warnmin and ids
+	SendMessage($pid,$pid,$eid,0,0,0,0,0,1,$warnmin);
+    }
+
 } else {
     # pid/eid mode - only check pid/eid, and let $f force sending,
     # even if msg was sent recently or expt isn't idle long enough.
@@ -296,13 +319,19 @@ EOT
 exit(0);
 
 sub SendMessage {
-    my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact) = @_;
+    my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact,
+	$autowarn,$warnmin) = @_;
+    if (!defined($autowarn)) { $autowarn=0; }
     $idlehrs = int($time);
     $idlemin = int(($time-$idlehrs)*60);
 
     if ($d) {
-	print "Sending message to $pid/$eid, ".
-	  "idle $idlehrs hrs $idlemin min, total $time hrs\n";
+	if ($autowarn) {
+	    print "Sending warning message to $pid/$eid before autoswap\n";
+	} else {
+	    print "Sending message to $pid/$eid, ".
+	      "idle $idlehrs hrs $idlemin min, total $time hrs\n";
+	}
     }
 
     my $expleader_name;
@@ -355,6 +384,15 @@ sub SendMessage {
 	       "available for use by other experimenters. You can do this ".
 	       "by logging into the $THISHOMEBASE Web Interface, and using ".
 	       "the swap or terminate links on this page:",$wrapwidth);
+    if ($autowarn) {
+	# We're sending a different kind of message...
+	# Fix the first half, and the rest is the same as the other message.
+	$msg="Hi, this is an important automated message from $THISHOMEBASE.".
+	  "\n\nYou scheduled your experiment $pid/$eid to be Auto-Swapped\n".
+	  "in about $warnmin minutes, whether it is in active use or not.\n".
+	  "If you would like to change the timing of the Auto-Swap, please \n".
+	  "use the Edit option on this page:\n";
+    }
     $msg .= "\n$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n";
     $msg .=
       wordwrap("More information on experiment swapping is available ".
@@ -386,6 +424,11 @@ sub SendMessage {
 	$cclist .="\n";
     }
 
+    if ($autowarn) {
+	$subj="Auto-Swap Warning: $pid/$eid";
+    } else {
+	$subj="$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid";
+    }
     if ($n) {
 	# no mail mode: don't send mail or update db counters
 	print "----NO-MAIL-MODE----\n";
@@ -394,8 +437,7 @@ sub SendMessage {
 	  $cclist.
 	  "Bcc: $TBMAIL_AUTOMAIL\n".
 	  "Errors-To: $TBMAIL_WWW"."\n";
-	print "Subject: $c PC".($c!=1?"s":"").
-	  " idle $idlehrs hours: $pid/$eid\n";
+	print "Subject: $subj\n";
 	print "\n$msg\n";
 	print "----NO-MAIL-MODE----\n";
     } else {
@@ -406,7 +448,7 @@ sub SendMessage {
 	# For debugging:
 	#SENDMAIL("Expt Leader <$TBMAILADDR_OPS>",
 	SENDMAIL("$expleader_name <$expleader_email>",
-		 "$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid",
+		 $subj,
 		 $msg,
 		 "$TBMAIL_OPS",
 		 $cclist.
