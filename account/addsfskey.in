@@ -1,0 +1,142 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Stub. Right now the work is done in php, and all this does is
+# invoke the script to fire the entire keys file to ops. I'll leave
+# it this way until SFS becomes more central to operations. 
+#
+sub usage()
+{
+    print "Usage: addsfskey [-n] <user> <keyfile>\n";
+    print "       addsfskey [-i | -w] <user>\n";
+    print "Options:\n";
+    print " -n      Verify key format only; do not enter into into DB\n";
+    print " -w      Generate new sfs_users entry for user\n";
+    print " -i      Initialize mode; generate initial key for user\n";
+    exit(-1);
+}
+my $optlist   = "niw";
+my $verify    = 0;
+my $initmode  = 0;
+my $genmode   = 0;
+my $nobody    = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT     = "@TBAUDITEMAIL@";
+my $HOMEDIR	= "/users";
+my $SFSUPDATE   = "$TB/sbin/sfskey_update";
+
+# Locals
+my $user;
+my $keyfile;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Please do not run it as root. Hard to track what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"n"})) {
+    $verify = 1;
+}
+if (defined($options{"i"})) {
+    $initmode = 1;
+}
+if (defined($options{"w"})) {
+    $genmode = 1;
+}
+if ($verify && $genmode) {
+    usage();
+}
+if ($initmode || $genmode) {
+    if (@ARGV != 1) {
+	usage();
+    }
+}
+elsif (@ARGV == 2) {
+    $keyfile = $ARGV[1];
+}
+else {
+    usage();
+}    
+$user = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    fatal("Tainted username: $user");
+}
+
+#
+# If invoked as "nobody" its for a user with no actual account.
+# 
+if (getpwuid($UID) eq "nobody") {
+    if ($initmode || $genmode) {
+	fatal("Bad usage as 'nobody'");
+    }
+    $nobody = 1;
+}
+
+#
+# Mark user record as modified so nodes are updated.
+#
+TBNodeUpdateAccountsByUID($user);
+
+#
+# This is it for now ...
+#
+system($SFSUPDATE) == 0
+    or fatal("$SFSUPDATE failed!");
+
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
