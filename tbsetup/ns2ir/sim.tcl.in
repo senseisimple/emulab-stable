@@ -241,6 +241,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::uselinkdelays
     var_import ::GLOBALS::forcelinkdelays
     var_import ::GLOBALS::multiplex_factor
+    var_import ::GLOBALS::sync_server
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
     
@@ -315,6 +316,11 @@ Simulator instproc run {} {
     if { $multiplex_factor != {} } {
 	lappend fields "multiplex_factor"
 	lappend values $multiplex_factor
+    }
+    
+    if { $sync_server != {} } {
+	lappend fields "sync_server"
+	lappend values $sync_server
     }
     
     $self spitxml_data "experiments" $fields $values

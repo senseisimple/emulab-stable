@@ -63,7 +63,8 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 			 "uselatestwadata"		=> 1,
 			 "wa_delay_solverweight"	=> 1,
 			 "wa_bw_solverweight"		=> 1,
-			 "wa_plr_solverweight"		=> 1);
+			 "wa_plr_solverweight"		=> 1,
+			 "sync_server"			=> 1);
 
 #
 # Turn off line buffering on output

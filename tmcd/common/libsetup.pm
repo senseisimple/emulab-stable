@@ -17,7 +17,7 @@ use Exporter;
     qw ( libsetup_init libsetup_setvnodeid cleanup_node check_status
 	 doifconfig dohostnames domounts dotunnels check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
-	 bootsetup nodeupdate startcmdstatus whatsmynickname
+	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
 	 TBBackGround TBForkCmd vnodesetup dorouterconfig
 	 jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
@@ -177,6 +177,8 @@ sub TMVTUNDCONFIG()	{ CONFDIR() . "/vtund.conf";}
 sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
 sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
 sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
+sub TMSYNCSERVER()	{ CONFDIR() . "/syncserver";}
+sub TMRCSYNCSERVER()	{ CONFDIR() . "/rc.syncserver";}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -222,6 +224,7 @@ sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
 sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 sub TMCCCMD_PROGRAMS()  { "programs"; }
+sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
 
 #
 # Some things never change.
@@ -363,7 +366,7 @@ sub cleanup_node ($) {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
     unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
-    unlink TMDELAY, TMLINKDELAY, TMPROGAGENTS;
+    unlink TMDELAY, TMLINKDELAY, TMPROGAGENTS, TMSYNCSERVER, TMRCSYNCSERVER;
     unlink TMMOUNTDB . ".db";
     unlink TMSFSMOUNTDB . ".db";
     unlink "$VARDIR/db/rtabid";
@@ -2013,6 +2016,64 @@ sub dojailconfig()
 }
 
 #
+# Get the sync server config. 
+# 
+sub dosyncserver()
+{
+    my @configstrings;
+    my $syncserver;
+    my $startserver;
+
+    $TM = OPENTMCC(TMCCCMD_SYNCSERVER);
+    while (<$TM>) {
+	push(@configstrings, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (! @configstrings) {
+	return 0;
+    }
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($configstrings[0] =~
+	/SYNCSERVER SERVER=\'([-\w\.]*)\' ISSERVER=(\d)/) {
+
+	$syncserver = $1;
+	$startserver = $2
+    }
+    else {
+	warn "*** WARNING: Bad syncserver line: $_";
+	return 1;
+    }
+
+    #
+    # Write a file so the client program knows where the server is.
+    #
+    if (system("echo '$syncserver' > ". TMSYNCSERVER)) {
+	warn "*** WARNING: Could not write " . TMSYNCSERVER . "\n";
+	return 1;
+    }
+
+    #
+    # If we are the sync server, arrange to start it up.
+    #
+    return 0
+	if (! $startserver);
+
+    open(RC, ">" . TMRCSYNCSERVER)
+	or die("Could not open " . TMRCSYNCSERVER . ": $!");
+
+    print RC "#!/bin/sh\n";
+    print RC "$BINDIR/emulab-syncd -d >$LOGDIR/syncserver.debug 2>&1 &\n";
+
+    close(RC);
+    chmod(0755, TMRCSYNCSERVER);
+    return 0;
+}
+
+#
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
 #
@@ -2066,6 +2127,12 @@ sub bootsetup()
 	print STDOUT "Checking Testbed hostnames configuration ... \n";
 	dohostnames();
 
+	#
+	# Init the sync server.
+	# 
+	print STDOUT "Checking Testbed sync server setup ...\n";
+	dosyncserver();
+	
 	#
 	# Router Configuration.
 	#
@@ -2176,6 +2243,9 @@ sub jailsetup()
 	    doaccounts();
 	}
 
+	print STDOUT "Checking Testbed sync server setup ...\n";
+	dosyncserver();
+	
 	print STDOUT "Checking Testbed RPM configuration ... \n";
 	dorpms();
 

@@ -210,6 +210,9 @@ namespace eval GLOBALS {
     # Control multiplex_factor for the experiment. Crude.
     variable multiplex_factor {}
 
+    # The name of the sync_server
+    variable sync_server {}
+
     # For remote nodes. The solver weights.
     variable wa_delay_solverweight 1
     variable wa_bw_solverweight	   7

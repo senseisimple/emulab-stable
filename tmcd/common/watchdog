@@ -40,7 +40,8 @@ my $timeout	= (60 * 60 * 12);	# In seconds of course.
 my $logname	= "$LOGDIR/emulab-watchdog.debug";
 my $pidfile	= "/var/run/emulab-watchdog.pid";
 my $debug	= 0;
-my $isalivewait = ((REMOTE() == 1) ? 60 : 180);	# Seconds to wait.
+my $isalivewait = ((REMOTE() == 1) ? 60 :
+		   ((JAILED() == 1) ? 600 : 180)); # Seconds to wait.
 my $driftfile;
 my $vnodeid;
 

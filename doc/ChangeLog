@@ -1,3 +1,100 @@
+stoller     2003/08/05 11:41:09 MDT
+
+  Modified files:
+    .                    configure configure.in 
+    db                   xmlconvert.in 
+    os                   GNUmakefile.in 
+    tbsetup/ns2ir        parse.tcl.in sim.tcl.in tb_compat.tcl.in 
+    tmcd                 libsetup.pm 
+    tmcd/common          rc.setup watchdog 
+    www                  showstuff.php3 
+  Added files:
+    os/syncd             GNUmakefile.in decls.h emulab-sync.c 
+                         emulab-syncd.c 
+  Log:
+  The rest of the sync server additions:
+  
+  * Parser: Added new tb command to set the name of the sync server:
+  
+  	tb-set-sync-server <node>
+  
+    This initializes the sync_server slot of the experiment entry to the
+    *vname* of the node that should run the sync server for that
+    experiment. In other words, the sync server is per-experiment, runs
+    on a node in the experiment, and the user gets to chose which node
+    it runs on.
+  
+  * tmcd and client side setup. Added new syncserver command which
+    returns the name of the syncserver and whether the requesting node
+    is the lucky one to run the daemon:
+  
+      SYNCSERVER SERVER='nodeG.syncserver.testbed.emulab.net' ISSERVER=1
+  
+    The name of the syncserver is written to /var/emulab/boot/syncserver
+    on the nodes so that clients can easily figure out where the server
+    is.
+  
+    Aside: The ready bits are now ignored (no DB accesses are made) for
+    virtual nodes; they are forced to use the new sync server.
+  
+  * New os/syncd directory containing the daemon and the client. The
+    daemon is pretty simple. It waits for TCP (and UDP, although that
+    path is not complete yet) connections, and reads in a little
+    structure that gives the name of the "barrier" to wait for, and an
+    optional count of clients in the group (this would be used by the
+    "master" who initializes barriers for clients). The socket is saved
+    (no reply is made, so the client is blocked) until the count reaches
+    zero. Then all clients are released by writting back to the
+    sockets, and the sockets are closed. Obviously, the number of
+    clients is limited by the numbed of FDs (open sockets), hence the
+    need for a UDP variant, but that will take more work.
+  
+    The client has a simple command line interface:
+  
+      usage: emulab-sync [options]
+      -n <name>         Optional barrier name; must be less than 64 bytes long
+      -d                Turn on debugging
+      -s server         Specify a sync server to connect to
+      -p portnum        Specify a port number to connect to
+      -i count          Initialize named barrier to count waiters
+      -u                Use UDP instead of TCP
+  
+      The client figures out the server by looking for the file created
+      above by libsetup (/var/emulab/boot/syncserver). If you do not
+      specify a barrier "name", it uses an internal default. Yes, the
+      server can handle multiple barriers (differently named of course)
+      at once (non-overlapping clients obviously).
+  
+      Clients can wait before a barrier in "initialized." The count on
+      the barrier just goes negative until someone initializes the
+      barrier using the -i option, which increments the count by the
+      count. Therefore, the master does not have to arrange to get there
+      "first." As an example, consider a master and one client:
+  
+  	nodeA> /usr/local/etc/emulab/emulab-sync -n mybarrier
+  	nodeB> /usr/local/etc/emulab/emulab-sync -n mybarrier -i 1
+  
+      Node A waits until Node B initializes the barrier (gives it a
+      count).  The count is the number of *waiters*, not including the
+      master. The master is also blocked until all of the waiters have
+      checked in.
+  
+      I have not made an provision for timeouts or crashed clients. Lets
+      see how it goes.
+  
+  Revision  Changes    Path
+  1.166     +1 -0      testbed/configure
+  1.173     +1 -0      testbed/configure.in
+  1.5       +2 -1      testbed/db/xmlconvert.in
+  1.14      +10 -2     testbed/os/GNUmakefile.in
+  1.42      +3 -0      testbed/tbsetup/ns2ir/parse.tcl.in
+  1.49      +6 -0      testbed/tbsetup/ns2ir/sim.tcl.in
+  1.47      +14 -0     testbed/tbsetup/ns2ir/tb_compat.tcl.in
+  1.60      +72 -2     testbed/tmcd/libsetup.pm
+  1.9       +5 -0      testbed/tmcd/common/rc.setup
+  1.5       +2 -1      testbed/tmcd/common/watchdog
+  1.103     +8 -0      testbed/www/showstuff.php3
+
 kwebb       2003/07/22 18:48:44 MDT
 
   Modified files:

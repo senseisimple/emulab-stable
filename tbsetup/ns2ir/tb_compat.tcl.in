@@ -618,3 +618,17 @@ proc tb-set-colocate-factor {factor} {
 
     set multiplex_factor $factor
 }
+
+#
+# Set the sync server for the experiment. Must a vnode name that has been
+# allocated.
+#
+proc tb-set-sync-server {node} {
+    var_import ::GLOBALS::sync_server
+
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-sync-server] $node is not a node."
+	return
+    }
+    set sync_server $node
+}

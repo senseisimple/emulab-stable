@@ -586,6 +586,7 @@ function SHOWEXP($pid, $eid, $edit=0) {
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
     $minnodes    = $exprow["min_nodes"];
+    $syncserver  = $exprow["sync_server"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -840,6 +841,13 @@ $noswap_form";
                     <td>Start Attempts: </td>
                     <td class=\"left\">$attempts</td>
                   </tr>\n";
+    }
+
+    if (isset($syncserver)) {
+	echo "<tr>
+                <td>Sync Server: </td>
+                <td class=\"left\">$syncserver</td>
+              </tr>\n";
     }
 
     if ($edit) {

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@ LBINDIR		= $(DESTDIR)/usr/local/bin
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip frisbee.redux growdisk
+SUBDIRS	= imagezip frisbee.redux growdisk syncd
 
 all:	$(SUBDIRS) split-image.sh
 
@@ -24,6 +24,9 @@ imagezip:
 
 frisbee.redux:
 	@$(MAKE) -C frisbee.redux all
+
+syncd:
+	@$(MAKE) -C syncd all
 
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
@@ -39,6 +42,11 @@ client-install:
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C imagezip client-install
+	$(MAKE) -C syncd client-install
+
+remote-install: 
+	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 
 clean:		subdir-clean
 
