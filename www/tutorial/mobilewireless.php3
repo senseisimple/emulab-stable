@@ -298,6 +298,20 @@ before moving it for the first time, you might want to check its current
 position in the <a href="/robotmap.php3">map</a> and/or <a
 href="https://www.emulab.net/webcam.php3">webcam</a>.
 
+<p>
+<table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
+<tr>
+<?php NLCLINKFIG("robotmap-ss.gif", 
+		 "<img src=\"robotmap-ss-thumb.gif\" border=1
+		 alt=\"Robot Map Screenshot\">",
+		 "Robot Map Screenshot") ?>
+<?php NLCLINKFIG("webcam-ss.gif", 
+		 "<img src=\"webcam-ss-thumb.gif\" border=1
+		 alt=\"Webcam Screenshot\">",
+		 "Webcam Screenshot") ?>
+</tr>
+</table>
+
 <!-- XXX We need to give them a clue on which way the webcam is pointing in -->
 <!-- relation to the robot map. -->
 
