@@ -1226,6 +1226,20 @@ CREATE TABLE switch_stacks (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `table_regex`
+--
+
+CREATE TABLE table_regex (
+  table_name varchar(64) NOT NULL default '',
+  column_name varchar(64) NOT NULL default '',
+  regex tinytext NOT NULL,
+  minlen int(11) NOT NULL,
+  maxlen int(11) NOT NULL,
+  comment tinytext,
+  UNIQUE KEY table_name (table_name,column_name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `testbed_stats`
 --
 

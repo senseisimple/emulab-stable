@@ -1084,3 +1084,17 @@ last_net_act,last_cpu_act,last_ext_act);
 1.198: Add a bit to the users table so that we can flag planetlab users:
 
        alter table users add column plab_user tinyint(1) not null default 0;
+
+1.199: Add table to hold per table/slot contraint data (min/max len
+       and a perl regex defining valid data for the slot).
+
+	CREATE TABLE table_regex (
+	  table_name varchar(64) NOT NULL default '',
+	  column_name varchar(64) NOT NULL default '',
+	  regex tinytext NOT NULL,
+	  minlen int(11) NOT NULL,
+	  maxlen int(11) NOT NULL,
+	  comment tinytext,
+	  UNIQUE KEY table_name (table_name,column_name)
+	) TYPE=MyISAM;
+
