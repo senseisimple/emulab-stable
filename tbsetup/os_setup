@@ -2,8 +2,7 @@
 use English;
 
 #
-# TODO: Database checks for valid OS image in IR file.
-#       Delta stuff.
+# TODO: Delta stuff.
 #       Reload disk images.
 #
 
@@ -22,6 +21,7 @@ my $power	= "$TB/power";
 my $ping	= "/sbin/ping";
 my $dbg		= 1;
 my %nodeos      = ();
+my %nodepath    = ();
 my $SAVEUID	= $UID;
 
 # un-taint path
@@ -130,14 +130,17 @@ while (<IN>) {
     # Cross check type from nodes table against image_ids for that type in
     # the disk_images table. 
     #
-    $db_result = $DB->query("select disk_images.image_id from disk_images ".
-			    "left join nodes ".
+    $db_result = $DB->query("select ".
+			    "disk_images.image_id,disk_images.img_path ".
+			    "from disk_images left join nodes ".
 			    "on nodes.type=disk_images.type ".
 			    "and disk_images.image_id='$os' ".
-                            "where nodes.node_id='tbpc09'");
+                            "where nodes.node_id='$node'");
     if ($db_result->numrows < 1) {	
 	die("Improper image specification $node:$os in IR file.\n");
     }
+    my @row = $db_result->fetchrow_array();
+    $nodepath{$node} = $row[1];
 }
 
 #
@@ -146,23 +149,17 @@ while (<IN>) {
 foreach my $node ( keys %nodeos ) {
     my $pc	= $node;
     my $os	= $nodeos{$node};
+    my $path    = $nodepath{$node};
 
     #
-    # database goo. We check to make sure the default image is set correctly
-    # and reset it if not. 
+    # database goo. Reset the OS stuff.
     #
-    my $cmd = "select def_boot_image_id from nodes where node_id='$pc'";
-    my $sth = $DB->query($cmd);
-    my @row = $sth->fetchrow_array();
-    print STDERR "$pc is currently set to OS = $row[0]\n" if $dbg;
-    if ($row[0] ne $os) {
-	print STDERR "Changing default OS for $pc to $os\n";
-	$cmd = "update nodes set def_boot_image_id='$os' ";
-	$cmd = "$cmd where node_id='$pc'";
-	$sth = $DB->query($cmd);
-	if ($sth == 0) {
-	    die("Database update failed. Aborted...\n");
-	}
+    print STDERR "Changing default OS for $pc to $os:$path\n";
+    $sth = $DB->query("update nodes set ".
+		      "def_boot_image_id='$os',next_boot_path='$path' ".
+		      "where node_id='$pc'");
+    if ($sth == 0) {
+	die("Database update failed. Aborted...\n");
     }
 
     #
