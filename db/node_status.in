@@ -46,6 +46,16 @@ if (($UID != 0) && (!TBAdmin())) {
 # The idea is simple; any nodes that have not reported in (isalive in
 # tmcd) within the last XX seconds are moved to the down category.
 #
+
+#
+# Grab the reporting intervals for the various types of nodes - we convert
+# them into seconds, and make the timeout twice as big as the reporting
+# interval
+#
+my $plab_timeout  = TBGetSiteVar("watchdog/isalive/plab")  * 60 * 2;
+my $vnode_timeout = TBGetSiteVar("watchdog/isalive/vnode") * 60 * 2;
+my $local_timeout = TBGetSiteVar("watchdog/isalive/local") * 60 * 2;
+my $wa_timeout    = TBGetSiteVar("watchdog/isalive/wa")    * 60 * 2;
 my $query_result =
     DBQueryFatal("SELECT n.node_id,ns.status,r.pid,nt.isremotenode, ".
 		 "       nt.isvirtnode, nt.isplabdslice, ".
@@ -59,13 +69,17 @@ my $query_result =
 		 # Jailed and PLAB virtnodes report every 600 seconds.
 		 # Must be allocated to an experiment to be considerd.
 		 " ((nt.isvirtnode=1 && r.pid is not null && ".
-		 "   ((now() - ns.status_timestamp) > 1000)) || ".
-		 # Local phys nodes report every 180 seconds.
+		 "   ((now() - ns.status_timestamp) > $vnode_timeout)) || ".
+		 # plab virtual nodes
+		 # Must be allocated to an experiment to be considerd.
+		 "  (nt.isplabdslice=1 && r.pid is not null && ".
+		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
+		 # Local phys nodes 
 		 "  (nt.isvirtnode=0 && nt.isremotenode=0 && ".
-		 "   ((now() - ns.status_timestamp) > 300)) || ".
-		 # Remote phys nodes check in every 60 seconds.
+		 "   ((now() - ns.status_timestamp) > $local_timeout)) || ".
+		 # Remote phys nodes 
 		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
-		 "   ((now() - ns.status_timestamp) > 100)))");
+		 "   ((now() - ns.status_timestamp) > $wa_timeout)))");
 		 
 
 while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
