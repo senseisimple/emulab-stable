@@ -26,13 +26,18 @@
 #include <syslog.h>
 #include <tbdb.h>
 
+#define SDPROTOVERS 2
 #define SDCOLLECTD_PORT 8509
 #define NODENAMESIZE 100
 #define BUFSIZE 1500
 #define MAXNUMIFACES 10
 #define MACADDRLEN 12
 
+#define NUMACTTYPES 4
+#define ACTSTRARRAY {"last_tty_act", "last_cpu_act", "last_net_act", "last_ext_act"}
+
 typedef struct {
+  u_char popold;
   u_char debug;
   u_short port;
 } SDCOLLECTD_OPTS;
@@ -40,24 +45,26 @@ typedef struct {
 SDCOLLECTD_OPTS *opts;
 
 typedef struct {
-  long mis;
+  long   mis;
   double l1m;
   double l5m;
   double l15m;
   u_char ifcnt;
+  u_int  actbits;
+  u_int  version;
   struct {
     char mac[MACADDRLEN+1];
     long ipkts;
     long opkts;
-  } ifaces[MAXNUMIFACES];
-  char id[NODENAMESIZE];      /* Host identifier - probably local part of hostname */
-  char buf[BUFSIZE];    /* String containing monitor output values */
+  }      ifaces[MAXNUMIFACES];
+  char   id[NODENAMESIZE];      /* Host identifier - probably local part of hostname */
+  char   buf[BUFSIZE];    /* String containing monitor output values */
 } IDLE_DATA;
 
 extern int errno;
 
 int CollectData(int, IDLE_DATA*);
-void ParseRecord(IDLE_DATA*);
+int ParseRecord(IDLE_DATA*);
 void PutDBRecord(IDLE_DATA*);
 
 char *tbmac(char*, char**);

@@ -8,8 +8,10 @@ SRCDIR          = @srcdir@
 TESTBED_SRCDIR  = @top_srcdir@
 OBJDIR          = ../..
 SUBDIR          = sensors/slothd
+SLOTHD_DIR	= unknownclient
 
 SBIN_SCRIPTS    = sdisrunning sddeploy
+SDPROGS		= sdcollectd slothd
 
 include $(OBJDIR)/Makeconf
 
@@ -21,17 +23,19 @@ SDLIBS+= -ltb -lmysqlclient
 LIBS=
 CP= cp -pf
 
-PROGS= slothd sdcollectd
+SYSTEM  := $(shell uname -s)
 
-all: $(PROGS)
+all: $(SDPROGS) client
 
 include ${TESTBED_SRCDIR}/GNUmakerules
 
-linux: islinux slothd
-	$(CP) slothd linux/slothd
+ifeq ($(SYSTEM),Linux)
+SLOTHD_DIR	= linuxclient
+endif
 
-fbsd: isfbsd slothd
-	$(CP) slothd fbsd/slothd
+ifeq ($(SYSTEM),FreeBSD)
+SLOTHD_DIR	= fbsdclient
+endif
 
 slothd: slothd.o slothd.h version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
@@ -42,14 +46,15 @@ sdcollectd: sdcollectd.o sdcollectd.h version.o
 version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-islinux:
-	@uname -s | grep inux > /dev/null
+client: slothd
+	-mkdir $(SLOTHD_DIR)
+	$(CP) slothd $(SLOTHD_DIR)/slothd
 
-isfbsd:
-	@uname -s | grep BSD > /dev/null
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd)
 
-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS))
+client-install:
+	$(INSTALL_PROGRAM) $(SLOTHD_DIR)/slothd $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
-	rm -f *.o $(PROGS) *~ core *.core version.c
+	rm -f *.o $(SDPROGS) *~ core *.core version.c
 

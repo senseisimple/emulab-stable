@@ -29,11 +29,13 @@ void siginthandler(int signum) {
 
 void usage(void) {  
 
-  printf("Usage:\tslothd -h\n");
-  printf("\tslothd [-d] [-p <port>]\n");
-  printf("\t -h\t This message.\n");
-  printf("\t -d\t Debug mode; do not fork into background.\n");
-  printf("\t -p <port>\t Send on port <port> (default is %d).\n", SDCOLLECTD_PORT);
+  printf("Usage:\tslothd -h\n"
+         "\tslothd [-d] [-p <port>]\n"
+         "\t -h\t This message.\n"
+         "\t -o\t DO populate old idlestats tables.\n"
+         "\t -d\t Debug mode; do not fork into background.\n"
+         "\t -p <port>\t Listen on port <port> (default is %d).\n", 
+         SDCOLLECTD_PORT);
 }
 
 
@@ -42,11 +44,17 @@ int parse_args(int argc, char **argv) {
   char ch;
 
   /* setup defaults. */
+  opts->popold = 0;
   opts->debug = 0;
   opts->port = SDCOLLECTD_PORT;
 
-  while ((ch = getopt(argc, argv, "dp:h")) != -1) {
+  while ((ch = getopt(argc, argv, "odp:h")) != -1) {
     switch (ch) {
+
+    case 'o':
+      lnotice("Populating old node_idlestats, and iface_counters tables");
+      opts->popold = 1;
+      break;
 
     case 'd':
       lnotice("Debug mode requested; staying in foreground.\n");
@@ -80,20 +88,20 @@ int main(int argc, char **argv) {
   extern char build_info[];
 
   opts = &gopts;
-
+  
   /* Foo on SIGPIPE & SIGHUP. */
   signal(SIGPIPE, SIG_IGN);
   signal(SIGHUP, SIG_IGN);
-
+  
   /* Cleanup on sigint/term */
   signal(SIGTERM, siginthandler);
   signal(SIGINT, siginthandler);
-
+  
   if (!parse_args(argc, argv)) {
     lnotice("Error processing arguments, exiting.\n");
     exit(1);
   }
-
+  
   /* clear, and initialize inet sockaddr */
   bzero(&servaddr, sizeof(struct sockaddr_in));
   servaddr.sin_family = AF_INET;
@@ -140,8 +148,9 @@ int main(int argc, char **argv) {
   for ( ;; ) {
     bzero(&iddata, sizeof(IDLE_DATA)); /* cleanse out old values, if any */
     if (CollectData(sd, &iddata)) {
-      ParseRecord(&iddata);
-      PutDBRecord(&iddata);
+      if (ParseRecord(&iddata)) {
+        PutDBRecord(&iddata);
+      }
     }
   }
   /* NOTREACHED */
@@ -149,6 +158,7 @@ int main(int argc, char **argv) {
 
 int CollectData(int sd, IDLE_DATA *iddata) {
   int numbytes, slen;
+  time_t curtime;
   /* struct hostent *hent; */
   struct sockaddr_in cliaddr;
 
@@ -157,20 +167,14 @@ int CollectData(int sd, IDLE_DATA *iddata) {
 
   if((numbytes = recvfrom(sd, iddata->buf, sizeof(iddata->buf), 0,
                           (struct sockaddr*)&cliaddr, &slen))) {
-    /* Using libtb functionality now.
-      if (!(hent = gethostbyaddr((char*)&cliaddr.sin_addr, 
-      sizeof(cliaddr.sin_addr), AF_INET))) {
-      lerror("Can't resolve host");
-      return -1;
-    }
-    */
 
     if (!mydb_iptonodeid(inet_ntoa(cliaddr.sin_addr), iddata->id)) {
       lerror("Couldn't obtain node id");
       return 0;
     }
     if (opts->debug) {
-      printf("Received data from: %s\n", iddata->id);
+      curtime = time(NULL);
+      printf("Received data from: %s at %s\n", iddata->id, ctime(&curtime));
       printf("buffer: %s\n", iddata->buf);
     }
   }
@@ -246,50 +250,57 @@ char *tbmac(char *maddr, char **endptr) {
   }
 }
 
-void ParseRecord(IDLE_DATA *iddata) {
 
-  int i;
-  char *itemptr, *ptr;
+int ParseRecord(IDLE_DATA *iddata) {
+
+  int tmpvers;
+  char *itemptr, *ptr, *tmpstr;
 
   iddata->ifcnt = 0;
   
   /* Parse out fields */
   itemptr = strtok(iddata->buf, " \t");
   do {
-    if (strstr(itemptr, "mis")) {
+
+    if (strstr(itemptr, "vers")) {
+      if ((tmpvers = strtoul(itemptr+5, NULL, 10)) > SDPROTOVERS) {
+        lerror("Unsupported protocol version; rejecting.");
+        return 0;
+      }
+      iddata->version = tmpvers;
+    }
+
+    else if (strstr(itemptr, "mis")) {
       iddata->mis = atol(itemptr+4);
     }
+
     else if (strstr(itemptr, "lave")) {
       iddata->l1m = strtod(itemptr+5, &ptr);
       iddata->l5m = strtod(ptr+1, &ptr);
       iddata->l15m = strtod(ptr+1, NULL);
     }
+
     else if (strstr(itemptr, "iface")) {
-      strcpy(iddata->ifaces[iddata->ifcnt].mac, tbmac(itemptr+6, &ptr));
+      if (!(tmpstr = tbmac(itemptr+6, &ptr))) {
+        lerror("Malformed interface record encountered, skipping");
+        continue;
+      }
+      strcpy(iddata->ifaces[iddata->ifcnt].mac, tmpstr);
       iddata->ifaces[iddata->ifcnt].ipkts = strtoul(ptr+1, &ptr, 10);
       iddata->ifaces[iddata->ifcnt].opkts = strtoul(ptr+1, NULL, 10);
       iddata->ifcnt++;
     }
+
+    else if (strstr(itemptr, "abits")) {
+      iddata->actbits = strtoul(itemptr+6, NULL, 16);
+    }
+
     else {
       lnotice("Unrecognized string in packet\n");
     }
   } while ((itemptr = strtok(NULL, " \t")) && iddata->ifcnt < MAXNUMIFACES);
 
-  if (opts->debug) {
-    printf("iddata->mis: %lu\n", iddata->mis);
-    printf("iddata->l1m: %f\n", iddata->l1m);
-    printf("iddata->l5m: %f\n", iddata->l5m);
-    printf("iddata->l15m: %f\n", iddata->l15m);
-    for (i = 0; i < iddata->ifcnt; ++i) {
-      printf("iface%d: %s, ipkts %lu, opkts %lu\n",
-             i,
-             iddata->ifaces[i].mac,
-             iddata->ifaces[i].ipkts,
-             iddata->ifaces[i].opkts);
-    }
-  }
-
-  return;
+  return 1;
 }
 
 
@@ -297,26 +308,77 @@ void PutDBRecord(IDLE_DATA *iddata) {
 
   int i;
   time_t now = time(NULL);
+  char curstamp[100];
+  char tmpstr[(NUMACTTYPES+1)*sizeof(curstamp)];
+  char *actstr[] = ACTSTRARRAY;
 
-  if (!mydb_update("INSERT INTO node_idlestats VALUES ('%s', FROM_UNIXTIME(%lu), FROM_UNIXTIME(%lu),  %f, %f, %f)", 
-                   iddata->id, 
-                   now,
-                   iddata->mis, 
-                   iddata->l1m, 
-                   iddata->l5m, 
-                   iddata->l15m)) {
-    lerror("Error inserting data into node_idlestats table");
+  sprintf(curstamp, "FROM_UNIXTIME(%lu)", now);
+
+  printf("now: %s\n", ctime(&now));
+
+  if (opts->debug) {
+    printf("\nReceived and parsed packet. Contents:\n"
+           "Version: %u\n"
+           "Node: %s\n"
+           "Last TTY: %s"
+           "Load averages (1, 5, 15): %f, %f, %f\n"
+           "Active bits: 0x%04x\n",
+           iddata->version,
+           iddata->id,
+           ctime(&iddata->mis),
+           iddata->l1m,
+           iddata->l5m,
+           iddata->l15m,
+           iddata->actbits);
+    for (i = 0; i < iddata->ifcnt; ++i) {
+      printf("Interface %s: ipkts: %lu  opkts: %lu\n",
+             iddata->ifaces[i].mac,
+             iddata->ifaces[i].ipkts,
+             iddata->ifaces[i].opkts);
+    }
+    printf("\n\n");
   }
-
-  for (i = 0; i < iddata->ifcnt; ++i) {
-    if (!mydb_update("INSERT INTO iface_counters VALUES ('%s', FROM_UNIXTIME(%lu), '%s', %lu, %lu)",
-                     iddata->id,
+  
+  if (opts->popold) {
+    if (!mydb_update("INSERT INTO node_idlestats VALUES ('%s', FROM_UNIXTIME(%lu), FROM_UNIXTIME(%lu), %f, %f, %f)", 
+                     iddata->id, 
                      now,
-                     iddata->ifaces[i].mac,
-                     iddata->ifaces[i].ipkts,
-                     iddata->ifaces[i].opkts)) {
-      lerror("Error inserting data into iface_counters table");
+                     iddata->mis, 
+                     iddata->l1m, 
+                     iddata->l5m, 
+                     iddata->l15m)) {
+      lerror("Error inserting data into node_idlestats table");
+    }
+    
+    for (i = 0; i < iddata->ifcnt; ++i) {
+      if (!mydb_update("INSERT INTO iface_counters VALUES ('%s', FROM_UNIXTIME(%lu), '%s', %lu, %lu)",
+                       iddata->id,
+                       now,
+                       iddata->ifaces[i].mac,
+                       iddata->ifaces[i].ipkts,
+                       iddata->ifaces[i].opkts)) {
+        lerror("Error inserting data into iface_counters table");
+      }
     }
   }
+  
+  if (iddata->version >= 2) {
+    sprintf(tmpstr, "last_report=%s", curstamp);
+    for (i = 0; i < NUMACTTYPES; ++i) {
+      if (iddata->actbits & (1<<i)) {
+          sprintf(tmpstr, "%s, %s=%s",
+                  tmpstr,
+                  actstr[i], 
+                  curstamp);
+      }
+    }
+
+    if(!mydb_update("UPDATE node_activity SET %s WHERE node_id = '%s'",
+                    tmpstr,
+                    iddata->id)) {
+      lerror("Error updating stamps in node_activity table");
+    }
+  }
+
   return;
 }

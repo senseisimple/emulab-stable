@@ -20,6 +20,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <syslog.h>
 #include <string.h>
 #include <dirent.h>
@@ -37,6 +38,8 @@
 #include <sys/ioctl.h>
 #endif
 
+#define SDPROTOVERS "2"
+
 #define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:" CLIENT_BINDIR
 #define UTMP_PATH "/var/run/utmp"
 #define WTMP_PATH "/var/log/wtmp"
@@ -47,8 +50,15 @@
 #define LINEBUFLEN 256
 #define MAXTTYS 2000
 #define MAXDEVLEN 50
-#define MIN_INTVL 1
-#define DEF_INTVL 3600  /* 1 hour */
+#define MIN_RINTVL 1     /* 1 minute */
+#define DEF_RINTVL 3600  /* 1 hour */
+#define MIN_AINTVL 1     /* 1 second */
+#define DEF_AINTVL 10    /* 10 seconds */
+#define MIN_LTHRSH 0.1   /* Load avg. threshold */
+#define DEF_LTHRSH 1     /* Fairly high - could get false pos/neg */
+#define MIN_CTHRSH 0     /* No packets */
+#define DEF_CTHRSH 1     /* At least 1 packet */
+#define OFFSET_FRACTION 0.5
 
 #define SLOTHD_DEF_SERV "boss"
 #define SLOTHD_DEF_PORT 8509 /* XXX change */
@@ -63,15 +73,30 @@
 #define NUMSCAN 3
 #endif
 
+#define TTYACT  (1<<0)
+#define LOADACT (1<<1)
+#define PKTACT  (1<<2)
+
 typedef struct {
-  u_long minidle;
-  double loadavg[3];
-  int ifcnt;
   int sd;
 #ifdef __linux__
   int ifd; /* IOCTL file descriptor */
 #endif
+  u_int cnt;
+  char *cifname;
+  u_char dolast;
+  time_t lastrpt;
+  time_t startup;
   struct sockaddr_in servaddr;
+  u_short numttys;
+  char *ttys[MAXTTYS];
+} SLOTHD_PARAMS;
+
+typedef struct {
+  int ifcnt;
+  u_long minidle;
+  double loadavg[3];
+  u_short actbits;
   struct {
     u_long ipkts;
     u_long opkts;
@@ -81,30 +106,29 @@ typedef struct {
 } SLOTHD_PACKET;
 
 typedef struct {
-  u_int interval;
-  u_short numttys;
+  time_t reg_interval;
+  time_t agg_interval;
+  double load_thresh;
+  u_long pkt_thresh;
+  u_long cif_thresh;
   u_char debug;
-  u_char actterms;
-  u_char first;
   u_char once;
   char *servname;
   u_short port;
-  char *ttys[MAXTTYS];
 } SLOTHD_OPTS;
 
 int parse_args(int, char**);
 int init_slothd(void);
-
-void get_min_tty_idle(void);
-void utmp_enum_terms(void);
-time_t wtmp_get_last(void);
-void get_load(void);
-void get_packet_counts(void);
-
-int get_macaddrs(char*,void*);
-int get_counters(char*,void*);
-
+void do_exit(void);
+int send_pkt(SLOTHD_PACKET*);
 int procpipe(char *const prog[], int (procfunc)(char*,void*), void* data);
-void send_pkt(void);
+
+void get_min_tty_idle(SLOTHD_PACKET*);
+void get_load(SLOTHD_PACKET*);
+void get_packet_counts(SLOTHD_PACKET*);
+int get_active_bits(SLOTHD_PACKET*, SLOTHD_PACKET*);
+
+int get_counters(char*,void*);
+int grab_cifname(char*,void*);
 
 #endif /* #ifndef _SLOTHD_H */

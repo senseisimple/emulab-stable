@@ -6,8 +6,8 @@
 
 #include "slothd.h"
 
-SLOTHD_PACKET *pkt;
 SLOTHD_OPTS   *opts;
+SLOTHD_PARAMS *parms;
 
 void lerror(const char* msgstr) {
   if (msgstr) {
@@ -42,42 +42,53 @@ void sigunkhandler(int signum) {
 }
 
 void siginthandler(int signum) {
-
-  int status;
-
-  unlink(PIDFILE);
-  while (wait(&status) != -1);
-  lnotice("exiting.");
-  exit(0);
+  parms->dolast = 1;
+  signal(SIGTERM, siginthandler);
+  signal(SIGINT, siginthandler);
+  signal(SIGQUIT, siginthandler);
 }
 
 void usage(void) {  
 
-  printf("Usage:\tslothd -h\n");
-  printf("\tslothd [-a] [-d] [-i <interval>] [-p <port>] [-s <server>]\n");
-  printf("\t -h\t This message.\n");
-  printf("\t -a\t Only scan active terminal special files.\n");
-  printf("\t -f\t Do not send idle data report immediately on startup.\n");
-  printf("\t -d\t Debug mode; do not fork into background.\n");
-  printf("\t -i <interval>\t Run interval, in seconds. (default is 10 min.)\n");
-  printf("\t -p <port>\t Send on port <port> (default is %d).\n", SLOTHD_DEF_PORT);
-  printf("\t -s <server>\t Send data to <server> (default is %s).\n", SLOTHD_DEF_SERV);
+  printf("Usage:\tslothd -h\n"
+         "\tslothd [-o] [-a] [-d] [-i <interval>] [-p <port>] [-s <server>]\n"
+         "\t       [-g <interval>] [-l <thresh>] [-c <thresh>]\n"
+         "\t -h\t\t This message.\n"
+         "\t -o\t\t Run once (collect a single report).\n"
+         "\t -a\t\t Only scan active terminal special files.\n"
+         "\t -d\t\t Debug mode; do not fork into background.\n"
+         "\t -i <interval>\t Regular run interval, in seconds.\n"
+         "\t -g <interval>\t Aggressive run interval, in seconds.\n"
+         "\t -l <thresh>\t load threshold (default 1 @ 1 minute).\n"
+         "\t -c <thresh>\t experimental network packet difference threshold (pps).\n"
+         "\t -n <thresh>\t control network packet difference threshold (pps)\n"
+         "\t -p <port>\t Send on port <port>\n"
+         "\t -s <server>\t Send data to <server>\n");
 }
 
 
 int main(int argc, char **argv) {
 
   int exitcode = -1;
+  u_int myabits, span;
+  time_t curtime;
   static SLOTHD_OPTS mopts;
+  static SLOTHD_PARAMS mparms;
   static SLOTHD_PACKET mpkt;
+  static SLOTHD_PACKET mopkt;
+  SLOTHD_PACKET *pkt, *opkt, *tmppkt;
 
   extern char build_info[];
 
   /* pre-init */
   bzero(&mopts, sizeof(SLOTHD_OPTS));
+  bzero(&mparms, sizeof(SLOTHD_PARAMS));
   bzero(&mpkt, sizeof(SLOTHD_PACKET));
+  bzero(&mopkt, sizeof(SLOTHD_PACKET));
   opts = &mopts;
+  parms = &mparms;
   pkt = &mpkt;
+  opkt = &mopkt;
 
   if (parse_args(argc, argv) < 0) {
     fprintf(stderr, "Error processing arguments.\n");
@@ -91,19 +102,63 @@ int main(int argc, char **argv) {
       lnotice("Slothd started");
       lnotice(build_info);
       for (;;) {
-        if (!opts->first) {
-          sleep(mopts.interval);
+        
+        /* Collect current machine stats */
+        mparms.cnt++;
+        get_load(pkt);
+        get_min_tty_idle(pkt);
+        get_packet_counts(pkt);
+        myabits = get_active_bits(pkt,opkt);
+
+        /*
+         * Time to send a packet?
+         * Yes, if:
+         * 1) We've been idle, and now we see activity (aggressive mode)
+         * 2) Its been over <reg_interval> seconds since the last report
+         */
+        if ((!opkt->actbits && pkt->actbits) ||
+            (time(&curtime) >=  mparms.lastrpt + mopts.reg_interval) ||
+            parms->dolast) {
+          if (send_pkt(pkt)) {
+            mparms.lastrpt = curtime;
+          }
+          if (parms->dolast) {
+            do_exit();
+          }
+          tmppkt = pkt;
+          pkt = opkt;
+          opkt = tmppkt;
         }
-        get_load();
-        get_min_tty_idle();
-        get_packet_counts();
-        send_pkt();
-        if (opts->once) {
+
+        if (mopts.once) {
           break;
         }
-        if (opts->first) {
-            sleep(mopts.interval);
+
+        /* 
+         * Figure out, based on run count, and activity, how long
+         * to sleep.
+         */
+        if (mparms.cnt == 1) {
+          span = mopts.reg_interval - 
+            (rand() / (float) RAND_MAX) * (OFFSET_FRACTION*mopts.reg_interval);
         }
+        else if (myabits) {
+          span = mopts.reg_interval;
+        }
+        else {
+          span = mopts.agg_interval;
+        }
+        
+        if (opts->debug) {
+          printf("About to sleep for %u seconds.\n", span);
+          fflush(stdout);
+        }
+
+        if (parms->dolast) {
+          continue;
+        }
+
+        sleep(span);
       }
     }
   }
@@ -115,15 +170,17 @@ int parse_args(int argc, char **argv) {
   char ch;
 
   /* setup defaults. */
+  opts->once = 0;
+  opts->reg_interval = DEF_RINTVL;
+  opts->agg_interval = DEF_AINTVL;
   opts->debug = 0;
-  opts->actterms = 0;
-  opts->interval = DEF_INTVL;
   opts->port = SLOTHD_DEF_PORT;
   opts->servname = SLOTHD_DEF_SERV;
-  opts->first = 1;
-  opts->once = 0;
+  opts->load_thresh = DEF_LTHRSH;
+  opts->pkt_thresh = DEF_CTHRSH;
+  opts->cif_thresh = DEF_CTHRSH;
 
-  while ((ch = getopt(argc, argv, "ai:dp:s:hfo")) != -1) {
+  while ((ch = getopt(argc, argv, "oi:g:dp:s:l:c:n:h")) != -1) {
     switch (ch) {
 
     case 'o': /* run once */
@@ -131,24 +188,22 @@ int parse_args(int argc, char **argv) {
       break;
 
     case 'i':
-      if ((opts->interval = atoi(optarg)) < MIN_INTVL) {
-        lwarn("Warning!  Interval set too low, defaulting.");
-        opts->interval = MIN_INTVL;
+      if ((opts->reg_interval = atol(optarg)) < MIN_RINTVL) {
+        lwarn("Warning!  Regular interval set too low, defaulting.");
+        opts->reg_interval = MIN_RINTVL;
+      }
+      break;
+
+    case 'g':
+      if ((opts->agg_interval = atol(optarg)) < MIN_AINTVL) {
+        lwarn("Warning! Aggressive interval set too low, defaulting.");
+        opts->reg_interval = MIN_AINTVL;
       }
       break;
 
     case 'd':
       lnotice("Debug mode requested; staying in foreground.");
       opts->debug = 1;
-      break;
-
-    case 'a':
-      lnotice("Scanning only active terminals.");
-      opts->actterms = 1;
-      break;
-
-    case 'f':
-      opts->first = 0;
       break;
 
     case 'p':
@@ -161,6 +216,27 @@ int parse_args(int argc, char **argv) {
       }
       else {
         lwarn("Invalid server name, default used.");
+      }
+      break;
+
+    case 'l':
+      if ((opts->load_thresh = atof(optarg)) < MIN_LTHRSH) {
+        lwarn("Warning! Load threshold set too low, defaulting.");
+        opts->load_thresh = DEF_LTHRSH;
+      }
+      break;
+
+    case 'c':
+      if ((opts->pkt_thresh = atol(optarg)) < MIN_CTHRSH) {
+        lwarn("Warning! Experimental net packet diff threshold too low, defaulting.");
+        opts->pkt_thresh = DEF_CTHRSH;
+      }
+      break;
+
+    case 'n':
+      if ((opts->cif_thresh = atol(optarg)) < MIN_CTHRSH) {
+        lwarn("Warning! Control net packet diff threshold too low, defaulting.");
+        opts->cif_thresh = DEF_CTHRSH;
       }
       break;
       
@@ -177,15 +253,20 @@ int parse_args(int argc, char **argv) {
 
 int init_slothd(void) {
 
-  DIR *devs;
+DIR *devs;
   int pfd;
   char pidbuf[10];
   char bufstr[MAXDEVLEN];
   struct dirent *dptr;
   struct hostent *hent;
+  char *ciprog[] = {"control_interface", NULL};
 
   /* init internal vars */
-  opts->numttys = 0;
+  parms->dolast = 0;  /* init send-last-report-before-exiting variable */
+  parms->numttys = 0; /* will enum terms in this func */
+  parms->cnt = 0;     /* daemon iter count */
+  parms->lastrpt = 0; /* the last time a report pkt was sent */
+  parms->startup = time(NULL); /* Make sure we don't report < invocation */
 
   /* Setup signals */
   signal(SIGTERM, siginthandler);
@@ -207,39 +288,47 @@ int init_slothd(void) {
     lerror("Couldn't set path env");
   }
 
-  /* enum tty special files, if necessary. */
-  if (!opts->actterms) {
-    if ((devs = opendir("/dev")) == 0) {
-      lerror("Can't open directory /dev for processing");
-      return -1;
-    }
-    opts->ttys[opts->numttys] = strdup("/dev/console");
-    opts->numttys++;
-#ifdef __linux__  
-    /* 
-       Include the pts mux device to check for activity on
-       dynamically allocated linux pts devices:
-       (/dev/pts/<num>)
-    */
-    opts->ttys[opts->numttys] = strdup("/dev/ptmx");
-    opts->numttys++;
+  /* Seed the random number generator */
+  srand(time(NULL));
 
-    /* Open socket for SIOCGHWADDR ioctl */
-    pkt->ifd = socket(PF_INET, SOCK_DGRAM, 0);
+  /* Grab control net iface */
+  if (procpipe(ciprog, &grab_cifname, parms)) {
+    lwarn("Failed to get control net iface name");
+  }
+
+#ifdef __linux__
+  /* Open socket for SIOCGHWADDR ioctl (to get mac addresses) */
+  parms->ifd = socket(PF_INET, SOCK_DGRAM, 0);
 #endif
-    while (opts->numttys < MAXTTYS && (dptr = readdir(devs))) {
-      if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
-        snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
-        opts->ttys[opts->numttys] = strdup(bufstr);
-        opts->numttys++;
-        bzero(bufstr, sizeof(bufstr));
-      }
+
+  /* enum tty special files */
+  if ((devs = opendir("/dev")) == 0) {
+    lerror("Can't open directory /dev for processing");
+    return -1;
+  }
+  parms->ttys[parms->numttys] = strdup("/dev/console");
+  parms->numttys++;
+#ifdef __linux__  
+  /* 
+     Include the pts mux device to check for activity on
+     dynamically allocated linux pts devices:
+     (/dev/pts/<num>)
+  */
+  parms->ttys[parms->numttys] = strdup("/dev/ptmx");
+  parms->numttys++;
+#endif
+  while (parms->numttys < MAXTTYS && (dptr = readdir(devs))) {
+    if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
+      snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
+      parms->ttys[parms->numttys] = strdup(bufstr);
+      parms->numttys++;
+      bzero(bufstr, sizeof(bufstr));
     }
   }
   closedir(devs);
 
   /* prepare UDP connection to server */
-  if ((pkt->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+  if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     lerror("Could not alloc socket");
     return -1;
   }
@@ -247,12 +336,12 @@ int init_slothd(void) {
     lerror("Can't resolve server hostname"); /* XXX use herror */
     return -1;
   }
-  bzero(&pkt->servaddr, sizeof(struct sockaddr_in));
-  pkt->servaddr.sin_family = AF_INET;
-  pkt->servaddr.sin_port = htons(opts->port);
-  bcopy(hent->h_addr_list[0], &pkt->servaddr.sin_addr.s_addr, 
+  bzero(&parms->servaddr, sizeof(struct sockaddr_in));
+  parms->servaddr.sin_family = AF_INET;
+  parms->servaddr.sin_port = htons(opts->port);
+  bcopy(hent->h_addr_list[0], &parms->servaddr.sin_addr.s_addr, 
         sizeof(struct in_addr));
-  if (connect(pkt->sd, (struct sockaddr*)&pkt->servaddr, 
+  if (connect(parms->sd, (struct sockaddr*)&parms->servaddr, 
               sizeof(struct sockaddr_in)) < 0) {
     lerror("Couldn't connect to server");
     return -1;
@@ -278,56 +367,98 @@ int init_slothd(void) {
 }
 
 
-void get_min_tty_idle(void) {
+void do_exit(void) {
+  int status;
+
+  unlink(PIDFILE);
+  while (wait(&status) != -1);
+  lnotice("exiting.");
+  exit(0);
+}
+
+int grab_cifname(char *buf, void *data) {
+
+  int retval = -1;
+  char *tmpptr;
+  SLOTHD_PARAMS *myparms = (SLOTHD_PARAMS*) data;
+
+  if (buf && isalpha(buf[0])) {
+    tmpptr = myparms->cifname = strdup(buf);
+    while (isalnum(*tmpptr))  tmpptr++;
+    *tmpptr = '\0';
+    retval = 0;
+  }
+  else {
+    myparms->cifname = NULL;
+  }
+
+  return retval;
+}
+
+
+int send_pkt(SLOTHD_PACKET *pkt) {
+
+  int i, numsent, retval = 1;
+  static char pktbuf[1500];
+  static char minibuf[50];
+
+  /* flatten data into packet buffer */
+  sprintf(pktbuf, "vers=%s mis=%lu lave=%.10f,%.10f,%.10f abits=0x%x ",
+          SDPROTOVERS,
+          pkt->minidle,
+          pkt->loadavg[0],
+          pkt->loadavg[1],
+          pkt->loadavg[2],
+          pkt->actbits);
+  
+  /* get all the interfaces too */
+  for (i = 0; i < pkt->ifcnt; ++i) {
+    sprintf(minibuf, "iface=%s,%lu,%lu ",
+            pkt->ifaces[i].addr,
+            pkt->ifaces[i].ipkts,
+            pkt->ifaces[i].opkts);
+    strcat(pktbuf, minibuf);
+  }
+  
+  if (opts->debug) {
+    printf("packet: %s\n", pktbuf);
+  }
+  
+  /* send it */
+  else {
+    if ((numsent = send(parms->sd, pktbuf, strlen(pktbuf)+1, 0)) < 0) {
+      lerror("Problem sending slothd packet");
+      retval = 0;
+    }
+    
+    else if (numsent < strlen(pktbuf)+1) {
+      lwarn("Warning!  Slothd packet truncated");
+      retval = 0;
+    }
+  }
+
+  return retval;
+}
+
+
+void get_min_tty_idle(SLOTHD_PACKET *pkt) {
   
   int i;
   time_t mintime = 0;
   struct stat sb;
 
-  if (opts->actterms) {
-    utmp_enum_terms();
-    if (!opts->numttys) {
-      mintime = wtmp_get_last();
-    }
-  }
-
-#ifdef COMMENT
-  /* Linux uses dynamically allocated UNIX98 ptys */
-  else {
-    DIR *ptsdir;
-    struct dirent *dptr;
-    char *ptspath = "/dev/pts", curpath[15];
-    
-    if ((ptsdir = opendir(ptspath)) == NULL) {
-      lerror("Couldn't open /dev/pts for processing");
-    }
-    else {
-      while ((dptr = readdir(ptsdir))) {
-        sprintf(curpath, "%s/%s", ptspath, dptr->d_name);
-        if (stat(curpath, &sb) < 0) {
-          fprintf(stderr, "Can't stat %s:  %s\n", 
-                  curpath, strerror(errno)); /* XXX change. */
-        }
-        else if (sb.st_atime > mintime) {
-          mintime = sb.st_atime;
-        }
-      }
-      closedir(ptsdir);
-    }
-  }
-#endif /* __linux__ */
-
-  for (i = 0; i < opts->numttys; ++i) {
-    if (stat(opts->ttys[i], &sb) < 0) {
+  for (i = 0; i < parms->numttys; ++i) {
+    if (stat(parms->ttys[i], &sb) < 0) {
       fprintf(stderr, "Can't stat %s:  %s\n", 
-              opts->ttys[i], strerror(errno)); /* XXX change. */
+              parms->ttys[i], strerror(errno)); /* XXX change. */
     }
     else if (sb.st_atime > mintime) {
       mintime = sb.st_atime;
     }
   }
 
-  pkt->minidle = mintime;
+  /* Assign TTY activity, ensuring we don't go older than initial startup */
+  pkt->minidle = (mintime > parms->startup) ? mintime : parms->startup;
   if (opts->debug) {
     printf("Minidle: %s", ctime(&mintime));
   }
@@ -335,74 +466,7 @@ void get_min_tty_idle(void) {
 }
 
 
-void utmp_enum_terms(void) {
-  
-  int utfd, nbytes, i;
-  char bufstr[MAXDEVLEN];
-  struct utmp u;
-
-  for (i = 0; i < opts->numttys; ++i) {
-    free(opts->ttys[i]);
-  }
-
-  opts->numttys = 0;
-
-  if ((utfd = open(UTMP_PATH, O_RDONLY)) < 0) {
-    lerror("Couldn't open utmp file");
-    return;
-  }
-  else {
-    while ((nbytes = read(utfd, &u, sizeof(struct utmp)))) {
-      if (nbytes < sizeof(struct utmp)) {
-        lwarn("problem reading utmp structure - truncated.");
-      }
-      else if (u.ut_name[0] != '\0' && u.ut_host[0] != '\0') {
-        snprintf(bufstr, MAXDEVLEN, "/dev/%s", u.ut_line);
-        opts->ttys[opts->numttys] = strdup(bufstr);
-        opts->numttys++;
-      }
-    }
-  }
-
-  close(utfd);
-  return;
-}
-
-
-time_t wtmp_get_last(void) {
-  int nbytes;
-  time_t retval = 0;
-  struct utmp u;
-  FILE *wtf;
-
-  if ((wtf = fopen(WTMP_PATH, "r")) < 0) {
-    lerror("Couldn't open wtmp file");
-  }
-
-  else if (fseek(wtf, -sizeof(struct utmp), SEEK_END) < 0) {
-    lerror("Can't seek to end of file");
-  }
-
-  else {
-    do {
-      nbytes = fread(&u, 1, sizeof(struct utmp), wtf);
-      if (nbytes < sizeof(struct utmp)) {
-        lwarn("problem reading utmp structure - truncated.");
-      }
-      else if (u.ut_name[0] != '\0' &&
-               u.ut_host[0] != '\0' &&
-               strlen(u.ut_line) > 1) {
-        retval = u.ut_time;
-        break;
-      } 
-    } while (fseek(wtf, -2*sizeof(struct utmp), SEEK_CUR) == 0 &&
-             !ferror(wtf));
-  }
-  fclose(wtf);
-  return retval;
-}        
-
-void get_load(void) {
+void get_load(SLOTHD_PACKET *pkt) {
 
   int retval;
 
@@ -418,7 +482,64 @@ void get_load(void) {
 }
 
 
-void get_packet_counts(void) {
+int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
+
+  int i;
+
+  pkt->actbits = 0;
+
+  if (pkt->minidle > opkt->minidle) {
+    pkt->actbits |= TTYACT;
+  }
+  else {
+    pkt->actbits &= ~TTYACT;
+  }
+
+  /* XXX: whats the best way to compare load averages to a threshold? */
+  if (pkt->loadavg[0] > opts->load_thresh) {
+    pkt->actbits |= LOADACT;
+  }
+  else {
+    pkt->actbits &= ~LOADACT;
+  }
+
+  /* 
+   * Have the packet counters exceeded the threshold?  Make sure we don't
+   * count the incoming packets on the control net interface.
+   */
+  for (i = 0; i < pkt->ifcnt; ++i) {
+    if (strcmp(parms->cifname, pkt->ifaces[i].ifname) == 0) {
+      if ((pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
+          opts->cif_thresh) {
+        break;
+      }
+    }
+    else if (((pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
+              opts->pkt_thresh) || 
+             ((pkt->ifaces[i].ipkts - opkt->ifaces[i].ipkts) >= 
+              opts->pkt_thresh)) {
+      break;
+    }
+  }
+
+  if (i < pkt->ifcnt) {
+    pkt->actbits |= PKTACT;
+    if (opts->debug) {
+      printf ("Packet threshold exceeded on %s\n", pkt->ifaces[i].ifname);
+    }
+  }
+  else {
+    pkt->actbits &= ~PKTACT;
+  }
+
+  if (opts->debug) {
+    printf("Active bits: 0x%04x\n", pkt->actbits);
+  }
+
+  return pkt->actbits;
+}
+
+void get_packet_counts(SLOTHD_PACKET *pkt) {
 
   int i;
   char *niprog[] = {"netstat", "-ni", NULL};
@@ -469,7 +590,7 @@ int get_counters(char *buf, void *data) {
     }
 #ifdef __linux__
     strcpy(ifr.ifr_name, pkt->ifaces[pkt->ifcnt].ifname);
-    if (ioctl(pkt->ifd, SIOCGIFHWADDR, &ifr) < 0) {
+    if (ioctl(parms->ifd, SIOCGIFHWADDR, &ifr) < 0) {
       perror("error getting HWADDR");
       return -1;
     }
@@ -533,43 +654,4 @@ int procpipe(char *const prog[], int (procfunc)(char*,void*), void* data) {
     } /* switch ((cpid = fork())) */
   }
   return retcode;
-}
-  
-
-void send_pkt(void) {
-
-  int i, numsent;
-  static char pktbuf[1500];
-  static char minibuf[50];
-
-  /* flatten data into packet buffer */
-  sprintf(pktbuf, "mis=%lu lave=%.10f,%.10f,%.10f ",
-          pkt->minidle,
-          pkt->loadavg[0],
-          pkt->loadavg[1],
-          pkt->loadavg[2]);
-
-  for (i = 0; i < pkt->ifcnt; ++i) {
-    sprintf(minibuf, "iface=%s,%lu,%lu ",
-            pkt->ifaces[i].addr,
-            pkt->ifaces[i].ipkts,
-            pkt->ifaces[i].opkts);
-    strcat(pktbuf, minibuf);
-  }
-
-  if (opts->debug) {
-    printf("packet: %s\n", pktbuf);
-  }
-
-  /* send it */
-  else {
-    if ((numsent = send(pkt->sd, pktbuf, strlen(pktbuf)+1, 0)) < 0) {
-      lerror("Problem sending slothd packet");
-    }
-
-    else if (numsent < strlen(pktbuf)+1) {
-      lwarn("Warning!  Slothd packet truncated");
-    }
-  }
-  return;
 }
