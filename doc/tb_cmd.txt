@@ -42,3 +42,15 @@ between them.
 This commands is used to set hardware specs.  Currently only one
 format is supported: <type> = shark-shelf.  This indicates that <node>
 should be a shelf (unswitches LAN) of 8 sharks.
+
+
+#TB set-dnard-ip <shelf> <number> <ip>
+#TB set-dnard-os <shelf> <number> <os>
+#TB set-node-os <node> <os>
+#TB set-node-deltas <node> <deltas>
+#TB set-dnard-deltas <shelf> <number> <deltas>
+
+Node, it all cases <node> can include * and ? as wild cards and
+<number> can be a range a-b.
+
+#TB create-os <label> <image_path> <partition>
