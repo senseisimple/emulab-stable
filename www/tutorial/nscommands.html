@@ -314,9 +314,10 @@ tb-set-node-rpms $node0 rpm1 rpm2 rpm3
 <p>Notes:
 
 <ul>
-  <li>This command sets which rpms are to be installed on the node.
   <li>This command sets which rpms are to be installed on the node
-  when it first boots after being assigned to an experiment. 
+  when it first boots after being assigned to an experiment.
+  <li>Each rpm file must reside in /proj or /groups. You are not
+  allowed to place your rpms in your home directory.
   <li>See the <a href="docwrapper.php3?docname=tutorial.html#RPMS">
   tutorial</a> for more information.
 </ul>
@@ -369,6 +370,8 @@ tb-set-node-tarfiles $node0 /bin mybinmods.tar /sbin mysbinmods.tar
   first boots after being assigned to an experiment. 
   <li>Each tar file is installed just one. Tarfiles that have been
   loaded, are not reloaded after subsequent reboots.
+  <li>Each tarfile must reside in /proj or /groups. You are not
+  allowed to place your tarfiles in your home directory.
 </ul>
 	
 <hr>

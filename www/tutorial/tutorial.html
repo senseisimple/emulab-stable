@@ -502,10 +502,10 @@ tb-set-node-rpms $nodeB /proj/pid/rpms/silly-linux.rpm	</code></pre>
 
 The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
 on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
-RPMs are installed as root when the node first boots, and must reside
-on the node's local filesystem, or in a directory that can be reached
-via NFS. This is either the project's <tt>/proj</tt> directory, or a
-project member's home directory in <tt>/users</tt>.
+RPMs are installed as root, must reside in either the project's
+<tt>/proj</tt> directory, or if the experiment has been created in a
+subgroup, in the <tt>/group</tt> directory. You may not place your
+rpms in your home directory.
 
 </p>
 
@@ -528,10 +528,10 @@ tb-set-node-tarfiles $nodeA /usr/site /proj/pid/tarfiles/silly.tar.gz </code></p
 
 The above NS code says to install the <tt>silly.tar.gz</tt> tar file
 on <tt>nodeA</tt> from the working directory <tt>/usr/site</tt> when
-the node first boots. The tarfile must reside on the node's local
-filesystem, or in a directory that can be reached via NFS. This is
-either the project's <tt>/proj</tt> directory, or a project member's
-home directory in <tt>/users</tt>. You may specify as many tarfiles as
+the node first boots. The tarfile must reside in either the project's
+<tt>/proj</tt> directory, or if the experiment has been created in a
+subgroup, in the <tt>/group</tt> directory. You may not place your
+tarfiles in your home directory. You may specify as many tarfiles as
 you wish, as long as each one is proceeded by the directory it should
 be unpacked in, all separated by spaces.
 
@@ -555,8 +555,9 @@ tb-set-node-startup $nodeB /proj/pid/runme.nodeB	</code></pre>
 will run <tt>/proj/pid/runme.nodeA</tt> on nodeA and
 <tt>/proj/pid/runme.nodeA</tt> on nodeB. The programs must reside on
 the node's local filesystem, or in a directory that can be reached via
-NFS. This is either the project's <tt>/proj</tt> directory, or a
-project member's home directory in <tt>/users</tt>.
+NFS. This is either the project's <tt>/proj</tt> directory, in the
+<tt>/group</tt> directory if the experiment has been created in a
+subgroup, or a project member's home directory in <tt>/users</tt>.
 
 <p>
 The exit value of the startup command is reported back to the Web
