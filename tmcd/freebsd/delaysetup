@@ -483,7 +483,7 @@ sub LinkDelaySetup()
 	    print DEL "\n";
 
 	    print DEL "ipfw add $ruleno pipe $pipeno ip from any to ".
-		      "any out xmit $iface nexthop $inet\n";
+		      "any out xmit $iface\n";
 
 	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
 	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
