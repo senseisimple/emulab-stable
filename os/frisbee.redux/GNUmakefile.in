@@ -81,8 +81,9 @@ trace.o:	decls.h trace.h log.h
 install:	$(INSTALL_SBINDIR)/frisbeed
 
 clean:
-	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug \
-	frisbee-dist frisbee.tar frisbee.tar.gz
+	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
+	/bin/rm -f frisbee.tar frisbee.tar.gz
+	/bin/rm -rf frisbee-dist
 
 frisbee.tar.gz: frisbee.tar
 	gzip -c frisbee.tar > frisbee.tar.gz
@@ -100,8 +101,9 @@ frisbee-dist: Makefile.sa Makefile-linux.sa README.sa $(DISTFILES)
 	mv frisbee-dist/frisbee/Makefile.sa frisbee-dist/frisbee/Makefile
 	mv frisbee-dist/frisbee/Makefile-linux.sa frisbee-dist/frisbee/Makefile-linux
 	mv frisbee-dist/frisbee/README.sa frisbee-dist/README
+	cp $(TESTBED_SRCDIR)/COPYING frisbee-dist
 	(cd frisbee-dist/frisbee; \
-		$(EXPANDCOPYRIGHT) Makefile README $(DISTFILES))
+		$(EXPANDCOPYRIGHT) Makefile Makefile-linux $(DISTFILES))
 	(cd ../imagezip; $(MAKE) imagezip.tar)
 	(cd frisbee-dist; tar xf -; mv imagezip-dist imagezip) \
 		< ../imagezip/imagezip.tar
