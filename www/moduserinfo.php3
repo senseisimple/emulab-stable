@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -432,7 +432,7 @@ else {
     # consisting of the 8 characters after an initial "$1$" and followed by a "$". 
     $unixpwd = explode('$', $row[usr_pswd]);
     if (strlen($unixpwd[0]) > 0)
-	# When there's no $ at the beginning, it's not an MD5 hash.
+	# When there's no $ at the beginning, its not an MD5 hash.
 	$randpwd = substr($unixpwd[0],0,8);
     else
 	$randpwd = substr($unixpwd[2],0,8); # The MD5 salt string.
@@ -470,6 +470,13 @@ if (!isset($formfields[usr_name]) ||
 elseif (! TBvalid_usrname($formfields[usr_name])) {
     $errors["Full Name"] = TBFieldErrorString();
 }
+# Make sure user name has at least two tokens!
+$tokens = preg_split("/[\s]+/", $formfields[usr_name],
+		     -1, PREG_SPLIT_NO_EMPTY);
+if (count($tokens) < 2) {
+    $errors["Full Name"] = "Please provide a first and last name";
+}
+
 if (!isset($formfields[usr_affil]) ||
     strcmp($formfields[usr_affil], "") == 0) {
     $errors["Affiliation"] = "Missing Field";
