@@ -65,7 +65,7 @@ elseif ($uid = GETUID()) {
 
 <html>
 <head>
-<title>Emulab</title>
+<title>Emulab.Net</title>
 <link rel='stylesheet' href='tbstyle.css' type='text/css'>
 
 <?php
@@ -78,7 +78,8 @@ echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
 
 </head>
 <body>
-<a href="welcome.html"><h3>Emulab Home</h3></a>
+<basefont size=5>
+<a href="welcome.html"><b>Emulab.Net Home</b></a>
 
 <?php
 if (isset($uid)) {

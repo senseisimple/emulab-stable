@@ -1,35 +1,107 @@
 <html>
 <head>
 	<title>Utah Network Testbed - FAQ</title>
-	<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+	<link rel='stylesheet' href='tbstyle-doc.css' type='text/css'>
 </head>
-
 <body>
-<h1>Utah Network Testbed - FAQ</h1>
 
+<center>
+<h1>Emulab FAQ</h1>
+</center>
+
+<h2>Contents</h2>
 <ul>
-<li> Web Interface
-	<ul>
-	<li> to gain authorization to use the testbed, either as
-	</ul>
-<li>
+<li> <a href="#GS">Getting Started</a>
+     <ul>
+     <li> <a href="#GS-1">How do I start a project?</a>
+     <li> <a href="#GS-2">How do I join a project?</a>
+     </ul>
+
+<li> <a href="#UTT">Using the Testbed</a>
+     <ul>
+     <li> <a href="#UTT-1">Is there a tutorial?</a>
+     <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
+     </ul>
 </ul>
 
 <hr>
-<h2>
-To protect data you submit, SSL is used to encrypt data as it
-is transferred accross the Internet. Therefore, you will need to
-access these pages with a browser that supports SSL.  We recommend
-Netscape 4.0 or greater, and also recommend a screen resolution
-of at least 800x600 to avoid excessive scrolling.
-<p>
 
+<a NAME="GS"></a>
+<h3>Getting Started</h3>
+<ul>
+<li><a NAME="GS-1"></a>
+    <h4>How do I start a project?</h4>
+    <p>
+    If you are new to the Testbed, simply click on the "Start Project"
+    link on the Emulab <a href="https://www.emulab.net/tbdb.html">Home
+    Page</a>. You will need to fill in the forms with your personal
+    information and information about the project. Then click on the
+    "Submit" button. Within a few days you will be contacted via email
+    with an approval message. More information about starting projects
+    can be found in <a href="auth.html">Authorization Page</a>.
+    <p>
+    If you already have an Emulab account, and wish to start a second
+    project, first log into the Web Interface. Then select the "Start
+    Project" link; all of the personal information will already be
+    filled in. You will need to complete just the project information
+    section. 
+    </p>
 
-
+<li><a NAME="GS-2"></a>
+    <h4>Someone told me to join their project. How do I do that?</h4>
+    <p>
+    If you are new to the Testbed, simply click on the "Join Project"
+    link on the Emulab <a href="https://www.emulab.net/tbdb.html">Home
+    Page</a>. You will need to fill in the form with your personal
+    information, and provide the name of the project you are trying to
+    join (typically, the <i>Project Leader</i> will have told you the
+    name of the project). The click on the "Submit" button, and wait
+    for the project leader to approve you.  When approved you will
+    receive an email message saying so, and you can then log into the
+    Testbed.
+</ul>
 
 <hr>
-<address>testbed-www@flux.cs.utah.edu<br>
-Last modified on Mar 8, 2001</address>
+
+<a NAME="UTT"></a>
+<h3>Using the Testbed</h3>
+<ul>
+<li><a NAME="UTT-1"></a>
+    <h4>Is there a tutorial?</h4>
+    <p>
+    Yes, we have an extensive <a href="tutorial/tutorial.html">tutorial</a>
+    on using the Testbed.
+    </p>
+
+<li><a NAME="UTT-2"></a>
+    <h4>Do I get root access on my nodes?</h4>
+    <p>
+    Yes. Project leaders get root access to all of the nodes in all of
+    the experiments that are running in their project. Project members
+    get root if their project leader grants them root access, when the
+    leader approves the group <a href="#GS-1">membership request</a>.
+    Root privileges are granted via the <code>sudo</code> command. The
+    <a href="tutorial/tutorial.html#RootAccess">tutorial</a> describes
+    this in more detail.
+    </p>
+    
+</ul>
+
+<hr size=2 noshade>
+<center>
+[<a href="https://www.emulab.net/">Emulab.Net Home</a>]<br>
+[<a href="http://www.cs.utah.edu/flux/">Flux Research Group</a>]
+[<a href="http://www.cs.utah.edu/">School of Computing</a>]
+[<a href="http://www.utah.edu/">University of Utah</a>]
+</center>  
+<p align=right>
+<font size="-1">
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 14, 2001
+</font>
+</p>
 
 </body>
 </html>
