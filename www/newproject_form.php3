@@ -247,6 +247,15 @@ echo "<tr>
       </tr>\n";
 
 #
+#  Funders/Grant numbers
+#
+echo "<tr>
+         <td>*Funding Sources and Grant Numbers:<br>
+              (Type \"none\" if not funded)</td>
+         <td><input type=\"text\" name=\"proj_funders\" size=\"45\"></td>
+      </tr>\n";
+
+#
 # Nodes and PCs and Users
 # 
 echo "<tr>

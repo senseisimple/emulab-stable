@@ -24,6 +24,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_expires	= $row[expires];
     $proj_name		= $row[name];
     $proj_URL		= $row[URL];
+    $proj_funders	= $row[funders];
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
@@ -58,6 +59,11 @@ function SHOWPROJECT($pid, $thisuid) {
                   <A href='$proj_URL'>$proj_URL</A></td>
           </tr>\n";
     
+    echo "<tr>
+              <td>Funders: </td>
+              <td class=\"left\">$proj_funders</td>
+          </tr>\n";
+
     echo "<tr>
               <td>#Project Members: </td>
               <td class=\"left\">$proj_members</td>
