@@ -33,48 +33,41 @@ punch the power button.  Just make sure they're not set to always off.
 #### Type information for the nodes
 
 Unless you're adding some more nodes, identical to the ones you already have,
-you'll need to put some type information about them into the database.  Add an
-entry to the node_types table for each type of experimental node you're going
-to be adding to the testbed.  Most of the columns should be self-explanatory,
-but here are some notes:
+you'll need to put some type information about them into the database. You can
+do this through the web interface: log in and go into admin mode. Now, click on
+the 'Node Status' link on the menu, and use the 'Create a new type' link. The
+important things on this page to fill out are: (You can leave the defaults for
+the rest)
 
-class: Should be 'pc'
-type: Should be 'pcXXX', where XXX is a short (a few characters) string
-	describing the nodes (such as processor speed, chipset, etc.)
-proc: Class of processor (ie. 'PIII')
-speed: CPU speed in MHz
+Type: We typically name types 'pcXXX', where XXX is a short (a few characters)
+	string describing the nodes (such as processor speed, chipset, etc.)
+	eg. pc600 for 600-MHz nodes
+Processor: Class of processor (ie. 'Pentium IV')
+Speed: CPU speed in MHz
 RAM: Amount of RAM in MB
 HD: Hard disk size in GB
-max_cards: Number of PCI (or ISA) slots
-max_ports: Maximum number of NIC ports (eg. dual port cards count as 2)
-osid: Default operating system to use. Should be one of the ones created in
-	Step 6
-control_net: Interface number (described below) of the control network
+Max Interfaces: Maximum number of NIC ports (eg. dual port cards count as 2)
+Control Network: Interface number (described below) of the control network
 	interface
-power_time: Number of second between power cycles (to help save wear and tear
-	on the hardware). We recommend 60.
-imageid: Default image to load (created in Step 6 of setup-db.txt)
-imageable: Set to 1 if a disk image can be created/restored on this node type.
-delay_capacity: How many delay nodes this node can be. For example, nodes with
+Control Network Iface: Name of the control network interface under Linux -
+	usually, just a concatenation of 'eth' and the Control Network number
+	you entered above. (eg. 'eth0')
+OSIDs: If Utah has already given you disk images (and their associated database
+	state), then select those at this stage. You should have only one choice
+	for the ImageID. For the Default OSID, select either Linux or FreeBSD,
+	depending on what you think your users are likely to want by default.
+	For the time being, both the delay and jail OSIDs need to be FreeBSD.
+	If Utah has not given you images yet, come back and set the OSIDs once
+	they have.
+Delay Capacity: How many delay nodes this node can be. For example, nodes with
 	2 experimental interfaces can be 1 delay node, nodes with 4 experimental
 	interfaces can be 2 delay nodes, etc.
-virtnode_capacity: Number of virtual nodes that can be hosted on a single
-	physical node of this type.
-control_iface: Linux-style interface name for the control network (ie. 'eth0')
-disktype: FreeBSD-style disk name for the primary hard drive.
+Disk Type: FreeBSD-style disk name for the primary hard drive.
 	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
-delay_osid: Which OS should be run when this node is being a delay node. 
-	Should usually be 'FBSD-STD'
-pxe_boot_path: Path (including hostname) to the mini-kernel that should be
-	loaded by PXE. Ask Utah for this kernel. For example,
-	'boss.emulab.net:/tftboot/pxeboot'
-isvirtnode: Should be 0.
-isremotenode: Should be 0.
-issubnode: Should be 0.
-isplabdslice: Should be 0.
 
-You'll also need to add entries to the interface_types table for each type of
-network card you are using. Notes on the columns:
+You'll also need to add entries to the interface_types table (using the web web
+SQL editor, or SQL directly) for each type of network card you are using. Notes
+on the columns:
 
 type: Name of the FreeBSD driver for the card (common ones are 'fxp' for Intel
 	EtherExpress Pro 100 and 'xl' for Tulip-based cards)
