@@ -162,6 +162,15 @@ if ($action eq "start" && !$force && !ExpNodes($pid, $eid)) {
     exit(0);
 }
 
+# Need the unix_gid info to pass to boss.
+my $gid = ExpGroup($pid, $eid);
+my ($unix_gid, $unix_gidname);
+
+if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
+    die("*** $0:\n".
+	"    Could not get unix group info for $pid/$gid!\n");
+}
+
 #
 # Pase the whole thing off to the proxy, which might be local when running
 # in UNIFIED_BOSS_AND_OPS mode. Become real root either way; the proxy will
@@ -172,7 +181,7 @@ $cmd .= " -d"
     if ($debug);
 $cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";
 $cmd .= " -k " . TBDB_EVENTKEY($pid, $eid);
-$cmd .= " -g " . ExpGroup($pid, $eid);
+$cmd .= " -g " . $unix_gidname;
 $cmd .= " -e $pid/$eid";
 $cmd .= " -u $dbuid";
 $cmd .= " $action";
