@@ -7,7 +7,11 @@
 
 echo "Checking for file updates ..."
 export HOME=/root
-/usr/local/bin/cvsup -e -1 -g -L 1 /etc/testbed/supfile
+
+if [ -f /etc/testbed/supfile ]; then
+	set -- `/etc/testbed/tmcc bossinfo`
+	/usr/local/bin/cvsup -h $1 -e -1 -g -L 1 /etc/testbed/supfile
+fi
 
 if [ -x /etc/testbed/rc.healthd ]; then
     echo "Starting node health monitoring ..."
