@@ -47,15 +47,15 @@ $questions = array(
   'More nodes',
     '"There are not enough free when I need them."',
   'More nodes',
-    '"To run experiments with more nodes than Emulab has (170)."',
+    '"I want to run experiments with more nodes than Emulab has (170)."',
   'More powerful nodes',
     'Faster, more RAM, bigger disks, etc (add specifics in text box below)',
   'Gigabit Ethernet links',
     'If you want faster than Gbit, say so in text box below.',
   'Nodes with more physical network interfaces',
     '',
-  'Virtual links/nodes <i>instead of<i> more physical resources',
-    'Approx 10 virtual per each physical link/node, w/o performance guarantees',
+  'Virtual links/nodes <i>instead of</i> more physical resources',
+    'Approx 10 virtual per each physical link/node, without performance guarantees',
   '"Real" commercial routers instead of just PCs',
     '',
   'Better user support',
@@ -108,6 +108,12 @@ if ($submit) {
         $mesg .= "\nSurvey Responder: $effuid\n";
 	$mesg .= "Auth notes: $uidnotes\n";
     }
+    if (strcmp($name,"")) {
+    	$mesg .= "User-supplied name: $name\n";
+    }
+    if (strcmp($email,"")) {
+    	$mesg .= "User-supplied email: $email\n";
+    }
     $mesg .= "> Multiple Choice:\n";
     $foo = 0;
     for( $n = 0; $n < count($questions) - 1; $n += 2) {
@@ -159,11 +165,20 @@ if ($submit) {
     return;
 }
 
+echo "<form action='survey.php3' method='post'>";
+
 if (0 == strcmp($effuid, "unknown")) {
     echo "<h3>If you have an account, please ";
     echo "<a href=\"$TBBASE/login.php3?refer=1\">log in</a>. ";
     echo "If you don't have an account or don't remember your password, ";
     echo "don't worry-- fill out the form anyway!</h3>\n";
+    echo "<p>If you don't have an account, you can\n";
+    echo "provide the following infomation: (<i>Not Required)</i></p>\n";
+    echo "<center><table>";
+    echo "<tr><th>Name</th><td><input name=\"name\"\></td></tr>\n";
+    echo "<tr><th>Email</th><td><input name=\"email\"\></td>\n";
+    echo "</table></center>";
+
 }
 
 echo "<p>";
@@ -171,12 +186,11 @@ echo "We are planning to grow Emulab.
       Since we need to know what's most important to you,
       please take a few moments to give us some feedback.
       Please answer at least the multiple choice section;
-      it's quick!"
+      it's quick!";
   
 echo "</p>";
 
 echo "<center>";
-echo "<form action='survey.php3' method='post'>";
 echo "<input type='checkbox' name='anonymous' value='1'><b>Report my answers anonymously</b></input>";
 echo "<h2>$intro</h2>";
 echo "<table>";

@@ -314,6 +314,9 @@ function WRITESIDEBAR() {
 	}
     }
 
+    WRITESIDEBARBUTTON_COOL("Take our Survey",
+	    $TBDOCBASE, "survey.php3");
+
     #
     # Cons up a nice message.
     # 
