@@ -1,0 +1,37 @@
+tb_prerun("tbprerun",0);
+@result = (
+["l8","0","100","0.000","node4:0"],
+["l8","0","100","0.000","node0:2"],
+["lan11","0","100","0.000","s5:0"],
+["lan11","0","100","0.000","s6:0"],
+["lan11","0","100","0.000","node4:1"],
+["link0","0","100","0.051","node0:1"],
+["link0","0","100","0.051","node3:0"],
+["lan0","100","20","0.400","node0:0"],
+["lan0","150","30","0.000","node1:0"],
+["lan0","0","100","0.106","node2:0"],
+);
+tb_compare("select vname,delay,bandwidth,lossrate,member from virt_lans" .
+	" where pid=\"testbed\" and eid=\"test\"",\@result);
+@result = (
+["0:1.0.0.3 1:1.0.0.2 2:1.0.0.1","node0","pc"],
+["0:1.0.0.2","node1","pc"],
+["0:1.0.0.4","node2","pc"],
+["0:1.0.0.3","node3","pc"],
+["0:1.0.4.1 1:192.168.1.4","node4","pc"],
+["0:192.168.1.2","s5","shark"],
+["0:192.168.1.3","s6","shark"],
+);
+tb_compare("select ips,vname,type from virt_nodes" .
+    " where pid=\"testbed\" and eid=\"test\"",\@result);
+@result = (
+["0:1.0.4.1 1:192.168.1.4","MYOS","my command line","{my node rpms}","deltas!","my node startup","dira tara dirb tarb dirc tarc","pc"],
+);
+tb_compare("select ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles,type" .
+    " from virt_nodes where pid=\"testbed\" and eid=\"test\"" .
+    " and vname=\"node4\"",\@result);
+tb_run("tbswapin",0);
+tb_run("tbswapout",0);
+tb_run("tbswapin",0);
+tb_run("tbswapout",0);
+tb_run("tbend",0);

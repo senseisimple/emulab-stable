@@ -103,13 +103,16 @@ while ($nsfile eq "") {
     }
 }
 
-$dir = "tests/$mode/$name";
+$dir = "tests/$name";
 mkdir $dir,0755;
 system "cp templates/$mode $dir/test";
 open(INFO,"> $dir/info");
 print INFO $description;
 close(INFO);
 system "cp $nsfile $dir/nsfile.ns";
+open(TESTLIST,">> testlists/$mode");
+print TESTLIST "$name\n";
+close(TESTLIST);
 
 print "Test generated.\n";
 

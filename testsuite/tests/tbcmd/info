@@ -1,0 +1,5 @@
+NOT A FULL TEST!
+
+This is a test of all the tb-* commands.  It also checks does checks on 
+virt_lans and virt_nodes to make sure they done the right thing.
+

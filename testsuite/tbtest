@@ -20,10 +20,10 @@
 #   -session <sessionid> - Specify an alternate session id.
 #
 # <mode> is one of:
-#    run <db> <testdir> [<pid> <eid> <num>] - Do everything.
+#    run <db> <testlist> [<pid> <eid> <num>] - Do everything.
 #    init <db> [<pid> <eid> <num>] - Initiatlize.  
-#    test <testdir> - Run tests
-#    single <testdir> <tests> - Run only <tests>
+#    test <testlist> - Run tests
+#    single <tests> - Run only <tests>
 #    finish - Finish run
 # <num> is "X <type> ...", for example "10 pc 16 shark"
 
@@ -73,17 +73,17 @@ sub show_help {
     print STDERR "  -exitonfail - Exit on any failure.\n";
     print STDERR "  -session <sessionid> - Specify an alternate session id.\n";
     print STDERR "Mode:\n";
-    print STDERR "  run <db> <testdir> [<pid> <eid> <num>]\n";
+    print STDERR "  run <db> <testlist> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
-    print STDERR "  test <testdir>\n";
-    print STDERR "  single <testdir> <tests>\n";
+    print STDERR "  test <testlist>\n";
+    print STDERR "  single <tests>\n";
     print STDERR "  finish\n";
     print STDERR "<num>: Must be even lengthed list of <number> <type>.\n";
     print STDERR "   Ex: \"4 pc 16 shark\"\n";
     print STDERR "Examples:\n";
     print STDERR "   $0 run tbdb frontend\n";
     print STDERR "   $0 -full run tbdb frontend testbed mytest \"10 pc 16 shark\"\n";
-    print STDERR "   $0 init tbdb;$0 single frontend ping basic;$0 finish\n";
+    print STDERR "   $0 init tbdb;$0 single ping basic;$0 finish\n";
     exit(1);
 };
 
@@ -121,10 +121,10 @@ $statefile = "state";
 if ($mode eq "run") {
     if ($type eq "frontend") {
 	if ($#ARGV != 1) {show_help;}
-	($TBDB,$testdir) = @ARGV;
+	($TBDB,$testlist) = @ARGV;
     } else {
 	if ($#ARGV != 4) {show_help;}
-	($TBDB,$testdir,$pid,$eid,$num) = @ARGV;
+	($TBDB,$testlist,$pid,$eid,$num) = @ARGV;
     }
 } elsif ($mode eq "init") {
     if ($type eq "frontend") {
@@ -136,10 +136,10 @@ if ($mode eq "run") {
     }
 } elsif ($mode eq "test") {
     if ($#ARGV != 0) {show_help;}
-    ($testdir) = @ARGV;
+    ($testlist) = @ARGV;
 } elsif ($mode eq "single") {
-    if ($#ARGV <= 0) {show_help;}
-    ($testdir,@tests) = @ARGV;
+    if ($#ARGV == -1) {show_help;}
+    (@tests) = @ARGV;
 } elsif ($mode eq "finish") {
     if ($#ARGV != -1) {show_help;}
 } else {
@@ -158,16 +158,6 @@ if (($mode ne "run") && ($mode ne "init")) {
     close(STATE);
 }
 
-
-if (($mode eq "run") || ($mode eq "test") || ($mode eq "single")) {
-    if (! ($testdir =~ m|^/|)) {
-	$testdirshort = $testdir;
-	$testdir = "$basedir/tests/$testdir";
-    } else {
-	@t = split("/",$testdir);
-	$testdirshort = $t[$#t];
-    }
-}
 if (($type eq "full") && (($mode eq "init") || ($mode eq "run"))) {
     @t = split(" ",$num);
     if (($#t % 2) == 0) {
@@ -482,7 +472,7 @@ sub step_test {
     
     # Time to run tests!
     prints "Running Tests\n";
-    prints "Testdir: $testdir\n";
+    prints "Testlist: $testlist\n";
 
     # Let's add some stuff to our path
     $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";
@@ -492,23 +482,26 @@ sub step_test {
     my $dir;
 
     if ($#_ == -1) {
-	opendir(TESTDIR,$testdir);
-	@tests = readdir(TESTDIR);
-	closedir(TESTDIR);
+	open(TESTLIST,"$basedir/testlists/$testlist");
+	@tests = ();
+	while (<TESTLIST>) {
+	    chop;
+	    push(@tests,$_);
+	}
+	close(TESTLIST);
     } else {
 	@tests = @_;
     }
 
     mkdir "tests",0755;
-    mkdir "tests/$testdirshort",0755;
     foreach $test (@tests) {
 	if (($test eq ".") || ($test eq "..") || ($test eq "CVS")) {
 	    next;
 	}
 	prints "  $test ";
 	
-	mkdir "tests/$testdirshort/$test",0755;
-	chdir "tests/$testdirshort/$test";
+	mkdir "tests/$test",0755;
+	chdir "tests/$test";
 	open(TESTLOG,"> test.log");
 	
 	# Set up DB state
@@ -531,8 +524,8 @@ sub step_test {
 	    doexit(1);
 	}
 	
-	if (-f "$testdir/$test/dbstate") {
-	    if (tbexect("cat $testdir/$test/dbstate | mysql $testdb",TESTLOG)) {
+	if (-f "$basedir/tests/$test/dbstate") {
+	    if (tbexect("cat $basedir/tests/$test/dbstate | mysql $testdb",TESTLOG)) {
 		prints "FAIL - Could not evaluate dbstate.\n";
 		$fail++;
 		if ($exitonfail) {doexit(1);}
@@ -545,7 +538,7 @@ sub step_test {
 	# The last line of this command will be either PASS
 	# or FAIL <msg>, all output before that should be sent 
 	# to the log file.
-	open(TESTFP,"tbstub $testdb testbed test $test $testdir/$test |");
+	open(TESTFP,"tbstub $testdb testbed test $test $basedir/tests/$test |");
 	while (<TESTFP>) {
 	    print TESTLOG $_;
 	    $status = $_;

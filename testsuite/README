@@ -155,12 +155,12 @@ Options:
   -exitonfail - Exit on any failure.
   -session <sessionid> - Specify alternate session ID.
 Mode:
-  run <db> <testdir> [<pid> <eid> <num>]
+  run <db> <testlist> [<pid> <eid> <num>]
   init <db> [<pid> <eid> <num>]
-  test <testdir>
-  single <testdir> <tests>
+  test <testlist>
+  single <testlist> <tests>
   finish
-tbtest [-leavedb] [-path <path>] <db> <testdir>
+tbtest [-leavedb] [-path <path>] <db> <testlist>
 
 Notes:
 
@@ -230,7 +230,7 @@ virtual<->physical mapping.
 Test Format
 -----------
 
-A test is a directory in testsuite/tests/<testdir> which contains the
+A test is a directory in testsuite/tests which contains the
 following files:
 	nsfile.ns - NS file.
 	dbstate - Any commands to set up the DB.
