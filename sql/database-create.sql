@@ -871,6 +871,7 @@ CREATE TABLE nodes (
   jailip varchar(15) default NULL,
   sfshostid varchar(128) default NULL,
   stated_tag varchar(32) default NULL,
+  rtabid smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),

@@ -1286,3 +1286,8 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add delay_osname varchar(20) \
 		default NULL after jail_osname;
 		
+1.124: Add rtabid to nodes table, athough it is meaninful only on a
+       jailed vnode. Set in assign_wrapper.
+
+       alter table nodes add rtabid smallint(5) unsigned NOT NULL \
+		default '0' after stated_tag;
