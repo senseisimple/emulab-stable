@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -360,7 +360,8 @@ mydb_update(char *query, ...)
 
 	if (! inited) {
 	    mysql_init(&db);
-	    if (mysql_real_connect(&db, 0, 0, 0, TBDBNAME, 0, 0, 0) == 0) {
+	    if (mysql_real_connect(&db, 0, "genlastlog",
+				   0, TBDBNAME, 0, 0, 0) == 0) {
 		    syslog(LOG_ERR, "%s: connect failed: %s",
 			   TBDBNAME, mysql_error(&db));
 		    return -1;

@@ -3104,7 +3104,7 @@ mydb_connect()
 	}
 	
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0,
+	if (mysql_real_connect(&db, 0, "tmcd", 0,
 			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
 		error("%s: connect failed: %s\n", dbname, mysql_error(&db));
 		return 1;

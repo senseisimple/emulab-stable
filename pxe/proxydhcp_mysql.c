@@ -50,7 +50,7 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 	}
 	
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
+	if (mysql_real_connect(&db, 0, "proxydhcp", 0, dbname, 0, 0, 0) == 0) {
 		syslog(LOG_ERR, "%s: connect failed: %s",
 			dbname, mysql_error(&db));
 		return 1;
@@ -162,7 +162,7 @@ ip2nodeid(struct in_addr ipaddr, char *nodeid, int len)
 	}
 	
 	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
+	if (mysql_real_connect(&db, 0, "proxydhcp", 0, dbname, 0, 0, 0) == 0) {
 		syslog(LOG_ERR, "%s: connect failed: %s",
 			dbname, mysql_error(&db));
 		return 1;
