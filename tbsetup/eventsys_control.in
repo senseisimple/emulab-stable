@@ -1,0 +1,164 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+use POSIX ":sys_wait_h";
+
+#
+# Start/Stop the event scheduler for an experiment. This script is
+# setuid so that the stop function can send a signal regardless of
+# who is running the script (must have appropriate permission of course).
+# This is temporary; we eventually want to use the event system to control
+# the event system, but lets see how well this event stuff works first.
+#
+sub usage()
+{
+    print STDOUT "Usage: eventsys_control <start|stop> <pid> <eid>\n";
+    exit(-1);
+}
+my  $optlist = "d";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+my $EVENTSYS    = @EVENTSYS@;
+
+#
+# The event system is currently optional.
+#
+if (! $EVENTSYS) {
+    exit(0);
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $evsched	= "$TB/sbin/event-sched";
+my $debug	= 0;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 3) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+my $action = $ARGV[0];
+my $pid    = $ARGV[1];
+my $eid    = $ARGV[2];
+
+#
+# Untaint args.
+#
+if ($action ne "start" &&
+    $action ne "stop") {
+    usage();
+}
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+#
+# Check permission. Only people with permission to destroy the experiment
+# can do this.
+#
+if ($UID &&
+    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+    die("*** $0:\n".
+	"    You do not have permission to control the event system!");
+}
+
+#
+# If stopping, find the pid from the DB and send it a kill.
+#
+if ($action eq "stop") {
+    DBQueryFatal("lock tables experiments write");
+
+    $query_result =
+	DBQueryFatal("select event_sched_pid from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    DBQueryFatal("update experiments set event_sched_pid=0 ".
+		     "where pid='$pid' and eid='$eid'");
+		 
+    DBQueryWarn("unlock tables");
+
+    my @row    = $query_result->fetchrow_array();
+    my $procid = $row[0];
+
+    if ($procid &&
+	! kill('TERM', $procid)) {
+	SENDMAIL($TBOPS,
+		 "Failed to stop event system for $pid/$eid",
+		 "Could not kill(TERM) process $procid: $? $!");
+    }
+    exit(0);
+}
+
+#
+# Otherwise, flip back to actual UID since no special privilege is
+# needed to start/run the event scheduler.
+#
+$EUID=$UID;
+
+#
+# start the event scheduler, redirecting output to the experiment
+# directory. 
+#
+$query_result = 
+    DBQueryFatal("select path from experiments ".
+		 "where pid='$pid' and eid='$eid'");
+my @row  = $query_result->fetchrow_array();
+my $path = $row[0];
+
+if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
+    #
+    # Delay just in case. The event scheduler needs to be turned into
+    # a proper daemon so we can avoid this sillyness (wanting to report
+    # startup error immediately to caller).
+    #
+    sleep(1);
+    my $foo = waitpid($childpid, &WNOHANG);
+    if ($foo) {
+	print STDERR "Failed to start event system $foo $?!\n";
+	SENDMAIL($TBOPS,
+		 "Event System Failure: $pid/$eid!\n",
+		 "Failed to start event system for $pid/$eid",
+		 undef, undef, "$path/logs/event-sched.log");
+	exit(-1);
+    }
+    exit(0);
+}
+system("$evsched -dd -s $BOSSADDR $pid $eid");
+exit($? >> 0);
