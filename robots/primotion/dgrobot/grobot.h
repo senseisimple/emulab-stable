@@ -51,7 +51,7 @@ class grobot {
     void resetPosition();
     void updatePosition();
     float getArclen();
-    void getDisplacement(float &dxtemp, float &dytemp, float &dttemp);
+    void getDisplacement(float &dxtemp, float &dytemp);
     
     int getGstatus();
     int getGOTOstatus();
@@ -72,19 +72,15 @@ class grobot {
     
         
     // Wheel odometry values
-    float Vl;       // left wheel velocity
-    float Vr;       // right wheel velocity
+    float Vl;      // left wheel velocity
+    float Vr;      // right wheel velocity
     
-    float dleft;    // left wheel distance
-    float dright;   // right wheel distance
+    float dleft;   // left wheel distance
+    float dright;  // right wheel distance
     
-    float dt_init;  // initial pivot angle for a goto command
-    float dt_final; // final pivot angle for a goto command
-    
-    // position estimates after a goto command has finished:
-    float dx_est;   // estimated displacement x
-    float dy_est;   // estimated displacement y
-    float dt_est;   // estimated orientation theta
+    float dt_init; // initial pivot angle for a goto command
+    float dx_est;  // estimated displacement x
+    float dy_est;  // estimated displacement y
 
     
     
