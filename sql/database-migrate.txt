@@ -1702,3 +1702,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table node_types add isdynamic tinyint(1) NOT NULL \
 		default '0' after isphantom;
+
+1.257: Change node_types:class to length 30 instead of 10.
+
+	alter table node_types change class class varchar(30) default NULL;

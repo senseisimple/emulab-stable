@@ -858,7 +858,7 @@ CREATE TABLE node_type_features (
 --
 
 CREATE TABLE node_types (
-  class varchar(10) default NULL,
+  class varchar(30) default NULL,
   type varchar(30) NOT NULL default '',
   proc varchar(30) default NULL,
   speed smallint(5) unsigned default NULL,
