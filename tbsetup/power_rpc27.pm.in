@@ -1,17 +1,15 @@
 #!/usr/bin/perl -wT
-#use English;
-#use strict;
-use Socket;
-use IO::Handle;
-
-use lib "@prefix@/lib";
-use libdb;
 
 package power_rpc27;
+
 use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( rpc27ctrl );
 
+use Socket;
+use IO::Handle;
+use lib "@prefix@/lib";
+use libdb;
 
 # A little perl module to power cycle something attached to an RPC27.
 # Thats a serially controlled, power controller.
@@ -19,15 +17,18 @@ use Exporter;
 # XXX The little secretkey handshake is coded in here. If this changes
 # in capture, you have to change it here too. Look for the "pack"
 # statement below.
+#
+# XXX Note that if someone has already tipped to the power controller 
+# in question, this won't work at all.
 
 # Turn off line buffering on output
 $| = 1;
 
 # Set for more output.
-my $debug = 1;
+my $debug = 0;
 
 # RPC27 Prompt string
-my $RPC27_PROMPT = "RPC27>";
+my $RPC27_PROMPT = "RPC-27>";
 my %RPC27_CMD =
   ("cycle"=>"reboot",
    "on"    =>"on",
@@ -39,49 +40,51 @@ my %RPC27_CMD =
 # controller = <node_id>
 # outlet = int, 1 <= outlet <= 20
 sub rpc27ctrl {
-  my($cmd, $controller, $outlet) = @_;
-  my($TIP, $i);
-
-  # Form the connection to the controller via a "tip" line to the
-  # capture process. Once we have that, we can just talk to the
-  # controller directly.
-  if (! ($TIP = tipconnect($controller))) {
-    print STDERR "*** Could not form TIP connection to $controller\n";
-    return 1;
-  }
-
-  if ( $outlet < 1 || $outlet > 20 ) {
-    print STDERR "*** Invalid outlet '$outlet': Must be 1-20\n";
-    return 1;
-  }
-
-  # Send a couple of newlines to get the command prompt, and then wait
-  # for it to print out the command prompt. This loop is set for a small
-  # number since if it cannot get the prompt quickly, then something has
-  # gone wrong/
-  print $TIP "\n";
-  for ($i = 0; $i < 5; $i++) {
-    my $line = <$TIP>;
-    if ($line =~ /^$RPC27_PROMPT/) {
-      last;
+    my($cmd, $controller, $outlet) = @_;
+    my($TIP, $i);
+    
+    # Form the connection to the controller via a "tip" line to the
+    # capture process. Once we have that, we can just talk to the
+    # controller directly.
+    if (! ($TIP = tipconnect($controller))) {
+	print STDERR "*** Could not form TIP connection to $controller\n";
+	return 1;
     }
-    print $TIP "\n";
-  }
+    
+    if ( $outlet < 1 || $outlet > 20 ) {
+	print STDERR "*** Invalid outlet '$outlet': Must be 1-20\n";
+	return 1;
+    }
 
-  # Okay, got a prompt. Send it the string:
-  print $TIP "$RPC27_CMD{$cmd} $outlet\n";
+    # Send a couple of newlines to get the command prompt, and then wait
+    # for it to print out the command prompt. This loop is set for a small
+    # number since if it cannot get the prompt quickly, then something has
+    # gone wrong/
+    print $TIP "\r\n";
+    for ($i = 0; $i < 5; $i++) {
+	my $line = <$TIP>;
+	if ($debug) { print "Read: $line"; }
+	if ($line =~ /^$RPC27_PROMPT/) {
+	    if ($debug) { print "Matched prompt '$RPC27_PROMPT'!\n"; }
+	    last;
+	}
+	print $TIP "\r\n";
+    }
 
-  if ($debug) {
-    print "rpc27ctrl: Sent $cmd command to outlet $outlet on $controller.\n";
-  }
+    # Okay, got a prompt. Send it the string:
+    print $TIP "$RPC27_CMD{$cmd} $outlet\r\n";
 
-  close($TIP);
+    if ($debug) {
+	print "Sending '$RPC27_CMD{$cmd} $outlet'...\n";
+	print "rpc27ctrl: Sent $cmd command to outlet $outlet on $controller.\n";
+    }
+
+    close($TIP);
 }
 
 # Connect up to the capture process. This should probably be in a library
 # someplace.
-sub tipconnect($)
-{
+sub tipconnect($) {
     my($controller) = $_[0];
     my($server, $portnum, $keylen, $keydata);
     my($inetaddr, $paddr, $proto);
@@ -89,7 +92,7 @@ sub tipconnect($)
     local *TIP;
 
     my $query_result =
-	DBQueryWarn("select * from tiplines where node_id='$controller'");
+      DBQueryWarn("select * from tiplines where node_id='$controller'");
 
     if ($query_result->numrows < 1) {
 	print STDERR "*** No such tipline: $controller\n";
@@ -116,25 +119,25 @@ sub tipconnect($)
     $paddr    = sockaddr_in($portnum, $inetaddr);
     $proto    = getprotobyname('tcp');
 
-    if (! socket(TIP, 'PF_INET', 'SOCK_STREAM', $proto)) {
+    if (! socket(TIP, PF_INET, SOCK_STREAM, $proto)) {
 	print STDERR "*** Cannot create socket.\n";
 	return 0;
     }
 
     if (! connect(TIP, $paddr)) {
 	print STDERR
-	    "*** Cannot connect to $controller on $server($portnum)\n";
+	  "*** Cannot connect to $controller on $server($portnum)\n";
 	return 0;
     }
     TIP->autoflush(1);
-
+    
     # Okay, we got a connection. We have to send over the key. This is a
     # little hokey, since we have to make it look like the C struct. 
     my $secretkey = pack("iZ256", $keylen, $keydata);
-
+    
     if (! syswrite(TIP, $secretkey)) {
 	print STDERR
-	    "*** Cannot write key to $controller on $server($portnum)\n";
+	  "*** Cannot write key to $controller on $server($portnum)\n";
 	return 0;
     }
 

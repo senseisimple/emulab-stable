@@ -2,10 +2,7 @@
 #
 # Testbed Power Control script
 #
-# Syntax:
-# power on <machine> <machine> ...
-# power off <machine> <machine> ...
-# power cycle <machine> <machine> ...
+# power [on|off|cycle] <node> [<node>] ...
 #
 ############################################################
 
@@ -24,6 +21,8 @@ print "VERBOSE ON: Set to level $verbose\n" if $verbose;
 #
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
+use lib "@prefix@/lib";
+use power_rpc27;
 
 # un-taint path since this gets called from setuid scripts.
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
@@ -42,9 +41,8 @@ my $exitval = 0;
 my $snmpit="$TB/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
-die("Usage:\npower [-v[n]] on <machine> <machine> ...\n",
-    "power [-v[n]] off <machine> <machine> ...\n",
-    "power [-v[n]] cycle <machine> <machine> ...\n") 
+die("Usage:\npower [-v[n]] [on|off|cycle] <node> [<node>] ...\n",
+    "n = verbosity level (0-3)\n")
   if ( @ARGV < 2 );
 
 #Read in ARGV
@@ -54,10 +52,6 @@ if ($op =~ /^(on|off|cycle)$/) {
 } else {
   die("Invalid command '$op'\n");
 }
-if ($op eq "cycle") {
-  $op = "cyc";
-}
-$op = '-'.$op;
 @machines = @ARGV;
 foreach my $n (0..$#ARGV) {
   #
@@ -82,19 +76,24 @@ use Mysql;
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
-print "Looking up node->(powerIP,outlet) mappings...\n" if $verbose;
-$sth = $dbh->query("select o.node_id,i.IP,o.outlet from ".
-		   "outlets as o left join interfaces as i ".
-		   "on o.power_id = i.node_id");
+print "Looking up node->(power_id,powerIP,outlet,powerType) mappings...\n" 
+  if $verbose;
+$sth = $dbh->query("select o.node_id,o.power_id,i.IP,o.outlet, n.type ".
+		   "from outlets as o left join interfaces as i ".
+		   "on o.power_id = i.node_id left join nodes as n ".
+		   "on o.power_id = n.node_id");
 while ( @_ = $sth->fetchrow_array()) {
-  $IPList{$_[0]}= $_[1];
-  $OutletList{$_[0]}= '-'.$_[2];
+  $powerID{$_[0]}= $_[1];
+  $IPList{$_[0]}= $_[2] || 0; # RPC-27's don't have IPs...
+  $OutletList{$_[0]}= $_[3];
+  $powerType{$_[0]}= $_[4];
 }
 
 if ($verbose > 2) {
   print "Displaying node -> (powerIP, outlet) map...\n";
   foreach $item (sort keys(%IPList)) {
-    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
+    print "$item\t$powerID{$item}\t$IPList{$item}\t".
+      "$OutletList{$item}\t$powerType{$item}\n";
   }
 }
 
@@ -212,27 +211,35 @@ foreach $node ( sort @machines) {
       print "Power controller for $node not found. Skipping...\n";
       $exitval++;
     } else {
-      my $cmd = ( $verbose > 1 ? "-debug $verbose " : "");
-      $cmd .= join(" ",
-		   ('-v','-i',$IPList{$node},$op,$OutletList{$node}));
-      $cmd = "$snmpit ".$cmd;
-      print "Calling snmpit: '$cmd'\n" if $verbose > 1;
-      open(OUT,$cmd." |");
-      while (<OUT>) {
-	if ($verbose) { print $_; }
-	if (/was outlet([OnfRebot]+)/) {
-	  print "$node was $1";
+      my $type = $powerType{$node};
+      if ($type eq "APC") {
+	my $cmd = ( $verbose > 1 ? ("-debug ".($verbose-1)) : " ");
+	$cmd .= join(" ",
+		     ('-v','-i',$IPList{$node},"-$op -$OutletList{$node}"));
+	$cmd = "$snmpit ".$cmd;
+	print "Calling snmpit: '$cmd'\n" if $verbose > 1;
+	open(OUT,$cmd." |");
+	while (<OUT>) {
+	  if ($verbose) { print $_; }
+	  if (/was outlet([OnfRebot]+)/) {
+	    print "$node was $1";
+	  }
+	  if (/to outlet([OnfRebot]+)/) {
+	    print " ... $node now $1";
+	  }
 	}
-	if (/to outlet([OnfRebot]+)/) {
-	  print " ... $node now $1";
-	}
+	print "\n";
+      } elsif ($type eq "RPC27") {
+	  if (rpc27ctrl($op,$powerID{$node},$OutletList{$node})) {
+	      print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
+	  } else { print "Control of $node failed.\n"; $exitval++; }
+      } else {
+	print "power: Unknown power type '$type'\n";
+	$exitval++;
       }
-      print "\n";
     }
   }
 }
 
-#
 # Return 0 on success. Return non-zero number of nodes that failed.
-# 
 exit $exitval;
