@@ -1,0 +1,45 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/linktest
+
+SYSTEM	       := $(shell uname -s)
+TESTS	= linktest
+
+include $(OBJDIR)/Makeconf
+
+all:	$(TESTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -static -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += `elvin-config --cflags vin4c`
+
+LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LIBS     += -levent -ltb
+LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
+
+linktest:		linktest.o
+	$(CC) $(LDFLAGS) -o $@ linktest.o $(LIBS)
+
+$(TESTS):	../lib/libevent.a ../lib/event.h
+
+install:
+
+client-install: 
+	$(INSTALL_TEST) linktest \
+			$(DESTDIR)$(CLIENT_BINDIR)/linktest
+
+clean:
+	/bin/rm -f *.o $(TESTS)
