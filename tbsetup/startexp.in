@@ -430,16 +430,6 @@ sub fatal()
     
     print $MAIL $mesg;
 
-    if (open(IN, "$tempns")) {
-	print $MAIL "\n\n--------- $tempns ---------\n\n";
-
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-	unlink("$tempns");
-    }
-
     if (open(IN, "$logname")) {
 	print $MAIL "\n\n--------- $logname ---------\n\n";
 	
@@ -457,6 +447,17 @@ sub fatal()
 	}
 	close(IN);
     }
+
+    if (open(IN, "$tempns")) {
+	print $MAIL "\n\n--------- $tempns ---------\n\n";
+
+	while (<IN>) {
+	    print $MAIL "$_";
+	}
+	close(IN);
+	unlink("$tempns");
+    }
+
     close($MAIL);
 
     unlink("$tempns");
