@@ -538,7 +538,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
 	xmlrpc/webxmlrpc \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
-	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpxbag \
+	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
