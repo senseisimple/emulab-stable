@@ -67,7 +67,20 @@ static void sigquit(int sig)
     }
     
     looping = 0;
-    quit_count -= 1;;
+    quit_count -= 1;
+}
+
+/**
+ * Signal handler for SIGUSR1, just toggles the debugging level.
+ *
+ * @param sig The actual signal number received.
+ */
+static void sigdebug(int sig)
+{
+    if (debug == 3)
+	debug = 1;
+    else
+	debug = 3;
 }
 
 /**
@@ -180,6 +193,8 @@ int main(int argc, char *argv[])
 		batteryfile);
     }
 
+    signal(SIGUSR1, sigdebug);
+
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
@@ -263,7 +278,9 @@ int main(int argc, char *argv[])
 			    NULL,
 			    &tv_zero);
 		if (rc > 0) {
+		    bool do_telem = db.wasTelemetryUpdated();
 		    pilotClient::iterator i, j;
+		    struct mtp_packet tmp;
 		    
 		    if (FD_ISSET(serv_sock, &rreadyfds)) {
 			struct sockaddr_in peer_sin;
@@ -292,7 +309,16 @@ int main(int argc, char *argv[])
 			}
 		    }
 		    
+		    if (do_telem) {
+			mtp_init_packet(&tmp,
+					MA_Opcode, MTP_TELEMETRY,
+					MA_Role, MTP_ROLE_RMC,
+					MA_GarciaTelemetry, db.getTelemetry(),
+					MA_TAG_DONE);
+		    }
+
 		    for (i = clients.begin(); i != clients.end(); ) {
+			bool bad_client = false;
 			pilotClient *pc = *i;
 			
 			j = i++;
@@ -303,38 +329,35 @@ int main(int argc, char *argv[])
 				if ((mtp_receive_packet(pc->getHandle(),
 							&mp) !=
 				     MTP_PP_SUCCESS) ||
-				    !pc->handlePacket(&mp)) {
-				    
-				    clients.erase(j);
-				    
-				    pc->clearFD(&readfds);
-				    pc->clearFD(&writefds);
-				    delete pc;
-				    
-				    pc = NULL;
+				    !pc->handlePacket(&mp, clients)) {
+				    bad_client = true;
 				}
 				
 				mtp_free_packet(&mp);
 			    } while (pc && pc->getHandle()->mh_remaining);
 			}
-		    }
-		}
-		
-		if (db.wasTelemetryUpdated()) {
-		    pilotClient::iterator i;
-		    struct mtp_packet mp;
-		    
-		    mtp_init_packet(&mp,
-				    MA_Opcode, MTP_TELEMETRY,
-				    MA_Role, MTP_ROLE_RMC,
-				    MA_GarciaTelemetry, db.getTelemetry(),
-				    MA_TAG_DONE);
-		    for (i = clients.begin(); i != clients.end(); i++) {
-			pilotClient *pc = *i;
-			
+
 			if ((pc->getRole() == MTP_ROLE_EMULAB) &&
 			    pc->isFDSet(&wreadyfds)) {
-			    mtp_send_packet(pc->getHandle(), &mp);
+			    if (do_telem &&
+				mtp_send_packet(pc->getHandle(), &tmp) !=
+				MTP_PP_SUCCESS) {
+				fprintf(stderr,
+					"error: cannot send telemetry to "
+					"client\n");
+
+				bad_client = true;
+			    }
+			}
+			
+			if (bad_client) {
+			    clients.erase(j);
+			    
+			    pc->clearFD(&readfds);
+			    pc->clearFD(&writefds);
+			    
+			    delete pc;
+			    pc = NULL;
 			}
 		    }
 		}

@@ -108,7 +108,7 @@ public:
      * @param mp The packet to dispatch.
      * @return True if the packet was handled successfully, false otherwise.
      */
-    virtual bool handlePacket(mtp_packet_t *mp);
+    virtual bool handlePacket(mtp_packet_t *mp, list &notify_list);
     
 private:
 

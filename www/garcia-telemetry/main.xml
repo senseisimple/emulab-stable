@@ -1,4 +1,10 @@
 <?xml version="1.0"?>
+<!-- 
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+
 <panel columns="1" background="#ffffff" gap="4">
   <panel weightx="1">
     <label text="Battery: " />
@@ -7,7 +13,8 @@
     <label name="battery-text" text="0.0" font="bold" />
   </panel>
 
-  <panel text="Wheels" border="true" columns="5" weightx="1">
+  <panel text="Wheels" border="true" columns="5" weightx="1"
+         left="4" top="4" bottom="4" right="4">
     <label text="Left Odometer: " />
     <label name="left-odom" width="10" font="bold" text="?.?" />
 
@@ -25,7 +32,8 @@
     <label name="right-vel" width="10" font="bold" text="?.?" />
   </panel>
 
-  <panel text="Sensors" border="true" columns="5" weightx="1">
+  <panel text="Sensors" border="true" columns="5" weightx="1"
+         left="4" top="4" bottom="4" right="4">
     <label text="Front Left: " />
     <label name="fl-sensor" width="10" font="bold" text="?.?" />
 
@@ -52,6 +60,11 @@
   </panel>
 
   <separator />
+
+  <textarea name="log" wrap="false" weightx="1" weighty="1" border="true"
+            editable="false" />
+
+  <separator />
   
   <panel weightx="1">
     <label name="connected" font="italic" />
@@ -65,4 +78,5 @@
 	    enabled="false"
 	    />
   </panel>
+
 </panel>

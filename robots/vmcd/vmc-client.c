@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -168,7 +168,7 @@ void local2global_posit_trans(struct robot_position *p_inout)
     
     p_inout->x = p_inout->y + x_offset;
     p_inout->y = old_x + y_offset;
-    p_inout->theta -= M_PI;
+    p_inout->theta -= M_PI_2;
 }
 
 /**
@@ -281,16 +281,16 @@ static int encode_packets(mezz_mmap_t *mm)
         }
     }
 
-    if (debug > 0) {
-	info("vmc-client: packet length %d\n", retval);
-    }
-    
 #if !defined(HAVE_MEZZANINE)
     mm->time += 1.0;
 #endif
 
     retval = cursor - packet_buffer;
 
+    if (debug > 1) {
+	info("vmc-client: packet length %d\n", retval);
+    }
+    
     return retval;
 }
 

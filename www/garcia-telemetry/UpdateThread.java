@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -19,6 +24,7 @@ import net.emulab.mtp_role_t;
 import net.emulab.mtp_control;
 import net.emulab.mtp_payload;
 import net.emulab.mtp_opcode_t;
+import net.emulab.mtp_status_t;
 import net.emulab.mtp_robot_type_t;
 import net.emulab.mtp_garcia_telemetry;
 
@@ -27,6 +33,17 @@ public class UpdateThread
 {
     private static final DecimalFormat FLOAT_FORMAT =
 	new DecimalFormat("0.00");
+
+    private static final String STATUS_STRINGS[] = {
+	"unknown",
+	"",
+	"idle",
+	"moving",
+	"error",
+	"complete",
+	"obstructed",
+	"aborted"
+    };
     
     private final GarciaTelemetry gt;
     private final URL servicePipe;
@@ -103,6 +120,8 @@ public class UpdateThread
 	    mtp_packet init;
 	    String request;
 	    
+	    this.gt.appendLog("Connecting...\n");
+	    
 	    uc = this.servicePipe.openConnection();
 	    uc.setDoInput(true);
 	    uc.setDoOutput(true);
@@ -138,6 +157,7 @@ public class UpdateThread
 		this.mp.xdrDecode(xdr);
 		xdr.endDecoding();
 		if (!connected) {
+		    this.gt.appendLog("Connected\n");
 		    this.gt.setString(this.gt.connected, "text", "Connected");
 		    connected = true;
 		}
@@ -152,6 +172,29 @@ public class UpdateThread
 		    (this.mp.data.telemetry.type ==
 		     mtp_robot_type_t.MTP_ROBOT_GARCIA)) {
 		    this.updateGUI(this.mp.data.telemetry.garcia);
+		}
+		else if (this.mp.data.opcode ==
+			 mtp_opcode_t.MTP_COMMAND_GOTO) {
+		    this.gt.appendLog(
+			"GOTO x="
+			+ this.mp.data.command_goto.position.x
+			+ " y="
+			+ this.mp.data.command_goto.position.y
+			+ " theta="
+			+ this.mp.data.command_goto.position.theta
+			+ "\n");
+		}
+		else if (this.mp.data.opcode ==
+			 mtp_opcode_t.MTP_COMMAND_STOP) {
+		    this.gt.appendLog("STOP\n");
+		}
+		else if (this.mp.data.opcode ==
+			 mtp_opcode_t.MTP_UPDATE_POSITION) {
+		    int ms = this.mp.data.update_position.status + 1;
+
+		    this.gt.appendLog("UPDATE-POS "
+				      + STATUS_STRINGS[ms]
+				      + "\n");
 		}
 		else {
 		    System.err.println("Unknown packet type: "
@@ -174,6 +217,7 @@ public class UpdateThread
 	
 	this.gt.setBoolean(this.gt.reconnectButton, "enabled", true);
 	this.gt.setString(this.gt.connected, "text", "Disconnected");
+	this.gt.appendLog("Disconnected\n");
     }
 
     public String toString()

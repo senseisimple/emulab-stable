@@ -1,3 +1,10 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+import java.util.Date;
 
 import java.io.IOException;
 
@@ -6,11 +13,16 @@ import java.net.URLEncoder;
 
 import java.applet.Applet;
 
+import java.text.SimpleDateFormat;
+
 import thinlet.Thinlet;
 
 public class GarciaTelemetry
     extends Thinlet
 {
+    public static final SimpleDateFormat TIME_FORMAT =
+	new SimpleDateFormat("hh:mm:ss a - ");
+    
     private final Applet applet;
     private URL servicePipe;
     
@@ -30,10 +42,13 @@ public class GarciaTelemetry
     public Object rlSensor;
     public Object rrSensor;
 
+    public Object log;
+    public String logString = "";
+    
     public Object connected;
     public Object lastUpdate;
     public Object reconnectButton;
-    
+
     public GarciaTelemetry(Applet applet)
 	throws Exception
     {
@@ -60,6 +75,8 @@ public class GarciaTelemetry
 
 	    this.rlSensor = this.find("rl-sensor");
 	    this.rrSensor = this.find("rr-sensor");
+
+	    this.log = this.find("log");
 
 	    this.connected = this.find("connected");
 	    this.lastUpdate = this.find("last-update");
@@ -102,6 +119,14 @@ public class GarciaTelemetry
 	this.setBoolean(this.reconnectButton, "enabled", false);
 	this.setString(this.connected, "text", "Connecting...");
 	this.connect();
+    }
+
+    public void appendLog(String msg)
+    {
+	this.logString += TIME_FORMAT.format(new Date()) + msg;
+	this.setString(this.log, "text", this.logString);
+	this.setInteger(this.log, "start", this.logString.length());
+	this.setInteger(this.log, "end", this.logString.length());
     }
 
     public String toString()

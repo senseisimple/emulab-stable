@@ -51,7 +51,7 @@ if (TBNodeStatus($node) == "up") {
     echo "
     <applet code='thinlet.AppletLauncher.class'
             archive='thinlet.jar,oncrpc.jar,mtp.jar,garcia-telemetry.jar'
-            width='400' height='250'
+            width='400' height='300'
             alt='You need java to run this applet'>
         <param name='class' value='GarciaTelemetry'>
         <param name='pipeurl' value='servicepipe.php3?node=$node'>

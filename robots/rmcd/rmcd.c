@@ -81,23 +81,18 @@ static int looping = 1;
 
 static struct mtp_config_rmc *rmc_config = NULL;
 
+typedef enum {
+    PS_ARRIVED,
+    PS_PENDING_POSITION,
+    PS_REFINING_POSITION,
+    PS_REFINING_ORIENTATION,
+} pos_state_t;
+
 enum {
-    GCB_PENDING_POSITION,
-    GCB_REFINING_POSITION,
     GCB_VISION_POSITION,
 };
 
 enum {
-    /**
-     * Flag used to indicate when a new intended position has been submitted.
-     */
-    GCF_PENDING_POSITION = (1L << GCB_PENDING_POSITION),
-
-    /**
-     * Flag used to indicate when we're trying to refine the position.
-     */
-    GCF_REFINING_POSITION = (1L << GCB_REFINING_POSITION),
-
     /**
      * Flag used to indicate that the value in the gc_actual_pos field was
      * obtained from the vision system.
@@ -107,6 +102,7 @@ enum {
 
 struct gorobot_conn {
     unsigned long gc_flags;
+    pos_state_t gc_state;
     struct robot_config *gc_robot;
     mtp_handle_t gc_handle;
     int gc_tries_remaining;
@@ -278,8 +274,7 @@ static int cmp_pos(struct robot_position *pos1, struct robot_position *pos2)
     assert(pos2 != NULL);
 
     if (cmp_fuzzy(pos1->x, pos2->x, METER_TOLERANCE) &&
-	cmp_fuzzy(pos1->y, pos2->y, METER_TOLERANCE) &&
-	cmp_fuzzy(pos1->theta, pos2->theta, RADIAN_TOLERANCE)) {
+	cmp_fuzzy(pos1->y, pos2->y, METER_TOLERANCE)) {
 	retval = 1;
     }
 
@@ -298,7 +293,7 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
     assert(emc_handle != NULL);
     
     if (mtp_receive_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
-	errorc("bad packet from emc!\n");
+	fatal("bad packet from emc!\n");
     }
     else {
 	struct mtp_command_goto *mcg = &mp.data.mtp_payload_u.command_goto;
@@ -317,9 +312,11 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 	    if ((gc = find_gorobot(mcg->robot_id)) == NULL) {
 		error("uknnown robot %d\n", mcg->robot_id);
 	    }
-	    else if (!(gc->gc_flags & (GCF_PENDING_POSITION|
-				       GCF_REFINING_POSITION)) &&
-		     cmp_pos(&gc->gc_actual_pos, &mcg->position)) {
+	    else if ((gc->gc_state == PS_ARRIVED) &&
+		     cmp_pos(&gc->gc_actual_pos, &mcg->position) &&
+		     cmp_fuzzy(gc->gc_actual_pos.theta,
+			       mcg->position.theta,
+			       RADIAN_TOLERANCE)) {
 		struct mtp_packet rmp;
 		
 		info("robot %d is already there\n", mcg->robot_id);
@@ -348,8 +345,7 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 		 * will send back an IDLE update and we can do more processing.
 		 */
 		gc->gc_intended_pos = mcg->position;
-		gc->gc_flags |= GCF_PENDING_POSITION;
-		gc->gc_flags &= ~GCF_REFINING_POSITION;
+		gc->gc_state = PS_PENDING_POSITION;
 		gc->gc_tries_remaining = 0;
 		
 		mtp_init_packet(&smp,
@@ -373,9 +369,7 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 		struct mtp_packet smp;
 
 		/* Just stop the robot in its tracks and clear out any state */
-		
-		gc->gc_flags &= ~GCF_PENDING_POSITION;
-		gc->gc_flags &= ~GCF_REFINING_POSITION;
+		gc->gc_state = PS_ARRIVED;
 		gc->gc_tries_remaining = 0;
 		
 		mtp_init_packet(&smp,
@@ -404,8 +398,8 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 		gc->gc_flags |= GCF_VISION_POSITION;
 		
 		info("position update %f\n", gc->gc_actual_pos.x);
-		
-		if (gc->gc_flags & GCF_REFINING_POSITION) {
+
+		if (gc->gc_state == PS_REFINING_POSITION) {
 
 		    /*
 		     * This update is a response to our request, try to refine
@@ -414,51 +408,30 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 		    
 		    gc->gc_tries_remaining -= 1;
 		    
-		    if (gc->gc_tries_remaining == 0) {
-			struct mtp_packet ump;
+		    if ((gc->gc_tries_remaining == 0) ||
+			(cmp_pos(&gc->gc_actual_pos,
+				 &gc->gc_intended_pos))) {
+			struct robot_position rp;
+			struct mtp_packet gmp;
 			
-			info("didn't make it it\n");
-			
-			gc->gc_flags &= ~GCF_REFINING_POSITION;
-			
-			mtp_init_packet(&ump,
-					MA_Opcode, MTP_UPDATE_POSITION,
+			gc->gc_state = PS_REFINING_ORIENTATION;
+
+			memset(&rp, 0, sizeof(rp));
+			rp.theta = gc->gc_intended_pos.theta -
+			    gc->gc_actual_pos.theta;
+			mtp_init_packet(&gmp,
+					MA_Opcode, MTP_COMMAND_GOTO,
 					MA_Role, MTP_ROLE_RMC,
-					MA_Position, &gc->gc_actual_pos,
+					MA_Position, &rp,
 					MA_RobotID, gc->gc_robot->id,
-					MA_Status, MTP_POSITION_STATUS_ERROR,
+					MA_CommandID, 1,
 					MA_TAG_DONE);
-			if (mtp_send_packet(emc_handle, &ump) !=
+			if (mtp_send_packet(gc->gc_handle, &gmp) !=
 			    MTP_PP_SUCCESS) {
 			    fatal("request id failed");
 			}
 			
-			mtp_free_packet(&ump);
-		    }
-		    else if (cmp_pos(&gc->gc_actual_pos,
-				     &gc->gc_intended_pos)) {
-			struct mtp_packet ump;
-			
-			info("made it\n");
-
-			/* We're on target, tell emcd. */
-			
-			gc->gc_flags &= ~GCF_REFINING_POSITION;
-			
-			mtp_init_packet(
-				&ump,
-				MA_Opcode, MTP_UPDATE_POSITION,
-				MA_Role, MTP_ROLE_RMC,
-				MA_Position, &gc->gc_actual_pos,
-				MA_RobotID, gc->gc_robot->id,
-				MA_Status, MTP_POSITION_STATUS_COMPLETE,
-				MA_TAG_DONE);
-			if (mtp_send_packet(emc_handle, &ump) !=
-			     MTP_PP_SUCCESS) {
-			    fatal("request id failed");
-			}
-			
-			mtp_free_packet(&ump);
+			mtp_free_packet(&gmp);
 		    }
 		    else {
 			struct robot_position new_pos;
@@ -500,11 +473,12 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 {
     struct mtp_packet mp;
-
+    int rc;
+    
     assert(gc != NULL);
     assert(emc_handle != NULL);
     
-    if (mtp_receive_packet(gc->gc_handle, &mp) != MTP_PP_SUCCESS) {
+    if ((rc = mtp_receive_packet(gc->gc_handle, &mp)) != MTP_PP_SUCCESS) {
 	fatal("bad packet from gorobot!\n");
     }
     else if (mp.data.opcode == MTP_UPDATE_POSITION) {
@@ -544,7 +518,7 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 	switch (mup->status) {
 	case MTP_POSITION_STATUS_IDLE:
 	    /* Response to a COMMAND_STOP. */
-	    if (gc->gc_flags & GCF_PENDING_POSITION) {
+	    if (gc->gc_state == PS_PENDING_POSITION) {
 		struct mtp_packet rmp;
 		
 		info("starting move\n");
@@ -562,8 +536,7 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 		mtp_free_packet(&rmp);
 
 		/* Update state. */
-		gc->gc_flags &= ~GCF_PENDING_POSITION;
-		gc->gc_flags |= GCF_REFINING_POSITION;
+		gc->gc_state = PS_REFINING_POSITION;
 		gc->gc_tries_remaining = MAX_REFINE_RETRIES;
 	    }
 	    break;
@@ -586,15 +559,14 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 		}
 		
 		mtp_free_packet(&ump);
-		
-		gc->gc_flags &= ~GCF_PENDING_POSITION;
-		gc->gc_flags &= ~GCF_REFINING_POSITION;
+
+		gc->gc_state = PS_ARRIVED;
 	    }
 	    break;
 	case MTP_POSITION_STATUS_COMPLETE:
 	    info("gorobot finished\n");
 	    
-	    if (gc->gc_flags & GCF_REFINING_POSITION) {
+	    if (gc->gc_state == PS_REFINING_POSITION) {
 		struct mtp_packet rmp;
 		
 		info("requesting position %d\n", gc->gc_robot->id);
@@ -609,6 +581,23 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 		}
 		
 		mtp_free_packet(&rmp);
+	    }
+	    else if (gc->gc_state == PS_REFINING_ORIENTATION) {
+		struct mtp_packet ump;
+		    
+		mtp_init_packet(&ump,
+				MA_Opcode, MTP_UPDATE_POSITION,
+				MA_Role, MTP_ROLE_RMC,
+				MA_Position, &gc->gc_actual_pos,
+				MA_RobotID, gc->gc_robot->id,
+				MA_Status, MTP_POSITION_STATUS_COMPLETE,
+				MA_TAG_DONE);
+		if (mtp_send_packet(emc_handle, &ump) !=
+		    MTP_PP_SUCCESS) {
+		    fatal("request id failed");
+		}
+		
+		mtp_free_packet(&ump);
 	    }
 	    break;
 	default:
@@ -701,7 +690,7 @@ int main(int argc, char *argv[])
 	else if (connect(emc_fd,
 			 (struct sockaddr *)&saddr,
 			 sizeof(saddr)) == -1) {
-	    pfatal("connect");
+	    pfatal("emc connect");
 	}
 	else if ((emc_handle = mtp_create_handle(emc_fd)) == NULL) {
 	    pfatal("mtp_create_handle");
@@ -724,7 +713,7 @@ int main(int argc, char *argv[])
 	     */
 	    for (lpc = 0; lpc < rmc_config->robots.robots_len; lpc++) {
 		struct gorobot_conn *gc = &gorobot_connections[lpc];
-		struct mtp_packet qmp, qrmp;
+		struct mtp_packet imp, qmp, qrmp;
 		int fd;
 		
 		info(" robot[%d] = %d %s\n",
@@ -732,6 +721,11 @@ int main(int argc, char *argv[])
 		     rmc_config->robots.robots_val[lpc].id,
 		     rmc_config->robots.robots_val[lpc].hostname);
 
+		mtp_init_packet(&imp,
+				MA_Opcode, MTP_CONTROL_INIT,
+				MA_Role, MTP_ROLE_RMC,
+				MA_Message, "rmcd v0.1",
+				MA_TAG_DONE);
 		gc->gc_robot = &rmc_config->robots.robots_val[lpc];
 		if (mygethostbyname(&saddr,
 				    gc->gc_robot->hostname,
@@ -749,6 +743,10 @@ int main(int argc, char *argv[])
 		}
 		else if ((gc->gc_handle = mtp_create_handle(fd)) == NULL) {
 		    fatal("robot mtp_create_handle");
+		}
+		else if (mtp_send_packet(gc->gc_handle, &imp) !=
+			 MTP_PP_SUCCESS) {
+		    fatal("could not send init packet");
 		}
 		else {
 		    FD_SET(fd, &readfds);

@@ -22,6 +22,8 @@ class pilotMoveCallback : public wmCallback
 
 public:
 
+    pilotMoveCallback(pilotClient::list &pcl);
+
     /**
      * Callback that will send an MTP_UPDATE_POSITION packet back to the client
      * with the appropriate status value.
@@ -30,10 +32,20 @@ public:
      */
     virtual void call(int status);
 
+private:
+
+    pilotClient::list &notify_list;
+    
 };
+
+pilotMoveCallback::pilotMoveCallback(pilotClient::list &pcl)
+    : notify_list(pcl)
+{
+}
 
 void pilotMoveCallback::call(int status)
 {
+    pilotClient::iterator i;
     mtp_packet_t mp;
     mtp_status_t ms;
     
@@ -56,8 +68,10 @@ void pilotMoveCallback::call(int status)
 		    MA_Status, ms,
 		    MA_TAG_DONE);
 
-    if (pilotClient::pc_rmc_client != NULL) {
-	mtp_send_packet(pilotClient::pc_rmc_client->getHandle(), &mp);
+    for (i = this->notify_list.begin(); i != this->notify_list.end(); i++) {
+	pilotClient *pc = *i;
+	
+	mtp_send_packet(pc->getHandle(), &mp);
     }
 }
 
@@ -88,12 +102,12 @@ pilotClient::~pilotClient()
     }
     else {
 	if (debug) {
-	    fprintf(stderr, "debug: emulab client disconnected\n");
+	    fprintf(stderr, "debug: client disconnected\n");
 	}
     }
 }
 
-bool pilotClient::handlePacket(mtp_packet_t *mp)
+bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 {
     struct mtp_command_goto *mcg;
     struct mtp_control *mc;
@@ -114,7 +128,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 	case MTP_ROLE_RMC:
 	    if (pilotClient::pc_rmc_client == NULL) {
 		if (debug) {
-		    fprintf(stderr, "debug: rmc client connected\n");
+		    fprintf(stderr,
+			    "debug: rmc client connected - %s\n",
+			    mp->data.mtp_payload_u.init.msg);
 		}
 		
 		pilotClient::pc_rmc_client = this;
@@ -124,7 +140,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 	    break;
 	case MTP_ROLE_EMULAB:
 	    if (debug) {
-		fprintf(stderr, "debug: emulab client connected\n");
+		fprintf(stderr,
+			"debug: emulab client connected - %s\n",
+			mp->data.mtp_payload_u.init.msg);
 	    }
 	    
 	    retval = true;
@@ -134,19 +152,33 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 	
     case MTP_COMMAND_GOTO:
 	if (this->pc_role == MTP_ROLE_RMC) {
+	    pilotClient::iterator i;
+	    struct mtp_packet cmp;
+	    
 	    mcg = &mp->data.mtp_payload_u.command_goto;
+	    
+	    cmp = *mp;
+	    cmp.role = MTP_ROLE_ROBOT;
+	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
+		pilotClient *pc = *i;
+		
+		if (pc->getRole() == MTP_ROLE_EMULAB)
+		    mtp_send_packet(pc->getHandle(), &cmp);
+	    }
+	    
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
+		
 		if (debug) {
 		    fprintf(stderr,
 			    "debug: move to %f %f\n",
 			    mcg->position.x,
 			    mcg->position.y);
 		}
-		
+
 		this->pc_wheel_manager.
 		    setDestination(mcg->position.x,
 				   mcg->position.y,
-				   new pilotMoveCallback());
+				   new pilotMoveCallback(notify_list));
 	    }
 	    else {
 		if (debug) {
@@ -155,8 +187,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 			    mcg->position.theta);
 		}
 		
-		this->pc_wheel_manager.setOrientation(mcg->position.theta,
-						      new pilotMoveCallback());
+		this->pc_wheel_manager.setOrientation(
+			mcg->position.theta,
+			new pilotMoveCallback(notify_list));
 	    }
 	    
 	    retval = true;
@@ -165,8 +198,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 
     case MTP_COMMAND_STOP:
 	if (this->pc_role == MTP_ROLE_RMC) {
-	    struct mtp_packet rmp;
-
+	    struct mtp_packet cmp, rmp;
+	    pilotClient::iterator i;
+	    
 	    if (debug) {
 		fprintf(stderr, "debug: full stop\n");
 	    }
@@ -177,8 +211,17 @@ bool pilotClient::handlePacket(mtp_packet_t *mp)
 			    MA_Role, MTP_ROLE_ROBOT,
 			    MA_Status, MTP_POSITION_STATUS_IDLE,
 			    MA_TAG_DONE);
-	    mtp_send_packet(this->pc_handle, &rmp);
 
+	    cmp = *mp;
+	    cmp.role = MTP_ROLE_ROBOT;
+	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
+		pilotClient *pc = *i;
+
+		if (pc->getRole() == MTP_ROLE_EMULAB)
+		    mtp_send_packet(pc->getHandle(), &cmp);
+		mtp_send_packet(pc->getHandle(), &rmp);
+	    }
+	    
 	    retval = true;
 	}
 	break;
