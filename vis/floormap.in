@@ -73,8 +73,10 @@ $building = $ARGV[0];
 # Hardwire the imagemaps for now.
 #
 my %baseimages = ();
-$baseimages{"MEB"}{"4-East"} = "$TB/www/meb-4east.png";
-$baseimages{"MEB"}{"4-West"} = "$TB/www/meb-4east.png";
+$baseimages{"MEB"}{"4"} = "$TB/www/meb4fl.png";
+$baseimages{"MEB"}{"3"} = "$TB/www/meb3fl.png";
+#$baseimages{"MEB"}{"2"} = "$TB/www/meb2fl.png";
+#$baseimages{"MEB"}{"1"} = "$TB/www/meb1fl.png";
 
 if (!exists($baseimages{$building})) {
     die("No such building: $building\n");
@@ -146,7 +148,7 @@ else {
     #
     # Create a new image using the aggregate size.
     #
-    $image = new GD::Image($max_x, $total_y);
+    $image = new GD::Image($max_x, $total_y, 1);
 
     #
     # Now copy the floor images into the superimage.
