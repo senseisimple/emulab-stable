@@ -49,6 +49,17 @@ endif
 	$(MAKE) -C dijkstra client-install
 	$(MAKE) -C genhostsfile client-install
 
+mfs:
+ifneq ($(SYSTEM),Linux)
+	$(MAKE) -C imagezip client
+endif
+
+mfs-install: mfs
+ifneq ($(SYSTEM),Linux)
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
+	$(MAKE) -C imagezip client-install
+endif
+
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile

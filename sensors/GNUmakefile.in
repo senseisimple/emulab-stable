@@ -32,6 +32,12 @@ client-install: client
 	@$(MAKE) -C slothd client-install
 	@$(MAKE) -C canaryd client-install
 
+# mfs: same as client for now
+mfs:
+	@$(MAKE) -C slothd client
+mfs-install: mfs
+	@$(MAKE) -C slothd client-install
+
 clean:		subdir-clean
 
 subdir-clean:

@@ -107,6 +107,22 @@ client-install: client client-mkdirs
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
+destdircheck:
+	@if [ -z "$(DESTDIR)" ]; then \
+	    echo "You must define DESTDIR for this target!"; \
+	    false; \
+	fi
+
+mfs:
+	@$(MAKE) -C os mfs
+	@$(MAKE) -C sensors mfs
+	@$(MAKE) -C tmcd mfs
+
+mfs-install: destdircheck mfs
+	@$(MAKE) -C os mfs-install
+	@$(MAKE) -C sensors mfs-install
+	@$(MAKE) -C tmcd mfs-install
+
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
 # tell, you can't put ifeq()'s inside of targets
