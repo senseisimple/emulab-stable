@@ -22,7 +22,7 @@
 #    init <db> [<pid> <eid> <num>] - Initiatlize.  
 #    test <testdir> - Run tests
 #    single <testdir> <tests> - Run only <tests>
-#    finish [<db> <pid> <eid>] - Finish run.
+#    finish - Finish run
 # <num> is "X <type> ...", for example "10 pc 16 shark"
 
 use DBI;
@@ -67,13 +67,13 @@ sub show_help {
     print STDERR "  -leavedb - Do not drop the test database on exit.\n";
     print STDERR "  -path <path> - Path to directory to store test files.\n";
     print STDERR "  -frontend - Run in frontend mode.\n";
-    print STDERR "  -full - Run in full mode (Not yet implemented).\n";
+    print STDERR "  -full - Run in full mode.\n";
     print STDERR "Mode:\n";
     print STDERR "  run <db> <testdir> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
     print STDERR "  test <testdir>\n";
     print STDERR "  single <testdir> <tests>\n";
-    print STDERR "  finish [<db> <pid> <eid>]\n";
+    print STDERR "  finish\n";
     print STDERR "<num>: Must be even lengthed list of <number> <type>.\n";
     print STDERR "   Ex: \"4 pc 16 shark\"\n";
     print STDERR "Examples:\n";
@@ -103,6 +103,10 @@ while (($#ARGV > -1) && ($mode eq "")) {
 }
 
 chdir $path;
+$user=`whoami`;
+chop $user;
+$logfile = "test.log";
+$statefile = "state";
 
 if ($mode eq "run") {
     if ($type eq "frontend") {
@@ -127,16 +131,23 @@ if ($mode eq "run") {
     if ($#ARGV <= 0) {show_help;}
     ($testdir,@tests) = @ARGV;
 } elsif ($mode eq "finish") {
-    if ($type eq "frontend") {
-	if ($#ARGV != -1) {show_help;}
-    } else {
-	if ($#ARGV != 2) {show_help;}
-	($TBDB,$pid,$eid) = @ARGV;
-    }
+    if ($#ARGV != -1) {show_help;}
 } else {
     print STDERR "Unknown mode: $mode\n";
     show_help;
 }
+
+if (($mode ne "run") && ($mode ne "init")) {
+    # Read state
+    open(STATE,$statefile) || do {
+	print STDERR "Could not find state file ($statefile).\n";
+	print STDERR "  Run in init mode first.\n";
+	exit(1);
+    };
+    ($type,$TBDB,$user,$pid,$eid) = split(" ",<STATE>);
+    close(STATE);
+}
+
 
 if (($mode eq "run") || ($mode eq "test") || ($mode eq "single")) {
     if (! ($testdir =~ m|^/|)) {
@@ -151,10 +162,7 @@ if (($type eq "full") && (($mode eq "init") || ($mode eq "run"))) {
     }
 }
 
-$user=`whoami`;
-chop $user;
 $testdb = "tbdb_$user";
-$logfile = "test.log";
 
 # Test counts
 $pass = 0;
@@ -226,12 +234,21 @@ sub step_init {
     prints "Type:     $type\n";
     prints "\n";
     prints "Beginning test run. " . ctime(time);
-    
+
     # Initialize DB
     $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
 	die "Could not connect to DB.\n";
     # Having made sure we can, we now disconnect so as not to harm DB.
     $dbh->disconnect;
+
+    # Write state
+    open(STATE,"> $statefile");
+    if ($type eq "full") {
+	print STATE "$type $TBDB $user $pid $eid\n";
+    } else {
+	print STATE "$type $TBDB $user\n";
+    }
+    close(STATE);
 
     # Reserve nodes
     if ($type eq "full") {
@@ -602,6 +619,15 @@ sub step_cleanup {
 	    prints "PASS\n";
 	    $pass++;
 	}
+    }
+    prints "  Clearing state ";
+    system("rm -f $statefile");
+    if (($? >> 8) != 0) {
+	prints "FAIL\n";
+	$fail++;
+    } else {
+	prints "PASS\n";
+	$pass++;
     }
     prints "End test run. " . ctime(time);
     prints "END CLEANUP\n";

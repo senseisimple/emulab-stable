@@ -42,6 +42,7 @@ The test directory holds the following files:
 	clean.txt		Dump of clean test DB.
 	dbdump.txt		Dump of real database.
 	defs			Defs file used for configure.
+	state			Used internally for proper cleanup.
 	
 * - Appears only in frontend (default) mode.
 ** - Appears only in full mode.
@@ -92,6 +93,23 @@ of commands, check for fail cases, and inspect data base state for
 correctness.  To create such tests read the "Test Format" section
 below.
 
+Using the Test Tree
+-------------------
+
+It is often useful to be able to do manual testing using the test
+tree.  This can easily be done.  By running 
+	tbtest -leavedb init tbdb
+you will setup the test tree and test database, leaving the DB
+intact.  You can now run all your commands from the install tree to do
+manual testing just as the tests do.
+
+The experiment 'test' under project 'testbed' exists in the test DB
+and should be used for all testing.
+
+The following command, when run from the test directory, will set up
+your path correctly:
+
+setenv PATH "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:.:`pwd`/install/bin:`pwd`/install/sbin"
 
 Program Reference 
 -----------------
@@ -131,13 +149,13 @@ Options:
   -leavedb - Do not drop the test database on exit.
   -path <path> - Path to directory to store test files.
   -frontend - Run in frontend mode.
-  -full - Run in full mode (Not yet implemented).
+  -full - Run in full mode.
 Mode:
   run <db> <testdir> [<pid> <eid> <num>]
   init <db> [<pid> <eid> <num>]
   test <testdir>
   single <testdir> <tests>
-  finish [<db> <pid> <eid>]
+  finish
 tbtest [-leavedb] [-path <path>] <db> <testdir>
 
 Notes:
@@ -145,9 +163,8 @@ Notes:
 The arguments in [] for the modes are necessary with -full and should
 not be present otherwise.
 
-IMPORTANT: If running with -full you must have -full on all modes.
-Doing a -full init and then a finish without -full will cause
-problems.
+You need only use -full on init to set the type for any other
+subsequent commands.
 
 Generally tbtest is invoked in 'run' mode that does everything.  For
 an more interactive approach a you can invoke 'tbtest init ...' and
