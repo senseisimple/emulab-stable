@@ -370,11 +370,14 @@ example:
       $queue0 set q_weight_ 0.004
       </pre>
 
-<li> CBR <pre>
+<li> CBR: interval_ and rate_ are two way of specifying the same thing.
+     iptos_ allows you to set the IP_TOS socket option for a traffic
+     stream.<pre>
       $cbr0 start
       $cbr0 set packetSize_ 512
       $cbr0 set interval_ 0.01
       $cbr0 set rate_ 10Mbs
+      $cbr0 set iptos_ 16
       $cbr0 stop
       </pre>
 
