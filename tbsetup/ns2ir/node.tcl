@@ -114,8 +114,10 @@ Node instproc updatedb {DB} {
 
         append nseconfig [$agent get_nseconfig]
     }
-    # update the per-node nseconfigs table in the DB
-    sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid','$eid','$self','$nseconfig')";
+    if( $nseconfig != {} } {
+        # update the per-node nseconfigs table in the DB
+        sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid','$eid','$self','$nseconfig')";
+    }
 
     # Update the DB
     sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osname,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype,fixed) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\",\"$fixed\")";
