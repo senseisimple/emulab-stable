@@ -730,24 +730,6 @@ if ($batch) {
 }
 
 #
-# HACK! if successful, put new NS file in DB.
-#
-
-if ($inout eq "modify") {
-    $nsdata_string = `cat $modnsfile`;
-    if (defined($nsdata_string)) {
-	$nsdata_string = DBQuoteSpecial($nsdata_string);
-
-	DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
-	DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
-		    "VALUES('$pid', '$eid', $nsdata_string)");
-    }
-    else {
-	print "Warning!! Could not read nsfile '$modnsfile'!\n";
-    }
-}
-
-#
 # Clear the log file so the web page stops spewing. 
 #
 if (defined($logname)) {

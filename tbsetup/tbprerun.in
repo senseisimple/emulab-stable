@@ -122,6 +122,28 @@ if (system("parse-ns $pid $gid $eid $nsfile")) {
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
+#
+# Put the nsfile into the DB, now that we know it parses okay.
+#
+$nsfile_string = `cat $nsfile`;
+
+if ($nsfile_string) {
+    $nsfile_string = DBQuoteSpecial($nsfile_string);
+
+    if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
+	cleanup();
+	die("*** $0:\n".
+	    "    NS File is way too big!\n");
+    }
+    if (!DBQueryWarn("delete from nsfiles where eid='$eid' and pid='$pid'") ||
+	!DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
+		     "VALUES('$pid', '$eid', $nsfile_string)")) {
+	cleanup();
+	die("*** $0:\n".
+	    "    Error storing the NS file into the database!\n");
+    }
+}
+
 TBDebugTimeStamp("prerender started in background");
 print "Precomputing visualization ...\n";
 system("prerender -t $pid $eid");
