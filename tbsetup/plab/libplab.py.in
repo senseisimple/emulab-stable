@@ -1603,7 +1603,7 @@ class Node:
         elif method == "PLC":
             TIMESTAMP("freenode %s started." % self.nodeid)
             try:
-                res = tryXmlrpcCmd(self.agent.UnAssignNodes, self.hostname)
+                res = tryXmlrpcCmd(self.agent.UnAssignNodes, self.IP)
                 if debug:
                     print res
             except:
