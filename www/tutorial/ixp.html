@@ -8,10 +8,13 @@
 </center>
 The IXP1200 network processor is now integrated into Emulab, and
 available to external researchers for remote experimentation.
-Similar to other emulab resources, an IXP1200 node can 
-be allocated through an ns script or through the Netbuild GUI.
-It can be configured as part of any arbitrary topology with end-nodes,
-traffic generators, routers, links etc. This makes it easy to
+Similar to other Emulab resources, an IXP1200 node can 
+be allocated through an <i>ns</i> script or through the Netbuild GUI.
+It can be configured as part of an arbitrary topology with end-nodes,
+traffic generators, routers, links etc.  Through NFS it has access to 
+/proj and your Emulab home directory.  You can configure a command to run
+automatically upon bootup.
+This makes it easy to
 allocate, experiment with, and evaluate an IXP based application.
 
 <p>
@@ -36,6 +39,8 @@ resources permit.
 <li> <a href="#testexpt">Test Experiment to get started using IXP1200 in Emulab</a>
 <li> <a href="#nodeusage">Node usage policies</a>
 <li> <a href="#notes">Setup Notes</a>
+<li> <a href="#internals">Internals</a>
+
 </ul>
 
 
@@ -46,7 +51,7 @@ resources permit.
 </center>
 
 <p>
-To start using IXP nodes in Emulab, you would first need an account
+To start using IXP nodes in Emulab, you first need an account
 in Emulab. See <a href="http://www.emulab.net/doc.php3">
 Emulab Documentation </a> for more details; especially if you are
 using Emulab for the first time.
@@ -73,33 +78,33 @@ end-nodes connected in a simple linear topology.
 
 <code><pre>
 
+# Boilerplate
 source tb_compat.tcl
-
 set ns [new Simulator]
 
-#Create an ixp node
+# Create an ixp node
 set myixp [$ns node]
 
-#set its type to ixp-bv hardware
+# Set its hardware type to ixp-bv (bridalveil)
 tb-set-hardware $myixp ixp-bv
 
-#Create the host which houses the IXP card
-set myixphost [$ns node] 
-
-# Set the host and ixp association	
-tb-bind-parent $myixp $myixphost     
+      # Optional: Create and bind the host that houses the IXP card.
+      # Emulab will generate these automatically if you don't.
+      #set host-myixp [$ns node] 
+      #tb-bind-parent $myixp $host-myixp
 
 # Create end nodes
 set n0 [$ns node] 
 set n1 [$ns node]
 
-#Create links between the end nodes and the IXP	
-$ns duplex-link $myixp $n0 100Mb 0ms DropTail
+# Create links between the end nodes and the IXP	
+$ns duplex-link $n0 $myixp 100Mb 0ms DropTail
 $ns duplex-link $myixp $n1 100Mb 0ms DropTail 
 
-#set up static routing on all nodes
+# Set up static routing on all nodes,
 $ns rtproto Static
 
+# Boilerplate
 $ns run
 
 </pre></code>
@@ -370,3 +375,12 @@ application on the StrongArm can read and print it. This is a
 useful debugging technique.
 
 </ul>
+
+<hr>
+<a NAME="internals"></a>
+<center>
+<h2>Internals of IXP Support</h2>
+</center>
+
+Nothing detailed, but the general issues and design are outlined in some 
+<a href="http://www.cs.utah.edu/flux/testbed-docs/internals/ixp.ppt">Powerpoint slides</a>.
