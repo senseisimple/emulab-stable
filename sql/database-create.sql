@@ -1163,6 +1163,24 @@ CREATE TABLE ntpinfo (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `obstacles`
+--
+
+CREATE TABLE obstacles (
+  obstacle_id int(11) unsigned NOT NULL auto_increment,
+  floor varchar(32) default NULL,
+  building varchar(32) default NULL,
+  x1 int(10) unsigned NOT NULL default '0',
+  y1 int(10) unsigned NOT NULL default '0',
+  z1 int(10) unsigned NOT NULL default '0',
+  x2 int(10) unsigned NOT NULL default '0',
+  y2 int(10) unsigned NOT NULL default '0',
+  z2 int(10) unsigned NOT NULL default '0',
+  description tinytext,
+  PRIMARY KEY  (obstacle_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `os_info`
 --
 

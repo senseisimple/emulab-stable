@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -454,6 +454,7 @@ sub dofloor($$)
 		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
     my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
 
+    
     my $newnodes_query = "select * from new_nodes ".
 		         "where building='$building'";
     my $newnodes_result = DBQueryFatal($newnodes_query . " and floor='$floor'");
@@ -689,6 +690,31 @@ sub dofloor($$)
 	# Have to adjust the maps cause we just moved everything.
 	adjustmap($areamap, 0, $head_height);
     }
+
+    #
+    # Stick in obstacles, if any.
+    #
+    my $obstacles_result =
+	DBQueryFatal("select * from obstacles ".
+		     "where floor='$floor' and building='$building'");
+
+    while (my %obrow = $obstacles_result->fetchhash()) {
+	my $id       = $obrow{"obstacle_id"};
+	my $x1       = $obrow{"x1"};
+	my $x2       = $obrow{"x2"};
+	my $y1       = $obrow{"y1"};
+	my $y2       = $obrow{"y2"};
+	my $descr    = $obrow{"description"};
+	my $props  = {};
+
+	$props->{"X1"}    = $x1;
+	$props->{"Y1"}    = $y1;
+	$props->{"X2"}    = $x2;
+	$props->{"Y2"}    = $y2;
+	$props->{"DESCR"} = $descr;
+	$props->{"ISOBS"} = 1;
+	$areamap->{"$id"} = $props;
+    }
     
     return ($baseimage, $areamap);
 }
@@ -809,11 +835,15 @@ sub writefiles($@)
 	    my $y1 = $map{$nodeid}->{"Y1"};
 	    my $x2 = $map{$nodeid}->{"X2"};
 	    my $y2 = $map{$nodeid}->{"Y2"};
+	    my $isobs = $map{$nodeid}->{"ISOBS"};
+	    my $descr = $map{$nodeid}->{"DESCR"};
 	    my $isnew = $map{$nodeid}->{"ISNEW"};
-	    my $link  = ($isnew ?
-			 "newnode_edit.php3?id=${isnew}" :
-			 "shownode.php3?node_id=${nodeid}");
-	    my $title = $nodeid;
+	    my $link  = ($isobs ?
+			 "showobstacle.php3?id=${nodeid}" :
+			 ($isnew ?
+			  "newnode_edit.php3?id=${isnew}" :
+			  "shownode.php3?node_id=${nodeid}"));
+	    my $title = ($isobs ? $descr : $nodeid);
 
 	    $title .= " (vname=" . $map{$nodeid}->{'VNAME'} . ")"
 		if (exists($map{$nodeid}->{'VNAME'}));
