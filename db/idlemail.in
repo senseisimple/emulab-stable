@@ -251,7 +251,8 @@ from node_activity as na left join reserved as r on na.node_id=r.node_id
 left join experiments as e on r.pid=e.pid and r.eid=e.eid
 where swappable>0 and state="active" and idleswap>0 group by pid,eid
 having idlemin+$idle_warnmin>=idleswap_timeout and
-idlemin+$idle_warnmin<=idleswap_timeout+$window order by pid,eid
+idlemin+$idle_warnmin<=idleswap_timeout+$window and
+idlemin >= (60 * $threshold) order by pid,eid
 EOT
         $q = DBQueryFatal($sql);
 	if ($d) { print $sql,"\n",$q->as_string; $q->dataseek(0); }
