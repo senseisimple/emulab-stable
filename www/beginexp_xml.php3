@@ -404,11 +404,7 @@ if ($deletensfile) {
 # do with the error. Also reports to tbops.
 # 
 if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_DIE);
-    #
-    # Never returns ...
-    #
-    die("");
+    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 }
 
 # User error. Tell user and exit.
