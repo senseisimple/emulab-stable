@@ -207,6 +207,7 @@ static void	signal_program(struct proginfo *pinfo, char *args);
  * @return Zero on success, -1 otherwise.
  */
 static int	parse_configfile(char *filename);
+static int	parse_configfile_env(char *filename);
 
 /**
  * Callback triggered when a program executes passed its timeout value.
@@ -585,6 +586,12 @@ main(int argc, char **argv)
 	    setenv("NODEIP", inet_ntoa(ia), 1);	    
 	}
 
+	/* XXX Need to eval the ENV parts of the config file after we've
+	 * setup the environment.
+	 */
+	if (parse_configfile_env(configfile) != 0)
+		exit(1);
+	
 	/*
 	 * Change to the temp directory, this will be inherited by any children
 	 * that do not have their own directory setting.
@@ -1396,6 +1403,38 @@ parse_configfile(char *filename)
 			continue;
 		}
 		if (!strncmp(buf, "ENV ", 4)) {
+			continue;
+		}
+		error("parse_configfile: malformed: %s\n", buf);
+		goto bad;
+	}
+	fclose(fp);
+	return 0;
+ bad:
+	fclose(fp);
+	return -1;
+}
+
+static int
+parse_configfile_env(char *filename)
+{
+	FILE	*fp;
+	char	buf[BUFSIZ];
+
+	assert(filename != NULL);
+	assert(strlen(filename) > 0);
+	
+	if ((fp = fopen(filename, "r")) == NULL) {
+		errorc("could not open configfile %s", filename);
+		return -1;
+	}
+	
+	while (fgets(buf, sizeof(buf), fp)) {
+		int cc = strlen(buf);
+		if (buf[cc-1] == '\n')
+			buf[cc-1] = (char) NULL;
+
+		if (!strncmp(buf, "ENV ", 4)) {
 			FILE *file;
 			
 			/* XXX Kind of a stupid way to eval any variables. */
@@ -1417,14 +1456,10 @@ parse_configfile(char *filename)
 			}
 			continue;
 		}
-		error("parse_configfile: malformed: %s\n", buf);
-		goto bad;
 	}
+	
 	fclose(fp);
 	return 0;
- bad:
-	fclose(fp);
-	return -1;
 }
 
 static int

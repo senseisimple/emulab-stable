@@ -1345,6 +1345,13 @@ class experiment:
             "elab_in_elab"
             ])
         
+        vue = DBQueryFatal("SELECT name,value FROM virt_user_environment "
+                           "WHERE pid=%s and eid=%s order by idx",
+                           (argdict["proj"], argdict["exp"]),
+                           True)
+
+        res["user_environment"] = vue
+
         return EmulabResponse(RESPONSE_SUCCESS, value=res, output=str(res))
 
     #

@@ -264,24 +264,43 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 }
 
 int
-RPC_exppath(char *pid, char *eid, char *path_out, size_t path_size)
+RPC_metadata(char *pid, char *eid)
 {
 	emulab::EmulabResponse er;
 	int retval;
 
 	assert(pid != NULL);
 	assert(eid != NULL);
-	assert(path_out != NULL);
-	assert(path_size > 0);
 
 	if ((retval = RPC_invoke(pid, eid, "experiment.metadata", &er)) == 0) {
 		ulxr::RpcString path;
+		ulxr::Array userenv;
 		ulxr::Struct md;
 
 		md = (ulxr::Struct)er.getValue();
 		path = md.getMember(ULXR_PCHAR("path"));
-		strncpy(path_out, path.getString().c_str(), path_size);
-		path_out[path_size - 1] = '\0';
+		SetExpPath(path.getString().c_str());
+
+		userenv = md.getMember(ULXR_PCHAR("user_environment"));
+		if (userenv.size() > 0) {
+			int lpc;
+
+			for (lpc = 0; lpc < userenv.size(); lpc++) {
+				ulxr::RpcString tmp;
+				char *name, *value;
+				ulxr::Struct ue;
+				
+				ue = (ulxr::Struct)userenv.getItem(lpc);
+				tmp = ue.getMember("name");
+				name = (char *)tmp.getString().c_str();
+				ue = (ulxr::Struct)userenv.getItem(lpc);
+				tmp = ue.getMember("value");
+				value = (char *)tmp.getString().c_str();
+
+				if ((retval = AddUserEnv(name, value)) != 0)
+					return retval;
+			}
+		}
 	}
 
 	return retval;

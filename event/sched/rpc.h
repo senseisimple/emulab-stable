@@ -56,7 +56,7 @@ int RPC_init(const char *certpath, const char *host, unsigned short port);
 int RPC_grab(void);
 void RPC_drop(void);
 
-int RPC_exppath(char *pid, char *eid, char *path_out, size_t path_size);
+int RPC_metadata(char *pid, char *eid);
 int RPC_waitforrobots(event_handle_t handle, char *pid, char *eid);
 int RPC_waitforactive(char *pid, char *eid);
 int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear);
@@ -65,6 +65,9 @@ int RPC_grouplist(event_handle_t handle, char *pid, char *eid);
 int RPC_eventlist(char *pid, char *eid,
 		  event_handle_t handle, address_tuple_t tuple,
 		  long basetime);
+
+extern int SetExpPath(const char *path);
+extern int AddUserEnv(char *name, char *value);
 
 extern int AddAgent(event_handle_t handle,
 		    char *vname, char *vnode, char *nodeid,

@@ -157,8 +157,6 @@ static int remap_experiment(simulator_agent_t sa, int token)
 	EmulabResponse er;
 	int retval;
 
-	rename("tbdata/feedback_data.tcl",
-	       "tbdata/feedback_data_old.tcl");
 	snprintf(nsfile, sizeof(nsfile),
 		 "/proj/%s/exp/%s/tbdata/%s-modify.ns",
 		 pid, eid, eid);
@@ -169,14 +167,14 @@ static int remap_experiment(simulator_agent_t sa, int token)
 	}
 	RPC_grab();
 	retval = RPC_invoke("experiment.modify",
-			&er,
-			SPA_String, "proj", pid,
-			SPA_String, "exp", eid,
-			SPA_Boolean, "wait", true,
-			SPA_Boolean, "reboot", true,
-			SPA_Boolean, "restart_eventsys", true,
-			SPA_String, "nsfilepath", nsfile,
-			SPA_TAG_DONE);
+			    &er,
+			    SPA_String, "proj", pid,
+			    SPA_String, "exp", eid,
+			    SPA_Boolean, "wait", true,
+			    SPA_Boolean, "reboot", true,
+			    SPA_Boolean, "restart_eventsys", true,
+			    SPA_String, "nsfilepath", nsfile,
+			    SPA_TAG_DONE);
 	RPC_drop();
 
 	if (retval != 0) {
@@ -201,6 +199,8 @@ static int do_modify(simulator_agent_t sa, int token, char *args)
 		error("no mode specified\n");
 	}
 	else if (strncasecmp("stabilize", mode, rc) == 0) {
+		rename("tbdata/feedback_data.tcl",
+		       "tbdata/feedback_data_old.tcl");
 		if (systemf("loghole --port=%d --quiet sync",
 			    DEFAULT_RPC_PORT) != 0) {
 			error("failed to sync log holes\n");

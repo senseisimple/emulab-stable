@@ -196,17 +196,13 @@ main(int argc, char *argv[])
 		fatal("could not connect to rpc server");
 	}
 	
-	if (RPC_exppath(pid, eid, buf, sizeof(buf))) {
-		fatal("could not get experiment metadata");
-	}
-	if (chdir(buf) < 0) {
-		fatal("could not chdir to experiment directory: %s", buf);
-	}
-
-	setenv("EXPDIR", buf, 1);
 	setenv("LOGDIR", LOGDIR, 1);
 	setenv("PID", pid, 1);
 	setenv("EID", eid, 1);
+
+	if (RPC_metadata(pid, eid)) {
+		fatal("could not get experiment metadata");
+	}
 
 	/*
 	 * Okay this is more complicated than it probably needs to be. We do
@@ -743,6 +739,44 @@ dequeue(event_handle_t handle)
 		sched_event_free(handle, &next_event);
 	}
 }
+
+int
+SetExpPath(const char *path)
+{
+	setenv("EXPDIR", path, 1);
+	return chdir(path);
+}
+
+int
+AddUserEnv(char *name, char *path)
+{
+	int retval = 0;
+	FILE *file;
+	
+	/* XXX Kind of a stupid way to eval any variables. */
+	if ((file = popenf("echo %s=%s", "r", name, path)) == NULL) {
+		retval = -1;
+	}
+	else {
+		char buf[BUFSIZ];
+		
+		if (fgets(buf, sizeof(buf), file) != NULL) {
+			char *idx;
+			
+			if ((idx = strchr(buf, '\n')) != NULL)
+				*idx = '\0';
+			if ((idx = strchr(buf, '=')) != NULL) {
+				*idx = '\0';
+				retval = setenv(strdup(buf), idx + 1, 1);
+			}
+		}
+		pclose(file);
+		file = NULL;
+	}
+	
+	return 0;
+}
+
 /*
  * Stuff to get the event list.
  */
