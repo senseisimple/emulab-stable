@@ -82,8 +82,7 @@ Agent instproc set_application {application} {
 Agent instproc connect {dst} {
     $self instvar destination
     if {$destination != {}} {
-	perror "\[connect] $self already has a destination: $destination."
-	return
+	puts stderr "*** WARNING: \[connect] $self is already connected to $destination"
     }
     set destination $dst
 }
@@ -110,6 +109,10 @@ Agent instproc updatedb {DB} {
     $self instvar port
     $self instvar link
 
+    if {$node == {}} {
+	perror "\[updatedb] $self is not attached to a node."
+	return
+    }
     if {$role == {}} {
 	perror "\[updatedb] $self has no role."
 	return
@@ -117,6 +120,10 @@ Agent instproc updatedb {DB} {
     if {$destination == {}} {
 	perror "\[updatedb] $self has no destination."
 	return
+    }
+    if { ($role == "source") && ($application == {}) } {
+        perror "\[updatedb] $self does not have an attached application."
+        return
     }
     set target_vnode [$destination set node]
     set target_port [$destination set port]
@@ -148,77 +155,15 @@ Agent instproc get_nseconfig {} {
 # Agent/UDP 
 Agent/UDP instproc connect {dst} {
     $self next $dst
-    $self instvar node
-    $self instvar application
-    $self instvar destination
-
-    set error 0
-    if {$node == {}} {
-	perror "\[connect] $self is not attached to a node."
-	set error 1
-    }
-
-    set dest [$destination set node]
-    if {$dest == {}} {
-	perror "\[connect] $destination is not attached to a node."
-	set error 1
-    }
-
-
-    # for the case when the node is simulated
-    # we just ignore
-    if { [$node set simulated] == 1 } {
-	return
-    }
-
-    if {$application == {}} {
-	perror "\[connect] $self does not have an attached application."
-	set error 1
-    }
-#    if {[llength [$node set portlist]] != 1} {
-#	perror "\[connect] $node must have exactly one link to be a traffic generator."
-#	set error 1
-#    }
-    if {$error} {return}
-
     $self set proto "udp"
+    $self set role "source"
 }
 
 # Agent/TCP
 Agent/TCP instproc connect {dst} {
     $self next $dst
-    $self instvar node
-    $self instvar application
-    $self instvar destination
-
-    set error 0
-    if {$node == {}} {
-	perror "\[connect] $self is not attached to a node."
-	set error 1
-    }
-    set dest [$destination set node]
-    if {$dest == {}} {
-	perror "\[connect] $destination is not attached to a node."
-	set error 1
-    }
-
-    # for the case when the node is simulated
-    # we just ignore
-    if { [$node set simulated] == 1 } {
-	return
-    }
-
-    if {$application == {}} {
-	perror "\[connect] $self does not have an attached application."
-	set error 1
-    }
-#    if {[llength [$node set portlist]] != 1} {
-#	perror "\[connect] $node must have exactly one link to be a traffic generator."
-#	set error 1
-#    }
-    if {$error} {return}
-
     $self set proto "tcp"
+    $self set role "source"
 }
 
 # Agent/TCP/FullTcp
@@ -276,6 +221,10 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     $self instvar port
     $self instvar link
 
+    if {$node == {}} {
+	perror "\[updatedb] $self is not attached to a node."
+	return
+    }
     if {$role == {}} {
 	perror "\[updatedb] $self has no role."
 	return
@@ -283,6 +232,10 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     if {$destination == {}} {
 	perror "\[updatedb] $self has no destination."
 	return
+    }
+    if { ($role == "source") && ($application == {}) } {
+        perror "\[updatedb] $self does not have an attached application."
+        return
     }
     set target_vnode [$destination set node]
     set target_port [$destination set port]
@@ -361,37 +314,6 @@ Agent/TCP/FullTcp instproc connect {dst} {
     $self instvar destination
     $self instvar role
 
-    set error 0
-    if {$node == {}} {
-        perror "\[connect] $self is not attached to a node."
-        set error 1
-    }
- 
-    # for the case when the node is simulated
-    # we just ignore
-    if { [$node set simulated] == 1 } {
-	return
-    }
-
-   if { ($role == "source") && ($application == {}) } {
-        perror "\[connect] $self does not have an attached application."
-        set error 1
-    }
-    set dest [$destination set node]
-    if {$dest == {}} {
-        perror "\[connect] $destination is not attached to a node."
-        set error 1
-    }
-
-# This was an artifact of SEND-CONSUME CBR model. Now that we run freebsd on the
-# traffic generator nodes, all we need to do is either enable OSPF routing by
-# default or setup static routes
-#    if {[llength [$node set portlist]] != 1} {
-#        perror "\[connect] $node must have exactly one link to be a traffic generator."
-#        set error 1
-#    }
-    if {$error} {return}
-
     $self set proto "tcp"
     $dst set proto "tcp"
     $node set osid "FBSD-STD"
@@ -403,64 +325,12 @@ Agent/TCP/FullTcp instproc connect {dst} {
 # Agent/Null
 Agent/Null instproc connect {dst} {
     $self next $dst
-    $self instvar node
-    $self instvar application
-    $self instvar destination
-    set error 0
-    if {$node == {}} {
-	perror "\[connect] $self is not attached to a node."
-	set error 1
-    }
-    set dest [$destination set node]
-    if {$dest == {}} {
-	perror "\[connect] $destination is not attached to a node."
-	set error 1
-    }
-
-    # for the case when the node is simulated
-    # we just ignore
-    if { [$node set simulated] == 1 } {
-	return
-    }
-
-#    if {[llength [$node set portlist]] != 1} {
-#	perror "\[connect] $node must have exactly one link to be a traffic consumer."
-#	set error 1
-#    }
-    if {$error} {return}
-
     $self set role "sink"
 }
 
 # Agent/Null
 Agent/TCPSink instproc connect {dst} {
     $self next $dst
-    $self instvar node
-    $self instvar application
-    $self instvar destination
-    set error 0
-    if {$node == {}} {
-	perror "\[connect] $self is not attached to a node."
-	set error 1
-    }
-    set dest [$destination set node]
-    if {$dest == {}} {
-	perror "\[connect] $destination is not attached to a node."
-	set error 1
-    }
-
-    # for the case when the node is simulated
-    # we just ignore
-    if { [$node set simulated] == 1 } {
-	return
-    }
-
-#    if {[llength [$node set portlist]] != 1} {
-#	perror "\[connect] $node must have exactly one link to be a traffic consumer."
-#	set error 1
-#    }
-    if {$error} {return}
-
     $self set role "sink"
     $self set proto "tcp"
 }
@@ -478,6 +348,10 @@ Application instproc attach-agent {agent} {
 }
 Application instproc get_node {} {
     $self instvar agent
+    if {$agent == {} } {
+	perror "\[Application get_node] $self is not attached to an agent."
+	return ""
+    }
     return [$agent get_node]
 }
 Application instproc rename {old new} {
