@@ -5,9 +5,14 @@ require("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Emulab Tutorial");
+if (!$printable) {
+    PAGEHEADER("Emulab Tutorial");
+}
 
-echo("<b><a href=$TBDOCBASE/docwrapper.php3?docname=tutorial/tutorial.html&printable=1>Printable version of this document</a></b><br>");
+if (!$printable) {
+    echo("<b><a href=$REQUEST_URI?printable=1>Printable version of this document</a></b><br>");
+}
+
 
 chdir("tutorial");
 readfile("tutorial.html");
@@ -15,6 +20,8 @@ readfile("tutorial.html");
 #
 # Standard Testbed Footer
 # 
-PAGEFOOTER();
+if (!$printable) {
+    PAGEFOOTER();
+}
 ?>
 
