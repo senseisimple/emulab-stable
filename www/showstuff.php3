@@ -683,6 +683,8 @@ function SHOWOSINFO($osid) {
     $os_pid         = $osrow[pid];
     $os_shared      = $osrow[shared];
     $os_osname      = $osrow[osname];
+    $creator        = $osrow[creator];
+    $created        = $osrow[created];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -694,6 +696,8 @@ function SHOWOSINFO($osid) {
 	$os_magic = "&nbsp";
     if (!$os_osfeatures)
 	$os_osfeatures = "&nbsp";
+    if (!$created)
+	$created = "N/A";
 
     #
     # Generate the table.
@@ -709,6 +713,16 @@ function SHOWOSINFO($osid) {
             <td>Project: </td>
             <td class=\"left\">$os_pid</td>
           </tr>\n";
+
+    echo "<tr>
+            <td>Creator: </td>
+            <td class=left>$creator</td>
+ 	  </tr>\n";
+
+    echo "<tr>
+            <td>Created: </td>
+            <td class=left>$created</td>
+ 	  </tr>\n";
 
     echo "<tr>
             <td>Description: </td>
@@ -784,6 +798,8 @@ function SHOWIMAGEID($imageid, $edit) {
     $path 	 = $row[path];
     $loadaddr	 = $row[load_address];
     $shared	 = $row[shared];
+    $creator     = $row[creator];
+    $created     = $row[created];
 
     if ($edit) {
 	if (!$description)
@@ -800,6 +816,8 @@ function SHOWIMAGEID($imageid, $edit) {
 	    $path = "&nbsp";
 	if (!$loadaddr)
 	    $loadaddr = "&nbsp";
+	if (!$created)
+	    $created = "N/A";
     }
     
     #
@@ -823,6 +841,16 @@ function SHOWIMAGEID($imageid, $edit) {
             <td>Project: </td>
             <td class=\"left\">$pid</td>
           </tr>\n";
+
+    echo "<tr>
+            <td>Creator: </td>
+            <td class=left>$creator</td>
+ 	  </tr>\n";
+
+    echo "<tr>
+            <td>Created: </td>
+            <td class=left>$created</td>
+ 	  </tr>\n";
 
     echo "<tr>
             <td>Description: </td>

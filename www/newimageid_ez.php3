@@ -571,17 +571,19 @@ if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
 DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$loadpart" . "_osid, ".
-	     " default_osid, path, pid, shared) ".
+	     " default_osid, path, pid, shared, creator, created) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, 1, ".
-	     "   '$imageid', '$imageid', '$path', '$pid', $shared)");
+	     "   '$imageid', '$imageid', '$path', '$pid', $shared, ".
+             "   '$uid', now())");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid) ".
+	     " osfeatures, pid, creator, created) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
-	     "   '$os_version', NULL, NULL, '$os_features', '$pid')");
+	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
+             "   '$uid', now())");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

@@ -43,6 +43,17 @@ if (mysql_num_rows($query_result) == 0) {
 	}
 }
 
+SUBPAGESTART();
+SUBMENUSTART("More Options");
+WRITESUBMENUBUTTON("Create an Image Descriptor",
+		   "newimageid_explain.php3");
+WRITESUBMENUBUTTON("Create an OS Descriptor",
+		   "newosid_form.php3");
+WRITESUBMENUBUTTON("Back to Image Descriptor list",
+		   "showimageid_list.php3");
+SUBMENUEND();
+SUBPAGEEND();
+
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
@@ -65,10 +76,6 @@ while ($row = mysql_fetch_array($query_result)) {
     echo "</tr>\n";
 }
 echo "</table>\n";
-
-echo "<br><center>
-      <a href='newosid_form.php3'>Create a new OS Descriptor.</a>
-      </center>\n";
 
 #
 # Standard Testbed Footer

@@ -169,10 +169,11 @@ if (TBValidOSID($osid)) {
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description, OS, version, path, magic, ".
-		 " osfeatures, pid, shared) ".
+		 " osfeatures, pid, shared, creator, created) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', ".
-		 "        '$os_features', '$pid', $os_shared)");
+		 "        '$os_features', '$pid', $os_shared, ".
+	         "        '$uid', now())");
 
 DBQueryFatal("unlock tables");
 
