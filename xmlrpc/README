@@ -1,0 +1,15 @@
+This directory contains the Emulab XMLRPC client code. Lots more
+information can be found at http://www.emulab.net/xmlrpcapi.php3
+
+* sshxmlrpc_client.py: A trivial demonstration program that allows you
+  to talk to the RPC server on boss.emulab.net, provided you have an
+  account on Emulab. It is intended to show how to talk to the server,
+  or perhaps even use it in production from the command line if you do
+  not want to write your own client.
+
+* sshxmlrpc.py: A library written at the University of Utah that you
+  need to include in your Python client program. Be sure to move this
+  file to your python library directory.
+
+* emulabclient.py: Another small library that you need to put in your
+  python library directory.

@@ -17,8 +17,10 @@ SBIN_SCRIPTS	= sshxmlrpc_server.py
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
-DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py
+DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README
 DEBUG_STUFF     = experiment node
+
+EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 #
 # These are the ones installed on plastic (users, control, etc). 
