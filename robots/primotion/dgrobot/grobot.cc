@@ -260,17 +260,20 @@ void grobot::dgoto(float Dx, float Dy, float Rf) {
      
     // calculate rotation components
     float Rir = atan2(Dy, Dx);
-    float Rfr = Rf - dt_init;
+    float Rfr = Rf - Rir;
     float moveL = sqrt((pow(Dx,2)) + (pow(Dy,2)));
 
-    if (0.0f == dt_init && 0.0f == moveL && 0.0f == Rfr) {
+    if (0.0f == Rir && 0.0f == moveL && 0.0f == Rfr) {
       set_gotocomplete();
     } else {
       // execute primitives
 
+      dt_init = Rir;
+      dt_final = Rfr;
+      
       // reset position estimates
-      dt_init = 0.0f;
-      dt_final = 0.0f;
+      
+      
       
       dx_est = 0.0f;
       dy_est = 0.0f;
@@ -432,19 +435,21 @@ void grobot::setCBstatus(int id, int stat, cb_type_t cbt) {
       
       
       updatePosition();
-      float pa_temp = (dright - dleft) / TRACK_WIDTH;
+      //float pa_temp = (dright - dleft) / TRACK_WIDTH;
       
       if (1 == gotomcomplete) {
       // first pivot has finished
         
-      dt_init = pa_temp;
+      // FIXME
+      //dt_init = pa_temp;
       gotop1 = stat;
       
       } else if (3 == gotomcomplete) {
       // second pivot has executed
         
-      dt_final = pa_temp;
-      dt_est = dt_init + dt_final;
+      // FIXME
+      //dt_final = pa_temp;
+      //dt_est = dt_init + dt_final;
       
       gotop2 = stat;
       
