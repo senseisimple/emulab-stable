@@ -44,9 +44,6 @@ if (!isset($usr_affil) ||
     strcmp($usr_affil, "") == 0) {
   $formerror = "Institutional Affiliation";
 }
-if (!isset($old_password) || strcmp($old_password, "") == 0) {
-  $formerror = "Old Password";
-}
 
 if ($formerror != "No Error") {
   USERERROR("Missing field; Please go back and fill out ".
@@ -54,23 +51,9 @@ if ($formerror != "No Error") {
 }
 
 #
-# Verify the old password.
+# Only known and logged in users can modify info.
 #
-$pswd_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
-if (!$pswd_result) {
-    TBERROR("Database Error retrieving password for $uid: $err\n", 1);
-}
-if ($row = mysql_fetch_row($pswd_result)) {
-    $db_encoding = $row[0];
-    $salt = substr($db_encoding,0,2);
-    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
-    $encoding = crypt("$old_password", $salt);
-    if (strcmp($encoding, $db_encoding)) {
-	USERERROR("The password provided was incorrect. ".
-                  "Please go back and retype the password.", 1);
-    }
-}
+LOGGEDINORDIE($uid);
 
 #
 # Now see if the user is requesting to change the password. We do the usual

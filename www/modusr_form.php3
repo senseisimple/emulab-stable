@@ -7,33 +7,19 @@
 <?php
 include("defs.php3");
 
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-  $uid=$Vals[1];
-  addslashes($uid);
-} else {
-  unset($uid);
-}
-
 #
 # Only known and logged in users can modify info.
 #
-if (!isset($uid)) {
-    USERERROR("You must be logged in to change your user information!", 1);
+$uid = "";
+if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
+    $uid=$Vals[1];
+    addslashes($uid);
 }
+else {
+    unset($uid);
+}
+LOGGEDINORDIE($uid);
 
-#
-# Verify that the uid is known in the database.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid='$uid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error confirming user $uid: $err\n", 1);
-}
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    USERERROR("You do not appear to have an account!", 1);
-}
 ?>
 
 <center>
@@ -74,7 +60,23 @@ echo "<tr>
           <td>Username:</td>
           <td class=\"left\"> 
               <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
+      </tr>\n";
 
+echo "<tr>
+          <td>*Full Name:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"usr_name\" size=\"30\"
+                     value=\"$usr_name\"></td>
+      </tr>\n";
+
+echo "<tr>
+          <td>*Email Address:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"usr_email\" size=\"30\"
+                     value=\"$usr_email\"></td>
+      </tr>\n";
+
+echo "<tr>
           <td>Expiration date:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"usr_expires\"
@@ -82,55 +84,43 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-          <td>*Email Address:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"usr_email\"
-                     value=\"$usr_email\"></td>
-
           <td>*Mailing Address:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"usr_addr\" 
+              <input type=\"text\" name=\"usr_addr\" size=\"40\"
                      value=\"$usr_addr\"></td>
       </tr>\n";
 
 echo "<tr>
-          <td>*Full Name:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"usr_name\"
-                     value=\"$usr_name\"></td>
-
           <td>*Phone #:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"usr_phone\"
+              <input type=\"text\" name=\"usr_phone\" size=\"15\"
                      value=\"$usr_phone\"></td>
       </tr>\n";
 
 echo "<tr>
-          <td>*Old Password:</td>
-          <td class=\"left\">
-              <input type=\"password\" name=\"old_password\"></td>
-
           <td>*Title/Position:</td>
           <td class=\"left\">
-              <input type=\"text\" name=\"usr_title\"
+              <input type=\"text\" name=\"usr_title\" size=\"30\"
                      value=\"$usr_title\"></td>
      </tr>\n";
 
 echo "<tr>
+          <td>*Institutional Affiliation:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"usr_affil\" size=\"40\"
+                     value=\"$usr_affil\"></td>
+      </tr>\n";
+
+echo "<tr>
           <td>New Password:</td>
           <td class=\"left\">
-              <input type=\"password\" name=\"new_password1\"></td>
-
-          <td>*Institutional<br>Affiliation:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"usr_affil\"
-                     value=\"$usr_affil\"></td>
+              <input type=\"password\" name=\"new_password1\" size=\"8\"></td>
      </tr>\n";
 
 echo "<tr>
           <td>Retype<br>New Password:</td>
           <td class=\"left\">
-              <input type=\"password\" name=\"new_password2\"></td>
+              <input type=\"password\" name=\"new_password2\" size=\"8\"></td>
      </tr>\n";
 ?>
 <td colspan="4" align="center">

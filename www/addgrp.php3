@@ -84,7 +84,7 @@ echo "<tr>
 if ($row) {
     echo "           type=\"readonly\" value=\"$row[usr_name]\">";
 } else {
-    echo "           type=\"text\">";
+    echo "           type=\"text\" size=\"30\">";
 }
 echo "     </td>
       </tr>\n";
@@ -99,7 +99,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_title]\">";
 } else {
-    echo "          type=\"text\" value=\"Professor Emeritus\">";
+    echo "          type=\"text\" value=\"Professor Emeritus\" size=\"30\">";
 }
 
 echo "     </td>
@@ -115,7 +115,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_affil]\">";
 } else {
-    echo "          type=\"text\" value=\"UCB Networks Group\">";
+    echo "          type=\"text\" value=\"UCB Networks Group\" size=\"40\">";
 }
 
 echo "     </td>
@@ -132,7 +132,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_email]\">";
 } else {
-    echo "          type=\"text\">";
+    echo "          type=\"text\" size=\"30\">";
 }
 
 echo "    </td>
@@ -148,7 +148,7 @@ echo "<tr>
 if ($row) {
     echo "           type=\"readonly\" value=\"$row[usr_addr]\">";
 } else {
-    echo "           type=\"text\">";
+    echo "           type=\"text\" size=\"40\">";
 }
 echo "    </td>
       </tr>\n";
@@ -162,7 +162,7 @@ echo "    <td>*Phone #:</td>
 if ($row) {
     echo "           type=\"readonly\" value=\"$row[usr_phone]\">";
 } else {
-    echo "           type=\"text\">";
+    echo "           type=\"text\" size=\"15\">";
 }
 echo "    </td>
       </tr>\n";
@@ -172,7 +172,7 @@ echo "    </td>
 #
 echo "<tr>
          <td>*Password:</td>
-         <td><input type=\"password\" name=\"password1\"></td>
+         <td><input type=\"password\" name=\"password1\" size=\"8\"></td>
       </tr>\n";
 
 #
@@ -183,7 +183,7 @@ if (! $row) {
 echo "<tr>
           <td>*Retype<br>New Password:</td>
           <td class=\"left\">
-              <input type=\"password\" name=\"password2\"></td>
+              <input type=\"password\" name=\"password2\" size=\"8\"></td>
       </tr>\n";
 }
 
@@ -214,7 +214,7 @@ echo "<tr>
 echo "<tr>
           <td>*Long name:</td>
           <td><input type=\"text\" name=\"grp_name\"
-                     value=\"UCB Overlay Multicast\"></td>
+                     value=\"UCB Overlay Multicast\" size=\"40\"></td>
       </tr>\n";
 
 #
@@ -222,7 +222,7 @@ echo "<tr>
 #
 echo "<tr>
          <td>+URL:</td>
-         <td><input type=\"text\" name=\"grp_URL\"
+         <td><input type=\"text\" name=\"grp_URL\" size=\"45\"
                     value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
       </tr>\n";
 
@@ -231,12 +231,13 @@ echo "<tr>
 # 
 echo "<tr>
          <td>*Estimated #of PCs:</td>
-         <td><input type=\"text\" name=\"grp_pcs\"></td>
+         <td><input type=\"text\" name=\"grp_pcs\" size=\"4\"></td>
       </tr>\n";
 
 echo "<tr>
          <td>*Estimated #of Sharks:</td>
-         <td><input type=\"text\" name=\"grp_sharks\" value=\"0\"></td>
+         <td><input type=\"text\" name=\"grp_sharks\" size=\"4\"
+                    value=\"0\"></td>
       </tr>\n";
 
 #

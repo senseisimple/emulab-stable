@@ -19,6 +19,11 @@ $TBLIST_USERS   = "$TBLIST_DIR"."/users.txt";
 $TBUSER_DIR	= "/users/";
 $TBNSSUBDIR     = "nsdir";
 
+$TBAUTHCOOKIE   = "HashCookie";
+$TBAUTHTIMEOUT  = 10800;
+$TBAUTHDOMAIN   = "emulab.net";
+#$TBAUTHDOMAIN   = "C884963-A.crvlls1.or.home.com";
+
 #
 # Generate the KEY from a name
 #
@@ -32,6 +37,8 @@ function GENKEY ($name) {
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death) {
+    global $TBMAIL_WWW;
+
     if (0) {
     mail($TBMAIL_WWW,
          "TESTBED ERROR REPORT",
@@ -65,6 +72,11 @@ function USERERROR($message, $death) {
           <br>
           </h3>";
 
+    echo "<p><p>
+          Please contact <a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+          Testbed Operations (testbed-ops@flux.cs.utah.edu)</a> 
+          if you feel this message is an error.";
+
     if ($death) {
         echo "</body>
               </html>";
@@ -72,4 +84,8 @@ function USERERROR($message, $death) {
     }
 }
 
+#
+# Beware empty spaces (cookies)!
+# 
+require("tbauth.php3");
 ?>
