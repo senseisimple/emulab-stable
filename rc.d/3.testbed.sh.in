@@ -57,6 +57,11 @@ if [ -x @prefix@/sbin/hmcd  ]; then
 	@prefix@/sbin/hmcd
 fi
 
+if [ -x @prefix@/sbin/sdcollectd  ]; then
+	echo -n " sdcollectd"
+	@prefix@/sbin/sdcollectd
+fi
+
 if [ -x @prefix@/sbin/stated  ]; then
 	echo -n " stated"
 	@prefix@/sbin/stated
