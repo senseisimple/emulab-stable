@@ -81,6 +81,17 @@ foreach (split("\n",&ir_get("/virtual/nodes"))) {
     $rvnodemap{$physical} = $virtual;
 }
 
+# Read in nodes
+&ir_exists("/topology/nodes") || do {
+    print STDERR "IR does not contain topology/nodes section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/topology/nodes"))) {
+    @t = split;
+    ($node,$type) = @t;
+    $nodetypes{$node} = $type;
+}
+
 # Read in the links
 &ir_exists("/topology/links") || do {
     print STDERR "IR does not contain topology/links section.\n";
@@ -90,17 +101,6 @@ foreach (split("\n",&ir_get("/topology/links"))) {
     @t = split;
     ($link,$src,$dst) = @t[0,1,3];
     $links{$link} = [$src,$dst];
-}
-
-# Get an idea of what LANs there are
-&ir_exists("/topology/lans") || do {
-    print STDERR "IR does not contain topology/lans section.\n";
-    exit(1);
-};
-foreach (split("\n",&ir_get("/topology/lans"))) {
-    ($lan,$nodesraw) = /^([^ ]+) "([^\"]+)"/;
-    my(@nodes) = split(" ",$nodesraw);
-    $lans{$lan} = [$lan,\@nodes];
 }
 
 # Pull the MAC table from the database.
@@ -121,6 +121,35 @@ while (@row = $sth->fetchrow_array) {
     }
 }
 $sth->finish;
+
+# Get an idea of what LANs there are
+&ir_exists("/topology/lans") || do {
+    print STDERR "IR does not contain topology/lans section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/topology/lans"))) {
+    ($lan,$nodesraw,$linksraw) = /^([^ ]+) "([^\"]+)" [^ ]+ [^ ]+ [^ ]+ (.+)$/;
+    my(@nodes) = split(" ",$nodesraw);
+    $lans{$lan} = [$lan,\@nodes];
+    # Check for sharkshelf
+    if ($nodetypes{$nodes[0]} == "shark") {
+	# We need to fill in the MACs for the vlan map for this lan
+	# since there is no actual VLAN for it.
+	$vlanmap{$lan} = [];
+	foreach $shark (@nodes) {
+	    push(@{$vlanmap{$lan}},@{$MACTABLE{$shark}});
+	}
+	# Linksraw only has a single link otherwise assign_wrapper would have
+	# generated an error.
+	($src,$dst) = @{$links{$linksraw}};
+	if ($src eq $lan) {
+	    $other = $dst;
+	} else {
+	    $other = $src;
+	}
+	push(@{$vlanmap{$lan}},@{$MACTABLE{$other}});
+    }
+}
 
 # This is a list of error messages
 @ERRORS = ();

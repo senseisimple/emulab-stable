@@ -133,8 +133,8 @@ foreach (split("\n",$raw)) {
     }
     $delay =~ s/[mM][sS]$//;
     $bw =~ s/[mM][bB]$//;
-    printdb "lans{$lan} = [$nodes_raw,$bw,$delay,$loss".
-      (defined $links_raw ? ",$links_raw" : "")."]\n";
+    printdb "lans{$lan} = [$nodes_raw,$bw,$delay,$loss,".
+	join(" ",@$links_tmp) ."]\n";
     $lans{$lan} = [$nodes_tmp,$bw,$delay,$loss,$links_tmp];
 }
 
@@ -148,6 +148,108 @@ sub min {
     }
     return $min;
 };
+
+# Shark shelf
+
+# We need to find LANs with sharks in them, check to see all's ok and
+# convert them in to shark shelves, splitting the LAN if necessary.  The 
+# following conditions must be checked:
+# Foreach lan with sharks
+#   1. 10 MB, 0 latency, no loss
+#   2. <= 8 sharks in LAN
+#   3. <= 1 external link.
+# Foreach shark
+#   1. In LAN
+#   2. No other links
+
+# %sharkshelves is indexed by sharkshelf name (ss-<lan>) and contains
+# a list of the sharks in it.
+foreach $lan (keys(%lans)) {
+    ($lnodes,$bw,$delay,$loss,$llinks) = @{$lans{$lan}};
+    @sharks = ();
+    @others = ();
+    foreach $node (@$lnodes) {
+	if ($nodetypes{$node} eq "shark") {
+	    push(@sharks,$node);
+	} else {
+	    push(@others,$node);
+	}
+    }
+    # Skip if nothing more to do
+    if ($#sharks == -1) {next;}
+
+    # Check LAN
+    if (($bw != 10) || ($delay != 0) || ($loss != 0)) {
+	print STDERR "$lan has sharks but is not 10Mb/0 delay/0 loss.\n";
+	exit(1);
+    }
+    if ($#sharks >= 8) {
+	print STDERR "$lan has too many sharks.  Max 8.\n";
+	exit(1);
+    }
+
+    printdb "shark-lan $lan\n";
+    # Check sharks and remove them from consideration if they are OK
+    foreach $shark (@sharks) {
+	if (@{$nodes{$shark}}) {
+	    print STDERR "Shark $shark has links.\n";
+	    exit(1);
+	}
+	delete $nodes{$shark};
+	delete $nodetypes{$shark};
+    }
+    
+    # Final checks
+    @lanlinks = @$llinks;
+    if (@others) {
+	print STDERR "Shark lan $lan has non-sharks.\n";
+	exit(1);
+    }
+    if ($#lanlinks > 0) {
+	print STDERR "Shark lan $lan has more than one outside link.\n";
+	exit(1);
+    }
+
+    # Generate the shark shelf node
+    $ssnode = "ss-$lan";
+    $nodetypes{$ssnode} = "shark-shelf";
+    printdb "  nodetypes{$ssnode} = shark-shelf\n";
+    $sharkshelves{$ssnode} = [];
+    push(@{$sharkshelves{$ssnode}},@sharks);
+    printdb "  sharkshelves{$ssnode} = " . join(" ",@{$sharkshelves{$ssnode}}) . "\n";
+    if ($#lanlinks == 0) {
+	printdb "  Setting up link\n";
+	$extlink = $lanlinks[0];
+	($src,$dst,$bw,$delay,$loss) = @{$links{$extlink}};
+	if ($src eq "$lan") {
+	    $rdst = $dst;
+	} else {
+	    $rdst = $src;
+	}
+	$nodes{$ssnode} = ["$ssnode-$extlink"];
+	printdb "  nodes{$ssnode} = $ssnode-$extlink\n";
+	$links{"$ssnode-$extlink"} = [$ssnode,$rdst,$bw,$delay,$loss];
+	printdb "  links{$ssnode-$extlink} = [$ssnode,$rdst,$bw,$delay,$loss]\n";
+	delete $links{$extlink};
+    } else {
+	$nodes{$ssnode} = [];
+	printdb "  nodes{$ssnode} = []\n";
+    }
+
+    # Remove the original LAN
+    delete $lans{$lan};
+}
+
+# Check all remaining nodes to make sure none are sharks
+foreach $node (keys(%nodes)) {
+    printdb "Checking $node for sharkness ($nodetypes{$node})\n";
+    if ($nodetypes{$node} eq "shark") {
+	print STDERR "$node is s shark but not in a LAN.\n";
+	exit(1);
+    }
+}
+
+
 # LAN conversion
 
 # We now need to turn LANs into links and nodes.  Each lan gets a central
@@ -645,7 +747,13 @@ open(IRFILE,">>$irfile") || do {
 print IRFILE "START virtual\n";
 print IRFILE "START nodes\n";
 foreach $vnode (keys(%v2pmap)) {
-    if (! defined($lans{$vnode})) {
+    if (defined($sharkshelves{$vnode})) {
+	$i = 1;
+	foreach $vshark (@{$sharkshelves{$vnode}}) {
+	    print IRFILE "$vshark $v2pmap{$vnode}-$i\n";
+	    $i++;
+	}
+    } elsif (! defined($lans{$vnode})) {
 	print IRFILE "$vnode $v2pmap{$vnode}\n";
     }
 }

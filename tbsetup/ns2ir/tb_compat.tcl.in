@@ -78,16 +78,10 @@ proc tb-set-lan-loss {lan rate} {
     global TBCMD nodeid_map prefix
     puts $TBCMD "tb-set-lan-loss $prefix-$nodeid_map($lan) $rate"
 }
-proc tb-set-dnard-os {shelf number os} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-dnard-os $nodeid_map($shelf) $number $os"
-}
 
 # The following commands are not clearly defined and probably will be
 # changed or removed
-proc tb-set-dnard-ip {shelf number ip} {}
 proc tb-set-node-deltas {node deltas} {}
-proc tb-set-dnard-deltas {shelf number deltas} {}
 
 # Show that we have loaded
 set TB_COMPACT 1

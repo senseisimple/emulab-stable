@@ -62,13 +62,7 @@ foreach (split("\n",$raw)) {
     $type = $info[1];
     $nodetype{$node} = $type;
     if (! defined($ostype{$type})) {
-	# Special case - shark shelf
-	if ($type eq "shark-shelf") {
-	    $subtype = "shark";
-	} else {
-	    $subtype = $type;
-	}
-	$sth = $dbh->prepare("SELECT image_id from node_types where type = \"$subtype\"");
+	$sth = $dbh->prepare("SELECT image_id from node_types where type = \"$type\"");
 	$rr = $sth->execute;
 	if ($rr == 0) {
 	    push(@ERRORS,"Invalid type $type");
@@ -96,13 +90,7 @@ foreach (split("\n",$raw)) {
 	# assume to be a delay node
 	$os{$physical} = $delayos;
     } else {
-	if ($nodetype{$virtual} ne "shark-shelf") {
-	    $os{$physical} = $ostype{$nodetype{$virtual}};
-	} else {
-	    for ($i=1;$i<=8;$i++) {
-		$os{"$physical-$i"} = $ostype{"shark-shelf"};
-	    }
-	}
+	$os{$physical} = $ostype{$nodetype{$virtual}};
     }
 }
 # Now we parse the tbcmd file
@@ -119,46 +107,6 @@ while (<TBCMD>) {
 	  } else {
 	      ($label,$path,$partition) = @line[1..3];
 	      $images{$label} = "$path $partition";
-	  }
-	  last SWITCH;
-      };
-      /^tb-set-dnard-os$/ && do {
-	  if ($#line != 3) {
-	      push(@ERRORS,"Syntax: tb-set-dnard-os shelf n os");
-	  } else {
-	      ($shelf,$n,$label) = @line[1..3];
-	      if (! defined($nodemap{$shelf})) {
-		  push(@ERRORS,"Unknown node $shelf\n");
-		  last SWITCH;
-	      }
-	      if (! (($n =~ /[0-9]-[0-9]/) || ($n =~ /[0-9]/))) {
-		  push(@ERRORS,"n must either be a number or a range start-end\n");
-		  last SWITCH;
-	      }
-	      
-	      # The label should either be in the images table or
-	      # in the DB.
-	      if (! defined($images{$label})) {
-		  # Check DB
-		  $sth = $dbh->prepare("SELECT image_id from disk_images where image_id = \"$label\"");
-		  $rr = $sth->execute;
-		  if ($rr == 0) {
-		      # Bad OS
-		      $sth->finish;
-		      push(@ERRORS,"Unknown OS label $label");
-		      last SWITCH;
-		  }
-		  $sth->finish;
-	      }
-	      $prefix = $nodemap{$shelf};
-	      if ($n =~ /[0-9]-[0-9]/) {
-		  ($start,$end) = split("-",$n);
-		  foreach ($start..$end) {
-		      $os{"$prefix-$_"}=$label;
-		  }
-	      } else {
-		  $os{"$prefix-$n"}=$label;
-	      }
 	  }
 	  last SWITCH;
       };
@@ -190,10 +138,7 @@ while (<TBCMD>) {
 	      }
 	      foreach (keys(%nodemap)) {
 		  if (eval("/^$nodespec" . '$' . "/")) {
-		      # Special case, make sure we aren't talking about sharks
-		      if ($nodetype{$_} eq "shark-shelf") {
-			  push(@ERRORS,"Use set-dnard-os for setting os of shark shelf $_\n");
-		      } elsif (($valid_type ne "") &&
+		      if (($valid_type ne "") &&
 			  ($nodetype{$_} ne $valid_type)) {
 			  push(@ERRORS,"$_ is of type $nodetype($_), OS $label is of type $valid_type");
 			  $os{$nodemap{$_}} = "INVALID";
@@ -204,10 +149,6 @@ while (<TBCMD>) {
 	      }
 	  }
 	      
-	  last SWITCH;
-      };
-      /^tb-set-dnard-deltas$/ && do {
-	  # PLACE HOLDER
 	  last SWITCH;
       };
       /^tb-set-node-deltas$/ && do {
