@@ -16,13 +16,14 @@ my $building;
 my $floor;
 my $debug;
 my $image;
+my @areamaps = ();
 my $prefix = "/tmp/floormap";
-sub dofloor($$);
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
+my $WWWPAGE     = "@TBBASE@/shownode.php3";
 my $ICONDIR     = "$TB/www";
 
 # Load libraries.
@@ -42,6 +43,9 @@ sub dprint($) {
     print STDERR $msg
 	if ($debug);
 }
+sub dofloor($$);
+sub writefiles($@);
+sub adjustmap($$$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -72,11 +76,6 @@ my %baseimages = ("MEB:4-East" => "$TB/www/meb-4east.png",
 		  "MEB:4-West" => "$TB/www/meb-4east.png");
 
 #
-# We are also going to build an imagemap array, indexed by node_id.
-#
-my %imagemap = ();
-
-#
 # Red dot mean node is down.
 #
 my $reddot = GD::Image->newFromPng("$ICONDIR/redball.png", 1) ||
@@ -104,7 +103,9 @@ my ($bluedot_width, $bluedot_height) = $bluedot->getBounds();
 # If a floor specified, then do just that floor and spit it out.
 #
 if (defined($floor)) {
-    $image = dofloor($building, $floor);
+    my ($floorimage, $areamap) = dofloor($building, $floor);
+    $image    = $floorimage;
+    @areamaps = ($areamap);
 }
 else {
     #
@@ -116,7 +117,9 @@ else {
 	DBQueryFatal("select distinct floor from location_info ".
 		     "where building='$building'");
     while (my ($floor) = $query_result->fetchrow_array()) {
-	push(@floors, dofloor($building, $floor));
+	my ($floorimage, $areamap) = dofloor($building, $floor);
+
+	push(@floors, [ $floorimage, $areamap ]);
     }
 
     #
@@ -125,7 +128,9 @@ else {
     #
     my $total_y = 0;
     my $max_x   = 0;
-    foreach my $floorimage (@floors) {
+    foreach my $ref (@floors) {
+	my ($floorimage, $areamap) = @$ref;
+	
 	($x, $y) = $floorimage->getBounds();
 
 	$total_y = $total_y + $y + 10;
@@ -141,28 +146,42 @@ else {
     # Now copy the floor images into the superimage.
     #
     my $running_y = 0;
-    foreach my $floorimage (@floors) {
+    foreach my $ref (@floors) {
+	my ($floorimage, $areamap) = @$ref;
+	
 	($x, $y) = $floorimage->getBounds();
 	$image->copy($floorimage,
 		     0, $running_y,
 		     0, 0, $x, $y);
+	# Move all the map references down/over by adjusted amount.
+	adjustmap($areamap, $x, $running_y);
+	push(@areamaps, $areamap);
+	
 	$running_y += $y + 10;
     }
 }
-open(PNG, "> ${prefix}.png") ||
-    die("*** $0:\n".
-	"    Could not open ${prefix}.png for writing!\n");
-print PNG $image->png();
-close(PNG);
-
+writefiles($image, @areamaps);
 exit(0);
 
 #
-# Do a floor. Returns the image object.
+# Do a floor. Returns the image object and an "areamap". 
 #
 sub dofloor($$)
 {
     my ($building, $floor) = @_;
+
+    #
+    # The area map is indexed by nodeid, and contains a list of the
+    # x1,y1,x2,y2 (upper left, lower right) coordinates of the "hot"
+    # area.  We have to wait till later to actually generate the map
+    # cause the coords might need to be adjusted if creating a floor
+    # as part of a building (and the floor image gets moved within a
+    # bigger image).
+    #
+    # XXX We make no attempt to deal with overlapping icons (areamaps).
+    # This will eventually lead to confusion and incorrect maps.
+    # 
+    my $areamap = {};
 
     #
     # Grab the base image for the floor.
@@ -171,9 +190,10 @@ sub dofloor($$)
 	die("*** $0:\n".
 	    "    No base image for $building:$floor!\n");
     }
-    my $baseimage = GD::Image->newFromPng($baseimages{"$building:$floor"}, 1) ||
+    my $baseimage =
+	GD::Image->newFromPng($baseimages{"$building:$floor"}, 1) ||
 	die("*** $0:\n".
-	    "    Could not get base " . $baseimages{"$building:$floor"} ."!\n");
+	    "    Could not get base ". $baseimages{"$building:$floor"} ."!\n");
 
 
     #
@@ -186,32 +206,103 @@ sub dofloor($$)
 		     "where loc.floor='$floor' and loc.building='$building'");
 
     while (my $rowref = $query_result->fetchrow_hashref()) {
-	my $x   = $rowref->{"loc_x"};
-	my $y   = $rowref->{"loc_y"};
-	my $pid = $rowref->{"pid"};
-	my $eid = $rowref->{"eid"};
+	my $nodeid = $rowref->{"node_id"};
+	my $x      = $rowref->{"loc_x"};
+	my $y      = $rowref->{"loc_y"};
+	my $pid    = $rowref->{"pid"};
+	my $eid    = $rowref->{"eid"};
+	my ($x1,$y1,$x2,$y2);
 
 	if (!defined($pid)) {
-	    $baseimage->copy($greendot,
-			     $x - int($greendot_width / 2.0),
-			     $y - int($greendot_height / 2.0),
-			     0, 0,
+	    $x1 = $x - int($greendot_width / 2.0);
+	    $y1 = $y - int($greendot_height / 2.0);
+	    $x2 = $x1 + $greendot_width;
+	    $y2 = $y1 + $greendot_height;
+
+	    $baseimage->copy($greendot, $x1, $y1, 0, 0,
 			     $greendot_width, $greendot_height);
 	}
 	elsif ($pid eq NODEDEAD_PID() and $eid eq NODEDEAD_EID()) {
-	    $baseimage->copy($reddot,
-			     $x - int($reddot_width / 2.0),
-			     $y - int($reddot_height / 2.0),
-			     0, 0,
+	    $x1 = $x - int($reddot_width / 2.0);
+	    $y1 = $y - int($reddot_height / 2.0);
+	    $x2 = $x1 + $reddot_width;
+	    $y2 = $y1 + $reddot_height;
+
+	    $baseimage->copy($reddot, $x1, $y1, 0, 0,
 			     $reddot_width, $reddot_height);
 	}
 	else {
-	    $baseimage->copy($bluedot,
-			     $x - int($bluedot_width / 2.0),
-			     $y - int($bluedot_height / 2.0),
-			     0, 0,
+	    $x1 = $x - int($bluedot_width / 2.0);
+	    $y1 = $y - int($bluedot_height / 2.0);
+	    $x2 = $x1 + $bluedot_width;
+	    $y2 = $y1 + $bluedot_height;
+
+	    $baseimage->copy($bluedot, $x1, $y1, 0, 0,
 			     $bluedot_width, $bluedot_height);
 	}
+
+	my $tmp = {};
+	$tmp->{"X1"} = $x1;
+	$tmp->{"Y1"} = $y1;
+	$tmp->{"X2"} = $x2;
+	$tmp->{"Y2"} = $y2;
+	$areamap->{$nodeid} = $tmp;
     }
-    return $baseimage;
+    return ($baseimage, $areamap);
+}
+
+#
+# Adjust map coordinates moving everything by x,y amount. This is used
+# when building an image of multiple maps.
+#
+sub adjustmap($$$)
+{
+    my ($mapref, $x, $y) = @_;
+
+    foreach my $nodeid (keys(%{ $mapref })) {
+	$mapref->{$nodeid}->{"X1"} += $x;
+	$mapref->{$nodeid}->{"Y1"} += $y;
+	$mapref->{$nodeid}->{"X2"} += $x;
+	$mapref->{$nodeid}->{"Y2"} += $y;
+    }
+}
+
+#
+# Take a list of the areamaps created in the above function, and dump them
+# to the output file so that the web page can grab them.
+#
+sub writefiles($@)
+{
+    my ($image, @maps) = @_;
+
+    # Image
+    open(PNG, "> ${prefix}.png") ||
+	die("*** $0:\n".
+	    "    Could not open ${prefix}.png for writing!\n");
+    print PNG $image->png();
+    close(PNG);
+
+    # Areamap.
+    if (!open(MAP, "> ${prefix}.map")) {
+	unlink("${prefix}.png");
+	die("*** $0:\n".
+	    "    Could not open ${prefix}.map for writing!\n");
+    }
+    print MAP "<MAP NAME=floormap>\n";
+
+    foreach my $mapref (@maps) {
+	my %map = %{ $mapref };
+	
+	foreach my $nodeid (keys(%map)) {
+	    my $x1 = $map{$nodeid}->{"X1"};
+	    my $y1 = $map{$nodeid}->{"Y1"};
+	    my $x2 = $map{$nodeid}->{"X2"};
+	    my $y2 = $map{$nodeid}->{"Y2"};
+
+	    print MAP "<AREA SHAPE=RECT COORDS=\"$x1,$y1,$x2,$y2\" ".
+		"HREF=\"shownode.php3?node_id=${nodeid}\">\n\n";
+	}
+    }
+    print MAP "</MAP>\n";
+    close(MAP);
 }
