@@ -104,14 +104,14 @@ foreach (split("\n",&ir_get("/topology/links"))) {
 }
 
 # Get a list of delays
-&ir_exists("/delay") || do {
-    print STDERR "IR does not contain delay section.\n";
-    exit(1);
-};
-foreach (split("\n",&ir_get("/delay"))) {
-    @t = split;
-    $delays{$t[0]} = 1;
-}
+#&ir_exists("/delay") || do {
+#    print STDERR "IR does not contain delay section.\n";
+#    exit(1);
+#};
+#foreach (split("\n",&ir_get("/delay"))) {
+#    @t = split;
+#    $delays{$t[0]} = 1;
+#}
 
 # Pull the MAC table from the database.
 # MACTABLE is indexed by virtual node name and contains a reference
