@@ -191,7 +191,7 @@ if (!$force) {
 
     if ($staticN > 250) {
 	warn("*** $0:\n".
-	     "    WARNING: More then 250 nodes; ".
+	     "    WARNING: More than 250 nodes; ".
 	     "refusing to use centralized static routes!\n".
 	     "    You must use an image that supports distributed static ".
 	     "route calculation.\n");
