@@ -156,7 +156,7 @@ use vars qw(@ISA @EXPORT);
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
 	 TBResolveNextOSID TBOsidToPid
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
-	 TBdbfork VnameToNodeid TBExpLocked
+	 TBdbfork TBDBDisconnect VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
@@ -293,6 +293,13 @@ sub TBdbfork()
     if ($EVENTSYS) {
 	EventFork();
     }
+}
+
+# To avoid keeping a mysql connection around.
+sub TBDBDisconnect()
+{
+    undef($DB);
+    select(undef, undef, undef, 0.3);
 }
 
 #
