@@ -12,20 +12,19 @@ use Getopt::Std;
 # which defines how/where to load, and what partitions are affected.
 # The nodes and partitions tables are updated appropriately. 
 # 
-# usage: os_load [-s] <imageid> <node> [node ...]
-# usage: os_load -l
-#
 sub usage()
 {
-    print STDOUT "Usage: os_load [-sw] [-r] <imageid> <node> [node ...]\n".
-	"Use -s to setup reload only, but do not issue a reboot\n".
-	"Use -w to block waiting for nodes to finish reloading\n".
+    print STDOUT "Usage: os_load [-s | -w] [-r] [-i <imageid>] ".
+	         "<node> [node ...]\n".
+	"Use -i to specify an imageid. Use node default otherwise.\n".
+	"Use -s to setup reload only, but do not issue a reboot.\n".
+	"Use -w to block waiting for nodes to finish reloading.\n".
 	"    (-s and -w are mutually exclusive)\n".
-	"Use -l to get a list of images you are permitted to load\n" .
-	"Use -r to use Frisbee support instead of netdisk\n";
+	"Use -l to get a list of images you are permitted to load.\n" .
+	"Use -r to use Frisbee support instead of netdisk (experimental).\n";
     exit(-1);
 }
-my  $optlist = "sldwr";
+my  $optlist = "sldwri:";
 
 #
 # Configure variables
@@ -33,6 +32,9 @@ my  $optlist = "sldwr";
 my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+my $USERADDR	= "@USERNODE@";
+
 
 #
 # Max number of simultaneous loads. Will be better with Frisbee.
@@ -46,16 +48,16 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $BOSSADDR	= "boss.emulab.net";
-my $USERADDR	= "users.emulab.net";
 my $NETDISKOSID = "NETDISK-STD";
-my $FRISBEEPATH = "boss.emulab.net:/tftpboot/pxeboot.frisbee";
+my $FRISBEEPATH = "$BOSSADDR:/tftpboot/pxeboot.frisbee";
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @row;
-my %imageid_row = ();
+my $usedefault  = 1;
+my $imageid;
+my %imageid_row;
 my @nodes       = ();
 my $mereuser    = 0;
 my $setuponly   = 0;
@@ -82,7 +84,7 @@ if (defined($options{"l"})) {
     dolisting();
     exit(0);
 }
-if (@ARGV < 2) {
+if (@ARGV < 1) {
     usage();
 }
 if (defined($options{"s"})) {
@@ -97,24 +99,27 @@ if (defined($options{"r"})) {
 if ($waitmode && $setuponly) {
     usage();
 }
-my $imageid = shift;
+if (defined($options{"i"})) {
+    $imageid    = $options{"i"};
+    $usedefault = 0;
+
+    if ($imageid =~ /^([-\@\w.\+]+)$/) {
+	$imageid = $1;
+    }
+    else {
+	die("*** Bad $imageid name.\n");
+    }
+}
 
 #
-# Untaint args.
+# Untaint nodes.
 #
-if ($imageid =~ /^([-\@\w.\+]+)$/) {
-    $imageid = $1;
-}
-else {
-    die("Bad data in $imageid.");
-}
-
 foreach my $node ( @ARGV ) {
     if ($node =~ /^([-\@\w]+)$/) {
 	$node = $1;
     }
     else {
-	die("Bad node name: $node.");
+	die("*** Bad node name: $node.\n");
     }
     
     push(@nodes, $node);
@@ -130,86 +135,108 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# Grab the imageid description from the DB. The permission check for this
-# is that mere user can load an image from any project he/she is a member of,
-# or any image that has a null pid field, since those are defined to be
-# open to anyone. 
-#
-$db_result = DBQueryFatal("select * from images where imageid='$imageid'");
-    
-if ($db_result->numrows < 1) {
-    die("No such imageid $imageid!");
-}
-%imageid_row = $db_result->fetchhash();
-
-my $imagepid = 0;
-if (defined($imageid_row{'pid'})) {
-    $imagepid = $imageid_row{'pid'};
-}
-    
-if ($mereuser && $imagepid && !ProjMember($imagepid)) {
-    die("You do not have permission to load imageid $imageid!");
-}
-
-#
 # Check to make sure that mere user is allowed to muck with nodes
 #
 if ($mereuser) {
     foreach my $node (@nodes) {
 	if (! NodeAccessCheck(\$node)) {
-	    die("You do not have permission to load images on $node\n");
+	    die("You do not have permission to load images on $node.\n");
 	}
     }
 }
 
-my $loadpart  = $imageid_row{'loadpart'};
-my $loadlen   = $imageid_row{'loadlength'};
-my $imagepath = $imageid_row{'path'};
-my $defosid   = $imageid_row{'default_osid'};
-
 #
-# 0 means load the entire disk.
+# Grab the imageid description from the DB. The permission check for this
+# is that mere user can load an image from any project he/she is a member of,
+# or any image that has a null pid field, since those are defined to be
+# open to anyone. 
 #
-my $diskpart = "";
-if ($loadpart) {
-    $diskpart = "wd0:s${loadpart}";
-}
-else {
-    $diskpart = "wd0";
-}
-
-#
-# For now, all testbed default images from from paper and all pid specific
-# images come from plastic:/proj.
-# 
-my $cmdline = "";
-if ($imagepid) {
-    if (! ($imagepath =~ /^\/proj\//)) {
-	die("Your image must reside in /proj\n");
+if (defined($imageid)) {
+    my $db_result =
+	DBQueryFatal("select * from images where imageid='$imageid'");
+    
+    if ($db_result->numrows < 1) {
+	die("*** No such imageid $imageid is defined in the DB!\n");
     }
-    $cmdline = "${USERADDR}:$imagepath $diskpart";    
-}
-else {
-    $cmdline = "${BOSSADDR}:$imagepath $diskpart";
+    %imageid_row = $db_result->fetchhash();
+
+    my $imagepid = 0;
+    if (defined($imageid_row{'pid'})) {
+	$imagepid = $imageid_row{'pid'};
+    }
+    
+    if ($mereuser && $imagepid && !ProjMember($imagepid)) {
+	die("*** You do not have permission to load imageid $imageid!\n");
+    }
 }
 
 #
 # Loop for each node.
 # 
 foreach my $node (@nodes) {
-    my $pc = $node;
-	
-    print STDOUT "Changing default OS for $pc to $defosid\n";
+    #
+    # Oh, I suppose it would be nice to do this just once per imageid,
+    # but that would be a pain. Not in the mood.
+    #
+    
+    #
+    # Get default imageid for this node if none specified on comand line.
+    #
+    if ($usedefault) {
+	if (! ($imageid = DefaultImageID($node))) {
+	    die("*** No default imageid is defined for $node!\n");
+	}
+    }
+    my $db_result =
+	DBQueryFatal("select * from images where imageid='$imageid'");
+    
+    if ($db_result->numrows < 1) {
+	die("*** No such imageid $imageid is defined in the DB!\n");
+    }
+    %imageid_row = $db_result->fetchhash();
+    
+    my $loadpart  = $imageid_row{'loadpart'};
+    my $loadlen   = $imageid_row{'loadlength'};
+    my $imagepath = $imageid_row{'path'};
+    my $defosid   = $imageid_row{'default_osid'};
+
+    #
+    # 0 means load the entire disk.
+    #
+    my $diskpart = "";
+    if ($loadpart) {
+	$diskpart = "wd0:s${loadpart}";
+    }
+    else {
+	$diskpart = "wd0";
+    }
+
+    #
+    # For now, all testbed default images come from paper and all pid specific
+    # images come from plastic:/proj.
+    # 
+    my $cmdline = "";
+    if (defined($imageid_row{'pid'})) {
+	if (! ($imagepath =~ /^\/proj\//)) {
+	    die("*** Your image must reside in /proj\n");
+	}
+	$cmdline = "${USERADDR}:$imagepath $diskpart";    
+    }
+    else {
+	$cmdline = "${BOSSADDR}:$imagepath $diskpart";
+    }
+    
+    print STDOUT "Changing default OS for $node to $defosid\n";
     if (!$TESTMODE) {
       DBQueryFatal("update nodes set ".
 		   "def_boot_osid='$defosid',def_boot_path='' ".
-		   "where node_id='$pc'");
+		   "where node_id='$node'");
     }
 
     # Put it in the current_reloads table so that nodes can find out which
-	# OS to load
+    # OS to load
     DBQueryFatal("replace into current_reloads ".
-		 "(node_id, image_id) values ('$pc', '$imageid')");
+		 "(node_id, image_id) values ('$node', '$imageid')");
 
     #
     # Assign partition table entries for each partition in the image.
@@ -230,26 +257,27 @@ foreach my $node (@nodes) {
 
 	    DBQueryFatal("replace into partitions ".
 			 "(partition, osid, node_id) ".
-			 "values('$i', '$osid', '$pc')");
+			 "values('$i', '$osid', '$node')");
 	}
 	else {
 	    DBQueryFatal("delete from partitions ".
-			 "where node_id='$pc' and partition='$i'");
+			 "where node_id='$node' and partition='$i'");
 	}
     }
     
-    print STDOUT "Setting up reload for $pc\n";
+    print STDOUT "Setting up reload for $node\n";
     if (!$TESTMODE) {
          if ($frisbee) {
 	     DBQueryFatal("update nodes set ".
 	                  "next_pxe_boot_path='$FRISBEEPATH'" .
-	 		  "where node_id='$pc'");
-	     system "$FRISBEELAUNCHER $imageid" and die "Unable to launch frisbee daemon\n";
+	 		  "where node_id='$node'");
+	     system "$FRISBEELAUNCHER $imageid" and
+		 die "*** Unable to launch frisbee daemon\n";
 	 } else {
 	     DBQueryFatal("update nodes set ".
 	                  "next_boot_osid='$NETDISKOSID',".
 	 		  "next_boot_cmd_line='$cmdline' ".
-	 		  "where node_id='$pc'");
+	 		  "where node_id='$node'");
 	}
     }
 }

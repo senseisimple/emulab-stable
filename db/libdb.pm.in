@@ -26,7 +26,7 @@ use Exporter;
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
-	 ExpNodes DBDateTime
+	 ExpNodes DBDateTime DefaultImageID 
 	 );
 
 # Must come after package declaration!
@@ -456,6 +456,29 @@ sub NodeidToExp ($$$) {
     $$pid = $row[0];
     $$eid = $row[1];
     return 1;
+}
+
+#
+# Get the default ImageID for a particular node, from the node_types table.
+#
+# usage: DefaultImageID(char *nodeid)
+#        returns imageid if the node is valid and has a default imageid.
+#        returns 0 if there are problems.
+#
+sub DefaultImageID ($) {
+    my($nodeid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select imageid from node_types as t ".
+		     "left join nodes as n on t.type=n.type ".
+		     "where n.node_id='$nodeid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
 }
 
 #

@@ -8,17 +8,19 @@ use Getopt::Std;
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload [-f | -p] <imageid> <node> [node ...]
+# usage: sched_reload [-f | -p] [-r] [-i <imageid>] <node> [node ...]
 #
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f | -p] <imageid> <node> [node ...]\n".
-	"Use the -f to force reload. Fail if node cannot be reserved.\n".
-	"Use the -p to pend reload for the reload daemon.\n" .
-	"Use the -r use Frisbee rather than netdisk (experimental).\n";
+    print STDOUT "Usage: sched_reload [-f | -p] [-r] [-i <imageid>] ".
+	         "<node> [node ...]\n".
+	"Use -i to specify an imageid. Use node default otherwise.\n".
+	"Use -f to force reload. Fail if node cannot be reserved.\n".
+	"Use -p to pend reload for the reload daemon.\n".
+	"Use -r to use Frisbee rather than netdisk (experimental).\n";
     exit(-1);
 }
-my  $optlist = "fpr";
+my  $optlist = "fpri:";
 
 #
 # Configure variables
@@ -47,6 +49,9 @@ my $force	= 0;
 my $pend	= 0;
 my $frisbee	= 0;
 my @nodes       = ();
+my $usedefault  = 1;
+my $imageid;
+my %imagenodes  = ();
 my @row;
 
 # un-taint path
@@ -63,7 +68,7 @@ $| = 1; #Turn off line buffering on output
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV < 2) {
+if (@ARGV < 1) {
     usage();
 }
 if (defined($options{"f"})) {
@@ -79,10 +84,20 @@ if (defined($options{"r"})) {
 if ($pend and $force) {
     usage();
 }
-my $imageid   = shift;
+if (defined($options{"i"})) {
+    $imageid    = $options{"i"};
+    $usedefault = 0;
+
+    if ($imageid =~ /^([-\@\w.\+]+)$/) {
+	$imageid = $1;
+    }
+    else {
+	die("Bad data in $imageid.");
+    }
+}
 
 # This type will be put into the database, to allow programs 
-# such as nfree to figure out what kind of reload is support
+# such as nfree to figure out what kind of reload is supposed
 # to occur
 if ($frisbee) {
 	$type = "frisbee";
@@ -91,15 +106,8 @@ if ($frisbee) {
 }
 
 #
-# Untaint args.
+# Untaint nodes.
 #
-if ($imageid =~ /^([-\@\w.\+]+)$/) {
-    $imageid = $1;
-}
-else {
-    die("Bad data in $imageid.");
-}
-
 foreach my $node ( @ARGV ) {
     if ($node =~ /^([-\@\w]+)$/) {
 	$node = $1;
@@ -120,13 +128,16 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# Confirm a valid imageid!
+# Confirm a valid imageid if one was specified. Otherwise we are going
+# to pull it out of the DB for each node.
 #
-my $query_result =
-    DBQueryFatal("select * from images where imageid='$imageid'");
+if (defined($imageid)) {
+    my $query_result =
+	DBQueryFatal("select * from images where imageid='$imageid'");
     
-if ($query_result->numrows < 1) {
-    die("*** No such imageid $imageid is registered in the DB!");
+    if ($query_result->numrows < 1) {
+	die("*** No such imageid $imageid is registered in the DB!");
+    }
 }
 
 #
@@ -141,6 +152,15 @@ foreach my $node (@nodes) {
     if ($sth->num_rows() != 1) {
       print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
       next;
+    }
+
+    #
+    # Get default imageid for this node if none specified on comand line.
+    #
+    if ($usedefault) {
+	if (! ($imageid = DefaultImageID($node))) {
+	    die("*** No default imageid is defined for $node!\n");
+	}
     }
     
     print STDERR "Checking if $pc is reserved...";
@@ -165,7 +185,6 @@ foreach my $node (@nodes) {
 	    # won't be fooled into thinking a reload is required.
 	    #
 	    DBQueryFatal("delete from last_reservation where node_id='$pc'");
-	    push (@load_list,$pc);
 	    $allocated = 1;
 	}
     } else {
@@ -185,21 +204,46 @@ foreach my $node (@nodes) {
     DBQueryFatal("replace into scheduled_reloads ".
 		 "(node_id, image_id, reload_type) values ".
 		 "('$pc', '$imageid','$type')");
+
+    #
+    # The point of this hash table is so that we can gather up all the
+    # nodes per imageid and issue single requests to os_load, so that it
+    # can optimize things (say, for Frisbee). It is possible to get multiple
+    # imageids when using the node defaults instead of a command line imageid.
+    #
+    # Note that building up a hashed array of lists is a mighty odd operation
+    # in PERL, hence this funny looking code!
+    #
+    if ($allocated) {
+	if (! defined($imagenodes{$imageid})) {
+	    $imagenodes{$imageid} = [ $node ];
+	}
+	else {
+	    push(@{ $imagenodes{$imageid} }, $node);
+	}
+    }
 }
 
 if ($pend) {
-    print STDOUT "Reload Scheduling Done!\n";
+    print STDOUT "Reload Scheduling Done! There were $error failures!\n";
     exit $error;
 }
 
-if (@load_list > 0) {
-  print STDERR "Running os_load on ",join(", ",@load_list),":\n";
-  $cmd = "$osload $imageid @load_list";
-  print STDERR "Calling '$cmd'\n";
-  if ( system($cmd) != 0 ) {
-    print STDERR "WARNING: OS_LOAD FAILED ON @load_list!\n";
-  }
+#
+# Now issue the reloads, one per imageid. The hash table we created above
+# stores a list of nodes for each imageid.
+#
+foreach my $id ( keys(%imagenodes) ) {
+    my @nodelist = @{ $imagenodes{$imageid} };
+
+    my $cmd = "$osload -i $id @nodelist";
+
+    print "Issuing $cmd\n";
+    if (system($cmd)) {
+	print STDERR "*** WARNING: Failed $cmd\n";
+	$error++;
+    }
 }
 
-print STDOUT "Reload Scheduling Done!\n";
+print STDOUT "Reload Scheduling Done! There were $error failures!\n";
 exit $error;
