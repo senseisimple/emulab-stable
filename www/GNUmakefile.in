@@ -140,7 +140,8 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/usrp/, $(ALLUSRP)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
-	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
+	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
+	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
