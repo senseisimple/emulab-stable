@@ -3,7 +3,9 @@
 ##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6, and FreeBSD 4.7
 #####
 
-Follow the instructions in the setup-ops.txt file before the ones in this file.
+##### Step -1 - Set up "ops"
+
+Follow the instructions in the setup-ops.txt file before the ones in this file!
 
 ##### Step 0 - OS installation and setup
 
@@ -43,7 +45,7 @@ cd ~/tbobj
 
 ##### Step 3 - Running the boss installation script
 
-Again, this works the same as it did on boss, except that you run
+Again, this works the same as it did on ops, except that you run
 install/boss-install in the object tree, instead of ops-install.
 
 Part way through, this script will bail out and prompt you to install some
