@@ -38,7 +38,7 @@ function SIDEBARCELL($contents, $last = 0) {
     } else {
 	echo "<td class=\"menuopt\">";
     }
-    echo $contents;
+    echo "$contents";
     echo "</td>";
     echo "</tr>";
     echo "\n";
@@ -55,6 +55,21 @@ function WRITETOPBARBUTTON($text, $base, $link ) {
 function WRITETOPBARBUTTON_NEW($text, $base, $link ) {
     $link = "$base/$link";
     TOPBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" />");
+}
+
+#
+# WRITESIDEBARDIVIDER(): Put a bit of whitespace in the sidebar
+#
+function WRITESIDEBARDIVIDER() {
+    global $BASEPATH;
+    echo "<tr>";
+    echo "<td class=\"menuoptdiv\">";
+    # We have to put something in this cell, or IE ignores it. But, we don't
+    # want to make the table row full line-height, so a space will not do.
+    echo "<img src=\"$BASEPATH/1px.gif\" border=0 height=1 width=1 />";
+    echo "</td>";
+    echo "</tr>";
+    echo "\n";
 }
 
 #
@@ -243,7 +258,7 @@ function WRITESIDEBAR() {
 
     echo "<FORM method=get ACTION=\"/cgi-bin/webglimpse/usr/testbed/webglimpse\">\n";
 ?>
-  <table class="menu" width=220 cellpadding="0" cellspacing="0">
+  <table class="menu" width=200 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
@@ -258,14 +273,9 @@ function WRITESIDEBAR() {
     if ($rootEmulab) {
 	WRITESIDEBARBUTTON("Other Emulabs", $TBDOCBASE,
 			       "docwrapper.php3?docname=otheremulabs.html");
-	WRITESIDEBARBUTTON("Join Netbed (CD)",
-				$TBDOCBASE, "cdrom.php");
     } else {
 	WRITESIDEBARBUTTON_ABS("Utah Emulab", $TBDOCBASE,
 			       "http://www.emulab.net/");
-	# Link ALWAYS TO UTAH
-	WRITESIDEBARBUTTON_ABSCOOL("Join Netbed (CD)",
-			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
 
     }
 
@@ -282,13 +292,20 @@ function WRITESIDEBAR() {
 	WRITESIDEBARBUTTON("Software <font size=-1> ".
 			       "(Oct 21)</font>",
 			       $TBDOCBASE, "software.php3");
-	WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
-	WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
-	WRITESIDEBARBUTTON("Emulab Users", $TBDOCBASE,
-			   "doc/docwrapper.php3?docname=users.html");
-	WRITESIDEBARLASTBUTTON("Sponsors", $TBDOCBASE,
-			       "docwrapper.php3?docname=sponsors.html");
+	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
+				$TBDOCBASE, "cdrom.php");
+
+	SIDEBARCELL("<a href=\"$TBDOCBASE/people.php3\">People</a> and " .
+	            "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>");
+
+	SIDEBARCELL("Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
+		    "docname=users.html\">Users</a> and " .
+	            "<a href=\"$TBDOCBASE/docwrapper.php3? " .
+		    "docname=sponsors.html\">Sponsors</a>",1);
     } else {
+	# Link ALWAYS TO UTAH
+	WRITESIDEBARBUTTON_ABSCOOL("Add Widearea Node (CD)",
+			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
 	WRITESIDEBARLASTBUTTON("Projects on Emulab", $TBDOCBASE,
 			       "projectlist.php3");
     }
@@ -296,23 +313,23 @@ function WRITESIDEBAR() {
     # create the search bit, then the second table for the Web Interface.
 ?>
     <tr><td class="menuoptst"><b>Search Documentation:</b></td></tr>
-    <tr><td class="menuopts"><input name=query />
-      <input type=submit style="font-size:10px;" value="Go" /></td></tr>
-      <tr><td class="menuoptsb" style="font-size:12px;" >[
-      <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced 
-      Search</a> ]</td></tr>
-    </td></tr>  
+    <tr><td class="menuoptsb"><input name=query size = 15/>
+      <input type=submit style="font-size:10px;" value="Go" /><br>
+      [ <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced Search</a> ]
+    </td></tr>
 <?php # BACK TO PHP
     echo "</table>\n";
     echo "</form>\n";
 ?>
-<table class="menu" width=220 cellpadding="0" cellspacing="0">
-    <tr><td class="menuheader"><b>Interaction</b></td></tr>
+<table class="menu" width=200 cellpadding="0" cellspacing="0">
+    <tr><td class="menuheader">
+      <b>Interaction</b>
+    </td></tr>
 <?php # BACK TO PHP
 
     if ($login_status & CHECKLOGIN_LOGGEDIN) {
          $freepcs = TBFreePCs();
-	 WRITESIDEBARNOTICE( "($freepcs Free PCs.)" );
+	 WRITESIDEBARNOTICE( "($freepcs free PCs)" );
     }
 
     #
@@ -349,14 +366,36 @@ function WRITESIDEBAR() {
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
 	    
-		if (ISADMIN($login_uid)) {
-		    WRITESIDEBARBUTTON("New Project Approval",
-				       $TBBASE, "approveproject_list.php3");
+                # Since a user can be a member of more than one project,
+                # display this option, and let the form decide if the 
+                # user is allowed to do this.
+                #
 
-		    WRITESIDEBARBUTTON("Widearea User Approval",
-				       $TBBASE, "approvewauser_form.php3");
+		WRITESIDEBARDIVIDER();
+	    
+		WRITESIDEBARBUTTON("Begin an Experiment",
+				   $TBBASE, "beginexp.php3");
+
+		WRITESIDEBARBUTTON_NEW("Create a PlanetLab Slice",
+				       $TBBASE, "plab_ez.php3");
+
+		WRITESIDEBARBUTTON("Experiment List",
+				   $TBBASE, "showexp_list.php3");
+
+		WRITESIDEBARDIVIDER();
+
+		WRITESIDEBARBUTTON("Node Status",
+				   $TBBASE, "nodecontrol_list.php3");
+
+		WRITESIDEBARBUTTON("ImageIDs and OSIDs",
+				   $TBBASE, "showimageid_list.php3");
+		
+		if ($login_status & CHECKLOGIN_CVSWEB) {
+		    WRITESIDEBARBUTTON("CVS Repository",
+				       $TBBASE, "cvsweb/cvsweb.php3");
 		}
 		if ($login_status & CHECKLOGIN_TRUSTED) {
+		  WRITESIDEBARDIVIDER();
                   # Only project/group leaders can do these options
                   # Show a "new" icon if there are people waiting for approval
 		  $query_result =
@@ -382,46 +421,26 @@ function WRITESIDEBAR() {
 				       $TBBASE, "approveuser_form.php3");
 		  }
 		}
-
-                #
-                # Since a user can be a member of more than one project,
-                # display this option, and let the form decide if the 
-                # user is allowed to do this.
-                #
-		WRITESIDEBARBUTTON("Project List",
-				   $TBBASE, "showproject_list.php3");
-	    
 		if (ISADMIN($login_uid)) {
-		    WRITESIDEBARBUTTON("User List",
-				       $TBBASE, "showuser_list.php3");
-		}
-	    
-		WRITESIDEBARBUTTON("Experiment List",
-				   $TBBASE, "showexp_list.php3");
-		WRITESIDEBARBUTTON("Begin an Experiment",
-				   $TBBASE, "beginexp.php3");
+		    WRITESIDEBARDIVIDER();
 
-		if (NODETYPE_ALLOWED("pcplab")) {
-		    WRITESIDEBARBUTTON_NEW("Create a PlanetLab Slice",
-				       $TBBASE, "plab_ez.php3");
-		}
-		WRITESIDEBARBUTTON("ImageIDs and OSIDs",
-				   $TBBASE, "showimageid_list.php3");
-		WRITESIDEBARBUTTON("Update User Information",
-				   $TBBASE, "moduserinfo.php3");
-		WRITESIDEBARBUTTON("Node Reservation Status",
-				   $TBBASE, "nodecontrol_list.php3");
-		WRITESIDEBARBUTTON("Node Up/Down Status",
-				   $TBDOCBASE, "updown.php3");
-		WRITESIDEBARBUTTON("View Testbed Stats",
-				   $TBBASE, "showstats.php3");
-		
-		if (ISADMIN($login_uid)) {
+		    SIDEBARCELL("List <a " .
+				" href=\"$TBBASE/showproject_list.php3\">" .
+		                "Projects</a> or <a " .
+		                "href=\"$TBBASE/showuser_list.php3\">Users</a>");
+
+		    WRITESIDEBARBUTTON("View Testbed Stats",
+				       $TBBASE, "showstats.php3");
+
+		    WRITESIDEBARBUTTON("Approve New Projects",
+				       $TBBASE, "approveproject_list.php3");
+
+		    WRITESIDEBARBUTTON("Approve Widearea User",
+				       $TBBASE, "approvewauser_form.php3");
+
 		    WRITESIDEBARBUTTON("Edit Site Variables",
 				       $TBBASE, "editsitevars.php3");
-		}
 
-		if (ISADMIN($login_uid)) {
 		    $query_result
 		      = DBQUeryFatal("select new_node_id from new_nodes");
                     if (mysql_num_rows($query_result) > 0) {
@@ -431,12 +450,8 @@ function WRITESIDEBAR() {
 		        WRITESIDEBARBUTTON("Add Testbed Nodes",
 				           $TBBASE, "newnodes_list.php3");
 		    }
-		}		
-
-		if ($login_status & CHECKLOGIN_CVSWEB) {
-		    WRITESIDEBARBUTTON("CVS Repository",
-				       $TBBASE, "cvsweb/cvsweb.php3");
 		}
+
 	    }
 	}
 	elseif ($login_status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER)) {
@@ -452,12 +467,14 @@ function WRITESIDEBAR() {
 	#
 	# Standard options for logged in users!
 	# 
-	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject.php3");
-	WRITESIDEBARLASTBUTTON("Join Project",  $TBBASE, "joinproject.php3");
+	WRITESIDEBARDIVIDER();
+	SIDEBARCELL("<a href=\"$TBBASE/newproject.php3\">Start</a> or " .
+	            "<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project",
+		    1);
     }
 
-    WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
-	    $TBDOCBASE, "survey.php3");
+    #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
+    #    $TBDOCBASE, "survey.php3");
 
     #
     # Cons up a nice message.

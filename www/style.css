@@ -70,13 +70,14 @@ td.paddedcell2 { padding: 0.5em; }
 	margin: 0px;
 	border: 0px; }
 
-.menuopt,.menuoptb, .menuopts, .menuoptst, .menuoptsb {
+.menuopt,.menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb {
 	background-color: #cde; 
 	padding-left: 6px;
 	padding-top: 4px; 
 	padding-bottom: 0px;
 	margin: 0px; 
-	border: 0px; }
+	border: 0px;
+	font-size: 9pt; }
 
 .topbaropt {
     	background-color: #fff;
@@ -93,6 +94,10 @@ td.paddedcell2 { padding: 0.5em; }
 
 .menuoptb, .menuoptsb {
    	padding-bottom: 8px;
+}
+
+.menuoptdiv {
+	height: 8px;
 }
 
 .menuoptst {
