@@ -47,21 +47,18 @@ echo "<tr>
           <td>Project Info</td>
           <td>Name</td>
           <td>Leader</td>
-          <td>Affiliation</td>
       </tr>\n";
 
 while ($projectrow = mysql_fetch_array($query_result)) {
     $pid      = $projectrow[pid];
     $headuid  = $projectrow[head_uid];
     $Pname    = $projectrow[name];
-    $Paffil   = $projectrow[affil];
 
     echo "<tr>
               <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
               <td>$Pname</td>
               <td><A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>
-	      <td>$Paffil</td>
           </tr>\n";
 }
 echo "</table>\n";
