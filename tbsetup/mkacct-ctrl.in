@@ -85,8 +85,6 @@ else {
 # 
 # 4) Called from command line as root.
 #
-print "$UID\n";
-
 if ($UID && !TBAdmin($UID)) {
     my ($me) = getpwuid($UID) or
 	fatal("$UID not in passwd file");
