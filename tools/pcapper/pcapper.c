@@ -120,6 +120,7 @@ struct sniff_veth {
 struct readpackets_args {
 	u_char index;
 	char *devname;
+	char *bpf_filter;
 };
 
 /*
@@ -260,6 +261,12 @@ extern int optreset;
 pthread_mutex_t lock;
 
 /*
+ * Looks like libpcap has some re-entrance problems - let's only call dispatch
+ * on one at a time
+ */
+pthread_mutex_t dispatch_lock;
+
+/*
  * Condition variable for device threads to wait on for activity.
  */
 pthread_cond_t cond;
@@ -292,7 +299,8 @@ void usage(char *progname) {
 #ifdef EVENTSYS
 			"[-e eid/pid] "
 #endif
-			"[interfaces...]\n";
+			"[interfaces...]\n"
+                        "       %s [options] -t interface 'filter' ... ";
     char *long_usage = "-f filename   Log output to a file\n"
     		       "-i interval   When logging to a file, the interval "
 			   "(in ms) to report\n"
@@ -301,13 +309,15 @@ void usage(char *progname) {
 		       "-N            Add in all ethernet overhead\n"
 		       "-z            Don't count zero-length packets\n"
 		       "-o            Print output to stdout\n"
+		       "-t            tcpdump mode\n"
+		       "-b filter     Use the given bpf filter\n"
 #ifdef EVENTSYS
 		       "-e pid/eid    Wait for a time start for experiment\n"
 		       "-s server     Use <server> for event server\n"
 #endif
 		       "interfaces... A list of interfaces to monitor\n";
 
-    fprintf(stderr,short_usage,progname);
+    fprintf(stderr,short_usage,progname,progname);
     fprintf(stderr,long_usage);
     exit(-1);
 }
@@ -332,6 +342,9 @@ int main (int argc, char **argv) {
 	int filetime;
 	char ch;
 	char *event_server;
+	char *global_bpf_filter;
+	int tcpdump_mode;
+	int interface_it;
 #ifdef EVENTSYS
 	char *exp;
 	address_tuple_t tuple;
@@ -358,10 +371,13 @@ int main (int argc, char **argv) {
 	exp = 0;
 #endif
 
+	tcpdump_mode = 0;
+	global_bpf_filter = NULL;
+
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:o")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:")) != -1)
 		switch(ch) {
 		case 'f':
 			/* Find the first empty slot */
@@ -382,6 +398,12 @@ int main (int argc, char **argv) {
 			break;
 		case 'z':
 			no_zero = 1;
+			break;
+		case 't':
+			tcpdump_mode = 1;
+			break;
+		case 'b':
+			global_bpf_filter = optarg;
 			break;
 		case 'o':
 			/* Find the first empty slot */
@@ -420,6 +442,10 @@ int main (int argc, char **argv) {
 	    	limit_interfaces = 0;
 	}
 
+	if (tcpdump_mode && (!argc || (argc % 2))) {
+	    usage(argv[0]);
+	}
+
 	/*
 	 * Zero out all packet counts and other arrays.
 	 */
@@ -428,6 +454,7 @@ int main (int argc, char **argv) {
 	bzero(client_connected,sizeof(client_connected));
 
 	pthread_mutex_init(&lock,NULL);
+	pthread_mutex_init(&dispatch_lock,NULL);
 	pthread_cond_init(&cond,NULL);
 
 #ifdef EMULAB
@@ -549,6 +576,7 @@ int main (int argc, char **argv) {
 		} else if (flag_ifr.ifr_flags & IFF_UP) {
 			struct readpackets_args *args;
 			struct sockaddr_in *sin;
+			int matched_filters = 0;
 
 			/*
 			 * Get theIP address for the interface.
@@ -578,52 +606,99 @@ int main (int argc, char **argv) {
 			}
 
 			/*
-			 * If we're limiting the interfaces we look at,
-			 * skip this one unless it matches one of the
-			 * arguments given by the user
+			 * If we're in 'tcmdump mode' we may have to do this
+			 * more than once
 			 */
-			if (limit_interfaces) {
-				int j;
-				for (j = 0; j < argc; j++) {
-					if (!(strcmp(name,argv[j])) ||
-					    (strstr(hostname,argv[j]))) {
-					    break;
+			interface_it = 0;
+			do {
+				char *bpf_filter = global_bpf_filter;
+
+				/*
+				 * In 'tcpdump mode', we find out if this is
+				 * one of the interfaces we're dealing with,
+				 * and if so, grab its bpf filter string
+				 */
+				if (tcpdump_mode) {
+					int matched = 0;
+					if (!(strcmp(name,argv[interface_it]))) {
+						matched = 1;
+						bpf_filter = argv[interface_it +1];
+						matched_filters++;
 					}
+					interface_it+= 2;
+					if (!matched) {
+						continue;
+					}
+					/*
+					 * Copy it into the global interfaces list
+					 */
+					strcpy(interface_names[interfaces],hostname);
+					strcat(interface_names[interfaces]," '");
+					strcat(interface_names[interfaces],bpf_filter);
+					strcat(interface_names[interfaces],"'");
+					strcat(interface_names[interfaces],"\n");
+					
+					printf("watched ");
+
+				} else { 
+					/*
+					 * If we're limiting the interfaces we
+					 * look at, skip this one unless it
+					 * matches one of the arguments given
+					 * by the user
+					 */
+					if (limit_interfaces) {
+						int j;
+						for (j = 0; j < argc; j++) {
+							if (!(strcmp(name,argv[j])) ||
+						             (strstr(hostname,argv[j]))) {
+								break;
+							}
+						}
+						if (j == argc) {
+							printf("skipped\n");
+							continue;
+						}
+					}
+					/*
+					 * Copy it into the global interfaces list
+					 */
+					strcpy(interface_names[interfaces],hostname);
+					strcat(interface_names[interfaces],"\n");
+
+					printf("up\n");
 				}
-				if (j == argc) {
-					printf("skipped\n");
+
+				if (interfaces >= MAX_INTERFACES) {
+					printf("up, ignored (too many interfaces)\n");
 					continue;
 				}
+
+
+				/*
+				 * Start up a new thread to read packets from this
+				 * interface.
+				 */
+				args = (struct readpackets_args*)
+					malloc(sizeof(struct  readpackets_args));
+				args->devname = (char*)malloc(strlen(name) + 1);
+				args->bpf_filter = bpf_filter;
+				strcpy(args->devname,name);
+				args->index = interfaces;
+				if (pthread_create(&thread,NULL,readpackets,args)) {
+					fprintf(stderr,"Unable to start thread!\n");
+					exit(1);
+				}
+
+				interfaces++;
+			} while (tcpdump_mode && (interface_it < argc));
+
+			if (tcpdump_mode) {
+				if (matched_filters == 0) {
+					printf("skipped");
+				}
+				printf("\n");
 			}
-
-			if (interfaces >= MAX_INTERFACES) {
-				printf("up, ignored (too many interfaces)\n");
-				continue;
-			}
-
-			printf("up\n");
-
-			/*
-			 * Copy it into the global interfaces list
-			 */
-			strcpy(interface_names[interfaces],hostname);
-			strcat(interface_names[interfaces],"\n");
-
-			/*
-			 * Start up a new thread to read packets from this
-			 * interface.
-			 */
-			args = (struct readpackets_args*)
-				malloc(sizeof(struct  readpackets_args));
-			args->devname = (char*)malloc(strlen(name) + 1);
-			strcpy(args->devname,name);
-			args->index = interfaces;
-			if (pthread_create(&thread,NULL,readpackets,args)) {
-				fprintf(stderr,"Unable to start thread!\n");
-				exit(1);
-			}
-
-			interfaces++;
 
 		} else {
 			/* Skip interfaces that don't have carrier */
@@ -1038,10 +1113,9 @@ void *readpackets(void *args) {
 	pcap_t *dev;
 	struct readpackets_args *sargs;
 	int size;
-#ifdef __linux__
 	bpf_u_int32 mask, net;
 	struct bpf_program filter;
-#endif
+	char *bpf_filter;
 
 	/*
 	 * How much of the packet we want to grab.
@@ -1079,16 +1153,28 @@ void *readpackets(void *args) {
 	 */
 	pcap_devs[sargs->index] = dev;
 
+	bpf_filter = sargs->bpf_filter;
+
 	/*
 	 * Put an empty filter on the device, or we get nothing (but only
 	 * in Linux) - how frustrating!
 	 */
 #ifdef __linux__
-	pcap_lookupnet(sargs->devname, &net, &mask, ebuf);
-	pcap_compile(dev, &filter, "", 0, net);
-	pcap_setfilter(dev, &filter);
-	pcap_freecode(&filter);
+	if (!bpf_filter) {
+	    bpf_filter = "";
+	}
 #endif
+
+	if (bpf_filter) {
+	    pcap_lookupnet(sargs->devname, &net, &mask, ebuf);
+	    if (pcap_compile(dev, &filter, bpf_filter, 0, net)) {
+		    fprintf(stderr,"Error compiling BPF filter '%s'\n",
+				    bpf_filter);
+		    exit(1);
+	    }
+	    pcap_setfilter(dev, &filter);
+	    pcap_freecode(&filter);
+	}
 
 	/*
 	 * We don't bother to lock the access to active.  If it gets cleared
@@ -1098,7 +1184,7 @@ void *readpackets(void *args) {
 	 */
 	while (active > 0) {
 		if (pcap_dispatch(dev, -1, got_packet, &sargs->index) < 0) {
-			printf("pcap_dispatch failed for %s\n", sargs->devname);
+			pcap_perror(dev,"pcap_dispatch failed: ");
 			exit(1);
 		}
 	}
