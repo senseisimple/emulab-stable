@@ -39,10 +39,8 @@ if (!isset($pid) ||
 #
 # Check to make sure thats this is a valid PID.
 #
-$query_result = 
-    DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The project $pid is not a valid project.", 1);
+if (! TBValidProject($pid)) {
+    USERERROR("The project '$pid' is not a valid project.", 1);
 }
 
 #
@@ -56,26 +54,37 @@ if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
 # A list of project experiments.
 #
 $query_result =
-    DBQueryFatal("SELECT eid,expt_name FROM experiments WHERE pid='$pid' order by eid");
+    DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
+		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		 "where e.pid='$pid' ".
+		 "group by e.eid order by e.state,e.eid");
+
 if (mysql_num_rows($query_result)) {
     echo "<center>
           <h3>Project Experiments</h3>
           </center>
-          <table align=center border=1>\n";
+          <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
-    while ($row = mysql_fetch_row($query_result)) {
-        $eid  = $row[0];
-        $name = $row[1];
-	if (!$name)
-	    $name = "--";
+    echo "<tr>
+              <td align=center>EID</td>
+              <td align=center>State</td>
+              <td align=center>Nodes</td>
+              <td align=center>Description</td>
+          </tr>\n";
+
+    while ($projrow = mysql_fetch_array($query_result)) {
+	$eid  = $projrow[eid];
+	$state= $projrow[state];
+	$nodes= $projrow["count(r.node_id)"];
+	$name = $projrow[expt_name];
+
         echo "<tr>
-                  <td>
-                      <A href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
-                      </td>
-                  <td>$name</td>
-              </tr>\n";
+                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+		 <td>$state</td>
+                 <td>$nodes</td>
+                 <td>$name</td>
+             </tr>\n";
     }
-
     echo "</table>\n";
 }
 
