@@ -21,8 +21,9 @@ use English;
 #
 # Configure variables
 #
-my $TBROOT   = "@prefix@";
-my $TESTMODE = @TESTMODE@;
+my $TBROOT         = "@prefix@";
+my $TESTMODE       = @TESTMODE@;
+my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -60,9 +61,11 @@ sub cleanup {
 	waitpid($os_setup_pid,0);
     }
 
-    print "Stopping event system\n";
-    if (system("eventsys_control stop $pid $eid")) {
-	print STDERR "*** Failed to stop the event system.\n";
+    if (!$DISABLE_EVENTS) {
+	print "Stopping event system\n";
+	if (system("eventsys_control stop $pid $eid")) {
+	    print STDERR "*** Failed to stop the event system.\n";
+	}
     }
 
     if ($cleanvlans) {
@@ -244,14 +247,16 @@ TBDebugTimeStamp("os_setup finished");
 # rebooted (os_setup is done). This only takes a moment (puts itself
 # in the background), so its not enough of a delay to worry about.
 # 
-print "Starting the event system.\n";
-TBDebugTimeStamp("eventsys_control started");
-if (system("eventsys_control start $pid $eid")) {
-    print STDERR "*** Failed to start the event system.\n";
-    cleanup;
-    exit(1);
+if (!$DISABLE_EVENTS) {
+    print "Starting the event system.\n";
+    TBDebugTimeStamp("eventsys_control started");
+    if (system("eventsys_control start $pid $eid")) {
+	print STDERR "*** Failed to start the event system.\n";
+	cleanup;
+	exit(1);
+    }
+    TBDebugTimeStamp("eventsys_control finished");
 }
-TBDebugTimeStamp("eventsys_control finished");
 
 # Accounting info.
 TBSetExpSwapTime($pid, $eid);
