@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.25 2000-12-04 00:07:58 kwright Exp $
+# $Id: mkacct,v 1.26 2000-12-04 21:16:30 kwright Exp $
 
 use English;
 use Mysql;
@@ -26,6 +26,7 @@ sanitize();
 dbsetup();
 check_credentials();
 dowork();
+exit(0);
 
 sub doqueries() {
 
@@ -139,6 +140,15 @@ sub dowork() {
 
     doqueries();
 
+    # At this point, we need to change the UID to be the EUID
+    # in order to do some of the commands below as root rather
+    # than the user. I had initially used just su1, but  that
+    # wouldn't work on a non-su1-able user. Finally, we're
+    # okay changing the UID to the EUID (root) since we've already
+    # run check_credentials(). -lkw
+
+    $UID = $EUID;
+
     # Ping nodes to see if alive. If alive, determine if 
     # machine is running FreeBSD or Linux or <other>.   If 
     # <other>, skip that node. If we don't skip, create the
@@ -165,7 +175,7 @@ sub dowork() {
             # will report it and move on.
             #
 
-	    print "Creating group $unix_gid on $node.\n";
+	    print "Creating group $group_number on $node.\n";
 	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $group_number $group_name 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
@@ -173,7 +183,7 @@ sub dowork() {
 	    foreach my $user (keys %passwd) {
 
 		print "Creating user $user on $IP.\n";
-		open(USERADD, "/usr/local/bin/sshtb $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		open(USERADD, "/usr/local/bin/sshtb $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $group_number -m -p $passwd{$user} -s /bin/tcsh -u $user_number{$user}  $user 2>&1 |");
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
 	    }
@@ -182,11 +192,9 @@ sub dowork() {
 
 	    #
 	    # Make group
-	    # Note: If I don't do an su1 below, the command will be executed
-	    #       as the user $UID. XXX Need to address. -lkw
-	    #
+	    # 
 	    print "Adding group $group_name to $node.\n";
-	    open(ADDGROUP, "/usr/site/bin/su1 /usr/local/bin/sshtb $node /usr/sbin/pw groupadd $group_name -g $group_number 2>&1 |");
+	    open(ADDGROUP, "/usr/local/bin/sshtb $node /usr/sbin/pw groupadd $group_name -g $group_number 2>&1 |");
 	    while (<ADDGROUP>) { print "$_"; }
 	    close(ADDGROUP);
 
@@ -273,7 +281,7 @@ sub check_credentials() {
     # All we have to check here is that a tuple exists (if $me isn't
     # in the experiment, no tuples will be selected).
     #
-    $db_query = "select pid from proj_memb as p, experiments as e" . 
+    $db_query = "select p.pid from proj_memb as p, experiments as e " . 
 	        "where eid='$eid' and e.pid=p.pid and uid='$me'";
     $sth      = $dbh->query($db_query);
     if (got_tuples($sth)) {
@@ -306,7 +314,7 @@ sub get_os() {
     # Get the first line. If the first line isn't what we expect,
     # print the rest and return 0 for failure.
 
-    open(UNAME,"/usr/site/bin/su1 /usr/local/bin/sshtb $node uname 2>&1 |");
+    open(UNAME,"/usr/local/bin/sshtb $node uname 2>&1 |");
     $_ = <UNAME>;
     if ( !($_ =~ /Linux/ or $_ =~ /FreeBSD/) ) {
 	
@@ -329,7 +337,7 @@ sub make_user() {
 
     print "Adding user $name to $node.\n";
 
-    my $cmd = "/usr/site/bin/su1 /usr/local/bin/sshtb $node " .
+    my $cmd = "/usr/local/bin/sshtb $node " .
 	      "/usr/sbin/pw useradd $name -u $user_number{$name} " .
 		  "-d /users/$name -g $group_number -s /bin/tcsh";
     # We couldn't do the -c for some reason.  
@@ -339,10 +347,7 @@ sub make_user() {
     while (<PWADD>) { print "$_"; }
     close(PWADD);
     
-    # Note: tried to take the su1 out below, but pipe was then executed
-    #       as $UID rather than 0. XXX fix by moding $> and $<.
-
-    open(CHPASS, "/usr/site/bin/su1 /usr/local/bin/sshtb $node " .
+    open(CHPASS, "/usr/local/bin/sshtb $node " .
 	 "/usr/bin/chpass -p $epasswd{$name} $name 2>&1 |"); 
     while (<CHPASS>) { print "$_"; }
     close(CHPASS);
