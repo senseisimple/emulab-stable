@@ -1,0 +1,35 @@
+###########################################################################
+# Desc: Options used by all Makefiles
+# Author: Andrew Howard
+# Date: 21 Mar 2002
+# CVS: $Id: Makefile.opt,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+###########################################################################
+
+###########################################################################
+# Version number
+###########################################################################
+
+VERSION = 0.00
+
+
+###########################################################################
+# Install paths
+###########################################################################
+
+INSTALL_BASE = /opt/mezzanine
+
+INSTALL_DIR = $(INSTALL_BASE)-$(VERSION)
+INSTALL_BIN = $(INSTALL_DIR)/bin
+INSTALL_ETC = $(INSTALL_DIR)/etc
+INSTALL_INC = $(INSTALL_DIR)/include
+INSTALL_LIB = $(INSTALL_DIR)/lib
+INSTALL_EG  = $(INSTALL_DIR)/examples
+INSTALL_DOC = $(INSTALL_DIR)/doc
+
+
+###########################################################################
+# Tools
+###########################################################################
+
+INSTALL = install
+MKDIR = mkdir

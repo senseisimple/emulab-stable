@@ -1,0 +1,92 @@
+
+Desc: README for Mezzanine package
+Author: Andrew Howard ahoward@usc.edu
+CVS: $Id: README,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+
+Abstract
+--------
+Mezzanine is an overhead 2D visual tracking package intended primarily
+for use as a mobile robot metrology system.  It uses a camera to track
+objects marked with color-coded fiducials, and infers the pose
+(position and orientation) of these objects in world coordinates.
+Mezzanine will work with almost any color camera (even the really
+cheap ones), and can correct for the barrel distortion produced by
+wide-angle-lenses.
+
+Mezzanine is also language and architecture neutral: object poses are
+written into a shared memory-mapped file which other programs can read
+and make use of as they see fit.  Mezzanine itself is written in pure
+C and was developed under Linux on x86 hardware.
+
+
+Documentation
+-------------
+Full documentation can be found in the user manual: docs/mezzanine.pdf.
+This file contains instructions for building mezzanine.
+
+
+Package contents
+----------------
+mezzanine : the visual object tracker.
+mezzcal   : a calibration tool for the tracker.
+libmezz   : an IPC library for talking to mezzanine.
+libfg     : a simple Video4Linux library written by Gavin Baker (thanks Gav!).
+rtk2      : a gui toolkit used by mezzcal.
+examples  : sample programs.
+docs      : package documentation.
+
+
+System Requirements
+-------------------
+Mezzanine is known to work on Linux x86 systems running 2.4.X kernels.
+
+
+Third party libraries
+---------------------
+Mezzanine requires the Gimp Toolkit (GTK+ 1.2) available from:
+  http://www.gtk.org
+Mezzanine also requires the Gnu Scientific Library (GSL 0.9 and above)
+available from:
+  http://sources.redhat.com/gsl/
+Both libraries come as RPMS in RedHat distros, although GSL is 
+not usually installed by default.
+
+
+Building Mezzanine
+------------------
+Currently, Mezzanine is not using autoconf, so you will just have
+to build it the old fashioned way.  Assuming the required third-party
+libraries are installed, you should be able to just:
+  
+  $ make; make install
+
+from the top-level directory (i.e. the one you found this README in).
+By default, Mezzanine will install in your home directory rather than
+/usr/local/bin, so you wont need root permissions to install it.  You
+will, however, need to append ~/mezzanine-<VERSION>/bin to your
+executable path.
+
+
+Build Options
+-------------
+Various build options, including the default installation path,
+can be changed by editing Makefile.opt.
+
+
+Bugs
+----
+Mezzanine is research software, and is bound to contain some bugs.  If
+you've broken something (or better yet, fixed something), please
+submit a bug report to 
+
+  http://sourceforge.net/playerstage  
+
+Make sure you include the Mezzanine and OS version, together with a
+detailed description of the problem.  While there is no warranty on
+this software, we'll try to fix things for you.
+
+
+
+
+
+

@@ -1,0 +1,188 @@
+/* 
+ *  Mezzanine - an overhead visual object tracker.
+ *  Copyright (C) Andrew Howard 2002
+ *
+ *  This program is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either version 2
+ *  of the License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ */
+/***************************************************************************
+ * Desc: Track objects
+ * Author: Andrew Howard
+ * Date: 21 Apr 2002
+ * CVS: $Id: track.c.leg,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ ***************************************************************************/
+
+#include <assert.h>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
+
+// Track the robots
+void track_update(mezz_objectlist_t *objectlist);
+
+// Track information
+typedef struct
+{
+  mezz_mmap_t *mmap;
+  mezz_tracklist_t *tracklist;
+} track_t;
+
+// The one and only instance of the tracker
+static track_t *track;
+
+
+// Initialise the identer
+int track_init(mezz_mmap_t *mmap)
+{
+  int i;
+  mezz_track_t *track;
+  
+  track = malloc(sizeof(track_t));
+  memset(track, 0, sizeof(track_t));
+
+  // Use the mmap'ed track list
+  track->tracklist = &mmap->tracklist;
+
+  // Load the track options
+  track->tracklist->count = opt_get_int("track", "track_count", 0);
+  // .5 m default
+  // this should become framerate-dependent later on!
+  track->max_dist_delta = opt_get_double("track","max_dist_delta",.5);
+  // 20 degree default
+  track->max_pose_delta = opt_get_double("track","max_pose_delta",
+										 20.0*(MATH_PI/180.0));
+
+
+  for (i = 0; i < track->tracklist->count; i++)
+  {
+    track = track->tracklist->tracks + i;
+	track->status = TRACK_STATUS_INVALID;
+	track->tracking_id = -1;
+	track->px = track->py = track->pa = 0.0;
+  }
+  
+  return 0;
+}
+
+
+// Close the identer
+void track_term()
+{
+  // Clean up
+  free(track);
+}
+
+
+// Locate and identify objects from the list of blobs.
+// This doesnt do any filtering on the pose.
+mezz_objectlist_t *ident_update(mezz_bloblist_t *bloblist)
+{
+  int i;
+  mezz_object_t *object;
+  mezz_blob_t *ablob, *bblob;
+  double mx, my, dx, dy;
+
+  for (i = 0; i < ident->objectlist->count; i++)
+  {
+    object = ident->objectlist->objects + i;
+    object->missed++;
+	object->valid = 0;
+
+    if (object->missed <= object->max_missed)
+      ablob = ident_get_nearest(bloblist, object->class[0],
+                                object->max_disp, object->px, object->py);
+    else
+      ablob = ident_get_nearest(bloblist, object->class[0],
+                                1e16, object->px, object->py);
+    if (ablob == NULL)
+      continue;
+    bblob = ident_get_nearest(bloblist, object->class[1],
+                              object->max_sep, ablob->wox, ablob->woy);
+    if (bblob == NULL)
+      continue;
+
+    mx = (bblob->wox + ablob->wox)/ 2;
+    my = (bblob->woy + ablob->woy)/ 2;
+    dx = (bblob->wox - ablob->wox);
+    dy = (bblob->woy - ablob->woy);
+
+	object->valid = 1;
+
+    object->missed = 0;
+    object->px = mx;
+    object->py = my;
+    object->pa = atan2(dy, dx);
+
+    // Assign the blobs to this object
+    ablob->object = i;
+    bblob->object = i;
+  }
+
+  return ident->objectlist;
+}
+
+
+// Update tracks
+void track_update(mezz_objectlist_t *objectlist)
+{
+  int i;
+  mezz_object_t *object;
+  mezz_track_t *track;
+  double dist_diff = 1000000.0;
+  double pose_diff = M_PI;
+
+  // first, we go through all the tracks, trying to find objects close
+  // to the last known posit/pose in the track.
+  
+  // delete any remaining tracks
+  
+}
+  
+
+// Find the nearest blob
+mezz_blob_t *ident_get_nearest(mezz_bloblist_t *bloblist, int class,
+                                double max_r, double ox, double oy)
+{
+  int i;
+  double dx, dy, dr;
+  double min_dr;
+  mezz_blob_t *blob, *min_blob;
+
+  min_dr = max_r;
+  min_blob = NULL;
+  
+  for (i = 0; i < bloblist->count; i++)
+  {
+    blob = bloblist->blobs + i;
+    if (blob->class != class)
+      continue;
+    if (blob->object >= 0)
+      continue;
+
+    dx = blob->wox - ox;
+    dy = blob->woy - oy;
+    dr = sqrt(dx * dx + dy * dy);
+
+    if (dr < min_dr)
+    {
+      min_blob = blob;
+      min_dr = dr;
+    }
+  }
+  
+  return min_blob;
+}
+
+
