@@ -873,6 +873,7 @@ fi
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -917,6 +918,8 @@ PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
+BOSSEVENTPORT=2927
+UNIFIED_BOSS_AND_OPS=0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -985,10 +988,6 @@ cat >> confdefs.h <<EOF
 EOF
 
 cat >> confdefs.h <<EOF
-#define EVENTSERVER "$EVENTSERVER"
-EOF
-
-cat >> confdefs.h <<EOF
 #define FSDIR_PROJ "$FSDIR_PROJ"
 EOF
 
@@ -1006,6 +1005,10 @@ if test -n "$FSDIR_SHARE"; then
 EOF
 
 fi
+cat >> confdefs.h <<EOF
+#define BOSSEVENTPORT "$BOSSEVENTPORT"
+EOF
+
 
 if test $PLABSUPPORT -eq 1; then
     if test "$PLAB_ROOTBALL" = "change.me"; then
@@ -1098,6 +1101,10 @@ fi
 if test -z "$EVENTSERVER"; then
     EVENTSERVER="$BOSSNODE"
 fi
+cat >> confdefs.h <<EOF
+#define EVENTSERVER "$EVENTSERVER"
+EOF
+
 
 #
 # LEDA library path
@@ -1241,6 +1248,7 @@ if test "$enable_events" = "no"; then
         EVENTSYS=0;
 else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
+		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
@@ -1326,7 +1334,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1330: checking for a BSD compatible install" >&5
+echo "configure:1337: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1667,6 +1675,7 @@ s%@BOSSNODE@%$BOSSNODE%g
 s%@USERNODE@%$USERNODE%g
 s%@FSNODE@%$FSNODE%g
 s%@EVENTSERVER@%$EVENTSERVER%g
+s%@BOSSEVENTPORT@%$BOSSEVENTPORT%g
 s%@OURDOMAIN@%$OURDOMAIN%g
 s%@FSDIR_PROJ@%$FSDIR_PROJ%g
 s%@FSDIR_GROUPS@%$FSDIR_GROUPS%g
