@@ -49,6 +49,7 @@
 #define PROJDIR		"/proj"
 #define GROUPDIR	"/groups"
 #define USERDIR		"/users"
+#define NETBEDDIR	"/netbed"
 #define SHAREDIR	"/share"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
@@ -2500,15 +2501,6 @@ COMMAND_PROTOTYPE(domounts)
 		}
 	}
 	else {
-#ifdef FSSHAREDIR
-		/*
-		 * Pointer to /share.
-		 */
-		sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
-			fshostid, FSDIR_SHARE, SHAREDIR);
-		client_writeback(sock, buf, strlen(buf), tcp);
-		info("MOUNTS: %s", buf);
-#endif
 		/*
 		 * Return SFS-based mounts. Locally, we send back per
 		 * project/group mounts (really symlinks) cause thats the
@@ -2534,38 +2526,66 @@ COMMAND_PROTOTYPE(domounts)
 				client_writeback(sock, buf, strlen(buf), tcp);
 				info("MOUNTS: %s", buf);
 			}
-			
+#ifdef FSSHAREDIR
+			/*
+			 * Pointer to /share.
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
+				fshostid, FSDIR_SHARE, SHAREDIR);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+#endif
 			/*
 			 * Return a mount for "certprog dirsearch"
 			 * that matches the local convention. This
 			 * allows the same paths to work on remote
 			 * nodes.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s%s\n",
 				fshostid, FSDIR_PROJ, DOTSFS, PROJDIR, DOTSFS);
 			client_writeback(sock, buf, strlen(buf), tcp);
 		}
 		else {
 			/*
+			 * Remote nodes get slightly different mounts.
+			 * in /netbed.
+			 *
 			 * Pointer to /proj.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
-				fshostid, FSDIR_PROJ, PROJDIR);
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s/%s\n",
+				fshostid, FSDIR_PROJ, NETBEDDIR, PROJDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			info("MOUNTS: %s", buf);
 
 			/*
 			 * Pointer to /groups
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
-				fshostid, FSDIR_GROUPS, GROUPDIR);
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+				fshostid, FSDIR_GROUPS, NETBEDDIR, GROUPDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			info("MOUNTS: %s", buf);
+
+			/*
+			 * Pointer to /users
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+				fshostid, FSDIR_USERS, NETBEDDIR, USERDIR);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+#ifdef FSSHAREDIR
+			/*
+			 * Pointer to /share.
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+				fshostid, FSDIR_SHARE, NETBEDDIR, SHAREDIR);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+#endif
 		}
 	}
 
 	/*
-	 * Remote nodes do not get user mounts at this point. 
+	 * Remote nodes do not get per-user mounts. See above.
 	 */
 	if (!reqp->islocal)
 		return 0;
