@@ -77,7 +77,7 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$perl_args = "-o $prefix -t -z -n -x -y -f $floor $building";
+$perl_args = "-o $prefix -t -z -n -x -v -y -f $floor $building";
 
 $retval = SUEXEC($uid, "nobody", "webfloormap $perl_args",
 		 SUEXEC_ACTION_IGNORE);
@@ -122,7 +122,10 @@ echo "<br>
           moves (start the robots on their way), or cancel the moves.
      <li> Only one move per robot at a time.
      <li> To change just the orientation (no drag), edit the destination
-          orientation column in the table. 
+          orientation column in the table.
+     <li> A robot destination must not overlap an obstacle (shaded area,
+          blue border), and it must be fully within the field of view of at
+          least one camera (orange boxes). 
      </ul>
      <blockquote><blockquote>\n";
 

@@ -151,6 +151,12 @@ public class RoboTrack extends JApplet {
         map.stop();
     }
 
+    // Simply for the benefit of running from the shell for testing.
+    public void init(boolean fromshell) {
+	shelled = fromshell;
+	init();
+    }
+
     /*
      * A thing that waits for an image to be loaded. 
      */
@@ -206,12 +212,33 @@ public class RoboTrack extends JApplet {
     Vector     robotmap   = new Vector(10, 10);
     int	       robotcount = 0;
 
+    /*
+     * A container for obstacle information. 
+     */
+    private class Obstacle {
+	int	id;			// DB identifier; not actually used.
+        int	x1, y1;			// Upper left x,y coords in pixels.
+        int	x2, y2;			// Lower right x,y coords in pixels.
+	String  description;
+    }
+    Vector	Obstacles = new Vector(10, 10);
+
+    /*
+     * A container for camera information. 
+     */
+    private class Camera {
+	String	name;			// DB identifier; not actually used.
+        int	x1, y1;			// Upper left x,y coords in pixels.
+        int	x2, y2;			// Lower right x,y coords in pixels.
+    }
+    Vector	Cameras = new Vector(10, 10);
+
     private class Map extends JPanel implements Runnable {
         private Thread thread;
         private BufferedImage bimg;
 	private Graphics2D G2 = null;
 
-	// The DOT radius.
+	// The DOT radius. This is radius of the circle of the robot.
 	int DOT_RAD   = 20;
 	// The length of the orientation stick, from the center of the circle.
 	int STICK_LEN = 20;
@@ -220,6 +247,13 @@ public class RoboTrack extends JApplet {
 	int LABEL_Y   = 20;
 	
         public Map() {
+	    /*
+	     * Request obstacle list when a real applet.
+	     */
+	    if (!shelled) {
+		GetObstacles();
+		GetCameras();
+	    }
         }
 
 	/*
@@ -362,11 +396,11 @@ public class RoboTrack extends JApplet {
 	    while (e.hasMoreElements()) {
 		Robot robbie  = (Robot)e.nextElement();
 
-		if ((Math.abs(robbie.y - y) < 10 &&
-		     Math.abs(robbie.x - x) < 10) ||
+		if ((Math.abs(robbie.y - y) < DOT_RAD/2 &&
+		     Math.abs(robbie.x - x) < DOT_RAD/2) ||
 		    (robbie.dragging &&
-		     Math.abs(robbie.drag_y - y) < 10 &&
-		     Math.abs(robbie.drag_x - x) < 10)) {
+		     Math.abs(robbie.drag_y - y) < DOT_RAD/2 &&
+		     Math.abs(robbie.drag_x - x) < DOT_RAD/2)) {
 		    return robbie.pname;
 		}
 	    }
@@ -374,8 +408,114 @@ public class RoboTrack extends JApplet {
 	}
 
 	/*
-	 * Draw some buttons.
+	 * Check for overlap with exclusions zones (obstacles). We check
+	 * all the robots that are dragging, and popup a dialog box if
+	 * we find one. The user then has to fix it.
+	 *
+	 * XXX I am treating the robot as a square! Easier to calculate.
+	 *
+	 * XXX The value below (OBSTACLE_BUFFER) is hardwired in floormap
+	 *     code (where the base image is generated).
 	 */
+	int OBSTACLE_BUFFER = 23;
+	
+	public boolean CheckforCollisions() {
+	    Enumeration robot_enum = robots.elements();
+
+	    while (robot_enum.hasMoreElements()) {
+		Robot robbie  = (Robot)robot_enum.nextElement();
+
+		if (!robbie.dragging)
+		    continue;
+
+		int rx1 = robbie.drag_x - ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int ry1 = robbie.drag_y - ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int rx2 = robbie.drag_x + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+		int ry2 = robbie.drag_y + ((DOT_RAD/2) + OBSTACLE_BUFFER);
+
+		//System.out.println("CheckCollision: " + rx1 + "," +
+		//                   ry1 + "," + rx2 + "," + ry2);
+
+		/*
+		 * Check for overlap of this robot with each obstacle.
+		 */
+		for (int index = 0; index < Obstacles.size(); index++) {
+		    Obstacle obstacle = (Obstacle) Obstacles.elementAt(index);
+		    
+		    int ox1 = obstacle.x1;
+		    int oy1 = obstacle.y1;
+		    int ox2 = obstacle.x2;
+		    int oy2 = obstacle.y2;
+
+		    //System.out.println("  " + ox1 + "," +
+		    //		       oy1 + "," + ox2 + "," + cy2);
+
+		    if (! (oy2 < ry1 ||
+			   ry2 < oy1 ||
+			   ox2 < rx1 ||
+			   rx2 < ox1)) {
+			MyDialog("Collision",
+				 robbie.pname + " overlaps with an obstacle");
+			return true;
+		    }
+		}
+	    }
+	    return false;
+	}
+
+	/*
+	 * Check for robots wandering out of camera range. We check
+	 * all the robots that are dragging, and popup a dialog box if
+	 * we find one. The user then has to fix it.
+	 *
+	 * XXX I am treating the robot as a square! Easier to calculate.
+	 */
+	public boolean CheckOutOfBounds() {
+	    Enumeration robot_enum = robots.elements();
+
+	    while (robot_enum.hasMoreElements()) {
+		Robot robbie  = (Robot)robot_enum.nextElement();
+		int   index;
+
+		if (!robbie.dragging)
+		    continue;
+
+		int rx1 = robbie.drag_x - ((DOT_RAD/2));
+		int ry1 = robbie.drag_y - ((DOT_RAD/2));
+		int rx2 = robbie.drag_x + ((DOT_RAD/2));
+		int ry2 = robbie.drag_y + ((DOT_RAD/2));
+
+		//System.out.println("CheckOutOfBounds: " + rx1 + "," +
+		//                   ry1 + "," + rx2 + "," + ry2);
+
+		/*
+		 * Check for full overlap with at least one camera.
+		 */
+		for (index = 0; index < Cameras.size(); index++) {
+		    Camera camera = (Camera) Cameras.elementAt(index);
+		    
+		    int cx1 = camera.x1;
+		    int cy1 = camera.y1;
+		    int cx2 = camera.x2;
+		    int cy2 = camera.y2;
+
+		    //System.out.println("  " + cx1 + "," +
+		    //		       cy1 + "," + cx2 + "," + cy2);
+
+		    if ((rx1 >= cx1 &&
+			 ry1 >= cy1 &&
+			 rx2 <= cx2 &&
+			 ry2 <= cy2))
+			break;
+		}
+		if (index == Cameras.size()) {
+		    MyDialog("Out of Bounds",
+			     robbie.pname + " is out of camera range");
+		    return true;
+		}
+	    }
+	    return false;
+	}
 
 	/*
 	 * Draw a robot, which is either the real one, a destination one,
@@ -1047,11 +1187,155 @@ public class RoboTrack extends JApplet {
 		maptable.clearSelection();
 	    }
 	    else if (source == SubmitMenuItem) {
-		SendInDestinations();
+		/*
+		 * Check for collisions before submitting.
+		 */
+		if (! map.CheckforCollisions() &&
+		    ! map.CheckOutOfBounds()) 
+		    SendInDestinations();
 	    }
 	    repaint();
 	    maptable.repaint(10);
 	}
+    }
+
+    /*
+     * Get the Obstacle list from the server.
+     */
+    public boolean GetObstacles() {
+ 	String urlstring = "obstacles.php3?fromapplet=1"
+	    + "&nocookieuid="
+	    + URLEncoder.encode(uid)
+	    + "&nocookieauth="
+	    + URLEncoder.encode(auth);
+
+	try
+	{
+	    URL			url = new URL(getCodeBase(), urlstring);
+	    URLConnection	urlConn;
+	    InputStream		is;
+	    String		str;
+	    int			index = 0;
+	    
+	    urlConn = url.openConnection();
+	    urlConn.setDoInput(true);
+	    urlConn.setUseCaches(false);
+	    is = urlConn.getInputStream();
+		
+	    BufferedReader input
+		= new BufferedReader(new InputStreamReader(is));
+
+	    Obstacles = new Vector(10, 10);	    
+
+	    /*
+	     * This should be in XML format.
+	     */
+	    while ((str = input.readLine()) != null) {
+		System.out.println(str);
+
+		StringTokenizer tokens = new StringTokenizer(str, ",");
+		String		tmp;
+		Obstacle	obstacle = new Obstacle();
+
+		/*
+		 * Convert from meters to pixels ...
+		 */
+		obstacle.id = Integer.parseInt(tokens.nextToken().trim());
+		obstacle.x1 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		obstacle.y1 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		obstacle.x2 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		obstacle.y2 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		obstacle.description = tokens.nextToken().trim();
+
+		Obstacles.insertElementAt(obstacle, index++);
+	    }
+	    is.close();
+	}
+	catch(Throwable th)
+	{
+	    MyDialog("GetObstacles",
+		     "Failed to get obstacle list from server");
+	    th.printStackTrace();
+	    return false;
+	}
+	return true;
+    }
+
+    /*
+     * Get the Camera list from the server.
+     */
+    public boolean GetCameras() {
+ 	String urlstring = "cameras.php3?fromapplet=1"
+	    + "&nocookieuid="
+	    + URLEncoder.encode(uid)
+	    + "&nocookieauth="
+	    + URLEncoder.encode(auth);
+
+	try
+	{
+	    URL			url = new URL(getCodeBase(), urlstring);
+	    URLConnection	urlConn;
+	    InputStream		is;
+	    String		str;
+	    int			index = 0;
+	    
+	    urlConn = url.openConnection();
+	    urlConn.setDoInput(true);
+	    urlConn.setUseCaches(false);
+	    is = urlConn.getInputStream();
+		
+	    BufferedReader input
+		= new BufferedReader(new InputStreamReader(is));
+
+	    Cameras = new Vector(10, 10);	    
+
+	    /*
+	     * This should be in XML format.
+	     */
+	    while ((str = input.readLine()) != null) {
+		System.out.println(str);
+
+		StringTokenizer tokens = new StringTokenizer(str, ",");
+		String		tmp;
+		Camera		camera = new Camera();
+
+		/*
+		 * Convert from meters to pixels ...
+		 */
+		camera.name = tokens.nextToken().trim();
+		camera.x1 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		camera.y1 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		camera.x2 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+		camera.y2 = (int)
+		    (Double.parseDouble(tokens.nextToken().trim())
+		     * pixels_per_meter);
+
+		Cameras.insertElementAt(camera, index++);
+	    }
+	    is.close();
+	}
+	catch(Throwable th)
+	{
+	    MyDialog("GetCameras",
+		     "Failed to get camera list from server");
+	    th.printStackTrace();
+	    return false;
+	}
+	return true;
     }
 
     /*
@@ -1062,7 +1346,7 @@ public class RoboTrack extends JApplet {
 
 	// Its a POST, so no leading "?" for the URL arguments.
  	String urlstring = "fromapplet=1"
-	    + "nocookieuid="
+	    + "&nocookieuid="
 	    + URLEncoder.encode(uid)
 	    + "&nocookieauth="
 	    + URLEncoder.encode(auth);
@@ -1126,11 +1410,7 @@ public class RoboTrack extends JApplet {
 	    input.close();
 
 	    if (str.length() > 0) {
-		System.out.println(str);
-
-		JOptionPane.showMessageDialog(getContentPane(),
-					      str, "Submit Failed",
-					      JOptionPane.ERROR_MESSAGE);
+		MyDialog("Setdest Submission Failed", str);
 	    }
 	}
 	catch(Throwable th)
@@ -1140,15 +1420,25 @@ public class RoboTrack extends JApplet {
 	return true;
     }
 
+    /*
+     * Utility function to pop up a dialog box.
+     */
+    public void MyDialog(String title, String msg) {
+	System.out.println(title + " - " + msg);
+	
+	JOptionPane.showMessageDialog(getContentPane(),
+				      msg, title,
+				      JOptionPane.ERROR_MESSAGE);
+    }
+
     public static void main(String argv[]) {
         final RoboTrack robomap = new RoboTrack();
 	try
 	{
 	    URL url = new URL("file://robots-4.jpg");
-	    robomap.init();
+	    robomap.init(true);
 	    robomap.is = System.in;
 	    robomap.floorimage = robomap.getImage(url);
-	    robomap.shelled = true;
 	    robomap.uid = "stoller";
 	    robomap.auth = "xyz";
 	}
