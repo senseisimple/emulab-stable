@@ -1,0 +1,23 @@
+source tb_compat.tcl
+set ns [new Simulator]
+
+set fe1 [$ns node]
+set fe2 [$ns node]
+set fe3 [$ns node]
+set fe4 [$ns node]
+set fe5 [$ns node]
+set proxy [$ns node]
+set or [$ns node]
+
+set lan0 [$ns make-lan "$fe1 $fe2 $fe3 $fe4 $fe5 $proxy $or" 100Mb .1ms]
+tb-set-node-lan-delay $or $lan0 20ms
+
+tb-set-node-os $fe1 RHL62-STD
+tb-set-node-os $fe2 RHL62-STD
+tb-set-node-os $fe3 RHL62-STD
+tb-set-node-os $fe4 RHL62-STD
+tb-set-node-os $fe5 RHL62-STD
+tb-set-node-os $or RHL62-STD
+tb-set-node-os $proxy RHL62-STD
+
+$ns run

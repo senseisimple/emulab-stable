@@ -1,0 +1,61 @@
+# Simple 5 node setup: Client, server and router, with CBR cross traffic
+#	   Server
+#	     ^
+#	     |
+#	     V
+# Send <-> Router <-> Consume
+#	     ^
+#	     |
+#	     V
+#	   Client
+#
+# To see something interesting, start up the expt, then do a flood ping
+# from client to server (see /users/newbold/linktest). You can also log
+# into the router and tcpdump to see the traffic going through.
+
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set send [$ns node]
+set consume [$ns node]
+
+set router [$ns node]
+
+set client [$ns node]
+set server [$ns node]
+
+set client-lan [$ns make-lan "$send $router $client" 100Mb 1ms]
+set server-lan [$ns make-lan "$consume $server $router" 100Mb 1ms]
+
+tb-set-node-os $router FBSD40-STD
+tb-set-node-startup $router /users/newbold/trafgen/fbsd-router-startup
+
+tb-set-node-os $client FBSD40-STD
+tb-set-node-startup $client /users/newbold/trafgen/clientroutecmd
+tb-set-node-os $server FBSD40-STD
+tb-set-node-startup $server /users/newbold/trafgen/serverroutecmd
+
+########## Magic code ###############
+#Create a UDP agent and attach it to node send
+set udp0 [new Agent/UDP]
+$ns attach-agent $send $udp0
+
+# Create a CBR traffic source and attach it to udp0
+set cbr0 [new Application/Traffic/CBR]
+$cbr0 set packetSize_ 1024
+$cbr0 set rate_ 100Mbps
+$cbr0 attach-agent $udp0
+
+set null0 [new Agent/Null] 
+$ns attach-agent $consume $null0
+
+$ns connect $udp0 $null0
+
+$ns at 0.00001 "$cbr0 start"
+$ns at 0.00500 "$cbr0 stop"
+#####################################
+
+$ns run
+
+

@@ -1,0 +1,23 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+# Set up two nodes, one called ping, and one called echo
+set ping [$ns node]
+set echo [$ns node]
+
+# Now we define the characteristics of the link between
+# the nodes - We want a 2-way link between the ping and
+# echo nodes, with a bandwith of 100MB, and a delay in
+# each direction of 150 ms
+$ns duplex-link $ping $echo 100Mb 150ms DropTail
+
+# Set OSes for the nodes
+tb-set-node-os ping FBSD40-STD
+tb-set-node-os echo MAC-PINGREPLY
+
+tb-set-ip ping 192.168.101.1
+tb-set-ip echo 192.168.101.2
+
+# And away we go...
+$ns run
