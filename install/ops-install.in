@@ -54,12 +54,13 @@ sub usage {
 my $packagedir = "";
 my $batchmode  = 0;
 my %opts;
-getopt("p:b",%opts);
-
-if ($opt{p}) {
-    $packagedir = $opt{p};
+if (! getopts("p:b", \%opts)) {
+    usage();
 }
-if ($opt{b}) {
+if (defined($opts{p})) {
+    $packagedir = $opts{p};
+}
+if (defined($opts{b})) {
     $batchmode = 1;
 }
 
@@ -153,6 +154,7 @@ if (! $batchmode) {
     my $response = <>;
     die "Installation aborted!\n" unless ($response =~ /^y/i);
 }
+exit(0);
 
 if ($UID != 0) {
     die "This script must be run as root.\n";
