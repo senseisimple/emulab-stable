@@ -15,4 +15,8 @@ elif [ "$NODETYPE" = 'pcL440GX' ]; then
     echo 'fxp1'
 elif [ "$NODETYPE" = 'pc1500' ]; then
     echo 'xl0'
+elif [ "$NODETYPE" = 'pc2000' ]; then
+    echo 'xl0'
+else
+    echo 'unknown'
 fi
