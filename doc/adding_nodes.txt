@@ -121,7 +121,7 @@ C. What to do on boss:
 	  pcN    IN      A       155.101.132.N
                  IN      MX 10   ops
                  IN      MX 20   fast.cs.utah.edu.
-	  ci -u emulab.db.head
+	  ci -u emulab.net.db.head
           cd reverse/
 	  co -l 155.101.132.db
 	  in 155.101.132.db, make these changes:
