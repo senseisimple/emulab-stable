@@ -1098,5 +1098,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	  UNIQUE KEY table_name (table_name,column_name)
 	) TYPE=MyISAM;
 
-1.201:
+1.201: Change the enum for pcremote_ok to match the phys type that was
+       ultimately chosen by Austin.
+
+	alter table projects modify pcremote_ok \
+		set('pcplabphys','pcron','pcwa') default NULL;
 

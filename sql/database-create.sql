@@ -1106,7 +1106,7 @@ CREATE TABLE projects (
   public_whynot tinytext,
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
-  pcremote_ok set('pcplab','pcron','pcwa') default NULL,
+  pcremote_ok set('pcplabphys','pcron','pcwa') default NULL,
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid),
   KEY approved (approved),
