@@ -25,3 +25,24 @@ Things to do for image*:
 
 6. Create a "signature" file for an image using a collision-resistant hash
    like MD5 or SHA-1.  See TODO.hash for more.
+
+7. Add an option to exclude (skip) disk blocks outside of any DOS partition.
+   By default, we want to include these blocks in the image since some
+   systems stash magic info this way IBM laptops for instance).  But in
+   some cases we want to ignore it.  Since the MBR often falls in the
+   outside-of-any-partition catagory (e.g., DOS partition 1 starting at
+   sector 63, aka cylinder 1), we may need to further break this down into
+   "before first part", "between parts", "after last part".  Also need an
+   option to exclude space outside a filesystem but inside a DOS partition
+   (e.g., when creating a small filesystem in a large partition).  This is
+   highly dependent on the filesystem type, but presumably we can easily
+   detect space beyond the end of the FS.  "Before the start" probably
+   doesn't make sense for most filesystems.  Hmm...for FFS we can detect
+   space outside a BSD partition in addition to space beyond the end of
+   a filesystem but inside the BSD partition.  Yuk!  Maybe we keep it
+   simple and have a single option and just treat things like the MBR
+   special.
+
+
+
+
