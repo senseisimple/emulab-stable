@@ -122,6 +122,15 @@ sub doboot()
     }
     TBDebugTimeStamp("rc.injail done running config scripts");
 
+    # Linktest daemon now runs inside jails.
+    if (-x "$RCDIR/rc.linktest") {
+	print("Starting linktest daemon\n");
+	system("$RCDIR/rc.linktest start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.linktest");
+	}
+    }
+
     print("Informing the testbed that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
 	fatal("Error sneding ISUP to Emulab Control!");
