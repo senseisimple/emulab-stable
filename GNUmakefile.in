@@ -58,7 +58,7 @@ ops-install:
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
-	@$(MAKE) -C os control-install
+#	@$(MAKE) -C os control-install
 	@$(MAKE) -C db control-install
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
