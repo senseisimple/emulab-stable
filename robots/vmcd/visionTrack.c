@@ -167,10 +167,13 @@ void vtCoalesce(struct lnMinList *extra,
 					  (struct vision_track *)
 					  vt->vt_link.ln_Succ,
 					  &distance)) != NULL) &&
+		   (vt->vt_client != vt_extra->vt_client) &&
 		   (distance < 0.35)) {
+#if 0
 		printf("coalesce %f %f  --  %f %f\n",
 		       vt->vt_position.x, vt->vt_position.y,
 		       vt_extra->vt_position.x, vt_extra->vt_position.y);
+#endif
 		
 		lnRemove(&vt_extra->vt_link);
 		lnAddHead(extra, &vt_extra->vt_link);
