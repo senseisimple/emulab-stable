@@ -440,7 +440,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
+        os/syncd/GNUmakefile  os/dijkstra/GNUmakefile \
+	os/genhostsfile/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
 	security/plasticwrap \
@@ -451,7 +452,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/addsfskey account/webaddsfskey \
 	account/quotamail \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
-	tbsetup/spewrpmtar \
+	tbsetup/spewrpmtar tbsetup/gentopofile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
