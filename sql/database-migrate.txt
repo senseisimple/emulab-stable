@@ -1275,3 +1275,14 @@ last_net_act,last_cpu_act,last_ext_act);
              add column old_eid varchar(32) NOT NULL default '';
 
        alter table reserved add KEY old_pid (old_pid,old_eid);
+
+1.123: Add jail_osname and delay_osname as temporary (well, perhaps)
+       aids for paper effort. Note, not an osid, but an osname like we
+       specify for a virt_node. Lookup rules are the same; first check
+       the current project for a match, and then check emulab-ops.
+
+       alter table experiments add jail_osname varchar(20) \
+		default NULL after allowfixnode;
+       alter table experiments add delay_osname varchar(20) \
+		default NULL after jail_osname;
+		
