@@ -1,0 +1,20 @@
+#
+# This is the definitions file for Chad on Mini.
+#
+TBDBNAME=tbdb
+WWWDEFS=barb-mini
+TBADMINGROUP=flux
+TBOPSEMAIL=barb@cs.utah.edu
+TBLOGSEMAIL=barb@cs.utah.edu
+TBAUDITEMAIL=barb@cs.utah.edu
+TBACTIVEARCHIVE=barb@cs.utah.edu
+TBUSERSARCHIVE=barb@cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=1
+BOSSNODE=boss.mini.emulab.net
+USERNODE=users.mini.emulab.net
+FSNODE=fs.mini.emulab.net
+OURDOMAIN=mini.emulab.net
+FSDIR_GROUPS=/z/groups
+FSDIR_PROJ=/z/proj
+FSDIR_USERS=/z/users
