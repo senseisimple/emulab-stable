@@ -1,3 +1,102 @@
+stoller     2003/10/09 14:03:10 MDT
+
+  Modified files:
+    db                   libdb.pm.in 
+    os                   GNUmakefile.in install-rpm 
+                         install-tarfile 
+    tbsetup              GNUmakefile.in node_update.in 
+                         spewrpmtar.in 
+    tmcd/common          update watchdog 
+    www                  dbdefs.php3.in showexp.php3 
+                         showimageid_list.php3 shownode.php3 
+                         showstuff.php3 spewrpmtar.php3 
+                         swapexp.php3 updateaccounts.php3 
+  Log:
+  Reorg of two aspects of node update.
+  
+  * install-rpm, install-tarfile, spewrpmtar.php3, spewrpmtar.in: Pumped
+    up even more! The db file we store in /var/db now records both the
+    timestamp (of the file, or if remote the install time) and the MD5
+    of the file that was installed. Locally, we can get this info when
+    accessing the file via NFS (copymode on or off). Remote, we use wget
+    to get the file, and so pass the timestamp along in the URL request,
+    and let spewrpmtar.in determine if the file has changed. If the
+    timestamp it gets is >= to the timestamp of the file, an error code
+    of 304 (Not Modifed) is returned. Otherwise the file is returned.
+  
+    If the timestamps are different (remote, server sends back an actual
+    file), the MD5 of the file is compared against the value stored. If
+    they are equal, update the timestamp in the db file to avoid
+    repeated MD5s (or server downloads) in the future. If the MD5 is
+    different, then reinstall the tarball or rpm, and update the db file
+    with the new timestamp and MD5. Presto, we have auto update capability!
+  
+    Caveat: I pass along the old MD5 in the URL, but it is currently
+    ignored. I do not know if doing the MD5 on the server is a good
+    idea, but obviously it is easy to add later. At the moment it
+    happens on the node, which means wasted bandwidth when the timestamp
+    has changed, but the file has not (probably not something that will
+    happen in typical usage).
+  
+    Caveat: The timestamp used on remote nodes is the time the tarfile
+    is installed (GM time of course). We could arrange to return the
+    timestamp of the local file back to the node, but that would mean
+    complicating the protocol (or using an http header) and I was not in
+    the mood for that. In typical usage, I do not think that people will
+    be changing tarfiles and rpms so rapidly that this will make a
+    difference, but if it does, we can change it.
+  
+  * node_update.in, client side watchdog, and various web pages:
+    Deflated node_update, removing all of the older ssh code. We now
+    assume that all nodes will auto update on a periodic basis, via the
+    watchdog that runs on all client nodes, including plab nodes.
+  
+    Changed the permission check to look for new UPDATE permission (used
+    to be UPDATEACCOUNT). As before, it requires local_root or better.
+    The reason for this is that node_update now implies more than just
+    updating the accounts/mounts. The web pages have been changed to
+    explain that in addition to mounts/accounts, rpms and tarfiles will
+    also be updated. At the moment, this is still tied to a single
+    variable (update_accounts) in the nodes table, but as Kirk requested
+    at the meeting, it will probably be nice to split these out in the
+    future.
+  
+    Added the ability to node_update a single node in an experiment (in
+    addition to all nodes option on the showexp page). This has been
+    added to the shownode webpage menu options.
+  
+    Changed locking code to use the newer wrapper states, and to move
+    the experiment to RUNNING_LOCKED until the update completes. This is
+    to prevent mayhem in the rest of the system (which could be dealt
+    with, but is not worth the trouble; people have to wait until their
+    initiated update is complete, before they can swap out the
+    experiment).
+  
+    Added "short" mode to shownode routine, equiv to the recently added
+    short mode for showexp. I use this on the confirmation page for
+    updating a single node, giving the user a couple of pertinent (feel
+    good) facts before they comfirm.
+  
+  Revision  Changes    Path
+  1.134     +3 -2      testbed/db/libdb.pm.in
+  1.17      +3 -0      testbed/os/GNUmakefile.in
+  1.5       +222 -33   testbed/os/install-rpm
+  1.11      +223 -32   testbed/os/install-tarfile
+  1.92      +0 -2      testbed/tbsetup/GNUmakefile.in
+  1.12      +112 -214  testbed/tbsetup/node_update.in
+  1.2       +51 -14    testbed/tbsetup/spewrpmtar.in
+  1.5       +37 -3     testbed/tmcd/common/update
+  1.9       +1 -1      testbed/tmcd/common/watchdog
+  1.60      +4 -3      testbed/www/dbdefs.php3.in
+  1.72      +2 -2      testbed/www/showexp.php3
+  1.15      +1 -1      testbed/www/showimageid_list.php3
+  1.14      +5 -0      testbed/www/shownode.php3
+  1.118     +191 -189  testbed/www/showstuff.php3
+  1.3       +22 -3     testbed/www/spewrpmtar.php3
+  1.20      +37 -17    testbed/www/swapexp.php3
+  1.5       +97 -62    testbed/www/updateaccounts.php3
+
+
 stoller     2003/10/06 14:27:46 MDT
 
   Modified files:
