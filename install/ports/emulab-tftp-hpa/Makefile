@@ -10,8 +10,11 @@ PORTVERSION=	0.33
 #CATEGORIES=	net
 CATEGORIES=	misc
 MASTER_SITES=	ftp://www.kernel.org/pub/software/network/tftp/
+PKGNAMEPREFIX=	emulab-
+DISTNAME=	${PORTNAME}-${PORTVERSION}
 
 MAINTAINER=	mike@cs.utah.edu
+COMMENT=	"The tftpd-hpa TFTP distribution as configured for Emulab"
 
 PATCH_STRIP=	-p1
 
