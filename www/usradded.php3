@@ -75,7 +75,12 @@ else {
 #
 if ($returning) {
     if (CHECKLOGIN($uid) != 1) {
-        USERERROR("You are not logged in. Please log in and try again.", 1);
+        USERERROR("The Username '$proj_head_uid' is in use. ".
+		  "If you already have an Emulab account, please go back ".
+		  "and login before trying to join a new project.<br><br>".
+		  "If you are a <em>new</em> Emulab user trying to join ".
+                  "your first project, please go back and select a different ".
+		  "Username.", 1);
     }
 }
 else {
