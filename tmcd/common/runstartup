@@ -97,9 +97,15 @@ if ($mypid) {
 }
 else {
     #
-    # The child becomes the user and runs the command.
+    # The child becomes the user and runs the command. Maybe cleaner to
+    # just use sudo instead, so we get the entire group list of the
+    # target user?
     #
-    $EGID = $GID = $gid;
+    my $glist = `id -G $login`;
+    chomp($glist);
+    
+    $GID  = $gid;
+    $EGID = $glist;
     $EUID = $UID = $uid;
 
     exec($runcmd);
