@@ -94,6 +94,12 @@ if (strlen($proj_head_uid) > 8) {
 }
 
 #
+# Certain of these values must be escaped or otherwise sanitized.
+# 
+$proj_why  = addslashes($proj_why);
+$proj_name = addslashes($proj_name);
+
+#
 # This is a new project request. Make sure it does not already exist.
 #
 $project_query  = "SELECT pid FROM projects WHERE pid=\"$pid\"";
