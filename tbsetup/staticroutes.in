@@ -488,7 +488,7 @@ HOSTROUTES:
 	     $netroutes{"$src:$newipsubnet"} eq $hop ) {
 	    next;
 	} else {	    
-	    $hostroutes{"$src:$srcip-$dst:$newip"} = "$hop:$hopip";
+	    $hostroutes{"$src:$srcip%$dst:$newip"} = "$hop:$hopip";
 	}
     }
 
@@ -545,7 +545,7 @@ HOSTROUTES:
 # and if subsequent host routes are different from the first
 # route we added, only then will the host routes get added.
 foreach my $hostroute (keys(%hostroutes)) {
-    my ($srcinfo,$dstinfo) = split("-", $hostroute);
+    my ($srcinfo,$dstinfo) = split("%", $hostroute);
     my ($src,$srcip) = split(":", $srcinfo);
     my ($dst,$dstip) = split(":", $dstinfo);
     my ($hop,$hopip) = split(":", $hostroutes{$hostroute});
