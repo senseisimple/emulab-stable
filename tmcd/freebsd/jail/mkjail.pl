@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -252,6 +252,7 @@ exit(0);
 sub mkrootfs($)
 {
     my ($path) = @_;
+    my $vnsize = $VNFILEMBS;
 
     chdir($path) or
 	fatal("Could not chdir to $path: $!");
@@ -262,7 +263,7 @@ sub mkrootfs($)
     #
     # Big file of zeros.
     # 
-    mysystem("dd if=/dev/zero of=root.vnode bs=1m count=$VNFILEMBS");
+    mysystem("dd if=/dev/zero of=root.vnode bs=1m count=$vnsize");
 
     #
     # Find a free vndevice.
@@ -279,6 +280,7 @@ sub mkrootfs($)
 
     mysystem("disklabel -r -w vn${vndevice} auto");
     mysystem("newfs -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
+    mysystem("tunefs -m 2 -o space /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
     push(@mntpoints, "$path/root");
 
@@ -614,6 +616,8 @@ sub getjailconfig($)
 # See if special jail opts supported.
 #
 sub setjailoptions() {
+    my $sawip = 0;
+    
     $jailoptions = "";
 
     #
@@ -657,12 +661,27 @@ sub setjailoptions() {
 		}
 		last SWITCH;
 	    };
+ 	    /^IPADDR$/ && do {
+		# Comma separated list of IPs
+		my @iplist = split(",", $val);
+
+		foreach my $ip (@iplist) {
+		    if ($ip =~ /(\d+\.\d+\.\d+\.\d+)/) {
+			$jailoptions .= " -i $1";
+			$sawip = 1;
+		    }
+		}
+ 		last SWITCH;
+ 	    };
 	}
     }
     print("SSHD port is $sshdport\n");
 
     system("sysctl jail.inetraw_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.bpf_allowed=1 >/dev/null 2>&1");
+    if ($sawip) {
+ 	system("sysctl jail.multiip_allowed=1 >/dev/null 2>&1");
+    }
     
     if ($?) {
 	print("Special jail options are NOT supported!\n");
