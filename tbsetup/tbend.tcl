@@ -36,7 +36,7 @@ set nfree "$updir/db/nfree"
 set libir "$scriptdir/ir/libir.tcl"
 set resetvlans "$scriptdir/resetvlans"
 
-load $updir/sql.so
+load /usr/testbed/lib/sql.so
 
 if {$argc != 3 && $argc != 2} {
     puts stderr "Syntax: $argv0 <pid> <eid>"
@@ -81,4 +81,9 @@ outs "Resetting VLANs"
 if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reseting vlans ($err)"
     exit 1
+}
+
+outs "Removing delay entries"
+foreach machine $machines {
+    sql exec $DB "delete from delays where node_id = \"$machine\""
 }
