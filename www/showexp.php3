@@ -87,6 +87,9 @@ if ($expstate) {
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Swap this Experiment Out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+
+	WRITESUBMENUBUTTON("Control Traffic Shaping",
+			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
 
@@ -108,14 +111,10 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 }
 
 if (ISADMIN($uid)) {
-
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 
 	SUBMENUSECTION("Beta-Test Options");
 	    
-	WRITESUBMENUBUTTON("Control Delay Nodes",
-			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
-	
 	WRITESUBMENUBUTTON("Restart this Experiment",
 			   "swapexp.php3?inout=restart&pid=$exp_pid".
 			   "&eid=$exp_eid");
