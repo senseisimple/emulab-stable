@@ -25,11 +25,12 @@ sub usage()
 	"Use -i to specify an image name. Use node default otherwise.\n".
 	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -s to start reload, but do not wait for it to complete.\n".
+	"Use -r to supress rebooting nodes - you'll need to to it yourself\n".
 	"Use -e to reload all the nodes in an experiment.\n" .
         "Use -l to get a list of images you are permitted to load.\n";
     exit(-1);
 }
-my  $optlist = "sldi:e:p:m:";
+my  $optlist = "sldi:e:p:m:r";
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -66,6 +67,7 @@ my $waitmode    = 1;
 my $failures    = 0;
 my $startwait   = 0;
 my $maxwait	= 0;
+my $reboot      = 1;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -80,6 +82,7 @@ if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"d"})) { $dbg++; }
 if (defined($options{"l"})) { dolisting(); exit(0); }
 if (defined($options{"s"})) { $waitmode = 0; }
+if (defined($options{"r"})) { $reboot = 0; }
 if (defined($options{"i"}) && defined($options{"m"})) { usage(); }
 if (defined($options{"i"})) {
     $imagename  = $options{"i"};
@@ -286,9 +289,13 @@ if ($TESTMODE) {
 
 # Fire off a mass reboot and quit if not in waitmode.
 if (! $waitmode) {
-    print STDOUT "Reload ready. Rebooting nodes at ".`date`;
-    system("$nodereboot @nodes");
-    $failures = $? >> 8;
+    if ($reboot) {
+	print STDOUT "Reload ready. Rebooting nodes at ".`date`;
+	system("$nodereboot @nodes");
+	$failures = $? >> 8;
+    } else {
+	$failures = 0;
+    }
 
     print STDOUT "OS Reload (no waiting) Done!\n";
     exit $failures;
@@ -305,10 +312,12 @@ while (@nodes) {
   # Reboot them all.
   print "Issuing reboot for @nodes and then waiting ...\n";
 
-  system("$nodereboot @nodes");
-  if ($?) {
-    print "Reboot failed for (some of) @nodes. Quitting!\n";
-    exit ($? >> 8);
+  if ($reboot) {
+      system("$nodereboot @nodes");
+      if ($?) {
+	  print "Reboot failed for (some of) @nodes. Quitting!\n";
+	  exit ($? >> 8);
+      }
   }
 
   # Now wait for them.
