@@ -28,5 +28,6 @@ is_available eth3
 is_available eth4
 is_available eth5
 is_available eth6
+is_available ath0
 
 exit 0
