@@ -1236,6 +1236,9 @@ COMMAND_PROTOTYPE(doaccounts)
 				row[10] ? row[10] : "");
 		}
 		else {
+			if (!islocal && vers == 5) {
+				row[1] = "'*'";
+			}
 			sprintf(buf,
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
