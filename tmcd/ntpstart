@@ -43,15 +43,18 @@ my $newfile     = "/tmp/ntp.conf.new";
 my $ntpfile     = "/etc/ntp.conf";
 my $driftfile   = "/etc/ntp.drift";
 my $pidfile	= "/var/run/ntpd.pid";
+my $debug       = 0;
 
 #
 # Since this is a wrapper, we have to try to start ntp no matter what.
 #
 sub ntpstart () {
-#    system("ntpd @ARGV");
-#    return ($? >> 8);
-    print "ntpd @ARGV\n";
-    return 0;
+    if ($debug) {
+	print "@ARGV\n";
+	return 0;
+    }
+    system("@ARGV");
+    return ($? >> 8);
 }
 
 #
@@ -110,11 +113,11 @@ foreach my $line (@ntpinfo) {
 
     SWITCH1: {
 	/^PEER=(.*)$/ && do {
-	    print NEW "peer $_\n";
+	    print NEW "peer $1\n";
 	    last SWITCH1;
 	};
 	/^SERVER=(.*)$/ && do {
-	    print NEW "server $_\n";
+	    print NEW "server $1\n";
 	    last SWITCH1;
 	};
 	/^DRIFT=(.*)$/ && do {
