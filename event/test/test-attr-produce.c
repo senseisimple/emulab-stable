@@ -1,6 +1,6 @@
 /* test-attr-produce.c: Test delivery of events, with attributes (producer). */
 
-static char rcsid[] = "$Id: test-attr-produce.c,v 1.2 2001-11-06 17:24:16 imurdock Exp $";
+static char rcsid[] = "$Id: test-attr-produce.c,v 1.3 2002-01-29 12:18:49 imurdock Exp $";
 
 #include <event.h>
 
@@ -11,6 +11,7 @@ main(int argc, char **argv)
     event_notification_t notification;
     char *server = NULL;
     int c;
+    struct timeval time;
 
     while ((c = getopt(argc, argv, "s:")) != -1) {
         switch (c) {
@@ -39,33 +40,41 @@ main(int argc, char **argv)
         return 1;
     }
 
-    if (event_notification_attr_put(handle, notification,
-                                    EVENT_ATTR_DOUBLE, "double",
-                                    (event_attr_value_t) 1.23)
+    if (event_notification_put_double(handle, notification, "double", 1.23)
         == 0)
     {
         ERROR("could not put double attribute\n");
         return 1;
     }
-    if (event_notification_attr_put(handle, notification,
-                                    EVENT_ATTR_INT32, "int32",
-                                    (event_attr_value_t) 123)
+
+    if (event_notification_put_int32(handle, notification, "int32", 123)
         == 0)
     {
         ERROR("could not put int32 attribute\n");
         return 1;
     }
-    if (event_notification_attr_put(handle, notification,
-                                    EVENT_ATTR_INT64, "int64",
-                                    (event_attr_value_t) 100000000000)
+
+    if (event_notification_put_int64(handle, notification, "int64",
+                                     100000000000)
         == 0)
     {
         ERROR("could not put int64 attribute\n");
         return 1;
     }
-    if (event_notification_attr_put(handle, notification,
-                                    EVENT_ATTR_STRING, "string",
-                                    (event_attr_value_t) "foo")
+
+    gettimeofday(&time, NULL);
+    TRACE("time.tv_sec = %ld, time.tv_usec = %ld\n",
+          time.tv_sec,
+          time.tv_usec);
+    if (event_notification_put_opaque(handle, notification, "opaque", &time,
+                                      sizeof(time))
+        == 0)
+    {
+        ERROR("could not put opaque attribute\n");
+        return 1;
+    }
+
+    if (event_notification_put_string(handle, notification, "string", "foo")
         == 0)
     {
         ERROR("could not put string attribute\n");

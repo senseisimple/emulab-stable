@@ -1,11 +1,11 @@
 /* test-consume.c: Test delivery of events (consumer). */
 
-static char rcsid[] = "$Id: test-consume.c,v 1.2 2001-11-06 17:24:16 imurdock Exp $";
+static char rcsid[] = "$Id: test-consume.c,v 1.3 2002-01-29 12:18:49 imurdock Exp $";
 
 #include <event.h>
 
 static void callback(event_handle_t handle, event_notification_t notification,
-                     void *data);
+                     char *host, event_type_t type, void *data);
 
 int
 main(int argc, char **argv)
@@ -53,33 +53,10 @@ main(int argc, char **argv)
 }
 
 static void
-callback(event_handle_t handle, event_notification_t notification, void *data)
+callback(event_handle_t handle, event_notification_t notification, char *host,
+         event_type_t type, void *data)
 {
-    char *message = (char *) data;
-    char *host;
-    event_type_t type;
-
-    TRACE("the message is: %s\n", message);
-
-    if (event_notification_attr_get(handle, notification,
-                                    EVENT_ATTR_STRING, "host",
-                                    (event_attr_value_t *) &host)
-        == 0)
-    {
-        ERROR("could not get host attribute\n");
-        return;
-    }
-
+    TRACE("data: %s\n", (char *) data);
     TRACE("host: %s\n", host);
-
-    if (event_notification_attr_get(handle, notification,
-                                    EVENT_ATTR_STRING, "type",
-                                    (event_attr_value_t *) &type)
-        == 0)
-    {
-        ERROR("could not get type attribute\n");
-        return;
-    }
-
     TRACE("type: %d\n", type);
 }
