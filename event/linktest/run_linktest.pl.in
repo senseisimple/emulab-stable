@@ -1,10 +1,11 @@
-#!/usr/bin/perl -w -T
+#!/usr/bin/perl -w
 #
 # wrapper for running linktest that includes
 # an extra event for reporting completion.
 
 use strict;
 use Getopt::Std;
+use English;
 
 # security
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -15,6 +16,14 @@ sub usage {
     $msg .= "\t-d n\tdebug level n (development only)\n";
     warn $msg;
     return 1;
+}
+
+#
+# This script should be run as a real person!
+#
+if (! $EUID) {
+    die("*** $0:\n".
+	"    This script should not be run as root!\n");
 }
 
 # signal handler in case the process is killed.
