@@ -28,11 +28,36 @@ When you first visit Emulab, you might be asked if you want to accept
 the <i>server certificate</i>. Be sure to accept it!
 
 
+<a NAME="SSH"></a>
 <h3>SSH</h3>
 
 We require all users to use Secure Shell (SSH) to log into Emulab
-nodes.
+nodes. Experience has taught us a few things about managing keys
+which we will pass on to you at no extra charge:
 
+<p>
+<p><blockquote>
+<ul>
+<li> You should <b>not</b> store your Emulab public key
+     (.ssh/identity.pub) in your authorized_keys file on remote
+     sites. This prevents easy logins from Emulab to your remote sites
+     in case your Emulab account is ever compromised (since the Emulab
+     generated private key is not protected by a passphrase).
+
+<li> We recommend that you use ssh's RSA authentication to login to
+     Emulab so that you do not have to type your password. The less
+     often you type your password the better! You do this by uploading
+     your own public keys to Emulab.
+
+<li> When you create your private keys (ssh-keygen), pick a good passphrase!
+     They can be (much) longer than Unix passwords; 10 to 30 character
+     phrases are good.
+
+<li> You should <b>not</b> copy ssh identity files (private keys) from
+     other places to Emulab (or any other off-site machine, for that
+     matter). Private keys should always be well protected!
+</ul>
+</blockquote>
 
 <h3>Email Addresses</h3>
 
@@ -47,7 +72,9 @@ addresses. Redirections and anonymous email addresses are not allowed.
 We employ a password checking library to prevent users from choosing
 passwords that could be guessed by the "Crack" library. A few basic
 rules are that standard english dictionary words are not permitted, as
-well as anything deemed too short or easily guessable. 
+well as anything deemed too short or easily guessable. Also, you
+should take care not to use the same password on Emulab that you use
+at other sites.
 
 <h3>Firewalling</h3>
 
