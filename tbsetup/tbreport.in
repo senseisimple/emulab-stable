@@ -323,23 +323,24 @@ if ($showlinks) {
 
     my $result =
 	DBQueryFatal("select vname,member,mask,delay,bandwidth,lossrate, ".
-		     "rdelay,rbandwidth,rlossrate ".
-		     "from virt_lans where pid='$pid' and eid='$eid'".
+		     "rdelay,rbandwidth,rlossrate,protocol ".
+		     "from virt_lans where pid='$pid' and eid='$eid' ".
 		     "order by vname,member");
 
     if ($result->numrows) {
 	print  "Virtual Lan/Link Info:\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-	       "ID", "Member", "IP/Mask", "Delay", "BW (Kbs)", "Loss Rate";
+	       "ID", "Member/Proto", "IP/Mask", "Delay", "BW (Kbs)", "Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
 
 	while (($vname,$member,$mask,$delay,$bandwidth,$lossrate,
-		$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array()) {
+		$rdelay,$rbandwidth,$rlossrate,$protocol)
+	       = $result->fetchrow_array()) {
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
 	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
-	           "", $mask, $rdelay, $rbandwidth, $rlossrate;
+	           $protocol, $mask, $rdelay, $rbandwidth, $rlossrate;
 	}
 	print "\n";
     }
@@ -349,7 +350,7 @@ if ($showlinks) {
 	DBQueryFatal("select vname,member,q_limit,q_maxthresh,q_minthresh, ".
 		     "q_weight,q_linterm,q_qinbytes,q_red,q_gentle ".
 		     "  from virt_lans ".
-		     "where pid='$pid' and eid='$eid'".
+		     "where pid='$pid' and eid='$eid' ".
 		     "order by vname,member");
 
     if ($result->numrows) {
@@ -374,9 +375,65 @@ if ($showlinks) {
     }
 
     #
+    # Settings.
+    #
+    my $result1 =
+	DBQueryFatal("select vname,capkey,capval from virt_lan_settings ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vname");
+
+    my $result2 =
+	DBQueryFatal("select vname,member,capkey,capval ".
+		     "  from virt_lan_member_settings ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vname,member");
+
+    if ($result1->numrows || $result2->numrows) {
+	print  "Virtual Lan Settings:\n";
+	printf "%-15s %-15s %-20s %-20s\n", "ID", "Member", "Key", "Value";
+	print  "--------------- --------------- -------------------- ".
+	       "--------------------\n";
+
+	while (my ($vname,$capkey,$capval) = $result1->fetchrow_array()) {
+	    printf("%-15s %-15s %-20s %-20s\n", $vname, "", $capkey, $capval);
+	}
+	while (my ($vname,$member,$capkey,$capval) =
+	       $result2->fetchrow_array()) {
+	    printf("%-15s %-15s %-20s %-20s\n", $vname, $member,
+		   $capkey, $capval);
+	}
+	print "\n";
+    }
+
+    #
     # Actual mapped information for widearea links
     #
     if ($state eq EXPTSTATE_ACTIVE) {
+	#
+	# Grab actual interface settings.
+	#
+	$result =
+	    DBQueryFatal("select s.* from reserved as r ".
+			 "left join interface_settings as s on ".
+			 "     s.node_id=r.node_id ".
+			 "where r.pid='$pid' and r.eid='$eid' ".
+			 "     and s.iface is not null ".
+			 "order by s.node_id,s.iface");
+
+	if ($result->numrows) {
+	    print  "Physical Lan Settings:\n";
+	    printf "%-15s %-15s %-20s %-20s\n", "ID", "Iface", "Key", "Value";
+	    print  "--------------- --------------- -------------------- ".
+		"--------------------\n";
+
+	    while (my ($pnode,$iface,$capkey,$capval) =
+		   $result->fetchrow_array()) {
+		printf("%-15s %-15s %-20s %-20s\n", $pnode, $iface,
+		       $capkey, $capval);
+	    }
+	    print "\n";
+	}
+	
 	#
 	# Grab all widearea links from the database
 	#
