@@ -24,14 +24,13 @@ use libdb;
 use power_rpc27;
 use snmpit_apc;
 use strict;
+use English;
 
 #
 # Un-taint path since this gets called from setuid scripts.
 #
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-my $user = (getpwuid($<))[0] || die "Cannot figure out who you are!\n";
 
 my $op = "";			#stores operation (on/off/cyc)
 my @machines = ();		#stores machines to operate on
@@ -95,8 +94,6 @@ print "do \"$op\" to @machines\n" if $verbose > 1;
 
 my %timelimited = ();
 
-print "Checking authorization for '$user'\n" if $verbose;
-
 #
 # Though TBNodeAccessCheck can check all nodes at once, we do it one at
 # a time, so that we can get a list of all nodes we have access to. This
@@ -104,7 +101,7 @@ print "Checking authorization for '$user'\n" if $verbose;
 #
 my %outlets = ();
 foreach my $node (@machines) {
-    if (!TBNodeAccessCheck($user,TB_NODEACCESS_POWERCYCLE,$node)) {
+    if (!(($UID == 0) || TBNodeAccessCheck($UID,TB_NODEACCESS_POWERCYCLE,$node))) {
 	warn "You are not authorized to control $node. Skipping...\n";
 	next;
     }
@@ -127,9 +124,9 @@ foreach my $node (@machines) {
 
     #
     # Check for rate-limiting, and update the last power cycle time
-    # if it's been long enough.
+    # if it's been long enough. Root gets to bypass the checks.
     #
-    if (!$time_ok && ($user ne "root")) {
+    if (! ($time_ok || ($UID == 0)) ) {
 	warn "$node was power cycled recently. Skipping...\n";
 	next;
     } else {
