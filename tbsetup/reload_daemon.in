@@ -118,14 +118,22 @@ while (1) {
     $query_result =
 	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
 		    "and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE) > rsrv_time");
+		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE) ".
+		    "  > rsrv_time");
+
+    if (! $query_result) {
+	print "DB Error. Waiting a bit.\n";
+	next;
+    }
+
     while (($node) = $query_result->fetchrow){ 
 	if (!$retried{$node}) {
+	    print "\nReload appears wedged at ".`date`.
+		"Power cycling and trying once more!\n";
+		
 	    if (system("$reboot -f $node")) {
 		fatal("$node was wedged, but could not be power cycled.\n");
 	    }
-	    print "\nReload appears wedged at ".`date`.
-		"Power cycling and trying once more!\n";
 	}
 	$retried{$node} = $time;
     }
@@ -140,7 +148,6 @@ while (1) {
 	}
     }
 
-
     #
     # Next, we do the same thing for nodes in the reloading experiment for
     # longer than $warn_time, and warn the admins.
@@ -148,7 +155,14 @@ while (1) {
     $query_result =
 	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
 		    "and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time MINUTE) > rsrv_time");
+		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time MINUTE) > ".
+		    "   rsrv_time");
+    
+    if (! $query_result) {
+	print "DB Error. Waiting a bit.\n";
+	next;
+    }
+
     while (($node) = $query_result->fetchrow){ 
 	if (!$warned{$node}) {
 	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
@@ -186,7 +200,7 @@ while (1) {
 		    "order by a.node_id");
 
     if (! $query_result) {
-	print "DB Error getting free nodes. Waiting a bit.\n";
+	print "DB Error. Waiting a bit.\n";
 	next;
     }
     $count = $query_result->numrows;
