@@ -907,6 +907,20 @@ sub doSwapin($) {
 	if ($CHILD_ERROR) {
 	    print STDERR "*** Failed to reset OS and reboot nodes.\n";
 	    #
+	    # If there is a firewall involved, it could be that the
+	    # firewall rules are preventing essential communication,
+	    # so don't retry.
+	    #
+	    # XXX should only do this if the user has specified additional
+	    # rules.  But right now, I may screw up too!
+	    #
+	    if ($firewalled) {
+		print STDERR "Not retrying, ".
+		    "firewall may be preventing setup.\n";
+		return 1;
+	    }
+
+	    #
 	    # Use returncode from os_setup process to
 	    # set global $retry flag, indicating to caller
 	    # that it may be beneficial to attempt
