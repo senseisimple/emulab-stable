@@ -129,16 +129,18 @@ TBUserInfo($swapper, $user_name, $user_email);
 # And send email
 TBMAIL("$user_name <$user_email>",
        "Please tell us about your experiment",
-       "Hi. We noticed that your experiment '$pid/$eid' has been swapped\n".
-       "in for $hours hours. Such long running experiments are unusual\n".
-       "so we want to make sure this experiment is still doing useful work.\n".
+       "Hi. We noticed that your experiment '$pid/$eid' has been\n".
+       "swapped in for $hours hours and is using $pcs nodes.\n".
+       "\n".
+       "Such long running experiments are unusual so we want to make sure\n".
+       "this experiment is still doing useful work.\n".
        "\n".
        "Please respond to this message letting us know; if we do not hear\n".
        "from you within a couple of hours, we will be forced to swap your\n".
        "experiment out so that others can use the nodes.\n\n".
        "Thanks very much!\n",
        "From: $TBMAIL_OPS\n".
-       "Bcc: $TBMAIL_OPS\n".
+       "Cc: $TBMAIL_OPS\n".
        "Errors-To: $TBMAIL_WWW");
 
 echo "<center><h2>Message sent!</h2>
