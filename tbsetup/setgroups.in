@@ -47,7 +47,6 @@ my $USERMOD = "/usr/sbin/pw usermod";
 my $dbuid;
 my @userlist;
 my $pid;
-my $
 my $user_name;
 my $user_email;
 my $logname;
