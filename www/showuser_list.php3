@@ -29,6 +29,7 @@ if (! $isadmin) {
 }
 
 echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
+               <a href='showuser_list.php3?showtype=recent'>recent</a>,
                <a href='showuser_list.php3?showtype=widearea'>widearea</a>,
                <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
                <a href='showuser_list.php3?showtype=active'>active</a>,
@@ -51,6 +52,12 @@ elseif (! strcmp($showtype, "loggedin")) {
     $clause  = "left join login as l on u.uid=l.uid ";
     $where   = "where l.timeout>=unix_timestamp()";
     $showtag = "logged in";
+}
+elseif (! strcmp($showtype, "recent")) {
+    $clause  = "left join login as l on u.uid=l.uid ";
+    $where   = "where l.timeout is null or l.timeout<unix_timestamp() ".
+	       "having webidle=1 ";
+    $showtag = "recently logged in (yesterday)";
 }
 elseif (! strcmp($showtype, "widearea")) {
     $clause  = "left join widearea_accounts as w on u.uid=w.uid ";
