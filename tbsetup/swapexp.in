@@ -177,6 +177,10 @@ if ($UID && !TBAdmin($UID) &&
 	"    You do not have permission to swap or modify this experiment!\n");
 }
 
+# Must do this before lock tables!
+# idleswap is in minutes, threshold is in hours
+$idleswap_time = 60 * TBGetSiteVar("idle/threshold");
+
 #
 # We have to protect against trying to end an experiment that is currently
 # in the process of being terminated. We use a "wrapper" state (actually
@@ -300,10 +304,12 @@ if ($inout eq "restart" && $estate ne EXPTSTATE_ACTIVE) {
 
 # if $inout eq "modify", either EXPTSTATE_ACTIVE -or- EXPTSTATE_SWAPPED is ok.
 
-#
 # Set the timestamp now, and unlock the experiments table.
-#
-DBQueryFatal("UPDATE experiments SET expt_locked=now() ".
+# Also update idleswap_timeout to whatever the current value is
+if ($inout ne "out") {
+    $idlestr = ", idleswap_timeout='$idleswap_time'";
+} else { $idlestr = ""; }
+DBQueryFatal("UPDATE experiments SET expt_locked=now() $idlestr ".
 	     "WHERE eid='$eid' and pid='$pid'");
 
 DBQueryFatal("unlock tables");
@@ -540,7 +546,7 @@ if (defined($logname)) {
 my $message =
     "Experiment $eid in project $pid has been ";
 
-if ($idleswap || $autoswap || $force) {
+if ($inout eq "out" && ($idleswap || $autoswap || $force) ) {
     $message .= "forcibly swapped out by\nTestbed Operations";
     if ($idleswap) {
 	$message .= " because it was idle for too long (Idle-Swap).\n".

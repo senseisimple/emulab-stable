@@ -83,6 +83,9 @@ $row = mysql_fetch_array($query_result);
 $exp_gid = $row[gid];
 $batch   = $row[batchmode];
 $swappable=$row[swappable];
+$idleswap_bit=$row[idleswap];
+
+$idlethresh=TBGetSiteVar("idle/threshold");
 
 #
 # Look for transition in progress and exit with error. 
@@ -158,6 +161,11 @@ if (!$confirmed) {
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
 
+    if ($inout!="out" && $idleswap_bit) {
+	echo "<p>Note: The Idle-Swap time for your experiment will be
+		 updated to $idlethresh hours.</p>\n";
+    }
+    
     if (!strcmp($inout, "restart")) {
 	echo "<p>
               <a href='$TBDOCBASE/faq.php3#UTT-Restart'>
