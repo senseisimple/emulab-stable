@@ -1251,3 +1251,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table images add frisbee_pid int(11) default '0' \
 		after load_address;
 
+1.220: Add allowfixnode flag to experiments table so it can be turned off.
+       This is useful when a user changes the vnode resources (such as cpu) 
+       for a vnode and then does a swapmod.
+
+         alter table experiments add allowfixnode tinyint(4) \ 
+	       not null default 1;

@@ -283,6 +283,8 @@ CREATE TABLE experiments (
   eventkey varchar(64) default NULL,
   idx int(10) unsigned NOT NULL auto_increment,
   sim_reswap_count smallint(5) unsigned NOT NULL default '0',
+  veth_encapsulate tinyint(4) NOT NULL default '1',
+  allowfixnode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
