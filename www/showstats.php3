@@ -81,7 +81,7 @@ if ($showby == "user") {
     }
     else
 	$which = $uid;
-    $wclause = "where s.creator='$which'";
+    $wclause = "where t.uid='$which'";
 }
 elseif ($showby == "project") {
     if (! $which) {
