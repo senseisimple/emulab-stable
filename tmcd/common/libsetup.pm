@@ -262,6 +262,11 @@ sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 sub WINDOWS()	{ if (-e "$ETCDIR/iscygwin") { return 1; } else { return 0; } }
 
 #
+# Same for a stargate/garcia node.
+#
+sub STARGATE()  { if (-e "$ETCDIR/isstargate") { return 1; } else { return 0; } }
+
+#
 # Are we jailed? See above.
 #
 sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }

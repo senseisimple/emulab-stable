@@ -57,6 +57,7 @@ sup-install:	dir-install
 bin-install:	dir-install
 
 etc-install:	dir-install sysetc-remove sysetc-install
+	-cp -f /dev/null $(ETCDIR)/isstargate
 
 sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/dhcpcd.exe $(SYSETCDIR)/dhcpc/dhcpcd.exe
@@ -68,7 +69,7 @@ sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
 	$(INSTALL) -m 755 $(SRCDIR)/wireless.opts \
 		$(SYSETCDIR)/pcmcia/wireless.opts
-	-ln -sf $(RCDIR)/init.d/mountallwrapper.sh \
+	-ln -sf ../init.d/mountallwrapper.sh \
 		$(RCDIR)/rcS.d/S05mountallwrapper.sh
 
 sysetc-remove:

@@ -307,6 +307,17 @@ sub doboot()
 	return;
     }
 
+    #
+    # Run the stargate startup if necessary
+    # 
+    if (-x "$RCDIR/rc.stargate" && STARGATE()) {
+        print("Firing off garcia/stargate processes\n");
+        system("$RCDIR/rc.stargate start");
+        if ($?) {
+            fatal("Error running $RCDIR/rc.stargate");
+        }
+    }
+
     # Now send ISUP
     print("Informing Emulab Control that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
