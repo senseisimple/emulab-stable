@@ -62,6 +62,10 @@
 
 #include "emcd.h"
 
+#ifndef __XSTRING
+#define __XSTRING(x) __STRING(x)
+#endif
+
 static event_handle_t handle;
 
 static char *pideid;
@@ -160,6 +164,8 @@ static int update_callback(elvin_timeout_t timeout,
 static void parse_config_file(char *filename);
 static void parse_movement_file(char *filename);
 
+static char *unix_path = NULL;
+
 #if defined(SIGINFO)
 /* SIGINFO-related stuff */
 
@@ -167,8 +173,6 @@ static void parse_movement_file(char *filename);
  * Variable used to tell the main loop that we received a SIGINFO.
  */
 static int got_siginfo = 0;
-
-static char *unix_path = NULL;
 
 /**
  * Handler for SIGINFO that sets the got_siginfo variable and breaks the main
@@ -179,14 +183,36 @@ static char *unix_path = NULL;
 static void siginfo(int sig)
 {
   got_siginfo = 1;
-#if 0
   if (handle->do_loop)
     event_stop_main(handle);
-#endif
 }
 
 static void dump_info(void)
 {
+  if (vmc_data.position_list == NULL) {
+    info("info: vision is not connected\n");
+  }
+  else {
+    struct mtp_update_position *mup;
+    struct robot_list_enum *e;
+
+    info("info: vision position list\n");
+    
+    e = robot_list_enum(vmc_data.position_list);
+    while ((mup = (struct mtp_update_position *)
+	    robot_list_enum_next_element(e)) != NULL) {
+      struct emc_robot_config *erc;
+      struct mtp_packet mp;
+      
+      erc = robot_list_search(hostname_list, mup->robot_id);
+      info("  %s: %.2f %.2f %.2f\n",
+	   erc->hostname,
+	   mup->position.x,
+	   mup->position.y,
+	   mup->position.theta);
+    }
+    robot_list_enum_destroy(e);
+  }
 }
 #endif
 
@@ -444,8 +470,17 @@ int main(int argc, char *argv[])
 			     elvin_error) == NULL) {
     fatal("could not add timeout");
   }
-  
-  event_main(handle);
+
+  while (1) {
+    event_main(handle);
+
+#if defined(SIGINFO)
+    if (got_siginfo) {
+      dump_info();
+      got_siginfo = 0;
+    }
+#endif
+  }
   
   return retval;
 }
@@ -478,8 +513,8 @@ static int position_in_obstacle(struct obstacle_config *oc,
     int retval = 0;
 
     for (i = 0; i < oc_size; ++i) {
-	if (x >= oc[i].xmin && y >= oc[i].ymin &&
-	    x <= oc[i].xmax && y <= oc[i].ymax) {
+	if (x >= (oc[i].xmin - 0.25) && y >= (oc[i].ymin - 0.25) &&
+	    x <= (oc[i].xmax + 0.25) && y <= (oc[i].ymax + 0.25)) {
 	    retval = 1;
 	    break;
 	}
@@ -507,11 +542,21 @@ void parse_config_file(char *config_file) {
   struct obstacle_config *oc = NULL;
   struct camera_config *cc = NULL;
   char line[BUFSIZ];
+  struct stat st;
   FILE *fp;
 
   if (config_file == NULL) {
-      fprintf(stderr, "error: no config file given\n");
-      exit(1);
+    fprintf(stderr, "error: no config file given\n");
+    exit(1);
+  }
+
+  if (stat(config_file, &st) != 0) {
+    fprintf(stderr, "error: cannot stat config file\n");
+    exit(1);
+  }
+  else if (!S_ISREG(st.st_mode)) {
+    fprintf(stderr, "error: config file is not a regular file\n");
+    exit(1);
   }
 
   fp = fopen(config_file,"r");
@@ -522,7 +567,7 @@ void parse_config_file(char *config_file) {
 
   // read line by line
   while (fgets(line, sizeof(line), fp) != NULL) {
-    char directive[16];
+    char directive[16] = "";
 
     // parse the line
     // sorry, i ain't using regex.h to do this simple crap
@@ -533,7 +578,10 @@ void parse_config_file(char *config_file) {
 
     sscanf(line, "%16s", directive);
 
-    if (strcmp(directive, "robot") == 0) {
+    if (directive[0] == '#' || directive[0] == '\0') {
+      // Comment or empty line.
+    }
+    else if (strcmp(directive, "robot") == 0) {
       char area[32], hostname[MAXHOSTNAMELEN], vname[TBDB_FLEN_EVOBJNAME];
       int id;
       float init_x;
@@ -651,6 +699,12 @@ void parse_config_file(char *config_file) {
 	oc_size += 1;
       }
     }
+    else {
+      fprintf(stderr,
+	      "error:%d: unknown directive - %s\n",
+	      line_no,
+	      directive);
+    }
     // next line!
   }
 
@@ -660,6 +714,10 @@ void parse_config_file(char *config_file) {
       struct box *boxes_val;
       int boxes_len;
       int lpc = 0;
+
+      if (hostname_list->item_count == 0) {
+	fatal("no robots have been specified!");
+      }
       
       robot_val = malloc(sizeof(robot_config) * hostname_list->item_count);
       e = robot_list_enum(hostname_list);
@@ -670,6 +728,10 @@ void parse_config_file(char *config_file) {
       }
       robot_list_enum_destroy(e);
 
+      if (cc_size == 0) {
+	fatal("no cameras have been specified!");
+      }
+      
       boxes_len = cc_size;
       boxes_val = (struct box *)malloc(sizeof(struct box) * boxes_len);
       for (lpc = 0; lpc < boxes_len; ++lpc) {
@@ -936,6 +998,13 @@ int acceptor_callback(elvin_io_handler_t handler,
     
     close(client_sock);
     client_sock = -1;
+  }
+  else {
+    if (debug > 1) {
+      info("debug: connect from %s:%d\n",
+	   inet_ntoa(client_sin.sin_addr),
+	   ntohs(client_sin.sin_port));
+    }
   }
   
   return 1;
