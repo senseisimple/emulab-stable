@@ -419,11 +419,11 @@ while ($run <= $maxrun) {
     close(ASSIGNFP);
     
     if ($violations > 0) {
-	print "Run $run resulted in $violations violations.";
+	print "Run $run resulted in $violations violations.\n";
 	$run++;
 	next;
     } elsif ($score == -1) {
-	print "No score reported???";
+	print "No score reported???\n";
 	$run++;
 	next;
     }
