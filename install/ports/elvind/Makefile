@@ -22,8 +22,7 @@ IGNORE=         may not be automatically fetched due to licensing\
 .endif
 
 HAS_CONFIGURE=	yes
-CONFIGURE_ARGS=	--enable-threads --prefix=${PREFIX} \
-                  --without-ssl --without-xt --enable-unix --without-gtk
+CONFIGURE_ARGS=	--prefix=${PREFIX}
 
 USE_GMAKE=	yes
 

@@ -4,6 +4,7 @@
 
 PORTNAME=	libelvin
 PORTVERSION=	4.0.3
+PORTREVISION=   1
 CATEGORIES=	misc
 
 MAINTAINER=	ricci@cs.utah.edu
@@ -22,7 +23,8 @@ IGNORE=         may not be automatically fetched due to licensing\
 .endif
 
 HAS_CONFIGURE=	yes
-CONFIGURE_ARGS=	--enable-threads --prefix=${PREFIX}
+CONFIGURE_ARGS=	--enable-threads --prefix=${PREFIX} \
+                  --without-ssl --without-xt --enable-unix --without-gtk
 
 USE_GMAKE=	yes
 
