@@ -405,6 +405,9 @@ namespace eval GLOBALS {
     foreach pnode [array names p2vmapsim] {
 	real_set nseconfig($pnode) {}
 	append nseconfig($pnode) "set [$sim set objname] [$sim set createcmd]\n"
+	# Since we will be adding IP address based routes, any ns default
+	# routing causes problems
+	append nseconfig($pnode) "\$[$sim set objname] rtproto Manual\n"
 	append nseconfig($pnode) \
 		    "\$[$sim set objname] set tbname \{$v2vmap([$sim set objname])\}\n"
 	append nseconfig($pnode) "[$sim set nseconfig]\n\n"

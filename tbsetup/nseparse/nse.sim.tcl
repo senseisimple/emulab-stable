@@ -167,17 +167,17 @@ Simulator instproc duplex-link {n0 n1 bw delay type args} {
 
     if { $n0pnode == $n1pnode } {
 	append nseconfiglanlinks($n0pnode) \
-		"set $linkname \[\$$objname duplex-link \$[$n0 set objname] \$[$n1 set objname] $bw $delay $type $args]\n"
+		"set $linkname \[\$$objname duplex-link \$$n0name \$$n1name $bw $delay $type $args]\n"
 	append nseconfiglanlinks($n0pnode) \
-		"\[\$$objname link \$[$n0 set objname] \$[$n1 set objname]] set-ip $n0ip\n"
+		"\[\$$objname link \$$n0name \$$n1name\] set-ip $n0ip\n"
 	append nseconfiglanlinks($n1pnode) \
-		"\[\$$objname link \$[$n1 set objname] \$[$n0 set objname]] set-ip $n1ip\n"
+		"\[\$$objname link \$$n1name \$$n0name\] set-ip $n1ip\n"
     } else {
 	append nseconfigrlinks($n0pnode) \
-		"set $linkname \[\$$objname rlink \$[$n0 set objname] $n1ip $bw $delay $type $args]\n"
+		"set $linkname \[\$$objname rlink \$$n0name $n1ip $bw $delay $type $args]\n"
 	append nseconfigrlinks($n0pnode) "\$\{$linkname\} set-ip $n0ip\n"
 	append nseconfigrlinks($n1pnode) \
-		"set $linkname \[\$$objname rlink \$[$n1 set objname] $n0ip $bw $delay $type $args]\n"
+		"set $linkname \[\$$objname rlink \$$n1name $n0ip $bw $delay $type $args]\n"
 	append nseconfigrlinks($n1pnode) "\$\{$linkname\} set-ip $n1ip\n"
     }
 
