@@ -547,6 +547,22 @@ CREATE TABLE linkdelays (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `location_info`
+--
+
+CREATE TABLE location_info (
+  node_id varchar(32) NOT NULL default '',
+  floor varchar(32) default NULL,
+  building varchar(32) default NULL,
+  loc_x int(10) unsigned NOT NULL default '0',
+  loc_y int(10) unsigned NOT NULL default '0',
+  contact tinytext,
+  phone tinytext,
+  room varchar(32) default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `login`
 --
 
