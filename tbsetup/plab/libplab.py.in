@@ -1,0 +1,778 @@
+# -*- python -*-
+"""
+Library for interfacing with Plab and, specifically, dslice.  This
+abstracts out the concepts of Plab central, slices, and nodes.  All
+data (except static things like certificates) is kept in the Emulab
+DB.  Unlike the regular dslice svm, this one supports dynamically
+changing which nodes are in a slice.
+
+This requires an already obtained dslice certficate and key.  By default
+it expects to find these in the @prefix@/etc/plab/ subdirectory.
+
+XXX This is a somewhat awkward mix of non-Emulab-specific and very
+Emulab-specific stuff (notably Plab.getFree).  Since the Emulab-specific
+stuff is rather hard to remove, it might be better to move some of the
+Emulab-specific stuff from the plab* scripts into here.
+"""
+
+import sys
+sys.path.append("@prefix@/lib/dslice")
+sys.path.append("@prefix@/lib/dslice/dslice")
+sys.path.append("@prefix@/lib/dslice/HTMLgen")
+
+import os, pwd, time
+import MySQLdb
+import agent, agentproxy
+import nodemgr, nodemgrproxy
+import lease
+
+#
+# Constants
+#
+
+LEASELEN = 1209600  # Two weeks (maximum lease length)
+AGENTIP = "dslice.planet-lab.org"
+
+RESERVED_PID = "emulab-ops"
+RESERVED_EID = "plab-nodes"
+
+NUM_VNODES = 8
+
+MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
+MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
+LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
+LOCAL_PLAB_LINKTYPE = "inet2"
+ALLOWED_NODES = ("155.98.35.", )
+
+DEFAULT_DATA_PATH = "@prefix@/etc/plab"
+
+verbose = 0
+debug = 0
+
+#
+# Database functions
+#
+
+__dbName = "@TBDBNAME@"
+if __dbName == "@TBDB" + "NAME@":
+    raise RuntimeError, "libplab has not been run through configure"
+__dbQueryMaxtries = 1
+__dbConnMaxtries = 5
+
+__dbConnection = None
+
+def TBDBConnect():
+    global __dbConnection
+    
+    if __dbConnection:
+        return
+
+    # Create a DB username for accounting purposes
+    uid = os.getuid()
+    try:
+        name = pwd.getpwuid(uid)[0]
+    except KeyError:
+        name = "uid%d" % uid
+    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
+
+    if debug:
+        print "Connecting to db %s as %s" % (__dbName, dbuser)
+
+    # Connect, with retries
+    for tries in range(__dbConnMaxtries):
+        try:
+            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
+        except MySQLdb.MySQLError:
+            time.sleep(1)
+        else:
+            break
+    else:
+        raise RuntimeError, "Cannot connect to DB after several attempts!"
+
+def DBQueryFatal(queryPat, querySub = (), asDict = False):
+    TBDBConnect()
+    
+    if asDict:
+        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
+    else:
+        cursor = __dbConnection.cursor()
+
+    if debug:
+        print "Executing DB query %s" % queryPat
+
+    tries = __dbQueryMaxtries
+    while tries:
+        try:
+            cursor.execute(queryPat, querySub)
+            ret = cursor.fetchall()
+            if debug:
+                rs = `ret`
+                if len(rs) > 60:
+                    rs = rs[:60] + "..."
+                print "Result: %s" % rs
+            return ret
+        except MySQLdb.MySQLError:
+            tries -= 1
+            if tries == 0:
+                raise
+            else:
+                time.sleep(1)
+                try:
+                    __dbConnection.ping()
+                except MySQLdb.MySQLError: pass
+    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
+
+def DBQuery(*args):
+    try:
+        ret = DBQueryFatal(*args)
+    except MySQLdb.MySQLError:
+        return None
+
+#
+# General stuff
+#
+
+def handleArgs(args):
+    """
+    Takes a list of command-line arguments, interprets those meant for
+    libplab (-vd), and returns a list with those removed
+    """
+    global verbose, debug
+    args = list(args)
+    
+    if "-v" in args:
+        verbose = 1
+        args.remove("-v")
+    if "-d" in args:
+        debug = 1
+        args.remove("-d")
+    return args
+
+#
+# Plab abstraction
+#
+
+class Plab:
+    def __init__(self, keyfile = DEFAULT_DATA_PATH + "/key.pem",
+                 pubkeyfile = DEFAULT_DATA_PATH + "/pubkey.pem",
+                 certfile = DEFAULT_DATA_PATH + "/cert.pem",
+                 cacertfile = DEFAULT_DATA_PATH + "/cacert.pem"):
+        for file in (keyfile, pubkeyfile, certfile, cacertfile):
+            if not os.path.exists(file):
+                raise RuntimeError, "Key or cert %s does not exist" % file
+        self.keyfile, self.pubkeyfile, self.certfile, self.cacertfile = \
+                      keyfile, pubkeyfile, certfile, cacertfile
+        self.__agentProxy = None
+
+    def createSlice(self, pid, eid):
+        """
+        Slice factory function
+        """
+        slice = Slice(self, pid, eid)
+        slice._create()
+        return slice
+
+    def loadSlice(self, pid, eid):
+        """
+        Slice factory function
+        """
+        slice = Slice(self, pid, eid)
+        slice._load()
+        return slice
+
+    def getFree(self, ignorenew = False):
+        """
+        Finds out which Plab nodes are free (advertised by agent), and
+        update the DB accordingly.  If ignorenew is True, this will only
+        make sure that the data in the DB is correct, and not complete.
+        If ignorenew is False (the default), this will do a complete
+        update of the DB.  However, this can take some time, as
+        information about new nodes (such as link type) must be
+        discovered.  Plab nodes that are in the DB but are not available
+        are marked as status down.
+
+        Note that this seemingly innocent funciton actually does a lot of
+        magic.  This is the main/only way that Plab nodes get into the
+        nodes DB, and this list is updated dynamically.  It also gathers
+        static data about new nodes.
+
+        Deleting nodes that are no longer available may not be the best
+        approach, due to the overhead of adding new nodes (ie, if the
+        node disappears for a while, then comes back), but the agent's
+        advertisement list doesn't change very dynamically (basically,
+        it's a list of the nodes reporting to ganglia that they support
+        dslices)
+        """
+        print "Getting free nodes"
+        agent = self._createAgentProxy(insecure = True)
+        avail = agent.getads()
+        if debug:
+            print "Got advertisement list:"
+            print avail
+
+        known = self.__getKnownPnodes()
+        if debug:
+            print "Got known pnodes:"
+            print known
+
+        # Mark known nodes that are not available as down and make sure
+        # those that are available are marked as up
+        todown = []  # List of nodeid's
+        toup = []  # List of nodeid's
+        for ip in known.keys():
+            if not ip in avail:
+                todown.append(known[ip])
+            else:
+                toup.append(known[ip])
+        if verbose:
+            print "%d known Plab nodes not available" % len(todown)
+            print "%d known Plab nodes available" % len(toup)
+        self.__setVnodesStatus(todown, "down")
+        self.__setPnodesStatus(todown, "down")
+        self.__setVnodesStatus(toup, "up")
+        self.__setPnodesStatus(toup, "up")
+
+        # Add new nodes
+        toadd = []  # List of IP's
+        for ip in avail:
+            if not known.has_key(ip):
+                toadd.append(ip)
+        if len(toadd):
+            if ignorenew:
+                print "%d new Plab nodes, but ignored for now" % len(toadd)
+            else:
+                print "There are %d new Plab nodes" % len(toadd)
+                for ip in toadd:
+                    if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
+                        continue
+                    linktype = self.__findLinkType(ip)
+                    if debug:
+                        print "Found linktype %s for node %s" % (linktype, ip)
+                    self.__addNode(ip, self.__findLinkType(ip))
+
+    def __getKnownPnodes(self):
+        """
+        getFree helper function.  Returns a dict of IP:node_id pairs
+        for the Plab nodes that currently exist in the DB.
+        """
+        res = DBQueryFatal("select i.node_id, i.IP from interfaces as i"
+                           " left join nodes as np on"
+                           "  np.node_id = i.node_id"
+                           " where np.type = 'pcplabphys'")
+        ret = {}
+        for nodeid, ip in res:
+            ret[ip] = nodeid
+        return ret
+
+    def __setVnodesStatus(self, pnodeids, status):
+        """
+        getFree helper function.  Sets the status of all vnodes with a
+        phys_nodeid in the given list.
+        """
+        if not len(pnodeids):
+            return
+        # XXX This is wrong
+        clause = " or ".join(["phys_nodeid = %s"] * len(pnodeids))
+        DBQueryFatal("update nodes set status = %s where " + clause,
+                     [status] + list(pnodeids))
+
+    def __setPnodesStatus(self, pnodeids, status):
+        """
+        getFree helper function.  Sets the status of all pnodes with a
+        node_id in the given list.
+        """
+        if not len(pnodeids):
+            return
+        clause = " or ".join(["node_id = %s"] * len(pnodeids))
+        DBQueryFatal("update node_status set status = %s,"
+                     " status_timestamp = now()"
+                     " where " + clause,
+                     [status] + list(pnodeids))
+
+    def __findLinkType(self, ip):
+        """
+        getFree helper function.  Figures out the link type of the given
+        host.  This first performs a traceroute and checks for the U of
+        U's I2 gateway to classify Internet2 hosts.  If this test fails,
+        it checks if the hostname is international.  If this test fails,
+        this simply specifies an inet link type.
+
+        This can't detect DSL links, but those are probably rare for
+        Plab nodes.
+        """
+        # Is host on I2?
+        traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
+        trace = traceroute.read()
+        traceroute.close()
+
+        for gw in MAGIC_INET2_GATEWAYS:
+            if trace.find(gw) != -1:
+                return "inet2"
+        for gw in MAGIC_INET_GATEWAYS:
+            if trace.find(gw) != -1:
+                break
+        else:
+            print "WARNING: Unknown gateway for host %s" % ip
+
+        # Is host international?
+        from socket import gethostbyaddr, getfqdn, herror
+        try:
+            hostname, aliaslist, ipaddrlist = gethostbyaddr(ip)
+            hostname = getfqdn(hostname)
+        except herror:
+            print "WARNING: Failed to get hostname for %s" % ip
+            return "inet"
+
+        tld = hostname.split(".")[-1]
+        if not tld in ("edu", "org", "net", "com", "gov", "us"):
+            return "intl"
+
+        # Is it us?
+        if hostname.endswith(LOCAL_PLAB_DOMAIN):
+            return LOCAL_PLAB_LINKTYPE
+
+        # Must be plain 'ole Internet
+        return "inet"
+
+    def __addNode(self, ip, linktype):
+        """
+        getFree helper function.  Adds a new Plab pnode and associated
+        vnodes to the DB.  linktype should be one of (inet2, inet, intl,
+        dsl).
+
+        XXX This duplicates a lot of the functionality of newwanode.
+        Note that, very unlike newwanode, the node is initially up,
+        since it had to be up to be added in the first place.
+        """
+        print "Not adding node %s as %s" % (ip, linktype)
+        return
+
+        defosid, controlnet = self.__getNodetypeInfo()
+        nodeid, priority = self.__nextFreeNodeid()
+        print "Creating pnode %s as %s, priority %d" % (ip, nodeid, priority)
+
+        DBQueryFatal("insert into nodes"
+                     " (node_id, type, phys_nodeid, role, priority,"
+                     "  op_mode, def_boot_osid)"
+                     " values (%s, %s, %s, %s, %s, %s, %s)",
+                     (nodeid, 'pcplabphys', nodeid, 'testnode', priority,
+                      'NORMAL', defosid))
+
+        DBQueryFatal("replace into node_status"
+                     " (node_id, status, status_timestamp)"
+                     " values (%s, %s, now())",
+                     (nodeid, 'up'))
+
+        DBQueryFatal("insert into interfaces"
+                     " (node_id, card, port, IP, interface_type, iface)"
+                     " values (%s, %s, %s, %s, %s, %s)",
+                     (nodeid, controlnet, 1, ip, 'fxp', 'eth0'))
+
+        DBQueryFatal("insert into reserved"
+                     " (node_id, pid, eid, rsrv_time, vname)"
+                     " values (%s, %s, %s, now(), %s)",
+                     (nodeid, RESERVED_PID, RESERVED_EID, nodeid))
+
+        vnodetype = "pcplab%s" % linktype
+        for n in range(NUM_VNODES):
+            vprio = (priority * 100) + n
+            vnodeid = "v%s-%d" % (nodeid, n+1)
+            if verbose:
+                print "Creating vnode %s, priority %d" % (vnodeid, vprio)
+
+            DBQueryFatal("insert into nodes"
+                         " (node_id, type, phys_nodeid, role, priority,"
+                         "  op_mode, def_boot_osid, update_accounts)"
+                         " values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                         (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
+                          'NORMAL', defosid, 1))
+
+            DBQueryFatal("insert into node_status"
+                         " (node_id, status, status_timestamp)"
+                         " values (%s, %s, now())",
+                         (vnodeid, 'up'))
+
+    def __getNodetypeInfo(self):
+        """
+        addNode helper function.  Returns a (defosid, controlnet) tuple
+        for the Plab pnode type.  Caches the result since it doesn't
+        change.
+        """
+        if not hasattr(self, "__getNodetypeInfoCache"):
+            if debug:
+                print "Getting node type info"
+            res = DBQueryFatal("select osid, control_net from node_types"
+                               " where type = 'pcplabphys'")
+            assert (len(res) == 1), "Failed to get node type info"
+            (self.__getNodetypeInfoCache, ) = res
+
+        return self.__getNodetypeInfoCache
+
+    def __nextFreeNodeid(self):
+        """
+        addNode helper function.  Returns a (nodeid, priority) tuple of
+        the next free nodeid and priority for Plab nodes.
+        """
+        if debug:
+            print "Getting next free nodeid"
+        DBQueryFatal("lock tables nextfreenode write")
+        try:
+            res = DBQueryFatal("select nextid, nextpri from nextfreenode"
+                               " where nodetype = 'pcplab'")
+            assert (len(res) == 1), "Unable to find next free nodeid"
+            DBQueryFatal("update nextfreenode"
+                         " set nextid = nextid + 1, nextpri = nextpri + 1"
+                         " where nodetype = 'pcplab'")
+            ((nodeid, priority), ) = res
+        finally:
+            DBQueryFatal("unlock tables")
+        return nodeid, priority
+
+    def renew(self):
+        raise NotImplementedError()
+
+    def _createAgentProxy(self, insecure = False):
+        """
+        Creates an agent proxy connected to the Plab central agent.
+        Also caches the agent for later reuse.
+        """
+        if not self.__agentProxy:
+            if verbose:
+                print "Connecting to agent %s" % AGENTIP
+            if insecure:
+                args = (AGENTIP, agent.PORT)
+            else:
+                args = (AGENTIP, agent.PORT, agent.SSLPORT,
+                        self.keyfile, self.certfile, self.cacertfile)
+            self.__agentProxy = agentproxy.agentproxy(*args)
+        return self.__agentProxy
+
+#
+# Slice abstraction
+#
+
+class Slice:
+    def __init__(self, plab, pid, eid):
+        self.plab = plab
+        self.pid, self.eid = pid, eid
+    
+    def _create(self):
+        """
+        Creates a new slice that initially contains no nodes.  Don't call
+        this directly, use Plab.createSlice instead.
+        """
+        self.slicename = "emulab_%s_%s" % (self.pid, self.eid)
+        print "Creating slice %s" % self.slicename
+        self.privkey, self.pubkey = self.__genKeypair()
+        try:
+            DBQueryFatal("insert into plab_slices"
+                         " (pid, eid, slicename, privkey, pubkey) "
+                         " values (%s, %s, %s, %s, %s)",
+                         (self.pid, self.eid, self.slicename,
+                          self.privkey, self.pubkey))
+        except:
+            # No cleanup necessary
+            raise
+        # It turns out that there's no concrete "slice" in dslice, so
+        # nothing real needs to be done
+
+    def _load(self):
+        """
+        Loads an already allocated slice from the DB.  Don't call this
+        directly, use Plab.loadSlice instead.
+        """
+        if verbose:
+            print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
+        res = DBQueryFatal("select slicename, privkey, pubkey from plab_slices"
+                           " where pid = %s and eid = %s",
+                           (self.pid, self.eid))
+        assert (len(res) > 0), \
+               "No slice found for %s-%s" % (self.pid, self.eid)
+        assert (len(res) == 1), \
+               "Multiple slices found for %s-%s" % (self.pid, self.eid)
+        ((self.slicename, self.privkey, self.pubkey), ) = res
+
+    def destroy(self):
+        """
+        Frees all nodes in this slice and destroys the slice.  Note
+        that this will really pound the DB if there are many nodes left
+        in the slice, but those should be removed by Emulab before the
+        slice is destroyed.
+        """
+        print "Destroying slice %s" % self.slicename
+        res = DBQueryFatal("select node_id from plab_slice_nodes"
+                           " where slicename = %s",
+                           (self.slicename))
+        for (nodeid,) in res:
+            node = self.loadNode(nodeid)
+            node.free()
+            del node  # Encourage the GC'er
+
+        DBQueryFatal("delete from plab_slices where slicename = %s",
+                     (self.slicename,))
+
+    def createNode(self, nodeid):
+        """
+        Node factory function
+        """
+        node = Node(self, nodeid)
+        node._create()
+        return node
+
+    def loadNode(self, nodeid):
+        """
+        Node factory function
+        """
+        node = Node(self, nodeid)
+        node._load()
+        return node
+
+    def __genKeypair(self):
+        """
+        Generates a passphrase-less RSA keypair and returns the PEM
+        format data to be stored in the slice's identity and
+        identity.pub files.
+        """
+        # XXX This is a workaround for a bug in M2Crypto
+        import tempfile
+
+        # pdssi = Plab Dynamic Slice SSH Identity
+        fname = tempfile.mktemp("pdssi%d" % os.getpid())
+        if verbose:
+            print "Generating slice keypair into %s" % fname
+        if os.spawnlp(os.P_WAIT, "ssh-keygen",
+                      "ssh-keygen", "-t", "rsa", "-b", "1024", "-P", "",
+                      "-f", fname, "-q"):
+            raise RuntimeError, "Error generating slice keypair"
+        
+        privkey = file(fname, "rb").read()
+        pubkey = file(fname + ".pub", "rb").read()
+        map(os.unlink, (fname, fname + ".pub"))
+        
+        return privkey, pubkey
+        
+        
+        # Below here is the way it _should_ be done
+        key = RSA.gen_key(1024, 35)    # OpenSSH ssh-keygen uses 35 for e
+
+        privkeyio = cStringIO.StringIO()
+        # Due to a current bug in M2Crypto, None cannot be passed as the
+        # cipher; therefore, passphraseless keys cannot be generated
+        key.save_key_bio(BIO.File(privkeyio), None)
+        privkey = privkeyio.getvalue()
+
+        pubkeyio = cStringIO.StringIO()
+        key.save_pub_key_bio(BIO.File(pubkeyio))
+        pubkey = pubkeyio.getvalue()
+
+        return privkey, pubkey
+
+#
+# Node abstraction
+#
+
+class Node:
+    def __init__(self, slice, nodeid):
+        self.slice, self.plab = slice, slice.plab
+        self.nodeid = nodeid
+        self.ip = self.__findIP()
+        self.identityfile = None
+        self.__nodemgrProxy = None
+
+    def _create(self):
+        """
+        Creates a new node.  This physically allocates the node into the
+        slice through the dslice agent and node manager.  Note that no
+        node setup is performed.  Don't call this directly, use
+        Slice.createNode instead.
+        """
+        print "Creating node %s on %s" % (self.nodeid, self.ip)
+        agent = self.plab._createAgentProxy()
+        tickets = agent.newtickets(self.slice.slicename, 1, LEASELEN,
+                                   (self.ip,))
+        assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
+        self.ticketdata = tickets[0]
+        if debug:
+            print "Obtained ticket:"
+            print self.ticketdata
+        nodemgr = self._createNodemgrProxy()
+        self.leasedata = nodemgr.newleasevm(self.ticketdata,
+                                            self.slice.privkey,
+                                            self.slice.pubkey)
+        if debug:
+            print "Obtained lease/vm:"
+            print self.leasedata
+        self.lease = lease.lease(self.leasedata)
+        # Note that the lease's end_time happens to be formatted the
+        # same as a SQL DATETIME (how conspicuously convenient...)
+        try:
+            DBQueryFatal("insert into plab_slice_nodes"
+                         " (pid, eid, slicename, node_id,"
+                         " ticketdata, leasedata, leaseend)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (self.slice.pid, self.slice.eid, self.slice.slicename,
+                          self.nodeid, self.ticketdata, self.leasedata,
+                          self.lease.end_time))
+        except:
+            self.free()
+            raise
+
+    def _load(self):
+        """
+        Loads an already allocated node from the DB.  Don't call this
+        directly, use Slice.loadNode instead.
+        """
+        if verbose:
+            print "Loading node %s" % self.nodeid
+        res = DBQueryFatal("select slicename, ticketdata, leasedata"
+                           " from plab_slice_nodes where node_id = %s",
+                           (self.nodeid))
+        assert (len(res) > 0), \
+               "Node %s (slice %s) not found" % \
+               (self.nodeid, self.slice.slicename)
+        assert (len(res) == 1), \
+               "Multiple nodes found for nodeid %s" % self.nodeid
+        ((slicename, self.ticketdata, self.leasedata), ) = res
+        assert (slicename == self.slice.slicename), \
+               "Node %s loaded by slice %s, but claims to be in slice %s" % \
+               (self.nodeid, self.slice.slicename, slicename)
+        self.lease = lease.lease(self.leasedata)
+        
+    def free(self):
+        """
+        Shuts down this node by calling 'rc.vinit stop', frees the node,
+        and kills the VM.
+        """
+        print "Freeing node %s" % self.nodeid
+        # XXX Won't work on loaded nodes
+        if self.identityfile:
+            try:
+                self.__perform("sudo /etc/rc.vinit stop")
+            except RuntimeError:
+                print "WARNING: Skipping node shutdown on %s" % self.nodeid
+        else:
+            print "WARNING: Skipping node shutdown on %s" % self.nodeid
+        # XXX Should this wait a bit before nuking the VM?
+        nodemgr = self._createNodemgrProxy()
+        ret = nodemgr.deletelease(self.slice.slicename)
+        if debug:
+            print "Deleted lease/VM: %s" % `ret`
+        DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
+                     (self.nodeid,))
+        return ret
+
+    def addKey(self, identityfile):
+        """
+        Adds an ssh public key to the node.  Note that identityfile must
+        be the path of the private key.  This must be done before any
+        calls to unpackTgz, putConfig, or boot, because those commands
+        need a key in order to ssh into the node.
+
+        XXX Currently this information doesn't persist over a DB load of
+        a node, so those three functions will fail on a loaded node
+
+        XXX Because this is the first point at which the slice user can
+        be added to the root group via ssh, it's done here
+        """
+        if verbose:
+            print "Adding pubkey to node %s" % self.nodeid
+        self.identityfile = identityfile
+        pubkey = file(self.identityfile + ".pub", "rb").read().strip()
+        nodemgr = self._createNodemgrProxy()
+        ret = nodemgr.addkey(self.slice.slicename, pubkey)
+        if debug:
+            print "Added key: %s" % `ret`
+        self.__perform("sudo /usr/sbin/usermod -G root %s" %
+                       self.slice.slicename)
+        return ret
+
+    def unpackTgz(self, tgzpath, destpath = "/"):
+        """
+        Unpacks a locally stored gzip'd tarball to the specified path
+        (default /) on the remote node.  Always done as remote root.
+        """
+        if verbose:
+            print "Unpacking tgz %s to %s on %s" % \
+                  (tgzpath, destpath, self.nodeid)
+        self.__copy(tgzpath, "/tmp/sliceinit.tgz")
+        self.__perform("sudo tar -xzf /tmp/sliceinit.tgz -C %s" % destpath)
+
+    def putConfig(self, filename, val):
+        """
+        Creates the specified file on the remote node and sticks some
+        text into it.  Currently, this is done with 'echo', so don't try
+        anything fancy.
+        """
+        if verbose:
+            print "Putting config value %s into %s on %s" % \
+                  (val, filename, self.nodeid)
+        self.__perform("sudo sh -c \"echo '%s' > %s\"" % (val, filename))
+
+    def boot(self):
+        """
+        Boots the remote node by calling /etc/rc.vinit
+        """
+        print "Booting node %s" % self.nodeid
+        self.__perform("sudo /etc/rc.vinit start")
+
+    def __perform(self, command):
+        """
+        Executes the given command on the remote node via ssh
+        """
+        if debug:
+            print "Performing '%s' on %s" % (command, self.nodeid)
+        assert self.identityfile, "SSH key must be added before perform"
+        if os.spawnlp(os.P_WAIT, "ssh", "ssh", "-i", self.identityfile,
+                      "-l", self.slice.slicename, self.ip, command):
+            raise RuntimeError, "'ssh %s' failed" % command
+
+    def __copy(self, localfile, remotefile):
+        """
+        Copies a file from the local system to the remote node.  Uses a
+        horrible combination of ssh, sudo, cat, and pipes to be able to
+        write the file as root remotely.  Ugh
+        """
+        if debug:
+            print "Copying %s to %s on %s" % \
+                  (localfile, remotefile, self.nodeid)
+        assert self.identityfile, "SSH key must be added before perform"
+        if os.system("ssh -i %s -l %s %s 'sudo cat > %s' < '%s'" %
+                     (self.identityfile, self.slice.slicename, self.ip,
+                      remotefile, localfile)):
+            raise RuntimeError, "Copying %s to %s failed" % \
+                  (localfile, remotefile)
+
+    def __findIP(self):
+        """
+        Figures out and returns the IP of the remote node.
+        """
+        res = DBQueryFatal("select i.IP from interfaces as i"
+                           " left join nodes as nv on"
+                           "  i.node_id=nv.phys_nodeid"
+                           " where nv.node_id=%s"
+                           " limit 1",
+                           (self.nodeid))
+        assert (len(res) > 0), \
+               "No IP found for nodeid %s" % self.nodeid
+        ((ip, ), ) = res
+        if debug:
+            print "Found IP %s for node %s" % (ip, self.nodeid)
+        return ip
+
+    def _createNodemgrProxy(self):
+        """
+        Creates a node manager proxy connected to this node's node
+        manager.  Also caches the nodemgr for later reuse.
+        """
+        if not self.__nodemgrProxy:
+            if verbose:
+                print "Connecting to nodemgr for %s on %s" % \
+                      (self.nodeid, self.ip)
+            self.__nodemgrProxy = \
+                                nodemgrproxy.nodemgrproxy(self.ip,
+                                                          nodemgr.PORT,
+                                                          nodemgr.SSLPORT,
+                                                          self.plab.keyfile,
+                                                          self.plab.certfile,
+                                                          self.plab.cacertfile)
+        return self.__nodemgrProxy

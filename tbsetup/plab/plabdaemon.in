@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+# -*- python -*-
+
+import sys
+sys.path.append("@prefix@/lib")
+import libplab
+
+def usage(me):
+    print "Usage: %s [-v] [-d] { getfree | renew }" % me
+    sys.exit(1)
+
+def main(args):
+    try:
+        me, command = libplab.handleArgs(args)
+    except ValueError:
+        usage(args[0])
+
+    plab = libplab.Plab()
+    if command == "getfree":
+        plab.getFree()
+    elif command == "renew":
+        plab.renew()
+    else:
+        usage(me)
+
+if __name__ == "__main__":
+    main(sys.argv)

@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+# -*- python -*-
+
+import sys
+sys.path.append("@prefix@/lib")
+import libplab
+
+def usage(me):
+    print "Usage: %s [-v] [-d] { alloc | free } pid eid nodeid" % me
+    sys.exit(1)
+
+def main(args):
+    try:
+        me, command, pid, eid, nodeid = libplab.handleArgs(args)
+    except ValueError:
+        usage(args[0])
+
+    plab = libplab.Plab()
+    slice = plab.loadSlice(pid, eid)
+    if command == "alloc":
+        node = slice.createNode(nodeid)
+        try:
+            node.addKey("plabdata/identity")
+            node.unpackTgz("plabdata/plabroot.tgz")
+            # XXX This file is redundant
+            node.putConfig("/etc/vnodeid", nodeid)
+            # Note that vnode_setup boots the node
+        except:
+            print "Node setup failed.  Cleaning up"
+            node.free()
+            raise
+    elif command == "free":
+        node = slice.loadNode(nodeid)
+        node.free()
+    else:
+        usage(me)
+
+if __name__ == "__main__":
+    main(sys.argv)
