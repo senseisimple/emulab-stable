@@ -18,13 +18,13 @@ use Exporter;
 	 doifconfig dohostnames domounts dotunnels check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
-	 TBBackGround TBForkCmd vnodesetup dorouterconfig
-	 jailsetup dojailconfig JailedMounts findiface
+	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
+	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED LOCALROOTFS
 
-	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
+	 CONFDIR TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
 	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
 	 TMPROGAGENTS TMPASSDB TMGROUPDB
@@ -58,6 +58,11 @@ sub libsetup_getvnodeid()
 # 
 my $injail;
 
+#
+# True if running in a Plab vserver.
+#
+my $inplab;
+
 # Load up the paths. Its conditionalized to be compatabile with older images.
 # Note this file has probably already been loaded by the caller.
 BEGIN
@@ -83,6 +88,21 @@ BEGIN
 	    die("Bad data in vnodeid: $vnodeid");
 	}
 	$injail = 1;
+    }
+
+    # Determine if running inside a Plab vserver.
+    if (-e "$BOOTDIR/plabname") {
+	open(VN, "$BOOTDIR/plabname");
+	$vnodeid = <VN>;
+	close(VN);
+
+	if ($vnodeid =~ /^([-\w]+)$/) {
+	    $vnodeid = $1;
+	}
+	else {
+	    die("Bad data in vnodeid: $vnodeid");
+	}
+	$inplab = 1;
     }
 
     # Make sure these exist!
@@ -136,14 +156,14 @@ sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
 #
 # Okay, here is the path mess. There are three environments.
 # 1. A local node where everything goes in one place ($VARDIR/boot).
-# 2. A virtual node inside a jail ($VARDIR/boot).
+# 2. A virtual node inside a jail or a Plab vserver ($VARDIR/boot).
 # 3. A virtual node outside a jail (JAILDIR()).
 #
 # As for #3, whether setting up a old-style virtual node or a new style
 # jailed node, the code that sets it up needs a different per-vnode path.
 #
 sub CONFDIR() {
-    if ($injail) {
+    if ($injail || $inplab) {
 	return $BOOTDIR;
     }
     if ($vnodeid) {
@@ -165,6 +185,7 @@ sub TMGROUPDB()		{ $VARDIR . "/db/groupdb"; }
 sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
 sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
 sub TMJAILCONFIG()	{ CONFDIR() . "/jailconfig";}
+sub TMPLABCONFIG()	{ CONFDIR() . "/rc.plab";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
 sub TMPROGAGENTS()	{ CONFDIR() . "/progagents";}
 sub TMIFC()		{ CONFDIR() . "/rc.ifc"; }
@@ -222,6 +243,7 @@ sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
+sub TMCCCMD_PLABCONFIG(){ "plabconfig"; }
 sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 sub TMCCCMD_PROGRAMS()  { "programs"; }
 sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
@@ -270,6 +292,11 @@ sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
 sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
 
 #
+# Are we on plab?
+#
+sub PLAB()	{ if ($inplab) { return $vnodeid; } else { return 0; } }
+
+#
 # Do not try this on the MFS since it has such a wimpy perl installation.
 #
 if (!MFS()) {
@@ -310,6 +337,10 @@ sub OPENTMCC($;$$)
 	die("\n") if $tmccdie;
 	return undef;
     }
+
+    # XXX For debugging
+    print STDERR "$foo\n";
+
     return (*TM);
 }
 
@@ -1149,7 +1180,7 @@ sub doaccounts()
 	    #
 	    my $gname = "$1";
 	    
-	    if (REMOTE() && !JAILED()) {
+	    if (REMOTE() && !JAILED() && !PLAB()) {
 		$gname = "emu-${gname}";
 	    }
 	    $newgroups{"$gname"} = $2
@@ -1397,6 +1428,15 @@ sub doaccounts()
 		    warn "*** WARNING: Error adding new user $login\n";
 		    next;
 		}
+
+		if (PLAB() && ! -e $hdir) {
+		    if (! os_mkdir($hdir, "0755")) {
+			warn "*** WARNING: Error creating user homedir\n";
+			next;
+		    }
+		    chown($login, $login, $hdir);
+		}
+		
 		# Add to DB only if successful. 
 		$PWDDB{$login} = "$uid:$serial";
 	    }
@@ -1567,7 +1607,8 @@ sub dotarballs ()
 {
     my @tarballs   = ();
     my $jailoption = (JAILED() ? "-j" : "");
-
+    # XXX Plab option?
+    
     my $TM = OPENTMCC(TMCCCMD_TARBALL);
     while (<$TM>) {
 	push(@tarballs, $_);
@@ -2074,6 +2115,72 @@ sub dosyncserver()
 }
 
 #
+# Plab configuration.  Currently sets up sshd and the DNS resolver
+# 
+sub doplabconfig()
+{
+    my $plabconfig;
+
+    my $TM = OPENTMCC(TMCCCMD_PLABCONFIG);
+    $_ = <$TM>;
+    if (defined($_)) {
+	$plabconfig = $_;
+    }
+    CLOSETMCC($TM);
+
+    if (! $plabconfig) {
+	return 0;
+    }
+
+    open(RC, ">" . TMPLABCONFIG)
+	or die("Could not open " . TMPLABCONFIG . ": $!");
+
+    if ($plabconfig =~ /SSHDPORT=(\d+)/) {
+	my $sshdport = $1;
+
+	print RC "#!/bin/sh\n";
+
+	# Note that it's important to never directly modify the config
+	# file unless it's already been recreated due to vserver's
+	# immutable-except-delete flag
+	print(RC
+	      "function setconfigopt()\n".
+	      "{\n".
+	      "    file=\$1\n".
+	      "    opt=\$2\n".
+	      "    value=\$3\n".
+	      "    if ( ! grep -q \"^\$opt[ \t]*\$value\\\$\" \$file ); then\n".
+	      "        sed -e \"s/^\\(\$opt[ \t]*.*\\)/#\\1/\" < \$file".
+	      " > \$file.tmp\n".
+	      "        mv -f \$file.tmp \$file\n".
+	      "        echo \$opt \$value >> \$file;\n".
+	      "    fi\n".
+	      "}\n\n");
+
+	# Make it look like it's in Emulab domain
+	print RC "setconfigopt /etc/resolv.conf domain emulab.net\n";
+	print RC "setconfigopt /etc/resolv.conf search emulab.net\n\n";
+
+	# No SSH X11 Forwarding
+	print RC "setconfigopt /etc/ssh/sshd_config X11Forwarding no\n";
+
+	# Set SSH port
+	print RC "setconfigopt /etc/ssh/sshd_config Port $sshdport\n";
+
+	# Start sshd
+	print RC "/etc/init.d/sshd restart\n";
+    }
+    else {
+	warn "*** WARNING: Bad plab line: $_";
+    }
+
+    close(RC);
+    chmod(0755, TMPLABCONFIG);
+
+    return 0;
+}
+
+#
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
 #
@@ -2269,9 +2376,10 @@ sub jailsetup()
 }
 
 #
-# Remote Node virtual node setup. This happens outside the jailed env.
+# Remote Node virtual node jail setup. This happens outside the jailed
+# env.
 #
-sub vnodesetup($)
+sub vnodejailsetup($)
 {
     my ($vid) = @_;
 
@@ -2326,6 +2434,100 @@ sub vnodesetup($)
 
     return ($pid, $eid, $vname);
 }    
+
+#
+# This happens inside a Plab vserver.
+#
+sub plabsetup()
+{
+    #
+    # vnodeid will either be found in BEGIN block or will be passed to
+    # vnodeplabsetup, so it doesn't need to be found here
+    #
+
+    #
+    # Do account stuff.
+    #
+    {
+	print STDOUT "Checking Testbed reservation status ... \n";
+	if (! check_status()) {
+	    print STDOUT "  Free!\n";
+	    return 0;
+	}
+	print STDOUT "  Allocated! $pid/$eid/$vname\n";
+
+	#
+	# Setup SFS hostid.
+	#
+	if ($USESFS) {
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+
+#	print STDOUT "Mounting project and home directories ... \n";
+#	domounts();
+
+	print STDOUT "Checking Testbed plab configuration ...\n";
+	doplabconfig();
+
+	print STDOUT "Checking Testbed hostnames configuration ... \n";
+	dohostnames();
+
+	print STDOUT "Checking Testbed group/user configuration ... \n";
+	doaccounts();
+
+	print STDOUT "Checking Testbed RPM configuration ... \n";
+	dorpms();
+
+	print STDOUT "Checking Testbed Tarball configuration ... \n";
+	dotarballs();
+
+# 	print STDOUT "Checking Testbed routing configuration ... \n";
+# 	dorouterconfig();
+
+# 	print STDOUT "Checking Testbed traffic generation configuration ...\n";
+# 	dotrafficconfig();
+
+# 	print STDOUT "Checking Testbed program agent configuration ... \n";
+# 	doprogagent();
+
+	print STDOUT "Checking Testbed Experiment Startup Command ... \n";
+	dostartupcmd();
+    }
+
+    return $vnodeid;
+}
+
+#
+# Remote node virtual node Plab setup.  This happens inside the vserver
+# environment (because on Plab you can't escape)
+#
+sub vnodeplabsetup($)
+{
+    my ($vid) = @_;
+
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    $vnodeid  = $vid;
+    $inplab   = 1;
+
+    # Do not bother if somehow got released.
+    if (! check_status()) {
+	print "Node is free!\n";
+	return undef;
+    }
+    
+    #
+    # Create a file so that libsetup knows it's inside Plab and what
+    # its ID is. 
+    #
+    system("echo '$vnodeid' > $BOOTDIR/plabname");
+    
+    # XXX Anything else to do?
+    
+    return ($pid, $eid, $vname);
+}
 
 #
 # Report startupcmd status back to the TMCC. Called by the runstartup

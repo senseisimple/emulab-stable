@@ -177,6 +177,7 @@ COMMAND_PROTOTYPE(doatarball);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
+COMMAND_PROTOTYPE(doplabconfig);
 COMMAND_PROTOTYPE(doslothdparams);
 COMMAND_PROTOTYPE(doprogagents);
 COMMAND_PROTOTYPE(dosyncserver);
@@ -220,6 +221,7 @@ struct command {
 	{ "ntpdrift",	dontpdrift},
 	{ "tarball",	doatarball},
 	{ "jailconfig",	dojailconfig},
+	{ "plabconfig",	doplabconfig},
         { "sdparams",   doslothdparams},
         { "programs",   doprogagents},
         { "syncserver", dosyncserver},
@@ -3395,6 +3397,7 @@ COMMAND_PROTOTYPE(dovnodelist)
 			sprintf(buf, "%s\n", row[0]);
 		}
 		else {
+			/* XXX Plab? */
 			sprintf(buf, "VNODEID=%s JAILED=%s\n", row[0], row[1]);
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -4507,6 +4510,56 @@ COMMAND_PROTOTYPE(dojailconfig)
 	return 0;
 }
 
+/*
+ * Return the config for a virtual Plab node.
+ */
+COMMAND_PROTOTYPE(doplabconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+
+	if (!reqp->isvnode) {
+		error("PLABCONFIG: %s: Not a vnode\n", reqp->nodeid);
+		return 1;
+	}
+	if (!reqp->allocated) {
+		error("PLABCONFIG: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+	/* XXX Check for Plab-ness */
+
+	/*
+	 * Now need the sshdport for this node.
+	 */
+	res = mydb_query("select sshdport from nodes "
+			 "where node_id='%s'",
+			 1, reqp->nodeid);
+	
+	if (!res) {
+		error("PLABCONFIG: %s: DB Error getting config!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row   = mysql_fetch_row(res);
+
+	bzero(buf, sizeof(buf));
+	sprintf(&buf[strlen(buf)], 
+		"SSHDPORT=%d\n",
+		atoi(row[0]));
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	mysql_free_result(res);
+
+	/* XXX Anything else? */
+	
+	return 0;
+}
 
 /* return slothd params - just compiled in for now. */
 COMMAND_PROTOTYPE(doslothdparams) 
