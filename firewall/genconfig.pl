@@ -1,7 +1,8 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 #
-# Generate a file of IPFW rules suitable either for feeding to IPFW or
-# for insertion in the DB.
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
 #
 use Getopt::Std;
 use English;
