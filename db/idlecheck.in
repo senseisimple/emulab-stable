@@ -161,7 +161,7 @@ my @list=();
 $cmd = "select r.pid,r.eid,swappable,expt_swapped from reserved as r
 left join experiments as e on e.pid=r.pid and e.eid=r.eid
 where (unix_timestamp(now())-unix_timestamp(expt_swapped) >= $idlesec)
-group by r.pid,r.eid order by r.pid,r.eid";
+and idle_ignore=0 group by r.pid,r.eid order by r.pid,r.eid";
 print "Sending cmd:\n$cmd\n" if $d;
 $result = DBQueryFatal($cmd);
 while(@r=$result->fetchrow()) {
