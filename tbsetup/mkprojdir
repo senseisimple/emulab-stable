@@ -1,0 +1,95 @@
+#!/usr/local/bin/perl -wT
+use Mysql;
+use English;
+
+#
+# Make a project directory hierarchy. Must be called as tbroot.
+# Creates a directory rooted /proj/pid. The directory is setuid
+# to the project leader, and setgid to the project gid. We get
+# this info from the database.
+#
+# usage: mkprojdir <pid>
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $PROJROOT = "/proj";
+my $dbh      = Mysql->connect("localhost","tbdb","script","none");
+my $db_result= "";
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: mkprojdir <pid>\n");
+}
+my $pid = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Invalid pid '$pid' contains illegal characters.\n");
+}
+
+#
+# Figure out who called us. Only root, tbroot, or people with admin status
+# in the DB can run this script.
+#
+if ($UID != 0) {
+    my ($me) = getpwuid($UID)
+	or die "$UID not in passwd file";
+    
+    $db_result = $dbh->query("select admin from users where uid='$me'");
+    my @row = $db_result->fetchrow_array();
+    if ($row[0] != 1) {
+	die("mkprojdir: You must be root or a TB administrator\n");
+    }
+}
+
+#
+# We need several bits of info from the database.
+#
+# * The project gid.
+# * The project leader uid.
+#
+$db_result = $dbh->query("select unix_gid,head_uid ".
+			 "from projects where pid='$pid'");
+if ($db_result->numrows < 1) {	
+    die("There is no project '$pid'.\n");
+}
+@row = $db_result->fetchrow_array();
+my $gid  = $row[0];
+my $head = $row[1];
+
+#
+# Okay, do it.
+#
+if (! mkdir("$PROJROOT/$pid", 0770)) {
+    die("Could not make directory $PROJROOT/$pid: $!\n");
+}
+
+my ($login,$pass,$uid) = getpwnam($head)
+    or die "$head not in passwd file";
+
+if (! chown($uid, $gid, "$PROJROOT/$pid")) {
+    die("Could not chown $PROJROOT/$pid to $uid/$gid: $!\n");
+}
+
+#
+# Make a few subdirs. If this gets long, make it a loop.
+# 
+if (! mkdir("$PROJROOT/$pid/exp", 0770)) {
+    die("Could not make directory $PROJROOT/$pid/exp: $!\n");
+}
+if (! chown($uid, $gid, "$PROJROOT/$pid/exp")) {
+    die("Could not chown $PROJROOT/$pid/exp to $uid/$gid: $!\n");
+}
+
+exit(0);
+
