@@ -140,9 +140,29 @@ function WRITESIDEBAR() {
 				       $TBBASE, "approveproject_list.php3");
 		}
 		if ($login_status & CHECKLOGIN_TRUSTED) {
-                    # Only project/group leaders can do these options
+                  # Only project/group leaders can do these options
+                  # Show a "new" icon if there are people waiting for approval
+		  $query_result =
+		    DBQueryFatal("SELECT g.* FROM group_membership as g ".
+				 "LEFT JOIN group_membership as authed ".
+				 "ON g.pid=authed.pid and g.gid=authed.gid ".
+				 "and g.uid!='$auth_usr' and g.trust='none' ".
+				 "left join users as u on u.uid=g.uid ".
+				 "WHERE u.status!='".
+				 TBDB_USERSTATUS_UNVERIFIED . "' and ".
+				 "u.status!='" . TBDB_USERSTATUS_NEWUSER .
+				 "' and authed.uid='$login_uid' and ".
+				 "(authed.trust='group_root' or ".
+				 " authed.trust='project_root') ".
+				 "ORDER BY g.uid,g.pid,g.gid");
+
+		  if (mysql_num_rows($query_result) > 0) {
+		    WRITESIDEBARBUTTON_NEW("New User Approval",
+					   $TBBASE, "approveuser_form.php3");
+		  } else {
 		    WRITESIDEBARBUTTON("New User Approval",
 				       $TBBASE, "approveuser_form.php3");
+		  }
 		}
 		
                 #
@@ -317,7 +337,7 @@ function FINISHSIDEBAR()
         <td valign="top" width=* class="rightcell">
           <table class="content" width=100% cellpadding="0" cellspacing="0">
             <tr>
-              <td class="contentheader"><h2 class="nomargin">
+              <td class="contentheader">
 <?php
 }
 
@@ -385,6 +405,7 @@ function PAGEHEADER($title) {
     PAGEBEGINNING( $title );
     WRITESIDEBAR();
     FINISHSIDEBAR();
+    echo "<h2 class=\"nomargin\">\n";
 
     if ($login_uid && ISADMININSTRATOR()) {
 	if (ISADMIN($login_uid)) {
@@ -398,8 +419,10 @@ function PAGEHEADER($title) {
                           border=0 alt='Admin Off'></a>\n";
 	}
     }
-    echo "$title</h2></td></tr>\n";
-    echo "<tr><td class=\"contentbody\" width=*>";
+    $now = date("D M d g:ia T");
+    echo "$title</h2></td>\n";
+    echo "<td class=\"contentheader\" align=right>$now</td></tr>\n";
+    echo "<tr><td colspan=2 class=\"contentbody\" width=*>";
     echo "<!-- begin content -->\n";
 }
 
