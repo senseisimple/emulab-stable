@@ -8,17 +8,18 @@
 </center>
 
 <h3>Per-Link Delays:</h3>
-In order to conserve nodes, it is possible to specify that instead of
-doing traffic shaping on separate delay nodes (which eats up a node
-for every two links), it be done on the nodes that are actually
-generating the traffic. Just like normal delay nodes, per-link delays
-use IPFW to direct traffic into the proper Dummynet pipe. On each node
-in a duplex link or lan, a set of ipfw rules and Dummynet pipes is
-setup. As traffic enters or leaves your node, ipfw looks at the packet
-and stuffs it into the proper Dummynet pipe. At the proper time,
-Dummynet takes the packet and sends it on its way. To specify this in
-your NS file, simply setup a normal link or lan, and then mark it as
-wanting to use per-link delays. For example:
+In order to conserve nodes, it is possible (when using FreeBSD) to
+specify that instead of doing traffic shaping on separate delay nodes
+(which eats up a node for every two links), it be done on the nodes
+that are actually generating the traffic. Just like normal delay
+nodes, per-link delays use IPFW to direct traffic into the proper
+Dummynet pipe. On each node in a duplex link or lan, a set of ipfw
+rules and Dummynet pipes is setup. As traffic enters or leaves your
+node, ipfw looks at the packet and stuffs it into the proper Dummynet
+pipe. At the proper time, Dummynet takes the packet and sends it on
+its way. To specify this in your NS file, simply setup a normal link
+or lan, and then mark it as wanting to use per-link delays. For
+example:
     <code><pre>
     set link0 [$ns duplex-link $nodeA $nodeD 50Mb 0ms DropTail]
     set lan0  [$ns make-lan "nodeA nodeB nodeC" 0Mb 100ms]
@@ -69,10 +70,35 @@ To prevent this problem, a shared link is automatically setup to use
 per-link delays (discussed above). Each of the links in the above
 example would get a set of DummyNet pipes restricting their bandwidth
 to 50Mbs. Each link is forced to behave just as it would if the actual
-link bandwidth were 50Mbs. The keeps the aggragate bandwidth to that
+link bandwidth were 50Mbs. The keeps the aggregate bandwidth to that
 which can be supported by the underlying physical link (on fxp0,
 100Mbs). Of course, the same caveats mentioned above for per-link
-delays applies when using shared links. 
+delays applies when using shared links.
+
+<br>
+<br>
+As a concrete example on Emulab.Net, consider the following NS file
+which creates a router and attaches it to 12 other nodes:
+    <code><pre>
+    set maxnodes 12
+
+    set router [$ns node]
+
+    for {set i 1} {$i <= $maxnodes} {incr i} {
+        set node($i) [$ns node]
+
+        set link($i) [$ns duplex-link $node($i) $router 30Mb 10ms DropTail]
+        tb-set-link-emulated $link($i) 1
+    }
+    # Turn on routing.
+    $ns rtproto Static 					</code></pre>
+
+Since each node on Emulab.Net has 4 100Mbs interfaces, the above
+mapping would not be possible without the use of shared links.
+However, since each link is defined to use 30Mbs, by using shared
+links, the 12 links can be multiplexed over the four physical
+interfaces, without oversubscribing the 400Mbs aggregate bandwidth
+available to the node that is assigned to the router. 
 
 <h3>Technical Discussion:</h3>
 
@@ -146,11 +172,12 @@ matching on the nexthop address, but seeing as we are kernel hackers,
 this is easy to deal with by adding new syntax to ipfw to allow
 matching on nexthop:
     <code><pre>
-    ipfw add ... out xmit fxp0 nexthop 192.168.2.3 </code></pre>
+    ipfw add ... out xmit fxp0 nexthop 192.168.2.3:255.255.255.0 </code></pre>
 
 Now, no matter how the user alters the routing table, packets will be
 stuffed into the proper pipe since the nexthop indicates which
-directly connected virtual link the packet was sent over.  
+directly connected virtual link the packet was sent over. The use of a
+mask allows for matching when directly connected to a lan (a simplification).
 
 <br>
 <br>
@@ -158,4 +185,4 @@ Shared lans present even worse problems because of the need to figure
 out which flow a incoming packet is part of. When a packet arrives at
 an interface, there is nothing in the packet to indicate which IP
 alias the packet was intended for (or which it came from) when the
-packet is not destined for the local node (is being forwarded). 
+packet is not destined for the local node (is being forwarded).
