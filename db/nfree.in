@@ -41,6 +41,8 @@ my $pendingeid  = "reloadpending";
 my $reloadeid   = "reloading";
 my $oldreserved_pid = OLDRESERVED_PID;
 my $oldreserved_eid = OLDRESERVED_EID;
+my $lockedpid   = NFREELOCKED_PID();
+my $lockedeid   = NFREELOCKED_EID();
 
 my @nodes;
 my @freed_nodes=();
@@ -165,10 +167,6 @@ if (@ARGV) {
 #
 ######################################################################
 
-# Form a unique temporary EID. I want this to be unique in case something
-# goes wrong, and they get left in the DB.
-my $lockedeid = "nfree-locked-$PID";
-
 DBQueryFatal("lock tables reserved write");
 
 foreach my $n (@nodes) {
@@ -197,7 +195,7 @@ foreach my $n (@nodes) {
 	# Move to locked reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
 	if (! DBQueryWarn("update reserved " .
-			  "set vname='$n', pid='$reloadpid', eid='$lockedeid', ".
+			  "set vname='$n', pid='$lockedpid', eid='$lockedeid', ".
 			  "old_pid='', old_eid='' ".
 			  "where node_id='$n'")) {
 	    print "*** WARNING: Error locking down node $n!\n";
@@ -233,13 +231,12 @@ foreach my $n (@freed_nodes) {
     # Find the default values for its node type.
     my $result =
 	DBQueryFatal("select nt.osid, " .
-		     "       n.def_boot_osid,n.def_boot_path, ".
-		     "       nt.isvirtnode, nt.imageable ".
+		     "       nt.isvirtnode, nt.imageable, o.mustclean ".
 		     " from nodes as n " .
 		     "left join node_types as nt on n.type=nt.type " .
+		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "where node_id='$n'");
-    my ($osid, $def_boot_osid, $def_boot_path,
-	$isvirt, $imageable) = $result->fetchrow_array();
+    my ($osid, $isvirt, $imageable, $clean) = $result->fetchrow_array();
 
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
@@ -249,17 +246,12 @@ foreach my $n (@freed_nodes) {
     if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
 	$mustclean = 0;
-    } elsif (! defined($def_boot_osid) ||
-	 (defined($def_boot_path) && $def_boot_path ne "")) {
-	$mustclean = 1;
-    } else {
-	my $result =
-	    DBQueryFatal("select mustclean from os_info " .
-			 "where osid='$def_boot_osid'");
-	if ($result->numrows()) {
-	    ($mustclean) = $result->fetchrow_array();
-	}
     }
+    elsif (defined($clean)) {
+	# If def_boot_osid set, then $clean is defined. Otherwise not set
+	# so default to cleaning node. 
+	$mustclean = $clean;
+    } 
 
     # Clean up interfaces by clearing IPs and/or aliases.
     if (! ($n =~ /sh\d+/)) {
@@ -274,22 +266,12 @@ foreach my $n (@freed_nodes) {
 		    "where node_id='$n'") || $error++;
     }
 
-    # Map the default OSID to something that is actually loaded on the
-    # machine. I think this is a hack, but its the best I can come up
-    # with right now.
-    if (! $isvirt && $imageable) {
-	my $mapped_osid = MapNodeOSID($n, $osid);
-	if ($mapped_osid) {
-	    $osid = $mapped_osid;
-	}
-    }
-
     my $allocFreeState = TBDB_ALLOCSTATE_FREE_DIRTY();
 
     DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
 		"tarballs='',failureaction='fatal', routertype='none', ".
 		"def_boot_cmd_line='',next_boot_cmd_line='', ".
-		"temp_boot_osid='', ".
+		"temp_boot_osid='',next_boot_osid='', ".
 		"update_accounts=0,ipport_next=ipport_low, ".
 		"sfshostid=NULL,allocstate='$allocFreeState' ".
 		"where node_id='$n'") || $error++;
