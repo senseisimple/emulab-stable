@@ -21,7 +21,7 @@
  * Desc: Simple object tracking example
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: simple.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: simple.c,v 1.2 2004-12-15 05:04:32 johnsond Exp $
  ***************************************************************************/
 
 #include <math.h>
@@ -58,8 +58,7 @@ int main(int argc, char **argv)
   if (tmpdir == NULL)
     tmpdir = "/tmp";
 
-  snprintf(ipcfilename,sizeof(ipcfilename),"%s/mezz_instance%s.ipc",
-		   tmpdir,argv[1]);
+  snprintf(ipcfilename,sizeof(ipcfilename),"%s",argv[1]);
   
   // Initialise the IPC
   if (mezz_init(0,ipcfilename) < 0)
