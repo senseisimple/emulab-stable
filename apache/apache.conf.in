@@ -241,7 +241,7 @@ LoadModule headers_module     libexec/apache/mod_headers.so
 LoadModule usertrack_module   libexec/apache/mod_usertrack.so
 LoadModule unique_id_module   libexec/apache/mod_unique_id.so
 LoadModule setenvif_module    libexec/apache/mod_setenvif.so
-LoadModule php3_module        libexec/apache/libphp3.so
+LoadModule php4_module        libexec/apache/libphp4.so
 LoadModule auth_mysql_module  libexec/apache/libauth_mysql.so
 <IfDefine SSL>
 LoadModule ssl_module         libexec/apache/libssl.so
@@ -284,7 +284,7 @@ AddModule mod_usertrack.c
 AddModule mod_unique_id.c
 AddModule mod_so.c
 AddModule mod_setenvif.c
-AddModule mod_php3.c
+AddModule mod_php4.c
 AddModule mod_auth_mysql.c
 <IfDefine SSL>
 AddModule mod_ssl.c
@@ -812,16 +812,20 @@ ServerSignature On
     # AddType allows you to tweak mime.types without actually editing it, or to
     # make certain files to be certain types.
     #
-    # For example, the PHP 3.x module (not part of the Apache distribution - see
-    # http://www.php.net) will typically use:
+    # For example, the PHP 3.x module (not part of the Apache distribution -
+    # see http://www.php.net) will typically use:
     #
-    AddType application/x-httpd-php3 .php3
-    AddType application/x-httpd-php3-source .phps
+    <IfModule mod_php3.c>
+        AddType application/x-httpd-php3 .php3
+        AddType application/x-httpd-php3-source .php3s
+    </IfModule>
     #
     # And for PHP 4.x, use:
     #
-    #AddType application/x-httpd-php .php
-    #AddType application/x-httpd-php-source .phps
+    <IfModule mod_php4.c>
+        AddType application/x-httpd-php .php .php3
+        AddType application/x-httpd-php-source .phps
+    </IfModule>
 
     AddType application/x-tar .tgz
 

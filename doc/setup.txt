@@ -26,7 +26,7 @@ L isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server
   linuxthreads-2.1.3_2 POSIX pthreads implementation using rfork to generate ker
   mhash-0.8.9         Library provides an easy way to access strong hashes such
   mod_auth_mysql-2.20 Allows users to use MySQL databases for user authenticatio
-  mod_php3-3.0.18     PHP3 module for Apache
+  mod_php4-4.1.1      PHP4 module for Apache
   mysql-client-3.23.36 Multithreaded SQL database (client)
   mysql-server-3.23.36 Multithreaded SQL database (server)
   otcl-1.0a6          MIT Object Tcl
@@ -42,18 +42,9 @@ L p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1
   tcl-sql-20000114_1  TCL module for accessing MySQL databases
 L ucd-snmp-4.2        An extendable SNMP implimentation
 
-IMPORTANT: php3 has some security vulernabilities, detailed at:
-http://www.cert.org/advisories/CA-2002-05.html
-When building mod_php3, make sure to apply the patch found at:
-http://www.php.net/do_download.php?download_file=mime.c.diff-3.0.gz
-(To do this with a FreeBSD port, do a 'make configure', change into the
-'work' directory to apply the patch, then return to the normal make procedure)
-The latest version of the ports collection (but not the one that came with
-FreeBSD 4.3) may have this patch applied already.
-
-IMPORTANT: The mhash package should be installed _before_ the mod_php3 port is
-built. When building mod_php3, you will be given a menu to choose the various
-features you want support for. Make sure to select support for mhash .
+IMPORTANT: The mhash package should be installed _before_ the mod_php4 port is
+built. When building mod_php4, you will be given a menu to choose the various
+features you want support for. Make sure to select support for mhash.
 
 Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
 scripts, requires tcl82. When you install the tcl-sql package, it will be put
@@ -215,11 +206,11 @@ Stick:
 named_enable="YES"
 in /etc/rc.conf
 
-apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
-3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
-newer versions are likely to work as well.) We have an auto-generated config
-file that you can install by changing to the apache subdir of your build tree
-and running 'gmake install'. Some apache installations may expect to find their
+apache - You should have installed apache with mod_ssl, and php4.
+have an auto-generated config file that you can install by changing to
+the apache subdir of your build tree and running 'gmake install'.
+
+Some apache installations may expect to find their
 config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
 ours gets installed.) Just symlink apache.conf to httpd.conf if you have
 trouble with this. Also our config file expects to find SSL certificates in:
