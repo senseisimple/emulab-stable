@@ -55,7 +55,7 @@ SHOWPROJECT($pid, $uid);
 $query_result =
     DBQueryFatal("SELECT m.*,u.* FROM group_membership as m ".
 		 "left join users as u on u.uid=m.uid ".
-		 "WHERE pid='$pid' and gid='$pid'");
+		 "WHERE pid='$pid' and gid='$pid' order by u.uid");
 if (mysql_num_rows($query_result)) {
     echo "<center>
           <h3>Project Members</h3>
@@ -100,7 +100,7 @@ if (mysql_num_rows($query_result)) {
 # A list of project experiments.
 #
 $query_result =
-    DBQueryFatal("SELECT eid,expt_name FROM experiments WHERE pid='$pid'");
+    DBQueryFatal("SELECT eid,expt_name FROM experiments WHERE pid='$pid' order by eid");
 if (mysql_num_rows($query_result)) {
     echo "<center>
           <h3>Project Experiments</h3>
