@@ -11,17 +11,36 @@ use XML::Parser;
 #
 # Load average metric to use
 #
-my $LOADMETRIC = "load_fifteen";
+my $LOADMETRIC;
+if (TBSiteVarExists("plab/load_metric")) {
+    $LOADMETRIC = TBGetSiteVar("plab/load_metric");
+    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
+	undef $LOADMETRIC;
+    }
+}
+if (!defined($LOADMETRIC)) {
+    $LOADMETRIC = "load_fifteen";
+}
 
 #
 # Load average at which we stop considering a node available
 #
-my $MAXLOAD   = 5.0;
+my $MAXLOAD = 5.0;
+if (TBSiteVarExists("plab/max_load")) {
+    $MAXLOAD = TBGetSiteVar("plab/max_load");
+}
+$MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
+$MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
 
 #
 # Minimum percentage of free space on disk below which we will not allocate
 #
-my $MINDISK   = 10.0;
+my $MINDISK = 10;
+if (TBSiteVarExists("plab/min_disk")) {
+    $MINDISK = TBGetSiteVar("plab/min_disk");
+}
+$MINDISK = 0 if $MINDISK < 0;
+$MINDISK = 100 if $MINDISK > 100;
 
 #
 # Drift to allow between our clock and the gmond nodes
@@ -120,7 +139,9 @@ if (defined($options{"f"})) {
     }
 }
 
-print "\n=== plabmetrics running at " . `date`
+print "\n=== plabmetrics ".
+    "(metric=$LOADMETRIC, maxload=$MAXLOAD, mindisk=$MINDISK) ".
+    "running at " . `date`
     if $debug;
 
 #
@@ -237,7 +258,11 @@ sub InsertMetrics()
 	# Load must be under MAXLOAD, favor those with lower load
 	#
 	$load = $metrics{$LOADMETRIC};
-	$scaled = $load / $MAXLOAD;
+	if ($MAXLOAD > 0) {
+	    $scaled = $load / $MAXLOAD;
+	} else {
+	    $scaled = 999.0;
+	}
 		
 	#
 	# Plab people request that we not start jobs on nodes
