@@ -10,7 +10,7 @@ $query_result = mysql_db_query($TBDBNAME,
 	"SELECT n.node_id, n.type, nt.class, j.pid, j.eid, j.vname ".
         "FROM nodes AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
         "LEFT JOIN node_types AS nt ON n.type=nt.type ".
-	"WHERE role='testnode' ORDER BY type,priority");
+	"WHERE role='testnode' ORDER BY priority,type");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting node reservation status: $err\n", 1);
