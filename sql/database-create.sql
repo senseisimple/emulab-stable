@@ -348,6 +348,7 @@ CREATE TABLE experiments (
   modelnet_edges tinyint(4) unsigned NOT NULL default '0',
   modelnetcore_osname varchar(20) default NULL,
   modelnetedge_osname varchar(20) default NULL,
+  elab_in_elab tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
@@ -1878,6 +1879,7 @@ CREATE TABLE virt_nodes (
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   fixed text NOT NULL,
+  inner_elab_role enum('boss','ops','node') default NULL,
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 

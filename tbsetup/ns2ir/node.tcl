@@ -75,6 +75,7 @@ Node instproc init {s} {
     $self set startup ""
     $self set tarfiles ""
     $self set failureaction "fatal"
+    $self set inner_elab_role ""
     $self set fixed ""
     $self set nseconfig ""
 
@@ -120,6 +121,7 @@ Node instproc updatedb {DB} {
     $self instvar iplist
     $self instvar tarfiles
     $self instvar failureaction
+    $self instvar inner_elab_role
     $self instvar routertype
     $self instvar fixed
     $self instvar agentlist
@@ -216,8 +218,16 @@ Node instproc updatedb {DB} {
     $self add_routes_to_DB $DB
 
     # Update the DB
-    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ] [list $self $type $ipraw $osid $cmdline $rpms $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
+    set fields [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ]
+    set values [list $self $type $ipraw $osid $cmdline $rpms $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
 
+    if { $inner_elab_role != "" } {
+	lappend fields "inner_elab_role"
+	lappend values $inner_elab_role
+    }
+
+    $sim spitxml_data "virt_nodes" $fields $values
+    
     # Put in the desires, too
     foreach desire [lsort [array names desirelist]] {
 	set weight $desirelist($desire)

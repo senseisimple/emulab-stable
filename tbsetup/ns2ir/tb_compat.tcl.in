@@ -1346,3 +1346,32 @@ proc tb-set-modelnet-physnodes {cores edges} {
     set modelnet_cores $cores
     set modelnet_edges $edges
 }
+
+#
+# Mark this experiment as an elab in elab.
+#
+proc tb-elab-in-elab {onoff} {
+    var_import ::GLOBALS::elab_in_elab
+
+    if {$onoff} {
+	set elab_in_elab 1
+    } else {
+	set elab_in_elab 0
+    }
+}
+
+#
+# Set the inner elab role for a node.
+#
+proc tb-set-node-inner-elab-role {node role} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-inner-elab-role] $node is not a node."
+	return
+    }
+    if {[lsearch -exact {boss ops node} $role] == -1} {
+	perror "\[tb-set-node-inner-elab-role] type must be one of boss|ops|node"
+	return
+    }
+    $node set inner_elab_role $role
+}
+

@@ -2038,3 +2038,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	UPDATE os_info SET nextosid='MAP:osid_map' \
 	  WHERE osname IN ('RHL-STD','FBSD-STD');
+
+1.276: Add inner_elab_role for elab-in-elab. Add elab_in_elab boolean
+       to the experiments table. Not sure these will survive.
+
+	alter table experiments add elab_in_elab tinyint(1) NOT NULL \
+		default '0' after modelnetedge_osname;
+
+	alter table virt_nodes add \
+	      inner_elab_role enum('boss', 'ops', 'node') \
+	      default NULL after fixed;
+

@@ -253,6 +253,9 @@ namespace eval GLOBALS {
     # wants thrown at the problem.
     variable modelnet_cores 0
     variable modelnet_edges 0
+
+    # Is an inner elab experiment.
+    variable elab_in_elab 0
 }
 
 # Load all our classes

@@ -269,6 +269,7 @@ Simulator instproc run {} {
     var_import ::TBCOMPAT::eventtypes
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
+    var_import ::GLOBALS::elab_in_elab
     
     # Fill out IPs
     if {! $use_ipassign } {
@@ -440,6 +441,11 @@ Simulator instproc run {} {
 	lappend values $modelnet_cores
 	lappend fields "modelnet_edges"
 	lappend values $modelnet_edges
+    }
+    
+    if {$elab_in_elab} {
+	lappend fields "elab_in_elab"
+	lappend values 1
     }
     
     $self spitxml_data "experiments" $fields $values
