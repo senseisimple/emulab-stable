@@ -1,0 +1,44 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# XXX ONLY RUN THIS INSTALL ON A TESTBED NODE!
+#
+# These things need to be installed into the right place on a testbed
+# node before cutting an image. This directory is installed first,
+# followed by the system-specific directory.
+#
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= tmcd/common/config
+
+SCRIPTS		= $(addprefix $(SRCDIR)/, \
+                    rc.config rc.misc rc.mounts rc.accounts rc.route \
+		    rc.tunnels rc.ifconfig rc.delays rc.hostnames rc.syncserver \
+		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
+		    rc.startcmd rc.simulator)
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+DESTDIR		=
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+TBBINDIR	= $(DESTDIR)/usr/testbed/bin
+TBLIBDIR	= $(DESTDIR)/usr/testbed/lib
+
+install:
+	@echo "You should probably not run this install directly!"
+
+script-install:
+	$(INSTALL_PROGRAM) $(SRCDIR)/librc.pm $(BINDIR)/librc.pm
+	$(INSTALL_PROGRAM) $(SCRIPTS) $(BINDIR)/rc
