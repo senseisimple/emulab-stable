@@ -1110,6 +1110,7 @@ CREATE TABLE projects (
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
   pcremote_ok set('pcplabphys','pcron','pcwa') default NULL,
+  default_user_interface enum('emulab','plab') NOT NULL default 'emulab',
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid),
   KEY approved (approved),
