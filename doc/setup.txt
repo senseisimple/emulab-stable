@@ -151,6 +151,14 @@ TransferLog /usr/testbed/log/apache_access_log
 Make sure SSL and mod_php are enabled (which is done for you if you install the
 FreeBSD port)
 
+Cron jobs: We currently have two cron jobs running for the testbed. Both can be
+run out of /etc/crontab
+45	1	*	*	*	root	/usr/testbed/sbin/backup
+*/5	*	*	*	*	tbroot	/usr/testbed/sbin/node_status
+(note that the second one is run as the 'tbroot' user, but can be run as any
+user that has read/write access to the database.)
+Don't forget to HUP cron!
+
 ##### Last-minute synching
 Right before bringing the new boss node online (if copying from an old boss node),
 make sure to have copy over the latest versions of:
