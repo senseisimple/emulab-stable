@@ -207,6 +207,7 @@ while (my %row = $db_result->fetchhash()) {
 	print "Skipping os_setup for $node cause its a robot.\n";
 	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	next;
     }
     elsif ($subnode) {
 	print "Will skip subnode $node ISUP wait.\n";
