@@ -18,6 +18,7 @@ cvsupd-bin-16.1     A general network file distribution system optimized for CV
 fping-2.2b1         Quickly ping N hosts w/o flooding the network
 gmake-3.79.1        GNU version of 'make' utility
 isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server c
+linuxthreads-2.1.3_2 POSIX pthreads implementation using rfork to generate kern
 mod_auth_mysql-2.20 Allows users to use MySQL databases for user authentication
 mod_php3-3.0.18     PHP3 module for Apache
 mysql-client-3.23.36 Multithreaded SQL database (client)
