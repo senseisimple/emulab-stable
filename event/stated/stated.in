@@ -50,6 +50,11 @@ use Sys::Syslog;
 # Do lots of db retries before we fail and die
 $libdb::DBQUERY_MAXTRIES = 5;
 
+# Set up some notification throttling
+my $mailgap = 15;		# in seconds
+my $lastmail = time() - $mailgap + 2; # Send a digest of startup msgs after 2s.
+my %msgs = ();
+
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
@@ -123,11 +128,6 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 
 # This only gets used here, so it isn't in a lib constant.
 my $TBFREENODE = "FREENODE";
-
-# Set up some notification throttling
-my $mailgap = 15;		# in seconds
-my $lastmail = time() - $mailgap + 2; # Send a digest of startup msgs after 2s.
-my %msgs = ();
 
 my $pidfile;
 if ( $TB eq $REALTB ) {
