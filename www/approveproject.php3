@@ -22,7 +22,7 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
-    USERERROR("You do not have admin privledges to approve projects!", 1);
+    USERERROR("You do not have admin privileges to approve projects!", 1);
 }
 
 echo "<center><h1>
