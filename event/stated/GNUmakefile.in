@@ -1,0 +1,12 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/stated
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:	$(addprefix $(INSTALL_SBINDIR)/, stated)
