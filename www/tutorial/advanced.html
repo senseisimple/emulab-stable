@@ -85,8 +85,7 @@ can modify to suit your needs (<em>currently, there are two queue
 objects per duplex link; one for each direction. You need to set the
 parameters for both directions, which means you can set the parameters
 asymmetrically if you want</em>). The following parameters can be
-changed, and are defined in the NS manual (see Section 7.3). <b>Note,
-only duplex links have queue objects, lans do not</b>.
+changed, and are defined in the NS manual (see Section 7.3).
 	<code><pre>
 	set queue0 [[$ns link $nodeA $nodeB] queue]
 	$queue0 set gentle_ 0
@@ -97,6 +96,30 @@ only duplex links have queue objects, lans do not</b>.
 	$queue0 set thresh_ 5
 	$queue0 set linterm_ 10
 	$queue0 set q_weight_ 0.002</code></pre>
+</p>
+
+<p>
+In the case of a LAN, there is a single queue object for every node
+that is a member of the LAN and it refers to the node-to-lan direction.
+The only special case is a 100Mb 0ms LAN that does <b>not</b> use 
+<a href="/doc/docwrapper.php3?docname=linkdelays.html#LINKDELAYS">end node shaping</a>.
+No queue object is available in that case. Here is an example
+that illustrates how to get handles on the queue objects of a LAN
+so as to change the parameters:
+	<code><pre>
+	set n0 [$ns node]
+	set n1 [$ns node]
+	set n2 [$ns node]
+
+	set lan0 [$ns make-lan "$n0 $n1 $n2" 100Mb 0ms]
+
+	set q0 [[$ns lanlink $lan0 $n0] queue]
+	set q1 [[$ns lanlink $lan0 $n1] queue]
+	set q2 [[$ns lanlink $lan0 $n2] queue]
+
+	$q0 set limit_ 20
+	...
+	</code></pre>
 </p>
 
 <p>
