@@ -134,12 +134,13 @@ sub ReadTranslationTable {
   while (@row = $sth->fetchrow_array()) {
     my @list = split(" ",$row[1]);
     foreach $port (@list) {
+      if ($port =~ /^(sh\d+)-\d(:.*)$/) { $port = "$1$2"; }
       my ($node,$card) = split(":",$port);
       if ($card =~ /[a-zA-Z]/) {
 	# specified ala ethX
 	my $sth2 = $dbh->
-	  query("select card from interfaces where node_id='$node' ".
-		"and iface='$card'");
+	  query("select card from interfaces where (node_id='$node' ".
+		"or node_id='$node-1') and iface='$card'");
 	$card = ($sth2->fetchrow_array())[0];
 	print "Had '$port', changed to '$node:$card'\n" if $debug > 2;
 	$port = "$node:$card";
