@@ -46,10 +46,8 @@ define("CHECKLOGIN_PLABUSER",		0x80000);
 #
 # Constants for tracking possible login attacks.
 #
-define("DOLOGIN_MAXUSERATTEMPTS",	8);
-define("DOLOGIN_MAXUSERWAITTIME",	100);	# Seconds
-define("DOLOGIN_MAXIPATTEMPTS",		8);
-define("DOLOGIN_MAXIPWAITTIME",		120);	# Seconds
+define("DOLOGIN_MAXUSERATTEMPTS",	15);
+define("DOLOGIN_MAXIPATTEMPTS",		25);
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -446,7 +444,7 @@ function ISPLABUSER() {
 	}
     } else {
 	#
-	# For logged-in users, we've recorded it in the the login status
+	# For logged-in users, we recorded it in the the login status
 	#
 	return (($CHECKLOGIN_STATUS &
 		 (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_PLABUSER)) ==
@@ -517,10 +515,10 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	$usr_email   = $row['usr_email'];
 	$usr_name    = $row['usr_name'];
 
-	# Check for frozen accounts, and for too many failures within
-	# the last N minutes.
+	# Check for frozen accounts. We do not update the IP record when
+	# an account is frozen.
 	if ($frozen) {
-	    DBQueryFatal("update users set , ".
+	    DBQueryFatal("update users set ".
 			 "       weblogin_failcount=weblogin_failcount+1, ".
 			 "       weblogin_failstamp='$now' ".
 			 "where uid='$uid'");
@@ -530,16 +528,9 @@ function DOLOGIN($token, $password, $adminmode = 0) {
         $encoding = crypt("$password", $db_encoding);
         if (strcmp($encoding, $db_encoding)) {
 	    #
-	    # Bump count and check for too many failures within the
-	    # last minute.
+	    # Bump count and check for too many consecutive failures.
 	    #
 	    $failcount++;
-	    if (($failstamp && $now - $failstamp > DOLOGIN_MAXUSERWAITTIME) ||
-		!$failstamp) {
-		$failstamp = $now;
-		$failcount = 1;
-	    }
-
 	    if ($failcount > DOLOGIN_MAXUSERATTEMPTS) {
 		$frozen = 1;
 	    
@@ -556,7 +547,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 
 	    DBQueryFatal("update users set weblogin_frozen='$frozen', ".
 			 "       weblogin_failcount='$failcount', ".
-			 "       weblogin_failstamp='$failstamp' ".
+			 "       weblogin_failstamp='$now' ".
 			 "where uid='$uid'");
             break;
         }
@@ -638,37 +629,39 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 		     "       weblogin_failcount=0,weblogin_failstamp=0 ".
 		     "where uid='$uid'");
 
+	# Clear IP record since we have a sucessful login from the IP.
+	if (isset($IP)) {
+	    DBQueryFatal("delete from login_failures where IP='$IP'");
+	}
 	return 0;
       }
     } while (0);
     #
     # No such user
     #
-    if (!isset($IP))
+    if (!isset($IP)) {
 	return -1;
-    
+    }
+	
+    $ipfrozen = 0;
     if (isset($iprow)) {
 	$ipfailcount = $iprow['failcount'];
-	$ipfailstamp = $iprow['failstamp'];
 
         #
-        # Bump count and check for too many (8) failures within the
-        # last 2 minutes. Note that aging is passive; we do not have
-        # a daemon cleaning out old records, so we have to age on the fly. 
+        # Bump count.
         #
 	$ipfailcount++;
-	if (($ipfailstamp && $now - $ipfailstamp > DOLOGIN_MAXIPWAITTIME) ||
-	    !$ipfailstamp) {
-	    $ipfailstamp = $now;
-	    $ipfailcount = 1;
-	}
     }
     else {
+	#
+	# First failure.
+	# 
 	$ipfailcount = 1;
-	$ipfailstamp = $now;
-	$ipfrozen    = 0;
     }
-    
+
+    #
+    # Check for too many consecutive failures.
+    #
     if ($ipfailcount > DOLOGIN_MAXIPATTEMPTS) {
 	$ipfrozen = 1;
 	    
@@ -684,7 +677,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 		 "       IP='$IP', ".
 		 "       frozen='$ipfrozen', ".
 		 "       failcount='$ipfailcount', ".
-		 "       failstamp='$ipfailstamp'");
+		 "       failstamp='$now'");
     return -1;
 }
 
