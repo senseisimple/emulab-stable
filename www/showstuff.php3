@@ -267,8 +267,11 @@ function SHOWGROUPMEMBERS($pid, $gid, $prived = 0) {
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
-              <th>Name</th>
-              <th>UID</th>
+              <th>Name</th>\n";
+    if (strcmp($pid, $gid)) {
+	echo "<th>Email</th>\n";
+    }
+    echo "    <th>UID</th>
               <th>Privs</th>\n";
     if ($showdel) {
 	echo "<th>Remove</th>\n";
@@ -278,11 +281,15 @@ function SHOWGROUPMEMBERS($pid, $gid, $prived = 0) {
     while ($row = mysql_fetch_array($query_result)) {
         $target_uid = $row[uid];
 	$usr_name   = $row[usr_name];
+	$usr_email  = $row[usr_email];
 	$trust      = $row[trust];
 
         echo "<tr>
-                  <td>$usr_name</td>
-                  <td>
+                  <td>$usr_name</td>\n";
+	if (strcmp($pid, $gid)) {
+	    echo "<td>$usr_email</td>\n";
+	}
+	echo "    <td>
                     <A href='showuser.php3?target_uid=$target_uid'>
                        $target_uid</A>
                   </td>\n";
