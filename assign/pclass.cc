@@ -63,6 +63,15 @@ struct hashlinkinfo {
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
   typedef hash_multiset<link_info,hashlinkinfo> link_set;
+
+  // The unique flag is used to signify that there is some reason that assign
+  // is not aware of that the node is unique, and shouldn't be put into a
+  // pclass. The usual reason for doing this is for scoring purposes - ie.
+  // don't prefer one just because it's the same pclass as another that, in
+  // reality, is very different.
+  if (a->unique || b->unique) {
+      return 0;
+  }
   
   // check type information
   for (tb_pnode::types_map::iterator it=a->types.begin();

@@ -166,6 +166,10 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 		    // an actual pnode later
 		    p->subnode_of_name = value;
 		}
+	    } else if (flag.compare("unique") == 0) {
+		// Means that we should never put this pnode into a ptype with
+		// other pnodes
+		p->unique = true;
 	    } else {
 		ptop_error("Bad flag given: " << flag << ".");
 	    }

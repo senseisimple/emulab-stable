@@ -78,7 +78,8 @@ public:
 			  total_bandwidth(0), my_class(NULL),
 			  my_own_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0), subnode_of(NULL),
-			  subnode_of_name(""), has_subnode(false) {;}
+			  subnode_of_name(""), has_subnode(false),
+			  unique(false) {;}
 
   class type_record {
       public:
@@ -146,6 +147,10 @@ public:
                                 // used to do late bindind
 
   bool has_subnode;		// whether or not this node has any subnodes
+
+  bool unique;		// says that this pnode should never go into a
+  				// pclass with other nodes, because of some
+				// characteristic that is not known to assign
 	
   bool set_current_type(crope type) {
       if (types.find(type) == types.end()) {
