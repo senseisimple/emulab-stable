@@ -226,6 +226,7 @@ foreach my $uid (@userlist) {
 	    next;
 	}
 	push(@groupnames, "guest");
+	goto nogroups;
     }
     else {
 	while (@db_row = $query_result->fetchrow_array() ) {
@@ -233,6 +234,9 @@ foreach my $uid (@userlist) {
 	}
     }
 
+    #
+    # Okay, pick up subgroup (pid!=gid) membership.
+    # 
     $query_result =
 	DBQueryFatal("select g.unix_name from group_membership as m ".
 		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
@@ -243,8 +247,39 @@ foreach my $uid (@userlist) {
 	push(@groupnames, $db_row[0]);
     }
 
-    print "Processing user $uid: @groupnames\n";
+    if (0) {
+    #
+    # Okay, this join looks for project/group roots in the pid, and finds
+    # any subgroups they are not members of. The intent is that project
+    # and group roots in the pid, should be able to read files in the
+    # subgroups, even if they are not actual members of the group in the DB.
+    # The reason they do not want to be actual members in the DB is cause
+    # we do *not* want to export home dirs to experimental nodes, or otherwise
+    # hand out sensitive info.
+    #
+    # XXX Not in use cause NGROUPS=16. Too Low!
+    #
+    $query_result =
+	DBQueryFatal("select distinct gn.pid,gn.gid,g.unix_name ".
+		     "  from group_membership as gp ".
+		     "left join group_membership as gn on ".
+		     "     gn.pid=gp.pid and gn.pid!=gn.gid ".
+		     "left join group_membership as go on go.uid=gp.uid and ".
+		     "     go.pid=gn.pid and go.gid=gn.gid ".
+		     "left join groups as g on gn.pid=g.pid and gn.gid=g.gid ".
+		     "where go.uid is null and gn.uid is not null and ".
+		     "      gp.uid='$uid' and gp.pid=gp.gid and ".
+		     "      (gp.trust='group_root' or ".
+		     "       gp.trust='project_root')");
 
+    while (@db_row = $query_result->fetchrow_array() ) {
+	print "Would also add $uid to $db_row[0]/$db_row[1]\n";
+#	push(@groupnames, $db_row[0]);
+    }
+    }
+
+  nogroups:
+    print "Processing user $uid: @groupnames\n";
     #
     # Construct an appropriate group list for the pw commands. Main project
     # is the first on the list, and that becomes the primary group. The rest
