@@ -330,8 +330,10 @@ if { $simcode_present == 1 } {
     
     # Disabling and Enabling interfaces so that routes are all
     # flushed and we can start cleanly
-    exec $CLIENTVARDIR/boot/rc.ifc disable
-    exec $CLIENTVARDIR/boot/rc.ifc enable
+    if { [file exists $CLIENTVARDIR/boot/rc.ifc] } { 
+    	exec $CLIENTVARDIR/boot/rc.ifc disable
+	exec $CLIENTVARDIR/boot/rc.ifc enable
+    }
     
     # Now, we configure IPTaps for links between real and simulated nodes
     set i 0    
@@ -443,6 +445,8 @@ set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
 set simobjname [$ns set tbname]
 set nseswap_cmdline "$CLIENTBINDIR/tevc -s $boss -e $pid/$eid now $simobjname NSESWAP SIMHOST=$vnode"
 
+set pktrate_logpath "/proj/$pid/exp/$eid/logs/nse-vnodepktrate-$vnode.log"
+
 # Configuring the Scheduler to monitor the event system
 set evsink [new TbEventSink]
 $evsink event-server "elvin://$boss"
@@ -469,5 +473,20 @@ if { [info exists tbroutes] } {
 # first event
 $ns at 0.0 {exec echo "Informing the testbed that we're up and running ..." > /dev/console}
 $ns at 0.0 "exec $CLIENTBINDIR/tmcc state ISUP"
+
+proc write-vnode-pktrate {} {
+    global pktrate_logpath
+    set f [open $pktrate_logpath w]
+    foreach nodeinst [concat [Node info instances] [Node/MobileNode info instances]] {
+
+	if { [$nodeinst info vars tbname] == {} } {
+	    continue
+	}
+	set tbnodename [$nodeinst set tbname]
+	set pktrate [$nodeinst get-pktrate]
+	puts $f "$tbnodename=$pktrate"
+    }
+    close $f
+}
 
 $ns run
