@@ -183,3 +183,15 @@ ID  Name                            Members of VLAN
       Console> (enable) clear vlan <NUM>
    ... where <NUM> is the VLAN number (duh!) NOTE: This puts all of the VLANs ports
      back into VLAN 1, and disables them. Use 'set port enable <PORT>' to re-enable it
+
+9. Cloning all traffic from a port or VLAN to another port
+   Pick a port to recieve the traffic - let's call it <monitor>
+   To forward the traffc from one port:
+      Console> (enable) set span <port> <monitor>
+   To forward the traffic from an entire VLAN:
+      Console> (enable) set span <vlan #> <monitor>
+   NOTE: You want want to append 'rx' or 'tx' to the VLAN command line, or
+      you'll get doubles of everything (incoming and outgoing both)
+   To stop cloning:
+      Console> (enable) set span disable <monitor>
+
