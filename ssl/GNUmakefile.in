@@ -54,6 +54,30 @@ server.pem:	dirsmade server.cnf ca.cnf
 	cat server_key.pem server_cert.pem > server.pem
 	rm -f newreq.pem
 
+capture.pem:	dirsmade capture.cnf ca.cnf
+	#
+	# Create the server side private key and certificate request.
+	#
+	openssl req -new -config capture.cnf \
+		-keyout capture_key.pem -out capture_req.pem
+	#
+	# Combine key and cert request.
+	#
+	cat capture_key.pem capture_req.pem > newreq.pem
+	#
+	# Sign the capture cert request, creating a capture certificate.
+	#
+	openssl ca -batch -policy policy_match -config ca.cnf \
+		-out capture_cert.pem \
+		-cert cacert.pem -keyfile cakey.pem \
+		-infiles newreq.pem
+	#
+	# Combine the key and the certificate into one file which is installed
+	# on boss and used by capture.
+	#
+	cat capture_key.pem capture_cert.pem > capture.pem
+	rm -f newreq.pem
+
 localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh localnode
 
@@ -76,7 +100,8 @@ install:
 	@echo "BE VERY CAREFUL! INSTALLING NEW CERTS CAN CAUSE DISASTER!"
 
 boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
-		$(INSTALL_ETCDIR)/server.pem
+		$(INSTALL_ETCDIR)/server.pem \
+		$(INSTALL_ETCDIR)/capture.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 
 client-install:
