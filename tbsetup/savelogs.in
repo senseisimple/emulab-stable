@@ -20,6 +20,11 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
 if (@ARGV != 2) {
 	&usage;
 }
