@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -114,6 +114,34 @@ if ($query_result->numrows) {
 	printf("%-12s %-8s %-12s %-12s %-22s %s\n",
 	       $pid, $hours, $eid, $creator, $swapped, $count);
     }
+}
+
+#
+# Look for real nodes in hwdown.
+#
+$DPID = NODEDEAD_PID();
+$DEID = NODEDEAD_EID();
+
+if (! ($query_result = 
+       DBQueryWarn("select r.node_id,rsrv_time from reserved as r ".
+		   "left join nodes as n on n.node_id=r.node_id ".
+		   "left join node_types as nt on nt.type=n.type ".
+		   "where r.pid='$DPID' and r.eid='$DEID' and ".
+		   "      nt.isremotenode=0 ".
+		   "order by rsrv_time desc"))) {
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "----------------------------------------------------------------\n";
+    print "\n";
+    print "Nodes stuck in emulab-ops/hwdown:\n";
+    
+    while (my ($node_id) = $query_result->fetchrow()) {
+	print "$node_id ";
+    }
+    print "\n";
 }
 
 #
