@@ -27,6 +27,8 @@ int parse_top(tb_vgraph &G, istream& i)
   char inbuf[255];
   char n1[32], n2[32], type[32];
   int num_nodes = 0;
+  int bw;
+  int r;
   
   while (!i.eof()) {
     char *ret;
@@ -67,17 +69,18 @@ int parse_top(tb_vgraph &G, istream& i)
       }
     }
     else if (!strncmp(inbuf, "link", 4)) {
-      if (sscanf(inbuf, "link %s %s", n1, n2) != 2) {
+      r=sscanf(inbuf, "link %s %s %d", n1, n2,&bw);
+      if (r < 2) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
+	if (r == 2) bw = 10;
 	string s1(n1);
 	string s2(n2);
 	edge e;
 	node node1 = nmap.access(s1);
 	node node2 = nmap.access(s2);
 	e = G.new_edge(node1, node2);
-	// XXX - add more bandwidth code
-	G[e].bandwidth = 10;
+	G[e].bandwidth = bw;
 	G[e].type = tb_vlink::LINK_UNKNOWN;
 	G[e].plink = NULL;
 	G[e].plink_two = NULL;
