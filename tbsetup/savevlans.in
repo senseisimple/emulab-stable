@@ -8,8 +8,6 @@ my $TBROOT = "@prefix@";
 
 $ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
 
-open(LIST,"snmpit -l |") || die ("savevlans: couldn't run snmpit: $!\n");
-
 my $time = `date +20%y%m%d-%H.%M.%S`;
 chomp ($time);
 my $name = "$TBROOT/backup/vlans-$time";
@@ -22,13 +20,17 @@ use Fcntl;
 sysopen(OUT, $name, (O_WRONLY | O_EXCL | O_CREAT) ) || 
   die ("savevlans: couldn't open '$name' for writing: $!\n");
 
+open(LIST,"snmpit -l |") || die ("savevlans: couldn't run snmpit: $!\n");
+
 print OUT "START vlan\n";
 while(<LIST>) {
   chop;
   if (/(^ID)|(^--)|(^1 )/) { next; }
   s/[\t ]+/ /g;
-  /(\d+)\s+(\S+)\s+(.*)/;
-  if ($2 ne "System") { 
+  /(\d+)\s+(\S+)\s+(.*)?/;
+  if (!defined $3) { next; }
+  #print "split to $1, $2, $3\n";
+  if ($2 ne "default") { 
     (my $name, my @IDs) = ($2,split(" ",$3));
     print OUT "$name @IDs\n";
   }
