@@ -20,9 +20,6 @@ else {
 }
 LOGGEDINORDIE($uid);
 
-$foo = GENKEY($uid);
-echo "Key = $foo";
-
 ?>
 
 <h1>New User Verification</h1>
