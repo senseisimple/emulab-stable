@@ -402,19 +402,19 @@ elsif ($doplab) {
 	#
 	# Parent waits for reboot/halt/kill signal
 	#
+	waitpid($vserverpid, 0);
+	# Boot process is done, but, unlike in a jail, this has nothing
+	# to do with the vserver going away.  However, by waitpid'ing,
+	# rc.vinit doesn't zombify.
 	while (1) {
-	    sleep 5;
+	    sleep(30);
 
 	    if ($rebooting) {
-		# Kill all processes except me
-		killvserver();
-
 		$rebooting = 0;
 		goto REBOOT;
 	    }
+	    # A kill or a halt will be done through the signal handler
 	}
-	# kill or halt (equivalent in vserver)
-	cleanup();
     }
     else {
 	exec("$BINDIR/rc.inplab");
@@ -452,6 +452,7 @@ sub killvnode() {
 	die("*** $0:\n".
 	    "    Bad data in pid: $mpid!\n");
     }
+
     my $sigtosend = ($haltit ? 'TERM' : 'USR1');
 	
     if (kill($sigtosend, $mpid) == 0) {
@@ -462,14 +463,24 @@ sub killvnode() {
     #
     # Wait for the pidfile to be removed. Do not wait too long though. 
     # 
-    for (my $i = 0; $i < 30;) {
-	sleep(2);
-	if (! -e $pidfile) {
-	    return 0;
+    my $i = 0;
+    while (-e $pidfile) {
+	if ($i >= 30) {
+	    print "*** Not able to kill running vnode manager process ".
+		"$mpid!\n";
+	    last;
 	}
+	sleep(2);
 	$i += 2;
     }
-    print "*** Not able to kill running vnode manager process $mpid!\n";
+
+    if ($doplab) {
+	# On Plab, the running vnodesetup does not take care of shutting
+	# down the vserver.  Instead, the signalling vnodesetup does.
+	# Otherwise, the running vnodesetup would happily kill off this
+	# vnodesetup and Emulab would never hear back from it.
+	killvserver();
+    }
     return 0;
 }
 
@@ -520,19 +531,24 @@ sub cleanup()
 	}
 	waitpid($jailpid, 0);
 	undef($jailpid);
+
+	#
+	# Kill off everything else (unnecessary in a vserver)
+	#
+	$SIG{TERM} = 'IGNORE';
+	kill('TERM', -$pgrp);
+	print "Waiting 5 seconds for process group to die off ...\n";
+	sleep(5);
     }
 
     #
-    # Kill off vserver
+    # Don't do anything to kill off vserver, because the signalling
+    # process will take care of it
     #
     if (defined($vserverpid)) {
-	killvserver();
+	print "Letting signalling process take down vserver.\n";
     }
 
-    $SIG{TERM} = 'IGNORE';
-    kill('TERM', -$pgrp);
-    print "Waiting 5 seconds for process group to die off ...\n";
-    sleep(5);
     if (! $leavejail) {
 	removeconfdir(CONFDIR());
     }
@@ -558,11 +574,21 @@ sub reboot()
 	undef($jailpid);
     }
 
-    $SIG{TERM} = 'IGNORE';
-    kill('TERM', -$pgrp);
-    print "Waiting 5 seconds for process group to die off ...\n";
-    sleep(5);
-    $SIG{TERM} = \&handler;
+    if (defined($vserverpid)) {
+	# Kill all processes except me
+	killvserver();
+	undef($vserverpid);
+    }
+    else {
+	#
+	# Kill off everything else (unnecessary in a vserver)
+	#
+	$SIG{TERM} = 'IGNORE';
+	kill('TERM', -$pgrp);
+	print "Waiting 5 seconds for process group to die off ...\n";
+	sleep(5);
+	$SIG{TERM} = \&handler;
+    }
 }
 
 #
@@ -571,30 +597,81 @@ sub reboot()
 #
 sub killvserver()
 {
-    print "Killing all processes in vserver ...\n";
+    sub getanyppid($) {
+	my ($pid) = @_;
 
-    foreach my $signal ('TERM', 'TERM', 'TERM', 'KILL') {
-	# Works on Linux ps, but isn't portable
-	my @processes = `ps -eo pid,comm --no-headers`;
-
-	foreach my $process (@processes) {
-	    if ($process =~ /\s*([0-9]*)\s*(.*)/) {
-		$procpid = $1;
-		$procname = $2;
-
-		if ($procpid == 1 || $procpid == $PID) { next; }
-		if ($procname eq 'vnodesetup') { next; }
-
-		print "Sending $signal to $procpid ($procname)\n";
-		kill($signal, $procpid);
+	# XXX This is super-duper system dependent
+	if (-e "/proc/$pid/stat") {
+	    # Linux
+	    open(STAT, "/proc/$pid/stat")
+		or die("Unable to get ppid of $pid");
+	    $statline = <STAT>;
+	    close(STAT);
+	    
+	    if ($statline =~ /^\d+ \([-\@.\w]+\) \w (\d+)/) {
+		return $1;
 	    }
 	    else {
-		warn("*** Bad ps line: $process\n");
+		warn("Bad stat line: $statline\n");
 	    }
 	}
-
-	sleep 1;
+	else {
+	    # FreeBSD (Not used in reality, but useful for testing)
+	    open(STAT, "/proc/$pid/status")
+		or die("Unable to get ppid of $pid");
+	    $statline = <STAT>;
+	    close(STAT);
+	    
+	    if ($statline =~ /^[-\@.\w]+ \d+ (\d+)/) {
+		return $1;
+	    }
+	    else {
+		warn("Bad stat line: $statline\n");
+	    }
+	}
     }
+
+    $SIG{TERM} = 'IGNORE';
+    foreach my $signal ('TERM', 'KILL') {
+	my ($any, %pids);
+
+	print "Sending $signal to all processes in vserver ...\n";
+
+	opendir(PROC, "/proc") or die("Could not open /proc: $!");
+	foreach my $procfile (readdir(PROC)) {
+	    if ($procfile =~ /^(\d+)$/) {
+		$pid = $1;
+		$pids{$pid} = getanyppid($pid);
+	    }
+	}
+	closedir(PROC);
+
+	# Remove this process and all parents
+	delete($pids{0});
+	delete($pids{1});
+	my $pid;
+	$pid = $PID;
+	my $ppid;
+	while (defined($pids{$pid})) {
+	    $ppid = $pids{$pid};
+	    delete($pids{$pid});
+	    $pid = $ppid;
+	}
+
+	while (($pid, $ppid) = each %pids) {
+	    $ppid = getanyppid($pid);
+	    if ($pid <= 1 || $pid == $PID) { next; }
+	    
+	    if ($debug) {
+		print "Sending $signal to $pid\n";
+	    }
+	    kill($signal, $pid);
+	    $any = 1;
+	}
+
+	sleep(5) if ($any);
+    }
+    $SIG{TERM} = \&handler;
 }
 
 #
