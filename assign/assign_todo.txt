@@ -118,3 +118,10 @@ This is the current TODO list for assign (not in order by priority):
    don't keep track of any nodes we might have foribly unmapped to try to open
    up a mapping for an unassignable vnode. Doesn't seem to hurt anything, so is
    low priority
+
+13.  add type-count checks
+
+   A common swapin failure comes become there are not, for example, enough
+   pc600s. Should be easy to count up the total number of slots for each time,
+   and the required slots, and exit with a good error message if it's not going
+   to be mappable, based on this type information.
