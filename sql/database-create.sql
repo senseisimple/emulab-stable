@@ -490,7 +490,6 @@ CREATE TABLE nodes (
   routertype enum('none','ospf','static','manual') NOT NULL default 'none',
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
-  eventstatus tinytext,
   eventstate varchar(10) default NULL,
   state_timestamp int(10) unsigned default NULL,
   op_mode varchar(10) default NULL,
