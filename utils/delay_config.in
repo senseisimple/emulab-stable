@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 my $TB = "@prefix@";
+my $debug=0;
 
 push(@INC, "$TB/lib");
 require libdb;
@@ -24,20 +25,27 @@ my $eid = shift || "";
 my $link = shift || "";
 
 my $sth = 
-  DBQueryFatal("select node_id,card0,card1,delay,bandwidth,lossrate from ".
+  DBQueryFatal("select node_id,iface0,iface1,delay,bandwidth,lossrate from ".
 	       "delays where pid='$pid' and eid='$eid' and vname='$link'");
 
 my @row= $sth->fetchrow_array();
 if (!@row) { die("Link $link in proj. $pid, expt. $eid, not found.\n"); }
 my $node = $row[0];
-my $pipe1= $row[1]*10 + 110;
-my $pipe2= $row[2]*10 + 110;
+$row[1] =~ /^[a-zA-Z]*(\d*)$/;
+my $card0 = $1;
+my $pipe1= $card0*10 + 110;
+$row[2] =~ /^[a-zA-Z]*(\d*)$/;
+my $card1 = $1;
+my $pipe2= $card1*10 + 110;
 my $delay= $row[3];
 my $bw= $row[4];
 my $unit= "M";
 my $plr= $row[5];
 
-print "Found $node($pipe1,$pipe2), delay $delay, bw $bw$unit, plr $plr\n";
+if ($debug) {
+  print "Found row in delays table: ", join (", ",@row),"\n";
+  print "Found $node($pipe1,$pipe2), delay $delay, bw $bw$unit, plr $plr\n";
+}
 
 my $n;
 while (defined ($n = shift)) {
@@ -78,10 +86,10 @@ sub applyChanges {
   my $ssh2 = "ssh -f -n $node 'sudo /sbin/ipfw pipe $pipe1 config $cmd1'";
   if ($cmd1 ne "") {
     if ($cmd2 ne "") {
-      print "$ssh1\n";
+      if ($debug) { print "$ssh1\n"; }
       system($ssh1) && die("Command '$ssh1' failed: $!\n");
     } else {
-      print "$ssh2\n";
+      if ($debug) { print "$ssh2\n"; }
       system($ssh2) && die("Command '$ssh2' failed: $!\n");
     }
   }
