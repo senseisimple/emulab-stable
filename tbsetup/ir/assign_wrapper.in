@@ -258,7 +258,7 @@ foreach $link (keys(%links)) {
 	# a node<->hub<->node<->link<->node<->hub<->node
 	# when actually want a traversal of
 	# node<->hub<->link<->hub<->node
-	$delayinfo{$link} = [$bw,$delay,$loss]
+	$delayinfo{$link} = [$bw,$delay,$loss];
 	printdb "delayinfo{$link} = [" . join(",",@{$delayinfo{$link}}) . "]\n";
 	
 	# Remove the original link
