@@ -225,6 +225,28 @@ elseif (isset($dodelete) && $dodelete != "") {
 if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
     PAGEHEADER("Set Node Location");
 
+    $building_result =
+	DBQueryFatal("select b.building,b.title,f.floor,f.thumb_path ".
+		     "   from buildings as b ".
+		     "left join floorimages as f on f.building=b.building " .
+		     "order by b.building,f.floor");
+
+    if (! mysql_num_rows($building_result)) {
+	USERERROR("There is no floormap data in the DB!", 1);
+    }
+
+    # Ha.
+    $floortags = array();
+    $floortags[1] = "1st floor";
+    $floortags[2] = "2nd floor";   
+    $floortags[3] = "3rd floor";
+    $floortags[4] = "4th floor";
+    $floortags[5] = "5th floor";
+    $floortags[6] = "6th floor";
+    $floortags[7] = "7th floor";
+    $floortags[8] = "8th floor";
+    $floortags[9] = "9th floor";
+
     echo "<center>\n";
 
     if (isset($old_building)) {
@@ -233,24 +255,61 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
     }
 
     echo "<font size=+2>Pick a floor, any floor</font><br><br>\n";
+    echo "<table>\n";
 
-    echo "<table>
-          <tr>
-            <td>
-               <a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
-                  <img src=meb3fl-thumb.png></a>
-            </td>
-            <td>
-               <a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
-                 <img src=meb4fl-thumb.png></a>
-            </td>
-          </tr>
-          <tr>
-          <td align=center>MEB 3rd Floor</td>
-          <td align=center>MEB 4th Floor</td>
-          </tr>
-          </table>\n";
-    
+    $maxcol = 2;
+    $i = 0;
+    $titles = array();
+
+    #
+    # XXX This will need to be generalized to multiple buildings at some
+    # point; right now just throw up a set of thumb images in a single 
+    # table. Not very pretty.
+    #
+    while ($row = mysql_fetch_array($building_result)) {
+	$building = $row["building"];
+	$title    = $row["title"];
+	$floor    = $row["floor"];
+	$thumb    = $row["thumb_path"];
+
+	if ($i == $maxcol) {
+	    #
+	    # Start a new row. Keeps the window reasonably narrow.
+	    # We have to put the titles in for the previous row before
+	    # starting the next row; see below where we have to do this
+	    # when the table is finished. 
+	    #
+	    echo "</tr><tr>\n";
+	    for ($i = 0 ; $i < $maxcol; $i++) {
+		echo "<td align=center>" . $titles[$i] . "</td>\n";
+	    }
+	    echo "</tr><tr>\n";
+	    $i = 0;
+	}
+	
+	echo "<td>
+                <a href='setnodeloc.php3?node_id=$node_id".
+	               "&building=$building&floor=$floor'>
+                   <img src=$thumb></a>
+              </td>\n";
+	$titles[$i] = "$title - " . $floortags[$floor];
+	$i++;
+    }
+    # Finish out previous row.
+    while ($i < $maxcol) {
+	echo "<td></td>";
+	$titles[$i] = "";
+	$i++;
+    }
+    echo "</tr>";
+    # Then stick in the title row.
+    echo "<tr>";
+    for ($i = 0 ; $i < $maxcol; $i++) {
+	echo "<td align=center>" . $titles[$i] . "</td>\n";
+    }
+    echo "</tr>\n";
+
+    echo "</table>\n";
     echo "</center>\n";
 
     PAGEFOOTER();

@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use File::Basename;
 
 #
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
@@ -17,15 +18,17 @@ sub usage {
     print STDERR "[-e <pid,eid>] [<building>]\n";
     exit(-1);
 }
-my $optlist  = "df:o:e:t";
+my $optlist  = "df:o:e:ta";
 my $debug    = 0;
 my $notitles = 0;
-my $building = "MEB";
+my $showany  = 0;	# When showing specific floor, showany is turned on.
+my $building;
 my $floor;
 my $image;
 my $pid;
 my $eid;
-my @areamaps = ();
+my @areamaps   = ();
+my %baseimages = ();
 my $prefix = "/tmp/floormap";
 
 #
@@ -41,14 +44,33 @@ use libdb;
 use GD;
 
 #
-# Hardwire the imagemaps for now. This needs to go into the DB in some format.
+# Gather image data from DB.
 #
-my %baseimages =
-    ("MEB"	=> { "title"	=> "Merril Engineering Building",
-		     "floors"	=> { 3 => "$TB/www/meb3fl.png",
-				     4 => "$TB/www/meb4fl.png"}
-		   }
-     );
+my $query_result =
+    DBQueryFatal("select b.building,b.title,f.floor,f.image_path ".
+		 "   from buildings as b ".
+		 "left join floorimages as f on f.building=b.building");
+
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    There is no building/floor data in the DB!\n");
+}
+
+while (my ($building,$title,$floor,$image) = $query_result->fetchrow_array()) {
+    if (!exists($baseimages{$building})) {
+	$baseimages{$building} = {};
+	$baseimages{$building}->{"title"}  = $title;
+	$baseimages{$building}->{"floors"} = {};
+    }
+    $image = "$TB/www/$image"
+	if (dirname($image) eq ".");
+
+    if (! -e $image) {
+	die("*** $0:\n".
+	    "    $image does not exist!\n");
+    }
+    $baseimages{$building}->{"floors"}->{$floor} = $image;
+}
 
 # Ha.
 my @floortags = ();
@@ -86,6 +108,9 @@ sub adjustmap($$$);
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"a"})) {
+    $showany = 1;
+}
 if (defined($options{"d"})) {
     $debug = 1;
 }
@@ -93,7 +118,8 @@ if (defined($options{"t"})) {
     $notitles = 1;
 }
 if (defined($options{"f"})) {
-    $floor = $options{"f"};
+    $floor   = $options{"f"};
+    $showany = 1;
 }
 if (defined($options{"o"})) {
     $prefix = $options{"o"};
@@ -130,13 +156,15 @@ if (defined($options{"e"})) {
 elsif (@ARGV == 1) {
     $building = $ARGV[0];
 }
-else {
-    # XXX We default to MEB above. Change later. 
-    ;
+
+# Must specify a building with a floor.
+if (defined($floor) && !defined($building)) {
+    die("*** $0:\n".
+	"    Must supply a building name!\n");
 }
 
-# Building must exist. Someday deal with multiple buildings. 
-if (!exists($baseimages{$building})) {
+# Building must exist.
+if (defined($building) && !exists($baseimages{$building})) {
     die("*** $0:\n".
 	"    No such building: $building\n");
 }
@@ -159,10 +187,29 @@ else {
     #
     my @floors = ();
 
-    foreach my $floor (sort(keys(%{ $baseimages{$building}->{"floors"} }))) {
-	my ($floorimage, $areamap) = dofloor($building, $floor);
+    if (defined($building)) {
+	foreach my $floor (sort(keys(%{ $baseimages{$building}->{"floors"} }))) {
+	    my ($floorimage, $areamap) = dofloor($building, $floor);
 
-	push(@floors, [ $floorimage, $areamap ]);
+	    push(@floors, [ $floorimage, $areamap ])
+		if (defined($floorimage));
+	}
+    }
+    else {
+	#
+	# XXX We need to be fancier for multiple buildings at some point!
+	# Not much of a worry right now.
+	#
+	foreach my $building (sort(keys(%baseimages))) {
+	    my @floorlist = sort(keys(%{ $baseimages{$building}->{"floors"} }));
+	    
+	    foreach my $floor (@floorlist) {
+		my ($floorimage, $areamap) = dofloor($building, $floor);
+
+		push(@floors, [ $floorimage, $areamap ])
+		    if (defined($floorimage));
+	    }
+	}
     }
 
     #
@@ -213,6 +260,21 @@ sub dofloor($$)
 {
     my ($building, $floor) = @_;
 
+
+    #
+    # Grab the nodes on this floor in this building. We want to know
+    # their allocation status so we know what colors to use.
+    # 
+    my $query_result =
+	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname ".
+		     "  from location_info as loc ".
+		     "left join reserved as r on r.node_id=loc.node_id ".
+		     "where loc.floor='$floor' and loc.building='$building'");
+
+    if (!$query_result->numrows && !$showany) {
+	return (undef, undef);
+    }
+
     #
     # The area map is indexed by nodeid, and contains a list of the
     # x1,y1,x2,y2 (upper left, lower right) coordinates of the "hot"
@@ -251,16 +313,6 @@ sub dofloor($$)
     my $white = $baseimage->colorAllocate(255,255,255);
     my $CY    = 10;
     my $CX    = 10;
-
-    #
-    # Grab the nodes on this floor in this building. We want to know
-    # their allocation status so we know what colors to use.
-    # 
-    my $query_result =
-	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname ".
-		     "  from location_info as loc ".
-		     "left join reserved as r on r.node_id=loc.node_id ".
-		     "where loc.floor='$floor' and loc.building='$building'");
 
     while (my $rowref = $query_result->fetchrow_hashref()) {
 	my $nodeid = $rowref->{"node_id"};

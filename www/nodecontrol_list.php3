@@ -45,7 +45,7 @@ else {
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
-               <a href='floormap.php3?building=MEB'>wireless</a>,
+               <a href='floormap.php3'>wireless</a>,
                <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
