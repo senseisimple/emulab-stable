@@ -294,8 +294,8 @@ sub plabnode($$$$) {
                 "    Uh oh, wait() returned a negative number");
         }
         elsif ($childpid != $plabpid) {
-            die("*** $0:\n".
-                "    Whoops! pid returned by wait() != pid ".
+            warn("*** $0:\n".
+                "    Hmm, pid returned by wait() != pid ".
                 "from fork().");
         }
         
