@@ -3891,7 +3891,7 @@ sub CreateTopFile()
 		my $bandwidth = &getbandwidth($node, $lan, $bw);
 		    
 		print TOPFILE "link $plink $node fakelan/$lan $bandwidth " .
-		    "0 0 wireless\n";
+		    "0 0 80211\n";
 	    }
 	}
 	elsif ($#members == 1) {
