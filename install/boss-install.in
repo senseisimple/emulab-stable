@@ -323,13 +323,19 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
-    Phase "snmpd", "Removing snmpd starup script",  sub {
+    Phase "snmpd", "Removing snmpd startup script",  sub {
 	DoneIfDoesntExist("$RCDIR/snmpd.sh");
 	if (!unlink "$RCDIR/snmpd.sh") {
 	    PhaseFail("Unable to remove $RCDIR/snmpd.sh: $!");
 	}
     };
-    Phase "dhcpd", "Removing isc-dhcpd starup script",  sub {
+    Phase "rsyncd", "Removing rsyncd startup script",  sub {
+	DoneIfDoesntExist("$RCDIR/rsyncd.sh");
+	if (!unlink "$RCDIR/rsyncd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/rsyncd.sh: $!");
+	}
+    };
+    Phase "dhcpd", "Removing isc-dhcpd startup script",  sub {
 	DoneIfDoesntExist("$RCDIR/isc-dhcpd.sh");
 	if (!unlink "$RCDIR/isc-dhcpd.sh") {
 	    PhaseFail("Unable to remove $RCDIR/isc-dhcpd.sh: $!");
